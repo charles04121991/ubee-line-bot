@@ -1,14 +1,13 @@
 {
   "name": "ubee-line-bot",
   "version": "1.0.0",
-  "description": "UBee 城市任務 LINE Bot",
+  "description": "UBee LINE 任務建立 / 立即估價系統",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.7.2",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "axios": "^1.8.4",
+    "express": "^4.21.2"
   }
 }
