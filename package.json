@@ -1,5 +1,5 @@
 {
-  "name": "ubee-line-bot",
+  "name": "ubee-webhook",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
