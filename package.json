@@ -1,7 +1,7 @@
 {
   "name": "ubee-line-bot",
   "version": "1.0.0",
-  "description": "UBee LINE 任務建立 / 立即估價系統",
+  "description": "UBee LINE bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
