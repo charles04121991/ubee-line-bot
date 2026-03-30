@@ -9,8 +9,6 @@ const config = {
 };
 
 const client = new line.Client(config);
-
-// 之後抓到群組 ID 再填進來
 const GROUP_ID = process.env.GROUP_ID || '';
 
 const userState = {};
@@ -19,27 +17,33 @@ app.get('/', (req, res) => {
   res.send('UBee Webhook OK');
 });
 
-app.post('/webhook', line.middleware(config), (req, res) => {
-  res.status(200).send('OK');
-
-  req.body.events.forEach((event) => {
-    handleEvent(event);
-  });
+app.post('/webhook', line.middleware(config), async (req, res) => {
+  try {
+    await Promise.all(req.body.events.map(handleEvent));
+    res.status(200).end();
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).end();
+  }
 });
 
-function handleEvent(event) {
+async function handleEvent(event) {
   console.log('收到 event:', JSON.stringify(event, null, 2));
 
-  if (event.source.type === 'group') {
+  if (event.source && event.source.type === 'group') {
     console.log('群組ID:', event.source.groupId);
   }
 
   if (event.type !== 'message' || event.message.type !== 'text') {
-    return;
+    return null;
   }
 
   const userId = event.source.userId;
   const text = event.message.text.trim();
+
+  if (!userId) {
+    return replyText(event.replyToken, '目前僅支援使用者私訊操作');
+  }
 
   if (!userState[userId]) {
     userState[userId] = {
@@ -55,7 +59,6 @@ function handleEvent(event) {
     state.mode = 'order';
     state.step = 'pickup_address';
     state.data = {};
-
     return replyText(event.replyToken, '請輸入【取件地點】');
   }
 
@@ -63,12 +66,9 @@ function handleEvent(event) {
     state.mode = 'estimate';
     state.step = 'pickup_address';
     state.data = {};
-
     return replyText(
       event.replyToken,
-      `您可以先快速取得任務費用估算，請提供：
-
-取件地點：`
+      '您可以先快速取得任務費用估算，請提供：\n\n取件地點：'
     );
   }
 
@@ -94,11 +94,16 @@ function handleEvent(event) {
 
   if (state.step === 'delivery_address') {
     state.data.delivery_address = text;
-    state.step = state.mode === 'order' ? 'delivery_phone' : 'item_content';
-    return replyText(
-      event.replyToken,
-      state.mode === 'order' ? '請輸入【送達電話】' : '請輸入【物品內容】'
-    );
+
+    if (state.mode === 'order') {
+      state.step = 'delivery_phone';
+      return replyText(event.replyToken, '請輸入【送達電話】');
+    }
+
+    if (state.mode === 'estimate') {
+      state.step = 'item_content';
+      return replyText(event.replyToken, '請輸入【物品內容】');
+    }
   }
 
   if (state.step === 'delivery_phone') {
@@ -115,16 +120,14 @@ function handleEvent(event) {
 
   if (state.step === 'is_urgent') {
     state.data.is_urgent = text;
-    
+
     if (state.mode === 'estimate') {
       const result = calculatePrice(state.data);
-
-      userState[userId] = null;
+      delete userState[userId];
 
       return replyText(
         event.replyToken,
-        `您可以先快速取得任務費用估算，結果如下：
-
+        `您可以先快速取得任務費用估算，請參考：\n
 取件地點：${state.data.pickup_address}
 送達地點：${state.data.delivery_address}
 物品內容：${state.data.item_content}
@@ -173,38 +176,31 @@ function handleEvent(event) {
 物品：${state.data.item_content}
 急件：${state.data.is_urgent}`;
 
-    userState[userId] = null;
+    delete userState[userId];
 
-    replyText(event.replyToken, customerMessage);
+    await replyText(event.replyToken, customerMessage);
 
     if (GROUP_ID) {
-      pushToGroup(groupMessage);
+      await pushToGroup(groupMessage);
     }
 
-    return;
+    return null;
   }
 
-  return replyText(
-    event.replyToken,
-    '請輸入「建立任務」或「立即估價」'
-  );
+  return replyText(event.replyToken, '請輸入「建立任務」或「立即估價」');
 }
 
 function replyText(replyToken, text) {
   return client.replyMessage(replyToken, {
     type: 'text',
-    text
-  }).catch((err) => {
-    console.error('reply error:', err);
+    text: text
   });
 }
 
 function pushToGroup(text) {
   return client.pushMessage(GROUP_ID, {
     type: 'text',
-    text
-  }).catch((err) => {
-    console.error('push group error:', err);
+    text: text
   });
 }
 
@@ -214,15 +210,13 @@ function calculatePrice(data) {
   const timeFee = 50;
   const urgentFee = data.is_urgent === '是' ? 100 : 0;
 
-  const total = baseFee + distanceFee + timeFee + urgentFee;
-
   return {
-    fee: total,
+    fee: baseFee + distanceFee + timeFee + urgentFee,
     distance: '5公里 / 12分鐘'
   };
 }
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log('Server running on ' + port);
+  console.log(`Server running on ${port}`);
 });
