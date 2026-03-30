@@ -10,6 +10,11 @@ const config = {
 
 const client = new line.Client(config);
 
+// 之後抓到群組 ID 再填進來
+const GROUP_ID = process.env.GROUP_ID || '';
+
+const userState = {};
+
 app.get('/', (req, res) => {
   res.send('UBee Webhook OK');
 });
@@ -25,16 +30,196 @@ app.post('/webhook', line.middleware(config), (req, res) => {
 function handleEvent(event) {
   console.log('收到 event:', JSON.stringify(event, null, 2));
 
+  if (event.source.type === 'group') {
+    console.log('群組ID:', event.source.groupId);
+  }
+
   if (event.type !== 'message' || event.message.type !== 'text') {
     return;
   }
 
-  client.replyMessage(event.replyToken, {
+  const userId = event.source.userId;
+  const text = event.message.text.trim();
+
+  if (!userState[userId]) {
+    userState[userId] = {
+      mode: null,
+      step: null,
+      data: {}
+    };
+  }
+
+  const state = userState[userId];
+
+  if (text === '建立任務') {
+    state.mode = 'order';
+    state.step = 'pickup_address';
+    state.data = {};
+
+    return replyText(event.replyToken, '請輸入【取件地點】');
+  }
+
+  if (text === '立即估價') {
+    state.mode = 'estimate';
+    state.step = 'pickup_address';
+    state.data = {};
+
+    return replyText(
+      event.replyToken,
+      `您可以先快速取得任務費用估算，請提供：
+
+取件地點：`
+    );
+  }
+
+  if (state.step === 'pickup_address') {
+    state.data.pickup_address = text;
+
+    if (state.mode === 'order') {
+      state.step = 'pickup_phone';
+      return replyText(event.replyToken, '請輸入【取件電話】');
+    }
+
+    if (state.mode === 'estimate') {
+      state.step = 'delivery_address';
+      return replyText(event.replyToken, '請輸入【送達地點】');
+    }
+  }
+
+  if (state.step === 'pickup_phone') {
+    state.data.pickup_phone = text;
+    state.step = 'delivery_address';
+    return replyText(event.replyToken, '請輸入【送達地點】');
+  }
+
+  if (state.step === 'delivery_address') {
+    state.data.delivery_address = text;
+    state.step = state.mode === 'order' ? 'delivery_phone' : 'item_content';
+    return replyText(
+      event.replyToken,
+      state.mode === 'order' ? '請輸入【送達電話】' : '請輸入【物品內容】'
+    );
+  }
+
+  if (state.step === 'delivery_phone') {
+    state.data.delivery_phone = text;
+    state.step = 'item_content';
+    return replyText(event.replyToken, '請輸入【物品內容】');
+  }
+
+  if (state.step === 'item_content') {
+    state.data.item_content = text;
+    state.step = 'is_urgent';
+    return replyText(event.replyToken, '請輸入【是否急件】（是 / 否）');
+  }
+
+  if (state.step === 'is_urgent') {
+    state.data.is_urgent = text;
+    
+    if (state.mode === 'estimate') {
+      const result = calculatePrice(state.data);
+
+      userState[userId] = null;
+
+      return replyText(
+        event.replyToken,
+        `您可以先快速取得任務費用估算，結果如下：
+
+取件地點：${state.data.pickup_address}
+送達地點：${state.data.delivery_address}
+物品內容：${state.data.item_content}
+是否急件：${state.data.is_urgent}
+
+———
+
+📌 我們將為您即時計算預估費用（非最終報價）
+
+費用：$${result.fee}
+距離：${result.distance}`
+      );
+    }
+
+    state.step = 'note';
+    return replyText(event.replyToken, '請輸入【備註】（沒有可輸入 無）');
+  }
+
+  if (state.step === 'note') {
+    state.data.note = text;
+
+    const result = calculatePrice(state.data);
+
+    const customerMessage = `✅ 任務建立完成
+
+取件地點：${state.data.pickup_address}
+取件電話：${state.data.pickup_phone}
+
+送達地點：${state.data.delivery_address}
+送達電話：${state.data.delivery_phone}
+
+物品內容：${state.data.item_content}
+是否急件：${state.data.is_urgent}
+備註：${state.data.note}
+
+費用：$${result.fee}
+距離：${result.distance}`;
+
+    const groupMessage = `🚨 UBee 派單
+
+費用：$${result.fee}
+距離：${result.distance}
+
+取件地點：${state.data.pickup_address}
+送達地點：${state.data.delivery_address}
+物品：${state.data.item_content}
+急件：${state.data.is_urgent}`;
+
+    userState[userId] = null;
+
+    replyText(event.replyToken, customerMessage);
+
+    if (GROUP_ID) {
+      pushToGroup(groupMessage);
+    }
+
+    return;
+  }
+
+  return replyText(
+    event.replyToken,
+    '請輸入「建立任務」或「立即估價」'
+  );
+}
+
+function replyText(replyToken, text) {
+  return client.replyMessage(replyToken, {
     type: 'text',
-    text: '我有收到！'
+    text
   }).catch((err) => {
     console.error('reply error:', err);
   });
+}
+
+function pushToGroup(text) {
+  return client.pushMessage(GROUP_ID, {
+    type: 'text',
+    text
+  }).catch((err) => {
+    console.error('push group error:', err);
+  });
+}
+
+function calculatePrice(data) {
+  const baseFee = 100;
+  const distanceFee = 80;
+  const timeFee = 50;
+  const urgentFee = data.is_urgent === '是' ? 100 : 0;
+
+  const total = baseFee + distanceFee + timeFee + urgentFee;
+
+  return {
+    fee: total,
+    distance: '5公里 / 12分鐘'
+  };
 }
 
 const port = process.env.PORT || 3000;
