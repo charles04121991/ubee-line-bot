@@ -11,7 +11,9 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const PORT = process.env.PORT || 3000;
 
 if (!CHANNEL_ACCESS_TOKEN || !TARGET_GROUP_ID || !GOOGLE_MAPS_API_KEY) {
-  console.error("缺少必要環境變數：CHANNEL_ACCESS_TOKEN / TARGET_GROUP_ID / GOOGLE_MAPS_API_KEY");
+  console.error(
+    "缺少必要環境變數：CHANNEL_ACCESS_TOKEN / TARGET_GROUP_ID / GOOGLE_MAPS_API_KEY"
+  );
   process.exit(1);
 }
 
@@ -36,15 +38,13 @@ const RIDER_PRICING = {
 };
 
 /* =========================
-   工具
+   Session 工具
 ========================= */
 function getSession(userId) {
   if (!userSessions[userId]) {
     userSessions[userId] = {
       mode: null, // task / estimate
       waitingInput: false,
-      quote: null,
-      readyToConfirm: false,
     };
   }
   return userSessions[userId];
@@ -54,6 +54,9 @@ function resetSession(userId) {
   delete userSessions[userId];
 }
 
+/* =========================
+   文字工具
+========================= */
 function normalizeText(value = "") {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -95,7 +98,6 @@ async function getDistanceAndDuration(origin, destination) {
   });
 
   const data = response.data;
-
   console.log("Google Maps response:", JSON.stringify(data, null, 2));
 
   if (!data || data.status !== "OK") {
@@ -158,7 +160,7 @@ function calculateRiderPrice({ km, minutes, urgent }) {
 }
 
 /* =========================
-   解析：建立任務
+   建立任務解析
 ========================= */
 function parseTaskTemplate(text) {
   const lines = text
@@ -221,13 +223,13 @@ function parseTaskTemplate(text) {
   const isUrgent =
     urgentSource.includes("是") ||
     urgentSource.includes("急件") ||
-    urgentSource.includes("急");
+    (urgentSource.includes("急") && !urgentSource.includes("不急"));
 
   return {
     pickupAddress: normalizeText(data.pickupAddress),
-    pickupContact: normalizePhone(data.pickupContact),
+    pickupContact: normalizeText(data.pickupContact),
     deliveryAddress: normalizeText(data.deliveryAddress),
-    deliveryContact: normalizePhone(data.deliveryContact),
+    deliveryContact: normalizeText(data.deliveryContact),
     itemContent: normalizeText(data.itemContent),
     isUrgent,
     note: normalizeText(data.note),
@@ -235,7 +237,7 @@ function parseTaskTemplate(text) {
 }
 
 /* =========================
-   解析：立即估價
+   立即估價解析
 ========================= */
 function parseEstimateTemplate(text) {
   const lines = text
@@ -275,7 +277,9 @@ function parseEstimateTemplate(text) {
   }
 
   const isUrgent =
-    data.isUrgentRaw.includes("是") || data.isUrgentRaw.includes("急");
+    data.isUrgentRaw.includes("是") ||
+    data.isUrgentRaw.includes("急件") ||
+    (data.isUrgentRaw.includes("急") && !data.isUrgentRaw.includes("不急"));
 
   return {
     pickupAddress: normalizeText(data.pickupAddress),
@@ -318,6 +322,7 @@ function getTaskTemplateText() {
     "收件人 / 電話：",
     "",
     "物品內容：",
+    "",
     "是否急件：",
     "",
     "備註：",
@@ -335,26 +340,64 @@ function getEstimateTemplateText() {
     "物品內容：",
     "是否急件：",
     "",
+    "———",
+    "",
     "📌 我們將為您即時計算預估費用（非最終報價）",
   ].join("\n");
 }
 
-function buildCustomerQuoteText(quote) {
+function getTaskTemplateErrorText() {
   return [
-    "【UBee 預估報價】",
+    "您好，您尚未填寫完整資料。",
+    "",
+    "請依下列格式填寫並整段回傳：",
+    "",
+    "取件地點：",
+    "取件人 / 電話：",
+    "",
+    "送達地點：",
+    "收件人 / 電話：",
+    "",
+    "物品內容：",
+    "",
+    "是否急件：",
+    "",
+    "備註：",
+    "",
+    "※ 不配送食品、違禁品或危險物品，若為急件請於備註註明「急件」",
+  ].join("\n");
+}
+
+function getEstimateTemplateErrorText() {
+  return [
+    "您好，您尚未填寫完整估價資料。",
+    "",
+    "請提供：",
+    "",
+    "取件地點：",
+    "送達地點：",
+    "物品內容：",
+    "是否急件：",
+    "",
+    "———",
+    "",
+    "📌 我們將為您即時計算預估費用（非最終報價）",
+  ].join("\n");
+}
+
+function buildTaskCustomerReplyText(quote) {
+  return [
+    "【UBee 任務報價】",
     `取件地點：${quote.pickupAddress}`,
     `送達地點：${quote.deliveryAddress}`,
     `物品內容：${quote.itemContent}`,
-    `是否急件：${quote.isUrgent ? "是" : "否"}`,
+    `是否急件：${quote.isUrgent ? "急件" : "一般"}`,
     "",
     `配送費：$${quote.customerPrice.deliveryFee}`,
-    `會員折扣：-$${quote.customerPrice.memberDiscount}`,
-    `小計：$${quote.customerPrice.subtotal}`,
     `稅金：$${quote.customerPrice.tax}`,
-    `客人總計：$${quote.customerPrice.total}`,
+    `總計：$${quote.customerPrice.total}`,
     "",
-    "如確認送出，請回覆：確認送出",
-    "如需取消，請回覆：取消",
+    "任務已建立，我們將盡快為您安排。",
   ].join("\n");
 }
 
@@ -364,11 +407,9 @@ function buildEstimateOnlyText(quote) {
     `取件地點：${quote.pickupAddress}`,
     `送達地點：${quote.deliveryAddress}`,
     `物品內容：${quote.itemContent}`,
-    `是否急件：${quote.isUrgent ? "是" : "否"}`,
+    `是否急件：${quote.isUrgent ? "急件" : "一般"}`,
     "",
-    `配送費：$${quote.customerPrice.deliveryFee}`,
-    `會員折扣：-$${quote.customerPrice.memberDiscount}`,
-    `小計：$${quote.customerPrice.subtotal}`,
+    `預估配送費：$${quote.customerPrice.deliveryFee}`,
     `稅金：$${quote.customerPrice.tax}`,
     `預估總計：$${quote.customerPrice.total}`,
     "",
@@ -494,61 +535,34 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
+        /* ===== 建立任務入口 ===== */
         if (userText === "建立任務") {
           const current = getSession(userId);
           current.mode = "task";
           current.waitingInput = true;
-          current.quote = null;
-          current.readyToConfirm = false;
 
           await replyMessage(replyToken, getTaskTemplateText());
           continue;
         }
 
+        /* ===== 立即估價入口 ===== */
         if (userText === "立即估價") {
           const current = getSession(userId);
           current.mode = "estimate";
           current.waitingInput = true;
-          current.quote = null;
-          current.readyToConfirm = false;
 
           await replyMessage(replyToken, getEstimateTemplateText());
           continue;
         }
 
-        if (userText === "確認送出") {
-          if (!session.readyToConfirm || !session.quote || session.mode !== "task") {
-            await replyMessage(replyToken, "目前沒有可送出的任務，請先輸入：建立任務");
-            continue;
-          }
-
-          const groupText = buildGroupTaskText(session.quote, userId);
-          await pushToGroup(groupText);
-
-          await replyMessage(
-            replyToken,
-            [
-              "您的任務已成功送出 ✅",
-              `本次總計：$${session.quote.customerPrice.total}`,
-              "",
-              "我們會盡快為您安排。",
-            ].join("\n")
-          );
-
-          resetSession(userId);
-          continue;
-        }
-
+        /* ===== 建立任務：貼表單後直接派單 ===== */
         if (session.waitingInput && session.mode === "task") {
           const taskData = parseTaskTemplate(userText);
           console.log("建立任務解析結果：", taskData);
 
           const validationError = validateTaskData(taskData);
           if (validationError) {
-            await replyMessage(
-              replyToken,
-              `${validationError}\n\n請重新依格式填寫：\n\n${getTaskTemplateText()}`
-            );
+            await replyMessage(replyToken, getTaskTemplateErrorText());
             continue;
           }
 
@@ -569,7 +583,7 @@ app.post("/webhook", async (req, res) => {
             urgent: taskData.isUrgent,
           });
 
-          session.quote = {
+          const quote = {
             ...taskData,
             customerPrice,
             riderPrice,
@@ -577,23 +591,23 @@ app.post("/webhook", async (req, res) => {
             durationText: mapResult.durationText,
           };
 
-          session.waitingInput = false;
-          session.readyToConfirm = true;
+          const groupText = buildGroupTaskText(quote, userId);
+          await pushToGroup(groupText);
 
-          await replyMessage(replyToken, buildCustomerQuoteText(session.quote));
+          await replyMessage(replyToken, buildTaskCustomerReplyText(quote));
+
+          resetSession(userId);
           continue;
         }
 
+        /* ===== 立即估價：只回估價，不派單 ===== */
         if (session.waitingInput && session.mode === "estimate") {
           const estimateData = parseEstimateTemplate(userText);
           console.log("立即估價解析結果：", estimateData);
 
           const validationError = validateEstimateData(estimateData);
           if (validationError) {
-            await replyMessage(
-              replyToken,
-              `${validationError}\n\n請重新依格式填寫：\n\n${getEstimateTemplateText()}`
-            );
+            await replyMessage(replyToken, getEstimateTemplateErrorText());
             continue;
           }
 
@@ -625,8 +639,9 @@ app.post("/webhook", async (req, res) => {
             durationText: mapResult.durationText,
           };
 
-          resetSession(userId);
           await replyMessage(replyToken, buildEstimateOnlyText(quote));
+
+          resetSession(userId);
           continue;
         }
 
@@ -641,7 +656,10 @@ app.post("/webhook", async (req, res) => {
           ].join("\n")
         );
       } catch (eventError) {
-        console.error("單筆事件處理失敗：", eventError?.response?.data || eventError.message);
+        console.error(
+          "單筆事件處理失敗：",
+          eventError?.response?.data || eventError.message
+        );
 
         try {
           if (event.replyToken) {
@@ -651,7 +669,10 @@ app.post("/webhook", async (req, res) => {
             );
           }
         } catch (replyError) {
-          console.error("錯誤回覆失敗：", replyError?.response?.data || replyError.message);
+          console.error(
+            "錯誤回覆失敗：",
+            replyError?.response?.data || replyError.message
+          );
         }
       }
     }
