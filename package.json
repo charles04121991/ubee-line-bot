@@ -1,7 +1,7 @@
 {
   "name": "ubee-line-bot",
   "version": "1.0.0",
-  "description": "UBee LINE official account bot",
+  "description": "UBee 城市任務 LINE Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
