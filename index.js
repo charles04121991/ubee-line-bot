@@ -1,33 +1,16 @@
 const express = require("express");
 const crypto = require("crypto");
+const fetch = require("node-fetch");
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-/**
- * ========= 環境變數 =========
- */
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 const CHANNEL_SECRET = process.env.CHANNEL_SECRET;
 const TARGET_GROUP_ID = process.env.TARGET_GROUP_ID;
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-const PORT = process.env.PORT || 3000;
 
-/**
- * ========= 基本檢查 =========
- */
-if (!CHANNEL_ACCESS_TOKEN) {
-  console.error("缺少環境變數：CHANNEL_ACCESS_TOKEN");
-}
-if (!CHANNEL_SECRET) {
-  console.error("缺少環境變數：CHANNEL_SECRET");
-}
-if (!GOOGLE_MAPS_API_KEY) {
-  console.error("缺少環境變數：GOOGLE_MAPS_API_KEY");
-}
-
-/**
- * ========= 重要：保留 raw body 做 LINE 簽章驗證 =========
- */
+// 保留 raw body 給 LINE 驗證簽章
 app.use(
   express.json({
     verify: (req, res, buf) => {
@@ -36,16 +19,11 @@ app.use(
   })
 );
 
-/**
- * ========= 記憶體資料（單機版） =========
- * 注意：Render 重啟/重新部署後，記憶體中的資料會消失
- */
-const userSessions = new Map(); // userId -> session
-const tasks = new Map(); // taskId -> task
+// ===== 記憶體資料 =====
+const userSessions = new Map();
+const tasks = new Map();
 
-/**
- * ========= 常數設定 =========
- */
+// ===== 固定欄位 =====
 const FLOW_FIELDS = [
   { key: "pickupAddress", label: "取件地點" },
   { key: "dropoffAddress", label: "送達地點" },
@@ -70,15 +48,27 @@ const HELP_TEXT =
   "2. 立即估價\n\n" +
   "若要取消目前流程，請輸入：取消";
 
-/**
- * ========= 工具函式 =========
- */
+// ===== 工具函式 =====
+function validateEnv() {
+  const missing = [];
+
+  if (!CHANNEL_ACCESS_TOKEN) missing.push("CHANNEL_ACCESS_TOKEN");
+  if (!CHANNEL_SECRET) missing.push("CHANNEL_SECRET");
+  if (!GOOGLE_MAPS_API_KEY) missing.push("GOOGLE_MAPS_API_KEY");
+
+  if (missing.length > 0) {
+    console.error("缺少環境變數：", missing.join(", "));
+  }
+}
+
 function isLineSignatureValid(channelSecret, rawBody, signature) {
   if (!channelSecret || !rawBody || !signature) return false;
+
   const hash = crypto
     .createHmac("SHA256", channelSecret)
     .update(rawBody)
     .digest("base64");
+
   return hash === signature;
 }
 
@@ -86,23 +76,19 @@ function normalizeTaichungAddress(address) {
   let text = (address || "").trim();
   if (!text) return text;
 
-  // 沒有縣市時，自動補台中市
-  const hasCity = /台中市|臺中市/.test(text);
-  if (!hasCity) {
+  if (!/^(台中市|臺中市)/.test(text)) {
     text = `台中市${text}`;
   }
   return text;
 }
 
 function normalizeUrgentInput(text) {
-  const value = (text || "").trim();
-  if (["是", "急件", "要", "需要", "yes", "y", "1"].includes(value.toLowerCase())) {
-    return "是";
-  }
-  if (["否", "不是", "不用", "不需要", "no", "n", "0"].includes(value.toLowerCase())) {
-    return "否";
-  }
-  return value;
+  const value = (text || "").trim().toLowerCase();
+
+  if (["是", "要", "需要", "急件", "yes", "y", "1"].includes(value)) return "是";
+  if (["否", "不要", "不需要", "不是", "no", "n", "0"].includes(value)) return "否";
+
+  return (text || "").trim();
 }
 
 function isValidUrgentValue(value) {
@@ -120,19 +106,16 @@ function generateTaskId() {
 
 function getDistrict(address) {
   const text = address || "";
-  const match = text.match(/(.+?[區鄉鎮市])/);
+  const match = text.match(/([^\s]+?[區鄉鎮市])/);
   return match ? match[1] : "";
 }
 
 function formatMoney(num) {
-  return `$${Math.round(num)}`;
+  return `$${Math.round(Number(num) || 0)}`;
 }
 
 function buildMainMenuText() {
-  return (
-    "您好，這裡是 UBee 城市任務。\n\n" +
-    HELP_TEXT
-  );
+  return "您好，這裡是 UBee 城市任務。\n\n" + HELP_TEXT;
 }
 
 function buildAskText(mode, stepIndex) {
@@ -149,6 +132,18 @@ function buildTaskSummary(data) {
     `是否急件：${data.urgent}\n` +
     `聯絡電話：${data.phone}`
   );
+}
+
+function startFlow(userId, mode) {
+  userSessions.set(userId, {
+    mode,
+    stepIndex: 0,
+    data: {},
+  });
+}
+
+function clearFlow(userId) {
+  userSessions.delete(userId);
 }
 
 async function callLineReplyApi(replyToken, messages) {
@@ -205,14 +200,13 @@ async function pushText(to, text) {
 }
 
 async function getDistanceAndDuration(origin, destination) {
-  const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
-  url.searchParams.set("origins", origin);
-  url.searchParams.set("destinations", destination);
-  url.searchParams.set("mode", "driving");
-  url.searchParams.set("language", "zh-TW");
-  url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
+  const url =
+    "https://maps.googleapis.com/maps/api/distancematrix/json" +
+    `?origins=${encodeURIComponent(origin)}` +
+    `&destinations=${encodeURIComponent(destination)}` +
+    `&mode=driving&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
 
-  const res = await fetch(url.toString());
+  const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Google Maps API HTTP 錯誤：${res.status} ${text}`);
@@ -224,8 +218,11 @@ async function getDistanceAndDuration(origin, destination) {
     throw new Error(`Google Maps API 錯誤：${data.status}`);
   }
 
-  const row = data.rows?.[0];
-  const element = row?.elements?.[0];
+  const element =
+    data.rows &&
+    data.rows[0] &&
+    data.rows[0].elements &&
+    data.rows[0].elements[0];
 
   if (!element) {
     throw new Error("Google Maps API 沒有回傳距離資料");
@@ -273,21 +270,11 @@ function calculatePrice({
   const total = subtotal + tax;
 
   return {
-    km: Math.ceil(km * 10) / 10,
-    minutes: Math.ceil(minutes),
-    baseFee,
-    kmFee,
-    minuteFee,
-    crossDistrictFee,
-    urgentFee,
     deliveryFee,
     memberDiscount,
     subtotal,
     tax,
     total,
-    isCrossDistrict,
-    pickupDistrict,
-    dropoffDistrict,
   };
 }
 
@@ -310,11 +297,20 @@ function buildQuoteText(input, route, price) {
   );
 }
 
+function buildTaskCreatedText(task) {
+  return (
+    "任務已建立成功 ✅\n\n" +
+    `任務編號：${task.taskId}\n` +
+    `${buildTaskSummary(task)}\n\n` +
+    `預估總計：${formatMoney(task.price.total)}\n\n` +
+    "好的！我們會持續為您安排騎手，一有騎手接單會第一時間通知您，感謝您的耐心等候"
+  );
+}
+
 function buildGroupTaskText(task) {
   return (
     "【UBee 新任務通知】\n\n" +
     `任務編號：${task.taskId}\n` +
-    `客戶LINE ID：${task.userId}\n` +
     `取件地點：${task.pickupAddress}\n` +
     `送達地點：${task.dropoffAddress}\n` +
     `物品內容：${task.item}\n` +
@@ -326,28 +322,6 @@ function buildGroupTaskText(task) {
     `接單請輸入：接單 ${task.taskId}\n` +
     `完成送達請輸入：抵達 ${task.taskId}`
   );
-}
-
-function buildTaskCreatedText(task) {
-  return (
-    "任務已建立成功 ✅\n\n" +
-    `任務編號：${task.taskId}\n` +
-    `${buildTaskSummary(task)}\n\n` +
-    `預估總計：${formatMoney(task.price.total)}\n\n` +
-    "好的！我們會持續為您安排騎手，一有騎手接單會第一時間通知您，感謝您的耐心等候"
-  );
-}
-
-function startFlow(userId, mode) {
-  userSessions.set(userId, {
-    mode, // create / quote
-    stepIndex: 0,
-    data: {},
-  });
-}
-
-function clearFlow(userId) {
-  userSessions.delete(userId);
 }
 
 async function finalizeQuote(replyToken, userId, session) {
@@ -371,7 +345,6 @@ async function finalizeQuote(replyToken, userId, session) {
   });
 
   clearFlow(userId);
-
   await replyText(replyToken, buildQuoteText(input, route, price));
 }
 
@@ -400,7 +373,11 @@ async function finalizeCreate(replyToken, userId, session) {
   const task = {
     taskId,
     userId,
-    ...input,
+    pickupAddress: input.pickupAddress,
+    dropoffAddress: input.dropoffAddress,
+    item: input.item,
+    urgent: input.urgent,
+    phone: input.phone,
     route,
     price,
     status: "pending",
@@ -422,11 +399,9 @@ async function finalizeCreate(replyToken, userId, session) {
 }
 
 async function handleGroupCommand(event, userText) {
-  const sourceType = event.source?.type;
-  if (sourceType !== "group") return false;
+  if (!event.source || event.source.type !== "group") return false;
 
   const replyToken = event.replyToken;
-  const userId = event.source?.userId || "";
   const text = (userText || "").trim();
 
   const acceptMatch = text.match(/^接單\s+([A-Za-z0-9\-]+)$/);
@@ -440,12 +415,11 @@ async function handleGroupCommand(event, userText) {
     }
 
     if (task.status !== "pending") {
-      await replyText(replyToken, `此任務目前狀態為：${task.status}，不可再次接單。`);
+      await replyText(replyToken, `此任務目前狀態為：${task.status}`);
       return true;
     }
 
     task.status = "accepted";
-    task.acceptedBy = userId;
     task.acceptedAt = new Date().toISOString();
 
     await replyText(replyToken, `已成功接單 ✅\n任務編號：${taskId}`);
@@ -478,10 +452,7 @@ async function handleGroupCommand(event, userText) {
     await replyText(replyToken, `已標記完成 ✅\n任務編號：${taskId}`);
 
     try {
-      await pushText(
-        task.userId,
-        "騎手已抵達您的送達地點，本次任務已完成"
-      );
+      await pushText(task.userId, "騎手已抵達您的送達地點，本次任務已完成");
     } catch (err) {
       console.error("通知客戶完成失敗：", err.message);
     }
@@ -494,31 +465,24 @@ async function handleGroupCommand(event, userText) {
 
 async function handleUserText(event) {
   if (event.type !== "message") return;
-  if (event.message?.type !== "text") return;
+  if (!event.message || event.message.type !== "text") return;
 
   const userText = (event.message.text || "").trim();
   const replyToken = event.replyToken;
-  const userId = event.source?.userId || "";
-  const sourceType = event.source?.type;
+  const userId = event.source && event.source.userId ? event.source.userId : "";
+  const sourceType = event.source && event.source.type ? event.source.type : "";
 
-  // 群組指令優先處理
   const groupHandled = await handleGroupCommand(event, userText);
   if (groupHandled) return;
 
-  // 只處理使用者 1:1 聊天流程
   if (sourceType !== "user") return;
 
-  // 取消
   if (userText === "取消") {
     clearFlow(userId);
-    await replyTexts(replyToken, [
-      "好的，已取消目前流程。",
-      HELP_TEXT,
-    ]);
+    await replyTexts(replyToken, ["好的，已取消目前流程。", HELP_TEXT]);
     return;
   }
 
-  // 主功能入口
   if (userText === "1" || userText === "建立任務") {
     startFlow(userId, "create");
     await replyText(replyToken, buildAskText("create", 0));
@@ -531,8 +495,8 @@ async function handleUserText(event) {
     return;
   }
 
-  // 打招呼時，只顯示主選單，不要重複進流程
-  if (["你好", "您好", "哈囉", "嗨", "hi", "hello"].includes(userText.toLowerCase())) {
+  const lower = userText.toLowerCase();
+  if (["你好", "您好", "哈囉", "嗨", "hi", "hello"].includes(lower)) {
     clearFlow(userId);
     await replyText(replyToken, buildMainMenuText());
     return;
@@ -540,7 +504,6 @@ async function handleUserText(event) {
 
   const session = userSessions.get(userId);
 
-  // 沒有流程中，顯示主選單
   if (!session) {
     await replyText(replyToken, buildMainMenuText());
     return;
@@ -555,7 +518,6 @@ async function handleUserText(event) {
 
   if (currentField.key === "urgent") {
     value = normalizeUrgentInput(value);
-
     if (!isValidUrgentValue(value)) {
       await replyText(replyToken, "請輸入「是」或「否」。");
       return;
@@ -563,13 +525,11 @@ async function handleUserText(event) {
   }
 
   session.data[currentField.key] = value;
-
-  const nextStep = session.stepIndex + 1;
-  session.stepIndex = nextStep;
+  session.stepIndex += 1;
   userSessions.set(userId, session);
 
-  if (nextStep < FLOW_FIELDS.length) {
-    await replyText(replyToken, buildAskText(session.mode, nextStep));
+  if (session.stepIndex < FLOW_FIELDS.length) {
+    await replyText(replyToken, buildAskText(session.mode, session.stepIndex));
     return;
   }
 
@@ -594,8 +554,9 @@ async function handleUserText(event) {
     let msg = "系統忙碌中，請稍後再試一次。";
 
     if (
-      err.message.includes("REQUEST_DENIED") ||
-      err.message.includes("Google Maps API")
+      err.message &&
+      (err.message.includes("REQUEST_DENIED") ||
+        err.message.includes("Google Maps API"))
     ) {
       msg =
         "目前無法取得 Google 地圖距離資料。\n請先確認 GOOGLE_MAPS_API_KEY 是否正確，並確認 Distance Matrix API 已啟用。";
@@ -605,9 +566,7 @@ async function handleUserText(event) {
   }
 }
 
-/**
- * ========= 路由 =========
- */
+// ===== 路由 =====
 app.get("/", (req, res) => {
   res.status(200).send("UBee bot running");
 });
@@ -635,7 +594,6 @@ app.post("/webhook", async (req, res) => {
 
     const events = req.body.events || [];
 
-    // 先回 200，避免 LINE timeout
     res.status(200).send("OK");
 
     for (const event of events) {
@@ -653,9 +611,8 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-/**
- * ========= 啟動 =========
- */
+validateEnv();
+
 app.listen(PORT, () => {
   console.log(`UBee bot running on port ${PORT}`);
 });
