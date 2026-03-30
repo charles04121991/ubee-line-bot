@@ -8,7 +8,7 @@ app.use(express.json());
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 const TARGET_GROUP_ID = process.env.TARGET_GROUP_ID;
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 10000;
 
 if (!CHANNEL_ACCESS_TOKEN || !TARGET_GROUP_ID || !GOOGLE_MAPS_API_KEY) {
   console.error(
@@ -59,10 +59,6 @@ function resetSession(userId) {
 ========================= */
 function normalizeText(value = "") {
   return value.replace(/\s+/g, " ").trim();
-}
-
-function normalizePhone(value = "") {
-  return value.replace(/\s+/g, "").trim();
 }
 
 function extractField(line, label) {
@@ -136,8 +132,6 @@ function calculateCustomerPrice({ km, minutes, urgent }) {
 
   return {
     deliveryFee,
-    memberDiscount: 0,
-    subtotal,
     tax: CUSTOMER_PRICING.tax,
     total,
   };
@@ -445,20 +439,25 @@ function buildGroupTaskText(quote, userId) {
    LINE API
 ========================= */
 async function replyMessage(replyToken, text) {
-  await axios.post(
-    "https://api.line.me/v2/bot/message/reply",
-    {
-      replyToken,
-      messages: [{ type: "text", text }],
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+  try {
+    await axios.post(
+      "https://api.line.me/v2/bot/message/reply",
+      {
+        replyToken,
+        messages: [{ type: "text", text }],
       },
-      timeout: 15000,
-    }
-  );
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+        },
+        timeout: 15000,
+      }
+    );
+  } catch (error) {
+    console.error("❌ LINE回覆錯誤：", error.response?.data || error.message);
+    throw error;
+  }
 }
 
 async function pushToGroup(text) {
@@ -479,12 +478,15 @@ async function pushToGroup(text) {
 }
 
 /* =========================
-   路由
+   Health Check
 ========================= */
 app.get("/", (req, res) => {
   res.status(200).send("UBee bot running");
 });
 
+/* =========================
+   Webhook
+========================= */
 app.post("/webhook", async (req, res) => {
   try {
     const events = req.body.events || [];
@@ -500,9 +502,10 @@ app.post("/webhook", async (req, res) => {
 
         if (!replyToken || !userId) continue;
 
-        console.log("收到訊息：", userText);
-
         const session = getSession(userId);
+
+        console.log("收到訊息：", userText);
+        console.log("目前session：", session);
 
         if (["你好", "嗨", "哈囉", "開始", "選單"].includes(userText)) {
           await replyMessage(
@@ -535,7 +538,6 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
-        /* ===== 建立任務入口 ===== */
         if (userText === "建立任務") {
           const current = getSession(userId);
           current.mode = "task";
@@ -545,7 +547,6 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
-        /* ===== 立即估價入口 ===== */
         if (userText === "立即估價") {
           const current = getSession(userId);
           current.mode = "estimate";
@@ -555,7 +556,6 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
-        /* ===== 建立任務：貼表單後直接派單 ===== */
         if (session.waitingInput && session.mode === "task") {
           const taskData = parseTaskTemplate(userText);
           console.log("建立任務解析結果：", taskData);
@@ -600,7 +600,6 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
-        /* ===== 立即估價：只回估價，不派單 ===== */
         if (session.waitingInput && session.mode === "estimate") {
           const estimateData = parseEstimateTemplate(userText);
           console.log("立即估價解析結果：", estimateData);
@@ -611,10 +610,21 @@ app.post("/webhook", async (req, res) => {
             continue;
           }
 
-          const mapResult = await getDistanceAndDuration(
-            estimateData.pickupAddress,
-            estimateData.deliveryAddress
-          );
+          let mapResult;
+          try {
+            mapResult = await getDistanceAndDuration(
+              estimateData.pickupAddress,
+              estimateData.deliveryAddress
+            );
+          } catch (error) {
+            console.error("立即估價 Google Maps 錯誤：", error.message);
+            await replyMessage(
+              replyToken,
+              `立即估價失敗：${error.message}\n\n請確認地址是否完整，例如「台中市＋行政區＋路名門牌」。`
+            );
+            resetSession(userId);
+            continue;
+          }
 
           const customerPrice = calculateCustomerPrice({
             km: mapResult.distanceKm,
@@ -656,23 +666,17 @@ app.post("/webhook", async (req, res) => {
           ].join("\n")
         );
       } catch (eventError) {
-        console.error(
-          "單筆事件處理失敗：",
-          eventError?.response?.data || eventError.message
-        );
+        console.error("🔥單筆事件處理失敗：", eventError);
 
         try {
           if (event.replyToken) {
             await replyMessage(
               event.replyToken,
-              `系統處理失敗：${eventError.message || "未知錯誤"}`
+              "系統錯誤：" + (eventError.message || JSON.stringify(eventError))
             );
           }
         } catch (replyError) {
-          console.error(
-            "錯誤回覆失敗：",
-            replyError?.response?.data || replyError.message
-          );
+          console.error("錯誤回覆失敗：", replyError?.response?.data || replyError.message);
         }
       }
     }
@@ -684,6 +688,21 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+/* =========================
+   啟動
+========================= */
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`UBee bot running on port ${PORT}`);
+});
+
+server.on("error", (err) => {
+  console.error("Server 啟動錯誤：", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("未處理 Promise 錯誤：", err);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("未捕捉例外：", err);
 });
