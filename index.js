@@ -10,27 +10,31 @@ const config = {
 
 const client = new line.Client(config);
 
-// 測試首頁（Render會用）
 app.get('/', (req, res) => {
   res.send('UBee Webhook OK');
 });
 
-// Webhook
 app.post('/webhook', line.middleware(config), (req, res) => {
-  res.status(200).send('OK'); // 👉 一定先回200
+  res.status(200).send('OK');
 
-  req.body.events.forEach(event => {
+  req.body.events.forEach((event) => {
     handleEvent(event);
   });
 });
 
 function handleEvent(event) {
-  if (event.type !== 'message') return;
+  console.log('收到 event:', JSON.stringify(event, null, 2));
+
+  if (event.type !== 'message' || event.message.type !== 'text') {
+    return;
+  }
 
   client.replyMessage(event.replyToken, {
     type: 'text',
     text: '我有收到！'
-  }).catch(err => console.error(err));
+  }).catch((err) => {
+    console.error('reply error:', err);
+  });
 }
 
 const port = process.env.PORT || 3000;
