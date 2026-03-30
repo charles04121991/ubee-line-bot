@@ -1,13 +1,12 @@
 {
   "name": "ubee-line-bot",
   "version": "1.0.0",
-  "description": "UBee LINE bot",
+  "description": "UBee LINE bot on Render",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.8.4",
-    "express": "^4.21.2"
+    "express": "^4.19.2"
   }
 }
