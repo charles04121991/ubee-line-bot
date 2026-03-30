@@ -10,34 +10,27 @@ const config = {
 
 const client = new line.Client(config);
 
-// 👉 測試首頁（Render用）
+// 測試首頁（Render會用）
 app.get('/', (req, res) => {
-  res.send('UBee bot running');
+  res.send('UBee Webhook OK');
 });
 
-// 👉 Webhook
+// Webhook
 app.post('/webhook', line.middleware(config), (req, res) => {
-  console.log('收到 webhook');
-
-  res.status(200).send('OK'); // 👉 先強制回200
+  res.status(200).send('OK'); // 👉 一定先回200
 
   req.body.events.forEach(event => {
     handleEvent(event);
   });
 });
 
-// 👉 處理訊息
 function handleEvent(event) {
-  console.log('event:', event);
-
-  if (event.type !== 'message' || event.message.type !== 'text') {
-    return;
-  }
+  if (event.type !== 'message') return;
 
   client.replyMessage(event.replyToken, {
     type: 'text',
     text: '我有收到！'
-  }).catch(err => console.error('reply錯誤:', err));
+  }).catch(err => console.error(err));
 }
 
 const port = process.env.PORT || 3000;
