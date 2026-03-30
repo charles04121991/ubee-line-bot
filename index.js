@@ -16,17 +16,11 @@ if (!CHANNEL_ACCESS_TOKEN || !TARGET_GROUP_ID || !GOOGLE_MAPS_API_KEY) {
 }
 
 /* =========================
-   暫存資料（初版）
+   暫存資料
 ========================= */
 const userSessions = {};
 const tasks = {};
 let taskCounter = 1;
-
-/**
- * 會員名單（先用 userId 暫存）
- * 之後可接 DB / Google Sheet
- */
-const memberUsers = new Set();
 
 /* =========================
    Session
@@ -66,10 +60,6 @@ function extractField(line, label) {
   return raw.replace(label, "").trim();
 }
 
-function isMember(userId) {
-  return memberUsers.has(userId);
-}
-
 function createTaskId() {
   const id = `UB${String(taskCounter).padStart(3, "0")}`;
   taskCounter += 1;
@@ -91,9 +81,7 @@ function findRiderTask(userId) {
 function findLatestPendingTaskByCustomer(userId) {
   const customerTasks = Object.values(tasks)
     .filter(
-      (task) =>
-        task.customerUserId === userId &&
-        task.status === "待派單"
+      (task) => task.customerUserId === userId && task.status === "待派單"
     )
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -146,15 +134,13 @@ async function getDistanceAndDuration(origin, destination) {
 /* =========================
    計價
 ========================= */
-function calculatePrice(km, minutes, urgent, isMemberUser) {
+function calculatePrice(km, minutes, urgent) {
   const baseFee = 99;
   const distanceFee = km * 6;
   const timeFee = minutes * 3;
   const urgentFee = urgent ? 100 : 0;
 
-  const rawDeliveryFee = baseFee + distanceFee + timeFee + urgentFee;
-  const memberDiscount = isMemberUser ? 99 : 0;
-  const deliveryFee = Math.max(rawDeliveryFee - memberDiscount, 0);
+  const deliveryFee = baseFee + distanceFee + timeFee + urgentFee;
   const tax = 15;
   const total = deliveryFee + tax;
 
@@ -164,7 +150,6 @@ function calculatePrice(km, minutes, urgent, isMemberUser) {
 
   return {
     deliveryFee,
-    memberDiscount,
     tax,
     total,
     riderFee,
@@ -172,7 +157,7 @@ function calculatePrice(km, minutes, urgent, isMemberUser) {
 }
 
 /* =========================
-   解析：建立任務
+   建立任務解析
 ========================= */
 function parseTaskTemplate(text) {
   const lines = text
@@ -247,7 +232,7 @@ function parseTaskTemplate(text) {
 }
 
 /* =========================
-   解析：立即估價
+   立即估價解析
 ========================= */
 function parseEstimateTemplate(text) {
   const lines = text
@@ -521,7 +506,6 @@ app.post("/webhook", async (req, res) => {
         console.log("收到訊息：", userText);
         console.log("目前session：", session);
 
-        /* ===== 主選單 ===== */
         if (["你好", "嗨", "哈囉", "開始", "選單"].includes(userText)) {
           await replyMessage(
             replyToken,
@@ -532,33 +516,20 @@ app.post("/webhook", async (req, res) => {
               "1. 建立任務",
               "2. 立即估價",
               "",
-              "會員開通請輸入：加入會員",
               "若要取消目前流程，請輸入：取消",
             ].join("\n")
           );
           continue;
         }
 
-        /* ===== 加入會員 ===== */
-        if (userText === "加入會員") {
-          memberUsers.add(userId);
-          await replyMessage(
-            replyToken,
-            "已為您開通會員 ✅\n之後建立任務或立即估價，將自動折抵 $99。"
-          );
-          continue;
-        }
-
-        /* ===== 客人取消流程 ===== */
+        /* ===== 客人取消 ===== */
         if (userText === "取消") {
-          // 1) 先取消正在填寫中的流程
           if (session.waitingInput) {
             resetSession(userId);
             await replyMessage(replyToken, "已取消目前流程。");
             continue;
           }
 
-          // 2) 找最後一筆待派單任務
           const pendingTask = findLatestPendingTaskByCustomer(userId);
           if (pendingTask) {
             session.cancelTaskId = pendingTask.taskId;
@@ -570,7 +541,6 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
-        /* ===== 客人取消選項：1 ===== */
         if (userText === "1" && session.cancelTaskId) {
           const task = tasks[session.cancelTaskId];
           session.cancelTaskId = null;
@@ -587,7 +557,6 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
-        /* ===== 客人取消選項：2 ===== */
         if (userText === "2" && session.cancelTaskId) {
           const task = tasks[session.cancelTaskId];
           session.cancelTaskId = null;
@@ -636,11 +605,7 @@ app.post("/webhook", async (req, res) => {
           task.acceptedBy = userId;
 
           await replyMessage(replyToken, "已接單");
-
-          await pushToUser(
-            task.customerUserId,
-            "已有騎手接單，司機正為您處理中。"
-          );
+          await pushToUser(task.customerUserId, "已有騎手接單，司機正為您處理中。");
           continue;
         }
 
@@ -656,11 +621,7 @@ app.post("/webhook", async (req, res) => {
           task.status = "已到取件地點";
 
           await replyMessage(replyToken, "已到取件地點");
-
-          await pushToUser(
-            task.customerUserId,
-            "已經抵達您的取件地點"
-          );
+          await pushToUser(task.customerUserId, "已經抵達您的取件地點");
           continue;
         }
 
@@ -676,15 +637,11 @@ app.post("/webhook", async (req, res) => {
           task.status = "已完成";
 
           await replyMessage(replyToken, "任務已完成");
-
-          await pushToUser(
-            task.customerUserId,
-            "騎手已抵達您的送達地點，本次任務已完成"
-          );
+          await pushToUser(task.customerUserId, "騎手已抵達您的送達地點，本次任務已完成");
           continue;
         }
 
-        /* ===== 建立任務：客人貼表單後直接派單 ===== */
+        /* ===== 建立任務：貼表單後直接派單 ===== */
         if (session.waitingInput && session.mode === "task") {
           const taskData = parseTaskTemplate(userText);
           console.log("建立任務解析結果：", taskData);
@@ -703,8 +660,7 @@ app.post("/webhook", async (req, res) => {
           const price = calculatePrice(
             mapResult.distanceKm,
             mapResult.durationMinutes,
-            taskData.isUrgent,
-            isMember(userId)
+            taskData.isUrgent
           );
 
           const taskId = createTaskId();
@@ -765,8 +721,7 @@ app.post("/webhook", async (req, res) => {
           const price = calculatePrice(
             mapResult.distanceKm,
             mapResult.durationMinutes,
-            estimateData.isUrgent,
-            isMember(userId)
+            estimateData.isUrgent
           );
 
           await replyMessage(replyToken, buildEstimateOnlyText(price));
@@ -782,7 +737,7 @@ app.post("/webhook", async (req, res) => {
             "1. 建立任務",
             "2. 立即估價",
             "",
-            "會員開通請輸入：加入會員",
+            "若要取消目前流程，請輸入：取消",
           ].join("\n")
         );
       } catch (eventError) {
