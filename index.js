@@ -16,10 +16,10 @@ app.get('/', (req, res) => {
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
-  const events = req.body.events;
-  await Promise.all(events.map(handleEvent));
-  res.status(200).end();
-});
+  try {
+    const events = req.body.events;
+    await Promise.all(events.map(handleEvent));
+    res.status(200).end();
   } catch (err) {
     console.error('Webhook error:', err);
     res.status(500).end();
@@ -39,7 +39,7 @@ async function handleEvent(event) {
   });
 }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on ${PORT}`);
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
