@@ -12,7 +12,7 @@ const config = {
 const client = new line.Client(config);
 
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot v6');
+  res.status(200).send('UBee bot v8');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -36,7 +36,7 @@ async function handleEvent(event) {
 
   console.log('收到文字=', JSON.stringify(text));
 
-  // ===== 1) 關鍵字：立即估價 =====
+  // ===== 1️⃣ 立即估價 =====
   if (text.includes('立即估價')) {
     return client.replyMessage(event.replyToken, {
       type: 'text',
@@ -51,7 +51,7 @@ async function handleEvent(event) {
     });
   }
 
-  // ===== 2) 關鍵字：建立任務 =====
+  // ===== 2️⃣ 建立任務 =====
   if (text.includes('建立任務')) {
     return client.replyMessage(event.replyToken, {
       type: 'text',
@@ -72,12 +72,12 @@ async function handleEvent(event) {
     });
   }
 
-  // ===== 3) 使用者貼上「估價表單」後，自動報價 =====
+  // ===== 3️⃣ 判斷表單 =====
   const isQuoteForm =
     text.includes('取件地點：') &&
     text.includes('送達地點：') &&
     text.includes('物品內容：') &&
-    text.includes('是否急件');
+    text.includes('是否急件：');
 
   const isTaskForm =
     text.includes('取件地點：') &&
@@ -85,26 +85,52 @@ async function handleEvent(event) {
     text.includes('送達地點：') &&
     text.includes('送達電話：') &&
     text.includes('物品內容：') &&
-    text.includes('是否急件');
+    text.includes('是否急件：');
 
-  // 先判斷任務單，因為任務單欄位比較完整
+  // ===== 4️⃣ 任務建立 =====
   if (isTaskForm) {
     return client.replyMessage(event.replyToken, {
       type: 'text',
       text:
 `您的任務已建立成功，我們會立即為您派單。
 
-如需再次建立任務或立即估價，請直接輸入：
+如需再次建立任務或立即估價，請輸入：
 ・建立任務
 ・立即估價`
     });
   }
 
-  // 再判斷估價單
+  // ===== 5️⃣ 估價系統 =====
   if (isQuoteForm) {
-    const urgent = text.includes('急件');
-    const deliveryFee = urgent ? 400 : 300;
-    const tax = Math.round(deliveryFee * 0.05);
+    const formData = parseForm(text);
+
+    const urgentText = formData['是否急件'] || '';
+
+    // ✅ 修正急件判斷（不會再誤判）
+    const isUrgent =
+      urgentText.includes('急件') && !urgentText.includes('一般');
+
+    // ===== 正式費率 =====
+    const baseFee = 99;
+    const perKmFee = 6;
+    const perMinuteFee = 3;
+    const urgentFee = isUrgent ? 100 : 0;
+    const crossZoneFee = 25;
+
+    // ⚠️ 目前測試值（下一步會換成 Google Maps）
+    const distanceKm = 10;
+    const durationMin = 12;
+    const isCrossZone = true;
+
+    const distanceFee = distanceKm * perKmFee;
+    const timeFee = durationMin * perMinuteFee;
+    const zoneFee = isCrossZone ? crossZoneFee : 0;
+
+    const deliveryFee =
+      baseFee + distanceFee + timeFee + urgentFee + zoneFee;
+
+    // ✅ 稅金固定
+    const tax = 15;
     const total = deliveryFee + tax;
 
     return client.replyMessage(event.replyToken, {
@@ -116,11 +142,28 @@ async function handleEvent(event) {
     });
   }
 
-  // ===== 4) 其他訊息 =====
+  // ===== 6️⃣ 其他訊息 =====
   return client.replyMessage(event.replyToken, {
     type: 'text',
     text: `你剛剛說：${text}`
   });
+}
+
+// ===== 表單解析 =====
+function parseForm(text) {
+  const result = {};
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const idx = line.indexOf('：');
+    if (idx === -1) continue;
+
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    result[key] = value;
+  }
+
+  return result;
 }
 
 const port = process.env.PORT || 3000;
