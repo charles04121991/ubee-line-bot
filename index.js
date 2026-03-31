@@ -11,12 +11,10 @@ const config = {
 
 const client = new line.Client(config);
 
-// 給 Render / 瀏覽器測試用
 app.get('/', (req, res) => {
   res.status(200).send('UBee bot is running');
 });
 
-// 給 LINE Webhook 驗證用
 app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
     const events = req.body.events || [];
@@ -42,6 +40,6 @@ async function handleEvent(event) {
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on ${PORT}`);
 });
