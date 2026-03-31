@@ -12,7 +12,7 @@ const config = {
 const client = new line.Client(config);
 
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot is running');
+  res.status(200).send('UBee bot v3');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
