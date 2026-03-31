@@ -36,14 +36,11 @@ async function handleEvent(event) {
 
   const text = event.message.text.trim();
 
-  // 1) 使用者點選單後，只要送出表單模板或輸入建立任務，就回提示
-  if (
-    text === '建立任務' ||
-    isTaskTemplate(text)
-  ) {
+  // ===== 建立任務：顯示表單 =====
+  if (text === '建立任務') {
     return replyText(
       event.replyToken,
-      `請直接依下列表單填寫並送出：
+      `請依下列格式填寫並送出：
 
 取件地點：
 取件電話：
@@ -53,21 +50,25 @@ async function handleEvent(event) {
 
 物品內容：
 是否急件：
-備註：
-
-範例：
-取件地點：豐原區中正路100號
-取件電話：0912345678
-送達地點：北屯區崇德路二段88號
-送達電話：0987654321
-物品內容：文件
-是否急件：一般
-備註：無`
+備註：`
     );
   }
 
-  // 2) 如果是使用者填好的表單，就解析
-  if (looksLikeFilledTaskForm(text)) {
+  // ===== 立即估價：顯示表單 =====
+  if (text === '立即估價') {
+    return replyText(
+      event.replyToken,
+      `請依下列格式填寫並送出：
+
+取件地點：
+送達地點：
+物品內容：
+是否急件：`
+    );
+  }
+
+  // ===== 建立任務：解析完整表單 =====
+  if (looksLikeTaskForm(text)) {
     const form = parseTaskForm(text);
 
     const missingFields = getMissingFields(form, [
@@ -82,7 +83,10 @@ async function handleEvent(event) {
     if (missingFields.length > 0) {
       return replyText(
         event.replyToken,
-        `以下欄位尚未完整填寫：\n${missingFields.join('\n')}\n\n請依格式補齊後重新送出。`
+        `以下欄位尚未完整填寫：
+${missingFields.join('\n')}
+
+請補齊後重新送出。`
       );
     }
 
@@ -100,8 +104,9 @@ async function handleEvent(event) {
 是否急件：${form.is_urgent}
 備註：${form.note || '無'}
 
-費用：$${result.fee}
-距離：${result.distance}`;
+配送費：$${result.fee}
+稅金：$${result.tax}
+總計：$${result.total}`;
 
     const groupMessage = `🚨 UBee 派單
 
@@ -122,25 +127,7 @@ async function handleEvent(event) {
     return null;
   }
 
-  // 3) 立即估價
-  if (text === '立即估價') {
-    return replyText(
-      event.replyToken,
-      `請直接依下列格式填寫並送出：
-
-取件地點：
-送達地點：
-物品內容：
-是否急件：
-
-範例：
-取件地點：豐原區中正路100號
-送達地點：北屯區崇德路二段88號
-物品內容：文件
-是否急件：一般`
-    );
-  }
-
+  // ===== 立即估價：解析簡化表單 =====
   if (looksLikeEstimateForm(text)) {
     const form = parseEstimateForm(text);
 
@@ -154,7 +141,10 @@ async function handleEvent(event) {
     if (missingFields.length > 0) {
       return replyText(
         event.replyToken,
-        `以下欄位尚未完整填寫：\n${missingFields.join('\n')}\n\n請依格式補齊後重新送出。`
+        `以下欄位尚未完整填寫：
+${missingFields.join('\n')}
+
+請補齊後重新送出。`
       );
     }
 
@@ -162,15 +152,16 @@ async function handleEvent(event) {
 
     return replyText(
       event.replyToken,
-      `📌 預估費用如下（非最終報價）
+      `📌 預估報價如下（非最終報價）
 
 取件地點：${form.pickup_address}
 送達地點：${form.delivery_address}
 物品內容：${form.item_content}
 是否急件：${form.is_urgent}
 
-費用：$${result.fee}
-距離：${result.distance}`
+配送費：$${result.fee}
+稅金：$${result.tax}
+總計：$${result.total}`
     );
   }
 
@@ -180,17 +171,8 @@ async function handleEvent(event) {
   );
 }
 
-function isTaskTemplate(text) {
-  return (
-    text.includes('取件地點：') &&
-    text.includes('取件人 / 電話') &&
-    text.includes('送達地點：') &&
-    text.includes('收件人 / 電話') &&
-    text.includes('物品內容：')
-  );
-}
-
-function looksLikeFilledTaskForm(text) {
+// ===== 判斷是否為建立任務表單 =====
+function looksLikeTaskForm(text) {
   return (
     text.includes('取件地點：') &&
     text.includes('取件電話：') &&
@@ -201,6 +183,7 @@ function looksLikeFilledTaskForm(text) {
   );
 }
 
+// ===== 判斷是否為立即估價表單 =====
 function looksLikeEstimateForm(text) {
   return (
     text.includes('取件地點：') &&
@@ -212,6 +195,7 @@ function looksLikeEstimateForm(text) {
   );
 }
 
+// ===== 解析建立任務表單 =====
 function parseTaskForm(text) {
   return {
     pickup_address: extractField(text, '取件地點'),
@@ -224,6 +208,7 @@ function parseTaskForm(text) {
   };
 }
 
+// ===== 解析立即估價表單 =====
 function parseEstimateForm(text) {
   return {
     pickup_address: extractField(text, '取件地點'),
@@ -233,12 +218,14 @@ function parseEstimateForm(text) {
   };
 }
 
+// ===== 抓欄位值 =====
 function extractField(text, label) {
   const regex = new RegExp(`${label}：\\s*(.+)`);
   const match = text.match(regex);
   return match ? match[1].trim() : '';
 }
 
+// ===== 檢查缺少欄位 =====
 function getMissingFields(data, requiredKeys) {
   const labels = {
     pickup_address: '取件地點',
@@ -254,6 +241,7 @@ function getMissingFields(data, requiredKeys) {
     .map((key) => `- ${labels[key]}`);
 }
 
+// ===== 回覆使用者 =====
 function replyText(replyToken, text) {
   return client.replyMessage(replyToken, {
     type: 'text',
@@ -261,6 +249,7 @@ function replyText(replyToken, text) {
   });
 }
 
+// ===== 推送到群組 =====
 function pushToGroup(text) {
   return client.pushMessage(GROUP_ID, {
     type: 'text',
@@ -268,15 +257,22 @@ function pushToGroup(text) {
   });
 }
 
+// ===== 計價邏輯（目前測試版） =====
 function calculatePrice(data) {
   const baseFee = 100;
   const distanceFee = 80;
   const timeFee = 50;
   const urgentFee =
-    data.is_urgent.includes('急') ? 100 : 0;
+    data.is_urgent && data.is_urgent.includes('急') ? 100 : 0;
+
+  const fee = baseFee + distanceFee + timeFee + urgentFee;
+  const tax = Math.round(fee * 0.05);
+  const total = fee + tax;
 
   return {
-    fee: baseFee + distanceFee + timeFee + urgentFee,
+    fee: fee,
+    tax: tax,
+    total: total,
     distance: '5公里 / 12分鐘'
   };
 }
