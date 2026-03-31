@@ -1,5 +1,7 @@
-const express = require("express");
-const line = require("@line/bot-sdk");
+require('dotenv').config();
+
+const express = require('express');
+const line = require('@line/bot-sdk');
 
 const app = express();
 
@@ -8,192 +10,182 @@ const config = {
   channelSecret: process.env.CHANNEL_SECRET,
 };
 
+if (!config.channelAccessToken || !config.channelSecret) {
+  console.error('❌ Missing CHANNEL_ACCESS_TOKEN or CHANNEL_SECRET');
+  process.exit(1);
+}
+
 const client = new line.Client(config);
 
-const GROUP_ID = process.env.GROUP_ID;
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const PORT = process.env.PORT || 3000;
+const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
 
-const orders = new Map();
-
-// ================= 工具 =================
-
-function formatCurrency(num) {
-  return `$${Math.round(num)}`;
+// ===== 工具函式 =====
+function normalizeText(text) {
+  return text.replace(/\r/g, '').trim();
 }
 
-function getField(text, label) {
-  const regex = new RegExp(`${label}[:：]\\s*(.+)`);
-  const match = text.match(regex);
-  return match ? match[1].trim() : "";
+function extractField(text, labels) {
+  for (const label of labels) {
+    const regex = new RegExp(`${label}\\s*[:：]\\s*(.+)`);
+    const match = text.match(regex);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return '';
 }
 
-function parseForm(text) {
-  return {
-    pickup: getField(text, "取件地點"),
-    dropoff: getField(text, "送達地點"),
-    item: getField(text, "物品內容"),
-    urgent: getField(text, "是否急件").includes("急件"),
-  };
-}
-
-// ================= 距離 =================
-
-async function getDistance(origin, destination) {
-  const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&key=${GOOGLE_MAPS_API_KEY}`;
-
-  const res = await fetch(url);
-  const data = await res.json();
-
-  const element = data.rows[0].elements[0];
-
-  return {
-    km: element.distance.value / 1000,
-    text: element.distance.text,
-    minutes: element.duration.value / 60,
-  };
-}
-
-// ================= 計價 =================
-
-async function calculatePrice(pickup, dropoff, urgent) {
-  const base = 99;
-  const kmRate = 6;
-  const minRate = 3;
-  const urgentFee = urgent ? 100 : 0;
-  const serviceFee = 50;
-  const tax = 15;
-
-  const route = await getDistance(pickup, dropoff);
-
-  const deliveryFee = Math.round(
-    base +
-    route.km * kmRate +
-    route.minutes * minRate +
-    urgentFee +
-    serviceFee
+function isTaskForm(text) {
+  return (
+    text.includes('取件地點') &&
+    text.includes('送達地點') &&
+    text.includes('物品內容') &&
+    text.includes('是否急件')
   );
+}
 
-  const total = deliveryFee + tax;
-
-  const riderFee = Math.round(deliveryFee * 0.6);
-  const platformIncome = deliveryFee - riderFee;
+function parseTaskForm(text) {
+  const pickupAddress = extractField(text, ['取件地點']);
+  const pickupPhone = extractField(text, ['取件電話', '取件人 / 電話', '取件人/電話']);
+  const deliveryAddress = extractField(text, ['送達地點']);
+  const deliveryPhone = extractField(text, ['送達電話', '收件人 / 電話', '收件人/電話']);
+  const item = extractField(text, ['物品內容']);
+  const urgent = extractField(text, ['是否急件']);
+  const note = extractField(text, ['備註']);
 
   return {
-    deliveryFee,
-    total,
-    riderFee,
-    platformIncome,
-    distanceText: route.text,
+    pickupAddress,
+    pickupPhone,
+    deliveryAddress,
+    deliveryPhone,
+    item,
+    urgent,
+    note,
   };
 }
 
-// ================= LINE =================
+function buildDispatchMessage(task) {
+  const urgentText = task.urgent || '一般';
 
-app.post("/webhook", line.middleware(config), async (req, res) => {
-  await Promise.all(req.body.events.map(handleEvent));
-  res.sendStatus(200);
+  return `【UBee 派單通知】
+
+取件：
+${task.pickupAddress || '未填寫'}
+
+送達：
+${task.deliveryAddress || '未填寫'}
+
+物品：
+${task.item || '未填寫'}
+
+急件：
+${urgentText}
+
+取件電話：
+${task.pickupPhone || '未填寫'}
+
+送達電話：
+${task.deliveryPhone || '未填寫'}
+
+備註：
+${task.note || '無'}`;
+}
+
+// ===== 路由 =====
+app.get('/', (req, res) => {
+  res.status(200).send('UBee bot v1 running');
 });
 
-// ================= 主邏輯 =================
-
-async function handleEvent(event) {
-  if (event.type !== "message") return;
-
-  const text = event.message.text;
-
-  // ================= 群組（騎手） =================
-  if (event.source.type === "group") {
-    const order = Array.from(orders.values()).find(o => o.status !== "done");
-
-    if (!order) return;
-
-    if (text === "接" && order.status === "pending") {
-      order.status = "accepted";
-      await push(order.userId, "已經有騎手接單");
-    }
-
-    if (text === "到" && order.status === "accepted") {
-      order.status = "arrived";
-      await push(order.userId, "騎手已抵達取件地點");
-    }
-
-    if (text === "出發" && order.status === "arrived") {
-      order.status = "picked";
-      await push(order.userId, "騎手已取件完成");
-    }
-
-    if (text === "抵達" && order.status === "picked") {
-      order.status = "done";
-      await push(order.userId, "騎手已抵達送達地點");
-    }
-
-    return;
+app.post('/webhook', line.middleware(config), async (req, res) => {
+  try {
+    await Promise.all(req.body.events.map(handleEvent));
+    res.status(200).end();
+  } catch (err) {
+    console.error('❌ Webhook error:', err);
+    res.status(500).end();
   }
+});
 
-  // ================= 客人 =================
+// ===== 核心處理 =====
+async function handleEvent(event) {
+  try {
+    if (event.type !== 'message' || event.message.type !== 'text') {
+      return null;
+    }
 
-  if (text === "建立任務" || text === "立即估價") {
-    return reply(event.replyToken, {
-      type: "text",
-      text: `請填寫：
+    const userText = normalizeText(event.message.text);
+
+    // 1. 建立任務
+    if (userText === '建立任務') {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text:
+`請填寫以下資料：
+
+取件地點：
+取件電話：
+
+送達地點：
+送達電話：
+
+物品內容：
+是否急件（一般 / 急件）：
+
+備註：`
+      });
+    }
+
+    // 2. 立即估價
+    if (userText === '立即估價') {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text:
+`請填寫以下資訊，我們立即為您估價：
 
 取件地點：
 送達地點：
 物品內容：
-是否急件（一般 / 急件）`,
-    });
-  }
+是否急件（一般 / 急件）：`
+      });
+    }
 
-  // 表單判斷
-  if (text.includes("取件地點") && text.includes("送達地點")) {
-    const form = parseForm(text);
+    // 3. 使用者送出任務表單
+    if (isTaskForm(userText)) {
+      const task = parseTaskForm(userText);
 
-    const price = await calculatePrice(
-      form.pickup,
-      form.dropoff,
-      form.urgent
-    );
+      // 派送到群組
+      if (LINE_GROUP_ID) {
+        const dispatchMessage = buildDispatchMessage(task);
 
-    // ===== 客人只看總計 =====
-    await reply(event.replyToken, {
-      type: "text",
-      text: `總計：${formatCurrency(price.total)}`,
-    });
+        try {
+          await client.pushMessage(LINE_GROUP_ID, {
+            type: 'text',
+            text: dispatchMessage,
+          });
+          console.log('✅ 派單成功推送到群組');
+        } catch (pushErr) {
+          console.error('❌ 派單推送失敗:', pushErr);
+        }
+      } else {
+        console.warn('⚠️ 未設定 LINE_GROUP_ID，略過群組派單');
+      }
 
-    // ===== 存訂單 =====
-    orders.set(Date.now(), {
-      ...form,
-      ...price,
-      userId: event.source.userId,
-      status: "pending",
-    });
+      // 回覆客人
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '您的任務已建立成功，我們會立即為您派單。'
+      });
+    }
 
-    // ===== 派單給騎手 =====
-    await push(GROUP_ID, {
-      type: "text",
-      text: `【UBee 派單】
-
-費用：${formatCurrency(price.riderFee)}
-距離：${price.distanceText}
-
-取件：${form.pickup}
-送達：${form.dropoff}
-物品：${form.item}
-急件：${form.urgent ? "急件" : "一般"}`,
-    });
-
-    return;
+    return null;
+  } catch (err) {
+    console.error('❌ handleEvent error:', err);
+    return null;
   }
 }
 
-// ================= 發送 =================
-
-function reply(token, msg) {
-  return client.replyMessage(token, msg);
-}
-
-function push(to, text) {
-  return client.pushMessage(to, { type: "text", text });
-}
-
-module.exports = app;
+// ===== 啟動 =====
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
