@@ -11,8 +11,6 @@ const config = {
 const client = new line.Client(config);
 const GROUP_ID = process.env.GROUP_ID || '';
 
-const userState = {};
-
 app.get('/', (req, res) => {
   res.send('UBee Webhook OK');
 });
@@ -28,8 +26,6 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 });
 
 async function handleEvent(event) {
-  console.log('收到 event:', JSON.stringify(event, null, 2));
-
   if (event.source && event.source.type === 'group') {
     console.log('群組ID:', event.source.groupId);
   }
@@ -38,130 +34,71 @@ async function handleEvent(event) {
     return null;
   }
 
-  const userId = event.source.userId;
   const text = event.message.text.trim();
 
-  if (!userId) {
-    return replyText(event.replyToken, '目前僅支援使用者私訊操作');
-  }
-
-  if (!userState[userId]) {
-    userState[userId] = {
-      mode: null,
-      step: null,
-      data: {}
-    };
-  }
-
-  const state = userState[userId];
-
-  if (text === '建立任務') {
-    state.mode = 'order';
-    state.step = 'pickup_address';
-    state.data = {};
-    return replyText(event.replyToken, '請輸入【取件地點】');
-  }
-
-  if (text === '立即估價') {
-    state.mode = 'estimate';
-    state.step = 'pickup_address';
-    state.data = {};
+  // 1) 使用者點選單後，只要送出表單模板或輸入建立任務，就回提示
+  if (
+    text === '建立任務' ||
+    isTaskTemplate(text)
+  ) {
     return replyText(
       event.replyToken,
-      '您可以先快速取得任務費用估算，請提供：\n\n取件地點：'
+      `請直接依下列表單填寫並送出：
+
+取件地點：
+取件電話：
+
+送達地點：
+送達電話：
+
+物品內容：
+是否急件：
+備註：
+
+範例：
+取件地點：豐原區中正路100號
+取件電話：0912345678
+送達地點：北屯區崇德路二段88號
+送達電話：0987654321
+物品內容：文件
+是否急件：一般
+備註：無`
     );
   }
 
-  if (state.step === 'pickup_address') {
-    state.data.pickup_address = text;
+  // 2) 如果是使用者填好的表單，就解析
+  if (looksLikeFilledTaskForm(text)) {
+    const form = parseTaskForm(text);
 
-    if (state.mode === 'order') {
-      state.step = 'pickup_phone';
-      return replyText(event.replyToken, '請輸入【取件電話】');
-    }
+    const missingFields = getMissingFields(form, [
+      'pickup_address',
+      'pickup_phone',
+      'delivery_address',
+      'delivery_phone',
+      'item_content',
+      'is_urgent'
+    ]);
 
-    if (state.mode === 'estimate') {
-      state.step = 'delivery_address';
-      return replyText(event.replyToken, '請輸入【送達地點】');
-    }
-  }
-
-  if (state.step === 'pickup_phone') {
-    state.data.pickup_phone = text;
-    state.step = 'delivery_address';
-    return replyText(event.replyToken, '請輸入【送達地點】');
-  }
-
-  if (state.step === 'delivery_address') {
-    state.data.delivery_address = text;
-
-    if (state.mode === 'order') {
-      state.step = 'delivery_phone';
-      return replyText(event.replyToken, '請輸入【送達電話】');
-    }
-
-    if (state.mode === 'estimate') {
-      state.step = 'item_content';
-      return replyText(event.replyToken, '請輸入【物品內容】');
-    }
-  }
-
-  if (state.step === 'delivery_phone') {
-    state.data.delivery_phone = text;
-    state.step = 'item_content';
-    return replyText(event.replyToken, '請輸入【物品內容】');
-  }
-
-  if (state.step === 'item_content') {
-    state.data.item_content = text;
-    state.step = 'is_urgent';
-    return replyText(event.replyToken, '請輸入【是否急件】（是 / 否）');
-  }
-
-  if (state.step === 'is_urgent') {
-    state.data.is_urgent = text;
-
-    if (state.mode === 'estimate') {
-      const result = calculatePrice(state.data);
-      delete userState[userId];
-
+    if (missingFields.length > 0) {
       return replyText(
         event.replyToken,
-        `您可以先快速取得任務費用估算，請參考：\n
-取件地點：${state.data.pickup_address}
-送達地點：${state.data.delivery_address}
-物品內容：${state.data.item_content}
-是否急件：${state.data.is_urgent}
-
-———
-
-📌 我們將為您即時計算預估費用（非最終報價）
-
-費用：$${result.fee}
-距離：${result.distance}`
+        `以下欄位尚未完整填寫：\n${missingFields.join('\n')}\n\n請依格式補齊後重新送出。`
       );
     }
 
-    state.step = 'note';
-    return replyText(event.replyToken, '請輸入【備註】（沒有可輸入 無）');
-  }
-
-  if (state.step === 'note') {
-    state.data.note = text;
-
-    const result = calculatePrice(state.data);
+    const result = calculatePrice(form);
 
     const customerMessage = `✅ 任務建立完成
 
-取件地點：${state.data.pickup_address}
-取件電話：${state.data.pickup_phone}
+取件地點：${form.pickup_address}
+取件電話：${form.pickup_phone}
 
-送達地點：${state.data.delivery_address}
-送達電話：${state.data.delivery_phone}
+送達地點：${form.delivery_address}
+送達電話：${form.delivery_phone}
 
-物品內容：${state.data.item_content}
-是否急件：${state.data.is_urgent}
-備註：${state.data.note}
+物品內容：${form.item_content}
+是否急件：${form.is_urgent}
+備註：${form.note || '無'}
 
 費用：$${result.fee}
 距離：${result.distance}`;
@@ -171,12 +108,10 @@ async function handleEvent(event) {
 費用：$${result.fee}
 距離：${result.distance}
 
-取件地點：${state.data.pickup_address}
-送達地點：${state.data.delivery_address}
-物品：${state.data.item_content}
-急件：${state.data.is_urgent}`;
-
-    delete userState[userId];
+取件地點：${form.pickup_address}
+送達地點：${form.delivery_address}
+物品：${form.item_content}
+急件：${form.is_urgent}`;
 
     await replyText(event.replyToken, customerMessage);
 
@@ -187,7 +122,136 @@ async function handleEvent(event) {
     return null;
   }
 
-  return replyText(event.replyToken, '請輸入「建立任務」或「立即估價」');
+  // 3) 立即估價
+  if (text === '立即估價') {
+    return replyText(
+      event.replyToken,
+      `請直接依下列格式填寫並送出：
+
+取件地點：
+送達地點：
+物品內容：
+是否急件：
+
+範例：
+取件地點：豐原區中正路100號
+送達地點：北屯區崇德路二段88號
+物品內容：文件
+是否急件：一般`
+    );
+  }
+
+  if (looksLikeEstimateForm(text)) {
+    const form = parseEstimateForm(text);
+
+    const missingFields = getMissingFields(form, [
+      'pickup_address',
+      'delivery_address',
+      'item_content',
+      'is_urgent'
+    ]);
+
+    if (missingFields.length > 0) {
+      return replyText(
+        event.replyToken,
+        `以下欄位尚未完整填寫：\n${missingFields.join('\n')}\n\n請依格式補齊後重新送出。`
+      );
+    }
+
+    const result = calculatePrice(form);
+
+    return replyText(
+      event.replyToken,
+      `📌 預估費用如下（非最終報價）
+
+取件地點：${form.pickup_address}
+送達地點：${form.delivery_address}
+物品內容：${form.item_content}
+是否急件：${form.is_urgent}
+
+費用：$${result.fee}
+距離：${result.distance}`
+    );
+  }
+
+  return replyText(
+    event.replyToken,
+    '請點選選單功能，或輸入「建立任務」／「立即估價」。'
+  );
+}
+
+function isTaskTemplate(text) {
+  return (
+    text.includes('取件地點：') &&
+    text.includes('取件人 / 電話') &&
+    text.includes('送達地點：') &&
+    text.includes('收件人 / 電話') &&
+    text.includes('物品內容：')
+  );
+}
+
+function looksLikeFilledTaskForm(text) {
+  return (
+    text.includes('取件地點：') &&
+    text.includes('取件電話：') &&
+    text.includes('送達地點：') &&
+    text.includes('送達電話：') &&
+    text.includes('物品內容：') &&
+    text.includes('是否急件：')
+  );
+}
+
+function looksLikeEstimateForm(text) {
+  return (
+    text.includes('取件地點：') &&
+    text.includes('送達地點：') &&
+    text.includes('物品內容：') &&
+    text.includes('是否急件：') &&
+    !text.includes('取件電話：') &&
+    !text.includes('送達電話：')
+  );
+}
+
+function parseTaskForm(text) {
+  return {
+    pickup_address: extractField(text, '取件地點'),
+    pickup_phone: extractField(text, '取件電話'),
+    delivery_address: extractField(text, '送達地點'),
+    delivery_phone: extractField(text, '送達電話'),
+    item_content: extractField(text, '物品內容'),
+    is_urgent: extractField(text, '是否急件'),
+    note: extractField(text, '備註')
+  };
+}
+
+function parseEstimateForm(text) {
+  return {
+    pickup_address: extractField(text, '取件地點'),
+    delivery_address: extractField(text, '送達地點'),
+    item_content: extractField(text, '物品內容'),
+    is_urgent: extractField(text, '是否急件')
+  };
+}
+
+function extractField(text, label) {
+  const regex = new RegExp(`${label}：\\s*(.+)`);
+  const match = text.match(regex);
+  return match ? match[1].trim() : '';
+}
+
+function getMissingFields(data, requiredKeys) {
+  const labels = {
+    pickup_address: '取件地點',
+    pickup_phone: '取件電話',
+    delivery_address: '送達地點',
+    delivery_phone: '送達電話',
+    item_content: '物品內容',
+    is_urgent: '是否急件'
+  };
+
+  return requiredKeys
+    .filter((key) => !data[key] || data[key].trim() === '')
+    .map((key) => `- ${labels[key]}`);
 }
 
 function replyText(replyToken, text) {
@@ -208,7 +272,8 @@ function calculatePrice(data) {
   const baseFee = 100;
   const distanceFee = 80;
   const timeFee = 50;
-  const urgentFee = data.is_urgent === '是' ? 100 : 0;
+  const urgentFee =
+    data.is_urgent.includes('急') ? 100 : 0;
 
   return {
     fee: baseFee + distanceFee + timeFee + urgentFee,
