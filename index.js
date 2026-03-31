@@ -15,14 +15,11 @@ app.get('/', (req, res) => {
   res.status(200).send('UBee bot v3');
 });
 
-app.post('/webhook', async (req, res) => {
-  console.log('Webhook hit');
-  res.status(200).send('OK');
+app.post('/webhook', line.middleware(config), async (req, res) => {
+  const events = req.body.events;
+  await Promise.all(events.map(handleEvent));
+  res.status(200).end();
 });
-  try {
-    const events = req.body.events || [];
-    await Promise.all(events.map(handleEvent));
-    res.status(200).end();
   } catch (err) {
     console.error('Webhook error:', err);
     res.status(500).end();
