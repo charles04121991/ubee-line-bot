@@ -1,13 +1,1 @@
-{
-  "name": "ubee-line-bot",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "@line/bot-sdk": "^9.7.0",
-    "axios": "^1.8.4",
-    "express": "^4.19.2"
-  }
-}
+
