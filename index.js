@@ -12,7 +12,7 @@ const config = {
 const client = new line.Client(config);
 
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot v3');
+  res.status(200).send('UBee bot v4');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -31,7 +31,41 @@ async function handleEvent(event) {
     return null;
   }
 
-  const text = event.message.text;
+  const text = event.message.text.trim();
+
+  if (text === '立即估價') {
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text:
+`請依照以下格式填寫估價資訊：
+
+取件地點：
+送達地點：
+物品內容：
+是否急件（一般 / 急件）：
+備註：`
+    });
+  }
+
+  if (text === '建立任務') {
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text:
+`請依照以下格式填寫任務資料：
+
+取件地點：
+取件電話：
+
+送達地點：
+送達電話：
+
+物品內容：
+是否急件（一般 / 急件）：
+備註：
+
+※ 不配送食品、違禁品或危險物品`
+    });
+  }
 
   return client.replyMessage(event.replyToken, {
     type: 'text',
