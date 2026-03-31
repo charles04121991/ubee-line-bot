@@ -1,14 +1,13 @@
 {
   "name": "ubee-line-bot",
   "version": "1.0.0",
-  "description": "UBee LINE Official Account Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.7.0",
-    "axios": "^1.7.2",
-    "express": "^4.21.2"
+    "axios": "^1.8.4",
+    "express": "^4.19.2"
   }
 }
