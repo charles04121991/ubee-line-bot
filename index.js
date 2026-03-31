@@ -1,8 +1,6 @@
 require('dotenv').config();
-
 const express = require('express');
 const line = require('@line/bot-sdk');
-const fetch = require('node-fetch');
 
 const app = express();
 
@@ -12,244 +10,13 @@ const config = {
 };
 
 if (!config.channelAccessToken || !config.channelSecret) {
-  console.error('❌ Missing CHANNEL_ACCESS_TOKEN or CHANNEL_SECRET');
-  process.exit(1);
+  console.error('Missing CHANNEL_ACCESS_TOKEN or CHANNEL_SECRET');
 }
 
 const client = new line.Client(config);
 
-const PORT = process.env.PORT || 3000;
-const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
-
-// ===== 固定費率 =====
-const BASE_FEE = 99;
-const PER_KM_FEE = 6;
-const PER_MIN_FEE = 3;
-const CROSS_DISTRICT_FEE = 25;
-const URGENT_FEE = 100;
-const FIXED_TAX = 15;
-const RIDER_SHARE_RATE = 0.6;
-
-// ===== 工具函式 =====
-function normalizeText(text = '') {
-  return text.replace(/\r/g, '').trim();
-}
-
-function extractField(text, labels) {
-  const lines = text.split('\n');
-
-  for (const label of labels) {
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith(label + '：') || trimmed.startsWith(label + ':')) {
-        const value = trimmed.split(/[:：]/).slice(1).join(':').trim();
-        return value;
-      }
-    }
-  }
-
-  return '';
-}
-
-function isEstimateForm(text) {
-  return (
-    text.includes('取件地點') &&
-    text.includes('送達地點') &&
-    text.includes('物品內容') &&
-    text.includes('是否急件') &&
-    !text.includes('取件電話') &&
-    !text.includes('送達電話') &&
-    !text.includes('取件人 / 電話') &&
-    !text.includes('收件人 / 電話')
-  );
-}
-
-function isTaskForm(text) {
-  return (
-    text.includes('取件地點') &&
-    text.includes('送達地點') &&
-    text.includes('物品內容') &&
-    text.includes('是否急件') &&
-    (
-      text.includes('取件電話') ||
-      text.includes('取件人 / 電話') ||
-      text.includes('取件人/電話')
-    ) &&
-    (
-      text.includes('送達電話') ||
-      text.includes('收件人 / 電話') ||
-      text.includes('收件人/電話')
-    )
-  );
-}
-
-function parseEstimateForm(text) {
-  return {
-    pickupAddress: extractField(text, ['取件地點']),
-    deliveryAddress: extractField(text, ['送達地點']),
-    item: extractField(text, ['物品內容']),
-    urgent: extractField(text, ['是否急件']),
-  };
-}
-
-function parseTaskForm(text) {
-  return {
-    pickupAddress: extractField(text, ['取件地點']),
-    pickupPhone: extractField(text, ['取件電話', '取件人 / 電話', '取件人/電話']),
-    deliveryAddress: extractField(text, ['送達地點']),
-    deliveryPhone: extractField(text, ['送達電話', '收件人 / 電話', '收件人/電話']),
-    item: extractField(text, ['物品內容']),
-    urgent: extractField(text, ['是否急件']),
-    note: extractField(text, ['備註']),
-  };
-}
-
-function isUrgent(urgentText = '') {
-  const text = String(urgentText).trim();
-  return text === '急件' || text === '是' || text.includes('急件');
-}
-
-function extractDistrict(address = '') {
-  const match = address.match(/(豐原區|潭子區|神岡區|大雅區|北屯區|西屯區|南屯區|西區|南區|北區|東區|太平區|大里區|烏日區|霧峰區|沙鹿區|龍井區|梧棲區|清水區|大肚區|后里區|石岡區|東勢區|和平區)/);
-  return match ? match[1] : '';
-}
-
-function isCrossDistrict(pickupAddress, deliveryAddress) {
-  const pickupDistrict = extractDistrict(pickupAddress);
-  const deliveryDistrict = extractDistrict(deliveryAddress);
-
-  if (!pickupDistrict || !deliveryDistrict) return false;
-  return pickupDistrict !== deliveryDistrict;
-}
-
-function parseGoogleDurationToMinutes(durationStr = '') {
-  const seconds = parseFloat(String(durationStr).replace('s', ''));
-  if (!Number.isFinite(seconds)) return 0;
-  return Math.ceil(seconds / 60);
-}
-
-async function getRouteInfo(originAddress, destinationAddress) {
-  if (!GOOGLE_MAPS_API_KEY) {
-    throw new Error('Missing GOOGLE_MAPS_API_KEY');
-  }
-
-  console.log('📍 origin:', originAddress);
-  console.log('📍 destination:', destinationAddress);
-
-  const response = await fetch(
-    'https://routes.googleapis.com/directions/v2:computeRoutes',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
-        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
-      },
-      body: JSON.stringify({
-        origin: {
-          address: originAddress,
-        },
-        destination: {
-          address: destinationAddress,
-        },
-        travelMode: 'DRIVE',
-        routingPreference: 'TRAFFIC_AWARE',
-        languageCode: 'zh-TW',
-        units: 'METRIC',
-        regionCode: 'TW',
-      }),
-    }
-  );
-
-  console.log('📡 Google response status:', response.status);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ Google API raw error:', errorText);
-    throw new Error(`Google Routes API error: ${response.status} ${errorText}`);
-  }
-
-  const data = await response.json();
-  console.log('✅ Google route data:', JSON.stringify(data));
-
-  if (!data.routes || !data.routes.length) {
-    throw new Error('No route found');
-  }
-
-  const route = data.routes[0];
-  const distanceMeters = route.distanceMeters || 0;
-  const duration = route.duration || '0s';
-
-  return {
-    distanceMeters,
-    distanceKm: Math.ceil(distanceMeters / 1000),
-    durationMinutes: parseGoogleDurationToMinutes(duration),
-  };
-}
-
-function calculatePrice({ distanceKm, durationMinutes, urgent, pickupAddress, deliveryAddress }) {
-  const distanceFee = distanceKm * PER_KM_FEE;
-  const timeFee = durationMinutes * PER_MIN_FEE;
-  const crossDistrictFee = isCrossDistrict(pickupAddress, deliveryAddress) ? CROSS_DISTRICT_FEE : 0;
-  const urgentFee = isUrgent(urgent) ? URGENT_FEE : 0;
-
-  const deliveryFee = Math.round(
-    BASE_FEE + distanceFee + timeFee + crossDistrictFee + urgentFee
-  );
-
-  const tax = FIXED_TAX;
-  const total = deliveryFee + tax;
-  const riderFee = Math.round(deliveryFee * RIDER_SHARE_RATE);
-
-  return {
-    baseFee: BASE_FEE,
-    distanceFee,
-    timeFee,
-    crossDistrictFee,
-    urgentFee,
-    deliveryFee,
-    tax,
-    total,
-    riderFee,
-  };
-}
-
-function buildCustomerQuoteMessage(pricing) {
-  return `配送費：$${pricing.deliveryFee}
-稅金：$${pricing.tax}
-總計：$${pricing.total}`;
-}
-
-function buildDispatchMessage(task, routeInfo, pricing) {
-  return `【UBee 派單通知】
-
-費用：$${pricing.riderFee}
-距離：${routeInfo.distanceKm} 公里 / ${routeInfo.durationMinutes} 分鐘
-
-取件：
-${task.pickupAddress || '未填寫'}
-
-送達：
-${task.deliveryAddress || '未填寫'}
-
-物品：
-${task.item || '未填寫'}
-
-急件：
-${isUrgent(task.urgent) ? '是' : '否'}`;
-}
-
-function validateAddresses(pickupAddress, deliveryAddress) {
-  if (!pickupAddress || !deliveryAddress) {
-    return '取件地點或送達地點未填寫完整。';
-  }
-  return '';
-}
-
-// ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot pricing version running');
+  res.status(200).send('UBee bot v1');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -257,155 +24,223 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
     await Promise.all(req.body.events.map(handleEvent));
     res.status(200).end();
   } catch (err) {
-    console.error('❌ Webhook error:', err);
+    console.error('Webhook Error:', err);
     res.status(500).end();
   }
 });
 
-// ===== 核心處理 =====
 async function handleEvent(event) {
   try {
     if (event.type !== 'message' || event.message.type !== 'text') {
       return null;
     }
 
-    const userText = normalizeText(event.message.text);
-    console.log('📩 User message:', userText);
+    const text = (event.message.text || '').trim();
 
     // 建立任務
-    if (userText === '建立任務') {
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text:
-`請填寫以下資料：
-
-取件地點：
-取件電話：
-
-送達地點：
-送達電話：
-
-物品內容：
-是否急件（一般 / 急件）：
-
-備註：`
-      });
+    if (text === '建立任務') {
+      return replyText(event.replyToken, createTaskTemplate());
     }
 
     // 立即估價
-    if (userText === '立即估價') {
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text:
-`請填寫以下資訊，我們立即為您估價：
-
-取件地點：
-送達地點：
-物品內容：
-是否急件（一般 / 急件）：`
-      });
+    if (text === '立即估價') {
+      return replyText(event.replyToken, quoteTemplate());
     }
 
-    // 立即估價表單
-    if (isEstimateForm(userText)) {
-      console.log('🟡 Detected estimate form');
+    // 解析使用者輸入
+    const parsed = parseUserInput(text);
 
-      const form = parseEstimateForm(userText);
-      console.log('🧾 Parsed estimate form:', form);
+    // 使用者填的是建立任務資料
+    if (isCreateTaskInput(parsed)) {
+      const quote = calculateQuote(parsed);
 
-      const addressError = validateAddresses(form.pickupAddress, form.deliveryAddress);
-      if (addressError) {
-        return client.replyMessage(event.replyToken, {
+      const customerMessage = [
+        '您的任務已建立成功，我們會立即為您派單。',
+        '',
+        `配送費：$${quote.deliveryFee}`,
+        `稅金：$${quote.tax}`,
+        `總計：$${quote.total}`,
+      ].join('\n');
+
+      await replyText(event.replyToken, customerMessage);
+
+      // 如果有設定群組 ID，就派單到群組
+      if (process.env.LINE_GROUP_ID) {
+        const riderFee = Math.round(quote.deliveryFee * 0.6);
+
+        const dispatchMessage = [
+          '【UBee 派單通知】',
+          '',
+          `費用：$${riderFee}`,
+          '',
+          `取件：${parsed.pickupAddress}`,
+          `送達：${parsed.dropoffAddress}`,
+          `物品：${parsed.item}`,
+          `急件：${quote.urgentText}`,
+          parsed.note ? `備註：${parsed.note}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        await client.pushMessage(process.env.LINE_GROUP_ID, {
           type: 'text',
-          text: `❌ ${addressError}`,
+          text: dispatchMessage,
         });
       }
 
-      const routeInfo = await getRouteInfo(form.pickupAddress, form.deliveryAddress);
-      console.log('🛣️ Route info:', routeInfo);
-
-      const pricing = calculatePrice({
-        distanceKm: routeInfo.distanceKm,
-        durationMinutes: routeInfo.durationMinutes,
-        urgent: form.urgent,
-        pickupAddress: form.pickupAddress,
-        deliveryAddress: form.deliveryAddress,
-      });
-      console.log('💰 Pricing:', pricing);
-
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: buildCustomerQuoteMessage(pricing),
-      });
+      return null;
     }
 
-    // 建立任務表單
-    if (isTaskForm(userText)) {
-      console.log('🟢 Detected task form');
+    // 使用者填的是立即估價資料
+    if (isQuoteInput(parsed)) {
+      const quote = calculateQuote(parsed);
 
-      const task = parseTaskForm(userText);
-      console.log('🧾 Parsed task form:', task);
+      const message = [
+        '以下為本次預估費用：',
+        '',
+        `配送費：$${quote.deliveryFee}`,
+        `稅金：$${quote.tax}`,
+        `總計：$${quote.total}`,
+      ].join('\n');
 
-      const addressError = validateAddresses(task.pickupAddress, task.deliveryAddress);
-      if (addressError) {
-        return client.replyMessage(event.replyToken, {
-          type: 'text',
-          text: `❌ ${addressError}`,
-        });
-      }
-
-      const routeInfo = await getRouteInfo(task.pickupAddress, task.deliveryAddress);
-      console.log('🛣️ Route info:', routeInfo);
-
-      const pricing = calculatePrice({
-        distanceKm: routeInfo.distanceKm,
-        durationMinutes: routeInfo.durationMinutes,
-        urgent: task.urgent,
-        pickupAddress: task.pickupAddress,
-        deliveryAddress: task.deliveryAddress,
-      });
-      console.log('💰 Pricing:', pricing);
-
-      if (LINE_GROUP_ID) {
-        const dispatchMessage = buildDispatchMessage(task, routeInfo, pricing);
-
-        try {
-          await client.pushMessage(LINE_GROUP_ID, {
-            type: 'text',
-            text: dispatchMessage,
-          });
-          console.log('✅ 派單成功推送到群組');
-        } catch (pushErr) {
-          console.error('❌ 派單推送失敗:', pushErr);
-          console.error('❌ 派單推送 message:', pushErr.message);
-        }
-      } else {
-        console.warn('⚠️ 未設定 LINE_GROUP_ID，略過群組派單');
-      }
-
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text:
-`${buildCustomerQuoteMessage(pricing)}
-
-您的任務已建立成功，我們會立即為您派單。`,
-      });
+      return replyText(event.replyToken, message);
     }
 
     return null;
   } catch (err) {
-    console.error('❌ handleEvent error:', err);
-    console.error('❌ error message:', err.message);
-    console.error('❌ error stack:', err.stack);
-
-    return client.replyMessage(event.replyToken, {
-      type: 'text',
-      text: '系統暫時忙碌中，請稍後再試一次。'
-    });
+    console.error('handleEvent Error:', err);
+    return replyText(event.replyToken, '系統暫時忙碌中，請稍後再試一次。');
   }
 }
 
-// ===== 啟動 =====
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+function createTaskTemplate() {
+  return [
+    '請填寫以下資料：',
+    '',
+    '取件地點：',
+    '取件電話：',
+    '',
+    '送達地點：',
+    '送達電話：',
+    '',
+    '物品內容：',
+    '是否急件：一般',
+    '備註：',
+  ].join('\n');
+}
+
+function quoteTemplate() {
+  return [
+    '請填寫以下資訊，我們立即為您估價：',
+    '',
+    '取件地點：',
+    '送達地點：',
+    '物品內容：',
+    '是否急件：一般',
+  ].join('\n');
+}
+
+function parseUserInput(text) {
+  const result = {
+    pickupAddress: '',
+    pickupPhone: '',
+    dropoffAddress: '',
+    dropoffPhone: '',
+    item: '',
+    urgent: '',
+    note: '',
+  };
+
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const normalized = line.replace(/：/g, ':');
+    const idx = normalized.indexOf(':');
+    if (idx === -1) continue;
+
+    const rawKey = normalized.slice(0, idx).trim();
+    const value = normalized.slice(idx + 1).trim();
+    const key = rawKey.replace(/\s+/g, '');
+
+    if (key.includes('取件地點')) result.pickupAddress = value;
+    else if (key.includes('取件電話')) result.pickupPhone = value;
+    else if (key.includes('送達地點')) result.dropoffAddress = value;
+    else if (key.includes('送達電話')) result.dropoffPhone = value;
+    else if (key.includes('物品內容')) result.item = value;
+    else if (key.includes('是否急件')) result.urgent = value;
+    else if (key.includes('備註')) result.note = value;
+  }
+
+  return result;
+}
+
+function isCreateTaskInput(data) {
+  return Boolean(
+    data.pickupAddress &&
+      data.pickupPhone &&
+      data.dropoffAddress &&
+      data.dropoffPhone &&
+      data.item &&
+      data.urgent
+  );
+}
+
+function isQuoteInput(data) {
+  return Boolean(
+    data.pickupAddress &&
+      data.dropoffAddress &&
+      data.item &&
+      data.urgent &&
+      !data.pickupPhone &&
+      !data.dropoffPhone
+  );
+}
+
+function calculateQuote(data) {
+  const baseFee = 99;
+  const crossDistrictFee = isCrossDistrict(data.pickupAddress, data.dropoffAddress) ? 25 : 0;
+  const urgentFee = isUrgent(data.urgent) ? 100 : 0;
+  const tax = 15;
+  const deliveryFee = baseFee + crossDistrictFee + urgentFee;
+
+  return {
+    baseFee,
+    crossDistrictFee,
+    urgentFee,
+    tax,
+    deliveryFee,
+    total: deliveryFee + tax,
+    urgentText: isUrgent(data.urgent) ? '急件' : '一般',
+  };
+}
+
+function isUrgent(value) {
+  const text = String(value || '').trim().toLowerCase();
+  return text === '急件' || text === '是' || text === 'yes' || text === 'y' || text === 'urgent';
+}
+
+function isCrossDistrict(from, to) {
+  const fromDistrict = extractDistrict(from);
+  const toDistrict = extractDistrict(to);
+  return Boolean(fromDistrict && toDistrict && fromDistrict !== toDistrict);
+}
+
+function extractDistrict(address) {
+  const match = String(address || '').match(/([\u4e00-\u9fff]{1,4}[區市鄉鎮])/);
+  return match ? match[1] : '';
+}
+
+function replyText(replyToken, text) {
+  return client.replyMessage(replyToken, {
+    type: 'text',
+    text,
+  });
+}
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`UBee bot listening on ${port}`);
 });
