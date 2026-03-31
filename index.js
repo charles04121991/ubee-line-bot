@@ -15,7 +15,10 @@ app.get('/', (req, res) => {
   res.status(200).send('UBee bot v3');
 });
 
-app.post('/webhook', line.middleware(config), async (req, res) => {
+app.post('/webhook', async (req, res) => {
+  console.log('Webhook hit');
+  res.status(200).send('OK');
+});
   try {
     const events = req.body.events || [];
     await Promise.all(events.map(handleEvent));
