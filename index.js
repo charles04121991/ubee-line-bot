@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const line = require('@line/bot-sdk');
+const fetch = require('node-fetch');
 
 const app = express();
 
@@ -36,13 +37,18 @@ function normalizeText(text = '') {
 }
 
 function extractField(text, labels) {
+  const lines = text.split('\n');
+
   for (const label of labels) {
-    const regex = new RegExp(`${label}\\s*[:：]\\s*(.+)`);
-    const match = text.match(regex);
-    if (match && match[1]) {
-      return match[1].trim();
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith(label + '：') || trimmed.startsWith(label + ':')) {
+        const value = trimmed.split(/[:：]/).slice(1).join(':').trim();
+        return value;
+      }
     }
   }
+
   return '';
 }
 
@@ -53,7 +59,9 @@ function isEstimateForm(text) {
     text.includes('物品內容') &&
     text.includes('是否急件') &&
     !text.includes('取件電話') &&
-    !text.includes('送達電話')
+    !text.includes('送達電話') &&
+    !text.includes('取件人 / 電話') &&
+    !text.includes('收件人 / 電話')
   );
 }
 
@@ -63,8 +71,16 @@ function isTaskForm(text) {
     text.includes('送達地點') &&
     text.includes('物品內容') &&
     text.includes('是否急件') &&
-    text.includes('取件電話') &&
-    text.includes('送達電話')
+    (
+      text.includes('取件電話') ||
+      text.includes('取件人 / 電話') ||
+      text.includes('取件人/電話')
+    ) &&
+    (
+      text.includes('送達電話') ||
+      text.includes('收件人 / 電話') ||
+      text.includes('收件人/電話')
+    )
   );
 }
 
@@ -90,11 +106,12 @@ function parseTaskForm(text) {
 }
 
 function isUrgent(urgentText = '') {
-  return urgentText.includes('急件');
+  const text = String(urgentText).trim();
+  return text === '急件' || text === '是' || text.includes('急件');
 }
 
 function extractDistrict(address = '') {
-  const match = address.match(/([^\s縣市區路段巷弄號樓之]{1,6}區)/);
+  const match = address.match(/(豐原區|潭子區|神岡區|大雅區|北屯區|西屯區|南屯區|西區|南區|北區|東區|太平區|大里區|烏日區|霧峰區|沙鹿區|龍井區|梧棲區|清水區|大肚區|后里區|石岡區|東勢區|和平區)/);
   return match ? match[1] : '';
 }
 
@@ -107,7 +124,6 @@ function isCrossDistrict(pickupAddress, deliveryAddress) {
 }
 
 function parseGoogleDurationToMinutes(durationStr = '') {
-  // Google Routes API duration 例如 "1234s"
   const seconds = parseFloat(String(durationStr).replace('s', ''));
   if (!Number.isFinite(seconds)) return 0;
   return Math.ceil(seconds / 60);
@@ -118,34 +134,44 @@ async function getRouteInfo(originAddress, destinationAddress) {
     throw new Error('Missing GOOGLE_MAPS_API_KEY');
   }
 
-  const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
-      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
-    },
-    body: JSON.stringify({
-      origin: {
-        address: originAddress,
+  console.log('📍 origin:', originAddress);
+  console.log('📍 destination:', destinationAddress);
+
+  const response = await fetch(
+    'https://routes.googleapis.com/directions/v2:computeRoutes',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
+        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
       },
-      destination: {
-        address: destinationAddress,
-      },
-      travelMode: 'DRIVE',
-      routingPreference: 'TRAFFIC_AWARE',
-      languageCode: 'zh-TW',
-      units: 'METRIC',
-      regionCode: 'TW',
-    }),
-  });
+      body: JSON.stringify({
+        origin: {
+          address: originAddress,
+        },
+        destination: {
+          address: destinationAddress,
+        },
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_AWARE',
+        languageCode: 'zh-TW',
+        units: 'METRIC',
+        regionCode: 'TW',
+      }),
+    }
+  );
+
+  console.log('📡 Google response status:', response.status);
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('❌ Google API raw error:', errorText);
     throw new Error(`Google Routes API error: ${response.status} ${errorText}`);
   }
 
   const data = await response.json();
+  console.log('✅ Google route data:', JSON.stringify(data));
 
   if (!data.routes || !data.routes.length) {
     throw new Error('No route found');
@@ -244,8 +270,9 @@ async function handleEvent(event) {
     }
 
     const userText = normalizeText(event.message.text);
+    console.log('📩 User message:', userText);
 
-    // 1) 建立任務
+    // 建立任務
     if (userText === '建立任務') {
       return client.replyMessage(event.replyToken, {
         type: 'text',
@@ -265,7 +292,7 @@ async function handleEvent(event) {
       });
     }
 
-    // 2) 立即估價
+    // 立即估價
     if (userText === '立即估價') {
       return client.replyMessage(event.replyToken, {
         type: 'text',
@@ -279,9 +306,12 @@ async function handleEvent(event) {
       });
     }
 
-    // 3) 立即估價表單
+    // 立即估價表單
     if (isEstimateForm(userText)) {
+      console.log('🟡 Detected estimate form');
+
       const form = parseEstimateForm(userText);
+      console.log('🧾 Parsed estimate form:', form);
 
       const addressError = validateAddresses(form.pickupAddress, form.deliveryAddress);
       if (addressError) {
@@ -292,6 +322,8 @@ async function handleEvent(event) {
       }
 
       const routeInfo = await getRouteInfo(form.pickupAddress, form.deliveryAddress);
+      console.log('🛣️ Route info:', routeInfo);
+
       const pricing = calculatePrice({
         distanceKm: routeInfo.distanceKm,
         durationMinutes: routeInfo.durationMinutes,
@@ -299,6 +331,7 @@ async function handleEvent(event) {
         pickupAddress: form.pickupAddress,
         deliveryAddress: form.deliveryAddress,
       });
+      console.log('💰 Pricing:', pricing);
 
       return client.replyMessage(event.replyToken, {
         type: 'text',
@@ -306,9 +339,12 @@ async function handleEvent(event) {
       });
     }
 
-    // 4) 建立任務表單
+    // 建立任務表單
     if (isTaskForm(userText)) {
+      console.log('🟢 Detected task form');
+
       const task = parseTaskForm(userText);
+      console.log('🧾 Parsed task form:', task);
 
       const addressError = validateAddresses(task.pickupAddress, task.deliveryAddress);
       if (addressError) {
@@ -319,6 +355,8 @@ async function handleEvent(event) {
       }
 
       const routeInfo = await getRouteInfo(task.pickupAddress, task.deliveryAddress);
+      console.log('🛣️ Route info:', routeInfo);
+
       const pricing = calculatePrice({
         distanceKm: routeInfo.distanceKm,
         durationMinutes: routeInfo.durationMinutes,
@@ -326,8 +364,8 @@ async function handleEvent(event) {
         pickupAddress: task.pickupAddress,
         deliveryAddress: task.deliveryAddress,
       });
+      console.log('💰 Pricing:', pricing);
 
-      // 推送派單到群組
       if (LINE_GROUP_ID) {
         const dispatchMessage = buildDispatchMessage(task, routeInfo, pricing);
 
@@ -339,12 +377,12 @@ async function handleEvent(event) {
           console.log('✅ 派單成功推送到群組');
         } catch (pushErr) {
           console.error('❌ 派單推送失敗:', pushErr);
+          console.error('❌ 派單推送 message:', pushErr.message);
         }
       } else {
         console.warn('⚠️ 未設定 LINE_GROUP_ID，略過群組派單');
       }
 
-      // 回覆客人
       return client.replyMessage(event.replyToken, {
         type: 'text',
         text:
@@ -357,10 +395,12 @@ async function handleEvent(event) {
     return null;
   } catch (err) {
     console.error('❌ handleEvent error:', err);
+    console.error('❌ error message:', err.message);
+    console.error('❌ error stack:', err.stack);
 
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: '系統暫時忙碌中，請稍後再試一次。',
+      text: '系統暫時忙碌中，請稍後再試一次。'
     });
   }
 }
