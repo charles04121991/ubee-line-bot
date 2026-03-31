@@ -2,6 +2,7 @@
 
 const express = require("express");
 const line = require("@line/bot-sdk");
+const axios = require("axios");
 
 const app = express();
 
@@ -14,15 +15,16 @@ const client = new line.Client(config);
 
 const PORT = process.env.PORT || 3000;
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-// 可自行調整的固定費用設定
-const DEFAULT_CREATE_TASK_FEE = Number(process.env.DEFAULT_CREATE_TASK_FEE || 300);
-const DEFAULT_QUOTE_FEE = Number(process.env.DEFAULT_QUOTE_FEE || 230);
-const DEFAULT_TAX = Number(process.env.DEFAULT_TAX || 15);
+// ====== 可調整費率 ======
+const BASE_FEE = Number(process.env.BASE_FEE || 99);        // 基本費
+const PER_KM_FEE = Number(process.env.PER_KM_FEE || 6);     // 每公里
+const PER_MIN_FEE = Number(process.env.PER_MIN_FEE || 3);   // 每分鐘
+const URGENT_FEE = Number(process.env.URGENT_FEE || 100);   // 急件加價
+const TAX_RATE = Number(process.env.TAX_RATE || 0.05);      // 稅率 5%
 
-// =========================
-// 表單文字
-// =========================
+// ====== 表單文字 ======
 const createTaskFormText = `請直接依下列表單填寫並送出：
 
 取件地點：
@@ -42,9 +44,7 @@ const instantQuoteFormText = `請直接依下列格式填寫並送出：
 物品內容：
 是否急件：`;
 
-// =========================
-// 工具函式
-// =========================
+// ====== 工具函式 ======
 function getValue(text, label) {
   const regex = new RegExp(`${label}：\\s*(.*)`);
   const match = text.match(regex);
@@ -53,12 +53,15 @@ function getValue(text, label) {
 
 function normalizeUrgentText(value) {
   const raw = (value || "").trim();
+
   if (["是", "急件", "需要", "yes", "Yes", "YES"].includes(raw)) {
     return "急件";
   }
+
   if (["否", "一般", "不需要", "no", "No", "NO"].includes(raw)) {
     return "一般";
   }
+
   return raw || "一般";
 }
 
@@ -122,24 +125,65 @@ function validateInstantQuoteForm(form) {
   return null;
 }
 
-function calculateCreateTaskFee(form) {
-  let fee = DEFAULT_CREATE_TASK_FEE;
-
-  if (form.urgent === "急件") {
-    fee += 100;
-  }
-
-  return fee;
+async function replyText(replyToken, text) {
+  await client.replyMessage(replyToken, {
+    type: "text",
+    text,
+  });
 }
 
-function calculateQuoteFee(form) {
-  let fee = DEFAULT_QUOTE_FEE;
-
-  if (form.urgent === "急件") {
-    fee += 100;
+async function getDistanceAndTime(origin, destination) {
+  if (!GOOGLE_MAPS_API_KEY) {
+    throw new Error("未設定 GOOGLE_MAPS_API_KEY");
   }
 
-  const tax = DEFAULT_TAX;
+  const url = "https://maps.googleapis.com/maps/api/distancematrix/json";
+
+  const response = await axios.get(url, {
+    params: {
+      origins: origin,
+      destinations: destination,
+      key: GOOGLE_MAPS_API_KEY,
+      language: "zh-TW",
+      region: "tw",
+      mode: "driving",
+    },
+  });
+
+  const data = response.data;
+
+  if (!data || data.status !== "OK") {
+    throw new Error(`Google Maps API 錯誤：${data?.status || "未知錯誤"}`);
+  }
+
+  const row = data.rows && data.rows[0];
+  const element = row && row.elements && row.elements[0];
+
+  if (!element || element.status !== "OK") {
+    throw new Error(`無法取得距離資料：${element?.status || "未知錯誤"}`);
+  }
+
+  const distanceKm = element.distance.value / 1000;
+  const durationMin = element.duration.value / 60;
+
+  return {
+    distanceKm,
+    durationMin,
+    distanceText: element.distance.text,
+    durationText: element.duration.text,
+  };
+}
+
+function calculateFee({ distanceKm, durationMin, urgent }) {
+  let fee = BASE_FEE + distanceKm * PER_KM_FEE + durationMin * PER_MIN_FEE;
+
+  if (urgent === "急件") {
+    fee += URGENT_FEE;
+  }
+
+  fee = Math.round(fee);
+
+  const tax = Math.round(fee * TAX_RATE);
   const total = fee + tax;
 
   return {
@@ -173,65 +217,121 @@ function formatQuoteMessage(quote) {
 總計：$${quote.total}`;
 }
 
-async function replyText(replyToken, text) {
-  await client.replyMessage(replyToken, {
-    type: "text",
-    text,
-  });
-}
-
+// ====== 建立任務 ======
 async function handleCreateTask(event, userText) {
   const form = parseCreateTaskForm(userText);
   const error = validateCreateTaskForm(form);
 
   if (error) {
-    await replyText(event.replyToken, `${error}\n\n請重新依格式填寫：\n\n${createTaskFormText}`);
+    await replyText(
+      event.replyToken,
+      `${error}\n\n請重新依格式填寫：\n\n${createTaskFormText}`
+    );
     return;
   }
 
-  const fee = calculateCreateTaskFee(form);
+  try {
+    const mapData = await getDistanceAndTime(
+      form.pickupAddress,
+      form.deliveryAddress
+    );
 
-  const task = {
-    ...form,
-    fee,
-    distanceText: "待確認",
-  };
+    const pricing = calculateFee({
+      distanceKm: mapData.distanceKm,
+      durationMin: mapData.durationMin,
+      urgent: form.urgent,
+    });
 
-  await replyText(event.replyToken, "您的任務已建立成功，我們會立即為您派單。");
+    const task = {
+      ...form,
+      fee: pricing.fee,
+      tax: pricing.tax,
+      total: pricing.total,
+      distanceText: mapData.distanceText,
+      durationText: mapData.durationText,
+    };
 
-  if (!LINE_GROUP_ID) {
-    console.error("未設定 LINE_GROUP_ID，無法推送群組派單訊息。");
-    return;
+    await replyText(
+      event.replyToken,
+      "您的任務已建立成功，我們會立即為您派單。"
+    );
+
+    if (!LINE_GROUP_ID) {
+      console.error("LINE_GROUP_ID 未設定，無法推送群組訊息");
+      return;
+    }
+
+    console.log("準備推送到群組，LINE_GROUP_ID =", LINE_GROUP_ID);
+
+    await client.pushMessage(LINE_GROUP_ID, {
+      type: "text",
+      text: formatDispatchMessage(task),
+    });
+
+    console.log("pushMessage 成功");
+  } catch (err) {
+    console.error("handleCreateTask 失敗：", err?.response?.data || err.message || err);
+
+    await replyText(
+      event.replyToken,
+      "任務建立失敗，請稍後再試，或確認地址是否填寫完整。"
+    );
   }
-
-  await client.pushMessage(LINE_GROUP_ID, {
-    type: "text",
-    text: formatDispatchMessage(task),
-  });
 }
 
+// ====== 立即估價 ======
 async function handleInstantQuote(event, userText) {
   const form = parseInstantQuoteForm(userText);
   const error = validateInstantQuoteForm(form);
 
   if (error) {
-    await replyText(event.replyToken, `${error}\n\n請重新依格式填寫：\n\n${instantQuoteFormText}`);
+    await replyText(
+      event.replyToken,
+      `${error}\n\n請重新依格式填寫：\n\n${instantQuoteFormText}`
+    );
     return;
   }
 
-  const result = calculateQuoteFee(form);
+  try {
+    const mapData = await getDistanceAndTime(
+      form.pickupAddress,
+      form.deliveryAddress
+    );
 
-  const quote = {
-    ...form,
-    fee: result.fee,
-    tax: result.tax,
-    total: result.total,
-  };
+    const pricing = calculateFee({
+      distanceKm: mapData.distanceKm,
+      durationMin: mapData.durationMin,
+      urgent: form.urgent,
+    });
 
-  await replyText(event.replyToken, formatQuoteMessage(quote));
+    const quote = {
+      ...form,
+      fee: pricing.fee,
+      tax: pricing.tax,
+      total: pricing.total,
+      distanceText: mapData.distanceText,
+      durationText: mapData.durationText,
+    };
+
+    await replyText(event.replyToken, formatQuoteMessage(quote));
+  } catch (err) {
+    console.error("handleInstantQuote 失敗：", err?.response?.data || err.message || err);
+
+    await replyText(
+      event.replyToken,
+      "目前無法完成估價，請確認地址是否正確，或稍後再試。"
+    );
+  }
 }
 
+// ====== 主事件處理 ======
 async function handleEvent(event) {
+  console.log("收到 webhook event:", JSON.stringify(event, null, 2));
+
+  if (event.source && event.source.type === "group") {
+    console.log("目前 groupId =", event.source.groupId);
+  }
+
   if (event.type !== "message" || event.message.type !== "text") {
     return;
   }
@@ -259,12 +359,12 @@ async function handleEvent(event) {
   }
 }
 
-// 健康檢查
+// ====== 健康檢查 ======
 app.get("/", (req, res) => {
   res.status(200).send("UBee LINE Bot is running.");
 });
 
-// LINE Webhook
+// ====== Webhook ======
 app.post("/webhook", line.middleware(config), async (req, res) => {
   try {
     const events = req.body.events || [];
