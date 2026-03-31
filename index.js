@@ -1,46 +1,29 @@
-const express = require('express');
-const line = require('@line/bot-sdk');
+"use strict";
+
+const express = require("express");
+const line = require("@line/bot-sdk");
 
 const app = express();
 
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.CHANNEL_SECRET
+  channelSecret: process.env.CHANNEL_SECRET,
 };
 
 const client = new line.Client(config);
-const GROUP_ID = process.env.GROUP_ID || '';
 
-app.get('/', (req, res) => {
-  res.send('UBee Webhook OK');
-});
+const PORT = process.env.PORT || 3000;
+const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 
-app.post('/webhook', line.middleware(config), async (req, res) => {
-  try {
-    await Promise.all(req.body.events.map(handleEvent));
-    res.status(200).end();
-  } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).end();
-  }
-});
+// 可自行調整的固定費用設定
+const DEFAULT_CREATE_TASK_FEE = Number(process.env.DEFAULT_CREATE_TASK_FEE || 300);
+const DEFAULT_QUOTE_FEE = Number(process.env.DEFAULT_QUOTE_FEE || 230);
+const DEFAULT_TAX = Number(process.env.DEFAULT_TAX || 15);
 
-async function handleEvent(event) {
-  if (event.source && event.source.type === 'group') {
-    console.log('群組ID:', event.source.groupId);
-  }
-
-  if (event.type !== 'message' || event.message.type !== 'text') {
-    return null;
-  }
-
-  const text = event.message.text.trim();
-
-  // ===== 建立任務：顯示表單 =====
-  if (text === '建立任務') {
-    return replyText(
-      event.replyToken,
-      `請依下列格式填寫並送出：
+// =========================
+// 表單文字
+// =========================
+const createTaskFormText = `請直接依下列表單填寫並送出：
 
 取件地點：
 取件電話：
@@ -50,234 +33,249 @@ async function handleEvent(event) {
 
 物品內容：
 是否急件：
-備註：`
-    );
-  }
+備註：`;
 
-  // ===== 立即估價：顯示表單 =====
-  if (text === '立即估價') {
-    return replyText(
-      event.replyToken,
-      `請依下列格式填寫並送出：
+const instantQuoteFormText = `請直接依下列格式填寫並送出：
 
 取件地點：
 送達地點：
 物品內容：
-是否急件：`
-    );
-  }
+是否急件：`;
 
-  // ===== 建立任務：解析完整表單 =====
-  if (looksLikeTaskForm(text)) {
-    const form = parseTaskForm(text);
-
-    const missingFields = getMissingFields(form, [
-      'pickup_address',
-      'pickup_phone',
-      'delivery_address',
-      'delivery_phone',
-      'item_content',
-      'is_urgent'
-    ]);
-
-    if (missingFields.length > 0) {
-      return replyText(
-        event.replyToken,
-        `以下欄位尚未完整填寫：
-${missingFields.join('\n')}
-
-請補齊後重新送出。`
-      );
-    }
-
-    const result = calculatePrice(form);
-
-    const customerMessage = `✅ 任務建立完成
-
-取件地點：${form.pickup_address}
-取件電話：${form.pickup_phone}
-
-送達地點：${form.delivery_address}
-送達電話：${form.delivery_phone}
-
-物品內容：${form.item_content}
-是否急件：${form.is_urgent}
-備註：${form.note || '無'}
-
-配送費：$${result.fee}
-稅金：$${result.tax}
-總計：$${result.total}`;
-
-    const groupMessage = `🚨 UBee 派單
-
-費用：$${result.fee}
-距離：${result.distance}
-
-取件地點：${form.pickup_address}
-送達地點：${form.delivery_address}
-物品：${form.item_content}
-急件：${form.is_urgent}`;
-
-    await replyText(event.replyToken, customerMessage);
-
-    if (GROUP_ID) {
-      await pushToGroup(groupMessage);
-    }
-
-    return null;
-  }
-
-  // ===== 立即估價：解析簡化表單 =====
-  if (looksLikeEstimateForm(text)) {
-    const form = parseEstimateForm(text);
-
-    const missingFields = getMissingFields(form, [
-      'pickup_address',
-      'delivery_address',
-      'item_content',
-      'is_urgent'
-    ]);
-
-    if (missingFields.length > 0) {
-      return replyText(
-        event.replyToken,
-        `以下欄位尚未完整填寫：
-${missingFields.join('\n')}
-
-請補齊後重新送出。`
-      );
-    }
-
-    const result = calculatePrice(form);
-
-    return replyText(
-      event.replyToken,
-      `📌 預估報價如下（非最終報價）
-
-取件地點：${form.pickup_address}
-送達地點：${form.delivery_address}
-物品內容：${form.item_content}
-是否急件：${form.is_urgent}
-
-配送費：$${result.fee}
-稅金：$${result.tax}
-總計：$${result.total}`
-    );
-  }
-
-  return replyText(
-    event.replyToken,
-    '請點選選單功能，或輸入「建立任務」／「立即估價」。'
-  );
-}
-
-// ===== 判斷是否為建立任務表單 =====
-function looksLikeTaskForm(text) {
-  return (
-    text.includes('取件地點：') &&
-    text.includes('取件電話：') &&
-    text.includes('送達地點：') &&
-    text.includes('送達電話：') &&
-    text.includes('物品內容：') &&
-    text.includes('是否急件：')
-  );
-}
-
-// ===== 判斷是否為立即估價表單 =====
-function looksLikeEstimateForm(text) {
-  return (
-    text.includes('取件地點：') &&
-    text.includes('送達地點：') &&
-    text.includes('物品內容：') &&
-    text.includes('是否急件：') &&
-    !text.includes('取件電話：') &&
-    !text.includes('送達電話：')
-  );
-}
-
-// ===== 解析建立任務表單 =====
-function parseTaskForm(text) {
-  return {
-    pickup_address: extractField(text, '取件地點'),
-    pickup_phone: extractField(text, '取件電話'),
-    delivery_address: extractField(text, '送達地點'),
-    delivery_phone: extractField(text, '送達電話'),
-    item_content: extractField(text, '物品內容'),
-    is_urgent: extractField(text, '是否急件'),
-    note: extractField(text, '備註')
-  };
-}
-
-// ===== 解析立即估價表單 =====
-function parseEstimateForm(text) {
-  return {
-    pickup_address: extractField(text, '取件地點'),
-    delivery_address: extractField(text, '送達地點'),
-    item_content: extractField(text, '物品內容'),
-    is_urgent: extractField(text, '是否急件')
-  };
-}
-
-// ===== 抓欄位值 =====
-function extractField(text, label) {
-  const regex = new RegExp(`${label}：\\s*(.+)`);
+// =========================
+// 工具函式
+// =========================
+function getValue(text, label) {
+  const regex = new RegExp(`${label}：\\s*(.*)`);
   const match = text.match(regex);
-  return match ? match[1].trim() : '';
+  return match ? match[1].trim() : "";
 }
 
-// ===== 檢查缺少欄位 =====
-function getMissingFields(data, requiredKeys) {
-  const labels = {
-    pickup_address: '取件地點',
-    pickup_phone: '取件電話',
-    delivery_address: '送達地點',
-    delivery_phone: '送達電話',
-    item_content: '物品內容',
-    is_urgent: '是否急件'
+function normalizeUrgentText(value) {
+  const raw = (value || "").trim();
+  if (["是", "急件", "需要", "yes", "Yes", "YES"].includes(raw)) {
+    return "急件";
+  }
+  if (["否", "一般", "不需要", "no", "No", "NO"].includes(raw)) {
+    return "一般";
+  }
+  return raw || "一般";
+}
+
+function isCreateTaskForm(text) {
+  return (
+    text.includes("取件地點：") &&
+    text.includes("取件電話：") &&
+    text.includes("送達地點：") &&
+    text.includes("送達電話：") &&
+    text.includes("物品內容：") &&
+    text.includes("是否急件：")
+  );
+}
+
+function isInstantQuoteForm(text) {
+  return (
+    text.includes("取件地點：") &&
+    !text.includes("取件電話：") &&
+    text.includes("送達地點：") &&
+    text.includes("物品內容：") &&
+    text.includes("是否急件：")
+  );
+}
+
+function parseCreateTaskForm(text) {
+  return {
+    pickupAddress: getValue(text, "取件地點"),
+    pickupPhone: getValue(text, "取件電話"),
+    deliveryAddress: getValue(text, "送達地點"),
+    deliveryPhone: getValue(text, "送達電話"),
+    item: getValue(text, "物品內容"),
+    urgent: normalizeUrgentText(getValue(text, "是否急件")),
+    note: getValue(text, "備註"),
   };
-
-  return requiredKeys
-    .filter((key) => !data[key] || data[key].trim() === '')
-    .map((key) => `- ${labels[key]}`);
 }
 
-// ===== 回覆使用者 =====
-function replyText(replyToken, text) {
-  return client.replyMessage(replyToken, {
-    type: 'text',
-    text: text
-  });
+function parseInstantQuoteForm(text) {
+  return {
+    pickupAddress: getValue(text, "取件地點"),
+    deliveryAddress: getValue(text, "送達地點"),
+    item: getValue(text, "物品內容"),
+    urgent: normalizeUrgentText(getValue(text, "是否急件")),
+  };
 }
 
-// ===== 推送到群組 =====
-function pushToGroup(text) {
-  return client.pushMessage(GROUP_ID, {
-    type: 'text',
-    text: text
-  });
+function validateCreateTaskForm(form) {
+  if (!form.pickupAddress) return "請填寫取件地點";
+  if (!form.pickupPhone) return "請填寫取件電話";
+  if (!form.deliveryAddress) return "請填寫送達地點";
+  if (!form.deliveryPhone) return "請填寫送達電話";
+  if (!form.item) return "請填寫物品內容";
+  if (!form.urgent) return "請填寫是否急件";
+  return null;
 }
 
-// ===== 計價邏輯（目前測試版） =====
-function calculatePrice(data) {
-  const baseFee = 100;
-  const distanceFee = 80;
-  const timeFee = 50;
-  const urgentFee =
-    data.is_urgent && data.is_urgent.includes('急') ? 100 : 0;
+function validateInstantQuoteForm(form) {
+  if (!form.pickupAddress) return "請填寫取件地點";
+  if (!form.deliveryAddress) return "請填寫送達地點";
+  if (!form.item) return "請填寫物品內容";
+  if (!form.urgent) return "請填寫是否急件";
+  return null;
+}
 
-  const fee = baseFee + distanceFee + timeFee + urgentFee;
-  const tax = Math.round(fee * 0.05);
+function calculateCreateTaskFee(form) {
+  let fee = DEFAULT_CREATE_TASK_FEE;
+
+  if (form.urgent === "急件") {
+    fee += 100;
+  }
+
+  return fee;
+}
+
+function calculateQuoteFee(form) {
+  let fee = DEFAULT_QUOTE_FEE;
+
+  if (form.urgent === "急件") {
+    fee += 100;
+  }
+
+  const tax = DEFAULT_TAX;
   const total = fee + tax;
 
   return {
-    fee: fee,
-    tax: tax,
-    total: total,
-    distance: '5公里 / 12分鐘'
+    fee,
+    tax,
+    total,
   };
 }
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server running on ${port}`);
+function formatDispatchMessage(task) {
+  return `【UBee 新任務派單】
+
+費用：$${task.fee}
+距離：${task.distanceText}
+取件地點：${task.pickupAddress}
+取件電話：${task.pickupPhone}
+送達地點：${task.deliveryAddress}
+送達電話：${task.deliveryPhone}
+物品內容：${task.item}
+是否急件：${task.urgent}`;
+}
+
+function formatQuoteMessage(quote) {
+  return `取件地點：${quote.pickupAddress}
+送達地點：${quote.deliveryAddress}
+物品內容：${quote.item}
+是否急件：${quote.urgent}
+
+費用：$${quote.fee}
+稅金：$${quote.tax}
+總計：$${quote.total}`;
+}
+
+async function replyText(replyToken, text) {
+  await client.replyMessage(replyToken, {
+    type: "text",
+    text,
+  });
+}
+
+async function handleCreateTask(event, userText) {
+  const form = parseCreateTaskForm(userText);
+  const error = validateCreateTaskForm(form);
+
+  if (error) {
+    await replyText(event.replyToken, `${error}\n\n請重新依格式填寫：\n\n${createTaskFormText}`);
+    return;
+  }
+
+  const fee = calculateCreateTaskFee(form);
+
+  const task = {
+    ...form,
+    fee,
+    distanceText: "待確認",
+  };
+
+  await replyText(event.replyToken, "您的任務已建立成功，我們會立即為您派單。");
+
+  if (!LINE_GROUP_ID) {
+    console.error("未設定 LINE_GROUP_ID，無法推送群組派單訊息。");
+    return;
+  }
+
+  await client.pushMessage(LINE_GROUP_ID, {
+    type: "text",
+    text: formatDispatchMessage(task),
+  });
+}
+
+async function handleInstantQuote(event, userText) {
+  const form = parseInstantQuoteForm(userText);
+  const error = validateInstantQuoteForm(form);
+
+  if (error) {
+    await replyText(event.replyToken, `${error}\n\n請重新依格式填寫：\n\n${instantQuoteFormText}`);
+    return;
+  }
+
+  const result = calculateQuoteFee(form);
+
+  const quote = {
+    ...form,
+    fee: result.fee,
+    tax: result.tax,
+    total: result.total,
+  };
+
+  await replyText(event.replyToken, formatQuoteMessage(quote));
+}
+
+async function handleEvent(event) {
+  if (event.type !== "message" || event.message.type !== "text") {
+    return;
+  }
+
+  const userText = (event.message.text || "").trim();
+
+  if (userText === "建立任務") {
+    await replyText(event.replyToken, createTaskFormText);
+    return;
+  }
+
+  if (userText === "立即估價") {
+    await replyText(event.replyToken, instantQuoteFormText);
+    return;
+  }
+
+  if (isCreateTaskForm(userText)) {
+    await handleCreateTask(event, userText);
+    return;
+  }
+
+  if (isInstantQuoteForm(userText)) {
+    await handleInstantQuote(event, userText);
+    return;
+  }
+}
+
+// 健康檢查
+app.get("/", (req, res) => {
+  res.status(200).send("UBee LINE Bot is running.");
+});
+
+// LINE Webhook
+app.post("/webhook", line.middleware(config), async (req, res) => {
+  try {
+    const events = req.body.events || [];
+    await Promise.all(events.map(handleEvent));
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("Webhook Error:", error);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
