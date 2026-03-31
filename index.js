@@ -12,7 +12,7 @@ const config = {
 const client = new line.Client(config);
 
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot v4');
+  res.status(200).send('UBee bot v5');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -31,9 +31,12 @@ async function handleEvent(event) {
     return null;
   }
 
-  const text = event.message.text.trim();
+  const rawText = event.message.text || '';
+  const text = rawText.trim();
 
-  if (text === '立即估價') {
+  console.log('收到文字=', JSON.stringify(text));
+
+  if (text.includes('立即估價')) {
     return client.replyMessage(event.replyToken, {
       type: 'text',
       text:
@@ -47,7 +50,7 @@ async function handleEvent(event) {
     });
   }
 
-  if (text === '建立任務') {
+  if (text.includes('建立任務')) {
     return client.replyMessage(event.replyToken, {
       type: 'text',
       text:
