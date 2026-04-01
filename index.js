@@ -19,8 +19,8 @@ if (!config.channelAccessToken || !config.channelSecret) {
 const client = new line.Client(config);
 
 const PORT = process.env.PORT || 3000;
-const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
+const LINE_GROUP_ID = (process.env.LINE_GROUP_ID || '').trim();
+const GOOGLE_MAPS_API_KEY = (process.env.GOOGLE_MAPS_API_KEY || '').trim();
 
 // ====== 費率設定 ======
 const BASE_FEE = 99;
@@ -31,20 +31,13 @@ const URGENT_FEE = 100;
 const SERVICE_FEE = 50;
 const FIXED_TAX = 15;
 
-// 騎手分潤：配送費 * 0.6
+// 騎手分潤：配送費 + 跨區費，再乘 0.6
 const RIDER_SHARE_RATE = 0.6;
 
 // ====== 記憶體資料 ======
-// 使用者引導流程
 const userSessions = {}; // { [userId]: { mode, step, data, quote } }
-
-// 已建立並派到群組的任務
-const activeJobs = {}; // { [groupId]: { customerUserId, customerName, status, ... } }
-
-// 群組等待騎手輸入 ETA 的暫存
+const activeJobs = {}; // { [groupId]: job }
 const pendingRiderAccept = {}; // { [groupId]: { riderUserId, riderName } }
-
-// 避免重複歡迎詞
 const greetedUsers = new Set();
 
 // ====== 工具函式 ======
@@ -154,6 +147,7 @@ async function getDistanceAndDuration(origin, destination) {
     !data.rows[0].elements[0] ||
     data.rows[0].elements[0].status !== 'OK'
   ) {
+    console.error('❌ Google Maps response error:', JSON.stringify(data));
     throw new Error('Google Maps distance lookup failed');
   }
 
@@ -242,15 +236,33 @@ function formatGroupJobMessage(job) {
 }
 
 async function pushToGroup(text) {
+  console.log('==== pushToGroup 開始 ====');
+  console.log('LINE_GROUP_ID =', JSON.stringify(LINE_GROUP_ID));
+  console.log('push text =', text);
+
   if (!LINE_GROUP_ID) {
     console.error('❌ Missing LINE_GROUP_ID');
-    return;
+    return false;
   }
 
   try {
     await client.pushMessage(LINE_GROUP_ID, { type: 'text', text });
+    console.log('✅ pushToGroup 成功');
+    return true;
   } catch (err) {
-    console.error('❌ pushToGroup failed:', err.message);
+    console.error('❌ pushToGroup failed');
+    console.error('err.message =', err.message);
+    console.error(
+      'err.response =',
+      JSON.stringify(
+        err?.response?.data ||
+        err?.originalError?.response?.data ||
+        err,
+        null,
+        2
+      )
+    );
+    return false;
   }
 }
 
@@ -282,7 +294,7 @@ async function getDisplayName(userId, source) {
 
 function createEmptySession(mode) {
   return {
-    mode, // create / quote
+    mode,
     step: 'pickupAddress',
     data: {
       pickupAddress: '',
@@ -447,7 +459,6 @@ async function handleUserFlow(event, text) {
       return true;
     }
 
-    // ===== 立即估價 =====
     if (session.mode === 'quote') {
       const quoteText = formatQuoteForCustomer(session.quote);
       clearUserSession(userId);
@@ -455,8 +466,8 @@ async function handleUserFlow(event, text) {
       return true;
     }
 
-    // ===== 建立任務 =====
     const customerName = await getDisplayName(userId, event.source);
+    const targetGroupId = LINE_GROUP_ID;
 
     const job = {
       customerUserId: userId,
@@ -481,10 +492,10 @@ async function handleUserFlow(event, text) {
       riderUserId: '',
       riderName: '',
       etaMin: 0,
-      groupId: LINE_GROUP_ID,
+      groupId: targetGroupId,
     };
 
-    activeJobs[LINE_GROUP_ID] = job;
+    activeJobs[targetGroupId] = job;
 
     const customerText = formatTaskCreatedForCustomer(session.quote);
     const groupText = formatGroupJobMessage(job);
@@ -492,7 +503,11 @@ async function handleUserFlow(event, text) {
     clearUserSession(userId);
 
     await client.replyMessage(event.replyToken, { type: 'text', text: customerText });
-    await pushToGroup(groupText);
+
+    const pushSuccess = await pushToGroup(groupText);
+    if (!pushSuccess) {
+      console.error('❌ 任務已建立，但群組派單失敗');
+    }
 
     return true;
   }
@@ -505,7 +520,6 @@ async function handleUserMessage(event, text) {
   const userId = event.source.userId;
   const t = safeText(text);
 
-  // 若在流程中，優先處理流程
   if (userSessions[userId]) {
     const handled = await handleUserFlow(event, t);
     if (handled) return;
@@ -552,7 +566,6 @@ async function handleGroupMessage(event, text) {
     return replyText(event.replyToken, '目前沒有可處理的任務。');
   }
 
-  // ===== 騎手輸入 接 =====
   if (t === '接') {
     if (job.status !== 'waiting_rider') {
       return replyText(event.replyToken, '此任務目前不可接單。');
@@ -569,7 +582,6 @@ async function handleGroupMessage(event, text) {
     );
   }
 
-  // ===== 接單後輸入 ETA 數字 =====
   if (/^\d{1,3}$/.test(t) && pendingRiderAccept[groupId]) {
     const pending = pendingRiderAccept[groupId];
 
@@ -591,13 +603,11 @@ async function handleGroupMessage(event, text) {
 
     delete pendingRiderAccept[groupId];
 
-    // 群組回覆
     await client.replyMessage(event.replyToken, {
       type: 'text',
       text: `✅ 此任務已由 ${job.riderName} 接單\n⏱ 預計 ${etaMin} 分鐘抵達取件地點`,
     });
 
-    // 客戶通知
     try {
       await client.pushMessage(job.customerUserId, {
         type: 'text',
@@ -610,7 +620,6 @@ async function handleGroupMessage(event, text) {
     return;
   }
 
-  // ===== 已抵達 =====
   if (t === '已抵達') {
     if (job.riderUserId !== userId) {
       return replyText(event.replyToken, '只有已接單騎手可以回報此狀態。');
@@ -634,7 +643,6 @@ async function handleGroupMessage(event, text) {
     return;
   }
 
-  // ===== 已取件 =====
   if (t === '已取件') {
     if (job.riderUserId !== userId) {
       return replyText(event.replyToken, '只有已接單騎手可以回報此狀態。');
@@ -658,7 +666,6 @@ async function handleGroupMessage(event, text) {
     return;
   }
 
-  // ===== 已送達 =====
   if (t === '已送達') {
     if (job.riderUserId !== userId) {
       return replyText(event.replyToken, '只有已接單騎手可以回報此狀態。');
@@ -682,7 +689,6 @@ async function handleGroupMessage(event, text) {
     return;
   }
 
-  // ===== 已完成 =====
   if (t === '已完成') {
     if (job.riderUserId !== userId) {
       return replyText(event.replyToken, '只有已接單騎手可以回報此狀態。');
@@ -766,4 +772,9 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ UBee bot v3.1 running on port ${PORT}`);
+  console.log('==== 啟動環境檢查 ====');
+  console.log('CHANNEL_ACCESS_TOKEN exists =', !!process.env.CHANNEL_ACCESS_TOKEN);
+  console.log('CHANNEL_SECRET exists =', !!process.env.CHANNEL_SECRET);
+  console.log('GOOGLE_MAPS_API_KEY exists =', !!GOOGLE_MAPS_API_KEY);
+  console.log('LINE_GROUP_ID =', JSON.stringify(LINE_GROUP_ID));
 });
