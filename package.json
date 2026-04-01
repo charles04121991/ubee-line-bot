@@ -1,17 +1,21 @@
 {
   "name": "ubee-line-bot",
   "version": "3.1.0",
-  "description": "UBee LINE bot",
+  "description": "UBee V3.1 stable dispatch system",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "engines": {
-    "node": "20.x"
+    "node": ">=18"
   },
   "dependencies": {
-    "@line/bot-sdk": "^9.7.0",
+    "@line/bot-sdk": "^9.3.0",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2"
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }
