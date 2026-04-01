@@ -235,6 +235,7 @@ function formatGroupJobMessage(job) {
   );
 }
 
+// ====== 推播到群組（已補 429 額度錯誤處理） ======
 async function pushToGroup(text) {
   console.log('==== pushToGroup 開始 ====');
   console.log('LINE_GROUP_ID =', JSON.stringify(LINE_GROUP_ID));
@@ -242,27 +243,34 @@ async function pushToGroup(text) {
 
   if (!LINE_GROUP_ID) {
     console.error('❌ Missing LINE_GROUP_ID');
-    return false;
+    return { success: false, type: 'NO_GROUP' };
   }
 
   try {
     await client.pushMessage(LINE_GROUP_ID, { type: 'text', text });
     console.log('✅ pushToGroup 成功');
-    return true;
+    return { success: true };
   } catch (err) {
     console.error('❌ pushToGroup failed');
     console.error('err.message =', err.message);
-    console.error(
-      'err.response =',
-      JSON.stringify(
-        err?.response?.data ||
-        err?.originalError?.response?.data ||
-        err,
-        null,
-        2
-      )
-    );
-    return false;
+
+    const errorData =
+      err?.response?.data ||
+      err?.originalError?.response?.data ||
+      {};
+
+    console.error('err.response =', JSON.stringify(errorData, null, 2));
+
+    if (
+      err?.response?.status === 429 &&
+      errorData.message &&
+      errorData.message.includes('monthly limit')
+    ) {
+      console.error('🚨 LINE 推播額度已滿');
+      return { success: false, type: 'LIMIT' };
+    }
+
+    return { success: false, type: 'OTHER' };
   }
 }
 
@@ -502,11 +510,44 @@ async function handleUserFlow(event, text) {
 
     clearUserSession(userId);
 
-    await client.replyMessage(event.replyToken, { type: 'text', text: customerText });
+    const pushResult = await pushToGroup(groupText);
 
-    const pushSuccess = await pushToGroup(groupText);
-    if (!pushSuccess) {
-      console.error('❌ 任務已建立，但群組派單失敗');
+    console.log('==============================');
+    console.log('派單結果:', pushResult);
+    console.log('==============================');
+
+    if (pushResult.success) {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: customerText,
+      });
+    } else if (pushResult.type === 'LIMIT') {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text:
+          `✅ 您的任務已建立成功\n\n` +
+          `⚠️ 目前系統推播額度已達上限\n` +
+          `暫時無法自動派單到群組\n\n` +
+          `我們將為您人工處理 🙏`,
+      });
+    } else if (pushResult.type === 'NO_GROUP') {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text:
+          `✅ 您的任務已建立成功\n\n` +
+          `⚠️ 尚未設定群組派單資訊\n` +
+          `暫時無法自動派單\n\n` +
+          `請由人工協助處理。`,
+      });
+    } else {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text:
+          `✅ 您的任務已建立成功\n\n` +
+          `⚠️ 派單系統發生異常\n` +
+          `暫時無法自動派單\n\n` +
+          `請稍後再試或聯繫客服`,
+      });
     }
 
     return true;
@@ -757,7 +798,7 @@ async function handleEvent(event) {
 
 // ====== Express ======
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot v3.1 running');
+  res.status(200).send('UBee bot v3.2 running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -771,7 +812,7 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ UBee bot v3.1 running on port ${PORT}`);
+  console.log(`✅ UBee bot v3.2 running on port ${PORT}`);
   console.log('==== 啟動環境檢查 ====');
   console.log('CHANNEL_ACCESS_TOKEN exists =', !!process.env.CHANNEL_ACCESS_TOKEN);
   console.log('CHANNEL_SECRET exists =', !!process.env.CHANNEL_SECRET);
