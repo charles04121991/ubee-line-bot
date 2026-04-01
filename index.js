@@ -43,10 +43,11 @@ const MIN_RIDER_FEE = 120;
 // =========================
 // 記憶體暫存
 // =========================
-const userStates = new Map();      // userId -> { mode: 'create' | 'quote' }
-const tasks = new Map();           // taskId -> task
-const processedEvents = new Set(); // 避免 webhook 重複
-const greetedUsers = new Map();    // userId -> timestamp
+const userStates = new Map();        // userId -> { mode: 'create' | 'quote' }
+const tasks = new Map();             // taskId -> task
+const processedEvents = new Set();   // 避免 webhook 重複
+const greetedUsers = new Map();      // userId -> timestamp
+const riderPendingAccept = new Map(); // riderId -> { taskId, groupId, createdAt }
 let taskCounter = 1;
 
 // =========================
@@ -111,6 +112,32 @@ function shouldSuppressGreeting(userId) {
 
   greetedUsers.set(userId, nowTs);
   return false;
+}
+
+function normalizeText(text = '') {
+  return safeTrim(text).replace(/\s+/g, ' ');
+}
+
+function isPureNumberText(text = '') {
+  return /^\d{1,3}$/.test(safeTrim(text));
+}
+
+function parseAcceptCommand(text = '') {
+  const normalized = normalizeText(text);
+
+  // 支援：
+  // 接
+  // 接單
+  // 接 8
+  // 接單 8
+  const match = normalized.match(/^(接|接單)(?:\s+(\d{1,3}))?$/);
+
+  if (!match) return null;
+
+  return {
+    hasEta: !!match[2],
+    etaMin: match[2] ? Number(match[2]) : null
+  };
 }
 
 // =========================
@@ -368,13 +395,27 @@ function getLatestWaitingTask() {
   return allTasks[0] || null;
 }
 
-function getLatestAcceptedTaskByRider(riderId) {
+function getLatestInProgressTaskByRider(riderId) {
+  const allowedStatuses = ['accepted', 'arrived', 'picked', 'delivered'];
+
   const allTasks = Array.from(tasks.values())
-    .filter(task => task.status !== 'completed')
+    .filter(task => allowedStatuses.includes(task.status))
     .filter(task => task.riderId === riderId)
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
   return allTasks[0] || null;
+}
+
+function cleanupExpiredPendingAccept() {
+  const nowTs = Date.now();
+  const expireMs = 5 * 60 * 1000;
+
+  for (const [riderId, pending] of riderPendingAccept.entries()) {
+    const createdAtTs = new Date(pending.createdAt).getTime();
+    if (!createdAtTs || nowTs - createdAtTs > expireMs) {
+      riderPendingAccept.delete(riderId);
+    }
+  }
 }
 
 // =========================
@@ -554,11 +595,13 @@ async function handleGroupText(event, text) {
     return null;
   }
 
+  cleanupExpiredPendingAccept();
+
   const riderId = event.source?.userId || '';
   let riderName = '騎手';
 
   try {
-    if (riderId) {
+    if (riderId && groupId) {
       const profile = await client.getGroupMemberProfile(groupId, riderId);
       riderName = profile?.displayName || riderName;
     }
@@ -566,13 +609,80 @@ async function handleGroupText(event, text) {
     console.warn('⚠️ 無法取得群組成員名稱，改用預設名稱');
   }
 
-  const acceptMatch = text.match(/^接單\s*(\d{1,3})$/);
-  if (acceptMatch) {
-    const etaMin = Number(acceptMatch[1]);
+  const normalizedText = normalizeText(text);
+
+  // =========================
+  // 1. 接 / 接單 / 接 8 / 接單 8
+  // =========================
+  const acceptCommand = parseAcceptCommand(normalizedText);
+  if (acceptCommand) {
     const task = getLatestWaitingTask();
 
     if (!task) {
       await safeReply(event.replyToken, '目前沒有等待中的任務。');
+      return null;
+    }
+
+    // A. 僅輸入「接」或「接單」→ 進入等待 ETA 模式
+    if (!acceptCommand.hasEta) {
+      if (!riderId) {
+        await safeReply(event.replyToken, '目前無法識別您的帳號，請稍後再試。');
+        return null;
+      }
+
+      riderPendingAccept.set(riderId, {
+        taskId: task.id,
+        groupId: groupId || '',
+        createdAt: now()
+      });
+
+      await safeReply(
+        event.replyToken,
+        '✅ 已收到接單\n請回覆幾分鐘會到取件地點\n例如：8'
+      );
+      return null;
+    }
+
+    // B. 輸入「接 8」或「接單 8」→ 直接完成接單
+    if (task.status !== 'waiting') {
+      await safeReply(event.replyToken, '此任務已不可接，請等待下一筆任務。');
+      return null;
+    }
+
+    task.status = 'accepted';
+    task.etaMin = acceptCommand.etaMin;
+    task.riderId = riderId;
+    task.riderName = riderName;
+    task.updatedAt = now();
+    tasks.set(task.id, task);
+
+    if (riderId) {
+      riderPendingAccept.delete(riderId);
+    }
+
+    await safeReply(
+      event.replyToken,
+      `✅ 已接單\n⏱ 預計 ${task.etaMin} 分鐘抵達取件地點`
+    );
+
+    if (task.customerUserId) {
+      await safePush(task.customerUserId, buildCustomerAcceptedMessage(task));
+    }
+
+    return null;
+  }
+
+  // =========================
+  // 2. 騎手在等待 ETA 時，直接輸入分鐘數
+  // =========================
+  if (riderId && riderPendingAccept.has(riderId) && isPureNumberText(normalizedText)) {
+    const pendingInfo = riderPendingAccept.get(riderId);
+    const etaMin = Number(normalizedText);
+    const task = tasks.get(pendingInfo.taskId);
+
+    if (!task || task.status !== 'waiting') {
+      riderPendingAccept.delete(riderId);
+      await safeReply(event.replyToken, '此任務已不可接，請等待下一筆任務。');
       return null;
     }
 
@@ -583,7 +693,12 @@ async function handleGroupText(event, text) {
     task.updatedAt = now();
     tasks.set(task.id, task);
 
-    await safeReply(event.replyToken, `✅ 已接單，ETA ${etaMin} 分鐘`);
+    riderPendingAccept.delete(riderId);
+
+    await safeReply(
+      event.replyToken,
+      `✅ 已接單\n⏱ 預計 ${task.etaMin} 分鐘抵達取件地點`
+    );
 
     if (task.customerUserId) {
       await safePush(task.customerUserId, buildCustomerAcceptedMessage(task));
@@ -592,8 +707,11 @@ async function handleGroupText(event, text) {
     return null;
   }
 
-  if (text === '已抵達') {
-    const task = getLatestAcceptedTaskByRider(riderId);
+  // =========================
+  // 3. 狀態回報
+  // =========================
+  if (normalizedText === '已抵達') {
+    const task = getLatestInProgressTaskByRider(riderId);
     if (!task) {
       await safeReply(event.replyToken, '目前找不到您已接下但尚未完成的任務。');
       return null;
@@ -608,8 +726,8 @@ async function handleGroupText(event, text) {
     return null;
   }
 
-  if (text === '已取件') {
-    const task = getLatestAcceptedTaskByRider(riderId);
+  if (normalizedText === '已取件') {
+    const task = getLatestInProgressTaskByRider(riderId);
     if (!task) {
       await safeReply(event.replyToken, '目前找不到您已接下但尚未完成的任務。');
       return null;
@@ -624,8 +742,8 @@ async function handleGroupText(event, text) {
     return null;
   }
 
-  if (text === '已送達') {
-    const task = getLatestAcceptedTaskByRider(riderId);
+  if (normalizedText === '已送達') {
+    const task = getLatestInProgressTaskByRider(riderId);
     if (!task) {
       await safeReply(event.replyToken, '目前找不到您已接下但尚未完成的任務。');
       return null;
@@ -640,8 +758,8 @@ async function handleGroupText(event, text) {
     return null;
   }
 
-  if (text === '已完成') {
-    const task = getLatestAcceptedTaskByRider(riderId);
+  if (normalizedText === '已完成') {
+    const task = getLatestInProgressTaskByRider(riderId);
     if (!task) {
       await safeReply(event.replyToken, '目前找不到您已接下但尚未完成的任務。');
       return null;
