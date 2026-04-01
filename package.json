@@ -1,7 +1,7 @@
 {
   "name": "ubee-line-bot",
   "version": "3.1.0",
-  "description": "UBee LINE bot V3.1",
+  "description": "UBee LINE bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
