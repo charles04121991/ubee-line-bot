@@ -36,11 +36,11 @@ const URGENT_FEE = 100;
 const SERVICE_FEE = 50;
 const FIXED_TAX = 15;
 
-// 急件費有 60% 給騎手
+// 急件費 60% 給騎手
 const RIDER_URGENT_SHARE_RATE = 0.6;
 
 // =========================
-// 系統狀態（V2.5.1 先用記憶體）
+// 系統狀態（記憶體版）
 // =========================
 let taskCounter = 1;
 
@@ -52,6 +52,48 @@ const userModes = new Map();
 
 // riderUserId -> { taskId }
 const pendingEta = new Map();
+
+// =========================
+// 訊息佇列（防 429）
+// =========================
+const messageQueue = [];
+let isSending = false;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function processQueue() {
+  if (isSending) return;
+  isSending = true;
+
+  while (messageQueue.length > 0) {
+    const job = messageQueue.shift();
+
+    try {
+      await client.pushMessage(job.to, [
+        {
+          type: 'text',
+          text: job.text,
+        },
+      ]);
+      console.log(`📤 已發送訊息 → ${job.to}`);
+    } catch (error) {
+      console.error('❌ 發送失敗:', error.response?.data || error.message || error);
+    }
+
+    // 每一筆之間稍微間隔，避免 429
+    await sleep(400);
+  }
+
+  isSending = false;
+}
+
+function pushTextQueue(to, text) {
+  if (!to || !text) return;
+  messageQueue.push({ to, text });
+  processQueue();
+}
 
 // =========================
 // 工具函式
@@ -103,9 +145,10 @@ function extractField(line, fieldName) {
 
 function isUrgentText(text) {
   const t = toText(text).replace(/[（）()\s]/g, '');
+  const lower = t.toLowerCase();
 
-  if (['急件', '是', 'yes', 'y'].includes(t.toLowerCase())) return true;
-  if (['一般', '不急件', '非急件', '否', 'no', 'n'].includes(t.toLowerCase())) return false;
+  if (['急件', '是', 'yes', 'y'].includes(lower)) return true;
+  if (['一般', '不急件', '非急件', '否', 'no', 'n'].includes(lower)) return false;
 
   return t === '急件';
 }
@@ -262,21 +305,21 @@ function calculateFees({ km, minutes, urgent, crossDistrict }) {
 
   const deliveryFee = Math.round(
     BASE_FEE +
-    distanceFee +
-    timeFee +
-    crossFee +
-    urgentFee +
-    SERVICE_FEE
+      distanceFee +
+      timeFee +
+      crossFee +
+      urgentFee +
+      SERVICE_FEE
   );
 
   const total = deliveryFee + FIXED_TAX;
 
   const riderFee = Math.round(
     BASE_FEE +
-    distanceFee +
-    timeFee +
-    crossFee +
-    (urgent ? URGENT_FEE * RIDER_URGENT_SHARE_RATE : 0)
+      distanceFee +
+      timeFee +
+      crossFee +
+      (urgent ? URGENT_FEE * RIDER_URGENT_SHARE_RATE : 0)
   );
 
   return {
@@ -387,16 +430,6 @@ async function replyText(replyToken, text) {
   ]);
 }
 
-async function pushText(to, text) {
-  if (!to) return;
-  return client.pushMessage(to, [
-    {
-      type: 'text',
-      text,
-    },
-  ]);
-}
-
 async function getGroupMemberName(groupId, userId) {
   try {
     const profile = await client.getGroupMemberProfile(groupId, userId);
@@ -458,6 +491,7 @@ ${buildTaskGuide(modeInfo.mode)}`
       crossDistrict,
     });
 
+    // 只估價，不建立任務
     if (modeInfo.mode === 'quote') {
       const tempTask = {
         pickupAddress: form.pickupAddress,
@@ -477,6 +511,7 @@ ${buildTaskGuide(modeInfo.mode)}`
       return true;
     }
 
+    // 建立正式任務
     const taskId = createTaskId();
 
     const task = {
@@ -509,24 +544,16 @@ ${buildTaskGuide(modeInfo.mode)}`
 
     if (!LINE_GROUP_ID) {
       console.warn('⚠️ LINE_GROUP_ID 未設定，任務無法派到群組');
-      await pushText(
+      pushTextQueue(
         task.customerUserId,
         '⚠️ 系統已建立任務，但派單群組尚未設定成功，請稍後由人工協助處理。'
       );
       return true;
     }
 
-    try {
-      await pushText(LINE_GROUP_ID, buildGroupTaskMessage(task));
-      task.status = 'broadcasted';
-      console.log(`✅ 任務 ${task.taskId} 已成功派送到群組 ${LINE_GROUP_ID}`);
-    } catch (error) {
-      console.error('❌ 派單到群組失敗:', error.response?.data || error.message || error);
-      await pushText(
-        task.customerUserId,
-        '⚠️ 任務已建立，但系統派單到群組失敗，請稍後由人工協助處理。'
-      );
-    }
+    task.status = 'broadcasted';
+    pushTextQueue(LINE_GROUP_ID, buildGroupTaskMessage(task));
+    console.log(`✅ 任務 ${task.taskId} 已加入派單佇列，群組 ${LINE_GROUP_ID}`);
 
     return true;
   } catch (error) {
@@ -587,7 +614,7 @@ async function acceptTask(event, task, etaMinutes) {
 ⏱ ETA ${etaMinutes} 分鐘`
   );
 
-  await pushText(
+  pushTextQueue(
     task.customerUserId,
     buildCustomerStatusMessage('accepted', etaMinutes)
   );
@@ -596,6 +623,7 @@ async function acceptTask(event, task, etaMinutes) {
 }
 
 async function handleGroupAccept(event, text) {
+  // 直接：接單 8
   const match = text.match(/^接單\s*(\d{1,3})$/);
   if (match) {
     const eta = parseInt(match[1], 10);
@@ -603,6 +631,7 @@ async function handleGroupAccept(event, text) {
     return acceptTask(event, task, eta);
   }
 
+  // 先打：接
   if (text === '接') {
     const task = getLatestBroadcastedTask();
 
@@ -616,6 +645,7 @@ async function handleGroupAccept(event, text) {
     return true;
   }
 
+  // 上一步輸入接後，只打數字
   if (/^\d{1,3}$/.test(text)) {
     const pending = pendingEta.get(event.source.userId);
     if (!pending) return false;
@@ -644,21 +674,21 @@ async function handleGroupStatus(event, text) {
   if (text === '已抵達') {
     task.status = 'arrived';
     await replyText(event.replyToken, '✅ 已回報：抵達取件地點');
-    await pushText(task.customerUserId, buildCustomerStatusMessage('arrived'));
+    pushTextQueue(task.customerUserId, buildCustomerStatusMessage('arrived'));
     return true;
   }
 
   if (text === '已取件') {
     task.status = 'picked';
     await replyText(event.replyToken, '✅ 已回報：完成取件');
-    await pushText(task.customerUserId, buildCustomerStatusMessage('picked'));
+    pushTextQueue(task.customerUserId, buildCustomerStatusMessage('picked'));
     return true;
   }
 
   if (text === '已送達') {
     task.status = 'delivered';
     await replyText(event.replyToken, '✅ 已回報：物品已送達');
-    await pushText(task.customerUserId, buildCustomerStatusMessage('delivered'));
+    pushTextQueue(task.customerUserId, buildCustomerStatusMessage('delivered'));
     return true;
   }
 
@@ -667,7 +697,7 @@ async function handleGroupStatus(event, text) {
     task.completedAt = Date.now();
 
     await replyText(event.replyToken, '✅ 已回報：任務完成');
-    await pushText(task.customerUserId, buildCustomerStatusMessage('completed'));
+    pushTextQueue(task.customerUserId, buildCustomerStatusMessage('completed'));
     return true;
   }
 
@@ -718,6 +748,7 @@ async function handleEvent(event) {
   const text = toText(event.message.text);
   console.log(`📨 收到訊息：${text}`);
 
+  // 群組
   if (event.source.type === 'group') {
     if (await handleHelp(event, text)) return;
     if (await handleGroupAccept(event, text)) return;
@@ -725,6 +756,7 @@ async function handleEvent(event) {
     return;
   }
 
+  // 1 對 1 客戶
   if (await handleHelp(event, text)) return;
   if (await handleCustomerCommand(event, text)) return;
   if (await handleCustomerForm(event, text)) return;
@@ -740,7 +772,7 @@ async function handleEvent(event) {
 // 路由
 // =========================
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot v2.5.1 running');
+  res.status(200).send('UBee bot v2.6 running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -757,5 +789,5 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 // 啟動
 // =========================
 app.listen(PORT, () => {
-  console.log(`✅ UBee V2.5.1 running on port ${PORT}`);
+  console.log(`✅ UBee V2.6 running on port ${PORT}`);
 });
