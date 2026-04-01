@@ -22,8 +22,8 @@ if (!config.channelAccessToken || !config.channelSecret) {
 const client = new line.Client(config);
 
 const PORT = process.env.PORT || 3000;
-const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
+const LINE_GROUP_ID = (process.env.LINE_GROUP_ID || '').trim();
+const GOOGLE_MAPS_API_KEY = (process.env.GOOGLE_MAPS_API_KEY || '').trim();
 
 // =========================
 // 費率設定
@@ -40,19 +40,16 @@ const FIXED_TAX = 15;
 const RIDER_URGENT_SHARE_RATE = 0.6;
 
 // =========================
-// 系統狀態（V2.5 先用記憶體）
+// 系統狀態（V2.5.1 先用記憶體）
 // =========================
 let taskCounter = 1;
 
-// 所有任務
 // taskId -> task
 const tasks = new Map();
 
-// 使用者目前模式
 // userId -> { mode: 'create' | 'quote' }
 const userModes = new Map();
 
-// 群組內等待 ETA
 // riderUserId -> { taskId }
 const pendingEta = new Map();
 
@@ -75,7 +72,10 @@ function createTaskId() {
 
 function getDistrict(address = '') {
   const text = toText(address);
-  const match = text.match(/(豐原區|潭子區|神岡區|大雅區|北屯區|西屯區|西區|南屯區|南區|東區|北區|中區|太平區|大里區|烏日區|清水區|沙鹿區|梧棲區|龍井區|大肚區|后里區|石岡區|新社區|和平區|霧峰區|大安區|外埔區|東勢區)/);
+
+  const match = text.match(
+    /(豐原區|潭子區|神岡區|大雅區|北屯區|西屯區|西區|南屯區|南區|東區|北區|中區|太平區|大里區|烏日區|清水區|沙鹿區|梧棲區|龍井區|大肚區|后里區|石岡區|新社區|和平區|霧峰區|大安區|外埔區|東勢區)/
+  );
   if (match) return match[1];
 
   const fallback = text.match(/(.{1,6}[區鄉鎮市])/);
@@ -90,9 +90,24 @@ function isCrossDistrict(fromAddress, toAddress) {
   return fromDistrict !== toDistrict;
 }
 
+function normalizeColon(text) {
+  return String(text || '').replace(/:/g, '：');
+}
+
+function extractField(line, fieldName) {
+  const normalized = normalizeColon(line).trim();
+  const regex = new RegExp(`^${fieldName}\\s*：\\s*(.*)$`);
+  const match = normalized.match(regex);
+  return match ? toText(match[1]) : null;
+}
+
 function isUrgentText(text) {
-  const t = toText(text);
-  return t.includes('急件');
+  const t = toText(text).replace(/[（）()\s]/g, '');
+
+  if (['急件', '是', 'yes', 'y'].includes(t.toLowerCase())) return true;
+  if (['一般', '不急件', '非急件', '否', 'no', 'n'].includes(t.toLowerCase())) return false;
+
+  return t === '急件';
 }
 
 function buildTaskGuide(mode = 'create') {
@@ -140,21 +155,47 @@ function parseTaskForm(text) {
   };
 
   for (const line of lines) {
-    if (line.startsWith('取件地點：')) {
-      data.pickupAddress = toText(line.replace('取件地點：', ''));
-    } else if (line.startsWith('取件電話：')) {
-      data.pickupPhone = toText(line.replace('取件電話：', ''));
-    } else if (line.startsWith('送達地點：')) {
-      data.deliveryAddress = toText(line.replace('送達地點：', ''));
-    } else if (line.startsWith('送達電話：')) {
-      data.deliveryPhone = toText(line.replace('送達電話：', ''));
-    } else if (line.startsWith('物品內容：')) {
-      data.item = toText(line.replace('物品內容：', ''));
-    } else if (line.startsWith('是否急件')) {
-      const parts = line.split('：');
+    const pickupAddress = extractField(line, '取件地點');
+    const pickupPhone = extractField(line, '取件電話');
+    const deliveryAddress = extractField(line, '送達地點');
+    const deliveryPhone = extractField(line, '送達電話');
+    const item = extractField(line, '物品內容');
+    const note = extractField(line, '備註');
+
+    if (pickupAddress !== null) {
+      data.pickupAddress = pickupAddress;
+      continue;
+    }
+
+    if (pickupPhone !== null) {
+      data.pickupPhone = pickupPhone;
+      continue;
+    }
+
+    if (deliveryAddress !== null) {
+      data.deliveryAddress = deliveryAddress;
+      continue;
+    }
+
+    if (deliveryPhone !== null) {
+      data.deliveryPhone = deliveryPhone;
+      continue;
+    }
+
+    if (item !== null) {
+      data.item = item;
+      continue;
+    }
+
+    if (note !== null) {
+      data.note = note;
+      continue;
+    }
+
+    const normalized = normalizeColon(line);
+    if (/^是否急件/.test(normalized)) {
+      const parts = normalized.split('：');
       data.urgency = toText(parts.slice(1).join('：'));
-    } else if (line.startsWith('備註：')) {
-      data.note = toText(line.replace('備註：', ''));
     }
   }
 
@@ -219,7 +260,6 @@ function calculateFees({ km, minutes, urgent, crossDistrict }) {
   const crossFee = crossDistrict ? CROSS_DISTRICT_FEE : 0;
   const urgentFee = urgent ? URGENT_FEE : 0;
 
-  // 客人看的配送費
   const deliveryFee = Math.round(
     BASE_FEE +
     distanceFee +
@@ -231,7 +271,6 @@ function calculateFees({ km, minutes, urgent, crossDistrict }) {
 
   const total = deliveryFee + FIXED_TAX;
 
-  // 騎手實拿
   const riderFee = Math.round(
     BASE_FEE +
     distanceFee +
@@ -419,7 +458,6 @@ ${buildTaskGuide(modeInfo.mode)}`
       crossDistrict,
     });
 
-    // 只估價，不建立任務
     if (modeInfo.mode === 'quote') {
       const tempTask = {
         pickupAddress: form.pickupAddress,
@@ -439,7 +477,6 @@ ${buildTaskGuide(modeInfo.mode)}`
       return true;
     }
 
-    // 建立正式任務
     const taskId = createTaskId();
 
     const task = {
@@ -472,11 +509,24 @@ ${buildTaskGuide(modeInfo.mode)}`
 
     if (!LINE_GROUP_ID) {
       console.warn('⚠️ LINE_GROUP_ID 未設定，任務無法派到群組');
+      await pushText(
+        task.customerUserId,
+        '⚠️ 系統已建立任務，但派單群組尚未設定成功，請稍後由人工協助處理。'
+      );
       return true;
     }
 
-    await pushText(LINE_GROUP_ID, buildGroupTaskMessage(task));
-    task.status = 'broadcasted';
+    try {
+      await pushText(LINE_GROUP_ID, buildGroupTaskMessage(task));
+      task.status = 'broadcasted';
+      console.log(`✅ 任務 ${task.taskId} 已成功派送到群組 ${LINE_GROUP_ID}`);
+    } catch (error) {
+      console.error('❌ 派單到群組失敗:', error.response?.data || error.message || error);
+      await pushText(
+        task.customerUserId,
+        '⚠️ 任務已建立，但系統派單到群組失敗，請稍後由人工協助處理。'
+      );
+    }
 
     return true;
   } catch (error) {
@@ -546,7 +596,6 @@ async function acceptTask(event, task, etaMinutes) {
 }
 
 async function handleGroupAccept(event, text) {
-  // 直接：接單 8
   const match = text.match(/^接單\s*(\d{1,3})$/);
   if (match) {
     const eta = parseInt(match[1], 10);
@@ -554,7 +603,6 @@ async function handleGroupAccept(event, text) {
     return acceptTask(event, task, eta);
   }
 
-  // 先打：接
   if (text === '接') {
     const task = getLatestBroadcastedTask();
 
@@ -568,7 +616,6 @@ async function handleGroupAccept(event, text) {
     return true;
   }
 
-  // 上一步輸入接後，只打數字
   if (/^\d{1,3}$/.test(text)) {
     const pending = pendingEta.get(event.source.userId);
     if (!pending) return false;
@@ -662,13 +709,15 @@ async function handleHelp(event, text) {
 // 主事件處理
 // =========================
 async function handleEvent(event) {
+  console.log('📩 event.source =', JSON.stringify(event.source, null, 2));
+
   if (event.type !== 'message' || event.message.type !== 'text') {
     return;
   }
 
   const text = toText(event.message.text);
+  console.log(`📨 收到訊息：${text}`);
 
-  // 群組
   if (event.source.type === 'group') {
     if (await handleHelp(event, text)) return;
     if (await handleGroupAccept(event, text)) return;
@@ -676,7 +725,6 @@ async function handleEvent(event) {
     return;
   }
 
-  // 1 對 1 客戶
   if (await handleHelp(event, text)) return;
   if (await handleCustomerCommand(event, text)) return;
   if (await handleCustomerForm(event, text)) return;
@@ -692,7 +740,7 @@ async function handleEvent(event) {
 // 路由
 // =========================
 app.get('/', (req, res) => {
-  res.status(200).send('UBee bot v2.5 running');
+  res.status(200).send('UBee bot v2.5.1 running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -709,5 +757,5 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 // 啟動
 // =========================
 app.listen(PORT, () => {
-  console.log(`✅ UBee V2.5 running on port ${PORT}`);
+  console.log(`✅ UBee V2.5.1 running on port ${PORT}`);
 });
