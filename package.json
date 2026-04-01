@@ -1,13 +1,13 @@
 {
   "name": "ubee-line-bot",
-  "version": "2.6.0",
-  "description": "UBee LINE bot V2.6",
+  "version": "3.0.0",
+  "description": "UBee LINE bot stable version",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@line/bot-sdk": "^10.6.0",
+    "@line/bot-sdk": "^9.7.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "node-fetch": "^2.7.0"
