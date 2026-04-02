@@ -1,7 +1,7 @@
 {
-  "name": "ubee-line-debug-bot",
-  "version": "1.0.0",
-  "description": "UBee LINE debug bot",
+  "name": "ubee-line-bot",
+  "version": "3.5.0",
+  "description": "UBee LINE bot V3.5",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,6 +9,7 @@
   "dependencies": {
     "@line/bot-sdk": "^9.7.0",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0"
   }
 }
