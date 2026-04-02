@@ -26,701 +26,123 @@ const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || '';
 
 if (!LINE_GROUP_ID) {
-  console.warn('⚠️ LINE_GROUP_ID 未設定，確認派單將無法推送到群組');
+  console.warn('⚠️ Missing LINE_GROUP_ID');
 }
-
 if (!GOOGLE_MAPS_API_KEY) {
-  console.warn('⚠️ GOOGLE_MAPS_API_KEY 未設定，距離與時間將無法精準估算');
+  console.warn('⚠️ Missing GOOGLE_MAPS_API_KEY');
 }
 
 // =========================
-// 費率設定
+// 固定費率
 // =========================
-const BASE_FEE = 99;            // 基本費
-const PER_KM_FEE = 6;           // 每公里
-const PER_MIN_FEE = 3;          // 每分鐘
-const CROSS_DISTRICT_FEE = 25;  // 跨區加價
-const SERVICE_FEE = 50;         // 服務費
-const URGENT_FEE = 100;         // 急件費
-const FIXED_TAX = 15;           // 固定稅金
+const BASE_FEE = 99;
+const PER_KM_FEE = 6;
+const PER_MIN_FEE = 3;
+const SERVICE_FEE = 50;
+const URGENT_FEE = 100;
+const CROSS_DISTRICT_FEE = 25;
+const FIXED_TAX = 15;
 
-// =========================
-// 記憶體暫存
-// =========================
-const userSessions = {};       // 客戶建立任務流程
-const riderEtaSessions = {};   // 騎手 ETA 流程
-const orders = {};             // 訂單資料
-let orderSeq = 1;
+// 騎手任務費 = 配送費 * 0.6（四捨五入）
+const RIDER_PERCENTAGE = 0.6;
 
 // =========================
-// Express
+// 記憶體資料
 // =========================
-app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.6.1 Running');
-});
+const userSessions = {}; // 客人流程
+const tasks = {}; // taskId -> 任務資料
+let currentTaskId = 1;
 
-app.post('/webhook', line.middleware(config), async (req, res) => {
-  try {
-    await Promise.all(req.body.events.map(handleEvent));
-    res.status(200).end();
-  } catch (err) {
-    console.error('❌ Webhook Error:', err);
-    res.status(500).end();
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`✅ UBee V3.6.1 running on port ${PORT}`);
-});
+// 騎手群組接單暫存
+const groupStates = {}; // groupId -> { waitingEta: true, taskId }
 
 // =========================
-// 主事件處理
+// 工具函式
 // =========================
-async function handleEvent(event) {
-  try {
-    if (event.type !== 'message' || event.message.type !== 'text') {
-      return null;
-    }
-
-    const text = (event.message.text || '').trim();
-    const sourceType = event.source.type;
-
-    if (sourceType === 'user') {
-      return await handleUserMessage(event, text);
-    }
-
-    if (sourceType === 'group' || sourceType === 'room') {
-      return await handleGroupMessage(event, text);
-    }
-
-    return null;
-  } catch (err) {
-    console.error('❌ handleEvent error:', err);
-    return safeReply(event.replyToken, [
-      { type: 'text', text: '⚠️ 系統暫時忙碌中，請稍後再試一次。' }
-    ]);
-  }
+function getUserId(event) {
+  return event.source.userId || event.source.groupId || event.source.roomId;
 }
 
-// =========================
-// 客戶私訊處理
-// =========================
-async function handleUserMessage(event, text) {
-  const userId = event.source.userId;
-  const session = userSessions[userId];
-
-  // 開始建立任務
-  if (text === '建立任務') {
-    userSessions[userId] = createNewTaskSession();
-    return replyText(
-      event.replyToken,
-      '📦 UBee 建立任務\n\n請先輸入【取件地點】\n例如：台中市豐原區中正路100號'
-    );
-  }
-
-  // 立即估價
-  if (text === '立即估價') {
-    return replyText(
-      event.replyToken,
-      '請輸入「建立任務」，系統會一步一步引導您填寫並自動精準報價。'
-    );
-  }
-
-  // 全域取消
-  if (text === '取消') {
-    delete userSessions[userId];
-    return replyText(event.replyToken, '已取消本次任務建立。');
-  }
-
-  // 客戶任務流程中
-  if (session && session.mode === 'create_task') {
-    return await handleGuidedTaskFlow(event, text, session);
-  }
-
-  // 客戶說謝謝
-  if (['謝謝', 'thanks', 'thank you'].includes(text.toLowerCase())) {
-    return replyText(
-      event.replyToken,
-      '不客氣 🙌\n感謝您使用 UBee 城市任務服務，期待再次為您服務。'
-    );
-  }
-
-  // 預設回覆
-  return replyMainMenu(event.replyToken);
+function normalizeText(text) {
+  return (text || '').trim();
 }
 
-// =========================
-// 引導式建立任務流程
-// =========================
-async function handleGuidedTaskFlow(event, text, session) {
-  const userId = event.source.userId;
-
-  if (session.step === 'final_confirm') {
-    if (text === '確認') {
-      if (!session.quote) {
-        return replyText(event.replyToken, '⚠️ 報價資料異常，請輸入「修改」重新建立任務。');
-      }
-
-      const orderId = generateOrderId();
-      const order = {
-        id: orderId,
-        userId,
-        customerSourceType: event.source.type,
-        customerData: { ...session.form },
-        quote: { ...session.quote },
-        status: 'waiting_rider',
-        createdAt: new Date().toISOString(),
-        riderId: null,
-        riderName: null,
-        etaMinutes: null,
-        hiddenSeq: orderSeq,
-      };
-
-      orders[orderId] = order;
-
-      const pushOk = await pushTaskToGroup(order);
-
-      delete userSessions[userId];
-
-      if (!pushOk) {
-        return replyText(
-          event.replyToken,
-          '⚠️ 任務已建立，但派單到群組失敗。\n請檢查群組設定、LINE_GROUP_ID 或稍後再試。'
-        );
-      }
-
-      return replyText(
-        event.replyToken,
-        [
-          '✅ 您的任務已建立成功',
-          '',
-          formatCustomerSummary(order.customerData),
-          '',
-          formatQuoteBlock(order.quote),
-          '',
-          '我們會立即為您安排人員處理。'
-        ].join('\n')
-      );
-    }
-
-    if (text === '修改') {
-      userSessions[userId] = createNewTaskSession();
-      return replyText(
-        event.replyToken,
-        '好的，重新建立任務。\n\n請先輸入【取件地點】'
-      );
-    }
-
-    if (text === '取消') {
-      delete userSessions[userId];
-      return replyText(event.replyToken, '已取消本次任務建立。');
-    }
-
-    return replyText(event.replyToken, '請點選下方按鈕，或輸入：確認 / 修改 / 取消');
-  }
-
-  switch (session.step) {
-    case 'pickup_address':
-      session.form.pickupAddress = text;
-      session.step = 'pickup_phone';
-      return replyText(event.replyToken, '請輸入【取件電話】');
-
-    case 'pickup_phone':
-      session.form.pickupPhone = text;
-      session.step = 'delivery_address';
-      return replyText(event.replyToken, '請輸入【送達地點】');
-
-    case 'delivery_address':
-      session.form.deliveryAddress = text;
-      session.step = 'delivery_phone';
-      return replyText(event.replyToken, '請輸入【送達電話】');
-
-    case 'delivery_phone':
-      session.form.deliveryPhone = text;
-      session.step = 'item';
-      return replyText(event.replyToken, '請輸入【物品內容】\n例如：文件、樣品、衣服、合約');
-
-    case 'item':
-      session.form.item = text;
-      session.step = 'urgent';
-      return replyText(event.replyToken, '請輸入【是否急件】\n請回覆：一般 或 急件');
-
-    case 'urgent':
-      if (!['一般', '急件'].includes(text)) {
-        return replyText(event.replyToken, '請回覆【一般】或【急件】');
-      }
-      session.form.urgent = text;
-      session.step = 'note';
-      return replyText(event.replyToken, '請輸入【備註】\n若無可輸入：無');
-
-    case 'note':
-      session.form.note = text || '無';
-
-      const quote = await buildQuote(session.form);
-      if (!quote.ok) {
-        return replyText(
-          event.replyToken,
-          '⚠️ 地址計算失敗，請重新輸入更完整的地址。\n例如：台中市豐原區中正路100號'
-        );
-      }
-
-      session.quote = quote.data;
-      session.step = 'final_confirm';
-
-      return replyFinalConfirmCard(event.replyToken, session.form, session.quote);
-
-    default:
-      delete userSessions[userId];
-      return replyText(event.replyToken, '⚠️ 流程已重置，請重新輸入「建立任務」。');
-  }
+function isUrgent(text) {
+  const value = normalizeText(text);
+  return value === '急件';
 }
 
-// =========================
-// 群組訊息處理（騎手）
-// =========================
-async function handleGroupMessage(event, text) {
-  const groupId = event.source.groupId || event.source.roomId || LINE_GROUP_ID;
-  const riderUserId = event.source.userId;
-  const etaKey = `${groupId}:${riderUserId}`;
-
-  // 騎手正在輸入 ETA
-  if (riderEtaSessions[etaKey]) {
-    const orderId = riderEtaSessions[etaKey];
-    const order = orders[orderId];
-
-    if (!order || order.status !== 'waiting_rider') {
-      delete riderEtaSessions[etaKey];
-      return replyText(event.replyToken, '⚠️ 此任務目前無法接單。');
-    }
-
-    const etaMinutes = parseEtaMinutes(text);
-    if (!etaMinutes) {
-      return replyText(
-        event.replyToken,
-        '請直接回覆數字或分鐘數。\n例如：8\n或：8分鐘'
-      );
-    }
-
-    const riderName = await getRiderDisplayName(groupId, riderUserId);
-
-    order.status = 'accepted';
-    order.riderId = riderUserId;
-    order.riderName = riderName;
-    order.etaMinutes = etaMinutes;
-    order.acceptedAt = new Date().toISOString();
-
-    delete riderEtaSessions[etaKey];
-
-    await safeReply(event.replyToken, [
-      {
-        type: 'text',
-        text: `✅ 此任務已由 ${riderName} 接單\n⏱ 預計 ${etaMinutes} 分鐘抵達取件地點`
-      }
-    ]);
-
-    await pushToUser(order.userId, [
-      {
-        type: 'text',
-        text:
-          `✅ 已有人接單\n` +
-          `接單人員：${riderName}\n` +
-          `⏱ 預計 ${etaMinutes} 分鐘抵達取件地點`
-      }
-    ]);
-
-    return null;
-  }
-
-  // 開始接單
-  if (['接', '接單', '+1'].includes(text)) {
-    const order = findLatestWaitingOrder();
-
-    if (!order) {
-      return replyText(event.replyToken, '目前沒有待接任務。');
-    }
-
-    riderEtaSessions[etaKey] = order.id;
-
-    return replyText(
-      event.replyToken,
-      '請回覆多久可抵達取件地點？\n\n例如：8\n或：8分鐘'
-    );
-  }
-
-  // 已抵達
-  if (text === '已抵達') {
-    const order = findRiderActiveOrder(riderUserId);
-    if (!order) {
-      return replyText(event.replyToken, '⚠️ 目前沒有可更新的任務。');
-    }
-
-    order.status = 'arrived_pickup';
-
-    await pushToUser(order.userId, [
-      { type: 'text', text: '📍 服務人員已抵達取件地點。' }
-    ]);
-
-    return replyText(event.replyToken, '✅ 已通知客戶：服務人員已抵達取件地點。');
-  }
-
-  // 已取件
-  if (text === '已取件') {
-    const order = findRiderActiveOrder(riderUserId);
-    if (!order) {
-      return replyText(event.replyToken, '⚠️ 目前沒有可更新的任務。');
-    }
-
-    order.status = 'picked_up';
-
-    await pushToUser(order.userId, [
-      { type: 'text', text: '📦 物品已完成取件，正送往目的地。' }
-    ]);
-
-    return replyText(event.replyToken, '✅ 已通知客戶：物品已完成取件。');
-  }
-
-  // 已送達
-  if (text === '已送達') {
-    const order = findRiderActiveOrder(riderUserId);
-    if (!order) {
-      return replyText(event.replyToken, '⚠️ 目前沒有可更新的任務。');
-    }
-
-    order.status = 'delivered';
-
-    await pushToUser(order.userId, [
-      { type: 'text', text: '📬 物品已送達指定地點。' }
-    ]);
-
-    return replyText(event.replyToken, '✅ 已通知客戶：物品已送達。');
-  }
-
-  // 已完成
-  if (text === '已完成') {
-    const order = findRiderActiveOrder(riderUserId);
-    if (!order) {
-      return replyText(event.replyToken, '⚠️ 目前沒有可完成的任務。');
-    }
-
-    order.status = 'completed';
-    order.completedAt = new Date().toISOString();
-
-    await pushToUser(order.userId, [
-      {
-        type: 'text',
-        text:
-          '✅ 任務已完成。\n\n' +
-          '感謝您使用 UBee 城市任務服務。\n' +
-          '期待再次為您服務。'
-      }
-    ]);
-
-    return replyText(event.replyToken, '✅ 任務已完成，已通知客戶。');
-  }
-
-  return null;
+function formatMoney(num) {
+  return `$${Math.round(num)}`;
 }
 
-// =========================
-// Session / Order 工具
-// =========================
-function createNewTaskSession() {
+function safeNumber(n, fallback = 0) {
+  return Number.isFinite(Number(n)) ? Number(n) : fallback;
+}
+
+function createQuickReply(items) {
   return {
-    mode: 'create_task',
-    step: 'pickup_address',
-    form: {
-      pickupAddress: '',
-      pickupPhone: '',
-      deliveryAddress: '',
-      deliveryPhone: '',
-      item: '',
-      urgent: '一般',
-      note: '無',
-    },
-    quote: null,
+    items: items.map((item) => ({
+      type: 'action',
+      action: {
+        type: 'message',
+        label: item.label,
+        text: item.text,
+      },
+    })),
   };
 }
 
-function generateOrderId() {
-  const id = `ORDER_${Date.now()}_${orderSeq}`;
-  orderSeq += 1;
-  return id;
+function extractDistrict(address = '') {
+  // 抓台中常見格式：XX區
+  const match = address.match(/([\u4e00-\u9fa5]{1,4}區)/);
+  return match ? match[1] : '';
 }
 
-function findLatestWaitingOrder() {
-  const waitingOrders = Object.values(orders)
-    .filter(order => order.status === 'waiting_rider')
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+function calcPrice({ distanceKm, durationMin, urgent, pickupAddress, deliveryAddress }) {
+  const km = safeNumber(distanceKm, 0);
+  const min = safeNumber(durationMin, 0);
 
-  return waitingOrders[0] || null;
+  const pickupDistrict = extractDistrict(pickupAddress);
+  const deliveryDistrict = extractDistrict(deliveryAddress);
+
+  const deliveryFee = Math.round(
+    BASE_FEE +
+    km * PER_KM_FEE +
+    min * PER_MIN_FEE +
+    (pickupDistrict && deliveryDistrict && pickupDistrict !== deliveryDistrict ? CROSS_DISTRICT_FEE : 0)
+  );
+
+  const urgentFee = urgent ? URGENT_FEE : 0;
+  const total = deliveryFee + SERVICE_FEE + urgentFee + FIXED_TAX;
+  const riderFee = Math.round(deliveryFee * RIDER_PERCENTAGE);
+
+  return {
+    deliveryFee,
+    serviceFee: SERVICE_FEE,
+    urgentFee,
+    tax: FIXED_TAX,
+    total,
+    riderFee,
+    pickupDistrict,
+    deliveryDistrict,
+  };
 }
 
-function findRiderActiveOrder(riderUserId) {
-  const activeStatuses = ['accepted', 'arrived_pickup', 'picked_up', 'delivered'];
+async function geocodeAddress(address) {
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
 
-  const riderOrders = Object.values(orders)
-    .filter(order => order.riderId === riderUserId && activeStatuses.includes(order.status))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  return riderOrders[0] || null;
-}
-
-function parseEtaMinutes(text) {
-  const cleaned = String(text).trim();
-  const match = cleaned.match(/(\d{1,3})/);
-  if (!match) return null;
-
-  const val = parseInt(match[1], 10);
-  if (Number.isNaN(val) || val <= 0 || val > 180) return null;
-  return val;
-}
-
-// =========================
-// Reply / Push
-// =========================
-async function replyText(replyToken, text) {
-  return safeReply(replyToken, [{ type: 'text', text }]);
-}
-
-async function safeReply(replyToken, messages) {
-  try {
-    return await client.replyMessage(replyToken, messages);
-  } catch (err) {
-    console.error('❌ replyMessage error:', err?.originalError?.response?.data || err.message || err);
-    return null;
-  }
-}
-
-async function pushToUser(userId, messages) {
-  try {
-    return await client.pushMessage(userId, messages);
-  } catch (err) {
-    console.error('❌ pushToUser error:', err?.originalError?.response?.data || err.message || err);
-    return null;
-  }
-}
-
-async function pushTaskToGroup(order) {
-  if (!LINE_GROUP_ID) return false;
-
-  const taskText =
-    `📦 UBee 新任務通知\n\n` +
-    `費用：$${order.quote.total}\n` +
-    `距離：${order.quote.distanceKm.toFixed(1)} 公里\n\n` +
-    `取件：${order.customerData.pickupAddress}\n` +
-    `送達：${order.customerData.deliveryAddress}\n` +
-    `物品：${order.customerData.item}\n` +
-    `急件：${order.customerData.urgent}`;
-
-  try {
-    await client.pushMessage(LINE_GROUP_ID, [
-      { type: 'text', text: taskText }
-    ]);
-    return true;
-  } catch (err) {
-    console.error('❌ pushTaskToGroup error:', err?.originalError?.response?.data || err.message || err);
-    return false;
-  }
-}
-
-// =========================
-// 畫面格式
-// =========================
-function formatCustomerSummary(form) {
-  return [
-    `取件地點：${form.pickupAddress}`,
-    `取件電話：${form.pickupPhone}`,
-    '',
-    `送達地點：${form.deliveryAddress}`,
-    `送達電話：${form.deliveryPhone}`,
-    '',
-    `物品內容：${form.item}`,
-    `是否急件：${form.urgent}`,
-    `備註：${form.note || '無'}`
-  ].join('\n');
-}
-
-function formatQuoteBlock(quote) {
-  return [
-    `配送費：$${quote.deliveryFee}`,
-    `服務費：$${quote.serviceFee}`,
-    `急件費：$${quote.urgentFee}`,
-    `稅金：$${quote.tax}`,
-    `總計：$${quote.total}`
-  ].join('\n');
-}
-
-async function replyMainMenu(replyToken) {
-  return safeReply(replyToken, [
-    {
-      type: 'text',
-      text: '您好，歡迎使用 UBee。\n請選擇您要的服務。',
-      quickReply: {
-        items: [
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '建立任務',
-              text: '建立任務'
-            }
-          },
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '立即估價',
-              text: '立即估價'
-            }
-          }
-        ]
-      }
-    }
-  ]);
-}
-
-async function replyFinalConfirmCard(replyToken, form, quote) {
-  const summaryText =
-    `請確認以下任務資訊：\n\n` +
-    `取件地點：${form.pickupAddress}\n` +
-    `取件電話：${form.pickupPhone}\n\n` +
-    `送達地點：${form.deliveryAddress}\n` +
-    `送達電話：${form.deliveryPhone}\n\n` +
-    `物品內容：${form.item}\n` +
-    `是否急件：${form.urgent}\n` +
-    `備註：${form.note || '無'}\n\n` +
-    `配送費：$${quote.deliveryFee}\n` +
-    `服務費：$${quote.serviceFee}\n` +
-    `急件費：$${quote.urgentFee}\n` +
-    `稅金：$${quote.tax}\n` +
-    `總計：$${quote.total}`;
-
-  return safeReply(replyToken, [
-    {
-      type: 'text',
-      text: summaryText,
-      quickReply: {
-        items: [
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '確認',
-              text: '確認'
-            }
-          },
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '修改',
-              text: '修改'
-            }
-          },
-          {
-            type: 'action',
-            action: {
-              type: 'message',
-              label: '取消',
-              text: '取消'
-            }
-          }
-        ]
-      }
-    }
-  ]);
-}
-
-// =========================
-// 騎手名稱
-// =========================
-async function getRiderDisplayName(groupId, userId) {
-  try {
-    if (!groupId || !userId) return '接單人員';
-
-    const profile = await client.getGroupMemberProfile(groupId, userId);
-    if (profile && profile.displayName) {
-      return profile.displayName;
-    }
-
-    return '接單人員';
-  } catch (err) {
-    console.error('⚠️ getGroupMemberProfile error:', err.message || err);
-    return '接單人員';
-  }
-}
-
-// =========================
-// 報價核心
-// =========================
-async function buildQuote(form) {
-  try {
-    const route = await getRouteInfo(form.pickupAddress, form.deliveryAddress);
-    if (!route.ok) {
-      return { ok: false };
-    }
-
-    const pickupDistrict = await getDistrictFromAddress(form.pickupAddress);
-    const deliveryDistrict = await getDistrictFromAddress(form.deliveryAddress);
-
-    const distanceKm = route.distanceMeters / 1000;
-    const durationMin = route.durationSeconds / 60;
-
-    const baseFee = BASE_FEE;
-    const kmFee = Math.ceil(distanceKm) * PER_KM_FEE;
-    const minFee = Math.ceil(durationMin) * PER_MIN_FEE;
-
-    let crossDistrictFee = 0;
-    if (pickupDistrict && deliveryDistrict && pickupDistrict !== deliveryDistrict) {
-      crossDistrictFee = CROSS_DISTRICT_FEE;
-    }
-
-    const urgentFee = form.urgent === '急件' ? URGENT_FEE : 0;
-    const serviceFee = SERVICE_FEE;
-    const tax = FIXED_TAX;
-
-    const deliveryFee = baseFee + kmFee + minFee + crossDistrictFee;
-    const total = deliveryFee + serviceFee + urgentFee + tax;
-
-    return {
-      ok: true,
-      data: {
-        baseFee,
-        kmFee,
-        minFee,
-        crossDistrictFee,
-        deliveryFee,
-        serviceFee,
-        urgentFee,
-        tax,
-        total,
-        distanceKm,
-        durationMin,
-        pickupDistrict,
-        deliveryDistrict,
-      }
-    };
-  } catch (err) {
-    console.error('❌ buildQuote error:', err.message || err);
-    return { ok: false };
-  }
-}
-
-// =========================
-// Google Maps API
-// =========================
-async function getRouteInfo(origin, destination) {
-  if (!GOOGLE_MAPS_API_KEY) {
-    return { ok: false };
+  if (data.status !== 'OK' || !data.results || !data.results.length) {
+    throw new Error(`Geocode failed for address: ${address}`);
   }
 
-  const url =
-    `https://maps.googleapis.com/maps/api/distancematrix/json` +
-    `?origins=${encodeURIComponent(origin)}` +
-    `&destinations=${encodeURIComponent(destination)}` +
-    `&mode=driving` +
-    `&language=zh-TW` +
-    `&key=${GOOGLE_MAPS_API_KEY}`;
+  return data.results[0].formatted_address;
+}
+
+async function getDistanceAndDuration(origin, destination) {
+  const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&mode=driving&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
 
   const res = await fetch(url);
   const data = await res.json();
@@ -733,65 +155,671 @@ async function getRouteInfo(origin, destination) {
     !data.rows[0].elements[0] ||
     data.rows[0].elements[0].status !== 'OK'
   ) {
-    console.error('❌ Distance Matrix error:', JSON.stringify(data));
-    return { ok: false };
+    throw new Error('Distance Matrix API failed');
   }
 
-  const el = data.rows[0].elements[0];
+  const element = data.rows[0].elements[0];
+  const distanceMeters = element.distance.value;
+  const durationSeconds = element.duration.value;
 
   return {
-    ok: true,
-    distanceMeters: el.distance.value,
-    durationSeconds: el.duration.value,
+    distanceKm: Number((distanceMeters / 1000).toFixed(1)),
+    durationMin: Math.ceil(durationSeconds / 60),
   };
 }
 
-async function getDistrictFromAddress(address) {
-  if (!GOOGLE_MAPS_API_KEY) return null;
+async function estimateTaskPrice(pickupAddress, deliveryAddress, urgentText) {
+  const urgent = isUrgent(urgentText);
 
+  const normalizedPickup = await geocodeAddress(pickupAddress);
+  const normalizedDelivery = await geocodeAddress(deliveryAddress);
+
+  const { distanceKm, durationMin } = await getDistanceAndDuration(normalizedPickup, normalizedDelivery);
+
+  const price = calcPrice({
+    distanceKm,
+    durationMin,
+    urgent,
+    pickupAddress,
+    deliveryAddress,
+  });
+
+  return {
+    normalizedPickup,
+    normalizedDelivery,
+    distanceKm,
+    durationMin,
+    urgent,
+    ...price,
+  };
+}
+
+function buildEstimateMessage(quote) {
+  return {
+    type: 'text',
+    text:
+`📊 UBee 即時報價
+
+配送費：${formatMoney(quote.deliveryFee)}
+服務費：${formatMoney(quote.serviceFee)}
+急件費：${formatMoney(quote.urgentFee)}
+稅金：${formatMoney(quote.tax)}
+
+💰 總計：${formatMoney(quote.total)}
+
+若您確認要安排，請點選下方按鈕【開始建立任務】
+我們將立即為您安排人員處理。`,
+    quickReply: createQuickReply([
+      { label: '開始建立任務', text: '開始建立任務' },
+    ]),
+  };
+}
+
+function buildTaskConfirmMessage(task) {
+  return {
+    type: 'text',
+    text:
+`請確認以下任務資訊：
+
+取件地點：${task.pickupAddress}
+取件電話：${task.pickupPhone}
+
+送達地點：${task.deliveryAddress}
+送達電話：${task.deliveryPhone}
+
+物品內容：${task.item}
+是否急件：${task.urgentText}
+備註：${task.note}
+
+配送費：${formatMoney(task.quote.deliveryFee)}
+服務費：${formatMoney(task.quote.serviceFee)}
+急件費：${formatMoney(task.quote.urgentFee)}
+稅金：${formatMoney(task.quote.tax)}
+總計：${formatMoney(task.quote.total)}`,
+    quickReply: createQuickReply([
+      { label: '確認送出', text: '確認送出' },
+      { label: '重新填寫', text: '重新填寫' },
+      { label: '取消任務', text: '取消任務' },
+    ]),
+  };
+}
+
+function buildGroupTaskMessage(taskId, task) {
+  return `📦 UBee 新任務通知
+
+騎手任務費：${formatMoney(task.quote.riderFee)}
+距離：${task.quote.distanceKm} 公里
+
+取件地點：${task.pickupAddress}
+送達地點：${task.deliveryAddress}
+送達電話：${task.deliveryPhone}
+
+物品內容：${task.item}
+急件：${task.urgentText}
+備註：${task.note}
+
+任務編號：#${taskId}
+
+請輸入「接」開始接單`;
+}
+
+async function pushToUser(userId, text) {
+  if (!userId) return;
   try {
-    const url =
-      `https://maps.googleapis.com/maps/api/geocode/json` +
-      `?address=${encodeURIComponent(address)}` +
-      `&language=zh-TW` +
-      `&key=${GOOGLE_MAPS_API_KEY}`;
-
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.status !== 'OK' || !data.results || !data.results[0]) {
-      return extractDistrictByRegex(address);
-    }
-
-    const components = data.results[0].address_components || [];
-
-    for (const c of components) {
-      if (
-        c.types.includes('administrative_area_level_3') ||
-        c.types.includes('administrative_area_level_2') ||
-        c.types.includes('sublocality_level_1')
-      ) {
-        const name = c.long_name || c.short_name;
-        const district = normalizeDistrictName(name);
-        if (district) return district;
-      }
-    }
-
-    return extractDistrictByRegex(data.results[0].formatted_address || address);
-  } catch (err) {
-    console.error('⚠️ getDistrictFromAddress error:', err.message || err);
-    return extractDistrictByRegex(address);
+    await client.pushMessage(userId, { type: 'text', text });
+  } catch (error) {
+    console.error('❌ pushToUser failed:', error.message);
   }
 }
 
-function normalizeDistrictName(name) {
-  if (!name) return null;
-  const match = String(name).match(/(.+[區鄉鎮市])/);
-  return match ? match[1] : null;
+async function pushToGroup(groupId, text) {
+  if (!groupId) return;
+  try {
+    await client.pushMessage(groupId, { type: 'text', text });
+  } catch (error) {
+    console.error('❌ pushToGroup failed:', error.message);
+  }
 }
 
-function extractDistrictByRegex(address) {
-  if (!address) return null;
-  const match = String(address).match(/([^\s,，]+[區鄉鎮市])/);
-  return match ? match[1] : null;
+function resetUserSession(userId) {
+  delete userSessions[userId];
 }
+
+function startEstimateSession(userId) {
+  userSessions[userId] = {
+    mode: 'estimate',
+    step: 'pickupAddress',
+    data: {},
+  };
+}
+
+function startTaskFormSession(userId) {
+  userSessions[userId] = {
+    mode: 'taskForm',
+    step: 'pickupAddress',
+    data: {},
+  };
+}
+
+function getLatestPendingTask() {
+  const ids = Object.keys(tasks).map(Number).sort((a, b) => b - a);
+  for (const id of ids) {
+    if (tasks[id] && tasks[id].status === 'pending') {
+      return { taskId: id, task: tasks[id] };
+    }
+  }
+  return null;
+}
+
+// =========================
+// 客人流程處理
+// =========================
+async function handleEstimateFlow(event, userId, text, session) {
+  const data = session.data;
+
+  try {
+    if (session.step === 'pickupAddress') {
+      data.pickupAddress = text;
+      session.step = 'deliveryAddress';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '請輸入送達地點：',
+      });
+    }
+
+    if (session.step === 'deliveryAddress') {
+      data.deliveryAddress = text;
+      session.step = 'item';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '請輸入物品內容：',
+      });
+    }
+
+    if (session.step === 'item') {
+      data.item = text;
+      session.step = 'urgent';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '請輸入是否急件（一般 / 急件）：',
+        quickReply: createQuickReply([
+          { label: '一般', text: '一般' },
+          { label: '急件', text: '急件' },
+        ]),
+      });
+    }
+
+    if (session.step === 'urgent') {
+      if (!['一般', '急件'].includes(text)) {
+        return client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '請輸入正確格式：一般 或 急件',
+          quickReply: createQuickReply([
+            { label: '一般', text: '一般' },
+            { label: '急件', text: '急件' },
+          ]),
+        });
+      }
+
+      data.urgentText = text;
+
+      const quote = await estimateTaskPrice(
+        data.pickupAddress,
+        data.deliveryAddress,
+        data.urgentText
+      );
+
+      session.quote = quote;
+      session.latestEstimate = {
+        pickupAddress: data.pickupAddress,
+        deliveryAddress: data.deliveryAddress,
+        item: data.item,
+        urgentText: data.urgentText,
+        quote,
+      };
+
+      resetUserSession(userId);
+
+      return client.replyMessage(event.replyToken, buildEstimateMessage(quote));
+    }
+  } catch (error) {
+    console.error('❌ handleEstimateFlow error:', error.message);
+    resetUserSession(userId);
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '⚠️ 估價失敗，請確認地址是否正確後再試一次。',
+    });
+  }
+}
+
+async function handleTaskFormFlow(event, userId, text, session) {
+  const data = session.data;
+
+  try {
+    if (session.step === 'pickupAddress') {
+      data.pickupAddress = text;
+      session.step = 'pickupPhone';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '第二步，請輸入取件電話：',
+      });
+    }
+
+    if (session.step === 'pickupPhone') {
+      data.pickupPhone = text;
+      session.step = 'deliveryAddress';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '第三步，請輸入送達地點：',
+      });
+    }
+
+    if (session.step === 'deliveryAddress') {
+      data.deliveryAddress = text;
+      session.step = 'deliveryPhone';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '第四步，請輸入送達電話：',
+      });
+    }
+
+    if (session.step === 'deliveryPhone') {
+      data.deliveryPhone = text;
+      session.step = 'item';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '第五步，請輸入物品內容：',
+      });
+    }
+
+    if (session.step === 'item') {
+      data.item = text;
+      session.step = 'urgent';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '第六步，請輸入是否急件（一般 / 急件）：',
+        quickReply: createQuickReply([
+          { label: '一般', text: '一般' },
+          { label: '急件', text: '急件' },
+        ]),
+      });
+    }
+
+    if (session.step === 'urgent') {
+      if (!['一般', '急件'].includes(text)) {
+        return client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '請輸入正確格式：一般 或 急件',
+          quickReply: createQuickReply([
+            { label: '一般', text: '一般' },
+            { label: '急件', text: '急件' },
+          ]),
+        });
+      }
+
+      data.urgentText = text;
+      session.step = 'note';
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '第七步，請輸入備註：\n若無備註，請輸入：無',
+      });
+    }
+
+    if (session.step === 'note') {
+      data.note = text || '無';
+
+      const quote = await estimateTaskPrice(
+        data.pickupAddress,
+        data.deliveryAddress,
+        data.urgentText
+      );
+
+      session.step = 'confirm';
+      session.finalTask = {
+        pickupAddress: data.pickupAddress,
+        pickupPhone: data.pickupPhone,
+        deliveryAddress: data.deliveryAddress,
+        deliveryPhone: data.deliveryPhone,
+        item: data.item,
+        urgentText: data.urgentText,
+        note: data.note || '無',
+        quote,
+      };
+
+      return client.replyMessage(event.replyToken, buildTaskConfirmMessage(session.finalTask));
+    }
+
+    if (session.step === 'confirm') {
+      if (text === '確認送出') {
+        const task = session.finalTask;
+        const taskId = currentTaskId++;
+
+        tasks[taskId] = {
+          ...task,
+          customerUserId: userId,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        };
+
+        resetUserSession(userId);
+
+        await pushToGroup(LINE_GROUP_ID, buildGroupTaskMessage(taskId, tasks[taskId]));
+
+        return client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '✅ 您的任務已建立成功，我們將立即為您安排人員處理。',
+        });
+      }
+
+      if (text === '重新填寫') {
+        startTaskFormSession(userId);
+        return client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '好的，請重新開始填寫。\n\n第一步，請輸入取件地點：',
+        });
+      }
+
+      if (text === '取消任務') {
+        resetUserSession(userId);
+        return client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '已取消本次任務建立。',
+        });
+      }
+
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '請點選下方按鈕進行操作。',
+        quickReply: createQuickReply([
+          { label: '確認送出', text: '確認送出' },
+          { label: '重新填寫', text: '重新填寫' },
+          { label: '取消任務', text: '取消任務' },
+        ]),
+      });
+    }
+  } catch (error) {
+    console.error('❌ handleTaskFormFlow error:', error.message);
+    resetUserSession(userId);
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '⚠️ 任務建立失敗，請確認地址是否正確後重新操作。',
+    });
+  }
+}
+
+// =========================
+// 群組騎手流程
+// =========================
+async function handleGroupMessage(event, text) {
+  const groupId = event.source.groupId;
+  if (!groupId) return null;
+
+  const normalized = normalizeText(text);
+  const state = groupStates[groupId] || {};
+
+  // 接單入口
+  if (normalized === '接' || normalized === '接單' || normalized === '+1') {
+    const latest = getLatestPendingTask();
+
+    if (!latest) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '目前沒有可接的待接任務。',
+      });
+    }
+
+    groupStates[groupId] = {
+      waitingEta: true,
+      taskId: latest.taskId,
+      riderUserId: event.source.userId || '',
+    };
+
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '請輸入多久抵達取件地點（分鐘）：',
+    });
+  }
+
+  // 等待 ETA
+  if (state.waitingEta) {
+    const eta = parseInt(normalized, 10);
+
+    if (Number.isNaN(eta) || eta <= 0) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '請輸入正確分鐘數，例如：8',
+      });
+    }
+
+    const task = tasks[state.taskId];
+    if (!task || task.status !== 'pending') {
+      delete groupStates[groupId];
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '此任務目前不可接單，請重新操作。',
+      });
+    }
+
+    task.status = 'accepted';
+    task.eta = eta;
+    task.acceptedAt = new Date().toISOString();
+    task.riderUserId = event.source.userId || '';
+
+    delete groupStates[groupId];
+
+    await pushToUser(
+      task.customerUserId,
+      `✅ 已有人接單\n⏱ 預計 ${eta} 分鐘抵達取件地點`
+    );
+
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: `✅ 此任務已成功接單\n⏱ 預計 ${eta} 分鐘抵達取件地點`,
+    });
+  }
+
+  // 已抵達
+  if (normalized === '已抵達') {
+    const latestAccepted = Object.entries(tasks)
+      .map(([taskId, task]) => ({ taskId, task }))
+      .reverse()
+      .find(({ task }) => task.status === 'accepted');
+
+    if (!latestAccepted) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '目前沒有進行中的已接單任務。',
+      });
+    }
+
+    latestAccepted.task.status = 'arrived';
+
+    await pushToUser(
+      latestAccepted.task.customerUserId,
+      '騎手已抵達取件地點'
+    );
+
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '已通知客人：騎手已抵達取件地點',
+    });
+  }
+
+  // 已取件
+  if (normalized === '已取件') {
+    const latestTask = Object.entries(tasks)
+      .map(([taskId, task]) => ({ taskId, task }))
+      .reverse()
+      .find(({ task }) => ['accepted', 'arrived'].includes(task.status));
+
+    if (!latestTask) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '目前沒有可更新為已取件的任務。',
+      });
+    }
+
+    latestTask.task.status = 'picked';
+
+    await pushToUser(
+      latestTask.task.customerUserId,
+      '物品已取件，正在送達中'
+    );
+
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '已通知客人：物品已取件，正在送達中',
+    });
+  }
+
+  // 已送達
+  if (normalized === '已送達') {
+    const latestTask = Object.entries(tasks)
+      .map(([taskId, task]) => ({ taskId, task }))
+      .reverse()
+      .find(({ task }) => ['picked', 'arrived', 'accepted'].includes(task.status));
+
+    if (!latestTask) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '目前沒有可更新為已送達的任務。',
+      });
+    }
+
+    latestTask.task.status = 'delivered';
+
+    await pushToUser(
+      latestTask.task.customerUserId,
+      '物品已送達目的地'
+    );
+
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '已通知客人：物品已送達目的地',
+    });
+  }
+
+  // 已完成
+  if (normalized === '已完成') {
+    const latestTask = Object.entries(tasks)
+      .map(([taskId, task]) => ({ taskId, task }))
+      .reverse()
+      .find(({ task }) => ['delivered', 'picked', 'arrived', 'accepted'].includes(task.status));
+
+    if (!latestTask) {
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '目前沒有可完成的任務。',
+      });
+    }
+
+    latestTask.task.status = 'completed';
+    latestTask.task.completedAt = new Date().toISOString();
+
+    await pushToUser(
+      latestTask.task.customerUserId,
+      '✅ 任務已完成。\n\n感謝您使用 UBee 城市任務服務，期待再次為您服務。'
+    );
+
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '已通知客人：任務已完成',
+    });
+  }
+
+  return null;
+}
+
+// =========================
+// 主要事件處理
+// =========================
+async function handleEvent(event) {
+  try {
+    if (event.type !== 'message' || event.message.type !== 'text') {
+      return null;
+    }
+
+    const text = normalizeText(event.message.text);
+    const userId = getUserId(event);
+
+    // 群組訊息優先處理騎手流程
+    if (event.source.type === 'group') {
+      const groupHandled = await handleGroupMessage(event, text);
+      if (groupHandled) return groupHandled;
+      return null;
+    }
+
+    const session = userSessions[userId];
+
+    // 正在估價流程
+    if (session && session.mode === 'estimate') {
+      return handleEstimateFlow(event, userId, text, session);
+    }
+
+    // 正在建立任務流程
+    if (session && session.mode === 'taskForm') {
+      return handleTaskFormFlow(event, userId, text, session);
+    }
+
+    // 指令：立即估價
+    if (text === '立即估價') {
+      startEstimateSession(userId);
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '請依序提供以下資訊。\n\n第一步，請輸入取件地點：',
+      });
+    }
+
+    // 指令：建立任務 / 開始建立任務
+    if (text === '建立任務' || text === '開始建立任務') {
+      startTaskFormSession(userId);
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '好的，請依序提供以下資訊。\n\n第一步，請輸入取件地點：',
+      });
+    }
+
+    // 其他常用關鍵字
+    if (text === '取消任務') {
+      resetUserSession(userId);
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '已取消目前流程。',
+      });
+    }
+
+    // 預設選單
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '請選擇您要使用的功能：',
+      quickReply: createQuickReply([
+        { label: '立即估價', text: '立即估價' },
+        { label: '建立任務', text: '建立任務' },
+      ]),
+    });
+  } catch (error) {
+    console.error('❌ handleEvent error:', error);
+    return null;
+  }
+}
+
+// =========================
+// Webhook
+// =========================
+app.get('/', (req, res) => {
+  res.status(200).send('UBee OMS V3.6.1 Running');
+});
+
+app.post('/webhook', line.middleware(config), async (req, res) => {
+  try {
+    await Promise.all(req.body.events.map(handleEvent));
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('❌ webhook error:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`✅ Server is running on port ${PORT}`);
+});
