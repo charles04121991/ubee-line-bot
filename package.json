@@ -1,7 +1,7 @@
 {
   "name": "ubee-oms",
-  "version": "3.6.2",
-  "description": "UBee OMS V3.6.2 群組按鈕版＋防亂按保護版",
+  "version": "3.6.3",
+  "description": "UBee OMS V3.6.3 LINE bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
