@@ -1,7 +1,7 @@
 {
-  "name": "ubee-oms-v1",
+  "name": "ubee-line-debug-bot",
   "version": "1.0.0",
-  "description": "UBee OMS V1",
+  "description": "UBee LINE debug bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
