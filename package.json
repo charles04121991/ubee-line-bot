@@ -1,7 +1,7 @@
 {
   "name": "ubee-oms",
   "version": "3.6.3",
-  "description": "UBee OMS V3.6.3 LINE bot",
+  "description": "UBee OMS V3.6.3 Rev.C",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -11,5 +11,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
