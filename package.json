@@ -1,6 +1,7 @@
 {
   "name": "ubee-oms-v1",
   "version": "1.0.0",
+  "description": "UBee OMS V1",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
