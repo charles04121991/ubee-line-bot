@@ -166,6 +166,58 @@ function formatMinutes(min) {
   return `${Math.round(min)} 分鐘`;
 }
 
+function calculateCancelFee(order) {
+  if (!order) return null;
+
+  if (order.status === 'pending') {
+    return 0;
+  }
+
+  if (order.status === 'accepted') {
+    return Math.round(Math.min(Math.max(order.deliveryFee * 0.3, 60), 200));
+  }
+
+  if (order.status === 'arrived_pickup') {
+    return Math.round(Math.min(Math.max(order.deliveryFee * 0.5, 100), 300));
+  }
+
+  return null;
+}
+
+function getCancelRuleText(order) {
+  if (!order) return '無法判定';
+
+  if (order.status === 'pending') {
+    return '尚未接單，免費取消';
+  }
+
+  if (order.status === 'accepted') {
+    return '騎手已接單，取消費為配送費 30%（最低 $60，最高 $200）';
+  }
+
+  if (order.status === 'arrived_pickup') {
+    return '騎手已抵達取件地點，取消費為配送費 50%（最低 $100，最高 $300）';
+  }
+
+  if (order.status === 'picked_up') {
+    return '訂單已取件，無法取消';
+  }
+
+  if (order.status === 'arrived_dropoff') {
+    return '訂單已進入送達階段，無法取消';
+  }
+
+  if (order.status === 'completed') {
+    return '訂單已完成，無法取消';
+  }
+
+  if (order.status === 'cancelled') {
+    return '訂單已取消';
+  }
+
+  return '目前無法取消';
+}
+
 async function getDistanceAndDuration(origin, destination) {
   const url =
     `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(
@@ -474,6 +526,11 @@ function createPriceSummaryFlex(order, title = '訂單費用更新', subtitle = 
                 formatCurrency(order.waitingFee),
                 order.waitingFee > 0 ? '#D32F2F' : '#111111'
               ),
+              createPriceRow(
+                '取消費',
+                formatCurrency(order.cancelFee || 0),
+                (order.cancelFee || 0) > 0 ? '#D32F2F' : '#111111'
+              ),
             ],
           },
           { type: 'separator' },
@@ -550,235 +607,10 @@ function createCompletedFlex(order) {
   };
 }
 
-// ===== Flex 畫面 =====
-function createMainMenuFlex() {
+function createOrderCreatedFlex(order) {
   return {
     type: 'flex',
-    altText: 'UBee 主選單',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      hero: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '20px',
-        contents: [
-          {
-            type: 'text',
-            text: 'UBee',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xxl',
-          },
-          {
-            type: 'text',
-            text: '城市任務服務',
-            color: '#F4C542',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'md',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '請選擇您要使用的功能',
-            size: 'sm',
-            color: '#555555',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createMessageButton('下單', '下單', 'primary', '#111111'),
-          createMessageButton('企業', '企業', 'secondary'),
-          createMessageButton('我的', '我的', 'secondary'),
-        ],
-      },
-    },
-  };
-}
-
-function createOrderMenuFlex() {
-  return {
-    type: 'flex',
-    altText: '下單選單',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '下單',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-          {
-            type: 'text',
-            text: '建立任務或立即估價',
-            color: '#D9D9D9',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'md',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '請選擇您要進行的操作',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createActionButton('建立任務', 'action=create', 'primary', '#111111'),
-          createActionButton('立即估價', 'action=quote', 'secondary'),
-        ],
-      },
-    },
-  };
-}
-
-function createEnterpriseFlex() {
-  return {
-    type: 'flex',
-    altText: '企業合作',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: 'UBee 企業合作',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text:
-              '我們提供企業專屬城市任務支援：\n' +
-              '・文件急送\n' +
-              '・商務跑腿\n' +
-              '・樣品收送\n' +
-              '・臨時行政支援\n\n' +
-              '如需合作，請填寫下方申請表。',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createUriButton('填寫企業合作申請', BUSINESS_FORM, 'primary', '#111111'),
-          createMessageButton('企業服務說明', '企業服務說明', 'secondary'),
-        ],
-      },
-    },
-  };
-}
-
-function createMeFlex() {
-  return {
-    type: 'flex',
-    altText: '我的選單',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '我的選單',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '您可以查看服務說明，或申請加入夥伴，一起參與城市任務服務。',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createMessageButton('服務說明', '服務說明', 'secondary'),
-          createUriButton('加入夥伴', PARTNER_FORM, 'primary', '#111111'),
-        ],
-      },
-    },
-  };
-}
-
-function createConfirmCardFlex(session, mode = 'create') {
-  const confirmData = mode === 'quote' ? 'action=confirmQuoteCreate' : 'action=confirmCreate';
-  const restartData = mode === 'quote' ? 'action=restartQuote' : 'action=restartCreate';
-  const cancelData = mode === 'quote' ? 'action=cancelQuote' : 'action=cancelCreate';
-
-  return {
-    type: 'flex',
-    altText: '請確認任務資訊',
+    altText: '任務已建立成功',
     contents: {
       type: 'bubble',
       size: 'giga',
@@ -790,14 +622,14 @@ function createConfirmCardFlex(session, mode = 'create') {
         contents: [
           {
             type: 'text',
-            text: '任務資訊確認',
+            text: '✅ 任務已建立',
             color: '#FFFFFF',
             weight: 'bold',
             size: 'xl',
           },
           {
             type: 'text',
-            text: '請確認內容與費用',
+            text: '系統正在安排騎手',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -807,73 +639,21 @@ function createConfirmCardFlex(session, mode = 'create') {
       body: {
         type: 'box',
         layout: 'vertical',
-        spacing: 'lg',
+        spacing: 'md',
         paddingAll: '18px',
         contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('取件地點', order.pickup),
+          createInfoRow('送達地點', order.dropoff),
+          createInfoRow('物品內容', order.item),
+          createInfoRow('總計', formatCurrency(order.totalFee)),
           {
-            type: 'box',
-            layout: 'vertical',
-            spacing: 'sm',
-            contents: [
-              createInfoRow('取件地點', session.pickup),
-              createInfoRow('取件電話', session.pickupPhone),
-              createInfoRow('送達地點', session.dropoff),
-              createInfoRow('送達電話', session.dropoffPhone),
-              createInfoRow('物品內容', session.item),
-              createInfoRow('任務類型', session.isUrgent),
-              createInfoRow('備註', session.note),
-              createInfoRow('預估距離', session.distanceText || formatKm(session.distanceKm)),
-              createInfoRow('預估時間', session.durationText || formatMinutes(session.durationMin)),
-            ],
-          },
-          {
-            type: 'separator',
-          },
-          {
-            type: 'box',
-            layout: 'vertical',
-            spacing: 'sm',
-            contents: [
-              createPriceRow('基本費', formatCurrency(session.baseFee)),
-              createPriceRow('距離費', formatCurrency(session.distanceFee)),
-              createPriceRow('時間費', formatCurrency(session.timeFee)),
-              createPriceRow('配送費', formatCurrency(session.deliveryFee), '#111111', 'bold'),
-              createPriceRow('服務費', formatCurrency(session.serviceFee)),
-              createPriceRow(
-                '急件費',
-                formatCurrency(session.urgentFee),
-                session.urgentFee > 0 ? '#D32F2F' : '#111111'
-              ),
-              createPriceRow(
-                '等候費',
-                formatCurrency(session.waitingFee),
-                session.waitingFee > 0 ? '#D32F2F' : '#111111'
-              ),
-            ],
-          },
-          {
-            type: 'separator',
-          },
-          {
-            type: 'box',
-            layout: 'horizontal',
-            contents: [
-              {
-                type: 'text',
-                text: '總計',
-                weight: 'bold',
-                size: 'lg',
-                color: '#111111',
-              },
-              {
-                type: 'text',
-                text: formatCurrency(session.totalFee),
-                weight: 'bold',
-                size: 'xl',
-                color: '#111111',
-                align: 'end',
-              },
-            ],
+            type: 'text',
+            text: '提醒：任務進入派送階段後取消，系統將依訂單狀態酌收取消費。',
+            wrap: true,
+            size: 'xs',
+            color: '#D32F2F',
+            margin: 'md',
           },
         ],
       },
@@ -882,15 +662,86 @@ function createConfirmCardFlex(session, mode = 'create') {
         layout: 'vertical',
         spacing: 'sm',
         contents: [
-          createActionButton(
-            mode === 'quote' ? '確認並建立任務' : '確認送出',
-            confirmData,
-            'primary',
-            '#111111'
-          ),
-          createActionButton('重新填寫', restartData, 'secondary'),
-          createActionButton('取消', cancelData, 'secondary'),
+          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
         ],
+      },
+    },
+  };
+}
+
+function createCancelConfirmFlex(order) {
+  const cancelFee = calculateCancelFee(order);
+  const ruleText = getCancelRuleText(order);
+
+  return {
+    type: 'flex',
+    altText: '取消任務確認',
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '取消任務確認',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '請確認是否要取消本次任務',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('目前狀態', getStatusText(order.status)),
+          createInfoRow('取件地點', order.pickup),
+          createInfoRow('送達地點', order.dropoff),
+          {
+            type: 'text',
+            text: ruleText,
+            wrap: true,
+            size: 'sm',
+            color: '#333333',
+          },
+          {
+            type: 'text',
+            text:
+              cancelFee === null
+                ? '此階段無法取消'
+                : `本次取消費：${formatCurrency(cancelFee)}`,
+            weight: 'bold',
+            size: 'lg',
+            color: cancelFee > 0 ? '#D32F2F' : '#111111',
+            margin: 'md',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents:
+          cancelFee === null
+            ? [createActionButton('返回', `cancelBack=${order.orderId}`, 'secondary')]
+            : [
+                createActionButton('確認取消任務', `cancelConfirm=${order.orderId}`, 'primary', '#111111'),
+                createActionButton('返回', `cancelBack=${order.orderId}`, 'secondary'),
+              ],
       },
     },
   };
@@ -1227,6 +1078,10 @@ async function createOrderFromSession(event, session) {
     totalFee: session.totalFee,
     driverFee: session.driverFee,
 
+    cancelFee: 0,
+    cancelledAt: null,
+    cancelledBy: null,
+
     status: 'pending',
     driverId: null,
     etaMinutes: null,
@@ -1239,11 +1094,13 @@ async function createOrderFromSession(event, session) {
     abandonedBy: [],
   };
 
+  const order = orders[orderId];
+
   clearSession(session.userId);
 
   await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
 
-  return safeReply(event.replyToken, textMessage('✅ 任務已建立成功，系統正在安排騎手。'));
+  return safeReply(event.replyToken, createOrderCreatedFlex(order));
 }
 
 // ===== 路由 =====
@@ -1298,7 +1155,8 @@ async function handleEvent(event) {
         textMessage(
           'UBee 服務說明\n\n' +
             'UBee 提供城市任務服務，包含文件急送、商務跑腿與即時在地支援。\n' +
-            '建立任務後，系統會媒合騎手執行，並在任務過程中同步通知進度。'
+            '建立任務後，系統會媒合騎手執行，並在任務過程中同步通知進度。\n' +
+            '若任務進入派送階段後取消，系統將依訂單狀態酌收取消費。'
         )
       );
     }
@@ -1320,7 +1178,7 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'pickup') {
     session.pickup = text;
     session.step = 'pickupPhone';
-    return safeReply(event.replyToken, textMessage('請輸入取件電話：'));
+    return safeReply(event.replyToken, textMessage('請輸入取件地點：') && textMessage('請輸入取件電話：'));
   }
 
   if (session.step === 'pickupPhone') {
@@ -1469,6 +1327,105 @@ async function handlePostback(event) {
   if (data === 'action=cancelQuote') {
     clearSession(userId);
     return safeReply(event.replyToken, textMessage('✅ 已取消本次立即估價。'));
+  }
+
+  if (data.startsWith('cancelRequest=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (order.userId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+    }
+
+    if (order.status === 'cancelled') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已取消。'));
+    }
+
+    if (order.status === 'completed') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已完成，無法取消。'));
+    }
+
+    return safeReply(event.replyToken, createCancelConfirmFlex(order));
+  }
+
+  if (data.startsWith('cancelBack=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (order.userId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+    }
+
+    return safeReply(event.replyToken, createOrderCreatedFlex(order));
+  }
+
+  if (data.startsWith('cancelConfirm=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (order.userId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+    }
+
+    if (order.status === 'cancelled') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已取消。'));
+    }
+
+    const cancelFee = calculateCancelFee(order);
+
+    if (cancelFee === null) {
+      return safeReply(
+        event.replyToken,
+        textMessage(`⚠️ 目前訂單狀態為「${getStatusText(order.status)}」，無法取消。`)
+      );
+    }
+
+    order.status = 'cancelled';
+    order.cancelFee = cancelFee;
+    order.cancelledAt = new Date().toISOString();
+    order.cancelledBy = userId;
+
+    await safeReply(
+      event.replyToken,
+      textMessage(
+        `✅ 任務已取消\n` +
+          `取消費：${formatCurrency(cancelFee)}\n` +
+          `取消階段：${getStatusText(order.status === 'cancelled' ? 'cancelled' : order.status)}`
+      )
+    );
+
+    await safePush(
+      LINE_GROUP_ID,
+      textMessage(
+        `⚠️ 訂單已由客戶取消\n\n` +
+          `訂單編號：${order.orderId}\n` +
+          `原狀態：${getCancelRuleText({ ...order, status: order.cancelFee === 0 ? 'pending' : order.arrivedPickupAt ? 'arrived_pickup' : order.acceptedAt ? 'accepted' : 'pending' })}\n` +
+          `取消費：${formatCurrency(cancelFee)}`
+      )
+    );
+
+    if (order.driverId) {
+      await safePush(
+        order.driverId,
+        textMessage(
+          `⚠️ 任務已被客戶取消\n` +
+            `訂單編號：${order.orderId}\n` +
+            `取消費：${formatCurrency(cancelFee)}`
+        )
+      );
+    }
+
+    return safePush(
+      order.userId,
+      createPriceSummaryFlex(
+        { ...order, totalFee: cancelFee, serviceFee: 0, urgentFee: 0, waitingFee: 0 },
+        '任務已取消',
+        '以下為本次取消費用明細'
+      )
+    );
   }
 
   if (data.startsWith('accept=')) {
