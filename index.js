@@ -3,8 +3,29 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
 const admin = require('firebase-admin');
-
 const app = express();
+const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+if (!firebaseServiceAccount) {
+  console.error('❌ 缺少 FIREBASE_SERVICE_ACCOUNT');
+  process.exit(1);
+}
+
+let firebaseConfig;
+try {
+  firebaseConfig = JSON.parse(firebaseServiceAccount);
+} catch (error) {
+  console.error('❌ FIREBASE_SERVICE_ACCOUNT 格式錯誤');
+  process.exit(1);
+}
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(firebaseConfig),
+  });
+}
+
+const db = admin.firestore();
 
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
