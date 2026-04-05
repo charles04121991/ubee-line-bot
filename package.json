@@ -1,7 +1,7 @@
 {
   "name": "ubee-oms",
-  "version": "3.8.0",
-  "description": "UBee OMS V3.8 Flex Version",
+  "version": "3.8.2",
+  "description": "UBee OMS V3.8.2 Waiting Fee Confirm Version",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
