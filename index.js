@@ -15,7 +15,6 @@ if (!config.channelAccessToken || !config.channelSecret) {
 }
 
 const client = new line.Client(config);
-app.use(line.middleware(config));
 
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 
@@ -67,19 +66,6 @@ function isDriverAuthorized(order, userId) {
 
 function textMessage(text) {
   return { type: 'text', text };
-}
-
-function createQuickReplyText(text, items) {
-  return {
-    type: 'text',
-    text,
-    quickReply: {
-      items: items.map(item => ({
-        type: 'action',
-        action: item
-      }))
-    }
-  };
 }
 
 function normalizePhone(input) {
@@ -143,9 +129,24 @@ function buildGoogleMapSearchUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
+function parseDistrict(address) {
+  if (!address) return '';
+  const match = address.match(/([\u4e00-\u9fa5]{1,6}[區鄉鎮市])/);
+  return match ? match[1] : '';
+}
+
 // ===== 計價 =====
 function calculateFees(session) {
-  const deliveryFee = 150;
+  const pickupDistrict = parseDistrict(session.pickup);
+  const dropoffDistrict = parseDistrict(session.dropoff);
+
+  const isCrossDistrict =
+    pickupDistrict && dropoffDistrict && pickupDistrict !== dropoffDistrict;
+
+  const baseDeliveryFee = 150;
+  const crossDistrictFee = isCrossDistrict ? 80 : 0;
+  const deliveryFee = baseDeliveryFee + crossDistrictFee;
+
   const serviceFee = 50;
   const urgentFee = session.isUrgent === '急件' ? 100 : 0;
   const totalFee = deliveryFee + serviceFee + urgentFee;
@@ -488,8 +489,7 @@ function createMeFlex() {
         contents: [
           {
             type: 'text',
-            text:
-              '您可以查看服務說明，或申請加入夥伴，一起參與城市任務服務。',
+            text: '您可以查看服務說明，或申請加入夥伴，一起參與城市任務服務。',
             wrap: true,
             size: 'sm',
             color: '#333333'
@@ -699,6 +699,55 @@ function createETAFlex(orderId, page) {
   );
 }
 
+function createUrgentChoiceFlex() {
+  return {
+    type: 'flex',
+    altText: '是否為急件',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '是否為急件？',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: '請選擇本次任務是否為急件',
+            wrap: true,
+            size: 'sm',
+            color: '#333333'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createMessageButton('一般', '一般', 'secondary'),
+          createMessageButton('急件', '急件', 'primary', '#111111')
+        ]
+      }
+    }
+  };
+}
+
 function createPickupActionFlex(orderId) {
   const order = orders[orderId];
   return createSimpleFlex(
@@ -798,8 +847,12 @@ async function createOrderFromSession(event, session) {
   return safeReply(event.replyToken, textMessage('✅ 任務已建立成功，系統正在尋找騎手'));
 }
 
-// ===== Webhook =====
-app.post('/webhook', async (req, res) => {
+// ===== 路由 =====
+app.get('/', (req, res) => {
+  res.status(200).send('UBee OMS V3.7.5 Flex Running');
+});
+
+app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
     await Promise.all(req.body.events.map(handleEvent));
     res.sendStatus(200);
@@ -901,24 +954,12 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'item') {
     session.item = text;
     session.step = 'urgent';
-    return safeReply(
-      event.replyToken,
-      createQuickReplyText('是否為急件？', [
-        { type: 'message', label: '一般', text: '一般' },
-        { type: 'message', label: '急件', text: '急件' }
-      ])
-    );
+    return safeReply(event.replyToken, createUrgentChoiceFlex());
   }
 
   if (session.step === 'urgent') {
     if (text !== '一般' && text !== '急件') {
-      return safeReply(
-        event.replyToken,
-        createQuickReplyText('請選擇是否為急件：', [
-          { type: 'message', label: '一般', text: '一般' },
-          { type: 'message', label: '急件', text: '急件' }
-        ])
-      );
+      return safeReply(event.replyToken, createUrgentChoiceFlex());
     }
 
     session.isUrgent = text;
