@@ -19,7 +19,6 @@ const client = new line.Client(config);
 
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-const PORT = process.env.PORT || 3000;
 
 if (!LINE_GROUP_ID) {
   console.error('❌ 缺少 LINE_GROUP_ID');
@@ -48,21 +47,7 @@ const PRICING = {
   perMinute: 2,
   serviceFee: 50,
   urgentFee: 100,
-  waitingFee: 60,
-};
-
-// ===== 品牌色 =====
-const BRAND = {
-  black: '#111111',
-  gold: '#F4B400',
-  goldDark: '#D89B00',
-  white: '#FFFFFF',
-  text: '#222222',
-  subtext: '#777777',
-  border: '#EAEAEA',
-  bgSoft: '#FFF8E8',
-  green: '#16A34A',
-  red: '#DC2626',
+  waitingFee: 60
 };
 
 // ===== 工具 =====
@@ -161,58 +146,51 @@ function buildGoogleMapSearchUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
+function buildGoogleMapDirectionsUrl(origin, destination) {
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+}
+
+function formatCurrency(num) {
+  return `$${Math.round(num)}`;
+}
+
 function formatKm(km) {
-  return Number(km || 0).toFixed(1);
+  return `${Number(km).toFixed(1)} 公里`;
 }
 
 function formatMinutes(min) {
-  return String(Math.max(1, Math.round(Number(min || 0))));
-}
-
-function formatMoney(num) {
-  return `$${Math.round(Number(num || 0))}`;
-}
-
-// ===== Google Maps API =====
-async function geocodeAddress(address) {
-  const url =
-    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
-
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if (!data.results || !data.results.length) {
-    throw new Error('找不到此地址，請輸入更完整的地址');
-  }
-
-  return {
-    formattedAddress: data.results[0].formatted_address,
-    location: data.results[0].geometry.location,
-  };
+  return `${Math.round(min)} 分鐘`;
 }
 
 async function getDistanceAndDuration(origin, destination) {
   const url =
-    `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&language=zh-TW&units=metric&key=${GOOGLE_MAPS_API_KEY}`;
+    `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}` +
+    `&destinations=${encodeURIComponent(destination)}` +
+    `&mode=driving&language=zh-TW&region=tw&key=${GOOGLE_MAPS_API_KEY}`;
 
-  const res = await fetch(url);
-  const data = await res.json();
+  const response = await fetch(url);
+  const data = await response.json();
 
-  const row = data.rows && data.rows[0];
-  const element = row && row.elements && row.elements[0];
-
-  if (!element || element.status !== 'OK') {
-    throw new Error('距離計算失敗，請確認地址是否完整');
+  if (data.status !== 'OK') {
+    throw new Error(`Google Maps API 錯誤：${data.status}`);
   }
 
-  const distanceMeters = element.distance.value || 0;
-  const durationSeconds = element.duration.value || 0;
+  const element = data.rows?.[0]?.elements?.[0];
+  if (!element || element.status !== 'OK') {
+    throw new Error(`地址查詢失敗：${element?.status || 'UNKNOWN'}`);
+  }
+
+  const distanceMeters = element.distance.value;
+  const durationSeconds = element.duration.value;
+
+  const distanceKm = distanceMeters / 1000;
+  const durationMin = durationSeconds / 60;
 
   return {
-    distanceKm: distanceMeters / 1000,
-    durationMinutes: durationSeconds / 60,
+    distanceKm,
+    durationMin,
     distanceText: element.distance.text,
-    durationText: element.duration.text,
+    durationText: element.duration.text
   };
 }
 
@@ -220,24 +198,23 @@ async function getDistanceAndDuration(origin, destination) {
 async function calculateFees(session) {
   const route = await getDistanceAndDuration(session.pickup, session.dropoff);
 
-  const distanceKm = Math.max(1, Math.ceil(route.distanceKm));
-  const durationMinutes = Math.max(1, Math.ceil(route.durationMinutes));
-
-  const baseFee = PRICING.baseFee;
-  const distanceFee = distanceKm * PRICING.perKm;
-  const timeFee = durationMinutes * PRICING.perMinute;
+  const distanceFee = Math.ceil(route.distanceKm) * PRICING.perKm;
+  const timeFee = Math.ceil(route.durationMin) * PRICING.perMinute;
+  const deliveryFee = PRICING.baseFee + distanceFee + timeFee;
   const serviceFee = PRICING.serviceFee;
   const urgentFee = session.isUrgent === '急件' ? PRICING.urgentFee : 0;
-  const waitingFee = session.needWaiting === '需要等候' ? PRICING.waitingFee : 0;
-
-  const deliveryFee = baseFee + distanceFee + timeFee;
+  const waitingFee = session.needWaitingFee ? PRICING.waitingFee : 0;
   const totalFee = deliveryFee + serviceFee + urgentFee + waitingFee;
 
-  // 可自行再調整騎手拆帳比例
-  const driverFee = Math.round(totalFee * 0.65);
+  // 你原本有保留騎手費用欄位，我這邊先延用 60% 的方式
+  const driverFee = Math.round(totalFee * 0.6);
 
   return {
-    baseFee,
+    distanceKm: route.distanceKm,
+    durationMin: route.durationMin,
+    distanceText: route.distanceText,
+    durationText: route.durationText,
+    baseFee: PRICING.baseFee,
     distanceFee,
     timeFee,
     deliveryFee,
@@ -245,11 +222,7 @@ async function calculateFees(session) {
     urgentFee,
     waitingFee,
     totalFee,
-    driverFee,
-    distanceKm,
-    durationMinutes,
-    distanceText: route.distanceText,
-    durationText: route.durationText,
+    driverFee
   };
 }
 
@@ -264,8 +237,14 @@ function createEmptySession(userId, type) {
     dropoffPhone: '',
     item: '',
     isUrgent: '',
-    needWaiting: '',
     note: '',
+    needWaitingFee: false,
+
+    distanceKm: 0,
+    durationMin: 0,
+    distanceText: '',
+    durationText: '',
+
     baseFee: 0,
     distanceFee: 0,
     timeFee: 0,
@@ -274,15 +253,11 @@ function createEmptySession(userId, type) {
     urgentFee: 0,
     waitingFee: 0,
     totalFee: 0,
-    driverFee: 0,
-    distanceKm: 0,
-    durationMinutes: 0,
-    distanceText: '',
-    durationText: '',
+    driverFee: 0
   };
 }
 
-// ===== Flex 共用元件 =====
+// ===== Flex 共用 =====
 function createActionButton(label, data, style = 'primary', color) {
   const btn = {
     type: 'button',
@@ -328,7 +303,7 @@ function createMessageButton(label, text, style = 'secondary', color) {
   return btn;
 }
 
-function createInfoRow(label, value, color = BRAND.text) {
+function createInfoRow(label, value, valueColor = '#111111') {
   return {
     type: 'box',
     layout: 'baseline',
@@ -338,123 +313,65 @@ function createInfoRow(label, value, color = BRAND.text) {
         type: 'text',
         text: label,
         size: 'sm',
-        color: BRAND.subtext,
+        color: '#7A7A7A',
         flex: 3
       },
       {
         type: 'text',
         text: value || '無',
         size: 'sm',
-        color,
         wrap: true,
+        color: valueColor,
         flex: 7
       }
     ]
   };
 }
 
-function createPriceRow(label, value, isBold = false, color = BRAND.text) {
+function createPriceRow(label, value, color = '#111111', weight = 'regular') {
   return {
     type: 'box',
     layout: 'horizontal',
-    spacing: 'sm',
     contents: [
       {
         type: 'text',
         text: label,
         size: 'sm',
-        color: isBold ? BRAND.black : BRAND.subtext,
-        weight: isBold ? 'bold' : 'regular',
+        color: '#666666',
         flex: 6
       },
       {
         type: 'text',
         text: value,
         size: 'sm',
-        color,
-        weight: isBold ? 'bold' : 'regular',
         align: 'end',
+        color,
+        weight,
         flex: 4
       }
     ]
   };
 }
 
-function createTag(text, color = BRAND.gold) {
-  return {
-    type: 'box',
-    layout: 'vertical',
-    cornerRadius: '12px',
-    paddingTop: '4px',
-    paddingBottom: '4px',
-    paddingStart: '10px',
-    paddingEnd: '10px',
-    backgroundColor: color,
-    contents: [
-      {
-        type: 'text',
-        text,
-        size: 'xs',
-        color: '#000000',
-        weight: 'bold',
-        align: 'center'
-      }
-    ]
-  };
-}
-
-function createPrettyCard({
-  altText,
-  title,
-  subtitle,
-  bodyContents = [],
-  footerButtons = [],
-  tagText = 'UBee',
-  tagColor = BRAND.gold
-}) {
+function createSimpleFlex(title, subtitle, buttons = [], accentColor = '#111111') {
   return {
     type: 'flex',
-    altText,
+    altText: title,
     contents: {
       type: 'bubble',
-      size: 'giga',
-      styles: {
-        body: {
-          backgroundColor: '#FFFFFF'
-        },
-        footer: {
-          separator: true
-        }
-      },
-      hero: {
+      size: 'mega',
+      header: {
         type: 'box',
         layout: 'vertical',
+        backgroundColor: accentColor,
         paddingAll: '18px',
-        backgroundColor: BRAND.black,
         contents: [
-          {
-            type: 'box',
-            layout: 'horizontal',
-            contents: [
-              createTag(tagText, tagColor)
-            ]
-          },
           {
             type: 'text',
             text: title,
-            color: BRAND.white,
+            color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl',
-            margin: 'md',
-            wrap: true
-          },
-          {
-            type: 'text',
-            text: subtitle,
-            color: '#E5E5E5',
-            size: 'sm',
-            margin: 'sm',
-            wrap: true
+            size: 'lg'
           }
         ]
       },
@@ -462,15 +379,22 @@ function createPrettyCard({
         type: 'box',
         layout: 'vertical',
         spacing: 'md',
-        paddingAll: '16px',
-        contents: bodyContents
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: subtitle,
+            wrap: true,
+            size: 'sm',
+            color: '#333333'
+          }
+        ]
       },
       footer: {
         type: 'box',
         layout: 'vertical',
         spacing: 'sm',
-        paddingAll: '14px',
-        contents: footerButtons
+        contents: buttons
       }
     }
   };
@@ -478,130 +402,223 @@ function createPrettyCard({
 
 // ===== Flex 畫面 =====
 function createMainMenuFlex() {
-  return createPrettyCard({
+  return {
+    type: 'flex',
     altText: 'UBee 主選單',
-    title: 'UBee 主選單',
-    subtitle: '城市任務服務入口',
-    bodyContents: [
-      {
-        type: 'text',
-        text: '請選擇您要使用的功能',
-        size: 'sm',
-        color: BRAND.text,
-        wrap: true
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      hero: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '20px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xxl'
+          },
+          {
+            type: 'text',
+            text: '城市任務服務',
+            color: '#F4C542',
+            size: 'sm',
+            margin: 'sm'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '請選擇您要使用的功能',
+            size: 'sm',
+            color: '#555555'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createMessageButton('下單', '下單', 'primary', '#111111'),
+          createMessageButton('企業', '企業', 'secondary'),
+          createMessageButton('我的', '我的', 'secondary')
+        ]
       }
-    ],
-    footerButtons: [
-      createMessageButton('下單', '下單', 'primary', BRAND.goldDark),
-      createMessageButton('企業', '企業', 'secondary'),
-      createMessageButton('我的', '我的', 'secondary')
-    ]
-  });
+    }
+  };
 }
 
 function createOrderMenuFlex() {
-  return createPrettyCard({
-    altText: '下單',
-    title: '任務下單',
-    subtitle: '建立任務或先快速估價',
-    bodyContents: [
-      createInfoRow('基本費', formatMoney(PRICING.baseFee)),
-      createInfoRow('每公里', formatMoney(PRICING.perKm)),
-      createInfoRow('每分鐘', formatMoney(PRICING.perMinute)),
-      createInfoRow('服務費', formatMoney(PRICING.serviceFee)),
-      createInfoRow('急件費', formatMoney(PRICING.urgentFee)),
-      createInfoRow('等候費', formatMoney(PRICING.waitingFee))
-    ],
-    footerButtons: [
-      createActionButton('建立任務', 'action=create', 'primary', BRAND.goldDark),
-      createActionButton('立即估價', 'action=quote', 'secondary')
-    ]
-  });
+  return {
+    type: 'flex',
+    altText: '下單選單',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '下單',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl'
+          },
+          {
+            type: 'text',
+            text: '建立任務或立即估價',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '請選擇您要進行的操作',
+            wrap: true,
+            size: 'sm',
+            color: '#333333'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('建立任務', 'action=create', 'primary', '#111111'),
+          createActionButton('立即估價', 'action=quote', 'secondary')
+        ]
+      }
+    }
+  };
 }
 
 function createEnterpriseFlex() {
-  return createPrettyCard({
+  return {
+    type: 'flex',
     altText: '企業合作',
-    title: 'UBee 企業合作',
-    subtitle: '文件急送・樣品收送・臨時行政支援',
-    bodyContents: [
-      {
-        type: 'text',
-        text:
-          '我們提供企業專屬城市任務支援，適用公司、工廠、中小企業、事務所與門市單位。',
-        wrap: true,
-        size: 'sm',
-        color: BRAND.text
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee 企業合作',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text:
+              '我們提供企業專屬城市任務支援：\n' +
+              '・文件急送\n' +
+              '・商務跑腿\n' +
+              '・樣品收送\n' +
+              '・臨時行政支援\n\n' +
+              '如需合作，請填寫下方申請表。',
+            wrap: true,
+            size: 'sm',
+            color: '#333333'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createUriButton('填寫企業合作申請', BUSINESS_FORM, 'primary', '#111111'),
+          createMessageButton('企業服務說明', '企業服務說明', 'secondary')
+        ]
       }
-    ],
-    footerButtons: [
-      createUriButton('填寫企業合作申請', BUSINESS_FORM, 'primary', BRAND.goldDark),
-      createMessageButton('企業服務說明', '企業服務說明', 'secondary')
-    ]
-  });
+    }
+  };
 }
 
 function createMeFlex() {
-  return createPrettyCard({
+  return {
+    type: 'flex',
     altText: '我的選單',
-    title: '我的選單',
-    subtitle: '服務資訊與夥伴加入入口',
-    bodyContents: [
-      {
-        type: 'text',
-        text: '您可以查看服務說明，或申請加入夥伴，一起參與城市任務服務。',
-        wrap: true,
-        size: 'sm',
-        color: BRAND.text
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '我的選單',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '您可以查看服務說明，或申請加入夥伴，一起參與城市任務服務。',
+            wrap: true,
+            size: 'sm',
+            color: '#333333'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createMessageButton('服務說明', '服務說明', 'secondary'),
+          createUriButton('加入夥伴', PARTNER_FORM, 'primary', '#111111')
+        ]
       }
-    ],
-    footerButtons: [
-      createMessageButton('服務說明', '服務說明', 'secondary'),
-      createUriButton('加入夥伴', PARTNER_FORM, 'primary', BRAND.goldDark)
-    ]
-  });
-}
-
-function createUrgentChoiceFlex() {
-  return createPrettyCard({
-    altText: '是否為急件',
-    title: '是否為急件？',
-    subtitle: `急件費固定 ${formatMoney(PRICING.urgentFee)}`,
-    bodyContents: [
-      {
-        type: 'text',
-        text: '請選擇本次任務是否需要急件處理',
-        wrap: true,
-        size: 'sm',
-        color: BRAND.text
-      }
-    ],
-    footerButtons: [
-      createMessageButton('一般', '一般', 'secondary'),
-      createMessageButton('急件', '急件', 'primary', BRAND.goldDark)
-    ]
-  });
-}
-
-function createWaitingChoiceFlex() {
-  return createPrettyCard({
-    altText: '是否需要等候',
-    title: '是否需要等候？',
-    subtitle: `等候費固定 ${formatMoney(PRICING.waitingFee)}`,
-    bodyContents: [
-      {
-        type: 'text',
-        text: '若本次任務需要現場等待，請選擇「需要等候」',
-        wrap: true,
-        size: 'sm',
-        color: BRAND.text
-      }
-    ],
-    footerButtons: [
-      createMessageButton('不需要等候', '不需要等候', 'secondary'),
-      createMessageButton('需要等候', '需要等候', 'primary', BRAND.goldDark)
-    ]
-  });
+    }
+  };
 }
 
 function createConfirmCardFlex(session, mode = 'create') {
@@ -615,33 +632,23 @@ function createConfirmCardFlex(session, mode = 'create') {
     contents: {
       type: 'bubble',
       size: 'giga',
-      styles: {
-        body: { backgroundColor: '#FFFFFF' },
-        footer: { separator: true }
-      },
-      hero: {
+      header: {
         type: 'box',
         layout: 'vertical',
-        backgroundColor: BRAND.black,
+        backgroundColor: '#111111',
         paddingAll: '18px',
         contents: [
           {
-            type: 'box',
-            layout: 'horizontal',
-            contents: [createTag('CONFIRM', BRAND.gold)]
-          },
-          {
             type: 'text',
-            text: '請確認任務資訊',
-            color: BRAND.white,
+            text: '任務資訊確認',
+            color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl',
-            margin: 'md'
+            size: 'xl'
           },
           {
             type: 'text',
-            text: 'UBee 將依此內容建立任務',
-            color: '#E5E5E5',
+            text: '請確認內容與費用',
+            color: '#D9D9D9',
             size: 'sm',
             margin: 'sm'
           }
@@ -651,7 +658,7 @@ function createConfirmCardFlex(session, mode = 'create') {
         type: 'box',
         layout: 'vertical',
         spacing: 'lg',
-        paddingAll: '16px',
+        paddingAll: '18px',
         contents: [
           {
             type: 'box',
@@ -663,9 +670,10 @@ function createConfirmCardFlex(session, mode = 'create') {
               createInfoRow('送達地點', session.dropoff),
               createInfoRow('送達電話', session.dropoffPhone),
               createInfoRow('物品內容', session.item),
-              createInfoRow('急件', session.isUrgent),
-              createInfoRow('等候', session.needWaiting),
-              createInfoRow('備註', session.note)
+              createInfoRow('任務類型', session.isUrgent),
+              createInfoRow('備註', session.note),
+              createInfoRow('預估距離', session.distanceText || formatKm(session.distanceKm)),
+              createInfoRow('預估時間', session.durationText || formatMinutes(session.durationMin))
             ]
           },
           {
@@ -676,51 +684,36 @@ function createConfirmCardFlex(session, mode = 'create') {
             layout: 'vertical',
             spacing: 'sm',
             contents: [
-              createPriceRow('基本費', formatMoney(session.baseFee)),
-              createPriceRow(`里程費（${formatKm(session.distanceKm)} km）`, formatMoney(session.distanceFee)),
-              createPriceRow(`時間費（${formatMinutes(session.durationMinutes)} 分）`, formatMoney(session.timeFee)),
-              createPriceRow('配送費小計', formatMoney(session.deliveryFee), true),
-              createPriceRow('服務費', formatMoney(session.serviceFee)),
-              createPriceRow('急件費', formatMoney(session.urgentFee)),
-              createPriceRow('等候費', formatMoney(session.waitingFee))
+              createPriceRow('基本費', formatCurrency(session.baseFee)),
+              createPriceRow('距離費', formatCurrency(session.distanceFee)),
+              createPriceRow('時間費', formatCurrency(session.timeFee)),
+              createPriceRow('配送費', formatCurrency(session.deliveryFee), '#111111', 'bold'),
+              createPriceRow('服務費', formatCurrency(session.serviceFee)),
+              createPriceRow('急件費', formatCurrency(session.urgentFee), session.urgentFee > 0 ? '#D32F2F' : '#111111'),
+              createPriceRow('等候費', formatCurrency(session.waitingFee), session.waitingFee > 0 ? '#D32F2F' : '#111111')
             ]
           },
           {
             type: 'separator'
-          },
-          {
-            type: 'box',
-            layout: 'vertical',
-            spacing: 'sm',
-            contents: [
-              createInfoRow('預估距離', session.distanceText || `${formatKm(session.distanceKm)} km`),
-              createInfoRow('預估時間', session.durationText || `${formatMinutes(session.durationMinutes)} 分`)
-            ]
           },
           {
             type: 'box',
             layout: 'horizontal',
-            margin: 'lg',
-            paddingAll: '12px',
-            backgroundColor: BRAND.bgSoft,
-            cornerRadius: '12px',
             contents: [
               {
                 type: 'text',
                 text: '總計',
                 weight: 'bold',
                 size: 'lg',
-                color: BRAND.black,
-                flex: 5
+                color: '#111111'
               },
               {
                 type: 'text',
-                text: formatMoney(session.totalFee),
+                text: formatCurrency(session.totalFee),
                 weight: 'bold',
                 size: 'xl',
-                color: BRAND.goldDark,
-                align: 'end',
-                flex: 5
+                color: '#111111',
+                align: 'end'
               }
             ]
           }
@@ -730,13 +723,12 @@ function createConfirmCardFlex(session, mode = 'create') {
         type: 'box',
         layout: 'vertical',
         spacing: 'sm',
-        paddingAll: '14px',
         contents: [
           createActionButton(
             mode === 'quote' ? '確認並建立任務' : '確認送出',
             confirmData,
             'primary',
-            BRAND.goldDark
+            '#111111'
           ),
           createActionButton('重新填寫', restartData, 'secondary'),
           createActionButton('取消', cancelData, 'secondary')
@@ -749,27 +741,76 @@ function createConfirmCardFlex(session, mode = 'create') {
 function createGroupTaskFlex(orderId) {
   const order = orders[orderId];
 
-  return createPrettyCard({
+  return {
+    type: 'flex',
     altText: 'UBee 新任務通知',
-    title: '📦 UBee 新任務通知',
-    subtitle: `訂單編號：${orderId}`,
-    bodyContents: [
-      createInfoRow('費用', formatMoney(order.driverFee), BRAND.goldDark),
-      createInfoRow('取件地點', order.pickup),
-      createInfoRow('送達地點', order.dropoff),
-      createInfoRow('物品', order.item),
-      createInfoRow('急件', order.isUrgent),
-      createInfoRow('等候', order.needWaiting),
-      createInfoRow('備註', order.note),
-      createInfoRow('總距離', order.distanceText || `${formatKm(order.distanceKm)} km`),
-      createInfoRow('預估時間', order.durationText || `${formatMinutes(order.durationMinutes)} 分`)
-    ],
-    footerButtons: [
-      createActionButton('接單', `accept=${orderId}`, 'primary', BRAND.goldDark),
-      createActionButton('放棄任務', `reject=${orderId}`, 'secondary')
-    ],
-    tagText: 'NEW ORDER'
-  });
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '📦 UBee 新任務',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl'
+          },
+          {
+            type: 'text',
+            text: `訂單編號：${order.orderId}`,
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#FFF8E1',
+            cornerRadius: '10px',
+            paddingAll: '12px',
+            contents: [
+              {
+                type: 'text',
+                text: `費用：${formatCurrency(order.driverFee)}`,
+                weight: 'bold',
+                size: 'lg',
+                color: '#111111'
+              }
+            ]
+          },
+          createInfoRow('取件地點', order.pickup),
+          createInfoRow('送達地點', order.dropoff),
+          createInfoRow('物品內容', order.item),
+          createInfoRow('任務類型', order.isUrgent),
+          createInfoRow('備註', order.note),
+          createInfoRow('距離', order.distanceText || formatKm(order.distanceKm)),
+          createInfoRow('時間', order.durationText || formatMinutes(order.durationMin))
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('接單', `accept=${orderId}`, 'primary', '#111111'),
+          createActionButton('放棄任務', `reject=${orderId}`, 'secondary')
+        ]
+      }
+    }
+  };
 }
 
 function createETAFlex(orderId, page) {
@@ -778,138 +819,143 @@ function createETAFlex(orderId, page) {
       createActionButton('5 分鐘', `eta=${orderId}=5`, 'secondary'),
       createActionButton('7 分鐘', `eta=${orderId}=7`, 'secondary'),
       createActionButton('8 分鐘', `eta=${orderId}=8`, 'secondary'),
-      createActionButton('下一頁', `etaPage2=${orderId}`, 'primary', BRAND.goldDark')
+      createActionButton('下一頁', `etaPage2=${orderId}`, 'primary', '#111111')
     ],
     2: [
       createActionButton('10 分鐘', `eta=${orderId}=10`, 'secondary'),
       createActionButton('12 分鐘', `eta=${orderId}=12`, 'secondary'),
       createActionButton('15 分鐘', `eta=${orderId}=15`, 'secondary'),
-      createActionButton('下一頁', `etaPage3=${orderId}`, 'primary', BRAND.goldDark)
+      createActionButton('下一頁', `etaPage3=${orderId}`, 'primary', '#111111')
     ],
     3: [
       createActionButton('17 分鐘', `eta=${orderId}=17`, 'secondary'),
       createActionButton('18 分鐘', `eta=${orderId}=18`, 'secondary'),
       createActionButton('20 分鐘', `eta=${orderId}=20`, 'secondary'),
-      createActionButton('下一頁', `etaPage4=${orderId}`, 'primary', BRAND.goldDark)
+      createActionButton('下一頁', `etaPage4=${orderId}`, 'primary', '#111111')
     ],
     4: [
       createActionButton('22 分鐘', `eta=${orderId}=22`, 'secondary'),
       createActionButton('25 分鐘', `eta=${orderId}=25`, 'secondary'),
-      createActionButton('上一頁', `etaPage3=${orderId}`, 'primary', BRAND.goldDark)
+      createActionButton('上一頁', `etaPage3=${orderId}`, 'primary', '#111111')
     ]
   };
 
-  return createPrettyCard({
-    altText: '選擇 ETA',
-    title: `選擇 ETA（${page}/4）`,
-    subtitle: '請選擇預計抵達取件地點時間',
-    bodyContents: [
-      {
-        type: 'text',
-        text: '接單後請設定 ETA，系統會同步通知客人。',
-        wrap: true,
-        size: 'sm',
-        color: BRAND.text
+  return createSimpleFlex(
+    `選擇 ETA（${page}/4）`,
+    '請選擇預計抵達取件地點時間',
+    pageMap[page],
+    '#111111'
+  );
+}
+
+function createUrgentChoiceFlex() {
+  return {
+    type: 'flex',
+    altText: '是否為急件',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '是否為急件？',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '請選擇本次任務是否為急件',
+            wrap: true,
+            size: 'sm',
+            color: '#333333'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createMessageButton('一般', '一般', 'secondary'),
+          createMessageButton('急件', '急件', 'primary', '#111111')
+        ]
       }
-    ],
-    footerButtons: pageMap[page],
-    tagText: 'ETA'
-  });
+    }
+  };
 }
 
 function createPickupActionFlex(orderId) {
   const order = orders[orderId];
-  return createPrettyCard({
-    altText: '取件操作',
-    title: '取件操作',
-    subtitle: '請前往取件地點',
-    bodyContents: [
-      createInfoRow('取件地點', order.pickup),
-      createInfoRow('取件電話', order.pickupPhone)
-    ],
-    footerButtons: [
-      createUriButton('導航取件地點', buildGoogleMapSearchUrl(order.pickup), 'primary', BRAND.goldDark),
+  return createSimpleFlex(
+    '取件操作',
+    `請前往取件地點\n\n取件：${order.pickup}`,
+    [
+      createUriButton('導航取件地點', buildGoogleMapDirectionsUrl(order.pickup, order.pickup), 'primary', '#111111'),
       createActionButton('已抵達取件地點', `arrivePickup=${orderId}`, 'secondary')
     ],
-    tagText: 'PICKUP'
-  });
+    '#111111'
+  );
 }
 
 function createPickedActionFlex(orderId) {
-  return createPrettyCard({
-    altText: '已取件操作',
-    title: '已取件操作',
-    subtitle: '請確認完成取件後再進入下一步',
-    bodyContents: [
-      {
-        type: 'text',
-        text: '若物品已完成交接，請點擊下方按鈕。',
-        wrap: true,
-        size: 'sm',
-        color: BRAND.text
-      }
+  return createSimpleFlex(
+    '已取件操作',
+    '請確認完成取件後，再進入下一步',
+    [
+      createActionButton('已取件', `picked=${orderId}`, 'primary', '#111111')
     ],
-    footerButtons: [
-      createActionButton('已取件', `picked=${orderId}`, 'primary', BRAND.goldDark)
-    ],
-    tagText: 'IN HAND'
-  });
+    '#111111'
+  );
 }
 
 function createDropoffActionFlex(orderId) {
   const order = orders[orderId];
-  return createPrettyCard({
-    altText: '送達操作',
-    title: '送達操作',
-    subtitle: '請前往送達地點',
-    bodyContents: [
-      createInfoRow('送達地點', order.dropoff),
-      createInfoRow('送達電話', order.dropoffPhone)
-    ],
-    footerButtons: [
-      createUriButton('導航送達地點', buildGoogleMapSearchUrl(order.dropoff), 'primary', BRAND.goldDark),
+  return createSimpleFlex(
+    '送達操作',
+    `請前往送達地點\n\n送達：${order.dropoff}`,
+    [
+      createUriButton('導航送達地點', buildGoogleMapDirectionsUrl(order.pickup, order.dropoff), 'primary', '#111111'),
       createActionButton('已抵達送達地點', `arriveDropoff=${orderId}`, 'secondary')
     ],
-    tagText: 'DROPOFF'
-  });
+    '#111111'
+  );
 }
 
 function createDropoffArrivedFlex(orderId) {
   const order = orders[orderId];
-  return createPrettyCard({
-    altText: '送達地點操作',
-    title: '送達地點操作',
-    subtitle: '請先聯絡收件人，再完成任務',
-    bodyContents: [
-      createInfoRow('送達電話', order.dropoffPhone)
-    ],
-    footerButtons: [
+  return createSimpleFlex(
+    '送達地點操作',
+    `請先聯絡收件人，再完成任務\n\n送達電話：${order.dropoffPhone}`,
+    [
       createActionButton('撥打收件人', `call=${orderId}=${order.dropoffPhone}`, 'secondary'),
-      createActionButton('已完成', `complete=${orderId}`, 'primary', BRAND.goldDark)
+      createActionButton('已完成', `complete=${orderId}`, 'primary', '#111111')
     ],
-    tagText: 'ARRIVED'
-  });
+    '#111111'
+  );
 }
 
 function createCallFlex(phone) {
-  return createPrettyCard({
-    altText: '聯絡收件人',
-    title: '聯絡收件人',
-    subtitle: `電話：${phone}`,
-    bodyContents: [
-      {
-        type: 'text',
-        text: '請點擊下方按鈕直接撥打電話。',
-        wrap: true,
-        size: 'sm',
-        color: BRAND.text
-      }
+  return createSimpleFlex(
+    '聯絡收件人',
+    `請點擊下方按鈕撥打電話\n\n電話：${phone}`,
+    [
+      createUriButton('📞 撥打', `tel:${phone}`, 'primary', '#111111')
     ],
-    footerButtons: [
-      createUriButton('📞 撥打', `tel:${phone}`, 'primary', BRAND.goldDark)
-    ],
-    tagText: 'CALL'
-  });
+    '#111111'
+  );
 }
 
 // ===== 建立正式訂單 =====
@@ -925,8 +971,14 @@ async function createOrderFromSession(event, session) {
     dropoffPhone: session.dropoffPhone,
     item: session.item,
     isUrgent: session.isUrgent,
-    needWaiting: session.needWaiting,
     note: session.note,
+    needWaitingFee: session.needWaitingFee,
+
+    distanceKm: session.distanceKm,
+    durationMin: session.durationMin,
+    distanceText: session.distanceText,
+    durationText: session.durationText,
+
     baseFee: session.baseFee,
     distanceFee: session.distanceFee,
     timeFee: session.timeFee,
@@ -936,10 +988,7 @@ async function createOrderFromSession(event, session) {
     waitingFee: session.waitingFee,
     totalFee: session.totalFee,
     driverFee: session.driverFee,
-    distanceKm: session.distanceKm,
-    durationMinutes: session.durationMinutes,
-    distanceText: session.distanceText,
-    durationText: session.durationText,
+
     status: 'pending',
     driverId: null,
     etaMinutes: null,
@@ -961,7 +1010,7 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8 Flex Pricing Running');
+  res.status(200).send('UBee OMS V3.8 Flex Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1076,16 +1125,6 @@ async function handleOrderInput(event, session, text) {
     }
 
     session.isUrgent = text;
-    session.step = 'waiting';
-    return safeReply(event.replyToken, createWaitingChoiceFlex());
-  }
-
-  if (session.step === 'waiting') {
-    if (text !== '不需要等候' && text !== '需要等候') {
-      return safeReply(event.replyToken, createWaitingChoiceFlex());
-    }
-
-    session.needWaiting = text;
     session.step = 'note';
     return safeReply(event.replyToken, textMessage('請輸入備註，若無請輸入「無」：'));
   }
@@ -1095,7 +1134,10 @@ async function handleOrderInput(event, session, text) {
 
     try {
       const fees = await calculateFees(session);
-
+      session.distanceKm = fees.distanceKm;
+      session.durationMin = fees.durationMin;
+      session.distanceText = fees.distanceText;
+      session.durationText = fees.durationText;
       session.baseFee = fees.baseFee;
       session.distanceFee = fees.distanceFee;
       session.timeFee = fees.timeFee;
@@ -1105,10 +1147,6 @@ async function handleOrderInput(event, session, text) {
       session.waitingFee = fees.waitingFee;
       session.totalFee = fees.totalFee;
       session.driverFee = fees.driverFee;
-      session.distanceKm = fees.distanceKm;
-      session.durationMinutes = fees.durationMinutes;
-      session.distanceText = fees.distanceText;
-      session.durationText = fees.durationText;
       session.step = 'confirm';
 
       const isQuote = session.type === 'quote_order';
@@ -1119,9 +1157,10 @@ async function handleOrderInput(event, session, text) {
       );
     } catch (err) {
       console.error('calculateFees error:', err);
+      clearSession(userId);
       return safeReply(
         event.replyToken,
-        textMessage(`⚠️ 地址查詢或費用計算失敗：${err.message}`)
+        textMessage(`⚠️ 地址查詢失敗：${err.message}\n請重新開始建立任務。`)
       );
     }
   }
@@ -1334,11 +1373,10 @@ async function handlePostback(event) {
 
     return safeReply(event.replyToken, textMessage('✅ 任務已完成'));
   }
-
-  return safeReply(event.replyToken, textMessage('⚠️ 無法辨識此操作'));
 }
 
 // ===== 啟動 =====
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('UBee OMS V3.8 Flex Pricing Running');
+  console.log('UBee OMS V3.8 Flex Running');
 });
