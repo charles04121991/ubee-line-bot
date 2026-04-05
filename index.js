@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
+const admin = require('firebase-admin');
 
 const app = express();
 
