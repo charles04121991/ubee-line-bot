@@ -47,20 +47,20 @@ const PRICING = {
   perMinute: 2,
   serviceFee: 50,
   urgentFee: 100,
-  waitingFee: 60
+  waitingFee: 60,
 };
 
 // ===== 工具 =====
 const createOrderId = () => 'OD' + Date.now();
 
 function safeReply(replyToken, message) {
-  return client.replyMessage(replyToken, message).catch(err => {
+  return client.replyMessage(replyToken, message).catch((err) => {
     console.error('replyMessage error:', err?.originalError || err);
   });
 }
 
 function safePush(to, message) {
-  return client.pushMessage(to, message).catch(err => {
+  return client.pushMessage(to, message).catch((err) => {
     console.error('pushMessage error:', err?.originalError || err);
   });
 }
@@ -147,7 +147,9 @@ function buildGoogleMapSearchUrl(address) {
 }
 
 function buildGoogleMapDirectionsUrl(origin, destination) {
-  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+    origin
+  )}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
 }
 
 function formatCurrency(num) {
@@ -164,7 +166,9 @@ function formatMinutes(min) {
 
 async function getDistanceAndDuration(origin, destination) {
   const url =
-    `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}` +
+    `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(
+      origin
+    )}` +
     `&destinations=${encodeURIComponent(destination)}` +
     `&mode=driving&language=zh-TW&region=tw&key=${GOOGLE_MAPS_API_KEY}`;
 
@@ -190,7 +194,7 @@ async function getDistanceAndDuration(origin, destination) {
     distanceKm,
     durationMin,
     distanceText: element.distance.text,
-    durationText: element.duration.text
+    durationText: element.duration.text,
   };
 }
 
@@ -206,7 +210,6 @@ async function calculateFees(session) {
   const waitingFee = session.needWaitingFee ? PRICING.waitingFee : 0;
   const totalFee = deliveryFee + serviceFee + urgentFee + waitingFee;
 
-  // 你原本有保留騎手費用欄位，我這邊先延用 60% 的方式
   const driverFee = Math.round(totalFee * 0.6);
 
   return {
@@ -222,7 +225,7 @@ async function calculateFees(session) {
     urgentFee,
     waitingFee,
     totalFee,
-    driverFee
+    driverFee,
   };
 }
 
@@ -253,7 +256,7 @@ function createEmptySession(userId, type) {
     urgentFee: 0,
     waitingFee: 0,
     totalFee: 0,
-    driverFee: 0
+    driverFee: 0,
   };
 }
 
@@ -266,8 +269,8 @@ function createActionButton(label, data, style = 'primary', color) {
     action: {
       type: 'postback',
       label,
-      data
-    }
+      data,
+    },
   };
   if (color) btn.color = color;
   return btn;
@@ -281,8 +284,8 @@ function createUriButton(label, uri, style = 'primary', color) {
     action: {
       type: 'uri',
       label,
-      uri
-    }
+      uri,
+    },
   };
   if (color) btn.color = color;
   return btn;
@@ -296,8 +299,8 @@ function createMessageButton(label, text, style = 'secondary', color) {
     action: {
       type: 'message',
       label,
-      text
-    }
+      text,
+    },
   };
   if (color) btn.color = color;
   return btn;
@@ -314,7 +317,7 @@ function createInfoRow(label, value, valueColor = '#111111') {
         text: label,
         size: 'sm',
         color: '#7A7A7A',
-        flex: 3
+        flex: 3,
       },
       {
         type: 'text',
@@ -322,9 +325,9 @@ function createInfoRow(label, value, valueColor = '#111111') {
         size: 'sm',
         wrap: true,
         color: valueColor,
-        flex: 7
-      }
-    ]
+        flex: 7,
+      },
+    ],
   };
 }
 
@@ -338,7 +341,7 @@ function createPriceRow(label, value, color = '#111111', weight = 'regular') {
         text: label,
         size: 'sm',
         color: '#666666',
-        flex: 6
+        flex: 6,
       },
       {
         type: 'text',
@@ -347,9 +350,9 @@ function createPriceRow(label, value, color = '#111111', weight = 'regular') {
         align: 'end',
         color,
         weight,
-        flex: 4
-      }
-    ]
+        flex: 4,
+      },
+    ],
   };
 }
 
@@ -371,9 +374,9 @@ function createSimpleFlex(title, subtitle, buttons = [], accentColor = '#111111'
             text: title,
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'lg'
-          }
-        ]
+            size: 'lg',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -386,17 +389,17 @@ function createSimpleFlex(title, subtitle, buttons = [], accentColor = '#111111'
             text: subtitle,
             wrap: true,
             size: 'sm',
-            color: '#333333'
-          }
-        ]
+            color: '#333333',
+          },
+        ],
       },
       footer: {
         type: 'box',
         layout: 'vertical',
         spacing: 'sm',
-        contents: buttons
-      }
-    }
+        contents: buttons,
+      },
+    },
   };
 }
 
@@ -419,16 +422,16 @@ function createMainMenuFlex() {
             text: 'UBee',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xxl'
+            size: 'xxl',
           },
           {
             type: 'text',
             text: '城市任務服務',
             color: '#F4C542',
             size: 'sm',
-            margin: 'sm'
-          }
-        ]
+            margin: 'sm',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -440,9 +443,9 @@ function createMainMenuFlex() {
             type: 'text',
             text: '請選擇您要使用的功能',
             size: 'sm',
-            color: '#555555'
-          }
-        ]
+            color: '#555555',
+          },
+        ],
       },
       footer: {
         type: 'box',
@@ -451,10 +454,10 @@ function createMainMenuFlex() {
         contents: [
           createMessageButton('下單', '下單', 'primary', '#111111'),
           createMessageButton('企業', '企業', 'secondary'),
-          createMessageButton('我的', '我的', 'secondary')
-        ]
-      }
-    }
+          createMessageButton('我的', '我的', 'secondary'),
+        ],
+      },
+    },
   };
 }
 
@@ -476,16 +479,16 @@ function createOrderMenuFlex() {
             text: '下單',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl'
+            size: 'xl',
           },
           {
             type: 'text',
             text: '建立任務或立即估價',
             color: '#D9D9D9',
             size: 'sm',
-            margin: 'sm'
-          }
-        ]
+            margin: 'sm',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -498,9 +501,9 @@ function createOrderMenuFlex() {
             text: '請選擇您要進行的操作',
             wrap: true,
             size: 'sm',
-            color: '#333333'
-          }
-        ]
+            color: '#333333',
+          },
+        ],
       },
       footer: {
         type: 'box',
@@ -508,10 +511,10 @@ function createOrderMenuFlex() {
         spacing: 'sm',
         contents: [
           createActionButton('建立任務', 'action=create', 'primary', '#111111'),
-          createActionButton('立即估價', 'action=quote', 'secondary')
-        ]
-      }
-    }
+          createActionButton('立即估價', 'action=quote', 'secondary'),
+        ],
+      },
+    },
   };
 }
 
@@ -533,9 +536,9 @@ function createEnterpriseFlex() {
             text: 'UBee 企業合作',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl'
-          }
-        ]
+            size: 'xl',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -554,9 +557,9 @@ function createEnterpriseFlex() {
               '如需合作，請填寫下方申請表。',
             wrap: true,
             size: 'sm',
-            color: '#333333'
-          }
-        ]
+            color: '#333333',
+          },
+        ],
       },
       footer: {
         type: 'box',
@@ -564,10 +567,10 @@ function createEnterpriseFlex() {
         spacing: 'sm',
         contents: [
           createUriButton('填寫企業合作申請', BUSINESS_FORM, 'primary', '#111111'),
-          createMessageButton('企業服務說明', '企業服務說明', 'secondary')
-        ]
-      }
-    }
+          createMessageButton('企業服務說明', '企業服務說明', 'secondary'),
+        ],
+      },
+    },
   };
 }
 
@@ -589,9 +592,9 @@ function createMeFlex() {
             text: '我的選單',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl'
-          }
-        ]
+            size: 'xl',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -604,9 +607,9 @@ function createMeFlex() {
             text: '您可以查看服務說明，或申請加入夥伴，一起參與城市任務服務。',
             wrap: true,
             size: 'sm',
-            color: '#333333'
-          }
-        ]
+            color: '#333333',
+          },
+        ],
       },
       footer: {
         type: 'box',
@@ -614,10 +617,10 @@ function createMeFlex() {
         spacing: 'sm',
         contents: [
           createMessageButton('服務說明', '服務說明', 'secondary'),
-          createUriButton('加入夥伴', PARTNER_FORM, 'primary', '#111111')
-        ]
-      }
-    }
+          createUriButton('加入夥伴', PARTNER_FORM, 'primary', '#111111'),
+        ],
+      },
+    },
   };
 }
 
@@ -643,16 +646,16 @@ function createConfirmCardFlex(session, mode = 'create') {
             text: '任務資訊確認',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl'
+            size: 'xl',
           },
           {
             type: 'text',
             text: '請確認內容與費用',
             color: '#D9D9D9',
             size: 'sm',
-            margin: 'sm'
-          }
-        ]
+            margin: 'sm',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -673,11 +676,11 @@ function createConfirmCardFlex(session, mode = 'create') {
               createInfoRow('任務類型', session.isUrgent),
               createInfoRow('備註', session.note),
               createInfoRow('預估距離', session.distanceText || formatKm(session.distanceKm)),
-              createInfoRow('預估時間', session.durationText || formatMinutes(session.durationMin))
-            ]
+              createInfoRow('預估時間', session.durationText || formatMinutes(session.durationMin)),
+            ],
           },
           {
-            type: 'separator'
+            type: 'separator',
           },
           {
             type: 'box',
@@ -689,12 +692,20 @@ function createConfirmCardFlex(session, mode = 'create') {
               createPriceRow('時間費', formatCurrency(session.timeFee)),
               createPriceRow('配送費', formatCurrency(session.deliveryFee), '#111111', 'bold'),
               createPriceRow('服務費', formatCurrency(session.serviceFee)),
-              createPriceRow('急件費', formatCurrency(session.urgentFee), session.urgentFee > 0 ? '#D32F2F' : '#111111'),
-              createPriceRow('等候費', formatCurrency(session.waitingFee), session.waitingFee > 0 ? '#D32F2F' : '#111111')
-            ]
+              createPriceRow(
+                '急件費',
+                formatCurrency(session.urgentFee),
+                session.urgentFee > 0 ? '#D32F2F' : '#111111'
+              ),
+              createPriceRow(
+                '等候費',
+                formatCurrency(session.waitingFee),
+                session.waitingFee > 0 ? '#D32F2F' : '#111111'
+              ),
+            ],
           },
           {
-            type: 'separator'
+            type: 'separator',
           },
           {
             type: 'box',
@@ -705,7 +716,7 @@ function createConfirmCardFlex(session, mode = 'create') {
                 text: '總計',
                 weight: 'bold',
                 size: 'lg',
-                color: '#111111'
+                color: '#111111',
               },
               {
                 type: 'text',
@@ -713,11 +724,11 @@ function createConfirmCardFlex(session, mode = 'create') {
                 weight: 'bold',
                 size: 'xl',
                 color: '#111111',
-                align: 'end'
-              }
-            ]
-          }
-        ]
+                align: 'end',
+              },
+            ],
+          },
+        ],
       },
       footer: {
         type: 'box',
@@ -731,10 +742,10 @@ function createConfirmCardFlex(session, mode = 'create') {
             '#111111'
           ),
           createActionButton('重新填寫', restartData, 'secondary'),
-          createActionButton('取消', cancelData, 'secondary')
-        ]
-      }
-    }
+          createActionButton('取消', cancelData, 'secondary'),
+        ],
+      },
+    },
   };
 }
 
@@ -758,16 +769,16 @@ function createGroupTaskFlex(orderId) {
             text: '📦 UBee 新任務',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl'
+            size: 'xl',
           },
           {
             type: 'text',
             text: `訂單編號：${order.orderId}`,
             color: '#D9D9D9',
             size: 'sm',
-            margin: 'sm'
-          }
-        ]
+            margin: 'sm',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -787,9 +798,9 @@ function createGroupTaskFlex(orderId) {
                 text: `費用：${formatCurrency(order.driverFee)}`,
                 weight: 'bold',
                 size: 'lg',
-                color: '#111111'
-              }
-            ]
+                color: '#111111',
+              },
+            ],
           },
           createInfoRow('取件地點', order.pickup),
           createInfoRow('送達地點', order.dropoff),
@@ -797,8 +808,8 @@ function createGroupTaskFlex(orderId) {
           createInfoRow('任務類型', order.isUrgent),
           createInfoRow('備註', order.note),
           createInfoRow('距離', order.distanceText || formatKm(order.distanceKm)),
-          createInfoRow('時間', order.durationText || formatMinutes(order.durationMin))
-        ]
+          createInfoRow('時間', order.durationText || formatMinutes(order.durationMin)),
+        ],
       },
       footer: {
         type: 'box',
@@ -806,10 +817,11 @@ function createGroupTaskFlex(orderId) {
         spacing: 'sm',
         contents: [
           createActionButton('接單', `accept=${orderId}`, 'primary', '#111111'),
-          createActionButton('放棄任務', `reject=${orderId}`, 'secondary')
-        ]
-      }
-    }
+          createActionButton('⏳ 加收等候費', `waitingFeeRequest=${orderId}`, 'secondary'),
+          createActionButton('放棄任務', `reject=${orderId}`, 'secondary'),
+        ],
+      },
+    },
   };
 }
 
@@ -819,25 +831,25 @@ function createETAFlex(orderId, page) {
       createActionButton('5 分鐘', `eta=${orderId}=5`, 'secondary'),
       createActionButton('7 分鐘', `eta=${orderId}=7`, 'secondary'),
       createActionButton('8 分鐘', `eta=${orderId}=8`, 'secondary'),
-      createActionButton('下一頁', `etaPage2=${orderId}`, 'primary', '#111111')
+      createActionButton('下一頁', `etaPage2=${orderId}`, 'primary', '#111111'),
     ],
     2: [
       createActionButton('10 分鐘', `eta=${orderId}=10`, 'secondary'),
       createActionButton('12 分鐘', `eta=${orderId}=12`, 'secondary'),
       createActionButton('15 分鐘', `eta=${orderId}=15`, 'secondary'),
-      createActionButton('下一頁', `etaPage3=${orderId}`, 'primary', '#111111')
+      createActionButton('下一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
     ],
     3: [
       createActionButton('17 分鐘', `eta=${orderId}=17`, 'secondary'),
       createActionButton('18 分鐘', `eta=${orderId}=18`, 'secondary'),
       createActionButton('20 分鐘', `eta=${orderId}=20`, 'secondary'),
-      createActionButton('下一頁', `etaPage4=${orderId}`, 'primary', '#111111')
+      createActionButton('下一頁', `etaPage4=${orderId}`, 'primary', '#111111'),
     ],
     4: [
       createActionButton('22 分鐘', `eta=${orderId}=22`, 'secondary'),
       createActionButton('25 分鐘', `eta=${orderId}=25`, 'secondary'),
-      createActionButton('上一頁', `etaPage3=${orderId}`, 'primary', '#111111')
-    ]
+      createActionButton('上一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
+    ],
   };
 
   return createSimpleFlex(
@@ -866,9 +878,9 @@ function createUrgentChoiceFlex() {
             text: '是否為急件？',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl'
-          }
-        ]
+            size: 'xl',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -880,9 +892,9 @@ function createUrgentChoiceFlex() {
             text: '請選擇本次任務是否為急件',
             wrap: true,
             size: 'sm',
-            color: '#333333'
-          }
-        ]
+            color: '#333333',
+          },
+        ],
       },
       footer: {
         type: 'box',
@@ -890,10 +902,10 @@ function createUrgentChoiceFlex() {
         spacing: 'sm',
         contents: [
           createMessageButton('一般', '一般', 'secondary'),
-          createMessageButton('急件', '急件', 'primary', '#111111')
-        ]
-      }
-    }
+          createMessageButton('急件', '急件', 'primary', '#111111'),
+        ],
+      },
+    },
   };
 }
 
@@ -903,8 +915,8 @@ function createPickupActionFlex(orderId) {
     '取件操作',
     `請前往取件地點\n\n取件：${order.pickup}`,
     [
-      createUriButton('導航取件地點', buildGoogleMapDirectionsUrl(order.pickup, order.pickup), 'primary', '#111111'),
-      createActionButton('已抵達取件地點', `arrivePickup=${orderId}`, 'secondary')
+      createUriButton('導航取件地點', buildGoogleMapSearchUrl(order.pickup), 'primary', '#111111'),
+      createActionButton('已抵達取件地點', `arrivePickup=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
@@ -914,9 +926,7 @@ function createPickedActionFlex(orderId) {
   return createSimpleFlex(
     '已取件操作',
     '請確認完成取件後，再進入下一步',
-    [
-      createActionButton('已取件', `picked=${orderId}`, 'primary', '#111111')
-    ],
+    [createActionButton('已取件', `picked=${orderId}`, 'primary', '#111111')],
     '#111111'
   );
 }
@@ -927,8 +937,13 @@ function createDropoffActionFlex(orderId) {
     '送達操作',
     `請前往送達地點\n\n送達：${order.dropoff}`,
     [
-      createUriButton('導航送達地點', buildGoogleMapDirectionsUrl(order.pickup, order.dropoff), 'primary', '#111111'),
-      createActionButton('已抵達送達地點', `arriveDropoff=${orderId}`, 'secondary')
+      createUriButton(
+        '導航送達地點',
+        buildGoogleMapDirectionsUrl(order.pickup, order.dropoff),
+        'primary',
+        '#111111'
+      ),
+      createActionButton('已抵達送達地點', `arriveDropoff=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
@@ -941,7 +956,7 @@ function createDropoffArrivedFlex(orderId) {
     `請先聯絡收件人，再完成任務\n\n送達電話：${order.dropoffPhone}`,
     [
       createActionButton('撥打收件人', `call=${orderId}=${order.dropoffPhone}`, 'secondary'),
-      createActionButton('已完成', `complete=${orderId}`, 'primary', '#111111')
+      createActionButton('已完成', `complete=${orderId}`, 'primary', '#111111'),
     ],
     '#111111'
   );
@@ -951,11 +966,74 @@ function createCallFlex(phone) {
   return createSimpleFlex(
     '聯絡收件人',
     `請點擊下方按鈕撥打電話\n\n電話：${phone}`,
-    [
-      createUriButton('📞 撥打', `tel:${phone}`, 'primary', '#111111')
-    ],
+    [createUriButton('📞 撥打', `tel:${phone}`, 'primary', '#111111')],
     '#111111'
   );
+}
+
+function createWaitingFeeConfirmFlex(orderId, currentTotal) {
+  return {
+    type: 'flex',
+    altText: '等候費確認',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '等候費確認',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '騎手目前於現場等候中，申請加收等候費 $60。',
+            wrap: true,
+            size: 'sm',
+            color: '#333333',
+          },
+          {
+            type: 'text',
+            text: `目前訂單金額：$${currentTotal}`,
+            weight: 'bold',
+            size: 'md',
+            margin: 'md',
+          },
+          {
+            type: 'text',
+            text: `確認加收後金額：$${currentTotal + 60}`,
+            weight: 'bold',
+            size: 'lg',
+            color: '#D32F2F',
+            margin: 'sm',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('同意加收', `waitingFeeApprove=${orderId}`, 'primary', '#111111'),
+          createActionButton('不同意加收', `waitingFeeReject=${orderId}`, 'secondary'),
+        ],
+      },
+    },
+  };
 }
 
 // ===== 建立正式訂單 =====
@@ -985,7 +1063,11 @@ async function createOrderFromSession(event, session) {
     deliveryFee: session.deliveryFee,
     serviceFee: session.serviceFee,
     urgentFee: session.urgentFee,
+
     waitingFee: session.waitingFee,
+    waitingFeeAdded: false,
+    waitingFeeRequested: false,
+
     totalFee: session.totalFee,
     driverFee: session.driverFee,
 
@@ -998,7 +1080,7 @@ async function createOrderFromSession(event, session) {
     pickedUpAt: null,
     arrivedDropoffAt: null,
     completedAt: null,
-    abandonedBy: []
+    abandonedBy: [],
   };
 
   clearSession(session.userId);
@@ -1010,7 +1092,7 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8 Flex Running');
+  res.status(200).send('UBee OMS V3.8.2 Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1306,6 +1388,85 @@ async function handlePostback(event) {
     return safeReply(event.replyToken, textMessage(`✅ 已設定 ETA，預計 ${min} 分鐘抵達取件地點`));
   }
 
+  if (data.startsWith('waitingFeeRequest=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (!requireDriver(event.replyToken, order, userId)) return;
+
+    if (order.waitingFeeAdded) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已加收過等候費'));
+    }
+
+    if (order.waitingFeeRequested) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已送出等候費申請，請等待客戶確認'));
+    }
+
+    if (!['accepted', 'arrived_pickup'].includes(order.status)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此階段無法申請等候費'));
+    }
+
+    order.waitingFeeRequested = true;
+
+    await safePush(order.userId, createWaitingFeeConfirmFlex(orderId, order.totalFee));
+
+    return safeReply(event.replyToken, textMessage('✅ 已送出等候費申請給客戶確認'));
+  }
+
+  if (data.startsWith('waitingFeeApprove=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (event.source.userId !== order.userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作'));
+    }
+
+    if (order.waitingFeeAdded) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已加收過等候費'));
+    }
+
+    if (!order.waitingFeeRequested) {
+      return safeReply(event.replyToken, textMessage('⚠️ 目前沒有待確認的等候費申請'));
+    }
+
+    order.waitingFee = PRICING.waitingFee;
+    order.totalFee += PRICING.waitingFee;
+    order.waitingFeeAdded = true;
+    order.waitingFeeRequested = false;
+
+    await safePush(
+      LINE_GROUP_ID,
+      textMessage(`✅ 客戶已同意加收等候費 $60\n目前訂單總金額：$${order.totalFee}`)
+    );
+
+    return safeReply(
+      event.replyToken,
+      textMessage(`✅ 您已同意加收等候費 $60\n目前訂單總金額：$${order.totalFee}`)
+    );
+  }
+
+  if (data.startsWith('waitingFeeReject=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (event.source.userId !== order.userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作'));
+    }
+
+    if (!order.waitingFeeRequested) {
+      return safeReply(event.replyToken, textMessage('⚠️ 目前沒有待確認的等候費申請'));
+    }
+
+    order.waitingFeeRequested = false;
+
+    await safePush(LINE_GROUP_ID, textMessage('⚠️ 客戶未同意本次等候費加收申請'));
+
+    return safeReply(event.replyToken, textMessage('已送出：您不同意本次等候費加收'));
+  }
+
   if (data.startsWith('arrivePickup=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
@@ -1373,10 +1534,12 @@ async function handlePostback(event) {
 
     return safeReply(event.replyToken, textMessage('✅ 任務已完成'));
   }
+
+  return safeReply(event.replyToken, textMessage('⚠️ 無法識別的操作'));
 }
 
 // ===== 啟動 =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('UBee OMS V3.8 Flex Running');
+  console.log('UBee OMS V3.8.2 Running');
 });
