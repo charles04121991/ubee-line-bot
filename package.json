@@ -1,7 +1,7 @@
 {
   "name": "ubee-oms",
   "version": "3.7.5",
-  "description": "UBee OMS V3.7.5 Official Version",
+  "description": "UBee OMS V3.7.5 Flex Version",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
