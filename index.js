@@ -86,7 +86,7 @@ function textMessage(text) {
 }
 
 function normalizePhone(input) {
-  return (input || '').trim();
+  return (input || '').trim().replace(/[\s-]/g, '');
 }
 
 function isValidTaiwanPhone(phone) {
@@ -209,7 +209,6 @@ async function calculateFees(session) {
   const urgentFee = session.isUrgent === '急件' ? PRICING.urgentFee : 0;
   const waitingFee = session.needWaitingFee ? PRICING.waitingFee : 0;
   const totalFee = deliveryFee + serviceFee + urgentFee + waitingFee;
-
   const driverFee = Math.round(totalFee * 0.6);
 
   return {
@@ -398,6 +397,147 @@ function createSimpleFlex(title, subtitle, buttons = [], accentColor = '#111111'
         layout: 'vertical',
         spacing: 'sm',
         contents: buttons,
+      },
+    },
+  };
+}
+
+function createPriceSummaryFlex(order, title = '訂單費用更新', subtitle = '以下為目前最新費用明細') {
+  return {
+    type: 'flex',
+    altText: title,
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: title,
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: subtitle,
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'lg',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              createInfoRow('訂單編號', order.orderId),
+              createInfoRow('取件地點', order.pickup),
+              createInfoRow('送達地點', order.dropoff),
+              createInfoRow('物品內容', order.item),
+              createInfoRow('任務類型', order.isUrgent),
+            ],
+          },
+          { type: 'separator' },
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              createPriceRow('配送費', formatCurrency(order.deliveryFee), '#111111', 'bold'),
+              createPriceRow('服務費', formatCurrency(order.serviceFee)),
+              createPriceRow(
+                '急件費',
+                formatCurrency(order.urgentFee),
+                order.urgentFee > 0 ? '#D32F2F' : '#111111'
+              ),
+              createPriceRow(
+                '等候費',
+                formatCurrency(order.waitingFee),
+                order.waitingFee > 0 ? '#D32F2F' : '#111111'
+              ),
+            ],
+          },
+          { type: 'separator' },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: '總計',
+                weight: 'bold',
+                size: 'lg',
+                color: '#111111',
+              },
+              {
+                type: 'text',
+                text: formatCurrency(order.totalFee),
+                weight: 'bold',
+                size: 'xl',
+                color: '#111111',
+                align: 'end',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  };
+}
+
+function createCompletedFlex(order) {
+  return {
+    type: 'flex',
+    altText: '任務已完成',
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '✅ 任務已完成',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '感謝您使用 UBee',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('取件地點', order.pickup),
+          createInfoRow('送達地點', order.dropoff),
+          createInfoRow('物品內容', order.item),
+          createInfoRow('最終金額', formatCurrency(order.totalFee), '#111111'),
+        ],
       },
     },
   };
@@ -817,7 +957,6 @@ function createGroupTaskFlex(orderId) {
         spacing: 'sm',
         contents: [
           createActionButton('接單', `accept=${orderId}`, 'primary', '#111111'),
-          createActionButton('⏳ 加收等候費', `waitingFeeRequest=${orderId}`, 'secondary'),
           createActionButton('放棄任務', `reject=${orderId}`, 'secondary'),
         ],
       },
@@ -922,11 +1061,14 @@ function createPickupActionFlex(orderId) {
   );
 }
 
-function createPickedActionFlex(orderId) {
+function createPickupArrivedActionFlex(orderId) {
   return createSimpleFlex(
-    '已取件操作',
-    '請確認完成取件後，再進入下一步',
-    [createActionButton('已取件', `picked=${orderId}`, 'primary', '#111111')],
+    '現場操作',
+    '如需等待，可先申請等候費；完成取件後請按下方按鈕。',
+    [
+      createActionButton('⏳ 申請等候費', `waitingFeeRequest=${orderId}`, 'secondary'),
+      createActionButton('已取件', `picked=${orderId}`, 'primary', '#111111'),
+    ],
     '#111111'
   );
 }
@@ -1008,14 +1150,14 @@ function createWaitingFeeConfirmFlex(orderId, currentTotal) {
           },
           {
             type: 'text',
-            text: `目前訂單金額：$${currentTotal}`,
+            text: `目前訂單金額：${formatCurrency(currentTotal)}`,
             weight: 'bold',
             size: 'md',
             margin: 'md',
           },
           {
             type: 'text',
-            text: `確認加收後金額：$${currentTotal + 60}`,
+            text: `確認加收後金額：${formatCurrency(currentTotal + PRICING.waitingFee)}`,
             weight: 'bold',
             size: 'lg',
             color: '#D32F2F',
@@ -1092,7 +1234,7 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8.2 Running');
+  res.status(200).send('UBee OMS V3.8.3 PRO Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1170,7 +1312,10 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'pickupPhone') {
     const phone = normalizePhone(text);
     if (!isValidTaiwanPhone(phone)) {
-      return safeReply(event.replyToken, textMessage('⚠️ 取件電話格式不正確，請重新輸入正確電話：'));
+      return safeReply(
+        event.replyToken,
+        textMessage('⚠️ 取件電話格式不正確，請重新輸入正確電話：')
+      );
     }
 
     session.pickupPhone = phone;
@@ -1187,7 +1332,10 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'dropoffPhone') {
     const phone = normalizePhone(text);
     if (!isValidTaiwanPhone(phone)) {
-      return safeReply(event.replyToken, textMessage('⚠️ 送達電話格式不正確，請重新輸入正確電話：'));
+      return safeReply(
+        event.replyToken,
+        textMessage('⚠️ 送達電話格式不正確，請重新輸入正確電話：')
+      );
     }
 
     session.dropoffPhone = phone;
@@ -1382,7 +1530,7 @@ async function handlePostback(event) {
     order.etaMinutes = min;
 
     await safePush(order.userId, textMessage(`✅ 已有騎手接單，預計 ${min} 分鐘抵達取件地點`));
-    await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已接單，預計 ${min} 分鐘抵達取件地點`));
+    await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已接單，騎手已設定 ETA：${min} 分鐘`));
     await safePush(LINE_GROUP_ID, createPickupActionFlex(orderId));
 
     return safeReply(event.replyToken, textMessage(`✅ 已設定 ETA，預計 ${min} 分鐘抵達取件地點`));
@@ -1403,15 +1551,15 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 此訂單已送出等候費申請，請等待客戶確認'));
     }
 
-    if (!['accepted', 'arrived_pickup'].includes(order.status)) {
-      return safeReply(event.replyToken, textMessage('⚠️ 此階段無法申請等候費'));
+    if (!['arrived_pickup'].includes(order.status)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 請於抵達取件地點後再申請等候費'));
     }
 
     order.waitingFeeRequested = true;
 
     await safePush(order.userId, createWaitingFeeConfirmFlex(orderId, order.totalFee));
 
-    return safeReply(event.replyToken, textMessage('✅ 已送出等候費申請給客戶確認'));
+    return safeReply(event.replyToken, textMessage('✅ 已送出等候費申請，等待客戶確認'));
   }
 
   if (data.startsWith('waitingFeeApprove=')) {
@@ -1433,17 +1581,23 @@ async function handlePostback(event) {
 
     order.waitingFee = PRICING.waitingFee;
     order.totalFee += PRICING.waitingFee;
+    order.driverFee = Math.round(order.totalFee * 0.6);
     order.waitingFeeAdded = true;
     order.waitingFeeRequested = false;
 
     await safePush(
       LINE_GROUP_ID,
-      textMessage(`✅ 客戶已同意加收等候費 $60\n目前訂單總金額：$${order.totalFee}`)
+      textMessage(`✅ 客戶已同意加收等候費 $60\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
     );
 
-    return safeReply(
+    await safeReply(
       event.replyToken,
-      textMessage(`✅ 您已同意加收等候費 $60\n目前訂單總金額：$${order.totalFee}`)
+      textMessage(`✅ 等候費 $60 已成功加收\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
+    );
+
+    return safePush(
+      order.userId,
+      createPriceSummaryFlex(order, '等候費已成功加收', '以下為最新訂單費用明細')
     );
   }
 
@@ -1462,9 +1616,9 @@ async function handlePostback(event) {
 
     order.waitingFeeRequested = false;
 
-    await safePush(LINE_GROUP_ID, textMessage('⚠️ 客戶未同意本次等候費加收申請'));
+    await safePush(LINE_GROUP_ID, textMessage('⚠️ 客戶未同意本次等候費申請'));
 
-    return safeReply(event.replyToken, textMessage('已送出：您不同意本次等候費加收'));
+    return safeReply(event.replyToken, textMessage('已送出：您不同意本次等候費申請'));
   }
 
   if (data.startsWith('arrivePickup=')) {
@@ -1479,7 +1633,7 @@ async function handlePostback(event) {
 
     await safePush(order.userId, textMessage('📍 騎手已抵達取件地點'));
 
-    return safeReply(event.replyToken, createPickedActionFlex(orderId));
+    return safeReply(event.replyToken, createPickupArrivedActionFlex(orderId));
   }
 
   if (data.startsWith('picked=')) {
@@ -1530,9 +1684,8 @@ async function handlePostback(event) {
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
 
-    await safePush(order.userId, textMessage('✅ 任務已完成，感謝您使用 UBee'));
-
-    return safeReply(event.replyToken, textMessage('✅ 任務已完成'));
+    await safeReply(event.replyToken, textMessage('✅ 任務已完成'));
+    return safePush(order.userId, createCompletedFlex(order));
   }
 
   return safeReply(event.replyToken, textMessage('⚠️ 無法識別的操作'));
@@ -1541,5 +1694,5 @@ async function handlePostback(event) {
 // ===== 啟動 =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('UBee OMS V3.8.2 Running');
+  console.log('UBee OMS V3.8.3 PRO Running');
 });
