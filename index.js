@@ -66,6 +66,14 @@ const PRICING = {
 // ===== 工具 =====
 const createOrderId = () => 'OD' + Date.now();
 
+function runAsync(taskName, fn) {
+  Promise.resolve()
+    .then(fn)
+    .catch((err) => {
+      console.error(`❌ ${taskName} error:`, err?.originalError || err);
+    });
+}
+
 function safeReply(replyToken, message) {
   return client.replyMessage(replyToken, message).catch((err) => {
     console.error('replyMessage error:', err?.originalError || err);
@@ -76,6 +84,11 @@ function safePush(to, message) {
   return client.pushMessage(to, message).catch((err) => {
     console.error('pushMessage error:', err?.originalError || err);
   });
+}
+
+async function replyAndRun(replyToken, message, taskName, fn) {
+  await safeReply(replyToken, message);
+  runAsync(taskName, fn);
 }
 
 function getOrder(orderId) {
@@ -864,7 +877,6 @@ function createFinishReportFlex(order) {
   };
 }
 
-// 原本函式保留
 function createOrderCreatedFlex(order) {
   return {
     type: 'flex',
@@ -1896,12 +1908,10 @@ function createWaitingFeeConfirmFlex(orderId, currentTotal) {
 async function dispatchOrder(orderId) {
   const order = getOrder(orderId);
   if (!order) return;
-
   if (order.dispatchedAt) return;
   if (order.paymentStatus !== 'paid') return;
 
   order.dispatchedAt = new Date().toISOString();
-
   await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
 }
 
@@ -1940,7 +1950,6 @@ async function createOrderFromSession(event, session) {
     totalFee: session.totalFee,
     driverFee: session.driverFee,
 
-    // ===== 付款欄位 =====
     paymentStatus: 'unpaid',
     paymentMethod: '',
     paymentCode: getPaymentCode(orderId),
@@ -1978,17 +1987,16 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8.6 PRO MAX Running');
+  res.status(200).send('UBee OMS V3.8.6 PRO MAX 極速回應版 Running');
 });
 
-app.post('/webhook', line.middleware(config), async (req, res) => {
-  try {
-    await Promise.all(req.body.events.map(handleEvent));
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('webhook error:', err);
-    res.sendStatus(500);
-  }
+// 先快速回 200，再背景處理
+app.post('/webhook', line.middleware(config), (req, res) => {
+  res.sendStatus(200);
+
+  Promise.allSettled(req.body.events.map(handleEvent)).catch((err) => {
+    console.error('webhook async error:', err);
+  });
 });
 
 // ===== 主邏輯 =====
@@ -2208,37 +2216,45 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'note') {
     session.note = text || '無';
 
-    try {
-      const fees = await calculateFees(session);
-      session.distanceKm = fees.distanceKm;
-      session.durationMin = fees.durationMin;
-      session.distanceText = fees.distanceText;
-      session.durationText = fees.durationText;
-      session.baseFee = fees.baseFee;
-      session.distanceFee = fees.distanceFee;
-      session.timeFee = fees.timeFee;
-      session.deliveryFee = fees.deliveryFee;
-      session.serviceFee = fees.serviceFee;
-      session.urgentFee = fees.urgentFee;
-      session.waitingFee = fees.waitingFee;
-      session.totalFee = fees.totalFee;
-      session.driverFee = fees.driverFee;
-      session.step = 'confirm';
+    await safeReply(event.replyToken, textMessage('⏳ 正在計算距離與費用，請稍候...'));
 
-      const isQuote = session.type === 'quote_order';
+    runAsync('calculateFeesAndPushConfirm', async () => {
+      try {
+        const latestSession = getSession(userId);
+        if (!latestSession || latestSession.step !== 'note') return;
 
-      return safeReply(
-        event.replyToken,
-        createConfirmCardFlex(session, isQuote ? 'quote' : 'create')
-      );
-    } catch (err) {
-      console.error('calculateFees error:', err);
-      clearSession(userId);
-      return safeReply(
-        event.replyToken,
-        textMessage(`⚠️ 地址查詢失敗：${err.message}\n請重新開始建立任務。`)
-      );
-    }
+        const fees = await calculateFees(latestSession);
+        latestSession.distanceKm = fees.distanceKm;
+        latestSession.durationMin = fees.durationMin;
+        latestSession.distanceText = fees.distanceText;
+        latestSession.durationText = fees.durationText;
+        latestSession.baseFee = fees.baseFee;
+        latestSession.distanceFee = fees.distanceFee;
+        latestSession.timeFee = fees.timeFee;
+        latestSession.deliveryFee = fees.deliveryFee;
+        latestSession.serviceFee = fees.serviceFee;
+        latestSession.urgentFee = fees.urgentFee;
+        latestSession.waitingFee = fees.waitingFee;
+        latestSession.totalFee = fees.totalFee;
+        latestSession.driverFee = fees.driverFee;
+        latestSession.step = 'confirm';
+
+        const isQuote = latestSession.type === 'quote_order';
+        await safePush(
+          userId,
+          createConfirmCardFlex(latestSession, isQuote ? 'quote' : 'create')
+        );
+      } catch (err) {
+        console.error('calculateFees error:', err);
+        clearSession(userId);
+        await safePush(
+          userId,
+          textMessage(`⚠️ 地址查詢失敗：${err.message}\n請重新開始建立任務。`)
+        );
+      }
+    });
+
+    return;
   }
 
   if (session.step === 'confirm') {
@@ -2313,10 +2329,15 @@ async function handlePaymentVerifyInput(event, session, text) {
     order.paymentStatus = 'paid';
     order.paidAt = new Date().toISOString();
 
-    await dispatchOrder(order.orderId);
-    await safePush(order.userId, createPaymentVerifiedFlex(order));
-
-    return safeReply(event.replyToken, textMessage('✅ 付款驗證成功，系統已自動派單。'));
+    return replyAndRun(
+      event.replyToken,
+      textMessage('✅ 付款驗證成功，系統已自動派單。'),
+      'paymentVerifiedDispatch',
+      async () => {
+        await dispatchOrder(order.orderId);
+        await safePush(order.userId, createPaymentVerifiedFlex(order));
+      }
+    );
   }
 
   order.paymentAttempts += 1;
@@ -2539,30 +2560,35 @@ async function handlePostback(event) {
     order.cancelledBy = userId;
     order.status = 'cancelled';
 
-    await safePush(
-      LINE_GROUP_ID,
-      textMessage(
-        `⚠️ 訂單已由客戶取消\n\n` +
-          `訂單編號：${order.orderId}\n` +
-          `取消階段：${getCancelStageText(order.cancelStage)}\n` +
-          `取消費：${formatCurrency(order.cancelFee)}\n` +
-          `請勿再執行此任務。`
-      )
+    return replyAndRun(
+      event.replyToken,
+      createCancelledFlex(order),
+      'cancelNotify',
+      async () => {
+        await safePush(
+          LINE_GROUP_ID,
+          textMessage(
+            `⚠️ 訂單已由客戶取消\n\n` +
+              `訂單編號：${order.orderId}\n` +
+              `取消階段：${getCancelStageText(order.cancelStage)}\n` +
+              `取消費：${formatCurrency(order.cancelFee)}\n` +
+              `請勿再執行此任務。`
+          )
+        );
+
+        if (order.driverId) {
+          await safePush(
+            order.driverId,
+            textMessage(
+              `⚠️ 此單已取消\n` +
+                `訂單編號：${order.orderId}\n` +
+                `取消費：${formatCurrency(order.cancelFee)}\n` +
+                `請停止前往或停止執行此任務。`
+            )
+          );
+        }
+      }
     );
-
-    if (order.driverId) {
-      await safePush(
-        order.driverId,
-        textMessage(
-          `⚠️ 此單已取消\n` +
-            `訂單編號：${order.orderId}\n` +
-            `取消費：${formatCurrency(order.cancelFee)}\n` +
-            `請停止前往或停止執行此任務。`
-        )
-      );
-    }
-
-    return safeReply(event.replyToken, createCancelledFlex(order));
   }
 
   // ===== 騎手接單 =====
@@ -2683,11 +2709,16 @@ async function handlePostback(event) {
     order.acceptedAt = new Date().toISOString();
     order.etaMinutes = min;
 
-    await safePush(order.userId, textMessage(`✅ 已有騎手接單，預計 ${min} 分鐘抵達取件地點。`));
-    await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已正式接單，騎手已設定 ETA：${min} 分鐘。`));
-    await safePush(LINE_GROUP_ID, createPickupActionFlex(orderId));
-
-    return safeReply(event.replyToken, textMessage(`✅ 已設定 ETA，預計 ${min} 分鐘抵達取件地點。`));
+    return replyAndRun(
+      event.replyToken,
+      textMessage(`✅ 已設定 ETA，預計 ${min} 分鐘抵達取件地點。`),
+      'etaNotify',
+      async () => {
+        await safePush(order.userId, textMessage(`✅ 已有騎手接單，預計 ${min} 分鐘抵達取件地點。`));
+        await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已正式接單，騎手已設定 ETA：${min} 分鐘。`));
+        await safePush(LINE_GROUP_ID, createPickupActionFlex(orderId));
+      }
+    );
   }
 
   if (data.startsWith('releaseOrder=')) {
@@ -2710,24 +2741,29 @@ async function handlePostback(event) {
       order.abandonedBy.push(userId);
     }
 
-    await safePush(
-      order.userId,
-      textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。')
+    return replyAndRun(
+      event.replyToken,
+      textMessage('✅ 您已取消接單，系統已重新釋出此任務。'),
+      'releaseOrderNotify',
+      async () => {
+        await safePush(
+          order.userId,
+          textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。')
+        );
+
+        await safePush(
+          LINE_GROUP_ID,
+          textMessage(
+            `⚠️ 任務重新釋單\n` +
+              `訂單編號：${order.orderId}\n` +
+              `原因：原接單騎手取消接單\n` +
+              `系統已重新開放派單`
+          )
+        );
+
+        await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
+      }
     );
-
-    await safePush(
-      LINE_GROUP_ID,
-      textMessage(
-        `⚠️ 任務重新釋單\n` +
-          `訂單編號：${order.orderId}\n` +
-          `原因：原接單騎手取消接單\n` +
-          `系統已重新開放派單`
-      )
-    );
-
-    await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
-
-    return safeReply(event.replyToken, textMessage('✅ 您已取消接單，系統已重新釋出此任務。'));
   }
 
   // ===== 等候費 =====
@@ -2752,9 +2788,14 @@ async function handlePostback(event) {
 
     order.waitingFeeRequested = true;
 
-    await safePush(order.userId, createWaitingFeeConfirmFlex(orderId, order.totalFee));
-
-    return safeReply(event.replyToken, textMessage('✅ 已送出等候費申請，等待客戶確認。'));
+    return replyAndRun(
+      event.replyToken,
+      textMessage('✅ 已送出等候費申請，等待客戶確認。'),
+      'waitingFeeRequestNotify',
+      async () => {
+        await safePush(order.userId, createWaitingFeeConfirmFlex(orderId, order.totalFee));
+      }
+    );
   }
 
   if (data.startsWith('waitingFeeApprove=')) {
@@ -2780,19 +2821,16 @@ async function handlePostback(event) {
     order.waitingFeeAdded = true;
     order.waitingFeeRequested = false;
 
-    await safePush(
-      LINE_GROUP_ID,
-      textMessage(`✅ 客戶已同意加收等候費 $60\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
-    );
-
-    await safeReply(
+    return replyAndRun(
       event.replyToken,
-      textMessage(`✅ 等候費 $60 已成功加收\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
-    );
-
-    return safePush(
-      order.userId,
-      createPriceSummaryFlex(order, '等候費已成功加收', '以下為最新訂單費用明細')
+      createPriceSummaryFlex(order, '等候費已成功加收', '以下為最新訂單費用明細'),
+      'waitingFeeApproveNotify',
+      async () => {
+        await safePush(
+          LINE_GROUP_ID,
+          textMessage(`✅ 客戶已同意加收等候費 $60\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
+        );
+      }
     );
   }
 
@@ -2811,9 +2849,14 @@ async function handlePostback(event) {
 
     order.waitingFeeRequested = false;
 
-    await safePush(LINE_GROUP_ID, textMessage('⚠️ 客戶未同意本次等候費申請。'));
-
-    return safeReply(event.replyToken, textMessage('已送出：您不同意本次等候費申請。'));
+    return replyAndRun(
+      event.replyToken,
+      textMessage('已送出：您不同意本次等候費申請。'),
+      'waitingFeeRejectNotify',
+      async () => {
+        await safePush(LINE_GROUP_ID, textMessage('⚠️ 客戶未同意本次等候費申請。'));
+      }
+    );
   }
 
   // ===== 任務流程 =====
@@ -2827,9 +2870,14 @@ async function handlePostback(event) {
     order.status = 'arrived_pickup';
     order.arrivedPickupAt = new Date().toISOString();
 
-    await safePush(order.userId, textMessage('📍 騎手已抵達取件地點。'));
-
-    return safeReply(event.replyToken, createPickupArrivedActionFlex(orderId));
+    return replyAndRun(
+      event.replyToken,
+      createPickupArrivedActionFlex(orderId),
+      'arrivePickupNotify',
+      async () => {
+        await safePush(order.userId, textMessage('📍 騎手已抵達取件地點。'));
+      }
+    );
   }
 
   if (data.startsWith('picked=')) {
@@ -2842,9 +2890,14 @@ async function handlePostback(event) {
     order.status = 'picked_up';
     order.pickedUpAt = new Date().toISOString();
 
-    await safePush(order.userId, textMessage('✅ 騎手已完成取件，正在前往送達地點。'));
-
-    return safeReply(event.replyToken, createDropoffActionFlex(orderId));
+    return replyAndRun(
+      event.replyToken,
+      createDropoffActionFlex(orderId),
+      'pickedNotify',
+      async () => {
+        await safePush(order.userId, textMessage('✅ 騎手已完成取件，正在前往送達地點。'));
+      }
+    );
   }
 
   if (data.startsWith('arriveDropoff=')) {
@@ -2857,9 +2910,14 @@ async function handlePostback(event) {
     order.status = 'arrived_dropoff';
     order.arrivedDropoffAt = new Date().toISOString();
 
-    await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
-
-    return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
+    return replyAndRun(
+      event.replyToken,
+      createDropoffArrivedFlex(orderId),
+      'arriveDropoffNotify',
+      async () => {
+        await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
+      }
+    );
   }
 
   if (data.startsWith('call=')) {
@@ -2881,16 +2939,20 @@ async function handlePostback(event) {
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
 
-    await safePush(order.userId, createCompletedFlex(order));
-
-    if (LINE_FINISH_GROUP_ID) {
-      await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
-    }
-
-    return safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
+    return replyAndRun(
+      event.replyToken,
+      textMessage('✅ 任務已完成。'),
+      'completeNotify',
+      async () => {
+        await safePush(order.userId, createCompletedFlex(order));
+        if (LINE_FINISH_GROUP_ID) {
+          await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
+        }
+      }
+    );
   }
 }
 
 app.listen(PORT, () => {
-  console.log(`✅ UBee OMS V3.8.6 PRO MAX running on ${PORT}`);
+  console.log(`✅ UBee OMS V3.8.6 PRO MAX 極速回應版 running on ${PORT}`);
 });
