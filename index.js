@@ -19,6 +19,10 @@ const client = new line.Client(config);
 
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 if (!LINE_GROUP_ID) {
   console.error('❌ 缺少 LINE_GROUP_ID');
@@ -77,12 +81,64 @@ function clearSession(userId) {
   delete sessions[userId];
 }
 
+function isAdmin(userId) {
+  return ADMIN_USER_IDS.includes(userId);
+}
+
 function isDriverAuthorized(order, userId) {
   return !!(order && order.driverId && order.driverId === userId);
 }
 
+function isPendingDriverAuthorized(order, userId) {
+  return !!(order && order.pendingDriverId && order.pendingDriverId === userId);
+}
+
 function textMessage(text) {
   return { type: 'text', text };
+}
+
+function createQuickReplyMessage(text, items) {
+  return {
+    type: 'text',
+    text,
+    quickReply: {
+      items,
+    },
+  };
+}
+
+function qrMessage(label, text) {
+  return {
+    type: 'action',
+    action: {
+      type: 'message',
+      label,
+      text,
+    },
+  };
+}
+
+function qrPostback(label, data, displayText = label) {
+  return {
+    type: 'action',
+    action: {
+      type: 'postback',
+      label,
+      data,
+      displayText,
+    },
+  };
+}
+
+function qrUri(label, uri) {
+  return {
+    type: 'action',
+    action: {
+      type: 'uri',
+      label,
+      uri,
+    },
+  };
 }
 
 function normalizePhone(input) {
@@ -216,6 +272,28 @@ function calculateCancelFee(order) {
   }
 
   return null;
+}
+
+function createOrderStatusText(order) {
+  const driverPart = order.driverId ? `\n接單騎手：已指派` : '\n接單騎手：尚未指派';
+  const etaPart = order.etaMinutes ? `\nETA：${order.etaMinutes} 分鐘` : '';
+  const waitingPart = order.waitingFeeAdded ? `\n等候費：${formatCurrency(order.waitingFee)}` : '';
+  const cancelPart = order.status === 'cancelled' ? `\n取消費：${formatCurrency(order.cancelFee)}` : '';
+
+  return (
+    `📦 訂單查詢結果\n\n` +
+    `訂單編號：${order.orderId}\n` +
+    `目前狀態：${getStatusText(order.status)}\n` +
+    `取件地點：${order.pickup}\n` +
+    `送達地點：${order.dropoff}\n` +
+    `物品內容：${order.item}\n` +
+    `任務類型：${order.isUrgent}\n` +
+    `訂單總額：${formatCurrency(order.totalFee)}` +
+    driverPart +
+    etaPart +
+    waitingPart +
+    cancelPart
+  );
 }
 
 async function getDistanceAndDuration(origin, destination) {
@@ -855,167 +933,33 @@ function createMainMenuFlex() {
   };
 }
 
-function createOrderMenuFlex() {
-  return {
-    type: 'flex',
-    altText: '下單選單',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '下單',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-          {
-            type: 'text',
-            text: '建立任務或立即估價',
-            color: '#D9D9D9',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'md',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '請選擇您要進行的操作',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createActionButton('建立任務', 'action=create', 'primary', '#111111'),
-          createActionButton('立即估價', 'action=quote', 'secondary'),
-        ],
-      },
-    },
-  };
+function createOrderMenuQuickReply() {
+  return createQuickReplyMessage('請選擇下單功能：', [
+    qrPostback('建立任務', 'action=create'),
+    qrPostback('立即估價', 'action=quote'),
+    qrMessage('計費說明', '計費說明'),
+    qrMessage('取消規則', '取消規則'),
+    qrMessage('查詢訂單', '查詢訂單'),
+  ]);
 }
 
-function createEnterpriseFlex() {
-  return {
-    type: 'flex',
-    altText: '企業合作',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: 'UBee 企業合作',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text:
-              '我們提供企業專屬城市任務支援：\n' +
-              '・文件急送\n' +
-              '・商務跑腿\n' +
-              '・樣品收送\n' +
-              '・臨時行政支援\n\n' +
-              '如需合作，請填寫下方申請表。',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createUriButton('填寫企業合作申請', BUSINESS_FORM, 'primary', '#111111'),
-          createMessageButton('企業服務說明', '企業服務說明', 'secondary'),
-        ],
-      },
-    },
-  };
+function createEnterpriseQuickReply() {
+  return createQuickReplyMessage('請選擇企業相關功能：', [
+    qrUri('企業合作申請', BUSINESS_FORM),
+    qrMessage('企業服務說明', '企業服務說明'),
+    qrMessage('服務區域', '服務區域'),
+    qrMessage('聯絡我們', '聯絡我們'),
+  ]);
 }
 
-function createMeFlex() {
-  return {
-    type: 'flex',
-    altText: '我的選單',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '我的選單',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '您可以查看服務說明，或申請加入夥伴，一起參與城市任務服務。',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createMessageButton('服務說明', '服務說明', 'secondary'),
-          createUriButton('加入夥伴', PARTNER_FORM, 'primary', '#111111'),
-        ],
-      },
-    },
-  };
+function createMeQuickReply() {
+  return createQuickReplyMessage('請選擇您要查看的內容：', [
+    qrMessage('服務說明', '服務說明'),
+    qrMessage('常見問題', '常見問題'),
+    qrUri('加入夥伴', PARTNER_FORM),
+    qrMessage('查詢訂單', '查詢訂單'),
+    qrMessage('聯絡我們', '聯絡我們'),
+  ]);
 }
 
 function createConfirmCardFlex(session, mode = 'create') {
@@ -1225,23 +1169,27 @@ function createETAFlex(orderId, page) {
       createActionButton('7 分鐘', `eta=${orderId}=7`, 'secondary'),
       createActionButton('8 分鐘', `eta=${orderId}=8`, 'secondary'),
       createActionButton('下一頁', `etaPage2=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
     ],
     2: [
       createActionButton('10 分鐘', `eta=${orderId}=10`, 'secondary'),
       createActionButton('12 分鐘', `eta=${orderId}=12`, 'secondary'),
       createActionButton('15 分鐘', `eta=${orderId}=15`, 'secondary'),
       createActionButton('下一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
     ],
     3: [
       createActionButton('17 分鐘', `eta=${orderId}=17`, 'secondary'),
       createActionButton('18 分鐘', `eta=${orderId}=18`, 'secondary'),
       createActionButton('20 分鐘', `eta=${orderId}=20`, 'secondary'),
       createActionButton('下一頁', `etaPage4=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
     ],
     4: [
       createActionButton('22 分鐘', `eta=${orderId}=22`, 'secondary'),
       createActionButton('25 分鐘', `eta=${orderId}=25`, 'secondary'),
       createActionButton('上一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
     ],
   };
 
@@ -1310,6 +1258,7 @@ function createPickupActionFlex(orderId) {
     [
       createUriButton('導航取件地點', buildGoogleMapSearchUrl(order.pickup), 'primary', '#111111'),
       createActionButton('已抵達取件地點', `arrivePickup=${orderId}`, 'secondary'),
+      createActionButton('取消接單', `releaseOrder=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
@@ -1481,7 +1430,10 @@ async function createOrderFromSession(event, session) {
 
     status: 'pending',
     driverId: null,
+    pendingDriverId: null,
+    pendingAcceptedAt: null,
     etaMinutes: null,
+    releasedCount: 0,
     createdAt: new Date().toISOString(),
     acceptedAt: null,
     arrivedPickupAt: null,
@@ -1500,7 +1452,7 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8.4 PLUS Running');
+  res.status(200).send('UBee OMS V3.8.5 FAST Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1528,9 +1480,9 @@ async function handleEvent(event) {
     const userId = event.source.userId;
 
     if (text === '主選單') return safeReply(event.replyToken, createMainMenuFlex());
-    if (text === '下單') return safeReply(event.replyToken, createOrderMenuFlex());
-    if (text === '企業') return safeReply(event.replyToken, createEnterpriseFlex());
-    if (text === '我的') return safeReply(event.replyToken, createMeFlex());
+    if (text === '下單') return safeReply(event.replyToken, createOrderMenuQuickReply());
+    if (text === '企業') return safeReply(event.replyToken, createEnterpriseQuickReply());
+    if (text === '我的') return safeReply(event.replyToken, createMeQuickReply());
 
     if (text === '企業服務說明') {
       return safeReply(
@@ -1556,9 +1508,106 @@ async function handleEvent(event) {
       );
     }
 
+    if (text === '計費說明') {
+      return safeReply(
+        event.replyToken,
+        textMessage(
+          'UBee 計費說明\n\n' +
+            `基本費：${formatCurrency(PRICING.baseFee)}\n` +
+            `每公里：${formatCurrency(PRICING.perKm)}\n` +
+            `每分鐘：${formatCurrency(PRICING.perMinute)}\n` +
+            `服務費：${formatCurrency(PRICING.serviceFee)}\n` +
+            `急件費：${formatCurrency(PRICING.urgentFee)}\n` +
+            `等候費：${formatCurrency(PRICING.waitingFee)}\n\n` +
+            '實際金額將依取送地點距離、時間與任務狀態計算。'
+        )
+      );
+    }
+
+    if (text === '取消規則') {
+      return safeReply(
+        event.replyToken,
+        textMessage(
+          'UBee 取消規則\n\n' +
+            '待接單：免費取消\n' +
+            '已接單：取消費為配送費 30%（最低 $60，最高 $200）\n' +
+            '已抵達取件地點：取消費為配送費 50%（最低 $100，最高 $300）\n' +
+            '已取件後：無法取消'
+        )
+      );
+    }
+
+    if (text === '服務區域') {
+      return safeReply(
+        event.replyToken,
+        textMessage(
+          'UBee 服務區域\n\n' +
+            '我們以豐原為中心，服務區域包含：\n' +
+            '豐原、潭子、神岡、大雅、北屯、北區、中區、東區、西屯、西區、南屯、南區。\n\n' +
+            '其他地區請先詢問。'
+        )
+      );
+    }
+
+    if (text === '聯絡我們') {
+      return safeReply(
+        event.replyToken,
+        textMessage(
+          '聯絡我們\n\n' +
+            '如需企業合作、任務協助或其他問題，請直接透過本官方帳號留言，我們將儘快與您聯繫。'
+        )
+      );
+    }
+
+    if (text === '常見問題') {
+      return safeReply(
+        event.replyToken,
+        textMessage(
+          '常見問題\n\n' +
+            '1. UBee 是什麼服務？\n' +
+            'UBee 提供城市任務服務，包含文件急送、商務跑腿與即時在地支援。\n\n' +
+            '2. 目前服務範圍有哪些？\n' +
+            '以豐原為中心，服務豐原、潭子、神岡、大雅、北屯、北區、中區、東區、西屯、西區、南屯、南區。\n\n' +
+            '3. 是否可以配送餐飲？\n' +
+            '目前不提供餐飲外送平台型服務。\n\n' +
+            '4. 如何建立任務？\n' +
+            '點選「下單」後，可選擇建立任務或立即估價。'
+        )
+      );
+    }
+
+    if (text === '查詢訂單') {
+      sessions[userId] = {
+        type: 'order_query',
+        step: 'orderId',
+        userId,
+      };
+      return safeReply(event.replyToken, textMessage('請輸入訂單編號，例如：OD1712345678901'));
+    }
+
+    if (text.startsWith('查單 ')) {
+      const orderId = text.replace('查單 ', '').trim();
+      const order = getOrder(orderId);
+
+      if (!isAdmin(userId)) {
+        return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+      }
+
+      if (!order) {
+        return safeReply(event.replyToken, textMessage('❌ 查無此訂單。'));
+      }
+
+      return safeReply(event.replyToken, textMessage(createOrderStatusText(order)));
+    }
+
     const session = getSession(userId);
+
     if (session && (session.type === 'create_order' || session.type === 'quote_order')) {
       return handleOrderInput(event, session, text);
+    }
+
+    if (session && session.type === 'order_query') {
+      return handleOrderQueryInput(event, session, text);
     }
   } catch (err) {
     console.error('handleEvent error:', err);
@@ -1671,6 +1720,31 @@ async function handleOrderInput(event, session, text) {
 
   clearSession(userId);
   return safeReply(event.replyToken, textMessage('⚠️ 流程已重置，請重新開始。'));
+}
+
+async function handleOrderQueryInput(event, session, text) {
+  const userId = event.source.userId;
+  const orderId = (text || '').trim();
+  const order = getOrder(orderId);
+
+  if (!order) {
+    clearSession(userId);
+    return safeReply(event.replyToken, textMessage('❌ 查無此訂單，請確認訂單編號是否正確。'));
+  }
+
+  const canView =
+    order.userId === userId ||
+    order.driverId === userId ||
+    order.pendingDriverId === userId ||
+    isAdmin(userId);
+
+  clearSession(userId);
+
+  if (!canView) {
+    return safeReply(event.replyToken, textMessage('⚠️ 您無權查看此訂單。'));
+  }
+
+  return safeReply(event.replyToken, textMessage(createOrderStatusText(order)));
 }
 
 // ===== Postback =====
@@ -1792,7 +1866,8 @@ async function handlePostback(event) {
         `⚠️ 訂單已由客戶取消\n\n` +
           `訂單編號：${order.orderId}\n` +
           `取消階段：${getCancelStageText(order.cancelStage)}\n` +
-          `取消費：${formatCurrency(order.cancelFee)}`
+          `取消費：${formatCurrency(order.cancelFee)}\n` +
+          `請勿再執行此任務。`
       )
     );
 
@@ -1800,9 +1875,10 @@ async function handlePostback(event) {
       await safePush(
         order.driverId,
         textMessage(
-          `⚠️ 任務已被客戶取消\n` +
+          `⚠️ 此單已取消\n` +
             `訂單編號：${order.orderId}\n` +
-            `取消費：${formatCurrency(order.cancelFee)}`
+            `取消費：${formatCurrency(order.cancelFee)}\n` +
+            `請停止前往或停止執行此任務。`
         )
       );
     }
@@ -1810,7 +1886,7 @@ async function handlePostback(event) {
     return safeReply(event.replyToken, createCancelledFlex(order));
   }
 
-  // ===== 騎手接單 =====
+  // ===== 騎手接單（先保留，再選 ETA，選完才正式接單）=====
   if (data.startsWith('accept=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
@@ -1823,14 +1899,40 @@ async function handlePostback(event) {
     }
 
     if (order.driverId) {
-      return safeReply(event.replyToken, textMessage('⚠️ 此任務已被其他騎手接單。'));
+      return safeReply(event.replyToken, textMessage('⚠️ 此任務已被其他騎手正式接單。'));
     }
 
-    order.driverId = userId;
-    order.status = 'accepted';
-    order.acceptedAt = new Date().toISOString();
+    if (order.pendingDriverId && order.pendingDriverId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此任務目前已有其他騎手正在確認 ETA。'));
+    }
+
+    order.pendingDriverId = userId;
+    order.pendingAcceptedAt = new Date().toISOString();
 
     return safeReply(event.replyToken, createETAFlex(orderId, 1));
+  }
+
+  if (data.startsWith('acceptCancel=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+
+    if (order.status !== 'pending') {
+      return safeReply(event.replyToken, textMessage('⚠️ 目前狀態無法取消此次接單。'));
+    }
+
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
+
+    if (!order.abandonedBy.includes(userId)) {
+      order.abandonedBy.push(userId);
+    }
+
+    return safeReply(event.replyToken, textMessage('✅ 您已取消本次接單，訂單將繼續等待其他騎手。'));
   }
 
   if (data.startsWith('reject=')) {
@@ -1851,8 +1953,12 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['accepted'], '查看 ETA')) return;
+
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+
+    if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
 
     return safeReply(event.replyToken, createETAFlex(orderId, 2));
   }
@@ -1861,8 +1967,12 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['accepted'], '查看 ETA')) return;
+
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+
+    if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
 
     return safeReply(event.replyToken, createETAFlex(orderId, 3));
   }
@@ -1871,8 +1981,12 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['accepted'], '查看 ETA')) return;
+
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+
+    if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
 
     return safeReply(event.replyToken, createETAFlex(orderId, 4));
   }
@@ -1881,16 +1995,65 @@ async function handlePostback(event) {
     const [, orderId, min] = data.split('=');
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['accepted'], '設定 ETA')) return;
 
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+
+    if (!requireStatus(event.replyToken, order, ['pending'], '設定 ETA')) return;
+
+    order.driverId = userId;
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
+    order.status = 'accepted';
+    order.acceptedAt = new Date().toISOString();
     order.etaMinutes = min;
 
     await safePush(order.userId, textMessage(`✅ 已有騎手接單，預計 ${min} 分鐘抵達取件地點。`));
-    await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已接單，騎手已設定 ETA：${min} 分鐘。`));
+    await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已正式接單，騎手已設定 ETA：${min} 分鐘。`));
     await safePush(LINE_GROUP_ID, createPickupActionFlex(orderId));
 
     return safeReply(event.replyToken, textMessage(`✅ 已設定 ETA，預計 ${min} 分鐘抵達取件地點。`));
+  }
+
+  if (data.startsWith('releaseOrder=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (!requireDriver(event.replyToken, order, userId)) return;
+    if (!requireStatus(event.replyToken, order, ['accepted'], '取消接單')) return;
+
+    order.driverId = null;
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
+    order.status = 'pending';
+    order.etaMinutes = null;
+    order.acceptedAt = null;
+    order.releasedCount = (order.releasedCount || 0) + 1;
+
+    if (!order.abandonedBy.includes(userId)) {
+      order.abandonedBy.push(userId);
+    }
+
+    await safePush(
+      order.userId,
+      textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。')
+    );
+
+    await safePush(
+      LINE_GROUP_ID,
+      textMessage(
+        `⚠️ 任務重新釋單\n` +
+          `訂單編號：${order.orderId}\n` +
+          `原因：原接單騎手取消接單\n` +
+          `系統已重新開放派單`
+      )
+    );
+
+    await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
+
+    return safeReply(event.replyToken, textMessage('✅ 您已取消接單，系統已重新釋出此任務。'));
   }
 
   // ===== 等候費 =====
@@ -2053,5 +2216,5 @@ async function handlePostback(event) {
 // ===== 啟動 =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('UBee OMS V3.8.4 PLUS Running');
+  console.log('UBee OMS V3.8.5 FAST Running');
 });
