@@ -17,6 +17,7 @@ if (!config.channelAccessToken || !config.channelSecret) {
 
 const client = new line.Client(config);
 
+const PORT = process.env.PORT || 3000;
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
@@ -406,6 +407,7 @@ function createActionButton(label, data, style = 'primary', color) {
       type: 'postback',
       label,
       data,
+      displayText: label,
     },
   };
   if (color) btn.color = color;
@@ -933,33 +935,180 @@ function createMainMenuFlex() {
   };
 }
 
-function createOrderMenuQuickReply() {
-  return createQuickReplyMessage('請選擇下單功能：', [
-    qrPostback('建立任務', 'action=create'),
-    qrPostback('立即估價', 'action=quote'),
-    qrMessage('計費說明', '計費說明'),
-    qrMessage('取消規則', '取消規則'),
-    qrMessage('查詢訂單', '查詢訂單'),
-  ]);
+function createOrderMenuFlex() {
+  return {
+    type: 'flex',
+    altText: 'UBee｜任務建立',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜任務建立',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'lg',
+          },
+          {
+            type: 'text',
+            text: '快速建立您的城市任務',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '請選擇您要進行的操作',
+            wrap: true,
+            size: 'sm',
+            color: '#333333',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('建立任務', 'action=create', 'primary', '#111111'),
+          createActionButton('立即估價', 'action=quote', 'secondary'),
+          createMessageButton('查詢訂單', '查詢訂單', 'secondary'),
+          createMessageButton('計費說明', '計費說明', 'secondary'),
+          createMessageButton('取消規則', '取消規則', 'secondary'),
+        ],
+      },
+    },
+  };
 }
 
-function createEnterpriseQuickReply() {
-  return createQuickReplyMessage('請選擇企業相關功能：', [
-    qrUri('企業合作申請', BUSINESS_FORM),
-    qrMessage('企業服務說明', '企業服務說明'),
-    qrMessage('服務區域', '服務區域'),
-    qrMessage('聯絡我們', '聯絡我們'),
-  ]);
+function createEnterpriseMenuFlex() {
+  return {
+    type: 'flex',
+    altText: 'UBee｜企業服務',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜企業服務',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'lg',
+          },
+          {
+            type: 'text',
+            text: '企業合作與服務資訊',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '專為企業打造的城市任務解決方案',
+            wrap: true,
+            size: 'sm',
+            color: '#333333',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createUriButton('企業合作申請', BUSINESS_FORM, 'primary', '#111111'),
+          createMessageButton('企業服務說明', '企業服務說明', 'secondary'),
+          createMessageButton('服務區域', '服務區域', 'secondary'),
+          createMessageButton('聯絡我們', '聯絡我們', 'secondary'),
+        ],
+      },
+    },
+  };
 }
 
-function createMeQuickReply() {
-  return createQuickReplyMessage('請選擇您要查看的內容：', [
-    qrMessage('服務說明', '服務說明'),
-    qrMessage('常見問題', '常見問題'),
-    qrUri('加入夥伴', PARTNER_FORM),
-    qrMessage('查詢訂單', '查詢訂單'),
-    qrMessage('聯絡我們', '聯絡我們'),
-  ]);
+function createMyMenuFlex() {
+  return {
+    type: 'flex',
+    altText: 'UBee｜個人中心',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜個人中心',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'lg',
+          },
+          {
+            type: 'text',
+            text: '查看服務資訊與夥伴申請',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '請選擇您要查看的內容',
+            wrap: true,
+            size: 'sm',
+            color: '#333333',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createMessageButton('查詢訂單', '查詢訂單', 'primary', '#111111'),
+          createMessageButton('服務說明', '服務說明', 'secondary'),
+          createMessageButton('常見問題', '常見問題', 'secondary'),
+          createUriButton('加入夥伴', PARTNER_FORM, 'secondary'),
+          createMessageButton('聯絡我們', '聯絡我們', 'secondary'),
+        ],
+      },
+    },
+  };
 }
 
 function createConfirmCardFlex(session, mode = 'create') {
@@ -1452,7 +1601,7 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8.5 FAST Running');
+  res.status(200).send('UBee OMS V3.8.5 FAST PRO Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1480,9 +1629,9 @@ async function handleEvent(event) {
     const userId = event.source.userId;
 
     if (text === '主選單') return safeReply(event.replyToken, createMainMenuFlex());
-    if (text === '下單') return safeReply(event.replyToken, createOrderMenuQuickReply());
-    if (text === '企業') return safeReply(event.replyToken, createEnterpriseQuickReply());
-    if (text === '我的') return safeReply(event.replyToken, createMeQuickReply());
+    if (text === '下單') return safeReply(event.replyToken, createOrderMenuFlex());
+    if (text === '企業') return safeReply(event.replyToken, createEnterpriseMenuFlex());
+    if (text === '我的') return safeReply(event.replyToken, createMyMenuFlex());
 
     if (text === '企業服務說明') {
       return safeReply(
@@ -2206,15 +2355,22 @@ async function handlePostback(event) {
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
 
-    await safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
-    return safePush(order.userId, createCompletedFlex(order));
-  }
+    await safePush(order.userId, createCompletedFlex(order));
+    await safePush(
+      LINE_GROUP_ID,
+      textMessage(
+        `✅ 任務已完成\n\n` +
+          `訂單編號：${order.orderId}\n` +
+          `取件地點：${order.pickup}\n` +
+          `送達地點：${order.dropoff}\n` +
+          `總計：${formatCurrency(order.totalFee)}`
+      )
+    );
 
-  return safeReply(event.replyToken, textMessage('⚠️ 無法識別的操作。'));
+    return safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
+  }
 }
 
-// ===== 啟動 =====
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('UBee OMS V3.8.5 FAST Running');
+  console.log(`✅ UBee OMS V3.8.5 FAST PRO running on port ${PORT}`);
 });
