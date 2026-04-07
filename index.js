@@ -1606,6 +1606,14 @@ app.get('/', (req, res) => {
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
+    if (req.body.events && req.body.events.length > 0) {
+      req.body.events.forEach((event) => {
+        if (event.source?.type === 'group') {
+          console.log('🟡 groupId =', event.source.groupId);
+        }
+      });
+    }
+
     await Promise.all(req.body.events.map(handleEvent));
     res.sendStatus(200);
   } catch (err) {
