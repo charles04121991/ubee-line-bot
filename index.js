@@ -19,6 +19,7 @@ const client = new line.Client(config);
 
 const PORT = process.env.PORT || 3000;
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
+const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
   .split(',')
@@ -694,6 +695,133 @@ function createCompletedFlex(order) {
   };
 }
 
+function createFinishReportFlex(order) {
+  const extraFee = (order.urgentFee || 0) + (order.waitingFee || 0);
+  const platformIncome = (order.totalFee || 0) - (order.driverFee || 0);
+  const baseRevenue = (order.deliveryFee || 0) + (order.serviceFee || 0);
+
+  return {
+    type: 'flex',
+    altText: `財務明細｜${order.orderId}`,
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '💰 財務明細',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: `訂單編號：${order.orderId}`,
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'lg',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#F4EFD8',
+            cornerRadius: '10px',
+            paddingAll: '12px',
+            contents: [
+              {
+                type: 'text',
+                text: `客戶支付：${formatCurrency(order.totalFee)}`,
+                weight: 'bold',
+                size: 'xl',
+                color: '#111111',
+              },
+            ],
+          },
+
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              createInfoRow('取件地點', order.pickup),
+              createInfoRow('送達地點', order.dropoff),
+              createInfoRow('物品內容', order.item),
+              createInfoRow('任務類型', order.isUrgent),
+              createInfoRow('備註', order.note || '無'),
+              createInfoRow('距離', order.distanceText || formatKm(order.distanceKm)),
+              createInfoRow('時間', order.durationText || formatMinutes(order.durationMin)),
+            ],
+          },
+
+          { type: 'separator' },
+
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              createPriceRow('騎手收入', formatCurrency(order.driverFee), '#111111', 'bold'),
+              createPriceRow('平台收入', formatCurrency(platformIncome), '#111111', 'bold'),
+            ],
+          },
+
+          { type: 'separator' },
+
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'text',
+                text: '附加費明細',
+                weight: 'bold',
+                size: 'md',
+                color: '#111111',
+              },
+              createPriceRow('急件費', formatCurrency(order.urgentFee || 0)),
+              createPriceRow('等候費', formatCurrency(order.waitingFee || 0)),
+              createPriceRow('附加費總額', formatCurrency(extraFee), '#D32F2F', 'bold'),
+            ],
+          },
+
+          { type: 'separator' },
+
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'text',
+                text: '收入拆解',
+                weight: 'bold',
+                size: 'md',
+                color: '#111111',
+              },
+              createPriceRow('基礎收入', formatCurrency(baseRevenue)),
+              createPriceRow('附加收入', formatCurrency(extraFee)),
+            ],
+          },
+        ],
+      },
+    },
+  };
+}
+
 function createOrderCreatedFlex(order) {
   return {
     type: 'flex',
@@ -938,7 +1066,7 @@ function createMainMenuFlex() {
 function createOrderMenuFlex() {
   return {
     type: 'flex',
-    altText: 'UBee｜任務建立',
+    altText: 'UBee｜下單服務',
     contents: {
       type: 'bubble',
       size: 'mega',
@@ -950,31 +1078,17 @@ function createOrderMenuFlex() {
         contents: [
           {
             type: 'text',
-            text: 'UBee｜任務建立',
+            text: 'UBee｜下單服務',
             color: '#FFFFFF',
             weight: 'bold',
             size: 'lg',
           },
           {
             type: 'text',
-            text: '快速建立您的城市任務',
+            text: '請選擇您要進行的操作',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '請選擇您要進行的操作',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
           },
         ],
       },
@@ -985,9 +1099,9 @@ function createOrderMenuFlex() {
         contents: [
           createActionButton('建立任務', 'action=create', 'primary', '#111111'),
           createActionButton('立即估價', 'action=quote', 'secondary'),
-          createMessageButton('查詢訂單', '查詢訂單', 'secondary'),
           createMessageButton('計費說明', '計費說明', 'secondary'),
           createMessageButton('取消規則', '取消規則', 'secondary'),
+          createMessageButton('查詢訂單', '查詢訂單', 'secondary'),
         ],
       },
     },
@@ -1023,20 +1137,6 @@ function createEnterpriseMenuFlex() {
           },
         ],
       },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '專為企業打造的城市任務解決方案',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
       footer: {
         type: 'box',
         layout: 'vertical',
@@ -1055,7 +1155,7 @@ function createEnterpriseMenuFlex() {
 function createMyMenuFlex() {
   return {
     type: 'flex',
-    altText: 'UBee｜個人中心',
+    altText: 'UBee｜我的',
     contents: {
       type: 'bubble',
       size: 'mega',
@@ -1067,7 +1167,7 @@ function createMyMenuFlex() {
         contents: [
           {
             type: 'text',
-            text: 'UBee｜個人中心',
+            text: 'UBee｜我的',
             color: '#FFFFFF',
             weight: 'bold',
             size: 'lg',
@@ -1081,29 +1181,15 @@ function createMyMenuFlex() {
           },
         ],
       },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '請選擇您要查看的內容',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
       footer: {
         type: 'box',
         layout: 'vertical',
         spacing: 'sm',
         contents: [
-          createMessageButton('查詢訂單', '查詢訂單', 'primary', '#111111'),
-          createMessageButton('服務說明', '服務說明', 'secondary'),
+          createMessageButton('服務說明', '服務說明', 'primary', '#111111'),
           createMessageButton('常見問題', '常見問題', 'secondary'),
           createUriButton('加入夥伴', PARTNER_FORM, 'secondary'),
+          createMessageButton('查詢訂單', '查詢訂單', 'secondary'),
           createMessageButton('聯絡我們', '聯絡我們', 'secondary'),
         ],
       },
@@ -1166,9 +1252,7 @@ function createConfirmCardFlex(session, mode = 'create') {
               createInfoRow('預估時間', session.durationText || formatMinutes(session.durationMin)),
             ],
           },
-          {
-            type: 'separator',
-          },
+          { type: 'separator' },
           {
             type: 'box',
             layout: 'vertical',
@@ -1191,9 +1275,7 @@ function createConfirmCardFlex(session, mode = 'create') {
               ),
             ],
           },
-          {
-            type: 'separator',
-          },
+          { type: 'separator' },
           {
             type: 'box',
             layout: 'horizontal',
@@ -1601,19 +1683,11 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8.5 FAST PRO Running');
+  res.status(200).send('UBee OMS V3.8.5 FINANCE FLEX Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
-    if (req.body.events && req.body.events.length > 0) {
-      req.body.events.forEach((event) => {
-        if (event.source?.type === 'group') {
-          console.log('🟡 groupId =', event.source.groupId);
-        }
-      });
-    }
-
     await Promise.all(req.body.events.map(handleEvent));
     res.sendStatus(200);
   } catch (err) {
@@ -2043,7 +2117,7 @@ async function handlePostback(event) {
     return safeReply(event.replyToken, createCancelledFlex(order));
   }
 
-  // ===== 騎手接單（先保留，再選 ETA，選完才正式接單）=====
+  // ===== 騎手接單 =====
   if (data.startsWith('accept=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
@@ -2110,13 +2184,10 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-
     if (!isPendingDriverAuthorized(order, userId)) {
       return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
     }
-
     if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
-
     return safeReply(event.replyToken, createETAFlex(orderId, 2));
   }
 
@@ -2124,13 +2195,10 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-
     if (!isPendingDriverAuthorized(order, userId)) {
       return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
     }
-
     if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
-
     return safeReply(event.replyToken, createETAFlex(orderId, 3));
   }
 
@@ -2138,13 +2206,10 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-
     if (!isPendingDriverAuthorized(order, userId)) {
       return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
     }
-
     if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
-
     return safeReply(event.replyToken, createETAFlex(orderId, 4));
   }
 
@@ -2363,22 +2428,18 @@ async function handlePostback(event) {
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
 
+    await safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
     await safePush(order.userId, createCompletedFlex(order));
-    await safePush(
-      LINE_GROUP_ID,
-      textMessage(
-        `✅ 任務已完成\n\n` +
-          `訂單編號：${order.orderId}\n` +
-          `取件地點：${order.pickup}\n` +
-          `送達地點：${order.dropoff}\n` +
-          `總計：${formatCurrency(order.totalFee)}`
-      )
-    );
 
-    return safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
+    if (LINE_FINISH_GROUP_ID) {
+      await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
+    }
+
+    return;
   }
 }
 
+// ===== 啟動 =====
 app.listen(PORT, () => {
-  console.log(`✅ UBee OMS V3.8.5 FAST PRO running on port ${PORT}`);
+  console.log(`✅ UBee OMS V3.8.5 FINANCE FLEX running on port ${PORT}`);
 });
