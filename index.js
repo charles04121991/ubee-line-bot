@@ -26,6 +26,13 @@ const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
   .map((s) => s.trim())
   .filter(Boolean);
 
+// ===== 付款設定 =====
+const PAYMENT_JKO_INFO = (process.env.PAYMENT_JKO_INFO || '').replace(/\\n/g, '\n');
+const PAYMENT_BANK_INFO = (process.env.PAYMENT_BANK_INFO || '').replace(/\\n/g, '\n');
+const PAYMENT_VERIFY_MODE = (process.env.PAYMENT_VERIFY_MODE || 'CODE').trim().toUpperCase();
+const PAYMENT_CODE_LENGTH = Number(process.env.PAYMENT_CODE_LENGTH || 5);
+const PAYMENT_MAX_ATTEMPTS = 3;
+
 if (!LINE_GROUP_ID) {
   console.error('❌ 缺少 LINE_GROUP_ID');
   process.exit(1);
@@ -172,6 +179,21 @@ function getStatusText(status) {
   }
 }
 
+function getPaymentStatusText(paymentStatus) {
+  switch (paymentStatus) {
+    case 'unpaid':
+      return '待付款';
+    case 'pending_verify':
+      return '待驗證';
+    case 'paid':
+      return '已付款';
+    case 'locked':
+      return '已鎖定';
+    default:
+      return '未知';
+  }
+}
+
 function requireOrder(replyToken, orderId) {
   const order = getOrder(orderId);
   if (!order) {
@@ -276,11 +298,30 @@ function calculateCancelFee(order) {
   return null;
 }
 
+function getPaymentCode(orderId) {
+  return String(orderId || '').slice(-PAYMENT_CODE_LENGTH);
+}
+
+function getPaymentMethodText(method) {
+  if (method === 'jko') return '街口支付';
+  if (method === 'bank') return '銀行轉帳';
+  return '尚未選擇';
+}
+
+function getPaymentInfoByMethod(method) {
+  if (method === 'jko') return PAYMENT_JKO_INFO || '尚未設定街口付款資訊';
+  if (method === 'bank') return PAYMENT_BANK_INFO || '尚未設定銀行付款資訊';
+  return '尚未選擇付款方式';
+}
+
 function createOrderStatusText(order) {
   const driverPart = order.driverId ? `\n接單騎手：已指派` : '\n接單騎手：尚未指派';
   const etaPart = order.etaMinutes ? `\nETA：${order.etaMinutes} 分鐘` : '';
   const waitingPart = order.waitingFeeAdded ? `\n等候費：${formatCurrency(order.waitingFee)}` : '';
   const cancelPart = order.status === 'cancelled' ? `\n取消費：${formatCurrency(order.cancelFee)}` : '';
+  const paymentPart =
+    `\n付款狀態：${getPaymentStatusText(order.paymentStatus)}` +
+    `\n付款方式：${getPaymentMethodText(order.paymentMethod)}`;
 
   return (
     `📦 訂單查詢結果\n\n` +
@@ -291,6 +332,7 @@ function createOrderStatusText(order) {
     `物品內容：${order.item}\n` +
     `任務類型：${order.isUrgent}\n` +
     `訂單總額：${formatCurrency(order.totalFee)}` +
+    paymentPart +
     driverPart +
     etaPart +
     waitingPart +
@@ -822,6 +864,7 @@ function createFinishReportFlex(order) {
   };
 }
 
+// 原本函式保留
 function createOrderCreatedFlex(order) {
   return {
     type: 'flex',
@@ -877,6 +920,237 @@ function createOrderCreatedFlex(order) {
         layout: 'vertical',
         spacing: 'sm',
         contents: [createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary')],
+      },
+    },
+  };
+}
+
+function createOrderPendingPaymentFlex(order) {
+  return {
+    type: 'flex',
+    altText: '任務已建立，等待付款',
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '✅ 任務已建立',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '請先完成付款，驗證成功後系統才會自動派單',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+            wrap: true,
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('取件地點', order.pickup),
+          createInfoRow('送達地點', order.dropoff),
+          createInfoRow('物品內容', order.item),
+          createInfoRow('總計', formatCurrency(order.totalFee)),
+          createInfoRow('付款狀態', getPaymentStatusText(order.paymentStatus)),
+          {
+            type: 'text',
+            text: `付款識別碼：${order.paymentCode}`,
+            wrap: true,
+            size: 'sm',
+            color: '#D32F2F',
+            weight: 'bold',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('選擇付款方式', `paymentMethodMenu=${order.orderId}`, 'primary', '#111111'),
+          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
+        ],
+      },
+    },
+  };
+}
+
+function createPaymentMethodFlex(order) {
+  return {
+    type: 'flex',
+    altText: '請選擇付款方式',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '付款方式',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '請選擇本次付款方式',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('應付金額', formatCurrency(order.totalFee)),
+          createInfoRow('付款識別碼', order.paymentCode, '#D32F2F'),
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('街口支付', `paymentMethod=${order.orderId}=jko`, 'primary', '#111111'),
+          createActionButton('銀行轉帳', `paymentMethod=${order.orderId}=bank`, 'secondary'),
+          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
+        ],
+      },
+    },
+  };
+}
+
+function createPaymentInfoFlex(order) {
+  const paymentInfo = getPaymentInfoByMethod(order.paymentMethod);
+
+  return {
+    type: 'flex',
+    altText: '付款資訊',
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '付款資訊',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '付款完成後請按下方按鈕',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('付款方式', getPaymentMethodText(order.paymentMethod)),
+          createInfoRow('應付金額', formatCurrency(order.totalFee)),
+          createInfoRow('付款識別碼', order.paymentCode, '#D32F2F'),
+          {
+            type: 'separator',
+          },
+          {
+            type: 'text',
+            text: paymentInfo,
+            wrap: true,
+            size: 'sm',
+            color: '#333333',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('我已付款', `paymentPaid=${order.orderId}`, 'primary', '#111111'),
+          createActionButton('重新選擇付款方式', `paymentMethodMenu=${order.orderId}`, 'secondary'),
+          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
+        ],
+      },
+    },
+  };
+}
+
+function createPaymentVerifiedFlex(order) {
+  return {
+    type: 'flex',
+    altText: '付款已驗證成功',
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '✅ 付款已驗證',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '系統已自動派單，正在安排騎手',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('付款方式', getPaymentMethodText(order.paymentMethod)),
+          createInfoRow('付款狀態', getPaymentStatusText(order.paymentStatus)),
+          createInfoRow('總計', formatCurrency(order.totalFee)),
+        ],
       },
     },
   };
@@ -1619,6 +1893,18 @@ function createWaitingFeeConfirmFlex(orderId, currentTotal) {
   };
 }
 
+async function dispatchOrder(orderId) {
+  const order = getOrder(orderId);
+  if (!order) return;
+
+  if (order.dispatchedAt) return;
+  if (order.paymentStatus !== 'paid') return;
+
+  order.dispatchedAt = new Date().toISOString();
+
+  await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
+}
+
 // ===== 建立正式訂單 =====
 async function createOrderFromSession(event, session) {
   const orderId = createOrderId();
@@ -1654,6 +1940,14 @@ async function createOrderFromSession(event, session) {
     totalFee: session.totalFee,
     driverFee: session.driverFee,
 
+    // ===== 付款欄位 =====
+    paymentStatus: 'unpaid',
+    paymentMethod: '',
+    paymentCode: getPaymentCode(orderId),
+    paymentAttempts: 0,
+    paidAt: null,
+    dispatchedAt: null,
+
     cancelFee: 0,
     cancelledAt: null,
     cancelledBy: null,
@@ -1676,14 +1970,15 @@ async function createOrderFromSession(event, session) {
 
   clearSession(session.userId);
 
-  await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
-
-  return safeReply(event.replyToken, createOrderCreatedFlex(orders[orderId]));
+  return safeReply(event.replyToken, [
+    createOrderPendingPaymentFlex(orders[orderId]),
+    createPaymentMethodFlex(orders[orderId]),
+  ]);
 }
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8.5 FINANCE FLEX Running');
+  res.status(200).send('UBee OMS V3.8.6 PRO MAX Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1840,6 +2135,10 @@ async function handleEvent(event) {
     if (session && session.type === 'order_query') {
       return handleOrderQueryInput(event, session, text);
     }
+
+    if (session && session.type === 'payment_verify' && session.step === 'code') {
+      return handlePaymentVerifyInput(event, session, text);
+    }
   } catch (err) {
     console.error('handleEvent error:', err);
     return safeReply(event.replyToken, textMessage('⚠️ 系統發生錯誤，請稍後再試。'));
@@ -1978,6 +2277,68 @@ async function handleOrderQueryInput(event, session, text) {
   return safeReply(event.replyToken, textMessage(createOrderStatusText(order)));
 }
 
+async function handlePaymentVerifyInput(event, session, text) {
+  const userId = event.source.userId;
+  const order = getOrder(session.orderId);
+
+  if (!order) {
+    clearSession(userId);
+    return safeReply(event.replyToken, textMessage('❌ 訂單不存在或已失效。'));
+  }
+
+  if (order.userId !== userId) {
+    clearSession(userId);
+    return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+  }
+
+  if (order.paymentStatus === 'locked') {
+    clearSession(userId);
+    return safeReply(
+      event.replyToken,
+      textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者處理。')
+    );
+  }
+
+  const inputCode = String(text || '').trim();
+  const correctCode = String(order.paymentCode || '').trim();
+
+  if (PAYMENT_VERIFY_MODE !== 'CODE') {
+    clearSession(userId);
+    return safeReply(event.replyToken, textMessage('⚠️ 目前付款驗證模式設定錯誤。'));
+  }
+
+  if (inputCode === correctCode) {
+    clearSession(userId);
+
+    order.paymentStatus = 'paid';
+    order.paidAt = new Date().toISOString();
+
+    await dispatchOrder(order.orderId);
+    await safePush(order.userId, createPaymentVerifiedFlex(order));
+
+    return safeReply(event.replyToken, textMessage('✅ 付款驗證成功，系統已自動派單。'));
+  }
+
+  order.paymentAttempts += 1;
+
+  if (order.paymentAttempts >= PAYMENT_MAX_ATTEMPTS) {
+    order.paymentStatus = 'locked';
+    clearSession(userId);
+
+    return safeReply(
+      event.replyToken,
+      textMessage('⚠️ 驗證失敗次數過多，此訂單已鎖定，請聯繫管理者協助處理。')
+    );
+  }
+
+  return safeReply(
+    event.replyToken,
+    textMessage(
+      `⚠️ 識別碼不正確，請重新輸入。\n剩餘次數：${PAYMENT_MAX_ATTEMPTS - order.paymentAttempts}`
+    )
+  );
+}
+
 // ===== Postback =====
 async function handlePostback(event) {
   const data = event.postback.data || '';
@@ -2029,6 +2390,89 @@ async function handlePostback(event) {
     return safeReply(event.replyToken, textMessage('✅ 已取消本次立即估價。'));
   }
 
+  // ===== 付款流程 =====
+  if (data.startsWith('paymentMethodMenu=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (order.userId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return safeReply(event.replyToken, createPaymentVerifiedFlex(order));
+    }
+
+    if (order.paymentStatus === 'locked') {
+      return safeReply(
+        event.replyToken,
+        textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者協助。')
+      );
+    }
+
+    return safeReply(event.replyToken, createPaymentMethodFlex(order));
+  }
+
+  if (data.startsWith('paymentMethod=')) {
+    const [, orderId, method] = data.split('=');
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (order.userId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return safeReply(event.replyToken, createPaymentVerifiedFlex(order));
+    }
+
+    order.paymentMethod = method;
+    order.paymentStatus = 'unpaid';
+
+    return safeReply(event.replyToken, createPaymentInfoFlex(order));
+  }
+
+  if (data.startsWith('paymentPaid=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (order.userId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+    }
+
+    if (!order.paymentMethod) {
+      return safeReply(event.replyToken, textMessage('⚠️ 請先選擇付款方式。'));
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return safeReply(event.replyToken, createPaymentVerifiedFlex(order));
+    }
+
+    if (order.paymentStatus === 'locked') {
+      return safeReply(
+        event.replyToken,
+        textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者協助。')
+      );
+    }
+
+    order.paymentStatus = 'pending_verify';
+    sessions[userId] = {
+      type: 'payment_verify',
+      step: 'code',
+      userId,
+      orderId,
+    };
+
+    return safeReply(
+      event.replyToken,
+      textMessage(
+        `請輸入付款識別碼（訂單後 ${PAYMENT_CODE_LENGTH} 碼）：${order.paymentCode}`
+      )
+    );
+  }
+
   // ===== 客戶取消任務 =====
   if (data.startsWith('cancelRequest=')) {
     const orderId = data.split('=')[1];
@@ -2057,6 +2501,10 @@ async function handlePostback(event) {
 
     if (order.status === 'cancelled') {
       return safeReply(event.replyToken, createCancelledFlex(order));
+    }
+
+    if (order.paymentStatus !== 'paid') {
+      return safeReply(event.replyToken, createOrderPendingPaymentFlex(order));
     }
 
     return safeReply(event.replyToken, createOrderCreatedFlex(order));
@@ -2122,6 +2570,10 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
+
+    if (order.paymentStatus !== 'paid') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單尚未完成付款驗證，暫時無法接單。'));
+    }
 
     if (!requireStatus(event.replyToken, order, ['pending'], '接單')) return;
 
@@ -2400,10 +2852,12 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
     if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['picked_up'], '抵達送達地點')) return;
+    if (!requireStatus(event.replyToken, order, ['picked_up'], '已抵達送達地點')) return;
 
     order.status = 'arrived_dropoff';
     order.arrivedDropoffAt = new Date().toISOString();
+
+    await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
 
     return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
   }
@@ -2413,7 +2867,6 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
     if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '撥打電話')) return;
 
     return safeReply(event.replyToken, createCallFlex(phone));
   }
@@ -2423,23 +2876,21 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
     if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '完成任務')) return;
+    if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '已完成')) return;
 
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
 
-    await safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
     await safePush(order.userId, createCompletedFlex(order));
 
     if (LINE_FINISH_GROUP_ID) {
       await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
     }
 
-    return;
+    return safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
   }
 }
 
-// ===== 啟動 =====
 app.listen(PORT, () => {
-  console.log(`✅ UBee OMS V3.8.5 FINANCE FLEX running on port ${PORT}`);
+  console.log(`✅ UBee OMS V3.8.6 PRO MAX running on ${PORT}`);
 });
