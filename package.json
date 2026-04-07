@@ -1,7 +1,7 @@
 {
   "name": "ubee-oms",
   "version": "3.8.5",
-  "description": "UBee OMS V3.8.5 FAST",
+  "description": "UBee OMS V3.8.5 FAST PRO",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,7 +9,7 @@
   "dependencies": {
     "@line/bot-sdk": "^9.7.0",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2",
+    "express": "^4.19.2",
     "node-fetch": "^2.7.0"
   }
 }
