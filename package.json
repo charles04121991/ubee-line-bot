@@ -1,15 +1,15 @@
 {
-  "name": "ubee-oms",
-  "version": "3.8.7",
-  "description": "UBee OMS V3.8.7 PRO UI (Fast & Non-blocking)",
+  "name": "ubee-oms-v3.8.6-pro-max",
+  "version": "3.8.6",
+  "description": "UBee OMS V3.8.6 PRO MAX 極速回應版",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@line/bot-sdk": "^9.3.0",
+    "@line/bot-sdk": "^9.7.0",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "node-fetch": "^2.6.9"
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0"
   }
 }
