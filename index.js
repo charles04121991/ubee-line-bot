@@ -14,189 +14,237 @@ const client = new line.Client(config);
 
 const PORT = process.env.PORT || 3000;
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
-const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-// ===== 記憶體 =====
+// ===== 資料 =====
 const orders = {};
 const sessions = {};
-const distanceCache = {};
 
 // ===== 計價 =====
 const PRICING = {
-  baseFee: 99,
+  base: 99,
   perKm: 8,
-  perMinute: 2,
-  serviceFee: 50,
-  urgentFee: 100,
-  waitingFee: 60,
-  nightFee: 50,
+  perMin: 2,
+  service: 50,
+  urgent: 100,
+  waiting: 60,
+  night: 50,
 };
 
 // ===== 工具 =====
-const createOrderId = () => 'OD' + Date.now();
-
-function safeReply(token, msg) {
-  if (!token) return;
-  return client.replyMessage(token, msg).catch(() => {});
-}
-function safePush(to, msg) {
-  return client.pushMessage(to, msg).catch(() => {});
-}
+const safeReply = (t, m) => client.replyMessage(t, m).catch(()=>{});
+const safePush = (to, m) => client.pushMessage(to, m).catch(()=>{});
+const createId = () => 'OD' + Date.now();
+const $ = (n) => `$${Math.round(n)}`;
 
 // ===== 夜間 =====
-function isNightTime() {
+function isNight() {
   const now = new Date();
-  const m = now.getHours() * 60 + now.getMinutes();
-  return m >= 1110 && m <= 1350;
+  const h = now.getHours();
+  const m = now.getMinutes();
+  return (h > 18 || (h === 18 && m >= 30)) && h < 22;
 }
 
-// ===== timeout =====
-async function fetchWithTimeout(url, timeout = 8000) {
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), timeout);
-  return fetch(url, { signal: controller.signal });
-}
+// ===== 距離 =====
+async function getDistance(o, d) {
+  const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(o)}&destinations=${encodeURIComponent(d)}&key=${GOOGLE_MAPS_API_KEY}`;
+  const r = await fetch(url);
+  const j = await r.json();
+  const e = j.rows[0].elements[0];
 
-// ===== 距離 cache =====
-async function getDistance(origin, destination) {
-  const key = origin + destination;
-
-  if (distanceCache[key]) return distanceCache[key];
-
-  const url =
-    `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}` +
-    `&destinations=${encodeURIComponent(destination)}&key=${GOOGLE_MAPS_API_KEY}`;
-
-  const res = await fetchWithTimeout(url);
-  const data = await res.json();
-
-  const el = data.rows[0].elements[0];
-
-  const result = {
-    km: el.distance.value / 1000,
-    min: el.duration.value / 60,
+  return {
+    km: e.distance.value / 1000,
+    min: e.duration.value / 60,
   };
-
-  distanceCache[key] = result;
-  return result;
 }
 
 // ===== 計價 =====
-async function calculate(session) {
-  const r = await getDistance(session.pickup, session.dropoff);
+async function calc(s) {
+  const r = await getDistance(s.pickup, s.dropoff);
 
-  const delivery =
-    PRICING.baseFee +
+  let total =
+    PRICING.base +
     Math.ceil(r.km) * PRICING.perKm +
-    Math.ceil(r.min) * PRICING.perMinute;
+    Math.ceil(r.min) * PRICING.perMin +
+    PRICING.service;
 
-  const urgent = session.isUrgent === '急件' ? PRICING.urgentFee : 0;
-  const night = isNightTime() ? PRICING.nightFee : 0;
+  if (s.urgent === '急件') total += PRICING.urgent;
+  if (isNight()) total += PRICING.night;
 
-  const total =
-    delivery +
-    PRICING.serviceFee +
-    urgent +
-    night;
+  return total;
+}
 
+// ===== Flex UI =====
+function flexTask(o) {
   return {
-    delivery,
-    total,
-    night,
+    type: 'flex',
+    altText: '新任務',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: '📦 新任務', weight: 'bold', size: 'lg' },
+          { type: 'text', text: `費用 ${$(o.total)}`, color: '#D32F2F', size: 'lg' },
+          { type: 'text', text: o.pickup, wrap: true },
+          { type: 'text', text: '↓' },
+          { type: 'text', text: o.dropoff, wrap: true },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            action: {
+              type: 'postback',
+              label: '接單',
+              data: `accept=${o.orderId}`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+function flexDone(o) {
+  return {
+    type: 'flex',
+    altText: '完成',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: '✅ 任務完成', weight: 'bold', size: 'lg' },
+          { type: 'text', text: `金額 ${$(o.total)}`, size: 'xl' },
+        ],
+      },
+    },
   };
 }
 
 // ===== webhook =====
 app.post('/webhook', line.middleware(config), (req, res) => {
   res.sendStatus(200);
-
-  for (const event of req.body.events) {
-    handleEvent(event);
-  }
+  req.body.events.forEach(handleEvent);
 });
 
 // ===== 主流程 =====
-async function handleEvent(event) {
-  if (event.type !== 'message' || event.message.type !== 'text') return;
+async function handleEvent(e) {
+  if (e.type === 'postback') return handlePostback(e);
+  if (e.type !== 'message') return;
 
-  const text = event.message.text.trim();
-  const userId = event.source.userId;
+  const t = e.message.text;
+  const uid = e.source.userId;
 
-  if (text === '下單') {
-    sessions[userId] = { step: 'pickup' };
-    return safeReply(event.replyToken, { type: 'text', text: '請輸入取件地點' });
+  // ===== 建立 =====
+  if (t === '下單') {
+    sessions[uid] = { step: 1 };
+    return safeReply(e.replyToken, { type: 'text', text: '輸入取件地點' });
   }
 
-  const s = sessions[userId];
+  const s = sessions[uid];
+  if (!s) return;
 
-  if (s?.step === 'pickup') {
-    s.pickup = text;
-    s.step = 'dropoff';
-    return safeReply(event.replyToken, { type: 'text', text: '請輸入送達地點' });
+  if (s.step === 1) {
+    s.pickup = t;
+    s.step = 2;
+    return safeReply(e.replyToken, { type: 'text', text: '輸入送達地點' });
   }
 
-  if (s?.step === 'dropoff') {
-    s.dropoff = text;
-    s.step = 'urgent';
-    return safeReply(event.replyToken, { type: 'text', text: '請輸入 一般 / 急件' });
+  if (s.step === 2) {
+    s.dropoff = t;
+    s.step = 3;
+    return safeReply(e.replyToken, { type: 'text', text: '一般 / 急件' });
   }
 
-  if (s?.step === 'urgent') {
-    s.isUrgent = text;
+  if (s.step === 3) {
+    s.urgent = t;
 
-    await safeReply(event.replyToken, { type: 'text', text: '計算中...' });
+    await safeReply(e.replyToken, { type: 'text', text: '計算中...' });
 
-    const fee = await calculate(s);
+    // 🔥 背景跑（不卡關鍵）
+    (async () => {
+      const total = await calc(s);
+      s.total = total;
+      s.step = 4;
 
-    const orderId = createOrderId();
+      await safePush(uid, {
+        type: 'text',
+        text: `費用 ${$(total)}\n輸入「確認」建立`,
+      });
+    })();
+  }
 
-    orders[orderId] = {
+  if (t === '確認') {
+    const id = createId();
+
+    orders[id] = {
       ...s,
-      ...fee,
-      orderId,
+      orderId: id,
+      userId: uid,
+      total: s.total,
       status: 'pending',
-      createdAt: new Date(),
+      paymentCode: id.slice(-5),
     };
 
-    delete sessions[userId];
+    delete sessions[uid];
 
-    await safePush(userId, {
+    return safeReply(e.replyToken, {
       type: 'text',
-      text:
-        `✅ 訂單建立成功\n金額：${fee.total}\n` +
-        (fee.night ? '🌙 含夜間加成\n' : ''),
-    });
-
-    await safePush(LINE_GROUP_ID, {
-      type: 'text',
-      text: `📦 新任務\n金額：${fee.total}`,
+      text: `建立成功\n付款碼 ${orders[id].paymentCode}`,
     });
   }
-}
 
-// ===== 等候費（騎手不可見）=====
-function applyWaitingFee(order) {
-  order.total += PRICING.waitingFee;
-  order.waitingFeeAdded = true;
-}
+  // ===== 付款 =====
+  if (/^\d{5}$/.test(t)) {
+    const o = Object.values(orders).find(x => x.userId === uid && !x.paid);
 
-// ===== 自動清理 =====
-setInterval(() => {
-  const now = Date.now();
+    if (!o) return;
 
-  for (const id in orders) {
-    if (now - orders[id].createdAt.getTime() > 86400000) {
-      delete orders[id];
+    if (t === o.paymentCode) {
+      o.paid = true;
+
+      await safeReply(e.replyToken, { type: 'text', text: '付款成功' });
+
+      return safePush(LINE_GROUP_ID, flexTask(o));
     }
   }
+}
 
-  for (const u in sessions) {
-    delete sessions[u];
+// ===== Postback =====
+async function handlePostback(e) {
+  const data = e.postback.data;
+  const uid = e.source.userId;
+
+  if (data.startsWith('accept=')) {
+    const id = data.split('=')[1];
+    const o = orders[id];
+
+    if (!o || o.status !== 'pending') return;
+
+    o.driverId = uid;
+    o.status = 'accepted';
+
+    return safeReply(e.replyToken, { type: 'text', text: '已接單' });
   }
-}, 3600000);
 
-// ===== 啟動 =====
+  if (data.startsWith('complete=')) {
+    const id = data.split('=')[1];
+    const o = orders[id];
+
+    o.status = 'done';
+
+    await safePush(o.userId, flexDone(o));
+  }
+}
+
 app.listen(PORT, () => {
-  console.log('🔥 UBee OMS V3.8.7 FULL PRO MAX running');
+  console.log('🔥 UBee PRO UI RUNNING');
 });
