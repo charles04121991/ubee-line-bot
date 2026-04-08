@@ -1,7 +1,7 @@
 {
-  "name": "ubee-oms-v3.8.7-pro-max",
+  "name": "ubee-oms-v3.8.7-pro-max-glamour",
   "version": "3.8.7",
-  "description": "UBee OMS V3.8.7 PRO MAX 騎手收入隔離版",
+  "description": "UBee OMS V3.8.7 PRO MAX 華麗版",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
