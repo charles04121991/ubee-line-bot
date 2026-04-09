@@ -6,16 +6,20 @@ const admin = require('firebase-admin');
 
 const app = express();
 
-// ===== Firebase 初始化 =====
+// =========================
+// Firebase 初始化
+// =========================
 let db = null;
 
 try {
   if (process.env.FIREBASE_KEY) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_KEY);
 
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    }
 
     db = admin.firestore();
     console.log('✅ Firebase 已成功連線');
@@ -25,6 +29,7 @@ try {
 } catch (error) {
   console.error('❌ Firebase 初始化失敗:', error.message);
 }
+
 // =========================
 // 基本設定
 // =========================
@@ -89,10 +94,6 @@ function createOrderId() {
   return `UB${Date.now()}`;
 }
 
-function isAdmin(userId) {
-  return ADMIN_USER_IDS.includes(userId);
-}
-
 function generatePaymentCode(length = 5) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -102,8 +103,14 @@ function generatePaymentCode(length = 5) {
   return code;
 }
 
+function sanitizeText(text = '') {
+  return String(text).trim();
+}
+
 function parseDistrict(address = '') {
-  const match = address.match(/(豐原區|潭子區|神岡區|大雅區|北屯區|西屯區|西區|南屯區|南區|北區|東區|中區|太平區|大里區|烏日區|霧峰區|后里區|石岡區|新社區|和平區|大甲區|外埔區|清水區|沙鹿區|龍井區|梧棲區|大肚區)/);
+  const match = address.match(
+    /(豐原區|潭子區|神岡區|大雅區|北屯區|西屯區|西區|南屯區|南區|北區|東區|中區|太平區|大里區|烏日區|霧峰區|后里區|石岡區|新社區|和平區|大甲區|外埔區|清水區|沙鹿區|龍井區|梧棲區|大肚區)/
+  );
   return match ? match[1] : '';
 }
 
@@ -167,8 +174,8 @@ function calcPrice({
   };
 }
 
-function sanitizeText(text = '') {
-  return String(text).trim();
+function formatTaskType(order) {
+  return order.isUrgent ? '急件' : '一般件';
 }
 
 function getUserSession(userId) {
@@ -190,21 +197,25 @@ function resetUserSession(userId) {
   };
 }
 
-async function geocodeAddress(address) {
-  const url =
-    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
-  const res = await fetch(url);
-  const data = await res.json();
+function ensureOrderExists(orderId) {
+  return orders[orderId];
+}
 
-  if (!data.results || !data.results.length) {
-    throw new Error(`找不到地址：${address}`);
-  }
+function ensureRiderAuthorized(order, userId) {
+  return order.riderUserId && order.riderUserId === userId;
+}
 
-  const result = data.results[0];
-  return {
-    formattedAddress: result.formatted_address,
-    location: result.geometry.location,
-  };
+function parsePostbackData(data = '') {
+  return Object.fromEntries(
+    data.split('&').map((pair) => {
+      const [k, v] = pair.split('=');
+      return [k, v];
+    })
+  );
+}
+
+function buildNavigationUrl(address) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
 }
 
 async function getDistanceAndDuration(origin, destination) {
@@ -232,10 +243,45 @@ async function getDistanceAndDuration(origin, destination) {
   };
 }
 
-function buildNavigationUrl(address) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
+function getFeeBreakdown(order) {
+  const distanceKm = Number(order.distanceKm || 0);
+  const durationMin = Number(order.durationMin || 0);
+
+  const baseIncome =
+    BASE_FEE +
+    Math.ceil(distanceKm) * PRICE_PER_KM +
+    Math.ceil(durationMin) * PRICE_PER_MIN;
+
+  const urgentFee = order.isUrgent ? URGENT_FEE : 0;
+  const crossDistrictFee = isCrossDistrict(order.pickupAddress, order.dropoffAddress)
+    ? CROSS_DISTRICT_FEE
+    : 0;
+  const nightFee =
+    order.createdAt && isNightTime(new Date(order.createdAt)) ? NIGHT_FEE : 0;
+
+  const serviceFee = SERVICE_FEE;
+  const extraFeeTotal = urgentFee + crossDistrictFee + nightFee + serviceFee;
+  const platformIncome = Math.max((order.totalPrice || 0) - (order.riderPay || 0), 0);
+
+  return {
+    baseIncome,
+    urgentFee,
+    crossDistrictFee,
+    nightFee,
+    serviceFee,
+    extraFeeTotal,
+    platformIncome,
+  };
 }
 
+async function syncOrderToFirebase(orderId, payload) {
+  if (!db) return;
+  await db.collection('orders').doc(orderId).set(payload, { merge: true });
+}
+
+// =========================
+// Flex / Template UI
+// =========================
 function buildMainMenuFlex() {
   return {
     type: 'flex',
@@ -245,8 +291,8 @@ function buildMainMenuFlex() {
       hero: {
         type: 'box',
         layout: 'vertical',
-        paddingAll: '20px',
         backgroundColor: '#111111',
+        paddingAll: '20px',
         contents: [
           {
             type: 'text',
@@ -308,93 +354,268 @@ function buildMainMenuFlex() {
   };
 }
 
-function buildOrderMenuButtons() {
+function buildOrderMenuFlex() {
   return {
-    type: 'template',
+    type: 'flex',
     altText: '下單選單',
-    template: {
-      type: 'buttons',
-      title: 'UBee｜下單',
-      text: '請選擇服務項目',
-      actions: [
-        {
-          type: 'postback',
-          label: '建立任務',
-          data: 'action=create_order_start',
-          displayText: '建立任務',
-        },
-        {
-          type: 'postback',
-          label: '立即估價',
-          data: 'action=quick_quote_start',
-          displayText: '立即估價',
-        },
-        {
-          type: 'message',
-          label: '返回主選單',
-          text: '主選單',
-        },
-      ],
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜下單',
+            weight: 'bold',
+            size: 'xl',
+            color: '#F7C948',
+          },
+          {
+            type: 'text',
+            text: '請選擇服務項目',
+            size: 'sm',
+            color: '#FFFFFF',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            action: {
+              type: 'postback',
+              label: '建立任務',
+              data: 'action=create_order_start',
+              displayText: '建立任務',
+            },
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'postback',
+              label: '立即估價',
+              data: 'action=quick_quote_start',
+              displayText: '立即估價',
+            },
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'message',
+              label: '主選單',
+              text: '主選單',
+            },
+          },
+        ],
+      },
     },
   };
 }
 
-function buildBusinessMenuButtons() {
+function buildBusinessMenuFlex() {
   return {
-    type: 'template',
+    type: 'flex',
     altText: '企業選單',
-    template: {
-      type: 'buttons',
-      title: 'UBee｜企業',
-      text: '企業合作與月結服務',
-      actions: [
-        {
-          type: 'uri',
-          label: '企業合作表單',
-          uri:
-            'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform',
-        },
-        {
-          type: 'message',
-          label: '企業服務介紹',
-          text: '企業服務介紹',
-        },
-        {
-          type: 'message',
-          label: '返回主選單',
-          text: '主選單',
-        },
-      ],
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜企業',
+            weight: 'bold',
+            size: 'xl',
+            color: '#F7C948',
+          },
+          {
+            type: 'text',
+            text: '企業合作與月結服務',
+            size: 'sm',
+            color: '#FFFFFF',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            action: {
+              type: 'uri',
+              label: '企業合作表單',
+              uri:
+                'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform',
+            },
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'message',
+              label: '企業服務介紹',
+              text: '企業服務介紹',
+            },
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'message',
+              label: '主選單',
+              text: '主選單',
+            },
+          },
+        ],
+      },
     },
   };
 }
 
-function buildMyMenuButtons() {
+function buildMyMenuFlex() {
   return {
-    type: 'template',
+    type: 'flex',
     altText: '我的選單',
-    template: {
-      type: 'buttons',
-      title: 'UBee｜我的',
-      text: '會員與服務資訊',
-      actions: [
-        {
-          type: 'uri',
-          label: '合作夥伴申請',
-          uri:
-            'https://docs.google.com/forms/d/e/1FAIpQLSc2qdklWuSSPw39vjfrXEakBHTI3TM_NgqMxWLAZg0ej6zvMA/viewform',
-        },
-        {
-          type: 'message',
-          label: '服務說明',
-          text: '服務說明',
-        },
-        {
-          type: 'message',
-          label: '返回主選單',
-          text: '主選單',
-        },
-      ],
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜我的',
+            weight: 'bold',
+            size: 'xl',
+            color: '#F7C948',
+          },
+          {
+            type: 'text',
+            text: '會員與服務資訊',
+            size: 'sm',
+            color: '#FFFFFF',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            action: {
+              type: 'uri',
+              label: '合作夥伴申請',
+              uri:
+                'https://docs.google.com/forms/d/e/1FAIpQLSc2qdklWuSSPw39vjfrXEakBHTI3TM_NgqMxWLAZg0ej6zvMA/viewform',
+            },
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'message',
+              label: '服務說明',
+              text: '服務說明',
+            },
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'message',
+              label: '主選單',
+              text: '主選單',
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+function buildInfoFlex(title, lines = []) {
+  return {
+    type: 'flex',
+    altText: title,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: title,
+            weight: 'bold',
+            size: 'xl',
+            color: '#F7C948',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: lines.map((line) => ({
+          type: 'text',
+          text: line,
+          wrap: true,
+          size: 'sm',
+          color: '#333333',
+        })),
+      },
+    },
+  };
+}
+
+function buildPromptFlex(title, desc) {
+  return {
+    type: 'flex',
+    altText: title,
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: title,
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: desc,
+            wrap: true,
+            size: 'sm',
+            color: '#666666',
+          },
+        ],
+      },
     },
   };
 }
@@ -405,21 +626,34 @@ function buildQuoteFlex(result) {
     altText: '估價結果',
     contents: {
       type: 'bubble',
+      hero: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '20px',
+        backgroundColor: '#111111',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee',
+            color: '#F7C948',
+            weight: 'bold',
+            size: 'xxl',
+          },
+          {
+            type: 'text',
+            text: '立即估價',
+            color: '#FFFFFF',
+            size: 'md',
+            margin: 'md',
+            weight: 'bold',
+          },
+        ],
+      },
       body: {
         type: 'box',
         layout: 'vertical',
         spacing: 'md',
         contents: [
-          {
-            type: 'text',
-            text: 'UBee｜立即估價',
-            weight: 'bold',
-            size: 'xl',
-          },
-          {
-            type: 'separator',
-            margin: 'md',
-          },
           {
             type: 'text',
             text: `取件：${result.pickupAddress}`,
@@ -443,11 +677,14 @@ function buildQuoteFlex(result) {
             size: 'sm',
           },
           {
+            type: 'separator',
+            margin: 'md',
+          },
+          {
             type: 'text',
             text: `費用：$${result.totalPrice}`,
             weight: 'bold',
             size: 'xxl',
-            margin: 'md',
           },
           {
             type: 'text',
@@ -487,18 +724,128 @@ function buildQuoteFlex(result) {
   };
 }
 
+function buildOrderCreatedFlex(order) {
+  return {
+    type: 'flex',
+    altText: '任務建立成功',
+    contents: {
+      type: 'bubble',
+      hero: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '20px',
+        backgroundColor: '#111111',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee',
+            color: '#F7C948',
+            weight: 'bold',
+            size: 'xxl',
+          },
+          {
+            type: 'text',
+            text: '任務建立成功',
+            color: '#FFFFFF',
+            size: 'md',
+            margin: 'md',
+            weight: 'bold',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: `訂單編號：${order.id}`,
+            size: 'sm',
+            color: '#666666',
+          },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'text',
+            text: `取件：${order.pickupAddress}`,
+            wrap: true,
+            size: 'sm',
+          },
+          {
+            type: 'text',
+            text: `送達：${order.dropoffAddress}`,
+            wrap: true,
+            size: 'sm',
+          },
+          {
+            type: 'text',
+            text: `任務內容：${order.item}`,
+            wrap: true,
+            size: 'sm',
+          },
+          {
+            type: 'text',
+            text: `類型：${formatTaskType(order)}`,
+            size: 'sm',
+            weight: 'bold',
+            color: order.isUrgent ? '#C92A2A' : '#2B8A3E',
+          },
+          {
+            type: 'text',
+            text: `距離：約 ${order.distanceKm.toFixed(1)} km`,
+            size: 'sm',
+          },
+          {
+            type: 'text',
+            text: `時間：約 ${Math.ceil(order.durationMin)} 分鐘`,
+            size: 'sm',
+          },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'text',
+            text: `費用：$${order.totalPrice}`,
+            weight: 'bold',
+            size: 'xxl',
+          },
+          {
+            type: 'text',
+            text: '請先完成付款，系統確認後會自動派單。',
+            wrap: true,
+            size: 'sm',
+            color: '#666666',
+          },
+        ],
+      },
+    },
+  };
+}
+
 function buildCustomerPaymentFlex(order) {
   return {
     type: 'flex',
     altText: '付款資訊',
     contents: {
       type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜付款資訊',
+            color: '#F7C948',
+            weight: 'bold',
+            size: 'xl',
+          },
+        ],
+      },
       body: {
         type: 'box',
         layout: 'vertical',
         spacing: 'md',
         contents: [
-          { type: 'text', text: 'UBee｜付款資訊', weight: 'bold', size: 'xl' },
           { type: 'text', text: `訂單編號：${order.id}`, size: 'sm' },
           { type: 'text', text: `費用：$${order.totalPrice}`, weight: 'bold', size: 'xl' },
           { type: 'separator', margin: 'md' },
@@ -508,9 +855,10 @@ function buildCustomerPaymentFlex(order) {
           { type: 'separator', margin: 'md' },
           {
             type: 'text',
-            text: PAYMENT_VERIFY_MODE === 'CODE'
-              ? `付款驗證碼：${order.paymentCode}`
-              : '付款後請按下方按鈕通知系統',
+            text:
+              PAYMENT_VERIFY_MODE === 'CODE'
+                ? `付款驗證碼：${order.paymentCode}`
+                : '付款後請按下方按鈕通知系統',
             wrap: true,
             size: 'sm',
             color: '#D9480F',
@@ -553,28 +901,60 @@ function buildGroupDispatchFlex(order) {
     altText: `新任務 ${order.id}`,
     contents: {
       type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜新任務',
+            color: '#F7C948',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: `訂單編號：${order.id}`,
+            color: '#FFFFFF',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
       body: {
         type: 'box',
         layout: 'vertical',
         spacing: 'md',
         contents: [
-          { type: 'text', text: 'UBee｜新任務', weight: 'bold', size: 'xl' },
-          { type: 'text', text: `訂單編號：${order.id}`, size: 'sm', color: '#666666' },
-          { type: 'separator', margin: 'md' },
-          { type: 'text', text: `費用：$${order.totalPrice}`, weight: 'bold', size: 'xxl' },
-          { type: 'text', text: `可領：$${order.riderPay}`, size: 'lg', color: '#0B7285', weight: 'bold' },
+          {
+            type: 'text',
+            text: `本單可領：$${order.riderPay}`,
+            weight: 'bold',
+            size: 'xxl',
+            color: '#0B7285',
+          },
           { type: 'separator', margin: 'md' },
           { type: 'text', text: `取件：${order.pickupAddress}`, wrap: true, size: 'sm' },
           { type: 'text', text: `送達：${order.dropoffAddress}`, wrap: true, size: 'sm' },
           { type: 'text', text: `任務內容：${order.item}`, wrap: true, size: 'sm' },
-          { type: 'text', text: `距離：約 ${order.distanceKm.toFixed(1)} km`, size: 'sm' },
-          { type: 'text', text: `時間：約 ${Math.ceil(order.durationMin)} 分鐘`, size: 'sm' },
           {
             type: 'text',
-            text: order.isUrgent ? '類型：急件' : '類型：一般件',
+            text: `類型：${formatTaskType(order)}`,
             size: 'sm',
             color: order.isUrgent ? '#C92A2A' : '#2B8A3E',
             weight: 'bold',
+          },
+          {
+            type: 'text',
+            text: `距離：約 ${Number(order.distanceKm || 0).toFixed(1)} km`,
+            size: 'sm',
+          },
+          {
+            type: 'text',
+            text: `時間：約 ${Math.ceil(Number(order.durationMin || 0))} 分鐘`,
+            size: 'sm',
           },
         ],
       },
@@ -588,18 +968,19 @@ function buildGroupDispatchFlex(order) {
             style: 'primary',
             action: {
               type: 'postback',
-              label: '我要接單',
+              label: '接受訂單',
               data: `action=rider_accept&orderId=${order.id}`,
-              displayText: `我要接 ${order.id}`,
+              displayText: `接受訂單 ${order.id}`,
             },
           },
           {
             type: 'button',
+            style: 'secondary',
             action: {
               type: 'postback',
-              label: '查看導航',
-              data: `action=view_nav_pickup&orderId=${order.id}`,
-              displayText: `查看 ${order.id} 導航`,
+              label: '放棄任務',
+              data: `action=abandon_order&orderId=${order.id}`,
+              displayText: `放棄任務 ${order.id}`,
             },
           },
         ],
@@ -608,53 +989,515 @@ function buildGroupDispatchFlex(order) {
   };
 }
 
-function buildRiderActionButtons(order) {
+function buildRiderActionFlex(order) {
   return {
-    type: 'template',
+    type: 'flex',
     altText: `任務操作 ${order.id}`,
-    template: {
-      type: 'buttons',
-      title: 'UBee｜任務操作',
-      text: `訂單 ${order.id}`,
-      actions: [
-        {
-          type: 'postback',
-          label: '設定 ETA',
-          data: `action=set_eta_prompt&orderId=${order.id}`,
-          displayText: `設定 ${order.id} ETA`,
-        },
-        {
-          type: 'uri',
-          label: '導航去取件',
-          uri: buildNavigationUrl(order.pickupAddress),
-        },
-        {
-          type: 'postback',
-          label: '已取件',
-          data: `action=pickup_done&orderId=${order.id}`,
-          displayText: `訂單 ${order.id} 已取件`,
-        },
-        {
-          type: 'postback',
-          label: '已送達',
-          data: `action=delivered_done&orderId=${order.id}`,
-          displayText: `訂單 ${order.id} 已送達`,
-        },
-      ],
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: 'UBee｜任務操作',
+            color: '#F7C948',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: `訂單 ${order.id}`,
+            color: '#FFFFFF',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            action: {
+              type: 'postback',
+              label: '設定 ETA',
+              data: `action=set_eta_prompt&orderId=${order.id}`,
+              displayText: `設定 ${order.id} ETA`,
+            },
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'uri',
+              label: '導航去取件',
+              uri: buildNavigationUrl(order.pickupAddress),
+            },
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: '已取件',
+              data: `action=pickup_done&orderId=${order.id}`,
+              displayText: `訂單 ${order.id} 已取件`,
+            },
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: '已送達',
+              data: `action=delivered_done&orderId=${order.id}`,
+              displayText: `訂單 ${order.id} 已送達`,
+            },
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'postback',
+              label: '放棄任務',
+              data: `action=abandon_order&orderId=${order.id}`,
+              displayText: `放棄任務 ${order.id}`,
+            },
+          },
+        ],
+      },
     },
   };
 }
 
-async function replyText(replyToken, text) {
-  return client.replyMessage(replyToken, {
-    type: 'text',
-    text,
-  });
+function buildRiderAcceptedFlex(order) {
+  return {
+    type: 'flex',
+    altText: '接單成功',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: '✅ 接單成功', weight: 'bold', size: 'xl' },
+          { type: 'text', text: `訂單：${order.id}`, size: 'sm' },
+          { type: 'text', text: `本單可領：$${order.riderPay}`, weight: 'bold', size: 'xl' },
+          {
+            type: 'text',
+            text: '請先設定 ETA，再前往取件。',
+            wrap: true,
+            size: 'sm',
+            color: '#666666',
+          },
+        ],
+      },
+    },
+  };
 }
 
-async function pushText(to, text) {
-  if (!to) return;
-  return client.pushMessage(to, {
+function buildEtaSetFlex(order) {
+  return {
+    type: 'flex',
+    altText: 'ETA 已設定',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: '✅ ETA 已設定', weight: 'bold', size: 'xl' },
+          { type: 'text', text: `訂單：${order.id}`, size: 'sm' },
+          { type: 'text', text: `預計 ${order.etaMin} 分鐘抵達取件地點`, wrap: true, size: 'md' },
+        ],
+      },
+    },
+  };
+}
+
+function buildPickupDoneFlex(order) {
+  return {
+    type: 'flex',
+    altText: '取件完成',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: '✅ 已完成取件', weight: 'bold', size: 'xl' },
+          { type: 'text', text: `訂單：${order.id}`, size: 'sm' },
+          { type: 'text', text: '物品正前往送達地點', wrap: true, size: 'sm', color: '#666666' },
+        ],
+      },
+    },
+  };
+}
+
+function buildDeliveredFlex(order) {
+  return {
+    type: 'flex',
+    altText: '任務完成',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: '✅ 任務已完成', weight: 'bold', size: 'xl' },
+          { type: 'text', text: `訂單：${order.id}`, size: 'sm' },
+          { type: 'text', text: '感謝使用 UBee 城市任務服務', wrap: true, size: 'sm', color: '#666666' },
+        ],
+      },
+    },
+  };
+}
+
+function buildAbandonSuccessFlex(orderId) {
+  return {
+    type: 'flex',
+    altText: '已放棄任務',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: '⚠️ 已放棄任務', weight: 'bold', size: 'xl' },
+          { type: 'text', text: `訂單：${orderId}`, size: 'sm' },
+          { type: 'text', text: '系統將重新釋出任務。', size: 'sm', color: '#666666' },
+        ],
+      },
+    },
+  };
+}
+
+function buildSkipOrderFlex(orderId) {
+  return {
+    type: 'flex',
+    altText: '已略過任務',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: '已略過任務', weight: 'bold', size: 'xl' },
+          { type: 'text', text: `訂單：${orderId}`, size: 'sm' },
+          { type: 'text', text: '此操作不會影響訂單狀態。', size: 'sm', color: '#666666' },
+        ],
+      },
+    },
+  };
+}
+
+function buildSimpleResultFlex(title, bodyText) {
+  return {
+    type: 'flex',
+    altText: title,
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          { type: 'text', text: title, weight: 'bold', size: 'xl' },
+          { type: 'text', text: bodyText, wrap: true, size: 'sm', color: '#666666' },
+        ],
+      },
+    },
+  };
+}
+
+function buildFinishGroupFinanceFlex(order) {
+  const fee = getFeeBreakdown(order);
+
+  return {
+    type: 'flex',
+    altText: `財務明細 ${order.id}`,
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '20px',
+        contents: [
+          {
+            type: 'text',
+            text: '💰 財務明細',
+            color: '#F7C948',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: `訂單編號：${order.id}`,
+            color: '#FFFFFF',
+            size: 'sm',
+            margin: 'md',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#EAE4D3',
+            cornerRadius: '12px',
+            paddingAll: '14px',
+            contents: [
+              {
+                type: 'text',
+                text: `客戶支付：$${order.totalPrice || 0}`,
+                weight: 'bold',
+                size: 'xl',
+                color: '#111111',
+              },
+            ],
+          },
+
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '取件地址', size: 'sm', color: '#777777', flex: 3 },
+              { type: 'text', text: order.pickupAddress || '-', size: 'sm', wrap: true, flex: 7 },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '送達地址', size: 'sm', color: '#777777', flex: 3 },
+              { type: 'text', text: order.dropoffAddress || '-', size: 'sm', wrap: true, flex: 7 },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '物品內容', size: 'sm', color: '#777777', flex: 3 },
+              { type: 'text', text: order.item || '-', size: 'sm', wrap: true, flex: 7 },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '任務類型', size: 'sm', color: '#777777', flex: 3 },
+              { type: 'text', text: formatTaskType(order), size: 'sm', flex: 7 },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '距離', size: 'sm', color: '#777777', flex: 3 },
+              {
+                type: 'text',
+                text: `${Number(order.distanceKm || 0).toFixed(1)} 公里`,
+                size: 'sm',
+                flex: 7,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '時間', size: 'sm', color: '#777777', flex: 3 },
+              {
+                type: 'text',
+                text: `${Math.ceil(Number(order.durationMin || 0))} 分鐘`,
+                size: 'sm',
+                flex: 7,
+              },
+            ],
+          },
+
+          { type: 'separator', margin: 'md' },
+
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '騎手收入', size: 'md', color: '#333333', flex: 6 },
+              {
+                type: 'text',
+                text: `$${order.riderPay || 0}`,
+                size: 'md',
+                weight: 'bold',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '平台收入', size: 'md', color: '#333333', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.platformIncome}`,
+                size: 'md',
+                weight: 'bold',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+
+          { type: 'separator', margin: 'md' },
+
+          {
+            type: 'text',
+            text: '附加費明細',
+            weight: 'bold',
+            size: 'md',
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '急件費', size: 'sm', color: '#555555', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.urgentFee}`,
+                size: 'sm',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '跨區加成', size: 'sm', color: '#555555', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.crossDistrictFee}`,
+                size: 'sm',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '夜間加成', size: 'sm', color: '#555555', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.nightFee}`,
+                size: 'sm',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '服務費', size: 'sm', color: '#555555', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.serviceFee}`,
+                size: 'sm',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '附加費總額', size: 'sm', color: '#C92A2A', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.extraFeeTotal}`,
+                size: 'sm',
+                weight: 'bold',
+                color: '#C92A2A',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+
+          { type: 'separator', margin: 'md' },
+
+          {
+            type: 'text',
+            text: '收入拆解',
+            weight: 'bold',
+            size: 'md',
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '基礎收入', size: 'sm', color: '#555555', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.baseIncome}`,
+                size: 'sm',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            contents: [
+              { type: 'text', text: '附加收入', size: 'sm', color: '#555555', flex: 6 },
+              {
+                type: 'text',
+                text: `$${fee.extraFeeTotal}`,
+                size: 'sm',
+                align: 'end',
+                flex: 4,
+              },
+            ],
+          },
+        ],
+      },
+    },
+  };
+}
+
+// =========================
+// 訊息工具
+// =========================
+async function replyFlex(replyToken, messages) {
+  const arr = Array.isArray(messages) ? messages : [messages];
+  return client.replyMessage(replyToken, arr);
+}
+
+async function replyText(replyToken, text) {
+  return client.replyMessage(replyToken, {
     type: 'text',
     text,
   });
@@ -666,7 +1509,7 @@ async function pushMulti(to, messages) {
 }
 
 async function sendMainMenu(replyToken) {
-  return client.replyMessage(replyToken, [buildMainMenuFlex()]);
+  return replyFlex(replyToken, buildMainMenuFlex());
 }
 
 async function dispatchOrderToGroup(order) {
@@ -678,57 +1521,35 @@ async function dispatchOrderToGroup(order) {
   order.status = 'WAITING_RIDER';
   order.dispatchedAt = new Date().toISOString();
 
-  await pushMulti(LINE_GROUP_ID, [
-    buildGroupDispatchFlex(order),
-  ]);
-}
+  await syncOrderToFirebase(order.id, {
+    status: order.status,
+    dispatchedAt: order.dispatchedAt,
+  });
 
-async function notifyCustomerOrderCreated(order) {
-  await pushMulti(order.userId, [
-    {
-      type: 'text',
-      text:
-        `✅ 任務建立成功\n` +
-        `訂單編號：${order.id}\n` +
-        `費用：$${order.totalPrice}\n` +
-        `請先完成付款，系統確認後會自動派單。`,
-    },
-    buildCustomerPaymentFlex(order),
-  ]);
+  await pushMulti(LINE_GROUP_ID, [buildGroupDispatchFlex(order)]);
 }
 
 async function markPaymentConfirmed(order) {
-  if (order.paymentStatus === 'PAID') {
-    return;
-  }
+  if (order.paymentStatus === 'PAID') return;
 
   order.paymentStatus = 'PAID';
   order.paidAt = new Date().toISOString();
   order.status = 'PAID_WAITING_DISPATCH';
 
-  await pushText(
-    order.userId,
-    `✅ 已確認收到付款\n訂單編號：${order.id}\n系統正在為您派單中……`
-  );
+  await syncOrderToFirebase(order.id, {
+    paymentStatus: order.paymentStatus,
+    paidAt: order.paidAt,
+    status: order.status,
+  });
+
+  await pushMulti(order.userId, [
+    buildSimpleResultFlex(
+      '✅ 已確認收到付款',
+      `訂單編號：${order.id}\n系統正在為您派單中……`
+    ),
+  ]);
 
   await dispatchOrderToGroup(order);
-}
-
-function ensureOrderExists(orderId) {
-  return orders[orderId];
-}
-
-function ensureRiderAuthorized(order, userId) {
-  return order.riderUserId && order.riderUserId === userId;
-}
-
-function parsePostbackData(data = '') {
-  return Object.fromEntries(
-    data.split('&').map((pair) => {
-      const [k, v] = pair.split('=');
-      return [k, v];
-    })
-  );
 }
 
 // =========================
@@ -741,7 +1562,7 @@ async function startQuickQuote(userId, replyToken) {
     data: {},
   };
 
-  await replyText(replyToken, '請輸入取件地址');
+  await replyFlex(replyToken, buildPromptFlex('立即估價', '請輸入取件地址'));
 }
 
 async function startCreateOrder(userId, replyToken) {
@@ -751,7 +1572,7 @@ async function startCreateOrder(userId, replyToken) {
     data: {},
   };
 
-  await replyText(replyToken, '請輸入取件地址');
+  await replyFlex(replyToken, buildPromptFlex('建立任務', '請輸入取件地址'));
 }
 
 async function handleTextMessage(event) {
@@ -760,7 +1581,7 @@ async function handleTextMessage(event) {
   const replyToken = event.replyToken;
 
   if (!userId) {
-    await replyText(replyToken, '此功能需於個人聊天中使用');
+    await replyFlex(replyToken, buildSimpleResultFlex('提醒', '此功能需於個人聊天中使用'));
     return;
   }
 
@@ -773,17 +1594,24 @@ async function handleTextMessage(event) {
   }
 
   if (text === '企業服務介紹') {
-    await replyText(
+    await replyFlex(
       replyToken,
-      'UBee 提供企業專屬城市任務服務，適用於文件急送、樣品遞送、臨時行政支援、同城快速送達與月結合作。'
+      buildInfoFlex('企業服務介紹', [
+        'UBee 提供企業專屬城市任務服務。',
+        '適用於文件急送、樣品遞送、臨時行政支援、同城快速送達與月結合作。',
+      ])
     );
     return;
   }
 
   if (text === '服務說明') {
-    await replyText(
+    await replyFlex(
       replyToken,
-      'UBee 為城市任務服務，主打文件、樣品、商務物件與臨時任務支援；目前不承接餐飲、生鮮與危險物品。'
+      buildInfoFlex('服務說明', [
+        'UBee 為城市任務服務。',
+        '主打文件、樣品、商務物件與臨時任務支援。',
+        '目前不承接餐飲、生鮮與危險物品。',
+      ])
     );
     return;
   }
@@ -794,19 +1622,19 @@ async function handleTextMessage(event) {
 
     if (!order) {
       delete pendingEtaInput[userId];
-      await replyText(replyToken, '找不到此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
       return;
     }
 
     if (!ensureRiderAuthorized(order, userId)) {
       delete pendingEtaInput[userId];
-      await replyText(replyToken, '你無權操作此訂單 ETA');
+      await replyFlex(replyToken, buildSimpleResultFlex('無法操作', '你無權設定此訂單 ETA'));
       return;
     }
 
     const eta = parseInt(text, 10);
     if (Number.isNaN(eta) || eta <= 0 || eta > 999) {
-      await replyText(replyToken, '請輸入正確分鐘數，例如：20');
+      await replyFlex(replyToken, buildSimpleResultFlex('ETA 格式錯誤', '請輸入正確分鐘數，例如：20'));
       return;
     }
 
@@ -814,19 +1642,29 @@ async function handleTextMessage(event) {
     order.status = 'RIDER_EN_ROUTE_PICKUP';
     order.etaSetAt = new Date().toISOString();
 
+    await syncOrderToFirebase(order.id, {
+      etaMin: order.etaMin,
+      status: order.status,
+      etaSetAt: order.etaSetAt,
+    });
+
     delete pendingEtaInput[userId];
 
-    await replyText(replyToken, `✅ 已設定 ETA：預計 ${eta} 分鐘抵達取件地點`);
+    await replyFlex(replyToken, buildEtaSetFlex(order));
 
-    await pushText(
-      order.userId,
-      `✅ 已有騎手接單\n接單人員：${order.riderName || '騎手'}\n預計 ${eta} 分鐘抵達取件地點`
-    );
+    await pushMulti(order.userId, [
+      buildSimpleResultFlex(
+        '✅ 已有騎手接單',
+        `接單人員：${order.riderName || '騎手'}\n預計 ${eta} 分鐘抵達取件地點`
+      ),
+    ]);
 
-    await pushText(
-      LINE_GROUP_ID,
-      `✅ 任務已接單\n訂單：${order.id}\n接單人員：${order.riderName || '騎手'}\nETA：${eta} 分鐘`
-    );
+    await pushMulti(LINE_GROUP_ID, [
+      buildSimpleResultFlex(
+        '✅ 任務已接單',
+        `訂單：${order.id}\n接單人員：${order.riderName || '騎手'}\nETA：${eta} 分鐘`
+      ),
+    ]);
     return;
   }
 
@@ -836,29 +1674,29 @@ async function handleTextMessage(event) {
 
     if (!order) {
       delete pendingPaymentCodeInput[userId];
-      await replyText(replyToken, '找不到此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
       return;
     }
 
     if (order.userId !== userId) {
       delete pendingPaymentCodeInput[userId];
-      await replyText(replyToken, '你無法驗證此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('無法驗證', '你無法驗證此訂單'));
       return;
     }
 
     if (order.paymentStatus === 'PAID') {
       delete pendingPaymentCodeInput[userId];
-      await replyText(replyToken, '此訂單已完成付款確認');
+      await replyFlex(replyToken, buildSimpleResultFlex('已完成付款確認', `訂單：${order.id}`));
       return;
     }
 
     if (text.toUpperCase() !== order.paymentCode) {
-      await replyText(replyToken, '❌ 驗證碼不正確，請重新輸入');
+      await replyFlex(replyToken, buildSimpleResultFlex('❌ 驗證碼不正確', '請重新輸入付款驗證碼'));
       return;
     }
 
     delete pendingPaymentCodeInput[userId];
-    await replyText(replyToken, '✅ 驗證成功，系統將自動派單');
+    await replyFlex(replyToken, buildSimpleResultFlex('✅ 驗證成功', '系統將自動派單'));
     await markPaymentConfirmed(order);
     return;
   }
@@ -867,15 +1705,15 @@ async function handleTextMessage(event) {
 
   if (!session.mode) {
     if (text === '下單') {
-      await client.replyMessage(replyToken, buildOrderMenuButtons());
+      await replyFlex(replyToken, buildOrderMenuFlex());
       return;
     }
     if (text === '企業') {
-      await client.replyMessage(replyToken, buildBusinessMenuButtons());
+      await replyFlex(replyToken, buildBusinessMenuFlex());
       return;
     }
     if (text === '我的') {
-      await client.replyMessage(replyToken, buildMyMenuButtons());
+      await replyFlex(replyToken, buildMyMenuFlex());
       return;
     }
 
@@ -887,14 +1725,14 @@ async function handleTextMessage(event) {
     if (session.step === 'pickup') {
       session.data.pickupAddress = text;
       session.step = 'dropoff';
-      await replyText(replyToken, '請輸入送達地址');
+      await replyFlex(replyToken, buildPromptFlex('立即估價', '請輸入送達地址'));
       return;
     }
 
     if (session.step === 'dropoff') {
       session.data.dropoffAddress = text;
       session.step = 'urgent';
-      await replyText(replyToken, '是否為急件？請輸入：是 / 否');
+      await replyFlex(replyToken, buildPromptFlex('立即估價', '是否為急件？請輸入：是 / 否'));
       return;
     }
 
@@ -902,35 +1740,39 @@ async function handleTextMessage(event) {
       session.data.isUrgent = text === '是';
 
       try {
-        const route = await getDistanceAndDuration(
-          session.data.pickupAddress,
-          session.data.dropoffAddress
-        );
+        const pickupAddress = session.data.pickupAddress;
+        const dropoffAddress = session.data.dropoffAddress;
+        const isUrgent = session.data.isUrgent;
+
+        const route = await getDistanceAndDuration(pickupAddress, dropoffAddress);
 
         const price = calcPrice({
           distanceKm: route.distanceKm,
           durationMin: route.durationMin,
-          pickupAddress: session.data.pickupAddress,
-          dropoffAddress: session.data.dropoffAddress,
-          isUrgent: session.data.isUrgent,
+          pickupAddress,
+          dropoffAddress,
+          isUrgent,
           now: new Date(),
         });
 
         resetUserSession(userId);
 
-        await client.replyMessage(replyToken, buildQuoteFlex({
-          pickupAddress: session.data.pickupAddress,
-          dropoffAddress: session.data.dropoffAddress,
-          distanceKm: route.distanceKm,
-          durationMin: route.durationMin,
-          totalPrice: price.total,
-          feeItems: price.feeItems,
-        }));
+        await replyFlex(
+          replyToken,
+          buildQuoteFlex({
+            pickupAddress,
+            dropoffAddress,
+            distanceKm: route.distanceKm,
+            durationMin: route.durationMin,
+            totalPrice: price.total,
+            feeItems: price.feeItems,
+          })
+        );
         return;
       } catch (err) {
         console.error(err);
         resetUserSession(userId);
-        await replyText(replyToken, `❌ 估價失敗：${err.message}`);
+        await replyFlex(replyToken, buildSimpleResultFlex('❌ 估價失敗', err.message));
         return;
       }
     }
@@ -940,21 +1782,21 @@ async function handleTextMessage(event) {
     if (session.step === 'pickup') {
       session.data.pickupAddress = text;
       session.step = 'dropoff';
-      await replyText(replyToken, '請輸入送達地址');
+      await replyFlex(replyToken, buildPromptFlex('建立任務', '請輸入送達地址'));
       return;
     }
 
     if (session.step === 'dropoff') {
       session.data.dropoffAddress = text;
       session.step = 'item';
-      await replyText(replyToken, '請輸入任務內容 / 物品內容');
+      await replyFlex(replyToken, buildPromptFlex('建立任務', '請輸入任務內容 / 物品內容'));
       return;
     }
 
     if (session.step === 'item') {
       session.data.item = text;
       session.step = 'urgent';
-      await replyText(replyToken, '是否為急件？請輸入：是 / 否');
+      await replyFlex(replyToken, buildPromptFlex('建立任務', '是否為急件？請輸入：是 / 否'));
       return;
     }
 
@@ -962,17 +1804,19 @@ async function handleTextMessage(event) {
       session.data.isUrgent = text === '是';
 
       try {
-        const route = await getDistanceAndDuration(
-          session.data.pickupAddress,
-          session.data.dropoffAddress
-        );
+        const pickupAddress = session.data.pickupAddress;
+        const dropoffAddress = session.data.dropoffAddress;
+        const item = session.data.item;
+        const isUrgent = session.data.isUrgent;
+
+        const route = await getDistanceAndDuration(pickupAddress, dropoffAddress);
 
         const price = calcPrice({
           distanceKm: route.distanceKm,
           durationMin: route.durationMin,
-          pickupAddress: session.data.pickupAddress,
-          dropoffAddress: session.data.dropoffAddress,
-          isUrgent: session.data.isUrgent,
+          pickupAddress,
+          dropoffAddress,
+          isUrgent,
           now: new Date(),
         });
 
@@ -983,10 +1827,10 @@ async function handleTextMessage(event) {
         orders[orderId] = {
           id: orderId,
           userId,
-          pickupAddress: session.data.pickupAddress,
-          dropoffAddress: session.data.dropoffAddress,
-          item: session.data.item,
-          isUrgent: session.data.isUrgent,
+          pickupAddress,
+          dropoffAddress,
+          item,
+          isUrgent,
           distanceKm: route.distanceKm,
           durationMin: route.durationMin,
           totalPrice: price.total,
@@ -1000,32 +1844,37 @@ async function handleTextMessage(event) {
           etaMin: null,
           createdAt: new Date().toISOString(),
         };
-if (db) {
-  await db.collection('orders').doc(orderId).set({
-    orderId,
-    userId,
-    pickup: session.data.pickupAddress,
-    dropoff: session.data.dropoffAddress,
-    item: session.data.item,
-    isUrgent: session.data.isUrgent,
-    totalFee: price.total,
-    status: 'pending',
-    createdAt: new Date()
-  });
-}
+
+        await syncOrderToFirebase(orderId, {
+          orderId,
+          userId,
+          pickupAddress,
+          dropoffAddress,
+          item,
+          isUrgent,
+          distanceKm: route.distanceKm,
+          durationMin: route.durationMin,
+          totalPrice: price.total,
+          feeItems: price.feeItems,
+          riderPay,
+          paymentCode,
+          paymentStatus: 'UNPAID',
+          status: 'WAITING_PAYMENT',
+          createdAt: new Date(),
+        });
+
+        const createdOrder = orders[orderId];
         resetUserSession(userId);
 
-        await replyText(
-          replyToken,
-          `✅ 任務已建立\n訂單編號：${orderId}\n費用：$${price.total}`
-        );
-
-        await notifyCustomerOrderCreated(orders[orderId]);
+        await replyFlex(replyToken, [
+          buildOrderCreatedFlex(createdOrder),
+          buildCustomerPaymentFlex(createdOrder),
+        ]);
         return;
       } catch (err) {
         console.error(err);
         resetUserSession(userId);
-        await replyText(replyToken, `❌ 建立任務失敗：${err.message}`);
+        await replyFlex(replyToken, buildSimpleResultFlex('❌ 建立任務失敗', err.message));
         return;
       }
     }
@@ -1035,6 +1884,9 @@ if (db) {
   await sendMainMenu(replyToken);
 }
 
+// =========================
+// Postback 流程
+// =========================
 async function handlePostback(event) {
   const userId = event.source.userId;
   const replyToken = event.replyToken;
@@ -1042,22 +1894,22 @@ async function handlePostback(event) {
   const action = postback.action;
 
   if (!userId) {
-    await replyText(replyToken, '此功能需於個人聊天中使用');
+    await replyFlex(replyToken, buildSimpleResultFlex('提醒', '此功能需於個人聊天中使用'));
     return;
   }
 
   if (action === 'menu_order') {
-    await client.replyMessage(replyToken, buildOrderMenuButtons());
+    await replyFlex(replyToken, buildOrderMenuFlex());
     return;
   }
 
   if (action === 'menu_business') {
-    await client.replyMessage(replyToken, buildBusinessMenuButtons());
+    await replyFlex(replyToken, buildBusinessMenuFlex());
     return;
   }
 
   if (action === 'menu_my') {
-    await client.replyMessage(replyToken, buildMyMenuButtons());
+    await replyFlex(replyToken, buildMyMenuFlex());
     return;
   }
 
@@ -1074,30 +1926,33 @@ async function handlePostback(event) {
   if (action === 'paid_click') {
     const order = ensureOrderExists(postback.orderId);
     if (!order) {
-      await replyText(replyToken, '找不到此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
       return;
     }
 
     if (order.userId !== userId) {
-      await replyText(replyToken, '你無法操作此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('無法操作', '你無法操作此訂單'));
       return;
     }
 
     if (order.paymentStatus === 'PAID') {
-      await replyText(replyToken, '此訂單已確認付款');
+      await replyFlex(replyToken, buildSimpleResultFlex('已確認付款', `訂單：${order.id}`));
       return;
     }
 
     if (PAYMENT_VERIFY_MODE === 'CODE') {
       pendingPaymentCodeInput[userId] = { orderId: order.id };
-      await replyText(
+      await replyFlex(
         replyToken,
-        `請輸入付款驗證碼\n訂單：${order.id}\n驗證碼長度：${PAYMENT_CODE_LENGTH} 碼`
+        buildPromptFlex(
+          '付款驗證',
+          `請輸入付款驗證碼\n訂單：${order.id}\n驗證碼長度：${PAYMENT_CODE_LENGTH} 碼`
+        )
       );
       return;
     }
 
-    await replyText(replyToken, '✅ 系統收到付款通知，正在派單中');
+    await replyFlex(replyToken, buildSimpleResultFlex('✅ 系統收到付款通知', '正在派單中'));
     await markPaymentConfirmed(order);
     return;
   }
@@ -1105,17 +1960,17 @@ async function handlePostback(event) {
   if (action === 'rider_accept') {
     const order = ensureOrderExists(postback.orderId);
     if (!order) {
-      await replyText(replyToken, '找不到此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
       return;
     }
 
     if (order.paymentStatus !== 'PAID') {
-      await replyText(replyToken, '此訂單尚未完成付款，暫不可接單');
+      await replyFlex(replyToken, buildSimpleResultFlex('尚未完成付款', '此訂單暫不可接單'));
       return;
     }
 
     if (order.riderUserId) {
-      await replyText(replyToken, '❌ 此訂單已被其他騎手接走');
+      await replyFlex(replyToken, buildSimpleResultFlex('❌ 已被接走', '此訂單已被其他騎手接單'));
       return;
     }
 
@@ -1129,121 +1984,167 @@ async function handlePostback(event) {
     order.status = 'RIDER_ACCEPTED';
     order.acceptedAt = new Date().toISOString();
 
-    await client.replyMessage(replyToken, [
-      {
-        type: 'text',
-        text:
-          `✅ 接單成功\n` +
-          `訂單：${order.id}\n` +
-          `可領：$${order.riderPay}\n` +
-          `請先設定 ETA`,
-      },
-      buildRiderActionButtons(order),
+    await syncOrderToFirebase(order.id, {
+      riderUserId: order.riderUserId,
+      riderName: order.riderName,
+      status: order.status,
+      acceptedAt: order.acceptedAt,
+    });
+
+    await replyFlex(replyToken, [buildRiderAcceptedFlex(order), buildRiderActionFlex(order)]);
+
+    await pushMulti(order.userId, [
+      buildSimpleResultFlex(
+        '✅ 已有騎手接單',
+        `接單人員：${order.riderName}\n系統將通知預計抵達時間`
+      ),
+    ]);
+    return;
+  }
+
+  if (action === 'abandon_order') {
+    const order = ensureOrderExists(postback.orderId);
+    if (!order) {
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
+      return;
+    }
+
+    if (!order.riderUserId) {
+      await replyFlex(replyToken, buildSkipOrderFlex(order.id));
+      return;
+    }
+
+    if (!ensureRiderAuthorized(order, userId)) {
+      await replyFlex(replyToken, buildSimpleResultFlex('無法操作', '你無權放棄此訂單'));
+      return;
+    }
+
+    if (order.status === 'PICKED_UP' || order.status === 'DELIVERED') {
+      await replyFlex(replyToken, buildSimpleResultFlex('無法放棄', '此訂單目前不可放棄'));
+      return;
+    }
+
+    const oldRiderName = order.riderName || '騎手';
+
+    order.riderUserId = '';
+    order.riderName = '';
+    order.etaMin = null;
+    order.status = 'WAITING_RIDER';
+    order.abandonedAt = new Date().toISOString();
+
+    await syncOrderToFirebase(order.id, {
+      riderUserId: '',
+      riderName: '',
+      etaMin: null,
+      status: order.status,
+      abandonedAt: order.abandonedAt,
+    });
+
+    await replyFlex(replyToken, buildAbandonSuccessFlex(order.id));
+
+    await pushMulti(order.userId, [
+      buildSimpleResultFlex(
+        '⚠️ 騎手已放棄任務',
+        `訂單：${order.id}\n原接單人員：${oldRiderName}\n系統將重新為您配對騎手`
+      ),
     ]);
 
-    await pushText(
-      order.userId,
-      `✅ 已有騎手接單\n接單人員：${order.riderName}\n系統將通知預計抵達時間`
-    );
+    if (LINE_GROUP_ID) {
+      await pushMulti(LINE_GROUP_ID, [
+        buildSimpleResultFlex(
+          '⚠️ 任務重新釋出',
+          `訂單：${order.id}\n原接單人員：${oldRiderName}`
+        ),
+        buildGroupDispatchFlex(order),
+      ]);
+    }
     return;
   }
 
   if (action === 'set_eta_prompt') {
     const order = ensureOrderExists(postback.orderId);
     if (!order) {
-      await replyText(replyToken, '找不到此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
       return;
     }
 
     if (!ensureRiderAuthorized(order, userId)) {
-      await replyText(replyToken, '你無權操作此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('無法操作', '你無權操作此訂單'));
       return;
     }
 
     pendingEtaInput[userId] = { orderId: order.id };
-    await replyText(replyToken, '請直接輸入 ETA 分鐘數，例如：20');
-    return;
-  }
-
-  if (action === 'view_nav_pickup') {
-    const order = ensureOrderExists(postback.orderId);
-    if (!order) {
-      await replyText(replyToken, '找不到此訂單');
-      return;
-    }
-
-    await replyText(
-      replyToken,
-      `取件導航：\n${buildNavigationUrl(order.pickupAddress)}`
-    );
+    await replyFlex(replyToken, buildPromptFlex('設定 ETA', '請直接輸入 ETA 分鐘數，例如：20'));
     return;
   }
 
   if (action === 'pickup_done') {
     const order = ensureOrderExists(postback.orderId);
     if (!order) {
-      await replyText(replyToken, '找不到此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
       return;
     }
 
     if (!ensureRiderAuthorized(order, userId)) {
-      await replyText(replyToken, '你無權操作此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('無法操作', '你無權操作此訂單'));
       return;
     }
 
     order.status = 'PICKED_UP';
     order.pickedUpAt = new Date().toISOString();
 
-    await replyText(replyToken, `✅ 已標記取件完成\n訂單：${order.id}`);
+    await syncOrderToFirebase(order.id, {
+      status: order.status,
+      pickedUpAt: order.pickedUpAt,
+    });
 
-    await pushText(
-      order.userId,
-      `✅ 騎手已完成取件\n訂單：${order.id}\n物品正前往送達地點`
-    );
+    await replyFlex(replyToken, buildPickupDoneFlex(order));
+
+    await pushMulti(order.userId, [buildPickupDoneFlex(order)]);
     return;
   }
 
   if (action === 'delivered_done') {
     const order = ensureOrderExists(postback.orderId);
     if (!order) {
-      await replyText(replyToken, '找不到此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('找不到訂單', '請重新操作'));
       return;
     }
 
     if (!ensureRiderAuthorized(order, userId)) {
-      await replyText(replyToken, '你無權操作此訂單');
+      await replyFlex(replyToken, buildSimpleResultFlex('無法操作', '你無權操作此訂單'));
       return;
     }
 
     order.status = 'DELIVERED';
     order.deliveredAt = new Date().toISOString();
 
-    await replyText(replyToken, `✅ 已標記送達完成\n訂單：${order.id}`);
+    await syncOrderToFirebase(order.id, {
+      status: order.status,
+      deliveredAt: order.deliveredAt,
+    });
 
-    await pushText(
-      order.userId,
-      `✅ 任務已完成\n訂單：${order.id}\n感謝使用 UBee 城市任務服務`
-    );
+    await replyFlex(replyToken, buildDeliveredFlex(order));
+    await pushMulti(order.userId, [buildDeliveredFlex(order)]);
 
     if (LINE_FINISH_GROUP_ID) {
-      await pushText(
-        LINE_FINISH_GROUP_ID,
-        `✅ 任務完成\n訂單：${order.id}\n接單人員：${order.riderName}\n費用：$${order.totalPrice}\n騎手可領：$${order.riderPay}`
-      );
+      await pushMulti(LINE_FINISH_GROUP_ID, [buildFinishGroupFinanceFlex(order)]);
     }
 
-    await pushText(
-      LINE_GROUP_ID,
-      `✅ 任務已完成\n訂單：${order.id}\n接單人員：${order.riderName}`
-    );
+    await pushMulti(LINE_GROUP_ID, [
+      buildSimpleResultFlex(
+        '✅ 任務已完成',
+        `訂單：${order.id}\n接單人員：${order.riderName || '騎手'}`
+      ),
+    ]);
     return;
   }
 
-  await replyText(replyToken, '未識別操作');
+  await replyFlex(replyToken, buildSimpleResultFlex('未識別操作', '請重新操作'));
 }
 
 // =========================
-// LINE webhook
+// Webhook
 // =========================
 app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
@@ -1267,7 +2168,7 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 // 健康檢查
 // =========================
 app.get('/', (req, res) => {
-  res.send('UBee OMS V3.8.7 PRO MAX is running');
+  res.send('UBee OMS V3.8.7 PRO MAX 完整正式版 is running');
 });
 
 app.listen(PORT, () => {
