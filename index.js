@@ -39,7 +39,6 @@ if (!config.channelAccessToken || !config.channelSecret) {
 }
 
 const client = new line.Client(config);
-app.use(line.middleware(config));
 
 const PORT = process.env.PORT || 3000;
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
@@ -1234,7 +1233,7 @@ async function handlePostback(event) {
 // =========================
 // LINE webhook
 // =========================
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
     await Promise.all(
       req.body.events.map(async (event) => {
