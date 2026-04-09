@@ -2,9 +2,29 @@ require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
+const admin = require('firebase-admin');
 
 const app = express();
 
+// ===== Firebase 初始化 =====
+let db = null;
+
+try {
+  if (process.env.FIREBASE_KEY) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_KEY);
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+
+    db = admin.firestore();
+    console.log('✅ Firebase 已成功連線');
+  } else {
+    console.log('⚠️ 未設定 FIREBASE_KEY');
+  }
+} catch (error) {
+  console.error('❌ Firebase 初始化失敗:', error.message);
+}
 // =========================
 // 基本設定
 // =========================
