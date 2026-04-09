@@ -1,14 +1,15 @@
 {
-  "name": "ubee-oms-v3.9-full",
-  "version": "3.9.0",
+  "name": "ubee-oms-v3.9.2-pro-max",
+  "version": "3.9.2",
+  "description": "UBee OMS V3.9.2 PRO MAX (Auto Pricing + Google Maps + Navigation)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@line/bot-sdk": "^8.0.0",
-    "dotenv": "^16.0.0",
+    "@line/bot-sdk": "^8.5.0",
+    "dotenv": "^16.4.5",
     "express": "^4.18.2",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.9"
   }
 }
