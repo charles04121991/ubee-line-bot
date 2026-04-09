@@ -1,14 +1,15 @@
 {
-  "name": "ubee-oms-v3.9.2",
-  "version": "3.9.2",
+  "name": "ubee-oms-v3.8.6-pro-max",
+  "version": "3.8.6",
+  "description": "UBee OMS V3.8.6 PRO MAX",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@line/bot-sdk": "^8.5.0",
+    "@line/bot-sdk": "^9.7.0",
     "dotenv": "^16.4.5",
-    "express": "^4.18.2",
-    "node-fetch": "^2.6.9"
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0"
   }
 }
