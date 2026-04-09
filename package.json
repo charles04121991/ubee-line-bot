@@ -1,7 +1,6 @@
 {
-  "name": "ubee-oms-v3.9.2-pro-max",
+  "name": "ubee-oms-v3.9.2",
   "version": "3.9.2",
-  "description": "UBee OMS V3.9.2 PRO MAX (Auto Pricing + Google Maps + Navigation)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
