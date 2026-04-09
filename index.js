@@ -1000,7 +1000,19 @@ async function handleTextMessage(event) {
           etaMin: null,
           createdAt: new Date().toISOString(),
         };
-
+if (db) {
+  await db.collection('orders').doc(orderId).set({
+    orderId,
+    userId,
+    pickup: session.data.pickupAddress,
+    dropoff: session.data.dropoffAddress,
+    item: session.data.item,
+    isUrgent: session.data.isUrgent,
+    totalFee: price.total,
+    status: 'pending',
+    createdAt: new Date()
+  });
+}
         resetUserSession(userId);
 
         await replyText(
