@@ -1686,15 +1686,6 @@ function createETAFlex(orderId) {
     ],
     '#111111'
   );
-}
-
-  return createSimpleFlex(
-    `選擇 ETA（${page}/4）`,
-    '請選擇預計抵達取件地點時間',
-    pageMap[page],
-    '#111111'
-  );
-}
 
 function createUrgentChoiceFlex() {
   return {
