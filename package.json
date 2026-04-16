@@ -1,14 +1,14 @@
 {
-  "name": "ubee-oms-v3.8.6-pro-max",
+  "name": "ubee-oms",
   "version": "3.8.6",
-  "description": "UBee OMS V3.8.6 PRO MAX",
+  "description": "UBee OMS Quick Reply + Flex Message version",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.7.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "node-fetch": "^2.7.0"
   }
