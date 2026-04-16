@@ -283,9 +283,7 @@ function getCancelRuleText(status) {
 function calculateCancelFee(order) {
   if (!order) return null;
 
-  if (order.status === 'pending') {
-    return 0;
-  }
+  if (order.status === 'pending') return 0;
 
   if (order.status === 'accepted') {
     return Math.round(Math.min(Math.max(order.deliveryFee * 0.3, 60), 200));
@@ -390,6 +388,8 @@ async function calculateFees(session) {
   const urgentFee = session.isUrgent === '急件' ? PRICING.urgentFee : 0;
   const waitingFee = session.needWaitingFee ? PRICING.waitingFee : 0;
   const totalFee = deliveryFee + serviceFee + urgentFee + waitingFee;
+
+  // 騎手收入這邊沿用你目前邏輯
   const driverFee = Math.round(totalFee * 0.6);
 
   return {
@@ -438,6 +438,44 @@ function createEmptySession(userId, type) {
     totalFee: 0,
     driverFee: 0,
   };
+}
+
+// ===== Quick Reply 選單 =====
+function createMainMenuQuickReply() {
+  return createQuickReplyMessage('請選擇功能 👇', [
+    qrMessage('下單', '下單'),
+    qrMessage('企業', '企業'),
+    qrMessage('我的', '我的'),
+  ]);
+}
+
+function createOrderMenuQuickReply() {
+  return createQuickReplyMessage('下單功能 👇', [
+    qrPostback('建立任務', 'action=create', '建立任務'),
+    qrPostback('立即估價', 'action=quote', '立即估價'),
+    qrMessage('計費說明', '計費說明'),
+    qrMessage('取消規則', '取消規則'),
+    qrMessage('查詢訂單', '查詢訂單'),
+  ]);
+}
+
+function createEnterpriseMenuQuickReply() {
+  return createQuickReplyMessage('企業功能 👇', [
+    qrUri('企業合作申請', BUSINESS_FORM),
+    qrMessage('企業服務說明', '企業服務說明'),
+    qrMessage('服務區域', '服務區域'),
+    qrMessage('聯絡我們', '聯絡我們'),
+  ]);
+}
+
+function createMyMenuQuickReply() {
+  return createQuickReplyMessage('我的功能 👇', [
+    qrMessage('服務說明', '服務說明'),
+    qrMessage('常見問題', '常見問題'),
+    qrUri('加入夥伴', PARTNER_FORM),
+    qrMessage('查詢訂單', '查詢訂單'),
+    qrMessage('聯絡我們', '聯絡我們'),
+  ]);
 }
 
 // ===== Flex 共用 =====
@@ -652,14 +690,7 @@ function createPriceSummaryFlex(order, title = '訂單費用更新', subtitle = 
                 order.waitingFee > 0 ? '#D32F2F' : '#111111'
               ),
               ...(showCancelFee
-                ? [
-                    createPriceRow(
-                      '取消費',
-                      formatCurrency(order.cancelFee),
-                      '#D32F2F',
-                      'bold'
-                    ),
-                  ]
+                ? [createPriceRow('取消費', formatCurrency(order.cancelFee), '#D32F2F', 'bold')]
                 : []),
             ],
           },
@@ -792,24 +823,22 @@ function createFinishReportFlex(order) {
               },
             ],
           },
-
           {
             type: 'box',
             layout: 'vertical',
             spacing: 'sm',
             contents: [
               createInfoRow('取件地點', order.pickup),
+              createInfoRow('取件電話', order.pickupPhone),
               createInfoRow('送達地點', order.dropoff),
+              createInfoRow('送達電話', order.dropoffPhone),
               createInfoRow('物品內容', order.item),
-              createInfoRow('任務類型', order.isUrgent),
               createInfoRow('備註', order.note || '無'),
               createInfoRow('距離', order.distanceText || formatKm(order.distanceKm)),
               createInfoRow('時間', order.durationText || formatMinutes(order.durationMin)),
             ],
           },
-
           { type: 'separator' },
-
           {
             type: 'box',
             layout: 'vertical',
@@ -819,9 +848,7 @@ function createFinishReportFlex(order) {
               createPriceRow('平台收入', formatCurrency(platformIncome), '#111111', 'bold'),
             ],
           },
-
           { type: 'separator' },
-
           {
             type: 'box',
             layout: 'vertical',
@@ -839,9 +866,7 @@ function createFinishReportFlex(order) {
               createPriceRow('附加費總額', formatCurrency(extraFee), '#D32F2F', 'bold'),
             ],
           },
-
           { type: 'separator' },
-
           {
             type: 'box',
             layout: 'vertical',
@@ -864,7 +889,6 @@ function createFinishReportFlex(order) {
   };
 }
 
-// 原本函式保留
 function createOrderCreatedFlex(order) {
   return {
     type: 'flex',
@@ -1085,9 +1109,7 @@ function createPaymentInfoFlex(order) {
           createInfoRow('付款方式', getPaymentMethodText(order.paymentMethod)),
           createInfoRow('應付金額', formatCurrency(order.totalFee)),
           createInfoRow('付款識別碼', order.paymentCode, '#D32F2F'),
-          {
-            type: 'separator',
-          },
+          { type: 'separator' },
           {
             type: 'text',
             text: paymentInfo,
@@ -1279,198 +1301,6 @@ function createCancelledFlex(order) {
   };
 }
 
-// ===== Flex 畫面 =====
-function createMainMenuFlex() {
-  return {
-    type: 'flex',
-    altText: 'UBee 主選單',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      hero: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '20px',
-        contents: [
-          {
-            type: 'text',
-            text: 'UBee',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xxl',
-          },
-          {
-            type: 'text',
-            text: '城市任務服務',
-            color: '#F4C542',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'md',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '請選擇您要使用的功能',
-            size: 'sm',
-            color: '#555555',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createMessageButton('下單', '下單', 'primary', '#111111'),
-          createMessageButton('企業', '企業', 'secondary'),
-          createMessageButton('我的', '我的', 'secondary'),
-        ],
-      },
-    },
-  };
-}
-
-function createOrderMenuFlex() {
-  return {
-    type: 'flex',
-    altText: 'UBee｜下單服務',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: 'UBee｜下單服務',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'lg',
-          },
-          {
-            type: 'text',
-            text: '請選擇您要進行的操作',
-            color: '#D9D9D9',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createActionButton('建立任務', 'action=create', 'primary', '#111111'),
-          createActionButton('立即估價', 'action=quote', 'secondary'),
-          createMessageButton('計費說明', '計費說明', 'secondary'),
-          createMessageButton('取消規則', '取消規則', 'secondary'),
-          createMessageButton('查詢訂單', '查詢訂單', 'secondary'),
-        ],
-      },
-    },
-  };
-}
-
-function createEnterpriseMenuFlex() {
-  return {
-    type: 'flex',
-    altText: 'UBee｜企業服務',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: 'UBee｜企業服務',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'lg',
-          },
-          {
-            type: 'text',
-            text: '企業合作與服務資訊',
-            color: '#D9D9D9',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createUriButton('企業合作申請', BUSINESS_FORM, 'primary', '#111111'),
-          createMessageButton('企業服務說明', '企業服務說明', 'secondary'),
-          createMessageButton('服務區域', '服務區域', 'secondary'),
-          createMessageButton('聯絡我們', '聯絡我們', 'secondary'),
-        ],
-      },
-    },
-  };
-}
-
-function createMyMenuFlex() {
-  return {
-    type: 'flex',
-    altText: 'UBee｜我的',
-    contents: {
-      type: 'bubble',
-      size: 'mega',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: 'UBee｜我的',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'lg',
-          },
-          {
-            type: 'text',
-            text: '查看服務資訊與夥伴申請',
-            color: '#D9D9D9',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createMessageButton('服務說明', '服務說明', 'primary', '#111111'),
-          createMessageButton('常見問題', '常見問題', 'secondary'),
-          createUriButton('加入夥伴', PARTNER_FORM, 'secondary'),
-          createMessageButton('查詢訂單', '查詢訂單', 'secondary'),
-          createMessageButton('聯絡我們', '聯絡我們', 'secondary'),
-        ],
-      },
-    },
-  };
-}
-
 function createConfirmCardFlex(session, mode = 'create') {
   const confirmData = mode === 'quote' ? 'action=confirmQuoteCreate' : 'action=confirmCreate';
   const restartData = mode === 'quote' ? 'action=restartQuote' : 'action=restartCreate';
@@ -1592,6 +1422,7 @@ function createConfirmCardFlex(session, mode = 'create') {
   };
 }
 
+// ===== 群組派單：騎手版本 =====
 function createGroupTaskFlex(orderId) {
   const order = orders[orderId];
 
@@ -1638,7 +1469,7 @@ function createGroupTaskFlex(orderId) {
             contents: [
               {
                 type: 'text',
-                text: `費用：${formatCurrency(order.driverFee)}`,
+                text: `騎手可賺：${formatCurrency(order.driverFee)}`,
                 weight: 'bold',
                 size: 'lg',
                 color: '#111111',
@@ -1646,10 +1477,11 @@ function createGroupTaskFlex(orderId) {
             ],
           },
           createInfoRow('取件地點', order.pickup),
+          createInfoRow('取件電話', order.pickupPhone),
           createInfoRow('送達地點', order.dropoff),
+          createInfoRow('送達電話', order.dropoffPhone),
           createInfoRow('物品內容', order.item),
-          createInfoRow('任務類型', order.isUrgent),
-          createInfoRow('備註', order.note),
+          createInfoRow('備註', order.note || '無'),
           createInfoRow('距離', order.distanceText || formatKm(order.distanceKm)),
           createInfoRow('時間', order.durationText || formatMinutes(order.durationMin)),
         ],
@@ -1659,7 +1491,7 @@ function createGroupTaskFlex(orderId) {
         layout: 'vertical',
         spacing: 'sm',
         contents: [
-          createActionButton('接單', `accept=${orderId}`, 'primary', '#111111'),
+          createActionButton('接受訂單', `accept=${orderId}`, 'primary', '#111111'),
           createActionButton('放棄任務', `reject=${orderId}`, 'secondary'),
         ],
       },
@@ -1896,7 +1728,6 @@ function createWaitingFeeConfirmFlex(orderId, currentTotal) {
 async function dispatchOrder(orderId) {
   const order = getOrder(orderId);
   if (!order) return;
-
   if (order.dispatchedAt) return;
   if (order.paymentStatus !== 'paid') return;
 
@@ -1940,7 +1771,6 @@ async function createOrderFromSession(event, session) {
     totalFee: session.totalFee,
     driverFee: session.driverFee,
 
-    // ===== 付款欄位 =====
     paymentStatus: 'unpaid',
     paymentMethod: '',
     paymentCode: getPaymentCode(orderId),
@@ -1978,7 +1808,7 @@ async function createOrderFromSession(event, session) {
 
 // ===== 路由 =====
 app.get('/', (req, res) => {
-  res.status(200).send('UBee OMS V3.8.6 PRO MAX Running');
+  res.status(200).send('UBee OMS Running');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -2005,10 +1835,21 @@ async function handleEvent(event) {
     const text = (event.message.text || '').trim();
     const userId = event.source.userId;
 
-    if (text === '主選單') return safeReply(event.replyToken, createMainMenuFlex());
-    if (text === '下單') return safeReply(event.replyToken, createOrderMenuFlex());
-    if (text === '企業') return safeReply(event.replyToken, createEnterpriseMenuFlex());
-    if (text === '我的') return safeReply(event.replyToken, createMyMenuFlex());
+    if (text === '主選單' || text === 'menu' || text === '開始') {
+      return safeReply(event.replyToken, createMainMenuQuickReply());
+    }
+
+    if (text === '下單') {
+      return safeReply(event.replyToken, createOrderMenuQuickReply());
+    }
+
+    if (text === '企業') {
+      return safeReply(event.replyToken, createEnterpriseMenuQuickReply());
+    }
+
+    if (text === '我的') {
+      return safeReply(event.replyToken, createMyMenuQuickReply());
+    }
 
     if (text === '企業服務說明') {
       return safeReply(
@@ -2139,13 +1980,15 @@ async function handleEvent(event) {
     if (session && session.type === 'payment_verify' && session.step === 'code') {
       return handlePaymentVerifyInput(event, session, text);
     }
+
+    return safeReply(event.replyToken, createMainMenuQuickReply());
   } catch (err) {
     console.error('handleEvent error:', err);
     return safeReply(event.replyToken, textMessage('⚠️ 系統發生錯誤，請稍後再試。'));
   }
 }
 
-// ===== 建立任務 / 立即估價 共用引導 =====
+// ===== 建立任務 / 立即估價 =====
 async function handleOrderInput(event, session, text) {
   const userId = event.source.userId;
 
@@ -2158,10 +2001,7 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'pickupPhone') {
     const phone = normalizePhone(text);
     if (!isValidTaiwanPhone(phone)) {
-      return safeReply(
-        event.replyToken,
-        textMessage('⚠️ 取件電話格式不正確，請重新輸入正確電話：')
-      );
+      return safeReply(event.replyToken, textMessage('⚠️ 取件電話格式不正確，請重新輸入正確電話：'));
     }
 
     session.pickupPhone = phone;
@@ -2178,10 +2018,7 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'dropoffPhone') {
     const phone = normalizePhone(text);
     if (!isValidTaiwanPhone(phone)) {
-      return safeReply(
-        event.replyToken,
-        textMessage('⚠️ 送達電話格式不正確，請重新輸入正確電話：')
-      );
+      return safeReply(event.replyToken, textMessage('⚠️ 送達電話格式不正確，請重新輸入正確電話：'));
     }
 
     session.dropoffPhone = phone;
@@ -2293,10 +2130,7 @@ async function handlePaymentVerifyInput(event, session, text) {
 
   if (order.paymentStatus === 'locked') {
     clearSession(userId);
-    return safeReply(
-      event.replyToken,
-      textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者處理。')
-    );
+    return safeReply(event.replyToken, textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者處理。'));
   }
 
   const inputCode = String(text || '').trim();
@@ -2405,10 +2239,7 @@ async function handlePostback(event) {
     }
 
     if (order.paymentStatus === 'locked') {
-      return safeReply(
-        event.replyToken,
-        textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者協助。')
-      );
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者協助。'));
     }
 
     return safeReply(event.replyToken, createPaymentMethodFlex(order));
@@ -2451,10 +2282,7 @@ async function handlePostback(event) {
     }
 
     if (order.paymentStatus === 'locked') {
-      return safeReply(
-        event.replyToken,
-        textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者協助。')
-      );
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單付款驗證已鎖定，請聯繫管理者協助。'));
     }
 
     order.paymentStatus = 'pending_verify';
@@ -2467,9 +2295,7 @@ async function handlePostback(event) {
 
     return safeReply(
       event.replyToken,
-      textMessage(
-        `請輸入付款識別碼（訂單後 ${PAYMENT_CODE_LENGTH} 碼）：${order.paymentCode}`
-      )
+      textMessage(`請輸入付款識別碼（訂單後 ${PAYMENT_CODE_LENGTH} 碼）：${order.paymentCode}`)
     );
   }
 
@@ -2710,10 +2536,7 @@ async function handlePostback(event) {
       order.abandonedBy.push(userId);
     }
 
-    await safePush(
-      order.userId,
-      textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。')
-    );
+    await safePush(order.userId, textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。'));
 
     await safePush(
       LINE_GROUP_ID,
@@ -2790,10 +2613,7 @@ async function handlePostback(event) {
       textMessage(`✅ 等候費 $60 已成功加收\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
     );
 
-    return safePush(
-      order.userId,
-      createPriceSummaryFlex(order, '等候費已成功加收', '以下為最新訂單費用明細')
-    );
+    return safePush(order.userId, createPriceSummaryFlex(order, '等候費已成功加收', '以下為最新訂單費用明細'));
   }
 
   if (data.startsWith('waitingFeeReject=')) {
@@ -2892,5 +2712,5 @@ async function handlePostback(event) {
 }
 
 app.listen(PORT, () => {
-  console.log(`✅ UBee OMS V3.8.6 PRO MAX running on ${PORT}`);
+  console.log(`✅ UBee OMS running on ${PORT}`);
 });
