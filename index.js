@@ -1765,7 +1765,7 @@ function createCallFlex(phone) {
   return createSimpleFlex(
     '聯絡收件人',
     `請點擊下方按鈕撥打電話\n\n電話：${phone}`,
-    [createUriButton('📞 撥打', `tel:${phone}`, 'primary', '#111111')],
+    [createUriButton('📞 撥打', `tel:${normalizePhone(phone)}`, 'primary', '#111111')],
     '#111111'
   );
 }
