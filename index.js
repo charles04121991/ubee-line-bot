@@ -1531,6 +1531,7 @@ function createConfirmCardFlex(session, mode = 'create') {
 // ===== 群組派單：騎手版本 =====
 function createGroupTaskFlex(orderId) {
   const order = orders[orderId];
+  if (!order) return null;
 
   return {
     type: 'flex',
@@ -1803,18 +1804,11 @@ function createWaitingFeeConfirmFlex(orderId, currentTotal) {
           },
           {
             type: 'text',
-            text: `目前訂單金額：${formatCurrency(currentTotal)}`,
-            weight: 'bold',
-            size: 'md',
-            margin: 'md',
-          },
-          {
-            type: 'text',
             text: `確認加收後金額：${formatCurrency(currentTotal + PRICING.waitingFee)}`,
             weight: 'bold',
             size: 'lg',
             color: '#D32F2F',
-            margin: 'sm',
+            margin: 'md',
           },
         ],
       },
@@ -2718,10 +2712,9 @@ async function handlePostback(event) {
     order.waitingFeeRequested = false;
 
     await safePush(
-      LINE_GROUP_ID,
-      textMessage(`✅ 客戶已同意加收等候費 $60\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
-    );
-
+  LINE_GROUP_ID,
+  textMessage(`✅ 客戶已同意加收等候費 $60`)
+);
     await safeReply(
       event.replyToken,
       textMessage(`✅ 等候費 $60 已成功加收\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
