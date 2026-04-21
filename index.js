@@ -1744,13 +1744,23 @@ function createDropoffArrivedFlex(orderId) {
     '送達地點操作',
     `請先聯絡收件人，再完成任務\n\n送達電話：${order.dropoffPhone}`,
     [
-      createActionButton('撥打收件人', `call=${orderId}=${order.dropoffPhone}`, 'secondary'),
+      {
+  type: 'button',
+  style: 'secondary',
+  action: {
+    type: 'uri',
+    label: '📞 撥打收件人',
+    uri: `tel:${normalizePhone(order.dropoffPhone)}`
+  }
+},
       createActionButton('已完成', `complete=${orderId}`, 'primary', '#111111'),
     ],
     '#111111'
   );
 }
-
+function normalizePhone(phone) {
+  return String(phone || '').replace(/[^\d+]/g, '');
+}
 function createCallFlex(phone) {
   return createSimpleFlex(
     '聯絡收件人',
