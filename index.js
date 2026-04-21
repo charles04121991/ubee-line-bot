@@ -1945,15 +1945,15 @@ async function handleEvent(event) {
       return safeReply(event.replyToken, createMainMenuQuickReply());
     }
 
-    if (text === '下單') {
+    if (text === '立即下單') {
       return safeReply(event.replyToken, createOrderMenuQuickReply());
     }
 
-    if (text === '企業') {
+    if (text === '商務合作') {
       return safeReply(event.replyToken, createEnterpriseMenuQuickReply());
     }
 
-    if (text === '我的') {
+    if (text === '我的任務') {
       return safeReply(event.replyToken, createMyMenuQuickReply());
     }
 
