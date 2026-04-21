@@ -1576,7 +1576,7 @@ function createGroupTaskFlex(orderId) {
             contents: [
               {
                 type: 'text',
-                text: `騎手可賺：${formatCurrency(order.driverFee)}`,
+                text: `收入：${formatCurrency(order.driverFee)}`,
                 weight: 'bold',
                 size: 'lg',
                 color: '#111111',
