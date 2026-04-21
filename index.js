@@ -182,6 +182,8 @@ function getStatusText(status) {
 function getPaymentStatusText(paymentStatus) {
   switch (paymentStatus) {
     case 'unpaid':
+      return '待結單';
+    case 'pending_payment':
       return '待付款';
     case 'pending_verify':
       return '待驗證';
@@ -768,6 +770,111 @@ function createCompletedFlex(order) {
   };
 }
 
+function createFinalPaymentFlex(order) {
+  return {
+    type: 'flex',
+    altText: '任務已完成，請確認付款',
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '✅ 任務已完成',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '請確認本次最終金額並完成付款',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+            wrap: true,
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'lg',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('訂單編號', order.orderId),
+          createInfoRow('取件地點', order.pickup),
+          createInfoRow('送達地點', order.dropoff),
+          createInfoRow('物品內容', order.item),
+          { type: 'separator' },
+          {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              createPriceRow('配送費', formatCurrency(order.deliveryFee), '#111111', 'bold'),
+              createPriceRow('服務費', formatCurrency(order.serviceFee)),
+              createPriceRow(
+                '急件費',
+                formatCurrency(order.urgentFee),
+                order.urgentFee > 0 ? '#D32F2F' : '#111111'
+              ),
+              createPriceRow(
+                '等候費',
+                formatCurrency(order.waitingFee),
+                order.waitingFee > 0 ? '#D32F2F' : '#111111'
+              ),
+            ],
+          },
+          { type: 'separator' },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: '最終應付',
+                weight: 'bold',
+                size: 'lg',
+                color: '#111111',
+              },
+              {
+                type: 'text',
+                text: formatCurrency(order.totalFee),
+                weight: 'bold',
+                size: 'xl',
+                color: '#111111',
+                align: 'end',
+              },
+            ],
+          },
+          {
+            type: 'text',
+            text: `付款識別碼：${order.paymentCode}`,
+            wrap: true,
+            size: 'sm',
+            color: '#D32F2F',
+            weight: 'bold',
+            margin: 'md',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('選擇付款方式', `paymentMethodMenu=${order.orderId}`, 'primary', '#111111'),
+        ],
+      },
+    },
+  };
+}
+
 function createFinishReportFlex(order) {
   const extraFee = (order.urgentFee || 0) + (order.waitingFee || 0);
   const platformIncome = (order.totalFee || 0) - (order.driverFee || 0);
@@ -911,7 +1018,7 @@ function createOrderCreatedFlex(order) {
           },
           {
             type: 'text',
-            text: '系統正在安排騎手',
+            text: '系統已開始安排騎手',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -928,10 +1035,10 @@ function createOrderCreatedFlex(order) {
           createInfoRow('取件地點', order.pickup),
           createInfoRow('送達地點', order.dropoff),
           createInfoRow('物品內容', order.item),
-          createInfoRow('總計', formatCurrency(order.totalFee)),
+          createInfoRow('預估金額', formatCurrency(order.totalFee)),
           {
             type: 'text',
-            text: '提醒：若任務進入派送階段後取消，系統將依訂單狀態酌收取消費。',
+            text: '提醒：最終付款金額將於任務完成後，依實際任務狀況確認（含等候費）。',
             wrap: true,
             size: 'xs',
             color: '#D32F2F',
@@ -1036,7 +1143,7 @@ function createPaymentMethodFlex(order) {
           },
           {
             type: 'text',
-            text: '請選擇本次付款方式',
+            text: '請選擇本次最終付款方式',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -1061,7 +1168,6 @@ function createPaymentMethodFlex(order) {
         contents: [
           createActionButton('街口支付', `paymentMethod=${order.orderId}=jko`, 'primary', '#111111'),
           createActionButton('銀行轉帳', `paymentMethod=${order.orderId}=bank`, 'secondary'),
-          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
         ],
       },
     },
@@ -1092,10 +1198,11 @@ function createPaymentInfoFlex(order) {
           },
           {
             type: 'text',
-            text: '付款完成後請按下方按鈕',
+            text: '任務已完成，請依下方資訊完成付款',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
+            wrap: true,
           },
         ],
       },
@@ -1126,7 +1233,6 @@ function createPaymentInfoFlex(order) {
         contents: [
           createActionButton('我已付款', `paymentPaid=${order.orderId}`, 'primary', '#111111'),
           createActionButton('重新選擇付款方式', `paymentMethodMenu=${order.orderId}`, 'secondary'),
-          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
         ],
       },
     },
@@ -1155,7 +1261,7 @@ function createPaymentVerifiedFlex(order) {
           },
           {
             type: 'text',
-            text: '系統已自動派單，正在安排騎手',
+            text: '感謝您完成本次付款',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -1171,7 +1277,7 @@ function createPaymentVerifiedFlex(order) {
           createInfoRow('訂單編號', order.orderId),
           createInfoRow('付款方式', getPaymentMethodText(order.paymentMethod)),
           createInfoRow('付款狀態', getPaymentStatusText(order.paymentStatus)),
-          createInfoRow('總計', formatCurrency(order.totalFee)),
+          createInfoRow('付款金額', formatCurrency(order.totalFee)),
         ],
       },
     },
@@ -1729,7 +1835,7 @@ async function dispatchOrder(orderId) {
   const order = getOrder(orderId);
   if (!order) return;
   if (order.dispatchedAt) return;
-  if (order.paymentStatus !== 'paid') return;
+  if (order.status !== 'pending') return;
 
   order.dispatchedAt = new Date().toISOString();
 
@@ -1777,6 +1883,7 @@ async function createOrderFromSession(event, session) {
     paymentAttempts: 0,
     paidAt: null,
     dispatchedAt: null,
+    finalFeeConfirmedAt: null,
 
     cancelFee: 0,
     cancelledAt: null,
@@ -1800,10 +1907,9 @@ async function createOrderFromSession(event, session) {
 
   clearSession(session.userId);
 
-  return safeReply(event.replyToken, [
-    createOrderPendingPaymentFlex(orders[orderId]),
-    createPaymentMethodFlex(orders[orderId]),
-  ]);
+  await dispatchOrder(orderId);
+
+  return safeReply(event.replyToken, createOrderCreatedFlex(orders[orderId]));
 }
 
 // ===== 路由 =====
@@ -2147,10 +2253,9 @@ async function handlePaymentVerifyInput(event, session, text) {
     order.paymentStatus = 'paid';
     order.paidAt = new Date().toISOString();
 
-    await dispatchOrder(order.orderId);
     await safePush(order.userId, createPaymentVerifiedFlex(order));
 
-    return safeReply(event.replyToken, textMessage('✅ 付款驗證成功，系統已自動派單。'));
+    return safeReply(event.replyToken, textMessage('✅ 付款驗證成功，感謝您完成付款。'));
   }
 
   order.paymentAttempts += 1;
@@ -2234,6 +2339,10 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
     }
 
+    if (order.status !== 'completed') {
+      return safeReply(event.replyToken, textMessage('⚠️ 任務尚未完成，完成後系統才會開放付款。'));
+    }
+
     if (order.paymentStatus === 'paid') {
       return safeReply(event.replyToken, createPaymentVerifiedFlex(order));
     }
@@ -2254,12 +2363,17 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
     }
 
+    if (order.status !== 'completed') {
+      return safeReply(event.replyToken, textMessage('⚠️ 任務尚未完成，完成後系統才會開放付款。'));
+    }
+
     if (order.paymentStatus === 'paid') {
       return safeReply(event.replyToken, createPaymentVerifiedFlex(order));
     }
 
     order.paymentMethod = method;
-    order.paymentStatus = 'unpaid';
+    order.paymentStatus = 'pending_payment';
+    order.finalFeeConfirmedAt = new Date().toISOString();
 
     return safeReply(event.replyToken, createPaymentInfoFlex(order));
   }
@@ -2271,6 +2385,10 @@ async function handlePostback(event) {
 
     if (order.userId !== userId) {
       return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
+    }
+
+    if (order.status !== 'completed') {
+      return safeReply(event.replyToken, textMessage('⚠️ 任務尚未完成，暫時無法付款。'));
     }
 
     if (!order.paymentMethod) {
@@ -2329,8 +2447,8 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, createCancelledFlex(order));
     }
 
-    if (order.paymentStatus !== 'paid') {
-      return safeReply(event.replyToken, createOrderPendingPaymentFlex(order));
+    if (order.status === 'completed' && order.paymentStatus !== 'paid') {
+      return safeReply(event.replyToken, createFinalPaymentFlex(order));
     }
 
     return safeReply(event.replyToken, createOrderCreatedFlex(order));
@@ -2396,10 +2514,6 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-
-    if (order.paymentStatus !== 'paid') {
-      return safeReply(event.replyToken, textMessage('⚠️ 此訂單尚未完成付款驗證，暫時無法接單。'));
-    }
 
     if (!requireStatus(event.replyToken, order, ['pending'], '接單')) return;
 
@@ -2700,8 +2814,12 @@ async function handlePostback(event) {
 
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
+    order.paymentStatus = 'unpaid';
 
-    await safePush(order.userId, createCompletedFlex(order));
+    await safePush(order.userId, [
+      createCompletedFlex(order),
+      createFinalPaymentFlex(order),
+    ]);
 
     if (LINE_FINISH_GROUP_ID) {
       await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
