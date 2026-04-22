@@ -1,7 +1,7 @@
 {
-  "name": "ubee-oms-lite-auto-dispatch",
+  "name": "ubee-oms-menu-lite",
   "version": "1.0.0",
-  "description": "UBee OMS 精簡自動派單版",
+  "description": "UBee OMS 主選單精簡版",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
