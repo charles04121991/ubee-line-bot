@@ -443,14 +443,14 @@ function createEmptySession(userId, type) {
 // ===== Quick Reply 選單 =====
 function createMainMenuQuickReply() {
   return createQuickReplyMessage('請選擇功能 👇', [
-    qrMessage('立即下單', '立即下單'),
-    qrMessage('商務合作', '商務合作'),
-    qrMessage('我的任務', '我的任務'),
+    qrMessage('下單', '下單'),
+    qrMessage('企業', '企業'),
+    qrMessage('我的', '我的'),
   ]);
 }
 
 function createOrderMenuQuickReply() {
-  return createQuickReplyMessage('請選擇服務內容', [
+  return createQuickReplyMessage('下單功能 👇', [
     qrPostback('建立任務', 'action=create', '建立任務'),
     qrPostback('立即估價', 'action=quote', '立即估價'),
     qrMessage('計費說明', '計費說明'),
@@ -460,7 +460,7 @@ function createOrderMenuQuickReply() {
 }
 
 function createEnterpriseMenuQuickReply() {
-  return createQuickReplyMessage('請選擇您要的服務', [
+  return createQuickReplyMessage('企業功能 👇', [
     qrUri('企業合作申請', BUSINESS_FORM),
     qrMessage('企業服務說明', '企業服務說明'),
     qrMessage('服務區域', '服務區域'),
@@ -469,7 +469,7 @@ function createEnterpriseMenuQuickReply() {
 }
 
 function createMyMenuQuickReply() {
-  return createQuickReplyMessage('請選擇您需要的服務', [
+  return createQuickReplyMessage('我的功能 👇', [
     qrMessage('服務說明', '服務說明'),
     qrMessage('常見問題', '常見問題'),
     qrUri('加入夥伴', PARTNER_FORM),
