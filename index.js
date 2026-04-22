@@ -2775,6 +2775,9 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
     if (!requireDriver(event.replyToken, order, userId)) return;
+    if (order.status === 'arrived_pickup') {
+  return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達取件地點」狀態。'));
+}
     if (!requireStatus(event.replyToken, order, ['accepted'], '已抵達')) return;
 
     order.status = 'arrived_pickup';
@@ -2823,6 +2826,9 @@ if (data.startsWith('dropoffArrivedMenu=')) {
   const order = requireOrder(event.replyToken, orderId);
   if (!order) return;
   if (!requireDriver(event.replyToken, order, userId)) return;
+    if (order.status === 'arrived_dropoff') {
+  return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達送達地點」狀態。'));
+}
   if (!requireStatus(event.replyToken, order, ['picked_up'], '已抵達送達地點')) return;
 
   order.status = 'arrived_dropoff';
@@ -2847,7 +2853,11 @@ if (data.startsWith('dropoffArrivedMenu=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
+    
     if (!requireDriver(event.replyToken, order, userId)) return;
+    if (order.status === 'completed') {
+  return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經完成，請勿重複操作。'));
+}
     if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '已完成')) return;
 
     order.status = 'completed';
