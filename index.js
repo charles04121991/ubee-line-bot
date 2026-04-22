@@ -1862,6 +1862,83 @@ async function dispatchOrder(orderId) {
   await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
 }
 
+function createGroupStatusFlex(orderId) {
+  const order = orders[orderId];
+  if (!order) return null;
+
+  const statusMap = {
+    pending: '🟡 等待接單',
+    accepted: '🟢 已接單',
+    arrived_pickup: '📍 已抵達取件',
+    picked_up: '📦 已取件',
+    arrived_dropoff: '🚚 已送達',
+    completed: '✅ 已完成',
+    cancelled: '❌ 已取消'
+  };
+
+  const statusText = statusMap[order.status] || order.status;
+
+  return {
+    type: 'flex',
+    altText: 'UBee 任務狀態更新',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '📡 任務狀態更新',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl'
+          },
+          {
+            type: 'text',
+            text: `訂單編號：${order.orderId}`,
+            color: '#DDDDDD',
+            size: 'sm',
+            margin: 'sm'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '18px',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: statusText,
+            size: 'xl',
+            weight: 'bold',
+            color: '#111111'
+          },
+          {
+            type: 'separator'
+          },
+          {
+            type: 'text',
+            text: `取件：${order.pickup}`,
+            size: 'sm',
+            wrap: true
+          },
+          {
+            type: 'text',
+            text: `送達：${order.dropoff}`,
+            size: 'sm',
+            wrap: true
+          }
+        ]
+      }
+    }
+  };
+}
 // ===== 建立正式訂單 =====
 async function createOrderFromSession(event, session) {
   const orderId = createOrderId();
@@ -2799,7 +2876,7 @@ async function handlePostback(event) {
     order.pickedUpAt = new Date().toISOString();
 
     await safePush(order.userId, textMessage('✅ 騎手已完成取件，正在前往送達地點。'));
-
+await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
     return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
   }
 if (data.startsWith('dropoffMenu=')) {
@@ -2835,6 +2912,7 @@ if (data.startsWith('dropoffArrivedMenu=')) {
   order.arrivedDropoffAt = new Date().toISOString();
 
   await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
+    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
   await safePush(userId, createDropoffArrivedFlex(orderId));
 
   return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
@@ -2868,7 +2946,7 @@ if (data.startsWith('dropoffArrivedMenu=')) {
       createCompletedFlex(order),
       createFinalPaymentFlex(order),
     ]);
-
+await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
     if (LINE_FINISH_GROUP_ID) {
       await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
     }
