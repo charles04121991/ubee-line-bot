@@ -22,9 +22,11 @@ const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-// ===== 連結設定（請自行替換）=====
+// ===== 連結設定 =====
 const BUSINESS_FORM_URL =
-  process.env.BUSINESS_FORM_URL || 'https://forms.gle/your-business-form';
+  process.env.BUSINESS_FORM_URL ||
+  'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform';
+
 const PARTNER_FORM_URL =
   process.env.PARTNER_FORM_URL || 'https://forms.gle/your-partner-form';
 
@@ -48,9 +50,9 @@ const PRICING = {
   driverRatio: 0.6,
 };
 
-// ===== 暫存資料（Render 重啟會清空）=====
-const userSessions = {};
-const orders = {};
+// ===== 暫存資料（重啟會清空）=====
+const userSessions = {}; // userId -> { mode, step, draft }
+const orders = {}; // orderId -> order
 let orderCounter = 1;
 
 // ===== 工具函式 =====
@@ -64,8 +66,7 @@ function generateOrderId() {
 }
 
 function formatCurrency(value) {
-  const num = Number(value || 0);
-  return `NT$${Math.round(num)}`;
+  return `NT$${Math.round(Number(value || 0))}`;
 }
 
 function normalizePhone(phone) {
@@ -300,7 +301,7 @@ function createMainMenuFlex() {
     [
       createActionButton('立即下單', 'menu=order'),
       createActionButton('商務合作', 'menu=business', 'secondary'),
-      createActionButton('我的資訊', 'menu=info', 'secondary'),
+      createActionButton('我的任務', 'menu=info', 'secondary'),
     ]
   );
 
@@ -351,11 +352,11 @@ function createBusinessMenuFlex() {
 
 function createInfoMenuFlex() {
   const bubble = createBubble(
-    '我的資訊',
+    '我的任務',
     [
       {
         type: 'text',
-        text: '請選擇要查看的資訊',
+        text: '請選擇你要查看的內容',
         size: 'sm',
         color: '#666666',
         wrap: true,
@@ -364,11 +365,11 @@ function createInfoMenuFlex() {
     [
       createActionButton('取消規則', 'submenu=cancelRules'),
       createActionButton('常見問題', 'submenu=faq', 'secondary'),
-      createUriButton('加入合作伙伴', PARTNER_FORM_URL, 'secondary'),
+      createUriButton('加入合作夥伴', PARTNER_FORM_URL, 'secondary'),
     ]
   );
 
-  return createFlexMessage('我的資訊', bubble);
+  return createFlexMessage('我的任務', bubble);
 }
 
 // ===== 說明文字 =====
@@ -401,7 +402,7 @@ function getFaqText() {
     createTextMessage(
       '常見問題：\n\n' +
         'Q：多久會有人接單？\n' +
-        'A：通常10～15分鐘內會有騎手接單。\n\n' +
+        'A：通常幾分鐘內會有騎手接單。\n\n' +
         'Q：可以送什麼？\n' +
         'A：文件、樣品、商務物品。\n\n' +
         'Q：可以送餐嗎？\n' +
@@ -501,7 +502,7 @@ function createRiderControlFlex(order) {
         '導航到送達地點',
         buildGoogleMapDirectionsUrl(order.dropoffAddress)
       ),
-      createActionButton('已送達', `completed=${order.id}`)
+      createActionButton('已送達', `completed=${order.id}`),
     ]
   );
 
@@ -529,7 +530,7 @@ function createFinanceFlex(order) {
   return createFlexMessage('UBee 財務明細', bubble);
 }
 
-// ===== 建立任務 / 估價流程 =====
+// ===== 流程啟動 =====
 async function startCreateOrder(replyToken, userId) {
   const session = getOrCreateSession(userId);
   session.mode = 'createOrder';
@@ -554,7 +555,10 @@ async function startQuoteOnly(replyToken, userId) {
 
 async function finishQuoteOnly(event, userId, draft) {
   try {
-    const distance = await getDistanceMatrix(draft.pickupAddress, draft.dropoffAddress);
+    const distance = await getDistanceMatrix(
+      draft.pickupAddress,
+      draft.dropoffAddress
+    );
     const price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
@@ -578,9 +582,7 @@ async function finishQuoteOnly(event, userId, draft) {
 
     resetUserSession(userId);
 
-    return client.replyMessage(event.replyToken, [
-      createQuoteFlex(order),
-    ]);
+    return client.replyMessage(event.replyToken, [createQuoteFlex(order)]);
   } catch (error) {
     console.error('❌ 立即估價失敗：', error);
     resetUserSession(userId);
@@ -595,7 +597,10 @@ async function finishCreateOrder(event, userId, draft) {
   const isUrgent = !!draft.isUrgent;
 
   try {
-    const distance = await getDistanceMatrix(draft.pickupAddress, draft.dropoffAddress);
+    const distance = await getDistanceMatrix(
+      draft.pickupAddress,
+      draft.dropoffAddress
+    );
     const price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
@@ -639,9 +644,7 @@ async function finishCreateOrder(event, userId, draft) {
     orders[order.id] = order;
     resetUserSession(userId);
 
-    return client.replyMessage(event.replyToken, [
-      createOrderConfirmFlex(order),
-    ]);
+    return client.replyMessage(event.replyToken, [createOrderConfirmFlex(order)]);
   } catch (error) {
     console.error('❌ 建立任務計價失敗：', error);
     resetUserSession(userId);
@@ -651,12 +654,12 @@ async function finishCreateOrder(event, userId, draft) {
   }
 }
 
+// ===== 文字訊息流程 =====
 async function handleTextStep(event, userId, text) {
   const session = getOrCreateSession(userId);
+  const normalized = text.trim();
 
   if (!session.step) {
-    const normalized = text.trim();
-
     if (normalized === '主選單') {
       return client.replyMessage(event.replyToken, [createMainMenuFlex()]);
     }
@@ -669,7 +672,7 @@ async function handleTextStep(event, userId, text) {
       return client.replyMessage(event.replyToken, [createBusinessMenuFlex()]);
     }
 
-    if (normalized === '我的資訊') {
+    if (normalized === '我的任務' || normalized === '我的資訊') {
       return client.replyMessage(event.replyToken, [createInfoMenuFlex()]);
     }
 
@@ -700,7 +703,7 @@ async function handleTextStep(event, userId, text) {
   }
 
   if (session.step === 'pickupAddress') {
-    session.draft.pickupAddress = text.trim();
+    session.draft.pickupAddress = normalized;
 
     if (session.mode === 'quoteOnly') {
       session.step = 'dropoffAddress';
@@ -716,7 +719,7 @@ async function handleTextStep(event, userId, text) {
   }
 
   if (session.step === 'pickupPhone') {
-    session.draft.pickupPhone = normalizePhone(text.trim());
+    session.draft.pickupPhone = normalizePhone(normalized);
     session.step = 'dropoffAddress';
     return client.replyMessage(event.replyToken, [
       createTextMessage('請輸入送達完整地址'),
@@ -724,7 +727,7 @@ async function handleTextStep(event, userId, text) {
   }
 
   if (session.step === 'dropoffAddress') {
-    session.draft.dropoffAddress = text.trim();
+    session.draft.dropoffAddress = normalized;
 
     if (session.mode === 'quoteOnly') {
       session.step = 'urgent';
@@ -743,7 +746,7 @@ async function handleTextStep(event, userId, text) {
   }
 
   if (session.step === 'dropoffPhone') {
-    session.draft.dropoffPhone = normalizePhone(text.trim());
+    session.draft.dropoffPhone = normalizePhone(normalized);
     session.step = 'urgent';
     return client.replyMessage(event.replyToken, [
       createQuickReplyMessage('請選擇是否急件', [
@@ -754,7 +757,7 @@ async function handleTextStep(event, userId, text) {
   }
 
   if (session.step === 'note') {
-    session.draft.note = text.trim() === '無' ? '' : text.trim();
+    session.draft.note = normalized === '無' ? '' : normalized;
     session.step = null;
     return finishCreateOrder(event, userId, session.draft);
   }
