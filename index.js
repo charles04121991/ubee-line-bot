@@ -1737,30 +1737,46 @@ function createDropoffActionFlex(orderId) {
     '#111111'
   );
 }
+function createDropoffProgressFlex(orderId) {
+  const order = orders[orderId];
+  if (!order) return null;
 
+  return createSimpleFlex(
+    '送達中操作',
+    `請前往送達地點\n\n送達：${order.dropoff}`,
+    [
+      createUriButton(
+        '導航送達地點',
+        buildGoogleMapDirectionsUrl(order.pickup, order.dropoff),
+        'primary',
+        '#111111'
+      ),
+      createActionButton('已抵達送達地點', `arriveDropoff=${orderId}`, 'secondary'),
+      createActionButton('重新顯示本頁', `dropoffMenu=${orderId}`, 'secondary'),
+    ],
+    '#111111'
+  );
+}
 function createDropoffArrivedFlex(orderId) {
   const order = orders[orderId];
+  if (!order) return null;
+
   return createSimpleFlex(
     '送達地點操作',
-    `請先聯絡收件人，再完成任務\n\n送達電話：${order.dropoffPhone}`,
+    `騎手已抵達送達地點\n\n送達地址：${order.dropoff}\n送達電話：${order.dropoffPhone}`,
     [
-      {
-  type: 'button',
-  style: 'secondary',
-  action: {
-    type: 'uri',
-    label: '📞 撥打收件人',
-    uri: `tel:${normalizePhone(order.dropoffPhone)}`
-  }
-},
+      createUriButton(
+        '📞 撥打收件人',
+        `tel:${normalizePhone(order.dropoffPhone)}`,
+        'secondary'
+      ),
+      createActionButton('重新顯示本頁', `dropoffArrivedMenu=${orderId}`, 'secondary'),
       createActionButton('已完成', `complete=${orderId}`, 'primary', '#111111'),
     ],
     '#111111'
   );
 }
-function normalizePhone(phone) {
-  return String(phone || '').replace(/[^\d+]/g, '');
-}
+
 function createCallFlex(phone) {
   return createSimpleFlex(
     '聯絡收件人',
@@ -2781,23 +2797,42 @@ async function handlePostback(event) {
 
     await safePush(order.userId, textMessage('✅ 騎手已完成取件，正在前往送達地點。'));
 
-    return safeReply(event.replyToken, createDropoffActionFlex(orderId));
+    return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
   }
+if (data.startsWith('dropoffMenu=')) {
+  const orderId = data.split('=')[1];
+  const order = requireOrder(event.replyToken, orderId);
+  if (!order) return;
+  if (!requireDriver(event.replyToken, order, userId)) return;
+  if (!requireStatus(event.replyToken, order, ['picked_up'], '查看送達操作')) return;
 
+  return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
+}
+
+if (data.startsWith('dropoffArrivedMenu=')) {
+  const orderId = data.split('=')[1];
+  const order = requireOrder(event.replyToken, orderId);
+  if (!order) return;
+  if (!requireDriver(event.replyToken, order, userId)) return;
+  if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '查看送達地點操作')) return;
+
+  return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
+}
   if (data.startsWith('arriveDropoff=')) {
-    const orderId = data.split('=')[1];
-    const order = requireOrder(event.replyToken, orderId);
-    if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['picked_up'], '已抵達送達地點')) return;
+  const orderId = data.split('=')[1];
+  const order = requireOrder(event.replyToken, orderId);
+  if (!order) return;
+  if (!requireDriver(event.replyToken, order, userId)) return;
+  if (!requireStatus(event.replyToken, order, ['picked_up'], '已抵達送達地點')) return;
 
-    order.status = 'arrived_dropoff';
-    order.arrivedDropoffAt = new Date().toISOString();
+  order.status = 'arrived_dropoff';
+  order.arrivedDropoffAt = new Date().toISOString();
 
-    await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
+  await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
+  await safePush(userId, createDropoffArrivedFlex(orderId));
 
-    return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
-  }
+  return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
+}
 
   if (data.startsWith('call=')) {
     const [, orderId, phone] = data.split('=');
