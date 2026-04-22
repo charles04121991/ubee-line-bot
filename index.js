@@ -151,7 +151,7 @@ function qrUri(label, uri) {
 }
 
 function normalizePhone(input) {
-  return String(input || '').replace(/[^\d+]/g, '');
+  return (input || '').trim().replace(/[\s-]/g, '');
 }
 
 function isValidTaiwanPhone(phone) {
@@ -182,8 +182,6 @@ function getStatusText(status) {
 function getPaymentStatusText(paymentStatus) {
   switch (paymentStatus) {
     case 'unpaid':
-      return '待付款';
-    case 'pending_payment':
       return '待付款';
     case 'pending_verify':
       return '待驗證';
@@ -390,6 +388,8 @@ async function calculateFees(session) {
   const urgentFee = session.isUrgent === '急件' ? PRICING.urgentFee : 0;
   const waitingFee = session.needWaitingFee ? PRICING.waitingFee : 0;
   const totalFee = deliveryFee + serviceFee + urgentFee + waitingFee;
+
+  // 騎手收入這邊沿用你目前邏輯
   const driverFee = Math.round(totalFee * 0.6);
 
   return {
@@ -443,14 +443,14 @@ function createEmptySession(userId, type) {
 // ===== Quick Reply 選單 =====
 function createMainMenuQuickReply() {
   return createQuickReplyMessage('請選擇功能 👇', [
-    qrMessage('立即下單', '立即下單'),
-    qrMessage('商務合作', '商務合作'),
-    qrMessage('我的任務', '我的任務'),
+    qrMessage('下單', '下單'),
+    qrMessage('企業', '企業'),
+    qrMessage('我的', '我的'),
   ]);
 }
 
 function createOrderMenuQuickReply() {
-  return createQuickReplyMessage('請選擇服務🚀', [
+  return createQuickReplyMessage('下單功能 👇', [
     qrPostback('建立任務', 'action=create', '建立任務'),
     qrPostback('立即估價', 'action=quote', '立即估價'),
     qrMessage('計費說明', '計費說明'),
@@ -460,7 +460,7 @@ function createOrderMenuQuickReply() {
 }
 
 function createEnterpriseMenuQuickReply() {
-  return createQuickReplyMessage('請選擇您需要的服務項目💼', [
+  return createQuickReplyMessage('企業功能 👇', [
     qrUri('企業合作申請', BUSINESS_FORM),
     qrMessage('企業服務說明', '企業服務說明'),
     qrMessage('服務區域', '服務區域'),
@@ -469,7 +469,7 @@ function createEnterpriseMenuQuickReply() {
 }
 
 function createMyMenuQuickReply() {
-  return createQuickReplyMessage('請選擇要查看的內容📦', [
+  return createQuickReplyMessage('我的功能 👇', [
     qrMessage('服務說明', '服務說明'),
     qrMessage('常見問題', '常見問題'),
     qrUri('加入夥伴', PARTNER_FORM),
@@ -768,111 +768,6 @@ function createCompletedFlex(order) {
   };
 }
 
-function createFinalPaymentFlex(order) {
-  return {
-    type: 'flex',
-    altText: '任務已完成，請確認付款',
-    contents: {
-      type: 'bubble',
-      size: 'giga',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '✅ 任務已完成',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-          {
-            type: 'text',
-            text: '請確認本次最終金額並完成付款',
-            color: '#D9D9D9',
-            size: 'sm',
-            margin: 'sm',
-            wrap: true,
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'lg',
-        paddingAll: '18px',
-        contents: [
-          createInfoRow('訂單編號', order.orderId),
-          createInfoRow('取件地點', order.pickup),
-          createInfoRow('送達地點', order.dropoff),
-          createInfoRow('物品內容', order.item),
-          { type: 'separator' },
-          {
-            type: 'box',
-            layout: 'vertical',
-            spacing: 'sm',
-            contents: [
-              createPriceRow('配送費', formatCurrency(order.deliveryFee), '#111111', 'bold'),
-              createPriceRow('服務費', formatCurrency(order.serviceFee)),
-              createPriceRow(
-                '急件費',
-                formatCurrency(order.urgentFee),
-                order.urgentFee > 0 ? '#D32F2F' : '#111111'
-              ),
-              createPriceRow(
-                '等候費',
-                formatCurrency(order.waitingFee),
-                order.waitingFee > 0 ? '#D32F2F' : '#111111'
-              ),
-            ],
-          },
-          { type: 'separator' },
-          {
-            type: 'box',
-            layout: 'horizontal',
-            contents: [
-              {
-                type: 'text',
-                text: '最終應付',
-                weight: 'bold',
-                size: 'lg',
-                color: '#111111',
-              },
-              {
-                type: 'text',
-                text: formatCurrency(order.totalFee),
-                weight: 'bold',
-                size: 'xl',
-                color: '#111111',
-                align: 'end',
-              },
-            ],
-          },
-          {
-            type: 'text',
-            text: `付款識別碼：${order.paymentCode}`,
-            wrap: true,
-            size: 'sm',
-            color: '#D32F2F',
-            weight: 'bold',
-            margin: 'md',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          createActionButton('選擇付款方式', `paymentMethodMenu=${order.orderId}`, 'primary', '#111111'),
-        ],
-      },
-    },
-  };
-}
-
 function createFinishReportFlex(order) {
   const extraFee = (order.urgentFee || 0) + (order.waitingFee || 0);
   const platformIncome = (order.totalFee || 0) - (order.driverFee || 0);
@@ -1016,7 +911,7 @@ function createOrderCreatedFlex(order) {
           },
           {
             type: 'text',
-            text: '系統已開始安排騎手',
+            text: '系統正在安排騎手',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -1033,10 +928,10 @@ function createOrderCreatedFlex(order) {
           createInfoRow('取件地點', order.pickup),
           createInfoRow('送達地點', order.dropoff),
           createInfoRow('物品內容', order.item),
-          createInfoRow('預估金額', formatCurrency(order.totalFee)),
+          createInfoRow('總計', formatCurrency(order.totalFee)),
           {
             type: 'text',
-            text: '提醒：最終付款金額將於任務完成後，依實際任務狀況確認（含等候費）。',
+            text: '提醒：若任務進入派送階段後取消，系統將依訂單狀態酌收取消費。',
             wrap: true,
             size: 'xs',
             color: '#D32F2F',
@@ -1141,7 +1036,7 @@ function createPaymentMethodFlex(order) {
           },
           {
             type: 'text',
-            text: '請選擇本次最終付款方式',
+            text: '請選擇本次付款方式',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -1166,6 +1061,7 @@ function createPaymentMethodFlex(order) {
         contents: [
           createActionButton('街口支付', `paymentMethod=${order.orderId}=jko`, 'primary', '#111111'),
           createActionButton('銀行轉帳', `paymentMethod=${order.orderId}=bank`, 'secondary'),
+          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
         ],
       },
     },
@@ -1196,11 +1092,10 @@ function createPaymentInfoFlex(order) {
           },
           {
             type: 'text',
-            text: '任務已完成，請依下方資訊完成付款',
+            text: '付款完成後請按下方按鈕',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
-            wrap: true,
           },
         ],
       },
@@ -1231,6 +1126,7 @@ function createPaymentInfoFlex(order) {
         contents: [
           createActionButton('我已付款', `paymentPaid=${order.orderId}`, 'primary', '#111111'),
           createActionButton('重新選擇付款方式', `paymentMethodMenu=${order.orderId}`, 'secondary'),
+          createActionButton('取消任務', `cancelRequest=${order.orderId}`, 'secondary'),
         ],
       },
     },
@@ -1259,7 +1155,7 @@ function createPaymentVerifiedFlex(order) {
           },
           {
             type: 'text',
-            text: '感謝您完成本次付款',
+            text: '系統已自動派單，正在安排騎手',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -1275,7 +1171,7 @@ function createPaymentVerifiedFlex(order) {
           createInfoRow('訂單編號', order.orderId),
           createInfoRow('付款方式', getPaymentMethodText(order.paymentMethod)),
           createInfoRow('付款狀態', getPaymentStatusText(order.paymentStatus)),
-          createInfoRow('付款金額', formatCurrency(order.totalFee)),
+          createInfoRow('總計', formatCurrency(order.totalFee)),
         ],
       },
     },
@@ -1529,7 +1425,6 @@ function createConfirmCardFlex(session, mode = 'create') {
 // ===== 群組派單：騎手版本 =====
 function createGroupTaskFlex(orderId) {
   const order = orders[orderId];
-  if (!order) return null;
 
   return {
     type: 'flex',
@@ -1574,7 +1469,7 @@ function createGroupTaskFlex(orderId) {
             contents: [
               {
                 type: 'text',
-                text: `收入：${formatCurrency(order.driverFee)}`,
+                text: `騎手可賺：${formatCurrency(order.driverFee)}`,
                 weight: 'bold',
                 size: 'lg',
                 color: '#111111',
@@ -1604,100 +1499,43 @@ function createGroupTaskFlex(orderId) {
   };
 }
 
-function createETAFlex(orderId) {
-  const etaRows = [
-    [3, 5],
-    [7, 8],
-    [9, 10],
-    [12, 13],
-    [15, 17],
-    [18, 20],
-    [22, 23],
-    [25, 30],
-  ];
-
-  const buttonRows = etaRows.map((row) => ({
-    type: 'box',
-    layout: 'horizontal',
-    spacing: 'sm',
-    contents: row.map((min) => ({
-      type: 'button',
-      style: 'secondary',
-      height: 'sm',
-      flex: 1,
-      action: {
-        type: 'postback',
-        label: `${min} 分鐘`,
-        data: `eta=${orderId}=${min}`,
-        displayText: `${min} 分鐘`,
-      },
-    })),
-  }));
-
-  buttonRows.push({
-    type: 'button',
-    style: 'primary',
-    height: 'sm',
-    color: '#111111',
-    action: {
-      type: 'postback',
-      label: '取消接單',
-      data: `acceptCancel=${orderId}`,
-      displayText: '取消接單',
-    },
-  });
-
-  return {
-    type: 'flex',
-    altText: '修改 ETA',
-    contents: {
-      type: 'bubble',
-      size: 'giga',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: '#111111',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '修改 ETA',
-            color: '#FFFFFF',
-            weight: 'bold',
-            size: 'xl',
-          },
-          {
-            type: 'text',
-            text: '請選擇最新預計抵達取件地點時間',
-            color: '#D9D9D9',
-            size: 'sm',
-            margin: 'sm',
-          },
-        ],
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'md',
-        paddingAll: '18px',
-        contents: [
-          {
-            type: 'text',
-            text: '請直接點選下方分鐘數',
-            wrap: true,
-            size: 'sm',
-            color: '#333333',
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: buttonRows,
-      },
-    },
+function createETAFlex(orderId, page) {
+  const pageMap = {
+    1: [
+      createActionButton('5 分鐘', `eta=${orderId}=5`, 'secondary'),
+      createActionButton('7 分鐘', `eta=${orderId}=7`, 'secondary'),
+      createActionButton('8 分鐘', `eta=${orderId}=8`, 'secondary'),
+      createActionButton('下一頁', `etaPage2=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
+    ],
+    2: [
+      createActionButton('10 分鐘', `eta=${orderId}=10`, 'secondary'),
+      createActionButton('12 分鐘', `eta=${orderId}=12`, 'secondary'),
+      createActionButton('15 分鐘', `eta=${orderId}=15`, 'secondary'),
+      createActionButton('下一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
+    ],
+    3: [
+      createActionButton('17 分鐘', `eta=${orderId}=17`, 'secondary'),
+      createActionButton('18 分鐘', `eta=${orderId}=18`, 'secondary'),
+      createActionButton('20 分鐘', `eta=${orderId}=20`, 'secondary'),
+      createActionButton('下一頁', `etaPage4=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
+    ],
+    4: [
+      createActionButton('22 分鐘', `eta=${orderId}=22`, 'secondary'),
+      createActionButton('25 分鐘', `eta=${orderId}=25`, 'secondary'),
+      createActionButton('上一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
+      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
+    ],
   };
+
+  return createSimpleFlex(
+    `選擇 ETA（${page}/4）`,
+    '請選擇預計抵達取件地點時間',
+    pageMap[page],
+    '#111111'
+  );
 }
 
 function createUrgentChoiceFlex() {
@@ -1749,47 +1587,36 @@ function createUrgentChoiceFlex() {
   };
 }
 
-function createAcceptedDriverFlex(orderId) {
+function createPickupActionFlex(orderId) {
   const order = orders[orderId];
-  if (!order) return null;
-
   return createSimpleFlex(
-    '已接單操作',
-    `請前往取件地點\n\n取件：${order.pickup}\n目前 ETA：${order.etaMinutes || 10} 分鐘`,
+    '取件操作',
+    `請前往取件地點\n\n取件：${order.pickup}`,
     [
       createUriButton('導航取件地點', buildGoogleMapSearchUrl(order.pickup), 'primary', '#111111'),
-      createActionButton('修改 ETA', `changeEta=${orderId}`, 'secondary'),
       createActionButton('已抵達取件地點', `arrivePickup=${orderId}`, 'secondary'),
       createActionButton('取消接單', `releaseOrder=${orderId}`, 'secondary'),
-      createActionButton('重新顯示本頁', `driverMenu=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
 }
 
 function createPickupArrivedActionFlex(orderId) {
-  const order = orders[orderId];
-  if (!order) return null;
-
   return createSimpleFlex(
     '現場操作',
-    `已抵達取件地點\n\n取件地址：${order.pickup}\n取件電話：${order.pickupPhone}`,
+    '如需等待，可先申請等候費；完成取件後請按下方按鈕。',
     [
-      createUriButton('📞 撥打取件人', `tel:${normalizePhone(order.pickupPhone)}`, 'secondary'),
       createActionButton('⏳ 申請等候費', `waitingFeeRequest=${orderId}`, 'secondary'),
       createActionButton('已取件', `picked=${orderId}`, 'primary', '#111111'),
-      createActionButton('重新顯示本頁', `pickupArrivedMenu=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
 }
 
-function createDropoffProgressFlex(orderId) {
+function createDropoffActionFlex(orderId) {
   const order = orders[orderId];
-  if (!order) return null;
-
   return createSimpleFlex(
-    '送達中操作',
+    '送達操作',
     `請前往送達地點\n\n送達：${order.dropoff}`,
     [
       createUriButton(
@@ -1799,7 +1626,6 @@ function createDropoffProgressFlex(orderId) {
         '#111111'
       ),
       createActionButton('已抵達送達地點', `arriveDropoff=${orderId}`, 'secondary'),
-      createActionButton('重新顯示本頁', `dropoffMenu=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
@@ -1807,43 +1633,22 @@ function createDropoffProgressFlex(orderId) {
 
 function createDropoffArrivedFlex(orderId) {
   const order = orders[orderId];
-  if (!order) return null;
-
   return createSimpleFlex(
     '送達地點操作',
-    `騎手已抵達送達地點\n\n送達地址：${order.dropoff}\n送達電話：${order.dropoffPhone}`,
+    `請先聯絡收件人，再完成任務\n\n送達電話：${order.dropoffPhone}`,
     [
-      createUriButton('📞 撥打收件人', `tel:${normalizePhone(order.dropoffPhone)}`, 'secondary'),
-      createActionButton('重新顯示本頁', `dropoffArrivedMenu=${orderId}`, 'secondary'),
+      createActionButton('撥打收件人', `call=${orderId}=${order.dropoffPhone}`, 'secondary'),
       createActionButton('已完成', `complete=${orderId}`, 'primary', '#111111'),
     ],
     '#111111'
   );
 }
 
-function createDriverStageFlex(orderId) {
-  const order = orders[orderId];
-  if (!order) return null;
-
-  switch (order.status) {
-    case 'accepted':
-      return createAcceptedDriverFlex(orderId);
-    case 'arrived_pickup':
-      return createPickupArrivedActionFlex(orderId);
-    case 'picked_up':
-      return createDropoffProgressFlex(orderId);
-    case 'arrived_dropoff':
-      return createDropoffArrivedFlex(orderId);
-    default:
-      return null;
-  }
-}
-
 function createCallFlex(phone) {
   return createSimpleFlex(
     '聯絡收件人',
     `請點擊下方按鈕撥打電話\n\n電話：${phone}`,
-    [createUriButton('📞 撥打', `tel:${normalizePhone(phone)}`, 'primary', '#111111')],
+    [createUriButton('📞 撥打', `tel:${phone}`, 'primary', '#111111')],
     '#111111'
   );
 }
@@ -1892,11 +1697,18 @@ function createWaitingFeeConfirmFlex(orderId, currentTotal) {
           },
           {
             type: 'text',
+            text: `目前訂單金額：${formatCurrency(currentTotal)}`,
+            weight: 'bold',
+            size: 'md',
+            margin: 'md',
+          },
+          {
+            type: 'text',
             text: `確認加收後金額：${formatCurrency(currentTotal + PRICING.waitingFee)}`,
             weight: 'bold',
             size: 'lg',
             color: '#D32F2F',
-            margin: 'md',
+            margin: 'sm',
           },
         ],
       },
@@ -1913,35 +1725,24 @@ function createWaitingFeeConfirmFlex(orderId, currentTotal) {
   };
 }
 
-async function dispatchOrder(orderId) {
-  const order = getOrder(orderId);
-  if (!order) return;
-  if (order.dispatchedAt) return;
-  if (order.status !== 'pending') return;
-
-  order.dispatchedAt = new Date().toISOString();
-  await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
+// ===== 管理員新增功能 =====
+function getAdminCancelReasonText(reason) {
+  switch (reason) {
+    case 'food':
+      return '餐飲配送不在目前服務範圍內';
+    case 'buy':
+      return '代買代購不在目前服務範圍內';
+    case 'invalid':
+      return '委託內容不符合目前服務範圍';
+    default:
+      return '訂單不符合服務條件';
+  }
 }
 
-function createGroupStatusFlex(orderId) {
-  const order = orders[orderId];
-  if (!order) return null;
-
-  const statusMap = {
-    pending: '🟡 等待接單',
-    accepted: '🟢 已接單',
-    arrived_pickup: '📍 已抵達取件',
-    picked_up: '📦 已取件',
-    arrived_dropoff: '📍 已抵達送達地點',
-    completed: '✅ 已完成',
-    cancelled: '❌ 已取消',
-  };
-
-  const statusText = statusMap[order.status] || order.status;
-
+function createAdminPanelFlex() {
   return {
     type: 'flex',
-    altText: 'UBee 任務狀態更新',
+    altText: '管理員控制台',
     contents: {
       type: 'bubble',
       size: 'mega',
@@ -1953,15 +1754,15 @@ function createGroupStatusFlex(orderId) {
         contents: [
           {
             type: 'text',
-            text: '📡 任務狀態更新',
+            text: '🛠 管理員控制台',
             color: '#FFFFFF',
             weight: 'bold',
             size: 'xl',
           },
           {
             type: 'text',
-            text: `訂單編號：${order.orderId}`,
-            color: '#DDDDDD',
+            text: '請選擇管理功能',
+            color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
           },
@@ -1970,52 +1771,99 @@ function createGroupStatusFlex(orderId) {
       body: {
         type: 'box',
         layout: 'vertical',
-        paddingAll: '18px',
         spacing: 'md',
+        paddingAll: '18px',
         contents: [
           {
             type: 'text',
-            text: statusText,
-            size: 'xl',
-            weight: 'bold',
-            color: '#111111',
-          },
-          {
-            type: 'separator',
-          },
-          {
-            type: 'text',
-            text: `取件：${order.pickup}`,
-            size: 'sm',
+            text: '可查詢指定訂單，執行付款確認、強制派單、或取消不符合服務範圍的訂單。',
             wrap: true,
-          },
-          {
-            type: 'text',
-            text: `送達：${order.dropoff}`,
             size: 'sm',
-            wrap: true,
+            color: '#333333',
           },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createMessageButton('查詢訂單', '管理員查詢訂單', 'primary', '#111111'),
+          createMessageButton('管理員說明', '管理員說明', 'secondary'),
         ],
       },
     },
   };
 }
 
-function resetOrderToPending(order, releasedByUserId) {
-  order.driverId = null;
-  order.pendingDriverId = null;
-  order.pendingAcceptedAt = null;
-  order.status = 'pending';
-  order.etaMinutes = null;
-  order.acceptedAt = null;
-  order.arrivedPickupAt = null;
-  order.pickedUpAt = null;
-  order.arrivedDropoffAt = null;
-  order.releasedCount = (order.releasedCount || 0) + 1;
+function createAdminOrderManageFlex(order) {
+  return {
+    type: 'flex',
+    altText: `管理訂單 ${order.orderId}`,
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '📋 訂單管理',
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: `訂單編號：${order.orderId}`,
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        paddingAll: '18px',
+        contents: [
+          createInfoRow('狀態', getStatusText(order.status)),
+          createInfoRow('付款狀態', getPaymentStatusText(order.paymentStatus)),
+          createInfoRow('取件地點', order.pickup),
+          createInfoRow('送達地點', order.dropoff),
+          createInfoRow('物品內容', order.item),
+          createInfoRow('總金額', formatCurrency(order.totalFee)),
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          createActionButton('確認付款', `adminPay=${order.orderId}`, 'primary', '#111111'),
+          createActionButton('強制派單', `adminDispatch=${order.orderId}`, 'secondary'),
+          createActionButton('取消｜餐飲', `adminCancel=${order.orderId}=food`, 'secondary'),
+          createActionButton('取消｜代購', `adminCancel=${order.orderId}=buy`, 'secondary'),
+          createActionButton('取消｜不符合服務', `adminCancel=${order.orderId}=invalid`, 'secondary'),
+        ],
+      },
+    },
+  };
+}
 
-  if (releasedByUserId && !order.abandonedBy.includes(releasedByUserId)) {
-    order.abandonedBy.push(releasedByUserId);
-  }
+async function dispatchOrder(orderId) {
+  const order = getOrder(orderId);
+  if (!order) return;
+  if (order.dispatchedAt) return;
+  if (order.paymentStatus !== 'paid') return;
+
+  order.dispatchedAt = new Date().toISOString();
+
+  await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
 }
 
 // ===== 建立正式訂單 =====
@@ -2059,7 +1907,6 @@ async function createOrderFromSession(event, session) {
     paymentAttempts: 0,
     paidAt: null,
     dispatchedAt: null,
-    finalFeeConfirmedAt: null,
 
     cancelFee: 0,
     cancelledAt: null,
@@ -2082,9 +1929,11 @@ async function createOrderFromSession(event, session) {
   };
 
   clearSession(session.userId);
-  await dispatchOrder(orderId);
 
-  return safeReply(event.replyToken, createOrderCreatedFlex(orders[orderId]));
+  return safeReply(event.replyToken, [
+    createOrderPendingPaymentFlex(orders[orderId]),
+    createPaymentMethodFlex(orders[orderId]),
+  ]);
 }
 
 // ===== 路由 =====
@@ -2120,16 +1969,60 @@ async function handleEvent(event) {
       return safeReply(event.replyToken, createMainMenuQuickReply());
     }
 
-    if (text === '立即下單') {
+    if (text === '下單') {
       return safeReply(event.replyToken, createOrderMenuQuickReply());
     }
 
-    if (text === '商務合作') {
+    if (text === '企業') {
       return safeReply(event.replyToken, createEnterpriseMenuQuickReply());
     }
 
-    if (text === '我的任務') {
+    if (text === '我的') {
       return safeReply(event.replyToken, createMyMenuQuickReply());
+    }
+
+    // ===== 管理員入口 =====
+    if (text === '管理員') {
+      if (!isAdmin(userId)) {
+        return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+      }
+      return safeReply(event.replyToken, createAdminPanelFlex());
+    }
+
+    if (text === '管理員說明') {
+      if (!isAdmin(userId)) {
+        return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+      }
+
+      return safeReply(
+        event.replyToken,
+        textMessage(
+          '管理員功能說明\n\n' +
+            '1. 輸入「管理員」開啟管理面板\n' +
+            '2. 點選「查詢訂單」\n' +
+            '3. 輸入訂單編號\n' +
+            '4. 可執行以下功能：\n' +
+            '・確認付款\n' +
+            '・強制派單\n' +
+            '・取消｜餐飲\n' +
+            '・取消｜代購\n' +
+            '・取消｜不符合服務'
+        )
+      );
+    }
+
+    if (text === '管理員查詢訂單') {
+      if (!isAdmin(userId)) {
+        return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+      }
+
+      sessions[userId] = {
+        type: 'admin_order_query',
+        step: 'orderId',
+        userId,
+      };
+
+      return safeReply(event.replyToken, textMessage('請輸入訂單編號，例如：OD1712345678901'));
     }
 
     if (text === '企業服務說明') {
@@ -2219,7 +2112,7 @@ async function handleEvent(event) {
             '3. 是否可以配送餐飲？\n' +
             '目前不提供餐飲外送平台型服務。\n\n' +
             '4. 如何建立任務？\n' +
-            '點選「立即下單」後，可選擇建立任務或立即估價。'
+            '點選「下單」後，可選擇建立任務或立即估價。'
         )
       );
     }
@@ -2258,6 +2151,10 @@ async function handleEvent(event) {
       return handleOrderQueryInput(event, session, text);
     }
 
+    if (session && session.type === 'admin_order_query') {
+      return handleAdminOrderQueryInput(event, session, text);
+    }
+
     if (session && session.type === 'payment_verify' && session.step === 'code') {
       return handlePaymentVerifyInput(event, session, text);
     }
@@ -2276,7 +2173,7 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'pickup') {
     session.pickup = text;
     session.step = 'pickupPhone';
-    return safeReply(event.replyToken, textMessage('請輸入取件地點電話：'));
+    return safeReply(event.replyToken, textMessage('請輸入取件地點：'));
   }
 
   if (session.step === 'pickupPhone') {
@@ -2395,6 +2292,24 @@ async function handleOrderQueryInput(event, session, text) {
   return safeReply(event.replyToken, textMessage(createOrderStatusText(order)));
 }
 
+async function handleAdminOrderQueryInput(event, session, text) {
+  const userId = event.source.userId;
+  const orderId = (text || '').trim();
+  const order = getOrder(orderId);
+
+  clearSession(userId);
+
+  if (!isAdmin(userId)) {
+    return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+  }
+
+  if (!order) {
+    return safeReply(event.replyToken, textMessage('❌ 查無此訂單，請確認訂單編號是否正確。'));
+  }
+
+  return safeReply(event.replyToken, createAdminOrderManageFlex(order));
+}
+
 async function handlePaymentVerifyInput(event, session, text) {
   const userId = event.source.userId;
   const order = getOrder(session.orderId);
@@ -2428,8 +2343,10 @@ async function handlePaymentVerifyInput(event, session, text) {
     order.paymentStatus = 'paid';
     order.paidAt = new Date().toISOString();
 
+    await dispatchOrder(order.orderId);
     await safePush(order.userId, createPaymentVerifiedFlex(order));
-    return safeReply(event.replyToken, textMessage('✅ 付款驗證成功，感謝您完成付款。'));
+
+    return safeReply(event.replyToken, textMessage('✅ 付款驗證成功，系統已自動派單。'));
   }
 
   order.paymentAttempts += 1;
@@ -2513,10 +2430,6 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
     }
 
-    if (order.status !== 'completed') {
-      return safeReply(event.replyToken, textMessage('⚠️ 任務尚未完成，完成後系統才會開放付款。'));
-    }
-
     if (order.paymentStatus === 'paid') {
       return safeReply(event.replyToken, createPaymentVerifiedFlex(order));
     }
@@ -2537,17 +2450,12 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
     }
 
-    if (order.status !== 'completed') {
-      return safeReply(event.replyToken, textMessage('⚠️ 任務尚未完成，完成後系統才會開放付款。'));
-    }
-
     if (order.paymentStatus === 'paid') {
       return safeReply(event.replyToken, createPaymentVerifiedFlex(order));
     }
 
     order.paymentMethod = method;
-    order.paymentStatus = 'pending_payment';
-    order.finalFeeConfirmedAt = new Date().toISOString();
+    order.paymentStatus = 'unpaid';
 
     return safeReply(event.replyToken, createPaymentInfoFlex(order));
   }
@@ -2559,10 +2467,6 @@ async function handlePostback(event) {
 
     if (order.userId !== userId) {
       return safeReply(event.replyToken, textMessage('⚠️ 只有此訂單客戶可以操作。'));
-    }
-
-    if (order.status !== 'completed') {
-      return safeReply(event.replyToken, textMessage('⚠️ 任務尚未完成，暫時無法付款。'));
     }
 
     if (!order.paymentMethod) {
@@ -2621,11 +2525,11 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, createCancelledFlex(order));
     }
 
-    if (order.status === 'completed' && order.paymentStatus !== 'paid') {
-      return safeReply(event.replyToken, createFinalPaymentFlex(order));
+    if (order.paymentStatus !== 'paid') {
+      return safeReply(event.replyToken, createOrderPendingPaymentFlex(order));
     }
 
-    return safeReply(event.replyToken, textMessage(createOrderStatusText(order)));
+    return safeReply(event.replyToken, createOrderCreatedFlex(order));
   }
 
   if (data.startsWith('cancelConfirm=')) {
@@ -2689,6 +2593,10 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
 
+    if (order.paymentStatus !== 'paid') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單尚未完成付款驗證，暫時無法接單。'));
+    }
+
     if (!requireStatus(event.replyToken, order, ['pending'], '接單')) return;
 
     if (order.abandonedBy.includes(userId)) {
@@ -2699,47 +2607,14 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 此任務已被其他騎手正式接單。'));
     }
 
-    order.driverId = userId;
-    order.pendingDriverId = null;
-    order.pendingAcceptedAt = null;
-    order.status = 'accepted';
-    order.etaMinutes = 10;
-    order.acceptedAt = new Date().toISOString();
-
-    await safePush(
-      order.userId,
-      textMessage(`✅ 您的訂單已由騎手接單，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
-    );
-
-    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
-
-    return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
-  }
-
-  if (data.startsWith('driverMenu=')) {
-    const orderId = data.split('=')[1];
-    const order = requireOrder(event.replyToken, orderId);
-    if (!order) return;
-
-    if (!requireDriver(event.replyToken, order, userId)) return;
-
-    const flex = createDriverStageFlex(orderId);
-    if (!flex) {
-      return safeReply(event.replyToken, textMessage('⚠️ 目前此狀態沒有可顯示的操作頁。'));
+    if (order.pendingDriverId && order.pendingDriverId !== userId) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此任務目前已有其他騎手正在確認 ETA。'));
     }
 
-    return safeReply(event.replyToken, flex);
-  }
+    order.pendingDriverId = userId;
+    order.pendingAcceptedAt = new Date().toISOString();
 
-  if (data.startsWith('changeEta=')) {
-    const orderId = data.split('=')[1];
-    const order = requireOrder(event.replyToken, orderId);
-    if (!order) return;
-
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
-
-    return safeReply(event.replyToken, createETAFlex(orderId));
+    return safeReply(event.replyToken, createETAFlex(orderId, 1));
   }
 
   if (data.startsWith('acceptCancel=')) {
@@ -2747,24 +2622,22 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
 
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['accepted'], '取消接單')) return;
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
 
-    resetOrderToPending(order, userId);
+    if (order.status !== 'pending') {
+      return safeReply(event.replyToken, textMessage('⚠️ 目前狀態無法取消此次接單。'));
+    }
 
-    await safePush(order.userId, textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。'));
-    await safePush(
-      LINE_GROUP_ID,
-      textMessage(
-        `⚠️ 任務重新釋單\n` +
-          `訂單編號：${order.orderId}\n` +
-          `原因：原接單騎手取消接單\n` +
-          `系統已重新開放派單`
-      )
-    );
-    await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
 
-    return safeReply(event.replyToken, textMessage('✅ 您已取消接單，系統已重新釋出此任務。'));
+    if (!order.abandonedBy.includes(userId)) {
+      order.abandonedBy.push(userId);
+    }
+
+    return safeReply(event.replyToken, textMessage('✅ 您已取消本次接單，訂單將繼續等待其他騎手。'));
   }
 
   if (data.startsWith('reject=')) {
@@ -2781,22 +2654,62 @@ async function handlePostback(event) {
     return safeReply(event.replyToken, textMessage('✅ 您已放棄此任務。'));
   }
 
+  if (data.startsWith('etaPage2=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+    if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
+    return safeReply(event.replyToken, createETAFlex(orderId, 2));
+  }
+
+  if (data.startsWith('etaPage3=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+    if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
+    return safeReply(event.replyToken, createETAFlex(orderId, 3));
+  }
+
+  if (data.startsWith('etaPage4=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
+    if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
+    return safeReply(event.replyToken, createETAFlex(orderId, 4));
+  }
+
   if (data.startsWith('eta=')) {
     const [, orderId, min] = data.split('=');
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
 
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
+    if (!isPendingDriverAuthorized(order, userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+    }
 
-    order.etaMinutes = Number(min);
+    if (!requireStatus(event.replyToken, order, ['pending'], '設定 ETA')) return;
 
-    await safePush(
-      order.userId,
-      textMessage(`📍 騎手已更新 ETA，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
-    );
+    order.driverId = userId;
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
+    order.status = 'accepted';
+    order.acceptedAt = new Date().toISOString();
+    order.etaMinutes = min;
 
-    return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
+    await safePush(order.userId, textMessage(`✅ 已有騎手接單，預計 ${min} 分鐘抵達取件地點。`));
+    await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已正式接單，騎手已設定 ETA：${min} 分鐘。`));
+    await safePush(LINE_GROUP_ID, createPickupActionFlex(orderId));
+
+    return safeReply(event.replyToken, textMessage(`✅ 已設定 ETA，預計 ${min} 分鐘抵達取件地點。`));
   }
 
   if (data.startsWith('releaseOrder=')) {
@@ -2807,7 +2720,17 @@ async function handlePostback(event) {
     if (!requireDriver(event.replyToken, order, userId)) return;
     if (!requireStatus(event.replyToken, order, ['accepted'], '取消接單')) return;
 
-    resetOrderToPending(order, userId);
+    order.driverId = null;
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
+    order.status = 'pending';
+    order.etaMinutes = null;
+    order.acceptedAt = null;
+    order.releasedCount = (order.releasedCount || 0) + 1;
+
+    if (!order.abandonedBy.includes(userId)) {
+      order.abandonedBy.push(userId);
+    }
 
     await safePush(order.userId, textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。'));
 
@@ -2849,6 +2772,7 @@ async function handlePostback(event) {
     order.waitingFeeRequested = true;
 
     await safePush(order.userId, createWaitingFeeConfirmFlex(orderId, order.totalFee));
+
     return safeReply(event.replyToken, textMessage('✅ 已送出等候費申請，等待客戶確認。'));
   }
 
@@ -2875,7 +2799,11 @@ async function handlePostback(event) {
     order.waitingFeeAdded = true;
     order.waitingFeeRequested = false;
 
-    await safePush(LINE_GROUP_ID, textMessage('✅ 客戶已同意加收等候費 $60'));
+    await safePush(
+      LINE_GROUP_ID,
+      textMessage(`✅ 客戶已同意加收等候費 $60\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
+    );
+
     await safeReply(
       event.replyToken,
       textMessage(`✅ 等候費 $60 已成功加收\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
@@ -2900,37 +2828,22 @@ async function handlePostback(event) {
     order.waitingFeeRequested = false;
 
     await safePush(LINE_GROUP_ID, textMessage('⚠️ 客戶未同意本次等候費申請。'));
+
     return safeReply(event.replyToken, textMessage('已送出：您不同意本次等候費申請。'));
   }
 
   // ===== 任務流程 =====
-  if (data.startsWith('pickupArrivedMenu=')) {
-    const orderId = data.split('=')[1];
-    const order = requireOrder(event.replyToken, orderId);
-    if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['arrived_pickup'], '查看取件地點操作')) return;
-
-    return safeReply(event.replyToken, createPickupArrivedActionFlex(orderId));
-  }
-
   if (data.startsWith('arrivePickup=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
     if (!requireDriver(event.replyToken, order, userId)) return;
-
-    if (order.status === 'arrived_pickup') {
-      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達取件地點」狀態。'));
-    }
-
     if (!requireStatus(event.replyToken, order, ['accepted'], '已抵達')) return;
 
     order.status = 'arrived_pickup';
     order.arrivedPickupAt = new Date().toISOString();
 
     await safePush(order.userId, textMessage('📍 騎手已抵達取件地點。'));
-    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
 
     return safeReply(event.replyToken, createPickupArrivedActionFlex(orderId));
   }
@@ -2946,29 +2859,8 @@ async function handlePostback(event) {
     order.pickedUpAt = new Date().toISOString();
 
     await safePush(order.userId, textMessage('✅ 騎手已完成取件，正在前往送達地點。'));
-    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
 
-    return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
-  }
-
-  if (data.startsWith('dropoffMenu=')) {
-    const orderId = data.split('=')[1];
-    const order = requireOrder(event.replyToken, orderId);
-    if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['picked_up'], '查看送達操作')) return;
-
-    return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
-  }
-
-  if (data.startsWith('dropoffArrivedMenu=')) {
-    const orderId = data.split('=')[1];
-    const order = requireOrder(event.replyToken, orderId);
-    if (!order) return;
-    if (!requireDriver(event.replyToken, order, userId)) return;
-    if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '查看送達地點操作')) return;
-
-    return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
+    return safeReply(event.replyToken, createDropoffActionFlex(orderId));
   }
 
   if (data.startsWith('arriveDropoff=')) {
@@ -2976,18 +2868,12 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
     if (!requireDriver(event.replyToken, order, userId)) return;
-
-    if (order.status === 'arrived_dropoff') {
-      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達送達地點」狀態。'));
-    }
-
     if (!requireStatus(event.replyToken, order, ['picked_up'], '已抵達送達地點')) return;
 
     order.status = 'arrived_dropoff';
     order.arrivedDropoffAt = new Date().toISOString();
 
     await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
-    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
 
     return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
   }
@@ -3005,21 +2891,13 @@ async function handlePostback(event) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-
     if (!requireDriver(event.replyToken, order, userId)) return;
-
-    if (order.status === 'completed') {
-      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經完成，請勿重複操作。'));
-    }
-
     if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '已完成')) return;
 
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
-    order.paymentStatus = 'unpaid';
 
-    await safePush(order.userId, [createCompletedFlex(order), createFinalPaymentFlex(order)]);
-    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
+    await safePush(order.userId, createCompletedFlex(order));
 
     if (LINE_FINISH_GROUP_ID) {
       await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
@@ -3028,7 +2906,116 @@ async function handlePostback(event) {
     return safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
   }
 
-  return safeReply(event.replyToken, textMessage('⚠️ 無法辨識的操作。'));
+  // ===== 管理員操作 =====
+  if (data.startsWith('adminPay=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (!isAdmin(userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已是已付款狀態。'));
+    }
+
+    order.paymentStatus = 'paid';
+    order.paidAt = new Date().toISOString();
+    order.paymentAttempts = 0;
+
+    await dispatchOrder(order.orderId);
+    await safePush(order.userId, createPaymentVerifiedFlex(order));
+
+    return safeReply(event.replyToken, textMessage('✅ 管理員已確認付款，系統已自動派單。'));
+  }
+
+  if (data.startsWith('adminDispatch=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (!isAdmin(userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+    }
+
+    if (order.status === 'cancelled') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已取消，無法派單。'));
+    }
+
+    if (order.status === 'completed') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已完成，無法派單。'));
+    }
+
+    if (order.paymentStatus !== 'paid') {
+      return safeReply(event.replyToken, textMessage('⚠️ 請先確認付款後再派單。'));
+    }
+
+    order.dispatchedAt = null;
+    order.status = 'pending';
+    order.driverId = null;
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
+    order.etaMinutes = null;
+
+    await dispatchOrder(order.orderId);
+
+    return safeReply(event.replyToken, textMessage('✅ 已由管理員強制派單。'));
+  }
+
+  if (data.startsWith('adminCancel=')) {
+    const [, orderId, reason] = data.split('=');
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (!isAdmin(userId)) {
+      return safeReply(event.replyToken, textMessage('⚠️ 此功能僅限管理者使用。'));
+    }
+
+    if (order.status === 'cancelled') {
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已取消。'));
+    }
+
+    order.cancelStage = order.status;
+    order.cancelFee = 0;
+    order.cancelledAt = new Date().toISOString();
+    order.cancelledBy = userId;
+    order.status = 'cancelled';
+    order.adminCancelReason = reason;
+
+    const reasonText = getAdminCancelReasonText(reason);
+
+    await safePush(
+      order.userId,
+      textMessage(
+        `⚠️ 很抱歉，本次任務已由管理員取消。\n\n原因：${reasonText}\n\n如需其他符合服務範圍的任務，歡迎重新下單。`
+      )
+    );
+
+    await safePush(
+      LINE_GROUP_ID,
+      textMessage(
+        `⚠️ 訂單已由管理員取消\n\n` +
+          `訂單編號：${order.orderId}\n` +
+          `原因：${reasonText}\n` +
+          `請勿再執行此任務。`
+      )
+    );
+
+    if (order.driverId) {
+      await safePush(
+        order.driverId,
+        textMessage(
+          `⚠️ 此單已由管理員取消\n` +
+            `訂單編號：${order.orderId}\n` +
+            `原因：${reasonText}\n` +
+            `請停止執行此任務。`
+        )
+      );
+    }
+
+    return safeReply(event.replyToken, textMessage(`✅ 已取消訂單，原因：${reasonText}`));
+  }
 }
 
 app.listen(PORT, () => {
