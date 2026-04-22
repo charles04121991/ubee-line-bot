@@ -1606,43 +1606,88 @@ function createGroupTaskFlex(orderId) {
   };
 }
 
-function createETAFlex(orderId, page) {
-  const pageMap = {
-    1: [
-      createActionButton('5 分鐘', `eta=${orderId}=5`, 'secondary'),
-      createActionButton('7 分鐘', `eta=${orderId}=7`, 'secondary'),
-      createActionButton('8 分鐘', `eta=${orderId}=8`, 'secondary'),
-      createActionButton('下一頁', `etaPage2=${orderId}`, 'primary', '#111111'),
-      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
-    ],
-    2: [
-      createActionButton('10 分鐘', `eta=${orderId}=10`, 'secondary'),
-      createActionButton('12 分鐘', `eta=${orderId}=12`, 'secondary'),
-      createActionButton('15 分鐘', `eta=${orderId}=15`, 'secondary'),
-      createActionButton('下一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
-      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
-    ],
-    3: [
-      createActionButton('17 分鐘', `eta=${orderId}=17`, 'secondary'),
-      createActionButton('18 分鐘', `eta=${orderId}=18`, 'secondary'),
-      createActionButton('20 分鐘', `eta=${orderId}=20`, 'secondary'),
-      createActionButton('下一頁', `etaPage4=${orderId}`, 'primary', '#111111'),
-      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
-    ],
-    4: [
-      createActionButton('22 分鐘', `eta=${orderId}=22`, 'secondary'),
-      createActionButton('25 分鐘', `eta=${orderId}=25`, 'secondary'),
-      createActionButton('上一頁', `etaPage3=${orderId}`, 'primary', '#111111'),
-      createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary'),
-    ],
+function createETAFlex(orderId, page = 1) {
+  const etaPages = {
+    1: [5, 10, 15],
+    2: [20, 25, 30],
+    3: [35, 40, 45],
+    4: [50, 55, 60],
   };
 
-  return createSimpleFlex(
-    `選擇 ETA（${page}/4）`,
-    '請選擇預計抵達取件地點時間',
-    pageMap[page],
-    '#111111'
+  const totalPages = Object.keys(etaPages).length;
+  const minutes = etaPages[page] || etaPages[1];
+
+  const buttons = minutes.map((min) =>
+    createActionButton(`${min} 分鐘`, `eta=${orderId}=${min}`, 'secondary')
   );
+
+  if (page > 1) {
+    buttons.push(
+      createActionButton('上一頁', `etaPage${page - 1}=${orderId}`, 'primary', '#111111')
+    );
+  }
+
+  if (page < totalPages) {
+    buttons.push(
+      createActionButton('下一頁', `etaPage${page + 1}=${orderId}`, 'primary', '#111111')
+    );
+  }
+
+  buttons.push(
+    createActionButton('取消接單', `acceptCancel=${orderId}`, 'secondary')
+  );
+
+  return {
+    type: 'flex',
+    altText: `選擇 ETA（${page}/${totalPages}）`,
+    contents: {
+      type: 'bubble',
+      size: 'giga',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#111111',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: `選擇 ETA（${page}/${totalPages}）`,
+            color: '#FFFFFF',
+            weight: 'bold',
+            size: 'xl',
+          },
+          {
+            type: 'text',
+            text: '請選擇預計抵達取件地點時間',
+            color: '#D9D9D9',
+            size: 'sm',
+            margin: 'sm',
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        paddingAll: '18px',
+        contents: [
+          {
+            type: 'text',
+            text: '請點選下方按鈕選擇 ETA 分鐘數',
+            wrap: true,
+            size: 'sm',
+            color: '#333333',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: buttons,
+      },
+    },
+  };
 }
 
 function createUrgentChoiceFlex() {
@@ -2668,7 +2713,16 @@ async function handlePostback(event) {
 
     return safeReply(event.replyToken, textMessage('✅ 您已放棄此任務。'));
   }
-
+if (data.startsWith('etaPage1=')) {
+  const orderId = data.split('=')[1];
+  const order = requireOrder(event.replyToken, orderId);
+  if (!order) return;
+  if (!isPendingDriverAuthorized(order, userId)) {
+    return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
+  }
+  if (!requireStatus(event.replyToken, order, ['pending'], '查看 ETA')) return;
+  return safeReply(event.replyToken, createETAFlex(orderId, 1));
+}
   if (data.startsWith('etaPage2=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
