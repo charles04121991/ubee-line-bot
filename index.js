@@ -151,7 +151,7 @@ function qrUri(label, uri) {
 }
 
 function normalizePhone(input) {
-  return (input || '').trim().replace(/[\s-]/g, '');
+  return String(input || '').replace(/[^\d+]/g, '');
 }
 
 function isValidTaiwanPhone(phone) {
@@ -182,7 +182,7 @@ function getStatusText(status) {
 function getPaymentStatusText(paymentStatus) {
   switch (paymentStatus) {
     case 'unpaid':
-      return '待結單';
+      return '待付款';
     case 'pending_payment':
       return '待付款';
     case 'pending_verify':
@@ -1651,7 +1651,7 @@ function createETAFlex(orderId) {
 
   return {
     type: 'flex',
-    altText: '選擇 ETA',
+    altText: '修改 ETA',
     contents: {
       type: 'bubble',
       size: 'giga',
@@ -1663,14 +1663,14 @@ function createETAFlex(orderId) {
         contents: [
           {
             type: 'text',
-            text: '選擇 ETA',
+            text: '修改 ETA',
             color: '#FFFFFF',
             weight: 'bold',
             size: 'xl',
           },
           {
             type: 'text',
-            text: '請選擇預計抵達取件地點時間',
+            text: '請選擇最新預計抵達取件地點時間',
             color: '#D9D9D9',
             size: 'sm',
             margin: 'sm',
@@ -1751,18 +1751,40 @@ function createUrgentChoiceFlex() {
   };
 }
 
-function createPickupActionFlex(orderId) {
+function createAcceptedDriverFlex(orderId) {
   const order = orders[orderId];
+  if (!order) return null;
+
   return createSimpleFlex(
-    '取件操作',
-    `請前往取件地點\n\n取件：${order.pickup}`,
+    '已接單操作',
+    `請前往取件地點\n\n取件：${order.pickup}\n目前 ETA：${order.etaMinutes || 10} 分鐘`,
     [
       createUriButton('導航取件地點', buildGoogleMapSearchUrl(order.pickup), 'primary', '#111111'),
+      createActionButton('修改 ETA', `changeEta=${orderId}`, 'secondary'),
       createActionButton('已抵達取件地點', `arrivePickup=${orderId}`, 'secondary'),
       createActionButton('取消接單', `releaseOrder=${orderId}`, 'secondary'),
+      createActionButton('重新顯示本頁', `driverMenu=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
+}
+
+function createDriverStageFlex(orderId) {
+  const order = orders[orderId];
+  if (!order) return null;
+
+  switch (order.status) {
+    case 'accepted':
+      return createAcceptedDriverFlex(orderId);
+    case 'arrived_pickup':
+      return createPickupArrivedActionFlex(orderId);
+    case 'picked_up':
+      return createDropoffProgressFlex(orderId);
+    case 'arrived_dropoff':
+      return createDropoffArrivedFlex(orderId);
+    default:
+      return null;
+  }
 }
 
 function createPickupArrivedActionFlex(orderId) {
@@ -1928,7 +1950,7 @@ function createGroupStatusFlex(orderId) {
     accepted: '🟢 已接單',
     arrived_pickup: '📍 已抵達取件',
     picked_up: '📦 已取件',
-    arrived_dropoff: '🚚 已送達',
+    arrived_dropoff: '📍 已抵達送達地點',
     completed: '✅ 已完成',
     cancelled: '❌ 已取消'
   };
@@ -2605,7 +2627,7 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, createFinalPaymentFlex(order));
     }
 
-    return safeReply(event.replyToken, createOrderCreatedFlex(order));
+    return safeReply(event.replyToken, textMessage(createOrderStatusText(order)));
   }
 
   if (data.startsWith('cancelConfirm=')) {
@@ -2683,12 +2705,46 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 此任務目前已有其他騎手正在確認 ETA。'));
     }
 
-    order.pendingDriverId = userId;
-    order.pendingAcceptedAt = new Date().toISOString();
+    order.driverId = userId;
+order.pendingDriverId = null;
+order.pendingAcceptedAt = null;
+order.status = 'accepted';
+order.etaMinutes = 10;
+order.acceptedAt = new Date().toISOString();
 
-    return safeReply(event.replyToken, createETAFlex(orderId, 1));
+await safePush(
+  order.userId,
+  textMessage(`✅ 您的訂單已由騎手接單，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
+);
+
+await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
+
+return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
+  }
+if (data.startsWith('driverMenu=')) {
+  const orderId = data.split('=')[1];
+  const order = requireOrder(event.replyToken, orderId);
+  if (!order) return;
+
+  if (!requireDriver(event.replyToken, order, userId)) return;
+
+  const flex = createDriverStageFlex(orderId);
+  if (!flex) {
+    return safeReply(event.replyToken, textMessage('⚠️ 目前此狀態沒有可顯示的操作頁。'));
   }
 
+  return safeReply(event.replyToken, flex);
+}
+  if (data.startsWith('changeEta=')) {
+  const orderId = data.split('=')[1];
+  const order = requireOrder(event.replyToken, orderId);
+  if (!order) return;
+
+  if (!requireDriver(event.replyToken, order, userId)) return;
+  if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
+
+  return safeReply(event.replyToken, createETAFlex(orderId));
+}
   if (data.startsWith('acceptCancel=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
@@ -2731,25 +2787,17 @@ async function handlePostback(event) {
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
 
-    if (!isPendingDriverAuthorized(order, userId)) {
-      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
-    }
+    if (!requireDriver(event.replyToken, order, userId)) return;
+if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
 
-    if (!requireStatus(event.replyToken, order, ['pending'], '設定 ETA')) return;
+order.etaMinutes = Number(min);
 
-    order.driverId = userId;
-    order.pendingDriverId = null;
-    order.pendingAcceptedAt = null;
-    order.status = 'accepted';
-    order.acceptedAt = new Date().toISOString();
-    order.etaMinutes = min;
+await safePush(
+  order.userId,
+  textMessage(`📍 騎手已更新 ETA，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
+);
 
-    await safePush(order.userId, textMessage(`✅ 已有騎手接單，預計 ${min} 分鐘抵達取件地點。`));
-    await safePush(LINE_GROUP_ID, textMessage(`✅ 任務已正式接單，騎手已設定 ETA：${min} 分鐘。`));
-    await safePush(LINE_GROUP_ID, createPickupActionFlex(orderId));
-
-    return safeReply(event.replyToken, textMessage(`✅ 已設定 ETA，預計 ${min} 分鐘抵達取件地點。`));
-  }
+return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
 
   if (data.startsWith('releaseOrder=')) {
     const orderId = data.split('=')[1];
@@ -2765,6 +2813,9 @@ async function handlePostback(event) {
     order.status = 'pending';
     order.etaMinutes = null;
     order.acceptedAt = null;
+    order.arrivedPickupAt = null;
+    order.pickedUpAt = null;
+    order.arrivedDropoffAt = null;
     order.releasedCount = (order.releasedCount || 0) + 1;
 
     if (!order.abandonedBy.includes(userId)) {
