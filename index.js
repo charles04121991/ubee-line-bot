@@ -538,7 +538,7 @@ async function startCreateOrder(replyToken, userId) {
   session.draft = {};
 
   await client.replyMessage(replyToken, [
-    createTextMessage('請輸入取件完整地址'),
+    createTextMessage('請輸入取件地址'),
   ]);
 }
 
@@ -549,7 +549,7 @@ async function startQuoteOnly(replyToken, userId) {
   session.draft = {};
 
   await client.replyMessage(replyToken, [
-    createTextMessage('請輸入取件完整地址（立即估價）'),
+    createTextMessage('請輸入取件地址（立即估價）'),
   ]);
 }
 
@@ -708,7 +708,7 @@ async function handleTextStep(event, userId, text) {
     if (session.mode === 'quoteOnly') {
       session.step = 'dropoffAddress';
       return client.replyMessage(event.replyToken, [
-        createTextMessage('請輸入送達完整地址'),
+        createTextMessage('請輸入送達地址'),
       ]);
     }
 
@@ -722,7 +722,7 @@ async function handleTextStep(event, userId, text) {
     session.draft.pickupPhone = normalizePhone(normalized);
     session.step = 'dropoffAddress';
     return client.replyMessage(event.replyToken, [
-      createTextMessage('請輸入送達完整地址'),
+      createTextMessage('請輸入送達地址'),
     ]);
   }
 
