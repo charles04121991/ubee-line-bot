@@ -3029,7 +3029,7 @@ await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
     return safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
   }
 }
-
+}
 app.listen(PORT, () => {
   console.log(`✅ UBee OMS running on ${PORT}`);
 });
