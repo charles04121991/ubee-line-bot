@@ -390,8 +390,6 @@ async function calculateFees(session) {
   const urgentFee = session.isUrgent === '急件' ? PRICING.urgentFee : 0;
   const waitingFee = session.needWaitingFee ? PRICING.waitingFee : 0;
   const totalFee = deliveryFee + serviceFee + urgentFee + waitingFee;
-
-  // 騎手收入這邊沿用你目前邏輯
   const driverFee = Math.round(totalFee * 0.6);
 
   return {
@@ -1769,53 +1767,23 @@ function createAcceptedDriverFlex(orderId) {
   );
 }
 
-function createDriverStageFlex(orderId) {
+function createPickupArrivedActionFlex(orderId) {
   const order = orders[orderId];
   if (!order) return null;
 
-  switch (order.status) {
-    case 'accepted':
-      return createAcceptedDriverFlex(orderId);
-    case 'arrived_pickup':
-      return createPickupArrivedActionFlex(orderId);
-    case 'picked_up':
-      return createDropoffProgressFlex(orderId);
-    case 'arrived_dropoff':
-      return createDropoffArrivedFlex(orderId);
-    default:
-      return null;
-  }
-}
-
-function createPickupArrivedActionFlex(orderId) {
   return createSimpleFlex(
     '現場操作',
-    '如需等待，可先申請等候費；完成取件後請按下方按鈕。',
+    `已抵達取件地點\n\n取件地址：${order.pickup}\n取件電話：${order.pickupPhone}`,
     [
+      createUriButton('📞 撥打取件人', `tel:${normalizePhone(order.pickupPhone)}`, 'secondary'),
       createActionButton('⏳ 申請等候費', `waitingFeeRequest=${orderId}`, 'secondary'),
       createActionButton('已取件', `picked=${orderId}`, 'primary', '#111111'),
+      createActionButton('重新顯示本頁', `pickupArrivedMenu=${orderId}`, 'secondary'),
     ],
     '#111111'
   );
 }
 
-function createDropoffActionFlex(orderId) {
-  const order = orders[orderId];
-  return createSimpleFlex(
-    '送達操作',
-    `請前往送達地點\n\n送達：${order.dropoff}`,
-    [
-      createUriButton(
-        '導航送達地點',
-        buildGoogleMapDirectionsUrl(order.pickup, order.dropoff),
-        'primary',
-        '#111111'
-      ),
-      createActionButton('已抵達送達地點', `arriveDropoff=${orderId}`, 'secondary'),
-    ],
-    '#111111'
-  );
-}
 function createDropoffProgressFlex(orderId) {
   const order = orders[orderId];
   if (!order) return null;
@@ -1836,6 +1804,7 @@ function createDropoffProgressFlex(orderId) {
     '#111111'
   );
 }
+
 function createDropoffArrivedFlex(orderId) {
   const order = orders[orderId];
   if (!order) return null;
@@ -1844,16 +1813,30 @@ function createDropoffArrivedFlex(orderId) {
     '送達地點操作',
     `騎手已抵達送達地點\n\n送達地址：${order.dropoff}\n送達電話：${order.dropoffPhone}`,
     [
-      createUriButton(
-        '📞 撥打收件人',
-        `tel:${normalizePhone(order.dropoffPhone)}`,
-        'secondary'
-      ),
+      createUriButton('📞 撥打收件人', `tel:${normalizePhone(order.dropoffPhone)}`, 'secondary'),
       createActionButton('重新顯示本頁', `dropoffArrivedMenu=${orderId}`, 'secondary'),
       createActionButton('已完成', `complete=${orderId}`, 'primary', '#111111'),
     ],
     '#111111'
   );
+}
+
+function createDriverStageFlex(orderId) {
+  const order = orders[orderId];
+  if (!order) return null;
+
+  switch (order.status) {
+    case 'accepted':
+      return createAcceptedDriverFlex(orderId);
+    case 'arrived_pickup':
+      return createPickupArrivedActionFlex(orderId);
+    case 'picked_up':
+      return createDropoffProgressFlex(orderId);
+    case 'arrived_dropoff':
+      return createDropoffArrivedFlex(orderId);
+    default:
+      return null;
+  }
 }
 
 function createCallFlex(phone) {
@@ -1937,7 +1920,6 @@ async function dispatchOrder(orderId) {
   if (order.status !== 'pending') return;
 
   order.dispatchedAt = new Date().toISOString();
-
   await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
 }
 
@@ -1952,7 +1934,7 @@ function createGroupStatusFlex(orderId) {
     picked_up: '📦 已取件',
     arrived_dropoff: '📍 已抵達送達地點',
     completed: '✅ 已完成',
-    cancelled: '❌ 已取消'
+    cancelled: '❌ 已取消',
   };
 
   const statusText = statusMap[order.status] || order.status;
@@ -1974,16 +1956,16 @@ function createGroupStatusFlex(orderId) {
             text: '📡 任務狀態更新',
             color: '#FFFFFF',
             weight: 'bold',
-            size: 'xl'
+            size: 'xl',
           },
           {
             type: 'text',
             text: `訂單編號：${order.orderId}`,
             color: '#DDDDDD',
             size: 'sm',
-            margin: 'sm'
-          }
-        ]
+            margin: 'sm',
+          },
+        ],
       },
       body: {
         type: 'box',
@@ -1996,28 +1978,46 @@ function createGroupStatusFlex(orderId) {
             text: statusText,
             size: 'xl',
             weight: 'bold',
-            color: '#111111'
+            color: '#111111',
           },
           {
-            type: 'separator'
+            type: 'separator',
           },
           {
             type: 'text',
             text: `取件：${order.pickup}`,
             size: 'sm',
-            wrap: true
+            wrap: true,
           },
           {
             type: 'text',
             text: `送達：${order.dropoff}`,
             size: 'sm',
-            wrap: true
-          }
-        ]
-      }
-    }
+            wrap: true,
+          },
+        ],
+      },
+    },
   };
 }
+
+function resetOrderToPending(order, releasedByUserId) {
+  order.driverId = null;
+  order.pendingDriverId = null;
+  order.pendingAcceptedAt = null;
+  order.status = 'pending';
+  order.etaMinutes = null;
+  order.acceptedAt = null;
+  order.arrivedPickupAt = null;
+  order.pickedUpAt = null;
+  order.arrivedDropoffAt = null;
+  order.releasedCount = (order.releasedCount || 0) + 1;
+
+  if (releasedByUserId && !order.abandonedBy.includes(releasedByUserId)) {
+    order.abandonedBy.push(releasedByUserId);
+  }
+}
+
 // ===== 建立正式訂單 =====
 async function createOrderFromSession(event, session) {
   const orderId = createOrderId();
@@ -2082,7 +2082,6 @@ async function createOrderFromSession(event, session) {
   };
 
   clearSession(session.userId);
-
   await dispatchOrder(orderId);
 
   return safeReply(event.replyToken, createOrderCreatedFlex(orders[orderId]));
@@ -2277,7 +2276,7 @@ async function handleOrderInput(event, session, text) {
   if (session.step === 'pickup') {
     session.pickup = text;
     session.step = 'pickupPhone';
-    return safeReply(event.replyToken, textMessage('請輸入取件電話：'));
+    return safeReply(event.replyToken, textMessage('請輸入取件地點電話：'));
   }
 
   if (session.step === 'pickupPhone') {
@@ -2430,7 +2429,6 @@ async function handlePaymentVerifyInput(event, session, text) {
     order.paidAt = new Date().toISOString();
 
     await safePush(order.userId, createPaymentVerifiedFlex(order));
-
     return safeReply(event.replyToken, textMessage('✅ 付款驗證成功，感謝您完成付款。'));
   }
 
@@ -2701,71 +2699,72 @@ async function handlePostback(event) {
       return safeReply(event.replyToken, textMessage('⚠️ 此任務已被其他騎手正式接單。'));
     }
 
-    if (order.pendingDriverId && order.pendingDriverId !== userId) {
-      return safeReply(event.replyToken, textMessage('⚠️ 此任務目前已有其他騎手正在確認 ETA。'));
+    order.driverId = userId;
+    order.pendingDriverId = null;
+    order.pendingAcceptedAt = null;
+    order.status = 'accepted';
+    order.etaMinutes = 10;
+    order.acceptedAt = new Date().toISOString();
+
+    await safePush(
+      order.userId,
+      textMessage(`✅ 您的訂單已由騎手接單，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
+    );
+
+    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
+
+    return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
+  }
+
+  if (data.startsWith('driverMenu=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+
+    if (!requireDriver(event.replyToken, order, userId)) return;
+
+    const flex = createDriverStageFlex(orderId);
+    if (!flex) {
+      return safeReply(event.replyToken, textMessage('⚠️ 目前此狀態沒有可顯示的操作頁。'));
     }
 
-    order.driverId = userId;
-order.pendingDriverId = null;
-order.pendingAcceptedAt = null;
-order.status = 'accepted';
-order.etaMinutes = 10;
-order.acceptedAt = new Date().toISOString();
-
-await safePush(
-  order.userId,
-  textMessage(`✅ 您的訂單已由騎手接單，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
-);
-
-await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
-
-return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
-  }
-if (data.startsWith('driverMenu=')) {
-  const orderId = data.split('=')[1];
-  const order = requireOrder(event.replyToken, orderId);
-  if (!order) return;
-
-  if (!requireDriver(event.replyToken, order, userId)) return;
-
-  const flex = createDriverStageFlex(orderId);
-  if (!flex) {
-    return safeReply(event.replyToken, textMessage('⚠️ 目前此狀態沒有可顯示的操作頁。'));
+    return safeReply(event.replyToken, flex);
   }
 
-  return safeReply(event.replyToken, flex);
-}
   if (data.startsWith('changeEta=')) {
-  const orderId = data.split('=')[1];
-  const order = requireOrder(event.replyToken, orderId);
-  if (!order) return;
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
 
-  if (!requireDriver(event.replyToken, order, userId)) return;
-  if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
+    if (!requireDriver(event.replyToken, order, userId)) return;
+    if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
 
-  return safeReply(event.replyToken, createETAFlex(orderId));
-}
+    return safeReply(event.replyToken, createETAFlex(orderId));
+  }
+
   if (data.startsWith('acceptCancel=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
 
-    if (!isPendingDriverAuthorized(order, userId)) {
-      return safeReply(event.replyToken, textMessage('⚠️ 此操作僅限目前保留中的騎手執行。'));
-    }
+    if (!requireDriver(event.replyToken, order, userId)) return;
+    if (!requireStatus(event.replyToken, order, ['accepted'], '取消接單')) return;
 
-    if (order.status !== 'pending') {
-      return safeReply(event.replyToken, textMessage('⚠️ 目前狀態無法取消此次接單。'));
-    }
+    resetOrderToPending(order, userId);
 
-    order.pendingDriverId = null;
-    order.pendingAcceptedAt = null;
+    await safePush(order.userId, textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。'));
+    await safePush(
+      LINE_GROUP_ID,
+      textMessage(
+        `⚠️ 任務重新釋單\n` +
+          `訂單編號：${order.orderId}\n` +
+          `原因：原接單騎手取消接單\n` +
+          `系統已重新開放派單`
+      )
+    );
+    await safePush(LINE_GROUP_ID, createGroupTaskFlex(orderId));
 
-    if (!order.abandonedBy.includes(userId)) {
-      order.abandonedBy.push(userId);
-    }
-
-    return safeReply(event.replyToken, textMessage('✅ 您已取消本次接單，訂單將繼續等待其他騎手。'));
+    return safeReply(event.replyToken, textMessage('✅ 您已取消接單，系統已重新釋出此任務。'));
   }
 
   if (data.startsWith('reject=')) {
@@ -2788,16 +2787,17 @@ if (data.startsWith('driverMenu=')) {
     if (!order) return;
 
     if (!requireDriver(event.replyToken, order, userId)) return;
-if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
+    if (!requireStatus(event.replyToken, order, ['accepted'], '修改 ETA')) return;
 
-order.etaMinutes = Number(min);
+    order.etaMinutes = Number(min);
 
-await safePush(
-  order.userId,
-  textMessage(`📍 騎手已更新 ETA，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
-);
+    await safePush(
+      order.userId,
+      textMessage(`📍 騎手已更新 ETA，預計 ${order.etaMinutes} 分鐘抵達取件地點。`)
+    );
 
-return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
+    return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
+  }
 
   if (data.startsWith('releaseOrder=')) {
     const orderId = data.split('=')[1];
@@ -2807,20 +2807,7 @@ return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
     if (!requireDriver(event.replyToken, order, userId)) return;
     if (!requireStatus(event.replyToken, order, ['accepted'], '取消接單')) return;
 
-    order.driverId = null;
-    order.pendingDriverId = null;
-    order.pendingAcceptedAt = null;
-    order.status = 'pending';
-    order.etaMinutes = null;
-    order.acceptedAt = null;
-    order.arrivedPickupAt = null;
-    order.pickedUpAt = null;
-    order.arrivedDropoffAt = null;
-    order.releasedCount = (order.releasedCount || 0) + 1;
-
-    if (!order.abandonedBy.includes(userId)) {
-      order.abandonedBy.push(userId);
-    }
+    resetOrderToPending(order, userId);
 
     await safePush(order.userId, textMessage('⚠️ 原接單騎手已取消接單，系統將重新為您安排騎手。'));
 
@@ -2862,7 +2849,6 @@ return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
     order.waitingFeeRequested = true;
 
     await safePush(order.userId, createWaitingFeeConfirmFlex(orderId, order.totalFee));
-
     return safeReply(event.replyToken, textMessage('✅ 已送出等候費申請，等待客戶確認。'));
   }
 
@@ -2889,10 +2875,7 @@ return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
     order.waitingFeeAdded = true;
     order.waitingFeeRequested = false;
 
-    await safePush(
-  LINE_GROUP_ID,
-  textMessage(`✅ 客戶已同意加收等候費 $60`)
-);
+    await safePush(LINE_GROUP_ID, textMessage('✅ 客戶已同意加收等候費 $60'));
     await safeReply(
       event.replyToken,
       textMessage(`✅ 等候費 $60 已成功加收\n目前訂單總金額：${formatCurrency(order.totalFee)}`)
@@ -2917,25 +2900,37 @@ return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
     order.waitingFeeRequested = false;
 
     await safePush(LINE_GROUP_ID, textMessage('⚠️ 客戶未同意本次等候費申請。'));
-
     return safeReply(event.replyToken, textMessage('已送出：您不同意本次等候費申請。'));
   }
 
   // ===== 任務流程 =====
+  if (data.startsWith('pickupArrivedMenu=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+    if (!requireDriver(event.replyToken, order, userId)) return;
+    if (!requireStatus(event.replyToken, order, ['arrived_pickup'], '查看取件地點操作')) return;
+
+    return safeReply(event.replyToken, createPickupArrivedActionFlex(orderId));
+  }
+
   if (data.startsWith('arrivePickup=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
     if (!requireDriver(event.replyToken, order, userId)) return;
+
     if (order.status === 'arrived_pickup') {
-  return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達取件地點」狀態。'));
-}
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達取件地點」狀態。'));
+    }
+
     if (!requireStatus(event.replyToken, order, ['accepted'], '已抵達')) return;
 
     order.status = 'arrived_pickup';
     order.arrivedPickupAt = new Date().toISOString();
 
     await safePush(order.userId, textMessage('📍 騎手已抵達取件地點。'));
+    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
 
     return safeReply(event.replyToken, createPickupArrivedActionFlex(orderId));
   }
@@ -2951,47 +2946,51 @@ return safeReply(event.replyToken, createAcceptedDriverFlex(orderId));
     order.pickedUpAt = new Date().toISOString();
 
     await safePush(order.userId, textMessage('✅ 騎手已完成取件，正在前往送達地點。'));
-await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
+    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
+
     return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
   }
-if (data.startsWith('dropoffMenu=')) {
-  const orderId = data.split('=')[1];
-  const order = requireOrder(event.replyToken, orderId);
-  if (!order) return;
-  if (!requireDriver(event.replyToken, order, userId)) return;
-  if (!requireStatus(event.replyToken, order, ['picked_up'], '查看送達操作')) return;
 
-  return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
-}
+  if (data.startsWith('dropoffMenu=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+    if (!requireDriver(event.replyToken, order, userId)) return;
+    if (!requireStatus(event.replyToken, order, ['picked_up'], '查看送達操作')) return;
 
-if (data.startsWith('dropoffArrivedMenu=')) {
-  const orderId = data.split('=')[1];
-  const order = requireOrder(event.replyToken, orderId);
-  if (!order) return;
-  if (!requireDriver(event.replyToken, order, userId)) return;
-  if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '查看送達地點操作')) return;
+    return safeReply(event.replyToken, createDropoffProgressFlex(orderId));
+  }
 
-  return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
-}
+  if (data.startsWith('dropoffArrivedMenu=')) {
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+    if (!requireDriver(event.replyToken, order, userId)) return;
+    if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '查看送達地點操作')) return;
+
+    return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
+  }
+
   if (data.startsWith('arriveDropoff=')) {
-  const orderId = data.split('=')[1];
-  const order = requireOrder(event.replyToken, orderId);
-  if (!order) return;
-  if (!requireDriver(event.replyToken, order, userId)) return;
+    const orderId = data.split('=')[1];
+    const order = requireOrder(event.replyToken, orderId);
+    if (!order) return;
+    if (!requireDriver(event.replyToken, order, userId)) return;
+
     if (order.status === 'arrived_dropoff') {
-  return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達送達地點」狀態。'));
-}
-  if (!requireStatus(event.replyToken, order, ['picked_up'], '已抵達送達地點')) return;
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經是「已抵達送達地點」狀態。'));
+    }
 
-  order.status = 'arrived_dropoff';
-  order.arrivedDropoffAt = new Date().toISOString();
+    if (!requireStatus(event.replyToken, order, ['picked_up'], '已抵達送達地點')) return;
 
-  await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
+    order.status = 'arrived_dropoff';
+    order.arrivedDropoffAt = new Date().toISOString();
+
+    await safePush(order.userId, textMessage('📍 騎手已抵達送達地點。'));
     await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
-  await safePush(userId, createDropoffArrivedFlex(orderId));
 
-  return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
-}
+    return safeReply(event.replyToken, createDropoffArrivedFlex(orderId));
+  }
 
   if (data.startsWith('call=')) {
     const [, orderId, phone] = data.split('=');
@@ -3006,30 +3005,32 @@ if (data.startsWith('dropoffArrivedMenu=')) {
     const orderId = data.split('=')[1];
     const order = requireOrder(event.replyToken, orderId);
     if (!order) return;
-    
+
     if (!requireDriver(event.replyToken, order, userId)) return;
+
     if (order.status === 'completed') {
-  return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經完成，請勿重複操作。'));
-}
+      return safeReply(event.replyToken, textMessage('⚠️ 此訂單已經完成，請勿重複操作。'));
+    }
+
     if (!requireStatus(event.replyToken, order, ['arrived_dropoff'], '已完成')) return;
 
     order.status = 'completed';
     order.completedAt = new Date().toISOString();
     order.paymentStatus = 'unpaid';
 
-    await safePush(order.userId, [
-      createCompletedFlex(order),
-      createFinalPaymentFlex(order),
-    ]);
-await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
+    await safePush(order.userId, [createCompletedFlex(order), createFinalPaymentFlex(order)]);
+    await safePush(LINE_GROUP_ID, createGroupStatusFlex(orderId));
+
     if (LINE_FINISH_GROUP_ID) {
       await safePush(LINE_FINISH_GROUP_ID, createFinishReportFlex(order));
     }
 
     return safeReply(event.replyToken, textMessage('✅ 任務已完成。'));
   }
+
+  return safeReply(event.replyToken, textMessage('⚠️ 無法辨識的操作。'));
 }
-}
+
 app.listen(PORT, () => {
   console.log(`✅ UBee OMS running on ${PORT}`);
 });
