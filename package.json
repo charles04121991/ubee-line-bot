@@ -1,15 +1,31 @@
 {
-  "name": "ubee-oms-v3.8.6-pro-max",
-  "version": "3.8.6",
-  "description": "UBee OMS V3.8.6 PRO MAX",
+  "name": "ubee-oms",
+  "version": "3.8.7-pro-max",
+  "description": "UBee OMS 城市任務系統（LINE Bot）",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
+  "keywords": [
+    "ubee",
+    "line-bot",
+    "delivery",
+    "task-platform",
+    "oms"
+  ],
+  "author": "UBee",
+  "license": "ISC",
   "dependencies": {
-    "@line/bot-sdk": "^9.7.0",
+    "@line/bot-sdk": "^9.3.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
