@@ -50,6 +50,9 @@ const PRICING = {
   driverRatio: 0.6,
 };
 
+// ===== ETA 設定 =====
+const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
+
 // ===== 暫存資料（重啟會清空）=====
 const userSessions = {}; // userId -> { mode, step, draft }
 const orders = {}; // orderId -> order
@@ -377,14 +380,12 @@ function getBusinessIntroText() {
   return [
     createTextMessage(
       'UBee 提供企業與商務跑腿服務\n\n' +
-
       '✓ 文件急送（合約、發票）\n\n' +
       '✓ 樣品配送\n\n' +
       '✓ 臨時行政支援\n\n' +
       '✓ 個人物品\n\n' +
       '✓ 安全代送\n\n' +
       '✓ 私人物件\n\n' +
-
       '平均 35 分鐘完成任務。\n\n' +
       '如需長期合作，歡迎填寫合作表單。'
     ),
@@ -406,24 +407,20 @@ function getFaqText() {
   return [
     createTextMessage(
       '常見問題：\n\n' +
-
       'Q：多久會有人接單？\n\n' +
       'A：通常10～15分鐘內會有騎手接單。\n\n\n' +
-
       'Q：可以送什麼？\n\n' +
       'A：文件、樣品、商務物品、個人物品、安全代送、私人物件。\n\n\n' +
-
       'Q：可以送餐嗎？\n\n' +
       'A：目前不提供餐飲代購服務。\n\n\n' +
-
       'Q：有沒有不能接的項目？\n\n' +
       'A：違法、危險品或涉及個資之項目恕不承接，其餘任務歡迎先私訊確認。\n\n\n' +
-
       'Q：有開發票或收據嗎？\n\n' +
       'A：目前提供收據或交易紀錄，暫不提供統一發票。\n\n'
     ),
   ];
 }
+
 // ===== Flex 卡片 =====
 function createOrderConfirmFlex(order) {
   const bubble = createBubble(
@@ -497,18 +494,55 @@ function createDispatchGroupFlex(order) {
   return createFlexMessage('UBee 新任務通知', bubble);
 }
 
+function createEtaRow(orderId, minutesList) {
+  return {
+    type: 'box',
+    layout: 'horizontal',
+    spacing: 'sm',
+    contents: minutesList.map((minutes) =>
+      createActionButton(`${minutes}分鐘`, `eta=${orderId}=${minutes}`, 'primary')
+    ),
+  };
+}
+
+function createETAFlex(order) {
+  const bubble = createBubble(
+    '請選擇 ETA',
+    [
+      {
+        type: 'text',
+        text: '請選擇預計抵達取件地點時間',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+      },
+      createInfoRow('訂單編號', order.id),
+      createInfoRow('取件地址', order.pickupAddress),
+      createInfoRow('送達地址', order.dropoffAddress),
+      { type: 'separator', margin: 'md' },
+      createEtaRow(order.id, [5, 7, 8]),
+      createEtaRow(order.id, [10, 12, 15]),
+      createEtaRow(order.id, [17, 20, 25]),
+    ]
+  );
+
+  return createFlexMessage('請選擇 ETA', bubble);
+}
+
 function createRiderControlFlex(order) {
   const bubble = createBubble(
     '騎手任務操作',
     [
       createInfoRow('訂單編號', order.id),
       createInfoRow('狀態', getStatusLabel(order.status)),
+      createInfoRow('ETA', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '尚未設定'),
       createInfoRow('取件地址', order.pickupAddress),
       createInfoRow('送達地址', order.dropoffAddress),
       createInfoRow('備註', order.note || '無'),
       createInfoRow('收入', formatCurrency(order.driverFee)),
     ],
     [
+      createActionButton('重新設定ETA', `showEta=${order.id}`, 'secondary'),
       createActionButton('已抵達取件地點', `arrivedPickup=${order.id}`),
       createActionButton('已取件', `pickedUp=${order.id}`),
       createUriButton(
@@ -529,6 +563,7 @@ function createFinanceFlex(order) {
       createInfoRow('訂單編號', order.id),
       createInfoRow('取件地址', order.pickupAddress),
       createInfoRow('送達地址', order.dropoffAddress),
+      createInfoRow('ETA', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '未設定'),
       { type: 'separator', margin: 'md' },
       createInfoRow('配送費', formatCurrency(order.deliveryFee)),
       createInfoRow('服務費', formatCurrency(order.serviceFee)),
@@ -646,6 +681,7 @@ async function finishCreateOrder(event, userId, draft) {
       total: price.total,
       driverFee: price.driverFee,
       platformFee: price.platformFee,
+      etaMinutes: null,
 
       createdAt: Date.now(),
       acceptedAt: null,
@@ -888,12 +924,70 @@ async function handlePostback(event) {
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(`你已成功接單：${order.id}`),
+      createETAFlex(order),
+    ]);
+    return;
+  }
+
+  if (data.startsWith('showEta=')) {
+    const orderId = data.split('=')[1];
+    const order = orders[orderId];
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此訂單。'),
+      ]);
+    }
+
+    if (order.riderId !== userId) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('只有接單騎手可以重新設定 ETA。'),
+      ]);
+    }
+
+    return client.replyMessage(event.replyToken, [createETAFlex(order)]);
+  }
+
+  if (data.startsWith('eta=')) {
+    const parts = data.split('=');
+    const orderId = parts[1];
+    const etaMinutes = Number(parts[2]);
+    const order = orders[orderId];
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此訂單。'),
+      ]);
+    }
+
+    if (order.riderId !== userId) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('只有接單騎手可以設定 ETA。'),
+      ]);
+    }
+
+    if (!ETA_OPTIONS.includes(etaMinutes)) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('ETA 選項無效。'),
+      ]);
+    }
+
+    if (!['accepted', 'arrived_pickup'].includes(order.status)) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('目前狀態不能設定 ETA。'),
+      ]);
+    }
+
+    order.etaMinutes = etaMinutes;
+
+    await client.replyMessage(event.replyToken, [
+      createTextMessage(`已設定 ETA：${etaMinutes} 分鐘`),
       createRiderControlFlex(order),
     ]);
 
     await pushToUser(
       order.customerId,
-      createTextMessage('你的任務已由騎手接單，騎手正前往取件地點。')
+      createTextMessage(`你的任務已由騎手接單，預計 ${etaMinutes} 分鐘抵達取件地點。`)
     );
     return;
   }
