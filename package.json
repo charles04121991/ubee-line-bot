@@ -1,7 +1,7 @@
 {
-  "name": "ubee-oms-minimal",
-  "version": "3.8.4",
-  "description": "UBee OMS 主選單精簡版",
+  "name": "ubee-oms-minimal-firebase",
+  "version": "3.9.0",
+  "description": "UBee OMS 主選單精簡版 + Firebase",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -10,6 +10,7 @@
     "@line/bot-sdk": "^9.5.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "firebase-admin": "^13.0.0",
     "node-fetch": "^2.7.0"
   }
 }
