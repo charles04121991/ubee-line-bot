@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
+const admin = require('firebase-admin');
 
 const app = express();
 
@@ -15,7 +16,20 @@ if (!config.channelAccessToken || !config.channelSecret) {
   process.exit(1);
 }
 
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.error('❌ 缺少 FIREBASE_SERVICE_ACCOUNT');
+  process.exit(1);
+}
+
 const client = new line.Client(config);
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const db = admin.firestore();
 
 const PORT = process.env.PORT || 3000;
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
@@ -59,9 +73,9 @@ const PRICING = {
 // ===== ETA 設定 =====
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
-// ===== 暫存資料（重啟會清空）=====
+// ===== 暫存資料（sessions 仍為記憶體；orders 同步到 Firebase）=====
 const userSessions = {}; // userId -> { mode, step, draft }
-const orders = {}; // orderId -> order
+const orders = {}; // orderId -> order cache
 let orderCounter = 1;
 
 // ===== 工具函式 =====
@@ -70,8 +84,8 @@ function generateOrderId() {
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
-  const no = String(orderCounter++).padStart(4, '0');
-  return `UB${yyyy}${mm}${dd}${no}`;
+  const unique = `${String(Date.now()).slice(-6)}${String(orderCounter++).padStart(2, '0')}`;
+  return `UB${yyyy}${mm}${dd}${unique}`;
 }
 
 function formatCurrency(value) {
@@ -241,6 +255,34 @@ async function pushToGroup(groupId, messages) {
   if (!groupId) return;
   const list = Array.isArray(messages) ? messages : [messages];
   await client.pushMessage(groupId, list);
+}
+
+// ===== Firebase / Firestore =====
+async function saveOrder(order) {
+  if (!order?.id) return;
+  await db.collection('orders').doc(order.id).set(order, { merge: true });
+  orders[order.id] = order;
+}
+
+async function getOrder(orderId) {
+  if (!orderId) return null;
+
+  if (orders[orderId]) {
+    return orders[orderId];
+  }
+
+  const doc = await db.collection('orders').doc(orderId).get();
+  if (!doc.exists) return null;
+
+  const order = doc.data();
+  orders[orderId] = order;
+  return order;
+}
+
+async function deleteOrder(orderId) {
+  if (!orderId) return;
+  delete orders[orderId];
+  await db.collection('orders').doc(orderId).delete();
 }
 
 // ===== Google Maps 距離時間 =====
@@ -720,6 +762,7 @@ async function finishCreateOrder(event, userId, draft) {
     };
 
     orders[order.id] = order;
+    await saveOrder(order);
     resetUserSession(userId);
 
     return client.replyMessage(event.replyToken, [createOrderConfirmFlex(order)]);
@@ -899,7 +942,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('cancelCreate=')) {
     const orderId = data.split('=')[1];
-    delete orders[orderId];
+    await deleteOrder(orderId);
     return client.replyMessage(event.replyToken, [
       createTextMessage('已取消本次建立任務。'),
     ]);
@@ -907,7 +950,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('confirmCreate=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -922,6 +965,7 @@ async function handlePostback(event) {
     }
 
     order.status = 'pending_dispatch';
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage('任務已建立成功，系統正在通知騎手接單。'),
@@ -933,7 +977,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('accept=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -950,6 +994,7 @@ async function handlePostback(event) {
     order.status = 'accepted';
     order.riderId = userId;
     order.acceptedAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(`你已成功接單：${order.id}`),
@@ -960,7 +1005,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('showEta=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -981,7 +1026,7 @@ async function handlePostback(event) {
     const parts = data.split('=');
     const orderId = parts[1];
     const etaMinutes = Number(parts[2]);
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -1008,6 +1053,7 @@ async function handlePostback(event) {
     }
 
     order.etaMinutes = etaMinutes;
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(`已設定 ETA：${etaMinutes} 分鐘`),
@@ -1025,7 +1071,7 @@ async function handlePostback(event) {
     const parts = data.split('=');
     const method = parts[1];
     const orderId = parts[2];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -1062,7 +1108,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('arrivedPickup=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -1084,6 +1130,7 @@ async function handlePostback(event) {
 
     order.status = 'arrived_pickup';
     order.arrivedPickupAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage('已更新為：已抵達取件地點'),
@@ -1099,7 +1146,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('pickedUp=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -1121,6 +1168,7 @@ async function handlePostback(event) {
 
     order.status = 'picked_up';
     order.pickedUpAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage('已更新為：已取件'),
@@ -1136,7 +1184,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('completed=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
@@ -1158,6 +1206,7 @@ async function handlePostback(event) {
 
     order.status = 'completed';
     order.completedAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(`任務 ${order.id} 已完成。`),
@@ -1226,7 +1275,7 @@ async function handleEvent(event) {
 
 // ===== Webhook =====
 app.get('/', (req, res) => {
-  res.send('UBee OMS 主選單精簡版運作中');
+  res.send('UBee OMS 主選單精簡版 + Firebase 運作中');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1240,5 +1289,5 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ UBee OMS 主選單精簡版啟動成功，PORT: ${PORT}`);
+  console.log(`✅ UBee OMS 主選單精簡版 + Firebase 啟動成功，PORT: ${PORT}`);
 });
