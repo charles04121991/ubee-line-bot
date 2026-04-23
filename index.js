@@ -1126,10 +1126,16 @@ async function handleEvent(event) {
     }
 
     if (event.type === 'message' && event.message.type === 'text') {
-      const userId = event.source.userId;
-      const text = (event.message.text || '').trim();
-      return handleTextStep(event, userId, text);
-    }
+
+  // 🚫 群組聊天不回應
+  if (event.source.type === 'group') {
+    return;
+  }
+
+  const userId = event.source.userId;
+  const text = (event.message.text || '').trim();
+  return handleTextStep(event, userId, text);
+}
 
     if (event.replyToken) {
       return client.replyMessage(event.replyToken, [
