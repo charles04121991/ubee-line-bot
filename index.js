@@ -22,6 +22,12 @@ const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
+const PAYMENT_JKO_INFO =
+  (process.env.PAYMENT_JKO_INFO || '街口支付\n帳號：請填入你的街口帳號').replace(/\\n/g, '\n');
+
+const PAYMENT_BANK_INFO =
+  (process.env.PAYMENT_BANK_INFO || '銀行轉帳\n銀行：請填入銀行名稱\n帳號：請填入銀行帳號').replace(/\\n/g, '\n');
+
 // ===== 連結設定 =====
 const BUSINESS_FORM_URL =
   process.env.BUSINESS_FORM_URL ||
@@ -556,6 +562,29 @@ function createRiderControlFlex(order) {
   return createFlexMessage('騎手任務操作', bubble);
 }
 
+function createPaymentMethodFlex(order) {
+  const bubble = createBubble(
+    '請選擇付款方式',
+    [
+      createInfoRow('訂單編號', order.id),
+      createInfoRow('總金額', formatCurrency(order.total)),
+      {
+        type: 'text',
+        text: '請選擇你要使用的付款方式',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+      },
+    ],
+    [
+      createActionButton('街口支付', `payment=jko=${order.id}`),
+      createActionButton('銀行轉帳', `payment=bank=${order.id}`, 'secondary'),
+    ]
+  );
+
+  return createFlexMessage('請選擇付款方式', bubble);
+}
+
 function createFinanceFlex(order) {
   const bubble = createBubble(
     'UBee 財務明細',
@@ -992,6 +1021,45 @@ async function handlePostback(event) {
     return;
   }
 
+  if (data.startsWith('payment=')) {
+    const parts = data.split('=');
+    const method = parts[1];
+    const orderId = parts[2];
+    const order = orders[orderId];
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此訂單。'),
+      ]);
+    }
+
+    if (order.customerId !== userId) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('這不是你的付款卡片。'),
+      ]);
+    }
+
+    if (method === 'jko') {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage(
+          `街口支付資訊：\n\n${PAYMENT_JKO_INFO}\n\n訂單編號：${order.id}\n應付金額：${formatCurrency(order.total)}`
+        ),
+      ]);
+    }
+
+    if (method === 'bank') {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage(
+          `銀行轉帳資訊：\n\n${PAYMENT_BANK_INFO}\n\n訂單編號：${order.id}\n應付金額：${formatCurrency(order.total)}`
+        ),
+      ]);
+    }
+
+    return client.replyMessage(event.replyToken, [
+      createTextMessage('未識別的付款方式。'),
+    ]);
+  }
+
   if (data.startsWith('arrivedPickup=')) {
     const orderId = data.split('=')[1];
     const order = orders[orderId];
@@ -1095,10 +1163,10 @@ async function handlePostback(event) {
       createTextMessage(`任務 ${order.id} 已完成。`),
     ]);
 
-    await pushToUser(
-      order.customerId,
-      createTextMessage('你的任務已送達完成，感謝使用 UBee。')
-    );
+    await pushToUser(order.customerId, [
+      createTextMessage('你的任務已送達完成，感謝使用 UBee。\n\n請問要怎麼付款？'),
+      createPaymentMethodFlex(order),
+    ]);
 
     if (LINE_FINISH_GROUP_ID) {
       await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
@@ -1126,16 +1194,15 @@ async function handleEvent(event) {
     }
 
     if (event.type === 'message' && event.message.type === 'text') {
+      // 🚫 群組聊天不回應
+      if (event.source.type === 'group') {
+        return;
+      }
 
-  // 🚫 群組聊天不回應
-  if (event.source.type === 'group') {
-    return;
-  }
-
-  const userId = event.source.userId;
-  const text = (event.message.text || '').trim();
-  return handleTextStep(event, userId, text);
-}
+      const userId = event.source.userId;
+      const text = (event.message.text || '').trim();
+      return handleTextStep(event, userId, text);
+    }
 
     if (event.replyToken) {
       return client.replyMessage(event.replyToken, [
