@@ -86,6 +86,15 @@ function buildGoogleMapDirectionsUrl(address) {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address || '')}`;
 }
 
+function getPaymentMethodLabel(method) {
+  return (
+    {
+      jko: '街口支付',
+      bank: '銀行轉帳',
+    }[method] || '未選擇'
+  );
+}
+
 function createTextMessage(text) {
   return { type: 'text', text };
 }
@@ -206,12 +215,14 @@ function getStatusLabel(status) {
   return (
     {
       draft_confirm: '📝 待確認',
-      quote_only: '💰 估價完成',
+      pending_payment: '💳 待付款',
+      paid_pending_dispatch: '💰 已付款待派單',
       pending_dispatch: '🟡 待派單',
       accepted: '🟢 已接單',
       arrived_pickup: '🟠 已抵達取件地點',
       picked_up: '🔵 已取件',
       completed: '✅ 已完成',
+      quote_only: '💰 估價完成',
     }[status] || status
   );
 }
@@ -402,9 +413,10 @@ function getCancelRulesText() {
   return [
     createTextMessage(
       '取消規則說明：\n\n' +
-        '未接單：可免費取消\n' +
-        '已接單：原則上不可取消\n\n' +
-        '請確認任務內容後再下單，若有特殊情況請聯繫客服。'
+      '未付款前：可取消\n' +
+      '已付款待派單：請聯繫客服協助\n' +
+      '已接單後：原則上不可取消\n\n' +
+      '請確認任務內容後再下單，若有特殊情況請聯繫客服。'
     ),
   ];
 }
@@ -414,7 +426,7 @@ function getFaqText() {
     createTextMessage(
       '常見問題：\n\n' +
       'Q：多久會有人接單？\n\n' +
-      'A：通常10～15分鐘內會有騎手接單。\n\n\n' +
+      'A：通常 10～15 分鐘內會有騎手接單。\n\n\n' +
       'Q：可以送什麼？\n\n' +
       'A：文件、樣品、商務物品、個人物品、安全代送、私人物件。\n\n\n' +
       'Q：可以送餐嗎？\n\n' +
@@ -448,7 +460,7 @@ function createOrderConfirmFlex(order) {
       createInfoRow('總金額', formatCurrency(order.total)),
     ],
     [
-      createActionButton('確定建立任務', `confirmCreate=${order.id}`),
+      createActionButton('確認並前往付款', `confirmCreate=${order.id}`),
       createActionButton('取消', `cancelCreate=${order.id}`, 'secondary'),
     ]
   );
@@ -570,7 +582,7 @@ function createPaymentMethodFlex(order) {
       createInfoRow('總金額', formatCurrency(order.total)),
       {
         type: 'text',
-        text: '請選擇你要使用的付款方式',
+        text: '請先完成付款，再按「我已付款」，系統才會派單。',
         size: 'sm',
         color: '#666666',
         wrap: true,
@@ -579,10 +591,46 @@ function createPaymentMethodFlex(order) {
     [
       createActionButton('街口支付', `payment=jko=${order.id}`),
       createActionButton('銀行轉帳', `payment=bank=${order.id}`, 'secondary'),
+      createActionButton('取消此訂單', `cancelCreate=${order.id}`, 'secondary'),
     ]
   );
 
   return createFlexMessage('請選擇付款方式', bubble);
+}
+
+function createPaymentInfoFlex(order) {
+  const paymentInfo =
+    order.paymentMethod === 'jko' ? PAYMENT_JKO_INFO : PAYMENT_BANK_INFO;
+
+  const bubble = createBubble(
+    order.paymentMethod === 'jko' ? '街口支付資訊' : '銀行轉帳資訊',
+    [
+      createInfoRow('訂單編號', order.id),
+      createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
+      createInfoRow('應付金額', formatCurrency(order.total)),
+      { type: 'separator', margin: 'md' },
+      {
+        type: 'text',
+        text: paymentInfo,
+        size: 'sm',
+        color: '#111111',
+        wrap: true,
+      },
+      {
+        type: 'text',
+        text: '完成付款後，請按下方「我已付款」，系統才會通知騎手接單。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+      },
+    ],
+    [
+      createActionButton('我已付款', `confirmPayment=${order.id}`),
+      createActionButton('重新選付款方式', `showPaymentMethod=${order.id}`, 'secondary'),
+    ]
+  );
+
+  return createFlexMessage('付款資訊', bubble);
 }
 
 function createFinanceFlex(order) {
@@ -590,6 +638,8 @@ function createFinanceFlex(order) {
     'UBee 財務明細',
     [
       createInfoRow('訂單編號', order.id),
+      createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
+      createInfoRow('付款狀態', order.isPaid ? '已付款' : '未付款'),
       createInfoRow('取件地址', order.pickupAddress),
       createInfoRow('送達地址', order.dropoffAddress),
       createInfoRow('ETA', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '未設定'),
@@ -711,6 +761,10 @@ async function finishCreateOrder(event, userId, draft) {
       driverFee: price.driverFee,
       platformFee: price.platformFee,
       etaMinutes: null,
+
+      paymentMethod: '',
+      isPaid: false,
+      paidAt: null,
 
       createdAt: Date.now(),
       acceptedAt: null,
@@ -899,9 +953,29 @@ async function handlePostback(event) {
 
   if (data.startsWith('cancelCreate=')) {
     const orderId = data.split('=')[1];
+    const order = orders[orderId];
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此訂單。'),
+      ]);
+    }
+
+    if (order.customerId !== userId) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('這不是你的訂單。'),
+      ]);
+    }
+
+    if (['accepted', 'arrived_pickup', 'picked_up', 'completed'].includes(order.status)) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('此訂單已進入配送流程，無法直接取消。'),
+      ]);
+    }
+
     delete orders[orderId];
     return client.replyMessage(event.replyToken, [
-      createTextMessage('已取消本次建立任務。'),
+      createTextMessage('已取消本次訂單。'),
     ]);
   }
 
@@ -921,10 +995,104 @@ async function handlePostback(event) {
       ]);
     }
 
+    order.status = 'pending_payment';
+
+    return client.replyMessage(event.replyToken, [
+      createTextMessage('任務資料已確認，請先完成付款。'),
+      createPaymentMethodFlex(order),
+    ]);
+  }
+
+  if (data.startsWith('showPaymentMethod=')) {
+    const orderId = data.split('=')[1];
+    const order = orders[orderId];
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此訂單。'),
+      ]);
+    }
+
+    if (order.customerId !== userId) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('這不是你的訂單。'),
+      ]);
+    }
+
+    return client.replyMessage(event.replyToken, [createPaymentMethodFlex(order)]);
+  }
+
+  if (data.startsWith('payment=')) {
+    const parts = data.split('=');
+    const method = parts[1];
+    const orderId = parts[2];
+    const order = orders[orderId];
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此訂單。'),
+      ]);
+    }
+
+    if (order.customerId !== userId) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('這不是你的付款卡片。'),
+      ]);
+    }
+
+    if (!['pending_payment', 'paid_pending_dispatch'].includes(order.status)) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('目前狀態不能選擇付款方式。'),
+      ]);
+    }
+
+    if (!['jko', 'bank'].includes(method)) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('未識別的付款方式。'),
+      ]);
+    }
+
+    order.paymentMethod = method;
+
+    return client.replyMessage(event.replyToken, [createPaymentInfoFlex(order)]);
+  }
+
+  if (data.startsWith('confirmPayment=')) {
+    const orderId = data.split('=')[1];
+    const order = orders[orderId];
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此訂單。'),
+      ]);
+    }
+
+    if (order.customerId !== userId) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('這不是你的訂單。'),
+      ]);
+    }
+
+    if (!order.paymentMethod) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('請先選擇付款方式。'),
+      ]);
+    }
+
+    if (order.isPaid) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('此訂單已經標記為付款完成，系統正在處理中。'),
+      ]);
+    }
+
+    order.isPaid = true;
+    order.paidAt = Date.now();
     order.status = 'pending_dispatch';
 
     await client.replyMessage(event.replyToken, [
-      createTextMessage('任務已建立成功，系統正在通知騎手接單。'),
+      createTextMessage(
+        `已收到你的付款通知。\n\n訂單編號：${order.id}\n付款方式：${getPaymentMethodLabel(order.paymentMethod)}\n系統正在通知騎手接單。`
+      ),
     ]);
 
     await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
@@ -943,7 +1111,7 @@ async function handlePostback(event) {
 
     if (order.status !== 'pending_dispatch') {
       return client.replyMessage(event.replyToken, [
-        createTextMessage('此單已被接走。'),
+        createTextMessage('此單已被接走或目前不可接單。'),
       ]);
     }
 
@@ -1019,45 +1187,6 @@ async function handlePostback(event) {
       createTextMessage(`你的任務已由騎手接單，預計 ${etaMinutes} 分鐘抵達取件地點。`)
     );
     return;
-  }
-
-  if (data.startsWith('payment=')) {
-    const parts = data.split('=');
-    const method = parts[1];
-    const orderId = parts[2];
-    const order = orders[orderId];
-
-    if (!order) {
-      return client.replyMessage(event.replyToken, [
-        createTextMessage('找不到此訂單。'),
-      ]);
-    }
-
-    if (order.customerId !== userId) {
-      return client.replyMessage(event.replyToken, [
-        createTextMessage('這不是你的付款卡片。'),
-      ]);
-    }
-
-    if (method === 'jko') {
-      return client.replyMessage(event.replyToken, [
-        createTextMessage(
-          `街口支付資訊：\n\n${PAYMENT_JKO_INFO}\n\n訂單編號：${order.id}\n應付金額：${formatCurrency(order.total)}`
-        ),
-      ]);
-    }
-
-    if (method === 'bank') {
-      return client.replyMessage(event.replyToken, [
-        createTextMessage(
-          `銀行轉帳資訊：\n\n${PAYMENT_BANK_INFO}\n\n訂單編號：${order.id}\n應付金額：${formatCurrency(order.total)}`
-        ),
-      ]);
-    }
-
-    return client.replyMessage(event.replyToken, [
-      createTextMessage('未識別的付款方式。'),
-    ]);
   }
 
   if (data.startsWith('arrivedPickup=')) {
@@ -1164,8 +1293,7 @@ async function handlePostback(event) {
     ]);
 
     await pushToUser(order.customerId, [
-      createTextMessage('你的任務已送達完成，感謝使用 UBee。\n\n請問要怎麼付款？'),
-      createPaymentMethodFlex(order),
+      createTextMessage('你的任務已送達完成，感謝使用 UBee。'),
     ]);
 
     if (LINE_FINISH_GROUP_ID) {
@@ -1226,7 +1354,7 @@ async function handleEvent(event) {
 
 // ===== Webhook =====
 app.get('/', (req, res) => {
-  res.send('UBee OMS 主選單精簡版運作中');
+  res.send('UBee OMS 主選單精簡版（完整付款版）運作中');
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
@@ -1240,5 +1368,5 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ UBee OMS 主選單精簡版啟動成功，PORT: ${PORT}`);
+  console.log(`✅ UBee OMS 主選單精簡版（完整付款版）啟動成功，PORT: ${PORT}`);
 });
