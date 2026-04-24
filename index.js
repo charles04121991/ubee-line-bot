@@ -749,82 +749,79 @@ return;
 async function finishCreateOrder(event, userId, draft) {
   const orderId = generateOrderId();
   const isUrgent = !!draft.isUrgent;
-  let replied = false;
 
-  try {
-    await client.replyMessage(event.replyToken, [
-      createTextMessage('正在建立任務並計算費用，請稍候約 3～5 秒...')
-    ]);
-    replied = true;
+  await client.replyMessage(event.replyToken, [
+    createTextMessage('正在建立任務，系統計算費用中...')
+  ]);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+  (async () => {
+    try {
+      const distance = await getDistanceMatrixCached(
+        draft.pickupAddress,
+        draft.dropoffAddress
+      );
 
-    const distance = await getDistanceMatrixCached(
-      draft.pickupAddress,
-      draft.dropoffAddress
-    );
+      const price = calculatePrice({
+        distanceMeters: distance.distanceMeters,
+        durationSeconds: distance.durationSeconds,
+        isUrgent,
+      });
 
-    const price = calculatePrice({
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
-      isUrgent,
-    });
+      const order = {
+        id: orderId,
+        customerId: userId,
+        riderId: '',
+        riderName: '',
+        status: 'draft_confirm',
 
-    const order = {
-      id: orderId,
-      customerId: userId,
-      riderId: '',
-      riderName: '',
-      status: 'draft_confirm',
+        pickupAddress: draft.pickupAddress,
+        pickupPhone: draft.pickupPhone,
+        dropoffAddress: draft.dropoffAddress,
+        dropoffPhone: draft.dropoffPhone,
+        isUrgent,
+        note: draft.note || '',
 
-      pickupAddress: draft.pickupAddress,
-      pickupPhone: draft.pickupPhone,
-      dropoffAddress: draft.dropoffAddress,
-      dropoffPhone: draft.dropoffPhone,
-      isUrgent,
-      note: draft.note || '',
+        distanceMeters: distance.distanceMeters,
+        durationSeconds: distance.durationSeconds,
+        distanceText: distance.distanceText,
+        durationText: distance.durationText,
 
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
-      distanceText: distance.distanceText,
-      durationText: distance.durationText,
+        deliveryFee: price.deliveryFee,
+        serviceFee: price.serviceFee,
+        urgentFee: price.urgentFee,
+        waitingFee: 0,
+        total: price.total,
+        driverFee: price.driverFee,
+        platformFee: price.platformFee,
+        etaMinutes: null,
 
-      deliveryFee: price.deliveryFee,
-      serviceFee: price.serviceFee,
-      urgentFee: price.urgentFee,
-      waitingFee: 0,
-      total: price.total,
-      driverFee: price.driverFee,
-      platformFee: price.platformFee,
-      etaMinutes: null,
+        paymentMethod: '',
+        isPaid: false,
+        paidAt: null,
 
-      paymentMethod: '',
-      isPaid: false,
-      paidAt: null,
+        createdAt: Date.now(),
+        acceptedAt: null,
+        arrivedPickupAt: null,
+        pickedUpAt: null,
+        completedAt: null,
+      };
 
-      createdAt: Date.now(),
-      acceptedAt: null,
-      arrivedPickupAt: null,
-      pickedUpAt: null,
-      completedAt: null,
-    };
+      orders[order.id] = order;
+      resetUserSession(userId);
 
-    orders[order.id] = order;
-    resetUserSession(userId);
+      await pushToUser(userId, [createOrderConfirmFlex(order)]);
+    } catch (error) {
+      console.error('❌ 建立任務背景計算失敗：', error);
+      resetUserSession(userId);
 
-    return client.pushMessage(userId, [createOrderConfirmFlex(order)]);
-  } catch (error) {
-    console.error('❌ 建立任務計價失敗：', error);
-    resetUserSession(userId);
-
-    if (replied) {
-      return pushToUser(userId, createTextMessage('抱歉，地址計算失敗，請重新輸入「建立任務」再試一次。'));
+      await pushToUser(
+        userId,
+        createTextMessage('抱歉，地址計算失敗，請重新輸入「建立任務」再試一次。')
+      );
     }
+  })();
 
-    return client.replyMessage(event.replyToken, [
-      createTextMessage('抱歉，地址計算失敗，請重新輸入「建立任務」再試一次。'),
-    ]);
-  }
+  return;
 }
 
 // ===== 文字訊息流程 =====
