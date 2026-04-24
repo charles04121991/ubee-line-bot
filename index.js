@@ -814,6 +814,9 @@ async function finishCreateOrder(event, userId, draft) {
         pickedUpAt: null,
         completedAt: null,
       };
+await db.collection('orders').doc(order.id).set({
+  ...order
+});
 
       orders[order.id] = order;
       resetUserSession(userId);
