@@ -682,14 +682,10 @@ async function startQuoteOnly(replyToken, userId) {
 
 async function finishQuoteOnly(event, userId, draft) {
   try {
-    await client.replyMessage(event.replyToken, [
-  createTextMessage('正在計算距離與費用，請稍候約 3～5 秒...')
-]);
-
-const distance = await getDistanceMatrix(
-  draft.pickupAddress,
-  draft.dropoffAddress
-);
+    const distance = await getDistanceMatrix(
+      draft.pickupAddress,
+      draft.dropoffAddress
+    );
     const price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
@@ -713,7 +709,7 @@ const distance = await getDistanceMatrix(
 
     resetUserSession(userId);
 
-    return client.pushMessage(userId, [createQuoteFlex(order)]);
+    return client.replyMessage(event.replyToken, [createQuoteFlex(order)]);
   } catch (error) {
     console.error('❌ 立即估價失敗：', error);
     resetUserSession(userId);
@@ -724,11 +720,10 @@ const distance = await getDistanceMatrix(
 }
 
 async function finishCreateOrder(event, userId, draft) {
- await client.replyMessage(event.replyToken, [
-  createTextMessage('正在建立任務並計算費用，請稍候約 3～5 秒...')
-]);
-await new Promise(resolve => setTimeout(resolve, 50));
-  
+  const orderId = generateOrderId();
+  const isUrgent = !!draft.isUrgent;
+
+  try {
     const distance = await getDistanceMatrix(
       draft.pickupAddress,
       draft.dropoffAddress
@@ -781,7 +776,7 @@ await new Promise(resolve => setTimeout(resolve, 50));
     orders[order.id] = order;
     resetUserSession(userId);
 
-    return client.pushMessage(userId, [createOrderConfirmFlex(order)]);
+    return client.replyMessage(event.replyToken, [createOrderConfirmFlex(order)]);
   } catch (error) {
     console.error('❌ 建立任務計價失敗：', error);
     resetUserSession(userId);
