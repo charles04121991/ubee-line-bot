@@ -1490,13 +1490,11 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 
   const events = req.body.events || [];
 
-  // ✅ 防掉單
-  eventQueue.push(...events);
-
   try {
     await Promise.all(events.map(handleEvent));
   } catch (error) {
-    console.error('❌ webhook 錯誤：', error);
+    console.error('❌ webhook 錯誤，加入補處理：', error);
+    eventQueue.push(...events);
   }
 });
 
