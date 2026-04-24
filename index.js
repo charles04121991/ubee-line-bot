@@ -60,9 +60,20 @@ const PRICING = {
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
 // ===== 暫存資料（重啟會清空）=====
-const userSessions = {}; // userId -> { mode, step, draft }
-const orders = {}; // orderId -> order
+const userSessions = {};
+const orders = {};
 let orderCounter = 1;
+
+// ===== Google Maps 快取 =====
+const distanceCache = new Map();
+
+function normalizeAddress(address) {
+  return String(address || '').trim().replace(/\s+/g, '');
+}
+
+function getDistanceCacheKey(origin, destination) {
+  return `${normalizeAddress(origin)}=>${normalizeAddress(destination)}`;
+}
 
 // ===== 工具函式 =====
 function generateOrderId() {
@@ -282,6 +293,18 @@ async function getDistanceMatrix(origin, destination) {
   };
 }
 
+async function getDistanceMatrixCached(origin, destination) {
+  const key = getDistanceCacheKey(origin, destination);
+
+  if (distanceCache.has(key)) {
+    return distanceCache.get(key);
+  }
+
+  const distance = await getDistanceMatrix(origin, destination);
+  distanceCache.set(key, distance);
+  return distance;
+}
+
 function calculatePrice({ distanceMeters, durationSeconds, isUrgent }) {
   const km = distanceMeters / 1000;
   const minutes = durationSeconds / 60;
@@ -392,6 +415,7 @@ function createInfoMenuFlex() {
 
   return createFlexMessage('我的任務', bubble);
 }
+
 // ===== 說明文字 =====
 function getBusinessIntroText() {
   return [
@@ -502,10 +526,7 @@ function createDispatchGroupFlex(order) {
     ],
     [
       createActionButton('接受訂單', `accept=${order.id}`),
-      createUriButton(
-        '導航到取件地點',
-        buildGoogleMapDirectionsUrl(order.pickupAddress)
-      ),
+      createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress)),
     ]
   );
 
@@ -563,10 +584,7 @@ function createRiderControlFlex(order) {
       createActionButton('重新設定ETA', `showEta=${order.id}`, 'secondary'),
       createActionButton('已抵達取件地點', `arrivedPickup=${order.id}`),
       createActionButton('已取件', `pickedUp=${order.id}`),
-      createUriButton(
-        '導航到送達地點',
-        buildGoogleMapDirectionsUrl(order.dropoffAddress)
-      ),
+      createUriButton('導航到送達地點', buildGoogleMapDirectionsUrl(order.dropoffAddress)),
       createActionButton('已送達', `completed=${order.id}`),
     ]
   );
@@ -681,11 +699,21 @@ async function startQuoteOnly(replyToken, userId) {
 }
 
 async function finishQuoteOnly(event, userId, draft) {
+  let replied = false;
+
   try {
-    const distance = await getDistanceMatrix(
+    await client.replyMessage(event.replyToken, [
+      createTextMessage('正在計算距離與費用，請稍候約 3～5 秒...')
+    ]);
+    replied = true;
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const distance = await getDistanceMatrixCached(
       draft.pickupAddress,
       draft.dropoffAddress
     );
+
     const price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
@@ -709,10 +737,15 @@ async function finishQuoteOnly(event, userId, draft) {
 
     resetUserSession(userId);
 
-    return client.replyMessage(event.replyToken, [createQuoteFlex(order)]);
+    return client.pushMessage(userId, [createQuoteFlex(order)]);
   } catch (error) {
     console.error('❌ 立即估價失敗：', error);
     resetUserSession(userId);
+
+    if (replied) {
+      return pushToUser(userId, createTextMessage('抱歉，立即估價失敗，請重新操作一次。'));
+    }
+
     return client.replyMessage(event.replyToken, [
       createTextMessage('抱歉，立即估價失敗，請重新操作一次。'),
     ]);
@@ -722,12 +755,21 @@ async function finishQuoteOnly(event, userId, draft) {
 async function finishCreateOrder(event, userId, draft) {
   const orderId = generateOrderId();
   const isUrgent = !!draft.isUrgent;
+  let replied = false;
 
   try {
-    const distance = await getDistanceMatrix(
+    await client.replyMessage(event.replyToken, [
+      createTextMessage('正在建立任務並計算費用，請稍候約 3～5 秒...')
+    ]);
+    replied = true;
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const distance = await getDistanceMatrixCached(
       draft.pickupAddress,
       draft.dropoffAddress
     );
+
     const price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
@@ -776,10 +818,15 @@ async function finishCreateOrder(event, userId, draft) {
     orders[order.id] = order;
     resetUserSession(userId);
 
-    return client.replyMessage(event.replyToken, [createOrderConfirmFlex(order)]);
+    return client.pushMessage(userId, [createOrderConfirmFlex(order)]);
   } catch (error) {
     console.error('❌ 建立任務計價失敗：', error);
     resetUserSession(userId);
+
+    if (replied) {
+      return pushToUser(userId, createTextMessage('抱歉，地址計算失敗，請重新輸入「建立任務」再試一次。'));
+    }
+
     return client.replyMessage(event.replyToken, [
       createTextMessage('抱歉，地址計算失敗，請重新輸入「建立任務」再試一次。'),
     ]);
@@ -935,12 +982,13 @@ async function handlePostback(event) {
   if (data === 'submenu=faq') {
     return client.replyMessage(event.replyToken, getFaqText());
   }
+
   if (data === 'submenu=queryOrder') {
-  return client.replyMessage(event.replyToken, {
-    type: 'text',
-    text: '請輸入你的訂單編號，例如：OD1234567890',
-  });
-}
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '請輸入你的訂單編號，例如：UB202604240001',
+    });
+  }
 
   if (data === 'urgent=yes' || data === 'urgent=no') {
     const session = getOrCreateSession(userId);
@@ -1328,37 +1376,36 @@ async function handleEvent(event) {
     }
 
     if (event.type === 'message' && event.message.type === 'text') {
-      // 🚫 群組聊天不回應
       if (event.source.type === 'group') {
         return;
       }
 
       const userId = event.source.userId;
       const text = (event.message.text || '').trim();
-      
-// 🔍 查詢訂單（OD開頭）
-if (/^OD\d+/i.test(text)) {
-  const orderId = text.toUpperCase();
-  const order = orders[orderId];
 
-  if (!order) {
-    return client.replyMessage(
-      event.replyToken,
-      createTextMessage('查無此訂單，請確認訂單編號是否正確。')
-    );
-  }
+      if (/^UB\d+/i.test(text)) {
+        const orderId = text.toUpperCase();
+        const order = orders[orderId];
 
-  return client.replyMessage(
-    event.replyToken,
-    createTextMessage(
-      `📦 訂單查詢結果\n\n` +
-      `訂單編號：${orderId}\n` +
-      `狀態：${order.status || '處理中'}\n` +
-      `取件地址：${order.pickupAddress || '未填寫'}\n` +
-      `送達地址：${order.dropoffAddress || '未填寫'}`
-    )
-  );
-}
+        if (!order) {
+          return client.replyMessage(
+            event.replyToken,
+            createTextMessage('查無此訂單，請確認訂單編號是否正確。')
+          );
+        }
+
+        return client.replyMessage(
+          event.replyToken,
+          createTextMessage(
+            `📦 訂單查詢結果\n\n` +
+            `訂單編號：${orderId}\n` +
+            `狀態：${getStatusLabel(order.status)}\n` +
+            `取件地址：${order.pickupAddress || '未填寫'}\n` +
+            `送達地址：${order.dropoffAddress || '未填寫'}`
+          )
+        );
+      }
+
       return handleTextStep(event, userId, text);
     }
 
