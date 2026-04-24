@@ -1158,7 +1158,16 @@ async function handlePostback(event) {
 
   if (data.startsWith('accept=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+
+let order = orders[orderId];
+
+if (!order) {
+  const doc = await db.collection('orders').doc(orderId).get();
+  if (doc.exists) {
+    order = doc.data();
+    orders[orderId] = order;
+  }
+}
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
