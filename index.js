@@ -1436,7 +1436,19 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
+app.get('/test-firebase', async (req, res) => {
+  try {
+    await db.collection('test').add({
+      message: 'Firebase 連線成功',
+      time: new Date(),
+    });
 
+    res.send('✅ Firebase OK');
+  } catch (error) {
+    console.error(error);
+    res.send('❌ Firebase 失敗');
+  }
+});
 app.head('/', (req, res) => {
   res.sendStatus(200);
 });
