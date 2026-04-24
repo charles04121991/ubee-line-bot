@@ -1434,6 +1434,10 @@ app.get('/', (req, res) => {
   res.send('UBee OMS 主選單精簡版（完整付款版）運作中');
 });
 
+app.head('/', (req, res) => {
+  res.sendStatus(200);
+});
+
 app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
     await Promise.all((req.body.events || []).map(handleEvent));
