@@ -702,13 +702,14 @@ async function finishQuoteOnly(event, userId, draft) {
   let replied = false;
 
   try {
-    await client.replyMessage(event.replyToken, [
-      createTextMessage('正在計算距離與費用，請稍候約 3～5 秒...')
-    ]);
-    replied = true;
+    // 1️⃣ 先秒回
+await client.replyMessage(event.replyToken, [
+  createTextMessage('正在計算中，請稍候...')
+]);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
-
+// 2️⃣ 背景處理（不阻塞）
+(async () => {
+  try {
     const distance = await getDistanceMatrixCached(
       draft.pickupAddress,
       draft.dropoffAddress
@@ -735,23 +736,16 @@ async function finishQuoteOnly(event, userId, draft) {
       total: price.total,
     };
 
-    resetUserSession(userId);
-
-    return client.pushMessage(userId, [createQuoteFlex(order)]);
+    await pushToUser(userId, [createQuoteFlex(order)]);
   } catch (error) {
-    console.error('❌ 立即估價失敗：', error);
-    resetUserSession(userId);
-
-    if (replied) {
-      return pushToUser(userId, createTextMessage('抱歉，立即估價失敗，請重新操作一次。'));
-    }
-
-    return client.replyMessage(event.replyToken, [
-      createTextMessage('抱歉，立即估價失敗，請重新操作一次。'),
-    ]);
+    console.error('❌ 背景計算失敗：', error);
+    await pushToUser(userId, createTextMessage('計算失敗，請重新操作'));
   }
-}
+})();
 
+return;
+}
+  
 async function finishCreateOrder(event, userId, draft) {
   const orderId = generateOrderId();
   const isUrgent = !!draft.isUrgent;
