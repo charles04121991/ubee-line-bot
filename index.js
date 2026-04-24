@@ -781,7 +781,7 @@ async function finishCreateOrder(event, userId, draft) {
         customerId: userId,
         riderId: '',
         riderName: '',
-        status: 'draft_confirm',
+        status: 'pending',
 
         pickupAddress: draft.pickupAddress,
         pickupPhone: draft.pickupPhone,
