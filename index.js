@@ -1223,10 +1223,19 @@ await db.collection('orders').doc(orderId).update({
   }
 
   if (data.startsWith('eta=')) {
-    const parts = data.split('=');
-    const orderId = parts[1];
-    const etaMinutes = Number(parts[2]);
-    const order = orders[orderId];
+  const parts = data.split('=');
+  const orderId = parts[1];
+  const etaMinutes = Number(parts[2]);
+
+  let order = orders[orderId];
+
+  if (!order) {
+    const doc = await db.collection('orders').doc(orderId).get();
+    if (doc.exists) {
+      order = doc.data();
+      orders[orderId] = order;
+    }
+  }
 
     if (!order) {
       return client.replyMessage(event.replyToken, [
