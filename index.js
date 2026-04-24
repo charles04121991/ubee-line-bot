@@ -1421,6 +1421,9 @@ async function handleEvent(event) {
 app.get('/', (req, res) => {
   res.send('UBee OMS 主選單精簡版（完整付款版）運作中');
 });
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
 
 app.head('/', (req, res) => {
   res.sendStatus(200);
