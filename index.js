@@ -1166,7 +1166,7 @@ async function handlePostback(event) {
       ]);
     }
 
-    if (order.status !== 'pending') {
+    if (order.status !== 'pending_dispatch') {
       return client.replyMessage(event.replyToken, [
         createTextMessage('此單已被接走或目前不可接單。'),
       ]);
