@@ -1,15 +1,18 @@
 {
-  "name": "ubee-oms",
+  "name": "ubee-oms-minimal-payment",
   "version": "3.8.4",
   "description": "UBee OMS 主選單精簡版（完整付款版）",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@line/bot-sdk": "^9.5.0",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "node-fetch": "^2.7.0"
   }
 }
