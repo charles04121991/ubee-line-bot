@@ -1144,8 +1144,13 @@ async function handlePostback(event) {
 
     order.isPaid = true;
     order.paidAt = Date.now();
-    order.status = 'pending';
+    order.status = 'pending_dispatch';
 
+await db.collection('orders').doc(order.id).update({
+  isPaid: true,
+  paidAt: order.paidAt,
+  status: 'pending_dispatch'
+});
     await client.replyMessage(event.replyToken, [
       createTextMessage(
         `已收到你的付款通知。\n\n訂單編號：${order.id}\n付款方式：${getPaymentMethodLabel(order.paymentMethod)}\n系統正在通知騎手接單。`
