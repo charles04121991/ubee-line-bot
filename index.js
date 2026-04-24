@@ -699,51 +699,48 @@ async function startQuoteOnly(replyToken, userId) {
 }
 
 async function finishQuoteOnly(event, userId, draft) {
-  let replied = false;
+  await client.replyMessage(event.replyToken, [
+    createTextMessage('正在計算中，請稍候...')
+  ]);
 
-  try {
-    // 1️⃣ 先秒回
-await client.replyMessage(event.replyToken, [
-  createTextMessage('正在計算中，請稍候...')
-]);
+  (async () => {
+    try {
+      const distance = await getDistanceMatrixCached(
+        draft.pickupAddress,
+        draft.dropoffAddress
+      );
 
-// 2️⃣ 背景處理（不阻塞）
-(async () => {
-  try {
-    const distance = await getDistanceMatrixCached(
-      draft.pickupAddress,
-      draft.dropoffAddress
-    );
+      const price = calculatePrice({
+        distanceMeters: distance.distanceMeters,
+        durationSeconds: distance.durationSeconds,
+        isUrgent: !!draft.isUrgent,
+      });
 
-    const price = calculatePrice({
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
-      isUrgent: !!draft.isUrgent,
-    });
+      const order = {
+        id: 'QUOTE',
+        status: 'quote_only',
+        pickupAddress: draft.pickupAddress,
+        dropoffAddress: draft.dropoffAddress,
+        isUrgent: !!draft.isUrgent,
+        note: '',
+        distanceText: distance.distanceText,
+        durationText: distance.durationText,
+        deliveryFee: price.deliveryFee,
+        serviceFee: price.serviceFee,
+        urgentFee: price.urgentFee,
+        total: price.total,
+      };
 
-    const order = {
-      id: 'QUOTE',
-      status: 'quote_only',
-      pickupAddress: draft.pickupAddress,
-      dropoffAddress: draft.dropoffAddress,
-      isUrgent: !!draft.isUrgent,
-      note: '',
-      distanceText: distance.distanceText,
-      durationText: distance.durationText,
-      deliveryFee: price.deliveryFee,
-      serviceFee: price.serviceFee,
-      urgentFee: price.urgentFee,
-      total: price.total,
-    };
+      resetUserSession(userId);
+      await pushToUser(userId, [createQuoteFlex(order)]);
+    } catch (error) {
+      console.error('❌ 立即估價背景計算失敗：', error);
+      resetUserSession(userId);
+      await pushToUser(userId, createTextMessage('計算失敗，請重新操作'));
+    }
+  })();
 
-    await pushToUser(userId, [createQuoteFlex(order)]);
-  } catch (error) {
-    console.error('❌ 背景計算失敗：', error);
-    await pushToUser(userId, createTextMessage('計算失敗，請重新操作'));
-  }
-})();
-
-return;
+  return;
 }
   
 async function finishCreateOrder(event, userId, draft) {
