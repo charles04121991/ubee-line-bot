@@ -1430,12 +1430,12 @@ app.head('/', (req, res) => {
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
+  res.status(200).send('OK');
+
   try {
     await Promise.all((req.body.events || []).map(handleEvent));
-    res.status(200).send('OK');
   } catch (error) {
     console.error('❌ webhook 錯誤：', error);
-    res.status(500).end();
   }
 });
 
