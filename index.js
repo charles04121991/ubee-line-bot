@@ -4,6 +4,7 @@ const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
 
 const app = express();
+let eventQueue = [];
 
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
@@ -1432,12 +1433,33 @@ app.head('/', (req, res) => {
 app.post('/webhook', line.middleware(config), async (req, res) => {
   res.status(200).send('OK');
 
+  const events = req.body.events || [];
+
+  // ✅ 防掉單
+  eventQueue.push(...events);
+
   try {
-    await Promise.all((req.body.events || []).map(handleEvent));
+    await Promise.all(events.map(handleEvent));
   } catch (error) {
     console.error('❌ webhook 錯誤：', error);
   }
 });
+
+setInterval(async () => {
+  if (eventQueue.length === 0) return;
+
+  console.log(`🔄 補處理事件：${eventQueue.length} 筆`);
+
+  const queue = [...eventQueue];
+  eventQueue = [];
+
+  try {
+    await Promise.all(queue.map(handleEvent));
+  } catch (err) {
+  console.error('❌ 補處理錯誤：', err);
+  eventQueue.push(...queue);
+}
+}, 10000);
 
 app.listen(PORT, () => {
   console.log(`✅ UBee OMS 主選單精簡版（完整付款版）啟動成功，PORT: ${PORT}`);
