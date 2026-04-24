@@ -385,13 +385,13 @@ function createInfoMenuFlex() {
     [
       createActionButton('取消規則', 'submenu=cancelRules'),
       createActionButton('常見問題', 'submenu=faq', 'secondary'),
+      createActionButton('查詢訂單', 'submenu=queryOrder', 'secondary'),
       createUriButton('加入合作夥伴', PARTNER_FORM_URL, 'secondary'),
     ]
   );
 
   return createFlexMessage('我的任務', bubble);
 }
-
 // ===== 說明文字 =====
 function getBusinessIntroText() {
   return [
@@ -935,6 +935,12 @@ async function handlePostback(event) {
   if (data === 'submenu=faq') {
     return client.replyMessage(event.replyToken, getFaqText());
   }
+  if (data === 'submenu=queryOrder') {
+  return client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: '請輸入你的訂單編號，例如：OD1234567890',
+  });
+}
 
   if (data === 'urgent=yes' || data === 'urgent=no') {
     const session = getOrCreateSession(userId);
@@ -1329,6 +1335,30 @@ async function handleEvent(event) {
 
       const userId = event.source.userId;
       const text = (event.message.text || '').trim();
+      
+// 🔍 查詢訂單（OD開頭）
+if (/^OD\d+/i.test(text)) {
+  const orderId = text.toUpperCase();
+  const order = orders[orderId];
+
+  if (!order) {
+    return client.replyMessage(
+      event.replyToken,
+      createTextMessage('查無此訂單，請確認訂單編號是否正確。')
+    );
+  }
+
+  return client.replyMessage(
+    event.replyToken,
+    createTextMessage(
+      `📦 訂單查詢結果\n\n` +
+      `訂單編號：${orderId}\n` +
+      `狀態：${order.status || '處理中'}\n` +
+      `取件地址：${order.pickupAddress || '未填寫'}\n` +
+      `送達地址：${order.dropoffAddress || '未填寫'}`
+    )
+  );
+}
       return handleTextStep(event, userId, text);
     }
 
