@@ -1176,6 +1176,12 @@ async function handlePostback(event) {
     order.riderId = userId;
     order.acceptedAt = Date.now();
 
+await db.collection('orders').doc(orderId).update({
+  status: 'accepted',
+  riderId: userId,
+  acceptedAt: Date.now()
+});
+
     await client.replyMessage(event.replyToken, [
       createTextMessage(`你已成功接單：${order.id}`),
       createETAFlex(order),
