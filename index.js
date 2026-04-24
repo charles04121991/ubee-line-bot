@@ -1144,7 +1144,7 @@ async function handlePostback(event) {
 
     order.isPaid = true;
     order.paidAt = Date.now();
-    order.status = 'pending_dispatch';
+    order.status = 'pending';
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(
