@@ -1632,15 +1632,19 @@ app.head('/', (req, res) => {
   res.sendStatus(200);
 });
 
-app.post('/webhook', line.middleware(config), async (req, res) => {
-  try {
-    res.status(200).send('OK');
-  } catch (err) {
-    console.error(err);
-    res.status(500).end();
-  }
-});
+app.post('/webhook', async (req, res) => {
+  const events = req.body.events || [];
 
+  res.status(200).send('OK');
+
+  for (const event of events) {
+  try {
+    await handleEvent(event);
+  } catch (err) {
+    console.error('❌ 單一事件錯誤：', err);
+  }
+}
+});
 setInterval(async () => {
   if (eventQueue.length === 0) return;
 
