@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商務合作</title>
+
+<style>
+body{
+  margin:0;
+  font-family:-apple-system;
+  background:#f6f6f6;
+}
+
+.container{
+  padding:24px 16px;
+}
+
+.card{
+  background:white;
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:16px;
+}
+
+.title{
+  font-size:22px;
+  font-weight:700;
+  margin-bottom:10px;
+}
+
+.btn{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:0;
+  font-size:16px;
+  margin-top:10px;
+}
+
+.btn-green{
+  background:#00c300;
+  color:white;
+}
+
+.btn-black{
+  background:black;
+  color:white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+  <div class="title">🤝 商務合作</div>
+  <div>企業長期配送 / 商務跑腿解決方案</div>
+</div>
+
+<div class="card">
+  <button class="btn btn-green"
+    onclick="location.href='https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform'">
+    📄 合作表單
+  </button>
+
+  <button class="btn btn-black" onclick="showInfo()">
+    📘 合作說明
+  </button>
+</div>
+
+<div class="card" id="infoBox" style="display:none;">
+  <div>
+    ✔ 專人配送<br>
+    ✔ 企業月結<br>
+    ✔ 快速調度（平均35分鐘）<br>
+    ✔ 專注文件 / 商務任務
+  </div>
+</div>
+
+</div>
+
+<script>
+function showInfo(){
+  document.getElementById('infoBox').style.display='block';
+}
+</script>
+
+</body>
+</html>
