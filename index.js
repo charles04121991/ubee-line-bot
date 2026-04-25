@@ -1097,35 +1097,18 @@ async function handleTextStep(event, userId, text) {
 async function handlePostback(event) {
   const data = event.postback.data || '';
   const userId = event.source.userId;
-  if (data.startsWith('accept_')) {
+
+if (data.startsWith('accept_')) {
   const orderId = data.split('_')[1];
-  const orders = global.orders || {};
 
-  if (!orders[orderId]) {
-    return client.replyMessage(event.replyToken, {
-      type: 'text',
-      text: '❌ 訂單不存在或系統已重啟'
-    });
-  }
-
-if (orders[orderId].status === 'accepted') {
-  return client.replyMessage(event.replyToken, {
+  await client.replyMessage(event.replyToken, {
     type: 'text',
-    text: '❌ 此訂單已被其他騎手接走'
+    text: `✅ 已接單\n訂單編號：${orderId}`
   });
+
+  await client.pushMessage(userId, createETAFlex(orderId));
+  return;
 }
-
-orders[orderId].status = 'accepted';
-orders[orderId].riderId = userId;
-
-await client.replyMessage(event.replyToken, {
-  type: 'text',
-  text: `✅ 已接單\n訂單編號：${orderId}`
-});
-
-await client.pushMessage(userId, createETAFlex(orderId));
-return;
-
   if (data === 'menu=order') {
     return client.replyMessage(event.replyToken, [createOrderMenuFlex()]);
   }
