@@ -1,100 +1,109 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UBee｜建立任務</title>
 <style>
-body { margin:0; font-family:sans-serif; background:#f5f5f5; }
-.container { padding:16px; padding-bottom:140px; }
-input, textarea {
-  width:100%; padding:12px; margin-top:10px;
-  border-radius:10px; border:1px solid #ddd;
-}
-.card-group { display:flex; gap:10px; }
-.card {
-  flex:1; padding:10px; background:white;
-  border-radius:10px; text-align:center;
-  border:2px solid transparent;
-}
-.card.active { border-color:#00c300; }
-
-.bottom {
-  position:fixed; bottom:0; left:0; right:0;
-  background:white; padding:10px; border-top:1px solid #ddd;
-}
-.btn {
-  width:100%; padding:14px;
-  background:#00c300; color:white;
-  border:none; border-radius:10px;
-}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;background:#f5f5f5;color:#111}
+.container{padding:24px 16px 190px}
+h1{font-size:26px;margin:24px 0}
+.label{font-size:18px;margin:22px 0 10px}
+.cards{display:flex;gap:10px}
+.card{flex:1;background:white;border-radius:14px;padding:16px 8px;text-align:center;font-size:18px;border:2px solid transparent}
+.card.active{border-color:#18c51f}
+input,textarea{width:100%;box-sizing:border-box;padding:15px;margin:8px 0;border-radius:12px;border:1px solid #ddd;font-size:17px}
+textarea{height:80px;resize:none}
+.bottom{position:fixed;left:0;right:0;bottom:0;background:white;border-top:1px solid #ddd;padding:14px 18px 22px}
+.row{display:flex;justify-content:space-between;font-size:18px;margin:5px 0}
+.total{font-weight:800;font-size:22px}
+.btn{width:100%;border:0;border-radius:13px;padding:16px;font-size:18px;margin-top:10px}
+.quote{background:#111;color:white}
+.submit{background:#00c300;color:white}
 </style>
 </head>
 
 <body>
-
 <div class="container">
+  <h1>🚀 建立任務</h1>
 
-<h3>🚀 建立任務</h3>
+  <div class="label">服務類型</div>
+  <div class="cards" id="serviceCards">
+    <div class="card active" onclick="selectCard('serviceCards', this, '文件急送')">📄 文件</div>
+    <div class="card" onclick="selectCard('serviceCards', this, '商務物品')">🏢 商務</div>
+    <div class="card" onclick="selectCard('serviceCards', this, '個人物品')">👤 個人</div>
+    <div class="card" onclick="selectCard('serviceCards', this, '安全代送')">🔒 安全</div>
+  </div>
 
-<!-- 服務類型 -->
-<p>服務類型</p>
-<div class="card-group">
-  <div class="card active" onclick="setType(this,'文件')">📄 文件</div>
-  <div class="card" onclick="setType(this,'商務')">🏢 商務</div>
-  <div class="card" onclick="setType(this,'個人')">👤 個人</div>
-  <div class="card" onclick="setType(this,'安全')">🔒 安全</div>
-</div>
+  <div class="label">路線資訊</div>
+  <input id="pickup" placeholder="取件地址">
+  <input id="pickupPhone" placeholder="取件電話">
+  <input id="dropoff" placeholder="送達地址">
+  <input id="dropoffPhone" placeholder="送達電話">
 
-<input id="pickup" placeholder="取件地址">
-<input id="pickupPhone" placeholder="取件電話">
+  <div class="label">配送速度</div>
+  <div class="cards" id="urgentCards">
+    <div class="card active" onclick="setUrgent(this, false)">一般</div>
+    <div class="card" onclick="setUrgent(this, true)">急件 +100</div>
+  </div>
 
-<input id="dropoff" placeholder="送達地址">
-<input id="dropoffPhone" placeholder="送達電話">
-
-<!-- 急件 -->
-<p style="margin-top:10px;">配送速度</p>
-<div class="card-group">
-  <div class="card active" onclick="setUrgent(false)">一般</div>
-  <div class="card" onclick="setUrgent(true)">急件 +100</div>
-</div>
-
-<textarea id="note" placeholder="備註"></textarea>
-
+  <div class="label">任務內容</div>
+  <input id="item" placeholder="物品內容">
+  <textarea id="note" placeholder="備註"></textarea>
 </div>
 
 <div class="bottom">
-  <div>配送費：99</div>
-  <div>服務費：50</div>
-  <div>急件費：<span id="urgentFee">0</span></div>
-  <div><b>總計：<span id="total">149</span></b></div>
-  <button class="btn" onclick="submit()">送出訂單</button>
+  <div class="row"><span>距離</span><span id="distanceText">尚未估價</span></div>
+  <div class="row"><span>時間</span><span id="durationText">尚未估價</span></div>
+  <div class="row"><span>配送費</span><span id="deliveryFee">$99</span></div>
+  <div class="row"><span>服務費</span><span>$50</span></div>
+  <div class="row"><span>急件費</span><span id="urgentFee">$0</span></div>
+  <div class="row total"><span>總計</span><span id="totalFee">$149</span></div>
+
+  <button class="btn quote" onclick="quoteOrder()">立即估價</button>
+  <button class="btn submit" onclick="submitOrder()">送出訂單</button>
 </div>
 
 <script>
+let serviceType = '文件急送';
 let urgent = false;
 
-function setType(el){
-  document.querySelectorAll('.card').forEach(c=>c.classList.remove('active'));
+function selectCard(groupId, el, value) {
+  serviceType = value;
+  document.querySelectorAll('#' + groupId + ' .card').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
 }
 
-function setUrgent(val){
-  urgent = val;
-
-  document.querySelectorAll('.card-group')[1].querySelectorAll('.card')
-    .forEach(c=>c.classList.remove('active'));
-
-  event.target.classList.add('active');
-
-  document.getElementById('urgentFee').innerText = val ? 100 : 0;
-  document.getElementById('total').innerText = val ? 249 : 149;
+function setUrgent(el, value) {
+  urgent = value;
+  document.querySelectorAll('#urgentCards .card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  updatePrice();
 }
 
-function submit(){
-  alert("🚀 訂單已送出，系統派單中");
+function updatePrice() {
+  const baseFee = 99;
+  const serviceFee = 50;
+  const urgentFee = urgent ? 100 : 0;
+  const total = baseFee + serviceFee + urgentFee;
+
+  document.getElementById('deliveryFee').innerText = '$' + baseFee;
+  document.getElementById('urgentFee').innerText = '$' + urgentFee;
+  document.getElementById('totalFee').innerText = '$' + total;
 }
+
+function quoteOrder() {
+  // 這版先做畫面估價；下一步再接 Google Maps 自動距離/時間
+  document.getElementById('distanceText').innerText = '下一步接 Google Maps';
+  document.getElementById('durationText').innerText = '下一步接 Google Maps';
+  updatePrice();
+}
+
+function submitOrder() {
+  alert('訂單已送出，系統派單中');
+}
+
+updatePrice();
 </script>
-
 </body>
 </html>
