@@ -3,52 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>我的資訊</title>
+<title>UBee｜我的資訊</title>
 
 <style>
-body{
-  margin:0;
-  font-family:-apple-system;
-  background:#f6f6f6;
-}
-
-.container{
-  padding:24px 16px;
-}
-
-.card{
-  background:white;
-  border-radius:16px;
-  padding:16px;
-  margin-bottom:16px;
-}
-
-.title{
-  font-size:22px;
-  font-weight:700;
-  margin-bottom:10px;
-}
-
-.btn{
-  width:100%;
-  padding:14px;
-  border-radius:12px;
-  border:0;
-  font-size:16px;
-  margin-top:10px;
-}
-
-.btn-black{
-  background:black;
-  color:white;
-}
-
-.content{
-  display:none;
-  margin-top:10px;
-  color:#333;
-  line-height:1.6;
-}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;background:#f6f6f6;color:#111}
+.container{padding:24px 16px}
+.card{background:white;border-radius:16px;padding:16px;margin-bottom:14px}
+.title{font-size:22px;font-weight:800;margin-bottom:8px}
+.btn{width:100%;padding:14px;border-radius:12px;border:0;font-size:16px;margin-top:10px;background:#111;color:white}
+.content{display:none;margin-top:12px;line-height:1.75;color:#333;font-size:15px}
+.qa{margin-bottom:18px}
+.green{background:#00c300}
 </style>
 </head>
 
@@ -56,42 +21,59 @@ body{
 
 <div class="container">
 
-<div class="card">
-  <div class="title">👤 我的資訊</div>
-</div>
+  <div class="card">
+    <div class="title">👤 我的資訊</div>
+    <div>查詢規則、常見問題與合作夥伴申請</div>
+  </div>
 
-<div class="card">
+  <div class="card">
+    <button class="btn" onclick="toggle('cancel')">取消規則</button>
+    <div id="cancel" class="content">
+      未接單：可免費取消。<br><br>
+      已接單：酌收配送費 30%，最低 $60，最高 $200。<br><br>
+      騎手已抵達取件地點：酌收配送費 50%，最低 $100，最高 $300。<br><br>
+      已取件後：原則上不可取消。
+    </div>
 
-<button class="btn btn-black" onclick="toggle('cancel')">取消規則</button>
-<div id="cancel" class="content">
-未接單可取消<br>
-已接單酌收30%費用<br>
-已取件後不可取消
-</div>
+    <button class="btn" onclick="toggle('faq')">常見問題</button>
+    <div id="faq" class="content">
+      <div class="qa">
+        Q：UBee 可以送什麼？<br>
+        A：文件、樣品、商務物品、個人物品與安全代送。
+      </div>
 
-<button class="btn btn-black" onclick="toggle('faq')">常見問題</button>
-<div id="faq" class="content">
-Q：可以送什麼？<br>
-A：文件、樣品、商務物品、個人物品、安全代送、私人物件<br><br>
-Q：多久送達？<br>
-A：平均35分鐘內
-Q：可以送餐嗎？
-A：目前不提供餐飲代購服務
-Q：有沒有不能接的項目？
-A：違法、危險物品及涉及個資之項目恕不承接，其餘任務歡迎先私訊確認
-</div>
+      <div class="qa">
+        Q：多久可以送達？<br>
+        A：依距離與路況而定，目標是一小時內快速送達，平均約 35 分鐘。
+      </div>
 
-<button class="btn btn-black" onclick="toggle('order')">查詢訂單</button>
-<div id="order" class="content">
-訂單查詢功能開發中
-</div>
+      <div class="qa">
+        Q：可以急件嗎？<br>
+        A：可以，急件費為 $100，系統會優先處理。
+      </div>
 
-<button class="btn btn-black"
-onclick="location.href='https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform'">
-加入合作夥伴
-</button>
+      <div class="qa">
+        Q：有沒有不能接的項目？<br>
+        A：違法、危險品或涉及高度個資風險的項目恕不承接，其餘可先詢問確認。
+      </div>
 
-</div>
+      <div class="qa">
+        Q：有開發票或收據嗎？<br>
+        A：目前提供收據或交易紀錄，暫不開立發票。
+      </div>
+    </div>
+
+    <button class="btn" onclick="toggle('orderSearch')">查詢訂單</button>
+    <div id="orderSearch" class="content">
+      <input id="orderId" placeholder="請輸入訂單編號，例如 UB123456" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid #ddd;font-size:16px;">
+      <button class="btn green" onclick="searchOrder()">查詢</button>
+      <div id="orderResult" style="margin-top:12px;">目前為簡易查詢頁，正式訂單資料庫功能開發中。</div>
+    </div>
+
+    <button class="btn green" onclick="location.href='https://ubee-line-bot-2-zezw.onrender.com/info.html'">
+      加入合作夥伴
+    </button>
+  </div>
 
 </div>
 
@@ -99,6 +81,18 @@ onclick="location.href='https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6
 function toggle(id){
   const el = document.getElementById(id);
   el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+
+function searchOrder(){
+  const orderId = document.getElementById('orderId').value.trim();
+  const result = document.getElementById('orderResult');
+
+  if(!orderId){
+    result.innerText = '請輸入訂單編號';
+    return;
+  }
+
+  result.innerText = `訂單 ${orderId} 查詢中。正式資料庫版本上線後，會顯示目前狀態、騎手與 ETA。`;
 }
 </script>
 
