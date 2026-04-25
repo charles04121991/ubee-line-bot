@@ -3,168 +3,112 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>UBee 建立任務</title>
+<title>UBee｜建立任務</title>
 
 <style>
-body{
-  margin:0;
-  font-family:-apple-system,BlinkMacSystemFont;
-  background:#f6f6f6;
-}
-
-/* 上方內容 */
-.container{
-  padding:24px 16px 130px;
-}
-
-/* 區塊 */
-.card{
-  background:white;
-  border-radius:16px;
-  padding:16px;
-  margin-bottom:16px;
-}
-
-/* 輸入框 */
-.input{
-  width:100%;
-  padding:14px;
-  border-radius:12px;
-  border:1px solid #ddd;
-  margin-top:8px;
-  font-size:16px;
-}
-
-/* 類型按鈕 */
-.type-btn{
-  display:inline-block;
-  padding:10px 14px;
-  border-radius:12px;
-  background:#eee;
-  margin-right:8px;
-  margin-top:8px;
-  cursor:pointer;
-}
-.active{
-  border:2px solid #00c300;
-  background:white;
-}
-
-/* 底部 */
-.bottom{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  background:white;
-  border-top:1px solid #ddd;
-  padding:8px 16px 14px;
-}
-
-/* 行 */
-.row{
-  display:flex;
-  justify-content:space-between;
-  font-size:14px;
-  margin:2px 0;
-}
-
-/* 總計 */
-.total{
-  font-weight:800;
-  font-size:18px;
-  margin-top:4px;
-}
-
-/* 按鈕 */
-.btn{
-  width:100%;
-  border:0;
-  border-radius:12px;
-  padding:11px;
-  font-size:16px;
-  margin-top:7px;
-}
-
-.btn-black{background:black;color:white;}
-.btn-green{background:#00c300;color:white;}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;background:#f6f6f6;color:#111}
+.container{padding:22px 16px 150px}
+h2{margin:0 0 18px;font-size:24px}
+.card{background:white;border-radius:16px;padding:16px;margin-bottom:14px}
+.label{font-weight:700;margin-bottom:10px}
+.cards{display:flex;gap:8px}
+.option{flex:1;background:#f2f2f2;border:2px solid transparent;border-radius:12px;padding:11px 4px;text-align:center;font-size:15px}
+.option.active{background:white;border-color:#00c300}
+input,textarea{width:100%;box-sizing:border-box;padding:13px;margin-top:8px;border-radius:12px;border:1px solid #ddd;font-size:16px}
+textarea{height:72px;resize:none}
+.bottom{position:fixed;left:0;right:0;bottom:0;background:white;border-top:1px solid #ddd;padding:8px 16px 14px}
+.row{display:flex;justify-content:space-between;align-items:center;font-size:14px;line-height:1.25;margin:2px 0}
+.total{font-weight:800;font-size:18px;margin-top:3px}
+.btn{width:100%;border:0;border-radius:12px;padding:11px;font-size:16px;margin-top:7px}
+.btn-black{background:#111;color:white}
+.btn-green{background:#00c300;color:white}
 </style>
 </head>
 
 <body>
 
 <div class="container">
+  <h2>🚀 建立任務</h2>
 
-<h2>🚀 建立任務</h2>
+  <div class="card">
+    <div class="label">服務類型</div>
+    <div class="cards" id="serviceCards">
+      <div class="option active" onclick="setService(this,'文件急送')">📄 文件</div>
+      <div class="option" onclick="setService(this,'商務物品')">🏢 商務</div>
+      <div class="option" onclick="setService(this,'個人物品')">👤 個人</div>
+      <div class="option" onclick="setService(this,'安全代送')">🔒 安全</div>
+    </div>
+  </div>
 
-<div class="card">
-  <div>服務類型</div>
-  <div>
-    <span class="type-btn active">文件</span>
-    <span class="type-btn">商務</span>
-    <span class="type-btn">個人</span>
-    <span class="type-btn">安全</span>
+  <div class="card">
+    <div class="label">路線資訊</div>
+    <input id="pickup" placeholder="取件地址">
+    <input id="pickupPhone" placeholder="取件電話">
+    <input id="dropoff" placeholder="送達地址">
+    <input id="dropoffPhone" placeholder="送達電話">
+  </div>
+
+  <div class="card">
+    <div class="label">配送速度</div>
+    <div class="cards" id="urgentCards">
+      <div class="option active" onclick="setUrgent(this,false)">一般</div>
+      <div class="option" onclick="setUrgent(this,true)">急件 +$100</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">任務內容</div>
+    <input id="item" placeholder="物品內容">
+    <textarea id="note" placeholder="備註"></textarea>
   </div>
 </div>
 
-<div class="card">
-  <div>路線資訊</div>
-  <input id="pickup" class="input" placeholder="取件地址">
-  <input id="pickupPhone" class="input" placeholder="取件電話">
-  <input id="dropoff" class="input" placeholder="送達地址">
-  <input id="dropoffPhone" class="input" placeholder="送達電話">
-</div>
-
-</div>
-
-<!-- 底部 -->
 <div class="bottom">
+  <div class="row"><span>距離</span><span id="distanceText">尚未估價</span></div>
+  <div class="row"><span>時間</span><span id="durationText">尚未估價</span></div>
+  <div class="row"><span>配送費</span><span id="deliveryFee">$99</span></div>
+  <div class="row"><span>服務費</span><span>$50</span></div>
+  <div class="row"><span>急件費</span><span id="urgentFee">$0</span></div>
+  <div class="row total"><span>總計</span><span id="totalFee">$149</span></div>
 
-<div class="row">
-  <div>距離</div>
-  <div id="distanceText">尚未估價</div>
-</div>
-
-<div class="row">
-  <div>時間</div>
-  <div id="durationText">尚未估價</div>
-</div>
-
-<div class="row">
-  <div>配送費</div>
-  <div id="deliveryFee">$99</div>
-</div>
-
-<div class="row">
-  <div>服務費</div>
-  <div>$50</div>
-</div>
-
-<div class="row">
-  <div>急件費</div>
-  <div id="urgentFee">$0</div>
-</div>
-
-<div class="row total">
-  <div>總計</div>
-  <div id="totalFee">$149</div>
-</div>
-
-<button class="btn btn-black" onclick="quoteOrder()">立即估價</button>
-<button class="btn btn-green">送出訂單</button>
-
+  <button class="btn btn-black" onclick="quoteOrder()">立即估價</button>
+  <button class="btn btn-green" onclick="submitOrder()">送出訂單</button>
 </div>
 
 <script>
-
+let service = '文件急送';
 let urgent = false;
+let currentDeliveryFee = 99;
+
+function setService(el, value){
+  service = value;
+  document.querySelectorAll('#serviceCards .option').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setUrgent(el, value){
+  urgent = value;
+  document.querySelectorAll('#urgentCards .option').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  updateTotal();
+}
+
+function updateTotal(){
+  const serviceFee = 50;
+  const urgentFee = urgent ? 100 : 0;
+  const total = currentDeliveryFee + serviceFee + urgentFee;
+
+  document.getElementById('deliveryFee').innerText = '$' + currentDeliveryFee;
+  document.getElementById('urgentFee').innerText = '$' + urgentFee;
+  document.getElementById('totalFee').innerText = '$' + total;
+}
 
 async function quoteOrder(){
   const from = document.getElementById('pickup').value.trim();
   const to = document.getElementById('dropoff').value.trim();
 
   if(!from || !to){
-    alert('請輸入地址');
+    alert('請輸入取件地址與送達地址');
     return;
   }
 
@@ -176,20 +120,52 @@ async function quoteOrder(){
 
   if(data.error){
     alert(data.error);
+    document.getElementById('distanceText').innerText = '尚未估價';
+    document.getElementById('durationText').innerText = '尚未估價';
     return;
   }
 
-  const serviceFee = 50;
-  const urgentFee = urgent ? 100 : 0;
-  const total = data.deliveryFee + serviceFee + urgentFee;
+  currentDeliveryFee = data.deliveryFee;
 
   document.getElementById('distanceText').innerText = data.distanceText;
   document.getElementById('durationText').innerText = data.durationText;
-  document.getElementById('deliveryFee').innerText = '$' + data.deliveryFee;
-  document.getElementById('urgentFee').innerText = '$' + urgentFee;
-  document.getElementById('totalFee').innerText = '$' + total;
+
+  updateTotal();
 }
 
+async function submitOrder(){
+  const data = {
+    service,
+    pickup: document.getElementById('pickup').value.trim(),
+    dropoff: document.getElementById('dropoff').value.trim(),
+    pickupPhone: document.getElementById('pickupPhone').value.trim(),
+    dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
+    item: document.getElementById('item').value.trim(),
+    note: document.getElementById('note').value.trim(),
+    urgent
+  };
+
+  if(!data.pickup || !data.dropoff || !data.pickupPhone || !data.dropoffPhone || !data.item){
+    alert('請完整填寫地址、電話與物品內容');
+    return;
+  }
+
+  const res = await fetch('/api/orders', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  });
+
+  const result = await res.json();
+
+  if(result.success){
+    alert('訂單已送出，系統派單中');
+  }else{
+    alert('送出失敗，請稍後再試');
+  }
+}
+
+updateTotal();
 </script>
 
 </body>
