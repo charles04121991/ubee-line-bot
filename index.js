@@ -64,7 +64,8 @@ app.post('/api/orders', async (req, res) => {
   pickupPhone,
   dropoffPhone,
   item,
-  note
+  note,
+  urgent
 } = req.body;
 
     const message = `
