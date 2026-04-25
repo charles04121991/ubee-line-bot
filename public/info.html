@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的資訊</title>
+
+<style>
+body{
+  margin:0;
+  font-family:-apple-system;
+  background:#f6f6f6;
+}
+
+.container{
+  padding:24px 16px;
+}
+
+.card{
+  background:white;
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:16px;
+}
+
+.title{
+  font-size:22px;
+  font-weight:700;
+  margin-bottom:10px;
+}
+
+.btn{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:0;
+  font-size:16px;
+  margin-top:10px;
+}
+
+.btn-black{
+  background:black;
+  color:white;
+}
+
+.content{
+  display:none;
+  margin-top:10px;
+  color:#333;
+  line-height:1.6;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+  <div class="title">👤 我的資訊</div>
+</div>
+
+<div class="card">
+
+<button class="btn btn-black" onclick="toggle('cancel')">取消規則</button>
+<div id="cancel" class="content">
+未接單可取消<br>
+已接單酌收30%費用<br>
+已取件後不可取消
+</div>
+
+<button class="btn btn-black" onclick="toggle('faq')">常見問題</button>
+<div id="faq" class="content">
+Q：可以送什麼？<br>
+A：文件、樣品、商務物品<br><br>
+Q：多久送達？<br>
+A：平均35分鐘內
+</div>
+
+<button class="btn btn-black" onclick="toggle('order')">查詢訂單</button>
+<div id="order" class="content">
+訂單查詢功能開發中
+</div>
+
+<button class="btn btn-black"
+onclick="location.href='https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform'">
+加入合作夥伴
+</button>
+
+</div>
+
+</div>
+
+<script>
+function toggle(id){
+  const el = document.getElementById(id);
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+</script>
+
+</body>
+</html>
