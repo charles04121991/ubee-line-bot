@@ -92,11 +92,37 @@ function updatePrice() {
   document.getElementById('totalFee').innerText = '$' + total;
 }
 
-function quoteOrder() {
-  // 這版先做畫面估價；下一步再接 Google Maps 自動距離/時間
-  document.getElementById('distanceText').innerText = '下一步接 Google Maps';
-  document.getElementById('durationText').innerText = '下一步接 Google Maps';
-  updatePrice();
+async function quoteOrder() {
+  const from = document.getElementById('pickup').value.trim();
+  const to = document.getElementById('dropoff').value.trim();
+
+  if (!from || !to) {
+    alert('請輸入取件地址與送達地址');
+    return;
+  }
+
+  document.getElementById('distanceText').innerText = '估價中...';
+  document.getElementById('durationText').innerText = '估價中...';
+
+  const res = await fetch(`/api/quote?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  const data = await res.json();
+
+  if (data.error) {
+    alert(data.error);
+    document.getElementById('distanceText').innerText = '尚未估價';
+    document.getElementById('durationText').innerText = '尚未估價';
+    return;
+  }
+
+  const serviceFee = 50;
+  const urgentFee = urgent ? 100 : 0;
+  const total = data.deliveryFee + serviceFee + urgentFee;
+
+  document.getElementById('distanceText').innerText = data.distanceText;
+  document.getElementById('durationText').innerText = data.durationText;
+  document.getElementById('deliveryFee').innerText = '$' + data.deliveryFee;
+  document.getElementById('urgentFee').innerText = '$' + urgentFee;
+  document.getElementById('totalFee').innerText = '$' + total;
 }
 
 function submitOrder() {
