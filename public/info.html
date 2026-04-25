@@ -6,14 +6,56 @@
 <title>UBee｜我的資訊</title>
 
 <style>
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;background:#f6f6f6;color:#111}
-.container{padding:24px 16px}
-.card{background:white;border-radius:16px;padding:16px;margin-bottom:14px}
-.title{font-size:22px;font-weight:800;margin-bottom:8px}
-.btn{width:100%;padding:14px;border-radius:12px;border:0;font-size:16px;margin-top:10px;background:#111;color:white}
-.content{display:none;margin-top:12px;line-height:1.75;color:#333;font-size:15px}
-.qa{margin-bottom:18px}
-.green{background:#00c300}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;
+  background:#f6f6f6;
+  color:#111;
+}
+
+.container{
+  padding:24px 16px;
+}
+
+.card{
+  background:white;
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:14px;
+}
+
+.title{
+  font-size:22px;
+  font-weight:800;
+  margin-bottom:8px;
+}
+
+.btn{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:0;
+  font-size:16px;
+  margin-top:10px;
+  background:#111;
+  color:white;
+}
+
+.green{
+  background:#00c300;
+}
+
+.content{
+  display:none;
+  margin-top:12px;
+  line-height:1.8;
+  color:#333;
+  font-size:15px;
+}
+
+.qa{
+  margin-bottom:18px;
+}
 </style>
 </head>
 
@@ -21,22 +63,30 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;
 
 <div class="container">
 
+  <!-- 標題 -->
   <div class="card">
     <div class="title">👤 我的資訊</div>
     <div>查詢規則、常見問題與合作夥伴申請</div>
   </div>
 
   <div class="card">
+
+    <!-- 取消規則 -->
     <button class="btn" onclick="toggle('cancel')">取消規則</button>
     <div id="cancel" class="content">
       未接單：可免費取消。<br><br>
+
       已接單：酌收配送費 30%，最低 $60，最高 $200。<br><br>
+
       騎手已抵達取件地點：酌收配送費 50%，最低 $100，最高 $300。<br><br>
+
       已取件後：原則上不可取消。
     </div>
 
+    <!-- 常見問題 -->
     <button class="btn" onclick="toggle('faq')">常見問題</button>
     <div id="faq" class="content">
+
       <div class="qa">
         Q：UBee 可以送什麼？<br>
         A：文件、樣品、商務物品、個人物品與安全代送。
@@ -44,7 +94,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;
 
       <div class="qa">
         Q：多久可以送達？<br>
-        A：依距離與路況而定，目標是一小時內快速送達，平均約 35 分鐘。
+        A：依距離與路況而定，目標一小時內快速送達，平均約 35 分鐘。
       </div>
 
       <div class="qa">
@@ -61,18 +111,28 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;
         Q：有開發票或收據嗎？<br>
         A：目前提供收據或交易紀錄，暫不開立發票。
       </div>
+
     </div>
 
+    <!-- 查詢訂單 -->
     <button class="btn" onclick="toggle('orderSearch')">查詢訂單</button>
     <div id="orderSearch" class="content">
-      <input id="orderId" placeholder="請輸入訂單編號，例如 UB123456" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid #ddd;font-size:16px;">
+      <input id="orderId" placeholder="請輸入訂單編號，例如 UB123456"
+        style="width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;font-size:16px;">
+
       <button class="btn green" onclick="searchOrder()">查詢</button>
-      <div id="orderResult" style="margin-top:12px;">目前為簡易查詢頁，正式訂單資料庫功能開發中。</div>
+
+      <div id="orderResult" style="margin-top:12px;">
+        目前為簡易查詢頁，正式資料庫版本開發中。
+      </div>
     </div>
 
-    <button class="btn green" onclick="location.href='https://ubee-line-bot-2-zezw.onrender.com/info.html'">
+    <!-- 加入合作夥伴 -->
+    <button class="btn green"
+      onclick="location.href='https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform'">
       加入合作夥伴
     </button>
+
   </div>
 
 </div>
@@ -92,7 +152,7 @@ function searchOrder(){
     return;
   }
 
-  result.innerText = `訂單 ${orderId} 查詢中。正式資料庫版本上線後，會顯示目前狀態、騎手與 ETA。`;
+  result.innerText = `訂單 ${orderId} 查詢中。\n正式資料庫版本會顯示：狀態、騎手、ETA。`;
 }
 </script>
 
