@@ -1685,6 +1685,48 @@ setInterval(async () => {
 }
 }, 10000);
 
+app.get('/api/quote', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.json({ error: '缺少地址' });
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(from)}&destinations=${encodeURIComponent(to)}&key=${process.env.GOOGLE_MAPS_API_KEY}&language=zh-TW`;
+
+    const r = await fetch(url);
+    const data = await r.json();
+
+    const element = data.rows[0].elements[0];
+
+    if (element.status !== 'OK') {
+      return res.json({ error: '地址解析失敗' });
+    }
+
+    const distanceKm = element.distance.value / 1000;
+    const durationMin = element.duration.value / 60;
+
+    const baseFee = 99;
+    const perKm = 8;
+    const perMin = 2;
+    const serviceFee = 50;
+
+    const distanceFee = Math.ceil(distanceKm) * perKm;
+    const timeFee = Math.ceil(durationMin) * perMin;
+
+    const deliveryFee = baseFee + distanceFee + timeFee;
+
+    res.json({
+      distanceText: element.distance.text,
+      durationText: element.duration.text,
+      deliveryFee
+    });
+
+  } catch (e) {
+    res.json({ error: '系統錯誤' });
+  }
+});
 app.listen(PORT, () => {
   console.log(`✅ UBee OMS 主選單精簡版（完整付款版）啟動成功，PORT: ${PORT}`);
 });
