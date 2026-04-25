@@ -1633,15 +1633,15 @@ app.head('/', (req, res) => {
 });
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
-  res.status(200).send('OK');
-
-  const events = req.body.events || [];
-
   try {
+    const events = req.body.events || [];
+
     await Promise.all(events.map(handleEvent));
-  } catch (error) {
-    console.error('❌ webhook 錯誤，加入補處理：', error);
-    eventQueue.push(...events);
+
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
   }
 });
 
