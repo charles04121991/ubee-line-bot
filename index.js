@@ -182,7 +182,7 @@ await client.pushMessage(LINE_GROUP_ID, {
           action: {
             type: 'postback',
             label: '接單',
-            data: `accept|${orderId}`
+            data: `accept_${orderId}`
           }
         }
       ]
