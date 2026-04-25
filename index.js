@@ -1634,10 +1634,6 @@ app.head('/', (req, res) => {
 
 app.post('/webhook', line.middleware(config), async (req, res) => {
   try {
-    const events = req.body.events || [];
-
-    await Promise.all(events.map(handleEvent));
-
     res.status(200).send('OK');
   } catch (err) {
     console.error(err);
