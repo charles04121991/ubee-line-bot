@@ -267,6 +267,22 @@ function createTextMessage(text) {
 }
 
 function createActionButton(label, data, style = 'primary') {
+
+  // 👉 只有「立即下單」走 H5
+  if (label === '立即下單') {
+    return {
+      type: 'button',
+      style,
+      height: 'sm',
+      action: {
+        type: 'uri',
+        label,
+        uri: 'https://ubee-line-bot-2-zezw.onrender.com/order.html'
+      }
+    };
+  }
+
+  // 👉 其他維持原本
   return {
     type: 'button',
     style,
