@@ -174,7 +174,7 @@ await client.pushMessage(LINE_GROUP_ID, {
           action: {
             type: 'postback',
             label: '接單',
-            data: `accept_${orderId}`
+            data: `accept|${orderId}`
           }
         }
       ]
@@ -1089,6 +1089,17 @@ async function handleTextStep(event, userId, text) {
 async function handlePostback(event) {
   const data = event.postback.data || '';
   const userId = event.source.userId;
+  if (data.startsWith('accept_')) {
+  const orderId = data.split('_')[1];
+
+  await client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: `✅ 已接單\n訂單編號：${orderId}`
+  });
+
+  await client.pushMessage(userId, createETAFlex(orderId));
+  return;
+}
 
   if (data === 'menu=order') {
     return client.replyMessage(event.replyToken, [createOrderMenuFlex()]);
