@@ -82,9 +82,58 @@ app.post('/api/orders', async (req, res) => {
     `;
 
     await client.pushMessage(LINE_GROUP_ID, {
-      type: 'text',
-      text: message
-    });
+  type: 'flex',
+  altText: '📦 UBee 新訂單',
+  contents: {
+    type: 'bubble',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'text',
+          text: '📦 UBee 新訂單',
+          weight: 'bold',
+          size: 'lg'
+        },
+        {
+          type: 'text',
+          text: `服務：${service}`,
+          margin: 'md'
+        },
+        {
+          type: 'text',
+          text: `取件：${pickup}`,
+          wrap: true
+        },
+        {
+          type: 'text',
+          text: `送達：${dropoff}`,
+          wrap: true
+        },
+        {
+          type: 'text',
+          text: `物品：${item}`
+        }
+      ]
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          action: {
+            type: 'postback',
+            label: '接單',
+            data: `accept_${Date.now()}`
+          }
+        }
+      ]
+    }
+  }
+});
 
     res.json({ success: true });
   } catch (err) {
