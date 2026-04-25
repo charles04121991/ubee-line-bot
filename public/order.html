@@ -58,7 +58,7 @@
   
 <div class="card">
   <h3>是否急件</h3>
-  <select id="urgent">
+  <select id="urgent" onchange="updatePrice()">
     <option value="false">一般任務</option>
     <option value="true">急件（+$100）</option>
   </select>
@@ -82,6 +82,7 @@
     <h3>費用預估</h3>
     <p>基本費：$99</p>
     <p>服務費：$50</p>
+    <p id="urgentFeeText">急件費：$0</p>
     <p id="total">預估總計：$149</p>
   </div>
 
