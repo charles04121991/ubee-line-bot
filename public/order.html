@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UBee｜城市任務跑腿</title>
+  <style>
+    body {
+      font-family: Arial;
+      margin: 0;
+      background: #f5f5f5;
+    }
+    .container {
+      padding: 20px;
+    }
+    h1 {
+      font-size: 20px;
+      text-align: center;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+    .btn {
+      background: #00b894;
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      margin-top: 10px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>UBee｜城市任務跑腿</h1>
+
+  <div class="card">
+    <h3>服務類型</h3>
+    <select id="service">
+      <option>文件急送</option>
+      <option>商務物品</option>
+      <option>個人物品</option>
+      <option>安全代送</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h3>路線資訊</h3>
+    <input id="pickup" placeholder="取件地址">
+    <input id="dropoff" placeholder="送達地址">
+    <input id="pickupPhone" placeholder="取件電話">
+    <input id="dropoffPhone" placeholder="送達電話">
+  </div>
+
+  <div class="card">
+    <h3>任務內容</h3>
+    <input id="item" placeholder="物品內容">
+    <input id="note" placeholder="備註">
+  </div>
+
+  <div class="card">
+    <h3>費用預估</h3>
+    <p>基本費：$99</p>
+    <p>服務費：$50</p>
+    <p id="total">預估總計：$149</p>
+  </div>
+
+  <div class="btn" onclick="submitOrder()">確認送出</div>
+</div>
+
+<script>
+function submitOrder() {
+  const data = {
+    service: document.getElementById('service').value,
+    pickup: document.getElementById('pickup').value,
+    dropoff: document.getElementById('dropoff').value,
+    pickupPhone: document.getElementById('pickupPhone').value,
+    dropoffPhone: document.getElementById('dropoffPhone').value,
+    item: document.getElementById('item').value,
+    note: document.getElementById('note').value
+  };
+
+  fetch('/api/orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  })
+  .then(res => res.json())
+  .then(() => {
+    alert('訂單已送出！');
+  });
+}
+</script>
+
+</body>
+</html>
