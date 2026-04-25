@@ -4,6 +4,7 @@ const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
 
 const app = express();
+app.use(express.static('public'));
 const admin = require('firebase-admin');
 
 admin.initializeApp({
