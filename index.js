@@ -82,7 +82,15 @@ app.post('/api/orders', async (req, res) => {
     `;
 
     const orderId = 'UB' + Date.now().toString().slice(-6);
-const driverFee = '計算中'; // 先佔位，之後接計價
+let driverFee = 99 + 50; // 基本費 + 服務費
+
+// 急件加價
+if (urgent) {
+  driverFee += 100;
+}
+
+// 騎手抽成（60%）
+driverFee = Math.floor(driverFee * 0.6);
 
 await client.pushMessage(LINE_GROUP_ID, {
   type: 'flex',
