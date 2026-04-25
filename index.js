@@ -1107,14 +1107,6 @@ async function handlePostback(event) {
       text: '❌ 訂單不存在或系統已重啟'
     });
   }
-const orders = global.orders || {};
-
-if (!orders[orderId]) {
-  return client.replyMessage(event.replyToken, {
-    type: 'text',
-    text: '❌ 訂單不存在或系統已重啟'
-  });
-}
 
 if (orders[orderId].status === 'accepted') {
   return client.replyMessage(event.replyToken, {
