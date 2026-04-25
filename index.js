@@ -53,6 +53,45 @@ if (!LINE_GROUP_ID) {
   console.error('❌ 缺少 LINE_GROUP_ID');
   process.exit(1);
 }
+app.use(express.json());
+
+app.post('/api/orders', async (req, res) => {
+  try {
+    const {
+  service,
+  pickup,
+  dropoff,
+  pickupPhone,
+  dropoffPhone,
+  item,
+  note
+} = req.body;
+
+    const message = `
+📦【UBee 新訂單】
+
+📌 服務類型：${service}
+📍 取件：${pickup}
+📍 送達：${dropoff}
+
+📞 取件電話：${pickupPhone}
+📞 收件電話：${dropoffPhone}
+
+📦 物品：${item}
+📝 備註：${note || '無'}
+    `;
+
+    await client.pushMessage(LINE_GROUP_ID, {
+      type: 'text',
+      text: message
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+});
 
 if (!GOOGLE_MAPS_API_KEY) {
   console.error('❌ 缺少 GOOGLE_MAPS_API_KEY');
