@@ -90,6 +90,20 @@
 </div>
 
 <script>
+
+function updatePrice() {
+  const isUrgent = document.getElementById('urgent').value === 'true';
+
+  const baseFee = 99;
+  const serviceFee = 50;
+  const urgentFee = isUrgent ? 100 : 0;
+
+  const total = baseFee + serviceFee + urgentFee;
+
+  document.getElementById('urgentFeeText').innerText = `急件費：$${urgentFee}`;
+  document.getElementById('total').innerText = `預估總計：$${total}`;
+}
+
 function submitOrder() {
   const data = {
     service: document.getElementById('service').value,
@@ -114,6 +128,7 @@ function submitOrder() {
     alert('訂單已送出！');
   });
 }
+updatePrice();
 </script>
 
 </body>
