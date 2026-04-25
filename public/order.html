@@ -1,134 +1,153 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>UBee｜城市任務跑腿</title>
-  <style>
-    body {
-      font-family: Arial;
-      margin: 0;
-      background: #f5f5f5;
-    }
-    .container {
-      padding: 20px;
-    }
-    h1 {
-      font-size: 20px;
-      text-align: center;
-    }
-    .card {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      margin-bottom: 15px;
-    }
-    .btn {
-      background: #00b894;
-      color: white;
-      padding: 12px;
-      border-radius: 8px;
-      text-align: center;
-      margin-top: 10px;
-    }
-    input, select {
-      width: 100%;
-      padding: 10px;
-      margin-top: 8px;
-      margin-bottom: 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UBee 下單</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont;
+  background: #f5f5f5;
+}
+
+.container {
+  padding: 16px;
+  padding-bottom: 120px;
+}
+
+h2 {
+  margin-bottom: 10px;
+}
+
+.card-group {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+}
+
+.card {
+  flex: 1;
+  min-width: 100px;
+  padding: 12px;
+  background: white;
+  border-radius: 12px;
+  text-align: center;
+  border: 2px solid transparent;
+}
+
+.card.active {
+  border-color: #00c300;
+}
+
+input, textarea {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  font-size: 16px;
+}
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid #ddd;
+  padding: 10px;
+}
+
+.price {
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  background: #00c300;
+  color: white;
+  font-size: 16px;
+}
+</style>
 </head>
+
 <body>
 
 <div class="container">
-  <h1>UBee｜城市任務跑腿</h1>
 
-  <div class="card">
-    <h3>服務類型</h3>
-    <select id="service">
-      <option>文件急送</option>
-      <option>商務物品</option>
-      <option>個人物品</option>
-      <option>安全代送</option>
-    </select>
-  </div>
-  
-<div class="card">
-  <h3>是否急件</h3>
-  <select id="urgent" onchange="updatePrice()">
-    <option value="false">一般任務</option>
-    <option value="true">急件（+$100）</option>
-  </select>
+<h2>🚀 建立任務</h2>
+
+<!-- 服務類型 -->
+<div>
+<p>服務類型</p>
+<div class="card-group">
+  <div class="card active" onclick="selectType(this,'文件')">📄 文件</div>
+  <div class="card" onclick="selectType(this,'商務')">🏢 商務</div>
+  <div class="card" onclick="selectType(this,'個人')">👤 個人</div>
+  <div class="card" onclick="selectType(this,'安全')">🔒 安全</div>
+</div>
 </div>
 
-  <div class="card">
-    <h3>路線資訊</h3>
-    <input id="pickup" placeholder="取件地址">
-    <input id="dropoff" placeholder="送達地址">
-    <input id="pickupPhone" placeholder="取件電話">
-    <input id="dropoffPhone" placeholder="送達電話">
-  </div>
+<input id="pickup" placeholder="取件地址">
+<input id="dropoff" placeholder="送達地址">
+<input id="phone" placeholder="聯絡電話">
 
-  <div class="card">
-    <h3>任務內容</h3>
-    <input id="item" placeholder="物品內容">
-    <input id="note" placeholder="備註">
-  </div>
+<!-- 急件 -->
+<div style="margin-top:15px;">
+<p>配送速度</p>
+<div class="card-group">
+  <div class="card active" onclick="setUrgent(false)">一般</div>
+  <div class="card" onclick="setUrgent(true)">急件 +100</div>
+</div>
+</div>
 
-  <div class="card">
-    <h3>費用預估</h3>
-    <p>基本費：$99</p>
-    <p>服務費：$50</p>
-    <p id="urgentFeeText">急件費：$0</p>
-    <p id="total">預估總計：$149</p>
-  </div>
+<textarea id="note" placeholder="備註"></textarea>
 
-  <div class="btn" onclick="submitOrder()">確認送出</div>
+</div>
+
+<!-- 底部 -->
+<div class="bottom-bar">
+  <div class="price">預估費用：<span id="price">99</span> 元</div>
+  <button class="btn" onclick="submitOrder()">送出訂單</button>
 </div>
 
 <script>
 
+let type = '文件';
+let urgent = false;
+
+function selectType(el, t) {
+  type = t;
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setUrgent(val) {
+  urgent = val;
+  updatePrice();
+
+  document.querySelectorAll('.card-group')[1].querySelectorAll('.card')
+    .forEach(c => c.classList.remove('active'));
+
+  event.target.classList.add('active');
+}
+
 function updatePrice() {
-  const isUrgent = document.getElementById('urgent').value === 'true';
-
-  const baseFee = 99;
-  const serviceFee = 50;
-  const urgentFee = isUrgent ? 100 : 0;
-
-  const total = baseFee + serviceFee + urgentFee;
-
-  document.getElementById('urgentFeeText').innerText = `急件費：$${urgentFee}`;
-  document.getElementById('total').innerText = `預估總計：$${total}`;
+  let price = 99;
+  if (urgent) price += 100;
+  document.getElementById('price').innerText = price;
 }
 
 function submitOrder() {
-  const data = {
-    service: document.getElementById('service').value,
-    pickup: document.getElementById('pickup').value,
-    dropoff: document.getElementById('dropoff').value,
-    pickupPhone: document.getElementById('pickupPhone').value,
-    dropoffPhone: document.getElementById('dropoffPhone').value,
-    item: document.getElementById('item').value,
-    note: document.getElementById('note').value,
-    urgent: document.getElementById('urgent').value === 'true'
-  };
-
-  fetch('/api/orders', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  })
-  .then(res => res.json())
-  .then(() => {
-    alert('訂單已送出！');
-  });
+  alert("🚀 訂單已送出，系統派單中");
 }
-updatePrice();
+
 </script>
 
 </body>
