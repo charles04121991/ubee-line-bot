@@ -93,6 +93,14 @@ if (urgent) {
 // 騎手抽成（60%）
 driverFee = Math.floor(driverFee * 0.6);
 
+const orders = global.orders || {};
+global.orders = orders;
+
+orders[orderId] = {
+  status: 'pending',
+  riderId: null
+};
+
 await client.pushMessage(LINE_GROUP_ID, {
   type: 'flex',
   altText: '📦 UBee 新訂單',
@@ -1091,15 +1099,40 @@ async function handlePostback(event) {
   const userId = event.source.userId;
   if (data.startsWith('accept_')) {
   const orderId = data.split('_')[1];
+  const orders = global.orders || {};
 
-  await client.replyMessage(event.replyToken, {
+  if (!orders[orderId]) {
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: '❌ 訂單不存在或系統已重啟'
+    });
+  }
+const orders = global.orders || {};
+
+if (!orders[orderId]) {
+  return client.replyMessage(event.replyToken, {
     type: 'text',
-    text: `✅ 已接單\n訂單編號：${orderId}`
+    text: '❌ 訂單不存在或系統已重啟'
   });
-
-  await client.pushMessage(userId, createETAFlex(orderId));
-  return;
 }
+
+if (orders[orderId].status === 'accepted') {
+  return client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: '❌ 此訂單已被其他騎手接走'
+  });
+}
+
+orders[orderId].status = 'accepted';
+orders[orderId].riderId = userId;
+
+await client.replyMessage(event.replyToken, {
+  type: 'text',
+  text: `✅ 已接單\n訂單編號：${orderId}`
+});
+
+await client.pushMessage(userId, createETAFlex(orderId));
+return;
 
   if (data === 'menu=order') {
     return client.replyMessage(event.replyToken, [createOrderMenuFlex()]);
