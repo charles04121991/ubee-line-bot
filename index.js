@@ -81,7 +81,10 @@ app.post('/api/orders', async (req, res) => {
 📝 備註：${note || '無'}
     `;
 
-    await client.pushMessage(LINE_GROUP_ID, {
+    const orderId = 'UB' + Date.now().toString().slice(-6);
+const driverFee = '計算中'; // 先佔位，之後接計價
+
+await client.pushMessage(LINE_GROUP_ID, {
   type: 'flex',
   altText: '📦 UBee 新訂單',
   contents: {
@@ -95,6 +98,29 @@ app.post('/api/orders', async (req, res) => {
           text: '📦 UBee 新訂單',
           weight: 'bold',
           size: 'lg'
+        },
+        {
+          type: 'text',
+          text: `訂單編號：${orderId}`,
+          size: 'sm',
+          color: '#888888'
+        },
+        {
+          type: 'text',
+          text: '🟡 狀態：待接單',
+          size: 'sm',
+          color: '#ff9500'
+        },
+        {
+          type: 'separator',
+          margin: 'md'
+        },
+        {
+          type: 'text',
+          text: `💰 騎手收入：${driverFee}`,
+          weight: 'bold',
+          color: '#00a000',
+          margin: 'md'
         },
         {
           type: 'text',
@@ -113,7 +139,19 @@ app.post('/api/orders', async (req, res) => {
         },
         {
           type: 'text',
-          text: `物品：${item}`
+          text: `📞 取件電話：${pickupPhone}`
+        },
+        {
+          type: 'text',
+          text: `📞 收件電話：${dropoffPhone}`
+        },
+        {
+          type: 'text',
+          text: `📦 物品：${item}`
+        },
+        {
+          type: 'text',
+          text: `📝 備註：${note || '無'}`
         }
       ]
     },
@@ -127,7 +165,7 @@ app.post('/api/orders', async (req, res) => {
           action: {
             type: 'postback',
             label: '接單',
-            data: `accept_${Date.now()}`
+            data: `accept_${orderId}`
           }
         }
       ]
