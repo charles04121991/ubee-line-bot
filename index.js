@@ -1129,7 +1129,6 @@ if (data.startsWith('accept_')) {
     text: `✅ 已接單\n訂單編號：${orderId}`
   });
 
-  await client.pushMessage(userId, createETAFlex(orderId));
   return;
 }
   if (data === 'menu=order') {
