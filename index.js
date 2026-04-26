@@ -92,15 +92,22 @@ if (urgent) {
 
 // 騎手抽成（60%）
 driverFee = Math.floor(driverFee * 0.6);
-
 const orders = global.orders || {};
-global.orders = orders;
 
 orders[orderId] = {
+  orderId,
+  service,
+  pickup,
+  dropoff,
+  pickupPhone,
+  dropoffPhone,
+  item,
+  note,
+  urgent,
   status: 'pending',
   riderId: null
 };
-
+global.orders = orders;
 await client.pushMessage(LINE_GROUP_ID, {
   type: 'flex',
   altText: '📦 UBee 新訂單',
