@@ -135,15 +135,16 @@ async function quoteOrder(){
 
 async function submitOrder(){
   const data = {
-    service,
-    pickup: document.getElementById('pickup').value.trim(),
-    dropoff: document.getElementById('dropoff').value.trim(),
-    pickupPhone: document.getElementById('pickupPhone').value.trim(),
-    dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
-    item: document.getElementById('item').value.trim(),
-    note: document.getElementById('note').value.trim(),
-    urgent
-  };
+  service,
+  pickup: document.getElementById('pickup').value,
+  dropoff: document.getElementById('dropoff').value,
+  pickupPhone: document.getElementById('pickupPhone').value,
+  dropoffPhone: document.getElementById('dropoffPhone').value,
+  item: document.getElementById('item').value,
+  note: document.getElementById('note').value,
+  urgent,
+  userId: 'U35f1d4bbead28a9ce8ce13d31abf3029' // ⭐ 就加在這一行
+};
 
   if(!data.pickup || !data.dropoff || !data.pickupPhone || !data.dropoffPhone || !data.item){
     alert('請完整填寫地址、電話與物品內容');
