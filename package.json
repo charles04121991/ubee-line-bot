@@ -1,19 +1,18 @@
 {
-  "name": "ubee-oms-minimal-payment",
-  "version": "3.8.4",
-  "description": "UBee OMS 主選單精簡版（完整付款版）",
+  "name": "ubee-oms-h5",
+  "version": "3.9.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "engines": {
-    "node": ">=18"
-  },
   "dependencies": {
-    "@line/bot-sdk": "^9.5.0",
+    "@line/bot-sdk": "^10.2.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "firebase-admin": "^13.5.0",
+    "firebase-admin": "^13.0.2",
     "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
