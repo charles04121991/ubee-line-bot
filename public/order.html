@@ -22,6 +22,7 @@ textarea{height:72px;resize:none}
 .btn{width:100%;border:0;border-radius:12px;padding:11px;font-size:16px;margin-top:7px}
 .btn-black{background:#111;color:white}
 .btn-green{background:#00c300;color:white}
+.btn:disabled{opacity:.55}
 </style>
 </head>
 
@@ -71,14 +72,15 @@ textarea{height:72px;resize:none}
   <div class="row"><span>急件費</span><span id="urgentFee">$0</span></div>
   <div class="row total"><span>總計</span><span id="totalFee">$149</span></div>
 
-  <button class="btn btn-black" onclick="quoteOrder()">立即估價</button>
-  <button class="btn btn-green" onclick="submitOrder()">送出訂單</button>
+  <button id="quoteBtn" class="btn btn-black" onclick="quoteOrder()">立即估價</button>
+  <button id="submitBtn" class="btn btn-green" onclick="submitOrder()">送出訂單</button>
 </div>
 
 <script>
 let service = '文件急送';
 let urgent = false;
 let currentDeliveryFee = 99;
+let isSubmitting = false;
 
 function setService(el, value){
   service = value;
@@ -103,66 +105,114 @@ function updateTotal(){
   document.getElementById('totalFee').innerText = '$' + total;
 }
 
-async function quoteOrder(){
-  const from = document.getElementById('pickup').value.trim();
-  const to = document.getElementById('dropoff').value.trim();
+function getFormData(){
+  return {
+    service,
+    pickup: document.getElementById('pickup').value.trim(),
+    dropoff: document.getElementById('dropoff').value.trim(),
+    pickupPhone: document.getElementById('pickupPhone').value.trim(),
+    dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
+    item: document.getElementById('item').value.trim(),
+    note: document.getElementById('note').value.trim(),
+    urgent,
+    userId: 'web-order'
+  };
+}
 
-  if(!from || !to){
+function validateOrder(data){
+  if(!data.pickup || !data.dropoff){
     alert('請輸入取件地址與送達地址');
-    return;
+    return false;
   }
+
+  if(!data.pickupPhone || !data.dropoffPhone || !data.item){
+    alert('請完整填寫電話與物品內容');
+    return false;
+  }
+
+  return true;
+}
+
+async function quoteOrder(){
+  const data = getFormData();
+
+  if(!data.pickup || !data.dropoff){
+    alert('請輸入取件地址與送達地址');
+    return false;
+  }
+
+  const quoteBtn = document.getElementById('quoteBtn');
+  quoteBtn.disabled = true;
+  quoteBtn.innerText = '估價中...';
 
   document.getElementById('distanceText').innerText = '估價中...';
   document.getElementById('durationText').innerText = '估價中...';
 
-  const res = await fetch(`/api/quote?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-  const data = await res.json();
+  try{
+    const res = await fetch(`/api/quote?from=${encodeURIComponent(data.pickup)}&to=${encodeURIComponent(data.dropoff)}`);
+    const result = await res.json();
 
-  if(data.error){
-    alert(data.error);
+    if(!res.ok || result.error){
+      throw new Error(result.error || '估價失敗');
+    }
+
+    currentDeliveryFee = Number(result.deliveryFee || 99);
+
+    document.getElementById('distanceText').innerText = result.distanceText || '已估價';
+    document.getElementById('durationText').innerText = result.durationText || '已估價';
+
+    updateTotal();
+    return true;
+
+  }catch(err){
+    alert(err.message || '估價失敗，請稍後再試');
     document.getElementById('distanceText').innerText = '尚未估價';
     document.getElementById('durationText').innerText = '尚未估價';
-    return;
+    currentDeliveryFee = 99;
+    updateTotal();
+    return false;
+
+  }finally{
+    quoteBtn.disabled = false;
+    quoteBtn.innerText = '立即估價';
   }
-
-  currentDeliveryFee = data.deliveryFee;
-
-  document.getElementById('distanceText').innerText = data.distanceText;
-  document.getElementById('durationText').innerText = data.durationText;
-
-  updateTotal();
 }
 
 async function submitOrder(){
-  const data = {
-  service,
-  pickup: document.getElementById('pickup').value,
-  dropoff: document.getElementById('dropoff').value,
-  pickupPhone: document.getElementById('pickupPhone').value,
-  dropoffPhone: document.getElementById('dropoffPhone').value,
-  item: document.getElementById('item').value,
-  note: document.getElementById('note').value,
-  urgent,
-  userId: 'U35f1d4bbead28a9ce8ce13d31abf3029' // ⭐ 就加在這一行
-};
+  if(isSubmitting) return;
 
-  if(!data.pickup || !data.dropoff || !data.pickupPhone || !data.dropoffPhone || !data.item){
-    alert('請完整填寫地址、電話與物品內容');
-    return;
-  }
+  const data = getFormData();
 
-  const res = await fetch('/api/orders', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(data)
-  });
+  if(!validateOrder(data)) return;
 
-  const result = await res.json();
+  isSubmitting = true;
 
-  if(result.success){
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerText = '送出中...';
+
+  try{
+    const res = await fetch('/api/orders', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if(!res.ok || !result.success){
+      throw new Error(result.error || '送出失敗');
+    }
+
     alert('訂單已送出，系統派單中');
-  }else{
-    alert('送出失敗，請稍後再試');
+
+  }catch(err){
+    alert(err.message || '送出失敗，請稍後再試');
+
+  }finally{
+    isSubmitting = false;
+    submitBtn.disabled = false;
+    submitBtn.innerText = '送出訂單';
   }
 }
 
