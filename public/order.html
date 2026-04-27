@@ -8,68 +8,152 @@
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
+    * { box-sizing: border-box; }
+
     body {
+      margin: 0;
+      padding: 22px 16px 36px;
       font-family: Arial, "Noto Sans TC", sans-serif;
-      padding: 20px;
       background: #f6f6f6;
       color: #111;
     }
 
-    h2 {
-      margin-top: 0;
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .title {
+      font-size: 34px;
+      font-weight: 900;
+      margin: 14px 0 6px;
+      letter-spacing: -1px;
+    }
+
+    .subtitle {
+      font-size: 17px;
+      color: #666;
+      line-height: 1.55;
+      margin-bottom: 20px;
     }
 
     .card {
       background: #fff;
-      padding: 16px;
-      border-radius: 14px;
+      border-radius: 26px;
+      padding: 22px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.04);
+    }
+
+    .step-badge {
+      display: inline-block;
+      background: #111;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 999px;
       margin-bottom: 14px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
 
-    label {
-      display: block;
-      font-weight: bold;
-      margin: 12px 0 6px;
+    .section-title {
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 16px;
     }
 
-    input, textarea, select {
+    .required {
+      color: #d60000;
+      margin-left: 4px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .option {
+      background: #f2f2f2;
+      border: 3px solid transparent;
+      border-radius: 18px;
+      padding: 18px 14px;
+      min-height: 92px;
+      cursor: pointer;
+      transition: .15s;
+    }
+
+    .option.active {
+      border-color: #00c300;
+      background: #fff;
+      box-shadow: 0 0 0 1px rgba(0,195,0,.15);
+    }
+
+    .option-title {
+      font-size: 20px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .option-desc {
+      font-size: 15px;
+      color: #666;
+      line-height: 1.35;
+    }
+
+    input, textarea {
       width: 100%;
-      box-sizing: border-box;
-      margin-bottom: 10px;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 18px;
+      padding: 17px 18px;
+      font-size: 17px;
+      margin-bottom: 12px;
+      outline: none;
+      background: #fff;
+    }
+
+    input:focus, textarea:focus {
+      border-color: #00c300;
+      box-shadow: 0 0 0 3px rgba(0,195,0,.08);
     }
 
     textarea {
-      min-height: 80px;
+      min-height: 92px;
+      resize: vertical;
     }
 
-    button {
+    .hint {
+      font-size: 15px;
+      color: #666;
+      line-height: 1.5;
+      margin-top: 2px;
+    }
+
+    .main-btn {
       width: 100%;
-      padding: 15px;
-      background: #00c300;
-      color: #fff;
       border: none;
-      border-radius: 10px;
-      font-size: 18px;
-      font-weight: bold;
-      margin-top: 10px;
+      border-radius: 18px;
+      background: #00c300;
+      color: white;
+      font-size: 20px;
+      font-weight: 900;
+      padding: 18px;
+      margin-top: 6px;
+      cursor: pointer;
     }
 
-    button.secondary {
+    .main-btn:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .dark-btn {
       background: #111;
     }
 
-    button.light {
-      background: #eee;
+    .light-btn {
+      background: #f0f0f0;
       color: #111;
-    }
-
-    button:disabled {
-      opacity: .55;
     }
 
     .hidden {
@@ -78,87 +162,170 @@
 
     .status {
       white-space: pre-line;
-      background: #fff8df;
-      border: 1px solid #ffe2a0;
-      padding: 12px;
-      border-radius: 10px;
-      margin-top: 12px;
+      background: #fff7db;
+      border: 1px solid #ffe3a3;
+      border-radius: 18px;
+      padding: 16px;
+      font-size: 16px;
       line-height: 1.6;
-      font-size: 15px;
+      margin-top: 14px;
     }
 
-    .paymentInfo {
+    .payment-info {
       white-space: pre-line;
-      background: #f1f1f1;
-      padding: 12px;
-      border-radius: 10px;
-      margin-top: 12px;
+      background: #f5f5f5;
+      border-radius: 18px;
+      padding: 16px;
+      font-size: 16px;
       line-height: 1.6;
-      font-size: 15px;
+      margin-top: 14px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      font-size: 16px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .summary-row:last-child {
+      border-bottom: none;
+      font-weight: 900;
+      font-size: 20px;
+    }
+
+    @media (max-width: 420px) {
+      .title { font-size: 30px; }
+      .section-title { font-size: 22px; }
+      .option-title { font-size: 18px; }
+      .card { padding: 20px; border-radius: 24px; }
     }
   </style>
 </head>
 
 <body>
+  <div class="page">
+    <div class="title">🚀 UBee 建立任務</div>
+    <div class="subtitle">
+      在 LINE 官方帳號內填寫，不需要跳到其他 App。先填任務資料，往下會看到費用與付款方式。
+    </div>
 
-<h2>🚀 UBee 建立任務</h2>
+    <div class="card">
+      <div class="step-badge">Step 1</div>
+      <div class="section-title">服務類型<span class="required">*</span></div>
 
-<div class="card">
-  <label>服務類型</label>
-  <select id="serviceType">
-    <option value="文件急送">文件急送</option>
-    <option value="商務物品">商務物品</option>
-    <option value="個人物品">個人物品</option>
-    <option value="安全代送">安全代送</option>
-  </select>
+      <div class="grid" id="serviceGrid">
+        <div class="option active" onclick="selectService(this, '文件急送')">
+          <div class="option-title">📄 文件急送</div>
+          <div class="option-desc">合約、發票、公司文件</div>
+        </div>
+        <div class="option" onclick="selectService(this, '商務物品')">
+          <div class="option-title">🏢 商務物品</div>
+          <div class="option-desc">樣品、資料、公司物件</div>
+        </div>
+        <div class="option" onclick="selectService(this, '個人物品')">
+          <div class="option-title">👤 個人物品</div>
+          <div class="option-desc">鑰匙、小物、遺留物</div>
+        </div>
+        <div class="option" onclick="selectService(this, '安全代送')">
+          <div class="option-title">🔒 安全代送</div>
+          <div class="option-desc">需穩妥交付的物件</div>
+        </div>
+      </div>
+    </div>
 
-  <label>配送速度</label>
-  <select id="speedType">
-    <option value="standard">一般件</option>
-    <option value="priority">快速件 +NT$50</option>
-    <option value="express">急件 +NT$100</option>
-    <option value="rush">極速件 +NT$200</option>
-  </select>
+    <div class="card">
+      <div class="step-badge">Step 2</div>
+      <div class="section-title">路線與聯絡資訊<span class="required">*</span></div>
 
-  <label>取件地址</label>
-  <input id="pickup" placeholder="例如：台中市北屯區...">
+      <input id="pickup" placeholder="取件地址，例如：台中市北屯區...">
+      <input id="pickupPhone" placeholder="取件電話">
+      <input id="dropoff" placeholder="送達地址，例如：台中市西屯區...">
+      <input id="dropoffPhone" placeholder="送達電話">
 
-  <label>取件電話</label>
-  <input id="pickupPhone" placeholder="例如：0912345678">
+      <div class="hint">地址越完整，系統估價越準。若是大樓、公司、樓層，可寫在備註。</div>
+    </div>
 
-  <label>送達地址</label>
-  <input id="dropoff" placeholder="例如：台中市西屯區...">
+    <div class="card">
+      <div class="step-badge">Step 3</div>
+      <div class="section-title">配送速度<span class="required">*</span></div>
 
-  <label>送達電話</label>
-  <input id="dropoffPhone" placeholder="例如：0912345678">
+      <div class="grid" id="speedGrid">
+        <div class="option active" onclick="selectSpeed(this, 'standard')">
+          <div class="option-title">一般件</div>
+          <div class="option-desc">60–120 分鐘｜+NT$0</div>
+        </div>
+        <div class="option" onclick="selectSpeed(this, 'priority')">
+          <div class="option-title">快速件</div>
+          <div class="option-desc">45–60 分鐘｜+NT$50</div>
+        </div>
+        <div class="option" onclick="selectSpeed(this, 'express')">
+          <div class="option-title">急件</div>
+          <div class="option-desc">30–45 分鐘｜+NT$100</div>
+        </div>
+        <div class="option" onclick="selectSpeed(this, 'rush')">
+          <div class="option-title">極速件</div>
+          <div class="option-desc">20–30 分鐘｜+NT$200</div>
+        </div>
+      </div>
+    </div>
 
-  <label>物品內容</label>
-  <input id="item" placeholder="例如：文件、合約、樣品">
+    <div class="card">
+      <div class="step-badge">Step 4</div>
+      <div class="section-title">物品內容與備註<span class="required">*</span></div>
 
-  <label>備註</label>
-  <textarea id="note" placeholder="例如：請到櫃台取件、送達請電話聯絡"></textarea>
+      <input id="item" placeholder="物品內容，例如：合約、樣品、小包裹">
+      <textarea id="note" placeholder="備註，例如：請到櫃台取件、送達前請電話聯絡"></textarea>
+    </div>
 
-  <button id="submitBtn" onclick="submitOrder()">送出訂單</button>
+    <div class="card">
+      <div class="step-badge">Step 5</div>
+      <div class="section-title">送出訂單</div>
 
-  <div id="statusBox" class="status hidden"></div>
-</div>
+      <button id="submitBtn" class="main-btn" onclick="submitOrder()">送出訂單</button>
+      <div id="statusBox" class="status hidden"></div>
+    </div>
 
-<div id="paymentCard" class="card hidden">
-  <h3>💳 選擇付款方式</h3>
+    <div id="paymentCard" class="card hidden">
+      <div class="step-badge">Step 6</div>
+      <div class="section-title">付款方式</div>
 
-  <button onclick="selectPayment('jko')">街口支付</button>
-  <button class="light" onclick="selectPayment('bank')">銀行轉帳</button>
+      <div id="summaryBox" class="hidden"></div>
 
-  <div id="paymentInfoBox" class="paymentInfo hidden"></div>
+      <button class="main-btn" onclick="selectPayment('jko')">街口支付</button>
+      <button class="main-btn light-btn" onclick="selectPayment('bank')">銀行轉帳</button>
 
-  <button id="paidBtn" class="secondary hidden" onclick="confirmPaid()">我已付款</button>
-</div>
+      <div id="paymentInfoBox" class="payment-info hidden"></div>
+
+      <button id="paidBtn" class="main-btn dark-btn hidden" onclick="confirmPaid()">我已付款</button>
+    </div>
+  </div>
 
 <script>
 let userId = 'web-order';
 let liffId = '';
+let serviceType = '文件急送';
+let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
+let currentTotal = '';
+
+function setActive(parentId, el) {
+  document.querySelectorAll(`#${parentId} .option`).forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function selectService(el, value) {
+  setActive('serviceGrid', el);
+  serviceType = value;
+}
+
+function selectSpeed(el, value) {
+  setActive('speedGrid', el);
+  speedType = value;
+}
 
 function showStatus(text) {
   const box = document.getElementById('statusBox');
@@ -178,29 +345,31 @@ async function initPage() {
     const cfg = await res.json();
     liffId = cfg.liffId || '';
 
-    if (window.liff && liffId) {
-      await liff.init({ liffId });
-
-      if (liff.isLoggedIn()) {
-        const profile = await liff.getProfile();
-        userId = profile.userId;
-        console.log('✅ userId:', userId);
-      } else {
-        liff.login();
-      }
-    } else {
+    if (!window.liff || !liffId) {
       alert('❌ LIFF 沒載入或沒設定');
+      return;
     }
+
+    await liff.init({ liffId });
+
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    userId = profile.userId;
+    console.log('✅ LIFF userId:', userId);
   } catch (err) {
-    console.log(err);
-    alert('❌ init 錯誤');
+    console.log('❌ LIFF init 錯誤', err);
+    alert('❌ LIFF 初始化失敗，請從 LINE 官方帳號重新開啟');
   }
 }
 
 function getData() {
   return {
-    serviceType: document.getElementById('serviceType').value,
-    speedType: document.getElementById('speedType').value,
+    serviceType,
+    speedType,
     pickup: document.getElementById('pickup').value.trim(),
     pickupPhone: document.getElementById('pickupPhone').value.trim(),
     dropoff: document.getElementById('dropoff').value.trim(),
@@ -213,7 +382,7 @@ function getData() {
 
 function validateData(data) {
   if (userId === 'web-order') {
-    alert('⚠️ 請從 LINE 裡開啟');
+    alert('⚠️ 請從 LINE 官方帳號內開啟');
     return false;
   }
 
@@ -235,6 +404,22 @@ function validateData(data) {
   return true;
 }
 
+function renderSummary(order) {
+  const total = order?.total || currentTotal || '';
+  currentTotal = total;
+
+  const box = document.getElementById('summaryBox');
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <div class="summary-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
+    <div class="summary-row"><span>服務類型</span><strong>${serviceType}</strong></div>
+    <div class="summary-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
+    <div class="summary-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
+    <div class="summary-row"><span>速度費</span><strong>NT$${order?.speedFee || 0}</strong></div>
+    <div class="summary-row"><span>總金額</span><strong>NT$${total}</strong></div>
+  `;
+}
+
 async function submitOrder() {
   const btn = document.getElementById('submitBtn');
   const data = getData();
@@ -242,7 +427,7 @@ async function submitOrder() {
   if (!validateData(data)) return;
 
   btn.disabled = true;
-  btn.innerText = '送出中...';
+  btn.innerText = '系統計算費用中...';
 
   try {
     const res = await fetch('/api/orders', {
@@ -260,15 +445,21 @@ async function submitOrder() {
     currentOrderId = result.orderId;
     window.currentOrderId = result.orderId;
 
+    currentTotal = result.total || result.order?.total || '';
+
     showStatus(
-      `✅ 訂單已建立\n\n訂單編號：${result.orderId}\n總金額：NT$${result.total || result.order?.total || ''}\n\n請在下方選擇付款方式，完成付款後按「我已付款」，系統才會派單。`
+      `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請往下選擇付款方式，完成付款後按「我已付款」，系統才會派單。`
     );
 
     document.getElementById('paymentCard').classList.remove('hidden');
-    alert('✅ 訂單成功：' + result.orderId);
+    renderSummary(result.order);
+
+    setTimeout(() => {
+      document.getElementById('paymentCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 250);
 
   } catch (err) {
-    alert('❌ 失敗：' + err.message);
+    alert('❌ ' + err.message);
   } finally {
     btn.disabled = false;
     btn.innerText = '送出訂單';
@@ -277,7 +468,7 @@ async function submitOrder() {
 
 async function selectPayment(method) {
   if (!currentOrderId) {
-    alert('請先建立訂單');
+    alert('請先送出訂單');
     return;
   }
 
@@ -339,7 +530,7 @@ async function confirmPaid() {
     }
 
     showStatus(
-      `✅ 已送出付款通知\n\n訂單編號：${currentOrderId}\n\n系統正在為你配對騎手，請稍候。`
+      `✅ 已收到付款通知\n\n訂單編號：${currentOrderId}\n\n系統正在為你配對騎手，請稍候。`
     );
 
     alert('✅ 已收到付款通知，系統已開始派單');
