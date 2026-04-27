@@ -837,6 +837,11 @@ async function handleTextStep(event, userId, text) {
 async function handlePostback(event) {
   const data = event.postback.data || '';
   const userId = event.source.userId;
+  
+  console.log('========== POSTBACK 進來了 ==========');
+  console.log('data:', data);
+  console.log('userId:', userId);
+  console.log('source:', event.source);
 
   if (data === 'menu=info') return client.replyMessage(event.replyToken, [createInfoMenuFlex()]);
   if (data === 'submenu=cancelRules') return client.replyMessage(event.replyToken, [createCancelRulesFlex()]);
