@@ -1,11 +1,10 @@
 {
-  "name": "ubee-oms-minimal-h5",
-  "version": "3.9.1-minimal-h5",
-  "description": "UBee OMS minimal LINE bot with H5 order form, speed tiers, payment flow and waiting fee approval.",
+  "name": "ubee-oms-h5",
+  "version": "3.9.1",
+  "description": "UBee OMS H5 極簡版（速度分級｜付款｜等候費）",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+    "start": "node index.js"
   },
   "engines": {
     "node": ">=18"
