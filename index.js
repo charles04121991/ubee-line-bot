@@ -932,22 +932,42 @@ if (data.startsWith('accept=')) {
   const orderId = data.split('=')[1];
   const order = orders[orderId];
 
-  if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
+  if (!order) {
+    return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
+  }
+
   if (order.status !== 'pending_dispatch') {
     return client.replyMessage(event.replyToken, [createTextMessage('此單已被接走或目前不可接單。')]);
   }
 
+  // ✅ 先改狀態（最重要）
   order.status = 'accepted';
   order.riderId = userId;
   order.acceptedAt = Date.now();
 
-  await notifyCustomer(order, createTextMessage('✅ 已有騎手接單，正在前往取件地點。'));
-
+  // ✅ 先回覆騎手（避免卡住）
   await client.replyMessage(event.replyToken, [
-    createTextMessage(`你已成功接單：${order.id}`),
+    createTextMessage(`✅ 你已成功接單：${order.id}`)
   ]);
 
+  // ✅ 再通知客人（防炸）
+  try {
+    if (order.customerId && order.customerId !== 'web-order') {
+      await pushToUser(order.customerId, [
+        createTextMessage('✅ 已有騎手接單，正在前往取件地點。')
+      ]);
+    }
+  } catch (err) {
+    console.error('❌ 客人通知失敗（接單）', err);
+  }
+
+  // ✅ 推 ETA（防炸）
+try {
   await pushToGroup(LINE_GROUP_ID, createETAFlex(order));
+} catch (err) {
+  console.error('❌ ETA 卡推送失敗', err);
+}
+
   return;
 }
 
