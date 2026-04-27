@@ -1,102 +1,75 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>UBee 建立任務</title>
+  <meta charset="utf-8">
+  <title>UBee 建立任務</title>
 
-<style>
-body{
-  font-family: Arial;
-  background:#f6f6f6;
-  margin:0;
-  padding:20px;
-}
-.card{
-  background:white;
-  padding:16px;
-  border-radius:12px;
-  margin-bottom:12px;
-}
-input,textarea{
-  width:100%;
-  padding:10px;
-  margin-top:8px;
-  border-radius:8px;
-  border:1px solid #ddd;
-}
-button{
-  width:100%;
-  padding:12px;
-  margin-top:10px;
-  border:none;
-  border-radius:8px;
-  background:#00c300;
-  color:white;
-  font-size:16px;
-}
-</style>
+  <!-- LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    body { font-family: Arial; padding:20px; }
+    input, textarea {
+      width:100%;
+      margin-bottom:10px;
+      padding:10px;
+      border-radius:8px;
+      border:1px solid #ccc;
+    }
+    button {
+      width:100%;
+      padding:15px;
+      background:#00c300;
+      color:#fff;
+      border:none;
+      border-radius:10px;
+      font-size:18px;
+    }
+  </style>
 </head>
 
 <body>
 
 <h2>🚀 UBee 建立任務</h2>
 
-<div class="card">
-  <input id="pickup" placeholder="取件地址">
-  <input id="pickupPhone" placeholder="取件電話">
-  <input id="dropoff" placeholder="送達地址">
-  <input id="dropoffPhone" placeholder="送達電話">
-  <input id="item" placeholder="物品內容">
-  <textarea id="note" placeholder="備註"></textarea>
+<input id="pickup" placeholder="取件地址">
+<input id="pickupPhone" placeholder="取件電話">
+<input id="dropoff" placeholder="送達地址">
+<input id="dropoffPhone" placeholder="送達電話">
+<input id="item" placeholder="物品內容">
+<textarea id="note" placeholder="備註"></textarea>
 
-  <button onclick="submitOrder()">送出訂單</button>
-</div>
-
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<button onclick="submitOrder()">送出訂單</button>
 
 <script>
-alert('版本2');
 let userId = 'web-order';
 let liffId = '';
-alert('liff:' + typeof liff);
+
 async function initPage(){
   try{
     const res = await fetch('/api/config');
     const cfg = await res.json();
-    liffId = cfg.liffId || '';
+    liffId = cfg.liffId;
 
-    // ✅ 修正重點：一定要有 liffId 才 init
-    if(window.liff && liffId){
-      try{
-        await liff.init({ liffId });
+    if (window.liff && liffId){
+      await liff.init({ liffId });
 
-        if(liff.isLoggedIn()){
-          const profile = await liff.getProfile();
-          userId = profile.userId;
+      if (liff.isLoggedIn()){
+        const profile = await liff.getProfile();
+        userId = profile.userId;
 
-          console.log('✅ LIFF userId:', userId);
+        console.log('✅ userId:', userId);
+        alert('userId: ' + userId);
+      } else {
+        liff.login();
+      }
+    } else {
+      alert('❌ LIFF 沒載入或沒設定');
+    }
 
-          // 🔥 直接顯示給你看
-          alert('userId: ' + userId);
-
-        }else{
-          liff.login();
-        }
-
-      } catch(err){
-  console.log('❌ LIFF 初始化失敗', err);
-  alert('❌ LIFF 初始化失敗：' + err.message);
-}
-if (!window.liff) {
-  alert('⚠️ liff 未載入，請確認 LIFF SDK 有沒有正確載入');
-}
-
-if (!liffId) {
-  alert('⚠️ 沒有 LIFF_ID，請確認 /api/config 是否有回傳 liffId');
-}
   }catch(err){
-    console.log('❌ initPage 錯誤', err);
+    console.log(err);
+    alert('❌ init錯誤');
   }
 }
 
@@ -114,18 +87,12 @@ function getData(){
 
 async function submitOrder(){
 
-  // ❗ 防呆（超重要）
   if(userId === 'web-order'){
-    alert('⚠️ 請從 LINE 裡面開啟，否則無法通知');
+    alert('⚠️ 請從 LINE 裡開啟');
     return;
   }
 
   const data = getData();
-
-  if(!data.pickup || !data.dropoff){
-    alert('請輸入地址');
-    return;
-  }
 
   const res = await fetch('/api/orders',{
     method:'POST',
@@ -136,9 +103,9 @@ async function submitOrder(){
   const result = await res.json();
 
   if(result.success){
-    alert('訂單建立成功：' + result.orderId);
+    alert('✅ 訂單成功: ' + result.orderId);
   }else{
-    alert('失敗：' + result.error);
+    alert('❌ 失敗: ' + result.error);
   }
 }
 
