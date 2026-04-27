@@ -2,50 +2,110 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>商務合作</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>UBee｜商務合作</title>
 
 <style>
+:root{
+  --green:#00c300;
+  --black:#111;
+  --gray:#f6f6f6;
+  --yellow:#fff4cc;
+  --line:#e9e9e9;
+}
+*{box-sizing:border-box}
 body{
   margin:0;
-  font-family:-apple-system;
-  background:#f6f6f6;
+  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;
+  background:var(--gray);
+  color:#111;
 }
-
 .container{
-  padding:24px 16px;
+  padding:24px 16px 36px;
+  max-width:720px;
+  margin:0 auto;
 }
-
 .card{
   background:white;
-  border-radius:16px;
+  border-radius:18px;
   padding:16px;
-  margin-bottom:16px;
+  margin-bottom:14px;
+  box-shadow:0 1px 0 rgba(0,0,0,.03);
 }
-
+.hero{
+  background:linear-gradient(180deg,#fff4cc,#fff);
+  border:1px solid #ffe7a3;
+}
 .title{
-  font-size:22px;
-  font-weight:700;
-  margin-bottom:10px;
+  font-size:24px;
+  font-weight:900;
+  margin-bottom:8px;
 }
-
+.sub{
+  font-size:14px;
+  color:#555;
+  line-height:1.7;
+}
+.sectionTitle{
+  font-size:18px;
+  font-weight:850;
+  margin-bottom:8px;
+}
+.item{
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:13px;
+  margin-top:9px;
+  line-height:1.65;
+}
+.item b{
+  display:block;
+  margin-bottom:3px;
+}
+.item span{
+  font-size:14px;
+  color:#555;
+}
 .btn{
   width:100%;
   padding:14px;
-  border-radius:12px;
+  border-radius:14px;
   border:0;
   font-size:16px;
+  font-weight:850;
   margin-top:10px;
 }
-
 .btn-green{
-  background:#00c300;
+  background:var(--green);
   color:white;
 }
-
 .btn-black{
-  background:black;
+  background:var(--black);
   color:white;
+}
+.content{
+  display:none;
+  margin-top:12px;
+  line-height:1.8;
+  color:#333;
+  font-size:15px;
+}
+.notice{
+  background:#fff8df;
+  border:1px solid #ffe7a3;
+  border-radius:14px;
+  padding:12px;
+  line-height:1.75;
+  font-size:14px;
+  color:#5a4300;
+}
+.grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:8px;
+}
+@media(min-width:560px){
+  .grid{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -54,37 +114,130 @@ body{
 
 <div class="container">
 
-<div class="card">
-  <div class="title">🤝 商務合作</div>
-  <div>企業長期配送 / 商務跑腿解決方案</div>
-</div>
-
-<div class="card">
-  <button class="btn btn-green"
-    onclick="location.href='https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform'">
-    📄 合作表單
-  </button>
-
-  <button class="btn btn-black" onclick="showInfo()">
-    📘 合作說明
-  </button>
-</div>
-
-<div class="card" id="infoBox" style="display:none;">
-  <div>
-    ✔ 專人配送<br>
-    ✔ 企業月結<br>
-    ✔ 快速調度（平均35分鐘）<br>
-    ✔ 專注文件 / 商務任務
+  <div class="card hero">
+    <div class="title">🤝 UBee 商務合作</div>
+    <div class="sub">
+      專為公司、工廠、辦公室與中小企業設計的城市任務服務。當你們需要有人「跑一趟」送文件、送樣品、送公司物品，UBee 可以協助即時處理。
+    </div>
   </div>
-</div>
+
+  <div class="card">
+    <div class="sectionTitle">適合哪些需求？</div>
+
+    <div class="grid">
+      <div class="item">
+        <b>📄 文件急送</b>
+        <span>合約、發票、報價單、公司文件、客戶資料送達。</span>
+      </div>
+
+      <div class="item">
+        <b>📦 樣品收送</b>
+        <span>工廠、公司、客戶之間的樣品、零件、小型物件配送。</span>
+      </div>
+
+      <div class="item">
+        <b>🏢 臨時商務任務</b>
+        <span>臨時行政支援、文件代送、物品轉交、現場協助。</span>
+      </div>
+
+      <div class="item">
+        <b>🗓 長期固定合作</b>
+        <span>每週、每月固定配送需求，可討論月結與固定路線。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sectionTitle">合作方式</div>
+
+    <div class="item">
+      <b>1. 單次任務合作</b>
+      <span>適合臨時文件、樣品或物品收送。每次依距離、時間與速度選項計價。</span>
+    </div>
+
+    <div class="item">
+      <b>2. 長期企業配合</b>
+      <span>適合每月有多次配送需求的公司，減少員工外出跑腿時間。</span>
+    </div>
+
+    <div class="item">
+      <b>3. 企業月結</b>
+      <span>適合固定合作客戶，未來可採月結、對帳明細、統一窗口處理。</span>
+    </div>
+
+    <div class="item">
+      <b>4. 客製化任務</b>
+      <span>若有固定時段、固定路線、大量配送、特殊交付規則，可另外討論。</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sectionTitle">為什麼企業適合用 UBee？</div>
+
+    <div class="notice">
+      如果公司一個月跑 10 次文件或樣品，每次來回 40 分鐘，等於行政或業務的工作一直被打斷。UBee 的價值不是單純送東西，而是讓員工回到該做的工作，把外出跑腿交給專門的人處理。
+    </div>
+
+    <div class="item">
+      <b>✅ 不佔用內部人力</b>
+      <span>不用再臨時叫員工放下工作出去送件。</span>
+    </div>
+
+    <div class="item">
+      <b>✅ 任務流程清楚</b>
+      <span>可提供接單、ETA、取件、送達等狀態通知。</span>
+    </div>
+
+    <div class="item">
+      <b>✅ 支援急件與速度分級</b>
+      <span>一般件、快速件、急件、極速件，可依需求選擇。</span>
+    </div>
+
+    <div class="item">
+      <b>✅ 專注商務跑腿</b>
+      <span>定位不是雜項跑腿，而是城市商務任務支援。</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sectionTitle">填寫合作表單</div>
+    <div class="sub">
+      若你是公司、工廠、店家、辦公室或有長期配送需求，請填寫合作表單。UBee 會依你的需求評估合作方式。
+    </div>
+
+    <button id="formBtn" class="btn btn-green">📄 填寫合作表單</button>
+
+    <button class="btn btn-black" onclick="toggle('moreInfo')">📘 查看合作說明</button>
+
+    <div id="moreInfo" class="content">
+      UBee 可討論的合作方向包含：企業月結、固定路線、固定時段、急件支援、樣品收送、文件配送、臨時行政任務與大量配送需求。<br><br>
+      初期合作可以先從單次任務開始，確認流程、速度與服務品質後，再討論長期合作方案。
+    </div>
+  </div>
 
 </div>
 
 <script>
-function showInfo(){
-  document.getElementById('infoBox').style.display='block';
+let businessFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform';
+
+async function init(){
+  try{
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    if(cfg.businessFormUrl) businessFormUrl = cfg.businessFormUrl;
+  }catch(e){}
+
+  document.getElementById('formBtn').onclick = () => {
+    location.href = businessFormUrl;
+  };
 }
+
+function toggle(id){
+  const el = document.getElementById(id);
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+
+init();
 </script>
 
 </body>
