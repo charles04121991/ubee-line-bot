@@ -88,7 +88,7 @@ async function initPage(){
   alert('❌ LIFF 初始化失敗：' + err.message);
 }
 if (!window.liff) {
-  alert('⚠️ liff 未載入，請確認 order.html 有沒有這行：<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>');
+  alert('⚠️ liff 未載入，請確認 LIFF SDK 有沒有正確載入');
 }
 
 if (!liffId) {
