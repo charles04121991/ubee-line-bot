@@ -47,6 +47,16 @@ if (!GOOGLE_MAPS_API_KEY) {
   process.exit(1);
 }
 
+app.post('/webhook', line.middleware(config), async (req, res) => {
+  try {
+    await Promise.all((req.body.events || []).map(handleEvent));
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('❌ webhook 錯誤：', error);
+    res.status(500).end();
+  }
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.get('/order.html', (req, res) => {
@@ -1423,16 +1433,6 @@ app.get('/', (req, res) => {
 
 app.head('/', (req, res) => {
   res.sendStatus(200);
-});
-
-app.post('/webhook', line.middleware(config), async (req, res) => {
-  try {
-    await Promise.all((req.body.events || []).map(handleEvent));
-    res.status(200).send('OK');
-  } catch (error) {
-    console.error('❌ webhook 錯誤：', error);
-    res.status(500).end();
-  }
 });
 
 app.listen(PORT, () => {
