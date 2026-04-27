@@ -83,13 +83,17 @@ async function initPage(){
           liff.login();
         }
 
-      }catch(err){
-        console.log('❌ LIFF 初始化失敗', err);
-      }
-    }else{
-      console.log('⚠️ 沒有 LIFF_ID 或 liff 未載入');
-    }
+      } catch(err){
+  console.log('❌ LIFF 初始化失敗', err);
+  alert('❌ LIFF 初始化失敗：' + err.message);
+}
+if (!window.liff) {
+  alert('⚠️ liff 未載入，請確認 order.html 有沒有這行：<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>');
+}
 
+if (!liffId) {
+  alert('⚠️ 沒有 LIFF_ID，請確認 /api/config 是否有回傳 liffId');
+}
   }catch(err){
     console.log('❌ initPage 錯誤', err);
   }
