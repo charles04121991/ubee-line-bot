@@ -1,18 +1,18 @@
 {
-  "name": "ubee-oms-h5",
+  "name": "ubee-oms-h5-pro-flow",
   "version": "3.9.1",
-  "description": "UBee OMS H5 極簡版（速度分級｜付款｜等候費）",
+  "description": "UBee OMS H5 order flow with LINE Messaging API, LIFF, payment before dispatch, rider status notifications",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "18.x"
   },
   "dependencies": {
-    "@line/bot-sdk": "^9.5.0",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "@line/bot-sdk": "^8.4.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "node-fetch": "^2.7.0"
   }
 }
