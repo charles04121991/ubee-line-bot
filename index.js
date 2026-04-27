@@ -1212,6 +1212,8 @@ app.get('/api/quote', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   try {
     const data = createOrderFromApi(req.body);
+console.log('========== H5 建立訂單 ==========');
+console.log('req.body:', req.body);
 
     if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !data.item) {
       return res.status(400).json({
