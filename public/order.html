@@ -317,15 +317,24 @@ async function initPage(){
     const cfg = await res.json();
     liffId = cfg.liffId || '';
 
-    if(liffId && window.liff){
-      await liff.init({ liffId });
-      if(liff.isLoggedIn()){
-        const profile = await liff.getProfile();
-        userId = profile.userId;
-      }else{
-        liff.login();
-      }
+   if (window.liff && liffId) {
+  try {
+    await liff.init({ liffId });
+
+    if (liff.isLoggedIn()) {
+      const profile = await liff.getProfile();
+      userId = profile.userId;
+      console.log('✅ LIFF userId:', userId);
+    } else {
+      liff.login();
     }
+
+  } catch (err) {
+    console.log('❌ LIFF 初始化失敗', err);
+  }
+} else {
+  console.log('⚠️ 沒有 LIFF_ID 或 liff 未載入');
+}
   }catch(err){
     console.log('LIFF 初始化失敗，將使用 web-order 模式', err);
   }
