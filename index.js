@@ -1399,6 +1399,10 @@ async function handleEvent(event) {
       const userId = event.source.userId;
       const text = (event.message.text || '').trim();
 
+      console.log('========== LINE 文字訊息 ==========');
+      console.log('LINE userId:', userId);
+      console.log('text:', text);
+
       if (/^UB\d+/i.test(text)) {
         const orderId = text.toUpperCase();
         const order = orders[orderId];
