@@ -914,25 +914,37 @@ async function handlePostback(event) {
   }
 
   if (data.startsWith('accept=')) {
-    const orderId = data.split('=')[1];
-    const order = orders[orderId];
+  const orderId = data.split('=')[1];
+  const order = orders[orderId];
 
-    if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
-    if (order.status !== 'pending_dispatch') return client.replyMessage(event.replyToken, [createTextMessage('此單已被接走或目前不可接單。')]);
-
-    order.status = 'accepted';
-    order.riderId = userId;
-    order.acceptedAt = Date.now();
-
-    await pushToUser(order.customerId, createTextMessage('✅ 已有騎手接單，正在前往取件地點。'));
-
-    await client.replyMessage(event.replyToken, [
-      createTextMessage(`你已成功接單：${order.id}`),
-      createETAFlex(order),
-    ]);
-
-    return;
+  if (!order) {
+    return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
   }
+
+  if (order.status !== 'pending_dispatch') {
+    return client.replyMessage(event.replyToken, [createTextMessage('此單已被接走或目前不可接單。')]);
+  }
+
+  order.status = 'accepted';
+  order.riderId = userId;
+  order.acceptedAt = Date.now();
+
+  try {
+    await pushToUser(
+      order.customerId,
+      createTextMessage('✅ 已有騎手接單，正在前往取件地點。')
+    );
+  } catch (err) {
+    console.error('❌ 接單後推播客人失敗：', err);
+  }
+
+  await client.replyMessage(event.replyToken, [
+    createTextMessage(`你已成功接單：${order.id}`),
+    createETAFlex(order),
+  ]);
+
+  return;
+}
 
   if (data.startsWith('showEta=')) {
     const orderId = data.split('=')[1];
