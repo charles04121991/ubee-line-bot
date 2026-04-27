@@ -242,12 +242,14 @@ async function pushToUser(userId, messages) {
 
 async function notifyCustomer(order, messages) {
   try {
-    if (!order || !order.customerId || order.customerId === 'web-order') {
+    const targetUserId = order?.userId || order?.customerId;
+
+    if (!targetUserId || targetUserId === 'web-order') {
       console.log(`⚠️ 訂單 ${order?.id || 'UNKNOWN'} 沒有綁定客人 LINE userId`);
       return false;
     }
 
-    await pushToUser(order.customerId, messages);
+    await pushToUser(targetUserId, messages);
     return true;
   } catch (err) {
     console.error(`❌ 通知客人失敗：${order?.id || 'UNKNOWN'}`, err);
