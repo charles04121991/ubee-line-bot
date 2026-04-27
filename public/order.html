@@ -1,29 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>UBee 建立任務</title>
 
-  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
-    body { font-family: Arial; padding:20px; }
-    input, textarea {
-      width:100%;
-      margin-bottom:10px;
-      padding:10px;
-      border-radius:8px;
-      border:1px solid #ccc;
+    body {
+      font-family: Arial, "Noto Sans TC", sans-serif;
+      padding: 20px;
+      background: #f6f6f6;
+      color: #111;
     }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    .card {
+      background: #fff;
+      padding: 16px;
+      border-radius: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin: 12px 0 6px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    textarea {
+      min-height: 80px;
+    }
+
     button {
-      width:100%;
-      padding:15px;
-      background:#00c300;
-      color:#fff;
-      border:none;
-      border-radius:10px;
-      font-size:18px;
+      width: 100%;
+      padding: 15px;
+      background: #00c300;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    button.secondary {
+      background: #111;
+    }
+
+    button.light {
+      background: #eee;
+      color: #111;
+    }
+
+    button:disabled {
+      opacity: .55;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .status {
+      white-space: pre-line;
+      background: #fff8df;
+      border: 1px solid #ffe2a0;
+      padding: 12px;
+      border-radius: 10px;
+      margin-top: 12px;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .paymentInfo {
+      white-space: pre-line;
+      background: #f1f1f1;
+      padding: 12px;
+      border-radius: 10px;
+      margin-top: 12px;
+      line-height: 1.6;
+      font-size: 15px;
     }
   </style>
 </head>
@@ -32,80 +103,251 @@
 
 <h2>🚀 UBee 建立任務</h2>
 
-<input id="pickup" placeholder="取件地址">
-<input id="pickupPhone" placeholder="取件電話">
-<input id="dropoff" placeholder="送達地址">
-<input id="dropoffPhone" placeholder="送達電話">
-<input id="item" placeholder="物品內容">
-<textarea id="note" placeholder="備註"></textarea>
+<div class="card">
+  <label>服務類型</label>
+  <select id="serviceType">
+    <option value="文件急送">文件急送</option>
+    <option value="商務物品">商務物品</option>
+    <option value="個人物品">個人物品</option>
+    <option value="安全代送">安全代送</option>
+  </select>
 
-<button onclick="submitOrder()">送出訂單</button>
+  <label>配送速度</label>
+  <select id="speedType">
+    <option value="standard">一般件</option>
+    <option value="priority">快速件 +NT$50</option>
+    <option value="express">急件 +NT$100</option>
+    <option value="rush">極速件 +NT$200</option>
+  </select>
+
+  <label>取件地址</label>
+  <input id="pickup" placeholder="例如：台中市北屯區...">
+
+  <label>取件電話</label>
+  <input id="pickupPhone" placeholder="例如：0912345678">
+
+  <label>送達地址</label>
+  <input id="dropoff" placeholder="例如：台中市西屯區...">
+
+  <label>送達電話</label>
+  <input id="dropoffPhone" placeholder="例如：0912345678">
+
+  <label>物品內容</label>
+  <input id="item" placeholder="例如：文件、合約、樣品">
+
+  <label>備註</label>
+  <textarea id="note" placeholder="例如：請到櫃台取件、送達請電話聯絡"></textarea>
+
+  <button id="submitBtn" onclick="submitOrder()">送出訂單</button>
+
+  <div id="statusBox" class="status hidden"></div>
+</div>
+
+<div id="paymentCard" class="card hidden">
+  <h3>💳 選擇付款方式</h3>
+
+  <button onclick="selectPayment('jko')">街口支付</button>
+  <button class="light" onclick="selectPayment('bank')">銀行轉帳</button>
+
+  <div id="paymentInfoBox" class="paymentInfo hidden"></div>
+
+  <button id="paidBtn" class="secondary hidden" onclick="confirmPaid()">我已付款</button>
+</div>
 
 <script>
 let userId = 'web-order';
 let liffId = '';
+let currentOrderId = '';
+let selectedPaymentMethod = '';
 
-async function initPage(){
-  try{
+function showStatus(text) {
+  const box = document.getElementById('statusBox');
+  box.classList.remove('hidden');
+  box.innerText = text;
+}
+
+function showPaymentInfo(text) {
+  const box = document.getElementById('paymentInfoBox');
+  box.classList.remove('hidden');
+  box.innerText = text;
+}
+
+async function initPage() {
+  try {
     const res = await fetch('/api/config');
     const cfg = await res.json();
-    liffId = cfg.liffId;
+    liffId = cfg.liffId || '';
 
-    if (window.liff && liffId){
+    if (window.liff && liffId) {
       await liff.init({ liffId });
 
-      if (liff.isLoggedIn()){
+      if (liff.isLoggedIn()) {
         const profile = await liff.getProfile();
         userId = profile.userId;
-
         console.log('✅ userId:', userId);
-        alert('userId: ' + userId);
       } else {
         liff.login();
       }
     } else {
       alert('❌ LIFF 沒載入或沒設定');
     }
-
-  }catch(err){
+  } catch (err) {
     console.log(err);
-    alert('❌ init錯誤');
+    alert('❌ init 錯誤');
   }
 }
 
-function getData(){
+function getData() {
   return {
-    pickup: document.getElementById('pickup').value,
-    pickupPhone: document.getElementById('pickupPhone').value,
-    dropoff: document.getElementById('dropoff').value,
-    dropoffPhone: document.getElementById('dropoffPhone').value,
-    item: document.getElementById('item').value,
-    note: document.getElementById('note').value,
+    serviceType: document.getElementById('serviceType').value,
+    speedType: document.getElementById('speedType').value,
+    pickup: document.getElementById('pickup').value.trim(),
+    pickupPhone: document.getElementById('pickupPhone').value.trim(),
+    dropoff: document.getElementById('dropoff').value.trim(),
+    dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
+    item: document.getElementById('item').value.trim(),
+    note: document.getElementById('note').value.trim(),
     userId
   };
 }
 
-async function submitOrder(){
-
-  if(userId === 'web-order'){
+function validateData(data) {
+  if (userId === 'web-order') {
     alert('⚠️ 請從 LINE 裡開啟');
+    return false;
+  }
+
+  if (!data.pickup || !data.dropoff) {
+    alert('請輸入取件地址與送達地址');
+    return false;
+  }
+
+  if (!data.pickupPhone || !data.dropoffPhone) {
+    alert('請輸入取件電話與送達電話');
+    return false;
+  }
+
+  if (!data.item) {
+    alert('請輸入物品內容');
+    return false;
+  }
+
+  return true;
+}
+
+async function submitOrder() {
+  const btn = document.getElementById('submitBtn');
+  const data = getData();
+
+  if (!validateData(data)) return;
+
+  btn.disabled = true;
+  btn.innerText = '送出中...';
+
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || '建立訂單失敗');
+    }
+
+    currentOrderId = result.orderId;
+    window.currentOrderId = result.orderId;
+
+    showStatus(
+      `✅ 訂單已建立\n\n訂單編號：${result.orderId}\n總金額：NT$${result.total || result.order?.total || ''}\n\n請在下方選擇付款方式，完成付款後按「我已付款」，系統才會派單。`
+    );
+
+    document.getElementById('paymentCard').classList.remove('hidden');
+    alert('✅ 訂單成功：' + result.orderId);
+
+  } catch (err) {
+    alert('❌ 失敗：' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '送出訂單';
+  }
+}
+
+async function selectPayment(method) {
+  if (!currentOrderId) {
+    alert('請先建立訂單');
     return;
   }
 
-  const data = getData();
+  selectedPaymentMethod = method;
 
-  const res = await fetch('/api/orders',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(data)
-  });
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentMethod: method })
+    });
 
-  const result = await res.json();
+    const result = await res.json();
 
-  if(result.success){
-    alert('✅ 訂單成功: ' + result.orderId);
-  }else{
-    alert('❌ 失敗: ' + result.error);
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || '付款方式設定失敗');
+    }
+
+    showPaymentInfo(
+      `付款方式：${result.paymentMethodLabel}\n\n` +
+      `應付金額：NT$${result.total}\n\n` +
+      `${result.paymentInfo}\n\n` +
+      `完成付款後，請按下方「我已付款」。`
+    );
+
+    document.getElementById('paidBtn').classList.remove('hidden');
+
+  } catch (err) {
+    alert('❌ ' + err.message);
+  }
+}
+
+async function confirmPaid() {
+  if (!currentOrderId) {
+    alert('找不到訂單編號，請重新建立訂單');
+    return;
+  }
+
+  if (!selectedPaymentMethod) {
+    alert('請先選擇付款方式');
+    return;
+  }
+
+  const btn = document.getElementById('paidBtn');
+  btn.disabled = true;
+  btn.innerText = '處理中...';
+
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+
+    const result = await res.json();
+
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || '確認付款失敗');
+    }
+
+    showStatus(
+      `✅ 已送出付款通知\n\n訂單編號：${currentOrderId}\n\n系統正在為你配對騎手，請稍候。`
+    );
+
+    alert('✅ 已收到付款通知，系統已開始派單');
+
+  } catch (err) {
+    alert('❌ ' + err.message);
+    btn.disabled = false;
+    btn.innerText = '我已付款';
   }
 }
 
