@@ -197,6 +197,35 @@ function createInfoRow(label, value, wrap = true) {
   };
 }
 
+function createTextBlock(title, text) {
+  return {
+    type: 'box',
+    layout: 'vertical',
+    spacing: 'xs',
+    paddingAll: '12px',
+    backgroundColor: '#F7F7F7',
+    cornerRadius: '12px',
+    contents: [
+      {
+        type: 'text',
+        text: title,
+        weight: 'bold',
+        size: 'sm',
+        color: '#111111',
+        wrap: true,
+      },
+      {
+        type: 'text',
+        text,
+        size: 'sm',
+        color: '#555555',
+        wrap: true,
+        margin: 'xs',
+      },
+    ],
+  };
+}
+
 function createBubble(title, bodyContents, footerContents = []) {
   const bubble = {
     type: 'bubble',
@@ -383,7 +412,7 @@ function createMainMenuFlex() {
     [
       createUriButton('立即下單', getPublicUrl('order.html'), 'primary'),
       createUriButton('商務合作', getPublicUrl('business.html'), 'secondary'),
-      createUriButton('我的資訊', getPublicUrl('info.html'), 'secondary'),
+      createActionButton('我的資訊', 'menu=info', 'secondary'),
     ]
   );
 
@@ -432,16 +461,173 @@ function createInfoMenuFlex() {
     [
       {
         type: 'text',
-        text: '查看取消規則、常見問題、查詢訂單與加入合作夥伴。',
+        text: '請選擇你要查看的內容。這裡可以查取消規則、常見問題、訂單狀態，也可以申請加入合作夥伴。',
         size: 'sm',
         color: '#666666',
         wrap: true,
       },
     ],
-    [createUriButton('開啟我的資訊頁', getPublicUrl('info.html'), 'primary')]
+    [
+      createActionButton('取消規則', 'submenu=cancelRules'),
+      createActionButton('常見問題', 'submenu=faq', 'secondary'),
+      createActionButton('查詢訂單', 'submenu=queryOrder', 'secondary'),
+      createUriButton('加入夥伴', PARTNER_FORM_URL, 'secondary'),
+    ]
   );
 
   return createFlexMessage('我的資訊', bubble);
+}
+
+function createCancelRulesFlex() {
+  const bubble = createBubble(
+    '取消規則',
+    [
+      {
+        type: 'text',
+        text: '取消費會依任務進度不同而調整。越接近配送中，騎手已投入的時間與成本越高。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+      },
+      createTextBlock(
+        '① 未接單',
+        '可免費取消。此時尚未有騎手接單，因此不收取取消費。'
+      ),
+      createTextBlock(
+        '② 已接單',
+        '酌收配送費 30%，最低 NT$60，最高 NT$200。因騎手已開始準備前往取件地點。'
+      ),
+      createTextBlock(
+        '③ 騎手已抵達取件地點',
+        '酌收配送費 50%，最低 NT$100，最高 NT$300。因騎手已抵達現場並產生時間成本。'
+      ),
+      createTextBlock(
+        '④ 已取件後',
+        '原則上不可取消。若有特殊狀況，請聯繫 UBee 協助處理。'
+      ),
+      createTextBlock(
+        '提醒',
+        '若地址填錯、電話錯誤、現場無法交件，請盡快聯繫 UBee，避免產生額外等候或取消費。'
+      ),
+    ],
+    [
+      createActionButton('返回我的資訊', 'menu=info', 'secondary'),
+    ]
+  );
+
+  return createFlexMessage('取消規則', bubble);
+}
+
+function createFaqFlex() {
+  const bubble = createBubble(
+    '常見問題',
+    [
+      createTextBlock(
+        'Q1：UBee 可以送什麼？',
+        '可以協助文件、合約、發票、樣品、商務物品、個人物品、安全代送與私人物件。'
+      ),
+      createTextBlock(
+        'Q2：UBee 不接哪些項目？',
+        '違法物品、危險品、易燃物、活體動物、高價未保管物、高度個資風險或需特殊證照的項目恕不承接。'
+      ),
+      createTextBlock(
+        'Q3：多久可以送達？',
+        '依距離、路況與速度選項而定。一般件約 60–120 分鐘，快速件約 45–60 分鐘，急件約 30–45 分鐘，極速件約 20–30 分鐘。'
+      ),
+      createTextBlock(
+        'Q4：費用怎麼計算？',
+        '費用會依照 Google Maps 距離與時間計算，並加上服務費與速度費。實際費用以下單頁顯示為準。'
+      ),
+      createTextBlock(
+        'Q5：付款方式有哪些？',
+        '目前支援街口支付與銀行轉帳。送出訂單後，可在下單頁直接選擇付款方式並按「我已付款」。'
+      ),
+      createTextBlock(
+        'Q6：什麼是等候費？',
+        '騎手抵達現場後，若需要額外等候超過 3–5 分鐘，可能會申請等候費 NT$60。客人同意後才會加收。'
+      ),
+      createTextBlock(
+        'Q7：可以查詢訂單嗎？',
+        '可以。點選「查詢訂單」後，輸入訂單編號，例如 UB202604270001，即可查看目前狀態。'
+      ),
+      createTextBlock(
+        'Q8：有開發票或收據嗎？',
+        '目前提供收據或交易紀錄，暫不開立統一發票。'
+      ),
+      createTextBlock(
+        'Q9：可以企業合作嗎？',
+        '可以。UBee 支援文件急送、樣品收送、固定路線、企業月結與客製化商務任務。'
+      ),
+      createTextBlock(
+        'Q10：可以臨時改地址嗎？',
+        '若騎手尚未取件，可先聯繫 UBee 協助確認；若已取件，可能會依距離與狀況重新計算費用。'
+      ),
+    ],
+    [
+      createActionButton('返回我的資訊', 'menu=info', 'secondary'),
+    ]
+  );
+
+  return createFlexMessage('常見問題', bubble);
+}
+
+function createQueryOrderFlex() {
+  const bubble = createBubble(
+    '查詢訂單',
+    [
+      {
+        type: 'text',
+        text: '請直接在聊天室輸入你的訂單編號，系統會回覆目前狀態。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+      },
+      createTextBlock(
+        '輸入範例',
+        'UB202604270001'
+      ),
+      createTextBlock(
+        '可查詢內容',
+        '目前狀態、配送速度、取件地址、送達地址、ETA、付款狀態與等候費狀態。'
+      ),
+    ],
+    [
+      createActionButton('返回我的資訊', 'menu=info', 'secondary'),
+    ]
+  );
+
+  return createFlexMessage('查詢訂單', bubble);
+}
+
+function createOrderStatusFlex(order) {
+  const waitingStatus = order.waitingFeeApproved
+    ? '已同意等候費'
+    : order.waitingFeeRejected
+      ? '不同意等候費'
+      : order.waitingFeeRequested
+        ? '等待客人確認'
+        : '尚未申請';
+
+  const bubble = createBubble(
+    '訂單查詢結果',
+    [
+      createInfoRow('訂單編號', order.id),
+      createInfoRow('目前狀態', getStatusLabel(order.status)),
+      createInfoRow('配送速度', getSpeedOption(order.speedType).label),
+      createInfoRow('取件地址', order.pickupAddress || '未填寫'),
+      createInfoRow('送達地址', order.dropoffAddress || '未填寫'),
+      createInfoRow('ETA', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '尚未設定'),
+      createInfoRow('付款狀態', order.isPaid ? '已付款' : '尚未付款'),
+      createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
+      createInfoRow('等候費狀態', waitingStatus),
+      createInfoRow('目前總金額', formatCurrency(order.total)),
+    ],
+    [
+      createActionButton('返回我的資訊', 'menu=info', 'secondary'),
+    ]
+  );
+
+  return createFlexMessage('訂單查詢結果', bubble);
 }
 
 function getBusinessIntroText() {
@@ -928,11 +1114,15 @@ async function handleTextStep(event, userId, text) {
     }
 
     if (normalized === '取消規則') {
-      return client.replyMessage(event.replyToken, getCancelRulesText());
+      return client.replyMessage(event.replyToken, [createCancelRulesFlex()]);
     }
 
     if (normalized === '常見問題') {
-      return client.replyMessage(event.replyToken, getFaqText());
+      return client.replyMessage(event.replyToken, [createFaqFlex()]);
+    }
+
+    if (normalized === '查詢訂單') {
+      return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
     }
 
     return client.replyMessage(event.replyToken, [
@@ -1069,11 +1259,15 @@ async function handlePostback(event) {
   }
 
   if (data === 'submenu=cancelRules') {
-    return client.replyMessage(event.replyToken, getCancelRulesText());
+    return client.replyMessage(event.replyToken, [createCancelRulesFlex()]);
   }
 
   if (data === 'submenu=faq') {
-    return client.replyMessage(event.replyToken, getFaqText());
+    return client.replyMessage(event.replyToken, [createFaqFlex()]);
+  }
+
+  if (data === 'submenu=queryOrder') {
+    return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
   }
 
   if (data.startsWith('cancelCreate=')) {
@@ -1696,15 +1890,104 @@ app.post('/api/orders', async (req, res) => {
       success: true,
       orderId: id,
       order,
-      message: order.customerId === 'web-order'
-        ? '訂單已建立，但尚未綁定 LINE userId，請確認 LIFF_ID 是否設定。'
-        : '訂單已建立，付款確認卡已送到官方帳號聊天室。',
+      paymentOptions: {
+        jko: PAYMENT_JKO_INFO,
+        bank: PAYMENT_BANK_INFO,
+      },
+      message: '訂單已建立，請在頁面下方選擇付款方式。',
     });
   } catch (error) {
     console.error('❌ API 建立訂單失敗：', error);
     res.status(500).json({
       success: false,
       error: '建立訂單失敗，請稍後再試',
+    });
+  }
+});
+
+app.post('/api/orders/:orderId/payment-method', async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || '').toUpperCase();
+    const { paymentMethod } = req.body;
+    const order = orders[orderId];
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    if (!['jko', 'bank'].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        error: '付款方式錯誤',
+      });
+    }
+
+    order.paymentMethod = paymentMethod;
+    order.status = 'pending_payment';
+
+    res.json({
+      success: true,
+      orderId,
+      paymentMethod,
+      paymentMethodLabel: getPaymentMethodLabel(paymentMethod),
+      paymentInfo: paymentMethod === 'jko' ? PAYMENT_JKO_INFO : PAYMENT_BANK_INFO,
+      total: order.total,
+    });
+  } catch (error) {
+    console.error('❌ 設定付款方式失敗：', error);
+    res.status(500).json({
+      success: false,
+      error: '設定付款方式失敗',
+    });
+  }
+});
+
+app.post('/api/orders/:orderId/paid', async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || '').toUpperCase();
+    const order = orders[orderId];
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    if (!order.paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        error: '請先選擇付款方式',
+      });
+    }
+
+    if (order.isPaid) {
+      return res.json({
+        success: true,
+        orderId,
+        message: '此訂單已標記付款完成',
+      });
+    }
+
+    order.isPaid = true;
+    order.paidAt = Date.now();
+    order.status = 'pending_dispatch';
+
+    await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
+
+    res.json({
+      success: true,
+      orderId,
+      message: '已收到付款通知，系統已通知騎手接單',
+    });
+  } catch (error) {
+    console.error('❌ H5 確認付款失敗：', error);
+    res.status(500).json({
+      success: false,
+      error: '確認付款失敗，請稍後再試',
     });
   }
 });
@@ -1732,6 +2015,9 @@ app.get('/api/orders/:orderId', (req, res) => {
       dropoffAddress: order.dropoffAddress,
       etaMinutes: order.etaMinutes,
       total: order.total,
+      isPaid: order.isPaid,
+      paymentMethod: order.paymentMethod,
+      paymentMethodLabel: getPaymentMethodLabel(order.paymentMethod),
       waitingFeeStatus: order.waitingFeeApproved
         ? '已同意等候費'
         : order.waitingFeeRejected
@@ -1775,15 +2061,7 @@ async function handleEvent(event) {
 
         return client.replyMessage(
           event.replyToken,
-          createTextMessage(
-            `📦 訂單查詢結果\n\n` +
-            `訂單編號：${orderId}\n` +
-            `狀態：${getStatusLabel(order.status)}\n` +
-            `配送速度：${getSpeedOption(order.speedType).label}\n` +
-            `取件地址：${order.pickupAddress || '未填寫'}\n` +
-            `送達地址：${order.dropoffAddress || '未填寫'}\n` +
-            `ETA：${order.etaMinutes ? `${order.etaMinutes} 分鐘` : '尚未設定'}`
-          )
+          [createOrderStatusFlex(order)]
         );
       }
 
