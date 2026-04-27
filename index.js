@@ -209,7 +209,12 @@ function createBubble(title, bodyContents, footerContents = []) {
 }
 
 async function pushToUser(userId, messages) {
-  async function notifyCustomer(order, messages) {
+  if (!userId || userId === 'web-order') return;
+  const list = Array.isArray(messages) ? messages : [messages];
+  await client.pushMessage(userId, list);
+}
+
+async function notifyCustomer(order, messages) {
   try {
     if (!order || !order.customerId || order.customerId === 'web-order') {
       console.log(`⚠️ 訂單 ${order?.id || 'UNKNOWN'} 沒有綁定客人 LINE userId`);
@@ -222,10 +227,6 @@ async function pushToUser(userId, messages) {
     console.error(`❌ 通知客人失敗：${order?.id || 'UNKNOWN'}`, err);
     return false;
   }
-}
-  if (!userId || userId === 'web-order') return;
-  const list = Array.isArray(messages) ? messages : [messages];
-  await client.pushMessage(userId, list);
 }
 
 async function pushToGroup(groupId, messages) {
