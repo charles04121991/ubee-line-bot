@@ -1096,7 +1096,7 @@ if (data.startsWith('completed=')) {
   }
 
   return;
-}}
+}
 
   return client.replyMessage(event.replyToken, [createTextMessage('未識別的操作。')]);
 }
