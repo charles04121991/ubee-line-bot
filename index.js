@@ -1264,10 +1264,10 @@ app.post('/api/orders', async (req, res) => {
 
     orders[id] = order;
 
-    await notifyCustomer(order, [
-  createTextMessage('你的訂單已建立，請確認任務內容與費用。'),
-  createOrderConfirmFlex(order),
-]);
+    await notifyCustomer(
+  order,
+  createTextMessage(`✅ 訂單已建立：${order.id}`)
+);
     res.json({
       success: true,
       orderId: id,
