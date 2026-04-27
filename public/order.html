@@ -151,7 +151,7 @@ textarea{
 <div class="container">
   <h2>🚀 UBee 建立任務</h2>
   <div class="desc">
-    請先填寫任務資料，費用會在下方估算。送出訂單後，付款資訊會傳到你的 LINE 官方帳號聊天室。
+    請先填寫任務資料，費用會在下方估算。送出訂單後，可直接在本頁選擇付款方式，完成付款通知後系統才會派單。
   </div>
 
   <div class="card">
@@ -211,8 +211,17 @@ textarea{
   <div class="card paymentCard" id="paymentCard">
     <div class="label">付款方式</div>
     <div class="hint">
-      訂單送出後，付款卡片會傳到你的 LINE 官方帳號聊天室。你可以選擇街口支付或銀行轉帳，完成後按「我已付款」。
+      請選擇付款方式，完成付款後按「我已付款」。系統收到付款通知後，才會派單給騎手。
     </div>
+
+    <button class="btn btn-green" onclick="selectPayment('jko')">街口支付</button>
+    <button class="btn btn-light" onclick="selectPayment('bank')">銀行轉帳</button>
+
+    <div id="paymentInfoBox" class="status" style="display:none;"></div>
+
+    <button id="paidBtn" class="btn btn-black" style="display:none;" onclick="confirmPaid()">
+      我已付款
+    </button>
   </div>
 </div>
 
@@ -226,6 +235,8 @@ let currentDurationText = '尚未估價';
 let isSubmitting = false;
 let liffId = '';
 let userId = 'web-order';
+let currentOrderId = '';
+let selectedPaymentMethod = '';
 
 const speedFees = {
   standard: 0,
@@ -397,11 +408,15 @@ async function submitOrder(){
       throw new Error(result.error || '送出失敗');
     }
 
+    currentOrderId = result.orderId;
+
     showStatus(
-      `訂單已建立。\n\n訂單編號：${result.orderId}\n\n請回到 LINE 官方帳號聊天室，確認訂單內容並選擇付款方式。`
+      `訂單已建立。\n\n訂單編號：${result.orderId}\n\n請在下方選擇付款方式，完成付款後按「我已付款」。`
     );
 
-    alert('訂單已建立，請回到 LINE 官方帳號聊天室確認付款。');
+    document.getElementById('paymentCard').style.display = 'block';
+
+    alert('訂單已建立，請在下方選擇付款方式。');
 
   }catch(err){
     alert(err.message || '送出失敗，請稍後再試');
@@ -410,6 +425,83 @@ async function submitOrder(){
     isSubmitting = false;
     submitBtn.disabled = false;
     submitBtn.innerText = '送出訂單';
+  }
+}
+
+async function selectPayment(method){
+  if(!currentOrderId){
+    alert('請先送出訂單');
+    return;
+  }
+
+  selectedPaymentMethod = method;
+
+  try{
+    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ paymentMethod: method })
+    });
+
+    const result = await res.json();
+
+    if(!res.ok || !result.success){
+      throw new Error(result.error || '付款方式設定失敗');
+    }
+
+    const box = document.getElementById('paymentInfoBox');
+    box.style.display = 'block';
+    box.innerText =
+      `付款方式：${result.paymentMethodLabel}\n\n` +
+      `應付金額：NT$${result.total}\n\n` +
+      `${result.paymentInfo}\n\n` +
+      `完成付款後，請按下方「我已付款」。`;
+
+    document.getElementById('paidBtn').style.display = 'block';
+
+  }catch(err){
+    alert(err.message || '付款方式設定失敗');
+  }
+}
+
+async function confirmPaid(){
+  if(!currentOrderId){
+    alert('找不到訂單編號');
+    return;
+  }
+
+  if(!selectedPaymentMethod){
+    alert('請先選擇付款方式');
+    return;
+  }
+
+  const paidBtn = document.getElementById('paidBtn');
+  paidBtn.disabled = true;
+  paidBtn.innerText = '處理中...';
+
+  try{
+    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({})
+    });
+
+    const result = await res.json();
+
+    if(!res.ok || !result.success){
+      throw new Error(result.error || '確認付款失敗');
+    }
+
+    showStatus(
+      `付款通知已送出。\n\n訂單編號：${currentOrderId}\n\n系統已通知騎手接單，請稍候。`
+    );
+
+    alert('已收到付款通知，系統已通知騎手接單。');
+
+  }catch(err){
+    alert(err.message || '確認付款失敗，請稍後再試');
+    paidBtn.disabled = false;
+    paidBtn.innerText = '我已付款';
   }
 }
 
