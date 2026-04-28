@@ -579,7 +579,7 @@ function createWaitingFeeConfirmFlex(order) {
 
 function createFinanceFlex(order) {
   const total = order.totalFee || 0;
-  const driver = order.driverFee || 0;
+  const driver = Math.floor(total * 0.6);
   const platform = total - driver;
 
   return {
