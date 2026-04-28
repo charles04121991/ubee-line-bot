@@ -578,25 +578,91 @@ function createWaitingFeeConfirmFlex(order) {
 }
 
 function createFinanceFlex(order) {
-  const speed = getSpeedOption(order.speedType);
-  return createFlexMessage('UBee 財務明細', createBubble(
-    'UBee 財務明細',
-    [
-      createInfoRow('訂單編號', order.id),
-      createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
-      createInfoRow('付款狀態', order.isPaid ? '已付款' : '未付款'),
-      createInfoRow('配送速度', speed.label),
-      createInfoRow('取件地址', order.pickupAddress),
-      createInfoRow('送達地址', order.dropoffAddress),
-      createInfoRow('配送費', formatCurrency(order.deliveryFee)),
-      createInfoRow('服務費', formatCurrency(order.serviceFee)),
-      createInfoRow('速度費', formatCurrency(order.speedFee)),
-      createInfoRow('等候費', formatCurrency(order.waitingFee || 0)),
-      createInfoRow('總金額', formatCurrency(order.total)),
-      createInfoRow('騎手收入', formatCurrency(order.driverFee)),
-      createInfoRow('平台收入', formatCurrency(order.platformFee)),
-    ]
-  ));
+  const total = order.totalFee || 0;
+  const driver = order.driverFee || 0;
+  const platform = total - driver;
+
+  return {
+    type: 'flex',
+    altText: '財務明細',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+
+          // 🔝 黑色標題
+          {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: '16px',
+            backgroundColor: '#111111',
+            contents: [
+              { type: 'text', text: '💰 財務明細', color: '#ffffff', weight: 'bold', size: 'lg' },
+              { type: 'text', text: `訂單編號：${order.id}`, color: '#cccccc', size: 'sm', margin: 'sm' }
+            ]
+          },
+
+          // 💰 客戶支付（米色）
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#F2EAD3',
+            paddingAll: '16px',
+            cornerRadius: '12px',
+            contents: [
+              { type: 'text', text: `客戶支付：$${total}`, weight: 'bold', size: 'xl' }
+            ]
+          },
+
+          // 📍 基本資訊
+          createInfoRow('取件地點', order.pickupAddress),
+          createInfoRow('取件電話', order.pickupPhone),
+          createInfoRow('送達地點', order.dropoffAddress),
+          createInfoRow('送達電話', order.dropoffPhone),
+          createInfoRow('物品內容', order.item),
+          createInfoRow('備註', order.note || '無'),
+          createInfoRow('距離', `${order.distanceKm || 0} 公里`),
+          createInfoRow('時間', `${order.durationMin || 0} 分鐘`),
+
+          { type: 'separator', margin: 'md' },
+
+          // 💸 收入
+          createInfoRow('騎手收入', `$${driver}`),
+          createInfoRow('平台收入', `$${platform}`),
+
+          { type: 'separator', margin: 'md' },
+
+          // ➕ 附加費
+          {
+            type: 'text',
+            text: '附加費明細',
+            weight: 'bold',
+            margin: 'md'
+          },
+          createInfoRow('急件費', `$${order.urgentFee || 0}`),
+          createInfoRow('等候費', `$${order.waitingFee || 0}`),
+          createInfoRow('附加費總額', `$${(order.urgentFee || 0) + (order.waitingFee || 0)}`),
+
+          { type: 'separator', margin: 'md' },
+
+          // 📊 收入拆解
+          {
+            type: 'text',
+            text: '收入拆解',
+            weight: 'bold',
+            margin: 'md'
+          },
+          createInfoRow('基礎收入', `$${(order.baseFee || 0)}`),
+          createInfoRow('附加收入', `$${(order.waitingFee || 0) + (order.urgentFee || 0)}`)
+
+        ]
+      }
+    }
+  };
 }
 
 function createOrderFromApi(data) {
