@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>UBee 建立任務</title>
+  <title>UBee 同城即時配送</title>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
@@ -11,15 +11,15 @@
     * { box-sizing: border-box; }
 
     body {
-  margin: 0;
-  padding: 22px 16px 36px;
-  font-family: Arial, "Noto Sans TC", sans-serif;
-  background: #f6f6f6;
-  color: #111;
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
+      margin: 0;
+      padding: 22px 16px 36px;
+      font-family: Arial, "Noto Sans TC", sans-serif;
+      background: #f6f6f6;
+      color: #111;
+      font-size: 16px;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
 
     .page {
       max-width: 760px;
@@ -27,18 +27,18 @@
     }
 
     .title {
-  font-size: 28px;
-  font-weight: 900;
-  margin: 14px 0 6px;
-  letter-spacing: -1px;
-}
+      font-size: 28px;
+      font-weight: 900;
+      margin: 14px 0 6px;
+      letter-spacing: -1px;
+    }
 
     .subtitle {
-  font-size: 15px;
-  color: #666;
-  line-height: 1.55;
-  margin-bottom: 20px;
-}
+      font-size: 15px;
+      color: #666;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
 
     .card {
       background: #fff;
@@ -210,43 +210,46 @@
 
 <body>
   <div class="page">
-    <div class="title">🚀 UBee 建立任務</div>
+    <div class="title">📦 UBee 同城即時配送</div>
     <div class="subtitle">
-      在 LINE 官方帳號內填寫，不需要跳到其他 App。先填任務資料，往下會看到費用與付款方式。
+      文件、小物、鑰匙、遺留物、商務物品，都可以快速送達。填寫配送資料後，系統會自動計算費用。
     </div>
 
     <div class="card">
       <div class="step-badge">Step 1</div>
-      <div class="section-title">服務類型<span class="required">*</span></div>
+      <div class="section-title">配送類型<span class="required">*</span></div>
 
       <div class="grid" id="serviceGrid">
-        <div class="option active" onclick="selectService(this, '文件急送')">
-          <div class="option-title">📄 文件急送</div>
-          <div class="option-desc">合約、發票、公司文件</div>
+        <div class="option active" onclick="selectService(this, '小件配送')">
+          <div class="option-title">📦 小件配送</div>
+          <div class="option-desc">文件、小物、鑰匙、輕便物品</div>
         </div>
-        <div class="option" onclick="selectService(this, '商務物品')">
-          <div class="option-title">🏢 商務物品</div>
-          <div class="option-desc">樣品、資料、公司物件</div>
+
+        <div class="option" onclick="selectService(this, '一般配送')">
+          <div class="option-title">📦 一般配送</div>
+          <div class="option-desc">包裹、商務物品、常規配送</div>
         </div>
-        <div class="option" onclick="selectService(this, '個人物品')">
-          <div class="option-title">👤 個人物品</div>
-          <div class="option-desc">鑰匙、小物、遺留物</div>
+
+        <div class="option" onclick="selectService(this, '重要文件')">
+          <div class="option-title">📄 重要文件</div>
+          <div class="option-desc">合約、發票、需準時送達</div>
         </div>
-        <div class="option" onclick="selectService(this, '安全代送')">
-          <div class="option-title">🔒 安全代送</div>
-          <div class="option-desc">需穩妥交付的物件</div>
+
+        <div class="option" onclick="selectService(this, '保密配送')">
+          <div class="option-title">🔐 保密配送</div>
+          <div class="option-desc">重要物件、需安全交付</div>
         </div>
       </div>
     </div>
 
     <div class="card">
       <div class="step-badge">Step 2</div>
-      <div class="section-title">路線與聯絡資訊<span class="required">*</span></div>
+      <div class="section-title">取送資訊<span class="required">*</span></div>
 
       <input id="pickup" placeholder="取件地址，例如：台中市北屯區...">
-      <input id="pickupPhone" placeholder="取件電話">
+      <input id="pickupPhone" placeholder="取件聯絡電話">
       <input id="dropoff" placeholder="送達地址，例如：台中市西屯區...">
-      <input id="dropoffPhone" placeholder="送達電話">
+      <input id="dropoffPhone" placeholder="送達聯絡電話">
 
       <div class="hint">地址越完整，系統估價越準。若是大樓、公司、樓層，可寫在備註。</div>
     </div>
@@ -257,19 +260,19 @@
 
       <div class="grid" id="speedGrid">
         <div class="option active" onclick="selectSpeed(this, 'standard')">
-          <div class="option-title">一般件</div>
+          <div class="option-title">標準配送</div>
           <div class="option-desc">60–120 分鐘｜+NT$0</div>
         </div>
         <div class="option" onclick="selectSpeed(this, 'priority')">
-          <div class="option-title">快速件</div>
+          <div class="option-title">快速配送</div>
           <div class="option-desc">45–60 分鐘｜+NT$50</div>
         </div>
         <div class="option" onclick="selectSpeed(this, 'express')">
-          <div class="option-title">急件</div>
+          <div class="option-title">急件配送</div>
           <div class="option-desc">30–45 分鐘｜+NT$100</div>
         </div>
         <div class="option" onclick="selectSpeed(this, 'rush')">
-          <div class="option-title">極速件</div>
+          <div class="option-title">極速專送</div>
           <div class="option-desc">20–30 分鐘｜+NT$200</div>
         </div>
       </div>
@@ -277,17 +280,17 @@
 
     <div class="card">
       <div class="step-badge">Step 4</div>
-      <div class="section-title">物品內容與備註<span class="required">*</span></div>
+      <div class="section-title">配送內容與備註<span class="required">*</span></div>
 
-      <input id="item" placeholder="物品內容，例如：合約、樣品、小包裹">
+      <input id="item" placeholder="配送內容，例如：合約、鑰匙、小包裹、衣物">
       <textarea id="note" placeholder="備註，例如：請到櫃台取件、送達前請電話聯絡"></textarea>
     </div>
 
     <div class="card">
       <div class="step-badge">Step 5</div>
-      <div class="section-title">送出訂單</div>
+      <div class="section-title">送出配送訂單</div>
 
-      <button id="submitBtn" class="main-btn" onclick="submitOrder()">送出訂單</button>
+      <button id="submitBtn" class="main-btn" onclick="submitOrder()">送出配送訂單</button>
       <div id="statusBox" class="status hidden"></div>
     </div>
 
@@ -309,7 +312,7 @@
 <script>
 let userId = 'web-order';
 let liffId = '';
-let serviceType = '文件急送';
+let serviceType = '小件配送';
 let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
@@ -400,7 +403,7 @@ function validateData(data) {
   }
 
   if (!data.item) {
-    alert('請輸入物品內容');
+    alert('請輸入配送內容');
     return false;
   }
 
@@ -415,7 +418,7 @@ function renderSummary(order) {
   box.classList.remove('hidden');
   box.innerHTML = `
     <div class="summary-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
-    <div class="summary-row"><span>服務類型</span><strong>${serviceType}</strong></div>
+    <div class="summary-row"><span>配送類型</span><strong>${serviceType}</strong></div>
     <div class="summary-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
     <div class="summary-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
     <div class="summary-row"><span>速度費</span><strong>NT$${order?.speedFee || 0}</strong></div>
@@ -442,7 +445,7 @@ async function submitOrder() {
     const result = await res.json();
 
     if (!res.ok || !result.success) {
-      throw new Error(result.error || '建立訂單失敗');
+      throw new Error(result.error || '建立配送訂單失敗');
     }
 
     currentOrderId = result.orderId;
@@ -451,7 +454,7 @@ async function submitOrder() {
     currentTotal = result.total || result.order?.total || '';
 
     showStatus(
-      `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請往下選擇付款方式，完成付款後按「我已付款」，系統才會派單。`
+      `✅ 配送訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請往下選擇付款方式，完成付款後按「我已付款」，系統才會派單。`
     );
 
     document.getElementById('paymentCard').classList.remove('hidden');
@@ -465,13 +468,13 @@ async function submitOrder() {
     alert('❌ ' + err.message);
   } finally {
     btn.disabled = false;
-    btn.innerText = '送出訂單';
+    btn.innerText = '送出配送訂單';
   }
 }
 
 async function selectPayment(method) {
   if (!currentOrderId) {
-    alert('請先送出訂單');
+    alert('請先送出配送訂單');
     return;
   }
 
@@ -506,7 +509,7 @@ async function selectPayment(method) {
 
 async function confirmPaid() {
   if (!currentOrderId) {
-    alert('找不到訂單編號，請重新建立訂單');
+    alert('找不到訂單編號，請重新建立配送訂單');
     return;
   }
 
