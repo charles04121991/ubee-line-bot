@@ -1089,6 +1089,58 @@ async function handlePostback(event) {
     return;
   }
 
+  if (data.startsWith('waitingApprove=')) {
+  const orderId = data.split('=')[1];
+  const order = orders[orderId];
+
+  if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
+
+  order.waitingFee = 60;
+
+if (!order.waitingFeeApproved) {
+  order.total = (order.total || 0) + 60;
+}
+
+order.waitingFeeApproved = true;
+order.waitingFeeRejected = false;
+
+  await client.replyMessage(event.replyToken, [
+    createTextMessage(`✅ 已同意加收等候費 $60\n\n訂單編號：${order.id}`)
+  ]);
+
+  if (order.riderId) {
+    await pushToUser(order.riderId, [
+      createTextMessage('✅ 客戶已同意加收等候費 $60'),
+      createRiderControlFlex(order)
+    ]);
+  }
+
+  return;
+}
+
+if (data.startsWith('waitingReject=')) {
+  const orderId = data.split('=')[1];
+  const order = orders[orderId];
+
+  if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
+
+  order.waitingFee = 0;
+  order.waitingFeeApproved = false;
+  order.waitingFeeRejected = true;
+
+  await client.replyMessage(event.replyToken, [
+    createTextMessage(`已拒絕加收等候費\n\n訂單編號：${order.id}`)
+  ]);
+
+  if (order.riderId) {
+    await pushToUser(order.riderId, [
+      createTextMessage('客戶不同意加收等候費'),
+      createRiderControlFlex(order)
+    ]);
+  }
+
+  return;
+}
   return client.replyMessage(event.replyToken, [createTextMessage('未識別的操作。')]);
 }
 
