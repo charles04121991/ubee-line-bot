@@ -458,26 +458,37 @@ function createOrderConfirmFlex(order) {
 
 function createDispatchGroupFlex(order) {
   const speed = getSpeedOption(order.speedType);
-  return createFlexMessage('UBee 新任務通知', createBubble(
-    'UBee 新任務通知',
+
+  return createFlexMessage('UBee 同城即時配送', createBubble(
+    '📦 UBee 同城即時配送',
     [
       createInfoRow('訂單編號', order.id),
-      createInfoRow('狀態', getStatusLabel(order.status)),
+
+      { type: 'separator', margin: 'md' },
+
+      createInfoRow('配送類型', '同城即時配送'),
       createInfoRow('配送速度', `${speed.label}｜${speed.riderText}`),
-      createInfoRow('服務類型', order.serviceType),
-      createInfoRow('取件地址', order.pickupAddress),
-      createInfoRow('送達地址', order.dropoffAddress),
-      createInfoRow('物品內容', order.item),
+
+      { type: 'separator', margin: 'md' },
+
+      createInfoRow('取件地點', order.pickupAddress),
+      createInfoRow('送達地點', order.dropoffAddress),
+
+      { type: 'separator', margin: 'md' },
+
+      createInfoRow('配送內容', order.item),
       createInfoRow('備註', order.note || '無'),
+
+      { type: 'separator', margin: 'md' },
+
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
     ],
     [
-      createActionButton('接受訂單', `accept=${order.id}`),
-      createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress)),
+      createActionButton('✔️ 接受訂單', `accept=${order.id}`),
+      createUriButton('導航取件', buildGoogleMapDirectionsUrl(order.pickupAddress)),
     ]
   ));
 }
-
 function createEtaRow(orderId, minutesList) {
   return {
     type: 'box',
