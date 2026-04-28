@@ -499,6 +499,32 @@ function createETAFlex(order) {
 }
 
 function createRiderControlFlex(order) {
+  const footerButtons = [];
+
+  footerButtons.push(createActionButton('重新設定 ETA', `showEta=${order.id}`, 'secondary'));
+
+  if (order.status === 'accepted') {
+    footerButtons.push(createUriButton('撥打取件電話', buildTelUrl(order.pickupPhone), 'secondary'));
+    footerButtons.push(createActionButton('已抵達取件地點', `arrivedPickup=${order.id}`));
+    footerButtons.push(createActionButton('已取件完成', `pickedUp=${order.id}`));
+  }
+
+  if (order.status === 'arrived_pickup') {
+    footerButtons.push(createUriButton('撥打取件電話', buildTelUrl(order.pickupPhone), 'secondary'));
+    footerButtons.push(createActionButton('已取件完成', `pickedUp=${order.id}`));
+  }
+
+  if (order.status === 'picked_up') {
+    footerButtons.push(createUriButton('導航到送達地點', buildGoogleMapDirectionsUrl(order.dropoffAddress)));
+    footerButtons.push(createUriButton('撥打送達電話', buildTelUrl(order.dropoffPhone), 'secondary'));
+    footerButtons.push(createActionButton('已抵達送達地點', `arrivedDropoff=${order.id}`));
+  }
+
+  if (order.status === 'arrived_dropoff') {
+    footerButtons.push(createUriButton('撥打送達電話', buildTelUrl(order.dropoffPhone), 'secondary'));
+    footerButtons.push(createActionButton('已完成', `completed=${order.id}`));
+  }
+
   return createFlexMessage('騎手任務操作', createBubble(
     '騎手任務操作',
     [
@@ -511,16 +537,7 @@ function createRiderControlFlex(order) {
       createInfoRow('送達電話', order.dropoffPhone),
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
     ],
-    [
-      createActionButton('重新設定 ETA', `showEta=${order.id}`, 'secondary'),
-      createActionButton('已抵達取件地點', `arrivedPickup=${order.id}`),
-      createActionButton('已取件完成', `pickedUp=${order.id}`),
-      createActionButton('已抵達送達地點', `arrivedDropoff=${order.id}`),
-      createUriButton('導航到送達地點', buildGoogleMapDirectionsUrl(order.dropoffAddress)),
-      createUriButton('撥打取件電話', buildTelUrl(order.pickupPhone), 'secondary'),
-      createUriButton('撥打送達電話', buildTelUrl(order.dropoffPhone), 'secondary'),
-      createActionButton('已完成', `completed=${order.id}`),
-    ]
+    footerButtons
   ));
 }
 
