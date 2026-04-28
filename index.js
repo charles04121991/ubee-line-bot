@@ -459,14 +459,14 @@ function createOrderConfirmFlex(order) {
 function createDispatchGroupFlex(order) {
   const speed = getSpeedOption(order.speedType);
 
-  return createFlexMessage('UBee 同城即時配送', createBubble(
-    '📦 UBee 同城即時配送',
+  return createFlexMessage('UBee 城市任務配送', createBubble(
+    '📦 UBee 城市任務配送',
     [
       createInfoRow('訂單編號', order.id),
 
       { type: 'separator', margin: 'md' },
 
-      createInfoRow('配送類型', order.serviceType || '同城配送'),
+      createInfoRow('配送類型', order.serviceType || '任務配送'),
       createInfoRow('配送速度', `${speed.label}｜${speed.riderText}`),
 
       { type: 'separator', margin: 'md' },
@@ -484,7 +484,7 @@ function createDispatchGroupFlex(order) {
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
     ],
     [
-      createActionButton('✔️ 接受訂單', `accept=${order.id}`),
+      createActionButton('接受訂單', `accept=${order.id}`),
       createUriButton('導航取件', buildGoogleMapDirectionsUrl(order.pickupAddress)),
     ]
   ));
@@ -502,8 +502,8 @@ function createEtaRow(orderId, minutesList) {
 }
 
 function createETAFlex(order) {
-  return createFlexMessage('請選擇 ETA', createBubble(
-    '請選擇 ETA',
+  return createFlexMessage('請選擇抵達取件地點時間', createBubble(
+    '請選擇抵達取件地點時間',
     [
       { type: 'text', text: '請選擇預計抵達取件地點時間。', size: 'sm', color: '#666666', wrap: true },
       createInfoRow('訂單編號', order.id),
@@ -518,7 +518,7 @@ function createETAFlex(order) {
 function createRiderControlFlex(order) {
   const footerButtons = [];
 
-  footerButtons.push(createActionButton('重新設定 ETA', `showEta=${order.id}`, 'secondary'));
+  footerButtons.push(createActionButton('重新設定', `showEta=${order.id}`, 'secondary'));
 
   if (order.status === 'accepted') {
     footerButtons.push(createUriButton('撥打取件電話', buildTelUrl(order.pickupPhone), 'secondary'));
