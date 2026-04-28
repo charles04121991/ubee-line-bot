@@ -58,6 +58,11 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
   }
 });
 
+// ✅ 健康檢查（給 UptimeRobot 用）
+app.get('/health', (req, res) => {
+res.status(200).send('OK');
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
