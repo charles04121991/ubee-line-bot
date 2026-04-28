@@ -516,6 +516,7 @@ function createRiderControlFlex(order) {
 
   if (order.status === 'arrived_pickup') {
     footerButtons.push(createUriButton('撥打取件電話', buildTelUrl(order.pickupPhone), 'secondary'));
+    footerButtons.push(createActionButton('申請等候費 $60', `requestWaitingFee=${order.id}`));
     footerButtons.push(createActionButton('已取件完成', `pickedUp=${order.id}`));
   }
 
