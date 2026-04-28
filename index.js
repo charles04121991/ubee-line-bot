@@ -1009,6 +1009,26 @@ async function handlePostback(event) {
       return client.replyMessage(event.replyToken, [createTextMessage('只有接單騎手可以申請等候費。')]);
     }
 
+    // 🚫 防濫用：只能申請一次
+if (order.waitingFeeRequested || order.waitingFeeApproved) {
+  return client.replyMessage(event.replyToken, [
+    createTextMessage('⚠️ 此任務已申請過等候費')
+  ]);
+}
+
+// ⛔ 必須已抵達取件地點
+if (!order.arrivedPickupAt) {
+  return client.replyMessage(event.replyToken, [
+    createTextMessage('請先按「已抵達取件地點」後，才能申請等候費')
+  ]);
+}
+
+// ⏱️ 必須等待 3 分鐘
+if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
+  return client.replyMessage(event.replyToken, [
+    createTextMessage('抵達取件地點滿 3 分鐘後才能申請等候費')
+  ]);
+}
     order.waitingFeeRequested = true;
     order.waitingFeeRejected = false;
     order.waitingFeeRequestedAt = Date.now();
