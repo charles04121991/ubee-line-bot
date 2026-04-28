@@ -578,10 +578,16 @@ function createWaitingFeeConfirmFlex(order) {
 }
 
 function createFinanceFlex(order) {
-  const total = order.totalFee || 0;
-  const driver = Math.floor(total * 0.6);
-  const platform = total - driver;
+  const total = order.total || 0;
+const driver = Math.floor(total * 0.6);
+const platform = total - driver;
 
+const distanceKm = Math.ceil((order.distanceMeters || 0) / 1000);
+const durationMin = Math.ceil((order.durationSeconds || 0) / 60);
+
+const baseIncome = order.deliveryFee || 0;
+const urgentFee = order.speedFee || 0;
+const waitingFee = order.waitingFee || 0;
   return {
     type: 'flex',
     altText: '財務明細',
@@ -625,8 +631,8 @@ function createFinanceFlex(order) {
           createInfoRow('送達電話', order.dropoffPhone),
           createInfoRow('物品內容', order.item),
           createInfoRow('備註', order.note || '無'),
-          createInfoRow('距離', `${order.distanceKm || 0} 公里`),
-          createInfoRow('時間', `${order.durationMin || 0} 分鐘`),
+          createInfoRow('距離', `${distanceKm} 公里`),
+          createInfoRow('時間', `${durationMin} 分鐘`),
 
           { type: 'separator', margin: 'md' },
 
@@ -643,9 +649,9 @@ function createFinanceFlex(order) {
             weight: 'bold',
             margin: 'md'
           },
-          createInfoRow('急件費', `$${order.urgentFee || 0}`),
-          createInfoRow('等候費', `$${order.waitingFee || 0}`),
-          createInfoRow('附加費總額', `$${(order.urgentFee || 0) + (order.waitingFee || 0)}`),
+          createInfoRow('急件費', `$${urgentFee}`),
+          createInfoRow('等候費', `$${waitingFee}`),
+          createInfoRow('附加費總額', `$${urgentFee + waitingFee}`),
 
           { type: 'separator', margin: 'md' },
 
@@ -656,8 +662,8 @@ function createFinanceFlex(order) {
             weight: 'bold',
             margin: 'md'
           },
-          createInfoRow('基礎收入', `$${(order.baseFee || 0)}`),
-          createInfoRow('附加收入', `$${(order.waitingFee || 0) + (order.urgentFee || 0)}`)
+          createInfoRow('基礎收入', `$${baseIncome}`),
+          createInfoRow('附加收入', `$${urgentFee + waitingFee}`)
 
         ]
       }
