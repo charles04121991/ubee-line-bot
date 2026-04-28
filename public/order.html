@@ -302,6 +302,18 @@
 
       <button class="main-btn" onclick="selectPayment('jko')">街口支付</button>
       <button class="main-btn light-btn" onclick="selectPayment('bank')">銀行轉帳</button>
+      
+      <!-- 取消訂單 -->
+<button id="cancelOrderBtn" class="light-btn"
+style="
+  width:100%;
+  padding:10px;
+  margin-top:12px;
+  border-radius:8px;
+  font-size:14px;
+">
+取消訂單
+</button>
 
       <div id="paymentInfoBox" class="payment-info hidden"></div>
 
@@ -549,6 +561,15 @@ async function confirmPaid() {
 }
 
 initPage();
+document.getElementById('cancelOrderBtn')?.addEventListener('click', function () {
+  const ok = confirm('確定要取消此訂單嗎？');
+
+  if (!ok) return;
+
+  alert('訂單已取消');
+
+  location.reload();
+});
 </script>
 
 </body>
