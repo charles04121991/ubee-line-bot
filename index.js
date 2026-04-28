@@ -94,10 +94,10 @@ const PRICING = {
 };
 
 const SPEED_OPTIONS = {
-  standard: { label: '一般件', time: '60–120 分鐘', fee: 0, riderText: '一般配送' },
-  priority: { label: '快速件', time: '45–60 分鐘', fee: 50, riderText: '優先派單' },
-  express: { label: '急件', time: '30–45 分鐘', fee: 100, riderText: '急件優先' },
-  rush: { label: '極速件', time: '20–30 分鐘', fee: 200, riderText: '專人專送' },
+  standard: { label: '標準配送', time: '60–120 分鐘', fee: 0, riderText: '一般配送' },
+  priority: { label: '快速配送', time: '45–60 分鐘', fee: 50, riderText: '優先派單' },
+  express: { label: '急件配送', time: '30–45 分鐘', fee: 100, riderText: '急件優先' },
+  rush: { label: '極速專送', time: '20–30 分鐘', fee: 200, riderText: '專人專送' },
 };
 
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
@@ -458,22 +458,34 @@ function createOrderConfirmFlex(order) {
 
 function createDispatchGroupFlex(order) {
   const speed = getSpeedOption(order.speedType);
-  return createFlexMessage('UBee 新任務通知', createBubble(
-    'UBee 新任務通知',
+
+  return createFlexMessage('UBee 同城即時配送', createBubble(
+    '📦 UBee 同城即時配送',
     [
       createInfoRow('訂單編號', order.id),
-      createInfoRow('狀態', getStatusLabel(order.status)),
+
+      { type: 'separator', margin: 'md' },
+
+      createInfoRow('配送類型', order.serviceType || '同城配送'),
       createInfoRow('配送速度', `${speed.label}｜${speed.riderText}`),
-      createInfoRow('服務類型', order.serviceType),
-      createInfoRow('取件地址', order.pickupAddress),
-      createInfoRow('送達地址', order.dropoffAddress),
-      createInfoRow('物品內容', order.item),
+
+      { type: 'separator', margin: 'md' },
+
+      createInfoRow('取件地點', order.pickupAddress),
+      createInfoRow('送達地點', order.dropoffAddress),
+
+      { type: 'separator', margin: 'md' },
+
+      createInfoRow('配送內容', order.item),
       createInfoRow('備註', order.note || '無'),
+
+      { type: 'separator', margin: 'md' },
+
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
     ],
     [
-      createActionButton('接受訂單', `accept=${order.id}`),
-      createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress)),
+      createActionButton('✔️ 接受訂單', `accept=${order.id}`),
+      createUriButton('導航取件', buildGoogleMapDirectionsUrl(order.pickupAddress)),
     ]
   ));
 }
