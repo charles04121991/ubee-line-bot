@@ -388,7 +388,7 @@ function createFaqFlex() {
       createTextBlock('Q1：UBee 可以送什麼？', '文件、合約、發票、樣品、商務物品、個人物品、安全代送與私人物件。'),
       createTextBlock('Q2：UBee 不接哪些項目？', '違法物品、危險品、易燃物、活體動物、高價未保管物、高度個資風險或需特殊證照的項目恕不承接。'),
       createTextBlock('Q3：多久可以送達？', '依距離、路況與速度選項而定。'),
-      createTextBlock('Q4：費用怎麼計算？', '費用依 Google Maps 距離與時間計算，並加上服務費與速度費。'),
+      createTextBlock('Q4：費用怎麼計算？', '費用依 Google Maps 距離與時間計算，並加上服務費與系統費。'),
       createTextBlock('Q5：付款方式有哪些？', '目前支援街口支付與銀行轉帳。'),
       createTextBlock('Q6：什麼是等候費？', '騎手抵達現場後，若需要額外等候超過 3–5 分鐘，可能會申請等候費 NT$60。'),
       createTextBlock('Q7：可以查詢訂單嗎？', '可以。點選「查詢訂單」後，輸入訂單編號即可查看目前狀態。'),
@@ -446,7 +446,7 @@ function createOrderConfirmFlex(order) {
       createInfoRow('時間', order.durationText),
       createInfoRow('配送費', formatCurrency(order.deliveryFee)),
       createInfoRow('服務費', formatCurrency(order.serviceFee)),
-      createInfoRow('速度費', formatCurrency(order.speedFee)),
+      createInfoRow('系統費', formatCurrency(order.speedFee)),
       createInfoRow('總金額', formatCurrency(order.total)),
     ],
     [
@@ -676,7 +676,7 @@ function createOrderFromApi(data) {
   return {
     userId: data.userId || data.customerId || 'web-order',
     customerId: data.userId || data.customerId || 'web-order',
-    serviceType: data.serviceType || data.service || '文件急送',
+    serviceType: data.serviceType || data.service || '個人物品',
     item: data.item || '',
     pickupAddress: data.pickup || data.pickupAddress || '',
     pickupPhone: normalizePhone(data.pickupPhone || ''),
