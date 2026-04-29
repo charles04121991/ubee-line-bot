@@ -561,14 +561,38 @@ async function confirmPaid() {
 }
 
 initPage();
-document.getElementById('cancelOrderBtn')?.addEventListener('click', function () {
-  const ok = confirm('確定要取消此訂單嗎？');
+document.getElementById('cancelOrderBtn')?.addEventListener('click', async function () {
 
+  if (!currentOrderId) {
+    alert('目前沒有訂單');
+    return;
+  }
+
+  const ok = confirm('確定要取消此訂單嗎？');
   if (!ok) return;
 
-  alert('訂單已取消');
+  try {
+    const res = await fetch(`/api/orders/${currentOrderId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
 
-  location.reload();
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result.error || '取消失敗');
+    }
+
+    alert(`訂單已取消\n${result.message}`);
+
+showStatus(`⚠️ 訂單已取消\n訂單編號：${currentOrderId}\n取消費：NT$${result.cancelFee}`);
+
+    document.getElementById('paymentCard').classList.add('hidden');
+
+  } catch (err) {
+    alert(err.message);
+  }
+
 });
 </script>
 
