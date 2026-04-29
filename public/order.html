@@ -278,7 +278,7 @@
   <div class="step-badge">Step 4</div>
   <div class="section-title">計算預估費用<span class="required">*</span></div>
 
-  <button type="button" class="submit-btn" onclick="calculateEstimate()">
+  <button type="button" class="submit-btn" onclick="calculateEstimate()"style="font-size:20px; padding:16px; border-radius:12px;">
     計算預估費用
   </button>
 
@@ -618,10 +618,18 @@ async function confirmPaid() {
 
     document.getElementById('estimateResult').style.display = 'block';
     document.getElementById('estimateText').innerHTML = `
-      距離：約 ${data.distanceText}<br>
-      時間：約 ${data.durationText}<br>
-      預估費用：NT$${data.totalFee}
-    `;
+  <div style="font-size:18px; margin-bottom:6px;">
+    📍 距離：約 ${data.distanceText}
+  </div>
+
+  <div style="font-size:18px; margin-bottom:6px;">
+    ⏱ 時間：約 ${data.durationText}
+  </div>
+
+  <div style="font-size:24px; font-weight:bold; color:#00b900;">
+    💰 預估費用：NT$${data.totalFee}
+  </div>
+`;
   } catch (err) {
     alert("估價失敗");
     console.error(err);
