@@ -342,7 +342,41 @@ function recalculateOrderFinancials(order) {
   order.platformFee = order.total - order.driverFee;
   return order;
 }
+function calculateCancelFee(order) {
+  const deliveryFee = Number(order.deliveryFee || 0);
 
+  if (order.status === 'pending_payment' || order.status === 'pending_dispatch') {
+    return {
+      canCancel: true,
+      cancelFee: 0,
+      message: '此訂單可免費取消。',
+    };
+  }
+
+  if (order.status === 'accepted') {
+    const fee = Math.min(Math.max(Math.round(deliveryFee * 0.3), 60), 200);
+    return {
+      canCancel: true,
+      cancelFee: fee,
+      message: `騎手已接單，取消費為 ${formatCurrency(fee)}。`,
+    };
+  }
+
+  if (order.status === 'arrived_pickup') {
+    const fee = Math.min(Math.max(Math.round(deliveryFee * 0.5), 100), 300);
+    return {
+      canCancel: true,
+      cancelFee: fee,
+      message: `騎手已抵達取件地點，取消費為 ${formatCurrency(fee)}。`,
+    };
+  }
+
+  return {
+    canCancel: false,
+    cancelFee: 0,
+    message: '此訂單目前不可取消，請聯繫 UBee 協助處理。',
+  };
+}
 function createMainMenuFlex() {
   return createFlexMessage('UBee 主選單', createBubble(
     'UBee 主選單',
@@ -881,6 +915,69 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
   } catch (error) {
     console.error('❌ H5 確認付款失敗：', error);
     res.status(500).json({ success: false, error: '確認付款失敗，請稍後再試' });
+  }
+});
+
+app.post('/api/orders/:orderId/cancel', async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || '').toUpperCase();
+    const order = orders[orderId];
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: '找不到此訂單' });
+    }
+
+    if (order.status === 'cancelled') {
+      return res.json({
+        success: true,
+        orderId,
+        status: order.status,
+        cancelFee: order.cancelFee || 0,
+        message: '此訂單已取消。',
+      });
+    }
+
+    const result = calculateCancelFee(order);
+
+    if (!result.canCancel) {
+      return res.status(400).json({
+        success: false,
+        error: result.message,
+      });
+    }
+
+    order.status = 'cancelled';
+    order.cancelledAt = Date.now();
+    order.cancelFee = result.cancelFee;
+    order.cancelMessage = result.message;
+
+    await notifyCustomer(
+      order,
+      createTextMessage(
+        `✅ 訂單已取消\n\n訂單編號：${order.id}\n${result.message}`
+      )
+    );
+
+    if (LINE_GROUP_ID && order.isPaid) {
+      await pushToGroup(
+        LINE_GROUP_ID,
+        createTextMessage(
+          `⚠️ 訂單已取消\n\n訂單編號：${order.id}\n狀態：${getStatusLabel(order.status)}\n取消費：${formatCurrency(result.cancelFee)}`
+        )
+      );
+    }
+
+    res.json({
+      success: true,
+      orderId,
+      status: order.status,
+      statusLabel: getStatusLabel(order.status),
+      cancelFee: result.cancelFee,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error('❌ 取消訂單失敗：', error);
+    res.status(500).json({ success: false, error: '取消訂單失敗，請稍後再試' });
   }
 });
 
