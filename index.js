@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log('🔥 UBee query route version loaded');
 const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
