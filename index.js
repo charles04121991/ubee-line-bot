@@ -748,7 +748,7 @@ if (!pickup || !dropoff) {
     res.json({
       distanceText: distance.distanceText,
       durationText: distance.durationText,
-      totalFee: price.totalFee
+      totalFee: price.total
     });
 
   } catch (err) {
