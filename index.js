@@ -5,6 +5,7 @@ const fetch = require('node-fetch');
 const path = require('path');
 
 const app = express();
+app.use(express.static('public'));
 
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
