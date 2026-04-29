@@ -729,6 +729,34 @@ app.get('/api/quote', async (req, res) => {
   }
 });
 
+app.post('/estimate', async (req, res) => {
+  try {
+    const { pickup, dropoff, speed } = req.body;
+if (!pickup || !dropoff) {
+  return res.status(400).json({
+    error: '請填寫取件地址與送達地址',
+  });
+}
+    const distance = await getDistanceMatrixCached(pickup, dropoff);
+
+    const price = calculatePrice({
+      distanceMeters: distance.distanceMeters,
+      durationSeconds: distance.durationSeconds,
+      speedType: speed
+    });
+
+    res.json({
+      distanceText: distance.distanceText,
+      durationText: distance.durationText,
+      totalFee: price.totalFee
+    });
+
+  } catch (err) {
+    console.error('estimate error:', err);
+    res.status(500).json({ error: 'estimate error' });
+  }
+});
+
 app.post('/api/orders', async (req, res) => {
   try {
     const data = createOrderFromApi(req.body);
