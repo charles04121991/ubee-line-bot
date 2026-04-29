@@ -898,6 +898,38 @@ app.get('/api/orders/:orderId', (req, res) => {
     },
   });
 });
+app.post('/cancel-order', async (req, res) => {
+  try {
+    const { orderId } = req.body;
+    const order = orders[orderId];
+
+    if (!order) {
+      return res.json({ success: false, message: '訂單不存在' });
+    }
+
+    if (['picked_up', 'completed', 'cancelled'].includes(order.status)) {
+      return res.json({ success: false, message: '此階段不可取消' });
+    }
+
+    order.status = 'cancelled';
+
+    try {
+      if (LINE_GROUP_ID) {
+        await client.pushMessage(LINE_GROUP_ID, {
+          type: 'text',
+          text: `❌ 訂單已取消\n訂單編號：${orderId}`
+        });
+      }
+    } catch (e) {
+      console.error('取消通知失敗', e);
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('cancel-order error:', err);
+    return res.status(500).json({ success: false, message: '取消失敗，請稍後再試' });
+  }
+});
 
 async function handlePostback(event) {
   const data = event.postback.data || '';
