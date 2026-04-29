@@ -594,33 +594,38 @@ async function confirmPaid() {
   async function calculateEstimate() {
   const pickup = document.querySelector('input[placeholder*="取件地址"]').value;
   const dropoff = document.querySelector('input[placeholder*="送達地址"]').value;
-  const speed = document.querySelector('.speed.active')?.dataset.value;
+  const speed = document.querySelector('.option.active')?.dataset.value;
 
   if (!pickup || !dropoff) {
     alert("請先填寫地址");
     return;
   }
 
-  const res = await fetch('/estimate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      pickup,
-      dropoff,
-      speed
-    })
-  });
+  try {
+    const res = await fetch('/estimate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        pickup,
+        dropoff,
+        speed
+      })
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  document.getElementById('priceResult').style.display = 'block';
-  document.getElementById('priceText').innerHTML = `
-    距離：約 ${data.distanceText} <br>
-    時間：約 ${data.durationText} <br>
-    預估費用：NT$${data.totalFee}
-  `;
+    document.getElementById('estimateResult').style.display = 'block';
+    document.getElementById('estimateText').innerHTML = `
+      距離：約 ${data.distanceText}<br>
+      時間：約 ${data.durationText}<br>
+      預估費用：NT$${data.totalFee}
+    `;
+  } catch (err) {
+    alert("估價失敗");
+    console.error(err);
+  }
 }
   
 initPage();
