@@ -94,10 +94,10 @@ const PRICING = {
 };
 
 const SPEED_OPTIONS = {
-  standard: { label: '一般件', time: '60–120 分鐘', fee: 0, riderText: '標準配送' },
-  priority: { label: '快速件', time: '45–60 分鐘', fee: 50, riderText: '優先配送' },
-  express: { label: '急件', time: '30–45 分鐘', fee: 100, riderText: '即時配送' },
-  rush: { label: '極速件', time: '20–30 分鐘', fee: 200, riderText: '急件配送' },
+  standard: { label: '標準件', time: '60–120 分鐘', fee: 0, riderText: '標準配送' },
+  priority: { label: '優先件', time: '45–60 分鐘', fee: 50, riderText: '優先配送' },
+  express: { label: '即時', time: '30–45 分鐘', fee: 100, riderText: '即時配送' },
+  rush: { label: '急件', time: '20–30 分鐘', fee: 200, riderText: '急件配送' },
 };
 
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
