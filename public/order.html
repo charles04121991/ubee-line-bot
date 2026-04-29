@@ -592,8 +592,8 @@ async function confirmPaid() {
 }
 
   async function calculateEstimate() {
-  const pickup = document.querySelector('input[placeholder*="取件地址"]').value;
-  const dropoff = document.querySelector('input[placeholder*="送達地址"]').value;
+  const pickup = document.getElementById('pickup').value;
+  const dropoff = document.getElementById('dropoff').value;
   const speed = document.querySelector('.option.active')?.dataset.value;
 
   if (!pickup || !dropoff) {
