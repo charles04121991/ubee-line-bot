@@ -338,7 +338,7 @@ function showStatus(text) {
   box.innerText = text;
 }
 
-  function cancelOrder() {
+  async function cancelOrder() {
   const ok = confirm(
     "確定要取消訂單嗎？\n\n" +
     "取消規則：\n" +
@@ -349,7 +349,25 @@ function showStatus(text) {
 
   if (!ok) return;
 
-  alert("訂單已取消（測試階段）");
+  try {
+    const res = await fetch('/cancel-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: currentOrderId })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("訂單已取消");
+      window.location.reload(); // 或導回首頁
+    } else {
+      alert("取消失敗：" + data.message);
+    }
+
+  } catch (err) {
+    alert("系統錯誤，請稍後再試");
+  }
 }
   
 function showPaymentInfo(text) {
