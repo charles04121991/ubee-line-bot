@@ -230,7 +230,7 @@
         </div>
         <div class="option" onclick="selectService(this, '商務急件')">
           <div class="option-title">👤 商務急件</div>
-          <div class="option-desc">合約、發票、需準時到達</div>
+          <div class="option-desc">樣品、需準時到達</div>
         </div>
         <div class="option" onclick="selectService(this, '特殊需求')">
           <div class="option-title">🔒 特殊需求</div>
@@ -261,11 +261,11 @@
           <div class="option-desc">60–120 分鐘｜+NT$0</div>
         </div>
         <div class="option" onclick="selectSpeed(this, 'priority')">
-          <div class="option-title">優先件</div>
+          <div class="option-title">即時件</div>
           <div class="option-desc">45–60 分鐘｜+NT$50</div>
         </div>
         <div class="option" onclick="selectSpeed(this, 'express')">
-          <div class="option-title">即時件</div>
+          <div class="option-title">優先件</div>
           <div class="option-desc">30–45 分鐘｜+NT$100</div>
         </div>
         <div class="option" onclick="selectSpeed(this, 'rush')">
@@ -303,6 +303,8 @@
       <div id="paymentInfoBox" class="payment-info hidden"></div>
 
       <button id="paidBtn" class="main-btn dark-btn hidden" onclick="confirmPaid()">我已付款</button>
+
+      <button id="cancelOrderBtn" class="main-btn cancel-btn hidden" onclick="cancelOrder()">取消訂單</button>
     </div>
   </div>
 
@@ -336,6 +338,20 @@ function showStatus(text) {
   box.innerText = text;
 }
 
+  function cancelOrder() {
+  const ok = confirm(
+    "確定要取消訂單嗎？\n\n" +
+    "取消規則：\n" +
+    "未接單：免費\n" +
+    "已接單：酌收費用\n\n" +
+    "是否確認取消？"
+  );
+
+  if (!ok) return;
+
+  alert("訂單已取消（測試階段）");
+}
+  
 function showPaymentInfo(text) {
   const box = document.getElementById('paymentInfoBox');
   box.classList.remove('hidden');
@@ -498,7 +514,8 @@ async function selectPayment(method) {
     );
 
     document.getElementById('paidBtn').classList.remove('hidden');
-
+    document.getElementById('cancelOrderBtn').classList.remove('hidden');
+    
   } catch (err) {
     alert('❌ ' + err.message);
   }
