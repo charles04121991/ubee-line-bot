@@ -74,10 +74,122 @@ app.get('/order.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'order.html'));
 });
 app.get('/query.html', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, 'public', 'query.html'));
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UBee 訂單查詢</title>
+  <style>
+    body{margin:0;padding:24px 16px 40px;font-family:Arial,"Noto Sans TC",sans-serif;background:#f6f6f6;color:#111}
+    .page{max-width:720px;margin:0 auto}
+    .title{font-size:30px;font-weight:900;margin:16px 0 8px}
+    .subtitle{font-size:15px;color:#666;line-height:1.6;margin-bottom:20px}
+    .card{background:#fff;border-radius:26px;padding:22px;margin-bottom:18px;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+    .section-title{font-size:24px;font-weight:900;margin-bottom:16px}
+    input{width:100%;border:1px solid #ddd;border-radius:18px;padding:17px 18px;font-size:17px;margin-bottom:12px;outline:none}
+    .main-btn{width:100%;border:none;border-radius:18px;background:#00c300;color:#fff;font-size:20px;font-weight:900;padding:18px;cursor:pointer}
+    .light-btn{width:100%;border:none;border-radius:18px;background:#f0f0f0;color:#111;font-size:18px;font-weight:900;padding:16px;margin-top:12px}
+    .status{white-space:pre-line;background:#fff7db;border:1px solid #ffe3a3;border-radius:18px;padding:16px;font-size:16px;line-height:1.6;margin-top:14px;display:none}
+    .row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #eee;font-size:16px}
+    .label{color:#666;flex:3}.value{font-weight:800;text-align:right;flex:5;word-break:break-word}
+    #resultBox{display:none;margin-top:18px}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="title">🔎 UBee 訂單查詢</div>
+    <div class="subtitle">請輸入你的訂單編號，例如：UB202604280003。</div>
+
+    <div class="card">
+      <div class="section-title">查詢訂單</div>
+      <input id="orderIdInput" placeholder="請輸入訂單編號，例如 UB202604280003">
+      <button id="queryBtn" class="main-btn" onclick="queryOrder()">查詢訂單</button>
+      <div id="statusBox" class="status"></div>
+
+      <div id="resultBox">
+        <div class="row"><div class="label">訂單編號</div><div class="value" id="orderIdText">-</div></div>
+        <div class="row"><div class="label">目前狀態</div><div class="value" id="statusText">-</div></div>
+        <div class="row"><div class="label">配送速度</div><div class="value" id="speedText">-</div></div>
+        <div class="row"><div class="label">取件地址</div><div class="value" id="pickupText">-</div></div>
+        <div class="row"><div class="label">送達地址</div><div class="value" id="dropoffText">-</div></div>
+        <div class="row"><div class="label">ETA</div><div class="value" id="etaText">-</div></div>
+        <div class="row"><div class="label">付款狀態</div><div class="value" id="paidText">-</div></div>
+        <div class="row"><div class="label">付款方式</div><div class="value" id="paymentText">-</div></div>
+        <div class="row"><div class="label">總金額</div><div class="value" id="totalText">-</div></div>
+      </div>
+
+      <button class="light-btn" onclick="location.href='/order.html'">返回下單頁</button>
+    </div>
+  </div>
+
+<script>
+function showStatus(text){
+  const box=document.getElementById('statusBox');
+  box.style.display='block';
+  box.innerText=text;
+}
+
+function hideStatus(){
+  const box=document.getElementById('statusBox');
+  box.style.display='none';
+  box.innerText='';
+}
+
+function setText(id,value){
+  document.getElementById(id).innerText=value || '-';
+}
+
+async function queryOrder(){
+  const input=document.getElementById('orderIdInput');
+  const btn=document.getElementById('queryBtn');
+  const resultBox=document.getElementById('resultBox');
+  const orderId=input.value.trim().toUpperCase();
+
+  if(!orderId){
+    alert('請輸入訂單編號');
+    return;
+  }
+
+  btn.disabled=true;
+  btn.innerText='查詢中...';
+  resultBox.style.display='none';
+  hideStatus();
+
+  try{
+    const res=await fetch('/api/orders/' + encodeURIComponent(orderId));
+    const result=await res.json();
+
+    if(!res.ok || !result.success){
+      throw new Error(result.error || '查詢失敗');
+    }
+
+    const order=result.order;
+
+    setText('orderIdText', order.id);
+    setText('statusText', order.statusLabel);
+    setText('speedText', order.speedLabel);
+    setText('pickupText', order.pickupAddress);
+    setText('dropoffText', order.dropoffAddress);
+    setText('etaText', order.etaMinutes ? order.etaMinutes + ' 分鐘' : '尚未設定');
+    setText('paidText', order.isPaid ? '已付款' : '尚未付款');
+    setText('paymentText', order.paymentMethodLabel || '尚未選擇');
+    setText('totalText', 'NT$' + (order.total || 0));
+
+    resultBox.style.display='block';
+  }catch(err){
+    showStatus('❌ ' + err.message + '\\n\\n請確認訂單編號是否正確。');
+  }finally{
+    btn.disabled=false;
+    btn.innerText='查詢訂單';
+  }
+}
+</script>
+</body>
+</html>
+  `);
 });
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
