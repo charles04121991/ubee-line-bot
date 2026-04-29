@@ -396,7 +396,7 @@ function createInfoMenuFlex() {
     [
       createActionButton('取消規則', 'submenu=cancelRules'),
       createActionButton('常見問題', 'submenu=faq', 'secondary'),
-      createActionButton('查詢訂單', 'submenu=queryOrder', 'secondary'),
+      createUriButton('查詢訂單', getPublicUrl('query.html'), 'secondary'),
       createUriButton('加入夥伴', PARTNER_FORM_URL, 'secondary'),
     ]
   ));
