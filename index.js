@@ -73,7 +73,12 @@ app.get('/order.html', (req, res) => {
   res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'public', 'order.html'));
 });
-
+app.get('/query.html', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'public', 'query.html'));
+});
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
   lastModified: false,
