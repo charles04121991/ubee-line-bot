@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>加入 UBee 合作夥伴</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    h2 {
+      text-align: center;
+    }
+
+    label {
+      margin-top: 10px;
+      display: block;
+      font-weight: bold;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      margin-top: 20px;
+      border: none;
+      background: #00b900;
+      color: white;
+      font-size: 16px;
+      border-radius: 10px;
+    }
+
+    .note {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>加入 UBee 合作夥伴</h2>
+
+  <form id="riderForm">
+
+    <!-- 基本資料 -->
+    <label>姓名</label>
+    <input type="text" required>
+
+    <label>手機號碼</label>
+    <input type="tel" required>
+
+    <label>LINE ID</label>
+    <input type="text">
+
+    <label>居住地區</label>
+    <input type="text" placeholder="例如：台中市北屯區">
+
+    <!-- 車輛 -->
+    <label>配送工具</label>
+    <select>
+      <option>機車</option>
+      <option>汽車</option>
+    </select>
+
+    <label>車牌號碼</label>
+    <input type="text">
+
+    <!-- 服務區域 -->
+    <label>可服務區域</label>
+    <input type="text" placeholder="例如：北屯、西屯、南屯">
+
+    <!-- 時段 -->
+    <label>可服務時段</label>
+    <select>
+      <option>白天</option>
+      <option>晚上</option>
+      <option>全天</option>
+    </select>
+
+    <!-- 文件上傳 -->
+    <label>上傳駕照</label>
+    <input type="file" required>
+
+    <label>上傳行照</label>
+    <input type="file" required>
+
+    <label>上傳良民證</label>
+    <input type="file" required>
+
+    <p class="note">
+      ※ 資料僅用於合作審核，不會對外公開
+    </p>
+
+    <button type="submit">送出申請</button>
+
+  </form>
+</div>
+
+<script>
+  document.getElementById('riderForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    alert('✅ 申請已送出！我們會盡快審核');
+  });
+</script>
+
+</body>
+</html>
