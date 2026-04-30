@@ -220,34 +220,34 @@
       <div class="section-title">服務類型<span class="required">*</span></div>
 
       <div class="grid" id="serviceGrid">
-  <div class="option active" onclick="selectService(this, '個人物品')">
-    <div class="option-title">🔑 個人物品</div>
-    <div class="option-desc">鑰匙、證件、重要物品，適合臨時急需快速送達</div>
+  <div class="option active" onclick="selectService(this, '物品配送')">
+    <div class="option-title">📦 物品配送</div>
+    <div class="option-desc">文件、證件、鑰匙、個人物品，快速安全送達</div>
   </div>
 
-  <div class="option" onclick="selectService(this, '代購代辦')">
-    <div class="option-title">🛍️ 代購代辦</div>
-    <div class="option-desc">代買、代取、臨時處理，一站完成不需親自跑</div>
+  <div class="option" onclick="selectService(this, '代買服務')">
+    <div class="option-title">🛒 代買服務</div>
+    <div class="option-desc">餐飲、飲料、生活用品，幫你買好再送到</div>
   </div>
 
-  <div class="option" onclick="selectService(this, '一般配送')">
-    <div class="option-title">🏠 一般配送</div>
-    <div class="option-desc">包裹與商務物品，穩定準時配送</div>
+  <div class="option" onclick="selectService(this, '代辦任務')">
+    <div class="option-title">🧾 代辦任務</div>
+    <div class="option-desc">排隊、取件、臨時處理，省下你的時間</div>
   </div>
 
-  <div class="option" onclick="selectService(this, '行政任務')">
-    <div class="option-title">📄 行政任務</div>
-    <div class="option-desc">合約、發票、公司文件，安全快速送達</div>
+  <div class="option" onclick="selectService(this, '同城配送')">
+    <div class="option-title">🚚 同城配送</div>
+    <div class="option-desc">包裹、商品、日常物品，穩定準時配送</div>
   </div>
 
   <div class="option" onclick="selectService(this, '商務急件')">
     <div class="option-title">⚡ 商務急件</div>
-    <div class="option-desc">急件優先處理，適合需要快速完成的任務</div>
+    <div class="option-desc">合約、發票、公司文件，優先快速處理</div>
   </div>
 
-  <div class="option" onclick="selectService(this, '特殊需求')">
-    <div class="option-title">🔒 特殊需求</div>
-    <div class="option-desc">客製化任務，需人工確認與安排執行</div>
+  <div class="option" onclick="selectService(this, '萬能任務')">
+    <div class="option-title">✨ 萬能任務</div>
+    <div class="option-desc">特殊任務、臨時需求，任何需求皆可協助</div>
   </div>
 </div>
     </div>
@@ -270,19 +270,19 @@
 
       <div class="grid" id="speedGrid">
         <div class="option active" data-value="standard" onclick="selectSpeed(this, 'standard')">
-          <div class="option-title">標準件（時間較彈性）</div>
+          <div class="option-title">🐢 標準件(彈性安排｜價格最省）</div>
           <div class="option-desc">60–90 分鐘｜+NT$0</div>
         </div>
         <div class="option" data-value="priority" onclick="selectSpeed(this, 'priority')">
-          <div class="option-title">即時件（縮短等待時間）</div>
+          <div class="option-title">🚗 快速件（即時媒合｜多數人選）</div>
           <div class="option-desc">45–60 分鐘｜+NT$30</div>
         </div>
         <div class="option" data-value="express" onclick="selectSpeed(this, 'express')">
-          <div class="option-title">優先件（大幅提升效率）</div>
+          <div class="option-title">⚡ 優先件（優先處理｜加速媒合）</div>
           <div class="option-desc">30–45 分鐘｜+NT$80</div>
         </div>
         <div class="option" data-value="rush" onclick="selectSpeed(this, 'rush')">
-          <div class="option-title">急件（立即安排配送）</div>
+          <div class="option-title">🔥  急件（最高優先｜立即指派）</div>
           <div class="option-desc">20–30 分鐘｜+NT$150</div>
         </div>
       </div>
@@ -335,7 +335,7 @@
 <script>
 let userId = 'web-order';
 let liffId = '';
-let serviceType = '個人物品';
+let serviceType = '物品配送';
 let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
