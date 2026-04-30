@@ -3,137 +3,449 @@
 <head>
   <meta charset="UTF-8">
   <title>加入 UBee 合作夥伴</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f5f5f5;
-      padding: 20px;
+    :root{
+      --green:#00c300;
+      --black:#111;
+      --gray:#f6f6f6;
+      --yellow:#fff4cc;
+      --line:#e5e5e5;
+      --text:#111;
+      --muted:#666;
     }
 
-    .container {
-      max-width: 500px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
+    *{
+      box-sizing:border-box;
     }
 
-    h2 {
-      text-align: center;
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;
+      background:var(--gray);
+      color:var(--text);
+      font-size:18px;
     }
 
-    label {
-      margin-top: 10px;
-      display: block;
-      font-weight: bold;
+    .page{
+      padding:24px 16px 40px;
+      max-width:720px;
+      margin:0 auto;
     }
 
-    input, select {
-      width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
+    .card{
+      background:white;
+      border-radius:20px;
+      padding:22px;
+      box-shadow:0 1px 0 rgba(0,0,0,.04);
     }
 
-    button {
-      width: 100%;
-      padding: 15px;
-      margin-top: 20px;
-      border: none;
-      background: #00b900;
-      color: white;
-      font-size: 16px;
-      border-radius: 10px;
+    h1{
+      text-align:center;
+      font-size:32px;
+      line-height:1.25;
+      margin:18px 0 16px;
+      font-weight:900;
     }
 
-    .note {
-      font-size: 12px;
-      color: #888;
-      margin-top: 5px;
+    .noticeBox{
+      background:#fff8df;
+      border:1px solid #ffe7a3;
+      border-radius:16px;
+      padding:15px;
+      margin:0 0 22px;
+      font-size:16px;
+      line-height:1.75;
+      color:#5a4300;
+    }
+
+    .sectionTitle{
+      font-size:22px;
+      font-weight:900;
+      margin:26px 0 10px;
+      padding-bottom:8px;
+      border-bottom:1px solid var(--line);
+    }
+
+    label{
+      display:block;
+      font-size:20px;
+      font-weight:900;
+      margin-top:18px;
+      margin-bottom:7px;
+    }
+
+    input,
+    select,
+    textarea{
+      width:100%;
+      min-height:56px;
+      padding:15px 16px;
+      border-radius:14px;
+      border:1px solid #cfcfcf;
+      font-size:18px;
+      background:white;
+      outline:none;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus{
+      border-color:var(--green);
+      box-shadow:0 0 0 3px rgba(0,195,0,.12);
+    }
+
+    textarea{
+      min-height:96px;
+      resize:vertical;
+      line-height:1.6;
+    }
+
+    .hint{
+      font-size:15px;
+      color:#777;
+      line-height:1.6;
+      margin-top:6px;
+    }
+
+    .fileInput{
+      padding:13px 14px;
+      background:white;
+    }
+
+    .checkRow{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      margin-top:10px;
+      line-height:1.55;
+      font-size:16px;
+      font-weight:700;
+      color:#333;
+    }
+
+    .checkRow input{
+      width:21px;
+      height:21px;
+      min-height:21px;
+      margin:2px 0 0;
+      flex:0 0 auto;
+    }
+
+    .checkRow span{
+      flex:1;
+    }
+
+    .agreeBox{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      margin-top:14px;
+      background:#fafafa;
+    }
+
+    .agreeTitle{
+      font-size:17px;
+      font-weight:900;
+      line-height:1.7;
+      margin-bottom:10px;
+    }
+
+    .requiredMark{
+      color:#d93025;
+      font-weight:900;
+      margin-left:4px;
+    }
+
+    .note{
+      font-size:15px;
+      color:#777;
+      line-height:1.7;
+      margin-top:20px;
+    }
+
+    .submitBtn{
+      width:100%;
+      min-height:62px;
+      border:0;
+      border-radius:16px;
+      background:var(--green);
+      color:white;
+      font-size:22px;
+      font-weight:900;
+      margin-top:28px;
+      cursor:pointer;
+    }
+
+    .submitBtn:disabled{
+      opacity:.6;
+      cursor:not-allowed;
+    }
+
+    .successBox{
+      display:none;
+      background:#eaffea;
+      border:1px solid #b6efb6;
+      color:#145c14;
+      border-radius:16px;
+      padding:14px;
+      line-height:1.7;
+      margin-top:18px;
+      font-size:16px;
+      font-weight:700;
+    }
+
+    .errorBox{
+      display:none;
+      background:#fff0f0;
+      border:1px solid #ffc7c7;
+      color:#8a1f1f;
+      border-radius:16px;
+      padding:14px;
+      line-height:1.7;
+      margin-top:18px;
+      font-size:16px;
+      font-weight:700;
+    }
+
+    @media(max-width:420px){
+      .page{
+        padding:18px 12px 36px;
+      }
+
+      .card{
+        padding:18px;
+        border-radius:18px;
+      }
+
+      h1{
+        font-size:28px;
+      }
+
+      label{
+        font-size:19px;
+      }
+
+      input,
+      select,
+      textarea{
+        font-size:17px;
+      }
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
-  <h2>加入 UBee 合作夥伴</h2>
+<div class="page">
+  <div class="card">
 
-  <form id="riderForm">
+    <h1>加入 UBee 合作夥伴</h1>
 
-    <!-- 基本資料 -->
-    <label>姓名</label>
-    <input type="text" required>
+    <div class="noticeBox">
+      <b>申請前請先確認</b><br>
+      UBee 合作夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核，不會對外公開。<br><br>
+      請確認姓名、手機、LINE ID、配送工具、可服務區域與證件資料皆填寫完整。送出後需等待 UBee 審核，審核通過後才可以接單。
+    </div>
 
-    <label>手機號碼</label>
-    <input type="tel" required>
+    <form id="riderForm">
 
-    <label>LINE ID</label>
-    <input type="text">
+      <div class="sectionTitle">基本資料</div>
 
-    <label>居住地區</label>
-    <input type="text" placeholder="例如：台中市北屯區">
+      <label>姓名<span class="requiredMark">*</span></label>
+      <input id="name" name="name" type="text" placeholder="請輸入真實姓名" required>
 
-    <!-- 車輛 -->
-    <label>配送工具</label>
-    <select>
-      <option>機車</option>
-      <option>汽車</option>
-    </select>
+      <label>手機號碼<span class="requiredMark">*</span></label>
+      <input id="phone" name="phone" type="tel" placeholder="例如：0912345678" required>
 
-    <label>車牌號碼</label>
-    <input type="text">
+      <label>LINE ID<span class="requiredMark">*</span></label>
+      <input id="lineId" name="lineId" type="text" placeholder="請輸入你的 LINE ID" required>
+      <div class="hint">審核或後續聯繫會使用此資料，請確認填寫正確。</div>
 
-    <!-- 服務區域 -->
-    <label>可服務區域</label>
-    <input type="text" placeholder="例如：北屯、西屯、南屯">
+      <label>居住地區<span class="requiredMark">*</span></label>
+      <input id="district" name="district" type="text" placeholder="例如：台中市北屯區" required>
 
-    <!-- 時段 -->
-    <label>可服務時段</label>
-    <select>
-      <option>白天</option>
-      <option>晚上</option>
-      <option>全天</option>
-    </select>
+      <div class="sectionTitle">配送資料</div>
 
-    <!-- 文件上傳 -->
-    <label>上傳駕照</label>
-    <input type="file" required>
+      <label>配送工具<span class="requiredMark">*</span></label>
+      <select id="vehicle" name="vehicle" required>
+        <option value="">請選擇配送工具</option>
+        <option value="機車">機車</option>
+        <option value="汽車">汽車</option>
+      </select>
 
-    <label>上傳行照</label>
-    <input type="file" required>
+      <label>車牌號碼<span class="requiredMark">*</span></label>
+      <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" required>
 
-    <label>上傳良民證</label>
-    <input type="file" required>
+      <label>可服務區域<span class="requiredMark">*</span></label>
+      <input id="serviceArea" name="serviceArea" type="text" placeholder="例如：北屯、西屯、南屯" required>
 
-    <p class="note">
-      ※ 資料僅用於合作審核，不會對外公開
-    </p>
+      <label>可服務時段<span class="requiredMark">*</span></label>
+      <select id="availableTime" name="availableTime" required>
+        <option value="">請選擇可服務時段</option>
+        <option value="白天">白天</option>
+        <option value="晚上">晚上</option>
+        <option value="全天">全天</option>
+        <option value="彈性配合">彈性配合</option>
+      </select>
 
-    <button type="submit">送出申請</button>
+      <div class="sectionTitle">證件上傳</div>
 
-  </form>
+      <label>上傳駕照<span class="requiredMark">*</span></label>
+      <input id="driverLicense" name="driverLicense" class="fileInput" type="file" accept="image/*,.pdf" required>
+      <label class="checkRow">
+        <input id="driverLicenseConfirm" name="driverLicenseConfirm" type="checkbox" required>
+        <span>我確認已上傳本人有效駕照。</span>
+      </label>
+
+      <label>上傳行照<span class="requiredMark">*</span></label>
+      <input id="vehicleLicense" name="vehicleLicense" class="fileInput" type="file" accept="image/*,.pdf" required>
+      <label class="checkRow">
+        <input id="vehicleLicenseConfirm" name="vehicleLicenseConfirm" type="checkbox" required>
+        <span>我確認已上傳配送車輛行照。</span>
+      </label>
+
+      <label>上傳良民證<span class="requiredMark">*</span></label>
+      <input id="policeRecord" name="policeRecord" class="fileInput" type="file" accept="image/*,.pdf" required>
+      <label class="checkRow">
+        <input id="policeRecordConfirm" name="policeRecordConfirm" type="checkbox" required>
+        <span>我確認已上傳良民證或相關證明文件。</span>
+      </label>
+
+      <div class="hint">
+        ※ 目前資料僅用於合作審核，不會對外公開。
+      </div>
+
+      <div class="sectionTitle">合作條件確認</div>
+
+      <div class="agreeBox">
+        <div class="agreeTitle">
+          是否可接受「商務急件」與文件、物品遞送服務條件？<span class="requiredMark">*</span><br>
+          服務定義為「需即時處理、不可延誤」之文件或物品遞送服務。適用項目包含：合約、文件、發票、小型商務物件。UBee 商務急件重視準時、安全交付。
+        </div>
+
+        <label class="checkRow">
+          <input id="businessConditionAgree" name="businessConditionAgree" type="checkbox" required>
+          <span>是，我了解條件規範。</span>
+        </label>
+      </div>
+
+      <div class="agreeBox">
+        <div class="agreeTitle">
+          是否已有機車強制險？<span class="requiredMark">*</span>
+        </div>
+
+        <label class="checkRow">
+          <input id="insuranceConfirm" name="insuranceConfirm" type="checkbox" required>
+          <span>是，我確認本人或車輛已有機車強制險，並了解須自行承擔相關風險。</span>
+        </label>
+      </div>
+
+      <div class="agreeBox">
+        <div class="agreeTitle">
+          若發生以下情況，UBee 有權進行警告、暫停派單或終止合作：無故爽約、偽造完成紀錄、私接客戶。<span class="requiredMark">*</span>
+        </div>
+
+        <label class="checkRow">
+          <input id="violationConfirm" name="violationConfirm" type="checkbox" required>
+          <span>已了解。</span>
+        </label>
+      </div>
+
+      <div class="agreeBox">
+        <div class="agreeTitle">
+          本合作為接案合作性質，非勞雇關係，UBee 不保證派單量，報酬依實際完成任務結算。<span class="requiredMark">*</span>
+        </div>
+
+        <label class="checkRow">
+          <input id="contractConfirm" name="contractConfirm" type="checkbox" required>
+          <span>我已閱讀並同意。</span>
+        </label>
+      </div>
+
+      <div class="agreeBox">
+        <div class="agreeTitle">
+          本人已了解並同意 UBee 騎手規範，包括但不限於：不私接客戶、不私下收價、不偽造完成紀錄，違規者 UBee 有權警告、停權或終止合作。<span class="requiredMark">*</span>
+        </div>
+
+        <label class="checkRow">
+          <input id="riderRuleConfirm" name="riderRuleConfirm" type="checkbox" required>
+          <span>我已閱讀並同意。</span>
+        </label>
+      </div>
+
+      <div class="agreeBox">
+        <div class="agreeTitle">
+          本人了解 UBee 僅為任務媒合平台，若因本人疏失造成貨物遺失、損壞，須配合平台進行責任釐清與處理。<span class="requiredMark">*</span>
+        </div>
+
+        <label class="checkRow">
+          <input id="liabilityConfirm" name="liabilityConfirm" type="checkbox" required>
+          <span>同意。</span>
+        </label>
+      </div>
+
+      <div class="agreeBox">
+        <div class="agreeTitle">
+          本人同意 UBee 於合作及派單必要範圍內，蒐集、處理及使用本人個人資料。<span class="requiredMark">*</span>
+        </div>
+
+        <label class="checkRow">
+          <input id="privacyConfirm" name="privacyConfirm" type="checkbox" required>
+          <span>同意。</span>
+        </label>
+      </div>
+
+      <div class="note">
+        ※ 所有欄位皆為必填。送出申請後，UBee 會進行資料審核。審核通過後，才可參與接單。
+      </div>
+
+      <button id="submitBtn" class="submitBtn" type="submit">送出申請</button>
+
+      <div id="successBox" class="successBox"></div>
+      <div id="errorBox" class="errorBox"></div>
+
+    </form>
+  </div>
 </div>
 
 <script>
-  document.getElementById('riderForm').addEventListener('submit', async function(e) {
+document.getElementById('riderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
-  const inputs = document.querySelectorAll('#riderForm input, #riderForm select');
+  const form = document.getElementById('riderForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const successBox = document.getElementById('successBox');
+  const errorBox = document.getElementById('errorBox');
 
-  const name = inputs[0].value;
-  const phone = inputs[1].value;
-  const lineId = inputs[2].value;
-  const area = inputs[3].value;
-  const vehicle = inputs[4].value;
+  successBox.style.display = 'none';
+  errorBox.style.display = 'none';
+  successBox.innerHTML = '';
+  errorBox.innerHTML = '';
 
-  if (!name || !phone) {
-    alert('請填寫姓名與電話');
+  if (!form.checkValidity()) {
+    form.reportValidity();
     return;
   }
+
+  const name = document.getElementById('name').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const lineId = document.getElementById('lineId').value.trim();
+  const district = document.getElementById('district').value.trim();
+  const vehicle = document.getElementById('vehicle').value;
+  const plateNumber = document.getElementById('plateNumber').value.trim();
+  const serviceArea = document.getElementById('serviceArea').value.trim();
+  const availableTime = document.getElementById('availableTime').value;
+
+  if (!name || !phone || !lineId || !district || !vehicle || !plateNumber || !serviceArea || !availableTime) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請完整填寫所有必填資料。';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerText = '送出中...';
 
   try {
     const res = await fetch('/api/rider/register', {
@@ -144,24 +456,46 @@
       body: JSON.stringify({
         name,
         phone,
+        lineId,
+        userId: lineId,
+        district,
         vehicle,
-        area,
-        userId: lineId
+        plateNumber,
+        area: serviceArea,
+        serviceArea,
+        availableTime,
+        driverLicenseConfirmed: true,
+        vehicleLicenseConfirmed: true,
+        policeRecordConfirmed: true,
+        businessConditionAgree: true,
+        insuranceConfirm: true,
+        violationConfirm: true,
+        contractConfirm: true,
+        riderRuleConfirm: true,
+        liabilityConfirm: true,
+        privacyConfirm: true
       })
     });
 
     const data = await res.json();
 
     if (data.success) {
-      alert('✅ 申請已送出，等待審核');
-      document.getElementById('riderForm').reset();
+      successBox.style.display = 'block';
+      successBox.innerHTML = '✅ 申請已送出，請等待 UBee 審核。審核通過後，才可以接單。';
+      form.reset();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      alert(data.message);
+      errorBox.style.display = 'block';
+      errorBox.innerHTML = data.message || '送出失敗，請稍後再試。';
     }
 
   } catch (err) {
     console.error(err);
-    alert('❌ 發生錯誤');
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '❌ 發生錯誤，請稍後再試。';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerText = '送出申請';
   }
 });
 </script>
