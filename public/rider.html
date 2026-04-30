@@ -119,10 +119,51 @@
 </div>
 
 <script>
-  document.getElementById('riderForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    alert('✅ 申請已送出！我們會盡快審核');
-  });
+  document.getElementById('riderForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const inputs = document.querySelectorAll('#riderForm input, #riderForm select');
+
+  const name = inputs[0].value;
+  const phone = inputs[1].value;
+  const lineId = inputs[2].value;
+  const area = inputs[3].value;
+  const vehicle = inputs[4].value;
+
+  if (!name || !phone) {
+    alert('請填寫姓名與電話');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/rider/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name,
+        phone,
+        vehicle,
+        area,
+        userId: lineId
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert('✅ 申請已送出，等待審核');
+      document.getElementById('riderForm').reset();
+    } else {
+      alert(data.message);
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert('❌ 發生錯誤');
+  }
+});
 </script>
 
 </body>
