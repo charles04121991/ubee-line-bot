@@ -1091,13 +1091,13 @@ async function handlePostback(event) {
 
     return client.replyMessage(event.replyToken, [
       createTextMessage(
-        `✅ 已通過騎手審核\n\n` +
-        `申請編號：${rider.riderId}\n` +
-        `姓名：${rider.name}\n` +
-        `手機：${rider.phone}\n` +
-        `LINE ID：${rider.lineId || rider.userId || '-'}\n\n` +
-        `提醒：目前是簡易審核版，若要讓騎手真正永久可接單，下一步要接 Firebase 或 LINE userId 白名單。`
-      )
+  `✅ 已通過騎手審核\n\n` +
+  `申請編號：${rider.riderId}\n` +
+  `姓名：${rider.name}\n` +
+  `手機：${rider.phone}\n` +
+  `LINE ID：${rider.lineId || rider.userId || '-'}\n\n` +
+  `請將此騎手加入 UBee 接單任務群組，加入後即可接收任務通知。`
+)
     ]);
   }
 
@@ -1126,12 +1126,7 @@ async function handlePostback(event) {
   }
   if (data.startsWith('accept=')) {
     const userId = event.source.userId;
-     if (!APPROVED_RIDER_IDS.includes(userId)) {
-    return client.replyMessage(event.replyToken, [
-      createTextMessage('⚠️ 你尚未通過 UBee 合作夥伴審核，目前無法接單。')
-    ]);
-  }
-    
+     
     const orderId = data.split('=')[1];
     const order = orders[orderId];
 
