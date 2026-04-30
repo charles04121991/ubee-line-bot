@@ -250,8 +250,23 @@
     <div class="option-desc">特殊任務、臨時需求，任何需求皆可協助</div>
   </div>
 </div>
-    </div>
+    <div id="dynamicFields" style="margin-top:16px;">
 
+  <div id="field-purchase" style="display:none;">
+    <label>購買內容</label>
+    <input type="text" id="purchaseContent" placeholder="例如：珍奶、便當、生活用品">
+
+    <label>購買地點</label>
+    <input type="text" id="purchaseStore" placeholder="例如：50嵐、超商、指定店家">
+  </div>
+
+  <div id="field-task" style="display:none;">
+    <label>任務說明</label>
+    <textarea id="taskContent" placeholder="請描述需要 UBee 協助處理的事情"></textarea>
+  </div>
+
+</div>
+  
     <div class="card">
       <div class="step-badge">Step 2</div>
       <div class="section-title">路線與聯絡資訊<span class="required">*</span></div>
@@ -349,6 +364,20 @@ function setActive(parentId, el) {
 function selectService(el, value) {
   setActive('serviceGrid', el);
   serviceType = value;
+
+  const purchaseField = document.getElementById('field-purchase');
+  const taskField = document.getElementById('field-task');
+
+  purchaseField.style.display = 'none';
+  taskField.style.display = 'none';
+
+  if (value === '代買服務') {
+    purchaseField.style.display = 'block';
+  }
+
+  if (value === '代辦任務' || value === '萬能任務') {
+    taskField.style.display = 'block';
+  }
 }
 
 function selectSpeed(el, value) {
