@@ -88,6 +88,38 @@ app.use(express.static(path.join(__dirname, 'public'), {
   },
 }));
 
+// ===== 騎手資料（暫存記憶體）=====
+const riders = {};
+
+// ===== 騎手註冊 API =====
+app.post('/api/rider/register', (req, res) => {
+  const { name, phone, vehicle, area, userId } = req.body;
+
+  if (!name || !phone) {
+    return res.json({ success: false, message: '資料不完整' });
+  }
+
+  const riderId = 'R' + Date.now();
+
+  riders[riderId] = {
+    riderId,
+    name,
+    phone,
+    vehicle,
+    area,
+    userId: userId || '',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  console.log('🟡 新騎手註冊：', riders[riderId]);
+
+  res.json({
+    success: true,
+    message: '已送出申請，等待審核',
+  });
+});
+
 const PRICING = {
   baseFee: 99,
   perKm: 8,
