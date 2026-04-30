@@ -22,6 +22,7 @@ const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
+const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || LINE_GROUP_ID;
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const LIFF_ID = process.env.LIFF_ID || '';
 // ===== 已審核騎手白名單 =====
@@ -94,32 +95,65 @@ app.use(express.static(path.join(__dirname, 'public'), {
 const riders = {};
 
 // ===== 騎手註冊 API =====
-app.post('/api/rider/register', (req, res) => {
-  const { name, phone, vehicle, area, userId } = req.body;
+app.post('/api/rider/register', async (req, res) => {
+  try {
+    const {
+      name,
+      phone,
+      lineId,
+      userId,
+      district,
+      vehicle,
+      plateNumber,
+      area,
+      serviceArea,
+      availableTime,
+    } = req.body;
 
-  if (!name || !phone) {
-    return res.json({ success: false, message: '資料不完整' });
+    if (!name || !phone || !vehicle || !(area || serviceArea)) {
+      return res.json({
+        success: false,
+        message: '資料不完整，請確認姓名、電話、配送工具與服務區域都有填寫。',
+      });
+    }
+
+    const riderId = 'R' + Date.now();
+
+    const rider = {
+      riderId,
+      name,
+      phone,
+      lineId: lineId || '',
+      userId: userId || lineId || '',
+      district: district || '',
+      vehicle,
+      plateNumber: plateNumber || '',
+      area: area || serviceArea || '',
+      serviceArea: serviceArea || area || '',
+      availableTime: availableTime || '',
+      status: 'pending',
+      createdAt: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
+    };
+
+    riders[riderId] = rider;
+
+    console.log('🟡 新騎手註冊：', rider);
+
+    await pushToGroup(LINE_ADMIN_GROUP_ID, createRiderReviewFlex(rider));
+
+    res.json({
+      success: true,
+      riderId,
+      message: '已送出申請，等待 UBee 審核。',
+    });
+  } catch (err) {
+    console.error('❌ 騎手註冊失敗：', err);
+
+    res.status(500).json({
+      success: false,
+      message: '申請送出失敗，請稍後再試。',
+    });
   }
-
-  const riderId = 'R' + Date.now();
-
-  riders[riderId] = {
-    riderId,
-    name,
-    phone,
-    vehicle,
-    area,
-    userId: userId || '',
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-
-  console.log('🟡 新騎手註冊：', riders[riderId]);
-
-  res.json({
-    success: true,
-    message: '已送出申請，等待審核',
-  });
 });
 
 const PRICING = {
@@ -389,6 +423,37 @@ function createMainMenuFlex() {
       createUriButton('立即下單', getPublicUrl('order.html'), 'primary'),
       createUriButton('商務合作', getPublicUrl('business.html'), 'secondary'),
       createUriButton('我的資訊', getPublicUrl('info.html'), 'secondary'),
+    ]
+  ));
+}
+
+function createRiderReviewFlex(rider) {
+  return createFlexMessage('新騎手申請審核', createBubble(
+    '🟡 新騎手申請審核',
+    [
+      createInfoRow('申請編號', rider.riderId),
+      createInfoRow('姓名', rider.name),
+      createInfoRow('手機', rider.phone),
+      createInfoRow('LINE ID', rider.lineId || rider.userId || '-'),
+      createInfoRow('居住地區', rider.district || '-'),
+      createInfoRow('配送工具', rider.vehicle),
+      createInfoRow('車牌號碼', rider.plateNumber || '-'),
+      createInfoRow('服務區域', rider.serviceArea || rider.area || '-'),
+      createInfoRow('服務時段', rider.availableTime || '-'),
+      createInfoRow('狀態', rider.status === 'pending' ? '待審核' : rider.status),
+      createInfoRow('申請時間', rider.createdAt),
+      {
+        type: 'text',
+        text: '請確認資料無誤後，再按「通過審核」。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+        margin: 'md',
+      },
+    ],
+    [
+      createActionButton('通過審核', `approveRider=${rider.riderId}`),
+      createActionButton('拒絕申請', `rejectRider=${rider.riderId}`, 'secondary'),
     ]
   ));
 }
@@ -1010,7 +1075,55 @@ async function handlePostback(event) {
   if (data === 'submenu=cancelRules') return client.replyMessage(event.replyToken, [createCancelRulesFlex()]);
   if (data === 'submenu=faq') return client.replyMessage(event.replyToken, [createFaqFlex()]);
   if (data === 'submenu=queryOrder') return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
+  if (data.startsWith('approveRider=')) {
+    const riderId = data.split('=')[1];
+    const rider = riders[riderId];
 
+    if (!rider) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此騎手申請，可能是系統重啟後暫存資料已消失。')
+      ]);
+    }
+
+    rider.status = 'approved';
+    rider.approvedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+    rider.approvedBy = userId;
+
+    return client.replyMessage(event.replyToken, [
+      createTextMessage(
+        `✅ 已通過騎手審核\n\n` +
+        `申請編號：${rider.riderId}\n` +
+        `姓名：${rider.name}\n` +
+        `手機：${rider.phone}\n` +
+        `LINE ID：${rider.lineId || rider.userId || '-'}\n\n` +
+        `提醒：目前是簡易審核版，若要讓騎手真正永久可接單，下一步要接 Firebase 或 LINE userId 白名單。`
+      )
+    ]);
+  }
+
+  if (data.startsWith('rejectRider=')) {
+    const riderId = data.split('=')[1];
+    const rider = riders[riderId];
+
+    if (!rider) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('找不到此騎手申請，可能是系統重啟後暫存資料已消失。')
+      ]);
+    }
+
+    rider.status = 'rejected';
+    rider.rejectedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+    rider.rejectedBy = userId;
+
+    return client.replyMessage(event.replyToken, [
+      createTextMessage(
+        `已拒絕騎手申請\n\n` +
+        `申請編號：${rider.riderId}\n` +
+        `姓名：${rider.name}\n` +
+        `手機：${rider.phone}`
+      )
+    ]);
+  }
   if (data.startsWith('accept=')) {
     const userId = event.source.userId;
      if (!APPROVED_RIDER_IDS.includes(userId)) {
