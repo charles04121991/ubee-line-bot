@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee｜商務合作</title>
+<title>UBee｜我的資訊</title>
 
 <style>
 :root{
@@ -16,12 +16,12 @@
 *{box-sizing:border-box}
 body{
   margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;
+  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;
   background:var(--gray);
   color:#111;
 }
 .container{
-  padding:24px 16px 36px;
+  padding:24px 16px 40px;
   max-width:720px;
   margin:0 auto;
 }
@@ -47,65 +47,71 @@ body{
   line-height:1.7;
 }
 .sectionTitle{
-  font-size:18px;
-  font-weight:850;
-  margin-bottom:8px;
+  font-size:20px;
+  font-weight:900;
+  margin-bottom:10px;
 }
 .item{
-  border:1px solid var(--line);
-  border-radius:14px;
-  padding:13px;
-  margin-top:9px;
-  line-height:1.65;
+  background:#f7f7f7;
+  border-radius:16px;
+  padding:15px;
+  margin-top:10px;
+  line-height:1.7;
 }
 .item b{
   display:block;
-  margin-bottom:3px;
+  font-size:16px;
+  margin-bottom:4px;
 }
 .item span{
-  font-size:14px;
+  font-size:15px;
   color:#555;
 }
 .btn{
   width:100%;
-  padding:14px;
+  padding:15px;
   border-radius:14px;
   border:0;
-  font-size:16px;
-  font-weight:850;
+  font-size:17px;
+  font-weight:900;
   margin-top:10px;
+  cursor:pointer;
 }
 .btn-green{
   background:var(--green);
   color:white;
 }
+.btn-gray{
+  background:#d9dee8;
+  color:#111;
+}
 .btn-black{
   background:var(--black);
   color:white;
 }
-.content{
+.section{
+  display:none;
+}
+.section.active{
+  display:block;
+}
+.input{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  font-size:16px;
+  margin-top:10px;
+}
+.resultBox{
   display:none;
   margin-top:12px;
-  line-height:1.8;
-  color:#333;
-  font-size:15px;
-}
-.notice{
+  padding:14px;
+  border-radius:14px;
   background:#fff8df;
   border:1px solid #ffe7a3;
-  border-radius:14px;
-  padding:12px;
-  line-height:1.75;
-  font-size:14px;
+  line-height:1.7;
   color:#5a4300;
-}
-.grid{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:8px;
-}
-@media(min-width:560px){
-  .grid{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -114,130 +120,160 @@ body{
 
 <div class="container">
 
-  <div class="card hero">
-    <div class="title">🤝 UBee 商務合作</div>
-    <div class="sub">
-      專為公司、工廠、辦公室與中小企業設計的城市任務服務。當你們需要有人「跑一趟」送文件、送樣品、送公司物品，UBee 可以協助即時處理。
-    </div>
+  <div id="menu" class="card hero section active">
+    <div class="title">📋 UBee｜我的資訊</div>
+    <div class="sub">請選擇你要查看的內容👇</div>
+
+    <button class="btn btn-green" onclick="showSection('cancelRules')">取消規則</button>
+    <button class="btn btn-gray" onclick="showSection('faq')">常見問題</button>
+    <button class="btn btn-gray" onclick="showSection('queryOrder')">查詢訂單</button>
+    <button class="btn btn-gray" onclick="goRider()">加入夥伴</button>
   </div>
 
-  <div class="card">
-    <div class="sectionTitle">適合哪些需求？</div>
+  <div id="cancelRules" class="card section">
+    <div class="sectionTitle">取消規則</div>
 
-    <div class="grid">
-      <div class="item">
-        <b>📄 文件急送</b>
-        <span>合約、發票、報價單、公司文件、客戶資料送達。</span>
-      </div>
-
-      <div class="item">
-        <b>📦 樣品收送</b>
-        <span>工廠、公司、客戶之間的樣品、零件、小型物件配送。</span>
-      </div>
-
-      <div class="item">
-        <b>🏢 臨時商務任務</b>
-        <span>臨時行政支援、文件代送、物品轉交、現場協助。</span>
-      </div>
-
-      <div class="item">
-        <b>🗓 長期固定合作</b>
-        <span>每週、每月固定配送需求，可討論月結與固定路線。</span>
-      </div>
+    <div class="item">
+      <b>① 未接單</b>
+      <span>可免費取消。</span>
     </div>
+
+    <div class="item">
+      <b>② 已接單</b>
+      <span>酌收配送費 30%，最低 NT$60，最高 NT$200。</span>
+    </div>
+
+    <div class="item">
+      <b>③ 騎手已抵達取件地點</b>
+      <span>酌收配送費 50%，最低 NT$100，最高 NT$300。</span>
+    </div>
+
+    <div class="item">
+      <b>④ 已取件後</b>
+      <span>原則上不可取消，若有特殊狀況請聯繫 UBee。</span>
+    </div>
+
+    <button class="btn btn-gray" onclick="showSection('menu')">返回我的資訊</button>
   </div>
 
-  <div class="card">
-    <div class="sectionTitle">合作方式</div>
+  <div id="faq" class="card section">
+    <div class="sectionTitle">常見問題</div>
 
     <div class="item">
-      <b>1. 單次任務合作</b>
-      <span>適合臨時文件、樣品或物品收送。每次依距離、時間與速度選項計價。</span>
+      <b>Q1：UBee 可以送什麼？</b>
+      <span>文件、合約、發票、樣品、商務物品、個人物品、安全代送與私人物件。</span>
     </div>
 
     <div class="item">
-      <b>2. 長期企業配合</b>
-      <span>適合每月有多次配送需求的公司，減少員工外出跑腿時間。</span>
+      <b>Q2：UBee 不接哪些項目？</b>
+      <span>違法物品、危險品、易燃物、活體動物、高價未保管物、高度個資風險或需特殊證照的項目恕不承接。</span>
     </div>
 
     <div class="item">
-      <b>3. 企業月結</b>
-      <span>適合固定合作客戶，未來可採月結、對帳明細、統一窗口處理。</span>
+      <b>Q3：多久可以送達？</b>
+      <span>依距離、路況與速度選項而定。</span>
     </div>
 
     <div class="item">
-      <b>4. 客製化任務</b>
-      <span>若有固定時段、固定路線、大量配送、特殊交付規則，可另外討論。</span>
+      <b>Q4：費用怎麼計算？</b>
+      <span>費用依 Google Maps 距離與時間計算，並加上服務費與配送加成。</span>
     </div>
+
+    <div class="item">
+      <b>Q5：付款方式有哪些？</b>
+      <span>目前支援街口支付與銀行轉帳。</span>
+    </div>
+
+    <div class="item">
+      <b>Q6：什麼是等候費？</b>
+      <span>騎手抵達現場後，若需要額外等候超過 3–5 分鐘，可能會申請等候費 NT$60。</span>
+    </div>
+
+    <div class="item">
+      <b>Q7：可以查詢訂單嗎？</b>
+      <span>可以。點選「查詢訂單」後，輸入訂單編號即可查看目前狀態。</span>
+    </div>
+
+    <div class="item">
+      <b>Q8：有開發票或收據嗎？</b>
+      <span>目前提供收據或交易紀錄，暫不開立統一發票。</span>
+    </div>
+
+    <button class="btn btn-gray" onclick="showSection('menu')">返回我的資訊</button>
   </div>
 
-  <div class="card">
-    <div class="sectionTitle">為什麼企業適合用 UBee？</div>
+  <div id="queryOrder" class="card section">
+    <div class="sectionTitle">查詢訂單</div>
+    <div class="sub">請輸入你的訂單編號，系統會查詢目前狀態。</div>
 
-    <div class="notice">
-      如果公司一個月跑 10 次文件或樣品，每次來回 40 分鐘，等於行政或業務的工作一直被打斷。UBee 的價值不是單純送東西，而是讓員工回到該做的工作，把外出跑腿交給專門的人處理。
-    </div>
+    <input id="orderIdInput" class="input" placeholder="例如：UB202604270001">
 
-    <div class="item">
-      <b>✅ 不佔用內部人力</b>
-      <span>不用再臨時叫員工放下工作出去送件。</span>
-    </div>
+    <button class="btn btn-green" onclick="queryOrder()">查詢訂單</button>
 
-    <div class="item">
-      <b>✅ 任務流程清楚</b>
-      <span>可提供接單、ETA、取件、送達等狀態通知。</span>
-    </div>
+    <div id="orderResult" class="resultBox"></div>
 
-    <div class="item">
-      <b>✅ 支援急件與速度分級</b>
-      <span>一般件、快速件、急件、極速件，可依需求選擇。</span>
-    </div>
-
-    <div class="item">
-      <b>✅ 專注商務跑腿</b>
-      <span>定位不是雜項跑腿，而是城市商務任務支援。</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="sectionTitle">填寫合作表單</div>
-    <div class="sub">
-      若你是公司、工廠、店家、辦公室或有長期配送需求，請填寫合作表單。UBee 會依你的需求評估合作方式。
-    </div>
-
-    <button id="formBtn" class="btn btn-green">📄 填寫合作表單</button>
-
-    <button class="btn btn-black" onclick="toggle('moreInfo')">📘 查看合作說明</button>
-
-    <div id="moreInfo" class="content">
-      UBee 可討論的合作方向包含：企業月結、固定路線、固定時段、急件支援、樣品收送、文件配送、臨時行政任務與大量配送需求。<br><br>
-      初期合作可以先從單次任務開始，確認流程、速度與服務品質後，再討論長期合作方案。
-    </div>
+    <button class="btn btn-gray" onclick="showSection('menu')">返回我的資訊</button>
   </div>
 
 </div>
 
 <script>
-let businessFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform';
+function showSection(id){
+  document.querySelectorAll('.section').forEach(el => {
+    el.classList.remove('active');
+  });
 
-async function init(){
+  const target = document.getElementById(id);
+  if(target){
+    target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function goRider(){
+  location.href = '/rider.html';
+}
+
+async function queryOrder(){
+  const input = document.getElementById('orderIdInput');
+  const result = document.getElementById('orderResult');
+  const orderId = input.value.trim().toUpperCase();
+
+  if(!orderId){
+    result.style.display = 'block';
+    result.innerHTML = '請先輸入訂單編號。';
+    return;
+  }
+
+  result.style.display = 'block';
+  result.innerHTML = '查詢中，請稍候...';
+
   try{
-    const res = await fetch('/api/config');
-    const cfg = await res.json();
-    if(cfg.businessFormUrl) businessFormUrl = cfg.businessFormUrl;
-  }catch(e){}
+    const res = await fetch('/api/orders/' + encodeURIComponent(orderId));
+    const data = await res.json();
 
-  document.getElementById('formBtn').onclick = () => {
-    location.href = businessFormUrl;
-  };
+    if(!data.success){
+      result.innerHTML = data.error || '查無此訂單，請確認訂單編號是否正確。';
+      return;
+    }
+
+    const order = data.order;
+
+    result.innerHTML = `
+      <b>訂單編號：</b>${order.id}<br>
+      <b>目前狀態：</b>${order.statusLabel}<br>
+      <b>配送速度：</b>${order.speedLabel || '-'}<br>
+      <b>取件地址：</b>${order.pickupAddress || '-'}<br>
+      <b>送達地址：</b>${order.dropoffAddress || '-'}<br>
+      <b>ETA：</b>${order.etaMinutes ? order.etaMinutes + ' 分鐘' : '尚未設定'}<br>
+      <b>付款狀態：</b>${order.isPaid ? '已付款' : '尚未付款'}<br>
+      <b>付款方式：</b>${order.paymentMethodLabel || '未選擇'}<br>
+      <b>目前總金額：</b>NT$${Math.round(order.total || 0)}
+    `;
+  }catch(e){
+    result.innerHTML = '查詢失敗，請稍後再試。';
+  }
 }
-
-function toggle(id){
-  const el = document.getElementById(id);
-  el.style.display = el.style.display === 'block' ? 'none' : 'block';
-}
-
-init();
 </script>
 
 </body>
