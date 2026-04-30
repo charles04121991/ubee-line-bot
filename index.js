@@ -1411,14 +1411,17 @@ async function handleEvent(event) {
     }
 
     if (event.type === 'message' && event.message.type === 'text') {
-      if (event.source.type === 'group') return;
+  const userId = event.source.userId;
+  const text = (event.message.text || '').trim();
 
-      const userId = event.source.userId;
-      const text = (event.message.text || '').trim();
+  console.log('========== LINE 文字訊息 ==========');
+  console.log('source type:', event.source.type);
+  console.log('LINE userId:', userId);
+  console.log('groupId:', event.source.groupId || '-');
+  console.log('roomId:', event.source.roomId || '-');
+  console.log('text:', text);
 
-      console.log('========== LINE 文字訊息 ==========');
-      console.log('LINE userId:', userId);
-      console.log('text:', text);
+  if (event.source.type === 'group') return;
 
       if (/^UB\d+/i.test(text)) {
         const orderId = text.toUpperCase();
