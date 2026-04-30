@@ -24,6 +24,10 @@ const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const LIFF_ID = process.env.LIFF_ID || '';
+// ===== 已審核騎手白名單 =====
+const APPROVED_RIDER_IDS = [
+  'Uxxxxxxxxxxxxxxxxxxxx'
+];
 
 const PAYMENT_JKO_INFO =
   (process.env.PAYMENT_JKO_INFO || '街口支付\n帳號：請填入你的街口帳號').replace(/\\n/g, '\n');
@@ -974,6 +978,13 @@ async function handlePostback(event) {
   if (data === 'submenu=queryOrder') return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
 
   if (data.startsWith('accept=')) {
+    const userId = event.source.userId;
+     if (!APPROVED_RIDER_IDS.includes(userId)) {
+    return client.replyMessage(event.replyToken, [
+      createTextMessage('⚠️ 你尚未通過 UBee 合作夥伴審核，目前無法接單。')
+    ]);
+  }
+    
     const orderId = data.split('=')[1];
     const order = orders[orderId];
 
