@@ -39,7 +39,9 @@ const BUSINESS_FORM_URL =
   process.env.BUSINESS_FORM_URL ||
   'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform';
 
-const PARTNER_FORM_URL = process.env.PARTNER_FORM_URL || BUSINESS_FORM_URL;
+const PARTNER_FORM_URL =
+  process.env.PARTNER_FORM_URL ||
+  `${BASE_URL}/rider.html`;
 
 if (!LINE_GROUP_ID) {
   console.error('❌ 缺少 LINE_GROUP_ID');
@@ -386,7 +388,7 @@ function createMainMenuFlex() {
     [
       createUriButton('立即下單', getPublicUrl('order.html'), 'primary'),
       createUriButton('商務合作', getPublicUrl('business.html'), 'secondary'),
-      createActionButton('我的資訊', 'menu=info', 'secondary'),
+      createUriButton('我的資訊', getPublicUrl('info.html'), 'secondary'),
     ]
   ));
 }
