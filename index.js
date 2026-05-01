@@ -1277,25 +1277,48 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
   }
 
   if (data.startsWith('arrivedDropoff=')) {
-    const orderId = data.split('=')[1];
-    const order = orders[orderId];
+  const orderId = data.split('=')[1];
+  const order = orders[orderId];
 
-    if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
-    if (order.riderId !== userId) {
-      return client.replyMessage(event.replyToken, [createTextMessage('只有接單騎手可以操作此訂單。')]);
-    }
-
-    order.status = 'arrived_dropoff';
-    order.arrivedDropoffAt = Date.now();
-
-    await client.replyMessage(event.replyToken, [
-      createTextMessage('已更新為：已抵達送達地點'),
-      createRiderControlFlex(order),
+  if (!order) {
+    return client.replyMessage(event.replyToken, [
+      createTextMessage('找不到此訂單。')
     ]);
-
-    await notifyCustomer(order, createTextMessage('📍 騎手已抵達您的送達地點。'));
-    return;
   }
+
+  if (order.riderId !== userId) {
+    return client.replyMessage(event.replyToken, [
+      createTextMessage('只有接單騎手可以操作此訂單。')
+    ]);
+  }
+
+  // ✅ 防呆：一定要先完成取件
+  if (order.status !== 'picked_up') {
+    return client.replyMessage(event.replyToken, [
+      createTextMessage(
+        '目前還不能按「已抵達送達地點」。\n\n請先完成「已取件完成」，系統才會開放送達流程。'
+      )
+    ]);
+  }
+
+  // ✅ 防呆：避免重複按
+  if (order.arrivedDropoffAt || order.status === 'arrived_dropoff') {
+    return client.replyMessage(event.replyToken, [
+      createTextMessage('此訂單已經更新過「已抵達送達地點」。')
+    ]);
+  }
+
+  order.status = 'arrived_dropoff';
+  order.arrivedDropoffAt = Date.now();
+
+  await client.replyMessage(event.replyToken, [
+    createTextMessage('已更新為：已抵達送達地點'),
+    createRiderControlFlex(order),
+  ]);
+
+  await notifyCustomer(order, createTextMessage('📍 騎手已抵達您的送達地點。'));
+  return;
+}
 
   if (data.startsWith('completed=')) {
     const orderId = data.split('=')[1];
@@ -1306,6 +1329,15 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
       return client.replyMessage(event.replyToken, [createTextMessage('只有接單騎手可以操作此訂單。')]);
     }
 
+  // ✅ 防呆：一定要先抵達送達地點，才能完成任務
+  if (order.status !== 'arrived_dropoff') {
+    return client.replyMessage(event.replyToken, [
+      createTextMessage(
+        '目前還不能完成任務。\n\n請先按「已抵達送達地點」，再按「已完成」。'
+      )
+    ]);
+  }
+  
     order.status = 'completed';
     order.completedAt = Date.now();
 
