@@ -226,7 +226,7 @@
   <div class="page">
     <div class="title">🚀 UBee 建立任務</div>
     <div class="subtitle">
-      在 LINE 官方帳號內填寫，不需要跳到其他 App。先填任務資料，往下會看到費用與付款方式。請選擇最符合您任務的類型，將影響配送時效與費用。
+      在 LINE 官方帳號內填寫，不需要跳到其他 App。先填任務資料，往下會看到費用與付款方式。請選擇最符合您任務的類型，將影響配送時效與費用
     </div>
 
     <div class="card">
@@ -261,7 +261,7 @@
 
         <div class="option" onclick="selectService(this, '萬能任務')">
           <div class="option-title">✨ 萬能任務</div>
-          <div class="option-desc">特殊任務、臨時需求，可先填寫需求內容</div>
+          <div class="option-desc">特殊任務、臨時需求，任何需求皆可協助</div>
         </div>
       </div>
 
@@ -299,23 +299,20 @@
 
       <div class="grid" id="speedGrid">
         <div class="option active" data-value="standard" onclick="selectSpeed(this, 'standard')">
-          <div class="option-title">🏍️ 標準件（彈性安排｜價格最省）</div>
-          <div class="option-desc">60–120 分鐘｜+NT$0</div>
+          <div class="option-title">🏍️ 標準件(彈性安排｜價格最省）</div>
+          <div class="option-desc">60–90 分鐘｜+NT$0</div>
         </div>
-
         <div class="option" data-value="priority" onclick="selectSpeed(this, 'priority')">
-          <div class="option-title">🚗 優先件（優先處理｜加速媒合）</div>
-          <div class="option-desc">45–60 分鐘｜+NT$50</div>
+          <div class="option-title">🚗 快速件（即時媒合｜多數人選）</div>
+          <div class="option-desc">45–60 分鐘｜+NT$30</div>
         </div>
-
         <div class="option" data-value="express" onclick="selectSpeed(this, 'express')">
-          <div class="option-title">⚡ 即時（即時媒合｜快速處理）</div>
-          <div class="option-desc">30–45 分鐘｜+NT$100</div>
+          <div class="option-title">⚡ 優先件（優先處理｜加速媒合）</div>
+          <div class="option-desc">30–45 分鐘｜+NT$80</div>
         </div>
-
         <div class="option" data-value="rush" onclick="selectSpeed(this, 'rush')">
-          <div class="option-title">🔥 急件（最高優先｜立即處理）</div>
-          <div class="option-desc">20–30 分鐘｜+NT$200</div>
+          <div class="option-title">🔥 急件（最高優先｜立即指派）</div>
+          <div class="option-desc">20–30 分鐘｜+NT$150</div>
         </div>
       </div>
     </div>
@@ -335,7 +332,7 @@
 
     <div class="card">
       <div class="step-badge">Step 5</div>
-      <div class="section-title">物品內容<span class="required">*</span> / 備註</div>
+      <div class="section-title">物品內容與備註都要填寫<span class="required">*</span></div>
 
       <input id="item" placeholder="物品內容，例如：合約、樣品、小包裹">
       <textarea id="note" placeholder="備註，例如：請到櫃台取件、送達前請電話聯絡"></textarea>
@@ -345,7 +342,7 @@
       <div class="step-badge">Step 6</div>
       <div class="section-title">送出訂單</div>
 
-      <button id="submitBtn" class="main-btn" onclick="submitOrder()">送出訂單</button>
+      <button id="submitBtn" class="main-btn" onclick="submitOrder()" disabled>LINE 身分確認中...</button>
       <div id="statusBox" class="status hidden"></div>
     </div>
 
@@ -361,6 +358,7 @@
       <div id="paymentInfoBox" class="payment-info hidden"></div>
 
       <button id="paidBtn" class="main-btn dark-btn hidden" onclick="confirmPaid()">我已付款</button>
+
       <button id="cancelOrderBtn" class="main-btn cancel-btn hidden" onclick="cancelOrder()">取消訂單</button>
     </div>
   </div>
@@ -373,9 +371,6 @@ let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
 let currentTotal = '';
-let liffReady = false;
-let liffLoginStatus = false;
-let liffErrorMessage = '';
 
 function setActive(parentId, el) {
   document.querySelectorAll(`#${parentId} .option`).forEach(o => o.classList.remove('active'));
@@ -412,72 +407,68 @@ function showStatus(text) {
   box.innerText = text;
 }
 
+async function cancelOrder() {
+  const ok = confirm(
+    "確定要取消訂單嗎？\n\n" +
+    "取消規則：\n" +
+    "未接單：免費\n" +
+    "已接單：酌收費用\n\n" +
+    "是否確認取消？"
+  );
+
+  if (!ok) return;
+
+  try {
+    const res = await fetch('/cancel-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: currentOrderId })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("訂單已取消");
+      window.location.reload();
+    } else {
+      alert("取消失敗：" + data.message);
+    }
+
+  } catch (err) {
+    alert("系統錯誤，請稍後再試");
+  }
+}
+
 function showPaymentInfo(text) {
   const box = document.getElementById('paymentInfoBox');
   box.classList.remove('hidden');
   box.innerText = text;
 }
 
-function showLiffDebugAlert() {
-  let isInClient = '未知';
-  let isLoggedIn = '未知';
-
-  try {
-    if (window.liff) {
-      isInClient = liff.isInClient ? String(liff.isInClient()) : '無法判斷';
-      isLoggedIn = liff.isLoggedIn ? String(liff.isLoggedIn()) : '無法判斷';
-    }
-  } catch (err) {
-    isInClient = '判斷失敗';
-    isLoggedIn = '判斷失敗';
-  }
-
-  alert(
-    '⚠️ 尚未取得 LINE userId\n\n' +
-    '目前 userId：' + userId + '\n' +
-    '目前 liffId：' + (liffId || '空白') + '\n' +
-    'LIFF SDK 是否存在：' + String(!!window.liff) + '\n' +
-    'LIFF 是否初始化完成：' + String(liffReady) + '\n' +
-    'LIFF 是否在 LINE 內開啟：' + isInClient + '\n' +
-    'LIFF 是否登入：' + isLoggedIn + '\n' +
-    '目前網址：' + window.location.href + '\n' +
-    '錯誤訊息：' + (liffErrorMessage || '無') + '\n\n' +
-    '請確認：\n' +
-    '1. Render 有設定 LIFF_ID\n' +
-    '2. LINE Developers 的 LIFF Endpoint URL 是 /order.html\n' +
-    '3. 圖文選單「立即下單」建議使用 https://liff.line.me/你的LIFF_ID'
-  );
-}
-
 async function initPage() {
+  const submitBtn = document.getElementById('submitBtn');
+
   try {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'LINE 身分確認中...';
+    }
+
     const res = await fetch('/api/config');
     const cfg = await res.json();
     liffId = cfg.liffId || '';
 
-    console.log('✅ /api/config:', cfg);
-    console.log('✅ liffId:', liffId);
+    if (!window.liff || !liffId) {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'LINE 身分確認失敗';
+      }
 
-    if (!window.liff) {
-      liffErrorMessage = 'LIFF SDK 沒有載入';
-      alert('❌ LIFF SDK 沒有載入，請重新開啟頁面');
-      return;
-    }
-
-    if (!liffId) {
-      liffErrorMessage = 'Render 沒有設定 LIFF_ID，/api/config 回傳空白';
-      alert('❌ Render 沒有設定 LIFF_ID');
+      alert('❌ LIFF 沒載入或沒設定');
       return;
     }
 
     await liff.init({ liffId });
-    liffReady = true;
-
-    liffLoginStatus = liff.isLoggedIn();
-
-    console.log('✅ LIFF 初始化完成');
-    console.log('✅ isInClient:', liff.isInClient());
-    console.log('✅ isLoggedIn:', liffLoginStatus);
 
     if (!liff.isLoggedIn()) {
       liff.login();
@@ -486,35 +477,26 @@ async function initPage() {
 
     const profile = await liff.getProfile();
     userId = profile.userId;
-
-    console.log('✅ LIFF profile:', profile);
     console.log('✅ LIFF userId:', userId);
+
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = '送出訂單';
+    }
 
   } catch (err) {
     console.log('❌ LIFF init 錯誤', err);
-    liffErrorMessage = err && err.message ? err.message : String(err);
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'LINE 身分確認失敗';
+    }
+
     alert('❌ LIFF 初始化失敗，請從 LINE 官方帳號重新開啟');
   }
 }
 
 function getData() {
-  const purchaseContent = document.getElementById('purchaseContent')?.value.trim() || '';
-  const purchaseStore = document.getElementById('purchaseStore')?.value.trim() || '';
-  const taskContent = document.getElementById('taskContent')?.value.trim() || '';
-
-  let finalItem = document.getElementById('item').value.trim();
-  let finalNote = document.getElementById('note').value.trim();
-
-  if (serviceType === '代買服務') {
-    finalItem = finalItem || purchaseContent;
-    finalNote = `${finalNote}\n購買內容：${purchaseContent || '-'}\n購買地點：${purchaseStore || '-'}`.trim();
-  }
-
-  if (serviceType === '代辦任務' || serviceType === '萬能任務') {
-    finalItem = finalItem || taskContent;
-    finalNote = `${finalNote}\n任務說明：${taskContent || '-'}`.trim();
-  }
-
   return {
     serviceType,
     speedType,
@@ -522,15 +504,15 @@ function getData() {
     pickupPhone: document.getElementById('pickupPhone').value.trim(),
     dropoff: document.getElementById('dropoff').value.trim(),
     dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
-    item: finalItem,
-    note: finalNote,
+    item: document.getElementById('item').value.trim(),
+    note: document.getElementById('note').value.trim(),
     userId
   };
 }
 
 function validateData(data) {
   if (userId === 'web-order') {
-    showLiffDebugAlert();
+    alert('⚠️ LINE 身分尚未確認完成，請稍等 1～3 秒後再按一次送出訂單。');
     return false;
   }
 
@@ -542,25 +524,6 @@ function validateData(data) {
   if (!data.pickupPhone || !data.dropoffPhone) {
     alert('請輸入取件電話與送達電話');
     return false;
-  }
-
-  if (serviceType === '代買服務') {
-    const purchaseContent = document.getElementById('purchaseContent').value.trim();
-    const purchaseStore = document.getElementById('purchaseStore').value.trim();
-
-    if (!purchaseContent || !purchaseStore) {
-      alert('請填寫購買內容與購買地點');
-      return false;
-    }
-  }
-
-  if (serviceType === '代辦任務' || serviceType === '萬能任務') {
-    const taskContent = document.getElementById('taskContent').value.trim();
-
-    if (!taskContent) {
-      alert('請填寫任務說明');
-      return false;
-    }
   }
 
   if (!data.item) {
@@ -611,6 +574,7 @@ async function submitOrder() {
 
     currentOrderId = result.orderId;
     window.currentOrderId = result.orderId;
+
     currentTotal = result.total || result.order?.total || '';
 
     showStatus(
@@ -709,65 +673,31 @@ async function confirmPaid() {
   }
 }
 
-async function cancelOrder() {
-  if (!currentOrderId) {
-    alert('找不到訂單編號');
-    return;
-  }
-
-  const ok = confirm(
-    "確定要取消訂單嗎？\n\n" +
-    "取消規則：\n" +
-    "未接單：免費\n" +
-    "已接單：酌收費用\n\n" +
-    "是否確認取消？"
-  );
-
-  if (!ok) return;
-
-  try {
-    const res = await fetch('/cancel-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId: currentOrderId })
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      alert("訂單已取消");
-      window.location.reload();
-    } else {
-      alert("取消失敗：" + data.message);
-    }
-
-  } catch (err) {
-    alert("系統錯誤，請稍後再試");
-  }
-}
-
 async function calculateEstimate() {
-  const pickup = document.getElementById('pickup').value.trim();
-  const dropoff = document.getElementById('dropoff').value.trim();
+  const pickup = document.getElementById('pickup').value;
+  const dropoff = document.getElementById('dropoff').value;
+
   const speed = document.querySelector('#speedGrid .option.active')?.dataset.value || speedType;
 
   if (!pickup || !dropoff) {
-    alert("請先填寫取件地址與送達地址");
+    alert("請先填寫地址");
     return;
   }
 
   try {
     const res = await fetch('/estimate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pickup, dropoff, speed })
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        pickup,
+        dropoff,
+        speed
+      })
     });
 
     const data = await res.json();
-
-    if (!res.ok || data.error) {
-      throw new Error(data.error || '估價失敗');
-    }
 
     document.getElementById('estimateResult').style.display = 'block';
     document.getElementById('estimateText').innerHTML = `
@@ -784,7 +714,7 @@ async function calculateEstimate() {
       </div>
     `;
   } catch (err) {
-    alert("估價失敗：" + err.message);
+    alert("估價失敗");
     console.error(err);
   }
 }
