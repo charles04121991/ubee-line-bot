@@ -373,6 +373,9 @@ let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
 let currentTotal = '';
+let liffReady = false;
+let liffLoginStatus = false;
+let liffErrorMessage = '';
 
 function setActive(parentId, el) {
   document.querySelectorAll(`#${parentId} .option`).forEach(o => o.classList.remove('active'));
@@ -415,18 +418,66 @@ function showPaymentInfo(text) {
   box.innerText = text;
 }
 
+function showLiffDebugAlert() {
+  let isInClient = '未知';
+  let isLoggedIn = '未知';
+
+  try {
+    if (window.liff) {
+      isInClient = liff.isInClient ? String(liff.isInClient()) : '無法判斷';
+      isLoggedIn = liff.isLoggedIn ? String(liff.isLoggedIn()) : '無法判斷';
+    }
+  } catch (err) {
+    isInClient = '判斷失敗';
+    isLoggedIn = '判斷失敗';
+  }
+
+  alert(
+    '⚠️ 尚未取得 LINE userId\n\n' +
+    '目前 userId：' + userId + '\n' +
+    '目前 liffId：' + (liffId || '空白') + '\n' +
+    'LIFF SDK 是否存在：' + String(!!window.liff) + '\n' +
+    'LIFF 是否初始化完成：' + String(liffReady) + '\n' +
+    'LIFF 是否在 LINE 內開啟：' + isInClient + '\n' +
+    'LIFF 是否登入：' + isLoggedIn + '\n' +
+    '目前網址：' + window.location.href + '\n' +
+    '錯誤訊息：' + (liffErrorMessage || '無') + '\n\n' +
+    '請確認：\n' +
+    '1. Render 有設定 LIFF_ID\n' +
+    '2. LINE Developers 的 LIFF Endpoint URL 是 /order.html\n' +
+    '3. 圖文選單「立即下單」建議使用 https://liff.line.me/你的LIFF_ID'
+  );
+}
+
 async function initPage() {
   try {
     const res = await fetch('/api/config');
     const cfg = await res.json();
     liffId = cfg.liffId || '';
 
-    if (!window.liff || !liffId) {
-      alert('❌ LIFF 沒載入或 Render 沒設定 LIFF_ID');
+    console.log('✅ /api/config:', cfg);
+    console.log('✅ liffId:', liffId);
+
+    if (!window.liff) {
+      liffErrorMessage = 'LIFF SDK 沒有載入';
+      alert('❌ LIFF SDK 沒有載入，請重新開啟頁面');
+      return;
+    }
+
+    if (!liffId) {
+      liffErrorMessage = 'Render 沒有設定 LIFF_ID，/api/config 回傳空白';
+      alert('❌ Render 沒有設定 LIFF_ID');
       return;
     }
 
     await liff.init({ liffId });
+    liffReady = true;
+
+    liffLoginStatus = liff.isLoggedIn();
+
+    console.log('✅ LIFF 初始化完成');
+    console.log('✅ isInClient:', liff.isInClient());
+    console.log('✅ isLoggedIn:', liffLoginStatus);
 
     if (!liff.isLoggedIn()) {
       liff.login();
@@ -436,9 +487,12 @@ async function initPage() {
     const profile = await liff.getProfile();
     userId = profile.userId;
 
+    console.log('✅ LIFF profile:', profile);
     console.log('✅ LIFF userId:', userId);
+
   } catch (err) {
     console.log('❌ LIFF init 錯誤', err);
+    liffErrorMessage = err && err.message ? err.message : String(err);
     alert('❌ LIFF 初始化失敗，請從 LINE 官方帳號重新開啟');
   }
 }
@@ -476,7 +530,7 @@ function getData() {
 
 function validateData(data) {
   if (userId === 'web-order') {
-    alert('⚠️ 請從 LINE 官方帳號內開啟');
+    showLiffDebugAlert();
     return false;
   }
 
@@ -695,8 +749,6 @@ async function cancelOrder() {
 async function calculateEstimate() {
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
-
-  // ✅ 修正：只抓配送速度區塊，不會誤抓服務類型
   const speed = document.querySelector('#speedGrid .option.active')?.dataset.value || speedType;
 
   if (!pickup || !dropoff) {
