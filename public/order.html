@@ -213,6 +213,69 @@
       font-size: 20px;
     }
 
+    .notice-card {
+      background: #fffdf3;
+      border: 1px solid #ffe8a3;
+    }
+
+    .notice-title {
+      font-size: 20px;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    .notice-text {
+      font-size: 15px;
+      color: #444;
+      line-height: 1.75;
+    }
+
+    .notice-list {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 15px;
+      color: #444;
+      line-height: 1.8;
+    }
+
+    .danger-card {
+      background: #fff;
+      border: 1px solid #f0d0d0;
+    }
+
+    .danger-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: #b3261e;
+      margin-bottom: 10px;
+    }
+
+    .confirm-box {
+      margin-top: 16px;
+      padding: 15px;
+      border-radius: 18px;
+      background: #f7f7f7;
+      border: 1px solid #e6e6e6;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .confirm-box input {
+      width: auto;
+      margin: 3px 0 0;
+      transform: scale(1.25);
+      cursor: pointer;
+    }
+
+    .confirm-text {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #333;
+      font-weight: 700;
+    }
+
     @media (max-width: 420px) {
       .title { font-size: 30px; }
       .section-title { font-size: 22px; }
@@ -227,6 +290,14 @@
     <div class="title">🚀 UBee 建立任務</div>
     <div class="subtitle">
       在 LINE 官方帳號內填寫，不需要跳到其他 App。先填任務資料，往下會看到費用與付款方式。請選擇最符合您任務的類型，將影響配送時效與費用
+    </div>
+
+    <div class="card notice-card">
+      <div class="notice-title">下單前提醒</div>
+      <div class="notice-text">
+        填寫任務資料後，系統會先為你計算預估費用。確認資料與金額後，完成付款才會開始派單。
+        騎手接單後，系統會回報 ETA、取件與送達狀態，讓你可以清楚掌握任務進度。
+      </div>
     </div>
 
     <div class="card">
@@ -328,6 +399,11 @@
       <div id="estimateResult" style="display:none; margin-top:16px; font-size:16px; line-height:1.8;">
         <div id="estimateText"></div>
       </div>
+
+      <div class="notice-text" style="margin-top:14px;">
+        費用會依照距離、預估時間、服務類型與配送速度計算。實際費用以系統確認頁顯示為準。
+        若現場等待過久，可能產生等候費。
+      </div>
     </div>
 
     <div class="card">
@@ -336,6 +412,39 @@
 
       <input id="item" placeholder="物品內容，例如：合約、樣品、小包裹">
       <textarea id="note" placeholder="備註，例如：請到櫃台取件、送達前請電話聯絡"></textarea>
+    </div>
+
+    <div class="card danger-card">
+      <div class="danger-title">注意事項</div>
+
+      <div class="notice-text" style="font-weight:900; margin-bottom:8px;">
+        暫不承接以下任務：
+      </div>
+
+      <ul class="notice-list">
+        <li>違法物品、危險物品、管制物品。</li>
+        <li>高風險現金交付或無法確認內容的任務。</li>
+        <li>活體動物、易腐敗或需特殊保存的物品。</li>
+        <li>需要專業證照、醫療判斷或法律責任的服務。</li>
+        <li>內容不明確、地址不完整或無法聯繫的任務。</li>
+      </ul>
+
+      <div class="notice-text" style="font-weight:900; margin-top:16px; margin-bottom:8px;">
+        取消提醒：
+      </div>
+
+      <ul class="notice-list">
+        <li>尚未派單前可免費取消。</li>
+        <li>騎手接單後取消，可能產生取消費。</li>
+        <li>騎手已抵達或已取件後，取消費會依任務狀態計算。</li>
+      </ul>
+
+      <label class="confirm-box" for="confirmNotice">
+        <input type="checkbox" id="confirmNotice">
+        <div class="confirm-text">
+          我已確認任務內容正確，並了解完成付款後才會開始派單。
+        </div>
+      </label>
     </div>
 
     <div class="card">
@@ -568,6 +677,13 @@ function validateData(data) {
 
   if (!data.item) {
     alert('請輸入物品內容');
+    return false;
+  }
+
+  const confirmNotice = document.getElementById('confirmNotice');
+
+  if (!confirmNotice || !confirmNotice.checked) {
+    alert('請先勾選「我已確認任務內容正確，並了解完成付款後才會開始派單。」');
     return false;
   }
 
