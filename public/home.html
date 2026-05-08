@@ -13,312 +13,62 @@
 
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
-      background: #f6f6f6;
-      color: #111;
-    }
-
-    .page {
-      max-width: 520px;
-      margin: 0 auto;
       min-height: 100vh;
-      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+      background: #111111;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
     }
 
-    .hero {
-      padding: 34px 22px 26px;
-      background: linear-gradient(135deg, #111111 0%, #2b2b2b 100%);
-      color: #ffffff;
-      border-bottom-left-radius: 26px;
-      border-bottom-right-radius: 26px;
+    .home {
+      width: 100%;
+      max-width: 420px;
     }
 
     .brand {
       display: inline-block;
-      padding: 7px 12px;
+      padding: 8px 14px;
       border-radius: 999px;
       background: #ffd54a;
-      color: #111;
-      font-size: 13px;
+      color: #111111;
+      font-size: 15px;
       font-weight: 800;
-      margin-bottom: 18px;
+      margin-bottom: 26px;
+      letter-spacing: 0.5px;
     }
 
     h1 {
       margin: 0;
-      font-size: 30px;
-      line-height: 1.25;
+      font-size: 34px;
+      line-height: 1.35;
+      font-weight: 900;
       letter-spacing: 0.5px;
-    }
-
-    .subtitle {
-      margin-top: 12px;
-      font-size: 15px;
-      line-height: 1.7;
-      color: #eeeeee;
-    }
-
-    .highlight {
-      margin-top: 18px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .tag {
-      padding: 8px 11px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.12);
-      color: #fff;
-      font-size: 13px;
-    }
-
-    .content {
-      padding: 22px;
-    }
-
-    .section {
-      margin-bottom: 22px;
-    }
-
-    .section-title {
-      font-size: 18px;
-      font-weight: 800;
-      margin-bottom: 12px;
-    }
-
-    .card {
-      background: #ffffff;
-      border: 1px solid #eeeeee;
-      border-radius: 18px;
-      padding: 16px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-    }
-
-    .actions {
-      display: grid;
-      gap: 12px;
-    }
-
-    .main-btn {
-      display: block;
-      width: 100%;
-      padding: 16px 18px;
-      border-radius: 16px;
-      text-decoration: none;
-      font-size: 17px;
-      font-weight: 800;
-      text-align: center;
-      border: none;
-    }
-
-    .btn-yellow {
-      background: #ffd54a;
-      color: #111;
-    }
-
-    .btn-dark {
-      background: #111;
-      color: #fff;
-    }
-
-    .btn-light {
-      background: #f2f2f2;
-      color: #111;
-    }
-
-    .service-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .service {
-      background: #f8f8f8;
-      border-radius: 14px;
-      padding: 13px;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.4;
-    }
-
-    .flow {
-      display: grid;
-      gap: 10px;
-    }
-
-    .flow-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .num {
-      flex: 0 0 25px;
-      width: 25px;
-      height: 25px;
-      border-radius: 50%;
-      background: #111;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .trust-list {
-      margin: 0;
-      padding-left: 20px;
-      font-size: 14px;
-      line-height: 1.8;
-      color: #333;
-    }
-
-    .notice {
-      margin-top: 14px;
-      padding: 13px;
-      border-radius: 14px;
-      background: #fff8d8;
-      color: #4a3a00;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    .footer {
-      padding: 20px 22px 30px;
-      text-align: center;
-      color: #888;
-      font-size: 12px;
     }
 
     @media (max-width: 380px) {
       h1 {
-        font-size: 26px;
+        font-size: 30px;
       }
 
-      .service-grid {
-        grid-template-columns: 1fr;
+      .brand {
+        font-size: 14px;
       }
     }
   </style>
 </head>
 
 <body>
-  <div class="page">
+  <main class="home">
+    <div class="brand">UBee 城市任務平台</div>
 
-    <section class="hero">
-      <div class="brand">UBee 城市任務平台</div>
-
-      <h1>把麻煩交給 UBee，<br>讓城市任務更快完成。</h1>
-
-      <div class="subtitle">
-        文件急送、物品配送、代買代辦、商務任務，  
-        為台中城市生活與商務需求打造的即時任務服務。
-      </div>
-
-      <div class="highlight">
-        <div class="tag">平均 35 分鐘完成</div>
-        <div class="tag">即時任務調度</div>
-        <div class="tag">狀態清楚回報</div>
-      </div>
-    </section>
-
-    <main class="content">
-
-      <section class="section">
-        <div class="actions">
-          <a class="main-btn btn-yellow" href="/order.html">
-            立即下單
-          </a>
-
-          <a class="main-btn btn-dark" href="https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform">
-            商務合作
-          </a>
-
-          <a class="main-btn btn-light" href="#info">
-            我的資訊
-          </a>
-        </div>
-
-        <div class="notice">
-          若你是從 LINE 官方帳號進入，建議直接使用下方選單操作，體驗會更完整。
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-title">我們可以協助什麼？</div>
-
-        <div class="service-grid">
-          <div class="service">文件急送</div>
-          <div class="service">物品配送</div>
-          <div class="service">代買服務</div>
-          <div class="service">代辦任務</div>
-          <div class="service">商務急件</div>
-          <div class="service">客製需求</div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-title">使用流程</div>
-
-        <div class="card">
-          <div class="flow">
-            <div class="flow-item">
-              <div class="num">1</div>
-              <div>填寫取件、送達與任務內容。</div>
-            </div>
-
-            <div class="flow-item">
-              <div class="num">2</div>
-              <div>系統計算預估費用與配送距離。</div>
-            </div>
-
-            <div class="flow-item">
-              <div class="num">3</div>
-              <div>確認資料並完成付款。</div>
-            </div>
-
-            <div class="flow-item">
-              <div class="num">4</div>
-              <div>UBee 派送任務給合作夥伴。</div>
-            </div>
-
-            <div class="flow-item">
-              <div class="num">5</div>
-              <div>騎手回報 ETA、取件與送達狀態。</div>
-            </div>
-
-            <div class="flow-item">
-              <div class="num">6</div>
-              <div>任務完成，系統留下任務紀錄。</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="info">
-        <div class="section-title">為什麼選擇 UBee？</div>
-
-        <div class="card">
-          <ul class="trust-list">
-            <li>任務狀態清楚，不是口頭說說而已。</li>
-            <li>騎手接單後提供 ETA，進度更安心。</li>
-            <li>適合文件、商務、臨時代辦與高頻配送。</li>
-            <li>流程系統化，比一般臨時跑腿更有紀錄。</li>
-            <li>官方帳號即可完成下單、查詢與聯繫。</li>
-          </ul>
-        </div>
-      </section>
-
-    </main>
-
-    <footer class="footer">
-      UBee 城市任務平台｜城市任務，即時完成
-    </footer>
-
-  </div>
+    <h1>
+      把麻煩交給 UBee，<br>
+      讓城市任務更快完成。
+    </h1>
+  </main>
 </body>
 </html>
