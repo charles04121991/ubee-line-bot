@@ -1461,9 +1461,11 @@ async function handleEvent(event) {
       return handleTextStep(event, userId, text);
     }
 
-    if (event.replyToken) {
-      return client.replyMessage(event.replyToken, [createTextMessage('目前僅支援文字與按鈕操作。')]);
-    }
+      if (event.replyToken) {
+  console.log('忽略非文字或非按鈕事件:', event.type);
+  return null;
+}
+
   } catch (error) {
     console.error('❌ handleEvent 錯誤：', error);
 
