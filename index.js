@@ -946,7 +946,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
     const order = orders[orderId];
 
     if (!order) return res.status(404).json({ success: false, error: '找不到此訂單' });
-    if (!['jko', 'bank'].includes(paymentMethod)) {
+    if (!['jko'].includes(paymentMethod)) {
       return res.status(400).json({ success: false, error: '付款方式錯誤' });
     }
 
