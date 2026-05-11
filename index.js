@@ -1419,6 +1419,7 @@ async function handleTextStep(event, userId, text) {
   if (normalized === '查詢訂單') return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
 
   return null;
+ }
 
 async function handleEvent(event) {
   try {
