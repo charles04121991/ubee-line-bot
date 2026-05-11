@@ -1418,11 +1418,7 @@ async function handleTextStep(event, userId, text) {
   if (normalized === '常見問題') return client.replyMessage(event.replyToken, [createFaqFlex()]);
   if (normalized === '查詢訂單') return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
 
-  return client.replyMessage(event.replyToken, [
-    createTextMessage('歡迎使用 UBee'),
-    createMainMenuFlex(),
-  ]);
-}
+  return null;
 
 async function handleEvent(event) {
   try {
