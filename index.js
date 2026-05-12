@@ -3,6 +3,19 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
 const path = require('path');
+const admin = require('firebase-admin');
+
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY
+      ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      : undefined,
+  }),
+});
+
+const db = admin.firestore();
 
 const app = express();
 
@@ -135,7 +148,7 @@ app.post('/api/rider/register', async (req, res) => {
       createdAt: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
     };
 
-    riders[riderId] = rider;
+    await saveRider(rider);
 
     console.log('🟡 新騎手註冊：', rider);
 
@@ -179,13 +192,58 @@ const userSessions = {};
 const distanceCache = new Map();
 let orderCounter = 1;
 
+async function saveOrder(order) {
+  if (!order || !order.id) return order;
+  orders[order.id] = order;
+  await db.collection('orders').doc(order.id).set(order, { merge: true });
+  return order;
+}
+
+async function getOrder(orderId) {
+  const id = String(orderId || '').toUpperCase();
+  if (!id) return null;
+
+  if (orders[id]) return orders[id];
+
+  const doc = await db.collection('orders').doc(id).get();
+  if (!doc.exists) return null;
+
+  const order = doc.data();
+  orders[id] = order;
+  return order;
+}
+
+async function saveRider(rider) {
+  if (!rider || !rider.riderId) return rider;
+  riders[rider.riderId] = rider;
+  await db.collection('riders').doc(rider.riderId).set(rider, { merge: true });
+  return rider;
+}
+
+async function getRider(riderId) {
+  const id = String(riderId || '');
+  if (!id) return null;
+
+  if (riders[id]) return riders[id];
+
+  const doc = await db.collection('riders').doc(id).get();
+  if (!doc.exists) return null;
+
+  const rider = doc.data();
+  riders[id] = rider;
+  return rider;
+}
+
 function generateOrderId() {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
-  const no = String(orderCounter++).padStart(4, '0');
-  return `UB${yyyy}${mm}${dd}${no}`;
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const no = String(orderCounter++).padStart(3, '0');
+  return `UB${yyyy}${mm}${dd}${hh}${mi}${ss}${no}`;
 }
 
 function formatCurrency(value) {
@@ -918,7 +976,7 @@ app.post('/api/orders', async (req, res) => {
       completedAt: null,
     };
 
-    orders[id] = order;
+    await saveOrder(order);
 
     await notifyCustomer(order, createTextMessage(`✅ 訂單已建立：${order.id}\n請在網頁選擇付款方式，完成付款後按「我已付款」，系統才會派單。`));
 
@@ -943,7 +1001,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
   try {
     const orderId = String(req.params.orderId || '').toUpperCase();
     const { paymentMethod } = req.body;
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return res.status(404).json({ success: false, error: '找不到此訂單' });
     if (!['jko'].includes(paymentMethod)) {
@@ -952,6 +1010,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
 
     order.paymentMethod = paymentMethod;
     order.status = 'pending_payment';
+    await saveOrder(order);
 
     await notifyCustomer(order, createTextMessage(`你已選擇付款方式：${getPaymentMethodLabel(paymentMethod)}\n完成付款後，請回到網頁按「我已付款」。`));
 
@@ -972,7 +1031,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
 app.post('/api/orders/:orderId/paid', async (req, res) => {
   try {
     const orderId = String(req.params.orderId || '').toUpperCase();
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return res.status(404).json({ success: false, error: '找不到此訂單' });
     if (!order.paymentMethod) return res.status(400).json({ success: false, error: '請先選擇付款方式' });
@@ -984,6 +1043,7 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     order.isPaid = true;
     order.paidAt = Date.now();
     order.status = 'pending_dispatch';
+    await saveOrder(order);
 
     await notifyCustomer(
       order,
@@ -1003,9 +1063,9 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
   }
 });
 
-app.get('/api/orders/:orderId', (req, res) => {
+app.get('/api/orders/:orderId', async (req, res) => {
   const orderId = String(req.params.orderId || '').toUpperCase();
-  const order = orders[orderId];
+  const order = await getOrder(orderId);
 
   if (!order) {
     return res.status(404).json({ success: false, error: '查無此訂單' });
@@ -1032,7 +1092,7 @@ app.get('/api/orders/:orderId', (req, res) => {
 app.post('/cancel-order', async (req, res) => {
   try {
     const { orderId } = req.body;
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) {
       return res.json({ success: false, message: '訂單不存在' });
@@ -1043,6 +1103,8 @@ app.post('/cancel-order', async (req, res) => {
     }
 
     order.status = 'cancelled';
+    order.cancelledAt = Date.now();
+    await saveOrder(order);
 
     try {
       if (LINE_GROUP_ID) {
@@ -1077,7 +1139,7 @@ async function handlePostback(event) {
   if (data === 'submenu=queryOrder') return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
   if (data.startsWith('approveRider=')) {
     const riderId = data.split('=')[1];
-    const rider = riders[riderId];
+    const rider = await getRider(riderId);
 
     if (!rider) {
       return client.replyMessage(event.replyToken, [
@@ -1088,6 +1150,7 @@ async function handlePostback(event) {
     rider.status = 'approved';
     rider.approvedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
     rider.approvedBy = userId;
+    await saveRider(rider);
 
     return client.replyMessage(event.replyToken, [
       createTextMessage(
@@ -1103,7 +1166,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('rejectRider=')) {
     const riderId = data.split('=')[1];
-    const rider = riders[riderId];
+    const rider = await getRider(riderId);
 
     if (!rider) {
       return client.replyMessage(event.replyToken, [
@@ -1114,6 +1177,7 @@ async function handlePostback(event) {
     rider.status = 'rejected';
     rider.rejectedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
     rider.rejectedBy = userId;
+    await saveRider(rider);
 
     return client.replyMessage(event.replyToken, [
       createTextMessage(
@@ -1128,7 +1192,7 @@ async function handlePostback(event) {
     const userId = event.source.userId;
      
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
     if (order.status !== 'pending_dispatch') {
@@ -1138,6 +1202,7 @@ async function handlePostback(event) {
     order.status = 'accepted';
     order.riderId = userId;
     order.acceptedAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(`✅ 你已成功接單：${order.id}`),
@@ -1156,7 +1221,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('showEta=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
     if (order.riderId !== userId) {
@@ -1170,7 +1235,7 @@ async function handlePostback(event) {
     const parts = data.split('=');
     const orderId = parts[1];
     const etaMinutes = Number(parts[2]);
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
     if (order.riderId !== userId) {
@@ -1181,6 +1246,7 @@ async function handlePostback(event) {
     }
 
     order.etaMinutes = etaMinutes;
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(`已設定 ETA：${etaMinutes} 分鐘`),
@@ -1194,7 +1260,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('arrivedPickup=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
     if (order.riderId !== userId) {
@@ -1203,6 +1269,7 @@ async function handlePostback(event) {
 
     order.status = 'arrived_pickup';
     order.arrivedPickupAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage('已更新為：已抵達取件地點'),
@@ -1215,7 +1282,7 @@ async function handlePostback(event) {
 
   if (data.startsWith('requestWaitingFee=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
     if (order.riderId !== userId) {
@@ -1245,6 +1312,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
     order.waitingFeeRequested = true;
     order.waitingFeeRejected = false;
     order.waitingFeeRequestedAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage('已送出等候費申請，等待客人確認。'),
@@ -1257,7 +1325,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
 
   if (data.startsWith('pickedUp=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
     if (order.riderId !== userId) {
@@ -1266,6 +1334,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
 
     order.status = 'picked_up';
     order.pickedUpAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage('已更新為：已取件完成'),
@@ -1278,7 +1347,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
 
   if (data.startsWith('arrivedDropoff=')) {
   const orderId = data.split('=')[1];
-  const order = orders[orderId];
+  const order = await getOrder(orderId);
 
   if (!order) {
     return client.replyMessage(event.replyToken, [
@@ -1310,6 +1379,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
 
   order.status = 'arrived_dropoff';
   order.arrivedDropoffAt = Date.now();
+  await saveOrder(order);
 
   await client.replyMessage(event.replyToken, [
     createTextMessage('已更新為：已抵達送達地點'),
@@ -1322,7 +1392,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
 
   if (data.startsWith('completed=')) {
     const orderId = data.split('=')[1];
-    const order = orders[orderId];
+    const order = await getOrder(orderId);
 
     if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
     if (order.riderId !== userId) {
@@ -1340,6 +1410,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
   
     order.status = 'completed';
     order.completedAt = Date.now();
+    await saveOrder(order);
 
     await client.replyMessage(event.replyToken, [
       createTextMessage(`✅ 任務 ${order.id} 已完成。`),
@@ -1356,7 +1427,7 @@ if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
 
   if (data.startsWith('waitingApprove=')) {
   const orderId = data.split('=')[1];
-  const order = orders[orderId];
+  const order = await getOrder(orderId);
 
   if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
 
@@ -1368,6 +1439,7 @@ if (!order.waitingFeeApproved) {
 
 order.waitingFeeApproved = true;
 order.waitingFeeRejected = false;
+await saveOrder(order);
 
   await client.replyMessage(event.replyToken, [
     createTextMessage(`✅ 已同意加收等候費 $60\n\n訂單編號：${order.id}`)
@@ -1385,13 +1457,14 @@ order.waitingFeeRejected = false;
 
 if (data.startsWith('waitingReject=')) {
   const orderId = data.split('=')[1];
-  const order = orders[orderId];
+  const order = await getOrder(orderId);
 
   if (!order) return client.replyMessage(event.replyToken, [createTextMessage('找不到此訂單。')]);
 
   order.waitingFee = 0;
   order.waitingFeeApproved = false;
   order.waitingFeeRejected = true;
+  await saveOrder(order);
 
   await client.replyMessage(event.replyToken, [
     createTextMessage(`已拒絕加收等候費\n\n訂單編號：${order.id}`)
@@ -1449,7 +1522,7 @@ async function handleEvent(event) {
 
       if (/^UB\d+/i.test(text)) {
         const orderId = text.toUpperCase();
-        const order = orders[orderId];
+        const order = await getOrder(orderId);
 
         if (!order) {
           return client.replyMessage(event.replyToken, createTextMessage('查無此訂單，請確認訂單編號是否正確。'));
