@@ -5,6 +5,8 @@
   <title>加入 UBee 合作夥伴</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
   <style>
     :root{
       --green:#00c300;
@@ -107,11 +109,6 @@
       color:#777;
       line-height:1.6;
       margin-top:6px;
-    }
-
-    .fileInput{
-      padding:13px 14px;
-      background:white;
     }
 
     .checkRow{
@@ -297,7 +294,6 @@
           是否可接受「商務急件」與文件、物品遞送服務條件？<span class="requiredMark">*</span><br>
           服務定義為「需即時處理、不可延誤」之文件或物品遞送服務。適用項目包含：合約、文件、發票、小型商務物件。UBee 商務急件重視準時、安全交付。
         </div>
-
         <label class="checkRow">
           <input id="businessConditionAgree" name="businessConditionAgree" type="checkbox" required>
           <span>是，我了解條件規範。</span>
@@ -305,10 +301,7 @@
       </div>
 
       <div class="agreeBox">
-        <div class="agreeTitle">
-          是否已有機車強制險？<span class="requiredMark">*</span>
-        </div>
-
+        <div class="agreeTitle">是否已有機車強制險？<span class="requiredMark">*</span></div>
         <label class="checkRow">
           <input id="insuranceConfirm" name="insuranceConfirm" type="checkbox" required>
           <span>是，我確認本人或車輛已有機車強制險，並了解須自行承擔相關風險。</span>
@@ -316,10 +309,7 @@
       </div>
 
       <div class="agreeBox">
-        <div class="agreeTitle">
-          若發生以下情況，UBee 有權進行警告、暫停派單或終止合作：無故爽約、偽造完成紀錄、私接客戶。<span class="requiredMark">*</span>
-        </div>
-
+        <div class="agreeTitle">若發生以下情況，UBee 有權進行警告、暫停派單或終止合作：無故爽約、偽造完成紀錄、私接客戶。<span class="requiredMark">*</span></div>
         <label class="checkRow">
           <input id="violationConfirm" name="violationConfirm" type="checkbox" required>
           <span>已了解。</span>
@@ -327,10 +317,7 @@
       </div>
 
       <div class="agreeBox">
-        <div class="agreeTitle">
-          本合作為接案合作性質，非勞雇關係，UBee 不保證派單量，報酬依實際完成任務結算。<span class="requiredMark">*</span>
-        </div>
-
+        <div class="agreeTitle">本合作為接案合作性質，非勞雇關係，UBee 不保證派單量，報酬依實際完成任務結算。<span class="requiredMark">*</span></div>
         <label class="checkRow">
           <input id="contractConfirm" name="contractConfirm" type="checkbox" required>
           <span>我已閱讀並同意。</span>
@@ -338,10 +325,7 @@
       </div>
 
       <div class="agreeBox">
-        <div class="agreeTitle">
-          本人已了解並同意 UBee 騎手規範，包括但不限於：不私接客戶、不私下收價、不偽造完成紀錄，違規者 UBee 有權警告、停權或終止合作。<span class="requiredMark">*</span>
-        </div>
-
+        <div class="agreeTitle">本人已了解並同意 UBee 騎手規範，包括但不限於：不私接客戶、不私下收價、不偽造完成紀錄，違規者 UBee 有權警告、停權或終止合作。<span class="requiredMark">*</span></div>
         <label class="checkRow">
           <input id="riderRuleConfirm" name="riderRuleConfirm" type="checkbox" required>
           <span>我已閱讀並同意。</span>
@@ -349,10 +333,7 @@
       </div>
 
       <div class="agreeBox">
-        <div class="agreeTitle">
-          本人了解 UBee 僅為任務媒合平台，若因本人疏失造成貨物遺失、損壞，須配合平台進行責任釐清與處理。<span class="requiredMark">*</span>
-        </div>
-
+        <div class="agreeTitle">本人了解 UBee 僅為任務媒合平台，若因本人疏失造成貨物遺失、損壞，須配合平台進行責任釐清與處理。<span class="requiredMark">*</span></div>
         <label class="checkRow">
           <input id="liabilityConfirm" name="liabilityConfirm" type="checkbox" required>
           <span>同意。</span>
@@ -360,10 +341,7 @@
       </div>
 
       <div class="agreeBox">
-        <div class="agreeTitle">
-          本人同意 UBee 於合作及派單必要範圍內，蒐集、處理及使用本人個人資料。<span class="requiredMark">*</span>
-        </div>
-
+        <div class="agreeTitle">本人同意 UBee 於合作及派單必要範圍內，蒐集、處理及使用本人個人資料。<span class="requiredMark">*</span></div>
         <label class="checkRow">
           <input id="privacyConfirm" name="privacyConfirm" type="checkbox" required>
           <span>同意。</span>
@@ -384,6 +362,30 @@
 </div>
 
 <script>
+const LIFF_ID = '請貼上你的 LIFF ID';
+
+let realLineUserId = '';
+
+async function initLiff() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    realLineUserId = profile.userId || '';
+
+    console.log('LINE real userId:', realLineUserId);
+  } catch (err) {
+    console.error('LIFF 初始化失敗:', err);
+  }
+}
+
+initLiff();
+
 document.getElementById('riderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
@@ -417,6 +419,12 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
     return;
   }
 
+  if (!realLineUserId || !realLineUserId.startsWith('U')) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請從 LINE 官方帳號內開啟此頁面，系統需要取得 LINE 身分才能送出申請。';
+    return;
+  }
+
   submitBtn.disabled = true;
   submitBtn.innerText = '送出中...';
 
@@ -430,7 +438,8 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
         name,
         phone,
         lineId,
-        userId: lineId,
+        userId: realLineUserId,
+        lineUserId: realLineUserId,
         district,
         vehicle,
         plateNumber,
@@ -454,7 +463,7 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
 
     if (data.success) {
       successBox.style.display = 'block';
-      successBox.innerHTML = '✅ 申請已送出，請等待 UBee 審核。審核通過後，才可以接單。';
+      successBox.innerHTML = '✅ 申請已送出，請等待 UBee 審核。審核通過後，系統會透過官方帳號通知你加入騎手 SOP 教學區。';
       form.reset();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
