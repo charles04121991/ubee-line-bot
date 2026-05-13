@@ -36,6 +36,7 @@ const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || LINE_GROUP_ID;
+const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const LIFF_ID = process.env.LIFF_ID || '';
 
@@ -1197,6 +1198,30 @@ async function handlePostback(event) {
     rider.approvedBy = userId;
     await saveRider(rider);
 
+  if (rider.userId || rider.lineUserId) {
+    await client.pushMessage(rider.userId || rider.lineUserId, createTextMessage(
+`🎉 恭喜您通過 UBee 騎手審核！
+
+歡迎加入 UBee 城市任務平台 🐝
+
+接下來請先加入「UBee｜騎手 SOP 教學區」：
+
+${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee 管理員索取。'}
+
+加入後請先閱讀：
+
+1. 接單流程
+2. 任務操作方式
+3. 配送注意事項
+4. 異常回報規範
+5. 收入與結算說明
+
+完成教學後，再開始接收任務。
+
+— UBee 城市任務平台`
+    ));
+  }
+  
     return client.replyMessage(event.replyToken, [
       createTextMessage(
   `✅ 已通過騎手審核\n\n` +
