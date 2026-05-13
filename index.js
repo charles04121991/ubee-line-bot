@@ -648,6 +648,37 @@ function createDispatchGroupFlex(order) {
   ));
 }
 
+// ✅ 新增：辦公室審核群組專用強制取消卡
+function createAdminForceCancelFlex(order) {
+  return createFlexMessage('UBee 辦公室訂單管理', createBubble(
+    'UBee 辦公室訂單管理',
+    [
+      createInfoRow('訂單編號', order.id),
+      createInfoRow('目前狀態', getStatusLabel(order.status)),
+      createInfoRow('服務類型', order.serviceType),
+      createInfoRow('取件地址', order.pickupAddress),
+      createInfoRow('取件電話', order.pickupPhone),
+      createInfoRow('送達地址', order.dropoffAddress),
+      createInfoRow('送達電話', order.dropoffPhone),
+      createInfoRow('物品內容', order.item),
+      createInfoRow('備註', order.note || '無'),
+      createInfoRow('客戶總金額', formatCurrency(order.total)),
+      createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
+      {
+        type: 'text',
+        text: '此卡片僅供 UBee 辦公室管理使用。必要時可強制取消此訂單。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+        margin: 'md',
+      },
+    ],
+    [
+      createActionButton('⚠️ 強制取消此訂單', `forceCancel=${order.id}`, 'primary'),
+    ]
+  ));
+}
+
 function createEtaRow(orderId, minutesList) {
   return {
     type: 'box',
@@ -1061,6 +1092,9 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
 
     await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
 
+    // ✅ 新增：同步推送辦公室審核群組管理卡
+    await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
+
     res.json({
       success: true,
       orderId,
@@ -1098,6 +1132,7 @@ app.get('/api/orders/:orderId', async (req, res) => {
     },
   });
 });
+
 app.post('/cancel-order', async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -1146,6 +1181,7 @@ async function handlePostback(event) {
   if (data === 'submenu=cancelRules') return client.replyMessage(event.replyToken, [createCancelRulesFlex()]);
   if (data === 'submenu=faq') return client.replyMessage(event.replyToken, [createFaqFlex()]);
   if (data === 'submenu=queryOrder') return client.replyMessage(event.replyToken, [createQueryOrderFlex()]);
+
   if (data.startsWith('approveRider=')) {
     const riderId = data.split('=')[1];
     const rider = await getRider(riderId);
@@ -1197,6 +1233,72 @@ async function handlePostback(event) {
       )
     ]);
   }
+
+  // ✅ 新增：辦公室審核群組按鈕版強制取消
+  if (data.startsWith('forceCancel=')) {
+    const sourceGroupId = event.source.groupId || '';
+
+    if (sourceGroupId !== LINE_ADMIN_GROUP_ID) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('此按鈕只能在 UBee 辦公室審核群組使用。')
+      ]);
+    }
+
+    if (!isAdminUser(userId)) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('你沒有權限操作強制取消訂單。')
+      ]);
+    }
+
+    const orderId = data.split('=')[1];
+    const order = await getOrder(orderId);
+
+    if (!order) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage('查無此訂單，請確認訂單編號是否正確。')
+      ]);
+    }
+
+    if (['completed', 'cancelled'].includes(order.status)) {
+      return client.replyMessage(event.replyToken, [
+        createTextMessage(`此訂單目前狀態為「${getStatusLabel(order.status)}」，不可重複取消。`)
+      ]);
+    }
+
+    order.status = 'cancelled';
+    order.cancelType = 'admin_force';
+    order.cancelledBy = userId;
+    order.cancelledAt = Date.now();
+    order.cancelReason = 'admin_force_cancel_button';
+
+    await saveOrder(order);
+
+    await client.replyMessage(event.replyToken, [
+      createTextMessage(
+        `✅ 已強制取消訂單\n\n` +
+        `訂單編號：${order.id}\n` +
+        `目前狀態：${getStatusLabel(order.status)}`
+      )
+    ]);
+
+    await notifyCustomer(order, createTextMessage(
+      `⚠️ UBee 訂單通知\n\n` +
+      `你的訂單已由 UBee 客服取消。\n\n` +
+      `訂單編號：${order.id}\n` +
+      `如有付款或退款問題，請聯繫 UBee 客服。`
+    ));
+
+    if (LINE_GROUP_ID) {
+      await pushToGroup(LINE_GROUP_ID, createTextMessage(
+        `⚠️ 訂單已由 UBee 管理員強制取消\n\n` +
+        `訂單編號：${order.id}\n` +
+        `請勿繼續執行此任務。`
+      ));
+    }
+
+    return;
+  }
+
   if (data.startsWith('accept=')) {
     const userId = event.source.userId;
      
