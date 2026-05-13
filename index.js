@@ -1198,8 +1198,18 @@ async function handlePostback(event) {
     rider.approvedBy = userId;
     await saveRider(rider);
 
-  if (rider.userId || rider.lineUserId) {
-    await client.pushMessage(rider.userId || rider.lineUserId, createTextMessage(
+    const riderLineUserId =
+    rider.userId ||
+    rider.lineUserId ||
+    rider.lineID ||
+    rider.lineId ||
+    rider.lineUserID ||
+    '';
+
+  console.log('準備推播騎手審核通過通知 riderLineUserId:', riderLineUserId);
+
+  if (riderLineUserId && riderLineUserId.startsWith('U')) {
+    await client.pushMessage(riderLineUserId, createTextMessage(
 `🎉 恭喜您通過 UBee 騎手審核！
 
 歡迎加入 UBee 城市任務平台 🐝
@@ -1220,6 +1230,8 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
 
 — UBee 城市任務平台`
     ));
+  } else {
+    console.log('⚠️ 找不到有效的騎手 LINE userId，無法推播審核通過通知:', rider);
   }
   
     return client.replyMessage(event.replyToken, [
