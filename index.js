@@ -1647,7 +1647,6 @@ async function handlePostback(event) {
     return replyMessages(event.replyToken, [
       createTextMessage(`✅ 你已接受訂單：${order.id}`),
       createETAFlex(order),
-      createRiderControlFlex(order),
     ]);
   }
 
