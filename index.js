@@ -336,6 +336,99 @@ function isAdminGroup(event) {
   return (event.source.groupId || '') === LINE_ADMIN_GROUP_ID;
 }
 
+function isTerminalOrderStatus(order) {
+  return ['completed', 'cancelled'].includes(order?.status);
+}
+
+function isOrderCustomer(event, order) {
+  const userId = event?.source?.userId || '';
+  const customerUserId = order?.userId || order?.customerId || '';
+  return !!userId && !!customerUserId && customerUserId !== 'web-order' && userId === customerUserId;
+}
+
+async function requireAdminPermission(event, actionText = '此操作') {
+  if (!isAdminGroup(event)) {
+    await replyText(event.replyToken, `${actionText}只能在 UBee 辦公室審核群組操作。`);
+    return false;
+  }
+
+  if (!isAdminUser(event.source.userId)) {
+    await replyText(event.replyToken, `你沒有權限執行${actionText}。`);
+    return false;
+  }
+
+  return true;
+}
+
+async function isApprovedRiderUser(userId) {
+  if (!userId) return false;
+
+  if (APPROVED_RIDER_IDS.includes(userId)) {
+    return true;
+  }
+
+  try {
+    const snap = await db
+      .collection('riders')
+      .where('userId', '==', userId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
+
+    return !snap.empty;
+  } catch (err) {
+    console.error('❌ 查詢已審核騎手失敗：', err);
+    return false;
+  }
+}
+
+async function requireApprovedRider(event) {
+  const userId = event.source.userId;
+
+  const approved = await isApprovedRiderUser(userId);
+
+  if (!approved) {
+    await replyText(
+      event.replyToken,
+      '你尚未通過 UBee 騎手審核，暫時無法接單。\n\n請先完成審核流程後，再開始接收任務。'
+    );
+    return false;
+  }
+
+  return true;
+}
+
+async function requireOrderStatus(event, order, allowedStatuses, message) {
+  if (!order) {
+    await replyText(event.replyToken, '找不到此訂單。');
+    return false;
+  }
+
+  if (isTerminalOrderStatus(order)) {
+    await replyText(
+      event.replyToken,
+      `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再操作。`
+    );
+    return false;
+  }
+
+  if (!allowedStatuses.includes(order.status)) {
+    await replyText(event.replyToken, message);
+    return false;
+  }
+
+  return true;
+}
+
+async function requireOrderCustomer(event, order) {
+  if (!isOrderCustomer(event, order)) {
+    await replyText(event.replyToken, '此操作只能由原本下單的客人確認。');
+    return false;
+  }
+
+  return true;
+}
+
 async function getOrderOrReply(replyToken, orderId, notFoundText = '查無此訂單，請確認訂單編號是否正確。') {
   const order = await getOrder(orderId);
   if (!order) {
@@ -1270,9 +1363,20 @@ async function handlePostback(event) {
   if (data === 'submenu=queryOrder') return replyMessages(event.replyToken, [createQueryOrderFlex()]);
 
   if (data.startsWith('approveRider=')) {
+    const permitted = await requireAdminPermission(event, '騎手審核');
+    if (!permitted) return null;
+
     const riderId = getPostbackValue(data, 'approveRider');
     const rider = await getRiderOrReply(event.replyToken, riderId);
     if (!rider) return null;
+
+    if (rider.status === 'approved') {
+      return replyText(event.replyToken, '此騎手已經通過審核，不需要重複操作。');
+    }
+
+    if (rider.status === 'rejected') {
+      return replyText(event.replyToken, '此騎手申請已被拒絕，不能再直接通過。');
+    }
 
     rider.status = 'approved';
     rider.approvedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
@@ -1327,9 +1431,20 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
   }
 
   if (data.startsWith('rejectRider=')) {
+    const permitted = await requireAdminPermission(event, '騎手審核');
+    if (!permitted) return null;
+
     const riderId = getPostbackValue(data, 'rejectRider');
     const rider = await getRiderOrReply(event.replyToken, riderId);
     if (!rider) return null;
+
+    if (rider.status === 'approved') {
+      return replyText(event.replyToken, '此騎手已經通過審核，不能再拒絕申請。');
+    }
+
+    if (rider.status === 'rejected') {
+      return replyText(event.replyToken, '此騎手申請已經被拒絕，不需要重複操作。');
+    }
 
     rider.status = 'rejected';
     rider.rejectedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
@@ -1356,6 +1471,9 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
   }
 
   if (data.startsWith('accept=')) {
+    const approved = await requireApprovedRider(event);
+    if (!approved) return null;
+
     const orderId = getPostbackValue(data, 'accept');
     const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
     if (!order) return null;
@@ -1389,6 +1507,14 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
     const ok = await requireOrderRider(event, order, '只有接單騎手可以重新設定 ETA。');
     if (!ok) return null;
 
+    const statusOk = await requireOrderStatus(
+      event,
+      order,
+      ['accepted', 'arrived_pickup', 'picked_up'],
+      '此訂單目前不能重新設定 ETA。'
+    );
+    if (!statusOk) return null;
+
     return replyMessages(event.replyToken, [createETAFlex(order)]);
   }
 
@@ -1400,6 +1526,14 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
 
     const ok = await requireOrderRider(event, order, '只有接單騎手可以設定 ETA。');
     if (!ok) return null;
+
+    const statusOk = await requireOrderStatus(
+      event,
+      order,
+      ['accepted', 'arrived_pickup', 'picked_up'],
+      '此訂單目前不能設定 ETA。'
+    );
+    if (!statusOk) return null;
 
     if (!ETA_OPTIONS.includes(etaMinutes)) {
       return replyText(event.replyToken, 'ETA 選項無效。');
@@ -1425,6 +1559,14 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
     const ok = await requireOrderRider(event, order);
     if (!ok) return null;
 
+    const statusOk = await requireOrderStatus(
+      event,
+      order,
+      ['accepted'],
+      '目前還不能按「已抵達取件地點」。\n\n此按鈕只能在騎手接單後操作。'
+    );
+    if (!statusOk) return null;
+
     await updateOrderStatus(order, 'arrived_pickup', {
       arrivedPickupAt: Date.now(),
     });
@@ -1445,6 +1587,14 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
 
     const ok = await requireOrderRider(event, order, '只有接單騎手可以申請等候費。');
     if (!ok) return null;
+
+    const statusOk = await requireOrderStatus(
+      event,
+      order,
+      ['arrived_pickup'],
+      '目前還不能申請等候費。\n\n請先按「已抵達取件地點」，並於現場等候滿 3 分鐘後再申請。'
+    );
+    if (!statusOk) return null;
 
     if (order.waitingFeeRequested || order.waitingFeeApproved) {
       return replyText(event.replyToken, '⚠️ 此任務已申請過等候費');
@@ -1481,6 +1631,14 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
 
     const ok = await requireOrderRider(event, order);
     if (!ok) return null;
+
+    const statusOk = await requireOrderStatus(
+      event,
+      order,
+      ['accepted', 'arrived_pickup'],
+      '目前還不能按「已取件完成」。\n\n請先確認任務已接單，必要時先按「已抵達取件地點」。'
+    );
+    if (!statusOk) return null;
 
     await updateOrderStatus(order, 'picked_up', {
       pickedUpAt: Date.now(),
@@ -1558,6 +1716,17 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
     const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
     if (!order) return null;
 
+    const customerOk = await requireOrderCustomer(event, order);
+    if (!customerOk) return null;
+
+    if (!order.waitingFeeRequested) {
+      return replyText(event.replyToken, '此訂單目前沒有等候費申請。');
+    }
+
+    if (isTerminalOrderStatus(order)) {
+      return replyText(event.replyToken, `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再處理等候費。`);
+    }
+
     order.waitingFee = PRICING.waitingFee;
 
     if (!order.waitingFeeApproved) {
@@ -1584,6 +1753,17 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
     const orderId = getPostbackValue(data, 'waitingReject');
     const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
     if (!order) return null;
+
+    const customerOk = await requireOrderCustomer(event, order);
+    if (!customerOk) return null;
+
+    if (!order.waitingFeeRequested) {
+      return replyText(event.replyToken, '此訂單目前沒有等候費申請。');
+    }
+
+    if (isTerminalOrderStatus(order)) {
+      return replyText(event.replyToken, `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再處理等候費。`);
+    }
 
     order.waitingFee = 0;
     order.waitingFeeApproved = false;
