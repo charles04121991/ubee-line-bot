@@ -346,6 +346,110 @@ function isOrderCustomer(event, order) {
   return !!userId && !!customerUserId && customerUserId !== 'web-order' && userId === customerUserId;
 }
 
+const ORDER_INPUT_LIMITS = {
+  serviceType: 20,
+  item: 80,
+  pickupAddress: 120,
+  pickupPhone: 20,
+  dropoffAddress: 120,
+  dropoffPhone: 20,
+  note: 200,
+};
+
+const DUPLICATE_ORDER_WINDOW_MS = 90 * 1000;
+
+function cleanText(value, maxLength = 100) {
+  return String(value || '')
+    .replace(/[<>]/g, '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function cleanLongText(value, maxLength = 200) {
+  return String(value || '')
+    .replace(/[<>]/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function isValidCustomerUserId(userId) {
+  return !!userId && userId !== 'web-order' && /^U[a-zA-Z0-9]{20,}$/.test(String(userId));
+}
+
+function getCustomerUserIdFromBody(body = {}) {
+  return String(body.userId || body.customerId || '').trim();
+}
+
+function isSameCustomerUserId(order, requestUserId) {
+  const orderUserId = String(order?.userId || order?.customerId || '').trim();
+  const userId = String(requestUserId || '').trim();
+  return isValidCustomerUserId(userId) && orderUserId && orderUserId !== 'web-order' && orderUserId === userId;
+}
+
+function validateOrderInput(data) {
+  const errors = [];
+
+  if (!isValidCustomerUserId(data.userId)) {
+    errors.push('LINE 身分驗證失敗，請重新從官方帳號點「立即下單」。');
+  }
+
+  if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !data.item) {
+    errors.push('請完整填寫取件地址、送達地址、電話與物品內容。');
+  }
+
+  Object.entries(ORDER_INPUT_LIMITS).forEach(([key, limit]) => {
+    if (String(data[key] || '').length > limit) {
+      errors.push(`${key} 欄位過長，請縮短內容。`);
+    }
+  });
+
+  return errors;
+}
+
+function getDuplicateFingerprint(data) {
+  return [
+    String(data.userId || '').trim(),
+    normalizeAddress(data.pickupAddress),
+    normalizeAddress(data.dropoffAddress),
+    String(data.pickupPhone || '').trim(),
+    String(data.dropoffPhone || '').trim(),
+    cleanText(data.item, ORDER_INPUT_LIMITS.item),
+    String(data.speedType || 'standard'),
+  ].join('|');
+}
+
+async function findRecentDuplicateOrder(data) {
+  const now = Date.now();
+  const fingerprint = getDuplicateFingerprint(data);
+
+  for (const order of Object.values(orders)) {
+    if (!order || !order.createdAt) continue;
+    if (now - Number(order.createdAt) > DUPLICATE_ORDER_WINDOW_MS) continue;
+    if (['cancelled', 'completed'].includes(order.status)) continue;
+    if (order.duplicateFingerprint === fingerprint) return order;
+  }
+
+  try {
+    const snap = await db
+      .collection('orders')
+      .where('userId', '==', data.userId)
+      .where('duplicateFingerprint', '==', fingerprint)
+      .where('createdAt', '>=', now - DUPLICATE_ORDER_WINDOW_MS)
+      .limit(1)
+      .get();
+
+    if (!snap.empty) return snap.docs[0].data();
+  } catch (err) {
+    console.error('❌ 查詢重複訂單失敗：', err);
+  }
+
+  return null;
+}
+
 async function requireAdminPermission(event, actionText = '此操作') {
   if (!isAdminGroup(event)) {
     await replyText(event.replyToken, `${actionText}只能在 UBee 辦公室審核群組操作。`);
@@ -1059,17 +1163,21 @@ function createFinanceFlex(order) {
 }
 
 function createOrderFromApi(data) {
+  const userId = cleanText(data.userId || data.customerId || '', 80);
+
   return {
-    userId: data.userId || data.customerId || 'web-order',
-    customerId: data.userId || data.customerId || 'web-order',
-    serviceType: data.serviceType || data.service || '個人物品',
-    item: data.item || '',
-    pickupAddress: data.pickup || data.pickupAddress || '',
-    pickupPhone: normalizePhone(data.pickupPhone || ''),
-    dropoffAddress: data.dropoff || data.dropoffAddress || '',
-    dropoffPhone: normalizePhone(data.dropoffPhone || ''),
-    speedType: data.speedType || data.speed || 'standard',
-    note: data.note || '',
+    userId,
+    customerId: userId,
+    serviceType: cleanText(data.serviceType || data.service || '個人物品', ORDER_INPUT_LIMITS.serviceType),
+    item: cleanText(data.item || '', ORDER_INPUT_LIMITS.item),
+    pickupAddress: cleanText(data.pickup || data.pickupAddress || '', ORDER_INPUT_LIMITS.pickupAddress),
+    pickupPhone: normalizePhone(cleanText(data.pickupPhone || '', ORDER_INPUT_LIMITS.pickupPhone)),
+    dropoffAddress: cleanText(data.dropoff || data.dropoffAddress || '', ORDER_INPUT_LIMITS.dropoffAddress),
+    dropoffPhone: normalizePhone(cleanText(data.dropoffPhone || '', ORDER_INPUT_LIMITS.dropoffPhone)),
+    speedType: ['standard', 'priority', 'express', 'rush'].includes(data.speedType || data.speed)
+      ? (data.speedType || data.speed)
+      : 'standard',
+    note: cleanLongText(data.note || '', ORDER_INPUT_LIMITS.note),
   };
 }
 
@@ -1152,10 +1260,20 @@ app.post('/api/orders', async (req, res) => {
     console.log('========== H5 建立訂單 ==========');
     console.log('req.body:', req.body);
 
-    if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !data.item) {
+    const inputErrors = validateOrderInput(data);
+    if (inputErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        error: '請完整填寫取件地址、送達地址、電話與物品內容',
+        error: inputErrors[0],
+      });
+    }
+
+    const duplicateOrder = await findRecentDuplicateOrder(data);
+    if (duplicateOrder) {
+      return res.status(409).json({
+        success: false,
+        error: `系統偵測到你剛剛已送出相同訂單，請勿重複下單。原訂單編號：${duplicateOrder.id}`,
+        orderId: duplicateOrder.id,
       });
     }
 
@@ -1182,6 +1300,7 @@ app.post('/api/orders', async (req, res) => {
       dropoffPhone: data.dropoffPhone,
       speedType: data.speedType,
       note: data.note,
+      duplicateFingerprint: getDuplicateFingerprint(data),
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
       distanceText: distance.distanceText,
@@ -1228,11 +1347,18 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
   try {
     const orderId = String(req.params.orderId || '').toUpperCase();
     const { paymentMethod } = req.body;
+    const requestUserId = getCustomerUserIdFromBody(req.body);
     const order = await getOrder(orderId);
 
     if (!order) return res.status(404).json({ success: false, error: '找不到此訂單' });
+    if (!isSameCustomerUserId(order, requestUserId)) {
+      return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人設定付款方式' });
+    }
     if (!['jko'].includes(paymentMethod)) {
       return res.status(400).json({ success: false, error: '付款方式錯誤' });
+    }
+    if (!['pending_payment'].includes(order.status)) {
+      return res.status(400).json({ success: false, error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再變更付款方式` });
     }
 
     order.paymentMethod = paymentMethod;
@@ -1258,13 +1384,21 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
 app.post('/api/orders/:orderId/paid', async (req, res) => {
   try {
     const orderId = String(req.params.orderId || '').toUpperCase();
+    const requestUserId = getCustomerUserIdFromBody(req.body);
     const order = await getOrder(orderId);
 
     if (!order) return res.status(404).json({ success: false, error: '找不到此訂單' });
+    if (!isSameCustomerUserId(order, requestUserId)) {
+      return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人確認付款' });
+    }
     if (!order.paymentMethod) return res.status(400).json({ success: false, error: '請先選擇付款方式' });
 
     if (order.isPaid) {
       return res.json({ success: true, orderId, message: '此訂單已標記付款完成' });
+    }
+
+    if (order.status !== 'pending_payment') {
+      return res.status(400).json({ success: false, error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可重複確認付款` });
     }
 
     order.isPaid = true;
@@ -1277,6 +1411,7 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
       createTextMessage(`✅ 已收到你的付款通知。\n\n訂單編號：${order.id}\n🚀 系統正在為你配對騎手，請稍候...`)
     );
 
+    // 客人確認付款後：直接派單到騎手群；辦公室審核群只收到管理/強制取消卡，不需要管理員確認付款。
     await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
     await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
 
@@ -1293,10 +1428,15 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
 
 app.get('/api/orders/:orderId', async (req, res) => {
   const orderId = String(req.params.orderId || '').toUpperCase();
+  const requestUserId = String(req.query.userId || '').trim();
   const order = await getOrder(orderId);
 
   if (!order) {
     return res.status(404).json({ success: false, error: '查無此訂單' });
+  }
+
+  if (requestUserId && !isSameCustomerUserId(order, requestUserId)) {
+    return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人查詢' });
   }
 
   res.json({
@@ -1321,22 +1461,29 @@ app.get('/api/orders/:orderId', async (req, res) => {
 app.post('/cancel-order', async (req, res) => {
   try {
     const { orderId } = req.body;
+    const requestUserId = getCustomerUserIdFromBody(req.body);
     const order = await getOrder(orderId);
 
     if (!order) {
       return res.json({ success: false, message: '訂單不存在' });
     }
 
-    if (['picked_up', 'completed', 'cancelled'].includes(order.status)) {
+    if (!isSameCustomerUserId(order, requestUserId)) {
+      return res.status(403).json({ success: false, message: '此訂單只能由原本下單的客人取消' });
+    }
+
+    if (['picked_up', 'arrived_dropoff', 'completed', 'cancelled'].includes(order.status)) {
       return res.json({ success: false, message: '此階段不可取消' });
     }
 
     order.status = 'cancelled';
+    order.cancelType = 'customer_cancel';
+    order.cancelledBy = requestUserId;
     order.cancelledAt = Date.now();
     await saveOrder(order);
 
     try {
-      await pushToGroup(LINE_GROUP_ID, createTextMessage(`❌ 訂單已取消\n訂單編號：${orderId}`));
+      await pushToGroup(LINE_GROUP_ID, createTextMessage(`❌ 訂單已取消\n訂單編號：${order.id}`));
     } catch (e) {
       console.error('取消通知失敗', e);
     }
@@ -1379,54 +1526,13 @@ async function handlePostback(event) {
     }
 
     rider.status = 'approved';
-    rider.approvedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+    rider.approvedAt = Date.now();
     rider.approvedBy = userId;
     await saveRider(rider);
 
-    const riderLineUserId =
-      rider.userId ||
-      rider.lineUserId ||
-      rider.lineID ||
-      rider.lineId ||
-      rider.lineUserID ||
-      '';
-
-    console.log('準備推播騎手審核通過通知 riderLineUserId:', riderLineUserId);
-
-    if (riderLineUserId && riderLineUserId.startsWith('U')) {
-      await client.pushMessage(riderLineUserId, createTextMessage(
-`🎉 恭喜您通過 UBee 騎手審核！
-
-歡迎加入 UBee 城市任務平台 🐝
-
-接下來請先加入「UBee｜騎手 SOP 教學區」：
-
-${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee 管理員索取。'}
-
-加入後請先閱讀：
-
-1. 接單流程
-2. 任務操作方式
-3. 配送注意事項
-4. 異常回報規範
-5. 收入與結算說明
-
-完成教學後，再開始接收任務。
-
-— UBee 城市任務平台`
-      ));
-    } else {
-      console.log('⚠️ 找不到有效的騎手 LINE userId，無法推播審核通過通知:', rider);
-    }
-
     return replyText(
       event.replyToken,
-      `✅ 已通過騎手審核\n\n` +
-      `申請編號：${rider.riderId}\n` +
-      `姓名：${rider.name}\n` +
-      `手機：${rider.phone}\n` +
-      `LINE ID：${rider.lineId || rider.userId || '-'}\n\n` +
-      `請將此騎手加入 UBee 接單任務群組，加入後即可接收任務通知。`
+      `✅ 已通過騎手審核\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
     );
   }
 
@@ -1439,7 +1545,7 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
     if (!rider) return null;
 
     if (rider.status === 'approved') {
-      return replyText(event.replyToken, '此騎手已經通過審核，不能再拒絕申請。');
+      return replyText(event.replyToken, '此騎手已通過審核，不能直接拒絕。');
     }
 
     if (rider.status === 'rejected') {
@@ -1447,16 +1553,13 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
     }
 
     rider.status = 'rejected';
-    rider.rejectedAt = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+    rider.rejectedAt = Date.now();
     rider.rejectedBy = userId;
     await saveRider(rider);
 
     return replyText(
       event.replyToken,
-      `已拒絕騎手申請\n\n` +
-      `申請編號：${rider.riderId}\n` +
-      `姓名：${rider.name}\n` +
-      `手機：${rider.phone}`
+      `已拒絕騎手申請\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
     );
   }
 
@@ -1466,319 +1569,350 @@ ${RIDER_SOP_GROUP_LINK || '目前教學群連結尚未設定，請稍後向 UBee
       event,
       orderId,
       'admin_force_cancel_button',
-      '此按鈕只能在 UBee 辦公室審核群組使用。'
+      '強制取消只能在 UBee 辦公室審核群組操作。'
     );
   }
 
+  if (data.startsWith('cancelCreate=')) {
+    const orderId = getPostbackValue(data, 'cancelCreate');
+    const order = await getOrderOrReply(event.replyToken, orderId);
+    if (!order) return null;
+
+    const customerOk = await requireOrderCustomer(event, order);
+    if (!customerOk) return null;
+
+    if (order.status !== 'draft_confirm') {
+      return replyText(event.replyToken, '此訂單已進入下一階段，不能取消建立。');
+    }
+
+    await updateOrderStatus(order, 'cancelled', {
+      cancelType: 'customer_cancel_before_create',
+      cancelledBy: userId,
+      cancelledAt: Date.now(),
+    });
+
+    return replyText(event.replyToken, `已取消建立訂單：${order.id}`);
+  }
+
+  if (data.startsWith('confirmCreate=')) {
+    const orderId = getPostbackValue(data, 'confirmCreate');
+    const order = await getOrderOrReply(event.replyToken, orderId);
+    if (!order) return null;
+
+    const customerOk = await requireOrderCustomer(event, order);
+    if (!customerOk) return null;
+
+    const ok = await requireOrderStatus(
+      event,
+      order,
+      ['draft_confirm'],
+      '此訂單無法重複確認建立。'
+    );
+    if (!ok) return null;
+
+    await updateOrderStatus(order, 'pending_payment');
+
+    return replyMessages(event.replyToken, [
+      createTextMessage(`✅ 已確認建立訂單：${order.id}\n請選擇付款方式並完成付款。`),
+      createPaymentInfoFlex({ ...order, paymentMethod: order.paymentMethod || 'jko' }),
+    ]);
+  }
+
   if (data.startsWith('accept=')) {
+    const orderId = getPostbackValue(data, 'accept');
+    const order = await getOrderOrReply(event.replyToken, orderId);
+    if (!order) return null;
+
     const approved = await requireApprovedRider(event);
     if (!approved) return null;
 
-    const orderId = getPostbackValue(data, 'accept');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
-    if (!order) return null;
+    const ok = await requireOrderStatus(
+      event,
+      order,
+      ['pending_dispatch'],
+      '此訂單目前不是可接單狀態，可能已被其他騎手接走。'
+    );
+    if (!ok) return null;
 
-    if (order.status !== 'pending_dispatch') {
-      return replyText(event.replyToken, '此單已被接走或目前不可接單。');
-    }
+    order.riderId = userId;
+    order.status = 'accepted';
+    order.acceptedAt = Date.now();
+    await saveOrder(order);
 
-    await updateOrderStatus(order, 'accepted', {
-      riderId: userId,
-      acceptedAt: Date.now(),
-    });
+    await notifyCustomer(
+      order,
+      createTextMessage(`🟢 UBee 騎手已接單\n\n訂單編號：${order.id}\n騎手將盡快設定 ETA。`)
+    );
 
-    await replyText(event.replyToken, `✅ 你已成功接單：${order.id}`);
-    await notifyCustomer(order, createTextMessage('✅ 已有騎手接單，正在前往取件地點。'));
-
-    try {
-      await pushToGroup(LINE_GROUP_ID, createETAFlex(order));
-    } catch (err) {
-      console.error('❌ ETA 卡推送失敗', err);
-    }
-
-    return null;
+    return replyMessages(event.replyToken, [
+      createTextMessage(`✅ 你已接受訂單：${order.id}`),
+      createETAFlex(order),
+      createRiderControlFlex(order),
+    ]);
   }
 
   if (data.startsWith('showEta=')) {
     const orderId = getPostbackValue(data, 'showEta');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
-    const ok = await requireOrderRider(event, order, '只有接單騎手可以重新設定 ETA。');
-    if (!ok) return null;
+    const riderOk = await requireOrderRider(event, order);
+    if (!riderOk) return null;
 
-    const statusOk = await requireOrderStatus(
+    const ok = await requireOrderStatus(
       event,
       order,
-      ['accepted', 'arrived_pickup', 'picked_up'],
-      '此訂單目前不能重新設定 ETA。'
+      ['accepted', 'arrived_pickup', 'picked_up', 'arrived_dropoff'],
+      '此訂單目前不能設定 ETA。'
     );
-    if (!statusOk) return null;
+    if (!ok) return null;
 
     return replyMessages(event.replyToken, [createETAFlex(order)]);
   }
 
   if (data.startsWith('eta=')) {
-    const [, orderId, minutesText] = data.split('=');
-    const etaMinutes = Number(minutesText);
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const parts = data.split('=');
+    const orderId = parts[1];
+    const minutes = Number(parts[2]);
+
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
-    const ok = await requireOrderRider(event, order, '只有接單騎手可以設定 ETA。');
-    if (!ok) return null;
+    const riderOk = await requireOrderRider(event, order);
+    if (!riderOk) return null;
 
-    const statusOk = await requireOrderStatus(
-      event,
-      order,
-      ['accepted', 'arrived_pickup', 'picked_up'],
-      '此訂單目前不能設定 ETA。'
-    );
-    if (!statusOk) return null;
-
-    if (!ETA_OPTIONS.includes(etaMinutes)) {
-      return replyText(event.replyToken, 'ETA 選項無效。');
+    if (!ETA_OPTIONS.includes(minutes)) {
+      return replyText(event.replyToken, 'ETA 分鐘數不正確。');
     }
 
-    order.etaMinutes = etaMinutes;
+    const ok = await requireOrderStatus(
+      event,
+      order,
+      ['accepted', 'arrived_pickup', 'picked_up', 'arrived_dropoff'],
+      '此訂單目前不能回報 ETA。'
+    );
+    if (!ok) return null;
+
+    order.etaMinutes = minutes;
+    order.etaUpdatedAt = Date.now();
     await saveOrder(order);
 
-    await replyMessages(event.replyToken, [
-      createTextMessage(`已設定 ETA：${etaMinutes} 分鐘`),
+    await notifyCustomer(
+      order,
+      createTextMessage(`⏱ UBee 騎手已更新 ETA\n\n訂單編號：${order.id}\n預計 ${minutes} 分鐘抵達。`)
+    );
+
+    return replyMessages(event.replyToken, [
+      createTextMessage(`✅ 已設定 ETA：${minutes} 分鐘`),
       createRiderControlFlex(order),
     ]);
-
-    await notifyCustomer(order, createTextMessage(`騎手已接單，預計 ${etaMinutes} 分鐘抵達取件地點。`));
-    return null;
   }
 
   if (data.startsWith('arrivedPickup=')) {
     const orderId = getPostbackValue(data, 'arrivedPickup');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
-    const ok = await requireOrderRider(event, order);
-    if (!ok) return null;
+    const riderOk = await requireOrderRider(event, order);
+    if (!riderOk) return null;
 
-    const statusOk = await requireOrderStatus(
+    const ok = await requireOrderStatus(
       event,
       order,
       ['accepted'],
-      '目前還不能按「已抵達取件地點」。\n\n此按鈕只能在騎手接單後操作。'
+      '此訂單目前不能回報抵達取件地點。'
     );
-    if (!statusOk) return null;
-
-    await updateOrderStatus(order, 'arrived_pickup', {
-      arrivedPickupAt: Date.now(),
-    });
-
-    await replyMessages(event.replyToken, [
-      createTextMessage('已更新為：已抵達取件地點'),
-      createRiderControlFlex(order),
-    ]);
-
-    await notifyCustomer(order, createTextMessage('📍 騎手已抵達取件地點。'));
-    return null;
-  }
-
-  if (data.startsWith('requestWaitingFee=')) {
-    const orderId = getPostbackValue(data, 'requestWaitingFee');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
-    if (!order) return null;
-
-    const ok = await requireOrderRider(event, order, '只有接單騎手可以申請等候費。');
     if (!ok) return null;
 
-    const statusOk = await requireOrderStatus(
-      event,
+    await updateOrderStatus(order, 'arrived_pickup', { arrivedPickupAt: Date.now() });
+
+    await notifyCustomer(
       order,
-      ['arrived_pickup'],
-      '目前還不能申請等候費。\n\n請先按「已抵達取件地點」，並於現場等候滿 3 分鐘後再申請。'
+      createTextMessage(`🟠 UBee 騎手已抵達取件地點\n\n訂單編號：${order.id}`)
     );
-    if (!statusOk) return null;
 
-    if (order.waitingFeeRequested || order.waitingFeeApproved) {
-      return replyText(event.replyToken, '⚠️ 此任務已申請過等候費');
-    }
-
-    if (!order.arrivedPickupAt) {
-      return replyText(event.replyToken, '請先按「已抵達取件地點」後，才能申請等候費');
-    }
-
-    if (Date.now() - order.arrivedPickupAt < 3 * 60 * 1000) {
-      return replyText(event.replyToken, '抵達取件地點滿 3 分鐘後才能申請等候費');
-    }
-
-    Object.assign(order, {
-      waitingFeeRequested: true,
-      waitingFeeRejected: false,
-      waitingFeeRequestedAt: Date.now(),
-    });
-    await saveOrder(order);
-
-    await replyMessages(event.replyToken, [
-      createTextMessage('已送出等候費申請，等待客人確認。'),
+    return replyMessages(event.replyToken, [
+      createTextMessage(`✅ 已回報抵達取件地點：${order.id}`),
       createRiderControlFlex(order),
     ]);
-
-    await notifyCustomer(order, createWaitingFeeConfirmFlex(order));
-    return null;
   }
 
   if (data.startsWith('pickedUp=')) {
     const orderId = getPostbackValue(data, 'pickedUp');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
-    const ok = await requireOrderRider(event, order);
-    if (!ok) return null;
+    const riderOk = await requireOrderRider(event, order);
+    if (!riderOk) return null;
 
-    const statusOk = await requireOrderStatus(
+    const ok = await requireOrderStatus(
       event,
       order,
       ['accepted', 'arrived_pickup'],
-      '目前還不能按「已取件完成」。\n\n請先確認任務已接單，必要時先按「已抵達取件地點」。'
+      '此訂單目前不能回報已取件。'
     );
-    if (!statusOk) return null;
+    if (!ok) return null;
 
-    await updateOrderStatus(order, 'picked_up', {
-      pickedUpAt: Date.now(),
-    });
+    await updateOrderStatus(order, 'picked_up', { pickedUpAt: Date.now() });
 
-    await replyMessages(event.replyToken, [
-      createTextMessage('已更新為：已取件完成'),
+    await notifyCustomer(
+      order,
+      createTextMessage(`🔵 UBee 騎手已完成取件\n\n訂單編號：${order.id}\n正在前往送達地點。`)
+    );
+
+    return replyMessages(event.replyToken, [
+      createTextMessage(`✅ 已回報已取件：${order.id}`),
       createRiderControlFlex(order),
     ]);
-
-    await notifyCustomer(order, createTextMessage('📦 騎手已取件完成，正前往送達地點。'));
-    return null;
   }
 
   if (data.startsWith('arrivedDropoff=')) {
     const orderId = getPostbackValue(data, 'arrivedDropoff');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
-    const ok = await requireOrderRider(event, order);
+    const riderOk = await requireOrderRider(event, order);
+    if (!riderOk) return null;
+
+    const ok = await requireOrderStatus(
+      event,
+      order,
+      ['picked_up'],
+      '此訂單目前不能回報抵達送達地點。'
+    );
     if (!ok) return null;
 
-    if (order.status !== 'picked_up') {
-      return replyText(
-        event.replyToken,
-        '目前還不能按「已抵達送達地點」。\n\n請先完成「已取件完成」，系統才會開放送達流程。'
-      );
-    }
+    await updateOrderStatus(order, 'arrived_dropoff', { arrivedDropoffAt: Date.now() });
 
-    if (order.arrivedDropoffAt || order.status === 'arrived_dropoff') {
-      return replyText(event.replyToken, '此訂單已經更新過「已抵達送達地點」。');
-    }
+    await notifyCustomer(
+      order,
+      createTextMessage(`🟣 UBee 騎手已抵達送達地點\n\n訂單編號：${order.id}`)
+    );
 
-    await updateOrderStatus(order, 'arrived_dropoff', {
-      arrivedDropoffAt: Date.now(),
-    });
-
-    await replyMessages(event.replyToken, [
-      createTextMessage('已更新為：已抵達送達地點'),
+    return replyMessages(event.replyToken, [
+      createTextMessage(`✅ 已回報抵達送達地點：${order.id}`),
       createRiderControlFlex(order),
     ]);
-
-    await notifyCustomer(order, createTextMessage('📍 騎手已抵達您的送達地點。'));
-    return null;
   }
 
   if (data.startsWith('completed=')) {
     const orderId = getPostbackValue(data, 'completed');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
-    const ok = await requireOrderRider(event, order);
+    const riderOk = await requireOrderRider(event, order);
+    if (!riderOk) return null;
+
+    const ok = await requireOrderStatus(
+      event,
+      order,
+      ['arrived_dropoff'],
+      '此訂單目前不能完成。'
+    );
     if (!ok) return null;
 
-    if (order.status !== 'arrived_dropoff') {
-      return replyText(
-        event.replyToken,
-        '目前還不能完成任務。\n\n請先按「已抵達送達地點」，再按「已完成」。'
-      );
-    }
+    await updateOrderStatus(order, 'completed', { completedAt: Date.now() });
 
-    await updateOrderStatus(order, 'completed', {
-      completedAt: Date.now(),
-    });
-
-    await replyText(event.replyToken, `✅ 任務 ${order.id} 已完成。`);
-    await notifyCustomer(order, createTextMessage('✅ 感謝使用 UBee 城市任務跑腿，希望下次再為您服務。'));
+    await notifyCustomer(
+      order,
+      createTextMessage(`✅ UBee 任務已完成\n\n訂單編號：${order.id}\n感謝你使用 UBee 城市任務服務。`)
+    );
 
     await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
-    return null;
+
+    return replyText(event.replyToken, `✅ 已完成訂單：${order.id}`);
+  }
+
+  if (data.startsWith('requestWaitingFee=')) {
+    const orderId = getPostbackValue(data, 'requestWaitingFee');
+    const order = await getOrderOrReply(event.replyToken, orderId);
+    if (!order) return null;
+
+    const riderOk = await requireOrderRider(event, order);
+    if (!riderOk) return null;
+
+    const ok = await requireOrderStatus(
+      event,
+      order,
+      ['arrived_pickup'],
+      '目前只有抵達取件地點後可以申請等候費。'
+    );
+    if (!ok) return null;
+
+    if (order.waitingFeeRequested && !order.waitingFeeRejected) {
+      return replyText(event.replyToken, '此訂單已申請過等候費，請等待客人回覆。');
+    }
+
+    order.waitingFeeRequested = true;
+    order.waitingFeeApproved = false;
+    order.waitingFeeRejected = false;
+    order.waitingFeeRequestedAt = Date.now();
+    await saveOrder(order);
+
+    await notifyCustomer(order, createWaitingFeeConfirmFlex(order));
+
+    return replyText(event.replyToken, '已向客人送出等候費確認。');
   }
 
   if (data.startsWith('waitingApprove=')) {
     const orderId = getPostbackValue(data, 'waitingApprove');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
     const customerOk = await requireOrderCustomer(event, order);
     if (!customerOk) return null;
 
     if (!order.waitingFeeRequested) {
-      return replyText(event.replyToken, '此訂單目前沒有等候費申請。');
+      return replyText(event.replyToken, '目前沒有待確認的等候費申請。');
     }
 
-    if (isTerminalOrderStatus(order)) {
-      return replyText(event.replyToken, `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再處理等候費。`);
-    }
-
-    order.waitingFee = PRICING.waitingFee;
-
-    if (!order.waitingFeeApproved) {
-      order.total = (order.total || 0) + PRICING.waitingFee;
+    if (order.waitingFeeApproved) {
+      return replyText(event.replyToken, '此等候費已經同意，不需要重複操作。');
     }
 
     order.waitingFeeApproved = true;
     order.waitingFeeRejected = false;
+    order.waitingFee = PRICING.waitingFee;
+    recalculateOrderFinancials(order);
     await saveOrder(order);
 
+    await pushToGroup(
+      LINE_GROUP_ID,
+      createTextMessage(`✅ 客人已同意等候費 NT$60\n訂單編號：${order.id}`)
+    );
+
     await replyText(event.replyToken, `✅ 已同意加收等候費 $60\n\n訂單編號：${order.id}`);
-
-    if (order.riderId) {
-      await pushToUser(order.riderId, [
-        createTextMessage('✅ 客戶已同意加收等候費 $60'),
-        createRiderControlFlex(order),
-      ]);
-    }
-
     return null;
   }
 
   if (data.startsWith('waitingReject=')) {
     const orderId = getPostbackValue(data, 'waitingReject');
-    const order = await getOrderOrReply(event.replyToken, orderId, '找不到此訂單。');
+    const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
 
     const customerOk = await requireOrderCustomer(event, order);
     if (!customerOk) return null;
 
     if (!order.waitingFeeRequested) {
-      return replyText(event.replyToken, '此訂單目前沒有等候費申請。');
+      return replyText(event.replyToken, '目前沒有待確認的等候費申請。');
     }
 
-    if (isTerminalOrderStatus(order)) {
-      return replyText(event.replyToken, `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再處理等候費。`);
+    if (order.waitingFeeRejected) {
+      return replyText(event.replyToken, '此等候費已經拒絕，不需要重複操作。');
     }
 
-    order.waitingFee = 0;
     order.waitingFeeApproved = false;
     order.waitingFeeRejected = true;
+    order.waitingFee = 0;
+    recalculateOrderFinancials(order);
     await saveOrder(order);
 
+    await pushToGroup(
+      LINE_GROUP_ID,
+      createTextMessage(`客人不同意等候費申請\n訂單編號：${order.id}`)
+    );
+
     await replyText(event.replyToken, `已拒絕加收等候費\n\n訂單編號：${order.id}`);
-
-    if (order.riderId) {
-      await pushToUser(order.riderId, [
-        createTextMessage('客戶不同意加收等候費'),
-        createRiderControlFlex(order),
-      ]);
-    }
-
     return null;
   }
 
@@ -1824,6 +1958,10 @@ async function handleTextMessage(event) {
     const orderId = text.toUpperCase();
     const order = await getOrderOrReply(event.replyToken, orderId);
     if (!order) return null;
+
+    const customerOk = await requireOrderCustomer(event, order);
+    if (!customerOk) return null;
+
     return replyMessages(event.replyToken, [createOrderStatusFlex(order)]);
   }
 
@@ -1843,35 +1981,24 @@ async function handleEvent(event) {
       return handlePostback(event);
     }
 
-    if (event.type === 'message' && event.message.type === 'text') {
+    if (event.type === 'message') {
+      if (event.message.type !== 'text') {
+        return null;
+      }
+
       return handleTextMessage(event);
     }
 
+    return null;
+  } catch (err) {
+    console.error('❌ handleEvent 錯誤：', err);
     if (event.replyToken) {
-      console.log('忽略非文字或非按鈕事件:', event.type);
-      return null;
+      return replyText(event.replyToken, '系統忙線中，請稍後再試。');
     }
-  } catch (error) {
-    console.error('❌ handleEvent 錯誤：', error);
-
-    if (event.replyToken) {
-      try {
-        await replyText(event.replyToken, '系統忙碌中，請稍後再試。');
-      } catch (replyError) {
-        console.error('❌ replyMessage 錯誤：', replyError);
-      }
-    }
+    return null;
   }
 }
 
-app.get('/', (req, res) => {
-  res.send('UBee OMS V3.9.1 PRO FLOW（H5下單｜付款後派單｜騎手狀態通知）運作中');
-});
-
-app.head('/', (req, res) => {
-  res.sendStatus(200);
-});
-
 app.listen(PORT, () => {
-  console.log(`✅ UBee OMS V3.9.1 PRO FLOW 啟動成功，PORT: ${PORT}`);
+  console.log(`UBee OMS is running on port ${PORT}`);
 });
