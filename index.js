@@ -481,7 +481,7 @@ async function isApprovedRiderUser(userId) {
 
     return !snap.empty;
   } catch (err) {
-    console.error('❌ 查詢已審核騎手失敗：', err);
+    console.error('❌ 查詢已審核騎士失敗：', err);
     return false;
   }
 }
@@ -494,7 +494,7 @@ async function requireApprovedRider(event) {
   if (!approved) {
     await replyText(
       event.replyToken,
-      '你尚未通過 UBee 騎手審核，暫時無法接單。\n\n請先完成審核流程後，再開始接收任務。'
+      '你尚未通過 UBee 騎士審核，暫時無法接單。\n\n請先完成審核流程後，再開始接收任務。'
     );
     return false;
   }
@@ -545,13 +545,13 @@ async function getOrderOrReply(replyToken, orderId, notFoundText = '查無此訂
 async function getRiderOrReply(replyToken, riderId) {
   const rider = await getRider(riderId);
   if (!rider) {
-    await replyText(replyToken, '找不到此騎手申請，可能是系統重啟後暫存資料已消失。');
+    await replyText(replyToken, '找不到此騎士申請，可能是系統重啟後暫存資料已消失。');
     return null;
   }
   return rider;
 }
 
-async function requireOrderRider(event, order, message = '只有接單騎手可以操作此訂單。') {
+async function requireOrderRider(event, order, message = '只有接單騎士可以操作此訂單。') {
   if (order.riderId !== event.source.userId) {
     await replyText(event.replyToken, message);
     return false;
@@ -809,8 +809,8 @@ function createMainMenuFlex() {
 }
 
 function createRiderReviewFlex(rider) {
-  return createFlexMessage('新騎手申請審核', createBubble(
-    '🟡 新騎手申請審核',
+  return createFlexMessage('新騎士申請審核', createBubble(
+    '🟡 新騎士申請審核',
     [
       createInfoRow('申請編號', rider.riderId),
       createInfoRow('姓名', rider.name),
@@ -858,7 +858,7 @@ function createCancelRulesFlex() {
     [
       createTextBlock('① 未接單', '可免費取消。'),
       createTextBlock('② 已接單', '酌收配送費 30%，最低 NT$60，最高 NT$200。'),
-      createTextBlock('③ 騎手已抵達取件地點', '酌收配送費 50%，最低 NT$100，最高 NT$300。'),
+      createTextBlock('③ 騎士已抵達取件地點', '酌收配送費 50%，最低 NT$100，最高 NT$300。'),
       createTextBlock('④ 已取件後', '原則上不可取消，若有特殊狀況請聯繫 UBee。'),
     ],
     [createActionButton('返回我的資訊', 'menu=info', 'secondary')]
@@ -874,7 +874,7 @@ function createFaqFlex() {
       createTextBlock('Q3：多久可以送達？', '依距離、路況與速度選項而定。'),
       createTextBlock('Q4：費用怎麼計算？', '費用依 Google Maps 距離與時間計算，並加上服務費與系統費。'),
       createTextBlock('Q5：付款方式有哪些？', '目前支援街口支付與銀行轉帳。'),
-      createTextBlock('Q6：什麼是等候費？', '騎手抵達現場後，若需要額外等候超過 3–5 分鐘，可能會申請等候費 NT$60。'),
+      createTextBlock('Q6：什麼是等候費？', '騎士抵達現場後，若需要額外等候超過 3–5 分鐘，可能會申請等候費 NT$60。'),
       createTextBlock('Q7：可以查詢訂單嗎？', '可以。點選「查詢訂單」後，輸入訂單編號即可查看目前狀態。'),
       createTextBlock('Q8：有開發票或收據嗎？', '目前提供收據或交易紀錄，暫不開立統一發票。'),
     ],
@@ -1046,8 +1046,8 @@ function createRiderControlFlex(order) {
     footerButtons.push(createActionButton('已完成', `completed=${order.id}`));
   }
 
-  return createFlexMessage('騎手任務操作', createBubble(
-    '騎手任務操作',
+  return createFlexMessage('騎士任務操作', createBubble(
+    '騎士任務操作',
     [
       createInfoRow('訂單編號', order.id),
       createInfoRow('狀態', getStatusLabel(order.status)),
@@ -1084,7 +1084,7 @@ function createWaitingFeeConfirmFlex(order) {
     [
       createInfoRow('訂單編號', order.id),
       createInfoRow('申請金額', formatCurrency(PRICING.waitingFee)),
-      { type: 'text', text: '騎手已抵達現場並等候超過 3–5 分鐘，將申請等候費 NT$60。請問是否同意加收？', size: 'sm', color: '#333333', wrap: true },
+      { type: 'text', text: '騎士已抵達現場並等候超過 3–5 分鐘，將申請等候費 NT$60。請問是否同意加收？', size: 'sm', color: '#333333', wrap: true },
     ],
     [
       createActionButton('同意加收 $60', `waitingApprove=${order.id}`),
@@ -1145,7 +1145,7 @@ function createFinanceFlex(order) {
           createInfoRow('距離', `${distanceKm} 公里`),
           createInfoRow('時間', `${durationMin} 分鐘`),
           { type: 'separator', margin: 'md' },
-          createInfoRow('騎手收入', `$${driver}`),
+          createInfoRow('騎手騎士收入', `$${driver}`),
           createInfoRow('平台收入', `$${platform}`),
           { type: 'separator', margin: 'md' },
           { type: 'text', text: '附加費明細', weight: 'bold', margin: 'md' },
@@ -1510,7 +1510,7 @@ async function handlePostback(event) {
   if (data === 'submenu=queryOrder') return replyMessages(event.replyToken, [createQueryOrderFlex()]);
 
   if (data.startsWith('approveRider=')) {
-    const permitted = await requireAdminPermission(event, '騎手審核');
+    const permitted = await requireAdminPermission(event, '騎士審核');
     if (!permitted) return null;
 
     const riderId = getPostbackValue(data, 'approveRider');
@@ -1518,11 +1518,11 @@ async function handlePostback(event) {
     if (!rider) return null;
 
     if (rider.status === 'approved') {
-      return replyText(event.replyToken, '此騎手已經通過審核，不需要重複操作。');
+      return replyText(event.replyToken, '此騎士已經通過審核，不需要重複操作。');
     }
 
     if (rider.status === 'rejected') {
-      return replyText(event.replyToken, '此騎手申請已被拒絕，不能再直接通過。');
+      return replyText(event.replyToken, '此騎士申請已被拒絕，不能再直接通過。');
     }
 
     rider.status = 'approved';
@@ -1532,12 +1532,12 @@ async function handlePostback(event) {
 
     return replyText(
       event.replyToken,
-      `✅ 已通過騎手審核\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
+      `✅ 已通過騎士審核\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
     );
   }
 
   if (data.startsWith('rejectRider=')) {
-    const permitted = await requireAdminPermission(event, '騎手審核');
+    const permitted = await requireAdminPermission(event, '騎士審核');
     if (!permitted) return null;
 
     const riderId = getPostbackValue(data, 'rejectRider');
@@ -1545,11 +1545,11 @@ async function handlePostback(event) {
     if (!rider) return null;
 
     if (rider.status === 'approved') {
-      return replyText(event.replyToken, '此騎手已通過審核，不能直接拒絕。');
+      return replyText(event.replyToken, '此騎士已通過審核，不能直接拒絕。');
     }
 
     if (rider.status === 'rejected') {
-      return replyText(event.replyToken, '此騎手申請已經被拒絕，不需要重複操作。');
+      return replyText(event.replyToken, '此騎士申請已經被拒絕，不需要重複操作。');
     }
 
     rider.status = 'rejected';
@@ -1559,7 +1559,7 @@ async function handlePostback(event) {
 
     return replyText(
       event.replyToken,
-      `已拒絕騎手申請\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
+      `已拒絕騎士申請\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
     );
   }
 
@@ -1641,7 +1641,7 @@ async function handlePostback(event) {
 
     await notifyCustomer(
       order,
-      createTextMessage(`🟢 UBee 騎手已接單\n\n訂單編號：${order.id}\n騎手將盡快設定 ETA。`)
+      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定 ETA。`)
     );
 
     return replyMessages(event.replyToken, [
@@ -1698,7 +1698,7 @@ async function handlePostback(event) {
 
     await notifyCustomer(
       order,
-      createTextMessage(`⏱ UBee 騎手已更新 ETA\n\n訂單編號：${order.id}\n預計 ${minutes} 分鐘抵達。`)
+      createTextMessage(`⏱ UBee 騎士已更新 ETA\n\n訂單編號：${order.id}\n預計 ${minutes} 分鐘抵達。`)
     );
 
     return replyMessages(event.replyToken, [
@@ -1727,7 +1727,7 @@ async function handlePostback(event) {
 
     await notifyCustomer(
       order,
-      createTextMessage(`🟠 UBee 騎手已抵達取件地點\n\n訂單編號：${order.id}`)
+      createTextMessage(`🟠 UBee 騎士已抵達取件地點\n\n訂單編號：${order.id}`)
     );
 
     return replyMessages(event.replyToken, [
@@ -1756,7 +1756,7 @@ async function handlePostback(event) {
 
     await notifyCustomer(
       order,
-      createTextMessage(`🔵 UBee 騎手已完成取件\n\n訂單編號：${order.id}\n正在前往送達地點。`)
+      createTextMessage(`🔵 UBee 騎士已完成取件\n\n訂單編號：${order.id}\n正在前往送達地點。`)
     );
 
     return replyMessages(event.replyToken, [
@@ -1785,7 +1785,7 @@ async function handlePostback(event) {
 
     await notifyCustomer(
       order,
-      createTextMessage(`🟣 UBee 騎手已抵達送達地點\n\n訂單編號：${order.id}`)
+      createTextMessage(`🟣 UBee 騎士已抵達送達地點\n\n訂單編號：${order.id}`)
     );
 
     return replyMessages(event.replyToken, [
