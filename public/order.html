@@ -339,15 +339,15 @@
       <div id="dynamicFields" style="margin-top:16px;">
         <div id="field-purchase" style="display:none;">
           <label>任務支援</label>
-          <input type="text" id="purchaseContent" placeholder="例如：幫忙送隨身物品、送緊急物品">
+          <input type="text" id="purchaseContent" maxlength="80" placeholder="例如：幫忙送隨身物品、送緊急物品">
 
           <label>取件地點</label>
-          <input type="text" id="purchaseStore" placeholder="例如：送鑰匙、送證件、緊急物品">
+          <input type="text" id="purchaseStore" maxlength="120" placeholder="例如：送鑰匙、送證件、緊急物品">
         </div>
 
         <div id="field-task" style="display:none;">
           <label>任務說明</label>
-          <textarea id="taskContent" placeholder="請描述需要 UBee 協助處理的事情"></textarea>
+          <textarea id="taskContent" maxlength="200" placeholder="請描述需要 UBee 協助處理的事情"></textarea>
         </div>
       </div>
     </div>
@@ -356,10 +356,10 @@
       <div class="step-badge">Step 2</div>
       <div class="section-title">路線與聯絡資訊<span class="required">*</span></div>
 
-      <input id="pickup" placeholder="取件地址，例如：台中市北屯區...">
-      <input id="pickupPhone" placeholder="取件電話">
-      <input id="dropoff" placeholder="送達地址，例如：台中市西屯區...">
-      <input id="dropoffPhone" placeholder="送達電話">
+      <input id="pickup" maxlength="120" placeholder="取件地址，例如：台中市北屯區...">
+      <input id="pickupPhone" maxlength="20" placeholder="取件電話">
+      <input id="dropoff" maxlength="120" placeholder="送達地址，例如：台中市西屯區...">
+      <input id="dropoffPhone" maxlength="20" placeholder="送達電話">
 
       <div class="hint">地址越完整，系統估價越準。若是大樓、公司、樓層，可寫在備註。</div>
     </div>
@@ -410,8 +410,8 @@
       <div class="step-badge">Step 5</div>
       <div class="section-title">物品內容與備註都要填寫<span class="required">*</span></div>
 
-      <input id="item" placeholder="物品內容，例如：合約、樣品、小包裹">
-      <textarea id="note" placeholder="備註部分需填寫內容，例如：請到櫃台取件、送達前請電話聯絡;如是小包裹物件已封箱完成，在我們人員抵達時，麻煩拆開協助確認"></textarea>
+      <input id="item" maxlength="80" placeholder="物品內容，例如：合約、樣品、小包裹">
+      <textarea id="note" maxlength="200" placeholder="備註部分需填寫內容，例如：請到櫃台取件、送達前請電話聯絡;如是小包裹物件已封箱完成，在我們人員抵達時，麻煩拆開協助確認"></textarea>
     </div>
 
     <div class="card danger-card">
@@ -479,6 +479,8 @@ let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
 let currentTotal = '';
+let isSubmittingOrder = false;
+let isConfirmingPaid = false;
 
 function setActive(parentId, el) {
   document.querySelectorAll(`#${parentId} .option`).forEach(o => o.classList.remove('active'));
@@ -543,7 +545,7 @@ async function cancelOrder() {
     const res = await fetch('/cancel-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId })
+      body: JSON.stringify({ orderId, userId })
     });
 
     const data = await res.json();
@@ -581,8 +583,8 @@ async function initPage() {
     setSubmitButton('LINE 身分確認中...', true);
 
     const configRes = await Promise.race([
-      fetch('/api/config'),
-      timeout(8000, '取得 LIFF 設定逾時')
+      fetch('/api/config', { cache: 'no-store' }),
+      timeout(10000, '取得 LIFF 設定逾時')
     ]);
 
     const cfg = await configRes.json();
@@ -602,22 +604,24 @@ async function initPage() {
 
     await Promise.race([
       liff.init({ liffId }),
-      timeout(8000, 'LIFF 初始化逾時')
+      timeout(10000, 'LIFF 初始化逾時')
     ]);
 
     console.log('✅ LIFF 初始化完成');
+    console.log('LIFF ID:', liffId);
+    console.log('Current URL:', window.location.href);
     console.log('isInClient:', liff.isInClient());
     console.log('isLoggedIn:', liff.isLoggedIn());
 
     if (!liff.isLoggedIn()) {
       setSubmitButton('LINE 登入中...', true);
-      liff.login();
+      liff.login({ redirectUri: window.location.href });
       return;
     }
 
     const profile = await Promise.race([
       liff.getProfile(),
-      timeout(8000, '取得 LINE 使用者資料逾時')
+      timeout(10000, '取得 LINE 使用者資料逾時')
     ]);
 
     userId = profile.userId;
@@ -639,7 +643,10 @@ async function initPage() {
     alert(
       '❌ LINE 身分確認失敗\n\n' +
       '原因：' + (err.message || err) + '\n\n' +
-      '請關閉此頁面，重新從 LINE 官方帳號點「立即下單」。'
+      '請確認：\n' +
+      '1. 是否從 LINE 官方帳號點「立即下單」進入\n' +
+      '2. LINE Developers 的 LIFF Endpoint URL 是否為目前這個 order.html 網址\n' +
+      '3. Render 的 /api/config 是否有正確回傳 LIFF_ID'
     );
   }
 }
@@ -679,6 +686,26 @@ function validateData(data) {
     return false;
   }
 
+  if (data.pickup.length > 120 || data.dropoff.length > 120) {
+    alert('地址內容過長，請縮短到 120 字內。');
+    return false;
+  }
+
+  if (data.pickupPhone.length > 20 || data.dropoffPhone.length > 20) {
+    alert('電話內容過長，請縮短到 20 字內。');
+    return false;
+  }
+
+  if (data.item.length > 80) {
+    alert('物品內容過長，請縮短到 80 字內。');
+    return false;
+  }
+
+  if (data.note.length > 200) {
+    alert('備註內容過長，請縮短到 200 字內。');
+    return false;
+  }
+
   const confirmNotice = document.getElementById('confirmNotice');
 
   if (!confirmNotice || !confirmNotice.checked) {
@@ -709,8 +736,10 @@ async function submitOrder() {
   const btn = document.getElementById('submitBtn');
   const data = getData();
 
+  if (isSubmittingOrder) return;
   if (!validateData(data)) return;
 
+  isSubmittingOrder = true;
   btn.disabled = true;
   btn.innerText = '系統計算費用中...';
 
@@ -745,10 +774,14 @@ async function submitOrder() {
 
   } catch (err) {
     alert('❌ ' + err.message);
-  } finally {
+    isSubmittingOrder = false;
     btn.disabled = false;
     btn.innerText = '送出訂單';
+    return;
   }
+
+  btn.disabled = true;
+  btn.innerText = '訂單已建立';
 }
 
 async function selectPayment(method) {
@@ -763,7 +796,7 @@ async function selectPayment(method) {
     const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentMethod: method })
+      body: JSON.stringify({ paymentMethod: method, userId })
     });
 
     const result = await res.json();
@@ -798,7 +831,10 @@ async function confirmPaid() {
     return;
   }
 
+  if (isConfirmingPaid) return;
+
   const btn = document.getElementById('paidBtn');
+  isConfirmingPaid = true;
   btn.disabled = true;
   btn.innerText = '處理中...';
 
@@ -806,7 +842,7 @@ async function confirmPaid() {
     const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({ userId })
     });
 
     const result = await res.json();
@@ -820,9 +856,11 @@ async function confirmPaid() {
     );
 
     alert('✅ 已收到付款通知，系統已開始派單');
+    btn.innerText = '已確認付款';
 
   } catch (err) {
     alert('❌ ' + err.message);
+    isConfirmingPaid = false;
     btn.disabled = false;
     btn.innerText = '我已付款';
   }
