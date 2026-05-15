@@ -1921,7 +1921,24 @@ async function handleTextStep(event, userId, text) {
   const normalized = text.trim();
 
   if (normalized === '主選單') return replyMessages(event.replyToken, [createMainMenuFlex()]);
-  if (normalized === '我的資訊' || normalized === '我的任務') return replyMessages(event.replyToken, [createInfoMenuFlex()]);
+  if (normalized === '我的資訊' || normalized === '我的') {
+  return replyMessage(event.replyToken, {
+    type: 'template',
+    altText: 'UBee 我的資訊',
+    template: {
+      type: 'buttons',
+      title: 'UBee｜我的資訊',
+      text: '查看 UBee 的取消規則與常見問題。',
+      actions: [
+        {
+          type: 'uri',
+          label: '開啟我的資訊',
+          uri: getPublicUrl('info.html')
+        }
+      ]
+    }
+  });
+}
   if (normalized === '取消規則') return replyMessages(event.replyToken, [createCancelRulesFlex()]);
   if (normalized === '常見問題') return replyMessages(event.replyToken, [createFaqFlex()]);
   if (normalized === '查詢訂單') return replyMessages(event.replyToken, [createQueryOrderFlex()]);
