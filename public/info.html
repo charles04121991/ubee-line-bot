@@ -7,20 +7,27 @@
 
 <style>
 :root{
-  --bg:#03070d;
-  --bg2:#06111f;
-  --card:#081421;
-  --card2:#0b1b2d;
-  --blue:#00b8ff;
-  --blue2:#38d5ff;
-  --blue3:#0077ff;
-  --white:#f5f8ff;
-  --text:#d9e8f7;
-  --muted:#8fa4b8;
-  --line:rgba(56,213,255,.32);
-  --line2:rgba(255,255,255,.12);
-  --danger:#ff6b6b;
-  --ok:#36e6a6;
+  --bg:#000000;
+  --card:#111111;
+  --card2:#181818;
+  --card3:#1f1f1f;
+
+  --white:#ffffff;
+  --text:#f2f2f2;
+  --muted:#a6a6a6;
+  --muted2:#737373;
+
+  --line:#2a2a2a;
+  --line2:#333333;
+
+  --primary:#ffffff;
+  --primaryText:#000000;
+
+  --blue:#3b82f6;
+  --green:#22c55e;
+  --red:#ef4444;
+  --yellow:#facc15;
+
   --radius:22px;
 }
 
@@ -36,42 +43,13 @@ html{
 body{
   margin:0;
   font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-  background:
-    radial-gradient(circle at 20% 0%, rgba(0,184,255,.20), transparent 32%),
-    radial-gradient(circle at 80% 20%, rgba(0,119,255,.16), transparent 34%),
-    linear-gradient(180deg,#02050a 0%, #06101d 45%, #02050a 100%);
+  background:var(--bg);
   color:var(--white);
   min-height:100vh;
   overflow-x:hidden;
 }
 
-body::before{
-  content:"";
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  background-image:
-    linear-gradient(rgba(56,213,255,.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56,213,255,.045) 1px, transparent 1px);
-  background-size:34px 34px;
-  mask-image:linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.15));
-  opacity:.65;
-}
-
-body::after{
-  content:"";
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  background:
-    linear-gradient(120deg, transparent 0%, rgba(255,255,255,.04) 18%, transparent 36%),
-    radial-gradient(circle at 50% 110%, rgba(0,184,255,.22), transparent 38%);
-  opacity:.7;
-}
-
 .container{
-  position:relative;
-  z-index:1;
   width:100%;
   max-width:760px;
   margin:0 auto;
@@ -82,32 +60,26 @@ body::after{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  margin-bottom:18px;
+  margin-bottom:22px;
 }
 
 .brand{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:11px;
 }
 
 .logoU{
   width:42px;
   height:42px;
-  border-radius:14px;
+  border-radius:13px;
   display:flex;
   align-items:center;
   justify-content:center;
   font-size:25px;
   font-weight:1000;
-  color:#fff;
-  background:
-    linear-gradient(180deg, rgba(0,184,255,.34), rgba(0,119,255,.12)),
-    #081421;
-  border:1px solid rgba(56,213,255,.42);
-  box-shadow:
-    0 0 22px rgba(0,184,255,.38),
-    inset 0 0 18px rgba(0,184,255,.16);
+  color:#000;
+  background:#fff;
 }
 
 .brandText{
@@ -116,66 +88,34 @@ body::after{
 
 .brandText b{
   display:block;
-  font-size:20px;
-  letter-spacing:.3px;
+  font-size:21px;
+  letter-spacing:.2px;
 }
 
 .brandText span{
   display:block;
   color:var(--muted);
   font-size:12px;
-  letter-spacing:2px;
+  letter-spacing:1.6px;
   text-transform:uppercase;
 }
 
 .status{
-  color:var(--blue2);
+  color:var(--text);
   font-size:12px;
   font-weight:800;
-  border:1px solid var(--line);
+  border:1px solid var(--line2);
   border-radius:999px;
   padding:8px 10px;
-  background:rgba(0,184,255,.08);
-  box-shadow:0 0 18px rgba(0,184,255,.12);
+  background:var(--card2);
 }
 
 .card{
-  position:relative;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,.06), transparent 36%),
-    linear-gradient(180deg, rgba(8,20,33,.94), rgba(5,12,22,.96));
+  background:var(--card);
   border:1px solid var(--line);
   border-radius:var(--radius);
   padding:18px;
   margin-bottom:14px;
-  box-shadow:
-    0 18px 42px rgba(0,0,0,.38),
-    0 0 28px rgba(0,184,255,.10),
-    inset 0 0 0 1px rgba(255,255,255,.04);
-  overflow:hidden;
-}
-
-.card::before{
-  content:"";
-  position:absolute;
-  left:18px;
-  right:18px;
-  top:0;
-  height:1px;
-  background:linear-gradient(90deg, transparent, rgba(56,213,255,.75), transparent);
-  opacity:.75;
-}
-
-.card::after{
-  content:"";
-  position:absolute;
-  width:160px;
-  height:160px;
-  right:-70px;
-  bottom:-90px;
-  border-radius:50%;
-  background:radial-gradient(circle, rgba(0,184,255,.17), transparent 68%);
-  pointer-events:none;
 }
 
 .hero{
@@ -186,38 +126,37 @@ body::after{
   display:inline-flex;
   align-items:center;
   gap:8px;
-  color:var(--blue2);
+  color:var(--muted);
   font-size:12px;
   font-weight:900;
-  letter-spacing:1.8px;
+  letter-spacing:1.6px;
   text-transform:uppercase;
-  margin-bottom:10px;
+  margin-bottom:12px;
 }
 
 .heroBadge::before{
   content:"";
-  width:8px;
-  height:8px;
+  width:7px;
+  height:7px;
   border-radius:50%;
-  background:var(--blue2);
-  box-shadow:0 0 12px var(--blue2);
+  background:var(--green);
 }
 
 .title{
-  font-size:30px;
+  font-size:31px;
   font-weight:1000;
   line-height:1.18;
-  letter-spacing:.5px;
+  letter-spacing:.2px;
   margin:0 0 10px;
 }
 
 .title span{
-  color:var(--blue2);
+  color:var(--white);
 }
 
 .sub{
   font-size:15px;
-  color:var(--text);
+  color:var(--muted);
   line-height:1.8;
   margin:0;
 }
@@ -226,29 +165,24 @@ body::after{
   display:grid;
   grid-template-columns:1fr;
   gap:12px;
-  margin-top:16px;
+  margin-top:18px;
 }
 
 .menuBtn{
-  position:relative;
   width:100%;
-  border:1px solid rgba(56,213,255,.30);
+  border:1px solid var(--line);
   border-radius:18px;
-  padding:16px 15px;
+  padding:16px;
   cursor:pointer;
   text-align:left;
-  background:
-    linear-gradient(135deg, rgba(0,184,255,.15), transparent 38%),
-    rgba(7,18,31,.86);
+  background:var(--card2);
   color:var(--white);
-  box-shadow:
-    0 0 20px rgba(0,184,255,.08),
-    inset 0 0 0 1px rgba(255,255,255,.035);
-  transition:.18s ease;
+  transition:.16s ease;
 }
 
 .menuBtn:active{
   transform:scale(.985);
+  background:var(--card3);
 }
 
 .menuBtnTop{
@@ -265,10 +199,10 @@ body::after{
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:22px;
-  background:rgba(0,184,255,.12);
-  border:1px solid rgba(56,213,255,.30);
-  box-shadow:inset 0 0 18px rgba(0,184,255,.10);
+  font-size:20px;
+  background:#242424;
+  border:1px solid var(--line2);
+  color:var(--white);
 }
 
 .menuArrow{
@@ -278,17 +212,17 @@ body::after{
   display:flex;
   align-items:center;
   justify-content:center;
-  color:var(--blue2);
-  border:1px solid rgba(56,213,255,.38);
-  background:rgba(0,184,255,.08);
-  font-weight:900;
+  color:#000;
+  background:#fff;
+  font-weight:1000;
+  font-size:22px;
 }
 
 .menuBtn b{
   display:block;
   font-size:20px;
-  margin-top:12px;
-  letter-spacing:.5px;
+  margin-top:13px;
+  letter-spacing:.2px;
 }
 
 .menuBtn span{
@@ -296,7 +230,7 @@ body::after{
   color:var(--muted);
   font-size:14px;
   line-height:1.6;
-  margin-top:4px;
+  margin-top:5px;
 }
 
 .section{
@@ -305,7 +239,7 @@ body::after{
 
 .section.active{
   display:block;
-  animation:fadeIn .18s ease;
+  animation:fadeIn .16s ease;
 }
 
 @keyframes fadeIn{
@@ -322,28 +256,28 @@ body::after{
 }
 
 .sectionTitle{
-  font-size:26px;
+  font-size:27px;
   font-weight:1000;
   margin:0;
   line-height:1.25;
 }
 
 .sectionTitle span{
-  color:var(--blue2);
+  color:var(--white);
 }
 
 .sectionDesc{
   color:var(--muted);
   font-size:14px;
   line-height:1.7;
-  margin:6px 0 0;
+  margin:7px 0 0;
 }
 
 .tag{
   flex:0 0 auto;
-  color:var(--blue2);
-  border:1px solid var(--line);
-  background:rgba(0,184,255,.08);
+  color:var(--text);
+  border:1px solid var(--line2);
+  background:var(--card2);
   border-radius:999px;
   padding:7px 10px;
   font-size:12px;
@@ -352,13 +286,10 @@ body::after{
 }
 
 .item{
-  position:relative;
-  background:
-    linear-gradient(135deg, rgba(0,184,255,.10), transparent 42%),
-    rgba(255,255,255,.035);
-  border:1px solid rgba(255,255,255,.09);
+  background:var(--card2);
+  border:1px solid var(--line);
   border-radius:18px;
-  padding:15px 15px 15px 16px;
+  padding:15px 16px;
   margin-top:10px;
   line-height:1.75;
 }
@@ -374,30 +305,26 @@ body::after{
 
 .item b::before{
   content:"";
-  width:7px;
-  height:7px;
+  width:6px;
+  height:6px;
   border-radius:50%;
-  background:var(--blue2);
-  box-shadow:0 0 12px var(--blue2);
+  background:var(--white);
   flex:0 0 auto;
 }
 
 .item span{
   display:block;
   font-size:15px;
-  color:var(--text);
+  color:var(--muted);
 }
 
 .notice{
-  border-color:rgba(255,107,107,.32);
-  background:
-    linear-gradient(135deg, rgba(255,107,107,.10), transparent 42%),
-    rgba(255,255,255,.035);
+  border-color:rgba(239,68,68,.42);
+  background:rgba(239,68,68,.08);
 }
 
 .notice b::before{
-  background:var(--danger);
-  box-shadow:0 0 12px var(--danger);
+  background:var(--red);
 }
 
 .btn{
@@ -409,53 +336,49 @@ body::after{
   font-weight:1000;
   margin-top:12px;
   cursor:pointer;
-  transition:.18s ease;
+  transition:.16s ease;
+  font-family:inherit;
 }
 
 .btn:active{
   transform:scale(.985);
 }
 
-.btn-blue{
-  background:linear-gradient(135deg, var(--blue), var(--blue3));
-  color:#001522;
-  box-shadow:0 0 24px rgba(0,184,255,.28);
+.btn-white{
+  background:var(--primary);
+  color:var(--primaryText);
 }
 
 .btn-dark{
-  background:rgba(255,255,255,.055);
+  background:var(--card2);
   color:var(--white);
-  border-color:rgba(255,255,255,.12);
+  border-color:var(--line2);
 }
 
-.btn-outline{
-  background:rgba(0,184,255,.06);
-  color:var(--blue2);
-  border-color:rgba(56,213,255,.36);
+.btn-blue{
+  background:var(--primary);
+  color:var(--primaryText);
 }
 
 .input{
   width:100%;
   padding:15px 15px;
   border-radius:16px;
-  border:1px solid rgba(56,213,255,.28);
-  background:rgba(0,0,0,.22);
+  border:1px solid var(--line2);
+  background:var(--card2);
   color:var(--white);
   font-size:16px;
   margin-top:12px;
   outline:none;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
 }
 
 .input::placeholder{
-  color:rgba(217,232,247,.42);
+  color:var(--muted2);
 }
 
 .input:focus{
-  border-color:rgba(56,213,255,.78);
-  box-shadow:
-    0 0 0 3px rgba(0,184,255,.12),
-    0 0 22px rgba(0,184,255,.15);
+  border-color:#fff;
+  box-shadow:0 0 0 2px rgba(255,255,255,.12);
 }
 
 .resultBox{
@@ -463,53 +386,42 @@ body::after{
   margin-top:14px;
   padding:15px;
   border-radius:18px;
-  background:
-    linear-gradient(135deg, rgba(0,184,255,.12), transparent 42%),
-    rgba(0,0,0,.22);
-  border:1px solid rgba(56,213,255,.30);
+  background:var(--card2);
+  border:1px solid var(--line);
   line-height:1.8;
   color:var(--text);
   font-size:15px;
 }
 
 .resultBox b{
-  color:var(--blue2);
+  color:var(--white);
 }
 
 .resultError{
-  border-color:rgba(255,107,107,.36);
+  border-color:rgba(239,68,68,.48);
+  background:rgba(239,68,68,.08);
   color:#ffd1d1;
 }
 
 .resultSuccess{
-  border-color:rgba(54,230,166,.32);
-}
-
-.quickRow{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
-  margin-top:12px;
+  border-color:rgba(34,197,94,.42);
+  background:rgba(34,197,94,.08);
 }
 
 .footer{
-  color:rgba(217,232,247,.46);
+  color:var(--muted2);
   text-align:center;
   font-size:12px;
   line-height:1.7;
-  padding:10px 0 0;
+  padding:12px 0 0;
 }
 
 .footer b{
-  color:rgba(245,248,255,.74);
+  color:var(--muted);
 }
 
 @media (min-width:560px){
   .menuGrid{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .quickRow{
     grid-template-columns:1fr 1fr;
   }
 
@@ -518,7 +430,25 @@ body::after{
   }
 
   .title{
-    font-size:34px;
+    font-size:35px;
+  }
+}
+
+@media (max-width:420px){
+  .title{
+    font-size:30px;
+  }
+
+  .sectionTitle{
+    font-size:25px;
+  }
+
+  .card{
+    border-radius:20px;
+  }
+
+  .status{
+    display:none;
   }
 }
 </style>
@@ -541,10 +471,10 @@ body::after{
 
   <!-- 主選單 -->
   <div id="menu" class="card hero section active">
-    <div class="heroBadge">UBee System</div>
-    <h1 class="title">我的<span>資訊中心</span></h1>
+    <div class="heroBadge">UBee Service</div>
+    <h1 class="title">我的資訊</h1>
     <p class="sub">
-      你可以在這裡查看取消規則、常見問題、查詢訂單狀態，或申請成為 UBee 城市任務合作夥伴。
+      查看取消規則、常見問題、查詢訂單狀態，或申請成為 UBee 城市任務合作夥伴。
     </p>
 
     <div class="menuGrid">
@@ -590,7 +520,7 @@ body::after{
   <div id="cancelRules" class="card section">
     <div class="sectionHeader">
       <div>
-        <h2 class="sectionTitle">取消<span>規則</span></h2>
+        <h2 class="sectionTitle">取消規則</h2>
         <p class="sectionDesc">取消費用會依任務進行階段判斷，實際狀況仍以 UBee 系統與客服確認為準。</p>
       </div>
       <div class="tag">CANCEL</div>
@@ -623,7 +553,7 @@ body::after{
   <div id="faq" class="card section">
     <div class="sectionHeader">
       <div>
-        <h2 class="sectionTitle">常見<span>問題</span></h2>
+        <h2 class="sectionTitle">常見問題</h2>
         <p class="sectionDesc">以下整理 UBee 常見服務問題，方便你快速了解任務流程與注意事項。</p>
       </div>
       <div class="tag">FAQ</div>
@@ -676,7 +606,7 @@ body::after{
   <div id="queryOrder" class="card section">
     <div class="sectionHeader">
       <div>
-        <h2 class="sectionTitle">查詢<span>訂單</span></h2>
+        <h2 class="sectionTitle">查詢訂單</h2>
         <p class="sectionDesc">請輸入你的訂單編號，系統會查詢目前任務狀態。</p>
       </div>
       <div class="tag">ORDER</div>
@@ -684,7 +614,7 @@ body::after{
 
     <input id="orderIdInput" class="input" placeholder="例如：UB202604270001" autocomplete="off">
 
-    <button class="btn btn-blue" onclick="queryOrder()">查詢訂單</button>
+    <button class="btn btn-white" onclick="queryOrder()">查詢訂單</button>
 
     <div id="orderResult" class="resultBox"></div>
 
