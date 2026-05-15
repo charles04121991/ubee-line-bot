@@ -123,6 +123,7 @@ app.post('/api/rider/register', async (req, res) => {
       phone,
       lineId,
       userId,
+      lineUserId,
       district,
       vehicle,
       plateNumber,
@@ -141,20 +142,21 @@ app.post('/api/rider/register', async (req, res) => {
     const riderId = 'R' + Date.now();
 
     const rider = {
-      riderId,
-      name,
-      phone,
-      lineId: lineId || '',
-      userId: userId || lineId || '',
-      district: district || '',
-      vehicle,
-      plateNumber: plateNumber || '',
-      area: area || serviceArea || '',
-      serviceArea: serviceArea || area || '',
-      availableTime: availableTime || '',
-      status: 'pending',
-      createdAt: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
-    };
+  riderId,
+  name,
+  phone,
+  lineId: lineId || '',
+  userId: userId || lineUserId || lineId || '',
+  lineUserId: lineUserId || userId || '',
+  district: district || '',
+  vehicle,
+  plateNumber: plateNumber || '',
+  area: area || serviceArea || '',
+  serviceArea: serviceArea || area || '',
+  availableTime: availableTime || '',
+  status: 'pending',
+  createdAt: new Date().toLocaleString('zh-TW')
+};
 
     await saveRider(rider);
 
@@ -1529,6 +1531,18 @@ async function handlePostback(event) {
     rider.approvedBy = userId;
     await saveRider(rider);
 
+    if (rider.lineUserId) {
+      await client.pushMessage(rider.lineUserId, {
+        type: 'text',
+        text:
+          `✅ UBee 合作夥伴申請已審核通過！\n\n` +
+          `歡迎加入 UBee 城市任務平台。\n\n` +
+          `請加入 UBee｜騎手 SOP 教學區：\n` +
+          `https://line.me/ti/g/Ut3XpxvHPN\n\n` +
+          `加入後請依照群組內教學完成接單流程與任務規範確認。`
+      });
+    }
+    
     return replyText(
       event.replyToken,
       `✅ 已通過騎士審核\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
