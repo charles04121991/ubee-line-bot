@@ -3,109 +3,480 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee｜商務合作</title>
+<title>UBee｜商務合作中心</title>
 
 <style>
 :root{
-  --green:#00c300;
-  --black:#111;
-  --gray:#f6f6f6;
-  --yellow:#fff4cc;
-  --line:#e9e9e9;
+  --bg:#03070d;
+  --bg2:#06111f;
+  --card:#081421;
+  --card2:#0b1b2d;
+  --blue:#00b8ff;
+  --blue2:#38d5ff;
+  --blue3:#0077ff;
+  --white:#f5f8ff;
+  --text:#d9e8f7;
+  --muted:#8fa4b8;
+  --line:rgba(56,213,255,.32);
+  --line2:rgba(255,255,255,.12);
+  --ok:#36e6a6;
+  --warning:#ffd166;
+  --radius:24px;
 }
-*{box-sizing:border-box}
+
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+}
+
+html{
+  scroll-behavior:smooth;
+}
+
 body{
   margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial;
-  background:var(--gray);
-  color:#111;
+  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(0,184,255,.20), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(0,119,255,.16), transparent 34%),
+    linear-gradient(180deg,#02050a 0%, #06101d 48%, #02050a 100%);
+  color:var(--white);
+  min-height:100vh;
+  overflow-x:hidden;
 }
+
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background-image:
+    linear-gradient(rgba(56,213,255,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56,213,255,.045) 1px, transparent 1px);
+  background-size:34px 34px;
+  opacity:.62;
+  mask-image:linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.16));
+}
+
+body::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255,255,255,.045) 18%, transparent 36%),
+    radial-gradient(circle at 50% 110%, rgba(0,184,255,.22), transparent 40%);
+  opacity:.72;
+}
+
 .container{
-  padding:24px 16px 36px;
-  max-width:720px;
+  position:relative;
+  z-index:1;
+  max-width:760px;
   margin:0 auto;
+  padding:22px 16px 42px;
 }
-.card{
-  background:white;
-  border-radius:18px;
-  padding:16px;
-  margin-bottom:14px;
-  box-shadow:0 1px 0 rgba(0,0,0,.03);
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:18px;
 }
-.hero{
-  background:linear-gradient(180deg,#fff4cc,#fff);
-  border:1px solid #ffe7a3;
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
 }
-.title{
-  font-size:24px;
-  font-weight:900;
-  margin-bottom:8px;
+
+.logoU{
+  width:44px;
+  height:44px;
+  border-radius:15px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:27px;
+  font-weight:1000;
+  color:#fff;
+  background:
+    linear-gradient(180deg, rgba(0,184,255,.34), rgba(0,119,255,.12)),
+    #081421;
+  border:1px solid rgba(56,213,255,.42);
+  box-shadow:
+    0 0 22px rgba(0,184,255,.38),
+    inset 0 0 18px rgba(0,184,255,.16);
 }
-.sub{
-  font-size:14px;
-  color:#555;
-  line-height:1.7;
+
+.brandText{
+  line-height:1.15;
 }
-.sectionTitle{
-  font-size:18px;
-  font-weight:850;
-  margin-bottom:8px;
-}
-.item{
-  border:1px solid var(--line);
-  border-radius:14px;
-  padding:13px;
-  margin-top:9px;
-  line-height:1.65;
-}
-.item b{
+
+.brandText b{
   display:block;
-  margin-bottom:3px;
+  font-size:20px;
+  letter-spacing:.4px;
 }
-.item span{
-  font-size:14px;
-  color:#555;
+
+.brandText span{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  letter-spacing:2px;
+  text-transform:uppercase;
 }
-.btn{
-  width:100%;
-  padding:14px;
-  border-radius:14px;
-  border:0;
-  font-size:16px;
-  font-weight:850;
-  margin-top:10px;
+
+.statusPill{
+  flex:0 0 auto;
+  color:var(--blue2);
+  font-size:12px;
+  font-weight:900;
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:8px 10px;
+  background:rgba(0,184,255,.08);
+  box-shadow:0 0 18px rgba(0,184,255,.12);
+  letter-spacing:.8px;
 }
-.btn-green{
-  background:var(--green);
-  color:white;
+
+.hero,
+.card{
+  position:relative;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.06), transparent 36%),
+    linear-gradient(180deg, rgba(8,20,33,.94), rgba(5,12,22,.96));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px;
+  margin-bottom:16px;
+  box-shadow:
+    0 18px 42px rgba(0,0,0,.36),
+    0 0 28px rgba(0,184,255,.10),
+    inset 0 0 0 1px rgba(255,255,255,.04);
+  overflow:hidden;
 }
-.btn-black{
-  background:var(--black);
-  color:white;
+
+.hero{
+  padding:22px 18px 20px;
+  border-radius:28px;
 }
-.content{
-  display:none;
-  margin-top:12px;
-  line-height:1.8;
-  color:#333;
+
+.hero::before,
+.card::before{
+  content:"";
+  position:absolute;
+  left:18px;
+  right:18px;
+  top:0;
+  height:1px;
+  background:linear-gradient(90deg, transparent, rgba(56,213,255,.78), transparent);
+  opacity:.75;
+}
+
+.hero::after,
+.card::after{
+  content:"";
+  position:absolute;
+  width:170px;
+  height:170px;
+  right:-75px;
+  bottom:-92px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(0,184,255,.17), transparent 68%);
+  pointer-events:none;
+}
+
+.hero > *,
+.card > *{
+  position:relative;
+  z-index:1;
+}
+
+.heroBadge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  color:var(--blue2);
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:1.8px;
+  text-transform:uppercase;
+  margin-bottom:10px;
+}
+
+.heroBadge::before{
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--blue2);
+  box-shadow:0 0 12px var(--blue2);
+}
+
+.title{
+  font-size:32px;
+  font-weight:1000;
+  line-height:1.18;
+  letter-spacing:.3px;
+  margin:0 0 10px;
+}
+
+.title span{
+  color:var(--blue2);
+}
+
+.sub{
   font-size:15px;
+  color:var(--text);
+  line-height:1.8;
+  margin:0;
 }
-.notice{
-  background:#fff8df;
-  border:1px solid #ffe7a3;
-  border-radius:14px;
-  padding:12px;
-  line-height:1.75;
+
+.metricRow{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin-top:16px;
+}
+
+.metric{
+  border:1px solid rgba(56,213,255,.26);
+  border-radius:18px;
+  padding:14px;
+  background:
+    linear-gradient(135deg, rgba(0,184,255,.10), transparent 44%),
+    rgba(255,255,255,.035);
+}
+
+.metric b{
+  display:block;
+  font-size:18px;
+  color:var(--white);
+  margin-bottom:4px;
+}
+
+.metric span{
+  display:block;
+  font-size:13px;
+  color:var(--muted);
+  line-height:1.55;
+}
+
+.sectionTitle{
+  font-size:24px;
+  font-weight:1000;
+  line-height:1.3;
+  margin:0 0 14px;
+  letter-spacing:.2px;
+}
+
+.sectionTitle span{
+  color:var(--blue2);
+}
+
+.sectionDesc{
+  color:var(--muted);
   font-size:14px;
-  color:#5a4300;
+  line-height:1.75;
+  margin:-4px 0 14px;
 }
+
 .grid{
   display:grid;
   grid-template-columns:1fr;
-  gap:8px;
+  gap:10px;
 }
+
+.item{
+  position:relative;
+  background:
+    linear-gradient(135deg, rgba(0,184,255,.08), transparent 44%),
+    rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:18px;
+  padding:15px;
+  line-height:1.75;
+  overflow:hidden;
+}
+
+.item::before{
+  content:"";
+  position:absolute;
+  left:14px;
+  right:14px;
+  top:0;
+  height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+  opacity:.7;
+}
+
+.item b{
+  display:block;
+  font-size:16px;
+  margin-bottom:4px;
+  color:var(--white);
+}
+
+.item span{
+  display:block;
+  font-size:14px;
+  color:var(--text);
+}
+
+.notice{
+  background:
+    linear-gradient(135deg, rgba(54,230,166,.10), transparent 45%),
+    rgba(0,0,0,.23);
+  border:1px solid rgba(54,230,166,.28);
+  border-radius:18px;
+  padding:15px;
+  line-height:1.8;
+  font-size:14px;
+  color:var(--text);
+  margin-bottom:12px;
+}
+
+.notice b{
+  color:var(--ok);
+}
+
+.btn{
+  width:100%;
+  padding:15px 16px;
+  border-radius:18px;
+  border:1px solid transparent;
+  font-size:16px;
+  font-weight:1000;
+  margin-top:10px;
+  cursor:pointer;
+  transition:.16s ease;
+  font-family:inherit;
+}
+
+.btn:active{
+  transform:scale(.985);
+}
+
+.btn-blue{
+  background:linear-gradient(135deg, var(--blue), var(--blue3));
+  color:#001522;
+  box-shadow:0 0 24px rgba(0,184,255,.28);
+}
+
+.btn-dark{
+  background:rgba(255,255,255,.055);
+  color:var(--white);
+  border-color:rgba(255,255,255,.14);
+  box-shadow:none;
+}
+
+.content{
+  display:none;
+  margin-top:14px;
+  line-height:1.85;
+  color:var(--text);
+  font-size:15px;
+  background:
+    linear-gradient(135deg, rgba(0,184,255,.10), transparent 44%),
+    rgba(0,0,0,.24);
+  border:1px solid rgba(56,213,255,.30);
+  border-radius:18px;
+  padding:15px;
+}
+
+.flow{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+.flowStep{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:18px;
+  padding:14px;
+  background:rgba(255,255,255,.035);
+}
+
+.flowNo{
+  flex:0 0 auto;
+  width:34px;
+  height:34px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#001522;
+  background:linear-gradient(135deg, var(--blue2), var(--blue3));
+  font-weight:1000;
+  box-shadow:0 0 18px rgba(0,184,255,.20);
+}
+
+.flowText b{
+  display:block;
+  color:var(--white);
+  margin-bottom:3px;
+}
+
+.flowText span{
+  display:block;
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.6;
+}
+
+.footer{
+  color:rgba(217,232,247,.46);
+  text-align:center;
+  font-size:12px;
+  line-height:1.7;
+  padding:10px 0 0;
+}
+
+.footer b{
+  color:rgba(245,248,255,.76);
+}
+
 @media(min-width:560px){
-  .grid{grid-template-columns:1fr 1fr}
+  .grid{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .metricRow{
+    grid-template-columns:1fr 1fr 1fr;
+  }
+
+  .flow{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .container{
+    padding-top:30px;
+  }
+}
+
+@media(max-width:420px){
+  .title{
+    font-size:30px;
+  }
+
+  .sectionTitle{
+    font-size:22px;
+  }
+
+  .card,
+  .hero{
+    padding:18px;
+    border-radius:22px;
+  }
+
+  .statusPill{
+    display:none;
+  }
 }
 </style>
 </head>
@@ -114,15 +485,46 @@ body{
 
 <div class="container">
 
-  <div class="card hero">
-    <div class="title">🤝 UBee 商務合作</div>
-    <div class="sub">
-      專為公司、工廠、辦公室與中小企業設計的城市任務服務。當你們需要有人「跑一趟」送文件、送樣品、送公司物品，UBee 可以協助即時處理。
+  <div class="topbar">
+    <div class="brand">
+      <div class="logoU">U</div>
+      <div class="brandText">
+        <b>UBee</b>
+        <span>City Task Platform</span>
+      </div>
     </div>
+    <div class="statusPill">BUSINESS</div>
   </div>
 
+  <section class="hero">
+    <div class="heroBadge">UBee Business Support</div>
+    <h1 class="title">UBee <span>商務合作中心</span></h1>
+    <p class="sub">
+      專為公司、工廠、辦公室、店家與工作室設計的城市任務支援服務。
+      當你們需要有人跑一趟、送文件、送樣品、送公司物品，UBee 可以協助即時處理。
+    </p>
+
+    <div class="metricRow">
+      <div class="metric">
+        <b>文件急送</b>
+        <span>合約、發票、報價單與公司文件配送</span>
+      </div>
+      <div class="metric">
+        <b>商務任務</b>
+        <span>樣品、零件、物品轉交與臨時支援</span>
+      </div>
+      <div class="metric">
+        <b>流程通知</b>
+        <span>接單、ETA、取件、送達狀態回報</span>
+      </div>
+    </div>
+  </section>
+
   <div class="card">
-    <div class="sectionTitle">適合哪些需求？</div>
+    <div class="sectionTitle">適合哪些<span>需求？</span></div>
+    <div class="sectionDesc">
+      UBee 適合需要穩定、清楚、可追蹤任務流程的企業與店家。
+    </div>
 
     <div class="grid">
       <div class="item">
@@ -142,77 +544,104 @@ body{
 
       <div class="item">
         <b>🗓 長期固定合作</b>
-        <span>每週、每月固定配送需求，可討論月結與固定路線。</span>
+        <span>每週、每月固定配送需求，可討論固定流程與合作方式。</span>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <div class="sectionTitle">合作方式</div>
-
-    <div class="item">
-      <b>1. 單次任務合作</b>
-      <span>適合臨時文件、樣品或物品收送。每次依距離、時間與速度選項計價。</span>
+    <div class="sectionTitle">合作<span>方式</span></div>
+    <div class="sectionDesc">
+      可從單次任務開始，也可以依照企業需求建立長期合作流程。
     </div>
 
-    <div class="item">
-      <b>2. 長期企業配合</b>
-      <span>適合每月有多次配送需求的公司，減少員工外出跑腿時間。</span>
-    </div>
+    <div class="flow">
+      <div class="flowStep">
+        <div class="flowNo">1</div>
+        <div class="flowText">
+          <b>單次任務合作</b>
+          <span>適合臨時文件、樣品或物品收送。每次依距離、時間與速度選項計價。</span>
+        </div>
+      </div>
 
-    <div class="item">
-      <b>3. 企業月結</b>
-      <span>適合固定合作客戶，未來可採月結、對帳明細、統一窗口處理。</span>
-    </div>
+      <div class="flowStep">
+        <div class="flowNo">2</div>
+        <div class="flowText">
+          <b>長期企業配合</b>
+          <span>適合每月有多次配送需求的公司，減少員工外出跑腿時間。</span>
+        </div>
+      </div>
 
-    <div class="item">
-      <b>4. 客製化任務</b>
-      <span>若有固定時段、固定路線、大量配送、特殊交付規則，可另外討論。</span>
+      <div class="flowStep">
+        <div class="flowNo">3</div>
+        <div class="flowText">
+          <b>企業月結</b>
+          <span>適合固定合作客戶，未來可採月結、對帳明細、統一窗口處理。</span>
+        </div>
+      </div>
+
+      <div class="flowStep">
+        <div class="flowNo">4</div>
+        <div class="flowText">
+          <b>客製化任務</b>
+          <span>若有固定時段、固定路線、大量配送、特殊交付規則，可另外討論。</span>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <div class="sectionTitle">為什麼企業適合用 UBee？</div>
+    <div class="sectionTitle">為什麼企業適合用 <span>UBee？</span></div>
 
     <div class="notice">
-      如果公司一個月跑 10 次文件或樣品，每次來回 40 分鐘，等於行政或業務的工作一直被打斷。UBee 的價值不是單純送東西，而是讓員工回到該做的工作，把外出跑腿交給專門的人處理。
+      <b>UBee 的價值不是單純送東西。</b><br>
+      如果公司一個月跑 10 次文件或樣品，每次來回 40 分鐘，等於行政或業務的工作一直被打斷。
+      UBee 協助把外出跑腿任務交給專門的人處理，讓內部人員回到該做的工作。
     </div>
 
-    <div class="item">
-      <b>✅ 不佔用內部人力</b>
-      <span>不用再臨時叫員工放下工作出去送件。</span>
-    </div>
+    <div class="grid">
+      <div class="item">
+        <b>✅ 不佔用內部人力</b>
+        <span>不用再臨時叫員工放下工作出去送件。</span>
+      </div>
 
-    <div class="item">
-      <b>✅ 任務流程清楚</b>
-      <span>可提供接單、ETA、取件、送達等狀態通知。</span>
-    </div>
+      <div class="item">
+        <b>✅ 任務流程清楚</b>
+        <span>可提供接單、ETA、取件、送達等狀態通知。</span>
+      </div>
 
-    <div class="item">
-      <b>✅ 支援急件與速度分級</b>
-      <span>一般件、快速件、急件、極速件，可依需求選擇。</span>
-    </div>
+      <div class="item">
+        <b>✅ 支援急件與速度分級</b>
+        <span>標準件、快速件、優先件、急件，可依需求選擇。</span>
+      </div>
 
-    <div class="item">
-      <b>✅ 專注商務跑腿</b>
-      <span>定位不是雜項跑腿，而是城市商務任務支援。</span>
+      <div class="item">
+        <b>✅ 專注商務任務</b>
+        <span>定位不是雜項跑腿，而是城市商務任務支援。</span>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <div class="sectionTitle">填寫合作表單</div>
-    <div class="sub">
-      若你是公司、工廠、店家、辦公室或有長期配送需求，請填寫合作表單。UBee 會依你的需求評估合作方式。
-    </div>
+    <div class="sectionTitle">填寫<span>合作表單</span></div>
+    <p class="sub">
+      若你是公司、工廠、店家、辦公室或有長期配送需求，請填寫合作表單。
+      UBee 會依你的需求評估合作方式。
+    </p>
 
-    <button id="formBtn" class="btn btn-green">📄 填寫合作表單</button>
+    <button id="formBtn" class="btn btn-blue">填寫合作表單</button>
 
-    <button class="btn btn-black" onclick="toggle('moreInfo')">📘 查看合作說明</button>
+    <button class="btn btn-dark" onclick="toggle('moreInfo')">查看合作說明</button>
 
     <div id="moreInfo" class="content">
       UBee 可討論的合作方向包含：企業月結、固定路線、固定時段、急件支援、樣品收送、文件配送、臨時行政任務與大量配送需求。<br><br>
       初期合作可以先從單次任務開始，確認流程、速度與服務品質後，再討論長期合作方案。
     </div>
+  </div>
+
+  <div class="footer">
+    <b>UBee 城市任務平台</b><br>
+    以豐原為主要服務起點，其他區域依任務需求評估安排。
   </div>
 
 </div>
@@ -222,7 +651,7 @@ let businessFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6f
 
 async function init(){
   try{
-    const res = await fetch('/api/config');
+    const res = await fetch('/api/config', { cache:'no-store' });
     const cfg = await res.json();
     if(cfg.businessFormUrl) businessFormUrl = cfg.businessFormUrl;
   }catch(e){}
