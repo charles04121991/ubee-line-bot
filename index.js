@@ -1922,7 +1922,7 @@ async function handleTextStep(event, userId, text) {
 
   if (normalized === '主選單') return replyMessages(event.replyToken, [createMainMenuFlex()]);
   if (normalized === '我的資訊' || normalized === '我的') {
-  return replyMessage(event.replyToken, {
+  return client.replyMessage(event.replyToken, {
     type: 'template',
     altText: 'UBee 我的資訊',
     template: {
