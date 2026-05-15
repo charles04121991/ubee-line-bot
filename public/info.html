@@ -23,10 +23,8 @@
   --primary:#ffffff;
   --primaryText:#000000;
 
-  --blue:#3b82f6;
   --green:#22c55e;
   --red:#ef4444;
-  --yellow:#facc15;
 
   --radius:22px;
 }
@@ -150,10 +148,6 @@ body{
   margin:0 0 10px;
 }
 
-.title span{
-  color:var(--white);
-}
-
 .sub{
   font-size:15px;
   color:var(--muted);
@@ -262,10 +256,6 @@ body{
   line-height:1.25;
 }
 
-.sectionTitle span{
-  color:var(--white);
-}
-
 .sectionDesc{
   color:var(--muted);
   font-size:14px;
@@ -344,68 +334,10 @@ body{
   transform:scale(.985);
 }
 
-.btn-white{
-  background:var(--primary);
-  color:var(--primaryText);
-}
-
 .btn-dark{
   background:var(--card2);
   color:var(--white);
   border-color:var(--line2);
-}
-
-.btn-blue{
-  background:var(--primary);
-  color:var(--primaryText);
-}
-
-.input{
-  width:100%;
-  padding:15px 15px;
-  border-radius:16px;
-  border:1px solid var(--line2);
-  background:var(--card2);
-  color:var(--white);
-  font-size:16px;
-  margin-top:12px;
-  outline:none;
-}
-
-.input::placeholder{
-  color:var(--muted2);
-}
-
-.input:focus{
-  border-color:#fff;
-  box-shadow:0 0 0 2px rgba(255,255,255,.12);
-}
-
-.resultBox{
-  display:none;
-  margin-top:14px;
-  padding:15px;
-  border-radius:18px;
-  background:var(--card2);
-  border:1px solid var(--line);
-  line-height:1.8;
-  color:var(--text);
-  font-size:15px;
-}
-
-.resultBox b{
-  color:var(--white);
-}
-
-.resultError{
-  border-color:rgba(239,68,68,.48);
-  background:rgba(239,68,68,.08);
-  color:#ffd1d1;
-}
-
-.resultSuccess{
-  border-color:rgba(34,197,94,.42);
-  background:rgba(34,197,94,.08);
 }
 
 .footer{
@@ -466,7 +398,7 @@ body{
         <span>City Task Platform</span>
       </div>
     </div>
-    <div class="status">INFO CENTER</div>
+    <div class="status">INFO</div>
   </div>
 
   <!-- 主選單 -->
@@ -474,7 +406,7 @@ body{
     <div class="heroBadge">UBee Service</div>
     <h1 class="title">我的資訊</h1>
     <p class="sub">
-      查看取消規則、常見問題、查詢訂單狀態，或申請成為 UBee 城市任務合作夥伴。
+      你可以在這裡查看 UBee 的取消規則與常見問題。
     </p>
 
     <div class="menuGrid">
@@ -494,24 +426,6 @@ body{
         </div>
         <b>常見問題</b>
         <span>了解 UBee 服務內容、付款方式與注意事項</span>
-      </button>
-
-      <button class="menuBtn" onclick="showSection('queryOrder')">
-        <div class="menuBtnTop">
-          <div class="menuIcon">⌕</div>
-          <div class="menuArrow">›</div>
-        </div>
-        <b>查詢訂單</b>
-        <span>輸入訂單編號，查看目前任務狀態</span>
-      </button>
-
-      <button class="menuBtn" onclick="goRiderPage()">
-        <div class="menuBtnTop">
-          <div class="menuIcon">U</div>
-          <div class="menuArrow">›</div>
-        </div>
-        <b>加入合作夥伴</b>
-        <span>申請成為 UBee 城市任務合作夥伴</span>
       </button>
     </div>
   </div>
@@ -590,33 +504,9 @@ body{
     </div>
 
     <div class="item">
-      <b>Q7：可以查詢訂單嗎？</b>
-      <span>可以。請點選「查詢訂單」，輸入訂單編號即可查看目前任務狀態。</span>
-    </div>
-
-    <div class="item">
-      <b>Q8：有開發票或收據嗎？</b>
+      <b>Q7：有開發票或收據嗎？</b>
       <span>目前可提供交易紀錄或收據資訊，暫不開立統一發票。</span>
     </div>
-
-    <button class="btn btn-dark" onclick="showSection('menu')">返回我的資訊</button>
-  </div>
-
-  <!-- 查詢訂單 -->
-  <div id="queryOrder" class="card section">
-    <div class="sectionHeader">
-      <div>
-        <h2 class="sectionTitle">查詢訂單</h2>
-        <p class="sectionDesc">請輸入你的訂單編號，系統會查詢目前任務狀態。</p>
-      </div>
-      <div class="tag">ORDER</div>
-    </div>
-
-    <input id="orderIdInput" class="input" placeholder="例如：UB202604270001" autocomplete="off">
-
-    <button class="btn btn-white" onclick="queryOrder()">查詢訂單</button>
-
-    <div id="orderResult" class="resultBox"></div>
 
     <button class="btn btn-dark" onclick="showSection('menu')">返回我的資訊</button>
   </div>
@@ -638,83 +528,6 @@ function showSection(id){
   if(target){
     target.classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-}
-
-function goRiderPage(){
-  window.location.href = '/rider.html';
-}
-
-function setResult(message, type){
-  const result = document.getElementById('orderResult');
-  result.style.display = 'block';
-  result.classList.remove('resultError', 'resultSuccess');
-
-  if(type === 'error'){
-    result.classList.add('resultError');
-  }
-
-  if(type === 'success'){
-    result.classList.add('resultSuccess');
-  }
-
-  result.innerHTML = message;
-}
-
-function safeText(value){
-  if(value === null || value === undefined || value === ''){
-    return '-';
-  }
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-async function queryOrder(){
-  const input = document.getElementById('orderIdInput');
-  const orderId = input.value.trim().toUpperCase();
-
-  if(!orderId){
-    setResult('請先輸入訂單編號。', 'error');
-    return;
-  }
-
-  setResult('查詢中，請稍候...', '');
-
-  try{
-    const res = await fetch('/api/orders/' + encodeURIComponent(orderId), {
-      method:'GET',
-      headers:{
-        'Accept':'application/json'
-      }
-    });
-
-    const data = await res.json();
-
-    if(!data.success){
-      setResult(safeText(data.error || '查無此訂單，請確認訂單編號是否正確。'), 'error');
-      return;
-    }
-
-    const order = data.order || {};
-
-    setResult(`
-      <b>訂單編號：</b>${safeText(order.id)}<br>
-      <b>目前狀態：</b>${safeText(order.statusLabel || order.status)}<br>
-      <b>配送速度：</b>${safeText(order.speedLabel)}<br>
-      <b>取件地址：</b>${safeText(order.pickupAddress)}<br>
-      <b>送達地址：</b>${safeText(order.dropoffAddress)}<br>
-      <b>ETA：</b>${order.etaMinutes ? safeText(order.etaMinutes + ' 分鐘') : '尚未設定'}<br>
-      <b>付款狀態：</b>${order.isPaid ? '已付款' : '尚未付款'}<br>
-      <b>付款方式：</b>${safeText(order.paymentMethodLabel || '未選擇')}<br>
-      <b>目前總金額：</b>NT$${Math.round(Number(order.total || 0))}
-    `, 'success');
-
-  }catch(e){
-    setResult('查詢失敗，請稍後再試。', 'error');
   }
 }
 </script>
