@@ -1535,11 +1535,18 @@ async function handlePostback(event) {
       await client.pushMessage(rider.lineUserId, {
         type: 'text',
         text:
-          `✅ UBee 合作夥伴申請已審核通過！\n\n` +
-          `歡迎加入 UBee 城市任務平台。\n\n` +
-          `請加入 UBee｜騎手 SOP 教學區：\n` +
+          `🎉 恭喜您通過 UBee 騎士審核！\n\n` +
+          `歡迎加入 UBee 城市任務平台 🐝\n\n` +
+          `接下來請先加入「UBee｜騎士 SOP 教學區」：\n\n` +
           `https://line.me/ti/g/Ut3XpxvHPN\n\n` +
-          `加入後請依照群組內教學完成接單流程與任務規範確認。`
+          `加入後請先閱讀記事本上內容：\n\n` +
+          `1. 接單流程\n` +
+          `2. 任務操作方式\n` +
+          `3. 配送注意事項\n` +
+          `4. 異常回報規範\n` +
+          `5. 收入與結算說明\n\n` +
+          `完成教學後，再開始接收任務。\n\n` +
+          `— UBee 城市任務平台`
       });
     }
     
