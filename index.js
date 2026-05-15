@@ -846,8 +846,7 @@ function createInfoMenuFlex() {
     [
       createActionButton('取消規則', 'submenu=cancelRules'),
       createActionButton('常見問題', 'submenu=faq', 'secondary'),
-      createActionButton('查詢訂單', 'submenu=queryOrder', 'secondary'),
-      createUriButton('加入夥伴', PARTNER_FORM_URL, 'secondary'),
+      createActionButton('查詢訂單', 'submenu=queryOrder', 'secondary')
     ]
   ));
 }
@@ -1411,7 +1410,7 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
       createTextMessage(`✅ 已收到你的付款通知。\n\n訂單編號：${order.id}\n🚀 系統正在為你配對騎手，請稍候...`)
     );
 
-    // 客人確認付款後：直接派單到騎手群；辦公室審核群只收到管理/強制取消卡，不需要管理員確認付款。
+    // 客人確認付款後：直接派單到騎士群；辦公室審核群只收到管理/強制取消卡，不需要管理員確認付款。
     await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
     await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
 
