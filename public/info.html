@@ -85,10 +85,6 @@ body{
   background:#d9dee8;
   color:#111;
 }
-.btn-black{
-  background:var(--black);
-  color:white;
-}
 .section{
   display:none;
 }
@@ -127,7 +123,6 @@ body{
     <button class="btn btn-green" onclick="showSection('cancelRules')">取消規則</button>
     <button class="btn btn-gray" onclick="showSection('faq')">常見問題</button>
     <button class="btn btn-gray" onclick="showSection('queryOrder')">查詢訂單</button>
-    <button class="btn btn-gray" onclick="goRider()">加入夥伴</button>
   </div>
 
   <div id="cancelRules" class="card section">
@@ -228,10 +223,6 @@ function showSection(id){
     target.classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-}
-
-function goRider(){
-  location.href = '/rider.html';
 }
 
 async function queryOrder(){
