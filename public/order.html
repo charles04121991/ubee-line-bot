@@ -17,8 +17,8 @@
       --muted2:#777;
       --line:#2a2a2a;
       --line2:#3a3a3a;
-      --yellow:#ffd21f;
-      --yellow2:#f3bc00;
+      --accent:#fff;
+      --accentText:#000;
       --primary:#fff;
       --primaryText:#000;
       --green:#22c55e;
@@ -73,7 +73,7 @@
     }
 
     .brand span{
-      color:var(--yellow);
+      color:var(--accent);
     }
 
     .brand-sub{
@@ -93,19 +93,19 @@
     }
 
     .hero-card{
-      position:relative;
-      overflow:hidden;
-      border-radius:26px;
-      padding:24px 20px;
-      margin:10px 0 18px;
-      background:
-        radial-gradient(circle at 85% 20%, rgba(255,255,255,.34), transparent 34%),
-        linear-gradient(135deg,#ffe680,#ffd21f 42%,#f1b900);
-      color:#111;
-      min-height:210px;
-      border:1px solid rgba(255,255,255,.15);
-      box-shadow:0 18px 45px rgba(255,210,31,.12);
-    }
+  position:relative;
+  overflow:hidden;
+  border-radius:26px;
+  padding:24px 20px;
+  margin:10px 0 18px;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(255,255,255,.16), transparent 34%),
+    linear-gradient(135deg,#2a2a2a,#111 45%,#050505);
+  color:#fff;
+  min-height:210px;
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 18px 45px rgba(255,255,255,.05);
+}
 
     .hero-kicker{
       font-size:13px;
@@ -126,30 +126,29 @@
     }
 
     .hero-sub{
-      font-size:14px;
-      font-weight:900;
-      color:#333;
-      line-height:1.6;
-      margin-bottom:18px;
-      position:relative;
-      z-index:2;
-    }
-
+  font-size:14px;
+  font-weight:900;
+  color:#cfcfcf;
+  line-height:1.6;
+  margin-bottom:18px;
+  position:relative;
+  z-index:2;
+}
     .hero-btn{
-      display:inline-flex;
-      align-items:center;
-      gap:10px;
-      border:none;
-      background:#111;
-      color:#fff;
-      border-radius:999px;
-      padding:12px 20px;
-      font-size:16px;
-      font-weight:1000;
-      font-family:inherit;
-      position:relative;
-      z-index:2;
-    }
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  border:none;
+  background:#fff;
+  color:#000;
+  border-radius:999px;
+  padding:12px 20px;
+  font-size:16px;
+  font-weight:1000;
+  font-family:inherit;
+  position:relative;
+  z-index:2;
+}
 
     .hero-illust{
       position:absolute;
@@ -189,9 +188,9 @@
     }
 
     .category-tab.active{
-      background:var(--yellow);
-      color:#111;
-    }
+  background:#fff;
+  color:#000;
+}
 
     .section-label{
       font-size:18px;
@@ -218,10 +217,10 @@
     }
 
     .service-item.active{
-      border-color:var(--yellow);
-      box-shadow:0 0 0 1px rgba(255,210,31,.25);
-      background:linear-gradient(180deg,#221f12,#111);
-    }
+  border-color:#fff;
+  box-shadow:0 0 0 1px rgba(255,255,255,.2);
+  background:linear-gradient(180deg,#232323,#111);
+}
 
     .service-item-icon{
       font-size:28px;
@@ -393,7 +392,7 @@
     }
 
     .speed-card.active{
-      border-color:var(--yellow);
+      border-color:var(--accent);
       background:#232115;
     }
 
@@ -425,8 +424,8 @@
     }
 
     .speed-card.active .speed-check{
-      background:var(--yellow);
-      border-color:var(--yellow);
+      background:var(--accent);
+      border-color:var(--accent);
     }
 
     .speed-desc{
@@ -546,7 +545,7 @@
     .confirm-box input{
       width:auto;
       margin-top:4px;
-      accent-color:var(--yellow);
+      accent-color:var(--accent);
       transform:scale(1.2);
     }
 
@@ -566,14 +565,14 @@
       width:104px;
       height:104px;
       border-radius:999px;
-      border:2px solid var(--yellow);
+      border:2px solid var(--accent);
       display:flex;
       align-items:center;
       justify-content:center;
       margin:20px auto 28px;
       font-size:54px;
       font-weight:1000;
-      color:var(--yellow);
+      color:var(--accent);
       box-shadow:0 0 45px rgba(255,210,31,.12);
     }
 
@@ -646,9 +645,9 @@
     }
 
     .btn-primary{
-      background:var(--yellow);
-      color:#111;
-    }
+  background:#fff;
+  color:#000;
+}
 
     .btn-secondary{
       background:#151515;
