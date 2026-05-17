@@ -1606,9 +1606,43 @@ async function handlePostback(event) {
 if (data.startsWith('business_approve:')) {
   const businessId = data.split(':')[1];
 
+  const doc = await db
+    .collection('businessApplications')
+    .doc(businessId)
+    .get();
+
+  if (!doc.exists) {
+    return replyText(event.replyToken, '找不到商務合作申請資料');
+  }
+
+  const business = doc.data();
+
+  await db.collection('businessApplications')
+    .doc(businessId)
+    .update({
+      status: 'approved',
+      approvedAt: Date.now(),
+      approvedBy: userId
+    });
+
+  if (business.lineUserId) {
+    await client.pushMessage(business.lineUserId, {
+      type: 'text',
+      text:
+`🎉 您的 UBee 商務合作申請已通過初步審核
+
+公司 / 店家：${business.companyName}
+
+UBee 辦公室將會再依照您的需求，
+主動與您聯繫並安排後續合作內容。
+
+感謝您使用 UBee 城市任務平台 🐝`
+    });
+  }
+
   return replyText(
     event.replyToken,
-    `已收到商務合作審核通過指令：${businessId}`
+    `已通過商務合作申請：${businessId}`
   );
 }
 
