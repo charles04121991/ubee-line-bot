@@ -791,9 +791,12 @@ document.getElementById('businessForm').addEventListener('submit', async functio
 });
 (async () => {
   try {
-    await liff.init({
-      liffId: '你的LIFF_ID'
-    });
+    const configRes = await fetch('/api/config');
+const config = await configRes.json();
+
+await liff.init({
+  liffId: config.liffId
+});
 
     if (liff.isLoggedIn()) {
       const profile = await liff.getProfile();
