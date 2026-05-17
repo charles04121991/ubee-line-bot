@@ -1602,6 +1602,15 @@ async function handlePostback(event) {
   console.log('userId:', userId);
   console.log('source:', event.source);
 
+if (data.startsWith('business_approve:')) {
+  const businessId = data.split(':')[1];
+
+  return replyText(
+    event.replyToken,
+    `已收到商務合作審核通過指令：${businessId}`
+  );
+}
+
   if (data === 'menu=info') return replyMessages(event.replyToken, [createInfoMenuFlex()]);
   if (data === 'submenu=cancelRules') return replyMessages(event.replyToken, [createCancelRulesFlex()]);
   if (data === 'submenu=faq') return replyMessages(event.replyToken, [createFaqFlex()]);
