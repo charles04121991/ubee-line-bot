@@ -3,48 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee｜商務合作中心</title>
+<title>UBee｜企業 / 店家合作申請</title>
 
 <style>
 :root{
-  --bg:#000000;
-  --card:#111111;
-  --card2:#181818;
-  --card3:#1f1f1f;
-
-  --white:#ffffff;
-  --text:#f2f2f2;
-  --muted:#a6a6a6;
-  --muted2:#737373;
-
-  --line:#2a2a2a;
-  --line2:#333333;
-
-  --primary:#ffffff;
-  --primaryText:#000000;
-
-  --blue:#3b82f6;
+  --bg:#000;
+  --card:#0f0f0f;
+  --card2:#151515;
+  --white:#fff;
+  --text:#f4f4f4;
+  --muted:#a5a5a5;
+  --muted2:#707070;
+  --line:rgba(255,255,255,.10);
+  --line2:rgba(255,255,255,.16);
+  --primary:#fff;
+  --primaryText:#000;
   --green:#22c55e;
   --red:#ef4444;
-  --yellow:#facc15;
-
-  --radius:22px;
 }
 
-*{
-  box-sizing:border-box;
-  -webkit-tap-highlight-color:transparent;
-}
-
-html{
-  scroll-behavior:smooth;
-}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
 
 body{
   margin:0;
   font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-  background:var(--bg);
-  color:var(--white);
+  background:#000;
+  color:#fff;
   min-height:100vh;
   overflow-x:hidden;
 }
@@ -53,89 +38,73 @@ body{
   width:100%;
   max-width:760px;
   margin:0 auto;
-  padding:22px 16px 42px;
+  padding:24px 18px 44px;
 }
 
 .topbar{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:12px;
   margin-bottom:22px;
 }
 
 .brand{
   display:flex;
   align-items:center;
-  gap:11px;
+  gap:12px;
 }
 
 .logoU{
-  width:44px;
-  height:44px;
-  border-radius:13px;
+  width:46px;
+  height:46px;
+  border-radius:14px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:27px;
+  font-size:28px;
   font-weight:1000;
   color:#000;
   background:#fff;
 }
 
-.brandText{
-  line-height:1.15;
-}
-
 .brandText b{
   display:block;
-  font-size:21px;
-  letter-spacing:.2px;
+  font-size:26px;
+  font-weight:1000;
 }
 
 .brandText span{
   display:block;
   color:var(--muted);
   font-size:12px;
-  letter-spacing:1.6px;
+  letter-spacing:2px;
   text-transform:uppercase;
-}
-
-.statusPill{
-  flex:0 0 auto;
-  color:var(--text);
-  font-size:12px;
-  font-weight:800;
-  border:1px solid var(--line2);
-  border-radius:999px;
-  padding:8px 10px;
-  background:var(--card2);
-}
-
-.hero,
-.card{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:20px;
-  margin-bottom:16px;
+  font-weight:900;
 }
 
 .hero{
-  padding:22px 18px 20px;
-  border-radius:26px;
+  position:relative;
+  overflow:hidden;
+  border-radius:28px;
+  padding:26px 24px;
+  margin-bottom:22px;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255,255,255,.16), transparent 32%),
+    linear-gradient(135deg,#242424,#101010 52%,#050505);
+  border:1px solid var(--line2);
+  box-shadow:0 18px 45px rgba(255,255,255,.04);
 }
 
 .heroBadge{
   display:inline-flex;
   align-items:center;
-  gap:8px;
+  gap:9px;
   color:var(--muted);
   font-size:12px;
-  font-weight:900;
-  letter-spacing:1.6px;
+  font-weight:1000;
+  letter-spacing:2px;
   text-transform:uppercase;
-  margin-bottom:12px;
+  margin-bottom:16px;
 }
 
 .heroBadge::before{
@@ -147,242 +116,368 @@ body{
 }
 
 .title{
-  font-size:32px;
+  font-size:42px;
+  line-height:1.1;
+  margin:0 0 12px;
   font-weight:1000;
-  line-height:1.18;
-  letter-spacing:.2px;
-  margin:0 0 10px;
-}
-
-.title span{
-  color:var(--white);
+  letter-spacing:-.8px;
 }
 
 .sub{
-  font-size:15px;
-  color:var(--muted);
+  font-size:16px;
+  color:#cfcfcf;
   line-height:1.8;
-  margin:0;
+  margin:0 0 20px;
+  font-weight:800;
 }
 
-.metricRow{
-  display:grid;
-  grid-template-columns:1fr;
+.heroBtn{
+  display:inline-flex;
+  align-items:center;
   gap:10px;
-  margin-top:18px;
+  border:0;
+  background:#fff;
+  color:#000;
+  border-radius:999px;
+  padding:13px 22px;
+  font-size:16px;
+  font-weight:1000;
+  font-family:inherit;
+  cursor:pointer;
 }
 
-.metric{
+.benefits{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:1px;
+  overflow:hidden;
   border:1px solid var(--line);
-  border-radius:18px;
-  padding:14px;
-  background:var(--card2);
+  border-radius:22px;
+  background:var(--line);
+  margin-top:22px;
 }
 
-.metric b{
-  display:block;
-  font-size:18px;
-  color:var(--white);
-  margin-bottom:5px;
+.benefit{
+  background:rgba(12,12,12,.78);
+  padding:14px 8px;
+  text-align:center;
 }
 
-.metric span{
-  display:block;
-  font-size:13px;
+.benefitIcon{
+  font-size:24px;
+  margin-bottom:6px;
+}
+
+.benefitTitle{
+  font-size:14px;
+  font-weight:1000;
+}
+
+.benefitText{
   color:var(--muted);
-  line-height:1.6;
+  font-size:12px;
+  line-height:1.45;
+  margin-top:4px;
+  font-weight:800;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:28px;
+  padding:22px;
+  margin-bottom:18px;
 }
 
 .sectionTitle{
-  font-size:24px;
+  font-size:26px;
   font-weight:1000;
-  line-height:1.3;
-  margin:0 0 14px;
-  letter-spacing:.2px;
-}
-
-.sectionTitle span{
-  color:var(--white);
+  margin:0 0 10px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--line);
 }
 
 .sectionDesc{
   color:var(--muted);
-  font-size:14px;
+  font-size:15px;
   line-height:1.75;
-  margin:-4px 0 14px;
+  margin:0 0 18px;
+  font-weight:800;
 }
 
-.grid{
+.typeGrid{
   display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
+  grid-template-columns:repeat(2,1fr);
+  gap:14px;
 }
 
-.item{
-  background:var(--card2);
+.typeCard{
+  position:relative;
   border:1px solid var(--line);
-  border-radius:18px;
-  padding:15px;
-  line-height:1.75;
+  background:#111;
+  border-radius:22px;
+  padding:20px;
+  cursor:pointer;
 }
 
-.item b{
-  display:block;
-  font-size:16px;
-  margin-bottom:5px;
-  color:var(--white);
+.typeCard.active{
+  border-color:#fff;
+  box-shadow:0 0 0 1px rgba(255,255,255,.2);
 }
 
-.item span{
-  display:block;
-  font-size:14px;
-  color:var(--muted);
-}
-
-.notice{
-  background:rgba(34,197,94,.08);
-  border:1px solid rgba(34,197,94,.42);
-  border-radius:18px;
-  padding:15px;
-  line-height:1.8;
-  font-size:14px;
-  color:var(--text);
+.typeIcon{
+  font-size:30px;
   margin-bottom:12px;
 }
 
-.notice b{
-  color:#bfffd7;
-}
-
-.btn{
-  width:100%;
-  padding:15px 16px;
-  border-radius:18px;
-  border:1px solid transparent;
-  font-size:16px;
+.typeTitle{
+  font-size:18px;
   font-weight:1000;
-  margin-top:10px;
-  cursor:pointer;
-  transition:.16s ease;
-  font-family:inherit;
+  margin-bottom:6px;
 }
 
-.btn:active{
-  transform:scale(.985);
+.typeDesc{
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.65;
+  font-weight:800;
 }
 
-.btn-white{
-  background:var(--primary);
-  color:var(--primaryText);
+.checkDot{
+  position:absolute;
+  top:16px;
+  right:16px;
+  width:22px;
+  height:22px;
+  border-radius:7px;
+  border:1px solid var(--line2);
 }
 
-.btn-dark{
-  background:var(--card2);
-  color:var(--white);
-  border-color:var(--line2);
+.typeCard.active .checkDot{
+  background:#fff;
 }
 
-.content{
-  display:none;
-  margin-top:14px;
-  line-height:1.85;
-  color:var(--text);
-  font-size:15px;
-  background:var(--card2);
+.fieldGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+
+.field{
+  background:#111;
   border:1px solid var(--line);
-  border-radius:18px;
-  padding:15px;
+  border-radius:20px;
+  padding:15px 16px;
+  min-height:88px;
+}
+
+.field.full{
+  grid-column:1 / -1;
+}
+
+label{
+  display:block;
+  font-size:15px;
+  font-weight:1000;
+  margin:0 0 8px;
+  color:#fff;
+}
+
+.required{
+  color:var(--red);
+  margin-left:4px;
+}
+
+input,select,textarea{
+  width:100%;
+  min-height:36px;
+  padding:0;
+  border:0;
+  font-size:17px;
+  background:transparent;
+  color:#fff;
+  outline:none;
+  font-family:inherit;
+  font-weight:900;
+}
+
+input::placeholder,
+textarea::placeholder{
+  color:var(--muted2);
+}
+
+select{
+  appearance:none;
+  -webkit-appearance:none;
+}
+
+select:invalid{
+  color:var(--muted2);
+}
+
+textarea{
+  min-height:96px;
+  resize:vertical;
+  line-height:1.6;
+}
+
+.field:focus-within{
+  border-color:#fff;
+  box-shadow:0 0 0 2px rgba(255,255,255,.10);
 }
 
 .flow{
   display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
+  gap:14px;
 }
 
 .flowStep{
   display:flex;
-  gap:12px;
+  gap:14px;
   align-items:flex-start;
   border:1px solid var(--line);
-  border-radius:18px;
-  padding:14px;
-  background:var(--card2);
+  border-radius:20px;
+  padding:16px;
+  background:#111;
 }
 
 .flowNo{
-  flex:0 0 auto;
   width:34px;
   height:34px;
   border-radius:12px;
   display:flex;
   align-items:center;
   justify-content:center;
-  color:#000;
   background:#fff;
+  color:#000;
   font-weight:1000;
+  flex:0 0 34px;
 }
 
 .flowText b{
   display:block;
-  color:var(--white);
-  margin-bottom:3px;
+  font-size:16px;
+  margin-bottom:4px;
 }
 
 .flowText span{
-  display:block;
   color:var(--muted);
   font-size:14px;
   line-height:1.6;
+  font-weight:800;
+}
+
+.note{
+  font-size:15px;
+  color:var(--muted);
+  line-height:1.85;
+  margin-top:22px;
+  background:#111;
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:16px;
+  font-weight:800;
+}
+
+.submitBtn{
+  width:100%;
+  min-height:68px;
+  border:0;
+  border-radius:22px;
+  background:#fff;
+  color:#000;
+  font-size:22px;
+  font-weight:1000;
+  margin-top:26px;
+  cursor:pointer;
+  font-family:inherit;
+}
+
+.submitBtn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.successBox,.errorBox{
+  display:none;
+  border-radius:18px;
+  padding:15px;
+  line-height:1.75;
+  margin-top:18px;
+  font-size:15px;
+  font-weight:800;
+}
+
+.successBox{
+  background:rgba(34,197,94,.08);
+  border:1px solid rgba(34,197,94,.42);
+  color:#c9ffd9;
+}
+
+.errorBox{
+  background:rgba(239,68,68,.08);
+  border:1px solid rgba(239,68,68,.42);
+  color:#ffd1d1;
 }
 
 .footer{
   color:var(--muted2);
   text-align:center;
-  font-size:12px;
-  line-height:1.7;
-  padding:12px 0 0;
+  font-size:13px;
+  line-height:1.8;
+  padding:14px 0 0;
+  font-weight:800;
 }
 
 .footer b{
   color:var(--muted);
 }
 
-@media(min-width:560px){
-  .grid{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .metricRow{
-    grid-template-columns:1fr 1fr 1fr;
-  }
-
-  .flow{
-    grid-template-columns:1fr 1fr;
-  }
-
+@media(max-width:640px){
   .container{
-    padding-top:30px;
+    padding:20px 14px 40px;
+  }
+
+  .title{
+    font-size:36px;
+  }
+
+  .benefits{
+    grid-template-columns:repeat(2,1fr);
+  }
+
+  .typeGrid,
+  .fieldGrid{
+    grid-template-columns:1fr;
+  }
+
+  .card{
+    padding:20px;
+    border-radius:26px;
   }
 }
 
 @media(max-width:420px){
+  .logoU{
+    width:42px;
+    height:42px;
+    font-size:26px;
+  }
+
+  .brandText b{
+    font-size:24px;
+  }
+
+  .brandText span{
+    font-size:11px;
+  }
+
   .title{
-    font-size:30px;
+    font-size:33px;
   }
 
-  .sectionTitle{
-    font-size:22px;
-  }
-
-  .card,
-  .hero{
-    padding:18px;
-    border-radius:20px;
-  }
-
-  .statusPill{
-    display:none;
+  input,select,textarea{
+    font-size:16px;
   }
 }
 </style>
@@ -400,180 +495,298 @@ body{
         <span>City Task Platform</span>
       </div>
     </div>
-    <div class="statusPill">BUSINESS</div>
   </div>
 
   <section class="hero">
     <div class="heroBadge">UBee Business</div>
-    <h1 class="title">商務合作中心</h1>
+    <h1 class="title">企業 / 店家<br>合作申請</h1>
     <p class="sub">
-      專為公司、工廠、辦公室、店家與工作室設計的城市任務支援服務。
-      當你們需要有人跑一趟、送文件、送樣品、送公司物品，UBee 可以協助即時處理。
+      文件急送、物品配送、商務支援、固定任務需求，UBee 協助企業與店家把城市任務交給專人處理。
     </p>
+    <button class="heroBtn" type="button" onclick="document.getElementById('businessFormCard').scrollIntoView({behavior:'smooth'})">
+      立即填寫合作需求 <span>›</span>
+    </button>
 
-    <div class="metricRow">
-      <div class="metric">
-        <b>文件急送</b>
-        <span>合約、發票、報價單與公司文件配送</span>
+    <div class="benefits">
+      <div class="benefit">
+        <div class="benefitIcon">🏢</div>
+        <div class="benefitTitle">專業配送</div>
+        <div class="benefitText">專人服務</div>
       </div>
-      <div class="metric">
-        <b>商務任務</b>
-        <span>樣品、零件、物品轉交與臨時支援</span>
+      <div class="benefit">
+        <div class="benefitIcon">🛡️</div>
+        <div class="benefitTitle">安全可靠</div>
+        <div class="benefitText">安心託付</div>
       </div>
-      <div class="metric">
-        <b>流程通知</b>
-        <span>接單、ETA、取件、送達狀態回報</span>
+      <div class="benefit">
+        <div class="benefitIcon">⏱️</div>
+        <div class="benefitTitle">彈性配合</div>
+        <div class="benefitText">即時支援</div>
+      </div>
+      <div class="benefit">
+        <div class="benefitIcon">📋</div>
+        <div class="benefitTitle">清楚流程</div>
+        <div class="benefitText">需求審核</div>
       </div>
     </div>
   </section>
 
   <div class="card">
-    <div class="sectionTitle">適合哪些需求？</div>
-    <div class="sectionDesc">
-      UBee 適合需要穩定、清楚、可追蹤任務流程的企業與店家。
-    </div>
+    <div class="sectionTitle">合作類型</div>
+    <div class="sectionDesc">請選擇你的主要合作需求類型，可複選。</div>
 
-    <div class="grid">
-      <div class="item">
-        <b>📄 文件急送</b>
-        <span>合約、發票、報價單、公司文件、客戶資料送達。</span>
+    <div class="typeGrid">
+      <div class="typeCard" data-type="企業文件急送" onclick="toggleType(this)">
+        <div class="checkDot"></div>
+        <div class="typeIcon">🏢</div>
+        <div class="typeTitle">企業文件急送</div>
+        <div class="typeDesc">合約、標書、重要文件、急件即時配送。</div>
       </div>
 
-      <div class="item">
-        <b>📦 樣品收送</b>
-        <span>工廠、公司、客戶之間的樣品、零件、小型物件配送。</span>
+      <div class="typeCard" data-type="店家物品配送" onclick="toggleType(this)">
+        <div class="checkDot"></div>
+        <div class="typeIcon">📦</div>
+        <div class="typeTitle">店家物品配送</div>
+        <div class="typeDesc">商品、備料、包裹等配送服務。</div>
       </div>
 
-      <div class="item">
-        <b>🏢 臨時商務任務</b>
-        <span>臨時行政支援、文件代送、物品轉交、現場協助。</span>
+      <div class="typeCard" data-type="固定商務任務" onclick="toggleType(this)">
+        <div class="checkDot"></div>
+        <div class="typeIcon">📄</div>
+        <div class="typeTitle">固定商務任務</div>
+        <div class="typeDesc">長期配合、固定路線、定期配送需求。</div>
       </div>
 
-      <div class="item">
-        <b>🗓 長期固定合作</b>
-        <span>每週、每月固定配送需求，可討論固定流程與合作方式。</span>
+      <div class="typeCard" data-type="臨時支援需求" onclick="toggleType(this)">
+        <div class="checkDot"></div>
+        <div class="typeIcon">💼</div>
+        <div class="typeTitle">臨時支援需求</div>
+        <div class="typeDesc">臨時突發需求、彈性調度支援。</div>
       </div>
     </div>
   </div>
 
+  <div class="card" id="businessFormCard">
+    <form id="businessForm">
+
+      <div class="sectionTitle">基本資料</div>
+      <div class="sectionDesc">請填寫公司 / 店家與聯絡人基本資訊。</div>
+
+      <div class="fieldGrid">
+        <div class="field full">
+          <label>公司 / 店家名稱<span class="required">*</span></label>
+          <input id="companyName" placeholder="請輸入公司或店家名稱" required>
+        </div>
+
+        <div class="field">
+          <label>聯絡人姓名<span class="required">*</span></label>
+          <input id="contactName" placeholder="請輸入聯絡人姓名" required>
+        </div>
+
+        <div class="field">
+          <label>手機號碼<span class="required">*</span></label>
+          <input id="phone" type="tel" placeholder="例如：0912345678" required>
+        </div>
+
+        <div class="field">
+          <label>LINE ID<span class="required">*</span></label>
+          <input id="lineId" placeholder="請輸入 LINE ID" required>
+        </div>
+
+        <div class="field">
+          <label>所在區域<span class="required">*</span></label>
+          <input id="district" placeholder="例如：台中市北屯區" required>
+        </div>
+      </div>
+
+      <div class="sectionTitle">需求資料</div>
+      <div class="sectionDesc">請提供合作需求，方便 UBee 初步評估合作方式。</div>
+
+      <div class="fieldGrid">
+        <div class="field">
+          <label>合作需求類型<span class="required">*</span></label>
+          <select id="needType" required>
+            <option value="">請選擇主要合作需求類型</option>
+            <option value="企業文件急送">企業文件急送</option>
+            <option value="店家物品配送">店家物品配送</option>
+            <option value="固定商務任務">固定商務任務</option>
+            <option value="臨時支援需求">臨時支援需求</option>
+            <option value="其他需求">其他需求</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>預估需求頻率<span class="required">*</span></label>
+          <select id="frequency" required>
+            <option value="">請選擇預估需求頻率</option>
+            <option value="偶爾需要">偶爾需要</option>
+            <option value="每週 1-2 次">每週 1-2 次</option>
+            <option value="每週 3 次以上">每週 3 次以上</option>
+            <option value="每日固定需求">每日固定需求</option>
+            <option value="尚不確定">尚不確定</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <label>主要配送區域<span class="required">*</span></label>
+          <input id="deliveryArea" placeholder="例如：台中市北區、西區、北屯區" required>
+        </div>
+
+        <div class="field full">
+          <label>備註說明</label>
+          <textarea id="note" placeholder="請簡單描述您的需求內容、特殊注意事項、固定時段或固定路線等..."></textarea>
+        </div>
+      </div>
+
+      <div class="note">
+        ※ 送出後會傳送到 UBee 辦公室審核群組，由 UBee 進行人工評估與後續聯繫。
+      </div>
+
+      <button id="submitBtn" class="submitBtn" type="submit">送出合作需求</button>
+
+      <div id="successBox" class="successBox"></div>
+      <div id="errorBox" class="errorBox"></div>
+
+    </form>
+  </div>
+
   <div class="card">
-    <div class="sectionTitle">合作方式</div>
-    <div class="sectionDesc">
-      可從單次任務開始，也可以依照企業需求建立長期合作流程。
-    </div>
+    <div class="sectionTitle">合作流程說明</div>
+    <div class="sectionDesc">簡單四步驟，快速開始合作。</div>
 
     <div class="flow">
       <div class="flowStep">
         <div class="flowNo">1</div>
         <div class="flowText">
-          <b>單次任務合作</b>
-          <span>適合臨時文件、樣品或物品收送。每次依距離、時間與速度選項計價。</span>
+          <b>提交需求</b>
+          <span>填寫合作申請表，送出您的合作需求。</span>
         </div>
       </div>
 
       <div class="flowStep">
         <div class="flowNo">2</div>
         <div class="flowText">
-          <b>長期企業配合</b>
-          <span>適合每月有多次配送需求的公司，減少員工外出跑腿時間。</span>
+          <b>專人聯繫</b>
+          <span>UBee 專人與您聯繫，了解詳細需求。</span>
         </div>
       </div>
 
       <div class="flowStep">
         <div class="flowNo">3</div>
         <div class="flowText">
-          <b>企業月結</b>
-          <span>適合固定合作客戶，未來可採月結、對帳明細、統一窗口處理。</span>
+          <b>報價確認</b>
+          <span>依需求提供合作方式與任務流程。</span>
         </div>
       </div>
 
       <div class="flowStep">
         <div class="flowNo">4</div>
         <div class="flowText">
-          <b>客製化任務</b>
-          <span>若有固定時段、固定路線、大量配送、特殊交付規則，可另外討論。</span>
+          <b>開始合作</b>
+          <span>確認合作後，開始安排任務服務。</span>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="sectionTitle">為什麼企業適合用 UBee？</div>
-
-    <div class="notice">
-      <b>UBee 的價值不是單純送東西。</b><br>
-      如果公司一個月跑 10 次文件或樣品，每次來回 40 分鐘，等於行政或業務的工作一直被打斷。
-      UBee 協助把外出跑腿任務交給專門的人處理，讓內部人員回到該做的工作。
-    </div>
-
-    <div class="grid">
-      <div class="item">
-        <b>✅ 不佔用內部人力</b>
-        <span>不用再臨時叫員工放下工作出去送件。</span>
-      </div>
-
-      <div class="item">
-        <b>✅ 任務流程清楚</b>
-        <span>可提供接單、ETA、取件、送達等狀態通知。</span>
-      </div>
-
-      <div class="item">
-        <b>✅ 支援急件與速度分級</b>
-        <span>標準件、快速件、優先件、急件，可依需求選擇。</span>
-      </div>
-
-      <div class="item">
-        <b>✅ 專注商務任務</b>
-        <span>定位不是雜項跑腿，而是城市商務任務支援。</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="sectionTitle">填寫合作表單</div>
-    <p class="sub">
-      若你是公司、工廠、店家、辦公室或有長期配送需求，請填寫合作表單。
-      UBee 會依你的需求評估合作方式。
-    </p>
-
-    <button id="formBtn" class="btn btn-white">填寫合作表單</button>
-
-    <button class="btn btn-dark" onclick="toggle('moreInfo')">查看合作說明</button>
-
-    <div id="moreInfo" class="content">
-      UBee 可討論的合作方向包含：企業月結、固定路線、固定時段、急件支援、樣品收送、文件配送、臨時行政任務與大量配送需求。<br><br>
-      初期合作可以先從單次任務開始，確認流程、速度與服務品質後，再討論長期合作方案。
-    </div>
-  </div>
-
   <div class="footer">
     <b>UBee 城市任務平台</b><br>
-    以豐原為主要服務起點，其他區域依任務需求評估安排。
+    企業 / 店家合作申請資料僅供合作聯繫與服務評估使用。
   </div>
 
 </div>
 
 <script>
-let businessFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform';
+let selectedTypes = [];
 
-async function init(){
+function toggleType(el){
+  const type = el.dataset.type;
+
+  if(el.classList.contains('active')){
+    el.classList.remove('active');
+    selectedTypes = selectedTypes.filter(t => t !== type);
+  }else{
+    el.classList.add('active');
+    selectedTypes.push(type);
+  }
+
+  if(selectedTypes.length > 0){
+    document.getElementById('needType').value = selectedTypes[0];
+  }
+}
+
+document.getElementById('businessForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+
+  const submitBtn = document.getElementById('submitBtn');
+  const successBox = document.getElementById('successBox');
+  const errorBox = document.getElementById('errorBox');
+
+  successBox.style.display = 'none';
+  errorBox.style.display = 'none';
+  successBox.innerHTML = '';
+  errorBox.innerHTML = '';
+
+  const companyName = document.getElementById('companyName').value.trim();
+  const contactName = document.getElementById('contactName').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const lineId = document.getElementById('lineId').value.trim();
+  const district = document.getElementById('district').value.trim();
+  const needType = document.getElementById('needType').value;
+  const frequency = document.getElementById('frequency').value;
+  const deliveryArea = document.getElementById('deliveryArea').value.trim();
+  const note = document.getElementById('note').value.trim();
+
+  if(!companyName || !contactName || !phone || !lineId || !district || !needType || !frequency || !deliveryArea){
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請完整填寫所有必填資料。';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerText = '送出中...';
+
   try{
-    const res = await fetch('/api/config', { cache:'no-store' });
-    const cfg = await res.json();
-    if(cfg.businessFormUrl) businessFormUrl = cfg.businessFormUrl;
-  }catch(e){}
+    const res = await fetch('/api/business/register', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        companyName,
+        contactName,
+        phone,
+        lineId,
+        district,
+        selectedTypes,
+        needType,
+        frequency,
+        deliveryArea,
+        note
+      })
+    });
 
-  document.getElementById('formBtn').onclick = () => {
-    location.href = businessFormUrl;
-  };
-}
+    const data = await res.json();
 
-function toggle(id){
-  const el = document.getElementById(id);
-  el.style.display = el.style.display === 'block' ? 'none' : 'block';
-}
+    if(data.success){
+      successBox.style.display = 'block';
+      successBox.innerHTML = '✅ 合作需求已送出，UBee 將會進行審核與評估，後續由專人聯繫您。';
+      document.getElementById('businessForm').reset();
+      document.querySelectorAll('.typeCard').forEach(c => c.classList.remove('active'));
+      selectedTypes = [];
+      window.scrollTo({top:0, behavior:'smooth'});
+    }else{
+      errorBox.style.display = 'block';
+      errorBox.innerHTML = data.message || '送出失敗，請稍後再試。';
+    }
 
-init();
+  }catch(err){
+    console.error(err);
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '❌ 發生錯誤，請確認後端是否已有 /api/business/register。';
+  }finally{
+    submitBtn.disabled = false;
+    submitBtn.innerText = '送出合作需求';
+  }
+});
 </script>
 
 </body>
