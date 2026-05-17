@@ -216,7 +216,7 @@ app.post('/api/business/register', async (req, res) => {
       frequency: cleanText(frequency, 40),
       deliveryArea: cleanText(deliveryArea, 120),
       note: cleanLongText(note || '', 300),
-      lineUserId: cleanText(lineUserId || '', 80),
+      lineUserId: cleanText(req.body.lineUserId || req.body.userId || '', 80),
       status: 'pending',
       createdAt: new Date().toLocaleString('zh-TW'),
       createdAtMs: Date.now(),
