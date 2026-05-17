@@ -946,8 +946,15 @@ function createBusinessReviewFlex(business) {
     ],
    [
   createUriButton('撥打聯絡人', buildTelUrl(business.phone)),
-  createPostbackButton('審核通過', `business_approve:${business.businessId}`)
-]
+  {
+  type: 'button',
+  style: 'secondary',
+  action: {
+    type: 'postback',
+    label: '審核通過',
+    data: `business_approve:${business.businessId}`
+  }
+}
   ));
 }
 
