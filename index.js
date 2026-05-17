@@ -195,7 +195,7 @@ app.post('/api/business/register', async (req, res) => {
       note,
     } = req.body;
 
-    if (!companyName || !contactName || !phone || !lineId || !district || !needType || !frequency || !deliveryArea) {
+    if (!companyName || !contactName || !phone || !district || !needType || !frequency || !deliveryArea) {
       return res.status(400).json({
         success: false,
         message: '資料不完整，請確認公司名稱、聯絡人、手機、LINE ID、所在區域與需求資料都有填寫。',
@@ -1612,6 +1612,9 @@ async function handlePostback(event) {
   console.log('source:', event.source);
 
 if (data.startsWith('business_approve:')) {
+  const permitted = await requireAdminPermission(event, '商務合作審核');
+  if (!permitted) return null;
+
   const businessId = data.split(':')[1];
 
   const doc = await db
@@ -1624,6 +1627,10 @@ if (data.startsWith('business_approve:')) {
   }
 
   const business = doc.data();
+
+  if (business.status === 'approved') {
+    return replyText(event.replyToken, '此商務合作申請已經審核通過，不需要重複操作。');
+  }
 
   await db.collection('businessApplications')
     .doc(businessId)
@@ -1646,11 +1653,13 @@ UBee 辦公室將會再依照您的需求，
 
 感謝您使用 UBee 城市任務平台 🐝`
     });
+  } else {
+    console.log(`⚠️ 商務合作申請 ${businessId} 沒有 lineUserId，無法通知客人`);
   }
 
   return replyText(
     event.replyToken,
-    `已通過商務合作申請：${businessId}`
+    `✅ 已通過商務合作申請，系統已通知客人。\n\n申請編號：${businessId}`
   );
 }
 
