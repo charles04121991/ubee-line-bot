@@ -11,694 +11,401 @@
   --bg:#000;
   --card:#0f0f0f;
   --card2:#151515;
+  --line:rgba(255,255,255,.12);
+  --text:#f5f5f5;
+  --muted:#a8a8a8;
   --white:#fff;
-  --text:#f4f4f4;
-  --muted:#a5a5a5;
-  --muted2:#707070;
-  --line:rgba(255,255,255,.10);
-  --line2:rgba(255,255,255,.16);
-  --primary:#fff;
-  --primaryText:#000;
-  --green:#22c55e;
-  --red:#ef4444;
+  --danger:#ff5c5c;
+  --success:#23c55e;
 }
 
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html{scroll-behavior:smooth;}
+*{box-sizing:border-box}
 
 body{
   margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-  background:#000;
-  color:#fff;
-  min-height:100vh;
-  overflow-x:hidden;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
 }
 
-.container{
-  width:100%;
+.wrap{
   max-width:760px;
   margin:0 auto;
-  padding:24px 18px 44px;
-}
-
-.topbar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:22px;
-}
-
-.brand{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.logoU{
-  width:46px;
-  height:46px;
-  border-radius:14px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:28px;
-  font-weight:1000;
-  color:#000;
-  background:#fff;
-}
-
-.brandText b{
-  display:block;
-  font-size:26px;
-  font-weight:1000;
-}
-
-.brandText span{
-  display:block;
-  color:var(--muted);
-  font-size:12px;
-  letter-spacing:2px;
-  text-transform:uppercase;
-  font-weight:900;
+  padding:28px 20px 56px;
 }
 
 .hero{
-  position:relative;
-  overflow:hidden;
-  border-radius:28px;
-  padding:26px 24px;
-  margin-bottom:22px;
-  background:
-    radial-gradient(circle at 82% 18%, rgba(255,255,255,.16), transparent 32%),
-    linear-gradient(135deg,#242424,#101010 52%,#050505);
-  border:1px solid var(--line2);
-  box-shadow:0 18px 45px rgba(255,255,255,.04);
+  padding:28px 0 22px;
 }
 
-.heroBadge{
-  display:inline-flex;
-  align-items:center;
-  gap:9px;
+.kicker{
   color:var(--muted);
-  font-size:12px;
-  font-weight:1000;
-  letter-spacing:2px;
-  text-transform:uppercase;
-  margin-bottom:16px;
+  font-size:14px;
+  letter-spacing:.08em;
+  margin-bottom:10px;
 }
 
-.heroBadge::before{
-  content:"";
-  width:7px;
-  height:7px;
-  border-radius:50%;
-  background:var(--green);
-}
-
-.title{
-  font-size:42px;
-  line-height:1.1;
-  margin:0 0 12px;
-  font-weight:1000;
-  letter-spacing:-.8px;
+h1{
+  margin:0;
+  font-size:34px;
+  line-height:1.18;
+  letter-spacing:-.04em;
 }
 
 .sub{
-  font-size:16px;
-  color:#cfcfcf;
-  line-height:1.8;
-  margin:0 0 20px;
-  font-weight:800;
-}
-
-.heroBtn{
-  display:inline-flex;
-  align-items:center;
-  gap:10px;
-  border:0;
-  background:#fff;
-  color:#000;
-  border-radius:999px;
-  padding:13px 22px;
-  font-size:16px;
-  font-weight:1000;
-  font-family:inherit;
-  cursor:pointer;
-}
-
-.benefits{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:1px;
-  overflow:hidden;
-  border:1px solid var(--line);
-  border-radius:22px;
-  background:var(--line);
-  margin-top:22px;
-}
-
-.benefit{
-  background:rgba(12,12,12,.78);
-  padding:14px 8px;
-  text-align:center;
-}
-
-.benefitIcon{
-  font-size:24px;
-  margin-bottom:6px;
-}
-
-.benefitTitle{
-  font-size:14px;
-  font-weight:1000;
-}
-
-.benefitText{
+  margin-top:14px;
   color:var(--muted);
-  font-size:12px;
-  line-height:1.45;
-  margin-top:4px;
-  font-weight:800;
+  line-height:1.7;
+  font-size:15px;
 }
 
 .card{
-  background:var(--card);
+  background:linear-gradient(180deg,var(--card2),var(--card));
   border:1px solid var(--line);
-  border-radius:28px;
+  border-radius:26px;
   padding:22px;
-  margin-bottom:18px;
+  margin-top:18px;
 }
 
 .sectionTitle{
-  font-size:26px;
-  font-weight:1000;
-  margin:0 0 10px;
-  padding-bottom:12px;
-  border-bottom:1px solid var(--line);
+  font-size:22px;
+  font-weight:900;
+  margin-bottom:8px;
 }
 
 .sectionDesc{
   color:var(--muted);
-  font-size:15px;
-  line-height:1.75;
-  margin:0 0 18px;
-  font-weight:800;
+  font-size:14px;
+  line-height:1.6;
+  margin-bottom:18px;
+}
+
+label{
+  display:block;
+  font-size:14px;
+  color:var(--muted);
+  margin:16px 0 8px;
+}
+
+input,select,textarea{
+  width:100%;
+  border:1px solid var(--line);
+  background:#050505;
+  color:var(--text);
+  border-radius:18px;
+  padding:15px 16px;
+  font-size:16px;
+  outline:none;
+}
+
+textarea{
+  min-height:130px;
+  resize:vertical;
+  line-height:1.6;
 }
 
 .typeGrid{
   display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:14px;
+  grid-template-columns:1fr;
+  gap:12px;
 }
 
 .typeCard{
-  position:relative;
   border:1px solid var(--line);
-  background:#111;
+  background:#090909;
   border-radius:22px;
-  padding:20px;
+  padding:16px;
+  position:relative;
   cursor:pointer;
+  user-select:none;
 }
 
 .typeCard.active{
   border-color:#fff;
-  box-shadow:0 0 0 1px rgba(255,255,255,.2);
-}
-
-.typeIcon{
-  font-size:30px;
-  margin-bottom:12px;
-}
-
-.typeTitle{
-  font-size:18px;
-  font-weight:1000;
-  margin-bottom:6px;
-}
-
-.typeDesc{
-  color:var(--muted);
-  font-size:14px;
-  line-height:1.65;
-  font-weight:800;
+  background:#1d1d1d;
 }
 
 .checkDot{
+  width:18px;
+  height:18px;
+  border-radius:99px;
+  border:1px solid var(--line);
   position:absolute;
-  top:16px;
   right:16px;
-  width:22px;
-  height:22px;
-  border-radius:7px;
-  border:1px solid var(--line2);
+  top:16px;
 }
 
 .typeCard.active .checkDot{
   background:#fff;
 }
 
-.fieldGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:16px;
+.typeIcon{
+  font-size:26px;
+  margin-bottom:8px;
 }
 
-.field{
-  background:#111;
-  border:1px solid var(--line);
-  border-radius:20px;
-  padding:15px 16px;
-  min-height:88px;
-}
-
-.field.full{
-  grid-column:1 / -1;
-}
-
-label{
-  display:block;
-  font-size:15px;
-  font-weight:1000;
-  margin:0 0 8px;
-  color:#fff;
-}
-
-.required{
-  color:var(--red);
-  margin-left:4px;
-}
-
-input,select,textarea{
-  width:100%;
-  min-height:36px;
-  padding:0;
-  border:0;
+.typeTitle{
   font-size:17px;
-  background:transparent;
-  color:#fff;
-  outline:none;
-  font-family:inherit;
   font-weight:900;
 }
 
-input::placeholder,
-textarea::placeholder{
-  color:var(--muted2);
+.typeDesc{
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.5;
+  margin-top:5px;
 }
 
-select{
-  appearance:none;
-  -webkit-appearance:none;
+.notice{
+  border:1px solid var(--line);
+  background:#0b0b0b;
+  border-radius:20px;
+  padding:16px;
+  color:var(--muted);
+  line-height:1.7;
+  margin-top:18px;
 }
 
-select:invalid{
-  color:var(--muted2);
+.btn{
+  width:100%;
+  border:none;
+  border-radius:22px;
+  padding:18px 20px;
+  font-size:20px;
+  font-weight:900;
+  margin-top:22px;
+  background:#fff;
+  color:#000;
 }
 
-textarea{
-  min-height:96px;
-  resize:vertical;
+.btn:disabled{
+  opacity:.5;
+}
+
+.msg{
+  display:none;
+  margin-top:16px;
+  padding:16px;
+  border-radius:18px;
   line-height:1.6;
+  font-weight:800;
 }
 
-.field:focus-within{
-  border-color:#fff;
-  box-shadow:0 0 0 2px rgba(255,255,255,.10);
+.success{
+  border:1px solid rgba(35,197,94,.45);
+  background:rgba(35,197,94,.12);
+  color:#bbf7d0;
 }
 
-.flow{
-  display:grid;
-  gap:14px;
+.error{
+  border:1px solid rgba(255,92,92,.45);
+  background:rgba(255,92,92,.12);
+  color:#fecaca;
 }
 
-.flowStep{
-  display:flex;
-  gap:14px;
-  align-items:flex-start;
+.flowItem{
   border:1px solid var(--line);
   border-radius:20px;
   padding:16px;
-  background:#111;
+  display:flex;
+  gap:14px;
+  margin-top:12px;
 }
 
-.flowNo{
-  width:34px;
-  height:34px;
+.num{
+  width:38px;
+  height:38px;
   border-radius:12px;
+  background:#fff;
+  color:#000;
   display:flex;
   align-items:center;
   justify-content:center;
-  background:#fff;
-  color:#000;
-  font-weight:1000;
-  flex:0 0 34px;
+  font-weight:900;
+  flex-shrink:0;
 }
 
-.flowText b{
-  display:block;
-  font-size:16px;
+.flowTitle{
+  font-weight:900;
   margin-bottom:4px;
 }
 
-.flowText span{
+.flowText{
   color:var(--muted);
   font-size:14px;
-  line-height:1.6;
-  font-weight:800;
+  line-height:1.5;
 }
 
-.note{
-  font-size:15px;
-  color:var(--muted);
-  line-height:1.85;
-  margin-top:22px;
-  background:#111;
-  border:1px solid var(--line);
-  border-radius:20px;
-  padding:16px;
-  font-weight:800;
-}
-
-.submitBtn{
-  width:100%;
-  min-height:68px;
-  border:0;
-  border-radius:22px;
-  background:#fff;
-  color:#000;
-  font-size:22px;
-  font-weight:1000;
-  margin-top:26px;
-  cursor:pointer;
-  font-family:inherit;
-}
-
-.submitBtn:disabled{
-  opacity:.45;
-  cursor:not-allowed;
-}
-
-.successBox,.errorBox{
-  display:none;
-  border-radius:18px;
-  padding:15px;
-  line-height:1.75;
-  margin-top:18px;
-  font-size:15px;
-  font-weight:800;
-}
-
-.successBox{
-  background:rgba(34,197,94,.08);
-  border:1px solid rgba(34,197,94,.42);
-  color:#c9ffd9;
-}
-
-.errorBox{
-  background:rgba(239,68,68,.08);
-  border:1px solid rgba(239,68,68,.42);
-  color:#ffd1d1;
-}
-
-.footer{
-  color:var(--muted2);
-  text-align:center;
-  font-size:13px;
-  line-height:1.8;
-  padding:14px 0 0;
-  font-weight:800;
-}
-
-.footer b{
-  color:var(--muted);
-}
-
-@media(max-width:640px){
-  .container{
-    padding:20px 14px 40px;
-  }
-
-  .title{
-    font-size:36px;
-  }
-
-  .benefits{
-    grid-template-columns:repeat(2,1fr);
-  }
-
-  .typeGrid,
-  .fieldGrid{
-    grid-template-columns:1fr;
-  }
-
-  .card{
-    padding:20px;
-    border-radius:26px;
-  }
-}
-
-@media(max-width:420px){
-  .logoU{
-    width:42px;
-    height:42px;
-    font-size:26px;
-  }
-
-  .brandText b{
-    font-size:24px;
-  }
-
-  .brandText span{
-    font-size:11px;
-  }
-
-  .title{
-    font-size:33px;
-  }
-
-  input,select,textarea{
-    font-size:16px;
-  }
+@media(min-width:620px){
+  .typeGrid{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
 
 <body>
-
-<div class="container">
-
-  <div class="topbar">
-    <div class="brand">
-      <div class="logoU">U</div>
-      <div class="brandText">
-        <b>UBee</b>
-        <span>City Task Platform</span>
-      </div>
-    </div>
-  </div>
+<div class="wrap">
 
   <section class="hero">
-    <div class="heroBadge">UBee Business</div>
-    <h1 class="title">企業 / 店家<br>合作申請</h1>
-    <p class="sub">
-      文件急送、物品配送、商務支援、固定任務需求，UBee 協助企業與店家把城市任務交給專人處理。
-    </p>
-    <button class="heroBtn" type="button" onclick="document.getElementById('businessFormCard').scrollIntoView({behavior:'smooth'})">
-      立即填寫合作需求 <span>›</span>
-    </button>
-
-    <div class="benefits">
-      <div class="benefit">
-        <div class="benefitIcon">🏢</div>
-        <div class="benefitTitle">專業配送</div>
-        <div class="benefitText">專人服務</div>
-      </div>
-      <div class="benefit">
-        <div class="benefitIcon">🛡️</div>
-        <div class="benefitTitle">安全可靠</div>
-        <div class="benefitText">安心託付</div>
-      </div>
-      <div class="benefit">
-        <div class="benefitIcon">⏱️</div>
-        <div class="benefitTitle">彈性配合</div>
-        <div class="benefitText">即時支援</div>
-      </div>
-      <div class="benefit">
-        <div class="benefitIcon">📋</div>
-        <div class="benefitTitle">清楚流程</div>
-        <div class="benefitText">需求審核</div>
-      </div>
+    <div class="kicker">UBee BUSINESS</div>
+    <h1>企業 / 店家合作申請</h1>
+    <div class="sub">
+      適合店家物品配送、企業文件急送、固定商務任務與臨時支援需求。<br>
+      送出後將傳送至 UBee 辦公室審核群組，由 UBee 進行評估與後續聯繫。
     </div>
   </section>
 
-  <div class="card">
-    <div class="sectionTitle">合作類型</div>
-    <div class="sectionDesc">請選擇你的主要合作需求類型，可複選。</div>
+  <form id="businessForm">
 
-    <div class="typeGrid">
-      <div class="typeCard" data-type="企業文件急送" onclick="toggleType(this)">
-        <div class="checkDot"></div>
-        <div class="typeIcon">🏢</div>
-        <div class="typeTitle">企業文件急送</div>
-        <div class="typeDesc">合約、標書、重要文件、急件即時配送。</div>
-      </div>
+    <div class="card">
+      <div class="sectionTitle">基本資料</div>
+      <div class="sectionDesc">請填寫聯絡資訊，方便 UBee 辦公室後續聯繫。</div>
 
-      <div class="typeCard" data-type="店家物品配送" onclick="toggleType(this)">
-        <div class="checkDot"></div>
-        <div class="typeIcon">📦</div>
-        <div class="typeTitle">店家物品配送</div>
-        <div class="typeDesc">商品、備料、包裹等配送服務。</div>
-      </div>
+      <label>公司 / 店家名稱</label>
+      <input id="companyName" placeholder="例如：88貼到好" required>
 
-      <div class="typeCard" data-type="固定商務任務" onclick="toggleType(this)">
-        <div class="checkDot"></div>
-        <div class="typeIcon">📄</div>
-        <div class="typeTitle">固定商務任務</div>
-        <div class="typeDesc">長期配合、固定路線、定期配送需求。</div>
-      </div>
+      <label>聯絡人</label>
+      <input id="contactName" placeholder="請輸入聯絡人姓名" required>
 
-      <div class="typeCard" data-type="臨時支援需求" onclick="toggleType(this)">
-        <div class="checkDot"></div>
-        <div class="typeIcon">💼</div>
-        <div class="typeTitle">臨時支援需求</div>
-        <div class="typeDesc">臨時突發需求、彈性調度支援。</div>
+      <label>手機</label>
+      <input id="phone" placeholder="例如：0912345678" inputmode="tel" required>
+
+      <label>LINE ID</label>
+      <input id="lineId" placeholder="請輸入可聯繫的 LINE ID">
+
+      <label>所在區域</label>
+      <input id="district" placeholder="例如：台中市豐原區" required>
+    </div>
+
+    <div class="card">
+      <div class="sectionTitle">合作類型</div>
+      <div class="sectionDesc">請選擇主要合作需求類型，可複選。</div>
+
+      <div class="typeGrid">
+        <div class="typeCard" data-type="企業文件急送" onclick="toggleType(this)">
+          <div class="checkDot"></div>
+          <div class="typeIcon">🏢</div>
+          <div class="typeTitle">企業文件急送</div>
+          <div class="typeDesc">合約、標書、重要文件、急件即時配送。</div>
+        </div>
+
+        <div class="typeCard" data-type="店家物品配送" onclick="toggleType(this)">
+          <div class="checkDot"></div>
+          <div class="typeIcon">📦</div>
+          <div class="typeTitle">店家物品配送</div>
+          <div class="typeDesc">商品、備料、包裹等配送服務。</div>
+        </div>
+
+        <div class="typeCard" data-type="固定商務任務" onclick="toggleType(this)">
+          <div class="checkDot"></div>
+          <div class="typeIcon">📄</div>
+          <div class="typeTitle">固定商務任務</div>
+          <div class="typeDesc">長期配合、固定路線、定期配送需求。</div>
+        </div>
+
+        <div class="typeCard" data-type="臨時支援需求" onclick="toggleType(this)">
+          <div class="checkDot"></div>
+          <div class="typeIcon">💼</div>
+          <div class="typeTitle">臨時支援需求</div>
+          <div class="typeDesc">臨時突發需求、彈性調度支援。</div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="card" id="businessFormCard">
-    <form id="businessForm">
+    <div class="card">
+      <div class="sectionTitle">需求內容</div>
 
-      <div class="sectionTitle">基本資料</div>
-      <div class="sectionDesc">請填寫公司 / 店家與聯絡人基本資訊。</div>
+      <label>主要需求</label>
+      <input id="needType" placeholder="例如：店家物品配送" required>
 
-      <div class="fieldGrid">
-        <div class="field full">
-          <label>公司 / 店家名稱<span class="required">*</span></label>
-          <input id="companyName" placeholder="請輸入公司或店家名稱" required>
-        </div>
+      <label>需求頻率</label>
+      <select id="frequency" required>
+        <option value="">請選擇</option>
+        <option>偶爾需要</option>
+        <option>每週 1 次</option>
+        <option>每週 3 次以上</option>
+        <option>每日固定需求</option>
+        <option>其他</option>
+      </select>
 
-        <div class="field">
-          <label>聯絡人姓名<span class="required">*</span></label>
-          <input id="contactName" placeholder="請輸入聯絡人姓名" required>
-        </div>
+      <label>配送區域</label>
+      <input id="deliveryArea" placeholder="例如：台中市豐原區、北屯區" required>
 
-        <div class="field">
-          <label>手機號碼<span class="required">*</span></label>
-          <input id="phone" type="tel" placeholder="例如：0912345678" required>
-        </div>
+      <label>備註說明</label>
+      <textarea id="note" placeholder="請簡單描述您的需求內容、特殊注意事項、固定時段或固定路線等..."></textarea>
 
-        <div class="field">
-          <label>LINE ID<span class="required">*</span></label>
-          <input id="lineId" placeholder="請輸入 LINE ID" required>
-        </div>
-
-        <div class="field">
-          <label>所在區域<span class="required">*</span></label>
-          <input id="district" placeholder="例如：台中市北屯區" required>
-        </div>
-      </div>
-
-      <div class="sectionTitle">需求資料</div>
-      <div class="sectionDesc">請提供合作需求，方便 UBee 初步評估合作方式。</div>
-
-      <div class="fieldGrid">
-        <div class="field">
-          <label>合作需求類型<span class="required">*</span></label>
-          <select id="needType" required>
-            <option value="">請選擇主要合作需求類型</option>
-            <option value="企業文件急送">企業文件急送</option>
-            <option value="店家物品配送">店家物品配送</option>
-            <option value="固定商務任務">固定商務任務</option>
-            <option value="臨時支援需求">臨時支援需求</option>
-            <option value="其他需求">其他需求</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>預估需求頻率<span class="required">*</span></label>
-          <select id="frequency" required>
-            <option value="">請選擇預估需求頻率</option>
-            <option value="偶爾需要">偶爾需要</option>
-            <option value="每週 1-2 次">每週 1-2 次</option>
-            <option value="每週 3 次以上">每週 3 次以上</option>
-            <option value="每日固定需求">每日固定需求</option>
-            <option value="尚不確定">尚不確定</option>
-          </select>
-        </div>
-
-        <div class="field full">
-          <label>主要配送區域<span class="required">*</span></label>
-          <input id="deliveryArea" placeholder="例如：台中市北區、西區、北屯區" required>
-        </div>
-
-        <div class="field full">
-          <label>備註說明</label>
-          <textarea id="note" placeholder="請簡單描述您的需求內容、特殊注意事項、固定時段或固定路線等..."></textarea>
-        </div>
-      </div>
-
-      <div class="note">
+      <div class="notice">
         ※ 送出後會傳送到 UBee 辦公室審核群組，由 UBee 進行人工評估與後續聯繫。
       </div>
 
-      <button id="submitBtn" class="submitBtn" type="submit">送出合作需求</button>
+      <button class="btn" id="submitBtn" type="submit">送出合作需求</button>
 
-      <div id="successBox" class="successBox"></div>
-      <div id="errorBox" class="errorBox"></div>
+      <div id="successBox" class="msg success"></div>
+      <div id="errorBox" class="msg error"></div>
+    </div>
 
-    </form>
-  </div>
+  </form>
 
   <div class="card">
     <div class="sectionTitle">合作流程說明</div>
     <div class="sectionDesc">簡單四步驟，快速開始合作。</div>
 
-    <div class="flow">
-      <div class="flowStep">
-        <div class="flowNo">1</div>
-        <div class="flowText">
-          <b>提交需求</b>
-          <span>填寫合作申請表，送出您的合作需求。</span>
-        </div>
-      </div>
-
-      <div class="flowStep">
-        <div class="flowNo">2</div>
-        <div class="flowText">
-          <b>專人聯繫</b>
-          <span>UBee 專人與您聯繫，了解詳細需求。</span>
-        </div>
-      </div>
-
-      <div class="flowStep">
-        <div class="flowNo">3</div>
-        <div class="flowText">
-          <b>報價確認</b>
-          <span>依需求提供合作方式與任務流程。</span>
-        </div>
-      </div>
-
-      <div class="flowStep">
-        <div class="flowNo">4</div>
-        <div class="flowText">
-          <b>開始合作</b>
-          <span>確認合作後，開始安排任務服務。</span>
-        </div>
+    <div class="flowItem">
+      <div class="num">1</div>
+      <div>
+        <div class="flowTitle">提交需求</div>
+        <div class="flowText">填寫合作申請表，送出您的合作需求。</div>
       </div>
     </div>
-  </div>
 
-  <div class="footer">
-    <b>UBee 城市任務平台</b><br>
-    企業 / 店家合作申請資料僅供合作聯繫與服務評估使用。
+    <div class="flowItem">
+      <div class="num">2</div>
+      <div>
+        <div class="flowTitle">專人聯繫</div>
+        <div class="flowText">UBee 辦公室審核後，會主動與您聯繫。</div>
+      </div>
+    </div>
+
+    <div class="flowItem">
+      <div class="num">3</div>
+      <div>
+        <div class="flowTitle">確認合作內容</div>
+        <div class="flowText">確認配送區域、需求頻率、任務內容與執行方式。</div>
+      </div>
+    </div>
+
+    <div class="flowItem">
+      <div class="num">4</div>
+      <div>
+        <div class="flowTitle">開始服務</div>
+        <div class="flowText">正式安排 UBee 城市任務支援。</div>
+      </div>
+    </div>
   </div>
 
 </div>
 
 <script>
+const BUSINESS_LIFF_ID = '2009895876-a4h2scCF';
 let selectedTypes = [];
+window.lineUserId = '';
+
+async function initLiff(){
+  try{
+    await liff.init({ liffId: BUSINESS_LIFF_ID });
+
+    if(!liff.isLoggedIn()){
+      liff.login({ redirectUri: window.location.href });
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    window.lineUserId = profile.userId;
+    console.log('LINE User ID:', window.lineUserId);
+
+  }catch(err){
+    console.error('LIFF 初始化失敗:', err);
+  }
+}
 
 function toggleType(el){
   const type = el.dataset.type;
@@ -716,6 +423,10 @@ function toggleType(el){
   }
 }
 
+function cleanValue(id){
+  return document.getElementById(id).value.trim();
+}
+
 document.getElementById('businessForm').addEventListener('submit', async function(e){
   e.preventDefault();
 
@@ -725,22 +436,32 @@ document.getElementById('businessForm').addEventListener('submit', async functio
 
   successBox.style.display = 'none';
   errorBox.style.display = 'none';
-  successBox.innerHTML = '';
-  errorBox.innerHTML = '';
 
-  const companyName = document.getElementById('companyName').value.trim();
-  const contactName = document.getElementById('contactName').value.trim();
-  const phone = document.getElementById('phone').value.trim();
-  const lineId = document.getElementById('lineId').value.trim();
-  const district = document.getElementById('district').value.trim();
-  const needType = document.getElementById('needType').value;
-  const frequency = document.getElementById('frequency').value;
-  const deliveryArea = document.getElementById('deliveryArea').value.trim();
-  const note = document.getElementById('note').value.trim();
+  const companyName = cleanValue('companyName');
+  const contactName = cleanValue('contactName');
+  const phone = cleanValue('phone');
+  const lineId = cleanValue('lineId');
+  const district = cleanValue('district');
+  const needType = cleanValue('needType');
+  const frequency = cleanValue('frequency');
+  const deliveryArea = cleanValue('deliveryArea');
+  const note = cleanValue('note');
 
-  if(!companyName || !contactName || !phone || !lineId || !district || !needType || !frequency || !deliveryArea){
+  if(!companyName || !contactName || !phone || !district || !needType || !frequency || !deliveryArea){
     errorBox.style.display = 'block';
-    errorBox.innerHTML = '請完整填寫所有必填資料。';
+    errorBox.innerHTML = '請確認必填欄位都已填寫。';
+    return;
+  }
+
+  if(selectedTypes.length === 0){
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請至少選擇一個合作類型。';
+    return;
+  }
+
+  if(!window.lineUserId){
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = 'LINE 身分尚未取得，請關閉頁面後從官方帳號重新開啟。';
     return;
   }
 
@@ -761,7 +482,7 @@ document.getElementById('businessForm').addEventListener('submit', async functio
         needType,
         frequency,
         deliveryArea,
-        lineUserId: window.lineUserId || '',
+        lineUserId: window.lineUserId,
         note
       })
     });
@@ -771,9 +492,11 @@ document.getElementById('businessForm').addEventListener('submit', async functio
     if(data.success){
       successBox.style.display = 'block';
       successBox.innerHTML = '✅ 合作需求已送出，UBee 將會進行審核與評估，後續由專人聯繫您。';
+
       document.getElementById('businessForm').reset();
       document.querySelectorAll('.typeCard').forEach(c => c.classList.remove('active'));
       selectedTypes = [];
+
       window.scrollTo({top:0, behavior:'smooth'});
     }else{
       errorBox.style.display = 'block';
@@ -783,40 +506,15 @@ document.getElementById('businessForm').addEventListener('submit', async functio
   }catch(err){
     console.error(err);
     errorBox.style.display = 'block';
-    errorBox.innerHTML = '❌ 發生錯誤，請確認後端是否已有 /api/business/register。';
+    errorBox.innerHTML = '❌ 發生錯誤，請確認後端是否已部署完成。';
+
   }finally{
     submitBtn.disabled = false;
     submitBtn.innerText = '送出合作需求';
   }
 });
-(async () => {
-  try {
-    const configRes = await fetch('/api/config');
-const config = await configRes.json();
 
-await liff.init({
-  liffId: '2009895876-a4h2scCF'
-});
-
-    if (!liff.isLoggedIn()) {
-  liff.login({
-    redirectUri: window.location.href
-  });
-  return;
-}
-
-const profile = await liff.getProfile();
-window.lineUserId = profile.userId;
-console.log('LINE User ID:', profile.userId);
-
-const profile = await liff.getProfile();
-window.lineUserId = profile.userId;
-console.log('LINE User ID:', profile.userId);
-
-  } catch (err) {
-    console.error('LIFF 初始化失敗:', err);
-  }
-})();
+initLiff();
 </script>
 
 </body>
