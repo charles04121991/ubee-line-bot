@@ -179,6 +179,70 @@ app.post('/api/rider/register', async (req, res) => {
   }
 });
 
+// ===== 商務合作申請 API =====
+app.post('/api/business/register', async (req, res) => {
+  try {
+    const {
+      companyName,
+      contactName,
+      phone,
+      lineId,
+      district,
+      selectedTypes,
+      needType,
+      frequency,
+      deliveryArea,
+      note,
+    } = req.body;
+
+    if (!companyName || !contactName || !phone || !lineId || !district || !needType || !frequency || !deliveryArea) {
+      return res.status(400).json({
+        success: false,
+        message: '資料不完整，請確認公司名稱、聯絡人、手機、LINE ID、所在區域與需求資料都有填寫。',
+      });
+    }
+
+    const businessId = 'B' + Date.now();
+
+    const business = {
+      businessId,
+      companyName: cleanText(companyName, 80),
+      contactName: cleanText(contactName, 40),
+      phone: normalizePhone(phone),
+      lineId: cleanText(lineId, 60),
+      district: cleanText(district, 80),
+      selectedTypes: Array.isArray(selectedTypes) ? selectedTypes.map(t => cleanText(t, 40)) : [],
+      needType: cleanText(needType, 40),
+      frequency: cleanText(frequency, 40),
+      deliveryArea: cleanText(deliveryArea, 120),
+      note: cleanLongText(note || '', 300),
+      status: 'pending',
+      createdAt: new Date().toLocaleString('zh-TW'),
+      createdAtMs: Date.now(),
+    };
+
+    await db.collection('businessApplications').doc(businessId).set(business, { merge: true });
+
+    console.log('🏢 新商務合作申請：', business);
+
+    await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(business));
+
+    res.json({
+      success: true,
+      businessId,
+      message: '合作需求已送出，UBee 將會進行審核與評估。',
+    });
+
+  } catch (err) {
+    console.error('❌ 商務合作申請失敗：', err);
+
+    res.status(500).json({
+      success: false,
+      message: '合作需求送出失敗，請稍後再試。',
+    });
+  }
+});
+
 const PRICING = {
   baseFee: 99,
   perKm: 8,
@@ -849,6 +913,38 @@ function createInfoMenuFlex() {
       createActionButton('取消規則', 'submenu=cancelRules'),
       createActionButton('常見問題', 'submenu=faq', 'secondary'),
       createActionButton('查詢訂單', 'submenu=queryOrder', 'secondary')
+    ]
+  ));
+}
+
+function createBusinessReviewFlex(business) {
+  return createFlexMessage('新商務合作申請', createBubble(
+    '🏢 新商務合作申請',
+    [
+      createInfoRow('申請編號', business.businessId),
+      createInfoRow('公司 / 店家', business.companyName),
+      createInfoRow('聯絡人', business.contactName),
+      createInfoRow('手機', business.phone),
+      createInfoRow('LINE ID', business.lineId),
+      createInfoRow('所在區域', business.district),
+      createInfoRow('合作類型', business.selectedTypes?.length ? business.selectedTypes.join('、') : business.needType),
+      createInfoRow('主要需求', business.needType),
+      createInfoRow('需求頻率', business.frequency),
+      createInfoRow('配送區域', business.deliveryArea),
+      createInfoRow('備註', business.note || '無'),
+      createInfoRow('狀態', '待審核 / 待聯繫'),
+      createInfoRow('送出時間', business.createdAt),
+      {
+        type: 'text',
+        text: '此為企業 / 店家合作需求，請 UBee 辦公室評估後主動聯繫。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+        margin: 'md',
+      },
+    ],
+    [
+      createUriButton('撥打聯絡人', buildTelUrl(business.phone), 'primary'),
     ]
   ));
 }
