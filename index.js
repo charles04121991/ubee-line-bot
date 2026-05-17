@@ -943,9 +943,10 @@ function createBusinessReviewFlex(business) {
         margin: 'md',
       },
     ],
-    [
-      createUriButton('撥打聯絡人', buildTelUrl(business.phone), 'primary'),
-    ]
+   [
+  createUriButton('撥打聯絡人', buildTelUrl(business.phone)),
+  createPostbackButton('審核通過', `business_approve:${business.businessId}`)
+]
   ));
 }
 
