@@ -2104,9 +2104,8 @@ async function handleEvent(event) {
   try {
     if (event.type === 'follow') {
       return replyMessages(event.replyToken, [
-        createTextMessage('歡迎使用 UBee｜城市任務服務 🐝'),
-        createMainMenuFlex(),
-      ]);
+  createTextMessage('歡迎使用 UBee｜城市任務服務 🐝'),
+]);
     }
 
     if (event.type === 'postback') {
