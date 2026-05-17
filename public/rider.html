@@ -9,44 +9,32 @@
 
   <style>
     :root{
-      --bg:#000000;
-      --card:#111111;
-      --card2:#181818;
-      --card3:#1f1f1f;
-
-      --white:#ffffff;
-      --text:#f2f2f2;
-      --muted:#a6a6a6;
-      --muted2:#737373;
-
-      --line:#2a2a2a;
-      --line2:#333333;
-
-      --primary:#ffffff;
-      --primaryText:#000000;
-
+      --bg:#000;
+      --card:#0f0f0f;
+      --card2:#151515;
+      --card3:#1b1b1b;
+      --white:#fff;
+      --text:#f4f4f4;
+      --muted:#a5a5a5;
+      --muted2:#6f6f6f;
+      --line:rgba(255,255,255,.10);
+      --line2:rgba(255,255,255,.16);
+      --primary:#fff;
+      --primaryText:#000;
       --green:#22c55e;
       --red:#ef4444;
-      --yellow:#facc15;
-
-      --radius:22px;
+      --radius:24px;
     }
 
-    *{
-      box-sizing:border-box;
-      -webkit-tap-highlight-color:transparent;
-    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 
-    html{
-      scroll-behavior:smooth;
-    }
+    html{scroll-behavior:smooth;}
 
     body{
       margin:0;
       font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-      background:var(--bg);
+      background:#000;
       color:var(--white);
-      font-size:18px;
       min-height:100vh;
       overflow-x:hidden;
     }
@@ -55,7 +43,8 @@
       width:100%;
       max-width:760px;
       margin:0 auto;
-      padding:22px 16px 42px;
+      padding:24px 18px 44px;
+      background:#000;
     }
 
     .topbar{
@@ -68,76 +57,69 @@
     .brand{
       display:flex;
       align-items:center;
-      gap:11px;
+      gap:12px;
     }
 
     .logoU{
-      width:44px;
-      height:44px;
-      border-radius:13px;
+      width:46px;
+      height:46px;
+      border-radius:14px;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:27px;
+      font-size:28px;
       font-weight:1000;
       color:#000;
       background:#fff;
     }
 
     .brandText{
-      line-height:1.15;
+      line-height:1.12;
     }
 
     .brandText b{
       display:block;
-      font-size:21px;
-      letter-spacing:.2px;
+      font-size:26px;
+      letter-spacing:-.3px;
+      font-weight:1000;
     }
 
     .brandText span{
       display:block;
       color:var(--muted);
       font-size:12px;
-      letter-spacing:1.6px;
+      letter-spacing:2px;
       text-transform:uppercase;
-    }
-
-    .status{
-      color:var(--text);
-      font-size:12px;
-      font-weight:800;
-      border:1px solid var(--line2);
-      border-radius:999px;
-      padding:8px 10px;
-      background:var(--card2);
-    }
-
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      padding:20px;
-      margin-bottom:16px;
+      font-weight:900;
+      margin-top:3px;
     }
 
     .hero{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:26px;
-      padding:22px 18px 18px;
-      margin-bottom:16px;
+      position:relative;
+      overflow:hidden;
+      border-radius:28px;
+      padding:26px 24px;
+      min-height:250px;
+      margin-bottom:22px;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(255,255,255,.16), transparent 32%),
+        linear-gradient(135deg,#242424,#101010 52%,#050505);
+      border:1px solid var(--line2);
+      box-shadow:0 18px 45px rgba(255,255,255,.04);
     }
 
     .heroBadge{
       display:inline-flex;
       align-items:center;
-      gap:8px;
+      gap:9px;
       color:var(--muted);
       font-size:12px;
-      font-weight:900;
-      letter-spacing:1.6px;
+      font-weight:1000;
+      letter-spacing:2px;
       text-transform:uppercase;
-      margin-bottom:12px;
+      margin-bottom:16px;
+      position:relative;
+      z-index:2;
     }
 
     .heroBadge::before{
@@ -149,67 +131,183 @@
     }
 
     h1{
-      font-size:32px;
-      line-height:1.22;
-      margin:0 0 10px;
+      font-size:42px;
+      line-height:1.1;
+      margin:0 0 12px;
       font-weight:1000;
-      letter-spacing:.2px;
+      letter-spacing:-.8px;
+      position:relative;
+      z-index:2;
     }
 
     .heroText{
-      font-size:15px;
-      color:var(--muted);
+      font-size:16px;
+      color:#cfcfcf;
       line-height:1.8;
-      margin:0;
+      margin:0 0 20px;
+      max-width:460px;
+      font-weight:800;
+      position:relative;
+      z-index:2;
+    }
+
+    .heroBtn{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      border:0;
+      background:#fff;
+      color:#000;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:16px;
+      font-weight:1000;
+      font-family:inherit;
+      position:relative;
+      z-index:2;
+      cursor:pointer;
+    }
+
+    .heroVisual{
+      position:absolute;
+      right:22px;
+      bottom:22px;
+      width:136px;
+      height:136px;
+      border-radius:34px;
+      background:linear-gradient(145deg,#343434,#181818);
+      border:1px solid rgba(255,255,255,.10);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:68px;
+      box-shadow:0 20px 50px rgba(0,0,0,.35);
+    }
+
+    .benefits{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:1px;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:var(--line);
+      margin:18px 0 6px;
+      position:relative;
+      z-index:2;
+      max-width:520px;
+    }
+
+    .benefit{
+      background:rgba(12,12,12,.76);
+      padding:14px 10px;
+      text-align:center;
+    }
+
+    .benefitIcon{
+      font-size:22px;
+      margin-bottom:5px;
+    }
+
+    .benefitTitle{
+      font-size:14px;
+      font-weight:1000;
+    }
+
+    .benefitText{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
+      margin-top:3px;
+      font-weight:800;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:28px;
+      padding:22px;
+      margin-bottom:18px;
     }
 
     .noticeBox{
-      background:var(--card2);
+      background:#121212;
       border:1px solid var(--line);
-      border-radius:18px;
-      padding:15px;
-      margin:0 0 22px;
+      border-radius:22px;
+      padding:18px;
+      margin:0 0 28px;
       font-size:15px;
-      line-height:1.8;
+      line-height:1.85;
       color:var(--muted);
+      font-weight:800;
     }
 
     .noticeBox b{
       color:var(--white);
-      font-size:17px;
+      font-size:19px;
+      display:block;
+      margin-bottom:8px;
     }
 
     .sectionTitle{
-      font-size:23px;
+      font-size:26px;
       font-weight:1000;
-      margin:28px 0 12px;
-      padding-bottom:10px;
+      margin:30px 0 16px;
+      padding-bottom:12px;
       border-bottom:1px solid var(--line);
       color:var(--white);
+      letter-spacing:-.3px;
+    }
+
+    .sectionTitle:first-of-type{
+      margin-top:0;
+    }
+
+    .fieldGrid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+
+    .field{
+      background:#111;
+      border:1px solid var(--line);
+      border-radius:20px;
+      padding:15px 16px;
+      min-height:88px;
+    }
+
+    .field.full{
+      grid-column:1 / -1;
     }
 
     label{
       display:block;
-      font-size:18px;
-      font-weight:900;
-      margin-top:18px;
-      margin-bottom:8px;
-      color:var(--text);
+      font-size:15px;
+      font-weight:1000;
+      margin:0 0 8px;
+      color:#fff;
+    }
+
+    .requiredMark{
+      color:var(--red);
+      font-weight:1000;
+      margin-left:4px;
     }
 
     input:not([type="checkbox"]),
     select,
     textarea{
       width:100%;
-      min-height:56px;
-      padding:15px 16px;
-      border-radius:16px;
-      border:1px solid var(--line2);
+      min-height:36px;
+      padding:0;
+      border:0;
       font-size:17px;
-      background:var(--card2);
+      background:transparent;
       color:var(--white);
       outline:none;
       font-family:inherit;
+      font-weight:900;
     }
 
     input::placeholder,
@@ -227,109 +325,119 @@
       color:var(--muted2);
     }
 
-    input:focus,
-    select:focus,
-    textarea:focus{
-      border-color:#fff;
-      box-shadow:0 0 0 2px rgba(255,255,255,.12);
-    }
-
     textarea{
-      min-height:96px;
+      min-height:82px;
       resize:vertical;
       line-height:1.6;
+      padding-top:4px;
+    }
+
+    .field:focus-within{
+      border-color:#fff;
+      box-shadow:0 0 0 2px rgba(255,255,255,.10);
     }
 
     .hint{
-      font-size:14px;
+      font-size:13px;
       color:var(--muted);
       line-height:1.7;
-      margin-top:7px;
+      margin-top:10px;
+      font-weight:800;
+    }
+
+    .agreeGrid{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:14px;
+    }
+
+    .agreeBox{
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:20px;
+      background:#111;
+    }
+
+    .agreeIcon{
+      font-size:28px;
+      margin-bottom:10px;
+    }
+
+    .agreeTitle{
+      font-size:18px;
+      font-weight:1000;
+      line-height:1.55;
+      margin-bottom:10px;
+      color:#fff;
+    }
+
+    .agreeDesc{
+      font-size:14px;
+      line-height:1.75;
+      color:#a5a5a5;
+      font-weight:800;
+      margin-bottom:14px;
     }
 
     .checkRow{
       display:flex;
-      align-items:flex-start;
+      align-items:center;
       gap:10px;
-      margin-top:12px;
-      line-height:1.6;
-      font-size:15px;
-      font-weight:700;
-      color:var(--text);
+      margin-top:10px;
+      line-height:1.5;
+      font-size:14px;
+      font-weight:900;
+      color:#fff;
+      cursor:pointer;
+      user-select:none;
+      -webkit-user-select:none;
     }
 
     .checkRow input[type="checkbox"]{
-  width:28px;
-  height:28px;
-  min-width:28px;
-  min-height:28px;
-  padding:0;
-  margin:2px 0 0;
-  flex:0 0 28px;
-  border:0;
-  border-radius:4px;
-  background:#fff;
-  color:#000;
-  accent-color:#ffffff;
-  appearance:auto;
-  -webkit-appearance:checkbox;
-  cursor:pointer;
-}
+      width:24px;
+      height:24px;
+      min-width:24px;
+      min-height:24px;
+      padding:0;
+      margin:0;
+      flex:0 0 24px;
+      border:0;
+      border-radius:5px;
+      background:#fff;
+      color:#000;
+      accent-color:#ffffff;
+      appearance:auto;
+      -webkit-appearance:checkbox;
+      cursor:pointer;
+    }
 
     .checkRow span{
-  flex:1;
-  pointer-events:none;
-}
-
-.checkRow{
-  cursor:pointer;
-  -webkit-user-select:none;
-  user-select:none;
-}
-
-    .agreeBox{
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:15px;
-      margin-top:14px;
-      background:var(--card2);
-    }
-
-    .agreeTitle{
-      font-size:16px;
-      font-weight:900;
-      line-height:1.75;
-      margin-bottom:10px;
-      color:var(--white);
-    }
-
-    .requiredMark{
-      color:var(--red);
-      font-weight:1000;
-      margin-left:4px;
+      flex:1;
+      pointer-events:none;
     }
 
     .note{
       font-size:15px;
       color:var(--muted);
-      line-height:1.8;
+      line-height:1.85;
       margin-top:22px;
-      background:var(--card2);
+      background:#111;
       border:1px solid var(--line);
-      border-radius:18px;
-      padding:14px;
+      border-radius:20px;
+      padding:16px;
+      font-weight:800;
     }
 
     .submitBtn{
       width:100%;
-      min-height:62px;
+      min-height:68px;
       border:0;
-      border-radius:18px;
+      border-radius:22px;
       background:var(--primary);
       color:var(--primaryText);
-      font-size:20px;
+      font-size:22px;
       font-weight:1000;
-      margin-top:24px;
+      margin-top:26px;
       cursor:pointer;
       font-family:inherit;
       transition:.16s ease;
@@ -354,7 +462,7 @@
       line-height:1.75;
       margin-top:18px;
       font-size:15px;
-      font-weight:700;
+      font-weight:800;
     }
 
     .errorBox{
@@ -367,48 +475,132 @@
       line-height:1.75;
       margin-top:18px;
       font-size:15px;
-      font-weight:700;
+      font-weight:800;
     }
 
     .footer{
       color:var(--muted2);
       text-align:center;
-      font-size:12px;
-      line-height:1.7;
-      padding:12px 0 0;
+      font-size:13px;
+      line-height:1.8;
+      padding:14px 0 0;
+      font-weight:800;
     }
 
     .footer b{
       color:var(--muted);
+      font-size:15px;
     }
 
-    @media(max-width:420px){
+    @media(max-width:640px){
       .page{
-        padding:20px 14px 38px;
+        padding:20px 14px 40px;
       }
 
-      .card,
+      .brandText b{
+        font-size:24px;
+      }
+
       .hero{
-        padding:18px;
-        border-radius:20px;
+        padding:24px 20px;
+        min-height:245px;
       }
 
       h1{
-        font-size:30px;
+        font-size:36px;
       }
 
-      label{
-        font-size:17px;
+      .heroText{
+        font-size:15px;
+        max-width:100%;
+        padding-right:110px;
       }
 
-      input,
+      .heroVisual{
+        width:104px;
+        height:104px;
+        font-size:54px;
+        right:18px;
+        bottom:24px;
+      }
+
+      .benefits{
+        grid-template-columns:repeat(3,1fr);
+        margin-top:18px;
+      }
+
+      .fieldGrid{
+        grid-template-columns:1fr;
+      }
+
+      .agreeGrid{
+        grid-template-columns:1fr;
+      }
+
+      .card{
+        padding:20px;
+        border-radius:26px;
+      }
+
+      .sectionTitle{
+        font-size:25px;
+      }
+    }
+
+    @media(max-width:420px){
+      .topbar{
+        margin-bottom:18px;
+      }
+
+      .logoU{
+        width:42px;
+        height:42px;
+        font-size:26px;
+      }
+
+      .brandText span{
+        font-size:11px;
+      }
+
+      h1{
+        font-size:33px;
+      }
+
+      .hero{
+        border-radius:24px;
+      }
+
+      .heroText{
+        padding-right:96px;
+      }
+
+      .heroVisual{
+        width:92px;
+        height:92px;
+        font-size:48px;
+      }
+
+      .benefit{
+        padding:12px 6px;
+      }
+
+      .benefitTitle{
+        font-size:13px;
+      }
+
+      .benefitText{
+        font-size:11px;
+      }
+
+      input:not([type="checkbox"]),
       select,
       textarea{
         font-size:16px;
       }
 
-      .status{
-        display:none;
+      .submitBtn{
+        min-height:64px;
+        font-size:21px;
       }
     }
   </style>
@@ -426,125 +618,195 @@
         <span>City Task Platform</span>
       </div>
     </div>
-    <div class="status">PARTNER</div>
   </div>
 
   <div class="hero">
     <div class="heroBadge">UBee Partner</div>
-    <h1>加入 UBee 合作夥伴</h1>
+    <h1>加入 UBee<br>合作夥伴</h1>
     <p class="heroText">
-      申請成為 UBee 城市任務合作夥伴。請完整填寫基本資料、配送資料與合作條件確認，送出後將由 UBee 進行審核。
+      彈性接單、自由安排時間，加入 UBee 城市任務平台，一起完成城市裡的即時任務。
     </p>
+    <button class="heroBtn" type="button" onclick="document.getElementById('formCard').scrollIntoView({behavior:'smooth'})">
+      立即申請 <span>›</span>
+    </button>
+    <div class="heroVisual">🛵</div>
+
+    <div class="benefits">
+      <div class="benefit">
+        <div class="benefitIcon">⏱️</div>
+        <div class="benefitTitle">時間彈性</div>
+        <div class="benefitText">自由安排接單時間</div>
+      </div>
+      <div class="benefit">
+        <div class="benefitIcon">💰</div>
+        <div class="benefitTitle">任務收入</div>
+        <div class="benefitText">依完成任務結算</div>
+      </div>
+      <div class="benefit">
+        <div class="benefitIcon">🛡️</div>
+        <div class="benefitTitle">平台規範</div>
+        <div class="benefitText">審核通過才可接單</div>
+      </div>
+    </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="formCard">
 
     <div class="noticeBox">
-      <b>申請前請先確認</b><br>
-      UBee 合作夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核，不會對外公開。<br><br>
-      請確認姓名、手機、LINE ID、配送工具、可服務區域與證件資料皆填寫完整。送出後需等待 UBee 審核，審核通過後才可以接單。
+      <b>申請前請先確認</b>
+      UBee 合作夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核，不會對外公開。送出後需等待 UBee 審核，審核通過後才可以接單。
     </div>
 
     <form id="riderForm">
 
       <div class="sectionTitle">基本資料</div>
 
-      <label>姓名<span class="requiredMark">*</span></label>
-      <input id="name" name="name" type="text" placeholder="請輸入真實姓名" required>
+      <div class="fieldGrid">
+        <div class="field">
+          <label>姓名<span class="requiredMark">*</span></label>
+          <input id="name" name="name" type="text" placeholder="請輸入真實姓名" required>
+        </div>
 
-      <label>手機號碼<span class="requiredMark">*</span></label>
-      <input id="phone" name="phone" type="tel" placeholder="例如：0912345678" required>
+        <div class="field">
+          <label>手機號碼<span class="requiredMark">*</span></label>
+          <input id="phone" name="phone" type="tel" placeholder="例如：0912345678" required>
+        </div>
 
-      <label>LINE ID<span class="requiredMark">*</span></label>
-      <input id="lineId" name="lineId" type="text" placeholder="請輸入你的 LINE ID" required>
+        <div class="field">
+          <label>LINE ID<span class="requiredMark">*</span></label>
+          <input id="lineId" name="lineId" type="text" placeholder="請輸入 LINE ID" required>
+        </div>
+
+        <div class="field">
+          <label>居住地區<span class="requiredMark">*</span></label>
+          <input id="district" name="district" type="text" placeholder="例如：台中市北屯區" required>
+        </div>
+      </div>
+
       <div class="hint">審核或後續聯繫會使用此資料，請確認填寫正確。</div>
-
-      <label>居住地區<span class="requiredMark">*</span></label>
-      <input id="district" name="district" type="text" placeholder="例如：台中市北屯區" required>
 
       <div class="sectionTitle">配送資料</div>
 
-      <label>配送工具<span class="requiredMark">*</span></label>
-      <select id="vehicle" name="vehicle" required>
-        <option value="">請選擇配送工具</option>
-        <option value="機車">機車</option>
-        <option value="汽車">汽車</option>
-      </select>
-
-      <label>車牌號碼<span class="requiredMark">*</span></label>
-      <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" required>
-
-      <label>可服務區域<span class="requiredMark">*</span></label>
-      <input id="serviceArea" name="serviceArea" type="text" placeholder="例如：豐原、潭子、神岡、大雅" required>
-
-      <label>可服務時段<span class="requiredMark">*</span></label>
-      <select id="availableTime" name="availableTime" required>
-        <option value="">請選擇可服務時段</option>
-        <option value="白天">白天</option>
-        <option value="晚上">晚上</option>
-        <option value="全天">全天</option>
-        <option value="彈性配合">彈性配合</option>
-      </select>
-
-      <div class="sectionTitle">合作條件確認</div>
-
-      <div class="agreeBox">
-        <div class="agreeTitle">
-          是否可接受「商務急件」與文件、物品遞送服務條件？<span class="requiredMark">*</span><br>
-          服務定義為「需即時處理、不可延誤」之文件或物品遞送服務。適用項目包含：合約、文件、發票、小型商務物件。UBee 商務急件重視準時、安全交付。
+      <div class="fieldGrid">
+        <div class="field">
+          <label>配送工具<span class="requiredMark">*</span></label>
+          <select id="vehicle" name="vehicle" required>
+            <option value="">請選擇配送工具</option>
+            <option value="機車">機車</option>
+            <option value="汽車">汽車</option>
+          </select>
         </div>
-        <label class="checkRow">
-          <input id="businessConditionAgree" name="businessConditionAgree" type="checkbox" required>
-          <span>是，我了解條件規範。</span>
-        </label>
+
+        <div class="field">
+          <label>車牌號碼<span class="requiredMark">*</span></label>
+          <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" required>
+        </div>
+
+        <div class="field">
+          <label>可服務區域<span class="requiredMark">*</span></label>
+          <input id="serviceArea" name="serviceArea" type="text" placeholder="例如：豐原、潭子、神岡、大雅" required>
+        </div>
+
+        <div class="field">
+          <label>可服務時段<span class="requiredMark">*</span></label>
+          <select id="availableTime" name="availableTime" required>
+            <option value="">請選擇可服務時段</option>
+            <option value="白天">白天</option>
+            <option value="晚上">晚上</option>
+            <option value="全天">全天</option>
+            <option value="彈性配合">彈性配合</option>
+          </select>
+        </div>
       </div>
 
-      <div class="agreeBox">
-        <div class="agreeTitle">是否已有機車強制險？<span class="requiredMark">*</span></div>
-        <label class="checkRow">
-          <input id="insuranceConfirm" name="insuranceConfirm" type="checkbox" required>
-          <span>是，我確認本人或車輛已有機車強制險，並了解須自行承擔相關風險。</span>
-        </label>
-      </div>
+      <div class="sectionTitle">合作規範確認</div>
 
-      <div class="agreeBox">
-        <div class="agreeTitle">若發生以下情況，UBee 有權進行警告、暫停派單或終止合作：無故爽約、偽造完成紀錄、私接客戶。<span class="requiredMark">*</span></div>
-        <label class="checkRow">
-          <input id="violationConfirm" name="violationConfirm" type="checkbox" required>
-          <span>已了解。</span>
-        </label>
-      </div>
+      <div class="agreeGrid">
 
-      <div class="agreeBox">
-        <div class="agreeTitle">本合作為接案合作性質，非勞雇關係，UBee 不保證派單量，報酬依實際完成任務結算。<span class="requiredMark">*</span></div>
-        <label class="checkRow">
-          <input id="contractConfirm" name="contractConfirm" type="checkbox" required>
-          <span>我已閱讀並同意。</span>
-        </label>
-      </div>
+        <div class="agreeBox">
+          <div class="agreeIcon">📦</div>
+          <div class="agreeTitle">商務急件與物品遞送</div>
+          <div class="agreeDesc">
+            可接受文件、合約、發票、小型商務物件等即時任務，並重視準時與安全交付。
+          </div>
+          <label class="checkRow">
+            <input id="businessConditionAgree" name="businessConditionAgree" type="checkbox" required>
+            <span>我了解條件規範</span>
+          </label>
+        </div>
 
-      <div class="agreeBox">
-        <div class="agreeTitle">本人已了解並同意 UBee 騎手規範，包括但不限於：不私接客戶、不私下收價、不偽造完成紀錄，違規者 UBee 有權警告、停權或終止合作。<span class="requiredMark">*</span></div>
-        <label class="checkRow">
-          <input id="riderRuleConfirm" name="riderRuleConfirm" type="checkbox" required>
-          <span>我已閱讀並同意。</span>
-        </label>
-      </div>
+        <div class="agreeBox">
+          <div class="agreeIcon">🛡️</div>
+          <div class="agreeTitle">保險與風險確認</div>
+          <div class="agreeDesc">
+            本人或車輛已有機車強制險，並了解接案過程須自行承擔相關交通與執行風險。
+          </div>
+          <label class="checkRow">
+            <input id="insuranceConfirm" name="insuranceConfirm" type="checkbox" required>
+            <span>我已確認</span>
+          </label>
+        </div>
 
-      <div class="agreeBox">
-        <div class="agreeTitle">本人了解 UBee 僅為任務媒合平台，若因本人疏失造成貨物遺失、損壞，須配合平台進行責任釐清與處理。<span class="requiredMark">*</span></div>
-        <label class="checkRow">
-          <input id="liabilityConfirm" name="liabilityConfirm" type="checkbox" required>
-          <span>同意。</span>
-        </label>
-      </div>
+        <div class="agreeBox">
+          <div class="agreeIcon">🚫</div>
+          <div class="agreeTitle">禁止私接客戶</div>
+          <div class="agreeDesc">
+            不私接客戶、不私下收價、不繞過平台交易。違規者 UBee 有權警告、暫停或終止合作。
+          </div>
+          <label class="checkRow">
+            <input id="violationConfirm" name="violationConfirm" type="checkbox" required>
+            <span>已了解</span>
+          </label>
+        </div>
 
-      <div class="agreeBox">
-        <div class="agreeTitle">本人同意 UBee 於合作及派單必要範圍內，蒐集、處理及使用本人個人資料。<span class="requiredMark">*</span></div>
-        <label class="checkRow">
-          <input id="privacyConfirm" name="privacyConfirm" type="checkbox" required>
-          <span>同意。</span>
-        </label>
+        <div class="agreeBox">
+          <div class="agreeIcon">🤝</div>
+          <div class="agreeTitle">接案合作性質</div>
+          <div class="agreeDesc">
+            本合作為接案合作性質，非勞雇關係。UBee 不保證派單量，報酬依實際完成任務結算。
+          </div>
+          <label class="checkRow">
+            <input id="contractConfirm" name="contractConfirm" type="checkbox" required>
+            <span>我已閱讀並同意</span>
+          </label>
+        </div>
+
+        <div class="agreeBox">
+          <div class="agreeIcon">📋</div>
+          <div class="agreeTitle">遵守騎手規範</div>
+          <div class="agreeDesc">
+            包含不得私接客戶、不得私下收費、不得偽造完成紀錄，並須依平台任務流程操作。
+          </div>
+          <label class="checkRow">
+            <input id="riderRuleConfirm" name="riderRuleConfirm" type="checkbox" required>
+            <span>我已閱讀並同意</span>
+          </label>
+        </div>
+
+        <div class="agreeBox">
+          <div class="agreeIcon">⚠️</div>
+          <div class="agreeTitle">責任釐清與處理</div>
+          <div class="agreeDesc">
+            UBee 為任務媒合平台，若因本人疏失造成貨物遺失或損壞，須配合平台釐清與處理。
+          </div>
+          <label class="checkRow">
+            <input id="liabilityConfirm" name="liabilityConfirm" type="checkbox" required>
+            <span>同意</span>
+          </label>
+        </div>
+
+        <div class="agreeBox">
+          <div class="agreeIcon">🔐</div>
+          <div class="agreeTitle">個人資料使用</div>
+          <div class="agreeDesc">
+            本人同意 UBee 於合作審核、派單聯繫與必要營運範圍內，蒐集、處理及使用個人資料。
+          </div>
+          <label class="checkRow">
+            <input id="privacyConfirm" name="privacyConfirm" type="checkbox" required>
+            <span>同意</span>
+          </label>
+        </div>
+
       </div>
 
       <div class="note">
