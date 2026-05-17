@@ -809,6 +809,10 @@ const profile = await liff.getProfile();
 window.lineUserId = profile.userId;
 console.log('LINE User ID:', profile.userId);
 
+const profile = await liff.getProfile();
+window.lineUserId = profile.userId;
+console.log('LINE User ID:', profile.userId);
+
   } catch (err) {
     console.error('LIFF 初始化失敗:', err);
   }
