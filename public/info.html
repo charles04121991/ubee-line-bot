@@ -7,26 +7,17 @@
 
 <style>
 :root{
-  --bg:#000000;
-  --card:#111111;
-  --card2:#181818;
-  --card3:#1f1f1f;
-
-  --white:#ffffff;
-  --text:#f2f2f2;
-  --muted:#a6a6a6;
-  --muted2:#737373;
-
-  --line:#2a2a2a;
-  --line2:#333333;
-
-  --primary:#ffffff;
-  --primaryText:#000000;
-
+  --bg:#000;
+  --card:#0f0f0f;
+  --card2:#151515;
+  --white:#fff;
+  --text:#f4f4f4;
+  --muted:#a5a5a5;
+  --muted2:#707070;
+  --line:rgba(255,255,255,.10);
+  --line2:rgba(255,255,255,.16);
   --green:#22c55e;
   --red:#ef4444;
-
-  --radius:22px;
 }
 
 *{
@@ -41,8 +32,8 @@ html{
 body{
   margin:0;
   font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-  background:var(--bg);
-  color:var(--white);
+  background:#000;
+  color:#fff;
   min-height:100vh;
   overflow-x:hidden;
 }
@@ -51,7 +42,7 @@ body{
   width:100%;
   max-width:760px;
   margin:0 auto;
-  padding:22px 16px 42px;
+  padding:24px 18px 44px;
 }
 
 .topbar{
@@ -64,72 +55,71 @@ body{
 .brand{
   display:flex;
   align-items:center;
-  gap:11px;
+  gap:12px;
 }
 
 .logoU{
-  width:42px;
-  height:42px;
-  border-radius:13px;
+  width:46px;
+  height:46px;
+  border-radius:14px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:25px;
+  font-size:28px;
   font-weight:1000;
   color:#000;
   background:#fff;
 }
 
-.brandText{
-  line-height:1.15;
-}
-
 .brandText b{
   display:block;
-  font-size:21px;
-  letter-spacing:.2px;
+  font-size:26px;
+  font-weight:1000;
 }
 
 .brandText span{
   display:block;
   color:var(--muted);
   font-size:12px;
-  letter-spacing:1.6px;
+  letter-spacing:2px;
   text-transform:uppercase;
+  font-weight:900;
 }
 
 .status{
-  color:var(--text);
-  font-size:12px;
-  font-weight:800;
+  color:#fff;
+  font-size:13px;
+  font-weight:1000;
   border:1px solid var(--line2);
   border-radius:999px;
-  padding:8px 10px;
-  background:var(--card2);
-}
-
-.card{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:18px;
-  margin-bottom:14px;
+  padding:9px 14px;
+  background:#111;
+  letter-spacing:1.5px;
 }
 
 .hero{
-  padding:22px 18px 18px;
+  position:relative;
+  overflow:hidden;
+  border-radius:28px;
+  padding:30px 24px;
+  margin-bottom:22px;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255,255,255,.16), transparent 32%),
+    linear-gradient(135deg,#242424,#101010 52%,#050505);
+  border:1px solid var(--line2);
+  box-shadow:0 18px 45px rgba(255,255,255,.04);
 }
 
 .heroBadge{
   display:inline-flex;
   align-items:center;
-  gap:8px;
+  gap:9px;
   color:var(--muted);
   font-size:12px;
-  font-weight:900;
-  letter-spacing:1.6px;
+  font-weight:1000;
+  letter-spacing:2px;
   text-transform:uppercase;
-  margin-bottom:12px;
+  margin-bottom:18px;
 }
 
 .heroBadge::before{
@@ -141,90 +131,163 @@ body{
 }
 
 .title{
-  font-size:31px;
+  font-size:42px;
+  line-height:1.1;
+  margin:0 0 14px;
   font-weight:1000;
-  line-height:1.18;
-  letter-spacing:.2px;
-  margin:0 0 10px;
+  letter-spacing:-.8px;
 }
 
 .sub{
-  font-size:15px;
-  color:var(--muted);
+  font-size:16px;
+  color:#cfcfcf;
   line-height:1.8;
   margin:0;
+  font-weight:800;
+}
+
+.heroIcon{
+  position:absolute;
+  right:24px;
+  top:58px;
+  width:88px;
+  height:88px;
+  border-radius:999px;
+  border:1px solid var(--line2);
+  background:rgba(255,255,255,.04);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:46px;
+  font-weight:1000;
+  color:#fff;
 }
 
 .menuGrid{
   display:grid;
-  grid-template-columns:1fr;
-  gap:12px;
-  margin-top:18px;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-bottom:22px;
 }
 
-.menuBtn{
-  width:100%;
+.menuCard{
+  position:relative;
+  min-height:178px;
   border:1px solid var(--line);
-  border-radius:18px;
-  padding:16px;
+  background:#0f0f0f;
+  border-radius:26px;
+  padding:22px;
   cursor:pointer;
   text-align:left;
-  background:var(--card2);
-  color:var(--white);
-  transition:.16s ease;
-}
-
-.menuBtn:active{
-  transform:scale(.985);
-  background:var(--card3);
-}
-
-.menuBtnTop{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
+  color:#fff;
+  font-family:inherit;
 }
 
 .menuIcon{
-  width:42px;
-  height:42px;
-  border-radius:14px;
+  width:62px;
+  height:62px;
+  border-radius:22px;
+  border:1px solid var(--line2);
+  background:linear-gradient(145deg,#242424,#111);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:20px;
-  background:#242424;
-  border:1px solid var(--line2);
-  color:var(--white);
+  font-size:34px;
+  margin-bottom:24px;
 }
 
 .menuArrow{
-  width:32px;
-  height:32px;
-  border-radius:50%;
+  position:absolute;
+  right:20px;
+  top:28px;
+  width:38px;
+  height:38px;
+  border-radius:999px;
   display:flex;
   align-items:center;
   justify-content:center;
-  color:#000;
   background:#fff;
+  color:#000;
+  font-size:28px;
   font-weight:1000;
-  font-size:22px;
 }
 
-.menuBtn b{
-  display:block;
-  font-size:20px;
-  margin-top:13px;
-  letter-spacing:.2px;
+.menuTitle{
+  font-size:28px;
+  font-weight:1000;
+  margin-bottom:8px;
 }
 
-.menuBtn span{
-  display:block;
+.menuDesc{
+  color:var(--muted);
+  font-size:15px;
+  line-height:1.7;
+  font-weight:800;
+}
+
+.card{
+  background:#0f0f0f;
+  border:1px solid var(--line);
+  border-radius:28px;
+  padding:22px;
+  margin-bottom:22px;
+}
+
+.sectionTitle{
+  font-size:26px;
+  font-weight:1000;
+  margin:0 0 8px;
+}
+
+.sectionDesc{
   color:var(--muted);
   font-size:14px;
-  line-height:1.6;
-  margin-top:5px;
+  line-height:1.8;
+  font-weight:800;
+  margin-bottom:20px;
+}
+
+.cancelFlow{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+
+.cancelStep{
+  text-align:center;
+  position:relative;
+}
+
+.cancelIcon{
+  width:58px;
+  height:58px;
+  border-radius:999px;
+  border:1px solid var(--line2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 12px;
+  font-size:24px;
+  background:#111;
+}
+
+.cancelStep.danger .cancelIcon{
+  border-color:rgba(239,68,68,.9);
+  color:var(--red);
+}
+
+.cancelStep b{
+  display:block;
+  font-size:16px;
+  margin-bottom:6px;
+}
+
+.cancelStep span{
+  display:block;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.55;
+  font-weight:800;
 }
 
 .section{
@@ -237,150 +300,239 @@ body{
 }
 
 @keyframes fadeIn{
-  from{opacity:0; transform:translateY(8px)}
-  to{opacity:1; transform:translateY(0)}
+  from{opacity:0;transform:translateY(8px);}
+  to{opacity:1;transform:translateY(0);}
 }
 
-.sectionHeader{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:14px;
-}
-
-.sectionTitle{
-  font-size:27px;
-  font-weight:1000;
-  margin:0;
-  line-height:1.25;
-}
-
-.sectionDesc{
-  color:var(--muted);
-  font-size:14px;
-  line-height:1.7;
-  margin:7px 0 0;
-}
-
-.tag{
-  flex:0 0 auto;
-  color:var(--text);
-  border:1px solid var(--line2);
-  background:var(--card2);
-  border-radius:999px;
-  padding:7px 10px;
-  font-size:12px;
-  font-weight:900;
-  letter-spacing:.8px;
-}
-
-.item{
-  background:var(--card2);
-  border:1px solid var(--line);
-  border-radius:18px;
-  padding:15px 16px;
-  margin-top:10px;
-  line-height:1.75;
-}
-
-.item b{
+.pageTitle{
   display:flex;
   align-items:center;
-  gap:8px;
-  font-size:16px;
-  margin-bottom:4px;
-  color:var(--white);
+  gap:12px;
+  margin-bottom:16px;
 }
 
-.item b::before{
-  content:"";
-  width:6px;
-  height:6px;
-  border-radius:50%;
-  background:var(--white);
-  flex:0 0 auto;
+.backBtn{
+  width:42px;
+  height:42px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:#111;
+  color:#fff;
+  font-size:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
 }
 
-.item span{
+.pageTitle h2{
+  flex:1;
+  text-align:center;
+  margin:0;
+  font-size:25px;
+  font-weight:1000;
+}
+
+.ruleItem{
+  display:flex;
+  gap:16px;
+  align-items:flex-start;
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:18px;
+  background:#111;
+  margin-top:12px;
+}
+
+.ruleNo{
+  width:38px;
+  height:38px;
+  border-radius:999px;
+  border:1px solid var(--line2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  font-weight:1000;
+  flex:0 0 38px;
+}
+
+.ruleItem.danger{
+  border-color:rgba(239,68,68,.35);
+}
+
+.ruleItem.danger .ruleNo,
+.ruleItem.danger b{
+  color:var(--red);
+  border-color:var(--red);
+}
+
+.ruleText b{
   display:block;
-  font-size:15px;
+  font-size:20px;
+  margin-bottom:6px;
+}
+
+.ruleText span{
+  display:block;
   color:var(--muted);
+  font-size:15px;
+  line-height:1.75;
+  font-weight:800;
 }
 
-.notice{
-  border-color:rgba(239,68,68,.42);
-  background:rgba(239,68,68,.08);
+.faqItem{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#111;
+  margin-top:10px;
+  overflow:hidden;
 }
 
-.notice b::before{
-  background:var(--red);
-}
-
-.btn{
+.faqQuestion{
   width:100%;
-  padding:15px 16px;
-  border-radius:16px;
-  border:1px solid transparent;
+  border:0;
+  background:transparent;
+  color:#fff;
+  padding:17px;
+  font-size:15px;
+  font-weight:1000;
+  text-align:left;
+  font-family:inherit;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  cursor:pointer;
+}
+
+.faqAnswer{
+  display:none;
+  padding:0 17px 17px;
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.75;
+  font-weight:800;
+}
+
+.faqItem.open .faqAnswer{
+  display:block;
+}
+
+.supportBtn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  min-height:66px;
+  border-radius:22px;
+  border:1px solid #fff;
+  color:#fff;
+  background:#000;
+  text-decoration:none;
+  font-size:20px;
+  font-weight:1000;
+  margin:24px 0 0;
+}
+
+.backHome{
+  width:100%;
+  min-height:56px;
+  border-radius:18px;
+  border:1px solid var(--line2);
+  background:#111;
+  color:#fff;
   font-size:16px;
   font-weight:1000;
-  margin-top:12px;
-  cursor:pointer;
-  transition:.16s ease;
   font-family:inherit;
-}
-
-.btn:active{
-  transform:scale(.985);
-}
-
-.btn-dark{
-  background:var(--card2);
-  color:var(--white);
-  border-color:var(--line2);
+  margin-top:18px;
+  cursor:pointer;
 }
 
 .footer{
   color:var(--muted2);
   text-align:center;
-  font-size:12px;
-  line-height:1.7;
-  padding:12px 0 0;
+  font-size:13px;
+  line-height:1.8;
+  padding:20px 0 0;
+  font-weight:800;
 }
 
 .footer b{
   color:var(--muted);
+  font-size:15px;
 }
 
-@media (min-width:560px){
-  .menuGrid{
-    grid-template-columns:1fr 1fr;
-  }
-
+@media(max-width:640px){
   .container{
-    padding-top:30px;
+    padding:20px 14px 40px;
   }
 
   .title{
-    font-size:35px;
+    font-size:36px;
+  }
+
+  .heroIcon{
+    width:74px;
+    height:74px;
+    font-size:38px;
+    right:20px;
+    top:62px;
+  }
+
+  .hero .sub{
+    padding-right:82px;
+  }
+
+  .cancelFlow{
+    grid-template-columns:repeat(2,1fr);
+    gap:18px 10px;
   }
 }
 
-@media (max-width:420px){
-  .title{
-    font-size:30px;
+@media(max-width:420px){
+  .logoU{
+    width:42px;
+    height:42px;
+    font-size:26px;
   }
 
-  .sectionTitle{
-    font-size:25px;
+  .brandText b{
+    font-size:24px;
   }
 
-  .card{
-    border-radius:20px;
+  .brandText span{
+    font-size:11px;
   }
 
   .status{
-    display:none;
+    font-size:12px;
+    padding:8px 12px;
+  }
+
+  .title{
+    font-size:34px;
+  }
+
+  .menuGrid{
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .menuCard{
+    min-height:168px;
+    padding:18px;
+  }
+
+  .menuTitle{
+    font-size:25px;
+  }
+
+  .menuDesc{
+    font-size:14px;
+  }
+
+  .supportBtn{
+    font-size:18px;
   }
 }
 </style>
@@ -401,115 +553,201 @@ body{
     <div class="status">INFO</div>
   </div>
 
-  <!-- 主選單 -->
-  <div id="menu" class="card hero section active">
-    <div class="heroBadge">UBee Service</div>
-    <h1 class="title">我的資訊</h1>
-    <p class="sub">
-      你可以在這裡查看 UBee 的取消規則與常見問題。
-    </p>
+  <section id="home" class="section active">
+
+    <div class="hero">
+      <div class="heroBadge">UBee Info Center</div>
+      <h1 class="title">我的資訊中心</h1>
+      <p class="sub">
+        服務規則｜常見問題｜使用須知<br>
+        你可以在這裡查看取消規則與常見問題。
+      </p>
+      <div class="heroIcon">i</div>
+    </div>
 
     <div class="menuGrid">
-      <button class="menuBtn" onclick="showSection('cancelRules')">
-        <div class="menuBtnTop">
-          <div class="menuIcon">✕</div>
-          <div class="menuArrow">›</div>
-        </div>
-        <b>取消規則</b>
-        <span>查看不同任務階段的取消費用與處理方式</span>
+      <button class="menuCard" type="button" onclick="showSection('cancelRules')">
+        <div class="menuArrow">›</div>
+        <div class="menuIcon">×</div>
+        <div class="menuTitle">取消規則</div>
+        <div class="menuDesc">查看不同任務階段的取消費用與處理方式</div>
       </button>
 
-      <button class="menuBtn" onclick="showSection('faq')">
-        <div class="menuBtnTop">
-          <div class="menuIcon">?</div>
-          <div class="menuArrow">›</div>
-        </div>
-        <b>常見問題</b>
-        <span>了解 UBee 服務內容、付款方式與注意事項</span>
+      <button class="menuCard" type="button" onclick="showSection('faq')">
+        <div class="menuArrow">›</div>
+        <div class="menuIcon">?</div>
+        <div class="menuTitle">常見問題</div>
+        <div class="menuDesc">了解服務內容、付款方式與注意事項</div>
       </button>
     </div>
-  </div>
 
-  <!-- 取消規則 -->
-  <div id="cancelRules" class="card section">
-    <div class="sectionHeader">
-      <div>
-        <h2 class="sectionTitle">取消規則</h2>
-        <p class="sectionDesc">取消費用會依任務進行階段判斷，實際狀況仍以 UBee 系統與客服確認為準。</p>
+    <div class="card">
+      <div class="sectionTitle">取消規則重點</div>
+      <div class="sectionDesc">實際以 UBee 系統與客服判定為準。</div>
+
+      <div class="cancelFlow">
+        <div class="cancelStep">
+          <div class="cancelIcon">①</div>
+          <b>未接單</b>
+          <span>可免費取消</span>
+        </div>
+
+        <div class="cancelStep">
+          <div class="cancelIcon">②</div>
+          <b>已接單</b>
+          <span>配送費 30%<br>NT$60–200</span>
+        </div>
+
+        <div class="cancelStep">
+          <div class="cancelIcon">③</div>
+          <b>已抵達取件</b>
+          <span>配送費 50%<br>NT$100–300</span>
+        </div>
+
+        <div class="cancelStep danger">
+          <div class="cancelIcon">④</div>
+          <b>已取件後</b>
+          <span>原則上不可取消</span>
+        </div>
       </div>
-      <div class="tag">CANCEL</div>
     </div>
 
-    <div class="item">
-      <b>① 未接單</b>
-      <span>任務尚未由合作夥伴接單前，可免費取消。</span>
+    <a class="supportBtn" href="https://lin.ee/WFgXVND">
+      如有問題，請聯繫 UBee 客服 →
+    </a>
+
+  </section>
+
+  <section id="cancelRules" class="section">
+
+    <div class="pageTitle">
+      <button class="backBtn" type="button" onclick="showSection('home')">‹</button>
+      <h2>取消規則</h2>
+      <div style="width:42px;"></div>
     </div>
 
-    <div class="item">
-      <b>② 已接單</b>
-      <span>合作夥伴已接單後，酌收配送費 30%，最低 NT$60，最高 NT$200。</span>
-    </div>
-
-    <div class="item">
-      <b>③ 已抵達取件地點</b>
-      <span>合作夥伴已抵達取件地點後，酌收配送費 50%，最低 NT$100，最高 NT$300。</span>
-    </div>
-
-    <div class="item notice">
-      <b>④ 已取件後</b>
-      <span>已取件或進入送達流程後，原則上不可取消。若遇特殊狀況，請立即聯繫 UBee 協助處理。</span>
-    </div>
-
-    <button class="btn btn-dark" onclick="showSection('menu')">返回我的資訊</button>
-  </div>
-
-  <!-- 常見問題 -->
-  <div id="faq" class="card section">
-    <div class="sectionHeader">
-      <div>
-        <h2 class="sectionTitle">常見問題</h2>
-        <p class="sectionDesc">以下整理 UBee 常見服務問題，方便你快速了解任務流程與注意事項。</p>
+    <div class="card">
+      <div class="sectionDesc">
+        以下整理會依任務進行階段判斷，實際狀況仍以 UBee 系統與客服確認為準。
       </div>
-      <div class="tag">FAQ</div>
+
+      <div class="ruleItem">
+        <div class="ruleNo">1</div>
+        <div class="ruleText">
+          <b>未接單</b>
+          <span>任務尚未由合作夥伴接單前，可免費取消。</span>
+        </div>
+      </div>
+
+      <div class="ruleItem">
+        <div class="ruleNo">2</div>
+        <div class="ruleText">
+          <b>已接單</b>
+          <span>合作夥伴已接單後，酌收配送費 30%，最低 NT$60，最高 NT$200。</span>
+        </div>
+      </div>
+
+      <div class="ruleItem">
+        <div class="ruleNo">3</div>
+        <div class="ruleText">
+          <b>已抵達取件地點</b>
+          <span>合作夥伴已抵達取件地點後，酌收配送費 50%，最低 NT$100，最高 NT$300。</span>
+        </div>
+      </div>
+
+      <div class="ruleItem danger">
+        <div class="ruleNo">4</div>
+        <div class="ruleText">
+          <b>已取件後</b>
+          <span>已取件或進入送達流程後，原則上不可取消。若遇特殊狀況，請立即聯繫 UBee 協助處理。</span>
+        </div>
+      </div>
+
+      <button class="backHome" type="button" onclick="showSection('home')">返回我的資訊</button>
     </div>
 
-    <div class="item">
-      <b>Q1：UBee 可以協助哪些任務？</b>
-      <span>文件急送、合約／發票配送、樣品與商務物品配送、個人物品代送、指定事項與臨時任務支援。</span>
+  </section>
+
+  <section id="faq" class="section">
+
+    <div class="pageTitle">
+      <button class="backBtn" type="button" onclick="showSection('home')">‹</button>
+      <h2>常見問題</h2>
+      <div style="width:42px;"></div>
     </div>
 
-    <div class="item">
-      <b>Q2：UBee 不承接哪些項目？</b>
-      <span>違法物品、危險品、易燃物、活體動物、高價未保管物、高度個資風險物品，或需特殊證照才可執行的項目。</span>
+    <div class="card">
+      <div class="sectionDesc">
+        以下整理 UBee 常見服務問題，方便你快速了解任務流程與注意事項。
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQuestion" type="button" onclick="toggleFaq(this)">
+          Q1：UBee 可以協助哪些任務？ <span>›</span>
+        </button>
+        <div class="faqAnswer">
+          文件急送、合約／發票配送、樣品與商務物品配送、個人物品代送、指定事項與臨時任務支援。
+        </div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQuestion" type="button" onclick="toggleFaq(this)">
+          Q2：UBee 不承接哪些項目？ <span>›</span>
+        </button>
+        <div class="faqAnswer">
+          違法物品、危險品、易燃物、活體動物、高價未保管物、高度個資風險物品，或需特殊證照才可執行的項目。
+        </div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQuestion" type="button" onclick="toggleFaq(this)">
+          Q3：多久可以完成任務？ <span>›</span>
+        </button>
+        <div class="faqAnswer">
+          依距離、路況、任務內容與配送速度而定。系統會依 Google Maps 預估距離與時間作為參考。
+        </div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQuestion" type="button" onclick="toggleFaq(this)">
+          Q4：費用怎麼計算？ <span>›</span>
+        </button>
+        <div class="faqAnswer">
+          費用會依距離、時間、服務費、速度選項與任務情況計算，送出前會顯示預估費用。
+        </div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQuestion" type="button" onclick="toggleFaq(this)">
+          Q5：付款方式有哪些？ <span>›</span>
+        </button>
+        <div class="faqAnswer">
+          目前支援街口支付。付款完成後，請依系統流程完成付款確認。
+        </div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQuestion" type="button" onclick="toggleFaq(this)">
+          Q6：什麼是等候費？ <span>›</span>
+        </button>
+        <div class="faqAnswer">
+          合作夥伴抵達現場後，如需額外等待，可能會依現場狀況申請等候費 NT$60。
+        </div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQuestion" type="button" onclick="toggleFaq(this)">
+          Q7：有開發票或收據嗎？ <span>›</span>
+        </button>
+        <div class="faqAnswer">
+          目前可提供交易紀錄或收據資訊，暫不開立統一發票。
+        </div>
+      </div>
+
+      <button class="backHome" type="button" onclick="showSection('home')">返回我的資訊</button>
     </div>
 
-    <div class="item">
-      <b>Q3：多久可以完成任務？</b>
-      <span>依距離、路況、任務內容與配送速度而定。系統會依 Google Maps 預估距離與時間作為參考。</span>
-    </div>
-
-    <div class="item">
-      <b>Q4：費用怎麼計算？</b>
-      <span>費用會依距離、時間、服務費、急件需求與任務情況計算，送出前會顯示預估費用。</span>
-    </div>
-
-    <div class="item">
-      <b>Q5：付款方式有哪些？</b>
-      <span>目前支援街口支付與銀行轉帳。付款完成後，請依系統流程完成付款確認。</span>
-    </div>
-
-    <div class="item">
-      <b>Q6：什麼是等候費？</b>
-      <span>合作夥伴抵達現場後，如需額外等待，可能會依現場狀況申請等候費 NT$60。</span>
-    </div>
-
-    <div class="item">
-      <b>Q7：有開發票或收據嗎？</b>
-      <span>目前可提供交易紀錄或收據資訊，暫不開立統一發票。</span>
-    </div>
-
-    <button class="btn btn-dark" onclick="showSection('menu')">返回我的資訊</button>
-  </div>
+  </section>
 
   <div class="footer">
     <b>UBee 城市任務平台</b><br>
@@ -525,10 +763,16 @@ function showSection(id){
   });
 
   const target = document.getElementById(id);
+
   if(target){
     target.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top:0, behavior:'smooth' });
   }
+}
+
+function toggleFaq(btn){
+  const item = btn.closest('.faqItem');
+  item.classList.toggle('open');
 }
 </script>
 
