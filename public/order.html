@@ -1037,7 +1037,7 @@ function selectService(el, value){
     document.getElementById('field-purchase').classList.remove('hidden');
   }
 
-  if(value === '臨時任務' || value === '幫排隊' || value === '小型搬運'){
+  if(value === '臨時任務' || value === '幫排隊' || value === '任務協運'){
     document.getElementById('field-task').classList.remove('hidden');
   }
 }
@@ -1180,7 +1180,7 @@ function validateData(data){
   if(!validateStep2()) return false;
 
   if(data.pickup.length > 120 || data.dropoff.length > 120){
-    alert('地址內容過長，請縮短到 120 字內。');
+    alert('地址內容過長，請縮短到 20 字內。');
     return false;
   }
 
@@ -1236,7 +1236,7 @@ function renderConfirmSummary(){
     <div class="summary-row">
       <div class="summary-icon">▣</div>
       <div>
-        <div class="summary-label">物品資訊</div>
+        <div class="summary-label">物品資訊(如是包裹，請協助說明內容物，人員抵達確認無誤再封箱</div>
         <div class="summary-value">${data.item}${data.note ? '<br>' + data.note.replace(/\n/g,'<br>') : ''}</div>
       </div>
     </div>
