@@ -47,9 +47,7 @@ const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
   .filter(Boolean);
 
 // ===== 已審核騎手白名單 =====
-const APPROVED_RIDER_IDS = [
-  'Uxxxxxxxxxxxxxxxxxxxx'
-];
+const APPROVED_RIDER_IDS = [];
 
 const PAYMENT_JKO_INFO =
   (process.env.PAYMENT_JKO_INFO || '街口支付\n帳號：請填入你的街口帳號').replace(/\\n/g, '\n');
@@ -112,17 +110,6 @@ app.use(express.static(path.join(__dirname, 'public'), {
   },
 }));
 
-app.use(express.static(path.join(__dirname, 'public'), {
-  etag: false,
-  lastModified: false,
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  },
-}));
-
 app.get("/", (req, res) => {
   res.redirect("/order.html");
 });
@@ -153,6 +140,29 @@ app.post('/api/rider/register', async (req, res) => {
         message: '資料不完整，請確認姓名、電話、配送工具與服務區域都有填寫。',
       });
     }
+
+const cleanPhone = normalizePhone(phone);
+
+if(!/^09\d{8}$/.test(cleanPhone)){
+  return res.json({
+    success: false,
+    message: '請輸入正確手機號碼。',
+  });
+}
+
+if(String(name).trim().length < 2 || String(name).trim().length > 20){
+  return res.json({
+    success: false,
+    message: '姓名長度需為 2～20 字。',
+  });
+}
+
+if(plateNumber && String(plateNumber).trim().length > 20){
+  return res.json({
+    success: false,
+    message: '車牌號碼不可超過 20 字。',
+  });
+}
 
     const riderId = 'R' + Date.now();
 
@@ -1376,7 +1386,13 @@ app.post('/estimate', async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-  try {
+    try {
+    if(!req.body || typeof req.body !== 'object'){
+    return res.status(400).json({
+    success:false,
+    error:'訂單資料格式錯誤'
+  });
+}
     const data = createOrderFromApi(req.body);
 
     console.log('========== H5 建立訂單 ==========');
@@ -1400,6 +1416,12 @@ app.post('/api/orders', async (req, res) => {
     }
 
     const distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
+    if(!distance || !distance.distanceMeters || !distance.durationSeconds){
+    return res.status(400).json({
+    success: false,
+    error: '地址無法計算距離，請確認取件與送達地址是否完整。'
+  });
+}
     const price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
