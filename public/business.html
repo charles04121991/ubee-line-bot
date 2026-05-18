@@ -459,11 +459,29 @@ document.getElementById('businessForm').addEventListener('submit', async functio
     return;
 }
 
+  if(companyName.length < 2 || companyName.length > 80){
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '公司 / 店家名稱需為 2～80 字。';
+    return;
+}
+
+  if(contactName.length < 2 || contactName.length > 40){
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '聯絡人姓名需為 2～40 字。';
+    return;
+}
+
   if(selectedTypes.length === 0){
     errorBox.style.display = 'block';
     errorBox.innerHTML = '請至少選擇一個合作類型。';
     return;
   }
+
+  if(note.length > 500){
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '備註內容不可超過 500 字。';
+    return;
+}
 
   if(!window.lineUserId){
     errorBox.style.display = 'block';
