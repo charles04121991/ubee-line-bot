@@ -994,7 +994,7 @@ function updateStepUI(){
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
-function goNext(){
+async function goNext(){
   if(currentStep === 1 && !serviceType){
     alert('請選擇服務類型');
     return;
@@ -1005,9 +1005,8 @@ function goNext(){
   }
 
   if(currentStep === 3){
-    calculateEstimate(true);
-  }
-
+  await calculateEstimate(true);
+}
   if(currentStep < 5){
     currentStep++;
     updateStepUI();
