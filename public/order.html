@@ -1478,7 +1478,10 @@ async function confirmPaid(){
 
     alert('✅ 已收到付款通知，系統已開始派單');
     btn.innerText = '已確認付款';
-
+    btn.disabled = true;
+    document.getElementById('cancelOrderBtn').classList.add('hidden');
+    document.getElementById('jkoBtn').classList.add('hidden');
+    
   }catch(err){
     alert('❌ ' + err.message);
     isConfirmingPaid = false;
