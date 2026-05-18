@@ -873,7 +873,24 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
     errorBox.innerHTML = '請完整填寫所有必填資料。';
     return;
   }
+  
+  if (name.length < 2 || name.length > 20) {
+  errorBox.style.display = 'block';
+  errorBox.innerHTML = '姓名長度需為 2～20 字。';
+  return;
+}
 
+if (plateNumber.length > 20) {
+  errorBox.style.display = 'block';
+  errorBox.innerHTML = '車牌號碼不可超過 20 字。';
+  return;
+}
+
+if (!/^09\d{8}$/.test(phone)) {
+  errorBox.style.display = 'block';
+  errorBox.innerHTML = '請輸入正確手機號碼，例如：0912345678。';
+  return;
+}
   if (!realLineUserId || !realLineUserId.startsWith('U')) {
     errorBox.style.display = 'block';
     errorBox.innerHTML = '請從 LINE 官方帳號內開啟此頁面，系統需要取得 LINE 身分才能送出申請。';
