@@ -453,6 +453,12 @@ document.getElementById('businessForm').addEventListener('submit', async functio
     return;
   }
 
+  if (!/^09\d{8}$/.test(phone)) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請輸入正確手機號碼，例如：0912345678。';
+    return;
+}
+
   if(selectedTypes.length === 0){
     errorBox.style.display = 'block';
     errorBox.innerHTML = '請至少選擇一個合作類型。';
