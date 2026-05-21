@@ -374,10 +374,6 @@ function buildRiderTaskUrl(orderId) {
   return getPublicUrl(`rider-task.html?orderId=${encodeURIComponent(orderId || '')}`);
 }
 
-function buildRiderTaskUrl(orderId) {
-  return getPublicUrl(`rider-task.html?orderId=${encodeURIComponent(orderId || '')}`);
-}
-
 function buildTelUrl(phone) {
   const clean = normalizePhone(phone);
   return clean ? `tel:${clean}` : 'tel:';
@@ -1622,36 +1618,6 @@ app.get('/api/rider-task/:orderId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: '讀取任務失敗',
-    });
-  }
-});
-
-app.post('/api/rider-distance-to-pickup', async (req, res) => {
-  try {
-    const { riderLat, riderLng, pickupAddress } = req.body;
-
-    if (!riderLat || !riderLng || !pickupAddress) {
-      return res.status(400).json({
-        success: false,
-        error: '缺少騎士位置或取件地址',
-      });
-    }
-
-    const origin = `${riderLat},${riderLng}`;
-    const distance = await getDistanceMatrix(origin, pickupAddress);
-
-    res.json({
-      success: true,
-      distanceText: distance.distanceText,
-      durationText: distance.durationText,
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
-    });
-  } catch (error) {
-    console.error('❌ 騎士到取件地距離計算失敗：', error);
-    res.status(500).json({
-      success: false,
-      error: '距離計算失敗',
     });
   }
 });
