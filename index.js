@@ -1110,18 +1110,9 @@ function createDispatchGroupFlex(order) {
       createInfoRow('物品內容', order.item),
       createInfoRow('備註', order.note || '無'),
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
-      {
-        type: 'text',
-        text: '建議先點「查看距離 / 接單」，系統會計算你目前位置到取件地點的預估時間。',
-        size: 'sm',
-        color: '#666666',
-        wrap: true,
-        margin: 'md',
-      },
     ],
     [
-      createUriButton('查看距離 / 接單', buildRiderTaskUrl(order.id), 'primary'),
-      createActionButton('直接接受訂單', `accept=${order.id}`, 'secondary'),
+      createActionButton('接受訂單', `accept=${order.id}`, 'secondary'),
       createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress), 'secondary'),
     ]
   ));
