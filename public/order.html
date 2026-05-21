@@ -830,7 +830,7 @@
           </div>
           <div class="input-wrap">
             <div class="input-icon">✎</div>
-            <textarea id="note" maxlength="200" placeholder="備註，例如：請到櫃台取件、送達前請電話聯絡"></textarea>
+            <textarea id="note" maxlength="200" placeholder="備註，例如：請到櫃台取件、送達前請電話聯絡，如是包裹請填寫內容物"></textarea>
           </div>
         </div>
       </div>
@@ -873,7 +873,7 @@
             <div class="speed-name">標準件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">彈性安排｜60–90 分鐘｜+NT$0</div>
+          <div class="speed-desc">彈性安排｜60–90 分鐘｜+NT$30</div>
         </div>
 
         <div class="speed-card" data-value="priority" onclick="selectSpeed(this, 'priority')">
@@ -881,7 +881,7 @@
             <div class="speed-name">快速件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">即時媒合｜45–60 分鐘｜+NT$30</div>
+          <div class="speed-desc">即時媒合｜45–60 分鐘｜+NT$50</div>
         </div>
 
         <div class="speed-card" data-value="express" onclick="selectSpeed(this, 'express')">
@@ -1284,8 +1284,8 @@ function renderConfirmSummary(){
 
 function getSpeedLabel(value){
   const map = {
-    standard:'標準件｜60–90 分鐘｜+NT$0',
-    priority:'快速件｜45–60 分鐘｜+NT$30',
+    standard:'標準件｜60–90 分鐘｜+NT$30',
+    priority:'快速件｜45–60 分鐘｜+NT$50',
     express:'優先件｜30–45 分鐘｜+NT$80',
     rush:'急件｜20–30 分鐘｜+NT$150'
   };
