@@ -2016,7 +2016,7 @@ UBee 辦公室將會再依照您的需求，
 
     await notifyCustomer(
       order,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定抵達取件時間。。`)
+      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定抵達取件時間。`)
     );
 
     return replyMessages(event.replyToken, [
