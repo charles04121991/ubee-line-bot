@@ -335,8 +335,10 @@
     await liff.init({ liffId: configData.liffId });
 
     if (!liff.isLoggedIn()) {
-      liff.login();
-      return;
+      liff.login({
+        redirectUri: window.location.href
+      });
+      return false;
     }
 
     const profile = await liff.getProfile();
@@ -344,9 +346,17 @@
 
     console.log('騎士 LINE userId:', realLineUserId);
 
+    if (!realLineUserId || !realLineUserId.startsWith('U')) {
+      throw new Error('無法取得 LINE userId');
+    }
+
+    return true;
+
   } catch (err) {
     console.error('LIFF 初始化失敗:', err);
-    showMessage('warn', 'LINE 身分讀取失敗，請從 LINE 任務通知重新開啟此頁面。');
+    showMessage('err', '無法取得 LINE 騎士身分，請從 LINE 任務通知重新開啟此頁面。');
+    acceptBtn.disabled = true;
+    return false;
   }
 }
 
@@ -541,8 +551,20 @@
   acceptBtn.addEventListener('click', acceptOrder);
 
   async function initPage() {
-  await initLiff();
-  await loadTask();
+
+await loadTask();
+
+const liffReady = await initLiff();
+
+if (!liffReady) {
+    acceptBtn.disabled = true;
+    return;
+}
+
+if (currentOrder && currentOrder.status === 'pending_dispatch') {
+    acceptBtn.disabled = false;
+}
+
 }
 
 initPage();
