@@ -1054,7 +1054,7 @@ function createOrderStatusFlex(order) {
       createInfoRow('配送速度', getSpeedOption(order.speedType).label),
       createInfoRow('取件地址', order.pickupAddress),
       createInfoRow('送達地址', order.dropoffAddress),
-      createInfoRow('ETA', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '尚未設定'),
+      createInfoRow('抵達取件時間', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '尚未設定'),
       createInfoRow('付款狀態', order.isPaid ? '已付款' : '尚未付款'),
       createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
       createInfoRow('目前總金額', formatCurrency(order.total)),
@@ -1157,8 +1157,8 @@ function createEtaRow(orderId, minutesList) {
 }
 
 function createETAFlex(order) {
-  return createFlexMessage('請選擇 ETA', createBubble(
-    '請選擇 ETA',
+  return createFlexMessage('請選擇抵達取件地點時間', createBubble(
+    '請選擇抵達取件地點時間',
     [
       { type: 'text', text: '請選擇預計抵達取件地點時間。', size: 'sm', color: '#666666', wrap: true },
       createInfoRow('訂單編號', order.id),
@@ -1172,8 +1172,6 @@ function createETAFlex(order) {
 
 function createRiderControlFlex(order) {
   const footerButtons = [];
-
-  footerButtons.push(createActionButton('重新設定 ETA', `showEta=${order.id}`, 'secondary'));
 
   if (order.status === 'accepted') {
     footerButtons.push(createUriButton('撥打取件電話', buildTelUrl(order.pickupPhone), 'secondary'));
@@ -1203,7 +1201,7 @@ function createRiderControlFlex(order) {
     [
       createInfoRow('訂單編號', order.id),
       createInfoRow('狀態', getStatusLabel(order.status)),
-      createInfoRow('ETA', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '尚未設定'),
+      createInfoRow('抵達取件時間', order.etaMinutes ? `${order.etaMinutes} 分鐘` : '尚未設定'),
       createInfoRow('取件地址', order.pickupAddress),
       createInfoRow('取件電話', order.pickupPhone),
       createInfoRow('送達地址', order.dropoffAddress),
@@ -1714,7 +1712,7 @@ app.post('/api/rider/accept-order', async (req, res) => {
 
     await notifyCustomer(
       order,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定 ETA。`)
+      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定抵達取件時間。`)
     );
 
     res.json({
@@ -2018,7 +2016,7 @@ UBee 辦公室將會再依照您的需求，
 
     await notifyCustomer(
       order,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定 ETA。`)
+      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定抵達取件時間。。`)
     );
 
     return replyMessages(event.replyToken, [
@@ -2039,7 +2037,7 @@ UBee 辦公室將會再依照您的需求，
       event,
       order,
       ['accepted', 'arrived_pickup', 'picked_up', 'arrived_dropoff'],
-      '此訂單目前不能設定 ETA。'
+      ''此訂單目前不能設定抵達取件時間。'
     );
     if (!ok) return null;
 
@@ -2058,14 +2056,14 @@ UBee 辦公室將會再依照您的需求，
     if (!riderOk) return null;
 
     if (!ETA_OPTIONS.includes(minutes)) {
-      return replyText(event.replyToken, 'ETA 分鐘數不正確。');
+      return replyText(event.replyToken, '抵達取件時間不正確。');
     }
 
     const ok = await requireOrderStatus(
       event,
       order,
       ['accepted', 'arrived_pickup', 'picked_up', 'arrived_dropoff'],
-      '此訂單目前不能回報 ETA。'
+      '此訂單目前不能回報抵達取件時間。'
     );
     if (!ok) return null;
 
@@ -2075,11 +2073,11 @@ UBee 辦公室將會再依照您的需求，
 
     await notifyCustomer(
       order,
-      createTextMessage(`⏱ UBee 騎士已更新 ETA\n\n訂單編號：${order.id}\n預計 ${minutes} 分鐘抵達。`)
+      createTextMessage(`⏱️ UBee 騎士已更新抵達取件時間\n\n訂單編號：${order.id}\n預計 ${minutes} 分鐘抵達。`)
     );
 
     return replyMessages(event.replyToken, [
-      createTextMessage(`✅ 已設定 ETA：${minutes} 分鐘`),
+      createTextMessage(`✅ 已設定抵達取件時間：${minutes} 分鐘`),
       createRiderControlFlex(order),
     ]);
   }
