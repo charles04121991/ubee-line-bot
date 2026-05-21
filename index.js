@@ -1108,7 +1108,7 @@ function createDispatchGroupFlex(order) {
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
     ],
     [
-      createActionButton('接受訂單', `accept=${order.id}`, 'secondary'),
+      createActionButton('接受訂單', `accept=${order.id}`, 'primary'),
       createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress), 'secondary'),
     ]
   ));
