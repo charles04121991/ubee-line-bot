@@ -370,6 +370,10 @@ function buildGoogleMapDirectionsUrl(address) {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address || '')}`;
 }
 
+function buildRiderTaskUrl(orderId) {
+  return getPublicUrl(`rider-task.html?orderId=${encodeURIComponent(orderId || '')}`);
+}
+
 function buildTelUrl(phone) {
   const clean = normalizePhone(phone);
   return clean ? `tel:${clean}` : 'tel:';
@@ -1086,10 +1090,19 @@ function createDispatchGroupFlex(order) {
       createInfoRow('物品內容', order.item),
       createInfoRow('備註', order.note || '無'),
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
+      {
+        type: 'text',
+        text: '建議先點「查看距離 / 接單」，系統會計算你目前位置到取件地點的預估時間。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+        margin: 'md',
+      },
     ],
     [
-      createActionButton('接受訂單', `accept=${order.id}`),
-      createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress)),
+      createUriButton('查看距離 / 接單', buildRiderTaskUrl(order.id), 'primary'),
+      createActionButton('直接接受訂單', `accept=${order.id}`, 'secondary'),
+      createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress), 'secondary'),
     ]
   ));
 }
@@ -1567,6 +1580,75 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
   } catch (error) {
     console.error('❌ H5 確認付款失敗：', error);
     res.status(500).json({ success: false, error: '確認付款失敗，請稍後再試' });
+  }
+});
+
+app.get('/api/rider-task/:orderId', async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || '').toUpperCase();
+    const order = await getOrder(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    res.json({
+      success: true,
+      order: {
+        id: order.id,
+        status: order.status,
+        statusLabel: getStatusLabel(order.status),
+        serviceType: order.serviceType,
+        item: order.item,
+        pickupAddress: order.pickupAddress,
+        pickupPhone: order.pickupPhone,
+        dropoffAddress: order.dropoffAddress,
+        dropoffPhone: order.dropoffPhone,
+        speedType: order.speedType,
+        speedLabel: getSpeedOption(order.speedType).label,
+        note: order.note || '',
+        driverFee: order.driverFee,
+      },
+    });
+  } catch (error) {
+    console.error('❌ 騎士任務讀取失敗：', error);
+    res.status(500).json({
+      success: false,
+      error: '讀取任務失敗',
+    });
+  }
+});
+
+app.post('/api/rider-distance-to-pickup', async (req, res) => {
+  try {
+    const { riderLat, riderLng, pickupAddress } = req.body;
+
+    if (!riderLat || !riderLng || !pickupAddress) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少騎士位置或取件地址',
+      });
+    }
+
+    const origin = `${riderLat},${riderLng}`;
+    const distance = await getDistanceMatrix(origin, pickupAddress);
+
+    res.json({
+      success: true,
+      distanceText: distance.distanceText,
+      durationText: distance.durationText,
+      distanceMeters: distance.distanceMeters,
+      durationSeconds: distance.durationSeconds,
+    });
+  } catch (error) {
+    console.error('❌ 騎士到取件地距離計算失敗：', error);
+    res.status(500).json({
+      success: false,
+      error: '距離計算失敗',
+    });
   }
 });
 
