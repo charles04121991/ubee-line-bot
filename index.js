@@ -358,6 +358,21 @@ function normalizeAddress(address) {
   return String(address || '').trim().replace(/\s+/g, '');
 }
 
+function normalizeMapsAddress(address) {
+  const text = String(address || '')
+    .replace(/[，,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!text) return '';
+
+  if (text.includes('台灣') || text.includes('臺灣')) {
+    return text;
+  }
+
+  return `台灣 ${text}`;
+}
+
 function getDistanceCacheKey(origin, destination) {
   return `${normalizeAddress(origin)}=>${normalizeAddress(destination)}`;
 }
@@ -821,11 +836,15 @@ async function pushToGroup(groupId, messages) {
 }
 
 async function getDistanceMatrix(origin, destination) {
+  const cleanOrigin = normalizeMapsAddress(origin);
+  const cleanDestination = normalizeMapsAddress(destination);
+
   const url =
   'https://maps.googleapis.com/maps/api/distancematrix/json' +
-  `?origins=${encodeURIComponent(origin)}` +
-  `&destinations=${encodeURIComponent(destination)}` +
+  `?origins=${encodeURIComponent(cleanOrigin)}` +
+  `&destinations=${encodeURIComponent(cleanDestination)}` +
   `&mode=driving` +
+  `&region=tw` +
   `&language=zh-TW&units=metric&key=${GOOGLE_MAPS_API_KEY}`;
   
   const res = await fetch(url);
