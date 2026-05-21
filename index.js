@@ -1652,6 +1652,74 @@ app.post('/api/rider-distance-to-pickup', async (req, res) => {
   }
 });
 
+app.post('/api/rider/accept-order', async (req, res) => {
+  try {
+    const { orderId, lineUserId } = req.body;
+
+    if (!orderId || !lineUserId) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少訂單編號或騎士 LINE 身分',
+      });
+    }
+
+    const order = await getOrder(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    const approved = await isApprovedRiderUser(lineUserId);
+
+    if (!approved) {
+      return res.status(403).json({
+        success: false,
+        error: '你尚未通過 UBee 騎士審核，暫時無法接單。',
+      });
+    }
+
+    if (isTerminalOrderStatus(order)) {
+      return res.status(400).json({
+        success: false,
+        error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再操作。`,
+      });
+    }
+
+    if (order.status !== 'pending_dispatch') {
+      return res.status(400).json({
+        success: false,
+        error: '此訂單目前不是可接單狀態，可能已被其他騎士接走。',
+      });
+    }
+
+    order.riderId = lineUserId;
+    order.status = 'accepted';
+    order.acceptedAt = Date.now();
+    await saveOrder(order);
+
+    await notifyCustomer(
+      order,
+      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定 ETA。`)
+    );
+
+    res.json({
+      success: true,
+      orderId: order.id,
+      message: '接單成功',
+    });
+
+  } catch (error) {
+    console.error('❌ 騎士網頁接單失敗：', error);
+    res.status(500).json({
+      success: false,
+      error: '接單失敗，請稍後再試。',
+    });
+  }
+});
+
 app.get('/api/orders/:orderId', async (req, res) => {
   const orderId = String(req.params.orderId || '').toUpperCase();
   const requestUserId = String(req.query.userId || '').trim();
