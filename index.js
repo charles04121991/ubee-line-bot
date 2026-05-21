@@ -822,11 +822,12 @@ async function pushToGroup(groupId, messages) {
 
 async function getDistanceMatrix(origin, destination) {
   const url =
-    'https://maps.googleapis.com/maps/api/distancematrix/json' +
-    `?origins=${encodeURIComponent(origin)}` +
-    `&destinations=${encodeURIComponent(destination)}` +
-    `&language=zh-TW&units=metric&key=${GOOGLE_MAPS_API_KEY}`;
-
+  'https://maps.googleapis.com/maps/api/distancematrix/json' +
+  `?origins=${encodeURIComponent(origin)}` +
+  `&destinations=${encodeURIComponent(destination)}` +
+  `&mode=driving` +
+  `&language=zh-TW&units=metric&key=${GOOGLE_MAPS_API_KEY}`;
+  
   const res = await fetch(url);
   const data = await res.json();
 
@@ -1393,9 +1394,11 @@ app.post('/estimate', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('estimate error:', err);
-    res.status(500).json({ error: 'estimate error' });
-  }
+  console.error('estimate error:', err.message || err);
+  res.status(500).json({
+    error: err.message || 'estimate error'
+  });
+}
 });
 
 app.post('/api/orders', async (req, res) => {
@@ -1495,9 +1498,12 @@ app.post('/api/orders', async (req, res) => {
       message: '訂單已建立，請在頁面下方選擇付款方式。',
     });
   } catch (error) {
-    console.error('❌ API 建立訂單失敗：', error);
-    res.status(500).json({ success: false, error: '建立訂單失敗，請稍後再試' });
-  }
+  console.error('❌ API 建立訂單失敗：', error.message || error);
+  res.status(500).json({
+    success: false,
+    error: error.message || '建立訂單失敗，請稍後再試'
+  });
+}
 });
 
 app.post('/api/orders/:orderId/payment-method', async (req, res) => {
