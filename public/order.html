@@ -1311,6 +1311,8 @@ function renderSummary(order){
 async function calculateEstimate(silent){
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
+console.log('估價 pickup:', pickup);
+console.log('估價 dropoff:', dropoff);
 
   if(!pickup || !dropoff){
     if(!silent) alert('請先填寫取件與送達地址');
