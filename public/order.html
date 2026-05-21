@@ -1007,12 +1007,18 @@ async function goNext(){
   }
 
   if(currentStep === 3){
-  await calculateEstimate(true);
-}
-  if(currentStep < 5){
-    currentStep++;
-    updateStepUI();
+  const estimateOk = await calculateEstimate(true);
+
+  if(!estimateOk){
+    alert('估價失敗，請確認取件地址與送達地址是否完整。');
+    return;
   }
+}
+
+if(currentStep < 5){
+  currentStep++;
+  updateStepUI();
+}
 }
 
 function goPrev(){
@@ -1259,7 +1265,7 @@ function renderConfirmSummary(){
     <div class="summary-row">
       <div class="summary-icon">▣</div>
       <div>
-        <div class="summary-label">物品資訊(如是包裹，請協助說明內容物，人員抵達確認無誤再封箱</div>
+        <div class="summary-label">物品資訊(如是包裹，請協助說明內容物，人員抵達確認無誤再封箱）</div>
         <div class="summary-value">${data.item}${data.note ? '<br>' + data.note.replace(/\n/g,'<br>') : ''}</div>
       </div>
     </div>
@@ -1315,9 +1321,9 @@ console.log('估價 pickup:', pickup);
 console.log('估價 dropoff:', dropoff);
 
   if(!pickup || !dropoff){
-    if(!silent) alert('請先填寫取件與送達地址');
-    return;
-  }
+  if(!silent) alert('請先填寫取件與送達地址');
+  return false;
+}
 
   try{
     const res = await fetch('/estimate',{
@@ -1341,11 +1347,13 @@ console.log('估價 dropoff:', dropoff);
       <div class="price-row"><span>時間</span><strong>${data.durationText}</strong></div>
       <div class="price-row"><span>預估費用</span><strong>NT$${data.totalFee}</strong></div>
     `;
+    return true;
   }catch(err){
     if(!silent){
       alert('估價失敗：' + err.message);
     }
     console.error(err);
+    return false;
   }
 }
 
@@ -1403,10 +1411,12 @@ async function submitOrder(){
 async function selectPayment(method){
   if(isSelectingPayment) return;
   isSelectingPayment = true;
-  if(!currentOrderId){
-    alert('請先建立訂單');
-    return;
-  }
+
+if(!currentOrderId){
+  isSelectingPayment = false;
+  alert('請先建立訂單');
+  return;
+}
 
   selectedPaymentMethod = method;
 
