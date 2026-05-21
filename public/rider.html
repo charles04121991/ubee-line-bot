@@ -839,7 +839,7 @@ async function initLiff() {
   }
 }
 
-initLiff();
+window.addEventListener('load', initLiff);
 
 document.getElementById('riderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
