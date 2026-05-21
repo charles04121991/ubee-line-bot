@@ -1295,7 +1295,7 @@ function createFinanceFlex(order) {
           createInfoRow('距離', `${distanceKm} 公里`),
           createInfoRow('時間', `${durationMin} 分鐘`),
           { type: 'separator', margin: 'md' },
-          createInfoRow('騎手騎士收入', `$${driver}`),
+          createInfoRow('騎士收入', `$${driver}`),
           createInfoRow('平台收入', `$${platform}`),
           { type: 'separator', margin: 'md' },
           { type: 'text', text: '附加費明細', weight: 'bold', margin: 'md' },
