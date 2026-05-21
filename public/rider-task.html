@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>UBee｜騎士任務</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root{
       --bg:#000;
@@ -312,7 +312,8 @@
 
 <script>
   let currentOrder = null;
-
+  let realLineUserId = '';
+  
   const params = new URLSearchParams(window.location.search);
   const orderId = String(params.get('orderId') || '').trim().toUpperCase();
 
@@ -321,6 +322,33 @@
   const locateBtn = document.getElementById('locateBtn');
   const acceptBtn = document.getElementById('acceptBtn');
   const navBtn = document.getElementById('navBtn');
+
+  async function initLiff() {
+  try {
+    const configRes = await fetch('/api/config');
+    const configData = await configRes.json();
+
+    if (!configData.success || !configData.liffId) {
+      throw new Error('LIFF 設定讀取失敗');
+    }
+
+    await liff.init({ liffId: configData.liffId });
+
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    realLineUserId = profile.userId || '';
+
+    console.log('騎士 LINE userId:', realLineUserId);
+
+  } catch (err) {
+    console.error('LIFF 初始化失敗:', err);
+    showMessage('warn', 'LINE 身分讀取失敗，請從 LINE 任務通知重新開啟此頁面。');
+  }
+}
 
   function showMessage(type, text) {
     messageBox.className = 'msg ' + type;
@@ -462,23 +490,62 @@
     window.open(url, '_blank');
   }
 
-  function acceptOrder() {
-    if (!currentOrder || !currentOrder.id) return;
+  async function acceptOrder() {
+  if (!currentOrder || !currentOrder.id) return;
 
-    showMessage('warn', '請回到 LINE 任務通知卡片，按「直接接受訂單」完成接單。');
-
-    /*
-      注意：
-      目前 LINE 的接單是 postback 按鈕，網頁不能直接代替 LINE postback。
-      所以第一版先保留原本 LINE 接單流程，避免破壞你原本系統。
-    */
+  if (!realLineUserId || !realLineUserId.startsWith('U')) {
+    showMessage('err', '無法取得 LINE 騎士身分，請從 LINE 任務通知重新開啟此頁面。');
+    return;
   }
 
+  acceptBtn.disabled = true;
+  acceptBtn.innerText = '接單中...';
+
+  try {
+    const res = await fetch('/api/rider/accept-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        orderId: currentOrder.id,
+        lineUserId: realLineUserId
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      throw new Error(data.error || '接單失敗');
+    }
+
+    currentOrder.status = 'accepted';
+    currentOrder.statusLabel = '🟢 已接單';
+
+    setText('statusText', currentOrder.statusLabel);
+
+    showMessage('ok', '✅ 接單成功！請回到 LINE 查看後續 ETA 操作。');
+    acceptBtn.innerText = '已接單';
+    acceptBtn.disabled = true;
+
+  } catch (err) {
+    console.error(err);
+    showMessage('err', err.message || '接單失敗，請稍後再試。');
+    acceptBtn.disabled = false;
+    acceptBtn.innerText = '接受訂單';
+  }
+}
+  
   locateBtn.addEventListener('click', calculateDistance);
   navBtn.addEventListener('click', openNavigation);
   acceptBtn.addEventListener('click', acceptOrder);
 
-  loadTask();
+  async function initPage() {
+  await initLiff();
+  await loadTask();
+}
+
+initPage();
 </script>
 
 </body>
