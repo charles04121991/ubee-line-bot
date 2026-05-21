@@ -354,6 +354,7 @@
 
   } catch (err) {
     console.error('LIFF 初始化失敗:', err);
+    alert('LIFF錯誤：' + (err.message || err));
     showMessage('err', '無法取得 LINE 騎士身分，請從 LINE 任務通知重新開啟此頁面。');
     acceptBtn.disabled = true;
     return false;
