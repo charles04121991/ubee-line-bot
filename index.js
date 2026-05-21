@@ -2037,7 +2037,7 @@ UBee 辦公室將會再依照您的需求，
       event,
       order,
       ['accepted', 'arrived_pickup', 'picked_up', 'arrived_dropoff'],
-      ''此訂單目前不能設定抵達取件時間。'
+      '此訂單目前不能設定抵達取件時間。'
     );
     if (!ok) return null;
 
