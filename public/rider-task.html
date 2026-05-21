@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>UBee｜騎士任務</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <style>
+    :root{
+      --bg:#000;
+      --card:#101010;
+      --card2:#171717;
+      --line:rgba(255,255,255,.12);
+      --text:#f4f4f4;
+      --muted:#a5a5a5;
+      --white:#fff;
+      --green:#22c55e;
+      --red:#ef4444;
+      --yellow:#facc15;
+    }
+
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      background:#000;
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
+    }
+
+    .page{
+      max-width:720px;
+      margin:0 auto;
+      padding:24px 16px 40px;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin-bottom:20px;
+    }
+
+    .logo{
+      width:44px;
+      height:44px;
+      border-radius:14px;
+      background:#fff;
+      color:#000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:26px;
+      font-weight:1000;
+    }
+
+    .brandText b{
+      display:block;
+      font-size:24px;
+      font-weight:1000;
+    }
+
+    .brandText span{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:800;
+      letter-spacing:1.5px;
+      margin-top:2px;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:26px;
+      padding:20px;
+      margin-bottom:16px;
+    }
+
+    .title{
+      font-size:26px;
+      font-weight:1000;
+      margin:0 0 10px;
+    }
+
+    .sub{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.7;
+      font-weight:800;
+      margin-bottom:16px;
+    }
+
+    .statusBox{
+      background:#151515;
+      border:1px solid var(--line);
+      border-radius:20px;
+      padding:16px;
+      margin-bottom:16px;
+    }
+
+    .statusTitle{
+      font-size:14px;
+      color:var(--muted);
+      font-weight:900;
+      margin-bottom:6px;
+    }
+
+    .statusValue{
+      font-size:24px;
+      font-weight:1000;
+      color:#fff;
+      line-height:1.35;
+    }
+
+    .distanceValue{
+      color:var(--green);
+    }
+
+    .row{
+      padding:14px 0;
+      border-bottom:1px solid var(--line);
+    }
+
+    .row:last-child{
+      border-bottom:0;
+    }
+
+    .label{
+      font-size:13px;
+      color:var(--muted);
+      font-weight:900;
+      margin-bottom:6px;
+    }
+
+    .value{
+      font-size:16px;
+      color:#fff;
+      line-height:1.6;
+      font-weight:900;
+      word-break:break-word;
+    }
+
+    .btn{
+      width:100%;
+      min-height:58px;
+      border:0;
+      border-radius:20px;
+      font-size:18px;
+      font-weight:1000;
+      font-family:inherit;
+      cursor:pointer;
+      margin-top:12px;
+    }
+
+    .btnPrimary{
+      background:#fff;
+      color:#000;
+    }
+
+    .btnSecondary{
+      background:#1b1b1b;
+      color:#fff;
+      border:1px solid var(--line);
+    }
+
+    .btnDanger{
+      background:rgba(239,68,68,.16);
+      color:#ffd1d1;
+      border:1px solid rgba(239,68,68,.35);
+    }
+
+    .btn:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+
+    .msg{
+      display:none;
+      border-radius:18px;
+      padding:14px;
+      line-height:1.7;
+      font-size:14px;
+      font-weight:800;
+      margin-top:14px;
+    }
+
+    .msg.ok{
+      display:block;
+      background:rgba(34,197,94,.1);
+      border:1px solid rgba(34,197,94,.38);
+      color:#c9ffd9;
+    }
+
+    .msg.err{
+      display:block;
+      background:rgba(239,68,68,.1);
+      border:1px solid rgba(239,68,68,.38);
+      color:#ffd1d1;
+    }
+
+    .msg.warn{
+      display:block;
+      background:rgba(250,204,21,.1);
+      border:1px solid rgba(250,204,21,.35);
+      color:#fff1a8;
+    }
+
+    .footer{
+      text-align:center;
+      color:#6f6f6f;
+      font-size:13px;
+      font-weight:800;
+      line-height:1.7;
+      padding-top:8px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="page">
+
+  <div class="brand">
+    <div class="logo">U</div>
+    <div class="brandText">
+      <b>UBee</b>
+      <span>RIDER TASK</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h1 class="title">騎士任務資訊</h1>
+    <div class="sub">
+      系統會先計算你目前位置到取件地點的預估時間，確認適合後再接受訂單。
+    </div>
+
+    <div class="statusBox">
+      <div class="statusTitle">距離取件地</div>
+      <div id="distanceText" class="statusValue distanceValue">正在取得定位...</div>
+    </div>
+
+    <div id="messageBox" class="msg"></div>
+
+    <button id="locateBtn" class="btn btnSecondary" type="button">
+      重新計算距離
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="label">訂單編號</div>
+      <div id="orderIdText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">目前狀態</div>
+      <div id="statusText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">配送速度</div>
+      <div id="speedText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">服務類型</div>
+      <div id="serviceTypeText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">取件地址</div>
+      <div id="pickupAddressText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">送達地址</div>
+      <div id="dropoffAddressText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">物品內容</div>
+      <div id="itemText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">備註</div>
+      <div id="noteText" class="value">讀取中...</div>
+    </div>
+
+    <div class="row">
+      <div class="label">騎手收入</div>
+      <div id="driverFeeText" class="value">讀取中...</div>
+    </div>
+
+    <button id="acceptBtn" class="btn btnPrimary" type="button">
+      接受訂單
+    </button>
+
+    <button id="navBtn" class="btn btnSecondary" type="button">
+      導航到取件地點
+    </button>
+  </div>
+
+  <div class="footer">
+    UBee 城市任務平台<br>
+    請確認距離、路況與自身狀況後再接單。
+  </div>
+
+</div>
+
+<script>
+  let currentOrder = null;
+
+  const params = new URLSearchParams(window.location.search);
+  const orderId = String(params.get('orderId') || '').trim().toUpperCase();
+
+  const distanceText = document.getElementById('distanceText');
+  const messageBox = document.getElementById('messageBox');
+  const locateBtn = document.getElementById('locateBtn');
+  const acceptBtn = document.getElementById('acceptBtn');
+  const navBtn = document.getElementById('navBtn');
+
+  function showMessage(type, text) {
+    messageBox.className = 'msg ' + type;
+    messageBox.innerHTML = text;
+  }
+
+  function clearMessage() {
+    messageBox.className = 'msg';
+    messageBox.innerHTML = '';
+  }
+
+  function formatMoney(value) {
+    return 'NT$' + Math.round(Number(value || 0));
+  }
+
+  function setText(id, text) {
+    document.getElementById(id).innerText = text || '-';
+  }
+
+  async function loadTask() {
+    if (!orderId) {
+      distanceText.innerText = '缺少訂單編號';
+      showMessage('err', '此連結缺少訂單編號，請回到 LINE 任務通知重新開啟。');
+      acceptBtn.disabled = true;
+      locateBtn.disabled = true;
+      navBtn.disabled = true;
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/rider-task/' + encodeURIComponent(orderId));
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.error || '讀取任務失敗');
+      }
+
+      currentOrder = data.order;
+
+      setText('orderIdText', currentOrder.id);
+      setText('statusText', currentOrder.statusLabel);
+      setText('speedText', currentOrder.speedLabel);
+      setText('serviceTypeText', currentOrder.serviceType);
+      setText('pickupAddressText', currentOrder.pickupAddress);
+      setText('dropoffAddressText', currentOrder.dropoffAddress);
+      setText('itemText', currentOrder.item);
+      setText('noteText', currentOrder.note || '無');
+      setText('driverFeeText', formatMoney(currentOrder.driverFee));
+
+      if (currentOrder.status !== 'pending_dispatch') {
+        acceptBtn.disabled = true;
+        showMessage('warn', '此訂單目前不是可接單狀態，可能已經被其他騎士接走。');
+      }
+
+      calculateDistance();
+
+    } catch (err) {
+      console.error(err);
+      distanceText.innerText = '讀取失敗';
+      showMessage('err', err.message || '任務讀取失敗，請稍後再試。');
+      acceptBtn.disabled = true;
+      locateBtn.disabled = true;
+      navBtn.disabled = true;
+    }
+  }
+
+  function calculateDistance() {
+    clearMessage();
+
+    if (!currentOrder || !currentOrder.pickupAddress) {
+      distanceText.innerText = '無法計算';
+      showMessage('err', '缺少取件地址，無法計算距離。');
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      distanceText.innerText = '手機不支援定位';
+      showMessage('err', '此裝置不支援定位，請直接使用導航確認距離。');
+      return;
+    }
+
+    distanceText.innerText = '正在取得定位...';
+    locateBtn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      async function(position) {
+        try {
+          const riderLat = position.coords.latitude;
+          const riderLng = position.coords.longitude;
+
+          distanceText.innerText = '正在計算距離...';
+
+          const res = await fetch('/api/rider-distance-to-pickup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              riderLat,
+              riderLng,
+              pickupAddress: currentOrder.pickupAddress
+            })
+          });
+
+          const data = await res.json();
+
+          if (!data.success) {
+            throw new Error(data.error || '距離計算失敗');
+          }
+
+          distanceText.innerText = `約 ${data.durationText}｜${data.distanceText}`;
+          showMessage('ok', '距離已更新，請確認是否適合接單。');
+
+        } catch (err) {
+          console.error(err);
+          distanceText.innerText = '計算失敗';
+          showMessage('err', err.message || '距離計算失敗，請稍後再試。');
+        } finally {
+          locateBtn.disabled = false;
+        }
+      },
+      function(error) {
+        console.error(error);
+        locateBtn.disabled = false;
+        distanceText.innerText = '無法取得定位';
+        showMessage('warn', '請允許手機定位權限，系統才能計算你到取件地點的時間。');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 30000
+      }
+    );
+  }
+
+  function openNavigation() {
+    if (!currentOrder || !currentOrder.pickupAddress) return;
+    const url = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(currentOrder.pickupAddress);
+    window.open(url, '_blank');
+  }
+
+  function acceptOrder() {
+    if (!currentOrder || !currentOrder.id) return;
+
+    showMessage('warn', '請回到 LINE 任務通知卡片，按「直接接受訂單」完成接單。');
+
+    /*
+      注意：
+      目前 LINE 的接單是 postback 按鈕，網頁不能直接代替 LINE postback。
+      所以第一版先保留原本 LINE 接單流程，避免破壞你原本系統。
+    */
+  }
+
+  locateBtn.addEventListener('click', calculateDistance);
+  navBtn.addEventListener('click', openNavigation);
+  acceptBtn.addEventListener('click', acceptOrder);
+
+  loadTask();
+</script>
+
+</body>
+</html>
