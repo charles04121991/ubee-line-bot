@@ -385,10 +385,6 @@ function buildGoogleMapDirectionsUrl(address) {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address || '')}`;
 }
 
-function buildRiderTaskUrl(orderId) {
-  return getPublicUrl(`rider-task.html?orderId=${encodeURIComponent(orderId || '')}`);
-}
-
 function buildTelUrl(phone) {
   const clean = normalizePhone(phone);
   return clean ? `tel:${clean}` : 'tel:';
