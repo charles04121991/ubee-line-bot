@@ -178,205 +178,199 @@
   </div>
 
   <script>
-    const LIFF_ID = "2009895876-hiq8YW0n";
+  const LIFF_ID = "2009895876-hiq8YW0n";
 
-    let lineUserId = "";
-    let riderProfile = null;
+  let lineUserId = "";
+  let riderProfile = null;
 
-    const statusBox = document.getElementById("status");
-    const taskList = document.getElementById("taskList");
+  const statusBox = document.getElementById("status");
+  const taskList = document.getElementById("taskList");
 
-    function setStatus(text, isError = false){
-      statusBox.textContent = text;
-      statusBox.className = isError ? "status error" : "status";
-    }
+  function setStatus(text, isError = false){
+    statusBox.textContent = text;
+    statusBox.className = isError ? "status error" : "status";
+  }
 
-    function safeText(value){
-      return value || "未填寫";
-    }
+  function safeText(value){
+    return value || "未填寫";
+  }
 
-    function money(value){
-      if(value === undefined || value === null || value === "") return "待確認";
-      return "$" + Number(value).toLocaleString("zh-TW");
-    }
+  function money(value){
+    if(value === undefined || value === null || value === "") return "待確認";
+    return "$" + Number(value).toLocaleString("zh-TW");
+  }
 
-    async function init(){
-      try{
-        setStatus("正在啟動 LIFF...");
-await liff.init({ liffId: LIFF_ID });
-setStatus("LIFF 啟動成功，正在檢查登入...");
+  async function init(){
+    try{
+      setStatus("正在啟動 LIFF...");
+      await liff.init({ liffId: LIFF_ID });
+      setStatus("LIFF 啟動成功，正在檢查登入...");
 
-        if(!liff.isLoggedIn()){
-          liff.login();
-          return;
-        }
-
-        console.log("開始取得 profile");
-
-        setStatus("正在取得 LINE 個人資料...");
-const profile = await liff.getProfile();
-setStatus("已取得 LINE 身分，正在確認騎士資料...");
-
-        console.log("profile =", profile);
-
-        lineUserId = profile.userId;
-
-        setStatus("正在確認騎士身分...");
-        await loadRiderProfile();
-
-        setStatus("正在載入可接任務...");
-        await loadTasks();
-
-      }catch(err){
-  console.error("LIFF ERROR =", err);
-
-  setStatus(
-    "初始化失敗：" + (err.message || JSON.stringify(err)),
-    true
-  );
-}
-    async function loadRiderProfile(){
-      const res = await fetch(`/api/rider/profile?lineUserId=${encodeURIComponent(lineUserId)}`);
-
-      if(!res.ok){
-        throw new Error("找不到騎士資料");
-      }
-
-      const data = await res.json();
-
-      if(!data || !data.rider){
-        setStatus("你目前尚未通過騎士審核，無法接任務。", true);
-        throw new Error("尚未通過騎士審核");
-      }
-
-      riderProfile = data.rider;
-
-      if(riderProfile.status !== "approved"){
-        setStatus("你的騎士資格尚未審核通過，暫時無法接任務。", true);
-        throw new Error("騎士未通過審核");
-      }
-    }
-
-    async function loadTasks(){
-      const res = await fetch("/api/rider/tasks");
-
-      if(!res.ok){
-        throw new Error("任務載入失敗");
-      }
-
-      const data = await res.json();
-      const tasks = data.tasks || [];
-
-      renderTasks(tasks);
-    }
-
-    function renderTasks(tasks){
-      taskList.innerHTML = "";
-
-      if(tasks.length === 0){
-        setStatus("目前沒有可接任務。");
-        taskList.innerHTML = `
-          <div class="empty">
-            目前沒有新的任務。<br>
-            有新任務時，請重新整理此頁。
-          </div>
-        `;
+      if(!liff.isLoggedIn()){
+        liff.login();
         return;
       }
 
-      setStatus(`目前共有 ${tasks.length} 張可接任務。`);
-      
-      const renderedIds = new Set();
-      
-      tasks.forEach(order => {
-        
-        if(renderedIds.has(order.id)) return;
-        renderedIds.add(order.id);
+      setStatus("正在取得 LINE 個人資料...");
+      const profile = await liff.getProfile();
 
-        const card = document.createElement("div");
-        card.className = "task";
+      console.log("profile =", profile);
 
-        card.innerHTML = `
-          <div class="task-head">
-            <div>
-              <div class="order-id">${safeText(order.id || order.orderId)}</div>
-              <div class="service">${safeText(order.serviceType || order.serviceName)}</div>
-            </div>
-            <div class="badge">${safeText(order.speedLabel || order.speedName || order.speedType)}</div>
+      lineUserId = profile.userId;
+
+      setStatus("已取得 LINE 身分，正在確認騎士資料...");
+      await loadRiderProfile();
+
+      setStatus("正在載入可接任務...");
+      await loadTasks();
+
+    }catch(err){
+      console.error("LIFF ERROR =", err);
+      setStatus("初始化失敗：" + (err.message || JSON.stringify(err)), true);
+    }
+  }
+
+  async function loadRiderProfile(){
+    const res = await fetch(`/api/rider/profile?lineUserId=${encodeURIComponent(lineUserId)}`);
+
+    if(!res.ok){
+      throw new Error("找不到騎士資料");
+    }
+
+    const data = await res.json();
+
+    if(!data || !data.rider){
+      throw new Error("尚未通過騎士審核");
+    }
+
+    riderProfile = data.rider;
+
+    if(riderProfile.status !== "approved"){
+      throw new Error("騎士未通過審核");
+    }
+  }
+
+  async function loadTasks(){
+    const res = await fetch("/api/rider/tasks");
+
+    if(!res.ok){
+      throw new Error("任務載入失敗");
+    }
+
+    const data = await res.json();
+    const tasks = data.tasks || [];
+
+    renderTasks(tasks);
+  }
+
+  function renderTasks(tasks){
+    taskList.innerHTML = "";
+
+    if(tasks.length === 0){
+      setStatus("目前沒有可接任務。");
+      taskList.innerHTML = `
+        <div class="empty">
+          目前沒有新的任務。<br>
+          有新任務時，請重新整理此頁。
+        </div>
+      `;
+      return;
+    }
+
+    setStatus(`目前共有 ${tasks.length} 張可接任務。`);
+
+    const renderedIds = new Set();
+
+    tasks.forEach(order => {
+      if(renderedIds.has(order.id)) return;
+      renderedIds.add(order.id);
+
+      const card = document.createElement("div");
+      card.className = "task";
+
+      card.innerHTML = `
+        <div class="task-head">
+          <div>
+            <div class="order-id">${safeText(order.id || order.orderId)}</div>
+            <div class="service">${safeText(order.serviceType || order.serviceName)}</div>
           </div>
+          <div class="badge">${safeText(order.speedLabel || order.speedName || order.speedType)}</div>
+        </div>
 
-          <div class="row">
-            <div class="label">取件地點</div>
-            <div class="value">${safeText(order.pickupAddress)}</div>
-          </div>
+        <div class="row">
+          <div class="label">取件地點</div>
+          <div class="value">${safeText(order.pickupAddress)}</div>
+        </div>
 
-          <div class="row">
-            <div class="label">送達地點</div>
-            <div class="value">${safeText(order.dropoffAddress)}</div>
-          </div>
+        <div class="row">
+          <div class="label">送達地點</div>
+          <div class="value">${safeText(order.dropoffAddress)}</div>
+        </div>
 
-          <div class="row">
-            <div class="label">物品 / 任務內容</div>
-            <div class="value">${safeText(order.item || order.itemName || order.itemNote || order.note)}</div>
-          </div>
+        <div class="row">
+          <div class="label">物品 / 任務內容</div>
+          <div class="value">${safeText(order.item || order.itemName || order.itemNote || order.note)}</div>
+        </div>
 
-          <div class="row">
-            <div class="label">騎士收入</div>
-            <div class="price">${money(order.driverFee || order.total || order.totalFee || order.estimatedFee)}</div>
-          </div>
+        <div class="row">
+          <div class="label">騎士收入</div>
+          <div class="price">${money(order.driverFee || order.total || order.totalFee || order.estimatedFee)}</div>
+        </div>
 
-          <button onclick="acceptTask('${order.id || order.orderId}', this)">
-            接受任務
-          </button>
-        `;
+        <button onclick="acceptTask('${order.id || order.orderId}', this)">
+          接受任務
+        </button>
+      `;
 
-        taskList.appendChild(card);
+      taskList.appendChild(card);
+    });
+  }
+
+  async function acceptTask(orderDocId, btn){
+    if(!confirm("確定要接受這張任務嗎？")) return;
+
+    try{
+      btn.disabled = true;
+      btn.textContent = "接單中...";
+
+      const res = await fetch("/api/rider/accept-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          orderId: orderDocId,
+          lineUserId,
+          riderId: riderProfile.riderId || "",
+          riderName: riderProfile.name || "",
+          riderPhone: riderProfile.phone || ""
+        })
       });
-    }
 
-    async function acceptTask(orderDocId, btn){
-      if(!confirm("確定要接受這張任務嗎？")) return;
+      const data = await res.json();
 
-      try{
-        btn.disabled = true;
-        btn.textContent = "接單中...";
-
-        const res = await fetch("/api/rider/accept-order", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            orderId: orderDocId,
-            lineUserId,
-            riderId: riderProfile.riderId || "",
-            riderName: riderProfile.name || "",
-            riderPhone: riderProfile.phone || ""
-          })
-        });
-
-        const data = await res.json();
-
-        if(!res.ok){
-  throw new Error(data.error || data.message || "接單失敗");
-}
-
-        alert("接單成功！");
-        location.href = `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}`;
-
-      }catch(err){
-        console.error(err);
-        alert(err.message || "接單失敗，請稍後再試。");
-        btn.disabled = false;
-        btn.textContent = "接受任務";
+      if(!res.ok){
+        throw new Error(data.error || data.message || "接單失敗");
       }
+
+      alert("接單成功！");
+      location.href = `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}`;
+
+    }catch(err){
+      console.error(err);
+      alert(err.message || "接單失敗，請稍後再試。");
+      btn.disabled = false;
+      btn.textContent = "接受任務";
     }
+  }
 
-    init();
+  init();
 
-    setInterval(() => {
-    loadTasks();
-    }, 10000);
-  </script>
+  setInterval(() => {
+    if(lineUserId && riderProfile){
+      loadTasks();
+    }
+  }, 10000);
+</script>
 </body>
 </html>
