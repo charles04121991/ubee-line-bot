@@ -1723,14 +1723,46 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
 app.get('/api/rider-task/:orderId', async (req, res) => {
   try {
     const orderId = String(req.params.orderId || '').toUpperCase();
-    const order = await getOrder(orderId);
+    const orderRef = db.collection('orders').doc(orderId);
 
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: '找不到此訂單',
-      });
-    }
+let order = null;
+
+await db.runTransaction(async (transaction) => {
+
+  const orderDoc = await transaction.get(orderRef);
+
+  if (!orderDoc.exists) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  order = orderDoc.data();
+  
+  const busySnap = await db
+  .collection('orders')
+  .where('riderId', '==', lineUserId)
+  .where('status', 'in', [
+    'accepted',
+    'arrived_pickup',
+    'picked_up',
+    'arrived_dropoff'
+  ])
+  .limit(1)
+  .get();
+
+if (!busySnap.empty) {
+  throw new Error('RIDER_ALREADY_BUSY');
+}
+
+  if (order.status !== 'pending_dispatch') {
+    throw new Error('ORDER_ALREADY_ACCEPTED');
+  }
+
+  order.riderId = lineUserId;
+  order.status = 'accepted';
+  order.acceptedAt = Date.now();
+
+  transaction.set(orderRef, order, { merge: true });
+});
 
     res.json({
       success: true,
@@ -1751,11 +1783,28 @@ app.get('/api/rider-task/:orderId', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ 騎士任務讀取失敗：', error);
-    res.status(500).json({
+
+  console.error('❌ 騎士網頁接單失敗：', error);
+
+  if (error.message === 'ORDER_NOT_FOUND') {
+    return res.status(404).json({
       success: false,
-      error: '讀取任務失敗',
+      error: '找不到此訂單',
     });
+  }
+
+  if (error.message === 'ORDER_ALREADY_ACCEPTED') {
+    return res.status(409).json({
+      success: false,
+      error: '此訂單已被其他騎士接走',
+    });
+  }
+
+  return res.status(500).json({
+    success: false,
+    error: '接單失敗，請稍後再試。',
+  });
+}
   }
 });
 
@@ -1849,12 +1898,34 @@ app.post('/api/rider/accept-order', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ 騎士網頁接單失敗：', error);
-    res.status(500).json({
+  console.error('❌ 騎士網頁接單失敗：', error);
+
+  if (error.message === 'ORDER_NOT_FOUND') {
+    return res.status(404).json({
       success: false,
-      error: '接單失敗，請稍後再試。',
+      error: '找不到此訂單',
     });
   }
+
+  if (error.message === 'ORDER_ALREADY_ACCEPTED') {
+    return res.status(409).json({
+      success: false,
+      error: '此訂單已被其他騎士接走',
+    });
+  }
+
+  if (error.message === 'RIDER_ALREADY_BUSY') {
+    return res.status(409).json({
+      success: false,
+      error: '你目前還有進行中的任務，請先完成後再接新單',
+    });
+  }
+
+  return res.status(500).json({
+    success: false,
+    error: '接單失敗，請稍後再試。',
+  });
+}
 });
 
 // ===== 騎士更新任務狀態 API =====
