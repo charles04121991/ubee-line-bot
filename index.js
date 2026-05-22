@@ -1857,6 +1857,88 @@ app.post('/api/rider/accept-order', async (req, res) => {
   }
 });
 
+// ===== 騎士更新任務狀態 API =====
+app.post('/api/rider/update-order-status', async (req, res) => {
+  try {
+    const { orderId, lineUserId, status } = req.body;
+
+    if (!orderId || !lineUserId || !status) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少訂單編號、騎士 LINE 身分或任務狀態',
+      });
+    }
+
+    const order = await getOrder(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    if (order.riderId !== lineUserId) {
+      return res.status(403).json({
+        success: false,
+        error: '只有接單騎士可以更新此任務狀態',
+      });
+    }
+
+    const allowedFlow = {
+      accepted: ['arrived_pickup'],
+      arrived_pickup: ['picked_up'],
+      picked_up: ['arrived_dropoff'],
+      arrived_dropoff: ['completed'],
+    };
+
+    const nextStatuses = allowedFlow[order.status] || [];
+
+    if (!nextStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不能更新為「${getStatusLabel(status)}」`,
+      });
+    }
+
+    const timeFieldMap = {
+      arrived_pickup: 'arrivedPickupAt',
+      picked_up: 'pickedUpAt',
+      arrived_dropoff: 'arrivedDropoffAt',
+      completed: 'completedAt',
+    };
+
+    order.status = status;
+    order[timeFieldMap[status]] = Date.now();
+
+    await saveOrder(order);
+
+    await notifyCustomer(
+      order,
+      createTextMessage(`UBee 任務狀態更新\n\n訂單編號：${order.id}\n目前狀態：${getStatusLabel(order.status)}`)
+    );
+
+    if (status === 'completed') {
+      await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
+    }
+
+    return res.json({
+      success: true,
+      orderId: order.id,
+      status: order.status,
+      statusLabel: getStatusLabel(order.status),
+      message: '任務狀態已更新',
+    });
+
+  } catch (error) {
+    console.error('❌ 騎士更新任務狀態失敗：', error);
+    return res.status(500).json({
+      success: false,
+      error: '任務狀態更新失敗，請稍後再試。',
+    });
+  }
+});
+
 app.get('/api/orders/:orderId', async (req, res) => {
   const orderId = String(req.params.orderId || '').toUpperCase();
   const requestUserId = String(req.query.userId || '').trim();
