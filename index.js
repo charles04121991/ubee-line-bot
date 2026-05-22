@@ -1720,94 +1720,6 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
   }
 });
 
-app.get('/api/rider-task/:orderId', async (req, res) => {
-  try {
-    const orderId = String(req.params.orderId || '').toUpperCase();
-    const orderRef = db.collection('orders').doc(orderId);
-
-let order = null;
-
-await db.runTransaction(async (transaction) => {
-
-  const orderDoc = await transaction.get(orderRef);
-
-  if (!orderDoc.exists) {
-    throw new Error('ORDER_NOT_FOUND');
-  }
-
-  order = orderDoc.data();
-  
-  const busySnap = await db
-  .collection('orders')
-  .where('riderId', '==', lineUserId)
-  .where('status', 'in', [
-    'accepted',
-    'arrived_pickup',
-    'picked_up',
-    'arrived_dropoff'
-  ])
-  .limit(1)
-  .get();
-
-if (!busySnap.empty) {
-  throw new Error('RIDER_ALREADY_BUSY');
-}
-
-  if (order.status !== 'pending_dispatch') {
-    throw new Error('ORDER_ALREADY_ACCEPTED');
-  }
-
-  order.riderId = lineUserId;
-  order.status = 'accepted';
-  order.acceptedAt = Date.now();
-
-  transaction.set(orderRef, order, { merge: true });
-});
-
-    res.json({
-      success: true,
-      order: {
-        id: order.id,
-        status: order.status,
-        statusLabel: getStatusLabel(order.status),
-        serviceType: order.serviceType,
-        item: order.item,
-        pickupAddress: order.pickupAddress,
-        pickupPhone: order.pickupPhone,
-        dropoffAddress: order.dropoffAddress,
-        dropoffPhone: order.dropoffPhone,
-        speedType: order.speedType,
-        speedLabel: getSpeedOption(order.speedType).label,
-        note: order.note || '',
-        driverFee: order.driverFee,
-      },
-    });
-  } catch (error) {
-
-  console.error('❌ 騎士網頁接單失敗：', error);
-
-  if (error.message === 'ORDER_NOT_FOUND') {
-    return res.status(404).json({
-      success: false,
-      error: '找不到此訂單',
-    });
-  }
-
-  if (error.message === 'ORDER_ALREADY_ACCEPTED') {
-    return res.status(409).json({
-      success: false,
-      error: '此訂單已被其他騎士接走',
-    });
-  }
-
-  return res.status(500).json({
-    success: false,
-    error: '接單失敗，請稍後再試。',
-  });
-}
-  }
-});
-
 app.post('/api/rider-distance-to-pickup', async (req, res) => {
   try {
     const { riderLat, riderLng, pickupAddress } = req.body;
@@ -1849,15 +1761,6 @@ app.post('/api/rider/accept-order', async (req, res) => {
       });
     }
 
-    const order = await getOrder(orderId);
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: '找不到此訂單',
-      });
-    }
-
     const approved = await isApprovedRiderUser(lineUserId);
 
     if (!approved) {
@@ -1867,65 +1770,100 @@ app.post('/api/rider/accept-order', async (req, res) => {
       });
     }
 
-    if (isTerminalOrderStatus(order)) {
-      return res.status(400).json({
-        success: false,
-        error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再操作。`,
-      });
-    }
+    const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+    let acceptedOrder = null;
 
-    if (order.status !== 'pending_dispatch') {
-      return res.status(400).json({
-        success: false,
-        error: '此訂單目前不是可接單狀態，可能已被其他騎士接走。',
-      });
-    }
+    await db.runTransaction(async (transaction) => {
+      const orderDoc = await transaction.get(orderRef);
 
-    order.riderId = lineUserId;
-    order.status = 'accepted';
-    order.acceptedAt = Date.now();
-    await saveOrder(order);
+      if (!orderDoc.exists) {
+        throw new Error('ORDER_NOT_FOUND');
+      }
+
+      const order = orderDoc.data();
+
+      const busyQuery = db.collection('orders')
+        .where('riderId', '==', lineUserId)
+        .where('status', 'in', [
+          'accepted',
+          'arrived_pickup',
+          'picked_up',
+          'arrived_dropoff'
+        ])
+        .limit(1);
+
+      const busySnap = await transaction.get(busyQuery);
+
+      if (!busySnap.empty) {
+        throw new Error('RIDER_ALREADY_BUSY');
+      }
+
+      if (isTerminalOrderStatus(order)) {
+        throw new Error('ORDER_TERMINAL');
+      }
+
+      if (order.status !== 'pending_dispatch') {
+        throw new Error('ORDER_ALREADY_ACCEPTED');
+      }
+
+      order.riderId = lineUserId;
+      order.status = 'accepted';
+      order.acceptedAt = Date.now();
+
+      transaction.set(orderRef, order, { merge: true });
+
+      acceptedOrder = order;
+    });
+
+    orders[acceptedOrder.id] = acceptedOrder;
 
     await notifyCustomer(
-      order,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定抵達取件時間。`)
+      acceptedOrder,
+      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快設定抵達取件時間。`)
     );
 
-    res.json({
+    return res.json({
       success: true,
-      orderId: order.id,
+      orderId: acceptedOrder.id,
       message: '接單成功',
     });
 
   } catch (error) {
-  console.error('❌ 騎士網頁接單失敗：', error);
+    console.error('❌ 騎士網頁接單失敗：', error);
 
-  if (error.message === 'ORDER_NOT_FOUND') {
-    return res.status(404).json({
+    if (error.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    if (error.message === 'ORDER_ALREADY_ACCEPTED') {
+      return res.status(409).json({
+        success: false,
+        error: '此訂單已被其他騎士接走',
+      });
+    }
+
+    if (error.message === 'RIDER_ALREADY_BUSY') {
+      return res.status(409).json({
+        success: false,
+        error: '你目前還有進行中的任務，請先完成後再接新單',
+      });
+    }
+
+    if (error.message === 'ORDER_TERMINAL') {
+      return res.status(400).json({
+        success: false,
+        error: '此訂單已完成或已取消，無法接單。',
+      });
+    }
+
+    return res.status(500).json({
       success: false,
-      error: '找不到此訂單',
+      error: '接單失敗，請稍後再試。',
     });
   }
-
-  if (error.message === 'ORDER_ALREADY_ACCEPTED') {
-    return res.status(409).json({
-      success: false,
-      error: '此訂單已被其他騎士接走',
-    });
-  }
-
-  if (error.message === 'RIDER_ALREADY_BUSY') {
-    return res.status(409).json({
-      success: false,
-      error: '你目前還有進行中的任務，請先完成後再接新單',
-    });
-  }
-
-  return res.status(500).json({
-    success: false,
-    error: '接單失敗，請稍後再試。',
-  });
-}
 });
 
 // ===== 騎士更新任務狀態 API =====
