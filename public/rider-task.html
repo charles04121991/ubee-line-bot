@@ -202,7 +202,9 @@
 
     async function init(){
       try{
-        await liff.init({ liffId: LIFF_ID });
+        setStatus("正在啟動 LIFF...");
+await liff.init({ liffId: LIFF_ID });
+setStatus("LIFF 啟動成功，正在檢查登入...");
 
         if(!liff.isLoggedIn()){
           liff.login();
@@ -211,7 +213,9 @@
 
         console.log("開始取得 profile");
 
-        const profile = await liff.getProfile();
+        setStatus("正在取得 LINE 個人資料...");
+const profile = await liff.getProfile();
+setStatus("已取得 LINE 身分，正在確認騎士資料...");
 
         console.log("profile =", profile);
 
