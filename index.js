@@ -2458,7 +2458,13 @@ async function handleTextMessage(event) {
     );
   }
 
-  if (event.source.type === 'group') return null;
+  if (event.source.type === 'group') {
+  if (text === '騎士狀態' || text === '上線狀態') {
+    return replyMessages(event.replyToken, [createRiderOnlineFlex(false)]);
+  }
+
+  return null;
+}
 
   if (/^UB\d+/i.test(text)) {
     const orderId = text.toUpperCase();
