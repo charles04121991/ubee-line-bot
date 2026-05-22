@@ -209,7 +209,12 @@
           return;
         }
 
+        console.log("開始取得 profile");
+
         const profile = await liff.getProfile();
+
+        console.log("profile =", profile);
+
         lineUserId = profile.userId;
 
         setStatus("正在確認騎士身分...");
@@ -219,9 +224,13 @@
         await loadTasks();
 
       }catch(err){
-        console.error("初始化失敗原因：", err);
-        setStatus("初始化失敗：" + err.message, true);
+  console.error("LIFF ERROR =", err);
 
+  setStatus(
+    "初始化失敗：" + (err.message || JSON.stringify(err)),
+    true
+  );
+}
     async function loadRiderProfile(){
       const res = await fetch(`/api/rider/profile?lineUserId=${encodeURIComponent(lineUserId)}`);
 
