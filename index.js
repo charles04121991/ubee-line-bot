@@ -2406,6 +2406,10 @@ UBee 辦公室將會再依照您的需求，
 
 async function handleTextStep(event, userId, text) {
   const normalized = text.trim();
+  
+    if (normalized === '騎士狀態' || normalized === '上線狀態') {
+    return replyMessages(event.replyToken, [createRiderOnlineFlex(false)]);
+  }
 
   if (normalized === '主選單') return replyMessages(event.replyToken, [createMainMenuFlex()]);
   if (normalized === '我的資訊' || normalized === '我的') {
