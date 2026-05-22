@@ -27,7 +27,6 @@
     }
 
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-
     html{scroll-behavior:smooth;}
 
     body{
@@ -73,9 +72,7 @@
       background:#fff;
     }
 
-    .brandText{
-      line-height:1.12;
-    }
+    .brandText{line-height:1.12;}
 
     .brandText b{
       display:block;
@@ -168,9 +165,7 @@
       cursor:pointer;
     }
 
-    .heroVisual{
-  display:none;
-}
+    .heroVisual{display:none;}
 
     .benefits{
       display:grid;
@@ -210,6 +205,65 @@
       font-weight:800;
     }
 
+    .statusCard{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:28px;
+      padding:22px;
+      margin-bottom:18px;
+    }
+
+    .statusTitle{
+      font-size:24px;
+      font-weight:1000;
+      margin-bottom:10px;
+    }
+
+    .statusText{
+      font-size:20px;
+      font-weight:1000;
+      margin-bottom:14px;
+      color:var(--muted);
+    }
+
+    .statusText.online{color:#7dd3fc;}
+    .statusText.offline{color:#ef4444;}
+
+    .statusHint{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.7;
+      font-weight:800;
+      margin-bottom:16px;
+    }
+
+    .statusBtns{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+
+    .onlineBtn,
+    .offlineBtn{
+      border:0;
+      border-radius:18px;
+      min-height:58px;
+      font-size:20px;
+      font-weight:1000;
+      font-family:inherit;
+      cursor:pointer;
+    }
+
+    .onlineBtn{
+      background:#7dd3fc;
+      color:#001018;
+    }
+
+    .offlineBtn{
+      background:#ef4444;
+      color:#fff;
+    }
+
     .card{
       background:var(--card);
       border:1px solid var(--line);
@@ -247,9 +301,7 @@
       letter-spacing:-.3px;
     }
 
-    .sectionTitle:first-of-type{
-      margin-top:0;
-    }
+    .sectionTitle:first-of-type{margin-top:0;}
 
     .fieldGrid{
       display:grid;
@@ -265,9 +317,7 @@
       min-height:88px;
     }
 
-    .field.full{
-      grid-column:1 / -1;
-    }
+    .field.full{grid-column:1 / -1;}
 
     label{
       display:block;
@@ -299,9 +349,7 @@
     }
 
     input::placeholder,
-    textarea::placeholder{
-      color:var(--muted2);
-    }
+    textarea::placeholder{color:var(--muted2);}
 
     select{
       appearance:none;
@@ -309,9 +357,7 @@
       color:var(--white);
     }
 
-    select:invalid{
-      color:var(--muted2);
-    }
+    select:invalid{color:var(--muted2);}
 
     textarea{
       min-height:82px;
@@ -431,9 +477,7 @@
       transition:.16s ease;
     }
 
-    .submitBtn:active{
-      transform:scale(.985);
-    }
+    .submitBtn:active{transform:scale(.985);}
 
     .submitBtn:disabled{
       opacity:.45;
@@ -481,22 +525,16 @@
     }
 
     @media(max-width:640px){
-      .page{
-        padding:20px 14px 40px;
-      }
+      .page{padding:20px 14px 40px;}
 
-      .brandText b{
-        font-size:24px;
-      }
+      .brandText b{font-size:24px;}
 
       .hero{
         padding:24px 20px;
         min-height:245px;
       }
 
-      h1{
-        font-size:36px;
-      }
+      h1{font-size:36px;}
 
       .heroText{
         font-size:15px;
@@ -517,28 +555,19 @@
         margin-top:18px;
       }
 
-      .fieldGrid{
-        grid-template-columns:1fr;
-      }
-
-      .agreeGrid{
-        grid-template-columns:1fr;
-      }
+      .fieldGrid{grid-template-columns:1fr;}
+      .agreeGrid{grid-template-columns:1fr;}
 
       .card{
         padding:20px;
         border-radius:26px;
       }
 
-      .sectionTitle{
-        font-size:25px;
-      }
+      .sectionTitle{font-size:25px;}
     }
 
     @media(max-width:420px){
-      .topbar{
-        margin-bottom:18px;
-      }
+      .topbar{margin-bottom:18px;}
 
       .logoU{
         width:42px;
@@ -546,21 +575,13 @@
         font-size:26px;
       }
 
-      .brandText span{
-        font-size:11px;
-      }
+      .brandText span{font-size:11px;}
 
-      h1{
-        font-size:33px;
-      }
+      h1{font-size:33px;}
 
-      .hero{
-        border-radius:24px;
-      }
+      .hero{border-radius:24px;}
 
-      .heroText{
-        padding-right:96px;
-      }
+      .heroText{padding-right:96px;}
 
       .heroVisual{
         width:92px;
@@ -568,23 +589,15 @@
         font-size:48px;
       }
 
-      .benefit{
-        padding:12px 6px;
-      }
+      .benefit{padding:12px 6px;}
 
-      .benefitTitle{
-        font-size:13px;
-      }
+      .benefitTitle{font-size:13px;}
 
-      .benefitText{
-        font-size:11px;
-      }
+      .benefitText{font-size:11px;}
 
       input:not([type="checkbox"]),
       select,
-      textarea{
-        font-size:16px;
-      }
+      textarea{font-size:16px;}
 
       .submitBtn{
         min-height:64px;
@@ -635,6 +648,20 @@
         <div class="benefitTitle">平台規範</div>
         <div class="benefitText">審核通過才可接單</div>
       </div>
+    </div>
+  </div>
+
+  <div class="statusCard">
+    <div class="statusTitle">接單狀態</div>
+    <div id="riderStatusText" class="statusText offline">目前狀態：下線中</div>
+
+    <div class="statusHint">
+      這裡只代表你目前是否方便接單，不影響群組接單方式。上線後，管理員會知道你現在可以接單。
+    </div>
+
+    <div class="statusBtns">
+      <button class="onlineBtn" type="button" onclick="updateRiderOnlineStatus(true)">上線</button>
+      <button class="offlineBtn" type="button" onclick="updateRiderOnlineStatus(false)">下線</button>
     </div>
   </div>
 
@@ -841,6 +868,47 @@ async function initLiff() {
 
 window.addEventListener('load', initLiff);
 
+async function updateRiderOnlineStatus(isOnline) {
+  const statusText = document.getElementById('riderStatusText');
+
+  if (!realLineUserId || !realLineUserId.startsWith('U')) {
+    alert('請先從 LINE 官方帳號內開啟此頁面。');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/rider/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        lineUserId: realLineUserId,
+        online: isOnline
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.message || '狀態更新失敗，請稍後再試。');
+      return;
+    }
+
+    if (isOnline) {
+      statusText.className = 'statusText online';
+      statusText.innerHTML = '目前狀態：上線中';
+    } else {
+      statusText.className = 'statusText offline';
+      statusText.innerHTML = '目前狀態：下線中';
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert('狀態更新失敗，請稍後再試。');
+  }
+}
+
 document.getElementById('riderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
@@ -873,24 +941,25 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
     errorBox.innerHTML = '請完整填寫所有必填資料。';
     return;
   }
-  
+
   if (name.length < 2 || name.length > 20) {
-  errorBox.style.display = 'block';
-  errorBox.innerHTML = '姓名長度需為 2～20 字。';
-  return;
-}
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '姓名長度需為 2～20 字。';
+    return;
+  }
 
-if (plateNumber.length > 20) {
-  errorBox.style.display = 'block';
-  errorBox.innerHTML = '車牌號碼不可超過 20 字。';
-  return;
-}
+  if (plateNumber.length > 20) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '車牌號碼不可超過 20 字。';
+    return;
+  }
 
-if (!/^09\d{8}$/.test(phone)) {
-  errorBox.style.display = 'block';
-  errorBox.innerHTML = '請輸入正確手機號碼，例如：0912345678。';
-  return;
-}
+  if (!/^09\d{8}$/.test(phone)) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請輸入正確手機號碼，例如：0912345678。';
+    return;
+  }
+
   if (!realLineUserId || !realLineUserId.startsWith('U')) {
     errorBox.style.display = 'block';
     errorBox.innerHTML = '請從 LINE 官方帳號內開啟此頁面，系統需要取得 LINE 身分才能送出申請。';
