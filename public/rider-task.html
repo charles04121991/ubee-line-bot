@@ -341,7 +341,7 @@
         const data = await res.json();
 
         if(!res.ok){
-          throw new Error(data.message || "接單失敗");
+          throw new Error(data.message || data.error || "接單失敗");
         }
 
         alert("接單成功！");
