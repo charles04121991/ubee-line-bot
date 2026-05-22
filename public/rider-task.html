@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>UBee｜騎士任務列表</title>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    :root{
+      --bg:#000;
+      --card:#111;
+      --card2:#181818;
+      --line:rgba(255,255,255,.12);
+      --text:#f5f5f5;
+      --muted:#a8a8a8;
+      --white:#fff;
+      --green:#22c55e;
+      --green2:#16a34a;
+      --yellow:#facc15;
+      --danger:#ef4444;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:520px;
+      margin:0 auto;
+      padding:22px 16px 40px;
+    }
+
+    .hero{
+      padding:20px;
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:linear-gradient(180deg,#151515,#0c0c0c);
+      margin-bottom:18px;
+    }
+
+    .hero h1{
+      margin:0 0 8px;
+      font-size:24px;
+      letter-spacing:.5px;
+    }
+
+    .hero p{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.6;
+    }
+
+    .status{
+      margin:14px 0;
+      padding:12px 14px;
+      border-radius:14px;
+      background:var(--card2);
+      border:1px solid var(--line);
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .task{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:20px;
+      padding:16px;
+      margin-bottom:14px;
+    }
+
+    .task-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      margin-bottom:12px;
+    }
+
+    .order-id{
+      font-size:14px;
+      color:var(--muted);
+    }
+
+    .service{
+      font-size:18px;
+      font-weight:700;
+      margin-top:4px;
+    }
+
+    .badge{
+      white-space:nowrap;
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      color:#000;
+      background:var(--yellow);
+      font-weight:700;
+    }
+
+    .row{
+      padding:10px 0;
+      border-top:1px solid var(--line);
+    }
+
+    .label{
+      color:var(--muted);
+      font-size:13px;
+      margin-bottom:4px;
+    }
+
+    .value{
+      font-size:15px;
+      line-height:1.5;
+      word-break:break-word;
+    }
+
+    .price{
+      font-size:20px;
+      font-weight:800;
+      color:var(--white);
+    }
+
+    button{
+      width:100%;
+      border:0;
+      border-radius:16px;
+      padding:15px 16px;
+      font-size:16px;
+      font-weight:800;
+      margin-top:14px;
+      color:#fff;
+      background:var(--green);
+    }
+
+    button:active{
+      transform:scale(.99);
+      background:var(--green2);
+    }
+
+    button:disabled{
+      opacity:.45;
+      background:#555;
+    }
+
+    .empty{
+      text-align:center;
+      color:var(--muted);
+      padding:36px 10px;
+      line-height:1.7;
+    }
+
+    .error{
+      color:#ffb4b4;
+      border-color:rgba(239,68,68,.35);
+      background:rgba(239,68,68,.12);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>UBee 騎士任務</h1>
+      <p>這裡會顯示目前可以接受的任務。接受後，任務會綁定到你的騎士資料。</p>
+    </div>
+
+    <div id="status" class="status">正在初始化騎士系統...</div>
+    <div id="taskList"></div>
+  </div>
+
+  <script>
+    const LIFF_ID = "2009895876-hiq8YW0n";
+
+    let lineUserId = "";
+    let riderProfile = null;
+
+    const statusBox = document.getElementById("status");
+    const taskList = document.getElementById("taskList");
+
+    function setStatus(text, isError = false){
+      statusBox.textContent = text;
+      statusBox.className = isError ? "status error" : "status";
+    }
+
+    function safeText(value){
+      return value || "未填寫";
+    }
+
+    function money(value){
+      if(value === undefined || value === null || value === "") return "待確認";
+      return "$" + Number(value).toLocaleString("zh-TW");
+    }
+
+    async function init(){
+      try{
+        await liff.init({ liffId: LIFF_ID });
+
+        if(!liff.isLoggedIn()){
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        lineUserId = profile.userId;
+
+        setStatus("正在確認騎士身分...");
+        await loadRiderProfile();
+
+        setStatus("正在載入可接任務...");
+        await loadTasks();
+
+      }catch(err){
+        console.error(err);
+        setStatus("初始化失敗，請稍後再試。", true);
+      }
+    }
+
+    async function loadRiderProfile(){
+      const res = await fetch(`/api/rider/profile?lineUserId=${encodeURIComponent(lineUserId)}`);
+
+      if(!res.ok){
+        throw new Error("找不到騎士資料");
+      }
+
+      const data = await res.json();
+
+      if(!data || !data.rider){
+        setStatus("你目前尚未通過騎士審核，無法接任務。", true);
+        throw new Error("尚未通過騎士審核");
+      }
+
+      riderProfile = data.rider;
+
+      if(riderProfile.status !== "approved"){
+        setStatus("你的騎士資格尚未審核通過，暫時無法接任務。", true);
+        throw new Error("騎士未通過審核");
+      }
+    }
+
+    async function loadTasks(){
+      const res = await fetch("/api/rider/tasks");
+
+      if(!res.ok){
+        throw new Error("任務載入失敗");
+      }
+
+      const data = await res.json();
+      const tasks = data.tasks || [];
+
+      renderTasks(tasks);
+    }
+
+    function renderTasks(tasks){
+      taskList.innerHTML = "";
+
+      if(tasks.length === 0){
+        setStatus("目前沒有可接任務。");
+        taskList.innerHTML = `
+          <div class="empty">
+            目前沒有新的任務。<br>
+            有新任務時，請重新整理此頁。
+          </div>
+        `;
+        return;
+      }
+
+      setStatus(`目前共有 ${tasks.length} 張可接任務。`);
+
+      tasks.forEach(order => {
+        const card = document.createElement("div");
+        card.className = "task";
+
+        card.innerHTML = `
+          <div class="task-head">
+            <div>
+              <div class="order-id">${safeText(order.orderId)}</div>
+              <div class="service">${safeText(order.serviceType || order.serviceName)}</div>
+            </div>
+            <div class="badge">${safeText(order.speedName || order.speedType)}</div>
+          </div>
+
+          <div class="row">
+            <div class="label">取件地點</div>
+            <div class="value">${safeText(order.pickupAddress)}</div>
+          </div>
+
+          <div class="row">
+            <div class="label">送達地點</div>
+            <div class="value">${safeText(order.dropoffAddress)}</div>
+          </div>
+
+          <div class="row">
+            <div class="label">物品 / 任務內容</div>
+            <div class="value">${safeText(order.itemName || order.itemNote || order.note)}</div>
+          </div>
+
+          <div class="row">
+            <div class="label">預估費用</div>
+            <div class="price">${money(order.totalFee || order.estimatedFee)}</div>
+          </div>
+
+          <button onclick="acceptTask('${order.id || order.orderId}', this)">
+            接受任務
+          </button>
+        `;
+
+        taskList.appendChild(card);
+      });
+    }
+
+    async function acceptTask(orderDocId, btn){
+      if(!confirm("確定要接受這張任務嗎？")) return;
+
+      try{
+        btn.disabled = true;
+        btn.textContent = "接單中...";
+
+        const res = await fetch("/api/rider/accept-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            orderId: orderDocId,
+            lineUserId,
+            riderId: riderProfile.riderId || "",
+            riderName: riderProfile.name || "",
+            riderPhone: riderProfile.phone || ""
+          })
+        });
+
+        const data = await res.json();
+
+        if(!res.ok){
+          throw new Error(data.message || "接單失敗");
+        }
+
+        alert("接單成功！");
+        await loadTasks();
+
+      }catch(err){
+        console.error(err);
+        alert(err.message || "接單失敗，請稍後再試。");
+        btn.disabled = false;
+        btn.textContent = "接受任務";
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
