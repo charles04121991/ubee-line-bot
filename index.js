@@ -2547,6 +2547,7 @@ async function handleTextMessage(event) {
   console.log('========== LINE 文字訊息 ==========');
   console.log('source type:', event.source.type);
   console.log('LINE userId:', userId);
+  console.log('請把這個 userId 複製到 Firebase riders 的 lineUserId 欄位:', userId);
   console.log('groupId:', event.source.groupId || '-');
   console.log('roomId:', event.source.roomId || '-');
   console.log('text:', text);
