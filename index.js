@@ -987,6 +987,50 @@ function createMainMenuFlex() {
   ));
 }
 
+function createRiderOnlineFlex(isOnline = false) {
+  return createFlexMessage(
+    'UBee 騎士狀態',
+    createBubble(
+      'UBee 騎士狀態',
+      [
+        createInfoRow('目前狀態', isOnline ? '🟢 上線中' : '🔴 離線中'),
+        {
+          type: 'text',
+          text: '上線後，系統會知道你目前可以接單。\n下線後，系統會知道你目前不方便接單。\n\n目前群組接單方式不變。',
+          size: 'sm',
+          color: '#666666',
+          wrap: true,
+          margin: 'md',
+        },
+      ],
+      [
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#7DD3FC',
+          height: 'sm',
+          action: {
+            type: 'postback',
+            label: '上線',
+            data: 'riderOnline',
+          },
+        },
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#EF4444',
+          height: 'sm',
+          action: {
+            type: 'postback',
+            label: '下線',
+            data: 'riderOffline',
+          },
+        },
+      ]
+    )
+  );
+}
+
 function createRiderReviewFlex(rider) {
   return createFlexMessage('新騎士申請審核', createBubble(
     '🟡 新騎士申請審核',
