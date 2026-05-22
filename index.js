@@ -1971,6 +1971,36 @@ UBee 辦公室將會再依照您的需求，
   );
 }
 
+if (data === 'riderOnline' || data === 'riderOffline') {
+  const isOnline = data === 'riderOnline';
+
+  const snap = await db
+    .collection('riders')
+    .where('lineUserId', '==', userId)
+    .where('status', '==', 'approved')
+    .limit(1)
+    .get();
+
+  if (snap.empty) {
+    return replyText(event.replyToken, '你尚未通過 UBee 騎士審核，暫時無法切換上線狀態。');
+  }
+
+  const riderDoc = snap.docs[0];
+
+  await db.collection('riders').doc(riderDoc.id).set({
+    online: isOnline,
+    busy: false,
+    currentOrderId: '',
+    lastActive: Date.now(),
+    onlineUpdatedAt: Date.now(),
+  }, { merge: true });
+
+  return replyText(
+    event.replyToken,
+    isOnline ? '✅ 你已上線，系統已記錄你目前可以接單。' : '🔴 你已下線，系統已記錄你目前不方便接單。'
+  );
+}
+
   if (data === 'menu=info') return replyMessages(event.replyToken, [createInfoMenuFlex()]);
   if (data === 'submenu=cancelRules') return replyMessages(event.replyToken, [createCancelRulesFlex()]);
   if (data === 'submenu=faq') return replyMessages(event.replyToken, [createFaqFlex()]);
