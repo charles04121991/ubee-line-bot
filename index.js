@@ -92,6 +92,66 @@ app.get('/health', (req, res) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ==============================
+// UBee 騎士系統 API
+// ==============================
+
+// 1. 取得騎士資料
+app.get('/api/rider/profile', async (req, res) => {
+  try {
+    const { lineUserId } = req.query;
+
+    if (!lineUserId) {
+      return res.status(400).json({ message: '缺少 lineUserId' });
+    }
+
+    const snap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.status(404).json({ message: '找不到騎士資料' });
+    }
+
+    const doc = snap.docs[0];
+
+    return res.json({
+      rider: {
+        id: doc.id,
+        ...doc.data()
+      }
+    });
+
+  } catch (err) {
+    console.error('取得騎士資料失敗:', err);
+    return res.status(500).json({ message: '取得騎士資料失敗' });
+  }
+});
+
+
+// 2. 取得可接任務
+app.get('/api/rider/tasks', async (req, res) => {
+  try {
+    const snap = await db.collection('orders')
+      .where('status', '==', 'pending_dispatch')
+      .orderBy('createdAt', 'desc')
+      .limit(30)
+      .get();
+
+    const tasks = snap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    return res.json({ tasks });
+
+  } catch (err) {
+    console.error('取得可接任務失敗:', err);
+    return res.status(500).json({ message: '取得可接任務失敗' });
+  }
+});
+
 app.get('/order.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
