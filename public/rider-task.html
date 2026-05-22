@@ -220,8 +220,7 @@
 
       }catch(err){
         console.error("初始化失敗原因：", err);
-        setStatus("初始化失敗：" + (err.message || err), true);
-}
+        setStatus("初始化失敗：" + err.message, true);
 
     async function loadRiderProfile(){
       const res = await fetch(`/api/rider/profile?lineUserId=${encodeURIComponent(lineUserId)}`);
