@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UBee｜騎士任務</title>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<style>
+body{
+  margin:0;
+  padding:20px;
+  background:#000;
+  color:#fff;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+}
+
+.card{
+  background:#111;
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:20px;
+  border:1px solid rgba(255,255,255,.08);
+}
+
+.title{
+  font-size:24px;
+  font-weight:700;
+  margin-bottom:20px;
+}
+
+.info{
+  margin-bottom:12px;
+  line-height:1.5;
+  color:#ddd;
+}
+
+button{
+  width:100%;
+  border:none;
+  border-radius:14px;
+  padding:16px;
+  margin-top:12px;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.primary{
+  background:#fff;
+  color:#000;
+}
+
+.secondary{
+  background:#1f1f1f;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.08);
+}
+
+.hidden{
+  display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+  <div class="title">UBee｜騎士任務</div>
+
+  <div class="info" id="orderId"></div>
+  <div class="info" id="status"></div>
+  <div class="info" id="pickup"></div>
+  <div class="info" id="dropoff"></div>
+  <div class="info" id="item"></div>
+</div>
+
+<button id="arrivedPickupBtn" class="primary hidden">
+  已抵達取件地
+</button>
+
+<button id="pickedUpBtn" class="primary hidden">
+  已取件
+</button>
+
+<button id="arrivedDropoffBtn" class="primary hidden">
+  已抵達送達地
+</button>
+
+<button id="completedBtn" class="primary hidden">
+  任務完成
+</button>
+
+<script>
+const LIFF_ID = "2009895876-rDpD9SvT";
+
+let lineUserId = "";
+let orderId = "";
+
+async function init(){
+  await liff.init({ liffId: LIFF_ID });
+
+  if(!liff.isLoggedIn()){
+    liff.login();
+    return;
+  }
+
+  const profile = await liff.getProfile();
+  lineUserId = profile.userId;
+
+  const params = new URLSearchParams(location.search);
+  orderId = params.get("orderId");
+
+  loadOrder();
+}
+
+async function loadOrder(){
+  const res = await fetch(`/api/orders/${orderId}`);
+  const data = await res.json();
+
+  if(!data.success){
+    alert(data.error || "讀取任務失敗");
+    return;
+  }
+
+  const order = data.order;
+
+  document.getElementById("orderId").innerText =
+    `訂單編號：${order.id}`;
+
+  document.getElementById("status").innerText =
+    `目前狀態：${order.statusLabel}`;
+
+  document.getElementById("pickup").innerText =
+    `取件地：${order.pickupAddress}`;
+
+  document.getElementById("dropoff").innerText =
+    `送達地：${order.dropoffAddress}`;
+
+  showButtons(order.status);
+}
+
+function showButtons(status){
+
+  hideAllButtons();
+
+  if(status === "accepted"){
+    show("arrivedPickupBtn");
+  }
+
+  if(status === "arrived_pickup"){
+    show("pickedUpBtn");
+  }
+
+  if(status === "picked_up"){
+    show("arrivedDropoffBtn");
+  }
+
+  if(status === "arrived_dropoff"){
+    show("completedBtn");
+  }
+}
+
+function show(id){
+  document.getElementById(id).classList.remove("hidden");
+}
+
+function hideAllButtons(){
+  [
+    "arrivedPickupBtn",
+    "pickedUpBtn",
+    "arrivedDropoffBtn",
+    "completedBtn"
+  ].forEach(id=>{
+    document.getElementById(id).classList.add("hidden");
+  });
+}
+
+async function updateStatus(status){
+
+  const res = await fetch("/api/rider/update-order-status",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      orderId,
+      lineUserId,
+      status
+    })
+  });
+
+  const data = await res.json();
+
+  if(!data.success){
+    alert(data.error || "更新失敗");
+    return;
+  }
+
+  alert(data.message);
+
+  loadOrder();
+}
+
+document.getElementById("arrivedPickupBtn")
+.addEventListener("click",()=>{
+  updateStatus("arrived_pickup");
+});
+
+document.getElementById("pickedUpBtn")
+.addEventListener("click",()=>{
+  updateStatus("picked_up");
+});
+
+document.getElementById("arrivedDropoffBtn")
+.addEventListener("click",()=>{
+  updateStatus("arrived_dropoff");
+});
+
+document.getElementById("completedBtn")
+.addEventListener("click",()=>{
+  updateStatus("completed");
+});
+
+init();
+</script>
+
+</body>
+</html>
