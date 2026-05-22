@@ -274,18 +274,24 @@
       }
 
       setStatus(`目前共有 ${tasks.length} 張可接任務。`);
-
+      
+      const renderedIds = new Set();
+      
       tasks.forEach(order => {
+        
+        if(renderedIds.has(order.id)) return;
+        renderedIds.add(order.id);
+
         const card = document.createElement("div");
         card.className = "task";
 
         card.innerHTML = `
           <div class="task-head">
             <div>
-              <div class="order-id">${safeText(order.orderId)}</div>
+              <div class="order-id">${safeText(order.id || order.orderId)}</div>
               <div class="service">${safeText(order.serviceType || order.serviceName)}</div>
             </div>
-            <div class="badge">${safeText(order.speedName || order.speedType)}</div>
+            <div class="badge">${safeText(order.speedLabel || order.speedName || order.speedType)}</div>
           </div>
 
           <div class="row">
@@ -300,12 +306,12 @@
 
           <div class="row">
             <div class="label">物品 / 任務內容</div>
-            <div class="value">${safeText(order.itemName || order.itemNote || order.note)}</div>
+            <div class="value">${safeText(order.item || order.itemName || order.itemNote || order.note)}</div>
           </div>
 
           <div class="row">
-            <div class="label">預估費用</div>
-            <div class="price">${money(order.totalFee || order.estimatedFee)}</div>
+            <div class="label">騎士收入</div>
+            <div class="price">${money(order.driverFee || order.total || order.totalFee || order.estimatedFee)}</div>
           </div>
 
           <button onclick="acceptTask('${order.id || order.orderId}', this)">
