@@ -345,7 +345,7 @@
         }
 
         alert("接單成功！");
-        await loadTasks();
+        location.href = `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}`;
 
       }catch(err){
         console.error(err);
