@@ -1782,22 +1782,6 @@ app.post('/api/rider/accept-order', async (req, res) => {
 
       const order = orderDoc.data();
 
-      const busyQuery = db.collection('orders')
-        .where('riderId', '==', lineUserId)
-        .where('status', 'in', [
-          'accepted',
-          'arrived_pickup',
-          'picked_up',
-          'arrived_dropoff'
-        ])
-        .limit(1);
-
-      const busySnap = await transaction.get(busyQuery);
-
-      if (!busySnap.empty) {
-        throw new Error('RIDER_ALREADY_BUSY');
-      }
-
       if (isTerminalOrderStatus(order)) {
         throw new Error('ORDER_TERMINAL');
       }
@@ -1842,13 +1826,6 @@ app.post('/api/rider/accept-order', async (req, res) => {
       return res.status(409).json({
         success: false,
         error: '此訂單已被其他騎士接走',
-      });
-    }
-
-    if (error.message === 'RIDER_ALREADY_BUSY') {
-      return res.status(409).json({
-        success: false,
-        error: '你目前還有進行中的任務，請先完成後再接新單',
       });
     }
 
