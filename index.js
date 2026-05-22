@@ -204,6 +204,73 @@ if(plateNumber && String(plateNumber).trim().length > 20){
   }
 });
 
+// ===== 騎手上線 / 下線狀態 API =====
+app.post('/api/rider/status', async (req, res) => {
+  try {
+    const { lineUserId, online } = req.body;
+
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的 LINE 身分。',
+      });
+    }
+
+    if (typeof online !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: '上線狀態格式錯誤。',
+      });
+    }
+
+    const snap = await db
+      .collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法切換接單狀態。',
+      });
+    }
+
+    const riderDoc = snap.docs[0];
+    const rider = riderDoc.data();
+
+    const updateData = {
+      online,
+      busy: rider.busy === true ? true : false,
+      currentOrderId: rider.currentOrderId || '',
+      lastActive: Date.now(),
+      onlineUpdatedAt: Date.now(),
+    };
+
+    if (!online) {
+      updateData.busy = false;
+      updateData.currentOrderId = '';
+    }
+
+    await db.collection('riders').doc(riderDoc.id).set(updateData, { merge: true });
+
+    return res.json({
+      success: true,
+      message: online ? '已上線。' : '已下線。',
+      online,
+    });
+
+  } catch (err) {
+    console.error('❌ 騎手狀態更新失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '狀態更新失敗，請稍後再試。',
+    });
+  }
+});
+
 // ===== 商務合作申請 API =====
 app.post('/api/business/register', async (req, res) => {
   try {
