@@ -987,41 +987,6 @@ function createMainMenuFlex() {
   ));
 }
 
-function createRiderOnlineFlex(isOnline = false) {
-  return createFlexMessage(
-    'UBee 騎士狀態',
-    createBubble(
-      'UBee 騎士狀態',
-      [
-        createInfoRow('目前狀態', isOnline ? '🟢 上線中' : '🔴 下線中'),
-        {
-          type: 'text',
-          text: isOnline
-            ? '你目前正在上線狀態。若現在不方便接單，請點擊下方按鈕下線。'
-            : '你目前正在下線狀態。若現在可以接單，請點擊下方按鈕上線。',
-          size: 'sm',
-          color: '#666666',
-          wrap: true,
-          margin: 'md',
-        },
-      ],
-      [
-        {
-          type: 'button',
-          style: 'primary',
-          color: isOnline ? '#EF4444' : '#7DD3FC',
-          height: 'sm',
-          action: {
-            type: 'postback',
-            label: isOnline ? '下線' : '上線',
-            data: isOnline ? 'riderOffline' : 'riderOnline',
-          },
-        },
-      ]
-    )
-  );
-}
-
 function createRiderReviewFlex(rider) {
   return createFlexMessage('新騎士申請審核', createBubble(
     '🟡 新騎士申請審核',
@@ -1962,36 +1927,6 @@ UBee 辦公室將會再依照您的需求，
   );
 }
 
-if (data === 'riderOnline' || data === 'riderOffline') {
-  const isOnline = data === 'riderOnline';
-
-  const snap = await db
-    .collection('riders')
-    .where('lineUserId', '==', userId)
-    .where('status', '==', 'approved')
-    .limit(1)
-    .get();
-
-  if (snap.empty) {
-    return replyText(event.replyToken, '你尚未通過 UBee 騎士審核，暫時無法切換上線狀態。');
-  }
-
-  const riderDoc = snap.docs[0];
-
-  await db.collection('riders').doc(riderDoc.id).set({
-    online: isOnline,
-    busy: false,
-    currentOrderId: '',
-    lastActive: Date.now(),
-    onlineUpdatedAt: Date.now(),
-  }, { merge: true });
-
-  return replyText(
-    event.replyToken,
-    isOnline ? '✅ 你已上線，系統已記錄你目前可以接單。' : '🔴 你已下線，系統已記錄你目前不方便接單。'
-  );
-}
-
   if (data === 'menu=info') return replyMessages(event.replyToken, [createInfoMenuFlex()]);
   if (data === 'submenu=cancelRules') return replyMessages(event.replyToken, [createCancelRulesFlex()]);
   if (data === 'submenu=faq') return replyMessages(event.replyToken, [createFaqFlex()]);
@@ -2427,30 +2362,6 @@ if (data === 'riderOnline' || data === 'riderOffline') {
 
 async function handleTextStep(event, userId, text) {
   const normalized = text.trim();
-  
-    if (normalized === '騎士狀態' || normalized === '上線狀態') {
-
-  const snap = await db
-    .collection('riders')
-    .where('lineUserId', '==', userId)
-    .where('status', '==', 'approved')
-    .limit(1)
-    .get();
-
-  if (snap.empty) {
-    return replyText(
-      event.replyToken,
-      '你尚未通過 UBee 騎士審核。'
-    );
-  }
-
-  const rider = snap.docs[0].data();
-
-  return replyMessages(
-    event.replyToken,
-    [createRiderOnlineFlex(rider.online === true)]
-  );
-}
 
   if (normalized === '主選單') return replyMessages(event.replyToken, [createMainMenuFlex()]);
   if (normalized === '我的資訊' || normalized === '我的') {
@@ -2499,34 +2410,7 @@ async function handleTextMessage(event) {
     );
   }
 
-  if (event.source.type === 'group') {
-
-  if (text === '騎士狀態' || text === '上線狀態') {
-
-    const snap = await db
-      .collection('riders')
-      .where('lineUserId', '==', userId)
-      .where('status', '==', 'approved')
-      .limit(1)
-      .get();
-
-    if (snap.empty) {
-      return replyText(
-        event.replyToken,
-        '你尚未通過 UBee 騎士審核。'
-      );
-    }
-
-    const rider = snap.docs[0].data();
-
-    return replyMessages(
-      event.replyToken,
-      [createRiderOnlineFlex(rider.online === true)]
-    );
-  }
-
-  return null;
-}
+  if (event.source.type === 'group') return null;
 
   if (/^UB\d+/i.test(text)) {
     const orderId = text.toUpperCase();
