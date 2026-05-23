@@ -19,7 +19,6 @@
   --blue:#2563eb;
   --green:#22c55e;
   --yellow:#facc15;
-  --danger:#ef4444;
 }
 *{box-sizing:border-box}
 html,body{
@@ -39,14 +38,14 @@ html,body{
 }
 .status-pill{color:#d1d5db;font-weight:700}
 .location-btn{
-  position:fixed;right:16px;bottom:300px;z-index:10;
+  position:fixed;right:16px;bottom:320px;z-index:10;
   width:48px;height:48px;border-radius:999px;
   border:1px solid rgba(255,255,255,.15);
   background:rgba(0,0,0,.8);color:#fff;font-size:20px;
 }
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:20;
-  max-height:48vh;background:rgba(12,12,12,.96);backdrop-filter:blur(18px);
+  max-height:58vh;background:rgba(12,12,12,.97);backdrop-filter:blur(18px);
   border-top:1px solid rgba(255,255,255,.12);border-radius:26px 26px 0 0;
   padding:14px 16px calc(20px + env(safe-area-inset-bottom));overflow:auto;
 }
@@ -61,21 +60,107 @@ html,body{
   border:1px solid var(--line);color:var(--muted);font-size:14px;
 }
 .status.error{color:#ffb4b4;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.12)}
-.task{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:14px}
-.task-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
-.order-id{font-size:13px;color:var(--muted)}
-.service{font-size:18px;font-weight:800;margin-top:4px}
-.badge{
-  white-space:nowrap;font-size:12px;padding:6px 10px;border-radius:999px;
-  color:#000;background:var(--yellow);font-weight:800;
+.task{
+  background:#101010;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:24px;
+  padding:18px;
+  margin-bottom:14px;
 }
-.row{padding:10px 0;border-top:1px solid var(--line)}
-.label{color:var(--muted);font-size:13px;margin-bottom:4px}
-.value{font-size:15px;line-height:1.5;word-break:break-word}
-.price{font-size:20px;font-weight:900;color:var(--white)}
+.task-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:16px;
+}
+.fare{
+  font-size:40px;
+  line-height:1;
+  font-weight:950;
+  letter-spacing:-1px;
+}
+.arrival{
+  text-align:right;
+  color:#fff;
+}
+.arrival-main{
+  font-size:20px;
+  font-weight:900;
+}
+.arrival-sub{
+  margin-top:4px;
+  font-size:13px;
+  color:var(--muted);
+}
+.order-id{
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+.service{
+  font-size:17px;
+  font-weight:900;
+}
+.badge{
+  display:inline-block;
+  margin-top:8px;
+  white-space:nowrap;
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  color:#000;
+  background:var(--yellow);
+  font-weight:900;
+}
+.route{
+  margin-top:14px;
+  border-top:1px solid var(--line);
+  padding-top:14px;
+}
+.route-row{
+  display:grid;
+  grid-template-columns:24px 1fr;
+  gap:10px;
+  margin-bottom:14px;
+}
+.dot{
+  width:12px;
+  height:12px;
+  border-radius:999px;
+  margin-top:5px;
+  background:#22c55e;
+}
+.dot.drop{background:#fff}
+.route-label{
+  color:var(--muted);
+  font-size:13px;
+  margin-bottom:4px;
+}
+.route-value{
+  font-size:15px;
+  line-height:1.45;
+  word-break:break-word;
+}
+.item-box{
+  margin-top:10px;
+  padding:12px;
+  border-radius:14px;
+  background:rgba(255,255,255,.06);
+  color:#ddd;
+  font-size:14px;
+  line-height:1.5;
+}
 .accept-btn{
-  width:100%;border:0;border-radius:16px;padding:15px 16px;font-size:16px;
-  font-weight:900;margin-top:14px;color:#fff;background:var(--green);
+  width:100%;
+  border:0;
+  border-radius:18px;
+  padding:16px;
+  font-size:18px;
+  font-weight:950;
+  margin-top:16px;
+  color:#fff;
+  background:var(--green);
 }
 .accept-btn:disabled{opacity:.45;background:#555}
 .empty{text-align:center;color:var(--muted);padding:26px 10px;line-height:1.7}
@@ -358,7 +443,7 @@ async function loadTasks(){
   latestTasks = data.tasks || [];
 
   renderTaskMarkers(latestTasks);
-  renderTasks(latestTasks);
+  await renderTasks(latestTasks);
 }
 
 function clearTaskMarkers(){
@@ -386,13 +471,29 @@ async function getLatLngFromAddress(address){
   });
 }
 
+function getTaskPosition(order){
+  if(order.pickupLat && order.pickupLng){
+    return {
+      lat: Number(order.pickupLat),
+      lng: Number(order.pickupLng)
+    };
+  }
+  return null;
+}
+
+async function getTaskPositionSafe(order){
+  const saved = getTaskPosition(order);
+  if(saved) return saved;
+  return await getLatLngFromAddress(order.pickupAddress);
+}
+
 async function renderTaskMarkers(tasks){
   clearTaskMarkers();
 
   if(!map || !isOnline || !tasks.length) return;
 
   for(const order of tasks){
-    const pos = await getLatLngFromAddress(order.pickupAddress);
+    const pos = await getTaskPositionSafe(order);
     if(!pos) continue;
 
     const marker = new google.maps.Marker({
@@ -409,9 +510,9 @@ async function renderTaskMarkers(tasks){
       }
     });
 
-    marker.addListener("click", () => {
+    marker.addListener("click", async () => {
       map.panTo(pos);
-      renderTasks([order]);
+      await renderTasks([order]);
       setStatus("已選取一張附近任務。");
     });
 
@@ -419,7 +520,37 @@ async function renderTaskMarkers(tasks){
   }
 }
 
-function renderTasks(tasks){
+async function getRiderDistanceInfo(order){
+  try{
+    if(!currentPosition || !order.pickupAddress){
+      return null;
+    }
+
+    const res = await fetch("/api/rider-distance-to-pickup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        riderLat: currentPosition.lat,
+        riderLng: currentPosition.lng,
+        pickupAddress: order.pickupAddress
+      })
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || !data.success){
+      return null;
+    }
+
+    return data;
+
+  }catch(err){
+    console.error("距離計算失敗", err);
+    return null;
+  }
+}
+
+async function renderTasks(tasks){
   taskList.innerHTML = "";
 
   if(!isOnline){
@@ -447,40 +578,56 @@ function renderTasks(tasks){
 
   const renderedIds = new Set();
 
-  tasks.forEach(order => {
-    if(renderedIds.has(order.id)) return;
+  for(const order of tasks){
+    if(renderedIds.has(order.id)) continue;
     renderedIds.add(order.id);
+
+    const distanceInfo = await getRiderDistanceInfo(order);
+
+    const arrivalMain = distanceInfo?.durationText || "時間待估";
+    const arrivalSub = distanceInfo?.distanceText
+      ? `距離取件地 ${distanceInfo.distanceText}`
+      : "距離待估";
 
     const card = document.createElement("div");
     card.className = "task";
 
     card.innerHTML = `
-      <div class="task-head">
+      <div class="task-top">
         <div>
-          <div class="order-id">${safeText(order.id || order.orderId)}</div>
-          <div class="service">${safeText(order.serviceType || order.serviceName)}</div>
+          <div class="fare">${money(order.driverFee || order.total || order.totalFee || order.estimatedFee)}</div>
+          <div class="badge">${safeText(order.speedLabel || order.speedName || order.speedType)}</div>
         </div>
-        <div class="badge">${safeText(order.speedLabel || order.speedName || order.speedType)}</div>
+
+        <div class="arrival">
+          <div class="arrival-main">${arrivalMain}</div>
+          <div class="arrival-sub">${arrivalSub}</div>
+        </div>
       </div>
 
-      <div class="row">
-        <div class="label">取件地點</div>
-        <div class="value">${safeText(order.pickupAddress)}</div>
+      <div class="order-id">${safeText(order.id || order.orderId)}</div>
+      <div class="service">${safeText(order.serviceType || order.serviceName)}</div>
+
+      <div class="route">
+        <div class="route-row">
+          <div class="dot"></div>
+          <div>
+            <div class="route-label">取件地點</div>
+            <div class="route-value">${safeText(order.pickupAddress)}</div>
+          </div>
+        </div>
+
+        <div class="route-row">
+          <div class="dot drop"></div>
+          <div>
+            <div class="route-label">送達地點</div>
+            <div class="route-value">${safeText(order.dropoffAddress)}</div>
+          </div>
+        </div>
       </div>
 
-      <div class="row">
-        <div class="label">送達地點</div>
-        <div class="value">${safeText(order.dropoffAddress)}</div>
-      </div>
-
-      <div class="row">
-        <div class="label">物品 / 任務內容</div>
-        <div class="value">${safeText(order.item || order.itemName || order.itemNote || order.note)}</div>
-      </div>
-
-      <div class="row">
-        <div class="label">騎士收入</div>
-        <div class="price">${money(order.driverFee || order.total || order.totalFee || order.estimatedFee)}</div>
+      <div class="item-box">
+        物品 / 任務內容：${safeText(order.item || order.itemName || order.itemNote || order.note)}
       </div>
 
       <button class="accept-btn" onclick="acceptTask('${order.id || order.orderId}', this)">
@@ -489,7 +636,7 @@ function renderTasks(tasks){
     `;
 
     taskList.appendChild(card);
-  });
+  }
 }
 
 async function acceptTask(orderDocId, btn){
