@@ -1533,6 +1533,37 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+app.post('/api/rider-distance-to-pickup', async (req, res) => {
+  try {
+    const { riderLat, riderLng, pickupAddress } = req.body;
+
+    if (!riderLat || !riderLng || !pickupAddress) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少騎士位置或取件地址',
+      });
+    }
+
+    const origin = `${riderLat},${riderLng}`;
+    const distance = await getDistanceMatrix(origin, pickupAddress);
+
+    return res.json({
+      success: true,
+      distanceText: distance.distanceText,
+      durationText: distance.durationText,
+      distanceMeters: distance.distanceMeters,
+      durationSeconds: distance.durationSeconds,
+    });
+
+  } catch (error) {
+    console.error('❌ 騎士到取件地距離計算失敗：', error);
+    return res.status(500).json({
+      success: false,
+      error: '距離計算失敗',
+    });
+  }
+});
+
 app.get('/api/quote', async (req, res) => {
   try {
     const from = req.query.from || req.query.pickup;
