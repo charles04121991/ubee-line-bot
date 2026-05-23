@@ -232,26 +232,6 @@ function setOnlineUI(online){
   topStatus.textContent = online ? "上線中" : "離線";
 }
 
-function openGoogleNavigation(destination){
-  if(!destination) return;
-
-  const url =
-    `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-
-  try{
-    if(window.liff && liff.isInClient()){
-      liff.openWindow({
-        url,
-        external:true
-      });
-    }else{
-      window.open(url, "_blank");
-    }
-  }catch(err){
-    window.open(url, "_blank");
-  }
-}
-
 async function init(){
   try{
     setStatus("正在啟動 LIFF...");
@@ -345,6 +325,7 @@ async function initMap(){
   });
 
   directionsService = new google.maps.DirectionsService();
+
   directionsRenderer = new google.maps.DirectionsRenderer({
     map,
     suppressMarkers:false,
@@ -398,19 +379,23 @@ function getCurrentPosition(){
 }
 
 async function recenterMap(){
-  const position = await getCurrentPosition();
-  currentPosition = {
-    lat: position.coords.latitude,
-    lng: position.coords.longitude
-  };
+  try{
+    const position = await getCurrentPosition();
+    currentPosition = {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude
+    };
 
-  if(map){
-    map.panTo(currentPosition);
-    map.setZoom(15);
-  }
+    if(map){
+      map.panTo(currentPosition);
+      map.setZoom(15);
+    }
 
-  if(riderMarker){
-    riderMarker.setPosition(currentPosition);
+    if(riderMarker){
+      riderMarker.setPosition(currentPosition);
+    }
+  }catch(err){
+    alert(err.message || "重新定位失敗");
   }
 }
 
@@ -594,6 +579,8 @@ async function showOffer(order){
   document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
   document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
 
+  document.getElementById("acceptBtn").disabled = false;
+  document.getElementById("acceptBtn").textContent = "接受任務";
   document.getElementById("acceptBtn").onclick = () => acceptTask(order.id);
 
   offerCard.classList.remove("hidden");
@@ -628,17 +615,31 @@ function hideOffer(){
 }
 
 async function acceptTask(orderDocId){
+  const btn = document.getElementById("acceptBtn");
+
   try{
-    const btn = document.getElementById("acceptBtn");
+    if(!orderDocId){
+      throw new Error("缺少任務編號");
+    }
+
+    if(!lineUserId){
+      throw new Error("尚未取得 LINE 使用者資料");
+    }
+
+    if(!riderProfile){
+      throw new Error("尚未取得騎士資料");
+    }
+
     btn.disabled = true;
     btn.textContent = "接單中...";
 
-    const order = activeTask;
-    const pickupAddress = order?.pickupAddress || "";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
 
     const res = await fetch("/api/rider/accept-order", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
+      signal:controller.signal,
       body:JSON.stringify({
         orderId:orderDocId,
         lineUserId,
@@ -648,18 +649,26 @@ async function acceptTask(orderDocId){
       })
     });
 
+    clearTimeout(timer);
+
     const data = await res.json();
 
-    if(!res.ok){
+    if(!res.ok || !data.success){
       throw new Error(data.error || data.message || "接單失敗");
     }
 
     location.href =
-  `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}&autoNav=pickup`;
+      `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}&autoNav=pickup`;
 
   }catch(err){
-    alert(err.message || "接單失敗，請稍後再試。");
-    const btn = document.getElementById("acceptBtn");
+    console.error("acceptTask error:", err);
+
+    if(err.name === "AbortError"){
+      alert("接單逾時，請確認網路或重新整理後再試。");
+    }else{
+      alert(err.message || "接單失敗，請稍後再試。");
+    }
+
     btn.disabled = false;
     btn.textContent = "接受任務";
   }
