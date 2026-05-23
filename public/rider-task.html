@@ -633,27 +633,26 @@ async function acceptTask(orderDocId){
     btn.disabled = true;
     btn.textContent = "接單中...";
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
-
     const res = await fetch("/api/rider/accept-order", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
-      signal:controller.signal,
       body:JSON.stringify({
         orderId:orderDocId,
         lineUserId,
-        riderId:riderProfile.riderId || "",
+        riderId:riderProfile.riderId || riderProfile.id || "",
         riderName:riderProfile.name || "",
         riderPhone:riderProfile.phone || ""
       })
     });
 
-    clearTimeout(timer);
+    let data = {};
+    try{
+      data = await res.json();
+    }catch(e){
+      data = {};
+    }
 
-    const data = await res.json();
-
-    if(!res.ok || !data.success){
+    if(!res.ok || data.success !== true){
       throw new Error(data.error || data.message || "接單失敗");
     }
 
@@ -662,12 +661,7 @@ async function acceptTask(orderDocId){
 
   }catch(err){
     console.error("acceptTask error:", err);
-
-    if(err.name === "AbortError"){
-      alert("接單逾時，請確認網路或重新整理後再試。");
-    }else{
-      alert(err.message || "接單失敗，請稍後再試。");
-    }
+    alert(err.message || "接單失敗，請稍後再試。");
 
     btn.disabled = false;
     btn.textContent = "接受任務";
