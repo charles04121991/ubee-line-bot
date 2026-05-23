@@ -198,6 +198,7 @@ let refreshTimer = null;
 
 let taskMarkers = [];
 let latestTasks = [];
+let lastTaskIds = [];
 
 const statusBox = document.getElementById("status");
 const taskList = document.getElementById("taskList");
@@ -440,10 +441,44 @@ async function loadTasks(){
   if(!res.ok) throw new Error("任務載入失敗");
 
   const data = await res.json();
-  latestTasks = data.tasks || [];
+  const newTasks = data.tasks || [];
 
-  renderTaskMarkers(latestTasks);
-  await renderTasks(latestTasks);
+const newTaskIds = newTasks.map(task => task.id);
+
+const hasNewTask =
+  newTaskIds.some(id => !lastTaskIds.includes(id));
+
+if(hasNewTask && lastTaskIds.length > 0){
+
+  try{
+
+    if(navigator.vibrate){
+      navigator.vibrate([300,150,300]);
+    }
+
+    const audio = new Audio(
+      "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"
+    );
+
+    audio.volume = 1;
+
+    audio.play();
+
+  }catch(err){
+    console.error("通知播放失敗", err);
+  }
+
+  setStatus("收到新的任務通知");
+
+}
+
+lastTaskIds = newTaskIds;
+
+latestTasks = newTasks;
+
+renderTaskMarkers(latestTasks);
+
+await renderTasks(latestTasks);
 }
 
 function clearTaskMarkers(){
