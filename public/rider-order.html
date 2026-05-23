@@ -1,148 +1,543 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UBee｜騎士任務</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>UBee｜騎士導航任務</title>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
 <style>
-body{
-  margin:0;
-  padding:20px;
-  background:#000;
-  color:#fff;
-  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+:root{
+  --bg:#000;
+  --card:#111;
+  --card2:#181818;
+  --line:rgba(255,255,255,.12);
+  --text:#fff;
+  --muted:#a8a8a8;
+  --green:#22c55e;
+  --blue:#2563eb;
 }
 
-.card{
+*{box-sizing:border-box}
+
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  background:#000;
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+  overflow:hidden;
+}
+
+#map{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100vh;
   background:#111;
-  border-radius:16px;
-  padding:20px;
-  margin-bottom:20px;
-  border:1px solid rgba(255,255,255,.08);
+  z-index:1;
+}
+
+.top-bar{
+  position:fixed;
+  top:14px;
+  left:14px;
+  right:14px;
+  z-index:10;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+
+.pill{
+  background:rgba(0,0,0,.78);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  padding:10px 14px;
+  font-size:14px;
+  font-weight:900;
+  backdrop-filter:blur(12px);
+}
+
+.locate-btn{
+  position:fixed;
+  right:16px;
+  bottom:310px;
+  z-index:10;
+  width:48px;
+  height:48px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(0,0,0,.82);
+  color:#fff;
+  font-size:20px;
+}
+
+.sheet{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:20;
+  max-height:52vh;
+  overflow:auto;
+  background:rgba(12,12,12,.97);
+  border-top:1px solid rgba(255,255,255,.12);
+  border-radius:26px 26px 0 0;
+  padding:14px 16px calc(20px + env(safe-area-inset-bottom));
+}
+
+.handle{
+  width:46px;
+  height:5px;
+  border-radius:999px;
+  background:rgba(255,255,255,.25);
+  margin:0 auto 14px;
+}
+
+.status{
+  padding:12px 14px;
+  border-radius:14px;
+  background:var(--card2);
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-size:14px;
+  margin-bottom:14px;
 }
 
 .title{
   font-size:24px;
-  font-weight:700;
-  margin-bottom:20px;
+  font-weight:950;
+  margin-bottom:8px;
 }
 
-.info{
-  margin-bottom:12px;
-  line-height:1.5;
+.route-info{
+  font-size:15px;
   color:#ddd;
+  line-height:1.6;
+  margin-bottom:14px;
+}
+
+.info-card{
+  background:#111;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:20px;
+  padding:16px;
+  margin-bottom:14px;
+}
+
+.row{
+  padding:10px 0;
+  border-top:1px solid var(--line);
+}
+
+.row:first-child{
+  border-top:0;
+  padding-top:0;
+}
+
+.label{
+  color:var(--muted);
+  font-size:13px;
+  margin-bottom:4px;
+}
+
+.value{
+  font-size:15px;
+  line-height:1.5;
+  word-break:break-word;
 }
 
 button{
   width:100%;
   border:none;
-  border-radius:14px;
+  border-radius:18px;
   padding:16px;
   margin-top:12px;
-  font-size:16px;
-  font-weight:700;
-  cursor:pointer;
+  font-size:18px;
+  font-weight:950;
 }
 
 .primary{
-  background:#fff;
-  color:#000;
+  background:var(--green);
+  color:#fff;
 }
 
 .secondary{
   background:#1f1f1f;
   color:#fff;
-  border:1px solid rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.12);
 }
 
 .hidden{
   display:none;
+}
+
+.error{
+  color:#ffb4b4;
+  border-color:rgba(239,68,68,.35);
+  background:rgba(239,68,68,.12);
 }
 </style>
 </head>
 
 <body>
 
-<div class="card">
-  <div class="title">UBee｜騎士任務</div>
+<div id="map"></div>
 
-  <div class="info" id="orderId"></div>
-  <div class="info" id="status"></div>
-  <div class="info" id="pickup"></div>
-  <div class="info" id="dropoff"></div>
-  <div class="info" id="item"></div>
+<div class="top-bar">
+  <div class="pill">UBee 導航</div>
+  <div id="topStatus" class="pill">任務中</div>
 </div>
 
-<button id="arrivedPickupBtn" class="primary hidden">
-  已抵達取件地
-</button>
+<button id="locateBtn" class="locate-btn">◎</button>
 
-<button id="pickedUpBtn" class="primary hidden">
-  已取件
-</button>
+<div class="sheet">
+  <div class="handle"></div>
 
-<button id="arrivedDropoffBtn" class="primary hidden">
-  已抵達送達地
-</button>
+  <div class="title" id="mainTitle">正在載入任務...</div>
+  <div class="status" id="statusBox">正在初始化導航系統...</div>
 
-<button id="completedBtn" class="primary hidden">
-  任務完成
-</button>
+  <div class="info-card">
+    <div class="row">
+      <div class="label">訂單編號</div>
+      <div class="value" id="orderIdText">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">目前目的地</div>
+      <div class="value" id="targetText">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">預估導航</div>
+      <div class="value" id="routeText">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">取件地點</div>
+      <div class="value" id="pickupText">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">送達地點</div>
+      <div class="value" id="dropoffText">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">物品內容</div>
+      <div class="value" id="itemText">-</div>
+    </div>
+  </div>
+
+  <button id="arrivedPickupBtn" class="primary hidden">已抵達取件地</button>
+  <button id="pickedUpBtn" class="primary hidden">已取件，導航到送達地</button>
+  <button id="arrivedDropoffBtn" class="primary hidden">已抵達送達地</button>
+  <button id="completedBtn" class="primary hidden">任務完成</button>
+  <button id="refreshBtn" class="secondary">重新整理導航</button>
+</div>
 
 <script>
 const LIFF_ID = "2009895876-hiq8YW0n";
 
 let lineUserId = "";
 let orderId = "";
+let order = null;
+
+let map = null;
+let riderMarker = null;
+let currentPosition = null;
+
+let directionsService = null;
+let directionsRenderer = null;
+let watchId = null;
+
+const statusBox = document.getElementById("statusBox");
+const mainTitle = document.getElementById("mainTitle");
+const topStatus = document.getElementById("topStatus");
+
+function setStatus(text, isError = false){
+  statusBox.textContent = text;
+  statusBox.className = isError ? "status error" : "status";
+}
+
+function safeText(value){
+  return value || "未填寫";
+}
 
 async function init(){
-  await liff.init({ liffId: LIFF_ID });
+  try{
+    setStatus("正在啟動 LIFF...");
+    await liff.init({ liffId: LIFF_ID });
 
-  if(!liff.isLoggedIn()){
-    liff.login();
-    return;
+    if(!liff.isLoggedIn()){
+      liff.login();
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    lineUserId = profile.userId;
+
+    const params = new URLSearchParams(location.search);
+    orderId = params.get("orderId");
+
+    if(!orderId){
+      throw new Error("缺少訂單編號");
+    }
+
+    setStatus("正在載入 Google Maps...");
+    await initMap();
+
+    setStatus("正在載入任務資料...");
+    await loadOrder();
+
+    startLocationTracking();
+
+  }catch(err){
+    console.error(err);
+    setStatus("初始化失敗：" + (err.message || JSON.stringify(err)), true);
+  }
+}
+
+async function initMap(){
+  const configRes = await fetch("/api/config");
+  const config = await configRes.json();
+
+  if(!config.googleMapsApiKey){
+    throw new Error("缺少 Google Maps API Key");
   }
 
-  const profile = await liff.getProfile();
-  lineUserId = profile.userId;
+  await loadGoogleMaps(config.googleMapsApiKey);
 
-  const params = new URLSearchParams(location.search);
-  orderId = params.get("orderId");
+  const position = await getCurrentPosition();
 
-  loadOrder();
+  currentPosition = {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude
+  };
+
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: currentPosition,
+    zoom: 16,
+    disableDefaultUI: true,
+    gestureHandling: "greedy",
+    styles: [
+      { elementType: "geometry", stylers: [{ color: "#1d1d1d" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#1d1d1d" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#8f8f8f" }] },
+      { featureType: "road", elementType: "geometry", stylers: [{ color: "#2b2b2b" }] },
+      { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca3af" }] },
+      { featureType: "water", elementType: "geometry", stylers: [{ color: "#0b1720" }] },
+      { featureType: "poi", stylers: [{ visibility: "off" }] },
+      { featureType: "transit", stylers: [{ visibility: "off" }] }
+    ]
+  });
+
+  riderMarker = new google.maps.Marker({
+    position: currentPosition,
+    map,
+    title: "目前位置",
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 9,
+      fillColor: "#2563eb",
+      fillOpacity: 1,
+      strokeColor: "#ffffff",
+      strokeWeight: 3
+    }
+  });
+
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({
+    map,
+    suppressMarkers: false,
+    preserveViewport: false,
+    polylineOptions: {
+      strokeColor: "#22c55e",
+      strokeWeight: 6,
+      strokeOpacity: .95
+    }
+  });
+}
+
+function loadGoogleMaps(key){
+  return new Promise((resolve, reject) => {
+    if(window.google && window.google.maps){
+      resolve();
+      return;
+    }
+
+    window.gm_authFailure = function(){
+      reject(new Error("Google Maps 金鑰授權失敗，請檢查 Billing、API 限制、網域限制"));
+    };
+
+    window.initGoogleMapScript = function(){
+      resolve();
+    };
+
+    const script = document.createElement("script");
+    script.src =
+      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initGoogleMapScript&v=weekly`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => reject(new Error("Google Maps 載入失敗"));
+    document.head.appendChild(script);
+  });
+}
+
+function getCurrentPosition(){
+  return new Promise((resolve, reject) => {
+    if(!navigator.geolocation){
+      reject(new Error("此裝置不支援定位"));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(resolve, () => {
+      reject(new Error("定位失敗，請允許位置權限"));
+    }, {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 0
+    });
+  });
 }
 
 async function loadOrder(){
-  const res = await fetch(`/api/orders/${orderId}`);
+  const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`);
   const data = await res.json();
 
   if(!data.success){
-    alert(data.error || "讀取任務失敗");
+    throw new Error(data.error || "讀取任務失敗");
+  }
+
+  order = data.order;
+
+  renderOrderInfo();
+  showButtons(order.status);
+  await drawRouteByStatus();
+}
+
+function renderOrderInfo(){
+  document.getElementById("orderIdText").textContent = order.id;
+  document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
+  document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
+  document.getElementById("itemText").textContent = safeText(order.item);
+
+  topStatus.textContent = order.statusLabel || order.status;
+
+  if(order.status === "accepted"){
+    mainTitle.textContent = "導航到取件地";
+    document.getElementById("targetText").textContent = safeText(order.pickupAddress);
+  }else if(order.status === "arrived_pickup"){
+    mainTitle.textContent = "等待取件";
+    document.getElementById("targetText").textContent = safeText(order.pickupAddress);
+  }else if(order.status === "picked_up"){
+    mainTitle.textContent = "導航到送達地";
+    document.getElementById("targetText").textContent = safeText(order.dropoffAddress);
+  }else if(order.status === "arrived_dropoff"){
+    mainTitle.textContent = "等待完成交付";
+    document.getElementById("targetText").textContent = safeText(order.dropoffAddress);
+  }else if(order.status === "completed"){
+    mainTitle.textContent = "任務已完成";
+  }else{
+    mainTitle.textContent = "UBee 騎士任務";
+  }
+}
+
+async function drawRouteByStatus(){
+  if(!currentPosition || !order) return;
+
+  let destination = "";
+
+  if(order.status === "accepted" || order.status === "arrived_pickup"){
+    destination = order.pickupAddress;
+  }
+
+  if(order.status === "picked_up" || order.status === "arrived_dropoff"){
+    destination = order.dropoffAddress;
+  }
+
+  if(!destination){
+    document.getElementById("routeText").textContent = "目前不需要導航";
     return;
   }
 
-  const order = data.order;
+  setStatus("正在規劃路線...");
 
-  document.getElementById("orderId").innerText =
-    `訂單編號：${order.id}`;
+  directionsService.route({
+    origin: currentPosition,
+    destination,
+    travelMode: google.maps.TravelMode.DRIVING,
+    region: "TW"
+  }, (result, status) => {
+    if(status !== "OK"){
+      console.error("Directions failed:", status);
+      setStatus("路線規劃失敗，請稍後重試", true);
+      document.getElementById("routeText").textContent = "路線規劃失敗";
+      return;
+    }
 
-  document.getElementById("status").innerText =
-    `目前狀態：${order.statusLabel}`;
+    directionsRenderer.setDirections(result);
 
-  document.getElementById("pickup").innerText =
-    `取件地：${order.pickupAddress}`;
+    const leg = result.routes?.[0]?.legs?.[0];
 
-  document.getElementById("item").innerText =
-  `物品內容：${order.item || "未填寫"}`;
+    if(leg){
+      document.getElementById("routeText").textContent =
+        `${leg.duration.text}｜${leg.distance.text}`;
+      setStatus(`導航中：${leg.duration.text}，${leg.distance.text}`);
+    }else{
+      document.getElementById("routeText").textContent = "路線已規劃";
+      setStatus("路線已規劃");
+    }
+  });
+}
 
-  showButtons(order.status);
+function startLocationTracking(){
+  if(!navigator.geolocation) return;
+
+  watchId = navigator.geolocation.watchPosition(async (pos) => {
+    currentPosition = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude
+    };
+
+    if(riderMarker){
+      riderMarker.setPosition(currentPosition);
+    }
+
+  }, (err) => {
+    console.warn("位置追蹤失敗", err);
+  }, {
+    enableHighAccuracy: true,
+    maximumAge: 3000,
+    timeout: 10000
+  });
+}
+
+async function recenterMap(){
+  const position = await getCurrentPosition();
+
+  currentPosition = {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude
+  };
+
+  if(map){
+    map.panTo(currentPosition);
+    map.setZoom(16);
+  }
+
+  if(riderMarker){
+    riderMarker.setPosition(currentPosition);
+  }
+
+  await drawRouteByStatus();
 }
 
 function showButtons(status){
-
   hideAllButtons();
 
   if(status === "accepted"){
@@ -172,55 +567,66 @@ function hideAllButtons(){
     "pickedUpBtn",
     "arrivedDropoffBtn",
     "completedBtn"
-  ].forEach(id=>{
+  ].forEach(id => {
     document.getElementById(id).classList.add("hidden");
   });
 }
 
 async function updateStatus(status){
+  try{
+    const res = await fetch("/api/rider/update-order-status", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+        orderId,
+        lineUserId,
+        status
+      })
+    });
 
-  const res = await fetch("/api/rider/update-order-status",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({
-      orderId,
-      lineUserId,
-      status
-    })
-  });
+    const data = await res.json();
 
-  const data = await res.json();
+    if(!data.success){
+      alert(data.error || "更新失敗");
+      return;
+    }
 
-  if(!data.success){
-    alert(data.error || "更新失敗");
-    return;
+    await loadOrder();
+
+  }catch(err){
+    console.error(err);
+    alert("更新失敗，請稍後再試");
   }
-
-  alert(data.message);
-
-  loadOrder();
 }
 
-document.getElementById("arrivedPickupBtn")
-.addEventListener("click",()=>{
+document.getElementById("arrivedPickupBtn").addEventListener("click", () => {
   updateStatus("arrived_pickup");
 });
 
-document.getElementById("pickedUpBtn")
-.addEventListener("click",()=>{
+document.getElementById("pickedUpBtn").addEventListener("click", () => {
   updateStatus("picked_up");
 });
 
-document.getElementById("arrivedDropoffBtn")
-.addEventListener("click",()=>{
+document.getElementById("arrivedDropoffBtn").addEventListener("click", () => {
   updateStatus("arrived_dropoff");
 });
 
-document.getElementById("completedBtn")
-.addEventListener("click",()=>{
+document.getElementById("completedBtn").addEventListener("click", () => {
   updateStatus("completed");
+});
+
+document.getElementById("refreshBtn").addEventListener("click", async () => {
+  await recenterMap();
+});
+
+document.getElementById("locateBtn").addEventListener("click", async () => {
+  await recenterMap();
+});
+
+window.addEventListener("beforeunload", () => {
+  if(watchId !== null){
+    navigator.geolocation.clearWatch(watchId);
+  }
 });
 
 init();
