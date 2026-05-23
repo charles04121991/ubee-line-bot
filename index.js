@@ -1015,8 +1015,10 @@ async function getDistanceMatrix(origin, destination) {
   `?origins=${encodeURIComponent(cleanOrigin)}` +
   `&destinations=${encodeURIComponent(cleanDestination)}` +
   `&mode=driving` +
-  `&region=tw` +
-  `&language=zh-TW&units=metric&key=${GOOGLE_MAPS_API_KEY}`;
+`&departure_time=now` +
+`&traffic_model=best_guess` +
+`&region=tw` +
+`&language=zh-TW&units=metric&key=${GOOGLE_MAPS_API_KEY}`;
   
   const res = await fetch(url);
   const data = await res.json();
@@ -1033,9 +1035,9 @@ async function getDistanceMatrix(origin, destination) {
 
   return {
     distanceMeters: element.distance.value,
-    durationSeconds: element.duration.value,
+    durationSeconds: element.duration_in_traffic?.value || element.duration.value,
     distanceText: element.distance.text,
-    durationText: element.duration.text,
+    durationText: element.duration_in_traffic?.text || element.duration.text,
   };
 }
 
