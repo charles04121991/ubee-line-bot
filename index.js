@@ -976,8 +976,6 @@ async function notifyOnlineRidersNewOrder(order) {
       `服務類型：${order.serviceType}\n` +
       `取件地點：${order.pickupAddress}\n` +
       `送達地點：${order.dropoffAddress}\n` +
-      `騎士收入：${formatCurrency(order.driverFee)}\n\n` +
-      `請打開 UBee 騎士接單頁查看任務。`
     );
 
     const jobs = [];
