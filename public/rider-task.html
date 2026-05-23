@@ -8,162 +8,153 @@
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
 <style>
-:root{
-  --bg:#000;
-  --card:#111;
-  --card2:#181818;
-  --line:rgba(255,255,255,.12);
-  --text:#f5f5f5;
-  --muted:#a8a8a8;
-  --white:#fff;
-  --blue:#2563eb;
-  --green:#22c55e;
-  --yellow:#facc15;
-}
 *{box-sizing:border-box}
 html,body{
-  margin:0;width:100%;height:100%;background:#000;color:var(--text);
+  margin:0;width:100%;height:100%;background:#000;color:#fff;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
   overflow:hidden;
 }
 #map{position:fixed;inset:0;width:100%;height:100vh;background:#111;z-index:1}
+
 .top-bar{
   position:fixed;top:14px;left:14px;right:14px;z-index:10;
-  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  display:flex;justify-content:space-between;align-items:center;
 }
-.brand-pill,.status-pill{
-  background:rgba(0,0,0,.78);backdrop-filter:blur(12px);
-  border:1px solid rgba(255,255,255,.12);border-radius:999px;
-  padding:10px 14px;font-size:14px;font-weight:800;
+.pill{
+  background:rgba(0,0,0,.82);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  padding:11px 16px;
+  font-size:15px;
+  font-weight:900;
 }
-.status-pill{color:#d1d5db;font-weight:700}
-.location-btn{
-  position:fixed;right:16px;bottom:320px;z-index:10;
-  width:48px;height:48px;border-radius:999px;
-  border:1px solid rgba(255,255,255,.15);
-  background:rgba(0,0,0,.8);color:#fff;font-size:20px;
+
+.locate-btn{
+  position:fixed;right:18px;bottom:150px;z-index:12;
+  width:52px;height:52px;border-radius:999px;border:0;
+  background:#111;color:#fff;font-size:22px;
+  border:1px solid rgba(255,255,255,.18);
 }
-.sheet{
+
+.bottom-panel{
   position:fixed;left:0;right:0;bottom:0;z-index:20;
-  max-height:58vh;background:rgba(12,12,12,.97);backdrop-filter:blur(18px);
-  border-top:1px solid rgba(255,255,255,.12);border-radius:26px 26px 0 0;
-  padding:14px 16px calc(20px + env(safe-area-inset-bottom));overflow:auto;
+  padding:14px 16px calc(18px + env(safe-area-inset-bottom));
+  background:rgba(10,10,10,.94);
+  border-radius:26px 26px 0 0;
+  border-top:1px solid rgba(255,255,255,.12);
 }
-.handle{width:46px;height:5px;border-radius:999px;background:rgba(255,255,255,.25);margin:0 auto 14px}
+.handle{
+  width:46px;height:5px;border-radius:999px;
+  background:rgba(255,255,255,.24);
+  margin:0 auto 14px;
+}
 .online-btn{
-  width:100%;height:64px;border:0;border-radius:999px;background:var(--blue);
-  color:#fff;font-size:24px;font-weight:900;margin-bottom:14px;
+  width:100%;height:64px;border:0;border-radius:999px;
+  background:#2563eb;color:#fff;font-size:25px;font-weight:950;
 }
-.online-btn.off{background:#2b2b2b;color:#fff}
+.online-btn.off{background:#2b2b2b}
 .status{
-  margin:0 0 12px;padding:12px 14px;border-radius:14px;background:var(--card2);
-  border:1px solid var(--line);color:var(--muted);font-size:14px;
+  margin-top:14px;
+  padding:13px 15px;
+  border-radius:16px;
+  background:#181818;
+  border:1px solid rgba(255,255,255,.12);
+  color:#aaa;
+  font-size:14px;
 }
-.status.error{color:#ffb4b4;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.12)}
-.task{
-  background:#101010;
-  border:1px solid rgba(255,255,255,.14);
-  border-radius:24px;
+.empty{
+  text-align:center;color:#aaa;padding:28px 10px 6px;line-height:1.7;
+  font-weight:700;
+}
+
+.offer-card{
+  position:fixed;
+  left:16px;
+  right:16px;
+  bottom:calc(30px + env(safe-area-inset-bottom));
+  z-index:30;
+  background:#f7f7f7;
+  color:#000;
+  border:3px solid #000;
+  border-radius:22px;
   padding:18px;
-  margin-bottom:14px;
+  box-shadow:0 16px 40px rgba(0,0,0,.35);
 }
-.task-top{
+.offer-top{
   display:flex;
   justify-content:space-between;
   align-items:flex-start;
   gap:12px;
-  margin-bottom:16px;
+}
+.tag{
+  display:inline-block;
+  background:#138a44;
+  color:#fff;
+  padding:8px 12px;
+  border-radius:10px;
+  font-size:15px;
+  font-weight:900;
+}
+.close-btn{
+  width:58px;height:58px;border:0;border-radius:14px;
+  background:#eee;color:#111;font-size:34px;font-weight:700;
 }
 .fare{
-  font-size:40px;
+  margin-top:14px;
+  font-size:54px;
   line-height:1;
   font-weight:950;
-  letter-spacing:-1px;
+  letter-spacing:-2px;
 }
-.arrival{
-  text-align:right;
-  color:#fff;
-}
-.arrival-main{
-  font-size:20px;
-  font-weight:900;
-}
-.arrival-sub{
-  margin-top:4px;
-  font-size:13px;
-  color:var(--muted);
-}
-.order-id{
-  font-size:12px;
-  color:var(--muted);
-  margin-bottom:6px;
-}
-.service{
-  font-size:17px;
-  font-weight:900;
-}
-.badge{
-  display:inline-block;
-  margin-top:8px;
-  white-space:nowrap;
-  font-size:12px;
-  padding:6px 10px;
-  border-radius:999px;
-  color:#000;
-  background:var(--yellow);
-  font-weight:900;
-}
-.route{
-  margin-top:14px;
-  border-top:1px solid var(--line);
+.meta{
+  margin-top:16px;
   padding-top:14px;
+  border-top:1px solid #ddd;
+  font-size:21px;
+  font-weight:900;
 }
-.route-row{
+.route-box{
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid #ddd;
   display:grid;
-  grid-template-columns:24px 1fr;
+  grid-template-columns:22px 1fr;
   gap:10px;
-  margin-bottom:14px;
 }
-.dot{
-  width:12px;
-  height:12px;
-  border-radius:999px;
-  margin-top:5px;
-  background:#22c55e;
+.route-line{
+  position:relative;
+  width:14px;
+  margin-top:6px;
 }
-.dot.drop{background:#fff}
-.route-label{
-  color:var(--muted);
-  font-size:13px;
-  margin-bottom:4px;
+.route-line:before{
+  content:"";
+  position:absolute;
+  top:8px;bottom:8px;left:6px;
+  width:2px;background:#111;
 }
-.route-value{
-  font-size:15px;
-  line-height:1.45;
-  word-break:break-word;
+.point{
+  width:10px;height:10px;background:#111;border-radius:999px;
+  position:relative;z-index:2;margin-bottom:72px;
 }
-.item-box{
-  margin-top:10px;
-  padding:12px;
-  border-radius:14px;
-  background:rgba(255,255,255,.06);
-  color:#ddd;
-  font-size:14px;
-  line-height:1.5;
+.point.end{border-radius:0;margin-bottom:0}
+.addr{
+  font-size:21px;
+  line-height:1.35;
+  font-weight:900;
 }
+.addr + .addr{margin-top:18px}
 .accept-btn{
   width:100%;
+  height:62px;
   border:0;
-  border-radius:18px;
-  padding:16px;
-  font-size:18px;
-  font-weight:950;
-  margin-top:16px;
+  border-radius:12px;
+  background:#000;
   color:#fff;
-  background:var(--green);
+  font-size:24px;
+  font-weight:950;
+  margin-top:18px;
 }
-.accept-btn:disabled{opacity:.45;background:#555}
-.empty{text-align:center;color:var(--muted);padding:26px 10px;line-height:1.7}
+.hidden{display:none}
 </style>
 </head>
 
@@ -171,17 +162,42 @@ html,body{
 <div id="map"></div>
 
 <div class="top-bar">
-  <div class="brand-pill">UBee 騎士</div>
-  <div id="topStatus" class="status-pill">離線</div>
+  <div class="pill">UBee 騎士</div>
+  <div id="topStatus" class="pill">離線</div>
 </div>
 
-<button id="locateBtn" class="location-btn">◎</button>
+<button id="locateBtn" class="locate-btn">◎</button>
 
-<div class="sheet">
+<div id="bottomPanel" class="bottom-panel">
   <div class="handle"></div>
   <button id="onlineBtn" class="online-btn off">上線</button>
   <div id="status" class="status">正在初始化騎士系統...</div>
-  <div id="taskList"></div>
+  <div id="emptyText" class="empty">按下「上線」後開始接收任務。</div>
+</div>
+
+<div id="offerCard" class="offer-card hidden">
+  <div class="offer-top">
+    <div>
+      <div class="tag" id="serviceText">任務</div>
+      <div class="fare" id="fareText">$0</div>
+    </div>
+    <button id="closeOfferBtn" class="close-btn">×</button>
+  </div>
+
+  <div class="meta" id="metaText">時間 / 距離待估</div>
+
+  <div class="route-box">
+    <div class="route-line">
+      <div class="point"></div>
+      <div class="point end"></div>
+    </div>
+    <div>
+      <div class="addr" id="pickupText">取件地點</div>
+      <div class="addr" id="dropoffText">送達地點</div>
+    </div>
+  </div>
+
+  <button id="acceptBtn" class="accept-btn">接受任務</button>
 </div>
 
 <script>
@@ -199,16 +215,23 @@ let refreshTimer = null;
 let taskMarkers = [];
 let latestTasks = [];
 let lastTaskIds = [];
+let activeTask = null;
+let dismissedTaskIds = new Set();
+
+let directionsService = null;
+let directionsRenderer = null;
 
 const statusBox = document.getElementById("status");
-const taskList = document.getElementById("taskList");
 const onlineBtn = document.getElementById("onlineBtn");
 const topStatus = document.getElementById("topStatus");
 const locateBtn = document.getElementById("locateBtn");
+const bottomPanel = document.getElementById("bottomPanel");
+const offerCard = document.getElementById("offerCard");
+const emptyText = document.getElementById("emptyText");
 
 function setStatus(text, isError = false){
   statusBox.textContent = text;
-  statusBox.className = isError ? "status error" : "status";
+  statusBox.style.color = isError ? "#ffb4b4" : "#aaa";
 }
 
 function safeText(value){
@@ -216,7 +239,7 @@ function safeText(value){
 }
 
 function money(value){
-  if(value === undefined || value === null || value === "") return "待確認";
+  if(value === undefined || value === null || value === "") return "$0";
   return "$" + Number(value).toLocaleString("zh-TW");
 }
 
@@ -246,7 +269,6 @@ async function init(){
     setStatus("正在啟動地圖定位...");
     await initMap();
 
-    setStatus("正在載入可接任務...");
     await loadTasks();
 
     refreshTimer = setInterval(() => {
@@ -256,7 +278,7 @@ async function init(){
     }, 10000);
 
   }catch(err){
-    console.error("INIT ERROR =", err);
+    console.error(err);
     setStatus("初始化失敗：" + (err.message || JSON.stringify(err)), true);
   }
 }
@@ -283,8 +305,8 @@ async function initMap(){
   }
 
   await loadGoogleMaps(config.googleMapsApiKey);
-  const position = await getCurrentPosition();
 
+  const position = await getCurrentPosition();
   currentPosition = {
     lat: position.coords.latitude,
     lng: position.coords.longitude
@@ -292,15 +314,14 @@ async function initMap(){
 
   map = new google.maps.Map(document.getElementById("map"), {
     center: currentPosition,
-    zoom: 16,
+    zoom: 15,
     disableDefaultUI: true,
     gestureHandling: "greedy",
     styles: [
       { elementType: "geometry", stylers: [{ color: "#1d1d1d" }] },
       { elementType: "labels.text.stroke", stylers: [{ color: "#1d1d1d" }] },
-      { elementType: "labels.text.fill", stylers: [{ color: "#8f8f8f" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#9ca3af" }] },
       { featureType: "road", elementType: "geometry", stylers: [{ color: "#2b2b2b" }] },
-      { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca3af" }] },
       { featureType: "water", elementType: "geometry", stylers: [{ color: "#0b1720" }] },
       { featureType: "poi", stylers: [{ visibility: "off" }] },
       { featureType: "transit", stylers: [{ visibility: "off" }] }
@@ -320,6 +341,17 @@ async function initMap(){
       strokeWeight: 3
     }
   });
+
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({
+    map,
+    suppressMarkers:false,
+    polylineOptions:{
+      strokeColor:"#111111",
+      strokeWeight:6,
+      strokeOpacity:.9
+    }
+  });
 }
 
 function loadGoogleMaps(key){
@@ -330,7 +362,7 @@ function loadGoogleMaps(key){
     }
 
     window.gm_authFailure = function(){
-      reject(new Error("Google Maps 金鑰授權失敗，請檢查 Billing、API 限制、網域限制"));
+      reject(new Error("Google Maps 金鑰授權失敗"));
     };
 
     window.initGoogleMapScript = function(){
@@ -338,8 +370,7 @@ function loadGoogleMaps(key){
     };
 
     const script = document.createElement("script");
-    script.src =
-      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initGoogleMapScript&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initGoogleMapScript&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onerror = () => reject(new Error("Google Maps 載入失敗"));
@@ -357,52 +388,41 @@ function getCurrentPosition(){
     navigator.geolocation.getCurrentPosition(resolve, () => {
       reject(new Error("定位失敗，請允許位置權限"));
     }, {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 0
+      enableHighAccuracy:true,
+      timeout:12000,
+      maximumAge:0
     });
   });
 }
 
 async function recenterMap(){
-  try{
-    const position = await getCurrentPosition();
+  const position = await getCurrentPosition();
+  currentPosition = {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude
+  };
 
-    currentPosition = {
-      lat: position.coords.latitude,
-      lng: position.coords.longitude
-    };
+  if(map){
+    map.panTo(currentPosition);
+    map.setZoom(15);
+  }
 
-    if(map){
-      map.panTo(currentPosition);
-      map.setZoom(16);
-    }
-
-    if(riderMarker){
-      riderMarker.setPosition(currentPosition);
-    }
-
-  }catch(err){
-    alert(err.message || "定位失敗");
+  if(riderMarker){
+    riderMarker.setPosition(currentPosition);
   }
 }
 
 async function toggleOnline(){
   try{
-    if(!lineUserId){
-      alert("尚未取得 LINE 身分");
-      return;
-    }
-
     const nextOnline = !isOnline;
 
     onlineBtn.disabled = true;
     onlineBtn.textContent = nextOnline ? "上線中..." : "下線中...";
 
     const res = await fetch("/api/rider/status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lineUserId, online: nextOnline })
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ lineUserId, online:nextOnline })
     });
 
     const data = await res.json();
@@ -414,21 +434,17 @@ async function toggleOnline(){
     setOnlineUI(nextOnline);
 
     if(nextOnline){
-      setStatus("你已上線，正在接收可接任務。");
+      setStatus("上線中，等待新任務。");
+      emptyText.textContent = "目前沒有新的任務。系統會自動刷新。";
       await loadTasks();
     }else{
+      setStatus("目前為離線狀態。");
+      emptyText.textContent = "按下「上線」後開始接收任務。";
+      hideOffer();
       clearTaskMarkers();
-      setStatus("你已下線，暫停接收任務。");
-      taskList.innerHTML = `
-        <div class="empty">
-          目前為離線狀態。<br>
-          按下「上線」後開始接收任務。
-        </div>
-      `;
     }
 
   }catch(err){
-    console.error(err);
     alert(err.message || "狀態更新失敗");
     setOnlineUI(isOnline);
   }finally{
@@ -442,43 +458,58 @@ async function loadTasks(){
 
   const data = await res.json();
   const newTasks = data.tasks || [];
+  const newTaskIds = newTasks.map(task => task.id);
 
-const newTaskIds = newTasks.map(task => task.id);
+  const hasNewTask = newTaskIds.some(id => !lastTaskIds.includes(id));
 
-const hasNewTask =
-  newTaskIds.some(id => !lastTaskIds.includes(id));
+  if(hasNewTask && lastTaskIds.length > 0){
+    notifyNewTask();
+  }
 
-if(hasNewTask && lastTaskIds.length > 0){
+  lastTaskIds = newTaskIds;
+  latestTasks = newTasks;
 
+  clearTaskMarkers();
+
+  if(!isOnline){
+    hideOffer();
+    return;
+  }
+
+  if(latestTasks.length === 0){
+    hideOffer();
+    setStatus("目前沒有可接任務。");
+    return;
+  }
+
+  const visibleTasks = latestTasks.filter(t => !dismissedTaskIds.has(t.id));
+
+  if(visibleTasks.length === 0){
+    hideOffer();
+    setStatus("任務已暫時收起，等待新任務。");
+    return;
+  }
+
+  activeTask = visibleTasks[0];
+
+  await renderTaskMarkers(visibleTasks);
+  await showOffer(activeTask);
+}
+
+function notifyNewTask(){
   try{
-
     if(navigator.vibrate){
       navigator.vibrate([300,150,300]);
     }
 
-    const audio = new Audio(
-      "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"
-    );
-
+    const audio = new Audio("https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg");
     audio.volume = 1;
-
     audio.play();
-
   }catch(err){
     console.error("通知播放失敗", err);
   }
 
   setStatus("收到新的任務通知");
-
-}
-
-lastTaskIds = newTaskIds;
-
-latestTasks = newTasks;
-
-renderTaskMarkers(latestTasks);
-
-await renderTasks(latestTasks);
 }
 
 function clearTaskMarkers(){
@@ -495,10 +526,10 @@ async function getLatLngFromAddress(address){
 
     const geocoder = new google.maps.Geocoder();
 
-    geocoder.geocode({ address: `台灣 ${address}` }, (results, status) => {
+    geocoder.geocode({ address:`台灣 ${address}` }, (results, status) => {
       if(status === "OK" && results && results[0]){
         const loc = results[0].geometry.location;
-        resolve({ lat: loc.lat(), lng: loc.lng() });
+        resolve({ lat:loc.lat(), lng:loc.lng() });
       }else{
         resolve(null);
       }
@@ -506,49 +537,22 @@ async function getLatLngFromAddress(address){
   });
 }
 
-function getTaskPosition(order){
-  if(order.pickupLat && order.pickupLng){
-    return {
-      lat: Number(order.pickupLat),
-      lng: Number(order.pickupLng)
-    };
-  }
-  return null;
-}
-
-async function getTaskPositionSafe(order){
-  const saved = getTaskPosition(order);
-  if(saved) return saved;
-  return await getLatLngFromAddress(order.pickupAddress);
-}
-
 async function renderTaskMarkers(tasks){
-  clearTaskMarkers();
-
-  if(!map || !isOnline || !tasks.length) return;
+  if(!map || !tasks.length) return;
 
   for(const order of tasks){
-    const pos = await getTaskPositionSafe(order);
+    const pos = await getLatLngFromAddress(order.pickupAddress);
     if(!pos) continue;
 
     const marker = new google.maps.Marker({
-      position: pos,
+      position:pos,
       map,
-      title: order.serviceType || "UBee 任務",
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 11,
-        fillColor: "#22c55e",
-        fillOpacity: 1,
-        strokeColor: "#ffffff",
-        strokeWeight: 3
-      }
+      title:order.serviceType || "UBee 任務"
     });
 
     marker.addListener("click", async () => {
-      map.panTo(pos);
-      await renderTasks([order]);
-      setStatus("已選取一張附近任務。");
+      activeTask = order;
+      await showOffer(order);
     });
 
     taskMarkers.push(marker);
@@ -562,134 +566,88 @@ async function getRiderDistanceInfo(order){
     }
 
     const res = await fetch("/api/rider-distance-to-pickup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        riderLat: currentPosition.lat,
-        riderLng: currentPosition.lng,
-        pickupAddress: order.pickupAddress
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+        riderLat:currentPosition.lat,
+        riderLng:currentPosition.lng,
+        pickupAddress:order.pickupAddress
       })
     });
 
     const data = await res.json();
-
-    if(!res.ok || !data.success){
-      return null;
-    }
-
+    if(!res.ok || !data.success) return null;
     return data;
-
   }catch(err){
-    console.error("距離計算失敗", err);
     return null;
   }
 }
 
-async function renderTasks(tasks){
-  taskList.innerHTML = "";
+async function showOffer(order){
+  const distanceInfo = await getRiderDistanceInfo(order);
 
-  if(!isOnline){
-    setStatus("目前為離線狀態。");
-    taskList.innerHTML = `
-      <div class="empty">
-        按下「上線」後開始接收任務。
-      </div>
-    `;
-    return;
-  }
+  document.getElementById("serviceText").textContent =
+    safeText(order.serviceType || order.serviceName || "任務");
 
-  if(tasks.length === 0){
-    setStatus("目前沒有可接任務。");
-    taskList.innerHTML = `
-      <div class="empty">
-        目前沒有新的任務。<br>
-        系統會自動刷新。
-      </div>
-    `;
-    return;
-  }
+  document.getElementById("fareText").textContent =
+    money(order.driverFee || order.total || order.totalFee || order.estimatedFee);
 
-  setStatus(`目前共有 ${tasks.length} 張可接任務。`);
+  document.getElementById("metaText").textContent =
+    distanceInfo
+      ? `${distanceInfo.durationText}｜${distanceInfo.distanceText}`
+      : "時間 / 距離待估";
 
-  const renderedIds = new Set();
+  document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
+  document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
 
-  for(const order of tasks){
-    if(renderedIds.has(order.id)) continue;
-    renderedIds.add(order.id);
+  document.getElementById("acceptBtn").onclick = () => acceptTask(order.id);
 
-    const distanceInfo = await getRiderDistanceInfo(order);
+  offerCard.classList.remove("hidden");
+  bottomPanel.classList.add("hidden");
 
-    const arrivalMain = distanceInfo?.durationText || "時間待估";
-    const arrivalSub = distanceInfo?.distanceText
-      ? `距離取件地 ${distanceInfo.distanceText}`
-      : "距離待估";
+  drawPreviewRoute(order);
+}
 
-    const card = document.createElement("div");
-    card.className = "task";
+async function drawPreviewRoute(order){
+  if(!directionsService || !directionsRenderer || !currentPosition) return;
 
-    card.innerHTML = `
-      <div class="task-top">
-        <div>
-          <div class="fare">${money(order.driverFee || order.total || order.totalFee || order.estimatedFee)}</div>
-          <div class="badge">${safeText(order.speedLabel || order.speedName || order.speedType)}</div>
-        </div>
+  directionsService.route({
+    origin:currentPosition,
+    destination:order.pickupAddress,
+    travelMode:google.maps.TravelMode.DRIVING,
+    region:"TW"
+  }, (result, status) => {
+    if(status === "OK"){
+      directionsRenderer.setDirections(result);
+    }
+  });
+}
 
-        <div class="arrival">
-          <div class="arrival-main">${arrivalMain}</div>
-          <div class="arrival-sub">${arrivalSub}</div>
-        </div>
-      </div>
+function hideOffer(){
+  offerCard.classList.add("hidden");
+  bottomPanel.classList.remove("hidden");
+  activeTask = null;
 
-      <div class="order-id">${safeText(order.id || order.orderId)}</div>
-      <div class="service">${safeText(order.serviceType || order.serviceName)}</div>
-
-      <div class="route">
-        <div class="route-row">
-          <div class="dot"></div>
-          <div>
-            <div class="route-label">取件地點</div>
-            <div class="route-value">${safeText(order.pickupAddress)}</div>
-          </div>
-        </div>
-
-        <div class="route-row">
-          <div class="dot drop"></div>
-          <div>
-            <div class="route-label">送達地點</div>
-            <div class="route-value">${safeText(order.dropoffAddress)}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="item-box">
-        物品 / 任務內容：${safeText(order.item || order.itemName || order.itemNote || order.note)}
-      </div>
-
-      <button class="accept-btn" onclick="acceptTask('${order.id || order.orderId}', this)">
-        接受任務
-      </button>
-    `;
-
-    taskList.appendChild(card);
+  if(directionsRenderer){
+    directionsRenderer.setDirections({ routes: [] });
   }
 }
 
-async function acceptTask(orderDocId, btn){
-  if(!confirm("確定要接受這張任務嗎？")) return;
-
+async function acceptTask(orderDocId){
   try{
+    const btn = document.getElementById("acceptBtn");
     btn.disabled = true;
-    btn.textContent = "接單中...";
+    btn.textContent = "配對中...";
 
     const res = await fetch("/api/rider/accept-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        orderId: orderDocId,
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+        orderId:orderDocId,
         lineUserId,
-        riderId: riderProfile.riderId || "",
-        riderName: riderProfile.name || "",
-        riderPhone: riderProfile.phone || ""
+        riderId:riderProfile.riderId || "",
+        riderName:riderProfile.name || "",
+        riderPhone:riderProfile.phone || ""
       })
     });
 
@@ -699,16 +657,22 @@ async function acceptTask(orderDocId, btn){
       throw new Error(data.error || data.message || "接單失敗");
     }
 
-    alert("接單成功！");
     location.href = `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}`;
 
   }catch(err){
-    console.error(err);
     alert(err.message || "接單失敗，請稍後再試。");
+    const btn = document.getElementById("acceptBtn");
     btn.disabled = false;
     btn.textContent = "接受任務";
   }
 }
+
+document.getElementById("closeOfferBtn").addEventListener("click", () => {
+  if(activeTask?.id){
+    dismissedTaskIds.add(activeTask.id);
+  }
+  hideOffer();
+});
 
 onlineBtn.addEventListener("click", toggleOnline);
 locateBtn.addEventListener("click", recenterMap);
