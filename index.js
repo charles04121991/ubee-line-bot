@@ -2071,6 +2071,7 @@ app.get('/api/orders/:orderId', async (req, res) => {
       speedLabel: getSpeedOption(order.speedType).label,
       pickupAddress: order.pickupAddress,
       dropoffAddress: order.dropoffAddress,
+      item: order.item,
       etaMinutes: order.etaMinutes,
       total: order.total,
       isPaid: order.isPaid,
