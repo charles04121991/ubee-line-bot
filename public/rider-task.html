@@ -30,7 +30,7 @@ html,body{
 }
 
 .locate-btn{
-  position:fixed;right:18px;bottom:150px;z-index:12;
+  position:fixed;right:18px;bottom:115px;z-index:12;
   width:52px;height:52px;border-radius:999px;border:0;
   background:#111;color:#fff;font-size:22px;
   border:1px solid rgba(255,255,255,.18);
@@ -53,19 +53,6 @@ html,body{
   background:#2563eb;color:#fff;font-size:25px;font-weight:950;
 }
 .online-btn.off{background:#2b2b2b}
-.status{
-  margin-top:14px;
-  padding:13px 15px;
-  border-radius:16px;
-  background:#181818;
-  border:1px solid rgba(255,255,255,.12);
-  color:#aaa;
-  font-size:14px;
-}
-.empty{
-  text-align:center;color:#aaa;padding:28px 10px 6px;line-height:1.7;
-  font-weight:700;
-}
 
 .offer-card{
   position:fixed;
@@ -171,8 +158,6 @@ html,body{
 <div id="bottomPanel" class="bottom-panel">
   <div class="handle"></div>
   <button id="onlineBtn" class="online-btn off">上線</button>
-  <div id="status" class="status">正在初始化騎士系統...</div>
-  <div id="emptyText" class="empty">按下「上線」後開始接收任務。</div>
 </div>
 
 <div id="offerCard" class="offer-card hidden">
@@ -221,17 +206,14 @@ let dismissedTaskIds = new Set();
 let directionsService = null;
 let directionsRenderer = null;
 
-const statusBox = document.getElementById("status");
 const onlineBtn = document.getElementById("onlineBtn");
 const topStatus = document.getElementById("topStatus");
 const locateBtn = document.getElementById("locateBtn");
 const bottomPanel = document.getElementById("bottomPanel");
 const offerCard = document.getElementById("offerCard");
-const emptyText = document.getElementById("emptyText");
 
 function setStatus(text, isError = false){
-  statusBox.textContent = text;
-  statusBox.style.color = isError ? "#ffb4b4" : "#aaa";
+  console.log(isError ? "ERROR:" : "STATUS:", text);
 }
 
 function safeText(value){
@@ -248,6 +230,26 @@ function setOnlineUI(online){
   onlineBtn.textContent = online ? "下線" : "上線";
   onlineBtn.className = online ? "online-btn" : "online-btn off";
   topStatus.textContent = online ? "上線中" : "離線";
+}
+
+function openGoogleNavigation(destination){
+  if(!destination) return;
+
+  const url =
+    `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+
+  try{
+    if(window.liff && liff.isInClient()){
+      liff.openWindow({
+        url,
+        external:true
+      });
+    }else{
+      window.open(url, "_blank");
+    }
+  }catch(err){
+    window.open(url, "_blank");
+  }
 }
 
 async function init(){
@@ -279,7 +281,7 @@ async function init(){
 
   }catch(err){
     console.error(err);
-    setStatus("初始化失敗：" + (err.message || JSON.stringify(err)), true);
+    alert("初始化失敗：" + (err.message || JSON.stringify(err)));
   }
 }
 
@@ -434,12 +436,8 @@ async function toggleOnline(){
     setOnlineUI(nextOnline);
 
     if(nextOnline){
-      setStatus("上線中，等待新任務。");
-      emptyText.textContent = "目前沒有新的任務。系統會自動刷新。";
       await loadTasks();
     }else{
-      setStatus("目前為離線狀態。");
-      emptyText.textContent = "按下「上線」後開始接收任務。";
       hideOffer();
       clearTaskMarkers();
     }
@@ -478,7 +476,6 @@ async function loadTasks(){
 
   if(latestTasks.length === 0){
     hideOffer();
-    setStatus("目前沒有可接任務。");
     return;
   }
 
@@ -486,7 +483,6 @@ async function loadTasks(){
 
   if(visibleTasks.length === 0){
     hideOffer();
-    setStatus("任務已暫時收起，等待新任務。");
     return;
   }
 
@@ -508,8 +504,6 @@ function notifyNewTask(){
   }catch(err){
     console.error("通知播放失敗", err);
   }
-
-  setStatus("收到新的任務通知");
 }
 
 function clearTaskMarkers(){
@@ -637,7 +631,10 @@ async function acceptTask(orderDocId){
   try{
     const btn = document.getElementById("acceptBtn");
     btn.disabled = true;
-    btn.textContent = "配對中...";
+    btn.textContent = "接單中...";
+
+    const order = activeTask;
+    const pickupAddress = order?.pickupAddress || "";
 
     const res = await fetch("/api/rider/accept-order", {
       method:"POST",
@@ -657,7 +654,13 @@ async function acceptTask(orderDocId){
       throw new Error(data.error || data.message || "接單失敗");
     }
 
-    location.href = `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}`;
+    if(pickupAddress){
+      openGoogleNavigation(pickupAddress);
+    }
+
+    setTimeout(() => {
+      location.href = `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}`;
+    }, 800);
 
   }catch(err){
     alert(err.message || "接單失敗，請稍後再試。");
