@@ -343,10 +343,20 @@ async function init(){
     setStatus("正在載入任務資料...");
     await loadOrder();
 
-    await autoAcceptIfNeeded();
+await autoAcceptIfNeeded();
 
-    startLocationTracking();
-    startAutoRouteRefresh();
+const params = new URLSearchParams(location.search);
+const autoNav = params.get("autoNav");
+
+if(autoNav === "pickup"){
+  setTimeout(() => {
+    openGoogleNavigation(order.pickupAddress);
+  }, 1200);
+}
+
+startLocationTracking();
+
+startAutoRouteRefresh();
 
   }catch(err){
     console.error(err);
