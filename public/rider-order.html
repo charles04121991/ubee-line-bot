@@ -344,15 +344,10 @@ async function init(){
     setStatus("正在載入任務資料...");
     await loadOrder();
 
-    await autoAcceptIfNeeded();
-
     if(autoNav === "pickup"){
-      setTimeout(() => {
-        if(order && order.pickupAddress){
-          openGoogleNavigation(order.pickupAddress);
-        }
-      }, 1200);
-    }
+    setStatus("已接單，正在地圖內導航到取件地...");
+    await drawRouteByStatus(true);
+}
 
     startLocationTracking();
     startAutoRouteRefresh();
@@ -481,26 +476,6 @@ async function loadOrder(){
   renderOrderInfo();
   renderMainAction(order.status);
   await drawRouteByStatus(true);
-}
-
-async function autoAcceptIfNeeded(){
-  if(!order) return;
-
-  const canAutoAccept = [
-    "pending_dispatch",
-    "pending",
-    "dispatching"
-  ].includes(order.status);
-
-  if(!canAutoAccept) return;
-
-  setStatus("系統已接收任務，正在進入導航...");
-
-  const ok = await updateStatusOnly("accepted");
-
-  if(ok){
-    await loadOrder();
-  }
 }
 
 function renderOrderInfo(){
@@ -738,9 +713,8 @@ async function updateStatus(status){
     await loadOrder();
 
     if(status === "picked_up"){
-      setStatus("已取件，正在開啟 Google Maps 導航到送達地...");
-      openGoogleNavigation(order.dropoffAddress);
-      await drawRouteByStatus(true);
+    setStatus("已取件，正在地圖內導航到送達地...");
+    await drawRouteByStatus(true);
     }
 
     if(status === "arrived_pickup"){
