@@ -654,13 +654,8 @@ async function acceptTask(orderDocId){
       throw new Error(data.error || data.message || "接單失敗");
     }
 
-    if(pickupAddress){
-      openGoogleNavigation(pickupAddress);
-    }
-
-    setTimeout(() => {
-      location.href = `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}`;
-    }, 800);
+    location.href =
+  `/rider-order.html?orderId=${encodeURIComponent(orderDocId)}&autoNav=pickup`;
 
   }catch(err){
     alert(err.message || "接單失敗，請稍後再試。");
