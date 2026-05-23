@@ -512,7 +512,7 @@ function renderMainAction(status){
   }
 
   if(status === "arrived_pickup"){
-    mainActionBtn.textContent = "已取件，導航到送達地";
+    mainActionBtn.textContent = "已取件完成";
     mainActionBtn.onclick = () => updateStatus("picked_up");
     return;
   }
