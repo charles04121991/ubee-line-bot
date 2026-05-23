@@ -243,10 +243,19 @@ function loadGoogleMaps(key){
       return;
     }
 
+    window.gm_authFailure = function(){
+      reject(new Error("Google Maps 金鑰授權失敗，請檢查 Billing、API 限制、網域限制"));
+    };
+
+    window.initGoogleMapScript = function(){
+      resolve();
+    };
+
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;
+    script.src =
+      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initGoogleMapScript&v=weekly`;
     script.async = true;
-    script.onload = resolve;
+    script.defer = true;
     script.onerror = () => reject(new Error("Google Maps 載入失敗"));
     document.head.appendChild(script);
   });
