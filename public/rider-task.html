@@ -565,6 +565,20 @@ async function getRiderDistanceInfo(order){
 async function showOffer(order){
   const distanceInfo = await getRiderDistanceInfo(order);
 
+if(distanceInfo){
+  const maxDistanceMeters = 20000;
+  const maxDurationSeconds = 40 * 60;
+
+  if(
+    distanceInfo.distanceMeters > maxDistanceMeters ||
+    distanceInfo.durationSeconds > maxDurationSeconds
+  ){
+    dismissedTaskIds.add(order.id);
+    hideOffer();
+    return;
+  }
+}
+
   document.getElementById("serviceText").textContent =
     safeText(order.serviceType || order.serviceName || "任務");
 
