@@ -571,21 +571,7 @@ async function showOffer(order){
   document.getElementById("fareText").textContent =
     money(order.driverFee || order.total || order.totalFee || order.estimatedFee);
 
-  let metaText = distanceInfo
-  ? `騎士到取件：約 ${distanceInfo.durationText}｜${distanceInfo.distanceText}`
-  : "騎士到取件：時間 / 距離待估";
-
-if(distanceInfo){
-  const isFar =
-    distanceInfo.distanceMeters > 20000 ||
-    distanceInfo.durationSeconds > 40 * 60;
-
-  if(isFar){
-    metaText += "｜⚠️ 距離較遠";
-  }
-}
-
-const pickupDistanceText = distanceInfo
+  const pickupDistanceText = distanceInfo
   ? `到取件：約 ${distanceInfo.durationText}｜${distanceInfo.distanceText}`
   : "到取件：時間 / 距離待估";
 
@@ -594,10 +580,21 @@ const deliveryDistanceText =
     ? `配送：約 ${order.durationText}｜${order.distanceText}`
     : "";
 
-document.getElementById("metaText").textContent =
-  deliveryDistanceText
-    ? `${pickupDistanceText}｜${deliveryDistanceText}`
-    : pickupDistanceText;
+let finalMetaText = deliveryDistanceText
+  ? `${pickupDistanceText}｜${deliveryDistanceText}`
+  : pickupDistanceText;
+
+if(distanceInfo){
+  const isFar =
+    distanceInfo.distanceMeters > 20000 ||
+    distanceInfo.durationSeconds > 40 * 60;
+
+  if(isFar){
+    finalMetaText += "｜⚠️ 距離較遠";
+  }
+}
+
+document.getElementById("metaText").textContent = finalMetaText;
 
   document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
   document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
