@@ -332,6 +332,7 @@ async function init(){
 
     const params = new URLSearchParams(location.search);
     orderId = params.get("orderId");
+    const autoNav = params.get("autoNav");
 
     if(!orderId){
       throw new Error("缺少訂單編號");
@@ -343,20 +344,18 @@ async function init(){
     setStatus("正在載入任務資料...");
     await loadOrder();
 
-await autoAcceptIfNeeded();
+    await autoAcceptIfNeeded();
 
-const params = new URLSearchParams(location.search);
-const autoNav = params.get("autoNav");
+    if(autoNav === "pickup"){
+      setTimeout(() => {
+        if(order && order.pickupAddress){
+          openGoogleNavigation(order.pickupAddress);
+        }
+      }, 1200);
+    }
 
-if(autoNav === "pickup"){
-  setTimeout(() => {
-    openGoogleNavigation(order.pickupAddress);
-  }, 1200);
-}
-
-startLocationTracking();
-
-startAutoRouteRefresh();
+    startLocationTracking();
+    startAutoRouteRefresh();
 
   }catch(err){
     console.error(err);
@@ -473,7 +472,7 @@ async function loadOrder(){
   const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`);
   const data = await res.json();
 
-  if(!data.success){
+  if(!res.ok || !data.success){
     throw new Error(data.error || "讀取任務失敗");
   }
 
@@ -501,7 +500,6 @@ async function autoAcceptIfNeeded(){
 
   if(ok){
     await loadOrder();
-    openGoogleNavigation(order.pickupAddress);
   }
 }
 
@@ -670,23 +668,27 @@ function startAutoRouteRefresh(){
 }
 
 async function recenterMap(){
-  const position = await getCurrentPosition();
+  try{
+    const position = await getCurrentPosition();
 
-  currentPosition = {
-    lat: position.coords.latitude,
-    lng: position.coords.longitude
-  };
+    currentPosition = {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude
+    };
 
-  if(map){
-    map.panTo(currentPosition);
-    map.setZoom(16);
+    if(map){
+      map.panTo(currentPosition);
+      map.setZoom(16);
+    }
+
+    if(riderMarker){
+      riderMarker.setPosition(currentPosition);
+    }
+
+    await drawRouteByStatus(true);
+  }catch(err){
+    alert(err.message || "重新定位失敗");
   }
-
-  if(riderMarker){
-    riderMarker.setPosition(currentPosition);
-  }
-
-  await drawRouteByStatus(true);
 }
 
 async function updateStatusOnly(status){
@@ -702,8 +704,8 @@ async function updateStatusOnly(status){
 
   const data = await res.json();
 
-  if(!data.success){
-    alert(data.error || "更新失敗");
+  if(!res.ok || !data.success){
+    alert(data.error || data.message || "更新失敗");
     return false;
   }
 
@@ -752,6 +754,7 @@ async function updateStatus(status){
   }catch(err){
     console.error(err);
     alert("更新失敗，請稍後再試");
+
     if(order){
       renderMainAction(order.status);
     }
