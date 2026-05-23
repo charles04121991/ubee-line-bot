@@ -1464,6 +1464,7 @@ app.get('/api/config', (req, res) => {
     liffId: LIFF_ID,
     businessFormUrl: BUSINESS_FORM_URL,
     partnerFormUrl: PARTNER_FORM_URL,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
 });
 
