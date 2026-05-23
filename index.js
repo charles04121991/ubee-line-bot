@@ -991,6 +991,31 @@ async function getDistanceMatrix(origin, destination) {
   };
 }
 
+async function geocodeAddress(address) {
+  const cleanAddress = normalizeMapsAddress(address);
+
+  const url =
+    'https://maps.googleapis.com/maps/api/geocode/json' +
+    `?address=${encodeURIComponent(cleanAddress)}` +
+    `&region=tw` +
+    `&language=zh-TW` +
+    `&key=${GOOGLE_MAPS_API_KEY}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.status !== 'OK' || !data.results?.[0]?.geometry?.location) {
+    console.warn('⚠️ 地址轉經緯度失敗：', address, data.status);
+    return null;
+  }
+
+  return {
+    lat: data.results[0].geometry.location.lat,
+    lng: data.results[0].geometry.location.lng,
+    formattedAddress: data.results[0].formatted_address || cleanAddress,
+  };
+}
+
 async function getDistanceMatrixCached(origin, destination) {
   const key = getDistanceCacheKey(origin, destination);
   if (distanceCache.has(key)) return distanceCache.get(key);
@@ -1534,13 +1559,14 @@ app.post('/estimate', async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-    try {
-    if(!req.body || typeof req.body !== 'object'){
-    return res.status(400).json({
-    success:false,
-    error:'訂單資料格式錯誤'
-  });
-}
+  try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: '訂單資料格式錯誤'
+      });
+    }
+
     const data = createOrderFromApi(req.body);
 
     console.log('========== H5 建立訂單 ==========');
@@ -1564,12 +1590,17 @@ app.post('/api/orders', async (req, res) => {
     }
 
     const distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
-    if(!distance || !distance.distanceMeters || !distance.durationSeconds){
-    return res.status(400).json({
-    success: false,
-    error: '地址無法計算距離，請確認取件與送達地址是否完整。'
-  });
-}
+
+    if (!distance || !distance.distanceMeters || !distance.durationSeconds) {
+      return res.status(400).json({
+        success: false,
+        error: '地址無法計算距離，請確認取件與送達地址是否完整。'
+      });
+    }
+
+    const pickupGeo = await geocodeAddress(data.pickupAddress);
+    const dropoffGeo = await geocodeAddress(data.dropoffAddress);
+
     const price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
@@ -1584,28 +1615,44 @@ app.post('/api/orders', async (req, res) => {
       customerId: data.customerId,
       riderId: '',
       status: 'pending_payment',
+
       serviceType: data.serviceType,
       item: data.item,
+
       pickupAddress: data.pickupAddress,
       pickupPhone: data.pickupPhone,
+      pickupLat: pickupGeo?.lat || null,
+      pickupLng: pickupGeo?.lng || null,
+      pickupFormattedAddress: pickupGeo?.formattedAddress || '',
+
       dropoffAddress: data.dropoffAddress,
       dropoffPhone: data.dropoffPhone,
+      dropoffLat: dropoffGeo?.lat || null,
+      dropoffLng: dropoffGeo?.lng || null,
+      dropoffFormattedAddress: dropoffGeo?.formattedAddress || '',
+
       speedType: data.speedType,
       note: data.note,
+
       duplicateFingerprint: getDuplicateFingerprint(data),
+
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
       distanceText: distance.distanceText,
       durationText: distance.durationText,
+
       ...price,
+
       etaMinutes: null,
       paymentMethod: '',
       isPaid: false,
       paidAt: null,
+
       waitingFeeRequested: false,
       waitingFeeApproved: false,
       waitingFeeRejected: false,
       waitingFeeRequestedAt: null,
+
       createdAt: Date.now(),
       acceptedAt: null,
       arrivedPickupAt: null,
@@ -1616,7 +1663,10 @@ app.post('/api/orders', async (req, res) => {
 
     await saveOrder(order);
 
-    await notifyCustomer(order, createTextMessage(`✅ 訂單已建立：${order.id}\n請在網頁選擇付款方式，完成付款後按「我已付款」，系統才會派單。`));
+    await notifyCustomer(
+      order,
+      createTextMessage(`✅ 訂單已建立：${order.id}\n請在網頁選擇付款方式，完成付款後按「我已付款」，系統才會派單。`)
+    );
 
     res.json({
       success: true,
@@ -1629,13 +1679,14 @@ app.post('/api/orders', async (req, res) => {
       total: order.total,
       message: '訂單已建立，請在頁面下方選擇付款方式。',
     });
+
   } catch (error) {
-  console.error('❌ API 建立訂單失敗：', error.message || error);
-  res.status(500).json({
-    success: false,
-    error: error.message || '建立訂單失敗，請稍後再試'
-  });
-}
+    console.error('❌ API 建立訂單失敗：', error.message || error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '建立訂單失敗，請稍後再試'
+    });
+  }
 });
 
 app.post('/api/orders/:orderId/payment-method', async (req, res) => {
