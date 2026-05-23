@@ -21,213 +21,68 @@
   --yellow:#facc15;
   --danger:#ef4444;
 }
-
 *{box-sizing:border-box}
-
 html,body{
-  margin:0;
-  width:100%;
-  height:100%;
-  background:#000;
-  color:var(--text);
+  margin:0;width:100%;height:100%;background:#000;color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
   overflow:hidden;
 }
-
-#map{
-  position:fixed;
-  inset:0;
-  width:100%;
-  height:100vh;
-  background:#111;
-  z-index:1;
-}
-
+#map{position:fixed;inset:0;width:100%;height:100vh;background:#111;z-index:1}
 .top-bar{
-  position:fixed;
-  top:14px;
-  left:14px;
-  right:14px;
-  z-index:10;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
+  position:fixed;top:14px;left:14px;right:14px;z-index:10;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
 }
-
 .brand-pill,.status-pill{
-  background:rgba(0,0,0,.78);
-  backdrop-filter:blur(12px);
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:999px;
-  padding:10px 14px;
-  font-size:14px;
-  font-weight:800;
+  background:rgba(0,0,0,.78);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,.12);border-radius:999px;
+  padding:10px 14px;font-size:14px;font-weight:800;
 }
-
-.status-pill{
-  color:#d1d5db;
-  font-weight:700;
-}
-
+.status-pill{color:#d1d5db;font-weight:700}
 .location-btn{
-  position:fixed;
-  right:16px;
-  bottom:300px;
-  z-index:10;
-  width:48px;
-  height:48px;
-  border-radius:999px;
+  position:fixed;right:16px;bottom:300px;z-index:10;
+  width:48px;height:48px;border-radius:999px;
   border:1px solid rgba(255,255,255,.15);
-  background:rgba(0,0,0,.8);
-  color:#fff;
-  font-size:20px;
+  background:rgba(0,0,0,.8);color:#fff;font-size:20px;
 }
-
 .sheet{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:20;
-  max-height:48vh;
-  background:rgba(12,12,12,.96);
-  backdrop-filter:blur(18px);
-  border-top:1px solid rgba(255,255,255,.12);
-  border-radius:26px 26px 0 0;
-  padding:14px 16px calc(20px + env(safe-area-inset-bottom));
-  overflow:auto;
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  max-height:48vh;background:rgba(12,12,12,.96);backdrop-filter:blur(18px);
+  border-top:1px solid rgba(255,255,255,.12);border-radius:26px 26px 0 0;
+  padding:14px 16px calc(20px + env(safe-area-inset-bottom));overflow:auto;
 }
-
-.handle{
-  width:46px;
-  height:5px;
-  border-radius:999px;
-  background:rgba(255,255,255,.25);
-  margin:0 auto 14px;
-}
-
+.handle{width:46px;height:5px;border-radius:999px;background:rgba(255,255,255,.25);margin:0 auto 14px}
 .online-btn{
-  width:100%;
-  height:64px;
-  border:0;
-  border-radius:999px;
-  background:var(--blue);
-  color:#fff;
-  font-size:24px;
-  font-weight:900;
-  margin-bottom:14px;
+  width:100%;height:64px;border:0;border-radius:999px;background:var(--blue);
+  color:#fff;font-size:24px;font-weight:900;margin-bottom:14px;
 }
-
-.online-btn.off{
-  background:#2b2b2b;
-  color:#fff;
-}
-
+.online-btn.off{background:#2b2b2b;color:#fff}
 .status{
-  margin:0 0 12px;
-  padding:12px 14px;
-  border-radius:14px;
-  background:var(--card2);
-  border:1px solid var(--line);
-  color:var(--muted);
-  font-size:14px;
+  margin:0 0 12px;padding:12px 14px;border-radius:14px;background:var(--card2);
+  border:1px solid var(--line);color:var(--muted);font-size:14px;
 }
-
-.status.error{
-  color:#ffb4b4;
-  border-color:rgba(239,68,68,.35);
-  background:rgba(239,68,68,.12);
-}
-
-.task{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:20px;
-  padding:16px;
-  margin-bottom:14px;
-}
-
-.task-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:12px;
-  margin-bottom:12px;
-}
-
-.order-id{
-  font-size:13px;
-  color:var(--muted);
-}
-
-.service{
-  font-size:18px;
-  font-weight:800;
-  margin-top:4px;
-}
-
+.status.error{color:#ffb4b4;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.12)}
+.task{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:14px}
+.task-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.order-id{font-size:13px;color:var(--muted)}
+.service{font-size:18px;font-weight:800;margin-top:4px}
 .badge{
-  white-space:nowrap;
-  font-size:12px;
-  padding:6px 10px;
-  border-radius:999px;
-  color:#000;
-  background:var(--yellow);
-  font-weight:800;
+  white-space:nowrap;font-size:12px;padding:6px 10px;border-radius:999px;
+  color:#000;background:var(--yellow);font-weight:800;
 }
-
-.row{
-  padding:10px 0;
-  border-top:1px solid var(--line);
-}
-
-.label{
-  color:var(--muted);
-  font-size:13px;
-  margin-bottom:4px;
-}
-
-.value{
-  font-size:15px;
-  line-height:1.5;
-  word-break:break-word;
-}
-
-.price{
-  font-size:20px;
-  font-weight:900;
-  color:var(--white);
-}
-
+.row{padding:10px 0;border-top:1px solid var(--line)}
+.label{color:var(--muted);font-size:13px;margin-bottom:4px}
+.value{font-size:15px;line-height:1.5;word-break:break-word}
+.price{font-size:20px;font-weight:900;color:var(--white)}
 .accept-btn{
-  width:100%;
-  border:0;
-  border-radius:16px;
-  padding:15px 16px;
-  font-size:16px;
-  font-weight:900;
-  margin-top:14px;
-  color:#fff;
-  background:var(--green);
+  width:100%;border:0;border-radius:16px;padding:15px 16px;font-size:16px;
+  font-weight:900;margin-top:14px;color:#fff;background:var(--green);
 }
-
-.accept-btn:disabled{
-  opacity:.45;
-  background:#555;
-}
-
-.empty{
-  text-align:center;
-  color:var(--muted);
-  padding:26px 10px;
-  line-height:1.7;
-}
+.accept-btn:disabled{opacity:.45;background:#555}
+.empty{text-align:center;color:var(--muted);padding:26px 10px;line-height:1.7}
 </style>
 </head>
 
 <body>
-
 <div id="map"></div>
 
 <div class="top-bar">
@@ -239,9 +94,7 @@ html,body{
 
 <div class="sheet">
   <div class="handle"></div>
-
   <button id="onlineBtn" class="online-btn off">上線</button>
-
   <div id="status" class="status">正在初始化騎士系統...</div>
   <div id="taskList"></div>
 </div>
@@ -257,6 +110,9 @@ let map = null;
 let riderMarker = null;
 let currentPosition = null;
 let refreshTimer = null;
+
+let taskMarkers = [];
+let latestTasks = [];
 
 const statusBox = document.getElementById("status");
 const taskList = document.getElementById("taskList");
@@ -321,22 +177,13 @@ async function init(){
 
 async function loadRiderProfile(){
   const res = await fetch(`/api/rider/profile?lineUserId=${encodeURIComponent(lineUserId)}`);
-
-  if(!res.ok){
-    throw new Error("找不到騎士資料");
-  }
+  if(!res.ok) throw new Error("找不到騎士資料");
 
   const data = await res.json();
-
-  if(!data || !data.rider){
-    throw new Error("尚未通過騎士審核");
-  }
+  if(!data || !data.rider) throw new Error("尚未通過騎士審核");
 
   riderProfile = data.rider;
-
-  if(riderProfile.status !== "approved"){
-    throw new Error("騎士未通過審核");
-  }
+  if(riderProfile.status !== "approved") throw new Error("騎士未通過審核");
 
   setOnlineUI(riderProfile.online === true);
 }
@@ -350,7 +197,6 @@ async function initMap(){
   }
 
   await loadGoogleMaps(config.googleMapsApiKey);
-
   const position = await getCurrentPosition();
 
   currentPosition = {
@@ -378,7 +224,15 @@ async function initMap(){
   riderMarker = new google.maps.Marker({
     position: currentPosition,
     map,
-    title: "目前位置"
+    title: "目前位置",
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 9,
+      fillColor: "#2563eb",
+      fillOpacity: 1,
+      strokeColor: "#ffffff",
+      strokeWeight: 3
+    }
   });
 }
 
@@ -452,13 +306,8 @@ async function toggleOnline(){
 
     const res = await fetch("/api/rider/status", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        lineUserId,
-        online: nextOnline
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lineUserId, online: nextOnline })
     });
 
     const data = await res.json();
@@ -473,6 +322,7 @@ async function toggleOnline(){
       setStatus("你已上線，正在接收可接任務。");
       await loadTasks();
     }else{
+      clearTaskMarkers();
       setStatus("你已下線，暫停接收任務。");
       taskList.innerHTML = `
         <div class="empty">
@@ -493,15 +343,71 @@ async function toggleOnline(){
 
 async function loadTasks(){
   const res = await fetch("/api/rider/tasks");
-
-  if(!res.ok){
-    throw new Error("任務載入失敗");
-  }
+  if(!res.ok) throw new Error("任務載入失敗");
 
   const data = await res.json();
-  const tasks = data.tasks || [];
+  latestTasks = data.tasks || [];
 
-  renderTasks(tasks);
+  renderTaskMarkers(latestTasks);
+  renderTasks(latestTasks);
+}
+
+function clearTaskMarkers(){
+  taskMarkers.forEach(marker => marker.setMap(null));
+  taskMarkers = [];
+}
+
+async function getLatLngFromAddress(address){
+  return new Promise((resolve) => {
+    if(!address || !window.google || !google.maps){
+      resolve(null);
+      return;
+    }
+
+    const geocoder = new google.maps.Geocoder();
+
+    geocoder.geocode({ address: `台灣 ${address}` }, (results, status) => {
+      if(status === "OK" && results && results[0]){
+        const loc = results[0].geometry.location;
+        resolve({ lat: loc.lat(), lng: loc.lng() });
+      }else{
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function renderTaskMarkers(tasks){
+  clearTaskMarkers();
+
+  if(!map || !isOnline || !tasks.length) return;
+
+  for(const order of tasks){
+    const pos = await getLatLngFromAddress(order.pickupAddress);
+    if(!pos) continue;
+
+    const marker = new google.maps.Marker({
+      position: pos,
+      map,
+      title: order.serviceType || "UBee 任務",
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 11,
+        fillColor: "#22c55e",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 3
+      }
+    });
+
+    marker.addListener("click", () => {
+      map.panTo(pos);
+      renderTasks([order]);
+      setStatus("已選取一張附近任務。");
+    });
+
+    taskMarkers.push(marker);
+  }
 }
 
 function renderTasks(tasks){
@@ -586,9 +492,7 @@ async function acceptTask(orderDocId, btn){
 
     const res = await fetch("/api/rider/accept-order", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         orderId: orderDocId,
         lineUserId,
