@@ -698,22 +698,32 @@ async function requireAdminPermission(event, actionText = '此操作') {
   return true;
 }
 
-async function isApprovedRiderUser(userId) {
-  if (!userId) return false;
+async function isApprovedRiderUser(lineUserId) {
+  if (!lineUserId) return false;
 
-  if (APPROVED_RIDER_IDS.includes(userId)) {
+  if (APPROVED_RIDER_IDS.includes(lineUserId)) {
     return true;
   }
 
   try {
-    const snap = await db
+    const byLineUserId = await db
       .collection('riders')
-      .where('userId', '==', userId)
+      .where('lineUserId', '==', lineUserId)
       .where('status', '==', 'approved')
       .limit(1)
       .get();
 
-    return !snap.empty;
+    if (!byLineUserId.empty) return true;
+
+    const byUserId = await db
+      .collection('riders')
+      .where('userId', '==', lineUserId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
+
+    return !byUserId.empty;
+
   } catch (err) {
     console.error('❌ 查詢已審核騎士失敗：', err);
     return false;
@@ -1873,7 +1883,7 @@ app.post('/api/rider-distance-to-pickup', async (req, res) => {
 
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
-    const { orderId, lineUserId } = req.body;
+    const { orderId, lineUserId, riderId, riderName, riderPhone } = req.body;
 
     if (!orderId || !lineUserId) {
       return res.status(400).json({
@@ -1882,16 +1892,25 @@ app.post('/api/rider/accept-order', async (req, res) => {
       });
     }
 
-    const approved = await isApprovedRiderUser(lineUserId);
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
 
-    if (!approved) {
+    if (riderSnap.empty) {
       return res.status(403).json({
         success: false,
         error: '你尚未通過 UBee 騎士審核，暫時無法接單。',
       });
     }
 
+    const riderDoc = riderSnap.docs[0];
+    const rider = riderDoc.data();
+
     const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+    const riderRef = db.collection('riders').doc(riderDoc.id);
+
     let acceptedOrder = null;
 
     await db.runTransaction(async (transaction) => {
@@ -1911,20 +1930,36 @@ app.post('/api/rider/accept-order', async (req, res) => {
         throw new Error('ORDER_ALREADY_ACCEPTED');
       }
 
-      order.riderId = lineUserId;
-      order.status = 'accepted';
-      order.acceptedAt = Date.now();
+      acceptedOrder = {
+        ...order,
+        riderId: lineUserId,
+        riderDocId: riderDoc.id,
+        riderRealId: rider.riderId || riderId || '',
+        riderName: rider.name || riderName || '',
+        riderPhone: rider.phone || riderPhone || '',
+        status: 'accepted',
+        acceptedAt: Date.now(),
+      };
 
-      transaction.set(orderRef, order, { merge: true });
+      transaction.set(orderRef, acceptedOrder, { merge: true });
 
-      acceptedOrder = order;
+      transaction.set(riderRef, {
+        online: true,
+        busy: true,
+        currentOrderId: acceptedOrder.id,
+        lastActive: Date.now(),
+      }, { merge: true });
     });
 
     orders[acceptedOrder.id] = acceptedOrder;
 
     await notifyCustomer(
       acceptedOrder,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快設定抵達取件時間。`)
+      createTextMessage(
+        `🟢 UBee 騎士已接單\n\n` +
+        `訂單編號：${acceptedOrder.id}\n` +
+        `騎士正在前往取件地點。`
+      )
     );
 
     return res.json({
@@ -1937,24 +1972,15 @@ app.post('/api/rider/accept-order', async (req, res) => {
     console.error('❌ 騎士網頁接單失敗：', error);
 
     if (error.message === 'ORDER_NOT_FOUND') {
-      return res.status(404).json({
-        success: false,
-        error: '找不到此訂單',
-      });
+      return res.status(404).json({ success: false, error: '找不到此訂單' });
     }
 
     if (error.message === 'ORDER_ALREADY_ACCEPTED') {
-      return res.status(409).json({
-        success: false,
-        error: '此訂單已被其他騎士接走',
-      });
+      return res.status(409).json({ success: false, error: '此訂單已被其他騎士接走' });
     }
 
     if (error.message === 'ORDER_TERMINAL') {
-      return res.status(400).json({
-        success: false,
-        error: '此訂單已完成或已取消，無法接單。',
-      });
+      return res.status(400).json({ success: false, error: '此訂單已完成或已取消，無法接單。' });
     }
 
     return res.status(500).json({
@@ -2026,8 +2052,21 @@ app.post('/api/rider/update-order-status', async (req, res) => {
     );
 
     if (status === 'completed') {
-      await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
-    }
+  const riderSnap = await db.collection('riders')
+    .where('lineUserId', '==', lineUserId)
+    .limit(1)
+    .get();
+
+  if (!riderSnap.empty) {
+    await db.collection('riders').doc(riderSnap.docs[0].id).set({
+      busy: false,
+      currentOrderId: '',
+      lastActive: Date.now(),
+    }, { merge: true });
+  }
+
+  await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
+}
 
     return res.json({
       success: true,
