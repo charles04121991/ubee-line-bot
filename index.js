@@ -975,7 +975,7 @@ async function notifyOnlineRidersNewOrder(order) {
       `訂單編號：${order.id}\n` +
       `服務類型：${order.serviceType}\n` +
       `取件地點：${order.pickupAddress}\n` +
-      `送達地點：${order.dropoffAddress}\n` +
+      `送達地點：${order.dropoffAddress}\n`
     );
 
     const jobs = [];
