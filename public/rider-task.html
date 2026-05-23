@@ -565,30 +565,27 @@ async function getRiderDistanceInfo(order){
 async function showOffer(order){
   const distanceInfo = await getRiderDistanceInfo(order);
 
-if(distanceInfo){
-  const maxDistanceMeters = 80000;
-  const maxDurationSeconds = 200 * 180;
-
-  if(
-    distanceInfo.distanceMeters > maxDistanceMeters ||
-    distanceInfo.durationSeconds > maxDurationSeconds
-  ){
-    dismissedTaskIds.add(order.id);
-    hideOffer();
-    return;
-  }
-}
-
   document.getElementById("serviceText").textContent =
     safeText(order.serviceType || order.serviceName || "任務");
 
   document.getElementById("fareText").textContent =
     money(order.driverFee || order.total || order.totalFee || order.estimatedFee);
 
-  document.getElementById("metaText").textContent =
-    distanceInfo
-      ? `${distanceInfo.durationText}｜${distanceInfo.distanceText}`
-      : "時間 / 距離待估";
+  let metaText = distanceInfo
+  ? `騎士到取件：約 ${distanceInfo.durationText}｜${distanceInfo.distanceText}`
+  : "騎士到取件：時間 / 距離待估";
+
+if(distanceInfo){
+  const isFar =
+    distanceInfo.distanceMeters > 20000 ||
+    distanceInfo.durationSeconds > 40 * 60;
+
+  if(isFar){
+    metaText += "｜⚠️ 距離較遠";
+  }
+}
+
+document.getElementById("metaText").textContent = metaText;
 
   document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
   document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
