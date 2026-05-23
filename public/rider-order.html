@@ -114,13 +114,6 @@ html,body{
   margin-bottom:8px;
 }
 
-.route-info{
-  font-size:15px;
-  color:#ddd;
-  line-height:1.6;
-  margin-bottom:14px;
-}
-
 .info-card{
   background:#111;
   border:1px solid rgba(255,255,255,.12);
@@ -172,9 +165,7 @@ button{
   border:1px solid rgba(255,255,255,.12);
 }
 
-.hidden{
-  display:none;
-}
+.hidden{display:none}
 
 .error{
   color:#ffb4b4;
@@ -242,6 +233,7 @@ button{
 
 <script>
 const LIFF_ID = "2009895876-hiq8YW0n";
+const COMPLETED_REDIRECT_URL = "/rider.html";
 
 let lineUserId = "";
 let orderId = "";
@@ -254,6 +246,7 @@ let currentPosition = null;
 let directionsService = null;
 let directionsRenderer = null;
 let watchId = null;
+let routeTimer = null;
 
 const statusBox = document.getElementById("statusBox");
 const mainTitle = document.getElementById("mainTitle");
@@ -294,7 +287,11 @@ async function init(){
     setStatus("正在載入任務資料...");
     await loadOrder();
 
+    await autoAcceptIfNeeded();
+
     startLocationTracking();
+
+    startAutoRouteRefresh();
 
   }catch(err){
     console.error(err);
@@ -351,6 +348,7 @@ async function initMap(){
   });
 
   directionsService = new google.maps.DirectionsService();
+
   directionsRenderer = new google.maps.DirectionsRenderer({
     map,
     suppressMarkers: false,
@@ -379,8 +377,7 @@ function loadGoogleMaps(key){
     };
 
     const script = document.createElement("script");
-    script.src =
-      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initGoogleMapScript&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initGoogleMapScript&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onerror = () => reject(new Error("Google Maps 載入失敗"));
@@ -417,50 +414,79 @@ async function loadOrder(){
 
   renderOrderInfo();
   showButtons(order.status);
-  await drawRouteByStatus();
+  await drawRouteByStatus(true);
+}
+
+async function autoAcceptIfNeeded(){
+  if(!order) return;
+
+  const canAutoAccept = [
+    "pending_dispatch",
+    "pending",
+    "dispatching"
+  ].includes(order.status);
+
+  if(!canAutoAccept) return;
+
+  setStatus("系統已接收任務，正在自動進入導航...");
+
+  const ok = await updateStatusOnly("accepted");
+
+  if(ok){
+    await loadOrder();
+  }
 }
 
 function renderOrderInfo(){
-  document.getElementById("orderIdText").textContent = order.id;
+  document.getElementById("orderIdText").textContent = order.id || order.orderId || orderId;
   document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
   document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
   document.getElementById("itemText").textContent = safeText(order.item);
 
-  topStatus.textContent = order.statusLabel || order.status;
+  topStatus.textContent = order.statusLabel || order.status || "任務中";
 
   if(order.status === "accepted"){
     mainTitle.textContent = "導航到取件地";
     document.getElementById("targetText").textContent = safeText(order.pickupAddress);
   }else if(order.status === "arrived_pickup"){
-    mainTitle.textContent = "等待取件";
+    mainTitle.textContent = "已抵達取件地";
     document.getElementById("targetText").textContent = safeText(order.pickupAddress);
   }else if(order.status === "picked_up"){
     mainTitle.textContent = "導航到送達地";
     document.getElementById("targetText").textContent = safeText(order.dropoffAddress);
   }else if(order.status === "arrived_dropoff"){
-    mainTitle.textContent = "等待完成交付";
+    mainTitle.textContent = "已抵達送達地";
     document.getElementById("targetText").textContent = safeText(order.dropoffAddress);
   }else if(order.status === "completed"){
     mainTitle.textContent = "任務已完成";
+    document.getElementById("targetText").textContent = "準備返回等待派單";
   }else{
     mainTitle.textContent = "UBee 騎士任務";
+    document.getElementById("targetText").textContent = "-";
   }
 }
 
-async function drawRouteByStatus(){
-  if(!currentPosition || !order) return;
-
-  let destination = "";
+function getDestinationByStatus(){
+  if(!order) return "";
 
   if(order.status === "accepted" || order.status === "arrived_pickup"){
-    destination = order.pickupAddress;
+    return order.pickupAddress || "";
   }
 
   if(order.status === "picked_up" || order.status === "arrived_dropoff"){
-    destination = order.dropoffAddress;
+    return order.dropoffAddress || "";
   }
 
+  return "";
+}
+
+async function drawRouteByStatus(forcePan = false){
+  if(!currentPosition || !order || !directionsService || !directionsRenderer) return;
+
+  const destination = getDestinationByStatus();
+
   if(!destination){
+    directionsRenderer.setDirections({ routes: [] });
     document.getElementById("routeText").textContent = "目前不需要導航";
     return;
   }
@@ -485,9 +511,19 @@ async function drawRouteByStatus(){
     const leg = result.routes?.[0]?.legs?.[0];
 
     if(leg){
-      document.getElementById("routeText").textContent =
-        `${leg.duration.text}｜${leg.distance.text}`;
-      setStatus(`導航中：${leg.duration.text}，${leg.distance.text}`);
+      document.getElementById("routeText").textContent = `${leg.duration.text}｜${leg.distance.text}`;
+
+      if(order.status === "accepted"){
+        setStatus(`導航到取件地：${leg.duration.text}，${leg.distance.text}`);
+      }else if(order.status === "picked_up"){
+        setStatus(`導航到送達地：${leg.duration.text}，${leg.distance.text}`);
+      }else{
+        setStatus(`路線已規劃：${leg.duration.text}，${leg.distance.text}`);
+      }
+
+      if(forcePan && map){
+        map.panTo(currentPosition);
+      }
     }else{
       document.getElementById("routeText").textContent = "路線已規劃";
       setStatus("路線已規劃");
@@ -517,6 +553,18 @@ function startLocationTracking(){
   });
 }
 
+function startAutoRouteRefresh(){
+  if(routeTimer){
+    clearInterval(routeTimer);
+  }
+
+  routeTimer = setInterval(() => {
+    if(order && currentPosition){
+      drawRouteByStatus(false);
+    }
+  }, 30000);
+}
+
 async function recenterMap(){
   const position = await getCurrentPosition();
 
@@ -534,7 +582,7 @@ async function recenterMap(){
     riderMarker.setPosition(currentPosition);
   }
 
-  await drawRouteByStatus();
+  await drawRouteByStatus(true);
 }
 
 function showButtons(status){
@@ -572,26 +620,51 @@ function hideAllButtons(){
   });
 }
 
+async function updateStatusOnly(status){
+  const res = await fetch("/api/rider/update-order-status", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      orderId,
+      lineUserId,
+      status
+    })
+  });
+
+  const data = await res.json();
+
+  if(!data.success){
+    alert(data.error || "更新失敗");
+    return false;
+  }
+
+  return true;
+}
+
 async function updateStatus(status){
   try{
-    const res = await fetch("/api/rider/update-order-status", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({
-        orderId,
-        lineUserId,
-        status
-      })
-    });
+    const ok = await updateStatusOnly(status);
 
-    const data = await res.json();
+    if(!ok) return;
 
-    if(!data.success){
-      alert(data.error || "更新失敗");
+    if(status === "completed"){
+      mainTitle.textContent = "任務已完成";
+      setStatus("任務完成，正在回到等待派單...");
+      hideAllButtons();
+
+      setTimeout(() => {
+        location.href = COMPLETED_REDIRECT_URL;
+      }, 600);
+
       return;
     }
 
     await loadOrder();
+
+    if(status === "picked_up"){
+      setStatus("已取件，正在自動導航到送達地...");
+      await drawRouteByStatus(true);
+    }
 
   }catch(err){
     console.error(err);
@@ -626,6 +699,10 @@ document.getElementById("locateBtn").addEventListener("click", async () => {
 window.addEventListener("beforeunload", () => {
   if(watchId !== null){
     navigator.geolocation.clearWatch(watchId);
+  }
+
+  if(routeTimer){
+    clearInterval(routeTimer);
   }
 });
 
