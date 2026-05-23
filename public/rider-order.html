@@ -570,12 +570,18 @@ async function drawRouteByStatus(forcePan = false){
 
   setStatus("正在規劃路線...");
 
+  const routeOrigin =
+  order.status === "picked_up" || order.status === "arrived_dropoff"
+    ? order.pickupAddress
+    : currentPosition;
+
   directionsService.route({
-    origin: currentPosition,
-    destination,
-    travelMode: google.maps.TravelMode.DRIVING,
-    region: "TW"
+  origin: routeOrigin,
+  destination,
+  travelMode: google.maps.TravelMode.DRIVING,
+  region: "TW"
   }, (result, status) => {
+  
     if(status !== "OK"){
       console.error("Directions failed:", status);
       setStatus("路線規劃失敗，請稍後重試", true);
