@@ -571,31 +571,12 @@ async function showOffer(order){
   document.getElementById("fareText").textContent =
     money(order.driverFee || order.total || order.totalFee || order.estimatedFee);
 
-  const pickupDistanceText = distanceInfo
-  ? `到取件：約 ${distanceInfo.durationText}｜${distanceInfo.distanceText}`
-  : "到取件：時間 / 距離待估";
-
-const deliveryDistanceText =
+  const deliveryDistanceText =
   order.durationText && order.distanceText
     ? `配送：約 ${order.durationText}｜${order.distanceText}`
-    : "";
+    : "配送：時間 / 距離待估";
 
-let finalMetaText = deliveryDistanceText
-  ? `${pickupDistanceText}｜${deliveryDistanceText}`
-  : pickupDistanceText;
-
-if(distanceInfo){
-  const isFar =
-    distanceInfo.distanceMeters > 20000 ||
-    distanceInfo.durationSeconds > 40 * 60;
-
-  if(isFar){
-    finalMetaText += "｜⚠️ 距離較遠";
-  }
-}
-
-document.getElementById("metaText").textContent = finalMetaText;
-
+document.getElementById("metaText").textContent = deliveryDistanceText;
   document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
   document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
 
