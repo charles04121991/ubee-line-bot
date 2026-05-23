@@ -65,10 +65,10 @@ html,body{
 .locate-btn{
   position:fixed;
   right:16px;
-  bottom:310px;
-  z-index:10;
-  width:48px;
-  height:48px;
+  bottom:150px;
+  z-index:12;
+  width:52px;
+  height:52px;
   border-radius:999px;
   border:1px solid rgba(255,255,255,.16);
   background:rgba(0,0,0,.82);
@@ -76,26 +76,83 @@ html,body{
   font-size:20px;
 }
 
-.sheet{
+.menu-btn{
   position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:20;
-  max-height:52vh;
-  overflow:auto;
-  background:rgba(12,12,12,.97);
-  border-top:1px solid rgba(255,255,255,.12);
-  border-radius:26px 26px 0 0;
-  padding:14px 16px calc(20px + env(safe-area-inset-bottom));
+  right:16px;
+  bottom:84px;
+  z-index:12;
+  width:52px;
+  height:52px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(0,0,0,.86);
+  color:#fff;
+  font-size:25px;
+  font-weight:950;
 }
 
-.handle{
-  width:46px;
-  height:5px;
+.action-wrap{
+  position:fixed;
+  left:16px;
+  right:16px;
+  bottom:calc(18px + env(safe-area-inset-bottom));
+  z-index:20;
+}
+
+.action-btn{
+  width:100%;
+  height:64px;
+  border:none;
   border-radius:999px;
-  background:rgba(255,255,255,.25);
-  margin:0 auto 14px;
+  background:var(--green);
+  color:#fff;
+  font-size:20px;
+  font-weight:950;
+  box-shadow:0 12px 34px rgba(0,0,0,.42);
+}
+
+.action-btn.secondary{
+  background:#1f1f1f;
+  border:1px solid rgba(255,255,255,.16);
+}
+
+.detail-panel{
+  position:fixed;
+  right:12px;
+  bottom:148px;
+  width:min(360px, calc(100vw - 24px));
+  max-height:62vh;
+  overflow:auto;
+  z-index:30;
+  background:rgba(12,12,12,.97);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:24px;
+  padding:16px;
+  box-shadow:0 16px 46px rgba(0,0,0,.55);
+}
+
+.detail-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.detail-title{
+  font-size:20px;
+  font-weight:950;
+}
+
+.close-detail{
+  width:42px;
+  height:42px;
+  border:0;
+  border-radius:999px;
+  background:#242424;
+  color:#fff;
+  font-size:24px;
+  font-weight:900;
 }
 
 .status{
@@ -105,37 +162,28 @@ html,body{
   border:1px solid var(--line);
   color:var(--muted);
   font-size:14px;
-  margin-bottom:14px;
+  margin-bottom:12px;
 }
 
-.title{
-  font-size:24px;
-  font-weight:950;
-  margin-bottom:8px;
-}
-
-.info-card{
-  background:#111;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:20px;
-  padding:16px;
-  margin-bottom:14px;
+.error{
+  color:#ffb4b4;
+  border-color:rgba(239,68,68,.35);
+  background:rgba(239,68,68,.12);
 }
 
 .row{
-  padding:10px 0;
+  padding:11px 0;
   border-top:1px solid var(--line);
 }
 
 .row:first-child{
   border-top:0;
-  padding-top:0;
 }
 
 .label{
   color:var(--muted);
   font-size:13px;
-  margin-bottom:4px;
+  margin-bottom:5px;
 }
 
 .value{
@@ -144,34 +192,20 @@ html,body{
   word-break:break-word;
 }
 
-button{
+.refresh-btn{
   width:100%;
   border:none;
-  border-radius:18px;
-  padding:16px;
+  border-radius:16px;
+  padding:14px;
   margin-top:12px;
-  font-size:18px;
+  font-size:16px;
   font-weight:950;
-}
-
-.primary{
-  background:var(--green);
-  color:#fff;
-}
-
-.secondary{
   background:#1f1f1f;
   color:#fff;
   border:1px solid rgba(255,255,255,.12);
 }
 
 .hidden{display:none}
-
-.error{
-  color:#ffb4b4;
-  border-color:rgba(239,68,68,.35);
-  background:rgba(239,68,68,.12);
-}
 </style>
 </head>
 
@@ -185,55 +219,56 @@ button{
 </div>
 
 <button id="locateBtn" class="locate-btn">◎</button>
+<button id="menuBtn" class="menu-btn">☰</button>
 
-<div class="sheet">
-  <div class="handle"></div>
-
-  <div class="title" id="mainTitle">正在載入任務...</div>
-  <div class="status" id="statusBox">正在初始化導航系統...</div>
-
-  <div class="info-card">
-    <div class="row">
-      <div class="label">訂單編號</div>
-      <div class="value" id="orderIdText">-</div>
-    </div>
-
-    <div class="row">
-      <div class="label">目前目的地</div>
-      <div class="value" id="targetText">-</div>
-    </div>
-
-    <div class="row">
-      <div class="label">預估導航</div>
-      <div class="value" id="routeText">-</div>
-    </div>
-
-    <div class="row">
-      <div class="label">取件地點</div>
-      <div class="value" id="pickupText">-</div>
-    </div>
-
-    <div class="row">
-      <div class="label">送達地點</div>
-      <div class="value" id="dropoffText">-</div>
-    </div>
-
-    <div class="row">
-      <div class="label">物品內容</div>
-      <div class="value" id="itemText">-</div>
-    </div>
+<div id="detailPanel" class="detail-panel hidden">
+  <div class="detail-top">
+    <div class="detail-title">任務明細</div>
+    <button id="closeDetailBtn" class="close-detail">×</button>
   </div>
 
-  <button id="arrivedPickupBtn" class="primary hidden">已抵達取件地</button>
-  <button id="pickedUpBtn" class="primary hidden">已取件，導航到送達地</button>
-  <button id="arrivedDropoffBtn" class="primary hidden">已抵達送達地</button>
-  <button id="completedBtn" class="primary hidden">任務完成</button>
-  <button id="refreshBtn" class="secondary">重新整理導航</button>
+  <div class="status" id="statusBox">正在初始化導航系統...</div>
+
+  <div class="row">
+    <div class="label">訂單編號</div>
+    <div class="value" id="orderIdText">-</div>
+  </div>
+
+  <div class="row">
+    <div class="label">目前目的地</div>
+    <div class="value" id="targetText">-</div>
+  </div>
+
+  <div class="row">
+    <div class="label">預估導航</div>
+    <div class="value" id="routeText">-</div>
+  </div>
+
+  <div class="row">
+    <div class="label">取件地點</div>
+    <div class="value" id="pickupText">-</div>
+  </div>
+
+  <div class="row">
+    <div class="label">送達地點</div>
+    <div class="value" id="dropoffText">-</div>
+  </div>
+
+  <div class="row">
+    <div class="label">物品內容</div>
+    <div class="value" id="itemText">-</div>
+  </div>
+
+  <button id="refreshBtn" class="refresh-btn">重新整理導航</button>
+</div>
+
+<div class="action-wrap">
+  <button id="mainActionBtn" class="action-btn">載入中...</button>
 </div>
 
 <script>
 const LIFF_ID = "2009895876-hiq8YW0n";
-const COMPLETED_REDIRECT_URL = "/rider.html";
+const COMPLETED_REDIRECT_URL = "/rider-task.html";
 
 let lineUserId = "";
 let orderId = "";
@@ -249,8 +284,9 @@ let watchId = null;
 let routeTimer = null;
 
 const statusBox = document.getElementById("statusBox");
-const mainTitle = document.getElementById("mainTitle");
 const topStatus = document.getElementById("topStatus");
+const mainActionBtn = document.getElementById("mainActionBtn");
+const detailPanel = document.getElementById("detailPanel");
 
 function setStatus(text, isError = false){
   statusBox.textContent = text;
@@ -259,6 +295,26 @@ function setStatus(text, isError = false){
 
 function safeText(value){
   return value || "未填寫";
+}
+
+function openGoogleNavigation(destination){
+  if(!destination) return;
+
+  const url =
+    `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+
+  try{
+    if(window.liff && liff.isInClient()){
+      liff.openWindow({
+        url,
+        external:true
+      });
+    }else{
+      window.open(url, "_blank");
+    }
+  }catch(err){
+    window.open(url, "_blank");
+  }
 }
 
 async function init(){
@@ -290,12 +346,13 @@ async function init(){
     await autoAcceptIfNeeded();
 
     startLocationTracking();
-
     startAutoRouteRefresh();
 
   }catch(err){
     console.error(err);
     setStatus("初始化失敗：" + (err.message || JSON.stringify(err)), true);
+    mainActionBtn.textContent = "載入失敗";
+    mainActionBtn.className = "action-btn secondary";
   }
 }
 
@@ -413,7 +470,7 @@ async function loadOrder(){
   order = data.order;
 
   renderOrderInfo();
-  showButtons(order.status);
+  renderMainAction(order.status);
   await drawRouteByStatus(true);
 }
 
@@ -428,12 +485,13 @@ async function autoAcceptIfNeeded(){
 
   if(!canAutoAccept) return;
 
-  setStatus("系統已接收任務，正在自動進入導航...");
+  setStatus("系統已接收任務，正在進入導航...");
 
   const ok = await updateStatusOnly("accepted");
 
   if(ok){
     await loadOrder();
+    openGoogleNavigation(order.pickupAddress);
   }
 }
 
@@ -441,29 +499,65 @@ function renderOrderInfo(){
   document.getElementById("orderIdText").textContent = order.id || order.orderId || orderId;
   document.getElementById("pickupText").textContent = safeText(order.pickupAddress);
   document.getElementById("dropoffText").textContent = safeText(order.dropoffAddress);
-  document.getElementById("itemText").textContent = safeText(order.item);
+  document.getElementById("itemText").textContent = safeText(order.item || order.itemName || order.content);
 
   topStatus.textContent = order.statusLabel || order.status || "任務中";
 
   if(order.status === "accepted"){
-    mainTitle.textContent = "導航到取件地";
     document.getElementById("targetText").textContent = safeText(order.pickupAddress);
   }else if(order.status === "arrived_pickup"){
-    mainTitle.textContent = "已抵達取件地";
     document.getElementById("targetText").textContent = safeText(order.pickupAddress);
   }else if(order.status === "picked_up"){
-    mainTitle.textContent = "導航到送達地";
     document.getElementById("targetText").textContent = safeText(order.dropoffAddress);
   }else if(order.status === "arrived_dropoff"){
-    mainTitle.textContent = "已抵達送達地";
     document.getElementById("targetText").textContent = safeText(order.dropoffAddress);
   }else if(order.status === "completed"){
-    mainTitle.textContent = "任務已完成";
     document.getElementById("targetText").textContent = "準備返回等待派單";
   }else{
-    mainTitle.textContent = "UBee 騎士任務";
     document.getElementById("targetText").textContent = "-";
   }
+}
+
+function renderMainAction(status){
+  mainActionBtn.disabled = false;
+  mainActionBtn.className = "action-btn";
+
+  if(status === "accepted"){
+    mainActionBtn.textContent = "已抵達取件地";
+    mainActionBtn.onclick = () => updateStatus("arrived_pickup");
+    return;
+  }
+
+  if(status === "arrived_pickup"){
+    mainActionBtn.textContent = "已取件，導航到送達地";
+    mainActionBtn.onclick = () => updateStatus("picked_up");
+    return;
+  }
+
+  if(status === "picked_up"){
+    mainActionBtn.textContent = "已抵達送達地";
+    mainActionBtn.onclick = () => updateStatus("arrived_dropoff");
+    return;
+  }
+
+  if(status === "arrived_dropoff"){
+    mainActionBtn.textContent = "任務完成";
+    mainActionBtn.onclick = () => updateStatus("completed");
+    return;
+  }
+
+  if(status === "completed"){
+    mainActionBtn.textContent = "回到等待派單";
+    mainActionBtn.className = "action-btn secondary";
+    mainActionBtn.onclick = () => {
+      location.href = COMPLETED_REDIRECT_URL;
+    };
+    return;
+  }
+
+  mainActionBtn.textContent = "重新整理任務";
+  mainActionBtn.className = "action-btn secondary";
+  mainActionBtn.onclick = () => loadOrder();
 }
 
 function getDestinationByStatus(){
@@ -514,9 +608,9 @@ async function drawRouteByStatus(forcePan = false){
       document.getElementById("routeText").textContent = `${leg.duration.text}｜${leg.distance.text}`;
 
       if(order.status === "accepted"){
-        setStatus(`導航到取件地：${leg.duration.text}，${leg.distance.text}`);
+        setStatus(`取件導航：${leg.duration.text}，${leg.distance.text}`);
       }else if(order.status === "picked_up"){
-        setStatus(`導航到送達地：${leg.duration.text}，${leg.distance.text}`);
+        setStatus(`送達導航：${leg.duration.text}，${leg.distance.text}`);
       }else{
         setStatus(`路線已規劃：${leg.duration.text}，${leg.distance.text}`);
       }
@@ -585,41 +679,6 @@ async function recenterMap(){
   await drawRouteByStatus(true);
 }
 
-function showButtons(status){
-  hideAllButtons();
-
-  if(status === "accepted"){
-    show("arrivedPickupBtn");
-  }
-
-  if(status === "arrived_pickup"){
-    show("pickedUpBtn");
-  }
-
-  if(status === "picked_up"){
-    show("arrivedDropoffBtn");
-  }
-
-  if(status === "arrived_dropoff"){
-    show("completedBtn");
-  }
-}
-
-function show(id){
-  document.getElementById(id).classList.remove("hidden");
-}
-
-function hideAllButtons(){
-  [
-    "arrivedPickupBtn",
-    "pickedUpBtn",
-    "arrivedDropoffBtn",
-    "completedBtn"
-  ].forEach(id => {
-    document.getElementById(id).classList.add("hidden");
-  });
-}
-
 async function updateStatusOnly(status){
   const res = await fetch("/api/rider/update-order-status", {
     method:"POST",
@@ -643,18 +702,23 @@ async function updateStatusOnly(status){
 
 async function updateStatus(status){
   try{
+    mainActionBtn.disabled = true;
+    mainActionBtn.textContent = "更新中...";
+
     const ok = await updateStatusOnly(status);
 
-    if(!ok) return;
+    if(!ok){
+      renderMainAction(order.status);
+      return;
+    }
 
     if(status === "completed"){
-      mainTitle.textContent = "任務已完成";
       setStatus("任務完成，正在回到等待派單...");
-      hideAllButtons();
+      mainActionBtn.textContent = "返回中...";
 
       setTimeout(() => {
         location.href = COMPLETED_REDIRECT_URL;
-      }, 600);
+      }, 500);
 
       return;
     }
@@ -662,30 +726,34 @@ async function updateStatus(status){
     await loadOrder();
 
     if(status === "picked_up"){
-      setStatus("已取件，正在自動導航到送達地...");
+      setStatus("已取件，正在開啟 Google Maps 導航到送達地...");
+      openGoogleNavigation(order.dropoffAddress);
       await drawRouteByStatus(true);
+    }
+
+    if(status === "arrived_pickup"){
+      setStatus("已抵達取件地，請完成取件後繼續。");
+    }
+
+    if(status === "arrived_dropoff"){
+      setStatus("已抵達送達地，確認交付後可完成任務。");
     }
 
   }catch(err){
     console.error(err);
     alert("更新失敗，請稍後再試");
+    if(order){
+      renderMainAction(order.status);
+    }
   }
 }
 
-document.getElementById("arrivedPickupBtn").addEventListener("click", () => {
-  updateStatus("arrived_pickup");
+document.getElementById("menuBtn").addEventListener("click", () => {
+  detailPanel.classList.toggle("hidden");
 });
 
-document.getElementById("pickedUpBtn").addEventListener("click", () => {
-  updateStatus("picked_up");
-});
-
-document.getElementById("arrivedDropoffBtn").addEventListener("click", () => {
-  updateStatus("arrived_dropoff");
-});
-
-document.getElementById("completedBtn").addEventListener("click", () => {
-  updateStatus("completed");
+document.getElementById("closeDetailBtn").addEventListener("click", () => {
+  detailPanel.classList.add("hidden");
 });
 
 document.getElementById("refreshBtn").addEventListener("click", async () => {
