@@ -958,6 +958,46 @@ async function pushToGroup(groupId, messages) {
   await client.pushMessage(groupId, list);
 }
 
+async function notifyOnlineRidersNewOrder(order) {
+  try {
+    const snap = await db.collection('riders')
+      .where('status', '==', 'approved')
+      .where('online', '==', true)
+      .get();
+
+    if (snap.empty) {
+      console.log('目前沒有上線騎士可推播');
+      return;
+    }
+
+    const message = createTextMessage(
+      `🔔 UBee 新任務通知\n\n` +
+      `訂單編號：${order.id}\n` +
+      `服務類型：${order.serviceType}\n` +
+      `取件地點：${order.pickupAddress}\n` +
+      `送達地點：${order.dropoffAddress}\n` +
+      `騎士收入：${formatCurrency(order.driverFee)}\n\n` +
+      `請打開 UBee 騎士接單頁查看任務。`
+    );
+
+    const jobs = [];
+
+    snap.forEach(doc => {
+      const rider = doc.data();
+      if (rider.lineUserId) {
+        jobs.push(client.pushMessage(rider.lineUserId, message));
+      }
+    });
+
+    await Promise.allSettled(jobs);
+
+    console.log(`✅ 已推播新任務給 ${jobs.length} 位上線騎士`);
+
+  } catch (err) {
+    console.error('❌ 推播上線騎士失敗：', err);
+  }
+}
+
 async function getDistanceMatrix(origin, destination) {
   const cleanOrigin = normalizeMapsAddress(origin);
   const cleanDestination = normalizeMapsAddress(destination);
@@ -1759,8 +1799,8 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
 
     // 客人確認付款後：直接派單到騎士群；辦公室審核群只收到管理/強制取消卡，不需要管理員確認付款。
     await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
+    await notifyOnlineRidersNewOrder(order);
     await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
-
     res.json({
       success: true,
       orderId,
