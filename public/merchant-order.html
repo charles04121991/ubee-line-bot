@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>UBee｜店家派單中心</title>
+
+<style>
+:root{
+  --bg:#000;
+  --card:#111;
+  --card2:#181818;
+  --line:rgba(255,255,255,.12);
+  --text:#fff;
+  --muted:#a8a8a8;
+  --yellow:#facc15;
+  --yellow2:#eab308;
+  --danger:#ef4444;
+  --green:#22c55e;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+}
+
+.wrap{
+  max-width:720px;
+  margin:0 auto;
+  padding:20px 16px 36px;
+}
+
+.hero{
+  padding:22px;
+  border:1px solid var(--line);
+  border-radius:24px;
+  background:linear-gradient(135deg,#111,#000);
+  margin-bottom:18px;
+}
+
+.logo{
+  font-size:34px;
+  font-weight:900;
+  letter-spacing:.5px;
+}
+
+.logo span{color:var(--yellow)}
+
+.hero h1{
+  margin:8px 0 6px;
+  font-size:26px;
+}
+
+.hero p{
+  margin:0;
+  color:var(--muted);
+  line-height:1.6;
+}
+
+.section{
+  margin-top:14px;
+  padding:18px;
+  border-radius:20px;
+  background:var(--card);
+  border:1px solid var(--line);
+}
+
+.section h2{
+  margin:0 0 14px;
+  font-size:18px;
+}
+
+label{
+  display:block;
+  margin:14px 0 7px;
+  font-size:14px;
+  color:#ddd;
+}
+
+input,textarea,select{
+  width:100%;
+  border:1px solid var(--line);
+  background:var(--card2);
+  color:var(--text);
+  border-radius:14px;
+  padding:14px;
+  font-size:16px;
+  outline:none;
+}
+
+textarea{
+  min-height:90px;
+  resize:vertical;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.option{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--card2);
+  cursor:pointer;
+}
+
+.option.active{
+  border-color:var(--yellow);
+  background:rgba(250,204,21,.12);
+}
+
+.option strong{
+  display:block;
+  font-size:15px;
+  margin-bottom:4px;
+}
+
+.option small{
+  color:var(--muted);
+  line-height:1.4;
+}
+
+.notice{
+  margin-top:16px;
+  padding:14px;
+  border-radius:16px;
+  background:rgba(250,204,21,.08);
+  border:1px solid rgba(250,204,21,.25);
+  color:#fef3c7;
+  line-height:1.6;
+  font-size:14px;
+}
+
+button{
+  width:100%;
+  margin-top:18px;
+  border:0;
+  border-radius:18px;
+  padding:16px;
+  font-size:17px;
+  font-weight:800;
+  color:#000;
+  background:linear-gradient(135deg,var(--yellow),var(--yellow2));
+  cursor:pointer;
+}
+
+button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+.result{
+  display:none;
+  margin-top:16px;
+  padding:16px;
+  border-radius:18px;
+  background:rgba(34,197,94,.12);
+  border:1px solid rgba(34,197,94,.35);
+  color:#dcfce7;
+  line-height:1.7;
+}
+
+.error{
+  display:none;
+  margin-top:16px;
+  padding:16px;
+  border-radius:18px;
+  background:rgba(239,68,68,.12);
+  border:1px solid rgba(239,68,68,.35);
+  color:#fecaca;
+  line-height:1.7;
+}
+
+@media(max-width:520px){
+  .grid{grid-template-columns:1fr}
+  .hero h1{font-size:24px}
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="logo"><span>U</span>Bee 🐝</div>
+    <h1>店家派單中心</h1>
+    <p>合作店家專屬配送入口，建立配送單後，UBee 將協助安排騎士前往店家取貨並配送至顧客地址。</p>
+  </div>
+
+  <form id="merchantForm">
+
+    <div class="section">
+      <h2>店家資訊</h2>
+
+      <label>店家名稱</label>
+      <input id="merchantName" placeholder="例如：UBee 飲料店" maxlength="40" required />
+
+      <label>店家電話</label>
+      <input id="merchantPhone" placeholder="例如：0912-345-678" maxlength="20" required />
+
+      <label>取貨地址</label>
+      <input id="pickupAddress" placeholder="請輸入店家完整地址" maxlength="100" required />
+    </div>
+
+    <div class="section">
+      <h2>顧客資訊</h2>
+
+      <label>顧客姓名</label>
+      <input id="customerName" placeholder="例如：陳先生" maxlength="30" required />
+
+      <label>顧客電話</label>
+      <input id="customerPhone" placeholder="例如：0912-345-678" maxlength="20" required />
+
+      <label>配送地址</label>
+      <input id="dropoffAddress" placeholder="請輸入顧客完整地址" maxlength="100" required />
+    </div>
+
+    <div class="section">
+      <h2>配送內容</h2>
+
+      <label>商品內容</label>
+      <textarea id="itemName" placeholder="例如：飲料 5 杯、蛋糕 1 盒、文件 1 份" maxlength="200" required></textarea>
+
+      <label>配送方式</label>
+      <div class="grid" id="deliveryOptions">
+        <div class="option active" data-value="standard">
+          <strong>標準件</strong>
+          <small>一般配送，依現場騎士安排</small>
+        </div>
+        <div class="option" data-value="priority">
+          <strong>優先件</strong>
+          <small>優先安排騎士前往取貨</small>
+        </div>
+        <div class="option" data-value="instant">
+          <strong>即時件</strong>
+          <small>需要較快完成配送</small>
+        </div>
+        <div class="option" data-value="urgent">
+          <strong>急件</strong>
+          <small>高優先順序配送任務</small>
+        </div>
+      </div>
+
+      <label>備註</label>
+      <textarea id="note" placeholder="例如：到店報手機末三碼、不要按門鈴、放管理室" maxlength="200"></textarea>
+
+      <div class="notice">
+        建立配送單後，系統會送出至 UBee 派單流程。請確認地址、電話與商品內容正確。
+      </div>
+
+      <button id="submitBtn" type="submit">建立配送單</button>
+
+      <div class="result" id="resultBox"></div>
+      <div class="error" id="errorBox"></div>
+    </div>
+
+  </form>
+</div>
+
+<script>
+let selectedDeliveryType = 'standard';
+
+const deliveryTextMap = {
+  standard: '標準件',
+  priority: '優先件',
+  instant: '即時件',
+  urgent: '急件'
+};
+
+document.querySelectorAll('.option').forEach(option => {
+  option.addEventListener('click', () => {
+    document.querySelectorAll('.option').forEach(o => o.classList.remove('active'));
+    option.classList.add('active');
+    selectedDeliveryType = option.dataset.value;
+  });
+});
+
+function getValue(id){
+  return document.getElementById(id).value.trim();
+}
+
+function showError(message){
+  const box = document.getElementById('errorBox');
+  box.style.display = 'block';
+  box.textContent = message;
+}
+
+function hideError(){
+  const box = document.getElementById('errorBox');
+  box.style.display = 'none';
+  box.textContent = '';
+}
+
+function showResult(orderId){
+  const box = document.getElementById('resultBox');
+  box.style.display = 'block';
+  box.innerHTML = `
+    配送單已建立成功！<br>
+    訂單編號：<strong>${orderId || '系統建立中'}</strong><br>
+    請等待 UBee 安排騎士前往店家取貨。
+  `;
+}
+
+document.getElementById('merchantForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideError();
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '建立中...';
+
+  const payload = {
+    merchantName: getValue('merchantName'),
+    merchantPhone: getValue('merchantPhone'),
+    pickupAddress: getValue('pickupAddress'),
+    customerName: getValue('customerName'),
+    customerPhone: getValue('customerPhone'),
+    dropoffAddress: getValue('dropoffAddress'),
+    itemName: getValue('itemName'),
+    deliveryType: selectedDeliveryType,
+    deliveryTypeText: deliveryTextMap[selectedDeliveryType],
+    note: getValue('note')
+  };
+
+  try{
+    const res = await fetch('/api/merchant/order', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || !data.success){
+      throw new Error(data.message || '建立配送單失敗');
+    }
+
+    showResult(data.orderId);
+    document.getElementById('merchantForm').reset();
+
+  }catch(err){
+    showError(err.message || '系統忙碌中，請稍後再試');
+  }finally{
+    submitBtn.disabled = false;
+    submitBtn.textContent = '建立配送單';
+  }
+});
+</script>
+</body>
+</html>
