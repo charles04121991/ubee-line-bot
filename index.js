@@ -1283,6 +1283,29 @@ function createDispatchGroupFlex(order) {
   ));
 }
 
+function createMerchantDispatchFlex(order) {
+  return createFlexMessage('UBee 合作店家配送單', createBubble(
+    'UBee 合作店家配送單',
+    [
+      createInfoRow('訂單編號', order.id),
+      createInfoRow('店家名稱', order.merchantName),
+      createInfoRow('配送方式', order.deliveryTypeText),
+      createInfoRow('取貨地址', order.pickupAddress),
+      createInfoRow('店家電話', order.pickupPhone),
+      createInfoRow('顧客姓名', order.customerName),
+      createInfoRow('顧客電話', order.dropoffPhone),
+      createInfoRow('送達地址', order.dropoffAddress),
+      createInfoRow('商品內容', order.item),
+      createInfoRow('備註', order.note || '無'),
+    ],
+    [
+      createActionButton('接受配送單', `accept=${order.id}`, 'primary'),
+      createUriButton('導航到店家', buildGoogleMapDirectionsUrl(order.pickupAddress), 'secondary'),
+      createUriButton('導航到顧客地址', buildGoogleMapDirectionsUrl(order.dropoffAddress), 'secondary'),
+    ]
+  ));
+}
+
 // ✅ 新增：辦公室審核群組專用強制取消卡
 function createAdminForceCancelFlex(order) {
   return createFlexMessage('UBee 辦公室訂單管理', createBubble(
@@ -1573,6 +1596,97 @@ app.post('/estimate', async (req, res) => {
     error: err.message || 'estimate error'
   });
 }
+});
+
+// ===== 合作店家派單 API =====
+app.post('/api/merchant/order', async (req, res) => {
+  try {
+    const {
+      merchantName,
+      merchantPhone,
+      pickupAddress,
+      customerName,
+      customerPhone,
+      dropoffAddress,
+      itemName,
+      deliveryType,
+      deliveryTypeText,
+      note,
+    } = req.body;
+
+    if (!merchantName || !merchantPhone || !pickupAddress || !customerName || !customerPhone || !dropoffAddress || !itemName) {
+      return res.status(400).json({
+        success: false,
+        message: '資料不完整，請確認店家、顧客、地址與商品內容都有填寫。',
+      });
+    }
+
+    const id = generateOrderId();
+
+    const order = {
+      id,
+      orderType: 'merchant_delivery',
+      source: 'merchant',
+      userId: 'merchant-order',
+      customerId: 'merchant-order',
+      riderId: '',
+      status: 'pending_dispatch',
+
+      merchantName: cleanText(merchantName, 60),
+      merchantPhone: normalizePhone(merchantPhone),
+      customerName: cleanText(customerName, 40),
+      customerPhone: normalizePhone(customerPhone),
+
+      serviceType: '合作店家配送',
+      item: cleanLongText(itemName, 200),
+      pickupAddress: cleanText(pickupAddress, 120),
+      pickupPhone: normalizePhone(merchantPhone),
+      dropoffAddress: cleanText(dropoffAddress, 120),
+      dropoffPhone: normalizePhone(customerPhone),
+
+      speedType: deliveryType || 'standard',
+      deliveryTypeText: cleanText(deliveryTypeText || '標準件', 20),
+      note: cleanLongText(note || '', 200),
+
+      total: 0,
+      driverFee: 0,
+      platformFee: 0,
+      deliveryFee: 0,
+      serviceFee: 0,
+      speedFee: 0,
+      waitingFee: 0,
+
+      etaMinutes: null,
+      paymentMethod: 'merchant',
+      isPaid: true,
+      paidAt: Date.now(),
+
+      createdAt: Date.now(),
+      acceptedAt: null,
+      arrivedPickupAt: null,
+      pickedUpAt: null,
+      arrivedDropoffAt: null,
+      completedAt: null,
+    };
+
+    await saveOrder(order);
+
+    await pushToGroup(LINE_GROUP_ID, createMerchantDispatchFlex(order));
+    await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
+
+    return res.json({
+      success: true,
+      orderId: id,
+      message: '店家配送單已建立，系統已推送到騎士群組。',
+    });
+
+  } catch (err) {
+    console.error('❌ 店家配送單建立失敗：', err);
+    return res.status(500).json({
+      success: false,
+      message: '店家配送單建立失敗，請稍後再試。',
+    });
+  }
 });
 
 app.post('/api/orders', async (req, res) => {
