@@ -165,8 +165,6 @@
       cursor:pointer;
     }
 
-    .heroVisual{display:none;}
-
     .benefits{
       display:grid;
       grid-template-columns:repeat(3,1fr);
@@ -794,9 +792,27 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
     return;
   }
 
+  if (lineId.length < 2 || lineId.length > 50) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = 'LINE ID 長度不正確，請重新確認。';
+    return;
+  }
+
+  if (district.length < 2 || district.length > 50) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '居住地區請填寫完整，例如：台中市豐原區。';
+    return;
+  }
+
   if (plateNumber.length > 20) {
     errorBox.style.display = 'block';
     errorBox.innerHTML = '車牌號碼不可超過 20 字。';
+    return;
+  }
+
+  if (serviceArea.length < 2 || serviceArea.length > 80) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '可服務區域請填寫 2～80 字。';
     return;
   }
 
@@ -848,7 +864,11 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
       })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.message || '伺服器回應失敗，請稍後再試。');
+    }
 
     if (data.success) {
       successBox.style.display = 'block';
@@ -857,12 +877,20 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
       submitBtn.innerText = '已送出申請';
       submitBtn.disabled = true;
 
+      form.querySelectorAll('input, select, textarea, button').forEach(el => {
+        el.disabled = true;
+      });
+
     } else if (data.duplicate) {
       successBox.style.display = 'block';
       successBox.innerHTML = data.message || '✅ 你的合作夥伴申請資料已送出，請等待 UBee 審核通過，請勿重複申請。';
 
       submitBtn.innerText = '資料已送出';
       submitBtn.disabled = true;
+
+      form.querySelectorAll('input, select, textarea, button').forEach(el => {
+        el.disabled = true;
+      });
 
     } else {
       errorBox.style.display = 'block';
@@ -874,8 +902,9 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
 
   } catch (err) {
     console.error(err);
+
     errorBox.style.display = 'block';
-    errorBox.innerHTML = '❌ 發生錯誤，請稍後再試。';
+    errorBox.innerHTML = err.message || '❌ 發生錯誤，請稍後再試。';
 
     submitBtn.disabled = false;
     submitBtn.innerText = '送出申請';
