@@ -92,6 +92,65 @@ app.get('/health', (req, res) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ==============================
+// UBee 騎士系統 API
+// ==============================
+
+// 1. 取得騎士資料
+app.get('/api/rider/profile', async (req, res) => {
+  try {
+    const { lineUserId } = req.query;
+
+    if (!lineUserId) {
+      return res.status(400).json({ message: '缺少 lineUserId' });
+    }
+
+    const snap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.status(404).json({ message: '找不到騎士資料' });
+    }
+
+    const doc = snap.docs[0];
+
+    return res.json({
+      rider: {
+        id: doc.id,
+        ...doc.data()
+      }
+    });
+
+  } catch (err) {
+    console.error('取得騎士資料失敗:', err);
+    return res.status(500).json({ message: '取得騎士資料失敗' });
+  }
+});
+
+// 2. 取得可接任務
+app.get('/api/rider/tasks', async (req, res) => {
+  try {
+    const snap = await db.collection('orders')
+      .where('status', '==', 'pending_dispatch')
+      .orderBy('createdAt', 'desc')
+      .limit(30)
+      .get();
+
+    const tasks = snap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    return res.json({ tasks });
+
+  } catch (err) {
+    console.error('取得可接任務失敗:', err);
+    return res.status(500).json({ message: '取得可接任務失敗' });
+  }
+});
+
 app.get('/order.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -1404,6 +1463,7 @@ app.get('/api/config', (req, res) => {
     liffId: LIFF_ID,
     businessFormUrl: BUSINESS_FORM_URL,
     partnerFormUrl: PARTNER_FORM_URL,
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
 });
 
@@ -1660,45 +1720,6 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
   }
 });
 
-app.get('/api/rider-task/:orderId', async (req, res) => {
-  try {
-    const orderId = String(req.params.orderId || '').toUpperCase();
-    const order = await getOrder(orderId);
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: '找不到此訂單',
-      });
-    }
-
-    res.json({
-      success: true,
-      order: {
-        id: order.id,
-        status: order.status,
-        statusLabel: getStatusLabel(order.status),
-        serviceType: order.serviceType,
-        item: order.item,
-        pickupAddress: order.pickupAddress,
-        pickupPhone: order.pickupPhone,
-        dropoffAddress: order.dropoffAddress,
-        dropoffPhone: order.dropoffPhone,
-        speedType: order.speedType,
-        speedLabel: getSpeedOption(order.speedType).label,
-        note: order.note || '',
-        driverFee: order.driverFee,
-      },
-    });
-  } catch (error) {
-    console.error('❌ 騎士任務讀取失敗：', error);
-    res.status(500).json({
-      success: false,
-      error: '讀取任務失敗',
-    });
-  }
-});
-
 app.post('/api/rider-distance-to-pickup', async (req, res) => {
   try {
     const { riderLat, riderLng, pickupAddress } = req.body;
@@ -1740,15 +1761,6 @@ app.post('/api/rider/accept-order', async (req, res) => {
       });
     }
 
-    const order = await getOrder(orderId);
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: '找不到此訂單',
-      });
-    }
-
     const approved = await isApprovedRiderUser(lineUserId);
 
     if (!approved) {
@@ -1758,41 +1770,157 @@ app.post('/api/rider/accept-order', async (req, res) => {
       });
     }
 
-    if (isTerminalOrderStatus(order)) {
-      return res.status(400).json({
-        success: false,
-        error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再操作。`,
-      });
-    }
+    const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+    let acceptedOrder = null;
 
-    if (order.status !== 'pending_dispatch') {
-      return res.status(400).json({
-        success: false,
-        error: '此訂單目前不是可接單狀態，可能已被其他騎士接走。',
-      });
-    }
+    await db.runTransaction(async (transaction) => {
+      const orderDoc = await transaction.get(orderRef);
 
-    order.riderId = lineUserId;
-    order.status = 'accepted';
-    order.acceptedAt = Date.now();
-    await saveOrder(order);
+      if (!orderDoc.exists) {
+        throw new Error('ORDER_NOT_FOUND');
+      }
+
+      const order = orderDoc.data();
+
+      if (isTerminalOrderStatus(order)) {
+        throw new Error('ORDER_TERMINAL');
+      }
+
+      if (order.status !== 'pending_dispatch') {
+        throw new Error('ORDER_ALREADY_ACCEPTED');
+      }
+
+      order.riderId = lineUserId;
+      order.status = 'accepted';
+      order.acceptedAt = Date.now();
+
+      transaction.set(orderRef, order, { merge: true });
+
+      acceptedOrder = order;
+    });
+
+    orders[acceptedOrder.id] = acceptedOrder;
 
     await notifyCustomer(
-      order,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定抵達取件時間。`)
+      acceptedOrder,
+      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快設定抵達取件時間。`)
     );
 
-    res.json({
+    return res.json({
       success: true,
-      orderId: order.id,
+      orderId: acceptedOrder.id,
       message: '接單成功',
     });
 
   } catch (error) {
     console.error('❌ 騎士網頁接單失敗：', error);
-    res.status(500).json({
+
+    if (error.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    if (error.message === 'ORDER_ALREADY_ACCEPTED') {
+      return res.status(409).json({
+        success: false,
+        error: '此訂單已被其他騎士接走',
+      });
+    }
+
+    if (error.message === 'ORDER_TERMINAL') {
+      return res.status(400).json({
+        success: false,
+        error: '此訂單已完成或已取消，無法接單。',
+      });
+    }
+
+    return res.status(500).json({
       success: false,
       error: '接單失敗，請稍後再試。',
+    });
+  }
+});
+
+// ===== 騎士更新任務狀態 API =====
+app.post('/api/rider/update-order-status', async (req, res) => {
+  try {
+    const { orderId, lineUserId, status } = req.body;
+
+    if (!orderId || !lineUserId || !status) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少訂單編號、騎士 LINE 身分或任務狀態',
+      });
+    }
+
+    const order = await getOrder(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
+    }
+
+    if (order.riderId !== lineUserId) {
+      return res.status(403).json({
+        success: false,
+        error: '只有接單騎士可以更新此任務狀態',
+      });
+    }
+
+    const allowedFlow = {
+      accepted: ['arrived_pickup'],
+      arrived_pickup: ['picked_up'],
+      picked_up: ['arrived_dropoff'],
+      arrived_dropoff: ['completed'],
+    };
+
+    const nextStatuses = allowedFlow[order.status] || [];
+
+    if (!nextStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不能更新為「${getStatusLabel(status)}」`,
+      });
+    }
+
+    const timeFieldMap = {
+      arrived_pickup: 'arrivedPickupAt',
+      picked_up: 'pickedUpAt',
+      arrived_dropoff: 'arrivedDropoffAt',
+      completed: 'completedAt',
+    };
+
+    order.status = status;
+    order[timeFieldMap[status]] = Date.now();
+
+    await saveOrder(order);
+
+    await notifyCustomer(
+      order,
+      createTextMessage(`UBee 任務狀態更新\n\n訂單編號：${order.id}\n目前狀態：${getStatusLabel(order.status)}`)
+    );
+
+    if (status === 'completed') {
+      await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
+    }
+
+    return res.json({
+      success: true,
+      orderId: order.id,
+      status: order.status,
+      statusLabel: getStatusLabel(order.status),
+      message: '任務狀態已更新',
+    });
+
+  } catch (error) {
+    console.error('❌ 騎士更新任務狀態失敗：', error);
+    return res.status(500).json({
+      success: false,
+      error: '任務狀態更新失敗，請稍後再試。',
     });
   }
 });
@@ -2396,6 +2524,7 @@ async function handleTextMessage(event) {
   console.log('========== LINE 文字訊息 ==========');
   console.log('source type:', event.source.type);
   console.log('LINE userId:', userId);
+  console.log('請把這個 userId 複製到 Firebase riders 的 lineUserId 欄位:', userId);
   console.log('groupId:', event.source.groupId || '-');
   console.log('roomId:', event.source.roomId || '-');
   console.log('text:', text);
