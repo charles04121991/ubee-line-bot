@@ -210,8 +210,6 @@ const existingRider = await db.collection('riders')
   .get();
 
 if (riderLineUserId && !existingRider.empty) {
-  
-if (!existingRider.empty) {
   const riderData = existingRider.docs[0].data();
 
   return res.json({
@@ -384,8 +382,6 @@ const existingBusiness = await db.collection('businessApplications')
   .get();
 
 if (businessLineUserId && !existingBusiness.empty) {
-
-if (!existingBusiness.empty) {
   const businessData = existingBusiness.docs[0].data();
 
   return res.json({
@@ -882,14 +878,6 @@ async function handleAdminForceCancel(event, orderId, reason, groupDenyText) {
 
   const order = await getOrderOrReply(event.replyToken, orderId);
   if (!order) return null;
-  const latestOrder = await getOrder(orderId);
-
-  if (!latestOrder || latestOrder.status !== 'pending_dispatch') {
-  return replyText(
-    event.replyToken,
-    '此訂單已被其他騎士接走。'
-  );
-}
 
   if (['completed', 'cancelled'].includes(order.status)) {
     return replyText(
