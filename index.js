@@ -270,7 +270,7 @@ if(plateNumber && String(plateNumber).trim().length > 20){
 
     await pushToGroup(LINE_ADMIN_GROUP_ID, createRiderReviewFlex(rider));
 
-    res.json({
+        res.json({
       success: true,
       riderId,
       message: '已送出申請，等待 UBee 審核。',
