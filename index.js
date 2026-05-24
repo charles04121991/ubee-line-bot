@@ -213,13 +213,14 @@ if (riderLineUserId && !existingRider.empty) {
   const riderData = existingRider.docs[0].data();
 
   return res.json({
-    success: false,
-    alreadyExists: true,
-    message:
-      riderData.status === 'approved'
-        ? '你已通過 UBee 騎士審核。'
-        : '你的資料已送出，請等待 UBee 審核通過。',
-  });
+  success: false,
+  duplicate: true,
+  alreadyExists: true,
+  message:
+    riderData.status === 'approved'
+      ? '你已通過 UBee 騎士審核。'
+      : '你的資料已送出，請等待 UBee 審核通過。',
+});
 }
 
 if(!/^09\d{8}$/.test(cleanPhone)){
@@ -385,13 +386,14 @@ if (businessLineUserId && !existingBusiness.empty) {
   const businessData = existingBusiness.docs[0].data();
 
   return res.json({
-    success: false,
-    alreadyExists: true,
-    message:
-      businessData.status === 'approved'
-        ? '你的商務合作已通過審核。'
-        : '你的合作資料已送出，請等待 UBee 審核。',
-  });
+  success: false,
+  duplicate: true,
+  alreadyExists: true,
+  message:
+    businessData.status === 'approved'
+      ? '你的商務合作已通過審核。'
+      : '你的合作資料已送出，請等待 UBee 審核。',
+});
 }
 
     const businessId = 'B' + Date.now();
