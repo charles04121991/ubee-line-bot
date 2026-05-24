@@ -201,6 +201,28 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
 const cleanPhone = normalizePhone(phone);
+const riderLineUserId = lineUserId || userId || '';
+
+// ===== 防止重複申請 =====
+const existingRider = await db.collection('riders')
+  .where('lineUserId', '==', riderLineUserId)
+  .limit(1)
+  .get();
+
+if (riderLineUserId && !existingRider.empty) {
+  
+if (!existingRider.empty) {
+  const riderData = existingRider.docs[0].data();
+
+  return res.json({
+    success: false,
+    alreadyExists: true,
+    message:
+      riderData.status === 'approved'
+        ? '你已通過 UBee 騎士審核。'
+        : '你的資料已送出，請等待 UBee 審核通過。',
+  });
+}
 
 if(!/^09\d{8}$/.test(cleanPhone)){
   return res.json({
@@ -353,6 +375,29 @@ app.post('/api/business/register', async (req, res) => {
       });
     }
 
+const businessLineUserId = cleanText(req.body.lineUserId || req.body.userId || '', 80);
+
+// ===== 防止重複送出合作申請 =====
+const existingBusiness = await db.collection('businessApplications')
+  .where('lineUserId', '==', businessLineUserId)
+  .limit(1)
+  .get();
+
+if (businessLineUserId && !existingBusiness.empty) {
+
+if (!existingBusiness.empty) {
+  const businessData = existingBusiness.docs[0].data();
+
+  return res.json({
+    success: false,
+    alreadyExists: true,
+    message:
+      businessData.status === 'approved'
+        ? '你的商務合作已通過審核。'
+        : '你的合作資料已送出，請等待 UBee 審核。',
+  });
+}
+
     const businessId = 'B' + Date.now();
 
     const business = {
@@ -367,7 +412,7 @@ app.post('/api/business/register', async (req, res) => {
       frequency: cleanText(frequency, 40),
       deliveryArea: cleanText(deliveryArea, 120),
       note: cleanLongText(note || '', 300),
-      lineUserId: cleanText(req.body.lineUserId || req.body.userId || '', 80),
+      lineUserId: businessLineUserId,
       status: 'pending',
       createdAt: new Date().toLocaleString('zh-TW'),
       createdAtMs: Date.now(),
@@ -837,6 +882,14 @@ async function handleAdminForceCancel(event, orderId, reason, groupDenyText) {
 
   const order = await getOrderOrReply(event.replyToken, orderId);
   if (!order) return null;
+  const latestOrder = await getOrder(orderId);
+
+  if (!latestOrder || latestOrder.status !== 'pending_dispatch') {
+  return replyText(
+    event.replyToken,
+    '此訂單已被其他騎士接走。'
+  );
+}
 
   if (['completed', 'cancelled'].includes(order.status)) {
     return replyText(
@@ -2088,7 +2141,7 @@ UBee 辦公室將會再依照您的需求，
           `🎉 恭喜您通過 UBee 騎士審核！\n\n` +
           `歡迎加入 UBee 城市任務平台 🐝\n\n` +
           `接下來請先加入「UBee｜騎士 SOP 教學區」：\n\n` +
-          `https://line.me/ti/g/Ut3XpxvHPN\n\n` +
+          `${RIDER_SOP_GROUP_LINK}\n\n` +
           `加入後請先閱讀記事本上內容：\n\n` +
           `1. 接單流程\n` +
           `2. 任務操作方式\n` +
@@ -2189,36 +2242,37 @@ UBee 辦公室將會再依照您的需求，
   }
 
   if (data.startsWith('accept=')) {
-    const orderId = getPostbackValue(data, 'accept');
-    const order = await getOrderOrReply(event.replyToken, orderId);
-    if (!order) return null;
+  const orderId = getPostbackValue(data, 'accept');
+  const order = await getOrderOrReply(event.replyToken, orderId);
+  if (!order) return null;
 
-    const approved = await requireApprovedRider(event);
-    if (!approved) return null;
+  const latestOrder = await getOrder(orderId);
 
-    const ok = await requireOrderStatus(
-      event,
-      order,
-      ['pending_dispatch'],
-      '此訂單目前不是可接單狀態，可能已被其他騎手接走。'
+  if (!latestOrder || latestOrder.status !== 'pending_dispatch') {
+    return replyText(
+      event.replyToken,
+      '此訂單已被其他騎士接走。'
     );
-    if (!ok) return null;
-
-    order.riderId = userId;
-    order.status = 'accepted';
-    order.acceptedAt = Date.now();
-    await saveOrder(order);
-
-    await notifyCustomer(
-      order,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${order.id}\n騎士將盡快設定抵達取件時間。`)
-    );
-
-    return replyMessages(event.replyToken, [
-      createTextMessage(`✅ 你已接受訂單：${order.id}`),
-      createETAFlex(order),
-    ]);
   }
+
+  const approved = await requireApprovedRider(event);
+  if (!approved) return null;
+
+  latestOrder.riderId = userId;
+  latestOrder.status = 'accepted';
+  latestOrder.acceptedAt = Date.now();
+  await saveOrder(latestOrder);
+
+  await notifyCustomer(
+    latestOrder,
+    createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${latestOrder.id}\n騎士將盡快設定抵達取件時間。`)
+  );
+
+  return replyMessages(event.replyToken, [
+    createTextMessage(`✅ 你已接受訂單：${latestOrder.id}`),
+    createETAFlex(latestOrder),
+  ]);
+}
 
   if (data.startsWith('showEta=')) {
     const orderId = getPostbackValue(data, 'showEta');
