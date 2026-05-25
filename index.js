@@ -40,6 +40,17 @@ const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const LIFF_ID = process.env.LIFF_ID || '';
 
+// ===== 騎士 App 登入設定 =====
+// RIDER_LIFF_ID：如果你有另外建立騎士專用 LIFF，就在 Render 環境變數設定 RIDER_LIFF_ID。
+// 如果沒有設定，就先共用原本 LIFF_ID。
+const RIDER_LIFF_ID = process.env.RIDER_LIFF_ID || LIFF_ID;
+
+// RIDER_APP_SCHEME 要跟 App 裡面的 scheme 一樣。
+// 目前 App 端會接收 ubee-rider://login?lineUserId=...
+const RIDER_APP_SCHEME = process.env.RIDER_APP_SCHEME || 'ubee-rider';
+const RIDER_APP_RETURN_URL =
+  process.env.RIDER_APP_RETURN_URL || `${RIDER_APP_SCHEME}://login`;
+
 // ===== 管理員權限名單 =====
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
   .split(',')
@@ -87,6 +98,240 @@ app.post('/webhook', line.middleware(config), async (req, res) => {
 // ✅ 健康檢查（給 UptimeRobot 用）
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
+});
+
+// ===== 騎士 App LINE 登入入口 =====
+// App 會先打開這個頁面，頁面用 LIFF 取得真正登入者的 lineUserId，
+// 再導回 App：ubee-rider://login?lineUserId=Uxxxx
+app.get('/rider-app-login', (req, res) => {
+  if (!RIDER_LIFF_ID) {
+    return res.status(500).send(`
+      <!DOCTYPE html>
+      <html lang="zh-Hant">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>UBee 騎士登入</title>
+        <style>
+          body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0f172a;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+          }
+          .card {
+            width: min(92vw, 420px);
+            background: #111827;
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.35);
+          }
+          h1 { margin: 0 0 12px; font-size: 24px; }
+          p { color: #cbd5e1; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>UBee 騎士登入設定未完成</h1>
+          <p>後端尚未設定 RIDER_LIFF_ID 或 LIFF_ID，請到 Render 環境變數確認。</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="zh-Hant">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+      <title>UBee 騎士登入</title>
+      <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+      <style>
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          min-height: 100vh;
+          background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+          color: #fff;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+        }
+
+        .card {
+          width: min(92vw, 430px);
+          background: rgba(17, 24, 39, .96);
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 28px;
+          padding: 28px;
+          box-shadow: 0 24px 70px rgba(0,0,0,.38);
+        }
+
+        .logo {
+          width: 64px;
+          height: 64px;
+          border-radius: 20px;
+          background: #facc15;
+          color: #111827;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 34px;
+          margin-bottom: 18px;
+        }
+
+        h1 {
+          margin: 0;
+          font-size: 26px;
+          line-height: 1.25;
+          font-weight: 900;
+        }
+
+        p {
+          margin: 12px 0 0;
+          color: #cbd5e1;
+          font-size: 16px;
+          line-height: 1.7;
+          font-weight: 600;
+        }
+
+        .status {
+          margin-top: 20px;
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: rgba(250, 204, 21, .12);
+          color: #fde68a;
+          font-size: 15px;
+          line-height: 1.6;
+          font-weight: 800;
+        }
+
+        .button {
+          margin-top: 22px;
+          width: 100%;
+          height: 56px;
+          border: 0;
+          border-radius: 16px;
+          background: #22c55e;
+          color: #fff;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .button.secondary {
+          background: #334155;
+          margin-top: 12px;
+        }
+
+        .small {
+          margin-top: 16px;
+          color: #94a3b8;
+          font-size: 13px;
+          line-height: 1.6;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="logo">🐝</div>
+        <h1>UBee 騎士登入</h1>
+        <p>系統正在確認你的 LINE 身分，完成後會自動回到騎士 App。</p>
+
+        <div id="status" class="status">正在啟動 LINE 登入...</div>
+
+        <button id="openAppButton" class="button" style="display:none;">回到騎士 App</button>
+        <button id="retryButton" class="button secondary" style="display:none;">重新登入</button>
+
+        <div class="small">
+          如果畫面沒有自動跳回 App，請按「回到騎士 App」。
+        </div>
+      </div>
+
+      <script>
+        const LIFF_ID = ${JSON.stringify(RIDER_LIFF_ID)};
+        const RIDER_APP_RETURN_URL = ${JSON.stringify(RIDER_APP_RETURN_URL)};
+
+        const statusEl = document.getElementById('status');
+        const openAppButton = document.getElementById('openAppButton');
+        const retryButton = document.getElementById('retryButton');
+
+        let appUrl = '';
+
+        function setStatus(text) {
+          statusEl.textContent = text;
+        }
+
+        function openApp() {
+          if (!appUrl) return;
+          window.location.href = appUrl;
+        }
+
+        async function main() {
+          try {
+            setStatus('正在初始化 LINE 登入...');
+
+            await liff.init({ liffId: LIFF_ID });
+
+            if (!liff.isLoggedIn()) {
+              setStatus('請先完成 LINE 登入...');
+              liff.login({
+                redirectUri: window.location.href
+              });
+              return;
+            }
+
+            setStatus('正在取得 LINE 騎士身分...');
+
+            const profile = await liff.getProfile();
+            const lineUserId = profile && profile.userId ? profile.userId : '';
+
+            if (!lineUserId || !lineUserId.startsWith('U')) {
+              throw new Error('無法取得 LINE userId');
+            }
+
+            appUrl =
+              RIDER_APP_RETURN_URL +
+              '?lineUserId=' +
+              encodeURIComponent(lineUserId) +
+              '&source=line';
+
+            setStatus('登入成功，正在回到 UBee 騎士 App...');
+
+            openAppButton.style.display = 'block';
+            openAppButton.onclick = openApp;
+
+            setTimeout(openApp, 600);
+          } catch (error) {
+            console.error(error);
+            setStatus('登入失敗，請重新開啟或重新登入。');
+
+            retryButton.style.display = 'block';
+            retryButton.onclick = function () {
+              window.location.reload();
+            };
+          }
+        }
+
+        main();
+      </script>
+    </body>
+    </html>
+  `);
 });
 
 app.use(express.json());
@@ -741,26 +986,6 @@ async function requireAdminPermission(event, actionText = '此操作') {
 }
 
 async function isApprovedRiderUser(userId) {
-  if (!userId) return false;
-
-  if (APPROVED_RIDER_IDS.includes(userId)) {
-    return true;
-  }
-
-  try {
-    const snap = await db
-      .collection('riders')
-      .where('userId', '==', userId)
-      .where('status', '==', 'approved')
-      .limit(1)
-      .get();
-
-    return !snap.empty;
-  } catch (err) {
-    console.error('❌ 查詢已審核騎士失敗：', err);
-    return false;
-  }
-}
 
 async function requireApprovedRider(event) {
   const userId = event.source.userId;
