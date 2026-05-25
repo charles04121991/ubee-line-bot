@@ -47,10 +47,9 @@ const RIDER_LIFF_ID = process.env.RIDER_LIFF_ID || LIFF_ID;
 
 // RIDER_APP_SCHEME 要跟 App 裡面的 scheme 一樣。
 // 目前 App 端會接收 ubee-rider://login?lineUserId=...
-const RIDER_APP_SCHEME = process.env.RIDER_APP_SCHEME || 'ubee-rider';
+const RIDER_APP_SCHEME = process.env.RIDER_APP_SCHEME || 'ubeerider';
 const RIDER_APP_RETURN_URL =
   process.env.RIDER_APP_RETURN_URL || `${RIDER_APP_SCHEME}://login`;
-
 // ===== 管理員權限名單 =====
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
   .split(',')
