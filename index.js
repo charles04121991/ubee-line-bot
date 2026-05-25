@@ -986,6 +986,23 @@ async function requireAdminPermission(event, actionText = '此操作') {
 }
 
 async function isApprovedRiderUser(userId) {
+  if (!userId) return false;
+
+  if (APPROVED_RIDER_IDS.includes(userId)) return true;
+
+  try {
+    const snap = await db.collection('riders')
+      .where('lineUserId', '==', userId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
+
+    return !snap.empty;
+  } catch (err) {
+    console.error('❌ 查詢騎士審核狀態失敗：', err);
+    return false;
+  }
+}
 
 async function requireApprovedRider(event) {
   const userId = event.source.userId;
