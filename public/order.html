@@ -17,10 +17,11 @@
       --muted2:#777;
       --line:#2a2a2a;
       --line2:#3a3a3a;
-      --accent:#fff;
-      --accentText:#000;
-      --primary:#fff;
-      --primaryText:#000;
+      --accent:#facc15;
+      --accentText:#111;
+      --primary:#facc15;
+      --primary2:#fbbf24;
+      --primaryText:#111;
       --green:#22c55e;
       --red:#ef4444;
       --radius:22px;
@@ -93,25 +94,25 @@
     }
 
     .hero-card{
-  position:relative;
-  overflow:hidden;
-  border-radius:26px;
-  padding:24px 20px;
-  margin:10px 0 18px;
-  background:
-    radial-gradient(circle at 85% 20%, rgba(255,255,255,.16), transparent 34%),
-    linear-gradient(135deg,#2a2a2a,#111 45%,#050505);
-  color:#fff;
-  min-height:210px;
-  border:1px solid rgba(255,255,255,.16);
-  box-shadow:0 18px 45px rgba(255,255,255,.05);
-}
+      position:relative;
+      overflow:hidden;
+      border-radius:26px;
+      padding:24px 20px;
+      margin:10px 0 18px;
+      background:
+        radial-gradient(circle at 85% 20%, rgba(250,204,21,.24), transparent 34%),
+        linear-gradient(135deg,#2a2a2a,#111 45%,#050505);
+      color:#fff;
+      min-height:210px;
+      border:1px solid rgba(250,204,21,.28);
+      box-shadow:0 18px 45px rgba(250,204,21,.06);
+    }
 
     .hero-kicker{
       font-size:13px;
       font-weight:1000;
       letter-spacing:1.5px;
-      opacity:.75;
+      color:var(--accent);
       margin-bottom:8px;
     }
 
@@ -126,29 +127,30 @@
     }
 
     .hero-sub{
-  font-size:14px;
-  font-weight:900;
-  color:#cfcfcf;
-  line-height:1.6;
-  margin-bottom:18px;
-  position:relative;
-  z-index:2;
-}
+      font-size:14px;
+      font-weight:900;
+      color:#cfcfcf;
+      line-height:1.6;
+      margin-bottom:18px;
+      position:relative;
+      z-index:2;
+    }
+
     .hero-btn{
-  display:inline-flex;
-  align-items:center;
-  gap:10px;
-  border:none;
-  background:#fff;
-  color:#000;
-  border-radius:999px;
-  padding:12px 20px;
-  font-size:16px;
-  font-weight:1000;
-  font-family:inherit;
-  position:relative;
-  z-index:2;
-}
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      border:none;
+      background:var(--primary);
+      color:var(--primaryText);
+      border-radius:999px;
+      padding:12px 20px;
+      font-size:16px;
+      font-weight:1000;
+      font-family:inherit;
+      position:relative;
+      z-index:2;
+    }
 
     .hero-illust{
       position:absolute;
@@ -157,7 +159,7 @@
       width:126px;
       height:126px;
       border-radius:34px;
-      background:rgba(255,255,255,.24);
+      background:rgba(250,204,21,.18);
       display:flex;
       align-items:center;
       justify-content:center;
@@ -166,31 +168,39 @@
     }
 
     .category-tabs{
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
+      display:flex;
       gap:8px;
+      overflow-x:auto;
       background:#0d0d0d;
       border:1px solid var(--line);
       border-radius:22px;
       padding:8px;
       margin-bottom:22px;
+      scrollbar-width:none;
+    }
+
+    .category-tabs::-webkit-scrollbar{
+      display:none;
     }
 
     .category-tab{
+      flex:0 0 auto;
+      min-width:88px;
       border:none;
       background:transparent;
       color:#bdbdbd;
       border-radius:16px;
-      padding:12px 6px;
+      padding:12px 10px;
       font-size:14px;
       font-weight:1000;
       font-family:inherit;
+      white-space:nowrap;
     }
 
     .category-tab.active{
-  background:#fff;
-  color:#000;
-}
+      background:var(--primary);
+      color:var(--primaryText);
+    }
 
     .section-label{
       font-size:18px;
@@ -217,10 +227,10 @@
     }
 
     .service-item.active{
-  border-color:#fff;
-  box-shadow:0 0 0 1px rgba(255,255,255,.2);
-  background:linear-gradient(180deg,#232323,#111);
-}
+      border-color:var(--accent);
+      box-shadow:0 0 0 1px rgba(250,204,21,.32);
+      background:linear-gradient(180deg,#2a2412,#111);
+    }
 
     .service-item-icon{
       font-size:28px;
@@ -573,7 +583,7 @@
       font-size:54px;
       font-weight:1000;
       color:var(--accent);
-      box-shadow:0 0 45px rgba(255,210,31,.12);
+      box-shadow:0 0 45px rgba(250,204,21,.12);
     }
 
     .success-title{
@@ -645,14 +655,19 @@
     }
 
     .btn-primary{
-  background:#fff;
-  color:#000;
-}
+      background:var(--primary);
+      color:var(--primaryText);
+    }
 
     .btn-secondary{
       background:#151515;
       color:#fff;
       border:1px solid var(--line2);
+    }
+
+    .btn-secondary.yellow-outline{
+      border-color:rgba(250,204,21,.55);
+      color:var(--accent);
     }
 
     .btn-danger{
@@ -681,7 +696,7 @@
       .service-grid-new{gap:9px;}
       .service-item{min-height:92px;}
       .service-item-title{font-size:12px;}
-      .category-tab{font-size:13px;}
+      .category-tab{font-size:13px;min-width:82px;}
     }
   </style>
 </head>
@@ -698,69 +713,29 @@
       <div class="page-count" id="pageCount">1 / 5</div>
     </div>
 
-    <!-- STEP 01 -->
     <section class="step active" id="step1">
 
       <div class="hero-card">
         <div class="hero-kicker">UBee 城市任務平台</div>
         <div class="hero-title">今天需要 UBee<br>幫你處理什麼？</div>
-        <div class="hero-sub">快速下單・專人完成・安全可靠</div>
+        <div class="hero-sub">快速下單・專人完成・生活任務一次處理</div>
         <button class="hero-btn" type="button" onclick="document.getElementById('serviceArea').scrollIntoView({behavior:'smooth'})">
           立即下單 <span>›</span>
         </button>
-        <div class="hero-illust">📦</div>
+        <div class="hero-illust">🐝</div>
       </div>
 
       <div class="category-tabs">
-  <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'support')">任務支援</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'queue')">幫排隊</button>
-</div>
+        <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'queue')">幫排隊</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'life')">生活跑腿</button>
+      </div>
 
       <div id="serviceArea" class="section-label">常用服務</div>
 
-      <div class="service-grid-new" id="serviceGrid">
-        <div class="service-item active" onclick="selectService(this, '文件急送')">
-          <div class="service-item-icon">📄</div>
-          <div class="service-item-title">文件急送</div>
-        </div>
-
-        <div class="service-item" onclick="selectService(this, '物品配送')">
-          <div class="service-item-icon">📦</div>
-          <div class="service-item-title">物品配送</div>
-        </div>
-
-        <div class="service-item" onclick="selectService(this, '商務支援')">
-          <div class="service-item-icon">🏢</div>
-          <div class="service-item-title">商務支援</div>
-        </div>
-
-        <div class="service-item" onclick="selectService(this, '急件配送')">
-  <div class="service-item-icon">⚡</div>
-  <div class="service-item-title">急件配送</div>
-</div>
-
-<div class="service-item" onclick="selectService(this, '鑰匙急送')">
-  <div class="service-item-icon">🔑</div>
-  <div class="service-item-title">鑰匙急送</div>
-</div>
-
-<div class="service-item" onclick="selectService(this, '票券文件')">
-  <div class="service-item-icon">🧾</div>
-  <div class="service-item-title">票券文件</div>
-</div>
-
-<div class="service-item" onclick="selectService(this, '禮品配送')">
-  <div class="service-item-icon">🎁</div>
-  <div class="service-item-title">禮品配送</div>
-</div>
-
-<div class="service-item" onclick="selectService(this, '指定送達')">
-  <div class="service-item-icon">📍</div>
-  <div class="service-item-title">指定送達</div>
-</div>
-      </div>
+      <div class="service-grid-new" id="serviceGrid"></div>
 
       <div class="trust-strip">
         <div class="trust-item">
@@ -782,13 +757,12 @@
 
       <div class="info-box">
         <div class="info-title">服務說明</div>
-        <div class="info-text">
-          UBee 主要協助文件急送、物品配送、商務支援、臨時任務、現場協助與指定事項。填寫資料後，系統會依距離、時間與任務速度計算預估費用。
+        <div class="info-text" id="serviceDescription">
+          UBee 協助文件急送、物品配送、代取、代買、排隊與生活跑腿。填寫資料後，系統會依距離、時間與任務速度計算預估費用。
         </div>
       </div>
     </section>
 
-    <!-- STEP 02 -->
     <section class="step" id="step2">
       <div class="headline">填寫取件與送達資訊</div>
       <div class="subtext">地址越完整，系統估價越準。</div>
@@ -797,12 +771,12 @@
         <div class="form-title">取件資訊</div>
         <div class="input-card">
           <div class="input-wrap">
-            <div class="input-icon"></div>
-            <input id="pickup" maxlength="120" placeholder="取件地址">
+            <div class="input-icon">📍</div>
+            <input id="pickup" maxlength="120" placeholder="取件地址 / 店家地址 / 任務地點">
           </div>
           <div class="input-wrap">
-            <div class="input-icon"></div>
-            <input id="pickupPhone" maxlength="20" placeholder="取件電話">
+            <div class="input-icon">☎️</div>
+            <input id="pickupPhone" maxlength="20" placeholder="取件電話 / 店家電話">
           </div>
         </div>
       </div>
@@ -811,61 +785,60 @@
         <div class="form-title">送達資訊</div>
         <div class="input-card">
           <div class="input-wrap">
-            <div class="input-icon"></div>
-            <input id="dropoff" maxlength="120" placeholder="送達地址">
+            <div class="input-icon">🏁</div>
+            <input id="dropoff" maxlength="120" placeholder="送達地址 / 交付地點">
           </div>
           <div class="input-wrap">
-            <div class="input-icon"></div>
-            <input id="dropoffPhone" maxlength="20" placeholder="送達電話">
+            <div class="input-icon">☎️</div>
+            <input id="dropoffPhone" maxlength="20" placeholder="收件電話 / 聯絡電話">
           </div>
         </div>
       </div>
 
       <div class="form-section">
-        <div class="form-title">物品資訊</div>
+        <div class="form-title">任務內容</div>
         <div class="input-card">
           <div class="input-wrap">
-            <div class="input-icon"></div>
-            <input id="item" maxlength="80" placeholder="物品內容，例如：合約、樣品、小包裹">
+            <div class="input-icon">▣</div>
+            <input id="item" maxlength="80" placeholder="例如：文件、飲料、洗衣、花束、手機貼膜">
           </div>
           <div class="input-wrap">
             <div class="input-icon">✎</div>
-            <textarea id="note" maxlength="200" placeholder="備註：如是小包裹，請先拍照上傳到官方帳號拍內容物確認"></textarea>
+            <textarea id="note" maxlength="200" placeholder="備註：請填寫品牌、數量、規格、顏色、注意事項。包裹請先拍照上傳官方帳號確認內容物。"></textarea>
           </div>
         </div>
       </div>
 
       <div id="dynamicFields">
         <div id="field-purchase" class="form-section hidden">
-          <div class="form-title">任務支援補充</div>
+          <div class="form-title" id="purchaseFieldTitle">代買補充</div>
           <div class="input-card">
             <div class="input-wrap">
-              <div class="input-icon">📋</div>
-              <input id="purchaseContent" maxlength="80" placeholder="例如：現場協助、指定事項、臨時支援">
+              <div class="input-icon">🛒</div>
+              <input id="purchaseContent" maxlength="80" placeholder="例如：珍奶 2 杯、藥局用品、手機保護貼">
             </div>
             <div class="input-wrap">
-              <div class="input-icon">📍</div>
-              <input id="purchaseStore" maxlength="120" placeholder="補充地點或任務位置">
+              <div class="input-icon">🏪</div>
+              <input id="purchaseStore" maxlength="120" placeholder="指定店家 / 可接受附近店家">
             </div>
           </div>
         </div>
 
         <div id="field-task" class="form-section hidden">
-          <div class="form-title">任務說明</div>
+          <div class="form-title" id="taskFieldTitle">任務說明</div>
           <div class="input-card">
             <div class="input-wrap">
               <div class="input-icon">✎</div>
-              <textarea id="taskContent" maxlength="200" placeholder="請描述需要 UBee 協助處理的事情"></textarea>
+              <textarea id="taskContent" maxlength="200" placeholder="請描述需要 UBee 協助處理的事情，例如排隊項目、現場注意事項、代送洗需求。"></textarea>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- STEP 03 -->
     <section class="step" id="step3">
-      <div class="headline">選擇配送速度</div>
-      <div class="subtext">依您的需求，選擇適合的配送速度。</div>
+      <div class="headline">選擇任務速度</div>
+      <div class="subtext">依您的需求，選擇適合的處理速度。</div>
 
       <div id="speedGrid">
         <div class="speed-card active" data-value="standard" onclick="selectSpeed(this, 'standard')">
@@ -901,14 +874,13 @@
         </div>
       </div>
 
-      <button class="btn btn-secondary" type="button" onclick="calculateEstimate()">先計算預估費用</button>
+      <button class="btn btn-secondary yellow-outline" type="button" onclick="calculateEstimate()">先計算預估費用</button>
 
       <div id="estimateResult" class="price-box hidden">
         <div id="estimateText"></div>
       </div>
     </section>
 
-    <!-- STEP 04 -->
     <section class="step" id="step4">
       <div class="headline">確認訂單內容</div>
       <div class="subtext">確認所有內容與金額後，即可建立任務。</div>
@@ -922,7 +894,7 @@
         <ul>
           <li>暫不承接違法物品、危險物品、管制物品。</li>
           <li>暫不承接高風險現金交付或無法確認內容的任務。</li>
-          <li>如是包裹請填寫內容物，實際抵達與現場不符，我方有權力強制取消訂單。<li>
+          <li>如是包裹請填寫內容物，實際抵達與現場不符，我方有權強制取消訂單。</li>
           <li>合作夥伴接單後取消，可能產生取消費。</li>
           <li>完成付款後才會開始派單。</li>
         </ul>
@@ -934,7 +906,6 @@
       </div>
     </section>
 
-    <!-- STEP 05 -->
     <section class="step" id="step5">
       <div class="success">
         <div class="success-icon">✓</div>
@@ -947,11 +918,11 @@
 
       <button id="createOrderBtn" class="btn btn-primary" onclick="submitOrder()" disabled>LINE 身分確認中...</button>
 
-      <button id="jkoBtn" class="btn btn-secondary hidden" onclick="selectPayment('jko')">街口支付</button>
+      <button id="jkoBtn" class="btn btn-primary hidden" onclick="selectPayment('jko')">街口支付</button>
 
       <div id="paymentInfoBox" class="payment-info hidden"></div>
 
-      <button id="paidBtn" class="btn btn-secondary hidden" onclick="confirmPaid()">我已付款</button>
+      <button id="paidBtn" class="btn btn-primary hidden" onclick="confirmPaid()">我已付款</button>
 
       <button id="cancelOrderBtn" class="btn btn-danger hidden" onclick="cancelOrder()">取消訂單</button>
 
@@ -972,6 +943,7 @@ let userId = 'web-order';
 let liffId = '';
 let currentStep = 1;
 let serviceType = '文件急送';
+let serviceGroup = 'send';
 let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
@@ -981,7 +953,68 @@ let isSubmittingOrder = false;
 let isConfirmingPaid = false;
 let isSelectingPayment = false;
 let isCancellingOrder = false;
-  
+
+const serviceDescriptions = {
+  send:'UBee 協助文件急送、物品配送、禮品配送、鑰匙急送與指定送達，適合需要快速、安全送達的任務。',
+  pickup:'UBee 協助代取包裹、文件、門市商品、醫院或學校物件，適合你不方便親自前往時使用。',
+  buy:'UBee 協助餐點、飲料、超商、藥局、生活用品、生鮮、蛋糕甜點與指定商品代買。',
+  queue:'UBee 協助一般排隊、醫院排隊、銀行排隊、機關排隊、餐廳候位、活動排隊與指定排隊。',
+  life:'UBee 協助洗衣送洗、洗鞋代送、手機貼膜、手機配件、花店、蔬果店、寵物用品與其他生活需求。'
+};
+
+const serviceGroups = {
+  send: [
+    { icon:'📄', title:'文件急送' },
+    { icon:'📦', title:'物品配送' },
+    { icon:'⚡', title:'急件配送' },
+    { icon:'🔑', title:'鑰匙急送' },
+    { icon:'🧾', title:'票券文件' },
+    { icon:'🎁', title:'禮品配送' },
+    { icon:'🏢', title:'商務配送' },
+    { icon:'📍', title:'指定送達' }
+  ],
+  pickup: [
+    { icon:'📦', title:'代取包裹' },
+    { icon:'📄', title:'代取文件' },
+    { icon:'🏢', title:'公司取件' },
+    { icon:'🏪', title:'門市取件' },
+    { icon:'🏥', title:'醫院取件' },
+    { icon:'🏫', title:'學校取件' },
+    { icon:'🔑', title:'代取鑰匙' },
+    { icon:'📍', title:'指定取件' }
+  ],
+  buy: [
+    { icon:'🍱', title:'餐點代買' },
+    { icon:'🧋', title:'飲料代買' },
+    { icon:'🏪', title:'超商代買' },
+    { icon:'💊', title:'藥局代買' },
+    { icon:'🧻', title:'生活用品' },
+    { icon:'🥬', title:'生鮮採買' },
+    { icon:'🎂', title:'蛋糕甜點' },
+    { icon:'🛒', title:'指定商品' }
+  ],
+  queue: [
+    { icon:'👥', title:'一般排隊' },
+    { icon:'🏥', title:'醫院排隊' },
+    { icon:'🏦', title:'銀行排隊' },
+    { icon:'🏛️', title:'機關排隊' },
+    { icon:'🍽️', title:'餐廳候位' },
+    { icon:'🏪', title:'門市排隊' },
+    { icon:'🎫', title:'活動排隊' },
+    { icon:'📍', title:'指定排隊' }
+  ],
+  life: [
+    { icon:'🧺', title:'洗衣送洗' },
+    { icon:'👟', title:'洗鞋代送' },
+    { icon:'📱', title:'手機貼膜' },
+    { icon:'🔌', title:'手機配件' },
+    { icon:'💐', title:'花店代買' },
+    { icon:'🥬', title:'蔬果採買' },
+    { icon:'🐾', title:'寵物用品' },
+    { icon:'✨', title:'其他生活需求' }
+  ]
+};
+
 function updateStepUI(){
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step' + currentStep).classList.add('active');
@@ -1008,18 +1041,18 @@ async function goNext(){
   }
 
   if(currentStep === 3){
-  const estimateOk = await calculateEstimate(true);
+    const estimateOk = await calculateEstimate(true);
 
-  if(!estimateOk){
-    alert('估價失敗，請確認取件地址與送達地址是否完整。');
-    return;
+    if(!estimateOk){
+      alert('估價失敗，請確認取件地址與送達地址是否完整。');
+      return;
+    }
   }
-}
 
-if(currentStep < 5){
-  currentStep++;
-  updateStepUI();
-}
+  if(currentStep < 5){
+    currentStep++;
+    updateStepUI();
+  }
 }
 
 function goPrev(){
@@ -1034,64 +1067,51 @@ function setActive(parentId, el, selector){
   el.classList.add('active');
 }
 
-function selectService(el, value){
-  setActive('serviceGrid', el, '.service-item');
-  serviceType = value;
-
+function resetDynamicFields(){
   document.getElementById('field-purchase').classList.add('hidden');
   document.getElementById('field-task').classList.add('hidden');
+}
 
-  if(value === '任務支援' || value === '現場協助' || value === '指定事項' || value === '商務支援'){
-    document.getElementById('field-purchase').classList.remove('hidden');
+function applyDynamicFields(){
+  resetDynamicFields();
+
+  const purchaseField = document.getElementById('field-purchase');
+  const taskField = document.getElementById('field-task');
+  const purchaseTitle = document.getElementById('purchaseFieldTitle');
+  const taskTitle = document.getElementById('taskFieldTitle');
+  const purchaseContent = document.getElementById('purchaseContent');
+  const purchaseStore = document.getElementById('purchaseStore');
+  const taskContent = document.getElementById('taskContent');
+
+  if(serviceGroup === 'buy'){
+    purchaseField.classList.remove('hidden');
+    purchaseTitle.innerText = '代買補充';
+    purchaseContent.placeholder = '例如：珍奶 2 杯、藥局用品、超商商品';
+    purchaseStore.placeholder = '指定店家 / 可接受附近店家';
   }
 
-  if(value === '臨時任務' || value === '幫排隊' || value === '任務協運'){
-    document.getElementById('field-task').classList.remove('hidden');
+  if(serviceGroup === 'life'){
+    purchaseField.classList.remove('hidden');
+    taskField.classList.remove('hidden');
+    purchaseTitle.innerText = '生活跑腿補充';
+    purchaseContent.placeholder = '例如：洗衣送洗、手機貼膜、花束、蔬果';
+    purchaseStore.placeholder = '指定店家，例如：洗衣店、洗鞋店、花店、蔬果店';
+    taskTitle.innerText = '生活需求說明';
+    taskContent.placeholder = '請補充規格、數量、顏色、預算、是否需來回取送。';
+  }
+
+  if(serviceGroup === 'queue'){
+    taskField.classList.remove('hidden');
+    taskTitle.innerText = '排隊任務說明';
+    taskContent.placeholder = '請說明排隊地點、項目、預計處理事項、是否需要代填資料。';
   }
 }
 
-const serviceGroups = {
-  send: [
-    { icon:'📄', title:'文件急送' },
-    { icon:'📦', title:'物品配送' },
-    { icon:'🏢', title:'商務支援' },
-    { icon:'⚡', title:'急件配送' },
-    { icon:'🔑', title:'鑰匙急送' },
-    { icon:'🧾', title:'票券文件' },
-    { icon:'🎁', title:'禮品配送' },
-    { icon:'📍', title:'指定送達' }
-  ],
-  pickup: [
-    { icon:'📦', title:'代取包裹' },
-    { icon:'📄', title:'代取文件' },
-    { icon:'🏢', title:'公司取件' },
-    { icon:'🏪', title:'門市取件' },
-    { icon:'🏥', title:'醫院取件' },
-    { icon:'🏫', title:'學校取件' },
-    { icon:'🔑', title:'代取鑰匙' },
-    { icon:'📍', title:'指定取件' }
-  ],
-  support: [
-    { icon:'🧍', title:'現場協助' },
-    { icon:'🛠️', title:'臨時任務' },
-    { icon:'🏢', title:'商務支援' },
-    { icon:'📋', title:'指定事項' },
-    { icon:'📷', title:'現場拍照' },
-    { icon:'☎️', title:'電話通知' },
-    { icon:'🛵', title:'任務協運' },
-    { icon:'🧾', title:'代辦事項' }
-  ],
-  queue: [
-    { icon:'👥', title:'一般排隊' },
-    { icon:'🏥', title:'醫院排隊' },
-    { icon:'🏦', title:'銀行排隊' },
-    { icon:'🏛️', title:'機關排隊' },
-    { icon:'🍽️', title:'餐廳候位' },
-    { icon:'🏪', title:'門市排隊' },
-    { icon:'🎫', title:'活動排隊' },
-    { icon:'📍', title:'指定排隊' }
-  ]
-};
+function selectService(el, value){
+  setActive('serviceGrid', el, '.service-item');
+  serviceType = value;
+  applyDynamicFields();
+}
 
 function renderServiceGrid(groupKey){
   const grid = document.getElementById('serviceGrid');
@@ -1104,10 +1124,10 @@ function renderServiceGrid(groupKey){
     </div>
   `).join('');
 
+  serviceGroup = groupKey;
   serviceType = list[0].title;
-
-  document.getElementById('field-purchase').classList.add('hidden');
-  document.getElementById('field-task').classList.add('hidden');
+  document.getElementById('serviceDescription').innerText = serviceDescriptions[groupKey] || serviceDescriptions.send;
+  applyDynamicFields();
 }
 
 function selectServiceFromTab(el, groupKey){
@@ -1141,12 +1161,13 @@ function getData(){
   const taskContent = document.getElementById('taskContent')?.value.trim() || '';
   const note = document.getElementById('note').value.trim();
 
-  if(purchaseContent) extra.push('任務支援：' + purchaseContent);
-  if(purchaseStore) extra.push('補充地點：' + purchaseStore);
+  if(purchaseContent) extra.push('補充內容：' + purchaseContent);
+  if(purchaseStore) extra.push('指定店家/地點：' + purchaseStore);
   if(taskContent) extra.push('任務說明：' + taskContent);
 
   return {
     serviceType,
+    serviceGroup,
     speedType,
     pickup: document.getElementById('pickup').value.trim(),
     pickupPhone: document.getElementById('pickupPhone').value.trim(),
@@ -1167,15 +1188,15 @@ function validateStep2(){
   }
 
   if(data.pickup.length < 6 || data.dropoff.length < 6){
-  alert('請輸入完整地址');
-  return false;
-}
+    alert('請輸入完整地址');
+    return false;
+  }
 
   if(data.pickup.trim() === data.dropoff.trim()){
-  alert('取件地址與送達地址不可相同');
-  return false;
-}
-  
+    alert('取件地址與送達地址不可相同');
+    return false;
+  }
+
   if(!data.pickupPhone || !data.dropoffPhone){
     alert('請輸入取件電話與送達電話');
     return false;
@@ -1183,21 +1204,21 @@ function validateStep2(){
 
   const phonePattern = /^09\d{8}$/;
 
-if(!phonePattern.test(data.pickupPhone) || !phonePattern.test(data.dropoffPhone)){
-  alert('請輸入正確手機號碼，例如：0912345678');
-  return false;
-}
-  
+  if(!phonePattern.test(data.pickupPhone) || !phonePattern.test(data.dropoffPhone)){
+    alert('請輸入正確手機號碼，例如：0912345678');
+    return false;
+  }
+
   if(!data.item){
-    alert('請輸入物品內容');
+    alert('請輸入任務內容');
     return false;
   }
 
   if(data.item.length < 2){
-  alert('請輸入完整物品內容');
-  return false;
-}
-  
+    alert('請輸入完整任務內容');
+    return false;
+  }
+
   return true;
 }
 
@@ -1220,7 +1241,7 @@ function validateData(data){
   }
 
   if(data.item.length > 80){
-    alert('物品內容過長，請縮短到 80 字內。');
+    alert('任務內容過長，請縮短到 80 字內。');
     return false;
   }
 
@@ -1257,7 +1278,7 @@ function renderConfirmSummary(){
       </div>
     </div>
     <div class="summary-row">
-      <div class="summary-icon">📍</div>
+      <div class="summary-icon">🏁</div>
       <div>
         <div class="summary-label">送達資訊</div>
         <div class="summary-value">${data.dropoff}<br>${data.dropoffPhone}</div>
@@ -1266,14 +1287,14 @@ function renderConfirmSummary(){
     <div class="summary-row">
       <div class="summary-icon">▣</div>
       <div>
-        <div class="summary-label">物品資訊(如是包裹，請協助說明內容物，人員抵達確認無誤再封箱）</div>
+        <div class="summary-label">任務內容</div>
         <div class="summary-value">${data.item}${data.note ? '<br>' + data.note.replace(/\n/g,'<br>') : ''}</div>
       </div>
     </div>
     <div class="summary-row">
       <div class="summary-icon">↯</div>
       <div>
-        <div class="summary-label">配送速度</div>
+        <div class="summary-label">任務速度</div>
         <div class="summary-value">${getSpeedLabel(speedType)}</div>
       </div>
     </div>
@@ -1318,13 +1339,14 @@ function renderSummary(order){
 async function calculateEstimate(silent){
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
-console.log('估價 pickup:', pickup);
-console.log('估價 dropoff:', dropoff);
+
+  console.log('估價 pickup:', pickup);
+  console.log('估價 dropoff:', dropoff);
 
   if(!pickup || !dropoff){
-  if(!silent) alert('請先填寫取件與送達地址');
-  return false;
-}
+    if(!silent) alert('請先填寫取件與送達地址');
+    return false;
+  }
 
   try{
     const res = await fetch('/estimate',{
@@ -1399,7 +1421,7 @@ async function submitOrder(){
     );
 
     isSubmittingOrder = false;
-    
+
   }catch(err){
     alert('❌ ' + err.message);
     isSubmittingOrder = false;
@@ -1413,11 +1435,11 @@ async function selectPayment(method){
   if(isSelectingPayment) return;
   isSelectingPayment = true;
 
-if(!currentOrderId){
-  isSelectingPayment = false;
-  alert('請先建立訂單');
-  return;
-}
+  if(!currentOrderId){
+    isSelectingPayment = false;
+    alert('請先建立訂單');
+    return;
+  }
 
   selectedPaymentMethod = method;
 
@@ -1447,7 +1469,7 @@ if(!currentOrderId){
     document.getElementById('jkoBtn').disabled = true;
 
     isSelectingPayment = false;
-    
+
   }catch(err){
     isSelectingPayment = false;
     alert('❌ ' + err.message);
@@ -1494,7 +1516,7 @@ async function confirmPaid(){
     btn.disabled = true;
     document.getElementById('cancelOrderBtn').classList.add('hidden');
     document.getElementById('jkoBtn').classList.add('hidden');
-    
+
   }catch(err){
     alert('❌ ' + err.message);
     isConfirmingPaid = false;
@@ -1506,7 +1528,7 @@ async function confirmPaid(){
 async function cancelOrder(){
   if(isCancellingOrder) return;
   isCancellingOrder = true;
-  
+
   const orderId = currentOrderId || window.currentOrderId || '';
 
   if(!orderId){
@@ -1524,9 +1546,9 @@ async function cancelOrder(){
   );
 
   if(!ok){
-  isCancellingOrder = false;
-  return;
-}
+    isCancellingOrder = false;
+    return;
+  }
 
   try{
     const res = await fetch('/cancel-order',{
@@ -1628,6 +1650,7 @@ async function initPage(){
   }
 }
 
+renderServiceGrid('send');
 updateStepUI();
 initPage();
 </script>
