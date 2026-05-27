@@ -692,12 +692,11 @@ const PRICING = {
 };
 
 const SPEED_OPTIONS = {
-  standard: { label: '標準件', time: '60–120 分鐘', fee: 0, riderText: '標準配送' },
-  priority: { label: '優先件', time: '45–60 分鐘', fee: 50, riderText: '優先配送' },
-  express: { label: '即時', time: '30–45 分鐘', fee: 100, riderText: '即時配送' },
-  rush: { label: '急件', time: '20–30 分鐘', fee: 200, riderText: '急件配送' },
+  standard: { label: '標準件', time: '60–90 分鐘', fee: 30, riderText: '標準任務' },
+  priority: { label: '快速件', time: '45–60 分鐘', fee: 50, riderText: '快速任務' },
+  express: { label: '優先件', time: '30–45 分鐘', fee: 80, riderText: '優先任務' },
+  rush: { label: '急件', time: '20–30 分鐘', fee: 150, riderText: '急件任務' },
 };
-
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
 const orders = {};
@@ -867,13 +866,14 @@ function isOrderCustomer(event, order) {
 }
 
 const ORDER_INPUT_LIMITS = {
-  serviceType: 20,
+  serviceType: 30,
+  serviceGroup: 30,
   item: 80,
   pickupAddress: 120,
   pickupPhone: 20,
   dropoffAddress: 120,
   dropoffPhone: 20,
-  note: 200,
+  note: 300,
 };
 
 const DUPLICATE_ORDER_WINDOW_MS = 90 * 1000;
@@ -933,6 +933,8 @@ function validateOrderInput(data) {
 function getDuplicateFingerprint(data) {
   return [
     String(data.userId || '').trim(),
+    String(data.serviceGroup || '').trim(),
+    String(data.serviceType || '').trim(),
     normalizeAddress(data.pickupAddress),
     normalizeAddress(data.dropoffAddress),
     String(data.pickupPhone || '').trim(),
@@ -1748,10 +1750,22 @@ function createFinanceFlex(order) {
 function createOrderFromApi(data) {
   const userId = cleanText(data.userId || data.customerId || '', 80);
 
+  const serviceGroupMap = {
+    send: '幫我送',
+    pickup: '幫我取',
+    buy: '幫代買',
+    queue: '幫排隊',
+    life: '生活跑腿',
+  };
+
+  const rawServiceGroup = cleanText(data.serviceGroup || '', ORDER_INPUT_LIMITS.serviceGroup);
+  const serviceGroupLabel = serviceGroupMap[rawServiceGroup] || rawServiceGroup || '';
+
   return {
     userId,
     customerId: userId,
-    serviceType: cleanText(data.serviceType || data.service || '個人物品', ORDER_INPUT_LIMITS.serviceType),
+    serviceGroup: serviceGroupLabel,
+    serviceType: cleanText(data.serviceType || data.service || '生活跑腿', ORDER_INPUT_LIMITS.serviceType),
     item: cleanText(data.item || '', ORDER_INPUT_LIMITS.item),
     pickupAddress: cleanText(data.pickup || data.pickupAddress || '', ORDER_INPUT_LIMITS.pickupAddress),
     pickupPhone: normalizePhone(cleanText(data.pickupPhone || '', ORDER_INPUT_LIMITS.pickupPhone)),
@@ -1763,7 +1777,6 @@ function createOrderFromApi(data) {
     note: cleanLongText(data.note || '', ORDER_INPUT_LIMITS.note),
   };
 }
-
 app.get('/api/config', (req, res) => {
   res.json({
     success: true,
@@ -1981,6 +1994,7 @@ app.post('/api/orders', async (req, res) => {
       customerId: data.customerId,
       riderId: '',
       status: 'pending_payment',
+      serviceGroup: data.serviceGroup,
       serviceType: data.serviceType,
       item: data.item,
       pickupAddress: data.pickupAddress,
