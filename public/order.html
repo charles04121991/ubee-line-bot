@@ -168,34 +168,27 @@
     }
 
     .category-tabs{
-      display:flex;
-      gap:8px;
-      overflow-x:auto;
-      background:#0d0d0d;
-      border:1px solid var(--line);
-      border-radius:22px;
-      padding:8px;
-      margin-bottom:22px;
-      scrollbar-width:none;
-    }
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:6px;
+  background:#0d0d0d;
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:8px;
+  margin-bottom:22px;
+}
 
-    .category-tabs::-webkit-scrollbar{
-      display:none;
-    }
-
-    .category-tab{
-      flex:0 0 auto;
-      min-width:88px;
-      border:none;
-      background:transparent;
-      color:#bdbdbd;
-      border-radius:16px;
-      padding:12px 10px;
-      font-size:14px;
-      font-weight:1000;
-      font-family:inherit;
-      white-space:nowrap;
-    }
+.category-tab{
+  border:none;
+  background:transparent;
+  color:#bdbdbd;
+  border-radius:16px;
+  padding:11px 4px;
+  font-size:12px;
+  font-weight:1000;
+  font-family:inherit;
+  white-space:nowrap;
+}
 
     .category-tab.active{
       background:var(--primary);
@@ -696,7 +689,7 @@
       .service-grid-new{gap:9px;}
       .service-item{min-height:92px;}
       .service-item-title{font-size:12px;}
-      .category-tab{font-size:13px;min-width:82px;}
+      .category-tab{font-size:11px;padding:10px 2px;}
     }
   </style>
 </head>
