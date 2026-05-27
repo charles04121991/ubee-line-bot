@@ -615,45 +615,13 @@ app.post('/api/business/register', async (req, res) => {
     if (!companyName || !contactName || !phone || !district || !needType || !frequency || !deliveryArea) {
       return res.status(400).json({
         success: false,
-        message: '資料不完整，請確認公司名稱、聯絡人、手機、LINE ID、所在區域與需求資料都有填寫。',
+        message: '資料不完整，請確認公司名稱、聯絡人、手機、所在區域與需求資料都有填寫。',
       });
     }
 
-const businessLineUserId = cleanText(req.body.lineUserId || req.body.userId || '', 80);
+    const businessLineUserId = cleanText(req.body.lineUserId || req.body.userId || '', 80);
 
-// ===== 防止重複送出合作申請 =====
-const existingBusiness = await db.collection('businessApplications')
-  .where('lineUserId', '==', businessLineUserId)
-  .limit(1)
-  .get();
-
-if (businessLineUserId && !existingBusiness.empty) {
-  const businessDoc = existingBusiness.docs[0];
-  const businessData = businessDoc.data();
-
-  await pushToGroup(
-  LINE_ADMIN_GROUP_ID,
-  createBusinessReviewFlex({
-    ...businessData,
-    businessId: businessDoc.id,
-  })
-);
-
-  return res.json({
-    success: false,
-    duplicate: true,
-    alreadyExists: true,
-    message:
-      businessData.status === 'approved'
-        ? '你的商務合作已通過審核。'
-        : '你的合作資料已送出，請等待 UBee 審核。',
-  });
-}
-
-    const businessId = 'B' + Date.now();
-
-    const business = {
-      businessId,
+    const businessPayload = {
       companyName: cleanText(companyName, 80),
       contactName: cleanText(contactName, 40),
       phone: normalizePhone(phone),
@@ -666,6 +634,50 @@ if (businessLineUserId && !existingBusiness.empty) {
       note: cleanLongText(note || '', 300),
       lineUserId: businessLineUserId,
       status: 'pending',
+      updatedAt: new Date().toLocaleString('zh-TW'),
+      updatedAtMs: Date.now(),
+    };
+
+    let businessId = '';
+
+    if (businessLineUserId) {
+      const existingBusiness = await db.collection('businessApplications')
+        .where('lineUserId', '==', businessLineUserId)
+        .limit(1)
+        .get();
+
+      if (!existingBusiness.empty) {
+        const businessDoc = existingBusiness.docs[0];
+        businessId = businessDoc.id;
+
+        const updatedBusiness = {
+          ...businessDoc.data(),
+          ...businessPayload,
+          businessId,
+          resubmittedAt: new Date().toLocaleString('zh-TW'),
+          resubmittedAtMs: Date.now(),
+        };
+
+        await db.collection('businessApplications').doc(businessId).set(updatedBusiness, { merge: true });
+
+        console.log('🏢 店家合作重新送出，已更新最新資料：', updatedBusiness);
+
+        await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(updatedBusiness));
+
+        return res.json({
+          success: true,
+          updated: true,
+          businessId,
+          message: '合作需求已重新送出，UBee 將會依最新資料進行審核。',
+        });
+      }
+    }
+
+    businessId = 'B' + Date.now();
+
+    const business = {
+      businessId,
+      ...businessPayload,
       createdAt: new Date().toLocaleString('zh-TW'),
       createdAtMs: Date.now(),
     };
@@ -676,7 +688,7 @@ if (businessLineUserId && !existingBusiness.empty) {
 
     await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(business));
 
-    res.json({
+    return res.json({
       success: true,
       businessId,
       message: '合作需求已送出，UBee 將會進行審核與評估。',
@@ -685,7 +697,7 @@ if (businessLineUserId && !existingBusiness.empty) {
   } catch (err) {
     console.error('❌ 商務合作申請失敗：', err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: '合作需求送出失敗，請稍後再試。',
     });
