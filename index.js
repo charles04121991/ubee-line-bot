@@ -628,17 +628,27 @@ const existingBusiness = await db.collection('businessApplications')
   .get();
 
 if (businessLineUserId && !existingBusiness.empty) {
-  const businessData = existingBusiness.docs[0].data();
+  const businessDoc = existingBusiness.docs[0];
+  const businessData = businessDoc.data();
+
+  await pushToGroup(LINE_ADMIN_GROUP_ID, createTextMessage(
+    `📌 店家合作重複送出通知\n\n` +
+    `公司 / 店家：${businessData.companyName || companyName}\n` +
+    `聯絡人：${businessData.contactName || contactName}\n` +
+    `手機：${businessData.phone || phone}\n` +
+    `目前狀態：${businessData.status === 'approved' ? '已通過審核' : '等待審核'}\n\n` +
+    `此店家已存在於商務合作資料中。`
+  ));
 
   return res.json({
-  success: false,
-  duplicate: true,
-  alreadyExists: true,
-  message:
-    businessData.status === 'approved'
-      ? '你的商務合作已通過審核。'
-      : '你的合作資料已送出，請等待 UBee 審核。',
-});
+    success: false,
+    duplicate: true,
+    alreadyExists: true,
+    message:
+      businessData.status === 'approved'
+        ? '你的商務合作已通過審核。'
+        : '你的合作資料已送出，請等待 UBee 審核。',
+  });
 }
 
     const businessId = 'B' + Date.now();
