@@ -65,6 +65,7 @@ const PAYMENT_JKO_INFO =
 const PAYMENT_BANK_INFO =
   (process.env.PAYMENT_BANK_INFO || '銀行轉帳\n銀行：請填入銀行名稱\n帳號：請填入銀行帳號\n戶名：請填入戶名').replace(/\\n/g, '\n');
 
+const MERCHANT_OA_LINK = process.env.MERCHANT_OA_LINK || 'https://lin.ee/uA2vLYZ';
 const BUSINESS_FORM_URL =
   process.env.BUSINESS_FORM_URL ||
   'https://docs.google.com/forms/d/e/1FAIpQLScn9AGnp4FbTGg6fZt5fpiMdNEi-yL9x595bTyVFHAoJmpYlA/viewform';
@@ -2451,6 +2452,12 @@ if (data.startsWith('business_approve:')) {
 `🎉 您的 UBee 商務合作申請已通過初步審核
 
 公司 / 店家：${business.companyName}
+
+請先加入 UBee 店家官方帳號：
+${MERCHANT_OA_LINK}
+
+加入後請傳送：
+我是店家｜${business.companyName}
 
 UBee 辦公室將會再依照您的需求，
 主動與您聯繫並安排後續合作內容。
