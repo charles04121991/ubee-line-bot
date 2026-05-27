@@ -631,14 +631,13 @@ if (businessLineUserId && !existingBusiness.empty) {
   const businessDoc = existingBusiness.docs[0];
   const businessData = businessDoc.data();
 
-  await pushToGroup(LINE_ADMIN_GROUP_ID, createTextMessage(
-    `📌 店家合作重複送出通知\n\n` +
-    `公司 / 店家：${businessData.companyName || companyName}\n` +
-    `聯絡人：${businessData.contactName || contactName}\n` +
-    `手機：${businessData.phone || phone}\n` +
-    `目前狀態：${businessData.status === 'approved' ? '已通過審核' : '等待審核'}\n\n` +
-    `此店家已存在於商務合作資料中。`
-  ));
+  await pushToGroup(
+  LINE_ADMIN_GROUP_ID,
+  createBusinessReviewFlex({
+    ...businessData,
+    businessId: businessDoc.id,
+  })
+);
 
   return res.json({
     success: false,
