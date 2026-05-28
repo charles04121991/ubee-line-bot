@@ -808,10 +808,10 @@ const PRICING = {
 };
 
 const SPEED_OPTIONS = {
-  standard: { label: '標準件', time: '60–90 分鐘', fee: 30, riderText: '標準任務' },
-  priority: { label: '快速件', time: '45–60 分鐘', fee: 50, riderText: '快速任務' },
-  express: { label: '優先件', time: '30–45 分鐘', fee: 80, riderText: '優先任務' },
-  rush: { label: '急件', time: '20–30 分鐘', fee: 150, riderText: '急件任務' },
+  standard: { label: '標準件', time: '60–90 分鐘', fee: 15, riderText: '標準任務' },
+  priority: { label: '快速件', time: '45–60 分鐘', fee: 20, riderText: '快速任務' },
+  express: { label: '優先件', time: '30–45 分鐘', fee: 60, riderText: '優先任務' },
+  rush: { label: '急件', time: '20–30 分鐘', fee: 100, riderText: '急件任務' },
 };
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
