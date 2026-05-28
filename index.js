@@ -626,6 +626,11 @@ app.post('/api/rider/status', async (req, res) => {
 );
 
 if (!riderOk) {
+  return res.status(403).json({
+    success: false,
+    message: '騎手尚未審核通過，無法上線。',
+  });
+}
 
     const riderDoc = snap.docs[0];
     const rider = riderDoc.data();
