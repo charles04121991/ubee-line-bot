@@ -377,22 +377,30 @@ app.get('/api/rider/profile', async (req, res) => {
 // 2. 取得可接任務
 app.get('/api/rider/tasks', async (req, res) => {
   try {
-    const snap = await db.collection('orders')
+    const snap = await db
+      .collection('orders')
       .where('status', '==', 'pending_dispatch')
-      .orderBy('createdAt', 'desc')
       .limit(30)
       .get();
 
-    const tasks = snap.docs.map(doc => ({
+    const orders = snap.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
 
-    return res.json({ tasks });
+    return res.json({
+      success: true,
+      orders,
+      tasks: orders
+    });
 
   } catch (err) {
     console.error('取得可接任務失敗:', err);
-    return res.status(500).json({ message: '取得可接任務失敗' });
+    return res.status(500).json({
+      success: false,
+      message: '取得可接任務失敗',
+      error: err.message
+    });
   }
 });
 
