@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>UBee｜建立任務</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
@@ -27,15 +27,43 @@
       --radius:22px;
     }
 
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    html{scroll-behavior:smooth;}
+    *{
+      box-sizing:border-box;
+      -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
+    }
+
+    html{
+      scroll-behavior:smooth;
+      width:100%;
+      min-height:100%;
+      overflow-x:hidden;
+      -webkit-text-size-adjust:100%;
+      touch-action:manipulation;
+      overscroll-behavior:none;
+    }
+
     body{
       margin:0;
+      width:100%;
+      min-height:100vh;
       background:var(--bg);
       color:var(--text);
       font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
       overflow-x:hidden;
       -webkit-text-size-adjust:100%;
+      touch-action:manipulation;
+      overscroll-behavior:none;
+      position:relative;
+    }
+
+    input,
+    textarea,
+    select,
+    button{
+      font-size:16px !important;
+      -webkit-text-size-adjust:100%;
+      touch-action:manipulation;
     }
 
     .app{
@@ -45,6 +73,7 @@
       margin:0 auto;
       padding:20px 16px 34px;
       background:#000;
+      overflow-x:hidden;
     }
 
     .topbar{
@@ -931,6 +960,31 @@
   </div>
 
 <script>
+document.addEventListener('gesturestart', function(e){
+  e.preventDefault();
+});
+
+document.addEventListener('gesturechange', function(e){
+  e.preventDefault();
+});
+
+document.addEventListener('gestureend', function(e){
+  e.preventDefault();
+});
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(e){
+  const now = Date.now();
+  if(now - lastTouchEnd <= 300){
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, { passive:false });
+
+document.addEventListener('dblclick', function(e){
+  e.preventDefault();
+}, { passive:false });
+
 let userId = 'web-order';
 let liffId = '';
 let currentStep = 1;
