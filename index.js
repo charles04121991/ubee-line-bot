@@ -2264,17 +2264,21 @@ app.post('/api/rider/accept-order', async (req, res) => {
     }
 
     const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .where('status', '==', 'approved')
-      .limit(1)
-      .get();
+  .where('lineUserId', '==', lineUserId)
+  .limit(1)
+  .get();
 
-    if (riderSnap.empty) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法接單。',
-      });
-    }
+const riderOk = !riderSnap.empty && (
+  riderSnap.docs[0].data().approved === true ||
+  riderSnap.docs[0].data().status === 'approved'
+);
+
+if (!riderOk) {
+  return res.status(403).json({
+    success: false,
+    message: '你尚未通過 UBee 騎士審核，暫時無法接單。',
+  });
+}
 
     const riderDoc = riderSnap.docs[0];
     const rider = riderDoc.data();
@@ -2403,17 +2407,21 @@ app.post('/api/rider/update-order-status', async (req, res) => {
     }
 
     const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .where('status', '==', 'approved')
-      .limit(1)
-      .get();
+  .where('lineUserId', '==', lineUserId)
+  .limit(1)
+  .get();
 
-    if (riderSnap.empty) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法更新任務。',
-      });
-    }
+const riderOk = !riderSnap.empty && (
+  riderSnap.docs[0].data().approved === true ||
+  riderSnap.docs[0].data().status === 'approved'
+);
+
+if (!riderOk) {
+  return res.status(403).json({
+    success: false,
+    message: '你尚未通過 UBee 騎士審核，暫時無法更新任務。',
+  });
+}
 
     const riderDoc = riderSnap.docs[0];
     const riderRef = db.collection('riders').doc(riderDoc.id);
