@@ -168,27 +168,27 @@
     }
 
     .category-tabs{
-  display:grid;
-  grid-template-columns:repeat(5,1fr);
-  gap:6px;
-  background:#0d0d0d;
-  border:1px solid var(--line);
-  border-radius:22px;
-  padding:8px;
-  margin-bottom:22px;
-}
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:6px;
+      background:#0d0d0d;
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:8px;
+      margin-bottom:22px;
+    }
 
-.category-tab{
-  border:none;
-  background:transparent;
-  color:#bdbdbd;
-  border-radius:16px;
-  padding:11px 4px;
-  font-size:12px;
-  font-weight:1000;
-  font-family:inherit;
-  white-space:nowrap;
-}
+    .category-tab{
+      border:none;
+      background:transparent;
+      color:#bdbdbd;
+      border-radius:16px;
+      padding:11px 4px;
+      font-size:12px;
+      font-weight:1000;
+      font-family:inherit;
+      white-space:nowrap;
+    }
 
     .category-tab.active{
       background:var(--primary);
@@ -710,8 +710,8 @@
 
       <div class="hero-card">
         <div class="hero-kicker">UBee 城市任務平台</div>
-        <div class="hero-title">今天需要 UBee<br>幫你處理什麼？</div>
-        <div class="hero-sub">快速下單・專人完成・生活任務一次處理</div>
+        <div class="hero-title">今天需要 UBee<br>幫你做什麼？</div>
+        <div class="hero-sub">快速下單・專人完成・安全可靠</div>
         <button class="hero-btn" type="button" onclick="document.getElementById('serviceArea').scrollIntoView({behavior:'smooth'})">
           立即下單 <span>›</span>
         </button>
@@ -722,7 +722,6 @@
         <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
         <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
         <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
-        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'queue')">幫排隊</button>
         <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'life')">生活跑腿</button>
       </div>
 
@@ -751,7 +750,7 @@
       <div class="info-box">
         <div class="info-title">服務說明</div>
         <div class="info-text" id="serviceDescription">
-          UBee 協助文件急送、物品配送、代取、代買、排隊與生活跑腿。填寫資料後，系統會依距離、時間與任務速度計算預估費用。
+          UBee 協助文件急送、物品配送、代取、代買與生活跑腿。填寫資料後，系統會依距離、時間與任務速度計算預估費用。
         </div>
       </div>
     </section>
@@ -793,7 +792,7 @@
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon">▣</div>
-            <input id="item" maxlength="80" placeholder="例如：文件、飲料、洗衣、花束、手機貼膜">
+            <input id="item" maxlength="80" placeholder="例如：文件、飲料、包裹、洗衣、排隊、手機貼膜">
           </div>
           <div class="input-wrap">
             <div class="input-icon">✎</div>
@@ -822,7 +821,7 @@
           <div class="input-card">
             <div class="input-wrap">
               <div class="input-icon">✎</div>
-              <textarea id="taskContent" maxlength="200" placeholder="如是小包裹，請先拍照上傳到官方帳號拍內容物確認"></textarea>
+              <textarea id="taskContent" maxlength="200" placeholder="請補充任務細節、規格、數量、預算、等待時間或特殊注意事項。"></textarea>
             </div>
           </div>
         </div>
@@ -839,7 +838,7 @@
             <div class="speed-name">標準件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">彈性安排｜60–90 分鐘｜+NT$30</div>
+          <div class="speed-desc">彈性安排｜60–90 分鐘｜+NT$15</div>
         </div>
 
         <div class="speed-card" data-value="priority" onclick="selectSpeed(this, 'priority')">
@@ -847,7 +846,7 @@
             <div class="speed-name">快速件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">即時媒合｜45–60 分鐘｜+NT$50</div>
+          <div class="speed-desc">即時媒合｜45–60 分鐘｜+NT$20</div>
         </div>
 
         <div class="speed-card" data-value="express" onclick="selectSpeed(this, 'express')">
@@ -855,7 +854,7 @@
             <div class="speed-name">優先件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">優先處理｜30–45 分鐘｜+NT$80</div>
+          <div class="speed-desc">優先處理｜30–45 分鐘｜+NT$60</div>
         </div>
 
         <div class="speed-card" data-value="rush" onclick="selectSpeed(this, 'rush')">
@@ -863,7 +862,7 @@
             <div class="speed-name">急件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">最高優先｜20–30 分鐘｜+NT$150</div>
+          <div class="speed-desc">最高優先｜20–30 分鐘｜+NT$100</div>
         </div>
       </div>
 
@@ -948,11 +947,10 @@ let isSelectingPayment = false;
 let isCancellingOrder = false;
 
 const serviceDescriptions = {
-  send:'UBee 協助文件急送、物品配送、禮品配送、鑰匙急送與指定送達，適合需要快速、安全送達的任務。',
-  pickup:'UBee 協助代取包裹、文件、門市商品、醫院或學校物件，適合你不方便親自前往時使用。',
+  send:'UBee 協助文件急送、物品配送、急件配送、鑰匙急送、商務配送與指定送達，適合需要快速、安全送達的任務。',
+  pickup:'UBee 協助代取包裹、代取文件、公司取件、門市取件、醫院取件、學校取件與指定取件，適合你不方便親自前往時使用。',
   buy:'UBee 協助餐點、飲料、超商、藥局、生活用品、生鮮、蛋糕甜點與指定商品代買。',
-  queue:'UBee 協助一般排隊、醫院排隊、銀行排隊、機關排隊、餐廳候位、活動排隊與指定排隊。',
-  life:'UBee 協助洗衣送洗、洗鞋代送、手機貼膜、手機配件、花店、蔬果店、寵物用品與其他生活需求。'
+  life:'UBee 協助一般排隊、醫院排隊、銀行排隊、餐廳候位、洗衣送洗、洗鞋代送、手機貼膜與其他生活需求。'
 };
 
 const serviceGroups = {
@@ -986,24 +984,14 @@ const serviceGroups = {
     { icon:'🎂', title:'蛋糕甜點' },
     { icon:'🛒', title:'指定商品' }
   ],
-  queue: [
+  life: [
     { icon:'👥', title:'一般排隊' },
     { icon:'🏥', title:'醫院排隊' },
     { icon:'🏦', title:'銀行排隊' },
-    { icon:'🏛️', title:'機關排隊' },
     { icon:'🍽️', title:'餐廳候位' },
-    { icon:'🏪', title:'門市排隊' },
-    { icon:'🎫', title:'活動排隊' },
-    { icon:'📍', title:'指定排隊' }
-  ],
-  life: [
     { icon:'🧺', title:'洗衣送洗' },
     { icon:'👟', title:'洗鞋代送' },
     { icon:'📱', title:'手機貼膜' },
-    { icon:'🔌', title:'手機配件' },
-    { icon:'💐', title:'花店代買' },
-    { icon:'🥬', title:'蔬果採買' },
-    { icon:'🐾', title:'寵物用品' },
     { icon:'✨', title:'其他生活需求' }
   ]
 };
@@ -1087,16 +1075,10 @@ function applyDynamicFields(){
     purchaseField.classList.remove('hidden');
     taskField.classList.remove('hidden');
     purchaseTitle.innerText = '生活跑腿補充';
-    purchaseContent.placeholder = '例如：洗衣送洗、手機貼膜、花束、蔬果';
-    purchaseStore.placeholder = '指定店家，例如：洗衣店、洗鞋店、花店、蔬果店';
+    purchaseContent.placeholder = '例如：排隊、洗衣、洗鞋、手機貼膜、其他需求';
+    purchaseStore.placeholder = '指定店家 / 指定地點 / 可接受附近店家';
     taskTitle.innerText = '生活需求說明';
-    taskContent.placeholder = '請補充規格、數量、顏色、預算、是否需來回取送。';
-  }
-
-  if(serviceGroup === 'queue'){
-    taskField.classList.remove('hidden');
-    taskTitle.innerText = '排隊任務說明';
-    taskContent.placeholder = '請說明排隊地點、項目、預計處理事項、是否需要代填資料。';
+    taskContent.placeholder = '請補充規格、數量、顏色、預算、等待時間、是否需來回取送。';
   }
 }
 
@@ -1305,10 +1287,10 @@ function renderConfirmSummary(){
 
 function getSpeedLabel(value){
   const map = {
-    standard:'標準件｜60–90 分鐘｜+NT$30',
-    priority:'快速件｜45–60 分鐘｜+NT$50',
-    express:'優先件｜30–45 分鐘｜+NT$80',
-    rush:'急件｜20–30 分鐘｜+NT$150'
+    standard:'標準件｜60–90 分鐘｜+NT$15',
+    priority:'快速件｜45–60 分鐘｜+NT$20',
+    express:'優先件｜30–45 分鐘｜+NT$60',
+    rush:'急件｜20–30 分鐘｜+NT$100'
   };
   return map[value] || value;
 }
