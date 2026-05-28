@@ -1811,6 +1811,7 @@ app.get('/api/config', (req, res) => {
   res.json({
     success: true,
     liffId: LIFF_ID,
+    riderLiffId: RIDER_LIFF_ID,
     businessFormUrl: BUSINESS_FORM_URL,
     partnerFormUrl: PARTNER_FORM_URL,
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
