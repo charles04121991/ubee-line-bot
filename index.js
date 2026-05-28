@@ -19,6 +19,30 @@ const db = admin.firestore();
 
 const app = express();
 
+// ===== CORS：允許 UBee 騎士前端正式站呼叫 Render 後端 =====
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'https://ubee-rider-web.vercel.app',
+    'https://ubee-line-bot-2-zezw.onrender.com',
+  ];
+
+  const origin = req.headers.origin;
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.CHANNEL_SECRET,
