@@ -374,9 +374,31 @@ app.get('/api/rider/profile', async (req, res) => {
   }
 });
 
-// 2. 取得可接任務
+// 2. 取得可接任務：正式版只允許 approved 騎士查看
 app.get('/api/rider/tasks', async (req, res) => {
   try {
+    const { lineUserId } = req.query;
+
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的騎士 LINE 身分。',
+      });
+    }
+
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
+
+    if (riderSnap.empty) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法查看任務。',
+      });
+    }
+
     const snap = await db
       .collection('orders')
       .where('status', '==', 'pending_dispatch')
@@ -2193,27 +2215,37 @@ app.post('/api/rider-distance-to-pickup', async (req, res) => {
   }
 });
 
+// 3. 接受任務：正式版 approved 騎士才可接單，並防止多人搶同一單
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
     const { orderId, lineUserId } = req.body;
 
-    if (!orderId || !lineUserId) {
+    if (!orderId || !lineUserId || !String(lineUserId).startsWith('U')) {
       return res.status(400).json({
         success: false,
-        error: '缺少訂單編號或騎士 LINE 身分',
+        message: '缺少訂單編號或正確的騎士 LINE 身分。',
       });
     }
 
-    const approved = await isApprovedRiderUser(lineUserId);
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
 
-    if (!approved) {
+    if (riderSnap.empty) {
       return res.status(403).json({
         success: false,
-        error: '你尚未通過 UBee 騎士審核，暫時無法接單。',
+        message: '你尚未通過 UBee 騎士審核，暫時無法接單。',
       });
     }
 
+    const riderDoc = riderSnap.docs[0];
+    const rider = riderDoc.data();
+
     const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+    const riderRef = db.collection('riders').doc(riderDoc.id);
+
     let acceptedOrder = null;
 
     await db.runTransaction(async (transaction) => {
@@ -2225,33 +2257,52 @@ app.post('/api/rider/accept-order', async (req, res) => {
 
       const order = orderDoc.data();
 
-      if (isTerminalOrderStatus(order)) {
-        throw new Error('ORDER_TERMINAL');
-      }
-
       if (order.status !== 'pending_dispatch') {
         throw new Error('ORDER_ALREADY_ACCEPTED');
       }
 
-      order.riderId = lineUserId;
-      order.status = 'accepted';
-      order.acceptedAt = Date.now();
+      acceptedOrder = {
+        ...order,
+        id: String(orderId).toUpperCase(),
+        status: 'accepted',
+        riderId: lineUserId,
+        riderLineUserId: lineUserId,
+        riderName: rider.name || '',
+        riderPhone: rider.phone || '',
+      };
 
-      transaction.set(orderRef, order, { merge: true });
+      transaction.update(orderRef, {
+        status: 'accepted',
+        riderId: lineUserId,
+        riderLineUserId: lineUserId,
+        riderName: rider.name || '',
+        riderPhone: rider.phone || '',
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-      acceptedOrder = order;
+      transaction.set(riderRef, {
+        busy: true,
+        currentOrderId: String(orderId).toUpperCase(),
+        lastActive: Date.now(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
     });
 
-    orders[acceptedOrder.id] = acceptedOrder;
+    orders[String(orderId).toUpperCase()] = acceptedOrder;
 
     await notifyCustomer(
       acceptedOrder,
-      createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快設定抵達取件時間。`)
+      createTextMessage(
+        `🟢 UBee 騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快前往取件。`
+      )
     );
 
     return res.json({
       success: true,
-      orderId: acceptedOrder.id,
+      orderId: String(orderId).toUpperCase(),
+      status: 'accepted',
       message: '接單成功',
     });
 
@@ -2261,108 +2312,189 @@ app.post('/api/rider/accept-order', async (req, res) => {
     if (error.message === 'ORDER_NOT_FOUND') {
       return res.status(404).json({
         success: false,
-        error: '找不到此訂單',
+        message: '找不到此訂單。',
       });
     }
 
     if (error.message === 'ORDER_ALREADY_ACCEPTED') {
       return res.status(409).json({
         success: false,
-        error: '此訂單已被其他騎士接走',
-      });
-    }
-
-    if (error.message === 'ORDER_TERMINAL') {
-      return res.status(400).json({
-        success: false,
-        error: '此訂單已完成或已取消，無法接單。',
+        message: '此訂單已被其他騎士接走。',
       });
     }
 
     return res.status(500).json({
       success: false,
-      error: '接單失敗，請稍後再試。',
+      message: '接單失敗，請稍後再試。',
     });
   }
 });
 
 // ===== 騎士更新任務狀態 API =====
+// 4. 更新任務狀態：正式版只允許接單本人更新
 app.post('/api/rider/update-order-status', async (req, res) => {
   try {
-    const { orderId, lineUserId, riderId, status } = req.body;
+    const { orderId, status, lineUserId } = req.body;
 
-    if (!orderId || !(lineUserId || riderId) || !status) {
-  return res.status(400).json({
-    success: false,
-    error: '缺少訂單編號、騎士 LINE 身分或任務狀態',
-  });
-}
-    const order = await getOrder(orderId);
-
-    if (!order) {
-      return res.status(404).json({
+    if (!orderId || !status || !lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
         success: false,
-        error: '找不到此訂單',
-      });
-    }
-
-    if (order.riderId !== (lineUserId || riderId)) {
-      return res.status(403).json({
-        success: false,
-        error: '只有接單騎士可以更新此任務狀態',
+        message: '缺少訂單編號、任務狀態或騎士 LINE 身分。',
       });
     }
 
     const allowedFlow = {
       accepted: ['arrived_pickup'],
+      going_to_pickup: ['arrived_pickup'],
       arrived_pickup: ['picked_up'],
       picked_up: ['arrived_dropoff'],
+      going_to_dropoff: ['arrived_dropoff'],
       arrived_dropoff: ['completed'],
     };
 
-    const nextStatuses = allowedFlow[order.status] || [];
+    const allowedStatus = [
+      'arrived_pickup',
+      'picked_up',
+      'arrived_dropoff',
+      'completed',
+    ];
 
-    if (!nextStatuses.includes(status)) {
+    if (!allowedStatus.includes(status)) {
       return res.status(400).json({
         success: false,
-        error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不能更新為「${getStatusLabel(status)}」`,
+        message: '不允許的任務狀態。',
       });
     }
 
-    const timeFieldMap = {
-      arrived_pickup: 'arrivedPickupAt',
-      picked_up: 'pickedUpAt',
-      arrived_dropoff: 'arrivedDropoffAt',
-      completed: 'completedAt',
-    };
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .where('status', '==', 'approved')
+      .limit(1)
+      .get();
 
-    order.status = status;
-    order[timeFieldMap[status]] = Date.now();
+    if (riderSnap.empty) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法更新任務。',
+      });
+    }
 
-    await saveOrder(order);
+    const riderDoc = riderSnap.docs[0];
+    const riderRef = db.collection('riders').doc(riderDoc.id);
+    const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+
+    let updatedOrder = null;
+
+    await db.runTransaction(async (transaction) => {
+      const orderDoc = await transaction.get(orderRef);
+
+      if (!orderDoc.exists) {
+        throw new Error('ORDER_NOT_FOUND');
+      }
+
+      const order = orderDoc.data();
+      const currentStatus = order.status;
+
+      if (order.riderId !== lineUserId && order.riderLineUserId !== lineUserId) {
+        throw new Error('NOT_THIS_RIDER');
+      }
+
+      const nextStatuses = allowedFlow[currentStatus] || [];
+
+      if (!nextStatuses.includes(status)) {
+        throw new Error('INVALID_TRANSITION');
+      }
+
+      const updateData = {
+        status,
+        riderStatus: status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        [`statusTimes.${status}`]: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (status === 'arrived_pickup') {
+        updateData.arrivedPickupAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      if (status === 'picked_up') {
+        updateData.pickedUpAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      if (status === 'arrived_dropoff') {
+        updateData.arrivedDropoffAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      if (status === 'completed') {
+        updateData.completedAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      transaction.update(orderRef, updateData);
+
+      if (status === 'completed') {
+        transaction.set(riderRef, {
+          busy: false,
+          currentOrderId: '',
+          lastActive: Date.now(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+
+      updatedOrder = {
+        ...order,
+        ...updateData,
+        id: String(orderId).toUpperCase(),
+        status,
+      };
+    });
+
+    orders[String(orderId).toUpperCase()] = updatedOrder;
 
     await notifyCustomer(
-      order,
-      createTextMessage(`UBee 任務狀態更新\n\n訂單編號：${order.id}\n目前狀態：${getStatusLabel(order.status)}`)
+      updatedOrder,
+      createTextMessage(
+        `UBee 任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
+      )
     );
 
     if (status === 'completed') {
-      await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
+      await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(updatedOrder));
     }
 
     return res.json({
       success: true,
-      orderId: order.id,
-      status: order.status,
-      statusLabel: getStatusLabel(order.status),
+      orderId: String(orderId).toUpperCase(),
+      status,
+      statusLabel: getStatusLabel(status),
       message: '任務狀態已更新',
     });
 
   } catch (error) {
-    console.error('❌ 騎士更新任務狀態失敗：', error);
+    console.error('❌ 騎士更新任務狀態失敗:', error);
+
+    if (error.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: '找不到此訂單。',
+      });
+    }
+
+    if (error.message === 'NOT_THIS_RIDER') {
+      return res.status(403).json({
+        success: false,
+        message: '這張任務不是你接的，無法操作。',
+      });
+    }
+
+    if (error.message === 'INVALID_TRANSITION') {
+      return res.status(400).json({
+        success: false,
+        message: '任務狀態流程不正確，請重新整理後再試。',
+      });
+    }
+
     return res.status(500).json({
       success: false,
-      error: '任務狀態更新失敗，請稍後再試。',
+      message: '任務狀態更新失敗，請稍後再試。',
     });
   }
 });
