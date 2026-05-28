@@ -344,28 +344,60 @@ app.use(express.urlencoded({ extended: true }));
 // 1. 取得騎士資料
 app.get('/api/rider/profile', async (req, res) => {
   try {
-    const { lineUserId } = req.query;
+    const { lineUserId, phone } = req.query;
 
     if (!lineUserId) {
       return res.status(400).json({ message: '缺少 lineUserId' });
     }
 
-    const snap = await db.collection('riders')
+    // 先用 LINE User ID 找已綁定騎士
+    let snap = await db.collection('riders')
       .where('lineUserId', '==', lineUserId)
       .limit(1)
       .get();
 
-    if (snap.empty) {
-      return res.status(404).json({ message: '找不到騎士資料' });
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      return res.json({
+        rider: {
+          id: doc.id,
+          ...doc.data()
+        }
+      });
     }
 
-    const doc = snap.docs[0];
+    // 如果前端有帶手機號碼，就用手機號碼文件 ID 綁定 LINE User ID
+    if (phone) {
+      const phoneDocRef = db.collection('riders').doc(phone);
+      const phoneDoc = await phoneDocRef.get();
 
-    return res.json({
-      rider: {
-        id: doc.id,
-        ...doc.data()
+      if (!phoneDoc.exists) {
+        return res.status(404).json({ message: '找不到騎士資料' });
       }
+
+      const riderData = phoneDoc.data();
+
+      if (riderData.approved !== true) {
+        return res.status(403).json({ message: '騎士尚未審核通過' });
+      }
+
+      await phoneDocRef.set({
+        lineUserId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      const updatedDoc = await phoneDocRef.get();
+
+      return res.json({
+        rider: {
+          id: updatedDoc.id,
+          ...updatedDoc.data()
+        }
+      });
+    }
+
+    return res.status(404).json({
+      message: '找不到騎士資料，請先完成騎士註冊或聯繫管理員'
     });
 
   } catch (err) {
