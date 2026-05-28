@@ -377,9 +377,9 @@ app.get('/api/rider/profile', async (req, res) => {
 
       const riderData = phoneDoc.data();
 
-      if (riderData.approved !== true) {
-        return res.status(403).json({ message: '騎士尚未審核通過' });
-      }
+      if (riderData.approved !== true && riderData.status !== 'approved') {
+  return res.status(403).json({ message: '騎士尚未審核通過' });
+}
 
       await phoneDocRef.set({
         lineUserId,
@@ -617,16 +617,15 @@ app.post('/api/rider/status', async (req, res) => {
     const snap = await db
       .collection('riders')
       .where('lineUserId', '==', lineUserId)
-      .where('status', '==', 'approved')
       .limit(1)
       .get();
 
-    if (snap.empty) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法切換接單狀態。',
-      });
-    }
+    const riderOk = !snap.empty && (
+  snap.docs[0].data().approved === true ||
+  snap.docs[0].data().status === 'approved'
+);
+
+if (!riderOk) {
 
     const riderDoc = snap.docs[0];
     const rider = riderDoc.data();
@@ -1082,11 +1081,14 @@ async function isApprovedRiderUser(userId) {
   try {
     const snap = await db.collection('riders')
       .where('lineUserId', '==', userId)
-      .where('status', '==', 'approved')
       .limit(1)
       .get();
 
-    return !snap.empty;
+    if (snap.empty) return false;
+
+    const rider = snap.docs[0].data();
+
+    return rider.approved === true || rider.status === 'approved';
   } catch (err) {
     console.error('❌ 查詢騎士審核狀態失敗：', err);
     return false;
