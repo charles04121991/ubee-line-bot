@@ -2288,15 +2288,14 @@ app.post('/api/rider/accept-order', async (req, res) => {
 // ===== 騎士更新任務狀態 API =====
 app.post('/api/rider/update-order-status', async (req, res) => {
   try {
-    const { orderId, lineUserId, status } = req.body;
+    const { orderId, lineUserId, riderId, status } = req.body;
 
-    if (!orderId || !lineUserId || !status) {
-      return res.status(400).json({
-        success: false,
-        error: '缺少訂單編號、騎士 LINE 身分或任務狀態',
-      });
-    }
-
+    if (!orderId || !(lineUserId || riderId) || !status) {
+  return res.status(400).json({
+    success: false,
+    error: '缺少訂單編號、騎士 LINE 身分或任務狀態',
+  });
+}
     const order = await getOrder(orderId);
 
     if (!order) {
@@ -2306,7 +2305,7 @@ app.post('/api/rider/update-order-status', async (req, res) => {
       });
     }
 
-    if (order.riderId !== lineUserId) {
+    if (order.riderId !== (lineUserId || riderId)) {
       return res.status(403).json({
         success: false,
         error: '只有接單騎士可以更新此任務狀態',
