@@ -419,17 +419,21 @@ app.get('/api/rider/tasks', async (req, res) => {
     }
 
     const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .where('status', '==', 'approved')
-      .limit(1)
-      .get();
+  .where('lineUserId', '==', lineUserId)
+  .limit(1)
+  .get();
 
-    if (riderSnap.empty) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法查看任務。',
-      });
-    }
+const riderOk = !riderSnap.empty && (
+  riderSnap.docs[0].data().approved === true ||
+  riderSnap.docs[0].data().status === 'approved'
+);
+
+if (!riderOk) {
+  return res.status(403).json({
+    success: false,
+    message: '你尚未通過 UBee 騎士審核，暫時無法查看任務。',
+  });
+}
 
     const snap = await db
       .collection('orders')
