@@ -1275,6 +1275,13 @@ async function claimTaichung85Coupon(){
     btn.disabled = true;
     btn.innerText = '領取中...';
 
+if(serviceGroup === 'life'){
+  alert('生活跑腿暫不適用 85 折優惠，系統將依任務內容評估報價。');
+  btn.disabled = false;
+  btn.innerText = '領取 85 折優惠';
+  return;
+}
+
     if(!userId || userId === 'web-order'){
       alert('LINE 身分尚未確認完成，請稍後再試。');
       btn.disabled = false;
