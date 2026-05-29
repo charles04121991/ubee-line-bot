@@ -776,6 +776,8 @@ app.get('/api/rider/completed-orders', async (req, res) => {
           pickupAddress: order.pickupAddress || order.fromAddress || order.pickup || '',
           dropoffAddress: order.dropoffAddress || order.toAddress || order.dropoff || '',
           item: order.item || '',
+          riderPhone: order.riderPhone || '',
+          riderDocId: order.riderDocId || '',
           driverFee: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
           total: Number(order.total || 0),
           completedAt: completedAtMs,
@@ -800,9 +802,6 @@ app.get('/api/rider/completed-orders', async (req, res) => {
           return false;
       })
 
-      .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0))
-
-      .slice(0, safeLimit);
       .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0))
       .slice(0, safeLimit);
 
