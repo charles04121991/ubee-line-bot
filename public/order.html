@@ -16,24 +16,58 @@
 
   <style>
     :root{
-      --bg:#000;
-      --card:#101010;
-      --card2:#171717;
-      --card3:#202020;
-      --text:#fff;
-      --muted:#a8a8a8;
-      --muted2:#777;
-      --line:#2a2a2a;
-      --line2:#3a3a3a;
-      --accent:#facc15;
-      --accentText:#111;
-      --primary:#facc15;
-      --primary2:#fbbf24;
-      --primaryText:#111;
-      --green:#22c55e;
-      --red:#ef4444;
-      --radius:22px;
-    }
+  --bg:#000;
+  --card:#101010;
+  --card2:#171717;
+  --card3:#202020;
+  --text:#fff;
+  --muted:#a8a8a8;
+  --muted2:#777;
+  --line:#2a2a2a;
+  --line2:#3a3a3a;
+  --accent:#facc15;
+  --accentText:#111;
+  --primary:#facc15;
+  --primary2:#fbbf24;
+  --primaryText:#111;
+  --green:#22c55e;
+  --red:#ef4444;
+  --radius:22px;
+}
+
+body.day-mode{
+  --bg:#f6f6f6;
+  --card:#ffffff;
+  --card2:#f3f3f3;
+  --card3:#eeeeee;
+  --text:#111111;
+  --muted:#666666;
+  --muted2:#888888;
+  --line:#dddddd;
+  --line2:#cccccc;
+  --accent:#facc15;
+  --accentText:#111111;
+  --primary:#facc15;
+  --primary2:#fbbf24;
+  --primaryText:#111111;
+}
+
+body.night-mode{
+  --bg:#000;
+  --card:#101010;
+  --card2:#171717;
+  --card3:#202020;
+  --text:#fff;
+  --muted:#a8a8a8;
+  --muted2:#777;
+  --line:#2a2a2a;
+  --line2:#3a3a3a;
+  --accent:#facc15;
+  --accentText:#111;
+  --primary:#facc15;
+  --primary2:#fbbf24;
+  --primaryText:#111;
+}
 
     *{
       box-sizing:border-box;
@@ -75,14 +109,16 @@
     }
 
     .app{
-      width:100%;
-      max-width:520px;
-      min-height:100vh;
-      margin:0 auto;
-      padding:calc(20px + env(safe-area-inset-top)) 16px calc(34px + env(safe-area-inset-bottom));
-      background:#000;
-      overflow-x:hidden;
-    }
+  width:100%;
+  max-width:520px;
+  min-height:100vh;
+  margin:0 auto;
+  padding:calc(20px + env(safe-area-inset-top)) 16px calc(34px + env(safe-area-inset-bottom));
+  background:var(--bg);
+  color:var(--text);
+  overflow-x:hidden;
+  transition:background .25s ease,color .25s ease;
+}
 
     .topbar{
       display:flex;
@@ -92,17 +128,17 @@
     }
 
     .icon-btn{
-      width:42px;
-      height:42px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background:#080808;
-      color:#fff;
-      font-size:22px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
+  width:42px;
+  height:42px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--card2);
+  color:var(--text);
+  font-size:22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 
     .brand{
       font-size:28px;
@@ -963,7 +999,6 @@
   </button>
 </div>
 
-<div id="pricePreview" class="price-box hidden"></div>
       <div id="pricePreview" class="price-box hidden"></div>
 
       <div class="notice">
