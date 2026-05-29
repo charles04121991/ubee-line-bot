@@ -3618,6 +3618,91 @@ app.get('/api/coupon/taichung85', async (req, res) => {
     });
   }
 });
+app.post('/api/coupon/taichung85/claim', async (req, res) => {
+  try {
+    const { lineUserId } = req.body || {};
+
+    if (!lineUserId) {
+      return res.status(400).json({
+        ok: false,
+        message: '缺少 LINE 使用者 ID'
+      });
+    }
+
+    const campaignRef = db.collection('couponCampaigns').doc(CAMPAIGN_ID);
+    const claimRef = campaignRef.collection('claims').doc(lineUserId);
+
+    const result = await db.runTransaction(async (tx) => {
+      const campaignSnap = await tx.get(campaignRef);
+      const claimSnap = await tx.get(claimRef);
+
+      if (!campaignSnap.exists) {
+        return {
+          ok: false,
+          message: '優惠活動不存在'
+        };
+      }
+
+      const campaign = campaignSnap.data();
+      const limit = campaign.limit || 500;
+      const used = campaign.used || 0;
+
+      if (!campaign.active) {
+        return {
+          ok: false,
+          message: '優惠活動尚未開放'
+        };
+      }
+
+      if (used >= limit) {
+        return {
+          ok: false,
+          soldOut: true,
+          remaining: 0,
+          message: '85 折優惠名額已額滿'
+        };
+      }
+
+      if (claimSnap.exists) {
+        return {
+          ok: true,
+          alreadyClaimed: true,
+          discountRate: campaign.discountRate || 0.85,
+          remaining: Math.max(limit - used, 0),
+          message: '你已經領取過 85 折優惠'
+        };
+      }
+
+      tx.set(claimRef, {
+        lineUserId,
+        code: campaign.code || 'TAICHUNG85',
+        discountRate: campaign.discountRate || 0.85,
+        claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+        used: false
+      });
+
+      tx.update(campaignRef, {
+        used: admin.firestore.FieldValue.increment(1)
+      });
+
+      return {
+        ok: true,
+        alreadyClaimed: false,
+        discountRate: campaign.discountRate || 0.85,
+        remaining: Math.max(limit - used - 1, 0),
+        message: '85 折優惠領取成功'
+      };
+    });
+
+    return res.json(result);
+  } catch (err) {
+    console.error('領取優惠失敗:', err);
+    return res.status(500).json({
+      ok: false,
+      message: '領取優惠失敗'
+    });
+  }
+});
 app.listen(PORT, () => {
   console.log(`UBee OMS is running on port ${PORT}`);
 });
