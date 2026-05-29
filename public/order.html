@@ -523,6 +523,45 @@
       padding:16px;
       margin:16px 0;
     }
+    
+    .coupon-box{
+  border:1px solid rgba(250,204,21,.45);
+  background:linear-gradient(180deg,#211d10,#111);
+  border-radius:20px;
+  padding:16px;
+  margin:16px 0;
+}
+
+.coupon-title{
+  color:var(--accent);
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+
+.coupon-text{
+  color:#ddd;
+  font-size:14px;
+  line-height:1.7;
+  font-weight:800;
+  margin-bottom:12px;
+}
+
+.coupon-btn{
+  width:100%;
+  border:none;
+  border-radius:16px;
+  padding:14px;
+  background:var(--accent);
+  color:var(--accentText);
+  font-size:16px;
+  font-weight:1000;
+  font-family:inherit;
+}
+
+.coupon-btn:disabled{
+  opacity:.45;
+}
 
     .price-row{
       display:flex;
@@ -916,6 +955,15 @@
 
       <div class="summary-card" id="confirmSummary"></div>
 
+<div id="couponBox" class="coupon-box">
+  <div class="coupon-title">台中 85 折優惠</div>
+  <div id="couponText" class="coupon-text">正在讀取優惠名額...</div>
+  <button id="claimCouponBtn" class="coupon-btn" type="button" onclick="claimTaichung85Coupon()">
+    領取 85 折優惠
+  </button>
+</div>
+
+<div id="pricePreview" class="price-box hidden"></div>
       <div id="pricePreview" class="price-box hidden"></div>
 
       <div class="notice">
@@ -1003,6 +1051,13 @@ let currentOrderId = '';
 let selectedPaymentMethod = '';
 let currentTotal = '';
 let lastEstimate = null;
+
+let taichung85Coupon = {
+  claimed: false,
+  discountRate: 1,
+  remaining: 0
+};
+
 let isSubmittingOrder = false;
 let isConfirmingPaid = false;
 let isSelectingPayment = false;
@@ -1067,8 +1122,9 @@ function updateStepUI(){
   document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
 
   if(currentStep === 4){
-    renderConfirmSummary();
-  }
+  renderConfirmSummary();
+  loadTaichung85Coupon();
+}
 
   window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -1176,6 +1232,94 @@ function selectServiceFromTab(el, groupKey){
 function selectSpeed(el, value){
   setActive('speedGrid', el, '.speed-card');
   speedType = value;
+}
+
+async function loadTaichung85Coupon(){
+  try{
+    const res = await fetch('/api/coupon/taichung85', { cache:'no-store' });
+    const data = await res.json();
+
+    const text = document.getElementById('couponText');
+    const btn = document.getElementById('claimCouponBtn');
+
+    if(!text || !btn) return;
+
+    if(!data.ok || !data.active){
+      text.innerText = '目前沒有可領取的優惠。';
+      btn.disabled = true;
+      return;
+    }
+
+    if(data.remaining <= 0){
+      text.innerText = '85 折優惠名額已額滿。';
+      btn.disabled = true;
+      return;
+    }
+
+    taichung85Coupon.remaining = data.remaining;
+    taichung85Coupon.discountRate = data.discountRate || 0.85;
+
+    text.innerText = `限量 500 名，目前剩餘 ${data.remaining} 名，活動只到 ${data.endDate}。`;
+    btn.disabled = false;
+
+  }catch(err){
+    console.error('讀取優惠失敗:', err);
+    const text = document.getElementById('couponText');
+    if(text) text.innerText = '優惠讀取失敗，請稍後再試。';
+  }
+}
+
+async function claimTaichung85Coupon(){
+  try{
+    const btn = document.getElementById('claimCouponBtn');
+    btn.disabled = true;
+    btn.innerText = '領取中...';
+
+    if(!userId || userId === 'web-order'){
+      alert('LINE 身分尚未確認完成，請稍後再試。');
+      btn.disabled = false;
+      btn.innerText = '領取 85 折優惠';
+      return;
+    }
+
+    const res = await fetch('/api/coupon/taichung85/claim', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ lineUserId:userId })
+    });
+
+    const data = await res.json();
+
+    if(!data.ok){
+      alert(data.message || '優惠領取失敗');
+      btn.innerText = '領取 85 折優惠';
+      btn.disabled = !!data.soldOut;
+      await loadTaichung85Coupon();
+      return;
+    }
+
+    taichung85Coupon.claimed = true;
+    taichung85Coupon.discountRate = data.discountRate || 0.85;
+    taichung85Coupon.remaining = data.remaining || 0;
+
+    document.getElementById('couponText').innerText =
+      `已領取 85 折優惠，本次訂單可使用。剩餘 ${taichung85Coupon.remaining} 名。`;
+
+    btn.innerText = '已領取 85 折優惠';
+    btn.disabled = true;
+
+    renderConfirmSummary();
+
+  }catch(err){
+    console.error('領取優惠失敗:', err);
+    alert('優惠領取失敗，請稍後再試。');
+
+    const btn = document.getElementById('claimCouponBtn');
+    if(btn){
+      btn.disabled = false;
+      btn.innerText = '領取 85 折優惠';
+    }
+  }
 }
 
 function showStatus(text){
@@ -1338,13 +1482,26 @@ function renderConfirmSummary(){
   `;
 
   if(lastEstimate){
-    document.getElementById('pricePreview').classList.remove('hidden');
-    document.getElementById('pricePreview').innerHTML = `
+  const originalTotal = Number(lastEstimate.totalFee || 0);
+  const finalTotal = taichung85Coupon.claimed
+    ? Math.round(originalTotal * taichung85Coupon.discountRate)
+    : originalTotal;
+
+  document.getElementById('pricePreview').classList.remove('hidden');
+
+  document.getElementById('pricePreview').innerHTML = taichung85Coupon.claimed
+    ? `
       <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
       <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
-      <div class="price-row"><span>預估金額</span><strong>NT$${lastEstimate.totalFee || '-'}</strong></div>
+      <div class="price-row"><span>原價</span><strong><s>NT$${originalTotal}</s></strong></div>
+      <div class="price-row"><span>85 折優惠價</span><strong>NT$${finalTotal}</strong></div>
+    `
+    : `
+      <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
+      <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
+      <div class="price-row"><span>預估金額</span><strong>NT$${originalTotal}</strong></div>
     `;
-  }
+}
 }
 
 function getSpeedLabel(value){
@@ -1420,6 +1577,24 @@ async function calculateEstimate(silent){
 async function submitOrder(){
   const btn = document.getElementById('createOrderBtn');
   const data = getData();
+
+if(lastEstimate && taichung85Coupon.claimed){
+  const originalTotal = Number(lastEstimate.totalFee || 0);
+  const finalTotal = Math.round(originalTotal * taichung85Coupon.discountRate);
+
+  data.coupon = {
+    campaignId: 'taichung85_2026',
+    code: 'TAICHUNG85',
+    discountRate: taichung85Coupon.discountRate,
+    originalTotal,
+    finalTotal
+  };
+
+  data.discountApplied = true;
+  data.originalTotal = originalTotal;
+  data.discountTotal = finalTotal;
+  data.total = finalTotal;
+}
 
   if(isSubmittingOrder) return;
   if(!validateData(data)) return;
