@@ -1515,21 +1515,34 @@ function getSpeedLabel(value){
 }
 
 function renderSummary(order){
-  const total = order?.total || currentTotal || '';
-  currentTotal = total;
+  const hasCoupon = taichung85Coupon.claimed && lastEstimate;
+  const originalTotal = hasCoupon ? Number(lastEstimate.totalFee || 0) : '';
+  const finalTotal = hasCoupon
+    ? Math.round(originalTotal * taichung85Coupon.discountRate)
+    : (order?.total || currentTotal || '');
+
+  currentTotal = finalTotal;
 
   const box = document.getElementById('summaryBox');
   box.classList.remove('hidden');
-  box.innerHTML = `
-    <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
-    <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
-    <div class="price-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
-    <div class="price-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
-    <div class="price-row"><span>優先處理費</span><strong>NT$${order?.speedFee || 0}</strong></div>
-    <div class="price-row"><span>總金額</span><strong>NT$${total}</strong></div>
-  `;
-}
 
+  box.innerHTML = hasCoupon
+    ? `
+      <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
+      <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
+      <div class="price-row"><span>原價</span><strong><s>NT$${originalTotal}</s></strong></div>
+      <div class="price-row"><span>優惠</span><strong>台中 85 折</strong></div>
+      <div class="price-row"><span>應付金額</span><strong>NT$${finalTotal}</strong></div>
+    `
+    : `
+      <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
+      <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
+      <div class="price-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
+      <div class="price-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
+      <div class="price-row"><span>優先處理費</span><strong>NT$${order?.speedFee || 0}</strong></div>
+      <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
+    `;
+}
 async function calculateEstimate(silent){
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
