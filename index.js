@@ -596,16 +596,36 @@ app.get('/api/rider/summary', async (req, res) => {
     const todayStartMs = todayStartTaipei.getTime();
     const tomorrowStartMs = tomorrowStartTaipei.getTime();
 
-    const completedSnap = await db.collection('orders')
-      .where('riderLineUserId', '==', lineUserId)
-      .where('status', '==', 'completed')
-      .limit(500)
-      .get();
+    const riderPhone = normalizePhone(rider.phone || '');
+const riderDocId = riderDoc.id;
 
-    const completedOrders = completedSnap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+const completedSnap = await db.collection('orders')
+  .where('riderLineUserId', '==', lineUserId)
+  .where('status', '==', 'completed')
+  .limit(500)
+  .get();
+
+const completedOrders = completedSnap.docs
+  .map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  }))
+  .filter(order => {
+    if (!riderPhone && !riderDocId) return false;
+
+    const orderRiderPhone = normalizePhone(order.riderPhone || '');
+    const orderRiderDocId = String(order.riderDocId || order.riderPhone || '').trim();
+
+    if (riderPhone && orderRiderPhone && orderRiderPhone === riderPhone) {
+      return true;
+    }
+
+    if (riderDocId && orderRiderDocId && orderRiderDocId === riderDocId) {
+      return true;
+    }
+
+    return false;
+  });
 
     let todayCompleted = 0;
     let todayIncome = 0;
@@ -716,6 +736,10 @@ app.get('/api/rider/completed-orders', async (req, res) => {
 
     const safeLimit = Math.min(Math.max(Number(limit || 20), 1), 50);
 
+    const riderData = riderSnap.docs[0].data();
+    const riderPhone = normalizePhone(riderData.phone || '');
+    const riderDocId = riderSnap.docs[0].id;
+
     const completedSnap = await db.collection('orders')
       .where('riderLineUserId', '==', lineUserId)
       .where('status', '==', 'completed')
@@ -760,6 +784,25 @@ app.get('/api/rider/completed-orders', async (req, res) => {
             : '',
         };
       })
+      .filter(order => {
+        if (!riderPhone && !riderDocId) return false;
+
+        const orderRiderPhone = normalizePhone(order.riderPhone || '');
+        const orderRiderDocId = String(order.riderDocId || order.riderPhone || '').trim();
+
+        if (riderPhone && orderRiderPhone && orderRiderPhone === riderPhone) {
+           return true;
+        }
+
+        if (riderDocId && orderRiderDocId && orderRiderDocId === riderDocId) {
+          return true;
+        }
+          return false;
+      })
+
+      .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0))
+
+      .slice(0, safeLimit);
       .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0))
       .slice(0, safeLimit);
 
@@ -2631,6 +2674,7 @@ if (!riderOk) {
   status: 'accepted',
   riderId: lineUserId,
   riderLineUserId: lineUserId,
+  riderDocId: riderDoc.id,
   riderName: rider.name || '',
   riderPhone: rider.phone || '',
 };
