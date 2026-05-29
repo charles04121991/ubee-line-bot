@@ -2679,16 +2679,16 @@ if (!riderOk) {
 };
 
       transaction.update(orderRef, {
-        status: 'accepted',
-        riderId: lineUserId,
-        riderLineUserId: lineUserId,
-        riderName: rider.name || '',
-        riderPhone: rider.phone || '',
-        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
-      });
-
+  status: 'accepted',
+  riderId: lineUserId,
+  riderLineUserId: lineUserId,
+  riderDocId: riderDoc.id,
+  riderName: rider.name || '',
+  riderPhone: rider.phone || '',
+  acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
+});
       transaction.set(riderRef, {
         busy: true,
         currentOrderId: String(orderId).toUpperCase(),
