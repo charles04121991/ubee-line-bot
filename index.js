@@ -365,68 +365,117 @@ app.use(express.urlencoded({ extended: true }));
 // UBee 騎士系統 API
 // ==============================
 
-// 1. 取得騎士資料
+// 1. 取得騎士資料：正式版，以手機綁定為最高優先，避免 LINE 綁錯人
 app.get('/api/rider/profile', async (req, res) => {
   try {
     const { lineUserId, phone } = req.query;
 
-    if (!lineUserId) {
-      return res.status(400).json({ message: '缺少 lineUserId' });
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的 LINE 騎士身分。',
+      });
     }
 
-    // 先用 LINE User ID 找已綁定騎士
-    let snap = await db.collection('riders')
+    const cleanPhone = normalizePhone(phone || '');
+
+    // 正式版規則：
+    // 只要前端有帶 phone，就以 phone 文件為主，重新綁定目前 LINE userId。
+    // 這可以避免以前錯誤綁定到別人的 lineUserId，導致顯示錯誤騎士資料。
+    if (cleanPhone) {
+      if (!/^09\d{8}$/.test(cleanPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: '手機號碼格式錯誤，請輸入 09 開頭的 10 碼手機號碼。',
+        });
+      }
+
+      const phoneDocRef = db.collection('riders').doc(cleanPhone);
+      const phoneDoc = await phoneDocRef.get();
+
+      if (!phoneDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到此手機號碼的騎士資料。',
+        });
+      }
+
+      const riderData = phoneDoc.data();
+
+      if (riderData.approved !== true && riderData.status !== 'approved') {
+        return res.status(403).json({
+          success: false,
+          message: '騎士尚未審核通過。',
+        });
+      }
+
+      // 清掉其他誤綁到同一個 lineUserId 的騎士資料，避免同一個 LINE 對到多人
+      const wrongBindSnap = await db.collection('riders')
+        .where('lineUserId', '==', lineUserId)
+        .get();
+
+      const batch = db.batch();
+
+      wrongBindSnap.docs.forEach(doc => {
+        if (doc.id !== cleanPhone) {
+          batch.set(doc.ref, {
+            lineUserId: '',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            unboundReason: 'rebind_to_correct_phone',
+          }, { merge: true });
+        }
+      });
+
+      batch.set(phoneDocRef, {
+        lineUserId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      await batch.commit();
+
+      const updatedDoc = await phoneDocRef.get();
+
+      return res.json({
+        success: true,
+        rider: {
+          id: updatedDoc.id,
+          ...updatedDoc.data(),
+        },
+      });
+    }
+
+    // 沒有帶手機時，才用 lineUserId 找已綁定騎士
+    const snap = await db.collection('riders')
       .where('lineUserId', '==', lineUserId)
       .limit(1)
       .get();
 
     if (!snap.empty) {
       const doc = snap.docs[0];
+
       return res.json({
+        success: true,
         rider: {
           id: doc.id,
-          ...doc.data()
-        }
-      });
-    }
-
-    // 如果前端有帶手機號碼，就用手機號碼文件 ID 綁定 LINE User ID
-    if (phone) {
-      const phoneDocRef = db.collection('riders').doc(phone);
-      const phoneDoc = await phoneDocRef.get();
-
-      if (!phoneDoc.exists) {
-        return res.status(404).json({ message: '找不到騎士資料' });
-      }
-
-      const riderData = phoneDoc.data();
-
-      if (riderData.approved !== true && riderData.status !== 'approved') {
-  return res.status(403).json({ message: '騎士尚未審核通過' });
-}
-
-      await phoneDocRef.set({
-        lineUserId,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-
-      const updatedDoc = await phoneDocRef.get();
-
-      return res.json({
-        rider: {
-          id: updatedDoc.id,
-          ...updatedDoc.data()
-        }
+          ...doc.data(),
+        },
       });
     }
 
     return res.status(404).json({
-      message: '找不到騎士資料，請先完成騎士註冊或聯繫管理員'
+      success: false,
+      message: '找不到騎士資料，請先輸入註冊手機號碼完成綁定。',
+      needPhoneBind: true,
     });
 
   } catch (err) {
     console.error('取得騎士資料失敗:', err);
-    return res.status(500).json({ message: '取得騎士資料失敗' });
+
+    return res.status(500).json({
+      success: false,
+      message: '取得騎士資料失敗。',
+      error: err.message,
+    });
   }
 });
 
