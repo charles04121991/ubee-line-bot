@@ -486,6 +486,250 @@ if (!riderOk) {
   }
 });
 
+// 3. 騎士今日 / 累積統計：正式版只允許 approved 騎士查看
+app.get('/api/rider/summary', async (req, res) => {
+  try {
+    const { lineUserId } = req.query;
+
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的騎士 LINE 身分。',
+      });
+    }
+
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    const riderOk = !riderSnap.empty && (
+      riderSnap.docs[0].data().approved === true ||
+      riderSnap.docs[0].data().status === 'approved'
+    );
+
+    if (!riderOk) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法查看統計資料。',
+      });
+    }
+
+    const riderDoc = riderSnap.docs[0];
+    const rider = riderDoc.data();
+
+    const now = new Date();
+
+    const taipeiNow = new Date(
+      now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' })
+    );
+
+    const todayStartTaipei = new Date(
+      taipeiNow.getFullYear(),
+      taipeiNow.getMonth(),
+      taipeiNow.getDate(),
+      0,
+      0,
+      0,
+      0
+    );
+
+    const tomorrowStartTaipei = new Date(
+      taipeiNow.getFullYear(),
+      taipeiNow.getMonth(),
+      taipeiNow.getDate() + 1,
+      0,
+      0,
+      0,
+      0
+    );
+
+    const todayStartMs = todayStartTaipei.getTime();
+    const tomorrowStartMs = tomorrowStartTaipei.getTime();
+
+    const completedSnap = await db.collection('orders')
+      .where('riderLineUserId', '==', lineUserId)
+      .where('status', '==', 'completed')
+      .limit(500)
+      .get();
+
+    const completedOrders = completedSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    let todayCompleted = 0;
+    let todayIncome = 0;
+    let totalCompleted = 0;
+    let totalIncome = 0;
+
+    completedOrders.forEach(order => {
+      totalCompleted += 1;
+
+      const income = Number(
+        order.driverFee ||
+        order.riderFee ||
+        order.fee ||
+        order.price ||
+        0
+      );
+
+      totalIncome += income;
+
+      let completedAtMs = 0;
+
+      if (order.completedAt && typeof order.completedAt.toDate === 'function') {
+        completedAtMs = order.completedAt.toDate().getTime();
+      } else if (typeof order.completedAt === 'number') {
+        completedAtMs = order.completedAt;
+      } else if (
+        order.statusTimes &&
+        order.statusTimes.completed &&
+        typeof order.statusTimes.completed.toDate === 'function'
+      ) {
+        completedAtMs = order.statusTimes.completed.toDate().getTime();
+      } else if (typeof order.updatedAt === 'number') {
+        completedAtMs = order.updatedAt;
+      }
+
+      if (completedAtMs >= todayStartMs && completedAtMs < tomorrowStartMs) {
+        todayCompleted += 1;
+        todayIncome += income;
+      }
+    });
+
+    return res.json({
+      success: true,
+      rider: {
+        id: riderDoc.id,
+        name: rider.name || rider.riderName || '',
+        phone: rider.phone || '',
+        vehicle: rider.vehicle || '',
+        plateNumber:
+          rider.plateNumber ||
+          rider.plateNo ||
+          rider.licensePlate ||
+          '',
+        serviceArea: rider.serviceArea || rider.area || '',
+        approved: rider.approved === true || rider.status === 'approved',
+        status: rider.status || '',
+        online: rider.online === true,
+        busy: rider.busy === true,
+        currentOrderId: rider.currentOrderId || '',
+      },
+      summary: {
+        todayCompleted,
+        todayIncome,
+        totalCompleted,
+        totalIncome,
+      },
+    });
+
+  } catch (err) {
+    console.error('❌ 取得騎士統計失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '取得騎士統計失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
+// 4. 騎士完成訂單列表：正式版只允許 approved 騎士查看
+app.get('/api/rider/completed-orders', async (req, res) => {
+  try {
+    const { lineUserId, limit } = req.query;
+
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的騎士 LINE 身分。',
+      });
+    }
+
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    const riderOk = !riderSnap.empty && (
+      riderSnap.docs[0].data().approved === true ||
+      riderSnap.docs[0].data().status === 'approved'
+    );
+
+    if (!riderOk) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法查看完成訂單。',
+      });
+    }
+
+    const safeLimit = Math.min(Math.max(Number(limit || 20), 1), 50);
+
+    const completedSnap = await db.collection('orders')
+      .where('riderLineUserId', '==', lineUserId)
+      .where('status', '==', 'completed')
+      .limit(200)
+      .get();
+
+    const completedOrders = completedSnap.docs
+      .map(doc => {
+        const order = {
+          id: doc.id,
+          ...doc.data(),
+        };
+
+        let completedAtMs = 0;
+
+        if (order.completedAt && typeof order.completedAt.toDate === 'function') {
+          completedAtMs = order.completedAt.toDate().getTime();
+        } else if (typeof order.completedAt === 'number') {
+          completedAtMs = order.completedAt;
+        } else if (
+          order.statusTimes &&
+          order.statusTimes.completed &&
+          typeof order.statusTimes.completed.toDate === 'function'
+        ) {
+          completedAtMs = order.statusTimes.completed.toDate().getTime();
+        } else if (typeof order.updatedAt === 'number') {
+          completedAtMs = order.updatedAt;
+        }
+
+        return {
+          id: order.id,
+          orderNo: order.orderNo || order.id,
+          status: order.status,
+          pickupAddress: order.pickupAddress || order.fromAddress || order.pickup || '',
+          dropoffAddress: order.dropoffAddress || order.toAddress || order.dropoff || '',
+          item: order.item || '',
+          driverFee: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
+          total: Number(order.total || 0),
+          completedAt: completedAtMs,
+          completedAtText: completedAtMs
+            ? new Date(completedAtMs).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
+            : '',
+        };
+      })
+      .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0))
+      .slice(0, safeLimit);
+
+    return res.json({
+      success: true,
+      orders: completedOrders,
+    });
+
+  } catch (err) {
+    console.error('❌ 取得騎士完成訂單失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '取得騎士完成訂單失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
 app.get('/order.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -2333,14 +2577,14 @@ if (!riderOk) {
       }
 
       acceptedOrder = {
-        ...order,
-        id: String(orderId).toUpperCase(),
-        status: 'accepted',
-        riderId: lineUserId,
-        riderLineUserId: lineUserId,
-        riderName: rider.name || '',
-        riderPhone: rider.phone || '',
-      };
+  ...order,
+  id: String(orderId).toUpperCase(),
+  status: 'accepted',
+  riderId: lineUserId,
+  riderLineUserId: lineUserId,
+  riderName: rider.name || '',
+  riderPhone: rider.phone || '',
+};
 
       transaction.update(orderRef, {
         status: 'accepted',
@@ -2515,11 +2759,11 @@ if (!riderOk) {
       }
 
       updatedOrder = {
-        ...order,
-        ...updateData,
-        id: String(orderId).toUpperCase(),
-        status,
-      };
+  ...order,
+  ...updateData,
+  id: String(orderId).toUpperCase(),
+  status,
+};
     });
 
     orders[String(orderId).toUpperCase()] = updatedOrder;
