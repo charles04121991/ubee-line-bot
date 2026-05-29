@@ -79,7 +79,7 @@
       max-width:520px;
       min-height:100vh;
       margin:0 auto;
-      padding:20px 16px 34px;
+      padding:calc(20px + env(safe-area-inset-top)) 16px calc(34px + env(safe-area-inset-bottom));
       background:#000;
       overflow-x:hidden;
     }
