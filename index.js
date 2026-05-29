@@ -57,6 +57,9 @@ const client = new line.Client(config);
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
+
+const CAMPAIGN_ID = 'taichung85_2026';
+
 const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || LINE_GROUP_ID;
@@ -3577,6 +3580,44 @@ async function handleEvent(event) {
   }
 }
 
+// ===============================
+// 台中 85 折優惠 API
+// ===============================
+app.get('/api/coupon/taichung85', async (req, res) => {
+  try {
+    const snap = await db
+      .collection('couponCampaigns')
+      .doc(CAMPAIGN_ID)
+      .get();
+
+    if (!snap.exists) {
+      return res.status(404).json({
+        ok: false,
+        message: '優惠活動不存在'
+      });
+    }
+
+    const data = snap.data();
+
+    return res.json({
+      ok: true,
+      active: data.active,
+      title: data.title,
+      discountRate: data.discountRate,
+      limit: data.limit,
+      used: data.used,
+      remaining: Math.max((data.limit || 0) - (data.used || 0), 0),
+      endDate: data.endDate,
+      code: data.code
+    });
+  } catch (err) {
+    console.error('讀取優惠失敗:', err);
+    return res.status(500).json({
+      ok: false,
+      message: '讀取優惠失敗'
+    });
+  }
+});
 app.listen(PORT, () => {
   console.log(`UBee OMS is running on port ${PORT}`);
 });
