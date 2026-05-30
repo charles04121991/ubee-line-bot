@@ -2700,20 +2700,32 @@ await saveOrder({
   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
 });
 
-    await notifyCustomer(
-      order,
-      createTextMessage(`✅ 已收到你的付款通知。\n\n訂單編號：${order.id}\n🚀 系統正在為你配對騎手，請稍候...`)
-    );
+    try {
+  await notifyCustomer(
+    order,
+    createTextMessage(`✅ 已收到你的付款通知。\n\n訂單編號：${order.id}\n🚀 系統正在為你配對騎手，請稍候...`)
+  );
+} catch (notifyErr) {
+  console.error('⚠️ 付款成功，但通知客人失敗：', notifyErr);
+}
 
-    // 客人確認付款後：直接派單到騎士群；辦公室審核群只收到管理/強制取消卡，不需要管理員確認付款。
-    await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
-    await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
+try {
+  await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
+} catch (dispatchErr) {
+  console.error('⚠️ 付款成功，但推送騎士群組失敗：', dispatchErr);
+}
 
-    res.json({
-      success: true,
-      orderId,
-      message: '已收到付款通知，系統已自動派單到騎手群組',
-    });
+try {
+  await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
+} catch (adminErr) {
+  console.error('⚠️ 付款成功，但推送辦公室群組失敗：', adminErr);
+}
+
+return res.json({
+  success: true,
+  orderId,
+  message: '已收到付款通知，系統已自動派單',
+});
   } catch (error) {
     console.error('❌ H5 確認付款失敗：', error);
     res.status(500).json({ success: false, error: '確認付款失敗，請稍後再試' });
