@@ -511,6 +511,15 @@ if (!riderOk) {
   });
 }
 
+const riderData = riderSnap.docs[0].data();
+
+if (riderData.online !== true) {
+  return res.status(403).json({
+    success: false,
+    message: '你目前尚未上線，請先上線後再查看任務。',
+  });
+}
+
     const snap = await db
       .collection('orders')
       .where('status', '==', 'pending_dispatch')
@@ -566,6 +575,15 @@ app.get('/api/rider/current-order', async (req, res) => {
         message: '你尚未通過 UBee 騎士審核，暫時無法查看目前任務。',
       });
     }
+
+const riderData = riderSnap.docs[0].data();
+
+if (riderData.online !== true) {
+  return res.status(403).json({
+    success: false,
+    message: '騎士尚未上線。',
+  });
+}
 
     const activeStatuses = [
       'accepted',
@@ -3405,6 +3423,10 @@ if (data.startsWith('accept=')) {
       const latestRiderDoc = await transaction.get(riderRef);
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
 
+      if (latestRider.online !== true) {
+        throw new Error('RIDER_OFFLINE');
+      }
+      
       if (
         latestRider.busy === true &&
         latestRider.currentOrderId &&
@@ -3453,6 +3475,10 @@ if (data.startsWith('accept=')) {
       return replyText(event.replyToken, '找不到此訂單。');
     }
 
+    if (error.message === 'RIDER_OFFLINE') {
+      return replyText(event.replyToken, '你目前尚未上線，請先上線後再接單。');
+    }
+    
     if (error.message === 'ORDER_ALREADY_ACCEPTED') {
       return replyText(event.replyToken, '此訂單已被其他騎士接走。');
     }
