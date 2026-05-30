@@ -917,25 +917,31 @@ if(plateNumber && String(plateNumber).trim().length > 20){
   });
 }
 
-    const riderId = 'R' + Date.now();
+    const riderId = cleanPhone;
 
-    const rider = {
+const rider = {
   riderId,
-  name,
-  phone,
-  lineId: lineId || '',
-  userId: userId || lineUserId || lineId || '',
-  lineUserId: lineUserId || userId || '',
-  district: district || '',
-  vehicle,
-  plateNumber: plateNumber || '',
-  area: area || serviceArea || '',
-  serviceArea: serviceArea || area || '',
-  availableTime: availableTime || '',
+  id: riderId,
+  name: cleanText(name, 20),
+  phone: cleanPhone,
+  lineId: cleanText(lineId || '', 60),
+  userId: riderLineUserId,
+  lineUserId: riderLineUserId,
+  district: cleanText(district || '', 80),
+  vehicle: cleanText(vehicle, 40),
+  plateNumber: cleanText(plateNumber || '', 20),
+  area: cleanText(area || serviceArea || '', 80),
+  serviceArea: cleanText(serviceArea || area || '', 80),
+  availableTime: cleanText(availableTime || '', 80),
+  approved: false,
   status: 'pending',
-  createdAt: new Date().toLocaleString('zh-TW')
+  online: false,
+  busy: false,
+  currentOrderId: '',
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  createdAtMs: Date.now(),
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
 };
-
     await saveRider(rider);
 
     console.log('🟡 新騎手註冊：', rider);
