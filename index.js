@@ -1813,6 +1813,18 @@ async function pushToGroup(groupId, messages) {
   await client.pushMessage(groupId, list);
 }
 
+function safeText(value, fallback = '無') {
+  const text = String(value || '').trim();
+  return text || fallback;
+}
+
+function createRiderGroupDispatchMessages(order) {
+  return [
+    createDispatchGroupFlex(order),
+    createAdminForceCancelFlex(order),
+  ];
+}
+
 async function getDistanceMatrix(origin, destination) {
   const originText = String(origin || '').trim();
   const destinationText = String(destination || '').trim();
@@ -2083,17 +2095,20 @@ function createOrderConfirmFlex(order) {
 
 function createDispatchGroupFlex(order) {
   const speed = getSpeedOption(order.speedType);
+
   return createFlexMessage('UBee 新任務通知', createBubble(
     'UBee 新任務通知',
     [
-      createInfoRow('訂單編號', order.id),
-      createInfoRow('狀態', getStatusLabel(order.status)),
+      createInfoRow('訂單編號', safeText(order.id)),
+      createInfoRow('狀態', getStatusLabel(order.status || 'pending_dispatch')),
       createInfoRow('配送速度', `${speed.label}｜${speed.riderText}`),
-      createInfoRow('服務類型', order.serviceType),
-      createInfoRow('取件地址', order.pickupAddress),
-      createInfoRow('送達地址', order.dropoffAddress),
-      createInfoRow('物品內容', order.item),
-      createInfoRow('備註', order.note || '無'),
+      createInfoRow('服務類型', safeText(order.serviceType)),
+      createInfoRow('取件地址', safeText(order.pickupAddress)),
+      createInfoRow('取件電話', safeText(order.pickupPhone)),
+      createInfoRow('送達地址', safeText(order.dropoffAddress)),
+      createInfoRow('送達電話', safeText(order.dropoffPhone)),
+      createInfoRow('物品內容', safeText(order.item)),
+      createInfoRow('備註', safeText(order.note)),
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
     ],
     [
@@ -2722,7 +2737,14 @@ await saveOrder({
 }
 
 try {
-  await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(order));
+  const dispatchOrder = {
+    ...order,
+    status: 'pending_dispatch',
+    isPaid: true,
+    paymentMethod: order.paymentMethod || 'jko',
+  };
+
+  await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(dispatchOrder));
 } catch (dispatchErr) {
   console.error('⚠️ 付款成功，但推送騎士群組失敗：', dispatchErr);
 }
