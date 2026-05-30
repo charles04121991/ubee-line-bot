@@ -1814,8 +1814,16 @@ async function pushToGroup(groupId, messages) {
 }
 
 async function getDistanceMatrix(origin, destination) {
-  const cleanOrigin = normalizeTaskAddressForMaps(origin);
-  const cleanDestination = normalizeTaskAddressForMaps(destination);
+  const originText = String(origin || '').trim();
+  const destinationText = String(destination || '').trim();
+
+  const isLatLngOrigin = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(originText);
+
+  const cleanOrigin = isLatLngOrigin
+  ? originText
+  : normalizeTaskAddressForMaps(originText);
+
+  const cleanDestination = normalizeTaskAddressForMaps(destinationText);
   const url =
   'https://maps.googleapis.com/maps/api/distancematrix/json' +
   `?origins=${encodeURIComponent(cleanOrigin)}` +
@@ -3007,9 +3015,33 @@ if (currentStatus === 'completed' && status === 'completed') {
 const nextStatuses = allowedFlow[currentStatus] || [];
 
 if (!nextStatuses.includes(status)) {
+  if (status === 'completed') {
+    updatedOrder = {
+      ...order,
+      id: String(orderId).toUpperCase(),
+      status: 'completed',
+    };
+
+    transaction.update(orderRef, {
+      status: 'completed',
+      riderStatus: 'completed',
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      'statusTimes.completed': admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    transaction.set(riderRef, {
+      busy: false,
+      currentOrderId: '',
+      lastActive: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return;
+  }
+
   throw new Error('INVALID_TRANSITION');
 }
-
       const updateData = {
         status,
         riderStatus: status,
