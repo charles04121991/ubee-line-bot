@@ -576,15 +576,6 @@ app.get('/api/rider/current-order', async (req, res) => {
       });
     }
 
-const riderData = riderSnap.docs[0].data();
-
-if (riderData.online !== true) {
-  return res.status(403).json({
-    success: false,
-    message: '騎士尚未上線。',
-  });
-}
-
     const activeStatuses = [
       'accepted',
       'arrived_pickup',
@@ -1272,12 +1263,14 @@ async function getOrder(orderId) {
   const id = String(orderId || '').toUpperCase();
   if (!id) return null;
 
-  if (orders[id]) return orders[id];
-
   const doc = await db.collection('orders').doc(id).get();
   if (!doc.exists) return null;
 
-  const order = doc.data();
+  const order = {
+    id: doc.id,
+    ...doc.data(),
+  };
+
   orders[id] = order;
   return order;
 }
@@ -1334,8 +1327,9 @@ function generateOrderId() {
   const hh = String(now.getHours()).padStart(2, '0');
   const mi = String(now.getMinutes()).padStart(2, '0');
   const ss = String(now.getSeconds()).padStart(2, '0');
-  const no = String(orderCounter++).padStart(3, '0');
-  return `UB${yyyy}${mm}${dd}${hh}${mi}${ss}${no}`;
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  const random = String(Math.floor(Math.random() * 900) + 100);
+  return `UB${yyyy}${mm}${dd}${hh}${mi}${ss}${ms}${random}`;
 }
 
 function formatCurrency(value) {
@@ -1387,7 +1381,7 @@ function getSpeedOption(speedType) {
 }
 
 function getPaymentMethodLabel(method) {
-  return ({ jko: '街口支付', bank: '銀行轉帳' }[method] || '未選擇');
+  return ({ jko: '街口支付', merchant: '合作店家月結' }[method] || '未選擇');
 }
 
 function isAdminUser(userId) {
@@ -2642,9 +2636,8 @@ app.post('/api/orders', async (req, res) => {
       orderId: id,
       order,
       paymentOptions: {
-        jko: PAYMENT_JKO_INFO,
-        bank: PAYMENT_BANK_INFO,
-      },
+  jko: PAYMENT_JKO_INFO,
+},
       total: order.total,
       message: '訂單已建立，請在頁面下方選擇付款方式。',
     });
