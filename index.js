@@ -2671,8 +2671,14 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
       return res.json({ success: true, orderId, message: '此訂單已標記付款完成' });
     }
 
-    if (order.status !== 'pending_payment') {
-      return res.status(400).json({ success: false, error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可重複確認付款` });
+    if (
+      order.status !== 'pending_payment' &&
+      !order.isPaid
+    ) {
+      return res.status(400).json({
+        success:false,
+        error:'訂單狀態異常'
+      });
     }
 
     order.isPaid = true;
