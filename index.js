@@ -3086,18 +3086,28 @@ if (!nextStatuses.includes(status)) {
 
     orders[String(orderId).toUpperCase()] = updatedOrder;
 
-    await notifyCustomer(
-      updatedOrder,
-      createTextMessage(
-        `UBee 任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
-      )
-    );
+    try {
+  await notifyCustomer(
+    updatedOrder,
+    createTextMessage(
+      `UBee 任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
+    )
+  );
+} catch (notifyErr) {
+  console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
+}
 
-    if (status === 'completed') {
+if (status === 'completed') {
+  try {
+    if (LINE_FINISH_GROUP_ID) {
       await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(updatedOrder));
     }
+  } catch (finishErr) {
+    console.error('⚠️ 任務已完成，但推送財務明細失敗：', finishErr);
+  }
+}
 
-    return res.json({
+return res.json({
       success: true,
       orderId: String(orderId).toUpperCase(),
       status,
