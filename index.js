@@ -2986,11 +2986,29 @@ if (!riderOk) {
         throw new Error('NOT_THIS_RIDER');
       }
 
-      const nextStatuses = allowedFlow[currentStatus] || [];
+      if (currentStatus === status) {
+  updatedOrder = {
+    ...order,
+    id: String(orderId).toUpperCase(),
+    status,
+  };
+  return;
+}
 
-      if (!nextStatuses.includes(status)) {
-        throw new Error('INVALID_TRANSITION');
-      }
+if (currentStatus === 'completed' && status === 'completed') {
+  updatedOrder = {
+    ...order,
+    id: String(orderId).toUpperCase(),
+    status: 'completed',
+  };
+  return;
+}
+
+const nextStatuses = allowedFlow[currentStatus] || [];
+
+if (!nextStatuses.includes(status)) {
+  throw new Error('INVALID_TRANSITION');
+}
 
       const updateData = {
         status,
