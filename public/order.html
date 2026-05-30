@@ -174,8 +174,8 @@ body.night-mode{
       margin:10px 0 18px;
       background:
         radial-gradient(circle at 85% 20%, rgba(250,204,21,.24), transparent 34%),
-        linear-gradient(135deg,#2a2a2a,#111 45%,#050505);
-      color:#fff;
+        linear-gradient(135deg,var(--card3),var(--card) 45%,var(--bg));
+      color:var(--text);
       min-height:210px;
       border:1px solid rgba(250,204,21,.28);
       box-shadow:0 18px 45px rgba(250,204,21,.06);
@@ -202,7 +202,7 @@ body.night-mode{
     .hero-sub{
       font-size:14px;
       font-weight:900;
-      color:#cfcfcf;
+      color:var(--muted);
       line-height:1.6;
       margin-bottom:18px;
       position:relative;
@@ -244,7 +244,7 @@ body.night-mode{
       display:grid;
       grid-template-columns:repeat(4,1fr);
       gap:6px;
-      background:#0d0d0d;
+      background:var(--card2);
       border:1px solid var(--line);
       border-radius:22px;
       padding:8px;
@@ -254,7 +254,7 @@ body.night-mode{
     .category-tab{
       border:none;
       background:transparent;
-      color:#bdbdbd;
+      color:var(--muted);
       border-radius:16px;
       padding:11px 4px;
       font-size:12px;
@@ -283,7 +283,7 @@ body.night-mode{
 
     .service-item{
       border:1px solid var(--line);
-      background:linear-gradient(180deg,#151515,#0d0d0d);
+      background:linear-gradient(180deg,var(--card2),var(--card));
       border-radius:18px;
       min-height:98px;
       padding:12px 6px;
@@ -295,7 +295,7 @@ body.night-mode{
     .service-item.active{
       border-color:var(--accent);
       box-shadow:0 0 0 1px rgba(250,204,21,.32);
-      background:linear-gradient(180deg,#2a2412,#111);
+      background:linear-gradient(180deg,rgba(250,204,21,.18),var(--card));
     }
 
     .service-item-icon{
@@ -306,7 +306,7 @@ body.night-mode{
     .service-item-title{
       font-size:13px;
       font-weight:1000;
-      color:#fff;
+      color:var(--text);
       line-height:1.35;
     }
 
@@ -322,7 +322,7 @@ body.night-mode{
     }
 
     .trust-item{
-      background:#111;
+      background:var(--card);
       padding:13px 8px;
       text-align:center;
     }
@@ -335,7 +335,7 @@ body.night-mode{
     .trust-title{
       font-size:13px;
       font-weight:1000;
-      color:#fff;
+      color:var(--text);
     }
 
     .trust-desc{
@@ -377,7 +377,7 @@ body.night-mode{
     }
 
     .info-box{
-      background:linear-gradient(180deg,#151515,#101010);
+      background:linear-gradient(180deg,var(--card2),var(--card));
       border:1px solid var(--line);
       border-radius:20px;
       padding:18px;
@@ -404,13 +404,13 @@ body.night-mode{
     .form-title{
       font-size:16px;
       font-weight:1000;
-      color:#fff;
+      color:var(--text);
       margin:0 0 10px;
     }
 
     .input-card{
       border:1px solid var(--line);
-      background:#101010;
+      background:var(--card);
       border-radius:18px;
       overflow:hidden;
     }
@@ -440,7 +440,7 @@ body.night-mode{
       border:none;
       outline:none;
       background:transparent;
-      color:#fff;
+      color:var(--text);
       font-size:16px;
       font-family:inherit;
       font-weight:800;
@@ -459,7 +459,7 @@ body.night-mode{
 
     .speed-card{
       border:1px solid var(--line);
-      background:linear-gradient(180deg,#171717,#101010);
+      background:linear-gradient(180deg,var(--card2),var(--card));
       border-radius:19px;
       padding:18px;
       margin-bottom:12px;
@@ -469,7 +469,7 @@ body.night-mode{
 
     .speed-card.active{
       border-color:var(--accent);
-      background:#232115;
+      background:rgba(250,204,21,.16);
     }
 
     .speed-top{
@@ -513,7 +513,7 @@ body.night-mode{
 
     .summary-card{
       border:1px solid var(--line);
-      background:#101010;
+      background:var(--card);
       border-radius:20px;
       overflow:hidden;
       margin-bottom:16px;
@@ -545,7 +545,7 @@ body.night-mode{
     }
 
     .summary-value{
-      color:#fff;
+      color:var(--text);
       font-size:15px;
       font-weight:900;
       line-height:1.5;
@@ -554,7 +554,7 @@ body.night-mode{
 
     .price-box{
       border:1px solid var(--line);
-      background:#151515;
+      background:var(--card2);
       border-radius:20px;
       padding:16px;
       margin:16px 0;
@@ -562,7 +562,7 @@ body.night-mode{
     
     .coupon-box{
   border:1px solid rgba(250,204,21,.45);
-  background:linear-gradient(180deg,#211d10,#111);
+  background:linear-gradient(180deg,rgba(250,204,21,.16),var(--card));
   border-radius:20px;
   padding:16px;
   margin:16px 0;
@@ -576,7 +576,7 @@ body.night-mode{
 }
 
 .coupon-text{
-  color:#ddd;
+  color:var(--muted);
   font-size:14px;
   line-height:1.7;
   font-weight:800;
@@ -612,13 +612,13 @@ body.night-mode{
 
     .price-row:last-child{
       border-bottom:none;
-      color:#fff;
+      color:var(--text);
       font-size:21px;
       font-weight:1000;
     }
 
     .price-row strong{
-      color:#fff;
+      color:var(--text);
     }
 
     .notice{
@@ -630,7 +630,7 @@ body.night-mode{
     }
 
     .notice-title{
-      color:#ffb4b4;
+      color:var(--red);
       font-size:18px;
       font-weight:1000;
       margin-bottom:8px;
@@ -650,7 +650,7 @@ body.night-mode{
       gap:10px;
       align-items:flex-start;
       border:1px solid var(--line2);
-      background:#151515;
+      background:var(--card2);
       border-radius:18px;
       padding:14px;
       margin-top:14px;
@@ -668,7 +668,7 @@ body.night-mode{
       font-size:14px;
       line-height:1.7;
       font-weight:900;
-      color:#fff;
+      color:var(--text);
     }
 
     .success{
@@ -698,7 +698,7 @@ body.night-mode{
     }
 
     .order-no{
-      color:#fff;
+      color:var(--text);
       font-size:24px;
       font-weight:1000;
       letter-spacing:.5px;
@@ -714,20 +714,20 @@ body.night-mode{
       font-size:15px;
       line-height:1.8;
       margin-top:14px;
-      color:#fff;
+      color:var(--text);
       font-weight:800;
     }
 
     .payment-info{
       white-space:pre-line;
-      background:#151515;
+      background:var(--card2);
       border:1px solid var(--line);
       border-radius:18px;
       padding:15px;
       font-size:15px;
       line-height:1.8;
       margin-top:14px;
-      color:#fff;
+      color:var(--text);
       font-weight:800;
       text-align:left;
     }
@@ -765,8 +765,8 @@ body.night-mode{
     }
 
     .btn-secondary{
-      background:#151515;
-      color:#fff;
+      background:var(--card2);
+      color:var(--text);
       border:1px solid var(--line2);
     }
 
@@ -787,7 +787,7 @@ body.night-mode{
     .footer-nav{
       position:sticky;
       bottom:0;
-      background:linear-gradient(180deg,rgba(0,0,0,0),#000 22%);
+      background:linear-gradient(180deg,rgba(0,0,0,0),var(--bg) 22%);
       padding-top:18px;
       margin-top:10px;
     }
@@ -1075,6 +1075,23 @@ document.addEventListener('touchend', function(e){
 document.addEventListener('dblclick', function(e){
   e.preventDefault();
 }, { passive:false });
+
+function applyThemeByTime(){
+  const hour = new Date().getHours();
+  const isDay = hour >= 6 && hour < 18;
+
+  document.body.classList.toggle('day-mode', isDay);
+  document.body.classList.toggle('night-mode', !isDay);
+
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if(metaTheme){
+    metaTheme.setAttribute('content', isDay ? '#f6f6f6' : '#000000');
+  }
+}
+
+applyThemeByTime();
+
+setInterval(applyThemeByTime, 5 * 60 * 1000);
 
 let userId = 'web-order';
 let liffId = '';
