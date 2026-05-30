@@ -2753,16 +2753,21 @@ await saveOrder({
 try {
   const dispatchOrder = {
     ...order,
+    id: order.id || orderId,
     status: 'pending_dispatch',
     isPaid: true,
     paymentMethod: order.paymentMethod || 'jko',
   };
 
-  await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(dispatchOrder));
-} catch (dispatchErr) {
-  console.error('⚠️ 付款成功，但推送騎士群組失敗：', dispatchErr);
-}
+  console.log('📣 準備推送派單群組 LINE_GROUP_ID:', LINE_GROUP_ID);
+  console.log('📣 派單訂單編號:', dispatchOrder.id);
 
+  await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(dispatchOrder));
+
+  console.log('✅ 已成功推送派單群組:', dispatchOrder.id);
+} catch (dispatchErr) {
+  console.error('❌ 付款成功，但推送騎士群組失敗：', dispatchErr);
+}
 try {
   await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
 } catch (adminErr) {
