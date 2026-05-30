@@ -2664,6 +2664,12 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
       return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人確認付款' });
     }
     if (!order.paymentMethod) {
+
+  await saveOrder({
+    ...order,
+    paymentMethod: 'jko'
+  });
+
   order.paymentMethod = 'jko';
 }
 
@@ -2682,9 +2688,17 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     }
 
     order.isPaid = true;
-    order.paidAt = Date.now();
-    order.status = 'pending_dispatch';
-    await saveOrder(order);
+order.paidAt = Date.now();
+order.status = 'pending_dispatch';
+
+await saveOrder({
+  ...order,
+  paymentMethod: order.paymentMethod || 'jko',
+  isPaid: true,
+  paidAt: order.paidAt,
+  status: 'pending_dispatch',
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+});
 
     await notifyCustomer(
       order,
