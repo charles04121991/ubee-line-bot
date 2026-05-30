@@ -1660,6 +1660,27 @@ async function forceCancelOrder(order, userId, reason = 'admin_force_cancel') {
   order.cancelledAt = Date.now();
   order.cancelReason = reason;
   await saveOrder(order);
+  
+  if (order.riderLineUserId || order.riderId) {
+  const riderLineUserId = order.riderLineUserId || order.riderId;
+
+  const riderSnap = await db.collection('riders')
+    .where('lineUserId', '==', riderLineUserId)
+    .limit(1)
+    .get();
+
+  if (!riderSnap.empty) {
+    const riderDoc = riderSnap.docs[0];
+
+    await db.collection('riders').doc(riderDoc.id).set({
+      busy: false,
+      currentOrderId: '',
+      lastActive: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
+}
+
   return order;
 }
 
@@ -2777,8 +2798,13 @@ if (!riderOk) {
 
       const order = orderDoc.data();
       
+      
       const latestRiderDoc = await transaction.get(riderRef);
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
+
+      if (latestRider.online !== true) {
+        throw new Error('RIDER_OFFLINE');
+}
 
       if (
         latestRider.busy === true &&
@@ -2855,6 +2881,13 @@ if (!riderOk) {
       });
     }
     
+    if (error.message === 'RIDER_OFFLINE') {
+  return res.status(403).json({
+    success: false,
+    message: '騎士目前為離線狀態，請先上線後再接單。',
+  });
+}
+
     if (error.message === 'RIDER_ALREADY_BUSY') {
   return res.status(409).json({
     success: false,
@@ -3097,6 +3130,26 @@ app.post('/cancel-order', async (req, res) => {
     order.cancelledBy = requestUserId;
     order.cancelledAt = Date.now();
     await saveOrder(order);
+
+if (order.riderLineUserId || order.riderId) {
+  const riderLineUserId = order.riderLineUserId || order.riderId;
+
+  const riderSnap = await db.collection('riders')
+    .where('lineUserId', '==', riderLineUserId)
+    .limit(1)
+    .get();
+
+  if (!riderSnap.empty) {
+    const riderDoc = riderSnap.docs[0];
+
+    await db.collection('riders').doc(riderDoc.id).set({
+      busy: false,
+      currentOrderId: '',
+      lastActive: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
+}
 
     try {
       await pushToGroup(LINE_GROUP_ID, createTextMessage(`❌ 訂單已取消\n訂單編號：${order.id}`));
