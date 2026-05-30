@@ -1395,7 +1395,20 @@ function getStatusLabel(status) {
     quote_only: '💰 估價完成',
   }[status] || status);
 }
+function createGroupStatusText(order, status) {
+  const label = getStatusLabel(status);
+  const riderName = order.riderName || '騎士';
+  const riderPhone = order.riderPhone || '';
 
+  return (
+    `📍 UBee 任務狀態更新\n\n` +
+    `訂單編號：${order.id}\n` +
+    `目前狀態：${label}\n` +
+    `騎士：${riderName}${riderPhone ? `｜${riderPhone}` : ''}\n` +
+    `取件地點：${order.pickupAddress || '未提供'}\n` +
+    `送達地點：${order.dropoffAddress || '未提供'}`
+  );
+}
 function createTextMessage(text) {
   return { type: 'text', text };
 }
@@ -3117,6 +3130,15 @@ if (!nextStatuses.includes(status)) {
   );
 } catch (notifyErr) {
   console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
+}
+
+try {
+  await pushToGroup(
+    LINE_GROUP_ID,
+    createTextMessage(createGroupStatusText(updatedOrder, status))
+  );
+} catch (groupErr) {
+  console.error('⚠️ 任務狀態已更新，但通知派單群組失敗：', groupErr);
 }
 
 if (status === 'completed') {
