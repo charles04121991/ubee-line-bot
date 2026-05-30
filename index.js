@@ -1332,19 +1332,24 @@ function normalizeAddress(address) {
   return String(address || '').trim().replace(/\s+/g, '');
 }
 
-function normalizeMapsAddress(address) {
-  const text = String(address || '')
-    .replace(/[，,]/g, ' ')
-    .replace(/\s+/g, ' ')
+function normalizeTaskAddressForMaps(address) {
+  let text = String(address || '')
+    .replace(/台灣/g, '')
+    .replace(/臺灣/g, '')
+    .replace(/\s+/g, '')
     .trim();
 
   if (!text) return '';
 
-  if (text.includes('台灣') || text.includes('臺灣')) {
-    return text;
+  if (text.includes('台中市') || text.includes('臺中市')) {
+    return `台灣 ${text}`;
   }
 
-  return `台灣 ${text}`;
+  if (text.includes('豐原區')) {
+    return `台灣 台中市 ${text}`;
+  }
+
+  return `台灣 台中市 豐原區 ${text}`;
 }
 
 function getDistanceCacheKey(origin, destination) {
@@ -1809,9 +1814,8 @@ async function pushToGroup(groupId, messages) {
 }
 
 async function getDistanceMatrix(origin, destination) {
-  const cleanOrigin = normalizeMapsAddress(origin);
-  const cleanDestination = normalizeMapsAddress(destination);
-
+  const cleanOrigin = normalizeTaskAddressForMaps(origin);
+  const cleanDestination = normalizeTaskAddressForMaps(destination);
   const url =
   'https://maps.googleapis.com/maps/api/distancematrix/json' +
   `?origins=${encodeURIComponent(cleanOrigin)}` +
