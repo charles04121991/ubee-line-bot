@@ -854,6 +854,9 @@ app.get('/api/rider/completed-orders', async (req, res) => {
           riderPhone: order.riderPhone || '',
           riderDocId: order.riderDocId || '',
           driverFee: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
+          riderFee: Number(order.riderFee || order.driverFee || order.fee || order.price || 0),
+          fee: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
+          price: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
           total: Number(order.total || 0),
           completedAt: completedAtMs,
           completedAtText: completedAtMs
