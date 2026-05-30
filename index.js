@@ -2107,6 +2107,7 @@ function createOrderConfirmFlex(order) {
 
 function createDispatchGroupFlex(order) {
   const speed = getSpeedOption(order.speedType);
+
   return createFlexMessage('UBee 新任務通知', createBubble(
     'UBee 新任務通知',
     [
@@ -2119,9 +2120,17 @@ function createDispatchGroupFlex(order) {
       createInfoRow('物品內容', order.item),
       createInfoRow('備註', order.note || '無'),
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
+      {
+        type: 'text',
+        text: '正式版請從 UBee 騎士端接單，群組通知僅供提醒，避免重複接單與上線狀態不同步。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true,
+        margin: 'md',
+      },
     ],
     [
-      createActionButton('接受訂單', `accept=${order.id}`, 'primary'),
+      createUriButton('開啟騎士端接單', 'https://liff.line.me/2009895876-XULNFrGL', 'primary'),
       createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress), 'secondary'),
     ]
   ));
@@ -2745,7 +2754,8 @@ app.post('/api/rider-distance-to-pickup', async (req, res) => {
     }
 
     const origin = `${riderLat},${riderLng}`;
-    const distance = await getDistanceMatrix(origin, pickupAddress);
+    const safePickupAddress = normalizeMapsAddress(pickupAddress);
+    const distance = await getDistanceMatrix(origin, safePickupAddress);
 
     res.json({
       success: true,
@@ -3415,10 +3425,6 @@ if (data.startsWith('accept=')) {
 
       const latestRiderDoc = await transaction.get(riderRef);
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
-
-      if (latestRider.online !== true) {
-        throw new Error('RIDER_OFFLINE');
-      }
       
       if (
         latestRider.busy === true &&
@@ -3457,21 +3463,18 @@ if (data.startsWith('accept=')) {
       });
 
       transaction.set(riderRef, {
-        busy: true,
-        currentOrderId: cleanOrderId,
-        lastActive: Date.now(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+  online: true,
+  busy: true,
+  currentOrderId: cleanOrderId,
+  lastActive: Date.now(),
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+}, { merge: true });
     });
   } catch (error) {
     if (error.message === 'ORDER_NOT_FOUND') {
       return replyText(event.replyToken, '找不到此訂單。');
     }
 
-    if (error.message === 'RIDER_OFFLINE') {
-      return replyText(event.replyToken, '你目前尚未上線，請先上線後再接單。');
-    }
-    
     if (error.message === 'ORDER_ALREADY_ACCEPTED') {
       return replyText(event.replyToken, '此訂單已被其他騎士接走。');
     }
