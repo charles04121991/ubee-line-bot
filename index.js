@@ -2812,11 +2812,20 @@ if (!riderOk) {
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
 
       if (
-        latestRider.busy === true &&
-        latestRider.currentOrderId &&
-        latestRider.currentOrderId !== String(orderId).toUpperCase()
+  latestRider.busy === true &&
+  latestRider.currentOrderId &&
+  latestRider.currentOrderId !== String(orderId).toUpperCase()
 ) {
-  throw new Error('RIDER_ALREADY_BUSY');
+  const oldOrderRef = db.collection('orders').doc(String(latestRider.currentOrderId).toUpperCase());
+  const oldOrderDoc = await transaction.get(oldOrderRef);
+
+  if (oldOrderDoc.exists) {
+    const oldOrder = oldOrderDoc.data();
+
+    if (!['completed', 'cancelled'].includes(oldOrder.status)) {
+      throw new Error('RIDER_ALREADY_BUSY');
+    }
+  }
 }
 
       if (order.status !== 'pending_dispatch') {
