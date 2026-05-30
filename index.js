@@ -1180,14 +1180,33 @@ async function getOrder(orderId) {
 }
 
 async function saveRider(rider) {
-  if (!rider || !rider.riderId) return rider;
-  riders[rider.riderId] = rider;
-  await db.collection('riders').doc(rider.riderId).set(rider, { merge: true });
-  return rider;
+  if (!rider) return rider;
+
+  const cleanPhone = normalizePhone(rider.phone || '');
+
+  if (!/^09\d{8}$/.test(cleanPhone)) {
+    throw new Error('RIDER_PHONE_INVALID');
+  }
+
+  const riderId = cleanPhone;
+
+  const payload = {
+    ...rider,
+    id: riderId,
+    riderId: rider.riderId || riderId,
+    phone: cleanPhone,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  riders[riderId] = payload;
+
+  await db.collection('riders').doc(riderId).set(payload, { merge: true });
+
+  return payload;
 }
 
 async function getRider(riderId) {
-  const id = String(riderId || '');
+  const id = String(riderId || '').trim();
   if (!id) return null;
 
   if (riders[id]) return riders[id];
@@ -1195,7 +1214,11 @@ async function getRider(riderId) {
   const doc = await db.collection('riders').doc(id).get();
   if (!doc.exists) return null;
 
-  const rider = doc.data();
+  const rider = {
+    id: doc.id,
+    ...doc.data(),
+  };
+
   riders[id] = rider;
   return rider;
 }
