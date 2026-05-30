@@ -1779,17 +1779,29 @@ async function confirmPaid(){
   btn.innerText = '處理中...';
 
   try{
-    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ userId })
-    });
 
-    const result = await res.json();
+  // 先強制寫入付款方式
+  await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      userId,
+      paymentMethod:'jko'
+    })
+  });
 
-    if(!res.ok || !result.success){
-      throw new Error(result.error || '確認付款失敗');
-    }
+  // 再確認付款
+  const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ userId })
+  });
+
+  const result = await res.json();
+
+  if(!res.ok || !result.success){
+    throw new Error(result.error || '確認付款失敗');
+  }
 
     showStatus(
       `✅ 已收到付款通知\n\n訂單編號：${currentOrderId}\n\n系統正在為你配對合作夥伴，請稍候。`
