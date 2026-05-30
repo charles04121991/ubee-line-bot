@@ -2766,6 +2766,17 @@ if (!riderOk) {
       }
 
       const order = orderDoc.data();
+      
+      const latestRiderDoc = await transaction.get(riderRef);
+      const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
+
+      if (
+        latestRider.busy === true &&
+        latestRider.currentOrderId &&
+        latestRider.currentOrderId !== String(orderId).toUpperCase()
+) {
+  throw new Error('RIDER_ALREADY_BUSY');
+}
 
       if (order.status !== 'pending_dispatch') {
         throw new Error('ORDER_ALREADY_ACCEPTED');
@@ -2833,6 +2844,13 @@ if (!riderOk) {
         message: '此訂單已被其他騎士接走。',
       });
     }
+    
+    if (error.message === 'RIDER_ALREADY_BUSY') {
+  return res.status(409).json({
+    success: false,
+    message: '你目前已有進行中的任務，完成後才能接下一張。',
+  });
+}
 
     return res.status(500).json({
       success: false,
