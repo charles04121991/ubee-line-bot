@@ -2107,12 +2107,13 @@ function createOrderConfirmFlex(order) {
 }
 
 function createDispatchGroupFlex(order) {
+  const orderId = String(order.id || order.orderId || order.orderNo || '').toUpperCase();
   const speed = getSpeedOption(order.speedType);
 
   return createFlexMessage('UBee 新任務通知', createBubble(
     'UBee 新任務通知',
     [
-      createInfoRow('訂單編號', safeText(order.id)),
+      createInfoRow('訂單編號', safeText(orderId)),
       createInfoRow('狀態', getStatusLabel(order.status || 'pending_dispatch')),
       createInfoRow('配送速度', `${speed.label}｜${speed.riderText}`),
       createInfoRow('服務類型', safeText(order.serviceType)),
@@ -2125,7 +2126,7 @@ function createDispatchGroupFlex(order) {
       createInfoRow('騎手收入', formatCurrency(order.driverFee)),
     ],
     [
-      createActionButton('接受訂單', `accept=${order.id}`, 'primary'),
+      createActionButton('接受訂單', `accept=${orderId}`, 'primary'),
       createUriButton('導航到取件地點', buildGoogleMapDirectionsUrl(order.pickupAddress), 'secondary'),
     ]
   ));
