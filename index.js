@@ -1137,9 +1137,9 @@ app.post('/api/business/register', async (req, res) => {
 });
 
 const PRICING = {
-  baseFee: 99,
-  perKm: 8,
-  perMinute: 2,
+  baseFee: 80,
+  perKm: 15,
+  perMinute: 3,
   serviceFee: 50,
   waitingFee: 60,
   driverRatio: 0.6,
