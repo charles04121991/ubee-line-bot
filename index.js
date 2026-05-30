@@ -2823,8 +2823,14 @@ if (!riderOk) {
       const latestRiderDoc = await transaction.get(riderRef);
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
 
-      if (latestRider.online !== true) {
-        throw new Error('RIDER_OFFLINE');
+      // 群組接單正式版：只要是審核通過騎士，群組接單時自動補上線
+if (latestRider.online !== true) {
+  transaction.set(riderRef, {
+    online: true,
+    onlineUpdatedAt: Date.now(),
+    lastActive: Date.now(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
 }
 
       if (
