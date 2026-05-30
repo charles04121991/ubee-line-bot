@@ -2038,7 +2038,7 @@ function createFaqFlex() {
       createTextBlock('Q2：UBee 不接哪些項目？', '違法物品、危險品、易燃物、活體動物、高價未保管物、高度個資風險或需特殊證照的項目恕不承接。'),
       createTextBlock('Q3：多久可以送達？', '依距離、路況與速度選項而定。'),
       createTextBlock('Q4：費用怎麼計算？', '費用依 Google Maps 距離與時間計算，並加上服務費與系統費。'),
-      createTextBlock('Q5：付款方式有哪些？', '目前支援街口支付與銀行轉帳。'),
+      createTextBlock('Q5：付款方式有哪些？', '目前支援街口支付。'),
       createTextBlock('Q6：什麼是等候費？', '騎士抵達現場後，若需要額外等候超過 3–5 分鐘，可能會申請等候費 NT$60。'),
       createTextBlock('Q7：可以查詢訂單嗎？', '可以。點選「查詢訂單」後，輸入訂單編號即可查看目前狀態。'),
       createTextBlock('Q8：有開發票或收據嗎？', '目前提供收據或交易紀錄，暫不開立統一發票。'),
@@ -2249,10 +2249,10 @@ function createRiderControlFlex(order) {
 }
 
 function createPaymentInfoFlex(order) {
-  const paymentInfo = order.paymentMethod === 'jko' ? PAYMENT_JKO_INFO : PAYMENT_BANK_INFO;
+  const paymentInfo = PAYMENT_JKO_INFO;
 
   return createFlexMessage('付款資訊', createBubble(
-    order.paymentMethod === 'jko' ? '街口支付資訊' : '銀行轉帳資訊',
+    order.paymentMethod === 'jko' ? '街口支付資訊',
     [
       createInfoRow('訂單編號', order.id),
       createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
