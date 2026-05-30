@@ -1778,23 +1778,7 @@ async function confirmPaid(){
   btn.innerText = '處理中...';
 
   try{
-
-  // 先強制寫入付款方式，確定成功後才確認付款
-const paymentRes = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`, {
-  method:'POST',
-  headers:{'Content-Type':'application/json'},
-  body:JSON.stringify({
-    userId,
-    paymentMethod:selectedPaymentMethod
-  })
-});
-
-const paymentData = await paymentRes.json().catch(() => ({}));
-
-if(!paymentRes.ok || paymentData.success === false){
-  throw new Error(paymentData.error || paymentData.message || '付款方式設定失敗');
-}
-
+    
   // 再確認付款
   const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`,{
     method:'POST',
