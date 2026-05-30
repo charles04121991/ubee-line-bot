@@ -1083,10 +1083,17 @@ if (!riderOk) {
       onlineUpdatedAt: Date.now(),
     };
 
-    if (!online) {
-      updateData.busy = false;
-      updateData.currentOrderId = '';
-    }
+    if (!online && rider.busy === true && rider.currentOrderId) {
+  return res.status(400).json({
+    success: false,
+    message: '你目前有進行中的任務，完成後才能下線。',
+  });
+}
+
+if (!online) {
+  updateData.busy = false;
+  updateData.currentOrderId = '';
+}
 
     await db.collection('riders').doc(riderDoc.id).set(updateData, { merge: true });
 
@@ -1629,10 +1636,13 @@ async function getRiderOrReply(replyToken, riderId) {
 }
 
 async function requireOrderRider(event, order, message = '只有接單騎士可以操作此訂單。') {
-  if (order.riderId !== event.source.userId) {
+  const userId = event.source.userId || '';
+
+  if (order.riderId !== userId && order.riderLineUserId !== userId) {
     await replyText(event.replyToken, message);
     return false;
   }
+
   return true;
 }
 
@@ -3301,36 +3311,119 @@ UBee 辦公室將會再依照您的需求，
     ]);
   }
 
-  if (data.startsWith('accept=')) {
+if (data.startsWith('accept=')) {
   const orderId = getPostbackValue(data, 'accept');
-  const order = await getOrderOrReply(event.replyToken, orderId);
-  if (!order) return null;
+  const cleanOrderId = String(orderId || '').toUpperCase();
 
-  const latestOrder = await getOrder(orderId);
-
-  if (!latestOrder || latestOrder.status !== 'pending_dispatch') {
-    return replyText(
-      event.replyToken,
-      '此訂單已被其他騎士接走。'
-    );
+  if (!cleanOrderId) {
+    return replyText(event.replyToken, '缺少訂單編號，無法接單。');
   }
 
   const approved = await requireApprovedRider(event);
   if (!approved) return null;
 
-  latestOrder.riderId = userId;
-  latestOrder.status = 'accepted';
-  latestOrder.acceptedAt = Date.now();
-  await saveOrder(latestOrder);
+  const riderSnap = await db.collection('riders')
+    .where('lineUserId', '==', userId)
+    .limit(1)
+    .get();
+
+  if (riderSnap.empty) {
+    return replyText(event.replyToken, '找不到你的騎士資料，請先完成騎士綁定。');
+  }
+
+  const riderDoc = riderSnap.docs[0];
+  const rider = riderDoc.data();
+
+  const orderRef = db.collection('orders').doc(cleanOrderId);
+  const riderRef = db.collection('riders').doc(riderDoc.id);
+
+  let acceptedOrder = null;
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const orderDoc = await transaction.get(orderRef);
+
+      if (!orderDoc.exists) {
+        throw new Error('ORDER_NOT_FOUND');
+      }
+
+      const order = orderDoc.data();
+
+      const latestRiderDoc = await transaction.get(riderRef);
+      const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
+
+      if (
+        latestRider.busy === true &&
+        latestRider.currentOrderId &&
+        latestRider.currentOrderId !== cleanOrderId
+      ) {
+        throw new Error('RIDER_ALREADY_BUSY');
+      }
+
+      if (order.status !== 'pending_dispatch') {
+        throw new Error('ORDER_ALREADY_ACCEPTED');
+      }
+
+      acceptedOrder = {
+        ...order,
+        id: cleanOrderId,
+        status: 'accepted',
+        riderId: userId,
+        riderLineUserId: userId,
+        riderDocId: riderDoc.id,
+        riderName: rider.name || '',
+        riderPhone: rider.phone || '',
+        acceptedAt: Date.now(),
+      };
+
+      transaction.update(orderRef, {
+        status: 'accepted',
+        riderId: userId,
+        riderLineUserId: userId,
+        riderDocId: riderDoc.id,
+        riderName: rider.name || '',
+        riderPhone: rider.phone || '',
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(riderRef, {
+        busy: true,
+        currentOrderId: cleanOrderId,
+        lastActive: Date.now(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+  } catch (error) {
+    if (error.message === 'ORDER_NOT_FOUND') {
+      return replyText(event.replyToken, '找不到此訂單。');
+    }
+
+    if (error.message === 'ORDER_ALREADY_ACCEPTED') {
+      return replyText(event.replyToken, '此訂單已被其他騎士接走。');
+    }
+
+    if (error.message === 'RIDER_ALREADY_BUSY') {
+      return replyText(event.replyToken, '你目前已有進行中的任務，完成後才能接下一張。');
+    }
+
+    console.error('❌ LINE 群組接單失敗：', error);
+    return replyText(event.replyToken, '接單失敗，請稍後再試。');
+  }
+
+  orders[cleanOrderId] = acceptedOrder;
 
   await notifyCustomer(
-    latestOrder,
-    createTextMessage(`🟢 UBee 騎士已接單\n\n訂單編號：${latestOrder.id}\n騎士將盡快設定抵達取件時間。`)
+    acceptedOrder,
+    createTextMessage(
+      `🟢 UBee 騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快設定抵達取件時間。`
+    )
   );
 
   return replyMessages(event.replyToken, [
-    createTextMessage(`✅ 你已接受訂單：${latestOrder.id}`),
-    createETAFlex(latestOrder),
+    createTextMessage(`✅ 你已接受訂單：${acceptedOrder.id}`),
+    createETAFlex(acceptedOrder),
   ]);
 }
 
@@ -3495,7 +3588,21 @@ UBee 辦公室將會再依照您的需求，
     if (!ok) return null;
 
     await updateOrderStatus(order, 'completed', { completedAt: Date.now() });
+    const riderSnap = await db.collection('riders')
+  .where('lineUserId', '==', userId)
+  .limit(1)
+  .get();
 
+if (!riderSnap.empty) {
+  const riderDoc = riderSnap.docs[0];
+
+  await db.collection('riders').doc(riderDoc.id).set({
+    busy: false,
+    currentOrderId: '',
+    lastActive: Date.now(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
     await notifyCustomer(
       order,
       createTextMessage(`✅ UBee 任務已完成\n\n訂單編號：${order.id}\n感謝你使用 UBee 城市任務服務。`)
