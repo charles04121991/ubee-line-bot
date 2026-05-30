@@ -2663,7 +2663,9 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     if (!isSameCustomerUserId(order, requestUserId)) {
       return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人確認付款' });
     }
-    if (!order.paymentMethod) return res.status(400).json({ success: false, error: '請先選擇付款方式' });
+    if (!order.paymentMethod) {
+  order.paymentMethod = 'jko';
+}
 
     if (order.isPaid) {
       return res.json({ success: true, orderId, message: '此訂單已標記付款完成' });
