@@ -1767,9 +1767,8 @@ async function confirmPaid(){
   }
 
   if(!selectedPaymentMethod){
-    alert('請先選擇付款方式');
-    return;
-  }
+  selectedPaymentMethod = 'jko';
+}
 
   if(isConfirmingPaid) return;
 
