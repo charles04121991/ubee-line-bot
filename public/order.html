@@ -1113,6 +1113,7 @@ let taichung85Coupon = {
 let isSubmittingOrder = false;
 let isConfirmingPaid = false;
 let isSelectingPayment = false;
+let isPaymentMethodSaved = false;
 let isCancellingOrder = false;
 
 const serviceDescriptions = {
@@ -1726,6 +1727,7 @@ async function selectPayment(method){
   }
 
   selectedPaymentMethod = method;
+  isPaymentMethodSaved = false;
 
   try{
     const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`,{
@@ -1741,11 +1743,13 @@ async function selectPayment(method){
     }
 
     showPaymentInfo(
-      `付款方式：${result.paymentMethodLabel}\n\n` +
-      `應付金額：NT$${result.total}\n\n` +
-      `${result.paymentInfo}\n\n` +
-      `完成付款後，請按下方「我已付款」。`
-    );
+  `付款方式：${result.paymentMethodLabel}\n\n` +
+  `應付金額：NT$${result.total}\n\n` +
+  `${result.paymentInfo}\n\n` +
+  `完成付款後，請按下方「我已付款」。`
+);
+
+    isPaymentMethodSaved = true;
 
     document.getElementById('paidBtn').classList.remove('hidden');
     document.getElementById('cancelOrderBtn').classList.remove('hidden');
@@ -1768,6 +1772,10 @@ async function confirmPaid(){
 
   if(!selectedPaymentMethod){
   selectedPaymentMethod = 'jko';
+}
+
+if(!isPaymentMethodSaved){
+  await selectPayment(selectedPaymentMethod);
 }
 
   if(isConfirmingPaid) return;
