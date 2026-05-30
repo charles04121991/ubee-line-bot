@@ -2249,10 +2249,10 @@ function createRiderControlFlex(order) {
 }
 
 function createPaymentInfoFlex(order) {
-  const paymentInfo = PAYMENT_JKO_INFO;
+  const paymentInfo = order.paymentMethod === 'jko' ? PAYMENT_JKO_INFO : PAYMENT_BANK_INFO;
 
   return createFlexMessage('付款資訊', createBubble(
-    order.paymentMethod === 'jko' ? '街口支付資訊',
+    order.paymentMethod === 'jko' ? '街口支付資訊' : '付款資訊',
     [
       createInfoRow('訂單編號', order.id),
       createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
