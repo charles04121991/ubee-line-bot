@@ -538,6 +538,78 @@ if (!riderOk) {
   }
 });
 
+// 3. 取得騎士目前進行中任務：正式版用於重新整理後恢復任務
+app.get('/api/rider/current-order', async (req, res) => {
+  try {
+    const { lineUserId } = req.query;
+
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的騎士 LINE 身分。',
+      });
+    }
+
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    const riderOk = !riderSnap.empty && (
+      riderSnap.docs[0].data().approved === true ||
+      riderSnap.docs[0].data().status === 'approved'
+    );
+
+    if (!riderOk) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法查看目前任務。',
+      });
+    }
+
+    const activeStatuses = [
+      'accepted',
+      'arrived_pickup',
+      'picked_up',
+      'arrived_dropoff',
+    ];
+
+    const snap = await db.collection('orders')
+      .where('riderLineUserId', '==', lineUserId)
+      .where('status', 'in', activeStatuses)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.json({
+        success: true,
+        hasOrder: false,
+        order: null,
+      });
+    }
+
+    const doc = snap.docs[0];
+
+    return res.json({
+      success: true,
+      hasOrder: true,
+      order: {
+        id: doc.id,
+        ...doc.data(),
+      },
+    });
+
+  } catch (err) {
+    console.error('❌ 取得騎士目前任務失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '取得騎士目前任務失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
 // 3. 騎士今日 / 累積統計：正式版只允許 approved 騎士查看
 app.get('/api/rider/summary', async (req, res) => {
   try {
