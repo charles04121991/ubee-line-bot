@@ -1579,11 +1579,10 @@ function renderConfirmSummary(){
       <div class="price-row"><span>85 折優惠價</span><strong>NT$${finalTotal}</strong></div>
     `
     : `
-      <div class="price-row"><span>距離</span><strong>${data.distanceText}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${data.durationText}</strong></div>
+      <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
+      <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
       <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
-      <div class="price-row"><span>總金額</span><strong>NT$${Number(data.totalFee || 0) + getAdvancePayment()}</strong></div>
-    `;
+      <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>    `;
 }
 }
 
