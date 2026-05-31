@@ -2597,6 +2597,10 @@ app.post('/api/orders', async (req, res) => {
       speedType: data.speedType,
     });
 
+      price.total = Number(price.total || 0) + Number(data.advancePayment || 0);
+      price.driverFee = Math.round(Number(price.total || 0) * PRICING.driverRatio);
+      price.platformFee = Number(price.total || 0) - Number(price.driverFee || 0);
+    
     const id = generateOrderId();
 
     const order = {
