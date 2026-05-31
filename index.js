@@ -2384,6 +2384,7 @@ function createOrderFromApi(data) {
       ? (data.speedType || data.speed)
       : 'standard',
     note: cleanLongText(data.note || '', ORDER_INPUT_LIMITS.note),
+    advancePayment: Math.max(0, Math.round(Number(data.advancePayment || 0))),
   };
 }
 app.get('/api/config', (req, res) => {
