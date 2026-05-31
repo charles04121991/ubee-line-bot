@@ -1404,6 +1404,10 @@ function showPaymentInfo(text){
   box.innerText = text;
 }
 
+function getAdvancePayment(){
+  return Number(document.getElementById('advancePayment')?.value || 0);
+}
+
 function getData(){
   const extra = [];
 
@@ -1575,9 +1579,10 @@ function renderConfirmSummary(){
       <div class="price-row"><span>85 折優惠價</span><strong>NT$${finalTotal}</strong></div>
     `
     : `
-      <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
-      <div class="price-row"><span>預估金額</span><strong>NT$${originalTotal}</strong></div>
+      <div class="price-row"><span>距離</span><strong>${data.distanceText}</strong></div>
+      <div class="price-row"><span>時間</span><strong>${data.durationText}</strong></div>
+      <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+      <div class="price-row"><span>總金額</span><strong>NT$${Number(data.totalFee || 0) + getAdvancePayment()}</strong></div>
     `;
 }
 }
@@ -1594,7 +1599,12 @@ function getSpeedLabel(value){
 
 function renderSummary(order){
   const hasCoupon = taichung85Coupon.claimed && lastEstimate;
-  const originalTotal = hasCoupon ? Number(lastEstimate.totalFee || 0) : '';
+  const advancePayment = getAdvancePayment();
+
+  const originalTotal = hasCoupon
+    ? Number(lastEstimate.totalFee || 0) + advancePayment
+    : '';
+
   const finalTotal = hasCoupon
     ? Math.round(originalTotal * taichung85Coupon.discountRate)
     : (order?.total || currentTotal || '');
@@ -1651,9 +1661,10 @@ async function calculateEstimate(silent){
     const estimateResult = document.getElementById('estimateResult');
     estimateResult.classList.remove('hidden');
     document.getElementById('estimateText').innerHTML = `
-      <div class="price-row"><span>距離</span><strong>${data.distanceText}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${data.durationText}</strong></div>
-      <div class="price-row"><span>預估費用</span><strong>NT$${data.totalFee}</strong></div>
+       <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
+       <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
+       <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+       <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
     `;
     return true;
   }catch(err){
@@ -1670,9 +1681,9 @@ async function submitOrder(){
   const data = getData();
 
 if(lastEstimate && taichung85Coupon.claimed){
-  const originalTotal = Number(lastEstimate.totalFee || 0);
+  const advancePayment = getAdvancePayment();
+  const originalTotal = Number(lastEstimate.totalFee || 0) + advancePayment;
   const finalTotal = Math.round(originalTotal * taichung85Coupon.discountRate);
-
   data.coupon = {
     campaignId: 'taichung85_2026',
     code: 'TAICHUNG85',
