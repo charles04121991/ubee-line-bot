@@ -910,6 +910,16 @@ body.night-mode{
             <div class="input-icon">✎</div>
             <textarea id="note" maxlength="200" placeholder="備註：請填寫品牌、數量、規格、顏色、注意事項。包裹請先拍照上傳官方帳號確認內容物。"></textarea>
           </div>
+             <div class="input-wrap">
+                <div class="input-icon">💰</div>
+             <input
+                id="advancePayment"
+                type="number"
+                min="0"
+                inputmode="numeric"
+                placeholder="預估代墊金額，例如：350，沒有請填 0"
+              >
+            </div>
         </div>
       </div>
 
@@ -1416,6 +1426,9 @@ function getData(){
     dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
     item: document.getElementById('item').value.trim(),
     note: [note, ...extra].filter(Boolean).join('\n'),
+    
+    advancePayment: Number(document.getElementById('advancePayment')?.value || 0),
+    
     userId
   };
 }
@@ -1454,12 +1467,17 @@ function validateStep2(){
     alert('請輸入任務內容');
     return false;
   }
+  
+  if((data.serviceGroup === 'buy' || data.serviceGroup === 'life') && data.advancePayment < 0){
+    alert('代墊金額不可小於 0');
+    return false;
+  }
 
   if(data.item.length < 2){
     alert('請輸入完整任務內容');
     return false;
   }
-
+  
   return true;
 }
 
