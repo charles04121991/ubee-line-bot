@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>UBee｜店家派單中心</title>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
 <style>
 :root{
   --bg:#000;
@@ -81,7 +84,7 @@ label{
   color:#ddd;
 }
 
-input,textarea,select{
+input,textarea{
   width:100%;
   border:1px solid var(--line);
   background:var(--card2);
@@ -191,7 +194,7 @@ button:disabled{
   <div class="hero">
     <div class="logo"><span>U</span>Bee 🐝</div>
     <h1>店家派單中心</h1>
-    <p>合作店家專屬配送入口，建立配送單後，UBee 將協助安排騎士前往店家取貨並配送至顧客地址。</p>
+    <p>合作店家專屬配送入口，建立配送單後，系統會直接送入 UBee 騎士端派單流程。</p>
   </div>
 
   <form id="merchantForm">
@@ -203,7 +206,7 @@ button:disabled{
       <input id="merchantName" placeholder="例如：UBee 飲料店" maxlength="40" required />
 
       <label>店家電話</label>
-      <input id="merchantPhone" placeholder="例如：0912-345-678,04-251234567" maxlength="20" required />
+      <input id="merchantPhone" placeholder="例如：0912-345-678 或 04-25123456" maxlength="20" required />
 
       <label>取貨地址</label>
       <input id="pickupAddress" placeholder="請輸入店家完整地址" maxlength="100" required />
@@ -219,7 +222,7 @@ button:disabled{
       <input id="customerPhone" placeholder="例如：0912-345-678" maxlength="20" required />
 
       <label>配送地址</label>
-      <input id="dropoffAddress" placeholder="請輸入顧客地址" maxlength="100" required />
+      <input id="dropoffAddress" placeholder="請輸入顧客完整地址" maxlength="100" required />
     </div>
 
     <div class="section">
@@ -252,7 +255,7 @@ button:disabled{
       <textarea id="note" placeholder="例如：有無需要代墊費用、不要按門鈴、放管理室" maxlength="200"></textarea>
 
       <div class="notice">
-        建立配送單後，系統會送出至 UBee 派單流程。請確認地址、電話與商品內容正確。
+        建立配送單後，系統會直接寫入 UBee 訂單資料庫，並送到騎士端等待接單。
       </div>
 
       <button id="submitBtn" type="submit">建立配送單</button>
@@ -265,91 +268,201 @@ button:disabled{
 </div>
 
 <script>
-let selectedDeliveryType = 'standard';
+let selectedDeliveryType = "standard";
 
 const deliveryTextMap = {
-  standard: '標準件',
-  priority: '優先件',
-  instant: '即時件',
-  urgent: '急件'
+  standard: "標準件",
+  priority: "優先件",
+  instant: "即時件",
+  urgent: "急件"
 };
 
-document.querySelectorAll('.option').forEach(option => {
-  option.addEventListener('click', () => {
-    document.querySelectorAll('.option').forEach(o => o.classList.remove('active'));
-    option.classList.add('active');
-    selectedDeliveryType = option.dataset.value;
+const deliveryFeeMap = {
+  standard: 90,
+  priority: 120,
+  instant: 150,
+  urgent: 200
+};
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
+  authDomain: "ubee-oms.firebaseapp.com",
+  projectId: "ubee-oms"
+};
+
+if(!firebase.apps.length){
+  firebase.initializeApp(firebaseConfig);
+}
+
+const db = firebase.firestore();
+
+document.querySelectorAll(".option").forEach(option => {
+  option.addEventListener("click", () => {
+    document.querySelectorAll(".option").forEach(o => o.classList.remove("active"));
+    option.classList.add("active");
+    selectedDeliveryType = option.dataset.value || "standard";
   });
 });
 
 function getValue(id){
-  return document.getElementById(id).value.trim();
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
 }
 
 function showError(message){
-  const box = document.getElementById('errorBox');
-  box.style.display = 'block';
+  const box = document.getElementById("errorBox");
+  const resultBox = document.getElementById("resultBox");
+
+  if(resultBox){
+    resultBox.style.display = "none";
+    resultBox.innerHTML = "";
+  }
+
+  box.style.display = "block";
   box.textContent = message;
 }
 
 function hideError(){
-  const box = document.getElementById('errorBox');
-  box.style.display = 'none';
-  box.textContent = '';
+  const box = document.getElementById("errorBox");
+  box.style.display = "none";
+  box.textContent = "";
 }
 
 function showResult(orderId){
-  const box = document.getElementById('resultBox');
-  box.style.display = 'block';
+  const box = document.getElementById("resultBox");
+  box.style.display = "block";
   box.innerHTML = `
     配送單已建立成功！<br>
-    訂單編號：<strong>${orderId || '系統建立中'}</strong><br>
-    請等待 UBee 安排騎士前往店家取貨。
+    訂單編號：<strong>${escapeHtml(orderId)}</strong><br>
+    已送出至 UBee 騎士端派單流程。
   `;
 }
 
-document.getElementById('merchantForm').addEventListener('submit', async (e) => {
+function generateMerchantOrderNo(){
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+
+  const y = now.getFullYear();
+  const m = pad(now.getMonth() + 1);
+  const d = pad(now.getDate());
+  const h = pad(now.getHours());
+  const min = pad(now.getMinutes());
+  const s = pad(now.getSeconds());
+  const rand = Math.floor(Math.random() * 900 + 100);
+
+  return `UBM${y}${m}${d}${h}${min}${s}${rand}`;
+}
+
+function resetDeliveryOption(){
+  selectedDeliveryType = "standard";
+
+  document.querySelectorAll(".option").forEach(o => {
+    o.classList.remove("active");
+  });
+
+  const standard = document.querySelector('.option[data-value="standard"]');
+  if(standard){
+    standard.classList.add("active");
+  }
+}
+
+function validatePayload(payload){
+  if(!payload.merchantName) return "請填寫店家名稱";
+  if(!payload.merchantPhone) return "請填寫店家電話";
+  if(!payload.pickupAddress) return "請填寫取貨地址";
+  if(!payload.customerName) return "請填寫顧客姓名";
+  if(!payload.customerPhone) return "請填寫顧客電話";
+  if(!payload.dropoffAddress) return "請填寫配送地址";
+  if(!payload.itemName) return "請填寫商品內容";
+  return "";
+}
+
+function escapeHtml(str){
+  return String(str ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+document.getElementById("merchantForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   hideError();
 
-  const submitBtn = document.getElementById('submitBtn');
+  const submitBtn = document.getElementById("submitBtn");
   submitBtn.disabled = true;
-  submitBtn.textContent = '建立中...';
+  submitBtn.textContent = "建立中...";
+
+  const orderNo = generateMerchantOrderNo();
+  const driverFee = deliveryFeeMap[selectedDeliveryType] || 90;
 
   const payload = {
-    merchantName: getValue('merchantName'),
-    merchantPhone: getValue('merchantPhone'),
-    pickupAddress: getValue('pickupAddress'),
-    customerName: getValue('customerName'),
-    customerPhone: getValue('customerPhone'),
-    dropoffAddress: getValue('dropoffAddress'),
-    itemName: getValue('itemName'),
+    orderNo: orderNo,
+    source: "merchant_center",
+    serviceType: "merchant_delivery",
+    status: "pending_dispatch",
+
+    merchantName: getValue("merchantName"),
+    merchantPhone: getValue("merchantPhone"),
+
+    customerName: getValue("customerName"),
+    customerPhone: getValue("customerPhone"),
+
+    pickupAddress: getValue("pickupAddress"),
+    dropoffAddress: getValue("dropoffAddress"),
+
+    pickupPhone: getValue("merchantPhone"),
+    dropoffPhone: getValue("customerPhone"),
+
+    itemName: getValue("itemName"),
+    item: getValue("itemName"),
+
     deliveryType: selectedDeliveryType,
-    deliveryTypeText: deliveryTextMap[selectedDeliveryType],
-    note: getValue('note')
+    deliveryTypeText: deliveryTextMap[selectedDeliveryType] || "標準件",
+
+    note: getValue("note"),
+    customerNote: getValue("note"),
+
+    driverFee: driverFee,
+    riderFee: driverFee,
+    fee: driverFee,
+    price: driverFee,
+
+    advancePayment: 0,
+    skippedRiderIds: [],
+
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
+  const validationError = validatePayload(payload);
+
+  if(validationError){
+    showError(validationError);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "建立配送單";
+    return;
+  }
+
   try{
-    const res = await fetch('/api/merchant/order', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
-    });
+    await db.collection("orders").doc(orderNo).set(payload);
 
-    const data = await res.json();
-
-    if(!res.ok || !data.success){
-      throw new Error(data.message || '建立配送單失敗');
-    }
-
-    showResult(data.orderId);
-    document.getElementById('merchantForm').reset();
+    showResult(orderNo);
+    document.getElementById("merchantForm").reset();
+    resetDeliveryOption();
 
   }catch(err){
-    showError(err.message || '系統忙碌中，請稍後再試');
+    console.error("店家配送單建立失敗:", err);
+
+    showError(
+      err && err.message
+        ? `店家配送單建立失敗：${err.message}`
+        : "店家配送單建立失敗，請稍後再試。"
+    );
   }finally{
     submitBtn.disabled = false;
-    submitBtn.textContent = '建立配送單';
+    submitBtn.textContent = "建立配送單";
   }
 });
 </script>
