@@ -2613,6 +2613,7 @@ app.post('/api/orders', async (req, res) => {
       dropoffPhone: data.dropoffPhone,
       speedType: data.speedType,
       note: data.note,
+      advancePayment: Number(data.advancePayment || 0),
       duplicateFingerprint: getDuplicateFingerprint(data),
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
