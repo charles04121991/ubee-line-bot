@@ -286,6 +286,29 @@ const deliveryTextMap = {
   urgent: "急件"
 };
 
+const merchantFeeMap = {
+  standard: {
+    totalFee: 120,
+    riderFee: 90,
+    platformFee: 30
+  },
+  priority: {
+    totalFee: 160,
+    riderFee: 120,
+    platformFee: 40
+  },
+  instant: {
+    totalFee: 200,
+    riderFee: 150,
+    platformFee: 50
+  },
+  urgent: {
+    totalFee: 260,
+    riderFee: 200,
+    platformFee: 60
+  }
+};
+
 const deliveryFeeMap = {
   standard: 90,
   priority: 120,
@@ -404,7 +427,7 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
   submitBtn.textContent = "建立中...";
 
   const orderNo = generateMerchantOrderNo();
-  const driverFee = deliveryFeeMap[selectedDeliveryType] || 90;
+  const feeConfig = merchantFeeMap[selectedDeliveryType] || merchantFeeMap.standard;
 
   const payload = {
     orderNo: orderNo,
@@ -433,10 +456,14 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
     note: getValue("note"),
     customerNote: getValue("note"),
 
-    driverFee: driverFee,
-    riderFee: driverFee,
-    fee: driverFee,
-    price: driverFee,
+    total: feeConfig.totalFee,
+    totalFee: feeConfig.totalFee,
+    driverFee: feeConfig.riderFee,
+    riderFee: feeConfig.riderFee,
+    fee: feeConfig.riderFee,
+    price: feeConfig.riderFee,
+    platformFee: feeConfig.platformFee,
+    merchantFee: feeConfig.totalFee,
 
     advancePayment: Number(getValue("advancePayment") || 0),
     skippedRiderIds: [],
