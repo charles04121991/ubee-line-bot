@@ -676,7 +676,7 @@ const riderDocId = riderDoc.id;
 
 const completedSnap = await db.collection('orders')
   .where('riderLineUserId', '==', lineUserId)
-  .where('status', '==', 'completed')
+  .where('status', 'in', ['completed', 'done'])
   .limit(500)
   .get();
 
