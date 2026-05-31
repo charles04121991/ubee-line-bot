@@ -250,6 +250,15 @@ button:disabled{
           <small>高優先順序配送任務</small>
         </div>
       </div>
+      
+      <label>代墊金額</label>
+      <input
+        id="advancePayment"
+        type="number"
+        min="0"
+        value="0"
+        placeholder="例如：300、500、1000，沒有代墊請填 0"
+      />
 
       <label>備註</label>
       <textarea id="note" placeholder="例如：有無需要代墊費用、不要按門鈴、放管理室" maxlength="200"></textarea>
@@ -429,7 +438,7 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
     fee: driverFee,
     price: driverFee,
 
-    advancePayment: 0,
+    advancePayment: Number(getValue("advancePayment") || 0),
     skippedRiderIds: [],
 
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
