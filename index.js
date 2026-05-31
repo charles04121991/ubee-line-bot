@@ -1226,11 +1226,11 @@ app.post('/api/business/register', async (req, res) => {
 
 const PRICING = {
   baseFee: 80,
-  perKm: 15,
+  perKm: 18,
   perMinute: 3,
   serviceFee: 50,
   waitingFee: 60,
-  driverRatio: 0.6,
+  driverRatio: 0.7,
 };
 
 const SPEED_OPTIONS = {
