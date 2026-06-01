@@ -22,9 +22,10 @@ const app = express();
 // ===== CORS：允許 UBee 騎士前端正式站呼叫 Render 後端 =====
 app.use((req, res, next) => {
   const allowedOrigins = [
-    'https://ubee-rider-web.vercel.app',
-    'https://ubee-line-bot-2-zezw.onrender.com',
-  ];
+  'https://ubee-rider-web.vercel.app',
+  'https://ubee-line-bot-2-zezw.onrender.com',
+  'https://ubee-business-web.vercel.app',
+];
 
   const origin = req.headers.origin;
 
@@ -1119,18 +1120,34 @@ if (!online) {
 // ===== 商務合作申請 API =====
 app.post('/api/business/register', async (req, res) => {
   try {
-    const {
-      companyName,
-      contactName,
-      phone,
-      lineId,
-      district,
-      selectedTypes,
-      needType,
-      frequency,
-      deliveryArea,
-      note,
-    } = req.body;
+    const companyName = cleanText(
+      req.body.companyName || req.body.businessName || '',
+      80
+    );
+
+    const contactName = cleanText(req.body.contactName || '', 40);
+    const phone = normalizePhone(req.body.phone || '');
+    const lineId = cleanText(req.body.lineId || '', 60);
+
+    const district = cleanText(
+      req.body.district || req.body.address || '',
+      120
+    );
+
+    const selectedTypes = Array.isArray(req.body.selectedTypes)
+      ? req.body.selectedTypes
+      : Array.isArray(req.body.cooperationTypes)
+        ? req.body.cooperationTypes
+        : [];
+
+    const needType = cleanText(
+      req.body.needType || req.body.mainNeed || '',
+      80
+    );
+
+    const frequency = cleanText(req.body.frequency || '', 40);
+    const deliveryArea = cleanText(req.body.deliveryArea || '', 120);
+    const note = cleanLongText(req.body.note || '', 300);
 
     if (!companyName || !contactName || !phone || !district || !needType || !frequency || !deliveryArea) {
       return res.status(400).json({
@@ -1139,20 +1156,29 @@ app.post('/api/business/register', async (req, res) => {
       });
     }
 
+    if (!/^09\d{8}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: '手機號碼格式錯誤，請輸入 09 開頭的 10 碼手機號碼。',
+      });
+    }
+
     const businessLineUserId = cleanText(req.body.lineUserId || req.body.userId || '', 80);
 
     const businessPayload = {
-      companyName: cleanText(companyName, 80),
-      contactName: cleanText(contactName, 40),
-      phone: normalizePhone(phone),
-      lineId: cleanText(lineId, 60),
-      district: cleanText(district, 80),
-      selectedTypes: Array.isArray(selectedTypes) ? selectedTypes.map(t => cleanText(t, 40)) : [],
-      needType: cleanText(needType, 40),
-      frequency: cleanText(frequency, 40),
-      deliveryArea: cleanText(deliveryArea, 120),
-      note: cleanLongText(note || '', 300),
+      companyName,
+      contactName,
+      phone,
+      lineId,
+      district,
+      selectedTypes: selectedTypes.map(t => cleanText(t, 40)).filter(Boolean),
+      needType,
+      frequency,
+      deliveryArea,
+      note,
       lineUserId: businessLineUserId,
+      source: cleanText(req.body.source || 'ubee-business-web', 80),
+      pageUrl: cleanText(req.body.pageUrl || '', 200),
       status: 'pending',
       updatedAt: new Date().toLocaleString('zh-TW'),
       updatedAtMs: Date.now(),
@@ -1183,10 +1209,10 @@ app.post('/api/business/register', async (req, res) => {
         console.log('🏢 店家合作重新送出，已更新最新資料：', updatedBusiness);
 
         try {
-  await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(updatedBusiness));
-} catch (pushErr) {
-  console.error('⚠️ 商務合作群組通知失敗：', pushErr);
-}
+          await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(updatedBusiness));
+        } catch (pushErr) {
+          console.error('⚠️ 商務合作群組通知失敗：', pushErr);
+        }
 
         return res.json({
           success: true,
@@ -1211,10 +1237,10 @@ app.post('/api/business/register', async (req, res) => {
     console.log('🏢 新商務合作申請：', business);
 
     try {
-  await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(business));
-} catch (pushErr) {
-  console.error('⚠️ 商務合作群組通知失敗：', pushErr);
-}
+      await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(business));
+    } catch (pushErr) {
+      console.error('⚠️ 商務合作群組通知失敗：', pushErr);
+    }
 
     return res.json({
       success: true,
@@ -1228,6 +1254,7 @@ app.post('/api/business/register', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: '合作需求送出失敗，請稍後再試。',
+      error: err.message,
     });
   }
 });
