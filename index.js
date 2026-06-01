@@ -1182,7 +1182,11 @@ app.post('/api/business/register', async (req, res) => {
 
         console.log('🏢 店家合作重新送出，已更新最新資料：', updatedBusiness);
 
-        await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(updatedBusiness));
+        try {
+  await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(updatedBusiness));
+} catch (pushErr) {
+  console.error('⚠️ 商務合作群組通知失敗：', pushErr);
+}
 
         return res.json({
           success: true,
@@ -1206,7 +1210,11 @@ app.post('/api/business/register', async (req, res) => {
 
     console.log('🏢 新商務合作申請：', business);
 
-    await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(business));
+    try {
+  await pushToGroup(LINE_ADMIN_GROUP_ID, createBusinessReviewFlex(business));
+} catch (pushErr) {
+  console.error('⚠️ 商務合作群組通知失敗：', pushErr);
+}
 
     return res.json({
       success: true,
