@@ -458,8 +458,16 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
   submitBtn.textContent = "建立中...";
 
   const orderNo = generateMerchantOrderNo();
-  const feeConfig = merchantFeeMap[selectedDeliveryType] || merchantFeeMap.standard;
 
+  const feeConfig =
+  merchantFeeMap[selectedDeliveryType] || merchantFeeMap.standard;
+
+  const deliveryFee =
+  deliveryFeeMap[selectedDeliveryType] || 0;
+
+  const riderFee = deliveryFee;
+  const platformFee = feeConfig.platformFee;
+  const totalFee = riderFee + platformFee;
   const payload = {
     orderNo: orderNo,
     source: "merchant_center",
@@ -487,14 +495,15 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
     note: getValue("note"),
     customerNote: getValue("note"),
 
-    total: feeConfig.totalFee,
-    totalFee: feeConfig.totalFee,
-    driverFee: feeConfig.riderFee,
-    riderFee: feeConfig.riderFee,
-    fee: feeConfig.riderFee,
-    price: feeConfig.riderFee,
-    platformFee: feeConfig.platformFee,
-    merchantFee: feeConfig.totalFee,
+    total: totalFee,
+    totalFee: totalFee,
+    driverFee: riderFee,
+    riderFee: riderFee,
+    fee: riderFee,
+    price: riderFee,
+    platformFee: platformFee,
+    merchantFee: totalFee,
+    deliveryFee: deliveryFee,
 
     advancePayment: Number(getValue("advancePayment") || 0),
     skippedRiderIds: [],
@@ -505,7 +514,7 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
 
   const paymentConfirmed = document.getElementById("paymentConfirmed");
 
-if(feeConfig.totalFee > 0 && (!paymentConfirmed || !paymentConfirmed.checked)){
+  if(totalFee > 0 && (!paymentConfirmed || !paymentConfirmed.checked)){
   showError("請先完成街口支付，並勾選「我已完成付款」後再建立配送單。");
   submitBtn.disabled = false;
   submitBtn.textContent = "建立配送單";
