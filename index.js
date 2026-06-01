@@ -2532,6 +2532,10 @@ app.post('/api/merchant/order', async (req, res) => {
     }
 
     const id = generateOrderId();
+    
+    const total = Number(req.body.total || req.body.totalFee || 0);
+    const driverFee = Math.round(total * PRICING.driverRatio);
+    const platformFee = total - driverFee;
 
     const order = {
       id,
@@ -2557,11 +2561,12 @@ app.post('/api/merchant/order', async (req, res) => {
       speedType: deliveryType || 'standard',
       deliveryTypeText: cleanText(deliveryTypeText || '標準件', 20),
       note: cleanLongText(note || '', 200),
-
-      total: 0,
-      driverFee: 0,
-      platformFee: 0,
-      deliveryFee: 0,
+      
+      total,
+      driverFee,
+      riderFee: driverFee,
+      platformFee,
+      deliveryFee: total,
       serviceFee: 0,
       speedFee: 0,
       waitingFee: 0,
