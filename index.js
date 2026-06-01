@@ -2533,11 +2533,33 @@ app.post('/api/merchant/order', async (req, res) => {
 
     const id = generateOrderId();
     
-    const total = Number(req.body.total || req.body.totalFee || 0);
+    const distance = await getDistanceMatrixCached(
+    pickupAddress,
+    dropoffAddress
+  );
+
+    const merchantSpeedFeeMap = {
+      standard: 0,
+      priority: 25,
+      instant: 50,
+      urgent: 75,
+    };
+
+    const km = Number(distance.distanceMeters || 0) / 1000;
+    const minutes = Number(distance.durationSeconds || 0) / 60;
+    const speedFee = merchantSpeedFeeMap[deliveryType] || 0;
+
+    const deliveryFee = Math.round(
+      PRICING.baseFee +
+      km * PRICING.perKm +
+      minutes * PRICING.perMinute
+    );
+
+    const total = deliveryFee + speedFee;
     const driverFee = Math.round(total * PRICING.driverRatio);
     const platformFee = total - driverFee;
-
     const order = {
+      
       id,
       orderType: 'merchant_delivery',
       source: 'merchant',
@@ -2562,13 +2584,18 @@ app.post('/api/merchant/order', async (req, res) => {
       deliveryTypeText: cleanText(deliveryTypeText || '標準件', 20),
       note: cleanLongText(note || '', 200),
       
+      distanceMeters: distance.distanceMeters,
+      durationSeconds: distance.durationSeconds,
+      distanceText: distance.distanceText,
+      durationText: distance.durationText,
+
       total,
       driverFee,
       riderFee: driverFee,
       platformFee,
-      deliveryFee: total,
+      deliveryFee,
       serviceFee: 0,
-      speedFee: 0,
+      speedFee,
       waitingFee: 0,
 
       etaMinutes: null,
