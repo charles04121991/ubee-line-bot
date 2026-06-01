@@ -531,9 +531,21 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
   }
 
   try{
-    await db.collection("orders").doc(orderNo).set(payload);
+    const response = await fetch("/api/merchant/order", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(payload)
+});
 
-    showResult(orderNo, feeConfig);
+const data = await response.json();
+
+if(!response.ok || !data.success){
+  throw new Error(data.message || "店家配送單建立失敗");
+}
+
+    showResult(data.orderId || orderNo, data.order || data);
     document.getElementById("merchantForm").reset();
     resetDeliveryOption();
 
