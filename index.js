@@ -2619,9 +2619,10 @@ app.post('/api/merchant/order', async (req, res) => {
     return res.json({
       success: true,
       orderId: id,
-      message: '店家配送單已建立，系統已推送到騎士群組。',
+      order,
+      message: '店家配送單已建立，系統已推送到騎士群組。'
     });
-
+    
   } catch (err) {
     console.error('❌ 店家配送單建立失敗：', err);
     return res.status(500).json({
