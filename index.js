@@ -1981,22 +1981,32 @@ function createInfoMenuFlex() {
 }
 
 function createBusinessReviewFlex(business) {
+  const safe = (v, fallback = '未填寫') => {
+    if (v === undefined || v === null || v === '') return fallback;
+    return String(v);
+  };
+
+  const selectedTypesText =
+    Array.isArray(business.selectedTypes) && business.selectedTypes.length
+      ? business.selectedTypes.join('、')
+      : safe(business.needType);
+
   return createFlexMessage('新商務合作申請', createBubble(
     '🏢 新商務合作申請',
     [
-      createInfoRow('申請編號', business.businessId),
-      createInfoRow('公司 / 店家', business.companyName),
-      createInfoRow('聯絡人', business.contactName),
-      createInfoRow('手機', business.phone),
-      createInfoRow('LINE ID', business.lineId),
-      createInfoRow('所在區域', business.district),
-      createInfoRow('合作類型', business.selectedTypes?.length ? business.selectedTypes.join('、') : business.needType),
-      createInfoRow('主要需求', business.needType),
-      createInfoRow('需求頻率', business.frequency),
-      createInfoRow('配送區域', business.deliveryArea),
-      createInfoRow('備註', business.note || '無'),
+      createInfoRow('申請編號', safe(business.businessId)),
+      createInfoRow('公司 / 店家', safe(business.companyName)),
+      createInfoRow('聯絡人', safe(business.contactName)),
+      createInfoRow('手機', safe(business.phone)),
+      createInfoRow('LINE ID', safe(business.lineId)),
+      createInfoRow('所在區域', safe(business.district)),
+      createInfoRow('合作類型', selectedTypesText),
+      createInfoRow('主要需求', safe(business.needType)),
+      createInfoRow('需求頻率', safe(business.frequency)),
+      createInfoRow('配送區域', safe(business.deliveryArea)),
+      createInfoRow('備註', safe(business.note, '無')),
       createInfoRow('狀態', '待審核 / 待聯繫'),
-      createInfoRow('送出時間', business.createdAt),
+      createInfoRow('送出時間', safe(business.createdAt || business.updatedAt || business.resubmittedAt)),
       {
         type: 'text',
         text: '此為企業 / 店家合作需求，請 UBee 辦公室評估後主動聯繫。',
@@ -2006,18 +2016,18 @@ function createBusinessReviewFlex(business) {
         margin: 'md',
       },
     ],
-   [
-  createUriButton('撥打聯絡人', buildTelUrl(business.phone)),
-  {
-    type: 'button',
-    style: 'secondary',
-    action: {
-      type: 'postback',
-      label: '審核通過',
-      data: `business_approve:${business.businessId}`
-    }
-  }
-]
+    [
+      createUriButton('撥打聯絡人', buildTelUrl(safe(business.phone, ''))),
+      {
+        type: 'button',
+        style: 'secondary',
+        action: {
+          type: 'postback',
+          label: '審核通過',
+          data: `business_approve:${safe(business.businessId, '')}`
+        }
+      }
+    ]
   ));
 }
 
