@@ -260,6 +260,17 @@ button:disabled{
         placeholder="例如：300、500、1000，沒有代墊請填 0"
       />
 
+      <div class="notice" id="paymentNotice">
+        本次應付 UBee：<strong>NT$120</strong><br>
+        街口支付：<strong>901871793</strong><br>
+        請完成付款後，再建立配送單。
+      </div>
+
+      <label style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+        <input id="paymentConfirmed" type="checkbox" style="width:auto;">
+        我已完成付款
+      </label>
+
       <label>備註</label>
       <textarea id="note" placeholder="例如：有無需要代墊費用、不要按門鈴、放管理室" maxlength="200"></textarea>
 
@@ -288,24 +299,24 @@ const deliveryTextMap = {
 
 const merchantFeeMap = {
   standard: {
-    totalFee: 120,
-    riderFee: 90,
-    platformFee: 30
+    totalFee: 0,
+    riderFee: 0,
+    platformFee: 0
   },
   priority: {
-    totalFee: 160,
-    riderFee: 120,
-    platformFee: 40
+    totalFee: 25,
+    riderFee: 0,
+    platformFee: 25
   },
   instant: {
-    totalFee: 200,
-    riderFee: 150,
+    totalFee: 50,
+    riderFee: 0,
     platformFee: 50
   },
   urgent: {
-    totalFee: 260,
-    riderFee: 200,
-    platformFee: 60
+    totalFee: 75,
+    riderFee: 0,
+    platformFee: 75
   }
 };
 
@@ -328,11 +339,26 @@ if(!firebase.apps.length){
 
 const db = firebase.firestore();
 
+function updatePaymentNotice(){
+  const box = document.getElementById("paymentNotice");
+  const feeConfig =
+    merchantFeeMap[selectedDeliveryType] || merchantFeeMap.standard;
+
+  if(box){
+    box.innerHTML = `
+      本次店家應付 UBee：<strong>NT$${feeConfig.totalFee}</strong><br>
+      街口支付：<strong>901871793</strong><br>
+      請完成付款後，再建立配送單。
+    `;
+  }
+}
+
 document.querySelectorAll(".option").forEach(option => {
   option.addEventListener("click", () => {
     document.querySelectorAll(".option").forEach(o => o.classList.remove("active"));
     option.classList.add("active");
     selectedDeliveryType = option.dataset.value || "standard";
+    updatePaymentNotice();
   });
 });
 
@@ -360,13 +386,18 @@ function hideError(){
   box.textContent = "";
 }
 
-function showResult(orderId){
+function showResult(orderId, feeConfig){
   const box = document.getElementById("resultBox");
   box.style.display = "block";
   box.innerHTML = `
-    配送單已建立成功！<br>
-    訂單編號：<strong>${escapeHtml(orderId)}</strong><br>
-    已送出至 UBee 騎士端派單流程。
+    <strong>配送單已建立成功！</strong><br>
+    訂單編號：<strong>${escapeHtml(orderId)}</strong><br><br>
+
+    本次應付 UBee：<strong>NT$${feeConfig.totalFee}</strong><br>
+    騎士配送收入：NT$${feeConfig.riderFee}<br>
+    UBee 平台服務費：NT$${feeConfig.platformFee}<br><br>
+
+    系統已通知附近騎士接單。
   `;
 }
 
@@ -472,6 +503,15 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
+  const paymentConfirmed = document.getElementById("paymentConfirmed");
+
+if(feeConfig.totalFee > 0 && (!paymentConfirmed || !paymentConfirmed.checked)){
+  showError("請先完成街口支付，並勾選「我已完成付款」後再建立配送單。");
+  submitBtn.disabled = false;
+  submitBtn.textContent = "建立配送單";
+  return;
+}
+
   const validationError = validatePayload(payload);
 
   if(validationError){
@@ -484,7 +524,7 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
   try{
     await db.collection("orders").doc(orderNo).set(payload);
 
-    showResult(orderNo);
+    showResult(orderNo, feeConfig);
     document.getElementById("merchantForm").reset();
     resetDeliveryOption();
 
