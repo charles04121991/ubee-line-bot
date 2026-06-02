@@ -1460,12 +1460,28 @@ function validateStep2(){
     return false;
   }
 
-  const phonePattern = /^09\d{8}$/;
+  const normalizePhone = (value) => {
+  return String(value || '')
+    .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+    .replace(/\s|-/g, '')
+    .replace(/^\+886/, '0')
+    .replace(/^886/, '0');
+};
 
-  if(!phonePattern.test(data.pickupPhone) || !phonePattern.test(data.dropoffPhone)){
-    alert('請輸入正確手機號碼，例如：0912345678');
-    return false;
-  }
+data.pickupPhone = normalizePhone(data.pickupPhone);
+data.dropoffPhone = normalizePhone(data.dropoffPhone);
+
+const mobilePattern = /^09\d{8}$/;
+const landlinePattern = /^0\d{8,9}$/;
+
+const isValidPhone = (phone) => {
+  return mobilePattern.test(phone) || landlinePattern.test(phone);
+};
+
+if(!isValidPhone(data.pickupPhone) || !isValidPhone(data.dropoffPhone)){
+  alert('請輸入正確電話，例如：0912345678 或 0425234567');
+  return false;
+}
 
   if(!data.item){
     alert('請輸入任務內容');
