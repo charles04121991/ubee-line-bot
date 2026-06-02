@@ -101,7 +101,7 @@ body{
   <div class="title">UBee 配送追蹤</div>
 
   <div class="order-no">
-    訂單編號：UBM202606020001
+    訂單編號：<span id="orderIdText">讀取中...</span>
   </div>
 </div>
 
@@ -150,5 +150,23 @@ body{
 
 </div>
 
+<script>
+function getQueryParam(name){
+  const params = new URLSearchParams(window.location.search);
+  return params.get(name) || "";
+}
+
+function initTrackPage(){
+  const orderId = getQueryParam("orderId") || getQueryParam("id");
+
+  const orderIdText = document.getElementById("orderIdText");
+
+  if(orderIdText){
+    orderIdText.textContent = orderId || "尚未指定訂單";
+  }
+}
+
+initTrackPage();
+</script>
 </body>
 </html>
