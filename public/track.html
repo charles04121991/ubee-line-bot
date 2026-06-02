@@ -10,11 +10,14 @@
 :root{
   --bg:#000;
   --card:#111;
+  --card2:#171717;
   --line:rgba(255,255,255,.12);
   --text:#fff;
   --muted:#a8a8a8;
   --yellow:#facc15;
   --green:#22c55e;
+  --blue:#38bdf8;
+  --red:#ef4444;
 }
 
 *{
@@ -50,45 +53,145 @@ body{
 .order-no{
   color:var(--muted);
   margin-top:6px;
+  line-height:1.6;
 }
 
-.status{
-  margin-top:20px;
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:14px;
+  padding:8px 12px;
+  border-radius:999px;
+  background:rgba(250,204,21,.14);
+  color:var(--yellow);
+  font-size:14px;
+  font-weight:900;
+}
+
+.info-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+.info-box{
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:14px;
+}
+
+.info-label{
+  color:var(--muted);
+  font-size:13px;
+  font-weight:700;
+  margin-bottom:6px;
+}
+
+.info-value{
+  color:var(--text);
+  font-size:15px;
+  font-weight:800;
+  line-height:1.5;
+  word-break:break-word;
 }
 
 .step{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   gap:12px;
-  margin-bottom:16px;
+  margin-bottom:18px;
+}
+
+.step:last-child{
+  margin-bottom:0;
 }
 
 .dot{
-  width:20px;
-  height:20px;
+  width:22px;
+  height:22px;
   border-radius:50%;
   background:#333;
+  border:3px solid #333;
+  flex:0 0 auto;
+  margin-top:1px;
 }
 
 .dot.done{
   background:var(--green);
+  border-color:var(--green);
+}
+
+.dot.current{
+  background:var(--yellow);
+  border-color:var(--yellow);
+  box-shadow:0 0 0 5px rgba(250,204,21,.16);
+}
+
+.dot.cancelled{
+  background:var(--red);
+  border-color:var(--red);
 }
 
 .step-text{
   font-size:16px;
-  font-weight:700;
+  font-weight:900;
+  line-height:1.35;
 }
 
-.close-btn{
+.step-sub{
+  color:var(--muted);
+  font-size:13px;
+  font-weight:700;
+  margin-top:4px;
+  line-height:1.45;
+}
+
+.actions{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  margin-top:20px;
+}
+
+.btn{
   width:100%;
   padding:16px;
   border:none;
   border-radius:18px;
-  background:var(--yellow);
-  color:#000;
   font-size:18px;
   font-weight:900;
-  margin-top:20px;
+}
+
+.btn-primary{
+  background:var(--yellow);
+  color:#000;
+}
+
+.btn-secondary{
+  background:#222;
+  color:#fff;
+  border:1px solid var(--line);
+}
+
+.notice{
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.6;
+  margin-top:12px;
+}
+
+.error{
+  color:#fecaca;
+  background:rgba(239,68,68,.14);
+  border:1px solid rgba(239,68,68,.3);
+  padding:14px;
+  border-radius:16px;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.6;
+  display:none;
 }
 </style>
 </head>
@@ -97,76 +200,288 @@ body{
 
 <div class="wrap">
 
-<div class="card">
-  <div class="title">UBee 配送追蹤</div>
+  <div class="card">
+    <div class="title">UBee 配送追蹤</div>
 
-  <div class="order-no">
-    訂單編號：<span id="orderIdText">讀取中...</span>
-  </div>
-</div>
+    <div class="order-no">
+      訂單編號：<span id="orderIdText">讀取中...</span><br>
+      最後更新：<span id="updatedAtText">讀取中...</span>
+    </div>
 
-<div class="card">
-
-  <div class="step">
-    <div class="dot done"></div>
-    <div class="step-text">訂單已建立</div>
+    <div id="statusPill" class="status-pill">讀取訂單狀態中...</div>
   </div>
 
-  <div class="step">
-    <div class="dot done"></div>
-    <div class="step-text">騎士已接單</div>
+  <div id="errorBox" class="error"></div>
+
+  <div class="card">
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-label">取件地點</div>
+        <div id="pickupAddressText" class="info-value">讀取中...</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">送達地點</div>
+        <div id="dropoffAddressText" class="info-value">讀取中...</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">付款方式 / 金額</div>
+        <div id="paymentText" class="info-value">讀取中...</div>
+      </div>
+    </div>
   </div>
 
-  <div class="step">
-    <div class="dot done"></div>
-    <div class="step-text">騎士已到店</div>
+  <div class="card" id="stepsBox">
+    <div class="step" data-step="created">
+      <div class="dot"></div>
+      <div>
+        <div class="step-text">訂單已建立</div>
+        <div class="step-sub">UBee 已收到你的任務資料</div>
+      </div>
+    </div>
+
+    <div class="step" data-step="dispatch">
+      <div class="dot"></div>
+      <div>
+        <div class="step-text">等待騎士接單</div>
+        <div class="step-sub">系統正在派送任務給合作騎士</div>
+      </div>
+    </div>
+
+    <div class="step" data-step="accepted">
+      <div class="dot"></div>
+      <div>
+        <div class="step-text">騎士已接單</div>
+        <div class="step-sub">騎士將前往取件地點</div>
+      </div>
+    </div>
+
+    <div class="step" data-step="arrived_pickup">
+      <div class="dot"></div>
+      <div>
+        <div class="step-text">騎士已抵達取件地點</div>
+        <div class="step-sub">騎士已到達取件位置</div>
+      </div>
+    </div>
+
+    <div class="step" data-step="picked_up">
+      <div class="dot"></div>
+      <div>
+        <div class="step-text">騎士已取件</div>
+        <div class="step-sub">物品已由騎士取走</div>
+      </div>
+    </div>
+
+    <div class="step" data-step="arrived_dropoff">
+      <div class="dot"></div>
+      <div>
+        <div class="step-text">騎士已抵達送達地點</div>
+        <div class="step-sub">騎士已抵達收件位置</div>
+      </div>
+    </div>
+
+    <div class="step" data-step="completed">
+      <div class="dot"></div>
+      <div>
+        <div class="step-text">訂單完成</div>
+        <div class="step-sub">任務已完成，感謝使用 UBee</div>
+      </div>
+    </div>
   </div>
 
-  <div class="step">
-    <div class="dot"></div>
-    <div class="step-text">騎士已取貨</div>
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="loadOrder()">重新整理狀態</button>
+    <button class="btn btn-primary" onclick="goHome()">返回首頁</button>
   </div>
 
-  <div class="step">
-    <div class="dot"></div>
-    <div class="step-text">配送中</div>
+  <div class="notice">
+    此頁面會自動更新配送狀態。若狀態沒有立即變化，請稍候幾秒或按「重新整理狀態」。
   </div>
-
-  <div class="step">
-    <div class="dot"></div>
-    <div class="step-text">已送達</div>
-  </div>
-
-  <div class="step">
-    <div class="dot"></div>
-    <div class="step-text">訂單完成</div>
-  </div>
-
-</div>
-
-<button class="close-btn">
-返回首頁
-</button>
 
 </div>
 
 <script>
+const REFRESH_MS = 8000;
+
+let refreshTimer = null;
+
 function getQueryParam(name){
   const params = new URLSearchParams(window.location.search);
   return params.get(name) || "";
 }
 
-function initTrackPage(){
-  const orderId = getQueryParam("orderId") || getQueryParam("id");
+function escapeHtml(value){
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
-  const orderIdText = document.getElementById("orderIdText");
+function getStatusLabel(status){
+  const map = {
+    draft_confirm: '待確認',
+    pending_payment: '待付款',
+    pending_dispatch: '等待騎士接單',
+    accepted: '騎士已接單',
+    arrived_pickup: '騎士已抵達取件地點',
+    picked_up: '騎士已取件',
+    arrived_dropoff: '騎士已抵達送達地點',
+    completed: '訂單完成',
+    done: '訂單完成',
+    cancelled: '訂單已取消',
+  };
 
-  if(orderIdText){
-    orderIdText.textContent = orderId || "尚未指定訂單";
+  return map[status] || status || '狀態讀取中';
+}
+
+function getStepOrder(status){
+  const map = {
+    draft_confirm: 0,
+    pending_payment: 0,
+    pending_dispatch: 1,
+    accepted: 2,
+    arrived_pickup: 3,
+    picked_up: 4,
+    arrived_dropoff: 5,
+    completed: 6,
+    done: 6,
+  };
+
+  return map[status] ?? 0;
+}
+
+function setText(id, text){
+  const el = document.getElementById(id);
+  if(el){
+    el.textContent = text;
   }
 }
 
-initTrackPage();
+function setError(message){
+  const box = document.getElementById('errorBox');
+
+  if(!box) return;
+
+  if(message){
+    box.style.display = 'block';
+    box.textContent = message;
+  }else{
+    box.style.display = 'none';
+    box.textContent = '';
+  }
+}
+
+function renderSteps(status){
+  const steps = Array.from(document.querySelectorAll('.step'));
+  const currentIndex = getStepOrder(status);
+
+  steps.forEach((step, index) => {
+    const dot = step.querySelector('.dot');
+    if(!dot) return;
+
+    dot.classList.remove('done', 'current', 'cancelled');
+
+    if(status === 'cancelled'){
+      if(index === currentIndex){
+        dot.classList.add('cancelled');
+      }
+      return;
+    }
+
+    if(index < currentIndex){
+      dot.classList.add('done');
+    }else if(index === currentIndex){
+      dot.classList.add('current');
+    }
+  });
+}
+
+function renderOrder(order){
+  const status = order.status || '';
+  const label = order.statusLabel || getStatusLabel(status);
+
+  setText('orderIdText', order.id || getQueryParam('orderId') || getQueryParam('id') || '尚未指定訂單');
+  setText('updatedAtText', new Date().toLocaleString('zh-TW'));
+  setText('pickupAddressText', order.pickupAddress || '尚未提供');
+  setText('dropoffAddressText', order.dropoffAddress || '尚未提供');
+
+  const paymentLabel = order.paymentMethodLabel || '尚未選擇';
+  const total = Math.round(Number(order.total || 0));
+  const paidText = order.isPaid ? '已付款' : (order.paymentMethod === 'cash' ? '現金付款' : '未付款');
+
+  setText('paymentText', `${paymentLabel}｜${paidText}｜NT$${total}`);
+
+  const pill = document.getElementById('statusPill');
+  if(pill){
+    pill.textContent = label;
+    pill.style.background = status === 'cancelled'
+      ? 'rgba(239,68,68,.14)'
+      : 'rgba(250,204,21,.14)';
+    pill.style.color = status === 'cancelled'
+      ? '#fecaca'
+      : 'var(--yellow)';
+  }
+
+  renderSteps(status);
+}
+
+async function loadOrder(){
+  const orderId = getQueryParam('orderId') || getQueryParam('id');
+  const userId = getQueryParam('userId') || '';
+
+  setError('');
+
+  if(!orderId){
+    setText('orderIdText', '尚未指定訂單');
+    setText('updatedAtText', new Date().toLocaleString('zh-TW'));
+    setError('缺少訂單編號，請重新從下單頁面進入。');
+    return;
+  }
+
+  try{
+    const query = userId
+      ? `?userId=${encodeURIComponent(userId)}`
+      : '';
+
+    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}${query}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || !data.success){
+      throw new Error(data.error || '讀取訂單失敗');
+    }
+
+    renderOrder(data.order || {});
+  }catch(err){
+    console.error(err);
+    setError(err.message || '讀取訂單失敗，請稍後再試。');
+    setText('updatedAtText', new Date().toLocaleString('zh-TW'));
+  }
+}
+
+function goHome(){
+  window.location.href = '/order.html';
+}
+
+function startAutoRefresh(){
+  if(refreshTimer){
+    clearInterval(refreshTimer);
+  }
+
+  refreshTimer = setInterval(loadOrder, REFRESH_MS);
+}
+
+loadOrder();
+startAutoRefresh();
 </script>
+
 </body>
 </html>
