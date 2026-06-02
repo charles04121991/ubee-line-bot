@@ -1412,7 +1412,27 @@ function getSpeedOption(speedType) {
 }
 
 function getPaymentMethodLabel(method) {
-  return ({ jko: '街口支付', bank: '銀行轉帳' }[method] || '未選擇');
+  return ({
+    cash: '現金付款',
+    jko: '街口支付',
+    bank: '銀行轉帳',
+  }[method] || '未選擇');
+}
+
+function getPaymentInfo(method, total) {
+  if (method === 'cash') {
+    return `現金付款\n請於任務完成時，將 NT$${Math.round(Number(total || 0))} 交付給騎士。`;
+  }
+
+  if (method === 'jko') {
+    return PAYMENT_JKO_INFO;
+  }
+
+  if (method === 'bank') {
+    return PAYMENT_BANK_INFO;
+  }
+
+  return '';
 }
 
 function isAdminUser(userId) {
@@ -2728,9 +2748,10 @@ app.post('/api/orders', async (req, res) => {
       orderId: id,
       order,
       paymentOptions: {
-        jko: PAYMENT_JKO_INFO,
-        bank: PAYMENT_BANK_INFO,
-      },
+  cash: '現金付款',
+  jko: PAYMENT_JKO_INFO,
+  bank: PAYMENT_BANK_INFO,
+},
       total: order.total,
       message: '訂單已建立，請在頁面下方選擇付款方式。',
     });
@@ -2750,34 +2771,61 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
     const requestUserId = getCustomerUserIdFromBody(req.body);
     const order = await getOrder(orderId);
 
-    if (!order) return res.status(404).json({ success: false, error: '找不到此訂單' });
+    if (!order) {
+      return res.status(404).json({ success: false, error: '找不到此訂單' });
+    }
+
     if (!isSameCustomerUserId(order, requestUserId)) {
-      return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人設定付款方式' });
+      return res.status(403).json({
+        success: false,
+        error: '此訂單只能由原本下單的客人設定付款方式',
+      });
     }
-    if (!['jko'].includes(paymentMethod)) {
-      return res.status(400).json({ success: false, error: '付款方式錯誤' });
+
+    if (!['cash', 'jko', 'bank'].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        error: '付款方式錯誤',
+      });
     }
+
     if (!['pending_payment'].includes(order.status)) {
-      return res.status(400).json({ success: false, error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再變更付款方式` });
+      return res.status(400).json({
+        success: false,
+        error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再變更付款方式`,
+      });
     }
 
     order.paymentMethod = paymentMethod;
+    order.paymentMethodLabel = getPaymentMethodLabel(paymentMethod);
+    order.paymentStatus = paymentMethod === 'cash' ? 'cash_on_delivery' : 'waiting_confirm';
+    order.cashCollectAmount = paymentMethod === 'cash' ? Number(order.total || 0) : 0;
+    order.cashCollected = false;
     order.status = 'pending_payment';
+
     await saveOrder(order);
 
-    await notifyCustomer(order, createTextMessage(`你已選擇付款方式：${getPaymentMethodLabel(paymentMethod)}\n完成付款後，請回到網頁按「我已付款」。`));
+    const customerText = paymentMethod === 'cash'
+      ? `你已選擇付款方式：現金付款\n\n請於任務完成時，將 NT$${Math.round(Number(order.total || 0))} 交付給騎士。\n\n請回到網頁按「確認現金付款」，系統才會開始派單。`
+      : `你已選擇付款方式：${getPaymentMethodLabel(paymentMethod)}\n完成付款後，請回到網頁按「我已付款」。`;
 
-    res.json({
+    await notifyCustomer(order, createTextMessage(customerText));
+
+    return res.json({
       success: true,
       orderId,
       paymentMethod,
       paymentMethodLabel: getPaymentMethodLabel(paymentMethod),
-      paymentInfo: paymentMethod === 'jko' ? PAYMENT_JKO_INFO : PAYMENT_BANK_INFO,
+      paymentInfo: getPaymentInfo(paymentMethod, order.total),
       total: order.total,
     });
+
   } catch (error) {
     console.error('❌ 設定付款方式失敗：', error);
-    res.status(500).json({ success: false, error: '設定付款方式失敗' });
+    return res.status(500).json({
+      success: false,
+      error: '設定付款方式失敗',
+    });
   }
 });
 
@@ -2787,88 +2835,97 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     const requestUserId = getCustomerUserIdFromBody(req.body);
     const order = await getOrder(orderId);
 
-    if (!order) return res.status(404).json({ success: false, error: '找不到此訂單' });
+    if (!order) {
+      return res.status(404).json({ success: false, error: '找不到此訂單' });
+    }
+
     if (!isSameCustomerUserId(order, requestUserId)) {
-      return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人確認付款' });
-    }
-    if (!order.paymentMethod) {
-
-  await saveOrder({
-    ...order,
-    paymentMethod: 'jko'
-  });
-
-  order.paymentMethod = 'jko';
-}
-
-    if (order.isPaid) {
-      return res.json({ success: true, orderId, message: '此訂單已標記付款完成' });
-    }
-
-    if (
-      order.status !== 'pending_payment' &&
-      !order.isPaid
-    ) {
-      return res.status(400).json({
-        success:false,
-        error:'訂單狀態異常'
+      return res.status(403).json({
+        success: false,
+        error: '此訂單只能由原本下單的客人確認付款',
       });
     }
 
-    order.isPaid = true;
-order.paidAt = Date.now();
-order.status = 'pending_dispatch';
+    if (!order.paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        error: '請先選擇付款方式',
+      });
+    }
 
-await saveOrder({
-  ...order,
-  paymentMethod: order.paymentMethod || 'jko',
-  isPaid: true,
-  paidAt: order.paidAt,
-  status: 'pending_dispatch',
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-});
+    if (order.status !== 'pending_payment' && !order.isPaid) {
+      return res.status(400).json({
+        success: false,
+        error: '訂單狀態異常',
+      });
+    }
+
+    const isCashPayment = order.paymentMethod === 'cash';
+
+    order.status = 'pending_dispatch';
+    order.paidAt = isCashPayment ? null : Date.now();
+    order.isPaid = isCashPayment ? false : true;
+    order.paymentStatus = isCashPayment ? 'cash_on_delivery' : 'paid_confirmed';
+    order.cashCollectAmount = isCashPayment ? Number(order.total || 0) : 0;
+    order.cashCollected = false;
+    order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+    await saveOrder(order);
 
     try {
-  await notifyCustomer(
-    order,
-    createTextMessage(`✅ 已收到你的付款通知。\n\n訂單編號：${order.id}\n🚀 系統正在為你配對騎手，請稍候...`)
-  );
-} catch (notifyErr) {
-  console.error('⚠️ 付款成功，但通知客人失敗：', notifyErr);
-}
+      const customerMessage = isCashPayment
+        ? `✅ 已確認現金付款方式。\n\n訂單編號：${order.id}\n應付金額：NT$${Math.round(Number(order.total || 0))}\n\n系統正在為你配對合作夥伴，任務完成時請將現金交付給騎士。`
+        : `✅ 已收到你的付款通知。\n\n訂單編號：${order.id}\n🚀 系統正在為你配對騎手，請稍候...`;
 
-try {
-  const dispatchOrder = {
-    ...order,
-    id: order.id || orderId,
-    status: 'pending_dispatch',
-    isPaid: true,
-    paymentMethod: order.paymentMethod || 'jko',
-  };
+      await notifyCustomer(order, createTextMessage(customerMessage));
+    } catch (notifyErr) {
+      console.error('⚠️ 付款確認成功，但通知客人失敗：', notifyErr);
+    }
 
-  console.log('📣 準備推送派單群組 LINE_GROUP_ID:', LINE_GROUP_ID);
-  console.log('📣 派單訂單編號:', dispatchOrder.id);
+    try {
+      const dispatchOrder = {
+        ...order,
+        id: order.id || orderId,
+        status: 'pending_dispatch',
+        paymentMethod: order.paymentMethod,
+        paymentMethodLabel: getPaymentMethodLabel(order.paymentMethod),
+        paymentStatus: order.paymentStatus,
+        cashCollectAmount: order.cashCollectAmount || 0,
+      };
 
-  await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(dispatchOrder));
+      console.log('📣 準備推送派單群組 LINE_GROUP_ID:', LINE_GROUP_ID);
+      console.log('📣 派單訂單編號:', dispatchOrder.id);
 
-  console.log('✅ 已成功推送派單群組:', dispatchOrder.id);
-} catch (dispatchErr) {
-  console.error('❌ 付款成功，但推送騎士群組失敗：', dispatchErr);
-}
-try {
-  await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
-} catch (adminErr) {
-  console.error('⚠️ 付款成功，但推送辦公室群組失敗：', adminErr);
-}
+      await pushToGroup(LINE_GROUP_ID, createDispatchGroupFlex(dispatchOrder));
 
-return res.json({
-  success: true,
-  orderId,
-  message: '已收到付款通知，系統已自動派單',
-});
+      console.log('✅ 已成功推送派單群組:', dispatchOrder.id);
+    } catch (dispatchErr) {
+      console.error('❌ 付款確認成功，但推送騎士群組失敗：', dispatchErr);
+    }
+
+    try {
+      await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
+    } catch (adminErr) {
+      console.error('⚠️ 付款確認成功，但推送辦公室群組失敗：', adminErr);
+    }
+
+    return res.json({
+      success: true,
+      orderId,
+      paymentMethod: order.paymentMethod,
+      paymentMethodLabel: getPaymentMethodLabel(order.paymentMethod),
+      paymentStatus: order.paymentStatus,
+      message: isCashPayment
+        ? '已確認現金付款方式，系統已開始派單'
+        : '已收到付款通知，系統已自動派單',
+    });
+
   } catch (error) {
     console.error('❌ H5 確認付款失敗：', error);
-    res.status(500).json({ success: false, error: '確認付款失敗，請稍後再試' });
+    return res.status(500).json({
+      success: false,
+      error: '確認付款失敗，請稍後再試',
+    });
   }
 });
 
