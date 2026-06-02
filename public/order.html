@@ -1739,6 +1739,8 @@ if(lastEstimate && taichung85Coupon.claimed){
     window.currentOrderId = result.orderId;
     currentTotal = result.total || result.order?.total || '';
 
+    localStorage.setItem('ubee_last_customer_order_id', currentOrderId);
+    
     document.getElementById('successTitle').innerText = '訂單已建立成功！';
     document.getElementById('successOrderNo').innerText = currentOrderId;
 
@@ -1854,12 +1856,11 @@ if(!isPaymentMethodSaved){
     );
 
     alert('✅ 已收到付款通知，系統已開始派單');
-    btn.innerText = '已確認付款';
-    btn.disabled = true;
-    document.getElementById('cancelOrderBtn').classList.add('hidden');
-    document.getElementById('cashBtn').classList.add('hidden');
-    document.getElementById('jkoBtn').classList.add('hidden');
 
+    localStorage.setItem('ubee_last_customer_order_id', currentOrderId);
+
+    window.location.href =
+      `/track.html?orderId=${encodeURIComponent(currentOrderId)}&type=customer`;
   }catch(err){
     alert('❌ ' + err.message);
     isConfirmingPaid = false;
