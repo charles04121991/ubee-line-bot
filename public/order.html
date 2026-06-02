@@ -1859,9 +1859,8 @@ if(!isPaymentMethodSaved){
 
     localStorage.setItem('ubee_last_customer_order_id', currentOrderId);
 
-    window.location.href =
-      `/track.html?orderId=${encodeURIComponent(currentOrderId)}&type=customer`;
-  }catch(err){
+    window.location.href = result.trackUrl || `/track.html?orderId=${encodeURIComponent(currentOrderId)}&userId=${encodeURIComponent(userId)}`;
+    
     alert('❌ ' + err.message);
     isConfirmingPaid = false;
     btn.disabled = false;
