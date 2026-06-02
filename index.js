@@ -2910,15 +2910,16 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     }
 
     return res.json({
-      success: true,
-      orderId,
-      paymentMethod: order.paymentMethod,
-      paymentMethodLabel: getPaymentMethodLabel(order.paymentMethod),
-      paymentStatus: order.paymentStatus,
-      message: isCashPayment
-        ? '已確認現金付款方式，系統已開始派單'
-        : '已收到付款通知，系統已自動派單',
-    });
+  success: true,
+  orderId,
+  paymentMethod: order.paymentMethod,
+  paymentMethodLabel: getPaymentMethodLabel(order.paymentMethod),
+  paymentStatus: order.paymentStatus,
+  trackUrl: `/track.html?orderId=${encodeURIComponent(orderId)}&userId=${encodeURIComponent(order.userId || order.customerId || '')}`,
+  message: isCashPayment
+    ? '已確認現金付款方式，系統已開始派單'
+    : '已收到付款通知，系統已自動派單',
+});
 
   } catch (error) {
     console.error('❌ H5 確認付款失敗：', error);
