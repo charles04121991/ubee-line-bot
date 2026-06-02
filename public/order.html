@@ -1040,7 +1040,9 @@ body.night-mode{
 
       <button id="createOrderBtn" class="btn btn-primary" onclick="submitOrder()" disabled>LINE 身分確認中...</button>
 
-      <button id="jkoBtn" class="btn btn-primary hidden" onclick="selectPayment('jko')">街口支付</button>
+      <button id="cashBtn" class="btn btn-primary hidden" onclick="selectPayment('cash')">現金付款</button>
+
+      <button id="jkoBtn" class="btn btn-secondary hidden" style="margin-top:12px;" onclick="selectPayment('jko')">街口支付</button>
 
       <div id="paymentInfoBox" class="payment-info hidden"></div>
 
@@ -1743,6 +1745,7 @@ if(lastEstimate && taichung85Coupon.claimed){
     renderSummary(result.order);
 
     btn.classList.add('hidden');
+    document.getElementById('cashBtn').classList.remove('hidden');
     document.getElementById('jkoBtn').classList.remove('hidden');
 
     showStatus(
@@ -1798,6 +1801,7 @@ async function selectPayment(method){
     document.getElementById('paidBtn').classList.remove('hidden');
     document.getElementById('cancelOrderBtn').classList.remove('hidden');
 
+    document.getElementById('cashBtn').disabled = true;
     document.getElementById('jkoBtn').disabled = true;
 
     isSelectingPayment = false;
@@ -1815,7 +1819,8 @@ async function confirmPaid(){
   }
 
   if(!selectedPaymentMethod){
-  selectedPaymentMethod = 'jko';
+  alert('請先選擇付款方式');
+  return;
 }
 
 if(!isPaymentMethodSaved){
@@ -1852,6 +1857,7 @@ if(!isPaymentMethodSaved){
     btn.innerText = '已確認付款';
     btn.disabled = true;
     document.getElementById('cancelOrderBtn').classList.add('hidden');
+    document.getElementById('cashBtn').classList.add('hidden');
     document.getElementById('jkoBtn').classList.add('hidden');
 
   }catch(err){
