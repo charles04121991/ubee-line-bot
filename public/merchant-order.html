@@ -290,6 +290,49 @@ button:disabled{
 <script>
 let selectedDeliveryType = "standard";
 
+  const MERCHANT_STORAGE_KEY = "ubee_merchant_saved_info";
+
+function saveMerchantInfo(){
+  const merchantInfo = {
+    merchantName: getValue("merchantName"),
+    merchantPhone: getValue("merchantPhone"),
+    pickupAddress: getValue("pickupAddress")
+  };
+
+  localStorage.setItem(
+    MERCHANT_STORAGE_KEY,
+    JSON.stringify(merchantInfo)
+  );
+}
+
+function loadMerchantInfo(){
+  const saved = localStorage.getItem(MERCHANT_STORAGE_KEY);
+
+  if(!saved) return;
+
+  try{
+    const info = JSON.parse(saved);
+
+    if(info.merchantName){
+      document.getElementById("merchantName").value =
+        info.merchantName;
+    }
+
+    if(info.merchantPhone){
+      document.getElementById("merchantPhone").value =
+        info.merchantPhone;
+    }
+
+    if(info.pickupAddress){
+      document.getElementById("pickupAddress").value =
+        info.pickupAddress;
+    }
+
+  }catch(err){
+    console.warn("讀取店家資料失敗:", err);
+  }
+}
+  
 const deliveryTextMap = {
   standard: "標準件",
   priority: "優先件",
@@ -532,9 +575,15 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
   try{
   await db.collection("orders").doc(orderNo).set(payload);
 
-  showResult(orderNo, feeConfig);
-  document.getElementById("merchantForm").reset();
-  resetDeliveryOption();
+saveMerchantInfo();
+
+showResult(orderNo, feeConfig);
+
+document.getElementById("merchantForm").reset();
+
+loadMerchantInfo();
+
+resetDeliveryOption();
 
   }catch(err){
     console.error("店家配送單建立失敗:", err);
@@ -548,6 +597,9 @@ document.getElementById("merchantForm").addEventListener("submit", async (e) => 
     submitBtn.disabled = false;
     submitBtn.textContent = "建立配送單";
   }
+});
+  window.addEventListener("load", () => {
+  loadMerchantInfo();
 });
 </script>
 </body>
