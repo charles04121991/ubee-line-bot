@@ -1263,7 +1263,7 @@ const PRICING = {
   baseFee: 80,
   perKm: 18,
   perMinute: 3,
-  serviceFee: 50,
+  serviceFee: 25,
   waitingFee: 60,
   driverRatio: 0.7,
 };
