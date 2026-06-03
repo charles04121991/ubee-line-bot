@@ -935,15 +935,16 @@ body.night-mode{
     </section>
 
     <section class="step" id="step2">
-      <div class="headline" id="step2Headline">填寫取件與送達資訊</div>
-      <div class="subtext" id="step2Subtext">地址越完整，系統估價越準。</div>
+      <div class="headline">填寫取件與送達資訊</div>
+      <div class="subtext">地址越完整，系統估價越準。</div>
+
       <div class="task-path-box">
   <div class="task-path-title">任務內容</div>
   <div class="task-path-value" id="taskPathText">尚未選擇</div>
 </div>
       
       <div class="form-section">
-        <div class="form-title" id="pickupTitle">取件資訊</div>
+        <div class="form-title">取件資訊</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon"></div>
@@ -957,7 +958,7 @@ body.night-mode{
       </div>
 
       <div class="form-section">
-        <div class="form-title" id="dropoffTitle">送達資訊</div>
+        <div class="form-title">送達資訊</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon"></div>
@@ -1019,21 +1020,6 @@ body.night-mode{
           </div>
         </div>
       </div>
-      <div id="field-onsite" class="form-section hidden">
-  <div class="form-title">現場任務時間</div>
-  <div class="input-card">
-    <div class="input-wrap">
-      <div class="input-icon">⏱️</div>
-      <select id="onsiteWaitTime" style="width:100%;border:none;outline:none;background:transparent;color:var(--text);font-weight:900;">
-        <option value="30">30 分鐘內｜基本出勤 NT$150</option>
-        <option value="60">1 小時內｜NT$200</option>
-        <option value="90">1.5 小時內｜NT$250</option>
-        <option value="120">2 小時內｜NT$300</option>
-        <option value="150">超過 2 小時｜現場另行報價</option>
-      </select>
-    </div>
-  </div>
-</div>
     </section>
 
     <section class="step" id="step3">
@@ -1357,59 +1343,18 @@ function setActive(parentId, el, selector){
 function resetDynamicFields(){
   document.getElementById('field-purchase').classList.add('hidden');
   document.getElementById('field-task').classList.add('hidden');
-
-  const onsiteField = document.getElementById('field-onsite');
-  if(onsiteField){
-    onsiteField.classList.add('hidden');
-  }
-}
-
-function isOnsiteTask(){
-  return serviceGroup === 'life' && [
-    '一般排隊',
-    '醫院排隊',
-    '銀行排隊',
-    '餐廳候位'
-  ].includes(serviceType);
-}
-
-function updateStep2Mode(){
-  const onsite = isOnsiteTask();
-
-  document.getElementById('step2Headline').innerText =
-    onsite ? '填寫現場任務資訊' : '填寫取件與送達資訊';
-
-  document.getElementById('step2Subtext').innerText =
-    onsite
-      ? '請填寫任務地點、聯絡方式與預估等待時間。'
-      : '地址越完整，系統估價越準。';
-
-  document.getElementById('pickupTitle').innerText =
-    onsite ? '任務地點' : '取件資訊';
-
-  document.getElementById('dropoffTitle').innerText =
-    onsite ? '聯絡資訊' : '送達資訊';
 }
 
 function applyDynamicFields(){
-
   resetDynamicFields();
 
   const purchaseField = document.getElementById('field-purchase');
   const taskField = document.getElementById('field-task');
-  const onsiteField = document.getElementById('field-onsite');
-
   const purchaseTitle = document.getElementById('purchaseFieldTitle');
   const taskTitle = document.getElementById('taskFieldTitle');
   const purchaseContent = document.getElementById('purchaseContent');
   const purchaseStore = document.getElementById('purchaseStore');
   const taskContent = document.getElementById('taskContent');
-
-  updateStep2Mode();
-
-  if(onsiteField){
-    onsiteField.classList.toggle('hidden', !isOnsiteTask());
-  }
 
   if(serviceGroup === 'buy'){
     purchaseField.classList.remove('hidden');
@@ -1421,29 +1366,11 @@ function applyDynamicFields(){
   if(serviceGroup === 'life'){
     purchaseField.classList.remove('hidden');
     taskField.classList.remove('hidden');
-
-    purchaseTitle.innerText =
-      isOnsiteTask() ? '現場任務補充' : '生活跑腿補充';
-
-    purchaseContent.placeholder =
-      isOnsiteTask()
-      ? '例如：排隊掛號、銀行抽號碼牌、餐廳候位'
-      : '例如：排隊、洗衣、洗鞋、手機貼膜';
-
-    purchaseStore.placeholder =
-      isOnsiteTask()
-      ? '指定地點 / 櫃台 / 餐廳'
-      : '指定店家 / 指定地點';
-
-    taskTitle.innerText =
-      isOnsiteTask()
-      ? '現場任務說明'
-      : '生活需求說明';
-
-    taskContent.placeholder =
-      isOnsiteTask()
-      ? '請補充到場後要做什麼、是否要領號碼牌、等待多久。'
-      : '請補充規格、數量、顏色、預算、等待時間。';
+    purchaseTitle.innerText = '生活跑腿補充';
+    purchaseContent.placeholder = '例如：排隊、洗衣、洗鞋、手機貼膜、其他需求';
+    purchaseStore.placeholder = '指定店家 / 指定地點 / 可接受附近店家';
+    taskTitle.innerText = '生活需求說明';
+    taskContent.placeholder = '請補充規格、數量、顏色、預算、等待時間、是否需來回取送。';
   }
 }
 
@@ -1669,34 +1596,22 @@ function getData(){
   const purchaseStore = document.getElementById('purchaseStore')?.value.trim() || '';
   const taskContent = document.getElementById('taskContent')?.value.trim() || '';
   const note = document.getElementById('note').value.trim();
-  
-  const onsite = isOnsiteTask();
-  const onsiteWaitTime = Number(document.getElementById('onsiteWaitTime')?.value || 30);
-  const onsiteFee = onsiteWaitTime >= 150
-  ? 300
-  : 150 + Math.max(0, Math.ceil((onsiteWaitTime - 30) / 30) * 50);
-  
+
   if(purchaseContent) extra.push('補充內容：' + purchaseContent);
   if(purchaseStore) extra.push('指定店家/地點：' + purchaseStore);
   if(taskContent) extra.push('任務說明：' + taskContent);
 
   return {
-    serviceType,
-    serviceGroup,
-    serviceCategory,
-    speedType,
-    taskType: onsite ? 'onsite' : 'delivery',
-    pricingMode: onsite ? 'attendance_time' : 'distance',
-    onsiteWaitTime,
-    onsiteFee,
+  serviceType,
+  serviceGroup,
+  serviceCategory,
+  speedType,
     pickup: document.getElementById('pickup').value.trim(),
     pickupPhone: document.getElementById('pickupPhone').value.trim(),
-    dropoff: onsite ? document.getElementById('pickup').value.trim() : document.getElementById('dropoff').value.trim(),
-    dropoffPhone: onsite
-      ? (document.getElementById('dropoffPhone').value.trim() || document.getElementById('pickupPhone').value.trim())
-      : document.getElementById('dropoffPhone').value.trim(),
-      item: document.getElementById('item').value.trim(),
-      note: [note, ...extra].filter(Boolean).join('\n'),
+    dropoff: document.getElementById('dropoff').value.trim(),
+    dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
+    item: document.getElementById('item').value.trim(),
+    note: [note, ...extra].filter(Boolean).join('\n'),
     
     advancePayment: Number(document.getElementById('advancePayment')?.value || 0),
     
@@ -1709,22 +1624,6 @@ function validateStep2(){
 
   const data = getData();
 
-  if(isOnsiteTask()){
-  if(!data.pickup){
-    alert('請輸入任務地點');
-    return false;
-  }
-
-  if(data.pickup.length < 4){
-    alert('請輸入完整任務地點');
-    return false;
-  }
-
-  if(!data.pickupPhone){
-    alert('請輸入現場聯絡電話');
-    return false;
-  }
-}else{
   if(!data.pickup || !data.dropoff){
     alert('請輸入取件地址與送達地址');
     return false;
@@ -1744,7 +1643,6 @@ function validateStep2(){
     alert('請輸入取件電話與送達電話');
     return false;
   }
-}
 
   const normalizePhone = (value) => {
   return String(value || '')
@@ -1933,42 +1831,6 @@ function renderSummary(order){
     `;
 }
 async function calculateEstimate(silent){
-    if(isOnsiteTask()){
-    const wait = Number(document.getElementById('onsiteWaitTime')?.value || 30);
-    const onsiteFee = wait >= 150
-      ? 300
-      : 150 + Math.max(0, Math.ceil((wait - 30) / 30) * 50);
-    const speedFeeMap = {
-  standard: 15,
-  priority: 20,
-  express: 60,
-  rush: 100
-};
-
-const speedFee = speedFeeMap[speedType] || 0;
-const totalFee = onsiteFee + speedFee;
-
-    lastEstimate = {
-      distanceText: '現場任務',
-      durationText: wait >= 150 ? '超過 2 小時' : `${wait} 分鐘內`,
-      totalFee: onsiteFee,
-      onsiteFee
-      speedFee: speedFee
-    };
-
-    const estimateResult = document.getElementById('estimateResult');
-    estimateResult.classList.remove('hidden');
-    document.getElementById('estimateText').innerHTML = `
-      <div class="price-row"><span>計價方式</span><strong>出勤費＋等待費</strong></div>
-      <div class="price-row"><span>預估等待</span><strong>${lastEstimate.durationText}</strong></div>
-      <div class="price-row"><span>現場任務費</span><strong>NT$${onsiteFee}</strong></div>
-      <div class="price-row"><span>速度加價</span><strong>NT$${speedFee}</strong></div>
-      <div class="price-row"><span>預估費用</span><strong>NT$${totalFee}</strong></div>
-    `;
-
-    return true;
-  }
-  
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
 
@@ -2318,4 +2180,4 @@ updateStepUI();
 initPage();
 </script>
 </body>
-</html>
+</html></html>
