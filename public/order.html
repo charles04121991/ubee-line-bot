@@ -1938,12 +1938,22 @@ async function calculateEstimate(silent){
     const onsiteFee = wait >= 150
       ? 300
       : 150 + Math.max(0, Math.ceil((wait - 30) / 30) * 50);
+    const speedFeeMap = {
+  standard: 15,
+  priority: 20,
+  express: 60,
+  rush: 100
+};
+
+const speedFee = speedFeeMap[speedType] || 0;
+const totalFee = onsiteFee + speedFee;
 
     lastEstimate = {
       distanceText: '現場任務',
       durationText: wait >= 150 ? '超過 2 小時' : `${wait} 分鐘內`,
       totalFee: onsiteFee,
       onsiteFee
+      speedFee: speedFee
     };
 
     const estimateResult = document.getElementById('estimateResult');
@@ -1951,7 +1961,9 @@ async function calculateEstimate(silent){
     document.getElementById('estimateText').innerHTML = `
       <div class="price-row"><span>計價方式</span><strong>出勤費＋等待費</strong></div>
       <div class="price-row"><span>預估等待</span><strong>${lastEstimate.durationText}</strong></div>
-      <div class="price-row"><span>預估費用</span><strong>NT$${onsiteFee}</strong></div>
+      <div class="price-row"><span>現場任務費</span><strong>NT$${onsiteFee}</strong></div>
+      <div class="price-row"><span>速度加價</span><strong>NT$${speedFee}</strong></div>
+      <div class="price-row"><span>預估費用</span><strong>NT$${totalFee}</strong></div>
     `;
 
     return true;
