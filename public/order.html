@@ -1291,6 +1291,10 @@ function updateStepUI(){
   document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
   document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
 
+  if(currentStep === 2){
+  updateTaskPathText();
+}
+  
   if(currentStep === 4){
   renderConfirmSummary();
   loadTaichung85Coupon();
