@@ -1559,12 +1559,16 @@ function selectService(el, value){
   applyDynamicFields();
 }
 
+function getPlaceKeyword(){
+  return `${serviceCategory || ''} ${serviceType || ''} 台中`;
+}
+
 async function loadMerchantsForCategory(){
 
   const box = document.getElementById('merchantSelectBox');
   const grid = document.getElementById('merchantSelectGrid');
 
-  if(!box || !grid || !db) return;
+  if(!box || !grid) return;
 
   box.classList.add('hidden');
   grid.innerHTML = '';
@@ -1573,39 +1577,90 @@ async function loadMerchantsForCategory(){
     return;
   }
 
-  try{
-    const snap = await db.collection('merchants')
-      .where('status', '==', 'active')
-      .where('serviceGroup', '==', serviceGroup)
-      .where('serviceType', '==', serviceType)
-      .where('serviceCategory', '==', serviceCategory)
-      .get();
+  if(!navigator.geolocation){
+    alert('此裝置不支援定位，請手動輸入店家地址。');
+    return;
+  }
 
-    if(snap.empty){
-      return;
-    }
+  grid.innerHTML = '正在搜尋附近店家...';
+  box.classList.remove('hidden');
 
-    box.classList.remove('hidden');
+  navigator.geolocation.getCurrentPosition(async position => {
+    try{
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const keyword = getPlaceKeyword();
 
-    grid.innerHTML = snap.docs.map(doc => {
-      const merchant = {
-        id: doc.id,
-        ...doc.data()
-      };
+      const res = await fetch('/api/places/search', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ lat, lng, keyword })
+      });
 
-      return `
+      const data = await res.json();
+
+      if(!data.success || !data.places || !data.places.length){
+        grid.innerHTML = '附近暫時找不到店家，請改用手動填寫。';
+        return;
+      }
+
+      grid.innerHTML = data.places.map(place => `
         <button
           type="button"
           class="category-choice-item"
-          onclick="selectMerchant('${merchant.id}')"
+          onclick="selectGooglePlace('${place.placeId}')"
         >
-          ${merchant.merchantName || '合作店家'}
+          ${place.name}
         </button>
-      `;
-    }).join('');
+      `).join('');
+
+    }catch(err){
+      console.error('搜尋附近店家失敗:', err);
+      grid.innerHTML = '搜尋附近店家失敗，請稍後再試。';
+    }
+  }, err => {
+    console.error('定位失敗:', err);
+    grid.innerHTML = '無法取得定位，請允許定位或手動填寫店家地址。';
+  });
+}
+
+async function selectGooglePlace(placeId){
+
+  try{
+    const res = await fetch('/api/places/detail', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ placeId })
+    });
+
+    const data = await res.json();
+
+    if(!data.success || !data.place){
+      alert(data.error || '取得店家資料失敗');
+      return;
+    }
+
+    const place = data.place;
+
+    currentMerchant = {
+      id: place.placeId,
+      merchantId: place.placeId,
+      merchantName: place.name || '',
+      merchantAddress: place.address || '',
+      merchantPhone: place.phone || '',
+      source: 'google_places'
+    };
+
+    merchantMode = true;
+
+    document.getElementById('pickup').value = place.address || '';
+    document.getElementById('pickupPhone').value = place.phone || '';
+
+    alert(`已選擇店家：${place.name || '店家'}\n\n系統已自動帶入取件地址${place.phone ? '與電話' : '，但此店家沒有公開電話，請客人自行補上。'}`);
 
   }catch(err){
-    console.error('讀取合作店家失敗:', err);
+    console.error('選擇 Google 店家失敗:', err);
+    alert('選擇店家失敗，請稍後再試。');
   }
 }
 
