@@ -940,6 +940,11 @@ body.night-mode{
   <div class="category-choice-grid" id="serviceCategoryGrid"></div>
 </div>
       
+      <div id="merchantSelectBox" class="category-choice-box hidden">
+  <div class="category-choice-title">選擇合作店家</div>
+  <div class="category-choice-grid" id="merchantSelectGrid"></div>
+</div>
+
       <div class="trust-strip">
         <div class="trust-item">
           <div class="trust-icon">🧑‍💼</div>
@@ -1536,6 +1541,8 @@ function selectServiceCategory(el, value){
 
   el.classList.add('active');
   serviceCategory = value;
+  
+  loadMerchantsForCategory();
 }
 
 function updateTaskPathText(){
@@ -1550,6 +1557,106 @@ function selectService(el, value){
   serviceType = value;
   renderServiceCategories();
   applyDynamicFields();
+}
+
+async function loadMerchantsForCategory(){
+
+  const box = document.getElementById('merchantSelectBox');
+  const grid = document.getElementById('merchantSelectGrid');
+
+  if(!box || !grid || !db) return;
+
+  box.classList.add('hidden');
+  grid.innerHTML = '';
+
+  if(serviceGroup !== 'buy' || !serviceType || !serviceCategory){
+    return;
+  }
+
+  try{
+    const snap = await db.collection('merchants')
+      .where('status', '==', 'active')
+      .where('serviceGroup', '==', serviceGroup)
+      .where('serviceType', '==', serviceType)
+      .where('serviceCategory', '==', serviceCategory)
+      .get();
+
+    if(snap.empty){
+      return;
+    }
+
+    box.classList.remove('hidden');
+
+    grid.innerHTML = snap.docs.map(doc => {
+      const merchant = {
+        id: doc.id,
+        ...doc.data()
+      };
+
+      return `
+        <button
+          type="button"
+          class="category-choice-item"
+          onclick="selectMerchant('${merchant.id}')"
+        >
+          ${merchant.merchantName || '合作店家'}
+        </button>
+      `;
+    }).join('');
+
+  }catch(err){
+    console.error('讀取合作店家失敗:', err);
+  }
+}
+
+async function selectMerchant(merchantId){
+
+  if(!db) return;
+
+  try{
+    const doc = await db.collection('merchants').doc(merchantId).get();
+
+    if(!doc.exists){
+      alert('找不到合作店家資料');
+      return;
+    }
+
+    const merchant = {
+      id: doc.id,
+      ...doc.data()
+    };
+
+    currentMerchant = merchant;
+    merchantMode = true;
+
+    const pickupInput = document.getElementById('pickup');
+    const pickupPhoneInput = document.getElementById('pickupPhone');
+
+    if(pickupInput){
+      pickupInput.value = merchant.merchantAddress || '';
+    }
+
+    if(pickupPhoneInput){
+      pickupPhoneInput.value = merchant.merchantPhone || '';
+    }
+
+    document.querySelectorAll('#merchantSelectGrid .category-choice-item').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    const clicked = [...document.querySelectorAll('#merchantSelectGrid .category-choice-item')]
+      .find(btn => btn.textContent.trim() === (merchant.merchantName || '').trim());
+
+    if(clicked){
+      clicked.classList.add('active');
+    }
+
+    alert(`已選擇合作店家：${merchant.merchantName || '合作店家'}\n\n系統已自動帶入取件地址與取件電話。`);
+
+  }catch(err){
+    console.error('選擇合作店家失敗:', err);
+    alert('選擇合作店家失敗，請稍後再試。');
+  }
 }
 
 function renderServiceGrid(groupKey){
