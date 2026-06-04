@@ -13,6 +13,8 @@
   
   <title>UBee｜建立任務</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
   <style>
     :root{
@@ -383,6 +385,34 @@ body.night-mode{
       padding:18px;
       margin:16px 0;
     }
+    .merchant-card{
+  border:1px solid rgba(250,204,21,.38);
+  background:linear-gradient(180deg,rgba(250,204,21,.14),var(--card));
+  border-radius:20px;
+  padding:16px;
+  margin:14px 0 18px;
+}
+
+.merchant-card-title{
+  color:var(--accent);
+  font-size:14px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+
+.merchant-card-name{
+  color:var(--text);
+  font-size:20px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+
+.merchant-card-text{
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.7;
+  font-weight:800;
+}
 
     .info-title{
       font-size:20px;
@@ -889,7 +919,9 @@ body.night-mode{
         </button>
         <div class="hero-illust">🐝</div>
       </div>
-
+      
+      <div id="merchantInfoBox" class="merchant-card hidden"></div>
+      
       <div class="category-tabs">
   <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
   <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
@@ -1189,6 +1221,9 @@ let selectedPaymentMethod = '';
 let currentTotal = '';
 let lastEstimate = null;
 
+let merchantMode = false;
+let currentMerchant = null;
+
 let taichung85Coupon = {
   claimed: false,
   discountRate: 1,
@@ -1200,6 +1235,76 @@ let isConfirmingPaid = false;
 let isSelectingPayment = false;
 let isPaymentMethodSaved = false;
 let isCancellingOrder = false;
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
+  authDomain: "ubee-oms.firebaseapp.com",
+  projectId: "ubee-oms"
+};
+
+if(window.firebase && !firebase.apps.length){
+  firebase.initializeApp(firebaseConfig);
+}
+
+const db = window.firebase ? firebase.firestore() : null;
+
+function escapeHtml(str){
+  return String(str ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+async function initMerchantContext(){
+  const params = new URLSearchParams(window.location.search);
+  const merchantId = params.get("merchantId");
+
+  if(!merchantId || !db){
+    return;
+  }
+
+  try{
+    const doc = await db.collection("merchants").doc(merchantId).get();
+
+    if(!doc.exists){
+      alert("找不到合作店家資料，請確認連結是否正確。");
+      return;
+    }
+
+    const merchant = {
+      id: doc.id,
+      ...doc.data()
+    };
+
+    if(merchant.status !== "active"){
+      alert("此合作店家目前尚未開放接單。");
+      return;
+    }
+
+    merchantMode = true;
+    currentMerchant = merchant;
+
+    const box = document.getElementById("merchantInfoBox");
+    if(box){
+      box.classList.remove("hidden");
+      box.innerHTML = `
+        <div class="merchant-card-title">目前合作店家</div>
+        <div class="merchant-card-name">${escapeHtml(merchant.merchantName || "合作店家")}</div>
+        <div class="merchant-card-text">
+          店家代碼：${escapeHtml(merchant.merchantId || merchant.id || "")}<br>
+          店家類型：${escapeHtml(merchant.merchantType || "")}<br>
+          店家地址：${escapeHtml(merchant.merchantAddress || "")}
+        </div>
+      `;
+    }
+
+  }catch(err){
+    console.error("讀取合作店家失敗:", err);
+    alert("合作店家資料讀取失敗，請稍後再試。");
+  }
+}
 
 const serviceDescriptions = {
   send:'UBee 協助文件急送、物品配送、鑰匙急送、禮品配送、商務配送與忘帶物品送達。',
@@ -2177,7 +2282,8 @@ async function initPage(){
 
 renderServiceGrid('send');
 updateStepUI();
+initMerchantContext();
 initPage();
 </script>
 </body>
-</html></html>
+</html>
