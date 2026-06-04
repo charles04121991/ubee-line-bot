@@ -2582,6 +2582,63 @@ app.post('/api/places/search', async (req, res) => {
   }
 });
 
+// ===== Google Places 店家詳細資料 API =====
+app.post('/api/places/detail', async (req, res) => {
+  try {
+    const { placeId } = req.body;
+
+    if (!placeId) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少 placeId'
+      });
+    }
+
+    const fields = [
+      'place_id',
+      'name',
+      'formatted_address',
+      'formatted_phone_number',
+      'geometry'
+    ].join(',');
+
+    const url =
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=${encodeURIComponent(fields)}&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK' || !data.result) {
+      return res.status(400).json({
+        success: false,
+        error: data.error_message || data.status || '查無店家詳細資料'
+      });
+    }
+
+    const place = data.result;
+
+    return res.json({
+      success: true,
+      place: {
+        placeId: place.place_id,
+        name: place.name || '',
+        address: place.formatted_address || '',
+        phone: place.formatted_phone_number || '',
+        lat: place.geometry?.location?.lat || null,
+        lng: place.geometry?.location?.lng || null
+      }
+    });
+
+  } catch (err) {
+    console.error('places detail error:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'places detail error'
+    });
+  }
+});
+
 // ===== 合作店家派單 API =====
 app.post('/api/merchant/order', async (req, res) => {
   try {
