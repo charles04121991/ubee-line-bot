@@ -2548,15 +2548,22 @@ app.post('/api/places/search', async (req, res) => {
     const radius = 3000;
 
     const url =
-      `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=${encodeURIComponent(keyword || '')}&key=${GOOGLE_MAPS_API_KEY}`;
-
+      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword || '飲料店')}&location=${lat},${lng}&radius=${radius}&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
     const response = await fetch(url);
     const data = await response.json();
 
-    if (!data.results) {
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      return res.status(400).json({
+        success: false,
+        error: data.error_message || data.status || 'Google Places 搜尋失敗'
+      });
+    }
+
+    if (!data.results || !data.results.length) {
       return res.json({
         success: true,
-        places: []
+        places: [],
+        googleStatus: data.status
       });
     }
 
