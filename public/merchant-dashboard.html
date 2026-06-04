@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>UBee｜店家接單中心</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
+<style>
+:root{
+  --bg:#000;
+  --card:#111;
+  --card2:#181818;
+  --line:rgba(255,255,255,.12);
+  --text:#fff;
+  --muted:#aaa;
+  --yellow:#facc15;
+  --yellow2:#eab308;
+  --green:#22c55e;
+  --blue:#38bdf8;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+}
+.wrap{
+  max-width:760px;
+  margin:0 auto;
+  padding:18px 14px 40px;
+}
+.hero{
+  padding:20px;
+  border-radius:24px;
+  background:linear-gradient(135deg,#111,#000);
+  border:1px solid var(--line);
+  margin-bottom:14px;
+}
+.logo{
+  font-size:32px;
+  font-weight:900;
+}
+.logo span{color:var(--yellow)}
+.hero h1{
+  margin:8px 0 6px;
+  font-size:24px;
+}
+.hero p{
+  margin:0;
+  color:var(--muted);
+  line-height:1.6;
+}
+.login,.section{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:16px;
+  margin-top:14px;
+}
+label{
+  display:block;
+  color:#ddd;
+  font-size:14px;
+  margin:10px 0 6px;
+}
+input{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:var(--card2);
+  color:var(--text);
+  font-size:16px;
+}
+button{
+  width:100%;
+  border:0;
+  border-radius:16px;
+  padding:14px;
+  margin-top:12px;
+  font-size:16px;
+  font-weight:800;
+  color:#000;
+  background:linear-gradient(135deg,var(--yellow),var(--yellow2));
+}
+button.secondary{
+  background:#222;
+  color:#fff;
+  border:1px solid var(--line);
+}
+button.green{
+  background:var(--green);
+}
+button.blue{
+  background:var(--blue);
+}
+.tabs{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+  margin-top:14px;
+}
+.tab{
+  padding:12px 8px;
+  border-radius:14px;
+  background:var(--card2);
+  border:1px solid var(--line);
+  color:#ddd;
+  text-align:center;
+  font-weight:800;
+}
+.tab.active{
+  border-color:var(--yellow);
+  color:#000;
+  background:var(--yellow);
+}
+.order{
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:14px;
+  margin-top:12px;
+}
+.order h3{
+  margin:0 0 8px;
+  font-size:17px;
+}
+.row{
+  color:#ddd;
+  line-height:1.6;
+  font-size:14px;
+}
+.row b{color:#fff}
+.badge{
+  display:inline-block;
+  padding:5px 9px;
+  border-radius:999px;
+  background:rgba(250,204,21,.15);
+  color:#fde68a;
+  font-size:12px;
+  margin-bottom:8px;
+}
+.empty{
+  color:var(--muted);
+  text-align:center;
+  padding:26px 10px;
+}
+.notice{
+  margin-top:12px;
+  padding:12px;
+  border-radius:14px;
+  background:rgba(250,204,21,.08);
+  border:1px solid rgba(250,204,21,.25);
+  color:#fef3c7;
+  line-height:1.6;
+  font-size:14px;
+}
+.error{
+  display:none;
+  margin-top:12px;
+  padding:12px;
+  border-radius:14px;
+  background:rgba(239,68,68,.12);
+  border:1px solid rgba(239,68,68,.35);
+  color:#fecaca;
+  line-height:1.6;
+}
+.hidden{display:none}
+.small{
+  color:var(--muted);
+  font-size:13px;
+  margin-top:8px;
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="logo"><span>U</span>Bee 🐝</div>
+    <h1>店家接單中心</h1>
+    <p>接收客人訂單、確認製作狀態，完成後派遣 UBee 騎士前往取件。</p>
+  </div>
+
+  <div class="login" id="loginBox">
+    <h2>店家登入</h2>
+
+    <label>店家電話 / 店家代碼</label>
+    <input id="merchantKey" placeholder="例如：0912345678 或 店家代碼" />
+
+    <button onclick="loginMerchant()">進入接單中心</button>
+
+    <div class="notice">
+      第一版先用店家電話或代碼進入。正式大量開放前，之後可再加密碼或店家帳號。
+    </div>
+
+    <div class="error" id="errorBox"></div>
+  </div>
+
+  <div id="dashboard" class="hidden">
+
+    <div class="section">
+      <h2 id="welcomeTitle">店家訂單</h2>
+      <div class="small">目前只處理：待接單、準備中、已完成待派遣。</div>
+
+      <button class="secondary" onclick="logoutMerchant()">切換店家</button>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">
+        待接單 <span id="countPending">0</span>
+      </div>
+      <div class="tab" data-tab="merchant_preparing" onclick="setTab('merchant_preparing')">
+        準備中 <span id="countPreparing">0</span>
+      </div>
+      <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">
+        待派遣 <span id="countReady">0</span>
+      </div>
+    </div>
+
+    <div id="ordersBox"></div>
+  </div>
+
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
+  authDomain: "ubee-oms.firebaseapp.com",
+  projectId: "ubee-oms"
+};
+
+if(!firebase.apps.length){
+  firebase.initializeApp(firebaseConfig);
+}
+
+const db = firebase.firestore();
+
+const STORAGE_KEY = "ubee_merchant_dashboard_key";
+
+let merchantKey = "";
+let currentTab = "merchant_pending";
+let ordersMap = {};
+let unsubscribers = [];
+
+const statusTextMap = {
+  merchant_pending: "店家待接單",
+  merchant_preparing: "店家準備中",
+  merchant_ready: "店家已完成，待派遣騎士"
+};
+
+function normalizePhone(str){
+  return String(str || "").replace(/\D/g, "");
+}
+
+function escapeHtml(str){
+  return String(str ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function getOrderTime(order){
+  const t = order.createdAt;
+  if(t && typeof t.toDate === "function"){
+    return t.toDate().getTime();
+  }
+  if(typeof t === "number") return t;
+  return 0;
+}
+
+function formatTime(order){
+  const t = order.createdAt;
+  let d = null;
+
+  if(t && typeof t.toDate === "function") d = t.toDate();
+  else if(typeof t === "number") d = new Date(t);
+
+  if(!d) return "未記錄";
+
+  const pad = n => String(n).padStart(2,"0");
+  return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function showError(message){
+  const box = document.getElementById("errorBox");
+  box.style.display = "block";
+  box.textContent = message;
+}
+
+function loginMerchant(){
+  const input = document.getElementById("merchantKey");
+  const value = input.value.trim();
+
+  if(!value){
+    showError("請輸入店家電話或店家代碼");
+    return;
+  }
+
+  merchantKey = value;
+  localStorage.setItem(STORAGE_KEY, merchantKey);
+
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("dashboard").classList.remove("hidden");
+  document.getElementById("welcomeTitle").textContent = `店家訂單｜${merchantKey}`;
+
+  startListenOrders();
+}
+
+function logoutMerchant(){
+  localStorage.removeItem(STORAGE_KEY);
+  merchantKey = "";
+  ordersMap = {};
+  stopListenOrders();
+
+  document.getElementById("dashboard").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("ordersBox").innerHTML = "";
+}
+
+function stopListenOrders(){
+  unsubscribers.forEach(fn => {
+    try{ fn(); }catch(e){}
+  });
+  unsubscribers = [];
+}
+
+function startListenOrders(){
+  stopListenOrders();
+
+  const statuses = [
+    "merchant_pending",
+    "merchant_preparing",
+    "merchant_ready"
+  ];
+
+  statuses.forEach(status => {
+    const unsub = db.collection("orders")
+      .where("status", "==", status)
+      .limit(50)
+      .onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          if(change.type === "removed"){
+            delete ordersMap[change.doc.id];
+          }else{
+            ordersMap[change.doc.id] = {
+              id: change.doc.id,
+              ...change.doc.data()
+            };
+          }
+        });
+
+        renderOrders();
+      }, err => {
+        console.error("讀取訂單失敗:", err);
+      });
+
+    unsubscribers.push(unsub);
+  });
+}
+
+function matchMerchant(order){
+  const key = normalizePhone(merchantKey);
+
+  const merchantPhone = normalizePhone(order.merchantPhone);
+  const pickupPhone = normalizePhone(order.pickupPhone);
+  const merchantCode = String(order.merchantCode || "").trim();
+  const merchantId = String(order.merchantId || "").trim();
+
+  if(merchantPhone && merchantPhone === key) return true;
+  if(pickupPhone && pickupPhone === key) return true;
+  if(merchantCode && merchantCode === merchantKey) return true;
+  if(merchantId && merchantId === merchantKey) return true;
+
+  return false;
+}
+
+function getVisibleOrders(){
+  return Object.values(ordersMap)
+    .filter(order => order.status === currentTab)
+    .filter(matchMerchant)
+    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
+}
+
+function setTab(tab){
+  currentTab = tab;
+
+  document.querySelectorAll(".tab").forEach(el => {
+    el.classList.remove("active");
+  });
+
+  const active = document.querySelector(`[data-tab="${tab}"]`);
+  if(active) active.classList.add("active");
+
+  renderOrders();
+}
+
+function updateCounts(){
+  const all = Object.values(ordersMap).filter(matchMerchant);
+
+  document.getElementById("countPending").textContent =
+    all.filter(o => o.status === "merchant_pending").length;
+
+  document.getElementById("countPreparing").textContent =
+    all.filter(o => o.status === "merchant_preparing").length;
+
+  document.getElementById("countReady").textContent =
+    all.filter(o => o.status === "merchant_ready").length;
+}
+
+function renderOrders(){
+  updateCounts();
+
+  const box = document.getElementById("ordersBox");
+  const orders = getVisibleOrders();
+
+  if(!orders.length){
+    box.innerHTML = `
+      <div class="empty">
+        目前沒有「${statusTextMap[currentTab]}」訂單
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = orders.map(order => renderOrderCard(order)).join("");
+}
+
+function renderOrderCard(order){
+  const orderNo = order.orderNo || order.id || "未命名訂單";
+  const customerName = order.customerName || order.receiverName || "未填寫";
+  const customerPhone = order.customerPhone || order.dropoffPhone || "";
+  const item = order.itemName || order.item || order.serviceType || "未填寫";
+  const note = order.note || order.customerNote || "";
+  const dropoff = order.dropoffAddress || "未填寫";
+  const total = order.totalFee || order.total || order.merchantFee || 0;
+
+  let buttonHtml = "";
+
+  if(order.status === "merchant_pending"){
+    buttonHtml = `
+      <button onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_preparing')">
+        接受訂單，開始準備
+      </button>
+    `;
+  }
+
+  if(order.status === "merchant_preparing"){
+    buttonHtml = `
+      <button class="green" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_ready')">
+        準備完成
+      </button>
+    `;
+  }
+
+  if(order.status === "merchant_ready"){
+    buttonHtml = `
+      <button class="blue" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">
+        派遣騎士
+      </button>
+    `;
+  }
+
+  return `
+    <div class="order">
+      <div class="badge">${escapeHtml(statusTextMap[order.status] || order.status)}</div>
+      <h3>${escapeHtml(orderNo)}</h3>
+
+      <div class="row"><b>建立時間：</b>${escapeHtml(formatTime(order))}</div>
+      <div class="row"><b>客人：</b>${escapeHtml(customerName)}</div>
+      <div class="row"><b>電話：</b>${escapeHtml(customerPhone)}</div>
+      <div class="row"><b>內容：</b>${escapeHtml(item)}</div>
+      <div class="row"><b>送達地址：</b>${escapeHtml(dropoff)}</div>
+      <div class="row"><b>備註：</b>${escapeHtml(note || "無")}</div>
+      <div class="row"><b>金額：</b>NT$${escapeHtml(total)}</div>
+
+      ${buttonHtml}
+    </div>
+  `;
+}
+
+async function updateOrderStatus(orderId, nextStatus){
+  const confirmTextMap = {
+    merchant_preparing: "確定接受訂單並開始準備嗎？",
+    merchant_ready: "確定商品已準備完成嗎？",
+    pending_dispatch: "確定要派遣騎士嗎？派遣後騎士端會收到此任務。"
+  };
+
+  if(!confirm(confirmTextMap[nextStatus] || "確定更新狀態嗎？")){
+    return;
+  }
+
+  const updateData = {
+    status: nextStatus,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  if(nextStatus === "merchant_preparing"){
+    updateData.merchantAcceptedAt = firebase.firestore.FieldValue.serverTimestamp();
+  }
+
+  if(nextStatus === "merchant_ready"){
+    updateData.merchantReadyAt = firebase.firestore.FieldValue.serverTimestamp();
+  }
+
+  if(nextStatus === "pending_dispatch"){
+    updateData.dispatchedAt = firebase.firestore.FieldValue.serverTimestamp();
+  }
+
+  try{
+    await db.collection("orders").doc(orderId).update(updateData);
+  }catch(err){
+    console.error("更新訂單狀態失敗:", err);
+    alert("更新失敗，請稍後再試。");
+  }
+}
+
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if(saved){
+    document.getElementById("merchantKey").value = saved;
+  }
+});
+</script>
+</body>
+</html>
