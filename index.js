@@ -2528,6 +2528,60 @@ app.post('/estimate', async (req, res) => {
 }
 });
 
+// ===== Google Places 附近店家搜尋 API =====
+app.post('/api/places/search', async (req, res) => {
+  try {
+
+    const {
+      lat,
+      lng,
+      keyword
+    } = req.body;
+
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少定位資訊'
+      });
+    }
+
+    const radius = 3000;
+
+    const url =
+      `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=${encodeURIComponent(keyword || '')}&key=${GOOGLE_MAPS_API_KEY}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.results) {
+      return res.json({
+        success: true,
+        places: []
+      });
+    }
+
+    const places = data.results.slice(0, 20).map(place => ({
+      placeId: place.place_id,
+      name: place.name,
+      address: place.vicinity || '',
+      rating: place.rating || null
+    }));
+
+    return res.json({
+      success: true,
+      places
+    });
+
+  } catch (err) {
+    console.error('places search error:', err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
 // ===== 合作店家派單 API =====
 app.post('/api/merchant/order', async (req, res) => {
   try {
