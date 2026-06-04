@@ -175,6 +175,16 @@ button.blue{
   font-size:13px;
   margin-top:8px;
 }
+.merchantInfo{
+  margin-top:10px;
+  padding:12px;
+  border-radius:16px;
+  background:rgba(250,204,21,.08);
+  border:1px solid rgba(250,204,21,.2);
+  color:#fef3c7;
+  line-height:1.7;
+  font-size:14px;
+}
 </style>
 </head>
 
@@ -191,12 +201,12 @@ button.blue{
     <h2>店家登入</h2>
 
     <label>店家電話 / 店家代碼</label>
-    <input id="merchantKey" placeholder="例如：0912345678 或 店家代碼" />
+    <input id="merchantKey" placeholder="例如：0987654321 或 M001" />
 
-    <button onclick="loginMerchant()">進入接單中心</button>
+    <button id="loginBtn" onclick="loginMerchant()">進入接單中心</button>
 
     <div class="notice">
-      第一版先用店家電話或代碼進入。正式大量開放前，之後可再加密碼或店家帳號。
+      請輸入已建立於 merchants 的店家電話或店家代碼。
     </div>
 
     <div class="error" id="errorBox"></div>
@@ -206,6 +216,9 @@ button.blue{
 
     <div class="section">
       <h2 id="welcomeTitle">店家訂單</h2>
+
+      <div class="merchantInfo" id="merchantInfoBox"></div>
+
       <div class="small">目前只處理：待接單、準備中、已完成待派遣。</div>
 
       <button class="secondary" onclick="logoutMerchant()">切換店家</button>
@@ -244,6 +257,7 @@ const db = firebase.firestore();
 const STORAGE_KEY = "ubee_merchant_dashboard_key";
 
 let merchantKey = "";
+let currentMerchant = null;
 let currentTab = "merchant_pending";
 let ordersMap = {};
 let unsubscribers = [];
@@ -267,6 +281,18 @@ function escapeHtml(str){
     .replaceAll("'","&#039;");
 }
 
+function hideError(){
+  const box = document.getElementById("errorBox");
+  box.style.display = "none";
+  box.textContent = "";
+}
+
+function showError(message){
+  const box = document.getElementById("errorBox");
+  box.style.display = "block";
+  box.textContent = message;
+}
+
 function getOrderTime(order){
   const t = order.createdAt;
   if(t && typeof t.toDate === "function"){
@@ -282,21 +308,67 @@ function formatTime(order){
 
   if(t && typeof t.toDate === "function") d = t.toDate();
   else if(typeof t === "number") d = new Date(t);
+  else if(typeof t === "string") d = new Date(t);
 
-  if(!d) return "未記錄";
+  if(!d || isNaN(d.getTime())) return "未記錄";
 
   const pad = n => String(n).padStart(2,"0");
   return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function showError(message){
-  const box = document.getElementById("errorBox");
-  box.style.display = "block";
-  box.textContent = message;
+async function findMerchant(value){
+  const rawValue = String(value || "").trim();
+  const cleanPhone = normalizePhone(rawValue);
+
+  let merchantDoc = null;
+
+  const byId = await db.collection("merchants").doc(rawValue).get();
+
+  if(byId.exists){
+    merchantDoc = {
+      id: byId.id,
+      ...byId.data()
+    };
+  }
+
+  if(!merchantDoc && cleanPhone){
+    const phoneSnap = await db.collection("merchants")
+      .where("merchantPhone", "==", cleanPhone)
+      .limit(1)
+      .get();
+
+    if(!phoneSnap.empty){
+      const doc = phoneSnap.docs[0];
+      merchantDoc = {
+        id: doc.id,
+        ...doc.data()
+      };
+    }
+  }
+
+  if(!merchantDoc){
+    const codeSnap = await db.collection("merchants")
+      .where("merchantId", "==", rawValue)
+      .limit(1)
+      .get();
+
+    if(!codeSnap.empty){
+      const doc = codeSnap.docs[0];
+      merchantDoc = {
+        id: doc.id,
+        ...doc.data()
+      };
+    }
+  }
+
+  return merchantDoc;
 }
 
-function loginMerchant(){
+async function loginMerchant(){
+  hideError();
+
   const input = document.getElementById("merchantKey");
+  const loginBtn = document.getElementById("loginBtn");
   const value = input.value.trim();
 
   if(!value){
@@ -304,25 +376,72 @@ function loginMerchant(){
     return;
   }
 
-  merchantKey = value;
-  localStorage.setItem(STORAGE_KEY, merchantKey);
+  loginBtn.disabled = true;
+  loginBtn.textContent = "登入中...";
 
-  document.getElementById("loginBox").classList.add("hidden");
-  document.getElementById("dashboard").classList.remove("hidden");
-  document.getElementById("welcomeTitle").textContent = `店家訂單｜${merchantKey}`;
+  try{
+    const merchantDoc = await findMerchant(value);
 
-  startListenOrders();
+    if(!merchantDoc){
+      showError("找不到店家資料，請確認店家電話或店家代碼是否正確。");
+      return;
+    }
+
+    if(merchantDoc.status !== "active"){
+      showError("此店家目前尚未啟用，請聯繫 UBee 管理員。");
+      return;
+    }
+
+    currentMerchant = merchantDoc;
+
+    merchantKey =
+      merchantDoc.merchantPhone ||
+      merchantDoc.merchantId ||
+      merchantDoc.id ||
+      value;
+
+    localStorage.setItem(STORAGE_KEY, merchantKey);
+
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+
+    document.getElementById("welcomeTitle").textContent =
+      `${merchantDoc.merchantName || "店家"}｜接單中心`;
+
+    document.getElementById("merchantInfoBox").innerHTML = `
+      <strong>${escapeHtml(merchantDoc.merchantName || "未命名店家")}</strong><br>
+      店家代碼：${escapeHtml(merchantDoc.merchantId || merchantDoc.id || "未設定")}<br>
+      店家類型：${escapeHtml(merchantDoc.merchantType || "未設定")}<br>
+      店家電話：${escapeHtml(merchantDoc.merchantPhone || "未設定")}<br>
+      店家地址：${escapeHtml(merchantDoc.merchantAddress || "未設定")}<br>
+      狀態：${merchantDoc.status === "active" ? "營運中" : escapeHtml(merchantDoc.status || "未設定")}
+    `;
+
+    startListenOrders();
+
+  }catch(err){
+    console.error("店家登入失敗:", err);
+    showError("店家登入失敗，請稍後再試。");
+  }finally{
+    loginBtn.disabled = false;
+    loginBtn.textContent = "進入接單中心";
+  }
 }
 
 function logoutMerchant(){
   localStorage.removeItem(STORAGE_KEY);
   merchantKey = "";
+  currentMerchant = null;
+  currentTab = "merchant_pending";
   ordersMap = {};
   stopListenOrders();
 
   document.getElementById("dashboard").classList.add("hidden");
   document.getElementById("loginBox").classList.remove("hidden");
   document.getElementById("ordersBox").innerHTML = "";
+  document.getElementById("merchantInfoBox").innerHTML = "";
+
+  setTab("merchant_pending");
 }
 
 function stopListenOrders(){
@@ -367,17 +486,20 @@ function startListenOrders(){
 }
 
 function matchMerchant(order){
-  const key = normalizePhone(merchantKey);
+  if(!currentMerchant) return false;
 
-  const merchantPhone = normalizePhone(order.merchantPhone);
-  const pickupPhone = normalizePhone(order.pickupPhone);
-  const merchantCode = String(order.merchantCode || "").trim();
-  const merchantId = String(order.merchantId || "").trim();
+  const currentPhone = normalizePhone(currentMerchant.merchantPhone);
+  const currentId = String(currentMerchant.merchantId || currentMerchant.id || "").trim();
 
-  if(merchantPhone && merchantPhone === key) return true;
-  if(pickupPhone && pickupPhone === key) return true;
-  if(merchantCode && merchantCode === merchantKey) return true;
-  if(merchantId && merchantId === merchantKey) return true;
+  const orderMerchantPhone = normalizePhone(order.merchantPhone);
+  const orderPickupPhone = normalizePhone(order.pickupPhone);
+  const orderMerchantCode = String(order.merchantCode || "").trim();
+  const orderMerchantId = String(order.merchantId || "").trim();
+
+  if(currentId && orderMerchantId && orderMerchantId === currentId) return true;
+  if(currentId && orderMerchantCode && orderMerchantCode === currentId) return true;
+  if(currentPhone && orderMerchantPhone && orderMerchantPhone === currentPhone) return true;
+  if(currentPhone && orderPickupPhone && orderPickupPhone === currentPhone) return true;
 
   return false;
 }
