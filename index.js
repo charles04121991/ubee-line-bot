@@ -2867,7 +2867,7 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
 
     const isCashPayment = order.paymentMethod === 'cash';
 
-    order.status = 'pending_dispatch';
+    order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
     order.paidAt = isCashPayment ? null : Date.now();
     order.isPaid = isCashPayment ? false : true;
     order.paymentStatus = isCashPayment ? 'cash_on_delivery' : 'paid_confirmed';
