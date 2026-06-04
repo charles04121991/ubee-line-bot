@@ -1560,7 +1560,25 @@ function selectService(el, value){
 }
 
 function getPlaceKeyword(){
-  return `${serviceCategory || ''} ${serviceType || ''} 台中`;
+  if(serviceType === '飲料代買'){
+    if(serviceCategory === '手搖飲') return '手搖飲';
+    if(serviceCategory === '咖啡廳') return '咖啡';
+    if(serviceCategory === '果汁店') return '果汁';
+    if(serviceCategory === '連鎖飲料店') return '飲料店';
+    return '飲料店';
+  }
+
+  if(serviceType === '餐點代買'){
+    if(serviceCategory === '便當店') return '便當';
+    if(serviceCategory === '小吃店') return '小吃';
+    if(serviceCategory === '早餐店') return '早餐';
+    if(serviceCategory === '簡餐店') return '簡餐';
+    if(serviceCategory === '麵食館') return '麵店';
+    if(serviceCategory === '速食店') return '速食';
+    return '餐廳';
+  }
+
+  return serviceCategory || serviceType || '店家';
 }
 
 async function loadMerchantsForCategory(){
