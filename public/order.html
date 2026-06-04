@@ -1827,7 +1827,13 @@ function getData(){
     
     advancePayment: Number(document.getElementById('advancePayment')?.value || 0),
     
-    userId
+    userId,
+
+    merchantId: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
+    merchantName: currentMerchant ? (currentMerchant.merchantName || '') : '',
+    merchantPhone: currentMerchant ? (currentMerchant.merchantPhone || '') : '',
+    merchantAddress: currentMerchant ? (currentMerchant.merchantAddress || '') : '',
+    hasMerchant: !!currentMerchant
   };
 }
 
