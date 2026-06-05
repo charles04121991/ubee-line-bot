@@ -61,9 +61,9 @@ const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
 const CAMPAIGN_ID = 'taichung85_2026';
 
-const LINE_GROUP_ID = process.env.LINE_GROUP_ID;
+const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
-const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || LINE_GROUP_ID;
+const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const LIFF_ID = process.env.LIFF_ID || '';
@@ -102,9 +102,8 @@ const PARTNER_FORM_URL =
   process.env.PARTNER_FORM_URL ||
   `${BASE_URL}/rider.html`;
 
-if (!LINE_GROUP_ID) {
-  console.error('❌ 缺少 LINE_GROUP_ID');
-  process.exit(1);
+if (!LINE_ADMIN_GROUP_ID) {
+  console.warn('⚠️ 未設定 LINE_ADMIN_GROUP_ID 或 LINE_FINISH_GROUP_ID，審核與管理通知可能無法推送。');
 }
 
 if (!GOOGLE_MAPS_API_KEY) {
@@ -4092,11 +4091,6 @@ if (!riderSnap.empty) {
     recalculateOrderFinancials(order);
     await saveOrder(order);
 
-    await pushToGroup(
-      LINE_GROUP_ID,
-      createTextMessage(`✅ 客人已同意等候費 NT$60\n訂單編號：${order.id}`)
-    );
-
     await replyText(event.replyToken, `✅ 已同意加收等候費 $60\n\n訂單編號：${order.id}`);
     return null;
   }
@@ -4122,12 +4116,7 @@ if (!riderSnap.empty) {
     order.waitingFee = 0;
     recalculateOrderFinancials(order);
     await saveOrder(order);
-
-    await pushToGroup(
-      LINE_GROUP_ID,
-      createTextMessage(`客人不同意等候費申請\n訂單編號：${order.id}`)
-    );
-
+    
     await replyText(event.replyToken, `已拒絕加收等候費\n\n訂單編號：${order.id}`);
     return null;
   }
