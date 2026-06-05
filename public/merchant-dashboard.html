@@ -693,6 +693,12 @@ function updateCounts(){
 
   document.getElementById("countReady").textContent =
     all.filter(o => o.status === "merchant_ready").length;
+
+  document.getElementById("countDelivery").textContent =
+    all.filter(o => deliveryStatuses.includes(o.status)).length;
+
+  document.getElementById("countCompleted").textContent =
+    all.filter(o => o.status === "completed").length;
 }
 
 function renderOrders(){
