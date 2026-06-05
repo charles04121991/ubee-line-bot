@@ -255,10 +255,14 @@ if(!firebase.apps.length){
 
 const db = firebase.firestore();
 
+const MERCHANT_LIFF_ID = "2009895876-8UhPutRu";
 const STORAGE_KEY = "ubee_merchant_dashboard_key";
 
+let merchantLineUserId = "";
 let merchantKey = "";
 let currentMerchant = null;
+let merchantAuthed = false;
+
 let currentTab = "merchant_pending";
 let ordersMap = {};
 let unsubscribers = [];
