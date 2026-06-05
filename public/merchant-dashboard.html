@@ -748,10 +748,23 @@ async function updateOrderStatus(orderId, nextStatus){
   }
 }
 
-window.addEventListener("load", () => {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if(saved){
-    document.getElementById("merchantKey").value = saved;
+window.addEventListener("load", async () => {
+  const loginBtn = document.getElementById("loginBtn");
+
+  if(loginBtn){
+    loginBtn.disabled = true;
+    loginBtn.textContent = "登入檢查中...";
+  }
+
+  await initMerchantLiff();
+
+  if(merchantLineUserId){
+    await loadMerchantProfile();
+  }
+
+  if(loginBtn && !merchantAuthed){
+    loginBtn.disabled = false;
+    loginBtn.textContent = "綁定並進入店家派單中心";
   }
 });
 </script>
