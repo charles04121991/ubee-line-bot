@@ -1140,15 +1140,25 @@ async function updateOrderStatus(orderId, nextStatus){
   }
 }
 
+function enableMerchantLoginButton(){
+  const loginBtn = document.getElementById("loginBtn");
+  if(loginBtn && !merchantAuthed){
+    loginBtn.disabled = false;
+    loginBtn.removeAttribute("disabled");
+    loginBtn.textContent = "綁定並進入店家派單中心";
+  }
+}
+
 window.addEventListener("load", async () => {
   const loginBtn = document.getElementById("loginBtn");
 
-  try{
-    if(loginBtn){
-      loginBtn.disabled = true;
-      loginBtn.textContent = "登入檢查中...";
-    }
+  if(loginBtn){
+    loginBtn.disabled = false;
+    loginBtn.removeAttribute("disabled");
+    loginBtn.textContent = "登入檢查中...";
+  }
 
+  try{
     await initMerchantLiff();
 
     if(merchantLineUserId){
@@ -1158,12 +1168,17 @@ window.addEventListener("load", async () => {
   }catch(err){
     console.error("店家登入檢查失敗:", err);
     showError("店家登入檢查失敗，請重新開啟店家派單中心。");
-  }finally{
-    if(loginBtn && !merchantAuthed){
-      loginBtn.disabled = false;
-      loginBtn.textContent = "綁定並進入店家派單中心";
-    }
   }
+
+  enableMerchantLoginButton();
+
+  setTimeout(() => {
+    enableMerchantLoginButton();
+  }, 1200);
+
+  setTimeout(() => {
+    enableMerchantLoginButton();
+  }, 3000);
 });
 </script>
 </body>
