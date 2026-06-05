@@ -2221,18 +2221,6 @@ function createRiderReviewFlex(rider) {
   ));
 }
 
-function createInfoMenuFlex() {
-  return createFlexMessage('我的資訊', createBubble(
-    '📋 UBee｜我的資訊',
-    [{ type: 'text', text: '請選擇你要查看的內容👇', size: 'sm', color: '#666666', wrap: true }],
-    [
-      createActionButton('取消規則', 'submenu=cancelRules'),
-      createActionButton('常見問題', 'submenu=faq', 'secondary'),
-      createActionButton('查詢訂單', 'submenu=queryOrder', 'secondary')
-    ]
-  ));
-}
-
 function createBusinessReviewFlex(business) {
   const safe = (v, fallback = '未填寫') => {
     if (v === undefined || v === null || v === '') return fallback;
@@ -2281,47 +2269,6 @@ function createBusinessReviewFlex(business) {
         }
       }
     ]
-  ));
-}
-
-function createCancelRulesFlex() {
-  return createFlexMessage('取消規則', createBubble(
-    '取消規則',
-    [
-      createTextBlock('① 未接單', '可免費取消。'),
-      createTextBlock('② 已接單', '酌收配送費 30%，最低 NT$60，最高 NT$200。'),
-      createTextBlock('③ 騎士已抵達取件地點', '酌收配送費 50%，最低 NT$100，最高 NT$300。'),
-      createTextBlock('④ 已取件後', '原則上不可取消，若有特殊狀況請聯繫 UBee。'),
-    ],
-    [createActionButton('返回我的資訊', 'menu=info', 'secondary')]
-  ));
-}
-
-function createFaqFlex() {
-  return createFlexMessage('常見問題', createBubble(
-    '常見問題',
-    [
-      createTextBlock('Q1：UBee 可以送什麼？', '文件、合約、發票、樣品、商務物品、個人物品、安全代送與私人物件。'),
-      createTextBlock('Q2：UBee 不接哪些項目？', '違法物品、危險品、易燃物、活體動物、高價未保管物、高度個資風險或需特殊證照的項目恕不承接。'),
-      createTextBlock('Q3：多久可以送達？', '依距離、路況與速度選項而定。'),
-      createTextBlock('Q4：費用怎麼計算？', '費用依 Google Maps 距離與時間計算，並加上服務費與系統費。'),
-      createTextBlock('Q5：付款方式有哪些？', '目前支援街口支付與銀行轉帳。'),
-      createTextBlock('Q6：什麼是等候費？', '騎士抵達現場後，若需要額外等候超過 3–5 分鐘，可能會申請等候費 NT$60。'),
-      createTextBlock('Q7：可以查詢訂單嗎？', '可以。點選「查詢訂單」後，輸入訂單編號即可查看目前狀態。'),
-      createTextBlock('Q8：有開發票或收據嗎？', '目前提供收據或交易紀錄，暫不開立統一發票。'),
-    ],
-    [createActionButton('返回我的資訊', 'menu=info', 'secondary')]
-  ));
-}
-
-function createQueryOrderFlex() {
-  return createFlexMessage('查詢訂單', createBubble(
-    '查詢訂單',
-    [
-      { type: 'text', text: '請直接在聊天室輸入你的訂單編號，系統會回覆目前狀態。', size: 'sm', color: '#666666', wrap: true },
-      createTextBlock('輸入範例', 'UB202604270001'),
-    ],
-    [createActionButton('返回我的資訊', 'menu=info', 'secondary')]
   ));
 }
 
@@ -3711,11 +3658,6 @@ UBee 辦公室將會再依照您的需求，
   );
 }
 
-  if (data === 'menu=info') return replyMessages(event.replyToken, [createInfoMenuFlex()]);
-  if (data === 'submenu=cancelRules') return replyMessages(event.replyToken, [createCancelRulesFlex()]);
-  if (data === 'submenu=faq') return replyMessages(event.replyToken, [createFaqFlex()]);
-  if (data === 'submenu=queryOrder') return replyMessages(event.replyToken, [createQueryOrderFlex()]);
-
   if (data.startsWith('approveRider=')) {
     const permitted = await requireAdminPermission(event, '騎士審核');
     if (!permitted) return null;
@@ -4123,28 +4065,9 @@ if (!riderSnap.empty) {
 async function handleTextStep(event, userId, text) {
   const normalized = text.trim();
 
-  if (normalized === '主選單') return replyMessages(event.replyToken, [createMainMenuFlex()]);
-  if (normalized === '我的資訊' || normalized === '我的') {
-  return client.replyMessage(event.replyToken, {
-    type: 'template',
-    altText: 'UBee 我的資訊',
-    template: {
-      type: 'buttons',
-      title: 'UBee｜我的資訊',
-      text: '查看 UBee 的取消規則與常見問題。',
-      actions: [
-        {
-          type: 'uri',
-          label: '開啟我的資訊',
-          uri: getPublicUrl('info.html')
-        }
-      ]
-    }
-  });
-}
-  if (normalized === '取消規則') return replyMessages(event.replyToken, [createCancelRulesFlex()]);
-  if (normalized === '常見問題') return replyMessages(event.replyToken, [createFaqFlex()]);
-  if (normalized === '查詢訂單') return replyMessages(event.replyToken, [createQueryOrderFlex()]);
+  if (normalized === '主選單') {
+    return replyMessages(event.replyToken, [createMainMenuFlex()]);
+  }
 
   return null;
 }
