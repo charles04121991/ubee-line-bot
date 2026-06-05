@@ -1340,6 +1340,151 @@ app.post('/api/merchant/register', async (req, res) => {
   }
 });
 
+// ===== 店家資料查詢 API：已綁定店家直接進入派單中心 =====
+app.get('/api/merchant/profile', async (req, res) => {
+  try {
+    const lineUserId = String(req.query.lineUserId || '').trim();
+
+    if (!lineUserId) {
+      return res.status(400).json({
+        ok: false,
+        needBind: true,
+        message: '缺少 LINE 使用者資料',
+      });
+    }
+
+    const snap = await db
+      .collection('merchants')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.json({
+        ok: false,
+        needBind: true,
+        message: '尚未綁定店家帳號',
+      });
+    }
+
+    const doc = snap.docs[0];
+    const merchant = doc.data() || {};
+
+    if (merchant.status !== 'approved' && merchant.approved !== true) {
+      return res.status(403).json({
+        ok: false,
+        needBind: false,
+        message: '您的店家帳號尚未審核通過，暫時無法使用店家派單中心',
+      });
+    }
+
+    return res.json({
+      ok: true,
+      needBind: false,
+      merchant: {
+        id: doc.id,
+        merchantName: merchant.merchantName || '',
+        contactPerson: merchant.contactPerson || '',
+        phone: merchant.phone || '',
+        pickupAddress: merchant.pickupAddress || '',
+        businessType: merchant.businessType || '',
+        settlementType: merchant.settlementType || '',
+        status: merchant.status || '',
+        approved: merchant.approved === true,
+      },
+    });
+  } catch (err) {
+    console.error('❌ /api/merchant/profile error:', err);
+    return res.status(500).json({
+      ok: false,
+      needBind: true,
+      message: '店家資料讀取失敗，請稍後再試',
+    });
+  }
+});
+
+// ===== 店家電話綁定 API：第一次使用店家派單中心 =====
+app.post('/api/merchant/bind', async (req, res) => {
+  try {
+    const { phone, lineUserId } = req.body || {};
+
+    const cleanPhone = String(phone || '').replace(/\s+/g, '').replace(/-/g, '');
+    const cleanLineUserId = String(lineUserId || '').trim();
+
+    if (!cleanLineUserId) {
+      return res.status(400).json({
+        ok: false,
+        message: '缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟',
+      });
+    }
+
+    if (!/^09\d{8}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        ok: false,
+        message: '請輸入申請合作時填寫的手機號碼，例如：0912345678',
+      });
+    }
+
+    const snap = await db
+      .collection('merchants')
+      .where('phone', '==', cleanPhone)
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.status(404).json({
+        ok: false,
+        message: '查無店家合作資料，請先完成店家合作申請',
+      });
+    }
+
+    const doc = snap.docs[0];
+    const merchant = doc.data() || {};
+
+    if (merchant.status !== 'approved' && merchant.approved !== true) {
+      return res.status(403).json({
+        ok: false,
+        message: '您的店家合作申請尚未審核通過，暫時無法使用店家派單中心',
+      });
+    }
+
+    if (merchant.lineUserId && merchant.lineUserId !== cleanLineUserId) {
+      return res.status(409).json({
+        ok: false,
+        message: '此店家帳號已完成綁定，如需更換管理者，請聯繫 UBee 客服',
+      });
+    }
+
+    await doc.ref.update({
+      lineUserId: cleanLineUserId,
+      boundAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.json({
+      ok: true,
+      message: '店家帳號綁定成功',
+      merchant: {
+        id: doc.id,
+        merchantName: merchant.merchantName || '',
+        contactPerson: merchant.contactPerson || '',
+        phone: merchant.phone || '',
+        pickupAddress: merchant.pickupAddress || '',
+        businessType: merchant.businessType || '',
+        settlementType: merchant.settlementType || '',
+        status: merchant.status || '',
+        approved: true,
+      },
+    });
+  } catch (err) {
+    console.error('❌ /api/merchant/bind error:', err);
+    return res.status(500).json({
+      ok: false,
+      message: '店家帳號綁定失敗，請稍後再試',
+    });
+  }
+});
+
 const PRICING = {
   baseFee: 80,
   perKm: 18,
