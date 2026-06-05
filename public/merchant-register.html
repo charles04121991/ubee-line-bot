@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>UBee｜店家加入合作</title>
+
+  <style>
+    :root {
+      --bg: #000000;
+      --card: #111111;
+      --card2: #181818;
+      --text: #ffffff;
+      --muted: #a3a3a3;
+      --line: #2a2a2a;
+      --brand: #facc15;
+      --brand2: #eab308;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --input: #202020;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top, rgba(250, 204, 21, 0.12), transparent 35%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+      padding: 20px 16px 40px;
+    }
+
+    .wrap {
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #facc15, #f59e0b);
+      color: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      font-weight: 900;
+      margin-bottom: 14px;
+      box-shadow: 0 12px 28px rgba(250, 204, 21, 0.22);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.25;
+      letter-spacing: 0.3px;
+    }
+
+    .desc {
+      margin: 10px 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .card {
+      background: rgba(17, 17, 17, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+    }
+
+    .notice {
+      background: rgba(250, 204, 21, 0.1);
+      border: 1px solid rgba(250, 204, 21, 0.22);
+      color: #fde68a;
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #e5e5e5;
+      margin: 14px 0 7px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #333;
+      background: var(--input);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 13px 14px;
+      font-size: 16px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 94px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.12);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 15px 16px;
+      font-size: 16px;
+      font-weight: 900;
+      margin-top: 20px;
+      background: linear-gradient(135deg, var(--brand), var(--brand2));
+      color: #111;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .msg {
+      display: none;
+      margin-top: 14px;
+      padding: 13px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .msg.ok {
+      display: block;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.28);
+      color: #86efac;
+    }
+
+    .msg.err {
+      display: block;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.28);
+      color: #fca5a5;
+    }
+
+    .footer {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    @media (max-width: 420px) {
+      body {
+        padding: 18px 14px 34px;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="logo">U</div>
+
+    <h1>UBee 店家加入合作</h1>
+
+    <p class="desc">
+      填寫資料後，UBee 會進行合作審核。審核通過後，店家即可使用店家派單中心建立配送任務。
+    </p>
+
+    <div class="card">
+      <div class="notice">
+        送出申請後不會立即開通派單功能。UBee 審核通過後，店家再從「店家派單」輸入申請電話完成綁定。
+      </div>
+
+      <form id="merchantForm">
+        <label for="merchantName">店家名稱 *</label>
+        <input id="merchantName" name="merchantName" type="text" placeholder="例如：XX 飲料店" required />
+
+        <label for="contactPerson">負責人 / 聯絡人 *</label>
+        <input id="contactPerson" name="contactPerson" type="text" placeholder="例如：王先生" required />
+
+        <label for="phone">店家電話 / 聯絡電話 *</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" placeholder="例如：0912345678" required />
+        <div class="hint">這支電話之後會用來綁定店家派單中心，請務必填寫正確。</div>
+
+        <label for="lineId">LINE ID</label>
+        <input id="lineId" name="lineId" type="text" placeholder="例如：ubee.store" />
+
+        <label for="pickupAddress">店家取件地址 *</label>
+        <textarea id="pickupAddress" name="pickupAddress" placeholder="請填寫完整地址，騎士會依此地址前往取件" required></textarea>
+
+        <div class="row">
+          <div>
+            <label for="businessType">營業項目 *</label>
+            <select id="businessType" name="businessType" required>
+              <option value="">請選擇</option>
+              <option value="飲料店">飲料店</option>
+              <option value="餐飲店">餐飲店</option>
+              <option value="花店">花店</option>
+              <option value="蔬果店">蔬果店</option>
+              <option value="生活用品">生活用品</option>
+              <option value="文件/行政">文件 / 行政</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="settlementType">結帳方式 *</label>
+            <select id="settlementType" name="settlementType" required>
+              <option value="">請選擇</option>
+              <option value="daily">日結</option>
+              <option value="weekly">週結</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="dispatchFrequency">預計派單頻率</label>
+        <select id="dispatchFrequency" name="dispatchFrequency">
+          <option value="">請選擇</option>
+          <option value="偶爾使用">偶爾使用</option>
+          <option value="每週 1-5 單">每週 1-5 單</option>
+          <option value="每天 1-5 單">每天 1-5 單</option>
+          <option value="每天 5-10 單">每天 5-10 單</option>
+          <option value="每天 10 單以上">每天 10 單以上</option>
+        </select>
+
+        <label for="note">備註</label>
+        <textarea id="note" name="note" placeholder="例如：希望週結、固定下午派單、需收現金等"></textarea>
+
+        <button id="submitBtn" type="submit">送出合作申請</button>
+
+        <div id="msg" class="msg"></div>
+      </form>
+    </div>
+
+    <div class="footer">
+      UBee 城市任務平台｜店家合作申請
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("merchantForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const msg = document.getElementById("msg");
+
+    function showMsg(type, text) {
+      msg.className = "msg " + type;
+      msg.textContent = text;
+    }
+
+    function cleanPhone(phone) {
+      return String(phone || "").replace(/\s+/g, "").replace(/-/g, "");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        merchantName: form.merchantName.value.trim(),
+        contactPerson: form.contactPerson.value.trim(),
+        phone: cleanPhone(form.phone.value),
+        lineId: form.lineId.value.trim(),
+        pickupAddress: form.pickupAddress.value.trim(),
+        businessType: form.businessType.value,
+        settlementType: form.settlementType.value,
+        dispatchFrequency: form.dispatchFrequency.value,
+        note: form.note.value.trim()
+      };
+
+      if (!payload.merchantName || !payload.contactPerson || !payload.phone || !payload.pickupAddress || !payload.businessType || !payload.settlementType) {
+        showMsg("err", "請確認必填欄位都有填寫。");
+        return;
+      }
+
+      if (!/^09\d{8}$/.test(payload.phone)) {
+        showMsg("err", "請輸入正確的手機格式，例如：0912345678。");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "送出中...";
+      showMsg("ok", "正在送出申請，請稍候...");
+
+      try {
+        const res = await fetch("/api/merchant/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "送出失敗，請稍後再試。");
+        }
+
+        showMsg("ok", "合作申請已送出！UBee 會進行審核，通過後即可使用店家派單中心。");
+        form.reset();
+      } catch (err) {
+        showMsg("err", err.message || "送出失敗，請稍後再試。");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "送出合作申請";
+      }
+    });
+  </script>
+</body>
+</html>
