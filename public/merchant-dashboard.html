@@ -237,7 +237,7 @@ button.blue{
   border:1px solid rgba(239,68,68,.35);
   color:#fecaca;
 }
-  .speedGrid{
+.speedGrid{
   display:grid;
   grid-template-columns:1fr;
   gap:10px;
@@ -309,7 +309,7 @@ button.blue{
     <label id="merchantKeyLabel">店家電話 / 店家代碼</label>
     <input id="merchantKey" placeholder="例如：0987654321 或 M001" />
 
-    <button id="loginBtn" onclick="loginMerchant()">進入派單中心</button>
+    <button id="loginBtn" type="button" onclick="loginMerchant()">進入派單中心</button>
 
     <div class="notice">
       請輸入已建立於 merchants 的店家電話或店家代碼。
@@ -327,7 +327,7 @@ button.blue{
 
       <div class="small">目前可查看：待接單、準備中、待派遣、配送中、已完成。</div>
 
-      <button class="secondary" onclick="logoutMerchant()">切換店家</button>
+      <button class="secondary" type="button" onclick="logoutMerchant()">切換店家</button>
     </div>
 
     <div class="section">
@@ -338,7 +338,7 @@ button.blue{
       </div>
 
       <div class="small">
-        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、備註與配送費。
+        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、備註與付款確認。
       </div>
 
       <div class="formGrid">
@@ -361,46 +361,46 @@ button.blue{
 
       <label>配送速度 *</label>
 
-<div class="speedGrid">
-  <div class="speedOption active" data-speed="standard" onclick="selectMerchantSpeed('standard')">
-    <strong>一般配送</strong>
-    <span>一般配送，依現場騎士安排</span>
-  </div>
+      <div class="speedGrid">
+        <div class="speedOption active" data-speed="standard" onclick="selectMerchantSpeed('standard')">
+          <strong>一般配送</strong>
+          <span>一般配送，依現場騎士安排</span>
+        </div>
 
-  <div class="speedOption" data-speed="priority" onclick="selectMerchantSpeed('priority')">
-    <strong>優先件</strong>
-    <span>優先安排騎士前往取貨</span>
-  </div>
+        <div class="speedOption" data-speed="priority" onclick="selectMerchantSpeed('priority')">
+          <strong>優先件</strong>
+          <span>優先安排騎士前往取貨</span>
+        </div>
 
-  <div class="speedOption" data-speed="express" onclick="selectMerchantSpeed('express')">
-    <strong>即時件</strong>
-    <span>需要較快完成配送</span>
-  </div>
+        <div class="speedOption" data-speed="express" onclick="selectMerchantSpeed('express')">
+          <strong>即時件</strong>
+          <span>需要較快完成配送</span>
+        </div>
 
-  <div class="speedOption" data-speed="rush" onclick="selectMerchantSpeed('rush')">
-    <strong>急件</strong>
-    <span>高優先順序配送任務</span>
-  </div>
-</div>
+        <div class="speedOption" data-speed="rush" onclick="selectMerchantSpeed('rush')">
+          <strong>急件</strong>
+          <span>高優先順序配送任務</span>
+        </div>
+      </div>
 
-<label>代墊金額</label>
-<input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
+      <label>代墊金額</label>
+      <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
 
-<div class="paymentBox">
-  本次應付 UBee：NT$100<br>
-  街口支付：901871793<br>
-  請完成付款後，再建立配送單。
-</div>
+      <div class="paymentBox">
+        本次應付 UBee：NT$100<br>
+        街口支付：901871793<br>
+        請完成付款後，再建立配送單。
+      </div>
 
-<label class="checkRow">
-  <input id="merchantPaidCheck" type="checkbox" />
-  <span>我已完成付款</span>
-</label>
+      <label class="checkRow">
+        <input id="merchantPaidCheck" type="checkbox" />
+        <span>我已完成付款</span>
+      </label>
 
       <label>備註</label>
       <textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
 
-      <button id="createOrderBtn" onclick="createMerchantOrder()">建立派單，放入待派遣</button>
+      <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立派單，放入待派遣</button>
 
       <div id="createOrderMsg" class="formMsg"></div>
     </div>
@@ -447,6 +447,7 @@ const db = firebase.firestore();
 
 const MERCHANT_LIFF_ID = "2009895876-8UhPutRu";
 const STORAGE_KEY = "ubee_merchant_dashboard_key";
+const MERCHANT_SERVICE_FEE = 100;
 
 let merchantLineUserId = "";
 let merchantKey = "";
@@ -456,9 +457,8 @@ let merchantAuthed = false;
 let currentTab = "merchant_pending";
 let ordersMap = {};
 let unsubscribers = [];
-const MERCHANT_SERVICE_FEE = 100;
 let selectedMerchantSpeed = "standard";
-  
+
 const deliveryStatuses = [
   "pending_dispatch",
   "accepted",
@@ -506,6 +506,16 @@ function showError(message){
   box.textContent = message;
 }
 
+function forceEnableLoginButton(text){
+  const loginBtn = document.getElementById("loginBtn");
+  if(loginBtn && !merchantAuthed){
+    loginBtn.disabled = false;
+    loginBtn.removeAttribute("disabled");
+    loginBtn.style.pointerEvents = "auto";
+    loginBtn.textContent = text || "進入派單中心";
+  }
+}
+
 function showCreateOrderMsg(type, message){
   const box = document.getElementById("createOrderMsg");
   box.className = "formMsg " + type;
@@ -523,6 +533,7 @@ async function initMerchantLiff(){
 
   if(typeof liff === "undefined"){
     showError("LINE LIFF 載入失敗，請從店家合作中心官方帳號重新開啟。");
+    forceEnableLoginButton("進入派單中心");
     return;
   }
 
@@ -541,6 +552,7 @@ async function initMerchantLiff(){
 
     if(!merchantLineUserId){
       showError("無法取得 LINE 使用者資料，請重新開啟店家派單中心。");
+      forceEnableLoginButton("進入派單中心");
       return;
     }
 
@@ -549,6 +561,7 @@ async function initMerchantLiff(){
   }catch(err){
     console.error("店家 LIFF 初始化失敗:", err);
     showError("店家登入初始化失敗，請從店家合作中心官方帳號重新開啟。");
+    forceEnableLoginButton("進入派單中心");
   }
 }
 
@@ -598,6 +611,7 @@ function enterMerchantDashboard(merchant){
 async function loadMerchantProfile(){
   if(!merchantLineUserId){
     showError("缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟。");
+    forceEnableLoginButton("進入派單中心");
     return;
   }
 
@@ -625,16 +639,19 @@ async function loadMerchantProfile(){
     input.type = "tel";
     input.inputMode = "tel";
 
-    document.getElementById("loginBtn").textContent = "綁定並進入店家派單中心";
+    document.getElementById("loginBtn").textContent = "進入派單中心";
 
     const notice = document.querySelector("#loginBox .notice");
     if(notice){
       notice.textContent = "審核通過的店家，第一次使用時請輸入申請合作時填寫的手機號碼完成 LINE 綁定。";
     }
 
+    forceEnableLoginButton("進入派單中心");
+
   }catch(err){
     console.error("讀取店家資料失敗:", err);
     showError("讀取店家資料失敗，請稍後再試。");
+    forceEnableLoginButton("進入派單中心");
   }
 }
 
@@ -691,17 +708,7 @@ function renderDispatchAutoInfo(){
   `;
 }
 
-function resetCreateOrderForm(){
-  document.getElementById("newCustomerName").value = "";
-  document.getElementById("newCustomerPhone").value = "";
-  document.getElementById("newDropoffAddress").value = "";
-  document.getElementById("newItemName").value = "";
-  document.getElementById("newAdvanceAmount").value = "0";
-  document.getElementById("newNote").value = "";
-  document.getElementById("merchantPaidCheck").checked = false;
-  selectMerchantSpeed("standard");
-}
-  function selectMerchantSpeed(speed){
+function selectMerchantSpeed(speed){
   selectedMerchantSpeed = speed || "standard";
 
   document.querySelectorAll(".speedOption").forEach(el => {
@@ -713,7 +720,18 @@ function resetCreateOrderForm(){
     active.classList.add("active");
   }
 }
-  
+
+function resetCreateOrderForm(){
+  document.getElementById("newCustomerName").value = "";
+  document.getElementById("newCustomerPhone").value = "";
+  document.getElementById("newDropoffAddress").value = "";
+  document.getElementById("newItemName").value = "";
+  document.getElementById("newAdvanceAmount").value = "0";
+  document.getElementById("newNote").value = "";
+  document.getElementById("merchantPaidCheck").checked = false;
+  selectMerchantSpeed("standard");
+}
+
 async function createMerchantOrder(){
   clearCreateOrderMsg();
 
@@ -730,23 +748,24 @@ async function createMerchantOrder(){
   const deliveryFee = MERCHANT_SERVICE_FEE;
   const paidChecked = document.getElementById("merchantPaidCheck").checked;
   const note = document.getElementById("newNote").value.trim();
-  if(!customerName || !customerPhone || !dropoffAddress || !itemName){
-  showCreateOrderMsg("err", "請確認客人姓名、電話、送達地址、品項內容都有填寫。");
-  return;
-}
 
-if(!paidChecked){
-  showCreateOrderMsg("err", "請先勾選「我已完成付款」，再建立配送單。");
-  return;
-}
+  if(!customerName || !customerPhone || !dropoffAddress || !itemName){
+    showCreateOrderMsg("err", "請確認客人姓名、電話、送達地址、品項內容都有填寫。");
+    return;
+  }
 
   if(!/^09\d{8}$/.test(customerPhone)){
     showCreateOrderMsg("err", "請輸入正確的客人手機格式，例如：0912345678。");
     return;
   }
 
-  if(deliveryFee <= 0){
-    showCreateOrderMsg("err", "配送費請輸入大於 0 的金額。");
+  if(advanceAmount < 0){
+    showCreateOrderMsg("err", "代墊金額不可小於 0。");
+    return;
+  }
+
+  if(!paidChecked){
+    showCreateOrderMsg("err", "請先勾選「我已完成付款」，再建立配送單。");
     return;
   }
 
@@ -767,6 +786,13 @@ if(!paidChecked){
     const merchantName = currentMerchant.merchantName || "";
     const merchantPhone = currentMerchant.merchantPhone || "";
     const pickupAddress = currentMerchant.merchantAddress || "";
+
+    const speedLabelMap = {
+      standard: "一般配送",
+      priority: "優先件",
+      express: "即時件",
+      rush: "急件"
+    };
 
     const orderPayload = {
       orderNo,
@@ -808,27 +834,23 @@ if(!paidChecked){
       merchantNote: note,
 
       speedType: selectedMerchantSpeed,
-speedLabel: {
-  standard: "一般配送",
-  priority: "優先件",
-  express: "即時件",
-  rush: "急件"
-}[selectedMerchantSpeed] || "一般配送",
+      speedLabel: speedLabelMap[selectedMerchantSpeed] || "一般配送",
 
-advanceAmount,
-merchantServiceFee: MERCHANT_SERVICE_FEE,
+      advanceAmount,
+      merchantServiceFee: MERCHANT_SERVICE_FEE,
 
-totalFee: deliveryFee,
-total: deliveryFee,
-merchantFee: deliveryFee,
-riderFee: deliveryFee,
-price: deliveryFee,
-deliveryFee,
+      totalFee: deliveryFee,
+      total: deliveryFee,
+      merchantFee: deliveryFee,
+      riderFee: deliveryFee,
+      price: deliveryFee,
+      deliveryFee,
 
-paymentMethod: "jkopay",
-paymentStatus: "paid_by_merchant",
-merchantPaid: true,
-paidAmount: MERCHANT_SERVICE_FEE
+      paymentMethod: "jkopay",
+      paymentStatus: "paid_by_merchant",
+      merchantPaid: true,
+      paidAmount: MERCHANT_SERVICE_FEE
+    };
 
     await db.collection("orders").doc(orderNo).set(orderPayload, { merge:true });
 
@@ -854,11 +876,13 @@ async function loginMerchant(){
 
   if(!merchantLineUserId){
     showError("缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟店家派單。");
+    forceEnableLoginButton("進入派單中心");
     return;
   }
 
   if(!/^09\d{8}$/.test(phone)){
     showError("請輸入申請合作時填寫的手機號碼，例如：0912345678。");
+    forceEnableLoginButton("進入派單中心");
     return;
   }
 
@@ -888,9 +912,11 @@ async function loginMerchant(){
   }catch(err){
     console.error("店家綁定失敗:", err);
     showError(err.message || "店家綁定失敗，請稍後再試。");
+    forceEnableLoginButton("進入派單中心");
   }finally{
-    loginBtn.disabled = false;
-    loginBtn.textContent = "綁定並進入店家派單中心";
+    if(!merchantAuthed){
+      forceEnableLoginButton("進入派單中心");
+    }
   }
 }
 
@@ -909,6 +935,7 @@ function logoutMerchant(){
   document.getElementById("merchantInfoBox").innerHTML = "";
   document.getElementById("dispatchAutoInfo").innerHTML = "店家資料尚未載入";
 
+  forceEnableLoginButton("進入派單中心");
   setTab("merchant_pending");
 }
 
@@ -1063,7 +1090,7 @@ function renderOrderCard(order){
 
   if(order.status === "merchant_pending"){
     buttonHtml = `
-      <button onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_preparing')">
+      <button type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_preparing')">
         接受訂單，開始準備
       </button>
     `;
@@ -1071,7 +1098,7 @@ function renderOrderCard(order){
 
   if(order.status === "merchant_preparing"){
     buttonHtml = `
-      <button class="green" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_ready')">
+      <button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_ready')">
         準備完成
       </button>
     `;
@@ -1079,7 +1106,7 @@ function renderOrderCard(order){
 
   if(order.status === "merchant_ready"){
     buttonHtml = `
-      <button class="blue" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">
+      <button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">
         派遣騎士
       </button>
     `;
@@ -1140,23 +1167,19 @@ async function updateOrderStatus(orderId, nextStatus){
   }
 }
 
-function enableMerchantLoginButton(){
-  const loginBtn = document.getElementById("loginBtn");
-  if(loginBtn && !merchantAuthed){
-    loginBtn.disabled = false;
-    loginBtn.removeAttribute("disabled");
-    loginBtn.textContent = "綁定並進入店家派單中心";
-  }
-}
-
 window.addEventListener("load", async () => {
   const loginBtn = document.getElementById("loginBtn");
 
   if(loginBtn){
     loginBtn.disabled = false;
     loginBtn.removeAttribute("disabled");
+    loginBtn.style.pointerEvents = "auto";
     loginBtn.textContent = "登入檢查中...";
   }
+
+  setTimeout(() => forceEnableLoginButton("進入派單中心"), 800);
+  setTimeout(() => forceEnableLoginButton("進入派單中心"), 1800);
+  setTimeout(() => forceEnableLoginButton("進入派單中心"), 3500);
 
   try{
     await initMerchantLiff();
@@ -1168,17 +1191,9 @@ window.addEventListener("load", async () => {
   }catch(err){
     console.error("店家登入檢查失敗:", err);
     showError("店家登入檢查失敗，請重新開啟店家派單中心。");
+  }finally{
+    forceEnableLoginButton("進入派單中心");
   }
-
-  enableMerchantLoginButton();
-
-  setTimeout(() => {
-    enableMerchantLoginButton();
-  }, 1200);
-
-  setTimeout(() => {
-    enableMerchantLoginButton();
-  }, 3000);
 });
 </script>
 </body>
