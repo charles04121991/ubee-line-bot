@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee｜店家接單中心</title>
+<title>UBee｜店家派單中心</title>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -21,6 +21,7 @@
   --yellow2:#eab308;
   --green:#22c55e;
   --blue:#38bdf8;
+  --red:#ef4444;
 }
 *{box-sizing:border-box}
 body{
@@ -68,7 +69,7 @@ label{
   font-size:14px;
   margin:10px 0 6px;
 }
-input{
+input,textarea{
   width:100%;
   padding:14px;
   border-radius:14px;
@@ -76,6 +77,16 @@ input{
   background:var(--card2);
   color:var(--text);
   font-size:16px;
+  outline:none;
+}
+textarea{
+  min-height:88px;
+  resize:vertical;
+  line-height:1.6;
+}
+input:focus,textarea:focus{
+  border-color:var(--yellow);
+  box-shadow:0 0 0 3px rgba(250,204,21,.12);
 }
 button{
   width:100%;
@@ -87,6 +98,9 @@ button{
   font-weight:800;
   color:#000;
   background:linear-gradient(135deg,var(--yellow),var(--yellow2));
+}
+button:disabled{
+  opacity:.55;
 }
 button.secondary{
   background:#222;
@@ -105,7 +119,6 @@ button.blue{
   gap:8px;
   margin-top:14px;
 }
-
 @media (min-width: 520px){
   .tabs{
     grid-template-columns:1fr 1fr 1fr 1fr 1fr;
@@ -181,8 +194,9 @@ button.blue{
   color:var(--muted);
   font-size:13px;
   margin-top:8px;
+  line-height:1.6;
 }
-.merchantInfo{
+.merchantInfo,.autoInfo{
   margin-top:10px;
   padding:12px;
   border-radius:16px;
@@ -192,6 +206,37 @@ button.blue{
   line-height:1.7;
   font-size:14px;
 }
+.formGrid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:0;
+}
+@media (min-width: 640px){
+  .formGrid{
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+}
+.formMsg{
+  display:none;
+  margin-top:12px;
+  padding:12px;
+  border-radius:14px;
+  line-height:1.6;
+  font-size:14px;
+}
+.formMsg.ok{
+  display:block;
+  background:rgba(34,197,94,.12);
+  border:1px solid rgba(34,197,94,.35);
+  color:#bbf7d0;
+}
+.formMsg.err{
+  display:block;
+  background:rgba(239,68,68,.12);
+  border:1px solid rgba(239,68,68,.35);
+  color:#fecaca;
+}
 </style>
 </head>
 
@@ -200,17 +245,17 @@ button.blue{
 
   <div class="hero">
     <div class="logo"><span>U</span>Bee 🐝</div>
-    <h1>店家接單中心</h1>
-    <p>接收客人訂單、確認製作狀態，完成後派遣 UBee 騎士前往取件。</p>
+    <h1>店家派單中心</h1>
+    <p>建立店家派單、確認製作狀態，完成後派遣 UBee 騎士前往取件。</p>
   </div>
 
   <div class="login" id="loginBox">
     <h2>店家登入</h2>
 
-    <label>店家電話 / 店家代碼</label>
+    <label id="merchantKeyLabel">店家電話 / 店家代碼</label>
     <input id="merchantKey" placeholder="例如：0987654321 或 M001" />
 
-    <button id="loginBtn" onclick="loginMerchant()">進入接單中心</button>
+    <button id="loginBtn" onclick="loginMerchant()">進入派單中心</button>
 
     <div class="notice">
       請輸入已建立於 merchants 的店家電話或店家代碼。
@@ -226,33 +271,74 @@ button.blue{
 
       <div class="merchantInfo" id="merchantInfoBox"></div>
 
-      <div class="small">目前只處理：待接單、準備中、已完成待派遣。</div>
+      <div class="small">目前可查看：待接單、準備中、待派遣、配送中、已完成。</div>
 
       <button class="secondary" onclick="logoutMerchant()">切換店家</button>
     </div>
 
-<div class="tabs">
-  <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">
-    待接單 <span id="countPending">0</span>
-  </div>
+    <div class="section">
+      <h2>建立新派單</h2>
 
-  <div class="tab" data-tab="merchant_preparing" onclick="setTab('merchant_preparing')">
-    準備中 <span id="countPreparing">0</span>
-  </div>
+      <div class="autoInfo" id="dispatchAutoInfo">
+        店家資料載入中...
+      </div>
 
-  <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">
-    待派遣 <span id="countReady">0</span>
-  </div>
+      <div class="small">
+        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、備註與配送費。
+      </div>
 
-  <div class="tab" data-tab="delivery_progress" onclick="setTab('delivery_progress')">
-    配送中 <span id="countDelivery">0</span>
-  </div>
+      <div class="formGrid">
+        <div>
+          <label>客人姓名 *</label>
+          <input id="newCustomerName" placeholder="例如：陳先生" />
+        </div>
 
-  <div class="tab" data-tab="completed" onclick="setTab('completed')">
-    已完成 <span id="countCompleted">0</span>
-  </div>
-</div>
-    
+        <div>
+          <label>客人電話 *</label>
+          <input id="newCustomerPhone" type="tel" inputmode="tel" placeholder="例如：0912345678" />
+        </div>
+      </div>
+
+      <label>送達地址 *</label>
+      <textarea id="newDropoffAddress" placeholder="請填寫完整送達地址"></textarea>
+
+      <label>品項內容 *</label>
+      <textarea id="newItemName" placeholder="例如：飲料 8 杯、餐點 3 份、文件 1 份"></textarea>
+
+      <label>配送費 / 顯示金額 *</label>
+      <input id="newDeliveryFee" type="number" inputmode="numeric" min="1" placeholder="例如：80" />
+      <div class="small">這個金額會顯示在訂單卡片，避免騎士端看到金額為 0。</div>
+
+      <label>備註</label>
+      <textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
+
+      <button id="createOrderBtn" onclick="createMerchantOrder()">建立派單，放入待派遣</button>
+
+      <div id="createOrderMsg" class="formMsg"></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">
+        待接單 <span id="countPending">0</span>
+      </div>
+
+      <div class="tab" data-tab="merchant_preparing" onclick="setTab('merchant_preparing')">
+        準備中 <span id="countPreparing">0</span>
+      </div>
+
+      <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">
+        待派遣 <span id="countReady">0</span>
+      </div>
+
+      <div class="tab" data-tab="delivery_progress" onclick="setTab('delivery_progress')">
+        配送中 <span id="countDelivery">0</span>
+      </div>
+
+      <div class="tab" data-tab="completed" onclick="setTab('completed')">
+        已完成 <span id="countCompleted">0</span>
+      </div>
+    </div>
+
     <div id="ordersBox"></div>
   </div>
 
@@ -330,7 +416,19 @@ function showError(message){
   box.textContent = message;
 }
 
-  async function initMerchantLiff(){
+function showCreateOrderMsg(type, message){
+  const box = document.getElementById("createOrderMsg");
+  box.className = "formMsg " + type;
+  box.textContent = message;
+}
+
+function clearCreateOrderMsg(){
+  const box = document.getElementById("createOrderMsg");
+  box.className = "formMsg";
+  box.textContent = "";
+}
+
+async function initMerchantLiff(){
   hideError();
 
   if(typeof liff === "undefined"){
@@ -364,7 +462,7 @@ function showError(message){
   }
 }
 
-  function enterMerchantDashboard(merchant){
+function enterMerchantDashboard(merchant){
   currentMerchant = {
     ...merchant,
     merchantId: merchant.merchantId || merchant.id || "",
@@ -372,6 +470,7 @@ function showError(message){
     merchantPhone: merchant.phone || merchant.merchantPhone || "",
     merchantAddress: merchant.pickupAddress || merchant.merchantAddress || "",
     merchantType: merchant.businessType || merchant.merchantType || "",
+    settlementType: merchant.settlementType || "",
     status: merchant.status || "",
     approved: merchant.approved === true
   };
@@ -402,6 +501,7 @@ function showError(message){
     狀態：${currentMerchant.approved ? "已審核通過" : escapeHtml(currentMerchant.status || "未設定")}
   `;
 
+  renderDispatchAutoInfo();
   startListenOrders();
 }
 
@@ -424,7 +524,11 @@ async function loadMerchantProfile(){
     document.getElementById("dashboard").classList.add("hidden");
 
     document.querySelector("#loginBox h2").textContent = "店家帳號綁定";
-    document.querySelector("label[for='merchantKey']")?.remove();
+
+    const label = document.getElementById("merchantKeyLabel");
+    if(label){
+      label.textContent = "申請合作時填寫的手機號碼";
+    }
 
     const input = document.getElementById("merchantKey");
     input.placeholder = "請輸入申請合作時填寫的手機號碼";
@@ -443,7 +547,7 @@ async function loadMerchantProfile(){
     showError("讀取店家資料失敗，請稍後再試。");
   }
 }
-  
+
 function getOrderTime(order){
   const t = order.createdAt;
   if(t && typeof t.toDate === "function"){
@@ -467,52 +571,156 @@ function formatTime(order){
   return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-async function findMerchant(value){
-  const rawValue = String(value || "").trim();
-  const cleanPhone = normalizePhone(rawValue);
+function generateMerchantOrderNo(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth()+1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  const rand = Math.floor(Math.random() * 900 + 100);
+  return `UBM${yyyy}${mm}${dd}${hh}${mi}${ss}${rand}`;
+}
 
-  let merchantDoc = null;
+function renderDispatchAutoInfo(){
+  const box = document.getElementById("dispatchAutoInfo");
+  if(!box) return;
 
-  const byId = await db.collection("merchants").doc(rawValue).get();
+  if(!currentMerchant){
+    box.innerHTML = "店家資料尚未載入";
+    return;
+  }
 
-  if(byId.exists){
-    merchantDoc = {
-      id: byId.id,
-      ...byId.data()
+  box.innerHTML = `
+    <strong>自動帶入取件資料</strong><br>
+    店家名稱：${escapeHtml(currentMerchant.merchantName || "未設定")}<br>
+    店家電話：${escapeHtml(currentMerchant.merchantPhone || "未設定")}<br>
+    取件地址：${escapeHtml(currentMerchant.merchantAddress || "未設定")}
+  `;
+}
+
+function resetCreateOrderForm(){
+  document.getElementById("newCustomerName").value = "";
+  document.getElementById("newCustomerPhone").value = "";
+  document.getElementById("newDropoffAddress").value = "";
+  document.getElementById("newItemName").value = "";
+  document.getElementById("newDeliveryFee").value = "";
+  document.getElementById("newNote").value = "";
+}
+
+async function createMerchantOrder(){
+  clearCreateOrderMsg();
+
+  if(!currentMerchant || !merchantAuthed){
+    showCreateOrderMsg("err", "店家資料尚未完成登入，請重新開啟店家派單中心。");
+    return;
+  }
+
+  const customerName = document.getElementById("newCustomerName").value.trim();
+  const customerPhone = normalizePhone(document.getElementById("newCustomerPhone").value);
+  const dropoffAddress = document.getElementById("newDropoffAddress").value.trim();
+  const itemName = document.getElementById("newItemName").value.trim();
+  const deliveryFee = Math.round(Number(document.getElementById("newDeliveryFee").value || 0));
+  const note = document.getElementById("newNote").value.trim();
+
+  if(!customerName || !customerPhone || !dropoffAddress || !itemName || !deliveryFee){
+    showCreateOrderMsg("err", "請確認客人姓名、電話、送達地址、品項內容、配送費都有填寫。");
+    return;
+  }
+
+  if(!/^09\d{8}$/.test(customerPhone)){
+    showCreateOrderMsg("err", "請輸入正確的客人手機格式，例如：0912345678。");
+    return;
+  }
+
+  if(deliveryFee <= 0){
+    showCreateOrderMsg("err", "配送費請輸入大於 0 的金額。");
+    return;
+  }
+
+  if(!currentMerchant.merchantPhone || !currentMerchant.merchantAddress){
+    showCreateOrderMsg("err", "店家電話或取件地址未設定，請先確認店家資料。");
+    return;
+  }
+
+  const btn = document.getElementById("createOrderBtn");
+  btn.disabled = true;
+  btn.textContent = "建立中...";
+
+  try{
+    const orderNo = generateMerchantOrderNo();
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+
+    const merchantId = currentMerchant.merchantId || currentMerchant.id || merchantKey || "";
+    const merchantName = currentMerchant.merchantName || "";
+    const merchantPhone = currentMerchant.merchantPhone || "";
+    const pickupAddress = currentMerchant.merchantAddress || "";
+
+    const orderPayload = {
+      orderNo,
+      source: "merchant-dashboard",
+      createdFrom: "merchant-dashboard",
+      orderType: "merchant_dispatch",
+
+      status: "merchant_ready",
+      createdAt: now,
+      updatedAt: now,
+      merchantCreatedAt: now,
+      merchantReadyAt: now,
+
+      merchantId,
+      merchantCode: merchantId,
+      merchantName,
+      merchantPhone,
+      merchantAddress: pickupAddress,
+      settlementType: currentMerchant.settlementType || "",
+
+      pickupName: merchantName,
+      pickupPhone: merchantPhone,
+      pickupAddress,
+      pickup: pickupAddress,
+
+      customerName,
+      receiverName: customerName,
+      customerPhone,
+      dropoffPhone: customerPhone,
+      dropoffAddress,
+      dropoff: dropoffAddress,
+
+      itemName,
+      item: itemName,
+      serviceType: "店家派單",
+
+      note,
+      customerNote: note,
+      merchantNote: note,
+
+      totalFee: deliveryFee,
+      total: deliveryFee,
+      merchantFee: deliveryFee,
+      riderFee: deliveryFee,
+      price: deliveryFee,
+      deliveryFee,
+
+      paymentMethod: "merchant_settlement",
+      paymentStatus: "merchant_settlement"
     };
+
+    await db.collection("orders").doc(orderNo).set(orderPayload, { merge:true });
+
+    showCreateOrderMsg("ok", `派單已建立，已放入「待派遣」。訂單編號：${orderNo}`);
+    resetCreateOrderForm();
+    setTab("merchant_ready");
+
+  }catch(err){
+    console.error("建立店家派單失敗:", err);
+    showCreateOrderMsg("err", "建立派單失敗，請稍後再試。");
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "建立派單，放入待派遣";
   }
-
-  if(!merchantDoc && cleanPhone){
-    const phoneSnap = await db.collection("merchants")
-      .where("merchantPhone", "==", cleanPhone)
-      .limit(1)
-      .get();
-
-    if(!phoneSnap.empty){
-      const doc = phoneSnap.docs[0];
-      merchantDoc = {
-        id: doc.id,
-        ...doc.data()
-      };
-    }
-  }
-
-  if(!merchantDoc){
-    const codeSnap = await db.collection("merchants")
-      .where("merchantId", "==", rawValue)
-      .limit(1)
-      .get();
-
-    if(!codeSnap.empty){
-      const doc = codeSnap.docs[0];
-      merchantDoc = {
-        id: doc.id,
-        ...doc.data()
-      };
-    }
-  }
-
-  return merchantDoc;
 }
 
 async function loginMerchant(){
@@ -568,6 +776,7 @@ function logoutMerchant(){
   localStorage.removeItem(STORAGE_KEY);
   merchantKey = "";
   currentMerchant = null;
+  merchantAuthed = false;
   currentTab = "merchant_pending";
   ordersMap = {};
   stopListenOrders();
@@ -576,6 +785,7 @@ function logoutMerchant(){
   document.getElementById("loginBox").classList.remove("hidden");
   document.getElementById("ordersBox").innerHTML = "";
   document.getElementById("merchantInfoBox").innerHTML = "";
+  document.getElementById("dispatchAutoInfo").innerHTML = "店家資料尚未載入";
 
   setTab("merchant_pending");
 }
@@ -591,16 +801,16 @@ function startListenOrders(){
   stopListenOrders();
 
   const statuses = [
-  "merchant_pending",
-  "merchant_preparing",
-  "merchant_ready",
-  "pending_dispatch",
-  "accepted",
-  "arrived_pickup",
-  "picked_up",
-  "arrived_dropoff",
-  "completed"
-];
+    "merchant_pending",
+    "merchant_preparing",
+    "merchant_ready",
+    "pending_dispatch",
+    "accepted",
+    "arrived_pickup",
+    "picked_up",
+    "arrived_dropoff",
+    "completed"
+  ];
 
   statuses.forEach(status => {
     const unsub = db.collection("orders")
@@ -658,7 +868,7 @@ function getVisibleOrders(){
     .filter(matchMerchant)
     .sort((a,b) => getOrderTime(b) - getOrderTime(a));
 }
-  
+
 function setTab(tab){
   currentTab = tab;
 
@@ -700,7 +910,7 @@ function renderOrders(){
   if(!orders.length){
     box.innerHTML = `
       <div class="empty">
-        目前沒有「${statusTextMap[currentTab]}」訂單
+        目前沒有「${statusTextMap[currentTab] || currentTab}」訂單
       </div>
     `;
     return;
@@ -716,9 +926,9 @@ function renderOrderCard(order){
   const item = order.itemName || order.item || order.serviceType || "未填寫";
   const note = order.note || order.customerNote || "";
   const dropoff = order.dropoffAddress || "未填寫";
-  const total = order.totalFee || order.total || order.merchantFee || 0;
+  const total = order.totalFee || order.total || order.merchantFee || order.deliveryFee || 0;
 
-    const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
+  const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
 
   let riderText = "";
   if(deliveryStatuses.includes(order.status) || order.status === "completed"){
@@ -726,7 +936,7 @@ function renderOrderCard(order){
       <div class="row"><b>配送進度：</b>${escapeHtml(progressText)}</div>
     `;
   }
-  
+
   let buttonHtml = "";
 
   if(order.status === "merchant_pending"){
