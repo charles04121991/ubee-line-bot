@@ -306,10 +306,23 @@ button.blue{
       <textarea id="newItemName" placeholder="例如：飲料 8 杯、餐點 3 份、文件 1 份"></textarea>
 
       <label>代墊金額</label>
-      <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
+<input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
 
-      <label>備註</label>
-      <textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
+<label>配送方式 *</label>
+<select id="newDeliveryMode">
+  <option value="ubee">UBee 派騎士</option>
+  <option value="merchant">店家自送</option>
+</select>
+
+<label>付款方式 *</label>
+<select id="newPaymentMethod">
+  <option value="merchant_settlement">店家月結 / 週結</option>
+  <option value="cash">現金付款</option>
+  <option value="merchant_paid">店家已收款</option>
+</select>
+
+<label>備註</label>
+<textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
 
       <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立派單，放入待派遣</button>
 
