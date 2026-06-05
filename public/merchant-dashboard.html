@@ -267,10 +267,25 @@ let currentTab = "merchant_pending";
 let ordersMap = {};
 let unsubscribers = [];
 
+const deliveryStatuses = [
+  "pending_dispatch",
+  "accepted",
+  "arrived_pickup",
+  "picked_up",
+  "arrived_dropoff"
+];
+
 const statusTextMap = {
   merchant_pending: "店家待接單",
   merchant_preparing: "店家準備中",
-  merchant_ready: "店家已完成，待派遣騎士"
+  merchant_ready: "店家已完成，待派遣騎士",
+
+  pending_dispatch: "已派遣，等待騎士接單",
+  accepted: "騎士已接單，前往店家",
+  arrived_pickup: "騎士已到店家",
+  picked_up: "騎士已取件，配送中",
+  arrived_dropoff: "騎士已到送達地點",
+  completed: "已完成送達"
 };
 
 function normalizePhone(str){
