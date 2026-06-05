@@ -69,7 +69,7 @@ label{
   font-size:14px;
   margin:10px 0 6px;
 }
-input,textarea{
+input,textarea,select{
   width:100%;
   padding:14px;
   border-radius:14px;
@@ -84,7 +84,7 @@ textarea{
   resize:vertical;
   line-height:1.6;
 }
-input:focus,textarea:focus{
+input:focus,textarea:focus,select:focus{
   border-color:var(--yellow);
   box-shadow:0 0 0 3px rgba(250,204,21,.12);
 }
@@ -121,7 +121,12 @@ button.blue{
 }
 @media (min-width: 520px){
   .tabs{
-    grid-template-columns:1fr 1fr 1fr 1fr 1fr;
+    grid-template-columns:1fr 1fr 1fr;
+  }
+}
+@media (min-width: 760px){
+  .tabs{
+    grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;
   }
 }
 .tab{
@@ -132,6 +137,7 @@ button.blue{
   color:#ddd;
   text-align:center;
   font-weight:800;
+  font-size:14px;
 }
 .tab.active{
   border-color:var(--yellow);
@@ -246,7 +252,7 @@ button.blue{
   <div class="hero">
     <div class="logo"><span>U</span>Bee 🐝</div>
     <h1>店家派單中心</h1>
-    <p>建立店家派單、確認製作狀態，完成後派遣 UBee 騎士前往取件。</p>
+    <p>建立店家派單、選擇 UBee 派騎士或店家自送，讓店家在忙碌時可以彈性調度。</p>
   </div>
 
   <div class="login" id="loginBox">
@@ -271,7 +277,7 @@ button.blue{
 
       <div class="merchantInfo" id="merchantInfoBox"></div>
 
-      <div class="small">目前可查看：待接單、準備中、待派遣、配送中、已完成。</div>
+      <div class="small">目前可查看：待接單、準備中、待派遣、店家自送、配送中、已完成。</div>
 
       <button class="secondary" type="button" onclick="logoutMerchant()">切換店家</button>
     </div>
@@ -284,7 +290,7 @@ button.blue{
       </div>
 
       <div class="small">
-        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、代墊金額與備註。
+        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、代墊金額、配送方式與付款方式。
       </div>
 
       <div class="formGrid">
@@ -306,25 +312,25 @@ button.blue{
       <textarea id="newItemName" placeholder="例如：飲料 8 杯、餐點 3 份、文件 1 份"></textarea>
 
       <label>代墊金額</label>
-<input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
+      <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
 
-<label>配送方式 *</label>
-<select id="newDeliveryMode">
-  <option value="ubee">UBee 派騎士</option>
-  <option value="merchant">店家自送</option>
-</select>
+      <label>配送方式 *</label>
+      <select id="newDeliveryMode">
+        <option value="ubee">UBee 派騎士</option>
+        <option value="merchant">店家自送</option>
+      </select>
 
-<label>付款方式 *</label>
-<select id="newPaymentMethod">
-  <option value="merchant_settlement">店家月結 / 週結</option>
-  <option value="cash">現金付款</option>
-  <option value="merchant_paid">店家已收款</option>
-</select>
+      <label>付款方式 *</label>
+      <select id="newPaymentMethod">
+        <option value="merchant_settlement">店家月結 / 週結</option>
+        <option value="cash">現金付款</option>
+        <option value="merchant_paid">店家已收款</option>
+      </select>
 
-<label>備註</label>
-<textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
+      <label>備註</label>
+      <textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
 
-      <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立派單，放入待派遣</button>
+      <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立訂單</button>
 
       <div id="createOrderMsg" class="formMsg"></div>
     </div>
@@ -340,6 +346,10 @@ button.blue{
 
       <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">
         待派遣 <span id="countReady">0</span>
+      </div>
+
+      <div class="tab" data-tab="merchant_self_delivery" onclick="setTab('merchant_self_delivery')">
+        店家自送 <span id="countSelfDelivery">0</span>
       </div>
 
       <div class="tab" data-tab="delivery_progress" onclick="setTab('delivery_progress')">
@@ -394,6 +404,7 @@ const statusTextMap = {
   merchant_pending: "店家待接單",
   merchant_preparing: "店家準備中",
   merchant_ready: "店家已完成，待派遣騎士",
+  merchant_self_delivery: "店家自送",
   delivery_progress: "配送中",
 
   pending_dispatch: "已派遣，等待騎士接單",
@@ -578,10 +589,15 @@ async function loadMerchantProfile(){
 
 function getOrderTime(order){
   const t = order.createdAt;
+
   if(t && typeof t.toDate === "function"){
     return t.toDate().getTime();
   }
-  if(typeof t === "number") return t;
+
+  if(typeof t === "number"){
+    return t;
+  }
+
   return 0;
 }
 
@@ -589,11 +605,17 @@ function formatTime(order){
   const t = order.createdAt;
   let d = null;
 
-  if(t && typeof t.toDate === "function") d = t.toDate();
-  else if(typeof t === "number") d = new Date(t);
-  else if(typeof t === "string") d = new Date(t);
+  if(t && typeof t.toDate === "function"){
+    d = t.toDate();
+  }else if(typeof t === "number"){
+    d = new Date(t);
+  }else if(typeof t === "string"){
+    d = new Date(t);
+  }
 
-  if(!d || isNaN(d.getTime())) return "未記錄";
+  if(!d || isNaN(d.getTime())){
+    return "未記錄";
+  }
 
   const pad = n => String(n).padStart(2,"0");
   return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -635,6 +657,8 @@ function resetCreateOrderForm(){
   document.getElementById("newDropoffAddress").value = "";
   document.getElementById("newItemName").value = "";
   document.getElementById("newAdvanceAmount").value = "0";
+  document.getElementById("newDeliveryMode").value = "ubee";
+  document.getElementById("newPaymentMethod").value = "merchant_settlement";
   document.getElementById("newNote").value = "";
 }
 
@@ -652,7 +676,30 @@ async function createMerchantOrder(){
   const itemName = document.getElementById("newItemName").value.trim();
   const advanceAmount = Math.round(Number(document.getElementById("newAdvanceAmount").value || 0));
   const deliveryFee = MERCHANT_SERVICE_FEE;
+  const deliveryMode = document.getElementById("newDeliveryMode").value || "ubee";
+  const paymentMethod = document.getElementById("newPaymentMethod").value || "merchant_settlement";
   const note = document.getElementById("newNote").value.trim();
+
+  const deliveryModeLabelMap = {
+    ubee: "UBee 派騎士",
+    merchant: "店家自送"
+  };
+
+  const paymentMethodLabelMap = {
+    merchant_settlement: "店家月結 / 週結",
+    cash: "現金付款",
+    merchant_paid: "店家已收款"
+  };
+
+  const paymentStatusMap = {
+    merchant_settlement: "merchant_settlement",
+    cash: "cash_on_delivery",
+    merchant_paid: "paid_by_merchant"
+  };
+
+  const orderStatus = deliveryMode === "merchant"
+    ? "merchant_self_delivery"
+    : "merchant_ready";
 
   if(!customerName || !customerPhone || !dropoffAddress || !itemName){
     showCreateOrderMsg("err", "請確認客人姓名、電話、送達地址、品項內容都有填寫。");
@@ -693,11 +740,13 @@ async function createMerchantOrder(){
       createdFrom: "merchant-dashboard",
       orderType: "merchant_dispatch",
 
-      status: "merchant_ready",
+      status: orderStatus,
+      deliveryType: deliveryMode,
+      deliveryTypeLabel: deliveryModeLabelMap[deliveryMode] || "UBee 派騎士",
+
       createdAt: now,
       updatedAt: now,
       merchantCreatedAt: now,
-      merchantReadyAt: now,
 
       merchantId,
       merchantCode: merchantId,
@@ -733,27 +782,48 @@ async function createMerchantOrder(){
       total: deliveryFee,
       merchantFee: deliveryFee,
       riderFee: deliveryFee,
+      driverFee: deliveryFee,
       price: deliveryFee,
+      fee: deliveryFee,
       deliveryFee,
 
-      paymentMethod: "merchant_settlement",
-      paymentStatus: "merchant_settlement",
-      merchantPaid: false,
-      paidAmount: 0
+      paymentMethod,
+      paymentMethodLabel: paymentMethodLabelMap[paymentMethod] || "店家月結 / 週結",
+      paymentStatus: paymentStatusMap[paymentMethod] || "merchant_settlement",
+      merchantPaid: paymentMethod === "merchant_paid",
+      paidAmount: paymentMethod === "merchant_paid" ? deliveryFee : 0,
+
+      riderLineUserId: "",
+      riderName: "",
+      riderPhone: ""
     };
+
+    if(deliveryMode === "ubee"){
+      orderPayload.merchantReadyAt = now;
+    }
+
+    if(deliveryMode === "merchant"){
+      orderPayload.selfDeliveryAt = now;
+    }
 
     await db.collection("orders").doc(orderNo).set(orderPayload, { merge:true });
 
-    showCreateOrderMsg("ok", `派單已建立，已放入「待派遣」。訂單編號：${orderNo}`);
-    resetCreateOrderForm();
-    setTab("merchant_ready");
+    if(deliveryMode === "merchant"){
+      showCreateOrderMsg("ok", `自送訂單已建立，不會派遣 UBee 騎士。訂單編號：${orderNo}`);
+      resetCreateOrderForm();
+      setTab("merchant_self_delivery");
+    }else{
+      showCreateOrderMsg("ok", `派單已建立，已放入「待派遣」。訂單編號：${orderNo}`);
+      resetCreateOrderForm();
+      setTab("merchant_ready");
+    }
 
   }catch(err){
     console.error("建立店家派單失敗:", err);
     showCreateOrderMsg("err", "建立派單失敗，請稍後再試。");
   }finally{
     btn.disabled = false;
-    btn.textContent = "建立派單，放入待派遣";
+    btn.textContent = "建立訂單";
   }
 }
 
@@ -843,6 +913,7 @@ function startListenOrders(){
     "merchant_pending",
     "merchant_preparing",
     "merchant_ready",
+    "merchant_self_delivery",
     "pending_dispatch",
     "accepted",
     "arrived_pickup",
@@ -902,6 +973,10 @@ function getVisibleOrders(){
         return deliveryStatuses.includes(order.status);
       }
 
+      if(currentTab === "merchant_self_delivery"){
+        return order.status === "merchant_self_delivery";
+      }
+
       return order.status === currentTab;
     })
     .filter(matchMerchant)
@@ -932,6 +1007,9 @@ function updateCounts(){
 
   document.getElementById("countReady").textContent =
     all.filter(o => o.status === "merchant_ready").length;
+
+  document.getElementById("countSelfDelivery").textContent =
+    all.filter(o => o.status === "merchant_self_delivery").length;
 
   document.getElementById("countDelivery").textContent =
     all.filter(o => deliveryStatuses.includes(o.status)).length;
@@ -964,8 +1042,24 @@ function renderOrderCard(order){
   const customerPhone = order.customerPhone || order.dropoffPhone || "";
   const item = order.itemName || order.item || order.serviceType || "未填寫";
   const note = order.note || order.customerNote || "";
-  const dropoff = order.dropoffAddress || "未填寫";
-  const total = order.totalFee || order.total || order.merchantFee || order.deliveryFee || 0;
+  const dropoff = order.dropoffAddress || order.dropoff || "未填寫";
+  const advanceAmount = Number(order.advanceAmount || 0);
+  const deliveryFee = Number(order.deliveryFee || order.fee || order.riderFee || order.driverFee || 0);
+  const total = Number(order.totalFee || order.total || order.merchantFee || order.deliveryFee || order.fee || 0);
+
+  const deliveryTypeLabel =
+    order.deliveryTypeLabel ||
+    (order.deliveryType === "merchant" ? "店家自送" : "UBee 派騎士");
+
+  const paymentMethodLabel =
+    order.paymentMethodLabel ||
+    (
+      order.paymentMethod === "cash"
+        ? "現金付款"
+        : order.paymentMethod === "merchant_paid"
+          ? "店家已收款"
+          : "店家月結 / 週結"
+    );
 
   const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
 
@@ -994,7 +1088,7 @@ function renderOrderCard(order){
     `;
   }
 
-  if(order.status === "merchant_ready"){
+  if(order.status === "merchant_ready" && order.deliveryType !== "merchant"){
     buttonHtml = `
       <button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">
         派遣騎士
@@ -1012,8 +1106,12 @@ function renderOrderCard(order){
       <div class="row"><b>電話：</b>${escapeHtml(customerPhone)}</div>
       <div class="row"><b>內容：</b>${escapeHtml(item)}</div>
       <div class="row"><b>送達地址：</b>${escapeHtml(dropoff)}</div>
+      <div class="row"><b>配送方式：</b>${escapeHtml(deliveryTypeLabel)}</div>
+      <div class="row"><b>付款方式：</b>${escapeHtml(paymentMethodLabel)}</div>
+      <div class="row"><b>代墊金額：</b>NT$${escapeHtml(advanceAmount)}</div>
+      <div class="row"><b>配送費：</b>NT$${escapeHtml(deliveryFee)}</div>
+      <div class="row"><b>總金額：</b>NT$${escapeHtml(total)}</div>
       <div class="row"><b>備註：</b>${escapeHtml(note || "無")}</div>
-      <div class="row"><b>金額：</b>NT$${escapeHtml(total)}</div>
       ${riderText}
 
       ${buttonHtml}
