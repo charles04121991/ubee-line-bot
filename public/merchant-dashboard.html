@@ -237,6 +237,60 @@ button.blue{
   border:1px solid rgba(239,68,68,.35);
   color:#fecaca;
 }
+  .speedGrid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin-top:8px;
+}
+.speedOption{
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:14px;
+  background:var(--card2);
+  cursor:pointer;
+}
+.speedOption.active{
+  border-color:var(--yellow);
+  background:rgba(250,204,21,.12);
+}
+.speedOption strong{
+  display:block;
+  font-size:18px;
+  margin-bottom:6px;
+}
+.speedOption span{
+  display:block;
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.5;
+}
+.paymentBox{
+  margin-top:14px;
+  padding:14px;
+  border-radius:18px;
+  background:rgba(250,204,21,.1);
+  border:1px solid rgba(250,204,21,.35);
+  color:#fef3c7;
+  font-size:16px;
+  font-weight:800;
+  line-height:1.8;
+}
+.checkRow{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-top:16px;
+  color:#ddd;
+  font-size:16px;
+  font-weight:800;
+}
+.checkRow input{
+  width:28px;
+  height:28px;
+  padding:0;
+  accent-color:#facc15;
+}
 </style>
 </head>
 
@@ -305,9 +359,43 @@ button.blue{
       <label>品項內容 *</label>
       <textarea id="newItemName" placeholder="例如：飲料 8 杯、餐點 3 份、文件 1 份"></textarea>
 
-      <label>配送費 / 顯示金額 *</label>
-      <input id="newDeliveryFee" type="number" inputmode="numeric" min="1" placeholder="例如：80" />
-      <div class="small">這個金額會顯示在訂單卡片，避免騎士端看到金額為 0。</div>
+      <label>配送速度 *</label>
+
+<div class="speedGrid">
+  <div class="speedOption active" data-speed="standard" onclick="selectMerchantSpeed('standard')">
+    <strong>一般配送</strong>
+    <span>一般配送，依現場騎士安排</span>
+  </div>
+
+  <div class="speedOption" data-speed="priority" onclick="selectMerchantSpeed('priority')">
+    <strong>優先件</strong>
+    <span>優先安排騎士前往取貨</span>
+  </div>
+
+  <div class="speedOption" data-speed="express" onclick="selectMerchantSpeed('express')">
+    <strong>即時件</strong>
+    <span>需要較快完成配送</span>
+  </div>
+
+  <div class="speedOption" data-speed="rush" onclick="selectMerchantSpeed('rush')">
+    <strong>急件</strong>
+    <span>高優先順序配送任務</span>
+  </div>
+</div>
+
+<label>代墊金額</label>
+<input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
+
+<div class="paymentBox">
+  本次應付 UBee：NT$100<br>
+  街口支付：901871793<br>
+  請完成付款後，再建立配送單。
+</div>
+
+<label class="checkRow">
+  <input id="merchantPaidCheck" type="checkbox" />
+  <span>我已完成付款</span>
+</label>
 
       <label>備註</label>
       <textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
@@ -368,7 +456,9 @@ let merchantAuthed = false;
 let currentTab = "merchant_pending";
 let ordersMap = {};
 let unsubscribers = [];
-
+const MERCHANT_SERVICE_FEE = 100;
+let selectedMerchantSpeed = "standard";
+  
 const deliveryStatuses = [
   "pending_dispatch",
   "accepted",
@@ -606,10 +696,24 @@ function resetCreateOrderForm(){
   document.getElementById("newCustomerPhone").value = "";
   document.getElementById("newDropoffAddress").value = "";
   document.getElementById("newItemName").value = "";
-  document.getElementById("newDeliveryFee").value = "";
+  document.getElementById("newAdvanceAmount").value = "0";
   document.getElementById("newNote").value = "";
+  document.getElementById("merchantPaidCheck").checked = false;
+  selectMerchantSpeed("standard");
 }
+  function selectMerchantSpeed(speed){
+  selectedMerchantSpeed = speed || "standard";
 
+  document.querySelectorAll(".speedOption").forEach(el => {
+    el.classList.remove("active");
+  });
+
+  const active = document.querySelector(`.speedOption[data-speed="${selectedMerchantSpeed}"]`);
+  if(active){
+    active.classList.add("active");
+  }
+}
+  
 async function createMerchantOrder(){
   clearCreateOrderMsg();
 
@@ -622,13 +726,19 @@ async function createMerchantOrder(){
   const customerPhone = normalizePhone(document.getElementById("newCustomerPhone").value);
   const dropoffAddress = document.getElementById("newDropoffAddress").value.trim();
   const itemName = document.getElementById("newItemName").value.trim();
-  const deliveryFee = Math.round(Number(document.getElementById("newDeliveryFee").value || 0));
+  const advanceAmount = Math.round(Number(document.getElementById("newAdvanceAmount").value || 0));
+  const deliveryFee = MERCHANT_SERVICE_FEE;
+  const paidChecked = document.getElementById("merchantPaidCheck").checked;
   const note = document.getElementById("newNote").value.trim();
+  if(!customerName || !customerPhone || !dropoffAddress || !itemName){
+  showCreateOrderMsg("err", "請確認客人姓名、電話、送達地址、品項內容都有填寫。");
+  return;
+}
 
-  if(!customerName || !customerPhone || !dropoffAddress || !itemName || !deliveryFee){
-    showCreateOrderMsg("err", "請確認客人姓名、電話、送達地址、品項內容、配送費都有填寫。");
-    return;
-  }
+if(!paidChecked){
+  showCreateOrderMsg("err", "請先勾選「我已完成付款」，再建立配送單。");
+  return;
+}
 
   if(!/^09\d{8}$/.test(customerPhone)){
     showCreateOrderMsg("err", "請輸入正確的客人手機格式，例如：0912345678。");
@@ -697,16 +807,28 @@ async function createMerchantOrder(){
       customerNote: note,
       merchantNote: note,
 
-      totalFee: deliveryFee,
-      total: deliveryFee,
-      merchantFee: deliveryFee,
-      riderFee: deliveryFee,
-      price: deliveryFee,
-      deliveryFee,
+      speedType: selectedMerchantSpeed,
+speedLabel: {
+  standard: "一般配送",
+  priority: "優先件",
+  express: "即時件",
+  rush: "急件"
+}[selectedMerchantSpeed] || "一般配送",
 
-      paymentMethod: "merchant_settlement",
-      paymentStatus: "merchant_settlement"
-    };
+advanceAmount,
+merchantServiceFee: MERCHANT_SERVICE_FEE,
+
+totalFee: deliveryFee,
+total: deliveryFee,
+merchantFee: deliveryFee,
+riderFee: deliveryFee,
+price: deliveryFee,
+deliveryFee,
+
+paymentMethod: "jkopay",
+paymentStatus: "paid_by_merchant",
+merchantPaid: true,
+paidAmount: MERCHANT_SERVICE_FEE
 
     await db.collection("orders").doc(orderNo).set(orderPayload, { merge:true });
 
