@@ -3152,9 +3152,6 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     } catch (notifyErr) {
       console.error('⚠️ 付款確認成功，但通知客人失敗：', notifyErr);
     }
-
-    // 已移除舊 LINE 群組派單推播。
-    // 訂單狀態已更新為 pending_dispatch，正式騎士端會直接讀取可接任務。
     
     try {
       await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
