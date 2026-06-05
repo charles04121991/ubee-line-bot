@@ -284,7 +284,7 @@ button.blue{
       </div>
 
       <div class="small">
-        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、備註與付款確認。
+        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、代墊金額與備註。
       </div>
 
       <div class="formGrid">
@@ -307,11 +307,6 @@ button.blue{
 
       <label>代墊金額</label>
       <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
-
-      <label class="checkRow">
-        <input id="merchantPaidCheck" type="checkbox" />
-        <span>我已完成付款</span>
-      </label>
 
       <label>備註</label>
       <textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
@@ -554,8 +549,6 @@ async function loadMerchantProfile(){
     input.type = "tel";
     input.inputMode = "tel";
 
-    document.getElementById("loginBtn").textContent = "進入派單中心";
-
     const notice = document.querySelector("#loginBox .notice");
     if(notice){
       notice.textContent = "審核通過的店家，第一次使用時請輸入申請合作時填寫的手機號碼完成 LINE 綁定。";
@@ -646,7 +639,6 @@ async function createMerchantOrder(){
   const itemName = document.getElementById("newItemName").value.trim();
   const advanceAmount = Math.round(Number(document.getElementById("newAdvanceAmount").value || 0));
   const deliveryFee = MERCHANT_SERVICE_FEE;
-  
   const note = document.getElementById("newNote").value.trim();
 
   if(!customerName || !customerPhone || !dropoffAddress || !itemName){
@@ -735,6 +727,7 @@ async function createMerchantOrder(){
       paymentStatus: "merchant_settlement",
       merchantPaid: false,
       paidAmount: 0
+    };
 
     await db.collection("orders").doc(orderNo).set(orderPayload, { merge:true });
 
