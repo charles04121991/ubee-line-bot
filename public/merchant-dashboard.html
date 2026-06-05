@@ -488,62 +488,47 @@ async function loginMerchant(){
 
   const input = document.getElementById("merchantKey");
   const loginBtn = document.getElementById("loginBtn");
-  const value = input.value.trim();
+  const phone = normalizePhone(input.value);
 
-  if(!value){
-    showError("請輸入店家電話或店家代碼");
+  if(!merchantLineUserId){
+    showError("缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟店家派單。");
+    return;
+  }
+
+  if(!/^09\d{8}$/.test(phone)){
+    showError("請輸入申請合作時填寫的手機號碼，例如：0912345678。");
     return;
   }
 
   loginBtn.disabled = true;
-  loginBtn.textContent = "登入中...";
+  loginBtn.textContent = "綁定中...";
 
   try{
-    const merchantDoc = await findMerchant(value);
+    const res = await fetch("/api/merchant/bind", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone,
+        lineUserId: merchantLineUserId
+      })
+    });
 
-    if(!merchantDoc){
-      showError("找不到店家資料，請確認店家電話或店家代碼是否正確。");
-      return;
+    const data = await res.json().catch(() => ({}));
+
+    if(!res.ok || !data.ok){
+      throw new Error(data.message || "店家帳號綁定失敗，請稍後再試。");
     }
 
-    if(merchantDoc.status !== "active"){
-      showError("此店家目前尚未啟用，請聯繫 UBee 管理員。");
-      return;
-    }
-
-    currentMerchant = merchantDoc;
-
-    merchantKey =
-      merchantDoc.merchantPhone ||
-      merchantDoc.merchantId ||
-      merchantDoc.id ||
-      value;
-
-    localStorage.setItem(STORAGE_KEY, merchantKey);
-
-    document.getElementById("loginBox").classList.add("hidden");
-    document.getElementById("dashboard").classList.remove("hidden");
-
-    document.getElementById("welcomeTitle").textContent =
-      `${merchantDoc.merchantName || "店家"}｜接單中心`;
-
-    document.getElementById("merchantInfoBox").innerHTML = `
-      <strong>${escapeHtml(merchantDoc.merchantName || "未命名店家")}</strong><br>
-      店家代碼：${escapeHtml(merchantDoc.merchantId || merchantDoc.id || "未設定")}<br>
-      店家類型：${escapeHtml(merchantDoc.merchantType || "未設定")}<br>
-      店家電話：${escapeHtml(merchantDoc.merchantPhone || "未設定")}<br>
-      店家地址：${escapeHtml(merchantDoc.merchantAddress || "未設定")}<br>
-      狀態：${merchantDoc.status === "active" ? "營運中" : escapeHtml(merchantDoc.status || "未設定")}
-    `;
-
-    startListenOrders();
+    enterMerchantDashboard(data.merchant);
 
   }catch(err){
-    console.error("店家登入失敗:", err);
-    showError("店家登入失敗，請稍後再試。");
+    console.error("店家綁定失敗:", err);
+    showError(err.message || "店家綁定失敗，請稍後再試。");
   }finally{
     loginBtn.disabled = false;
-    loginBtn.textContent = "進入接單中心";
+    loginBtn.textContent = "綁定並進入店家派單中心";
   }
 }
 
