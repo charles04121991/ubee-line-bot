@@ -601,10 +601,16 @@ function startListenOrders(){
   stopListenOrders();
 
   const statuses = [
-    "merchant_pending",
-    "merchant_preparing",
-    "merchant_ready"
-  ];
+  "merchant_pending",
+  "merchant_preparing",
+  "merchant_ready",
+  "pending_dispatch",
+  "accepted",
+  "arrived_pickup",
+  "picked_up",
+  "arrived_dropoff",
+  "completed"
+];
 
   statuses.forEach(status => {
     const unsub = db.collection("orders")
