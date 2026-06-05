@@ -728,6 +728,15 @@ function renderOrderCard(order){
   const dropoff = order.dropoffAddress || "未填寫";
   const total = order.totalFee || order.total || order.merchantFee || 0;
 
+    const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
+
+  let riderText = "";
+  if(deliveryStatuses.includes(order.status) || order.status === "completed"){
+    riderText = `
+      <div class="row"><b>配送進度：</b>${escapeHtml(progressText)}</div>
+    `;
+  }
+  
   let buttonHtml = "";
 
   if(order.status === "merchant_pending"){
@@ -766,6 +775,7 @@ function renderOrderCard(order){
       <div class="row"><b>送達地址：</b>${escapeHtml(dropoff)}</div>
       <div class="row"><b>備註：</b>${escapeHtml(note || "無")}</div>
       <div class="row"><b>金額：</b>NT$${escapeHtml(total)}</div>
+      ${riderText}
 
       ${buttonHtml}
     </div>
