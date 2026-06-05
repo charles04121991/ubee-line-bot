@@ -1679,20 +1679,7 @@ function getStatusLabel(status) {
     quote_only: '💰 估價完成',
   }[status] || status);
 }
-function createGroupStatusText(order, status) {
-  const label = getStatusLabel(status);
-  const riderName = order.riderName || '騎士';
-  const riderPhone = order.riderPhone || '';
 
-  return (
-    `📍 UBee 任務狀態更新\n\n` +
-    `訂單編號：${order.id}\n` +
-    `目前狀態：${label}\n` +
-    `騎士：${riderName}${riderPhone ? `｜${riderPhone}` : ''}\n` +
-    `取件地點：${order.pickupAddress || '未提供'}\n` +
-    `送達地點：${order.dropoffAddress || '未提供'}`
-  );
-}
 function createTextMessage(text) {
   return { type: 'text', text };
 }
@@ -1968,12 +1955,6 @@ async function notifyForceCancel(order) {
     `你的訂單已由 UBee 客服取消。\n\n` +
     `訂單編號：${order.id}\n` +
     `如有付款或退款問題，請聯繫 UBee 客服。`
-  ));
-
-  await pushToGroup(LINE_GROUP_ID, createTextMessage(
-    `⚠️ 訂單已由 UBee 管理員強制取消\n\n` +
-    `訂單編號：${order.id}\n` +
-    `請勿繼續執行此任務。`
   ));
 }
 
@@ -3556,15 +3537,6 @@ if (!nextStatuses.includes(status)) {
   console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
 }
 
-try {
-  await pushToGroup(
-    LINE_GROUP_ID,
-    createTextMessage(createGroupStatusText(updatedOrder, status))
-  );
-} catch (groupErr) {
-  console.error('⚠️ 任務狀態已更新，但通知派單群組失敗：', groupErr);
-}
-
 if (status === 'completed') {
   try {
     if (LINE_FINISH_GROUP_ID) {
@@ -3669,12 +3641,6 @@ app.post('/cancel-order', async (req, res) => {
     order.cancelledBy = requestUserId;
     order.cancelledAt = Date.now();
     await saveOrder(order);
-
-    try {
-      await pushToGroup(LINE_GROUP_ID, createTextMessage(`❌ 訂單已取消\n訂單編號：${order.id}`));
-    } catch (e) {
-      console.error('取消通知失敗', e);
-    }
 
     return res.json({ success: true });
   } catch (err) {
