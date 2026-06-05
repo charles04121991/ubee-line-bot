@@ -105,6 +105,12 @@ button.blue{
   gap:8px;
   margin-top:14px;
 }
+
+@media (min-width: 520px){
+  .tabs{
+    grid-template-columns:1fr 1fr 1fr 1fr 1fr;
+  }
+}
 .tab{
   padding:12px 8px;
   border-radius:14px;
@@ -236,7 +242,28 @@ button.blue{
         待派遣 <span id="countReady">0</span>
       </div>
     </div>
+<div class="tabs">
+  <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">
+    待接單 <span id="countPending">0</span>
+  </div>
 
+  <div class="tab" data-tab="merchant_preparing" onclick="setTab('merchant_preparing')">
+    準備中 <span id="countPreparing">0</span>
+  </div>
+
+  <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">
+    待派遣 <span id="countReady">0</span>
+  </div>
+
+  <div class="tab" data-tab="delivery_progress" onclick="setTab('delivery_progress')">
+    配送中 <span id="countDelivery">0</span>
+  </div>
+
+  <div class="tab" data-tab="completed" onclick="setTab('completed')">
+    已完成 <span id="countCompleted">0</span>
+  </div>
+</div>
+    
     <div id="ordersBox"></div>
   </div>
 
