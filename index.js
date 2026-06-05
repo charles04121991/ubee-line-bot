@@ -61,7 +61,6 @@ const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
 const CAMPAIGN_ID = 'taichung85_2026';
 
-const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
