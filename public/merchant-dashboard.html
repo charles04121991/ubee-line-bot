@@ -331,6 +331,86 @@ function showError(message){
     showError("店家登入初始化失敗，請從店家合作中心官方帳號重新開啟。");
   }
 }
+
+  function enterMerchantDashboard(merchant){
+  currentMerchant = {
+    ...merchant,
+    merchantId: merchant.merchantId || merchant.id || "",
+    merchantName: merchant.merchantName || "",
+    merchantPhone: merchant.phone || merchant.merchantPhone || "",
+    merchantAddress: merchant.pickupAddress || merchant.merchantAddress || "",
+    merchantType: merchant.businessType || merchant.merchantType || "",
+    status: merchant.status || "",
+    approved: merchant.approved === true
+  };
+
+  merchantKey =
+    currentMerchant.merchantPhone ||
+    currentMerchant.merchantId ||
+    currentMerchant.id ||
+    "";
+
+  merchantAuthed = true;
+
+  if(merchantKey){
+    localStorage.setItem(STORAGE_KEY, merchantKey);
+  }
+
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("dashboard").classList.remove("hidden");
+
+  document.getElementById("welcomeTitle").textContent =
+    `${currentMerchant.merchantName || "店家"}｜派單中心`;
+
+  document.getElementById("merchantInfoBox").innerHTML = `
+    <strong>${escapeHtml(currentMerchant.merchantName || "未命名店家")}</strong><br>
+    店家電話：${escapeHtml(currentMerchant.merchantPhone || "未設定")}<br>
+    店家地址：${escapeHtml(currentMerchant.merchantAddress || "未設定")}<br>
+    店家類型：${escapeHtml(currentMerchant.merchantType || "未設定")}<br>
+    狀態：${currentMerchant.approved ? "已審核通過" : escapeHtml(currentMerchant.status || "未設定")}
+  `;
+
+  startListenOrders();
+}
+
+async function loadMerchantProfile(){
+  if(!merchantLineUserId){
+    showError("缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟。");
+    return;
+  }
+
+  try{
+    const res = await fetch(`/api/merchant/profile?lineUserId=${encodeURIComponent(merchantLineUserId)}`);
+    const data = await res.json().catch(() => ({}));
+
+    if(data.ok && data.merchant){
+      enterMerchantDashboard(data.merchant);
+      return;
+    }
+
+    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("dashboard").classList.add("hidden");
+
+    document.querySelector("#loginBox h2").textContent = "店家帳號綁定";
+    document.querySelector("label[for='merchantKey']")?.remove();
+
+    const input = document.getElementById("merchantKey");
+    input.placeholder = "請輸入申請合作時填寫的手機號碼";
+    input.type = "tel";
+    input.inputMode = "tel";
+
+    document.getElementById("loginBtn").textContent = "綁定並進入店家派單中心";
+
+    const notice = document.querySelector("#loginBox .notice");
+    if(notice){
+      notice.textContent = "審核通過的店家，第一次使用時請輸入申請合作時填寫的手機號碼完成 LINE 綁定。";
+    }
+
+  }catch(err){
+    console.error("讀取店家資料失敗:", err);
+    showError("讀取店家資料失敗，請稍後再試。");
+  }
+}
   
 function getOrderTime(order){
   const t = order.createdAt;
