@@ -298,6 +298,40 @@ function showError(message){
   box.textContent = message;
 }
 
+  async function initMerchantLiff(){
+  hideError();
+
+  if(typeof liff === "undefined"){
+    showError("LINE LIFF 載入失敗，請從店家合作中心官方帳號重新開啟。");
+    return;
+  }
+
+  try{
+    await liff.init({
+      liffId: MERCHANT_LIFF_ID
+    });
+
+    if(!liff.isLoggedIn()){
+      liff.login();
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    merchantLineUserId = profile.userId || "";
+
+    if(!merchantLineUserId){
+      showError("無法取得 LINE 使用者資料，請重新開啟店家派單中心。");
+      return;
+    }
+
+    console.log("✅ 店家 LIFF userId:", merchantLineUserId);
+
+  }catch(err){
+    console.error("店家 LIFF 初始化失敗:", err);
+    showError("店家登入初始化失敗，請從店家合作中心官方帳號重新開啟。");
+  }
+}
+  
 function getOrderTime(order){
   const t = order.createdAt;
   if(t && typeof t.toDate === "function"){
