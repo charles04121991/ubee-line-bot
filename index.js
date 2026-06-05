@@ -1259,6 +1259,87 @@ app.post('/api/business/register', async (req, res) => {
   }
 });
 
+app.post('/api/merchant/register', async (req, res) => {
+  try {
+    const {
+      merchantName,
+      contactPerson,
+      phone,
+      lineId,
+      pickupAddress,
+      businessType,
+      settlementType,
+      dispatchFrequency,
+      note,
+    } = req.body || {};
+
+    const cleanPhone = String(phone || '').replace(/\s+/g, '').replace(/-/g, '');
+
+    if (!merchantName || !contactPerson || !cleanPhone || !pickupAddress || !businessType || !settlementType) {
+      return res.status(400).json({
+        ok: false,
+        message: '請確認必填欄位都有填寫',
+      });
+    }
+
+    if (!/^09\d{8}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        ok: false,
+        message: '請輸入正確的手機格式，例如：0912345678',
+      });
+    }
+
+    const existsSnap = await db
+      .collection('merchants')
+      .where('phone', '==', cleanPhone)
+      .limit(1)
+      .get();
+
+    if (!existsSnap.empty) {
+      return res.status(409).json({
+        ok: false,
+        message: '這支電話已送出過店家合作申請，請勿重複送出',
+      });
+    }
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const merchantRef = await db.collection('merchants').add({
+      merchantName: String(merchantName).trim(),
+      contactPerson: String(contactPerson).trim(),
+      phone: cleanPhone,
+      lineId: String(lineId || '').trim(),
+      pickupAddress: String(pickupAddress).trim(),
+      businessType: String(businessType).trim(),
+      settlementType: String(settlementType).trim(),
+      dispatchFrequency: String(dispatchFrequency || '').trim(),
+      note: String(note || '').trim(),
+
+      status: 'pending_review',
+      approved: false,
+
+      lineUserId: '',
+      boundAt: null,
+
+      source: 'merchant-register',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return res.json({
+      ok: true,
+      message: '合作申請已送出，請等待 UBee 審核',
+      merchantId: merchantRef.id,
+    });
+  } catch (err) {
+    console.error('❌ /api/merchant/register error:', err);
+    return res.status(500).json({
+      ok: false,
+      message: '店家合作申請送出失敗，請稍後再試',
+    });
+  }
+});
+
 const PRICING = {
   baseFee: 80,
   perKm: 18,
