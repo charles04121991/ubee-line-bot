@@ -658,11 +658,17 @@ function matchMerchant(order){
 
 function getVisibleOrders(){
   return Object.values(ordersMap)
-    .filter(order => order.status === currentTab)
+    .filter(order => {
+      if(currentTab === "delivery_progress"){
+        return deliveryStatuses.includes(order.status);
+      }
+
+      return order.status === currentTab;
+    })
     .filter(matchMerchant)
     .sort((a,b) => getOrderTime(b) - getOrderTime(a));
 }
-
+  
 function setTab(tab){
   currentTab = tab;
 
