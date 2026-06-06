@@ -874,6 +874,58 @@ body.night-mode{
       display:none !important;
     }
 
+     .customer-progress{
+  margin-top:18px;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--card2);
+}
+
+.progress-title{
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:14px;
+}
+
+.progress-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:4px;
+}
+
+.progress-step{
+  flex:1;
+  text-align:center;
+}
+
+.progress-dot{
+  width:24px;
+  height:24px;
+  border-radius:999px;
+  margin:0 auto 8px;
+  background:#444;
+  border:2px solid #666;
+}
+
+.progress-step.done .progress-dot{
+  background:var(--accent);
+  border-color:var(--accent);
+}
+
+.progress-step.current .progress-dot{
+  background:var(--green);
+  border-color:var(--green);
+}
+
+.progress-label{
+  font-size:11px;
+  line-height:1.4;
+  color:var(--muted);
+  font-weight:900;
+}
+
     .footer-nav{
       position:sticky;
       bottom:0;
@@ -1160,6 +1212,7 @@ body.night-mode{
       <button id="cancelOrderBtn" class="btn btn-danger hidden" style="margin-top:18px;" onclick="cancelOrder()">取消訂單</button>
 
       <div id="statusBox" class="status hidden"></div>
+      <div id="customerProgressBox" class="customer-progress hidden"></div>
     </section>
 
     <div class="footer-nav">
@@ -1241,6 +1294,7 @@ let isConfirmingPaid = false;
 let isSelectingPayment = false;
 let isPaymentMethodSaved = false;
 let isCancellingOrder = false;
+let customerOrderUnsubscribe = null;
 
 const firebaseConfig = {
   apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
@@ -1885,6 +1939,88 @@ function showStatus(text){
   const box = document.getElementById('statusBox');
   box.classList.remove('hidden');
   box.innerText = text;
+}
+
+const customerProgressSteps = [
+  { status:'pending_dispatch', text:'等待接單' },
+  { status:'accepted', text:'騎士接單' },
+  { status:'arrived_pickup', text:'前往取件' },
+  { status:'picked_up', text:'配送中' },
+  { status:'completed', text:'已送達' }
+];
+
+function renderCustomerProgress(status){
+  const box = document.getElementById('customerProgressBox');
+  if(!box) return;
+
+  const currentStatus = status || '';
+  const currentIndex = customerProgressSteps.findIndex(step => step.status === currentStatus);
+
+  if(currentIndex < 0){
+    box.classList.add('hidden');
+    return;
+  }
+
+  box.classList.remove('hidden');
+
+  box.innerHTML = `
+    <div class="progress-title">任務進度</div>
+    <div class="progress-bar">
+      ${customerProgressSteps.map((step, index) => {
+        let cls = '';
+
+        if(index < currentIndex){
+          cls = 'done';
+        }
+
+        if(index === currentIndex){
+          cls = 'current';
+        }
+
+        if(currentStatus === 'completed'){
+          cls = 'done';
+        }
+
+        return `
+          <div class="progress-step ${cls}">
+            <div class="progress-dot"></div>
+            <div class="progress-label">${escapeHtml(step.text)}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function startCustomerOrderListener(orderId){
+  if(!db || !orderId){
+    return;
+  }
+
+  if(customerOrderUnsubscribe){
+    try{
+      customerOrderUnsubscribe();
+    }catch(e){}
+    customerOrderUnsubscribe = null;
+  }
+
+  customerOrderUnsubscribe = db.collection('orders').doc(orderId)
+    .onSnapshot(doc => {
+      if(!doc.exists){
+        return;
+      }
+
+      const order = doc.data() || {};
+      renderCustomerProgress(order.status);
+
+      if(order.status === 'completed'){
+        showStatus(
+          `✅ 任務已完成\n\n訂單編號：${orderId}\n\n感謝您使用 UBee 城市任務。`
+        );
+      }
+    }, err => {
+      console.error('客人端訂單監聽失敗:', err);
+    });
 }
 
 function showPaymentInfo(text){
