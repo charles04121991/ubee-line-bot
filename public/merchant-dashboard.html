@@ -243,6 +243,50 @@ button.blue{
   border:1px solid rgba(239,68,68,.35);
   color:#fecaca;
 }
+.statusFlow{
+  margin-top:12px;
+  padding:12px;
+  border-radius:16px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--line);
+}
+.statusStep{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:7px 0;
+  color:#777;
+  font-size:14px;
+  line-height:1.5;
+}
+.statusStep .dot{
+  width:22px;
+  height:22px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#333;
+  color:#aaa;
+  font-size:13px;
+  font-weight:900;
+  flex:0 0 auto;
+}
+.statusStep.done{
+  color:#fff;
+}
+.statusStep.done .dot{
+  background:var(--yellow);
+  color:#000;
+}
+.statusStep.current{
+  color:#fef3c7;
+  font-weight:800;
+}
+.statusStep.current .dot{
+  background:var(--green);
+  color:#000;
+}
 </style>
 </head>
 
@@ -397,7 +441,31 @@ const deliveryStatuses = [
   "accepted",
   "arrived_pickup",
   "picked_up",
-  "arrived_dropoff"
+  "arrived_dropoff",
+  "completed"
+];
+
+const merchantDeliverySteps = [
+  {
+    status: "pending_dispatch",
+    text: "等待騎士接單"
+  },
+  {
+    status: "accepted",
+    text: "騎士已接單，前往取件"
+  },
+  {
+    status: "arrived_pickup",
+    text: "騎士已抵達取件地"
+  },
+  {
+    status: "picked_up",
+    text: "已取件，配送中"
+  },
+  {
+    status: "completed",
+    text: "已送達"
+  }
 ];
 
 const statusTextMap = {
@@ -1036,6 +1104,47 @@ function renderOrders(){
   box.innerHTML = orders.map(order => renderOrderCard(order)).join("");
 }
 
+function renderMerchantStatusFlow(order){
+  const currentStatus = order.status || "";
+  const currentIndex = merchantDeliverySteps.findIndex(step => step.status === currentStatus);
+
+  if(currentIndex < 0){
+    return "";
+  }
+
+  return `
+    <div class="statusFlow">
+      <div class="row"><b>即時配送狀態</b></div>
+      ${merchantDeliverySteps.map((step, index) => {
+        let cls = "";
+        let icon = "○";
+
+        if(index < currentIndex){
+          cls = "done";
+          icon = "✓";
+        }
+
+        if(index === currentIndex){
+          cls = "current";
+          icon = "●";
+        }
+
+        if(currentStatus === "completed"){
+          cls = "done";
+          icon = "✓";
+        }
+
+        return `
+          <div class="statusStep ${cls}">
+            <div class="dot">${icon}</div>
+            <div>${escapeHtml(step.text)}</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function renderOrderCard(order){
   const orderNo = order.orderNo || order.id || "未命名訂單";
   const customerName = order.customerName || order.receiverName || "未填寫";
@@ -1113,6 +1222,7 @@ function renderOrderCard(order){
       <div class="row"><b>總金額：</b>NT$${escapeHtml(total)}</div>
       <div class="row"><b>備註：</b>${escapeHtml(note || "無")}</div>
       ${riderText}
+      ${renderMerchantStatusFlow(order)}
 
       ${buttonHtml}
     </div>
