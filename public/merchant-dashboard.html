@@ -526,8 +526,7 @@ const deliveryStatuses = [
   "accepted",
   "arrived_pickup",
   "picked_up",
-  "arrived_dropoff",
-  "completed"
+  "arrived_dropoff"
 ];
 
 const merchantDeliverySteps = [
@@ -839,7 +838,7 @@ async function createMerchantOrder(){
   const paymentMethodLabelMap = {
     merchant_settlement: "店家月結 / 週結",
     cash: "現金付款",
-    merchant_paid: "店家已收款"
+    merchant_paid: "客人已收款"
   };
 
   const paymentStatusMap = {
@@ -884,6 +883,37 @@ async function createMerchantOrder(){
     const merchantName = currentMerchant.merchantName || "";
     const merchantPhone = currentMerchant.merchantPhone || "";
     const pickupAddress = currentMerchant.merchantAddress || "";
+    
+    try{
+  const estimateRes = await fetch("/estimate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      pickup: pickupAddress,
+      dropoff: dropoffAddress,
+      speed: "standard"
+    })
+  });
+
+  const estimateData = await estimateRes.json();
+
+  distanceText = estimateData.distanceText || "";
+
+  distanceKm = parseFloat(
+    String(distanceText)
+      .replace("公里", "")
+      .replace("km", "")
+      .trim()
+  ) || 0;
+
+  deliveryFee = calculateMerchantDeliveryFee(distanceKm);
+
+}catch(err){
+  console.error("店家配送距離計算失敗:", err);
+  deliveryFee = MERCHANT_SERVICE_FEE;
+}
 
     const orderPayload = {
       orderNo,
@@ -927,7 +957,9 @@ async function createMerchantOrder(){
       merchantNote: note,
 
       advanceAmount,
-      merchantServiceFee: MERCHANT_SERVICE_FEE,
+      merchantServiceFee: deliveryFee,
+      distanceKm,
+      distanceText,
 
       totalFee: deliveryFee,
       total: deliveryFee,
@@ -1303,7 +1335,7 @@ function renderOrderCard(order){
       order.paymentMethod === "cash"
         ? "現金付款"
         : order.paymentMethod === "merchant_paid"
-          ? "店家已收款"
+          ? "客人已收款"
           : "店家月結 / 週結"
     );
 
