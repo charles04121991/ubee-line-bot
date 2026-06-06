@@ -396,8 +396,34 @@ button.blue{
   </div>
 </div>
 
+<div class="tabs">
+      <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">
+        待接單 <span id="countPending">0</span>
+      </div>
+
+      <div class="tab" data-tab="merchant_preparing" onclick="setTab('merchant_preparing')">
+        準備中 <span id="countPreparing">0</span>
+      </div>
+
+      <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">
+        待派遣 <span id="countReady">0</span>
+      </div>
+
+      <div class="tab" data-tab="merchant_self_delivery" onclick="setTab('merchant_self_delivery')">
+        店家自送 <span id="countSelfDelivery">0</span>
+      </div>
+
+      <div class="tab" data-tab="delivery_progress" onclick="setTab('delivery_progress')">
+        配送中 <span id="countDelivery">0</span>
+      </div>
+
+      <div class="tab" data-tab="completed" onclick="setTab('completed')">
+        已完成 <span id="countCompleted">0</span>
+      </div>
+    </div>
+    
     <div class="section">
-      <h2>建立新派單</h2>
+      <h2>建立騎士派遣</h2>
 
       <div class="autoInfo" id="dispatchAutoInfo">
         店家資料載入中...
@@ -438,7 +464,7 @@ button.blue{
       <select id="newPaymentMethod">
         <option value="merchant_settlement">店家月結 / 週結</option>
         <option value="cash">現金付款</option>
-        <option value="merchant_paid">店家已收款</option>
+        <option value="merchant_paid">客人已收款</option>
       </select>
 
       <label>備註</label>
@@ -447,32 +473,6 @@ button.blue{
       <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立訂單</button>
 
       <div id="createOrderMsg" class="formMsg"></div>
-    </div>
-
-    <div class="tabs">
-      <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">
-        待接單 <span id="countPending">0</span>
-      </div>
-
-      <div class="tab" data-tab="merchant_preparing" onclick="setTab('merchant_preparing')">
-        準備中 <span id="countPreparing">0</span>
-      </div>
-
-      <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">
-        待派遣 <span id="countReady">0</span>
-      </div>
-
-      <div class="tab" data-tab="merchant_self_delivery" onclick="setTab('merchant_self_delivery')">
-        店家自送 <span id="countSelfDelivery">0</span>
-      </div>
-
-      <div class="tab" data-tab="delivery_progress" onclick="setTab('delivery_progress')">
-        配送中 <span id="countDelivery">0</span>
-      </div>
-
-      <div class="tab" data-tab="completed" onclick="setTab('completed')">
-        已完成 <span id="countCompleted">0</span>
-      </div>
     </div>
 
     <div id="ordersBox"></div>
@@ -495,7 +495,22 @@ const db = firebase.firestore();
 
 const MERCHANT_LIFF_ID = "2009895876-8UhPutRu";
 const STORAGE_KEY = "ubee_merchant_dashboard_key";
-const MERCHANT_SERVICE_FEE = 100;
+const MERCHANT_SERVICE_FEE = 70;
+
+function calculateMerchantDeliveryFee(distanceKm){
+
+  if(distanceKm <= 5) return 70;
+  if(distanceKm <= 7) return 80;
+  if(distanceKm <= 9) return 90;
+  if(distanceKm <= 10) return 110;
+  if(distanceKm <= 12) return 130;
+  if(distanceKm <= 14) return 150;
+  if(distanceKm <= 16) return 170;
+  if(distanceKm <= 18) return 200;
+  if(distanceKm <= 20) return 220;
+
+  return 220;
+}
 
 let merchantLineUserId = "";
 let merchantKey = "";
@@ -669,12 +684,8 @@ function enterMerchantDashboard(merchant){
     `${currentMerchant.merchantName || "店家"}｜派單中心`;
 
   document.getElementById("merchantInfoBox").innerHTML = `
-    <strong>${escapeHtml(currentMerchant.merchantName || "未命名店家")}</strong><br>
-    店家電話：${escapeHtml(currentMerchant.merchantPhone || "未設定")}<br>
-    店家地址：${escapeHtml(currentMerchant.merchantAddress || "未設定")}<br>
-    店家類型：${escapeHtml(currentMerchant.merchantType || "未設定")}<br>
-    狀態：${currentMerchant.approved ? "已審核通過" : escapeHtml(currentMerchant.status || "未設定")}
-  `;
+  <strong>🟢 已審核通過店家</strong>
+`;
 
   renderDispatchAutoInfo();
   startListenOrders();
@@ -813,10 +824,12 @@ async function createMerchantOrder(){
   const dropoffAddress = document.getElementById("newDropoffAddress").value.trim();
   const itemName = document.getElementById("newItemName").value.trim();
   const advanceAmount = Math.round(Number(document.getElementById("newAdvanceAmount").value || 0));
-  const deliveryFee = MERCHANT_SERVICE_FEE;
+  let deliveryFee = MERCHANT_SERVICE_FEE;
   const deliveryMode = document.getElementById("newDeliveryMode").value || "ubee";
   const paymentMethod = document.getElementById("newPaymentMethod").value || "merchant_settlement";
   const note = document.getElementById("newNote").value.trim();
+  let distanceKm = 0;
+  let distanceText = "";
 
   const deliveryModeLabelMap = {
     ubee: "UBee 派騎士",
