@@ -2381,8 +2381,10 @@ if(lastEstimate && taichung85Coupon.claimed){
     document.getElementById('jkoBtn').classList.remove('hidden');
 
     showStatus(
-      `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請選擇付款方式，完成付款後按「我已付款」。`
-    );
+  `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請選擇付款方式，完成付款後按「我已付款」。`
+  );
+
+    startCustomerOrderListener(currentOrderId);
 
     isSubmittingOrder = false;
 
