@@ -287,6 +287,69 @@ button.blue{
   background:var(--green);
   color:#000;
 }
+.merchantHorizontalProgress{
+  margin-top:12px;
+}
+
+.horizontalFlow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  overflow-x:auto;
+  padding:10px 0;
+}
+
+.horizontalStep{
+  min-width:80px;
+  text-align:center;
+  color:#666;
+  font-size:12px;
+  flex-shrink:0;
+}
+
+.horizontalStep .circle{
+  width:38px;
+  height:38px;
+  margin:0 auto 6px;
+  border-radius:50%;
+  background:#333;
+  color:#999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+}
+
+.horizontalStep.done{
+  color:#fff;
+}
+
+.horizontalStep.done .circle{
+  background:var(--yellow);
+  color:#000;
+}
+
+.horizontalStep.current{
+  color:#fef3c7;
+  font-weight:800;
+}
+
+.horizontalStep.current .circle{
+  background:var(--green);
+  color:#000;
+}
+
+.horizontalLine{
+  flex:1;
+  height:3px;
+  background:#333;
+  min-width:30px;
+}
+
+.horizontalLine.done{
+  background:var(--yellow);
+}
 </style>
 </head>
 
@@ -325,6 +388,14 @@ button.blue{
 
       <button class="secondary" type="button" onclick="logoutMerchant()">切換店家</button>
     </div>
+
+      <div class="section">
+  <h2>騎士配送狀態</h2>
+
+  <div id="merchantHorizontalProgressBox" class="merchantHorizontalProgress">
+    <div class="empty">目前沒有配送中的訂單</div>
+  </div>
+</div>
 
     <div class="section">
       <h2>建立新派單</h2>
@@ -1088,7 +1159,7 @@ function updateCounts(){
 
 function renderOrders(){
   updateCounts();
-
+  renderMerchantHorizontalProgress();
   const box = document.getElementById("ordersBox");
   const orders = getVisibleOrders();
 
@@ -1102,6 +1173,60 @@ function renderOrders(){
   }
 
   box.innerHTML = orders.map(order => renderOrderCard(order)).join("");
+}
+
+function renderMerchantHorizontalProgress(){
+  const box = document.getElementById("merchantHorizontalProgressBox");
+  if(!box) return;
+
+  const activeOrders = Object.values(ordersMap)
+    .filter(matchMerchant)
+    .filter(order => deliveryStatuses.includes(order.status))
+    .filter(order => order.status !== "completed")
+    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
+
+  if(!activeOrders.length){
+    box.innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
+    return;
+  }
+
+  const order = activeOrders[0];
+  const currentStatus = order.status || "";
+  const currentIndex = merchantDeliverySteps.findIndex(step => step.status === currentStatus);
+  const orderNo = order.orderNo || order.id || "未命名訂單";
+
+  box.innerHTML = `
+    <div class="row"><b>最新配送訂單：</b>${escapeHtml(orderNo)}</div>
+    <div class="small">目前共有 ${activeOrders.length} 筆配送中訂單</div>
+
+    <div class="horizontalFlow">
+      ${merchantDeliverySteps.map((step, index) => {
+        let cls = "";
+        let icon = "○";
+
+        if(index < currentIndex){
+          cls = "done";
+          icon = "✓";
+        }
+
+        if(index === currentIndex){
+          cls = "current";
+          icon = "●";
+        }
+
+        return `
+          <div class="horizontalStep ${cls}">
+            <div class="circle">${icon}</div>
+            <div>${escapeHtml(step.text)}</div>
+          </div>
+          ${index < merchantDeliverySteps.length - 1
+            ? `<div class="horizontalLine ${index < currentIndex ? "done" : ""}"></div>`
+            : ""
+          }
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function renderMerchantStatusFlow(order){
@@ -1222,7 +1347,6 @@ function renderOrderCard(order){
       <div class="row"><b>總金額：</b>NT$${escapeHtml(total)}</div>
       <div class="row"><b>備註：</b>${escapeHtml(note || "無")}</div>
       ${riderText}
-      ${renderMerchantStatusFlow(order)}
 
       ${buttonHtml}
     </div>
