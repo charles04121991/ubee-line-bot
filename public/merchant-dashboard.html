@@ -119,11 +119,6 @@ button.blue{
   gap:8px;
   margin-top:14px;
 }
-@media (min-width: 520px){
-  .tabs{
-    grid-template-columns:1fr 1fr 1fr;
-  }
-}
 @media (min-width: 760px){
   .tabs{
     grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;
@@ -154,11 +149,13 @@ button.blue{
 .order h3{
   margin:0 0 8px;
   font-size:17px;
+  word-break:break-word;
 }
 .row{
   color:#ddd;
   line-height:1.6;
   font-size:14px;
+  word-break:break-word;
 }
 .row b{color:#fff}
 .badge{
@@ -243,54 +240,9 @@ button.blue{
   border:1px solid rgba(239,68,68,.35);
   color:#fecaca;
 }
-.statusFlow{
-  margin-top:12px;
-  padding:12px;
-  border-radius:16px;
-  background:rgba(255,255,255,.04);
-  border:1px solid var(--line);
-}
-.statusStep{
-  display:flex;
-  gap:10px;
-  align-items:flex-start;
-  padding:7px 0;
-  color:#777;
-  font-size:14px;
-  line-height:1.5;
-}
-.statusStep .dot{
-  width:22px;
-  height:22px;
-  border-radius:999px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#333;
-  color:#aaa;
-  font-size:13px;
-  font-weight:900;
-  flex:0 0 auto;
-}
-.statusStep.done{
-  color:#fff;
-}
-.statusStep.done .dot{
-  background:var(--yellow);
-  color:#000;
-}
-.statusStep.current{
-  color:#fef3c7;
-  font-weight:800;
-}
-.statusStep.current .dot{
-  background:var(--green);
-  color:#000;
-}
 .merchantHorizontalProgress{
   margin-top:12px;
 }
-
 .horizontalFlow{
   display:flex;
   align-items:center;
@@ -299,7 +251,6 @@ button.blue{
   overflow-x:auto;
   padding:10px 0;
 }
-
 .horizontalStep{
   min-width:80px;
   text-align:center;
@@ -307,7 +258,6 @@ button.blue{
   font-size:12px;
   flex-shrink:0;
 }
-
 .horizontalStep .circle{
   width:38px;
   height:38px;
@@ -320,32 +270,27 @@ button.blue{
   justify-content:center;
   font-weight:900;
 }
-
 .horizontalStep.done{
   color:#fff;
 }
-
 .horizontalStep.done .circle{
   background:var(--green);
   color:#000;
 }
-
+.horizontalStep.current{
+  color:#fef3c7;
+  font-weight:900;
+}
 .horizontalStep.current .circle{
   background:var(--yellow);
   color:#000;
 }
-
-.horizontalLine.done{
-  background:var(--green);
-}
-
 .horizontalLine{
   flex:1;
   height:3px;
   background:#333;
   min-width:30px;
 }
-
 .horizontalLine.done{
   background:var(--yellow);
 }
@@ -388,15 +333,15 @@ button.blue{
       <button class="secondary" type="button" onclick="logoutMerchant()">切換店家</button>
     </div>
 
-      <div class="section">
-  <h2>騎士配送狀態</h2>
+    <div class="section">
+      <h2>騎士配送狀態</h2>
 
-  <div id="merchantHorizontalProgressBox" class="merchantHorizontalProgress">
-    <div class="empty">目前沒有配送中的訂單</div>
-  </div>
-</div>
+      <div id="merchantHorizontalProgressBox" class="merchantHorizontalProgress">
+        <div class="empty">目前沒有配送中的訂單</div>
+      </div>
+    </div>
 
-<div class="tabs">
+    <div class="tabs">
       <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">
         待接單 <span id="countPending">0</span>
       </div>
@@ -436,20 +381,20 @@ button.blue{
       <div class="formGrid">
         <div>
           <label>客人姓名 *</label>
-          <input id="newCustomerName" placeholder="例如：陳先生" />
+          <input id="newCustomerName" maxlength="40" placeholder="例如：陳先生" />
         </div>
 
         <div>
           <label>客人電話 *</label>
-          <input id="newCustomerPhone" type="tel" inputmode="tel" placeholder="例如：0912345678" />
+          <input id="newCustomerPhone" type="tel" inputmode="tel" maxlength="20" placeholder="例如：0912345678" />
         </div>
       </div>
 
       <label>送達地址 *</label>
-      <textarea id="newDropoffAddress" placeholder="請填寫完整送達地址"></textarea>
+      <textarea id="newDropoffAddress" maxlength="160" placeholder="請填寫完整送達地址"></textarea>
 
       <label>品項內容 *</label>
-      <textarea id="newItemName" placeholder="例如：飲料 8 杯、餐點 3 份、文件 1 份"></textarea>
+      <textarea id="newItemName" maxlength="160" placeholder="例如：飲料 8 杯、餐點 3 份、文件 1 份"></textarea>
 
       <label>代墊金額</label>
       <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
@@ -464,11 +409,11 @@ button.blue{
       <select id="newPaymentMethod">
         <option value="merchant_settlement">店家月結 / 週結</option>
         <option value="cash">現金付款</option>
-        <option value="merchant_paid">客人已收款</option>
+        <option value="merchant_paid">店家已收款</option>
       </select>
 
       <label>備註</label>
-      <textarea id="newNote" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
+      <textarea id="newNote" maxlength="220" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
 
       <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立訂單</button>
 
@@ -487,7 +432,7 @@ const firebaseConfig = {
   projectId: "ubee-oms"
 };
 
-if(!firebase.apps.length){
+if(window.firebase && !firebase.apps.length){
   firebase.initializeApp(firebaseConfig);
 }
 
@@ -496,20 +441,80 @@ const db = firebase.firestore();
 const MERCHANT_LIFF_ID = "2009895876-8UhPutRu";
 const STORAGE_KEY = "ubee_merchant_dashboard_key";
 const MERCHANT_SERVICE_FEE = 70;
+const ESTIMATE_TIMEOUT_MS = 12000;
 
 function calculateMerchantDeliveryFee(distanceKm){
+  const km = Number(distanceKm);
 
-  if(distanceKm <= 5) return 70;
-  if(distanceKm <= 7) return 80;
-  if(distanceKm <= 9) return 90;
-  if(distanceKm <= 10) return 110;
-  if(distanceKm <= 12) return 130;
-  if(distanceKm <= 14) return 150;
-  if(distanceKm <= 16) return 170;
-  if(distanceKm <= 18) return 200;
-  if(distanceKm <= 20) return 220;
+  if(!Number.isFinite(km) || km <= 0){
+    throw new Error("距離結果異常");
+  }
+
+  if(km <= 5) return 70;
+  if(km <= 7) return 80;
+  if(km <= 9) return 90;
+  if(km <= 10) return 110;
+  if(km <= 12) return 130;
+  if(km <= 14) return 150;
+  if(km <= 16) return 170;
+  if(km <= 18) return 200;
+  if(km <= 20) return 220;
 
   return 220;
+}
+
+function parseDistanceKm(distanceText){
+  const raw = String(distanceText || "")
+    .replaceAll(",", "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toLowerCase();
+
+  if(!raw){
+    throw new Error("距離資料為空");
+  }
+
+  let km = 0;
+
+  if(raw.includes("公里") || raw.includes("km")){
+    km = parseFloat(
+      raw
+        .replace("公里", "")
+        .replace("km", "")
+    ) || 0;
+  }else if(raw.includes("公尺") || raw.endsWith("m")){
+    km = (parseFloat(
+      raw
+        .replace("公尺", "")
+        .replace("m", "")
+    ) || 0) / 1000;
+  }else{
+    km = parseFloat(raw) || 0;
+  }
+
+  if(!Number.isFinite(km) || km <= 0){
+    throw new Error("距離結果異常");
+  }
+
+  return km;
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = ESTIMATE_TIMEOUT_MS){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try{
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+
+  }finally{
+    clearTimeout(timer);
+  }
 }
 
 let merchantLineUserId = "";
@@ -520,6 +525,7 @@ let merchantAuthed = false;
 let currentTab = "merchant_pending";
 let ordersMap = {};
 let unsubscribers = [];
+let isCreatingMerchantOrder = false;
 
 const deliveryStatuses = [
   "pending_dispatch",
@@ -547,6 +553,10 @@ const merchantDeliverySteps = [
     text: "已取件，配送中"
   },
   {
+    status: "arrived_dropoff",
+    text: "騎士已抵達送達地"
+  },
+  {
     status: "completed",
     text: "已送達"
   }
@@ -568,7 +578,11 @@ const statusTextMap = {
 };
 
 function normalizePhone(str){
-  return String(str || "").replace(/\D/g, "");
+  return String(str || "")
+    .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+    .replace(/^\+886/, "0")
+    .replace(/^886/, "0")
+    .replace(/\D/g, "");
 }
 
 function escapeHtml(str){
@@ -582,12 +596,16 @@ function escapeHtml(str){
 
 function hideError(){
   const box = document.getElementById("errorBox");
+  if(!box) return;
+
   box.style.display = "none";
   box.textContent = "";
 }
 
 function showError(message){
   const box = document.getElementById("errorBox");
+  if(!box) return;
+
   box.style.display = "block";
   box.textContent = message;
 }
@@ -604,12 +622,16 @@ function forceEnableLoginButton(text){
 
 function showCreateOrderMsg(type, message){
   const box = document.getElementById("createOrderMsg");
+  if(!box) return;
+
   box.className = "formMsg " + type;
   box.textContent = message;
 }
 
 function clearCreateOrderMsg(){
   const box = document.getElementById("createOrderMsg");
+  if(!box) return;
+
   box.className = "formMsg";
   box.textContent = "";
 }
@@ -654,6 +676,7 @@ async function initMerchantLiff(){
 function enterMerchantDashboard(merchant){
   currentMerchant = {
     ...merchant,
+    id: merchant.id || merchant.merchantId || "",
     merchantId: merchant.merchantId || merchant.id || "",
     merchantName: merchant.merchantName || "",
     merchantPhone: merchant.phone || merchant.merchantPhone || "",
@@ -679,12 +702,11 @@ function enterMerchantDashboard(merchant){
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("dashboard").classList.remove("hidden");
 
-  document.getElementById("welcomeTitle").textContent =
-    `${currentMerchant.merchantName || "店家"}｜派單中心`;
+  document.getElementById("welcomeTitle").textContent = "店家派單中心";
 
   document.getElementById("merchantInfoBox").innerHTML = `
-  <strong>🟢 已審核通過店家</strong>
-`;
+    <strong>🟢 已審核通過店家</strong>
+  `;
 
   renderDispatchAutoInfo();
   startListenOrders();
@@ -744,6 +766,11 @@ function getOrderTime(order){
 
   if(typeof t === "number"){
     return t;
+  }
+
+  if(typeof t === "string"){
+    const parsed = new Date(t).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   return 0;
@@ -813,6 +840,10 @@ function resetCreateOrderForm(){
 async function createMerchantOrder(){
   clearCreateOrderMsg();
 
+  if(isCreatingMerchantOrder){
+    return;
+  }
+
   if(!currentMerchant || !merchantAuthed){
     showCreateOrderMsg("err", "店家資料尚未完成登入，請重新開啟店家派單中心。");
     return;
@@ -823,10 +854,11 @@ async function createMerchantOrder(){
   const dropoffAddress = document.getElementById("newDropoffAddress").value.trim();
   const itemName = document.getElementById("newItemName").value.trim();
   const advanceAmount = Math.round(Number(document.getElementById("newAdvanceAmount").value || 0));
-  let deliveryFee = MERCHANT_SERVICE_FEE;
   const deliveryMode = document.getElementById("newDeliveryMode").value || "ubee";
   const paymentMethod = document.getElementById("newPaymentMethod").value || "merchant_settlement";
   const note = document.getElementById("newNote").value.trim();
+
+  let deliveryFee = MERCHANT_SERVICE_FEE;
   let distanceKm = 0;
   let distanceText = "";
 
@@ -838,7 +870,7 @@ async function createMerchantOrder(){
   const paymentMethodLabelMap = {
     merchant_settlement: "店家月結 / 週結",
     cash: "現金付款",
-    merchant_paid: "客人已收款"
+    merchant_paid: "店家已收款"
   };
 
   const paymentStatusMap = {
@@ -861,7 +893,17 @@ async function createMerchantOrder(){
     return;
   }
 
-  if(advanceAmount < 0){
+  if(dropoffAddress.length < 6){
+    showCreateOrderMsg("err", "請輸入完整送達地址。");
+    return;
+  }
+
+  if(itemName.length < 2){
+    showCreateOrderMsg("err", "請輸入完整品項內容。");
+    return;
+  }
+
+  if(!Number.isFinite(advanceAmount) || advanceAmount < 0){
     showCreateOrderMsg("err", "代墊金額不可小於 0。");
     return;
   }
@@ -872,6 +914,7 @@ async function createMerchantOrder(){
   }
 
   const btn = document.getElementById("createOrderBtn");
+  isCreatingMerchantOrder = true;
   btn.disabled = true;
   btn.textContent = "建立中...";
 
@@ -883,37 +926,33 @@ async function createMerchantOrder(){
     const merchantName = currentMerchant.merchantName || "";
     const merchantPhone = currentMerchant.merchantPhone || "";
     const pickupAddress = currentMerchant.merchantAddress || "";
-    
+
     try{
-  const estimateRes = await fetch("/estimate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      pickup: pickupAddress,
-      dropoff: dropoffAddress,
-      speed: "standard"
-    })
-  });
+      const { res: estimateRes, data: estimateData } = await fetchJsonWithTimeout("/estimate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          pickup: pickupAddress,
+          dropoff: dropoffAddress,
+          speed: "standard"
+        })
+      });
 
-  const estimateData = await estimateRes.json();
+      if(!estimateRes.ok || estimateData.error || !estimateData.distanceText){
+        throw new Error(estimateData.error || "距離計算失敗");
+      }
 
-  distanceText = estimateData.distanceText || "";
+      distanceText = estimateData.distanceText || "";
+      distanceKm = parseDistanceKm(distanceText);
+      deliveryFee = calculateMerchantDeliveryFee(distanceKm);
 
-  distanceKm = parseFloat(
-    String(distanceText)
-      .replace("公里", "")
-      .replace("km", "")
-      .trim()
-  ) || 0;
-
-  deliveryFee = calculateMerchantDeliveryFee(distanceKm);
-
-}catch(err){
-  console.error("店家配送距離計算失敗:", err);
-  deliveryFee = MERCHANT_SERVICE_FEE;
-}
+    }catch(err){
+      console.error("店家配送距離計算失敗:", err);
+      showCreateOrderMsg("err", "距離計算失敗，請確認送達地址是否完整，或稍後再試。");
+      return;
+    }
 
     const orderPayload = {
       orderNo,
@@ -996,7 +1035,7 @@ async function createMerchantOrder(){
       resetCreateOrderForm();
       setTab("merchant_self_delivery");
     }else{
-      showCreateOrderMsg("ok", `派單已建立，已放入「待派遣」。訂單編號：${orderNo}`);
+      showCreateOrderMsg("ok", `派單已建立，已放入「待派遣」。距離：${distanceText}，配送費：NT$${deliveryFee}。訂單編號：${orderNo}`);
       resetCreateOrderForm();
       setTab("merchant_ready");
     }
@@ -1005,6 +1044,7 @@ async function createMerchantOrder(){
     console.error("建立店家派單失敗:", err);
     showCreateOrderMsg("err", "建立派單失敗，請稍後再試。");
   }finally{
+    isCreatingMerchantOrder = false;
     btn.disabled = false;
     btn.textContent = "建立訂單";
   }
@@ -1077,6 +1117,7 @@ function logoutMerchant(){
   document.getElementById("ordersBox").innerHTML = "";
   document.getElementById("merchantInfoBox").innerHTML = "";
   document.getElementById("dispatchAutoInfo").innerHTML = "店家資料尚未載入";
+  document.getElementById("merchantHorizontalProgressBox").innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
 
   forceEnableLoginButton("進入派單中心");
   setTab("merchant_pending");
@@ -1204,6 +1245,7 @@ function updateCounts(){
 function renderOrders(){
   updateCounts();
   renderMerchantHorizontalProgress();
+
   const box = document.getElementById("ordersBox");
   const orders = getVisibleOrders();
 
@@ -1226,7 +1268,6 @@ function renderMerchantHorizontalProgress(){
   const activeOrders = Object.values(ordersMap)
     .filter(matchMerchant)
     .filter(order => deliveryStatuses.includes(order.status))
-    .filter(order => order.status !== "completed")
     .sort((a,b) => getOrderTime(b) - getOrderTime(a));
 
   if(!activeOrders.length){
@@ -1237,6 +1278,7 @@ function renderMerchantHorizontalProgress(){
   const order = activeOrders[0];
   const currentStatus = order.status || "";
   const currentIndex = merchantDeliverySteps.findIndex(step => step.status === currentStatus);
+  const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
   const orderNo = order.orderNo || order.id || "未命名訂單";
 
   box.innerHTML = `
@@ -1248,12 +1290,12 @@ function renderMerchantHorizontalProgress(){
         let cls = "";
         let icon = "○";
 
-        if(index < currentIndex){
+        if(index < safeCurrentIndex){
           cls = "done";
           icon = "✓";
         }
 
-        if(index === currentIndex){
+        if(index === safeCurrentIndex){
           cls = "current";
           icon = "●";
         }
@@ -1264,50 +1306,9 @@ function renderMerchantHorizontalProgress(){
             <div>${escapeHtml(step.text)}</div>
           </div>
           ${index < merchantDeliverySteps.length - 1
-            ? `<div class="horizontalLine ${index < currentIndex ? "done" : ""}"></div>`
+            ? `<div class="horizontalLine ${index < safeCurrentIndex ? "done" : ""}"></div>`
             : ""
           }
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
-function renderMerchantStatusFlow(order){
-  const currentStatus = order.status || "";
-  const currentIndex = merchantDeliverySteps.findIndex(step => step.status === currentStatus);
-
-  if(currentIndex < 0){
-    return "";
-  }
-
-  return `
-    <div class="statusFlow">
-      <div class="row"><b>即時配送狀態</b></div>
-      ${merchantDeliverySteps.map((step, index) => {
-        let cls = "";
-        let icon = "○";
-
-        if(index < currentIndex){
-          cls = "done";
-          icon = "✓";
-        }
-
-        if(index === currentIndex){
-          cls = "current";
-          icon = "●";
-        }
-
-        if(currentStatus === "completed"){
-          cls = "done";
-          icon = "✓";
-        }
-
-        return `
-          <div class="statusStep ${cls}">
-            <div class="dot">${icon}</div>
-            <div>${escapeHtml(step.text)}</div>
-          </div>
         `;
       }).join("")}
     </div>
@@ -1324,6 +1325,7 @@ function renderOrderCard(order){
   const advanceAmount = Number(order.advanceAmount || 0);
   const deliveryFee = Number(order.deliveryFee || order.fee || order.riderFee || order.driverFee || 0);
   const total = Number(order.totalFee || order.total || order.merchantFee || order.deliveryFee || order.fee || 0);
+  const distanceText = order.distanceText || "";
 
   const deliveryTypeLabel =
     order.deliveryTypeLabel ||
@@ -1335,7 +1337,7 @@ function renderOrderCard(order){
       order.paymentMethod === "cash"
         ? "現金付款"
         : order.paymentMethod === "merchant_paid"
-          ? "客人已收款"
+          ? "店家已收款"
           : "店家月結 / 週結"
     );
 
@@ -1386,6 +1388,7 @@ function renderOrderCard(order){
       <div class="row"><b>送達地址：</b>${escapeHtml(dropoff)}</div>
       <div class="row"><b>配送方式：</b>${escapeHtml(deliveryTypeLabel)}</div>
       <div class="row"><b>付款方式：</b>${escapeHtml(paymentMethodLabel)}</div>
+      <div class="row"><b>距離：</b>${escapeHtml(distanceText || "未記錄")}</div>
       <div class="row"><b>代墊金額：</b>NT$${escapeHtml(advanceAmount)}</div>
       <div class="row"><b>配送費：</b>NT$${escapeHtml(deliveryFee)}</div>
       <div class="row"><b>總金額：</b>NT$${escapeHtml(total)}</div>
