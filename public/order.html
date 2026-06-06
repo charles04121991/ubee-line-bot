@@ -1228,6 +1228,7 @@ let lastEstimate = null;
 
 let merchantMode = false;
 let currentMerchant = null;
+let merchantSearchToken = 0;
 
 let taichung85Coupon = {
   claimed: false,
@@ -1508,6 +1509,15 @@ function renderServiceCategories(){
   const title = document.getElementById('serviceCategoryTitle');
   const item = getCurrentServiceItem();
 
+  const merchantBox = document.getElementById('merchantSelectBox');
+  const merchantGrid = document.getElementById('merchantSelectGrid');
+
+  if(merchantBox) merchantBox.classList.add('hidden');
+  if(merchantGrid) merchantGrid.innerHTML = '';
+
+  currentMerchant = null;
+  merchantMode = false;
+
   if(!box || !grid || !title){
     return;
   }
@@ -1532,6 +1542,8 @@ function renderServiceCategories(){
       ${cat}
     </button>
   `).join('');
+
+  loadMerchantsForCategory();
 }
 
 function selectServiceCategory(el, value){
@@ -1582,21 +1594,26 @@ function getPlaceKeyword(){
 }
 
 async function loadMerchantsForCategory(){
-
   const box = document.getElementById('merchantSelectBox');
   const grid = document.getElementById('merchantSelectGrid');
 
   if(!box || !grid) return;
 
+  const token = ++merchantSearchToken;
+
   box.classList.add('hidden');
   grid.innerHTML = '';
+
+  currentMerchant = null;
+  merchantMode = false;
 
   if(serviceGroup !== 'buy' || !serviceType || !serviceCategory){
     return;
   }
 
   if(!navigator.geolocation){
-    alert('此裝置不支援定位，請手動輸入店家地址。');
+    box.classList.remove('hidden');
+    grid.innerHTML = '此裝置不支援定位，請手動輸入店家地址。';
     return;
   }
 
@@ -1604,6 +1621,8 @@ async function loadMerchantsForCategory(){
   box.classList.remove('hidden');
 
   navigator.geolocation.getCurrentPosition(async position => {
+    if(token !== merchantSearchToken) return;
+
     try{
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
@@ -1617,6 +1636,8 @@ async function loadMerchantsForCategory(){
 
       const data = await res.json();
 
+      if(token !== merchantSearchToken) return;
+
       if(!data.success || !data.places || !data.places.length){
         grid.innerHTML = '附近暫時找不到店家，請改用手動填寫。';
         return;
@@ -1628,15 +1649,17 @@ async function loadMerchantsForCategory(){
           class="category-choice-item"
           onclick="selectGooglePlace('${place.placeId}')"
         >
-          ${place.name}
+          ${escapeHtml(place.name)}
         </button>
       `).join('');
 
     }catch(err){
+      if(token !== merchantSearchToken) return;
       console.error('搜尋附近店家失敗:', err);
       grid.innerHTML = '搜尋附近店家失敗，請稍後再試。';
     }
   }, err => {
+    if(token !== merchantSearchToken) return;
     console.error('定位失敗:', err);
     grid.innerHTML = '無法取得定位，請允許定位或手動填寫店家地址。';
   });
