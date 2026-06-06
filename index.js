@@ -3303,6 +3303,120 @@ if (!riderOk) {
   }
 });
 
+// ===== 騎士轉單 API =====
+// 已接單騎士可把任務退回待派遣，重新開放給其他騎士接單
+app.post('/api/rider/transfer-order', async (req, res) => {
+  try {
+    const { orderId, lineUserId, reason } = req.body;
+
+    if (!orderId || !lineUserId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少訂單編號或騎士 LINE 身分。'
+      });
+    }
+
+    const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    if (riderSnap.empty) {
+      return res.status(403).json({
+        success: false,
+        message: '找不到騎士資料。'
+      });
+    }
+
+    const riderDoc = riderSnap.docs[0];
+    const rider = riderDoc.data();
+    const riderRef = db.collection('riders').doc(riderDoc.id);
+
+    await db.runTransaction(async (transaction) => {
+      const orderDoc = await transaction.get(orderRef);
+
+      if (!orderDoc.exists) {
+        throw new Error('ORDER_NOT_FOUND');
+      }
+
+      const order = orderDoc.data();
+
+      if (order.riderLineUserId !== lineUserId && order.riderId !== lineUserId) {
+        throw new Error('NOT_YOUR_ORDER');
+      }
+
+      if (order.status !== 'accepted') {
+        throw new Error('ORDER_ALREADY_STARTED');
+      }
+
+      transaction.update(orderRef, {
+        status: 'pending_dispatch',
+
+        previousRiderLineUserId: lineUserId,
+        previousRiderDocId: riderDoc.id,
+        previousRiderName: rider.name || '',
+        previousRiderPhone: rider.phone || '',
+        transferReason: reason || '',
+        transferredAt: admin.firestore.FieldValue.serverTimestamp(),
+
+        riderId: '',
+        riderLineUserId: '',
+        riderDocId: '',
+        riderName: '',
+        riderPhone: '',
+
+        acceptedAt: null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        'statusTimes.transferred': admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      transaction.set(riderRef, {
+        busy: false,
+        currentOrderId: '',
+        lastActive: Date.now(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    });
+
+    return res.json({
+      success: true,
+      status: 'pending_dispatch',
+      message: '轉單成功，任務已重新開放給其他騎士。'
+    });
+
+  } catch (error) {
+    console.error('❌ 騎士轉單失敗：', error);
+
+    if (error.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: '找不到此訂單。'
+      });
+    }
+
+    if (error.message === 'NOT_YOUR_ORDER') {
+      return res.status(403).json({
+        success: false,
+        message: '此訂單不是你目前接的任務。'
+      });
+    }
+
+    if (error.message === 'ORDER_ALREADY_STARTED') {
+      return res.status(409).json({
+        success: false,
+        message: '任務已開始進行，不能轉單。'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: '轉單失敗，請稍後再試。'
+    });
+  }
+});
+
 // ===== 騎士更新任務狀態 API =====
 // 4. 更新任務狀態：正式版只允許接單本人更新
 app.post('/api/rider/update-order-status', async (req, res) => {
