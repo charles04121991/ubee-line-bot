@@ -1524,9 +1524,9 @@ body.day-mode .bottom-tabs{
     <div class="sub-title">歷史任務</div>
   </div>
   <div class="content-card">
-    <div class="content-title">任務紀錄</div>
-    <div class="content-text">歷史任務功能已建立。下一階段可接 Firestore，顯示完成、取消與付款紀錄。</div>
-  </div>
+  <div class="content-title">任務紀錄</div>
+  <div class="content-text" id="historyTaskText">正在讀取歷史任務...</div>
+</div>
 </section>
 
 <section class="app-section" id="couponPage">
@@ -3118,8 +3118,12 @@ function openCustomerSubPage(pageId){
   if(page) page.classList.add('active');
 
   if(pageId === 'activeTaskPage'){
-    renderCustomerActiveTask();
-  }
+  renderCustomerActiveTask();
+}
+
+if(pageId === 'historyTaskPage'){
+  renderCustomerHistoryTasks();
+}
 
   document.getElementById('pageCount').innerText = '詳細';
   window.scrollTo({ top:0, behavior:'smooth' });
@@ -3153,19 +3157,179 @@ function renderCustomerMemberInfo(){
   }
 }
 
-function renderCustomerActiveTask(){
+function formatOrderTime(value){
+  if(!value) return '-';
+
+  try{
+    if(value.toDate){
+      return value.toDate().toLocaleString('zh-TW', {
+        month:'2-digit',
+        day:'2-digit',
+        hour:'2-digit',
+        minute:'2-digit'
+      });
+    }
+
+    return new Date(value).toLocaleString('zh-TW', {
+      month:'2-digit',
+      day:'2-digit',
+      hour:'2-digit',
+      minute:'2-digit'
+    });
+  }catch(e){
+    return '-';
+  }
+}
+
+function getOrderStatusLabel(status){
+  const map = {
+    draft_confirm:'草稿確認',
+    pending_payment:'等待付款',
+    pending_dispatch:'等待派單',
+    accepted:'騎士已接單',
+    arrived_pickup:'騎士已抵達取件地',
+    picked_up:'配送中',
+    arrived_dropoff:'騎士已抵達送達地',
+    completed:'已完成',
+    cancelled:'已取消',
+    quote_only:'僅估價'
+  };
+
+  return map[status] || status || '未知狀態';
+}
+
+function renderOrderList(el, orders, emptyText){
+  if(!el) return;
+
+  if(!orders.length){
+    el.innerHTML = escapeHtml(emptyText);
+    return;
+  }
+
+  el.innerHTML = orders.map(order => {
+    const pickup = order.pickup || order.pickupAddress || '-';
+    const dropoff = order.dropoff || order.dropoffAddress || '-';
+    const total = order.total || order.discountTotal || order.totalFee || '-';
+    const service = order.serviceType || 'UBee 任務';
+    const status = getOrderStatusLabel(order.status);
+    const time = formatOrderTime(order.createdAt || order.updatedAt);
+
+    return `
+      <div style="border:1px solid var(--line);background:var(--card2);border-radius:18px;padding:14px;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:1000;color:var(--text);margin-bottom:8px;">
+          ${escapeHtml(service)}
+        </div>
+        <div style="font-size:13px;font-weight:900;color:var(--accent);margin-bottom:8px;">
+          ${escapeHtml(status)}
+        </div>
+        <div style="font-size:13px;line-height:1.7;color:var(--muted);font-weight:800;">
+          訂單編號：${escapeHtml(order.id || '-')}<br>
+          建立時間：${escapeHtml(time)}<br>
+          取件：${escapeHtml(pickup)}<br>
+          送達：${escapeHtml(dropoff)}<br>
+          金額：NT$${escapeHtml(total)}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadCustomerOrders(){
+  if(!db){
+    return [];
+  }
+
+  if(!userId || userId === 'web-order'){
+    return [];
+  }
+
+  const snap = await db.collection('orders')
+    .where('userId', '==', userId)
+    .limit(30)
+    .get();
+
+  const orders = [];
+
+  snap.forEach(doc => {
+    orders.push({
+      id: doc.id,
+      ...doc.data()
+    });
+  });
+
+  orders.sort((a, b) => {
+    const getTime = (order) => {
+      const value = order.createdAt || order.updatedAt;
+      if(!value) return 0;
+      if(value.toDate) return value.toDate().getTime();
+      return new Date(value).getTime() || 0;
+    };
+
+    return getTime(b) - getTime(a);
+  });
+
+  return orders;
+}
+
+async function renderCustomerActiveTask(){
   const el = document.getElementById('activeTaskText');
   if(!el) return;
 
-  if(currentOrderId){
-    el.innerText =
-      `目前有一筆任務進行中。\n\n` +
-      `訂單編號：${currentOrderId}\n` +
-      `服務類型：${serviceType}\n` +
-      `總金額：NT$${currentTotal || '-'}\n\n` +
-      `任務進度會顯示在訂單完成頁，並同步由系統通知。`;
-  }else{
-    el.innerText = '目前沒有進行中的任務。建立訂單後，任務狀態會顯示在這裡。';
+  if(!userId || userId === 'web-order'){
+    el.innerHTML = 'LINE 身分確認中，請稍後再查看任務。';
+    return;
+  }
+
+  el.innerHTML = '正在讀取進行中任務...';
+
+  try{
+    const orders = await loadCustomerOrders();
+
+    const activeStatuses = [
+      'pending_payment',
+      'pending_dispatch',
+      'accepted',
+      'arrived_pickup',
+      'picked_up',
+      'arrived_dropoff'
+    ];
+
+    const activeOrders = orders.filter(order => activeStatuses.includes(order.status));
+
+    renderOrderList(el, activeOrders, '目前沒有進行中的任務。');
+
+  }catch(err){
+    console.error('讀取進行中任務失敗:', err);
+    el.innerHTML = '進行中任務讀取失敗，請稍後再試。';
+  }
+}
+
+async function renderCustomerHistoryTasks(){
+  const el = document.getElementById('historyTaskText');
+  if(!el) return;
+
+  if(!userId || userId === 'web-order'){
+    el.innerHTML = 'LINE 身分確認中，請稍後再查看歷史任務。';
+    return;
+  }
+
+  el.innerHTML = '正在讀取歷史任務...';
+
+  try{
+    const orders = await loadCustomerOrders();
+
+    const historyStatuses = [
+      'completed',
+      'cancelled'
+    ];
+
+    const historyOrders = orders.filter(order => historyStatuses.includes(order.status));
+
+    renderOrderList(el, historyOrders, '目前沒有歷史任務紀錄。');
+
+  }catch(err){
+    console.error('讀取歷史任務失敗:', err);
+    el.innerHTML = '歷史任務讀取失敗，請稍後再試。';
   }
 }
 
