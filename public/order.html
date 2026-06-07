@@ -1688,6 +1688,7 @@ let isSelectingPayment = false;
 let isPaymentMethodSaved = false;
 let isCancellingOrder = false;
 let customerOrderUnsubscribe = null;
+let customerActiveOrdersUnsubscribe = null;
 
 const firebaseConfig = {
   apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
@@ -3040,8 +3041,17 @@ function hideCustomerPages(){
     const el = document.getElementById(id);
     if(el) el.classList.remove('active');
   });
-}
 
+  const activePage = document.getElementById('activeTaskPage');
+  if(activePage && !activePage.classList.contains('active')){
+    if(customerActiveOrdersUnsubscribe){
+      try{
+        customerActiveOrdersUnsubscribe();
+      }catch(e){}
+      customerActiveOrdersUnsubscribe = null;
+    }
+  }
+}
 function setBottomTab(active){
   ['tabHome','tabTasks','tabProfile'].forEach(id => {
     const el = document.getElementById(id);
@@ -3289,36 +3299,69 @@ async function loadCustomerOrders(){
 }
 
 async function renderCustomerActiveTask(){
+  startCustomerActiveOrdersListener();
+}
+
+function startCustomerActiveOrdersListener(){
   const el = document.getElementById('activeTaskText');
   if(!el) return;
+
+  if(!db){
+    el.innerHTML = '系統尚未連線，請稍後再試。';
+    return;
+  }
 
   if(!userId || userId === 'web-order'){
     el.innerHTML = 'LINE 身分確認中，請稍後再查看任務。';
     return;
   }
 
-  el.innerHTML = '正在讀取進行中任務...';
+  if(customerActiveOrdersUnsubscribe){
+    try{
+      customerActiveOrdersUnsubscribe();
+    }catch(e){}
+    customerActiveOrdersUnsubscribe = null;
+  }
 
-  try{
-    const orders = await loadCustomerOrders();
+  el.innerHTML = '正在即時讀取進行中任務...';
 
-    const activeStatuses = [
+  customerActiveOrdersUnsubscribe = db.collection('orders')
+    .where('userId', '==', userId)
+    .where('status', 'in', [
       'pending_payment',
       'pending_dispatch',
       'accepted',
       'arrived_pickup',
       'picked_up',
       'arrived_dropoff'
-    ];
+    ])
+    .limit(30)
+    .onSnapshot(snapshot => {
+      const orders = [];
 
-    const activeOrders = orders.filter(order => activeStatuses.includes(order.status));
+      snapshot.forEach(doc => {
+        orders.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
 
-    renderOrderList(el, activeOrders, '目前沒有進行中的任務。');
+      orders.sort((a, b) => {
+        const getTime = (order) => {
+          const value = order.createdAt || order.updatedAt;
+          if(!value) return 0;
+          if(value.toDate) return value.toDate().getTime();
+          return new Date(value).getTime() || 0;
+        };
 
-  }catch(err){
-    console.error('讀取進行中任務失敗:', err);
-    el.innerHTML = '進行中任務讀取失敗，請稍後再試。';
-  }
+        return getTime(b) - getTime(a);
+      });
+
+      renderOrderList(el, orders, '目前沒有進行中的任務。');
+    }, err => {
+      console.error('即時讀取進行中任務失敗:', err);
+      el.innerHTML = '進行中任務即時讀取失敗，請稍後再試。';
+    });
 }
 
 async function renderCustomerHistoryTasks(){
