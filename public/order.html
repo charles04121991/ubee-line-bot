@@ -313,21 +313,22 @@ body.night-mode{
     }
 
     .trust-strip{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:1px;
-      overflow:hidden;
-      border:1px solid var(--line);
-      border-radius:18px;
-      background:var(--line);
-      margin:18px 0;
-    }
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+  border:none;
+  border-radius:0;
+  background:transparent;
+  margin:22px 0;
+}
 
-    .trust-item{
-      background:var(--card);
-      padding:13px 8px;
-      text-align:center;
-    }
+.trust-item{
+  background:transparent;
+  border:none;
+  padding:6px 2px;
+  text-align:center;
+  pointer-events:none;
+}
 
     .trust-icon{
       font-size:20px;
