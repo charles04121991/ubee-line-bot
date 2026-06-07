@@ -1525,6 +1525,13 @@ body.day-mode .bottom-tabs{
   </div>
   <div class="content-card">
   <div class="content-title">任務紀錄</div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+    <button class="category-choice-item active" type="button" onclick="setHistoryFilter(this, 'all')">全部</button>
+    <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'completed')">已完成</button>
+    <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'cancelled')">已取消</button>
+  </div>
+
   <div class="content-text" id="historyTaskText">正在讀取歷史任務...</div>
 </div>
 </section>
@@ -1689,6 +1696,8 @@ let isPaymentMethodSaved = false;
 let isCancellingOrder = false;
 let customerOrderUnsubscribe = null;
 let customerActiveOrdersUnsubscribe = null;
+let currentHistoryFilter = 'all';
+let cachedHistoryOrders = [];
 
 const firebaseConfig = {
   apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
@@ -3364,6 +3373,36 @@ function startCustomerActiveOrdersListener(){
     });
 }
 
+function setHistoryFilter(el, status){
+  document.querySelectorAll('#historyTaskPage .category-choice-item').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  if(el) el.classList.add('active');
+
+  currentHistoryFilter = status;
+  renderFilteredHistoryTasks();
+}
+
+function renderFilteredHistoryTasks(){
+  const el = document.getElementById('historyTaskText');
+  if(!el) return;
+
+  let list = cachedHistoryOrders;
+
+  if(currentHistoryFilter !== 'all'){
+    list = cachedHistoryOrders.filter(order => order.status === currentHistoryFilter);
+  }
+
+  const emptyText = currentHistoryFilter === 'completed'
+    ? '目前沒有已完成的任務。'
+    : currentHistoryFilter === 'cancelled'
+      ? '目前沒有已取消的任務。'
+      : '目前沒有歷史任務紀錄。';
+
+  renderOrderList(el, list, emptyText);
+}
+
 async function renderCustomerHistoryTasks(){
   const el = document.getElementById('historyTaskText');
   if(!el) return;
@@ -3383,10 +3422,8 @@ async function renderCustomerHistoryTasks(){
       'cancelled'
     ];
 
-    const historyOrders = orders.filter(order => historyStatuses.includes(order.status));
-
-    renderOrderList(el, historyOrders, '目前沒有歷史任務紀錄。');
-
+    cachedHistoryOrders = orders.filter(order => historyStatuses.includes(order.status));
+    renderFilteredHistoryTasks();
   }catch(err){
     console.error('讀取歷史任務失敗:', err);
     el.innerHTML = '歷史任務讀取失敗，請稍後再試。';
