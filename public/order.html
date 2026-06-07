@@ -1780,6 +1780,16 @@ async function selectMerchant(merchantId){
     merchantMode = true;
 
     const pickupInput = document.getElementById('pickup');
+const pickupPhoneInput = document.getElementById('pickupPhone');
+
+if(pickupInput){
+  pickupInput.value = merchant.pickupAddress || merchant.merchantAddress || '';
+}
+
+if(pickupPhoneInput){
+  pickupPhoneInput.value = merchant.phone || merchant.merchantPhone || '';
+}
+    const pickupInput = document.getElementById('pickup');
     const pickupPhoneInput = document.getElementById('pickupPhone');
 
     if(pickupInput){
@@ -2062,11 +2072,12 @@ function getData(){
     userId,
 
     merchantId: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
+    merchantCode: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
     merchantName: currentMerchant ? (currentMerchant.merchantName || '') : '',
-    merchantPhone: currentMerchant ? (currentMerchant.merchantPhone || '') : '',
-    merchantAddress: currentMerchant ? (currentMerchant.merchantAddress || '') : '',
+    merchantPhone: currentMerchant ? (currentMerchant.phone || currentMerchant.merchantPhone || '') : '',
+    merchantAddress: currentMerchant ? (currentMerchant.pickupAddress || currentMerchant.merchantAddress || '') : '',
     hasMerchant: !!currentMerchant
-  };
+   };
 }
 
 function validateStep2(){
