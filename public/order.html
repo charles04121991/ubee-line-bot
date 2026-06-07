@@ -3198,6 +3198,22 @@ function getOrderStatusLabel(status){
   return map[status] || status || '未知狀態';
 }
 
+function getOrderStatusColor(status){
+  const map = {
+    pending_payment:'#facc15',
+    pending_dispatch:'#facc15',
+    accepted:'#38bdf8',
+    arrived_pickup:'#38bdf8',
+    picked_up:'#22c55e',
+    arrived_dropoff:'#22c55e',
+    completed:'#22c55e',
+    cancelled:'#ef4444',
+    quote_only:'#a8a8a8'
+  };
+
+  return map[status] || '#a8a8a8';
+}
+
 function renderOrderList(el, orders, emptyText){
   if(!el) return;
 
@@ -3212,6 +3228,7 @@ function renderOrderList(el, orders, emptyText){
     const total = order.total || order.discountTotal || order.totalFee || '-';
     const service = order.serviceType || 'UBee 任務';
     const status = getOrderStatusLabel(order.status);
+    const statusColor = getOrderStatusColor(order.status);
     const time = formatOrderTime(order.createdAt || order.updatedAt);
 
     return `
@@ -3219,9 +3236,9 @@ function renderOrderList(el, orders, emptyText){
         <div style="font-size:16px;font-weight:1000;color:var(--text);margin-bottom:8px;">
           ${escapeHtml(service)}
         </div>
-        <div style="font-size:13px;font-weight:900;color:var(--accent);margin-bottom:8px;">
-          ${escapeHtml(status)}
-        </div>
+        <div style="font-size:13px;font-weight:1000;color:${statusColor};margin-bottom:8px;">
+        ● ${escapeHtml(status)}
+      </div>
         <div style="font-size:13px;line-height:1.7;color:var(--muted);font-weight:800;">
           訂單編號：${escapeHtml(order.id || '-')}<br>
           建立時間：${escapeHtml(time)}<br>
