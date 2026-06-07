@@ -1780,24 +1780,14 @@ async function selectMerchant(merchantId){
     merchantMode = true;
 
     const pickupInput = document.getElementById('pickup');
-const pickupPhoneInput = document.getElementById('pickupPhone');
-
-if(pickupInput){
-  pickupInput.value = merchant.pickupAddress || merchant.merchantAddress || '';
-}
-
-if(pickupPhoneInput){
-  pickupPhoneInput.value = merchant.phone || merchant.merchantPhone || '';
-}
-    const pickupInput = document.getElementById('pickup');
     const pickupPhoneInput = document.getElementById('pickupPhone');
 
     if(pickupInput){
-      pickupInput.value = merchant.merchantAddress || '';
+      pickupInput.value = merchant.pickupAddress || merchant.merchantAddress || '';
     }
 
     if(pickupPhoneInput){
-      pickupPhoneInput.value = merchant.merchantPhone || '';
+      pickupPhoneInput.value = merchant.phone || merchant.merchantPhone || '';
     }
 
     document.querySelectorAll('#merchantSelectGrid .category-choice-item').forEach(btn => {
