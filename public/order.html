@@ -934,9 +934,224 @@ body.night-mode{
       padding-top:18px;
       margin-top:10px;
     }
+    .app{
+  padding-bottom:120px;
+}
+
+.app-section{
+  display:none;
+  animation:fade .18s ease;
+}
+
+.app-section.active{
+  display:block;
+}
+
+.member-card{
+  border:1px solid rgba(250,204,21,.35);
+  background:linear-gradient(180deg,rgba(250,204,21,.16),var(--card));
+  border-radius:26px;
+  padding:20px;
+  margin:14px 0 18px;
+}
+
+.member-title{
+  font-size:24px;
+  font-weight:1000;
+}
+
+.member-sub{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:800;
+  margin-top:6px;
+  line-height:1.6;
+}
+
+.member-stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-top:16px;
+}
+
+.member-stat{
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:12px 8px;
+  text-align:center;
+}
+
+.member-stat strong{
+  display:block;
+  font-size:20px;
+  color:var(--accent);
+}
+
+.member-stat span{
+  display:block;
+  font-size:11px;
+  color:var(--muted);
+  margin-top:4px;
+  font-weight:900;
+}
+
+.menu-group{
+  margin:18px 0;
+}
+
+.menu-title{
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:12px;
+}
+
+.menu-list{
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:22px;
+  overflow:hidden;
+}
+
+.menu-item{
+  width:100%;
+  border:none;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+  color:var(--text);
+  padding:17px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-family:inherit;
+  font-size:16px;
+  font-weight:1000;
+  text-align:left;
+}
+
+.menu-item:last-child{
+  border-bottom:none;
+}
+
+.menu-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.menu-icon{
+  width:30px;
+  text-align:center;
+  font-size:20px;
+}
+
+.menu-arrow{
+  color:var(--muted);
+}
+
+.sub-page-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:8px 0 18px;
+}
+
+.sub-back{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:var(--card2);
+  color:var(--text);
+  font-size:24px;
+}
+
+.sub-title{
+  font-size:24px;
+  font-weight:1000;
+}
+
+.content-card{
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:22px;
+  padding:18px;
+  margin-bottom:14px;
+}
+
+.content-title{
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:8px;
+}
+
+.content-text{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:800;
+  line-height:1.8;
+}
+
+.rule-list{
+  margin:0;
+  padding-left:20px;
+  color:var(--muted);
+  font-size:14px;
+  font-weight:800;
+  line-height:1.9;
+}
+
+.bottom-tabs{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:calc(10px + env(safe-area-inset-bottom));
+  width:calc(100% - 24px);
+  max-width:500px;
+  z-index:99;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  background:rgba(20,20,20,.94);
+  border:1px solid var(--line);
+  border-radius:24px;
+  padding:8px;
+  backdrop-filter:blur(14px);
+}
+
+body.day-mode .bottom-tabs{
+  background:rgba(255,255,255,.94);
+}
+
+.bottom-tab{
+  border:none;
+  border-radius:18px;
+  padding:10px 4px;
+  background:transparent;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:1000;
+  font-family:inherit;
+}
+
+.bottom-tab.active{
+  background:var(--accent);
+  color:var(--accentText);
+}
+
+.bottom-tab span{
+  display:block;
+  font-size:20px;
+  margin-bottom:3px;
+}
+
+.footer-nav{
+  margin-bottom:78px;
+}
 
     @media(max-width:380px){
-      .app{padding:18px 12px 30px;}
+      .app{padding:18px 12px 120px;}
       .headline{font-size:25px;}
       .brand{font-size:25px;}
       .hero-title{font-size:27px;}
@@ -1216,13 +1431,190 @@ body.night-mode{
       <div id="statusBox" class="status hidden"></div>
     </section>
 
+    <section class="app-section" id="customerTasksPage">
+  <div class="headline">我的任務</div>
+  <div class="subtext">查看目前任務狀態、歷史紀錄與訂單資訊。</div>
+
+  <div class="menu-group">
+    <div class="menu-title">任務管理</div>
+    <div class="menu-list">
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
+        <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
+        <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<section class="app-section" id="customerProfilePage">
+  <div class="member-card">
+    <div class="member-title">UBee 會員</div>
+    <div class="member-sub" id="memberInfoText">LINE 會員｜使用 UBee 建立城市任務</div>
+
+    <div class="member-stats">
+      <div class="member-stat"><strong id="memberTaskCount">0</strong><span>累積任務</span></div>
+      <div class="member-stat"><strong>1</strong><span>可用優惠</span></div>
+      <div class="member-stat"><strong>一般</strong><span>會員等級</span></div>
+    </div>
+  </div>
+
+  <div class="menu-group">
+    <div class="menu-title">我的任務</div>
+    <div class="menu-list">
+      <button class="menu-item" type="button" onclick="showTasksTab()">
+        <div class="menu-left"><div class="menu-icon">📦</div><div>我的任務</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
+        <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
+        <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+    </div>
+  </div>
+
+  <div class="menu-group">
+    <div class="menu-title">會員服務</div>
+    <div class="menu-list">
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('couponPage')">
+        <div class="menu-left"><div class="menu-icon">🎟️</div><div>優惠券</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('addressPage')">
+        <div class="menu-left"><div class="menu-icon">📍</div><div>常用地址</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('supportPage')">
+        <div class="menu-left"><div class="menu-icon">💬</div><div>客服中心</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('cancelRulePage')">
+        <div class="menu-left"><div class="menu-icon">⚠️</div><div>取消規則</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('faqPage')">
+        <div class="menu-left"><div class="menu-icon">❓</div><div>常見問題</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<section class="app-section" id="activeTaskPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">進行中任務</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">目前任務狀態</div>
+    <div class="content-text" id="activeTaskText">目前沒有進行中的任務。建立訂單後，任務狀態會顯示在這裡。</div>
+  </div>
+</section>
+
+<section class="app-section" id="historyTaskPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">歷史任務</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">任務紀錄</div>
+    <div class="content-text">歷史任務功能已建立。下一階段可接 Firestore，顯示完成、取消與付款紀錄。</div>
+  </div>
+</section>
+
+<section class="app-section" id="couponPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">優惠券</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">台中 85 折優惠</div>
+    <div class="content-text">限量優惠活動。建立任務時可於確認訂單頁領取並使用，生活跑腿暫不適用。</div>
+  </div>
+</section>
+
+<section class="app-section" id="addressPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">常用地址</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">尚未新增常用地址</div>
+    <div class="content-text">之後可以加入住家、公司、常用店家地址，讓下單更快。</div>
+  </div>
+</section>
+
+<section class="app-section" id="supportPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">客服中心</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">聯絡 UBee 客服</div>
+    <div class="content-text">如需修改訂單、確認付款、任務異常或合作洽詢，請回到 LINE 官方帳號與客服聯繫。</div>
+  </div>
+</section>
+
+<section class="app-section" id="cancelRulePage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">取消規則</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">訂單取消說明</div>
+    <ul class="rule-list">
+      <li>尚未付款：可直接取消，不收費。</li>
+      <li>付款後尚未接單：可申請取消，依實際狀況處理退款。</li>
+      <li>騎士已接單：可能產生取消費。</li>
+      <li>騎士已抵達或已取件：需依任務進度收取相關費用。</li>
+      <li>內容與現場不符、違禁品或高風險任務，UBee 可取消訂單。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="app-section" id="faqPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">常見問題</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">UBee 可以幫我做什麼？</div>
+    <div class="content-text">可以協助文件急送、物品配送、代取、代買、生活跑腿與商務支援。</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">什麼時候開始派單？</div>
+    <div class="content-text">完成付款並確認後，系統才會開始派單給合作騎士。</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">可以送違禁品或高價現金嗎？</div>
+    <div class="content-text">不可以。違法物品、危險物品、管制物品與高風險現金交付暫不承接。</div>
+  </div>
+</section>
+
     <div class="footer-nav">
       <div class="btn-row">
         <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
         <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
       </div>
     </div>
-
+<div class="bottom-tabs">
+  <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
+    <span>🏠</span>首頁
+  </button>
+  <button id="tabTasks" class="bottom-tab" type="button" onclick="showTasksTab()">
+    <span>📦</span>任務
+  </button>
+  <button id="tabProfile" class="bottom-tab" type="button" onclick="showProfileTab()">
+    <span>👤</span>我的
+  </button>
+</div>
   </div>
 
 <script>
@@ -2626,6 +3018,154 @@ async function initPage(){
       '2. LINE Developers 的 LIFF Endpoint URL 是否為目前這個 order.html 網址\n' +
       '3. Render 的 /api/config 是否有正確回傳 LIFF_ID'
     );
+  }
+}
+
+const customerPages = [
+  'customerTasksPage',
+  'customerProfilePage',
+  'activeTaskPage',
+  'historyTaskPage',
+  'couponPage',
+  'addressPage',
+  'supportPage',
+  'cancelRulePage',
+  'faqPage'
+];
+
+let lastMainCustomerPage = 'customerProfilePage';
+
+function hideCustomerPages(){
+  customerPages.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('active');
+  });
+}
+
+function setBottomTab(active){
+  ['tabHome','tabTasks','tabProfile'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('active');
+  });
+
+  const target = document.getElementById(active);
+  if(target) target.classList.add('active');
+}
+
+function showOrderSteps(){
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('hidden'));
+  const footer = document.querySelector('.footer-nav');
+  const topbar = document.querySelector('.topbar');
+
+  if(footer) footer.classList.remove('hidden');
+  if(topbar) topbar.classList.remove('hidden');
+
+  hideCustomerPages();
+  updateStepUI();
+}
+
+function hideOrderSteps(){
+  document.querySelectorAll('.step').forEach(s => {
+    s.classList.remove('active');
+    s.classList.add('hidden');
+  });
+
+  const footer = document.querySelector('.footer-nav');
+  const topbar = document.querySelector('.topbar');
+
+  if(footer) footer.classList.add('hidden');
+  if(topbar) topbar.classList.remove('hidden');
+}
+
+function showHomeTab(){
+  setBottomTab('tabHome');
+  showOrderSteps();
+}
+
+function showTasksTab(){
+  setBottomTab('tabTasks');
+  hideOrderSteps();
+  hideCustomerPages();
+
+  const page = document.getElementById('customerTasksPage');
+  if(page) page.classList.add('active');
+
+  lastMainCustomerPage = 'customerTasksPage';
+  document.getElementById('pageCount').innerText = '任務';
+  renderCustomerActiveTask();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function showProfileTab(){
+  setBottomTab('tabProfile');
+  hideOrderSteps();
+  hideCustomerPages();
+
+  const page = document.getElementById('customerProfilePage');
+  if(page) page.classList.add('active');
+
+  lastMainCustomerPage = 'customerProfilePage';
+  document.getElementById('pageCount').innerText = '我的';
+  renderCustomerMemberInfo();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function openCustomerSubPage(pageId){
+  hideOrderSteps();
+  hideCustomerPages();
+
+  const page = document.getElementById(pageId);
+  if(page) page.classList.add('active');
+
+  if(pageId === 'activeTaskPage'){
+    renderCustomerActiveTask();
+  }
+
+  document.getElementById('pageCount').innerText = '詳細';
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function closeCustomerSubPage(){
+  hideOrderSteps();
+  hideCustomerPages();
+
+  const page = document.getElementById(lastMainCustomerPage || 'customerProfilePage');
+  if(page) page.classList.add('active');
+
+  document.getElementById('pageCount').innerText =
+    lastMainCustomerPage === 'customerTasksPage' ? '任務' : '我的';
+
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function renderCustomerMemberInfo(){
+  const info = document.getElementById('memberInfoText');
+  const count = document.getElementById('memberTaskCount');
+
+  if(info){
+    info.innerText = userId && userId !== 'web-order'
+      ? 'LINE 會員已確認｜可使用 UBee 城市任務服務'
+      : 'LINE 身分確認中｜請從官方帳號開啟';
+  }
+
+  if(count){
+    count.innerText = currentOrderId ? '1' : '0';
+  }
+}
+
+function renderCustomerActiveTask(){
+  const el = document.getElementById('activeTaskText');
+  if(!el) return;
+
+  if(currentOrderId){
+    el.innerText =
+      `目前有一筆任務進行中。\n\n` +
+      `訂單編號：${currentOrderId}\n` +
+      `服務類型：${serviceType}\n` +
+      `總金額：NT$${currentTotal || '-'}\n\n` +
+      `任務進度會顯示在訂單完成頁，並同步由系統通知。`;
+  }else{
+    el.innerText = '目前沒有進行中的任務。建立訂單後，任務狀態會顯示在這裡。';
   }
 }
 
