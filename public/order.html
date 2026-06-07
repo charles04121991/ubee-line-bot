@@ -3075,6 +3075,8 @@ function showOrderSteps(){
   document.querySelectorAll('.step').forEach(s => s.classList.remove('hidden'));
   const footer = document.querySelector('.footer-nav');
   const topbar = document.querySelector('.topbar');
+  const topBackBtn = document.querySelector('.topbar .icon-btn');
+  if(topBackBtn) topBackBtn.classList.remove('hidden');
 
   if(footer) footer.classList.remove('hidden');
   if(topbar) topbar.classList.remove('hidden');
@@ -3094,6 +3096,8 @@ function hideOrderSteps(){
 
   if(footer) footer.classList.add('hidden');
   if(topbar) topbar.classList.remove('hidden');
+  const topBackBtn = document.querySelector('.topbar .icon-btn');
+  if(topBackBtn) topBackBtn.classList.add('hidden');
 }
 
 function showHomeTab(){
