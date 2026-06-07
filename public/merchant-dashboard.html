@@ -199,7 +199,7 @@ button.blue{
   margin-top:8px;
   line-height:1.6;
 }
-.merchantInfo,.autoInfo{
+.merchantInfo{
   margin-top:10px;
   padding:12px;
   border-radius:16px;
@@ -369,14 +369,6 @@ button.blue{
     
     <div class="section">
       <h2>建立騎士派遣</h2>
-
-      <div class="autoInfo" id="dispatchAutoInfo">
-        店家資料載入中...
-      </div>
-
-      <div class="small">
-        店家名稱、電話、取件地址會自動帶入。店家只需要填客人資料、送達地址、品項內容、代墊金額、配送方式與付款方式。
-      </div>
 
       <div class="formGrid">
         <div>
@@ -708,7 +700,6 @@ function enterMerchantDashboard(merchant){
     <strong>🟢 已審核通過店家</strong>
   `;
 
-  renderDispatchAutoInfo();
   startListenOrders();
 }
 
@@ -807,23 +798,6 @@ function generateMerchantOrderNo(){
   const ss = pad(d.getSeconds());
   const rand = Math.floor(Math.random() * 900 + 100);
   return `UBM${yyyy}${mm}${dd}${hh}${mi}${ss}${rand}`;
-}
-
-function renderDispatchAutoInfo(){
-  const box = document.getElementById("dispatchAutoInfo");
-  if(!box) return;
-
-  if(!currentMerchant){
-    box.innerHTML = "店家資料尚未載入";
-    return;
-  }
-
-  box.innerHTML = `
-    <strong>自動帶入取件資料</strong><br>
-    店家名稱：${escapeHtml(currentMerchant.merchantName || "未設定")}<br>
-    店家電話：${escapeHtml(currentMerchant.merchantPhone || "未設定")}<br>
-    取件地址：${escapeHtml(currentMerchant.merchantAddress || "未設定")}
-  `;
 }
 
 function resetCreateOrderForm(){
@@ -1116,7 +1090,6 @@ function logoutMerchant(){
   document.getElementById("loginBox").classList.remove("hidden");
   document.getElementById("ordersBox").innerHTML = "";
   document.getElementById("merchantInfoBox").innerHTML = "";
-  document.getElementById("dispatchAutoInfo").innerHTML = "店家資料尚未載入";
   document.getElementById("merchantHorizontalProgressBox").innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
 
   forceEnableLoginButton("進入派單中心");
