@@ -1619,33 +1619,70 @@ function updateTaskPathText(){
   el.innerText = `${getServiceGroupLabel(serviceGroup)} ＞ ${serviceType} ＞ ${serviceCategory}`;
 }
   
-function selectService(el, value){
-  setActive('serviceGrid', el, '.service-item');
-  serviceType = value;
-  renderServiceCategories();
-  applyDynamicFields();
-}
-
 function getPlaceKeyword(){
-  if(serviceType === '飲料代買'){
-    if(serviceCategory === '手搖飲') return '手搖飲';
-    if(serviceCategory === '咖啡廳') return '咖啡';
-    if(serviceCategory === '果汁店') return '果汁';
-    if(serviceCategory === '連鎖飲料店') return '飲料店';
-    return '飲料店';
-  }
+  const keywordMap = {
+    '文件急送':'影印店 文件',
+    '物品配送':'便利商店 包裹',
+    '急件配送':'便利商店',
+    '鑰匙急送':'鎖店',
+    '票券文件':'便利商店',
+    '禮品配送':'花店 禮品',
+    '商務配送':'公司 商辦',
+    '指定送達':'地點',
+    '忘帶物品':'地點',
 
-  if(serviceType === '餐點代買'){
-    if(serviceCategory === '便當店') return '便當';
-    if(serviceCategory === '小吃店') return '小吃';
-    if(serviceCategory === '早餐店') return '早餐';
-    if(serviceCategory === '簡餐店') return '簡餐';
-    if(serviceCategory === '麵食館') return '麵店';
-    if(serviceCategory === '速食店') return '速食';
-    return '餐廳';
-  }
+    '代取包裹':'便利商店 宅配',
+    '代取文件':'影印店 文件',
+    '公司取件':'公司 商辦',
+    '門市取件':'門市',
+    '醫院取件':'醫院',
+    '學校取件':'學校',
+    '代取鑰匙':'鎖店',
+    '指定取件':'地點',
+    '超商取件':'便利商店',
 
-  return serviceCategory || serviceType || '店家';
+    '餐點代買':'餐廳',
+    '飲料代買':'飲料店',
+    '超商代買':'便利商店',
+    '藥局代買':'藥局',
+    '生活用品':'生活用品',
+    '生鮮採買':'市場 生鮮',
+    '蛋糕甜點':'蛋糕 甜點',
+    '指定商品':'商店',
+    '賣場代買':'賣場 超市',
+
+    '一般排隊':'排隊 店家',
+    '醫院排隊':'醫院',
+    '銀行排隊':'銀行',
+    '餐廳候位':'餐廳',
+    '洗衣送洗':'洗衣店',
+    '洗鞋代送':'洗鞋',
+    '手機貼膜':'手機配件 手機維修',
+    '其他生活需求':'生活服務',
+    '送禮服務':'花店 蛋糕 禮品',
+
+    '文件往返':'公司 商辦',
+    '樣品配送':'公司 商辦',
+    '發票收送':'公司 商辦',
+    '店家補貨':'賣場 超市',
+    '合約簽署':'公司 商辦',
+    '活動物資':'活動用品',
+    '展場支援':'展覽館 活動場地',
+    '公司採購':'文具 辦公用品',
+    '其他商務需求':'公司 商辦',
+
+    '緊急文件':'影印店 文件',
+    '緊急包裹':'便利商店 宅配',
+    '緊急代買':'商店',
+    '緊急送藥':'藥局',
+    '緊急鑰匙':'鎖店',
+    '緊急送件':'便利商店',
+    '限時任務':'店家',
+    '當日件':'店家',
+    '其他急件':'店家'
+  };
+
+  return keywordMap[serviceType] || serviceCategory || serviceType || '店家';
 }
 
 async function loadMerchantsForCategory(){
@@ -1662,9 +1699,9 @@ async function loadMerchantsForCategory(){
   currentMerchant = null;
   merchantMode = false;
 
-  if(serviceGroup !== 'buy' || !serviceType || !serviceCategory){
-    return;
-  }
+  if(!serviceGroup || !serviceType || !serviceCategory){
+  return;
+}
 
   if(!navigator.geolocation){
     box.classList.remove('hidden');
