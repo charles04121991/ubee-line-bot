@@ -817,36 +817,14 @@ function clearCreateOrderMsg(){
 async function initMerchantLiff(){
   hideError();
 
-  const cachedMerchantKey = String(localStorage.getItem(STORAGE_KEY) || "").trim();
-
   if(typeof liff === "undefined"){
-    console.warn("LIFF SDK 未載入，使用一般網頁模式");
-
-    merchantLineUserId = "";
+    showError("LINE LIFF 載入失敗，請從店家合作中心官方帳號重新開啟。");
     forceEnableLoginButton("進入派單中心");
-
-    if(cachedMerchantKey){
-      document.getElementById("merchantKey").value = cachedMerchantKey;
-    }
-
     return;
   }
 
   try{
     await liff.init({liffId:MERCHANT_LIFF_ID});
-
-    if(!liff.isInClient()){
-      console.warn("不是從 LINE App 開啟，使用一般網頁模式");
-
-      merchantLineUserId = "";
-      forceEnableLoginButton("進入派單中心");
-
-      if(cachedMerchantKey){
-        document.getElementById("merchantKey").value = cachedMerchantKey;
-      }
-
-      return;
-    }
 
     if(!liff.isLoggedIn()){
       liff.login();
@@ -862,13 +840,8 @@ async function initMerchantLiff(){
     }
   }catch(err){
     console.error("店家 LIFF 初始化失敗:", err);
-
-    merchantLineUserId = "";
+    showError("店家登入初始化失敗，請從店家合作中心官方帳號重新開啟。");
     forceEnableLoginButton("進入派單中心");
-
-    if(cachedMerchantKey){
-      document.getElementById("merchantKey").value = cachedMerchantKey;
-    }
   }
 }
 
@@ -1187,22 +1160,33 @@ async function createMerchantOrder(){
   }
 }
 
-  const isBrowserMode = !merchantLineUserId;
+async function loginMerchant(){
+  hideError();
+
+  const input = document.getElementById("merchantKey");
+  const loginBtn = document.getElementById("loginBtn");
+  const phone = normalizePhone(input.value);
+
+  if(!merchantLineUserId){
+    showError("缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟店家派單。");
+    forceEnableLoginButton("進入派單中心");
+    return;
+  }
+
+  if(!/^09\d{8}$/.test(phone)){
+    showError("請輸入申請合作時填寫的手機號碼，例如：0912345678。");
+    forceEnableLoginButton("進入派單中心");
+    return;
+  }
 
   loginBtn.disabled = true;
   loginBtn.textContent = "綁定中...";
 
   try{
-    const apiUrl = isBrowserMode ? "/api/merchant/profile-by-phone" : "/api/merchant/bind";
-
-    const payload = isBrowserMode
-      ? { phone }
-      : { phone, lineUserId:merchantLineUserId };
-
-    const res = await fetch(apiUrl, {
+    const res = await fetch("/api/merchant/bind", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(payload)
+      body:JSON.stringify({phone,lineUserId:merchantLineUserId})
     });
 
     const data = await res.json().catch(() => ({}));
