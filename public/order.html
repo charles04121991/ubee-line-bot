@@ -2586,10 +2586,6 @@ if(!isValidPhone(data.pickupPhone) || !isValidPhone(data.dropoffPhone)){
 }
 
 function validateData(data){
-  if(userId === 'web-order'){
-    alert('⚠️ LINE 身分尚未確認完成，請稍等 1～3 秒後再按一次。');
-    return false;
-  }
 
   if(!validateStep2()) return false;
 
@@ -3018,7 +3014,7 @@ async function initPage(){
   }
 
   try{
-    setSubmitButton('LINE 身分確認中...', true);
+    setSubmitButton('身分確認中...', true);
 
     const configRes = await Promise.race([
       fetch('/api/config', { cache:'no-store' }),
@@ -3028,15 +3024,10 @@ async function initPage(){
     const cfg = await configRes.json();
     liffId = cfg.liffId || '';
 
-    if(!window.liff){
-      setSubmitButton('LIFF 載入失敗', true);
-      alert('❌ LIFF SDK 沒有載入，請關閉頁面後重新從 LINE 官方帳號開啟。');
-      return;
-    }
-
-    if(!liffId){
-      setSubmitButton('LIFF_ID 未設定', true);
-      alert('❌ Render 沒有設定 LIFF_ID，請確認環境變數。');
+    if(!window.liff || !liffId){
+      console.warn('目前使用一般網頁模式，不啟用 LIFF');
+      userId = 'web-order-' + Date.now();
+      setSubmitButton('確認並建立任務', false);
       return;
     }
 
@@ -3044,6 +3035,13 @@ async function initPage(){
       liff.init({ liffId }),
       timeout(10000, 'LIFF 初始化逾時')
     ]);
+
+    if(!liff.isInClient()){
+      console.warn('不是從 LINE App 開啟，目前使用一般網頁模式');
+      userId = 'web-order-' + Date.now();
+      setSubmitButton('確認並建立任務', false);
+      return;
+    }
 
     if(!liff.isLoggedIn()){
       setSubmitButton('LINE 登入中...', true);
@@ -3056,28 +3054,14 @@ async function initPage(){
       timeout(10000, '取得 LINE 使用者資料逾時')
     ]);
 
-    userId = profile.userId;
-
-    if(!userId || userId === 'web-order'){
-      setSubmitButton('LINE 身分取得失敗', true);
-      alert('❌ 尚未取得 LINE userId，請關閉頁面後重新從官方帳號點「立即下單」。');
-      return;
-    }
+    userId = profile.userId || ('web-order-' + Date.now());
 
     setSubmitButton('確認並建立任務', false);
 
   }catch(err){
-    console.log('❌ LIFF init 錯誤', err);
-    setSubmitButton('LINE 身分確認失敗', true);
-
-    alert(
-      '❌ LINE 身分確認失敗\n\n' +
-      '原因：' + (err.message || err) + '\n\n' +
-      '請確認：\n' +
-      '1. 是否從 LINE 官方帳號點「立即下單」進入\n' +
-      '2. LINE Developers 的 LIFF Endpoint URL 是否為目前這個 order.html 網址\n' +
-      '3. Render 的 /api/config 是否有正確回傳 LIFF_ID'
-    );
+    console.warn('LIFF 初始化失敗，改用一般網頁模式:', err);
+    userId = 'web-order-' + Date.now();
+    setSubmitButton('確認並建立任務', false);
   }
 }
 
