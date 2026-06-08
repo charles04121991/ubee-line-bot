@@ -487,6 +487,15 @@ a.linkBtn{
 
         <label>代墊金額</label>
         <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
+        
+        <label>多點選擇</label>
+        <select id="newStopCount">
+        <option value="1">單點配送</option>
+        <option value="2">1～2 個位置</option>
+        <option value="3">2～3 個位置</option>
+        <option value="4">3～4 個位置</option>
+   </select>
+        <div class="small">多點配送會依照位置數量自動加價，每多 1 個位置加 NT$20。</div>
 
         <label>配送方式 *</label>
         <select id="newDeliveryMode">
@@ -663,19 +672,28 @@ function applyDefaultPaymentMethod(){
   alert("已套用預設付款方式。");
 }
 
-function calculateMerchantDeliveryFee(distanceKm){
+function calculateMerchantDeliveryFee(distanceKm, stopCount = 1){
   const km = Number(distanceKm);
+  const stops = Math.max(1, Number(stopCount || 1));
+
   if(!Number.isFinite(km) || km <= 0) throw new Error("距離結果異常");
-  if(km <= 5) return 70;
-  if(km <= 7) return 80;
-  if(km <= 9) return 90;
-  if(km <= 10) return 110;
-  if(km <= 12) return 130;
-  if(km <= 14) return 150;
-  if(km <= 16) return 170;
-  if(km <= 18) return 200;
-  if(km <= 20) return 220;
-  return 220;
+
+  let baseFee = 70;
+
+  if(km <= 5) baseFee = 70;
+  else if(km <= 7) baseFee = 80;
+  else if(km <= 9) baseFee = 90;
+  else if(km <= 10) baseFee = 110;
+  else if(km <= 12) baseFee = 130;
+  else if(km <= 14) baseFee = 150;
+  else if(km <= 16) baseFee = 170;
+  else if(km <= 18) baseFee = 200;
+  else if(km <= 20) baseFee = 220;
+  else baseFee = 220;
+
+  const extraStopFee = Math.max(0, stops - 1) * 20;
+
+  return baseFee + extraStopFee;
 }
 
 function parseDistanceKm(distanceText){
@@ -944,6 +962,7 @@ function resetCreateOrderForm(){
   document.getElementById("newDropoffAddress").value = "";
   document.getElementById("newItemName").value = "";
   document.getElementById("newAdvanceAmount").value = "0";
+  document.getElementById("newStopCount").value = "1";
   document.getElementById("newDeliveryMode").value = "ubee";
   document.getElementById("newPaymentMethod").value = "merchant_settlement";
   document.getElementById("newNote").value = "";
@@ -964,6 +983,7 @@ async function createMerchantOrder(){
   const dropoffAddress = document.getElementById("newDropoffAddress").value.trim();
   const itemName = document.getElementById("newItemName").value.trim();
   const advanceAmount = Math.round(Number(document.getElementById("newAdvanceAmount").value || 0));
+  const stopCount = Number(document.getElementById("newStopCount")?.value || 1);
   const deliveryMode = document.getElementById("newDeliveryMode").value || "ubee";
   const paymentMethod = document.getElementById("newPaymentMethod").value || "merchant_settlement";
   const note = document.getElementById("newNote").value.trim();
@@ -1052,7 +1072,7 @@ async function createMerchantOrder(){
 
       distanceText = estimateData.distanceText || "";
       distanceKm = parseDistanceKm(distanceText);
-      deliveryFee = calculateMerchantDeliveryFee(distanceKm);
+      deliveryFee = calculateMerchantDeliveryFee(distanceKm, stopCount);
     }catch(err){
       console.error("店家配送距離計算失敗:", err);
       showCreateOrderMsg("err", "距離計算失敗，請確認送達地址是否完整，或稍後再試。");
@@ -1094,6 +1114,8 @@ async function createMerchantOrder(){
       merchantNote:note,
       advanceAmount,
       merchantServiceFee:deliveryFee,
+      stopCount,
+      extraStopFee:Math.max(0, stopCount - 1) * 20,
       distanceKm,
       distanceText,
       totalFee:deliveryFee,
