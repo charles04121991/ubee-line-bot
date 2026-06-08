@@ -1401,6 +1401,11 @@ body.day-mode .bottom-tabs{
       </button>
     </div>
   </div>
+  
+    <div class="menu-group">
+    <div class="menu-title">最近任務</div>
+    <div id="recentTaskList" class="content-text">正在讀取最近任務...</div>
+  </div>
 </section>
 
 <section class="app-section" id="customerProfilePage">
@@ -2955,6 +2960,7 @@ function showTasksTab(){
   lastMainCustomerPage = 'customerTasksPage';
   document.getElementById('pageCount').innerText = '任務';
   renderCustomerActiveTask();
+  renderRecentTasks();
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
@@ -3153,6 +3159,33 @@ async function loadCustomerOrders(){
   });
 
   return orders;
+}
+
+async function renderRecentTasks(){
+  const el = document.getElementById('recentTaskList');
+  if(!el) return;
+
+  if(!db){
+    el.innerHTML = '系統尚未連線，請稍後再試。';
+    return;
+  }
+
+  if(!userId || userId === 'web-order'){
+    el.innerHTML = 'LINE 身分確認中，請稍後再查看最近任務。';
+    return;
+  }
+
+  el.innerHTML = '正在讀取最近任務...';
+
+  try{
+    const orders = await loadCustomerOrders();
+    const recentOrders = orders.slice(0, 3);
+
+    renderOrderList(el, recentOrders, '目前還沒有最近任務。');
+  }catch(err){
+    console.error('讀取最近任務失敗:', err);
+    el.innerHTML = '最近任務讀取失敗，請稍後再試。';
+  }
 }
 
 async function renderCustomerActiveTask(){
