@@ -1416,7 +1416,7 @@ body.day-mode .bottom-tabs{
     <div class="member-stats">
       <div class="member-stat"><strong id="memberTaskCount">0</strong><span>累積任務</span></div>
       <div class="member-stat"><strong>0</strong><span>可用優惠</span></div>
-      <div class="member-stat"><strong>一般</strong><span>會員等級</span></div>
+      <div class="member-stat"><strong id="memberLevelText">一般</strong><span>會員等級</span></div>
     </div>
   </div>
 
@@ -3027,6 +3027,22 @@ function renderCustomerMemberInfo(){
 
   if(count){
     count.innerText = currentOrderId ? '1' : '0';
+  }
+    const level = document.getElementById('memberLevelText');
+
+  const taskCount = Number(count?.innerText || 0);
+  let levelText = '一般';
+
+  if(taskCount >= 30){
+    levelText = '鑽石';
+  }else if(taskCount >= 15){
+    levelText = '金卡';
+  }else if(taskCount >= 5){
+    levelText = '銀卡';
+  }
+
+  if(level){
+    level.innerText = levelText;
   }
 }
 
