@@ -2391,13 +2391,13 @@ function showStatus(text){
 }
 
 const customerProgressSteps = [
-  { status:'pending_dispatch', text:'等待接單' },
-  { status:'accepted', text:'騎士接單' },
-  { status:'arrived_pickup', text:'前往取件' },
+  { status:'pending_dispatch', text:'等待騎士接單' },
+  { status:'accepted', text:'騎士已接單' },
+  { status:'arrived_pickup', text:'抵達取件地' },
   { status:'picked_up', text:'配送中' },
+  { status:'arrived_dropoff', text:'抵達送達地' },
   { status:'completed', text:'已送達' }
 ];
-
 function renderCustomerProgress(status){
   const box = document.getElementById('customerProgressBox');
   if(!box) return;
