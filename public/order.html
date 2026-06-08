@@ -1554,44 +1554,45 @@ body.day-mode .bottom-tabs{
   </div>
 
   <div class="content-card">
-
-    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">
-      🏠 住家
+    <div class="content-title">常用地址</div>
+    <div class="content-text" style="margin-bottom:14px;">
+      可先填寫住家、公司或常用地址，下單時可以複製使用。
     </div>
 
-    <div style="color:var(--muted);margin-bottom:18px;">
-      <div id="homeAddressText" style="color:var(--muted);margin-bottom:18px;">
-  尚未設定住家地址
-</div>
+    <div class="form-section">
+      <div class="form-title">住家地址</div>
+      <div class="input-card">
+        <div class="input-wrap">
+          <input id="homeAddressInput" maxlength="120" placeholder="請輸入住家地址">
+        </div>
+      </div>
     </div>
 
-    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">
-      🏢 公司
+    <div class="form-section">
+      <div class="form-title">公司地址</div>
+      <div class="input-card">
+        <div class="input-wrap">
+          <input id="companyAddressInput" maxlength="120" placeholder="請輸入公司地址">
+        </div>
+      </div>
     </div>
 
-    <div style="color:var(--muted);margin-bottom:18px;">
-<div id="companyAddressText" style="color:var(--muted);margin-bottom:18px;">
-  尚未設定公司地址
-</div>
+    <div class="form-section">
+      <div class="form-title">其他常用地址</div>
+      <div class="input-card">
+        <div class="input-wrap">
+          <input id="favoriteAddressInput" maxlength="120" placeholder="請輸入常用地址">
+        </div>
+      </div>
     </div>
 
-    <div style="font-size:16px;font-weight:700;margin-bottom:14px;">
-      ⭐ 常用地址
-    </div>
-
-    <div style="color:var(--muted);margin-bottom:24px;">
-      <div id="favoriteAddressText" style="color:var(--muted);margin-bottom:24px;">
-  尚未新增常用地址
-</div>
-    </div>
-
-    <button
-      type="button"
-      class="btn btn-primary"
-      onclick="alert('地址功能開發中')"
-      ＋ 新增地址
+    <button type="button" class="btn btn-primary" onclick="saveCustomerAddresses()">
+      儲存常用地址
     </button>
 
+    <button type="button" class="btn btn-secondary" style="margin-top:12px;" onclick="fillAddressToOrder()">
+      帶入住家地址到下單頁
+    </button>
   </div>
 </section>
 
@@ -3187,6 +3188,9 @@ if(pageId === 'historyTaskPage'){
 if(pageId === 'addressPage'){
   renderLocalAddresses();
 }
+if(pageId === 'historyTaskPage'){
+  renderCustomerHistoryTasks();
+}
   document.getElementById('pageCount').innerText = '詳細';
   window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -3533,6 +3537,52 @@ function renderLocalAddresses(){
   if(favoriteEl){
     favoriteEl.innerText = saved.favorite || '尚未新增常用地址';
   }
+}
+
+function saveCustomerAddresses(){
+  const data = {
+    home: document.getElementById('homeAddressInput')?.value.trim() || '',
+    company: document.getElementById('companyAddressInput')?.value.trim() || '',
+    favorite: document.getElementById('favoriteAddressInput')?.value.trim() || ''
+  };
+
+  localStorage.setItem('ubee_customer_addresses', JSON.stringify(data));
+  alert('常用地址已儲存');
+}
+
+function loadCustomerAddresses(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
+
+    if(document.getElementById('homeAddressInput')){
+      document.getElementById('homeAddressInput').value = saved.home || '';
+    }
+
+    if(document.getElementById('companyAddressInput')){
+      document.getElementById('companyAddressInput').value = saved.company || '';
+    }
+
+    if(document.getElementById('favoriteAddressInput')){
+      document.getElementById('favoriteAddressInput').value = saved.favorite || '';
+    }
+  }catch(e){}
+}
+
+function fillAddressToOrder(){
+  const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
+
+  if(!saved.home){
+    alert('尚未設定住家地址');
+    return;
+  }
+
+  const dropoffInput = document.getElementById('dropoff');
+  if(dropoffInput){
+    dropoffInput.value = saved.home;
+  }
+
+  alert('已帶入住家地址到送達地址');
+  showHomeTab();
 }
 
 renderServiceGrid('send');
