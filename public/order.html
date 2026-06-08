@@ -1644,11 +1644,15 @@ body.day-mode .bottom-tabs{
 </section>
 
     <div class="footer-nav">
-      <div class="btn-row">
-        <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
-        <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
-      </div>
-    </div>
+  <button id="footerCancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:12px;">
+    取消訂單
+  </button>
+
+  <div class="btn-row">
+    <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
+    <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
+  </div>
+</div>
 <div class="bottom-tabs">
   <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
     <span>🏠</span>首頁
@@ -1896,6 +1900,10 @@ function updateStepUI(){
 
   document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
   document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
+  const footerCancelBtn = document.getElementById('footerCancelOrderBtn');
+if(footerCancelBtn){
+  footerCancelBtn.classList.toggle('hidden', !(currentStep === 5 && currentOrderId));
+}
 
   if(currentStep === 2){
   updateTaskPathText();
@@ -2821,6 +2829,10 @@ if(lastEstimate && taichung85Coupon.claimed){
     btn.classList.add('hidden');
     document.getElementById('cashBtn').classList.remove('hidden');
     document.getElementById('jkoBtn').classList.remove('hidden');
+    const footerCancelBtn = document.getElementById('footerCancelOrderBtn');
+if(footerCancelBtn){
+  footerCancelBtn.classList.remove('hidden');
+}
 
     showStatus(
   `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請選擇付款方式，完成付款後按「我已付款」。`
