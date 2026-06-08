@@ -1560,7 +1560,9 @@ body.day-mode .bottom-tabs{
     </div>
 
     <div style="color:var(--muted);margin-bottom:18px;">
-      尚未設定住家地址
+      <div id="homeAddressText" style="color:var(--muted);margin-bottom:18px;">
+  尚未設定住家地址
+</div>
     </div>
 
     <div style="font-size:16px;font-weight:700;margin-bottom:14px;">
@@ -1568,7 +1570,9 @@ body.day-mode .bottom-tabs{
     </div>
 
     <div style="color:var(--muted);margin-bottom:18px;">
-      尚未設定公司地址
+<div id="companyAddressText" style="color:var(--muted);margin-bottom:18px;">
+  尚未設定公司地址
+</div>
     </div>
 
     <div style="font-size:16px;font-weight:700;margin-bottom:14px;">
@@ -1576,7 +1580,9 @@ body.day-mode .bottom-tabs{
     </div>
 
     <div style="color:var(--muted);margin-bottom:24px;">
-      尚未新增常用地址
+      <div id="favoriteAddressText" style="color:var(--muted);margin-bottom:24px;">
+  尚未新增常用地址
+</div>
     </div>
 
     <button
@@ -3178,7 +3184,9 @@ function openCustomerSubPage(pageId){
 if(pageId === 'historyTaskPage'){
   renderCustomerHistoryTasks();
 }
-
+if(pageId === 'addressPage'){
+  renderLocalAddresses();
+}
   document.getElementById('pageCount').innerText = '詳細';
   window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -3462,6 +3470,68 @@ async function renderCustomerHistoryTasks(){
   }catch(err){
     console.error('讀取歷史任務失敗:', err);
     el.innerHTML = '歷史任務讀取失敗，請稍後再試。';
+  }
+}
+
+function addLocalAddress(){
+  const type = prompt('請選擇地址類型：住家、公司、常用');
+
+  if(!type){
+    return;
+  }
+
+  const allowedTypes = ['住家','公司','常用'];
+
+  if(!allowedTypes.includes(type)){
+    alert('請輸入住家、公司或常用');
+    return;
+  }
+
+  const address = prompt(`請輸入${type}地址`);
+
+  if(!address || address.trim().length < 6){
+    alert('請輸入完整地址');
+    return;
+  }
+
+  const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
+
+  if(type === '住家'){
+    saved.home = address.trim();
+  }
+
+  if(type === '公司'){
+    saved.company = address.trim();
+  }
+
+  if(type === '常用'){
+    saved.favorite = address.trim();
+  }
+
+  localStorage.setItem('ubee_customer_addresses', JSON.stringify(saved));
+
+  renderLocalAddresses();
+
+  alert('地址已儲存');
+}
+
+function renderLocalAddresses(){
+  const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
+
+  const homeEl = document.getElementById('homeAddressText');
+  const companyEl = document.getElementById('companyAddressText');
+  const favoriteEl = document.getElementById('favoriteAddressText');
+
+  if(homeEl){
+    homeEl.innerText = saved.home || '尚未設定住家地址';
+  }
+
+  if(companyEl){
+    companyEl.innerText = saved.company || '尚未設定公司地址';
+  }
+
+  if(favoriteEl){
+    favoriteEl.innerText = saved.favorite || '尚未新增常用地址';
   }
 }
 
