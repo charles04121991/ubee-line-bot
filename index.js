@@ -59,8 +59,6 @@ const client = new line.Client(config);
 const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
-const CAMPAIGN_ID = 'taichung85_2026';
-
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
@@ -4255,129 +4253,6 @@ async function handleEvent(event) {
   }
 }
 
-// ===============================
-// 台中 85 折優惠 API
-// ===============================
-app.get('/api/coupon/taichung85', async (req, res) => {
-  try {
-    const snap = await db
-      .collection('couponCampaigns')
-      .doc(CAMPAIGN_ID)
-      .get();
-
-    if (!snap.exists) {
-      return res.status(404).json({
-        ok: false,
-        message: '優惠活動不存在'
-      });
-    }
-
-    const data = snap.data();
-
-    return res.json({
-      ok: true,
-      active: data.active,
-      title: data.title,
-      discountRate: data.discountRate,
-      limit: data.limit,
-      used: data.used,
-      remaining: Math.max((data.limit || 0) - (data.used || 0), 0),
-      endDate: data.endDate,
-      code: data.code
-    });
-  } catch (err) {
-    console.error('讀取優惠失敗:', err);
-    return res.status(500).json({
-      ok: false,
-      message: '讀取優惠失敗'
-    });
-  }
-});
-app.post('/api/coupon/taichung85/claim', async (req, res) => {
-  try {
-    const { lineUserId } = req.body || {};
-
-    if (!lineUserId) {
-      return res.status(400).json({
-        ok: false,
-        message: '缺少 LINE 使用者 ID'
-      });
-    }
-
-    const campaignRef = db.collection('couponCampaigns').doc(CAMPAIGN_ID);
-    const claimRef = campaignRef.collection('claims').doc(lineUserId);
-
-    const result = await db.runTransaction(async (tx) => {
-      const campaignSnap = await tx.get(campaignRef);
-      const claimSnap = await tx.get(claimRef);
-
-      if (!campaignSnap.exists) {
-        return {
-          ok: false,
-          message: '優惠活動不存在'
-        };
-      }
-
-      const campaign = campaignSnap.data();
-      const limit = campaign.limit || 500;
-      const used = campaign.used || 0;
-
-      if (!campaign.active) {
-        return {
-          ok: false,
-          message: '優惠活動尚未開放'
-        };
-      }
-
-      if (used >= limit) {
-        return {
-          ok: false,
-          soldOut: true,
-          remaining: 0,
-          message: '85 折優惠名額已額滿'
-        };
-      }
-
-      if (claimSnap.exists) {
-        return {
-          ok: true,
-          alreadyClaimed: true,
-          discountRate: campaign.discountRate || 0.85,
-          remaining: Math.max(limit - used, 0),
-          message: '你已經領取過 85 折優惠'
-        };
-      }
-
-      tx.set(claimRef, {
-        lineUserId,
-        code: campaign.code || 'TAICHUNG85',
-        discountRate: campaign.discountRate || 0.85,
-        claimedAt: admin.firestore.FieldValue.serverTimestamp(),
-        used: false
-      });
-
-      tx.update(campaignRef, {
-        used: admin.firestore.FieldValue.increment(1)
-      });
-
-      return {
-        ok: true,
-        alreadyClaimed: false,
-        discountRate: campaign.discountRate || 0.85,
-        remaining: Math.max(limit - used - 1, 0),
-        message: '85 折優惠領取成功'
-      };
-    });
-
-    return res.json(result);
-  } catch (err) {
-    console.error('領取優惠失敗:', err);
-    return res.status(500).json({
-      ok: false,
-      message: '領取優惠失敗'
-    });
-  }
-});
 app.listen(PORT, () => {
   console.log(`UBee OMS is running on port ${PORT}`);
 });
