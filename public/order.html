@@ -590,45 +590,6 @@ body.night-mode{
       padding:16px;
       margin:16px 0;
     }
-    
-    .coupon-box{
-  border:1px solid rgba(250,204,21,.45);
-  background:linear-gradient(180deg,rgba(250,204,21,.16),var(--card));
-  border-radius:20px;
-  padding:16px;
-  margin:16px 0;
-}
-
-.coupon-title{
-  color:var(--accent);
-  font-size:18px;
-  font-weight:1000;
-  margin-bottom:6px;
-}
-
-.coupon-text{
-  color:var(--muted);
-  font-size:14px;
-  line-height:1.7;
-  font-weight:800;
-  margin-bottom:12px;
-}
-
-.coupon-btn{
-  width:100%;
-  border:none;
-  border-radius:16px;
-  padding:14px;
-  background:var(--accent);
-  color:var(--accentText);
-  font-size:16px;
-  font-weight:1000;
-  font-family:inherit;
-}
-
-.coupon-btn:disabled{
-  opacity:.45;
-}
 
     .price-row{
       display:flex;
@@ -1378,14 +1339,6 @@ body.day-mode .bottom-tabs{
 
       <div class="summary-card" id="confirmSummary"></div>
 
-<div id="couponBox" class="coupon-box">
-  <div class="coupon-title">台中 85 折優惠</div>
-  <div id="couponText" class="coupon-text">正在讀取優惠名額...</div>
-  <button id="claimCouponBtn" class="coupon-btn" type="button" onclick="claimTaichung85Coupon()">
-    領取 85 折優惠
-  </button>
-</div>
-
       <div id="pricePreview" class="price-box hidden"></div>
 
       <div class="notice">
@@ -1457,7 +1410,7 @@ body.day-mode .bottom-tabs{
 
     <div class="member-stats">
       <div class="member-stat"><strong id="memberTaskCount">0</strong><span>累積任務</span></div>
-      <div class="member-stat"><strong>1</strong><span>可用優惠</span></div>
+      <div class="member-stat"><strong>0</strong><span>可用優惠</span></div>
       <div class="member-stat"><strong>一般</strong><span>會員等級</span></div>
     </div>
   </div>
@@ -1542,9 +1495,9 @@ body.day-mode .bottom-tabs{
     <div class="sub-title">優惠券</div>
   </div>
   <div class="content-card">
-    <div class="content-title">台中 85 折優惠</div>
-    <div class="content-text">限量優惠活動。建立任務時可於確認訂單頁領取並使用，生活跑腿暫不適用。</div>
-  </div>
+  <div class="content-title">目前沒有可用優惠</div>
+  <div class="content-text">後續若有優惠活動，會顯示在這裡。</div>
+</div>
 </section>
 
 <section class="app-section" id="addressPage">
@@ -1724,12 +1677,6 @@ let lastEstimate = null;
 let merchantMode = false;
 let currentMerchant = null;
 let merchantSearchToken = 0;
-
-let taichung85Coupon = {
-  claimed: false,
-  discountRate: 1,
-  remaining: 0
-};
 
 let isSubmittingOrder = false;
 let isConfirmingPaid = false;
@@ -1911,7 +1858,6 @@ if(footerCancelBtn){
   
   if(currentStep === 4){
   renderConfirmSummary();
-  loadTaichung85Coupon();
 }
 
   window.scrollTo({ top:0, behavior:'smooth' });
@@ -2289,101 +2235,6 @@ function selectSpeed(el, value){
   speedType = value;
 }
 
-async function loadTaichung85Coupon(){
-  try{
-    const res = await fetch('/api/coupon/taichung85', { cache:'no-store' });
-    const data = await res.json();
-
-    const text = document.getElementById('couponText');
-    const btn = document.getElementById('claimCouponBtn');
-
-    if(!text || !btn) return;
-
-    if(!data.ok || !data.active){
-      text.innerText = '目前沒有可領取的優惠。';
-      btn.disabled = true;
-      return;
-    }
-
-    if(data.remaining <= 0){
-      text.innerText = '85 折優惠名額已額滿。';
-      btn.disabled = true;
-      return;
-    }
-
-    taichung85Coupon.remaining = data.remaining;
-    taichung85Coupon.discountRate = data.discountRate || 0.85;
-
-    text.innerText = `限量 500 名，目前剩餘 ${data.remaining} 名，活動只到 ${data.endDate}。`;
-    btn.disabled = false;
-
-  }catch(err){
-    console.error('讀取優惠失敗:', err);
-    const text = document.getElementById('couponText');
-    if(text) text.innerText = '優惠讀取失敗，請稍後再試。';
-  }
-}
-
-async function claimTaichung85Coupon(){
-  try{
-    const btn = document.getElementById('claimCouponBtn');
-    btn.disabled = true;
-    btn.innerText = '領取中...';
-
-if(serviceGroup === 'life'){
-  alert('生活跑腿暫不適用 85 折優惠，系統將依任務內容評估報價。');
-  btn.disabled = false;
-  btn.innerText = '領取 85 折優惠';
-  return;
-}
-
-    if(!userId || userId === 'web-order'){
-      alert('LINE 身分尚未確認完成，請稍後再試。');
-      btn.disabled = false;
-      btn.innerText = '領取 85 折優惠';
-      return;
-    }
-
-    const res = await fetch('/api/coupon/taichung85/claim', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ lineUserId:userId })
-    });
-
-    const data = await res.json();
-
-    if(!data.ok){
-      alert(data.message || '優惠領取失敗');
-      btn.innerText = '領取 85 折優惠';
-      btn.disabled = !!data.soldOut;
-      await loadTaichung85Coupon();
-      return;
-    }
-
-    taichung85Coupon.claimed = true;
-    taichung85Coupon.discountRate = data.discountRate || 0.85;
-    taichung85Coupon.remaining = data.remaining || 0;
-
-    document.getElementById('couponText').innerText =
-      `已領取 85 折優惠，本次訂單可使用。剩餘 ${taichung85Coupon.remaining} 名。`;
-
-    btn.innerText = '已領取 85 折優惠';
-    btn.disabled = true;
-
-    renderConfirmSummary();
-
-  }catch(err){
-    console.error('領取優惠失敗:', err);
-    alert('優惠領取失敗，請稍後再試。');
-
-    const btn = document.getElementById('claimCouponBtn');
-    if(btn){
-      btn.disabled = false;
-      btn.innerText = '領取 85 折優惠';
-    }
-  }
-}
-
 function showStatus(text){
   const box = document.getElementById('statusBox');
   box.classList.remove('hidden');
@@ -2660,25 +2511,14 @@ function renderConfirmSummary(){
   `;
 
   if(lastEstimate){
-  const originalTotal = Number(lastEstimate.totalFee || 0);
-  const finalTotal = taichung85Coupon.claimed
-    ? Math.round(originalTotal * taichung85Coupon.discountRate)
-    : originalTotal;
-
   document.getElementById('pricePreview').classList.remove('hidden');
 
-  document.getElementById('pricePreview').innerHTML = taichung85Coupon.claimed
-    ? `
-      <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
-      <div class="price-row"><span>原價</span><strong><s>NT$${originalTotal}</s></strong></div>
-      <div class="price-row"><span>85 折優惠價</span><strong>NT$${finalTotal}</strong></div>
-    `
-    : `
-      <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
-      <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
-      <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>    `;
+document.getElementById('pricePreview').innerHTML = `
+  <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
+  <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
+  <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+  <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
+`;
 }
 }
 
@@ -2693,39 +2533,22 @@ function getSpeedLabel(value){
 }
 
 function renderSummary(order){
-  const hasCoupon = taichung85Coupon.claimed && lastEstimate;
-  const advancePayment = getAdvancePayment();
-
-  const originalTotal = hasCoupon
-    ? Number(lastEstimate.totalFee || 0) + advancePayment
-    : '';
-
-  const finalTotal = hasCoupon
-    ? Math.round(originalTotal * taichung85Coupon.discountRate)
-    : (order?.total || currentTotal || '');
-
+  const finalTotal = order?.total || currentTotal || '';
   currentTotal = finalTotal;
 
   const box = document.getElementById('summaryBox');
   box.classList.remove('hidden');
 
-  box.innerHTML = hasCoupon
-    ? `
-      <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
-      <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
-      <div class="price-row"><span>原價</span><strong><s>NT$${originalTotal}</s></strong></div>
-      <div class="price-row"><span>優惠</span><strong>台中 85 折</strong></div>
-      <div class="price-row"><span>應付金額</span><strong>NT$${finalTotal}</strong></div>
-    `
-    : `
-      <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
-      <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
-      <div class="price-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
-      <div class="price-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
-      <div class="price-row"><span>優先處理費</span><strong>NT$${order?.speedFee || 0}</strong></div>
-      <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
-    `;
+  box.innerHTML = `
+    <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
+    <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
+    <div class="price-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
+    <div class="price-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
+    <div class="price-row"><span>優先處理費</span><strong>NT$${order?.speedFee || 0}</strong></div>
+    <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
+  `;
 }
+
 async function calculateEstimate(silent){
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
@@ -2774,24 +2597,6 @@ async function calculateEstimate(silent){
 async function submitOrder(){
   const btn = document.getElementById('createOrderBtn');
   const data = getData();
-
-if(lastEstimate && taichung85Coupon.claimed){
-  const advancePayment = getAdvancePayment();
-  const originalTotal = Number(lastEstimate.totalFee || 0) + advancePayment;
-  const finalTotal = Math.round(originalTotal * taichung85Coupon.discountRate);
-  data.coupon = {
-    campaignId: 'taichung85_2026',
-    code: 'TAICHUNG85',
-    discountRate: taichung85Coupon.discountRate,
-    originalTotal,
-    finalTotal
-  };
-
-  data.discountApplied = true;
-  data.originalTotal = originalTotal;
-  data.discountTotal = finalTotal;
-  data.total = finalTotal;
-}
 
   if(isSubmittingOrder) return;
   if(!validateData(data)) return;
@@ -3287,7 +3092,7 @@ function renderOrderList(el, orders, emptyText){
   el.innerHTML = orders.map(order => {
     const pickup = order.pickup || order.pickupAddress || '-';
     const dropoff = order.dropoff || order.dropoffAddress || '-';
-    const total = order.total || order.discountTotal || order.totalFee || '-';
+    const total = order.total || order.totalFee || '-';
     const service = order.serviceType || 'UBee 任務';
     const status = getOrderStatusLabel(order.status);
     const statusColor = getOrderStatusColor(order.status);
