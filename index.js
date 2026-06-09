@@ -750,12 +750,18 @@ const isCashOrder =
   paymentMethodText.includes('cash') ||
   paymentMethodText.includes('現金');
 
+const settlementStatus = String(order.settlementStatus || 'pending').toLowerCase();
+
 if (isCashOrder) {
   cashCollectedTotal += orderTotal;
   cashDueToPlatform += orderPlatformIncome;
 } else {
-  pendingIncome += income;
-  platformPayToRider += income;
+  if (settlementStatus === 'settled') {
+    settledIncome += income;
+  } else {
+    pendingIncome += income;
+    platformPayToRider += income;
+  }
 }
       
       let completedAtMs = 0;
