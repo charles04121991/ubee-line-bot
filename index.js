@@ -710,6 +710,10 @@ const completedOrders = completedSnap.docs
     let settledIncome = 0;
     let platformIncome = 0;
 
+    let cashCollectedTotal = 0;
+    let cashDueToPlatform = 0;
+    let platformPayToRider = 0;
+    
     completedOrders.forEach(order => {
       totalCompleted += 1;
 
@@ -732,7 +736,27 @@ const orderPlatformIncome = Number(
       totalIncome += income;
 
       platformIncome += orderPlatformIncome;
-      pendingIncome += income;
+
+const paymentMethodText = String(
+  order.paymentMethod ||
+  order.payMethod ||
+  order.paymentType ||
+  order.payment ||
+  order.payType ||
+  ''
+).toLowerCase();
+
+const isCashOrder =
+  paymentMethodText.includes('cash') ||
+  paymentMethodText.includes('現金');
+
+if (isCashOrder) {
+  cashCollectedTotal += orderTotal;
+  cashDueToPlatform += orderPlatformIncome;
+} else {
+  pendingIncome += income;
+  platformPayToRider += income;
+}
       
       let completedAtMs = 0;
 
@@ -811,6 +835,10 @@ if (completedAtMs >= monthStartMs && completedAtMs < tomorrowStartMs) {
   settledIncome,
 
   platformIncome,
+
+  cashCollectedTotal,
+  cashDueToPlatform,
+  platformPayToRider,
 },
     });
 
