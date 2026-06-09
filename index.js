@@ -704,19 +704,36 @@ const completedOrders = completedSnap.docs
     let totalCompleted = 0;
     let totalIncome = 0;
 
+    let weekIncome = 0;
+    let monthIncome = 0;
+    let pendingIncome = 0;
+    let settledIncome = 0;
+    let platformIncome = 0;
+
     completedOrders.forEach(order => {
       totalCompleted += 1;
 
       const income = Number(
-        order.driverFee ||
-        order.riderFee ||
-        order.fee ||
-        order.price ||
-        0
-      );
+      order.driverFee ||
+      order.riderFee ||
+      order.fee ||
+   0
+ );
 
+const orderTotal = Number(order.total || order.price || 0);
+
+const orderPlatformIncome = Number(
+  order.platformFee ||
+  order.platformIncome ||
+  order.serviceFee ||
+  Math.max(0, orderTotal - income) ||
+  0
+);
       totalIncome += income;
 
+      platformIncome += orderPlatformIncome;
+      pendingIncome += income;
+      
       let completedAtMs = 0;
 
       if (order.completedAt && typeof order.completedAt.toDate === 'function') {
@@ -737,6 +754,29 @@ const completedOrders = completedSnap.docs
         todayCompleted += 1;
         todayIncome += income;
       }
+      const weekStartTaipei = new Date(todayStartTaipei);
+weekStartTaipei.setDate(todayStartTaipei.getDate() - 6);
+
+const monthStartTaipei = new Date(
+  taipeiNow.getFullYear(),
+  taipeiNow.getMonth(),
+  1,
+  0,
+  0,
+  0,
+  0
+);
+
+const weekStartMs = weekStartTaipei.getTime();
+const monthStartMs = monthStartTaipei.getTime();
+
+if (completedAtMs >= weekStartMs && completedAtMs < tomorrowStartMs) {
+  weekIncome += income;
+}
+
+if (completedAtMs >= monthStartMs && completedAtMs < tomorrowStartMs) {
+  monthIncome += income;
+}
     });
 
     return res.json({
@@ -759,11 +799,19 @@ const completedOrders = completedSnap.docs
         currentOrderId: rider.currentOrderId || '',
       },
       summary: {
-        todayCompleted,
-        todayIncome,
-        totalCompleted,
-        totalIncome,
-      },
+  todayCompleted,
+  todayIncome,
+  totalCompleted,
+  totalIncome,
+
+  weekIncome,
+  monthIncome,
+
+  pendingIncome,
+  settledIncome,
+
+  platformIncome,
+},
     });
 
   } catch (err) {
