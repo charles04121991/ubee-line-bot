@@ -3634,6 +3634,8 @@ if (!nextStatuses.includes(status)) {
 
       if (status === 'completed') {
         updateData.completedAt = admin.firestore.FieldValue.serverTimestamp();
+        updateData.settlementStatus = 'pending';
+        updateData.settledAt = null;
       }
 
       transaction.update(orderRef, updateData);
