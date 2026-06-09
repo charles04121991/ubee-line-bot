@@ -859,6 +859,159 @@ if (completedAtMs >= monthStartMs && completedAtMs < tomorrowStartMs) {
   }
 });
 
+app.get('/api/admin/pending-settlements', async (req, res) => {
+  try {
+    const snap = await db.collection('orders')
+      .where('status', '==', 'completed')
+      .where('settlementStatus', '==', 'pending')
+      .limit(100)
+      .get();
+
+    const orders = [];
+    let pendingTotal = 0;
+
+    snap.forEach(doc => {
+      const order = {
+        id: doc.id,
+        ...doc.data()
+      };
+
+      const paymentText = String(
+        order.paymentMethod ||
+        order.payMethod ||
+        order.paymentType ||
+        order.payment ||
+        ''
+      ).toLowerCase();
+
+      const isCashOrder =
+        paymentText.includes('cash') ||
+        paymentText.includes('現金');
+
+      if (isCashOrder) {
+        return;
+      }
+
+      const riderIncome = Number(
+        order.riderFee ||
+        order.driverFee ||
+        order.fee ||
+        0
+      );
+
+      pendingTotal += riderIncome;
+
+      orders.push({
+        id: order.id,
+        orderNo: order.orderNo || order.id,
+        riderId: order.riderId || order.riderLineUserId || order.driverId || '',
+        riderName: order.riderName || order.driverName || '',
+        paymentMethod: order.paymentMethod || order.payMethod || order.paymentType || '',
+        riderFee: riderIncome,
+        completedAt: order.completedAt || null,
+        updatedAt: order.updatedAt || null
+      });
+    });
+
+    orders.sort((a, b) => {
+      const getMs = value => {
+        if (!value) return 0;
+        if (value.toDate) return value.toDate().getTime();
+        if (value.seconds) return value.seconds * 1000;
+        return new Date(value).getTime() || 0;
+      };
+
+      return getMs(b.completedAt || b.updatedAt) - getMs(a.completedAt || a.updatedAt);
+    });
+
+    res.json({
+      success: true,
+      pendingTotal,
+      count: orders.length,
+      orders
+    });
+
+  } catch (err) {
+    console.error('pending settlements error:', err);
+    res.status(500).json({
+      success: false,
+      message: '讀取待結算資料失敗',
+      error: err.message
+    });
+  }
+});
+
+app.post('/api/admin/settle-order', async (req, res) => {
+  try {
+    const { orderId } = req.body || {};
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少 orderId'
+      });
+    }
+
+    const ref = db.collection('orders').doc(orderId);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到訂單'
+      });
+    }
+
+    const order = doc.data() || {};
+
+    if (order.status !== 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: '只有已完成訂單可以結算'
+      });
+    }
+
+    const paymentText = String(
+      order.paymentMethod ||
+      order.payMethod ||
+      order.paymentType ||
+      order.payment ||
+      ''
+    ).toLowerCase();
+
+    const isCashOrder =
+      paymentText.includes('cash') ||
+      paymentText.includes('現金');
+
+    if (isCashOrder) {
+      return res.status(400).json({
+        success: false,
+        message: '現金單不應標記為平台撥款結算，應走待繳平台邏輯'
+      });
+    }
+
+    await ref.update({
+      settlementStatus: 'settled',
+      settledAt: admin.firestore.FieldValue.serverTimestamp(),
+      settledBy: 'admin'
+    });
+
+    res.json({
+      success: true,
+      message: '已完成結算',
+      orderId
+    });
+
+  } catch (err) {
+    console.error('settle order error:', err);
+    res.status(500).json({
+      success: false,
+      message: '完成結算失敗',
+      error: err.message
+    });
+  }
+});
+
 // 4. 騎士完成訂單列表：正式版只允許 approved 騎士查看
 app.get('/api/rider/completed-orders', async (req, res) => {
   try {
