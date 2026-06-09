@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UBee｜財務結算中心</title>
+<style>
+body{
+  margin:0;
+  background:#050505;
+  color:#fff;
+  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;
+}
+.app{
+  max-width:520px;
+  margin:0 auto;
+  padding:22px 16px 80px;
+}
+.title{
+  font-size:28px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+.sub{
+  color:#aaa;
+  font-size:14px;
+  font-weight:800;
+  margin-bottom:20px;
+}
+.stat{
+  background:#111;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:22px;
+  padding:18px;
+  margin-bottom:16px;
+}
+.stat-label{
+  color:#aaa;
+  font-size:14px;
+  font-weight:900;
+}
+.stat-value{
+  font-size:34px;
+  font-weight:1000;
+  color:#facc15;
+  margin-top:8px;
+}
+.card{
+  background:#111;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:22px;
+  padding:16px;
+  margin-bottom:14px;
+}
+.row{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  font-size:15px;
+}
+.row:last-child{
+  border-bottom:none;
+}
+.label{
+  color:#aaa;
+  font-weight:800;
+}
+.value{
+  font-weight:1000;
+  text-align:right;
+}
+.fee{
+  color:#22c55e;
+  font-size:24px;
+  font-weight:1000;
+}
+.btn{
+  width:100%;
+  border:0;
+  border-radius:16px;
+  padding:15px;
+  margin-top:14px;
+  background:#facc15;
+  color:#111;
+  font-size:17px;
+  font-weight:1000;
+}
+.btn:disabled{
+  opacity:.45;
+}
+.empty{
+  text-align:center;
+  color:#aaa;
+  padding:30px 10px;
+  font-weight:800;
+  line-height:1.7;
+}
+.top-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:16px;
+}
+.btn-dark{
+  background:#222;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.14);
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+  <div class="title">UBee 財務結算中心</div>
+  <div class="sub">管理街口支付、平台收款與店家月結的騎士待撥款。</div>
+
+  <div class="top-actions">
+    <button class="btn btn-dark" onclick="loadSettlements()">重新整理</button>
+    <button class="btn btn-dark" onclick="location.reload()">重載頁面</button>
+  </div>
+
+  <div class="stat">
+    <div class="stat-label">待結算總額</div>
+    <div class="stat-value" id="pendingTotal">$0</div>
+  </div>
+
+  <div id="list">
+    <div class="empty">正在讀取待結算資料...</div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "";
+
+function money(n){
+  return "$" + Number(n || 0).toLocaleString("zh-TW");
+}
+
+function escapeHtml(str){
+  return String(str ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function getPaymentText(method){
+  const text = String(method || "").toLowerCase();
+
+  if(text.includes("jko") || text.includes("街口")) return "街口支付";
+  if(text.includes("cash") || text.includes("現金")) return "現金";
+  if(text.includes("merchant")) return "店家月結";
+  if(text.includes("platform")) return "平台收款";
+
+  return method || "未設定";
+}
+
+function formatTime(value){
+  if(!value) return "-";
+
+  try{
+    if(value._seconds){
+      return new Date(value._seconds * 1000).toLocaleString("zh-TW");
+    }
+
+    if(value.seconds){
+      return new Date(value.seconds * 1000).toLocaleString("zh-TW");
+    }
+
+    return new Date(value).toLocaleString("zh-TW");
+  }catch(e){
+    return "-";
+  }
+}
+
+async function loadSettlements(){
+  const list = document.getElementById("list");
+  const pendingTotal = document.getElementById("pendingTotal");
+
+  list.innerHTML = `<div class="empty">正在讀取待結算資料...</div>`;
+
+  try{
+    const res = await fetch(`${API_BASE}/api/admin/pending-settlements?t=${Date.now()}`);
+    const data = await res.json();
+
+    if(!res.ok || data.success === false){
+      throw new Error(data.message || data.error || "讀取失敗");
+    }
+
+    pendingTotal.innerText = money(data.pendingTotal || 0);
+
+    const orders = Array.isArray(data.orders) ? data.orders : [];
+
+    if(!orders.length){
+      list.innerHTML = `<div class="empty">目前沒有待結算訂單。</div>`;
+      return;
+    }
+
+    list.innerHTML = orders.map(order => `
+      <div class="card">
+        <div class="row">
+          <div class="label">訂單編號</div>
+          <div class="value">${escapeHtml(order.orderNo || order.id || "-")}</div>
+        </div>
+
+        <div class="row">
+          <div class="label">騎士</div>
+          <div class="value">${escapeHtml(order.riderName || order.driverName || order.riderId || "-")}</div>
+        </div>
+
+        <div class="row">
+          <div class="label">付款方式</div>
+          <div class="value">${escapeHtml(getPaymentText(order.paymentMethod || order.payMethod || order.paymentType))}</div>
+        </div>
+
+        <div class="row">
+          <div class="label">完成時間</div>
+          <div class="value">${escapeHtml(formatTime(order.completedAt || order.updatedAt))}</div>
+        </div>
+
+        <div class="row">
+          <div class="label">騎士收入</div>
+          <div class="fee">${money(order.riderFee || order.driverFee || order.fee || 0)}</div>
+        </div>
+
+        <button class="btn" onclick="settleOrder('${escapeHtml(order.id)}', this)">
+          完成結算
+        </button>
+      </div>
+    `).join("");
+
+  }catch(err){
+    console.error(err);
+    list.innerHTML = `<div class="empty">讀取失敗：${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function settleOrder(orderId, btn){
+  if(!orderId){
+    alert("缺少訂單 ID");
+    return;
+  }
+
+  const ok = confirm("確認已經撥款給騎士？\n\n確認後，這筆訂單會從待結算轉為已結算。");
+  if(!ok) return;
+
+  btn.disabled = true;
+  btn.innerText = "結算中...";
+
+  try{
+    const res = await fetch(`${API_BASE}/api/admin/settle-order`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ orderId })
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || data.success === false){
+      throw new Error(data.message || data.error || "結算失敗");
+    }
+
+    alert("已完成結算");
+    await loadSettlements();
+
+  }catch(err){
+    console.error(err);
+    alert("結算失敗：" + err.message);
+    btn.disabled = false;
+    btn.innerText = "完成結算";
+  }
+}
+
+loadSettlements();
+</script>
+</body>
+</html>
