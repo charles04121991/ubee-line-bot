@@ -2823,8 +2823,20 @@ async function initPage(){
     });
   }
 
+  function getCachedLineUserId(){
+    return String(localStorage.getItem('ubee_customer_line_user_id') || '').trim();
+  }
+
+  function saveLineUserId(id){
+    if(id && String(id).startsWith('U')){
+      localStorage.setItem('ubee_customer_line_user_id', id);
+    }
+  }
+
   try{
     setSubmitButton('身分確認中...', true);
+
+    const cachedUserId = getCachedLineUserId();
 
     const configRes = await Promise.race([
       fetch('/api/config', { cache:'no-store' }),
@@ -2834,44 +2846,60 @@ async function initPage(){
     const cfg = await configRes.json();
     liffId = cfg.liffId || '';
 
-    if(!window.liff || !liffId){
-      console.warn('目前使用一般網頁模式，不啟用 LIFF');
-      userId = 'web-order-' + Date.now();
-      setSubmitButton('確認並建立任務', false);
-      return;
-    }
+    if(window.liff && liffId){
+      await Promise.race([
+        liff.init({ liffId }),
+        timeout(10000, 'LIFF 初始化逾時')
+      ]);
 
-    await Promise.race([
-      liff.init({ liffId }),
-      timeout(10000, 'LIFF 初始化逾時')
-    ]);
+      if(liff.isLoggedIn()){
+        const profile = await Promise.race([
+          liff.getProfile(),
+          timeout(10000, '取得 LINE 使用者資料逾時')
+        ]);
 
-    if(!liff.isInClient()){
-      console.warn('不是從 LINE App 開啟，目前使用一般網頁模式');
-      userId = 'web-order-' + Date.now();
-      setSubmitButton('確認並建立任務', false);
-      return;
-    }
+        userId = profile.userId || '';
 
-    if(!liff.isLoggedIn()){
+        if(userId && userId.startsWith('U')){
+          saveLineUserId(userId);
+          setSubmitButton('確認並建立任務', false);
+          return;
+        }
+      }
+
+      if(cachedUserId && cachedUserId.startsWith('U')){
+        userId = cachedUserId;
+        setSubmitButton('確認並建立任務', false);
+        return;
+      }
+
       setSubmitButton('LINE 登入中...', true);
-      liff.login({ redirectUri:window.location.href });
+      liff.login({ redirectUri: window.location.href });
       return;
     }
 
-    const profile = await Promise.race([
-      liff.getProfile(),
-      timeout(10000, '取得 LINE 使用者資料逾時')
-    ]);
+    if(cachedUserId && cachedUserId.startsWith('U')){
+      userId = cachedUserId;
+      setSubmitButton('確認並建立任務', false);
+      return;
+    }
 
-    userId = profile.userId || ('web-order-' + Date.now());
-
-    setSubmitButton('確認並建立任務', false);
+    setSubmitButton('請從官方帳號開啟一次', true);
+    alert('第一次使用請先從 UBee 官方帳號點「立即下單」，完成 LINE 身分綁定後，手機桌面捷徑就可以正常使用。');
 
   }catch(err){
-    console.warn('LIFF 初始化失敗，改用一般網頁模式:', err);
-    userId = 'web-order-' + Date.now();
-    setSubmitButton('確認並建立任務', false);
+    console.warn('LIFF 初始化失敗:', err);
+
+    const cachedUserId = getCachedLineUserId();
+
+    if(cachedUserId && cachedUserId.startsWith('U')){
+      userId = cachedUserId;
+      setSubmitButton('確認並建立任務', false);
+      return;
+    }
+
+    setSubmitButton('請從官方帳號開啟一次', true);
+    alert('第一次使用請先從 UBee 官方帳號點「立即下單」，完成 LINE 身分綁定後，手機桌面捷徑就可以正常使用。');
   }
 }
 
