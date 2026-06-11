@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee｜店家派單中心</title>
+<title>UBee｜店家派單中心｜正式營運版</title>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -26,22 +26,9 @@
   --shadow:0 16px 40px rgba(0,0,0,.35);
 }
 
-body.day{
-  --bg:#f7f4ea;
-  --card:#ffffff;
-  --card2:#f1f1f1;
-  --card3:#e8e8e8;
-  --line:rgba(0,0,0,.1);
-  --text:#111827;
-  --muted:#4b5563;
-  --shadow:0 14px 30px rgba(0,0,0,.08);
-}
-
 *{box-sizing:border-box}
 
-html{
-  scroll-behavior:smooth;
-}
+html{scroll-behavior:smooth}
 
 body{
   margin:0;
@@ -71,7 +58,6 @@ body{
 .logo{
   font-size:32px;
   font-weight:900;
-  letter-spacing:.2px;
 }
 
 .logo span{color:var(--yellow)}
@@ -95,16 +81,12 @@ body{
 }
 
 .heroChip{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
   padding:7px 10px;
   border-radius:999px;
   background:rgba(250,204,21,.12);
   border:1px solid rgba(250,204,21,.26);
-  color:var(--text);
   font-size:13px;
-  font-weight:800;
+  font-weight:900;
 }
 
 .login,.section{
@@ -115,33 +97,20 @@ body{
   margin-top:14px;
 }
 
-.section{
-  scroll-margin-top:92px;
-}
-
-.sectionHead{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:10px;
-}
-
-.sectionHead h2{
-  margin:0;
-}
-
-.sectionHead .small{
-  margin-top:4px;
-}
+.section{scroll-margin-top:92px}
 
 h2{
   font-size:20px;
   margin:0 0 12px;
 }
 
-h3{
-  margin:0;
+h3{margin:0}
+
+.small{
+  color:var(--muted);
+  font-size:13px;
+  margin-top:8px;
+  line-height:1.6;
 }
 
 .quickNav{
@@ -149,11 +118,11 @@ h3{
   top:0;
   z-index:20;
   display:grid;
-  grid-template-columns:repeat(5,1fr);
+  grid-template-columns:repeat(4,1fr);
   gap:8px;
   padding:10px 0;
   margin-top:12px;
-  background:linear-gradient(to bottom,var(--bg) 70%,rgba(0,0,0,0));
+  background:linear-gradient(to bottom,var(--bg) 75%,rgba(0,0,0,0));
 }
 
 .quickNav button{
@@ -180,9 +149,7 @@ h3{
 }
 
 @media (min-width:640px){
-  .summaryGrid{
-    grid-template-columns:repeat(4,1fr);
-  }
+  .summaryGrid{grid-template-columns:repeat(4,1fr)}
 }
 
 .summaryCard{
@@ -196,7 +163,6 @@ h3{
   display:block;
   font-size:22px;
   color:var(--yellow);
-  line-height:1.2;
 }
 
 .summaryCard span{
@@ -211,7 +177,7 @@ label{
   color:var(--text);
   font-size:14px;
   margin:10px 0 6px;
-  font-weight:800;
+  font-weight:900;
 }
 
 input,textarea,select{
@@ -260,28 +226,19 @@ button.secondary{
   border:1px solid var(--line);
 }
 
-button.green{
-  background:var(--green);
-}
-
-button.blue{
-  background:var(--blue);
-}
-
-button.red{
-  background:var(--red);
-  color:#fff;
-}
+button.green{background:var(--green)}
+button.blue{background:var(--blue)}
+button.red{background:var(--red);color:#fff}
 
 .tabs{
   display:grid;
-  grid-template-columns:1fr 1fr 1fr;
+  grid-template-columns:1fr 1fr;
   gap:8px;
   margin-top:14px;
 }
 
-@media (min-width:760px){
-  .tabs{grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr}
+@media (min-width:640px){
+  .tabs{grid-template-columns:repeat(4,1fr)}
 }
 
 .tab{
@@ -310,9 +267,7 @@ button.red{
   margin-top:12px;
 }
 
-.stopCard{
-  background:var(--card3);
-}
+.stopCard{background:var(--card3)}
 
 .stopTitle{
   display:flex;
@@ -322,27 +277,13 @@ button.red{
   margin-bottom:8px;
 }
 
-.stopTitle h3{
-  font-size:16px;
-}
-
 .stopBadge{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
   padding:5px 9px;
   border-radius:999px;
   background:rgba(250,204,21,.16);
-  color:var(--text);
   font-size:12px;
   font-weight:900;
   white-space:nowrap;
-}
-
-.order h3,.simpleCard h3{
-  margin:0 0 8px;
-  font-size:17px;
-  word-break:break-word;
 }
 
 .row{
@@ -352,14 +293,11 @@ button.red{
   word-break:break-word;
 }
 
-.row b{color:var(--text)}
-
 .badge{
   display:inline-block;
   padding:5px 9px;
   border-radius:999px;
   background:rgba(250,204,21,.18);
-  color:var(--text);
   font-size:12px;
   margin-bottom:8px;
   font-weight:900;
@@ -377,7 +315,6 @@ button.red{
   border-radius:14px;
   background:rgba(250,204,21,.1);
   border:1px solid rgba(250,204,21,.25);
-  color:var(--text);
   line-height:1.6;
   font-size:14px;
 }
@@ -395,20 +332,12 @@ button.red{
 
 .hidden{display:none!important}
 
-.small{
-  color:var(--muted);
-  font-size:13px;
-  margin-top:8px;
-  line-height:1.6;
-}
-
 .merchantInfo{
   margin-top:10px;
   padding:12px;
   border-radius:16px;
   background:rgba(250,204,21,.1);
   border:1px solid rgba(250,204,21,.25);
-  color:var(--text);
   line-height:1.7;
   font-size:14px;
 }
@@ -454,7 +383,11 @@ button.red{
   color:#ef4444;
 }
 
-.horizontalFlow{
+.progressBox{
+  margin-top:10px;
+}
+
+.flow{
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -463,15 +396,15 @@ button.red{
   padding:10px 0;
 }
 
-.horizontalStep{
-  min-width:80px;
+.step{
+  min-width:86px;
   text-align:center;
   color:var(--muted);
   font-size:12px;
   flex-shrink:0;
 }
 
-.horizontalStep .circle{
+.step .circle{
   width:38px;
   height:38px;
   margin:0 auto 6px;
@@ -485,49 +418,30 @@ button.red{
   border:1px solid var(--line);
 }
 
-.horizontalStep.done{color:var(--text)}
-
-.horizontalStep.done .circle{
+.step.done{color:var(--text)}
+.step.done .circle{
   background:var(--green);
   color:#000;
 }
 
-.horizontalStep.current{
+.step.current{
   color:var(--text);
   font-weight:900;
 }
 
-.horizontalStep.current .circle{
+.step.current .circle{
   background:var(--yellow);
   color:#000;
 }
 
-.horizontalLine{
+.line{
   flex:1;
   height:3px;
   background:var(--line);
   min-width:30px;
 }
 
-.horizontalLine.done{background:var(--yellow)}
-
-.settingItem{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  cursor:pointer;
-}
-
-.settingPanel{
-  display:none;
-  margin-top:12px;
-  padding:14px;
-  border-radius:16px;
-  background:var(--card);
-  border:1px solid var(--line);
-}
-
-.settingPanel.active{display:block}
+.line.done{background:var(--yellow)}
 
 .moneyBox{
   display:grid;
@@ -563,10 +477,6 @@ button.red{
   border:1px solid var(--line);
 }
 
-body.day .stopList{
-  background:rgba(0,0,0,.03);
-}
-
 .stopListTitle{
   font-weight:900;
   margin-bottom:6px;
@@ -577,23 +487,22 @@ body.day .stopList{
   border-top:1px solid var(--line);
 }
 
-.stopListItem:first-of-type{
-  border-top:0;
+.stopListItem:first-of-type{border-top:0}
+
+.confirmText{
+  white-space:pre-line;
+  line-height:1.7;
 }
 
 @media (max-width:420px){
   .quickNav{
-    grid-template-columns:repeat(5,minmax(64px,1fr));
+    grid-template-columns:repeat(4,minmax(64px,1fr));
     gap:6px;
   }
 
   .quickNav button{
     font-size:12px;
     padding:9px 4px;
-  }
-
-  .tabs{
-    grid-template-columns:1fr 1fr;
   }
 }
 </style>
@@ -605,21 +514,21 @@ body.day .stopList{
   <div class="hero">
     <div class="logo"><span>U</span>Bee 🐝</div>
     <h1>店家派單中心</h1>
-    <p>正式營運版｜建立店家派單、查看配送進度、管理訂單狀態。支援便當店、餐飲店、飲料店多點配送。</p>
+    <p>正式營運版｜店家可建立派單、查看配送進度、管理訂單狀態，支援餐飲、飲料、便當與多點配送。</p>
     <div class="heroChips">
       <div class="heroChip">正式派單</div>
       <div class="heroChip">多點配送</div>
       <div class="heroChip">店家月結</div>
-      <div class="heroChip">騎士即時接單</div>
+      <div class="heroChip">騎士接單</div>
     </div>
   </div>
 
   <div class="login" id="loginBox">
     <h2>店家登入</h2>
-    <label id="merchantKeyLabel">店家電話 / 店家代碼</label>
-    <input id="merchantKey" placeholder="例如：0987654321 或 M001" />
+    <label id="merchantKeyLabel">申請合作時填寫的手機號碼</label>
+    <input id="merchantKey" type="tel" inputmode="tel" placeholder="例如：0912345678" />
     <button id="loginBtn" type="button" onclick="loginMerchant()">進入派單中心</button>
-    <div class="notice">請輸入已建立於 merchants 的店家電話或店家代碼。</div>
+    <div class="notice">審核通過的店家，第一次使用時請輸入申請合作時填寫的手機號碼完成 LINE 綁定。</div>
     <div class="error" id="errorBox"></div>
   </div>
 
@@ -628,16 +537,16 @@ body.day .stopList{
     <div class="section" id="section-overview">
       <h2 id="welcomeTitle">店家派單中心</h2>
       <div class="merchantInfo" id="merchantInfoBox"></div>
-      <div class="small">正式營運版｜本頁採一頁式設計，店家可在同一頁完成派單、看進度、查訂單與設定。</div>
+      <div class="small">正式營運資料以 UBee 管理端建檔為準，請確認店家電話與取件地址正確。</div>
 
       <div class="summaryGrid">
         <div class="summaryCard">
-          <b id="summaryToday">0</b>
+          <b id="summaryAll">0</b>
           <span>目前訂單</span>
         </div>
         <div class="summaryCard">
-          <b id="summaryReady">0</b>
-          <span>待派遣</span>
+          <b id="summaryTodo">0</b>
+          <span>待處理</span>
         </div>
         <div class="summaryCard">
           <b id="summaryDelivery">0</b>
@@ -653,20 +562,15 @@ body.day .stopList{
     </div>
 
     <div class="quickNav">
-      <button type="button" data-nav="create" onclick="scrollToSection('section-create')">建立</button>
-      <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">進度</button>
-      <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">訂單</button>
-      <button type="button" data-nav="store" onclick="scrollToSection('section-store')">店家</button>
-      <button type="button" data-nav="settings" onclick="scrollToSection('section-settings')">設定</button>
+      <button type="button" data-nav="create" onclick="scrollToSection('section-create')">建立派單</button>
+      <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">配送進度</button>
+      <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">訂單查詢</button>
+      <button type="button" data-nav="store" onclick="scrollToSection('section-store')">店家資料</button>
     </div>
 
     <section id="section-create" class="section">
-      <div class="sectionHead">
-        <div>
-          <h2>建立騎士派遣</h2>
-          <div class="small">便當店、餐飲店大量配送可使用多點配送，系統會分段估算距離並自動加上多點費。</div>
-        </div>
-      </div>
+      <h2>建立派單</h2>
+      <div class="small">請確認收件資料、送達地址與品項內容正確。正式派單建立後會進入訂單流程。</div>
 
       <label>配送方式 *</label>
       <select id="newDeliveryMode">
@@ -693,7 +597,7 @@ body.day .stopList{
         <option value="5">5 個送達點</option>
         <option value="6">6 個送達點</option>
       </select>
-      <div class="small">正式規則：每多 1 個送達點，加 NT$20。例：2 點加 NT$20、3 點加 NT$40。</div>
+      <div class="small">正式規則：每多 1 個送達點，加 NT$20。</div>
 
       <div class="stopCard">
         <div class="stopTitle">
@@ -719,109 +623,49 @@ body.day .stopList{
         <textarea id="newItemName" maxlength="220" placeholder="例如：便當 8 份、飲料 5 杯、餐點 3 份"></textarea>
 
         <label>第 1 點備註</label>
-        <textarea id="newNote" maxlength="260" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡、餐點已付款"></textarea>
+        <textarea id="newNote" maxlength="260" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡"></textarea>
       </div>
 
       <div id="extraStopsBox"></div>
 
-      <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立訂單</button>
+      <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立正式訂單</button>
       <div id="createOrderMsg" class="formMsg"></div>
     </section>
 
     <section id="section-progress" class="section">
-      <div class="sectionHead">
-        <div>
-          <h2>騎士配送狀態</h2>
-          <div class="small">顯示目前最新一筆配送中訂單，以及整體配送進度。</div>
-        </div>
-      </div>
+      <h2>配送進度</h2>
+      <div class="small">顯示目前最新一筆配送中訂單，以及整體配送狀態。</div>
 
-      <div id="merchantHorizontalProgressBox" class="merchantHorizontalProgress">
+      <div id="merchantProgressBox" class="progressBox">
         <div class="empty">目前沒有配送中的訂單</div>
       </div>
     </section>
 
     <section id="section-orders" class="section">
-      <div class="sectionHead">
-        <div>
-          <h2>訂單列表</h2>
-          <div class="small">可查看待接單、準備中、待派遣、店家自送、配送中與已完成訂單。</div>
-        </div>
-      </div>
+      <h2>訂單查詢</h2>
+      <div class="small">可查看待處理、配送中、已完成與店家自送訂單。</div>
 
       <div class="tabs">
-        <div class="tab active" data-tab="merchant_pending" onclick="setTab('merchant_pending')">待接單 <span id="countPending">0</span></div>
-        <div class="tab" data-tab="merchant_preparing" onclick="setTab('merchant_preparing')">準備中 <span id="countPreparing">0</span></div>
-        <div class="tab" data-tab="merchant_ready" onclick="setTab('merchant_ready')">待派遣 <span id="countReady">0</span></div>
-        <div class="tab" data-tab="merchant_self_delivery" onclick="setTab('merchant_self_delivery')">店家自送 <span id="countSelfDelivery">0</span></div>
-        <div class="tab" data-tab="delivery_progress" onclick="setTab('delivery_progress')">配送中 <span id="countDelivery">0</span></div>
+        <div class="tab active" data-tab="todo" onclick="setTab('todo')">待處理 <span id="countTodo">0</span></div>
+        <div class="tab" data-tab="delivery" onclick="setTab('delivery')">配送中 <span id="countDelivery">0</span></div>
         <div class="tab" data-tab="completed" onclick="setTab('completed')">已完成 <span id="countCompleted">0</span></div>
+        <div class="tab" data-tab="self" onclick="setTab('self')">店家自送 <span id="countSelf">0</span></div>
       </div>
 
       <div id="ordersBox"></div>
     </section>
 
     <section id="section-store" class="section">
-      <div class="sectionHead">
-        <div>
-          <h2>店家資訊</h2>
-          <div class="small">正式營運資料以管理端建檔為準，避免派單地址或電話錯誤。</div>
-        </div>
-      </div>
+      <h2>店家資料</h2>
+      <div class="small">如需修改店家資料，請聯絡 UBee 管理端協助更新，避免正式派單資料錯誤。</div>
 
       <div class="simpleCard">
         <h3 id="storeName">店家名稱</h3>
-        <div class="row approved">🟢已審核店家</div>
+        <div class="row approved">🟢 已審核店家</div>
         <div class="row"><b>店家電話：</b><span id="storePhone">未設定</span></div>
-        <div class="row"><b>店家地址：</b><span id="storeAddress">未設定</span></div>
+        <div class="row"><b>取件地址：</b><span id="storeAddress">未設定</span></div>
         <div class="row"><b>店家類型：</b><span id="storeType">未設定</span></div>
         <div class="row"><b>結帳方式：</b><span id="storeSettlement">未設定</span></div>
-      </div>
-    </section>
-
-    <section id="section-settings" class="section">
-      <div class="sectionHead">
-        <div>
-          <h2>設定</h2>
-          <div class="small">店家可設定建立訂單時的預設配送與付款方式。</div>
-        </div>
-      </div>
-
-      <div class="simpleCard settingItem" onclick="toggleSetting('profileSetting')">
-        <div><h3>店家資料設定</h3><div class="small">查看店名、電話、地址與審核狀態。</div></div><b>›</b>
-      </div>
-      <div id="profileSetting" class="settingPanel">
-        <div class="row"><b>狀態：</b><span class="approved">🟢已審核店家</span></div>
-        <div class="row"><b>提醒：</b>如需修改店家資料，請聯絡 UBee 管理端協助更新，避免正式派單資料錯誤。</div>
-      </div>
-
-      <div class="simpleCard settingItem" onclick="toggleSetting('deliverySetting')">
-        <div><h3>配送設定</h3><div class="small">UBee 派騎士 / 店家自送。</div></div><b>›</b>
-      </div>
-      <div id="deliverySetting" class="settingPanel">
-        <label>預設配送方式</label>
-        <select id="defaultDeliveryMode">
-          <option value="ubee">UBee 派騎士</option>
-          <option value="merchant">店家自送</option>
-        </select>
-        <button type="button" onclick="applyDefaultDeliveryMode()">套用到建立訂單</button>
-      </div>
-
-      <div class="simpleCard settingItem" onclick="toggleSetting('paymentSetting')">
-        <div><h3>付款設定</h3><div class="small">店家月結 / 週結、現金、店家已收款。</div></div><b>›</b>
-      </div>
-      <div id="paymentSetting" class="settingPanel">
-        <label>預設付款方式</label>
-        <select id="defaultPaymentMethod">
-          <option value="merchant_settlement">店家月結 / 週結</option>
-          <option value="cash">現金付款</option>
-          <option value="merchant_paid">店家已收款</option>
-        </select>
-        <button type="button" onclick="applyDefaultPaymentMethod()">套用到建立訂單</button>
-      </div>
-
-      <div class="simpleCard settingItem" onclick="toggleThemeNow()">
-        <div><h3>切換日夜模式</h3><div class="small">系統會自動依照時間切換，也可以手動預覽。</div></div><b>切換</b>
       </div>
     </section>
 
@@ -848,18 +692,48 @@ const EXTRA_STOP_FEE = 20;
 const ESTIMATE_TIMEOUT_MS = 12000;
 const MAX_STOP_COUNT = 6;
 
-function applyAutoTheme(){
-  const hour = new Date().getHours();
-  if(hour >= 6 && hour < 18){
-    document.body.classList.add("day");
-  }else{
-    document.body.classList.remove("day");
-  }
-}
+let merchantLineUserId = "";
+let merchantKey = "";
+let currentMerchant = null;
+let merchantAuthed = false;
+let currentTab = "todo";
+let ordersMap = {};
+let unsubscribers = [];
+let isCreatingMerchantOrder = false;
 
-function toggleThemeNow(){
-  document.body.classList.toggle("day");
-}
+const todoStatuses = [
+  "merchant_pending",
+  "merchant_preparing",
+  "merchant_ready",
+  "pending_dispatch"
+];
+
+const deliveryStatuses = [
+  "accepted",
+  "arrived_pickup",
+  "picked_up",
+  "arrived_dropoff"
+];
+
+const progressSteps = [
+  {status:"pending_dispatch",text:"等待接單"},
+  {status:"accepted",text:"騎士取件"},
+  {status:"picked_up",text:"配送途中"},
+  {status:"completed",text:"完成送達"}
+];
+
+const statusTextMap = {
+  merchant_pending:"待店家接單",
+  merchant_preparing:"店家準備中",
+  merchant_ready:"待派遣騎士",
+  merchant_self_delivery:"店家自送",
+  pending_dispatch:"等待騎士接單",
+  accepted:"騎士已接單",
+  arrived_pickup:"騎士已抵達取件地",
+  picked_up:"騎士已取件，配送中",
+  arrived_dropoff:"騎士已抵達送達地",
+  completed:"已完成"
+};
 
 function scrollToSection(id){
   const el = document.getElementById(id);
@@ -873,8 +747,7 @@ function updateNavActive(sectionId){
     "section-create":"create",
     "section-progress":"progress",
     "section-orders":"orders",
-    "section-store":"store",
-    "section-settings":"settings"
+    "section-store":"store"
   };
 
   document.querySelectorAll(".quickNav button").forEach(btn => btn.classList.remove("active"));
@@ -887,7 +760,7 @@ function updateNavActive(sectionId){
 }
 
 function setupScrollSpy(){
-  const targets = ["section-create","section-progress","section-orders","section-store","section-settings"];
+  const targets = ["section-create","section-progress","section-orders","section-store"];
   window.addEventListener("scroll", () => {
     let current = "";
     for(const id of targets){
@@ -899,110 +772,6 @@ function setupScrollSpy(){
     if(current) updateNavActive(current);
   }, {passive:true});
 }
-
-function toggleSetting(id){
-  const panel = document.getElementById(id);
-  if(panel) panel.classList.toggle("active");
-}
-
-function applyDefaultDeliveryMode(){
-  const val = document.getElementById("defaultDeliveryMode").value;
-  document.getElementById("newDeliveryMode").value = val;
-  alert("已套用預設配送方式。");
-}
-
-function applyDefaultPaymentMethod(){
-  const val = document.getElementById("defaultPaymentMethod").value;
-  document.getElementById("newPaymentMethod").value = val;
-  alert("已套用預設付款方式。");
-}
-
-function calculateMerchantDeliveryFee(distanceKm, stopCount = 1){
-  const km = Number(distanceKm);
-  const stops = Math.max(1, Number(stopCount || 1));
-
-  if(!Number.isFinite(km) || km <= 0) throw new Error("距離結果異常");
-
-  let baseFee = MERCHANT_SERVICE_FEE;
-
-  if(km <= 5) baseFee = 70;
-  else if(km <= 7) baseFee = 80;
-  else if(km <= 9) baseFee = 90;
-  else if(km <= 10) baseFee = 110;
-  else if(km <= 12) baseFee = 130;
-  else if(km <= 14) baseFee = 150;
-  else if(km <= 16) baseFee = 170;
-  else if(km <= 18) baseFee = 200;
-  else if(km <= 20) baseFee = 220;
-  else baseFee = 220;
-
-  const extraStopFee = Math.max(0, stops - 1) * EXTRA_STOP_FEE;
-
-  return baseFee + extraStopFee;
-}
-
-function parseDistanceKm(distanceText){
-  const raw = String(distanceText || "").replaceAll(",", "").replace(/\s+/g, "").trim().toLowerCase();
-  if(!raw) throw new Error("距離資料為空");
-
-  let km = 0;
-  if(raw.includes("公里") || raw.includes("km")){
-    km = parseFloat(raw.replace("公里", "").replace("km", "")) || 0;
-  }else if(raw.includes("公尺") || raw.endsWith("m")){
-    km = (parseFloat(raw.replace("公尺", "").replace("m", "")) || 0) / 1000;
-  }else{
-    km = parseFloat(raw) || 0;
-  }
-
-  if(!Number.isFinite(km) || km <= 0) throw new Error("距離結果異常");
-  return km;
-}
-
-async function fetchJsonWithTimeout(url, options = {}, timeoutMs = ESTIMATE_TIMEOUT_MS){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try{
-    const res = await fetch(url, {...options, signal:controller.signal});
-    const data = await res.json().catch(() => ({}));
-    return {res,data};
-  }finally{
-    clearTimeout(timer);
-  }
-}
-
-let merchantLineUserId = "";
-let merchantKey = "";
-let currentMerchant = null;
-let merchantAuthed = false;
-let currentTab = "merchant_pending";
-let ordersMap = {};
-let unsubscribers = [];
-let isCreatingMerchantOrder = false;
-
-const deliveryStatuses = ["pending_dispatch","accepted","arrived_pickup","picked_up","arrived_dropoff"];
-
-const merchantDeliverySteps = [
-  {status:"pending_dispatch",text:"等待騎士接單"},
-  {status:"accepted",text:"騎士已接單，前往取件"},
-  {status:"arrived_pickup",text:"騎士已抵達取件地"},
-  {status:"picked_up",text:"已取件，配送中"},
-  {status:"arrived_dropoff",text:"騎士已抵達送達地"},
-  {status:"completed",text:"已送達"}
-];
-
-const statusTextMap = {
-  merchant_pending:"店家待接單",
-  merchant_preparing:"店家準備中",
-  merchant_ready:"店家已完成，待派遣騎士",
-  merchant_self_delivery:"店家自送",
-  delivery_progress:"配送中",
-  pending_dispatch:"已派遣，等待騎士接單",
-  accepted:"騎士已接單，前往店家",
-  arrived_pickup:"騎士已到店家",
-  picked_up:"騎士已取件，配送中",
-  arrived_dropoff:"騎士已到送達地點",
-  completed:"已完成送達"
-};
 
 function normalizePhone(str){
   return String(str || "")
@@ -1059,6 +828,11 @@ function clearCreateOrderMsg(){
   box.textContent = "";
 }
 
+function getInputValue(id){
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+
 function renderExtraStopFields(){
   const box = document.getElementById("extraStopsBox");
   const select = document.getElementById("newStopCount");
@@ -1107,43 +881,26 @@ function renderExtraStopFields(){
   box.innerHTML = html;
 }
 
-function getInputValue(id){
-  const el = document.getElementById(id);
-  return el ? el.value.trim() : "";
-}
-
 function collectDeliveryStops(){
   const stopCount = Math.min(MAX_STOP_COUNT, Math.max(1, Number(document.getElementById("newStopCount")?.value || 1)));
 
-  const primaryName = getInputValue("newCustomerName");
-  const primaryPhone = normalizePhone(getInputValue("newCustomerPhone"));
-  const primaryAddress = getInputValue("newDropoffAddress");
-  const primaryItem = getInputValue("newItemName");
-  const primaryNote = getInputValue("newNote");
-
   const stops = [{
     index:1,
-    customerName:primaryName,
-    customerPhone:primaryPhone,
-    dropoffAddress:primaryAddress,
-    itemName:primaryItem,
-    note:primaryNote
+    customerName:getInputValue("newCustomerName"),
+    customerPhone:normalizePhone(getInputValue("newCustomerPhone")),
+    dropoffAddress:getInputValue("newDropoffAddress"),
+    itemName:getInputValue("newItemName"),
+    note:getInputValue("newNote")
   }];
 
   for(let i = 2; i <= stopCount; i++){
-    const name = getInputValue(`stopCustomerName_${i}`);
-    const phone = normalizePhone(getInputValue(`stopCustomerPhone_${i}`));
-    const address = getInputValue(`stopAddress_${i}`);
-    const item = getInputValue(`stopItem_${i}`);
-    const note = getInputValue(`stopNote_${i}`);
-
     stops.push({
       index:i,
-      customerName:name,
-      customerPhone:phone,
-      dropoffAddress:address,
-      itemName:item,
-      note
+      customerName:getInputValue(`stopCustomerName_${i}`),
+      customerPhone:normalizePhone(getInputValue(`stopCustomerPhone_${i}`)),
+      dropoffAddress:getInputValue(`stopAddress_${i}`),
+      itemName:getInputValue(`stopItem_${i}`),
+      note:getInputValue(`stopNote_${i}`)
     });
   }
 
@@ -1197,10 +954,62 @@ function buildItemSummary(stops){
 }
 
 function buildNoteSummary(stops, originalNote){
-  const stopText = buildStopsText(stops);
   if(stops.length <= 1) return originalNote || "";
+  return `【多點配送】共 ${stops.length} 個送達點\n${buildStopsText(stops)}`;
+}
 
-  return `【多點配送】共 ${stops.length} 個送達點\n${stopText}`;
+function calculateMerchantDeliveryFee(distanceKm, stopCount = 1){
+  const km = Number(distanceKm);
+  const stops = Math.max(1, Number(stopCount || 1));
+
+  if(!Number.isFinite(km) || km <= 0) throw new Error("距離結果異常");
+
+  let baseFee = MERCHANT_SERVICE_FEE;
+
+  if(km <= 5) baseFee = 70;
+  else if(km <= 7) baseFee = 80;
+  else if(km <= 9) baseFee = 90;
+  else if(km <= 10) baseFee = 110;
+  else if(km <= 12) baseFee = 130;
+  else if(km <= 14) baseFee = 150;
+  else if(km <= 16) baseFee = 170;
+  else if(km <= 18) baseFee = 200;
+  else if(km <= 20) baseFee = 220;
+  else baseFee = 220;
+
+  const extraStopFee = Math.max(0, stops - 1) * EXTRA_STOP_FEE;
+  return baseFee + extraStopFee;
+}
+
+function parseDistanceKm(distanceText){
+  const raw = String(distanceText || "").replaceAll(",", "").replace(/\s+/g, "").trim().toLowerCase();
+  if(!raw) throw new Error("距離資料為空");
+
+  let km = 0;
+
+  if(raw.includes("公里") || raw.includes("km")){
+    km = parseFloat(raw.replace("公里", "").replace("km", "")) || 0;
+  }else if(raw.includes("公尺") || raw.endsWith("m")){
+    km = (parseFloat(raw.replace("公尺", "").replace("m", "")) || 0) / 1000;
+  }else{
+    km = parseFloat(raw) || 0;
+  }
+
+  if(!Number.isFinite(km) || km <= 0) throw new Error("距離結果異常");
+  return km;
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = ESTIMATE_TIMEOUT_MS){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try{
+    const res = await fetch(url, {...options, signal:controller.signal});
+    const data = await res.json().catch(() => ({}));
+    return {res,data};
+  }finally{
+    clearTimeout(timer);
+  }
 }
 
 async function estimateMultiStopRoute(pickupAddress, stops){
@@ -1240,11 +1049,9 @@ async function estimateMultiStopRoute(pickupAddress, stops){
     fromAddress = stop.dropoffAddress;
   }
 
-  const displayDistance = segments.map(seg => `${seg.label} ${seg.distanceText}`).join(" / ");
-
   return {
     totalKm,
-    distanceText:displayDistance,
+    distanceText:segments.map(seg => `${seg.label} ${seg.distanceText}`).join(" / "),
     routeSegments:segments
   };
 }
@@ -1253,7 +1060,7 @@ async function initMerchantLiff(){
   hideError();
 
   if(typeof liff === "undefined"){
-    showError("LINE LIFF 載入失敗，請從店家合作中心官方帳號重新開啟。");
+    showError("LINE LIFF 載入失敗，請從 UBee 店家合作中心重新開啟。");
     forceEnableLoginButton("進入派單中心");
     return;
   }
@@ -1275,7 +1082,7 @@ async function initMerchantLiff(){
     }
   }catch(err){
     console.error("店家 LIFF 初始化失敗:", err);
-    showError("店家登入初始化失敗，請從店家合作中心官方帳號重新開啟。");
+    showError("店家登入初始化失敗，請從 UBee 店家合作中心重新開啟。");
     forceEnableLoginButton("進入派單中心");
   }
 }
@@ -1283,15 +1090,15 @@ async function initMerchantLiff(){
 function enterMerchantDashboard(merchant){
   currentMerchant = {
     ...merchant,
-    id: merchant.id || merchant.merchantId || "",
-    merchantId: merchant.merchantId || merchant.id || "",
-    merchantName: merchant.merchantName || "",
-    merchantPhone: merchant.phone || merchant.merchantPhone || "",
-    merchantAddress: merchant.pickupAddress || merchant.merchantAddress || "",
-    merchantType: merchant.businessType || merchant.merchantType || "",
-    settlementType: merchant.settlementType || "",
-    status: merchant.status || "",
-    approved: merchant.approved === true
+    id:merchant.id || merchant.merchantId || "",
+    merchantId:merchant.merchantId || merchant.id || "",
+    merchantName:merchant.merchantName || "",
+    merchantPhone:merchant.phone || merchant.merchantPhone || "",
+    merchantAddress:merchant.pickupAddress || merchant.merchantAddress || "",
+    merchantType:merchant.businessType || merchant.merchantType || "",
+    settlementType:merchant.settlementType || "",
+    status:merchant.status || "",
+    approved:merchant.approved === true
   };
 
   merchantKey = currentMerchant.merchantPhone || currentMerchant.merchantId || currentMerchant.id || "";
@@ -1303,12 +1110,12 @@ function enterMerchantDashboard(merchant){
 
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("dashboard").classList.remove("hidden");
-  document.getElementById("welcomeTitle").textContent = "店家派單中心";
 
   document.getElementById("merchantInfoBox").innerHTML = `
-    <strong class="approved">🟢已審核店家</strong>
+    <strong class="approved">🟢 已審核店家</strong>
     <div>店家名稱：${escapeHtml(currentMerchant.merchantName || "未設定")}</div>
     <div>店家電話：${escapeHtml(currentMerchant.merchantPhone || "未設定")}</div>
+    <div>取件地址：${escapeHtml(currentMerchant.merchantAddress || "未設定")}</div>
   `;
 
   document.getElementById("storeName").textContent = currentMerchant.merchantName || "店家名稱未設定";
@@ -1323,7 +1130,7 @@ function enterMerchantDashboard(merchant){
 
 async function loadMerchantProfile(){
   if(!merchantLineUserId){
-    showError("缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟。");
+    showError("缺少 LINE 使用者資料，請從 UBee 店家合作中心重新開啟。");
     forceEnableLoginButton("進入派單中心");
     return;
   }
@@ -1339,27 +1146,145 @@ async function loadMerchantProfile(){
 
     document.getElementById("loginBox").classList.remove("hidden");
     document.getElementById("dashboard").classList.add("hidden");
-    document.querySelector("#loginBox h2").textContent = "店家帳號綁定";
-
-    const label = document.getElementById("merchantKeyLabel");
-    if(label) label.textContent = "申請合作時填寫的手機號碼";
-
-    const input = document.getElementById("merchantKey");
-    input.placeholder = "請輸入申請合作時填寫的手機號碼";
-    input.type = "tel";
-    input.inputMode = "tel";
-
-    const notice = document.querySelector("#loginBox .notice");
-    if(notice){
-      notice.textContent = "審核通過的店家，第一次使用時請輸入申請合作時填寫的手機號碼完成 LINE 綁定。";
-    }
-
     forceEnableLoginButton("進入派單中心");
   }catch(err){
     console.error("讀取店家資料失敗:", err);
     showError("讀取店家資料失敗，請稍後再試。");
     forceEnableLoginButton("進入派單中心");
   }
+}
+
+async function loginMerchant(){
+  hideError();
+
+  const input = document.getElementById("merchantKey");
+  const loginBtn = document.getElementById("loginBtn");
+  const phone = normalizePhone(input.value);
+
+  if(!merchantLineUserId){
+    showError("缺少 LINE 使用者資料，請從 UBee 店家合作中心重新開啟店家派單。");
+    forceEnableLoginButton("進入派單中心");
+    return;
+  }
+
+  if(!/^09\d{8}$/.test(phone)){
+    showError("請輸入申請合作時填寫的手機號碼，例如：0912345678。");
+    forceEnableLoginButton("進入派單中心");
+    return;
+  }
+
+  loginBtn.disabled = true;
+  loginBtn.textContent = "綁定中...";
+
+  try{
+    const res = await fetch("/api/merchant/bind", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({phone,lineUserId:merchantLineUserId})
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if(!res.ok || !data.ok){
+      throw new Error(data.message || "店家帳號綁定失敗，請稍後再試。");
+    }
+
+    enterMerchantDashboard(data.merchant);
+  }catch(err){
+    console.error("店家綁定失敗:", err);
+    showError(err.message || "店家綁定失敗，請稍後再試。");
+    forceEnableLoginButton("進入派單中心");
+  }finally{
+    if(!merchantAuthed) forceEnableLoginButton("進入派單中心");
+  }
+}
+
+function logoutMerchant(){
+  localStorage.removeItem(STORAGE_KEY);
+
+  merchantKey = "";
+  currentMerchant = null;
+  merchantAuthed = false;
+  currentTab = "todo";
+  ordersMap = {};
+
+  stopListenOrders();
+
+  document.getElementById("dashboard").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("ordersBox").innerHTML = "";
+  document.getElementById("merchantInfoBox").innerHTML = "";
+  document.getElementById("merchantProgressBox").innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
+
+  forceEnableLoginButton("進入派單中心");
+  setTab("todo");
+}
+
+function stopListenOrders(){
+  unsubscribers.forEach(fn => {
+    try{fn();}catch(e){}
+  });
+  unsubscribers = [];
+}
+
+function startListenOrders(){
+  stopListenOrders();
+
+  const statuses = [
+    "merchant_pending",
+    "merchant_preparing",
+    "merchant_ready",
+    "merchant_self_delivery",
+    "pending_dispatch",
+    "accepted",
+    "arrived_pickup",
+    "picked_up",
+    "arrived_dropoff",
+    "completed"
+  ];
+
+  statuses.forEach(status => {
+    const unsub = db.collection("orders")
+      .where("status", "==", status)
+      .limit(50)
+      .onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          if(change.type === "removed"){
+            delete ordersMap[change.doc.id];
+          }else{
+            ordersMap[change.doc.id] = {
+              id:change.doc.id,
+              ...change.doc.data()
+            };
+          }
+        });
+
+        renderOrders();
+      }, err => {
+        console.error("讀取訂單失敗:", err);
+      });
+
+    unsubscribers.push(unsub);
+  });
+}
+
+function matchMerchant(order){
+  if(!currentMerchant) return false;
+
+  const currentPhone = normalizePhone(currentMerchant.merchantPhone);
+  const currentId = String(currentMerchant.merchantId || currentMerchant.id || "").trim();
+
+  const orderMerchantPhone = normalizePhone(order.merchantPhone);
+  const orderPickupPhone = normalizePhone(order.pickupPhone);
+  const orderMerchantCode = String(order.merchantCode || "").trim();
+  const orderMerchantId = String(order.merchantId || "").trim();
+
+  if(currentId && orderMerchantId && orderMerchantId === currentId) return true;
+  if(currentId && orderMerchantCode && orderMerchantCode === currentId) return true;
+  if(currentPhone && orderMerchantPhone && orderMerchantPhone === currentPhone) return true;
+  if(currentPhone && orderPickupPhone && orderPickupPhone === currentPhone) return true;
+
+  return false;
 }
 
 function getOrderTime(order){
@@ -1376,13 +1301,149 @@ function getOrderTime(order){
 function formatTime(order){
   const t = order.createdAt;
   let d = null;
+
   if(t && typeof t.toDate === "function") d = t.toDate();
   else if(typeof t === "number") d = new Date(t);
   else if(typeof t === "string") d = new Date(t);
 
   if(!d || isNaN(d.getTime())) return "未記錄";
+
   const pad = n => String(n).padStart(2,"0");
   return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function getAllMerchantOrders(){
+  return Object.values(ordersMap)
+    .filter(matchMerchant)
+    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
+}
+
+function getVisibleOrders(){
+  const all = getAllMerchantOrders();
+
+  if(currentTab === "todo"){
+    return all.filter(order => todoStatuses.includes(order.status));
+  }
+
+  if(currentTab === "delivery"){
+    return all.filter(order => deliveryStatuses.includes(order.status));
+  }
+
+  if(currentTab === "completed"){
+    return all.filter(order => order.status === "completed");
+  }
+
+  if(currentTab === "self"){
+    return all.filter(order => order.status === "merchant_self_delivery");
+  }
+
+  return all;
+}
+
+function setTab(tab){
+  currentTab = tab;
+
+  document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+  const active = document.querySelector(`[data-tab="${tab}"]`);
+  if(active) active.classList.add("active");
+
+  renderOrders();
+}
+
+function updateCounts(){
+  const all = getAllMerchantOrders();
+
+  const todo = all.filter(o => todoStatuses.includes(o.status)).length;
+  const delivery = all.filter(o => deliveryStatuses.includes(o.status)).length;
+  const completed = all.filter(o => o.status === "completed").length;
+  const self = all.filter(o => o.status === "merchant_self_delivery").length;
+
+  document.getElementById("countTodo").textContent = todo;
+  document.getElementById("countDelivery").textContent = delivery;
+  document.getElementById("countCompleted").textContent = completed;
+  document.getElementById("countSelf").textContent = self;
+
+  document.getElementById("summaryAll").textContent = all.length;
+  document.getElementById("summaryTodo").textContent = todo;
+  document.getElementById("summaryDelivery").textContent = delivery;
+  document.getElementById("summaryCompleted").textContent = completed;
+}
+
+function renderOrders(){
+  updateCounts();
+  renderMerchantProgress();
+
+  const box = document.getElementById("ordersBox");
+  const orders = getVisibleOrders();
+
+  const tabNameMap = {
+    todo:"待處理",
+    delivery:"配送中",
+    completed:"已完成",
+    self:"店家自送"
+  };
+
+  if(!orders.length){
+    box.innerHTML = `<div class="empty">目前沒有「${tabNameMap[currentTab] || "訂單"}」</div>`;
+    return;
+  }
+
+  box.innerHTML = orders.map(order => renderOrderCard(order)).join("");
+}
+
+function getSimpleProgressIndex(status){
+  if(status === "pending_dispatch") return 0;
+  if(status === "accepted" || status === "arrived_pickup") return 1;
+  if(status === "picked_up" || status === "arrived_dropoff") return 2;
+  if(status === "completed") return 3;
+  return 0;
+}
+
+function renderMerchantProgress(){
+  const box = document.getElementById("merchantProgressBox");
+  if(!box) return;
+
+  const activeOrders = getAllMerchantOrders()
+    .filter(order => ["pending_dispatch",...deliveryStatuses].includes(order.status))
+    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
+
+  if(!activeOrders.length){
+    box.innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
+    return;
+  }
+
+  const order = activeOrders[0];
+  const currentIndex = getSimpleProgressIndex(order.status);
+  const orderNo = order.orderNo || order.id || "未命名訂單";
+
+  box.innerHTML = `
+    <div class="row"><b>最新配送訂單：</b>${escapeHtml(orderNo)}</div>
+    <div class="small">目前共有 ${activeOrders.length} 筆配送中訂單</div>
+    <div class="flow">
+      ${progressSteps.map((step,index) => {
+        let cls = "";
+        let icon = "○";
+
+        if(index < currentIndex){
+          cls = "done";
+          icon = "✓";
+        }
+
+        if(index === currentIndex){
+          cls = "current";
+          icon = "●";
+        }
+
+        return `
+          <div class="step ${cls}">
+            <div class="circle">${icon}</div>
+            <div>${escapeHtml(step.text)}</div>
+          </div>
+          ${index < progressSteps.length - 1 ? `<div class="line ${index < currentIndex ? "done" : ""}"></div>` : ""}
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function generateMerchantOrderNo(){
@@ -1422,10 +1483,21 @@ async function createMerchantOrder(){
   const stopCount = stops.length;
   const primaryStop = stops[0];
 
-  let deliveryFee = MERCHANT_SERVICE_FEE;
-  let distanceKm = 0;
-  let distanceText = "";
-  let routeSegments = [];
+  const validateMsg = validateDeliveryStops(stops);
+  if(validateMsg){
+    showCreateOrderMsg("err", validateMsg);
+    return;
+  }
+
+  if(!Number.isFinite(advanceAmount) || advanceAmount < 0){
+    showCreateOrderMsg("err", "代墊金額不可小於 0。");
+    return;
+  }
+
+  if(!currentMerchant.merchantPhone || !currentMerchant.merchantAddress){
+    showCreateOrderMsg("err", "店家電話或取件地址未設定，請先確認店家資料。");
+    return;
+  }
 
   const deliveryModeLabelMap = {
     ubee:"UBee 派騎士",
@@ -1444,21 +1516,20 @@ async function createMerchantOrder(){
     merchant_paid:"paid_by_merchant"
   };
 
-  const orderStatus = deliveryMode === "merchant" ? "merchant_self_delivery" : "merchant_ready";
+  const confirmBasicText =
+`請確認以下正式派單資料：
 
-  const validateMsg = validateDeliveryStops(stops);
-  if(validateMsg){
-    showCreateOrderMsg("err", validateMsg);
-    return;
-  }
+配送方式：${deliveryModeLabelMap[deliveryMode]}
+付款方式：${paymentMethodLabelMap[paymentMethod]}
+送達點數：${stopCount} 點
+代墊金額：NT$${advanceAmount}
 
-  if(!Number.isFinite(advanceAmount) || advanceAmount < 0){
-    showCreateOrderMsg("err", "代墊金額不可小於 0。");
-    return;
-  }
+主要送達地址：
+${primaryStop.dropoffAddress}
 
-  if(!currentMerchant.merchantPhone || !currentMerchant.merchantAddress){
-    showCreateOrderMsg("err", "店家電話或取件地址未設定，請先確認店家資料。");
+確認建立正式訂單？`;
+
+  if(!confirm(confirmBasicText)){
     return;
   }
 
@@ -1468,6 +1539,11 @@ async function createMerchantOrder(){
   btn.textContent = "建立中...";
 
   try{
+    let deliveryFee = MERCHANT_SERVICE_FEE;
+    let distanceKm = 0;
+    let distanceText = "";
+    let routeSegments = [];
+
     const orderNo = generateMerchantOrderNo();
     const now = firebase.firestore.FieldValue.serverTimestamp();
 
@@ -1489,6 +1565,22 @@ async function createMerchantOrder(){
       return;
     }
 
+    const feeConfirmText =
+`系統已完成距離與費用估算：
+
+距離：
+${distanceText}
+
+配送費：NT$${deliveryFee}
+送達點數：${stopCount} 點
+
+確認送出正式訂單？`;
+
+    if(!confirm(feeConfirmText)){
+      return;
+    }
+
+    const orderStatus = deliveryMode === "merchant" ? "merchant_self_delivery" : "merchant_ready";
     const stopText = buildStopsText(stops);
     const itemSummary = buildItemSummary(stops);
     const noteSummary = buildNoteSummary(stops, primaryStop.note);
@@ -1575,14 +1667,14 @@ async function createMerchantOrder(){
     await db.collection("orders").doc(orderNo).set(orderPayload, {merge:true});
 
     if(deliveryMode === "merchant"){
-      showCreateOrderMsg("ok", `自送訂單已建立，不會派遣 UBee 騎士。送達點：${stopCount} 點，訂單編號：${orderNo}`);
+      showCreateOrderMsg("ok", `店家自送訂單已建立。送達點：${stopCount} 點，訂單編號：${orderNo}`);
       resetCreateOrderForm();
-      setTab("merchant_self_delivery");
+      setTab("self");
       scrollToSection("section-orders");
     }else{
-      showCreateOrderMsg("ok", `派單已建立，已放入「待派遣」。送達點：${stopCount} 點，距離：${distanceText}，配送費：NT$${deliveryFee}。訂單編號：${orderNo}`);
+      showCreateOrderMsg("ok", `正式派單已建立，已進入待派遣。送達點：${stopCount} 點，配送費：NT$${deliveryFee}，訂單編號：${orderNo}`);
       resetCreateOrderForm();
-      setTab("merchant_ready");
+      setTab("todo");
       scrollToSection("section-orders");
     }
   }catch(err){
@@ -1591,238 +1683,8 @@ async function createMerchantOrder(){
   }finally{
     isCreatingMerchantOrder = false;
     btn.disabled = false;
-    btn.textContent = "建立訂單";
+    btn.textContent = "建立正式訂單";
   }
-}
-
-async function loginMerchant(){
-  hideError();
-
-  const input = document.getElementById("merchantKey");
-  const loginBtn = document.getElementById("loginBtn");
-  const phone = normalizePhone(input.value);
-
-  if(!merchantLineUserId){
-    showError("缺少 LINE 使用者資料，請從店家合作中心官方帳號重新開啟店家派單。");
-    forceEnableLoginButton("進入派單中心");
-    return;
-  }
-
-  if(!/^09\d{8}$/.test(phone)){
-    showError("請輸入申請合作時填寫的手機號碼，例如：0912345678。");
-    forceEnableLoginButton("進入派單中心");
-    return;
-  }
-
-  loginBtn.disabled = true;
-  loginBtn.textContent = "綁定中...";
-
-  try{
-    const res = await fetch("/api/merchant/bind", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({phone,lineUserId:merchantLineUserId})
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if(!res.ok || !data.ok){
-      throw new Error(data.message || "店家帳號綁定失敗，請稍後再試。");
-    }
-
-    enterMerchantDashboard(data.merchant);
-  }catch(err){
-    console.error("店家綁定失敗:", err);
-    showError(err.message || "店家綁定失敗，請稍後再試。");
-    forceEnableLoginButton("進入派單中心");
-  }finally{
-    if(!merchantAuthed) forceEnableLoginButton("進入派單中心");
-  }
-}
-
-function logoutMerchant(){
-  localStorage.removeItem(STORAGE_KEY);
-  merchantKey = "";
-  currentMerchant = null;
-  merchantAuthed = false;
-  currentTab = "merchant_pending";
-  ordersMap = {};
-  stopListenOrders();
-
-  document.getElementById("dashboard").classList.add("hidden");
-  document.getElementById("loginBox").classList.remove("hidden");
-  document.getElementById("ordersBox").innerHTML = "";
-  document.getElementById("merchantInfoBox").innerHTML = "";
-  document.getElementById("merchantHorizontalProgressBox").innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
-
-  forceEnableLoginButton("進入派單中心");
-  setTab("merchant_pending");
-}
-
-function stopListenOrders(){
-  unsubscribers.forEach(fn => {
-    try{fn();}catch(e){}
-  });
-  unsubscribers = [];
-}
-
-function startListenOrders(){
-  stopListenOrders();
-
-  const statuses = [
-    "merchant_pending",
-    "merchant_preparing",
-    "merchant_ready",
-    "merchant_self_delivery",
-    "pending_dispatch",
-    "accepted",
-    "arrived_pickup",
-    "picked_up",
-    "arrived_dropoff",
-    "completed"
-  ];
-
-  statuses.forEach(status => {
-    const unsub = db.collection("orders")
-      .where("status", "==", status)
-      .limit(50)
-      .onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          if(change.type === "removed"){
-            delete ordersMap[change.doc.id];
-          }else{
-            ordersMap[change.doc.id] = {
-              id:change.doc.id,
-              ...change.doc.data()
-            };
-          }
-        });
-        renderOrders();
-      }, err => {
-        console.error("讀取訂單失敗:", err);
-      });
-
-    unsubscribers.push(unsub);
-  });
-}
-
-function matchMerchant(order){
-  if(!currentMerchant) return false;
-
-  const currentPhone = normalizePhone(currentMerchant.merchantPhone);
-  const currentId = String(currentMerchant.merchantId || currentMerchant.id || "").trim();
-
-  const orderMerchantPhone = normalizePhone(order.merchantPhone);
-  const orderPickupPhone = normalizePhone(order.pickupPhone);
-  const orderMerchantCode = String(order.merchantCode || "").trim();
-  const orderMerchantId = String(order.merchantId || "").trim();
-
-  if(currentId && orderMerchantId && orderMerchantId === currentId) return true;
-  if(currentId && orderMerchantCode && orderMerchantCode === currentId) return true;
-  if(currentPhone && orderMerchantPhone && orderMerchantPhone === currentPhone) return true;
-  if(currentPhone && orderPickupPhone && orderPickupPhone === currentPhone) return true;
-
-  return false;
-}
-
-function getVisibleOrders(){
-  return Object.values(ordersMap)
-    .filter(order => {
-      if(currentTab === "delivery_progress") return deliveryStatuses.includes(order.status);
-      if(currentTab === "merchant_self_delivery") return order.status === "merchant_self_delivery";
-      return order.status === currentTab;
-    })
-    .filter(matchMerchant)
-    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
-}
-
-function setTab(tab){
-  currentTab = tab;
-
-  document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
-  const active = document.querySelector(`[data-tab="${tab}"]`);
-  if(active) active.classList.add("active");
-
-  renderOrders();
-}
-
-function updateCounts(){
-  const all = Object.values(ordersMap).filter(matchMerchant);
-
-  const pending = all.filter(o => o.status === "merchant_pending").length;
-  const preparing = all.filter(o => o.status === "merchant_preparing").length;
-  const ready = all.filter(o => o.status === "merchant_ready").length;
-  const selfDelivery = all.filter(o => o.status === "merchant_self_delivery").length;
-  const delivery = all.filter(o => deliveryStatuses.includes(o.status)).length;
-  const completed = all.filter(o => o.status === "completed").length;
-
-  document.getElementById("countPending").textContent = pending;
-  document.getElementById("countPreparing").textContent = preparing;
-  document.getElementById("countReady").textContent = ready;
-  document.getElementById("countSelfDelivery").textContent = selfDelivery;
-  document.getElementById("countDelivery").textContent = delivery;
-  document.getElementById("countCompleted").textContent = completed;
-
-  document.getElementById("summaryToday").textContent = all.length;
-  document.getElementById("summaryReady").textContent = ready;
-  document.getElementById("summaryDelivery").textContent = delivery;
-  document.getElementById("summaryCompleted").textContent = completed;
-}
-
-function renderOrders(){
-  updateCounts();
-  renderMerchantHorizontalProgress();
-
-  const box = document.getElementById("ordersBox");
-  const orders = getVisibleOrders();
-
-  if(!orders.length){
-    box.innerHTML = `<div class="empty">目前沒有「${statusTextMap[currentTab] || currentTab}」訂單</div>`;
-    return;
-  }
-
-  box.innerHTML = orders.map(order => renderOrderCard(order)).join("");
-}
-
-function renderMerchantHorizontalProgress(){
-  const box = document.getElementById("merchantHorizontalProgressBox");
-  if(!box) return;
-
-  const activeOrders = Object.values(ordersMap)
-    .filter(matchMerchant)
-    .filter(order => deliveryStatuses.includes(order.status))
-    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
-
-  if(!activeOrders.length){
-    box.innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
-    return;
-  }
-
-  const order = activeOrders[0];
-  const currentStatus = order.status || "";
-  const currentIndex = merchantDeliverySteps.findIndex(step => step.status === currentStatus);
-  const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
-  const orderNo = order.orderNo || order.id || "未命名訂單";
-
-  box.innerHTML = `
-    <div class="row"><b>最新配送訂單：</b>${escapeHtml(orderNo)}</div>
-    <div class="small">目前共有 ${activeOrders.length} 筆配送中訂單</div>
-    <div class="horizontalFlow">
-      ${merchantDeliverySteps.map((step,index) => {
-        let cls = "";
-        let icon = "○";
-        if(index < safeCurrentIndex){cls = "done"; icon = "✓";}
-        if(index === safeCurrentIndex){cls = "current"; icon = "●";}
-        return `
-          <div class="horizontalStep ${cls}">
-            <div class="circle">${icon}</div>
-            <div>${escapeHtml(step.text)}</div>
-          </div>
-          ${index < merchantDeliverySteps.length - 1 ? `<div class="horizontalLine ${index < safeCurrentIndex ? "done" : ""}"></div>` : ""}
-        `;
-      }).join("")}
-    </div>
-  `;
 }
 
 function renderDeliveryStops(order){
@@ -1833,7 +1695,7 @@ function renderDeliveryStops(order){
   if(stops.length){
     return `
       <div class="stopList">
-        <div class="stopListTitle">多點配送明細</div>
+        <div class="stopListTitle">送達點明細</div>
         ${stops.map(stop => `
           <div class="stopListItem">
             <div class="row"><b>第 ${escapeHtml(stop.index || "")} 點：</b>${escapeHtml(stop.dropoffAddress || "未填寫")}</div>
@@ -1848,7 +1710,7 @@ function renderDeliveryStops(order){
 
   return `
     <div class="stopList">
-      <div class="stopListTitle">多點配送明細</div>
+      <div class="stopListTitle">送達點明細</div>
       <div class="row">${escapeHtml(order.deliveryStopsText || "")}</div>
     </div>
   `;
@@ -1875,11 +1737,6 @@ function renderOrderCard(order){
 
   const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
 
-  let riderText = "";
-  if(deliveryStatuses.includes(order.status) || order.status === "completed"){
-    riderText = `<div class="row"><b>配送進度：</b>${escapeHtml(progressText)}</div>`;
-  }
-
   let buttonHtml = "";
 
   if(order.status === "merchant_pending"){
@@ -1891,17 +1748,22 @@ function renderOrderCard(order){
   }
 
   if(order.status === "merchant_ready" && order.deliveryType !== "merchant"){
-    buttonHtml = `<button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">派遣騎士</button>`;
+    buttonHtml = `<button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">確認派遣騎士</button>`;
   }
 
   if(order.status === "merchant_self_delivery"){
     buttonHtml = `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','completed')">店家自送完成</button>`;
   }
 
+  const lockedText = order.status === "completed"
+    ? `<div class="notice">此訂單已完成，正式營運資料不建議再修改。</div>`
+    : "";
+
   return `
     <div class="order">
-      <div class="badge">${escapeHtml(statusTextMap[order.status] || order.status)}</div>
+      <div class="badge">${escapeHtml(progressText)}</div>
       <h3>${escapeHtml(orderNo)}</h3>
+
       <div class="row"><b>建立時間：</b>${escapeHtml(formatTime(order))}</div>
       <div class="row"><b>客人：</b>${escapeHtml(customerName)}</div>
       <div class="row"><b>電話：</b>${escapeHtml(customerPhone)}</div>
@@ -1921,7 +1783,7 @@ function renderOrderCard(order){
 
       <div class="row" style="margin-top:10px;"><b>備註：</b>${escapeHtml(note || "無")}</div>
       ${renderDeliveryStops(order)}
-      ${riderText}
+      ${lockedText}
       ${buttonHtml}
     </div>
   `;
@@ -1931,11 +1793,11 @@ async function updateOrderStatus(orderId, nextStatus){
   const confirmTextMap = {
     merchant_preparing:"確定接受訂單並開始準備嗎？",
     merchant_ready:"確定商品已準備完成嗎？",
-    pending_dispatch:"確定要派遣騎士嗎？派遣後騎士端會收到此任務。",
+    pending_dispatch:"派遣後會進入騎士接單流程，請確認要正式派遣騎士嗎？",
     completed:"確定此訂單已完成嗎？"
   };
 
-  if(!confirm(confirmTextMap[nextStatus] || "確定更新狀態嗎？")) return;
+  if(!confirm(confirmTextMap[nextStatus] || "確定更新訂單狀態嗎？")) return;
 
   const updateData = {
     status:nextStatus,
@@ -1956,7 +1818,6 @@ async function updateOrderStatus(orderId, nextStatus){
 }
 
 window.addEventListener("load", async () => {
-  applyAutoTheme();
   setupScrollSpy();
   renderExtraStopFields();
 
@@ -1974,6 +1835,7 @@ window.addEventListener("load", async () => {
 
   try{
     await initMerchantLiff();
+
     if(merchantLineUserId){
       await loadMerchantProfile();
     }
