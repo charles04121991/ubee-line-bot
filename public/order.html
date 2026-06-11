@@ -1316,14 +1316,6 @@ body.day-mode .bottom-tabs{
           </div>
           <div class="speed-desc">優先處理｜30–45 分鐘｜+NT$60</div>
         </div>
-
-        <div class="speed-card" data-value="rush" onclick="selectSpeed(this, 'rush')">
-          <div class="speed-top">
-            <div class="speed-name">急件</div>
-            <div class="speed-check">✓</div>
-          </div>
-          <div class="speed-desc">最高優先｜20–30 分鐘｜+NT$100</div>
-        </div>
       </div>
 
       <button class="btn btn-secondary yellow-outline" type="button" onclick="calculateEstimate()">先計算預估費用</button>
@@ -2529,10 +2521,9 @@ document.getElementById('pricePreview').innerHTML = `
 
 function getSpeedLabel(value){
   const map = {
-    standard:'標準件｜60–90 分鐘｜+NT$15',
-    priority:'快速件｜45–60 分鐘｜+NT$20',
-    express:'優先件｜30–45 分鐘｜+NT$60',
-    rush:'急件｜20–30 分鐘｜+NT$100'
+    standard:'一般件｜60–90 分鐘｜+NT$15',
+    priority:'標準件｜45–60 分鐘｜+NT$20',
+    express:'優先件｜30–45 分鐘｜+NT$25'
   };
   return map[value] || value;
 }
