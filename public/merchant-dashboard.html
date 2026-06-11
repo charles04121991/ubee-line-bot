@@ -537,7 +537,6 @@ button.red{background:var(--red);color:#fff}
     <div class="section" id="section-overview">
       <h2 id="welcomeTitle">店家派單中心</h2>
       <div class="merchantInfo" id="merchantInfoBox"></div>
-      <div class="small">正式營運資料以 UBee 管理端建檔為準，請確認店家電話與取件地址正確。</div>
 
       <div class="summaryGrid">
         <div class="summaryCard">
@@ -1112,11 +1111,11 @@ function enterMerchantDashboard(merchant){
   document.getElementById("dashboard").classList.remove("hidden");
 
   document.getElementById("merchantInfoBox").innerHTML = `
-    <strong class="approved">🟢 已審核店家</strong>
-    <div>店家名稱：${escapeHtml(currentMerchant.merchantName || "未設定")}</div>
-    <div>店家電話：${escapeHtml(currentMerchant.merchantPhone || "未設定")}</div>
-    <div>取件地址：${escapeHtml(currentMerchant.merchantAddress || "未設定")}</div>
-  `;
+  <strong class="approved">🟢 審核通過店家</strong>
+  <div style="margin-top:10px;">
+    正式營運資料以 UBee 管理端建檔為準，請確認店家電話與取件地址正確。
+  </div>
+`;
 
   document.getElementById("storeName").textContent = currentMerchant.merchantName || "店家名稱未設定";
   document.getElementById("storePhone").textContent = currentMerchant.merchantPhone || "未設定";
