@@ -116,13 +116,6 @@ async function sendNewOrderPushToRiders(order) {
   }
 }
 
-    console.log(`UBee 推播完成：成功 ${response.successCount}，失敗 ${response.failureCount}`);
-
-  } catch (err) {
-    console.error("UBee 新任務推播失敗:", err);
-  }
-}
-
 const PAYMENT_JKO_INFO =
   (process.env.PAYMENT_JKO_INFO || '街口支付\n帳號：請填入你的街口帳號').replace(/\\n/g, '\n');
 
