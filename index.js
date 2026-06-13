@@ -2344,20 +2344,8 @@ async function pushToUser(userId, messages) {
 }
 
 async function notifyCustomer(order, messages) {
-  try {
-    const targetUserId = order?.userId || order?.customerId;
-
-    if (!targetUserId || targetUserId === 'web-order') {
-      console.log(`⚠️ 訂單 ${order?.id || 'UNKNOWN'} 沒有綁定客人 LINE userId`);
-      return false;
-    }
-
-    await pushToUser(targetUserId, messages);
-    return true;
-  } catch (err) {
-    console.error(`❌ 通知客人失敗：${order?.id || 'UNKNOWN'}`, err);
-    return false;
-  }
+  console.log(`UBee 客人 LINE 通知已暫停：${order?.id || 'UNKNOWN'}`);
+  return false;
 }
 
 async function pushToGroup(groupId, messages) {
