@@ -84,6 +84,66 @@ const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
 // ===== 已審核騎手白名單 =====
 const APPROVED_RIDER_IDS = [];
 
+async function sendNewOrderPushToRiders(order) {
+  try {
+    const orderId = order.id || order.orderId || "";
+    if (!orderId) return;
+
+    const ridersSnap = await db
+      .collection("riders")
+      .where("approved", "==", true)
+      .where("online", "==", true)
+      .where("pushEnabled", "==", true)
+      .get();
+
+    if (ridersSnap.empty) {
+      console.log("UBee 推播：目前沒有符合條件的上線騎士");
+      return;
+    }
+
+    const tokens = [];
+
+    ridersSnap.forEach(doc => {
+      const rider = doc.data();
+      if (rider.pushToken) {
+        tokens.push(rider.pushToken);
+      }
+    });
+
+    if (!tokens.length) {
+      console.log("UBee 推播：符合條件的騎士沒有 pushToken");
+      return;
+    }
+
+    const fee = order.driverFee || order.riderFee || order.fee || order.price || "";
+    const pickup = order.pickupAddress || order.fromAddress || order.pickup || "附近取件地";
+
+    const response = await admin.messaging().sendEachForMulticast({
+      tokens,
+      notification: {
+        title: "UBee 新任務",
+        body: `${pickup}｜騎士收入 $${fee}`
+      },
+      data: {
+        type: "new_order",
+        orderId: String(orderId)
+      },
+      webpush: {
+        notification: {
+          icon: "/ubee-rider-icon.png?v=1",
+          badge: "/ubee-rider-icon.png?v=1",
+          requireInteraction: true
+        }
+      }
+    });
+
+    console.log(`UBee 推播完成：成功 ${response.successCount}，失敗 ${response.failureCount}`);
+
+  } catch (err) {
+    console.error("UBee 新任務推播失敗:", err);
+  }
+}
+
 const PAYMENT_JKO_INFO =
   (process.env.PAYMENT_JKO_INFO || '街口支付\n帳號：請填入你的街口帳號').replace(/\\n/g, '\n');
 
