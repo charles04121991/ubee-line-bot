@@ -1799,8 +1799,21 @@ let orderCounter = 1;
 
 async function saveOrder(order) {
   if (!order || !order.id) return order;
+
   orders[order.id] = order;
+
   await db.collection('orders').doc(order.id).set(order, { merge: true });
+
+  if (order.status === 'pending_dispatch' && !order.pushSentAt) {
+    await sendNewOrderPushToRiders(order);
+
+    await db.collection('orders').doc(order.id).set({
+      pushSentAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    order.pushSentAt = Date.now();
+  }
+
   return order;
 }
 
