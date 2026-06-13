@@ -3355,16 +3355,6 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
     await saveOrder(order);
-
-    try {
-      const customerMessage = isCashPayment
-        ? `✅ 已確認現金付款方式。\n\n訂單編號：${order.id}\n應付金額：NT$${Math.round(Number(order.total || 0))}\n\n系統正在為你配對合作夥伴，任務完成時請將現金交付給騎士。`
-        : `✅ 已收到你的付款通知。\n\n訂單編號：${order.id}\n🚀 系統正在為你配對騎手，請稍候...`;
-
-      await notifyCustomer(order, createTextMessage(customerMessage));
-    } catch (notifyErr) {
-      console.error('⚠️ 付款確認成功，但通知客人失敗：', notifyErr);
-    }
     
     try {
       await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
