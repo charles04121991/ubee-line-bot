@@ -1,12 +1,25 @@
 {
-  "name": "UBee 城市任務平台",
-  "short_name": "UBee",
-  "description": "UBee 城市任務平台",
-  "start_url": "/order.html",
+  "name": "UBee 騎士端",
+  "short_name": "UBee騎士",
+  "description": "UBee 騎士端派單接單系統",
+  "start_url": "/rider.html",
   "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
   "orientation": "portrait-primary",
-  "icons": []
+  "icons": [
+    {
+      "src": "/ubee-rider-icon.png?v=1",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/ubee-rider-icon.png?v=1",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
