@@ -89,53 +89,32 @@ async function sendNewOrderPushToRiders(order) {
     const orderId = order.id || order.orderId || "";
     if (!orderId) return;
 
-    const ridersSnap = await db
-      .collection("riders")
-      .where("approved", "==", true)
-      .where("online", "==", true)
-      .where("pushEnabled", "==", true)
-      .get();
-
-    if (ridersSnap.empty) {
-      console.log("UBee 推播：目前沒有符合條件的上線騎士");
-      return;
-    }
-
-    const tokens = [];
-
-    ridersSnap.forEach(doc => {
-      const rider = doc.data();
-      if (rider.pushToken) {
-        tokens.push(rider.pushToken);
-      }
-    });
-
-    if (!tokens.length) {
-      console.log("UBee 推播：符合條件的騎士沒有 pushToken");
-      return;
-    }
-
-    const fee = order.driverFee || order.riderFee || order.fee || order.price || "";
+    const fee = order.driverFee || order.riderFee || order.fee || order.price || "未設定";
     const pickup = order.pickupAddress || order.fromAddress || order.pickup || "附近取件地";
+    const dropoff = order.dropoffAddress || order.toAddress || order.dropoff || "送達地未提供";
 
-    const response = await admin.messaging().sendEachForMulticast({
-      tokens,
-      notification: {
-        title: "UBee 新任務",
-        body: `${pickup}｜騎士收入 $${fee}`
-      },
-      data: {
-        type: "new_order",
-        orderId: String(orderId)
-      },
-      webpush: {
-        notification: {
-          icon: "/ubee-rider-icon.png?v=1",
-          badge: "/ubee-rider-icon.png?v=1",
-          requireInteraction: true
-        }
-      }
-    });
+    try {
+      await client.pushMessage("Cdc5a9583fb1364402c2a3e4e5edb4c1b", {
+        type: "text",
+        text:
+`🔔 UBee 新任務通知
+
+有新的跑腿任務等待接單
+
+📍取件：${pickup}
+🏁送達：${dropoff}
+💰騎士收入：$${fee}`
+      });
+
+      console.log(`UBee LINE 新任務通知已送出：${orderId}`);
+    } catch (lineErr) {
+      console.error("UBee LINE 新任務通知失敗:", lineErr);
+    }
+
+  } catch (err) {
+    console.error("UBee 新任務通知失敗:", err);
+  }
+}
 
     console.log(`UBee 推播完成：成功 ${response.successCount}，失敗 ${response.failureCount}`);
 
