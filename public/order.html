@@ -2432,8 +2432,11 @@ function getData(){
     speedType,
     queueMinutes,
     pickup: document.getElementById('pickup').value.trim(),
+    pickupAddress: document.getElementById('pickup').value.trim(),
     pickupPhone: document.getElementById('pickupPhone').value.trim(),
+
     dropoff: document.getElementById('dropoff').value.trim(),
+    dropoffAddress: document.getElementById('dropoff').value.trim(),
     dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
     item: document.getElementById('item').value.trim(),
     note: [note, ...extra].filter(Boolean).join('\n'),
