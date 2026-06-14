@@ -2627,9 +2627,8 @@ function renderConfirmSummary(){
     document.getElementById('pricePreview').innerHTML = isQueueTask() ? `
       <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
       <div class="price-row"><span>預估排隊時間</span><strong>${getQueueMinutes()} 分鐘內</strong></div>
-      <div class="price-row"><span>計費方式</span><strong>後端計算</strong></div>
-      <div class="price-row"><span>預估金額</span><strong>送出後計算</strong></div>
-    ` : `
+      <div class="price-row"><span>計費方式</span><strong>依排隊時間計算</strong></div>
+      <div class="price-row"><span>預估金額</span><strong>建立訂單後顯示</strong></div>    ` : `
       <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
       <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
       <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
@@ -2691,8 +2690,8 @@ async function calculateEstimate(silent){
       estimateText.innerHTML = `
         <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
         <div class="price-row"><span>預估排隊時間</span><strong>${queueMinutes} 分鐘內</strong></div>
-        <div class="price-row"><span>計費方式</span><strong>後端計算</strong></div>
-        <div class="price-row"><span>預估金額</span><strong>送出後計算</strong></div>
+        <div class="price-row"><span>計費方式</span><strong>依排隊時間計算</strong></div>
+        <div class="price-row"><span>預估金額</span><strong>建立訂單後顯示</strong></div>
       `;
     }
 
