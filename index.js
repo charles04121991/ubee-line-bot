@@ -3315,7 +3315,7 @@ if (data.serviceMode === 'queue') {
     platformFee: 0
   };
 } else {
-  distance = await getDistanceMatrixCache(data.pickupAddress, data.dropoffAddress);
+  distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
 
   if(!distance || !distance.distanceMeters){
     return res.status(400).json({
