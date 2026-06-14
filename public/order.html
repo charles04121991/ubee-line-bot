@@ -1943,6 +1943,20 @@ function syncQueueLocation(){
   if(dropoffPhone && !dropoffPhone.value.trim()) dropoffPhone.value = pickupPhone;
 }
 
+function isAutoFilledItem(value){
+  const text = String(value || '').trim();
+
+  if(!text){
+    return true;
+  }
+
+  const allTypes = Object.values(serviceGroups)
+    .flat()
+    .map(item => item.title);
+
+  return allTypes.some(type => text.startsWith(type + '｜'));
+}
+
 function applyQueueMode(){
   const pickupTitle = document.getElementById('pickupSectionTitle');
   const pickupInput = document.getElementById('pickup');
@@ -1958,9 +1972,9 @@ function applyQueueMode(){
     if(dropoffSection) dropoffSection.classList.add('hidden');
     if(queueTimeField) queueTimeField.classList.remove('hidden');
 
-    if(itemInput && (!itemInput.value.trim() || queueServiceTypes.some(t => itemInput.value.includes(t)))){
-      itemInput.value = `${serviceType}｜${serviceCategory || '排隊服務'}`;
-    }
+    if(itemInput && isAutoFilledItem(itemInput.value)){
+      itemInput.value = `${serviceType}｜${serviceCategory || '現場服務'}`;
+     }
 
     syncQueueLocation();
     return;
@@ -1974,7 +1988,7 @@ function applyQueueMode(){
     if(dropoffSection) dropoffSection.classList.add('hidden');
     if(queueTimeField) queueTimeField.classList.add('hidden');
 
-    if(itemInput && !itemInput.value.trim()){
+    if(itemInput && isAutoFilledItem(itemInput.value)){
       itemInput.value = `${serviceType}｜${serviceCategory || '現場服務'}`;
     }
 
