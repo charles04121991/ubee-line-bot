@@ -1893,6 +1893,19 @@ function setActive(parentId, el, selector){
 
 const queueServiceTypes = ['一般排隊', '醫院排隊', '銀行排隊', '餐廳候位'];
 
+const onsiteServiceTypes = [
+  '手機貼膜',
+  '洗衣送洗',
+  '洗鞋代送',
+  '送禮服務',
+  '其他生活需求'
+];
+
+function isOnsiteTask(){
+  return serviceGroup === 'life' &&
+         onsiteServiceTypes.includes(serviceType);
+}
+
 function isQueueTask(){
   return serviceGroup === 'life' && queueServiceTypes.includes(serviceType);
 }
@@ -1941,14 +1954,31 @@ function applyQueueMode(){
     }
 
     syncQueueLocation();
-  }else{
-    serviceMode = 'normal';
-
-    if(pickupTitle) pickupTitle.innerText = '取件資訊';
-    if(pickupInput) pickupInput.placeholder = '取件地址 / 店家地址 / 任務地點';
-    if(dropoffSection) dropoffSection.classList.remove('hidden');
-    if(queueTimeField) queueTimeField.classList.add('hidden');
+    return;
   }
+
+  if(isOnsiteTask()){
+    serviceMode = 'onsite';
+
+    if(pickupTitle) pickupTitle.innerText = '服務地點';
+    if(pickupInput) pickupInput.placeholder = '請輸入服務地點 / 店家地址 / 任務地點';
+    if(dropoffSection) dropoffSection.classList.add('hidden');
+    if(queueTimeField) queueTimeField.classList.add('hidden');
+
+    if(itemInput && !itemInput.value.trim()){
+      itemInput.value = `${serviceType}｜${serviceCategory || '現場服務'}`;
+    }
+
+    return;
+  }
+
+  serviceMode = 'normal';
+
+  if(pickupTitle) pickupTitle.innerText = '取件資訊';
+  if(pickupInput) pickupInput.placeholder = '取件地址 / 店家地址 / 任務地點';
+  if(dropoffSection) dropoffSection.classList.remove('hidden');
+  if(queueTimeField) queueTimeField.classList.add('hidden');
+}
 }
 
 function resetDynamicFields(){
@@ -2375,6 +2405,7 @@ function getData(){
   const taskContent = document.getElementById('taskContent')?.value.trim() || '';
   const note = document.getElementById('note').value.trim();
   const queueMinutes = isQueueTask() ? getQueueMinutes() : 0;
+  const finalServiceMode = isQueueTask() ? 'queue' : isOnsiteTask() ? 'onsite' : 'normal';
 
   if(purchaseContent) extra.push('補充內容：' + purchaseContent);
   if(purchaseStore) extra.push('指定店家/地點：' + purchaseStore);
@@ -2385,8 +2416,11 @@ function getData(){
     serviceType,
     serviceGroup,
     serviceCategory,
-    serviceMode: isQueueTask() ? 'queue' : 'normal',
-    serviceKey: isQueueTask() ? 'helper' : '',
+    serviceMode: finalServiceMode,
+    serviceKey:
+  isQueueTask() ? 'helper' :
+  isOnsiteTask() ? 'onsite' :
+  '',
     speedType,
     queueMinutes,
     pickup: document.getElementById('pickup').value.trim(),
