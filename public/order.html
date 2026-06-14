@@ -1133,6 +1133,22 @@
       </div>
 
       <div id="normalForm">
+        <div id="nearbyPlaceBox" class="form-section hidden">
+  <div class="form-title" id="nearbyPlaceTitle">附近地點</div>
+
+  <div class="full-card">
+    <div class="info-title" id="nearbyPlaceInfoTitle">搜尋附近地點</div>
+    <div class="info-text" id="nearbyPlaceInfoText">
+      系統會依照您目前位置，搜尋 3～5 公里內可用地點。
+    </div>
+
+    <button type="button" class="btn btn-primary" style="margin-top:14px;" onclick="searchNearbyPlaces()">
+      重新搜尋附近地點
+    </button>
+  </div>
+
+  <div id="nearbyPlaceList" class="choice-grid"></div>
+</div>
         <div class="form-section">
           <div class="form-title" id="pickupTitle">取件資訊</div>
           <div class="input-card">
@@ -1707,6 +1723,9 @@ let queueActionValue = '取貨';
 
 let helperNeedsDelivery = '否';
 let helperTimeType = '立即';
+let selectedNearbyPlace = null;
+let nearbySearchRadius = 5000; // 5公里，後端可限制最大值
+window.nearbyPlacesCache = [];
 
 let isSubmittingOrder = false;
 let isConfirmingPaid = false;
