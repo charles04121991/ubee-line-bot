@@ -3300,14 +3300,21 @@ if (data.serviceMode === 'review' || data.serviceKey === 'helper') {
 let price = null;
 
 if (data.serviceMode === 'queue') {
+  const queueMinutes = Number(data.queueMinutes || 0);
+  const waitingFee = Math.max(0, queueMinutes * 3);
+  const serviceFee = 25;
+  const speedFee = 0;
+  const deliveryFee = 80;
+  const total = deliveryFee + waitingFee + serviceFee + speedFee;
+
   price = {
-    deliveryFee: Number(data.manualEstimate?.deliveryFee || 0),
-    serviceFee: 25,
-    speedFee: 0,
-    waitingFee: Number(data.manualEstimate?.waitFee || 0),
-    total: Number(data.total || data.totalFee || data.manualEstimate?.totalFee || 0),
-    driverFee: 0,
-    platformFee: Number(data.total || data.totalFee || data.manualEstimate?.totalFee || 0)
+    deliveryFee,
+    serviceFee,
+    speedFee,
+    waitingFee,
+    total,
+    driverFee: deliveryFee + waitingFee + speedFee,
+    platformFee: serviceFee
   };
 } else if (data.serviceMode === 'review') {
   price = {
