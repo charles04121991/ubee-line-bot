@@ -1691,6 +1691,7 @@ let liffId = '';
 let currentStep = 1;
 
 let selectedService = null;
+let selectedSubType = '';
 let speedType = 'standard';
 
 let currentOrderId = '';
@@ -1789,6 +1790,19 @@ const SERVICE_LIST = [
     examples:'特殊需求、臨時任務、客人不知道該選哪個分類'
   }
 ];
+
+const SERVICE_SUB_TYPES = {
+  buy: [
+    { key:'drink', title:'飲料代買', keyword:'飲料店' },
+    { key:'food', title:'餐點代買', keyword:'餐廳' },
+    { key:'daily', title:'生活用品代買', keyword:'便利商店' }
+  ],
+  pickup: [
+    { key:'convenience', title:'超商取貨', keyword:'便利商店' },
+    { key:'parcel', title:'代領包裹', keyword:'物流' },
+    { key:'document', title:'文件代取', keyword:'文件 影印 店家' }
+  ]
+};
 
 const customerPages = [
   'customerTasksPage',
