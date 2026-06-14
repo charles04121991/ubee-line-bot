@@ -2067,7 +2067,7 @@ function renderServiceCategories(){
     <button
       type="button"
       class="category-choice-item ${index === 0 ? 'active' : ''}"
-      onclick="selectServiceCategory(this, '${escapeHtml(cat)}')"
+      onclick="selectServiceCategory(this, '${cat}')"
     >
       ${escapeHtml(cat)}
     </button>
@@ -2279,7 +2279,7 @@ function renderServiceGrid(groupKey){
   const list = serviceGroups[groupKey] || serviceGroups.send;
 
   grid.innerHTML = list.map((item, index) => `
-    <div class="service-item ${index === 0 ? 'active' : ''}" onclick="selectService(this, '${escapeHtml(item.title)}')">
+    <div class="service-item ${index === 0 ? 'active' : ''}" onclick="selectService(this, '${item.title}')"
       <div class="service-item-icon">${item.icon}</div>
       <div class="service-item-title">${escapeHtml(item.title)}</div>
     </div>
