@@ -2625,15 +2625,17 @@ function renderConfirmSummary(){
     document.getElementById('pricePreview').classList.remove('hidden');
 
     document.getElementById('pricePreview').innerHTML = isQueueTask() ? `
-      <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
-      <div class="price-row"><span>預估排隊時間</span><strong>${getQueueMinutes()} 分鐘內</strong></div>
-      <div class="price-row"><span>計費方式</span><strong>依排隊時間計算</strong></div>
-      <div class="price-row"><span>預估金額</span><strong>建立訂單後顯示</strong></div>    ` : `
-      <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
-      <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
-      <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
-    `;
+  <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
+  <div class="price-row"><span>預估排隊時間</span><strong>${getQueueMinutes()} 分鐘內</strong></div>
+  <div class="price-row"><span>等待費</span><strong>NT$${getQueueMinutes() * 3}</strong></div>
+  <div class="price-row"><span>服務費</span><strong>NT$25</strong></div>
+  <div class="price-row"><span>總金額</span><strong>NT$${80 + (getQueueMinutes() * 3) + 25}</strong></div>
+` : `
+  <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
+  <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
+  <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+  <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
+`;
   }
 }
 
@@ -2674,11 +2676,11 @@ async function calculateEstimate(silent){
     }
 
     lastEstimate = {
-      distanceText: '排隊任務',
-      durationText: `${queueMinutes} 分鐘內`,
-      totalFee: 0,
-      queueMinutes
-    };
+  distanceText: '排隊任務',
+  durationText: `${queueMinutes} 分鐘內`,
+  totalFee: 80 + (queueMinutes * 3) + 25,
+  queueMinutes
+};
 
     const estimateResult = document.getElementById('estimateResult');
     if(estimateResult){
@@ -2688,11 +2690,12 @@ async function calculateEstimate(silent){
     const estimateText = document.getElementById('estimateText');
     if(estimateText){
       estimateText.innerHTML = `
-        <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
-        <div class="price-row"><span>預估排隊時間</span><strong>${queueMinutes} 分鐘內</strong></div>
-        <div class="price-row"><span>計費方式</span><strong>依排隊時間計算</strong></div>
-        <div class="price-row"><span>預估金額</span><strong>建立訂單後顯示</strong></div>
-      `;
+  <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
+  <div class="price-row"><span>預估排隊時間</span><strong>${queueMinutes} 分鐘內</strong></div>
+  <div class="price-row"><span>等待費</span><strong>NT$${queueMinutes * 3}</strong></div>
+  <div class="price-row"><span>服務費</span><strong>NT$25</strong></div>
+  <div class="price-row"><span>預估金額</span><strong>NT$${80 + (queueMinutes * 3) + 25}</strong></div>
+`;
     }
 
     return true;
