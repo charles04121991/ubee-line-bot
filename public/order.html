@@ -1133,8 +1133,31 @@
       </div>
 
       <div id="normalForm">
-        <div class="form-section">
-          <div class="form-title" id="pickupTitle">取件資訊</div>
+
+  <div id="subTypeBox" class="form-section hidden">
+    <div class="form-title" id="subTypeTitle">請選擇類型</div>
+    <div class="choice-grid" id="subTypeGrid"></div>
+  </div>
+
+  <div id="nearbyPlaceBox" class="form-section hidden">
+    <div class="form-title" id="nearbyPlaceTitle">附近地點</div>
+
+    <div class="full-card">
+      <div class="info-title" id="nearbyPlaceInfoTitle">搜尋附近地點</div>
+      <div class="info-text" id="nearbyPlaceInfoText">
+        系統會依照您目前位置，搜尋 3～5 公里內可用地點。
+      </div>
+
+      <button type="button" class="btn btn-primary" style="margin-top:14px;" onclick="searchNearbyPlaces()">
+        重新搜尋附近地點
+      </button>
+    </div>
+
+    <div id="nearbyPlaceList" class="choice-grid"></div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-title" id="pickupTitle">取件資訊</div>
           <div class="input-card">
             <div class="input-wrap">
               <div class="input-icon">📍</div>
@@ -1968,12 +1991,11 @@ function applyServiceFormMode(){
 
   updateNearbyPlaceBox();
 
-  if(selectedService &&
-    (selectedService.key === 'buy' ||
-    selectedService.key === 'pickup')){
-    searchNearbyPlaces();
+ if(currentStep === 2 && selectedService &&
+  (selectedService.key === 'buy' ||
+  selectedService.key === 'pickup')){
+  searchNearbyPlaces();
 }
-
 }
 
 function updateTaskPathText(){
@@ -3593,6 +3615,216 @@ function fillAddressToOrder(){
 
 function openLineOfficial(){
   window.location.href = 'https://line.me/R/ti/p/@686rwnvn';
+}
+
+function selectSubType(key){
+  selectedSubType = key;
+
+  document.querySelectorAll('#subTypeGrid .choice-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  const btn = document.querySelector(`#subTypeGrid .choice-btn[data-key="${key}"]`);
+  if(btn) btn.classList.add('active');
+
+  updateNearbyPlaceBox();
+  searchNearbyPlaces();
+}
+
+function updateNearbyPlaceBox(){
+  const subTypeBox = document.getElementById('subTypeBox');
+  const subTypeGrid = document.getElementById('subTypeGrid');
+  const subTypeTitle = document.getElementById('subTypeTitle');
+  const nearbyPlaceBox = document.getElementById('nearbyPlaceBox');
+  const nearbyPlaceTitle = document.getElementById('nearbyPlaceTitle');
+  const nearbyPlaceInfoTitle = document.getElementById('nearbyPlaceInfoTitle');
+  const nearbyPlaceInfoText = document.getElementById('nearbyPlaceInfoText');
+
+  if(!selectedService || !subTypeBox || !subTypeGrid || !nearbyPlaceBox) return;
+
+  const list = SERVICE_SUB_TYPES[selectedService.key];
+
+  if(!list){
+    selectedSubType = '';
+    subTypeBox.classList.add('hidden');
+    nearbyPlaceBox.classList.add('hidden');
+    return;
+  }
+
+  subTypeBox.classList.remove('hidden');
+  nearbyPlaceBox.classList.remove('hidden');
+
+  subTypeTitle.innerText = selectedService.key === 'buy'
+    ? '請選擇代買類型'
+    : '請選擇取件類型';
+
+  if(!selectedSubType || !list.some(item => item.key === selectedSubType)){
+  selectedSubType = list[0].key;
+}
+
+  subTypeGrid.innerHTML = list.map(item => `
+    <button
+      class="choice-btn ${selectedSubType === item.key ? 'active' : ''}"
+      data-key="${escapeHtml(item.key)}"
+      type="button"
+      onclick="selectSubType('${item.key}')"
+    >
+      ${escapeHtml(item.title)}
+    </button>
+  `).join('');
+
+  const current = list.find(item => item.key === selectedSubType) || list[0];
+
+  nearbyPlaceTitle.innerText = selectedService.key === 'buy'
+    ? '附近可購買地點'
+    : '附近可取件地點';
+
+  nearbyPlaceInfoTitle.innerText = `搜尋附近${current.title}`;
+  nearbyPlaceInfoText.innerText = '系統會依照您目前位置，協助搜尋附近地點；選擇後會自動帶入取件地址欄位。';
+}
+
+function getCurrentSubType(){
+  if(!selectedService) return null;
+  const list = SERVICE_SUB_TYPES[selectedService.key];
+  if(!list || !list.length) return null;
+
+  if(!selectedSubType || !list.some(item => item.key === selectedSubType)){
+  selectedSubType = list[0].key;
+}
+
+  return list.find(item => item.key === selectedSubType) || list[0];
+}
+
+function getGeoPosition(){
+  return new Promise((resolve, reject) => {
+    if(!navigator.geolocation){
+      reject(new Error('此裝置不支援定位'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      }),
+      err => reject(err),
+      {
+        enableHighAccuracy:true,
+        timeout:8000,
+        maximumAge:60000
+      }
+    );
+  });
+}
+
+async function searchNearbyPlaces(){
+  const nearbyPlaceBox = document.getElementById('nearbyPlaceBox');
+  const nearbyPlaceList = document.getElementById('nearbyPlaceList');
+
+  if(!selectedService || !nearbyPlaceBox || !nearbyPlaceList) return;
+
+  const current = getCurrentSubType();
+
+  if(!current){
+    nearbyPlaceBox.classList.add('hidden');
+    return;
+  }
+
+  nearbyPlaceBox.classList.remove('hidden');
+  nearbyPlaceList.innerHTML = `
+    <button class="choice-btn" type="button" disabled>正在取得附近地點...</button>
+  `;
+
+  try{
+    const location = await getGeoPosition();
+
+    const query = new URLSearchParams({
+      lat: String(location.lat),
+      lng: String(location.lng),
+      keyword: current.keyword || current.title,
+      radius: '5000'
+    });
+
+    const res = await fetch('/api/nearby-places?' + query.toString(), {
+      method:'GET',
+      cache:'no-store'
+    });
+
+    if(!res.ok){
+      throw new Error('附近地點 API 尚未啟用');
+    }
+
+    const data = await res.json();
+    const places = Array.isArray(data.places) ? data.places : [];
+
+    if(!places.length){
+      throw new Error('附近找不到可用地點');
+    }
+
+    renderNearbyPlaces(places.slice(0, 8));
+
+  }catch(err){
+    console.warn('附近地點搜尋失敗，改用 Google Maps 搜尋連結:', err);
+
+    const keyword = current.keyword || current.title;
+    const mapUrl = 'https://www.google.com/maps/search/' + encodeURIComponent(keyword + ' 附近');
+
+    nearbyPlaceList.innerHTML = `
+      <button class="choice-btn" type="button" onclick="window.open('${mapUrl}','_blank')">
+        開啟 Google Maps 搜尋
+      </button>
+      <button class="choice-btn" type="button" onclick="document.getElementById('pickup').focus()">
+        我手動輸入地址
+      </button>
+    `;
+  }
+}
+
+function renderNearbyPlaces(places){
+  const nearbyPlaceList = document.getElementById('nearbyPlaceList');
+  if(!nearbyPlaceList) return;
+
+  nearbyPlaceList.innerHTML = places.map((place, index) => {
+    const name = place.name || place.title || '附近地點';
+    const address = place.address || place.vicinity || place.formatted_address || '';
+    const phone = place.phone || place.formatted_phone_number || '';
+
+    return `
+      <button
+        class="choice-btn"
+        type="button"
+        onclick="selectNearbyPlace(${index})"
+      >
+        ${escapeHtml(name)}${address ? '<br><span style="font-size:11px;color:var(--muted);line-height:1.4;">' + escapeHtml(address) + '</span>' : ''}
+      </button>
+    `;
+  }).join('');
+
+  window.ubeeNearbyPlaces = places;
+}
+
+function selectNearbyPlace(index){
+  const places = window.ubeeNearbyPlaces || [];
+  const place = places[index];
+
+  if(!place) return;
+
+  const name = place.name || place.title || '';
+  const address = place.address || place.vicinity || place.formatted_address || '';
+  const phone = place.phone || place.formatted_phone_number || '';
+
+  const pickupInput = document.getElementById('pickup');
+  const pickupPhoneInput = document.getElementById('pickupPhone');
+
+  if(pickupInput){
+    pickupInput.value = address ? `${name}｜${address}` : name;
+  }
+
+  if(pickupPhoneInput && phone){
+    pickupPhoneInput.value = phone;
+  }
+
+  alert('已帶入取件地點');
 }
 
 renderServiceGrid();
