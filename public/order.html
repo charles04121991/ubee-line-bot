@@ -1209,12 +1209,12 @@ body.day-mode .bottom-tabs{
   <div class="task-path-value" id="taskPathText">尚未選擇</div>
 </div>
       
-      <div class="form-section">
-        <div class="form-title">取件資訊</div>
+      <div class="form-section" id="pickupSection">
+  <div class="form-title" id="pickupSectionTitle">取件資訊</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon"></div>
-            <input id="pickup" maxlength="120" placeholder="取件地址 / 店家地址 / 任務地點">
+            <input id="pickup" maxlength="120" placeholder="取件地址 / 店家地址 / 任務地點" oninput="syncQueueLocation()">
           </div>
           <div class="input-wrap">
             <div class="input-icon"></div>
@@ -1223,8 +1223,8 @@ body.day-mode .bottom-tabs{
         </div>
       </div>
 
-      <div class="form-section">
-        <div class="form-title">送達資訊</div>
+<div class="form-section" id="dropoffSection">
+  <div class="form-title">送達資訊</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon"></div>
@@ -1851,6 +1851,7 @@ if(footerCancelBtn){
 
   if(currentStep === 2){
   updateTaskPathText();
+  applyQueueMode();
 }
   
   if(currentStep === 4){
@@ -1871,13 +1872,21 @@ async function goNext(){
   }
 
   if(currentStep === 3){
+  if(!isQueueTask()){
     const estimateOk = await calculateEstimate(true);
 
     if(!estimateOk){
       alert('估價失敗，請確認取件地址與送達地址是否完整。');
       return;
     }
+  }else{
+    lastEstimate = {
+      distanceText: '排隊任務',
+      durationText: '依現場等待時間計算',
+      totalFee: 0
+    };
   }
+}
 
   if(currentStep < 5){
     currentStep++;
@@ -1895,6 +1904,55 @@ function goPrev(){
 function setActive(parentId, el, selector){
   document.querySelectorAll(`#${parentId} ${selector}`).forEach(o => o.classList.remove('active'));
   el.classList.add('active');
+}
+
+const queueServiceTypes = ['一般排隊', '醫院排隊', '銀行排隊', '餐廳候位'];
+
+function isQueueTask(){
+  return serviceGroup === 'life' && queueServiceTypes.includes(serviceType);
+}
+
+function getQueuePlaceholder(){
+  if(serviceType === '醫院排隊') return '請輸入醫院名稱 / 排隊位置';
+  if(serviceType === '銀行排隊') return '請輸入銀行名稱 / 分行 / 排隊位置';
+  if(serviceType === '餐廳候位') return '請輸入餐廳名稱 / 候位位置';
+  return '請輸入排隊位置';
+}
+
+function syncQueueLocation(){
+  if(!isQueueTask()) return;
+
+  const pickup = document.getElementById('pickup')?.value.trim() || '';
+  const pickupPhone = document.getElementById('pickupPhone')?.value.trim() || '';
+
+  const dropoff = document.getElementById('dropoff');
+  const dropoffPhone = document.getElementById('dropoffPhone');
+
+  if(dropoff) dropoff.value = pickup;
+  if(dropoffPhone && !dropoffPhone.value.trim()) dropoffPhone.value = pickupPhone;
+}
+
+function applyQueueMode(){
+  const pickupTitle = document.getElementById('pickupSectionTitle');
+  const pickupInput = document.getElementById('pickup');
+  const dropoffSection = document.getElementById('dropoffSection');
+  const itemInput = document.getElementById('item');
+
+  if(isQueueTask()){
+    if(pickupTitle) pickupTitle.innerText = '排隊位置';
+    if(pickupInput) pickupInput.placeholder = getQueuePlaceholder();
+    if(dropoffSection) dropoffSection.classList.add('hidden');
+
+    if(itemInput && (!itemInput.value.trim() || queueServiceTypes.some(t => itemInput.value.includes(t)))){
+      itemInput.value = `${serviceType}｜${serviceCategory || '排隊服務'}`;
+    }
+
+    syncQueueLocation();
+  }else{
+    if(pickupTitle) pickupTitle.innerText = '取件資訊';
+    if(pickupInput) pickupInput.placeholder = '取件地址 / 店家地址 / 任務地點';
+    if(dropoffSection) dropoffSection.classList.remove('hidden');
+  }
 }
 
 function resetDynamicFields(){
@@ -2001,6 +2059,7 @@ function selectServiceCategory(el, value){
   serviceCategory = value;
   
   loadMerchantsForCategory();
+  applyQueueMode();
 }
 
 function updateTaskPathText(){
@@ -2015,6 +2074,7 @@ function selectService(el, value){
   serviceType = value;
   renderServiceCategories();
   applyDynamicFields();
+  applyQueueMode();
 }
 
 function getPlaceKeyword(){
@@ -2219,6 +2279,7 @@ function renderServiceGrid(groupKey){
 
   renderServiceCategories();
   applyDynamicFields();
+  applyQueueMode();
 }
 
 function selectServiceFromTab(el, groupKey){
@@ -2370,22 +2431,46 @@ function getData(){
 function validateStep2(){
   updateTaskPathText();
 
+  if(isQueueTask()){
+    syncQueueLocation();
+
+    const pickup = document.getElementById('pickup')?.value.trim() || '';
+    const pickupPhone = document.getElementById('pickupPhone')?.value.trim() || '';
+    const dropoff = document.getElementById('dropoff');
+    const dropoffPhone = document.getElementById('dropoffPhone');
+
+    if(dropoff) dropoff.value = pickup;
+    if(dropoffPhone && !dropoffPhone.value.trim()) dropoffPhone.value = pickupPhone;
+
+    if(!pickup){
+      alert('請輸入排隊位置');
+      return false;
+    }
+
+    if(pickup.length < 3){
+      alert('請輸入完整排隊位置');
+      return false;
+    }
+  }else{
+    const data = getData();
+
+    if(!data.pickup || !data.dropoff){
+      alert('請輸入取件地址與送達地址');
+      return false;
+    }
+
+    if(data.pickup.length < 6 || data.dropoff.length < 6){
+      alert('請輸入完整地址');
+      return false;
+    }
+
+    if(data.pickup.trim() === data.dropoff.trim()){
+      alert('取件地址與送達地址不可相同');
+      return false;
+    }
+  }
+
   const data = getData();
-
-  if(!data.pickup || !data.dropoff){
-    alert('請輸入取件地址與送達地址');
-    return false;
-  }
-
-  if(data.pickup.length < 6 || data.dropoff.length < 6){
-    alert('請輸入完整地址');
-    return false;
-  }
-
-  if(data.pickup.trim() === data.dropoff.trim()){
-    alert('取件地址與送達地址不可相同');
-    return false;
-  }
 
   if(!data.pickupPhone || !data.dropoffPhone){
     alert('請輸入取件電話與送達電話');
@@ -2393,33 +2478,33 @@ function validateStep2(){
   }
 
   const normalizePhone = (value) => {
-  return String(value || '')
-    .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
-    .replace(/\s|-/g, '')
-    .replace(/^\+886/, '0')
-    .replace(/^886/, '0');
-};
+    return String(value || '')
+      .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+      .replace(/\s|-/g, '')
+      .replace(/^\+886/, '0')
+      .replace(/^886/, '0');
+  };
 
-data.pickupPhone = normalizePhone(data.pickupPhone);
-data.dropoffPhone = normalizePhone(data.dropoffPhone);
+  data.pickupPhone = normalizePhone(data.pickupPhone);
+  data.dropoffPhone = normalizePhone(data.dropoffPhone);
 
-const mobilePattern = /^09\d{8}$/;
-const landlinePattern = /^0\d{8,9}$/;
+  const mobilePattern = /^09\d{8}$/;
+  const landlinePattern = /^0\d{8,9}$/;
 
-const isValidPhone = (phone) => {
-  return mobilePattern.test(phone) || landlinePattern.test(phone);
-};
+  const isValidPhone = (phone) => {
+    return mobilePattern.test(phone) || landlinePattern.test(phone);
+  };
 
-if(!isValidPhone(data.pickupPhone) || !isValidPhone(data.dropoffPhone)){
-  alert('請輸入正確電話，例如：0912345678 或 0425234567');
-  return false;
-}
+  if(!isValidPhone(data.pickupPhone) || !isValidPhone(data.dropoffPhone)){
+    alert('請輸入正確電話，例如：0912345678 或 0425234567');
+    return false;
+  }
 
   if(!data.item){
     alert('請輸入任務內容');
     return false;
   }
-  
+
   if((data.serviceGroup === 'buy' || data.serviceGroup === 'life') && data.advancePayment < 0){
     alert('代墊金額不可小於 0');
     return false;
@@ -2429,7 +2514,7 @@ if(!isValidPhone(data.pickupPhone) || !isValidPhone(data.dropoffPhone)){
     alert('請輸入完整任務內容');
     return false;
   }
-  
+
   return true;
 }
 
@@ -2510,7 +2595,11 @@ function renderConfirmSummary(){
   if(lastEstimate){
   document.getElementById('pricePreview').classList.remove('hidden');
 
-document.getElementById('pricePreview').innerHTML = `
+document.getElementById('pricePreview').innerHTML = isQueueTask() ? `
+  <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
+  <div class="price-row"><span>計費方式</span><strong>依現場等待時間計算</strong></div>
+  <div class="price-row"><span>預估金額</span><strong>待客服確認</strong></div>
+` : `
   <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
   <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
   <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
@@ -2521,9 +2610,9 @@ document.getElementById('pricePreview').innerHTML = `
 
 function getSpeedLabel(value){
   const map = {
-    standard:'一般件｜60–90 分鐘｜+NT$15',
-    priority:'標準件｜45–60 分鐘｜+NT$20',
-    express:'優先件｜30–45 分鐘｜+NT$25'
+    standard:'標準件｜60–90 分鐘｜+NT$20',
+    priority:'快速件｜45–60 分鐘｜+NT$25',
+    express:'優先件｜30–45 分鐘｜+NT$30'
   };
   return map[value] || value;
 }
@@ -2546,6 +2635,31 @@ function renderSummary(order){
 }
 
 async function calculateEstimate(silent){
+  
+  if(isQueueTask()){
+  lastEstimate = {
+    distanceText: '排隊任務',
+    durationText: '依現場等待時間計算',
+    totalFee: 0
+  };
+
+  const estimateResult = document.getElementById('estimateResult');
+  if(estimateResult){
+    estimateResult.classList.remove('hidden');
+  }
+
+  const estimateText = document.getElementById('estimateText');
+  if(estimateText){
+    estimateText.innerHTML = `
+      <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
+      <div class="price-row"><span>計費方式</span><strong>依現場等待時間計算</strong></div>
+      <div class="price-row"><span>預估金額</span><strong>待客服確認</strong></div>
+    `;
+  }
+
+  return true;
+}
+
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
 
@@ -3008,11 +3122,8 @@ function openCustomerSubPage(pageId){
   renderCustomerActiveTask();
 }
 
-if(pageId === 'historyTaskPage'){
-  renderCustomerHistoryTasks();
-}
 if(pageId === 'addressPage'){
-  renderLocalAddresses();
+  loadCustomerAddresses();
 }
 if(pageId === 'historyTaskPage'){
   renderCustomerHistoryTasks();
