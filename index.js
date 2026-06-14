@@ -3457,7 +3457,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
     order.paymentMethod = paymentMethod;
     order.paymentMethodLabel = getPaymentMethodLabel(paymentMethod);
     order.paymentStatus = paymentMethod === 'cash' ? 'cash_on_delivery' : 'waiting_confirm';
-    order.cashCollectAmount = paymentMethod === 'cash' ? Number(order.total || 0) : 0;
+    order.cashCollectAmount = paymentMethod === 'cash' ? Number(order.total || order.totalFee || 0) : 0;
     order.cashCollected = false;
     order.status = 'pending_payment';
 
@@ -3474,7 +3474,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       orderId,
       paymentMethod,
       paymentMethodLabel: getPaymentMethodLabel(paymentMethod),
-      paymentInfo: getPaymentInfo(paymentMethod, order.total),
+      paymentInfo: getPaymentInfo(paymentMethod, Number(order.total || order.totalFee || 0)),
       total: order.total,
     });
 
