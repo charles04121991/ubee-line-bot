@@ -1978,8 +1978,7 @@ function applyQueueMode(){
   if(pickupInput) pickupInput.placeholder = '取件地址 / 店家地址 / 任務地點';
   if(dropoffSection) dropoffSection.classList.remove('hidden');
   if(queueTimeField) queueTimeField.classList.add('hidden');
-}
-}
+  } 
 
 function resetDynamicFields(){
   document.getElementById('field-purchase').classList.add('hidden');
@@ -2279,7 +2278,7 @@ function renderServiceGrid(groupKey){
   const list = serviceGroups[groupKey] || serviceGroups.send;
 
   grid.innerHTML = list.map((item, index) => `
-    <div class="service-item ${index === 0 ? 'active' : ''}" onclick="selectService(this, '${item.title}')"
+    <div class="service-item ${index === 0 ? 'active' : ''}" onclick="selectService(this, '${item.title}')">
       <div class="service-item-icon">${item.icon}</div>
       <div class="service-item-title">${escapeHtml(item.title)}</div>
     </div>
