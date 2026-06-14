@@ -1900,7 +1900,7 @@ function renderServiceGrid(){
 
 function selectService(key){
   selectedService = getServiceByKey(key);
-
+  window.ubeeSelectedNearbyPlace = null;
   document.querySelectorAll('.service-card').forEach(btn => btn.classList.remove('active'));
   const cards = [...document.querySelectorAll('.service-card')];
   const index = SERVICE_LIST.findIndex(s => s.key === key);
@@ -2221,6 +2221,8 @@ function getNormalData(){
     item: document.getElementById('item').value.trim(),
     note,
     advancePayment: getAdvancePayment(),
+    nearbyPlace: window.ubeeSelectedNearbyPlace || null,
+    selectedSubType,
     userId,
     merchantId: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
     merchantCode: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
@@ -3812,6 +3814,15 @@ function selectNearbyPlace(index){
   const name = place.name || place.title || '';
   const address = place.address || place.vicinity || place.formatted_address || '';
   const phone = place.phone || place.formatted_phone_number || '';
+  window.ubeeSelectedNearbyPlace = {
+  name,
+  address,
+  phone,
+  placeId: place.placeId || place.place_id || '',
+  lat: place.lat || place.latitude || '',
+  lng: place.lng || place.longitude || '',
+  source: 'nearby_places'
+};
 
   const pickupInput = document.getElementById('pickup');
   const pickupPhoneInput = document.getElementById('pickupPhone');
