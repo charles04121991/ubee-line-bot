@@ -12,12 +12,13 @@
   <meta name="theme-color" content="#000000">
   
   <title>UBee｜建立任務</title>
+
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
   <style>
-    :root{
+:root{
   --bg:#000;
   --card:#101010;
   --card2:#171717;
@@ -71,65 +72,65 @@ body.night-mode{
   --primaryText:#111;
 }
 
-    *{
-      box-sizing:border-box;
-      -webkit-tap-highlight-color:transparent;
-      touch-action:manipulation;
-    }
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
 
-    html{
-      scroll-behavior:smooth;
-      width:100%;
-      min-height:100%;
-      overflow-x:hidden;
-      -webkit-text-size-adjust:100%;
-      touch-action:manipulation;
-      overscroll-behavior:none;
-    }
+html{
+  scroll-behavior:smooth;
+  width:100%;
+  min-height:100%;
+  overflow-x:hidden;
+  -webkit-text-size-adjust:100%;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+}
 
-    body{
-      margin:0;
-      width:100%;
-      min-height:100vh;
-      background:var(--bg);
-      color:var(--text);
-      font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-      overflow-x:hidden;
-      -webkit-text-size-adjust:100%;
-      touch-action:manipulation;
-      overscroll-behavior:none;
-      position:relative;
-    }
+body{
+  margin:0;
+  width:100%;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
+  overflow-x:hidden;
+  -webkit-text-size-adjust:100%;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+  position:relative;
+}
 
-    input,
-    textarea,
-    select,
-    button{
-      font-size:16px !important;
-      -webkit-text-size-adjust:100%;
-      touch-action:manipulation;
-    }
+input,
+textarea,
+select,
+button{
+  font-size:16px !important;
+  -webkit-text-size-adjust:100%;
+  touch-action:manipulation;
+}
 
-    .app{
+.app{
   width:100%;
   max-width:520px;
   min-height:100vh;
   margin:0 auto;
-  padding:calc(20px + env(safe-area-inset-top)) 16px calc(34px + env(safe-area-inset-bottom));
+  padding:calc(20px + env(safe-area-inset-top)) 16px 110px;
   background:var(--bg);
   color:var(--text);
   overflow-x:hidden;
   transition:background .25s ease,color .25s ease;
 }
 
-    .topbar{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      margin-bottom:18px;
-    }
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:18px;
+}
 
-    .icon-btn{
+.icon-btn{
   width:42px;
   height:42px;
   border:1px solid var(--line);
@@ -142,177 +143,177 @@ body.night-mode{
   justify-content:center;
 }
 
-    .brand{
-      font-size:28px;
-      font-weight:1000;
-      letter-spacing:-.5px;
-    }
+.brand{
+  font-size:28px;
+  font-weight:1000;
+  letter-spacing:-.5px;
+}
 
-    .brand span{
-      color:var(--accent);
-    }
+.brand span{
+  color:var(--accent);
+}
 
-    .brand-sub{
-      font-size:11px;
-      color:var(--muted);
-      letter-spacing:2.2px;
-      text-transform:uppercase;
-      text-align:center;
-      margin-top:3px;
-      font-weight:900;
-    }
+.brand-sub{
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:2.2px;
+  text-transform:uppercase;
+  text-align:center;
+  margin-top:3px;
+  font-weight:900;
+}
 
-    .page-count{
-      color:var(--muted);
-      font-size:14px;
-      font-weight:900;
-    }
+.page-count{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:900;
+}
 
-    .hero-card{
-      position:relative;
-      overflow:hidden;
-      border-radius:26px;
-      padding:24px 20px;
-      margin:10px 0 18px;
-      background:
-        radial-gradient(circle at 85% 20%, rgba(250,204,21,.24), transparent 34%),
-        linear-gradient(135deg,var(--card3),var(--card) 45%,var(--bg));
-      color:var(--text);
-      min-height:210px;
-      border:1px solid rgba(250,204,21,.28);
-      box-shadow:0 18px 45px rgba(250,204,21,.06);
-    }
+.hero-card{
+  position:relative;
+  overflow:hidden;
+  border-radius:26px;
+  padding:24px 20px;
+  margin:10px 0 18px;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(250,204,21,.24), transparent 34%),
+    linear-gradient(135deg,var(--card3),var(--card) 45%,var(--bg));
+  color:var(--text);
+  min-height:210px;
+  border:1px solid rgba(250,204,21,.28);
+  box-shadow:0 18px 45px rgba(250,204,21,.06);
+}
 
-    .hero-kicker{
-      font-size:13px;
-      font-weight:1000;
-      letter-spacing:1.5px;
-      color:var(--accent);
-      margin-bottom:8px;
-    }
+.hero-kicker{
+  font-size:13px;
+  font-weight:1000;
+  letter-spacing:1.5px;
+  color:var(--accent);
+  margin-bottom:8px;
+}
 
-    .hero-title{
-      font-size:30px;
-      font-weight:1000;
-      line-height:1.25;
-      letter-spacing:-.6px;
-      margin-bottom:10px;
-      position:relative;
-      z-index:2;
-    }
+.hero-title{
+  font-size:30px;
+  font-weight:1000;
+  line-height:1.25;
+  letter-spacing:-.6px;
+  margin-bottom:10px;
+  position:relative;
+  z-index:2;
+}
 
-    .hero-sub{
-      font-size:14px;
-      font-weight:900;
-      color:var(--muted);
-      line-height:1.6;
-      margin-bottom:18px;
-      position:relative;
-      z-index:2;
-    }
+.hero-sub{
+  font-size:14px;
+  font-weight:900;
+  color:var(--muted);
+  line-height:1.6;
+  margin-bottom:18px;
+  position:relative;
+  z-index:2;
+}
 
-    .hero-btn{
-      display:inline-flex;
-      align-items:center;
-      gap:10px;
-      border:none;
-      background:var(--primary);
-      color:var(--primaryText);
-      border-radius:999px;
-      padding:12px 20px;
-      font-size:16px;
-      font-weight:1000;
-      font-family:inherit;
-      position:relative;
-      z-index:2;
-    }
+.hero-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  border:none;
+  background:var(--primary);
+  color:var(--primaryText);
+  border-radius:999px;
+  padding:12px 20px;
+  font-size:16px;
+  font-weight:1000;
+  font-family:inherit;
+  position:relative;
+  z-index:2;
+}
 
-    .hero-illust{
-      position:absolute;
-      right:12px;
-      bottom:8px;
-      width:126px;
-      height:126px;
-      border-radius:34px;
-      background:rgba(250,204,21,.18);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:66px;
-      box-shadow:0 18px 45px rgba(0,0,0,.16);
-    }
+.hero-illust{
+  position:absolute;
+  right:12px;
+  bottom:8px;
+  width:126px;
+  height:126px;
+  border-radius:34px;
+  background:rgba(250,204,21,.18);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:66px;
+  box-shadow:0 18px 45px rgba(0,0,0,.16);
+}
 
-    .category-tabs{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:6px;
-      background:var(--card2);
-      border:1px solid var(--line);
-      border-radius:22px;
-      padding:8px;
-      margin-bottom:22px;
-    }
+.category-tabs{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:6px;
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:8px;
+  margin-bottom:22px;
+}
 
-    .category-tab{
-      border:none;
-      background:transparent;
-      color:var(--muted);
-      border-radius:16px;
-      padding:11px 4px;
-      font-size:12px;
-      font-weight:1000;
-      font-family:inherit;
-      white-space:nowrap;
-    }
+.category-tab{
+  border:none;
+  background:transparent;
+  color:var(--muted);
+  border-radius:16px;
+  padding:11px 4px;
+  font-size:12px;
+  font-weight:1000;
+  font-family:inherit;
+  white-space:nowrap;
+}
 
-    .category-tab.active{
-      background:var(--primary);
-      color:var(--primaryText);
-    }
+.category-tab.active{
+  background:var(--primary);
+  color:var(--primaryText);
+}
 
-    .section-label{
-      font-size:18px;
-      font-weight:1000;
-      margin:4px 0 14px;
-    }
+.section-label{
+  font-size:18px;
+  font-weight:1000;
+  margin:4px 0 14px;
+}
 
-    .service-grid-new{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
-      gap:12px;
-      margin-bottom:20px;
-    }
+.service-grid-new{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
+  gap:12px;
+  margin-bottom:20px;
+}
 
-    .service-item{
-      border:1px solid var(--line);
-      background:linear-gradient(180deg,var(--card2),var(--card));
-      border-radius:18px;
-      min-height:98px;
-      padding:12px 6px;
-      text-align:center;
-      cursor:pointer;
-      transition:.16s ease;
-    }
+.service-item{
+  border:1px solid var(--line);
+  background:linear-gradient(180deg,var(--card2),var(--card));
+  border-radius:18px;
+  min-height:98px;
+  padding:12px 6px;
+  text-align:center;
+  cursor:pointer;
+  transition:.16s ease;
+}
 
-    .service-item.active{
-      border-color:var(--accent);
-      box-shadow:0 0 0 1px rgba(250,204,21,.32);
-      background:linear-gradient(180deg,rgba(250,204,21,.18),var(--card));
-    }
+.service-item.active{
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px rgba(250,204,21,.32);
+  background:linear-gradient(180deg,rgba(250,204,21,.18),var(--card));
+}
 
-    .service-item-icon{
-      font-size:28px;
-      margin-bottom:8px;
-    }
+.service-item-icon{
+  font-size:28px;
+  margin-bottom:8px;
+}
 
-    .service-item-title{
-      font-size:13px;
-      font-weight:1000;
-      color:var(--text);
-      line-height:1.35;
-    }
+.service-item-title{
+  font-size:13px;
+  font-weight:1000;
+  color:var(--text);
+  line-height:1.35;
+}
 
-    .trust-strip{
+.trust-strip{
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:12px;
@@ -330,63 +331,65 @@ body.night-mode{
   pointer-events:none;
 }
 
-    .trust-icon{
-      font-size:20px;
-      margin-bottom:4px;
-    }
+.trust-icon{
+  font-size:20px;
+  margin-bottom:4px;
+}
 
-    .trust-title{
-      font-size:13px;
-      font-weight:1000;
-      color:var(--text);
-    }
+.trust-title{
+  font-size:13px;
+  font-weight:1000;
+  color:var(--text);
+}
 
-    .trust-desc{
-      font-size:11px;
-      color:var(--muted);
-      font-weight:800;
-      margin-top:3px;
-      line-height:1.4;
-    }
+.trust-desc{
+  font-size:11px;
+  color:var(--muted);
+  font-weight:800;
+  margin-top:3px;
+  line-height:1.4;
+}
 
-    .step{
-      display:none;
-      animation:fade .18s ease;
-    }
+.step{
+  display:none;
+  animation:fade .18s ease;
+}
 
-    .step.active{
-      display:block;
-    }
+.step.active{
+  display:block;
+}
 
-    @keyframes fade{
-      from{opacity:.4;transform:translateY(6px);}
-      to{opacity:1;transform:translateY(0);}
-    }
+@keyframes fade{
+  from{opacity:.4;transform:translateY(6px);}
+  to{opacity:1;transform:translateY(0);}
+}
 
-    .headline{
-      font-size:28px;
-      font-weight:1000;
-      line-height:1.28;
-      margin:8px 0 10px;
-      letter-spacing:-.4px;
-    }
+.headline{
+  font-size:28px;
+  font-weight:1000;
+  line-height:1.28;
+  margin:8px 0 10px;
+  letter-spacing:-.4px;
+}
 
-    .subtext{
-      color:var(--muted);
-      font-size:15px;
-      line-height:1.8;
-      margin-bottom:20px;
-      font-weight:700;
-    }
+.subtext{
+  color:var(--muted);
+  font-size:15px;
+  line-height:1.8;
+  margin-bottom:20px;
+  font-weight:700;
+}
 
-    .info-box{
-      background:linear-gradient(180deg,var(--card2),var(--card));
-      border:1px solid var(--line);
-      border-radius:20px;
-      padding:18px;
-      margin:16px 0;
-    }
-    .merchant-card{
+.info-box,
+.content-card{
+  background:linear-gradient(180deg,var(--card2),var(--card));
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:18px;
+  margin:16px 0;
+}
+
+.merchant-card{
   border:1px solid rgba(250,204,21,.38);
   background:linear-gradient(180deg,rgba(250,204,21,.14),var(--card));
   border-radius:20px;
@@ -408,371 +411,380 @@ body.night-mode{
   margin-bottom:6px;
 }
 
-.merchant-card-text{
+.merchant-card-text,
+.info-text,
+.content-text{
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.8;
+  font-weight:800;
+}
+
+.info-title,
+.content-title{
+  font-size:20px;
+  font-weight:1000;
+  margin-bottom:10px;
+}
+
+.form-section{
+  margin-bottom:22px;
+}
+
+.form-title{
+  font-size:16px;
+  font-weight:1000;
+  color:var(--text);
+  margin:0 0 10px;
+}
+
+.input-card{
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:18px;
+  overflow:hidden;
+}
+
+.input-wrap{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px;
+  border-bottom:1px solid var(--line);
+}
+
+.input-wrap:last-child{
+  border-bottom:none;
+}
+
+.input-icon{
+  width:26px;
+  flex:0 0 26px;
+  text-align:center;
+  font-size:19px;
+  opacity:.9;
+}
+
+input,
+textarea,
+select{
+  width:100%;
+  border:none;
+  outline:none;
+  background:transparent;
+  color:var(--text);
+  font-size:16px;
+  font-family:inherit;
+  font-weight:800;
+  padding:4px 0;
+}
+
+select option{
+  background:#111;
+  color:#fff;
+}
+
+body.day-mode select option{
+  background:#fff;
+  color:#111;
+}
+
+textarea{
+  min-height:78px;
+  resize:vertical;
+  line-height:1.7;
+}
+
+input::placeholder,
+textarea::placeholder{
+  color:var(--muted2);
+}
+
+.speed-card{
+  border:1px solid var(--line);
+  background:linear-gradient(180deg,var(--card2),var(--card));
+  border-radius:19px;
+  padding:18px;
+  margin-bottom:12px;
+  cursor:pointer;
+  transition:.16s ease;
+}
+
+.speed-card.active{
+  border-color:var(--accent);
+  background:rgba(250,204,21,.16);
+}
+
+.speed-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+
+.speed-name{
+  font-size:22px;
+  font-weight:1000;
+}
+
+.speed-check{
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  border:2px solid var(--line2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  font-weight:1000;
+  color:#000;
+  background:transparent;
+}
+
+.speed-card.active .speed-check{
+  background:var(--accent);
+  border-color:var(--accent);
+}
+
+.speed-desc{
   color:var(--muted);
   font-size:14px;
   line-height:1.7;
   font-weight:800;
 }
 
-    .info-title{
-      font-size:20px;
-      font-weight:1000;
-      margin-bottom:10px;
-    }
+.summary-card{
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:20px;
+  overflow:hidden;
+  margin-bottom:16px;
+}
 
-    .info-text{
-      color:var(--muted);
-      font-size:15px;
-      line-height:1.8;
-      font-weight:800;
-    }
+.summary-row{
+  display:flex;
+  gap:14px;
+  padding:14px 16px;
+  border-bottom:1px solid var(--line);
+}
 
-    .form-section{
-      margin-bottom:22px;
-    }
+.summary-row:last-child{
+  border-bottom:none;
+}
 
-    .form-title{
-      font-size:16px;
-      font-weight:1000;
-      color:var(--text);
-      margin:0 0 10px;
-    }
+.summary-icon{
+  width:28px;
+  flex:0 0 28px;
+  font-size:20px;
+  opacity:.95;
+}
 
-    .input-card{
-      border:1px solid var(--line);
-      background:var(--card);
-      border-radius:18px;
-      overflow:hidden;
-    }
+.summary-label{
+  color:var(--muted);
+  font-size:13px;
+  font-weight:900;
+  margin-bottom:4px;
+}
 
-    .input-wrap{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      padding:14px;
-      border-bottom:1px solid var(--line);
-    }
+.summary-value{
+  color:var(--text);
+  font-size:15px;
+  font-weight:900;
+  line-height:1.5;
+  word-break:break-word;
+}
 
-    .input-wrap:last-child{
-      border-bottom:none;
-    }
+.price-box{
+  border:1px solid var(--line);
+  background:var(--card2);
+  border-radius:20px;
+  padding:16px;
+  margin:16px 0;
+}
 
-    .input-icon{
-      width:26px;
-      flex:0 0 26px;
-      text-align:center;
-      font-size:19px;
-      opacity:.9;
-    }
+.price-row{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  padding:9px 0;
+  border-bottom:1px solid var(--line);
+  color:var(--muted);
+  font-size:15px;
+  font-weight:800;
+}
 
-    input,textarea{
-      width:100%;
-      border:none;
-      outline:none;
-      background:transparent;
-      color:var(--text);
-      font-size:16px;
-      font-family:inherit;
-      font-weight:800;
-      padding:4px 0;
-    }
+.price-row:last-child{
+  border-bottom:none;
+  color:var(--text);
+  font-size:21px;
+  font-weight:1000;
+}
 
-    textarea{
-      min-height:78px;
-      resize:vertical;
-      line-height:1.7;
-    }
+.price-row strong{
+  color:var(--text);
+}
 
-    input::placeholder,textarea::placeholder{
-      color:var(--muted2);
-    }
+.notice{
+  border:1px solid rgba(239,68,68,.42);
+  background:rgba(239,68,68,.07);
+  border-radius:18px;
+  padding:16px;
+  margin:16px 0;
+}
 
-    .speed-card{
-      border:1px solid var(--line);
-      background:linear-gradient(180deg,var(--card2),var(--card));
-      border-radius:19px;
-      padding:18px;
-      margin-bottom:12px;
-      cursor:pointer;
-      transition:.16s ease;
-    }
+.notice-title{
+  color:var(--red);
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:8px;
+}
 
-    .speed-card.active{
-      border-color:var(--accent);
-      background:rgba(250,204,21,.16);
-    }
+.notice ul{
+  margin:0;
+  padding-left:18px;
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.8;
+  font-weight:800;
+}
 
-    .speed-top{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:8px;
-    }
+.confirm-box{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  border:1px solid var(--line2);
+  background:var(--card2);
+  border-radius:18px;
+  padding:14px;
+  margin-top:14px;
+  cursor:pointer;
+}
 
-    .speed-name{
-      font-size:22px;
-      font-weight:1000;
-    }
+.confirm-box input{
+  width:auto;
+  margin-top:4px;
+  accent-color:var(--accent);
+  transform:scale(1.2);
+}
 
-    .speed-check{
-      width:26px;
-      height:26px;
-      border-radius:50%;
-      border:2px solid var(--line2);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:14px;
-      font-weight:1000;
-      color:#000;
-      background:transparent;
-    }
+.confirm-text{
+  font-size:14px;
+  line-height:1.7;
+  font-weight:900;
+  color:var(--text);
+}
 
-    .speed-card.active .speed-check{
-      background:var(--accent);
-      border-color:var(--accent);
-    }
+.success{
+  text-align:center;
+  padding:28px 0 10px;
+}
 
-    .speed-desc{
-      color:var(--muted);
-      font-size:14px;
-      line-height:1.7;
-      font-weight:800;
-    }
+.success-icon{
+  width:104px;
+  height:104px;
+  border-radius:999px;
+  border:2px solid var(--accent);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:20px auto 28px;
+  font-size:54px;
+  font-weight:1000;
+  color:var(--accent);
+  box-shadow:0 0 45px rgba(250,204,21,.12);
+}
 
-    .summary-card{
-      border:1px solid var(--line);
-      background:var(--card);
-      border-radius:20px;
-      overflow:hidden;
-      margin-bottom:16px;
-    }
+.success-title{
+  font-size:28px;
+  font-weight:1000;
+  margin-bottom:18px;
+}
 
-    .summary-row{
-      display:flex;
-      gap:14px;
-      padding:14px 16px;
-      border-bottom:1px solid var(--line);
-    }
+.order-no{
+  color:var(--text);
+  font-size:24px;
+  font-weight:1000;
+  letter-spacing:.5px;
+  margin:8px 0 16px;
+}
 
-    .summary-row:last-child{
-      border-bottom:none;
-    }
+.status{
+  white-space:pre-line;
+  background:rgba(34,197,94,.08);
+  border:1px solid rgba(34,197,94,.42);
+  border-radius:18px;
+  padding:15px;
+  font-size:15px;
+  line-height:1.8;
+  margin-top:14px;
+  color:var(--text);
+  font-weight:800;
+}
 
-    .summary-icon{
-      width:28px;
-      flex:0 0 28px;
-      font-size:20px;
-      opacity:.95;
-    }
+.payment-info{
+  white-space:pre-line;
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:15px;
+  font-size:15px;
+  line-height:1.8;
+  margin-top:14px;
+  color:var(--text);
+  font-weight:800;
+  text-align:left;
+}
 
-    .summary-label{
-      color:var(--muted);
-      font-size:13px;
-      font-weight:900;
-      margin-bottom:4px;
-    }
+.btn-row{
+  display:flex;
+  gap:10px;
+  margin-top:22px;
+}
 
-    .summary-value{
-      color:var(--text);
-      font-size:15px;
-      font-weight:900;
-      line-height:1.5;
-      word-break:break-word;
-    }
+.btn{
+  width:100%;
+  border:none;
+  border-radius:18px;
+  padding:16px;
+  font-size:17px;
+  font-weight:1000;
+  font-family:inherit;
+  cursor:pointer;
+  transition:.16s ease;
+}
 
-    .price-box{
-      border:1px solid var(--line);
-      background:var(--card2);
-      border-radius:20px;
-      padding:16px;
-      margin:16px 0;
-    }
+.btn:active{
+  transform:scale(.985);
+}
 
-    .price-row{
-      display:flex;
-      justify-content:space-between;
-      gap:14px;
-      padding:9px 0;
-      border-bottom:1px solid var(--line);
-      color:var(--muted);
-      font-size:15px;
-      font-weight:800;
-    }
+.btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
 
-    .price-row:last-child{
-      border-bottom:none;
-      color:var(--text);
-      font-size:21px;
-      font-weight:1000;
-    }
+.btn-primary{
+  background:var(--primary);
+  color:var(--primaryText);
+}
 
-    .price-row strong{
-      color:var(--text);
-    }
+.btn-secondary{
+  background:var(--card2);
+  color:var(--text);
+  border:1px solid var(--line2);
+}
 
-    .notice{
-      border:1px solid rgba(239,68,68,.42);
-      background:rgba(239,68,68,.07);
-      border-radius:18px;
-      padding:16px;
-      margin:16px 0;
-    }
+.btn-secondary.yellow-outline{
+  border-color:rgba(250,204,21,.55);
+  color:var(--accent);
+}
 
-    .notice-title{
-      color:var(--red);
-      font-size:18px;
-      font-weight:1000;
-      margin-bottom:8px;
-    }
+.btn-danger{
+  background:var(--red);
+  color:#fff;
+}
 
-    .notice ul{
-      margin:0;
-      padding-left:18px;
-      color:var(--muted);
-      font-size:14px;
-      line-height:1.8;
-      font-weight:800;
-    }
-
-    .confirm-box{
-      display:flex;
-      gap:10px;
-      align-items:flex-start;
-      border:1px solid var(--line2);
-      background:var(--card2);
-      border-radius:18px;
-      padding:14px;
-      margin-top:14px;
-      cursor:pointer;
-    }
-
-    .confirm-box input{
-      width:auto;
-      margin-top:4px;
-      accent-color:var(--accent);
-      transform:scale(1.2);
-    }
-
-    .confirm-text{
-      font-size:14px;
-      line-height:1.7;
-      font-weight:900;
-      color:var(--text);
-    }
-
-    .success{
-      text-align:center;
-      padding:28px 0 10px;
-    }
-
-    .success-icon{
-      width:104px;
-      height:104px;
-      border-radius:999px;
-      border:2px solid var(--accent);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      margin:20px auto 28px;
-      font-size:54px;
-      font-weight:1000;
-      color:var(--accent);
-      box-shadow:0 0 45px rgba(250,204,21,.12);
-    }
-
-    .success-title{
-      font-size:28px;
-      font-weight:1000;
-      margin-bottom:18px;
-    }
-
-    .order-no{
-      color:var(--text);
-      font-size:24px;
-      font-weight:1000;
-      letter-spacing:.5px;
-      margin:8px 0 16px;
-    }
-
-    .status{
-      white-space:pre-line;
-      background:rgba(34,197,94,.08);
-      border:1px solid rgba(34,197,94,.42);
-      border-radius:18px;
-      padding:15px;
-      font-size:15px;
-      line-height:1.8;
-      margin-top:14px;
-      color:var(--text);
-      font-weight:800;
-    }
-
-    .payment-info{
-      white-space:pre-line;
-      background:var(--card2);
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:15px;
-      font-size:15px;
-      line-height:1.8;
-      margin-top:14px;
-      color:var(--text);
-      font-weight:800;
-      text-align:left;
-    }
-
-    .btn-row{
-      display:flex;
-      gap:10px;
-      margin-top:22px;
-    }
-
-    .btn{
-      width:100%;
-      border:none;
-      border-radius:18px;
-      padding:16px;
-      font-size:17px;
-      font-weight:1000;
-      font-family:inherit;
-      cursor:pointer;
-      transition:.16s ease;
-    }
-
-    .btn:active{
-      transform:scale(.985);
-    }
-
-    .btn:disabled{
-      opacity:.45;
-      cursor:not-allowed;
-    }
-
-    .btn-primary{
-      background:var(--primary);
-      color:var(--primaryText);
-    }
-
-    .btn-secondary{
-      background:var(--card2);
-      color:var(--text);
-      border:1px solid var(--line2);
-    }
-
-    .btn-secondary.yellow-outline{
-      border-color:rgba(250,204,21,.55);
-      color:var(--accent);
-    }
-
-    .btn-danger{
-      background:var(--red);
-      color:#fff;
-    }
-
-    .category-choice-box{
+.category-choice-box{
   margin:12px 0 20px;
   border:1px solid rgba(250,204,21,.35);
   background:linear-gradient(180deg,rgba(250,204,21,.12),var(--card));
@@ -832,11 +844,11 @@ body.night-mode{
   line-height:1.6;
 }
     
-    .hidden{
-      display:none !important;
-    }
+.hidden{
+  display:none !important;
+}
 
-     .customer-progress{
+.customer-progress{
   margin-top:18px;
   padding:16px;
   border:1px solid var(--line);
@@ -888,15 +900,13 @@ body.night-mode{
   font-weight:900;
 }
 
-    .footer-nav{
-      position:sticky;
-      bottom:0;
-      background:linear-gradient(180deg,rgba(0,0,0,0),var(--bg) 22%);
-      padding-top:18px;
-      margin-top:10px;
-    }
-    .app{
-  padding-bottom:110px;
+.footer-nav{
+  position:sticky;
+  bottom:0;
+  background:linear-gradient(180deg,rgba(0,0,0,0),var(--bg) 22%);
+  padding-top:18px;
+  margin-top:10px;
+  margin-bottom:78px;
 }
 
 .app-section{
@@ -1033,27 +1043,6 @@ body.night-mode{
   font-weight:1000;
 }
 
-.content-card{
-  border:1px solid var(--line);
-  background:var(--card);
-  border-radius:22px;
-  padding:18px;
-  margin-bottom:14px;
-}
-
-.content-title{
-  font-size:18px;
-  font-weight:1000;
-  margin-bottom:8px;
-}
-
-.content-text{
-  color:var(--muted);
-  font-size:14px;
-  font-weight:800;
-  line-height:1.8;
-}
-
 .rule-list{
   margin:0;
   padding-left:20px;
@@ -1107,21 +1096,17 @@ body.day-mode .bottom-tabs{
   margin-bottom:3px;
 }
 
-.footer-nav{
-  margin-bottom:78px;
+@media(max-width:380px){
+  .app{padding:18px 12px 110px;}
+  .headline{font-size:25px;}
+  .brand{font-size:25px;}
+  .hero-title{font-size:27px;}
+  .hero-illust{width:104px;height:104px;font-size:54px;}
+  .service-grid-new{gap:9px;}
+  .service-item{min-height:92px;}
+  .service-item-title{font-size:12px;}
+  .category-tab{font-size:11px;padding:10px 2px;}
 }
-
-    @media(max-width:380px){
-      .app{padding:18px 12px 110px;}
-      .headline{font-size:25px;}
-      .brand{font-size:25px;}
-      .hero-title{font-size:27px;}
-      .hero-illust{width:104px;height:104px;font-size:54px;}
-      .service-grid-new{gap:9px;}
-      .service-item{min-height:92px;}
-      .service-item-title{font-size:12px;}
-      .category-tab{font-size:11px;padding:10px 2px;}
-    }
   </style>
 </head>
 
@@ -1138,7 +1123,6 @@ body.day-mode .bottom-tabs{
     </div>
 
     <section class="step active" id="step1">
-
       <div class="hero-card">
         <div class="hero-kicker">UBee 城市任務平台</div>
         <div class="hero-title">今天需要 UBee<br>幫你做什麼？</div>
@@ -1152,27 +1136,27 @@ body.day-mode .bottom-tabs{
       <div id="merchantInfoBox" class="merchant-card hidden"></div>
       
       <div class="category-tabs">
-  <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'life')">生活跑腿</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'business')">商務支援</button>
-  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">急件專送</button>
-</div>
+        <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'life')">生活跑腿</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'business')">商務支援</button>
+        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">急件專送</button>
+      </div>
 
       <div id="serviceArea" class="section-label">常用服務</div>
 
       <div class="service-grid-new" id="serviceGrid"></div>
 
       <div id="serviceCategoryBox" class="category-choice-box hidden">
-  <div class="category-choice-title" id="serviceCategoryTitle">請選擇分類</div>
-  <div class="category-choice-grid" id="serviceCategoryGrid"></div>
-</div>
+        <div class="category-choice-title" id="serviceCategoryTitle">請選擇分類</div>
+        <div class="category-choice-grid" id="serviceCategoryGrid"></div>
+      </div>
       
       <div id="merchantSelectBox" class="category-choice-box hidden">
-  <div class="category-choice-title">選擇合作店家</div>
-  <div class="category-choice-grid" id="merchantSelectGrid"></div>
-</div>
+        <div class="category-choice-title">選擇合作店家</div>
+        <div class="category-choice-grid" id="merchantSelectGrid"></div>
+      </div>
 
       <div class="trust-strip">
         <div class="trust-item">
@@ -1205,12 +1189,12 @@ body.day-mode .bottom-tabs{
       <div class="subtext">地址越完整，系統估價越準。</div>
 
       <div class="task-path-box">
-  <div class="task-path-title">任務內容</div>
-  <div class="task-path-value" id="taskPathText">尚未選擇</div>
-</div>
+        <div class="task-path-title">任務內容</div>
+        <div class="task-path-value" id="taskPathText">尚未選擇</div>
+      </div>
       
       <div class="form-section" id="pickupSection">
-  <div class="form-title" id="pickupSectionTitle">取件資訊</div>
+        <div class="form-title" id="pickupSectionTitle">取件資訊</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon"></div>
@@ -1223,8 +1207,8 @@ body.day-mode .bottom-tabs{
         </div>
       </div>
 
-<div class="form-section" id="dropoffSection">
-  <div class="form-title">送達資訊</div>
+      <div class="form-section" id="dropoffSection">
+        <div class="form-title">送達資訊</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon"></div>
@@ -1248,16 +1232,28 @@ body.day-mode .bottom-tabs{
             <div class="input-icon">✎</div>
             <textarea id="note" maxlength="200" placeholder="備註：請填寫品牌、數量、規格、顏色、注意事項。包裹請先拍照上傳官方帳號確認內容物。"></textarea>
           </div>
-             <div class="input-wrap">
-                <div class="input-icon">💰</div>
-             <input
-                id="advancePayment"
-                type="number"
-                min="0"
-                inputmode="numeric"
-                placeholder="預估代墊金額，例如：350，沒有請填 0"
-              >
-            </div>
+          <div class="input-wrap">
+            <div class="input-icon">💰</div>
+            <input id="advancePayment" type="number" min="0" inputmode="numeric" placeholder="預估代墊金額，例如：350，沒有請填 0">
+          </div>
+        </div>
+      </div>
+
+      <div id="queueTimeField" class="form-section hidden">
+        <div class="form-title">預估排隊時間</div>
+        <div class="input-card">
+          <div class="input-wrap">
+            <div class="input-icon">⏱️</div>
+            <select id="queueMinutes">
+              <option value="">請選擇排隊時間</option>
+              <option value="15">15 分鐘內</option>
+              <option value="30">30 分鐘內</option>
+              <option value="45">45 分鐘內</option>
+              <option value="60">60 分鐘內</option>
+              <option value="90">90 分鐘內</option>
+              <option value="120">120 分鐘內</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1377,257 +1373,246 @@ body.day-mode .bottom-tabs{
     </section>
 
     <section class="app-section" id="customerTasksPage">
-  <div class="headline">我的任務</div>
-  <div class="subtext">查看目前任務狀態、歷史紀錄與訂單資訊。</div>
+      <div class="headline">我的任務</div>
+      <div class="subtext">查看目前任務狀態、歷史紀錄與訂單資訊。</div>
 
-  <div class="menu-group">
-    <div class="menu-title">任務管理</div>
-    <div class="menu-list">
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
-        <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
-        <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-    </div>
-  </div>
-  
-    <div class="menu-group">
-    <div class="menu-title">最近任務</div>
-    <div id="recentTaskList" class="content-text">正在讀取最近任務...</div>
-  </div>
-</section>
-
-<section class="app-section" id="customerProfilePage">
-  <div class="member-card">
-    <div class="member-title">UBee 會員</div>
-    <div class="member-sub" id="memberInfoText">LINE 會員｜使用 UBee 建立城市任務</div>
-
-    <div class="member-stats">
-      <div class="member-stat"><strong id="memberTaskCount">0</strong><span>累積任務</span></div>
-      <div class="member-stat"><strong>0</strong><span>可用優惠</span></div>
-      <div class="member-stat"><strong id="memberLevelText">一般</strong><span>會員等級</span></div>
-    </div>
-  </div>
-
-  <div class="menu-group">
-    <div class="menu-title">我的任務</div>
-    <div class="menu-list">
-      <button class="menu-item" type="button" onclick="showTasksTab()">
-        <div class="menu-left"><div class="menu-icon">📦</div><div>我的任務</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
-        <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
-        <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-    </div>
-  </div>
-
-  <div class="menu-group">
-    <div class="menu-title">會員服務</div>
-    <div class="menu-list">
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('couponPage')">
-        <div class="menu-left"><div class="menu-icon">🎟️</div><div>優惠券</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('addressPage')">
-        <div class="menu-left"><div class="menu-icon">📍</div><div>常用地址</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('supportPage')">
-        <div class="menu-left"><div class="menu-icon">💬</div><div>客服中心</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('cancelRulePage')">
-        <div class="menu-left"><div class="menu-icon">⚠️</div><div>取消規則</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-      <button class="menu-item" type="button" onclick="openCustomerSubPage('faqPage')">
-        <div class="menu-left"><div class="menu-icon">❓</div><div>常見問題</div></div>
-        <div class="menu-arrow">›</div>
-      </button>
-    </div>
-  </div>
-</section>
-
-<section class="app-section" id="activeTaskPage">
-  <div class="sub-page-head">
-    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-    <div class="sub-title">進行中任務</div>
-  </div>
-  <div class="content-card">
-    <div class="content-title">目前任務狀態</div>
-    <div class="content-text" id="activeTaskText">目前沒有進行中的任務。建立訂單後，任務狀態會顯示在這裡。</div>
-  </div>
-</section>
-
-<section class="app-section" id="historyTaskPage">
-  <div class="sub-page-head">
-    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-    <div class="sub-title">歷史任務</div>
-  </div>
-  <div class="content-card">
-  <div class="content-title">任務紀錄</div>
-
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
-    <button class="category-choice-item active" type="button" onclick="setHistoryFilter(this, 'all')">全部</button>
-    <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'completed')">已完成</button>
-    <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'cancelled')">已取消</button>
-  </div>
-
-  <div class="content-text" id="historyTaskText">正在讀取歷史任務...</div>
-</div>
-</section>
-
-<section class="app-section" id="couponPage">
-  <div class="sub-page-head">
-    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-    <div class="sub-title">優惠券</div>
-  </div>
-  <div class="content-card">
-  <div class="content-title">目前沒有可用優惠</div>
-  <div class="content-text">後續若有優惠活動，會顯示在這裡。</div>
-</div>
-</section>
-
-<section class="app-section" id="addressPage">
-  <div class="sub-page-head">
-    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-    <div class="sub-title">常用地址</div>
-  </div>
-
-  <div class="content-card">
-    <div class="content-title">常用地址</div>
-    <div class="content-text" style="margin-bottom:14px;">
-      可先填寫住家、公司或常用地址，下單時可以複製使用。
-    </div>
-
-    <div class="form-section">
-      <div class="form-title">住家地址</div>
-      <div class="input-card">
-        <div class="input-wrap">
-          <input id="homeAddressInput" maxlength="120" placeholder="請輸入住家地址">
+      <div class="menu-group">
+        <div class="menu-title">任務管理</div>
+        <div class="menu-list">
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
+            <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
+            <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
         </div>
       </div>
-    </div>
+      
+      <div class="menu-group">
+        <div class="menu-title">最近任務</div>
+        <div id="recentTaskList" class="content-text">正在讀取最近任務...</div>
+      </div>
+    </section>
 
-    <div class="form-section">
-      <div class="form-title">公司地址</div>
-      <div class="input-card">
-        <div class="input-wrap">
-          <input id="companyAddressInput" maxlength="120" placeholder="請輸入公司地址">
+    <section class="app-section" id="customerProfilePage">
+      <div class="member-card">
+        <div class="member-title">UBee 會員</div>
+        <div class="member-sub" id="memberInfoText">LINE 會員｜使用 UBee 建立城市任務</div>
+
+        <div class="member-stats">
+          <div class="member-stat"><strong id="memberTaskCount">0</strong><span>累積任務</span></div>
+          <div class="member-stat"><strong>0</strong><span>可用優惠</span></div>
+          <div class="member-stat"><strong id="memberLevelText">一般</strong><span>會員等級</span></div>
         </div>
       </div>
-    </div>
 
-    <div class="form-section">
-      <div class="form-title">其他常用地址</div>
-      <div class="input-card">
-        <div class="input-wrap">
-          <input id="favoriteAddressInput" maxlength="120" placeholder="請輸入常用地址">
+      <div class="menu-group">
+        <div class="menu-title">我的任務</div>
+        <div class="menu-list">
+          <button class="menu-item" type="button" onclick="showTasksTab()">
+            <div class="menu-left"><div class="menu-icon">📦</div><div>我的任務</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
+            <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
+            <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
         </div>
       </div>
-    </div>
 
-    <button type="button" class="btn btn-primary" onclick="saveCustomerAddresses()">
-      儲存常用地址
-    </button>
+      <div class="menu-group">
+        <div class="menu-title">會員服務</div>
+        <div class="menu-list">
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('couponPage')">
+            <div class="menu-left"><div class="menu-icon">🎟️</div><div>優惠券</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('addressPage')">
+            <div class="menu-left"><div class="menu-icon">📍</div><div>常用地址</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('supportPage')">
+            <div class="menu-left"><div class="menu-icon">💬</div><div>客服中心</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('cancelRulePage')">
+            <div class="menu-left"><div class="menu-icon">⚠️</div><div>取消規則</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+          <button class="menu-item" type="button" onclick="openCustomerSubPage('faqPage')">
+            <div class="menu-left"><div class="menu-icon">❓</div><div>常見問題</div></div>
+            <div class="menu-arrow">›</div>
+          </button>
+        </div>
+      </div>
+    </section>
 
-    <button type="button" class="btn btn-secondary" style="margin-top:12px;" onclick="fillAddressToOrder()">
-      帶入住家地址到下單頁
-    </button>
-  </div>
-</section>
+    <section class="app-section" id="activeTaskPage">
+      <div class="sub-page-head">
+        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+        <div class="sub-title">進行中任務</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">目前任務狀態</div>
+        <div class="content-text" id="activeTaskText">目前沒有進行中的任務。建立訂單後，任務狀態會顯示在這裡。</div>
+      </div>
+    </section>
 
-<section class="app-section" id="supportPage">
-  <div class="sub-page-head">
-    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-    <div class="sub-title">客服中心</div>
-  </div>
-  <div class="content-card">
-    <div class="content-title">聯絡 UBee 客服</div>
-    <div class="content-text">如需修改訂單、確認付款、任務異常或合作洽詢，請回到 LINE 官方帳號與客服聯繫。</div>
-  </div>
-</section>
+    <section class="app-section" id="historyTaskPage">
+      <div class="sub-page-head">
+        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+        <div class="sub-title">歷史任務</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">任務紀錄</div>
 
-<section class="app-section" id="cancelRulePage">
-  <div class="sub-page-head">
-    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-    <div class="sub-title">取消規則</div>
-  </div>
-  <div class="content-card">
-    <div class="content-title">訂單取消說明</div>
-    <ul class="rule-list">
-      <li>尚未付款：可直接取消，不收費。</li>
-      <li>付款後尚未接單：可申請取消，依實際狀況處理退款。</li>
-      <li>騎士已接單：可能產生取消費。</li>
-      <li>騎士已抵達或已取件：需依任務進度收取相關費用。</li>
-      <li>內容與現場不符、違禁品或高風險任務，UBee 可取消訂單。</li>
-    </ul>
-  </div>
-</section>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+          <button class="category-choice-item active" type="button" onclick="setHistoryFilter(this, 'all')">全部</button>
+          <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'completed')">已完成</button>
+          <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'cancelled')">已取消</button>
+        </div>
 
-<section class="app-section" id="faqPage">
-  <div class="sub-page-head">
-    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-    <div class="sub-title">常見問題</div>
-  </div>
-  <div class="content-card">
-    <div class="content-title">UBee 可以幫我做什麼？</div>
-    <div class="content-text">可以協助文件急送、物品配送、代取、代買、生活跑腿與商務支援。</div>
-  </div>
-  <div class="content-card">
-    <div class="content-title">什麼時候開始派單？</div>
-    <div class="content-text">完成付款並確認後，系統才會開始派單給合作騎士。</div>
-  </div>
-  <div class="content-card">
-    <div class="content-title">可以送違禁品或高價現金嗎？</div>
-    <div class="content-text">不可以。違法物品、危險物品、管制物品與高風險現金交付暫不承接。</div>
-  </div>
-</section>
+        <div class="content-text" id="historyTaskText">正在讀取歷史任務...</div>
+      </div>
+    </section>
+
+    <section class="app-section" id="couponPage">
+      <div class="sub-page-head">
+        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+        <div class="sub-title">優惠券</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">目前沒有可用優惠</div>
+        <div class="content-text">後續若有優惠活動，會顯示在這裡。</div>
+      </div>
+    </section>
+
+    <section class="app-section" id="addressPage">
+      <div class="sub-page-head">
+        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+        <div class="sub-title">常用地址</div>
+      </div>
+
+      <div class="content-card">
+        <div class="content-title">常用地址</div>
+        <div class="content-text" style="margin-bottom:14px;">
+          可先填寫住家、公司或常用地址，下單時可以複製使用。
+        </div>
+
+        <div class="form-section">
+          <div class="form-title">住家地址</div>
+          <div class="input-card">
+            <div class="input-wrap">
+              <input id="homeAddressInput" maxlength="120" placeholder="請輸入住家地址">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-title">公司地址</div>
+          <div class="input-card">
+            <div class="input-wrap">
+              <input id="companyAddressInput" maxlength="120" placeholder="請輸入公司地址">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-title">其他常用地址</div>
+          <div class="input-card">
+            <div class="input-wrap">
+              <input id="favoriteAddressInput" maxlength="120" placeholder="請輸入常用地址">
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary" onclick="saveCustomerAddresses()">儲存常用地址</button>
+
+        <button type="button" class="btn btn-secondary" style="margin-top:12px;" onclick="fillAddressToOrder()">帶入住家地址到下單頁</button>
+      </div>
+    </section>
+
+    <section class="app-section" id="supportPage">
+      <div class="sub-page-head">
+        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+        <div class="sub-title">客服中心</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">聯絡 UBee 客服</div>
+        <div class="content-text">如需修改訂單、確認付款、任務異常或合作洽詢，請回到 LINE 官方帳號與客服聯繫。</div>
+      </div>
+    </section>
+
+    <section class="app-section" id="cancelRulePage">
+      <div class="sub-page-head">
+        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+        <div class="sub-title">取消規則</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">訂單取消說明</div>
+        <ul class="rule-list">
+          <li>尚未付款：可直接取消，不收費。</li>
+          <li>付款後尚未接單：可申請取消，依實際狀況處理退款。</li>
+          <li>騎士已接單：可能產生取消費。</li>
+          <li>騎士已抵達或已取件：需依任務進度收取相關費用。</li>
+          <li>內容與現場不符、違禁品或高風險任務，UBee 可取消訂單。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="app-section" id="faqPage">
+      <div class="sub-page-head">
+        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+        <div class="sub-title">常見問題</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">UBee 可以幫我做什麼？</div>
+        <div class="content-text">可以協助文件急送、物品配送、代取、代買、生活跑腿與商務支援。</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">什麼時候開始派單？</div>
+        <div class="content-text">完成付款並確認後，系統才會開始派單給合作騎士。</div>
+      </div>
+      <div class="content-card">
+        <div class="content-title">可以送違禁品或高價現金嗎？</div>
+        <div class="content-text">不可以。違法物品、危險物品、管制物品與高風險現金交付暫不承接。</div>
+      </div>
+    </section>
 
     <div class="footer-nav">
-  <button id="footerCancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:12px;">
-    取消訂單
-  </button>
+      <button id="footerCancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:12px;">
+        取消訂單
+      </button>
 
-  <div class="btn-row">
-    <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
-    <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
-  </div>
-</div>
-<div class="bottom-tabs">
-  <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
-    <span>🏠</span>首頁
-  </button>
-  <button id="tabTasks" class="bottom-tab" type="button" onclick="showTasksTab()">
-    <span>📦</span>任務
-  </button>
-  <button id="tabProfile" class="bottom-tab" type="button" onclick="showProfileTab()">
-    <span>👤</span>我的
-  </button>
-</div>
+      <div class="btn-row">
+        <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
+        <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
+      </div>
+    </div>
+
+    <div class="bottom-tabs">
+      <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
+        <span>🏠</span>首頁
+      </button>
+      <button id="tabTasks" class="bottom-tab" type="button" onclick="showTasksTab()">
+        <span>📦</span>任務
+      </button>
+      <button id="tabProfile" class="bottom-tab" type="button" onclick="showProfileTab()">
+        <span>👤</span>我的
+      </button>
+    </div>
   </div>
 
 <script>
-document.addEventListener('gesturestart', function(e){
-  e.preventDefault();
-});
-
-document.addEventListener('gesturechange', function(e){
-  e.preventDefault();
-});
-
-document.addEventListener('gestureend', function(e){
-  e.preventDefault();
-});
+document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+document.addEventListener('gesturechange', function(e){ e.preventDefault(); });
+document.addEventListener('gestureend', function(e){ e.preventDefault(); });
 
 let lastTouchEnd = 0;
 document.addEventListener('touchend', function(e){
@@ -1656,7 +1641,6 @@ function applyThemeByTime(){
 }
 
 applyThemeByTime();
-
 setInterval(applyThemeByTime, 5 * 60 * 1000);
 
 let userId = 'web-order';
@@ -1665,6 +1649,7 @@ let currentStep = 1;
 let serviceType = '文件急送';
 let serviceGroup = 'send';
 let serviceCategory = '';
+let serviceMode = 'normal';
 let speedType = 'standard';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
@@ -1776,7 +1761,6 @@ const serviceGroups = {
     { icon:'📍', title:'指定送達', categories:['指定時間','指定地點','指定收件人','指定方式','其他指定需求'] },
     { icon:'🛍️', title:'忘帶物品', categories:['手機','鑰匙','錢包','筆電','充電器','其他忘帶物品'] }
   ],
-
   pickup: [
     { icon:'📦', title:'代取包裹', categories:['一般包裹','宅配包裹','店家包裹','網購包裹','其他包裹'] },
     { icon:'📄', title:'代取文件', categories:['合約文件','證明文件','公司文件','收據發票','其他文件'] },
@@ -1788,7 +1772,6 @@ const serviceGroups = {
     { icon:'📍', title:'指定取件', categories:['指定地點','指定時間','指定窗口','指定物品','其他指定需求'] },
     { icon:'🏪', title:'超商取件', categories:['7-ELEVEN','全家','萊爾富','OK','其他超商'] }
   ],
-
   buy: [
     { icon:'🍱', title:'餐點代買', categories:['便當店','小吃店','早餐店','簡餐店','麵食館','速食店','其他餐點'] },
     { icon:'🧋', title:'飲料代買', categories:['手搖飲','咖啡廳','果汁店','連鎖飲料店','其他飲品'] },
@@ -1800,7 +1783,6 @@ const serviceGroups = {
     { icon:'🛒', title:'指定商品', categories:['指定品牌','指定店家','指定型號','指定數量','其他指定商品'] },
     { icon:'🛍️', title:'賣場代買', categories:['全聯','家樂福','寶雅','小北百貨','五金百貨','其他賣場'] }
   ],
-
   life: [
     { icon:'👥', title:'一般排隊', categories:['現場排隊','限量商品','活動排隊','領號碼牌','其他排隊'] },
     { icon:'🏥', title:'醫院排隊', categories:['掛號','領藥','報到等候','檢查排隊','其他醫院排隊'] },
@@ -1812,7 +1794,6 @@ const serviceGroups = {
     { icon:'✨', title:'其他生活需求', categories:['臨時協助','物品代送','現場等候','生活雜事','其他需求'] },
     { icon:'💝', title:'送禮服務', categories:['代買禮物','驚喜送禮','送花','蛋糕配送','節慶送禮','其他送禮需求'] }
   ],
-
   business: [
     { icon:'📄', title:'文件往返', categories:['合約往返','報價單','公司文件','簽收文件','其他文件往返'] },
     { icon:'📦', title:'樣品配送', categories:['商品樣品','餐飲樣品','包材樣品','測試樣品','其他樣品'] },
@@ -1824,7 +1805,6 @@ const serviceGroups = {
     { icon:'🛒', title:'公司採購', categories:['文具用品','辦公用品','飲料餐點','活動用品','其他採購'] },
     { icon:'💼', title:'其他商務需求', categories:['臨時支援','文件處理','物品送取','現場等候','其他商務需求'] }
   ],
-
   urgent: [
     { icon:'📄', title:'緊急文件', categories:['合約文件','證明文件','發票收據','報表資料','其他緊急文件'] },
     { icon:'📦', title:'緊急包裹', categories:['小型包裹','重要物品','店家商品','個人物品','其他緊急包裹'] },
@@ -1837,6 +1817,7 @@ const serviceGroups = {
     { icon:'🚨', title:'其他急件', categories:['臨時需求','特殊任務','重要物品','現場支援','其他急件'] }
   ]
 };
+
 function updateStepUI(){
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step' + currentStep).classList.add('active');
@@ -1844,49 +1825,53 @@ function updateStepUI(){
 
   document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
   document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
+
   const footerCancelBtn = document.getElementById('footerCancelOrderBtn');
-if(footerCancelBtn){
-  footerCancelBtn.classList.toggle('hidden', !(currentStep === 5 && currentOrderId));
-}
+  if(footerCancelBtn){
+    footerCancelBtn.classList.toggle('hidden', !(currentStep === 5 && currentOrderId));
+  }
 
   if(currentStep === 2){
-  updateTaskPathText();
-  applyQueueMode();
-}
+    updateTaskPathText();
+    applyQueueMode();
+  }
   
   if(currentStep === 4){
-  renderConfirmSummary();
-}
+    renderConfirmSummary();
+  }
 
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
 async function goNext(){
   if(currentStep === 1 && (!serviceType || !serviceCategory)){
-  alert('請先選擇服務類型與分類');
-  return;
-}
+    alert('請先選擇服務類型與分類');
+    return;
+  }
 
   if(currentStep === 2 && !validateStep2()){
     return;
   }
 
   if(currentStep === 3){
-  if(!isQueueTask()){
-    const estimateOk = await calculateEstimate(true);
+    if(!isQueueTask()){
+      const estimateOk = await calculateEstimate(true);
 
-    if(!estimateOk){
-      alert('估價失敗，請確認取件地址與送達地址是否完整。');
-      return;
+      if(!estimateOk){
+        alert('估價失敗，請確認取件地址與送達地址是否完整。');
+        return;
+      }
+    }else{
+      const queueMinutes = getQueueMinutes();
+
+      lastEstimate = {
+        distanceText: '排隊任務',
+        durationText: `${queueMinutes} 分鐘內`,
+        totalFee: 0,
+        queueMinutes
+      };
     }
-  }else{
-    lastEstimate = {
-      distanceText: '排隊任務',
-      durationText: '依現場等待時間計算',
-      totalFee: 0
-    };
   }
-}
 
   if(currentStep < 5){
     currentStep++;
@@ -1910,6 +1895,10 @@ const queueServiceTypes = ['一般排隊', '醫院排隊', '銀行排隊', '餐�
 
 function isQueueTask(){
   return serviceGroup === 'life' && queueServiceTypes.includes(serviceType);
+}
+
+function getQueueMinutes(){
+  return Number(document.getElementById('queueMinutes')?.value || 0);
 }
 
 function getQueuePlaceholder(){
@@ -1937,11 +1926,15 @@ function applyQueueMode(){
   const pickupInput = document.getElementById('pickup');
   const dropoffSection = document.getElementById('dropoffSection');
   const itemInput = document.getElementById('item');
+  const queueTimeField = document.getElementById('queueTimeField');
 
   if(isQueueTask()){
+    serviceMode = 'queue';
+
     if(pickupTitle) pickupTitle.innerText = '排隊位置';
     if(pickupInput) pickupInput.placeholder = getQueuePlaceholder();
     if(dropoffSection) dropoffSection.classList.add('hidden');
+    if(queueTimeField) queueTimeField.classList.remove('hidden');
 
     if(itemInput && (!itemInput.value.trim() || queueServiceTypes.some(t => itemInput.value.includes(t)))){
       itemInput.value = `${serviceType}｜${serviceCategory || '排隊服務'}`;
@@ -1949,9 +1942,12 @@ function applyQueueMode(){
 
     syncQueueLocation();
   }else{
+    serviceMode = 'normal';
+
     if(pickupTitle) pickupTitle.innerText = '取件資訊';
     if(pickupInput) pickupInput.placeholder = '取件地址 / 店家地址 / 任務地點';
     if(dropoffSection) dropoffSection.classList.remove('hidden');
+    if(queueTimeField) queueTimeField.classList.add('hidden');
   }
 }
 
@@ -1989,7 +1985,7 @@ function applyDynamicFields(){
   }
 }
 
-  function getServiceGroupLabel(group){
+function getServiceGroupLabel(group){
   const map = {
     send:'幫我送',
     pickup:'幫我取',
@@ -2041,9 +2037,9 @@ function renderServiceCategories(){
     <button
       type="button"
       class="category-choice-item ${index === 0 ? 'active' : ''}"
-      onclick="selectServiceCategory(this, '${cat}')"
+      onclick="selectServiceCategory(this, '${escapeHtml(cat)}')"
     >
-      ${cat}
+      ${escapeHtml(cat)}
     </button>
   `).join('');
 
@@ -2153,7 +2149,7 @@ async function loadMerchantsForCategory(){
         <button
           type="button"
           class="category-choice-item"
-          onclick="selectGooglePlace('${place.placeId}')"
+          onclick="selectGooglePlace('${escapeHtml(place.placeId)}')"
         >
           ${escapeHtml(place.name)}
         </button>
@@ -2172,7 +2168,6 @@ async function loadMerchantsForCategory(){
 }
 
 async function selectGooglePlace(placeId){
-
   try{
     const res = await fetch('/api/places/detail', {
       method:'POST',
@@ -2212,7 +2207,6 @@ async function selectGooglePlace(placeId){
 }
 
 async function selectMerchant(merchantId){
-
   if(!db) return;
 
   try{
@@ -2242,17 +2236,6 @@ async function selectMerchant(merchantId){
       pickupPhoneInput.value = merchant.phone || merchant.merchantPhone || '';
     }
 
-    document.querySelectorAll('#merchantSelectGrid .category-choice-item').forEach(btn => {
-      btn.classList.remove('active');
-    });
-
-    const clicked = [...document.querySelectorAll('#merchantSelectGrid .category-choice-item')]
-      .find(btn => btn.textContent.trim() === (merchant.merchantName || '').trim());
-
-    if(clicked){
-      clicked.classList.add('active');
-    }
-
     alert(`已選擇合作店家：${merchant.merchantName || '合作店家'}\n\n系統已自動帶入取件地址與取件電話。`);
 
   }catch(err){
@@ -2266,9 +2249,9 @@ function renderServiceGrid(groupKey){
   const list = serviceGroups[groupKey] || serviceGroups.send;
 
   grid.innerHTML = list.map((item, index) => `
-    <div class="service-item ${index === 0 ? 'active' : ''}" onclick="selectService(this, '${item.title}')">
+    <div class="service-item ${index === 0 ? 'active' : ''}" onclick="selectService(this, '${escapeHtml(item.title)}')">
       <div class="service-item-icon">${item.icon}</div>
-      <div class="service-item-title">${item.title}</div>
+      <div class="service-item-title">${escapeHtml(item.title)}</div>
     </div>
   `).join('');
 
@@ -2307,6 +2290,7 @@ const customerProgressSteps = [
   { status:'arrived_dropoff', text:'抵達送達地' },
   { status:'completed', text:'已送達' }
 ];
+
 function renderCustomerProgress(status){
   const box = document.getElementById('customerProgressBox');
   if(!box) return;
@@ -2327,17 +2311,9 @@ function renderCustomerProgress(status){
       ${customerProgressSteps.map((step, index) => {
         let cls = '';
 
-        if(index < currentIndex){
-          cls = 'done';
-        }
-
-        if(index === currentIndex){
-          cls = 'current';
-        }
-
-        if(currentStatus === 'completed'){
-          cls = 'done';
-        }
+        if(index < currentIndex) cls = 'done';
+        if(index === currentIndex) cls = 'current';
+        if(currentStatus === 'completed') cls = 'done';
 
         return `
           <div class="progress-step ${cls}">
@@ -2398,28 +2374,28 @@ function getData(){
   const purchaseStore = document.getElementById('purchaseStore')?.value.trim() || '';
   const taskContent = document.getElementById('taskContent')?.value.trim() || '';
   const note = document.getElementById('note').value.trim();
+  const queueMinutes = isQueueTask() ? getQueueMinutes() : 0;
 
   if(purchaseContent) extra.push('補充內容：' + purchaseContent);
   if(purchaseStore) extra.push('指定店家/地點：' + purchaseStore);
   if(taskContent) extra.push('任務說明：' + taskContent);
+  if(isQueueTask() && queueMinutes) extra.push('預估排隊時間：' + queueMinutes + ' 分鐘內');
 
   return {
-  serviceType,
-  serviceGroup,
-  serviceCategory,
-  serviceMode,
-  speedType,
+    serviceType,
+    serviceGroup,
+    serviceCategory,
+    serviceMode: isQueueTask() ? 'queue' : 'normal',
+    serviceKey: isQueueTask() ? 'helper' : '',
+    speedType,
+    queueMinutes,
     pickup: document.getElementById('pickup').value.trim(),
     pickupPhone: document.getElementById('pickupPhone').value.trim(),
     dropoff: document.getElementById('dropoff').value.trim(),
     dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
     item: document.getElementById('item').value.trim(),
     note: [note, ...extra].filter(Boolean).join('\n'),
-    
     advancePayment: Number(document.getElementById('advancePayment')?.value || 0),
-    
-    serviceKey: isQueueTask() ? 'helper' : '',
-    
     userId,
 
     merchantId: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
@@ -2428,7 +2404,7 @@ function getData(){
     merchantPhone: currentMerchant ? (currentMerchant.phone || currentMerchant.merchantPhone || '') : '',
     merchantAddress: currentMerchant ? (currentMerchant.pickupAddress || currentMerchant.merchantAddress || '') : '',
     hasMerchant: !!currentMerchant
-   };
+  };
 }
 
 function validateStep2(){
@@ -2452,6 +2428,11 @@ function validateStep2(){
 
     if(pickup.length < 3){
       alert('請輸入完整排隊位置');
+      return false;
+    }
+
+    if(!getQueueMinutes()){
+      alert('請選擇預估排隊時間');
       return false;
     }
   }else{
@@ -2522,7 +2503,6 @@ function validateStep2(){
 }
 
 function validateData(data){
-
   if(!validateStep2()) return false;
 
   if(data.pickup.length > 120 || data.dropoff.length > 120){
@@ -2540,7 +2520,7 @@ function validateData(data){
     return false;
   }
 
-  if(data.note.length > 200){
+  if(data.note.length > 260){
     alert('備註內容過長，請縮短。');
     return false;
   }
@@ -2557,58 +2537,72 @@ function validateData(data){
 function renderConfirmSummary(){
   const data = getData();
 
+  const queueRow = isQueueTask() ? `
+    <div class="summary-row">
+      <div class="summary-icon">⏱️</div>
+      <div>
+        <div class="summary-label">預估排隊時間</div>
+        <div class="summary-value">${escapeHtml(data.queueMinutes)} 分鐘內</div>
+      </div>
+    </div>
+  ` : '';
+
   document.getElementById('confirmSummary').innerHTML = `
     <div class="summary-row">
       <div class="summary-icon">▤</div>
       <div>
         <div class="summary-label">服務類型</div>
-        <div class="summary-value">${getServiceGroupLabel(serviceGroup)}<br>${serviceType}<br>${serviceCategory}</div>
+        <div class="summary-value">${escapeHtml(getServiceGroupLabel(serviceGroup))}<br>${escapeHtml(serviceType)}<br>${escapeHtml(serviceCategory)}</div>
       </div>
     </div>
     <div class="summary-row">
       <div class="summary-icon">📍</div>
       <div>
-        <div class="summary-label">取件資訊</div>
-        <div class="summary-value">${data.pickup}<br>${data.pickupPhone}</div>
+        <div class="summary-label">${isQueueTask() ? '排隊位置' : '取件資訊'}</div>
+        <div class="summary-value">${escapeHtml(data.pickup)}<br>${escapeHtml(data.pickupPhone)}</div>
       </div>
     </div>
+    ${!isQueueTask() ? `
     <div class="summary-row">
       <div class="summary-icon">🏁</div>
       <div>
         <div class="summary-label">送達資訊</div>
-        <div class="summary-value">${data.dropoff}<br>${data.dropoffPhone}</div>
+        <div class="summary-value">${escapeHtml(data.dropoff)}<br>${escapeHtml(data.dropoffPhone)}</div>
       </div>
     </div>
+    ` : ''}
+    ${queueRow}
     <div class="summary-row">
       <div class="summary-icon">▣</div>
       <div>
         <div class="summary-label">任務內容</div>
-        <div class="summary-value">${data.item}${data.note ? '<br>' + data.note.replace(/\n/g,'<br>') : ''}</div>
+        <div class="summary-value">${escapeHtml(data.item)}${data.note ? '<br>' + escapeHtml(data.note).replace(/\n/g,'<br>') : ''}</div>
       </div>
     </div>
     <div class="summary-row">
       <div class="summary-icon">↯</div>
       <div>
         <div class="summary-label">任務速度</div>
-        <div class="summary-value">${getSpeedLabel(speedType)}</div>
+        <div class="summary-value">${escapeHtml(getSpeedLabel(speedType))}</div>
       </div>
     </div>
   `;
 
   if(lastEstimate){
-  document.getElementById('pricePreview').classList.remove('hidden');
+    document.getElementById('pricePreview').classList.remove('hidden');
 
-document.getElementById('pricePreview').innerHTML = isQueueTask() ? `
-  <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
-  <div class="price-row"><span>計費方式</span><strong>依現場等待時間計算</strong></div>
-  <div class="price-row"><span>預估金額</span><strong>待客服確認</strong></div>
-` : `
-  <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
-  <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
-  <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
-  <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
-`;
-}
+    document.getElementById('pricePreview').innerHTML = isQueueTask() ? `
+      <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
+      <div class="price-row"><span>預估排隊時間</span><strong>${getQueueMinutes()} 分鐘內</strong></div>
+      <div class="price-row"><span>計費方式</span><strong>後端計算</strong></div>
+      <div class="price-row"><span>預估金額</span><strong>送出後計算</strong></div>
+    ` : `
+      <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
+      <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
+      <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+      <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
+    `;
+  }
 }
 
 function getSpeedLabel(value){
@@ -2628,46 +2622,52 @@ function renderSummary(order){
   box.classList.remove('hidden');
 
   box.innerHTML = `
-    <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
-    <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
-    <div class="price-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
-    <div class="price-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
-    <div class="price-row"><span>優先處理費</span><strong>NT$${order?.speedFee || 0}</strong></div>
-    <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
+    <div class="price-row"><span>訂單編號</span><strong>${escapeHtml(currentOrderId)}</strong></div>
+    <div class="price-row"><span>服務類型</span><strong>${escapeHtml(serviceType)}</strong></div>
+    ${isQueueTask() ? `<div class="price-row"><span>排隊時間</span><strong>${getQueueMinutes()} 分鐘內</strong></div>` : ''}
+    <div class="price-row"><span>配送費</span><strong>NT$${escapeHtml(order?.deliveryFee ?? '-')}</strong></div>
+    <div class="price-row"><span>服務費</span><strong>NT$${escapeHtml(order?.serviceFee ?? '-')}</strong></div>
+    <div class="price-row"><span>優先處理費</span><strong>NT$${escapeHtml(order?.speedFee ?? 0)}</strong></div>
+    <div class="price-row"><span>總金額</span><strong>NT$${escapeHtml(finalTotal)}</strong></div>
   `;
 }
 
 async function calculateEstimate(silent){
-  
   if(isQueueTask()){
-  lastEstimate = {
-    distanceText: '排隊任務',
-    durationText: '依現場等待時間計算',
-    totalFee: 0
-  };
+    const queueMinutes = getQueueMinutes();
 
-  const estimateResult = document.getElementById('estimateResult');
-  if(estimateResult){
-    estimateResult.classList.remove('hidden');
+    if(!queueMinutes){
+      if(!silent) alert('請先選擇預估排隊時間');
+      return false;
+    }
+
+    lastEstimate = {
+      distanceText: '排隊任務',
+      durationText: `${queueMinutes} 分鐘內`,
+      totalFee: 0,
+      queueMinutes
+    };
+
+    const estimateResult = document.getElementById('estimateResult');
+    if(estimateResult){
+      estimateResult.classList.remove('hidden');
+    }
+
+    const estimateText = document.getElementById('estimateText');
+    if(estimateText){
+      estimateText.innerHTML = `
+        <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
+        <div class="price-row"><span>預估排隊時間</span><strong>${queueMinutes} 分鐘內</strong></div>
+        <div class="price-row"><span>計費方式</span><strong>後端計算</strong></div>
+        <div class="price-row"><span>預估金額</span><strong>送出後計算</strong></div>
+      `;
+    }
+
+    return true;
   }
-
-  const estimateText = document.getElementById('estimateText');
-  if(estimateText){
-    estimateText.innerHTML = `
-      <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
-      <div class="price-row"><span>計費方式</span><strong>依現場等待時間計算</strong></div>
-      <div class="price-row"><span>預估金額</span><strong>待客服確認</strong></div>
-    `;
-  }
-
-  return true;
-}
 
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
-
-  console.log('估價 pickup:', pickup);
-  console.log('估價 dropoff:', dropoff);
 
   if(!pickup || !dropoff){
     if(!silent) alert('請先填寫取件與送達地址');
@@ -2691,12 +2691,14 @@ async function calculateEstimate(silent){
 
     const estimateResult = document.getElementById('estimateResult');
     estimateResult.classList.remove('hidden');
+
     document.getElementById('estimateText').innerHTML = `
-       <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
-       <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
-       <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
-       <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
+      <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
+      <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
+      <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+      <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
     `;
+
     return true;
   }catch(err){
     if(!silent){
@@ -2743,14 +2745,15 @@ async function submitOrder(){
     btn.classList.add('hidden');
     document.getElementById('cashBtn').classList.remove('hidden');
     document.getElementById('jkoBtn').classList.remove('hidden');
+
     const footerCancelBtn = document.getElementById('footerCancelOrderBtn');
-if(footerCancelBtn){
-  footerCancelBtn.classList.remove('hidden');
-}
+    if(footerCancelBtn){
+      footerCancelBtn.classList.remove('hidden');
+    }
 
     showStatus(
-  `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請選擇付款方式，完成付款後按「我已付款」。`
-  );
+      `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請選擇付款方式，完成付款後按「我已付款」。`
+    );
 
     startCustomerOrderListener(currentOrderId);
 
@@ -2792,11 +2795,11 @@ async function selectPayment(method){
     }
 
     showPaymentInfo(
-  `付款方式：${result.paymentMethodLabel}\n\n` +
-  `應付金額：NT$${result.total}\n\n` +
-  `${result.paymentInfo}\n\n` +
-  `完成付款後，請按下方「我已付款」。`
-);
+      `付款方式：${result.paymentMethodLabel}\n\n` +
+      `應付金額：NT$${result.total}\n\n` +
+      `${result.paymentInfo}\n\n` +
+      `完成付款後，請按下方「我已付款」。`
+    );
 
     isPaymentMethodSaved = true;
 
@@ -2821,13 +2824,13 @@ async function confirmPaid(){
   }
 
   if(!selectedPaymentMethod){
-  alert('請先選擇付款方式');
-  return;
-}
+    alert('請先選擇付款方式');
+    return;
+  }
 
-if(!isPaymentMethodSaved){
-  await selectPayment(selectedPaymentMethod);
-}
+  if(!isPaymentMethodSaved){
+    await selectPayment(selectedPaymentMethod);
+  }
 
   if(isConfirmingPaid) return;
 
@@ -2837,19 +2840,17 @@ if(!isPaymentMethodSaved){
   btn.innerText = '處理中...';
 
   try{
-    
-  // 再確認付款
-  const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ userId })
-  });
+    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ userId })
+    });
 
-  const result = await res.json();
+    const result = await res.json();
 
-  if(!res.ok || !result.success){
-    throw new Error(result.error || '確認付款失敗');
-  }
+    if(!res.ok || !result.success){
+      throw new Error(result.error || '確認付款失敗');
+    }
 
     showStatus(
       `✅ 已收到付款通知\n\n訂單編號：${currentOrderId}\n\n系統正在為你配對合作夥伴，請稍候。`
@@ -2909,6 +2910,7 @@ async function cancelOrder(){
       window.location.reload();
     }else{
       alert('取消失敗：' + (data.message || '未知錯誤'));
+      isCancellingOrder = false;
     }
   }catch(err){
     isCancellingOrder = false;
@@ -3041,6 +3043,7 @@ function hideCustomerPages(){
     }
   }
 }
+
 function setBottomTab(active){
   ['tabHome','tabTasks','tabProfile'].forEach(id => {
     const el = document.getElementById(id);
@@ -3053,11 +3056,12 @@ function setBottomTab(active){
 
 function showOrderSteps(){
   document.querySelectorAll('.step').forEach(s => s.classList.remove('hidden'));
+
   const footer = document.querySelector('.footer-nav');
   const topbar = document.querySelector('.topbar');
   const topBackBtn = document.querySelector('.topbar .icon-btn');
-  if(topBackBtn) topBackBtn.classList.remove('hidden');
 
+  if(topBackBtn) topBackBtn.classList.remove('hidden');
   if(footer) footer.classList.remove('hidden');
   if(topbar) topbar.classList.remove('hidden');
 
@@ -3073,10 +3077,10 @@ function hideOrderSteps(){
 
   const footer = document.querySelector('.footer-nav');
   const topbar = document.querySelector('.topbar');
+  const topBackBtn = document.querySelector('.topbar .icon-btn');
 
   if(footer) footer.classList.add('hidden');
   if(topbar) topbar.classList.remove('hidden');
-  const topBackBtn = document.querySelector('.topbar .icon-btn');
   if(topBackBtn) topBackBtn.classList.add('hidden');
 }
 
@@ -3122,15 +3126,17 @@ function openCustomerSubPage(pageId){
   if(page) page.classList.add('active');
 
   if(pageId === 'activeTaskPage'){
-  renderCustomerActiveTask();
-}
+    renderCustomerActiveTask();
+  }
 
-if(pageId === 'addressPage'){
-  loadCustomerAddresses();
-}
-if(pageId === 'historyTaskPage'){
-  renderCustomerHistoryTasks();
-}
+  if(pageId === 'addressPage'){
+    loadCustomerAddresses();
+  }
+
+  if(pageId === 'historyTaskPage'){
+    renderCustomerHistoryTasks();
+  }
+
   document.getElementById('pageCount').innerText = '詳細';
   window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -3161,8 +3167,8 @@ function renderCustomerMemberInfo(){
   if(count){
     count.innerText = currentOrderId ? '1' : '0';
   }
-    const level = document.getElementById('memberLevelText');
 
+  const level = document.getElementById('memberLevelText');
   const taskCount = Number(count?.innerText || 0);
   let levelText = '一般';
 
@@ -3259,8 +3265,8 @@ function renderOrderList(el, orders, emptyText){
           ${escapeHtml(service)}
         </div>
         <div style="font-size:13px;font-weight:1000;color:${statusColor};margin-bottom:8px;">
-        ● ${escapeHtml(status)}
-      </div>
+          ● ${escapeHtml(status)}
+        </div>
         <div style="font-size:13px;line-height:1.7;color:var(--muted);font-weight:800;">
           訂單編號：${escapeHtml(order.id || '-')}<br>
           建立時間：${escapeHtml(time)}<br>
@@ -3457,68 +3463,6 @@ async function renderCustomerHistoryTasks(){
   }catch(err){
     console.error('讀取歷史任務失敗:', err);
     el.innerHTML = '歷史任務讀取失敗，請稍後再試。';
-  }
-}
-
-function addLocalAddress(){
-  const type = prompt('請選擇地址類型：住家、公司、常用');
-
-  if(!type){
-    return;
-  }
-
-  const allowedTypes = ['住家','公司','常用'];
-
-  if(!allowedTypes.includes(type)){
-    alert('請輸入住家、公司或常用');
-    return;
-  }
-
-  const address = prompt(`請輸入${type}地址`);
-
-  if(!address || address.trim().length < 6){
-    alert('請輸入完整地址');
-    return;
-  }
-
-  const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
-
-  if(type === '住家'){
-    saved.home = address.trim();
-  }
-
-  if(type === '公司'){
-    saved.company = address.trim();
-  }
-
-  if(type === '常用'){
-    saved.favorite = address.trim();
-  }
-
-  localStorage.setItem('ubee_customer_addresses', JSON.stringify(saved));
-
-  renderLocalAddresses();
-
-  alert('地址已儲存');
-}
-
-function renderLocalAddresses(){
-  const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
-
-  const homeEl = document.getElementById('homeAddressText');
-  const companyEl = document.getElementById('companyAddressText');
-  const favoriteEl = document.getElementById('favoriteAddressText');
-
-  if(homeEl){
-    homeEl.innerText = saved.home || '尚未設定住家地址';
-  }
-
-  if(companyEl){
-    companyEl.innerText = saved.company || '尚未設定公司地址';
-  }
-
-  if(favoriteEl){
-    favoriteEl.innerText = saved.favorite || '尚未新增常用地址';
   }
 }
 
