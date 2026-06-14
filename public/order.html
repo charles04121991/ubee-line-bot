@@ -3744,7 +3744,7 @@ async function searchNearbyPlaces(){
       lat: String(location.lat),
       lng: String(location.lng),
       keyword: current.keyword || current.title,
-      radius: '5000'
+      radius: '3000'
     });
 
     const res = await fetch('/api/nearby-places?' + query.toString(), {
