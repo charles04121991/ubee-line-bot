@@ -89,10 +89,9 @@ async function sendNewOrderPushToRiders(order) {
     const orderId = order.id || order.orderId || "";
     if (!orderId) return;
 
-    const fee = order.driverFee || order.riderFee || order.fee || order.price || "未設定";
+    const fee = order.driverFee || order.riderFee || "未設定";
     const pickup = order.pickupAddress || order.fromAddress || order.pickup || "附近取件地";
     const dropoff = order.dropoffAddress || order.toAddress || order.dropoff || "送達地未提供";
-
     try {
       await client.pushMessage("Cdc5a9583fb1364402c2a3e4e5edb4c1b", {
         type: "text",
