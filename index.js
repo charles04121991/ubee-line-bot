@@ -2981,7 +2981,7 @@ app.post('/api/places/search', async (req, res) => {
       });
     }
 
-    const radius = Math.min(Math.max(Number(req.body.radius || 5000), 3000), 5000);
+    const radius = Math.min(Math.max(Number(req.body.radius || 3000), 3000), 3000);
 
     const url =
       `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword || '飲料店')}&location=${lat},${lng}&radius=${radius}&language=zh-TW&key=${GOOGLE_MAPS_API_KEY}`;
