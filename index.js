@@ -2850,16 +2850,41 @@ app.get('/api/nearby-places', async (req, res) => {
     const response = await fetch(url);
     const data = await response.json();
 
-    const places = (data.results || []).map(place => ({
-      name: place.name || '',
-      address: place.vicinity || '',
-      placeId: place.place_id || '',
-      lat: place.geometry?.location?.lat || '',
-      lng: place.geometry?.location?.lng || '',
-      rating: place.rating || '',
-      userRatingsTotal: place.user_ratings_total || ''
-    }));
+    const places = await Promise.all((data.results || []).slice(0, 8).map(async place => {
+  let phone = '';
 
+  try{
+    const detailUrl =
+      'https://maps.googleapis.com/maps/api/place/details/json?' +
+      new URLSearchParams({
+        place_id: place.place_id,
+        fields: 'formatted_phone_number,international_phone_number',
+        language: 'zh-TW',
+        key: GOOGLE_MAPS_API_KEY
+      }).toString();
+
+    const detailRes = await fetch(detailUrl);
+    const detailData = await detailRes.json();
+
+    phone =
+      detailData.result?.formatted_phone_number ||
+      detailData.result?.international_phone_number ||
+      '';
+  }catch(e){
+    console.warn('place detail phone error:', e);
+  }
+
+  return {
+    name: place.name || '',
+    address: place.vicinity || '',
+    placeId: place.place_id || '',
+    lat: place.geometry?.location?.lat || '',
+    lng: place.geometry?.location?.lng || '',
+    rating: place.rating || '',
+    userRatingsTotal: place.user_ratings_total || '',
+    phone
+  };
+}));
     res.json({
       success: true,
       places
