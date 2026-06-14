@@ -2828,7 +2828,7 @@ app.get('/api/nearby-places', async (req, res) => {
     const lat = req.query.lat;
     const lng = req.query.lng;
     const keyword = req.query.keyword || '餐廳';
-    const radius = req.query.radius || 5000;
+    const radius = req.query.radius || 3000;
 
     if (!lat || !lng) {
       return res.status(400).json({
