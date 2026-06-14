@@ -2823,6 +2823,57 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+app.get('/api/nearby-places', async (req, res) => {
+  try {
+    const lat = req.query.lat;
+    const lng = req.query.lng;
+    const keyword = req.query.keyword || '餐廳';
+    const radius = req.query.radius || 5000;
+
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少定位資料'
+      });
+    }
+
+    const url =
+      'https://maps.googleapis.com/maps/api/place/nearbysearch/json?' +
+      new URLSearchParams({
+        location: `${lat},${lng}`,
+        radius: String(radius),
+        keyword: String(keyword),
+        language: 'zh-TW',
+        key: GOOGLE_MAPS_API_KEY
+      }).toString();
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const places = (data.results || []).map(place => ({
+      name: place.name || '',
+      address: place.vicinity || '',
+      placeId: place.place_id || '',
+      lat: place.geometry?.location?.lat || '',
+      lng: place.geometry?.location?.lng || '',
+      rating: place.rating || '',
+      userRatingsTotal: place.user_ratings_total || ''
+    }));
+
+    res.json({
+      success: true,
+      places
+    });
+
+  } catch (err) {
+    console.error('nearby places error:', err);
+    res.status(500).json({
+      success: false,
+      error: '附近地點搜尋失敗'
+    });
+  }
+});
+
 app.get('/api/quote', async (req, res) => {
   try {
     const from = req.query.from || req.query.pickup;
