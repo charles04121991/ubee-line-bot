@@ -3,41 +3,73 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-
+  
   <link rel="manifest" href="/manifest.json">
-
+    
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="UBee">
-  <meta name="theme-color" content="#f6f6f6">
-
+  <meta name="theme-color" content="#000000">
+  
   <title>UBee｜建立任務</title>
-
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
   <style>
     :root{
-      --bg:#f6f6f6;
-      --card:#ffffff;
-      --card2:#f3f3f3;
-      --card3:#eeeeee;
-      --text:#111111;
-      --muted:#666666;
-      --muted2:#888888;
-      --line:#dddddd;
-      --line2:#cccccc;
-      --accent:#facc15;
-      --accentText:#111111;
-      --primary:#facc15;
-      --primary2:#fbbf24;
-      --primaryText:#111111;
-      --green:#22c55e;
-      --red:#ef4444;
-      --blue:#2563eb;
-      --radius:22px;
-    }
+  --bg:#000;
+  --card:#101010;
+  --card2:#171717;
+  --card3:#202020;
+  --text:#fff;
+  --muted:#a8a8a8;
+  --muted2:#777;
+  --line:#2a2a2a;
+  --line2:#3a3a3a;
+  --accent:#facc15;
+  --accentText:#111;
+  --primary:#facc15;
+  --primary2:#fbbf24;
+  --primaryText:#111;
+  --green:#22c55e;
+  --red:#ef4444;
+  --radius:22px;
+}
+
+body.day-mode{
+  --bg:#f6f6f6;
+  --card:#ffffff;
+  --card2:#f3f3f3;
+  --card3:#eeeeee;
+  --text:#111111;
+  --muted:#666666;
+  --muted2:#888888;
+  --line:#dddddd;
+  --line2:#cccccc;
+  --accent:#facc15;
+  --accentText:#111111;
+  --primary:#facc15;
+  --primary2:#fbbf24;
+  --primaryText:#111111;
+}
+
+body.night-mode{
+  --bg:#000;
+  --card:#101010;
+  --card2:#171717;
+  --card3:#202020;
+  --text:#fff;
+  --muted:#a8a8a8;
+  --muted2:#777;
+  --line:#2a2a2a;
+  --line2:#3a3a3a;
+  --accent:#facc15;
+  --accentText:#111;
+  --primary:#facc15;
+  --primary2:#fbbf24;
+  --primaryText:#111;
+}
 
     *{
       box-sizing:border-box;
@@ -51,6 +83,7 @@
       min-height:100%;
       overflow-x:hidden;
       -webkit-text-size-adjust:100%;
+      touch-action:manipulation;
       overscroll-behavior:none;
     }
 
@@ -63,6 +96,7 @@
       font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
       overflow-x:hidden;
       -webkit-text-size-adjust:100%;
+      touch-action:manipulation;
       overscroll-behavior:none;
       position:relative;
     }
@@ -76,21 +110,17 @@
       touch-action:manipulation;
     }
 
-    button{
-      cursor:pointer;
-      font-family:inherit;
-    }
-
     .app{
-      width:100%;
-      max-width:520px;
-      min-height:100vh;
-      margin:0 auto;
-      padding:calc(20px + env(safe-area-inset-top)) 16px calc(122px + env(safe-area-inset-bottom));
-      background:var(--bg);
-      color:var(--text);
-      overflow-x:hidden;
-    }
+  width:100%;
+  max-width:520px;
+  min-height:100vh;
+  margin:0 auto;
+  padding:calc(20px + env(safe-area-inset-top)) 16px calc(34px + env(safe-area-inset-bottom));
+  background:var(--bg);
+  color:var(--text);
+  overflow-x:hidden;
+  transition:background .25s ease,color .25s ease;
+}
 
     .topbar{
       display:flex;
@@ -100,24 +130,22 @@
     }
 
     .icon-btn{
-      width:42px;
-      height:42px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background:var(--card);
-      color:var(--text);
-      font-size:24px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      box-shadow:0 8px 18px rgba(0,0,0,.04);
-    }
+  width:42px;
+  height:42px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--card2);
+  color:var(--text);
+  font-size:22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 
     .brand{
       font-size:28px;
       font-weight:1000;
       letter-spacing:-.5px;
-      text-align:center;
     }
 
     .brand span{
@@ -135,49 +163,31 @@
     }
 
     .page-count{
-      min-width:42px;
       color:var(--muted);
       font-size:14px;
       font-weight:900;
-      text-align:right;
-    }
-
-    .app-section,
-    .step{
-      display:none;
-      animation:fade .18s ease;
-    }
-
-    .app-section.active,
-    .step.active{
-      display:block;
-    }
-
-    @keyframes fade{
-      from{opacity:.4;transform:translateY(6px);}
-      to{opacity:1;transform:translateY(0);}
     }
 
     .hero-card{
       position:relative;
       overflow:hidden;
-      border-radius:28px;
+      border-radius:26px;
       padding:24px 20px;
       margin:10px 0 18px;
       background:
-        radial-gradient(circle at 86% 18%, rgba(250,204,21,.34), transparent 32%),
-        linear-gradient(135deg,#fff,#fff7d6);
+        radial-gradient(circle at 85% 20%, rgba(250,204,21,.24), transparent 34%),
+        linear-gradient(135deg,var(--card3),var(--card) 45%,var(--bg));
       color:var(--text);
-      min-height:212px;
-      border:1px solid rgba(250,204,21,.55);
-      box-shadow:0 18px 45px rgba(0,0,0,.06);
+      min-height:210px;
+      border:1px solid rgba(250,204,21,.28);
+      box-shadow:0 18px 45px rgba(250,204,21,.06);
     }
 
     .hero-kicker{
       font-size:13px;
       font-weight:1000;
-      letter-spacing:1.4px;
-      color:#b98500;
+      letter-spacing:1.5px;
+      color:var(--accent);
       margin-bottom:8px;
     }
 
@@ -194,12 +204,11 @@
     .hero-sub{
       font-size:14px;
       font-weight:900;
-      color:#6b5b16;
+      color:var(--muted);
       line-height:1.6;
       margin-bottom:18px;
       position:relative;
       z-index:2;
-      max-width:250px;
     }
 
     .hero-btn{
@@ -213,9 +222,9 @@
       padding:12px 20px;
       font-size:16px;
       font-weight:1000;
+      font-family:inherit;
       position:relative;
       z-index:2;
-      box-shadow:0 10px 20px rgba(250,204,21,.32);
     }
 
     .hero-illust{
@@ -225,119 +234,105 @@
       width:126px;
       height:126px;
       border-radius:34px;
-      background:rgba(250,204,21,.22);
+      background:rgba(250,204,21,.18);
       display:flex;
       align-items:center;
       justify-content:center;
       font-size:66px;
+      box-shadow:0 18px 45px rgba(0,0,0,.16);
+    }
+
+    .category-tabs{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:6px;
+      background:var(--card2);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:8px;
+      margin-bottom:22px;
+    }
+
+    .category-tab{
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      border-radius:16px;
+      padding:11px 4px;
+      font-size:12px;
+      font-weight:1000;
+      font-family:inherit;
+      white-space:nowrap;
+    }
+
+    .category-tab.active{
+      background:var(--primary);
+      color:var(--primaryText);
     }
 
     .section-label{
       font-size:18px;
       font-weight:1000;
-      margin:4px 0 12px;
+      margin:4px 0 14px;
     }
 
-    .service-grid{
+    .service-grid-new{
       display:grid;
-      grid-template-columns:repeat(2,1fr);
+      grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
       gap:12px;
-      margin-bottom:18px;
+      margin-bottom:20px;
     }
 
-    .service-card{
+    .service-item{
       border:1px solid var(--line);
-      background:var(--card);
-      border-radius:22px;
-      padding:16px 12px;
-      min-height:128px;
-      text-align:left;
+      background:linear-gradient(180deg,var(--card2),var(--card));
+      border-radius:18px;
+      min-height:98px;
+      padding:12px 6px;
+      text-align:center;
+      cursor:pointer;
       transition:.16s ease;
-      box-shadow:0 8px 20px rgba(0,0,0,.04);
     }
 
-    .service-card.active{
+    .service-item.active{
       border-color:var(--accent);
-      box-shadow:0 0 0 2px rgba(250,204,21,.34),0 12px 25px rgba(0,0,0,.06);
-      background:linear-gradient(180deg,#fffbea,#fff);
+      box-shadow:0 0 0 1px rgba(250,204,21,.32);
+      background:linear-gradient(180deg,rgba(250,204,21,.18),var(--card));
     }
 
-    .service-icon{
-      font-size:30px;
-      margin-bottom:9px;
+    .service-item-icon{
+      font-size:28px;
+      margin-bottom:8px;
     }
 
-    .service-title{
-      font-size:17px;
+    .service-item-title{
+      font-size:13px;
       font-weight:1000;
       color:var(--text);
-      line-height:1.25;
-      margin-bottom:6px;
-    }
-
-    .service-desc{
-      font-size:12px;
-      color:var(--muted);
-      font-weight:800;
-      line-height:1.45;
-    }
-
-    .full-card{
-      border:1px solid rgba(250,204,21,.58);
-      background:linear-gradient(180deg,#fff9d7,#fff);
-      border-radius:22px;
-      padding:16px;
-      margin:14px 0 18px;
-      box-shadow:0 12px 25px rgba(0,0,0,.05);
-    }
-
-    .merchant-card{
-      border:1px solid rgba(250,204,21,.5);
-      background:linear-gradient(180deg,#fff9d7,#fff);
-      border-radius:20px;
-      padding:16px;
-      margin:14px 0 18px;
-    }
-
-    .merchant-card-title{
-      color:#a97700;
-      font-size:14px;
-      font-weight:1000;
-      margin-bottom:6px;
-    }
-
-    .merchant-card-name{
-      color:var(--text);
-      font-size:20px;
-      font-weight:1000;
-      margin-bottom:6px;
-    }
-
-    .merchant-card-text{
-      color:var(--muted);
-      font-size:14px;
-      line-height:1.7;
-      font-weight:800;
+      line-height:1.35;
     }
 
     .trust-strip{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:10px;
-      margin:20px 0;
-    }
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+  border:none;
+  border-radius:0;
+  background:transparent;
+  margin:22px 0;
+}
 
-    .trust-item{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:12px 8px;
-      text-align:center;
-    }
+.trust-item{
+  background:transparent;
+  border:none;
+  padding:6px 2px;
+  text-align:center;
+  pointer-events:none;
+}
 
     .trust-icon{
       font-size:20px;
-      margin-bottom:5px;
+      margin-bottom:4px;
     }
 
     .trust-title{
@@ -354,6 +349,20 @@
       line-height:1.4;
     }
 
+    .step{
+      display:none;
+      animation:fade .18s ease;
+    }
+
+    .step.active{
+      display:block;
+    }
+
+    @keyframes fade{
+      from{opacity:.4;transform:translateY(6px);}
+      to{opacity:1;transform:translateY(0);}
+    }
+
     .headline{
       font-size:28px;
       font-weight:1000;
@@ -367,17 +376,44 @@
       font-size:15px;
       line-height:1.8;
       margin-bottom:20px;
-      font-weight:800;
+      font-weight:700;
     }
 
     .info-box{
-      background:var(--card);
+      background:linear-gradient(180deg,var(--card2),var(--card));
       border:1px solid var(--line);
-      border-radius:22px;
+      border-radius:20px;
       padding:18px;
       margin:16px 0;
-      box-shadow:0 8px 18px rgba(0,0,0,.04);
     }
+    .merchant-card{
+  border:1px solid rgba(250,204,21,.38);
+  background:linear-gradient(180deg,rgba(250,204,21,.14),var(--card));
+  border-radius:20px;
+  padding:16px;
+  margin:14px 0 18px;
+}
+
+.merchant-card-title{
+  color:var(--accent);
+  font-size:14px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+
+.merchant-card-name{
+  color:var(--text);
+  font-size:20px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+
+.merchant-card-text{
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.7;
+  font-weight:800;
+}
 
     .info-title{
       font-size:20px;
@@ -390,28 +426,6 @@
       font-size:15px;
       line-height:1.8;
       font-weight:800;
-    }
-
-    .task-path-box{
-      border:1px solid rgba(250,204,21,.5);
-      background:#fff9d7;
-      border-radius:18px;
-      padding:14px;
-      margin-bottom:18px;
-    }
-
-    .task-path-title{
-      color:#9b7000;
-      font-size:13px;
-      font-weight:1000;
-      margin-bottom:6px;
-    }
-
-    .task-path-value{
-      color:var(--text);
-      font-size:15px;
-      font-weight:1000;
-      line-height:1.6;
     }
 
     .form-section{
@@ -430,7 +444,6 @@
       background:var(--card);
       border-radius:18px;
       overflow:hidden;
-      box-shadow:0 8px 18px rgba(0,0,0,.035);
     }
 
     .input-wrap{
@@ -446,16 +459,14 @@
     }
 
     .input-icon{
-      width:28px;
-      flex:0 0 28px;
+      width:26px;
+      flex:0 0 26px;
       text-align:center;
       font-size:19px;
-      opacity:.95;
+      opacity:.9;
     }
 
-    input,
-    textarea,
-    select{
+    input,textarea{
       width:100%;
       border:none;
       outline:none;
@@ -468,53 +479,28 @@
     }
 
     textarea{
-      min-height:86px;
+      min-height:78px;
       resize:vertical;
       line-height:1.7;
     }
 
-    input::placeholder,
-    textarea::placeholder{
+    input::placeholder,textarea::placeholder{
       color:var(--muted2);
-    }
-
-    .choice-grid{
-      display:grid;
-      grid-template-columns:repeat(2,1fr);
-      gap:10px;
-    }
-
-    .choice-btn{
-      border:1px solid var(--line);
-      background:var(--card);
-      color:var(--text);
-      border-radius:16px;
-      padding:13px 10px;
-      font-size:14px;
-      font-weight:1000;
-      text-align:center;
-    }
-
-    .choice-btn.active{
-      border-color:var(--accent);
-      background:var(--accent);
-      color:var(--accentText);
     }
 
     .speed-card{
       border:1px solid var(--line);
-      background:var(--card);
+      background:linear-gradient(180deg,var(--card2),var(--card));
       border-radius:19px;
       padding:18px;
       margin-bottom:12px;
+      cursor:pointer;
       transition:.16s ease;
-      box-shadow:0 8px 18px rgba(0,0,0,.035);
     }
 
     .speed-card.active{
       border-color:var(--accent);
-      background:#fff9d7;
-      box-shadow:0 0 0 2px rgba(250,204,21,.3);
+      background:rgba(250,204,21,.16);
     }
 
     .speed-top{
@@ -526,7 +512,7 @@
     }
 
     .speed-name{
-      font-size:21px;
+      font-size:22px;
       font-weight:1000;
     }
 
@@ -540,7 +526,7 @@
       justify-content:center;
       font-size:14px;
       font-weight:1000;
-      color:var(--accentText);
+      color:#000;
       background:transparent;
     }
 
@@ -562,7 +548,6 @@
       border-radius:20px;
       overflow:hidden;
       margin-bottom:16px;
-      box-shadow:0 8px 18px rgba(0,0,0,.035);
     }
 
     .summary-row{
@@ -600,11 +585,10 @@
 
     .price-box{
       border:1px solid var(--line);
-      background:var(--card);
+      background:var(--card2);
       border-radius:20px;
       padding:16px;
       margin:16px 0;
-      box-shadow:0 8px 18px rgba(0,0,0,.035);
     }
 
     .price-row{
@@ -627,12 +611,11 @@
 
     .price-row strong{
       color:var(--text);
-      text-align:right;
     }
 
     .notice{
-      border:1px solid rgba(239,68,68,.34);
-      background:rgba(239,68,68,.055);
+      border:1px solid rgba(239,68,68,.42);
+      background:rgba(239,68,68,.07);
       border-radius:18px;
       padding:16px;
       margin:16px 0;
@@ -659,7 +642,7 @@
       gap:10px;
       align-items:flex-start;
       border:1px solid var(--line2);
-      background:var(--card);
+      background:var(--card2);
       border-radius:18px;
       padding:14px;
       margin-top:14px;
@@ -696,9 +679,8 @@
       margin:20px auto 28px;
       font-size:54px;
       font-weight:1000;
-      color:#9b7000;
-      background:#fff9d7;
-      box-shadow:0 0 45px rgba(250,204,21,.16);
+      color:var(--accent);
+      box-shadow:0 0 45px rgba(250,204,21,.12);
     }
 
     .success-title{
@@ -726,12 +708,11 @@
       margin-top:14px;
       color:var(--text);
       font-weight:800;
-      text-align:left;
     }
 
     .payment-info{
       white-space:pre-line;
-      background:var(--card);
+      background:var(--card2);
       border:1px solid var(--line);
       border-radius:18px;
       padding:15px;
@@ -756,6 +737,7 @@
       padding:16px;
       font-size:17px;
       font-weight:1000;
+      font-family:inherit;
       cursor:pointer;
       transition:.16s ease;
     }
@@ -772,19 +754,17 @@
     .btn-primary{
       background:var(--primary);
       color:var(--primaryText);
-      box-shadow:0 10px 18px rgba(250,204,21,.2);
     }
 
     .btn-secondary{
-      background:var(--card);
+      background:var(--card2);
       color:var(--text);
       border:1px solid var(--line2);
     }
 
     .btn-secondary.yellow-outline{
-      border-color:rgba(250,204,21,.7);
-      color:#9b7000;
-      background:#fff9d7;
+      border-color:rgba(250,204,21,.55);
+      color:var(--accent);
     }
 
     .btn-danger{
@@ -792,278 +772,355 @@
       color:#fff;
     }
 
+    .category-choice-box{
+  margin:12px 0 20px;
+  border:1px solid rgba(250,204,21,.35);
+  background:linear-gradient(180deg,rgba(250,204,21,.12),var(--card));
+  border-radius:20px;
+  padding:14px;
+}
+
+.category-choice-title{
+  font-size:16px;
+  font-weight:1000;
+  color:var(--accent);
+  margin-bottom:10px;
+}
+
+.category-choice-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+
+.category-choice-item{
+  border:1px solid var(--line);
+  background:var(--card2);
+  color:var(--text);
+  border-radius:15px;
+  padding:12px 10px;
+  font-size:14px;
+  font-weight:1000;
+  font-family:inherit;
+}
+
+.category-choice-item.active{
+  border-color:var(--accent);
+  background:var(--accent);
+  color:var(--accentText);
+}
+
+.task-path-box{
+  border:1px solid rgba(250,204,21,.35);
+  background:rgba(250,204,21,.10);
+  border-radius:18px;
+  padding:14px;
+  margin-bottom:18px;
+}
+
+.task-path-title{
+  color:var(--accent);
+  font-size:13px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+
+.task-path-value{
+  color:var(--text);
+  font-size:15px;
+  font-weight:1000;
+  line-height:1.6;
+}
+    
     .hidden{
       display:none !important;
     }
 
-    .customer-progress{
-      margin-top:18px;
-      padding:16px;
-      border:1px solid var(--line);
-      border-radius:20px;
-      background:var(--card);
-      text-align:left;
-    }
+     .customer-progress{
+  margin-top:18px;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--card2);
+}
 
-    .progress-title{
-      font-size:18px;
-      font-weight:1000;
-      margin-bottom:14px;
-    }
+.progress-title{
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:14px;
+}
 
-    .progress-bar{
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:4px;
-    }
+.progress-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:4px;
+}
 
-    .progress-step{
-      flex:1;
-      text-align:center;
-    }
+.progress-step{
+  flex:1;
+  text-align:center;
+}
 
-    .progress-dot{
-      width:24px;
-      height:24px;
-      border-radius:999px;
-      margin:0 auto 8px;
-      background:#d4d4d4;
-      border:2px solid #c6c6c6;
-    }
+.progress-dot{
+  width:24px;
+  height:24px;
+  border-radius:999px;
+  margin:0 auto 8px;
+  background:#444;
+  border:2px solid #666;
+}
 
-    .progress-step.done .progress-dot{
-      background:var(--accent);
-      border-color:var(--accent);
-    }
+.progress-step.done .progress-dot{
+  background:var(--accent);
+  border-color:var(--accent);
+}
 
-    .progress-step.current .progress-dot{
-      background:var(--green);
-      border-color:var(--green);
-    }
+.progress-step.current .progress-dot{
+  background:var(--green);
+  border-color:var(--green);
+}
 
-    .progress-label{
-      font-size:11px;
-      line-height:1.4;
-      color:var(--muted);
-      font-weight:900;
-    }
+.progress-label{
+  font-size:11px;
+  line-height:1.4;
+  color:var(--muted);
+  font-weight:900;
+}
 
     .footer-nav{
       position:sticky;
       bottom:0;
-      background:linear-gradient(180deg,rgba(246,246,246,0),var(--bg) 22%);
+      background:linear-gradient(180deg,rgba(0,0,0,0),var(--bg) 22%);
       padding-top:18px;
       margin-top:10px;
-      margin-bottom:78px;
     }
+    .app{
+  padding-bottom:110px;
+}
 
-    .member-card{
-      border:1px solid rgba(250,204,21,.5);
-      background:linear-gradient(180deg,#fff9d7,#fff);
-      border-radius:26px;
-      padding:20px;
-      margin:14px 0 18px;
-    }
+.app-section{
+  display:none;
+  animation:fade .18s ease;
+}
 
-    .member-title{
-      font-size:24px;
-      font-weight:1000;
-    }
+.app-section.active{
+  display:block;
+}
 
-    .member-sub{
-      color:var(--muted);
-      font-size:14px;
-      font-weight:800;
-      margin-top:6px;
-      line-height:1.6;
-    }
+.member-card{
+  border:1px solid rgba(250,204,21,.35);
+  background:linear-gradient(180deg,rgba(250,204,21,.16),var(--card));
+  border-radius:26px;
+  padding:20px;
+  margin:14px 0 18px;
+}
 
-    .member-stats{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:10px;
-      margin-top:16px;
-    }
+.member-title{
+  font-size:24px;
+  font-weight:1000;
+}
 
-    .member-stat{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:12px 8px;
-      text-align:center;
-    }
+.member-sub{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:800;
+  margin-top:6px;
+  line-height:1.6;
+}
 
-    .member-stat strong{
-      display:block;
-      font-size:20px;
-      color:#9b7000;
-    }
+.member-stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-top:16px;
+}
 
-    .member-stat span{
-      display:block;
-      font-size:11px;
-      color:var(--muted);
-      margin-top:4px;
-      font-weight:900;
-    }
+.member-stat{
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:12px 8px;
+  text-align:center;
+}
 
-    .menu-group{
-      margin:18px 0;
-    }
+.member-stat strong{
+  display:block;
+  font-size:20px;
+  color:var(--accent);
+}
 
-    .menu-title{
-      font-size:18px;
-      font-weight:1000;
-      margin-bottom:12px;
-    }
+.member-stat span{
+  display:block;
+  font-size:11px;
+  color:var(--muted);
+  margin-top:4px;
+  font-weight:900;
+}
 
-    .menu-list{
-      border:1px solid var(--line);
-      background:var(--card);
-      border-radius:22px;
-      overflow:hidden;
-      box-shadow:0 8px 18px rgba(0,0,0,.035);
-    }
+.menu-group{
+  margin:18px 0;
+}
 
-    .menu-item{
-      width:100%;
-      border:none;
-      border-bottom:1px solid var(--line);
-      background:transparent;
-      color:var(--text);
-      padding:17px 16px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      font-size:16px;
-      font-weight:1000;
-      text-align:left;
-    }
+.menu-title{
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:12px;
+}
 
-    .menu-item:last-child{
-      border-bottom:none;
-    }
+.menu-list{
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:22px;
+  overflow:hidden;
+}
 
-    .menu-left{
-      display:flex;
-      align-items:center;
-      gap:12px;
-    }
+.menu-item{
+  width:100%;
+  border:none;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+  color:var(--text);
+  padding:17px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-family:inherit;
+  font-size:16px;
+  font-weight:1000;
+  text-align:left;
+}
 
-    .menu-icon{
-      width:30px;
-      text-align:center;
-      font-size:20px;
-    }
+.menu-item:last-child{
+  border-bottom:none;
+}
 
-    .menu-arrow{
-      color:var(--muted);
-    }
+.menu-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
 
-    .sub-page-head{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      margin:8px 0 18px;
-    }
+.menu-icon{
+  width:30px;
+  text-align:center;
+  font-size:20px;
+}
 
-    .sub-back{
-      width:42px;
-      height:42px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:var(--card);
-      color:var(--text);
-      font-size:24px;
-    }
+.menu-arrow{
+  color:var(--muted);
+}
 
-    .sub-title{
-      font-size:24px;
-      font-weight:1000;
-    }
+.sub-page-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:8px 0 18px;
+}
 
-    .content-card{
-      border:1px solid var(--line);
-      background:var(--card);
-      border-radius:22px;
-      padding:18px;
-      margin-bottom:14px;
-      box-shadow:0 8px 18px rgba(0,0,0,.035);
-    }
+.sub-back{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:var(--card2);
+  color:var(--text);
+  font-size:24px;
+}
 
-    .content-title{
-      font-size:18px;
-      font-weight:1000;
-      margin-bottom:8px;
-    }
+.sub-title{
+  font-size:24px;
+  font-weight:1000;
+}
 
-    .content-text{
-      color:var(--muted);
-      font-size:14px;
-      font-weight:800;
-      line-height:1.8;
-    }
+.content-card{
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:22px;
+  padding:18px;
+  margin-bottom:14px;
+}
 
-    .rule-list{
-      margin:0;
-      padding-left:20px;
-      color:var(--muted);
-      font-size:14px;
-      font-weight:800;
-      line-height:1.9;
-    }
+.content-title{
+  font-size:18px;
+  font-weight:1000;
+  margin-bottom:8px;
+}
 
-    .bottom-tabs{
-      position:fixed;
-      left:50%;
-      transform:translateX(-50%);
-      bottom:4px;
-      width:calc(100% - 24px);
-      max-width:500px;
-      z-index:99;
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:8px;
-      background:rgba(255,255,255,.94);
-      border:1px solid var(--line);
-      border-radius:24px;
-      padding:8px;
-      backdrop-filter:blur(14px);
-      box-shadow:0 -8px 28px rgba(0,0,0,.08);
-    }
+.content-text{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:800;
+  line-height:1.8;
+}
 
-    .bottom-tab{
-      border:none;
-      border-radius:18px;
-      padding:10px 4px;
-      background:transparent;
-      color:var(--muted);
-      font-size:12px;
-      font-weight:1000;
-    }
+.rule-list{
+  margin:0;
+  padding-left:20px;
+  color:var(--muted);
+  font-size:14px;
+  font-weight:800;
+  line-height:1.9;
+}
 
-    .bottom-tab.active{
-      background:var(--accent);
-      color:var(--accentText);
-    }
+.bottom-tabs{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:4px;
+  width:calc(100% - 24px);
+  max-width:500px;
+  z-index:99;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  background:rgba(20,20,20,.94);
+  border:1px solid var(--line);
+  border-radius:24px;
+  padding:8px;
+  backdrop-filter:blur(14px);
+}
 
-    .bottom-tab span{
-      display:block;
-      font-size:20px;
-      margin-bottom:3px;
-    }
+body.day-mode .bottom-tabs{
+  background:rgba(255,255,255,.94);
+}
+
+.bottom-tab{
+  border:none;
+  border-radius:18px;
+  padding:10px 4px;
+  background:transparent;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:1000;
+  font-family:inherit;
+}
+
+.bottom-tab.active{
+  background:var(--accent);
+  color:var(--accentText);
+}
+
+.bottom-tab span{
+  display:block;
+  font-size:20px;
+  margin-bottom:3px;
+}
+
+.footer-nav{
+  margin-bottom:78px;
+}
 
     @media(max-width:380px){
-      .app{padding:18px 12px 122px;}
+      .app{padding:18px 12px 110px;}
       .headline{font-size:25px;}
       .brand{font-size:25px;}
       .hero-title{font-size:27px;}
       .hero-illust{width:104px;height:104px;font-size:54px;}
-      .service-grid{gap:9px;}
-      .service-card{min-height:126px;padding:14px 10px;}
-      .service-title{font-size:16px;}
-      .service-desc{font-size:11px;}
+      .service-grid-new{gap:9px;}
+      .service-item{min-height:92px;}
+      .service-item-title{font-size:12px;}
+      .category-tab{font-size:11px;padding:10px 2px;}
     }
   </style>
 </head>
@@ -1081,298 +1138,150 @@
     </div>
 
     <section class="step active" id="step1">
+
       <div class="hero-card">
-        <div class="hero-kicker">UBee 跑腿正式營運版</div>
+        <div class="hero-kicker">UBee 城市任務平台</div>
         <div class="hero-title">今天需要 UBee<br>幫你做什麼？</div>
-        <div class="hero-sub">下單清楚、費用透明、專人媒合，城市任務交給 UBee。</div>
+        <div class="hero-sub">快速下單・專人完成・安全可靠</div>
         <button class="hero-btn" type="button" onclick="document.getElementById('serviceArea').scrollIntoView({behavior:'smooth'})">
           立即下單 <span>›</span>
         </button>
         <div class="hero-illust">🐝</div>
       </div>
-
+      
       <div id="merchantInfoBox" class="merchant-card hidden"></div>
+      
+      <div class="category-tabs">
+  <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
+  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
+  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
+  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'life')">生活跑腿</button>
+  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'business')">商務支援</button>
+  <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">急件專送</button>
+</div>
 
-      <div id="serviceArea" class="section-label">選擇任務類型</div>
+      <div id="serviceArea" class="section-label">常用服務</div>
 
-      <div class="service-grid" id="serviceGrid"></div>
+      <div class="service-grid-new" id="serviceGrid"></div>
+
+      <div id="serviceCategoryBox" class="category-choice-box hidden">
+  <div class="category-choice-title" id="serviceCategoryTitle">請選擇分類</div>
+  <div class="category-choice-grid" id="serviceCategoryGrid"></div>
+</div>
+      
+      <div id="merchantSelectBox" class="category-choice-box hidden">
+  <div class="category-choice-title">選擇合作店家</div>
+  <div class="category-choice-grid" id="merchantSelectGrid"></div>
+</div>
 
       <div class="trust-strip">
         <div class="trust-item">
           <div class="trust-icon">🧑‍💼</div>
-          <div class="trust-title">正式派單</div>
-          <div class="trust-desc">完成付款後媒合騎士</div>
+          <div class="trust-title">專人處理</div>
+          <div class="trust-desc">由合作夥伴執行</div>
         </div>
         <div class="trust-item">
           <div class="trust-icon">⏱️</div>
-          <div class="trust-title">進度清楚</div>
-          <div class="trust-desc">可查看任務狀態</div>
+          <div class="trust-title">即時追蹤</div>
+          <div class="trust-desc">任務進度清楚掌握</div>
         </div>
         <div class="trust-item">
           <div class="trust-icon">🛡️</div>
-          <div class="trust-title">安全規範</div>
-          <div class="trust-desc">拒收高風險任務</div>
+          <div class="trust-title">安全可靠</div>
+          <div class="trust-desc">付款後開始派單</div>
         </div>
       </div>
 
       <div class="info-box">
-        <div class="info-title" id="serviceInfoTitle">服務說明</div>
+        <div class="info-title">服務說明</div>
         <div class="info-text" id="serviceDescription">
-          請選擇您需要的任務類型，UBee 會依照不同任務提供對應欄位與流程。
+          UBee 協助文件急送、物品配送、代取、代買與生活跑腿。填寫資料後，系統會依距離、時間與任務速度計算預估費用。
         </div>
       </div>
     </section>
 
     <section class="step" id="step2">
-      <div class="headline" id="step2Title">填寫任務資訊</div>
-      <div class="subtext" id="step2Subtext">資料越完整，騎士越能準確完成任務。</div>
+      <div class="headline">填寫取件與送達資訊</div>
+      <div class="subtext">地址越完整，系統估價越準。</div>
 
       <div class="task-path-box">
-        <div class="task-path-title">目前選擇</div>
-        <div class="task-path-value" id="taskPathText">尚未選擇</div>
-      </div>
-
-      <div id="normalForm">
-
-  <div id="subTypeBox" class="form-section hidden">
-    <div class="form-title" id="subTypeTitle">請選擇類型</div>
-    <div class="choice-grid" id="subTypeGrid"></div>
-  </div>
-
-  <div id="nearbyPlaceBox" class="form-section hidden">
-    <div class="form-title" id="nearbyPlaceTitle">附近地點</div>
-
-    <div class="full-card">
-      <div class="info-title" id="nearbyPlaceInfoTitle">搜尋附近地點</div>
-      <div class="info-text" id="nearbyPlaceInfoText">
-        系統會依照您目前位置，搜尋 3～5 公里內可用地點。
-      </div>
-
-      <button type="button" class="btn btn-primary" style="margin-top:14px;" onclick="searchNearbyPlaces()">
-        重新搜尋附近地點
-      </button>
-    </div>
-
-    <div id="nearbyPlaceList" class="choice-grid"></div>
-  </div>
-
-  <div class="form-section">
-    <div class="form-title" id="pickupTitle">取件資訊</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">📍</div>
-              <input id="pickup" maxlength="120" placeholder="取件地址 / 店家地址 / 任務地點">
-            </div>
-            <div class="input-wrap">
-              <div class="input-icon">☎️</div>
-              <input id="pickupPhone" maxlength="20" inputmode="tel" placeholder="取件電話 / 店家電話">
-            </div>
+  <div class="task-path-title">任務內容</div>
+  <div class="task-path-value" id="taskPathText">尚未選擇</div>
+</div>
+      
+      <div class="form-section">
+        <div class="form-title">取件資訊</div>
+        <div class="input-card">
+          <div class="input-wrap">
+            <div class="input-icon"></div>
+            <input id="pickup" maxlength="120" placeholder="取件地址 / 店家地址 / 任務地點">
           </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title" id="dropoffTitle">送達資訊</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">🏁</div>
-              <input id="dropoff" maxlength="120" placeholder="送達地址 / 交付地點">
-            </div>
-            <div class="input-wrap">
-              <div class="input-icon">☎️</div>
-              <input id="dropoffPhone" maxlength="20" inputmode="tel" placeholder="收件電話 / 聯絡電話">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">任務內容</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">▣</div>
-              <input id="item" maxlength="80" placeholder="例如：文件、飲料、包裹、鑰匙、餐點">
-            </div>
-            <div class="input-wrap">
-              <div class="input-icon">✎</div>
-              <textarea id="note" maxlength="300" placeholder="請填寫品牌、數量、規格、顏色、注意事項。包裹請清楚填寫內容物。"></textarea>
-            </div>
-            <div class="input-wrap" id="advancePaymentWrap">
-              <div class="input-icon">💰</div>
-              <input id="advancePayment" type="number" min="0" inputmode="numeric" placeholder="預估代墊金額，沒有請填 0">
-            </div>
+          <div class="input-wrap">
+            <div class="input-icon"></div>
+            <input id="pickupPhone" maxlength="20" placeholder="取件電話 / 店家電話">
           </div>
         </div>
       </div>
 
-      <div id="queueForm" class="hidden">
-        <div class="form-section">
-          <div class="form-title">排隊地點</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">📍</div>
-              <input id="queuePlace" maxlength="120" placeholder="例如：豐原某餐廳、醫院、銀行、活動現場">
-            </div>
-            <div class="input-wrap">
-              <div class="input-icon">☎️</div>
-              <input id="queuePhone" maxlength="20" inputmode="tel" placeholder="聯絡電話">
-            </div>
+      <div class="form-section">
+        <div class="form-title">送達資訊</div>
+        <div class="input-card">
+          <div class="input-wrap">
+            <div class="input-icon"></div>
+            <input id="dropoff" maxlength="120" placeholder="送達地址 / 交付地點">
           </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">要排什麼</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">⏰</div>
-              <input id="queueTask" maxlength="80" placeholder="例如：餐廳候位、掛號、領號碼牌、限量商品">
-            </div>
-            <div class="input-wrap">
-              <div class="input-icon">✎</div>
-              <textarea id="queueNote" maxlength="300" placeholder="請補充排隊規則、現場注意事項、需要騎士完成的動作。"></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">開始時間</div>
-          <div class="choice-grid" id="queueStartGrid">
-            <button class="choice-btn active" type="button" onclick="selectQueueStart(this,'now')">現在</button>
-            <button class="choice-btn" type="button" onclick="selectQueueStart(this,'scheduled')">預約時間</button>
-          </div>
-        </div>
-
-        <div class="form-section hidden" id="queueScheduleBox">
-          <div class="form-title">預約時間</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">📅</div>
-              <input id="queueScheduleTime" type="datetime-local">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">最多排多久</div>
-          <div class="choice-grid" id="queueDurationGrid">
-            <button class="choice-btn active" type="button" onclick="selectQueueDuration(this,30)">30 分鐘</button>
-            <button class="choice-btn" type="button" onclick="selectQueueDuration(this,60)">60 分鐘</button>
-            <button class="choice-btn" type="button" onclick="selectQueueDuration(this,90)">90 分鐘</button>
-            <button class="choice-btn" type="button" onclick="selectQueueDuration(this,'custom')">自訂</button>
-          </div>
-        </div>
-
-        <div class="form-section hidden" id="queueCustomDurationBox">
-          <div class="form-title">自訂分鐘數</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">⏱️</div>
-              <input id="queueCustomDuration" type="number" min="10" max="240" inputmode="numeric" placeholder="請輸入 10～240 分鐘">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">完成後要怎麼做</div>
-          <div class="choice-grid" id="queueActionGrid">
-            <button class="choice-btn active" type="button" onclick="selectQueueAction(this,'取貨')">取貨</button>
-            <button class="choice-btn" type="button" onclick="selectQueueAction(this,'佔位')">佔位</button>
-            <button class="choice-btn" type="button" onclick="selectQueueAction(this,'通知我')">通知我</button>
-            <button class="choice-btn" type="button" onclick="selectQueueAction(this,'其他')">其他</button>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">完成方式補充</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">✎</div>
-              <textarea id="queueActionNote" maxlength="220" placeholder="例如：排到後請通知我、候位到號後請聯絡我、取到商品後送到指定地址。"></textarea>
-            </div>
+          <div class="input-wrap">
+            <div class="input-icon"></div>
+            <input id="dropoffPhone" maxlength="20" placeholder="收件電話 / 聯絡電話">
           </div>
         </div>
       </div>
 
-      <div id="helperForm" class="hidden">
-        <div class="full-card">
-          <div class="info-title">全能幫手｜人工審核任務</div>
-          <div class="info-text">此類任務範圍較廣，送出後 UBee 會先確認是否可承接與報價，不會直接派單給騎士。</div>
+      <div class="form-section">
+        <div class="form-title">任務內容</div>
+        <div class="input-card">
+          <div class="input-wrap">
+            <div class="input-icon">▣</div>
+            <input id="item" maxlength="80" placeholder="例如：文件、飲料、包裹、洗衣、排隊、手機貼膜">
+          </div>
+          <div class="input-wrap">
+            <div class="input-icon">✎</div>
+            <textarea id="note" maxlength="200" placeholder="備註：請填寫品牌、數量、規格、顏色、注意事項。包裹請先拍照上傳官方帳號確認內容物。"></textarea>
+          </div>
+             <div class="input-wrap">
+                <div class="input-icon">💰</div>
+             <input
+                id="advancePayment"
+                type="number"
+                min="0"
+                inputmode="numeric"
+                placeholder="預估代墊金額，例如：350，沒有請填 0"
+              >
+            </div>
         </div>
+      </div>
 
-        <div class="form-section">
-          <div class="form-title">你需要 UBee 幫你完成什麼？</div>
+      <div id="dynamicFields">
+        <div id="field-purchase" class="form-section hidden">
+          <div class="form-title" id="purchaseFieldTitle">代買補充</div>
           <div class="input-card">
             <div class="input-wrap">
-              <div class="input-icon">✨</div>
-              <textarea id="helperTask" maxlength="400" placeholder="例如：幫我送花給女朋友、幫我去銀行拿文件、幫我確認某個地方是否營業。"></textarea>
+              <div class="input-icon"></div>
+              <input id="purchaseContent" maxlength="80" placeholder="例如：珍奶 2 杯、藥局用品、手機保護貼">
+            </div>
+            <div class="input-wrap">
+              <div class="input-icon"></div>
+              <input id="purchaseStore" maxlength="120" placeholder="指定店家 / 可接受附近店家">
             </div>
           </div>
         </div>
 
-        <div class="form-section">
-          <div class="form-title">任務地點</div>
+        <div id="field-task" class="form-section hidden">
+          <div class="form-title" id="taskFieldTitle">任務說明</div>
           <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">📍</div>
-              <input id="helperPlace" maxlength="120" placeholder="請輸入主要任務地點">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">是否需要送到其他地方</div>
-          <div class="choice-grid" id="helperDeliveryGrid">
-            <button class="choice-btn active" type="button" onclick="selectHelperDelivery(this,'否')">否</button>
-            <button class="choice-btn" type="button" onclick="selectHelperDelivery(this,'是')">是</button>
-          </div>
-        </div>
-
-        <div class="form-section hidden" id="helperDropoffBox">
-          <div class="form-title">送達地點</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">🏁</div>
-              <input id="helperDropoff" maxlength="120" placeholder="請輸入送達地址">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">預算金額</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">💰</div>
-              <input id="helperBudget" type="number" min="0" inputmode="numeric" placeholder="例如：500，沒有預算可填 0">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">希望完成時間</div>
-          <div class="choice-grid" id="helperTimeGrid">
-            <button class="choice-btn active" type="button" onclick="selectHelperTime(this,'立即')">立即</button>
-            <button class="choice-btn" type="button" onclick="selectHelperTime(this,'預約')">預約</button>
-          </div>
-        </div>
-
-        <div class="form-section hidden" id="helperScheduleBox">
-          <div class="form-title">預約時間</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">📅</div>
-              <input id="helperScheduleTime" type="datetime-local">
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">聯絡電話與備註</div>
-          <div class="input-card">
-            <div class="input-wrap">
-              <div class="input-icon">☎️</div>
-              <input id="helperPhone" maxlength="20" inputmode="tel" placeholder="聯絡電話">
-            </div>
             <div class="input-wrap">
               <div class="input-icon">✎</div>
-              <textarea id="helperNote" maxlength="300" placeholder="請補充注意事項、限制條件、現場聯絡方式。"></textarea>
+              <textarea id="taskContent" maxlength="200" placeholder="請補充任務細節、規格、數量、預算、等待時間或特殊注意事項。"></textarea>
             </div>
           </div>
         </div>
@@ -1380,51 +1289,36 @@
     </section>
 
     <section class="step" id="step3">
-      <div class="headline" id="step3Title">確認服務方式</div>
-      <div class="subtext" id="step3Subtext">依任務類型確認速度、等待時間或人工審核方式。</div>
+      <div class="headline">選擇任務速度</div>
+      <div class="subtext">依您的需求，選擇適合的處理速度。</div>
 
-      <div id="speedSection">
-        <div class="speed-card active" data-value="standard" onclick="selectSpeed(this,'standard')">
+      <div id="speedGrid">
+        <div class="speed-card active" data-value="standard" onclick="selectSpeed(this, 'standard')">
           <div class="speed-top">
             <div class="speed-name">標準件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">一般媒合｜60–90 分鐘｜+NT$15</div>
+          <div class="speed-desc">彈性安排｜60–90 分鐘｜+NT$20</div>
         </div>
 
-        <div class="speed-card" data-value="priority" onclick="selectSpeed(this,'priority')">
+        <div class="speed-card" data-value="priority" onclick="selectSpeed(this, 'priority')">
           <div class="speed-top">
             <div class="speed-name">快速件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">加速媒合｜45–60 分鐘｜+NT$20</div>
+          <div class="speed-desc">即時媒合｜45–60 分鐘｜+NT$25</div>
         </div>
 
-        <div class="speed-card" data-value="express" onclick="selectSpeed(this,'express')">
+        <div class="speed-card" data-value="express" onclick="selectSpeed(this, 'express')">
           <div class="speed-top">
             <div class="speed-name">優先件</div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">優先處理｜30–45 分鐘｜+NT$25</div>
-        </div>
-
-        <button class="btn btn-secondary yellow-outline" type="button" onclick="calculateEstimate(false)">立即估價</button>
-      </div>
-
-      <div id="queueEstimateSection" class="hidden">
-        <div class="info-box">
-          <div class="info-title">幫排隊計價方式</div>
-          <div class="info-text">起步價 NT$80 + 等待時間每分鐘 NT$3 + 平台服務費 NT$25。此任務屬時間型任務，依您選擇的最多等待時間計算。</div>
-        </div>
-        <button class="btn btn-secondary yellow-outline" type="button" onclick="calculateEstimate(false)">立即估價</button>
-      </div>
-
-      <div id="helperReviewSection" class="hidden">
-        <div class="info-box">
-          <div class="info-title">全能幫手需要人工確認</div>
-          <div class="info-text">此類任務需由 UBee 確認是否可承接、是否需要代墊、是否涉及高風險內容，確認後才會報價與安排。</div>
+          <div class="speed-desc">優先處理｜30–45 分鐘｜+NT$30</div>
         </div>
       </div>
+
+      <button class="btn btn-secondary yellow-outline" type="button" onclick="calculateEstimate()">先計算預估費用</button>
 
       <div id="estimateResult" class="price-box hidden">
         <div id="estimateText"></div>
@@ -1432,8 +1326,8 @@
     </section>
 
     <section class="step" id="step4">
-      <div class="headline">確認任務內容</div>
-      <div class="subtext" id="confirmSubtext">確認內容無誤後，即可建立任務。</div>
+      <div class="headline">確認訂單內容</div>
+      <div class="subtext">確認所有內容與金額後，即可建立任務。</div>
 
       <div class="summary-card" id="confirmSummary"></div>
 
@@ -1441,17 +1335,17 @@
 
       <div class="notice">
         <div class="notice-title">注意事項</div>
-        <ul id="noticeList">
+        <ul>
           <li>暫不承接違法物品、危險物品、管制物品。</li>
           <li>暫不承接高風險現金交付或無法確認內容的任務。</li>
-          <li>如內容與現場不符，UBee 有權取消訂單。</li>
-          <li>騎士接單後取消，可能產生取消費。</li>
-          <li>一般任務完成付款後才會開始派單。</li>
+          <li>如是包裹請填寫內容物，實際抵達與現場不符，我方有權強制取消訂單。</li>
+          <li>合作夥伴接單後取消，可能產生取消費。</li>
+          <li>完成付款後才會開始派單。</li>
         </ul>
 
         <label class="confirm-box" for="confirmNotice">
           <input type="checkbox" id="confirmNotice">
-          <div class="confirm-text" id="confirmNoticeText">我已確認任務內容正確，並了解完成付款後才會開始派單。</div>
+          <div class="confirm-text">我已確認任務內容正確，並了解完成付款後才會開始派單。</div>
         </label>
       </div>
     </section>
@@ -1459,8 +1353,8 @@
     <section class="step" id="step5">
       <div class="success">
         <div class="success-icon">✓</div>
-        <div class="success-title" id="successTitle">準備建立任務</div>
-        <div class="subtext" id="successSubtext">請按下方按鈕建立任務。</div>
+        <div class="success-title" id="successTitle">訂單建立完成</div>
+        <div class="subtext">請選擇付款方式，完成付款後系統才會開始派單。</div>
         <div class="order-no" id="successOrderNo">尚未建立訂單</div>
         <div id="customerProgressBox" class="customer-progress hidden"></div>
       </div>
@@ -1470,253 +1364,308 @@
       <button id="createOrderBtn" class="btn btn-primary" onclick="submitOrder()" disabled>LINE 身分確認中...</button>
 
       <button id="cashBtn" class="btn btn-primary hidden" onclick="selectPayment('cash')">現金付款</button>
+
       <button id="jkoBtn" class="btn btn-secondary hidden" style="margin-top:12px;" onclick="selectPayment('jko')">街口支付</button>
 
       <div id="paymentInfoBox" class="payment-info hidden"></div>
 
       <button id="paidBtn" class="btn btn-primary hidden" onclick="confirmPaid()">我已付款</button>
+
       <button id="cancelOrderBtn" class="btn btn-danger hidden" style="margin-top:18px;" onclick="cancelOrder()">取消訂單</button>
 
       <div id="statusBox" class="status hidden"></div>
     </section>
 
     <section class="app-section" id="customerTasksPage">
-      <div class="headline">我的任務</div>
-      <div class="subtext">查看進行中任務、歷史紀錄與訂單資訊。</div>
+  <div class="headline">我的任務</div>
+  <div class="subtext">查看目前任務狀態、歷史紀錄與訂單資訊。</div>
 
-      <div class="menu-group">
-        <div class="menu-title">任務管理</div>
-        <div class="menu-list">
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
-            <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
-            <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-        </div>
-      </div>
-
-      <div class="menu-group">
-        <div class="menu-title">最近任務</div>
-        <div id="recentTaskList" class="content-text">正在讀取最近任務...</div>
-      </div>
-    </section>
-
-    <section class="app-section" id="customerProfilePage">
-      <div class="member-card">
-        <div class="member-title">UBee 會員</div>
-        <div class="member-sub" id="memberInfoText">LINE 會員｜使用 UBee 建立城市任務</div>
-
-        <div class="member-stats">
-          <div class="member-stat"><strong id="memberTaskCount">0</strong><span>累積任務</span></div>
-          <div class="member-stat"><strong id="memberActiveCount">0</strong><span>進行中</span></div>
-          <div class="member-stat"><strong id="memberLevelText">一般</strong><span>會員等級</span></div>
-        </div>
-      </div>
-
-      <div class="menu-group">
-        <div class="menu-title">我的任務</div>
-        <div class="menu-list">
-          <button class="menu-item" type="button" onclick="showTasksTab()">
-            <div class="menu-left"><div class="menu-icon">📦</div><div>我的任務</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
-            <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
-            <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-        </div>
-      </div>
-
-      <div class="menu-group">
-        <div class="menu-title">服務中心</div>
-        <div class="menu-list">
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('addressPage')">
-            <div class="menu-left"><div class="menu-icon">📍</div><div>常用地址</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('supportPage')">
-            <div class="menu-left"><div class="menu-icon">💬</div><div>客服中心</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('cancelRulePage')">
-            <div class="menu-left"><div class="menu-icon">⚠️</div><div>取消規則</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-          <button class="menu-item" type="button" onclick="openCustomerSubPage('faqPage')">
-            <div class="menu-left"><div class="menu-icon">❓</div><div>常見問題</div></div>
-            <div class="menu-arrow">›</div>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section class="app-section" id="activeTaskPage">
-      <div class="sub-page-head">
-        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-        <div class="sub-title">進行中任務</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">目前任務狀態</div>
-        <div class="content-text" id="activeTaskText">目前沒有進行中的任務。</div>
-      </div>
-    </section>
-
-    <section class="app-section" id="historyTaskPage">
-      <div class="sub-page-head">
-        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-        <div class="sub-title">歷史任務</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">任務紀錄</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
-          <button class="choice-btn active" type="button" onclick="setHistoryFilter(this,'all')">全部</button>
-          <button class="choice-btn" type="button" onclick="setHistoryFilter(this,'completed')">已完成</button>
-          <button class="choice-btn" type="button" onclick="setHistoryFilter(this,'cancelled')">已取消</button>
-        </div>
-        <div class="content-text" id="historyTaskText">正在讀取歷史任務...</div>
-      </div>
-    </section>
-
-    <section class="app-section" id="addressPage">
-      <div class="sub-page-head">
-        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-        <div class="sub-title">常用地址</div>
-      </div>
-
-      <div class="content-card">
-        <div class="content-title">常用地址</div>
-        <div class="content-text" style="margin-bottom:14px;">可先填寫住家、公司或常用地址，下單時可帶入送達地址。</div>
-
-        <div class="form-section">
-          <div class="form-title">住家地址</div>
-          <div class="input-card">
-            <div class="input-wrap"><input id="homeAddressInput" maxlength="120" placeholder="請輸入住家地址"></div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">公司地址</div>
-          <div class="input-card">
-            <div class="input-wrap"><input id="companyAddressInput" maxlength="120" placeholder="請輸入公司地址"></div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <div class="form-title">其他常用地址</div>
-          <div class="input-card">
-            <div class="input-wrap"><input id="favoriteAddressInput" maxlength="120" placeholder="請輸入常用地址"></div>
-          </div>
-        </div>
-
-        <button type="button" class="btn btn-primary" onclick="saveCustomerAddresses()">儲存常用地址</button>
-        <button type="button" class="btn btn-secondary" style="margin-top:12px;" onclick="fillAddressToOrder()">帶入住家地址到下單頁</button>
-      </div>
-    </section>
-
-    <section class="app-section" id="supportPage">
-      <div class="sub-page-head">
-        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-        <div class="sub-title">客服中心</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">聯絡 UBee 客服</div>
-        <div class="content-text">如需修改訂單、確認付款、任務異常、退款處理或店家合作，請回到 LINE 官方帳號與客服聯繫。客服會依照訂單編號協助處理。</div>
-      </div>
-      <button type="button" class="btn btn-primary" onclick="openLineOfficial()">開啟 LINE 客服</button>
-    </section>
-
-    <section class="app-section" id="cancelRulePage">
-      <div class="sub-page-head">
-        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-        <div class="sub-title">取消規則</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">訂單取消說明</div>
-        <ul class="rule-list">
-          <li>尚未付款：可直接取消，不收費。</li>
-          <li>付款後尚未接單：可申請取消，依實際狀況處理退款。</li>
-          <li>騎士已接單：可能產生取消費。</li>
-          <li>騎士已抵達或已取件：需依任務進度收取相關費用。</li>
-          <li>內容與現場不符、違禁品或高風險任務，UBee 可取消訂單。</li>
-          <li>全能幫手任務若尚未報價確認，不會產生派單費用。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section class="app-section" id="faqPage">
-      <div class="sub-page-head">
-        <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
-        <div class="sub-title">常見問題</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">UBee 可以幫我做什麼？</div>
-        <div class="content-text">可以協助幫我送、幫我買、幫我取、幫排隊、商務配送、店家代送與全能幫手任務。</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">什麼任務可以直接派單？</div>
-        <div class="content-text">幫我送、幫我買、幫我取、幫排隊、商務配送、店家代送都可以估價後建立任務，完成付款後開始派單。</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">全能幫手為什麼要人工審核？</div>
-        <div class="content-text">因為全能幫手可能包含特殊需求、現場確認、代辦或不確定風險，所以 UBee 會先確認可不可做，再報價與安排。</div>
-      </div>
-      <div class="content-card">
-        <div class="content-title">可以送違禁品或高價現金嗎？</div>
-        <div class="content-text">不可以。違法物品、危險物品、管制物品與高風險現金交付暫不承接。</div>
-      </div>
-    </section>
-
-    <div class="footer-nav">
-      <button id="footerCancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:12px;">取消訂單</button>
-
-      <div class="btn-row">
-        <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
-        <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
-      </div>
+  <div class="menu-group">
+    <div class="menu-title">任務管理</div>
+    <div class="menu-list">
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
+        <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
+        <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
     </div>
+  </div>
+  
+    <div class="menu-group">
+    <div class="menu-title">最近任務</div>
+    <div id="recentTaskList" class="content-text">正在讀取最近任務...</div>
+  </div>
+</section>
 
-    <div class="bottom-tabs">
-      <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
-        <span>🏠</span>首頁
+<section class="app-section" id="customerProfilePage">
+  <div class="member-card">
+    <div class="member-title">UBee 會員</div>
+    <div class="member-sub" id="memberInfoText">LINE 會員｜使用 UBee 建立城市任務</div>
+
+    <div class="member-stats">
+      <div class="member-stat"><strong id="memberTaskCount">0</strong><span>累積任務</span></div>
+      <div class="member-stat"><strong>0</strong><span>可用優惠</span></div>
+      <div class="member-stat"><strong id="memberLevelText">一般</strong><span>會員等級</span></div>
+    </div>
+  </div>
+
+  <div class="menu-group">
+    <div class="menu-title">我的任務</div>
+    <div class="menu-list">
+      <button class="menu-item" type="button" onclick="showTasksTab()">
+        <div class="menu-left"><div class="menu-icon">📦</div><div>我的任務</div></div>
+        <div class="menu-arrow">›</div>
       </button>
-      <button id="tabTasks" class="bottom-tab" type="button" onclick="showTasksTab()">
-        <span>📦</span>任務
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('activeTaskPage')">
+        <div class="menu-left"><div class="menu-icon">🚚</div><div>進行中任務</div></div>
+        <div class="menu-arrow">›</div>
       </button>
-      <button id="tabProfile" class="bottom-tab" type="button" onclick="showProfileTab()">
-        <span>👤</span>我的
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('historyTaskPage')">
+        <div class="menu-left"><div class="menu-icon">📋</div><div>歷史任務</div></div>
+        <div class="menu-arrow">›</div>
       </button>
     </div>
   </div>
 
+  <div class="menu-group">
+    <div class="menu-title">會員服務</div>
+    <div class="menu-list">
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('couponPage')">
+        <div class="menu-left"><div class="menu-icon">🎟️</div><div>優惠券</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('addressPage')">
+        <div class="menu-left"><div class="menu-icon">📍</div><div>常用地址</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('supportPage')">
+        <div class="menu-left"><div class="menu-icon">💬</div><div>客服中心</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('cancelRulePage')">
+        <div class="menu-left"><div class="menu-icon">⚠️</div><div>取消規則</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+      <button class="menu-item" type="button" onclick="openCustomerSubPage('faqPage')">
+        <div class="menu-left"><div class="menu-icon">❓</div><div>常見問題</div></div>
+        <div class="menu-arrow">›</div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<section class="app-section" id="activeTaskPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">進行中任務</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">目前任務狀態</div>
+    <div class="content-text" id="activeTaskText">目前沒有進行中的任務。建立訂單後，任務狀態會顯示在這裡。</div>
+  </div>
+</section>
+
+<section class="app-section" id="historyTaskPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">歷史任務</div>
+  </div>
+  <div class="content-card">
+  <div class="content-title">任務紀錄</div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+    <button class="category-choice-item active" type="button" onclick="setHistoryFilter(this, 'all')">全部</button>
+    <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'completed')">已完成</button>
+    <button class="category-choice-item" type="button" onclick="setHistoryFilter(this, 'cancelled')">已取消</button>
+  </div>
+
+  <div class="content-text" id="historyTaskText">正在讀取歷史任務...</div>
+</div>
+</section>
+
+<section class="app-section" id="couponPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">優惠券</div>
+  </div>
+  <div class="content-card">
+  <div class="content-title">目前沒有可用優惠</div>
+  <div class="content-text">後續若有優惠活動，會顯示在這裡。</div>
+</div>
+</section>
+
+<section class="app-section" id="addressPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">常用地址</div>
+  </div>
+
+  <div class="content-card">
+    <div class="content-title">常用地址</div>
+    <div class="content-text" style="margin-bottom:14px;">
+      可先填寫住家、公司或常用地址，下單時可以複製使用。
+    </div>
+
+    <div class="form-section">
+      <div class="form-title">住家地址</div>
+      <div class="input-card">
+        <div class="input-wrap">
+          <input id="homeAddressInput" maxlength="120" placeholder="請輸入住家地址">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-title">公司地址</div>
+      <div class="input-card">
+        <div class="input-wrap">
+          <input id="companyAddressInput" maxlength="120" placeholder="請輸入公司地址">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-title">其他常用地址</div>
+      <div class="input-card">
+        <div class="input-wrap">
+          <input id="favoriteAddressInput" maxlength="120" placeholder="請輸入常用地址">
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-primary" onclick="saveCustomerAddresses()">
+      儲存常用地址
+    </button>
+
+    <button type="button" class="btn btn-secondary" style="margin-top:12px;" onclick="fillAddressToOrder()">
+      帶入住家地址到下單頁
+    </button>
+  </div>
+</section>
+
+<section class="app-section" id="supportPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">客服中心</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">聯絡 UBee 客服</div>
+    <div class="content-text">如需修改訂單、確認付款、任務異常或合作洽詢，請回到 LINE 官方帳號與客服聯繫。</div>
+  </div>
+</section>
+
+<section class="app-section" id="cancelRulePage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">取消規則</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">訂單取消說明</div>
+    <ul class="rule-list">
+      <li>尚未付款：可直接取消，不收費。</li>
+      <li>付款後尚未接單：可申請取消，依實際狀況處理退款。</li>
+      <li>騎士已接單：可能產生取消費。</li>
+      <li>騎士已抵達或已取件：需依任務進度收取相關費用。</li>
+      <li>內容與現場不符、違禁品或高風險任務，UBee 可取消訂單。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="app-section" id="faqPage">
+  <div class="sub-page-head">
+    <button class="sub-back" type="button" onclick="closeCustomerSubPage()">‹</button>
+    <div class="sub-title">常見問題</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">UBee 可以幫我做什麼？</div>
+    <div class="content-text">可以協助文件急送、物品配送、代取、代買、生活跑腿與商務支援。</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">什麼時候開始派單？</div>
+    <div class="content-text">完成付款並確認後，系統才會開始派單給合作騎士。</div>
+  </div>
+  <div class="content-card">
+    <div class="content-title">可以送違禁品或高價現金嗎？</div>
+    <div class="content-text">不可以。違法物品、危險物品、管制物品與高風險現金交付暫不承接。</div>
+  </div>
+</section>
+
+    <div class="footer-nav">
+  <button id="footerCancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:12px;">
+    取消訂單
+  </button>
+
+  <div class="btn-row">
+    <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
+    <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
+  </div>
+</div>
+<div class="bottom-tabs">
+  <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
+    <span>🏠</span>首頁
+  </button>
+  <button id="tabTasks" class="bottom-tab" type="button" onclick="showTasksTab()">
+    <span>📦</span>任務
+  </button>
+  <button id="tabProfile" class="bottom-tab" type="button" onclick="showProfileTab()">
+    <span>👤</span>我的
+  </button>
+</div>
+  </div>
+
 <script>
-document.addEventListener('gesturestart', e => e.preventDefault());
-document.addEventListener('gesturechange', e => e.preventDefault());
-document.addEventListener('gestureend', e => e.preventDefault());
+document.addEventListener('gesturestart', function(e){
+  e.preventDefault();
+});
+
+document.addEventListener('gesturechange', function(e){
+  e.preventDefault();
+});
+
+document.addEventListener('gestureend', function(e){
+  e.preventDefault();
+});
 
 let lastTouchEnd = 0;
 document.addEventListener('touchend', function(e){
   const now = Date.now();
-  if(now - lastTouchEnd <= 300) e.preventDefault();
+  if(now - lastTouchEnd <= 300){
+    e.preventDefault();
+  }
   lastTouchEnd = now;
 }, { passive:false });
 
-document.addEventListener('dblclick', e => e.preventDefault(), { passive:false });
+document.addEventListener('dblclick', function(e){
+  e.preventDefault();
+}, { passive:false });
+
+function applyThemeByTime(){
+  const hour = new Date().getHours();
+  const isDay = hour >= 6 && hour < 18;
+
+  document.body.classList.toggle('day-mode', isDay);
+  document.body.classList.toggle('night-mode', !isDay);
+
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if(metaTheme){
+    metaTheme.setAttribute('content', isDay ? '#f6f6f6' : '#000000');
+  }
+}
+
+applyThemeByTime();
+
+setInterval(applyThemeByTime, 5 * 60 * 1000);
 
 let userId = 'web-order';
 let liffId = '';
 let currentStep = 1;
-
-let selectedService = null;
-let selectedSubType = '';
+let serviceType = '文件急送';
+let serviceGroup = 'send';
+let serviceCategory = '';
 let speedType = 'standard';
-
 let currentOrderId = '';
 let selectedPaymentMethod = '';
 let currentTotal = '';
@@ -1724,20 +1673,13 @@ let lastEstimate = null;
 
 let merchantMode = false;
 let currentMerchant = null;
-
-let queueStartType = 'now';
-let queueDurationValue = 30;
-let queueActionValue = '取貨';
-
-let helperNeedsDelivery = '否';
-let helperTimeType = '立即';
+let merchantSearchToken = 0;
 
 let isSubmittingOrder = false;
 let isConfirmingPaid = false;
 let isSelectingPayment = false;
 let isPaymentMethodSaved = false;
 let isCancellingOrder = false;
-
 let customerOrderUnsubscribe = null;
 let customerActiveOrdersUnsubscribe = null;
 let currentHistoryFilter = 'all';
@@ -1755,91 +1697,6 @@ if(window.firebase && !firebase.apps.length){
 
 const db = window.firebase ? firebase.firestore() : null;
 
-const SERVICE_LIST = [
-  {
-    key:'send',
-    icon:'🚚',
-    title:'幫我送',
-    mode:'direct',
-    description:'文件急送、送鑰匙、包裹配送、禮物代送。自動估價後可直接建立任務。',
-    examples:'文件急送、鑰匙急送、包裹配送、禮物代送'
-  },
-  {
-    key:'buy',
-    icon:'🛒',
-    title:'幫我買',
-    mode:'direct',
-    description:'飲料、餐點、生活用品代買。請填寫指定店家、商品、數量與預估代墊金額。',
-    examples:'飲料代買、餐點代買、生活用品代買'
-  },
-  {
-    key:'pickup',
-    icon:'📦',
-    title:'幫我取',
-    mode:'direct',
-    description:'超商取貨、代領包裹、文件代取。請填寫取件資訊與交付地點。',
-    examples:'超商取貨、代領包裹、文件代取'
-  },
-  {
-    key:'queue',
-    icon:'⏰',
-    title:'幫排隊',
-    mode:'queue',
-    description:'餐廳候位、排隊掛號、領號碼牌、限量商品排隊。依等待時間自動估價，可直接建立任務。',
-    examples:'餐廳候位、排隊掛號、領號碼牌、限量商品排隊'
-  },
-  {
-    key:'business',
-    icon:'💼',
-    title:'商務配送',
-    mode:'direct',
-    description:'合約急送、公司文件、樣品配送。適合公司、店家、工作室與商務需求。',
-    examples:'合約急送、公司文件、樣品配送'
-  },
-  {
-    key:'merchant',
-    icon:'🏪',
-    title:'店家代送',
-    mode:'direct',
-    description:'合作店家外送、早餐店、飲料店、小吃店。可由店家連結帶入資料，也可手動填寫。',
-    examples:'合作店家外送、早餐店、飲料店、小吃店'
-  },
-  {
-    key:'helper',
-    icon:'✨',
-    title:'全能幫手',
-    mode:'review',
-    description:'特殊需求、臨時任務、不知道該選哪個分類。此類任務送出後由 UBee 人工審核報價。',
-    examples:'特殊需求、臨時任務、客人不知道該選哪個分類'
-  }
-];
-
-const SERVICE_SUB_TYPES = {
-  buy: [
-    { key:'drink', title:'飲料代買', keyword:'飲料店' },
-    { key:'food', title:'餐點代買', keyword:'餐廳' },
-    { key:'daily', title:'生活用品代買', keyword:'便利商店' }
-  ],
-  pickup: [
-    { key:'convenience', title:'超商取貨', keyword:'便利商店' },
-    { key:'parcel', title:'代領包裹', keyword:'物流' },
-    { key:'document', title:'文件代取', keyword:'文件 影印 店家' }
-  ]
-};
-
-const customerPages = [
-  'customerTasksPage',
-  'customerProfilePage',
-  'activeTaskPage',
-  'historyTaskPage',
-  'addressPage',
-  'supportPage',
-  'cancelRulePage',
-  'faqPage'
-];
-
-let lastMainCustomerPage = 'customerProfilePage';
-
 function escapeHtml(str){
   return String(str ?? "")
     .replaceAll("&","&amp;")
@@ -1849,262 +1706,176 @@ function escapeHtml(str){
     .replaceAll("'","&#039;");
 }
 
-function setActiveButtons(containerId, el){
-  document.querySelectorAll(`#${containerId} .choice-btn`).forEach(btn => btn.classList.remove('active'));
-  el.classList.add('active');
-}
+async function initMerchantContext(){
+  const params = new URLSearchParams(window.location.search);
+  const merchantId = params.get("merchantId");
 
-function normalizePhone(value){
-  return String(value || '')
-    .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
-    .replace(/\s|-/g, '')
-    .replace(/^\+886/, '0')
-    .replace(/^886/, '0');
-}
-
-function isValidPhone(phone){
-  const p = normalizePhone(phone);
-  return /^09\d{8}$/.test(p) || /^0\d{8,9}$/.test(p);
-}
-
-function getServiceByKey(key){
-  return SERVICE_LIST.find(s => s.key === key) || SERVICE_LIST[0];
-}
-
-function isQueueTask(){
-  return selectedService && selectedService.mode === 'queue';
-}
-
-function isReviewTask(){
-  return selectedService && selectedService.mode === 'review';
-}
-
-function isDirectTask(){
-  return selectedService && selectedService.mode === 'direct';
-}
-
-function renderServiceGrid(){
-  const grid = document.getElementById('serviceGrid');
-
-  grid.innerHTML = SERVICE_LIST.map((service, index) => `
-    <button class="service-card ${index === 0 ? 'active' : ''}" type="button" onclick="selectService('${service.key}')">
-      <div class="service-icon">${service.icon}</div>
-      <div class="service-title">${escapeHtml(service.title)}</div>
-      <div class="service-desc">${escapeHtml(service.examples)}</div>
-    </button>
-  `).join('');
-
-  selectedService = SERVICE_LIST[0];
-  updateServiceDescription();
-}
-
-function selectService(key){
-  selectedService = getServiceByKey(key);
-  window.ubeeSelectedNearbyPlace = null;
-  document.querySelectorAll('.service-card').forEach(btn => btn.classList.remove('active'));
-  const cards = [...document.querySelectorAll('.service-card')];
-  const index = SERVICE_LIST.findIndex(s => s.key === key);
-  if(cards[index]) cards[index].classList.add('active');
-
-  updateServiceDescription();
-  applyServiceFormMode();
-}
-
-function updateServiceDescription(){
-  const title = document.getElementById('serviceInfoTitle');
-  const desc = document.getElementById('serviceDescription');
-
-  if(title) title.innerText = `${selectedService.icon} ${selectedService.title}`;
-  if(desc) desc.innerText = selectedService.description;
-}
-
-function applyServiceFormMode(){
-  if(!selectedService) return;
-
-  const normalForm = document.getElementById('normalForm');
-  const queueForm = document.getElementById('queueForm');
-  const helperForm = document.getElementById('helperForm');
-
-  normalForm.classList.toggle('hidden', !isDirectTask());
-  queueForm.classList.toggle('hidden', !isQueueTask());
-  helperForm.classList.toggle('hidden', !isReviewTask());
-
-  document.getElementById('speedSection').classList.toggle('hidden', !isDirectTask());
-  document.getElementById('queueEstimateSection').classList.toggle('hidden', !isQueueTask());
-  document.getElementById('helperReviewSection').classList.toggle('hidden', !isReviewTask());
-
-  document.getElementById('advancePaymentWrap').classList.toggle('hidden', selectedService.key !== 'buy');
-
-  const pickupTitle = document.getElementById('pickupTitle');
-  const dropoffTitle = document.getElementById('dropoffTitle');
-  const pickup = document.getElementById('pickup');
-  const dropoff = document.getElementById('dropoff');
-  const item = document.getElementById('item');
-  const note = document.getElementById('note');
-
-  if(selectedService.key === 'send'){
-    pickupTitle.innerText = '取件資訊';
-    dropoffTitle.innerText = '送達資訊';
-    pickup.placeholder = '取件地址';
-    dropoff.placeholder = '送達地址';
-    item.placeholder = '例如：文件、鑰匙、包裹、禮物';
-    note.placeholder = '請填寫物品內容、數量、注意事項。';
-  }
-
-  if(selectedService.key === 'buy'){
-    pickupTitle.innerText = '購買店家資訊';
-    dropoffTitle.innerText = '送達資訊';
-    pickup.placeholder = '指定店家地址 / 可接受附近店家';
-    dropoff.placeholder = '送達地址';
-    item.placeholder = '例如：珍奶 2 杯、便當 1 份、生活用品';
-    note.placeholder = '請填寫品牌、數量、規格、口味、預算上限。';
-  }
-
-  if(selectedService.key === 'pickup'){
-    pickupTitle.innerText = '取件資訊';
-    dropoffTitle.innerText = '交付資訊';
-    pickup.placeholder = '超商 / 包裹 / 文件取件地址';
-    dropoff.placeholder = '交付地址';
-    item.placeholder = '例如：超商包裹、文件、代領物品';
-    note.placeholder = '請填寫取件編號、取件姓名、領取方式與注意事項。';
-  }
-
-  if(selectedService.key === 'business'){
-    pickupTitle.innerText = '商務取件資訊';
-    dropoffTitle.innerText = '商務送達資訊';
-    pickup.placeholder = '公司 / 店家 / 工作室取件地址';
-    dropoff.placeholder = '公司 / 客戶 / 指定送達地址';
-    item.placeholder = '例如：合約、公司文件、樣品、發票';
-    note.placeholder = '請填寫簽收方式、窗口、文件重要性與注意事項。';
-  }
-
-  if(selectedService.key === 'merchant'){
-    pickupTitle.innerText = '店家資訊';
-    dropoffTitle.innerText = '客人送達資訊';
-    pickup.placeholder = '店家地址';
-    dropoff.placeholder = '客人送達地址';
-    item.placeholder = '例如：早餐、飲料、小吃、便當';
-    note.placeholder = '請填寫品項、數量、取餐號碼、付款方式與店家備註。';
-  }
-
-  updateTaskPathText();
-
-  updateNearbyPlaceBox();
-
- if(currentStep === 2 && selectedService &&
-  (selectedService.key === 'buy' ||
-  selectedService.key === 'pickup')){
-  searchNearbyPlaces();
-}
-}
-
-function updateTaskPathText(){
-  const el = document.getElementById('taskPathText');
-  if(!el || !selectedService) return;
-
-  if(isQueueTask()){
-    el.innerText = `${selectedService.icon} ${selectedService.title}｜時間型任務｜自動估價、直接派單`;
+  if(!merchantId || !db){
     return;
   }
 
-  if(isReviewTask()){
-    el.innerText = `${selectedService.icon} ${selectedService.title}｜自訂任務｜人工審核後報價`;
-    return;
-  }
+  try{
+    const doc = await db.collection("merchants").doc(merchantId).get();
 
-  el.innerText = `${selectedService.icon} ${selectedService.title}｜自動估價、直接派單`;
-}
+    if(!doc.exists){
+      alert("找不到合作店家資料，請確認連結是否正確。");
+      return;
+    }
 
-function updateStepText(){
-  if(!selectedService) return;
+    const merchant = {
+      id: doc.id,
+      ...doc.data()
+    };
 
-  const step2Title = document.getElementById('step2Title');
-  const step2Subtext = document.getElementById('step2Subtext');
-  const step3Title = document.getElementById('step3Title');
-  const step3Subtext = document.getElementById('step3Subtext');
-  const confirmSubtext = document.getElementById('confirmSubtext');
-  const confirmNoticeText = document.getElementById('confirmNoticeText');
-  const successTitle = document.getElementById('successTitle');
-  const successSubtext = document.getElementById('successSubtext');
-  const nextBtn = document.getElementById('nextBtn');
+    if(merchant.status !== "active"){
+      alert("此合作店家目前尚未開放接單。");
+      return;
+    }
 
-  step2Title.innerText = `填寫${selectedService.title}資訊`;
+    merchantMode = true;
+    currentMerchant = merchant;
 
-  if(isQueueTask()){
-    step2Subtext.innerText = '請填寫排隊地點、開始時間、最多等待時間與完成方式。';
-    step3Title.innerText = '幫排隊估價';
-    step3Subtext.innerText = '幫排隊依等待時間計價，可以估價後直接建立任務。';
-    confirmSubtext.innerText = '確認排隊地點、等待時間與完成方式後，即可建立任務。';
-    confirmNoticeText.innerText = '我已確認幫排隊內容正確，並了解付款後才會開始派單。';
-    successTitle.innerText = '準備建立幫排隊任務';
-    successSubtext.innerText = '請建立任務並完成付款，系統才會開始派單。';
-  }else if(isReviewTask()){
-    step2Subtext.innerText = '請完整描述需求，UBee 會先人工確認是否可承接與報價。';
-    step3Title.innerText = '人工審核說明';
-    step3Subtext.innerText = '全能幫手不自動估價，送出後由 UBee 確認後再報價。';
-    confirmSubtext.innerText = '確認需求內容後，送出給 UBee 人工審核。';
-    confirmNoticeText.innerText = '我已確認全能幫手需求正確，並了解此任務需由 UBee 確認後報價，不會直接派單。';
-    successTitle.innerText = '準備送出審核需求';
-    successSubtext.innerText = '送出後 UBee 會確認是否可承接與報價。';
-  }else{
-    step2Subtext.innerText = '地址與電話越完整，系統估價越準確，騎士也更容易完成任務。';
-    step3Title.innerText = '選擇任務速度';
-    step3Subtext.innerText = '依您的需求選擇適合的媒合速度。';
-    confirmSubtext.innerText = '確認所有內容與金額後，即可建立任務。';
-    confirmNoticeText.innerText = '我已確認任務內容正確，並了解完成付款後才會開始派單。';
-    successTitle.innerText = '準備建立任務';
-    successSubtext.innerText = '請建立任務並完成付款，系統才會開始派單。';
-  }
+    const box = document.getElementById("merchantInfoBox");
+    if(box){
+      box.classList.remove("hidden");
+      box.innerHTML = `
+        <div class="merchant-card-title">目前合作店家</div>
+        <div class="merchant-card-name">${escapeHtml(merchant.merchantName || "合作店家")}</div>
+        <div class="merchant-card-text">
+          店家代碼：${escapeHtml(merchant.merchantId || merchant.id || "")}<br>
+          店家類型：${escapeHtml(merchant.merchantType || "")}<br>
+          店家地址：${escapeHtml(merchant.merchantAddress || "")}
+        </div>
+      `;
+    }
 
-  if(nextBtn){
-    if(currentStep === 1) nextBtn.innerText = '開始填寫';
-    else if(currentStep === 3 && isReviewTask()) nextBtn.innerText = '確認需求';
-    else if(currentStep === 4 && isReviewTask()) nextBtn.innerText = '送出審核';
-    else nextBtn.innerText = '下一步';
+  }catch(err){
+    console.error("讀取合作店家失敗:", err);
+    alert("合作店家資料讀取失敗，請稍後再試。");
   }
 }
 
+const serviceDescriptions = {
+  send:'UBee 協助文件急送、物品配送、鑰匙急送、禮品配送、商務配送與忘帶物品送達。',
+  pickup:'UBee 協助代取包裹、文件、公司取件、門市取件、醫院取件、學校取件與超商取件。',
+  buy:'UBee 協助餐點、飲料、超商、藥局、生活用品、生鮮、蛋糕甜點與賣場代買。',
+  life:'UBee 協助排隊、候位、洗衣送洗、洗鞋代送、手機貼膜與送禮服務。',
+  business:'UBee 協助公司、店家、工作室處理文件往返、樣品配送、發票收送、活動物資與公司採購。',
+  urgent:'UBee 協助緊急文件、緊急包裹、緊急代買、緊急鑰匙、限時任務與當日件。'
+};
+
+const serviceGroups = {
+  send: [
+    { icon:'📄', title:'文件急送', categories:['合約文件','發票收據','證明文件','報表資料','其他文件'] },
+    { icon:'📦', title:'物品配送', categories:['個人物品','小型包裹','生活用品','店家商品','其他物品'] },
+    { icon:'⚡', title:'急件配送', categories:['立即送','限時送','跨區急送','商務急件','其他急件'] },
+    { icon:'🔑', title:'鑰匙急送', categories:['住家鑰匙','機車鑰匙','汽車鑰匙','公司鑰匙','其他鑰匙'] },
+    { icon:'🧾', title:'票券文件', categories:['門票','票券','收據','證件影本','其他票券文件'] },
+    { icon:'🎁', title:'禮品配送', categories:['禮盒','蛋糕','花束','節慶禮品','其他禮品'] },
+    { icon:'🏢', title:'商務配送', categories:['公司文件','樣品配送','合約往返','店家物品','其他商務配送'] },
+    { icon:'📍', title:'指定送達', categories:['指定時間','指定地點','指定收件人','指定方式','其他指定需求'] },
+    { icon:'🛍️', title:'忘帶物品', categories:['手機','鑰匙','錢包','筆電','充電器','其他忘帶物品'] }
+  ],
+
+  pickup: [
+    { icon:'📦', title:'代取包裹', categories:['一般包裹','宅配包裹','店家包裹','網購包裹','其他包裹'] },
+    { icon:'📄', title:'代取文件', categories:['合約文件','證明文件','公司文件','收據發票','其他文件'] },
+    { icon:'🏢', title:'公司取件', categories:['公司文件','樣品','器材','禮品','其他公司物品'] },
+    { icon:'🏪', title:'門市取件', categories:['餐飲門市','零售門市','維修門市','百貨門市','其他門市'] },
+    { icon:'🏥', title:'醫院取件', categories:['藥品','報告','文件','用品','其他醫院取件'] },
+    { icon:'🏫', title:'學校取件', categories:['文件','書籍','制服','便當用品','其他學校取件'] },
+    { icon:'🔑', title:'代取鑰匙', categories:['住家鑰匙','機車鑰匙','汽車鑰匙','公司鑰匙','其他鑰匙'] },
+    { icon:'📍', title:'指定取件', categories:['指定地點','指定時間','指定窗口','指定物品','其他指定需求'] },
+    { icon:'🏪', title:'超商取件', categories:['7-ELEVEN','全家','萊爾富','OK','其他超商'] }
+  ],
+
+  buy: [
+    { icon:'🍱', title:'餐點代買', categories:['便當店','小吃店','早餐店','簡餐店','麵食館','速食店','其他餐點'] },
+    { icon:'🧋', title:'飲料代買', categories:['手搖飲','咖啡廳','果汁店','連鎖飲料店','其他飲品'] },
+    { icon:'🏪', title:'超商代買', categories:['7-ELEVEN','全家','萊爾富','OK','其他超商'] },
+    { icon:'💊', title:'藥局代買', categories:['一般藥局','丁丁藥局','大樹藥局','啄木鳥藥局','其他藥局商品'] },
+    { icon:'🧻', title:'生活用品', categories:['清潔用品','衛生用品','五金用品','日用品','其他生活用品'] },
+    { icon:'🥬', title:'生鮮採買', categories:['蔬菜','水果','肉品','海鮮','其他生鮮'] },
+    { icon:'🎂', title:'蛋糕甜點', categories:['生日蛋糕','甜點','麵包','伴手禮','其他甜點'] },
+    { icon:'🛒', title:'指定商品', categories:['指定品牌','指定店家','指定型號','指定數量','其他指定商品'] },
+    { icon:'🛍️', title:'賣場代買', categories:['全聯','家樂福','寶雅','小北百貨','五金百貨','其他賣場'] }
+  ],
+
+  life: [
+    { icon:'👥', title:'一般排隊', categories:['現場排隊','限量商品','活動排隊','領號碼牌','其他排隊'] },
+    { icon:'🏥', title:'醫院排隊', categories:['掛號','領藥','報到等候','檢查排隊','其他醫院排隊'] },
+    { icon:'🏦', title:'銀行排隊', categories:['臨櫃排隊','繳費排隊','開戶排隊','文件送取','其他銀行需求'] },
+    { icon:'🍽️', title:'餐廳候位', categories:['現場候位','領號碼牌','排隊訂位','代等座位','其他候位'] },
+    { icon:'🧺', title:'洗衣送洗', categories:['衣物送洗','棉被送洗','乾洗送件','代取衣物','其他洗衣需求'] },
+    { icon:'👟', title:'洗鞋代送', categories:['球鞋送洗','皮鞋送洗','包包清潔','代取鞋包','其他洗鞋需求'] },
+    { icon:'📱', title:'手機貼膜', categories:['手機貼膜','平板貼膜','手機殼購買','配件購買','其他手機需求'] },
+    { icon:'✨', title:'其他生活需求', categories:['臨時協助','物品代送','現場等候','生活雜事','其他需求'] },
+    { icon:'💝', title:'送禮服務', categories:['代買禮物','驚喜送禮','送花','蛋糕配送','節慶送禮','其他送禮需求'] }
+  ],
+
+  business: [
+    { icon:'📄', title:'文件往返', categories:['合約往返','報價單','公司文件','簽收文件','其他文件往返'] },
+    { icon:'📦', title:'樣品配送', categories:['商品樣品','餐飲樣品','包材樣品','測試樣品','其他樣品'] },
+    { icon:'🧾', title:'發票收送', categories:['發票收件','收據送達','帳務文件','公司憑證','其他財務文件'] },
+    { icon:'🏪', title:'店家補貨', categories:['餐飲備品','包材補貨','飲料補貨','營業用品','其他補貨'] },
+    { icon:'✍️', title:'合約簽署', categories:['合約送簽','文件簽回','客戶簽收','公司用印','其他簽署需求'] },
+    { icon:'🎪', title:'活動物資', categories:['活動用品','展場物資','海報立牌','餐點飲品','其他活動物資'] },
+    { icon:'🏟️', title:'展場支援', categories:['展品配送','臨時補件','文件送達','物資搬送','其他展場支援'] },
+    { icon:'🛒', title:'公司採購', categories:['文具用品','辦公用品','飲料餐點','活動用品','其他採購'] },
+    { icon:'💼', title:'其他商務需求', categories:['臨時支援','文件處理','物品送取','現場等候','其他商務需求'] }
+  ],
+
+  urgent: [
+    { icon:'📄', title:'緊急文件', categories:['合約文件','證明文件','發票收據','報表資料','其他緊急文件'] },
+    { icon:'📦', title:'緊急包裹', categories:['小型包裹','重要物品','店家商品','個人物品','其他緊急包裹'] },
+    { icon:'🛒', title:'緊急代買', categories:['餐點飲料','藥局用品','生活用品','指定商品','其他緊急代買'] },
+    { icon:'💊', title:'緊急送藥', categories:['感冒用品','腸胃用品','外傷用品','保健用品','其他藥局商品'] },
+    { icon:'🔑', title:'緊急鑰匙', categories:['住家鑰匙','機車鑰匙','汽車鑰匙','公司鑰匙','其他鑰匙'] },
+    { icon:'⚡', title:'緊急送件', categories:['立即送達','跨區急送','商務急件','指定時間','其他緊急送件'] },
+    { icon:'⏱️', title:'限時任務', categories:['30分鐘內','1小時內','指定時間前','現場等候','其他限時需求'] },
+    { icon:'📆', title:'當日件', categories:['上午送達','下午送達','今日送達','今日取回','其他當日件'] },
+    { icon:'🚨', title:'其他急件', categories:['臨時需求','特殊任務','重要物品','現場支援','其他急件'] }
+  ]
+};
 function updateStepUI(){
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById('step' + currentStep).classList.add('active');
-
   document.getElementById('pageCount').innerText = currentStep + ' / 5';
+
   document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'block';
   document.getElementById('nextBtn').style.display = currentStep === 5 ? 'none' : 'block';
-
   const footerCancelBtn = document.getElementById('footerCancelOrderBtn');
-  if(footerCancelBtn){
-    footerCancelBtn.classList.toggle('hidden', !(currentStep === 5 && currentOrderId));
-  }
+if(footerCancelBtn){
+  footerCancelBtn.classList.toggle('hidden', !(currentStep === 5 && currentOrderId));
+}
 
-  applyServiceFormMode();
-  updateStepText();
-
-  if(currentStep === 2) updateTaskPathText();
-  if(currentStep === 4) renderConfirmSummary();
+  if(currentStep === 2){
+  updateTaskPathText();
+}
+  
+  if(currentStep === 4){
+  renderConfirmSummary();
+}
 
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
 async function goNext(){
-  if(currentStep === 1){
-    if(!selectedService){
-      alert('請先選擇任務類型');
-      return;
-    }
-  }
+  if(currentStep === 1 && (!serviceType || !serviceCategory)){
+  alert('請先選擇服務類型與分類');
+  return;
+}
 
-  if(currentStep === 2){
-    if(!validateStep2()) return;
+  if(currentStep === 2 && !validateStep2()){
+    return;
   }
 
   if(currentStep === 3){
-    if(!isReviewTask()){
-      const estimateOk = await calculateEstimate(true);
-      if(!estimateOk){
-        alert('估價失敗，請確認資料是否完整。');
-        return;
-      }
+    const estimateOk = await calculateEstimate(true);
+
+    if(!estimateOk){
+      alert('估價失敗，請確認取件地址與送達地址是否完整。');
+      return;
     }
   }
 
@@ -2121,295 +1892,485 @@ function goPrev(){
   }
 }
 
-function selectSpeed(el, value){
-  document.querySelectorAll('#speedSection .speed-card').forEach(card => card.classList.remove('active'));
+function setActive(parentId, el, selector){
+  document.querySelectorAll(`#${parentId} ${selector}`).forEach(o => o.classList.remove('active'));
   el.classList.add('active');
+}
+
+function resetDynamicFields(){
+  document.getElementById('field-purchase').classList.add('hidden');
+  document.getElementById('field-task').classList.add('hidden');
+}
+
+function applyDynamicFields(){
+  resetDynamicFields();
+
+  const purchaseField = document.getElementById('field-purchase');
+  const taskField = document.getElementById('field-task');
+  const purchaseTitle = document.getElementById('purchaseFieldTitle');
+  const taskTitle = document.getElementById('taskFieldTitle');
+  const purchaseContent = document.getElementById('purchaseContent');
+  const purchaseStore = document.getElementById('purchaseStore');
+  const taskContent = document.getElementById('taskContent');
+
+  if(serviceGroup === 'buy'){
+    purchaseField.classList.remove('hidden');
+    purchaseTitle.innerText = '代買補充';
+    purchaseContent.placeholder = '例如：珍奶 2 杯、藥局用品、超商商品';
+    purchaseStore.placeholder = '指定店家 / 可接受附近店家';
+  }
+
+  if(serviceGroup === 'life'){
+    purchaseField.classList.remove('hidden');
+    taskField.classList.remove('hidden');
+    purchaseTitle.innerText = '生活跑腿補充';
+    purchaseContent.placeholder = '例如：排隊、洗衣、洗鞋、手機貼膜、其他需求';
+    purchaseStore.placeholder = '指定店家 / 指定地點 / 可接受附近店家';
+    taskTitle.innerText = '生活需求說明';
+    taskContent.placeholder = '請補充規格、數量、顏色、預算、等待時間、是否需來回取送。';
+  }
+}
+
+  function getServiceGroupLabel(group){
+  const map = {
+    send:'幫我送',
+    pickup:'幫我取',
+    buy:'幫代買',
+    life:'生活跑腿',
+    business:'商務支援',
+    urgent:'急件專送'
+  };
+
+  return map[group] || group;
+}
+
+function getCurrentServiceItem(){
+  const list = serviceGroups[serviceGroup] || [];
+  return list.find(item => item.title === serviceType) || null;
+}
+
+function renderServiceCategories(){
+  const box = document.getElementById('serviceCategoryBox');
+  const grid = document.getElementById('serviceCategoryGrid');
+  const title = document.getElementById('serviceCategoryTitle');
+  const item = getCurrentServiceItem();
+
+  const merchantBox = document.getElementById('merchantSelectBox');
+  const merchantGrid = document.getElementById('merchantSelectGrid');
+
+  if(merchantBox) merchantBox.classList.add('hidden');
+  if(merchantGrid) merchantGrid.innerHTML = '';
+
+  currentMerchant = null;
+  merchantMode = false;
+
+  if(!box || !grid || !title){
+    return;
+  }
+
+  if(!item || !item.categories || !item.categories.length){
+    box.classList.add('hidden');
+    serviceCategory = '';
+    return;
+  }
+
+  box.classList.remove('hidden');
+  title.innerText = `${serviceType}｜請選擇分類`;
+
+  serviceCategory = item.categories[0];
+
+  grid.innerHTML = item.categories.map((cat, index) => `
+    <button
+      type="button"
+      class="category-choice-item ${index === 0 ? 'active' : ''}"
+      onclick="selectServiceCategory(this, '${cat}')"
+    >
+      ${cat}
+    </button>
+  `).join('');
+
+  loadMerchantsForCategory();
+}
+
+function selectServiceCategory(el, value){
+  document.querySelectorAll('#serviceCategoryGrid .category-choice-item').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  el.classList.add('active');
+  serviceCategory = value;
+  
+  loadMerchantsForCategory();
+}
+
+function updateTaskPathText(){
+  const el = document.getElementById('taskPathText');
+  if(!el) return;
+
+  el.innerText = `${getServiceGroupLabel(serviceGroup)} ＞ ${serviceType} ＞ ${serviceCategory}`;
+}
+  
+function selectService(el, value){
+  setActive('serviceGrid', el, '.service-item');
+  serviceType = value;
+  renderServiceCategories();
+  applyDynamicFields();
+}
+
+function getPlaceKeyword(){
+  if(serviceType === '飲料代買'){
+    if(serviceCategory === '手搖飲') return '手搖飲';
+    if(serviceCategory === '咖啡廳') return '咖啡';
+    if(serviceCategory === '果汁店') return '果汁';
+    if(serviceCategory === '連鎖飲料店') return '飲料店';
+    return '飲料店';
+  }
+
+  if(serviceType === '餐點代買'){
+    if(serviceCategory === '便當店') return '便當';
+    if(serviceCategory === '小吃店') return '小吃';
+    if(serviceCategory === '早餐店') return '早餐';
+    if(serviceCategory === '簡餐店') return '簡餐';
+    if(serviceCategory === '麵食館') return '麵店';
+    if(serviceCategory === '速食店') return '速食';
+    return '餐廳';
+  }
+
+  return serviceCategory || serviceType || '店家';
+}
+
+async function loadMerchantsForCategory(){
+  const box = document.getElementById('merchantSelectBox');
+  const grid = document.getElementById('merchantSelectGrid');
+
+  if(!box || !grid) return;
+
+  const token = ++merchantSearchToken;
+
+  box.classList.add('hidden');
+  grid.innerHTML = '';
+
+  currentMerchant = null;
+  merchantMode = false;
+
+  if(serviceGroup !== 'buy' || !serviceType || !serviceCategory){
+    return;
+  }
+
+  if(!navigator.geolocation){
+    box.classList.remove('hidden');
+    grid.innerHTML = '此裝置不支援定位，請手動輸入店家地址。';
+    return;
+  }
+
+  grid.innerHTML = '正在搜尋附近店家...';
+  box.classList.remove('hidden');
+
+  navigator.geolocation.getCurrentPosition(async position => {
+    if(token !== merchantSearchToken) return;
+
+    try{
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const keyword = getPlaceKeyword();
+
+      const res = await fetch('/api/places/search', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ lat, lng, keyword })
+      });
+
+      const data = await res.json();
+
+      if(token !== merchantSearchToken) return;
+
+      if(!data.success || !data.places || !data.places.length){
+        grid.innerHTML = '附近暫時找不到店家，請改用手動填寫。';
+        return;
+      }
+
+      grid.innerHTML = data.places.map(place => `
+        <button
+          type="button"
+          class="category-choice-item"
+          onclick="selectGooglePlace('${place.placeId}')"
+        >
+          ${escapeHtml(place.name)}
+        </button>
+      `).join('');
+
+    }catch(err){
+      if(token !== merchantSearchToken) return;
+      console.error('搜尋附近店家失敗:', err);
+      grid.innerHTML = '搜尋附近店家失敗，請稍後再試。';
+    }
+  }, err => {
+    if(token !== merchantSearchToken) return;
+    console.error('定位失敗:', err);
+    grid.innerHTML = '無法取得定位，請允許定位或手動填寫店家地址。';
+  });
+}
+
+async function selectGooglePlace(placeId){
+
+  try{
+    const res = await fetch('/api/places/detail', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ placeId })
+    });
+
+    const data = await res.json();
+
+    if(!data.success || !data.place){
+      alert(data.error || '取得店家資料失敗');
+      return;
+    }
+
+    const place = data.place;
+
+    currentMerchant = {
+      id: place.placeId,
+      merchantId: place.placeId,
+      merchantName: place.name || '',
+      merchantAddress: place.address || '',
+      merchantPhone: place.phone || '',
+      source: 'google_places'
+    };
+
+    merchantMode = true;
+
+    document.getElementById('pickup').value = place.address || '';
+    document.getElementById('pickupPhone').value = place.phone || '';
+
+    alert(`已選擇店家：${place.name || '店家'}\n\n系統已自動帶入取件地址${place.phone ? '與電話' : '，但此店家沒有公開電話，請客人自行補上。'}`);
+
+  }catch(err){
+    console.error('選擇 Google 店家失敗:', err);
+    alert('選擇店家失敗，請稍後再試。');
+  }
+}
+
+async function selectMerchant(merchantId){
+
+  if(!db) return;
+
+  try{
+    const doc = await db.collection('merchants').doc(merchantId).get();
+
+    if(!doc.exists){
+      alert('找不到合作店家資料');
+      return;
+    }
+
+    const merchant = {
+      id: doc.id,
+      ...doc.data()
+    };
+
+    currentMerchant = merchant;
+    merchantMode = true;
+
+    const pickupInput = document.getElementById('pickup');
+    const pickupPhoneInput = document.getElementById('pickupPhone');
+
+    if(pickupInput){
+      pickupInput.value = merchant.pickupAddress || merchant.merchantAddress || '';
+    }
+
+    if(pickupPhoneInput){
+      pickupPhoneInput.value = merchant.phone || merchant.merchantPhone || '';
+    }
+
+    document.querySelectorAll('#merchantSelectGrid .category-choice-item').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    const clicked = [...document.querySelectorAll('#merchantSelectGrid .category-choice-item')]
+      .find(btn => btn.textContent.trim() === (merchant.merchantName || '').trim());
+
+    if(clicked){
+      clicked.classList.add('active');
+    }
+
+    alert(`已選擇合作店家：${merchant.merchantName || '合作店家'}\n\n系統已自動帶入取件地址與取件電話。`);
+
+  }catch(err){
+    console.error('選擇合作店家失敗:', err);
+    alert('選擇合作店家失敗，請稍後再試。');
+  }
+}
+
+function renderServiceGrid(groupKey){
+  const grid = document.getElementById('serviceGrid');
+  const list = serviceGroups[groupKey] || serviceGroups.send;
+
+  grid.innerHTML = list.map((item, index) => `
+    <div class="service-item ${index === 0 ? 'active' : ''}" onclick="selectService(this, '${item.title}')">
+      <div class="service-item-icon">${item.icon}</div>
+      <div class="service-item-title">${item.title}</div>
+    </div>
+  `).join('');
+
+  serviceGroup = groupKey;
+  serviceType = list[0].title;
+  serviceCategory = '';
+  document.getElementById('serviceDescription').innerText = serviceDescriptions[groupKey] || serviceDescriptions.send;
+
+  renderServiceCategories();
+  applyDynamicFields();
+}
+
+function selectServiceFromTab(el, groupKey){
+  document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderServiceGrid(groupKey);
+}
+
+function selectSpeed(el, value){
+  setActive('speedGrid', el, '.speed-card');
   speedType = value;
 }
 
-function selectQueueStart(el, value){
-  setActiveButtons('queueStartGrid', el);
-  queueStartType = value;
-  document.getElementById('queueScheduleBox').classList.toggle('hidden', value !== 'scheduled');
+function showStatus(text){
+  const box = document.getElementById('statusBox');
+  box.classList.remove('hidden');
+  box.innerText = text;
 }
 
-function selectQueueDuration(el, value){
-  setActiveButtons('queueDurationGrid', el);
-  queueDurationValue = value;
-  document.getElementById('queueCustomDurationBox').classList.toggle('hidden', value !== 'custom');
+const customerProgressSteps = [
+  { status:'pending_dispatch', text:'等待騎士接單' },
+  { status:'accepted', text:'騎士已接單' },
+  { status:'arrived_pickup', text:'抵達取件地' },
+  { status:'picked_up', text:'配送中' },
+  { status:'arrived_dropoff', text:'抵達送達地' },
+  { status:'completed', text:'已送達' }
+];
+function renderCustomerProgress(status){
+  const box = document.getElementById('customerProgressBox');
+  if(!box) return;
+
+  const currentStatus = status || '';
+  const currentIndex = customerProgressSteps.findIndex(step => step.status === currentStatus);
+
+  if(currentIndex < 0){
+    box.classList.add('hidden');
+    return;
+  }
+
+  box.classList.remove('hidden');
+
+  box.innerHTML = `
+    <div class="progress-title">任務進度</div>
+    <div class="progress-bar">
+      ${customerProgressSteps.map((step, index) => {
+        let cls = '';
+
+        if(index < currentIndex){
+          cls = 'done';
+        }
+
+        if(index === currentIndex){
+          cls = 'current';
+        }
+
+        if(currentStatus === 'completed'){
+          cls = 'done';
+        }
+
+        return `
+          <div class="progress-step ${cls}">
+            <div class="progress-dot"></div>
+            <div class="progress-label">${escapeHtml(step.text)}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
-function selectQueueAction(el, value){
-  setActiveButtons('queueActionGrid', el);
-  queueActionValue = value;
+function startCustomerOrderListener(orderId){
+  if(!db || !orderId){
+    return;
+  }
+
+  if(customerOrderUnsubscribe){
+    try{
+      customerOrderUnsubscribe();
+    }catch(e){}
+    customerOrderUnsubscribe = null;
+  }
+
+  customerOrderUnsubscribe = db.collection('orders').doc(orderId)
+    .onSnapshot(doc => {
+      if(!doc.exists){
+        return;
+      }
+
+      const order = doc.data() || {};
+      renderCustomerProgress(order.status);
+
+      if(order.status === 'completed'){
+        showStatus(
+          `✅ 任務已完成\n\n訂單編號：${orderId}\n\n感謝您使用 UBee 城市任務。`
+        );
+      }
+    }, err => {
+      console.error('客人端訂單監聽失敗:', err);
+    });
 }
 
-function selectHelperDelivery(el, value){
-  setActiveButtons('helperDeliveryGrid', el);
-  helperNeedsDelivery = value;
-  document.getElementById('helperDropoffBox').classList.toggle('hidden', value !== '是');
-}
-
-function selectHelperTime(el, value){
-  setActiveButtons('helperTimeGrid', el);
-  helperTimeType = value;
-  document.getElementById('helperScheduleBox').classList.toggle('hidden', value !== '預約');
-}
-
-function getSpeedLabel(value){
-  const map = {
-    standard:'標準件｜60–90 分鐘｜+NT$15',
-    priority:'快速件｜45–60 分鐘｜+NT$20',
-    express:'優先件｜30–45 分鐘｜+NT$25'
-  };
-  return map[value] || value;
-}
-
-function getSpeedFee(){
-  const map = { standard:15, priority:20, express:25 };
-  return map[speedType] || 15;
+function showPaymentInfo(text){
+  const box = document.getElementById('paymentInfoBox');
+  box.classList.remove('hidden');
+  box.innerText = text;
 }
 
 function getAdvancePayment(){
   return Number(document.getElementById('advancePayment')?.value || 0);
 }
 
-function getQueueDuration(){
-  if(queueDurationValue === 'custom'){
-    return Number(document.getElementById('queueCustomDuration')?.value || 0);
-  }
-  return Number(queueDurationValue || 0);
-}
+function getData(){
+  const extra = [];
 
-function getQueueEstimate(){
-  const baseFee = 80;
-  const waitMinute = getQueueDuration();
-  const waitFee = waitMinute * 3;
-  const serviceFee = 25;
-  const totalFee = baseFee + waitFee + serviceFee;
-
-  return {
-    estimateType:'queue_time',
-    baseFee,
-    waitMinute,
-    waitFee,
-    serviceFee,
-    speedFee:0,
-    deliveryFee:baseFee + waitFee,
-    totalFee,
-    total:totalFee,
-    distanceText:'時間型任務',
-    durationText:`最多等待 ${waitMinute} 分鐘`
-  };
-}
-
-function getNormalData(){
-  const pickupPhone = normalizePhone(document.getElementById('pickupPhone').value.trim());
-  const dropoffPhone = normalizePhone(document.getElementById('dropoffPhone').value.trim());
+  const purchaseContent = document.getElementById('purchaseContent')?.value.trim() || '';
+  const purchaseStore = document.getElementById('purchaseStore')?.value.trim() || '';
+  const taskContent = document.getElementById('taskContent')?.value.trim() || '';
   const note = document.getElementById('note').value.trim();
 
+  if(purchaseContent) extra.push('補充內容：' + purchaseContent);
+  if(purchaseStore) extra.push('指定店家/地點：' + purchaseStore);
+  if(taskContent) extra.push('任務說明：' + taskContent);
+
   return {
-    serviceType: selectedService.title,
-    serviceKey: selectedService.key,
-    serviceMode: selectedService.mode,
-    speedType,
-    serviceCategory: selectedService.title,
+  serviceType,
+  serviceGroup,
+  serviceCategory,
+  speedType,
     pickup: document.getElementById('pickup').value.trim(),
-    pickupPhone,
+    pickupPhone: document.getElementById('pickupPhone').value.trim(),
     dropoff: document.getElementById('dropoff').value.trim(),
-    dropoffPhone,
+    dropoffPhone: document.getElementById('dropoffPhone').value.trim(),
     item: document.getElementById('item').value.trim(),
-    note,
-    advancePayment: getAdvancePayment(),
-    nearbyPlace: window.ubeeSelectedNearbyPlace || null,
-    selectedSubType,
+    note: [note, ...extra].filter(Boolean).join('\n'),
+    
+    advancePayment: Number(document.getElementById('advancePayment')?.value || 0),
+    
     userId,
+
     merchantId: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
     merchantCode: currentMerchant ? (currentMerchant.merchantId || currentMerchant.id || '') : '',
     merchantName: currentMerchant ? (currentMerchant.merchantName || '') : '',
     merchantPhone: currentMerchant ? (currentMerchant.phone || currentMerchant.merchantPhone || '') : '',
     merchantAddress: currentMerchant ? (currentMerchant.pickupAddress || currentMerchant.merchantAddress || '') : '',
     hasMerchant: !!currentMerchant
-  };
-}
-
-function getQueueData(){
-  const place = document.getElementById('queuePlace').value.trim();
-  const phone = normalizePhone(document.getElementById('queuePhone').value.trim());
-  const task = document.getElementById('queueTask').value.trim();
-  const note = document.getElementById('queueNote').value.trim();
-  const actionNote = document.getElementById('queueActionNote').value.trim();
-  const scheduleTime = document.getElementById('queueScheduleTime').value.trim();
-  const duration = getQueueDuration();
-
-  const fullNote = [
-    `排隊任務：${task}`,
-    `開始時間：${queueStartType === 'now' ? '現在' : scheduleTime}`,
-    `最多等待：${duration} 分鐘`,
-    `完成後動作：${queueActionValue}`,
-    actionNote ? `完成方式補充：${actionNote}` : '',
-    note ? `備註：${note}` : ''
-  ].filter(Boolean).join('\n');
-
-  return {
-    serviceType:'幫排隊',
-    serviceKey:'queue',
-    serviceMode:'queue',
-    serviceCategory:'時間型任務',
-    speedType:'queue',
-    pickup: place,
-    pickupPhone: phone,
-    dropoff: place + '（幫排隊時間型任務）',
-    dropoffPhone: phone,
-    item: task,
-    note: fullNote,
-    queuePlace: place,
-    queuePhone: phone,
-    queueTask: task,
-    queueStartType,
-    queueScheduleTime: scheduleTime,
-    queueDurationMinutes: duration,
-    queueAction: queueActionValue,
-    queueActionNote: actionNote,
-    advancePayment:0,
-    userId,
-    manualEstimate:lastEstimate || getQueueEstimate()
-  };
-}
-
-function getHelperData(){
-  const task = document.getElementById('helperTask').value.trim();
-  const place = document.getElementById('helperPlace').value.trim();
-  const dropoff = document.getElementById('helperDropoff').value.trim();
-  const budget = Number(document.getElementById('helperBudget').value || 0);
-  const phone = normalizePhone(document.getElementById('helperPhone').value.trim());
-  const note = document.getElementById('helperNote').value.trim();
-  const scheduleTime = document.getElementById('helperScheduleTime').value.trim();
-
-  const fullNote = [
-    `全能幫手需求：${task}`,
-    `任務地點：${place}`,
-    `是否需要送達其他地方：${helperNeedsDelivery}`,
-    helperNeedsDelivery === '是' ? `送達地點：${dropoff}` : '',
-    `預算金額：NT$${budget}`,
-    `希望完成時間：${helperTimeType}`,
-    helperTimeType === '預約' ? `預約時間：${scheduleTime}` : '',
-    note ? `備註：${note}` : ''
-  ].filter(Boolean).join('\n');
-
-  return {
-    serviceType:'全能幫手',
-    serviceKey:'helper',
-    serviceMode:'review',
-    serviceCategory:'人工審核任務',
-    status:'pending_review',
-    requestedStatus:'pending_review',
-    estimateMode:'manual_review',
-    speedType:'manual_review',
-    pickup: place,
-    pickupPhone: phone,
-    dropoff: helperNeedsDelivery === '是' ? dropoff : place + '（無送達需求）',
-    dropoffPhone: phone,
-    item: task.slice(0, 80),
-    note: fullNote,
-    helperTask: task,
-    helperPlace: place,
-    helperNeedsDelivery,
-    helperDropoff: dropoff,
-    helperBudget: budget,
-    helperTimeType,
-    helperScheduleTime: scheduleTime,
-    helperPhone: phone,
-    advancePayment: budget,
-    userId
-  };
-}
-
-function getData(){
-  if(isQueueTask()) return getQueueData();
-  if(isReviewTask()) return getHelperData();
-  return getNormalData();
+   };
 }
 
 function validateStep2(){
-  if(!selectedService){
-    alert('請先選擇任務類型');
-    return false;
-  }
+  updateTaskPathText();
 
-  if(isQueueTask()){
-    const data = getQueueData();
-
-    if(!data.queuePlace || data.queuePlace.length < 6){
-      alert('請輸入完整排隊地點');
-      return false;
-    }
-
-    if(!data.queuePhone || !isValidPhone(data.queuePhone)){
-      alert('請輸入正確聯絡電話，例如：0912345678 或 0425234567');
-      return false;
-    }
-
-    if(!data.queueTask || data.queueTask.length < 2){
-      alert('請輸入要排什麼');
-      return false;
-    }
-
-    if(queueStartType === 'scheduled' && !data.queueScheduleTime){
-      alert('請選擇預約時間');
-      return false;
-    }
-
-    if(!data.queueDurationMinutes || data.queueDurationMinutes < 10 || data.queueDurationMinutes > 240){
-      alert('排隊時間請設定 10～240 分鐘');
-      return false;
-    }
-
-    if(!data.queueAction){
-      alert('請選擇完成後要怎麼做');
-      return false;
-    }
-
-    return true;
-  }
-
-  if(isReviewTask()){
-    const data = getHelperData();
-
-    if(!data.helperTask || data.helperTask.length < 5){
-      alert('請完整描述你需要 UBee 幫你完成什麼');
-      return false;
-    }
-
-    if(!data.helperPlace || data.helperPlace.length < 6){
-      alert('請輸入完整任務地點');
-      return false;
-    }
-
-    if(data.helperNeedsDelivery === '是' && (!data.helperDropoff || data.helperDropoff.length < 6)){
-      alert('請輸入完整送達地點');
-      return false;
-    }
-
-    if(data.helperBudget < 0){
-      alert('預算金額不可小於 0');
-      return false;
-    }
-
-    if(data.helperTimeType === '預約' && !data.helperScheduleTime){
-      alert('請選擇預約時間');
-      return false;
-    }
-
-    if(!data.helperPhone || !isValidPhone(data.helperPhone)){
-      alert('請輸入正確聯絡電話，例如：0912345678 或 0425234567');
-      return false;
-    }
-
-    return true;
-  }
-
-  const data = getNormalData();
+  const data = getData();
 
   if(!data.pickup || !data.dropoff){
     alert('請輸入取件地址與送達地址');
@@ -2431,43 +2392,67 @@ function validateStep2(){
     return false;
   }
 
-  if(!isValidPhone(data.pickupPhone) || !isValidPhone(data.dropoffPhone)){
-    alert('請輸入正確電話，例如：0912345678 或 0425234567');
+  const normalizePhone = (value) => {
+  return String(value || '')
+    .replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+    .replace(/\s|-/g, '')
+    .replace(/^\+886/, '0')
+    .replace(/^886/, '0');
+};
+
+data.pickupPhone = normalizePhone(data.pickupPhone);
+data.dropoffPhone = normalizePhone(data.dropoffPhone);
+
+const mobilePattern = /^09\d{8}$/;
+const landlinePattern = /^0\d{8,9}$/;
+
+const isValidPhone = (phone) => {
+  return mobilePattern.test(phone) || landlinePattern.test(phone);
+};
+
+if(!isValidPhone(data.pickupPhone) || !isValidPhone(data.dropoffPhone)){
+  alert('請輸入正確電話，例如：0912345678 或 0425234567');
+  return false;
+}
+
+  if(!data.item){
+    alert('請輸入任務內容');
     return false;
   }
-
-  if(!data.item || data.item.length < 2){
-    alert('請輸入完整任務內容');
-    return false;
-  }
-
-  if(data.advancePayment < 0){
+  
+  if((data.serviceGroup === 'buy' || data.serviceGroup === 'life') && data.advancePayment < 0){
     alert('代墊金額不可小於 0');
     return false;
   }
 
+  if(data.item.length < 2){
+    alert('請輸入完整任務內容');
+    return false;
+  }
+  
   return true;
 }
 
 function validateData(data){
+
   if(!validateStep2()) return false;
 
-  if(data.pickup && data.pickup.length > 120){
-    alert('任務地點內容過長，請縮短到 120 字內。');
+  if(data.pickup.length > 120 || data.dropoff.length > 120){
+    alert('地址內容過長，請縮短到 120 字內。');
     return false;
   }
 
-  if(data.dropoff && data.dropoff.length > 140){
-    alert('送達地點內容過長，請縮短。');
+  if(data.pickupPhone.length > 20 || data.dropoffPhone.length > 20){
+    alert('電話內容過長，請縮短到 20 字內。');
     return false;
   }
 
-  if(data.item && data.item.length > 80){
+  if(data.item.length > 80){
     alert('任務內容過長，請縮短到 80 字內。');
     return false;
   }
 
-  if(data.note && data.note.length > 900){
+  if(data.note.length > 200){
     alert('備註內容過長，請縮短。');
     return false;
   }
@@ -2481,44 +2466,102 @@ function validateData(data){
   return true;
 }
 
+function renderConfirmSummary(){
+  const data = getData();
+
+  document.getElementById('confirmSummary').innerHTML = `
+    <div class="summary-row">
+      <div class="summary-icon">▤</div>
+      <div>
+        <div class="summary-label">服務類型</div>
+        <div class="summary-value">${getServiceGroupLabel(serviceGroup)}<br>${serviceType}<br>${serviceCategory}</div>
+      </div>
+    </div>
+    <div class="summary-row">
+      <div class="summary-icon">📍</div>
+      <div>
+        <div class="summary-label">取件資訊</div>
+        <div class="summary-value">${data.pickup}<br>${data.pickupPhone}</div>
+      </div>
+    </div>
+    <div class="summary-row">
+      <div class="summary-icon">🏁</div>
+      <div>
+        <div class="summary-label">送達資訊</div>
+        <div class="summary-value">${data.dropoff}<br>${data.dropoffPhone}</div>
+      </div>
+    </div>
+    <div class="summary-row">
+      <div class="summary-icon">▣</div>
+      <div>
+        <div class="summary-label">任務內容</div>
+        <div class="summary-value">${data.item}${data.note ? '<br>' + data.note.replace(/\n/g,'<br>') : ''}</div>
+      </div>
+    </div>
+    <div class="summary-row">
+      <div class="summary-icon">↯</div>
+      <div>
+        <div class="summary-label">任務速度</div>
+        <div class="summary-value">${getSpeedLabel(speedType)}</div>
+      </div>
+    </div>
+  `;
+
+  if(lastEstimate){
+  document.getElementById('pricePreview').classList.remove('hidden');
+
+document.getElementById('pricePreview').innerHTML = `
+  <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
+  <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
+  <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+  <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
+`;
+}
+}
+
+function getSpeedLabel(value){
+  const map = {
+    standard:'一般件｜60–90 分鐘｜+NT$15',
+    priority:'標準件｜45–60 分鐘｜+NT$20',
+    express:'優先件｜30–45 分鐘｜+NT$25'
+  };
+  return map[value] || value;
+}
+
+function renderSummary(order){
+  const finalTotal = order?.total || currentTotal || '';
+  currentTotal = finalTotal;
+
+  const box = document.getElementById('summaryBox');
+  box.classList.remove('hidden');
+
+  box.innerHTML = `
+    <div class="price-row"><span>訂單編號</span><strong>${currentOrderId}</strong></div>
+    <div class="price-row"><span>服務類型</span><strong>${serviceType}</strong></div>
+    <div class="price-row"><span>配送費</span><strong>NT$${order?.deliveryFee || '-'}</strong></div>
+    <div class="price-row"><span>服務費</span><strong>NT$${order?.serviceFee || '-'}</strong></div>
+    <div class="price-row"><span>優先處理費</span><strong>NT$${order?.speedFee || 0}</strong></div>
+    <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
+  `;
+}
+
 async function calculateEstimate(silent){
-  if(!validateStep2()) return false;
-
-  if(isReviewTask()){
-    lastEstimate = null;
-    return true;
-  }
-
-  if(isQueueTask()){
-    lastEstimate = getQueueEstimate();
-
-    const estimateResult = document.getElementById('estimateResult');
-    estimateResult.classList.remove('hidden');
-    document.getElementById('estimateText').innerHTML = `
-      <div class="price-row"><span>任務類型</span><strong>幫排隊</strong></div>
-      <div class="price-row"><span>起步價</span><strong>NT$${lastEstimate.baseFee}</strong></div>
-      <div class="price-row"><span>等待時間</span><strong>${lastEstimate.waitMinute} 分鐘</strong></div>
-      <div class="price-row"><span>等待費</span><strong>NT$${lastEstimate.waitFee}</strong></div>
-      <div class="price-row"><span>平台服務費</span><strong>NT$${lastEstimate.serviceFee}</strong></div>
-      <div class="price-row"><span>總金額</span><strong>NT$${lastEstimate.totalFee}</strong></div>
-    `;
-    return true;
-  }
-
   const pickup = document.getElementById('pickup').value.trim();
   const dropoff = document.getElementById('dropoff').value.trim();
+
+  console.log('估價 pickup:', pickup);
+  console.log('估價 dropoff:', dropoff);
+
+  if(!pickup || !dropoff){
+    if(!silent) alert('請先填寫取件與送達地址');
+    return false;
+  }
 
   try{
     const res = await fetch('/estimate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        pickup,
-        dropoff,
-        speed:speedType,
-        serviceKey:selectedService.key,
-        serviceType:selectedService.title
-      })
+      body:JSON.stringify({ pickup, dropoff, speed:speedType })
     });
 
     const data = await res.json();
@@ -2531,17 +2574,12 @@ async function calculateEstimate(silent){
 
     const estimateResult = document.getElementById('estimateResult');
     estimateResult.classList.remove('hidden');
-
-    const advancePayment = selectedService.key === 'buy' ? getAdvancePayment() : 0;
-    const finalTotal = Number(lastEstimate.totalFee || 0) + advancePayment;
-
     document.getElementById('estimateText').innerHTML = `
-      <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
-      <div class="price-row"><span>代墊金額</span><strong>NT$${advancePayment}</strong></div>
-      <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
+       <div class="price-row"><span>距離</span><strong>${lastEstimate.distanceText || '-'}</strong></div>
+       <div class="price-row"><span>時間</span><strong>${lastEstimate.durationText || '-'}</strong></div>
+       <div class="price-row"><span>代買費用</span><strong>NT$${getAdvancePayment()}</strong></div>
+       <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0) + getAdvancePayment()}</strong></div>
     `;
-
     return true;
   }catch(err){
     if(!silent){
@@ -2550,210 +2588,6 @@ async function calculateEstimate(silent){
     console.error(err);
     return false;
   }
-}
-
-function renderConfirmSummary(){
-  const data = getData();
-
-  let rows = [];
-
-  if(isQueueTask()){
-    rows = [
-      ['⏰','任務類型','幫排隊｜時間型任務'],
-      ['📍','排隊地點',`${data.queuePlace}<br>${data.queuePhone}`],
-      ['▣','排隊內容',escapeHtml(data.queueTask)],
-      ['📅','開始時間',data.queueStartType === 'now' ? '現在' : escapeHtml(data.queueScheduleTime)],
-      ['⏱️','最多等待',`${data.queueDurationMinutes} 分鐘`],
-      ['✅','完成後動作',`${escapeHtml(data.queueAction)}${data.queueActionNote ? '<br>' + escapeHtml(data.queueActionNote) : ''}`],
-      ['✎','備註',escapeHtml(data.queueNote || '無')]
-    ];
-  }else if(isReviewTask()){
-    rows = [
-      ['✨','任務類型','全能幫手｜人工審核後報價'],
-      ['▣','任務內容',escapeHtml(data.helperTask)],
-      ['📍','任務地點',escapeHtml(data.helperPlace)],
-      ['🏁','是否需要送達',`${escapeHtml(data.helperNeedsDelivery)}${data.helperNeedsDelivery === '是' ? '<br>' + escapeHtml(data.helperDropoff) : ''}`],
-      ['💰','預算金額',`NT$${Number(data.helperBudget || 0)}`],
-      ['📅','希望完成時間',`${escapeHtml(data.helperTimeType)}${data.helperTimeType === '預約' ? '<br>' + escapeHtml(data.helperScheduleTime) : ''}`],
-      ['☎️','聯絡電話',escapeHtml(data.helperPhone)],
-      ['✎','備註',escapeHtml(data.helperNote || '無')]
-    ];
-  }else{
-    rows = [
-      [selectedService.icon,'服務類型',`${escapeHtml(selectedService.title)}<br>${escapeHtml(getSpeedLabel(speedType))}`],
-      ['📍','取件資訊',`${escapeHtml(data.pickup)}<br>${escapeHtml(data.pickupPhone)}`],
-      ['🏁','送達資訊',`${escapeHtml(data.dropoff)}<br>${escapeHtml(data.dropoffPhone)}`],
-      ['▣','任務內容',`${escapeHtml(data.item)}${data.note ? '<br>' + escapeHtml(data.note).replace(/\n/g,'<br>') : ''}`]
-    ];
-
-    if(selectedService.key === 'buy'){
-      rows.push(['💰','預估代墊金額',`NT$${Number(data.advancePayment || 0)}`]);
-    }
-  }
-
-  document.getElementById('confirmSummary').innerHTML = rows.map(row => `
-    <div class="summary-row">
-      <div class="summary-icon">${row[0]}</div>
-      <div>
-        <div class="summary-label">${row[1]}</div>
-        <div class="summary-value">${row[2]}</div>
-      </div>
-    </div>
-  `).join('');
-
-  const pricePreview = document.getElementById('pricePreview');
-
-  if(isReviewTask()){
-    pricePreview.classList.remove('hidden');
-    pricePreview.innerHTML = `
-      <div class="price-row"><span>報價方式</span><strong>人工確認後報價</strong></div>
-      <div class="price-row"><span>目前狀態</span><strong>送出審核需求</strong></div>
-    `;
-    return;
-  }
-
-  if(lastEstimate){
-    pricePreview.classList.remove('hidden');
-
-    if(isQueueTask()){
-      pricePreview.innerHTML = `
-        <div class="price-row"><span>起步價</span><strong>NT$${lastEstimate.baseFee}</strong></div>
-        <div class="price-row"><span>等待費</span><strong>NT$${lastEstimate.waitFee}</strong></div>
-        <div class="price-row"><span>平台服務費</span><strong>NT$${lastEstimate.serviceFee}</strong></div>
-        <div class="price-row"><span>總金額</span><strong>NT$${lastEstimate.totalFee}</strong></div>
-      `;
-    }else{
-      const advancePayment = selectedService.key === 'buy' ? getAdvancePayment() : 0;
-      const finalTotal = Number(lastEstimate.totalFee || 0) + advancePayment;
-
-      pricePreview.innerHTML = `
-        <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
-        <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
-        <div class="price-row"><span>代墊金額</span><strong>NT$${advancePayment}</strong></div>
-        <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
-      `;
-    }
-  }else{
-    pricePreview.classList.add('hidden');
-  }
-}
-
-function renderSummary(order){
-  const finalTotal = order?.total || currentTotal || '';
-
-  if(finalTotal !== undefined && finalTotal !== null){
-    currentTotal = finalTotal;
-  }
-
-  const box = document.getElementById('summaryBox');
-  box.classList.remove('hidden');
-
-  if(isReviewTask()){
-    box.innerHTML = `
-      <div class="price-row"><span>需求編號</span><strong>${escapeHtml(currentOrderId)}</strong></div>
-      <div class="price-row"><span>任務類型</span><strong>全能幫手</strong></div>
-      <div class="price-row"><span>目前狀態</span><strong>等待 UBee 確認報價</strong></div>
-    `;
-    return;
-  }
-
-  box.innerHTML = `
-    <div class="price-row"><span>訂單編號</span><strong>${escapeHtml(currentOrderId)}</strong></div>
-    <div class="price-row"><span>服務類型</span><strong>${escapeHtml(selectedService.title)}</strong></div>
-    <div class="price-row"><span>配送／服務費</span><strong>NT$${order?.deliveryFee || lastEstimate?.deliveryFee || '-'}</strong></div>
-    <div class="price-row"><span>平台服務費</span><strong>NT$${order?.serviceFee || lastEstimate?.serviceFee || 25}</strong></div>
-    <div class="price-row"><span>優先處理費</span><strong>NT$${order?.speedFee || lastEstimate?.speedFee || 0}</strong></div>
-    <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
-  `;
-}
-
-function showStatus(text){
-  const box = document.getElementById('statusBox');
-  box.classList.remove('hidden');
-  box.innerText = text;
-}
-
-function showPaymentInfo(text){
-  const box = document.getElementById('paymentInfoBox');
-  box.classList.remove('hidden');
-  box.innerText = text;
-}
-
-const customerProgressSteps = [
-  { status:'pending_dispatch', text:'等待騎士接單' },
-  { status:'accepted', text:'騎士已接單' },
-  { status:'arrived_pickup', text:'抵達取件地' },
-  { status:'picked_up', text:'配送中' },
-  { status:'arrived_dropoff', text:'抵達送達地' },
-  { status:'completed', text:'已完成' }
-];
-
-function renderCustomerProgress(status){
-  const box = document.getElementById('customerProgressBox');
-  if(!box) return;
-
-  if(status === 'pending_review'){
-    box.classList.remove('hidden');
-    box.innerHTML = `
-      <div class="progress-title">審核進度</div>
-      <div class="content-text">您的全能幫手需求已送出，UBee 會確認是否可承接與報價。</div>
-    `;
-    return;
-  }
-
-  const currentIndex = customerProgressSteps.findIndex(step => step.status === status);
-
-  if(currentIndex < 0){
-    box.classList.add('hidden');
-    return;
-  }
-
-  box.classList.remove('hidden');
-
-  box.innerHTML = `
-    <div class="progress-title">任務進度</div>
-    <div class="progress-bar">
-      ${customerProgressSteps.map((step, index) => {
-        let cls = '';
-        if(index < currentIndex) cls = 'done';
-        if(index === currentIndex) cls = 'current';
-        if(status === 'completed') cls = 'done';
-
-        return `
-          <div class="progress-step ${cls}">
-            <div class="progress-dot"></div>
-            <div class="progress-label">${escapeHtml(step.text)}</div>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-}
-
-function startCustomerOrderListener(orderId){
-  if(!db || !orderId) return;
-
-  if(customerOrderUnsubscribe){
-    try{ customerOrderUnsubscribe(); }catch(e){}
-    customerOrderUnsubscribe = null;
-  }
-
-  customerOrderUnsubscribe = db.collection('orders').doc(orderId).onSnapshot(doc => {
-    if(!doc.exists) return;
-
-    const order = doc.data() || {};
-    renderCustomerProgress(order.status);
-
-    if(order.status === 'completed'){
-      showStatus(`✅ 任務已完成\n\n訂單編號：${orderId}\n\n感謝您使用 UBee 跑腿。`);
-    }
-
-    if(order.status === 'pending_review'){
-      showStatus(`✅ 需求已送出\n\n需求編號：${orderId}\n\n此任務正在等待 UBee 確認與報價。`);
-    }
-  }, err => {
-    console.error('客人端訂單監聽失敗:', err);
-  });
 }
 
 async function submitOrder(){
@@ -2765,72 +2599,41 @@ async function submitOrder(){
 
   isSubmittingOrder = true;
   btn.disabled = true;
-  btn.innerText = isReviewTask() ? '正在送出審核需求...' : '正在建立任務...';
+  btn.innerText = '系統計算費用中...';
 
   try{
-    const payload = {
-      ...data,
-      clientVersion:'UBee Customer V2',
-      createdFrom:'customer_order_html_v2',
-      estimate: lastEstimate || null
-    };
-
-    if(isQueueTask()){
-      payload.total = lastEstimate?.totalFee || getQueueEstimate().totalFee;
-      payload.totalFee = payload.total;
-      payload.deliveryFee = lastEstimate?.deliveryFee || getQueueEstimate().deliveryFee;
-      payload.serviceFee = 25;
-      payload.speedFee = 0;
-    }
-
-    if(isReviewTask()){
-      payload.status = 'pending_review';
-      payload.requestedStatus = 'pending_review';
-      payload.total = 0;
-      payload.totalFee = 0;
-      payload.requiresManualReview = true;
-      payload.paymentRequiredBeforeDispatch = false;
-    }
-
     const res = await fetch('/api/orders',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
+      body:JSON.stringify(data)
     });
 
     const result = await res.json();
 
     if(!res.ok || !result.success){
-      throw new Error(result.error || '建立任務失敗');
+      throw new Error(result.error || '建立訂單失敗');
     }
 
     currentOrderId = result.orderId;
     window.currentOrderId = result.orderId;
+    currentTotal = result.total || result.order?.total || '';
 
-    currentTotal = result.total || result.order?.total || payload.total || payload.totalFee || '';
-
+    document.getElementById('successTitle').innerText = '訂單已建立成功！';
     document.getElementById('successOrderNo').innerText = currentOrderId;
 
-    renderSummary(result.order || payload);
+    renderSummary(result.order);
 
     btn.classList.add('hidden');
+    document.getElementById('cashBtn').classList.remove('hidden');
+    document.getElementById('jkoBtn').classList.remove('hidden');
+    const footerCancelBtn = document.getElementById('footerCancelOrderBtn');
+if(footerCancelBtn){
+  footerCancelBtn.classList.remove('hidden');
+}
 
-    if(isReviewTask()){
-      document.getElementById('successTitle').innerText = '需求已送出審核';
-      document.getElementById('successSubtext').innerText = 'UBee 會確認是否可承接與報價，確認後會透過客服與您聯繫。';
-      showStatus(`✅ 全能幫手需求已送出\n\n需求編號：${currentOrderId}\n\n此類任務需由 UBee 確認後報價，不會直接派單。`);
-      renderCustomerProgress('pending_review');
-    }else{
-      document.getElementById('successTitle').innerText = '訂單已建立成功！';
-      document.getElementById('successSubtext').innerText = '請選擇付款方式，完成付款後系統才會開始派單。';
-      document.getElementById('cashBtn').classList.remove('hidden');
-      document.getElementById('jkoBtn').classList.remove('hidden');
-
-      const footerCancelBtn = document.getElementById('footerCancelOrderBtn');
-      if(footerCancelBtn) footerCancelBtn.classList.remove('hidden');
-
-      showStatus(`✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請選擇付款方式，完成付款後按「我已付款」。`);
-    }
+    showStatus(
+  `✅ 訂單已建立\n\n訂單編號：${currentOrderId}\n總金額：NT$${currentTotal}\n\n請選擇付款方式，完成付款後按「我已付款」。`
+  );
 
     startCustomerOrderListener(currentOrderId);
 
@@ -2840,7 +2643,8 @@ async function submitOrder(){
     alert('❌ ' + err.message);
     isSubmittingOrder = false;
     btn.disabled = false;
-    btn.innerText = isReviewTask() ? '送出審核需求' : '確認並建立任務';
+    btn.innerText = '確認並建立任務';
+    return;
   }
 }
 
@@ -2871,11 +2675,11 @@ async function selectPayment(method){
     }
 
     showPaymentInfo(
-      `付款方式：${result.paymentMethodLabel}\n\n` +
-      `應付金額：NT$${result.total}\n\n` +
-      `${result.paymentInfo}\n\n` +
-      `完成付款後，請按下方「我已付款」。`
-    );
+  `付款方式：${result.paymentMethodLabel}\n\n` +
+  `應付金額：NT$${result.total}\n\n` +
+  `${result.paymentInfo}\n\n` +
+  `完成付款後，請按下方「我已付款」。`
+);
 
     isPaymentMethodSaved = true;
 
@@ -2900,13 +2704,13 @@ async function confirmPaid(){
   }
 
   if(!selectedPaymentMethod){
-    alert('請先選擇付款方式');
-    return;
-  }
+  alert('請先選擇付款方式');
+  return;
+}
 
-  if(!isPaymentMethodSaved){
-    await selectPayment(selectedPaymentMethod);
-  }
+if(!isPaymentMethodSaved){
+  await selectPayment(selectedPaymentMethod);
+}
 
   if(isConfirmingPaid) return;
 
@@ -2916,25 +2720,27 @@ async function confirmPaid(){
   btn.innerText = '處理中...';
 
   try{
-    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ userId })
-    });
+    
+  // 再確認付款
+  const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ userId })
+  });
 
-    const result = await res.json();
+  const result = await res.json();
 
-    if(!res.ok || !result.success){
-      throw new Error(result.error || '確認付款失敗');
-    }
+  if(!res.ok || !result.success){
+    throw new Error(result.error || '確認付款失敗');
+  }
 
-    showStatus(`✅ 已收到付款通知\n\n訂單編號：${currentOrderId}\n\n系統正在為您媒合騎士，請稍候。`);
+    showStatus(
+      `✅ 已收到付款通知\n\n訂單編號：${currentOrderId}\n\n系統正在為你配對合作夥伴，請稍候。`
+    );
 
     alert('✅ 已收到付款通知，系統已開始派單');
-
     btn.innerText = '已確認付款';
     btn.disabled = true;
-
     document.getElementById('cancelOrderBtn').classList.add('hidden');
     document.getElementById('cashBtn').classList.add('hidden');
     document.getElementById('jkoBtn').classList.add('hidden');
@@ -2963,7 +2769,7 @@ async function cancelOrder(){
     "確定要取消訂單嗎？\n\n" +
     "取消規則：\n" +
     "未接單：免費\n" +
-    "已接單：可能產生取消費\n\n" +
+    "已接單：酌收費用\n\n" +
     "是否確認取消？"
   );
 
@@ -2986,64 +2792,11 @@ async function cancelOrder(){
       window.location.reload();
     }else{
       alert('取消失敗：' + (data.message || '未知錯誤'));
-      isCancellingOrder = false;
     }
   }catch(err){
     isCancellingOrder = false;
     console.error('cancelOrder error:', err);
     alert('系統錯誤，請稍後再試');
-  }
-}
-
-async function initMerchantContext(){
-  const params = new URLSearchParams(window.location.search);
-  const merchantId = params.get("merchantId");
-
-  if(!merchantId || !db) return;
-
-  try{
-    const doc = await db.collection("merchants").doc(merchantId).get();
-
-    if(!doc.exists){
-      alert("找不到合作店家資料，請確認連結是否正確。");
-      return;
-    }
-
-    const merchant = { id: doc.id, ...doc.data() };
-
-    if(merchant.status !== "active"){
-      alert("此合作店家目前尚未開放接單。");
-      return;
-    }
-
-    merchantMode = true;
-    currentMerchant = merchant;
-
-    selectService('merchant');
-
-    const box = document.getElementById("merchantInfoBox");
-    if(box){
-      box.classList.remove("hidden");
-      box.innerHTML = `
-        <div class="merchant-card-title">目前合作店家</div>
-        <div class="merchant-card-name">${escapeHtml(merchant.merchantName || "合作店家")}</div>
-        <div class="merchant-card-text">
-          店家代碼：${escapeHtml(merchant.merchantId || merchant.id || "")}<br>
-          店家類型：${escapeHtml(merchant.merchantType || "")}<br>
-          店家地址：${escapeHtml(merchant.merchantAddress || "")}
-        </div>
-      `;
-    }
-
-    const pickupInput = document.getElementById('pickup');
-    const pickupPhoneInput = document.getElementById('pickupPhone');
-
-    if(pickupInput) pickupInput.value = merchant.pickupAddress || merchant.merchantAddress || '';
-    if(pickupPhoneInput) pickupPhoneInput.value = merchant.phone || merchant.merchantPhone || '';
-
-  }catch(err){
-    console.error("讀取合作店家失敗:", err);
-    alert("合作店家資料讀取失敗，請稍後再試。");
   }
 }
 
@@ -3141,18 +2894,36 @@ async function initPage(){
   }
 }
 
+const customerPages = [
+  'customerTasksPage',
+  'customerProfilePage',
+  'activeTaskPage',
+  'historyTaskPage',
+  'couponPage',
+  'addressPage',
+  'supportPage',
+  'cancelRulePage',
+  'faqPage'
+];
+
+let lastMainCustomerPage = 'customerProfilePage';
+
 function hideCustomerPages(){
   customerPages.forEach(id => {
     const el = document.getElementById(id);
     if(el) el.classList.remove('active');
   });
 
-  if(customerActiveOrdersUnsubscribe){
-    try{ customerActiveOrdersUnsubscribe(); }catch(e){}
-    customerActiveOrdersUnsubscribe = null;
+  const activePage = document.getElementById('activeTaskPage');
+  if(activePage && !activePage.classList.contains('active')){
+    if(customerActiveOrdersUnsubscribe){
+      try{
+        customerActiveOrdersUnsubscribe();
+      }catch(e){}
+      customerActiveOrdersUnsubscribe = null;
+    }
   }
 }
-
 function setBottomTab(active){
   ['tabHome','tabTasks','tabProfile'].forEach(id => {
     const el = document.getElementById(id);
@@ -3168,8 +2939,8 @@ function showOrderSteps(){
   const footer = document.querySelector('.footer-nav');
   const topbar = document.querySelector('.topbar');
   const topBackBtn = document.querySelector('.topbar .icon-btn');
-
   if(topBackBtn) topBackBtn.classList.remove('hidden');
+
   if(footer) footer.classList.remove('hidden');
   if(topbar) topbar.classList.remove('hidden');
 
@@ -3185,10 +2956,10 @@ function hideOrderSteps(){
 
   const footer = document.querySelector('.footer-nav');
   const topbar = document.querySelector('.topbar');
-  const topBackBtn = document.querySelector('.topbar .icon-btn');
 
   if(footer) footer.classList.add('hidden');
   if(topbar) topbar.classList.remove('hidden');
+  const topBackBtn = document.querySelector('.topbar .icon-btn');
   if(topBackBtn) topBackBtn.classList.add('hidden');
 }
 
@@ -3207,10 +2978,8 @@ function showTasksTab(){
 
   lastMainCustomerPage = 'customerTasksPage';
   document.getElementById('pageCount').innerText = '任務';
-
   renderCustomerActiveTask();
   renderRecentTasks();
-
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
@@ -3224,9 +2993,7 @@ function showProfileTab(){
 
   lastMainCustomerPage = 'customerProfilePage';
   document.getElementById('pageCount').innerText = '我的';
-
   renderCustomerMemberInfo();
-
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
@@ -3237,10 +3004,19 @@ function openCustomerSubPage(pageId){
   const page = document.getElementById(pageId);
   if(page) page.classList.add('active');
 
-  if(pageId === 'activeTaskPage') renderCustomerActiveTask();
-  if(pageId === 'historyTaskPage') renderCustomerHistoryTasks();
-  if(pageId === 'addressPage') loadCustomerAddresses();
+  if(pageId === 'activeTaskPage'){
+  renderCustomerActiveTask();
+}
 
+if(pageId === 'historyTaskPage'){
+  renderCustomerHistoryTasks();
+}
+if(pageId === 'addressPage'){
+  renderLocalAddresses();
+}
+if(pageId === 'historyTaskPage'){
+  renderCustomerHistoryTasks();
+}
   document.getElementById('pageCount').innerText = '詳細';
   window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -3256,6 +3032,37 @@ function closeCustomerSubPage(){
     lastMainCustomerPage === 'customerTasksPage' ? '任務' : '我的';
 
   window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function renderCustomerMemberInfo(){
+  const info = document.getElementById('memberInfoText');
+  const count = document.getElementById('memberTaskCount');
+
+  if(info){
+    info.innerText = userId && userId !== 'web-order'
+      ? 'LINE 會員已確認｜可使用 UBee 城市任務服務'
+      : 'LINE 身分確認中｜請從官方帳號開啟';
+  }
+
+  if(count){
+    count.innerText = currentOrderId ? '1' : '0';
+  }
+    const level = document.getElementById('memberLevelText');
+
+  const taskCount = Number(count?.innerText || 0);
+  let levelText = '一般';
+
+  if(taskCount >= 30){
+    levelText = '鑽石';
+  }else if(taskCount >= 15){
+    levelText = '金卡';
+  }else if(taskCount >= 5){
+    levelText = '銀卡';
+  }
+
+  if(level){
+    level.innerText = levelText;
+  }
 }
 
 function formatOrderTime(value){
@@ -3285,7 +3092,6 @@ function formatOrderTime(value){
 function getOrderStatusLabel(status){
   const map = {
     draft_confirm:'草稿確認',
-    pending_review:'等待 UBee 審核',
     pending_payment:'等待付款',
     pending_dispatch:'等待派單',
     accepted:'騎士已接單',
@@ -3302,19 +3108,18 @@ function getOrderStatusLabel(status){
 
 function getOrderStatusColor(status){
   const map = {
-    pending_review:'#2563eb',
-    pending_payment:'#b98500',
-    pending_dispatch:'#b98500',
-    accepted:'#2563eb',
-    arrived_pickup:'#2563eb',
+    pending_payment:'#facc15',
+    pending_dispatch:'#facc15',
+    accepted:'#38bdf8',
+    arrived_pickup:'#38bdf8',
     picked_up:'#22c55e',
     arrived_dropoff:'#22c55e',
     completed:'#22c55e',
     cancelled:'#ef4444',
-    quote_only:'#888888'
+    quote_only:'#a8a8a8'
   };
 
-  return map[status] || '#888888';
+  return map[status] || '#a8a8a8';
 }
 
 function renderOrderList(el, orders, emptyText){
@@ -3326,28 +3131,28 @@ function renderOrderList(el, orders, emptyText){
   }
 
   el.innerHTML = orders.map(order => {
-    const pickup = order.pickup || order.pickupAddress || order.queuePlace || order.helperPlace || '-';
-    const dropoff = order.dropoff || order.dropoffAddress || order.helperDropoff || '-';
-    const total = order.total || order.totalFee || (order.status === 'pending_review' ? '待報價' : '-');
+    const pickup = order.pickup || order.pickupAddress || '-';
+    const dropoff = order.dropoff || order.dropoffAddress || '-';
+    const total = order.total || order.totalFee || '-';
     const service = order.serviceType || 'UBee 任務';
     const status = getOrderStatusLabel(order.status);
     const statusColor = getOrderStatusColor(order.status);
     const time = formatOrderTime(order.createdAt || order.updatedAt);
 
     return `
-      <div style="border:1px solid var(--line);background:var(--card);border-radius:18px;padding:14px;margin-bottom:12px;">
+      <div style="border:1px solid var(--line);background:var(--card2);border-radius:18px;padding:14px;margin-bottom:12px;">
         <div style="font-size:16px;font-weight:1000;color:var(--text);margin-bottom:8px;">
           ${escapeHtml(service)}
         </div>
         <div style="font-size:13px;font-weight:1000;color:${statusColor};margin-bottom:8px;">
-          ● ${escapeHtml(status)}
-        </div>
+        ● ${escapeHtml(status)}
+      </div>
         <div style="font-size:13px;line-height:1.7;color:var(--muted);font-weight:800;">
           訂單編號：${escapeHtml(order.id || '-')}<br>
           建立時間：${escapeHtml(time)}<br>
-          取件／任務地點：${escapeHtml(pickup)}<br>
-          送達／完成地點：${escapeHtml(dropoff)}<br>
-          金額：${typeof total === 'number' ? 'NT$' + total : escapeHtml(total)}
+          取件：${escapeHtml(pickup)}<br>
+          送達：${escapeHtml(dropoff)}<br>
+          金額：NT$${escapeHtml(total)}
         </div>
       </div>
     `;
@@ -3355,8 +3160,13 @@ function renderOrderList(el, orders, emptyText){
 }
 
 async function loadCustomerOrders(){
-  if(!db) return [];
-  if(!userId || userId === 'web-order') return [];
+  if(!db){
+    return [];
+  }
+
+  if(!userId || userId === 'web-order'){
+    return [];
+  }
 
   const snap = await db.collection('orders')
     .where('userId', '==', userId)
@@ -3404,14 +3214,16 @@ async function renderRecentTasks(){
 
   try{
     const orders = await loadCustomerOrders();
-    renderOrderList(el, orders.slice(0, 3), '目前還沒有最近任務。');
+    const recentOrders = orders.slice(0, 3);
+
+    renderOrderList(el, recentOrders, '目前還沒有最近任務。');
   }catch(err){
     console.error('讀取最近任務失敗:', err);
     el.innerHTML = '最近任務讀取失敗，請稍後再試。';
   }
 }
 
-function renderCustomerActiveTask(){
+async function renderCustomerActiveTask(){
   startCustomerActiveOrdersListener();
 }
 
@@ -3430,7 +3242,9 @@ function startCustomerActiveOrdersListener(){
   }
 
   if(customerActiveOrdersUnsubscribe){
-    try{ customerActiveOrdersUnsubscribe(); }catch(e){}
+    try{
+      customerActiveOrdersUnsubscribe();
+    }catch(e){}
     customerActiveOrdersUnsubscribe = null;
   }
 
@@ -3439,7 +3253,6 @@ function startCustomerActiveOrdersListener(){
   customerActiveOrdersUnsubscribe = db.collection('orders')
     .where('userId', '==', userId)
     .where('status', 'in', [
-      'pending_review',
       'pending_payment',
       'pending_dispatch',
       'accepted',
@@ -3477,7 +3290,10 @@ function startCustomerActiveOrdersListener(){
 }
 
 function setHistoryFilter(el, status){
-  document.querySelectorAll('#historyTaskPage .choice-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('#historyTaskPage .category-choice-item').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
   if(el) el.classList.add('active');
 
   currentHistoryFilter = status;
@@ -3516,7 +3332,13 @@ async function renderCustomerHistoryTasks(){
 
   try{
     const orders = await loadCustomerOrders();
-    cachedHistoryOrders = orders.filter(order => ['completed','cancelled'].includes(order.status));
+
+    const historyStatuses = [
+      'completed',
+      'cancelled'
+    ];
+
+    cachedHistoryOrders = orders.filter(order => historyStatuses.includes(order.status));
     renderFilteredHistoryTasks();
   }catch(err){
     console.error('讀取歷史任務失敗:', err);
@@ -3524,48 +3346,65 @@ async function renderCustomerHistoryTasks(){
   }
 }
 
-async function renderCustomerMemberInfo(){
-  const info = document.getElementById('memberInfoText');
-  const count = document.getElementById('memberTaskCount');
-  const active = document.getElementById('memberActiveCount');
-  const level = document.getElementById('memberLevelText');
+function addLocalAddress(){
+  const type = prompt('請選擇地址類型：住家、公司、常用');
 
-  if(info){
-    info.innerText = userId && userId !== 'web-order'
-      ? 'LINE 會員已確認｜可使用 UBee 跑腿服務'
-      : 'LINE 身分確認中｜請從官方帳號開啟';
-  }
-
-  if(!db || !userId || userId === 'web-order'){
-    if(count) count.innerText = '0';
-    if(active) active.innerText = '0';
-    if(level) level.innerText = '一般';
+  if(!type){
     return;
   }
 
-  try{
-    const orders = await loadCustomerOrders();
-    const activeOrders = orders.filter(order => [
-      'pending_review',
-      'pending_payment',
-      'pending_dispatch',
-      'accepted',
-      'arrived_pickup',
-      'picked_up',
-      'arrived_dropoff'
-    ].includes(order.status));
+  const allowedTypes = ['住家','公司','常用'];
 
-    if(count) count.innerText = String(orders.length);
-    if(active) active.innerText = String(activeOrders.length);
+  if(!allowedTypes.includes(type)){
+    alert('請輸入住家、公司或常用');
+    return;
+  }
 
-    let levelText = '一般';
-    if(orders.length >= 30) levelText = '鑽石';
-    else if(orders.length >= 15) levelText = '金卡';
-    else if(orders.length >= 5) levelText = '銀卡';
+  const address = prompt(`請輸入${type}地址`);
 
-    if(level) level.innerText = levelText;
-  }catch(err){
-    console.error('會員資訊讀取失敗:', err);
+  if(!address || address.trim().length < 6){
+    alert('請輸入完整地址');
+    return;
+  }
+
+  const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
+
+  if(type === '住家'){
+    saved.home = address.trim();
+  }
+
+  if(type === '公司'){
+    saved.company = address.trim();
+  }
+
+  if(type === '常用'){
+    saved.favorite = address.trim();
+  }
+
+  localStorage.setItem('ubee_customer_addresses', JSON.stringify(saved));
+
+  renderLocalAddresses();
+
+  alert('地址已儲存');
+}
+
+function renderLocalAddresses(){
+  const saved = JSON.parse(localStorage.getItem('ubee_customer_addresses') || '{}');
+
+  const homeEl = document.getElementById('homeAddressText');
+  const companyEl = document.getElementById('companyAddressText');
+  const favoriteEl = document.getElementById('favoriteAddressText');
+
+  if(homeEl){
+    homeEl.innerText = saved.home || '尚未設定住家地址';
+  }
+
+  if(companyEl){
+    companyEl.innerText = saved.company || '尚未設定公司地址';
+  }
+
+  if(favoriteEl){
+    favoriteEl.innerText = saved.favorite || '尚未新增常用地址';
   }
 }
 
@@ -3615,235 +3454,10 @@ function fillAddressToOrder(){
   showHomeTab();
 }
 
-function openLineOfficial(){
-  window.location.href = 'https://line.me/R/ti/p/@686rwnvn';
-}
-
-function selectSubType(key){
-  selectedSubType = key;
-
-  document.querySelectorAll('#subTypeGrid .choice-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
-
-  const btn = document.querySelector(`#subTypeGrid .choice-btn[data-key="${key}"]`);
-  if(btn) btn.classList.add('active');
-
-  updateNearbyPlaceBox();
-  searchNearbyPlaces();
-}
-
-function updateNearbyPlaceBox(){
-  const subTypeBox = document.getElementById('subTypeBox');
-  const subTypeGrid = document.getElementById('subTypeGrid');
-  const subTypeTitle = document.getElementById('subTypeTitle');
-  const nearbyPlaceBox = document.getElementById('nearbyPlaceBox');
-  const nearbyPlaceTitle = document.getElementById('nearbyPlaceTitle');
-  const nearbyPlaceInfoTitle = document.getElementById('nearbyPlaceInfoTitle');
-  const nearbyPlaceInfoText = document.getElementById('nearbyPlaceInfoText');
-
-  if(!selectedService || !subTypeBox || !subTypeGrid || !nearbyPlaceBox) return;
-
-  const list = SERVICE_SUB_TYPES[selectedService.key];
-
-  if(!list){
-    selectedSubType = '';
-    subTypeBox.classList.add('hidden');
-    nearbyPlaceBox.classList.add('hidden');
-    return;
-  }
-
-  subTypeBox.classList.remove('hidden');
-  nearbyPlaceBox.classList.remove('hidden');
-
-  subTypeTitle.innerText = selectedService.key === 'buy'
-    ? '請選擇代買類型'
-    : '請選擇取件類型';
-
-  if(!selectedSubType || !list.some(item => item.key === selectedSubType)){
-  selectedSubType = list[0].key;
-}
-
-  subTypeGrid.innerHTML = list.map(item => `
-    <button
-      class="choice-btn ${selectedSubType === item.key ? 'active' : ''}"
-      data-key="${escapeHtml(item.key)}"
-      type="button"
-      onclick="selectSubType('${item.key}')"
-    >
-      ${escapeHtml(item.title)}
-    </button>
-  `).join('');
-
-  const current = list.find(item => item.key === selectedSubType) || list[0];
-
-  nearbyPlaceTitle.innerText = selectedService.key === 'buy'
-    ? '附近可購買地點'
-    : '附近可取件地點';
-
-  nearbyPlaceInfoTitle.innerText = `搜尋附近${current.title}`;
-  nearbyPlaceInfoText.innerText = '系統會依照您目前位置，協助搜尋附近地點；選擇後會自動帶入取件地址欄位。';
-}
-
-function getCurrentSubType(){
-  if(!selectedService) return null;
-  const list = SERVICE_SUB_TYPES[selectedService.key];
-  if(!list || !list.length) return null;
-
-  if(!selectedSubType || !list.some(item => item.key === selectedSubType)){
-  selectedSubType = list[0].key;
-}
-
-  return list.find(item => item.key === selectedSubType) || list[0];
-}
-
-function getGeoPosition(){
-  return new Promise((resolve, reject) => {
-    if(!navigator.geolocation){
-      reject(new Error('此裝置不支援定位'));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      pos => resolve({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude
-      }),
-      err => reject(err),
-      {
-        enableHighAccuracy:true,
-        timeout:8000,
-        maximumAge:60000
-      }
-    );
-  });
-}
-
-async function searchNearbyPlaces(){
-  const nearbyPlaceBox = document.getElementById('nearbyPlaceBox');
-  const nearbyPlaceList = document.getElementById('nearbyPlaceList');
-
-  if(!selectedService || !nearbyPlaceBox || !nearbyPlaceList) return;
-
-  const current = getCurrentSubType();
-
-  if(!current){
-    nearbyPlaceBox.classList.add('hidden');
-    return;
-  }
-
-  nearbyPlaceBox.classList.remove('hidden');
-  nearbyPlaceList.innerHTML = `
-    <button class="choice-btn" type="button" disabled>正在取得附近地點...</button>
-  `;
-
-  try{
-    const location = await getGeoPosition();
-
-    const query = new URLSearchParams({
-      lat: String(location.lat),
-      lng: String(location.lng),
-      keyword: current.keyword || current.title,
-      radius: '3000'
-    });
-
-    const res = await fetch('/api/nearby-places?' + query.toString(), {
-      method:'GET',
-      cache:'no-store'
-    });
-
-    if(!res.ok){
-      throw new Error('附近地點 API 尚未啟用');
-    }
-
-    const data = await res.json();
-    const places = Array.isArray(data.places) ? data.places : [];
-
-    if(!places.length){
-      throw new Error('附近找不到可用地點');
-    }
-
-    renderNearbyPlaces(places.slice(0, 8));
-
-  }catch(err){
-    console.warn('附近地點搜尋失敗，改用 Google Maps 搜尋連結:', err);
-
-    const keyword = current.keyword || current.title;
-    const mapUrl = 'https://www.google.com/maps/search/' + encodeURIComponent(keyword + ' 附近');
-
-    nearbyPlaceList.innerHTML = `
-      <button class="choice-btn" type="button" onclick="window.open('${mapUrl}','_blank')">
-        開啟 Google Maps 搜尋
-      </button>
-      <button class="choice-btn" type="button" onclick="document.getElementById('pickup').focus()">
-        我手動輸入地址
-      </button>
-    `;
-  }
-}
-
-function renderNearbyPlaces(places){
-  const nearbyPlaceList = document.getElementById('nearbyPlaceList');
-  if(!nearbyPlaceList) return;
-
-  nearbyPlaceList.innerHTML = places.map((place, index) => {
-    const name = place.name || place.title || '附近地點';
-    const address = place.address || place.vicinity || place.formatted_address || '';
-    const phone = place.phone || place.formatted_phone_number || '';
-
-    return `
-      <button
-        class="choice-btn"
-        type="button"
-        onclick="selectNearbyPlace(${index})"
-      >
-        ${escapeHtml(name)}${address ? '<br><span style="font-size:11px;color:var(--muted);line-height:1.4;">' + escapeHtml(address) + '</span>' : ''}
-      </button>
-    `;
-  }).join('');
-
-  window.ubeeNearbyPlaces = places;
-}
-
-function selectNearbyPlace(index){
-  const places = window.ubeeNearbyPlaces || [];
-  const place = places[index];
-
-  if(!place) return;
-
-  const name = place.name || place.title || '';
-  const address = place.address || place.vicinity || place.formatted_address || '';
-  const phone = place.phone || place.formatted_phone_number || '';
-  window.ubeeSelectedNearbyPlace = {
-  name,
-  address,
-  phone,
-  placeId: place.placeId || place.place_id || '',
-  lat: place.lat || place.latitude || '',
-  lng: place.lng || place.longitude || '',
-  source: 'nearby_places'
-};
-
-  const pickupInput = document.getElementById('pickup');
-  const pickupPhoneInput = document.getElementById('pickupPhone');
-
-  if(pickupInput){
-    pickupInput.value = address ? `${name}｜${address}` : name;
-  }
-
-  if(pickupPhoneInput && phone){
-    pickupPhoneInput.value = phone;
-  }
-
-  alert('已帶入取件地點');
-}
-
-renderServiceGrid();
-applyServiceFormMode();
+renderServiceGrid('send');
 updateStepUI();
 initMerchantContext();
 initPage();
-loadCustomerAddresses();
 </script>
 </body>
 </html>
