@@ -1970,7 +1970,11 @@ function applyServiceFormMode(){
   }
 
   updateTaskPathText();
-}
+  updateNearbyPlaceBox();
+
+  if(selectedService && (selectedService.key === 'buy' || selectedService.key === 'pickup')){
+    searchNearbyPlaces();
+  }
 
 function updateTaskPathText(){
   const el = document.getElementById('taskPathText');
@@ -2128,6 +2132,179 @@ function selectHelperTime(el, value){
   setActiveButtons('helperTimeGrid', el);
   helperTimeType = value;
   document.getElementById('helperScheduleBox').classList.toggle('hidden', value !== '預約');
+}
+
+function updateNearbyPlaceBox(){
+  const box = document.getElementById('nearbyPlaceBox');
+  const title = document.getElementById('nearbyPlaceTitle');
+  const infoTitle = document.getElementById('nearbyPlaceInfoTitle');
+  const infoText = document.getElementById('nearbyPlaceInfoText');
+
+  if(!box || !selectedService){
+    return;
+  }
+
+  const showBox = selectedService.key === 'buy' || selectedService.key === 'pickup';
+
+  box.classList.toggle('hidden', !showBox);
+
+  if(!showBox){
+    return;
+  }
+
+  if(selectedService.key === 'buy'){
+    if(title) title.innerText = '附近可代買店家';
+    if(infoTitle) infoTitle.innerText = '搜尋附近 3～5 公里店家';
+    if(infoText) infoText.innerText = '系統會依照您目前位置，搜尋附近飲料店、餐點店家與生活用品店家。';
+  }
+
+  if(selectedService.key === 'pickup'){
+    if(title) title.innerText = '附近可取貨地點';
+    if(infoTitle) infoTitle.innerText = '搜尋附近 3～5 公里取貨點';
+    if(infoText) infoText.innerText = '系統會依照您目前位置，搜尋附近超商、包裹取貨或代領地點。';
+  }
+}
+
+async function searchNearbyPlaces(){
+  const list = document.getElementById('nearbyPlaceList');
+
+  if(!list){
+    return;
+  }
+
+  if(!selectedService){
+    list.innerHTML = '請先選擇任務類型。';
+    return;
+  }
+
+  const canSearch =
+    selectedService.key === 'buy' ||
+    selectedService.key === 'pickup';
+
+  if(!canSearch){
+    list.innerHTML = '';
+    return;
+  }
+
+  if(!navigator.geolocation){
+    list.innerHTML = '此裝置不支援定位功能，請手動輸入地址。';
+    return;
+  }
+
+  list.innerHTML = '正在取得您的目前位置...';
+
+  navigator.geolocation.getCurrentPosition(async position => {
+    try{
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      let keyword = '';
+
+      if(selectedService.key === 'buy'){
+        keyword = '飲料店 餐廳 生活用品';
+      }
+
+      if(selectedService.key === 'pickup'){
+        keyword = '便利商店 超商 包裹 取貨';
+      }
+
+      if(!keyword){
+        list.innerHTML = '';
+        return;
+      }
+
+      list.innerHTML = '正在搜尋附近 3～5 公里內地點...';
+
+      const res = await fetch('/api/places/search',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({
+          lat,
+          lng,
+          keyword,
+          radius: nearbySearchRadius || 5000
+        })
+      });
+
+      const data = await res.json();
+
+      if(!res.ok || !data.success){
+        throw new Error(data.error || '搜尋附近地點失敗');
+      }
+
+      if(!data.places || !data.places.length){
+        list.innerHTML = '附近 3～5 公里暫時找不到符合地點，請手動輸入取件地址。';
+        return;
+      }
+
+      window.nearbyPlacesCache = data.places;
+
+      list.innerHTML = data.places.slice(0, 8).map(place => `
+        <button
+          type="button"
+          class="choice-btn"
+          onclick="selectNearbyPlace('${escapeHtml(place.placeId)}')"
+          style="grid-column:1 / -1;text-align:left;"
+        >
+          <strong>${escapeHtml(place.name || '附近地點')}</strong><br>
+          <span style="font-size:12px;color:var(--muted);line-height:1.5;">
+            ${escapeHtml(place.address || '')}
+          </span>
+        </button>
+      `).join('');
+
+    }catch(err){
+      console.error('搜尋附近地點失敗:', err);
+      list.innerHTML = '搜尋附近地點失敗，請允許定位權限，或改用手動輸入地址。';
+    }
+  }, err => {
+    console.error('定位失敗:', err);
+    list.innerHTML = '無法取得定位，請允許定位權限，或手動輸入取件地址。';
+  }, {
+    enableHighAccuracy:true,
+    timeout:10000,
+    maximumAge:60000
+  });
+}
+
+function selectNearbyPlace(placeId){
+  const place = (window.nearbyPlacesCache || []).find(p => p.placeId === placeId);
+
+  if(!place){
+    alert('找不到此地點資料，請重新搜尋。');
+    return;
+  }
+
+  selectedNearbyPlace = place;
+
+  document.querySelectorAll('#nearbyPlaceList .choice-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  const clicked = [...document.querySelectorAll('#nearbyPlaceList .choice-btn')]
+    .find(btn => btn.textContent.includes(place.name || ''));
+
+  if(clicked){
+    clicked.classList.add('active');
+  }
+
+  const pickupInput = document.getElementById('pickup');
+  const pickupPhoneInput = document.getElementById('pickupPhone');
+
+  if(pickupInput){
+    pickupInput.value = place.address || place.name || '';
+  }
+
+  if(pickupPhoneInput){
+    pickupPhoneInput.value = place.phone || '';
+  }
+
+  alert(
+    `已選擇：${place.name || '附近地點'}\n\n` +
+    `系統已帶入取件地址。${place.phone ? '也已帶入電話。' : '若沒有電話，請自行補上取件電話。'}`
+  );
 }
 
 function getSpeedLabel(value){
