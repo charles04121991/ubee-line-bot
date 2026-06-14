@@ -3159,23 +3159,101 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
-    const distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
-    if(!distance || !distance.distanceMeters || !distance.durationSeconds){
-    return res.status(400).json({
-    success: false,
-    error: '地址無法計算距離，請確認取件與送達地址是否完整。'
+if (data.serviceMode === 'review' || data.serviceKey === 'helper') {
+  const id = generateOrderId();
+
+  const order = {
+    id,
+    userId: data.userId,
+    customerId: data.customerId,
+    riderId: '',
+    status: 'pending_review',
+    serviceGroup: data.serviceGroup,
+    serviceType: data.serviceType,
+    item: data.item,
+    pickupAddress: data.pickupAddress,
+    pickupPhone: data.pickupPhone,
+    dropoffAddress: data.dropoffAddress,
+    dropoffPhone: data.dropoffPhone,
+    speedType: 'manual_review',
+    note: data.note,
+    advancePayment: Number(data.advancePayment || 0),
+    duplicateFingerprint: getDuplicateFingerprint(data),
+    distanceMeters: 0,
+    durationSeconds: 0,
+    distanceText: '人工審核',
+    durationText: '人工審核',
+    deliveryFee: 0,
+    serviceFee: 0,
+    speedFee: 0,
+    waitingFee: 0,
+    total: 0,
+    driverFee: 0,
+    platformFee: 0,
+    etaMinutes: null,
+    paymentMethod: '',
+    isPaid: false,
+    paidAt: null,
+    requiresManualReview: true,
+    paymentRequiredBeforeDispatch: false,
+    createdAt: Date.now(),
+    acceptedAt: null,
+    arrivedPickupAt: null,
+    pickedUpAt: null,
+    arrivedDropoffAt: null,
+    completedAt: null,
+  };
+
+  await saveOrder(order);
+
+  return res.json({
+    success: true,
+    orderId: id,
+    order,
+    total: 0,
+    message: '需求已送出，等待 UBee 人工審核。',
   });
 }
-    const price = calculatePrice({
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
-      speedType: data.speedType,
-    });
 
-      price.total = Number(price.total || 0) + Number(data.advancePayment || 0);
-      price.driverFee = Math.round(Number(price.total || 0) * PRICING.driverRatio);
-      price.platformFee = Number(price.total || 0) - Number(price.driverFee || 0);
-    
+    let distance = null;
+let price = null;
+
+if (data.serviceMode === 'queue') {
+  price = {
+    deliveryFee: Number(data.manualEstimate?.deliveryFee || 0),
+    serviceFee: 25,
+    speedFee: 0,
+    waitingFee: Number(data.manualEstimate?.waitFee || 0),
+    total: Number(data.total || data.totalFee || data.manualEstimate?.totalFee || 0),
+    driverFee: 0,
+    platformFee: Number(data.total || data.totalFee || data.manualEstimate?.totalFee || 0)
+  };
+} else if (data.serviceMode === 'review') {
+  price = {
+    deliveryFee: 0,
+    serviceFee: 0,
+    speedFee: 0,
+    waitingFee: 0,
+    total: 0,
+    driverFee: 0,
+    platformFee: 0
+  };
+} else {
+  distance = await getDistanceMatrixCache(data.pickupAddress, data.dropoffAddress);
+
+  if(!distance || !distance.distanceMeters){
+    return res.status(400).json({
+      success: false,
+      error: '地址無法計算距離，請確認取件與送達地址是否完整'
+    });
+  }
+
+  price = calculatePrice({
+    distanceMeters: distance.distanceMeters,
+    durationSeconds: distance.durationSeconds,
+    speedType: data.speedType,
+  });
+}    
     const id = generateOrderId();
 
     const order = {
