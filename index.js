@@ -3301,12 +3301,18 @@ let price = null;
 
 if (data.serviceMode === 'queue') {
   const queueMinutes = Number(data.queueMinutes || 0);
-  const waitingFee = Math.max(0, queueMinutes * 3);
-  const serviceFee = 25;
-  const speedFee = 0;
-  const deliveryFee = 80;
-  const total = deliveryFee + waitingFee + serviceFee + speedFee;
+const waitingFee = Math.max(0, queueMinutes * 3);
+const serviceFee = 25;
+const deliveryFee = 80;
 
+const speedFeeMap = {
+  standard: 20,
+  priority: 25,
+  express: 30
+};
+
+const speedFee = speedFeeMap[data.speedType] || 0;
+const total = deliveryFee + waitingFee + serviceFee + speedFee;
   price = {
     deliveryFee,
     serviceFee,
