@@ -2312,6 +2312,13 @@ function selectServiceFromTab(el, groupKey){
 function selectSpeed(el, value){
   setActive('speedGrid', el, '.speed-card');
   speedType = value;
+  lastEstimate = null;
+
+  const estimateResult = document.getElementById('estimateResult');
+  if(estimateResult) estimateResult.classList.add('hidden');
+
+  const pricePreview = document.getElementById('pricePreview');
+  if(pricePreview) pricePreview.classList.add('hidden');
 }
 
 function showStatus(text){
@@ -2674,28 +2681,14 @@ function renderSummary(order){
   const isQueue = isQueueTask();
   const queueMinutes = getQueueMinutes();
 
-  const fallbackQueuePrice = {
-    deliveryFee: 80,
-    serviceFee: 25,
-    speedFee: getSpeedFee(speedType),
-    waitingFee: queueMinutes * 3,
-    total: 80 + (queueMinutes * 3) + 25 + getSpeedFee(speedType)
-  };
+  const deliveryFee = Number(order?.deliveryFee ?? lastEstimate?.deliveryFee ?? 80);
+  const waitingFee = Number(order?.waitingFee ?? lastEstimate?.waitingFee ?? queueMinutes * 3);
+  const serviceFee = Number(order?.serviceFee ?? lastEstimate?.serviceFee ?? 25);
+  const speedFee = Number(order?.speedFee ?? lastEstimate?.speedFee ?? getSpeedFee(speedType));
+  const driverFee = Number(order?.driverFee ?? lastEstimate?.driverFee ?? deliveryFee + waitingFee + speedFee);
+  const platformFee = Number(order?.platformFee ?? lastEstimate?.platformFee ?? serviceFee);
+  const finalTotal = Number(order?.total ?? order?.totalFee ?? lastEstimate?.totalFee ?? deliveryFee + waitingFee + serviceFee + speedFee);
 
-  const finalOrder = isQueue ? {
-    ...fallbackQueuePrice,
-    ...(order || {})
-  } : (order || {});
-
-  if(isQueue){
-    finalOrder.deliveryFee = Number(finalOrder.deliveryFee || 80);
-    finalOrder.serviceFee = Number(finalOrder.serviceFee || 25);
-    finalOrder.speedFee = Number(finalOrder.speedFee || 0);
-    finalOrder.waitingFee = Number(finalOrder.waitingFee || queueMinutes * 3);
-    finalOrder.total = Number(finalOrder.total || finalOrder.totalFee || fallbackQueuePrice.total);
-  }
-
-  const finalTotal = finalOrder.total || finalOrder.totalFee || currentTotal || '';
   currentTotal = finalTotal;
 
   const box = document.getElementById('summaryBox');
@@ -2705,11 +2698,13 @@ function renderSummary(order){
     <div class="price-row"><span>訂單編號</span><strong>${escapeHtml(currentOrderId)}</strong></div>
     <div class="price-row"><span>服務類型</span><strong>${escapeHtml(serviceType)}</strong></div>
     ${isQueue ? `<div class="price-row"><span>排隊時間</span><strong>${queueMinutes} 分鐘內</strong></div>` : ''}
-    <div class="price-row"><span>配送費</span><strong>NT$${escapeHtml(finalOrder.deliveryFee ?? '-')}</strong></div>
-    ${isQueue ? `<div class="price-row"><span>等待費</span><strong>NT$${escapeHtml(finalOrder.waitingFee ?? 0)}</strong></div>` : ''}
-    <div class="price-row"><span>服務費</span><strong>NT$${escapeHtml(finalOrder.serviceFee ?? '-')}</strong></div>
-    <div class="price-row"><span>優先處理費</span><strong>NT$${escapeHtml(finalOrder.speedFee ?? 0)}</strong></div>
-    <div class="price-row"><span>總金額</span><strong>NT$${escapeHtml(finalTotal)}</strong></div>
+    <div class="price-row"><span>配送費</span><strong>NT$${deliveryFee}</strong></div>
+    ${isQueue ? `<div class="price-row"><span>等待費</span><strong>NT$${waitingFee}</strong></div>` : ''}
+    <div class="price-row"><span>服務費</span><strong>NT$${serviceFee}</strong></div>
+    <div class="price-row"><span>優先處理費</span><strong>NT$${speedFee}</strong></div>
+    <div class="price-row"><span>騎士應收</span><strong>NT$${driverFee}</strong></div>
+    <div class="price-row"><span>平台收入</span><strong>NT$${platformFee}</strong></div>
+    <div class="price-row"><span>總金額</span><strong>NT$${finalTotal}</strong></div>
   `;
 }
 
@@ -2727,15 +2722,21 @@ const serviceFee = 25;
 const deliveryFee = 80;
 const speedFee = getSpeedFee(speedType);
 const totalFee = deliveryFee + waitingFee + serviceFee + speedFee;
+const driverFee = deliveryFee + waitingFee + speedFee;
+const platformFee = serviceFee;
 
 lastEstimate = {
+
   distanceText: '排隊任務',
   durationText: `${queueMinutes} 分鐘內`,
   deliveryFee,
   waitingFee,
   serviceFee,
   speedFee,
+  driverFee,
+  platformFee,
   totalFee,
+  total: totalFee,
   queueMinutes
 };
 
@@ -2806,14 +2807,29 @@ async function submitOrder(){
   const btn = document.getElementById('createOrderBtn');
   const data = getData();
   
-  if(isQueueTask() && lastEstimate){
-  data.total = Number(lastEstimate.totalFee || 0);
-  data.totalFee = Number(lastEstimate.totalFee || 0);
-  data.deliveryFee = 80;
-  data.serviceFee = 25;
-  data.waitingFee = getQueueMinutes() * 3;
-  data.speedFee = Number(lastEstimate.speedFee || getSpeedFee(speedType));
-  data.queueMinutes = getQueueMinutes();
+  if(isQueueTask()){
+  if(!lastEstimate){
+    await calculateEstimate(true);
+  }
+
+  const queueMinutes = getQueueMinutes();
+  const deliveryFee = 80;
+  const waitingFee = queueMinutes * 3;
+  const serviceFee = 25;
+  const speedFee = getSpeedFee(speedType);
+  const driverFee = deliveryFee + waitingFee + speedFee;
+  const platformFee = serviceFee;
+  const totalFee = deliveryFee + waitingFee + serviceFee + speedFee;
+
+  data.total = totalFee;
+  data.totalFee = totalFee;
+  data.deliveryFee = deliveryFee;
+  data.waitingFee = waitingFee;
+  data.serviceFee = serviceFee;
+  data.speedFee = speedFee;
+  data.driverFee = driverFee;
+  data.platformFee = platformFee;
+  data.queueMinutes = queueMinutes;
 }
 
   if(isSubmittingOrder) return;
