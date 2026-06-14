@@ -2649,7 +2649,31 @@ function getSpeedLabel(value){
 }
 
 function renderSummary(order){
-  const finalTotal = order?.total || currentTotal || '';
+  const isQueue = isQueueTask();
+  const queueMinutes = getQueueMinutes();
+
+  const fallbackQueuePrice = {
+    deliveryFee: 80,
+    serviceFee: 25,
+    speedFee: 0,
+    waitingFee: queueMinutes * 3,
+    total: 80 + (queueMinutes * 3) + 25
+  };
+
+  const finalOrder = isQueue ? {
+    ...fallbackQueuePrice,
+    ...(order || {})
+  } : (order || {});
+
+  if(isQueue){
+    finalOrder.deliveryFee = Number(finalOrder.deliveryFee || 80);
+    finalOrder.serviceFee = Number(finalOrder.serviceFee || 25);
+    finalOrder.speedFee = Number(finalOrder.speedFee || 0);
+    finalOrder.waitingFee = Number(finalOrder.waitingFee || queueMinutes * 3);
+    finalOrder.total = Number(finalOrder.total || finalOrder.totalFee || fallbackQueuePrice.total);
+  }
+
+  const finalTotal = finalOrder.total || finalOrder.totalFee || currentTotal || '';
   currentTotal = finalTotal;
 
   const box = document.getElementById('summaryBox');
@@ -2658,10 +2682,11 @@ function renderSummary(order){
   box.innerHTML = `
     <div class="price-row"><span>訂單編號</span><strong>${escapeHtml(currentOrderId)}</strong></div>
     <div class="price-row"><span>服務類型</span><strong>${escapeHtml(serviceType)}</strong></div>
-    ${isQueueTask() ? `<div class="price-row"><span>排隊時間</span><strong>${getQueueMinutes()} 分鐘內</strong></div>` : ''}
-    <div class="price-row"><span>配送費</span><strong>NT$${escapeHtml(order?.deliveryFee ?? '-')}</strong></div>
-    <div class="price-row"><span>服務費</span><strong>NT$${escapeHtml(order?.serviceFee ?? '-')}</strong></div>
-    <div class="price-row"><span>優先處理費</span><strong>NT$${escapeHtml(order?.speedFee ?? 0)}</strong></div>
+    ${isQueue ? `<div class="price-row"><span>排隊時間</span><strong>${queueMinutes} 分鐘內</strong></div>` : ''}
+    <div class="price-row"><span>配送費</span><strong>NT$${escapeHtml(finalOrder.deliveryFee ?? '-')}</strong></div>
+    ${isQueue ? `<div class="price-row"><span>等待費</span><strong>NT$${escapeHtml(finalOrder.waitingFee ?? 0)}</strong></div>` : ''}
+    <div class="price-row"><span>服務費</span><strong>NT$${escapeHtml(finalOrder.serviceFee ?? '-')}</strong></div>
+    <div class="price-row"><span>優先處理費</span><strong>NT$${escapeHtml(finalOrder.speedFee ?? 0)}</strong></div>
     <div class="price-row"><span>總金額</span><strong>NT$${escapeHtml(finalTotal)}</strong></div>
   `;
 }
@@ -2780,7 +2805,7 @@ async function submitOrder(){
 
     currentOrderId = result.orderId;
     window.currentOrderId = result.orderId;
-    currentTotal = result.total || result.order?.total || '';
+    currentTotal = result.total ?? result.order?.total ?? data.total ?? data.totalFee ?? '';
 
     document.getElementById('successTitle').innerText = '訂單已建立成功！';
     document.getElementById('successOrderNo').innerText = currentOrderId;
