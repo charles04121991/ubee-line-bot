@@ -1865,11 +1865,11 @@ async function goNext(){
       const queueMinutes = getQueueMinutes();
 
       lastEstimate = {
-        distanceText: '排隊任務',
-        durationText: `${queueMinutes} 分鐘內`,
-        totalFee: 0,
-        queueMinutes
-      };
+  distanceText: '排隊任務',
+  durationText: `${queueMinutes} 分鐘內`,
+  totalFee: 80 + (queueMinutes * 3) + 25,
+  queueMinutes
+};
     }
   }
 
