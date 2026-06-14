@@ -3237,79 +3237,20 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
-if (data.serviceMode === 'review' || data.serviceKey === 'helper') {
-  const id = generateOrderId();
-
-  const order = {
-    id,
-    userId: data.userId,
-    customerId: data.customerId,
-    riderId: '',
-    status: 'pending_payment',
-    serviceGroup: data.serviceGroup,
-    serviceType: data.serviceType,
-    serviceMode: data.serviceMode,
-    serviceKey: data.serviceKey,
-    queueMinutes: data.queueMinutes,
-    item: data.item,
-    pickupAddress: data.pickupAddress,
-    pickupPhone: data.pickupPhone,
-    dropoffAddress: data.dropoffAddress,
-    dropoffPhone: data.dropoffPhone,
-    speedType: data.speedType,
-    note: data.note,
-    advancePayment: Number(data.advancePayment || 0),
-    duplicateFingerprint: getDuplicateFingerprint(data),
-    distanceMeters: 0,
-    durationSeconds: 0,
-    distanceText: '人工審核',
-    durationText: '人工審核',
-    deliveryFee: 0,
-    serviceFee: 0,
-    speedFee: 0,
-    waitingFee: 0,
-    total: 0,
-    driverFee: 0,
-    platformFee: 0,
-    etaMinutes: null,
-    paymentMethod: '',
-    isPaid: false,
-    paidAt: null,
-    requiresManualReview: true,
-    paymentRequiredBeforeDispatch: false,
-    createdAt: Date.now(),
-    acceptedAt: null,
-    arrivedPickupAt: null,
-    pickedUpAt: null,
-    arrivedDropoffAt: null,
-    completedAt: null,
-  };
-
-  await saveOrder(order);
-
-  return res.json({
-    success: true,
-    orderId: id,
-    order,
-    total: 0,
-    message: '需求已送出，等待 UBee 人工審核。',
-  });
-}
-
     let distance = null;
-let price = null;
+    let price = null;
 
-if (data.serviceMode === 'queue') {
-  const queueMinutes = Number(data.queueMinutes || 0);
-const waitingFee = Math.max(0, queueMinutes * 3);
-const serviceFee = 25;
-const deliveryFee = 80;
+    if (data.serviceMode === 'queue') {
+      const queueMinutes = Number(data.queueMinutes || 0);
+      const waitingFee = Math.max(0, queueMinutes * 3);
+      const serviceFee = 25;
+      const deliveryFee = 80;
 
-const speedFeeMap = {
-  standard: 20,
-  priority: 25,
-  express: 30
-};
+      const speedFeeMap = {
+        standard: 20,
+        priority: 25,
+        express: 30
+       };
 
 const speedFee = speedFeeMap[data.speedType] || 0;
 const total = deliveryFee + waitingFee + serviceFee + speedFee;
