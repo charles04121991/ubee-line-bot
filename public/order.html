@@ -1863,11 +1863,20 @@ async function goNext(){
       }
     }else{
       const queueMinutes = getQueueMinutes();
+      const waitingFee = queueMinutes * 3;
+      const serviceFee = 25;
+      const deliveryFee = 80;
+      const speedFee = getSpeedFee(speedType);
+      const totalFee = deliveryFee + waitingFee + serviceFee + speedFee;
 
-      lastEstimate = {
+lastEstimate = {
   distanceText: '排隊任務',
   durationText: `${queueMinutes} 分鐘內`,
-  totalFee: 80 + (queueMinutes * 3) + 25,
+  deliveryFee,
+  waitingFee,
+  serviceFee,
+  speedFee,
+  totalFee,
   queueMinutes
 };
     }
@@ -2629,7 +2638,8 @@ function renderConfirmSummary(){
   <div class="price-row"><span>預估排隊時間</span><strong>${getQueueMinutes()} 分鐘內</strong></div>
   <div class="price-row"><span>等待費</span><strong>NT$${getQueueMinutes() * 3}</strong></div>
   <div class="price-row"><span>服務費</span><strong>NT$25</strong></div>
-  <div class="price-row"><span>總金額</span><strong>NT$${80 + (getQueueMinutes() * 3) + 25}</strong></div>
+  <div class="price-row"><span>優先處理費</span><strong>NT$${Number(lastEstimate.speedFee || 0)}</strong></div>
+  <div class="price-row"><span>總金額</span><strong>NT$${Number(lastEstimate.totalFee || 0)}</strong></div>
 ` : `
   <div class="price-row"><span>距離</span><strong>${escapeHtml(lastEstimate.distanceText || '-')}</strong></div>
   <div class="price-row"><span>時間</span><strong>${escapeHtml(lastEstimate.durationText || '-')}</strong></div>
@@ -2648,6 +2658,15 @@ function getSpeedLabel(value){
   return map[value] || value;
 }
 
+function getSpeedFee(value){
+  const map = {
+    standard: 20,
+    priority: 25,
+    express: 30
+  };
+  return map[value] || 0;
+}
+
 function renderSummary(order){
   const isQueue = isQueueTask();
   const queueMinutes = getQueueMinutes();
@@ -2655,9 +2674,9 @@ function renderSummary(order){
   const fallbackQueuePrice = {
     deliveryFee: 80,
     serviceFee: 25,
-    speedFee: 0,
+    speedFee: getSpeedFee(speedType),
     waitingFee: queueMinutes * 3,
-    total: 80 + (queueMinutes * 3) + 25
+    total: 80 + (queueMinutes * 3) + 25 + getSpeedFee(speedType)
   };
 
   const finalOrder = isQueue ? {
@@ -2700,10 +2719,20 @@ async function calculateEstimate(silent){
       return false;
     }
 
-    lastEstimate = {
+    const waitingFee = queueMinutes * 3;
+const serviceFee = 25;
+const deliveryFee = 80;
+const speedFee = getSpeedFee(speedType);
+const totalFee = deliveryFee + waitingFee + serviceFee + speedFee;
+
+lastEstimate = {
   distanceText: '排隊任務',
   durationText: `${queueMinutes} 分鐘內`,
-  totalFee: 80 + (queueMinutes * 3) + 25,
+  deliveryFee,
+  waitingFee,
+  serviceFee,
+  speedFee,
+  totalFee,
   queueMinutes
 };
 
@@ -2717,9 +2746,10 @@ async function calculateEstimate(silent){
       estimateText.innerHTML = `
   <div class="price-row"><span>任務類型</span><strong>排隊服務</strong></div>
   <div class="price-row"><span>預估排隊時間</span><strong>${queueMinutes} 分鐘內</strong></div>
-  <div class="price-row"><span>等待費</span><strong>NT$${queueMinutes * 3}</strong></div>
-  <div class="price-row"><span>服務費</span><strong>NT$25</strong></div>
-  <div class="price-row"><span>預估金額</span><strong>NT$${80 + (queueMinutes * 3) + 25}</strong></div>
+  <div class="price-row"><span>等待費</span><strong>NT$${waitingFee}</strong></div>
+  <div class="price-row"><span>服務費</span><strong>NT$${serviceFee}</strong></div>
+  <div class="price-row"><span>優先處理費</span><strong>NT$${speedFee}</strong></div>
+  <div class="price-row"><span>預估金額</span><strong>NT$${totalFee}</strong></div>
 `;
     }
 
@@ -2779,7 +2809,7 @@ async function submitOrder(){
   data.deliveryFee = 80;
   data.serviceFee = 25;
   data.waitingFee = getQueueMinutes() * 3;
-  data.speedFee = 0;
+  data.speedFee = Number(lastEstimate.speedFee || getSpeedFee(speedType));
   data.queueMinutes = getQueueMinutes();
 }
 
