@@ -2407,6 +2407,7 @@ function getData(){
   serviceType,
   serviceGroup,
   serviceCategory,
+  serviceMode,
   speedType,
     pickup: document.getElementById('pickup').value.trim(),
     pickupPhone: document.getElementById('pickupPhone').value.trim(),
@@ -2416,6 +2417,8 @@ function getData(){
     note: [note, ...extra].filter(Boolean).join('\n'),
     
     advancePayment: Number(document.getElementById('advancePayment')?.value || 0),
+    
+    serviceKey: isQueueTask() ? 'helper' : '',
     
     userId,
 
