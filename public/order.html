@@ -2747,6 +2747,16 @@ async function calculateEstimate(silent){
 async function submitOrder(){
   const btn = document.getElementById('createOrderBtn');
   const data = getData();
+  
+  if(isQueueTask() && lastEstimate){
+  data.total = Number(lastEstimate.totalFee || 0);
+  data.totalFee = Number(lastEstimate.totalFee || 0);
+  data.deliveryFee = 80;
+  data.serviceFee = 25;
+  data.waitingFee = getQueueMinutes() * 3;
+  data.speedFee = 0;
+  data.queueMinutes = getQueueMinutes();
+}
 
   if(isSubmittingOrder) return;
   if(!validateData(data)) return;
