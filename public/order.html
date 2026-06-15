@@ -1371,7 +1371,7 @@ body.day-mode .bottom-tabs{
             <div class="nearby-title">附近店家</div>
             <div class="nearby-sub">依照你選擇的代買分類，自動搜尋附近可參考店家。點選後會帶入購買地點與電話。</div>
           </div>
-          <button id="nearbyReloadBtn" class="nearby-btn" type="button" onclick="searchNearbyPlaces(true)">重新搜尋</button>
+          <button id="nearbyReloadBtn" class="nearby-btn" type="button" onclick="searchNearbyPlaces(true)">搜尋附近店家</button>
         </div>
         <div id="nearbyPlacesStatus" class="nearby-status">選擇代買分類後，系統會顯示附近店家。</div>
         <div id="nearbyPlacesList" class="nearby-list"></div>
@@ -2037,15 +2037,9 @@ function handleServiceSelectionChanged(){
     return;
   }
 
-  if(nearbyPlacesTimer){
-    clearTimeout(nearbyPlacesTimer);
-  }
-
-  nearbyPlacesTimer = setTimeout(() => {
-    searchNearbyPlaces(false);
-  }, 250);
+  setNearbyStatus('已選擇代買分類。請按「搜尋附近店家」，系統才會開始定位與搜尋。');
 }
-
+  
 function getCurrentPosition(){
   return new Promise((resolve, reject) => {
     if(!navigator.geolocation){
@@ -2054,10 +2048,10 @@ function getCurrentPosition(){
     }
 
     navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy:true,
-      timeout:10000,
-      maximumAge:300000
-    });
+  enableHighAccuracy:false,
+  timeout:6000,
+  maximumAge:300000
+});
   });
 }
 
