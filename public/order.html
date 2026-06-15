@@ -980,35 +980,47 @@ textarea::placeholder{
 
 .order-timeline{
   position:relative;
-  display:flex;
-  flex-direction:column;
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
   gap:0;
-  margin:6px 0 16px;
+  margin:18px 0 14px;
+  padding:8px 0 4px;
+  overflow:visible;
+}
+
+.timeline-line{
+  position:absolute;
+  left:7.14%;
+  right:7.14%;
+  top:21px;
+  height:4px;
+  border-radius:999px;
+  background:var(--line2);
+  overflow:hidden;
+  z-index:0;
+}
+
+.timeline-line-fill{
+  height:100%;
+  width:var(--progress,0%);
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),var(--green));
+  transition:width .25s ease;
 }
 
 .timeline-item{
   position:relative;
-  display:grid;
-  grid-template-columns:32px 1fr;
-  gap:12px;
-  padding:0 0 16px;
-}
-
-.timeline-item:last-child{
-  padding-bottom:0;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  text-align:center;
+  min-width:0;
+  padding:0 2px;
 }
 
 .timeline-item::before{
-  content:"";
-  position:absolute;
-  left:15px;
-  top:30px;
-  bottom:0;
-  width:2px;
-  background:var(--line2);
-}
-
-.timeline-item:last-child::before{
   display:none;
 }
 
@@ -1024,7 +1036,8 @@ textarea::placeholder{
   justify-content:center;
   font-size:13px;
   font-weight:1000;
-  z-index:1;
+  margin-bottom:7px;
+  box-shadow:0 0 0 4px var(--card);
 }
 
 .timeline-item.done .timeline-dot{
@@ -1037,29 +1050,79 @@ textarea::placeholder{
   background:var(--green);
   border-color:var(--green);
   color:#fff;
-  box-shadow:0 0 0 5px rgba(34,197,94,.12);
+  box-shadow:0 0 0 5px rgba(34,197,94,.16);
 }
 
 .timeline-title{
   color:var(--text);
-  font-size:15px;
+  font-size:11px;
   font-weight:1000;
-  line-height:1.45;
+  line-height:1.25;
+  min-height:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  word-break:keep-all;
 }
 
 .timeline-desc{
   color:var(--muted);
-  font-size:12px;
-  font-weight:800;
-  line-height:1.65;
+  font-size:10px;
+  font-weight:900;
+  line-height:1.25;
   margin-top:2px;
+  word-break:keep-all;
 }
 
 .timeline-time{
-  color:var(--muted2);
-  font-size:11px;
-  font-weight:800;
-  margin-top:3px;
+  display:none;
+}
+
+.current-status-card{
+  border:1px solid rgba(250,204,21,.32);
+  background:rgba(250,204,21,.08);
+  border-radius:16px;
+  padding:12px 13px;
+  margin:12px 0 14px;
+}
+
+.current-status-kicker{
+  color:var(--accent);
+  font-size:12px;
+  font-weight:1000;
+  margin-bottom:4px;
+}
+
+.current-status-text{
+  color:var(--text);
+  font-size:14px;
+  font-weight:900;
+  line-height:1.65;
+}
+
+@media(max-width:380px){
+  .timeline-dot{
+    width:27px;
+    height:27px;
+    font-size:12px;
+  }
+
+  .timeline-line{
+    top:19px;
+  }
+
+  .timeline-title{
+    font-size:10px;
+    min-height:27px;
+  }
+
+  .timeline-desc{
+    font-size:9px;
+  }
+
+  .status{
+    padding:14px 12px;
+  }
 }
 
 .status-total{
@@ -2991,6 +3054,7 @@ function getStatusLabel(status){
     completed:'已完成',
     done:'已完成',
     cancelled:'已取消',
+    quote_only:'僅估價',
   };
 
   return map[status] || status || '等待處理';
@@ -3125,73 +3189,76 @@ function renderTimeline(status, order){
       rank:0,
       icon:'✓',
       title:'訂單建立',
-      desc:'訂單已建立，等待付款確認。'
+      shortDesc:'已建立'
     },
     {
       key:'pending_dispatch',
       rank:1,
       icon:'🔎',
       title:'等待派單',
-      desc:'付款確認後，系統開始媒合附近騎士。'
+      shortDesc:'媒合中'
     },
     {
       key:'accepted',
       rank:2,
       icon:'🛵',
       title:'騎士接單',
-      desc:'騎士已接單，準備前往取件地。'
+      shortDesc:'已接單'
     },
     {
       key:'arrived_pickup',
       rank:3,
       icon:'📍',
-      title:'抵達取件地',
-      desc:'騎士已抵達取件地或店家。'
+      title:'抵達取件',
+      shortDesc:'已抵達'
     },
     {
       key:'picked_up',
       rank:4,
       icon:'📦',
       title:'取件完成',
-      desc:'騎士已取件，正在配送中。'
+      shortDesc:'配送中'
     },
     {
       key:'arrived_dropoff',
       rank:5,
       icon:'🏁',
-      title:'抵達送達地',
-      desc:'騎士已抵達收件地點。'
+      title:'抵達送達',
+      shortDesc:'快送達'
     },
     {
       key:'completed',
       rank:6,
       icon:'✅',
       title:'任務完成',
-      desc:'任務已完成。'
+      shortDesc:'已完成'
     }
   ];
+
+  const safeRank = currentStatus === 'cancelled'
+    ? 0
+    : Math.max(0, Math.min(steps.length - 1, displayRank));
+
+  const progressPercent = currentStatus === 'cancelled'
+    ? 0
+    : Math.max(0, Math.min(100, (safeRank / (steps.length - 1)) * 100));
 
   const timelineHtml = steps.map(step => {
     let cls = '';
 
     if(currentStatus === 'cancelled'){
       cls = step.rank === 0 ? 'done' : '';
-    }else if(step.rank < displayRank){
+    }else if(step.rank < safeRank){
       cls = 'done';
-    }else if(step.rank === displayRank){
+    }else if(step.rank === safeRank){
       cls = 'current';
     }
-
-    const time = getOrderStepTime(order, step.key);
 
     return `
       <div class="timeline-item ${cls}">
         <div class="timeline-dot">${escapeHtml(step.icon)}</div>
-        <div>
-          <div class="timeline-title">${escapeHtml(step.title)}</div>
-          <div class="timeline-desc">${escapeHtml(step.desc)}</div>
-          ${time ? `<div class="timeline-time">${escapeHtml(time)}</div>` : ''}
-        </div>
+        <div class="timeline-title">${escapeHtml(step.title)}</div>
+        <div class="timeline-desc">${escapeHtml(step.shortDesc)}</div>
       </div>
     `;
   }).join('');
@@ -3220,12 +3287,18 @@ function renderTimeline(status, order){
       </div>
     </div>
 
-    <div class="status-message">
-      ${escapeHtml(getCurrentStatusMessage(currentStatus))}
+    <div class="order-timeline" style="--progress:${progressPercent}%;">
+      <div class="timeline-line">
+        <div class="timeline-line-fill"></div>
+      </div>
+      ${timelineHtml}
     </div>
 
-    <div class="order-timeline">
-      ${timelineHtml}
+    <div class="current-status-card">
+      <div class="current-status-kicker">目前進度</div>
+      <div class="current-status-text">
+        ${escapeHtml(getCurrentStatusMessage(currentStatus))}
+      </div>
     </div>
 
     <div class="status-total">
