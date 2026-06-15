@@ -1361,6 +1361,98 @@ textarea::placeholder{
   color:var(--muted);
 }
 
+.info-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin-top:14px;
+}
+
+.info-item{
+  border:1px solid var(--line);
+  background:var(--card2);
+  border-radius:18px;
+  padding:14px;
+}
+
+.info-item-title{
+  color:var(--text);
+  font-size:15px;
+  font-weight:1000;
+  margin-bottom:6px;
+}
+
+.info-item-text{
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  line-height:1.75;
+}
+
+.address-display{
+  border:1px solid rgba(250,204,21,.35);
+  background:rgba(250,204,21,.08);
+  border-radius:18px;
+  padding:14px;
+  margin:14px 0;
+}
+
+.address-display-label{
+  color:var(--accent);
+  font-size:13px;
+  font-weight:1000;
+  margin-bottom:5px;
+}
+
+.address-display-value{
+  color:var(--text);
+  font-size:15px;
+  font-weight:900;
+  line-height:1.7;
+  word-break:break-word;
+}
+
+.profile-action-row{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin-top:14px;
+}
+
+.profile-note{
+  border:1px solid rgba(56,189,248,.34);
+  background:rgba(56,189,248,.08);
+  color:var(--text);
+  border-radius:18px;
+  padding:13px;
+  margin-top:14px;
+  font-size:13px;
+  font-weight:900;
+  line-height:1.7;
+}
+
+.profile-status{
+  color:var(--muted);
+  font-size:13px;
+  font-weight:900;
+  line-height:1.7;
+  margin-top:12px;
+  min-height:22px;
+}
+
+.line-id-pill{
+  display:inline-flex;
+  align-items:center;
+  border:1px solid rgba(250,204,21,.45);
+  background:rgba(250,204,21,.12);
+  color:var(--accent);
+  border-radius:999px;
+  padding:7px 11px;
+  font-size:13px;
+  font-weight:1000;
+  margin-top:8px;
+}
+    
 .bottom-tabs{
   position:fixed;
   left:50%;
@@ -1740,14 +1832,10 @@ body.day-mode .bottom-tabs{
 
       <div class="content-card">
         <div class="content-title">付款方式</div>
-        <div class="btn-row">
-          <button class="btn btn-secondary yellow-outline" type="button" onclick="selectPaymentMethod('cash')">現金</button>
-          <button class="btn btn-secondary yellow-outline" type="button" onclick="selectPaymentMethod('jko')">街口</button>
-        </div>
-
-        <button class="btn btn-secondary" type="button" onclick="selectPaymentMethod('bank')" style="margin-top:10px;">
-          銀行轉帳
-        </button>
+<div class="btn-row">
+  <button class="btn btn-secondary yellow-outline" type="button" onclick="selectPaymentMethod('cash')">現金</button>
+  <button class="btn btn-secondary yellow-outline" type="button" onclick="selectPaymentMethod('jko')">街口支付</button>
+</div>
 
         <div id="paymentInfo" class="payment-info hidden"></div>
 
@@ -1772,7 +1860,7 @@ body.day-mode .bottom-tabs{
       </div>
     </section>
 
-    <section class="app-section" id="customerProfilePage">
+      <section class="app-section" id="customerProfilePage">
       <div class="headline">我的</div>
       <div class="subtext">UBee 客戶端服務資訊。</div>
 
@@ -1803,15 +1891,11 @@ body.day-mode .bottom-tabs{
             <span class="menu-left"><span class="menu-icon">📦</span>我的任務</span>
             <span class="menu-arrow">›</span>
           </button>
-          <button class="menu-item" type="button" onclick="saveCurrentAddress()">
-            <span class="menu-left"><span class="menu-icon">📍</span>儲存目前送達地址</span>
+          <button class="menu-item" type="button" onclick="showCustomerSubPage('customerAddressPage','常用地址')">
+            <span class="menu-left"><span class="menu-icon">🏠</span>常用地址</span>
             <span class="menu-arrow">›</span>
           </button>
-          <button class="menu-item" type="button" onclick="fillSavedAddress()">
-            <span class="menu-left"><span class="menu-icon">🏠</span>帶入常用地址</span>
-            <span class="menu-arrow">›</span>
-          </button>
-          <button class="menu-item" type="button" onclick="alert('目前優惠券功能建置中。')">
+          <button class="menu-item" type="button" onclick="showCustomerSubPage('customerCouponPage','優惠券')">
             <span class="menu-left"><span class="menu-icon">🎟️</span>優惠券</span>
             <span class="menu-arrow">›</span>
           </button>
@@ -1821,19 +1905,19 @@ body.day-mode .bottom-tabs{
       <div class="menu-group">
         <div class="menu-title">服務資訊</div>
         <div class="menu-list">
-          <button class="menu-item" type="button" onclick="alert('請回到 LINE 官方帳號聯繫 UBee 客服。')">
+          <button class="menu-item" type="button" onclick="openLineOfficialAccount()">
             <span class="menu-left"><span class="menu-icon">💬</span>客服中心</span>
             <span class="menu-arrow">›</span>
           </button>
-          <button class="menu-item" type="button" onclick="alert('UBee 是網頁版 App，可加入手機主畫面使用。')">
+          <button class="menu-item" type="button" onclick="showCustomerSubPage('customerFaqPage','常見問題')">
             <span class="menu-left"><span class="menu-icon">❓</span>常見問題</span>
             <span class="menu-arrow">›</span>
           </button>
-          <button class="menu-item" type="button" onclick="alert('付款後尚未媒合騎士可聯繫客服協助取消；騎士已開始任務後，可能依狀況產生取消費。')">
+          <button class="menu-item" type="button" onclick="showCustomerSubPage('customerCancelRulePage','取消規則')">
             <span class="menu-left"><span class="menu-icon">📄</span>取消規則</span>
             <span class="menu-arrow">›</span>
           </button>
-          <button class="menu-item" type="button" onclick="alert('UBee 跑腿｜你的任務・我們使命必達。')">
+          <button class="menu-item" type="button" onclick="showCustomerSubPage('customerAboutPage','關於 UBee')">
             <span class="menu-left"><span class="menu-icon">🐝</span>關於 UBee</span>
             <span class="menu-arrow">›</span>
           </button>
@@ -1841,6 +1925,120 @@ body.day-mode .bottom-tabs{
       </div>
     </section>
 
+    <section class="app-section" id="customerAddressPage">
+      <div class="headline">常用地址</div>
+      <div class="subtext">管理你常用的送達地址。可從目前訂單欄位儲存，也可以一鍵帶回首頁使用。</div>
+
+      <div class="content-card">
+        <div class="content-title">目前儲存地址</div>
+        <div class="address-display">
+          <div class="address-display-label">常用送達地址</div>
+          <div class="address-display-value" id="savedAddressText">尚未儲存常用地址。</div>
+        </div>
+        <div class="profile-action-row">
+          <button class="btn btn-primary" type="button" onclick="saveCurrentAddress()">儲存目前送達地址</button>
+          <button class="btn btn-secondary yellow-outline" type="button" onclick="fillSavedAddress()">帶入常用地址到訂單</button>
+          <button class="btn btn-secondary" type="button" onclick="clearSavedAddress()">清除常用地址</button>
+        </div>
+        <div id="addressActionStatus" class="profile-status"></div>
+      </div>
+
+      <div class="profile-note">
+        使用方式：先回首頁填寫「送達地址」，再進入常用地址按「儲存目前送達地址」。之後要下單時，按「帶入常用地址到訂單」即可自動填入。
+      </div>
+    </section>
+
+    <section class="app-section" id="customerCouponPage">
+      <div class="headline">優惠券</div>
+      <div class="subtext">查看 UBee 可用優惠與活動說明。</div>
+
+      <div class="content-card">
+        <div class="content-title">目前優惠</div>
+        <div class="content-text" id="couponPageText">目前尚無可自動套用的優惠券。</div>
+      </div>
+
+      <div class="info-list">
+        <div class="info-item">
+          <div class="info-item-title">活動提醒</div>
+          <div class="info-item-text">優惠券功能已先建立頁面架構，未來可再接後端優惠券資料，例如首單折扣、店家活動碼、區域活動券。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">使用規則</div>
+          <div class="info-item-text">優惠是否可使用，會以建立任務時的服務區域、任務類型、付款方式與活動期間為準。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="app-section" id="customerFaqPage">
+      <div class="headline">常見問題</div>
+      <div class="subtext">整理 UBee 下單、付款、服務範圍與網頁版 App 使用方式。</div>
+
+      <div class="info-list">
+        <div class="info-item">
+          <div class="info-item-title">UBee 是 App 嗎？</div>
+          <div class="info-item-text">UBee 目前是網頁版 App，可用手機瀏覽器開啟，也可以加入手機主畫面，使用方式會接近一般 App。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">服務範圍有哪些？</div>
+          <div class="info-item-text">目前服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">可以做哪些任務？</div>
+          <div class="info-item-text">可建立幫我送、幫我取、幫代買、幫排隊、全能跑腿與急件專送等任務。請把地址、電話、品項、數量、備註寫清楚。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">哪些任務不能接？</div>
+          <div class="info-item-text">UBee 不承接違法、管制、危險、法律、金融、證件、授權簽署或高風險委託事項。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">付款後多久會派單？</div>
+          <div class="info-item-text">任務建立後需選擇付款方式並完成付款確認，系統才會開始媒合騎士。實際媒合速度會依區域、時段與騎士狀態而不同。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="app-section" id="customerCancelRulePage">
+      <div class="headline">取消規則</div>
+      <div class="subtext">請在送出任務前確認內容。任務進入派單或騎士開始處理後，取消規則會依狀況不同。</div>
+
+      <div class="info-list">
+        <div class="info-item">
+          <div class="info-item-title">尚未付款</div>
+          <div class="info-item-text">訂單尚未付款或尚未確認付款前，通常可直接取消或重新建立任務。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">付款後尚未媒合騎士</div>
+          <div class="info-item-text">若付款後尚未媒合騎士，請聯繫 UBee 客服協助處理取消與退款事宜。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">騎士已接單或已出發</div>
+          <div class="info-item-text">若騎士已接單、已抵達取件點、已代買或任務已開始執行，可能會依實際狀況產生取消費、代墊費或已發生的服務費。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">代買與代墊商品</div>
+          <div class="info-item-text">若騎士已完成購買，商品與代墊費用通常需由下單者負擔，實際處理以客服確認結果為準。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="app-section" id="customerAboutPage">
+      <div class="headline">關於 UBee</div>
+      <div class="subtext">UBee 跑腿｜你的任務・我們使命必達。</div>
+
+      <div class="content-card">
+        <div class="content-title">UBee 跑腿</div>
+        <div class="content-text">
+          UBee 是以系統化派單為核心的跑腿服務平台，協助處理外送、代送、代買、代取、排隊與急件配送等生活任務。
+          <br><br>
+          目前從豐原出發，服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。
+        </div>
+        <div class="line-id-pill">LINE 官方帳號：@686rwnvn</div>
+      </div>
+
+      <div class="profile-action-row">
+        <button class="btn btn-primary" type="button" onclick="openLineOfficialAccount()">聯繫 UBee 客服</button>
+      </div>
+    </section>
     <div class="footer-nav">
       <button id="cancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:12px;">
         取消訂單
@@ -1920,7 +2118,11 @@ let isSelectingPayment = false;
 let isCancellingOrder = false;
 let cachedHistoryOrders = [];
 let currentHistoryFilter = 'all';
+let currentCustomerPage = '';
 
+const LINE_OFFICIAL_ID = '@686rwnvn';
+const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
+  
 let nearbyPlaces = [];
 let selectedNearbyPlace = null;
 let selectedNearbyPlaceId = '';
@@ -2525,10 +2727,25 @@ function hideCustomerPages(){
   });
 }
 
+function setBottomTabActive(tabId){
+  document.querySelectorAll('.bottom-tab').forEach(btn => btn.classList.remove('active'));
+  const tab = qs(tabId);
+  if(tab){
+    tab.classList.add('active');
+  }
+}
+
+function hideFooterButtons(){
+  qs('prevBtn').classList.add('hidden');
+  qs('nextBtn').classList.add('hidden');
+  qs('cancelOrderBtn').classList.add('hidden');
+}
+
 function showOnlyStep(step){
   hideCustomerPages();
   hideOrderSteps();
 
+  currentCustomerPage = '';
   currentStep = step;
 
   const el = qs(`step${step}`);
@@ -2546,13 +2763,12 @@ function showOnlyStep(step){
 
   qs('cancelOrderBtn').classList.toggle('hidden', !currentOrderId || step !== 5);
 
-  document.querySelectorAll('.bottom-tab').forEach(btn => btn.classList.remove('active'));
-  qs('tabHome').classList.add('active');
-
+  setBottomTabActive('tabHome');
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
 function showHomeTab(){
+  currentCustomerPage = '';
   showOnlyStep(currentOrderId ? 5 : 1);
 }
 
@@ -2560,15 +2776,12 @@ function showTasksTab(){
   hideOrderSteps();
   hideCustomerPages();
 
+  currentCustomerPage = 'customerTasksPage';
   qs('customerTasksPage').classList.add('active');
   qs('pageCount').innerText = '任務';
 
-  qs('prevBtn').classList.add('hidden');
-  qs('nextBtn').classList.add('hidden');
-  qs('cancelOrderBtn').classList.add('hidden');
-
-  document.querySelectorAll('.bottom-tab').forEach(btn => btn.classList.remove('active'));
-  qs('tabTasks').classList.add('active');
+  hideFooterButtons();
+  setBottomTabActive('tabTasks');
 
   renderCustomerActiveTask();
   renderRecentTasks();
@@ -2580,58 +2793,62 @@ function showProfileTab(){
   hideOrderSteps();
   hideCustomerPages();
 
+  currentCustomerPage = 'customerProfilePage';
   qs('customerProfilePage').classList.add('active');
   qs('pageCount').innerText = '我的';
 
-  qs('prevBtn').classList.add('hidden');
-  qs('nextBtn').classList.add('hidden');
-  qs('cancelOrderBtn').classList.add('hidden');
-
-  document.querySelectorAll('.bottom-tab').forEach(btn => btn.classList.remove('active'));
-  qs('tabProfile').classList.add('active');
+  hideFooterButtons();
+  setBottomTabActive('tabProfile');
 
   renderCustomerMemberInfo();
 
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
-function validateStep2(){
-  const pickup = qs('pickup').value.trim();
-  const dropoff = qs('dropoff').value.trim();
-  const pickupPhone = cleanPhone(qs('pickupPhone').value);
-  const dropoffPhone = cleanPhone(qs('dropoffPhone').value);
-  const item = qs('item').value.trim();
+function showCustomerSubPage(pageId, title){
+  hideOrderSteps();
+  hideCustomerPages();
 
-  if(!pickup){
-    alert('請填寫取件地點 / 購買地點 / 任務地點。');
-    return false;
+  const page = qs(pageId);
+  if(!page){
+    showProfileTab();
+    return;
   }
 
-  if(!dropoff){
-    alert('請填寫送達地址 / 交付地點。');
-    return false;
+  currentCustomerPage = pageId;
+  page.classList.add('active');
+  qs('pageCount').innerText = title || '我的';
+
+  hideFooterButtons();
+  setBottomTabActive('tabProfile');
+
+  if(pageId === 'customerAddressPage'){
+    renderCustomerAddressPage();
   }
 
-  if(!pickupPhone){
-    alert('請填寫取件電話 / 店家電話。');
-    return false;
+  if(pageId === 'customerCouponPage'){
+    renderCustomerCouponPage();
   }
 
-  if(!dropoffPhone){
-    alert('請填寫收件電話 / 聯絡電話。');
-    return false;
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function openLineOfficialAccount(){
+  const url = LINE_OFFICIAL_URL;
+
+  try{
+    if(window.liff && typeof liff.isInClient === 'function' && liff.isInClient()){
+      liff.openWindow({
+        url,
+        external:true
+      });
+      return;
+    }
+  }catch(err){
+    console.warn('LINE 官方帳號跳轉失敗，改用瀏覽器開啟:', err);
   }
 
-  if(!item){
-    alert('請填寫任務內容。');
-    return false;
-  }
-
-  if(serviceGroup === 'queue'){
-    syncQueueLocation();
-  }
-
-  return true;
+  window.location.href = url;
 }
 
 function goNext(){
@@ -2654,8 +2871,15 @@ function goNext(){
 }
 
 function goPrev(){
-  if(document.querySelector('.app-section.active')){
-    showHomeTab();
+  const activeCustomerPage = document.querySelector('.app-section.active');
+
+  if(activeCustomerPage){
+    if(activeCustomerPage.id === 'customerProfilePage' || activeCustomerPage.id === 'customerTasksPage'){
+      showHomeTab();
+      return;
+    }
+
+    showProfileTab();
     return;
   }
 
@@ -2666,7 +2890,6 @@ function goPrev(){
 
   showHomeTab();
 }
-
 function getPayload(){
   const pickup = qs('pickup').value.trim();
   const dropoff = qs('dropoff').value.trim();
@@ -2903,6 +3126,13 @@ async function selectPaymentMethod(method){
     return;
   }
 
+  const allowedPaymentMethods = ['cash', 'jko'];
+
+  if(!allowedPaymentMethods.includes(method)){
+    alert('目前付款方式僅支援現金與街口支付。');
+    return;
+  }
+
   if(isSelectingPayment) return;
 
   try{
@@ -2931,11 +3161,17 @@ async function selectPaymentMethod(method){
 
     if(method === 'cash'){
       info.innerText =
-        `你已選擇：現金付款\n\n請於任務完成時，將費用交付給騎士。\n\n請按下方「確認現金付款」，系統才會開始派單。`;
+        `你已選擇：現金付款\n\n請於任務完成時，將費用交付給騎士。\n\n請按下方「確認現金付款並開始派單」，系統才會開始派單。`;
+
       qs('confirmPaidBtn').innerText = '確認現金付款並開始派單';
-    }else{
-      info.innerText = data.paymentInfo || '請依 UBee 官方帳號提供的付款資訊完成付款。完成付款後，請按「我已付款」。';
-      qs('confirmPaidBtn').innerText = '我已付款，開始派單';
+    }
+
+    if(method === 'jko'){
+      info.innerText =
+        data.paymentInfo ||
+        `你已選擇：街口支付\n\n請依 UBee 官方提供的街口支付資訊完成付款。\n\n付款完成後，請按下方「我已完成街口支付，開始派單」。`;
+
+      qs('confirmPaidBtn').innerText = '我已完成街口支付，開始派單';
     }
 
     qs('confirmPaidBtn').classList.remove('hidden');
@@ -3588,21 +3824,59 @@ function renderCustomerMemberInfo(){
   }
 }
 
+function getSavedCustomerAddress(){
+  return localStorage.getItem('ubee_customer_home_address') || '';
+}
+
+function setAddressActionStatus(message, isError){
+  const el = qs('addressActionStatus');
+  if(!el) return;
+
+  el.innerText = message || '';
+  el.style.color = isError ? 'var(--red)' : 'var(--muted)';
+}
+
+function renderCustomerAddressPage(){
+  const saved = getSavedCustomerAddress();
+  const text = qs('savedAddressText');
+
+  if(text){
+    text.innerText = saved || '尚未儲存常用地址。';
+  }
+}
+
+function renderCustomerCouponPage(){
+  const couponCount = qs('memberCouponCount');
+  const pageText = qs('couponPageText');
+  const count = Number(couponCount?.innerText || 0);
+
+  if(pageText){
+    pageText.innerText = count > 0
+      ? `你目前有 ${count} 張優惠券可查看。正式優惠資料可再接後端 coupons 集合。`
+      : '目前尚無可自動套用的優惠券。';
+  }
+}
+
 function saveCurrentAddress(){
   const dropoff = qs('dropoff')?.value.trim() || '';
+
   if(!dropoff){
-    alert('目前沒有送達地址可以儲存。');
+    showCustomerSubPage('customerAddressPage','常用地址');
+    setAddressActionStatus('目前沒有可儲存的送達地址。請先回首頁填寫「送達地址 / 交付地點」，再回來儲存。', true);
     return;
   }
 
   localStorage.setItem('ubee_customer_home_address', dropoff);
-  alert('常用地址已儲存。');
+  renderCustomerAddressPage();
+  setAddressActionStatus('已儲存目前送達地址。之後建立任務時，可直接帶入常用地址。', false);
 }
 
 function fillSavedAddress(){
-  const address = localStorage.getItem('ubee_customer_home_address') || '';
+  const address = getSavedCustomerAddress();
+
   if(!address){
-    alert('尚未儲存常用地址。');
+    showCustomerSubPage('customerAddressPage','常用地址');
+    setAddressActionStatus('尚未儲存常用地址。請先在首頁填寫送達地址後，再按「儲存目前送達地址」。', true);
     return;
   }
 
@@ -3610,8 +3884,14 @@ function fillSavedAddress(){
     qs('dropoff').value = address;
   }
 
-  alert('已帶入常用地址到送達地址。');
+  setAddressActionStatus('已帶入常用地址到訂單。', false);
   showHomeTab();
+}
+
+function clearSavedAddress(){
+  localStorage.removeItem('ubee_customer_home_address');
+  renderCustomerAddressPage();
+  setAddressActionStatus('已清除常用地址。', false);
 }
 
 async function initMerchantContext(){
