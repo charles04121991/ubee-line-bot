@@ -908,16 +908,180 @@ textarea::placeholder{
 }
 
 .status{
-  white-space:pre-line;
   background:rgba(34,197,94,.08);
   border:1px solid rgba(34,197,94,.42);
   border-radius:18px;
-  padding:15px;
+  padding:16px;
   font-size:15px;
   line-height:1.8;
   margin-top:14px;
   color:var(--text);
   font-weight:800;
+  white-space:normal;
+  text-align:left;
+}
+
+.status-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+.status-label{
+  font-size:12px;
+  color:var(--muted);
+  font-weight:900;
+  margin-bottom:4px;
+}
+
+.status-title{
+  font-size:20px;
+  color:var(--text);
+  font-weight:1000;
+  line-height:1.35;
+}
+
+.status-badge{
+  flex:0 0 auto;
+  border-radius:999px;
+  padding:7px 10px;
+  font-size:12px;
+  font-weight:1000;
+  border:1px solid var(--line);
+}
+
+.status-badge.active{
+  color:var(--accent);
+  border-color:rgba(250,204,21,.45);
+  background:rgba(250,204,21,.12);
+}
+
+.status-badge.success{
+  color:var(--green);
+  border-color:rgba(34,197,94,.45);
+  background:rgba(34,197,94,.12);
+}
+
+.status-badge.danger{
+  color:var(--red);
+  border-color:rgba(239,68,68,.45);
+  background:rgba(239,68,68,.12);
+}
+
+.status-message{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:900;
+  line-height:1.7;
+  margin-bottom:16px;
+}
+
+.order-timeline{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  margin:6px 0 16px;
+}
+
+.timeline-item{
+  position:relative;
+  display:grid;
+  grid-template-columns:32px 1fr;
+  gap:12px;
+  padding:0 0 16px;
+}
+
+.timeline-item:last-child{
+  padding-bottom:0;
+}
+
+.timeline-item::before{
+  content:"";
+  position:absolute;
+  left:15px;
+  top:30px;
+  bottom:0;
+  width:2px;
+  background:var(--line2);
+}
+
+.timeline-item:last-child::before{
+  display:none;
+}
+
+.timeline-dot{
+  width:30px;
+  height:30px;
+  border-radius:999px;
+  border:2px solid var(--line2);
+  background:var(--card);
+  color:var(--muted);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  font-weight:1000;
+  z-index:1;
+}
+
+.timeline-item.done .timeline-dot{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--accentText);
+}
+
+.timeline-item.current .timeline-dot{
+  background:var(--green);
+  border-color:var(--green);
+  color:#fff;
+  box-shadow:0 0 0 5px rgba(34,197,94,.12);
+}
+
+.timeline-title{
+  color:var(--text);
+  font-size:15px;
+  font-weight:1000;
+  line-height:1.45;
+}
+
+.timeline-desc{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+  line-height:1.65;
+  margin-top:2px;
+}
+
+.timeline-time{
+  color:var(--muted2);
+  font-size:11px;
+  font-weight:800;
+  margin-top:3px;
+}
+
+.status-total{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  border-top:1px solid rgba(34,197,94,.28);
+  padding-top:14px;
+  margin-top:4px;
+}
+
+.status-total span{
+  color:var(--muted);
+  font-size:14px;
+  font-weight:1000;
+}
+
+.status-total strong{
+  color:var(--text);
+  font-size:20px;
+  font-weight:1000;
 }
 
 .payment-info{
@@ -2825,32 +2989,259 @@ function getStatusLabel(status){
     picked_up:'配送中',
     arrived_dropoff:'騎士已抵達送達地',
     completed:'已完成',
+    done:'已完成',
     cancelled:'已取消',
-    quote_only:'僅估價'
   };
 
   return map[status] || status || '等待處理';
 }
 
+function getStatusRank(status){
+  const map = {
+    pending_payment: 0,
+    merchant_pending: 1,
+    pending_dispatch: 1,
+    accepted: 2,
+    arrived_pickup: 3,
+    picked_up: 4,
+    arrived_dropoff: 5,
+    completed: 6,
+    done: 6,
+    cancelled: -1,
+    quote_only: -1
+  };
+
+  return map[status] ?? 0;
+}
+
+function formatProgressTime(value){
+  if(!value) return '';
+
+  try{
+    if(value.toDate){
+      return value.toDate().toLocaleString('zh-TW', {
+        month:'2-digit',
+        day:'2-digit',
+        hour:'2-digit',
+        minute:'2-digit'
+      });
+    }
+
+    if(typeof value === 'number'){
+      return new Date(value).toLocaleString('zh-TW', {
+        month:'2-digit',
+        day:'2-digit',
+        hour:'2-digit',
+        minute:'2-digit'
+      });
+    }
+
+    if(value.seconds){
+      return new Date(value.seconds * 1000).toLocaleString('zh-TW', {
+        month:'2-digit',
+        day:'2-digit',
+        hour:'2-digit',
+        minute:'2-digit'
+      });
+    }
+
+    return new Date(value).toLocaleString('zh-TW', {
+      month:'2-digit',
+      day:'2-digit',
+      hour:'2-digit',
+      minute:'2-digit'
+    });
+  }catch(e){
+    return '';
+  }
+}
+
+function getOrderStepTime(order, key){
+  if(!order) return '';
+
+  const statusTimes = order.statusTimes || {};
+
+  const fieldMap = {
+    pending_payment: ['createdAt', 'pendingPaymentAt'],
+    pending_dispatch: ['paidAt', 'paymentConfirmedAt', 'pendingDispatchAt'],
+    accepted: ['acceptedAt'],
+    arrived_pickup: ['arrivedPickupAt', 'arrived_pickupAt'],
+    picked_up: ['pickedUpAt', 'picked_upAt'],
+    arrived_dropoff: ['arrivedDropoffAt', 'arrived_dropoffAt'],
+    completed: ['completedAt', 'doneAt']
+  };
+
+  if(statusTimes[key]){
+    return formatProgressTime(statusTimes[key]);
+  }
+
+  const fields = fieldMap[key] || [];
+
+  for(const field of fields){
+    if(order[field]){
+      return formatProgressTime(order[field]);
+    }
+  }
+
+  return '';
+}
+
+function getCurrentStatusMessage(status){
+  const map = {
+    pending_payment:'請先選擇付款方式，完成付款確認後才會開始派單。',
+    merchant_pending:'此訂單正在等待合作店家確認。',
+    pending_dispatch:'系統正在媒合附近騎士。',
+    accepted:'騎士已接單，正在前往取件地。',
+    arrived_pickup:'騎士已抵達取件地。',
+    picked_up:'騎士已取件，配送中。',
+    arrived_dropoff:'騎士已抵達送達地。',
+    completed:'任務已完成，感謝使用 UBee。',
+    done:'任務已完成，感謝使用 UBee。',
+    cancelled:'此訂單已取消。',
+    quote_only:'此訂單目前為估價狀態。'
+  };
+
+  return map[status] || '訂單狀態更新中。';
+}
+
 function renderTimeline(status, order){
-  const totalText = order?.total ? `\n預估費用：NT$${Math.round(Number(order.total || 0))}` : '';
+  const currentStatus = status || 'pending_payment';
+  let displayRank = getStatusRank(currentStatus);
 
-  const text =
-`訂單狀態：${getStatusLabel(status)}
+  if(currentStatus === 'merchant_pending'){
+    displayRank = 1;
+  }
 
-${status === 'pending_payment' ? '請先選擇付款方式，完成付款確認後才會開始派單。' : ''}
-${status === 'merchant_pending' ? '此訂單正在等待合作店家確認。' : ''}
-${status === 'pending_dispatch' ? '系統正在媒合附近騎士。' : ''}
-${status === 'accepted' ? '騎士已接單，正在前往取件地。' : ''}
-${status === 'arrived_pickup' ? '騎士已抵達取件地。' : ''}
-${status === 'picked_up' ? '騎士已取件，配送中。' : ''}
-${status === 'arrived_dropoff' ? '騎士已抵達送達地。' : ''}
-${status === 'completed' ? '任務已完成，感謝使用 UBee。' : ''}
-${status === 'cancelled' ? '此訂單已取消。' : ''}${totalText}`;
+  if(currentStatus === 'done'){
+    displayRank = 6;
+  }
 
-  qs('statusBox').innerText = text.trim();
+  const total = Number(order?.total || order?.totalFee || order?.price || 0);
+  const totalText = total > 0 ? `NT$${Math.round(total)}` : '系統計算中';
 
-  const canCancel = currentOrderId && !['picked_up','arrived_dropoff','completed','cancelled'].includes(status);
+  const steps = [
+    {
+      key:'pending_payment',
+      rank:0,
+      icon:'✓',
+      title:'訂單建立',
+      desc:'訂單已建立，等待付款確認。'
+    },
+    {
+      key:'pending_dispatch',
+      rank:1,
+      icon:'🔎',
+      title:'等待派單',
+      desc:'付款確認後，系統開始媒合附近騎士。'
+    },
+    {
+      key:'accepted',
+      rank:2,
+      icon:'🛵',
+      title:'騎士接單',
+      desc:'騎士已接單，準備前往取件地。'
+    },
+    {
+      key:'arrived_pickup',
+      rank:3,
+      icon:'📍',
+      title:'抵達取件地',
+      desc:'騎士已抵達取件地或店家。'
+    },
+    {
+      key:'picked_up',
+      rank:4,
+      icon:'📦',
+      title:'取件完成',
+      desc:'騎士已取件，正在配送中。'
+    },
+    {
+      key:'arrived_dropoff',
+      rank:5,
+      icon:'🏁',
+      title:'抵達送達地',
+      desc:'騎士已抵達收件地點。'
+    },
+    {
+      key:'completed',
+      rank:6,
+      icon:'✅',
+      title:'任務完成',
+      desc:'任務已完成。'
+    }
+  ];
+
+  const timelineHtml = steps.map(step => {
+    let cls = '';
+
+    if(currentStatus === 'cancelled'){
+      cls = step.rank === 0 ? 'done' : '';
+    }else if(step.rank < displayRank){
+      cls = 'done';
+    }else if(step.rank === displayRank){
+      cls = 'current';
+    }
+
+    const time = getOrderStepTime(order, step.key);
+
+    return `
+      <div class="timeline-item ${cls}">
+        <div class="timeline-dot">${escapeHtml(step.icon)}</div>
+        <div>
+          <div class="timeline-title">${escapeHtml(step.title)}</div>
+          <div class="timeline-desc">${escapeHtml(step.desc)}</div>
+          ${time ? `<div class="timeline-time">${escapeHtml(time)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const statusColorClass =
+    currentStatus === 'cancelled'
+      ? 'danger'
+      : currentStatus === 'completed' || currentStatus === 'done'
+        ? 'success'
+        : 'active';
+
+  qs('statusBox').innerHTML = `
+    <div class="status-head">
+      <div>
+        <div class="status-label">訂單狀態</div>
+        <div class="status-title">${escapeHtml(getStatusLabel(currentStatus))}</div>
+      </div>
+      <div class="status-badge ${statusColorClass}">
+        ${
+          currentStatus === 'cancelled'
+            ? '已取消'
+            : currentStatus === 'completed' || currentStatus === 'done'
+              ? '已完成'
+              : '進行中'
+        }
+      </div>
+    </div>
+
+    <div class="status-message">
+      ${escapeHtml(getCurrentStatusMessage(currentStatus))}
+    </div>
+
+    <div class="order-timeline">
+      ${timelineHtml}
+    </div>
+
+    <div class="status-total">
+      <span>預估費用</span>
+      <strong>${escapeHtml(totalText)}</strong>
+    </div>
+  `;
+
+  const canCancel = currentOrderId && ![
+    'picked_up',
+    'arrived_dropoff',
+    'completed',
+    'done',
+    'cancelled'
+  ].includes(currentStatus);
+
   qs('cancelOrderBtn').classList.toggle('hidden', !canCancel || currentStep !== 5);
 }
 
