@@ -1926,27 +1926,46 @@ body.day-mode .bottom-tabs{
     </section>
 
     <section class="app-section" id="customerAddressPage">
-      <div class="headline">常用地址</div>
-      <div class="subtext">管理你常用的送達地址。可從目前訂單欄位儲存，也可以一鍵帶回首頁使用。</div>
+  <div class="headline">常用地址</div>
+  <div class="subtext">新增、儲存與帶入你的常用送達地址。之後下單時，可以一鍵帶入訂單。</div>
 
-      <div class="content-card">
-        <div class="content-title">目前儲存地址</div>
-        <div class="address-display">
-          <div class="address-display-label">常用送達地址</div>
-          <div class="address-display-value" id="savedAddressText">尚未儲存常用地址。</div>
-        </div>
-        <div class="profile-action-row">
-          <button class="btn btn-primary" type="button" onclick="saveCurrentAddress()">儲存目前送達地址</button>
-          <button class="btn btn-secondary yellow-outline" type="button" onclick="fillSavedAddress()">帶入常用地址到訂單</button>
-          <button class="btn btn-secondary" type="button" onclick="clearSavedAddress()">清除常用地址</button>
-        </div>
-        <div id="addressActionStatus" class="profile-status"></div>
-      </div>
+  <div class="content-card">
+    <div class="content-title">目前儲存地址</div>
 
-      <div class="profile-note">
-        使用方式：先回首頁填寫「送達地址」，再進入常用地址按「儲存目前送達地址」。之後要下單時，按「帶入常用地址到訂單」即可自動填入。
+    <div class="address-display">
+      <div class="address-display-label">常用送達地址</div>
+      <div class="address-display-value" id="savedAddressText">尚未儲存常用地址。</div>
+    </div>
+  </div>
+
+  <div class="content-card">
+    <div class="content-title">新增 / 修改常用地址</div>
+
+    <div class="input-card">
+      <div class="input-wrap">
+        <div class="input-icon">🏠</div>
+        <input id="customerAddressInput" maxlength="120" placeholder="請輸入常用送達地址，例如：台中市豐原區...">
       </div>
-    </section>
+      <div class="input-wrap">
+        <div class="input-icon">📱</div>
+        <input id="customerAddressPhoneInput" maxlength="20" inputmode="tel" placeholder="常用聯絡電話，可不填">
+      </div>
+    </div>
+
+    <div class="profile-action-row">
+      <button class="btn btn-primary" type="button" onclick="saveManualAddress()">儲存這筆常用地址</button>
+      <button class="btn btn-secondary yellow-outline" type="button" onclick="saveCurrentAddress()">從目前訂單帶入並儲存</button>
+      <button class="btn btn-secondary yellow-outline" type="button" onclick="fillSavedAddress()">帶入常用地址到訂單</button>
+      <button class="btn btn-secondary" type="button" onclick="clearSavedAddress()">清除常用地址</button>
+    </div>
+
+    <div id="addressActionStatus" class="profile-status"></div>
+  </div>
+
+  <div class="profile-note">
+    使用方式：你可以直接在這裡輸入常用地址並儲存；也可以先回首頁填寫「送達地址」，再按「從目前訂單帶入並儲存」。下次下單時，按「帶入常用地址到訂單」即可自動填入。
+  </div>
+</section>
 
     <section class="app-section" id="customerCouponPage">
       <div class="headline">優惠券</div>
@@ -3825,7 +3844,32 @@ function renderCustomerMemberInfo(){
 }
 
 function getSavedCustomerAddress(){
-  return localStorage.getItem('ubee_customer_home_address') || '';
+  const raw = localStorage.getItem('ubee_customer_home_address') || '';
+
+  if(!raw){
+    return {
+      address:'',
+      phone:''
+    };
+  }
+
+  try{
+    const data = JSON.parse(raw);
+
+    if(data && typeof data === 'object'){
+      return {
+        address:String(data.address || '').trim(),
+        phone:String(data.phone || '').trim()
+      };
+    }
+  }catch(e){
+    // 舊版如果只存純地址字串，這裡會自動相容
+  }
+
+  return {
+    address:String(raw || '').trim(),
+    phone:''
+  };
 }
 
 function setAddressActionStatus(message, isError){
@@ -3836,12 +3880,45 @@ function setAddressActionStatus(message, isError){
   el.style.color = isError ? 'var(--red)' : 'var(--muted)';
 }
 
+function saveCustomerAddressData(address, phone){
+  const cleanAddress = String(address || '').trim();
+  const cleanPhone = String(phone || '').trim();
+
+  if(!cleanAddress){
+    return false;
+  }
+
+  localStorage.setItem('ubee_customer_home_address', JSON.stringify({
+    address:cleanAddress,
+    phone:cleanPhone
+  }));
+
+  return true;
+}
+
 function renderCustomerAddressPage(){
   const saved = getSavedCustomerAddress();
   const text = qs('savedAddressText');
 
   if(text){
-    text.innerText = saved || '尚未儲存常用地址。';
+    if(saved.address){
+      text.innerText = saved.phone
+        ? `${saved.address}\n聯絡電話：${saved.phone}`
+        : saved.address;
+    }else{
+      text.innerText = '尚未儲存常用地址。';
+    }
+  }
+
+  const addressInput = qs('customerAddressInput');
+  const phoneInput = qs('customerAddressPhoneInput');
+
+  if(addressInput){
+    addressInput.value = saved.address || '';
+  }
+
+  if(phoneInput){
+    phoneInput.value = saved.phone || '';
   }
 }
 
@@ -3857,31 +3934,50 @@ function renderCustomerCouponPage(){
   }
 }
 
-function saveCurrentAddress(){
-  const dropoff = qs('dropoff')?.value.trim() || '';
+function saveManualAddress(){
+  const address = qs('customerAddressInput')?.value.trim() || '';
+  const phone = qs('customerAddressPhoneInput')?.value.trim() || '';
 
-  if(!dropoff){
-    showCustomerSubPage('customerAddressPage','常用地址');
-    setAddressActionStatus('目前沒有可儲存的送達地址。請先回首頁填寫「送達地址 / 交付地點」，再回來儲存。', true);
+  if(!address){
+    setAddressActionStatus('請先輸入常用送達地址。', true);
     return;
   }
 
-  localStorage.setItem('ubee_customer_home_address', dropoff);
+  saveCustomerAddressData(address, phone);
   renderCustomerAddressPage();
-  setAddressActionStatus('已儲存目前送達地址。之後建立任務時，可直接帶入常用地址。', false);
+  setAddressActionStatus('已儲存這筆常用地址。下次下單時可以直接帶入。', false);
+}
+
+function saveCurrentAddress(){
+  const dropoff = qs('dropoff')?.value.trim() || '';
+  const dropoffPhone = qs('dropoffPhone')?.value.trim() || '';
+
+  if(!dropoff){
+    showCustomerSubPage('customerAddressPage','常用地址');
+    setAddressActionStatus('目前訂單沒有可儲存的送達地址。你可以直接在上方輸入常用地址後儲存。', true);
+    return;
+  }
+
+  saveCustomerAddressData(dropoff, dropoffPhone);
+  renderCustomerAddressPage();
+  setAddressActionStatus('已從目前訂單帶入並儲存常用地址。', false);
 }
 
 function fillSavedAddress(){
-  const address = getSavedCustomerAddress();
+  const saved = getSavedCustomerAddress();
 
-  if(!address){
+  if(!saved.address){
     showCustomerSubPage('customerAddressPage','常用地址');
-    setAddressActionStatus('尚未儲存常用地址。請先在首頁填寫送達地址後，再按「儲存目前送達地址」。', true);
+    setAddressActionStatus('尚未儲存常用地址。請先輸入常用地址並儲存。', true);
     return;
   }
 
   if(qs('dropoff')){
-    qs('dropoff').value = address;
+    qs('dropoff').value = saved.address;
+  }
+
+  if(qs('dropoffPhone') && saved.phone){
+    qs('dropoffPhone').value = saved.phone;
   }
 
   setAddressActionStatus('已帶入常用地址到訂單。', false);
@@ -3890,6 +3986,15 @@ function fillSavedAddress(){
 
 function clearSavedAddress(){
   localStorage.removeItem('ubee_customer_home_address');
+
+  if(qs('customerAddressInput')){
+    qs('customerAddressInput').value = '';
+  }
+
+  if(qs('customerAddressPhoneInput')){
+    qs('customerAddressPhoneInput').value = '';
+  }
+
   renderCustomerAddressPage();
   setAddressActionStatus('已清除常用地址。', false);
 }
