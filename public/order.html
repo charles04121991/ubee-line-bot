@@ -1701,6 +1701,9 @@ let nearbyPlacesTimer = null;
 let isLoadingNearbyPlaces = false;
 let lastNearbySearchKey = '';
 
+let nearbyAutoFilledPickup = '';
+let nearbyAutoFilledPhone = '';
+
 const firebaseConfig = {
   apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
   authDomain: "ubee-oms.firebaseapp.com",
@@ -1814,6 +1817,16 @@ function getServiceKeyForApi(){
 }
 
 function selectServiceFromTab(el, group){
+  const oldServiceGroup = serviceGroup;
+
+  if(oldServiceGroup === 'buy' && group !== 'buy'){
+    clearNearbyAutoFill(true);
+  }
+
+  if(oldServiceGroup === 'buy' && group === 'buy'){
+    clearNearbyAutoFill(true);
+  }
+
   serviceGroup = group;
   serviceMode = group === 'queue' ? 'queue' : 'normal';
 
@@ -1857,6 +1870,9 @@ function selectServiceItem(index){
 
   if(!item) return;
 
+  if(serviceGroup === 'buy'){
+    clearNearbyAutoFill(true);
+  }
   serviceType = item.title;
   serviceCategory = item.categories?.[0] || '';
 
@@ -1895,6 +1911,10 @@ function renderCategoryBox(item){
 }
 
 function selectCategory(el, cat){
+  if(serviceGroup === 'buy' && serviceCategory !== cat){
+    clearNearbyAutoFill(true);
+  }
+
   serviceCategory = cat;
 
   document.querySelectorAll('#serviceCategoryGrid .category-choice-item').forEach(btn => {
@@ -1970,6 +1990,34 @@ function getNearbyKeyword(){
   return '餐廳';
 }
 
+function clearNearbyAutoFill(clearFields){
+  const pickupEl = qs('pickup');
+  const pickupPhoneEl = qs('pickupPhone');
+
+  if(clearFields){
+    if(pickupEl && nearbyAutoFilledPickup && pickupEl.value.trim() === nearbyAutoFilledPickup){
+      pickupEl.value = '';
+    }
+
+    if(pickupPhoneEl && nearbyAutoFilledPhone && pickupPhoneEl.value.trim() === nearbyAutoFilledPhone){
+      pickupPhoneEl.value = '';
+    }
+  }
+
+  nearbyPlaces = [];
+  selectedNearbyPlace = null;
+  selectedNearbyPlaceId = '';
+  lastNearbySearchKey = '';
+  nearbyAutoFilledPickup = '';
+  nearbyAutoFilledPhone = '';
+
+  const list = qs('nearbyPlacesList');
+  const status = qs('nearbyPlacesStatus');
+
+  if(list) list.innerHTML = '';
+  if(status) status.innerText = '選擇代買分類後，系統會顯示附近店家。';
+}
+  
 function updateNearbyPlacesVisibility(){
   const box = qs('nearbyPlacesBox');
   if(!box) return;
@@ -1978,19 +2026,10 @@ function updateNearbyPlacesVisibility(){
   box.classList.toggle('hidden', !shouldShow);
 
   if(!shouldShow){
-    nearbyPlaces = [];
-    selectedNearbyPlace = null;
-    selectedNearbyPlaceId = '';
-    lastNearbySearchKey = '';
-
-    const list = qs('nearbyPlacesList');
-    const status = qs('nearbyPlacesStatus');
-
-    if(list) list.innerHTML = '';
-    if(status) status.innerText = '選擇代買分類後，系統會顯示附近店家。';
+    clearNearbyAutoFill(true);
   }
 }
-
+  
 function handleServiceSelectionChanged(){
   updateNearbyPlacesVisibility();
 
@@ -2131,17 +2170,21 @@ function selectNearbyPlace(index){
   selectedNearbyPlaceId = String(place.placeId || index);
 
   const pickupText = [place.name, place.address].filter(Boolean).join(' ');
+  const phoneText = place.phone || '';
 
   if(qs('pickup')){
     qs('pickup').value = pickupText || place.name || place.address || '';
+    nearbyAutoFilledPickup = qs('pickup').value.trim();
   }
 
-  if(place.phone && qs('pickupPhone')){
-    qs('pickupPhone').value = place.phone;
+  if(qs('pickupPhone')){
+    qs('pickupPhone').value = phoneText;
+    nearbyAutoFilledPhone = qs('pickupPhone').value.trim();
   }
 
   setNearbyStatus(`已選擇：${place.name || '附近店家'}。購買地點已帶入，可再確認店名、地址與電話。`);
   renderNearbyPlaces();
+}
 }
 
 function updateServiceDescription(){
