@@ -2830,13 +2830,22 @@ app.get('/api/nearby-places', async (req, res) => {
     const lat = req.query.lat;
     const lng = req.query.lng;
     const keyword = req.query.keyword || '餐廳';
-    const radius = req.query.radius || 3000;
+    const radius = Math.min(Number(req.query.radius || 2000), 3000);
 
     if (!lat || !lng) {
       return res.status(400).json({
         success: false,
         error: '缺少定位資料'
       });
+    }
+
+    function fetchJsonWithTimeout(url, ms = 7000) {
+      return Promise.race([
+        fetch(url).then(r => r.json()),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Google Places request timeout')), ms);
+        })
+      ]);
     }
 
     const url =
@@ -2849,54 +2858,67 @@ app.get('/api/nearby-places', async (req, res) => {
         key: GOOGLE_MAPS_API_KEY
       }).toString();
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const data = await fetchJsonWithTimeout(url, 7000);
 
-    const places = await Promise.all((data.results || []).slice(0, 8).map(async place => {
-  let phone = '';
+    if (data.status && data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('Google Nearby Search error:', data.status, data.error_message || '');
 
-  try{
-    const detailUrl =
-      'https://maps.googleapis.com/maps/api/place/details/json?' +
-      new URLSearchParams({
-        place_id: place.place_id,
-        fields: 'formatted_phone_number,international_phone_number',
-        language: 'zh-TW',
-        key: GOOGLE_MAPS_API_KEY
-      }).toString();
+      return res.status(502).json({
+        success: false,
+        error: data.error_message || `Google Places error: ${data.status}`
+      });
+    }
 
-    const detailRes = await fetch(detailUrl);
-    const detailData = await detailRes.json();
+    const basePlaces = (data.results || []).slice(0, 6).map(place => ({
+      name: place.name || '',
+      address: place.vicinity || '',
+      placeId: place.place_id || '',
+      lat: place.geometry?.location?.lat || '',
+      lng: place.geometry?.location?.lng || '',
+      rating: place.rating || '',
+      userRatingsTotal: place.user_ratings_total || '',
+      phone: ''
+    }));
 
-    phone =
-      detailData.result?.formatted_phone_number ||
-      detailData.result?.international_phone_number ||
-      '';
-  }catch(e){
-    console.warn('place detail phone error:', e);
-  }
+    const places = await Promise.all(basePlaces.map(async place => {
+      if (!place.placeId) return place;
 
-  return {
-    name: place.name || '',
-    address: place.vicinity || '',
-    placeId: place.place_id || '',
-    lat: place.geometry?.location?.lat || '',
-    lng: place.geometry?.location?.lng || '',
-    rating: place.rating || '',
-    userRatingsTotal: place.user_ratings_total || '',
-    phone
-  };
-}));
-    res.json({
+      try {
+        const detailUrl =
+          'https://maps.googleapis.com/maps/api/place/details/json?' +
+          new URLSearchParams({
+            place_id: place.placeId,
+            fields: 'formatted_phone_number,international_phone_number',
+            language: 'zh-TW',
+            key: GOOGLE_MAPS_API_KEY
+          }).toString();
+
+        const detailData = await fetchJsonWithTimeout(detailUrl, 2500);
+
+        return {
+          ...place,
+          phone:
+            detailData.result?.formatted_phone_number ||
+            detailData.result?.international_phone_number ||
+            ''
+        };
+      } catch (e) {
+        console.warn('place detail phone timeout or error:', e.message);
+        return place;
+      }
+    }));
+
+    return res.json({
       success: true,
       places
     });
 
   } catch (err) {
     console.error('nearby places error:', err);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
-      error: '附近地點搜尋失敗'
+      error: err.message || '附近地點搜尋失敗'
     });
   }
 });
