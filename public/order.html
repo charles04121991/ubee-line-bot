@@ -2870,25 +2870,164 @@ function openLineOfficialAccount(){
   window.location.href = url;
 }
 
-function goNext(){
-  if(currentStep === 1){
-    showOnlyStep(2);
-    return;
+function validateStep2(){
+  const pickupEl = qs('pickup');
+  const dropoffEl = qs('dropoff');
+  const pickupPhoneEl = qs('pickupPhone');
+  const dropoffPhoneEl = qs('dropoffPhone');
+  const itemEl = qs('item');
+  const queueLocationEl = qs('queueLocation');
+
+  let pickup = pickupEl ? pickupEl.value.trim() : '';
+  let dropoff = dropoffEl ? dropoffEl.value.trim() : '';
+  let pickupPhone = pickupPhoneEl ? cleanPhone(pickupPhoneEl.value) : '';
+  let dropoffPhone = dropoffPhoneEl ? cleanPhone(dropoffPhoneEl.value) : '';
+  const item = itemEl ? itemEl.value.trim() : '';
+  const queueLocation = queueLocationEl ? queueLocationEl.value.trim() : '';
+
+  if(serviceGroup === 'queue' && !pickup && queueLocation){
+    pickup = queueLocation;
+    if(pickupEl){
+      pickupEl.value = queueLocation;
+    }
   }
 
-  if(currentStep === 2){
-    if(!validateStep2()) return;
-    showOnlyStep(3);
-    return;
+  if(!pickup){
+    alert('請填寫取件地點 / 購買地點 / 任務地點。');
+    return false;
   }
 
-  if(currentStep === 3){
-    renderSummary();
-    showOnlyStep(4);
-    return;
+  if(!dropoff){
+    alert('請填寫送達地址 / 交付地點。若此任務不需要送達，請填寫「同取件地點」或「現場完成」。');
+    return false;
   }
+
+  if(!pickupPhone && !dropoffPhone){
+    alert('請至少填寫一組聯絡電話。');
+    return false;
+  }
+
+  if(!pickupPhone && dropoffPhone && pickupPhoneEl){
+    pickupPhoneEl.value = dropoffPhone;
+    pickupPhone = dropoffPhone;
+  }
+
+  if(!dropoffPhone && pickupPhone && dropoffPhoneEl){
+    dropoffPhoneEl.value = pickupPhone;
+    dropoffPhone = pickupPhone;
+  }
+
+  if(!item){
+    alert('請填寫任務內容。');
+    return false;
+  }
+
+  if(serviceGroup === 'queue'){
+    syncQueueLocation();
+  }
+
+  return true;
 }
 
+  function validateStep2(){
+  const safeCleanPhone = (value) => {
+    if(typeof cleanPhone === 'function'){
+      return cleanPhone(value || '');
+    }
+    return String(value || '').replace(/[^\d+]/g, '').trim();
+  };
+
+  const pickupEl = qs('pickup');
+  const dropoffEl = qs('dropoff');
+  const pickupPhoneEl = qs('pickupPhone');
+  const dropoffPhoneEl = qs('dropoffPhone');
+  const itemEl = qs('item');
+  const queueLocationEl = qs('queueLocation');
+
+  let pickup = pickupEl ? pickupEl.value.trim() : '';
+  let dropoff = dropoffEl ? dropoffEl.value.trim() : '';
+  let pickupPhone = pickupPhoneEl ? safeCleanPhone(pickupPhoneEl.value) : '';
+  let dropoffPhone = dropoffPhoneEl ? safeCleanPhone(dropoffPhoneEl.value) : '';
+  const item = itemEl ? itemEl.value.trim() : '';
+  const queueLocation = queueLocationEl ? queueLocationEl.value.trim() : '';
+
+  if(serviceGroup === 'queue' && !pickup && queueLocation){
+    pickup = queueLocation;
+    if(pickupEl){
+      pickupEl.value = queueLocation;
+    }
+  }
+
+  if(!pickup){
+    alert('請填寫取件地點 / 購買地點 / 任務地點。');
+    return false;
+  }
+
+  if(!dropoff){
+    alert('請填寫送達地址 / 交付地點。若此任務不需要送達，請填寫「同取件地點」或「現場完成」。');
+    return false;
+  }
+
+  if(!pickupPhone && !dropoffPhone){
+    alert('請至少填寫一組聯絡電話。');
+    return false;
+  }
+
+  if(!pickupPhone && dropoffPhone && pickupPhoneEl){
+    pickupPhoneEl.value = dropoffPhone;
+    pickupPhone = dropoffPhone;
+  }
+
+  if(!dropoffPhone && pickupPhone && dropoffPhoneEl){
+    dropoffPhoneEl.value = pickupPhone;
+    dropoffPhone = pickupPhone;
+  }
+
+  if(!item){
+    alert('請填寫任務內容。');
+    return false;
+  }
+
+  if(serviceGroup === 'queue' && typeof syncQueueLocation === 'function'){
+    syncQueueLocation();
+  }
+
+  return true;
+}
+  
+function goNext(){
+  try{
+    if(currentStep === 1){
+      showOnlyStep(2);
+      return;
+    }
+
+    if(currentStep === 2){
+      if(typeof validateStep2 !== 'function'){
+        alert('系統驗證功能尚未載入，請重新整理頁面後再試。');
+        return;
+      }
+
+      if(!validateStep2()) return;
+
+      showOnlyStep(3);
+      return;
+    }
+
+    if(currentStep === 3){
+      if(typeof renderSummary === 'function'){
+        renderSummary();
+      }
+
+      showOnlyStep(4);
+      return;
+    }
+
+  }catch(err){
+    console.error('下一步發生錯誤:', err);
+    alert('下一步發生錯誤：' + (err.message || '請稍後再試'));
+  }
+}
 function goPrev(){
   const activeCustomerPage = document.querySelector('.app-section.active');
 
