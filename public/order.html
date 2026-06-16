@@ -1223,6 +1223,12 @@ textarea::placeholder{
   border:1px solid #dddddd !important;
   color:#111111 !important;
 }
+
+.btn-secondary.black-outline.selected{
+  background:#111111;
+  border:1px solid #111111 !important;
+  color:#ffffff !important;
+}
     
 .btn-danger{
   background:var(--red);
@@ -1656,7 +1662,7 @@ body.day-mode .bottom-tabs{
       <div class="info-box">
         <div class="info-title">服務說明</div>
         <div class="info-text" id="serviceDescription">
-          UBee 協助文件急送、物品配送、代取、代買、排隊與全能跑腿。選擇服務後，系統會自動帶出適合欄位。
+          選擇服務類型後，系統會依照任務內容帶出對應欄位，協助你快速建立配送、代取、代買、排隊與生活跑腿任務。
         </div>
       </div>
     </section>
@@ -1839,8 +1845,8 @@ body.day-mode .bottom-tabs{
       <div class="content-card">
         <div class="content-title">付款方式</div>
 <div class="btn-row">
-  <button class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('cash')">現金</button>
-  <button class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('jko')">街口支付</button>
+  <button id="payCashBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('cash')">現金</button>
+  <button id="payJkoBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('jko')">街口支付</button>
 </div>
 
         <div id="paymentInfo" class="payment-info hidden"></div>
@@ -2171,14 +2177,13 @@ if(window.firebase && !firebase.apps.length){
 const db = window.firebase ? firebase.firestore() : null;
 
 const serviceDescriptions = {
-  send:'幫我送：適合文件、包裹、鑰匙、禮品、店家商品與商務物品配送。',
-  pickup:'幫我取：適合代取包裹、文件、門市商品、醫院文件、超商取件。',
-  buy:'幫代買：先填想買什麼，再填購買地點與預估代墊金額，適合餐點、飲料、超商、藥局與生活用品。',
-  queue:'幫排隊：適合餐廳候位、醫院掛號、銀行辦理、活動排隊、代領號碼牌。',
-  helper:'全能跑腿：想不到分類的臨時任務、現場確認、商務支援、物品代送，都可以先描述需求。',
-  urgent:'急件專送：適合小包裹、餐點、店家商品與生活用品等需要較快送達的配送任務。'
+  send:'需要配送文件、包裹、鑰匙或店家商品時，選擇幫我送，UBee 會依照取件與送達資訊建立任務。',
+  pickup:'需要代取包裹、文件、門市商品或生活用品時，選擇幫我取，請填寫取件地點與交付地點。',
+  buy:'需要代買餐點、飲料、超商商品、藥局用品或生活用品時，選擇幫代買，請填寫品項、規格與預估代墊金額。',
+  queue:'需要餐廳候位、醫院掛號、銀行辦理或活動排隊時，選擇幫排隊，請填寫排隊位置與預估等候時間。',
+  helper:'找不到適合分類時，可以選擇全能跑腿，請清楚描述任務內容、完成標準與注意事項。',
+  urgent:'需要較快處理的小包裹、餐點、店家商品或生活用品配送時，選擇急件專送，系統會以高急迫性任務處理。'
 };
-
 const serviceGroups = {
   send: [
     { icon:'📄', title:'文件急送', categories:['一般文件','合約文件','發票收據','公司文件','其他文件'] },
@@ -3319,6 +3324,9 @@ async function selectPaymentMethod(method){
     }
 
     selectedPaymentMethod = method;
+
+    document.getElementById('payCashBtn')?.classList.toggle('selected', method === 'cash');
+    document.getElementById('payJkoBtn')?.classList.toggle('selected', method === 'jko');
 
     const info = qs('paymentInfo');
     info.classList.remove('hidden');
