@@ -1223,6 +1223,21 @@ textarea::placeholder{
   word-break:break-word;
 }
 
+.payment-card-row.stack{
+  display:block;
+}
+
+.payment-card-row.stack .payment-card-label{
+  flex:none;
+  margin-bottom:6px;
+}
+
+.payment-card-row.stack .payment-card-value{
+  text-align:left;
+  line-height:1.75;
+  margin-top:4px;
+}
+    
 .payment-card-note{
   margin-top:13px;
   border-radius:15px;
@@ -3463,7 +3478,7 @@ if(method === 'jko'){
         <div class="payment-card-label">付款狀態</div>
         <div class="payment-card-value">付款完成後需手動確認</div>
       </div>
-      <div class="payment-card-row">
+      <div class="payment-card-row stack">
         <div class="payment-card-label">付款資訊</div>
         <div class="payment-card-value">${escapeHtmlWithBreaks(jkoPaymentInfo)}</div>
       </div>
