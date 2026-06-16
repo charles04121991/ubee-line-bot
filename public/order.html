@@ -3332,19 +3332,32 @@ async function selectPaymentMethod(method){
     info.classList.remove('hidden');
 
     if(method === 'cash'){
-      info.innerText =
-        `你已選擇：現金付款\n\n請於任務完成時，將費用交付給騎士。\n\n請按下方「確認現金付款並開始派單」，系統才會開始派單。`;
+  info.innerText =
+    `付款方式｜現金付款
+付款狀態｜任務完成時付款
 
-      qs('confirmPaidBtn').innerText = '確認現金付款並開始派單';
-    }
+付款說明
+請確認本次任務使用現金付款。系統收到確認後，會開始進入派單流程。
 
-    if(method === 'jko'){
-      info.innerText =
-        data.paymentInfo ||
-        `你已選擇：街口支付\n\n請依 UBee 官方提供的街口支付資訊完成付款。\n\n付款完成後，請按下方「我已完成街口支付，開始派單」。`;
+任務完成時，請依訂單金額將費用交付給 UBee 騎士。`;
 
-      qs('confirmPaidBtn').innerText = '我已完成街口支付，開始派單';
-    }
+  qs('confirmPaidBtn').innerText = '確認使用現金付款，開始派單';
+}
+
+if(method === 'jko'){
+  const jkoPaymentInfo = data.paymentInfo || '請依 UBee 官方提供的街口支付資訊完成付款。';
+
+  info.innerText =
+    `付款方式｜街口支付
+付款狀態｜待付款確認
+
+付款說明
+${jkoPaymentInfo}
+
+完成付款後，請按下方「我已完成街口支付，開始派單」，系統才會進入派單流程。`;
+
+  qs('confirmPaidBtn').innerText = '我已完成街口支付，開始派單';
+}
 
     qs('confirmPaidBtn').classList.remove('hidden');
 
@@ -3392,7 +3405,12 @@ async function confirmPaid(){
       throw new Error(data.error || data.message || '確認付款失敗');
     }
 
-    qs('paymentInfo').innerText = data.message || '付款確認完成，系統已開始媒合附近騎士。';
+    qs('paymentInfo').innerText =
+  data.message ||
+  `付款確認完成
+
+系統已進入派單流程，正在媒合附近可服務的 UBee 騎士。
+請留意任務狀態更新，如有問題可聯繫 UBee 客服。`;
     btn.classList.add('hidden');
 
     renderTimeline('pending_dispatch', currentOrderData);
