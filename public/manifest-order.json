@@ -1,0 +1,25 @@
+{
+  "name": "UBee 跑腿",
+  "short_name": "UBee",
+  "description": "UBee 跑腿客人下單系統",
+  "start_url": "/order.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/ubee-rider-icon.png?v=1",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/ubee-rider-icon.png?v=1",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
