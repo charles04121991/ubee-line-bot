@@ -823,6 +823,30 @@ textarea::placeholder{
   color:var(--text);
 }
 
+.price-row.price-subtotal{
+  color:var(--text);
+  font-weight:1000;
+}
+
+.price-row.price-total{
+  border-bottom:none;
+  color:var(--text);
+  font-size:21px;
+  font-weight:1000;
+}
+
+.price-note{
+  margin-top:12px;
+  border-radius:14px;
+  background:rgba(250,204,21,.08);
+  border:1px solid rgba(250,204,21,.22);
+  padding:11px 12px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  line-height:1.7;
+}
+    
 .notice{
   border:1px solid rgba(239,68,68,.42);
   background:rgba(239,68,68,.07);
@@ -3268,25 +3292,33 @@ async function renderEstimate(){
   box.classList.remove('hidden');
   box.innerHTML = '<div class="price-row"><span>預估費用</span><strong>計算中...</strong></div>';
 
+  const advanceAmount = Math.max(0, Math.round(Number(qs('advancePayment')?.value || 0)));
+
   if(serviceGroup === 'queue'){
     const queueMinutes = Number(qs('queueMinutes').value || 0);
     const deliveryFee = 80;
     const waitingFee = Math.max(0, queueMinutes * 3);
     const serviceFee = 25;
-    const speedFeeMap = {
+
+    const taskFeeMap = {
       standard:20,
       priority:25,
       express:30
     };
-    const speedFee = speedFeeMap[speedType] || 20;
-    const total = deliveryFee + waitingFee + serviceFee + speedFee;
+
+    const taskFee = taskFeeMap[speedType] || 20;
+    const serviceSubtotal = deliveryFee + waitingFee + serviceFee + taskFee;
+    const estimatedPayableTotal = serviceSubtotal + advanceAmount;
 
     box.innerHTML = `
       <div class="price-row"><span>排隊基本費</span><strong>NT$${deliveryFee}</strong></div>
       <div class="price-row"><span>排隊時間費</span><strong>NT$${waitingFee}</strong></div>
-      <div class="price-row"><span>速度費</span><strong>NT$${speedFee}</strong></div>
+      <div class="price-row"><span>任務處理費</span><strong>NT$${taskFee}</strong></div>
       <div class="price-row"><span>平台服務費</span><strong>NT$${serviceFee}</strong></div>
-      <div class="price-row"><span>預估總費用</span><strong>NT$${total}</strong></div>
+      <div class="price-row price-subtotal"><span>服務費小計</span><strong>NT$${serviceSubtotal}</strong></div>
+      <div class="price-row"><span>預估代墊金額</span><strong>NT$${advanceAmount}</strong></div>
+      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${estimatedPayableTotal}</strong></div>
+      <div class="price-note">實際代墊金額依店家現場金額、收據或實際購買金額為準。</div>
     `;
     return;
   }
@@ -3305,13 +3337,22 @@ async function renderEstimate(){
       throw new Error(data.error || data.message || '估價失敗');
     }
 
+    const deliveryFee = Number(data.deliveryFee || 0);
+    const taskFee = Number(data.speedFee || 0);
+    const serviceFee = Number(data.serviceFee || 0);
+    const serviceSubtotal = Number(data.total || 0);
+    const estimatedPayableTotal = serviceSubtotal + advanceAmount;
+
     box.innerHTML = `
       <div class="price-row"><span>距離</span><strong>${escapeHtml(data.distanceText || '-')}</strong></div>
       <div class="price-row"><span>時間</span><strong>${escapeHtml(data.durationText || '-')}</strong></div>
-      <div class="price-row"><span>配送費</span><strong>NT$${Number(data.deliveryFee || 0)}</strong></div>
-      <div class="price-row"><span>速度費</span><strong>NT$${Number(data.speedFee || 0)}</strong></div>
-      <div class="price-row"><span>平台服務費</span><strong>NT$${Number(data.serviceFee || 0)}</strong></div>
-      <div class="price-row"><span>預估總費用</span><strong>NT$${Number(data.total || 0)}</strong></div>
+      <div class="price-row"><span>配送服務費</span><strong>NT$${deliveryFee}</strong></div>
+      <div class="price-row"><span>任務處理費</span><strong>NT$${taskFee}</strong></div>
+      <div class="price-row"><span>平台服務費</span><strong>NT$${serviceFee}</strong></div>
+      <div class="price-row price-subtotal"><span>服務費小計</span><strong>NT$${serviceSubtotal}</strong></div>
+      <div class="price-row"><span>預估代墊金額</span><strong>NT$${advanceAmount}</strong></div>
+      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${estimatedPayableTotal}</strong></div>
+      <div class="price-note">實際代墊金額依店家現場金額、收據或實際購買金額為準。</div>
     `;
   }catch(err){
     console.warn('估價失敗:', err);
@@ -3320,7 +3361,7 @@ async function renderEstimate(){
     `;
   }
 }
-
+  
 async function createOrder(){
   if(isSubmittingOrder) return;
 
