@@ -2,31 +2,37 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
   <title>UBee 跑腿｜台中在地跑腿服務平台</title>
 
   <meta name="description" content="UBee 跑腿是台中在地跑腿服務平台，提供代送、代買、取件、排隊、文件急送與急件專送服務。服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。" />
-  <meta name="keywords" content="UBee跑腿, 台中跑腿, 豐原跑腿, 潭子跑腿, 神岡跑腿, 大雅跑腿, 后里跑腿, 文件急送, 代送, 代買, 取件, 排隊, 急件專送" />
+  <meta name="keywords" content="UBee跑腿, 台中跑腿, 豐原跑腿, 潭子跑腿, 神岡跑腿, 大雅跑腿, 后里跑腿, 文件急送, 代送, 代買, 取件, 排隊, 急件專送, 店家外送合作" />
 
   <meta property="og:title" content="UBee 跑腿｜台中在地跑腿服務平台" />
-  <meta property="og:description" content="代送、代買、取件、排隊、文件急送、急件專送，使用 LINE LIFF 網頁版 App 下單，不需下載 App。" />
+  <meta property="og:description" content="代送、代買、取件、排隊、文件急送、急件專送。使用 LINE LIFF 網頁版 App 下單，不需下載 App。" />
   <meta property="og:type" content="website" />
 
   <style>
     :root {
-      --bg: #f6f7f9;
+      --bg: #f4f5f7;
+      --bg-2: #ffffff;
+      --text: #121212;
+      --muted: #666;
+      --muted-2: #8a8a8a;
+      --black: #101010;
+      --black-2: #1b1b1b;
+      --yellow: #f8c832;
+      --yellow-2: #ffeaa3;
+      --yellow-soft: #fff7db;
+      --line: #e9e9e9;
       --card: #ffffff;
-      --text: #151515;
-      --muted: #666666;
-      --light-muted: #8a8a8a;
-      --line: #e8e8e8;
-      --black: #111111;
-      --yellow: #f7c948;
-      --yellow-soft: #fff6d7;
-      --radius: 22px;
-      --shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
-      --max-width: 1120px;
+      --radius-lg: 34px;
+      --radius-md: 24px;
+      --radius-sm: 16px;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.10);
+      --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.06);
+      --max: 1180px;
     }
 
     * {
@@ -39,9 +45,12 @@
 
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
-      background: var(--bg);
       color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(248, 200, 50, 0.22), transparent 28%),
+        radial-gradient(circle at 95% 15%, rgba(248, 200, 50, 0.16), transparent 24%),
+        var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
       line-height: 1.7;
     }
 
@@ -51,23 +60,28 @@
     }
 
     .page {
-      width: 100%;
-      overflow-x: hidden;
+      overflow: hidden;
+    }
+
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 22px;
     }
 
     .topbar {
       position: sticky;
       top: 0;
       z-index: 100;
-      background: rgba(255, 255, 255, 0.92);
-      backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(16, 16, 16, 0.86);
+      backdrop-filter: blur(18px);
     }
 
     .topbar-inner {
-      max-width: var(--max-width);
+      max-width: var(--max);
       margin: 0 auto;
-      padding: 14px 20px;
+      padding: 14px 22px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -75,492 +89,816 @@
     }
 
     .brand {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
-      font-weight: 900;
-      letter-spacing: 0.2px;
+      gap: 11px;
+      color: #fff;
     }
 
     .brand-mark {
-      width: 38px;
-      height: 38px;
-      border-radius: 14px;
-      background: var(--black);
-      color: var(--yellow);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--yellow), #ffdf72);
+      color: #111;
+      display: grid;
+      place-items: center;
       font-size: 22px;
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+      box-shadow: 0 12px 28px rgba(248, 200, 50, 0.28);
+      font-weight: 950;
+    }
+
+    .brand-text {
+      display: grid;
+      line-height: 1.15;
     }
 
     .brand-name {
       font-size: 18px;
+      font-weight: 950;
+      letter-spacing: 0.2px;
+    }
+
+    .brand-sub {
+      color: rgba(255, 255, 255, 0.58);
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .nav {
       display: flex;
       align-items: center;
       gap: 18px;
+      color: rgba(255, 255, 255, 0.78);
       font-size: 14px;
-      color: #333;
       white-space: nowrap;
     }
 
-    .nav a {
-      color: #333;
-    }
-
     .nav a:hover {
-      color: #000;
-      font-weight: 700;
+      color: #fff;
     }
 
     .nav-cta {
-      background: var(--black);
-      color: #fff !important;
+      background: #fff;
+      color: #111 !important;
       padding: 9px 16px;
       border-radius: 999px;
-      font-weight: 800;
+      font-weight: 950;
+      box-shadow: 0 10px 24px rgba(255, 255, 255, 0.12);
+    }
+
+    .hero-wrap {
+      background:
+        linear-gradient(135deg, #101010 0%, #181818 45%, #25210f 100%);
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-wrap::before {
+      content: "";
+      position: absolute;
+      width: 520px;
+      height: 520px;
+      border-radius: 999px;
+      right: -160px;
+      top: -180px;
+      background: rgba(248, 200, 50, 0.20);
+      filter: blur(2px);
+    }
+
+    .hero-wrap::after {
+      content: "";
+      position: absolute;
+      width: 380px;
+      height: 380px;
+      border-radius: 999px;
+      left: -140px;
+      bottom: -170px;
+      background: rgba(248, 200, 50, 0.11);
     }
 
     .hero {
-      max-width: var(--max-width);
+      position: relative;
+      z-index: 2;
+      max-width: var(--max);
       margin: 0 auto;
-      padding: 76px 20px 42px;
+      padding: 74px 22px 58px;
       display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-columns: 1.08fr 0.92fr;
       align-items: center;
-      gap: 34px;
+      gap: 42px;
     }
 
     .eyebrow {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--yellow-soft);
-      color: #5a4200;
-      border: 1px solid rgba(247, 201, 72, 0.55);
-      padding: 8px 14px;
+      color: #111;
+      background: linear-gradient(135deg, var(--yellow), #ffe28a);
       border-radius: 999px;
+      padding: 8px 14px;
       font-size: 14px;
-      font-weight: 800;
+      font-weight: 950;
       margin-bottom: 18px;
+      box-shadow: 0 12px 28px rgba(248, 200, 50, 0.22);
     }
 
     .hero h1 {
       margin: 0;
-      font-size: clamp(36px, 5vw, 62px);
-      line-height: 1.12;
-      letter-spacing: -1.6px;
-      font-weight: 950;
+      font-size: clamp(42px, 6vw, 76px);
+      line-height: 1.04;
+      letter-spacing: -2.4px;
+      font-weight: 1000;
     }
 
-    .hero h1 span {
-      color: #111;
-      background: linear-gradient(180deg, transparent 58%, rgba(247, 201, 72, 0.55) 58%);
+    .hero h1 .highlight {
+      color: var(--yellow);
     }
 
     .hero-desc {
-      margin: 22px 0 0;
       max-width: 680px;
-      color: var(--muted);
+      margin: 22px 0 0;
+      color: rgba(255, 255, 255, 0.72);
       font-size: 18px;
     }
 
     .hero-actions {
       display: flex;
-      align-items: center;
       flex-wrap: wrap;
+      align-items: center;
       gap: 12px;
-      margin-top: 28px;
+      margin-top: 30px;
     }
 
     .btn {
+      min-height: 50px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      min-height: 48px;
-      padding: 12px 20px;
       border-radius: 999px;
-      font-weight: 900;
+      padding: 12px 20px;
       border: 1px solid transparent;
-      cursor: pointer;
+      font-weight: 950;
       transition: 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
     }
 
     .btn-primary {
-      background: var(--black);
+      background: linear-gradient(135deg, var(--yellow), #ffe28a);
+      color: #111;
+      box-shadow: 0 16px 34px rgba(248, 200, 50, 0.24);
+    }
+
+    .btn-dark {
+      background: #111;
       color: #fff;
-      box-shadow: 0 12px 22px rgba(0, 0, 0, 0.16);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
     }
 
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 16px 26px rgba(0, 0, 0, 0.18);
+    .btn-ghost {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.20);
+      background: rgba(255, 255, 255, 0.08);
     }
 
-    .btn-secondary {
-      background: #fff;
-      color: var(--black);
-      border-color: var(--line);
+    .trust-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+      max-width: 680px;
     }
 
-    .btn-secondary:hover {
-      border-color: #cfcfcf;
-      transform: translateY(-2px);
+    .trust-item {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(12px);
+      border-radius: 18px;
+      padding: 14px;
     }
 
-    .hero-note {
-      margin-top: 14px;
-      color: var(--light-muted);
-      font-size: 14px;
+    .trust-value {
+      color: var(--yellow);
+      font-size: 20px;
+      font-weight: 1000;
+      line-height: 1.2;
     }
 
-    .hero-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 30px;
-      padding: 28px;
-      box-shadow: var(--shadow);
+    .trust-label {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 13px;
+      font-weight: 750;
+      margin-top: 4px;
+    }
+
+    .phone-shell {
+      justify-self: center;
       position: relative;
-      overflow: hidden;
+      width: min(360px, 100%);
+      border-radius: 42px;
+      padding: 14px;
+      background: linear-gradient(180deg, #3a3a3a, #090909);
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
     }
 
-    .hero-card::before {
+    .phone-shell::before {
       content: "";
       position: absolute;
-      width: 220px;
-      height: 220px;
-      background: rgba(247, 201, 72, 0.22);
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 22px;
       border-radius: 999px;
-      right: -80px;
-      top: -80px;
+      background: #050505;
+      z-index: 3;
     }
 
-    .mock-phone {
+    .phone-screen {
       position: relative;
-      background: #111;
+      z-index: 2;
+      overflow: hidden;
+      min-height: 620px;
       border-radius: 32px;
-      padding: 12px;
-      max-width: 320px;
-      margin: 0 auto;
-      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.22);
+      background:
+        radial-gradient(circle at top right, rgba(248, 200, 50, 0.26), transparent 35%),
+        #fff;
+      color: #111;
+      padding: 34px 18px 18px;
     }
 
-    .mock-screen {
-      background: #fff;
-      border-radius: 24px;
-      padding: 18px;
-      min-height: 470px;
-    }
-
-    .mock-top {
+    .app-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
 
-    .mock-title {
-      font-weight: 950;
-      font-size: 20px;
+    .app-title {
+      font-size: 22px;
+      font-weight: 1000;
+      letter-spacing: -0.5px;
     }
 
-    .mock-badge {
-      background: var(--yellow);
-      color: #111;
+    .app-pill {
+      background: #111;
+      color: var(--yellow);
       border-radius: 999px;
-      padding: 5px 9px;
+      padding: 6px 10px;
       font-size: 12px;
-      font-weight: 900;
+      font-weight: 950;
     }
 
-    .service-grid-small {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+    .app-card {
+      border: 1px solid #eee;
+      background: #fff;
+      border-radius: 22px;
+      padding: 16px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+      margin-bottom: 14px;
     }
 
-    .mini-service {
-      background: #f7f7f7;
-      border: 1px solid #ededed;
-      border-radius: 16px;
-      padding: 14px 10px;
-      text-align: center;
-      font-weight: 900;
-      font-size: 14px;
+    .app-card.dark {
+      background: #111;
+      color: #fff;
+      border-color: #111;
     }
 
-    .mock-section-title {
-      margin: 18px 0 10px;
-      font-size: 14px;
+    .app-card.yellow {
+      background: linear-gradient(135deg, var(--yellow), #ffe69a);
+      border-color: transparent;
+    }
+
+    .app-mini-title {
+      font-size: 13px;
       color: #777;
-      font-weight: 800;
+      font-weight: 850;
+      margin-bottom: 8px;
     }
 
-    .mock-route {
-      background: #f7f7f7;
-      border-radius: 18px;
-      padding: 14px;
-      border: 1px solid #ededed;
+    .app-card.dark .app-mini-title {
+      color: rgba(255, 255, 255, 0.56);
     }
 
-    .route-row {
-      display: flex;
+    .app-route {
+      display: grid;
       gap: 10px;
-      align-items: flex-start;
-      margin-bottom: 12px;
     }
 
-    .route-row:last-child {
-      margin-bottom: 0;
+    .route {
+      display: grid;
+      grid-template-columns: 16px 1fr;
+      gap: 10px;
+      align-items: start;
     }
 
-    .dot {
-      width: 11px;
-      height: 11px;
+    .route-dot {
+      width: 12px;
+      height: 12px;
+      margin-top: 7px;
       border-radius: 999px;
       background: #111;
-      margin-top: 7px;
-      flex: 0 0 auto;
     }
 
-    .dot.yellow {
+    .route-dot.end {
       background: var(--yellow);
     }
 
     .route-label {
+      color: #777;
       font-size: 12px;
-      color: #888;
       font-weight: 800;
     }
 
-    .route-text {
-      font-size: 14px;
-      font-weight: 900;
+    .route-place {
+      font-weight: 950;
+      font-size: 15px;
     }
 
-    .mock-price {
-      margin-top: 14px;
-      background: #111;
-      color: #fff;
-      border-radius: 18px;
-      padding: 14px;
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+      margin-top: 12px;
+    }
+
+    .mini-service {
+      background: #f6f6f6;
+      border: 1px solid #eee;
+      border-radius: 15px;
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .app-status {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      font-weight: 900;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 950;
+    }
+
+    .progress {
+      height: 9px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.14);
+      margin-top: 14px;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 68%;
+      border-radius: 999px;
+      background: var(--yellow);
     }
 
     .section {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 46px 20px;
+      padding: 70px 0;
     }
 
     .section-head {
-      margin-bottom: 24px;
       display: flex;
-      align-items: flex-end;
       justify-content: space-between;
-      gap: 20px;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 26px;
     }
 
-    .section-kicker {
-      color: #9a7400;
-      font-size: 14px;
-      font-weight: 950;
-      letter-spacing: 0.8px;
+    .kicker {
+      color: #8b6800;
+      font-size: 13px;
+      font-weight: 1000;
+      letter-spacing: 1.2px;
       text-transform: uppercase;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .section h2 {
       margin: 0;
-      font-size: clamp(28px, 3vw, 42px);
-      line-height: 1.25;
-      letter-spacing: -0.8px;
-      font-weight: 950;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.18;
+      letter-spacing: -1.2px;
+      font-weight: 1000;
     }
 
     .section-desc {
-      max-width: 560px;
+      max-width: 600px;
       color: var(--muted);
       margin: 10px 0 0;
       font-size: 16px;
     }
 
-    .cards {
+    .service-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 16px;
     }
 
-    .card {
+    .service-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 236px;
+      padding: 24px;
+      border-radius: var(--radius-md);
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 22px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+      box-shadow: var(--shadow-soft);
+      transition: 0.2s ease;
     }
 
-    .card-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 17px;
+    .service-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+    }
+
+    .service-card::after {
+      content: "";
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      border-radius: 999px;
+      right: -70px;
+      top: -70px;
+      background: rgba(248, 200, 50, 0.18);
+    }
+
+    .service-icon {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
       background: var(--yellow-soft);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 23px;
-      margin-bottom: 14px;
+      font-size: 25px;
+      margin-bottom: 16px;
     }
 
-    .card h3 {
+    .service-card h3 {
       margin: 0 0 8px;
-      font-size: 19px;
-      font-weight: 950;
+      font-size: 21px;
+      font-weight: 1000;
+      letter-spacing: -0.3px;
     }
 
-    .card p {
+    .service-card p {
       margin: 0;
       color: var(--muted);
       font-size: 15px;
     }
 
-    .feature-band {
-      background: #111;
-      color: #fff;
-      border-radius: 30px;
-      padding: 32px;
+    .why-wrap {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      align-items: center;
-      overflow: hidden;
-      position: relative;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 18px;
+      align-items: stretch;
     }
 
-    .feature-band::after {
+    .why-main {
+      color: #fff;
+      background:
+        linear-gradient(135deg, #101010 0%, #181818 60%, #2e270c 100%);
+      border-radius: var(--radius-lg);
+      padding: 34px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .why-main::after {
       content: "";
       position: absolute;
-      right: -120px;
-      bottom: -140px;
-      width: 300px;
-      height: 300px;
-      background: rgba(247, 201, 72, 0.22);
+      width: 220px;
+      height: 220px;
       border-radius: 999px;
+      right: -80px;
+      bottom: -90px;
+      background: rgba(248, 200, 50, 0.18);
     }
 
-    .feature-band h2 {
+    .why-main h2 {
       color: #fff;
     }
 
-    .feature-band p {
-      color: rgba(255, 255, 255, 0.72);
-      margin: 12px 0 0;
-      max-width: 560px;
+    .why-main p {
+      color: rgba(255, 255, 255, 0.70);
+      margin: 14px 0 0;
     }
 
-    .steps {
+    .why-list {
       display: grid;
-      gap: 12px;
-      position: relative;
-      z-index: 2;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
     }
 
-    .step {
-      background: rgba(255, 255, 255, 0.09);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 18px;
-      padding: 16px;
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
+    .why-item {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      box-shadow: var(--shadow-soft);
     }
 
-    .step-num {
-      width: 32px;
-      height: 32px;
-      border-radius: 999px;
-      background: var(--yellow);
+    .why-num {
       color: #111;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 950;
-      flex: 0 0 auto;
+      background: var(--yellow);
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-weight: 1000;
+      margin-bottom: 12px;
     }
 
-    .step-title {
-      font-weight: 950;
-      margin-bottom: 2px;
+    .why-title {
+      font-size: 18px;
+      font-weight: 1000;
+      margin-bottom: 6px;
     }
 
-    .step-text {
-      color: rgba(255, 255, 255, 0.68);
+    .why-text {
+      color: var(--muted);
       font-size: 14px;
     }
 
-    .area-card {
-      background: var(--card);
+    .flow {
+      background: #fff;
       border: 1px solid var(--line);
-      border-radius: 30px;
-      padding: 30px;
-      box-shadow: var(--shadow);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
     }
+
+    .flow-step {
+      position: relative;
+      padding: 20px;
+      border-radius: 22px;
+      background: #f7f7f7;
+      border: 1px solid #eeeeee;
+    }
+
+    .flow-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: #111;
+      color: var(--yellow);
+      font-weight: 1000;
+      margin-bottom: 14px;
+    }
+
+    .flow-step h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 1000;
+    }
+
+    .flow-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .area-box {
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(circle at top right, rgba(248, 200, 50, 0.30), transparent 34%),
+        #fff;
+      border: 1px solid var(--line);
+      padding: 34px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .area-content {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .area-map {
+      min-height: 300px;
+      border-radius: 28px;
+      background:
+        linear-gradient(135deg, rgba(16, 16, 16, 0.94), rgba(16, 16, 16, 0.82)),
+        radial-gradient(circle at 30% 35%, rgba(248, 200, 50, 0.55), transparent 22%);
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .area-map::before,
+    .area-map::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      border: 1px solid rgba(248, 200, 50, 0.22);
+    }
+
+    .area-map::before {
+      width: 280px;
+      height: 280px;
+      left: -90px;
+      top: -80px;
+    }
+
+    .area-map::after {
+      width: 340px;
+      height: 340px;
+      right: -110px;
+      bottom: -160px;
+    }
+
+    .area-map-title {
+      position: relative;
+      z-index: 2;
+      font-size: 24px;
+      font-weight: 1000;
+    }
+
+    .area-map-sub {
+      position: relative;
+      z-index: 2;
+      color: rgba(255, 255, 255, 0.68);
+      margin-top: 6px;
+    }
+
+    .area-pin {
+      position: absolute;
+      z-index: 3;
+      background: var(--yellow);
+      color: #111;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 1000;
+      box-shadow: 0 12px 26px rgba(248, 200, 50, 0.26);
+    }
+
+    .pin-1 { left: 36%; top: 36%; }
+    .pin-2 { left: 55%; top: 46%; }
+    .pin-3 { left: 24%; top: 58%; }
+    .pin-4 { right: 15%; top: 30%; }
+    .pin-5 { right: 24%; bottom: 18%; }
 
     .area-tags {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      margin-top: 18px;
+      margin-top: 20px;
     }
 
     .tag {
-      background: #f3f3f3;
+      background: #f4f4f4;
       border: 1px solid #e8e8e8;
       border-radius: 999px;
       padding: 9px 14px;
-      font-weight: 900;
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .partner {
+      background:
+        linear-gradient(135deg, #fff 0%, #fff8df 100%);
+      border: 1px solid rgba(248, 200, 50, 0.34);
+      border-radius: var(--radius-lg);
+      padding: 34px;
+      box-shadow: var(--shadow-soft);
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .partner-points {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .partner-point {
+      background: #fff;
+      border: 1px solid #f0e0a4;
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
+    }
+
+    .partner-point strong {
+      display: block;
+      font-size: 18px;
+      font-weight: 1000;
+      margin-bottom: 4px;
+    }
+
+    .partner-point span {
+      color: var(--muted);
       font-size: 14px;
     }
 
-    .contact-wrap {
+    .faq-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 18px;
+      gap: 14px;
+    }
+
+    details {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 1000;
+      list-style: none;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .contact-panel {
+      background: #111;
+      color: #fff;
+      border-radius: var(--radius-lg);
+      padding: 34px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: stretch;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-panel::after {
+      content: "";
+      position: absolute;
+      width: 260px;
+      height: 260px;
+      border-radius: 999px;
+      right: -100px;
+      top: -110px;
+      background: rgba(248, 200, 50, 0.18);
+    }
+
+    .contact-panel h2 {
+      color: #fff;
+    }
+
+    .contact-panel p {
+      color: rgba(255, 255, 255, 0.66);
     }
 
     .contact-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 26px;
-      padding: 26px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
-    }
-
-    .contact-card h3 {
-      margin: 0 0 12px;
-      font-size: 22px;
-      font-weight: 950;
+      position: relative;
+      z-index: 2;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 24px;
+      padding: 24px;
     }
 
     .info-list {
       display: grid;
-      gap: 10px;
-      margin-top: 16px;
+      gap: 12px;
+      margin-top: 18px;
     }
 
     .info-row {
       display: grid;
-      grid-template-columns: 120px 1fr;
+      grid-template-columns: 110px 1fr;
       gap: 12px;
-      border-bottom: 1px solid #f0f0f0;
-      padding-bottom: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
       font-size: 15px;
     }
 
@@ -570,50 +908,50 @@
     }
 
     .info-label {
-      color: #777;
-      font-weight: 800;
+      color: rgba(255, 255, 255, 0.52);
+      font-weight: 850;
     }
 
     .info-value {
-      color: #222;
-      font-weight: 800;
+      color: #fff;
+      font-weight: 850;
       word-break: break-word;
     }
 
     .notice {
       margin-top: 18px;
-      background: #fff9e6;
-      border: 1px solid rgba(247, 201, 72, 0.45);
-      color: #604700;
+      background: rgba(248, 200, 50, 0.12);
+      border: 1px solid rgba(248, 200, 50, 0.26);
+      color: rgba(255, 255, 255, 0.78);
       border-radius: 18px;
       padding: 14px 16px;
       font-size: 14px;
     }
 
     .footer {
-      background: #111;
+      background: #0d0d0d;
       color: #fff;
-      margin-top: 40px;
+      margin-top: 70px;
     }
 
     .footer-inner {
-      max-width: var(--max-width);
+      max-width: var(--max);
       margin: 0 auto;
-      padding: 34px 20px;
+      padding: 34px 22px;
       display: flex;
       justify-content: space-between;
-      gap: 20px;
+      gap: 18px;
       align-items: center;
       flex-wrap: wrap;
     }
 
     .footer-brand {
-      font-weight: 950;
+      font-weight: 1000;
       font-size: 18px;
     }
 
     .footer-small {
-      color: rgba(255, 255, 255, 0.58);
+      color: rgba(255, 255, 255, 0.54);
       font-size: 13px;
       margin-top: 4px;
     }
@@ -623,35 +961,40 @@
       position: fixed;
       left: 14px;
       right: 14px;
-      bottom: 14px;
+      bottom: calc(14px + env(safe-area-inset-bottom));
       z-index: 120;
     }
 
     .floating-order a {
       width: 100%;
-      min-height: 52px;
+      min-height: 54px;
       border-radius: 18px;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 980px) {
       .hero {
         grid-template-columns: 1fr;
-        padding-top: 44px;
+        padding-top: 52px;
       }
 
-      .hero-card {
+      .phone-shell {
         order: -1;
+        width: min(340px, 100%);
       }
 
-      .cards {
+      .phone-screen {
+        min-height: 560px;
+      }
+
+      .service-grid,
+      .flow {
         grid-template-columns: 1fr 1fr;
       }
 
-      .feature-band {
-        grid-template-columns: 1fr;
-      }
-
-      .contact-wrap {
+      .why-wrap,
+      .area-content,
+      .partner,
+      .contact-panel {
         grid-template-columns: 1fr;
       }
 
@@ -660,21 +1003,32 @@
       }
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 680px) {
+      .container {
+        padding: 0 16px;
+      }
+
       .topbar-inner {
         padding: 12px 16px;
       }
 
-      .brand-name {
-        font-size: 16px;
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+      }
+
+      .brand-sub {
+        display: none;
       }
 
       .hero {
-        padding: 28px 16px 24px;
+        padding: 30px 16px 44px;
       }
 
       .hero h1 {
-        font-size: 38px;
+        font-size: 42px;
+        letter-spacing: -1.5px;
       }
 
       .hero-desc {
@@ -685,39 +1039,58 @@
         width: 100%;
       }
 
-      .hero-card {
-        padding: 18px;
-        border-radius: 24px;
+      .trust-row {
+        grid-template-columns: 1fr;
       }
 
-      .mock-phone {
-        max-width: 100%;
+      .phone-shell {
+        width: 100%;
+        max-width: 350px;
       }
 
-      .mock-screen {
-        min-height: 410px;
+      .phone-screen {
+        min-height: auto;
+      }
+
+      .mini-grid {
+        grid-template-columns: 1fr 1fr;
       }
 
       .section {
-        padding: 34px 16px;
+        padding: 46px 0;
       }
 
       .section-head {
         display: block;
       }
 
-      .cards {
+      .service-grid,
+      .why-list,
+      .flow,
+      .partner-points,
+      .faq-grid {
         grid-template-columns: 1fr;
       }
 
-      .feature-band {
-        padding: 24px;
-        border-radius: 24px;
+      .service-card {
+        min-height: auto;
       }
 
-      .area-card {
-        padding: 22px;
-        border-radius: 24px;
+      .area-box,
+      .partner,
+      .contact-panel,
+      .why-main {
+        padding: 24px;
+        border-radius: 28px;
+      }
+
+      .area-map {
+        min-height: 260px;
+      }
+
+      .area-pin {
+        font-size: 12px;
+        padding: 7px 10px;
       }
 
       .info-row {
@@ -730,7 +1103,7 @@
       }
 
       .footer-inner {
-        padding-bottom: 88px;
+        padding-bottom: 92px;
       }
     }
   </style>
@@ -743,88 +1116,119 @@
       <div class="topbar-inner">
         <a class="brand" href="#top" aria-label="UBee 跑腿首頁">
           <div class="brand-mark">🐝</div>
-          <div class="brand-name">UBee 跑腿</div>
+          <div class="brand-text">
+            <div class="brand-name">UBee 跑腿</div>
+            <div class="brand-sub">城市任務｜即時代送</div>
+          </div>
         </a>
 
         <nav class="nav" aria-label="網站導覽">
           <a href="#services">服務項目</a>
-          <a href="#how">使用流程</a>
-          <a href="#area">服務範圍</a>
-          <a href="#contact">聯絡資訊</a>
+          <a href="#why">平台特色</a>
+          <a href="#flow">使用流程</a>
+          <a href="#partner">店家合作</a>
+          <a href="#contact">聯絡我們</a>
           <a class="nav-cta" href="https://liff.line.me/2009895876-eDSfemYo">立即下單</a>
         </nav>
       </div>
     </header>
 
     <main id="top">
-      <section class="hero">
-        <div>
-          <div class="eyebrow">台中在地跑腿服務平台</div>
 
-          <h1>
-            你的任務，<br />
-            <span>我們使命必達。</span>
-          </h1>
+      <section class="hero-wrap">
+        <div class="hero">
+          <div>
+            <div class="eyebrow">台中在地跑腿服務平台</div>
 
-          <p class="hero-desc">
-            UBee 跑腿提供代送、代買、取件、排隊、文件急送與急件專送等城市任務服務。
-            使用 LINE LIFF 網頁版 App 下單，不需下載 App，讓日常任務更快速、更清楚、更有效率。
-          </p>
+            <h1>
+              你的任務，<br />
+              <span class="highlight">我們使命必達。</span>
+            </h1>
 
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
-              立即進入下單頁
-            </a>
-            <a class="btn btn-secondary" href="#services">
-              查看服務項目
-            </a>
+            <p class="hero-desc">
+              UBee 跑腿提供代送、代買、取件、排隊、文件急送與急件專送等城市任務服務。
+              使用 LINE LIFF 網頁版 App 下單，不需下載 App，讓日常任務更快速、更清楚、更有效率。
+            </p>
+
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
+                立即進入下單頁
+              </a>
+              <a class="btn btn-ghost" href="#services">
+                查看服務項目
+              </a>
+            </div>
+
+            <div class="trust-row">
+              <div class="trust-item">
+                <div class="trust-value">6 大服務</div>
+                <div class="trust-label">代送、代買、取件、排隊、全能跑腿、急件專送</div>
+              </div>
+              <div class="trust-item">
+                <div class="trust-value">免下載</div>
+                <div class="trust-label">透過 LINE LIFF 網頁版 App 直接下單</div>
+              </div>
+              <div class="trust-item">
+                <div class="trust-value">從豐原出發</div>
+                <div class="trust-label">持續擴展大台中地區服務網路</div>
+              </div>
+            </div>
           </div>
 
-          <div class="hero-note">
-            服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。
-          </div>
-        </div>
-
-        <div class="hero-card" aria-label="UBee 跑腿下單示意">
-          <div class="mock-phone">
-            <div class="mock-screen">
-              <div class="mock-top">
-                <div class="mock-title">UBee</div>
-                <div class="mock-badge">免下載</div>
+          <div class="phone-shell" aria-label="UBee 跑腿下單介面示意">
+            <div class="phone-screen">
+              <div class="app-head">
+                <div class="app-title">UBee</div>
+                <div class="app-pill">免下載 App</div>
               </div>
 
-              <div class="service-grid-small">
-                <div class="mini-service">幫我送</div>
-                <div class="mini-service">幫代買</div>
-                <div class="mini-service">幫我取</div>
-                <div class="mini-service">幫排隊</div>
-                <div class="mini-service">全能跑腿</div>
-                <div class="mini-service">急件專送</div>
-              </div>
-
-              <div class="mock-section-title">任務資訊</div>
-
-              <div class="mock-route">
-                <div class="route-row">
-                  <div class="dot"></div>
-                  <div>
-                    <div class="route-label">取件地點</div>
-                    <div class="route-text">台中市豐原區</div>
-                  </div>
-                </div>
-
-                <div class="route-row">
-                  <div class="dot yellow"></div>
-                  <div>
-                    <div class="route-label">送達地點</div>
-                    <div class="route-text">台中市潭子區</div>
-                  </div>
+              <div class="app-card yellow">
+                <div class="app-mini-title">今日任務</div>
+                <div style="font-size: 24px; font-weight: 1000; line-height: 1.22;">
+                  選擇服務，填寫地點，送出需求。
                 </div>
               </div>
 
-              <div class="mock-price">
-                <span>系統化下單</span>
-                <span>即時送出</span>
+              <div class="app-card">
+                <div class="app-mini-title">服務項目</div>
+                <div class="mini-grid">
+                  <div class="mini-service">幫我送</div>
+                  <div class="mini-service">幫代買</div>
+                  <div class="mini-service">幫我取</div>
+                  <div class="mini-service">幫排隊</div>
+                  <div class="mini-service">全能跑腿</div>
+                  <div class="mini-service">急件專送</div>
+                </div>
+              </div>
+
+              <div class="app-card">
+                <div class="app-mini-title">任務路線</div>
+                <div class="app-route">
+                  <div class="route">
+                    <div class="route-dot"></div>
+                    <div>
+                      <div class="route-label">取件地點</div>
+                      <div class="route-place">台中市豐原區</div>
+                    </div>
+                  </div>
+                  <div class="route">
+                    <div class="route-dot end"></div>
+                    <div>
+                      <div class="route-label">送達地點</div>
+                      <div class="route-place">台中市潭子區</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="app-card dark">
+                <div class="app-status">
+                  <span>系統化下單流程</span>
+                  <span>處理中</span>
+                </div>
+                <div class="progress">
+                  <span></span>
+                </div>
               </div>
             </div>
           </div>
@@ -832,212 +1236,330 @@
       </section>
 
       <section class="section" id="services">
-        <div class="section-head">
-          <div>
-            <div class="section-kicker">Services</div>
-            <h2>UBee 可以幫你完成什麼？</h2>
-            <p class="section-desc">
-              從日常代送到急件任務，UBee 以系統化下單流程協助使用者清楚送出需求，並進行任務媒合與聯繫。
-            </p>
+        <div class="container">
+          <div class="section-head">
+            <div>
+              <div class="kicker">Services</div>
+              <h2>UBee 可以幫你完成什麼？</h2>
+              <p class="section-desc">
+                從生活代送到高急迫性任務，UBee 讓使用者透過清楚的系統化流程送出需求。
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div class="cards">
-          <article class="card">
-            <div class="card-icon">📦</div>
-            <h3>幫我送</h3>
-            <p>文件、物品、包裹、店家商品等代送任務，適合一般生活配送與臨時配送需求。</p>
-          </article>
+          <div class="service-grid">
+            <article class="service-card">
+              <div class="service-icon">📦</div>
+              <h3>幫我送</h3>
+              <p>文件、物品、包裹、店家商品等代送任務，適合一般生活配送與臨時配送需求。</p>
+            </article>
 
-          <article class="card">
-            <div class="card-icon">🛒</div>
-            <h3>幫代買</h3>
-            <p>協助購買餐點、飲品、生活用品等，適合不方便出門或臨時需要代買的情境。</p>
-          </article>
+            <article class="service-card">
+              <div class="service-icon">🛒</div>
+              <h3>幫代買</h3>
+              <p>協助購買餐點、飲品、生活用品等，適合不方便出門或臨時需要代買的情境。</p>
+            </article>
 
-          <article class="card">
-            <div class="card-icon">📍</div>
-            <h3>幫我取</h3>
-            <p>協助到指定地點取件，再送至指定位置，適合文件、商品、物品取送需求。</p>
-          </article>
+            <article class="service-card">
+              <div class="service-icon">📍</div>
+              <h3>幫我取</h3>
+              <p>協助到指定地點取件，再送至指定位置，適合文件、商品、物品取送需求。</p>
+            </article>
 
-          <article class="card">
-            <div class="card-icon">🧾</div>
-            <h3>幫排隊</h3>
-            <p>協助排隊、等候、現場領取等任務，適合熱門店家、活動現場或臨時等待需求。</p>
-          </article>
+            <article class="service-card">
+              <div class="service-icon">🧾</div>
+              <h3>幫排隊</h3>
+              <p>協助排隊、等候、現場領取等任務，適合熱門店家、活動現場或臨時等待需求。</p>
+            </article>
 
-          <article class="card">
-            <div class="card-icon">🧰</div>
-            <h3>全能跑腿</h3>
-            <p>無法歸類的生活任務，可透過平台送出需求，由客服或系統流程協助確認任務內容。</p>
-          </article>
+            <article class="service-card">
+              <div class="service-icon">🧰</div>
+              <h3>全能跑腿</h3>
+              <p>無法歸類的生活任務，可透過平台送出需求，由客服或系統流程協助確認任務內容。</p>
+            </article>
 
-          <article class="card">
-            <div class="card-icon">⚡</div>
-            <h3>急件專送</h3>
-            <p>針對高急迫性的代送需求，協助處理文件急送、重要物品送達與即時配送任務。</p>
-          </article>
+            <article class="service-card">
+              <div class="service-icon">⚡</div>
+              <h3>急件專送</h3>
+              <p>針對高急迫性的代送需求，協助處理文件急送、重要物品送達與即時配送任務。</p>
+            </article>
+          </div>
         </div>
       </section>
 
-      <section class="section" id="how">
-        <div class="feature-band">
-          <div>
-            <div class="section-kicker">How It Works</div>
-            <h2>不用下載 App，也能快速下單</h2>
-            <p>
-              UBee 採用 LINE LIFF 網頁版 App，下單入口可直接透過 LINE 開啟。
-              使用者填寫任務資訊後，即可送出需求，讓任務流程更清楚。
-            </p>
+      <section class="section" id="why">
+        <div class="container">
+          <div class="why-wrap">
+            <div class="why-main">
+              <div class="kicker">Why UBee</div>
+              <h2>不是群組喊單，UBee 用系統把任務流程做清楚。</h2>
+              <p>
+                UBee 跑腿以系統化下單流程協助使用者提交任務資訊，讓服務內容、地點、聯絡方式與付款方式更清楚。
+                對店家與用戶來說，這不只是跑腿服務，而是更接近平台化的城市任務系統。
+              </p>
+            </div>
+
+            <div class="why-list">
+              <div class="why-item">
+                <div class="why-num">1</div>
+                <div class="why-title">下單流程清楚</div>
+                <div class="why-text">透過 LINE LIFF 網頁版 App 填寫任務，不需要另外下載原生 App。</div>
+              </div>
+
+              <div class="why-item">
+                <div class="why-num">2</div>
+                <div class="why-title">任務分類完整</div>
+                <div class="why-text">代送、代買、取件、排隊、全能跑腿、急件專送，對應不同生活情境。</div>
+              </div>
+
+              <div class="why-item">
+                <div class="why-num">3</div>
+                <div class="why-title">在地服務網路</div>
+                <div class="why-text">目前以豐原、潭子、神岡、大雅、后里為主，持續擴展大台中。</div>
+              </div>
+
+              <div class="why-item">
+                <div class="why-num">4</div>
+                <div class="why-title">適合店家合作</div>
+                <div class="why-text">店家可用更低門檻測試外送、代送與臨時配送需求。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="flow">
+        <div class="container">
+          <div class="section-head">
+            <div>
+              <div class="kicker">How It Works</div>
+              <h2>不用下載 App，也能快速下單</h2>
+              <p class="section-desc">
+                UBee 採用 LINE LIFF 網頁版 App。使用者從 LINE 開啟下單頁，填寫任務內容後即可送出需求。
+              </p>
+            </div>
           </div>
 
-          <div class="steps">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div>
-                <div class="step-title">選擇服務項目</div>
-                <div class="step-text">依需求選擇代送、代買、取件、排隊、全能跑腿或急件專送。</div>
-              </div>
+          <div class="flow">
+            <div class="flow-step">
+              <div class="flow-badge">1</div>
+              <h3>選擇服務</h3>
+              <p>依需求選擇代送、代買、取件、排隊、全能跑腿或急件專送。</p>
             </div>
 
-            <div class="step">
-              <div class="step-num">2</div>
-              <div>
-                <div class="step-title">填寫任務資訊</div>
-                <div class="step-text">輸入取件地點、送達地點、任務內容與聯絡資訊。</div>
-              </div>
+            <div class="flow-step">
+              <div class="flow-badge">2</div>
+              <h3>填寫資訊</h3>
+              <p>輸入取件地點、送達地點、任務內容、聯絡方式與付款方式。</p>
             </div>
 
-            <div class="step">
-              <div class="step-num">3</div>
-              <div>
-                <div class="step-title">送出任務需求</div>
-                <div class="step-text">透過系統送出訂單，後續依任務內容進行確認與派單。</div>
-              </div>
+            <div class="flow-step">
+              <div class="flow-badge">3</div>
+              <h3>送出任務</h3>
+              <p>系統送出任務需求，後續依任務內容進行確認與派單。</p>
             </div>
 
-            <div class="step">
-              <div class="step-num">4</div>
-              <div>
-                <div class="step-title">完成任務交付</div>
-                <div class="step-text">任務完成後，依實際服務內容進行付款與結算。</div>
-              </div>
+            <div class="flow-step">
+              <div class="flow-badge">4</div>
+              <h3>完成交付</h3>
+              <p>任務完成後，依實際服務內容進行付款、交付與後續紀錄。</p>
             </div>
           </div>
         </div>
       </section>
 
       <section class="section" id="area">
-        <div class="area-card">
-          <div class="section-kicker">Service Area</div>
-          <h2>目前服務範圍</h2>
-          <p class="section-desc">
-            UBee 跑腿目前以台中地區為主要服務範圍，從豐原出發，逐步建立更完整的在地任務服務網路。
-          </p>
+        <div class="container">
+          <div class="area-box">
+            <div class="area-content">
+              <div>
+                <div class="kicker">Service Area</div>
+                <h2>從豐原出發，持續擴展大台中地區。</h2>
+                <p class="section-desc">
+                  UBee 跑腿目前以台中地區為主要服務範圍，服務範圍涵蓋豐原、潭子、神岡、大雅、后里，
+                  並持續擴展大台中地區。
+                </p>
 
-          <div class="area-tags">
-            <span class="tag">豐原</span>
-            <span class="tag">潭子</span>
-            <span class="tag">神岡</span>
-            <span class="tag">大雅</span>
-            <span class="tag">后里</span>
-            <span class="tag">持續擴展大台中地區</span>
+                <div class="area-tags">
+                  <span class="tag">豐原</span>
+                  <span class="tag">潭子</span>
+                  <span class="tag">神岡</span>
+                  <span class="tag">大雅</span>
+                  <span class="tag">后里</span>
+                  <span class="tag">大台中持續擴展中</span>
+                </div>
+              </div>
+
+              <div class="area-map" aria-label="UBee 服務範圍示意">
+                <div>
+                  <div class="area-map-title">UBee 台中服務網路</div>
+                  <div class="area-map-sub">以在地騎士與系統化任務流程，建立區域服務密度。</div>
+                </div>
+
+                <div class="area-pin pin-1">豐原</div>
+                <div class="area-pin pin-2">潭子</div>
+                <div class="area-pin pin-3">神岡</div>
+                <div class="area-pin pin-4">大雅</div>
+                <div class="area-pin pin-5">后里</div>
+
+                <div style="position: relative; z-index: 2; color: rgba(255,255,255,.68); font-size: 13px;">
+                  實際可服務範圍依當下騎士量、距離、天候與任務內容確認。
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="partner">
+        <div class="container">
+          <div class="partner">
+            <div>
+              <div class="kicker">Partner With UBee</div>
+              <h2>店家想做外送，不一定要被平台抽成。</h2>
+              <p class="section-desc">
+                UBee 跑腿提供店家更彈性的外送與代送合作方式。沒有月費壓力，不需要上架成本，也不用綁長約。
+                有單再合作，先從一筆訂單開始測試就可以。
+              </p>
+
+              <div class="hero-actions">
+                <a class="btn btn-dark" href="https://liff.line.me/2009895876-eDSfemYo">
+                  進入 UBee 下單頁
+                </a>
+                <a class="btn btn-dark" href="#contact">
+                  聯絡合作
+                </a>
+              </div>
+            </div>
+
+            <div class="partner-points">
+              <div class="partner-point">
+                <strong>免抽成</strong>
+                <span>店家不需要被高比例平台抽成壓縮利潤。</span>
+              </div>
+
+              <div class="partner-point">
+                <strong>免月費</strong>
+                <span>沒有固定月租壓力，有需求再使用。</span>
+              </div>
+
+              <div class="partner-point">
+                <strong>免上架費</strong>
+                <span>降低店家測試外送與代送服務的門檻。</span>
+              </div>
+
+              <div class="partner-point">
+                <strong>不綁約</strong>
+                <span>先從單次合作開始，依實際需求逐步加深合作。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="faq">
+        <div class="container">
+          <div class="section-head">
+            <div>
+              <div class="kicker">FAQ</div>
+              <h2>常見問題</h2>
+              <p class="section-desc">
+                下單前可以先了解 UBee 的服務方式、付款方式與合作模式。
+              </p>
+            </div>
           </div>
 
-          <div class="notice">
-            實際可服務範圍、配送時間與任務承接狀況，仍會依當下騎士量、距離、天候與任務內容進行確認。
+          <div class="faq-grid">
+            <details>
+              <summary>UBee 需要下載 App 嗎？</summary>
+              <p>不需要。UBee 採用 LINE LIFF 網頁版 App，下單入口可透過 LINE 開啟使用。</p>
+            </details>
+
+            <details>
+              <summary>目前服務哪些地區？</summary>
+              <p>目前服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。</p>
+            </details>
+
+            <details>
+              <summary>可以幫忙送文件或急件嗎？</summary>
+              <p>可以。UBee 提供文件急送、物品代送與急件專送等服務，實際承接會依任務內容確認。</p>
+            </details>
+
+            <details>
+              <summary>店家可以合作嗎？</summary>
+              <p>可以。UBee 主打免抽成、免月費、免上架費、不綁約，有單再合作，適合店家先從單次配送開始測試。</p>
+            </details>
           </div>
         </div>
       </section>
 
       <section class="section" id="contact">
-        <div class="section-head">
-          <div>
-            <div class="section-kicker">Contact</div>
-            <h2>聯絡 UBee 跑腿</h2>
-            <p class="section-desc">
-              一般用戶下單、店家合作、客服聯繫與商務配送需求，都可以透過 UBee 官方管道聯繫。
-            </p>
-          </div>
-        </div>
+        <div class="container">
+          <div class="contact-panel">
+            <div class="contact-card">
+              <div class="kicker">Contact</div>
+              <h2>立即使用 UBee 跑腿</h2>
+              <p>
+                一般用戶下單、店家合作、客服聯繫與商務配送需求，都可以透過 UBee 官方管道聯繫。
+              </p>
 
-        <div class="contact-wrap">
-          <div class="contact-card">
-            <h3>立即使用服務</h3>
-            <p>
-              點擊下方按鈕即可進入 UBee 跑腿下單頁。
-            </p>
-
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
-                進入 UBee 下單頁
-              </a>
-            </div>
-
-            <div class="info-list">
-              <div class="info-row">
-                <div class="info-label">下單入口</div>
-                <div class="info-value">LINE LIFF 網頁版 App</div>
+              <div class="hero-actions">
+                <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
+                  立即進入下單頁
+                </a>
               </div>
 
-              <div class="info-row">
-                <div class="info-label">官方帳號</div>
-                <div class="info-value">@686rvnvn</div>
-              </div>
-
-              <div class="info-row">
-                <div class="info-label">服務型態</div>
-                <div class="info-value">在地跑腿、代送、代買、急件專送</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="contact-card">
-            <h3>品牌與營運資訊</h3>
-
-            <div class="info-list">
-              <div class="info-row">
-                <div class="info-label">品牌名稱</div>
-                <div class="info-value">UBee 跑腿</div>
-              </div>
-
-              <div class="info-row">
-                <div class="info-label">服務地區</div>
-                <div class="info-value">豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區</div>
-              </div>
-
-              <div class="info-row">
-                <div class="info-label">客服信箱</div>
-                <div class="info-value">as25252159@yahoo.com.tw</div>
-              </div>
-
-              <div class="info-row">
-                <div class="info-label">統一編號</div>
-                <div class="info-value">商業登記完成後補上</div>
-              </div>
-
-              <div class="info-row">
-                <div class="info-label">登記地址</div>
-                <div class="info-value">商業登記完成後補上</div>
+              <div class="notice">
+                UBee 使用 LINE LIFF 網頁版 App 作為下單入口，使用者不需下載原生 App。
               </div>
             </div>
 
-            <div class="notice">
-              本頁為 UBee 跑腿官方服務介紹頁。公司／商業登記資訊完成後，將同步更新於本網站。
+            <div class="contact-card">
+              <h2>品牌資訊</h2>
+
+              <div class="info-list">
+                <div class="info-row">
+                  <div class="info-label">品牌名稱</div>
+                  <div class="info-value">UBee 跑腿</div>
+                </div>
+
+                <div class="info-row">
+                  <div class="info-label">官方帳號</div>
+                  <div class="info-value">@686rvnvn</div>
+                </div>
+
+                <div class="info-row">
+                  <div class="info-label">服務地區</div>
+                  <div class="info-value">豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區</div>
+                </div>
+
+                <div class="info-row">
+                  <div class="info-label">客服信箱</div>
+                  <div class="info-value">as25252159@yahoo.com.tw</div>
+                </div>
+
+                <div class="info-row">
+                  <div class="info-label">服務型態</div>
+                  <div class="info-value">在地跑腿、代送、代買、取件、排隊、文件急送、急件專送</div>
+                </div>
+
+                <div class="info-row">
+                  <div class="info-label">下單入口</div>
+                  <div class="info-value">https://liff.line.me/2009895876-eDSfemYo</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
+
     </main>
 
     <footer class="footer">
       <div class="footer-inner">
         <div>
           <div class="footer-brand">UBee 跑腿</div>
-          <div class="footer-small">
-            台中在地跑腿服務平台｜你的任務・我們使命必達
-          </div>
+          <div class="footer-small">台中在地跑腿服務平台｜你的任務・我們使命必達</div>
         </div>
 
         <div class="footer-small">
