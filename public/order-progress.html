@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>UBee 訂單進度</title>
+  <title>UBee 我的訂單</title>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
   <style>
     * {
@@ -88,6 +92,52 @@
       cursor: pointer;
     }
 
+    .profile-card {
+      margin: 16px;
+      background: #fff;
+      border-radius: 20px;
+      padding: 14px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid #eef0f3;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+    }
+
+    .profile-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      background: #111827;
+      color: #facc15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .profile-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .profile-name {
+      font-size: 16px;
+      font-weight: 950;
+      color: #111827;
+    }
+
+    .profile-desc {
+      margin-top: 3px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #6b7280;
+    }
+
     .hero {
       margin: 16px;
       background: linear-gradient(135deg, #111827, #374151);
@@ -108,6 +158,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      min-width: 0;
     }
 
     .order-label {
@@ -116,9 +167,10 @@
     }
 
     .order-number {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 900;
       letter-spacing: 0.3px;
+      word-break: break-all;
     }
 
     .status-pill {
@@ -162,6 +214,7 @@
       border: 1px solid rgba(255, 255, 255, 0.16);
       border-radius: 16px;
       padding: 12px;
+      min-width: 0;
     }
 
     .hero-stat span {
@@ -176,6 +229,7 @@
       font-size: 15px;
       font-weight: 900;
       color: #ffffff;
+      word-break: break-word;
     }
 
     .card {
@@ -553,7 +607,7 @@
       <div class="header-left">
         <button class="back-btn" type="button" onclick="goBack()">‹</button>
         <div class="header-title">
-          <strong>訂單進度</strong>
+          <strong>我的訂單</strong>
           <span>UBee 跑腿任務追蹤</span>
         </div>
       </div>
@@ -561,21 +615,33 @@
       <button class="refresh-btn" type="button" onclick="refreshPage()">更新</button>
     </header>
 
-    <section class="hero" id="mainContent">
+    <section class="profile-card" id="profileCard">
+      <div class="profile-avatar" id="profileAvatar">🐝</div>
+      <div>
+        <div class="profile-name" id="profileName">LINE 身分確認中</div>
+        <div class="profile-desc" id="profileDesc">正在讀取你的 UBee 訂單</div>
+      </div>
+    </section>
+
+    <section class="empty-state" id="loadingState" style="display:block;">
+      <div class="empty-icon">🐝</div>
+      <h2>正在啟動我的訂單</h2>
+      <p>請稍候，系統正在確認 LINE 身分與訂單資料。</p>
+    </section>
+
+    <section class="hero" id="mainContent" style="display:none;">
       <div class="hero-top">
         <div class="order-info">
           <span class="order-label">目前追蹤訂單</span>
-          <strong class="order-number" id="orderNumber">UBEE-000000</strong>
+          <strong class="order-number" id="orderNumber">-</strong>
         </div>
 
-        <div class="status-pill" id="statusPill">等待騎士接單</div>
+        <div class="status-pill" id="statusPill">處理中</div>
       </div>
 
       <div class="hero-main">
-        <h1 class="current-title" id="currentTitle">正在等待騎士接單</h1>
-        <p class="current-desc" id="currentDesc">
-          系統已收到您的任務需求，正在等待附近騎士接單。
-        </p>
+        <h1 class="current-title" id="currentTitle">正在讀取訂單</h1>
+        <p class="current-desc" id="currentDesc">請稍候，系統正在同步最新進度。</p>
       </div>
 
       <div class="hero-footer">
@@ -590,10 +656,10 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="progressCard" style="display:none;">
       <div class="card-title">
         <h2>流程進度圖</h2>
-        <span id="progressText">第 2 / 7 步</span>
+        <span id="progressText">第 1 / 7 步</span>
       </div>
 
       <div class="horizontal-progress">
@@ -605,7 +671,7 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="timelineCard" style="display:none;">
       <div class="card-title">
         <h2>任務流程</h2>
         <span>即時狀態</span>
@@ -614,7 +680,7 @@
       <div class="timeline" id="timeline"></div>
     </section>
 
-    <section class="card">
+    <section class="card" id="detailCard" style="display:none;">
       <div class="card-title">
         <h2>訂單資訊</h2>
         <span>任務摘要</span>
@@ -623,7 +689,7 @@
       <div class="detail-list">
         <div class="detail-row">
           <div class="detail-label">訂單編號</div>
-          <div class="detail-value" id="detailOrderId">UBEE-000000</div>
+          <div class="detail-value" id="detailOrderId">-</div>
         </div>
 
         <div class="detail-row">
@@ -648,8 +714,8 @@
       </div>
     </section>
 
-    <div class="notice">
-      提醒您：此頁面為 UBee 訂單流程進度頁。正式接上後端資料後，訂單狀態會依照騎士接單、取件、配送與完成狀態自動更新。
+    <div class="notice" id="noticeBox" style="display:none;">
+      此頁面會依照騎士接單、取件、配送與完成狀態，即時更新 UBee 訂單流程。
     </div>
 
     <div class="actions">
@@ -658,33 +724,49 @@
     </div>
 
     <section class="empty-state" id="emptyState">
-      <div class="empty-icon">🐝</div>
-      <h2>找不到訂單資料</h2>
-      <p>
-        目前沒有取得訂單編號。請從訂單頁或 LINE 官方帳號重新進入。
-      </p>
+      <div class="empty-icon">📦</div>
+      <h2>目前沒有進行中訂單</h2>
+      <p>這個 LINE 帳號目前沒有 UBee 進行中的訂單。</p>
     </section>
   </div>
 
   <div class="toast" id="toast">已更新訂單進度</div>
 
   <script>
+    const PROGRESS_LIFF_ID = "2009895876-7ycqRYbI";
+
+    const ORDER_LIFF_URL = "https://liff.line.me/2009895876-eDSfemYo";
+    const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@686rwnvn";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
+      authDomain: "ubee-oms.firebaseapp.com",
+      projectId: "ubee-oms"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let userId = "";
+    let currentOrderId = "";
+    let unsubscribeOrder = null;
+
     const steps = [
       {
-        key: "created",
-        title: "訂單成立",
-        shortTitle: "成立",
-        desc: "系統已收到您的任務需求，訂單已建立完成。",
-        activeTitle: "訂單已成立",
-        activeDesc: "UBee 已收到您的任務內容，正在準備進入媒合流程。"
+        key: "pending_payment",
+        title: "等待付款",
+        shortTitle: "付款",
+        desc: "訂單已建立，正在等待付款確認。",
+        activeTitle: "等待付款確認",
+        activeDesc: "請完成付款或等待系統確認付款狀態。"
       },
       {
-        key: "matching",
-        title: "等待騎士接單",
-        shortTitle: "媒合",
-        desc: "系統正在等待附近騎士接單。",
+        key: "pending_dispatch",
+        title: "等待派單",
+        shortTitle: "派單",
+        desc: "系統正在媒合附近可服務的 UBee 騎士。",
         activeTitle: "正在等待騎士接單",
-        activeDesc: "系統已收到您的任務需求，正在等待附近騎士接單。"
+        activeDesc: "系統正在尋找附近可服務的 UBee 騎士。"
       },
       {
         key: "accepted",
@@ -695,15 +777,15 @@
         activeDesc: "您的任務已有騎士接單，騎士即將前往取件地點。"
       },
       {
-        key: "toPickup",
-        title: "騎士前往取件",
-        shortTitle: "取件",
-        desc: "騎士正在前往取件地點，請保持電話與 LINE 暢通。",
-        activeTitle: "騎士正在前往取件",
-        activeDesc: "騎士已出發前往取件地點，請留意聯絡訊息。"
+        key: "arrived_pickup",
+        title: "抵達取件",
+        shortTitle: "抵達",
+        desc: "騎士已抵達取件地點，正在確認任務內容。",
+        activeTitle: "騎士已抵達取件地點",
+        activeDesc: "騎士已到達取件地點，正在確認物品或任務內容。"
       },
       {
-        key: "pickedUp",
+        key: "picked_up",
         title: "已完成取件",
         shortTitle: "已取",
         desc: "騎士已完成取件，準備開始配送。",
@@ -711,12 +793,12 @@
         activeDesc: "物品已由騎士取件完成，接下來會前往送達地點。"
       },
       {
-        key: "delivering",
-        title: "配送中",
-        shortTitle: "配送",
-        desc: "騎士正在配送途中，請等待送達通知。",
-        activeTitle: "騎士配送中",
-        activeDesc: "您的物品正在配送途中，請等待騎士送達。"
+        key: "arrived_dropoff",
+        title: "抵達送達",
+        shortTitle: "送達",
+        desc: "騎士已抵達送達地點，正在完成交付。",
+        activeTitle: "騎士已抵達送達地點",
+        activeDesc: "騎士已抵達送達地點，正在完成最後交付。"
       },
       {
         key: "completed",
@@ -729,86 +811,176 @@
     ];
 
     const statusAlias = {
-      created: 0,
-      pending: 0,
-      new: 0,
+      draft_confirm: 0,
+      pending_payment: 0,
 
-      matching: 1,
-      waiting: 1,
-      waitRider: 1,
-      waiting_rider: 1,
+      merchant_pending: 1,
+      pending_dispatch: 1,
 
       accepted: 2,
-      riderAccepted: 2,
-      rider_accepted: 2,
 
-      toPickup: 3,
-      pickup: 3,
-      goingPickup: 3,
-      going_pickup: 3,
+      arrived_pickup: 3,
 
-      pickedUp: 4,
       picked_up: 4,
-      picked: 4,
 
-      delivering: 5,
-      delivery: 5,
-      onDelivery: 5,
-      on_delivery: 5,
+      arrived_dropoff: 5,
 
       completed: 6,
-      done: 6,
-      finished: 6
+      done: 6
     };
 
-    const params = new URLSearchParams(window.location.search);
-
-    const orderData = {
-      orderId: getValue("orderId") || getValue("id") || createDemoOrderId(),
-      status: getValue("status") || "matching",
-      serviceType: getValue("service") || "跑腿任務",
-      pickup: getValue("pickup") || "尚未提供",
-      dropoff: getValue("dropoff") || "尚未提供",
-      rider: getValue("rider") || "",
-      fee: getValue("fee") || "",
-      eta: getValue("eta") || "約 35 分鐘"
-    };
-
-    function getValue(key) {
-      const value = params.get(key);
-      if (!value) return "";
-      return decodeURIComponent(value).trim();
-    }
-
-    function createDemoOrderId() {
-      const now = new Date();
-      const y = String(now.getFullYear()).slice(2);
-      const m = String(now.getMonth() + 1).padStart(2, "0");
-      const d = String(now.getDate()).padStart(2, "0");
-      const random = String(Math.floor(Math.random() * 9000) + 1000);
-      return `UBEE-${y}${m}${d}-${random}`;
-    }
+    const activeStatuses = [
+      "pending_payment",
+      "merchant_pending",
+      "pending_dispatch",
+      "accepted",
+      "arrived_pickup",
+      "picked_up",
+      "arrived_dropoff"
+    ];
 
     function getCurrentIndex(status) {
       if (!status) return 1;
       return typeof statusAlias[status] === "number" ? statusAlias[status] : 1;
     }
 
-    function renderPage() {
-      const currentIndex = getCurrentIndex(orderData.status);
+    function getStatusLabel(status) {
+      const map = {
+        draft_confirm: "待確認",
+        pending_payment: "等待付款",
+        merchant_pending: "店家確認中",
+        pending_dispatch: "等待派單",
+        accepted: "騎士已接單",
+        arrived_pickup: "抵達取件",
+        picked_up: "已完成取件",
+        arrived_dropoff: "抵達送達",
+        completed: "已完成",
+        done: "已完成",
+        cancelled: "已取消"
+      };
+
+      return map[status] || "處理中";
+    }
+
+    function getMoney(order) {
+      const value = order.total || order.totalFee || order.price || 0;
+      const num = Number(value || 0);
+
+      if (!Number.isFinite(num) || num <= 0) {
+        return "待系統確認";
+      }
+
+      return `NT$ ${Math.round(num)}`;
+    }
+
+    function getPickup(order) {
+      return order.pickupAddress || order.pickup || order.fromAddress || "尚未提供";
+    }
+
+    function getDropoff(order) {
+      return order.dropoffAddress || order.dropoff || order.toAddress || "尚未提供";
+    }
+
+    function getServiceType(order) {
+      return order.serviceType || order.serviceName || "跑腿任務";
+    }
+
+    function getRiderInfo(order) {
+      if (order.riderName) return order.riderName;
+      if (order.riderDisplayName) return order.riderDisplayName;
+      if (order.riderPhone) return order.riderPhone;
+      if (order.riderId) return "騎士已接單，詳細資訊以 LINE 通知為主";
+      return "等待騎士接單中";
+    }
+
+    function getOrderTime(order) {
+      const value = order.createdAt || order.updatedAt;
+
+      if (!value) return 0;
+
+      if (value.toDate) {
+        return value.toDate().getTime();
+      }
+
+      const parsed = Date.parse(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+
+      setTimeout(() => {
+        toast.classList.remove("show");
+      }, 1800);
+    }
+
+    function showLoading(message) {
+      document.getElementById("loadingState").style.display = "block";
+      document.querySelector("#loadingState h2").textContent = message || "正在讀取訂單";
+      document.getElementById("emptyState").style.display = "none";
+      hideOrderContent();
+    }
+
+    function showEmpty(title, desc) {
+      document.getElementById("loadingState").style.display = "none";
+      document.getElementById("emptyState").style.display = "block";
+      document.querySelector("#emptyState h2").textContent = title;
+      document.querySelector("#emptyState p").textContent = desc;
+      hideOrderContent();
+    }
+
+    function hideOrderContent() {
+      document.getElementById("mainContent").style.display = "none";
+      document.getElementById("progressCard").style.display = "none";
+      document.getElementById("timelineCard").style.display = "none";
+      document.getElementById("detailCard").style.display = "none";
+      document.getElementById("noticeBox").style.display = "none";
+    }
+
+    function showOrderContent() {
+      document.getElementById("loadingState").style.display = "none";
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("mainContent").style.display = "block";
+      document.getElementById("progressCard").style.display = "block";
+      document.getElementById("timelineCard").style.display = "block";
+      document.getElementById("detailCard").style.display = "block";
+      document.getElementById("noticeBox").style.display = "block";
+    }
+
+    function renderProfile(profile) {
+      const card = document.getElementById("profileCard");
+      const avatar = document.getElementById("profileAvatar");
+
+      card.style.display = "flex";
+
+      document.getElementById("profileName").textContent = profile.displayName || "UBee 會員";
+      document.getElementById("profileDesc").textContent = "LINE 身分已確認，正在同步訂單進度";
+
+      if (profile.pictureUrl) {
+        avatar.innerHTML = `<img src="${profile.pictureUrl}" alt="profile" />`;
+      }
+    }
+
+    function renderPage(order) {
+      const status = order.status || "pending_dispatch";
+      const currentIndex = getCurrentIndex(status);
       const currentStep = steps[currentIndex];
 
-      document.getElementById("orderNumber").textContent = orderData.orderId;
-      document.getElementById("detailOrderId").textContent = orderData.orderId;
-      document.getElementById("statusPill").textContent = currentStep.title;
+      showOrderContent();
+
+      document.getElementById("orderNumber").textContent = order.id;
+      document.getElementById("detailOrderId").textContent = order.id;
+      document.getElementById("statusPill").textContent = getStatusLabel(status);
       document.getElementById("currentTitle").textContent = currentStep.activeTitle;
       document.getElementById("currentDesc").textContent = currentStep.activeDesc;
-      document.getElementById("serviceType").textContent = orderData.serviceType;
-      document.getElementById("etaText").textContent = orderData.eta;
-      document.getElementById("pickupAddress").textContent = orderData.pickup;
-      document.getElementById("dropoffAddress").textContent = orderData.dropoff;
-      document.getElementById("riderInfo").textContent = orderData.rider || getDefaultRiderText(currentIndex);
-      document.getElementById("feeInfo").textContent = orderData.fee ? `NT$ ${orderData.fee}` : "待系統確認";
+      document.getElementById("serviceType").textContent = getServiceType(order);
+      document.getElementById("etaText").textContent = order.eta || order.estimatedTime || "約 35 分鐘";
+      document.getElementById("pickupAddress").textContent = getPickup(order);
+      document.getElementById("dropoffAddress").textContent = getDropoff(order);
+      document.getElementById("riderInfo").textContent = getRiderInfo(order);
+      document.getElementById("feeInfo").textContent = getMoney(order);
       document.getElementById("progressText").textContent = `第 ${currentIndex + 1} / ${steps.length} 步`;
 
       const percent = currentIndex / (steps.length - 1) * 100;
@@ -816,12 +988,6 @@
 
       renderHorizontalSteps(currentIndex);
       renderTimeline(currentIndex);
-    }
-
-    function getDefaultRiderText(currentIndex) {
-      if (currentIndex <= 1) return "等待騎士接單中";
-      if (currentIndex >= 2 && currentIndex <= 5) return "騎士已接單，詳細資訊以 LINE 通知為主";
-      return "任務已完成";
     }
 
     function renderHorizontalSteps(currentIndex) {
@@ -895,39 +1061,140 @@
       });
     }
 
+    async function findLatestActiveOrder() {
+      const byUserId = await db.collection("orders")
+        .where("userId", "==", userId)
+        .limit(30)
+        .get();
+
+      const byCustomerId = await db.collection("orders")
+        .where("customerId", "==", userId)
+        .limit(30)
+        .get();
+
+      const orderMap = new Map();
+
+      byUserId.forEach(doc => {
+        orderMap.set(doc.id, { id: doc.id, ...doc.data() });
+      });
+
+      byCustomerId.forEach(doc => {
+        orderMap.set(doc.id, { id: doc.id, ...doc.data() });
+      });
+
+      const orders = Array.from(orderMap.values())
+        .filter(order => activeStatuses.includes(order.status))
+        .sort((a, b) => getOrderTime(b) - getOrderTime(a));
+
+      return orders[0] || null;
+    }
+
+    function listenOrder(orderId) {
+      if (unsubscribeOrder) {
+        unsubscribeOrder();
+        unsubscribeOrder = null;
+      }
+
+      currentOrderId = orderId;
+
+      unsubscribeOrder = db.collection("orders").doc(orderId).onSnapshot(doc => {
+        if (!doc.exists) {
+          showEmpty("找不到訂單資料", "這筆訂單不存在或已被移除。");
+          return;
+        }
+
+        const order = {
+          id: doc.id,
+          ...doc.data()
+        };
+
+        if (order.userId !== userId && order.customerId !== userId) {
+          showEmpty("無法查看此訂單", "這筆訂單不是目前 LINE 帳號建立的訂單。");
+          return;
+        }
+
+        renderPage(order);
+      }, error => {
+        console.error("監聽訂單失敗", error);
+        showEmpty("讀取訂單失敗", "目前無法即時讀取訂單進度，請稍後再試。");
+      });
+    }
+
+    async function initApp() {
+      try {
+        showLoading("正在啟動我的訂單");
+
+        await liff.init({
+          liffId: PROGRESS_LIFF_ID
+        });
+
+        if (!liff.isLoggedIn()) {
+          liff.login({
+            redirectUri: window.location.origin + window.location.pathname
+          });
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        userId = profile.userId || "";
+
+        if (!userId) {
+          showEmpty("無法取得 LINE 身分", "請從 LINE 官方帳號重新開啟我的訂單。");
+          return;
+        }
+
+        renderProfile(profile);
+
+        showLoading("正在讀取你的訂單");
+
+        const order = await findLatestActiveOrder();
+
+        if (!order) {
+          showEmpty("目前沒有進行中訂單", "這個 LINE 帳號目前沒有 UBee 進行中的訂單。");
+          return;
+        }
+
+        listenOrder(order.id);
+
+      } catch (error) {
+        console.error("初始化失敗", error);
+        showEmpty("系統初始化失敗", "請確認是否從 LINE 官方帳號開啟，或稍後重新整理。");
+      }
+    }
+
     function goBack() {
       if (window.history.length > 1) {
         window.history.back();
         return;
       }
 
-      window.location.href = "./order.html";
+      window.location.href = ORDER_LIFF_URL;
     }
 
     function goOrderPage() {
-      window.location.href = "./order.html";
+      window.location.href = ORDER_LIFF_URL;
     }
 
     function refreshPage() {
-      showToast("已更新訂單進度");
-      renderPage();
+      if (currentOrderId) {
+        showToast("已更新訂單進度");
+        return;
+      }
+
+      initApp();
     }
 
     function contactService() {
-      showToast("請回到 LINE 官方帳號聯絡 UBee 客服");
+      window.location.href = LINE_OFFICIAL_URL;
     }
 
-    function showToast(message) {
-      const toast = document.getElementById("toast");
-      toast.textContent = message;
-      toast.classList.add("show");
+    window.addEventListener("beforeunload", () => {
+      if (unsubscribeOrder) {
+        unsubscribeOrder();
+      }
+    });
 
-      setTimeout(() => {
-        toast.classList.remove("show");
-      }, 1800);
-    }
-
-    renderPage();
+    initApp();
   </script>
 </body>
 </html>
