@@ -2263,7 +2263,8 @@ let isCancellingOrder = false;
 let cachedHistoryOrders = [];
 let currentHistoryFilter = 'all';
 let currentCustomerPage = '';
-
+let initialOpenActionHandled = false;
+  
 const LINE_OFFICIAL_ID = '@686rwnvn';
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
   
@@ -2936,6 +2937,53 @@ function showTasksTab(){
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
+function getInitialOpenAction(){
+  const allowedOrderActions = ['orders', 'my-orders', 'tasks'];
+
+  const params = new URLSearchParams(window.location.search);
+  const directOpen = String(params.get('open') || params.get('page') || '').trim();
+
+  if(allowedOrderActions.includes(directOpen)){
+    return 'orders';
+  }
+
+  const liffState = params.get('liff.state') || '';
+
+  if(liffState){
+    try{
+      const decodedState = decodeURIComponent(liffState);
+
+      if(
+        decodedState.includes('open=orders') ||
+        decodedState.includes('page=orders') ||
+        decodedState.includes('/orders') ||
+        decodedState.includes('my-orders') ||
+        decodedState.includes('tasks')
+      ){
+        return 'orders';
+      }
+    }catch(err){
+      console.warn('解析 LIFF state 失敗:', err);
+    }
+  }
+
+  return '';
+}
+
+function handleInitialOpenAction(){
+  if(initialOpenActionHandled) return;
+
+  const action = getInitialOpenAction();
+
+  if(action === 'orders'){
+    initialOpenActionHandled = true;
+
+    setTimeout(() => {
+      showTasksTab();
+    }, 120);
+  }
+}
+  
 function showProfileTab(){
   hideOrderSteps();
   hideCustomerPages();
@@ -4479,17 +4527,19 @@ async function initPage(){
         userId = profile.userId || '';
 
         if(userId && userId.startsWith('U')){
-          saveLineUserId(userId);
-          setSubmitButton('確認並建立任務', false);
-          renderCustomerMemberInfo();
-          return;
-        }
+  saveLineUserId(userId);
+  setSubmitButton('確認並建立任務', false);
+  renderCustomerMemberInfo();
+  handleInitialOpenAction();
+  return;
+}
       }
 
       if(cachedUserId && cachedUserId.startsWith('U')){
         userId = cachedUserId;
         setSubmitButton('確認並建立任務', false);
         renderCustomerMemberInfo();
+        handleInitialOpenAction();
         return;
       }
 
@@ -4504,6 +4554,7 @@ async function initPage(){
       userId = cachedUserId;
       setSubmitButton('確認並建立任務', false);
       renderCustomerMemberInfo();
+      handleInitialOpenAction();
       return;
     }
 
@@ -4519,6 +4570,7 @@ async function initPage(){
       userId = cachedUserId;
       setSubmitButton('確認並建立任務', false);
       renderCustomerMemberInfo();
+      handleInitialOpenAction();
       return;
     }
 
