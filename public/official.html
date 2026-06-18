@@ -501,59 +501,297 @@
     .service-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
+      gap: 22px;
     }
 
     .service-card {
-      position: relative;
+      min-height: 0;
+      padding: 0;
+      border-radius: 32px;
+      background: #fff;
+      border: 1px solid rgba(16, 16, 16, 0.08);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
       overflow: hidden;
-      min-height: 236px;
-      padding: 24px;
-      border-radius: var(--radius-md);
-      background: var(--card);
-      border: 1px solid var(--line);
-      box-shadow: var(--shadow-soft);
+      isolation: isolate;
       transition: 0.2s ease;
     }
 
     .service-card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow);
+      transform: translateY(-8px);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.14);
     }
 
-    .service-card::after {
+    .service-visual {
+      position: relative;
+      height: 230px;
+      overflow: hidden;
+      background: #111;
+    }
+
+    .service-visual::before {
       content: "";
       position: absolute;
-      width: 140px;
-      height: 140px;
-      border-radius: 999px;
-      right: -70px;
-      top: -70px;
-      background: rgba(248, 200, 50, 0.18);
+      inset: 0;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.40), transparent 12%),
+        radial-gradient(circle at 86% 18%, rgba(255, 255, 255, 0.28), transparent 16%),
+        radial-gradient(circle at 50% 120%, rgba(0, 0, 0, 0.40), transparent 42%);
+      z-index: 1;
     }
 
-    .service-icon {
-      width: 54px;
-      height: 54px;
+    .service-visual::after {
+      content: "";
+      position: absolute;
+      inset: auto 18px 18px 18px;
+      height: 74px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      backdrop-filter: blur(14px);
+      z-index: 2;
+    }
+
+    .visual-delivery {
+      background:
+        linear-gradient(135deg, rgba(255, 201, 50, 0.95), rgba(255, 231, 150, 0.9)),
+        linear-gradient(135deg, #111, #2a260f);
+    }
+
+    .visual-buy {
+      background:
+        linear-gradient(135deg, rgba(255, 214, 86, 0.95), rgba(255, 246, 215, 0.95)),
+        linear-gradient(135deg, #111, #2a260f);
+    }
+
+    .visual-pickup {
+      background:
+        linear-gradient(135deg, rgba(250, 198, 45, 0.95), rgba(255, 232, 150, 0.92)),
+        linear-gradient(135deg, #111, #2a260f);
+    }
+
+    .visual-queue {
+      background:
+        linear-gradient(135deg, rgba(255, 208, 70, 0.95), rgba(255, 242, 190, 0.94)),
+        linear-gradient(135deg, #111, #2a260f);
+    }
+
+    .visual-anything {
+      background:
+        linear-gradient(135deg, rgba(255, 225, 118, 0.98), rgba(255, 248, 220, 0.95)),
+        linear-gradient(135deg, #111, #2a260f);
+    }
+
+    .visual-express {
+      background:
+        linear-gradient(135deg, rgba(255, 195, 36, 0.96), rgba(255, 225, 118, 0.96)),
+        linear-gradient(135deg, #111, #2a260f);
+    }
+
+    .visual-city {
+      position: absolute;
+      left: -16px;
+      right: -16px;
+      bottom: 0;
+      height: 86px;
+      z-index: 1;
+      opacity: 0.72;
+      background:
+        linear-gradient(to top, rgba(17, 17, 17, 0.92), rgba(17, 17, 17, 0)),
+        repeating-linear-gradient(
+          90deg,
+          rgba(17, 17, 17, 0.84) 0 22px,
+          rgba(17, 17, 17, 0.64) 22px 34px,
+          rgba(17, 17, 17, 0.78) 34px 56px
+        );
+      clip-path: polygon(
+        0 36%, 8% 36%, 8% 22%, 18% 22%, 18% 44%,
+        27% 44%, 27% 12%, 38% 12%, 38% 40%,
+        48% 40%, 48% 26%, 58% 26%, 58% 48%,
+        68% 48%, 68% 16%, 78% 16%, 78% 38%,
+        90% 38%, 90% 24%, 100% 24%, 100% 100%, 0 100%
+      );
+    }
+
+    .visual-main {
+      position: absolute;
+      left: 50%;
+      top: 42%;
+      z-index: 3;
+      transform: translate(-50%, -50%);
+      width: 112px;
+      height: 112px;
+      display: grid;
+      place-items: center;
+      border-radius: 34px;
+      background: rgba(17, 17, 17, 0.90);
+      color: var(--yellow);
+      font-size: 54px;
+      box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28);
+    }
+
+    .visual-main.wide {
+      width: 132px;
+    }
+
+    .visual-tag {
+      position: absolute;
+      left: 32px;
+      bottom: 38px;
+      z-index: 4;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 1000;
+      letter-spacing: 0.4px;
+    }
+
+    .visual-note {
+      position: absolute;
+      right: 32px;
+      bottom: 38px;
+      z-index: 4;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .visual-bubble {
+      position: absolute;
+      z-index: 2;
+      width: 48px;
+      height: 48px;
       display: grid;
       place-items: center;
       border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.54);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12);
+      font-size: 24px;
+    }
+
+    .bubble-a {
+      left: 24px;
+      top: 30px;
+    }
+
+    .bubble-b {
+      right: 24px;
+      top: 42px;
+    }
+
+    .bubble-c {
+      left: 34px;
+      bottom: 104px;
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      font-size: 18px;
+    }
+
+    .service-body {
+      padding: 24px;
+    }
+
+    .service-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .service-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 10px;
+      border-radius: 999px;
       background: var(--yellow-soft);
-      font-size: 25px;
-      margin-bottom: 16px;
+      color: #6a5000;
+      font-size: 12px;
+      font-weight: 1000;
+      white-space: nowrap;
     }
 
     .service-card h3 {
-      margin: 0 0 8px;
-      font-size: 21px;
+      margin: 0;
+      font-size: 24px;
       font-weight: 1000;
-      letter-spacing: -0.3px;
+      letter-spacing: -0.6px;
     }
 
     .service-card p {
-      margin: 0;
+      margin: 10px 0 0;
       color: var(--muted);
       font-size: 15px;
+    }
+
+    .service-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .service-meta span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #f5f5f5;
+      border: 1px solid #ececec;
+      color: #333;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .service-usecase {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 20px;
+      background:
+        linear-gradient(135deg, rgba(248, 200, 50, 0.16), rgba(255, 255, 255, 0.86));
+      border: 1px solid rgba(248, 200, 50, 0.28);
+    }
+
+    .service-usecase strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-weight: 1000;
+    }
+
+    .service-usecase span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .service-section-note {
+      margin-top: 22px;
+      padding: 20px 22px;
+      border-radius: 26px;
+      background: #111;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+    }
+
+    .service-section-note strong {
+      display: block;
+      font-size: 18px;
+      font-weight: 1000;
+    }
+
+    .service-section-note span {
+      display: block;
+      margin-top: 4px;
+      color: rgba(255, 255, 255, 0.64);
+      font-size: 14px;
     }
 
     .why-wrap {
@@ -815,21 +1053,109 @@
       font-size: 14px;
     }
 
-    .faq-grid {
+    .faq-intro {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 20px;
+    }
+
+    .faq-highlight {
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at top right, rgba(248, 200, 50, 0.30), transparent 34%),
+        #111;
+      color: #fff;
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .faq-highlight .kicker {
+      color: var(--yellow);
+    }
+
+    .faq-highlight h2 {
+      color: #fff;
+      margin: 0;
+      font-size: clamp(28px, 3vw, 42px);
+      line-height: 1.18;
+      letter-spacing: -1px;
+      font-weight: 1000;
+    }
+
+    .faq-highlight p {
+      color: rgba(255, 255, 255, 0.66);
+      margin: 12px 0 0;
+    }
+
+    .faq-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .faq-stat {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 22px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .faq-stat strong {
+      display: block;
+      font-size: 24px;
+      font-weight: 1000;
+      line-height: 1.1;
+    }
+
+    .faq-stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+      margin-top: 8px;
+    }
+
+    .faq-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
     }
 
     details {
+      position: relative;
+      overflow: hidden;
+      border-radius: 24px;
+      padding: 0;
       background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 18px 20px;
+      border: 1px solid rgba(16, 16, 16, 0.08);
       box-shadow: var(--shadow-soft);
     }
 
+    details::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      background: var(--yellow);
+      opacity: 0;
+      transition: 0.2s ease;
+    }
+
+    details[open]::before {
+      opacity: 1;
+    }
+
     summary {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 54px 20px 22px;
       cursor: pointer;
       font-weight: 1000;
       list-style: none;
@@ -839,10 +1165,73 @@
       display: none;
     }
 
+    summary::after {
+      content: "+";
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: #111;
+      color: var(--yellow);
+      font-size: 18px;
+      line-height: 1;
+      transition: 0.2s ease;
+    }
+
+    details[open] summary::after {
+      content: "–";
+      background: var(--yellow);
+      color: #111;
+    }
+
+    .faq-icon {
+      flex: 0 0 auto;
+      width: 34px;
+      height: 34px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      background: var(--yellow-soft);
+      font-size: 18px;
+    }
+
     details p {
-      margin: 10px 0 0;
+      margin: 0;
+      padding: 0 22px 20px 68px;
       color: var(--muted);
       font-size: 15px;
+    }
+
+    .faq-category {
+      grid-column: 1 / -1;
+      margin: 10px 0 2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .faq-category span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #111;
+      color: var(--yellow);
+      font-size: 13px;
+      font-weight: 1000;
+    }
+
+    .faq-category::after {
+      content: "";
+      height: 1px;
+      flex: 1;
+      background: var(--line);
     }
 
     .contact-panel {
@@ -994,7 +1383,8 @@
       .why-wrap,
       .area-content,
       .partner,
-      .contact-panel {
+      .contact-panel,
+      .faq-intro {
         grid-template-columns: 1fr;
       }
 
@@ -1068,18 +1458,40 @@
       .why-list,
       .flow,
       .partner-points,
-      .faq-grid {
+      .faq-grid,
+      .faq-stats {
         grid-template-columns: 1fr;
       }
 
-      .service-card {
-        min-height: auto;
+      .service-visual {
+        height: 220px;
+      }
+
+      .service-section-note {
+        display: block;
+        padding: 22px;
+      }
+
+      .service-section-note .btn {
+        width: 100%;
+        margin-top: 16px;
+      }
+
+      .visual-main {
+        width: 104px;
+        height: 104px;
+        font-size: 48px;
+      }
+
+      .visual-note {
+        display: none;
       }
 
       .area-box,
       .partner,
       .contact-panel,
-      .why-main {
+      .why-main,
+      .faq-highlight {
         padding: 24px;
         border-radius: 28px;
       }
@@ -1096,6 +1508,14 @@
       .info-row {
         grid-template-columns: 1fr;
         gap: 2px;
+      }
+
+      details p {
+        padding-left: 22px;
+      }
+
+      summary {
+        padding: 18px 50px 18px 18px;
       }
 
       .floating-order {
@@ -1127,6 +1547,7 @@
           <a href="#why">平台特色</a>
           <a href="#flow">使用流程</a>
           <a href="#partner">店家合作</a>
+          <a href="#faq">常見問題</a>
           <a href="#contact">聯絡我們</a>
           <a class="nav-cta" href="https://liff.line.me/2009895876-eDSfemYo">立即下單</a>
         </nav>
@@ -1242,47 +1663,207 @@
               <div class="kicker">Services</div>
               <h2>UBee 可以幫你完成什麼？</h2>
               <p class="section-desc">
-                從生活代送到高急迫性任務，UBee 讓使用者透過清楚的系統化流程送出需求。
+                從生活代送、餐點代買，到文件急送與高急迫性任務，UBee 把不同跑腿需求整理成清楚的服務分類，讓使用者更快找到適合的下單方式。
               </p>
             </div>
           </div>
 
           <div class="service-grid">
             <article class="service-card">
-              <div class="service-icon">📦</div>
-              <h3>幫我送</h3>
-              <p>文件、物品、包裹、店家商品等代送任務，適合一般生活配送與臨時配送需求。</p>
+              <div class="service-visual visual-delivery">
+                <div class="visual-city"></div>
+                <div class="visual-bubble bubble-a">📄</div>
+                <div class="visual-bubble bubble-b">📦</div>
+                <div class="visual-bubble bubble-c">📍</div>
+                <div class="visual-main">🛵</div>
+                <div class="visual-tag">DELIVERY</div>
+                <div class="visual-note">物品・文件・包裹</div>
+              </div>
+
+              <div class="service-body">
+                <div class="service-topline">
+                  <h3>幫我送</h3>
+                  <span class="service-chip">日常代送</span>
+                </div>
+                <p>
+                  文件、物品、包裹、店家商品等代送任務，適合一般生活配送與臨時配送需求。
+                </p>
+                <div class="service-meta">
+                  <span>文件送達</span>
+                  <span>物品配送</span>
+                  <span>店家商品</span>
+                </div>
+                <div class="service-usecase">
+                  <strong>適合情境</strong>
+                  <span>東西忘了帶、文件需要送、店家商品需要交給客人。</span>
+                </div>
+              </div>
             </article>
 
             <article class="service-card">
-              <div class="service-icon">🛒</div>
-              <h3>幫代買</h3>
-              <p>協助購買餐點、飲品、生活用品等，適合不方便出門或臨時需要代買的情境。</p>
+              <div class="service-visual visual-buy">
+                <div class="visual-city"></div>
+                <div class="visual-bubble bubble-a">🥤</div>
+                <div class="visual-bubble bubble-b">🍱</div>
+                <div class="visual-bubble bubble-c">🧾</div>
+                <div class="visual-main">🛒</div>
+                <div class="visual-tag">BUY FOR ME</div>
+                <div class="visual-note">餐點・飲品・用品</div>
+              </div>
+
+              <div class="service-body">
+                <div class="service-topline">
+                  <h3>幫代買</h3>
+                  <span class="service-chip">生活代買</span>
+                </div>
+                <p>
+                  協助購買餐點、飲品、生活用品等，適合不方便出門或臨時需要代買的情境。
+                </p>
+                <div class="service-meta">
+                  <span>餐點代買</span>
+                  <span>飲料代買</span>
+                  <span>生活用品</span>
+                </div>
+                <div class="service-usecase">
+                  <strong>適合情境</strong>
+                  <span>想吃某家店、臨時需要飲料、人在忙但有東西要買。</span>
+                </div>
+              </div>
             </article>
 
             <article class="service-card">
-              <div class="service-icon">📍</div>
-              <h3>幫我取</h3>
-              <p>協助到指定地點取件，再送至指定位置，適合文件、商品、物品取送需求。</p>
+              <div class="service-visual visual-pickup">
+                <div class="visual-city"></div>
+                <div class="visual-bubble bubble-a">🏪</div>
+                <div class="visual-bubble bubble-b">📍</div>
+                <div class="visual-bubble bubble-c">📦</div>
+                <div class="visual-main">🤝</div>
+                <div class="visual-tag">PICK UP</div>
+                <div class="visual-note">指定取件・送達</div>
+              </div>
+
+              <div class="service-body">
+                <div class="service-topline">
+                  <h3>幫我取</h3>
+                  <span class="service-chip">取件任務</span>
+                </div>
+                <p>
+                  協助到指定地點取件，再送至指定位置，適合文件、商品、物品取送需求。
+                </p>
+                <div class="service-meta">
+                  <span>到店取件</span>
+                  <span>物品取送</span>
+                  <span>指定地點</span>
+                </div>
+                <div class="service-usecase">
+                  <strong>適合情境</strong>
+                  <span>商品已經準備好、文件在某處、需要有人到指定地點幫忙取回。</span>
+                </div>
+              </div>
             </article>
 
             <article class="service-card">
-              <div class="service-icon">🧾</div>
-              <h3>幫排隊</h3>
-              <p>協助排隊、等候、現場領取等任務，適合熱門店家、活動現場或臨時等待需求。</p>
+              <div class="service-visual visual-queue">
+                <div class="visual-city"></div>
+                <div class="visual-bubble bubble-a">🎟️</div>
+                <div class="visual-bubble bubble-b">☕</div>
+                <div class="visual-bubble bubble-c">⏱️</div>
+                <div class="visual-main wide">👥</div>
+                <div class="visual-tag">QUEUE</div>
+                <div class="visual-note">排隊・等候・領取</div>
+              </div>
+
+              <div class="service-body">
+                <div class="service-topline">
+                  <h3>幫排隊</h3>
+                  <span class="service-chip">現場等候</span>
+                </div>
+                <p>
+                  協助排隊、等候、現場領取等任務，適合熱門店家、活動現場或臨時等待需求。
+                </p>
+                <div class="service-meta">
+                  <span>熱門店家</span>
+                  <span>現場等候</span>
+                  <span>排隊領取</span>
+                </div>
+                <div class="service-usecase">
+                  <strong>適合情境</strong>
+                  <span>熱門店要排隊、活動現場要等、需要有人幫你先卡時間。</span>
+                </div>
+              </div>
             </article>
 
             <article class="service-card">
-              <div class="service-icon">🧰</div>
-              <h3>全能跑腿</h3>
-              <p>無法歸類的生活任務，可透過平台送出需求，由客服或系統流程協助確認任務內容。</p>
+              <div class="service-visual visual-anything">
+                <div class="visual-city"></div>
+                <div class="visual-bubble bubble-a">🧰</div>
+                <div class="visual-bubble bubble-b">📝</div>
+                <div class="visual-bubble bubble-c">✨</div>
+                <div class="visual-main">🐝</div>
+                <div class="visual-tag">ALL TASK</div>
+                <div class="visual-note">彈性任務・生活支援</div>
+              </div>
+
+              <div class="service-body">
+                <div class="service-topline">
+                  <h3>全能跑腿</h3>
+                  <span class="service-chip">彈性任務</span>
+                </div>
+                <p>
+                  無法歸類的生活任務，可透過平台送出需求，由客服或系統流程協助確認任務內容。
+                </p>
+                <div class="service-meta">
+                  <span>臨時任務</span>
+                  <span>生活支援</span>
+                  <span>彈性需求</span>
+                </div>
+                <div class="service-usecase">
+                  <strong>適合情境</strong>
+                  <span>不知道該選哪一類，但確實需要有人幫你完成一件事。</span>
+                </div>
+              </div>
             </article>
 
             <article class="service-card">
-              <div class="service-icon">⚡</div>
-              <h3>急件專送</h3>
-              <p>針對高急迫性的代送需求，協助處理文件急送、重要物品送達與即時配送任務。</p>
+              <div class="service-visual visual-express">
+                <div class="visual-city"></div>
+                <div class="visual-bubble bubble-a">⚡</div>
+                <div class="visual-bubble bubble-b">📄</div>
+                <div class="visual-bubble bubble-c">🚀</div>
+                <div class="visual-main">⚡</div>
+                <div class="visual-tag">EXPRESS</div>
+                <div class="visual-note">文件急送・高急迫性</div>
+              </div>
+
+              <div class="service-body">
+                <div class="service-topline">
+                  <h3>急件專送</h3>
+                  <span class="service-chip">高急迫性</span>
+                </div>
+                <p>
+                  針對高急迫性的代送需求，協助處理文件急送、重要物品送達與即時配送任務。
+                </p>
+                <div class="service-meta">
+                  <span>文件急送</span>
+                  <span>重要物品</span>
+                  <span>即時配送</span>
+                </div>
+                <div class="service-usecase">
+                  <strong>適合情境</strong>
+                  <span>時間很趕、文件很重要、需要用更清楚的流程處理急件。</span>
+                </div>
+              </div>
             </article>
+          </div>
+
+          <div class="service-section-note">
+            <div>
+              <strong>不知道該選哪一項？</strong>
+              <span>先依照最接近的任務類型送出需求，UBee 會依任務內容協助確認服務方式。</span>
+            </div>
+            <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
+              立即進入下單頁
+            </a>
           </div>
         </div>
       </section>
@@ -1459,35 +2040,133 @@
 
       <section class="section" id="faq">
         <div class="container">
-          <div class="section-head">
-            <div>
+          <div class="faq-intro">
+            <div class="faq-highlight">
               <div class="kicker">FAQ</div>
               <h2>常見問題</h2>
-              <p class="section-desc">
-                下單前可以先了解 UBee 的服務方式、付款方式與合作模式。
+              <p>
+                下單前、配送中、店家合作前，可以先了解 UBee 的服務方式、付款方式、合作條件與任務限制。
               </p>
+            </div>
+
+            <div class="faq-stats">
+              <div class="faq-stat">
+                <strong>LINE LIFF</strong>
+                <span>使用網頁版 App 下單，不需另外下載原生 App。</span>
+              </div>
+
+              <div class="faq-stat">
+                <strong>6 大任務</strong>
+                <span>代送、代買、取件、排隊、全能跑腿、急件專送。</span>
+              </div>
+
+              <div class="faq-stat">
+                <strong>在地服務</strong>
+                <span>以豐原、潭子、神岡、大雅、后里為主要服務範圍。</span>
+              </div>
+
+              <div class="faq-stat">
+                <strong>店家合作</strong>
+                <span>免抽成、免月費、免上架費、不綁約，有單再合作。</span>
+              </div>
             </div>
           </div>
 
           <div class="faq-grid">
+            <div class="faq-category">
+              <span>一般使用問題</span>
+            </div>
+
             <details>
-              <summary>UBee 需要下載 App 嗎？</summary>
-              <p>不需要。UBee 採用 LINE LIFF 網頁版 App，下單入口可透過 LINE 開啟使用。</p>
+              <summary><span class="faq-icon">📱</span>UBee 需要下載 App 嗎？</summary>
+              <p>不需要。UBee 採用 LINE LIFF 網頁版 App，下單入口可透過 LINE 開啟使用，不需要另外到 App Store 或 Google Play 下載。</p>
             </details>
 
             <details>
-              <summary>目前服務哪些地區？</summary>
-              <p>目前服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。</p>
+              <summary><span class="faq-icon">📍</span>目前服務哪些地區？</summary>
+              <p>目前服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。實際可服務範圍會依當下騎士量、距離、天候與任務內容確認。</p>
             </details>
 
             <details>
-              <summary>可以幫忙送文件或急件嗎？</summary>
-              <p>可以。UBee 提供文件急送、物品代送與急件專送等服務，實際承接會依任務內容確認。</p>
+              <summary><span class="faq-icon">🧾</span>UBee 可以處理哪些任務？</summary>
+              <p>UBee 提供幫我送、幫代買、幫我取、幫排隊、全能跑腿與急件專送。常見情境包含物品代送、餐點代買、文件急送、現場等候與臨時生活任務。</p>
             </details>
 
             <details>
-              <summary>店家可以合作嗎？</summary>
-              <p>可以。UBee 主打免抽成、免月費、免上架費、不綁約，有單再合作，適合店家先從單次配送開始測試。</p>
+              <summary><span class="faq-icon">🐝</span>不知道該選哪一種服務怎麼辦？</summary>
+              <p>可以先選擇最接近的服務類型。如果任務比較特殊，可以使用「全能跑腿」，由 UBee 依照任務內容協助確認是否適合承接。</p>
+            </details>
+
+            <div class="faq-category">
+              <span>下單與付款問題</span>
+            </div>
+
+            <details>
+              <summary><span class="faq-icon">📝</span>下單時需要填寫什麼資料？</summary>
+              <p>通常需要填寫服務項目、取件地點、送達地點、任務內容、聯絡資訊與付款方式。資料越清楚，越能降低後續確認時間。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">💰</span>費用怎麼計算？</summary>
+              <p>UBee 會依任務距離、時間、服務內容與實際情況計算費用。若任務內容較特殊，會依照實際需求進行確認。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">💳</span>目前支援哪些付款方式？</summary>
+              <p>目前以現金與街口支付為主要付款方式。實際可用付款方式會依下單頁面與任務內容顯示為準。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">🛒</span>幫代買需要先付商品費用嗎？</summary>
+              <p>代買任務通常會涉及商品費用與跑腿服務費。實際付款方式會依任務內容與客服確認流程為準。</p>
+            </details>
+
+            <div class="faq-category">
+              <span>配送與任務限制</span>
+            </div>
+
+            <details>
+              <summary><span class="faq-icon">⚡</span>可以幫忙送文件或急件嗎？</summary>
+              <p>可以。UBee 提供文件急送、物品代送與急件專送等服務。實際承接會依任務距離、時間、內容與當下騎士狀況確認。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">📦</span>可以送包裹、商品或店家餐點嗎？</summary>
+              <p>可以。一般物品、店家商品、餐點飲品都可以依任務內容送出需求。若物品尺寸、重量或保存條件特殊，需事先說明。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">🚫</span>有哪些東西不能配送？</summary>
+              <p>違法物品、危險物品、來源不明物品、需要特殊執照或不適合一般跑腿承接的任務，UBee 有權拒絕承接。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">🌧️</span>下雨天或尖峰時段會影響服務嗎？</summary>
+              <p>會。天候、路況、尖峰時段、距離與當下騎士量都可能影響承接速度與完成時間，實際狀況會依當下任務安排為準。</p>
+            </details>
+
+            <div class="faq-category">
+              <span>店家合作問題</span>
+            </div>
+
+            <details>
+              <summary><span class="faq-icon">🏪</span>店家可以和 UBee 合作嗎？</summary>
+              <p>可以。UBee 適合早餐店、小吃店、飲料店、餐飲店與有代送需求的在地店家。店家可以先從單次訂單開始測試合作。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">🤝</span>店家合作需要簽約嗎？</summary>
+              <p>UBee 目前主打低門檻合作，不收月費、不收上架費、不綁約，有單再合作。若後續合作量增加，可再討論更正式的合作方式。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">📉</span>UBee 會抽店家平台抽成嗎？</summary>
+              <p>UBee 店家合作主打免抽成，讓店家不需要被高比例平台抽成壓縮利潤。實際合作條件仍以雙方確認內容為準。</p>
+            </details>
+
+            <details>
+              <summary><span class="faq-icon">🚚</span>連鎖店或企業可以合作嗎？</summary>
+              <p>可以討論。若是連鎖店、企業、商務配送或高頻任務需求，UBee 可依需求評估服務範圍、任務量、配送流程與合作模式。</p>
             </details>
           </div>
         </div>
