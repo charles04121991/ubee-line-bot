@@ -1749,9 +1749,9 @@ app.post('/api/merchant/bind', async (req, res) => {
 
 const PRICING = {
   baseFee: 80,
-  perKm: 15,
-  perMinute: 3,
-  serviceFee: 15,
+  perKm: 12,
+  perMinute: 2,
+  serviceFee: 10,
   waitingFee: 40,
   driverRatio: 0.7,
 };
