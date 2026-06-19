@@ -1749,17 +1749,17 @@ app.post('/api/merchant/bind', async (req, res) => {
 
 const PRICING = {
   baseFee: 80,
-  perKm: 18,
+  perKm: 15,
   perMinute: 3,
-  serviceFee: 25,
-  waitingFee: 60,
+  serviceFee: 15,
+  waitingFee: 40,
   driverRatio: 0.7,
 };
 
 const SPEED_OPTIONS = {
-  standard: { label: '一般件', time: '60–90 分鐘', fee: 20, riderText: '一般任務' },
-  priority: { label: '標準件', time: '45–60 分鐘', fee: 25, riderText: '標準任務' },
-  express: { label: '優先件', time: '30–45 分鐘', fee: 30, riderText: '優先任務' },
+  standard: { label: '一般件', time: '60–90 分鐘', fee: 10, riderText: '一般任務' },
+  priority: { label: '標準件', time: '45–60 分鐘', fee: 15, riderText: '標準任務' },
+  express: { label: '優先件', time: '30–45 分鐘', fee: 20, riderText: '優先任務' },
 };
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
