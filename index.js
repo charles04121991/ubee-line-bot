@@ -1748,11 +1748,11 @@ app.post('/api/merchant/bind', async (req, res) => {
 });
 
 const PRICING = {
-  baseFee: 80,
+  baseFee: 60,
   perKm: 12,
   perMinute: 2,
   serviceFee: 10,
-  waitingFee: 40,
+  waitingFee: 30,
   driverRatio: 0.7,
 };
 
