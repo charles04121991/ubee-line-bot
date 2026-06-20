@@ -587,7 +587,7 @@ button.red{background:var(--red);color:#fff}
       <label>代墊金額</label>
       <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
 
-      <label>送達點數 *</label>
+      <label>送達點 *</label>
       <select id="newStopCount" onchange="renderExtraStopFields()">
         <option value="1">單點配送</option>
         <option value="2">2 個送達點</option>
@@ -1520,7 +1520,7 @@ async function createMerchantOrder(){
 
 配送方式：${deliveryModeLabelMap[deliveryMode]}
 付款方式：${paymentMethodLabelMap[paymentMethod]}
-送達點數：${stopCount} 點
+送達點：${stopCount} 
 代墊金額：NT$${advanceAmount}
 
 主要送達地址：
@@ -1571,7 +1571,7 @@ ${primaryStop.dropoffAddress}
 ${distanceText}
 
 配送費：NT$${deliveryFee}
-送達點數：${stopCount} 點
+送達點：${stopCount} 點
 
 確認送出正式訂單？`;
 
@@ -1770,7 +1770,7 @@ function renderOrderCard(order){
       <div class="row"><b>主要送達地址：</b>${escapeHtml(dropoff)}</div>
       <div class="row"><b>配送方式：</b>${escapeHtml(deliveryTypeLabel)}</div>
       <div class="row"><b>付款方式：</b>${escapeHtml(paymentMethodLabel)}</div>
-      <div class="row"><b>送達點數：</b>${escapeHtml(stopCount)} 點</div>
+      <div class="row"><b>送達點：</b>${escapeHtml(stopCount)} 點</div>
       <div class="row"><b>距離：</b>${escapeHtml(distanceText || "未記錄")}</div>
 
       <div class="moneyBox">
