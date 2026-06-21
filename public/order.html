@@ -3410,6 +3410,66 @@ async function renderEstimate(){
   }
 }
   
+  function getFirstMoneyValue(order, fields){
+  for(const field of fields){
+    const value = order?.[field];
+
+    if(value === null || value === undefined || value === '') continue;
+
+    const num = Number(String(value).replace(/[^\d.-]/g, ''));
+
+    if(Number.isFinite(num) && num >= 0){
+      return Math.round(num);
+    }
+  }
+
+  return null;
+}
+
+function getCustomerPayableTotal(order){
+  if(!order) return null;
+
+  const advancePayment = getFirstMoneyValue(order, [
+    'advancePayment',
+    'advanceAmount',
+    'estimatedAdvancePayment',
+    'estimatedAdvanceAmount'
+  ]) || 0;
+
+  const directPayableTotal = getFirstMoneyValue(order, [
+    'customerPayTotal',
+    'customerPayAmount',
+    'customerTotalWithAdvance',
+    'estimatedPayableTotal',
+    'payableTotal',
+    'finalPayAmount',
+    'collectAmount',
+    'cashCollectAmount',
+    'amountToCollect'
+  ]);
+
+  if(directPayableTotal !== null){
+    return directPayableTotal;
+  }
+
+  const serviceSubtotal = getFirstMoneyValue(order, [
+    'serviceSubtotal',
+    'serviceTotal',
+    'deliveryServiceFee',
+    'taskServiceFee',
+    'deliveryFee',
+    'totalFee',
+    'total',
+    'price'
+  ]);
+
+  if(serviceSubtotal !== null){
+    return serviceSubtotal + advancePayment;
+  }
+
+  return advancePayment > 0 ? advancePayment : null;
+}
+
 async function createOrder(){
   if(isSubmittingOrder) return;
 
@@ -3847,9 +3907,11 @@ function renderTimeline(status, order){
     displayRank = 6;
   }
 
-  const total = Number(order?.total || order?.totalFee || order?.price || 0);
-  const totalText = total > 0 ? `NT$${Math.round(total)}` : '系統計算中';
-
+  const payableTotal = getCustomerPayableTotal(order);
+  const totalText = payableTotal !== null && payableTotal > 0
+    ? `NT$${Math.round(payableTotal)}`
+    : '系統計算中';
+    
   const steps = [
     {
       key:'pending_payment',
@@ -4071,7 +4133,8 @@ function renderOrderList(el, orders, emptyText){
   el.innerHTML = orders.map(order => {
     const pickup = order.pickup || order.pickupAddress || order.fromAddress || '-';
     const dropoff = order.dropoff || order.dropoffAddress || order.toAddress || '-';
-    const total = order.total || order.totalFee || order.price || '-';
+    const payableTotal = getCustomerPayableTotal(order);
+    const total = payableTotal !== null && payableTotal > 0 ? Math.round(payableTotal) : '-';
     const service = order.serviceType || 'UBee 任務';
     const status = getStatusLabel(order.status);
     const statusColor = getOrderStatusColor(order.status);
