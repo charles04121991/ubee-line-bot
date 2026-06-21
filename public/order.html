@@ -3593,6 +3593,37 @@ function getFirstMoneyValue(order, fields){
   return null;
 }
 
+function clearCurrentOrderCache(){
+  localStorage.removeItem('ubee_current_order_id');
+  currentOrderId = '';
+  currentOrderData = null;
+  selectedPaymentMethod = '';
+
+  if(orderUnsubscribe){
+    try{
+      orderUnsubscribe();
+    }catch(e){}
+    orderUnsubscribe = null;
+  }
+
+  if(qs('orderNo')){
+    qs('orderNo').innerText = '-';
+  }
+
+  if(qs('paymentInfo')){
+    qs('paymentInfo').classList.add('hidden');
+    qs('paymentInfo').innerHTML = '';
+  }
+
+  if(qs('confirmPaidBtn')){
+    qs('confirmPaidBtn').classList.add('hidden');
+  }
+
+  if(qs('cancelOrderBtn')){
+    qs('cancelOrderBtn').classList.add('hidden');
+  }
+}
+
 function getCustomerPayableTotal(order){
   if(!order) return null;
 
@@ -4201,7 +4232,17 @@ function startOrderListener(orderId){
   }
 
   orderUnsubscribe = db.collection('orders').doc(orderId).onSnapshot(doc => {
-    if(!doc.exists) return;
+    if(!doc.exists){
+      console.warn('快取訂單不存在，已清除本機訂單狀態:', orderId);
+      clearCurrentOrderCache();
+
+      if(currentStep === 5){
+        alert('這筆訂單已不存在，系統已回到首頁。');
+        showOnlyStep(1);
+      }
+
+      return;
+    }
 
     const order = {
       id:doc.id,
@@ -4216,7 +4257,7 @@ function startOrderListener(orderId){
     renderTimeline(order.status || 'pending_payment', order);
 
     if(order.status === 'completed' || order.status === 'cancelled'){
-      localStorage.removeItem('ubee_current_order_id');
+      clearCurrentOrderCache();
     }
   }, err => {
     console.warn('訂單即時監聽失敗:', err);
@@ -4782,14 +4823,40 @@ async function initPage(){
   }
 }
 
-function initCachedOrder(){
+async function initCachedOrder(){
   const cachedOrderId = localStorage.getItem('ubee_current_order_id') || '';
 
-  if(cachedOrderId && db){
-    currentOrderId = cachedOrderId;
-    qs('orderNo').innerText = cachedOrderId;
+  if(!cachedOrderId || !db){
+    return;
+  }
+
+  try{
+    const doc = await db.collection('orders').doc(cachedOrderId).get();
+
+    if(!doc.exists){
+      console.warn('本機快取訂單已不存在，清除快取:', cachedOrderId);
+      clearCurrentOrderCache();
+      showOnlyStep(1);
+      return;
+    }
+
+    const order = {
+      id:doc.id,
+      ...doc.data()
+    };
+
+    currentOrderId = doc.id;
+    currentOrderData = order;
+
+    qs('orderNo').innerText = currentOrderId;
     showOnlyStep(5);
-    startOrderListener(cachedOrderId);
+    renderTimeline(order.status || 'pending_payment', order);
+    startOrderListener(currentOrderId);
+
+  }catch(err){
+    console.warn('檢查快取訂單失敗，清除本機快取:', err);
+    clearCurrentOrderCache();
+    showOnlyStep(1);
   }
 }
 
