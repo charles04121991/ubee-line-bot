@@ -821,6 +821,7 @@ textarea::placeholder{
 
 .price-row strong{
   color:var(--text);
+  text-align:right;
 }
 
 .price-row.price-subtotal{
@@ -1791,7 +1792,9 @@ body.day-mode .bottom-tabs{
 
       <div id="buyGuide" class="quick-guide hidden">
         <div class="quick-guide-title">代買提醒</div>
-        <div class="quick-guide-text">請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與預估代墊金額。若不指定店家，可以先選附近店家。</div>
+        <div class="quick-guide-text">
+          請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與購買注意事項。正式營運期間，UBee 代買服務不提供騎士代墊商品費，商品款項需由客人先完成付款，或由平台人工確認後再處理。
+        </div>
       </div>
 
       <div id="queueGuide" class="quick-guide hidden">
@@ -1864,6 +1867,21 @@ body.day-mode .bottom-tabs{
       </div>
 
       <div class="form-section">
+        <div class="form-title">是否需要上樓？</div>
+        <div class="input-card">
+          <div class="input-wrap">
+            <div class="input-icon">🏢</div>
+            <select id="upstairsOption" onchange="renderEstimate()">
+              <option value="none">不用上樓，門口交付</option>
+              <option value="elevator">需要上樓，有電梯（+20）</option>
+              <option value="no_elevator">需要上樓，無電梯（+30）</option>
+              <option value="heavy">重物／大量物品，需人工確認</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
         <div class="form-title" id="itemTitle">任務內容</div>
         <div class="input-card">
           <div class="input-wrap">
@@ -1877,20 +1895,19 @@ body.day-mode .bottom-tabs{
         </div>
       </div>
 
-      <div class="form-section">
-        <div class="form-title">預估代墊金額</div>
-        <div class="input-card">
-          <div class="input-wrap">
-            <div class="input-icon">💰</div>
-            <input id="advancePayment" type="number" min="0" step="1" inputmode="numeric" placeholder="沒有代墊請填 0">
-          </div>
+      <input id="advancePayment" type="hidden" value="0">
+
+      <div id="advanceRuleBox" class="quick-guide hidden">
+        <div class="quick-guide-title">代買付款規則</div>
+        <div class="quick-guide-text">
+          目前 UBee 不提供騎士代墊商品費。若是代買任務，請先自行完成商品付款，或等待平台人工確認後再派單，避免商品費與取消爭議轉嫁給騎士。
         </div>
       </div>
     </section>
 
     <section class="step" id="step3">
       <div class="headline">選擇任務速度</div>
-      <div class="subtext">平台會依照距離、時間、速度與服務費計算金額。</div>
+      <div class="subtext">平台會依照距離區間、任務速度、上樓需求與服務費計算金額。</div>
 
       <div class="speed-card active" data-speed="standard" onclick="selectSpeed('standard')">
         <div class="speed-top">
@@ -1919,7 +1936,7 @@ body.day-mode .bottom-tabs{
 
     <section class="step" id="step4">
       <div class="headline">確認任務內容</div>
-      <div class="subtext">請確認內容正確。建立訂單後，需選擇付款方式並確認付款，系統才會開始派單。</div>
+      <div class="subtext">請確認內容正確。建立訂單後，需使用街口支付完成付款確認，系統才會開始派單。</div>
 
       <div class="summary-card" id="summaryBox"></div>
 
@@ -1929,11 +1946,19 @@ body.day-mode .bottom-tabs{
         <div class="notice-title">注意事項</div>
         <ul>
           <li>UBee 不承接違法、管制、危險、法律、金融、證件、授權簽署等高風險任務。</li>
-          <li>代買商品請填清楚規格與替代方案，代墊金額請如實填寫。</li>
+          <li>代買商品請填清楚規格與替代方案；目前 UBee 不提供騎士代墊商品費，商品款項需由客人先完成付款或由平台人工確認。</li>
+          <li>目前正式營運版僅支援街口支付，不開放現金付款。</li>
           <li>付款確認後才會進入派單流程。</li>
           <li>騎士已接單或任務已開始後，取消可能產生相關費用。</li>
         </ul>
       </div>
+
+      <label class="confirm-box">
+        <input id="locationConfirmedCheck" type="checkbox">
+        <div class="confirm-text">
+          我已確認取件地址與送達地址正確。若定位、門牌、樓層或地標有誤，我已在地址或備註中補充清楚。
+        </div>
+      </label>
 
       <label class="confirm-box">
         <input id="agreeCheck" type="checkbox">
@@ -1949,7 +1974,7 @@ body.day-mode .bottom-tabs{
       <div class="success">
         <div class="success-icon">✓</div>
         <div class="success-title">訂單已建立</div>
-        <div class="subtext">請選擇付款方式，完成付款確認後，系統才會開始媒合騎士。</div>
+        <div class="subtext">請使用街口支付完成付款確認後，系統才會開始媒合騎士。</div>
         <div class="order-no" id="orderNo">-</div>
       </div>
 
@@ -1957,15 +1982,22 @@ body.day-mode .bottom-tabs{
 
       <div class="content-card">
         <div class="content-title">付款方式</div>
-<div class="btn-row">
-  <button id="payCashBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('cash')">現金</button>
-  <button id="payJkoBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('jko')">街口支付</button>
-</div>
+
+        <div class="quick-guide">
+          <div class="quick-guide-title">正式營運付款規則</div>
+          <div class="quick-guide-text">
+            目前 UBee 正式營運版僅支援街口支付。付款確認後，系統才會開始媒合騎士；不開放現金付款，避免收款與取消爭議。
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="payJkoBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('jko')">街口支付</button>
+        </div>
 
         <div id="paymentInfo" class="payment-info hidden"></div>
 
         <button id="confirmPaidBtn" class="btn btn-primary hidden" type="button" onclick="confirmPaid()" style="margin-top:12px;">
-          我已付款 / 確認現金付款
+          我已完成街口支付，開始派單
         </button>
       </div>
     </section>
@@ -1985,7 +2017,7 @@ body.day-mode .bottom-tabs{
       </div>
     </section>
 
-      <section class="app-section" id="customerProfilePage">
+    <section class="app-section" id="customerProfilePage">
       <div class="headline">我的</div>
       <div class="subtext">UBee 客戶端服務資訊。</div>
 
@@ -2051,46 +2083,46 @@ body.day-mode .bottom-tabs{
     </section>
 
     <section class="app-section" id="customerAddressPage">
-  <div class="headline">常用地址</div>
-  <div class="subtext">新增、儲存與帶入你的常用送達地址。之後下單時，可以一鍵帶入訂單。</div>
+      <div class="headline">常用地址</div>
+      <div class="subtext">新增、儲存與帶入你的常用送達地址。之後下單時，可以一鍵帶入訂單。</div>
 
-  <div class="content-card">
-    <div class="content-title">目前儲存地址</div>
+      <div class="content-card">
+        <div class="content-title">目前儲存地址</div>
 
-    <div class="address-display">
-      <div class="address-display-label">常用送達地址</div>
-      <div class="address-display-value" id="savedAddressText">尚未儲存常用地址。</div>
-    </div>
-  </div>
-
-  <div class="content-card">
-    <div class="content-title">新增 / 修改常用地址</div>
-
-    <div class="input-card">
-      <div class="input-wrap">
-        <div class="input-icon">🏠</div>
-        <input id="customerAddressInput" maxlength="120" placeholder="請輸入常用送達地址，例如：台中市豐原區...">
+        <div class="address-display">
+          <div class="address-display-label">常用送達地址</div>
+          <div class="address-display-value" id="savedAddressText">尚未儲存常用地址。</div>
+        </div>
       </div>
-      <div class="input-wrap">
-        <div class="input-icon">📱</div>
-        <input id="customerAddressPhoneInput" maxlength="20" inputmode="tel" placeholder="常用聯絡電話，可不填">
+
+      <div class="content-card">
+        <div class="content-title">新增 / 修改常用地址</div>
+
+        <div class="input-card">
+          <div class="input-wrap">
+            <div class="input-icon">🏠</div>
+            <input id="customerAddressInput" maxlength="120" placeholder="請輸入常用送達地址，例如：台中市豐原區...">
+          </div>
+          <div class="input-wrap">
+            <div class="input-icon">📱</div>
+            <input id="customerAddressPhoneInput" maxlength="20" inputmode="tel" placeholder="常用聯絡電話，可不填">
+          </div>
+        </div>
+
+        <div class="profile-action-row">
+          <button class="btn btn-primary" type="button" onclick="saveManualAddress()">儲存這筆常用地址</button>
+          <button class="btn btn-secondary yellow-outline" type="button" onclick="saveCurrentAddress()">從目前訂單帶入並儲存</button>
+          <button class="btn btn-secondary yellow-outline" type="button" onclick="fillSavedAddress()">帶入常用地址到訂單</button>
+          <button class="btn btn-secondary" type="button" onclick="clearSavedAddress()">清除常用地址</button>
+        </div>
+
+        <div id="addressActionStatus" class="profile-status"></div>
       </div>
-    </div>
 
-    <div class="profile-action-row">
-      <button class="btn btn-primary" type="button" onclick="saveManualAddress()">儲存這筆常用地址</button>
-      <button class="btn btn-secondary yellow-outline" type="button" onclick="saveCurrentAddress()">從目前訂單帶入並儲存</button>
-      <button class="btn btn-secondary yellow-outline" type="button" onclick="fillSavedAddress()">帶入常用地址到訂單</button>
-      <button class="btn btn-secondary" type="button" onclick="clearSavedAddress()">清除常用地址</button>
-    </div>
-
-    <div id="addressActionStatus" class="profile-status"></div>
-  </div>
-
-  <div class="profile-note">
-    使用方式：你可以直接在這裡輸入常用地址並儲存；也可以先回首頁填寫「送達地址」，再按「從目前訂單帶入並儲存」。下次下單時，按「帶入常用地址到訂單」即可自動填入。
-  </div>
-</section>
+      <div class="profile-note">
+        使用方式：你可以直接在這裡輸入常用地址並儲存；也可以先回首頁填寫「送達地址」，再按「從目前訂單帶入並儲存」。下次下單時，按「帶入常用地址到訂單」即可自動填入。
+      </div>
+    </section>
 
     <section class="app-section" id="customerCouponPage">
       <div class="headline">優惠券</div>
@@ -2135,8 +2167,16 @@ body.day-mode .bottom-tabs{
           <div class="info-item-text">UBee 不承接違法、管制、危險、法律、金融、證件、授權簽署或高風險委託事項。</div>
         </div>
         <div class="info-item">
+          <div class="info-item-title">付款方式有哪些？</div>
+          <div class="info-item-text">目前 UBee 正式營運版僅支援街口支付，不開放現金付款。付款確認後，系統才會開始媒合騎士。</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">代買可以請騎士先代墊嗎？</div>
+          <div class="info-item-text">目前不提供騎士代墊商品費。若需代買，請先完成商品款項付款，或由平台人工確認後再處理。</div>
+        </div>
+        <div class="info-item">
           <div class="info-item-title">付款後多久會派單？</div>
-          <div class="info-item-text">任務建立後需選擇付款方式並完成付款確認，系統才會開始媒合騎士。實際媒合速度會依區域、時段與騎士狀態而不同。</div>
+          <div class="info-item-text">任務建立後需完成街口支付並確認付款，系統才會開始媒合騎士。實際媒合速度會依區域、時段與騎士狀態而不同。</div>
         </div>
       </div>
     </section>
@@ -2156,11 +2196,11 @@ body.day-mode .bottom-tabs{
         </div>
         <div class="info-item">
           <div class="info-item-title">騎士已接單或已出發</div>
-          <div class="info-item-text">若騎士已接單、已抵達取件點、已代買或任務已開始執行，可能會依實際狀況產生取消費、代墊費或已發生的服務費。</div>
+          <div class="info-item-text">若騎士已接單、已抵達取件點或任務已開始執行，可能會依實際狀況產生取消費、等待費或已發生的服務費。</div>
         </div>
         <div class="info-item">
-          <div class="info-item-title">代買與代墊商品</div>
-          <div class="info-item-text">若騎士已完成購買，商品與代墊費用通常需由下單者負擔，實際處理以客服確認結果為準。</div>
+          <div class="info-item-title">代買商品付款</div>
+          <div class="info-item-text">目前 UBee 不提供騎士代墊商品費。若代買任務涉及商品款項，需由客人先完成付款，或由平台人工確認後再處理。</div>
         </div>
       </div>
     </section>
@@ -2183,6 +2223,7 @@ body.day-mode .bottom-tabs{
         <button class="btn btn-primary" type="button" onclick="openLineOfficialAccount()">聯繫 UBee 客服</button>
       </div>
     </section>
+
     <div class="footer-nav">
       <button id="cancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:12px;">
         取消訂單
@@ -2264,10 +2305,145 @@ let cachedHistoryOrders = [];
 let currentHistoryFilter = 'all';
 let currentCustomerPage = '';
 let initialOpenActionHandled = false;
-  
+
 const LINE_OFFICIAL_ID = '@686rwnvn';
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
-  
+
+const FIXED_PAYMENT_METHOD = 'jko';
+const FIXED_PAYMENT_LABEL = '街口支付';
+
+function qs(id){
+  return document.getElementById(id);
+}
+
+function getUpstairsOption(){
+  return qs('upstairsOption') ? qs('upstairsOption').value : 'none';
+}
+
+function getUpstairsLabel(option){
+  const map = {
+    none:'不用上樓，門口交付',
+    elevator:'需要上樓，有電梯',
+    no_elevator:'需要上樓，無電梯',
+    heavy:'重物／大量物品，需人工確認'
+  };
+
+  return map[option] || '不用上樓，門口交付';
+}
+
+function calculateUpstairsFee(option){
+  switch(option){
+    case 'elevator':
+      return 20;
+    case 'no_elevator':
+      return 30;
+    case 'heavy':
+      return 0;
+    case 'none':
+    default:
+      return 0;
+  }
+}
+
+function calculateDistanceTierFee(distanceKm){
+  const km = Number(distanceKm) || 0;
+
+  if(km <= 0){
+    return 0;
+  }
+
+  if(km <= 3){
+    return 80;
+  }
+
+  if(km <= 5){
+    return 100;
+  }
+
+  if(km <= 8){
+    return 130;
+  }
+
+  const extraKm = Math.ceil(km - 8);
+  return 130 + extraKm * 15;
+}
+
+function getDistanceTierText(distanceKm){
+  const km = Number(distanceKm) || 0;
+
+  if(km <= 0){
+    return '距離待系統確認';
+  }
+
+  if(km <= 3){
+    return '3 公里內固定 NT$80';
+  }
+
+  if(km <= 5){
+    return '3.1～5 公里固定 NT$100';
+  }
+
+  if(km <= 8){
+    return '5.1～8 公里固定 NT$130';
+  }
+
+  return '8 公里以上，NT$130 + 超出每公里 NT$15';
+}
+
+function parseDistanceKmFromQuote(data){
+  if(!data) return 0;
+
+  const directValues = [
+    data.distanceKm,
+    data.distance_km,
+    data.km
+  ];
+
+  for(const value of directValues){
+    const num = Number(value);
+    if(Number.isFinite(num) && num > 0){
+      return num;
+    }
+  }
+
+  const meterValues = [
+    data.distanceMeters,
+    data.distance_meters,
+    data.meters
+  ];
+
+  for(const value of meterValues){
+    const num = Number(value);
+    if(Number.isFinite(num) && num > 0){
+      return num / 1000;
+    }
+  }
+
+  const text = String(data.distanceText || data.distance || '').replace(',', '');
+
+  const kmMatch = text.match(/([\d.]+)\s*(km|公里|公?里)/i);
+  if(kmMatch){
+    return Number(kmMatch[1]) || 0;
+  }
+
+  const mMatch = text.match(/([\d.]+)\s*(m|公尺|米)/i);
+  if(mMatch){
+    return (Number(mMatch[1]) || 0) / 1000;
+  }
+
+  return 0;
+}
+
+function getSpeedServiceFee(type){
+  const map = {
+    standard:0,
+    priority:20,
+    express:40
+  };
+
+  return map[type] || 0;
+}
+
 let nearbyPlaces = [];
 let selectedNearbyPlace = null;
 let selectedNearbyPlaceId = '';
@@ -2293,11 +2469,12 @@ const db = window.firebase ? firebase.firestore() : null;
 const serviceDescriptions = {
   send:'需要配送文件、包裹、鑰匙或店家商品時，選擇幫我送，UBee 會依照取件與送達資訊建立任務。',
   pickup:'需要代取包裹、文件、門市商品或生活用品時，選擇幫我取，請填寫取件地點與交付地點。',
-  buy:'需要代買餐點、飲料、超商商品、藥局用品或生活用品時，選擇幫代買，請填寫品項、規格與預估代墊金額。',
+  buy:'需要代買餐點、飲料、超商商品、藥局用品或生活用品時，選擇幫代買，請填寫品項、規格與購買注意事項。目前正式營運版不提供騎士代墊商品費。',
   queue:'需要餐廳候位、醫院掛號、銀行辦理或活動排隊時，選擇幫排隊，請填寫排隊位置與預估等候時間。',
   helper:'找不到適合分類時，可以選擇全能跑腿，請清楚描述任務內容、完成標準與注意事項。',
   urgent:'需要較快處理的小包裹、餐點、店家商品或生活用品配送時，選擇急件專送，系統會以高急迫性任務處理。'
 };
+
 const serviceGroups = {
   send: [
     { icon:'📄', title:'文件急送', categories:['一般文件','合約文件','發票收據','公司文件','其他文件'] },
@@ -2351,13 +2528,9 @@ function escapeHtml(str){
 }
 
 function escapeHtmlWithBreaks(str){
-return escapeHtml(str).replace(/\n/g,'<br>');
+  return escapeHtml(str).replace(/\n/g,'<br>');
 }
   
-function qs(id){
-  return document.getElementById(id);
-}
-
 function cleanPhone(value){
   return String(value || '').replace(/[^\d]/g,'').trim();
 }
@@ -2450,6 +2623,7 @@ function selectServiceItem(index){
   if(serviceGroup === 'buy'){
     clearNearbyAutoFill(true);
   }
+
   serviceType = item.title;
   serviceCategory = item.categories?.[0] || '';
 
@@ -2625,10 +2799,10 @@ function getCurrentPosition(){
     }
 
     navigator.geolocation.getCurrentPosition(resolve, reject, {
-  enableHighAccuracy:false,
-  timeout:6000,
-  maximumAge:300000
-});
+      enableHighAccuracy:false,
+      timeout:6000,
+      maximumAge:300000
+    });
   });
 }
 
@@ -2783,6 +2957,14 @@ function applyDynamicFields(){
   qs('urgentGuide').classList.toggle('hidden', !isUrgent);
   qs('queueSection').classList.toggle('hidden', !isQueue);
 
+  if(qs('advanceRuleBox')){
+    qs('advanceRuleBox').classList.toggle('hidden', !isBuy);
+  }
+
+  if(qs('advancePayment')){
+    qs('advancePayment').value = '0';
+  }
+
   qs('pickupTitle').innerText =
     isBuy ? '購買地點' :
     isQueue ? '排隊地點' :
@@ -2834,16 +3016,11 @@ function applyDynamicFields(){
     '例如：文件、飲料、包裹、洗衣、手機貼膜';
 
   qs('note').placeholder =
-    isBuy ? '請填寫品牌、數量、規格、冰塊甜度、替代品、購買限制。' :
+    isBuy ? '請填寫品牌、數量、規格、冰塊甜度、替代品、購買限制。商品款項需由客人先完成付款。' :
     isQueue ? '請補充現場狀況、號碼、要排到什麼程度、是否需要拍照回報。' :
     isHelper ? '請詳細描述你希望 UBee 完成的任務、注意事項、完成標準。' :
     isUrgent ? '請補充急件注意事項、最晚送達時間、聯絡方式。' :
     '備註：請填寫品牌、數量、規格、顏色、注意事項。';
-
-  qs('advancePayment').placeholder =
-    isBuy ? '預估商品代墊金額，例如：350' :
-    isQueue ? '排隊任務通常填 0，如需代繳請填金額' :
-    '預估代墊金額，例如：350，沒有請填 0';
 }
 
 function syncQueueLocation(){
@@ -3047,65 +3224,6 @@ function openLineOfficialAccount(){
 }
 
 function validateStep2(){
-  const pickupEl = qs('pickup');
-  const dropoffEl = qs('dropoff');
-  const pickupPhoneEl = qs('pickupPhone');
-  const dropoffPhoneEl = qs('dropoffPhone');
-  const itemEl = qs('item');
-  const queueLocationEl = qs('queueLocation');
-
-  let pickup = pickupEl ? pickupEl.value.trim() : '';
-  let dropoff = dropoffEl ? dropoffEl.value.trim() : '';
-  let pickupPhone = pickupPhoneEl ? cleanPhone(pickupPhoneEl.value) : '';
-  let dropoffPhone = dropoffPhoneEl ? cleanPhone(dropoffPhoneEl.value) : '';
-  const item = itemEl ? itemEl.value.trim() : '';
-  const queueLocation = queueLocationEl ? queueLocationEl.value.trim() : '';
-
-  if(serviceGroup === 'queue' && !pickup && queueLocation){
-    pickup = queueLocation;
-    if(pickupEl){
-      pickupEl.value = queueLocation;
-    }
-  }
-
-  if(!pickup){
-    alert('請填寫取件地點 / 購買地點 / 任務地點。');
-    return false;
-  }
-
-  if(!dropoff){
-    alert('請填寫送達地址 / 交付地點。若此任務不需要送達，請填寫「同取件地點」或「現場完成」。');
-    return false;
-  }
-
-  if(!pickupPhone && !dropoffPhone){
-    alert('請至少填寫一組聯絡電話。');
-    return false;
-  }
-
-  if(!pickupPhone && dropoffPhone && pickupPhoneEl){
-    pickupPhoneEl.value = dropoffPhone;
-    pickupPhone = dropoffPhone;
-  }
-
-  if(!dropoffPhone && pickupPhone && dropoffPhoneEl){
-    dropoffPhoneEl.value = pickupPhone;
-    dropoffPhone = pickupPhone;
-  }
-
-  if(!item){
-    alert('請填寫任務內容。');
-    return false;
-  }
-
-  if(serviceGroup === 'queue'){
-    syncQueueLocation();
-  }
-
-  return true;
-}
-
-  function validateStep2(){
   const safeCleanPhone = (value) => {
     if(typeof cleanPhone === 'function'){
       return cleanPhone(value || '');
@@ -3204,6 +3322,7 @@ function goNext(){
     alert('下一步發生錯誤：' + (err.message || '請稍後再試'));
   }
 }
+
 function goPrev(){
   const activeCustomerPage = document.querySelector('.app-section.active');
 
@@ -3224,9 +3343,11 @@ function goPrev(){
 
   showHomeTab();
 }
+
 function getPayload(){
   const pickup = qs('pickup').value.trim();
   const dropoff = qs('dropoff').value.trim();
+  const upstairsOption = getUpstairsOption();
 
   return {
     userId,
@@ -3251,7 +3372,24 @@ function getPayload(){
     note:qs('note').value.trim(),
     speedType,
     speed:speedType,
-    advancePayment:Math.max(0, Math.round(Number(qs('advancePayment').value || 0))),
+
+    locationConfirmed:!!qs('locationConfirmedCheck')?.checked,
+
+    advancePayment:0,
+    estimatedGoodsAmount:0,
+    purchaseAdvanceAllowed:false,
+    riderAdvanceAmount:0,
+    purchasePaymentRule:'customer_paid_first',
+
+    paymentMethod:FIXED_PAYMENT_METHOD,
+    paymentLabel:FIXED_PAYMENT_LABEL,
+    isCashOrder:false,
+
+    upstairsOption,
+    upstairsLabel:getUpstairsLabel(upstairsOption),
+    upstairsFee:calculateUpstairsFee(upstairsOption),
+
+    fareMode:'distance_tier',
 
     nearbyPlace:selectedNearbyPlace ? {
       name:selectedNearbyPlace.name || '',
@@ -3324,10 +3462,26 @@ function renderSummary(){
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">💰</div>
+      <div class="summary-icon">🏢</div>
       <div>
-        <div class="summary-label">預估代墊</div>
-        <div class="summary-value">NT$${Number(payload.advancePayment || 0)}</div>
+        <div class="summary-label">上樓需求</div>
+        <div class="summary-value">${escapeHtml(payload.upstairsLabel)}${payload.upstairsFee > 0 ? `｜上樓費 NT$${payload.upstairsFee}` : ''}</div>
+      </div>
+    </div>
+
+    <div class="summary-row">
+      <div class="summary-icon">💳</div>
+      <div>
+        <div class="summary-label">付款方式</div>
+        <div class="summary-value">街口支付｜不開放現金付款</div>
+      </div>
+    </div>
+
+    <div class="summary-row">
+      <div class="summary-icon">🛡️</div>
+      <div>
+        <div class="summary-label">代買風控</div>
+        <div class="summary-value">目前不提供騎士代墊商品費</div>
       </div>
     </div>
   `;
@@ -3337,36 +3491,44 @@ function renderSummary(){
 
 async function renderEstimate(){
   const box = qs('priceBox');
+  if(!box) return;
+
   box.classList.remove('hidden');
   box.innerHTML = '<div class="price-row"><span>預估費用</span><strong>計算中...</strong></div>';
 
-  const advanceAmount = Math.max(0, Math.round(Number(qs('advancePayment')?.value || 0)));
+  const upstairsOption = getUpstairsOption();
+  const upstairsFee = calculateUpstairsFee(upstairsOption);
+  const upstairsLabel = getUpstairsLabel(upstairsOption);
+  const platformServiceFee = 10;
+
+  if(upstairsOption === 'heavy'){
+    box.innerHTML = `
+      <div class="price-row"><span>預估費用</span><strong>需人工確認</strong></div>
+      <div class="price-note">
+        此任務選擇「重物／大量物品」，需由 UBee 人工確認重量、樓層、搬運距離與可派單狀況後再報價。
+      </div>
+    `;
+    return;
+  }
 
   if(serviceGroup === 'queue'){
     const queueMinutes = Number(qs('queueMinutes').value || 0);
-    const deliveryFee = 80;
+    const queueBaseFee = 80;
     const waitingFee = Math.max(0, queueMinutes * 3);
-    const serviceFee = 25;
-
-    const taskFeeMap = {
-      standard:20,
-      priority:25,
-      express:30
-    };
-
-    const taskFee = taskFeeMap[speedType] || 20;
-    const serviceSubtotal = deliveryFee + waitingFee + serviceFee + taskFee;
-    const estimatedPayableTotal = serviceSubtotal + advanceAmount;
+    const speedFee = getSpeedServiceFee(speedType);
+    const serviceSubtotal = queueBaseFee + waitingFee + speedFee + upstairsFee + platformServiceFee;
 
     box.innerHTML = `
-      <div class="price-row"><span>排隊基本費</span><strong>NT$${deliveryFee}</strong></div>
+      <div class="price-row"><span>排隊基本費</span><strong>NT$${queueBaseFee}</strong></div>
       <div class="price-row"><span>排隊時間費</span><strong>NT$${waitingFee}</strong></div>
-      <div class="price-row"><span>任務處理費</span><strong>NT$${taskFee}</strong></div>
-      <div class="price-row"><span>平台服務費</span><strong>NT$${serviceFee}</strong></div>
-      <div class="price-row price-subtotal"><span>服務費小計</span><strong>NT$${serviceSubtotal}</strong></div>
-      <div class="price-row"><span>預估代墊金額</span><strong>NT$${advanceAmount}</strong></div>
-      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${estimatedPayableTotal}</strong></div>
-      <div class="price-note">實際代墊金額依店家現場金額、收據或實際購買金額為準。</div>
+      <div class="price-row"><span>速度處理費</span><strong>NT$${speedFee}</strong></div>
+      <div class="price-row"><span>上樓需求</span><strong>${escapeHtml(upstairsLabel)}</strong></div>
+      <div class="price-row"><span>上樓費</span><strong>NT$${upstairsFee}</strong></div>
+      <div class="price-row"><span>平台服務費</span><strong>NT$${platformServiceFee}</strong></div>
+      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${serviceSubtotal}</strong></div>
+      <div class="price-note">
+        目前 UBee 不提供騎士代墊商品費。若任務涉及代買或代繳，需由客人先完成付款或由平台人工確認。
+      </div>
     `;
     return;
   }
@@ -3385,32 +3547,37 @@ async function renderEstimate(){
       throw new Error(data.error || data.message || '估價失敗');
     }
 
-    const deliveryFee = Number(data.deliveryFee || 0);
-    const taskFee = Number(data.speedFee || 0);
-    const serviceFee = Number(data.serviceFee || 0);
-    const serviceSubtotal = Number(data.total || 0);
-    const estimatedPayableTotal = serviceSubtotal + advanceAmount;
+    const distanceKm = parseDistanceKmFromQuote(data);
+    const distanceFee = calculateDistanceTierFee(distanceKm);
+    const speedFee = getSpeedServiceFee(speedType);
+    const serviceSubtotal = distanceFee + speedFee + upstairsFee + platformServiceFee;
+    const distanceText = distanceKm > 0 ? `${distanceKm.toFixed(1)} 公里` : (data.distanceText || '-');
 
     box.innerHTML = `
-      <div class="price-row"><span>距離</span><strong>${escapeHtml(data.distanceText || '-')}</strong></div>
-      <div class="price-row"><span>時間</span><strong>${escapeHtml(data.durationText || '-')}</strong></div>
-      <div class="price-row"><span>配送服務費</span><strong>NT$${deliveryFee}</strong></div>
-      <div class="price-row"><span>任務處理費</span><strong>NT$${taskFee}</strong></div>
-      <div class="price-row"><span>平台服務費</span><strong>NT$${serviceFee}</strong></div>
-      <div class="price-row price-subtotal"><span>服務費小計</span><strong>NT$${serviceSubtotal}</strong></div>
-      <div class="price-row"><span>預估代墊金額</span><strong>NT$${advanceAmount}</strong></div>
-      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${estimatedPayableTotal}</strong></div>
-      <div class="price-note">實際代墊金額依店家現場金額、收據或實際購買金額為準。</div>
+      <div class="price-row"><span>距離</span><strong>${escapeHtml(distanceText)}</strong></div>
+      <div class="price-row"><span>距離計費規則</span><strong>${escapeHtml(getDistanceTierText(distanceKm))}</strong></div>
+      <div class="price-row"><span>配送服務費</span><strong>NT$${distanceFee}</strong></div>
+      <div class="price-row"><span>速度處理費</span><strong>NT$${speedFee}</strong></div>
+      <div class="price-row"><span>上樓需求</span><strong>${escapeHtml(upstairsLabel)}</strong></div>
+      <div class="price-row"><span>上樓費</span><strong>NT$${upstairsFee}</strong></div>
+      <div class="price-row"><span>平台服務費</span><strong>NT$${platformServiceFee}</strong></div>
+      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${serviceSubtotal}</strong></div>
+      <div class="price-note">
+        運費採區間制計算：3 公里內 NT$80、3.1～5 公里 NT$100、5.1～8 公里 NT$130，8 公里以上每超出 1 公里加收 NT$15。實際距離仍以系統定位與路線估算為準。
+      </div>
     `;
   }catch(err){
     console.warn('估價失敗:', err);
     box.innerHTML = `
       <div class="price-row"><span>預估費用</span><strong>建立訂單後由系統計算</strong></div>
+      <div class="price-note">
+        若系統暫時無法估價，UBee 會依距離區間、上樓需求與任務內容確認費用。
+      </div>
     `;
   }
 }
   
-  function getFirstMoneyValue(order, fields){
+function getFirstMoneyValue(order, fields){
   for(const field of fields){
     const value = order?.[field];
 
@@ -3472,6 +3639,11 @@ function getCustomerPayableTotal(order){
 
 async function createOrder(){
   if(isSubmittingOrder) return;
+
+  if(!qs('locationConfirmedCheck')?.checked){
+    alert('請先確認取件地址與送達地址正確。');
+    return;
+  }
 
   if(!qs('agreeCheck').checked){
     alert('請先勾選確認同意。');
@@ -3537,10 +3709,8 @@ async function selectPaymentMethod(method){
     return;
   }
 
-  const allowedPaymentMethods = ['cash', 'jko'];
-
-  if(!allowedPaymentMethods.includes(method)){
-    alert('目前付款方式僅支援現金與街口支付。');
+  if(method !== 'jko'){
+    alert('目前 UBee 正式營運版僅支援街口支付。');
     return;
   }
 
@@ -3555,7 +3725,9 @@ async function selectPaymentMethod(method){
       body:JSON.stringify({
         userId,
         customerId:userId,
-        paymentMethod:method
+        paymentMethod:'jko',
+        paymentLabel:'街口支付',
+        isCashOrder:false
       })
     });
 
@@ -3565,81 +3737,49 @@ async function selectPaymentMethod(method){
       throw new Error(data.error || data.message || '設定付款方式失敗');
     }
 
-    selectedPaymentMethod = method;
+    selectedPaymentMethod = 'jko';
 
-    document.getElementById('payCashBtn')?.classList.toggle('selected', method === 'cash');
-    document.getElementById('payJkoBtn')?.classList.toggle('selected', method === 'jko');
+    document.getElementById('payJkoBtn')?.classList.add('selected');
 
     const info = qs('paymentInfo');
     info.classList.remove('hidden');
 
-    if(method === 'cash'){
-  info.innerHTML = `
-    <div class="payment-card-head">
-      <div>
-        <div class="payment-card-kicker">UBee 付款資訊</div>
-        <div class="payment-card-title">現金付款</div>
-      </div>
-      <div class="payment-card-badge">任務完成時付款</div>
-    </div>
+    const jkoPaymentInfo = data.paymentInfo || '請依 UBee 官方提供的街口支付資訊完成付款。';
 
-    <div class="payment-card-body">
-      <div class="payment-card-row">
-        <div class="payment-card-label">付款方式</div>
-        <div class="payment-card-value">現金付款</div>
+    info.innerHTML = `
+      <div class="payment-card-head">
+        <div>
+          <div class="payment-card-kicker">UBee 付款資訊</div>
+          <div class="payment-card-title">街口支付</div>
+        </div>
+        <div class="payment-card-badge">待付款確認</div>
       </div>
-      <div class="payment-card-row">
-        <div class="payment-card-label">付款狀態</div>
-        <div class="payment-card-value">待任務完成後付款</div>
+
+      <div class="payment-card-body">
+        <div class="payment-card-row">
+          <div class="payment-card-label">付款方式</div>
+          <div class="payment-card-value">街口支付</div>
+        </div>
+        <div class="payment-card-row">
+          <div class="payment-card-label">付款狀態</div>
+          <div class="payment-card-value">付款完成後需手動確認</div>
+        </div>
+        <div class="payment-card-row">
+          <div class="payment-card-label">現金付款</div>
+          <div class="payment-card-value">不開放</div>
+        </div>
+        <div class="payment-card-row stack">
+          <div class="payment-card-label">付款資訊</div>
+          <div class="payment-card-value">${escapeHtmlWithBreaks(jkoPaymentInfo)}</div>
+        </div>
       </div>
-      <div class="payment-card-row">
-        <div class="payment-card-label">付款對象</div>
-        <div class="payment-card-value">UBee 合作騎士</div>
+
+      <div class="payment-card-note">
+        完成街口支付後，請按下方「我已完成街口支付，開始派單」。系統確認後才會進入派單流程。
       </div>
-    </div>
+    `;
 
-    <div class="payment-card-note">
-      請確認本次任務使用現金付款。系統收到確認後，會開始進入派單流程。任務完成時，請依訂單金額將費用交付給 UBee 騎士。
-    </div>
-  `;
-
-  qs('confirmPaidBtn').innerText = '確認使用現金付款，開始派單';
-}
-
-if(method === 'jko'){
-  const jkoPaymentInfo = data.paymentInfo || '請依 UBee 官方提供的街口支付資訊完成付款。';
-
-  info.innerHTML = `
-    <div class="payment-card-head">
-      <div>
-        <div class="payment-card-kicker">UBee 付款資訊</div>
-        <div class="payment-card-title">街口支付</div>
-      </div>
-      <div class="payment-card-badge">待付款確認</div>
-    </div>
-
-    <div class="payment-card-body">
-      <div class="payment-card-row">
-        <div class="payment-card-label">付款方式</div>
-        <div class="payment-card-value">街口支付</div>
-      </div>
-      <div class="payment-card-row">
-        <div class="payment-card-label">付款狀態</div>
-        <div class="payment-card-value">付款完成後需手動確認</div>
-      </div>
-      <div class="payment-card-row stack">
-        <div class="payment-card-label">付款資訊</div>
-        <div class="payment-card-value">${escapeHtmlWithBreaks(jkoPaymentInfo)}</div>
-      </div>
-    </div>
-
-    <div class="payment-card-note">
-      完成付款後，請按下方「我已完成街口支付，開始派單」，系統才會進入派單流程。
-    </div>
-  `;
-
-  qs('confirmPaidBtn').innerText = '我已完成街口支付，開始派單';
-}
+    qs('confirmPaidBtn').innerText = '我已完成街口支付，開始派單';
     qs('confirmPaidBtn').classList.remove('hidden');
 
   }catch(err){
@@ -3656,8 +3796,8 @@ async function confirmPaid(){
     return;
   }
 
-  if(!selectedPaymentMethod){
-    alert('請先選擇付款方式。');
+  if(selectedPaymentMethod !== 'jko'){
+    alert('請先選擇街口支付。');
     return;
   }
 
@@ -3688,30 +3828,31 @@ async function confirmPaid(){
 
     const paidMessage = data.message || '系統已進入派單流程，正在媒合附近可服務的 UBee 騎士。請留意任務狀態更新，如有問題可聯繫 UBee 客服。';
 
-qs('paymentInfo').innerHTML = `
-  <div class="payment-card-head">
-    <div>
-      <div class="payment-card-kicker">UBee 派單流程</div>
-      <div class="payment-card-title">付款確認完成</div>
-    </div>
-    <div class="payment-card-badge">派單中</div>
-  </div>
+    qs('paymentInfo').innerHTML = `
+      <div class="payment-card-head">
+        <div>
+          <div class="payment-card-kicker">UBee 派單流程</div>
+          <div class="payment-card-title">付款確認完成</div>
+        </div>
+        <div class="payment-card-badge">派單中</div>
+      </div>
 
-  <div class="payment-card-body">
-    <div class="payment-card-row">
-      <div class="payment-card-label">目前狀態</div>
-      <div class="payment-card-value">系統已開始媒合騎士</div>
-    </div>
-    <div class="payment-card-row">
-      <div class="payment-card-label">任務提醒</div>
-      <div class="payment-card-value">${escapeHtmlWithBreaks(paidMessage)}</div>
-    </div>
-  </div>
+      <div class="payment-card-body">
+        <div class="payment-card-row">
+          <div class="payment-card-label">目前狀態</div>
+          <div class="payment-card-value">系統已開始媒合騎士</div>
+        </div>
+        <div class="payment-card-row">
+          <div class="payment-card-label">任務提醒</div>
+          <div class="payment-card-value">${escapeHtmlWithBreaks(paidMessage)}</div>
+        </div>
+      </div>
 
-  <div class="payment-card-note">
-    請留意任務進度更新。若騎士已接單或任務已開始處理，取消可能會依規則產生相關費用。
-  </div>
-`;
+      <div class="payment-card-note">
+        請留意任務進度更新。若騎士已接單或任務已開始處理，取消可能會依規則產生相關費用。
+      </div>
+    `;
+
     btn.classList.add('hidden');
 
     renderTimeline('pending_dispatch', currentOrderData);
@@ -3781,7 +3922,7 @@ function getStatusLabel(status){
     completed:'已完成',
     done:'已完成',
     cancelled:'已取消',
-    quote_only:'僅估價',
+    quote_only:'僅估價'
   };
 
   return map[status] || status || '等待處理';
@@ -3879,7 +4020,7 @@ function getOrderStepTime(order, key){
 
 function getCurrentStatusMessage(status){
   const map = {
-    pending_payment:'請先選擇付款方式，完成付款確認後才會開始派單。',
+    pending_payment:'請先選擇街口支付，完成付款確認後才會開始派單。',
     merchant_pending:'此訂單正在等待合作店家確認。',
     pending_dispatch:'系統正在媒合附近騎士。',
     accepted:'騎士已接單，正在前往取件地。',
@@ -4338,7 +4479,6 @@ function getSavedCustomerAddress(){
       };
     }
   }catch(e){
-    // 舊版如果只存純地址字串，這裡會自動相容
   }
 
   return {
@@ -4357,7 +4497,7 @@ function setAddressActionStatus(message, isError){
 
 function saveCustomerAddressData(address, phone){
   const cleanAddress = String(address || '').trim();
-  const cleanPhone = String(phone || '').trim();
+  const cleanPhoneText = String(phone || '').trim();
 
   if(!cleanAddress){
     return false;
@@ -4365,7 +4505,7 @@ function saveCustomerAddressData(address, phone){
 
   localStorage.setItem('ubee_customer_home_address', JSON.stringify({
     address:cleanAddress,
-    phone:cleanPhone
+    phone:cleanPhoneText
   }));
 
   return true;
@@ -4590,12 +4730,12 @@ async function initPage(){
         userId = profile.userId || '';
 
         if(userId && userId.startsWith('U')){
-  saveLineUserId(userId);
-  setSubmitButton('確認並建立任務', false);
-  renderCustomerMemberInfo();
-  handleInitialOpenAction();
-  return;
-}
+          saveLineUserId(userId);
+          setSubmitButton('確認並建立任務', false);
+          renderCustomerMemberInfo();
+          handleInitialOpenAction();
+          return;
+        }
       }
 
       if(cachedUserId && cachedUserId.startsWith('U')){
