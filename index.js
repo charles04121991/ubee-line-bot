@@ -510,6 +510,110 @@ app.get('/api/rider/profile', async (req, res) => {
   }
 });
 
+// ===== UBee 騎士可接單判斷：正式營運版 =====
+// 原則：
+// 1. 客人端街口已付款訂單可以派給騎士
+// 2. 店家派單中心的「店家月結 / 店家已收款」可以派給騎士
+// 3. 現金單先不開放，避免正式營運對帳混亂
+
+function getOrderPaymentMethod(order) {
+  return String(
+    order?.paymentMethod ||
+    order?.payMethod ||
+    order?.paymentType ||
+    order?.payment ||
+    order?.payType ||
+    ''
+  ).trim().toLowerCase();
+}
+
+function getOrderPaymentStatus(order) {
+  return String(
+    order?.paymentStatus ||
+    order?.payStatus ||
+    ''
+  ).trim().toLowerCase();
+}
+
+function isPaidJkoDispatchOrder(order) {
+  if (!order) return false;
+
+  const orderStatus = String(order.status || '').trim().toLowerCase();
+  const paymentMethod = getOrderPaymentMethod(order);
+  const paymentStatus = getOrderPaymentStatus(order);
+
+  const isJko =
+    paymentMethod === 'jko' ||
+    paymentMethod === 'jkopay' ||
+    paymentMethod === 'jkpay' ||
+    paymentMethod.includes('jko') ||
+    paymentMethod.includes('jkopay') ||
+    paymentMethod.includes('jkpay') ||
+    paymentMethod.includes('街口');
+
+  const isPaidConfirmed =
+    paymentStatus === 'paid_confirmed' ||
+    paymentStatus === 'paid' ||
+    paymentStatus === 'payment_confirmed' ||
+    paymentStatus.includes('paid_confirmed') ||
+    paymentStatus.includes('已付款') ||
+    paymentStatus.includes('付款完成');
+
+  return (
+    orderStatus === 'pending_dispatch' &&
+    isJko &&
+    isPaidConfirmed &&
+    order.isPaid === true &&
+    order.isCashOrder !== true
+  );
+}
+
+function isMerchantDispatchOrder(order) {
+  if (!order) return false;
+
+  const orderStatus = String(order.status || '').trim().toLowerCase();
+  const paymentMethod = getOrderPaymentMethod(order);
+  const paymentStatus = getOrderPaymentStatus(order);
+
+  const source = String(order.source || '').trim().toLowerCase();
+  const createdFrom = String(order.createdFrom || '').trim().toLowerCase();
+  const orderType = String(order.orderType || '').trim().toLowerCase();
+  const deliveryType = String(order.deliveryType || '').trim().toLowerCase();
+
+  const isMerchantOrder =
+    source === 'merchant-dashboard' ||
+    createdFrom === 'merchant-dashboard' ||
+    orderType === 'merchant_dispatch';
+
+  const isMerchantPaymentReady =
+    paymentMethod === 'merchant_settlement' ||
+    paymentMethod === 'merchant_paid' ||
+    paymentStatus === 'merchant_settlement' ||
+    paymentStatus === 'paid_by_merchant' ||
+    order.merchantPaid === true;
+
+  const isNotCashOrder =
+    paymentMethod !== 'cash' &&
+    paymentStatus !== 'cash_on_delivery' &&
+    order.isCashOrder !== true;
+
+  return (
+    orderStatus === 'pending_dispatch' &&
+    isMerchantOrder &&
+    orderType === 'merchant_dispatch' &&
+    deliveryType !== 'merchant' &&
+    isMerchantPaymentReady &&
+    isNotCashOrder
+  );
+}
+
+function isRiderVisibleDispatchOrder(order) {
+  return (
+    isPaidJkoDispatchOrder(order) ||
+    isMerchantDispatchOrder(order)
+  );
+}
+
 // 2. 取得可接任務：正式版只允許 approved 騎士查看，且只顯示已付款街口單
 app.get('/api/rider/tasks', async (req, res) => {
   try {
@@ -548,31 +652,12 @@ app.get('/api/rider/tasks', async (req, res) => {
       .get();
 
     const orders = snap.docs
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-      .filter(order => {
-        const paymentMethod = String(
-          order.paymentMethod ||
-          order.payMethod ||
-          order.paymentType ||
-          order.payment ||
-          ''
-        ).toLowerCase();
-
-        const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-
-        const isPaidJkoOrder =
-          order.status === 'pending_dispatch' &&
-          paymentMethod === 'jko' &&
-          paymentStatus === 'paid_confirmed' &&
-          order.isPaid === true &&
-          order.isCashOrder !== true;
-
-        return isPaidJkoOrder;
-      })
-      .slice(0, 30);
+  .map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }))
+  .filter(order => isRiderVisibleDispatchOrder(order))
+  .slice(0, 30);
 
     return res.json({
       success: true,
@@ -3931,26 +4016,9 @@ if (!riderOk) {
   throw new Error('ORDER_ALREADY_ACCEPTED');
 }
 
-const paymentMethod = String(
-  order.paymentMethod ||
-  order.payMethod ||
-  order.paymentType ||
-  order.payment ||
-  ''
-).toLowerCase();
-
-const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-
-const isPaidJkoOrder =
-  paymentMethod === 'jko' &&
-  paymentStatus === 'paid_confirmed' &&
-  order.isPaid === true &&
-  order.isCashOrder !== true;
-
-if (!isPaidJkoOrder) {
+if (!isRiderVisibleDispatchOrder(order)) {
   throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
 }
-
       const acceptedEtaPayload = getEtaPayloadByStatus('accepted');
 
 acceptedOrder = {
@@ -4023,7 +4091,7 @@ acceptedOrder = {
     if (error.message === 'ORDER_PAYMENT_NOT_CONFIRMED') {
   return res.status(409).json({
     success: false,
-    message: '此訂單尚未完成街口支付確認，暫時無法接單。',
+    message: '此訂單尚未符合可派送條件，請確認付款狀態或店家派單狀態。',
   });
 }
     
