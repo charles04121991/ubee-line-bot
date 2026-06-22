@@ -3683,7 +3683,7 @@ app.post('/api/orders', async (req, res) => {
       userId: data.userId,
       customerId: data.customerId,
       riderId: '',
-      status: data.hasMerchant ? 'merchant_pending' : 'pending_payment',
+      status: 'pending_payment',
       serviceGroup: data.serviceGroup,
       serviceType: data.serviceType,
       serviceMode: data.serviceMode,
@@ -3787,53 +3787,6 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       });
     }
 
-    const customerPayableTotal = getOrderCustomerPayableTotal(order);
-const advancePayment = getOrderAdvancePaymentAmount(order);
-
-order.customerPayableTotal = customerPayableTotal;
-order.payableTotal = customerPayableTotal;
-order.riderDisplayTotal = customerPayableTotal;
-order.advancePayment = advancePayment;
-
-if (normalizedPaymentMethod === 'cash') {
-  order.paymentMethod = 'cash';
-  order.paymentMethodLabel = '現金付款';
-  order.paymentLabel = '現金付款';
-  order.paymentStatus = 'cash_on_delivery';
-  order.isCashOrder = true;
-  order.cashCollectAmount = customerPayableTotal;
-  order.cashCollected = false;
-  order.isPaid = false;
-  order.paidAt = null;
-  order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
-  order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-
-  await saveOrder(order);
-
-  const customerText =
-    `你已選擇付款方式：現金付款\n\n` +
-    `本單將由騎士服務完成時向你收取現金，預計收取金額：NT$${customerPayableTotal}。`;
-
-  await notifyCustomer(order, createTextMessage(customerText));
-
-  return res.json({
-    success: true,
-    orderId,
-    status: order.status,
-    paymentMethod: 'cash',
-    paymentMethodLabel: '現金付款',
-    paymentLabel: '現金付款',
-    paymentStatus: 'cash_on_delivery',
-    isCashOrder: true,
-    cashCollectAmount: customerPayableTotal,
-    total: customerPayableTotal,
-    customerPayableTotal,
-    advancePayment,
-    paymentInfo: getPaymentInfo('cash', customerPayableTotal),
-    message: '已選擇現金單，系統開始媒合騎士。',
-  });
-}
-    
     if (!isSameCustomerUserId(order, requestUserId)) {
       return res.status(403).json({
         success: false,
@@ -3843,20 +3796,97 @@ if (normalizedPaymentMethod === 'cash') {
 
     const normalizedPaymentMethod = String(paymentMethod || '').trim().toLowerCase();
 
-if (!['jko', 'cash'].includes(normalizedPaymentMethod)) {
-  return res.status(400).json({
-    success: false,
-    error: 'UBee 正式營運版目前僅支援街口支付與現金單。',
-  });
-}
+    if (!['jko', 'cash'].includes(normalizedPaymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        error: 'UBee 正式營運版目前僅支援街口支付與現金單。',
+      });
+    }
 
-    if (!['pending_payment'].includes(order.status)) {
+    const currentStatus = String(order.status || '').trim();
+
+    // 正式版保護：
+    // 正常情況只允許 pending_payment。
+    // 但為了救目前已經被舊邏輯建成 merchant_pending 的單，也允許 merchant_pending 回來設定付款。
+    if (!['pending_payment', 'merchant_pending'].includes(currentStatus)) {
       return res.status(400).json({
         success: false,
         error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可再變更付款方式`,
       });
     }
 
+    const advancePayment = Math.max(0, Math.round(Number(order.advancePayment || 0)));
+
+    const serviceSubtotal = Math.max(0, Math.round(Number(
+      order.serviceSubtotal ||
+      order.serviceTotal ||
+      order.total ||
+      order.price ||
+      0
+    )));
+
+    const customerPayableTotal = Math.max(0, Math.round(Number(
+      order.customerPayableTotal ||
+      order.payableTotal ||
+      order.riderDisplayTotal ||
+      (serviceSubtotal + advancePayment) ||
+      0
+    )));
+
+    order.customerPayableTotal = customerPayableTotal;
+    order.payableTotal = customerPayableTotal;
+    order.riderDisplayTotal = customerPayableTotal;
+    order.advancePayment = advancePayment;
+
+    if (normalizedPaymentMethod === 'cash') {
+      order.paymentMethod = 'cash';
+      order.paymentMethodLabel = '現金付款';
+      order.paymentLabel = '現金付款';
+      order.paymentStatus = 'cash_on_delivery';
+
+      order.isCashOrder = true;
+      order.cashCollectAmount = customerPayableTotal;
+      order.cashCollected = false;
+
+      order.isPaid = false;
+      order.paidAt = null;
+
+      // 現金單選完後，直接進入下一階段
+      // 有店家：先進店家處理 / 無店家：直接待派單
+      order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
+      order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+      await saveOrder(order);
+
+      try {
+        await notifyCustomer(order, createTextMessage(
+          `你已選擇付款方式：現金付款\n\n` +
+          `本單將由騎士於任務完成時向你收取現金。\n` +
+          `預計收取金額：NT$${customerPayableTotal}。`
+        ));
+      } catch (notifyErr) {
+        console.error('⚠️ 現金單設定成功，但通知客人失敗：', notifyErr);
+      }
+
+      return res.json({
+        success: true,
+        orderId,
+        status: order.status,
+        paymentMethod: 'cash',
+        paymentMethodLabel: '現金付款',
+        paymentLabel: '現金付款',
+        paymentStatus: 'cash_on_delivery',
+        isCashOrder: true,
+        cashCollectAmount: customerPayableTotal,
+        total: customerPayableTotal,
+        customerPayableTotal,
+        advancePayment,
+        paymentInfo: getPaymentInfo('cash', customerPayableTotal),
+        message: '已選擇現金單，系統開始媒合騎士。',
+      });
+    }
+
+    // 街口支付：先停在等待付款，客人按「我已完成街口支付」後才派單
     order.paymentMethod = 'jko';
     order.paymentMethodLabel = '街口支付';
     order.paymentLabel = '街口支付';
@@ -3871,22 +3901,29 @@ if (!['jko', 'cash'].includes(normalizedPaymentMethod)) {
 
     await saveOrder(order);
 
-    const customerText =
-      `你已選擇付款方式：街口支付\n\n` +
-      `完成付款後，請回到網頁按「我已付款」，系統才會開始派單。`;
-
-    await notifyCustomer(order, createTextMessage(customerText));
+    try {
+      await notifyCustomer(order, createTextMessage(
+        `你已選擇付款方式：街口支付\n\n` +
+        `完成付款後，請回到網頁按「我已完成街口支付，開始派單」。`
+      ));
+    } catch (notifyErr) {
+      console.error('⚠️ 街口付款方式設定成功，但通知客人失敗：', notifyErr);
+    }
 
     return res.json({
       success: true,
       orderId,
+      status: order.status,
       paymentMethod: 'jko',
       paymentMethodLabel: '街口支付',
       paymentLabel: '街口支付',
+      paymentStatus: 'waiting_confirm',
+      isCashOrder: false,
       paymentInfo: getPaymentInfo('jko', customerPayableTotal),
       total: customerPayableTotal,
       customerPayableTotal,
       advancePayment,
+      message: '已選擇街口支付，請完成付款後再確認付款。',
     });
 
   } catch (error) {
@@ -3955,21 +3992,20 @@ if (order.status !== 'pending_payment') {
 
     order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
 
-    order.paidAt = Date.now();
-    order.isPaid = true;
-    order.paymentStatus = 'paid_confirmed';
-    order.paymentMethod = 'jko';
-    order.paymentMethodLabel = '街口支付';
-    order.paymentLabel = '街口支付';
+order.paidAt = Date.now();
+order.isPaid = true;
+order.paymentStatus = 'paid_confirmed';
+order.paymentMethod = 'jko';
+order.paymentMethodLabel = '街口支付';
+order.paymentLabel = '街口支付';
 
-    // 正式版不開放現金收款
-    order.isCashOrder = false;
-    order.cashCollectAmount = 0;
-    order.cashCollected = false;
+order.isCashOrder = false;
+order.cashCollectAmount = 0;
+order.cashCollected = false;
 
-    order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
-    await saveOrder(order);
+await saveOrder(order);
 
     try {
       await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
