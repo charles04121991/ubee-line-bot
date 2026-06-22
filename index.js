@@ -935,7 +935,7 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         ...doc.data()
       };
 
-      const paymentText = String(
+      const paymentMethod = String(
         order.paymentMethod ||
         order.payMethod ||
         order.paymentType ||
@@ -943,11 +943,17 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         ''
       ).toLowerCase();
 
-      const isCashOrder =
-        paymentText.includes('cash') ||
-        paymentText.includes('現金');
+      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
 
-      if (isCashOrder) {
+      const isPaidJkoOrder =
+        order.status === 'completed' &&
+        paymentMethod === 'jko' &&
+        paymentStatus === 'paid_confirmed' &&
+        order.isPaid === true &&
+        order.isCashOrder !== true;
+
+      // UBee 正式營運版：後台待撥款只顯示已完成、已付款、街口支付、非現金單
+      if (!isPaidJkoOrder) {
         return;
       }
 
@@ -958,6 +964,17 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         0
       );
 
+      if (riderIncome <= 0) {
+        return;
+      }
+
+      const customerTotal = Number(
+        order.total ||
+        order.customerPayableTotal ||
+        order.finalTotal ||
+        0
+      );
+
       pendingTotal += riderIncome;
 
       orders.push({
@@ -965,8 +982,13 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         orderNo: order.orderNo || order.id,
         riderId: order.riderId || order.riderLineUserId || order.driverId || '',
         riderName: order.riderName || order.driverName || '',
-        paymentMethod: order.paymentMethod || order.payMethod || order.paymentType || '',
+        paymentMethod: 'jko',
+        paymentMethodLabel: '街口支付',
+        paymentStatus: 'paid_confirmed',
         riderFee: riderIncome,
+        driverFee: riderIncome,
+        fee: riderIncome,
+        total: customerTotal,
         completedAt: order.completedAt || null,
         updatedAt: order.updatedAt || null
       });
@@ -1030,7 +1052,14 @@ app.post('/api/admin/settle-order', async (req, res) => {
       });
     }
 
-    const paymentText = String(
+    if (String(order.settlementStatus || 'pending').toLowerCase() === 'settled') {
+      return res.status(409).json({
+        success: false,
+        message: '此訂單已完成結算，請勿重複操作'
+      });
+    }
+
+    const paymentMethod = String(
       order.paymentMethod ||
       order.payMethod ||
       order.paymentType ||
@@ -1038,27 +1067,48 @@ app.post('/api/admin/settle-order', async (req, res) => {
       ''
     ).toLowerCase();
 
-    const isCashOrder =
-      paymentText.includes('cash') ||
-      paymentText.includes('現金');
+    const paymentStatus = String(order.paymentStatus || '').toLowerCase();
 
-    if (isCashOrder) {
+    const isPaidJkoOrder =
+      paymentMethod === 'jko' &&
+      paymentStatus === 'paid_confirmed' &&
+      order.isPaid === true &&
+      order.isCashOrder !== true;
+
+    if (!isPaidJkoOrder) {
       return res.status(400).json({
         success: false,
-        message: '現金單不應標記為平台撥款結算，應走待繳平台邏輯'
+        message: '此訂單不是已付款街口支付訂單，不能標記為平台撥款結算'
+      });
+    }
+
+    const riderIncome = Number(
+      order.riderFee ||
+      order.driverFee ||
+      order.fee ||
+      0
+    );
+
+    if (riderIncome <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '此訂單缺少正確的騎士收入，不能結算'
       });
     }
 
     await ref.update({
       settlementStatus: 'settled',
       settledAt: admin.firestore.FieldValue.serverTimestamp(),
-      settledBy: 'admin'
+      settledBy: 'admin',
+      settledAmount: riderIncome,
+      settlementPaymentMethod: 'jko'
     });
 
     res.json({
       success: true,
       message: '已完成結算',
-      orderId
+      orderId,
+      settledAmount: riderIncome
     });
 
   } catch (err) {
