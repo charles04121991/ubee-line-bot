@@ -650,8 +650,8 @@
           <strong id="serviceType">跑腿任務</strong>
         </div>
         <div class="hero-stat">
-          <span>預估完成</span>
-          <strong id="etaText">約 35 分鐘</strong>
+          <span>預估剩餘時間</span>
+          <strong id="etaText">媒合騎士中</strong>
         </div>
       </div>
     </section>
@@ -885,6 +885,37 @@
       return order.serviceType || order.serviceName || "跑腿任務";
     }
 
+    function getEtaText(order, status) {
+  const manualEta =
+    order.etaText ||
+    order.estimatedCompletionText ||
+    order.estimatedTimeText ||
+    order.eta ||
+    order.estimatedTime ||
+    "";
+
+  // 如果後端或訂單資料已經有明確 ETA，優先使用後端資料
+  if (manualEta) {
+    return manualEta;
+  }
+
+  const map = {
+    draft_confirm: "等待確認",
+    pending_payment: "付款完成後開始媒合",
+    merchant_pending: "等待店家確認",
+    pending_dispatch: "媒合騎士中",
+    accepted: "約 30～45 分鐘",
+    arrived_pickup: "約 20～30 分鐘",
+    picked_up: "約 10～20 分鐘",
+    arrived_dropoff: "即將完成",
+    completed: "已完成",
+    done: "已完成",
+    cancelled: "已取消"
+  };
+
+  return map[status] || "約 35 分鐘";
+}
+    
     function getRiderInfo(order) {
       if (order.riderName) return order.riderName;
       if (order.riderDisplayName) return order.riderDisplayName;
@@ -976,7 +1007,7 @@
       document.getElementById("currentTitle").textContent = currentStep.activeTitle;
       document.getElementById("currentDesc").textContent = currentStep.activeDesc;
       document.getElementById("serviceType").textContent = getServiceType(order);
-      document.getElementById("etaText").textContent = order.eta || order.estimatedTime || "約 35 分鐘";
+      document.getElementById("etaText").textContent = getEtaText(order, status);
       document.getElementById("pickupAddress").textContent = getPickup(order);
       document.getElementById("dropoffAddress").textContent = getDropoff(order);
       document.getElementById("riderInfo").textContent = getRiderInfo(order);
