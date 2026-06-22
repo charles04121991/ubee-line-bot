@@ -1962,8 +1962,8 @@ body.day-mode .bottom-tabs{
         <div class="notice-title">注意事項</div>
         <ul>
           <li>UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署等高風險任務。</li>
-          <li>代買商品請填清楚規格與替代方案；目前 UBee 跑腿不提供騎士代墊商品費，商品款項需由客人先完成付款或由平台人工確認。</li>
-          <li>目前正式營運版僅支援街口支付，不開放現金付款。</li>
+          <li>代買商品請填清楚規格與替代方案；若有代墊費用，請正確填寫代墊金額。代墊款項達 NT$1,000（含）以上，需改由 UBee 跑腿客服人工確認。</li>
+          <li>目前正式營運版支援街口支付與現金單。街口單需付款確認後派單；現金單確認後會直接派單。</li>
           <li>付款確認後才會進入派單流程。</li>
           <li>騎士已接單或任務已開始後，取消可能產生相關費用。</li>
         </ul>
@@ -2184,7 +2184,7 @@ body.day-mode .bottom-tabs{
           <div class="info-item-text">UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署或高風險委託事項。</div>
         </div>
         <div class="info-item">
-          <<div class="info-item-title">付款方式有哪些？</div>
+          <div class="info-item-title">付款方式有哪些？</div>
           <div class="info-item-text">目前 UBee 跑腿支援街口支付與現金單。街口單需完成付款確認後開始媒合騎士；現金單會直接媒合騎士，任務完成時由騎士向客人收取現金。</div>
         </div>
         <div class="info-item">
@@ -2326,8 +2326,10 @@ let initialOpenActionHandled = false;
 const LINE_OFFICIAL_ID = '@686rwnvn';
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
 
-const FIXED_PAYMENT_METHOD = 'jko';
-const FIXED_PAYMENT_LABEL = '街口支付';
+const INITIAL_PAYMENT_METHOD = '';
+const INITIAL_PAYMENT_LABEL = '尚未選擇';
+
+const MAX_ADVANCE_PAYMENT = 1000;
 
 function qs(id){
   return document.getElementById(id);
@@ -2550,6 +2552,95 @@ function escapeHtmlWithBreaks(str){
   
 function cleanPhone(value){
   return String(value || '').replace(/[^\d]/g,'').trim();
+}
+
+function getAdvancePaymentAmount(){
+  if(serviceGroup !== 'buy'){
+    return 0;
+  }
+
+  const el = qs('advancePayment');
+
+  if(!el){
+    return 0;
+  }
+
+  const raw = String(el.value || '').trim();
+
+  if(raw === ''){
+    return 0;
+  }
+
+  const amount = Number(raw);
+
+  if(!Number.isFinite(amount)){
+    return NaN;
+  }
+
+  return Math.max(0, Math.round(amount));
+}
+
+function validateAdvancePaymentLimit(){
+  const amount = getAdvancePaymentAmount();
+
+  if(Number.isNaN(amount)){
+    alert('代墊費用請填寫 0 或正確金額。');
+    return false;
+  }
+
+  if(amount >= MAX_ADVANCE_PAYMENT){
+    alert('代墊款項達 NT$1,000（含）以上，為了保障客人與騎士安全，請改由 UBee 跑腿客服人工確認，系統暫不開放繼續下單。');
+    return false;
+  }
+
+  return true;
+}
+
+function isPaymentChangeLocked(order){
+  const data = order || currentOrderData || {};
+  const status = String(data.status || '');
+  const paymentStatus = String(data.paymentStatus || '');
+
+  const lockedStatuses = [
+    'pending_dispatch',
+    'merchant_pending',
+    'accepted',
+    'arrived_pickup',
+    'picked_up',
+    'arrived_dropoff',
+    'completed',
+    'done',
+    'cancelled'
+  ];
+
+  if(paymentStatus === 'paid' || paymentStatus === 'payment_confirmed'){
+    return true;
+  }
+
+  if(data.riderId || data.riderLineId || data.acceptedBy || data.driverId){
+    return true;
+  }
+
+  if(lockedStatuses.includes(status)){
+    return true;
+  }
+
+  return false;
+}
+
+function updatePaymentButtons(method){
+  const locked = isPaymentChangeLocked(currentOrderData);
+
+  qs('payJkoBtn')?.classList.toggle('selected', method === 'jko');
+  qs('payCashBtn')?.classList.toggle('selected', method === 'cash');
+
+  if(qs('payJkoBtn')){
+    qs('payJkoBtn').disabled = locked;
+  }
+
+  if(qs('payCashBtn')){
+    qs('payCashBtn').disabled = locked;
+  }
 }
 
 function getSpeedLabel(type){
@@ -3309,17 +3400,15 @@ function validateStep2(){
     return false;
   }
 
+    if(!validateAdvancePaymentLimit()){
+    return false;
+  }
+
   const advancePaymentEl = qs('advancePayment');
-const advancePayment = advancePaymentEl ? Number(advancePaymentEl.value || 0) : 0;
 
-if(Number.isNaN(advancePayment) || advancePayment < 0){
-  alert('代墊費用請填寫 0 或正確金額。');
-  return false;
-}
-
-if(serviceGroup !== 'buy' && advancePaymentEl){
-  advancePaymentEl.value = '0';
-}
+  if(serviceGroup !== 'buy' && advancePaymentEl){
+    advancePaymentEl.value = '0';
+  }
   
   if(serviceGroup === 'queue' && typeof syncQueueLocation === 'function'){
     syncQueueLocation();
@@ -3387,10 +3476,8 @@ function getPayload(){
   const pickup = qs('pickup').value.trim();
 const dropoff = qs('dropoff').value.trim();
 const upstairsOption = getUpstairsOption();
-const advancePayment = serviceGroup === 'buy'
-  ? Math.max(0, Math.round(Number(qs('advancePayment')?.value || 0)))
-  : 0;
-
+const rawAdvancePayment = getAdvancePaymentAmount();
+const advancePayment = Number.isFinite(rawAdvancePayment) ? rawAdvancePayment : 0;
   return {
     userId,
     customerId:userId,
@@ -3423,9 +3510,10 @@ purchaseAdvanceAllowed:advancePayment > 0,
 riderAdvanceAmount:advancePayment,
 purchasePaymentRule:advancePayment > 0 ? 'rider_advance_then_customer_pay' : 'no_advance',
 
-    paymentMethod:FIXED_PAYMENT_METHOD,
-    paymentLabel:FIXED_PAYMENT_LABEL,
-    isCashOrder:false,
+        paymentMethod:INITIAL_PAYMENT_METHOD,
+        paymentLabel:INITIAL_PAYMENT_LABEL,
+        paymentStatus:'unselected',
+        isCashOrder:false,
 
     upstairsOption,
     upstairsLabel:getUpstairsLabel(upstairsOption),
@@ -3784,7 +3872,7 @@ async function createOrder(){
   }
 }
 
-async function selectPaymentMethod(method){
+function selectPaymentMethod(method){
   if(!currentOrderId){
     alert('找不到訂單編號。');
     return;
@@ -3797,71 +3885,153 @@ async function selectPaymentMethod(method){
     return;
   }
 
-  if(isSelectingPayment) return;
+  if(isPaymentChangeLocked(currentOrderData)){
+    alert('訂單已開始派單、騎士已接單或付款已完成，付款方式無法再更改。');
+    updatePaymentButtons(selectedPaymentMethod);
+    return;
+  }
+
+  selectedPaymentMethod = normalizedMethod;
+  updatePaymentButtons(normalizedMethod);
+
+  const info = qs('paymentInfo');
+  info.classList.remove('hidden');
+
+  const payableTotal = getCustomerPayableTotal(currentOrderData);
+  const totalText = payableTotal !== null && payableTotal > 0
+    ? `NT$${Math.round(payableTotal)}`
+    : '系統計算中';
+
+  if(normalizedMethod === 'cash'){
+    info.innerHTML = `
+      <div class="payment-card-head">
+        <div>
+          <div class="payment-card-kicker">UBee 跑腿付款資訊</div>
+          <div class="payment-card-title">現金單</div>
+        </div>
+        <div class="payment-card-badge">確認後派單</div>
+      </div>
+
+      <div class="payment-card-body">
+        <div class="payment-card-row">
+          <div class="payment-card-label">付款方式</div>
+          <div class="payment-card-value">現金付款</div>
+        </div>
+        <div class="payment-card-row">
+          <div class="payment-card-label">費用</div>
+          <div class="payment-card-value">${escapeHtml(totalText)}</div>
+        </div>
+        <div class="payment-card-row">
+          <div class="payment-card-label">付款狀態</div>
+          <div class="payment-card-value">任務完成時交付給騎士</div>
+        </div>
+      </div>
+
+      <div class="payment-card-note">
+        你目前選擇的是現金單。按下「確認使用現金單，開始派單」後，系統才會正式媒合騎士；派單開始後付款方式就不能再更改。
+      </div>
+    `;
+
+    qs('confirmPaidBtn').innerText = '確認使用現金單，開始派單';
+    qs('confirmPaidBtn').classList.remove('hidden');
+    return;
+  }
+
+  info.innerHTML = `
+    <div class="payment-card-head">
+      <div>
+        <div class="payment-card-kicker">UBee 跑腿付款資訊</div>
+        <div class="payment-card-title">街口支付</div>
+      </div>
+      <div class="payment-card-badge">待付款確認</div>
+    </div>
+
+    <div class="payment-card-body">
+      <div class="payment-card-row">
+        <div class="payment-card-label">付款方式</div>
+        <div class="payment-card-value">街口支付</div>
+      </div>
+      <div class="payment-card-row">
+        <div class="payment-card-label">費用</div>
+        <div class="payment-card-value">${escapeHtml(totalText)}</div>
+      </div>
+      <div class="payment-card-row">
+        <div class="payment-card-label">付款狀態</div>
+        <div class="payment-card-value">付款完成後需手動確認</div>
+      </div>
+      <div class="payment-card-row stack">
+        <div class="payment-card-label">付款資訊</div>
+        <div class="payment-card-value">請依 UBee 跑腿官方提供的街口支付資訊完成付款。</div>
+      </div>
+    </div>
+
+    <div class="payment-card-note">
+      你目前選擇的是街口支付。在尚未按下「我已完成街口支付，開始派單」以前，可以改選現金單。
+    </div>
+  `;
+
+  qs('confirmPaidBtn').innerText = '我已完成街口支付，開始派單';
+  qs('confirmPaidBtn').classList.remove('hidden');
+}
+
+async function submitPaymentMethodToServer(method){
+  const normalizedMethod = String(method || '').trim().toLowerCase();
+
+  const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify({
+      userId,
+      customerId:userId,
+      paymentMethod:normalizedMethod,
+      paymentLabel:normalizedMethod === 'cash' ? '現金付款' : '街口支付',
+      isCashOrder:normalizedMethod === 'cash'
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if(!res.ok || data.success === false){
+    throw new Error(data.error || data.message || '設定付款方式失敗');
+  }
+
+  return data;
+}
+
+async function confirmPaid(){
+  if(!currentOrderId){
+    alert('找不到訂單編號。');
+    return;
+  }
+
+  if(!selectedPaymentMethod){
+    alert('請先選擇付款方式。');
+    return;
+  }
+
+  if(isPaymentChangeLocked(currentOrderData)){
+    alert('訂單已開始派單、騎士已接單或付款已完成，付款方式無法再更改。');
+    return;
+  }
+
+  if(isConfirmingPaid) return;
+
+  const btn = qs('confirmPaidBtn');
+  const originalText = btn.innerText;
 
   try{
-    isSelectingPayment = true;
+    isConfirmingPaid = true;
+    btn.disabled = true;
+    btn.innerText = '確認中...';
 
-    const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({
-        userId,
-        customerId:userId,
-        paymentMethod:normalizedMethod,
-        paymentLabel:normalizedMethod === 'cash' ? '現金付款' : '街口支付',
-        isCashOrder:normalizedMethod === 'cash'
-      })
-    });
+    if(selectedPaymentMethod === 'cash'){
+      const ok = confirm('確定使用現金單並開始派單嗎？開始派單後，付款方式就不能再更改。');
 
-    const data = await res.json().catch(() => ({}));
+      if(!ok){
+        return;
+      }
 
-    if(!res.ok || data.success === false){
-      throw new Error(data.error || data.message || '設定付款方式失敗');
-    }
-
-    selectedPaymentMethod = normalizedMethod;
-
-    document.getElementById('payJkoBtn')?.classList.toggle('selected', normalizedMethod === 'jko');
-    document.getElementById('payCashBtn')?.classList.toggle('selected', normalizedMethod === 'cash');
-
-    const info = qs('paymentInfo');
-    info.classList.remove('hidden');
-
-    const payableAmount = Number(data.total || data.customerPayableTotal || 0);
-    const totalText = payableAmount > 0 ? `NT$${Math.round(payableAmount)}` : '系統計算中';
-
-    if(normalizedMethod === 'cash'){
-      info.innerHTML = `
-        <div class="payment-card-head">
-          <div>
-            <div class="payment-card-kicker">UBee 跑腿付款資訊</div>
-            <div class="payment-card-title">現金單</div>
-          </div>
-          <div class="payment-card-badge">直接派單</div>
-        </div>
-
-        <div class="payment-card-body">
-          <div class="payment-card-row">
-            <div class="payment-card-label">付款方式</div>
-            <div class="payment-card-value">現金付款</div>
-          </div>
-          <div class="payment-card-row">
-            <div class="payment-card-label">費用</div>
-            <div class="payment-card-value">${escapeHtml(totalText)}</div>
-          </div>
-          <div class="payment-card-row">
-            <div class="payment-card-label">付款狀態</div>
-            <div class="payment-card-value">任務完成時交付給騎士</div>
-          </div>
-        </div>
-
-        <div class="payment-card-note">
-          現金單已建立，系統會直接開始媒合附近騎士。請於任務完成時依實際金額交付現金。
-        </div>
-      `;
-
-      qs('confirmPaidBtn').classList.add('hidden');
+      const data = await submitPaymentMethodToServer('cash');
 
       currentOrderData = {
         ...(currentOrderData || {}),
@@ -3876,76 +4046,43 @@ async function selectPaymentMethod(method){
         advancePayment:data.advancePayment || currentOrderData?.advancePayment || 0
       };
 
+      qs('paymentInfo').innerHTML = `
+        <div class="payment-card-head">
+          <div>
+            <div class="payment-card-kicker">UBee 跑腿付款資訊</div>
+            <div class="payment-card-title">現金單已確認</div>
+          </div>
+          <div class="payment-card-badge">派單中</div>
+        </div>
+
+        <div class="payment-card-body">
+          <div class="payment-card-row">
+            <div class="payment-card-label">目前狀態</div>
+            <div class="payment-card-value">系統已開始媒合騎士</div>
+          </div>
+          <div class="payment-card-row">
+            <div class="payment-card-label">付款方式</div>
+            <div class="payment-card-value">任務完成時由騎士向客人收取現金</div>
+          </div>
+        </div>
+
+        <div class="payment-card-note">
+          現金單已進入派單流程。騎士接單後，請留意任務進度與電話聯繫。
+        </div>
+      `;
+
+      btn.classList.add('hidden');
+      updatePaymentButtons('cash');
       renderTimeline(currentOrderData.status, currentOrderData);
       return;
     }
 
-    const jkoPaymentInfo = data.paymentInfo || '請依 UBee 跑腿官方提供的街口支付資訊完成付款。';
+    if(selectedPaymentMethod !== 'jko'){
+      alert('請先選擇街口支付或現金單。');
+      return;
+    }
 
-    info.innerHTML = `
-      <div class="payment-card-head">
-        <div>
-          <div class="payment-card-kicker">UBee 跑腿付款資訊</div>
-          <div class="payment-card-title">街口支付</div>
-        </div>
-        <div class="payment-card-badge">待付款確認</div>
-      </div>
-
-      <div class="payment-card-body">
-        <div class="payment-card-row">
-          <div class="payment-card-label">付款方式</div>
-          <div class="payment-card-value">街口支付</div>
-        </div>
-        <div class="payment-card-row">
-          <div class="payment-card-label">費用</div>
-          <div class="payment-card-value">${escapeHtml(totalText)}</div>
-        </div>
-        <div class="payment-card-row">
-          <div class="payment-card-label">付款狀態</div>
-          <div class="payment-card-value">付款完成後需手動確認</div>
-        </div>
-        <div class="payment-card-row stack">
-          <div class="payment-card-label">付款資訊</div>
-          <div class="payment-card-value">${escapeHtmlWithBreaks(jkoPaymentInfo)}</div>
-        </div>
-      </div>
-
-      <div class="payment-card-note">
-        完成街口支付後，請按下方「我已完成街口支付，開始派單」。系統確認後才會進入派單流程。
-      </div>
-    `;
-
-    qs('confirmPaidBtn').innerText = '我已完成街口支付，開始派單';
-    qs('confirmPaidBtn').classList.remove('hidden');
-
-  }catch(err){
-    console.error('設定付款方式失敗:', err);
-    alert(err.message || '設定付款方式失敗，請稍後再試。');
-  }finally{
-    isSelectingPayment = false;
-  }
-}
-
-async function confirmPaid(){
-  if(!currentOrderId){
-    alert('找不到訂單編號。');
-    return;
-  }
-
-  if(selectedPaymentMethod !== 'jko'){
-    alert('請先選擇街口支付。');
-    return;
-  }
-
-  if(isConfirmingPaid) return;
-
-  const btn = qs('confirmPaidBtn');
-  const originalText = btn.innerText;
-
-  try{
-    isConfirmingPaid = true;
-    btn.disabled = true;
-    btn.innerText = '確認中...';
+    await submitPaymentMethodToServer('jko');
 
     const res = await fetch(`/api/orders/${encodeURIComponent(currentOrderId)}/paid`, {
       method:'POST',
@@ -3963,6 +4100,15 @@ async function confirmPaid(){
     }
 
     const paidMessage = data.message || '系統已進入派單流程，正在媒合附近可服務的 UBee 跑腿騎士。請留意任務狀態更新，如有問題可聯繫 UBee 跑腿客服。';
+
+    currentOrderData = {
+      ...(currentOrderData || {}),
+      status:data.status || 'pending_dispatch',
+      paymentMethod:'jko',
+      paymentMethodLabel:'街口支付',
+      paymentLabel:'街口支付',
+      paymentStatus:data.paymentStatus || 'paid'
+    };
 
     qs('paymentInfo').innerHTML = `
       <div class="payment-card-head">
@@ -3990,12 +4136,12 @@ async function confirmPaid(){
     `;
 
     btn.classList.add('hidden');
-
+    updatePaymentButtons('jko');
     renderTimeline('pending_dispatch', currentOrderData);
 
   }catch(err){
-    console.error('確認付款失敗:', err);
-    alert(err.message || '確認付款失敗，請稍後再試。');
+    console.error('確認付款方式失敗:', err);
+    alert(err.message || '確認付款方式失敗，請稍後再試。');
   }finally{
     isConfirmingPaid = false;
     btn.disabled = false;
@@ -4156,7 +4302,7 @@ function getOrderStepTime(order, key){
 
 function getCurrentStatusMessage(status){
   const map = {
-    pending_payment:'請先選擇街口支付，完成付款確認後才會開始派單。',
+    pending_payment:'請先選擇街口支付或現金單。街口單完成付款確認後派單；現金單確認後直接派單。',
     merchant_pending:'此訂單正在等待合作店家確認。',
     pending_dispatch:'系統正在媒合附近騎士。',
     accepted:'騎士已接單，正在前往取件地。',
