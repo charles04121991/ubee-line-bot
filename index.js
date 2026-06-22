@@ -510,7 +510,7 @@ app.get('/api/rider/profile', async (req, res) => {
   }
 });
 
-// 2. 取得可接任務：正式版只允許 approved 騎士查看
+// 2. 取得可接任務：正式版只允許 approved 騎士查看，且只顯示已付款街口單
 app.get('/api/rider/tasks', async (req, res) => {
   try {
     const { lineUserId } = req.query;
@@ -523,32 +523,56 @@ app.get('/api/rider/tasks', async (req, res) => {
     }
 
     const riderSnap = await db.collection('riders')
-  .where('lineUserId', '==', lineUserId)
-  .limit(1)
-  .get();
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
 
-const riderOk = !riderSnap.empty && (
-  riderSnap.docs[0].data().approved === true ||
-  riderSnap.docs[0].data().status === 'approved'
-);
+    const riderOk = !riderSnap.empty && (
+      riderSnap.docs[0].data().approved === true ||
+      riderSnap.docs[0].data().status === 'approved'
+    );
 
-if (!riderOk) {
-  return res.status(403).json({
-    success: false,
-    message: '你尚未通過 UBee 騎士審核，暫時無法查看任務。',
-  });
-}
+    if (!riderOk) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法查看任務。',
+      });
+    }
 
+    // 先只用 status 查詢，避免 Firestore 複合索引問題；
+    // 再用後端 JS 做正式營運版付款防呆過濾。
     const snap = await db
       .collection('orders')
       .where('status', '==', 'pending_dispatch')
-      .limit(30)
+      .limit(50)
       .get();
 
-    const orders = snap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const orders = snap.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(order => {
+        const paymentMethod = String(
+          order.paymentMethod ||
+          order.payMethod ||
+          order.paymentType ||
+          order.payment ||
+          ''
+        ).toLowerCase();
+
+        const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+
+        const isPaidJkoOrder =
+          order.status === 'pending_dispatch' &&
+          paymentMethod === 'jko' &&
+          paymentStatus === 'paid_confirmed' &&
+          order.isPaid === true &&
+          order.isCashOrder !== true;
+
+        return isPaidJkoOrder;
+      })
+      .slice(0, 30);
 
     return res.json({
       success: true,
