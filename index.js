@@ -2778,16 +2778,21 @@ function createRiderControlFlex(order) {
 }
 
 function createPaymentInfoFlex(order) {
-  const paymentInfo = order.paymentMethod === 'jko' ? PAYMENT_JKO_INFO : PAYMENT_BANK_INFO;
+  const safeOrder = {
+    ...order,
+    paymentMethod: 'jko',
+    paymentMethodLabel: '街口支付',
+    paymentLabel: '街口支付',
+  };
 
   return createFlexMessage('付款資訊', createBubble(
-    order.paymentMethod === 'jko' ? '街口支付資訊' : '銀行轉帳資訊',
+    '街口支付資訊',
     [
-      createInfoRow('訂單編號', order.id),
-      createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
-      createInfoRow('應付金額', formatCurrency(order.total)),
+      createInfoRow('訂單編號', safeOrder.id),
+      createInfoRow('付款方式', '街口支付'),
+      createInfoRow('應付金額', formatCurrency(safeOrder.total)),
       { type: 'separator', margin: 'md' },
-      { type: 'text', text: paymentInfo, size: 'sm', color: '#111111', wrap: true },
+      { type: 'text', text: PAYMENT_JKO_INFO, size: 'sm', color: '#111111', wrap: true },
       { type: 'text', text: '完成付款後，請按「我已付款」，系統才會派單。', size: 'sm', color: '#666666', wrap: true },
     ]
   ));
@@ -4470,7 +4475,7 @@ UBee 辦公室將會再依照您的需求，
     await updateOrderStatus(order, 'pending_payment');
 
     return replyMessages(event.replyToken, [
-      createTextMessage(`✅ 已確認建立訂單：${order.id}\n請選擇付款方式並完成付款。`),
+      createTextMessage(`✅ 已確認建立訂單：${order.id}\n請完成街口支付，付款完成後再按「我已付款」。`),
       createPaymentInfoFlex({ ...order, paymentMethod: order.paymentMethod || 'jko' }),
     ]);
   }
