@@ -535,6 +535,89 @@ function getOrderPaymentStatus(order) {
   ).trim().toLowerCase();
 }
 
+function getOrderMoneyValue(order, fields) {
+  for (const field of fields) {
+    const raw = order?.[field];
+
+    if (raw === null || raw === undefined || raw === '') continue;
+
+    const value = Number(String(raw).replace(/[^\d.-]/g, ''));
+
+    if (Number.isFinite(value) && value >= 0) {
+      return Math.round(value);
+    }
+  }
+
+  return null;
+}
+
+function getOrderAdvancePaymentAmount(order) {
+  return getOrderMoneyValue(order, [
+    'advancePayment',
+    'advanceAmount',
+    'estimatedAdvancePayment',
+    'estimatedAdvanceAmount',
+    'riderAdvanceAmount',
+  ]) || 0;
+}
+
+function getOrderCustomerPayableTotal(order) {
+  const directTotal = getOrderMoneyValue(order, [
+    'customerPayableTotal',
+    'customerPayTotal',
+    'customerPayAmount',
+    'customerTotalWithAdvance',
+    'estimatedPayableTotal',
+    'payableTotal',
+    'finalPayAmount',
+    'collectAmount',
+    'amountToCollect',
+  ]);
+
+  if (directTotal !== null) return directTotal;
+
+  const serviceTotal = getOrderMoneyValue(order, [
+    'serviceSubtotal',
+    'serviceTotal',
+    'deliveryServiceFee',
+    'taskServiceFee',
+    'totalFee',
+    'total',
+    'price',
+  ]);
+
+  const advancePayment = getOrderAdvancePaymentAmount(order);
+
+  if (serviceTotal !== null) {
+    return serviceTotal + advancePayment;
+  }
+
+  return advancePayment > 0 ? advancePayment : 0;
+}
+
+function isCashDispatchOrder(order) {
+  if (!order) return false;
+
+  const orderStatus = String(order.status || '').trim().toLowerCase();
+  const paymentMethod = getOrderPaymentMethod(order);
+  const paymentStatus = getOrderPaymentStatus(order);
+
+  const isCash =
+    paymentMethod === 'cash' ||
+    paymentMethod.includes('cash') ||
+    paymentMethod.includes('現金') ||
+    paymentStatus === 'cash_on_delivery' ||
+    paymentStatus === 'cash_pending' ||
+    paymentStatus.includes('現金') ||
+    order.isCashOrder === true;
+
+  return (
+    orderStatus === 'pending_dispatch' &&
+    isCash &&
+    order.isCashOrder === true
+  );
+}
+
 function isPaidJkoDispatchOrder(order) {
   if (!order) return false;
 
@@ -610,6 +693,7 @@ function isMerchantDispatchOrder(order) {
 function isRiderVisibleDispatchOrder(order) {
   return (
     isPaidJkoDispatchOrder(order) ||
+    isCashDispatchOrder(order) ||
     isMerchantDispatchOrder(order)
   );
 }
@@ -3590,6 +3674,10 @@ app.post('/api/orders', async (req, res) => {
 }    
     const id = generateOrderId();
 
+    const advancePayment = Math.max(0, Math.round(Number(data.advancePayment || 0)));
+    const serviceSubtotal = Math.max(0, Math.round(Number(price.total || 0)));
+    const customerPayableTotal = serviceSubtotal + advancePayment;
+
     const order = {
       id,
       userId: data.userId,
@@ -3614,7 +3702,11 @@ app.post('/api/orders', async (req, res) => {
       hasMerchant: data.hasMerchant || false,
       speedType: data.speedType,
       note: data.note,
-      advancePayment: Number(data.advancePayment || 0),
+      advancePayment,
+      serviceSubtotal,
+      customerPayableTotal,
+      payableTotal: customerPayableTotal,
+      riderDisplayTotal: customerPayableTotal,
       duplicateFingerprint: getDuplicateFingerprint(data),
       distanceMeters: data.serviceMode === 'queue' ? 0 : distance.distanceMeters,
       durationSeconds: data.serviceMode === 'queue' ? 0 : distance.durationSeconds,
@@ -3627,7 +3719,7 @@ app.post('/api/orders', async (req, res) => {
       paymentLabel: '街口支付',
       paymentStatus: 'waiting_confirm',
 
-      // UBee 正式營運版：不開放現金單
+      // UBee 正式營運版：預設街口支付；若客人選擇現金，會在付款方式 API 改成現金單並直接進入派單。
       isCashOrder: false,
       cashCollectAmount: 0,
       cashCollected: false,
@@ -3662,11 +3754,15 @@ app.post('/api/orders', async (req, res) => {
   paymentMethodLabel: '街口支付',
   paymentLabel: '街口支付',
   paymentInfo: PAYMENT_JKO_INFO,
-  paymentOptions: {
-    jko: PAYMENT_JKO_INFO,
-  },
-  total: order.total,
-  message: '訂單已建立，請依頁面付款資訊完成街口支付。',
+paymentOptions: {
+  jko: PAYMENT_JKO_INFO,
+  cash: getPaymentInfo('cash', order.customerPayableTotal),
+},
+total: order.customerPayableTotal,
+serviceSubtotal: order.serviceSubtotal,
+customerPayableTotal: order.customerPayableTotal,
+advancePayment: order.advancePayment,
+message: '訂單已建立，請選擇街口支付或現金單。',
 });
   } catch (error) {
   console.error('❌ API 建立訂單失敗：', error.message || error);
@@ -3691,6 +3787,53 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       });
     }
 
+    const customerPayableTotal = getOrderCustomerPayableTotal(order);
+const advancePayment = getOrderAdvancePaymentAmount(order);
+
+order.customerPayableTotal = customerPayableTotal;
+order.payableTotal = customerPayableTotal;
+order.riderDisplayTotal = customerPayableTotal;
+order.advancePayment = advancePayment;
+
+if (normalizedPaymentMethod === 'cash') {
+  order.paymentMethod = 'cash';
+  order.paymentMethodLabel = '現金付款';
+  order.paymentLabel = '現金付款';
+  order.paymentStatus = 'cash_on_delivery';
+  order.isCashOrder = true;
+  order.cashCollectAmount = customerPayableTotal;
+  order.cashCollected = false;
+  order.isPaid = false;
+  order.paidAt = null;
+  order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
+  order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+  await saveOrder(order);
+
+  const customerText =
+    `你已選擇付款方式：現金付款\n\n` +
+    `本單將由騎士服務完成時向你收取現金，預計收取金額：NT$${customerPayableTotal}。`;
+
+  await notifyCustomer(order, createTextMessage(customerText));
+
+  return res.json({
+    success: true,
+    orderId,
+    status: order.status,
+    paymentMethod: 'cash',
+    paymentMethodLabel: '現金付款',
+    paymentLabel: '現金付款',
+    paymentStatus: 'cash_on_delivery',
+    isCashOrder: true,
+    cashCollectAmount: customerPayableTotal,
+    total: customerPayableTotal,
+    customerPayableTotal,
+    advancePayment,
+    paymentInfo: getPaymentInfo('cash', customerPayableTotal),
+    message: '已選擇現金單，系統開始媒合騎士。',
+  });
+}
+    
     if (!isSameCustomerUserId(order, requestUserId)) {
       return res.status(403).json({
         success: false,
@@ -3698,13 +3841,14 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       });
     }
 
-    // UBee 正式營運版：後端只接受街口支付
-    if (paymentMethod !== 'jko') {
-      return res.status(400).json({
-        success: false,
-        error: 'UBee 正式營運版目前僅支援街口支付，不開放現金或銀行轉帳。',
-      });
-    }
+    const normalizedPaymentMethod = String(paymentMethod || '').trim().toLowerCase();
+
+if (!['jko', 'cash'].includes(normalizedPaymentMethod)) {
+  return res.status(400).json({
+    success: false,
+    error: 'UBee 正式營運版目前僅支援街口支付與現金單。',
+  });
+}
 
     if (!['pending_payment'].includes(order.status)) {
       return res.status(400).json({
@@ -3718,7 +3862,6 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
     order.paymentLabel = '街口支付';
     order.paymentStatus = 'waiting_confirm';
 
-    // 正式版不開放現金單
     order.isCashOrder = false;
     order.cashCollectAmount = 0;
     order.cashCollected = false;
@@ -3740,8 +3883,10 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       paymentMethod: 'jko',
       paymentMethodLabel: '街口支付',
       paymentLabel: '街口支付',
-      paymentInfo: getPaymentInfo('jko', Number(order.total || order.totalFee || 0)),
-      total: order.total,
+      paymentInfo: getPaymentInfo('jko', customerPayableTotal),
+      total: customerPayableTotal,
+      customerPayableTotal,
+      advancePayment,
     });
 
   } catch (error) {
@@ -3780,13 +3925,13 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
       });
     }
 
-    // UBee 正式營運版：付款確認只接受街口支付
-    if (order.paymentMethod !== 'jko') {
-      return res.status(400).json({
-        success: false,
-        error: 'UBee 正式營運版目前僅支援街口支付，無法使用現金或銀行轉帳確認付款。',
-      });
-    }
+    // 只有街口單需要按「我已付款」；現金單選擇後會直接進入派單。
+if (order.paymentMethod !== 'jko') {
+  return res.status(400).json({
+    success: false,
+    error: '現金單不需要確認付款，選擇現金單後系統會直接開始派單。',
+  });
+}
 
     if (order.isPaid === true && order.paymentStatus === 'paid_confirmed') {
   return res.json({
