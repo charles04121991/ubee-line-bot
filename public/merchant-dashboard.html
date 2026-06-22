@@ -238,7 +238,7 @@ button.red{background:var(--red);color:#fff}
 }
 
 @media (min-width:640px){
-  .tabs{grid-template-columns:repeat(4,1fr)}
+  .tabs{grid-template-columns:repeat(5,1fr)}
 }
 
 .tab{
@@ -642,12 +642,13 @@ button.red{background:var(--red);color:#fff}
 
     <section id="section-orders" class="section">
       <h2>訂單查詢</h2>
-      <div class="small">可查看待處理、配送中、已完成與店家自送訂單。</div>
+      <div class="small">可查看待處理、配送中、已完成、已取消與店家自送訂單。</div>
 
       <div class="tabs">
         <div class="tab active" data-tab="todo" onclick="setTab('todo')">待處理 <span id="countTodo">0</span></div>
         <div class="tab" data-tab="delivery" onclick="setTab('delivery')">配送中 <span id="countDelivery">0</span></div>
         <div class="tab" data-tab="completed" onclick="setTab('completed')">已完成 <span id="countCompleted">0</span></div>
+        <div class="tab" data-tab="cancelled" onclick="setTab('cancelled')">已取消 <span id="countCancelled">0</span></div>
         <div class="tab" data-tab="self" onclick="setTab('self')">店家自送 <span id="countSelf">0</span></div>
       </div>
 
@@ -714,6 +715,13 @@ const deliveryStatuses = [
   "arrived_dropoff"
 ];
 
+const cancellableStatuses = [
+  "merchant_pending",
+  "merchant_preparing",
+  "merchant_ready",
+  "pending_dispatch"
+];
+
 const progressSteps = [
   {status:"pending_dispatch",text:"等待接單"},
   {status:"accepted",text:"騎士取件"},
@@ -731,7 +739,8 @@ const statusTextMap = {
   arrived_pickup:"騎士已抵達取件地",
   picked_up:"騎士已取件，配送中",
   arrived_dropoff:"騎士已抵達送達地",
-  completed:"已完成"
+  completed:"已完成",
+  merchant_cancelled:"店家已取消"
 };
 
 function scrollToSection(id){
@@ -1239,7 +1248,8 @@ function startListenOrders(){
     "arrived_pickup",
     "picked_up",
     "arrived_dropoff",
-    "completed"
+    "completed",
+    "merchant_cancelled"
   ];
 
   statuses.forEach(status => {
@@ -1332,6 +1342,10 @@ function getVisibleOrders(){
     return all.filter(order => order.status === "completed");
   }
 
+  if(currentTab === "cancelled"){
+    return all.filter(order => order.status === "merchant_cancelled");
+  }
+
   if(currentTab === "self"){
     return all.filter(order => order.status === "merchant_self_delivery");
   }
@@ -1355,11 +1369,13 @@ function updateCounts(){
   const todo = all.filter(o => todoStatuses.includes(o.status)).length;
   const delivery = all.filter(o => deliveryStatuses.includes(o.status)).length;
   const completed = all.filter(o => o.status === "completed").length;
+  const cancelled = all.filter(o => o.status === "merchant_cancelled").length;
   const self = all.filter(o => o.status === "merchant_self_delivery").length;
 
   document.getElementById("countTodo").textContent = todo;
   document.getElementById("countDelivery").textContent = delivery;
   document.getElementById("countCompleted").textContent = completed;
+  document.getElementById("countCancelled").textContent = cancelled;
   document.getElementById("countSelf").textContent = self;
 
   document.getElementById("summaryAll").textContent = all.length;
@@ -1379,6 +1395,7 @@ function renderOrders(){
     todo:"待處理",
     delivery:"配送中",
     completed:"已完成",
+    cancelled:"已取消",
     self:"店家自送"
   };
 
@@ -1739,24 +1756,34 @@ function renderOrderCard(order){
   let buttonHtml = "";
 
   if(order.status === "merchant_pending"){
-    buttonHtml = `<button type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_preparing')">接受訂單，開始準備</button>`;
+    buttonHtml += `<button type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_preparing')">接受訂單，開始準備</button>`;
   }
 
   if(order.status === "merchant_preparing"){
-    buttonHtml = `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_ready')">準備完成</button>`;
+    buttonHtml += `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_ready')">準備完成</button>`;
   }
 
   if(order.status === "merchant_ready" && order.deliveryType !== "merchant"){
-    buttonHtml = `<button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">確認派遣騎士</button>`;
+    buttonHtml += `<button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">確認派遣騎士</button>`;
   }
 
   if(order.status === "merchant_self_delivery"){
-    buttonHtml = `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','completed')">店家自送完成</button>`;
+    buttonHtml += `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','completed')">店家自送完成</button>`;
   }
 
-  const lockedText = order.status === "completed"
-    ? `<div class="notice">此訂單已完成，正式營運資料不建議再修改。</div>`
-    : "";
+  if(cancellableStatuses.includes(order.status)){
+    buttonHtml += `<button class="red" type="button" onclick="cancelMerchantOrder('${escapeHtml(order.id)}')">取消派單</button>`;
+  }
+
+  let lockedText = "";
+
+  if(order.status === "completed"){
+    lockedText = `<div class="notice">此訂單已完成，正式營運資料不建議再修改。</div>`;
+  }
+
+  if(order.status === "merchant_cancelled"){
+    lockedText = `<div class="notice">此訂單已由店家取消，系統已保留正式紀錄。</div>`;
+  }
 
   return `
     <div class="order">
@@ -1813,6 +1840,82 @@ async function updateOrderStatus(orderId, nextStatus){
   }catch(err){
     console.error("更新訂單狀態失敗:", err);
     alert("更新失敗，請稍後再試。");
+  }
+}
+
+async function cancelMerchantOrder(orderId){
+  if(!orderId){
+    alert("缺少訂單資料，無法取消。");
+    return;
+  }
+
+  const confirmText =
+`確定要取消這筆派單嗎？
+
+取消後，訂單會標記為「店家已取消」。
+若騎士已接單、已取件或配送中，系統將不允許店家端直接取消。`;
+
+  if(!confirm(confirmText)){
+    return;
+  }
+
+  try{
+    const orderRef = db.collection("orders").doc(orderId);
+
+    await db.runTransaction(async transaction => {
+      const snap = await transaction.get(orderRef);
+
+      if(!snap.exists){
+        throw new Error("ORDER_NOT_FOUND");
+      }
+
+      const order = {
+        id:snap.id,
+        ...snap.data()
+      };
+
+      if(!matchMerchant(order)){
+        throw new Error("ORDER_NOT_MERCHANT");
+      }
+
+      if(!cancellableStatuses.includes(order.status)){
+        throw new Error("ORDER_NOT_CANCELABLE");
+      }
+
+      transaction.update(orderRef, {
+        status:"merchant_cancelled",
+        cancelledBy:"merchant",
+        cancelledReason:"店家於派單中心取消",
+        cancelledFromStatus:order.status || "",
+        cancelledMerchantId:currentMerchant?.merchantId || currentMerchant?.id || "",
+        cancelledMerchantName:currentMerchant?.merchantName || "",
+        cancelledAt:firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    setTab("cancelled");
+    scrollToSection("section-orders");
+
+  }catch(err){
+    console.error("取消派單失敗:", err);
+
+    if(err.message === "ORDER_NOT_FOUND"){
+      alert("找不到這筆訂單，可能已被更新或不存在。");
+      return;
+    }
+
+    if(err.message === "ORDER_NOT_MERCHANT"){
+      alert("這筆訂單不屬於目前登入店家，無法取消。");
+      return;
+    }
+
+    if(err.message === "ORDER_NOT_CANCELABLE"){
+      alert("此訂單目前已進入騎士接單或配送流程，店家端不能直接取消，請聯絡 UBee 管理端協助處理。");
+      return;
+    }
+
+    alert("取消派單失敗，請稍後再試。");
   }
 }
 
