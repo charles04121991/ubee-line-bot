@@ -1131,6 +1131,20 @@ app.get('/api/rider/completed-orders', async (req, res) => {
           completedAtMs = order.updatedAt;
         }
 
+                const riderIncome = Number(
+          order.driverFee ||
+          order.riderFee ||
+          order.fee ||
+          0
+        );
+
+        const customerTotal = Number(
+          order.total ||
+          order.customerPayableTotal ||
+          order.finalTotal ||
+          0
+        );
+        
         return {
           id: order.id,
           orderNo: order.orderNo || order.id,
@@ -1140,11 +1154,15 @@ app.get('/api/rider/completed-orders', async (req, res) => {
           item: order.item || '',
           riderPhone: order.riderPhone || '',
           riderDocId: order.riderDocId || '',
-          driverFee: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
-          riderFee: Number(order.riderFee || order.driverFee || order.fee || order.price || 0),
-          fee: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
-          price: Number(order.driverFee || order.riderFee || order.fee || order.price || 0),
-          total: Number(order.total || 0),
+          driverFee: riderIncome,
+          riderFee: riderIncome,
+          fee: riderIncome,
+
+          // price 保留給舊版騎士端相容，但內容改成騎士收入，不再吃客人總額
+          price: riderIncome,
+
+          // total 才是客人訂單總額
+          total: customerTotal,
           completedAt: completedAtMs,
           completedAtText: completedAtMs
             ? new Date(completedAtMs).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
