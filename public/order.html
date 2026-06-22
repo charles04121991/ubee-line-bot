@@ -1888,21 +1888,37 @@ body.day-mode .bottom-tabs{
             <div class="input-icon">📝</div>
             <textarea id="item" maxlength="300" placeholder="例如：文件、飲料、包裹、代買品項"></textarea>
           </div>
-          <div class="input-wrap">
-            <div class="input-icon">✎</div>
-            <textarea id="note" maxlength="400" placeholder="備註：請填寫品牌、數量、規格、注意事項"></textarea>
-          </div>
+          <div class="input-wrap" id="noteWrap">
+  <div class="input-icon">✎</div>
+  <textarea id="note" maxlength="400" placeholder="備註：請填寫品牌、數量、規格、注意事項"></textarea>
+</div>
         </div>
       </div>
 
-      <input id="advancePayment" type="hidden" value="0">
+      <div class="form-section hidden" id="advancePaymentBox">
+  <div class="form-title">代墊費用</div>
+  <div class="input-card">
+    <div class="input-wrap">
+      <div class="input-icon">💰</div>
+      <input
+        id="advancePayment"
+        type="number"
+        inputmode="numeric"
+        min="0"
+        step="1"
+        value="0"
+        placeholder="請填寫需要騎士代墊的商品金額，沒有請填 0"
+      >
+    </div>
+  </div>
+</div>
 
       <div id="advanceRuleBox" class="quick-guide hidden">
-        <div class="quick-guide-title">代買付款規則</div>
-        <div class="quick-guide-text">
-          目前 UBee 跑腿不提供騎士代墊商品費。若是代買任務，請先自行完成商品付款，或等待平台人工確認後再派單，避免商品費與取消爭議轉嫁給騎士。
-        </div>
-      </div>
+  <div class="quick-guide-title">代墊費用提醒</div>
+  <div class="quick-guide-text">
+    若需要騎士先代墊商品費，請在上方填寫預估代墊金額。系統會把代墊費用併入騎士端顯示的總金額，方便騎士接單前判斷。
+  </div>
+</div>
     </section>
 
     <section class="step" id="step3">
@@ -1974,7 +1990,7 @@ body.day-mode .bottom-tabs{
       <div class="success">
         <div class="success-icon">✓</div>
         <div class="success-title">訂單已建立</div>
-        <div class="subtext">請使用街口支付完成付款確認後，系統才會開始媒合騎士。</div>
+        <div class="subtext">請選擇街口支付或現金單，系統會依付款方式進入後續流程。</div>
         <div class="order-no" id="orderNo">-</div>
       </div>
 
@@ -1986,13 +2002,14 @@ body.day-mode .bottom-tabs{
         <div class="quick-guide">
           <div class="quick-guide-title">正式營運付款規則</div>
           <div class="quick-guide-text">
-            目前 UBee 跑腿僅支援街口支付。付款確認後，系統才會開始媒合騎士；不開放現金付款，避免收款與取消爭議。
-          </div>
+  街口單需完成付款後再派單；現金單會直接媒合騎士，任務完成時由騎士向客人收取現金。
+</div>
         </div>
 
         <div class="btn-row">
-          <button id="payJkoBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('jko')">街口支付</button>
-        </div>
+  <button id="payJkoBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('jko')">街口支付</button>
+  <button id="payCashBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('cash')">現金單</button>
+</div>
 
         <div id="paymentInfo" class="payment-info hidden"></div>
 
@@ -2167,12 +2184,12 @@ body.day-mode .bottom-tabs{
           <div class="info-item-text">UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署或高風險委託事項。</div>
         </div>
         <div class="info-item">
-          <div class="info-item-title">付款方式有哪些？</div>
-          <div class="info-item-text">目前 UBee 跑腿正式營運版僅支援街口支付，不開放現金付款。付款確認後，系統才會開始媒合騎士。</div>
+          <<div class="info-item-title">付款方式有哪些？</div>
+          <div class="info-item-text">目前 UBee 跑腿支援街口支付與現金單。街口單需完成付款確認後開始媒合騎士；現金單會直接媒合騎士，任務完成時由騎士向客人收取現金。</div>
         </div>
         <div class="info-item">
           <div class="info-item-title">代買可以請騎士先代墊嗎？</div>
-          <div class="info-item-text">目前不提供騎士代墊商品費。若需代買，請先完成商品款項付款，或由平台人工確認後再處理。</div>
+          <div class="info-item-text">可以在建立任務時填寫代墊費用。系統會把代墊金額併入任務總金額，騎士接單前會看到代墊金額與總金額。</div>
         </div>
         <div class="info-item">
           <div class="info-item-title">付款後多久會派單？</div>
@@ -2957,14 +2974,25 @@ function applyDynamicFields(){
   qs('urgentGuide').classList.toggle('hidden', !isUrgent);
   qs('queueSection').classList.toggle('hidden', !isQueue);
 
-  if(qs('advanceRuleBox')){
-    qs('advanceRuleBox').classList.toggle('hidden', !isBuy);
-  }
+  if(qs('advancePaymentBox')){
+  qs('advancePaymentBox').classList.toggle('hidden', !isBuy);
+}
 
-  if(qs('advancePayment')){
-    qs('advancePayment').value = '0';
-  }
+if(qs('advanceRuleBox')){
+  qs('advanceRuleBox').classList.toggle('hidden', !isBuy);
+}
 
+if(qs('noteWrap')){
+  qs('noteWrap').classList.toggle('hidden', isBuy);
+}
+
+if(isBuy && qs('note')){
+  qs('note').value = '';
+}
+
+if(!isBuy && qs('advancePayment')){
+  qs('advancePayment').value = '0';
+}
   qs('pickupTitle').innerText =
     isBuy ? '購買地點' :
     isQueue ? '排隊地點' :
@@ -3016,11 +3044,10 @@ function applyDynamicFields(){
     '例如：文件、飲料、包裹、洗衣、手機貼膜';
 
   qs('note').placeholder =
-    isBuy ? '請填寫品牌、數量、規格、冰塊甜度、替代品、購買限制。商品款項需由客人先完成付款。' :
-    isQueue ? '請補充現場狀況、號碼、要排到什麼程度、是否需要拍照回報。' :
-    isHelper ? '請詳細描述你希望 UBee 跑腿完成的任務、注意事項、完成標準。' :
-    isUrgent ? '請補充急件注意事項、最晚送達時間、聯絡方式。' :
-    '備註：請填寫品牌、數量、規格、顏色、注意事項。';
+  isQueue ? '請補充現場狀況、號碼、要排到什麼程度、是否需要拍照回報。' :
+  isHelper ? '請詳細描述你希望 UBee 跑腿完成的任務、注意事項、完成標準。' :
+  isUrgent ? '請補充急件注意事項、最晚送達時間、聯絡方式。' :
+  '備註：請填寫品牌、數量、規格、顏色、注意事項。';
 }
 
 function syncQueueLocation(){
@@ -3282,6 +3309,18 @@ function validateStep2(){
     return false;
   }
 
+  const advancePaymentEl = qs('advancePayment');
+const advancePayment = advancePaymentEl ? Number(advancePaymentEl.value || 0) : 0;
+
+if(Number.isNaN(advancePayment) || advancePayment < 0){
+  alert('代墊費用請填寫 0 或正確金額。');
+  return false;
+}
+
+if(serviceGroup !== 'buy' && advancePaymentEl){
+  advancePaymentEl.value = '0';
+}
+  
   if(serviceGroup === 'queue' && typeof syncQueueLocation === 'function'){
     syncQueueLocation();
   }
@@ -3346,8 +3385,11 @@ function goPrev(){
 
 function getPayload(){
   const pickup = qs('pickup').value.trim();
-  const dropoff = qs('dropoff').value.trim();
-  const upstairsOption = getUpstairsOption();
+const dropoff = qs('dropoff').value.trim();
+const upstairsOption = getUpstairsOption();
+const advancePayment = serviceGroup === 'buy'
+  ? Math.max(0, Math.round(Number(qs('advancePayment')?.value || 0)))
+  : 0;
 
   return {
     userId,
@@ -3375,11 +3417,11 @@ function getPayload(){
 
     locationConfirmed:!!qs('locationConfirmedCheck')?.checked,
 
-    advancePayment:0,
-    estimatedGoodsAmount:0,
-    purchaseAdvanceAllowed:false,
-    riderAdvanceAmount:0,
-    purchasePaymentRule:'customer_paid_first',
+    advancePayment,
+estimatedGoodsAmount:advancePayment,
+purchaseAdvanceAllowed:advancePayment > 0,
+riderAdvanceAmount:advancePayment,
+purchasePaymentRule:advancePayment > 0 ? 'rider_advance_then_customer_pay' : 'no_advance',
 
     paymentMethod:FIXED_PAYMENT_METHOD,
     paymentLabel:FIXED_PAYMENT_LABEL,
@@ -3470,20 +3512,28 @@ function renderSummary(){
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">💳</div>
-      <div>
-        <div class="summary-label">付款方式</div>
-        <div class="summary-value">街口支付｜不開放現金付款</div>
-      </div>
-    </div>
+  <div class="summary-icon">💰</div>
+  <div>
+    <div class="summary-label">代墊費用</div>
+    <div class="summary-value">${payload.advancePayment > 0 ? `NT$${payload.advancePayment}` : '無需代墊'}</div>
+  </div>
+</div>
 
-    <div class="summary-row">
-      <div class="summary-icon">🛡️</div>
-      <div>
-        <div class="summary-label">代買風控</div>
-        <div class="summary-value">目前不提供騎士代墊商品費</div>
-      </div>
-    </div>
+<div class="summary-row">
+  <div class="summary-icon">💳</div>
+  <div>
+    <div class="summary-label">付款方式</div>
+    <div class="summary-value">建立訂單後可選擇街口支付或現金單</div>
+  </div>
+</div>
+
+<div class="summary-row">
+  <div class="summary-icon">🛡️</div>
+  <div>
+    <div class="summary-label">代墊提醒</div>
+    <div class="summary-value">若有填寫代墊費用，騎士端會顯示併入後的任務總金額</div>
+  </div>
+</div>
   `;
 
   renderEstimate();
@@ -3494,7 +3544,7 @@ async function renderEstimate(){
   if(!box) return;
 
   box.classList.remove('hidden');
-  box.innerHTML = '<div class="price-row"><span>預估費用</span><strong>計算中...</strong></div>';
+  box.innerHTML = '<div class="price-row"><span>費用</span><strong>系統計算中</strong></div>';
 
   const upstairsOption = getUpstairsOption();
   const upstairsFee = calculateUpstairsFee(upstairsOption);
@@ -3503,7 +3553,7 @@ async function renderEstimate(){
 
   if(upstairsOption === 'heavy'){
     box.innerHTML = `
-      <div class="price-row"><span>預估費用</span><strong>需人工確認</strong></div>
+      <div class="price-row price-total"><span>費用</span><strong>NT$${serviceSubtotal}</strong></div>
       <div class="price-note">
         此任務選擇「重物／大量物品」，需由 UBee 跑腿人工確認重量、樓層、搬運距離與可派單狀況後再報價。
       </div>
@@ -3527,7 +3577,7 @@ async function renderEstimate(){
       <div class="price-row"><span>平台服務費</span><strong>NT$${platformServiceFee}</strong></div>
       <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${serviceSubtotal}</strong></div>
       <div class="price-note">
-        目前 UBee 跑腿不提供騎士代墊商品費。若任務涉及代買或代繳，需由客人先完成付款或由平台人工確認。
+        若有代墊商品費，會在建立訂單時另外併入騎士端顯示的任務總金額。
       </div>
     `;
     return;
@@ -3569,7 +3619,7 @@ async function renderEstimate(){
   }catch(err){
     console.warn('估價失敗:', err);
     box.innerHTML = `
-      <div class="price-row"><span>預估費用</span><strong>建立訂單後由系統計算</strong></div>
+      <div class="price-row"><span>費用</span><strong>系統計算中</strong></div>
       <div class="price-note">
         若系統暫時無法估價，UBee 跑腿會依距離區間、上樓需求與任務內容確認費用。
       </div>
@@ -3740,8 +3790,10 @@ async function selectPaymentMethod(method){
     return;
   }
 
-  if(method !== 'jko'){
-    alert('目前 UBee 跑腿僅支援街口支付。');
+  const normalizedMethod = String(method || '').trim().toLowerCase();
+
+  if(!['jko', 'cash'].includes(normalizedMethod)){
+    alert('目前 UBee 跑腿僅支援街口支付與現金單。');
     return;
   }
 
@@ -3756,9 +3808,9 @@ async function selectPaymentMethod(method){
       body:JSON.stringify({
         userId,
         customerId:userId,
-        paymentMethod:'jko',
-        paymentLabel:'街口支付',
-        isCashOrder:false
+        paymentMethod:normalizedMethod,
+        paymentLabel:normalizedMethod === 'cash' ? '現金付款' : '街口支付',
+        isCashOrder:normalizedMethod === 'cash'
       })
     });
 
@@ -3768,12 +3820,65 @@ async function selectPaymentMethod(method){
       throw new Error(data.error || data.message || '設定付款方式失敗');
     }
 
-    selectedPaymentMethod = 'jko';
+    selectedPaymentMethod = normalizedMethod;
 
-    document.getElementById('payJkoBtn')?.classList.add('selected');
+    document.getElementById('payJkoBtn')?.classList.toggle('selected', normalizedMethod === 'jko');
+    document.getElementById('payCashBtn')?.classList.toggle('selected', normalizedMethod === 'cash');
 
     const info = qs('paymentInfo');
     info.classList.remove('hidden');
+
+    const payableAmount = Number(data.total || data.customerPayableTotal || 0);
+    const totalText = payableAmount > 0 ? `NT$${Math.round(payableAmount)}` : '系統計算中';
+
+    if(normalizedMethod === 'cash'){
+      info.innerHTML = `
+        <div class="payment-card-head">
+          <div>
+            <div class="payment-card-kicker">UBee 跑腿付款資訊</div>
+            <div class="payment-card-title">現金單</div>
+          </div>
+          <div class="payment-card-badge">直接派單</div>
+        </div>
+
+        <div class="payment-card-body">
+          <div class="payment-card-row">
+            <div class="payment-card-label">付款方式</div>
+            <div class="payment-card-value">現金付款</div>
+          </div>
+          <div class="payment-card-row">
+            <div class="payment-card-label">費用</div>
+            <div class="payment-card-value">${escapeHtml(totalText)}</div>
+          </div>
+          <div class="payment-card-row">
+            <div class="payment-card-label">付款狀態</div>
+            <div class="payment-card-value">任務完成時交付給騎士</div>
+          </div>
+        </div>
+
+        <div class="payment-card-note">
+          現金單已建立，系統會直接開始媒合附近騎士。請於任務完成時依實際金額交付現金。
+        </div>
+      `;
+
+      qs('confirmPaidBtn').classList.add('hidden');
+
+      currentOrderData = {
+        ...(currentOrderData || {}),
+        status:data.status || 'pending_dispatch',
+        paymentMethod:'cash',
+        paymentMethodLabel:'現金付款',
+        paymentLabel:'現金付款',
+        paymentStatus:data.paymentStatus || 'cash_on_delivery',
+        isCashOrder:true,
+        cashCollectAmount:data.cashCollectAmount || data.total || 0,
+        customerPayableTotal:data.customerPayableTotal || data.total || 0,
+        advancePayment:data.advancePayment || currentOrderData?.advancePayment || 0
+      };
+
+      renderTimeline(currentOrderData.status, currentOrderData);
+      return;
+    }
 
     const jkoPaymentInfo = data.paymentInfo || '請依 UBee 跑腿官方提供的街口支付資訊完成付款。';
 
@@ -3792,12 +3897,12 @@ async function selectPaymentMethod(method){
           <div class="payment-card-value">街口支付</div>
         </div>
         <div class="payment-card-row">
-          <div class="payment-card-label">付款狀態</div>
-          <div class="payment-card-value">付款完成後需手動確認</div>
+          <div class="payment-card-label">費用</div>
+          <div class="payment-card-value">${escapeHtml(totalText)}</div>
         </div>
         <div class="payment-card-row">
-          <div class="payment-card-label">現金付款</div>
-          <div class="payment-card-value">不開放</div>
+          <div class="payment-card-label">付款狀態</div>
+          <div class="payment-card-value">付款完成後需手動確認</div>
         </div>
         <div class="payment-card-row stack">
           <div class="payment-card-label">付款資訊</div>
@@ -4203,9 +4308,9 @@ function renderTimeline(status, order){
     </div>
 
     <div class="status-total">
-      <span>預估費用</span>
-      <strong>${escapeHtml(totalText)}</strong>
-    </div>
+  <span>費用</span>
+  <strong>${escapeHtml(totalText || '系統計算中')}</strong>
+</div>
   `;
 
   const canCancel = currentOrderId && ![
