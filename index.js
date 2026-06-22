@@ -3393,7 +3393,10 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
     const order = await getOrder(orderId);
 
     if (!order) {
-      return res.status(404).json({ success: false, error: '找不到此訂單' });
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
     }
 
     if (!isSameCustomerUserId(order, requestUserId)) {
@@ -3403,10 +3406,11 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       });
     }
 
-    if (!['cash', 'jko', 'bank'].includes(paymentMethod)) {
+    // UBee 正式營運版：後端只接受街口支付
+    if (paymentMethod !== 'jko') {
       return res.status(400).json({
         success: false,
-        error: '付款方式錯誤',
+        error: 'UBee 正式營運版目前僅支援街口支付，不開放現金或銀行轉帳。',
       });
     }
 
@@ -3417,27 +3421,34 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       });
     }
 
-    order.paymentMethod = paymentMethod;
-    order.paymentMethodLabel = getPaymentMethodLabel(paymentMethod);
-    order.paymentStatus = paymentMethod === 'cash' ? 'cash_on_delivery' : 'waiting_confirm';
-    order.cashCollectAmount = paymentMethod === 'cash' ? Number(order.total || order.totalFee || 0) : 0;
+    order.paymentMethod = 'jko';
+    order.paymentMethodLabel = '街口支付';
+    order.paymentLabel = '街口支付';
+    order.paymentStatus = 'waiting_confirm';
+
+    // 正式版不開放現金單
+    order.isCashOrder = false;
+    order.cashCollectAmount = 0;
     order.cashCollected = false;
+
     order.status = 'pending_payment';
+    order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
     await saveOrder(order);
 
-    const customerText = paymentMethod === 'cash'
-      ? `你已選擇付款方式：現金付款\n\n請於任務完成時，將 NT$${Math.round(Number(order.total || 0))} 交付給騎士。\n\n請回到網頁按「確認現金付款」，系統才會開始派單。`
-      : `你已選擇付款方式：${getPaymentMethodLabel(paymentMethod)}\n完成付款後，請回到網頁按「我已付款」。`;
+    const customerText =
+      `你已選擇付款方式：街口支付\n\n` +
+      `完成付款後，請回到網頁按「我已付款」，系統才會開始派單。`;
 
     await notifyCustomer(order, createTextMessage(customerText));
 
     return res.json({
       success: true,
       orderId,
-      paymentMethod,
-      paymentMethodLabel: getPaymentMethodLabel(paymentMethod),
-      paymentInfo: getPaymentInfo(paymentMethod, Number(order.total || order.totalFee || 0)),
+      paymentMethod: 'jko',
+      paymentMethodLabel: '街口支付',
+      paymentLabel: '街口支付',
+      paymentInfo: getPaymentInfo('jko', Number(order.total || order.totalFee || 0)),
       total: order.total,
     });
 
@@ -3457,7 +3468,10 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     const order = await getOrder(orderId);
 
     if (!order) {
-      return res.status(404).json({ success: false, error: '找不到此訂單' });
+      return res.status(404).json({
+        success: false,
+        error: '找不到此訂單',
+      });
     }
 
     if (!isSameCustomerUserId(order, requestUserId)) {
@@ -3474,25 +3488,52 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
       });
     }
 
-    if (order.status !== 'pending_payment' && !order.isPaid) {
+    // UBee 正式營運版：付款確認只接受街口支付
+    if (order.paymentMethod !== 'jko') {
       return res.status(400).json({
         success: false,
-        error: '訂單狀態異常',
+        error: 'UBee 正式營運版目前僅支援街口支付，無法使用現金或銀行轉帳確認付款。',
       });
     }
 
-    const isCashPayment = order.paymentMethod === 'cash';
+    if (order.isPaid === true && order.paymentStatus === 'paid_confirmed') {
+  return res.json({
+    success: true,
+    orderId,
+    status: order.status,
+    paymentMethod: 'jko',
+    paymentMethodLabel: '街口支付',
+    paymentStatus: 'paid_confirmed',
+    isPaid: true,
+    message: '此訂單已確認付款，請勿重複操作。',
+  });
+}
+
+if (order.status !== 'pending_payment') {
+  return res.status(400).json({
+    success: false,
+    error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可重複確認付款`,
+  });
+}
 
     order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
-    order.paidAt = isCashPayment ? null : Date.now();
-    order.isPaid = isCashPayment ? false : true;
-    order.paymentStatus = isCashPayment ? 'cash_on_delivery' : 'paid_confirmed';
-    order.cashCollectAmount = isCashPayment ? Number(order.total || 0) : 0;
+
+    order.paidAt = Date.now();
+    order.isPaid = true;
+    order.paymentStatus = 'paid_confirmed';
+    order.paymentMethod = 'jko';
+    order.paymentMethodLabel = '街口支付';
+    order.paymentLabel = '街口支付';
+
+    // 正式版不開放現金收款
+    order.isCashOrder = false;
+    order.cashCollectAmount = 0;
     order.cashCollected = false;
+
     order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
     await saveOrder(order);
-    
+
     try {
       await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
     } catch (adminErr) {
@@ -3500,15 +3541,15 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
     }
 
     return res.json({
-  success: true,
-  orderId,
-  paymentMethod: order.paymentMethod,
-  paymentMethodLabel: getPaymentMethodLabel(order.paymentMethod),
-  paymentStatus: order.paymentStatus,
-  message: isCashPayment
-    ? '已確認現金付款方式，系統已開始派單'
-    : '已收到付款通知，系統已自動派單',
-});
+      success: true,
+      orderId,
+      status: order.status,
+      paymentMethod: 'jko',
+      paymentMethodLabel: '街口支付',
+      paymentStatus: 'paid_confirmed',
+      isPaid: true,
+      message: '付款已確認，系統開始媒合騎士。',
+    });
 
   } catch (error) {
     console.error('❌ H5 確認付款失敗：', error);
