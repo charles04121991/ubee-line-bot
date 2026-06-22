@@ -3345,7 +3345,16 @@ const total = deliveryFee + waitingFee + serviceFee + speedFee;
       durationText: data.serviceMode === 'queue' ? `${data.queueMinutes} 分鐘內` : distance.durationText,
       ...price,
       etaMinutes: null,
-      paymentMethod: '',
+      paymentMethod: 'jko',
+      paymentMethodLabel: '街口支付',
+      paymentLabel: '街口支付',
+      paymentStatus: 'waiting_confirm',
+
+      // UBee 正式營運版：不開放現金單
+      isCashOrder: false,
+      cashCollectAmount: 0,
+      cashCollected: false,
+
       isPaid: false,
       paidAt: null,
       waitingFeeRequested: false,
@@ -3362,20 +3371,26 @@ const total = deliveryFee + waitingFee + serviceFee + speedFee;
 
     await saveOrder(order);
 
-    await notifyCustomer(order, createTextMessage(`✅ 訂單已建立：${order.id}\n請在網頁選擇付款方式，完成付款後按「我已付款」，系統才會派單。`));
+    await notifyCustomer(order, createTextMessage(
+  `✅ 訂單已建立：${order.id}\n\n` +
+  `付款方式：街口支付\n` +
+  `請完成付款後，回到網頁按「我已付款」，系統才會開始媒合騎士。`
+));
 
     res.json({
-      success: true,
-      orderId: id,
-      order,
-      paymentOptions: {
-  cash: '現金付款',
-  jko: PAYMENT_JKO_INFO,
-  bank: PAYMENT_BANK_INFO,
-},
-      total: order.total,
-      message: '訂單已建立，請在頁面下方選擇付款方式。',
-    });
+  success: true,
+  orderId: id,
+  order,
+  paymentMethod: 'jko',
+  paymentMethodLabel: '街口支付',
+  paymentLabel: '街口支付',
+  paymentInfo: PAYMENT_JKO_INFO,
+  paymentOptions: {
+    jko: PAYMENT_JKO_INFO,
+  },
+  total: order.total,
+  message: '訂單已建立，請依頁面付款資訊完成街口支付。',
+});
   } catch (error) {
   console.error('❌ API 建立訂單失敗：', error.message || error);
   res.status(500).json({
