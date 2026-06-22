@@ -2304,8 +2304,43 @@ async function requireOrderRider(event, order, message = '只有接單騎士可�
 }
 
 async function updateOrderStatus(order, status, extra = {}) {
-  order.status = status;
-  Object.assign(order, extra);
+  const etaPayload = getEtaPayloadByStatus(status);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  const normalExtra = {};
+  const statusTimesExtra = {};
+
+  Object.entries(extra || {}).forEach(([key, value]) => {
+    if (key.startsWith('statusTimes.')) {
+      const statusKey = key.split('.').slice(1).join('.');
+      if (statusKey) {
+        statusTimesExtra[statusKey] = value;
+      }
+    } else {
+      normalExtra[key] = value;
+    }
+  });
+
+  const currentStatusTimes =
+    order.statusTimes && typeof order.statusTimes === 'object'
+      ? order.statusTimes
+      : {};
+
+  const updatePayload = {
+    ...normalExtra,
+    ...etaPayload,
+    status,
+    riderStatus: status,
+    updatedAt: now,
+    statusTimes: {
+      ...currentStatusTimes,
+      ...statusTimesExtra,
+      [status]: statusTimesExtra[status] || now,
+    },
+  };
+
+  Object.assign(order, updatePayload);
+
   await saveOrder(order);
   return order;
 }
@@ -3762,6 +3797,70 @@ app.post('/api/rider-distance-to-pickup', async (req, res) => {
   }
 });
 
+function getEtaPayloadByStatus(status) {
+  const normalizedStatus = String(status || '').trim();
+
+  const etaMap = {
+    draft_confirm: {
+      etaText: '等待訂單確認',
+      etaMinutes: null,
+    },
+    pending_payment: {
+      etaText: '付款完成後開始媒合',
+      etaMinutes: null,
+    },
+    merchant_pending: {
+      etaText: '等待店家確認',
+      etaMinutes: null,
+    },
+    pending_dispatch: {
+      etaText: '媒合騎士中',
+      etaMinutes: null,
+    },
+    accepted: {
+      etaText: '約 30～45 分鐘',
+      etaMinutes: 45,
+    },
+    arrived_pickup: {
+      etaText: '約 20～30 分鐘',
+      etaMinutes: 30,
+    },
+    picked_up: {
+      etaText: '約 10～20 分鐘',
+      etaMinutes: 20,
+    },
+    arrived_dropoff: {
+      etaText: '即將完成',
+      etaMinutes: 5,
+    },
+    completed: {
+      etaText: '已完成',
+      etaMinutes: 0,
+    },
+    done: {
+      etaText: '已完成',
+      etaMinutes: 0,
+    },
+    cancelled: {
+      etaText: '已取消',
+      etaMinutes: null,
+    },
+  };
+
+  const eta = etaMap[normalizedStatus] || {
+    etaText: '約 35 分鐘',
+    etaMinutes: 35,
+  };
+
+  return {
+    etaText: eta.etaText,
+    estimatedTime: eta.etaText,
+    etaMinutes: eta.etaMinutes,
+    etaStatus: normalizedStatus,
+    etaUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
 // 3. 接受任務：正式版 approved 騎士才可接單，並防止多人搶同一單
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
@@ -3852,10 +3951,14 @@ if (!isPaidJkoOrder) {
   throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
 }
 
-      acceptedOrder = {
+      const acceptedEtaPayload = getEtaPayloadByStatus('accepted');
+
+acceptedOrder = {
   ...order,
+  ...acceptedEtaPayload,
   id: String(orderId).toUpperCase(),
   status: 'accepted',
+  riderStatus: 'accepted',
   riderId: lineUserId,
   riderLineUserId: lineUserId,
   riderDocId: riderDoc.id,
@@ -3865,6 +3968,7 @@ if (!isPaidJkoOrder) {
 
       transaction.update(orderRef, {
   status: 'accepted',
+  riderStatus: 'accepted',
   riderId: lineUserId,
   riderLineUserId: lineUserId,
   riderDocId: riderDoc.id,
@@ -3873,6 +3977,7 @@ if (!isPaidJkoOrder) {
   acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
+  ...acceptedEtaPayload,
 });
       transaction.set(riderRef, {
         busy: true,
@@ -3985,25 +4090,27 @@ app.post('/api/rider/transfer-order', async (req, res) => {
       }
 
       transaction.update(orderRef, {
-        status: 'pending_dispatch',
+  status: 'pending_dispatch',
+  riderStatus: 'pending_dispatch',
 
-        previousRiderLineUserId: lineUserId,
-        previousRiderDocId: riderDoc.id,
-        previousRiderName: rider.name || '',
-        previousRiderPhone: rider.phone || '',
-        transferReason: reason || '',
-        transferredAt: admin.firestore.FieldValue.serverTimestamp(),
+  previousRiderLineUserId: lineUserId,
+  previousRiderDocId: riderDoc.id,
+  previousRiderName: rider.name || '',
+  previousRiderPhone: rider.phone || '',
+  transferReason: reason || '',
+  transferredAt: admin.firestore.FieldValue.serverTimestamp(),
 
-        riderId: '',
-        riderLineUserId: '',
-        riderDocId: '',
-        riderName: '',
-        riderPhone: '',
+  riderId: '',
+  riderLineUserId: '',
+  riderDocId: '',
+  riderName: '',
+  riderPhone: '',
 
-        acceptedAt: null,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        'statusTimes.transferred': admin.firestore.FieldValue.serverTimestamp()
-      });
+  acceptedAt: null,
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  'statusTimes.transferred': admin.firestore.FieldValue.serverTimestamp(),
+  ...getEtaPayloadByStatus('pending_dispatch'),
+});
 
       transaction.set(riderRef, {
         busy: false,
@@ -4145,38 +4252,49 @@ const nextStatuses = allowedFlow[currentStatus] || [];
 
 if (!nextStatuses.includes(status)) {
   if (status === 'completed') {
-    updatedOrder = {
-      ...order,
-      id: String(orderId).toUpperCase(),
-      status: 'completed',
-    };
+  const completedEtaPayload = getEtaPayloadByStatus('completed');
 
-    transaction.update(orderRef, {
-      status: 'completed',
-      riderStatus: 'completed',
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      'statusTimes.completed': admin.firestore.FieldValue.serverTimestamp(),
-    });
+  const completedUpdateData = {
+    status: 'completed',
+    riderStatus: 'completed',
+    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    'statusTimes.completed': admin.firestore.FieldValue.serverTimestamp(),
+    settlementStatus: 'pending',
+    settledAt: null,
+    ...completedEtaPayload,
+  };
 
-    transaction.set(riderRef, {
-      busy: false,
-      currentOrderId: '',
-      lastActive: Date.now(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+  transaction.update(orderRef, completedUpdateData);
 
-    return;
-  }
+  transaction.set(riderRef, {
+    busy: false,
+    currentOrderId: '',
+    lastActive: Date.now(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  updatedOrder = {
+    ...order,
+    ...completedUpdateData,
+    id: String(orderId).toUpperCase(),
+    status: 'completed',
+  };
+
+  return;
+}
 
   throw new Error('INVALID_TRANSITION');
 }
-      const updateData = {
-        status,
-        riderStatus: status,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        [`statusTimes.${status}`]: admin.firestore.FieldValue.serverTimestamp(),
-      };
+      const etaPayload = getEtaPayloadByStatus(status);
+
+const updateData = {
+  status,
+  riderStatus: status,
+  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  [`statusTimes.${status}`]: admin.firestore.FieldValue.serverTimestamp(),
+  ...etaPayload,
+};
 
       if (status === 'arrived_pickup') {
         updateData.arrivedPickupAt = admin.firestore.FieldValue.serverTimestamp();
