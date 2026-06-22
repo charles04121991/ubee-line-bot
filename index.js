@@ -3696,8 +3696,28 @@ if (!riderOk) {
 }
 
       if (order.status !== 'pending_dispatch') {
-        throw new Error('ORDER_ALREADY_ACCEPTED');
-      }
+  throw new Error('ORDER_ALREADY_ACCEPTED');
+}
+
+const paymentMethod = String(
+  order.paymentMethod ||
+  order.payMethod ||
+  order.paymentType ||
+  order.payment ||
+  ''
+).toLowerCase();
+
+const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+
+const isPaidJkoOrder =
+  paymentMethod === 'jko' &&
+  paymentStatus === 'paid_confirmed' &&
+  order.isPaid === true &&
+  order.isCashOrder !== true;
+
+if (!isPaidJkoOrder) {
+  throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
+}
 
       acceptedOrder = {
   ...order,
@@ -3756,11 +3776,18 @@ if (!riderOk) {
     }
 
     if (error.message === 'ORDER_ALREADY_ACCEPTED') {
-      return res.status(409).json({
-        success: false,
-        message: '此訂單已被其他騎士接走。',
-      });
-    }
+  return res.status(409).json({
+    success: false,
+    message: '此訂單已被其他騎士接走。',
+  });
+}
+    
+    if (error.message === 'ORDER_PAYMENT_NOT_CONFIRMED') {
+  return res.status(409).json({
+    success: false,
+    message: '此訂單尚未完成街口支付確認，暫時無法接單。',
+  });
+}
     
     if (error.message === 'RIDER_ALREADY_BUSY') {
   return res.status(409).json({
