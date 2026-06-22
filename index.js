@@ -779,14 +779,18 @@ const completedOrders = completedSnap.docs
    0
  );
 
-const orderTotal = Number(order.total || order.price || 0);
+const customerTotal = Number(
+  order.total ||
+  order.customerPayableTotal ||
+  order.finalTotal ||
+  0
+);
 
 const orderPlatformIncome = Number(
   order.platformFee ||
   order.platformIncome ||
   order.serviceFee ||
-  Math.max(0, orderTotal - income) ||
-  0
+  (customerTotal > 0 ? Math.max(0, customerTotal - income) : 0)
 );
       totalIncome += income;
 
@@ -808,7 +812,7 @@ const isCashOrder =
 const settlementStatus = String(order.settlementStatus || 'pending').toLowerCase();
 
 if (isCashOrder) {
-  cashCollectedTotal += orderTotal;
+  cashCollectedTotal += customerTotal;
   cashDueToPlatform += orderPlatformIncome;
 } else {
   if (settlementStatus === 'settled') {
