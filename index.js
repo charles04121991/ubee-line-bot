@@ -1853,9 +1853,10 @@ const PRICING = {
 };
 
 const SPEED_OPTIONS = {
-  standard: { label: '一般件', time: '60–90 分鐘', fee: 10, riderText: '一般任務' },
-  priority: { label: '標準件', time: '45–60 分鐘', fee: 15, riderText: '標準任務' },
-  express: { label: '優先件', time: '30–45 分鐘', fee: 20, riderText: '優先任務' },
+  // 必須與 order.html 的 getSpeedServiceFee() 保持一致
+  standard: { label: '一般件', time: '60–90 分鐘', fee: 0, riderText: '一般任務' },
+  priority: { label: '標準件', time: '45–60 分鐘', fee: 20, riderText: '標準任務' },
+  express: { label: '優先件', time: '30–45 分鐘', fee: 40, riderText: '優先任務' },
 };
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
@@ -2502,25 +2503,40 @@ async function getDistanceMatrixCached(origin, destination) {
   return distance;
 }
 
-function calculatePrice({ distanceMeters, durationSeconds, speedType }) {
-  const km = distanceMeters / 1000;
-  const minutes = durationSeconds / 60;
+function calculateDistanceTierFee(distanceKm) {
+  const km = Number(distanceKm) || 0;
+
+  if (km <= 0) return 0;
+  if (km <= 3) return 80;
+  if (km <= 5) return 100;
+  if (km <= 8) return 130;
+
+  const extraKm = Math.ceil(km - 8);
+  return 130 + extraKm * 15;
+}
+
+function calculatePrice({ distanceMeters, durationSeconds, speedType, upstairsFee = 0 }) {
+  const km = Number(distanceMeters || 0) / 1000;
   const speed = getSpeedOption(speedType);
+  const safeUpstairsFee = Math.max(0, Math.round(Number(upstairsFee || 0)));
 
-  const deliveryFee = Math.round(
-    PRICING.baseFee + km * PRICING.perKm + minutes * PRICING.perMinute
-  );
-
-  const total = deliveryFee + PRICING.serviceFee + speed.fee;
+  // 正式營運版：必須與 order.html 的區間制估價一致
+  const deliveryFee = calculateDistanceTierFee(km);
+  const serviceFee = 20;
+  const total = deliveryFee + serviceFee + speed.fee + safeUpstairsFee;
   const driverFee = Math.round(total * PRICING.driverRatio);
 
   return {
+    fareMode: 'distance_tier',
+    distanceKm: Math.round(km * 100) / 100,
     deliveryFee,
-    serviceFee: PRICING.serviceFee,
+    serviceFee,
     speedFee: speed.fee,
+    upstairsFee: safeUpstairsFee,
     waitingFee: 0,
     total,
     driverFee,
+    riderFee: driverFee,
     platformFee: total - driverFee,
   };
 }
@@ -2884,35 +2900,78 @@ function createFinanceFlex(order) {
 
 function createOrderFromApi(data) {
   const userId = cleanText(data.userId || data.customerId || '', 80);
+  const rawServiceGroup = cleanText(data.serviceGroup || '', ORDER_INPUT_LIMITS.serviceGroup);
+  const serviceKey = cleanText(data.serviceKey || rawServiceGroup || '', 40);
 
   const serviceGroupMap = {
     send: '幫我送',
     pickup: '幫我取',
     buy: '幫代買',
     queue: '幫排隊',
-    life: '生活跑腿',
+    helper: '全能跑腿',
+    urgent: '急件專送',
+    life:
+      serviceKey === 'urgent'
+        ? '急件專送'
+        : serviceKey === 'helper'
+          ? '全能跑腿'
+          : '生活跑腿',
   };
 
-  const rawServiceGroup = cleanText(data.serviceGroup || '', ORDER_INPUT_LIMITS.serviceGroup);
   const serviceGroupLabel = serviceGroupMap[rawServiceGroup] || rawServiceGroup || '';
+
+  const nearbyPlace = data.nearbyPlace && typeof data.nearbyPlace === 'object'
+    ? {
+        name: cleanText(data.nearbyPlace.name || '', 80),
+        address: cleanText(data.nearbyPlace.address || '', 120),
+        placeId: cleanText(data.nearbyPlace.placeId || '', 120),
+        phone: normalizePhone(cleanText(data.nearbyPlace.phone || '', 30)),
+        lat: Number(data.nearbyPlace.lat || 0) || '',
+        lng: Number(data.nearbyPlace.lng || 0) || '',
+      }
+    : null;
+
+  const merchantId = cleanText(data.merchantId || data.merchantCode || '', 80);
+  const merchantName = cleanText(data.merchantName || '', 80);
+  const merchantPhone = normalizePhone(cleanText(data.merchantPhone || '', 30));
+  const merchantAddress = cleanText(data.merchantAddress || '', 120);
 
   return {
     userId,
     customerId: userId,
     serviceGroup: serviceGroupLabel,
     serviceType: cleanText(data.serviceType || ''),
+    serviceCategory: cleanText(data.serviceCategory || '', 40),
     serviceMode: cleanText(data.serviceMode || 'normal'),
-    serviceKey: cleanText(data.serviceKey || ''),
-    queueMinutes: Math.max(0, Math.round(Number(data.queueMinutes || 0))),    item: cleanText(data.item || '', ORDER_INPUT_LIMITS.item),
+    serviceKey,
+    queueMinutes: Math.max(0, Math.round(Number(data.queueMinutes || 0))),
+
+    item: cleanText(data.item || '', ORDER_INPUT_LIMITS.item),
     pickupAddress: cleanText(data.pickup || data.pickupAddress || '', ORDER_INPUT_LIMITS.pickupAddress),
     pickupPhone: normalizePhone(cleanText(data.pickupPhone || '', ORDER_INPUT_LIMITS.pickupPhone)),
     dropoffAddress: cleanText(data.dropoff || data.dropoffAddress || '', ORDER_INPUT_LIMITS.dropoffAddress),
     dropoffPhone: normalizePhone(cleanText(data.dropoffPhone || '', ORDER_INPUT_LIMITS.dropoffPhone)),
-    speedType: ['standard', 'priority', 'express', 'rush'].includes(data.speedType || data.speed)
+
+    speedType: ['standard', 'priority', 'express'].includes(data.speedType || data.speed)
       ? (data.speedType || data.speed)
       : 'standard',
+
     note: cleanLongText(data.note || '', ORDER_INPUT_LIMITS.note),
     advancePayment: Math.max(0, Math.round(Number(data.advancePayment || 0))),
+
+    upstairsOption: cleanText(data.upstairsOption || 'none', 30),
+    upstairsLabel: cleanText(data.upstairsLabel || '', 60),
+    upstairsFee: Math.max(0, Math.round(Number(data.upstairsFee || 0))),
+    fareMode: cleanText(data.fareMode || 'distance_tier', 40),
+
+    nearbyPlace,
+
+    merchantId,
+    merchantCode: merchantId,
+    merchantName,
+    merchantPhone,
+    merchantAddress,
+    hasMerchant: data.hasMerchant === true || !!merchantId || !!merchantName,
   };
 }
 app.get('/api/config', (req, res) => {
@@ -3366,37 +3425,33 @@ app.post('/api/orders', async (req, res) => {
     if (data.serviceMode === 'queue') {
       const queueMinutes = Number(data.queueMinutes || 0);
       const waitingFee = Math.max(0, queueMinutes * 3);
-      const serviceFee = 25;
+      const serviceFee = 20;
       const deliveryFee = 80;
+      const upstairsFee = Math.max(0, Math.round(Number(data.upstairsFee || 0)));
 
       const speedFeeMap = {
-        standard: 20,
-        priority: 25,
-        express: 30
-       };
+        standard: 0,
+        priority: 20,
+        express: 40,
+      };
 
-const speedFee = speedFeeMap[data.speedType] || 0;
-const total = deliveryFee + waitingFee + serviceFee + speedFee;
-  price = {
-    deliveryFee,
-    serviceFee,
-    speedFee,
-    waitingFee,
-    total,
-    driverFee: deliveryFee + waitingFee + speedFee,
-    platformFee: serviceFee
-  };
-} else if (data.serviceMode === 'review') {
-  price = {
-    deliveryFee: 0,
-    serviceFee: 0,
-    speedFee: 0,
-    waitingFee: 0,
-    total: 0,
-    driverFee: 0,
-    platformFee: 0
-  };
-} else {
+      const speedFee = speedFeeMap[data.speedType] || 0;
+      const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
+      const driverFee = Math.round(total * PRICING.driverRatio);
+
+      price = {
+        fareMode: 'queue',
+        deliveryFee,
+        serviceFee,
+        speedFee,
+        upstairsFee,
+        waitingFee,
+        total,
+        driverFee,
+        riderFee: driverFee,
+        platformFee: total - driverFee,
+      };
+}else {
   distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
 
   if(!distance || !distance.distanceMeters){
@@ -3410,6 +3465,7 @@ const total = deliveryFee + waitingFee + serviceFee + speedFee;
     distanceMeters: distance.distanceMeters,
     durationSeconds: distance.durationSeconds,
     speedType: data.speedType,
+    upstairsFee: data.upstairsFee,
   });
 }    
     const id = generateOrderId();
