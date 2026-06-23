@@ -749,7 +749,7 @@ button.red{background:var(--red);color:#fff}
 
       <div class="workbenchHint">
         <b>操作原則：</b>
-        店家只需要看「下一步要做什麼」。騎士接單前可取消；騎士接單後請聯絡 UBee 管理端協助處理。
+        騎士接單前可取消；騎士接單後請聯絡 UBee 管理端協助處理。
       </div>
 
       <div class="tabs workbenchTabs">
@@ -1693,7 +1693,7 @@ async function createMerchantOrder(){
   };
 
   const paymentMethodLabelMap = {
-    merchant_settlement:"店家週結",
+    merchant_settlement:"店家月結",
     cash:"現金付款",
     merchant_paid:"店家已收款"
   };
@@ -1837,7 +1837,7 @@ ${distanceText}
       deliveryFee,
 
       paymentMethod,
-      paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家週結",
+      paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家月結",
       paymentStatus:paymentStatusMap[paymentMethod] || "merchant_settlement",
       merchantPaid:paymentMethod === "merchant_paid",
       paidAmount:paymentMethod === "merchant_paid" ? deliveryFee : 0,
@@ -1919,7 +1919,7 @@ function renderOrderCard(order){
   const deliveryTypeLabel = order.deliveryTypeLabel || (order.deliveryType === "merchant" ? "店家自送" : "UBee 派騎士");
 
   const paymentMethodLabel = order.paymentMethodLabel ||
-    (order.paymentMethod === "cash" ? "現金付款" : order.paymentMethod === "merchant_paid" ? "店家已收款" : "店家月結 / 週結");
+    (order.paymentMethod === "cash" ? "現金付款" : order.paymentMethod === "merchant_paid" ? "店家已收款" : "店家月結");
 
   const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
 
