@@ -1923,6 +1923,10 @@ function renderOrderCard(order){
 
   const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
 
+  const riderName = order.riderName || "";
+  const riderPhone = order.riderPhone || "";
+  const riderAssigned = !!(order.riderLineUserId || order.riderId || order.riderName || order.riderPhone);
+
   let buttonHtml = "";
   let nextActionTitle = "目前狀態";
   let nextActionText = "請依照訂單狀態處理。";
@@ -2029,14 +2033,20 @@ function renderOrderCard(order){
       </div>
 
       <div class="posNext">
-        <div class="posNextTitle">${escapeHtml(nextActionTitle)}</div>
-        <div class="posNextText">${escapeHtml(nextActionText)}</div>
-      </div>
+  <div class="posNextTitle">${escapeHtml(nextActionTitle)}</div>
+  <div class="posNextText">${escapeHtml(nextActionText)}</div>
+</div>
 
-      <div class="posActionBar">
-        ${buttonHtml}
-      </div>
+<div class="posInfoBlock" style="margin-top:12px;">
+  <div class="posInfoTitle">騎士狀態</div>
+  <div class="row"><b>目前狀態：</b>${escapeHtml(progressText)}</div>
+  <div class="row"><b>騎士姓名：</b>${escapeHtml(riderAssigned ? riderName || "已接單騎士" : "等待騎士接單")}</div>
+  <div class="row"><b>騎士電話：</b>${escapeHtml(riderAssigned && riderPhone ? riderPhone : "尚未提供")}</div>
+</div>
 
+<div class="posActionBar">
+  ${buttonHtml}
+</div>
       ${
         cancellableStatuses.includes(order.status)
           ? `<div class="posCancelRule">正式營運規則：騎士接單前可取消；騎士接單後請聯絡 UBee 管理端處理。</div>`
