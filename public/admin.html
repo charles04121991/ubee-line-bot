@@ -99,9 +99,21 @@ body{
 }
 .top-actions{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:repeat(3,1fr);
   gap:10px;
   margin-bottom:16px;
+}
+
+.top-actions .btn{
+  margin-top:0;
+  padding:12px 8px;
+  font-size:14px;
+}
+
+@media (max-width:420px){
+  .top-actions{
+    grid-template-columns:1fr;
+  }
 }
 .btn-dark{
   background:#222;
@@ -114,17 +126,18 @@ body{
 <body>
 <div class="app">
   <div class="title">UBee 財務結算中心</div>
-  <div class="sub">管理街口支付、平台收款與店家月結的騎士待撥款。</div>
+  <div class="sub">管理騎士待撥款、街口支付結算與店家月結應收帳款。</div>
 
   <div class="top-actions">
-    <button class="btn btn-dark" onclick="loadSettlements()">重新整理</button>
-    <button class="btn btn-dark" onclick="location.reload()">重載頁面</button>
-  </div>
+  <button class="btn btn-dark" onclick="loadSettlements()">騎士待撥款</button>
+  <button class="btn btn-dark" onclick="loadMerchantReceivables()">店家應收款</button>
+  <button class="btn btn-dark" onclick="location.reload()">重載頁面</button>
+</div>
 
   <div class="stat">
-    <div class="stat-label">待結算總額</div>
-    <div class="stat-value" id="pendingTotal">$0</div>
-  </div>
+  <div class="stat-label" id="mainStatLabel">騎士待撥款總額</div>
+  <div class="stat-value" id="pendingTotal">$0</div>
+</div>
 
   <div id="list">
     <div class="empty">正在讀取待結算資料...</div>
@@ -179,9 +192,14 @@ function formatTime(value){
 async function loadSettlements(){
   const list = document.getElementById("list");
   const pendingTotal = document.getElementById("pendingTotal");
+  const mainStatLabel = document.getElementById("mainStatLabel");
 
-  list.innerHTML = `<div class="empty">正在讀取待結算資料...</div>`;
+  if(mainStatLabel){
+    mainStatLabel.innerText = "騎士待撥款總額";
+  }
 
+  pendingTotal.innerText = "$0";
+  list.innerHTML = `<div class="empty">正在讀取騎士待撥款資料...</div>`;
   try{
     const res = await fetch(`${API_BASE}/api/admin/pending-settlements?t=${Date.now()}`);
     const data = await res.json();
@@ -274,6 +292,143 @@ async function settleOrder(orderId, btn){
   }
 }
 
+async function loadMerchantReceivables(){
+  const list = document.getElementById("list");
+  const pendingTotal = document.getElementById("pendingTotal");
+  const mainStatLabel = document.getElementById("mainStatLabel");
+
+  if(mainStatLabel){
+    mainStatLabel.innerText = "店家未結清總額";
+  }
+
+  pendingTotal.innerText = "$0";
+  list.innerHTML = `<div class="empty">正在讀取店家應收帳款...</div>`;
+
+  try{
+    const res = await fetch(`${API_BASE}/api/admin/merchant-receivables?t=${Date.now()}`);
+    const data = await res.json();
+
+    if(!res.ok || data.success === false){
+      throw new Error(data.message || data.error || "讀取失敗");
+    }
+
+    pendingTotal.innerText = money(data.unpaidTotal || 0);
+
+    const merchants = Array.isArray(data.merchants)
+  ? data.merchants.filter(merchant => Number(merchant.unpaidAmount || 0) > 0)
+  : [];
+
+    if(!merchants.length){
+      list.innerHTML = `<div class="empty">目前沒有店家未結清帳款。</div>`;
+      return;
+    }
+
+    list.innerHTML = merchants.map(merchant => `
+      <div class="card">
+        <div class="row">
+          <div class="label">店家名稱</div>
+          <div class="value">${escapeHtml(merchant.merchantName || "-")}</div>
+        </div>
+
+        <div class="row">
+          <div class="label">店家電話</div>
+          <div class="value">${escapeHtml(merchant.merchantPhone || "-")}</div>
+        </div>
+
+        <div class="row">
+          <div class="label">未結清金額</div>
+          <div class="fee">${money(merchant.unpaidAmount || 0)}</div>
+        </div>
+
+        <div class="row">
+          <div class="label">未結清筆數</div>
+          <div class="value">${Number(merchant.unpaidCount || 0)} 筆</div>
+        </div>
+
+        <div class="row">
+          <div class="label">已結清金額</div>
+          <div class="value">${money(merchant.paidAmount || 0)}</div>
+        </div>
+
+        ${(merchant.orders || []).length ? `
+          <div class="row">
+            <div class="label">未結清明細</div>
+            <div class="value">${Number((merchant.orders || []).length)} 筆</div>
+          </div>
+        ` : ""}
+
+        ${(merchant.orders || []).map(order => `
+          <div class="card" style="background:#181818;margin-top:12px;">
+            <div class="row">
+              <div class="label">訂單編號</div>
+              <div class="value">${escapeHtml(order.orderNo || order.id || "-")}</div>
+            </div>
+
+            <div class="row">
+              <div class="label">應收金額</div>
+              <div class="fee">${money(order.amount || 0)}</div>
+            </div>
+
+            <div class="row">
+              <div class="label">完成時間</div>
+              <div class="value">${escapeHtml(formatTime(order.completedAt || order.createdAt))}</div>
+            </div>
+
+            <div class="row">
+              <div class="label">付款方式</div>
+              <div class="value">${escapeHtml(getPaymentText(order.paymentMethod || order.paymentMethodLabel))}</div>
+            </div>
+
+            <button class="btn" onclick="settleMerchantReceivable('${escapeHtml(order.id)}', this)">
+              標記店家已結清
+            </button>
+          </div>
+        `).join("")}
+      </div>
+    `).join("");
+
+  }catch(err){
+    console.error(err);
+    list.innerHTML = `<div class="empty">讀取店家帳款失敗：${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function settleMerchantReceivable(orderId, btn){
+  if(!orderId){
+    alert("缺少訂單 ID");
+    return;
+  }
+
+  const ok = confirm("確認店家已完成付款？\n\n確認後，這筆店家應收款會標記為已結清。");
+  if(!ok) return;
+
+  btn.disabled = true;
+  btn.innerText = "結清中...";
+
+  try{
+    const res = await fetch(`${API_BASE}/api/admin/merchant-receivables/settle-order`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ orderId })
+    });
+
+    const data = await res.json();
+
+    if(!res.ok || data.success === false){
+      throw new Error(data.message || data.error || "結清失敗");
+    }
+
+    alert("店家帳款已標記結清");
+    await loadMerchantReceivables();
+
+  }catch(err){
+    console.error(err);
+    alert("店家帳款結清失敗：" + err.message);
+    btn.disabled = false;
+    btn.innerText = "標記店家已結清";
+  }
+}
+  
 loadSettlements();
 </script>
 </body>
