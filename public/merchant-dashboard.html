@@ -41,52 +41,7 @@ body{
 .wrap{
   max-width:760px;
   margin:0 auto;
-  padding:18px 14px 44px;
-}
-
-.hero{
-  padding:20px;
-  border-radius:24px;
-  background:
-    radial-gradient(circle at top right,rgba(250,204,21,.22),transparent 36%),
-    linear-gradient(135deg,var(--card),var(--bg));
-  border:1px solid var(--line);
-  margin-bottom:14px;
-  box-shadow:var(--shadow);
-}
-
-.logo{
-  font-size:32px;
-  font-weight:900;
-}
-
-.logo span{color:var(--yellow)}
-
-.hero h1{
-  margin:8px 0 6px;
-  font-size:24px;
-}
-
-.hero p{
-  margin:0;
-  color:var(--muted);
-  line-height:1.6;
-}
-
-.heroChips{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:14px;
-}
-
-.heroChip{
-  padding:7px 10px;
-  border-radius:999px;
-  background:rgba(250,204,21,.12);
-  border:1px solid rgba(250,204,21,.26);
-  font-size:13px;
-  font-weight:900;
+  padding:14px 14px 44px;
 }
 
 .login,.section{
@@ -113,12 +68,49 @@ h3{margin:0}
   line-height:1.6;
 }
 
+.hidden{display:none!important}
+
+#dashboard{
+  display:flex;
+  flex-direction:column;
+}
+
+.merchantApprovedOnly{
+  padding:12px 14px;
+  margin-top:0;
+}
+
+.merchantApprovedOnly .merchantInfo{
+  margin-top:0;
+  text-align:center;
+  background:#fff;
+}
+
+.hiddenCounters{
+  display:none!important;
+}
+
+.merchantInfo{
+  margin-top:10px;
+  padding:12px;
+  border-radius:16px;
+  background:rgba(250,204,21,.1);
+  border:1px solid rgba(250,204,21,.25);
+  line-height:1.7;
+  font-size:14px;
+}
+
+.approved{
+  color:#16a34a;
+  font-weight:900;
+}
+
 .quickNav{
   position:sticky;
   top:0;
   z-index:20;
   display:grid;
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns:repeat(3,1fr);
   gap:8px;
   padding:10px 0;
   margin-top:12px;
@@ -139,37 +131,6 @@ h3{margin:0}
   background:linear-gradient(135deg,var(--yellow),var(--yellow2));
   color:#000;
   border:0;
-}
-
-.summaryGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:12px;
-}
-
-@media (min-width:640px){
-  .summaryGrid{grid-template-columns:repeat(4,1fr)}
-}
-
-.summaryCard{
-  background:var(--card2);
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:12px;
-}
-
-.summaryCard b{
-  display:block;
-  font-size:22px;
-  color:var(--yellow);
-}
-
-.summaryCard span{
-  display:block;
-  color:var(--muted);
-  font-size:13px;
-  margin-top:4px;
 }
 
 label{
@@ -230,15 +191,38 @@ button.green{background:var(--green)}
 button.blue{background:var(--blue)}
 button.red{background:var(--red);color:#fff}
 
+.summaryGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:12px;
+}
+
+.summaryCard{
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:12px;
+}
+
+.summaryCard b{
+  display:block;
+  font-size:22px;
+  color:var(--yellow);
+}
+
+.summaryCard span{
+  display:block;
+  color:var(--muted);
+  font-size:13px;
+  margin-top:4px;
+}
+
 .tabs{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:8px;
   margin-top:14px;
-}
-
-@media (min-width:640px){
-  .tabs{grid-template-columns:repeat(5,1fr)}
 }
 
 .tab{
@@ -330,34 +314,10 @@ button.red{background:var(--red);color:#fff}
   line-height:1.6;
 }
 
-.hidden{display:none!important}
-
-.merchantInfo{
-  margin-top:10px;
-  padding:12px;
-  border-radius:16px;
-  background:rgba(250,204,21,.1);
-  border:1px solid rgba(250,204,21,.25);
-  line-height:1.7;
-  font-size:14px;
-}
-
-.approved{
-  color:#16a34a;
-  font-weight:900;
-}
-
 .formGrid{
   display:grid;
   grid-template-columns:1fr;
   gap:0;
-}
-
-@media (min-width:640px){
-  .formGrid{
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-  }
 }
 
 .formMsg{
@@ -489,109 +449,7 @@ button.red{background:var(--red);color:#fff}
 
 .stopListItem:first-of-type{border-top:0}
 
-.confirmText{
-  white-space:pre-line;
-  line-height:1.7;
-}
-
-.orderHeader{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:10px;
-}
-
-.orderTitle{
-  flex:1;
-  min-width:0;
-}
-
-.orderTitle h3{
-  font-size:20px;
-  line-height:1.3;
-  margin:0;
-  word-break:break-word;
-}
-
-.orderSub{
-  margin-top:5px;
-  color:var(--muted);
-  font-size:13px;
-  line-height:1.5;
-}
-
-.orderStatusBox{
-  text-align:right;
-  flex-shrink:0;
-}
-
-.orderStatusBox .badge{
-  margin-bottom:4px;
-}
-
-.orderMetaPill{
-  display:inline-block;
-  margin-top:5px;
-  padding:5px 8px;
-  border-radius:999px;
-  background:var(--card);
-  border:1px solid var(--line);
-  color:var(--muted);
-  font-size:12px;
-  font-weight:900;
-}
-
-.orderKitchenBox{
-  margin-top:12px;
-  padding:12px;
-  border-radius:16px;
-  background:#fff;
-  border:1px solid var(--line);
-}
-
-.orderKitchenTitle{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:8px;
-}
-
-.orderKitchenTitle b{
-  font-size:15px;
-}
-
-.nextAction{
-  margin-top:12px;
-  padding:12px;
-  border-radius:16px;
-  background:rgba(250,204,21,.13);
-  border:1px solid rgba(250,204,21,.32);
-  line-height:1.6;
-}
-
-.nextAction b{
-  display:block;
-  margin-bottom:4px;
-}
-
-.btnStack{
-  margin-top:12px;
-}
-
-.btnStack button{
-  margin-top:8px;
-}
-
-.cancelNote{
-  margin-top:8px;
-  color:var(--muted);
-  font-size:12px;
-  line-height:1.5;
-}
-
-  .workbenchSection{
+.workbenchSection{
   background:
     radial-gradient(circle at top right,rgba(250,204,21,.18),transparent 32%),
     var(--card);
@@ -634,12 +492,6 @@ button.red{background:var(--red);color:#fff}
 .workbenchTabs{
   margin-top:14px;
   grid-template-columns:repeat(2,1fr);
-}
-
-@media (min-width:640px){
-  .workbenchTabs{
-    grid-template-columns:repeat(5,1fr);
-  }
 }
 
 .workbenchTabs .tab{
@@ -808,24 +660,22 @@ button.red{background:var(--red);color:#fff}
 }
 
 @media (min-width:640px){
+  .summaryGrid{grid-template-columns:repeat(4,1fr)}
+  .formGrid{
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+  .workbenchTabs{
+    grid-template-columns:repeat(5,1fr);
+  }
   .posMainInfo{
     grid-template-columns:1.2fr .8fr;
   }
 }
 
 @media (max-width:420px){
-  .posHeader{
-    flex-direction:column;
-  }
-
-  .posStatusArea{
-    text-align:left;
-  }
-}
-  
-@media (max-width:420px){
   .quickNav{
-    grid-template-columns:repeat(4,minmax(64px,1fr));
+    grid-template-columns:repeat(3,minmax(64px,1fr));
     gap:6px;
   }
 
@@ -834,11 +684,11 @@ button.red{background:var(--red);color:#fff}
     padding:9px 4px;
   }
 
-  .orderHeader{
+  .posHeader{
     flex-direction:column;
   }
 
-  .orderStatusBox{
+  .posStatusArea{
     text-align:left;
   }
 }
@@ -847,18 +697,6 @@ button.red{background:var(--red);color:#fff}
 
 <body>
 <div class="wrap">
-
-  <div class="hero">
-    <div class="logo"><span>U</span>Bee 🐝</div>
-    <h1>店家派單中心</h1>
-    <p>店家可建立派單、查看配送進度、管理訂單狀態，支援餐飲、飲料、便當與多點配送。</p>
-    <div class="heroChips">
-      <div class="heroChip">正式派單</div>
-      <div class="heroChip">多點配送</div>
-      <div class="heroChip">店家月結</div>
-      <div class="heroChip">騎士接單</div>
-    </div>
-  </div>
 
   <div class="login" id="loginBox">
     <h2>店家登入</h2>
@@ -871,11 +709,10 @@ button.red{background:var(--red);color:#fff}
 
   <div id="dashboard" class="hidden">
 
-    <div class="section" id="section-overview">
-      <h2 id="welcomeTitle">店家派單中心</h2>
+    <div class="section merchantApprovedOnly" id="section-overview">
       <div class="merchantInfo" id="merchantInfoBox"></div>
 
-      <div class="summaryGrid">
+      <div class="summaryGrid hiddenCounters" aria-hidden="true">
         <div class="summaryCard">
           <b id="summaryAll">0</b>
           <span>目前訂單</span>
@@ -893,33 +730,69 @@ button.red{background:var(--red);color:#fff}
           <span>已完成</span>
         </div>
       </div>
-
-      <button class="secondary" type="button" onclick="logoutMerchant()">切換店家</button>
     </div>
 
     <div class="quickNav">
-      <button type="button" data-nav="create" onclick="scrollToSection('section-create')">建立派單</button>
-      <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">配送進度</button>
       <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">訂單工作台</button>
-      <button type="button" data-nav="store" onclick="scrollToSection('section-store')">店家資料</button>
+      <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">配送進度</button>
+      <button type="button" data-nav="create" onclick="scrollToSection('section-create')">建立派單</button>
     </div>
+
+    <section id="section-orders" class="section workbenchSection">
+      <div class="workbenchTop">
+        <div>
+          <div class="workbenchLabel">UBee 店家 POS 工作台</div>
+          <h2>訂單工作台</h2>
+          <div class="small">依照訂單狀態處理接單、備餐、派遣騎士、自送完成與取消紀錄。</div>
+        </div>
+      </div>
+
+      <div class="workbenchHint">
+        <b>操作原則：</b>
+        店家只需要看「下一步要做什麼」。騎士接單前可取消；騎士接單後請聯絡 UBee 管理端協助處理。
+      </div>
+
+      <div class="tabs workbenchTabs">
+        <div class="tab active" data-tab="todo" onclick="setTab('todo')">
+          待處理
+          <span id="countTodo">0</span>
+        </div>
+        <div class="tab" data-tab="delivery" onclick="setTab('delivery')">
+          配送中
+          <span id="countDelivery">0</span>
+        </div>
+        <div class="tab" data-tab="self" onclick="setTab('self')">
+          店家自送
+          <span id="countSelf">0</span>
+        </div>
+        <div class="tab" data-tab="completed" onclick="setTab('completed')">
+          已完成
+          <span id="countCompleted">0</span>
+        </div>
+        <div class="tab" data-tab="cancelled" onclick="setTab('cancelled')">
+          已取消
+          <span id="countCancelled">0</span>
+        </div>
+      </div>
+
+      <div id="ordersBox" class="workbenchOrders"></div>
+    </section>
+
+    <section id="section-progress" class="section">
+      <h2>配送進度</h2>
+      <div class="small">顯示目前最新一筆配送中訂單，以及整體配送狀態。</div>
+
+      <div id="merchantProgressBox" class="progressBox">
+        <div class="empty">目前沒有配送中的訂單</div>
+      </div>
+    </section>
 
     <section id="section-create" class="section">
       <h2>建立派單</h2>
-      <div class="small">請確認收件資料、送達地址與品項內容正確。正式派單建立後會進入訂單流程。</div>
+      <div class="small">店家只需要填寫代墊金額、送達點、收件資料與品項內容，系統會自動建立 UBee 跑腿派單。</div>
 
-      <label>配送方式 *</label>
-      <select id="newDeliveryMode">
-        <option value="ubee">UBee 派騎士</option>
-        <option value="merchant">店家自送</option>
-      </select>
-
-      <label>付款方式 *</label>
-      <select id="newPaymentMethod">
-        <option value="merchant_settlement">店家週結</option>
-        <option value="cash">現金付款</option>
-        <option value="merchant_paid">店家已收款</option>
-      </select>
+      <input id="newDeliveryMode" type="hidden" value="ubee" />
+      <input id="newPaymentMethod" type="hidden" value="merchant_settlement" />
 
       <label>代墊金額</label>
       <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
@@ -967,55 +840,6 @@ button.red{background:var(--red);color:#fff}
       <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立正式訂單</button>
       <div id="createOrderMsg" class="formMsg"></div>
     </section>
-
-    <section id="section-progress" class="section">
-      <h2>配送進度</h2>
-      <div class="small">顯示目前最新一筆配送中訂單，以及整體配送狀態。</div>
-
-      <div id="merchantProgressBox" class="progressBox">
-        <div class="empty">目前沒有配送中的訂單</div>
-      </div>
-    </section>
-
-    <section id="section-orders" class="section workbenchSection">
-  <div class="workbenchTop">
-    <div>
-      <div class="workbenchLabel">UBee 店家 POS 工作台</div>
-      <h2>訂單工作台</h2>
-      <div class="small">依照訂單狀態處理接單、備餐、派遣騎士、自送完成與取消紀錄。</div>
-    </div>
-  </div>
-
-  <div class="workbenchHint">
-    <b>操作原則：</b>
-    店家只需要看「下一步要做什麼」。騎士接單前可取消；騎士接單後請聯絡 UBee 管理端協助處理。
-  </div>
-
-  <div class="tabs workbenchTabs">
-    <div class="tab active" data-tab="todo" onclick="setTab('todo')">
-      待處理
-      <span id="countTodo">0</span>
-    </div>
-    <div class="tab" data-tab="delivery" onclick="setTab('delivery')">
-      配送中
-      <span id="countDelivery">0</span>
-    </div>
-    <div class="tab" data-tab="self" onclick="setTab('self')">
-      店家自送
-      <span id="countSelf">0</span>
-    </div>
-    <div class="tab" data-tab="completed" onclick="setTab('completed')">
-      已完成
-      <span id="countCompleted">0</span>
-    </div>
-    <div class="tab" data-tab="cancelled" onclick="setTab('cancelled')">
-      已取消
-      <span id="countCancelled">0</span>
-    </div>
-  </div>
-
-  <div id="ordersBox" class="workbenchOrders"></div>
-</section>
 
   </div>
 </div>
@@ -1101,10 +925,9 @@ function scrollToSection(id){
 
 function updateNavActive(sectionId){
   const map = {
-    "section-create":"create",
-    "section-progress":"progress",
     "section-orders":"orders",
-    "section-store":"store"
+    "section-progress":"progress",
+    "section-create":"create"
   };
 
   document.querySelectorAll(".quickNav button").forEach(btn => btn.classList.remove("active"));
@@ -1117,7 +940,8 @@ function updateNavActive(sectionId){
 }
 
 function setupScrollSpy(){
-  const targets = ["section-create","section-progress","section-orders","section-store"];
+  const targets = ["section-orders","section-progress","section-create"];
+
   window.addEventListener("scroll", () => {
     let current = "";
     for(const id of targets){
@@ -1469,20 +1293,11 @@ function enterMerchantDashboard(merchant){
   document.getElementById("dashboard").classList.remove("hidden");
 
   document.getElementById("merchantInfoBox").innerHTML = `
-  <strong class="approved">🟢 審核通過店家</strong>
-  <div style="margin-top:10px;">
-    正式營運資料以 UBee 跑腿管理端建檔為準，請確認店家電話與取件地址正確。
-  </div>
-`;
-
-  document.getElementById("storeName").textContent = currentMerchant.merchantName || "店家名稱未設定";
-  document.getElementById("storePhone").textContent = currentMerchant.merchantPhone || "未設定";
-  document.getElementById("storeAddress").textContent = currentMerchant.merchantAddress || "未設定";
-  document.getElementById("storeType").textContent = currentMerchant.merchantType || "未設定";
-  document.getElementById("storeSettlement").textContent = currentMerchant.settlementType || "未設定";
+    <strong class="approved">🟢 審核通過店家</strong>
+  `;
 
   startListenOrders();
-  updateNavActive("section-create");
+  updateNavActive("section-orders");
 }
 
 async function loadMerchantProfile(){
@@ -1712,6 +1527,11 @@ function setTab(tab){
   renderOrders();
 }
 
+function safeSetText(id, value){
+  const el = document.getElementById(id);
+  if(el) el.textContent = value;
+}
+
 function updateCounts(){
   const all = getAllMerchantOrders();
   const activeAll = all.filter(o => o.status !== "merchant_cancelled");
@@ -1722,16 +1542,16 @@ function updateCounts(){
   const cancelled = all.filter(o => o.status === "merchant_cancelled").length;
   const self = all.filter(o => o.status === "merchant_self_delivery").length;
 
-  document.getElementById("countTodo").textContent = todo;
-  document.getElementById("countDelivery").textContent = delivery;
-  document.getElementById("countCompleted").textContent = completed;
-  document.getElementById("countCancelled").textContent = cancelled;
-  document.getElementById("countSelf").textContent = self;
+  safeSetText("countTodo", todo);
+  safeSetText("countDelivery", delivery);
+  safeSetText("countCompleted", completed);
+  safeSetText("countCancelled", cancelled);
+  safeSetText("countSelf", self);
 
-  document.getElementById("summaryAll").textContent = activeAll.length;
-  document.getElementById("summaryTodo").textContent = todo;
-  document.getElementById("summaryDelivery").textContent = delivery;
-  document.getElementById("summaryCompleted").textContent = completed;
+  safeSetText("summaryAll", activeAll.length);
+  safeSetText("summaryTodo", todo);
+  safeSetText("summaryDelivery", delivery);
+  safeSetText("summaryCompleted", completed);
 }
 
 function renderOrders(){
@@ -1739,6 +1559,8 @@ function renderOrders(){
   renderMerchantProgress();
 
   const box = document.getElementById("ordersBox");
+  if(!box) return;
+
   const orders = getVisibleOrders();
 
   const tabNameMap = {
@@ -1885,9 +1707,7 @@ async function createMerchantOrder(){
   const confirmBasicText =
 `請確認以下正式派單資料：
 
-配送方式：${deliveryModeLabelMap[deliveryMode]}
-付款方式：${paymentMethodLabelMap[paymentMethod]}
-送達點：${stopCount} 
+送達點：${stopCount}
 代墊金額：NT$${advanceAmount}
 
 主要送達地址：
