@@ -1290,6 +1290,303 @@ app.post('/api/admin/settle-order', async (req, res) => {
   }
 });
 
+// ==============================
+// UBee 店家應收帳款 API
+// ==============================
+
+// 取得店家派單應收金額
+function getMerchantReceivableAmount(order) {
+  const amount = Number(
+    order.merchantPayableAmount ||
+    order.storePayableAmount ||
+    order.merchantFee ||
+    order.totalFee ||
+    order.deliveryFee ||
+    order.total ||
+    0
+  );
+
+  return Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 0;
+}
+
+// 轉換 Firestore Timestamp / Date / number / string 成毫秒
+function getMerchantReceivableTimeMs(value) {
+  if (!value) return 0;
+
+  if (typeof value.toDate === 'function') {
+    return value.toDate().getTime();
+  }
+
+  if (value._seconds) {
+    return value._seconds * 1000;
+  }
+
+  if (value.seconds) {
+    return value.seconds * 1000;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+// 判斷這筆訂單是不是可以列入「店家應收帳款」
+function isMerchantReceivableOrder(order) {
+  if (!order) return false;
+
+  const status = String(order.status || '').trim().toLowerCase();
+  const orderType = String(order.orderType || '').trim().toLowerCase();
+  const source = String(order.source || '').trim().toLowerCase();
+  const createdFrom = String(order.createdFrom || '').trim().toLowerCase();
+  const deliveryType = String(order.deliveryType || '').trim().toLowerCase();
+  const billingStatus = String(order.merchantBillingStatus || '').trim().toLowerCase();
+
+  const isMerchantOrder =
+    orderType === 'merchant_dispatch' ||
+    source === 'merchant-dashboard' ||
+    createdFrom === 'merchant-dashboard';
+
+  const isCompleted =
+    status === 'completed' ||
+    status === 'done';
+
+  const isUbeeDispatch =
+    deliveryType !== 'merchant';
+
+  const notCancelled =
+    status !== 'merchant_cancelled' &&
+    billingStatus !== 'not_billable';
+
+  return (
+    isMerchantOrder &&
+    isCompleted &&
+    isUbeeDispatch &&
+    notCancelled
+  );
+}
+
+// 讀取所有店家應收帳款
+app.get('/api/admin/merchant-receivables', async (req, res) => {
+  try {
+    const snap = await db.collection('orders')
+      .where('orderType', '==', 'merchant_dispatch')
+      .limit(500)
+      .get();
+
+    const merchantMap = new Map();
+
+    let unpaidTotal = 0;
+    let paidTotal = 0;
+    let receivableOrderCount = 0;
+
+    snap.forEach(doc => {
+      const order = {
+        id: doc.id,
+        ...doc.data()
+      };
+
+      if (!isMerchantReceivableOrder(order)) {
+        return;
+      }
+
+      const amount = getMerchantReceivableAmount(order);
+
+      if (amount <= 0) {
+        return;
+      }
+
+      receivableOrderCount += 1;
+
+      const merchantId = String(
+        order.merchantId ||
+        order.merchantCode ||
+        order.merchantPhone ||
+        'unknown'
+      ).trim();
+
+      const merchantName = order.merchantName || '未命名店家';
+      const merchantPhone = order.merchantPhone || '';
+
+      const billingStatus = String(
+        order.merchantBillingStatus || 'unpaid'
+      ).trim().toLowerCase();
+
+      const isPaid =
+        billingStatus === 'paid';
+
+      if (!merchantMap.has(merchantId)) {
+        merchantMap.set(merchantId, {
+          merchantId,
+          merchantName,
+          merchantPhone,
+          unpaidAmount: 0,
+          paidAmount: 0,
+          totalAmount: 0,
+          orderCount: 0,
+          unpaidCount: 0,
+          paidCount: 0,
+          lastOrderAt: null,
+          orders: []
+        });
+      }
+
+      const merchant = merchantMap.get(merchantId);
+
+      merchant.orderCount += 1;
+      merchant.totalAmount += amount;
+
+      if (isPaid) {
+        merchant.paidAmount += amount;
+        merchant.paidCount += 1;
+        paidTotal += amount;
+      } else {
+        merchant.unpaidAmount += amount;
+        merchant.unpaidCount += 1;
+        unpaidTotal += amount;
+
+        merchant.orders.push({
+          id: order.id,
+          orderNo: order.orderNo || order.id,
+          amount,
+          status: order.status || '',
+          billingStatus: billingStatus || 'unpaid',
+          completedAt: order.completedAt || order.updatedAt || null,
+          createdAt: order.createdAt || null,
+          paymentMethod: order.paymentMethod || '',
+          paymentMethodLabel: order.paymentMethodLabel || '',
+          merchantName,
+          merchantPhone
+        });
+      }
+
+      const orderTime =
+        order.completedAt ||
+        order.updatedAt ||
+        order.createdAt ||
+        null;
+
+      if (
+        !merchant.lastOrderAt ||
+        getMerchantReceivableTimeMs(orderTime) > getMerchantReceivableTimeMs(merchant.lastOrderAt)
+      ) {
+        merchant.lastOrderAt = orderTime;
+      }
+    });
+
+    const merchants = Array.from(merchantMap.values())
+      .filter(merchant => merchant.unpaidAmount > 0 || merchant.paidAmount > 0)
+      .sort((a, b) => {
+        if (b.unpaidAmount !== a.unpaidAmount) {
+          return b.unpaidAmount - a.unpaidAmount;
+        }
+
+        return getMerchantReceivableTimeMs(b.lastOrderAt) - getMerchantReceivableTimeMs(a.lastOrderAt);
+      });
+
+    res.json({
+      success: true,
+      unpaidTotal,
+      paidTotal,
+      totalAmount: unpaidTotal + paidTotal,
+      merchantCount: merchants.length,
+      receivableOrderCount,
+      merchants
+    });
+
+  } catch (err) {
+    console.error('merchant receivables error:', err);
+
+    res.status(500).json({
+      success: false,
+      message: '讀取店家應收帳款失敗',
+      error: err.message
+    });
+  }
+});
+
+// 將單筆店家應收帳款標記為已結清
+app.post('/api/admin/merchant-receivables/settle-order', async (req, res) => {
+  try {
+    const { orderId } = req.body || {};
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少 orderId'
+      });
+    }
+
+    const ref = db.collection('orders').doc(orderId);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到訂單'
+      });
+    }
+
+    const order = {
+      id: doc.id,
+      ...doc.data()
+    };
+
+    if (!isMerchantReceivableOrder(order)) {
+      return res.status(400).json({
+        success: false,
+        message: '此訂單不是可結清的店家派單帳款'
+      });
+    }
+
+    const currentBillingStatus = String(
+      order.merchantBillingStatus || 'unpaid'
+    ).trim().toLowerCase();
+
+    if (currentBillingStatus === 'paid') {
+      return res.status(409).json({
+        success: false,
+        message: '此店家帳款已經結清，請勿重複操作'
+      });
+    }
+
+    const amount = getMerchantReceivableAmount(order);
+
+    if (amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '此訂單缺少正確的店家應付金額'
+      });
+    }
+
+    await ref.update({
+      merchantBillingStatus: 'paid',
+      merchantPaidAmount: amount,
+      merchantBillingSettledAt: admin.firestore.FieldValue.serverTimestamp(),
+      merchantBillingSettledBy: 'admin'
+    });
+
+    res.json({
+      success: true,
+      message: '店家帳款已標記結清',
+      orderId,
+      paidAmount: amount
+    });
+
+  } catch (err) {
+    console.error('settle merchant receivable error:', err);
+
+    res.status(500).json({
+      success: false,
+      message: '店家帳款結清失敗',
+      error: err.message
+    });
+  }
+});
+
+
 // 4. 騎士完成訂單列表：正式版只允許 approved 騎士查看
 app.get('/api/rider/completed-orders', async (req, res) => {
   try {
