@@ -946,6 +946,16 @@ textarea::placeholder{
   text-align:left;
 }
 
+.status.payment-paid{
+  background:rgba(34,197,94,.08);
+  border-color:rgba(34,197,94,.42);
+}
+
+.status.payment-unpaid{
+  background:rgba(239,68,68,.07);
+  border-color:rgba(239,68,68,.42);
+}
+    
 .status-head{
   display:flex;
   justify-content:space-between;
@@ -1882,18 +1892,15 @@ body.day-mode .bottom-tabs{
       </div>
 
       <div class="form-section">
-        <div class="form-title" id="itemTitle">任務內容</div>
-        <div class="input-card">
-          <div class="input-wrap">
-            <div class="input-icon">📝</div>
-            <textarea id="item" maxlength="300" placeholder="例如：文件、飲料、包裹、代買品項"></textarea>
-          </div>
-          <div class="input-wrap" id="noteWrap">
-  <div class="input-icon">✎</div>
-  <textarea id="note" maxlength="400" placeholder="備註：請填寫品牌、數量、規格、注意事項"></textarea>
+  <div class="form-title" id="noteTitle">備註</div>
+  <div class="input-card">
+    <input id="item" type="hidden" value="">
+    <div class="input-wrap" id="noteWrap">
+      <div class="input-icon">✎</div>
+      <textarea id="note" maxlength="300" placeholder="請填寫品項、數量、規格、地點補充、注意事項"></textarea>
+    </div>
+  </div>
 </div>
-        </div>
-      </div>
 
       <div class="form-section hidden" id="advancePaymentBox">
   <div class="form-title">代墊費用</div>
@@ -3066,24 +3073,21 @@ function applyDynamicFields(){
   qs('queueSection').classList.toggle('hidden', !isQueue);
 
   if(qs('advancePaymentBox')){
-  qs('advancePaymentBox').classList.toggle('hidden', !isBuy);
-}
+    qs('advancePaymentBox').classList.toggle('hidden', !isBuy);
+  }
 
-if(qs('advanceRuleBox')){
-  qs('advanceRuleBox').classList.toggle('hidden', !isBuy);
-}
+  if(qs('advanceRuleBox')){
+    qs('advanceRuleBox').classList.toggle('hidden', !isBuy);
+  }
 
-if(qs('noteWrap')){
-  qs('noteWrap').classList.toggle('hidden', isBuy);
-}
+  if(qs('noteWrap')){
+    qs('noteWrap').classList.remove('hidden');
+  }
 
-if(isBuy && qs('note')){
-  qs('note').value = '';
-}
+  if(!isBuy && qs('advancePayment')){
+    qs('advancePayment').value = '0';
+  }
 
-if(!isBuy && qs('advancePayment')){
-  qs('advancePayment').value = '0';
-}
   qs('pickupTitle').innerText =
     isBuy ? '購買地點' :
     isQueue ? '排隊地點' :
@@ -3097,12 +3101,14 @@ if(!isBuy && qs('advancePayment')){
     isUrgent ? '急件送達地點' :
     '送達資訊';
 
-  qs('itemTitle').innerText =
-    isBuy ? '要買的商品' :
-    isQueue ? '排隊需求' :
-    isHelper ? '任務內容' :
-    isUrgent ? '急件內容' :
-    '任務內容';
+  if(qs('noteTitle')){
+    qs('noteTitle').innerText =
+      isBuy ? '備註 / 要買的商品' :
+      isQueue ? '備註 / 排隊需求' :
+      isHelper ? '備註 / 任務需求' :
+      isUrgent ? '備註 / 急件內容' :
+      '備註';
+  }
 
   qs('pickup').placeholder =
     isBuy ? '購買地點 / 店家地址，可點選附近店家帶入' :
@@ -3127,18 +3133,16 @@ if(!isBuy && qs('advancePayment')){
     isQueue ? '你的聯絡電話 / 通知電話' :
     '收件電話 / 聯絡電話';
 
-  qs('item').placeholder =
-    isBuy ? '例如：50嵐珍奶微糖少冰 2 杯、麥當勞大麥克套餐' :
-    isQueue ? '例如：幫我排隊掛號、幫我候位、幫我領號碼牌' :
-    isHelper ? '例如：幫我現場拍照確認、物品代送、送禮、臨時協助' :
-    isUrgent ? '例如：小包裹急送、餐點急送、店家商品急件送達' :
-    '例如：文件、飲料、包裹、洗衣、手機貼膜';
-
   qs('note').placeholder =
-  isQueue ? '請補充現場狀況、號碼、要排到什麼程度、是否需要拍照回報。' :
-  isHelper ? '請詳細描述你希望 UBee 跑腿完成的任務、注意事項、完成標準。' :
-  isUrgent ? '請補充急件注意事項、最晚送達時間、聯絡方式。' :
-  '備註：請填寫品牌、數量、規格、顏色、注意事項。';
+    isBuy ? '請填寫要買的商品、品牌、數量、規格、冰塊甜度、替代品與注意事項。' :
+    isQueue ? '請補充排隊位置、要排到什麼程度、是否需要拍照回報。' :
+    isHelper ? '請詳細描述希望 UBee 跑腿完成的任務、注意事項、完成標準。' :
+    isUrgent ? '請補充急件內容、最晚送達時間、聯絡方式與注意事項。' :
+    '請填寫文件、包裹、物品內容、數量、規格、地點補充與注意事項。';
+
+  if(qs('item') && qs('note')){
+    qs('item').value = qs('note').value.trim();
+  }
 }
 
 function syncQueueLocation(){
@@ -3353,6 +3357,7 @@ function validateStep2(){
   const dropoffEl = qs('dropoff');
   const pickupPhoneEl = qs('pickupPhone');
   const dropoffPhoneEl = qs('dropoffPhone');
+  const noteEl = qs('note');
   const itemEl = qs('item');
   const queueLocationEl = qs('queueLocation');
 
@@ -3360,7 +3365,7 @@ function validateStep2(){
   let dropoff = dropoffEl ? dropoffEl.value.trim() : '';
   let pickupPhone = pickupPhoneEl ? safeCleanPhone(pickupPhoneEl.value) : '';
   let dropoffPhone = dropoffPhoneEl ? safeCleanPhone(dropoffPhoneEl.value) : '';
-  const item = itemEl ? itemEl.value.trim() : '';
+  const note = noteEl ? noteEl.value.trim() : '';
   const queueLocation = queueLocationEl ? queueLocationEl.value.trim() : '';
 
   if(serviceGroup === 'queue' && !pickup && queueLocation){
@@ -3395,12 +3400,16 @@ function validateStep2(){
     dropoffPhone = pickupPhone;
   }
 
-  if(!item){
-    alert('請填寫任務內容。');
+  if(!note){
+    alert('請填寫備註，讓 UBee 騎士知道這筆任務要處理什麼。');
     return false;
   }
 
-    if(!validateAdvancePaymentLimit()){
+  if(itemEl){
+    itemEl.value = note;
+  }
+
+  if(!validateAdvancePaymentLimit()){
     return false;
   }
 
@@ -3409,7 +3418,7 @@ function validateStep2(){
   if(serviceGroup !== 'buy' && advancePaymentEl){
     advancePaymentEl.value = '0';
   }
-  
+
   if(serviceGroup === 'queue' && typeof syncQueueLocation === 'function'){
     syncQueueLocation();
   }
@@ -3474,10 +3483,17 @@ function goPrev(){
 
 function getPayload(){
   const pickup = qs('pickup').value.trim();
-const dropoff = qs('dropoff').value.trim();
-const upstairsOption = getUpstairsOption();
-const rawAdvancePayment = getAdvancePaymentAmount();
-const advancePayment = Number.isFinite(rawAdvancePayment) ? rawAdvancePayment : 0;
+  const dropoff = qs('dropoff').value.trim();
+  const upstairsOption = getUpstairsOption();
+  const rawAdvancePayment = getAdvancePaymentAmount();
+  const advancePayment = Number.isFinite(rawAdvancePayment) ? rawAdvancePayment : 0;
+  const note = qs('note') ? qs('note').value.trim() : '';
+  const itemText = note || serviceType || 'UBee 跑腿任務';
+
+  if(qs('item')){
+    qs('item').value = itemText;
+  }
+
   return {
     userId,
     customerId:userId,
@@ -3497,23 +3513,23 @@ const advancePayment = Number.isFinite(rawAdvancePayment) ? rawAdvancePayment : 
     dropoffAddress:dropoff,
     dropoffPhone:cleanPhone(qs('dropoffPhone').value),
 
-    item:qs('item').value.trim(),
-    note:qs('note').value.trim(),
+    item:itemText,
+    note,
     speedType,
     speed:speedType,
 
     locationConfirmed:!!qs('locationConfirmedCheck')?.checked,
 
     advancePayment,
-estimatedGoodsAmount:advancePayment,
-purchaseAdvanceAllowed:advancePayment > 0,
-riderAdvanceAmount:advancePayment,
-purchasePaymentRule:advancePayment > 0 ? 'rider_advance_then_customer_pay' : 'no_advance',
+    estimatedGoodsAmount:advancePayment,
+    purchaseAdvanceAllowed:advancePayment > 0,
+    riderAdvanceAmount:advancePayment,
+    purchasePaymentRule:advancePayment > 0 ? 'rider_advance_then_customer_pay' : 'no_advance',
 
-        paymentMethod:INITIAL_PAYMENT_METHOD,
-        paymentLabel:INITIAL_PAYMENT_LABEL,
-        paymentStatus:'unselected',
-        isCashOrder:false,
+    paymentMethod:INITIAL_PAYMENT_METHOD,
+    paymentLabel:INITIAL_PAYMENT_LABEL,
+    paymentStatus:'unselected',
+    isCashOrder:false,
 
     upstairsOption,
     upstairsLabel:getUpstairsLabel(upstairsOption),
@@ -3886,10 +3902,9 @@ function selectPaymentMethod(method){
   }
 
   if(isPaymentChangeLocked(currentOrderData)){
-    alert('訂單已開始派單、騎士已接單或付款已完成，付款方式無法再更改。');
-    updatePaymentButtons(selectedPaymentMethod);
-    return;
-  }
+  updatePaymentButtons(selectedPaymentMethod);
+  return;
+}
 
   selectedPaymentMethod = normalizedMethod;
   updatePaymentButtons(normalizedMethod);
@@ -4318,6 +4333,32 @@ function getCurrentStatusMessage(status){
   return map[status] || '訂單狀態更新中。';
 }
 
+  function isOrderPaymentConfirmed(order, status){
+  const data = order || {};
+  const currentStatus = String(status || data.status || '').trim();
+  const paymentStatus = String(data.paymentStatus || '').trim().toLowerCase();
+
+  if(currentStatus === 'completed' || currentStatus === 'done'){
+    return true;
+  }
+
+  if(data.isPaid === true){
+    return true;
+  }
+
+  if(data.cashCollected === true){
+    return true;
+  }
+
+  return [
+    'paid',
+    'paid_confirmed',
+    'payment_confirmed',
+    '付款完成',
+    '已付款'
+  ].includes(paymentStatus);
+}
+  
 function renderTimeline(status, order){
   const currentStatus = status || 'pending_payment';
   let displayRank = getStatusRank(currentStatus);
@@ -4415,12 +4456,27 @@ function renderTimeline(status, order){
     `;
   }).join('');
 
+  const paymentConfirmed = isOrderPaymentConfirmed(order, currentStatus);
+
   const statusColorClass =
-    currentStatus === 'cancelled'
-      ? 'danger'
-      : currentStatus === 'completed' || currentStatus === 'done'
-        ? 'success'
-        : 'active';
+  currentStatus === 'cancelled'
+    ? 'danger'
+    : paymentConfirmed
+      ? 'success'
+      : 'danger';
+
+const statusBadgeText =
+  currentStatus === 'cancelled'
+    ? '已取消'
+    : paymentConfirmed
+      ? '已付款'
+      : '尚未付款';
+
+const statusBoxEl = qs('statusBox');
+if(statusBoxEl){
+  statusBoxEl.classList.toggle('payment-paid', paymentConfirmed && currentStatus !== 'cancelled');
+  statusBoxEl.classList.toggle('payment-unpaid', !paymentConfirmed && currentStatus !== 'cancelled');
+}
 
   qs('statusBox').innerHTML = `
     <div class="status-head">
@@ -4429,14 +4485,8 @@ function renderTimeline(status, order){
         <div class="status-title">${escapeHtml(getStatusLabel(currentStatus))}</div>
       </div>
       <div class="status-badge ${statusColorClass}">
-        ${
-          currentStatus === 'cancelled'
-            ? '已取消'
-            : currentStatus === 'completed' || currentStatus === 'done'
-              ? '已完成'
-              : '進行中'
-        }
-      </div>
+  ${escapeHtml(statusBadgeText)}
+</div>
     </div>
 
     <div class="order-timeline" style="--progress:${progressPercent}%;">
