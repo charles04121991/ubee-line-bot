@@ -712,6 +712,28 @@ button.red{background:var(--red);color:#fff}
     <div class="section merchantApprovedOnly" id="section-overview">
       <div class="merchantInfo" id="merchantInfoBox"></div>
 
+      <div class="summaryGrid" id="merchantBillingSummary">
+  <div class="summaryCard">
+    <b id="billingUnpaid">NT$0</b>
+    <span>尚未結清配送費</span>
+  </div>
+
+  <div class="summaryCard">
+    <b id="billingMonth">NT$0</b>
+    <span>本月派單金額</span>
+  </div>
+
+  <div class="summaryCard">
+    <b id="billingPaid">NT$0</b>
+    <span>已結清金額</span>
+  </div>
+
+  <div class="summaryCard">
+    <b id="billingActive">NT$0</b>
+    <span>進行中預估</span>
+  </div>
+</div>
+      
       <div class="summaryGrid hiddenCounters" aria-hidden="true">
         <div class="summaryCard">
           <b id="summaryAll">0</b>
@@ -1532,6 +1554,116 @@ function safeSetText(id, value){
   if(el) el.textContent = value;
 }
 
+  function moneyText(n){
+  return "NT$" + Number(n || 0).toLocaleString("zh-TW");
+}
+
+  function getMerchantBillingAmount(order){
+  const amount = Number(
+    order.merchantPayableAmount ||
+    order.storePayableAmount ||
+    order.merchantFee ||
+    order.totalFee ||
+    order.deliveryFee ||
+    order.total ||
+    0
+  );
+
+  return Number.isFinite(amount) && amount > 0 ? Math.round(amount) : 0;
+}
+
+function isMerchantBillableOrder(order){
+  if(!order) return false;
+
+  const status = String(order.status || "").toLowerCase();
+  const orderType = String(order.orderType || "").toLowerCase();
+  const source = String(order.source || "").toLowerCase();
+  const createdFrom = String(order.createdFrom || "").toLowerCase();
+  const deliveryType = String(order.deliveryType || "").toLowerCase();
+  const billingStatus = String(order.merchantBillingStatus || "").toLowerCase();
+
+  const isMerchantOrder =
+    orderType === "merchant_dispatch" ||
+    source === "merchant-dashboard" ||
+    createdFrom === "merchant-dashboard";
+
+  const isUbeeDispatch = deliveryType !== "merchant";
+
+  const notCancelled =
+    status !== "merchant_cancelled" &&
+    billingStatus !== "not_billable";
+
+  return isMerchantOrder && isUbeeDispatch && notCancelled;
+}
+
+function getMerchantBillingTime(order){
+  const t =
+    order.completedAt ||
+    order.updatedAt ||
+    order.createdAt ||
+    null;
+
+  if(t && typeof t.toDate === "function") return t.toDate().getTime();
+  if(t && t.seconds) return t.seconds * 1000;
+  if(typeof t === "number") return t;
+
+  if(typeof t === "string"){
+    const parsed = new Date(t).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function updateMerchantBillingSummary(){
+  const all = getAllMerchantOrders().filter(isMerchantBillableOrder);
+
+  let unpaid = 0;
+  let paid = 0;
+  let monthTotal = 0;
+  let active = 0;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  all.forEach(order => {
+    const amount = getMerchantBillingAmount(order);
+    const status = String(order.status || "").toLowerCase();
+    const billingStatus = String(order.merchantBillingStatus || "unpaid").toLowerCase();
+    const orderTime = getMerchantBillingTime(order);
+
+    if(status === "completed" || status === "done"){
+      if(orderTime >= monthStart){
+        monthTotal += amount;
+      }
+
+      if(billingStatus === "paid"){
+        paid += amount;
+      }else{
+        unpaid += amount;
+      }
+
+      return;
+    }
+
+    if(
+      status === "merchant_ready" ||
+      status === "pending_dispatch" ||
+      status === "accepted" ||
+      status === "arrived_pickup" ||
+      status === "picked_up" ||
+      status === "arrived_dropoff"
+    ){
+      active += amount;
+    }
+  });
+
+  safeSetText("billingUnpaid", moneyText(unpaid));
+  safeSetText("billingMonth", moneyText(monthTotal));
+  safeSetText("billingPaid", moneyText(paid));
+  safeSetText("billingActive", moneyText(active));
+}
+  
 function updateCounts(){
   const all = getAllMerchantOrders();
   const activeAll = all.filter(o => o.status !== "merchant_cancelled");
@@ -1556,6 +1688,7 @@ function updateCounts(){
 
 function renderOrders(){
   updateCounts();
+  updateMerchantBillingSummary();
   renderMerchantProgress();
 
   const box = document.getElementById("ordersBox");
@@ -1837,14 +1970,40 @@ ${distanceText}
       deliveryFee,
 
       paymentMethod,
-      paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家月結",
-      paymentStatus:paymentStatusMap[paymentMethod] || "merchant_settlement",
-      merchantPaid:paymentMethod === "merchant_paid",
-      paidAmount:paymentMethod === "merchant_paid" ? deliveryFee : 0,
+paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家月結",
+paymentStatus:paymentStatusMap[paymentMethod] || "merchant_settlement",
+merchantPaid:paymentMethod === "merchant_paid",
+paidAmount:paymentMethod === "merchant_paid" ? deliveryFee : 0,
 
-      riderLineUserId:"",
-      riderName:"",
-      riderPhone:""
+// ===== 店家帳款 / UBee 應收款 =====
+// deliveryMode === "ubee" 代表這筆是 UBee 派騎士，需要列入店家應付款。
+// deliveryMode === "merchant" 代表店家自送，不需要算 UBee 應收款。
+billedTo:deliveryMode === "ubee" ? "merchant" : "none",
+merchantBillingType:"merchant_dispatch",
+merchantPayableAmount:deliveryMode === "ubee" ? deliveryFee : 0,
+storePayableAmount:deliveryMode === "ubee" ? deliveryFee : 0,
+
+merchantBillingStatus:
+  deliveryMode !== "ubee"
+    ? "not_billable"
+    : paymentMethod === "merchant_paid"
+      ? "paid"
+      : "unpaid",
+
+merchantPaidAmount:
+  deliveryMode === "ubee" && paymentMethod === "merchant_paid"
+    ? deliveryFee
+    : 0,
+
+merchantBillingCreatedAt:now,
+merchantBillingSettledAt:
+  deliveryMode === "ubee" && paymentMethod === "merchant_paid"
+    ? now
+    : null,
+
+riderLineUserId:"",
+riderName:"",
+riderPhone:""
     };
 
     if(deliveryMode === "ubee") orderPayload.merchantReadyAt = now;
