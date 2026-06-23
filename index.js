@@ -2308,8 +2308,10 @@ function validateOrderInput(data) {
     errors.push('LINE 身分驗證失敗，請重新從官方帳號點「立即下單」。');
   }
 
-  if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !data.item) {
-    errors.push('請完整填寫取件地址、送達地址、電話與物品內容。');
+  const hasRemark = !!String(data.note || data.item || '').trim();
+
+  if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !hasRemark) {
+    errors.push('請完整填寫取件地址、送達地址、電話與備註。');
   }
 
   Object.entries(ORDER_INPUT_LIMITS).forEach(([key, limit]) => {
@@ -3140,6 +3142,9 @@ function createOrderFromApi(data) {
   const merchantPhone = normalizePhone(cleanText(data.merchantPhone || '', 30));
   const merchantAddress = cleanText(data.merchantAddress || '', 120);
 
+  const rawNote = cleanLongText(data.note || data.item || '', ORDER_INPUT_LIMITS.note);
+  const rawItem = cleanText(data.item || rawNote || data.serviceType || 'UBee 跑腿任務', ORDER_INPUT_LIMITS.item);
+  
   return {
     userId,
     customerId: userId,
@@ -3150,7 +3155,7 @@ function createOrderFromApi(data) {
     serviceKey,
     queueMinutes: Math.max(0, Math.round(Number(data.queueMinutes || 0))),
 
-    item: cleanText(data.item || '', ORDER_INPUT_LIMITS.item),
+    item: rawItem,
     pickupAddress: cleanText(data.pickup || data.pickupAddress || '', ORDER_INPUT_LIMITS.pickupAddress),
     pickupPhone: normalizePhone(cleanText(data.pickupPhone || '', ORDER_INPUT_LIMITS.pickupPhone)),
     dropoffAddress: cleanText(data.dropoff || data.dropoffAddress || '', ORDER_INPUT_LIMITS.dropoffAddress),
@@ -3160,7 +3165,7 @@ function createOrderFromApi(data) {
       ? (data.speedType || data.speed)
       : 'standard',
 
-    note: cleanLongText(data.note || '', ORDER_INPUT_LIMITS.note),
+    note: rawNote,
     advancePayment: Math.max(0, Math.round(Number(data.advancePayment || 0))),
 
     upstairsOption: cleanText(data.upstairsOption || 'none', 30),
