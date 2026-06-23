@@ -591,6 +591,238 @@ button.red{background:var(--red);color:#fff}
   line-height:1.5;
 }
 
+  .workbenchSection{
+  background:
+    radial-gradient(circle at top right,rgba(250,204,21,.18),transparent 32%),
+    var(--card);
+}
+
+.workbenchTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+.workbenchTop h2{
+  margin-bottom:4px;
+  font-size:24px;
+}
+
+.workbenchLabel{
+  display:inline-block;
+  padding:5px 9px;
+  border-radius:999px;
+  background:#111827;
+  color:#fff;
+  font-size:12px;
+  font-weight:900;
+  margin-bottom:8px;
+}
+
+.workbenchHint{
+  margin-top:10px;
+  padding:12px;
+  border-radius:16px;
+  background:rgba(17,24,39,.05);
+  border:1px solid var(--line);
+  line-height:1.6;
+  font-size:14px;
+}
+
+.workbenchTabs{
+  margin-top:14px;
+  grid-template-columns:repeat(2,1fr);
+}
+
+@media (min-width:640px){
+  .workbenchTabs{
+    grid-template-columns:repeat(5,1fr);
+  }
+}
+
+.workbenchTabs .tab{
+  min-height:58px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  font-size:13px;
+}
+
+.workbenchTabs .tab span{
+  display:block;
+  font-size:20px;
+  line-height:1;
+}
+
+.workbenchOrders{
+  margin-top:14px;
+}
+
+.posOrder{
+  background:#fff;
+  border:1px solid rgba(17,24,39,.1);
+  box-shadow:0 12px 24px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+
+.posHeader{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--line);
+}
+
+.posOrderNo{
+  font-size:20px;
+  font-weight:900;
+  line-height:1.3;
+  word-break:break-word;
+}
+
+.posMeta{
+  margin-top:5px;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.5;
+}
+
+.posStatusArea{
+  text-align:right;
+  flex-shrink:0;
+}
+
+.posStatus{
+  display:inline-block;
+  padding:7px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  color:#111827;
+  background:rgba(250,204,21,.22);
+  border:1px solid rgba(250,204,21,.35);
+}
+
+.posStatus.hot{
+  background:rgba(239,68,68,.12);
+  border-color:rgba(239,68,68,.32);
+  color:#b91c1c;
+}
+
+.posStatus.wait{
+  background:rgba(56,189,248,.14);
+  border-color:rgba(56,189,248,.34);
+  color:#0369a1;
+}
+
+.posStatus.move{
+  background:rgba(34,197,94,.14);
+  border-color:rgba(34,197,94,.34);
+  color:#15803d;
+}
+
+.posPill{
+  display:inline-block;
+  margin-top:6px;
+  padding:5px 8px;
+  border-radius:999px;
+  background:var(--card2);
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+
+.posNext{
+  margin-top:12px;
+  padding:14px;
+  border-radius:18px;
+  background:linear-gradient(135deg,rgba(250,204,21,.2),rgba(250,204,21,.06));
+  border:1px solid rgba(250,204,21,.34);
+}
+
+.posNextTitle{
+  font-size:17px;
+  font-weight:900;
+  margin-bottom:5px;
+}
+
+.posNextText{
+  color:#374151;
+  line-height:1.6;
+  font-size:14px;
+}
+
+.posActionBar{
+  margin-top:12px;
+}
+
+.posActionBar button{
+  margin-top:8px;
+}
+
+.posMainInfo{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+.posInfoBlock{
+  padding:12px;
+  border-radius:16px;
+  background:var(--card2);
+  border:1px solid var(--line);
+}
+
+.posInfoTitle{
+  font-weight:900;
+  margin-bottom:8px;
+  font-size:15px;
+}
+
+.posItemText{
+  font-size:17px;
+  line-height:1.6;
+  font-weight:900;
+  white-space:pre-line;
+}
+
+.posAddress{
+  margin-top:8px;
+  color:#374151;
+  line-height:1.6;
+  font-size:14px;
+}
+
+.posCancelRule{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+}
+
+@media (min-width:640px){
+  .posMainInfo{
+    grid-template-columns:1.2fr .8fr;
+  }
+}
+
+@media (max-width:420px){
+  .posHeader{
+    flex-direction:column;
+  }
+
+  .posStatusArea{
+    text-align:left;
+  }
+}
+  
 @media (max-width:420px){
   .quickNav{
     grid-template-columns:repeat(4,minmax(64px,1fr));
@@ -668,7 +900,7 @@ button.red{background:var(--red);color:#fff}
     <div class="quickNav">
       <button type="button" data-nav="create" onclick="scrollToSection('section-create')">建立派單</button>
       <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">配送進度</button>
-      <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">訂單查詢</button>
+      <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">訂單工作台</button>
       <button type="button" data-nav="store" onclick="scrollToSection('section-store')">店家資料</button>
     </div>
 
@@ -745,34 +977,45 @@ button.red{background:var(--red);color:#fff}
       </div>
     </section>
 
-    <section id="section-orders" class="section">
-      <h2>訂單查詢</h2>
-      <div class="small">可查看待處理、配送中、已完成、已取消與店家自送訂單。</div>
+    <section id="section-orders" class="section workbenchSection">
+  <div class="workbenchTop">
+    <div>
+      <div class="workbenchLabel">UBee 店家 POS 工作台</div>
+      <h2>訂單工作台</h2>
+      <div class="small">依照訂單狀態處理接單、備餐、派遣騎士、自送完成與取消紀錄。</div>
+    </div>
+  </div>
 
-      <div class="tabs">
-        <div class="tab active" data-tab="todo" onclick="setTab('todo')">待處理 <span id="countTodo">0</span></div>
-        <div class="tab" data-tab="delivery" onclick="setTab('delivery')">配送中 <span id="countDelivery">0</span></div>
-        <div class="tab" data-tab="completed" onclick="setTab('completed')">已完成 <span id="countCompleted">0</span></div>
-        <div class="tab" data-tab="cancelled" onclick="setTab('cancelled')">已取消 <span id="countCancelled">0</span></div>
-        <div class="tab" data-tab="self" onclick="setTab('self')">店家自送 <span id="countSelf">0</span></div>
-      </div>
+  <div class="workbenchHint">
+    <b>操作原則：</b>
+    店家只需要看「下一步要做什麼」。騎士接單前可取消；騎士接單後請聯絡 UBee 管理端協助處理。
+  </div>
 
-      <div id="ordersBox"></div>
-    </section>
+  <div class="tabs workbenchTabs">
+    <div class="tab active" data-tab="todo" onclick="setTab('todo')">
+      待處理
+      <span id="countTodo">0</span>
+    </div>
+    <div class="tab" data-tab="delivery" onclick="setTab('delivery')">
+      配送中
+      <span id="countDelivery">0</span>
+    </div>
+    <div class="tab" data-tab="self" onclick="setTab('self')">
+      店家自送
+      <span id="countSelf">0</span>
+    </div>
+    <div class="tab" data-tab="completed" onclick="setTab('completed')">
+      已完成
+      <span id="countCompleted">0</span>
+    </div>
+    <div class="tab" data-tab="cancelled" onclick="setTab('cancelled')">
+      已取消
+      <span id="countCancelled">0</span>
+    </div>
+  </div>
 
-    <section id="section-store" class="section">
-      <h2>店家資料</h2>
-      <div class="small">如需修改店家資料，請聯絡 UBee 管理端協助更新，避免正式派單資料錯誤。</div>
-
-      <div class="simpleCard">
-        <h3 id="storeName">店家名稱</h3>
-        <div class="row approved">🟢 已審核店家</div>
-        <div class="row"><b>店家電話：</b><span id="storePhone">未設定</span></div>
-        <div class="row"><b>取件地址：</b><span id="storeAddress">未設定</span></div>
-        <div class="row"><b>店家類型：</b><span id="storeType">未設定</span></div>
-        <div class="row"><b>結帳方式：</b><span id="storeSettlement">未設定</span></div>
-      </div>
-    </section>
+  <div id="ordersBox" class="workbenchOrders"></div>
+</section>
 
   </div>
 </div>
@@ -1863,62 +2106,74 @@ function renderOrderCard(order){
   let buttonHtml = "";
   let nextActionTitle = "目前狀態";
   let nextActionText = "請依照訂單狀態處理。";
+  let statusClass = "";
 
   if(order.status === "merchant_pending"){
+    statusClass = "hot";
     nextActionTitle = "下一步：接受訂單";
     nextActionText = "確認店家可以處理這筆訂單後，請按下接受訂單，系統會進入準備中。";
     buttonHtml += `<button type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_preparing')">接受訂單，開始準備</button>`;
   }
 
   if(order.status === "merchant_preparing"){
+    statusClass = "hot";
     nextActionTitle = "下一步：準備完成";
     nextActionText = "商品或餐點準備完成後，請按下準備完成，讓訂單進入待派遣狀態。";
     buttonHtml += `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_ready')">準備完成</button>`;
   }
 
   if(order.status === "merchant_ready" && order.deliveryType !== "merchant"){
+    statusClass = "hot";
     nextActionTitle = "下一步：派遣騎士";
     nextActionText = "確認商品已備妥後，請正式派遣騎士。派遣後會進入騎士接單流程。";
     buttonHtml += `<button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">確認派遣騎士</button>`;
   }
 
   if(order.status === "pending_dispatch"){
+    statusClass = "wait";
     nextActionTitle = "目前等待騎士接單";
     nextActionText = "訂單已送出給騎士端，等待騎士接單中。騎士接單前仍可取消派單。";
   }
 
   if(order.status === "accepted"){
+    statusClass = "move";
     nextActionTitle = "騎士已接單";
     nextActionText = "騎士已接受此任務，店家端不可直接取消。如有問題請聯絡 UBee 管理端。";
   }
 
   if(order.status === "arrived_pickup"){
+    statusClass = "move";
     nextActionTitle = "騎士已抵達取件地";
     nextActionText = "請確認商品是否已交給騎士，並保持電話暢通。";
   }
 
   if(order.status === "picked_up"){
+    statusClass = "move";
     nextActionTitle = "配送中";
     nextActionText = "騎士已取件並開始配送，此階段不可由店家端取消。";
   }
 
   if(order.status === "arrived_dropoff"){
+    statusClass = "move";
     nextActionTitle = "騎士已抵達送達地";
     nextActionText = "訂單即將完成，請等待系統更新完成狀態。";
   }
 
   if(order.status === "merchant_self_delivery"){
+    statusClass = "hot";
     nextActionTitle = "店家自送中";
     nextActionText = "此訂單由店家自行配送。送達後請按下店家自送完成。完成前也可以取消派單。";
     buttonHtml += `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','completed')">店家自送完成</button>`;
   }
 
   if(order.status === "completed"){
+    statusClass = "move";
     nextActionTitle = "訂單已完成";
     nextActionText = "此訂單已完成，正式營運資料不建議再修改。";
   }
 
   if(order.status === "merchant_cancelled"){
+    statusClass = "";
     nextActionTitle = "訂單已取消";
     nextActionText = "此訂單已由店家取消，系統已保留正式紀錄。";
   }
@@ -1938,38 +2193,50 @@ function renderOrderCard(order){
   }
 
   return `
-    <div class="order">
-      <div class="orderHeader">
-        <div class="orderTitle">
-          <h3>${escapeHtml(orderNo)}</h3>
-          <div class="orderSub">
-            ${escapeHtml(formatTime(order))}｜${escapeHtml(deliveryTypeLabel)}
+    <div class="order posOrder">
+      <div class="posHeader">
+        <div>
+          <div class="posOrderNo">${escapeHtml(orderNo)}</div>
+          <div class="posMeta">
+            ${escapeHtml(formatTime(order))}｜${escapeHtml(deliveryTypeLabel)}｜${escapeHtml(stopCount)} 點
           </div>
         </div>
 
-        <div class="orderStatusBox">
-          <div class="badge">${escapeHtml(progressText)}</div>
-          <div class="orderMetaPill">${escapeHtml(paymentMethodLabel)}</div>
+        <div class="posStatusArea">
+          <div class="posStatus ${escapeHtml(statusClass)}">${escapeHtml(progressText)}</div>
+          <div class="posPill">${escapeHtml(paymentMethodLabel)}</div>
         </div>
       </div>
 
-      <div class="nextAction">
-        <b>${escapeHtml(nextActionTitle)}</b>
-        ${escapeHtml(nextActionText)}
+      <div class="posNext">
+        <div class="posNextTitle">${escapeHtml(nextActionTitle)}</div>
+        <div class="posNextText">${escapeHtml(nextActionText)}</div>
       </div>
 
-      <div class="orderKitchenBox">
-        <div class="orderKitchenTitle">
-          <b>訂單內容</b>
-          <span class="orderMetaPill">${escapeHtml(stopCount)} 點</span>
+      <div class="posActionBar">
+        ${buttonHtml}
+      </div>
+
+      ${
+        cancellableStatuses.includes(order.status)
+          ? `<div class="posCancelRule">正式營運規則：騎士接單前可取消；騎士接單後請聯絡 UBee 管理端處理。</div>`
+          : ""
+      }
+
+      <div class="posMainInfo">
+        <div class="posInfoBlock">
+          <div class="posInfoTitle">訂單內容</div>
+          <div class="posItemText">${escapeHtml(item)}</div>
+          <div class="posAddress"><b>主要送達地址：</b>${escapeHtml(dropoff)}</div>
+          <div class="posAddress"><b>備註：</b>${escapeHtml(note || "無")}</div>
         </div>
 
-        <div class="row"><b>客人：</b>${escapeHtml(customerName)}</div>
-        <div class="row"><b>電話：</b>${escapeHtml(customerPhone)}</div>
-        <div class="row"><b>內容：</b>${escapeHtml(item)}</div>
-        <div class="row"><b>主要送達地址：</b>${escapeHtml(dropoff)}</div>
-        <div class="row"><b>距離：</b>${escapeHtml(distanceText || "未記錄")}</div>
-        <div class="row" style="margin-top:10px;"><b>備註：</b>${escapeHtml(note || "無")}</div>
+        <div class="posInfoBlock">
+          <div class="posInfoTitle">收件資訊</div>
+          <div class="row"><b>客人：</b>${escapeHtml(customerName)}</div>
+          <div class="row"><b>電話：</b>${escapeHtml(customerPhone)}</div>
+          <div class="row"><b>距離：</b>${escapeHtml(distanceText || "未記錄")}</div>
+        </div>
       </div>
 
       <div class="moneyBox">
@@ -1981,16 +2248,6 @@ function renderOrderCard(order){
 
       ${renderDeliveryStops(order)}
       ${lockedText}
-
-      <div class="btnStack">
-        ${buttonHtml}
-      </div>
-
-      ${
-        cancellableStatuses.includes(order.status)
-          ? `<div class="cancelNote">正式營運規則：騎士接單前可取消；騎士接單後請聯絡 UBee 跑腿管理端處理。</div>`
-          : ""
-      }
     </div>
   `;
 }
