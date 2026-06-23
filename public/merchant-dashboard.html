@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee｜店家派單中心｜正式營運版</title>
+<title>UBee 跑腿店家派單中心</title>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -494,6 +494,103 @@ button.red{background:var(--red);color:#fff}
   line-height:1.7;
 }
 
+.orderHeader{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.orderTitle{
+  flex:1;
+  min-width:0;
+}
+
+.orderTitle h3{
+  font-size:20px;
+  line-height:1.3;
+  margin:0;
+  word-break:break-word;
+}
+
+.orderSub{
+  margin-top:5px;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.5;
+}
+
+.orderStatusBox{
+  text-align:right;
+  flex-shrink:0;
+}
+
+.orderStatusBox .badge{
+  margin-bottom:4px;
+}
+
+.orderMetaPill{
+  display:inline-block;
+  margin-top:5px;
+  padding:5px 8px;
+  border-radius:999px;
+  background:var(--card);
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:900;
+}
+
+.orderKitchenBox{
+  margin-top:12px;
+  padding:12px;
+  border-radius:16px;
+  background:#fff;
+  border:1px solid var(--line);
+}
+
+.orderKitchenTitle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+
+.orderKitchenTitle b{
+  font-size:15px;
+}
+
+.nextAction{
+  margin-top:12px;
+  padding:12px;
+  border-radius:16px;
+  background:rgba(250,204,21,.13);
+  border:1px solid rgba(250,204,21,.32);
+  line-height:1.6;
+}
+
+.nextAction b{
+  display:block;
+  margin-bottom:4px;
+}
+
+.btnStack{
+  margin-top:12px;
+}
+
+.btnStack button{
+  margin-top:8px;
+}
+
+.cancelNote{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+}
+
 @media (max-width:420px){
   .quickNav{
     grid-template-columns:repeat(4,minmax(64px,1fr));
@@ -503,6 +600,14 @@ button.red{background:var(--red);color:#fff}
   .quickNav button{
     font-size:12px;
     padding:9px 4px;
+  }
+
+  .orderHeader{
+    flex-direction:column;
+  }
+
+  .orderStatusBox{
+    text-align:left;
   }
 }
 </style>
@@ -514,7 +619,7 @@ button.red{background:var(--red);color:#fff}
   <div class="hero">
     <div class="logo"><span>U</span>Bee 🐝</div>
     <h1>店家派單中心</h1>
-    <p>正式營運版｜店家可建立派單、查看配送進度、管理訂單狀態，支援餐飲、飲料、便當與多點配送。</p>
+    <p>店家可建立派單、查看配送進度、管理訂單狀態，支援餐飲、飲料、便當與多點配送。</p>
     <div class="heroChips">
       <div class="heroChip">正式派單</div>
       <div class="heroChip">多點配送</div>
@@ -579,7 +684,7 @@ button.red{background:var(--red);color:#fff}
 
       <label>付款方式 *</label>
       <select id="newPaymentMethod">
-        <option value="merchant_settlement">店家月結 / 週結</option>
+        <option value="merchant_settlement">店家週結</option>
         <option value="cash">現金付款</option>
         <option value="merchant_paid">店家已收款</option>
       </select>
@@ -596,7 +701,7 @@ button.red{background:var(--red);color:#fff}
         <option value="5">5 個送達點</option>
         <option value="6">6 個送達點</option>
       </select>
-      <div class="small">正式規則：每多 1 個送達點，加 NT$20。</div>
+      <div class="small">規則：每多 1 個送達點，加 NT$20。</div>
 
       <div class="stopCard">
         <div class="stopTitle">
@@ -1069,7 +1174,7 @@ async function initMerchantLiff(){
   hideError();
 
   if(typeof liff === "undefined"){
-    showError("LINE LIFF 載入失敗，請從 UBee 店家合作中心重新開啟。");
+    showError("LINE LIFF 載入失敗，請從 UBee 跑腿店家合作中心重新開啟。");
     forceEnableLoginButton("進入派單中心");
     return;
   }
@@ -1091,7 +1196,7 @@ async function initMerchantLiff(){
     }
   }catch(err){
     console.error("店家 LIFF 初始化失敗:", err);
-    showError("店家登入初始化失敗，請從 UBee 店家合作中心重新開啟。");
+    showError("店家登入初始化失敗，請從 UBee 跑腿店家合作中心重新開啟。");
     forceEnableLoginButton("進入派單中心");
   }
 }
@@ -1123,7 +1228,7 @@ function enterMerchantDashboard(merchant){
   document.getElementById("merchantInfoBox").innerHTML = `
   <strong class="approved">🟢 審核通過店家</strong>
   <div style="margin-top:10px;">
-    正式營運資料以 UBee 管理端建檔為準，請確認店家電話與取件地址正確。
+    正式營運資料以 UBee 跑腿管理端建檔為準，請確認店家電話與取件地址正確。
   </div>
 `;
 
@@ -1171,7 +1276,7 @@ async function loginMerchant(){
   const phone = normalizePhone(input.value);
 
   if(!merchantLineUserId){
-    showError("缺少 LINE 使用者資料，請從 UBee 店家合作中心重新開啟店家派單。");
+    showError("缺少 LINE 使用者資料，請從 UBee 跑腿店家合作中心重新開啟店家派單。");
     forceEnableLoginButton("進入派單中心");
     return;
   }
@@ -1366,6 +1471,7 @@ function setTab(tab){
 
 function updateCounts(){
   const all = getAllMerchantOrders();
+  const activeAll = all.filter(o => o.status !== "merchant_cancelled");
 
   const todo = all.filter(o => todoStatuses.includes(o.status)).length;
   const delivery = all.filter(o => deliveryStatuses.includes(o.status)).length;
@@ -1379,7 +1485,7 @@ function updateCounts(){
   document.getElementById("countCancelled").textContent = cancelled;
   document.getElementById("countSelf").textContent = self;
 
-  document.getElementById("summaryAll").textContent = all.length;
+  document.getElementById("summaryAll").textContent = activeAll.length;
   document.getElementById("summaryTodo").textContent = todo;
   document.getElementById("summaryDelivery").textContent = delivery;
   document.getElementById("summaryCompleted").textContent = completed;
@@ -1517,12 +1623,12 @@ async function createMerchantOrder(){
   }
 
   const deliveryModeLabelMap = {
-    ubee:"UBee 派騎士",
+    ubee:"UBee 跑腿派騎士",
     merchant:"店家自送"
   };
 
   const paymentMethodLabelMap = {
-    merchant_settlement:"店家月結 / 週結",
+    merchant_settlement:"店家週結",
     cash:"現金付款",
     merchant_paid:"店家已收款"
   };
@@ -1610,7 +1716,7 @@ ${distanceText}
       orderType:"merchant_dispatch",
       status:orderStatus,
       deliveryType:deliveryMode,
-      deliveryTypeLabel:deliveryModeLabelMap[deliveryMode] || "UBee 派騎士",
+      deliveryTypeLabel:deliveryModeLabelMap[deliveryMode] || "UBee 跑腿派騎士",
       createdAt:now,
       updatedAt:now,
       merchantCreatedAt:now,
@@ -1668,7 +1774,7 @@ ${distanceText}
       deliveryFee,
 
       paymentMethod,
-      paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家月結 / 週結",
+      paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家週結",
       paymentStatus:paymentStatusMap[paymentMethod] || "merchant_settlement",
       merchantPaid:paymentMethod === "merchant_paid",
       paidAmount:paymentMethod === "merchant_paid" ? deliveryFee : 0,
@@ -1755,21 +1861,66 @@ function renderOrderCard(order){
   const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
 
   let buttonHtml = "";
+  let nextActionTitle = "目前狀態";
+  let nextActionText = "請依照訂單狀態處理。";
 
   if(order.status === "merchant_pending"){
+    nextActionTitle = "下一步：接受訂單";
+    nextActionText = "確認店家可以處理這筆訂單後，請按下接受訂單，系統會進入準備中。";
     buttonHtml += `<button type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_preparing')">接受訂單，開始準備</button>`;
   }
 
   if(order.status === "merchant_preparing"){
+    nextActionTitle = "下一步：準備完成";
+    nextActionText = "商品或餐點準備完成後，請按下準備完成，讓訂單進入待派遣狀態。";
     buttonHtml += `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','merchant_ready')">準備完成</button>`;
   }
 
   if(order.status === "merchant_ready" && order.deliveryType !== "merchant"){
+    nextActionTitle = "下一步：派遣騎士";
+    nextActionText = "確認商品已備妥後，請正式派遣騎士。派遣後會進入騎士接單流程。";
     buttonHtml += `<button class="blue" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','pending_dispatch')">確認派遣騎士</button>`;
   }
 
+  if(order.status === "pending_dispatch"){
+    nextActionTitle = "目前等待騎士接單";
+    nextActionText = "訂單已送出給騎士端，等待騎士接單中。騎士接單前仍可取消派單。";
+  }
+
+  if(order.status === "accepted"){
+    nextActionTitle = "騎士已接單";
+    nextActionText = "騎士已接受此任務，店家端不可直接取消。如有問題請聯絡 UBee 管理端。";
+  }
+
+  if(order.status === "arrived_pickup"){
+    nextActionTitle = "騎士已抵達取件地";
+    nextActionText = "請確認商品是否已交給騎士，並保持電話暢通。";
+  }
+
+  if(order.status === "picked_up"){
+    nextActionTitle = "配送中";
+    nextActionText = "騎士已取件並開始配送，此階段不可由店家端取消。";
+  }
+
+  if(order.status === "arrived_dropoff"){
+    nextActionTitle = "騎士已抵達送達地";
+    nextActionText = "訂單即將完成，請等待系統更新完成狀態。";
+  }
+
   if(order.status === "merchant_self_delivery"){
+    nextActionTitle = "店家自送中";
+    nextActionText = "此訂單由店家自行配送。送達後請按下店家自送完成。完成前也可以取消派單。";
     buttonHtml += `<button class="green" type="button" onclick="updateOrderStatus('${escapeHtml(order.id)}','completed')">店家自送完成</button>`;
+  }
+
+  if(order.status === "completed"){
+    nextActionTitle = "訂單已完成";
+    nextActionText = "此訂單已完成，正式營運資料不建議再修改。";
+  }
+
+  if(order.status === "merchant_cancelled"){
+    nextActionTitle = "訂單已取消";
+    nextActionText = "此訂單已由店家取消，系統已保留正式紀錄。";
   }
 
   if(cancellableStatuses.includes(order.status)){
@@ -1788,18 +1939,38 @@ function renderOrderCard(order){
 
   return `
     <div class="order">
-      <div class="badge">${escapeHtml(progressText)}</div>
-      <h3>${escapeHtml(orderNo)}</h3>
+      <div class="orderHeader">
+        <div class="orderTitle">
+          <h3>${escapeHtml(orderNo)}</h3>
+          <div class="orderSub">
+            ${escapeHtml(formatTime(order))}｜${escapeHtml(deliveryTypeLabel)}
+          </div>
+        </div>
 
-      <div class="row"><b>建立時間：</b>${escapeHtml(formatTime(order))}</div>
-      <div class="row"><b>客人：</b>${escapeHtml(customerName)}</div>
-      <div class="row"><b>電話：</b>${escapeHtml(customerPhone)}</div>
-      <div class="row"><b>內容：</b>${escapeHtml(item)}</div>
-      <div class="row"><b>主要送達地址：</b>${escapeHtml(dropoff)}</div>
-      <div class="row"><b>配送方式：</b>${escapeHtml(deliveryTypeLabel)}</div>
-      <div class="row"><b>付款方式：</b>${escapeHtml(paymentMethodLabel)}</div>
-      <div class="row"><b>送達點：</b>${escapeHtml(stopCount)} 點</div>
-      <div class="row"><b>距離：</b>${escapeHtml(distanceText || "未記錄")}</div>
+        <div class="orderStatusBox">
+          <div class="badge">${escapeHtml(progressText)}</div>
+          <div class="orderMetaPill">${escapeHtml(paymentMethodLabel)}</div>
+        </div>
+      </div>
+
+      <div class="nextAction">
+        <b>${escapeHtml(nextActionTitle)}</b>
+        ${escapeHtml(nextActionText)}
+      </div>
+
+      <div class="orderKitchenBox">
+        <div class="orderKitchenTitle">
+          <b>訂單內容</b>
+          <span class="orderMetaPill">${escapeHtml(stopCount)} 點</span>
+        </div>
+
+        <div class="row"><b>客人：</b>${escapeHtml(customerName)}</div>
+        <div class="row"><b>電話：</b>${escapeHtml(customerPhone)}</div>
+        <div class="row"><b>內容：</b>${escapeHtml(item)}</div>
+        <div class="row"><b>主要送達地址：</b>${escapeHtml(dropoff)}</div>
+        <div class="row"><b>距離：</b>${escapeHtml(distanceText || "未記錄")}</div>
+        <div class="row" style="margin-top:10px;"><b>備註：</b>${escapeHtml(note || "無")}</div>
+      </div>
 
       <div class="moneyBox">
         <div class="moneyItem"><span>代墊金額</span><b>NT$${escapeHtml(advanceAmount)}</b></div>
@@ -1808,10 +1979,18 @@ function renderOrderCard(order){
         <div class="moneyItem"><span>總金額</span><b>NT$${escapeHtml(total)}</b></div>
       </div>
 
-      <div class="row" style="margin-top:10px;"><b>備註：</b>${escapeHtml(note || "無")}</div>
       ${renderDeliveryStops(order)}
       ${lockedText}
-      ${buttonHtml}
+
+      <div class="btnStack">
+        ${buttonHtml}
+      </div>
+
+      ${
+        cancellableStatuses.includes(order.status)
+          ? `<div class="cancelNote">正式營運規則：騎士接單前可取消；騎士接單後請聯絡 UBee 跑腿管理端處理。</div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -1912,7 +2091,7 @@ async function cancelMerchantOrder(orderId){
     }
 
     if(err.message === "ORDER_NOT_CANCELABLE"){
-      alert("此訂單目前已進入騎士接單或配送流程，店家端不能直接取消，請聯絡 UBee 管理端協助處理。");
+      alert("此訂單目前已進入騎士接單或配送流程，店家端不能直接取消，請聯絡 UBee 跑腿管理端協助處理。");
       return;
     }
 
