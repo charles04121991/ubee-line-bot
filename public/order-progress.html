@@ -619,7 +619,7 @@
       <div class="profile-avatar" id="profileAvatar">🐝</div>
       <div>
         <div class="profile-name" id="profileName">LINE 身分確認中</div>
-        <div class="profile-desc" id="profileDesc">正在讀取你的 UBee 訂單</div>
+        <div class="profile-desc" id="profileDesc">正在讀取你的 UBee 跑腿訂單</div>
       </div>
     </section>
 
@@ -726,7 +726,7 @@
     <section class="empty-state" id="emptyState">
       <div class="empty-icon">📦</div>
       <h2>目前沒有進行中訂單</h2>
-      <p>這個 LINE 帳號目前沒有 UBee 進行中的訂單。</p>
+      <p>這個 LINE 帳號目前沒有 UBee 跑腿進行中的訂單。</p>
     </section>
   </div>
 
@@ -764,9 +764,9 @@
         key: "pending_dispatch",
         title: "等待派單",
         shortTitle: "派單",
-        desc: "系統正在媒合附近可服務的 UBee 騎士。",
+        desc: "系統正在媒合附近可服務的 UBee 跑腿騎士。",
         activeTitle: "正在等待騎士接單",
-        activeDesc: "系統正在尋找附近可服務的 UBee 騎士。"
+        activeDesc: "系統正在尋找附近可服務的 UBee 跑腿騎士。"
       },
       {
         key: "accepted",
@@ -1181,7 +1181,7 @@
         const order = await findLatestActiveOrder();
 
         if (!order) {
-          showEmpty("目前沒有進行中訂單", "這個 LINE 帳號目前沒有 UBee 進行中的訂單。");
+          showEmpty("目前沒有進行中訂單", "這個 LINE 帳號目前沒有 UBee 跑腿進行中的訂單。");
           return;
         }
 
