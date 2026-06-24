@@ -2564,6 +2564,8 @@ const ORDER_INPUT_LIMITS = {
   note: 300,
 };
 
+const MAX_ADVANCE_PAYMENT = 1000;
+
 const DUPLICATE_ORDER_WINDOW_MS = 90 * 1000;
 
 function cleanText(value, maxLength = 100) {
@@ -2575,13 +2577,86 @@ function cleanText(value, maxLength = 100) {
     .slice(0, maxLength);
 }
 
-function cleanLongText(value, maxLength = 200) {
-  return String(value || '')
-    .replace(/[<>]/g, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trim()
-    .slice(0, maxLength);
+function normalizeAdvancePaymentText(text) {
+  return String(text || '')
+    .replace(/[０-９]/g, function(ch) {
+      return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+    })
+    .replace(/[，,]/g, '')
+    .trim();
+}
+
+function parseNonNegativeMoney(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  const raw = normalizeAdvancePaymentText(value);
+  const normalized = raw.replace(/[^\d.-]/g, '');
+
+  if (!normalized) {
+    return NaN;
+  }
+
+  const amount = Number(normalized);
+
+  if (!Number.isFinite(amount)) {
+    return NaN;
+  }
+
+  return Math.max(0, Math.round(amount));
+}
+
+function extractAdvancePaymentAmountFromText(text) {
+  const source = normalizeAdvancePaymentText(text);
+
+  if (!source) {
+    return 0;
+  }
+
+  const hasAdvanceKeyword =
+    /代墊|墊付|先墊|幫忙墊|幫我墊|代付|先付|先付款|代買金額|商品費|餐費|餐點費|餐點金額|商品金額|購買金額|購買費用|買東西金額|物品金額|預估金額|店家金額/.test(source);
+
+  if (!hasAdvanceKeyword) {
+    return 0;
+  }
+
+  const moneyRegex = /(?:NT\$|N T\$|新台幣|台幣|\$)?\s*(\d{1,7})(?:\s*(?:元|塊|圓|NTD|台幣))?/gi;
+
+  let maxAmount = 0;
+  let match;
+
+  while ((match = moneyRegex.exec(source)) !== null) {
+    const amount = Math.round(Number(match[1] || 0));
+
+    if (Number.isFinite(amount) && amount > maxAmount) {
+      maxAmount = amount;
+    }
+  }
+
+  return maxAmount;
+}
+
+function getDetectedAdvancePaymentAmountFromOrderInput(data = {}) {
+  const fieldAmount = parseNonNegativeMoney(
+    data.advancePayment ??
+    data.advanceAmount ??
+    data.estimatedAdvancePayment ??
+    data.estimatedAdvanceAmount ??
+    data.riderAdvanceAmount ??
+    0
+  );
+
+  if (Number.isNaN(fieldAmount)) {
+    return NaN;
+  }
+
+  const textAmount = Math.max(
+    extractAdvancePaymentAmountFromText(data.note || ''),
+    extractAdvancePaymentAmountFromText(data.item || '')
+  );
+
+  return Math.max(fieldAmount || 0, textAmount || 0);
 }
 
 function isValidCustomerUserId(userId) {
@@ -2616,6 +2691,14 @@ function validateOrderInput(data) {
       errors.push(`${key} 欄位過長，請縮短內容。`);
     }
   });
+
+  const detectedAdvancePayment = getDetectedAdvancePaymentAmountFromOrderInput(data);
+
+  if (Number.isNaN(detectedAdvancePayment)) {
+    errors.push('代墊費用請填寫 0 或正確金額。');
+  } else if (detectedAdvancePayment >= MAX_ADVANCE_PAYMENT) {
+    errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。請改由 UBee 跑腿客服人工確認。');
+  }
 
   return errors;
 }
@@ -3463,7 +3546,7 @@ function createOrderFromApi(data) {
       : 'standard',
 
     note: rawNote,
-    advancePayment: Math.max(0, Math.round(Number(data.advancePayment || 0))),
+    advancePayment: parseNonNegativeMoney(data.advancePayment),
 
     upstairsOption: cleanText(data.upstairsOption || 'none', 30),
     upstairsLabel: cleanText(data.upstairsLabel || '', 60),
@@ -4058,7 +4141,7 @@ app.post('/api/orders', async (req, res) => {
 }    
     const id = generateOrderId();
 
-    const advancePayment = Math.max(0, Math.round(Number(data.advancePayment || 0)));
+    const advancePayment = parseNonNegativeMoney(data.advancePayment);
     const serviceSubtotal = Math.max(0, Math.round(Number(price.total || 0)));
     const customerPayableTotal = serviceSubtotal + advancePayment;
 
@@ -4199,7 +4282,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       });
     }
 
-    const advancePayment = Math.max(0, Math.round(Number(order.advancePayment || 0)));
+    const advancePayment = parseNonNegativeMoney(order.advancePayment);
 
     const serviceSubtotal = Math.max(0, Math.round(Number(
       order.serviceSubtotal ||
