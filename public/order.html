@@ -1803,7 +1803,7 @@ body.day-mode .bottom-tabs{
       <div id="buyGuide" class="quick-guide hidden">
         <div class="quick-guide-title">代買提醒</div>
         <div class="quick-guide-text">
-          請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與購買注意事項。UBee 跑腿代買服務不提供騎士代墊商品費，商品款項需由客人先完成付款，或由平台人工確認後再處理。
+          請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與購買注意事項。UBee 跑腿代買服務不提供騎士代墊商品費，商品款項需由客人先完成付款。
         </div>
       </div>
 
@@ -2224,7 +2224,7 @@ body.day-mode .bottom-tabs{
         </div>
         <div class="info-item">
           <div class="info-item-title">代買商品付款</div>
-          <div class="info-item-text">目前 UBee 跑腿不提供騎士代墊商品費。若代買任務涉及商品款項，需由客人先完成付款，或由平台人工確認後再處理。</div>
+          <div class="info-item-text">目前 UBee 跑腿不提供騎士代墊商品費。若代買任務涉及商品款項，需由客人先完成付款。</div>
         </div>
       </div>
     </section>
@@ -2495,7 +2495,7 @@ const db = window.firebase ? firebase.firestore() : null;
 const serviceDescriptions = {
   send:'需要配送文件、包裹、鑰匙或店家商品時，選擇幫我送，UBee 跑腿會依照取件與送達資訊建立任務。',
   pickup:'需要代取包裹、文件、門市商品或生活用品時，選擇幫我取，請填寫取件地點與交付地點。',
-  buy:'需要代買餐點、飲料、超商商品、藥局用品或生活用品時，選擇幫代買，請填寫品項、規格與購買注意事項。目前正式營運版不提供騎士代墊商品費。',
+  buy:'需要代買餐點、飲料、超商商品、藥局用品或生活用品時，選擇幫代買，請填寫品項、規格與購買注意事項。目前不提供騎士代墊商品費。',
   queue:'需要餐廳候位、醫院掛號、銀行辦理或活動排隊時，選擇幫排隊，請填寫排隊位置與預估等候時間。',
   helper:'找不到適合分類時，可以選擇全能跑腿，請清楚描述任務內容、完成標準與注意事項。',
   urgent:'需要較快處理的小包裹、餐點、店家商品或生活用品配送時，選擇急件專送，系統會以高急迫性任務處理。'
@@ -2653,7 +2653,7 @@ function validateAdvancePaymentLimit(){
   }
 
   if(amount >= MAX_ADVANCE_PAYMENT){
-    alert('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。為保障客人與騎士安全，請改由 UBee 跑腿客服人工確認，系統暫不開放繼續下單。');
+    alert('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。為保障客人與騎士安全系統暫不開放繼續下單。');
     return false;
   }
 
