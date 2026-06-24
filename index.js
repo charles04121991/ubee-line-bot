@@ -2697,7 +2697,7 @@ function validateOrderInput(data) {
   if (Number.isNaN(detectedAdvancePayment)) {
     errors.push('代墊費用請填寫 0 或正確金額。');
   } else if (detectedAdvancePayment >= MAX_ADVANCE_PAYMENT) {
-    errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。請改由 UBee 跑腿客服人工確認。');
+    errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。');
   }
 
   return errors;
