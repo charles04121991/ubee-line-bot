@@ -96,7 +96,7 @@ async function sendNewOrderPushToRiders(order) {
       await client.pushMessage("Cdc5a9583fb1364402c2a3e4e5edb4c1b", {
         type: "text",
         text:
-`🔔 UBee 新任務通知
+`🔔 UBee 跑腿新任務通知
 
 有新的跑腿任務等待接單
 
@@ -1791,8 +1791,8 @@ if (riderLineUserId && !existingRider.empty) {
   alreadyExists: true,
   message:
     riderData.status === 'approved'
-      ? '你已通過 UBee 騎士審核。'
-      : '你的資料已送出，請等待 UBee 審核通過。',
+      ? '你已通過 UBee 跑腿騎士審核。'
+      : '你的資料已送出，請等待 UBee 跑腿審核通過。',
 });
 }
 
@@ -1844,17 +1844,17 @@ const rider = {
 };
     await saveRider(rider);
 
-    console.log('🟡 新騎手註冊：', rider);
+    console.log('🟡 新騎士註冊：', rider);
 
     await pushToGroup(LINE_ADMIN_GROUP_ID, createRiderReviewFlex(rider));
 
         res.json({
       success: true,
       riderId,
-      message: '已送出申請，等待 UBee 審核。',
+      message: '已送出申請，等待 UBee 跑腿審核。',
     });
   } catch (err) {
-    console.error('❌ 騎手註冊失敗：', err);
+    console.error('❌ 騎士註冊失敗：', err);
 
     res.status(500).json({
       success: false,
@@ -1896,7 +1896,7 @@ app.post('/api/rider/status', async (req, res) => {
 if (!riderOk) {
   return res.status(403).json({
     success: false,
-    message: '騎手尚未審核通過，無法上線。',
+    message: '騎士尚未審核通過，無法上線。',
   });
 }
 
@@ -1932,7 +1932,7 @@ if (!online) {
     });
 
   } catch (err) {
-    console.error('❌ 騎手狀態更新失敗：', err);
+    console.error('❌ 騎士狀態更新失敗：', err);
 
     return res.status(500).json({
       success: false,
@@ -1976,7 +1976,7 @@ app.post('/api/business/register', async (req, res) => {
     if (!companyName || !contactName || !phone || !district || !needType || !frequency || !deliveryArea) {
       return res.status(400).json({
         success: false,
-        message: '資料不完整，請確認公司名稱、聯絡人、手機、所在區域與需求資料都有填寫。',
+        message: '資料不完整，請確認公司名稱、聯絡人、手機、所在區域與需求資料都有填寫正確。',
       });
     }
 
@@ -2069,7 +2069,7 @@ app.post('/api/business/register', async (req, res) => {
     return res.json({
       success: true,
       businessId,
-      message: '合作需求已送出，UBee 將會進行審核與評估。',
+      message: '合作需求已送出，UBee 跑腿將會進行審核與評估。',
     });
 
   } catch (err) {
@@ -2152,7 +2152,7 @@ app.post('/api/merchant/register', async (req, res) => {
 
     return res.json({
       ok: true,
-      message: '合作申請已送出，請等待 UBee 審核',
+      message: '合作申請已送出，請等待 UBee 跑腿管理端進行審核',
       merchantId: merchantRef.id,
     });
   } catch (err) {
@@ -2275,7 +2275,7 @@ app.post('/api/merchant/bind', async (req, res) => {
     if (merchant.lineUserId && merchant.lineUserId !== cleanLineUserId) {
       return res.status(409).json({
         ok: false,
-        message: '此店家帳號已完成綁定，如需更換管理者，請聯繫 UBee 客服',
+        message: '此店家帳號已完成綁定，如需更換管理者，請聯繫 UBee 跑腿客服',
       });
     }
 
@@ -2320,7 +2320,7 @@ const PRICING = {
 
 const SPEED_OPTIONS = {
   // 必須與 order.html 的 getSpeedServiceFee() 保持一致
-  standard: { label: '一般件', time: '60–90 分鐘', fee: 0, riderText: '一般任務' },
+  standard: { label: '一般件', time: '60–90 分鐘', fee: 15, riderText: '一般任務' },
   priority: { label: '標準件', time: '45–60 分鐘', fee: 20, riderText: '標準任務' },
   express: { label: '優先件', time: '30–45 分鐘', fee: 40, riderText: '優先任務' },
 };
@@ -2706,7 +2706,7 @@ async function requireApprovedRider(event) {
   if (!approved) {
     await replyText(
       event.replyToken,
-      '你尚未通過 UBee 騎士審核，暫時無法接單。\n\n請先完成審核流程後，再開始接收任務。'
+      '你尚未通過 UBee 跑腿騎士審核，暫時無法接單。\n\n請先完成審核流程後，再開始接收任務。'
     );
     return false;
   }
@@ -2826,9 +2826,9 @@ async function forceCancelOrder(order, userId, reason = 'admin_force_cancel') {
 async function notifyForceCancel(order) {
   await notifyCustomer(order, createTextMessage(
     `⚠️ UBee 訂單通知\n\n` +
-    `你的訂單已由 UBee 客服取消。\n\n` +
+    `你的訂單已由 UBee 跑腿客服取消。\n\n` +
     `訂單編號：${order.id}\n` +
-    `如有付款或退款問題，請聯繫 UBee 客服。`
+    `如有付款或退款問題，請聯繫 UBee 跑腿客服。`
   ));
 }
 
@@ -3058,8 +3058,8 @@ function recalculateOrderFinancials(order) {
 }
 
 function createMainMenuFlex() {
-  return createFlexMessage('UBee 主選單', createBubble(
-    'UBee 主選單',
+  return createFlexMessage('UBee 跑腿主選單', createBubble(
+    'UBee 跑腿主選單',
     [{ type: 'text', text: '請選擇你要使用的功能。', size: 'sm', color: '#666666', wrap: true }],
     [
       createUriButton('立即下單', getPublicUrl('order.html'), 'primary'),
@@ -4183,7 +4183,7 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
     if (!['jko', 'cash'].includes(normalizedPaymentMethod)) {
       return res.status(400).json({
         success: false,
-        error: 'UBee 正式營運版目前僅支援街口支付與現金單。',
+        error: 'UBee 跑腿目前僅支援街口支付與現金單。',
       });
     }
 
@@ -4625,7 +4625,7 @@ acceptedOrder = {
     await notifyCustomer(
       acceptedOrder,
       createTextMessage(
-        `🟢 UBee 騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快前往取件。`
+        `🟢 UBee 跑腿騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快前往取件。`
       )
     );
 
@@ -4972,7 +4972,7 @@ const updateData = {
   await notifyCustomer(
     updatedOrder,
     createTextMessage(
-      `UBee 任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
+      `UBee 跑腿任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
     )
   );
 } catch (notifyErr) {
@@ -5133,20 +5133,20 @@ if (data.startsWith('business_approve:')) {
     await client.pushMessage(business.lineUserId, {
       type: 'text',
       text:
-`🎉 您的 UBee 商務合作申請已通過初步審核
+`🎉 您的 UBee 跑腿商務合作申請已通過初步審核
 
 公司 / 店家：${business.companyName}
 
-請先加入 UBee 店家官方帳號：
+請先加入 UBee 跑腿店家官方帳號：
 ${MERCHANT_OA_LINK}
 
 加入後請傳送：
 我是店家｜${business.companyName}
 
-UBee 辦公室將會再依照您的需求，
+UBee 跑腿辦公室將會再依照您的需求，
 主動與您聯繫並安排後續合作內容。
 
-感謝您使用 UBee 城市任務平台 🐝`
+感謝您使用 UBee 跑腿 🐝`
     });
   } else {
     console.log(`⚠️ 商務合作申請 ${businessId} 沒有 lineUserId，無法通知客人`);
@@ -5184,8 +5184,8 @@ UBee 辦公室將會再依照您的需求，
       await client.pushMessage(rider.lineUserId, {
         type: 'text',
         text:
-          `🎉 恭喜您通過 UBee 騎士審核！\n\n` +
-          `歡迎加入 UBee 城市任務平台 🐝\n\n` +
+          `🎉 恭喜您通過 UBee 跑腿騎士審核！\n\n` +
+          `歡迎加入 UBee 跑腿 🐝\n\n` +
           `接下來請先加入「UBee｜騎士 SOP 教學區」：\n\n` +
           `${RIDER_SOP_GROUP_LINK}\n\n` +
           `加入後請先閱讀記事本上內容：\n\n` +
@@ -5238,7 +5238,7 @@ UBee 辦公室將會再依照您的需求，
       event,
       orderId,
       'admin_force_cancel_button',
-      '強制取消只能在 UBee 辦公室審核群組操作。'
+      '強制取消只能在 UBee 跑腿辦公室審核群組操作。'
     );
   }
 
@@ -5393,7 +5393,7 @@ UBee 辦公室將會再依照您的需求，
 
     await notifyCustomer(
       order,
-      createTextMessage(`🔵 UBee 騎士已完成取件\n\n訂單編號：${order.id}\n正在前往送達地點。`)
+      createTextMessage(`🔵 UBee 跑腿騎士已完成取件\n\n訂單編號：${order.id}\n正在前往送達地點。`)
     );
 
     return replyMessages(event.replyToken, [
@@ -5422,7 +5422,7 @@ UBee 辦公室將會再依照您的需求，
 
     await notifyCustomer(
       order,
-      createTextMessage(`🟣 UBee 騎士已抵達送達地點\n\n訂單編號：${order.id}`)
+      createTextMessage(`🟣 UBee 跑腿騎士已抵達送達地點\n\n訂單編號：${order.id}`)
     );
 
     return replyMessages(event.replyToken, [
@@ -5454,7 +5454,7 @@ UBee 辦公室將會再依照您的需求，
 
     await notifyCustomer(
       order,
-      createTextMessage(`✅ UBee 任務已完成\n\n訂單編號：${order.id}\n感謝你使用 UBee 城市任務服務。`)
+      createTextMessage(`✅ UBee 跑腿任務已完成\n\n訂單編號：${order.id}\n感謝你使用 UBee 跑腿。`)
     );
     
     const riderSnap = await db.collection('riders')
@@ -5573,10 +5573,10 @@ async function handleTextStep(event, userId, text) {
     return replyMessages(event.replyToken, [
       {
         type: 'template',
-        altText: 'UBee 快速估價',
+        altText: 'UBee 跑腿快速估價',
         template: {
           type: 'buttons',
-          title: 'UBee 快速估價',
+          title: 'UBee 跑腿快速估價',
           text: '想先知道跑腿大約多少錢？點選下方按鈕，選擇服務項目與任務地點，系統會協助試算費用。',
           actions: [
             {
@@ -5594,11 +5594,11 @@ async function handleTextStep(event, userId, text) {
   return replyMessages(event.replyToken, [
     {
       type: 'template',
-      altText: 'UBee 服務範圍',
+      altText: 'UBee 跑腿服務範圍',
       template: {
         type: 'buttons',
-        title: 'UBee 服務範圍',
-        text: '查看 UBee 目前主要服務區域、可承接任務類型與下單前注意事項。',
+        title: 'UBee 跑腿服務服務範圍',
+        text: '查看 UBee 跑腿目前主要服務區域、可承接任務類型與下單前注意事項。',
         actions: [
           {
             type: 'uri',
@@ -5661,7 +5661,7 @@ async function handleEvent(event) {
   try {
     if (event.type === 'follow') {
       return replyMessages(event.replyToken, [
-  createTextMessage('歡迎使用 UBee｜城市任務服務 🐝'),
+  createTextMessage('歡迎使用 UBee 跑腿 🐝'),
 ]);
     }
 
