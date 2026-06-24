@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>UBee 快速估價</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(255, 193, 7, 0.18), transparent 36%),
+        linear-gradient(180deg, #fffaf0 0%, #f8fafc 48%, #ffffff 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      color: #111827;
+    }
+
+    .page {
+      width: min(100%, 520px);
+      margin: 0 auto;
+      padding: 18px 16px 32px;
+    }
+
+    .hero {
+      background: #111827;
+      color: #ffffff;
+      border-radius: 28px;
+      padding: 24px 22px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -46px;
+      top: -46px;
+      width: 150px;
+      height: 150px;
+      border-radius: 999px;
+      background: rgba(250, 204, 21, 0.22);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(250, 204, 21, 0.16);
+      color: #fde68a;
+      border: 1px solid rgba(250, 204, 21, 0.26);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.18;
+      letter-spacing: -0.5px;
+      font-weight: 950;
+    }
+
+    .hero p {
+      margin: 12px 0 0;
+      color: #d1d5db;
+      font-size: 15px;
+      line-height: 1.7;
+      font-weight: 650;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #eef2f7;
+      border-radius: 26px;
+      padding: 20px;
+      margin-top: 16px;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+    }
+
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 950;
+      color: #111827;
+    }
+
+    .service-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .service-btn,
+    .speed-btn {
+      border: 1.5px solid #e5e7eb;
+      background: #ffffff;
+      color: #111827;
+      border-radius: 16px;
+      min-height: 54px;
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 15px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: 0.16s ease;
+    }
+
+    .service-btn span,
+    .speed-btn span {
+      display: block;
+      margin-top: 4px;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .service-btn.active,
+    .speed-btn.active {
+      border-color: #f5b301;
+      background: #fff8df;
+      box-shadow: 0 8px 22px rgba(245, 179, 1, 0.16);
+    }
+
+    .field {
+      margin-top: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 900;
+      color: #374151;
+    }
+
+    input {
+      width: 100%;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 16px;
+      height: 54px;
+      padding: 0 15px;
+      font-size: 16px;
+      font-weight: 700;
+      outline: none;
+      background: #ffffff;
+      color: #111827;
+    }
+
+    input:focus {
+      border-color: #f5b301;
+      box-shadow: 0 0 0 4px rgba(245, 179, 1, 0.13);
+    }
+
+    .speed-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .primary-btn {
+      width: 100%;
+      height: 58px;
+      border: 0;
+      border-radius: 18px;
+      background: #f5b301;
+      color: #111827;
+      font-size: 17px;
+      font-weight: 950;
+      margin-top: 18px;
+      cursor: pointer;
+      box-shadow: 0 12px 26px rgba(245, 179, 1, 0.28);
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .secondary-btn {
+      width: 100%;
+      height: 54px;
+      border: 1.5px solid #111827;
+      border-radius: 18px;
+      background: #111827;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 950;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    .ghost-btn {
+      width: 100%;
+      height: 50px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      color: #374151;
+      font-size: 15px;
+      font-weight: 900;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    .result {
+      display: none;
+      margin-top: 16px;
+      background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
+      color: #ffffff;
+      border-radius: 26px;
+      padding: 20px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+    }
+
+    .result.show {
+      display: block;
+    }
+
+    .result-label {
+      color: #fde68a;
+      font-size: 13px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .price {
+      font-size: 44px;
+      line-height: 1;
+      font-weight: 950;
+      letter-spacing: -1px;
+      margin: 0 0 14px;
+    }
+
+    .rows {
+      display: grid;
+      gap: 9px;
+      margin-top: 12px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #e5e7eb;
+      font-size: 14px;
+      font-weight: 750;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 9px;
+    }
+
+    .row strong {
+      color: #ffffff;
+      text-align: right;
+    }
+
+    .notice {
+      margin-top: 14px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      border-radius: 18px;
+      padding: 13px 14px;
+      font-size: 13px;
+      line-height: 1.65;
+      font-weight: 760;
+    }
+
+    .error {
+      display: none;
+      margin-top: 14px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      border-radius: 16px;
+      padding: 13px 14px;
+      font-size: 14px;
+      font-weight: 850;
+      line-height: 1.5;
+    }
+
+    .error.show {
+      display: block;
+    }
+
+    .footer-note {
+      margin: 18px 6px 0;
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="badge">🐝 UBee 跑腿平台</div>
+      <h1>快速估價</h1>
+      <p>
+        先輸入取件與送達地點，系統會協助試算跑腿費用。
+        此頁只做費用估算，不會建立訂單。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">1. 選擇服務類型</h2>
+
+      <div class="service-grid" id="serviceGrid">
+        <button class="service-btn active" type="button" data-service="幫我送">
+          幫我送
+          <span>文件、物品、包裹</span>
+        </button>
+
+        <button class="service-btn" type="button" data-service="幫代買">
+          幫代買
+          <span>餐點、飲料、日用品</span>
+        </button>
+
+        <button class="service-btn" type="button" data-service="幫我取">
+          幫我取
+          <span>取貨、取件、取物</span>
+        </button>
+
+        <button class="service-btn" type="button" data-service="幫排隊">
+          幫排隊
+          <span>現場排隊服務</span>
+        </button>
+
+        <button class="service-btn" type="button" data-service="全能跑腿">
+          全能跑腿
+          <span>臨時任務協助</span>
+        </button>
+
+        <button class="service-btn" type="button" data-service="急件專送">
+          急件專送
+          <span>高急迫性任務</span>
+        </button>
+      </div>
+
+      <div class="field">
+        <label for="fromInput">2. 取件地點</label>
+        <input id="fromInput" type="text" placeholder="例如：豐原火車站" autocomplete="street-address" />
+      </div>
+
+      <div class="field">
+        <label for="toInput">3. 送達地點</label>
+        <input id="toInput" type="text" placeholder="例如：潭子車站" autocomplete="street-address" />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">4. 選擇配送速度</h2>
+
+      <div class="speed-grid" id="speedGrid">
+        <button class="speed-btn active" type="button" data-speed="standard">
+          一般件
+          <span>60–90 分鐘｜不加價</span>
+        </button>
+
+        <button class="speed-btn" type="button" data-speed="priority">
+          標準件
+          <span>45–60 分鐘｜加價 $20</span>
+        </button>
+
+        <button class="speed-btn" type="button" data-speed="express">
+          優先件
+          <span>30–45 分鐘｜加價 $40</span>
+        </button>
+      </div>
+
+      <button id="quoteButton" class="primary-btn" type="button">
+        開始快速估價
+      </button>
+
+      <div id="errorBox" class="error"></div>
+    </section>
+
+    <section id="resultBox" class="result">
+      <div class="result-label">預估費用</div>
+      <p class="price" id="totalPrice">$0</p>
+
+      <div class="rows">
+        <div class="row">
+          <span>服務類型</span>
+          <strong id="serviceText">幫我送</strong>
+        </div>
+
+        <div class="row">
+          <span>配送速度</span>
+          <strong id="speedText">一般件</strong>
+        </div>
+
+        <div class="row">
+          <span>預估距離</span>
+          <strong id="distanceText">-</strong>
+        </div>
+
+        <div class="row">
+          <span>預估車程</span>
+          <strong id="durationText">-</strong>
+        </div>
+
+        <div class="row">
+          <span>配送費</span>
+          <strong id="deliveryFeeText">$0</strong>
+        </div>
+
+        <div class="row">
+          <span>平台服務費</span>
+          <strong id="serviceFeeText">$0</strong>
+        </div>
+
+        <div class="row">
+          <span>速度費</span>
+          <strong id="speedFeeText">$0</strong>
+        </div>
+      </div>
+
+      <div class="notice">
+        此金額為系統初步估算。實際費用仍可能依任務內容、等候時間、代墊金額、地址完整度與現場狀況調整。
+      </div>
+
+      <button id="orderButton" class="secondary-btn" type="button">
+        我要正式下單
+      </button>
+
+      <button id="resetButton" class="ghost-btn" type="button">
+        重新估價
+      </button>
+    </section>
+
+    <p class="footer-note">
+      UBee 快速估價僅供參考，不會自動建立任務、不會通知騎士、不會進入付款流程。
+    </p>
+  </main>
+
+  <script>
+    const ORDER_LIFF_URL = 'https://liff.line.me/2009895876-eDSfemYo';
+
+    const serviceButtons = document.querySelectorAll('.service-btn');
+    const speedButtons = document.querySelectorAll('.speed-btn');
+
+    const fromInput = document.getElementById('fromInput');
+    const toInput = document.getElementById('toInput');
+    const quoteButton = document.getElementById('quoteButton');
+    const orderButton = document.getElementById('orderButton');
+    const resetButton = document.getElementById('resetButton');
+
+    const resultBox = document.getElementById('resultBox');
+    const errorBox = document.getElementById('errorBox');
+
+    const totalPrice = document.getElementById('totalPrice');
+    const serviceText = document.getElementById('serviceText');
+    const speedText = document.getElementById('speedText');
+    const distanceText = document.getElementById('distanceText');
+    const durationText = document.getElementById('durationText');
+    const deliveryFeeText = document.getElementById('deliveryFeeText');
+    const serviceFeeText = document.getElementById('serviceFeeText');
+    const speedFeeText = document.getElementById('speedFeeText');
+
+    let selectedService = '幫我送';
+    let selectedSpeed = 'standard';
+
+    function money(value) {
+      const number = Number(value || 0);
+      return '$' + Math.round(number).toLocaleString('zh-TW');
+    }
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.classList.add('show');
+    }
+
+    function clearError() {
+      errorBox.textContent = '';
+      errorBox.classList.remove('show');
+    }
+
+    function setLoading(isLoading) {
+      quoteButton.disabled = isLoading;
+      quoteButton.textContent = isLoading ? '估價中，請稍候...' : '開始快速估價';
+    }
+
+    serviceButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        serviceButtons.forEach((btn) => btn.classList.remove('active'));
+        button.classList.add('active');
+        selectedService = button.dataset.service || '幫我送';
+      });
+    });
+
+    speedButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        speedButtons.forEach((btn) => btn.classList.remove('active'));
+        button.classList.add('active');
+        selectedSpeed = button.dataset.speed || 'standard';
+      });
+    });
+
+    quoteButton.addEventListener('click', async () => {
+      clearError();
+
+      const from = fromInput.value.trim();
+      const to = toInput.value.trim();
+
+      if (!from) {
+        showError('請先輸入取件地點。');
+        fromInput.focus();
+        return;
+      }
+
+      if (!to) {
+        showError('請先輸入送達地點。');
+        toInput.focus();
+        return;
+      }
+
+      if (from === to) {
+        showError('取件地點與送達地點不能相同。');
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const params = new URLSearchParams({
+          from,
+          to,
+          speedType: selectedSpeed,
+        });
+
+        const response = await fetch('/api/quote?' + params.toString(), {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || '估價失敗，請確認地址是否完整。');
+        }
+
+        totalPrice.textContent = money(data.total);
+        serviceText.textContent = selectedService;
+        speedText.textContent = data.speedLabel || getSpeedLabel(selectedSpeed);
+        distanceText.textContent = data.distanceText || '-';
+        durationText.textContent = data.durationText || '-';
+        deliveryFeeText.textContent = money(data.deliveryFee);
+        serviceFeeText.textContent = money(data.serviceFee);
+        speedFeeText.textContent = money(data.speedFee);
+
+        resultBox.classList.add('show');
+
+        setTimeout(() => {
+          resultBox.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }, 80);
+      } catch (error) {
+        showError(error.message || '估價失敗，請稍後再試。');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    orderButton.addEventListener('click', () => {
+      window.location.href = ORDER_LIFF_URL;
+    });
+
+    resetButton.addEventListener('click', () => {
+      resultBox.classList.remove('show');
+      clearError();
+
+      setTimeout(() => {
+        fromInput.focus();
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth',
+        });
+      }, 80);
+    });
+
+    function getSpeedLabel(speed) {
+      if (speed === 'priority') return '標準件';
+      if (speed === 'express') return '優先件';
+      return '一般件';
+    }
+  </script>
+</body>
+</html>
