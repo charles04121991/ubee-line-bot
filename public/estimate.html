@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>UBee 快速估價</title>
+  <title>UBee 跑腿快速估價</title>
 
   <style>
     * {
@@ -135,6 +135,10 @@
       margin-top: 14px;
     }
 
+    .field.hidden {
+      display: none;
+    }
+
     label {
       display: block;
       margin-bottom: 8px;
@@ -143,22 +147,60 @@
       color: #374151;
     }
 
-    input {
+    input,
+    textarea {
       width: 100%;
       border: 1.5px solid #e5e7eb;
       border-radius: 16px;
-      height: 54px;
       padding: 0 15px;
       font-size: 16px;
       font-weight: 700;
       outline: none;
       background: #ffffff;
       color: #111827;
+      font-family: inherit;
     }
 
-    input:focus {
+    input {
+      height: 54px;
+    }
+
+    textarea {
+      min-height: 96px;
+      padding-top: 14px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+
+    input:focus,
+    textarea:focus {
       border-color: #f5b301;
       box-shadow: 0 0 0 4px rgba(245, 179, 1, 0.13);
+    }
+
+    .hint {
+      margin-top: 7px;
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.55;
+      font-weight: 700;
+    }
+
+    .service-notice {
+      display: none;
+      margin-top: 14px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      border-radius: 16px;
+      padding: 13px 14px;
+      font-size: 13px;
+      line-height: 1.65;
+      font-weight: 800;
+    }
+
+    .service-notice.show {
+      display: block;
     }
 
     .speed-grid {
@@ -259,6 +301,10 @@
       padding-top: 9px;
     }
 
+    .row.hidden {
+      display: none;
+    }
+
     .row strong {
       color: #ffffff;
       text-align: right;
@@ -310,7 +356,7 @@
       <div class="badge">🐝 UBee 跑腿平台</div>
       <h1>快速估價</h1>
       <p>
-        先輸入取件與送達地點，系統會協助試算跑腿費用。
+        先選擇服務類型，再輸入任務地點，系統會協助試算費用。
         此頁只做費用估算，不會建立訂單。
       </p>
     </section>
@@ -350,14 +396,50 @@
         </button>
       </div>
 
-      <div class="field">
-        <label for="fromInput">2. 取件地點</label>
+      <div id="serviceNotice" class="service-notice"></div>
+
+      <div class="field" id="fromField">
+        <label id="fromLabel" for="fromInput">2. 取件地點</label>
         <input id="fromInput" type="text" placeholder="例如：豐原火車站" autocomplete="street-address" />
+        <div id="fromHint" class="hint">請輸入完整地點或店家名稱，估價會更準確。</div>
       </div>
 
-      <div class="field">
-        <label for="toInput">3. 送達地點</label>
+      <div class="field" id="toField">
+        <label id="toLabel" for="toInput">3. 送達地點</label>
         <input id="toInput" type="text" placeholder="例如：潭子車站" autocomplete="street-address" />
+        <div id="toHint" class="hint">請輸入完整送達地址或明確地標。</div>
+      </div>
+
+      <div class="field hidden" id="advanceField">
+        <label id="advanceLabel" for="advanceInput">預估代墊費用</label>
+        <input id="advanceInput" type="number" inputmode="numeric" min="0" step="1" placeholder="例如：250" />
+        <div id="advanceHint" class="hint">
+          代墊費用會加到客人預估應付總額，但不列入跑腿服務費。
+        </div>
+      </div>
+
+      <div class="field hidden" id="queueField">
+        <label for="queueMinutesInput">預估排隊時間</label>
+        <input id="queueMinutesInput" type="number" inputmode="numeric" min="10" max="240" step="5" value="30" />
+        <div class="hint">
+          請輸入預估排隊分鐘數。排隊費用會依時間估算。
+        </div>
+      </div>
+
+      <div class="field hidden" id="taskMinutesField">
+        <label for="taskMinutesInput">預估任務處理時間</label>
+        <input id="taskMinutesInput" type="number" inputmode="numeric" min="10" max="240" step="5" value="30" />
+        <div class="hint">
+          全能跑腿會依任務處理時間、是否需要送達、代墊費用等條件估算。
+        </div>
+      </div>
+
+      <div class="field hidden" id="taskNoteField">
+        <label for="taskNoteInput">任務內容簡述</label>
+        <textarea id="taskNoteInput" placeholder="例如：到現場協助詢問、購買指定物品、臨時處理生活任務等。"></textarea>
+        <div class="hint">
+          此欄位只協助估價判斷，正式下單時仍需填寫完整任務內容。
+        </div>
       </div>
     </section>
 
@@ -389,7 +471,7 @@
     </section>
 
     <section id="resultBox" class="result">
-      <div class="result-label">預估費用</div>
+      <div class="result-label">預估應付總額</div>
       <p class="price" id="totalPrice">$0</p>
 
       <div class="rows">
@@ -404,13 +486,18 @@
         </div>
 
         <div class="row">
-          <span>預估距離</span>
+          <span id="distanceRowLabel">預估距離</span>
           <strong id="distanceText">-</strong>
         </div>
 
         <div class="row">
-          <span>預估車程</span>
+          <span id="durationRowLabel">預估車程</span>
           <strong id="durationText">-</strong>
+        </div>
+
+        <div class="row">
+          <span>跑腿服務費小計</span>
+          <strong id="serviceSubtotalText">$0</strong>
         </div>
 
         <div class="row">
@@ -427,9 +514,29 @@
           <span>速度費</span>
           <strong id="speedFeeText">$0</strong>
         </div>
+
+        <div class="row hidden" id="waitingFeeRow">
+          <span>排隊／等待費</span>
+          <strong id="waitingFeeText">$0</strong>
+        </div>
+
+        <div class="row hidden" id="taskHandlingFeeRow">
+          <span>任務處理費</span>
+          <strong id="taskHandlingFeeText">$0</strong>
+        </div>
+
+        <div class="row hidden" id="advancePaymentRow">
+          <span>預估代墊費用</span>
+          <strong id="advancePaymentText">$0</strong>
+        </div>
+
+        <div class="row">
+          <span>客人預估應付總額</span>
+          <strong id="customerTotalText">$0</strong>
+        </div>
       </div>
 
-      <div class="notice">
+      <div class="notice" id="resultNotice">
         此金額為系統初步估算。實際費用仍可能依任務內容、等候時間、代墊金額、地址完整度與現場狀況調整。
       </div>
 
@@ -443,18 +550,155 @@
     </section>
 
     <p class="footer-note">
-      UBee 快速估價僅供參考，不會自動建立任務、不會通知騎士、不會進入付款流程。
+      UBee 跑腿快速估價僅供參考，不會自動建立任務、不會通知騎士、不會進入付款流程。
     </p>
   </main>
 
   <script>
     const ORDER_LIFF_URL = 'https://liff.line.me/2009895876-eDSfemYo';
 
+    const SERVICE_CONFIG = {
+      '幫我送': {
+        mode: 'normal',
+        fromLabel: '2. 取件地點',
+        fromPlaceholder: '例如：豐原火車站、店家名稱、取件地址',
+        fromHint: '請輸入完整取件地點，估價會更準確。',
+        toLabel: '3. 送達地點',
+        toPlaceholder: '例如：潭子車站、收件地址、指定地點',
+        toHint: '請輸入完整送達地址或明確地標。',
+        toRequired: true,
+        hideTo: false,
+        showAdvance: false,
+        showQueue: false,
+        showTaskMinutes: false,
+        showTaskNote: false,
+        notice: '',
+      },
+
+      '幫代買': {
+        mode: 'normal',
+        fromLabel: '2. 購買地點',
+        fromPlaceholder: '例如：某某早餐店、超商、飲料店、商店地址',
+        fromHint: '請輸入要購買的店家或地點。',
+        toLabel: '3. 送達地點',
+        toPlaceholder: '例如：公司、住家、指定送達地址',
+        toHint: '請輸入購買後要送達的地點。',
+        toRequired: true,
+        hideTo: false,
+        showAdvance: true,
+        advanceLabel: '預估代墊費用',
+        advancePlaceholder: '例如：250',
+        advanceHint: '請輸入預估商品金額。系統會把代墊費用加到客人預估應付總額。',
+        showQueue: false,
+        showTaskMinutes: false,
+        showTaskNote: false,
+        notice: '幫代買會另外估算預估代墊費用。代墊金額越高，正式下單時可能需要先付款或由客服確認。',
+      },
+
+      '幫我取': {
+        mode: 'normal',
+        fromLabel: '2. 取件地點',
+        fromPlaceholder: '例如：店家、超商、門市、取貨地點',
+        fromHint: '請輸入要前往取件的地點。',
+        toLabel: '3. 送達地點',
+        toPlaceholder: '例如：公司、住家、指定送達地址',
+        toHint: '請輸入取件後要送達的地點。',
+        toRequired: true,
+        hideTo: false,
+        showAdvance: true,
+        advanceLabel: '預估代墊費用',
+        advancePlaceholder: '例如：100',
+        advanceHint: '若取件時可能需要代付費用，請先填入預估金額；沒有代墊可留空。',
+        showQueue: false,
+        showTaskMinutes: false,
+        showTaskNote: false,
+        notice: '幫我取若涉及現場付款、補差額、代付費用，會把代墊金額加到預估應付總額。',
+      },
+
+      '幫排隊': {
+        mode: 'queue',
+        fromLabel: '2. 排隊地點',
+        fromPlaceholder: '例如：某某店家、活動現場、門市地址',
+        fromHint: '請輸入需要排隊的地點。',
+        toLabel: '',
+        toPlaceholder: '',
+        toHint: '',
+        toRequired: false,
+        hideTo: true,
+        showAdvance: false,
+        showQueue: true,
+        showTaskMinutes: false,
+        showTaskNote: false,
+        notice: '幫排隊改用「排隊地點＋預估排隊時間」估價，不用填送達地點。實際費用仍會依現場等待時間調整。',
+      },
+
+      '全能跑腿': {
+        mode: 'custom',
+        fromLabel: '2. 任務地點',
+        fromPlaceholder: '例如：需要協助處理任務的地點',
+        fromHint: '請輸入主要任務地點。',
+        toLabel: '3. 送達地點（選填）',
+        toPlaceholder: '若任務完成後需要送達，請填寫送達地點；沒有可留空',
+        toHint: '全能跑腿可只有單點任務，也可以包含送達地點。',
+        toRequired: false,
+        hideTo: false,
+        showAdvance: true,
+        advanceLabel: '預估代墊費用（選填）',
+        advancePlaceholder: '例如：300',
+        advanceHint: '若全能跑腿需要購買、代付或現場付款，請填入預估代墊金額。',
+        showQueue: false,
+        showTaskMinutes: true,
+        showTaskNote: true,
+        notice: '全能跑腿屬於特殊任務，系統會依任務地點、是否需要送達、預估處理時間與代墊費用試算。正式金額仍可能由客服確認。',
+      },
+
+      '急件專送': {
+        mode: 'normal',
+        fromLabel: '2. 取件地點',
+        fromPlaceholder: '例如：文件、物品、急件取件地址',
+        fromHint: '請輸入急件取件地點。',
+        toLabel: '3. 送達地點',
+        toPlaceholder: '例如：急件送達地址',
+        toHint: '請輸入急件送達地點。',
+        toRequired: true,
+        hideTo: false,
+        showAdvance: false,
+        showQueue: false,
+        showTaskMinutes: false,
+        showTaskNote: false,
+        notice: '急件專送適合高急迫性任務，實際媒合速度仍會依騎士位置與現場狀況而定。',
+      },
+    };
+
     const serviceButtons = document.querySelectorAll('.service-btn');
     const speedButtons = document.querySelectorAll('.speed-btn');
 
+    const serviceNotice = document.getElementById('serviceNotice');
+
+    const fromField = document.getElementById('fromField');
+    const fromLabel = document.getElementById('fromLabel');
     const fromInput = document.getElementById('fromInput');
+    const fromHint = document.getElementById('fromHint');
+
+    const toField = document.getElementById('toField');
+    const toLabel = document.getElementById('toLabel');
     const toInput = document.getElementById('toInput');
+    const toHint = document.getElementById('toHint');
+
+    const advanceField = document.getElementById('advanceField');
+    const advanceLabel = document.getElementById('advanceLabel');
+    const advanceInput = document.getElementById('advanceInput');
+    const advanceHint = document.getElementById('advanceHint');
+
+    const queueField = document.getElementById('queueField');
+    const queueMinutesInput = document.getElementById('queueMinutesInput');
+
+    const taskMinutesField = document.getElementById('taskMinutesField');
+    const taskMinutesInput = document.getElementById('taskMinutesInput');
+
+    const taskNoteField = document.getElementById('taskNoteField');
+    const taskNoteInput = document.getElementById('taskNoteInput');
+
     const quoteButton = document.getElementById('quoteButton');
     const orderButton = document.getElementById('orderButton');
     const resetButton = document.getElementById('resetButton');
@@ -465,18 +709,46 @@
     const totalPrice = document.getElementById('totalPrice');
     const serviceText = document.getElementById('serviceText');
     const speedText = document.getElementById('speedText');
+
+    const distanceRowLabel = document.getElementById('distanceRowLabel');
     const distanceText = document.getElementById('distanceText');
+
+    const durationRowLabel = document.getElementById('durationRowLabel');
     const durationText = document.getElementById('durationText');
+
+    const serviceSubtotalText = document.getElementById('serviceSubtotalText');
     const deliveryFeeText = document.getElementById('deliveryFeeText');
     const serviceFeeText = document.getElementById('serviceFeeText');
     const speedFeeText = document.getElementById('speedFeeText');
 
+    const waitingFeeRow = document.getElementById('waitingFeeRow');
+    const waitingFeeText = document.getElementById('waitingFeeText');
+
+    const taskHandlingFeeRow = document.getElementById('taskHandlingFeeRow');
+    const taskHandlingFeeText = document.getElementById('taskHandlingFeeText');
+
+    const advancePaymentRow = document.getElementById('advancePaymentRow');
+    const advancePaymentText = document.getElementById('advancePaymentText');
+
+    const customerTotalText = document.getElementById('customerTotalText');
+    const resultNotice = document.getElementById('resultNotice');
+
     let selectedService = '幫我送';
     let selectedSpeed = 'standard';
+
+    function getCurrentConfig() {
+      return SERVICE_CONFIG[selectedService] || SERVICE_CONFIG['幫我送'];
+    }
 
     function money(value) {
       const number = Number(value || 0);
       return '$' + Math.round(number).toLocaleString('zh-TW');
+    }
+
+    function numberValue(input) {
+      const value = Number(String(input.value || '').replace(/[^\d.-]/g, ''));
+      if (!Number.isFinite(value)) return 0;
+      return Math.max(0, Math.round(value));
     }
 
     function showError(message) {
@@ -494,11 +766,250 @@
       quoteButton.textContent = isLoading ? '估價中，請稍候...' : '開始快速估價';
     }
 
+    function toggleField(field, shouldShow) {
+      field.classList.toggle('hidden', !shouldShow);
+    }
+
+    function hideResult() {
+      resultBox.classList.remove('show');
+    }
+
+    function updateServiceUI() {
+      const config = getCurrentConfig();
+
+      clearError();
+      hideResult();
+
+      fromLabel.textContent = config.fromLabel;
+      fromInput.placeholder = config.fromPlaceholder;
+      fromHint.textContent = config.fromHint;
+
+      toLabel.textContent = config.toLabel || '3. 送達地點';
+      toInput.placeholder = config.toPlaceholder || '';
+      toHint.textContent = config.toHint || '';
+
+      toggleField(toField, !config.hideTo);
+      toggleField(advanceField, config.showAdvance);
+      toggleField(queueField, config.showQueue);
+      toggleField(taskMinutesField, config.showTaskMinutes);
+      toggleField(taskNoteField, config.showTaskNote);
+
+      if (config.showAdvance) {
+        advanceLabel.textContent = config.advanceLabel || '預估代墊費用';
+        advanceInput.placeholder = config.advancePlaceholder || '例如：250';
+        advanceHint.textContent = config.advanceHint || '代墊費用會加到客人預估應付總額。';
+      } else {
+        advanceInput.value = '';
+      }
+
+      if (config.notice) {
+        serviceNotice.textContent = config.notice;
+        serviceNotice.classList.add('show');
+      } else {
+        serviceNotice.textContent = '';
+        serviceNotice.classList.remove('show');
+      }
+    }
+
+    function getSpeedLabel(speed) {
+      if (speed === 'priority') return '標準件';
+      if (speed === 'express') return '優先件';
+      return '一般件';
+    }
+
+    function validateForm() {
+      const config = getCurrentConfig();
+
+      const from = fromInput.value.trim();
+      const to = toInput.value.trim();
+
+      if (!from) {
+        if (config.mode === 'queue') {
+          showError('請先輸入排隊地點。');
+        } else if (config.mode === 'custom') {
+          showError('請先輸入任務地點。');
+        } else {
+          showError('請先輸入取件地點。');
+        }
+
+        fromInput.focus();
+        return false;
+      }
+
+      if (config.toRequired && !to) {
+        showError('請先輸入送達地點。');
+        toInput.focus();
+        return false;
+      }
+
+      if (!config.hideTo && to && from === to) {
+        showError('取件地點／任務地點與送達地點不能相同。');
+        toInput.focus();
+        return false;
+      }
+
+      if (config.showQueue) {
+        const queueMinutes = numberValue(queueMinutesInput);
+
+        if (queueMinutes <= 0) {
+          showError('請輸入預估排隊時間。');
+          queueMinutesInput.focus();
+          return false;
+        }
+
+        if (queueMinutes > 240) {
+          showError('排隊時間超過 240 分鐘，建議改由客服協助確認費用。');
+          queueMinutesInput.focus();
+          return false;
+        }
+      }
+
+      if (config.showTaskMinutes) {
+        const taskMinutes = numberValue(taskMinutesInput);
+
+        if (taskMinutes <= 0) {
+          showError('請輸入預估任務處理時間。');
+          taskMinutesInput.focus();
+          return false;
+        }
+
+        if (taskMinutes > 240) {
+          showError('任務處理時間超過 240 分鐘，建議改由客服協助確認費用。');
+          taskMinutesInput.focus();
+          return false;
+        }
+      }
+
+      const advancePayment = numberValue(advanceInput);
+
+      if (advancePayment > 10000) {
+        showError('代墊費用過高，建議改由客服協助確認是否可承接。');
+        advanceInput.focus();
+        return false;
+      }
+
+      return true;
+    }
+
+    function buildQuoteParams() {
+      const config = getCurrentConfig();
+
+      const from = fromInput.value.trim();
+      const to = toInput.value.trim();
+      const advancePayment = config.showAdvance ? numberValue(advanceInput) : 0;
+
+      const params = new URLSearchParams({
+        serviceType: selectedService,
+        serviceMode: config.mode,
+        from,
+        speedType: selectedSpeed,
+        advancePayment: String(advancePayment),
+      });
+
+      if (!config.hideTo && to) {
+        params.set('to', to);
+      }
+
+      if (config.showQueue) {
+        params.set('queueMinutes', String(numberValue(queueMinutesInput)));
+      }
+
+      if (config.showTaskMinutes) {
+        params.set('taskMinutes', String(numberValue(taskMinutesInput)));
+      }
+
+      return params;
+    }
+
+    function setRowVisible(row, visible) {
+      row.classList.toggle('hidden', !visible);
+    }
+
+    function updateResult(data) {
+      const config = getCurrentConfig();
+
+      const advancePayment = Number(data.advancePayment || 0);
+      const serviceSubtotal = Number(data.serviceSubtotal || 0);
+      const customerTotal = Number(data.customerPayableTotal || data.payableTotal || data.total || 0);
+
+      totalPrice.textContent = money(customerTotal);
+
+      serviceText.textContent = selectedService;
+      speedText.textContent = data.speedLabel || getSpeedLabel(selectedSpeed);
+
+      if (data.serviceMode === 'queue') {
+        distanceRowLabel.textContent = '任務型態';
+        distanceText.textContent = data.distanceText || '排隊任務';
+
+        durationRowLabel.textContent = '預估排隊時間';
+        durationText.textContent = data.durationText || `${numberValue(queueMinutesInput)} 分鐘內`;
+      } else if (data.serviceMode === 'custom' && Number(data.distanceMeters || 0) === 0) {
+        distanceRowLabel.textContent = '任務型態';
+        distanceText.textContent = data.distanceText || '單點任務';
+
+        durationRowLabel.textContent = '預估處理時間';
+        durationText.textContent = data.durationText || `${numberValue(taskMinutesInput)} 分鐘內`;
+      } else {
+        distanceRowLabel.textContent = '預估距離';
+        distanceText.textContent = data.distanceText || '-';
+
+        durationRowLabel.textContent = '預估車程';
+        durationText.textContent = data.durationText || '-';
+      }
+
+      serviceSubtotalText.textContent = money(serviceSubtotal);
+      deliveryFeeText.textContent = money(data.deliveryFee);
+      serviceFeeText.textContent = money(data.serviceFee);
+      speedFeeText.textContent = money(data.speedFee);
+
+      const waitingFee = Number(data.waitingFee || 0);
+      const taskHandlingFee = Number(data.taskHandlingFee || 0);
+
+      waitingFeeText.textContent = money(waitingFee);
+      taskHandlingFeeText.textContent = money(taskHandlingFee);
+      advancePaymentText.textContent = money(advancePayment);
+      customerTotalText.textContent = money(customerTotal);
+
+      setRowVisible(waitingFeeRow, waitingFee > 0 || data.serviceMode === 'queue');
+      setRowVisible(taskHandlingFeeRow, taskHandlingFee > 0 || data.serviceMode === 'custom');
+      setRowVisible(advancePaymentRow, config.showAdvance || advancePayment > 0);
+
+      let notice =
+        '此金額為系統初步估算。實際費用仍可能依任務內容、等候時間、代墊金額、地址完整度與現場狀況調整。';
+
+      if (selectedService === '幫代買') {
+        notice =
+          '幫代買的預估應付總額包含跑腿服務費與預估代墊費用。正式下單時，實際代墊金額仍需依店家現場金額為準。';
+      }
+
+      if (selectedService === '幫我取') {
+        notice =
+          '幫我取若有現場付款、補款或代付費用，代墊金額會另外加到預估應付總額。實際金額仍依現場為準。';
+      }
+
+      if (selectedService === '幫排隊') {
+        notice =
+          '幫排隊以排隊地點與預估排隊時間試算。若現場等待時間增加，正式任務費用可能需要重新確認。';
+      }
+
+      if (selectedService === '全能跑腿') {
+        notice =
+          '全能跑腿屬於特殊任務，快速估價僅供初步參考。若任務內容複雜、等待時間較長或代墊金額較高，實際費用可能由客服確認。';
+      }
+
+      if (advancePayment > 1000) {
+        notice += ' 此次預估代墊費用已超過 $1,000，正式下單後可能需要先付款或由 UBee 跑腿客服確認。';
+      }
+
+      resultNotice.textContent = notice;
+    }
+
     serviceButtons.forEach((button) => {
       button.addEventListener('click', () => {
         serviceButtons.forEach((btn) => btn.classList.remove('active'));
         button.classList.add('active');
         selectedService = button.dataset.service || '幫我送';
+        updateServiceUI();
       });
     });
 
@@ -507,40 +1018,28 @@
         speedButtons.forEach((btn) => btn.classList.remove('active'));
         button.classList.add('active');
         selectedSpeed = button.dataset.speed || 'standard';
+        hideResult();
+      });
+    });
+
+    [fromInput, toInput, advanceInput, queueMinutesInput, taskMinutesInput, taskNoteInput].forEach((input) => {
+      input.addEventListener('input', () => {
+        clearError();
+        hideResult();
       });
     });
 
     quoteButton.addEventListener('click', async () => {
       clearError();
 
-      const from = fromInput.value.trim();
-      const to = toInput.value.trim();
-
-      if (!from) {
-        showError('請先輸入取件地點。');
-        fromInput.focus();
-        return;
-      }
-
-      if (!to) {
-        showError('請先輸入送達地點。');
-        toInput.focus();
-        return;
-      }
-
-      if (from === to) {
-        showError('取件地點與送達地點不能相同。');
+      if (!validateForm()) {
         return;
       }
 
       try {
         setLoading(true);
 
-        const params = new URLSearchParams({
-          from,
-          to,
-          speedType: selectedSpeed,
-        });
+        const params = buildQuoteParams();
 
         const response = await fetch('/api/quote?' + params.toString(), {
           method: 'GET',
@@ -552,17 +1051,10 @@
         const data = await response.json();
 
         if (!response.ok || !data.success) {
-          throw new Error(data.error || '估價失敗，請確認地址是否完整。');
+          throw new Error(data.error || '估價失敗，請確認資料是否完整。');
         }
 
-        totalPrice.textContent = money(data.total);
-        serviceText.textContent = selectedService;
-        speedText.textContent = data.speedLabel || getSpeedLabel(selectedSpeed);
-        distanceText.textContent = data.distanceText || '-';
-        durationText.textContent = data.durationText || '-';
-        deliveryFeeText.textContent = money(data.deliveryFee);
-        serviceFeeText.textContent = money(data.serviceFee);
-        speedFeeText.textContent = money(data.speedFee);
+        updateResult(data);
 
         resultBox.classList.add('show');
 
@@ -596,11 +1088,7 @@
       }, 80);
     });
 
-    function getSpeedLabel(speed) {
-      if (speed === 'priority') return '標準件';
-      if (speed === 'express') return '優先件';
-      return '一般件';
-    }
+    updateServiceUI();
   </script>
 </body>
 </html>
