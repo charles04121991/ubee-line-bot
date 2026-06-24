@@ -5591,35 +5591,30 @@ async function handleTextStep(event, userId, text) {
   }
 
   if (normalized === '服務範圍') {
-    return replyMessages(event.replyToken, [
-      {
-        type: 'template',
-        altText: 'UBee 服務範圍',
-        template: {
-          type: 'buttons',
-          title: 'UBee 服務範圍',
-          text:
-`UBee 目前主要服務區域：
-
-豐原、潭子、神岡、大雅、后里
-
-其他台中地區也可以先使用快速估價，系統會依取件地點、送達地點與任務內容協助試算。實際是否可承接，仍以系統媒合與客服確認為準。`,
-          actions: [
-            {
-              type: 'uri',
-              label: '快速估價',
-              uri: 'https://ubee-line-bot-2-zezw.onrender.com/estimate.html'
-            },
-            {
-              type: 'uri',
-              label: '立即下單',
-              uri: 'https://liff.line.me/2009895876-eDSfemYo'
-            }
-          ]
-        }
+  return replyMessages(event.replyToken, [
+    {
+      type: 'template',
+      altText: 'UBee 服務範圍',
+      template: {
+        type: 'buttons',
+        title: 'UBee 服務範圍',
+        text: '查看 UBee 目前主要服務區域、可承接任務類型與下單前注意事項。',
+        actions: [
+          {
+            type: 'uri',
+            label: '查看服務範圍',
+            uri: 'https://ubee-line-bot-2-zezw.onrender.com/service-area.html'
+          },
+          {
+            type: 'uri',
+            label: '快速估價',
+            uri: 'https://ubee-line-bot-2-zezw.onrender.com/estimate.html'
+          }
+        ]
       }
-    ]);
-  }
+    }
+  ]);
+}
 
   return null;
 }
