@@ -3591,34 +3591,116 @@ app.get('/api/nearby-places', async (req, res) => {
 
 app.get('/api/quote', async (req, res) => {
   try {
+    const serviceType = String(req.query.serviceType || '').trim();
+    const serviceMode = String(req.query.serviceMode || '').trim();
+
     const from = req.query.from || req.query.pickup;
     const to = req.query.to || req.query.dropoff;
-    const speedType = req.query.speed || req.query.speedType || 'standard';
 
-    if (!from || !to) {
-      return res.status(400).json({ success: false, error: '請輸入取件地址與送達地址' });
+    const speedType = req.query.speed || req.query.speedType || 'standard';
+    const speed = getSpeedOption(speedType);
+
+    const advancePayment = Math.max(
+      0,
+      Math.round(Number(req.query.advancePayment || 0))
+    );
+
+    const upstairsFee = Math.max(
+      0,
+      Math.round(Number(req.query.upstairsFee || 0))
+    );
+
+    const isQueueTask =
+      serviceMode === 'queue' ||
+      serviceType === '幫排隊';
+
+    let distance = null;
+    let price = null;
+    let queueMinutes = 0;
+
+    if (isQueueTask) {
+      queueMinutes = Math.max(
+        0,
+        Math.round(Number(req.query.queueMinutes || 30))
+      );
+
+      const waitingFee = Math.max(0, queueMinutes * 3);
+      const serviceFee = 20;
+      const deliveryFee = 80;
+      const speedFee = speed.fee || 0;
+
+      const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
+      const driverFee = Math.round(total * PRICING.driverRatio);
+
+      price = {
+        fareMode: 'queue',
+        deliveryFee,
+        serviceFee,
+        speedFee,
+        upstairsFee,
+        waitingFee,
+        total,
+        driverFee,
+        riderFee: driverFee,
+        platformFee: total - driverFee,
+      };
+    } else {
+      if (!from || !to) {
+        return res.status(400).json({
+          success: false,
+          error: '請輸入取件地址與送達地址'
+        });
+      }
+
+      distance = await getDistanceMatrixCached(from, to);
+
+      price = calculatePrice({
+        distanceMeters: distance.distanceMeters,
+        durationSeconds: distance.durationSeconds,
+        speedType,
+        upstairsFee,
+      });
     }
 
-    const distance = await getDistanceMatrixCached(from, to);
-    const price = calculatePrice({
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
-      speedType,
-    });
+    const serviceSubtotal = Math.max(
+      0,
+      Math.round(Number(price.total || 0))
+    );
 
-    res.json({
+    const customerPayableTotal = serviceSubtotal + advancePayment;
+
+    return res.json({
       success: true,
-      distanceText: distance.distanceText,
-      durationText: distance.durationText,
-      distanceMeters: distance.distanceMeters,
-      durationSeconds: distance.durationSeconds,
+
+      serviceType,
+      serviceMode: isQueueTask ? 'queue' : 'normal',
+
+      distanceText: isQueueTask ? '排隊任務' : distance.distanceText,
+      durationText: isQueueTask ? `${queueMinutes} 分鐘內` : distance.durationText,
+      distanceMeters: isQueueTask ? 0 : distance.distanceMeters,
+      durationSeconds: isQueueTask ? 0 : distance.durationSeconds,
+
+      queueMinutes,
+
       speedType,
-      speedLabel: getSpeedOption(speedType).label,
+      speedLabel: speed.label,
+
       ...price,
+
+      serviceSubtotal,
+      advancePayment,
+      customerPayableTotal,
+      payableTotal: customerPayableTotal,
+
+      // 給快速估價頁直接顯示用
+      total: customerPayableTotal,
     });
   } catch (error) {
     console.error('❌ API 估價失敗：', error);
-    res.status(500).json({ success: false, error: '估價失敗，請確認地址是否正確' });
+    res.status(500).json({
+      success: false,
+      error: '估價失敗，請確認地址是否正確'
+    });
   }
 });
 
