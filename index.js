@@ -5487,6 +5487,27 @@ async function handleTextStep(event, userId, text) {
     return replyMessages(event.replyToken, [createMainMenuFlex()]);
   }
 
+  if (normalized === '快速估價' || normalized === '最新優惠') {
+    return replyMessages(event.replyToken, [
+      {
+        type: 'template',
+        altText: 'UBee 快速估價',
+        template: {
+          type: 'buttons',
+          title: 'UBee 快速估價',
+          text: '想先知道跑腿大約多少錢？點選下方按鈕，輸入服務項目、取件地點與送達地點，系統會協助試算費用。',
+          actions: [
+            {
+              type: 'uri',
+              label: '開始快速估價',
+              uri: 'https://liff.line.me/2009895876-eDSfemYo'
+            }
+          ]
+        }
+      }
+    ]);
+  }
+
   return null;
 }
 
