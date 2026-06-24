@@ -5577,11 +5577,42 @@ async function handleTextStep(event, userId, text) {
         template: {
           type: 'buttons',
           title: 'UBee 快速估價',
-          text: '想先知道跑腿大約多少錢？點選下方按鈕，輸入服務項目、取件地點與送達地點，系統會協助試算費用。',
+          text: '想先知道跑腿大約多少錢？點選下方按鈕，選擇服務項目與任務地點，系統會協助試算費用。',
           actions: [
             {
               type: 'uri',
               label: '開始快速估價',
+              uri: 'https://ubee-line-bot-2-zezw.onrender.com/estimate.html'
+            }
+          ]
+        }
+      }
+    ]);
+  }
+
+  if (normalized === '服務範圍') {
+    return replyMessages(event.replyToken, [
+      {
+        type: 'template',
+        altText: 'UBee 服務範圍',
+        template: {
+          type: 'buttons',
+          title: 'UBee 服務範圍',
+          text:
+`UBee 目前主要服務區域：
+
+豐原、潭子、神岡、大雅、后里
+
+其他台中地區也可以先使用快速估價，系統會依取件地點、送達地點與任務內容協助試算。實際是否可承接，仍以系統媒合與客服確認為準。`,
+          actions: [
+            {
+              type: 'uri',
+              label: '快速估價',
+              uri: 'https://ubee-line-bot-2-zezw.onrender.com/estimate.html'
+            },
+            {
+              type: 'uri',
+              label: '立即下單',
               uri: 'https://liff.line.me/2009895876-eDSfemYo'
             }
           ]
