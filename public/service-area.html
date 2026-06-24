@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>UBee 跑腿服務範圍</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(255, 193, 7, 0.2), transparent 34%),
+        linear-gradient(180deg, #fffaf0 0%, #f8fafc 48%, #ffffff 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      color: #111827;
+    }
+
+    .page {
+      width: min(100%, 520px);
+      margin: 0 auto;
+      padding: 18px 16px 36px;
+    }
+
+    .hero {
+      background: #111827;
+      color: #ffffff;
+      border-radius: 28px;
+      padding: 24px 22px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -46px;
+      top: -46px;
+      width: 150px;
+      height: 150px;
+      border-radius: 999px;
+      background: rgba(250, 204, 21, 0.22);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(250, 204, 21, 0.16);
+      color: #fde68a;
+      border: 1px solid rgba(250, 204, 21, 0.26);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.18;
+      letter-spacing: -0.5px;
+      font-weight: 950;
+    }
+
+    .hero p {
+      margin: 12px 0 0;
+      color: #d1d5db;
+      font-size: 15px;
+      line-height: 1.75;
+      font-weight: 650;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #eef2f7;
+      border-radius: 26px;
+      padding: 20px;
+      margin-top: 16px;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+    }
+
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 950;
+      color: #111827;
+    }
+
+    .section-desc {
+      margin: 0;
+      color: #4b5563;
+      font-size: 14px;
+      line-height: 1.75;
+      font-weight: 700;
+    }
+
+    .area-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .area-item {
+      border: 1.5px solid #f3e7b3;
+      background: #fff8df;
+      border-radius: 18px;
+      padding: 14px 13px;
+      min-height: 76px;
+    }
+
+    .area-item strong {
+      display: block;
+      font-size: 17px;
+      font-weight: 950;
+      color: #111827;
+      margin-bottom: 5px;
+    }
+
+    .area-item span {
+      display: block;
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 750;
+      color: #6b7280;
+    }
+
+    .area-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .list-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 13px 14px;
+      background: #ffffff;
+    }
+
+    .icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #facc15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      font-size: 15px;
+    }
+
+    .list-row strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 950;
+      color: #111827;
+      margin-bottom: 3px;
+    }
+
+    .list-row span {
+      display: block;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #6b7280;
+      font-weight: 700;
+    }
+
+    .notice {
+      margin-top: 14px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      border-radius: 18px;
+      padding: 13px 14px;
+      font-size: 13px;
+      line-height: 1.7;
+      font-weight: 760;
+    }
+
+    .button {
+      width: 100%;
+      height: 56px;
+      border: 0;
+      border-radius: 18px;
+      font-size: 16px;
+      font-weight: 950;
+      cursor: pointer;
+      margin-top: 12px;
+      font-family: inherit;
+    }
+
+    .button.primary {
+      background: #f5b301;
+      color: #111827;
+      box-shadow: 0 12px 26px rgba(245, 179, 1, 0.28);
+    }
+
+    .button.dark {
+      background: #111827;
+      color: #ffffff;
+    }
+
+    .footer-note {
+      margin: 18px 6px 0;
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.65;
+      text-align: center;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="badge">🐝 UBee 跑腿平台</div>
+      <h1>服務範圍</h1>
+      <p>
+        UBee 跑腿目前以台中北屯以北與山線生活圈為主要服務區域，
+        優先從豐原出發，逐步擴大跑腿任務覆蓋。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">目前主要服務區域</h2>
+      <p class="section-desc">
+        以下區域為 UBee 跑腿現階段優先媒合騎士與任務的核心範圍。
+        若任務距離較遠，仍可先使用快速估價，由系統協助初步試算。
+      </p>
+
+      <div class="area-grid">
+        <div class="area-item">
+          <strong>豐原</strong>
+          <span>UBee 主要起點與核心推廣區</span>
+        </div>
+
+        <div class="area-item">
+          <strong>潭子</strong>
+          <span>鄰近豐原，適合短程配送與代買</span>
+        </div>
+
+        <div class="area-item">
+          <strong>神岡</strong>
+          <span>支援生活跑腿、取送、急件任務</span>
+        </div>
+
+        <div class="area-item">
+          <strong>大雅</strong>
+          <span>可依騎士位置與任務距離媒合</span>
+        </div>
+
+        <div class="area-item">
+          <strong>后里</strong>
+          <span>可先估價，依任務內容確認承接</span>
+        </div>
+
+        <div class="area-item">
+          <strong>台中其他地區</strong>
+          <span>可先快速估價，再由系統或客服確認</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">可以協助的任務</h2>
+
+      <div class="area-list">
+        <div class="list-row">
+          <div class="icon">📦</div>
+          <div>
+            <strong>幫我送</strong>
+            <span>文件、物品、包裹、生活用品、急件配送。</span>
+          </div>
+        </div>
+
+        <div class="list-row">
+          <div class="icon">🛒</div>
+          <div>
+            <strong>幫代買</strong>
+            <span>餐點、飲料、超商商品、日用品等代買任務。</span>
+          </div>
+        </div>
+
+        <div class="list-row">
+          <div class="icon">📍</div>
+          <div>
+            <strong>幫我取</strong>
+            <span>取貨、取餐、取包裹、取文件、取物品。</span>
+          </div>
+        </div>
+
+        <div class="list-row">
+          <div class="icon">⏳</div>
+          <div>
+            <strong>幫排隊</strong>
+            <span>現場排隊、等候、協助排隊購買或領取。</span>
+          </div>
+        </div>
+
+        <div class="list-row">
+          <div class="icon">⚡</div>
+          <div>
+            <strong>急件專送</strong>
+            <span>高急迫性任務，依騎士位置與距離優先媒合。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="notice">
+        實際是否可承接，會依任務內容、距離、天氣、現場狀況、代墊金額與騎士媒合情況判斷。
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">下單前可以先做什麼？</h2>
+      <p class="section-desc">
+        如果你不確定 UBee 跑腿是否能服務你的地點，可以先使用快速估價。
+        系統會依取件地點、送達地點、服務類型與速度需求初步試算費用。
+      </p>
+
+      <button class="button primary" type="button" onclick="goEstimate()">
+        先快速估價
+      </button>
+
+      <button class="button dark" type="button" onclick="goOrder()">
+        我要立即下單
+      </button>
+    </section>
+
+    <p class="footer-note">
+      UBee 跑腿會依照騎士密度與訂單需求逐步擴大服務範圍。若地點不在主要區域內，仍可先估價或聯繫客服確認。
+    </p>
+  </main>
+
+  <script>
+    function goEstimate() {
+      window.location.href = 'https://ubee-line-bot-2-zezw.onrender.com/estimate.html';
+    }
+
+    function goOrder() {
+      window.location.href = 'https://liff.line.me/2009895876-eDSfemYo';
+    }
+  </script>
+</body>
+</html>
