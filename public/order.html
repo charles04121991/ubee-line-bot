@@ -2561,6 +2561,45 @@ function cleanPhone(value){
   return String(value || '').replace(/[^\d]/g,'').trim();
 }
 
+function normalizeAdvancePaymentText(text){
+  return String(text || '')
+    .replace(/[０-９]/g, function(ch){
+      return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+    })
+    .replace(/[，,]/g, '')
+    .trim();
+}
+
+function extractAdvancePaymentAmountFromText(text){
+  const source = normalizeAdvancePaymentText(text);
+
+  if(!source){
+    return 0;
+  }
+
+  const hasAdvanceKeyword =
+    /代墊|墊付|先墊|幫忙墊|幫我墊|商品費|餐費|餐點費|餐點金額|商品金額|購買金額|購買費用|買東西金額|物品金額|預估金額|店家金額/.test(source);
+
+  if(!hasAdvanceKeyword){
+    return 0;
+  }
+
+  const moneyRegex = /(?:NT\$|N T\$|新台幣|台幣|\$)?\s*(\d{1,7})(?:\s*(?:元|塊|圓|NTD|台幣))?/gi;
+
+  let maxAmount = 0;
+  let match;
+
+  while((match = moneyRegex.exec(source)) !== null){
+    const amount = Math.round(Number(match[1] || 0));
+
+    if(Number.isFinite(amount) && amount > maxAmount){
+      maxAmount = amount;
+    }
+  }
+
+  return maxAmount;
+}
+
 function getAdvancePaymentAmount(){
   if(serviceGroup !== 'buy'){
     return 0;
@@ -2587,8 +2626,26 @@ function getAdvancePaymentAmount(){
   return Math.max(0, Math.round(amount));
 }
 
+function getDetectedAdvancePaymentAmount(){
+  const fieldAmount = getAdvancePaymentAmount();
+
+  if(Number.isNaN(fieldAmount)){
+    return NaN;
+  }
+
+  const noteText = qs('note') ? qs('note').value.trim() : '';
+  const itemText = qs('item') ? qs('item').value.trim() : '';
+
+  const textAmount = Math.max(
+    extractAdvancePaymentAmountFromText(noteText),
+    extractAdvancePaymentAmountFromText(itemText)
+  );
+
+  return Math.max(fieldAmount || 0, textAmount || 0);
+}
+
 function validateAdvancePaymentLimit(){
-  const amount = getAdvancePaymentAmount();
+  const amount = getDetectedAdvancePaymentAmount();
 
   if(Number.isNaN(amount)){
     alert('代墊費用請填寫 0 或正確金額。');
@@ -2596,13 +2653,13 @@ function validateAdvancePaymentLimit(){
   }
 
   if(amount >= MAX_ADVANCE_PAYMENT){
-    alert('代墊款項達 NT$1,000（含）以上，為了保障客人與騎士安全，請改由 UBee 跑腿客服人工確認，系統暫不開放繼續下單。');
+    alert('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。為保障客人與騎士安全，請改由 UBee 跑腿客服人工確認，系統暫不開放繼續下單。');
     return false;
   }
 
   return true;
 }
-
+  
 function isPaymentChangeLocked(order){
   const data = order || currentOrderData || {};
   const status = String(data.status || '');
