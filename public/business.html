@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee｜公司企業 / 店家合作申請</title>
+<title>UBee 跑腿｜公司企業 / 店家合作申請</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
 <style>
@@ -246,11 +246,11 @@ textarea{
 <div class="wrap">
 
   <section class="hero">
-    <div class="kicker">UBee BUSINESS</div>
+    <div class="kicker">UBee 跑腿 BUSINESS</div>
     <h1>公司企業 / 店家合作申請</h1>
     <div class="sub">
       適合店家物品配送、企業文件急送、固定商務任務與臨時支援需求。<br>
-      送出後將傳送至 UBee 辦公室審核群組，由 UBee 進行評估與後續聯繫。
+      送出後將傳送至 UBee 跑腿辦公室審核群組，由 UBee 跑腿進行評估與後續聯繫。
     </div>
   </section>
 
@@ -258,7 +258,7 @@ textarea{
 
     <div class="card">
       <div class="sectionTitle">基本資料</div>
-      <div class="sectionDesc">請填寫聯絡資訊，方便 UBee 辦公室後續聯繫。</div>
+      <div class="sectionDesc">請填寫聯絡資訊，方便 UBee 跑腿辦公室後續聯繫。</div>
 
       <label>公司 / 店家名稱</label>
       <input id="companyName" placeholder="例如：OO電器行" required>
@@ -334,7 +334,7 @@ textarea{
       <textarea id="note" placeholder="請簡單描述您的需求內容、特殊注意事項、固定時段或固定路線等..."></textarea>
 
       <div class="notice">
-        ※ 送出後會傳送到 UBee 辦公室審核，由 UBee 進行人工評估與後續聯繫。
+        ※ 送出後會傳送到 UBee 跑腿辦公室審核，由 UBee 跑腿進行人工評估與後續聯繫。
       </div>
 
       <button class="btn" id="submitBtn" type="submit">送出合作需求</button>
@@ -361,7 +361,7 @@ textarea{
       <div class="num">2</div>
       <div>
         <div class="flowTitle">專人聯繫</div>
-        <div class="flowText">UBee 辦公室審核後，會主動與您聯繫。</div>
+        <div class="flowText">UBee 跑腿辦公室審核後，會主動與您聯繫。</div>
       </div>
     </div>
 
@@ -377,7 +377,7 @@ textarea{
       <div class="num">4</div>
       <div>
         <div class="flowTitle">開始服務</div>
-        <div class="flowText">正式安排 UBee 城市任務支援。</div>
+        <div class="flowText">正式安排 UBee 跑腿城市任務支援。</div>
       </div>
     </div>
   </div>
@@ -515,7 +515,7 @@ document.getElementById('businessForm').addEventListener('submit', async functio
 
     if(data.success){
       successBox.style.display = 'block';
-      successBox.innerHTML = '✅ 合作需求已送出，UBee 將會進行審核與評估，後續由專人聯繫您。';
+      successBox.innerHTML = '✅ 合作需求已送出，UBee 跑腿將會進行審核與評估，後續由專人聯繫您。';
 
       document.getElementById('businessForm').reset();
       document.querySelectorAll('.typeCard').forEach(c => c.classList.remove('active'));
