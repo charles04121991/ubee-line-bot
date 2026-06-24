@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>UBee｜店家加入合作</title>
+  <title>UBee 跑腿店家合作</title>
 
   <style>
     :root {
@@ -208,12 +208,12 @@
     <h1>UBee 店家加入合作</h1>
 
     <p class="desc">
-      填寫資料後，UBee 會進行合作審核。審核通過後，店家即可使用店家派單中心建立配送任務。
+      填寫資料後，UBee 管理端會進行合作審核。審核通過後，店家即可使用店家派單中心建立配送任務。
     </p>
 
     <div class="card">
       <div class="notice">
-        送出申請後不會立即開通派單功能。UBee 審核通過後，店家再從「店家派單」輸入申請電話完成綁定。
+        送出申請後不會立即開通派單功能。UBee 管理端審核通過後，店家再從「店家派單」輸入申請電話完成綁定。
       </div>
 
       <form id="merchantForm">
@@ -278,7 +278,7 @@
     </div>
 
     <div class="footer">
-      UBee 城市任務平台｜店家合作申請
+      UBee 跑腿｜店家合作申請
     </div>
   </div>
 
@@ -340,7 +340,7 @@
           throw new Error(data.message || "送出失敗，請稍後再試。");
         }
 
-        showMsg("ok", "合作申請已送出！UBee 會進行審核，通過後即可使用店家派單中心。");
+        showMsg("ok", "合作申請已送出！UBee 管理端會進行審核，通過後即可使用店家派單中心。");
         form.reset();
       } catch (err) {
         showMsg("err", err.message || "送出失敗，請稍後再試。");
