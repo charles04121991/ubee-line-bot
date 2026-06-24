@@ -1,7 +1,7 @@
 {
-  "name": "UBee 騎士端",
-  "short_name": "UBee騎士",
-  "description": "UBee 騎士端派單接單系統",
+  "name": "UBee 跑腿騎士端",
+  "short_name": "UBee跑腿騎士",
+  "description": "UBee 跑腿騎士端派單接單系統",
   "start_url": "/rider.html",
   "scope": "/",
   "display": "standalone",
