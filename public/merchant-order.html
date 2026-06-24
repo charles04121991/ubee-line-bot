@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee｜店家派單中心</title>
+<title>UBee 跑腿｜店家派單中心</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
@@ -389,7 +389,7 @@ function updatePaymentNotice(){
 
   if(box){
     box.innerHTML = `
-      本次店家應付 UBee：<strong>NT$${feeConfig.totalFee}</strong><br>
+      本次店家應付 UBee 跑腿：<strong>NT$${feeConfig.totalFee}</strong><br>
       街口支付：<strong>901871793</strong><br>
       請完成付款後，再建立配送單。
     `;
@@ -436,9 +436,9 @@ function showResult(orderId, feeConfig){
     <strong>配送單已建立成功！</strong><br>
     訂單編號：<strong>${escapeHtml(orderId)}</strong><br><br>
 
-    本次應付 UBee：<strong>NT$${feeConfig.totalFee}</strong><br>
+    本次應付 UBee 跑腿：<strong>NT$${feeConfig.totalFee}</strong><br>
     騎士配送收入：NT$${feeConfig.riderFee}<br>
-    UBee 平台服務費：NT$${feeConfig.platformFee}<br><br>
+    UBee 跑腿平台服務費：NT$${feeConfig.platformFee}<br><br>
 
     系統已通知附近騎士接單。
   `;
