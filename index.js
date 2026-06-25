@@ -1856,43 +1856,136 @@ app.get('/api/rider/completed-orders', async (req, res) => {
           completedAtMs = order.updatedAt;
         }
 
-                const riderIncome = Number(
-          order.driverFee ||
-          order.riderFee ||
-          order.fee ||
-          0
-        );
+                const paymentMethod = String(
+  order.paymentMethod ||
+  order.payMethod ||
+  order.paymentType ||
+  order.payment ||
+  order.payType ||
+  ''
+).trim().toLowerCase();
 
-        const customerTotal = Number(
-          order.total ||
-          order.customerPayableTotal ||
-          order.finalTotal ||
-          0
-        );
-        
-        return {
-          id: order.id,
-          orderNo: order.orderNo || order.id,
-          status: order.status,
-          pickupAddress: order.pickupAddress || order.fromAddress || order.pickup || '',
-          dropoffAddress: order.dropoffAddress || order.toAddress || order.dropoff || '',
-          item: order.item || '',
-          riderPhone: order.riderPhone || '',
-          riderDocId: order.riderDocId || '',
-          driverFee: riderIncome,
-          riderFee: riderIncome,
-          fee: riderIncome,
+const paymentStatus = String(
+  order.paymentStatus ||
+  order.payStatus ||
+  ''
+).trim().toLowerCase();
 
-          // price 保留給舊版騎士端相容，但內容改成騎士收入，不再吃客人總額
-          price: riderIncome,
+const isCashOrder =
+  order.isCashOrder === true ||
+  paymentMethod === 'cash' ||
+  paymentMethod.includes('cash') ||
+  paymentMethod.includes('現金') ||
+  paymentStatus === 'cash_on_delivery' ||
+  paymentStatus === 'cash_pending' ||
+  paymentStatus.includes('現金');
 
-          // total 才是客人訂單總額
-          total: customerTotal,
-          completedAt: completedAtMs,
-          completedAtText: completedAtMs
-            ? new Date(completedAtMs).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
-            : '',
-        };
+const advancePayment = Math.max(0, Math.round(Number(
+  order.advancePayment ??
+  order.advanceAmount ??
+  order.estimatedAdvancePayment ??
+  order.estimatedAdvanceAmount ??
+  order.riderAdvanceAmount ??
+  0
+) || 0));
+
+const customerTotal = Math.max(0, Math.round(Number(
+  order.customerPayableTotal ??
+  order.customerPayTotal ??
+  order.customerPayAmount ??
+  order.customerTotalWithAdvance ??
+  order.riderDisplayTotal ??
+  order.payableTotal ??
+  order.finalPayAmount ??
+  order.cashCollectAmount ??
+  order.collectAmount ??
+  order.amountToCollect ??
+  order.total ??
+  order.price ??
+  0
+) || 0));
+
+const serviceNet = Math.max(0, customerTotal - advancePayment);
+
+const directRiderIncome = Math.round(Number(
+  order.driverFee ??
+  order.riderFee ??
+  order.riderIncome ??
+  order.riderEarning ??
+  order.riderPayout ??
+  order.riderShare ??
+  0
+) || 0);
+
+const riderIncome = directRiderIncome > 0
+  ? directRiderIncome
+  : Math.round(serviceNet * 0.7);
+
+const directCashDueToPlatform = Math.round(Number(
+  order.cashDueToPlatform ??
+  order.platformReceivable ??
+  order.riderDueToPlatform ??
+  0
+) || 0);
+
+const cashDueToPlatform = isCashOrder
+  ? (
+      directCashDueToPlatform > 0
+        ? directCashDueToPlatform
+        : Math.max(0, Math.round(serviceNet - riderIncome))
+    )
+  : 0;
+
+return {
+  id: order.id,
+  orderNo: order.orderNo || order.id,
+  status: order.status,
+
+  pickupAddress: order.pickupAddress || order.fromAddress || order.pickup || '',
+  dropoffAddress: order.dropoffAddress || order.toAddress || order.dropoff || '',
+  item: order.item || '',
+
+  riderPhone: order.riderPhone || '',
+  riderDocId: order.riderDocId || '',
+
+  paymentMethod: paymentMethod || order.paymentMethod || '',
+  paymentStatus: paymentStatus || order.paymentStatus || '',
+  isCashOrder,
+
+  driverFee: riderIncome,
+  riderFee: riderIncome,
+  fee: riderIncome,
+
+  // 舊版相容：price 保留騎士收入，避免完成紀錄誤顯示客人總額
+  price: riderIncome,
+
+  // 客人實際應付總額
+  total: customerTotal,
+  customerPayableTotal: customerTotal,
+  payableTotal: customerTotal,
+  riderDisplayTotal: customerTotal,
+
+  // 代墊資料
+  advancePayment,
+  advanceAmount: advancePayment,
+
+  // 現金單錢包需要的資料
+  cashCollectAmount: isCashOrder ? customerTotal : 0,
+  cashCollectedAmount: isCashOrder ? customerTotal : 0,
+  cashGrossCollected: isCashOrder ? customerTotal : 0,
+
+  cashAdvanceRecovered: isCashOrder ? advancePayment : 0,
+  cashServiceNet: isCashOrder ? serviceNet : 0,
+
+  cashDueToPlatform,
+  platformReceivable: cashDueToPlatform,
+  riderDueToPlatform: cashDueToPlatform,
+
+  completedAt: completedAtMs,
+  completedAtText: completedAtMs
+    ? new Date(completedAtMs).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
+    : '',
+};
       })
       .filter(order => {
         if (!riderPhone && !riderDocId) return false;
