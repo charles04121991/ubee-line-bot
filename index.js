@@ -109,6 +109,101 @@ async function sendNewOrderPushToRiders(order) {
     const fee = order.driverFee || order.riderFee || "未設定";
     const pickup = order.pickupAddress || order.fromAddress || order.pickup || "附近取件地";
     const dropoff = order.dropoffAddress || order.toAddress || order.dropoff || "送達地未提供";
+
+    // ==============================
+    // 1. iPhone / PWA Web Push 派單通知
+    // ==============================
+    try {
+      if (!WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) {
+        console.warn("⚠️ Web Push VAPID 尚未設定，略過 iPhone Web Push 派單通知");
+      } else {
+        const ridersSnap = await db.collection("riders")
+          .limit(300)
+          .get();
+
+        let webPushSuccess = 0;
+        let webPushFail = 0;
+
+        const pushPayload = JSON.stringify({
+          title: "UBee 新任務",
+          body:
+`有新的跑腿任務等待接單
+
+取件：${pickup}
+送達：${dropoff}
+騎士收入：$${fee}`,
+          url: "/rider.html",
+          orderId
+        });
+
+        const pushTasks = [];
+
+        ridersSnap.forEach((riderDoc) => {
+          const rider = riderDoc.data() || {};
+
+          const riderApproved =
+            rider.approved === true ||
+            rider.status === "approved";
+
+          const riderOnline =
+            rider.online === true;
+
+          const webPushEnabled =
+            rider.webPushEnabled === true;
+
+          const subscription = rider.webPushSubscription;
+
+          if (
+            !riderApproved ||
+            !riderOnline ||
+            !webPushEnabled ||
+            !subscription ||
+            !subscription.endpoint
+          ) {
+            return;
+          }
+
+          pushTasks.push(
+            webpush.sendNotification(subscription, pushPayload)
+              .then(() => {
+                webPushSuccess += 1;
+              })
+              .catch(async (pushErr) => {
+                webPushFail += 1;
+
+                console.error(
+                  `UBee Web Push 發送失敗 rider=${riderDoc.id}:`,
+                  pushErr && pushErr.message ? pushErr.message : pushErr
+                );
+
+                const statusCode = Number(pushErr && pushErr.statusCode);
+
+                // 404 / 410 代表這支手機的訂閱已失效，直接關閉避免之後一直失敗
+                if (statusCode === 404 || statusCode === 410) {
+                  await db.collection("riders").doc(riderDoc.id).set({
+                    webPushSubscription: admin.firestore.FieldValue.delete(),
+                    webPushEnabled: false,
+                    webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    webPushError: `expired_subscription_${statusCode}`
+                  }, { merge: true });
+                }
+              })
+          );
+        });
+
+        await Promise.all(pushTasks);
+
+        console.log(
+          `UBee Web Push 新任務通知完成：${orderId}，成功 ${webPushSuccess}，失敗 ${webPushFail}`
+        );
+      }
+    } catch (webPushErr) {
+      console.error("UBee Web Push 新任務通知失敗:", webPushErr);
+    }
+
+    // ==============================
+    // 2. 原本 LINE 管理通知保留
+    // ==============================
     try {
       await client.pushMessage("Cdc5a9583fb1364402c2a3e4e5edb4c1b", {
         type: "text",
