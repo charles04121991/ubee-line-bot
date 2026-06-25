@@ -2782,6 +2782,15 @@ function cleanText(value, maxLength = 100) {
     .slice(0, maxLength);
 }
 
+function cleanLongText(value, maxLength = 500) {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .trim()
+    .slice(0, maxLength);
+}
+
 function normalizeAdvancePaymentText(text) {
   return String(text || '')
     .replace(/[０-９]/g, function(ch) {
