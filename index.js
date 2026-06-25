@@ -4,6 +4,7 @@ const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
 const path = require('path');
 const admin = require('firebase-admin');
+const webpush = require('web-push');
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -16,6 +17,22 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+
+const WEB_PUSH_PUBLIC_KEY = process.env.WEB_PUSH_PUBLIC_KEY || '';
+const WEB_PUSH_PRIVATE_KEY = process.env.WEB_PUSH_PRIVATE_KEY || '';
+const WEB_PUSH_SUBJECT = process.env.WEB_PUSH_SUBJECT || 'mailto:ubee.service@gmail.com';
+
+if (WEB_PUSH_PUBLIC_KEY && WEB_PUSH_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    WEB_PUSH_SUBJECT,
+    WEB_PUSH_PUBLIC_KEY,
+    WEB_PUSH_PRIVATE_KEY
+  );
+
+  console.log('✅ UBee Web Push VAPID 已設定');
+} else {
+  console.warn('⚠️ 尚未設定 WEB_PUSH_PUBLIC_KEY / WEB_PUSH_PRIVATE_KEY，iPhone Web Push 暫時無法發送');
+}
 
 const app = express();
 
