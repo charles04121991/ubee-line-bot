@@ -410,6 +410,99 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ==============================
+// UBee Web Push API
+// ==============================
+
+// 取得 Web Push Public Key：給騎士端 pushManager.subscribe 使用
+app.get('/api/web-push/public-key', (req, res) => {
+  if (!WEB_PUSH_PUBLIC_KEY) {
+    return res.status(500).json({
+      success: false,
+      message: 'WEB_PUSH_PUBLIC_KEY 尚未設定',
+    });
+  }
+
+  return res.json({
+    success: true,
+    publicKey: WEB_PUSH_PUBLIC_KEY,
+  });
+});
+
+// 儲存騎士 iPhone / PWA Web Push 訂閱資料
+app.post('/api/rider/push-subscription', async (req, res) => {
+  try {
+    const { lineUserId, subscription } = req.body || {};
+
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的騎士 LINE 身分。',
+      });
+    }
+
+    if (
+      !subscription ||
+      !subscription.endpoint ||
+      !subscription.keys ||
+      !subscription.keys.p256dh ||
+      !subscription.keys.auth
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的 Web Push subscription。',
+      });
+    }
+
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    if (riderSnap.empty) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到騎士資料。',
+      });
+    }
+
+    const riderDoc = riderSnap.docs[0];
+    const riderData = riderDoc.data() || {};
+
+    const riderApproved =
+      riderData.approved === true ||
+      riderData.status === 'approved';
+
+    if (!riderApproved) {
+      return res.status(403).json({
+        success: false,
+        message: '騎士尚未審核通過，無法啟用派單通知。',
+      });
+    }
+
+    await db.collection('riders').doc(riderDoc.id).set({
+      webPushSubscription: subscription,
+      webPushEnabled: true,
+      webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      pushProvider: 'web-push',
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      message: 'UBee 派單通知訂閱已儲存。',
+    });
+
+  } catch (err) {
+    console.error('❌ 儲存騎士 Web Push subscription 失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '儲存派單通知失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
+// ==============================
 // UBee 騎士系統 API
 // ==============================
 
