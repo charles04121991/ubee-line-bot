@@ -3082,16 +3082,29 @@ function parseNonNegativeMoney(value) {
   }
 
   const raw = normalizeAdvancePaymentText(value);
-  const normalized = raw.replace(/[^\d.-]/g, '');
 
-  if (!normalized) {
-    return NaN;
+  if (!raw) {
+    return 0;
   }
 
-  const amount = Number(normalized);
+  if (/^(無|沒有|不用|免|否|no|none|null|undefined)$/i.test(raw)) {
+    return 0;
+  }
+
+  let amount = Number(raw);
 
   if (!Number.isFinite(amount)) {
-    return NaN;
+    const match = raw.match(/\d+(?:\.\d+)?/);
+
+    if (!match) {
+      return 0;
+    }
+
+    amount = Number(match[0]);
+  }
+
+  if (!Number.isFinite(amount) || amount < 0) {
+    return 0;
   }
 
   return Math.max(0, Math.round(amount));
@@ -3184,10 +3197,8 @@ function validateOrderInput(data) {
 
   const detectedAdvancePayment = getDetectedAdvancePaymentAmountFromOrderInput(data);
 
-  if (Number.isNaN(detectedAdvancePayment)) {
-    errors.push('代墊費用請填寫 0 或正確金額。');
-  } else if (detectedAdvancePayment >= MAX_ADVANCE_PAYMENT) {
-    errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。');
+  if (detectedAdvancePayment >= MAX_ADVANCE_PAYMENT) {
+    errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額，請先聯繫 UBee 跑腿客服人工確認。');
   }
 
   return errors;
@@ -4631,9 +4642,21 @@ app.post('/api/orders', async (req, res) => {
 }    
     const id = generateOrderId();
 
-    const advancePayment = parseNonNegativeMoney(data.advancePayment);
-    const serviceSubtotal = Math.max(0, Math.round(Number(price.total || 0)));
-    const customerPayableTotal = serviceSubtotal + advancePayment;
+    const detectedAdvancePayment = getDetectedAdvancePaymentAmountFromOrderInput(data);
+
+    const advancePayment = Number.isFinite(detectedAdvancePayment)
+      ? Math.max(0, Math.round(detectedAdvancePayment))
+      : 0;
+
+    if (advancePayment >= MAX_ADVANCE_PAYMENT) {
+      return res.status(400).json({
+        success: false,
+        error: '代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。',
+      });
+    }
+
+const serviceSubtotal = Math.max(0, Math.round(Number(price.total || 0)));
+const customerPayableTotal = serviceSubtotal + advancePayment;
 
     const order = {
       id,
@@ -4659,7 +4682,18 @@ app.post('/api/orders', async (req, res) => {
       hasMerchant: data.hasMerchant || false,
       speedType: data.speedType,
       note: data.note,
+
       advancePayment,
+      advanceAmount: advancePayment,
+      estimatedGoodsAmount: advancePayment,
+      estimatedAdvancePayment: advancePayment,
+      estimatedAdvanceAmount: advancePayment,
+      riderAdvanceAmount: advancePayment,
+      purchaseAdvanceAllowed: advancePayment > 0,
+      purchasePaymentRule: advancePayment > 0
+        ? 'rider_advance_then_customer_pay'
+        : 'no_advance',
+
       serviceSubtotal,
       customerPayableTotal,
       payableTotal: customerPayableTotal,
@@ -4669,7 +4703,15 @@ app.post('/api/orders', async (req, res) => {
       durationSeconds: data.serviceMode === 'queue' ? 0 : distance.durationSeconds,
       distanceText: data.serviceMode === 'queue' ? '排隊任務' : distance.distanceText,
       durationText: data.serviceMode === 'queue' ? `${data.queueMinutes} 分鐘內` : distance.durationText,
+
       ...price,
+
+      // 注意：...price 裡面的 total 是服務費小計，這裡要覆蓋成客人實際應付總額
+      total: customerPayableTotal,
+      finalTotal: customerPayableTotal,
+      customerTotalWithAdvance: customerPayableTotal,
+      serviceTotal: serviceSubtotal,
+
       etaMinutes: null,
       paymentMethod: 'jko',
       paymentMethodLabel: '街口支付',
