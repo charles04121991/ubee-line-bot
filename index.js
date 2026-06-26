@@ -718,9 +718,9 @@ app.get('/api/rider/profile', async (req, res) => {
 
 // ===== UBee 騎士可接單判斷：正式營運版 =====
 // 原則：
-// 1. 客人端街口已付款訂單可以派給騎士
-// 2. 店家派單中心的「店家月結 / 店家已收款」可以派給騎士
-// 3. 現金單先不開放，避免正式營運對帳混亂
+// 1. 客人端現金單確認後，可以派給騎士
+// 2. 未來街口支付恢復後，只有已確認付款的街口單可以派給騎士
+// 3. 店家派單中心的「店家月結 / 店家已收款」可以派給騎士
 
 function getOrderPaymentMethod(order) {
   return String(
@@ -871,15 +871,19 @@ function isMerchantDispatchOrder(order) {
 
   const isMerchantOrder =
     source === 'merchant-dashboard' ||
+    source === 'merchant' ||
     createdFrom === 'merchant-dashboard' ||
-    orderType === 'merchant_dispatch';
+    orderType === 'merchant_dispatch' ||
+    orderType === 'merchant_delivery';
 
   const isMerchantPaymentReady =
     paymentMethod === 'merchant_settlement' ||
     paymentMethod === 'merchant_paid' ||
+    paymentMethod === 'merchant' ||
     paymentStatus === 'merchant_settlement' ||
     paymentStatus === 'paid_by_merchant' ||
-    order.merchantPaid === true;
+    order.merchantPaid === true ||
+    order.isPaid === true;
 
   const isNotCashOrder =
     paymentMethod !== 'cash' &&
@@ -889,7 +893,6 @@ function isMerchantDispatchOrder(order) {
   return (
     orderStatus === 'pending_dispatch' &&
     isMerchantOrder &&
-    orderType === 'merchant_dispatch' &&
     deliveryType !== 'merchant' &&
     isMerchantPaymentReady &&
     isNotCashOrder
@@ -904,7 +907,7 @@ function isRiderVisibleDispatchOrder(order) {
   );
 }
 
-// 2. 取得可接任務：正式版只允許 approved 騎士查看，且只顯示已付款街口單
+// 2. 取得可接任務：正式版只允許 approved 騎士查看，只顯示符合派單條件的任務
 app.get('/api/rider/tasks', async (req, res) => {
   try {
     const { lineUserId } = req.query;
@@ -1552,9 +1555,11 @@ function isMerchantReceivableOrder(order) {
 
   const isMerchantOrder =
     orderType === 'merchant_dispatch' ||
+    orderType === 'merchant_delivery' ||
     source === 'merchant-dashboard' ||
+    source === 'merchant' ||
     createdFrom === 'merchant-dashboard';
-
+  
   const isCompleted =
     status === 'completed' ||
     status === 'done';
@@ -1578,7 +1583,7 @@ function isMerchantReceivableOrder(order) {
 app.get('/api/admin/merchant-receivables', async (req, res) => {
   try {
     const snap = await db.collection('orders')
-      .where('orderType', '==', 'merchant_dispatch')
+      .where('orderType', 'in', ['merchant_dispatch', 'merchant_delivery'])
       .limit(500)
       .get();
 
@@ -2986,7 +2991,7 @@ function isAdminUser(userId) {
 function getStatusLabel(status) {
   return ({
     draft_confirm: '📝 待確認',
-    pending_payment: '💳 待付款',
+    pending_payment: '🟡 待確認現金單',
     pending_dispatch: '🟡 待派單',
     accepted: '🟢 已接單',
     arrived_pickup: '🟠 已抵達取件地點',
@@ -3849,7 +3854,7 @@ function createRiderControlFlex(order) {
 
   if (order.status === 'arrived_pickup') {
     footerButtons.push(createUriButton('撥打取件電話', buildTelUrl(order.pickupPhone), 'secondary'));
-    footerButtons.push(createActionButton('申請等候費 $60', `requestWaitingFee=${order.id}`));
+    footerButtons.push(createActionButton(`申請等候費 $${PRICING.waitingFee}`, `requestWaitingFee=${order.id}`));
     footerButtons.push(createActionButton('已取件完成', `pickedUp=${order.id}`));
   }
 
@@ -3881,22 +3886,34 @@ function createRiderControlFlex(order) {
 }
 
 function createPaymentInfoFlex(order) {
-  const safeOrder = {
-    ...order,
-    paymentMethod: 'jko',
-    paymentMethodLabel: '街口支付',
-    paymentLabel: '街口支付',
-  };
+  const total = Math.round(Number(
+    order.customerPayableTotal ||
+    order.payableTotal ||
+    order.total ||
+    0
+  ));
 
-  return createFlexMessage('付款資訊', createBubble(
-    '街口支付資訊',
+  return createFlexMessage('現金單資訊', createBubble(
+    '現金單資訊',
     [
-      createInfoRow('訂單編號', safeOrder.id),
-      createInfoRow('付款方式', '街口支付'),
-      createInfoRow('應付金額', formatCurrency(safeOrder.total)),
+      createInfoRow('訂單編號', order.id),
+      createInfoRow('付款方式', '現金付款'),
+      createInfoRow('預計收取金額', formatCurrency(total)),
       { type: 'separator', margin: 'md' },
-      { type: 'text', text: PAYMENT_JKO_INFO, size: 'sm', color: '#111111', wrap: true },
-      { type: 'text', text: '完成付款後，請按「我已付款」，系統才會派單。', size: 'sm', color: '#666666', wrap: true },
+      {
+        type: 'text',
+        text: '目前 UBee 跑腿先開放現金單，任務完成時由騎士向客人收取現金。',
+        size: 'sm',
+        color: '#111111',
+        wrap: true
+      },
+      {
+        type: 'text',
+        text: '確認現金單後，系統才會開始媒合騎士。',
+        size: 'sm',
+        color: '#666666',
+        wrap: true
+      },
     ]
   ));
 }
@@ -3907,19 +3924,42 @@ function createWaitingFeeConfirmFlex(order) {
     [
       createInfoRow('訂單編號', order.id),
       createInfoRow('申請金額', formatCurrency(PRICING.waitingFee)),
-      { type: 'text', text: '騎士已抵達現場並等候超過 3–5 分鐘，將申請等候費 NT$60。請問是否同意加收？', size: 'sm', color: '#333333', wrap: true },
+      {
+        type: 'text',
+        text: `騎士已抵達現場並等候超過 3–5 分鐘，將申請等候費 NT$${PRICING.waitingFee}。請問是否同意加收？`,
+        size: 'sm',
+        color: '#333333',
+        wrap: true
+      },
     ],
     [
-      createActionButton('同意加收 $60', `waitingApprove=${order.id}`),
+      createActionButton(`同意加收 $${PRICING.waitingFee}`, `waitingApprove=${order.id}`),
       createActionButton('不同意加收', `waitingReject=${order.id}`, 'secondary'),
     ]
   ));
 }
 
 function createFinanceFlex(order) {
-  const total = order.total || 0;
-  const driver = Math.floor(total * 0.6);
-  const platform = total - driver;
+  const total = Math.round(Number(
+    order.customerPayableTotal ||
+    order.payableTotal ||
+    order.total ||
+    0
+  ));
+
+  const driver = Math.round(Number(
+    order.driverFee ||
+    order.riderFee ||
+    order.fee ||
+    0
+  ));
+
+  const platform = Math.round(Number(
+    order.platformFee ||
+    order.platformIncome ||
+    Math.max(0, Number(order.serviceSubtotal || order.serviceTotal || 0) - driver) ||
+    0
+  ));
 
   const distanceKm = Math.ceil((order.distanceMeters || 0) / 1000);
   const durationMin = Math.ceil((order.durationSeconds || 0) / 60);
@@ -4520,6 +4560,13 @@ app.post('/api/merchant/order', async (req, res) => {
       durationText: distance.durationText,
 
       total,
+      finalTotal: total,
+      customerPayableTotal: total,
+
+      merchantPayableAmount: total,
+      storePayableAmount: total,
+      totalFee: total,
+
       driverFee,
       riderFee: driverFee,
       platformFee,
@@ -4713,12 +4760,13 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
       serviceTotal: serviceSubtotal,
 
       etaMinutes: null,
-      paymentMethod: 'jko',
-      paymentMethodLabel: '街口支付',
-      paymentLabel: '街口支付',
-      paymentStatus: 'waiting_confirm',
 
-      // UBee 正式營運版：預設街口支付；若客人選擇現金，會在付款方式 API 改成現金單並直接進入派單。
+      // UBee 第一階段正式營運版：建立訂單後先等待客人確認現金單
+      paymentMethod: '',
+      paymentMethodLabel: '尚未選擇',
+      paymentLabel: '尚未選擇',
+      paymentStatus: 'unselected',
+
       isCashOrder: false,
       cashCollectAmount: 0,
       cashCollected: false,
@@ -4740,29 +4788,28 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     await saveOrder(order);
 
     await notifyCustomer(order, createTextMessage(
-  `✅ 訂單已建立：${order.id}\n\n` +
-  `付款方式：街口支付\n` +
-  `請完成付款後，回到網頁按「我已付款」，系統才會開始媒合騎士。`
-));
+      `✅ 訂單已建立：${order.id}\n\n` +
+      `目前 UBee 跑腿先開放現金單。\n` +
+      `請回到網頁確認使用現金單，確認後系統才會開始媒合騎士。`
+    ));
 
     res.json({
-  success: true,
-  orderId: id,
-  order,
-  paymentMethod: 'jko',
-  paymentMethodLabel: '街口支付',
-  paymentLabel: '街口支付',
-  paymentInfo: PAYMENT_JKO_INFO,
-paymentOptions: {
-  jko: PAYMENT_JKO_INFO,
-  cash: getPaymentInfo('cash', order.customerPayableTotal),
-},
-total: order.customerPayableTotal,
-serviceSubtotal: order.serviceSubtotal,
-customerPayableTotal: order.customerPayableTotal,
-advancePayment: order.advancePayment,
-message: '訂單已建立，請選擇街口支付或現金單。',
-});
+      success: true,
+      orderId: id,
+      order,
+      paymentMethod: '',
+      paymentMethodLabel: '尚未選擇',
+      paymentLabel: '尚未選擇',
+      paymentInfo: '',
+      paymentOptions: {
+        cash: getPaymentInfo('cash', order.customerPayableTotal),
+      },
+      total: order.customerPayableTotal,
+      serviceSubtotal: order.serviceSubtotal,
+      customerPayableTotal: order.customerPayableTotal,
+      advancePayment: order.advancePayment,
+      message: '訂單已建立，請確認使用現金單。',
+    });
   } catch (error) {
   console.error('❌ API 建立訂單失敗：', error.message || error);
   res.status(500).json({
@@ -4795,10 +4842,10 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
 
     const normalizedPaymentMethod = String(paymentMethod || '').trim().toLowerCase();
 
-    if (!['jko', 'cash'].includes(normalizedPaymentMethod)) {
+    if (normalizedPaymentMethod !== 'cash') {
       return res.status(400).json({
         success: false,
-        error: 'UBee 跑腿目前僅支援街口支付與現金單。',
+        error: '街口支付目前尚未開放，請改用現金單。',
       });
     }
 
@@ -4850,9 +4897,8 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       order.isPaid = false;
       order.paidAt = null;
 
-      // 現金單選完後，直接進入下一階段
-      // 有店家：先進店家處理 / 無店家：直接待派單
-      order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
+      // 現金單確認後，直接進入待派單
+      order.status = 'pending_dispatch';
       order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
       await saveOrder(order);
@@ -4885,46 +4931,6 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       });
     }
 
-    // 街口支付：先停在等待付款，客人按「我已完成街口支付」後才派單
-    order.paymentMethod = 'jko';
-    order.paymentMethodLabel = '街口支付';
-    order.paymentLabel = '街口支付';
-    order.paymentStatus = 'waiting_confirm';
-
-    order.isCashOrder = false;
-    order.cashCollectAmount = 0;
-    order.cashCollected = false;
-
-    order.status = 'pending_payment';
-    order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-
-    await saveOrder(order);
-
-    try {
-      await notifyCustomer(order, createTextMessage(
-        `你已選擇付款方式：街口支付\n\n` +
-        `完成付款後，請回到網頁按「我已完成街口支付，開始派單」。`
-      ));
-    } catch (notifyErr) {
-      console.error('⚠️ 街口付款方式設定成功，但通知客人失敗：', notifyErr);
-    }
-
-    return res.json({
-      success: true,
-      orderId,
-      status: order.status,
-      paymentMethod: 'jko',
-      paymentMethodLabel: '街口支付',
-      paymentLabel: '街口支付',
-      paymentStatus: 'waiting_confirm',
-      isCashOrder: false,
-      paymentInfo: getPaymentInfo('jko', customerPayableTotal),
-      total: customerPayableTotal,
-      customerPayableTotal,
-      advancePayment,
-      message: '已選擇街口支付，請完成付款後再確認付款。',
-    });
-
   } catch (error) {
     console.error('❌ 設定付款方式失敗：', error);
     return res.status(500).json({
@@ -4935,101 +4941,10 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
 });
 
 app.post('/api/orders/:orderId/paid', async (req, res) => {
-  try {
-    const orderId = String(req.params.orderId || '').toUpperCase();
-    const requestUserId = getCustomerUserIdFromBody(req.body);
-    const order = await getOrder(orderId);
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: '找不到此訂單',
-      });
-    }
-
-    if (!isSameCustomerUserId(order, requestUserId)) {
-      return res.status(403).json({
-        success: false,
-        error: '此訂單只能由原本下單的客人確認付款',
-      });
-    }
-
-    if (!order.paymentMethod) {
-      return res.status(400).json({
-        success: false,
-        error: '請先選擇付款方式',
-      });
-    }
-
-    // 只有街口單需要按「我已付款」；現金單選擇後會直接進入派單。
-if (order.paymentMethod !== 'jko') {
   return res.status(400).json({
     success: false,
-    error: '現金單不需要確認付款，選擇現金單後系統會直接開始派單。',
+    error: '街口支付目前尚未開放，現階段不提供線上付款確認。請改用現金單，任務完成時由騎士向客人收取現金。',
   });
-}
-
-    if (order.isPaid === true && order.paymentStatus === 'paid_confirmed') {
-  return res.json({
-    success: true,
-    orderId,
-    status: order.status,
-    paymentMethod: 'jko',
-    paymentMethodLabel: '街口支付',
-    paymentStatus: 'paid_confirmed',
-    isPaid: true,
-    message: '此訂單已確認付款，請勿重複操作。',
-  });
-}
-
-if (order.status !== 'pending_payment') {
-  return res.status(400).json({
-    success: false,
-    error: `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可重複確認付款`,
-  });
-}
-
-    order.status = order.hasMerchant ? 'merchant_pending' : 'pending_dispatch';
-
-order.paidAt = Date.now();
-order.isPaid = true;
-order.paymentStatus = 'paid_confirmed';
-order.paymentMethod = 'jko';
-order.paymentMethodLabel = '街口支付';
-order.paymentLabel = '街口支付';
-
-order.isCashOrder = false;
-order.cashCollectAmount = 0;
-order.cashCollected = false;
-
-order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
-
-await saveOrder(order);
-
-    try {
-      await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
-    } catch (adminErr) {
-      console.error('⚠️ 付款確認成功，但推送辦公室群組失敗：', adminErr);
-    }
-
-    return res.json({
-      success: true,
-      orderId,
-      status: order.status,
-      paymentMethod: 'jko',
-      paymentMethodLabel: '街口支付',
-      paymentStatus: 'paid_confirmed',
-      isPaid: true,
-      message: '付款已確認，系統開始媒合騎士。',
-    });
-
-  } catch (error) {
-    console.error('❌ H5 確認付款失敗：', error);
-    return res.status(500).json({
-      success: false,
-      error: '確認付款失敗，請稍後再試',
-    });
-  }
 });
 
 app.post('/api/rider-distance-to-pickup', async (req, res) => {
@@ -5071,7 +4986,7 @@ function getEtaPayloadByStatus(status) {
       etaMinutes: null,
     },
     pending_payment: {
-      etaText: '付款完成後開始媒合',
+      etaText: '等待確認現金單',
       etaMinutes: null,
     },
     merchant_pending: {
@@ -5897,9 +5812,12 @@ UBee 跑腿辦公室將會再依照您的需求，
     await updateOrderStatus(order, 'pending_payment');
 
     return replyMessages(event.replyToken, [
-      createTextMessage(`✅ 已確認建立訂單：${order.id}\n請完成街口支付，付款完成後再按「我已付款」。`),
-      createPaymentInfoFlex({ ...order, paymentMethod: order.paymentMethod || 'jko' }),
-    ]);
+  createTextMessage(
+    `✅ 已確認建立訂單：${order.id}\n\n` +
+    `目前 UBee 跑腿先開放現金單。\n` +
+    `請回到下單頁面確認使用現金單，確認後系統才會開始媒合騎士。`
+  ),
+]);
   }
 
   if (data.startsWith('showEta=')) {
@@ -6144,7 +6062,7 @@ if (!riderSnap.empty) {
     recalculateOrderFinancials(order);
     await saveOrder(order);
 
-    await replyText(event.replyToken, `✅ 已同意加收等候費 $60\n\n訂單編號：${order.id}`);
+    await replyText(event.replyToken, `✅ 已同意加收等候費 $${PRICING.waitingFee}\n\n訂單編號：${order.id}`);
     return null;
   }
 
