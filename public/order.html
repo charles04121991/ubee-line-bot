@@ -1907,16 +1907,15 @@ body.day-mode .bottom-tabs{
   <div class="input-card">
     <div class="input-wrap">
       <div class="input-icon">💰</div>
-      <input
-        id="advancePayment"
-        type="number"
-        inputmode="numeric"
-        min="0"
-        step="1"
-        value="0"
-        placeholder="請填寫需要騎士代墊的金額，沒有請填 0"
-        oninput="renderEstimate()"
-      >
+        <input
+          id="advancePayment"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          value="0"
+          placeholder="請填寫需要騎士代墊的金額，沒有請填 0"
+          oninput="renderEstimate()"
+        >
     </div>
   </div>
 </div>
@@ -2611,16 +2610,37 @@ function getAdvancePaymentAmount(){
   const raw = normalizeAdvancePaymentText(el.value);
 
   if(raw === ''){
+    el.value = '0';
     return 0;
   }
 
-  const amount = Number(raw);
-
-  if(!Number.isFinite(amount) || amount < 0){
-    return NaN;
+  if(/^(無|沒有|不用|免|否|no|none)$/i.test(raw)){
+    el.value = '0';
+    return 0;
   }
 
-  return Math.max(0, Math.round(amount));
+  let amount = Number(raw);
+
+  if(!Number.isFinite(amount)){
+    const match = raw.match(/\d+(?:\.\d+)?/);
+
+    if(!match){
+      el.value = '0';
+      return 0;
+    }
+
+    amount = Number(match[0]);
+  }
+
+  if(!Number.isFinite(amount) || amount < 0){
+    el.value = '0';
+    return 0;
+  }
+
+  amount = Math.max(0, Math.round(amount));
+  el.value = String(amount);
+
+  return amount;
 }
 
 function getDetectedAdvancePaymentAmount(){
@@ -2642,15 +2662,21 @@ function getDetectedAdvancePaymentAmount(){
 }
 
 function validateAdvancePaymentLimit(){
-  const amount = getDetectedAdvancePaymentAmount();
+  let amount = getDetectedAdvancePaymentAmount();
 
-  if(Number.isNaN(amount)){
-    alert('代墊費用請填寫 0 或正確金額。');
-    return false;
+  if(!Number.isFinite(amount) || amount < 0){
+    amount = 0;
+  }
+
+  amount = Math.max(0, Math.round(amount));
+
+  const advancePaymentEl = qs('advancePayment');
+  if(advancePaymentEl){
+    advancePaymentEl.value = String(amount);
   }
 
   if(amount >= MAX_ADVANCE_PAYMENT){
-    alert('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。為保障客人與騎士安全系統暫不開放繼續下單。');
+    alert('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額。為保障客人與騎士安全，系統暫不開放繼續下單，請先聯繫 UBee 跑腿客服人工確認。');
     return false;
   }
 
@@ -3464,16 +3490,11 @@ function validateStep2(){
   }
 
   const advancePaymentEl = qs('advancePayment');
-const advancePaymentValue = getAdvancePaymentAmount();
+  const advancePaymentValue = getAdvancePaymentAmount();
 
-if(Number.isNaN(advancePaymentValue)){
-  alert('代墊費用請填寫 0 或正確金額。');
-  return false;
-}
-
-if(advancePaymentEl){
-  advancePaymentEl.value = String(advancePaymentValue);
-}
+  if(advancePaymentEl){
+    advancePaymentEl.value = String(advancePaymentValue || 0);
+  }
 
   if(serviceGroup === 'queue' && typeof syncQueueLocation === 'function'){
     syncQueueLocation();
@@ -3713,7 +3734,7 @@ async function renderEstimate(){
 
   if(upstairsOption === 'heavy'){
     box.innerHTML = `
-      <div class="price-row price-total"><span>費用</span><strong>NT$${serviceSubtotal}</strong></div>
+      <div class="price-row price-total"><span>費用</span><strong>人工確認</strong></div>
       <div class="price-note">
         此任務選擇「重物／大量物品」，需由 UBee 跑腿人工確認重量、樓層、搬運距離與可派單狀況後再報價。
       </div>
