@@ -2239,6 +2239,187 @@ if (!online) {
   }
 });
 
+// ===== UBee 騎士安全中心回報 API =====
+app.post('/api/rider/safety-report', async (req, res) => {
+  try {
+    const {
+      lineUserId,
+      reportType,
+      reportTitle,
+      reportOption,
+      note,
+      orderId,
+      orderNo,
+      orderStatus,
+      createdFrom,
+    } = req.body || {};
+
+    if (!lineUserId || !String(lineUserId).startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的騎士 LINE 身分。',
+      });
+    }
+
+    const typeMap = {
+      customer: '客人失聯 / 無法交付',
+      store: '店家異常',
+      money: '金額 / 代墊異常',
+      accident: '事故 / 緊急狀況',
+    };
+
+    const safeReportType = cleanText(reportType || '', 30);
+    const safeReportTitle = cleanText(
+      reportTitle || typeMap[safeReportType] || '',
+      60
+    );
+    const safeReportOption = cleanText(reportOption || '', 80);
+    const safeNote = cleanLongText(note || '', 500);
+    const safeOrderId = cleanText(orderId || '', 120).replace(/\//g, '');
+    const safeOrderNo = cleanText(orderNo || '', 120);
+    const safeOrderStatus = cleanText(orderStatus || '', 40);
+    const safeCreatedFrom = cleanText(createdFrom || 'rider-web', 40);
+
+    if (!typeMap[safeReportType]) {
+      return res.status(400).json({
+        success: false,
+        message: '安全回報分類錯誤。',
+      });
+    }
+
+    if (!safeReportOption) {
+      return res.status(400).json({
+        success: false,
+        message: '請選擇要回報的狀況。',
+      });
+    }
+
+    const riderSnap = await db.collection('riders')
+      .where('lineUserId', '==', lineUserId)
+      .limit(1)
+      .get();
+
+    const riderOk = !riderSnap.empty && (
+      riderSnap.docs[0].data().approved === true ||
+      riderSnap.docs[0].data().status === 'approved'
+    );
+
+    if (!riderOk) {
+      return res.status(403).json({
+        success: false,
+        message: '你尚未通過 UBee 騎士審核，暫時無法使用安全中心回報。',
+      });
+    }
+
+    const riderDoc = riderSnap.docs[0];
+    const rider = riderDoc.data() || {};
+
+    let orderData = null;
+
+    if (safeOrderId) {
+      try {
+        const orderDoc = await db.collection('orders').doc(safeOrderId).get();
+
+        if (orderDoc.exists) {
+          orderData = {
+            id: orderDoc.id,
+            ...orderDoc.data(),
+          };
+        }
+      } catch (orderErr) {
+        console.warn('安全中心回報讀取訂單失敗：', orderErr.message);
+      }
+    }
+
+    const reportRef = db.collection('riderSafetyReports').doc();
+    const reportId = reportRef.id;
+
+    const report = {
+      id: reportId,
+      reportId,
+
+      status: 'open',
+      priority: safeReportType === 'accident' ? 'urgent' : 'normal',
+
+      reportType: safeReportType,
+      reportTitle: safeReportTitle || typeMap[safeReportType],
+      reportOption: safeReportOption,
+      note: safeNote,
+
+      riderDocId: riderDoc.id,
+      riderName: cleanText(rider.name || rider.riderName || '', 40),
+      riderPhone: normalizePhone(rider.phone || riderDoc.id || ''),
+      riderLineUserId: lineUserId,
+      riderPlateNumber: cleanText(rider.plateNumber || rider.plateNo || '', 30),
+      riderServiceArea: cleanText(rider.serviceArea || rider.area || '', 80),
+
+      orderId: orderData?.id || safeOrderId || '',
+      orderNo: cleanText(orderData?.orderNo || safeOrderNo || orderData?.id || '', 120),
+      orderStatus: cleanText(orderData?.status || safeOrderStatus || '', 40),
+      pickupAddress: cleanText(orderData?.pickupAddress || orderData?.fromAddress || '', 160),
+      dropoffAddress: cleanText(orderData?.dropoffAddress || orderData?.toAddress || '', 160),
+
+      source: safeCreatedFrom,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await reportRef.set(report);
+
+    if (report.orderId) {
+      await db.collection('orders').doc(report.orderId).set({
+        lastSafetyReportId: reportId,
+        lastSafetyReportType: report.reportType,
+        lastSafetyReportTitle: report.reportTitle,
+        lastSafetyReportOption: report.reportOption,
+        lastSafetyReportAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+
+    const adminText =
+`🛡️ UBee 騎士安全中心回報
+
+回報分類：${report.reportTitle}
+回報狀況：${report.reportOption}
+優先等級：${report.priority === 'urgent' ? '緊急' : '一般'}
+
+騎士姓名：${report.riderName || '未提供'}
+騎士電話：${report.riderPhone || '未提供'}
+車牌：${report.riderPlateNumber || '未提供'}
+LINE：${report.riderLineUserId}
+
+訂單編號：${report.orderNo || report.orderId || '目前未綁定訂單'}
+訂單狀態：${report.orderStatus || '未提供'}
+
+補充說明：
+${report.note || '未填寫'}
+
+回報編號：${reportId}`;
+
+    try {
+      await pushToGroup(LINE_ADMIN_GROUP_ID, createTextMessage(adminText));
+    } catch (pushErr) {
+      console.error('安全中心回報推送管理群失敗：', pushErr);
+    }
+
+    return res.json({
+      success: true,
+      message: '安全中心回報已送出。',
+      reportId,
+    });
+
+  } catch (err) {
+    console.error('❌ 騎士安全中心回報失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '安全中心回報失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
 // ===== 商務合作申請 API =====
 app.post('/api/business/register', async (req, res) => {
   try {
