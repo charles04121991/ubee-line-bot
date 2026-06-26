@@ -78,6 +78,7 @@ const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
+const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const LIFF_ID = process.env.LIFF_ID || '';
@@ -2398,11 +2399,11 @@ ${report.note || '未填寫'}
 回報編號：${reportId}`;
 
     try {
-      await pushToGroup(LINE_ADMIN_GROUP_ID, createTextMessage(adminText));
+      await pushToGroup(LINE_SAFETY_GROUP_ID, createTextMessage(adminText));
+      console.log('✅ 安全中心回報已推送到 LINE_SAFETY_GROUP_ID：', LINE_SAFETY_GROUP_ID);
     } catch (pushErr) {
-      console.error('安全中心回報推送管理群失敗：', pushErr);
+      console.error('安全中心回報推送安全群失敗：', pushErr);
     }
-
     return res.json({
       success: true,
       message: '安全中心回報已送出。',
