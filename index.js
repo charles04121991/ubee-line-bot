@@ -2267,6 +2267,7 @@ app.post('/api/rider/safety-report', async (req, res) => {
       store: '店家異常',
       money: '金額 / 代墊異常',
       accident: '事故 / 緊急狀況',
+      account_system: '帳號與系統',
     };
 
     const safeReportType = cleanText(reportType || '', 30);
