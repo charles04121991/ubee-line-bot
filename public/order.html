@@ -2522,7 +2522,7 @@ const serviceGroups = {
     { icon:'🧻', title:'生活用品', categories:['清潔用品','衛生用品','五金用品','日用品','其他生活用品'] },
     { icon:'🥬', title:'生鮮代買', categories:['蔬菜','水果','肉品','海鮮','其他生鮮'] },
     { icon:'🍰', title:'蛋糕甜點', categories:['生日蛋糕','甜點','麵包','伴手禮','其他甜點'] },
-    { icon:'🛒', title:'賣場代買', categories:['全聯','家樂福','寶雅','小北百貨','五金百貨','其他賣場'] }
+    { icon:'🛒', title:'賣場代買', categories:['全聯','康達盛通','寶雅','小北百貨','楓康超市','美廉社'] }
   ],
   queue: [
     { icon:'🍽️', title:'餐廳候位', categories:['現場候位','領號碼牌','排隊訂位','代等座位','其他候位'] },
@@ -2982,7 +2982,7 @@ function handleServiceSelectionChanged(){
     return;
   }
 
-  setNearbyStatus('已選擇代買分類。請按「搜尋附近店家」，系統才會開始定位與搜尋。');
+  setNearbyStatus('已選擇代買分類，請按「搜尋附近店家」，系統才會開始定位與搜尋。');
 }
   
 function getCurrentPosition(){
@@ -3476,7 +3476,7 @@ function validateStep2(){
   }
 
   if(!note){
-    alert('請填寫備註，讓 UBee 騎士知道這筆任務要處理什麼。');
+    alert('請填寫備註，讓 UBee 跑腿騎士知道這筆任務要處理什麼。');
     return false;
   }
 
