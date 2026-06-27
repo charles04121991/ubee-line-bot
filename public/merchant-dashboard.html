@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee 跑腿店家派單中心</title>
+<title>UBee 跑腿店家端</title>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -771,7 +771,7 @@ button.red{background:var(--red);color:#fff}
 
       <div class="workbenchHint">
         <b>操作原則：</b>
-        騎士接單前可取消；騎士接單後請聯絡 UBee 管理端協助處理。
+        騎士接單前可取消；騎士接單後請聯絡 UBee 跑腿管理端協助處理。
       </div>
 
       <div class="tabs workbenchTabs">
@@ -1263,7 +1263,7 @@ async function initMerchantLiff(){
   hideError();
 
   if(typeof liff === "undefined"){
-    showError("LINE LIFF 載入失敗，請從 UBee 跑腿店家合作中心重新開啟。");
+    showError("LINE LIFF 載入失敗，請從 UBee 跑腿店家端重新開啟。");
     forceEnableLoginButton("進入派單中心");
     return;
   }
@@ -1285,7 +1285,7 @@ async function initMerchantLiff(){
     }
   }catch(err){
     console.error("店家 LIFF 初始化失敗:", err);
-    showError("店家登入初始化失敗，請從 UBee 跑腿店家合作中心重新開啟。");
+    showError("店家登入初始化失敗，請從 UBee 跑腿店家端重新開啟。");
     forceEnableLoginButton("進入派單中心");
   }
 }
@@ -1324,7 +1324,7 @@ function enterMerchantDashboard(merchant){
 
 async function loadMerchantProfile(){
   if(!merchantLineUserId){
-    showError("缺少 LINE 使用者資料，請從 UBee 店家合作中心重新開啟。");
+    showError("缺少 LINE 使用者資料，請從 UBee 店家端重新開啟。");
     forceEnableLoginButton("進入派單中心");
     return;
   }
@@ -1356,7 +1356,7 @@ async function loginMerchant(){
   const phone = normalizePhone(input.value);
 
   if(!merchantLineUserId){
-    showError("缺少 LINE 使用者資料，請從 UBee 跑腿店家合作中心重新開啟店家派單。");
+    showError("缺少 LINE 使用者資料，請從 UBee 跑腿店家端重新開啟店家派單。");
     forceEnableLoginButton("進入派單中心");
     return;
   }
