@@ -998,7 +998,10 @@
 <script>
 const LIFF_ID = '2009895876-MsVhzIxz';
 const API_BASE_URL = 'https://ubee-line-bot-2-zezw.onrender.com';
-  
+
+let realLineUserId = '';
+let isSubmitting = false;
+
 const form = document.getElementById('riderForm');
 const submitBtn = document.getElementById('submitBtn');
 const successBox = document.getElementById('successBox');
@@ -1029,6 +1032,8 @@ function showError(message) {
 }
 
 function updateSubmitState() {
+  // 正式營運版：不要因為未勾同意就鎖死按鈕。
+  // 使用者按送出時再檢查，避免看起來像壞掉。
   submitBtn.disabled = isSubmitting;
 }
 
@@ -1052,15 +1057,22 @@ async function initLiff() {
     console.log('LINE real userId:', realLineUserId);
   } catch (err) {
     console.error('LIFF 初始化失敗:', err);
+  } finally {
+    updateSubmitState();
   }
 }
 
-window.addEventListener('load', initLiff);
-
-agreeCheck.addEventListener('change', function() {
-  clearMessage();
-  updateSubmitState();
+window.addEventListener('load', function() {
+  submitBtn.disabled = false;
+  initLiff();
 });
+
+if (agreeCheck) {
+  agreeCheck.addEventListener('change', function() {
+    clearMessage();
+    updateSubmitState();
+  });
+}
 
 document.getElementById('phone').addEventListener('input', function() {
   this.value = this.value.replace(/\D/g, '').slice(0, 10);
@@ -1196,7 +1208,7 @@ form.addEventListener('submit', async function(e) {
     }
 
     if (data.success) {
-      showSuccess(data.message || '✅ 申請已送出，請等待 UBee 跑腿審核通過。審核通過後，系統會透過官方帳號通知你後續流程。');
+      showSuccess(data.message || '✅ 申請已送出，請等待 UBee 跑腿審核通過。');
 
       submitBtn.textContent = '已送出申請';
       submitBtn.disabled = true;
@@ -1205,7 +1217,10 @@ form.addEventListener('submit', async function(e) {
         el.disabled = true;
       });
 
-    } else if (data.duplicate) {
+      return;
+    }
+
+    if (data.duplicate) {
       showSuccess(data.message || '✅ 你的任務夥伴申請資料已送出，請等待 UBee 跑腿審核通過，請勿重複申請。');
 
       submitBtn.textContent = '資料已送出';
@@ -1215,13 +1230,14 @@ form.addEventListener('submit', async function(e) {
         el.disabled = true;
       });
 
-    } else {
-      showError(data.message || '送出失敗，請稍後再試。');
-
-      isSubmitting = false;
-      submitBtn.textContent = '送出申請';
-      updateSubmitState();
+      return;
     }
+
+    showError(data.message || '送出失敗，請稍後再試。');
+
+    isSubmitting = false;
+    submitBtn.textContent = '送出申請';
+    updateSubmitState();
 
   } catch (err) {
     console.error(err);
@@ -1234,6 +1250,5 @@ form.addEventListener('submit', async function(e) {
   }
 });
 </script>
-
 </body>
 </html>
