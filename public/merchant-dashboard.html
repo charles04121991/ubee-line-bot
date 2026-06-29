@@ -11,185 +11,349 @@
 
 <style>
 :root{
-  --bg:#f7f4ea;
+  --bg:#f8f2e9;
+  --bg2:#fffaf3;
   --card:#ffffff;
-  --card2:#f8fafc;
-  --card3:#f1f5f9;
-  --line:rgba(0,0,0,.1);
-  --text:#111827;
-  --muted:#4b5563;
-  --yellow:#facc15;
-  --yellow2:#eab308;
-  --green:#22c55e;
-  --blue:#38bdf8;
-  --red:#ef4444;
-  --shadow:0 14px 30px rgba(0,0,0,.08);
+  --card2:#fff7ed;
+  --card3:#f5eadc;
+  --line:rgba(92,64,39,.12);
+  --line2:rgba(92,64,39,.18);
+  --text:#3f2b20;
+  --muted:#8a6d58;
+  --brand:#c28b5c;
+  --brand2:#a96f43;
+  --brand3:#e8c8a7;
+  --cream:#fffdf8;
+  --yellow:#d99645;
+  --yellow2:#c4803a;
+  --green:#5bbf7a;
+  --blue:#70a6d8;
+  --red:#e46d62;
+  --shadow:0 18px 45px rgba(107,71,39,.12);
+  --shadow2:0 10px 24px rgba(107,71,39,.10);
+  --radius:24px;
 }
 
 *{box-sizing:border-box}
-
 html{scroll-behavior:smooth}
-
 body{
   margin:0;
-  background:var(--bg);
+  min-height:100vh;
+  background:
+    radial-gradient(circle at 8% 0%,rgba(226,183,137,.35),transparent 30%),
+    radial-gradient(circle at 100% 12%,rgba(255,245,218,.95),transparent 35%),
+    linear-gradient(180deg,#fff8ee 0%,var(--bg) 52%,#f6eadb 100%);
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
   -webkit-font-smoothing:antialiased;
 }
 
 .wrap{
-  max-width:760px;
+  width:min(100%,980px);
   margin:0 auto;
-  padding:14px 14px 44px;
+  padding:18px 14px 52px;
 }
 
-.login,.section{
-  background:var(--card);
+.hidden{display:none!important}
+
+.login,.section,.posHero{
+  background:rgba(255,255,255,.88);
   border:1px solid var(--line);
-  border-radius:20px;
-  padding:16px;
+  border-radius:var(--radius);
+  padding:18px;
   margin-top:14px;
+  box-shadow:var(--shadow2);
+  backdrop-filter:blur(10px);
 }
 
-.section{scroll-margin-top:92px}
+.login{
+  max-width:520px;
+  margin:36px auto 0;
+  padding:22px;
+}
+
+.login::before{
+  content:"UBee Merchant POS";
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border-radius:999px;
+  color:#fff;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:.2px;
+}
+
+.section{scroll-margin-top:108px}
+
+#dashboard{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
 
 h2{
-  font-size:20px;
+  font-size:22px;
+  line-height:1.2;
   margin:0 0 12px;
+  color:var(--text);
+  letter-spacing:-.3px;
 }
 
-h3{margin:0}
+h3{margin:0;color:var(--text)}
 
 .small{
   color:var(--muted);
   font-size:13px;
   margin-top:8px;
-  line-height:1.6;
-}
-
-.hidden{display:none!important}
-
-#dashboard{
-  display:flex;
-  flex-direction:column;
-}
-
-.merchantApprovedOnly{
-  padding:12px 14px;
-  margin-top:0;
-}
-
-.merchantApprovedOnly .merchantInfo{
-  margin-top:0;
-  text-align:center;
-  background:#fff;
-}
-
-.hiddenCounters{
-  display:none!important;
-}
-
-.merchantInfo{
-  margin-top:10px;
-  padding:12px;
-  border-radius:16px;
-  background:rgba(250,204,21,.1);
-  border:1px solid rgba(250,204,21,.25);
   line-height:1.7;
-  font-size:14px;
-}
-
-.approved{
-  color:#16a34a;
-  font-weight:900;
-}
-
-.quickNav{
-  position:sticky;
-  top:0;
-  z-index:20;
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:8px;
-  padding:10px 0;
-  margin-top:12px;
-  background:linear-gradient(to bottom,var(--bg) 75%,rgba(0,0,0,0));
-}
-
-.quickNav button{
-  margin:0;
-  padding:10px 6px;
-  border-radius:14px;
-  font-size:13px;
-  background:var(--card2);
-  color:var(--text);
-  border:1px solid var(--line);
-}
-
-.quickNav button.active{
-  background:linear-gradient(135deg,var(--yellow),var(--yellow2));
-  color:#000;
-  border:0;
 }
 
 label{
   display:block;
   color:var(--text);
   font-size:14px;
-  margin:10px 0 6px;
+  margin:12px 0 7px;
   font-weight:900;
 }
 
 input,textarea,select{
   width:100%;
-  padding:14px;
-  border-radius:14px;
-  border:1px solid var(--line);
-  background:var(--card2);
+  padding:14px 15px;
+  border-radius:18px;
+  border:1px solid var(--line2);
+  background:#fffaf4;
   color:var(--text);
   font-size:16px;
   outline:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
 }
 
 textarea{
-  min-height:88px;
+  min-height:92px;
   resize:vertical;
   line-height:1.6;
 }
 
 input:focus,textarea:focus,select:focus{
-  border-color:var(--yellow);
-  box-shadow:0 0 0 3px rgba(250,204,21,.12);
+  border-color:rgba(194,139,92,.62);
+  box-shadow:0 0 0 4px rgba(194,139,92,.12);
+  background:#fff;
 }
 
 button{
   width:100%;
   border:0;
-  border-radius:16px;
+  border-radius:18px;
   padding:14px;
   margin-top:12px;
   font-size:16px;
   font-weight:900;
-  color:#000;
-  background:linear-gradient(135deg,var(--yellow),var(--yellow2));
+  color:#fff;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
   cursor:pointer;
+  box-shadow:0 10px 22px rgba(169,111,67,.18);
+  transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
 }
 
-button:disabled{
-  opacity:.55;
-  cursor:not-allowed;
-}
+button:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(169,111,67,.22)}
+button:active{transform:translateY(0);filter:brightness(.98)}
+button:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
 
 button.secondary{
-  background:var(--card2);
+  background:#fffaf4;
   color:var(--text);
+  border:1px solid var(--line2);
+  box-shadow:none;
+}
+
+button.green{background:linear-gradient(135deg,#6ccf8c,#4aa96a);color:#fff}
+button.blue{background:linear-gradient(135deg,#7bb5e8,#4d8ec7);color:#fff}
+button.red{background:linear-gradient(135deg,#ef8278,#d94f45);color:#fff}
+
+/* ===== UBee Merchant POS Hero ===== */
+.posHero{
+  position:relative;
+  overflow:hidden;
+  padding:18px;
+  background:
+    radial-gradient(circle at 92% 0%,rgba(244,205,160,.7),transparent 33%),
+    linear-gradient(180deg,#fffdf8 0%,#fff4e6 100%);
+}
+
+.posHero::after{
+  content:"";
+  position:absolute;
+  right:-42px;
+  top:-44px;
+  width:150px;
+  height:150px;
+  border-radius:50%;
+  background:rgba(194,139,92,.12);
+}
+
+.brandBar{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+
+.brandMarkRow{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.brandLogo{
+  width:58px;
+  height:58px;
+  border-radius:22px;
+  background:linear-gradient(135deg,#fff4cc,#e6a84e);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:31px;
+  box-shadow:0 14px 26px rgba(194,139,92,.22);
+  flex-shrink:0;
+}
+
+.brandTitle{
+  font-size:25px;
+  font-weight:950;
+  letter-spacing:-.6px;
+  color:#3c271a;
+  line-height:1.16;
+}
+
+.brandSub{
+  margin-top:4px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+}
+
+.statusChip{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 11px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid var(--line);
+  color:var(--text);
+  font-size:12px;
+  font-weight:900;
+  box-shadow:0 8px 16px rgba(107,71,39,.08);
+  white-space:nowrap;
+}
+
+.heroToolRow{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:16px;
+}
+
+.heroTool{
+  margin:0;
+  padding:13px 12px;
+  border-radius:18px;
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--text);
+  box-shadow:0 10px 20px rgba(107,71,39,.08);
+}
+
+.notifyPanel{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:16px;
+  padding:14px;
+  border-radius:22px;
+  background:rgba(255,255,255,.72);
   border:1px solid var(--line);
 }
 
-button.green{background:var(--green)}
-button.blue{background:var(--blue)}
-button.red{background:var(--red);color:#fff}
+.notifyLeft{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.notifyIcon{
+  width:44px;
+  height:44px;
+  border-radius:17px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#fff4d8;
+  font-size:23px;
+}
+
+.notifyTitle{
+  font-weight:950;
+  color:var(--text);
+}
+
+.notifyText{
+  margin-top:2px;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.4;
+}
+
+.notifyCount{
+  min-width:50px;
+  height:50px;
+  border-radius:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  font-weight:950;
+  font-size:22px;
+  box-shadow:0 12px 24px rgba(169,111,67,.22);
+}
+
+.merchantApprovedOnly{
+  position:relative;
+  z-index:1;
+  padding:0;
+  margin-top:16px;
+  background:transparent;
+  border:0;
+  box-shadow:none;
+}
+
+.merchantApprovedOnly .merchantInfo{
+  margin-top:0;
+}
+
+.merchantInfo{
+  padding:13px 14px;
+  border-radius:20px;
+  background:#fff;
+  border:1px solid var(--line);
+  line-height:1.7;
+  font-size:14px;
+  color:var(--text);
+  box-shadow:0 10px 22px rgba(107,71,39,.07);
+}
+
+.approved{color:#2f9b57;font-weight:950}
 
 .summaryGrid{
   display:grid;
@@ -199,24 +363,111 @@ button.red{background:var(--red);color:#fff}
 }
 
 .summaryCard{
-  background:var(--card2);
+  background:#fff;
   border:1px solid var(--line);
-  border-radius:16px;
-  padding:12px;
+  border-radius:20px;
+  padding:13px;
+  box-shadow:0 8px 18px rgba(107,71,39,.06);
 }
 
 .summaryCard b{
   display:block;
   font-size:22px;
-  color:var(--yellow);
+  color:var(--brand2);
+  letter-spacing:-.4px;
 }
 
 .summaryCard span{
   display:block;
   color:var(--muted);
-  font-size:13px;
-  margin-top:4px;
+  font-size:12px;
+  margin-top:5px;
+  font-weight:800;
 }
+
+.hiddenCounters{display:none!important}
+
+.quickNav{
+  position:sticky;
+  top:0;
+  z-index:20;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  padding:12px 0;
+  margin-top:0;
+  background:linear-gradient(to bottom,rgba(248,242,233,.96) 70%,rgba(248,242,233,0));
+  backdrop-filter:blur(10px);
+}
+
+.quickNav button{
+  position:relative;
+  min-height:86px;
+  margin:0;
+  padding:14px;
+  border-radius:24px;
+  background:#fff;
+  color:var(--text);
+  border:1px solid var(--line);
+  box-shadow:0 12px 26px rgba(107,71,39,.10);
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  text-align:left;
+  overflow:hidden;
+}
+
+.quickNav button::after{
+  content:"";
+  position:absolute;
+  right:-22px;
+  bottom:-30px;
+  width:82px;
+  height:82px;
+  border-radius:50%;
+  background:rgba(194,139,92,.08);
+}
+
+.quickNav button .navIcon{
+  width:40px;
+  height:40px;
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#fff4df;
+  font-size:22px;
+  margin-bottom:10px;
+}
+
+.quickNav button .navTitle{
+  position:relative;
+  z-index:1;
+  display:block;
+  font-size:16px;
+  line-height:1.2;
+}
+
+.quickNav button .navSub{
+  position:relative;
+  z-index:1;
+  display:block;
+  margin-top:5px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+  line-height:1.35;
+}
+
+.quickNav button.active{
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff;
+  border-color:transparent;
+}
+
+.quickNav button.active .navSub{color:rgba(255,255,255,.78)}
+.quickNav button.active .navIcon{background:rgba(255,255,255,.18)}
 
 .tabs{
   display:grid;
@@ -227,31 +478,31 @@ button.red{background:var(--red);color:#fff}
 
 .tab{
   padding:12px 8px;
-  border-radius:14px;
-  background:var(--card2);
+  border-radius:18px;
+  background:#fffaf4;
   border:1px solid var(--line);
   color:var(--text);
   text-align:center;
-  font-weight:900;
+  font-weight:950;
   font-size:14px;
   cursor:pointer;
+  transition:all .16s ease;
 }
 
-.tab.active{
-  border-color:var(--yellow);
-  color:#000;
-  background:var(--yellow);
-}
+.tab:hover{transform:translateY(-1px)}
+.tab.active{border-color:transparent;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 10px 20px rgba(169,111,67,.18)}
+.tab span{display:block;margin-top:6px;font-size:20px;line-height:1}
 
 .order,.simpleCard,.stopCard{
-  background:var(--card2);
+  background:#fffdf8;
   border:1px solid var(--line);
-  border-radius:18px;
+  border-radius:22px;
   padding:14px;
   margin-top:12px;
+  box-shadow:0 10px 22px rgba(107,71,39,.07);
 }
 
-.stopCard{background:var(--card3)}
+.stopCard{background:linear-gradient(180deg,#fffdf8,#fff7ec)}
 
 .stopTitle{
   display:flex;
@@ -261,45 +512,40 @@ button.red{background:var(--red);color:#fff}
   margin-bottom:8px;
 }
 
-.stopBadge{
-  padding:5px 9px;
+.stopBadge,.badge{
+  display:inline-block;
+  padding:6px 10px;
   border-radius:999px;
-  background:rgba(250,204,21,.16);
+  background:#fff0d7;
+  color:#8c5a31;
   font-size:12px;
-  font-weight:900;
+  margin-bottom:8px;
+  font-weight:950;
   white-space:nowrap;
 }
 
 .row{
   color:var(--text);
-  line-height:1.6;
+  line-height:1.65;
   font-size:14px;
   word-break:break-word;
-}
-
-.badge{
-  display:inline-block;
-  padding:5px 9px;
-  border-radius:999px;
-  background:rgba(250,204,21,.18);
-  font-size:12px;
-  margin-bottom:8px;
-  font-weight:900;
 }
 
 .empty{
   color:var(--muted);
   text-align:center;
-  padding:26px 10px;
+  padding:28px 10px;
+  font-weight:800;
 }
 
-.notice{
+.notice,.workbenchHint{
   margin-top:12px;
-  padding:12px;
-  border-radius:14px;
-  background:rgba(250,204,21,.1);
-  border:1px solid rgba(250,204,21,.25);
-  line-height:1.6;
+  padding:13px;
+  border-radius:18px;
+  background:#fff5e6;
+  border:1px solid rgba(194,139,92,.20);
+  color:#63442f;
+  line-height:1.65;
   font-size:14px;
 }
 
@@ -307,10 +553,10 @@ button.red{background:var(--red);color:#fff}
   display:none;
   margin-top:12px;
   padding:12px;
-  border-radius:14px;
-  background:rgba(239,68,68,.12);
-  border:1px solid rgba(239,68,68,.35);
-  color:#ef4444;
+  border-radius:18px;
+  background:rgba(228,109,98,.12);
+  border:1px solid rgba(228,109,98,.35);
+  color:#c0392f;
   line-height:1.6;
 }
 
@@ -324,84 +570,44 @@ button.red{background:var(--red);color:#fff}
   display:none;
   margin-top:12px;
   padding:12px;
-  border-radius:14px;
+  border-radius:18px;
   line-height:1.6;
   font-size:14px;
+  font-weight:800;
 }
 
-.formMsg.ok{
-  display:block;
-  background:rgba(34,197,94,.12);
-  border:1px solid rgba(34,197,94,.35);
-  color:#16a34a;
-}
+.formMsg.ok{display:block;background:rgba(91,191,122,.13);border:1px solid rgba(91,191,122,.35);color:#2f8a50}
+.formMsg.err{display:block;background:rgba(228,109,98,.13);border:1px solid rgba(228,109,98,.35);color:#c0392f}
 
-.formMsg.err{
-  display:block;
-  background:rgba(239,68,68,.12);
-  border:1px solid rgba(239,68,68,.35);
-  color:#ef4444;
-}
-
-.progressBox{
-  margin-top:10px;
-}
-
+.progressBox{margin-top:10px}
 .flow{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:8px;
   overflow-x:auto;
-  padding:10px 0;
+  padding:12px 0;
 }
-
-.step{
-  min-width:86px;
-  text-align:center;
-  color:var(--muted);
-  font-size:12px;
-  flex-shrink:0;
-}
-
+.step{min-width:86px;text-align:center;color:var(--muted);font-size:12px;flex-shrink:0;font-weight:800}
 .step .circle{
-  width:38px;
-  height:38px;
-  margin:0 auto 6px;
+  width:40px;
+  height:40px;
+  margin:0 auto 7px;
   border-radius:50%;
-  background:var(--card);
+  background:#fff;
   color:var(--muted);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-weight:900;
+  font-weight:950;
   border:1px solid var(--line);
 }
-
 .step.done{color:var(--text)}
-.step.done .circle{
-  background:var(--green);
-  color:#000;
-}
-
-.step.current{
-  color:var(--text);
-  font-weight:900;
-}
-
-.step.current .circle{
-  background:var(--yellow);
-  color:#000;
-}
-
-.line{
-  flex:1;
-  height:3px;
-  background:var(--line);
-  min-width:30px;
-}
-
-.line.done{background:var(--yellow)}
+.step.done .circle{background:var(--green);color:#fff;border-color:transparent}
+.step.current{color:var(--text);font-weight:950}
+.step.current .circle{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-color:transparent}
+.line{flex:1;height:4px;background:var(--line);min-width:30px;border-radius:999px}
+.line.done{background:var(--brand)}
 
 .moneyBox{
   display:grid;
@@ -409,50 +615,30 @@ button.red{background:var(--red);color:#fff}
   gap:10px;
   margin-top:10px;
 }
-
 .moneyItem{
-  background:var(--card);
+  background:#fff;
   border:1px solid var(--line);
-  border-radius:14px;
-  padding:10px;
+  border-radius:18px;
+  padding:12px;
 }
-
-.moneyItem span{
-  display:block;
-  color:var(--muted);
-  font-size:12px;
-}
-
-.moneyItem b{
-  display:block;
-  margin-top:4px;
-  font-size:16px;
-}
+.moneyItem span{display:block;color:var(--muted);font-size:12px;font-weight:800}
+.moneyItem b{display:block;margin-top:4px;font-size:17px;color:var(--text)}
 
 .stopList{
   margin-top:10px;
-  padding:10px;
-  border-radius:14px;
-  background:rgba(255,255,255,.04);
+  padding:12px;
+  border-radius:18px;
+  background:#fffaf4;
   border:1px solid var(--line);
 }
-
-.stopListTitle{
-  font-weight:900;
-  margin-bottom:6px;
-}
-
-.stopListItem{
-  padding:8px 0;
-  border-top:1px solid var(--line);
-}
-
+.stopListTitle{font-weight:950;margin-bottom:6px}
+.stopListItem{padding:9px 0;border-top:1px solid var(--line)}
 .stopListItem:first-of-type{border-top:0}
 
 .workbenchSection{
   background:
-    radial-gradient(circle at top right,rgba(250,204,21,.18),transparent 32%),
-    var(--card);
+    radial-gradient(circle at top right,rgba(226,183,137,.35),transparent 32%),
+    rgba(255,255,255,.9);
 }
 
 .workbenchTop{
@@ -462,38 +648,18 @@ button.red{background:var(--red);color:#fff}
   gap:12px;
   margin-bottom:12px;
 }
-
-.workbenchTop h2{
-  margin-bottom:4px;
-  font-size:24px;
-}
-
+.workbenchTop h2{margin-bottom:4px;font-size:24px}
 .workbenchLabel{
   display:inline-block;
-  padding:5px 9px;
+  padding:6px 10px;
   border-radius:999px;
-  background:#111827;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
   color:#fff;
   font-size:12px;
-  font-weight:900;
-  margin-bottom:8px;
+  font-weight:950;
+  margin-bottom:9px;
 }
-
-.workbenchHint{
-  margin-top:10px;
-  padding:12px;
-  border-radius:16px;
-  background:rgba(17,24,39,.05);
-  border:1px solid var(--line);
-  line-height:1.6;
-  font-size:14px;
-}
-
-.workbenchTabs{
-  margin-top:14px;
-  grid-template-columns:repeat(2,1fr);
-}
-
+.workbenchTabs{margin-top:14px;grid-template-columns:repeat(2,1fr)}
 .workbenchTabs .tab{
   min-height:58px;
   display:flex;
@@ -503,195 +669,107 @@ button.red{background:var(--red);color:#fff}
   gap:4px;
   font-size:13px;
 }
-
-.workbenchTabs .tab span{
-  display:block;
-  font-size:20px;
-  line-height:1;
-}
-
-.workbenchOrders{
-  margin-top:14px;
-}
+.workbenchOrders{margin-top:14px}
 
 .posOrder{
   background:#fff;
-  border:1px solid rgba(17,24,39,.1);
-  box-shadow:0 12px 24px rgba(0,0,0,.06);
+  border:1px solid var(--line);
+  box-shadow:0 14px 32px rgba(107,71,39,.10);
   overflow:hidden;
 }
-
 .posHeader{
   display:flex;
   align-items:flex-start;
   justify-content:space-between;
   gap:12px;
-  padding-bottom:12px;
+  padding-bottom:13px;
   border-bottom:1px solid var(--line);
 }
-
 .posOrderNo{
   font-size:20px;
-  font-weight:900;
+  font-weight:950;
   line-height:1.3;
   word-break:break-word;
+  color:#3b2619;
 }
-
-.posMeta{
-  margin-top:5px;
-  color:var(--muted);
-  font-size:13px;
-  line-height:1.5;
-}
-
-.posStatusArea{
-  text-align:right;
-  flex-shrink:0;
-}
-
+.posMeta{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.5;font-weight:800}
+.posStatusArea{text-align:right;flex-shrink:0}
 .posStatus{
   display:inline-block;
-  padding:7px 10px;
+  padding:7px 11px;
   border-radius:999px;
   font-size:12px;
-  font-weight:900;
-  color:#111827;
-  background:rgba(250,204,21,.22);
-  border:1px solid rgba(250,204,21,.35);
+  font-weight:950;
+  color:#74471f;
+  background:#fff0d7;
+  border:1px solid rgba(194,139,92,.25);
 }
-
-.posStatus.hot{
-  background:rgba(239,68,68,.12);
-  border-color:rgba(239,68,68,.32);
-  color:#b91c1c;
-}
-
-.posStatus.wait{
-  background:rgba(56,189,248,.14);
-  border-color:rgba(56,189,248,.34);
-  color:#0369a1;
-}
-
-.posStatus.move{
-  background:rgba(34,197,94,.14);
-  border-color:rgba(34,197,94,.34);
-  color:#15803d;
-}
-
+.posStatus.hot{background:rgba(228,109,98,.12);border-color:rgba(228,109,98,.32);color:#b33a31}
+.posStatus.wait{background:rgba(112,166,216,.14);border-color:rgba(112,166,216,.34);color:#2f6e9f}
+.posStatus.move{background:rgba(91,191,122,.14);border-color:rgba(91,191,122,.34);color:#2d824a}
 .posPill{
   display:inline-block;
-  margin-top:6px;
-  padding:5px 8px;
+  margin-top:7px;
+  padding:6px 9px;
   border-radius:999px;
-  background:var(--card2);
+  background:#fffaf4;
   border:1px solid var(--line);
   color:var(--muted);
   font-size:12px;
-  font-weight:900;
+  font-weight:950;
 }
-
 .posNext{
   margin-top:12px;
   padding:14px;
-  border-radius:18px;
-  background:linear-gradient(135deg,rgba(250,204,21,.2),rgba(250,204,21,.06));
-  border:1px solid rgba(250,204,21,.34);
+  border-radius:20px;
+  background:linear-gradient(135deg,rgba(226,183,137,.32),rgba(255,248,235,.88));
+  border:1px solid rgba(194,139,92,.22);
 }
-
-.posNextTitle{
-  font-size:17px;
-  font-weight:900;
-  margin-bottom:5px;
-}
-
-.posNextText{
-  color:#374151;
-  line-height:1.6;
-  font-size:14px;
-}
-
-.posActionBar{
-  margin-top:12px;
-}
-
-.posActionBar button{
-  margin-top:8px;
-}
-
-.posMainInfo{
-  margin-top:12px;
-  display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
-}
-
+.posNextTitle{font-size:17px;font-weight:950;margin-bottom:5px;color:#3b2619}
+.posNextText{color:#63442f;line-height:1.65;font-size:14px}
+.posActionBar{margin-top:12px}
+.posActionBar button{margin-top:8px}
+.posMainInfo{margin-top:12px;display:grid;grid-template-columns:1fr;gap:10px}
 .posInfoBlock{
   padding:12px;
-  border-radius:16px;
-  background:var(--card2);
+  border-radius:20px;
+  background:#fffaf4;
   border:1px solid var(--line);
 }
-
-.posInfoTitle{
-  font-weight:900;
-  margin-bottom:8px;
-  font-size:15px;
-}
-
-.posItemText{
-  font-size:17px;
-  line-height:1.6;
-  font-weight:900;
-  white-space:pre-line;
-}
-
-.posAddress{
-  margin-top:8px;
-  color:#374151;
-  line-height:1.6;
-  font-size:14px;
-}
-
-.posCancelRule{
-  margin-top:8px;
-  color:var(--muted);
-  font-size:12px;
-  line-height:1.5;
-}
+.posInfoTitle{font-weight:950;margin-bottom:8px;font-size:15px;color:#3b2619}
+.posItemText{font-size:17px;line-height:1.6;font-weight:950;white-space:pre-line}
+.posAddress{margin-top:8px;color:#63442f;line-height:1.65;font-size:14px}
+.posCancelRule{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.5;font-weight:800}
 
 @media (min-width:640px){
+  .wrap{padding:22px 18px 60px}
   .summaryGrid{grid-template-columns:repeat(4,1fr)}
-  .formGrid{
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-  }
-  .workbenchTabs{
-    grid-template-columns:repeat(5,1fr);
-  }
-  .posMainInfo{
-    grid-template-columns:1.2fr .8fr;
-  }
+  .formGrid{grid-template-columns:1fr 1fr;gap:12px}
+  .quickNav{grid-template-columns:repeat(3,1fr)}
+  .workbenchTabs{grid-template-columns:repeat(5,1fr)}
+  .posMainInfo{grid-template-columns:1.2fr .8fr}
+}
+
+@media (min-width:900px){
+  .quickNav{grid-template-columns:repeat(6,1fr)}
+  .quickNav button{min-height:116px}
 }
 
 @media (max-width:420px){
-  .quickNav{
-    grid-template-columns:repeat(3,minmax(64px,1fr));
-    gap:6px;
-  }
-
-  .quickNav button{
-    font-size:12px;
-    padding:9px 4px;
-  }
-
-  .posHeader{
-    flex-direction:column;
-  }
-
-  .posStatusArea{
-    text-align:left;
-  }
+  .wrap{padding:12px 10px 44px}
+  .login,.section,.posHero{border-radius:22px;padding:15px}
+  .brandBar{flex-direction:column}
+  .brandTitle{font-size:23px}
+  .brandLogo{width:54px;height:54px}
+  .heroToolRow{grid-template-columns:1fr 1fr}
+  .notifyPanel{align-items:flex-start}
+  .quickNav{gap:9px}
+  .quickNav button{min-height:94px;padding:12px;border-radius:21px}
+  .quickNav button .navTitle{font-size:15px}
+  .posHeader{flex-direction:column}
+  .posStatusArea{text-align:left}
 }
+
 </style>
 </head>
 
@@ -709,55 +787,111 @@ button.red{background:var(--red);color:#fff}
 
   <div id="dashboard" class="hidden">
 
-    <div class="section merchantApprovedOnly" id="section-overview">
-      <div class="merchantInfo" id="merchantInfoBox"></div>
-
-      <div class="summaryGrid" id="merchantBillingSummary">
-  <div class="summaryCard">
-    <b id="billingUnpaid">NT$0</b>
-    <span>尚未結清配送費</span>
-  </div>
-
-  <div class="summaryCard">
-    <b id="billingMonth">NT$0</b>
-    <span>本月派單金額</span>
-  </div>
-
-  <div class="summaryCard">
-    <b id="billingPaid">NT$0</b>
-    <span>已結清金額</span>
-  </div>
-
-  <div class="summaryCard">
-    <b id="billingActive">NT$0</b>
-    <span>進行中預估</span>
-  </div>
-</div>
-      
-      <div class="summaryGrid hiddenCounters" aria-hidden="true">
-        <div class="summaryCard">
-          <b id="summaryAll">0</b>
-          <span>目前訂單</span>
+    <header class="posHero" id="section-overview">
+      <div class="brandBar">
+        <div class="brandMarkRow">
+          <div class="brandLogo">🐝</div>
+          <div>
+            <div class="brandTitle">UBee 店家 POS</div>
+            <div class="brandSub">派單中心｜配送工作台｜帳款總覽</div>
+          </div>
         </div>
-        <div class="summaryCard">
-          <b id="summaryTodo">0</b>
-          <span>待處理</span>
+        <div class="statusChip">🟢 正式營運版</div>
+      </div>
+
+      <div class="notifyPanel">
+        <div class="notifyLeft">
+          <div class="notifyIcon">🔔</div>
+          <div>
+            <div class="notifyTitle">新訂單通知</div>
+            <div class="notifyText">即時同步待處理訂單，請保持 LINE 店家端開啟。</div>
+          </div>
         </div>
-        <div class="summaryCard">
-          <b id="summaryDelivery">0</b>
-          <span>配送中</span>
+        <div class="notifyCount" id="heroTodoCount">0</div>
+      </div>
+
+      <div class="heroToolRow">
+        <button class="heroTool" type="button" onclick="openLineOfficial()">💬 LINE 官方</button>
+        <button class="heroTool" type="button" onclick="toggleMerchantFullscreen()">🖥️ 全螢幕</button>
+      </div>
+
+      <div class="merchantApprovedOnly">
+        <div class="merchantInfo" id="merchantInfoBox"></div>
+
+        <div class="summaryGrid" id="merchantBillingSummary">
+          <div class="summaryCard">
+            <b id="billingUnpaid">NT$0</b>
+            <span>尚未結清配送費</span>
+          </div>
+
+          <div class="summaryCard">
+            <b id="billingMonth">NT$0</b>
+            <span>本月派單金額</span>
+          </div>
+
+          <div class="summaryCard">
+            <b id="billingPaid">NT$0</b>
+            <span>已結清金額</span>
+          </div>
+
+          <div class="summaryCard">
+            <b id="billingActive">NT$0</b>
+            <span>進行中預估</span>
+          </div>
         </div>
-        <div class="summaryCard">
-          <b id="summaryCompleted">0</b>
-          <span>已完成</span>
+
+        <div class="summaryGrid hiddenCounters" aria-hidden="true">
+          <div class="summaryCard">
+            <b id="summaryAll">0</b>
+            <span>目前訂單</span>
+          </div>
+          <div class="summaryCard">
+            <b id="summaryTodo">0</b>
+            <span>待處理</span>
+          </div>
+          <div class="summaryCard">
+            <b id="summaryDelivery">0</b>
+            <span>配送中</span>
+          </div>
+          <div class="summaryCard">
+            <b id="summaryCompleted">0</b>
+            <span>已完成</span>
+          </div>
         </div>
       </div>
-    </div>
+    </header>
 
-    <div class="quickNav">
-      <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">訂單工作台</button>
-      <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">配送進度</button>
-      <button type="button" data-nav="create" onclick="scrollToSection('section-create')">建立派單</button>
+    <div class="quickNav" aria-label="UBee 店家功能選單">
+      <button type="button" data-nav="create" onclick="scrollToSection('section-create')">
+        <span class="navIcon">🧾</span>
+        <span class="navTitle">建立派單</span>
+        <span class="navSub">新增正式配送訂單</span>
+      </button>
+      <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">
+        <span class="navIcon">📋</span>
+        <span class="navTitle">今日訂單</span>
+        <span class="navSub">接單、準備、取消</span>
+      </button>
+      <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">
+        <span class="navIcon">🛵</span>
+        <span class="navTitle">配送進度</span>
+        <span class="navSub">查看騎士狀態</span>
+      </button>
+      <button type="button" data-nav="overview" onclick="scrollToSection('section-overview')">
+        <span class="navIcon">💰</span>
+        <span class="navTitle">帳款總覽</span>
+        <span class="navSub">月結與未結清</span>
+      </button>
+      <button type="button" onclick="scrollToOrdersTab('todo')">
+        <span class="navIcon">🔔</span>
+        <span class="navTitle">待處理</span>
+        <span class="navSub"><span id="heroTodoText">0</span> 筆待處理</span>
+      </button>
+      <button type="button" onclick="scrollToOrdersTab('completed')">
+        <span class="navIcon">✅</span>
+        <span class="navTitle">已完成</span>
+        <span class="navSub"><span id="heroCompletedText">0</span> 筆完成紀錄</span>
+      </button>
     </div>
 
     <section id="section-orders" class="section workbenchSection">
@@ -938,6 +1072,31 @@ const statusTextMap = {
   merchant_cancelled:"店家已取消"
 };
 
+function openLineOfficial(){
+  alert("請從 UBee LINE 官方帳號開啟店家端，或回到 LINE 官方帳號查看最新通知。");
+}
+
+function toggleMerchantFullscreen(){
+  const doc = document;
+  const root = doc.documentElement;
+
+  if(!doc.fullscreenElement){
+    if(root.requestFullscreen){
+      root.requestFullscreen().catch(() => {});
+    }
+    return;
+  }
+
+  if(doc.exitFullscreen){
+    doc.exitFullscreen().catch(() => {});
+  }
+}
+
+function scrollToOrdersTab(tab){
+  setTab(tab);
+  scrollToSection("section-orders");
+}
+
 function scrollToSection(id){
   const el = document.getElementById(id);
   if(!el) return;
@@ -947,6 +1106,7 @@ function scrollToSection(id){
 
 function updateNavActive(sectionId){
   const map = {
+    "section-overview":"overview",
     "section-orders":"orders",
     "section-progress":"progress",
     "section-create":"create"
@@ -962,7 +1122,7 @@ function updateNavActive(sectionId){
 }
 
 function setupScrollSpy(){
-  const targets = ["section-orders","section-progress","section-create"];
+  const targets = ["section-overview","section-orders","section-progress","section-create"];
 
   window.addEventListener("scroll", () => {
     let current = "";
@@ -1315,11 +1475,13 @@ function enterMerchantDashboard(merchant){
   document.getElementById("dashboard").classList.remove("hidden");
 
   document.getElementById("merchantInfoBox").innerHTML = `
-    <strong class="approved">🟢 審核通過店家</strong>
+    <strong class="approved">🟢 審核通過店家</strong><br>
+    ${escapeHtml(currentMerchant.merchantName || "UBee 合作店家")}
+    ${currentMerchant.merchantAddress ? `<div class="small">取件地址：${escapeHtml(currentMerchant.merchantAddress)}</div>` : ""}
   `;
 
   startListenOrders();
-  updateNavActive("section-orders");
+  updateNavActive("section-overview");
 }
 
 async function loadMerchantProfile(){
@@ -1554,11 +1716,11 @@ function safeSetText(id, value){
   if(el) el.textContent = value;
 }
 
-  function moneyText(n){
+function moneyText(n){
   return "NT$" + Number(n || 0).toLocaleString("zh-TW");
 }
 
-  function getMerchantBillingAmount(order){
+function getMerchantBillingAmount(order){
   const amount = Number(
     order.merchantPayableAmount ||
     order.storePayableAmount ||
@@ -1684,6 +1846,9 @@ function updateCounts(){
   safeSetText("summaryTodo", todo);
   safeSetText("summaryDelivery", delivery);
   safeSetText("summaryCompleted", completed);
+  safeSetText("heroTodoCount", todo);
+  safeSetText("heroTodoText", todo);
+  safeSetText("heroCompletedText", completed);
 }
 
 function renderOrders(){
@@ -2192,20 +2357,21 @@ function renderOrderCard(order){
       </div>
 
       <div class="posNext">
-  <div class="posNextTitle">${escapeHtml(nextActionTitle)}</div>
-  <div class="posNextText">${escapeHtml(nextActionText)}</div>
-</div>
+        <div class="posNextTitle">${escapeHtml(nextActionTitle)}</div>
+        <div class="posNextText">${escapeHtml(nextActionText)}</div>
+      </div>
 
-<div class="posInfoBlock" style="margin-top:12px;">
-  <div class="posInfoTitle">騎士狀態</div>
-  <div class="row"><b>目前狀態：</b>${escapeHtml(progressText)}</div>
-  <div class="row"><b>騎士姓名：</b>${escapeHtml(riderAssigned ? riderName || "已接單騎士" : "等待騎士接單")}</div>
-  <div class="row"><b>騎士電話：</b>${escapeHtml(riderAssigned && riderPhone ? riderPhone : "尚未提供")}</div>
-</div>
+      <div class="posInfoBlock" style="margin-top:12px;">
+        <div class="posInfoTitle">騎士狀態</div>
+        <div class="row"><b>目前狀態：</b>${escapeHtml(progressText)}</div>
+        <div class="row"><b>騎士姓名：</b>${escapeHtml(riderAssigned ? riderName || "已接單騎士" : "等待騎士接單")}</div>
+        <div class="row"><b>騎士電話：</b>${escapeHtml(riderAssigned && riderPhone ? riderPhone : "尚未提供")}</div>
+      </div>
 
-<div class="posActionBar">
-  ${buttonHtml}
-</div>
+      <div class="posActionBar">
+        ${buttonHtml}
+      </div>
+
       ${
         cancellableStatuses.includes(order.status)
           ? `<div class="posCancelRule">正式營運規則：騎士接單前可取消；騎士接單後請聯絡 UBee 管理端處理。</div>`
