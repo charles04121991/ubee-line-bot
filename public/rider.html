@@ -980,7 +980,7 @@
         ※ 送出申請後，UBee 跑腿會進行資料審核。審核通過後，系統會透過官方帳號通知你後續流程。未通過審核前，無法使用 UBee 跑腿任務夥伴接單功能。
       </div>
 
-      <button id="submitBtn" class="submitBtn" type="submit" disabled>送出申請</button>
+      <button id="submitBtn" class="submitBtn" type="submit">送出申請</button>
 
       <div id="successBox" class="successBox"></div>
       <div id="errorBox" class="errorBox"></div>
@@ -997,7 +997,8 @@
 
 <script>
 const LIFF_ID = '2009895876-MsVhzIxz';
-
+const API_BASE_URL = 'https://ubee-line-bot-2-zezw.onrender.com';
+  
 const form = document.getElementById('riderForm');
 const submitBtn = document.getElementById('submitBtn');
 const successBox = document.getElementById('successBox');
@@ -1028,7 +1029,7 @@ function showError(message) {
 }
 
 function updateSubmitState() {
-  submitBtn.disabled = isSubmitting || !agreeCheck.checked;
+  submitBtn.disabled = isSubmitting;
 }
 
 function getCheckedValues(name) {
