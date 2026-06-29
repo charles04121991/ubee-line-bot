@@ -81,6 +81,8 @@ const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_SERVER_API_KEY =
+  process.env.GOOGLE_MAPS_SERVER_API_KEY || GOOGLE_MAPS_API_KEY;
 const LIFF_ID = process.env.LIFF_ID || '';
 
 // ===== 騎士 App 登入設定 =====
@@ -4146,7 +4148,7 @@ app.get('/api/nearby-places', async (req, res) => {
         radius: String(radius),
         keyword: String(keyword),
         language: 'zh-TW',
-        key: GOOGLE_MAPS_API_KEY
+        key: GOOGLE_MAPS_SERVER_API_KEY
       }).toString();
 
     const data = await fetchJsonWithTimeout(url, 7000);
@@ -4181,7 +4183,7 @@ app.get('/api/nearby-places', async (req, res) => {
             place_id: place.placeId,
             fields: 'formatted_phone_number,international_phone_number',
             language: 'zh-TW',
-            key: GOOGLE_MAPS_API_KEY
+            key: GOOGLE_MAPS_SERVER_API_KEY
           }).toString();
 
         const detailData = await fetchJsonWithTimeout(detailUrl, 2500);
