@@ -3,41 +3,42 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee 跑腿店家端</title>
+<title>UBee 跑腿店家端 v2.3 Lite</title>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
 <style>
-
 :root{
-  --bg:#f6efe6;
-  --page:#fffaf3;
+  --bg:#f7f1e8;
   --card:#ffffff;
-  --cardSoft:#fff6e9;
-  --line:rgba(91,57,31,.13);
-  --line2:rgba(91,57,31,.20);
-  --text:#332216;
-  --muted:#7c604b;
+  --soft:#fff7ed;
+  --soft2:#f3e2ce;
+  --line:rgba(83,54,32,.14);
+  --line2:rgba(83,54,32,.22);
+  --text:#2f2118;
+  --muted:#7d604b;
   --brand:#9f6841;
   --brand2:#754522;
-  --brandSoft:#f0dcc7;
   --green:#3fa866;
   --blue:#4e8fc8;
   --red:#dc5b50;
-  --shadow:0 16px 36px rgba(83,52,28,.12);
-  --shadow2:0 8px 18px rgba(83,52,28,.09);
-  --radius:26px;
+  --yellow:#d99a44;
+  --shadow:0 12px 30px rgba(74,47,27,.12);
+  --shadow2:0 7px 16px rgba(74,47,27,.08);
+  --radius:24px;
 }
 
 *{box-sizing:border-box}
+
 html{scroll-behavior:smooth}
+
 body{
   margin:0;
   min-height:100vh;
   background:
-    radial-gradient(circle at top,#fff8ef 0%,#f6efe6 48%,#eadbc9 100%);
+    radial-gradient(circle at top,#fffaf3 0%,#f7f1e8 48%,#eadbc9 100%);
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
   -webkit-font-smoothing:antialiased;
@@ -51,8 +52,8 @@ body{
 
 .hidden{display:none!important}
 
-.login,.appShell,.section{
-  background:rgba(255,255,255,.94);
+.login,.topCard,.section{
+  background:rgba(255,255,255,.96);
   border:1px solid var(--line);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
@@ -65,7 +66,7 @@ body{
 }
 
 .login::before{
-  content:"UBee Merchant POS";
+  content:"UBee 店家端";
   display:inline-flex;
   align-items:center;
   padding:7px 11px;
@@ -77,13 +78,40 @@ body{
   margin-bottom:12px;
 }
 
-#dashboard{display:flex;flex-direction:column;gap:12px}
+#dashboard{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
 
-h2{font-size:22px;line-height:1.2;margin:0 0 10px;color:var(--text);letter-spacing:-.3px}
-h3{margin:0;color:var(--text)}
-.small{color:var(--muted);font-size:13px;margin-top:7px;line-height:1.65}
+h2{
+  font-size:22px;
+  line-height:1.25;
+  margin:0 0 10px;
+  color:var(--text);
+  letter-spacing:-.3px;
+}
 
-label{display:block;color:var(--text);font-size:14px;margin:12px 0 7px;font-weight:950}
+h3{
+  margin:0;
+  color:var(--text);
+}
+
+.small{
+  color:var(--muted);
+  font-size:13px;
+  margin-top:7px;
+  line-height:1.65;
+}
+
+label{
+  display:block;
+  color:var(--text);
+  font-size:14px;
+  margin:12px 0 7px;
+  font-weight:950;
+}
+
 input,textarea,select{
   width:100%;
   padding:14px;
@@ -94,8 +122,18 @@ input,textarea,select{
   font-size:16px;
   outline:none;
 }
-textarea{min-height:92px;resize:vertical;line-height:1.6}
-input:focus,textarea:focus,select:focus{border-color:rgba(159,104,65,.6);box-shadow:0 0 0 4px rgba(159,104,65,.12);background:#fff}
+
+textarea{
+  min-height:92px;
+  resize:vertical;
+  line-height:1.6;
+}
+
+input:focus,textarea:focus,select:focus{
+  border-color:rgba(159,104,65,.6);
+  box-shadow:0 0 0 4px rgba(159,104,65,.12);
+  background:#fff;
+}
 
 button{
   width:100%;
@@ -111,107 +149,901 @@ button{
   box-shadow:0 10px 22px rgba(117,69,34,.18);
   transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;
 }
-button:hover{transform:translateY(-1px);box-shadow:0 14px 26px rgba(117,69,34,.22)}
-button:active{transform:translateY(0);filter:brightness(.98)}
-button:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
-button.secondary{background:#fffaf4;color:var(--text);border:1px solid var(--line2);box-shadow:none}
+
+button:hover{
+  transform:translateY(-1px);
+  box-shadow:0 14px 26px rgba(117,69,34,.22);
+}
+
+button:active{
+  transform:translateY(0);
+  filter:brightness(.98);
+}
+
+button:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  transform:none;
+  box-shadow:none;
+}
+
+button.secondary{
+  background:#fffaf4;
+  color:var(--text);
+  border:1px solid var(--line2);
+  box-shadow:none;
+}
+
 button.green{background:linear-gradient(135deg,#55bf76,#31985a)}
 button.blue{background:linear-gradient(135deg,#6faee5,#4a89c4)}
 button.red{background:linear-gradient(135deg,#eb756b,#d84d43)}
 
-/* ===== Unified App Layout ===== */
-.appShell{padding:15px;overflow:hidden;background:linear-gradient(180deg,#fffdf8,#fff5e9)}
-.appHeader{text-align:center;position:relative;padding:4px 4px 0}
-.brandLogo{
-  width:72px;height:72px;border-radius:50%;margin:0 auto 10px;
-  background:linear-gradient(135deg,#fff0bd,#e3a54b);
-  display:flex;align-items:center;justify-content:center;font-size:38px;
-  box-shadow:0 10px 22px rgba(159,104,65,.18)
+/* ===== Lite Header ===== */
+.topCard{
+  padding:16px;
+  background:
+    radial-gradient(circle at top right,rgba(232,196,151,.42),transparent 34%),
+    linear-gradient(180deg,#fffdf8,#fff6eb);
 }
-.brandTitle{font-size:25px;font-weight:950;letter-spacing:-.5px;color:var(--text)}
-.brandSub{margin-top:4px;color:var(--muted);font-size:12px;font-weight:850;line-height:1.45}
-.statusChip{position:absolute;right:0;top:0;display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:11px;font-weight:950;color:var(--text)}
 
-.merchantInfo{margin-top:12px;padding:11px 12px;border-radius:20px;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow2);line-height:1.55;font-size:13px;color:var(--text);text-align:center}
-.approved{color:#278d4d;font-weight:950}
+.brandBox{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
 
-.heroStats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
-.heroStat{display:flex;align-items:center;gap:10px;min-height:70px;padding:11px;border-radius:20px;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow2);text-align:left}
-.heroIcon{width:42px;height:42px;border-radius:16px;background:#fff0d5;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
-.heroLabel{font-size:12px;font-weight:900;color:var(--muted)}
-.heroValue{margin-top:2px;font-size:20px;font-weight:950;color:var(--text);line-height:1}
+.brandLogo{
+  width:58px;
+  height:58px;
+  border-radius:21px;
+  background:linear-gradient(135deg,#fff0bd,#e3a54b);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:32px;
+  flex-shrink:0;
+  box-shadow:0 9px 18px rgba(159,104,65,.18);
+}
 
-.heroToolRow{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
-.heroTool{margin:0;height:46px;padding:0 10px;border-radius:18px;background:#fff;color:var(--text);border:1px solid var(--line);box-shadow:var(--shadow2);font-size:14px}
+.brandTitle{
+  font-size:23px;
+  font-weight:950;
+  color:var(--text);
+  letter-spacing:-.4px;
+}
 
-.quickNav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.quickNav button{min-height:92px;margin:0;padding:12px 8px;border-radius:24px;background:#fff;color:var(--text);border:1px solid var(--line);box-shadow:var(--shadow2);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.quickNav button .navIcon{width:44px;height:44px;border-radius:17px;background:#fff0d8;display:flex;align-items:center;justify-content:center;font-size:23px;margin-bottom:8px}
-.quickNav button .navTitle{display:block;font-size:15px;font-weight:950;line-height:1.2}
-.quickNav button .navSub{display:block;margin-top:4px;font-size:11px;line-height:1.35;color:var(--muted);font-weight:850}
-.quickNav button.active{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
-.quickNav button.active .navIcon{background:rgba(255,255,255,.18)}
-.quickNav button.active .navSub{color:rgba(255,255,255,.78)}
+.brandSub{
+  margin-top:4px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:850;
+  line-height:1.45;
+}
 
-.appContent{margin-top:12px}
-.appView{display:none}
-.appView.activeView{display:block;animation:fadeIn .18s ease}
-@keyframes fadeIn{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.statusLine{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  margin-top:12px;
+}
 
-.section{padding:16px;background:#fff;border-radius:28px;box-shadow:var(--shadow);border:1px solid var(--line);scroll-margin-top:12px}
-.sectionTitleRow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
-.sectionBadge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-size:12px;font-weight:950;white-space:nowrap}
+.statusChip{
+  display:inline-flex;
+  align-items:center;
+  padding:6px 9px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid var(--line);
+  color:var(--text);
+  font-size:12px;
+  font-weight:950;
+}
 
-.summaryGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
-.summaryCard{background:#fffaf4;border:1px solid var(--line);border-radius:20px;padding:12px;box-shadow:var(--shadow2)}
-.summaryCard b{display:block;font-size:19px;color:var(--brand2);letter-spacing:-.3px}
-.summaryCard span{display:block;color:var(--muted);font-size:11px;line-height:1.35;margin-top:5px;font-weight:850}
+.merchantInfo{
+  margin-top:12px;
+  padding:11px 12px;
+  border-radius:18px;
+  background:#fff;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow2);
+  line-height:1.55;
+  font-size:13px;
+  color:var(--text);
+}
+
+.approved{
+  color:#278d4d;
+  font-weight:950;
+}
+
+.quickStats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:12px;
+}
+
+.quickStat{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:64px;
+  padding:10px;
+  border-radius:18px;
+  background:#fff;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow2);
+}
+
+.quickIcon{
+  width:38px;
+  height:38px;
+  border-radius:15px;
+  background:#fff0d5;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  flex-shrink:0;
+}
+
+.quickLabel{
+  font-size:12px;
+  font-weight:900;
+  color:var(--muted);
+}
+
+.quickValue{
+  margin-top:2px;
+  font-size:19px;
+  font-weight:950;
+  color:var(--text);
+  line-height:1;
+}
+
+/* ===== Main Menu ===== */
+.menuGrid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+.menuBtn{
+  min-height:72px;
+  margin:0;
+  padding:12px;
+  border-radius:22px;
+  background:#fff;
+  color:var(--text);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow2);
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  text-align:left;
+  gap:12px;
+}
+
+.menuBtn .menuIcon{
+  width:46px;
+  height:46px;
+  border-radius:17px;
+  background:#fff0d8;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:24px;
+  flex-shrink:0;
+}
+
+.menuBtn .menuTitle{
+  display:block;
+  font-size:16px;
+  font-weight:950;
+  line-height:1.2;
+}
+
+.menuBtn .menuSub{
+  display:block;
+  margin-top:4px;
+  font-size:12px;
+  line-height:1.35;
+  color:var(--muted);
+  font-weight:850;
+}
+
+.menuBtn.active{
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff;
+}
+
+.menuBtn.active .menuIcon{
+  background:rgba(255,255,255,.18);
+}
+
+.menuBtn.active .menuSub{
+  color:rgba(255,255,255,.78);
+}
+
+/* ===== Views ===== */
+.appContent{
+  margin-top:0;
+}
+
+.appView{
+  display:none;
+}
+
+.appView.activeView{
+  display:block;
+  animation:fadeIn .18s ease;
+}
+
+@keyframes fadeIn{
+  from{opacity:.4;transform:translateY(4px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+.section{
+  padding:16px;
+  background:#fff;
+  border-radius:24px;
+  box-shadow:var(--shadow);
+  border:1px solid var(--line);
+}
+
+.sectionTitleRow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+
+.sectionBadge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:6px 10px;
+  border-radius:999px;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff;
+  font-size:12px;
+  font-weight:950;
+  white-space:nowrap;
+}
+
+.summaryGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:12px;
+}
+
+.summaryCard{
+  background:#fffaf4;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:12px;
+  box-shadow:var(--shadow2);
+}
+
+.summaryCard b{
+  display:block;
+  font-size:19px;
+  color:var(--brand2);
+  letter-spacing:-.3px;
+}
+
+.summaryCard span{
+  display:block;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.35;
+  margin-top:5px;
+  font-weight:850;
+}
+
 .hiddenCounters{display:none!important}
 
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
-.tab{min-height:56px;padding:10px 8px;border-radius:18px;background:#fffaf4;border:1px solid var(--line);color:var(--text);text-align:center;font-weight:950;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.tab.active{border-color:transparent;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 10px 20px rgba(117,69,34,.17)}
-.tab span{display:block;margin-top:4px;font-size:19px;line-height:1}
+.tabs{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:14px;
+}
 
-.order,.simpleCard,.stopCard{background:#fffdf8;border:1px solid var(--line);border-radius:22px;padding:14px;margin-top:12px;box-shadow:var(--shadow2)}
-.stopCard{background:linear-gradient(180deg,#fffdf8,#fff7ec)}
-.stopTitle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-.stopBadge,.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#fff0d7;color:#7f4f2d;font-size:12px;margin-bottom:8px;font-weight:950;white-space:nowrap}
-.row{color:var(--text);line-height:1.65;font-size:14px;word-break:break-word}
-.empty{color:var(--muted);text-align:center;padding:28px 10px;font-weight:850}
-.notice,.workbenchHint{margin-top:12px;padding:13px;border-radius:18px;background:#fff5e6;border:1px solid rgba(159,104,65,.20);color:#62402a;line-height:1.65;font-size:14px}
-.error{display:none;margin-top:12px;padding:12px;border-radius:18px;background:rgba(220,91,80,.12);border:1px solid rgba(220,91,80,.35);color:#bb3d34;line-height:1.6}
-.formGrid{display:grid;grid-template-columns:1fr;gap:0}
-.formMsg{display:none;margin-top:12px;padding:12px;border-radius:18px;line-height:1.6;font-size:14px;font-weight:850}
-.formMsg.ok{display:block;background:rgba(63,168,102,.13);border:1px solid rgba(63,168,102,.35);color:#2f8a50}
-.formMsg.err{display:block;background:rgba(220,91,80,.13);border:1px solid rgba(220,91,80,.35);color:#bb3d34}
+.tab{
+  min-height:56px;
+  padding:10px 8px;
+  border-radius:18px;
+  background:#fffaf4;
+  border:1px solid var(--line);
+  color:var(--text);
+  text-align:center;
+  font-weight:950;
+  font-size:14px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
 
-.progressBox{margin-top:10px}.flow{display:flex;align-items:center;justify-content:space-between;gap:8px;overflow-x:auto;padding:12px 0}.step{min-width:86px;text-align:center;color:var(--muted);font-size:12px;flex-shrink:0;font-weight:850}.step .circle{width:40px;height:40px;margin:0 auto 7px;border-radius:50%;background:#fff;color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:950;border:1px solid var(--line)}.step.done{color:var(--text)}.step.done .circle{background:var(--green);color:#fff;border-color:transparent}.step.current{color:var(--text);font-weight:950}.step.current .circle{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-color:transparent}.line{flex:1;height:4px;background:var(--line);min-width:30px;border-radius:999px}.line.done{background:var(--brand)}
-.moneyBox{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.moneyItem{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px}.moneyItem span{display:block;color:var(--muted);font-size:12px;font-weight:850}.moneyItem b{display:block;margin-top:4px;font-size:17px;color:var(--text)}
-.stopList{margin-top:10px;padding:12px;border-radius:18px;background:#fffaf4;border:1px solid var(--line)}.stopListTitle{font-weight:950;margin-bottom:6px}.stopListItem{padding:9px 0;border-top:1px solid var(--line)}.stopListItem:first-of-type{border-top:0}
-.workbenchTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.workbenchTop h2{margin-bottom:4px;font-size:22px}.workbenchLabel{display:inline-block;padding:6px 10px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-size:12px;font-weight:950;margin-bottom:9px}.workbenchOrders{margin-top:14px}
-.posOrder{background:#fff;border:1px solid var(--line);box-shadow:var(--shadow2);overflow:hidden;border-radius:24px}.posHeader{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:10px;padding-bottom:13px;border-bottom:1px solid var(--line)}.posOrderNo{font-size:19px;font-weight:950;line-height:1.3;word-break:break-word;color:#332216}.posMeta{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.5;font-weight:850}.posStatusArea{text-align:left;flex-shrink:0}.posStatus{display:inline-block;padding:7px 11px;border-radius:999px;font-size:12px;font-weight:950;color:#74471f;background:#fff0d7;border:1px solid rgba(159,104,65,.25)}.posStatus.hot{background:rgba(220,91,80,.12);border-color:rgba(220,91,80,.32);color:#b33a31}.posStatus.wait{background:rgba(78,143,200,.14);border-color:rgba(78,143,200,.34);color:#2f6e9f}.posStatus.move{background:rgba(63,168,102,.14);border-color:rgba(63,168,102,.34);color:#2d824a}.posPill{display:inline-block;margin-top:7px;padding:6px 9px;border-radius:999px;background:#fffaf4;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:950}.posNext{margin-top:12px;padding:14px;border-radius:20px;background:#fff4e3;border:1px solid rgba(159,104,65,.18)}.posNextTitle{font-size:17px;font-weight:950;margin-bottom:5px;color:#332216}.posNextText{color:#62402a;line-height:1.65;font-size:14px}.posActionBar{margin-top:12px}.posActionBar button{margin-top:8px}.posMainInfo{margin-top:12px;display:grid;grid-template-columns:1fr;gap:10px}.posInfoBlock{padding:12px;border-radius:20px;background:#fffaf3;border:1px solid var(--line)}.posInfoTitle{font-weight:950;margin-bottom:8px;font-size:15px;color:#332216}.posItemText{font-size:17px;line-height:1.6;font-weight:950;white-space:pre-line}.posAddress{margin-top:8px;color:#62402a;line-height:1.65;font-size:14px}.posCancelRule{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.5;font-weight:850}
+.tab.active{
+  border-color:transparent;
+  color:#fff;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  box-shadow:0 10px 20px rgba(117,69,34,.17);
+}
+
+.tab span{
+  display:block;
+  margin-top:4px;
+  font-size:19px;
+  line-height:1;
+}
+
+.order,.simpleCard,.stopCard{
+  background:#fffdf8;
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:14px;
+  margin-top:12px;
+  box-shadow:var(--shadow2);
+}
+
+.stopCard{
+  background:linear-gradient(180deg,#fffdf8,#fff7ec);
+}
+
+.stopTitle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+
+.stopBadge,.badge{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#fff0d7;
+  color:#7f4f2d;
+  font-size:12px;
+  margin-bottom:8px;
+  font-weight:950;
+  white-space:nowrap;
+}
+
+.row{
+  color:var(--text);
+  line-height:1.65;
+  font-size:14px;
+  word-break:break-word;
+}
+
+.empty{
+  color:var(--muted);
+  text-align:center;
+  padding:28px 10px;
+  font-weight:850;
+}
+
+.notice,.workbenchHint{
+  margin-top:12px;
+  padding:13px;
+  border-radius:18px;
+  background:#fff5e6;
+  border:1px solid rgba(159,104,65,.20);
+  color:#62402a;
+  line-height:1.65;
+  font-size:14px;
+}
+
+.error{
+  display:none;
+  margin-top:12px;
+  padding:12px;
+  border-radius:18px;
+  background:rgba(220,91,80,.12);
+  border:1px solid rgba(220,91,80,.35);
+  color:#bb3d34;
+  line-height:1.6;
+}
+
+.formGrid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:0;
+}
+
+.formMsg{
+  display:none;
+  margin-top:12px;
+  padding:12px;
+  border-radius:18px;
+  line-height:1.6;
+  font-size:14px;
+  font-weight:850;
+}
+
+.formMsg.ok{
+  display:block;
+  background:rgba(63,168,102,.13);
+  border:1px solid rgba(63,168,102,.35);
+  color:#2f8a50;
+}
+
+.formMsg.err{
+  display:block;
+  background:rgba(220,91,80,.13);
+  border:1px solid rgba(220,91,80,.35);
+  color:#bb3d34;
+}
+
+/* ===== Detailed Progress ===== */
+.progressBox{
+  margin-top:10px;
+}
+
+.progressOrder{
+  background:#fffdf8;
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:14px;
+  margin-top:12px;
+  box-shadow:var(--shadow2);
+}
+
+.progressTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--line);
+}
+
+.progressOrderNo{
+  font-size:18px;
+  font-weight:950;
+  color:var(--text);
+  line-height:1.35;
+  word-break:break-word;
+}
+
+.progressStatus{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#fff0d7;
+  color:#74471f;
+  border:1px solid rgba(159,104,65,.25);
+  font-size:12px;
+  font-weight:950;
+  white-space:nowrap;
+}
+
+.progressStatus.move{
+  background:rgba(63,168,102,.14);
+  border-color:rgba(63,168,102,.34);
+  color:#2d824a;
+}
+
+.progressStatus.wait{
+  background:rgba(78,143,200,.14);
+  border-color:rgba(78,143,200,.34);
+  color:#2f6e9f;
+}
+
+.progressStatus.hot{
+  background:rgba(220,91,80,.12);
+  border-color:rgba(220,91,80,.32);
+  color:#b33a31;
+}
+
+.progressTimeline{
+  margin-top:14px;
+  display:grid;
+  gap:0;
+}
+
+.timelineItem{
+  position:relative;
+  display:grid;
+  grid-template-columns:34px 1fr;
+  gap:10px;
+  padding:0 0 14px;
+}
+
+.timelineItem:last-child{
+  padding-bottom:0;
+}
+
+.timelineItem::before{
+  content:"";
+  position:absolute;
+  left:16px;
+  top:34px;
+  width:2px;
+  height:calc(100% - 24px);
+  background:rgba(83,54,32,.13);
+}
+
+.timelineItem:last-child::before{
+  display:none;
+}
+
+.timelineDot{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:#fff;
+  border:1px solid var(--line2);
+  color:var(--muted);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:950;
+  z-index:1;
+}
+
+.timelineItem.done .timelineDot{
+  background:var(--green);
+  color:#fff;
+  border-color:transparent;
+}
+
+.timelineItem.current .timelineDot{
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 8px 16px rgba(117,69,34,.18);
+}
+
+.timelineTitle{
+  font-size:14px;
+  font-weight:950;
+  color:var(--text);
+}
+
+.timelineText{
+  margin-top:3px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.45;
+  font-weight:800;
+}
+
+.progressInfoGrid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:9px;
+  margin-top:12px;
+}
+
+.progressInfo{
+  background:#fffaf4;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:12px;
+}
+
+.progressInfoTitle{
+  font-weight:950;
+  margin-bottom:7px;
+  color:var(--text);
+  font-size:14px;
+}
+
+.progressFlowHint{
+  margin-top:12px;
+  padding:12px;
+  border-radius:18px;
+  background:#fff5e6;
+  border:1px solid rgba(159,104,65,.20);
+  color:#62402a;
+  line-height:1.6;
+  font-size:13px;
+  font-weight:800;
+}
+
+/* ===== Order Card ===== */
+.moneyBox{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+
+.moneyItem{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:12px;
+}
+
+.moneyItem span{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:850;
+}
+
+.moneyItem b{
+  display:block;
+  margin-top:4px;
+  font-size:17px;
+  color:var(--text);
+}
+
+.stopList{
+  margin-top:10px;
+  padding:12px;
+  border-radius:18px;
+  background:#fffaf4;
+  border:1px solid var(--line);
+}
+
+.stopListTitle{
+  font-weight:950;
+  margin-bottom:6px;
+}
+
+.stopListItem{
+  padding:9px 0;
+  border-top:1px solid var(--line);
+}
+
+.stopListItem:first-of-type{
+  border-top:0;
+}
+
+.workbenchTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+.workbenchTop h2{
+  margin-bottom:4px;
+  font-size:22px;
+}
+
+.workbenchLabel{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  background:linear-gradient(135deg,var(--brand),var(--brand2));
+  color:#fff;
+  font-size:12px;
+  font-weight:950;
+  margin-bottom:9px;
+}
+
+.workbenchOrders{
+  margin-top:14px;
+}
+
+.posOrder{
+  background:#fff;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow2);
+  overflow:hidden;
+  border-radius:22px;
+}
+
+.posHeader{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom:13px;
+  border-bottom:1px solid var(--line);
+}
+
+.posOrderNo{
+  font-size:19px;
+  font-weight:950;
+  line-height:1.3;
+  word-break:break-word;
+  color:var(--text);
+}
+
+.posMeta{
+  margin-top:6px;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.5;
+  font-weight:850;
+}
+
+.posStatusArea{
+  text-align:left;
+  flex-shrink:0;
+}
+
+.posStatus{
+  display:inline-block;
+  padding:7px 11px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:950;
+  color:#74471f;
+  background:#fff0d7;
+  border:1px solid rgba(159,104,65,.25);
+}
+
+.posStatus.hot{
+  background:rgba(220,91,80,.12);
+  border-color:rgba(220,91,80,.32);
+  color:#b33a31;
+}
+
+.posStatus.wait{
+  background:rgba(78,143,200,.14);
+  border-color:rgba(78,143,200,.34);
+  color:#2f6e9f;
+}
+
+.posStatus.move{
+  background:rgba(63,168,102,.14);
+  border-color:rgba(63,168,102,.34);
+  color:#2d824a;
+}
+
+.posPill{
+  display:inline-block;
+  margin-top:7px;
+  padding:6px 9px;
+  border-radius:999px;
+  background:#fffaf4;
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:950;
+}
+
+.posNext{
+  margin-top:12px;
+  padding:14px;
+  border-radius:20px;
+  background:#fff4e3;
+  border:1px solid rgba(159,104,65,.18);
+}
+
+.posNextTitle{
+  font-size:17px;
+  font-weight:950;
+  margin-bottom:5px;
+  color:var(--text);
+}
+
+.posNextText{
+  color:#62402a;
+  line-height:1.65;
+  font-size:14px;
+}
+
+.posActionBar{
+  margin-top:12px;
+}
+
+.posActionBar button{
+  margin-top:8px;
+}
+
+.posMainInfo{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+.posInfoBlock{
+  padding:12px;
+  border-radius:20px;
+  background:#fffaf3;
+  border:1px solid var(--line);
+}
+
+.posInfoTitle{
+  font-weight:950;
+  margin-bottom:8px;
+  font-size:15px;
+  color:var(--text);
+}
+
+.posItemText{
+  font-size:17px;
+  line-height:1.6;
+  font-weight:950;
+  white-space:pre-line;
+}
+
+.posAddress{
+  margin-top:8px;
+  color:#62402a;
+  line-height:1.65;
+  font-size:14px;
+}
+
+.posCancelRule{
+  margin-top:8px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+  font-weight:850;
+}
 
 @media (min-width:640px){
-  .wrap{width:min(100%,560px);padding:18px 14px 56px}
-  .formGrid{grid-template-columns:1fr 1fr;gap:12px}
-}
-@media (max-width:420px){
-  .wrap{padding:10px 10px 44px}
-  .login,.appShell,.section{border-radius:26px}
-  .brandLogo{width:66px;height:66px;font-size:35px}
-  .brandTitle{font-size:23px}
-  .statusChip{position:static;display:inline-flex;margin-top:9px}
-  .heroStats{gap:8px}.heroStat{min-height:66px;padding:10px}.heroIcon{width:38px;height:38px;font-size:20px}.heroValue{font-size:19px}
-  .quickNav{gap:9px}.quickNav button{min-height:88px;border-radius:22px}.quickNav button .navIcon{width:40px;height:40px;font-size:21px}.quickNav button .navTitle{font-size:14px}.quickNav button .navSub{font-size:10.5px}
-  .section{padding:15px}
+  .wrap{
+    width:min(100%,560px);
+    padding:18px 14px 56px;
+  }
+
+  .formGrid{
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+
+  .menuGrid{
+    grid-template-columns:1fr 1fr;
+  }
 }
 
+@media (max-width:420px){
+  .wrap{
+    padding:10px 10px 44px;
+  }
+
+  .login,.topCard,.section{
+    border-radius:22px;
+  }
+
+  .brandLogo{
+    width:54px;
+    height:54px;
+    font-size:29px;
+  }
+
+  .brandTitle{
+    font-size:22px;
+  }
+
+  .quickStats{
+    gap:8px;
+  }
+
+  .quickStat{
+    min-height:62px;
+    padding:9px;
+  }
+
+  .quickIcon{
+    width:36px;
+    height:36px;
+    font-size:19px;
+  }
+
+  .quickValue{
+    font-size:18px;
+  }
+
+  .section{
+    padding:15px;
+  }
+}
 </style>
 </head>
 
 <body>
-
 <div class="wrap">
 
   <div class="login" id="loginBox">
@@ -225,67 +1057,81 @@ button.red{background:linear-gradient(135deg,#eb756b,#d84d43)}
 
   <div id="dashboard" class="hidden">
 
-    <div class="appShell">
-      <header class="appHeader">
-        <div class="statusChip">🟢 正式營運版</div>
+    <section class="topCard">
+      <div class="brandBox">
         <div class="brandLogo">🐝</div>
-        <div class="brandTitle">UBee 店家 POS</div>
-        <div class="brandSub">派單中心｜配送工作台｜帳款總覽</div>
-        <div class="merchantInfo" id="merchantInfoBox"></div>
-
-        <div class="heroStats">
-          <div class="heroStat">
-            <div class="heroIcon">🔔</div>
-            <div>
-              <div class="heroLabel">今日待處理</div>
-              <div class="heroValue"><span id="heroTodoCount">0</span> 筆</div>
-            </div>
-          </div>
-          <div class="heroStat">
-            <div class="heroIcon">✅</div>
-            <div>
-              <div class="heroLabel">完成紀錄</div>
-              <div class="heroValue"><span id="heroCompletedText">0</span> 筆</div>
-            </div>
-          </div>
+        <div>
+          <div class="brandTitle">UBee 店家端</div>
+          <div class="brandSub">建立派單｜訂單處理｜配送追蹤｜帳款總覽</div>
         </div>
-
-        <div class="heroToolRow">
-          <button class="heroTool" type="button" onclick="openLineOfficial()">💬 LINE 官方</button>
-          <button class="heroTool" type="button" onclick="toggleMerchantFullscreen()">🖥️ 全螢幕</button>
-        </div>
-      </header>
-
-      <div class="quickNav" aria-label="UBee 店家功能選單">
-        <button type="button" data-nav="create" onclick="switchMerchantView('create')">
-          <span class="navIcon">🧾</span>
-          <span class="navTitle">建立派單</span>
-          <span class="navSub">新增正式配送訂單</span>
-        </button>
-        <button type="button" data-nav="orders" onclick="switchMerchantView('orders')">
-          <span class="navIcon">📋</span>
-          <span class="navTitle">今日訂單</span>
-          <span class="navSub"><span id="heroTodoText">0</span> 筆待處理</span>
-        </button>
-        <button type="button" data-nav="progress" onclick="switchMerchantView('progress')">
-          <span class="navIcon">🛵</span>
-          <span class="navTitle">配送進度</span>
-          <span class="navSub">查看騎士狀態</span>
-        </button>
-        <button type="button" data-nav="overview" onclick="switchMerchantView('overview')">
-          <span class="navIcon">💰</span>
-          <span class="navTitle">帳款總覽</span>
-          <span class="navSub">月結與未結清</span>
-        </button>
       </div>
+
+      <div class="statusLine">
+        <span class="statusChip">🟢 正式營運版</span>
+        <span class="statusChip">店家工作台</span>
+      </div>
+
+      <div class="merchantInfo" id="merchantInfoBox"></div>
+
+      <div class="quickStats">
+        <div class="quickStat">
+          <div class="quickIcon">🔔</div>
+          <div>
+            <div class="quickLabel">待處理</div>
+            <div class="quickValue"><span id="heroTodoCount">0</span> 筆</div>
+          </div>
+        </div>
+        <div class="quickStat">
+          <div class="quickIcon">🛵</div>
+          <div>
+            <div class="quickLabel">配送中</div>
+            <div class="quickValue"><span id="heroDeliveryCount">0</span> 筆</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="menuGrid" aria-label="UBee 店家功能選單">
+      <button class="menuBtn active" type="button" data-nav="create" onclick="switchMerchantView('create')">
+        <span class="menuIcon">🧾</span>
+        <span>
+          <span class="menuTitle">建立派單</span>
+          <span class="menuSub">新增正式配送訂單</span>
+        </span>
+      </button>
+
+      <button class="menuBtn" type="button" data-nav="orders" onclick="switchMerchantView('orders')">
+        <span class="menuIcon">📋</span>
+        <span>
+          <span class="menuTitle">今日訂單</span>
+          <span class="menuSub"><span id="heroTodoText">0</span> 筆待處理</span>
+        </span>
+      </button>
+
+      <button class="menuBtn" type="button" data-nav="progress" onclick="switchMerchantView('progress')">
+        <span class="menuIcon">🛵</span>
+        <span>
+          <span class="menuTitle">配送進度</span>
+          <span class="menuSub">詳細追蹤騎士狀態</span>
+        </span>
+      </button>
+
+      <button class="menuBtn" type="button" data-nav="overview" onclick="switchMerchantView('overview')">
+        <span class="menuIcon">💰</span>
+        <span>
+          <span class="menuTitle">帳款總覽</span>
+          <span class="menuSub">月結與未結清</span>
+        </span>
+      </button>
     </div>
 
     <main id="appContent" class="appContent">
+
       <section id="section-create" class="section appView activeView">
         <div class="sectionTitleRow">
           <div>
             <h2>建立派單</h2>
-            <div class="small">店家只需要填寫代墊金額、送達點、收件資料與品項內容，系統會自動建立 UBee 跑腿派單。</div>
+            <div class="small">填寫送達資料後，系統會自動建立 UBee 跑腿派單。</div>
           </div>
           <div class="sectionBadge">常用</div>
         </div>
@@ -343,15 +1189,14 @@ button.red{background:linear-gradient(135deg,#eb756b,#d84d43)}
       <section id="section-orders" class="section appView">
         <div class="workbenchTop">
           <div>
-            <div class="workbenchLabel">UBee 店家 POS 工作台</div>
+            <div class="workbenchLabel">訂單工作台</div>
             <h2>今日訂單</h2>
-            <div class="small">依照訂單狀態處理接單、備餐、派遣騎士、自送完成與取消紀錄。</div>
+            <div class="small">處理接單、準備、派遣、自送完成與取消紀錄。</div>
           </div>
         </div>
 
         <div class="workbenchHint">
-          <b>操作原則：</b>
-          騎士接單前可取消；騎士接單後請聯絡 UBee 跑腿管理端協助處理。
+          <b>取消規則：</b>騎士接單前可取消；騎士接單後請聯絡 UBee 管理端協助。
         </div>
 
         <div class="tabs workbenchTabs">
@@ -382,7 +1227,7 @@ button.red{background:linear-gradient(135deg,#eb756b,#d84d43)}
 
       <section id="section-progress" class="section appView">
         <h2>配送進度</h2>
-        <div class="small">顯示目前最新一筆配送中訂單，以及整體配送狀態。</div>
+        <div class="small">詳細顯示目前進行中訂單、騎士狀態、送達資料與配送階段。</div>
 
         <div id="merchantProgressBox" class="progressBox">
           <div class="empty">目前沒有配送中的訂單</div>
@@ -391,7 +1236,7 @@ button.red{background:linear-gradient(135deg,#eb756b,#d84d43)}
 
       <section id="section-overview" class="section appView">
         <h2>帳款總覽</h2>
-        <div class="small">統一查看店家派單帳款、月結金額、已結清金額與進行中預估。</div>
+        <div class="small">查看店家派單帳款、月結金額、已結清金額與進行中預估。</div>
 
         <div class="summaryGrid" id="merchantBillingSummary">
           <div class="summaryCard">
@@ -434,11 +1279,11 @@ button.red{background:linear-gradient(135deg,#eb756b,#d84d43)}
           </div>
         </div>
       </section>
+
     </main>
 
   </div>
 </div>
-
 
 <script>
 const firebaseConfig = {
@@ -465,6 +1310,7 @@ let merchantKey = "";
 let currentMerchant = null;
 let merchantAuthed = false;
 let currentTab = "todo";
+let currentView = "create";
 let ordersMap = {};
 let unsubscribers = [];
 let isCreatingMerchantOrder = false;
@@ -483,19 +1329,24 @@ const deliveryStatuses = [
   "arrived_dropoff"
 ];
 
+const progressVisibleStatuses = [
+  "merchant_pending",
+  "merchant_preparing",
+  "merchant_ready",
+  "merchant_self_delivery",
+  "pending_dispatch",
+  "accepted",
+  "arrived_pickup",
+  "picked_up",
+  "arrived_dropoff"
+];
+
 const cancellableStatuses = [
   "merchant_pending",
   "merchant_preparing",
   "merchant_ready",
   "pending_dispatch",
   "merchant_self_delivery"
-];
-
-const progressSteps = [
-  {status:"pending_dispatch",text:"等待接單"},
-  {status:"accepted",text:"騎士取件"},
-  {status:"picked_up",text:"配送途中"},
-  {status:"completed",text:"完成送達"}
 ];
 
 const statusTextMap = {
@@ -512,8 +1363,66 @@ const statusTextMap = {
   merchant_cancelled:"店家已取消"
 };
 
+const progressFlow = [
+  {
+    key:"merchant_pending",
+    title:"訂單已建立",
+    text:"訂單已進入店家端，等待店家確認。"
+  },
+  {
+    key:"merchant_preparing",
+    title:"店家準備中",
+    text:"店家已接受訂單，正在準備品項。"
+  },
+  {
+    key:"merchant_ready",
+    title:"待派遣騎士",
+    text:"店家已準備完成，等待派遣 UBee 騎士。"
+  },
+  {
+    key:"pending_dispatch",
+    title:"等待騎士接單",
+    text:"訂單已送出給騎士端，等待騎士接受任務。"
+  },
+  {
+    key:"accepted",
+    title:"騎士已接單",
+    text:"騎士已接受此任務，正在前往取件地。"
+  },
+  {
+    key:"arrived_pickup",
+    title:"騎士抵達取件地",
+    text:"騎士已抵達店家，請協助確認交付品項。"
+  },
+  {
+    key:"picked_up",
+    title:"騎士已取件",
+    text:"騎士已完成取件，準備前往送達地。"
+  },
+  {
+    key:"arrived_dropoff",
+    title:"騎士抵達送達地",
+    text:"騎士已抵達收件地址，訂單即將完成。"
+  },
+  {
+    key:"completed",
+    title:"完成送達",
+    text:"此訂單已完成配送。"
+  }
+];
 
-let currentView = "create";
+const selfDeliveryFlow = [
+  {
+    key:"merchant_self_delivery",
+    title:"店家自送中",
+    text:"此訂單由店家自行配送。"
+  },
+  {
+    key:"completed",
+    title:"店家自送完成",
+    text:"此訂單已由店家完成配送。"
+  }
+];
 
 function switchMerchantView(view){
   const allowed = ["create","orders","progress","overview"];
@@ -535,25 +1444,17 @@ function switchMerchantView(view){
   if(content){
     content.scrollIntoView({behavior:"smooth",block:"start"});
   }
-}
 
-function openLineOfficial(){
-  alert("請從 UBee LINE 官方帳號開啟店家端，或回到 LINE 官方帳號查看最新通知。");
-}
-
-function toggleMerchantFullscreen(){
-  const doc = document;
-  const root = doc.documentElement;
-
-  if(!doc.fullscreenElement){
-    if(root.requestFullscreen){
-      root.requestFullscreen().catch(() => {});
-    }
-    return;
+  if(target === "progress"){
+    renderMerchantProgress();
   }
 
-  if(doc.exitFullscreen){
-    doc.exitFullscreen().catch(() => {});
+  if(target === "orders"){
+    renderOrders();
+  }
+
+  if(target === "overview"){
+    updateMerchantBillingSummary();
   }
 }
 
@@ -588,12 +1489,12 @@ function updateNavActive(sectionId){
     "section-create":"create"
   };
 
-  document.querySelectorAll(".quickNav button").forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll(".menuBtn").forEach(btn => btn.classList.remove("active"));
 
   const navKey = map[sectionId];
   if(!navKey) return;
 
-  const btn = document.querySelector(`.quickNav button[data-nav="${navKey}"]`);
+  const btn = document.querySelector(`.menuBtn[data-nav="${navKey}"]`);
   if(btn) btn.classList.add("active");
 }
 
@@ -1290,7 +2191,7 @@ function updateMerchantBillingSummary(){
   safeSetText("billingPaid", moneyText(paid));
   safeSetText("billingActive", moneyText(active));
 }
-  
+
 function updateCounts(){
   const all = getAllMerchantOrders();
   const activeAll = all.filter(o => o.status !== "merchant_cancelled");
@@ -1313,7 +2214,7 @@ function updateCounts(){
   safeSetText("summaryCompleted", completed);
   safeSetText("heroTodoCount", todo);
   safeSetText("heroTodoText", todo);
-  safeSetText("heroCompletedText", completed);
+  safeSetText("heroDeliveryCount", delivery);
 }
 
 function renderOrders(){
@@ -1342,36 +2243,49 @@ function renderOrders(){
   box.innerHTML = orders.map(order => renderOrderCard(order)).join("");
 }
 
-function getSimpleProgressIndex(status){
-  if(status === "pending_dispatch") return 0;
-  if(status === "accepted" || status === "arrived_pickup") return 1;
-  if(status === "picked_up" || status === "arrived_dropoff") return 2;
-  if(status === "completed") return 3;
+function getProgressFlow(order){
+  if(order.deliveryType === "merchant" || order.status === "merchant_self_delivery"){
+    return selfDeliveryFlow;
+  }
+  return progressFlow;
+}
+
+function getProgressIndex(order){
+  const flow = getProgressFlow(order);
+  const status = order.status || "";
+
+  const index = flow.findIndex(step => step.key === status);
+  if(index >= 0) return index;
+
+  if(status === "completed") return flow.length - 1;
   return 0;
 }
 
-function renderMerchantProgress(){
-  const box = document.getElementById("merchantProgressBox");
-  if(!box) return;
+function getProgressStatusClass(order){
+  const status = order.status || "";
 
-  const activeOrders = getAllMerchantOrders()
-    .filter(order => ["pending_dispatch",...deliveryStatuses].includes(order.status))
-    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
-
-  if(!activeOrders.length){
-    box.innerHTML = `<div class="empty">目前沒有配送中的訂單</div>`;
-    return;
+  if(status === "merchant_pending" || status === "merchant_preparing" || status === "merchant_ready" || status === "merchant_self_delivery"){
+    return "hot";
   }
 
-  const order = activeOrders[0];
-  const currentIndex = getSimpleProgressIndex(order.status);
-  const orderNo = order.orderNo || order.id || "未命名訂單";
+  if(status === "pending_dispatch"){
+    return "wait";
+  }
 
-  box.innerHTML = `
-    <div class="row"><b>最新配送訂單：</b>${escapeHtml(orderNo)}</div>
-    <div class="small">目前共有 ${activeOrders.length} 筆配送中訂單</div>
-    <div class="flow">
-      ${progressSteps.map((step,index) => {
+  if(deliveryStatuses.includes(status) || status === "completed"){
+    return "move";
+  }
+
+  return "";
+}
+
+function renderProgressTimeline(order){
+  const flow = getProgressFlow(order);
+  const currentIndex = getProgressIndex(order);
+
+  return `
+    <div class="progressTimeline">
+      ${flow.map((step,index) => {
         let cls = "";
         let icon = "○";
 
@@ -1386,14 +2300,102 @@ function renderMerchantProgress(){
         }
 
         return `
-          <div class="step ${cls}">
-            <div class="circle">${icon}</div>
-            <div>${escapeHtml(step.text)}</div>
+          <div class="timelineItem ${cls}">
+            <div class="timelineDot">${icon}</div>
+            <div>
+              <div class="timelineTitle">${escapeHtml(step.title)}</div>
+              <div class="timelineText">${escapeHtml(step.text)}</div>
+            </div>
           </div>
-          ${index < progressSteps.length - 1 ? `<div class="line ${index < currentIndex ? "done" : ""}"></div>` : ""}
         `;
       }).join("")}
     </div>
+  `;
+}
+
+function renderProgressCard(order){
+  const orderNo = order.orderNo || order.id || "未命名訂單";
+  const progressText = statusTextMap[order.status] || order.status || "狀態更新中";
+  const statusClass = getProgressStatusClass(order);
+
+  const riderName = order.riderName || "";
+  const riderPhone = order.riderPhone || "";
+  const riderAssigned = !!(order.riderLineUserId || order.riderId || order.riderName || order.riderPhone);
+
+  const customerName = order.customerName || order.receiverName || "未填寫";
+  const customerPhone = order.customerPhone || order.dropoffPhone || "";
+  const dropoff = order.dropoffAddress || order.dropoff || "未填寫";
+  const item = order.itemName || order.item || order.serviceType || "未填寫";
+  const distanceText = order.distanceText || "未記錄";
+  const deliveryFee = Number(order.deliveryFee || order.fee || order.riderFee || order.driverFee || 0);
+  const stopCount = Number(order.stopCount || 1);
+
+  return `
+    <div class="progressOrder">
+      <div class="progressTop">
+        <div>
+          <div class="progressOrderNo">${escapeHtml(orderNo)}</div>
+          <div class="small">${escapeHtml(formatTime(order))}｜${escapeHtml(stopCount)} 點配送</div>
+        </div>
+        <div class="progressStatus ${escapeHtml(statusClass)}">${escapeHtml(progressText)}</div>
+      </div>
+
+      ${renderProgressTimeline(order)}
+
+      <div class="progressInfoGrid">
+        <div class="progressInfo">
+          <div class="progressInfoTitle">騎士資訊</div>
+          <div class="row"><b>騎士姓名：</b>${escapeHtml(riderAssigned ? riderName || "已接單騎士" : "等待騎士接單")}</div>
+          <div class="row"><b>騎士電話：</b>${escapeHtml(riderAssigned && riderPhone ? riderPhone : "尚未提供")}</div>
+        </div>
+
+        <div class="progressInfo">
+          <div class="progressInfoTitle">收件資訊</div>
+          <div class="row"><b>收件人：</b>${escapeHtml(customerName)}</div>
+          <div class="row"><b>電話：</b>${escapeHtml(customerPhone || "未填寫")}</div>
+          <div class="row"><b>地址：</b>${escapeHtml(dropoff)}</div>
+        </div>
+
+        <div class="progressInfo">
+          <div class="progressInfoTitle">配送內容</div>
+          <div class="row"><b>品項：</b>${escapeHtml(item)}</div>
+          <div class="row"><b>距離：</b>${escapeHtml(distanceText)}</div>
+          <div class="row"><b>配送費：</b>NT$${escapeHtml(deliveryFee)}</div>
+        </div>
+      </div>
+
+      ${renderDeliveryStops(order)}
+
+      <div class="progressFlowHint">
+        目前階段：${escapeHtml(progressText)}。若騎士已接單後需要取消或調整，請聯絡 UBee 管理端協助。
+      </div>
+    </div>
+  `;
+}
+
+function renderMerchantProgress(){
+  const box = document.getElementById("merchantProgressBox");
+  if(!box) return;
+
+  const activeOrders = getAllMerchantOrders()
+    .filter(order => progressVisibleStatuses.includes(order.status))
+    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
+
+  if(!activeOrders.length){
+    box.innerHTML = `
+      <div class="empty">
+        目前沒有進行中的配送訂單
+        <div class="small">建立派單後，這裡會顯示詳細配送進度。</div>
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="notice">
+      目前共有 <b>${activeOrders.length}</b> 筆進行中訂單。最新訂單會顯示在最上方。
+    </div>
+    ${activeOrders.map(order => renderProgressCard(order)).join("")}
   `;
 }
 
@@ -1600,40 +2602,37 @@ ${distanceText}
       deliveryFee,
 
       paymentMethod,
-paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家月結",
-paymentStatus:paymentStatusMap[paymentMethod] || "merchant_settlement",
-merchantPaid:paymentMethod === "merchant_paid",
-paidAmount:paymentMethod === "merchant_paid" ? deliveryFee : 0,
+      paymentMethodLabel:paymentMethodLabelMap[paymentMethod] || "店家月結",
+      paymentStatus:paymentStatusMap[paymentMethod] || "merchant_settlement",
+      merchantPaid:paymentMethod === "merchant_paid",
+      paidAmount:paymentMethod === "merchant_paid" ? deliveryFee : 0,
 
-// ===== 店家帳款 / UBee 應收款 =====
-// deliveryMode === "ubee" 代表這筆是 UBee 派騎士，需要列入店家應付款。
-// deliveryMode === "merchant" 代表店家自送，不需要算 UBee 應收款。
-billedTo:deliveryMode === "ubee" ? "merchant" : "none",
-merchantBillingType:"merchant_dispatch",
-merchantPayableAmount:deliveryMode === "ubee" ? deliveryFee : 0,
-storePayableAmount:deliveryMode === "ubee" ? deliveryFee : 0,
+      billedTo:deliveryMode === "ubee" ? "merchant" : "none",
+      merchantBillingType:"merchant_dispatch",
+      merchantPayableAmount:deliveryMode === "ubee" ? deliveryFee : 0,
+      storePayableAmount:deliveryMode === "ubee" ? deliveryFee : 0,
 
-merchantBillingStatus:
-  deliveryMode !== "ubee"
-    ? "not_billable"
-    : paymentMethod === "merchant_paid"
-      ? "paid"
-      : "unpaid",
+      merchantBillingStatus:
+        deliveryMode !== "ubee"
+          ? "not_billable"
+          : paymentMethod === "merchant_paid"
+            ? "paid"
+            : "unpaid",
 
-merchantPaidAmount:
-  deliveryMode === "ubee" && paymentMethod === "merchant_paid"
-    ? deliveryFee
-    : 0,
+      merchantPaidAmount:
+        deliveryMode === "ubee" && paymentMethod === "merchant_paid"
+          ? deliveryFee
+          : 0,
 
-merchantBillingCreatedAt:now,
-merchantBillingSettledAt:
-  deliveryMode === "ubee" && paymentMethod === "merchant_paid"
-    ? now
-    : null,
+      merchantBillingCreatedAt:now,
+      merchantBillingSettledAt:
+        deliveryMode === "ubee" && paymentMethod === "merchant_paid"
+          ? now
+          : null,
 
-riderLineUserId:"",
-riderName:"",
-riderPhone:""
+      riderLineUserId:"",
+      riderName:"",
+      riderPhone:""
     };
 
     if(deliveryMode === "ubee") orderPayload.merchantReadyAt = now;
