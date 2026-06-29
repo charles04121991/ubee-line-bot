@@ -2053,11 +2053,9 @@ app.get("/", (req, res) => {
 // ===== 騎手資料（暫存記憶體）=====
 const riders = {};
 
-// ===== 騎手 / 任務夥伴註冊 API：正式營運修正版 =====
+// ===== 騎手註冊 API =====
 app.post('/api/rider/register', async (req, res) => {
   try {
-    const body = req.body || {};
-
     const {
       name,
       phone,
@@ -2069,329 +2067,103 @@ app.post('/api/rider/register', async (req, res) => {
       plateNumber,
       area,
       serviceArea,
-      serviceAreas,
       availableTime,
-      availableTimes,
+    } = req.body;
 
-      driverLicenseConfirmed,
-      vehicleLicenseConfirmed,
-      policeRecordConfirmed,
-
-      legalVehicleConfirm,
-      businessConditionAgree,
-      insuranceConfirm,
-      violationConfirm,
-      prohibitedItemConfirm,
-      contractConfirm,
-      riderRuleConfirm,
-      liabilityConfirm,
-      privacyConfirm,
-    } = body;
-
-    const cleanPhone = normalizePhone(phone || '');
-    const riderLineUserId = String(lineUserId || userId || '').trim();
-
-    let selectedServiceAreas = Array.isArray(serviceAreas)
-      ? serviceAreas
-          .map(v => cleanText(v || '', 30))
-          .filter(Boolean)
-          .slice(0, 20)
-      : [];
-
-    let selectedAvailableTimes = Array.isArray(availableTimes)
-      ? availableTimes
-          .map(v => cleanText(v || '', 30))
-          .filter(Boolean)
-          .slice(0, 20)
-      : [];
-
-    const serviceAreaText = cleanText(
-      serviceArea ||
-      area ||
-      selectedServiceAreas.join('、') ||
-      '',
-      120
-    );
-
-    const availableTimeText = cleanText(
-      availableTime ||
-      selectedAvailableTimes.join('、') ||
-      '',
-      120
-    );
-
-    if (selectedServiceAreas.length === 0 && serviceAreaText) {
-      selectedServiceAreas = serviceAreaText
-        .split(/[、,，\s]+/)
-        .map(v => cleanText(v || '', 30))
-        .filter(Boolean)
-        .slice(0, 20);
-    }
-
-    if (selectedAvailableTimes.length === 0 && availableTimeText) {
-      selectedAvailableTimes = availableTimeText
-        .split(/[、,，\s]+/)
-        .map(v => cleanText(v || '', 30))
-        .filter(Boolean)
-        .slice(0, 20);
-    }
-
-    const cleanName = cleanText(name || '', 20);
-    const cleanLineId = cleanText(lineId || '', 60);
-    const cleanDistrict = cleanText(district || '', 80);
-    const cleanVehicle = cleanText(vehicle || '', 40);
-    const cleanPlateNumber = cleanText(plateNumber || '', 20).toUpperCase();
-
-    // ===== 基本驗證 =====
-    if (!riderLineUserId || !riderLineUserId.startsWith('U')) {
-      return res.status(400).json({
-        success: false,
-        message: '請從 LINE 官方帳號內開啟申請頁，系統需要取得 LINE 身分才能送出申請。',
-      });
-    }
-
-    if (!cleanName || !cleanPhone || !cleanVehicle || !serviceAreaText) {
-      return res.status(400).json({
+    if (!name || !phone || !vehicle || !(area || serviceArea)) {
+      return res.json({
         success: false,
         message: '資料不完整，請確認姓名、電話、配送工具與服務區域都有填寫。',
       });
     }
 
-    if (!/^09\d{8}$/.test(cleanPhone)) {
-      return res.status(400).json({
+    const cleanPhone = normalizePhone(phone);
+    const riderLineUserId = lineUserId || userId || '';
+
+    // ===== 防止重複申請 =====
+    const existingRider = await db.collection('riders')
+      .where('lineUserId', '==', riderLineUserId)
+      .limit(1)
+      .get();
+
+    if (riderLineUserId && !existingRider.empty) {
+      const riderData = existingRider.docs[0].data();
+
+      return res.json({
         success: false,
-        message: '請輸入正確手機號碼，例如：0912345678。',
+        duplicate: true,
+        alreadyExists: true,
+        message:
+          riderData.status === 'approved'
+            ? '你已通過 UBee 跑腿騎士審核。'
+            : '你的資料已送出，請等待 UBee 跑腿審核通過。',
       });
     }
 
-    if (cleanName.length < 2 || cleanName.length > 20) {
-      return res.status(400).json({
+    if (!/^09\d{8}$/.test(cleanPhone)) {
+      return res.json({
+        success: false,
+        message: '請輸入正確手機號碼。',
+      });
+    }
+
+    if (String(name).trim().length < 2 || String(name).trim().length > 20) {
+      return res.json({
         success: false,
         message: '姓名長度需為 2～20 字。',
       });
     }
 
-    if (cleanLineId && cleanLineId.length > 60) {
-      return res.status(400).json({
-        success: false,
-        message: 'LINE 暱稱 / LINE ID 長度不可超過 60 字。',
-      });
-    }
-
-    if (cleanDistrict && cleanDistrict.length > 80) {
-      return res.status(400).json({
-        success: false,
-        message: '居住地區不可超過 80 字。',
-      });
-    }
-
-    if (cleanPlateNumber && cleanPlateNumber.length > 20) {
-      return res.status(400).json({
+    if (plateNumber && String(plateNumber).trim().length > 20) {
+      return res.json({
         success: false,
         message: '車牌號碼不可超過 20 字。',
       });
     }
-
-    if (!availableTimeText) {
-      return res.status(400).json({
-        success: false,
-        message: '請至少選擇一個可服務時段。',
-      });
-    }
-
-    // ===== 正式營運防呆：同手機 / 同 LINE 都檢查 =====
-    const phoneDocRef = db.collection('riders').doc(cleanPhone);
-    const phoneDoc = await phoneDocRef.get();
-
-    const lineSnap = await db.collection('riders')
-      .where('lineUserId', '==', riderLineUserId)
-      .limit(1)
-      .get();
-
-    const phoneData = phoneDoc.exists ? (phoneDoc.data() || {}) : null;
-    const lineDoc = lineSnap.empty ? null : lineSnap.docs[0];
-    const lineData = lineDoc ? (lineDoc.data() || {}) : null;
-
-    const phoneDocApproved =
-      phoneData &&
-      (phoneData.approved === true || phoneData.status === 'approved');
-
-    const lineDocApproved =
-      lineData &&
-      (lineData.approved === true || lineData.status === 'approved');
-
-    // 同手機已是 approved：不可用申請頁覆蓋正式騎士資料
-    if (phoneDocApproved) {
-      return res.json({
-        success: false,
-        duplicate: true,
-        alreadyExists: true,
-        riderId: cleanPhone,
-        message: '你已通過 UBee 跑腿騎士審核，不需要重複申請。',
-      });
-    }
-
-    // 同 LINE 已是 approved：不可建立另一筆 pending
-    if (lineDocApproved) {
-      return res.json({
-        success: false,
-        duplicate: true,
-        alreadyExists: true,
-        riderId: lineDoc.id,
-        message: '你已通過 UBee 跑腿騎士審核，不需要重複申請。',
-      });
-    }
-
-    // 同手機已被不同 LINE 申請過：避免覆蓋別人的申請資料
-    if (
-      phoneData &&
-      phoneData.lineUserId &&
-      phoneData.lineUserId !== riderLineUserId
-    ) {
-      return res.status(409).json({
-        success: false,
-        message: '此手機號碼已送出過申請，如需修改資料請聯繫 UBee 管理員。',
-      });
-    }
-
-    // 同 LINE 曾用不同手機送過 pending：
-    // 舊資料標記 replaced，新資料寫到這次填的新手機文件。
-    if (lineDoc && lineDoc.id !== cleanPhone) {
-      await lineDoc.ref.set({
-        status: 'replaced',
-        approved: false,
-        replacedBy: cleanPhone,
-        replacedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-    }
-
-    const nowMs = Date.now();
-    const isExistingPending = phoneDoc.exists || !!lineDoc;
 
     const riderId = cleanPhone;
 
     const rider = {
       riderId,
       id: riderId,
-
-      name: cleanName,
+      name: cleanText(name, 20),
       phone: cleanPhone,
-      lineId: cleanLineId,
-
+      lineId: cleanText(lineId || '', 60),
       userId: riderLineUserId,
       lineUserId: riderLineUserId,
-
-      district: cleanDistrict,
-      vehicle: cleanVehicle,
-      plateNumber: cleanPlateNumber,
-
-      area: serviceAreaText,
-      serviceArea: serviceAreaText,
-      serviceAreas: selectedServiceAreas,
-
-      availableTime: availableTimeText,
-      availableTimes: selectedAvailableTimes,
-
+      district: cleanText(district || '', 80),
+      vehicle: cleanText(vehicle, 40),
+      plateNumber: cleanText(plateNumber || '', 20),
+      area: cleanText(area || serviceArea || '', 80),
+      serviceArea: cleanText(serviceArea || area || '', 80),
+      availableTime: cleanText(availableTime || '', 80),
       approved: false,
       status: 'pending',
-
       online: false,
       busy: false,
       currentOrderId: '',
-
-      driverLicenseConfirmed:
-        driverLicenseConfirmed === true || legalVehicleConfirm === true,
-
-      vehicleLicenseConfirmed:
-        vehicleLicenseConfirmed === true || legalVehicleConfirm === true,
-
-      policeRecordConfirmed:
-        policeRecordConfirmed === true,
-
-      legalVehicleConfirm:
-        legalVehicleConfirm === true,
-
-      businessConditionAgree:
-        businessConditionAgree === true,
-
-      insuranceConfirm:
-        insuranceConfirm === true,
-
-      violationConfirm:
-        violationConfirm === true,
-
-      prohibitedItemConfirm:
-        prohibitedItemConfirm === true,
-
-      contractConfirm:
-        contractConfirm === true,
-
-      riderRuleConfirm:
-        riderRuleConfirm === true,
-
-      liabilityConfirm:
-        liabilityConfirm === true,
-
-      privacyConfirm:
-        privacyConfirm === true,
-
-      source: 'rider-register',
-      applicationVersion: 'task-partner-v2',
-      applicationOrigin: String(req.headers.origin || ''),
-      applicationUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      applicationUpdatedAtMs: nowMs,
-
-      createdAt:
-        phoneData && phoneData.createdAt
-          ? phoneData.createdAt
-          : admin.firestore.FieldValue.serverTimestamp(),
-
-      createdAtMs:
-        phoneData && phoneData.createdAtMs
-          ? phoneData.createdAtMs
-          : nowMs,
-
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAtMs: Date.now(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    // ===== 正式寫入 Firestore riders / 手機號碼 =====
-    const savedRider = await saveRider(rider);
+    await saveRider(rider);
 
-    console.log(
-      isExistingPending
-        ? '🟡 UBee 任務夥伴申請已更新：'
-        : '🟡 UBee 新任務夥伴申請：',
-      savedRider
-    );
+    console.log('🟡 新騎士註冊：', rider);
 
-    // ===== 管理群通知：不能讓通知失敗影響資料落庫 =====
-    try {
-      if (LINE_ADMIN_GROUP_ID) {
-        await pushToGroup(LINE_ADMIN_GROUP_ID, createRiderReviewFlex(savedRider));
-      } else {
-        console.warn('⚠️ LINE_ADMIN_GROUP_ID 未設定，略過騎士審核通知。');
-      }
-    } catch (pushErr) {
-      console.error('⚠️ 騎士申請已寫入資料庫，但推送管理群通知失敗：', pushErr);
-    }
+    await pushToGroup(LINE_ADMIN_GROUP_ID, createRiderReviewFlex(rider));
 
-    return res.json({
+    res.json({
       success: true,
       riderId,
-      updated: isExistingPending,
-      message: isExistingPending
-        ? '✅ 你的申請資料已更新，請等待 UBee 跑腿審核。'
-        : '✅ 已送出申請，請等待 UBee 跑腿審核。',
+      message: '已送出申請，等待 UBee 跑腿審核。',
     });
-
   } catch (err) {
-    console.error('❌ 騎士 / 任務夥伴註冊失敗：', err);
+    console.error('❌ 騎士註冊失敗：', err);
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: '申請送出失敗，請稍後再試。',
-      error: err.message,
     });
   }
 });
