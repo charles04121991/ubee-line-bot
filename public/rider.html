@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>UBee｜任務夥伴申請</title>
+  <title>UBee 跑腿夥伴申請</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -23,18 +23,11 @@
       --primaryText:#000;
       --green:#22c55e;
       --red:#ef4444;
-      --yellow:#facc15;
       --radius:24px;
     }
 
-    *{
-      box-sizing:border-box;
-      -webkit-tap-highlight-color:transparent;
-    }
-
-    html{
-      scroll-behavior:smooth;
-    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+    html{scroll-behavior:smooth;}
 
     body{
       margin:0;
@@ -43,13 +36,6 @@
       color:var(--white);
       min-height:100vh;
       overflow-x:hidden;
-    }
-
-    button,
-    input,
-    select,
-    textarea{
-      font-family:inherit;
     }
 
     .page{
@@ -84,12 +70,9 @@
       font-weight:1000;
       color:#000;
       background:#fff;
-      flex:0 0 auto;
     }
 
-    .brandText{
-      line-height:1.12;
-    }
+    .brandText{line-height:1.12;}
 
     .brandText b{
       display:block;
@@ -159,7 +142,7 @@
       color:#cfcfcf;
       line-height:1.8;
       margin:0 0 20px;
-      max-width:480px;
+      max-width:460px;
       font-weight:800;
       position:relative;
       z-index:2;
@@ -176,6 +159,7 @@
       padding:13px 22px;
       font-size:16px;
       font-weight:1000;
+      font-family:inherit;
       position:relative;
       z-index:2;
       cursor:pointer;
@@ -256,9 +240,7 @@
       letter-spacing:-.3px;
     }
 
-    .sectionTitle:first-of-type{
-      margin-top:0;
-    }
+    .sectionTitle:first-of-type{margin-top:0;}
 
     .fieldGrid{
       display:grid;
@@ -299,6 +281,7 @@
       background:transparent;
       color:var(--white);
       outline:none;
+      font-family:inherit;
       font-weight:900;
     }
 
@@ -313,9 +296,7 @@
       color:var(--white);
     }
 
-    select:invalid{
-      color:var(--muted2);
-    }
+    select:invalid{color:var(--muted2);}
 
     .field:focus-within{
       border-color:#fff;
@@ -328,67 +309,6 @@
       line-height:1.7;
       margin-top:10px;
       font-weight:800;
-    }
-
-    .checkboxGrid{
-      display:grid;
-      grid-template-columns:repeat(2,1fr);
-      gap:12px;
-    }
-
-    .chipOption{
-      margin:0;
-      cursor:pointer;
-      user-select:none;
-    }
-
-    .chipOption input{
-      display:none;
-    }
-
-    .chipBox{
-      min-height:58px;
-      border:1px solid var(--line);
-      border-radius:18px;
-      background:#111;
-      display:flex;
-      align-items:center;
-      gap:10px;
-      padding:14px 15px;
-      color:#fff;
-      transition:.16s ease;
-    }
-
-    .chipIcon{
-      width:24px;
-      height:24px;
-      border-radius:8px;
-      border:1px solid var(--line2);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:transparent;
-      background:#0b0b0b;
-      font-size:15px;
-      font-weight:1000;
-      flex:0 0 auto;
-    }
-
-    .chipText{
-      font-size:16px;
-      font-weight:1000;
-      line-height:1.35;
-    }
-
-    .chipOption input:checked + .chipBox{
-      border-color:rgba(34,197,94,.72);
-      background:rgba(34,197,94,.12);
-    }
-
-    .chipOption input:checked + .chipBox .chipIcon{
-      border-color:var(--green);
-      background:var(--green);
-      color:#fff;
     }
 
     .agreeGrid{
@@ -441,48 +361,23 @@
       margin-bottom:14px;
     }
 
-    .finalCheck{
-      display:flex;
-      align-items:flex-start;
-      gap:12px;
-      padding:16px;
+    .agreeBtn{
+      width:100%;
+      min-height:58px;
       border:1px solid var(--line2);
       border-radius:18px;
       background:#fff;
       color:#000;
+      font-size:18px;
+      font-weight:1000;
+      font-family:inherit;
       cursor:pointer;
-      margin:0;
     }
 
-    .finalCheck input{
-      display:none;
-    }
-
-    .checkVisual{
-      width:26px;
-      height:26px;
-      border-radius:8px;
-      border:2px solid #000;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:transparent;
-      font-size:16px;
-      font-weight:1000;
-      flex:0 0 auto;
-      margin-top:1px;
-    }
-
-    .finalCheckText{
-      font-size:17px;
-      line-height:1.55;
-      font-weight:1000;
-    }
-
-    .finalCheck input:checked + .checkVisual{
+    .agreeBtn.active{
       background:var(--green);
-      border-color:var(--green);
       color:#fff;
+      border-color:var(--green);
     }
 
     .note{
@@ -508,17 +403,15 @@
       font-weight:1000;
       margin-top:26px;
       cursor:pointer;
+      font-family:inherit;
       transition:.16s ease;
     }
 
-    .submitBtn:active{
-      transform:scale(.985);
-    }
+    .submitBtn:active{transform:scale(.985);}
 
     .submitBtn:disabled{
-      opacity:.45;
+      opacity:.55;
       cursor:not-allowed;
-      transform:none;
     }
 
     .successBox{
@@ -562,50 +455,34 @@
     }
 
     @media(max-width:640px){
-      .page{
-        padding:20px 14px 40px;
-      }
-
-      .brandText b{
-        font-size:24px;
-      }
+      .page{padding:20px 14px 40px;}
+      .brandText b{font-size:24px;}
 
       .hero{
         padding:24px 20px;
         min-height:245px;
       }
 
-      h1{
-        font-size:36px;
-      }
+      h1{font-size:36px;}
 
       .heroText{
         font-size:15px;
         max-width:100%;
       }
 
-      .fieldGrid{
-        grid-template-columns:1fr;
-      }
-
-      .agreeGrid{
-        grid-template-columns:1fr;
-      }
+      .fieldGrid{grid-template-columns:1fr;}
+      .agreeGrid{grid-template-columns:1fr;}
 
       .card{
         padding:20px;
         border-radius:26px;
       }
 
-      .sectionTitle{
-        font-size:25px;
-      }
+      .sectionTitle{font-size:25px;}
     }
 
     @media(max-width:420px){
-      .topbar{
-        margin-bottom:18px;
-      }
+      .topbar{margin-bottom:18px;}
 
       .logoU{
         width:42px;
@@ -613,38 +490,18 @@
         font-size:26px;
       }
 
-      .brandText span{
-        font-size:11px;
-      }
+      .brandText span{font-size:11px;}
+      h1{font-size:33px;}
+      .hero{border-radius:24px;}
 
-      h1{
-        font-size:33px;
-      }
-
-      .hero{
-        border-radius:24px;
-      }
-
-      .benefit{
-        padding:12px 6px;
-      }
-
-      .benefitTitle{
-        font-size:13px;
-      }
-
-      .benefitText{
-        font-size:11px;
-      }
+      .benefit{padding:12px 6px;}
+      .benefitTitle{font-size:13px;}
+      .benefitText{font-size:11px;}
 
       input,
       select,
       textarea{
         font-size:16px;
-      }
-
-      .checkboxGrid{
-        grid-template-columns:1fr;
       }
 
       .submitBtn{
@@ -670,14 +527,11 @@
   </div>
 
   <div class="hero">
-    <div class="heroBadge">UBee Task Partner</div>
-
-    <h1>加入 UBee<br>任務夥伴</h1>
-
+    <div class="heroBadge">UBee Partner</div>
+    <h1>加入 UBee<br>合作夥伴</h1>
     <p class="heroText">
-      彈性接單、自由安排時間，加入 UBee 跑腿，一起完成城市裡的即時配送與跑腿任務。
+      彈性接單、自由安排時間，加入 UBee 城市任務平台，一起完成城市裡的即時任務。
     </p>
-
     <button class="heroBtn" type="button" onclick="document.getElementById('formCard').scrollIntoView({behavior:'smooth'})">
       立即申請 <span>›</span>
     </button>
@@ -688,16 +542,14 @@
         <div class="benefitTitle">時間彈性</div>
         <div class="benefitText">自由安排接單時間</div>
       </div>
-
       <div class="benefit">
         <div class="benefitIcon">💰</div>
         <div class="benefitTitle">任務收入</div>
         <div class="benefitText">依完成任務結算</div>
       </div>
-
       <div class="benefit">
         <div class="benefitIcon">🛡️</div>
-        <div class="benefitTitle">平台審核</div>
+        <div class="benefitTitle">平台規範</div>
         <div class="benefitText">審核通過才可接單</div>
       </div>
     </div>
@@ -707,7 +559,7 @@
 
     <div class="noticeBox">
       <b>申請前請先確認</b>
-      UBee 任務夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核、派單聯繫與必要營運流程，不會對外公開。送出後請等待審核通過，審核通過後才可以接單。
+      UBee 合作夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核，不會對外公開。送出後請等待審核通過，審核通過後才可以接單。
     </div>
 
     <form id="riderForm">
@@ -717,17 +569,17 @@
       <div class="fieldGrid">
         <div class="field">
           <label>姓名<span class="requiredMark">*</span></label>
-          <input id="name" name="name" type="text" placeholder="請輸入真實姓名" autocomplete="name" required>
+          <input id="name" name="name" type="text" placeholder="請輸入真實姓名" required>
         </div>
 
         <div class="field">
           <label>手機號碼<span class="requiredMark">*</span></label>
-          <input id="phone" name="phone" type="tel" inputmode="numeric" maxlength="10" placeholder="例如：0912345678" autocomplete="tel" required>
+          <input id="phone" name="phone" type="tel" placeholder="例如：0912345678" required>
         </div>
 
         <div class="field">
-          <label>LINE 暱稱 / LINE ID<span class="requiredMark">*</span></label>
-          <input id="lineId" name="lineId" type="text" placeholder="請輸入 LINE 暱稱或 LINE ID" required>
+          <label>LINE ID<span class="requiredMark">*</span></label>
+          <input id="lineId" name="lineId" type="text" placeholder="請輸入 LINE ID" required>
         </div>
 
         <div class="field">
@@ -736,9 +588,7 @@
         </div>
       </div>
 
-      <div class="hint">
-        審核或後續聯繫會使用此資料，請確認填寫正確。系統會透過 LINE LIFF 取得你的 LINE 身分作為申請依據。
-      </div>
+      <div class="hint">審核或後續聯繫會使用此資料，請確認填寫正確。</div>
 
       <div class="sectionTitle">配送資料</div>
 
@@ -754,136 +604,24 @@
 
         <div class="field">
           <label>車牌號碼<span class="requiredMark">*</span></label>
-          <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" maxlength="20" required>
+          <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" required>
         </div>
-      </div>
 
-      <div class="sectionTitle">可服務區域</div>
+        <div class="field">
+          <label>可服務區域<span class="requiredMark">*</span></label>
+          <input id="serviceArea" name="serviceArea" type="text" placeholder="例如：豐原、潭子、神岡、大雅" required>
+        </div>
 
-      <div class="checkboxGrid" id="serviceAreaGroup">
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="豐原">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">豐原</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="潭子">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">潭子</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="神岡">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">神岡</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="大雅">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">大雅</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="后里">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">后里</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="北屯">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">北屯</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="西屯">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">西屯</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="serviceArea" value="其他">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">其他區域</span>
-          </span>
-        </label>
-      </div>
-
-      <div class="hint">
-        可複選。建議選擇自己熟悉、可穩定接單的區域，方便後續派單與任務支援。
-      </div>
-
-      <div class="sectionTitle">可服務時段</div>
-
-      <div class="checkboxGrid" id="availableTimeGroup">
-        <label class="chipOption">
-          <input type="checkbox" name="availableTime" value="平日白天">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">平日白天</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="availableTime" value="平日晚上">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">平日晚上</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="availableTime" value="假日白天">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">假日白天</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="availableTime" value="假日晚上">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">假日晚上</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="availableTime" value="全天彈性">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">全天彈性</span>
-          </span>
-        </label>
-
-        <label class="chipOption">
-          <input type="checkbox" name="availableTime" value="臨時支援">
-          <span class="chipBox">
-            <span class="chipIcon">✓</span>
-            <span class="chipText">臨時支援</span>
-          </span>
-        </label>
-      </div>
-
-      <div class="hint">
-        可複選。此資料僅作為 UBee 後續派單與任務安排參考，不代表平台保證派單。
+        <div class="field">
+          <label>可服務時段<span class="requiredMark">*</span></label>
+          <select id="availableTime" name="availableTime" required>
+            <option value="">請選擇可服務時段</option>
+            <option value="白天">白天</option>
+            <option value="晚上">晚上</option>
+            <option value="全天">全天</option>
+            <option value="彈性配合">彈性配合</option>
+          </select>
+        </div>
       </div>
 
       <div class="sectionTitle">合作規範確認</div>
@@ -891,10 +629,18 @@
       <div class="agreeGrid">
 
         <div class="agreeBox">
-          <div class="agreeIcon">🤝</div>
-          <div class="agreeTitle">接案合作性質</div>
+          <div class="agreeIcon">📦</div>
+          <div class="agreeTitle">商務急件與物品遞送</div>
           <div class="agreeDesc">
-            本合作為接案合作性質，非勞雇關係。UBee 跑腿不保證派單量，報酬依實際完成任務結算。
+            可接受文件、合約、發票、小型商務物件等即時任務，並重視準時與安全交付。
+          </div>
+        </div>
+
+        <div class="agreeBox">
+          <div class="agreeIcon">🛡️</div>
+          <div class="agreeTitle">保險與風險確認</div>
+          <div class="agreeDesc">
+            本人或車輛已有機車強制險，並了解接案過程須自行承擔相關交通與執行風險。
           </div>
         </div>
 
@@ -907,42 +653,18 @@
         </div>
 
         <div class="agreeBox">
-          <div class="agreeIcon">⛔</div>
-          <div class="agreeTitle">禁止違規任務與危險物品</div>
+          <div class="agreeIcon">🤝</div>
+          <div class="agreeTitle">接案合作性質</div>
           <div class="agreeDesc">
-            不得承接或運送違法、危險、管制、需特殊許可、來源不明或平台判定不適合配送之物品。遇到疑慮任務，須立即回報 UBee 跑腿官方人員協助處理。
-          </div>
-        </div>
-
-        <div class="agreeBox">
-          <div class="agreeIcon">🪪</div>
-          <div class="agreeTitle">合法駕駛與車輛確認</div>
-          <div class="agreeDesc">
-            本人確認具備合法駕駛資格，並會使用可合法上路之車輛執行任務。如 UBee 跑腿因審核或安全需要要求補充資料，本人願意配合提供。
-          </div>
-        </div>
-
-        <div class="agreeBox">
-          <div class="agreeIcon">🛡️</div>
-          <div class="agreeTitle">保險與風險確認</div>
-          <div class="agreeDesc">
-            本人確認執行任務所使用之車輛，已具備依法必要之保險與可合法上路條件，並了解接案過程須自行注意交通安全與執行風險。
-          </div>
-        </div>
-
-        <div class="agreeBox">
-          <div class="agreeIcon">📦</div>
-          <div class="agreeTitle">商務急件與物品遞送</div>
-          <div class="agreeDesc">
-            可接受文件、合約、發票、小型商務物件等即時任務，並重視準時、安全交付與任務流程回報。
+            本合作為接案合作性質，非勞雇關係。UBee 不保證派單量，報酬依實際完成任務結算。
           </div>
         </div>
 
         <div class="agreeBox">
           <div class="agreeIcon">📋</div>
-          <div class="agreeTitle">遵守平台流程</div>
+          <div class="agreeTitle">遵守騎手規範</div>
           <div class="agreeDesc">
-            須依 UBee 跑腿任務流程操作，不得偽造接單、取件、送達或完成紀錄，並須配合平台必要管理。
+            包含不得私接客戶、不得私下收費、不得偽造完成紀錄，並須依平台任務流程操作。
           </div>
         </div>
 
@@ -950,7 +672,7 @@
           <div class="agreeIcon">⚠️</div>
           <div class="agreeTitle">責任釐清與處理</div>
           <div class="agreeDesc">
-            UBee 跑腿為任務媒合平台，若因本人疏失造成物品遺失、損壞、延誤或客訴，須配合平台釐清與處理。
+            UBee 為任務媒合平台，若因本人疏失造成貨物遺失或損壞，須配合平台釐清與處理。
           </div>
         </div>
 
@@ -958,7 +680,7 @@
           <div class="agreeIcon">🔐</div>
           <div class="agreeTitle">個人資料使用</div>
           <div class="agreeDesc">
-            本人同意 UBee 跑腿於合作審核、派單聯繫、帳務結算與必要營運範圍內，蒐集、處理及使用個人資料。
+            本人同意 UBee 於合作審核、派單聯繫與必要營運範圍內，蒐集、處理及使用個人資料。
           </div>
         </div>
 
@@ -966,18 +688,16 @@
 
       <div class="finalAgreeBox">
         <div class="finalAgreeText">
-          請確認你已閱讀上方全部合作規範。送出後，代表你同意 UBee 跑腿任務夥伴申請、審核、派單、平台管理與必要營運相關規範。
+          請確認你已閱讀上方全部合作規範。送出後，代表你同意 UBee 合作夥伴申請、審核、派單與平台管理相關規範。
         </div>
 
-        <label class="finalCheck">
-          <input id="agreeCheck" type="checkbox">
-          <span class="checkVisual">✓</span>
-          <span class="finalCheckText">我已閱讀並同意全部合作規範</span>
-        </label>
+        <button id="agreeBtn" type="button" class="agreeBtn">
+          我已閱讀並同意全部合作規範
+        </button>
       </div>
 
       <div class="note">
-        ※ 送出申請後，UBee 跑腿會進行資料審核。審核通過後，系統會透過官方帳號通知你後續流程。未通過審核前，無法使用 UBee 跑腿任務夥伴接單功能。
+        ※ 送出申請後，UBee 會進行資料審核。審核通過後，系統會透過官方帳號通知你後續流程。
       </div>
 
       <button id="submitBtn" class="submitBtn" type="submit">送出申請</button>
@@ -989,58 +709,17 @@
   </div>
 
   <div class="footer">
-    <b>UBee 跑腿</b><br>
-    任務夥伴申請資料僅供審核、派單與必要營運流程使用。
+    <b>UBee 城市任務平台</b><br>
+    合作夥伴申請資料僅供審核與派單必要流程使用。
   </div>
 
 </div>
 
 <script>
 const LIFF_ID = '2009895876-MsVhzIxz';
-const API_BASE_URL = 'https://ubee-line-bot-2-zezw.onrender.com';
 
 let realLineUserId = '';
-let isSubmitting = false;
-
-const form = document.getElementById('riderForm');
-const submitBtn = document.getElementById('submitBtn');
-const successBox = document.getElementById('successBox');
-const errorBox = document.getElementById('errorBox');
-const agreeCheck = document.getElementById('agreeCheck');
-
-function clearMessage() {
-  successBox.style.display = 'none';
-  errorBox.style.display = 'none';
-  successBox.textContent = '';
-  errorBox.textContent = '';
-}
-
-function showSuccess(message) {
-  successBox.style.display = 'block';
-  successBox.textContent = message;
-  errorBox.style.display = 'none';
-  errorBox.textContent = '';
-  successBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function showError(message) {
-  errorBox.style.display = 'block';
-  errorBox.textContent = message;
-  successBox.style.display = 'none';
-  successBox.textContent = '';
-  errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function updateSubmitState() {
-  // 正式營運版：不要因為未勾同意就鎖死按鈕。
-  // 使用者按送出時再檢查，避免看起來像壞掉。
-  submitBtn.disabled = isSubmitting;
-}
-
-function getCheckedValues(name) {
-  return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
-    .map(input => input.value);
-}
+let hasAgreed = false;
 
 async function initLiff() {
   try {
@@ -1057,37 +736,29 @@ async function initLiff() {
     console.log('LINE real userId:', realLineUserId);
   } catch (err) {
     console.error('LIFF 初始化失敗:', err);
-  } finally {
-    updateSubmitState();
   }
 }
 
-window.addEventListener('load', function() {
-  submitBtn.disabled = false;
-  initLiff();
+window.addEventListener('load', initLiff);
+
+document.getElementById('agreeBtn').addEventListener('click', function(){
+  hasAgreed = true;
+  this.classList.add('active');
+  this.innerText = '✅ 已閱讀並同意全部合作規範';
 });
 
-if (agreeCheck) {
-  agreeCheck.addEventListener('change', function() {
-    clearMessage();
-    updateSubmitState();
-  });
-}
-
-document.getElementById('phone').addEventListener('input', function() {
-  this.value = this.value.replace(/\D/g, '').slice(0, 10);
-});
-
-document.getElementById('plateNumber').addEventListener('input', function() {
-  this.value = this.value.toUpperCase();
-});
-
-form.addEventListener('submit', async function(e) {
+document.getElementById('riderForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
-  clearMessage();
+  const submitBtn = document.getElementById('submitBtn');
+  const successBox = document.getElementById('successBox');
+  const errorBox = document.getElementById('errorBox');
+  const form = document.getElementById('riderForm');
 
-  if (isSubmitting) return;
+  successBox.style.display = 'none';
+  errorBox.style.display = 'none';
+  successBox.innerHTML = '';
+  errorBox.innerHTML = '';
 
   if (!form.checkValidity()) {
     form.reportValidity();
@@ -1100,69 +771,68 @@ form.addEventListener('submit', async function(e) {
   const district = document.getElementById('district').value.trim();
   const vehicle = document.getElementById('vehicle').value;
   const plateNumber = document.getElementById('plateNumber').value.trim();
+  const serviceArea = document.getElementById('serviceArea').value.trim();
+  const availableTime = document.getElementById('availableTime').value;
 
-  const selectedServiceAreas = getCheckedValues('serviceArea');
-  const selectedAvailableTimes = getCheckedValues('availableTime');
-
-  const serviceAreaText = selectedServiceAreas.join('、');
-  const availableTimeText = selectedAvailableTimes.join('、');
-
-  if (!name || !phone || !lineId || !district || !vehicle || !plateNumber) {
-    showError('請完整填寫所有必填資料。');
+  if (!name || !phone || !lineId || !district || !vehicle || !plateNumber || !serviceArea || !availableTime) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請完整填寫所有必填資料。';
     return;
   }
 
   if (name.length < 2 || name.length > 20) {
-    showError('姓名長度需為 2～20 字。');
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '姓名長度需為 2～20 字。';
     return;
   }
 
   if (!/^09\d{8}$/.test(phone)) {
-    showError('請輸入正確手機號碼，例如：0912345678。');
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請輸入正確手機號碼，例如：0912345678。';
     return;
   }
 
   if (lineId.length < 2 || lineId.length > 50) {
-    showError('LINE 暱稱 / LINE ID 長度不正確，請重新確認。');
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = 'LINE ID 長度不正確，請重新確認。';
     return;
   }
 
   if (district.length < 2 || district.length > 50) {
-    showError('居住地區請填寫完整，例如：台中市豐原區。');
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '居住地區請填寫完整，例如：台中市豐原區。';
     return;
   }
 
-  if (plateNumber.length < 4 || plateNumber.length > 20) {
-    showError('車牌號碼請填寫完整，例如：ABC-1234。');
+  if (plateNumber.length > 20) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '車牌號碼不可超過 20 字。';
     return;
   }
 
-  if (selectedServiceAreas.length === 0) {
-    showError('請至少選擇一個可服務區域。');
+  if (serviceArea.length < 2 || serviceArea.length > 80) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '可服務區域請填寫 2～80 字。';
     return;
   }
 
-  if (selectedAvailableTimes.length === 0) {
-    showError('請至少選擇一個可服務時段。');
-    return;
-  }
-
-  if (!agreeCheck.checked) {
-    showError('請先勾選「我已閱讀並同意全部合作規範」。');
+  if (!hasAgreed) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請先點選「我已閱讀並同意全部合作規範」。';
     return;
   }
 
   if (!realLineUserId || !realLineUserId.startsWith('U')) {
-    showError('請從 LINE 官方帳號內開啟此頁面，系統需要取得 LINE 身分才能送出申請。');
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '請從 LINE 官方帳號內開啟此頁面，系統需要取得 LINE 身分才能送出申請。';
     return;
   }
 
-  isSubmitting = true;
   submitBtn.disabled = true;
-  submitBtn.textContent = '送出中...';
+  submitBtn.innerText = '送出中...';
 
   try {
-    const res = await fetch(`${API_BASE_URL}/api/rider/register`, {
+    const res = await fetch('/api/rider/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1173,27 +843,20 @@ form.addEventListener('submit', async function(e) {
         lineId,
         userId: realLineUserId,
         lineUserId: realLineUserId,
-
         district,
         vehicle,
         plateNumber,
-
-        area: serviceAreaText,
-        serviceArea: serviceAreaText,
-        serviceAreas: selectedServiceAreas,
-
-        availableTime: availableTimeText,
-        availableTimes: selectedAvailableTimes,
+        area: serviceArea,
+        serviceArea,
+        availableTime,
 
         driverLicenseConfirmed: true,
         vehicleLicenseConfirmed: true,
-        policeRecordConfirmed: false,
+        policeRecordConfirmed: true,
 
-        legalVehicleConfirm: true,
         businessConditionAgree: true,
         insuranceConfirm: true,
         violationConfirm: true,
-        prohibitedItemConfirm: true,
         contractConfirm: true,
         riderRuleConfirm: true,
         liabilityConfirm: true,
@@ -1208,47 +871,46 @@ form.addEventListener('submit', async function(e) {
     }
 
     if (data.success) {
-      showSuccess(data.message || '✅ 申請已送出，請等待 UBee 跑腿審核通過。');
+      successBox.style.display = 'block';
+      successBox.innerHTML = data.message || '✅ 申請已送出，請等待 UBee 審核通過。審核通過後，系統會透過官方帳號通知你後續流程。';
 
-      submitBtn.textContent = '已送出申請';
+      submitBtn.innerText = '已送出申請';
       submitBtn.disabled = true;
 
       form.querySelectorAll('input, select, textarea, button').forEach(el => {
         el.disabled = true;
       });
 
-      return;
-    }
+    } else if (data.duplicate) {
+      successBox.style.display = 'block';
+      successBox.innerHTML = data.message || '✅ 你的合作夥伴申請資料已送出，請等待 UBee 審核通過，請勿重複申請。';
 
-    if (data.duplicate) {
-      showSuccess(data.message || '✅ 你的任務夥伴申請資料已送出，請等待 UBee 跑腿審核通過，請勿重複申請。');
-
-      submitBtn.textContent = '資料已送出';
+      submitBtn.innerText = '資料已送出';
       submitBtn.disabled = true;
 
       form.querySelectorAll('input, select, textarea, button').forEach(el => {
         el.disabled = true;
       });
 
-      return;
+    } else {
+      errorBox.style.display = 'block';
+      errorBox.innerHTML = data.message || '送出失敗，請稍後再試。';
+
+      submitBtn.disabled = false;
+      submitBtn.innerText = '送出申請';
     }
-
-    showError(data.message || '送出失敗，請稍後再試。');
-
-    isSubmitting = false;
-    submitBtn.textContent = '送出申請';
-    updateSubmitState();
 
   } catch (err) {
     console.error(err);
 
-    showError(err.message || '❌ 發生錯誤，請稍後再試。');
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = err.message || '❌ 發生錯誤，請稍後再試。';
 
-    isSubmitting = false;
-    submitBtn.textContent = '送出申請';
-    updateSubmitState();
+    submitBtn.disabled = false;
+    submitBtn.innerText = '送出申請';
   }
 });
 </script>
+
 </body>
 </html>
