@@ -3567,7 +3567,7 @@ async function getDistanceMatrix(origin, destination) {
   `&destinations=${encodeURIComponent(cleanDestination)}` +
   `&mode=driving` +
   `&region=tw` +
-  `&language=zh-TW&units=metric&key=${GOOGLE_MAPS_API_KEY}`;
+  `&language=zh-TW&units=metric&key=${GOOGLE_MAPS_SERVER_API_KEY}`;
   
   const res = await fetch(url);
   const data = await res.json();
