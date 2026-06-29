@@ -10,28 +10,25 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
 <style>
+
 :root{
-  --bg:#f8f2e9;
-  --bg2:#fffaf3;
+  --bg:#f6efe6;
+  --page:#fffaf3;
   --card:#ffffff;
-  --card2:#fff7ed;
-  --card3:#f5eadc;
-  --line:rgba(92,64,39,.12);
-  --line2:rgba(92,64,39,.18);
-  --text:#3f2b20;
-  --muted:#8a6d58;
-  --brand:#c28b5c;
-  --brand2:#a96f43;
-  --brand3:#e8c8a7;
-  --cream:#fffdf8;
-  --yellow:#d99645;
-  --yellow2:#c4803a;
-  --green:#5bbf7a;
-  --blue:#70a6d8;
-  --red:#e46d62;
-  --shadow:0 18px 45px rgba(107,71,39,.12);
-  --shadow2:0 10px 24px rgba(107,71,39,.10);
-  --radius:24px;
+  --cardSoft:#fff6e9;
+  --line:rgba(91,57,31,.13);
+  --line2:rgba(91,57,31,.20);
+  --text:#332216;
+  --muted:#7c604b;
+  --brand:#9f6841;
+  --brand2:#754522;
+  --brandSoft:#f0dcc7;
+  --green:#3fa866;
+  --blue:#4e8fc8;
+  --red:#dc5b50;
+  --shadow:0 16px 36px rgba(83,52,28,.12);
+  --shadow2:0 8px 18px rgba(83,52,28,.09);
+  --radius:26px;
 }
 
 *{box-sizing:border-box}
@@ -40,108 +37,65 @@ body{
   margin:0;
   min-height:100vh;
   background:
-    radial-gradient(circle at 8% 0%,rgba(226,183,137,.35),transparent 30%),
-    radial-gradient(circle at 100% 12%,rgba(255,245,218,.95),transparent 35%),
-    linear-gradient(180deg,#fff8ee 0%,var(--bg) 52%,#f6eadb 100%);
+    radial-gradient(circle at top,#fff8ef 0%,#f6efe6 48%,#eadbc9 100%);
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
   -webkit-font-smoothing:antialiased;
 }
 
 .wrap{
-  width:min(100%,980px);
+  width:min(100%,520px);
   margin:0 auto;
-  padding:18px 14px 52px;
+  padding:12px 12px 44px;
 }
 
 .hidden{display:none!important}
 
-.login,.section,.posHero{
-  background:rgba(255,255,255,.88);
+.login,.appShell,.section{
+  background:rgba(255,255,255,.94);
   border:1px solid var(--line);
   border-radius:var(--radius);
-  padding:18px;
-  margin-top:14px;
-  box-shadow:var(--shadow2);
-  backdrop-filter:blur(10px);
+  box-shadow:var(--shadow);
 }
 
 .login{
-  max-width:520px;
-  margin:36px auto 0;
-  padding:22px;
+  max-width:430px;
+  margin:28px auto 0;
+  padding:20px;
 }
 
 .login::before{
   content:"UBee Merchant POS";
   display:inline-flex;
   align-items:center;
-  gap:8px;
-  padding:8px 12px;
+  padding:7px 11px;
   border-radius:999px;
   color:#fff;
   background:linear-gradient(135deg,var(--brand),var(--brand2));
-  font-size:13px;
-  font-weight:900;
-  letter-spacing:.2px;
+  font-size:12px;
+  font-weight:950;
+  margin-bottom:12px;
 }
 
-.section{scroll-margin-top:108px}
+#dashboard{display:flex;flex-direction:column;gap:12px}
 
-#dashboard{
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-}
-
-h2{
-  font-size:22px;
-  line-height:1.2;
-  margin:0 0 12px;
-  color:var(--text);
-  letter-spacing:-.3px;
-}
-
+h2{font-size:22px;line-height:1.2;margin:0 0 10px;color:var(--text);letter-spacing:-.3px}
 h3{margin:0;color:var(--text)}
+.small{color:var(--muted);font-size:13px;margin-top:7px;line-height:1.65}
 
-.small{
-  color:var(--muted);
-  font-size:13px;
-  margin-top:8px;
-  line-height:1.7;
-}
-
-label{
-  display:block;
-  color:var(--text);
-  font-size:14px;
-  margin:12px 0 7px;
-  font-weight:900;
-}
-
+label{display:block;color:var(--text);font-size:14px;margin:12px 0 7px;font-weight:950}
 input,textarea,select{
   width:100%;
-  padding:14px 15px;
+  padding:14px;
   border-radius:18px;
   border:1px solid var(--line2);
   background:#fffaf4;
   color:var(--text);
   font-size:16px;
   outline:none;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
 }
-
-textarea{
-  min-height:92px;
-  resize:vertical;
-  line-height:1.6;
-}
-
-input:focus,textarea:focus,select:focus{
-  border-color:rgba(194,139,92,.62);
-  box-shadow:0 0 0 4px rgba(194,139,92,.12);
-  background:#fff;
-}
+textarea{min-height:92px;resize:vertical;line-height:1.6}
+input:focus,textarea:focus,select:focus{border-color:rgba(159,104,65,.6);box-shadow:0 0 0 4px rgba(159,104,65,.12);background:#fff}
 
 button{
   width:100%;
@@ -150,630 +104,114 @@ button{
   padding:14px;
   margin-top:12px;
   font-size:16px;
-  font-weight:900;
+  font-weight:950;
   color:#fff;
   background:linear-gradient(135deg,var(--brand),var(--brand2));
   cursor:pointer;
-  box-shadow:0 10px 22px rgba(169,111,67,.18);
-  transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
+  box-shadow:0 10px 22px rgba(117,69,34,.18);
+  transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;
 }
-
-button:hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(169,111,67,.22)}
+button:hover{transform:translateY(-1px);box-shadow:0 14px 26px rgba(117,69,34,.22)}
 button:active{transform:translateY(0);filter:brightness(.98)}
 button:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+button.secondary{background:#fffaf4;color:var(--text);border:1px solid var(--line2);box-shadow:none}
+button.green{background:linear-gradient(135deg,#55bf76,#31985a)}
+button.blue{background:linear-gradient(135deg,#6faee5,#4a89c4)}
+button.red{background:linear-gradient(135deg,#eb756b,#d84d43)}
 
-button.secondary{
-  background:#fffaf4;
-  color:var(--text);
-  border:1px solid var(--line2);
-  box-shadow:none;
-}
-
-button.green{background:linear-gradient(135deg,#6ccf8c,#4aa96a);color:#fff}
-button.blue{background:linear-gradient(135deg,#7bb5e8,#4d8ec7);color:#fff}
-button.red{background:linear-gradient(135deg,#ef8278,#d94f45);color:#fff}
-
-/* ===== UBee Merchant POS Hero ===== */
-.posHero{
-  position:relative;
-  overflow:hidden;
-  padding:18px;
-  background:
-    radial-gradient(circle at 92% 0%,rgba(244,205,160,.7),transparent 33%),
-    linear-gradient(180deg,#fffdf8 0%,#fff4e6 100%);
-}
-
-.posHero::after{
-  content:"";
-  position:absolute;
-  right:-42px;
-  top:-44px;
-  width:150px;
-  height:150px;
-  border-radius:50%;
-  background:rgba(194,139,92,.12);
-}
-
-.brandBar{
-  position:relative;
-  z-index:1;
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:14px;
-}
-
-.brandMarkRow{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
+/* ===== Unified App Layout ===== */
+.appShell{padding:15px;overflow:hidden;background:linear-gradient(180deg,#fffdf8,#fff5e9)}
+.appHeader{text-align:center;position:relative;padding:4px 4px 0}
 .brandLogo{
-  width:58px;
-  height:58px;
-  border-radius:22px;
-  background:linear-gradient(135deg,#fff4cc,#e6a84e);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:31px;
-  box-shadow:0 14px 26px rgba(194,139,92,.22);
-  flex-shrink:0;
+  width:72px;height:72px;border-radius:50%;margin:0 auto 10px;
+  background:linear-gradient(135deg,#fff0bd,#e3a54b);
+  display:flex;align-items:center;justify-content:center;font-size:38px;
+  box-shadow:0 10px 22px rgba(159,104,65,.18)
 }
+.brandTitle{font-size:25px;font-weight:950;letter-spacing:-.5px;color:var(--text)}
+.brandSub{margin-top:4px;color:var(--muted);font-size:12px;font-weight:850;line-height:1.45}
+.statusChip{position:absolute;right:0;top:0;display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:11px;font-weight:950;color:var(--text)}
 
-.brandTitle{
-  font-size:25px;
-  font-weight:950;
-  letter-spacing:-.6px;
-  color:#3c271a;
-  line-height:1.16;
-}
+.merchantInfo{margin-top:12px;padding:11px 12px;border-radius:20px;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow2);line-height:1.55;font-size:13px;color:var(--text);text-align:center}
+.approved{color:#278d4d;font-weight:950}
 
-.brandSub{
-  margin-top:4px;
-  color:var(--muted);
-  font-size:13px;
-  font-weight:800;
-}
+.heroStats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.heroStat{display:flex;align-items:center;gap:10px;min-height:70px;padding:11px;border-radius:20px;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow2);text-align:left}
+.heroIcon{width:42px;height:42px;border-radius:16px;background:#fff0d5;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.heroLabel{font-size:12px;font-weight:900;color:var(--muted)}
+.heroValue{margin-top:2px;font-size:20px;font-weight:950;color:var(--text);line-height:1}
 
-.statusChip{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  padding:8px 11px;
-  border-radius:999px;
-  background:#fff;
-  border:1px solid var(--line);
-  color:var(--text);
-  font-size:12px;
-  font-weight:900;
-  box-shadow:0 8px 16px rgba(107,71,39,.08);
-  white-space:nowrap;
-}
+.heroToolRow{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.heroTool{margin:0;height:46px;padding:0 10px;border-radius:18px;background:#fff;color:var(--text);border:1px solid var(--line);box-shadow:var(--shadow2);font-size:14px}
 
-.heroToolRow{
-  position:relative;
-  z-index:1;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:16px;
-}
+.quickNav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.quickNav button{min-height:92px;margin:0;padding:12px 8px;border-radius:24px;background:#fff;color:var(--text);border:1px solid var(--line);box-shadow:var(--shadow2);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.quickNav button .navIcon{width:44px;height:44px;border-radius:17px;background:#fff0d8;display:flex;align-items:center;justify-content:center;font-size:23px;margin-bottom:8px}
+.quickNav button .navTitle{display:block;font-size:15px;font-weight:950;line-height:1.2}
+.quickNav button .navSub{display:block;margin-top:4px;font-size:11px;line-height:1.35;color:var(--muted);font-weight:850}
+.quickNav button.active{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.quickNav button.active .navIcon{background:rgba(255,255,255,.18)}
+.quickNav button.active .navSub{color:rgba(255,255,255,.78)}
 
-.heroTool{
-  margin:0;
-  padding:13px 12px;
-  border-radius:18px;
-  border:1px solid var(--line);
-  background:#fff;
-  color:var(--text);
-  box-shadow:0 10px 20px rgba(107,71,39,.08);
-}
+.appContent{margin-top:12px}
+.appView{display:none}
+.appView.activeView{display:block;animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
-.notifyPanel{
-  position:relative;
-  z-index:1;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-top:16px;
-  padding:14px;
-  border-radius:22px;
-  background:rgba(255,255,255,.72);
-  border:1px solid var(--line);
-}
+.section{padding:16px;background:#fff;border-radius:28px;box-shadow:var(--shadow);border:1px solid var(--line);scroll-margin-top:12px}
+.sectionTitleRow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+.sectionBadge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-size:12px;font-weight:950;white-space:nowrap}
 
-.notifyLeft{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.notifyIcon{
-  width:44px;
-  height:44px;
-  border-radius:17px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#fff4d8;
-  font-size:23px;
-}
-
-.notifyTitle{
-  font-weight:950;
-  color:var(--text);
-}
-
-.notifyText{
-  margin-top:2px;
-  color:var(--muted);
-  font-size:13px;
-  line-height:1.4;
-}
-
-.notifyCount{
-  min-width:50px;
-  height:50px;
-  border-radius:18px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#fff;
-  background:linear-gradient(135deg,var(--brand),var(--brand2));
-  font-weight:950;
-  font-size:22px;
-  box-shadow:0 12px 24px rgba(169,111,67,.22);
-}
-
-.merchantApprovedOnly{
-  position:relative;
-  z-index:1;
-  padding:0;
-  margin-top:16px;
-  background:transparent;
-  border:0;
-  box-shadow:none;
-}
-
-.merchantApprovedOnly .merchantInfo{
-  margin-top:0;
-}
-
-.merchantInfo{
-  padding:13px 14px;
-  border-radius:20px;
-  background:#fff;
-  border:1px solid var(--line);
-  line-height:1.7;
-  font-size:14px;
-  color:var(--text);
-  box-shadow:0 10px 22px rgba(107,71,39,.07);
-}
-
-.approved{color:#2f9b57;font-weight:950}
-
-.summaryGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:12px;
-}
-
-.summaryCard{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:20px;
-  padding:13px;
-  box-shadow:0 8px 18px rgba(107,71,39,.06);
-}
-
-.summaryCard b{
-  display:block;
-  font-size:22px;
-  color:var(--brand2);
-  letter-spacing:-.4px;
-}
-
-.summaryCard span{
-  display:block;
-  color:var(--muted);
-  font-size:12px;
-  margin-top:5px;
-  font-weight:800;
-}
-
+.summaryGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.summaryCard{background:#fffaf4;border:1px solid var(--line);border-radius:20px;padding:12px;box-shadow:var(--shadow2)}
+.summaryCard b{display:block;font-size:19px;color:var(--brand2);letter-spacing:-.3px}
+.summaryCard span{display:block;color:var(--muted);font-size:11px;line-height:1.35;margin-top:5px;font-weight:850}
 .hiddenCounters{display:none!important}
 
-.quickNav{
-  position:sticky;
-  top:0;
-  z-index:20;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  padding:12px 0;
-  margin-top:0;
-  background:linear-gradient(to bottom,rgba(248,242,233,.96) 70%,rgba(248,242,233,0));
-  backdrop-filter:blur(10px);
-}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.tab{min-height:56px;padding:10px 8px;border-radius:18px;background:#fffaf4;border:1px solid var(--line);color:var(--text);text-align:center;font-weight:950;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.tab.active{border-color:transparent;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 10px 20px rgba(117,69,34,.17)}
+.tab span{display:block;margin-top:4px;font-size:19px;line-height:1}
 
-.quickNav button{
-  position:relative;
-  min-height:86px;
-  margin:0;
-  padding:14px;
-  border-radius:24px;
-  background:#fff;
-  color:var(--text);
-  border:1px solid var(--line);
-  box-shadow:0 12px 26px rgba(107,71,39,.10);
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  justify-content:center;
-  text-align:left;
-  overflow:hidden;
-}
-
-.quickNav button::after{
-  content:"";
-  position:absolute;
-  right:-22px;
-  bottom:-30px;
-  width:82px;
-  height:82px;
-  border-radius:50%;
-  background:rgba(194,139,92,.08);
-}
-
-.quickNav button .navIcon{
-  width:40px;
-  height:40px;
-  border-radius:16px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#fff4df;
-  font-size:22px;
-  margin-bottom:10px;
-}
-
-.quickNav button .navTitle{
-  position:relative;
-  z-index:1;
-  display:block;
-  font-size:16px;
-  line-height:1.2;
-}
-
-.quickNav button .navSub{
-  position:relative;
-  z-index:1;
-  display:block;
-  margin-top:5px;
-  color:var(--muted);
-  font-size:12px;
-  font-weight:800;
-  line-height:1.35;
-}
-
-.quickNav button.active{
-  background:linear-gradient(135deg,var(--brand),var(--brand2));
-  color:#fff;
-  border-color:transparent;
-}
-
-.quickNav button.active .navSub{color:rgba(255,255,255,.78)}
-.quickNav button.active .navIcon{background:rgba(255,255,255,.18)}
-
-.tabs{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:14px;
-}
-
-.tab{
-  padding:12px 8px;
-  border-radius:18px;
-  background:#fffaf4;
-  border:1px solid var(--line);
-  color:var(--text);
-  text-align:center;
-  font-weight:950;
-  font-size:14px;
-  cursor:pointer;
-  transition:all .16s ease;
-}
-
-.tab:hover{transform:translateY(-1px)}
-.tab.active{border-color:transparent;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 10px 20px rgba(169,111,67,.18)}
-.tab span{display:block;margin-top:6px;font-size:20px;line-height:1}
-
-.order,.simpleCard,.stopCard{
-  background:#fffdf8;
-  border:1px solid var(--line);
-  border-radius:22px;
-  padding:14px;
-  margin-top:12px;
-  box-shadow:0 10px 22px rgba(107,71,39,.07);
-}
-
+.order,.simpleCard,.stopCard{background:#fffdf8;border:1px solid var(--line);border-radius:22px;padding:14px;margin-top:12px;box-shadow:var(--shadow2)}
 .stopCard{background:linear-gradient(180deg,#fffdf8,#fff7ec)}
+.stopTitle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.stopBadge,.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#fff0d7;color:#7f4f2d;font-size:12px;margin-bottom:8px;font-weight:950;white-space:nowrap}
+.row{color:var(--text);line-height:1.65;font-size:14px;word-break:break-word}
+.empty{color:var(--muted);text-align:center;padding:28px 10px;font-weight:850}
+.notice,.workbenchHint{margin-top:12px;padding:13px;border-radius:18px;background:#fff5e6;border:1px solid rgba(159,104,65,.20);color:#62402a;line-height:1.65;font-size:14px}
+.error{display:none;margin-top:12px;padding:12px;border-radius:18px;background:rgba(220,91,80,.12);border:1px solid rgba(220,91,80,.35);color:#bb3d34;line-height:1.6}
+.formGrid{display:grid;grid-template-columns:1fr;gap:0}
+.formMsg{display:none;margin-top:12px;padding:12px;border-radius:18px;line-height:1.6;font-size:14px;font-weight:850}
+.formMsg.ok{display:block;background:rgba(63,168,102,.13);border:1px solid rgba(63,168,102,.35);color:#2f8a50}
+.formMsg.err{display:block;background:rgba(220,91,80,.13);border:1px solid rgba(220,91,80,.35);color:#bb3d34}
 
-.stopTitle{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:8px;
-}
-
-.stopBadge,.badge{
-  display:inline-block;
-  padding:6px 10px;
-  border-radius:999px;
-  background:#fff0d7;
-  color:#8c5a31;
-  font-size:12px;
-  margin-bottom:8px;
-  font-weight:950;
-  white-space:nowrap;
-}
-
-.row{
-  color:var(--text);
-  line-height:1.65;
-  font-size:14px;
-  word-break:break-word;
-}
-
-.empty{
-  color:var(--muted);
-  text-align:center;
-  padding:28px 10px;
-  font-weight:800;
-}
-
-.notice,.workbenchHint{
-  margin-top:12px;
-  padding:13px;
-  border-radius:18px;
-  background:#fff5e6;
-  border:1px solid rgba(194,139,92,.20);
-  color:#63442f;
-  line-height:1.65;
-  font-size:14px;
-}
-
-.error{
-  display:none;
-  margin-top:12px;
-  padding:12px;
-  border-radius:18px;
-  background:rgba(228,109,98,.12);
-  border:1px solid rgba(228,109,98,.35);
-  color:#c0392f;
-  line-height:1.6;
-}
-
-.formGrid{
-  display:grid;
-  grid-template-columns:1fr;
-  gap:0;
-}
-
-.formMsg{
-  display:none;
-  margin-top:12px;
-  padding:12px;
-  border-radius:18px;
-  line-height:1.6;
-  font-size:14px;
-  font-weight:800;
-}
-
-.formMsg.ok{display:block;background:rgba(91,191,122,.13);border:1px solid rgba(91,191,122,.35);color:#2f8a50}
-.formMsg.err{display:block;background:rgba(228,109,98,.13);border:1px solid rgba(228,109,98,.35);color:#c0392f}
-
-.progressBox{margin-top:10px}
-.flow{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  overflow-x:auto;
-  padding:12px 0;
-}
-.step{min-width:86px;text-align:center;color:var(--muted);font-size:12px;flex-shrink:0;font-weight:800}
-.step .circle{
-  width:40px;
-  height:40px;
-  margin:0 auto 7px;
-  border-radius:50%;
-  background:#fff;
-  color:var(--muted);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:950;
-  border:1px solid var(--line);
-}
-.step.done{color:var(--text)}
-.step.done .circle{background:var(--green);color:#fff;border-color:transparent}
-.step.current{color:var(--text);font-weight:950}
-.step.current .circle{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-color:transparent}
-.line{flex:1;height:4px;background:var(--line);min-width:30px;border-radius:999px}
-.line.done{background:var(--brand)}
-
-.moneyBox{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:10px;
-}
-.moneyItem{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:18px;
-  padding:12px;
-}
-.moneyItem span{display:block;color:var(--muted);font-size:12px;font-weight:800}
-.moneyItem b{display:block;margin-top:4px;font-size:17px;color:var(--text)}
-
-.stopList{
-  margin-top:10px;
-  padding:12px;
-  border-radius:18px;
-  background:#fffaf4;
-  border:1px solid var(--line);
-}
-.stopListTitle{font-weight:950;margin-bottom:6px}
-.stopListItem{padding:9px 0;border-top:1px solid var(--line)}
-.stopListItem:first-of-type{border-top:0}
-
-.workbenchSection{
-  background:
-    radial-gradient(circle at top right,rgba(226,183,137,.35),transparent 32%),
-    rgba(255,255,255,.9);
-}
-
-.workbenchTop{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:12px;
-}
-.workbenchTop h2{margin-bottom:4px;font-size:24px}
-.workbenchLabel{
-  display:inline-block;
-  padding:6px 10px;
-  border-radius:999px;
-  background:linear-gradient(135deg,var(--brand),var(--brand2));
-  color:#fff;
-  font-size:12px;
-  font-weight:950;
-  margin-bottom:9px;
-}
-.workbenchTabs{margin-top:14px;grid-template-columns:repeat(2,1fr)}
-.workbenchTabs .tab{
-  min-height:58px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:4px;
-  font-size:13px;
-}
-.workbenchOrders{margin-top:14px}
-
-.posOrder{
-  background:#fff;
-  border:1px solid var(--line);
-  box-shadow:0 14px 32px rgba(107,71,39,.10);
-  overflow:hidden;
-}
-.posHeader{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  padding-bottom:13px;
-  border-bottom:1px solid var(--line);
-}
-.posOrderNo{
-  font-size:20px;
-  font-weight:950;
-  line-height:1.3;
-  word-break:break-word;
-  color:#3b2619;
-}
-.posMeta{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.5;font-weight:800}
-.posStatusArea{text-align:right;flex-shrink:0}
-.posStatus{
-  display:inline-block;
-  padding:7px 11px;
-  border-radius:999px;
-  font-size:12px;
-  font-weight:950;
-  color:#74471f;
-  background:#fff0d7;
-  border:1px solid rgba(194,139,92,.25);
-}
-.posStatus.hot{background:rgba(228,109,98,.12);border-color:rgba(228,109,98,.32);color:#b33a31}
-.posStatus.wait{background:rgba(112,166,216,.14);border-color:rgba(112,166,216,.34);color:#2f6e9f}
-.posStatus.move{background:rgba(91,191,122,.14);border-color:rgba(91,191,122,.34);color:#2d824a}
-.posPill{
-  display:inline-block;
-  margin-top:7px;
-  padding:6px 9px;
-  border-radius:999px;
-  background:#fffaf4;
-  border:1px solid var(--line);
-  color:var(--muted);
-  font-size:12px;
-  font-weight:950;
-}
-.posNext{
-  margin-top:12px;
-  padding:14px;
-  border-radius:20px;
-  background:linear-gradient(135deg,rgba(226,183,137,.32),rgba(255,248,235,.88));
-  border:1px solid rgba(194,139,92,.22);
-}
-.posNextTitle{font-size:17px;font-weight:950;margin-bottom:5px;color:#3b2619}
-.posNextText{color:#63442f;line-height:1.65;font-size:14px}
-.posActionBar{margin-top:12px}
-.posActionBar button{margin-top:8px}
-.posMainInfo{margin-top:12px;display:grid;grid-template-columns:1fr;gap:10px}
-.posInfoBlock{
-  padding:12px;
-  border-radius:20px;
-  background:#fffaf4;
-  border:1px solid var(--line);
-}
-.posInfoTitle{font-weight:950;margin-bottom:8px;font-size:15px;color:#3b2619}
-.posItemText{font-size:17px;line-height:1.6;font-weight:950;white-space:pre-line}
-.posAddress{margin-top:8px;color:#63442f;line-height:1.65;font-size:14px}
-.posCancelRule{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.5;font-weight:800}
+.progressBox{margin-top:10px}.flow{display:flex;align-items:center;justify-content:space-between;gap:8px;overflow-x:auto;padding:12px 0}.step{min-width:86px;text-align:center;color:var(--muted);font-size:12px;flex-shrink:0;font-weight:850}.step .circle{width:40px;height:40px;margin:0 auto 7px;border-radius:50%;background:#fff;color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:950;border:1px solid var(--line)}.step.done{color:var(--text)}.step.done .circle{background:var(--green);color:#fff;border-color:transparent}.step.current{color:var(--text);font-weight:950}.step.current .circle{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-color:transparent}.line{flex:1;height:4px;background:var(--line);min-width:30px;border-radius:999px}.line.done{background:var(--brand)}
+.moneyBox{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.moneyItem{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px}.moneyItem span{display:block;color:var(--muted);font-size:12px;font-weight:850}.moneyItem b{display:block;margin-top:4px;font-size:17px;color:var(--text)}
+.stopList{margin-top:10px;padding:12px;border-radius:18px;background:#fffaf4;border:1px solid var(--line)}.stopListTitle{font-weight:950;margin-bottom:6px}.stopListItem{padding:9px 0;border-top:1px solid var(--line)}.stopListItem:first-of-type{border-top:0}
+.workbenchTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.workbenchTop h2{margin-bottom:4px;font-size:22px}.workbenchLabel{display:inline-block;padding:6px 10px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-size:12px;font-weight:950;margin-bottom:9px}.workbenchOrders{margin-top:14px}
+.posOrder{background:#fff;border:1px solid var(--line);box-shadow:var(--shadow2);overflow:hidden;border-radius:24px}.posHeader{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:10px;padding-bottom:13px;border-bottom:1px solid var(--line)}.posOrderNo{font-size:19px;font-weight:950;line-height:1.3;word-break:break-word;color:#332216}.posMeta{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.5;font-weight:850}.posStatusArea{text-align:left;flex-shrink:0}.posStatus{display:inline-block;padding:7px 11px;border-radius:999px;font-size:12px;font-weight:950;color:#74471f;background:#fff0d7;border:1px solid rgba(159,104,65,.25)}.posStatus.hot{background:rgba(220,91,80,.12);border-color:rgba(220,91,80,.32);color:#b33a31}.posStatus.wait{background:rgba(78,143,200,.14);border-color:rgba(78,143,200,.34);color:#2f6e9f}.posStatus.move{background:rgba(63,168,102,.14);border-color:rgba(63,168,102,.34);color:#2d824a}.posPill{display:inline-block;margin-top:7px;padding:6px 9px;border-radius:999px;background:#fffaf4;border:1px solid var(--line);color:var(--muted);font-size:12px;font-weight:950}.posNext{margin-top:12px;padding:14px;border-radius:20px;background:#fff4e3;border:1px solid rgba(159,104,65,.18)}.posNextTitle{font-size:17px;font-weight:950;margin-bottom:5px;color:#332216}.posNextText{color:#62402a;line-height:1.65;font-size:14px}.posActionBar{margin-top:12px}.posActionBar button{margin-top:8px}.posMainInfo{margin-top:12px;display:grid;grid-template-columns:1fr;gap:10px}.posInfoBlock{padding:12px;border-radius:20px;background:#fffaf3;border:1px solid var(--line)}.posInfoTitle{font-weight:950;margin-bottom:8px;font-size:15px;color:#332216}.posItemText{font-size:17px;line-height:1.6;font-weight:950;white-space:pre-line}.posAddress{margin-top:8px;color:#62402a;line-height:1.65;font-size:14px}.posCancelRule{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.5;font-weight:850}
 
 @media (min-width:640px){
-  .wrap{padding:22px 18px 60px}
-  .summaryGrid{grid-template-columns:repeat(4,1fr)}
+  .wrap{width:min(100%,560px);padding:18px 14px 56px}
   .formGrid{grid-template-columns:1fr 1fr;gap:12px}
-  .quickNav{grid-template-columns:repeat(3,1fr)}
-  .workbenchTabs{grid-template-columns:repeat(5,1fr)}
-  .posMainInfo{grid-template-columns:1.2fr .8fr}
 }
-
-@media (min-width:900px){
-  .quickNav{grid-template-columns:repeat(6,1fr)}
-  .quickNav button{min-height:116px}
-}
-
 @media (max-width:420px){
-  .wrap{padding:12px 10px 44px}
-  .login,.section,.posHero{border-radius:22px;padding:15px}
-  .brandBar{flex-direction:column}
+  .wrap{padding:10px 10px 44px}
+  .login,.appShell,.section{border-radius:26px}
+  .brandLogo{width:66px;height:66px;font-size:35px}
   .brandTitle{font-size:23px}
-  .brandLogo{width:54px;height:54px}
-  .heroToolRow{grid-template-columns:1fr 1fr}
-  .notifyPanel{align-items:flex-start}
-  .quickNav{gap:9px}
-  .quickNav button{min-height:94px;padding:12px;border-radius:21px}
-  .quickNav button .navTitle{font-size:15px}
-  .posHeader{flex-direction:column}
-  .posStatusArea{text-align:left}
+  .statusChip{position:static;display:inline-flex;margin-top:9px}
+  .heroStats{gap:8px}.heroStat{min-height:66px;padding:10px}.heroIcon{width:38px;height:38px;font-size:20px}.heroValue{font-size:19px}
+  .quickNav{gap:9px}.quickNav button{min-height:88px;border-radius:22px}.quickNav button .navIcon{width:40px;height:40px;font-size:21px}.quickNav button .navTitle{font-size:14px}.quickNav button .navSub{font-size:10.5px}
+  .section{padding:15px}
 }
 
 </style>
 </head>
 
 <body>
+
 <div class="wrap">
 
   <div class="login" id="loginBox">
@@ -787,36 +225,173 @@ button.red{background:linear-gradient(135deg,#ef8278,#d94f45);color:#fff}
 
   <div id="dashboard" class="hidden">
 
-    <header class="posHero" id="section-overview">
-      <div class="brandBar">
-        <div class="brandMarkRow">
-          <div class="brandLogo">🐝</div>
-          <div>
-            <div class="brandTitle">UBee 店家 POS</div>
-            <div class="brandSub">派單中心｜配送工作台｜帳款總覽</div>
-          </div>
-        </div>
+    <div class="appShell">
+      <header class="appHeader">
         <div class="statusChip">🟢 正式營運版</div>
-      </div>
+        <div class="brandLogo">🐝</div>
+        <div class="brandTitle">UBee 店家 POS</div>
+        <div class="brandSub">派單中心｜配送工作台｜帳款總覽</div>
+        <div class="merchantInfo" id="merchantInfoBox"></div>
 
-      <div class="notifyPanel">
-        <div class="notifyLeft">
-          <div class="notifyIcon">🔔</div>
-          <div>
-            <div class="notifyTitle">新訂單通知</div>
-            <div class="notifyText">即時同步待處理訂單，請保持 LINE 店家端開啟。</div>
+        <div class="heroStats">
+          <div class="heroStat">
+            <div class="heroIcon">🔔</div>
+            <div>
+              <div class="heroLabel">今日待處理</div>
+              <div class="heroValue"><span id="heroTodoCount">0</span> 筆</div>
+            </div>
+          </div>
+          <div class="heroStat">
+            <div class="heroIcon">✅</div>
+            <div>
+              <div class="heroLabel">完成紀錄</div>
+              <div class="heroValue"><span id="heroCompletedText">0</span> 筆</div>
+            </div>
           </div>
         </div>
-        <div class="notifyCount" id="heroTodoCount">0</div>
-      </div>
 
-      <div class="heroToolRow">
-        <button class="heroTool" type="button" onclick="openLineOfficial()">💬 LINE 官方</button>
-        <button class="heroTool" type="button" onclick="toggleMerchantFullscreen()">🖥️ 全螢幕</button>
-      </div>
+        <div class="heroToolRow">
+          <button class="heroTool" type="button" onclick="openLineOfficial()">💬 LINE 官方</button>
+          <button class="heroTool" type="button" onclick="toggleMerchantFullscreen()">🖥️ 全螢幕</button>
+        </div>
+      </header>
 
-      <div class="merchantApprovedOnly">
-        <div class="merchantInfo" id="merchantInfoBox"></div>
+      <div class="quickNav" aria-label="UBee 店家功能選單">
+        <button type="button" data-nav="create" onclick="switchMerchantView('create')">
+          <span class="navIcon">🧾</span>
+          <span class="navTitle">建立派單</span>
+          <span class="navSub">新增正式配送訂單</span>
+        </button>
+        <button type="button" data-nav="orders" onclick="switchMerchantView('orders')">
+          <span class="navIcon">📋</span>
+          <span class="navTitle">今日訂單</span>
+          <span class="navSub"><span id="heroTodoText">0</span> 筆待處理</span>
+        </button>
+        <button type="button" data-nav="progress" onclick="switchMerchantView('progress')">
+          <span class="navIcon">🛵</span>
+          <span class="navTitle">配送進度</span>
+          <span class="navSub">查看騎士狀態</span>
+        </button>
+        <button type="button" data-nav="overview" onclick="switchMerchantView('overview')">
+          <span class="navIcon">💰</span>
+          <span class="navTitle">帳款總覽</span>
+          <span class="navSub">月結與未結清</span>
+        </button>
+      </div>
+    </div>
+
+    <main id="appContent" class="appContent">
+      <section id="section-create" class="section appView activeView">
+        <div class="sectionTitleRow">
+          <div>
+            <h2>建立派單</h2>
+            <div class="small">店家只需要填寫代墊金額、送達點、收件資料與品項內容，系統會自動建立 UBee 跑腿派單。</div>
+          </div>
+          <div class="sectionBadge">常用</div>
+        </div>
+
+        <input id="newDeliveryMode" type="hidden" value="ubee" />
+        <input id="newPaymentMethod" type="hidden" value="merchant_settlement" />
+
+        <label>代墊金額</label>
+        <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
+
+        <label>送達點 *</label>
+        <select id="newStopCount" onchange="renderExtraStopFields()">
+          <option value="1">單點配送</option>
+          <option value="2">2 個送達點</option>
+          <option value="3">3 個送達點</option>
+          <option value="4">4 個送達點</option>
+          <option value="5">5 個送達點</option>
+          <option value="6">6 個送達點</option>
+        </select>
+        <div class="small">規則：每多 1 個送達點，加 NT$20。</div>
+
+        <div class="stopCard">
+          <div class="stopTitle">
+            <h3>第 1 個送達點</h3>
+            <span class="stopBadge">主要送達點</span>
+          </div>
+
+          <div class="formGrid">
+            <div>
+              <label>收件人姓名 *</label>
+              <input id="newCustomerName" maxlength="40" placeholder="例如：陳先生" />
+            </div>
+            <div>
+              <label>收件人電話 *</label>
+              <input id="newCustomerPhone" type="tel" inputmode="tel" maxlength="20" placeholder="例如：0912345678" />
+            </div>
+          </div>
+
+          <label>送達地址 *</label>
+          <textarea id="newDropoffAddress" maxlength="180" placeholder="請填寫完整送達地址"></textarea>
+
+          <label>品項內容 *</label>
+          <textarea id="newItemName" maxlength="220" placeholder="例如：便當 8 份、飲料 5 杯、餐點 3 份"></textarea>
+
+          <label>第 1 點備註</label>
+          <textarea id="newNote" maxlength="260" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡"></textarea>
+        </div>
+
+        <div id="extraStopsBox"></div>
+
+        <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立正式訂單</button>
+        <div id="createOrderMsg" class="formMsg"></div>
+      </section>
+
+      <section id="section-orders" class="section appView">
+        <div class="workbenchTop">
+          <div>
+            <div class="workbenchLabel">UBee 店家 POS 工作台</div>
+            <h2>今日訂單</h2>
+            <div class="small">依照訂單狀態處理接單、備餐、派遣騎士、自送完成與取消紀錄。</div>
+          </div>
+        </div>
+
+        <div class="workbenchHint">
+          <b>操作原則：</b>
+          騎士接單前可取消；騎士接單後請聯絡 UBee 跑腿管理端協助處理。
+        </div>
+
+        <div class="tabs workbenchTabs">
+          <div class="tab active" data-tab="todo" onclick="setTab('todo')">
+            待處理
+            <span id="countTodo">0</span>
+          </div>
+          <div class="tab" data-tab="delivery" onclick="setTab('delivery')">
+            配送中
+            <span id="countDelivery">0</span>
+          </div>
+          <div class="tab" data-tab="self" onclick="setTab('self')">
+            店家自送
+            <span id="countSelf">0</span>
+          </div>
+          <div class="tab" data-tab="completed" onclick="setTab('completed')">
+            已完成
+            <span id="countCompleted">0</span>
+          </div>
+          <div class="tab" data-tab="cancelled" onclick="setTab('cancelled')">
+            已取消
+            <span id="countCancelled">0</span>
+          </div>
+        </div>
+
+        <div id="ordersBox" class="workbenchOrders"></div>
+      </section>
+
+      <section id="section-progress" class="section appView">
+        <h2>配送進度</h2>
+        <div class="small">顯示目前最新一筆配送中訂單，以及整體配送狀態。</div>
+
+        <div id="merchantProgressBox" class="progressBox">
+          <div class="empty">目前沒有配送中的訂單</div>
+        </div>
+      </section>
+
+      <section id="section-overview" class="section appView">
+        <h2>帳款總覽</h2>
+        <div class="small">統一查看店家派單帳款、月結金額、已結清金額與進行中預估。</div>
 
         <div class="summaryGrid" id="merchantBillingSummary">
           <div class="summaryCard">
@@ -858,147 +433,12 @@ button.red{background:linear-gradient(135deg,#ef8278,#d94f45);color:#fff}
             <span>已完成</span>
           </div>
         </div>
-      </div>
-    </header>
-
-    <div class="quickNav" aria-label="UBee 店家功能選單">
-      <button type="button" data-nav="create" onclick="scrollToSection('section-create')">
-        <span class="navIcon">🧾</span>
-        <span class="navTitle">建立派單</span>
-        <span class="navSub">新增正式配送訂單</span>
-      </button>
-      <button type="button" data-nav="orders" onclick="scrollToSection('section-orders')">
-        <span class="navIcon">📋</span>
-        <span class="navTitle">今日訂單</span>
-        <span class="navSub">接單、準備、取消</span>
-      </button>
-      <button type="button" data-nav="progress" onclick="scrollToSection('section-progress')">
-        <span class="navIcon">🛵</span>
-        <span class="navTitle">配送進度</span>
-        <span class="navSub">查看騎士狀態</span>
-      </button>
-      <button type="button" data-nav="overview" onclick="scrollToSection('section-overview')">
-        <span class="navIcon">💰</span>
-        <span class="navTitle">帳款總覽</span>
-        <span class="navSub">月結與未結清</span>
-      </button>
-      <button type="button" onclick="scrollToOrdersTab('todo')">
-        <span class="navIcon">🔔</span>
-        <span class="navTitle">待處理</span>
-        <span class="navSub"><span id="heroTodoText">0</span> 筆待處理</span>
-      </button>
-      <button type="button" onclick="scrollToOrdersTab('completed')">
-        <span class="navIcon">✅</span>
-        <span class="navTitle">已完成</span>
-        <span class="navSub"><span id="heroCompletedText">0</span> 筆完成紀錄</span>
-      </button>
-    </div>
-
-    <section id="section-orders" class="section workbenchSection">
-      <div class="workbenchTop">
-        <div>
-          <div class="workbenchLabel">UBee 店家 POS 工作台</div>
-          <h2>訂單工作台</h2>
-          <div class="small">依照訂單狀態處理接單、備餐、派遣騎士、自送完成與取消紀錄。</div>
-        </div>
-      </div>
-
-      <div class="workbenchHint">
-        <b>操作原則：</b>
-        騎士接單前可取消；騎士接單後請聯絡 UBee 跑腿管理端協助處理。
-      </div>
-
-      <div class="tabs workbenchTabs">
-        <div class="tab active" data-tab="todo" onclick="setTab('todo')">
-          待處理
-          <span id="countTodo">0</span>
-        </div>
-        <div class="tab" data-tab="delivery" onclick="setTab('delivery')">
-          配送中
-          <span id="countDelivery">0</span>
-        </div>
-        <div class="tab" data-tab="self" onclick="setTab('self')">
-          店家自送
-          <span id="countSelf">0</span>
-        </div>
-        <div class="tab" data-tab="completed" onclick="setTab('completed')">
-          已完成
-          <span id="countCompleted">0</span>
-        </div>
-        <div class="tab" data-tab="cancelled" onclick="setTab('cancelled')">
-          已取消
-          <span id="countCancelled">0</span>
-        </div>
-      </div>
-
-      <div id="ordersBox" class="workbenchOrders"></div>
-    </section>
-
-    <section id="section-progress" class="section">
-      <h2>配送進度</h2>
-      <div class="small">顯示目前最新一筆配送中訂單，以及整體配送狀態。</div>
-
-      <div id="merchantProgressBox" class="progressBox">
-        <div class="empty">目前沒有配送中的訂單</div>
-      </div>
-    </section>
-
-    <section id="section-create" class="section">
-      <h2>建立派單</h2>
-      <div class="small">店家只需要填寫代墊金額、送達點、收件資料與品項內容，系統會自動建立 UBee 跑腿派單。</div>
-
-      <input id="newDeliveryMode" type="hidden" value="ubee" />
-      <input id="newPaymentMethod" type="hidden" value="merchant_settlement" />
-
-      <label>代墊金額</label>
-      <input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="例如：0" />
-
-      <label>送達點 *</label>
-      <select id="newStopCount" onchange="renderExtraStopFields()">
-        <option value="1">單點配送</option>
-        <option value="2">2 個送達點</option>
-        <option value="3">3 個送達點</option>
-        <option value="4">4 個送達點</option>
-        <option value="5">5 個送達點</option>
-        <option value="6">6 個送達點</option>
-      </select>
-      <div class="small">規則：每多 1 個送達點，加 NT$20。</div>
-
-      <div class="stopCard">
-        <div class="stopTitle">
-          <h3>第 1 個送達點</h3>
-          <span class="stopBadge">主要送達點</span>
-        </div>
-
-        <div class="formGrid">
-          <div>
-            <label>收件人姓名 *</label>
-            <input id="newCustomerName" maxlength="40" placeholder="例如：陳先生" />
-          </div>
-          <div>
-            <label>收件人電話 *</label>
-            <input id="newCustomerPhone" type="tel" inputmode="tel" maxlength="20" placeholder="例如：0912345678" />
-          </div>
-        </div>
-
-        <label>送達地址 *</label>
-        <textarea id="newDropoffAddress" maxlength="180" placeholder="請填寫完整送達地址"></textarea>
-
-        <label>品項內容 *</label>
-        <textarea id="newItemName" maxlength="220" placeholder="例如：便當 8 份、飲料 5 杯、餐點 3 份"></textarea>
-
-        <label>第 1 點備註</label>
-        <textarea id="newNote" maxlength="260" placeholder="例如：送到一樓櫃台、抵達前請電話聯絡"></textarea>
-      </div>
-
-      <div id="extraStopsBox"></div>
-
-      <button id="createOrderBtn" type="button" onclick="createMerchantOrder()">建立正式訂單</button>
-      <div id="createOrderMsg" class="formMsg"></div>
-    </section>
+      </section>
+    </main>
 
   </div>
 </div>
+
 
 <script>
 const firebaseConfig = {
@@ -1072,6 +512,31 @@ const statusTextMap = {
   merchant_cancelled:"店家已取消"
 };
 
+
+let currentView = "create";
+
+function switchMerchantView(view){
+  const allowed = ["create","orders","progress","overview"];
+  const target = allowed.includes(view) ? view : "create";
+  currentView = target;
+
+  document.querySelectorAll(".appView").forEach(section => {
+    section.classList.remove("activeView");
+  });
+
+  const activeSection = document.getElementById(`section-${target}`);
+  if(activeSection){
+    activeSection.classList.add("activeView");
+  }
+
+  updateNavActive(`section-${target}`);
+
+  const content = document.getElementById("appContent");
+  if(content){
+    content.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+}
+
 function openLineOfficial(){
   alert("請從 UBee LINE 官方帳號開啟店家端，或回到 LINE 官方帳號查看最新通知。");
 }
@@ -1094,14 +559,25 @@ function toggleMerchantFullscreen(){
 
 function scrollToOrdersTab(tab){
   setTab(tab);
-  scrollToSection("section-orders");
+  switchMerchantView("orders");
 }
 
 function scrollToSection(id){
+  const map = {
+    "section-overview":"overview",
+    "section-orders":"orders",
+    "section-progress":"progress",
+    "section-create":"create"
+  };
+
+  if(map[id]){
+    switchMerchantView(map[id]);
+    return;
+  }
+
   const el = document.getElementById(id);
   if(!el) return;
   el.scrollIntoView({behavior:"smooth",block:"start"});
-  updateNavActive(id);
 }
 
 function updateNavActive(sectionId){
@@ -1122,18 +598,7 @@ function updateNavActive(sectionId){
 }
 
 function setupScrollSpy(){
-  const targets = ["section-overview","section-orders","section-progress","section-create"];
-
-  window.addEventListener("scroll", () => {
-    let current = "";
-    for(const id of targets){
-      const el = document.getElementById(id);
-      if(!el) continue;
-      const rect = el.getBoundingClientRect();
-      if(rect.top <= 120) current = id;
-    }
-    if(current) updateNavActive(current);
-  }, {passive:true});
+  updateNavActive("section-create");
 }
 
 function normalizePhone(str){
@@ -1481,7 +946,7 @@ function enterMerchantDashboard(merchant){
   `;
 
   startListenOrders();
-  updateNavActive("section-overview");
+  switchMerchantView("create");
 }
 
 async function loadMerchantProfile(){
@@ -2514,6 +1979,7 @@ async function cancelMerchantOrder(orderId){
 window.addEventListener("load", async () => {
   setupScrollSpy();
   renderExtraStopFields();
+  switchMerchantView("create");
 
   const loginBtn = document.getElementById("loginBtn");
   if(loginBtn){
