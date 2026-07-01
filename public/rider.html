@@ -871,29 +871,35 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
       throw new Error(data.message || '伺服器回應失敗，請稍後再試。');
     }
 
-    if (data.success) {
-      successBox.style.display = 'block';
-      successBox.innerHTML = data.message || '✅ 申請已送出，請等待 UBee 審核通過。審核通過後，系統會透過官方帳號通知你後續流程。';
+    if (data.duplicate) {
+  successBox.style.display = 'block';
+  successBox.innerHTML =
+    '⚠️ 系統偵測到你已經送出過申請，或此 LINE 帳號已經是 UBee 騎手。<br><br>' +
+    '目前狀態：' + (data.status || 'pending') + '<br>' +
+    '資料編號：' + (data.riderId || '') + '<br><br>' +
+    '請勿重複送出。如需修改資料，請聯繫 UBee 管理端協助處理。';
 
-      submitBtn.innerText = '已送出申請';
-      submitBtn.disabled = true;
+  submitBtn.innerText = '已申請過';
+  submitBtn.disabled = true;
 
-      form.querySelectorAll('input, select, textarea, button').forEach(el => {
-        el.disabled = true;
-      });
+  form.querySelectorAll('input, select, textarea, button').forEach(el => {
+    el.disabled = true;
+  });
 
-    } else if (data.duplicate) {
-      successBox.style.display = 'block';
-      successBox.innerHTML = data.message || '✅ 你的合作夥伴申請資料已送出，請等待 UBee 審核通過，請勿重複申請。';
+} else if (data.success) {
+  successBox.style.display = 'block';
+  successBox.innerHTML =
+    '✅ 已送出申請，等待 UBee 跑腿審核。<br><br>' +
+    '資料已成功送到系統，請等待審核通知。';
 
-      submitBtn.innerText = '資料已送出';
-      submitBtn.disabled = true;
+  submitBtn.innerText = '已送出申請';
+  submitBtn.disabled = true;
 
-      form.querySelectorAll('input, select, textarea, button').forEach(el => {
-        el.disabled = true;
-      });
+  form.querySelectorAll('input, select, textarea, button').forEach(el => {
+    el.disabled = true;
+  });
 
-    } else {
+} else {
       errorBox.style.display = 'block';
       errorBox.innerHTML = data.message || '送出失敗，請稍後再試。';
 
