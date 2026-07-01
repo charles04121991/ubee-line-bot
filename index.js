@@ -3018,11 +3018,13 @@ const PRICING = {
   driverRatio: 0.7,
 };
 
+const MAX_QUOTE_TIME_MINUTES = 480;
+
 const SPEED_OPTIONS = {
-  // 必須與 order.html 的 getSpeedServiceFee() 保持一致
-  standard: { label: '一般件', time: '60–90 分鐘', fee: 15, riderText: '一般任務' },
-  priority: { label: '標準件', time: '45–60 分鐘', fee: 20, riderText: '標準任務' },
-  express: { label: '優先件', time: '30–45 分鐘', fee: 40, riderText: '優先任務' },
+  // 必須與前端快速估價頁顯示保持一致
+  standard: { label: '一般件', time: '90–120 分鐘', fee: 15, riderText: '一般任務' },
+  priority: { label: '標準件', time: '60–90 分鐘', fee: 20, riderText: '標準任務' },
+  express: { label: '優先件', time: '45–60 分鐘', fee: 40, riderText: '優先任務' },
 };
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
@@ -4457,15 +4459,29 @@ app.get('/api/quote', async (req, res) => {
     let queueMinutes = 0;
 
     if (isQueueTask) {
-      queueMinutes = Math.max(
-        0,
-        Math.round(Number(req.query.queueMinutes || 30))
-      );
+  queueMinutes = Math.max(
+    0,
+    Math.round(Number(req.query.queueMinutes || 30))
+  );
 
-      const waitingFee = Math.max(0, queueMinutes * 3);
-      const serviceFee = 20;
-      const deliveryFee = 80;
-      const speedFee = speed.fee || 0;
+  if (queueMinutes <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: '請輸入正確的預估排隊時間'
+    });
+  }
+
+  if (queueMinutes > MAX_QUOTE_TIME_MINUTES) {
+    return res.status(400).json({
+      success: false,
+      error: `排隊時間超過 ${MAX_QUOTE_TIME_MINUTES} 分鐘，建議改由客服協助確認費用。`
+    });
+  }
+
+  const waitingFee = Math.max(0, queueMinutes * 3);
+  const serviceFee = 20;
+  const deliveryFee = 80;
+  const speedFee = speed.fee || 0;
 
       const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
       const driverFee = Math.round(total * PRICING.driverRatio);
