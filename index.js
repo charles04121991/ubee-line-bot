@@ -3010,22 +3010,54 @@ app.post('/api/merchant/bind', async (req, res) => {
 });
 
 const PRICING = {
+  // 騎士分潤比例
+  driverRatio: 0.7,
+
+  // 一般配送基本價格
   baseFee: 60,
   perKm: 12,
   perMinute: 2,
-  serviceFee: 10,
+
+  // 平台服務費
+  serviceFee: 20,
+
+  // 排隊服務設定
+  queueBaseFee: 80,
+  queuePerMinute: 4,
+  queueLongTaskThresholdMinutes: 240,
+  queueLongTaskExtraFee: 100,
+  maxQuoteTimeMinutes: 480,
+
+  // 舊版相容欄位，先保留，避免其他地方還有引用
   waitingFee: 30,
-  driverRatio: 0.7,
 };
 
 const MAX_QUOTE_TIME_MINUTES = 480;
 
 const SPEED_OPTIONS = {
-  // 必須與前端快速估價頁顯示保持一致
-  standard: { label: '一般件', time: '90–120 分鐘', fee: 15, riderText: '一般任務' },
-  priority: { label: '標準件', time: '60–90 分鐘', fee: 20, riderText: '標準任務' },
-  express: { label: '優先件', time: '45–60 分鐘', fee: 40, riderText: '優先任務' },
+  // 必須與前端快速估價頁 / 正式下單頁的速度費保持一致
+  standard: {
+    label: '一般件',
+    time: '90–120 分鐘',
+    fee: 0,
+    riderText: '一般任務',
+  },
+
+  priority: {
+    label: '標準件',
+    time: '60–90 分鐘',
+    fee: 30,
+    riderText: '標準任務',
+  },
+
+  express: {
+    label: '優先件',
+    time: '45–60 分鐘',
+    fee: 60,
+    riderText: '優先任務',
+  },
 };
+
 const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 
 const orders = {};
@@ -4471,34 +4503,46 @@ app.get('/api/quote', async (req, res) => {
     });
   }
 
-  if (queueMinutes > MAX_QUOTE_TIME_MINUTES) {
+  if (queueMinutes > PRICING.maxQuoteTimeMinutes) {
     return res.status(400).json({
       success: false,
-      error: `排隊時間超過 ${MAX_QUOTE_TIME_MINUTES} 分鐘，建議改由客服協助確認費用。`
+      error: `排隊時間超過 ${PRICING.maxQuoteTimeMinutes} 分鐘，建議改由客服協助確認費用。`
     });
   }
 
-  const waitingFee = Math.max(0, queueMinutes * 3);
-  const serviceFee = 20;
-  const deliveryFee = 80;
+  const queueTimeFee = Math.max(
+    0,
+    queueMinutes * PRICING.queuePerMinute
+  );
+
+  const longTaskExtraFee =
+    queueMinutes > PRICING.queueLongTaskThresholdMinutes
+      ? PRICING.queueLongTaskExtraFee
+      : 0;
+
+  const waitingFee = queueTimeFee + longTaskExtraFee;
+  const serviceFee = PRICING.serviceFee;
+  const deliveryFee = PRICING.queueBaseFee;
   const speedFee = speed.fee || 0;
 
-      const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
-      const driverFee = Math.round(total * PRICING.driverRatio);
+  const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
+  const driverFee = Math.round(total * PRICING.driverRatio);
 
-      price = {
-        fareMode: 'queue',
-        deliveryFee,
-        serviceFee,
-        speedFee,
-        upstairsFee,
-        waitingFee,
-        total,
-        driverFee,
-        riderFee: driverFee,
-        platformFee: total - driverFee,
-      };
-    } else {
+  price = {
+    fareMode: 'queue',
+    deliveryFee,
+    serviceFee,
+    speedFee,
+    upstairsFee,
+    waitingFee,
+    queueTimeFee,
+    longTaskExtraFee,
+    total,
+    driverFee,
+    riderFee: driverFee,
+    platformFee: total - driverFee,
+  };
+} else {
       if (!from || !to) {
         return res.status(400).json({
           success: false,
@@ -4872,34 +4916,63 @@ app.post('/api/orders', async (req, res) => {
     let price = null;
 
     if (data.serviceMode === 'queue') {
-      const queueMinutes = Number(data.queueMinutes || 0);
-      const waitingFee = Math.max(0, queueMinutes * 3);
-      const serviceFee = 20;
-      const deliveryFee = 80;
-      const upstairsFee = Math.max(0, Math.round(Number(data.upstairsFee || 0)));
+  const queueMinutes = Math.max(
+    0,
+    Math.round(Number(data.queueMinutes || 0))
+  );
 
-      const speedFeeMap = {
-        standard: 0,
-        priority: 20,
-        express: 40,
-      };
+  if (queueMinutes <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: '請輸入正確的預估排隊時間',
+    });
+  }
 
-      const speedFee = speedFeeMap[data.speedType] || 0;
-      const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
-      const driverFee = Math.round(total * PRICING.driverRatio);
+  if (queueMinutes > PRICING.maxQuoteTimeMinutes) {
+    return res.status(400).json({
+      success: false,
+      error: `排隊時間超過 ${PRICING.maxQuoteTimeMinutes} 分鐘，建議改由 UBee 跑腿客服協助確認費用。`,
+    });
+  }
 
-      price = {
-        fareMode: 'queue',
-        deliveryFee,
-        serviceFee,
-        speedFee,
-        upstairsFee,
-        waitingFee,
-        total,
-        driverFee,
-        riderFee: driverFee,
-        platformFee: total - driverFee,
-      };
+  const deliveryFee = PRICING.queueBaseFee;
+  const serviceFee = PRICING.serviceFee;
+  const upstairsFee = Math.max(0, Math.round(Number(data.upstairsFee || 0)));
+
+  const queueTimeFee = Math.max(
+    0,
+    queueMinutes * PRICING.queuePerMinute
+  );
+
+  const longTaskExtraFee =
+    queueMinutes > PRICING.queueLongTaskThresholdMinutes
+      ? PRICING.queueLongTaskExtraFee
+      : 0;
+
+  const waitingFee = queueTimeFee + longTaskExtraFee;
+
+  const speed = getSpeedOption(data.speedType || 'standard');
+  const speedFee = speed.fee || 0;
+
+  const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
+  const driverFee = Math.round(total * PRICING.driverRatio);
+
+  price = {
+    fareMode: 'queue',
+    deliveryFee,
+    serviceFee,
+    speedFee,
+    upstairsFee,
+
+    waitingFee,
+    queueTimeFee,
+    longTaskExtraFee,
+
+    total,
+    driverFee,
+    riderFee: driverFee,
+    platformFee: total - driverFee,
+  };
 }else {
   distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
 
