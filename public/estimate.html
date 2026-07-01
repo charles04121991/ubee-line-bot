@@ -420,7 +420,7 @@
 
       <div class="field hidden" id="queueField">
         <label for="queueMinutesInput">預估排隊時間</label>
-        <input id="queueMinutesInput" type="number" inputmode="numeric" min="10" max="240" step="5" value="30" />
+        <input id="queueMinutesInput" type="number" inputmode="numeric" min="10" max="480" step="5" value="30" />
         <div class="hint">
           請輸入預估排隊分鐘數。排隊費用會依時間估算。
         </div>
@@ -428,7 +428,7 @@
 
       <div class="field hidden" id="taskMinutesField">
         <label for="taskMinutesInput">預估任務處理時間</label>
-        <input id="taskMinutesInput" type="number" inputmode="numeric" min="10" max="240" step="5" value="30" />
+        <input id="taskMinutesInput" type="number" inputmode="numeric" min="10" max="480" step="5" value="30" />
         <div class="hint">
           全能跑腿會依任務處理時間、是否需要送達、代墊費用等條件估算。
         </div>
@@ -449,17 +449,17 @@
       <div class="speed-grid" id="speedGrid">
         <button class="speed-btn active" type="button" data-speed="standard">
           一般件
-          <span>60–90 分鐘｜加價 $15</span>
+          <span>90–120 分鐘｜加價 $15</span>
         </button>
 
         <button class="speed-btn" type="button" data-speed="priority">
           標準件
-          <span>45–60 分鐘｜加價 $20</span>
+          <span>60–90 分鐘｜加價 $20</span>
         </button>
 
         <button class="speed-btn" type="button" data-speed="express">
           優先件
-          <span>30–45 分鐘｜加價 $40</span>
+          <span>45–60 分鐘｜加價 $40</span>
         </button>
       </div>
 
@@ -857,8 +857,8 @@
           return false;
         }
 
-        if (queueMinutes > 240) {
-          showError('排隊時間超過 240 分鐘，建議改由客服協助確認費用。');
+        if (queueMinutes > 480) {
+          showError('排隊時間超過 480 分鐘，建議改由客服協助確認費用。');
           queueMinutesInput.focus();
           return false;
         }
@@ -873,8 +873,8 @@
           return false;
         }
 
-        if (taskMinutes > 240) {
-          showError('任務處理時間超過 240 分鐘，建議改由客服協助確認費用。');
+        if (taskMinutes > 480) {
+          showError('任務處理時間超過 480 分鐘，建議改由客服協助確認費用。');
           taskMinutesInput.focus();
           return false;
         }
