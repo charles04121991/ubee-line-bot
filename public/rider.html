@@ -717,7 +717,8 @@
 
 <script>
 const LIFF_ID = '2009895876-MsVhzIxz';
-
+const API_BASE = 'https://ubee-line-bot-2-zezw.onrender.com';
+  
 let realLineUserId = '';
 let hasAgreed = false;
 
@@ -832,7 +833,7 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
   submitBtn.innerText = '送出中...';
 
   try {
-    const res = await fetch('/api/rider/register', {
+    const res = await fetch(`${API_BASE}/api/rider/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
