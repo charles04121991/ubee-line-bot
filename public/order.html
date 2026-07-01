@@ -1857,7 +1857,7 @@ body.day-mode .bottom-tabs{
           </div>
           <div class="input-wrap">
             <div class="input-icon">⏱️</div>
-            <input id="queueMinutes" type="number" min="0" step="5" inputmode="numeric" placeholder="預估排隊時間，分鐘，例如：30">
+            <input id="queueMinutes" type="number" min="10" max="480" step="5" inputmode="numeric" placeholder="預估排隊時間，分鐘，例如：30">
           </div>
         </div>
       </div>
@@ -2461,14 +2461,14 @@ function parseDistanceKmFromQuote(data){
 
 function getSpeedServiceFee(type){
   const map = {
-    standard:0,
-    priority:20,
-    express:40
+    standard: 0,
+    priority: 30,
+    express: 60
   };
 
   return map[type] || 0;
 }
-
+  
 let nearbyPlaces = [];
 let selectedNearbyPlace = null;
 let selectedNearbyPlaceId = '';
@@ -3450,6 +3450,42 @@ function validateStep2(){
     }
   }
 
+  if(serviceGroup === 'queue'){
+  const queueMinutesEl = qs('queueMinutes');
+  const queueMinutes = Math.max(
+    0,
+    Math.round(Number(queueMinutesEl ? queueMinutesEl.value : 0))
+  );
+
+  if(!queueLocation && !pickup){
+    alert('請填寫排隊地點。');
+    if(queueLocationEl){
+      queueLocationEl.focus();
+    }
+    return false;
+  }
+
+  if(queueMinutes <= 0){
+    alert('請填寫預估排隊時間。');
+    if(queueMinutesEl){
+      queueMinutesEl.focus();
+    }
+    return false;
+  }
+
+  if(queueMinutes > 480){
+    alert('排隊時間超過 480 分鐘，建議改由 UBee 跑腿客服協助確認費用。');
+    if(queueMinutesEl){
+      queueMinutesEl.focus();
+    }
+    return false;
+  }
+
+  if(queueMinutesEl){
+    queueMinutesEl.value = String(queueMinutes);
+  }
+}
+  
   if(!pickup){
     alert('請填寫取件地點 / 購買地點 / 任務地點。');
     return false;
@@ -3742,26 +3778,53 @@ async function renderEstimate(){
   }
 
   if(serviceGroup === 'queue'){
-    const queueMinutes = Number(qs('queueMinutes').value || 0);
-    const queueBaseFee = 80;
-    const waitingFee = Math.max(0, queueMinutes * 3);
-    const speedFee = getSpeedServiceFee(speedType);
-    const serviceSubtotal = queueBaseFee + waitingFee + speedFee + upstairsFee + platformServiceFee;
+  const queueMinutes = Math.max(
+    0,
+    Math.round(Number(qs('queueMinutes').value || 0))
+  );
 
+  const queueBaseFee = 80;
+  const queuePerMinute = 4;
+  const queueLongTaskThresholdMinutes = 240;
+  const queueLongTaskExtraFee = 100;
+  const maxQuoteTimeMinutes = 480;
+
+  if(queueMinutes > maxQuoteTimeMinutes){
     box.innerHTML = `
-      <div class="price-row"><span>排隊基本費</span><strong>NT$${queueBaseFee}</strong></div>
-      <div class="price-row"><span>排隊時間費</span><strong>NT$${waitingFee}</strong></div>
-      <div class="price-row"><span>速度處理費</span><strong>NT$${speedFee}</strong></div>
-      <div class="price-row"><span>上樓需求</span><strong>${escapeHtml(upstairsLabel)}</strong></div>
-      <div class="price-row"><span>上樓費</span><strong>NT$${upstairsFee}</strong></div>
-      <div class="price-row"><span>平台服務費</span><strong>NT$${platformServiceFee}</strong></div>
-      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${serviceSubtotal}</strong></div>
+      <div class="price-row price-total"><span>費用</span><strong>人工確認</strong></div>
       <div class="price-note">
-        若有代墊商品費，會在建立訂單時另外併入騎士端顯示的任務總金額。
+        排隊時間超過 ${maxQuoteTimeMinutes} 分鐘，建議改由 UBee 跑腿客服協助確認費用。
       </div>
     `;
     return;
   }
+
+  const queueTimeFee = Math.max(0, queueMinutes * queuePerMinute);
+
+  const longTaskExtraFee =
+    queueMinutes > queueLongTaskThresholdMinutes
+      ? queueLongTaskExtraFee
+      : 0;
+
+  const waitingFee = queueTimeFee + longTaskExtraFee;
+  const speedFee = getSpeedServiceFee(speedType);
+  const serviceSubtotal = queueBaseFee + waitingFee + speedFee + upstairsFee + platformServiceFee;
+
+  box.innerHTML = `
+    <div class="price-row"><span>排隊基本費</span><strong>NT$${queueBaseFee}</strong></div>
+    <div class="price-row"><span>排隊時間費</span><strong>NT$${queueTimeFee}</strong></div>
+    <div class="price-row"><span>長時間任務費</span><strong>NT$${longTaskExtraFee}</strong></div>
+    <div class="price-row"><span>速度處理費</span><strong>NT$${speedFee}</strong></div>
+    <div class="price-row"><span>上樓需求</span><strong>${escapeHtml(upstairsLabel)}</strong></div>
+    <div class="price-row"><span>上樓費</span><strong>NT$${upstairsFee}</strong></div>
+    <div class="price-row"><span>平台服務費</span><strong>NT$${platformServiceFee}</strong></div>
+    <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${serviceSubtotal}</strong></div>
+    <div class="price-note">
+      排隊費以每分鐘 NT$${queuePerMinute} 計算；超過 ${queueLongTaskThresholdMinutes} 分鐘會加收長時間任務費 NT$${queueLongTaskExtraFee}。若有代墊商品費，會在建立訂單時另外併入騎士端顯示的任務總金額。
+    </div>
+  `;
+  return;
+}
 
   try{
     const pickup = qs('pickup').value.trim();
