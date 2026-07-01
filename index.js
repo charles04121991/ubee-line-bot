@@ -2279,17 +2279,25 @@ app.post('/api/rider/register', async (req, res) => {
     });
 
     if (duplicatePayload) {
-      return res.json({
-        success: true,
-        duplicate: true,
-        alreadyExists: true,
-        riderId: duplicatePayload.riderId,
-        status: duplicatePayload.status,
-        collection: 'riders',
-        applicationCollection: 'riderApplications',
-        message: duplicatePayload.message,
-      });
-    }
+  console.log('⚠️ 騎士重複申請，未新增新資料：', {
+    inputPhone: cleanPhone,
+    inputLineUserId: riderLineUserId,
+    existingRiderId: duplicatePayload.riderId,
+    existingStatus: duplicatePayload.status,
+    message: duplicatePayload.message,
+  });
+
+  return res.json({
+    success: true,
+    duplicate: true,
+    alreadyExists: true,
+    riderId: duplicatePayload.riderId,
+    status: duplicatePayload.status,
+    collection: 'riders',
+    applicationCollection: 'riderApplications',
+    message: duplicatePayload.message,
+  });
+}
 
     riders[riderId] = rider;
 
