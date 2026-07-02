@@ -76,6 +76,7 @@ const client = new line.Client(config);
 const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
+const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
@@ -208,14 +209,14 @@ async function sendNewOrderPushToRiders(order) {
     // 2. 原本 LINE 管理通知保留
     // ==============================
         try {
-      const targetGroupId = LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID;
+      const targetGroupId = LINE_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID;
 
-      if (!targetGroupId) {
-        console.warn(
-          `UBee LINE 新任務通知略過：未設定 LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
-        );
-      } else {
-        await client.pushMessage(targetGroupId, {
+if (!targetGroupId) {
+  console.warn(
+    `UBee LINE 新任務通知略過：未設定 LINE_GROUP_ID / LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
+  );
+} else {
+  await client.pushMessage(targetGroupId, {
           type: "text",
           text:
 `🔔 UBee 跑腿新任務通知
