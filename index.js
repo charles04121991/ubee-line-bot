@@ -508,6 +508,152 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ==============================
+// UBee 騎士手機登入 API
+// 第一階段：只允許 Firebase riders/{手機號碼} 且審核通過的騎士登入
+// ==============================
+
+function isApprovedRiderData(riderData) {
+  if (!riderData) return false;
+
+  return (
+    riderData.approved === true ||
+    String(riderData.status || '').trim().toLowerCase() === 'approved'
+  );
+}
+
+function isBlockedRiderData(riderData) {
+  if (!riderData) return false;
+
+  const status = String(riderData.status || '').trim().toLowerCase();
+
+  return (
+    riderData.disabled === true ||
+    riderData.suspended === true ||
+    riderData.blocked === true ||
+    status === 'disabled' ||
+    status === 'suspended' ||
+    status === 'blocked' ||
+    status === 'rejected'
+  );
+}
+
+function buildRiderLoginPayload(riderDoc) {
+  const riderData = riderDoc.data() || {};
+  const cleanPhone = normalizePhone(riderData.phone || riderDoc.id || '');
+
+  return {
+    id: riderDoc.id,
+    riderId: riderData.riderId || riderDoc.id,
+    ...riderData,
+    phone: cleanPhone,
+  };
+}
+
+async function findRiderByPhoneForLogin(phone) {
+  const cleanPhone = normalizePhone(phone || '');
+
+  if (!/^09\d{8}$/.test(cleanPhone)) {
+    return {
+      ok: false,
+      statusCode: 400,
+      message: '手機號碼格式錯誤，請輸入 09 開頭的 10 碼手機號碼。',
+    };
+  }
+
+  // 第一優先：正式資料結構 riders/{手機號碼}
+  const phoneDocRef = db.collection('riders').doc(cleanPhone);
+  let riderDoc = await phoneDocRef.get();
+
+  // 保險：如果舊資料不是用手機當文件 ID，就用 phone 欄位補查
+  if (!riderDoc.exists) {
+    const phoneSnap = await db.collection('riders')
+      .where('phone', '==', cleanPhone)
+      .limit(1)
+      .get();
+
+    if (!phoneSnap.empty) {
+      riderDoc = phoneSnap.docs[0];
+    }
+  }
+
+  if (!riderDoc.exists) {
+    return {
+      ok: false,
+      statusCode: 404,
+      message: '找不到此手機號碼的騎士資料，請確認是否已送出 UBee 跑腿夥伴申請。',
+    };
+  }
+
+  const riderData = riderDoc.data() || {};
+
+  if (isBlockedRiderData(riderData)) {
+    return {
+      ok: false,
+      statusCode: 403,
+      message: '此騎士帳號目前無法登入，請聯繫 UBee 跑腿管理員。',
+    };
+  }
+
+  if (!isApprovedRiderData(riderData)) {
+    return {
+      ok: false,
+      statusCode: 403,
+      message: '你的騎士資料尚未審核通過，暫時無法登入騎士端。',
+    };
+  }
+
+  await riderDoc.ref.set({
+    phone: cleanPhone,
+    riderId: riderData.riderId || riderDoc.id,
+    phoneLoginEnabled: true,
+    lastLoginMethod: 'phone',
+    lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastLoginAtMs: Date.now(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  const updatedDoc = await riderDoc.ref.get();
+
+  return {
+    ok: true,
+    statusCode: 200,
+    rider: buildRiderLoginPayload(updatedDoc),
+  };
+}
+
+app.post('/api/rider/login', async (req, res) => {
+  try {
+    const { phone } = req.body || {};
+
+    const result = await findRiderByPhoneForLogin(phone);
+
+    if (!result.ok) {
+      return res.status(result.statusCode).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: '登入成功。',
+      rider: result.rider,
+      riderId: result.rider.id,
+      phone: result.rider.phone,
+    });
+
+  } catch (err) {
+    console.error('❌ 騎士手機登入失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '騎士登入失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
+// ==============================
 // UBee Web Push API
 // ==============================
 
