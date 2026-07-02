@@ -793,17 +793,17 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
     return;
   }
 
-  if (lineId.length < 2 || lineId.length > 50) {
-    errorBox.style.display = 'block';
-    errorBox.innerHTML = 'LINE ID 長度不正確，請重新確認。';
-    return;
-  }
+  if (lineId.length < 2 || lineId.length > 60) {
+  errorBox.style.display = 'block';
+  errorBox.innerHTML = 'LINE ID 長度需為 2～60 字，請重新確認。';
+  return;
+}
 
-  if (district.length < 2 || district.length > 50) {
-    errorBox.style.display = 'block';
-    errorBox.innerHTML = '居住地區請填寫完整，例如：台中市豐原區。';
-    return;
-  }
+if (district.length < 2 || district.length > 80) {
+  errorBox.style.display = 'block';
+  errorBox.innerHTML = '居住地區長度需為 2～80 字，例如：台中市豐原區。';
+  return;
+}
 
   if (plateNumber.length > 20) {
     errorBox.style.display = 'block';
