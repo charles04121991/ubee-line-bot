@@ -4606,9 +4606,17 @@ function startOrderListener(orderId){
     qs('orderNo').innerText = currentOrderId;
     renderTimeline(order.status || 'pending_payment', order);
 
-    if(order.status === 'completed' || order.status === 'cancelled'){
-      clearCurrentOrderCache();
-    }
+    if(order.status === 'completed' || order.status === 'done' || order.status === 'cancelled'){
+  if(currentCustomerPage === 'customerProfilePage'){
+    renderCustomerMemberInfo();
+  }
+
+  if(currentCustomerPage === 'customerTasksPage'){
+    renderRecentTasks();
+  }
+
+  clearCurrentOrderCache();
+}
   }, err => {
     console.warn('訂單即時監聽失敗:', err);
   });
@@ -4819,9 +4827,89 @@ function renderCustomerActiveTask(){
     });
 }
 
-function renderCustomerMemberInfo(){
+function isCountableMemberTask(order){
+  const status = String(order?.status || '').trim();
+
+  const notCountStatuses = [
+    'cancelled',
+    'canceled',
+    'quote_only',
+    'draft_confirm'
+  ];
+
+  return !notCountStatuses.includes(status);
+}
+
+function getMemberLevelText(taskCount){
+  const count = Number(taskCount || 0);
+
+  if(count >= 30){
+    return '鑽石';
+  }
+
+  if(count >= 15){
+    return '金卡';
+  }
+
+  if(count >= 5){
+    return '銀卡';
+  }
+
+  return '一般';
+}
+
+async function loadCustomerMemberStats(){
+  if(!db){
+    return {
+      taskCount:0,
+      couponCount:0
+    };
+  }
+
+  if(!userId || userId === 'web-order'){
+    return {
+      taskCount:0,
+      couponCount:0
+    };
+  }
+
+  const orderMap = new Map();
+
+  const queryJobs = [
+    db.collection('orders').where('userId', '==', userId).limit(100).get(),
+    db.collection('orders').where('customerId', '==', userId).limit(100).get()
+  ];
+
+  const results = await Promise.allSettled(queryJobs);
+
+  results.forEach(result => {
+    if(result.status !== 'fulfilled'){
+      console.warn('會員任務統計查詢失敗:', result.reason);
+      return;
+    }
+
+    result.value.forEach(doc => {
+      orderMap.set(doc.id, {
+        id:doc.id,
+        ...doc.data()
+      });
+    });
+  });
+
+  const orders = Array.from(orderMap.values());
+  const taskCount = orders.filter(isCountableMemberTask).length;
+
+  return {
+    taskCount,
+    couponCount:0
+  };
+}
+
+async function renderCustomerMemberInfo(){
   const info = qs('memberInfoText');
   const count = qs('memberTaskCount');
+  const couponCount = qs('memberCouponCount');
+  const level = qs('memberLevelText');
 
   if(info){
     info.innerText = userId && userId !== 'web-order'
@@ -4829,24 +4917,46 @@ function renderCustomerMemberInfo(){
       : 'LINE 身分確認中｜請從官方帳號開啟';
   }
 
+  if(!userId || userId === 'web-order'){
+    if(count) count.innerText = '0';
+    if(couponCount) couponCount.innerText = '0';
+    if(level) level.innerText = '一般';
+    return;
+  }
+
   if(count){
-    count.innerText = currentOrderId ? '1' : '0';
+    count.innerText = '讀取中';
   }
 
-  const level = qs('memberLevelText');
-  const taskCount = Number(count?.innerText || 0);
-  let levelText = '一般';
+  try{
+    const stats = await loadCustomerMemberStats();
 
-  if(taskCount >= 30){
-    levelText = '鑽石';
-  }else if(taskCount >= 15){
-    levelText = '金卡';
-  }else if(taskCount >= 5){
-    levelText = '銀卡';
-  }
+    if(count){
+      count.innerText = String(stats.taskCount || 0);
+    }
 
-  if(level){
-    level.innerText = levelText;
+    if(couponCount){
+      couponCount.innerText = String(stats.couponCount || 0);
+    }
+
+    if(level){
+      level.innerText = getMemberLevelText(stats.taskCount || 0);
+    }
+
+  }catch(err){
+    console.error('讀取會員統計失敗:', err);
+
+    if(count){
+      count.innerText = '0';
+    }
+
+    if(couponCount){
+      couponCount.innerText = '0';
+    }
+
+    if(level){
+      level.innerText = '一般';
+    }
   }
 }
 
