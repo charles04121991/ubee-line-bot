@@ -1055,37 +1055,25 @@ function isRiderVisibleDispatchOrder(order) {
   );
 }
 
-// 2. 取得可接任務：正式版只允許 approved 騎士查看，只顯示符合派單條件的任務
+// 2. 取得可接任務：手機登入正式版
+// 支援 phone / riderId，並保留 lineUserId 相容
 app.get('/api/rider/tasks', async (req, res) => {
   try {
-    const { lineUserId } = req.query;
+    const { lineUserId, phone, riderId } = req.query || {};
 
-    if (!lineUserId || !String(lineUserId).startsWith('U')) {
-      return res.status(400).json({
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
         success: false,
-        message: '缺少正確的騎士 LINE 身分。',
+        message: riderResult.message,
       });
     }
 
-    const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
-
-    const riderOk = !riderSnap.empty && (
-      riderSnap.docs[0].data().approved === true ||
-      riderSnap.docs[0].data().status === 'approved'
-    );
-
-    if (!riderOk) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法查看任務。',
-      });
-    }
-
-    // 先只用 status 查詢，避免 Firestore 複合索引問題；
-    // 再用後端 JS 做正式營運版付款防呆過濾。
     const snap = await db
       .collection('orders')
       .where('status', '==', 'pending_dispatch')
@@ -1093,12 +1081,12 @@ app.get('/api/rider/tasks', async (req, res) => {
       .get();
 
     const orders = snap.docs
-  .map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }))
-  .filter(order => isRiderVisibleDispatchOrder(order))
-  .slice(0, 30);
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(order => isRiderVisibleDispatchOrder(order))
+      .slice(0, 30);
 
     return res.json({
       success: true,
@@ -1108,6 +1096,7 @@ app.get('/api/rider/tasks', async (req, res) => {
 
   } catch (err) {
     console.error('取得可接任務失敗:', err);
+
     return res.status(500).json({
       success: false,
       message: '取得可接任務失敗',
@@ -1116,34 +1105,32 @@ app.get('/api/rider/tasks', async (req, res) => {
   }
 });
 
-// 3. 取得騎士目前進行中任務：正式版用於重新整理後恢復任務
+// 3. 取得騎士目前進行中任務：手機登入正式版
+// 支援 phone / riderId，並保留 lineUserId 相容
 app.get('/api/rider/current-order', async (req, res) => {
   try {
-    const { lineUserId } = req.query;
+    const { lineUserId, phone, riderId } = req.query || {};
 
-    if (!lineUserId || !String(lineUserId).startsWith('U')) {
-      return res.status(400).json({
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
         success: false,
-        message: '缺少正確的騎士 LINE 身分。',
+        message: riderResult.message,
       });
     }
 
-    const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
-
-    const riderOk = !riderSnap.empty && (
-      riderSnap.docs[0].data().approved === true ||
-      riderSnap.docs[0].data().status === 'approved'
-    );
-
-    if (!riderOk) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法查看目前任務。',
-      });
-    }
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+    const identity = buildRiderApiIdentity(riderDoc, rider, {
+      lineUserId,
+      phone,
+      riderId,
+    });
 
     const activeStatuses = [
       'accepted',
@@ -1152,29 +1139,76 @@ app.get('/api/rider/current-order', async (req, res) => {
       'arrived_dropoff',
     ];
 
-    const snap = await db.collection('orders')
-      .where('riderLineUserId', '==', lineUserId)
-      .where('status', 'in', activeStatuses)
-      .limit(1)
-      .get();
+    async function returnOrderIfActive(orderId) {
+      const safeOrderId = String(orderId || '').trim().toUpperCase();
+      if (!safeOrderId) return null;
 
-    if (snap.empty) {
+      const orderDoc = await db.collection('orders').doc(safeOrderId).get();
+      if (!orderDoc.exists) return null;
+
+      const order = {
+        id: orderDoc.id,
+        ...orderDoc.data(),
+      };
+
+      if (!activeStatuses.includes(String(order.status || '').trim())) {
+        return null;
+      }
+
+      if (!isOrderBelongsToRider(order, identity)) {
+        return null;
+      }
+
+      return order;
+    }
+
+    // 第一優先：騎士資料上的 currentOrderId
+    const directOrder = await returnOrderIfActive(rider.currentOrderId);
+    if (directOrder) {
       return res.json({
         success: true,
-        hasOrder: false,
-        order: null,
+        hasOrder: true,
+        order: directOrder,
       });
     }
 
-    const doc = snap.docs[0];
+    // 第二優先：從 orders 反查，不使用複合索引，避免 Firestore index 問題
+    const queryFields = [
+      ['riderDocId', identity.riderDocId],
+      ['riderId', identity.riderId],
+      ['riderPhone', identity.phone],
+      ['riderLineUserId', identity.lineUserId],
+    ].filter(([, value]) => !!value);
+
+    for (const [field, value] of queryFields) {
+      const snap = await db.collection('orders')
+        .where(field, '==', value)
+        .limit(20)
+        .get();
+
+      const found = snap.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .find(order => {
+          const status = String(order.status || '').trim();
+          return activeStatuses.includes(status) && isOrderBelongsToRider(order, identity);
+        });
+
+      if (found) {
+        return res.json({
+          success: true,
+          hasOrder: true,
+          order: found,
+        });
+      }
+    }
 
     return res.json({
       success: true,
-      hasOrder: true,
-      order: {
-        id: doc.id,
-        ...doc.data(),
-      },
+      hasOrder: false,
+      order: null,
     });
 
   } catch (err) {
@@ -2612,6 +2646,56 @@ async function findApprovedRiderForApi(source = {}) {
       ...rider,
     },
   };
+}
+
+// ===== 騎士 API 身分整理：手機登入 / riderId / 舊 LINE 相容 =====
+function buildRiderApiIdentity(riderDoc, riderData = {}, source = {}) {
+  const riderDocId = String(riderDoc && riderDoc.id ? riderDoc.id : '').trim();
+
+  const phone = normalizePhone(
+    riderData.phone ||
+    source.phone ||
+    source.riderPhone ||
+    riderDocId ||
+    ''
+  );
+
+  const riderId = String(
+    riderData.riderId ||
+    source.riderId ||
+    riderDocId ||
+    phone ||
+    ''
+  ).trim();
+
+  const lineUserId = String(
+    riderData.lineUserId ||
+    source.lineUserId ||
+    ''
+  ).trim();
+
+  return {
+    riderDocId,
+    riderId,
+    phone,
+    lineUserId,
+  };
+}
+
+function isOrderBelongsToRider(order = {}, identity = {}) {
+  if (!order || !identity) return false;
+
+  const orderRiderDocId = String(order.riderDocId || '').trim();
+  const orderRiderId = String(order.riderId || order.driverId || '').trim();
+  const orderRiderPhone = normalizePhone(order.riderPhone || order.driverPhone || '');
+  const orderLineUserId = String(order.riderLineUserId || order.lineUserId || '').trim();
+
+  if (identity.riderDocId && orderRiderDocId && orderRiderDocId === identity.riderDocId) return true;
+  if (identity.riderId && orderRiderId && orderRiderId === identity.riderId) return true;
+  if (identity.phone && orderRiderPhone && orderRiderPhone === identity.phone) return true;
+  if (identity.lineUserId && orderLineUserId && orderLineUserId === identity.lineUserId) return true;
+
+  return false;
 }
 
 // ===== 騎手上線 / 下線狀態 API =====
@@ -5578,39 +5662,42 @@ function getEtaPayloadByStatus(status) {
   };
 }
 
-// 3. 接受任務：正式版 approved 騎士才可接單，並防止多人搶同一單
+// 3. 接受任務：手機登入正式版
+// 支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/accept-order', async (req, res) => {
   try {
-    const { orderId, lineUserId } = req.body;
+    const { orderId, lineUserId, phone, riderId } = req.body || {};
 
-    if (!orderId || !lineUserId || !String(lineUserId).startsWith('U')) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: '缺少訂單編號或正確的騎士 LINE 身分。',
+        message: '缺少訂單編號。',
       });
     }
 
-    const riderSnap = await db.collection('riders')
-  .where('lineUserId', '==', lineUserId)
-  .limit(1)
-  .get();
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
 
-const riderOk = !riderSnap.empty && (
-  riderSnap.docs[0].data().approved === true ||
-  riderSnap.docs[0].data().status === 'approved'
-);
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
+        success: false,
+        message: riderResult.message || '找不到可接單的騎士身分。',
+      });
+    }
 
-if (!riderOk) {
-  return res.status(403).json({
-    success: false,
-    message: '你尚未通過 UBee 騎士審核，暫時無法接單。',
-  });
-}
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+    const identity = buildRiderApiIdentity(riderDoc, rider, {
+      lineUserId,
+      phone,
+      riderId,
+    });
 
-    const riderDoc = riderSnap.docs[0];
-    const rider = riderDoc.data();
-
-    const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+    const safeOrderId = String(orderId).toUpperCase();
+    const orderRef = db.collection('orders').doc(safeOrderId);
     const riderRef = db.collection('riders').doc(riderDoc.id);
 
     let acceptedOrder = null;
@@ -5622,84 +5709,93 @@ if (!riderOk) {
         throw new Error('ORDER_NOT_FOUND');
       }
 
-      const order = orderDoc.data();
-      
+      const order = orderDoc.data() || {};
+
       const latestRiderDoc = await transaction.get(riderRef);
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
 
       if (
-  latestRider.busy === true &&
-  latestRider.currentOrderId &&
-  latestRider.currentOrderId !== String(orderId).toUpperCase()
-) {
-  const oldOrderRef = db.collection('orders').doc(String(latestRider.currentOrderId).toUpperCase());
-  const oldOrderDoc = await transaction.get(oldOrderRef);
+        latestRider.busy === true &&
+        latestRider.currentOrderId &&
+        latestRider.currentOrderId !== safeOrderId
+      ) {
+        const oldOrderRef = db.collection('orders').doc(String(latestRider.currentOrderId).toUpperCase());
+        const oldOrderDoc = await transaction.get(oldOrderRef);
 
-  if (oldOrderDoc.exists) {
-    const oldOrder = oldOrderDoc.data();
+        if (oldOrderDoc.exists) {
+          const oldOrder = oldOrderDoc.data() || {};
 
-    if (!['completed', 'cancelled'].includes(oldOrder.status)) {
-      throw new Error('RIDER_ALREADY_BUSY');
-    }
-  }
-}
+          if (!['completed', 'cancelled'].includes(oldOrder.status)) {
+            throw new Error('RIDER_ALREADY_BUSY');
+          }
+        }
+      }
 
       if (order.status !== 'pending_dispatch') {
-  throw new Error('ORDER_ALREADY_ACCEPTED');
-}
+        throw new Error('ORDER_ALREADY_ACCEPTED');
+      }
 
-if (!isRiderVisibleDispatchOrder(order)) {
-  throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
-}
+      if (!isRiderVisibleDispatchOrder(order)) {
+        throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
+      }
+
       const acceptedEtaPayload = getEtaPayloadByStatus('accepted');
 
-acceptedOrder = {
-  ...order,
-  ...acceptedEtaPayload,
-  id: String(orderId).toUpperCase(),
-  status: 'accepted',
-  riderStatus: 'accepted',
-  riderId: lineUserId,
-  riderLineUserId: lineUserId,
-  riderDocId: riderDoc.id,
-  riderName: rider.name || '',
-  riderPhone: rider.phone || '',
-};
+      const acceptUpdateData = {
+        status: 'accepted',
+        riderStatus: 'accepted',
 
-      transaction.update(orderRef, {
-  status: 'accepted',
-  riderStatus: 'accepted',
-  riderId: lineUserId,
-  riderLineUserId: lineUserId,
-  riderDocId: riderDoc.id,
-  riderName: rider.name || '',
-  riderPhone: rider.phone || '',
-  acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
-  ...acceptedEtaPayload,
-});
+        // 手機登入正式識別
+        riderId: identity.riderId,
+        riderDocId: identity.riderDocId,
+        riderPhone: identity.phone,
+
+        // 舊版相容欄位，若騎士資料仍有 lineUserId 就保留
+        riderLineUserId: identity.lineUserId || '',
+
+        riderName: rider.name || rider.riderName || '',
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
+        ...acceptedEtaPayload,
+      };
+
+      acceptedOrder = {
+        ...order,
+        ...acceptUpdateData,
+        id: safeOrderId,
+        status: 'accepted',
+        riderStatus: 'accepted',
+      };
+
+      transaction.update(orderRef, acceptUpdateData);
+
       transaction.set(riderRef, {
         busy: true,
-        currentOrderId: String(orderId).toUpperCase(),
+        currentOrderId: safeOrderId,
         lastActive: Date.now(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
     });
 
-    orders[String(orderId).toUpperCase()] = acceptedOrder;
+    orders[safeOrderId] = acceptedOrder;
 
-    await notifyCustomer(
-      acceptedOrder,
-      createTextMessage(
-        `🟢 UBee 跑腿騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快前往取件。`
-      )
-    );
+    try {
+      await notifyCustomer(
+        acceptedOrder,
+        createTextMessage(
+          `🟢 UBee 跑腿騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快前往取件。`
+        )
+      );
+    } catch (notifyErr) {
+      console.error('⚠️ 任務已接單，但通知客人失敗：', notifyErr);
+    }
 
     return res.json({
       success: true,
-      orderId: String(orderId).toUpperCase(),
+      orderId: safeOrderId,
       status: 'accepted',
+      order: acceptedOrder,
       message: '接單成功',
     });
 
@@ -5714,25 +5810,25 @@ acceptedOrder = {
     }
 
     if (error.message === 'ORDER_ALREADY_ACCEPTED') {
-  return res.status(409).json({
-    success: false,
-    message: '此訂單已被其他騎士接走。',
-  });
-}
-    
+      return res.status(409).json({
+        success: false,
+        message: '此訂單已被其他騎士接走。',
+      });
+    }
+
     if (error.message === 'ORDER_PAYMENT_NOT_CONFIRMED') {
-  return res.status(409).json({
-    success: false,
-    message: '此訂單尚未符合可派送條件，請確認付款狀態或店家派單狀態。',
-  });
-}
-    
+      return res.status(409).json({
+        success: false,
+        message: '此訂單尚未符合可派送條件，請確認付款狀態或店家派單狀態。',
+      });
+    }
+
     if (error.message === 'RIDER_ALREADY_BUSY') {
-  return res.status(409).json({
-    success: false,
-    message: '你目前已有進行中的任務，完成後才能接下一張。',
-  });
-}
+      return res.status(409).json({
+        success: false,
+        message: '你目前已有進行中的任務，完成後才能接下一張。',
+      });
+    }
 
     return res.status(500).json({
       success: false,
