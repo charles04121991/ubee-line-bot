@@ -4208,23 +4208,38 @@ function calculateDistanceTierFee(distanceKm) {
 
 function calculatePrice({ distanceMeters, durationSeconds, speedType, upstairsFee = 0 }) {
   const km = Number(distanceMeters || 0) / 1000;
+  const minutes = Number(durationSeconds || 0) / 60;
+
   const speed = getSpeedOption(speedType);
   const safeUpstairsFee = Math.max(0, Math.round(Number(upstairsFee || 0)));
 
-  // 正式營運版：必須與 order.html 的區間制估價一致
-  const deliveryFee = calculateDistanceTierFee(km);
-  const serviceFee = 20;
-  const total = deliveryFee + serviceFee + speed.fee + safeUpstairsFee;
+  const baseFee = Number(PRICING.baseFee || 0);
+  const distanceFee = Math.round(km * Number(PRICING.perKm || 0));
+  const timeFee = Math.round(minutes * Number(PRICING.perMinute || 0));
+
+  const deliveryFee = Math.round(baseFee + distanceFee + timeFee);
+  const serviceFee = Math.round(Number(PRICING.serviceFee || 0));
+  const speedFee = Math.round(Number(speed.fee || 0));
+
+  const total = deliveryFee + serviceFee + speedFee + safeUpstairsFee;
   const driverFee = Math.round(total * PRICING.driverRatio);
 
   return {
-    fareMode: 'distance_tier',
+    fareMode: 'base_km_minute',
+
     distanceKm: Math.round(km * 100) / 100,
+    durationMinutes: Math.round(minutes),
+
+    baseFee,
+    distanceFee,
+    timeFee,
+
     deliveryFee,
     serviceFee,
-    speedFee: speed.fee,
+    speedFee,
     upstairsFee: safeUpstairsFee,
     waitingFee: 0,
+
     total,
     driverFee,
     riderFee: driverFee,
