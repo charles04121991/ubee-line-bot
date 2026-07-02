@@ -1930,7 +1930,7 @@ body.day-mode .bottom-tabs{
 
     <section class="step" id="step3">
       <div class="headline">選擇任務速度</div>
-      <div class="subtext">平台會依照距離區間、任務速度、上樓需求與服務費計算金額。</div>
+      <div class="subtext">平台會依照後端費率、路線距離、預估時間、任務速度、上樓需求與平台服務費計算金額。</div>
 
       <div class="speed-card active" data-speed="standard" onclick="selectSpeed('standard')">
         <div class="speed-top">
@@ -3647,7 +3647,7 @@ function getPayload(){
     upstairsLabel:getUpstairsLabel(upstairsOption),
     upstairsFee:calculateUpstairsFee(upstairsOption),
 
-    fareMode:'distance_tier',
+    fareMode:'base_km_minute',
 
     nearbyPlace:selectedNearbyPlace ? {
       name:selectedNearbyPlace.name || '',
@@ -3759,13 +3759,31 @@ async function renderEstimate(){
   const box = qs('priceBox');
   if(!box) return;
 
+  const money = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) && num >= 0 ? Math.round(num) : 0;
+  };
+
+  const row = (label, value, className = '') => {
+    return `
+      <div class="price-row ${className}">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </div>
+    `;
+  };
+
+  const rowIf = (condition, label, value, className = '') => {
+    return condition ? row(label, value, className) : '';
+  };
+
   box.classList.remove('hidden');
   box.innerHTML = '<div class="price-row"><span>費用</span><strong>系統計算中</strong></div>';
 
   const upstairsOption = getUpstairsOption();
   const upstairsFee = calculateUpstairsFee(upstairsOption);
   const upstairsLabel = getUpstairsLabel(upstairsOption);
-  const platformServiceFee = 20;
+  const advancePayment = getAdvancePaymentAmount();
 
   if(upstairsOption === 'heavy'){
     box.innerHTML = `
@@ -3777,60 +3795,55 @@ async function renderEstimate(){
     return;
   }
 
-  if(serviceGroup === 'queue'){
+  const pickup = qs('pickup') ? qs('pickup').value.trim() : '';
+  const dropoff = qs('dropoff') ? qs('dropoff').value.trim() : '';
   const queueMinutes = Math.max(
     0,
-    Math.round(Number(qs('queueMinutes').value || 0))
+    Math.round(Number(qs('queueMinutes') ? qs('queueMinutes').value : 0))
   );
 
-  const queueBaseFee = 80;
-  const queuePerMinute = 4;
-  const queueLongTaskThresholdMinutes = 240;
-  const queueLongTaskExtraFee = 100;
-  const maxQuoteTimeMinutes = 480;
+  const isQueueTask = serviceGroup === 'queue';
 
-  if(queueMinutes > maxQuoteTimeMinutes){
+  if(isQueueTask && queueMinutes <= 0){
     box.innerHTML = `
-      <div class="price-row price-total"><span>費用</span><strong>人工確認</strong></div>
+      <div class="price-row price-total"><span>費用</span><strong>請先填寫排隊時間</strong></div>
       <div class="price-note">
-        排隊時間超過 ${maxQuoteTimeMinutes} 分鐘，建議改由 UBee 跑腿客服協助確認費用。
+        排隊任務需要先填寫預估排隊時間，系統才能依照後端費率計算排隊費用。
       </div>
     `;
     return;
   }
 
-  const queueTimeFee = Math.max(0, queueMinutes * queuePerMinute);
-
-  const longTaskExtraFee =
-    queueMinutes > queueLongTaskThresholdMinutes
-      ? queueLongTaskExtraFee
-      : 0;
-
-  const waitingFee = queueTimeFee + longTaskExtraFee;
-  const speedFee = getSpeedServiceFee(speedType);
-  const serviceSubtotal = queueBaseFee + waitingFee + speedFee + upstairsFee + platformServiceFee;
-
-  box.innerHTML = `
-    <div class="price-row"><span>排隊基本費</span><strong>NT$${queueBaseFee}</strong></div>
-    <div class="price-row"><span>排隊時間費</span><strong>NT$${queueTimeFee}</strong></div>
-    <div class="price-row"><span>長時間任務費</span><strong>NT$${longTaskExtraFee}</strong></div>
-    <div class="price-row"><span>速度處理費</span><strong>NT$${speedFee}</strong></div>
-    <div class="price-row"><span>上樓需求</span><strong>${escapeHtml(upstairsLabel)}</strong></div>
-    <div class="price-row"><span>上樓費</span><strong>NT$${upstairsFee}</strong></div>
-    <div class="price-row"><span>平台服務費</span><strong>NT$${platformServiceFee}</strong></div>
-    <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${serviceSubtotal}</strong></div>
-    <div class="price-note">
-      排隊費以每分鐘 NT$${queuePerMinute} 計算；超過 ${queueLongTaskThresholdMinutes} 分鐘會加收長時間任務費 NT$${queueLongTaskExtraFee}。若有代墊商品費，會在建立訂單時另外併入騎士端顯示的任務總金額。
-    </div>
-  `;
-  return;
-}
+  if(!isQueueTask && (!pickup || !dropoff)){
+    box.innerHTML = `
+      <div class="price-row price-total"><span>費用</span><strong>請先填寫地址</strong></div>
+      <div class="price-note">
+        請先填寫取件地址與送達地址，系統才能依照後端路線估算費用。
+      </div>
+    `;
+    return;
+  }
 
   try{
-    const pickup = qs('pickup').value.trim();
-    const dropoff = qs('dropoff').value.trim();
+    const params = new URLSearchParams();
 
-    const res = await fetch(`/api/quote?from=${encodeURIComponent(pickup)}&to=${encodeURIComponent(dropoff)}&speedType=${encodeURIComponent(speedType)}`, {
+    params.set('from', pickup);
+    params.set('to', dropoff);
+    params.set('pickup', pickup);
+    params.set('dropoff', dropoff);
+
+    params.set('speedType', speedType);
+    params.set('speed', speedType);
+
+    params.set('serviceMode', isQueueTask ? 'queue' : 'normal');
+    params.set('serviceType', getServiceGroupLabel());
+    params.set('serviceKey', getServiceKeyForApi());
+
+    params.set('queueMinutes', String(queueMinutes));
+    params.set('upstairsFee', String(upstairsFee));
+    params.set('advancePayment', String(advancePayment));
+
+    const res = await fetch(`/api/quote?${params.toString()}`, {
       cache:'no-store'
     });
 
@@ -3841,30 +3854,97 @@ async function renderEstimate(){
     }
 
     const distanceKm = parseDistanceKmFromQuote(data);
-    const distanceFee = calculateDistanceTierFee(distanceKm);
-    const speedFee = getSpeedServiceFee(speedType);
-    const serviceSubtotal = distanceFee + speedFee + upstairsFee + platformServiceFee;
-    const distanceText = distanceKm > 0 ? `${distanceKm.toFixed(1)} 公里` : (data.distanceText || '-');
 
-    box.innerHTML = `
-      <div class="price-row"><span>距離</span><strong>${escapeHtml(distanceText)}</strong></div>
-      <div class="price-row"><span>距離計費規則</span><strong>${escapeHtml(getDistanceTierText(distanceKm))}</strong></div>
-      <div class="price-row"><span>配送服務費</span><strong>NT$${distanceFee}</strong></div>
-      <div class="price-row"><span>速度處理費</span><strong>NT$${speedFee}</strong></div>
-      <div class="price-row"><span>上樓需求</span><strong>${escapeHtml(upstairsLabel)}</strong></div>
-      <div class="price-row"><span>上樓費</span><strong>NT$${upstairsFee}</strong></div>
-      <div class="price-row"><span>平台服務費</span><strong>NT$${platformServiceFee}</strong></div>
-      <div class="price-row price-total"><span>預估應付總額</span><strong>NT$${serviceSubtotal}</strong></div>
+    const distanceText = isQueueTask
+      ? '排隊任務'
+      : (distanceKm > 0 ? `${distanceKm.toFixed(1)} 公里` : (data.distanceText || '-'));
+
+    const durationText = isQueueTask
+      ? `${queueMinutes} 分鐘`
+      : (data.durationText || (data.durationMinutes ? `${data.durationMinutes} 分鐘` : '-'));
+
+    const baseFee = money(data.baseFee);
+    const distanceFee = money(data.distanceFee);
+    const timeFee = money(data.timeFee);
+
+    const deliveryFee = money(data.deliveryFee);
+    const serviceFee = money(data.serviceFee);
+    const speedFee = money(data.speedFee);
+    const finalUpstairsFee = money(data.upstairsFee ?? upstairsFee);
+
+    const waitingFee = money(data.waitingFee);
+    const queueTimeFee = money(data.queueTimeFee);
+    const longTaskExtraFee = money(data.longTaskExtraFee);
+
+    const serviceSubtotal = money(
+      data.serviceSubtotal ??
+      data.serviceTotal ??
+      (
+        deliveryFee +
+        waitingFee +
+        serviceFee +
+        speedFee +
+        finalUpstairsFee
+      )
+    );
+
+    const serverAdvancePayment = money(data.advancePayment ?? advancePayment);
+
+    const payableTotal = money(
+      data.customerPayableTotal ??
+      data.payableTotal ??
+      data.total ??
+      (serviceSubtotal + serverAdvancePayment)
+    );
+
+    let html = '';
+
+    if(isQueueTask){
+      html += row('任務類型', '排隊任務');
+      html += row('預估排隊時間', `${queueMinutes} 分鐘`);
+      html += row('排隊基本費', `NT$${deliveryFee}`);
+      html += rowIf(queueTimeFee > 0, '排隊時間費', `NT$${queueTimeFee}`);
+      html += rowIf(longTaskExtraFee > 0, '長時間任務費', `NT$${longTaskExtraFee}`);
+      html += rowIf(waitingFee > 0, '排隊費小計', `NT$${waitingFee}`);
+    }else{
+      html += row('距離', distanceText);
+      html += row('預估時間', durationText);
+
+      html += rowIf(baseFee > 0, '起步價', `NT$${baseFee}`);
+      html += rowIf(distanceFee > 0, '距離費', `NT$${distanceFee}`);
+      html += rowIf(timeFee > 0, '時間費', `NT$${timeFee}`);
+
+      html += row('配送服務費', `NT$${deliveryFee}`);
+    }
+
+    html += row('速度處理費', `NT$${speedFee}`);
+    html += row('上樓需求', upstairsLabel);
+    html += row('上樓費', `NT$${finalUpstairsFee}`);
+    html += row('平台服務費', `NT$${serviceFee}`);
+
+    html += row('服務費小計', `NT$${serviceSubtotal}`, 'price-subtotal');
+
+    if(serverAdvancePayment > 0){
+      html += row('代墊費用', `NT$${serverAdvancePayment}`);
+    }
+
+    html += row('預估應付總額', `NT$${payableTotal}`, 'price-total');
+
+    html += `
       <div class="price-note">
-        運費採區間制計算：3 公里內 NT$80、3.1～5 公里 NT$100、5.1～8 公里 NT$130，8 公里以上每超出 1 公里加收 NT$15。實際距離仍以系統定位與路線估算為準。
+        費用由 UBee 後端統一計算並回傳。若有代墊費用，代墊金額會併入客人應付總額與騎士端顯示金額；實際距離與時間以系統路線估算為準。
       </div>
     `;
+
+    box.innerHTML = html;
+
   }catch(err){
     console.warn('估價失敗:', err);
+
     box.innerHTML = `
       <div class="price-row"><span>費用</span><strong>系統計算中</strong></div>
       <div class="price-note">
-        若系統暫時無法估價，UBee 跑腿會依距離區間、上樓需求與任務內容確認費用。
+        若系統暫時無法估價，UBee 跑腿會依後端費率、路線距離、上樓需求與任務內容確認費用。
       </div>
     `;
   }
