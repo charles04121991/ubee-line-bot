@@ -5954,15 +5954,16 @@ app.post('/api/rider/transfer-order', async (req, res) => {
 });
 
 // ===== 騎士更新任務狀態 API =====
-// 4. 更新任務狀態：正式版只允許接單本人更新
+// 4. 更新任務狀態：手機登入正式版
+// 支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/update-order-status', async (req, res) => {
   try {
-    const { orderId, status, lineUserId } = req.body;
+    const { orderId, status, lineUserId, phone, riderId } = req.body || {};
 
-    if (!orderId || !status || !lineUserId || !String(lineUserId).startsWith('U')) {
+    if (!orderId || !status) {
       return res.status(400).json({
         success: false,
-        message: '缺少訂單編號、任務狀態或騎士 LINE 身分。',
+        message: '缺少訂單編號或任務狀態。',
       });
     }
 
@@ -5989,26 +5990,31 @@ app.post('/api/rider/update-order-status', async (req, res) => {
       });
     }
 
-    const riderSnap = await db.collection('riders')
-  .where('lineUserId', '==', lineUserId)
-  .limit(1)
-  .get();
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
 
-const riderOk = !riderSnap.empty && (
-  riderSnap.docs[0].data().approved === true ||
-  riderSnap.docs[0].data().status === 'approved'
-);
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
+        success: false,
+        message: riderResult.message || '找不到可更新任務的騎士身分。',
+      });
+    }
 
-if (!riderOk) {
-  return res.status(403).json({
-    success: false,
-    message: '你尚未通過 UBee 騎士審核，暫時無法更新任務。',
-  });
-}
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
 
-    const riderDoc = riderSnap.docs[0];
+    const identity = buildRiderApiIdentity(riderDoc, rider, {
+      lineUserId,
+      phone,
+      riderId,
+    });
+
+    const safeOrderId = String(orderId).toUpperCase();
+    const orderRef = db.collection('orders').doc(safeOrderId);
     const riderRef = db.collection('riders').doc(riderDoc.id);
-    const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
 
     let updatedOrder = null;
 
@@ -6019,78 +6025,53 @@ if (!riderOk) {
         throw new Error('ORDER_NOT_FOUND');
       }
 
-      const order = orderDoc.data();
-      const currentStatus = order.status;
+      const order = orderDoc.data() || {};
+      const currentStatus = String(order.status || '').trim();
 
-      if (order.riderId !== lineUserId && order.riderLineUserId !== lineUserId) {
+      if (!isOrderBelongsToRider(order, identity)) {
         throw new Error('NOT_THIS_RIDER');
       }
 
       if (currentStatus === status) {
-  updatedOrder = {
-    ...order,
-    id: String(orderId).toUpperCase(),
-    status,
-  };
-  return;
-}
+        updatedOrder = {
+          ...order,
+          id: safeOrderId,
+          status,
+        };
+        return;
+      }
 
-if (currentStatus === 'completed' && status === 'completed') {
-  updatedOrder = {
-    ...order,
-    id: String(orderId).toUpperCase(),
-    status: 'completed',
-  };
-  return;
-}
+      if (currentStatus === 'completed' && status === 'completed') {
+        updatedOrder = {
+          ...order,
+          id: safeOrderId,
+          status: 'completed',
+        };
+        return;
+      }
 
-const nextStatuses = allowedFlow[currentStatus] || [];
+      const nextStatuses = allowedFlow[currentStatus] || [];
 
-if (!nextStatuses.includes(status)) {
-  if (status === 'completed') {
-  const completedEtaPayload = getEtaPayloadByStatus('completed');
+      if (!nextStatuses.includes(status)) {
+        throw new Error('INVALID_TRANSITION');
+      }
 
-  const completedUpdateData = {
-    status: 'completed',
-    riderStatus: 'completed',
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    'statusTimes.completed': admin.firestore.FieldValue.serverTimestamp(),
-    settlementStatus: 'pending',
-    settledAt: null,
-    ...completedEtaPayload,
-  };
-
-  transaction.update(orderRef, completedUpdateData);
-
-  transaction.set(riderRef, {
-    busy: false,
-    currentOrderId: '',
-    lastActive: Date.now(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
-
-  updatedOrder = {
-    ...order,
-    ...completedUpdateData,
-    id: String(orderId).toUpperCase(),
-    status: 'completed',
-  };
-
-  return;
-}
-
-  throw new Error('INVALID_TRANSITION');
-}
       const etaPayload = getEtaPayloadByStatus(status);
 
-const updateData = {
-  status,
-  riderStatus: status,
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  [`statusTimes.${status}`]: admin.firestore.FieldValue.serverTimestamp(),
-  ...etaPayload,
-};
+      const updateData = {
+        status,
+        riderStatus: status,
+
+        // 保留目前任務歸屬資訊，避免後續查詢不到
+        riderId: identity.riderId,
+        riderDocId: identity.riderDocId,
+        riderPhone: identity.phone,
+        riderLineUserId: identity.lineUserId || '',
+
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        [`statusTimes.${status}`]: admin.firestore.FieldValue.serverTimestamp(),
+        ...etaPayload,
+      };
 
       if (status === 'arrived_pickup') {
         updateData.arrivedPickupAt = admin.firestore.FieldValue.serverTimestamp();
@@ -6106,6 +6087,7 @@ const updateData = {
 
       if (status === 'completed') {
         updateData.completedAt = admin.firestore.FieldValue.serverTimestamp();
+        updateData.finishedAt = admin.firestore.FieldValue.serverTimestamp();
         updateData.settlementStatus = 'pending';
         updateData.settledAt = null;
       }
@@ -6119,44 +6101,53 @@ const updateData = {
           lastActive: Date.now(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
+      } else {
+        transaction.set(riderRef, {
+          busy: true,
+          currentOrderId: safeOrderId,
+          lastActive: Date.now(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
       }
 
       updatedOrder = {
-  ...order,
-  ...updateData,
-  id: String(orderId).toUpperCase(),
-  status,
-};
+        ...order,
+        ...updateData,
+        id: safeOrderId,
+        status,
+        riderStatus: status,
+      };
     });
 
-    orders[String(orderId).toUpperCase()] = updatedOrder;
+    orders[safeOrderId] = updatedOrder;
 
     try {
-  await notifyCustomer(
-    updatedOrder,
-    createTextMessage(
-      `UBee 跑腿任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
-    )
-  );
-} catch (notifyErr) {
-  console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
-}
-
-if (status === 'completed') {
-  try {
-    if (LINE_FINISH_GROUP_ID) {
-      await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(updatedOrder));
+      await notifyCustomer(
+        updatedOrder,
+        createTextMessage(
+          `UBee 跑腿任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
+        )
+      );
+    } catch (notifyErr) {
+      console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
     }
-  } catch (finishErr) {
-    console.error('⚠️ 任務已完成，但推送財務明細失敗：', finishErr);
-  }
-}
 
-return res.json({
+    if (status === 'completed') {
+      try {
+        if (LINE_FINISH_GROUP_ID) {
+          await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(updatedOrder));
+        }
+      } catch (finishErr) {
+        console.error('⚠️ 任務已完成，但推送財務明細失敗：', finishErr);
+      }
+    }
+
+    return res.json({
       success: true,
-      orderId: String(orderId).toUpperCase(),
+      orderId: safeOrderId,
       status,
       statusLabel: getStatusLabel(status),
+      order: updatedOrder,
       message: '任務狀態已更新',
     });
 
@@ -6173,20 +6164,21 @@ return res.json({
     if (error.message === 'NOT_THIS_RIDER') {
       return res.status(403).json({
         success: false,
-        message: '這張任務不是你接的，無法操作。',
+        message: '你不是此任務的接單騎士，無法更新狀態。',
       });
     }
 
     if (error.message === 'INVALID_TRANSITION') {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: '任務狀態流程不正確，請重新整理後再試。',
+        message: '任務狀態順序錯誤，請依照接單流程逐步更新。',
       });
     }
 
     return res.status(500).json({
       success: false,
       message: '任務狀態更新失敗，請稍後再試。',
+      error: error.message,
     });
   }
 });
