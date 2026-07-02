@@ -2296,6 +2296,26 @@ app.post('/api/rider/register', async (req, res) => {
       value === 1 ||
       value === '1';
 
+        const requiredAgreements = [
+      driverLicenseConfirmed,
+      vehicleLicenseConfirmed,
+      policeRecordConfirmed,
+      businessConditionAgree,
+      insuranceConfirm,
+      violationConfirm,
+      contractConfirm,
+      riderRuleConfirm,
+      liabilityConfirm,
+      privacyConfirm,
+    ];
+
+    if (!requiredAgreements.every(toBool)) {
+      return res.status(400).json({
+        success: false,
+        message: '請先閱讀並同意全部合作規範後再送出申請。',
+      });
+    }
+    
     // ===== 1. 正式版欄位檢查 =====
     if (!riderLineUserId || !riderLineUserId.startsWith('U')) {
       return res.status(400).json({
