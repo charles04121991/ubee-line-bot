@@ -9,60 +9,83 @@
 
   <style>
     :root{
-      --bg:#000;
-      --card:#0f0f0f;
-      --card2:#151515;
-      --card3:#1b1b1b;
-      --white:#fff;
-      --text:#f4f4f4;
-      --muted:#a5a5a5;
-      --muted2:#6f6f6f;
+      --bg:#050505;
+      --bg2:#0b0b0b;
+      --card:#111111;
+      --card2:#171717;
+      --card3:#202020;
+      --white:#ffffff;
+      --text:#f5f5f5;
+      --muted:#b8b8b8;
+      --muted2:#777777;
       --line:rgba(255,255,255,.10);
-      --line2:rgba(255,255,255,.16);
-      --primary:#fff;
-      --primaryText:#000;
+      --line2:rgba(255,255,255,.18);
+      --line3:rgba(255,255,255,.26);
+      --primary:#ffffff;
+      --primaryText:#000000;
       --green:#22c55e;
+      --green2:#16a34a;
       --red:#ef4444;
-      --radius:24px;
+      --yellow:#facc15;
+      --shadow:0 22px 70px rgba(0,0,0,.42);
+      --radius:26px;
+      --radius2:34px;
     }
 
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    html{scroll-behavior:smooth;}
+    *{
+      box-sizing:border-box;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    html{
+      scroll-behavior:smooth;
+    }
 
     body{
       margin:0;
       font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-      background:#000;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,.10), transparent 30%),
+        radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 28%),
+        linear-gradient(180deg,#000,#080808 40%,#000);
       color:var(--white);
       min-height:100vh;
       overflow-x:hidden;
     }
 
+    button,
+    input,
+    select,
+    textarea{
+      font-family:inherit;
+    }
+
     .page{
       width:100%;
-      max-width:760px;
+      max-width:820px;
       margin:0 auto;
-      padding:24px 18px 44px;
-      background:#000;
+      padding:22px 18px 46px;
     }
 
     .topbar{
       display:flex;
       align-items:center;
       justify-content:space-between;
-      margin-bottom:22px;
+      gap:14px;
+      margin-bottom:18px;
     }
 
     .brand{
       display:flex;
       align-items:center;
       gap:12px;
+      min-width:0;
     }
 
     .logoU{
-      width:46px;
-      height:46px;
-      border-radius:14px;
+      width:48px;
+      height:48px;
+      border-radius:16px;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -70,287 +93,510 @@
       font-weight:1000;
       color:#000;
       background:#fff;
+      box-shadow:0 10px 26px rgba(255,255,255,.10);
+      flex:0 0 auto;
     }
 
-    .brandText{line-height:1.12;}
+    .brandText{
+      line-height:1.12;
+      min-width:0;
+    }
 
     .brandText b{
       display:block;
       font-size:26px;
-      letter-spacing:-.3px;
+      letter-spacing:-.5px;
       font-weight:1000;
     }
 
     .brandText span{
       display:block;
+      margin-top:4px;
       color:var(--muted);
       font-size:12px;
-      letter-spacing:2px;
+      letter-spacing:1.8px;
       text-transform:uppercase;
       font-weight:900;
-      margin-top:3px;
+      white-space:nowrap;
+    }
+
+    .statusPill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:#dcdcdc;
+      border-radius:999px;
+      padding:10px 12px;
+      font-size:12px;
+      font-weight:1000;
+      white-space:nowrap;
+    }
+
+    .statusDot{
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:var(--green);
+      box-shadow:0 0 0 5px rgba(34,197,94,.12);
     }
 
     .hero{
       position:relative;
       overflow:hidden;
-      border-radius:28px;
-      padding:26px 24px;
-      min-height:250px;
-      margin-bottom:22px;
+      border-radius:34px;
+      padding:28px 24px;
+      margin-bottom:18px;
       background:
-        radial-gradient(circle at 82% 18%, rgba(255,255,255,.16), transparent 32%),
-        linear-gradient(135deg,#242424,#101010 52%,#050505);
+        linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.02) 32%,rgba(255,255,255,.00)),
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,.18), transparent 32%),
+        radial-gradient(circle at 12% 88%, rgba(34,197,94,.14), transparent 30%),
+        linear-gradient(135deg,#242424,#0d0d0d 56%,#030303);
       border:1px solid var(--line2);
-      box-shadow:0 18px 45px rgba(255,255,255,.04);
+      box-shadow:var(--shadow);
+    }
+
+    .hero::after{
+      content:"";
+      position:absolute;
+      right:-80px;
+      bottom:-92px;
+      width:240px;
+      height:240px;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.03);
+    }
+
+    .heroInner{
+      position:relative;
+      z-index:2;
     }
 
     .heroBadge{
       display:inline-flex;
       align-items:center;
       gap:9px;
-      color:var(--muted);
+      color:#d8d8d8;
       font-size:12px;
       font-weight:1000;
       letter-spacing:2px;
       text-transform:uppercase;
-      margin-bottom:16px;
-      position:relative;
-      z-index:2;
+      margin-bottom:18px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.26);
+      border-radius:999px;
+      padding:9px 12px;
     }
 
     .heroBadge::before{
       content:"";
-      width:7px;
-      height:7px;
+      width:8px;
+      height:8px;
       border-radius:50%;
       background:var(--green);
     }
 
     h1{
-      font-size:42px;
-      line-height:1.1;
-      margin:0 0 12px;
+      font-size:43px;
+      line-height:1.08;
+      margin:0 0 14px;
       font-weight:1000;
-      letter-spacing:-.8px;
-      position:relative;
-      z-index:2;
+      letter-spacing:-1px;
     }
 
     .heroText{
       font-size:16px;
-      color:#cfcfcf;
+      color:#d0d0d0;
       line-height:1.8;
-      margin:0 0 20px;
-      max-width:460px;
+      margin:0 0 22px;
+      max-width:560px;
       font-weight:800;
-      position:relative;
-      z-index:2;
+    }
+
+    .heroActions{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
     }
 
     .heroBtn{
       display:inline-flex;
       align-items:center;
+      justify-content:center;
       gap:10px;
       border:0;
       background:#fff;
       color:#000;
       border-radius:999px;
-      padding:13px 22px;
+      padding:14px 22px;
+      min-height:50px;
       font-size:16px;
       font-weight:1000;
-      font-family:inherit;
-      position:relative;
-      z-index:2;
       cursor:pointer;
+      box-shadow:0 14px 35px rgba(255,255,255,.10);
     }
 
-    .benefits{
+    .heroSubNote{
+      color:#a9a9a9;
+      font-size:13px;
+      font-weight:900;
+      line-height:1.5;
+    }
+
+    .quickStats{
       display:grid;
       grid-template-columns:repeat(3,1fr);
-      gap:1px;
-      overflow:hidden;
-      border:1px solid var(--line);
+      gap:10px;
+      margin-top:24px;
+      max-width:620px;
+    }
+
+    .quickStat{
+      min-height:94px;
       border-radius:22px;
-      background:var(--line);
-      margin:18px 0 6px;
-      position:relative;
-      z-index:2;
-      max-width:520px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.28);
+      padding:15px 12px;
     }
 
-    .benefit{
-      background:rgba(12,12,12,.76);
-      padding:14px 10px;
-      text-align:center;
-    }
-
-    .benefitIcon{
-      font-size:22px;
-      margin-bottom:5px;
-    }
-
-    .benefitTitle{
-      font-size:14px;
-      font-weight:1000;
-    }
-
-    .benefitText{
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.45;
-      margin-top:3px;
-      font-weight:800;
-    }
-
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:28px;
-      padding:22px;
-      margin-bottom:18px;
-    }
-
-    .noticeBox{
-      background:#121212;
-      border:1px solid var(--line);
-      border-radius:22px;
-      padding:18px;
-      margin:0 0 28px;
-      font-size:15px;
-      line-height:1.85;
-      color:var(--muted);
-      font-weight:800;
-    }
-
-    .noticeBox b{
-      color:var(--white);
-      font-size:19px;
-      display:block;
+    .quickIcon{
+      font-size:24px;
       margin-bottom:8px;
     }
 
-    .sectionTitle{
-      font-size:26px;
+    .quickTitle{
+      font-size:15px;
       font-weight:1000;
-      margin:30px 0 16px;
-      padding-bottom:12px;
-      border-bottom:1px solid var(--line);
-      color:var(--white);
-      letter-spacing:-.3px;
+      color:#fff;
+      margin-bottom:4px;
     }
 
-    .sectionTitle:first-of-type{margin-top:0;}
+    .quickText{
+      color:#a8a8a8;
+      font-size:12px;
+      line-height:1.55;
+      font-weight:800;
+    }
+
+    .processCard{
+      border:1px solid var(--line);
+      background:rgba(17,17,17,.82);
+      border-radius:28px;
+      padding:18px;
+      margin-bottom:18px;
+      box-shadow:0 16px 40px rgba(0,0,0,.20);
+    }
+
+    .processTitle{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      margin-bottom:14px;
+    }
+
+    .processTitle b{
+      font-size:18px;
+      font-weight:1000;
+    }
+
+    .processTitle span{
+      color:var(--muted);
+      font-size:13px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+
+    .steps{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:10px;
+    }
+
+    .step{
+      position:relative;
+      background:#0f0f0f;
+      border:1px solid var(--line);
+      border-radius:20px;
+      padding:14px 10px;
+      min-height:100px;
+    }
+
+    .stepNo{
+      width:28px;
+      height:28px;
+      border-radius:10px;
+      background:#fff;
+      color:#000;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:13px;
+      font-weight:1000;
+      margin-bottom:10px;
+    }
+
+    .stepTitle{
+      font-size:14px;
+      font-weight:1000;
+      line-height:1.35;
+      margin-bottom:5px;
+    }
+
+    .stepText{
+      font-size:12px;
+      color:var(--muted);
+      font-weight:800;
+      line-height:1.5;
+    }
+
+    .mainCard{
+      background:
+        linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01)),
+        var(--card);
+      border:1px solid var(--line);
+      border-radius:34px;
+      padding:22px;
+      box-shadow:var(--shadow);
+    }
+
+    .noticeBox{
+      display:flex;
+      gap:14px;
+      background:#151515;
+      border:1px solid var(--line);
+      border-radius:26px;
+      padding:18px;
+      margin:0 0 26px;
+    }
+
+    .noticeIcon{
+      width:42px;
+      height:42px;
+      border-radius:16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#fff;
+      color:#000;
+      font-size:22px;
+      flex:0 0 auto;
+    }
+
+    .noticeText{
+      min-width:0;
+      font-size:15px;
+      line-height:1.8;
+      color:var(--muted);
+      font-weight:800;
+    }
+
+    .noticeText b{
+      color:var(--white);
+      font-size:19px;
+      display:block;
+      margin-bottom:6px;
+      font-weight:1000;
+    }
+
+    .section{
+      margin-top:30px;
+    }
+
+    .section:first-of-type{
+      margin-top:0;
+    }
+
+    .sectionHeader{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:14px;
+      margin-bottom:14px;
+      padding-bottom:12px;
+      border-bottom:1px solid var(--line);
+    }
+
+    .sectionTitle{
+      margin:0;
+      font-size:25px;
+      font-weight:1000;
+      letter-spacing:-.4px;
+      color:#fff;
+    }
+
+    .sectionHint{
+      color:var(--muted2);
+      font-size:13px;
+      font-weight:900;
+      white-space:nowrap;
+    }
 
     .fieldGrid{
       display:grid;
       grid-template-columns:1fr 1fr;
-      gap:16px;
+      gap:14px;
     }
 
     .field{
-      background:#111;
+      position:relative;
+      background:#0f0f0f;
       border:1px solid var(--line);
-      border-radius:20px;
-      padding:15px 16px;
-      min-height:88px;
+      border-radius:22px;
+      padding:15px 16px 14px;
+      min-height:92px;
+      transition:border-color .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    .field.full{
+      grid-column:1 / -1;
     }
 
     label{
-      display:block;
-      font-size:15px;
+      display:flex;
+      align-items:center;
+      gap:4px;
+      font-size:14px;
       font-weight:1000;
-      margin:0 0 8px;
+      margin:0 0 9px;
       color:#fff;
     }
 
     .requiredMark{
       color:var(--red);
       font-weight:1000;
-      margin-left:4px;
     }
 
     input,
     select,
     textarea{
       width:100%;
-      min-height:36px;
+      min-height:38px;
       padding:0;
       border:0;
       font-size:17px;
       background:transparent;
       color:var(--white);
       outline:none;
-      font-family:inherit;
       font-weight:900;
+    }
+
+    textarea{
+      resize:vertical;
+      line-height:1.6;
+      padding-top:4px;
     }
 
     input::placeholder,
     textarea::placeholder{
       color:var(--muted2);
+      font-weight:800;
     }
 
     select{
       appearance:none;
       -webkit-appearance:none;
+      padding-right:28px;
       color:var(--white);
+      cursor:pointer;
     }
 
-    select:invalid{color:var(--muted2);}
+    select:invalid{
+      color:var(--muted2);
+    }
+
+    .field.selectField::after{
+      content:"⌄";
+      position:absolute;
+      right:16px;
+      bottom:21px;
+      color:#aaa;
+      font-size:20px;
+      pointer-events:none;
+      font-weight:1000;
+    }
 
     .field:focus-within{
       border-color:#fff;
-      box-shadow:0 0 0 2px rgba(255,255,255,.10);
+      background:#121212;
+      box-shadow:0 0 0 3px rgba(255,255,255,.08);
     }
 
-    .hint{
+    .formHint{
       font-size:13px;
       color:var(--muted);
       line-height:1.7;
-      margin-top:10px;
+      margin-top:12px;
       font-weight:800;
+      background:#0d0d0d;
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:13px 14px;
     }
 
     .agreeGrid{
       display:grid;
       grid-template-columns:repeat(2,1fr);
-      gap:14px;
+      gap:13px;
     }
 
     .agreeBox{
       border:1px solid var(--line);
-      border-radius:22px;
-      padding:20px;
-      background:#111;
+      border-radius:24px;
+      padding:18px;
+      background:
+        linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01)),
+        #0f0f0f;
+      min-height:180px;
+    }
+
+    .agreeTop{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin-bottom:10px;
     }
 
     .agreeIcon{
-      font-size:28px;
-      margin-bottom:10px;
+      width:42px;
+      height:42px;
+      border-radius:16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#181818;
+      border:1px solid var(--line);
+      font-size:22px;
+      flex:0 0 auto;
     }
 
     .agreeTitle{
-      font-size:18px;
+      font-size:17px;
       font-weight:1000;
-      line-height:1.55;
-      margin-bottom:10px;
+      line-height:1.45;
       color:#fff;
     }
 
     .agreeDesc{
       font-size:14px;
       line-height:1.75;
-      color:#a5a5a5;
+      color:#a9a9a9;
       font-weight:800;
-      margin-bottom:0;
+      margin:0;
     }
 
     .finalAgreeBox{
       margin-top:18px;
       border:1px solid var(--line2);
-      border-radius:22px;
+      border-radius:26px;
       padding:18px;
-      background:#121212;
+      background:
+        radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 32%),
+        #121212;
     }
 
     .finalAgreeText{
@@ -363,64 +609,86 @@
 
     .agreeBtn{
       width:100%;
-      min-height:58px;
+      min-height:60px;
       border:1px solid var(--line2);
-      border-radius:18px;
+      border-radius:20px;
       background:#fff;
       color:#000;
       font-size:18px;
       font-weight:1000;
-      font-family:inherit;
       cursor:pointer;
+      transition:.16s ease;
+    }
+
+    .agreeBtn:active{
+      transform:scale(.988);
     }
 
     .agreeBtn.active{
       background:var(--green);
       color:#fff;
       border-color:var(--green);
+      box-shadow:0 12px 34px rgba(34,197,94,.18);
     }
 
     .note{
       font-size:15px;
       color:var(--muted);
       line-height:1.85;
-      margin-top:22px;
-      background:#111;
+      margin-top:20px;
+      background:#0f0f0f;
       border:1px solid var(--line);
-      border-radius:20px;
+      border-radius:22px;
       padding:16px;
       font-weight:800;
     }
 
+    .submitArea{
+      margin-top:24px;
+      padding-top:18px;
+      border-top:1px solid var(--line);
+    }
+
     .submitBtn{
       width:100%;
-      min-height:68px;
+      min-height:70px;
       border:0;
-      border-radius:22px;
+      border-radius:24px;
       background:var(--primary);
       color:var(--primaryText);
       font-size:22px;
       font-weight:1000;
-      margin-top:26px;
       cursor:pointer;
-      font-family:inherit;
       transition:.16s ease;
+      box-shadow:0 18px 44px rgba(255,255,255,.10);
     }
 
-    .submitBtn:active{transform:scale(.985);}
+    .submitBtn:active{
+      transform:scale(.985);
+    }
 
     .submitBtn:disabled{
-      opacity:.55;
+      opacity:.58;
       cursor:not-allowed;
+      box-shadow:none;
+    }
+
+    .submitMiniText{
+      text-align:center;
+      color:var(--muted2);
+      font-size:13px;
+      font-weight:800;
+      line-height:1.6;
+      margin-top:10px;
     }
 
     .successBox{
       display:none;
-      background:rgba(34,197,94,.08);
-      border:1px solid rgba(34,197,94,.42);
-      color:#c9ffd9;
-      border-radius:18px;
-      padding:15px;
+      background:rgba(34,197,94,.10);
+      border:1px solid rgba(34,197,94,.45);
+      color:#caffd9;
+      border-radius:20px;
+      padding:16px;
       line-height:1.75;
       margin-top:18px;
       font-size:15px;
@@ -429,11 +697,11 @@
 
     .errorBox{
       display:none;
-      background:rgba(239,68,68,.08);
-      border:1px solid rgba(239,68,68,.42);
+      background:rgba(239,68,68,.10);
+      border:1px solid rgba(239,68,68,.45);
       color:#ffd1d1;
-      border-radius:18px;
-      padding:15px;
+      border-radius:20px;
+      padding:16px;
       line-height:1.75;
       margin-top:18px;
       font-size:15px;
@@ -445,7 +713,7 @@
       text-align:center;
       font-size:13px;
       line-height:1.8;
-      padding:14px 0 0;
+      padding:22px 0 0;
       font-weight:800;
     }
 
@@ -454,49 +722,123 @@
       font-size:15px;
     }
 
-    @media(max-width:640px){
-      .page{padding:20px 14px 40px;}
-      .brandText b{font-size:24px;}
-
-      .hero{
-        padding:24px 20px;
-        min-height:245px;
+    @media(max-width:720px){
+      .page{
+        padding:20px 14px 42px;
       }
 
-      h1{font-size:36px;}
+      .statusPill{
+        display:none;
+      }
+
+      .hero{
+        padding:25px 20px;
+        border-radius:30px;
+      }
+
+      h1{
+        font-size:38px;
+      }
 
       .heroText{
         font-size:15px;
-        max-width:100%;
       }
 
-      .fieldGrid{grid-template-columns:1fr;}
-      .agreeGrid{grid-template-columns:1fr;}
-
-      .card{
-        padding:20px;
-        border-radius:26px;
+      .quickStats{
+        grid-template-columns:1fr;
+        gap:9px;
       }
 
-      .sectionTitle{font-size:25px;}
+      .quickStat{
+        min-height:auto;
+        display:flex;
+        gap:12px;
+        align-items:flex-start;
+      }
+
+      .quickIcon{
+        margin:0;
+        width:34px;
+        flex:0 0 auto;
+      }
+
+      .steps{
+        grid-template-columns:1fr 1fr;
+      }
+
+      .mainCard{
+        padding:18px;
+        border-radius:30px;
+      }
+
+      .fieldGrid{
+        grid-template-columns:1fr;
+      }
+
+      .agreeGrid{
+        grid-template-columns:1fr;
+      }
+
+      .sectionHeader{
+        align-items:flex-start;
+        flex-direction:column;
+        gap:5px;
+      }
+
+      .sectionHint{
+        white-space:normal;
+      }
     }
 
     @media(max-width:420px){
-      .topbar{margin-bottom:18px;}
-
-      .logoU{
-        width:42px;
-        height:42px;
-        font-size:26px;
+      .topbar{
+        margin-bottom:16px;
       }
 
-      .brandText span{font-size:11px;}
-      h1{font-size:33px;}
-      .hero{border-radius:24px;}
+      .logoU{
+        width:44px;
+        height:44px;
+        font-size:26px;
+        border-radius:15px;
+      }
 
-      .benefit{padding:12px 6px;}
-      .benefitTitle{font-size:13px;}
-      .benefitText{font-size:11px;}
+      .brandText b{
+        font-size:24px;
+      }
+
+      .brandText span{
+        font-size:11px;
+        letter-spacing:1.4px;
+      }
+
+      .hero{
+        border-radius:28px;
+      }
+
+      h1{
+        font-size:34px;
+      }
+
+      .heroActions{
+        align-items:stretch;
+        flex-direction:column;
+      }
+
+      .heroBtn{
+        width:100%;
+      }
+
+      .steps{
+        grid-template-columns:1fr;
+      }
+
+      .noticeBox{
+        flex-direction:column;
+      }
+
+      .sectionTitle{
+        font-size:24px;
+      }
 
       input,
       select,
@@ -505,7 +847,7 @@
       }
 
       .submitBtn{
-        min-height:64px;
+        min-height:66px;
         font-size:21px;
       }
     }
@@ -524,186 +866,286 @@
         <span>City Task Platform</span>
       </div>
     </div>
+
+    <div class="statusPill">
+      <span class="statusDot"></span>
+      騎士招募中
+    </div>
   </div>
 
   <div class="hero">
-    <div class="heroBadge">UBee Partner</div>
-    <h1>加入 UBee<br>合作夥伴</h1>
-    <p class="heroText">
-      彈性接單、自由安排時間，加入 UBee 城市任務平台，一起完成城市裡的即時任務。
-    </p>
-    <button class="heroBtn" type="button" onclick="document.getElementById('formCard').scrollIntoView({behavior:'smooth'})">
-      立即申請 <span>›</span>
-    </button>
+    <div class="heroInner">
+      <div class="heroBadge">UBee Partner Application</div>
 
-    <div class="benefits">
-      <div class="benefit">
-        <div class="benefitIcon">⏱️</div>
-        <div class="benefitTitle">時間彈性</div>
-        <div class="benefitText">自由安排接單時間</div>
+      <h1>加入 UBee<br>跑腿合作夥伴</h1>
+
+      <p class="heroText">
+        彈性接單、自由安排時間，加入 UBee 城市任務平台，一起完成文件急送、代買代送、物品取送與即時任務。
+      </p>
+
+      <div class="heroActions">
+        <button class="heroBtn" type="button" onclick="document.getElementById('formCard').scrollIntoView({behavior:'smooth'})">
+          立即填寫申請 <span>›</span>
+        </button>
+        <div class="heroSubNote">
+          送出後由 UBee 進行資料審核<br>
+          審核通過後才可開始接單
+        </div>
       </div>
-      <div class="benefit">
-        <div class="benefitIcon">💰</div>
-        <div class="benefitTitle">任務收入</div>
-        <div class="benefitText">依完成任務結算</div>
-      </div>
-      <div class="benefit">
-        <div class="benefitIcon">🛡️</div>
-        <div class="benefitTitle">平台規範</div>
-        <div class="benefitText">審核通過才可接單</div>
+
+      <div class="quickStats">
+        <div class="quickStat">
+          <div class="quickIcon">⏱️</div>
+          <div>
+            <div class="quickTitle">時間彈性</div>
+            <div class="quickText">可依自己的時間安排上線與接單。</div>
+          </div>
+        </div>
+
+        <div class="quickStat">
+          <div class="quickIcon">💰</div>
+          <div>
+            <div class="quickTitle">任務收入</div>
+            <div class="quickText">依實際完成任務進行報酬結算。</div>
+          </div>
+        </div>
+
+        <div class="quickStat">
+          <div class="quickIcon">🛡️</div>
+          <div>
+            <div class="quickTitle">平台規範</div>
+            <div class="quickText">審核通過後，依照平台流程接案。</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="card" id="formCard">
+  <div class="processCard">
+    <div class="processTitle">
+      <b>申請流程</b>
+      <span>約 1～3 分鐘完成填寫</span>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="stepNo">1</div>
+        <div class="stepTitle">填寫基本資料</div>
+        <div class="stepText">留下姓名、手機、LINE ID 與居住地區。</div>
+      </div>
+
+      <div class="step">
+        <div class="stepNo">2</div>
+        <div class="stepTitle">填寫配送資料</div>
+        <div class="stepText">提供配送工具、車牌、服務區域與時段。</div>
+      </div>
+
+      <div class="step">
+        <div class="stepNo">3</div>
+        <div class="stepTitle">確認合作規範</div>
+        <div class="stepText">閱讀平台規範、風險與資料使用說明。</div>
+      </div>
+
+      <div class="step">
+        <div class="stepNo">4</div>
+        <div class="stepTitle">等待審核通知</div>
+        <div class="stepText">審核通過後，UBee 會通知後續流程。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mainCard" id="formCard">
 
     <div class="noticeBox">
-      <b>申請前請先確認</b>
-      UBee 合作夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核，不會對外公開。送出後請等待審核通過，審核通過後才可以接單。
+      <div class="noticeIcon">✓</div>
+      <div class="noticeText">
+        <b>申請前請先確認</b>
+        UBee 合作夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核，不會對外公開。送出後請等待 UBee 審核，審核通過後才可以接單。
+      </div>
     </div>
 
     <form id="riderForm">
 
-      <div class="sectionTitle">基本資料</div>
-
-      <div class="fieldGrid">
-        <div class="field">
-          <label>姓名<span class="requiredMark">*</span></label>
-          <input id="name" name="name" type="text" placeholder="請輸入真實姓名" required>
+      <div class="section">
+        <div class="sectionHeader">
+          <h2 class="sectionTitle">基本資料</h2>
+          <div class="sectionHint">請填寫真實資料</div>
         </div>
 
-        <div class="field">
-          <label>手機號碼<span class="requiredMark">*</span></label>
-          <input id="phone" name="phone" type="tel" placeholder="例如：0912345678" required>
+        <div class="fieldGrid">
+          <div class="field">
+            <label for="name">姓名<span class="requiredMark">*</span></label>
+            <input id="name" name="name" type="text" placeholder="請輸入真實姓名" required>
+          </div>
+
+          <div class="field">
+            <label for="phone">手機號碼<span class="requiredMark">*</span></label>
+            <input id="phone" name="phone" type="tel" inputmode="numeric" placeholder="例如：0912345678" required>
+          </div>
+
+          <div class="field">
+            <label for="lineId">LINE ID<span class="requiredMark">*</span></label>
+            <input id="lineId" name="lineId" type="text" placeholder="請輸入 LINE ID" required>
+          </div>
+
+          <div class="field">
+            <label for="district">居住地區<span class="requiredMark">*</span></label>
+            <input id="district" name="district" type="text" placeholder="例如：台中市豐原區" required>
+          </div>
         </div>
 
-        <div class="field">
-          <label>LINE ID<span class="requiredMark">*</span></label>
-          <input id="lineId" name="lineId" type="text" placeholder="請輸入 LINE ID" required>
-        </div>
-
-        <div class="field">
-          <label>居住地區<span class="requiredMark">*</span></label>
-          <input id="district" name="district" type="text" placeholder="例如：台中市豐原區" required>
+        <div class="formHint">
+          審核或後續聯繫會使用此資料，請確認姓名、手機號碼與 LINE ID 填寫正確。
         </div>
       </div>
 
-      <div class="hint">審核或後續聯繫會使用此資料，請確認填寫正確。</div>
-
-      <div class="sectionTitle">配送資料</div>
-
-      <div class="fieldGrid">
-        <div class="field">
-          <label>配送工具<span class="requiredMark">*</span></label>
-          <select id="vehicle" name="vehicle" required>
-            <option value="">請選擇配送工具</option>
-            <option value="機車">機車</option>
-            <option value="汽車">汽車</option>
-          </select>
+      <div class="section">
+        <div class="sectionHeader">
+          <h2 class="sectionTitle">配送資料</h2>
+          <div class="sectionHint">用於任務媒合與派單判斷</div>
         </div>
 
-        <div class="field">
-          <label>車牌號碼<span class="requiredMark">*</span></label>
-          <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" required>
+        <div class="fieldGrid">
+          <div class="field selectField">
+            <label for="vehicle">配送工具<span class="requiredMark">*</span></label>
+            <select id="vehicle" name="vehicle" required>
+              <option value="">請選擇配送工具</option>
+              <option value="機車">機車</option>
+              <option value="汽車">汽車</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="plateNumber">車牌號碼<span class="requiredMark">*</span></label>
+            <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" required>
+          </div>
+
+          <div class="field">
+            <label for="serviceArea">可服務區域<span class="requiredMark">*</span></label>
+            <input id="serviceArea" name="serviceArea" type="text" placeholder="例如：豐原、潭子、神岡、大雅" required>
+          </div>
+
+          <div class="field selectField">
+            <label for="availableTime">可服務時段<span class="requiredMark">*</span></label>
+            <select id="availableTime" name="availableTime" required>
+              <option value="">請選擇可服務時段</option>
+              <option value="白天">白天</option>
+              <option value="晚上">晚上</option>
+              <option value="全天">全天</option>
+              <option value="彈性配合">彈性配合</option>
+            </select>
+          </div>
         </div>
 
-        <div class="field">
-          <label>可服務區域<span class="requiredMark">*</span></label>
-          <input id="serviceArea" name="serviceArea" type="text" placeholder="例如：豐原、潭子、神岡、大雅" required>
-        </div>
-
-        <div class="field">
-          <label>可服務時段<span class="requiredMark">*</span></label>
-          <select id="availableTime" name="availableTime" required>
-            <option value="">請選擇可服務時段</option>
-            <option value="白天">白天</option>
-            <option value="晚上">晚上</option>
-            <option value="全天">全天</option>
-            <option value="彈性配合">彈性配合</option>
-          </select>
+        <div class="formHint">
+          可服務區域可填寫多個地區，例如：豐原、潭子、神岡、大雅、后里。
         </div>
       </div>
 
-      <div class="sectionTitle">合作規範確認</div>
-
-      <div class="agreeGrid">
-
-        <div class="agreeBox">
-          <div class="agreeIcon">📦</div>
-          <div class="agreeTitle">商務急件與物品遞送</div>
-          <div class="agreeDesc">
-            可接受文件、合約、發票、小型商務物件等即時任務，並重視準時與安全交付。
-          </div>
+      <div class="section">
+        <div class="sectionHeader">
+          <h2 class="sectionTitle">合作規範確認</h2>
+          <div class="sectionHint">請閱讀後再送出</div>
         </div>
 
-        <div class="agreeBox">
-          <div class="agreeIcon">🛡️</div>
-          <div class="agreeTitle">保險與風險確認</div>
-          <div class="agreeDesc">
-            本人或車輛已有機車強制險，並了解接案過程須自行承擔相關交通與執行風險。
+        <div class="agreeGrid">
+
+          <div class="agreeBox">
+            <div class="agreeTop">
+              <div class="agreeIcon">📦</div>
+              <div class="agreeTitle">商務急件與物品遞送</div>
+            </div>
+            <p class="agreeDesc">
+              可接受文件、合約、發票、小型商務物件等即時任務，並重視準時與安全交付。
+            </p>
           </div>
+
+          <div class="agreeBox">
+            <div class="agreeTop">
+              <div class="agreeIcon">🛡️</div>
+              <div class="agreeTitle">保險與風險確認</div>
+            </div>
+            <p class="agreeDesc">
+              本人或車輛已有機車強制險，並了解接案過程須自行承擔相關交通與執行風險。
+            </p>
+          </div>
+
+          <div class="agreeBox">
+            <div class="agreeTop">
+              <div class="agreeIcon">🚫</div>
+              <div class="agreeTitle">禁止私接客戶</div>
+            </div>
+            <p class="agreeDesc">
+              不私接客戶、不私下收價、不繞過平台交易。違規者 UBee 有權警告、暫停或終止合作。
+            </p>
+          </div>
+
+          <div class="agreeBox">
+            <div class="agreeTop">
+              <div class="agreeIcon">🤝</div>
+              <div class="agreeTitle">接案合作性質</div>
+            </div>
+            <p class="agreeDesc">
+              本合作為接案合作性質，非勞雇關係。UBee 不保證派單量，報酬依實際完成任務結算。
+            </p>
+          </div>
+
+          <div class="agreeBox">
+            <div class="agreeTop">
+              <div class="agreeIcon">📋</div>
+              <div class="agreeTitle">遵守騎手規範</div>
+            </div>
+            <p class="agreeDesc">
+              包含不得私接客戶、不得私下收費、不得偽造完成紀錄，並須依平台任務流程操作。
+            </p>
+          </div>
+
+          <div class="agreeBox">
+            <div class="agreeTop">
+              <div class="agreeIcon">⚠️</div>
+              <div class="agreeTitle">責任釐清與處理</div>
+            </div>
+            <p class="agreeDesc">
+              UBee 為任務媒合平台，若因本人疏失造成貨物遺失或損壞，須配合平台釐清與處理。
+            </p>
+          </div>
+
+          <div class="agreeBox">
+            <div class="agreeTop">
+              <div class="agreeIcon">🔐</div>
+              <div class="agreeTitle">個人資料使用</div>
+            </div>
+            <p class="agreeDesc">
+              本人同意 UBee 於合作審核、派單聯繫與必要營運範圍內，蒐集、處理及使用個人資料。
+            </p>
+          </div>
+
         </div>
 
-        <div class="agreeBox">
-          <div class="agreeIcon">🚫</div>
-          <div class="agreeTitle">禁止私接客戶</div>
-          <div class="agreeDesc">
-            不私接客戶、不私下收價、不繞過平台交易。違規者 UBee 有權警告、暫停或終止合作。
+        <div class="finalAgreeBox">
+          <div class="finalAgreeText">
+            請確認你已閱讀上方全部合作規範。送出後，代表你同意 UBee 合作夥伴申請、審核、派單與平台管理相關規範。
           </div>
+
+          <button id="agreeBtn" type="button" class="agreeBtn">
+            我已閱讀並同意全部合作規範
+          </button>
         </div>
 
-        <div class="agreeBox">
-          <div class="agreeIcon">🤝</div>
-          <div class="agreeTitle">接案合作性質</div>
-          <div class="agreeDesc">
-            本合作為接案合作性質，非勞雇關係。UBee 不保證派單量，報酬依實際完成任務結算。
-          </div>
+        <div class="note">
+          ※ 送出申請後，UBee 會進行資料審核。審核通過後，系統會透過官方帳號通知你後續流程。
         </div>
-
-        <div class="agreeBox">
-          <div class="agreeIcon">📋</div>
-          <div class="agreeTitle">遵守騎手規範</div>
-          <div class="agreeDesc">
-            包含不得私接客戶、不得私下收費、不得偽造完成紀錄，並須依平台任務流程操作。
-          </div>
-        </div>
-
-        <div class="agreeBox">
-          <div class="agreeIcon">⚠️</div>
-          <div class="agreeTitle">責任釐清與處理</div>
-          <div class="agreeDesc">
-            UBee 為任務媒合平台，若因本人疏失造成貨物遺失或損壞，須配合平台釐清與處理。
-          </div>
-        </div>
-
-        <div class="agreeBox">
-          <div class="agreeIcon">🔐</div>
-          <div class="agreeTitle">個人資料使用</div>
-          <div class="agreeDesc">
-            本人同意 UBee 於合作審核、派單聯繫與必要營運範圍內，蒐集、處理及使用個人資料。
-          </div>
-        </div>
-
       </div>
 
-      <div class="finalAgreeBox">
-        <div class="finalAgreeText">
-          請確認你已閱讀上方全部合作規範。送出後，代表你同意 UBee 合作夥伴申請、審核、派單與平台管理相關規範。
+      <div class="submitArea">
+        <button id="submitBtn" class="submitBtn" type="submit">送出申請</button>
+        <div class="submitMiniText">
+          送出前請確認資料正確，重複申請可能會由系統判定為已申請。
         </div>
 
-        <button id="agreeBtn" type="button" class="agreeBtn">
-          我已閱讀並同意全部合作規範
-        </button>
+        <div id="successBox" class="successBox"></div>
+        <div id="errorBox" class="errorBox"></div>
       </div>
-
-      <div class="note">
-        ※ 送出申請後，UBee 會進行資料審核。審核通過後，系統會透過官方帳號通知你後續流程。
-      </div>
-
-      <button id="submitBtn" class="submitBtn" type="submit">送出申請</button>
-
-      <div id="successBox" class="successBox"></div>
-      <div id="errorBox" class="errorBox"></div>
 
     </form>
   </div>
@@ -718,7 +1160,7 @@
 <script>
 const LIFF_ID = '2009895876-MsVhzIxz';
 const API_BASE = 'https://ubee-line-bot-2-zezw.onrender.com';
-  
+
 let realLineUserId = '';
 let hasAgreed = false;
 
@@ -794,16 +1236,16 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
   }
 
   if (lineId.length < 2 || lineId.length > 60) {
-  errorBox.style.display = 'block';
-  errorBox.innerHTML = 'LINE ID 長度需為 2～60 字，請重新確認。';
-  return;
-}
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = 'LINE ID 長度需為 2～60 字，請重新確認。';
+    return;
+  }
 
-if (district.length < 2 || district.length > 80) {
-  errorBox.style.display = 'block';
-  errorBox.innerHTML = '居住地區長度需為 2～80 字，例如：台中市豐原區。';
-  return;
-}
+  if (district.length < 2 || district.length > 80) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = '居住地區長度需為 2～80 字，例如：台中市豐原區。';
+    return;
+  }
 
   if (plateNumber.length > 20) {
     errorBox.style.display = 'block';
@@ -872,34 +1314,34 @@ if (district.length < 2 || district.length > 80) {
     }
 
     if (data.duplicate) {
-  successBox.style.display = 'block';
-  successBox.innerHTML =
-    '⚠️ 系統偵測到你已經送出過申請，或此 LINE 帳號已經是 UBee 騎手。<br><br>' +
-    '目前狀態：' + (data.status || 'pending') + '<br>' +
-    '資料編號：' + (data.riderId || '') + '<br><br>' +
-    '請勿重複送出。如需修改資料，請聯繫 UBee 管理端協助處理。';
+      successBox.style.display = 'block';
+      successBox.innerHTML =
+        '⚠️ 系統偵測到你已經送出過申請，或此 LINE 帳號已經是 UBee 騎手。<br><br>' +
+        '目前狀態：' + (data.status || 'pending') + '<br>' +
+        '資料編號：' + (data.riderId || '') + '<br><br>' +
+        '請勿重複送出。如需修改資料，請聯繫 UBee 管理端協助處理。';
 
-  submitBtn.innerText = '已申請過';
-  submitBtn.disabled = true;
+      submitBtn.innerText = '已申請過';
+      submitBtn.disabled = true;
 
-  form.querySelectorAll('input, select, textarea, button').forEach(el => {
-    el.disabled = true;
-  });
+      form.querySelectorAll('input, select, textarea, button').forEach(el => {
+        el.disabled = true;
+      });
 
-} else if (data.success) {
-  successBox.style.display = 'block';
-  successBox.innerHTML =
-    '✅ 已送出申請，等待 UBee 跑腿審核。<br><br>' +
-    '資料已成功送到系統，請等待審核通知。';
+    } else if (data.success) {
+      successBox.style.display = 'block';
+      successBox.innerHTML =
+        '✅ 已送出申請，等待 UBee 跑腿審核。<br><br>' +
+        '資料已成功送到系統，請等待審核通知。';
 
-  submitBtn.innerText = '已送出申請';
-  submitBtn.disabled = true;
+      submitBtn.innerText = '已送出申請';
+      submitBtn.disabled = true;
 
-  form.querySelectorAll('input, select, textarea, button').forEach(el => {
-    el.disabled = true;
-  });
+      form.querySelectorAll('input, select, textarea, button').forEach(el => {
+        el.disabled = true;
+      });
 
-} else {
+    } else {
       errorBox.style.display = 'block';
       errorBox.innerHTML = data.message || '送出失敗，請稍後再試。';
 
