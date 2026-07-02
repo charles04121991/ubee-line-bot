@@ -2527,17 +2527,98 @@ app.post('/api/rider/register', async (req, res) => {
   }
 });
 
+// ===== 騎士身分查找工具：支援手機登入 / riderId / 舊 LINE 身分 =====
+async function findApprovedRiderForApi(source = {}) {
+  const cleanPhone = normalizePhone(
+    source.phone ||
+    source.riderPhone ||
+    ''
+  );
+
+  const cleanRiderId = String(
+    source.riderId ||
+    source.id ||
+    ''
+  ).trim();
+
+  const cleanLineUserId = String(
+    source.lineUserId ||
+    ''
+  ).trim();
+
+  let riderDoc = null;
+
+  // 第一優先：手機號碼，也就是 riders/{手機號碼}
+  if (/^09\d{8}$/.test(cleanPhone)) {
+    const doc = await db.collection('riders').doc(cleanPhone).get();
+
+    if (doc.exists) {
+      riderDoc = doc;
+    }
+  }
+
+  // 第二優先：riderId。你目前申請表建立資料時 riderId 就是手機號碼。
+  if (!riderDoc && cleanRiderId) {
+    const doc = await db.collection('riders').doc(cleanRiderId).get();
+
+    if (doc.exists) {
+      riderDoc = doc;
+    }
+  }
+
+  // 第三優先：舊版 LINE 綁定，先保留，避免舊騎士資料壞掉。
+  if (!riderDoc && cleanLineUserId.startsWith('U')) {
+    const snap = await db.collection('riders')
+      .where('lineUserId', '==', cleanLineUserId)
+      .limit(1)
+      .get();
+
+    if (!snap.empty) {
+      riderDoc = snap.docs[0];
+    }
+  }
+
+  if (!riderDoc) {
+    return {
+      ok: false,
+      statusCode: 404,
+      message: '找不到騎士資料，請確認手機號碼是否已審核通過。',
+    };
+  }
+
+  const rider = riderDoc.data() || {};
+
+  if (isBlockedRiderData(rider)) {
+    return {
+      ok: false,
+      statusCode: 403,
+      message: '此騎士帳號目前無法使用，請聯繫 UBee 跑腿管理員。',
+    };
+  }
+
+  if (!isApprovedRiderData(rider)) {
+    return {
+      ok: false,
+      statusCode: 403,
+      message: '騎士尚未審核通過，無法使用騎士端功能。',
+    };
+  }
+
+  return {
+    ok: true,
+    riderDoc,
+    rider: {
+      id: riderDoc.id,
+      ...rider,
+    },
+  };
+}
+
 // ===== 騎手上線 / 下線狀態 API =====
+// 手機登入正式版：支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/status', async (req, res) => {
   try {
-    const { lineUserId, online } = req.body;
-
-    if (!lineUserId || !String(lineUserId).startsWith('U')) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的 LINE 身分。',
-      });
-    }
+    const { lineUserId, phone, riderId, online } = req.body || {};
 
     if (typeof online !== 'boolean') {
       return res.status(400).json({
@@ -2546,26 +2627,21 @@ app.post('/api/rider/status', async (req, res) => {
       });
     }
 
-    const snap = await db
-      .collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
 
-    const riderOk = !snap.empty && (
-  snap.docs[0].data().approved === true ||
-  snap.docs[0].data().status === 'approved'
-);
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
+        success: false,
+        message: riderResult.message,
+      });
+    }
 
-if (!riderOk) {
-  return res.status(403).json({
-    success: false,
-    message: '騎士尚未審核通過，無法上線。',
-  });
-}
-
-    const riderDoc = snap.docs[0];
-    const rider = riderDoc.data();
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
 
     const updateData = {
       online,
@@ -2573,19 +2649,22 @@ if (!riderOk) {
       currentOrderId: rider.currentOrderId || '',
       lastActive: Date.now(),
       onlineUpdatedAt: Date.now(),
+      onlineUpdatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastIdentityMethod: phone || riderId ? 'phone' : 'line',
     };
 
     if (!online && rider.busy === true && rider.currentOrderId) {
-  return res.status(409).json({
-    success: false,
-    message: '你目前有進行中的任務，完成後才能下線。',
-  });
-}
+      return res.status(409).json({
+        success: false,
+        message: '你目前有進行中的任務，完成後才能下線。',
+      });
+    }
 
-if (!online) {
-  updateData.busy = false;
-  updateData.currentOrderId = '';
-}
+    if (!online) {
+      updateData.busy = false;
+      updateData.currentOrderId = '';
+    }
 
     await db.collection('riders').doc(riderDoc.id).set(updateData, { merge: true });
 
@@ -2593,6 +2672,14 @@ if (!online) {
       success: true,
       message: online ? '已上線。' : '已下線。',
       online,
+      rider: {
+        id: riderDoc.id,
+        phone: rider.phone || riderDoc.id,
+        name: rider.name || rider.riderName || '',
+        online,
+        busy: updateData.busy,
+        currentOrderId: updateData.currentOrderId,
+      },
     });
 
   } catch (err) {
@@ -2600,7 +2687,8 @@ if (!online) {
 
     return res.status(500).json({
       success: false,
-      message: '狀態更新失敗，請稍後再試。',
+      message: '騎士狀態更新失敗，請稍後再試。',
+      error: err.message,
     });
   }
 });
