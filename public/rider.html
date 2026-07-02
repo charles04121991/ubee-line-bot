@@ -9,27 +9,31 @@
 
   <style>
     :root{
-      --bg:#050505;
-      --bg2:#0b0b0b;
-      --card:#111111;
-      --card2:#171717;
-      --card3:#202020;
-      --white:#ffffff;
-      --text:#f5f5f5;
-      --muted:#b8b8b8;
-      --muted2:#777777;
-      --line:rgba(255,255,255,.10);
-      --line2:rgba(255,255,255,.18);
-      --line3:rgba(255,255,255,.26);
-      --primary:#ffffff;
-      --primaryText:#000000;
-      --green:#22c55e;
-      --green2:#16a34a;
+      --bg:#f6f7fb;
+      --bg2:#ffffff;
+      --card:#ffffff;
+      --card2:#f9fafb;
+      --card3:#f3f4f6;
+      --text:#111827;
+      --text2:#374151;
+      --muted:#6b7280;
+      --muted2:#9ca3af;
+      --line:#e5e7eb;
+      --line2:#d1d5db;
+      --primary:#111827;
+      --primaryText:#ffffff;
+      --accent:#facc15;
+      --accent2:#fef3c7;
+      --green:#16a34a;
+      --greenBg:#ecfdf5;
       --red:#ef4444;
-      --yellow:#facc15;
-      --shadow:0 22px 70px rgba(0,0,0,.42);
-      --radius:26px;
-      --radius2:34px;
+      --redBg:#fef2f2;
+      --blueBg:#eff6ff;
+      --blue:#2563eb;
+      --shadow:0 18px 50px rgba(17,24,39,.08);
+      --shadow2:0 10px 30px rgba(17,24,39,.06);
+      --radius:24px;
+      --radius2:32px;
     }
 
     *{
@@ -45,10 +49,10 @@
       margin:0;
       font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
       background:
-        radial-gradient(circle at top left, rgba(255,255,255,.10), transparent 30%),
-        radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 28%),
-        linear-gradient(180deg,#000,#080808 40%,#000);
-      color:var(--white);
+        radial-gradient(circle at top left, rgba(250,204,21,.22), transparent 30%),
+        radial-gradient(circle at top right, rgba(37,99,235,.10), transparent 28%),
+        linear-gradient(180deg,#ffffff 0%,#f6f7fb 42%,#eef1f6 100%);
+      color:var(--text);
       min-height:100vh;
       overflow-x:hidden;
     }
@@ -62,7 +66,7 @@
 
     .page{
       width:100%;
-      max-width:820px;
+      max-width:860px;
       margin:0 auto;
       padding:22px 18px 46px;
     }
@@ -83,17 +87,17 @@
     }
 
     .logoU{
-      width:48px;
-      height:48px;
-      border-radius:16px;
+      width:50px;
+      height:50px;
+      border-radius:17px;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:28px;
+      font-size:29px;
       font-weight:1000;
-      color:#000;
-      background:#fff;
-      box-shadow:0 10px 26px rgba(255,255,255,.10);
+      color:#111827;
+      background:linear-gradient(135deg,#facc15,#fde68a);
+      box-shadow:0 12px 28px rgba(250,204,21,.28);
       flex:0 0 auto;
     }
 
@@ -107,6 +111,7 @@
       font-size:26px;
       letter-spacing:-.5px;
       font-weight:1000;
+      color:#111827;
     }
 
     .brandText span{
@@ -126,13 +131,14 @@
       justify-content:center;
       gap:8px;
       border:1px solid var(--line);
-      background:rgba(255,255,255,.06);
-      color:#dcdcdc;
+      background:#ffffff;
+      color:#374151;
       border-radius:999px;
-      padding:10px 12px;
+      padding:10px 13px;
       font-size:12px;
       font-weight:1000;
       white-space:nowrap;
+      box-shadow:var(--shadow2);
     }
 
     .statusDot{
@@ -140,34 +146,33 @@
       height:8px;
       border-radius:50%;
       background:var(--green);
-      box-shadow:0 0 0 5px rgba(34,197,94,.12);
+      box-shadow:0 0 0 5px rgba(22,163,74,.12);
     }
 
     .hero{
       position:relative;
       overflow:hidden;
       border-radius:34px;
-      padding:28px 24px;
+      padding:30px 26px;
       margin-bottom:18px;
       background:
-        linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.02) 32%,rgba(255,255,255,.00)),
-        radial-gradient(circle at 80% 20%, rgba(255,255,255,.18), transparent 32%),
-        radial-gradient(circle at 12% 88%, rgba(34,197,94,.14), transparent 30%),
-        linear-gradient(135deg,#242424,#0d0d0d 56%,#030303);
-      border:1px solid var(--line2);
+        radial-gradient(circle at 86% 18%, rgba(250,204,21,.28), transparent 34%),
+        radial-gradient(circle at 10% 92%, rgba(37,99,235,.10), transparent 30%),
+        linear-gradient(135deg,#ffffff 0%,#fffdf4 52%,#f9fafb 100%);
+      border:1px solid var(--line);
       box-shadow:var(--shadow);
     }
 
     .hero::after{
       content:"";
       position:absolute;
-      right:-80px;
-      bottom:-92px;
-      width:240px;
-      height:240px;
+      right:-88px;
+      bottom:-102px;
+      width:260px;
+      height:260px;
       border-radius:50%;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.03);
+      background:rgba(250,204,21,.16);
+      border:1px solid rgba(250,204,21,.35);
     }
 
     .heroInner{
@@ -179,14 +184,14 @@
       display:inline-flex;
       align-items:center;
       gap:9px;
-      color:#d8d8d8;
+      color:#374151;
       font-size:12px;
       font-weight:1000;
       letter-spacing:2px;
       text-transform:uppercase;
       margin-bottom:18px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(0,0,0,.26);
+      border:1px solid #fde68a;
+      background:#fffbeb;
       border-radius:999px;
       padding:9px 12px;
     }
@@ -200,19 +205,20 @@
     }
 
     h1{
-      font-size:43px;
+      font-size:44px;
       line-height:1.08;
       margin:0 0 14px;
       font-weight:1000;
       letter-spacing:-1px;
+      color:#111827;
     }
 
     .heroText{
       font-size:16px;
-      color:#d0d0d0;
-      line-height:1.8;
+      color:#4b5563;
+      line-height:1.85;
       margin:0 0 22px;
-      max-width:560px;
+      max-width:580px;
       font-weight:800;
     }
 
@@ -229,22 +235,26 @@
       justify-content:center;
       gap:10px;
       border:0;
-      background:#fff;
-      color:#000;
+      background:#111827;
+      color:#ffffff;
       border-radius:999px;
-      padding:14px 22px;
-      min-height:50px;
+      padding:14px 24px;
+      min-height:52px;
       font-size:16px;
       font-weight:1000;
       cursor:pointer;
-      box-shadow:0 14px 35px rgba(255,255,255,.10);
+      box-shadow:0 14px 35px rgba(17,24,39,.18);
+    }
+
+    .heroBtn:active{
+      transform:scale(.986);
     }
 
     .heroSubNote{
-      color:#a9a9a9;
+      color:#6b7280;
       font-size:13px;
       font-weight:900;
-      line-height:1.5;
+      line-height:1.55;
     }
 
     .quickStats{
@@ -252,15 +262,16 @@
       grid-template-columns:repeat(3,1fr);
       gap:10px;
       margin-top:24px;
-      max-width:620px;
+      max-width:640px;
     }
 
     .quickStat{
-      min-height:94px;
+      min-height:96px;
       border-radius:22px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(0,0,0,.28);
-      padding:15px 12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.72);
+      padding:15px 13px;
+      box-shadow:0 8px 22px rgba(17,24,39,.04);
     }
 
     .quickIcon{
@@ -271,12 +282,12 @@
     .quickTitle{
       font-size:15px;
       font-weight:1000;
-      color:#fff;
+      color:#111827;
       margin-bottom:4px;
     }
 
     .quickText{
-      color:#a8a8a8;
+      color:#6b7280;
       font-size:12px;
       line-height:1.55;
       font-weight:800;
@@ -284,11 +295,11 @@
 
     .processCard{
       border:1px solid var(--line);
-      background:rgba(17,17,17,.82);
+      background:#ffffff;
       border-radius:28px;
       padding:18px;
       margin-bottom:18px;
-      box-shadow:0 16px 40px rgba(0,0,0,.20);
+      box-shadow:var(--shadow2);
     }
 
     .processTitle{
@@ -302,10 +313,11 @@
     .processTitle b{
       font-size:18px;
       font-weight:1000;
+      color:#111827;
     }
 
     .processTitle span{
-      color:var(--muted);
+      color:#6b7280;
       font-size:13px;
       font-weight:900;
       white-space:nowrap;
@@ -319,19 +331,19 @@
 
     .step{
       position:relative;
-      background:#0f0f0f;
+      background:#f9fafb;
       border:1px solid var(--line);
       border-radius:20px;
       padding:14px 10px;
-      min-height:100px;
+      min-height:102px;
     }
 
     .stepNo{
-      width:28px;
-      height:28px;
-      border-radius:10px;
-      background:#fff;
-      color:#000;
+      width:30px;
+      height:30px;
+      border-radius:11px;
+      background:#111827;
+      color:#ffffff;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -345,19 +357,18 @@
       font-weight:1000;
       line-height:1.35;
       margin-bottom:5px;
+      color:#111827;
     }
 
     .stepText{
       font-size:12px;
-      color:var(--muted);
+      color:#6b7280;
       font-weight:800;
       line-height:1.5;
     }
 
     .mainCard{
-      background:
-        linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01)),
-        var(--card);
+      background:#ffffff;
       border:1px solid var(--line);
       border-radius:34px;
       padding:22px;
@@ -367,23 +378,24 @@
     .noticeBox{
       display:flex;
       gap:14px;
-      background:#151515;
-      border:1px solid var(--line);
+      background:#fffbeb;
+      border:1px solid #fde68a;
       border-radius:26px;
       padding:18px;
       margin:0 0 26px;
     }
 
     .noticeIcon{
-      width:42px;
-      height:42px;
+      width:44px;
+      height:44px;
       border-radius:16px;
       display:flex;
       align-items:center;
       justify-content:center;
-      background:#fff;
-      color:#000;
+      background:#facc15;
+      color:#111827;
       font-size:22px;
+      font-weight:1000;
       flex:0 0 auto;
     }
 
@@ -391,12 +403,12 @@
       min-width:0;
       font-size:15px;
       line-height:1.8;
-      color:var(--muted);
+      color:#4b5563;
       font-weight:800;
     }
 
     .noticeText b{
-      color:var(--white);
+      color:#111827;
       font-size:19px;
       display:block;
       margin-bottom:6px;
@@ -426,11 +438,11 @@
       font-size:25px;
       font-weight:1000;
       letter-spacing:-.4px;
-      color:#fff;
+      color:#111827;
     }
 
     .sectionHint{
-      color:var(--muted2);
+      color:#6b7280;
       font-size:13px;
       font-weight:900;
       white-space:nowrap;
@@ -444,11 +456,11 @@
 
     .field{
       position:relative;
-      background:#0f0f0f;
-      border:1px solid var(--line);
+      background:#ffffff;
+      border:1px solid var(--line2);
       border-radius:22px;
       padding:15px 16px 14px;
-      min-height:92px;
+      min-height:94px;
       transition:border-color .16s ease, box-shadow .16s ease, background .16s ease;
     }
 
@@ -463,7 +475,7 @@
       font-size:14px;
       font-weight:1000;
       margin:0 0 9px;
-      color:#fff;
+      color:#111827;
     }
 
     .requiredMark{
@@ -475,12 +487,12 @@
     select,
     textarea{
       width:100%;
-      min-height:38px;
+      min-height:40px;
       padding:0;
       border:0;
       font-size:17px;
       background:transparent;
-      color:var(--white);
+      color:#111827;
       outline:none;
       font-weight:900;
     }
@@ -493,46 +505,52 @@
 
     input::placeholder,
     textarea::placeholder{
-      color:var(--muted2);
+      color:#9ca3af;
       font-weight:800;
     }
 
     select{
       appearance:none;
       -webkit-appearance:none;
-      padding-right:28px;
-      color:var(--white);
+      padding-right:30px;
+      color:#111827;
       cursor:pointer;
     }
 
     select:invalid{
-      color:var(--muted2);
+      color:#9ca3af;
+    }
+
+    option{
+      color:#111827;
+      background:#ffffff;
+      font-weight:800;
     }
 
     .field.selectField::after{
       content:"⌄";
       position:absolute;
       right:16px;
-      bottom:21px;
-      color:#aaa;
-      font-size:20px;
+      bottom:22px;
+      color:#6b7280;
+      font-size:21px;
       pointer-events:none;
       font-weight:1000;
     }
 
     .field:focus-within{
-      border-color:#fff;
-      background:#121212;
-      box-shadow:0 0 0 3px rgba(255,255,255,.08);
+      border-color:#111827;
+      background:#ffffff;
+      box-shadow:0 0 0 4px rgba(17,24,39,.08);
     }
 
     .formHint{
       font-size:13px;
-      color:var(--muted);
-      line-height:1.7;
+      color:#6b7280;
+      line-height:1.75;
       margin-top:12px;
       font-weight:800;
-      background:#0d0d0d;
+      background:#f9fafb;
       border:1px solid var(--line);
       border-radius:18px;
       padding:13px 14px;
@@ -548,10 +566,9 @@
       border:1px solid var(--line);
       border-radius:24px;
       padding:18px;
-      background:
-        linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01)),
-        #0f0f0f;
+      background:#ffffff;
       min-height:180px;
+      box-shadow:0 8px 22px rgba(17,24,39,.04);
     }
 
     .agreeTop{
@@ -562,13 +579,13 @@
     }
 
     .agreeIcon{
-      width:42px;
-      height:42px;
+      width:44px;
+      height:44px;
       border-radius:16px;
       display:flex;
       align-items:center;
       justify-content:center;
-      background:#181818;
+      background:#f9fafb;
       border:1px solid var(--line);
       font-size:22px;
       flex:0 0 auto;
@@ -578,31 +595,31 @@
       font-size:17px;
       font-weight:1000;
       line-height:1.45;
-      color:#fff;
+      color:#111827;
     }
 
     .agreeDesc{
       font-size:14px;
       line-height:1.75;
-      color:#a9a9a9;
+      color:#4b5563;
       font-weight:800;
       margin:0;
     }
 
     .finalAgreeBox{
       margin-top:18px;
-      border:1px solid var(--line2);
+      border:1px solid #bbf7d0;
       border-radius:26px;
       padding:18px;
       background:
-        radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 32%),
-        #121212;
+        radial-gradient(circle at top right, rgba(22,163,74,.10), transparent 32%),
+        #f0fdf4;
     }
 
     .finalAgreeText{
       font-size:15px;
       line-height:1.75;
-      color:#cfcfcf;
+      color:#374151;
       font-weight:800;
       margin-bottom:14px;
     }
@@ -610,10 +627,10 @@
     .agreeBtn{
       width:100%;
       min-height:60px;
-      border:1px solid var(--line2);
+      border:1px solid #111827;
       border-radius:20px;
-      background:#fff;
-      color:#000;
+      background:#111827;
+      color:#ffffff;
       font-size:18px;
       font-weight:1000;
       cursor:pointer;
@@ -626,17 +643,17 @@
 
     .agreeBtn.active{
       background:var(--green);
-      color:#fff;
+      color:#ffffff;
       border-color:var(--green);
-      box-shadow:0 12px 34px rgba(34,197,94,.18);
+      box-shadow:0 12px 34px rgba(22,163,74,.18);
     }
 
     .note{
       font-size:15px;
-      color:var(--muted);
+      color:#4b5563;
       line-height:1.85;
       margin-top:20px;
-      background:#0f0f0f;
+      background:#f9fafb;
       border:1px solid var(--line);
       border-radius:22px;
       padding:16px;
@@ -654,13 +671,13 @@
       min-height:70px;
       border:0;
       border-radius:24px;
-      background:var(--primary);
-      color:var(--primaryText);
+      background:#111827;
+      color:#ffffff;
       font-size:22px;
       font-weight:1000;
       cursor:pointer;
       transition:.16s ease;
-      box-shadow:0 18px 44px rgba(255,255,255,.10);
+      box-shadow:0 18px 44px rgba(17,24,39,.18);
     }
 
     .submitBtn:active{
@@ -675,7 +692,7 @@
 
     .submitMiniText{
       text-align:center;
-      color:var(--muted2);
+      color:#6b7280;
       font-size:13px;
       font-weight:800;
       line-height:1.6;
@@ -684,9 +701,9 @@
 
     .successBox{
       display:none;
-      background:rgba(34,197,94,.10);
-      border:1px solid rgba(34,197,94,.45);
-      color:#caffd9;
+      background:#ecfdf5;
+      border:1px solid #86efac;
+      color:#166534;
       border-radius:20px;
       padding:16px;
       line-height:1.75;
@@ -697,9 +714,9 @@
 
     .errorBox{
       display:none;
-      background:rgba(239,68,68,.10);
-      border:1px solid rgba(239,68,68,.45);
-      color:#ffd1d1;
+      background:#fef2f2;
+      border:1px solid #fecaca;
+      color:#991b1b;
       border-radius:20px;
       padding:16px;
       line-height:1.75;
@@ -709,7 +726,7 @@
     }
 
     .footer{
-      color:var(--muted2);
+      color:#6b7280;
       text-align:center;
       font-size:13px;
       line-height:1.8;
@@ -718,7 +735,7 @@
     }
 
     .footer b{
-      color:var(--muted);
+      color:#374151;
       font-size:15px;
     }
 
@@ -988,14 +1005,46 @@
             <input id="lineId" name="lineId" type="text" placeholder="請輸入 LINE ID" required>
           </div>
 
-          <div class="field">
+          <div class="field selectField">
             <label for="district">居住地區<span class="requiredMark">*</span></label>
-            <input id="district" name="district" type="text" placeholder="例如：台中市豐原區" required>
+            <select id="district" name="district" required>
+              <option value="">請選擇居住地區</option>
+              <option value="台中市豐原區">台中市豐原區</option>
+              <option value="台中市潭子區">台中市潭子區</option>
+              <option value="台中市神岡區">台中市神岡區</option>
+              <option value="台中市大雅區">台中市大雅區</option>
+              <option value="台中市后里區">台中市后里區</option>
+              <option value="台中市石岡區">台中市石岡區</option>
+              <option value="台中市東勢區">台中市東勢區</option>
+              <option value="台中市新社區">台中市新社區</option>
+              <option value="台中市北屯區">台中市北屯區</option>
+              <option value="台中市北區">台中市北區</option>
+              <option value="台中市中區">台中市中區</option>
+              <option value="台中市東區">台中市東區</option>
+              <option value="台中市太平區">台中市太平區</option>
+              <option value="台中市大里區">台中市大里區</option>
+              <option value="台中市霧峰區">台中市霧峰區</option>
+              <option value="台中市西屯區">台中市西屯區</option>
+              <option value="台中市西區">台中市西區</option>
+              <option value="台中市南屯區">台中市南屯區</option>
+              <option value="台中市南區">台中市南區</option>
+              <option value="台中市烏日區">台中市烏日區</option>
+              <option value="台中市大肚區">台中市大肚區</option>
+              <option value="台中市龍井區">台中市龍井區</option>
+              <option value="台中市沙鹿區">台中市沙鹿區</option>
+              <option value="台中市清水區">台中市清水區</option>
+              <option value="台中市梧棲區">台中市梧棲區</option>
+              <option value="台中市大安區">台中市大安區</option>
+              <option value="台中市大甲區">台中市大甲區</option>
+              <option value="台中市外埔區">台中市外埔區</option>
+              <option value="台中市和平區">台中市和平區</option>
+              <option value="其他地區">其他地區</option>
+            </select>
           </div>
         </div>
 
         <div class="formHint">
-          審核或後續聯繫會使用此資料，請確認姓名、手機號碼與 LINE ID 填寫正確。
+          審核或後續聯繫會使用此資料，請確認姓名、手機號碼、LINE ID 與居住地區正確。
         </div>
       </div>
 
@@ -1020,9 +1069,19 @@
             <input id="plateNumber" name="plateNumber" type="text" placeholder="例如：ABC-1234" required>
           </div>
 
-          <div class="field">
+          <div class="field selectField">
             <label for="serviceArea">可服務區域<span class="requiredMark">*</span></label>
-            <input id="serviceArea" name="serviceArea" type="text" placeholder="例如：豐原、潭子、神岡、大雅" required>
+            <select id="serviceArea" name="serviceArea" required>
+              <option value="">請選擇可服務區域</option>
+              <option value="豐原、潭子、神岡、大雅">豐原、潭子、神岡、大雅</option>
+              <option value="石岡、東勢、新社">石岡、東勢、新社</option>
+              <option value="北屯、北區、中區、東區">北屯、北區、中區、東區</option>
+              <option value="太平、大里、霧峰">太平、大里、霧峰</option>
+              <option value="西屯、西區、南屯、南區">西屯、西區、南屯、南區</option>
+              <option value="烏日、大肚、龍井、沙鹿">烏日、大肚、龍井、沙鹿</option>
+              <option value="清水、梧棲、大安、大甲">清水、梧棲、大安、大甲</option>
+              <option value="其他地區">其他地區</option>
+            </select>
           </div>
 
           <div class="field selectField">
@@ -1038,7 +1097,7 @@
         </div>
 
         <div class="formHint">
-          可服務區域可填寫多個地區，例如：豐原、潭子、神岡、大雅、后里。
+          可服務區域目前採區域群組選擇，方便 UBee 後續依照任務地點進行派單與聯繫。
         </div>
       </div>
 
