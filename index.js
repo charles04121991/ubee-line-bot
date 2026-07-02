@@ -207,10 +207,17 @@ async function sendNewOrderPushToRiders(order) {
     // ==============================
     // 2. 原本 LINE 管理通知保留
     // ==============================
-    try {
-      await client.pushMessage("Cdc5a9583fb1364402c2a3e4e5edb4c1b", {
-        type: "text",
-        text:
+        try {
+      const targetGroupId = LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID;
+
+      if (!targetGroupId) {
+        console.warn(
+          `UBee LINE 新任務通知略過：未設定 LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
+        );
+      } else {
+        await client.pushMessage(targetGroupId, {
+          type: "text",
+          text:
 `🔔 UBee 跑腿新任務通知
 
 有新的跑腿任務等待接單
@@ -218,11 +225,17 @@ async function sendNewOrderPushToRiders(order) {
 📍取件：${pickup}
 🏁送達：${dropoff}
 💰騎士收入：$${fee}`
-      });
+        });
 
-      console.log(`UBee LINE 新任務通知已送出：${orderId}`);
+        console.log(`UBee LINE 新任務通知已送出：${orderId}`);
+      }
+
     } catch (lineErr) {
-      console.error("UBee LINE 新任務通知失敗:", lineErr);
+      console.error("UBee LINE 新任務通知失敗:", {
+        orderId,
+        statusCode: lineErr?.statusCode || lineErr?.response?.status,
+        statusMessage: lineErr?.statusMessage || lineErr?.message,
+      });
     }
 
   } catch (err) {
