@@ -689,14 +689,19 @@ app.get('/api/web-push/public-key', (req, res) => {
 // 儲存騎士 iPhone / PWA Web Push 訂閱資料
 app.post('/api/rider/push-subscription', async (req, res) => {
   try {
-    const { lineUserId, subscription } = req.body || {};
+    const {
+      lineUserId,
+      phone,
+      riderId,
+      subscription,
+      userAgent,
+      platform,
+      app: riderApp
+    } = req.body || {};
 
-    if (!lineUserId || !String(lineUserId).startsWith('U')) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的騎士 LINE 身分。',
-      });
-    }
+    const safeLineUserId = String(lineUserId || '').trim();
+    const cleanPhone = normalizePhone(phone || '');
+    const safeRiderId = String(riderId || '').trim();
 
     if (
       !subscription ||
@@ -711,24 +716,68 @@ app.post('/api/rider/push-subscription', async (req, res) => {
       });
     }
 
-    const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
+    let riderDoc = null;
 
-    if (riderSnap.empty) {
+    // 1. 手機登入正式版：優先用 riders/{手機號碼}
+    if (cleanPhone && /^09\d{8}$/.test(cleanPhone)) {
+      const phoneDoc = await db.collection('riders').doc(cleanPhone).get();
+
+      if (phoneDoc.exists) {
+        riderDoc = phoneDoc;
+      } else {
+        const phoneSnap = await db.collection('riders')
+          .where('phone', '==', cleanPhone)
+          .limit(1)
+          .get();
+
+        if (!phoneSnap.empty) {
+          riderDoc = phoneSnap.docs[0];
+        }
+      }
+    }
+
+    // 2. riderId 相容
+    if (!riderDoc && safeRiderId) {
+      const riderIdDoc = await db.collection('riders').doc(safeRiderId).get();
+
+      if (riderIdDoc.exists) {
+        riderDoc = riderIdDoc;
+      } else {
+        const riderIdSnap = await db.collection('riders')
+          .where('riderId', '==', safeRiderId)
+          .limit(1)
+          .get();
+
+        if (!riderIdSnap.empty) {
+          riderDoc = riderIdSnap.docs[0];
+        }
+      }
+    }
+
+    // 3. 舊版 LINE 登入相容
+    if (!riderDoc && safeLineUserId && safeLineUserId.startsWith('U')) {
+      const lineSnap = await db.collection('riders')
+        .where('lineUserId', '==', safeLineUserId)
+        .limit(1)
+        .get();
+
+      if (!lineSnap.empty) {
+        riderDoc = lineSnap.docs[0];
+      }
+    }
+
+    if (!riderDoc) {
       return res.status(404).json({
         success: false,
-        message: '找不到騎士資料。',
+        message: '找不到騎士資料，無法儲存派單通知。',
       });
     }
 
-    const riderDoc = riderSnap.docs[0];
     const riderData = riderDoc.data() || {};
 
     const riderApproved =
       riderData.approved === true ||
-      riderData.status === 'approved';
+      String(riderData.status || '').trim().toLowerCase() === 'approved';
 
     if (!riderApproved) {
       return res.status(403).json({
@@ -741,12 +790,24 @@ app.post('/api/rider/push-subscription', async (req, res) => {
       webPushSubscription: subscription,
       webPushEnabled: true,
       webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      webPushUpdatedAtMs: Date.now(),
+
       pushProvider: 'web-push',
+      pushApp: riderApp || 'ubee-rider-web',
+      pushPlatform: platform || '',
+      pushUserAgent: userAgent || '',
+
+      pushPhone: cleanPhone || riderData.phone || riderDoc.id || '',
+      pushRiderId: safeRiderId || riderData.riderId || riderDoc.id || '',
+      pushLineUserId: safeLineUserId || riderData.lineUserId || '',
+
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
     return res.json({
       success: true,
       message: 'UBee 派單通知訂閱已儲存。',
+      riderId: riderDoc.id,
     });
 
   } catch (err) {
