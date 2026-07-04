@@ -76,7 +76,6 @@ body.night-mode{
 *{
   box-sizing:border-box;
   -webkit-tap-highlight-color:transparent;
-  touch-action:manipulation;
 }
 
 html{
@@ -84,22 +83,22 @@ html{
   width:100%;
   min-height:100%;
   overflow-x:hidden;
+  overflow-y:auto;
   -webkit-text-size-adjust:100%;
-  touch-action:manipulation;
-  overscroll-behavior:none;
 }
 
 body{
   margin:0;
   width:100%;
   min-height:100vh;
+  min-height:100dvh;
   background:var(--bg);
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
   overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
   -webkit-text-size-adjust:100%;
-  touch-action:manipulation;
-  overscroll-behavior:none;
   position:relative;
 }
 
@@ -109,7 +108,6 @@ select,
 button{
   font-size:16px !important;
   -webkit-text-size-adjust:100%;
-  touch-action:manipulation;
   font-family:inherit;
 }
 
@@ -1386,8 +1384,7 @@ textarea::placeholder{
 }
 
 .footer-nav{
-  position:sticky;
-  bottom:0;
+  position:relative;
   background:linear-gradient(180deg,rgba(0,0,0,0),var(--bg) 22%);
   padding-top:18px;
   margin-top:10px;
@@ -2272,23 +2269,6 @@ body.day-mode .bottom-tabs{
   </div>
 
 <script>
-document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
-document.addEventListener('gesturechange', function(e){ e.preventDefault(); });
-document.addEventListener('gestureend', function(e){ e.preventDefault(); });
-
-let lastTouchEnd = 0;
-document.addEventListener('touchend', function(e){
-  const now = Date.now();
-  if(now - lastTouchEnd <= 300){
-    e.preventDefault();
-  }
-  lastTouchEnd = now;
-}, { passive:false });
-
-document.addEventListener('dblclick', function(e){
-  e.preventDefault();
-}, { passive:false });
-
 function applyThemeByTime(){
   const hour = new Date().getHours();
   const isDay = hour >= 6 && hour < 18;
