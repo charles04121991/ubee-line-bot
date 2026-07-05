@@ -2542,269 +2542,712 @@ app.post('/api/admin/merchant-receivables/settle-order', async (req, res) => {
 });
 
 
-// 4. 騎士完成訂單列表：正式版只允許 approved 騎士查看
+// 4. 騎士完成訂單列表：手機登入正式版
+// 支援 phone / riderId，並保留 lineUserId 舊版相容
 app.get('/api/rider/completed-orders', async (req, res) => {
   try {
-    const { lineUserId, limit } = req.query;
+    const {
+      lineUserId,
+      phone,
+      riderId,
+      limit,
+    } = req.query || {};
 
-    if (!lineUserId || !String(lineUserId).startsWith('U')) {
-      return res.status(400).json({
+    // ==============================
+    // 1. 驗證騎士身分
+    // ==============================
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
         success: false,
-        message: '缺少正確的騎士 LINE 身分。',
+        message: riderResult.message,
       });
     }
 
-    const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
 
-    const riderOk = !riderSnap.empty && (
-      riderSnap.docs[0].data().approved === true ||
-      riderSnap.docs[0].data().status === 'approved'
+    const identity = buildRiderApiIdentity(
+      riderDoc,
+      rider,
+      {
+        lineUserId,
+        phone,
+        riderId,
+      }
     );
 
-    if (!riderOk) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法查看完成訂單。',
-      });
+    const safeLimit = Math.min(
+      Math.max(Number(limit || 20), 1),
+      50
+    );
+
+    // ==============================
+    // 2. 完成時間轉毫秒
+    // 支援 Firestore Timestamp /
+    // number / string
+    // ==============================
+    function getCompletedOrderTimeMs(order) {
+      if (!order) return 0;
+
+      const timeCandidates = [
+        order.completedAt,
+
+        order.statusTimes &&
+        order.statusTimes.completed,
+
+        order.finishedAt,
+        order.deliveredAt,
+        order.updatedAt,
+        order.createdAt,
+      ];
+
+      for (const value of timeCandidates) {
+        if (!value) continue;
+
+        if (
+          typeof value.toDate === 'function'
+        ) {
+          return value.toDate().getTime();
+        }
+
+        if (
+          typeof value.seconds === 'number'
+        ) {
+          return value.seconds * 1000;
+        }
+
+        if (
+          typeof value._seconds === 'number'
+        ) {
+          return value._seconds * 1000;
+        }
+
+        if (typeof value === 'number') {
+          // 保險相容秒數與毫秒數
+          return value < 1000000000000
+            ? value * 1000
+            : value;
+        }
+
+        if (typeof value === 'string') {
+          const parsed =
+            new Date(value).getTime();
+
+          if (Number.isFinite(parsed)) {
+            return parsed;
+          }
+        }
+      }
+
+      return 0;
     }
 
-    const safeLimit = Math.min(Math.max(Number(limit || 20), 1), 50);
+    // ==============================
+    // 3. 建立訂單查詢條件
+    //
+    // 不使用複合索引：
+    // 分別查詢，再自行去重複
+    // ==============================
+    const queryPairs = [];
 
-    const riderData = riderSnap.docs[0].data();
-    const riderPhone = normalizePhone(riderData.phone || '');
-    const riderDocId = riderSnap.docs[0].id;
+    function addQueryPair(field, value) {
+      const safeValue =
+        String(value || '').trim();
 
-    const completedSnap = await db.collection('orders')
-      .where('riderLineUserId', '==', lineUserId)
-      .where('status', '==', 'completed')
-      .limit(200)
-      .get();
+      if (!safeValue) return;
 
-    const completedOrders = completedSnap.docs
-      .map(doc => {
-        const order = {
-          id: doc.id,
-          ...doc.data(),
-        };
+      const alreadyExists =
+        queryPairs.some(
+          ([oldField, oldValue]) =>
+            oldField === field &&
+            oldValue === safeValue
+        );
 
-        let completedAtMs = 0;
+      if (!alreadyExists) {
+        queryPairs.push([
+          field,
+          safeValue,
+        ]);
+      }
+    }
 
-        if (order.completedAt && typeof order.completedAt.toDate === 'function') {
-          completedAtMs = order.completedAt.toDate().getTime();
-        } else if (typeof order.completedAt === 'number') {
-          completedAtMs = order.completedAt;
-        } else if (
-          order.statusTimes &&
-          order.statusTimes.completed &&
-          typeof order.statusTimes.completed.toDate === 'function'
-        ) {
-          completedAtMs = order.statusTimes.completed.toDate().getTime();
-        } else if (typeof order.updatedAt === 'number') {
-          completedAtMs = order.updatedAt;
-        }
+    // 手機登入正式欄位
+    addQueryPair(
+      'riderDocId',
+      identity.riderDocId
+    );
 
-                const paymentMethod = String(
-  order.paymentMethod ||
-  order.payMethod ||
-  order.paymentType ||
-  order.payment ||
-  order.payType ||
-  ''
-).trim().toLowerCase();
+    addQueryPair(
+      'riderId',
+      identity.riderId
+    );
 
-const paymentStatus = String(
-  order.paymentStatus ||
-  order.payStatus ||
-  ''
-).trim().toLowerCase();
+    addQueryPair(
+      'riderPhone',
+      identity.phone
+    );
 
-const isCashOrder =
-  order.isCashOrder === true ||
-  paymentMethod === 'cash' ||
-  paymentMethod.includes('cash') ||
-  paymentMethod.includes('現金') ||
-  paymentStatus === 'cash_on_delivery' ||
-  paymentStatus === 'cash_pending' ||
-  paymentStatus.includes('現金');
+    // 舊 LINE 身分欄位
+    addQueryPair(
+      'riderLineUserId',
+      identity.lineUserId
+    );
 
-const advancePayment = Math.max(0, Math.round(Number(
-  order.advancePayment ??
-  order.advanceAmount ??
-  order.estimatedAdvancePayment ??
-  order.estimatedAdvanceAmount ??
-  order.riderAdvanceAmount ??
-  0
-) || 0));
-
-const customerTotal = Math.max(0, Math.round(Number(
-  order.customerPayableTotal ??
-  order.customerPayTotal ??
-  order.customerPayAmount ??
-  order.customerTotalWithAdvance ??
-  order.riderDisplayTotal ??
-  order.payableTotal ??
-  order.finalPayAmount ??
-  order.cashCollectAmount ??
-  order.collectAmount ??
-  order.amountToCollect ??
-  order.total ??
-  order.price ??
-  0
-) || 0));
-
-const serviceNet = Math.max(0, customerTotal - advancePayment);
-
-const directRiderIncome = Math.round(Number(
-  order.driverFee ??
-  order.riderFee ??
-  order.riderIncome ??
-  order.riderEarning ??
-  order.riderPayout ??
-  order.riderShare ??
-  0
-) || 0);
-
-const fallbackTaskSubtotal =
-  Math.max(
-    0,
-    Math.round(Number(order.deliveryFee || 0))
-  ) +
-  Math.max(
-    0,
-    Math.round(Number(order.speedFee || 0))
-  ) +
-  Math.max(
-    0,
-    Math.round(Number(order.upstairsFee || 0))
-  ) +
-  Math.max(
-    0,
-    Math.round(Number(order.waitingFee || 0))
-  );
-
-const fallbackServiceFee = Math.max(
-  0,
-  Math.round(Number(order.serviceFee || 0))
-);
-
-const fallbackRiderIncome =
-  fallbackTaskSubtotal > 0
-    ? Math.round(
-        fallbackTaskSubtotal *
-        Number(PRICING.driverRatio || 0.7)
-      )
-    : Math.round(
-        Math.max(
-          0,
-          serviceNet - fallbackServiceFee
-        ) *
-        Number(PRICING.driverRatio || 0.7)
+    // ==============================
+    // 舊版資料相容
+    // 過去部分訂單可能把 LINE userId
+    // 存在 riderId 或 driverId
+    // ==============================
+    if (identity.lineUserId) {
+      addQueryPair(
+        'riderId',
+        identity.lineUserId
       );
 
-const riderIncome =
-  directRiderIncome > 0
-    ? directRiderIncome
-    : fallbackRiderIncome;
+      addQueryPair(
+        'driverId',
+        identity.lineUserId
+      );
+    }
 
-const directCashDueToPlatform = Math.round(Number(
-  order.cashDueToPlatform ??
-  order.platformReceivable ??
-  order.riderDueToPlatform ??
-  0
-) || 0);
+    if (identity.riderId) {
+      addQueryPair(
+        'driverId',
+        identity.riderId
+      );
+    }
 
-const cashDueToPlatform = isCashOrder
-  ? (
-      directCashDueToPlatform > 0
-        ? directCashDueToPlatform
-        : Math.max(0, Math.round(serviceNet - riderIncome))
-    )
-  : 0;
+    // ==============================
+    // 4. 查詢所有屬於這名騎士的完成訂單
+    // ==============================
+    const completedOrderMap =
+      new Map();
 
-return {
-  id: order.id,
-  orderNo: order.orderNo || order.id,
-  status: order.status,
+    for (const [field, value] of queryPairs) {
+      try {
+        const snap = await db
+          .collection('orders')
+          .where(field, '==', value)
+          .limit(500)
+          .get();
 
-  pickupAddress: order.pickupAddress || order.fromAddress || order.pickup || '',
-  dropoffAddress: order.dropoffAddress || order.toAddress || order.dropoff || '',
-  item: order.item || '',
+        snap.docs.forEach(doc => {
+          const order = {
+            id: doc.id,
+            ...doc.data(),
+          };
 
-  riderPhone: order.riderPhone || '',
-  riderDocId: order.riderDocId || '',
+          const status =
+            String(order.status || '')
+              .trim()
+              .toLowerCase();
 
-  paymentMethod: paymentMethod || order.paymentMethod || '',
-  paymentStatus: paymentStatus || order.paymentStatus || '',
-  isCashOrder,
+          const isCompleted =
+            status === 'completed' ||
+            status === 'done';
 
-  driverFee: riderIncome,
-  riderFee: riderIncome,
-  fee: riderIncome,
+          if (!isCompleted) {
+            return;
+          }
 
-  // 舊版相容：price 保留騎士收入，避免完成紀錄誤顯示客人總額
-  price: riderIncome,
+          // ==========================
+          // 正式身分確認
+          // ==========================
+          const directBelongs =
+            isOrderBelongsToRider(
+              order,
+              identity
+            );
 
-  // 客人實際應付總額
-  total: customerTotal,
-  customerPayableTotal: customerTotal,
-  payableTotal: customerTotal,
-  riderDisplayTotal: customerTotal,
+          // ==========================
+          // 舊版資料相容
+          // 某些舊訂單可能把 LINE userId
+          // 寫在 riderId / driverId
+          // ==========================
+          const oldOrderRiderId =
+            String(
+              order.riderId || ''
+            ).trim();
 
-  // 代墊資料
-  advancePayment,
-  advanceAmount: advancePayment,
+          const oldOrderDriverId =
+            String(
+              order.driverId || ''
+            ).trim();
 
-  // 現金單錢包需要的資料
-  cashCollectAmount: isCashOrder ? customerTotal : 0,
-  cashCollectedAmount: isCashOrder ? customerTotal : 0,
-  cashGrossCollected: isCashOrder ? customerTotal : 0,
+          const legacyBelongs =
+            !!identity.lineUserId &&
+            (
+              oldOrderRiderId ===
+                identity.lineUserId ||
 
-  cashAdvanceRecovered: isCashOrder ? advancePayment : 0,
-  cashServiceNet: isCashOrder ? serviceNet : 0,
+              oldOrderDriverId ===
+                identity.lineUserId
+            );
 
-  cashDueToPlatform,
-  platformReceivable: cashDueToPlatform,
-  riderDueToPlatform: cashDueToPlatform,
+          if (
+            !directBelongs &&
+            !legacyBelongs
+          ) {
+            return;
+          }
 
-  completedAt: completedAtMs,
-  completedAtText: completedAtMs
-    ? new Date(completedAtMs).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
-    : '',
-};
+          // 同一張訂單只保留一次
+          completedOrderMap.set(
+            doc.id,
+            order
+          );
+        });
+
+      } catch (queryErr) {
+        console.warn(
+          `⚠️ 完成訂單查詢失敗 field=${field}:`,
+          queryErr.message
+        );
+      }
+    }
+
+    const completedOrders =
+      Array.from(
+        completedOrderMap.values()
+      );
+
+    // ==============================
+    // 5. 整理完成訂單資料
+    // ==============================
+    const resultOrders = completedOrders
+      .map(order => {
+        const completedAtMs =
+          getCompletedOrderTimeMs(order);
+
+        // ----------------------------
+        // 付款方式
+        // ----------------------------
+        const paymentMethod =
+          getOrderPaymentMethod(order);
+
+        const paymentStatus =
+          getOrderPaymentStatus(order);
+
+        const isCashOrder =
+          order.isCashOrder === true ||
+
+          paymentMethod === 'cash' ||
+
+          paymentMethod.includes(
+            'cash'
+          ) ||
+
+          paymentMethod.includes(
+            '現金'
+          ) ||
+
+          paymentStatus ===
+            'cash_on_delivery' ||
+
+          paymentStatus ===
+            'cash_pending' ||
+
+          paymentStatus.includes(
+            '現金'
+          );
+
+        // ----------------------------
+        // 代墊款
+        // 不屬於騎士收入
+        // ----------------------------
+        const advancePayment =
+          getOrderAdvancePaymentAmount(
+            order
+          );
+
+        // ----------------------------
+        // 客人實際應付總額
+        // 含代墊款
+        // ----------------------------
+        const directCustomerTotal =
+          getOrderMoneyValue(
+            order,
+            [
+              'customerPayableTotal',
+              'customerPayTotal',
+              'customerPayAmount',
+              'customerTotalWithAdvance',
+              'riderDisplayTotal',
+              'estimatedPayableTotal',
+              'payableTotal',
+              'finalPayAmount',
+              'cashCollectAmount',
+              'collectAmount',
+              'amountToCollect',
+              'total',
+              'price',
+            ]
+          );
+
+        const customerTotal =
+          directCustomerTotal !== null
+            ? directCustomerTotal
+            : 0;
+
+        // ----------------------------
+        // 服務總額
+        // 不含代墊款
+        // ----------------------------
+        const directServiceSubtotal =
+          getOrderMoneyValue(
+            order,
+            [
+              'serviceSubtotal',
+              'serviceTotal',
+              'deliveryServiceFee',
+              'taskServiceFee',
+            ]
+          );
+
+        const serviceNet =
+          directServiceSubtotal !== null
+            ? directServiceSubtotal
+            : Math.max(
+                0,
+                customerTotal -
+                advancePayment
+              );
+
+        // ============================
+        // 騎士收入
+        // ============================
+        const directRiderIncome =
+          getOrderMoneyValue(
+            order,
+            [
+              'driverFee',
+              'riderFee',
+              'riderIncome',
+              'riderEarning',
+              'riderPayout',
+              'riderShare',
+            ]
+          );
+
+        // 新正式規則：
+        // 配送費 + 急件費 + 樓層費 + 等候費
+        // 才參與 70 / 30 分潤
+        const fallbackTaskSubtotal =
+          Math.max(
+            0,
+            Math.round(
+              Number(
+                order.deliveryFee || 0
+              )
+            )
+          ) +
+
+          Math.max(
+            0,
+            Math.round(
+              Number(
+                order.speedFee || 0
+              )
+            )
+          ) +
+
+          Math.max(
+            0,
+            Math.round(
+              Number(
+                order.upstairsFee || 0
+              )
+            )
+          ) +
+
+          Math.max(
+            0,
+            Math.round(
+              Number(
+                order.waitingFee || 0
+              )
+            )
+          );
+
+        const fallbackServiceFee =
+          Math.max(
+            0,
+            Math.round(
+              Number(
+                order.serviceFee || 0
+              )
+            )
+          );
+
+        const fallbackRiderIncome =
+          fallbackTaskSubtotal > 0
+
+            ? Math.round(
+                fallbackTaskSubtotal *
+                Number(
+                  PRICING.driverRatio ||
+                  0.7
+                )
+              )
+
+            : Math.round(
+                Math.max(
+                  0,
+                  serviceNet -
+                  fallbackServiceFee
+                ) *
+                Number(
+                  PRICING.driverRatio ||
+                  0.7
+                )
+              );
+
+        const riderIncome =
+          directRiderIncome !== null &&
+          directRiderIncome > 0
+
+            ? directRiderIncome
+
+            : fallbackRiderIncome;
+
+        // ============================
+        // 現金單應回繳平台
+        // ============================
+        const directCashDueToPlatform =
+          getOrderMoneyValue(
+            order,
+            [
+              'cashDueToPlatform',
+              'platformReceivable',
+              'riderDueToPlatform',
+            ]
+          );
+
+        const cashDueToPlatform =
+          isCashOrder
+            ? (
+                directCashDueToPlatform !== null &&
+                directCashDueToPlatform > 0
+
+                  ? directCashDueToPlatform
+
+                  : Math.max(
+                      0,
+                      Math.round(
+                        serviceNet -
+                        riderIncome
+                      )
+                    )
+              )
+            : 0;
+
+        return {
+          id:
+            order.id,
+
+          orderNo:
+            order.orderNo ||
+            order.id,
+
+          status:
+            order.status,
+
+          pickupAddress:
+            order.pickupAddress ||
+            order.fromAddress ||
+            order.pickup ||
+            '',
+
+          dropoffAddress:
+            order.dropoffAddress ||
+            order.toAddress ||
+            order.dropoff ||
+            '',
+
+          item:
+            order.item ||
+            '',
+
+          // ==========================
+          // 騎士身分相容欄位
+          // ==========================
+          riderId:
+            order.riderId ||
+            '',
+
+          riderPhone:
+            order.riderPhone ||
+            '',
+
+          riderDocId:
+            order.riderDocId ||
+            '',
+
+          riderLineUserId:
+            order.riderLineUserId ||
+            '',
+
+          // ==========================
+          // 付款資料
+          // ==========================
+          paymentMethod:
+            paymentMethod ||
+            order.paymentMethod ||
+            '',
+
+          paymentStatus:
+            paymentStatus ||
+            order.paymentStatus ||
+            '',
+
+          isCashOrder,
+
+          // ==========================
+          // 騎士收入
+          // ==========================
+          driverFee:
+            riderIncome,
+
+          riderFee:
+            riderIncome,
+
+          fee:
+            riderIncome,
+
+          // 舊版 rider.html 相容
+          // price 保留騎士收入
+          price:
+            riderIncome,
+
+          // ==========================
+          // 客人實際應付總額
+          // ==========================
+          total:
+            customerTotal,
+
+          customerPayableTotal:
+            customerTotal,
+
+          payableTotal:
+            customerTotal,
+
+          riderDisplayTotal:
+            customerTotal,
+
+          // ==========================
+          // 服務費小計
+          // 不含代墊
+          // ==========================
+          serviceSubtotal:
+            serviceNet,
+
+          serviceTotal:
+            serviceNet,
+
+          // ==========================
+          // 代墊資料
+          // ==========================
+          advancePayment,
+
+          advanceAmount:
+            advancePayment,
+
+          // ==========================
+          // 現金單錢包資料
+          // ==========================
+          cashCollectAmount:
+            isCashOrder
+              ? customerTotal
+              : 0,
+
+          cashCollectedAmount:
+            isCashOrder
+              ? customerTotal
+              : 0,
+
+          cashGrossCollected:
+            isCashOrder
+              ? customerTotal
+              : 0,
+
+          cashAdvanceRecovered:
+            isCashOrder
+              ? advancePayment
+              : 0,
+
+          cashServiceNet:
+            isCashOrder
+              ? serviceNet
+              : 0,
+
+          cashDueToPlatform,
+
+          platformReceivable:
+            cashDueToPlatform,
+
+          riderDueToPlatform:
+            cashDueToPlatform,
+
+          // ==========================
+          // 完成時間
+          // ==========================
+          completedAt:
+            completedAtMs,
+
+          completedAtText:
+            completedAtMs
+              ? new Date(
+                  completedAtMs
+                ).toLocaleString(
+                  'zh-TW',
+                  {
+                    timeZone:
+                      'Asia/Taipei',
+                  }
+                )
+              : '',
+        };
       })
-      .filter(order => {
-        if (!riderPhone && !riderDocId) return false;
 
-        const orderRiderPhone = normalizePhone(order.riderPhone || '');
-        const orderRiderDocId = String(order.riderDocId || order.riderPhone || '').trim();
+      .sort(
+        (a, b) =>
+          Number(
+            b.completedAt || 0
+          ) -
+          Number(
+            a.completedAt || 0
+          )
+      )
 
-        if (riderPhone && orderRiderPhone && orderRiderPhone === riderPhone) {
-           return true;
-        }
+      .slice(
+        0,
+        safeLimit
+      );
 
-        if (riderDocId && orderRiderDocId && orderRiderDocId === riderDocId) {
-          return true;
-        }
-          return false;
-      })
-
-      .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0))
-      .slice(0, safeLimit);
-
+    // ==============================
+    // 6. 回傳完成訂單
+    // ==============================
     return res.json({
       success: true,
-      orders: completedOrders,
+      orders: resultOrders,
     });
 
   } catch (err) {
-    console.error('❌ 取得騎士完成訂單失敗：', err);
+    console.error(
+      '❌ 取得騎士完成訂單失敗：',
+      err
+    );
 
     return res.status(500).json({
       success: false,
-      message: '取得騎士完成訂單失敗，請稍後再試。',
+      message:
+        '取得騎士完成訂單失敗，請稍後再試。',
       error: err.message,
     });
   }
