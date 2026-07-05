@@ -1297,282 +1297,680 @@ app.get('/api/rider/current-order', async (req, res) => {
   }
 });
 
-// 3. 騎士今日 / 累積統計：正式版只允許 approved 騎士查看
+// 3. 騎士今日 / 累積統計：手機登入正式版
+// 支援 phone / riderId，並保留 lineUserId 舊版相容
 app.get('/api/rider/summary', async (req, res) => {
   try {
-    const { lineUserId } = req.query;
+    const {
+      lineUserId,
+      phone,
+      riderId,
+    } = req.query || {};
 
-    if (!lineUserId || !String(lineUserId).startsWith('U')) {
-      return res.status(400).json({
+    // ==============================
+    // 1. 驗證騎士身分
+    // ==============================
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
         success: false,
-        message: '缺少正確的騎士 LINE 身分。',
+        message: riderResult.message,
       });
     }
 
-    const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
 
-    const riderOk = !riderSnap.empty && (
-      riderSnap.docs[0].data().approved === true ||
-      riderSnap.docs[0].data().status === 'approved'
+    const identity = buildRiderApiIdentity(
+      riderDoc,
+      rider,
+      {
+        lineUserId,
+        phone,
+        riderId,
+      }
     );
 
-    if (!riderOk) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法查看統計資料。',
-      });
-    }
+    // ==============================
+    // 2. 台灣時間區間
+    // Asia/Taipei 固定 UTC+8
+    // ==============================
+    const TAIPEI_OFFSET_MS =
+      8 * 60 * 60 * 1000;
 
-    const riderDoc = riderSnap.docs[0];
-    const rider = riderDoc.data();
-
-    const now = new Date();
+    const nowMs = Date.now();
 
     const taipeiNow = new Date(
-      now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' })
+      nowMs + TAIPEI_OFFSET_MS
     );
 
-    const todayStartTaipei = new Date(
-      taipeiNow.getFullYear(),
-      taipeiNow.getMonth(),
-      taipeiNow.getDate(),
-      0,
-      0,
-      0,
-      0
-    );
+    const year =
+      taipeiNow.getUTCFullYear();
 
-    const tomorrowStartTaipei = new Date(
-      taipeiNow.getFullYear(),
-      taipeiNow.getMonth(),
-      taipeiNow.getDate() + 1,
-      0,
-      0,
-      0,
-      0
-    );
+    const month =
+      taipeiNow.getUTCMonth();
 
-    const todayStartMs = todayStartTaipei.getTime();
-    const tomorrowStartMs = tomorrowStartTaipei.getTime();
+    const date =
+      taipeiNow.getUTCDate();
 
-    const riderPhone = normalizePhone(rider.phone || '');
-const riderDocId = riderDoc.id;
+    const todayStartMs =
+      Date.UTC(
+        year,
+        month,
+        date,
+        0,
+        0,
+        0,
+        0
+      ) - TAIPEI_OFFSET_MS;
 
-const completedSnap = await db.collection('orders')
-  .where('riderLineUserId', '==', lineUserId)
-  .where('status', 'in', ['completed', 'done'])
-  .limit(500)
-  .get();
+    const tomorrowStartMs =
+      Date.UTC(
+        year,
+        month,
+        date + 1,
+        0,
+        0,
+        0,
+        0
+      ) - TAIPEI_OFFSET_MS;
 
-const completedOrders = completedSnap.docs
-  .map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  }))
-  .filter(order => {
-    if (!riderPhone && !riderDocId) return false;
+    // 最近 7 天，包含今天
+    const weekStartMs =
+      Date.UTC(
+        year,
+        month,
+        date - 6,
+        0,
+        0,
+        0,
+        0
+      ) - TAIPEI_OFFSET_MS;
 
-    const orderRiderPhone = normalizePhone(order.riderPhone || '');
-    const orderRiderDocId = String(order.riderDocId || order.riderPhone || '').trim();
+    // 本月第一天
+    const monthStartMs =
+      Date.UTC(
+        year,
+        month,
+        1,
+        0,
+        0,
+        0,
+        0
+      ) - TAIPEI_OFFSET_MS;
 
-    if (riderPhone && orderRiderPhone && orderRiderPhone === riderPhone) {
-      return true;
+    // ==============================
+    // 3. 訂單時間轉毫秒
+    // 支援 Firestore Timestamp /
+    // number / string
+    // ==============================
+    function getOrderTimeMs(order) {
+      if (!order) return 0;
+
+      const timeCandidates = [
+        order.completedAt,
+
+        order.statusTimes &&
+        order.statusTimes.completed,
+
+        order.finishedAt,
+        order.deliveredAt,
+        order.updatedAt,
+        order.createdAt,
+      ];
+
+      for (const value of timeCandidates) {
+        if (!value) continue;
+
+        if (
+          typeof value.toDate === 'function'
+        ) {
+          return value.toDate().getTime();
+        }
+
+        if (
+          typeof value.seconds === 'number'
+        ) {
+          return value.seconds * 1000;
+        }
+
+        if (
+          typeof value._seconds === 'number'
+        ) {
+          return value._seconds * 1000;
+        }
+
+        if (typeof value === 'number') {
+          return value;
+        }
+
+        if (typeof value === 'string') {
+          const parsed =
+            new Date(value).getTime();
+
+          if (Number.isFinite(parsed)) {
+            return parsed;
+          }
+        }
+      }
+
+      return 0;
     }
 
-    if (riderDocId && orderRiderDocId && orderRiderDocId === riderDocId) {
-      return true;
+    // ==============================
+    // 4. 整理查詢條件
+    //
+    // 不使用複合索引：
+    // 分別查 riderDocId / riderId /
+    // riderPhone / riderLineUserId
+    //
+    // 最後再去重複
+    // ==============================
+    const queryPairs = [];
+
+    function addQueryPair(field, value) {
+      const safeValue =
+        String(value || '').trim();
+
+      if (!safeValue) return;
+
+      const exists =
+        queryPairs.some(
+          ([oldField, oldValue]) =>
+            oldField === field &&
+            oldValue === safeValue
+        );
+
+      if (!exists) {
+        queryPairs.push([
+          field,
+          safeValue,
+        ]);
+      }
     }
 
-    return false;
-  });
+    addQueryPair(
+      'riderDocId',
+      identity.riderDocId
+    );
 
+    addQueryPair(
+      'riderId',
+      identity.riderId
+    );
+
+    addQueryPair(
+      'riderPhone',
+      identity.phone
+    );
+
+    addQueryPair(
+      'riderLineUserId',
+      identity.lineUserId
+    );
+
+    // 舊版相容：
+    // 過去有些訂單可能把 LINE userId
+    // 寫在 riderId
+    if (identity.lineUserId) {
+      addQueryPair(
+        'riderId',
+        identity.lineUserId
+      );
+
+      addQueryPair(
+        'driverId',
+        identity.lineUserId
+      );
+    }
+
+    // driverId 舊欄位相容
+    if (identity.riderId) {
+      addQueryPair(
+        'driverId',
+        identity.riderId
+      );
+    }
+
+    // ==============================
+    // 5. 查詢所有屬於這名騎士的訂單
+    // ==============================
+    const completedOrderMap =
+      new Map();
+
+    for (const [field, value] of queryPairs) {
+      try {
+        const snap = await db
+          .collection('orders')
+          .where(field, '==', value)
+          .limit(500)
+          .get();
+
+        snap.docs.forEach(doc => {
+          const order = {
+            id: doc.id,
+            ...doc.data(),
+          };
+
+          const status =
+            String(
+              order.status || ''
+            )
+              .trim()
+              .toLowerCase();
+
+          const isCompleted =
+            status === 'completed' ||
+            status === 'done';
+
+          if (!isCompleted) {
+            return;
+          }
+
+          // 再次確認訂單真的屬於這名騎士
+          if (
+            !isOrderBelongsToRider(
+              order,
+              identity
+            )
+          ) {
+            // 舊版 riderId = LINE userId 相容
+            const oldOrderRiderId =
+              String(
+                order.riderId ||
+                order.driverId ||
+                ''
+              ).trim();
+
+            if (
+              !identity.lineUserId ||
+              oldOrderRiderId !==
+                identity.lineUserId
+            ) {
+              return;
+            }
+          }
+
+          completedOrderMap.set(
+            doc.id,
+            order
+          );
+        });
+
+      } catch (queryErr) {
+        console.warn(
+          `⚠️ 騎士統計查詢失敗 field=${field}:`,
+          queryErr.message
+        );
+      }
+    }
+
+    const completedOrders =
+      Array.from(
+        completedOrderMap.values()
+      );
+
+    // ==============================
+    // 6. 統計初始化
+    // ==============================
     let todayCompleted = 0;
     let todayIncome = 0;
+
     let totalCompleted = 0;
     let totalIncome = 0;
 
     let weekIncome = 0;
     let monthIncome = 0;
+
     let pendingIncome = 0;
     let settledIncome = 0;
+
     let platformIncome = 0;
 
+    // 現金單
     let cashCollectedTotal = 0;
     let cashDueToPlatform = 0;
-    let platformPayToRider = 0;
-    
+
+    // 非現金單：
+    // 平台尚未撥給騎士的總額
+    let riderReceivable = 0;
+
+    // ==============================
+    // 7. 開始統計
+    // ==============================
     completedOrders.forEach(order => {
       totalCompleted += 1;
 
-      const income = Number(
-      order.driverFee ||
-      order.riderFee ||
-      order.fee ||
-   0
- );
+      // ------------------------------
+      // 騎士收入
+      // ------------------------------
+      const riderIncome =
+        getOrderMoneyValue(
+          order,
+          [
+            'driverFee',
+            'riderFee',
+            'riderIncome',
+            'riderEarning',
+            'riderPayout',
+            'riderShare',
+            'fee',
+          ]
+        ) || 0;
 
-const customerTotal = Number(
-  order.total ||
-  order.customerPayableTotal ||
-  order.finalTotal ||
-  0
-);
+      // ------------------------------
+      // 代墊款
+      // 不列入騎士收入
+      // ------------------------------
+      const advancePayment =
+        getOrderAdvancePaymentAmount(order);
 
-const summaryAdvancePayment =
-  getOrderAdvancePaymentAmount(order);
+      // ------------------------------
+      // 客人實際應付總額
+      // 含代墊
+      // ------------------------------
+      const customerTotal =
+        getOrderCustomerPayableTotal(order);
 
-const summaryServiceSubtotal = Math.max(
-  0,
-  Math.round(
-    Number(
-      order.serviceSubtotal ??
-      order.serviceTotal ??
-      (
-        customerTotal -
-        summaryAdvancePayment
-      )
-    ) || 0
-  )
-);
+      // ------------------------------
+      // 服務費小計
+      // 不含代墊
+      // ------------------------------
+      const directServiceSubtotal =
+        getOrderMoneyValue(
+          order,
+          [
+            'serviceSubtotal',
+            'serviceTotal',
+            'deliveryServiceFee',
+            'taskServiceFee',
+          ]
+        );
 
-const orderPlatformIncome = Math.max(
-  0,
-  Math.round(
-    Number(
-      order.platformFee ??
-      order.platformIncome ??
-      (
-        summaryServiceSubtotal -
-        income
-      )
-    ) || 0
-  )
-);
+      const serviceSubtotal =
+        directServiceSubtotal !== null
+          ? directServiceSubtotal
+          : Math.max(
+              0,
+              customerTotal -
+              advancePayment
+            );
 
-      totalIncome += income;
+      // ------------------------------
+      // 平台收入
+      //
+      // 新正式規則：
+      // 任務費 30%
+      // +
+      // 完整平台服務費
+      // ------------------------------
+      const directPlatformIncome =
+        getOrderMoneyValue(
+          order,
+          [
+            'platformFee',
+            'platformIncome',
+          ]
+        );
 
-      platformIncome += orderPlatformIncome;
+      const orderPlatformIncome =
+        directPlatformIncome !== null
+          ? directPlatformIncome
+          : Math.max(
+              0,
+              serviceSubtotal -
+              riderIncome
+            );
 
-const paymentMethodText = String(
-  order.paymentMethod ||
-  order.payMethod ||
-  order.paymentType ||
-  order.payment ||
-  order.payType ||
-  ''
-).toLowerCase();
+      // ------------------------------
+      // 累積收入
+      // ------------------------------
+      totalIncome += riderIncome;
 
-const isCashOrder =
-  paymentMethodText.includes('cash') ||
-  paymentMethodText.includes('現金');
+      platformIncome +=
+        orderPlatformIncome;
 
-const settlementStatus = String(order.settlementStatus || 'pending').toLowerCase();
+      // ------------------------------
+      // 判斷付款方式
+      // ------------------------------
+      const paymentMethodText =
+        getOrderPaymentMethod(order);
 
-if (isCashOrder) {
-  cashCollectedTotal += customerTotal;
-  cashDueToPlatform += orderPlatformIncome;
-} else {
-  if (settlementStatus === 'settled') {
-    settledIncome += income;
-  } else {
-    pendingIncome += income;
-    platformPayToRider += income;
-  }
-}
-      
-      let completedAtMs = 0;
+      const paymentStatusText =
+        getOrderPaymentStatus(order);
 
-      if (order.completedAt && typeof order.completedAt.toDate === 'function') {
-        completedAtMs = order.completedAt.toDate().getTime();
-      } else if (typeof order.completedAt === 'number') {
-        completedAtMs = order.completedAt;
-      } else if (
-        order.statusTimes &&
-        order.statusTimes.completed &&
-        typeof order.statusTimes.completed.toDate === 'function'
+      const isCashOrder =
+        order.isCashOrder === true ||
+        paymentMethodText === 'cash' ||
+        paymentMethodText.includes('cash') ||
+        paymentMethodText.includes('現金') ||
+        paymentStatusText ===
+          'cash_on_delivery' ||
+        paymentStatusText ===
+          'cash_pending' ||
+        paymentStatusText.includes('現金');
+
+      const settlementStatus =
+        String(
+          order.settlementStatus ||
+          'pending'
+        )
+          .trim()
+          .toLowerCase();
+
+      // ==============================
+      // 現金單
+      // ==============================
+      if (isCashOrder) {
+        // 騎士從客人收到的現金總額
+        cashCollectedTotal +=
+          customerTotal;
+
+        // 騎士需回繳給平台的金額
+        cashDueToPlatform +=
+          orderPlatformIncome;
+      }
+
+      // ==============================
+      // 非現金單
+      // ==============================
+      else {
+        if (
+          settlementStatus === 'settled'
+        ) {
+          settledIncome +=
+            riderIncome;
+        } else {
+          pendingIncome +=
+            riderIncome;
+
+          // 平台未來要撥給騎士：
+          // 騎士收入 + 騎士代墊款
+          riderReceivable +=
+            riderIncome +
+            advancePayment;
+        }
+      }
+
+      // ------------------------------
+      // 完成時間
+      // ------------------------------
+      const completedAtMs =
+        getOrderTimeMs(order);
+
+      if (!completedAtMs) {
+        return;
+      }
+
+      // 今日
+      if (
+        completedAtMs >= todayStartMs &&
+        completedAtMs <
+          tomorrowStartMs
       ) {
-        completedAtMs = order.statusTimes.completed.toDate().getTime();
-      } else if (typeof order.updatedAt === 'number') {
-        completedAtMs = order.updatedAt;
-      }
-
-      if (completedAtMs >= todayStartMs && completedAtMs < tomorrowStartMs) {
         todayCompleted += 1;
-        todayIncome += income;
+        todayIncome += riderIncome;
       }
-      const weekStartTaipei = new Date(todayStartTaipei);
-weekStartTaipei.setDate(todayStartTaipei.getDate() - 6);
 
-const monthStartTaipei = new Date(
-  taipeiNow.getFullYear(),
-  taipeiNow.getMonth(),
-  1,
-  0,
-  0,
-  0,
-  0
-);
+      // 最近 7 天
+      if (
+        completedAtMs >= weekStartMs &&
+        completedAtMs <
+          tomorrowStartMs
+      ) {
+        weekIncome += riderIncome;
+      }
 
-const weekStartMs = weekStartTaipei.getTime();
-const monthStartMs = monthStartTaipei.getTime();
-
-if (completedAtMs >= weekStartMs && completedAtMs < tomorrowStartMs) {
-  weekIncome += income;
-}
-
-if (completedAtMs >= monthStartMs && completedAtMs < tomorrowStartMs) {
-  monthIncome += income;
-}
+      // 本月
+      if (
+        completedAtMs >= monthStartMs &&
+        completedAtMs <
+          tomorrowStartMs
+      ) {
+        monthIncome += riderIncome;
+      }
     });
 
+    // ==============================
+    // 8. 回傳正式統計資料
+    // ==============================
     return res.json({
       success: true,
+
       rider: {
         id: riderDoc.id,
-        name: rider.name || rider.riderName || '',
-        phone: rider.phone || '',
-        vehicle: rider.vehicle || '',
+
+        riderId:
+          rider.riderId ||
+          riderDoc.id,
+
+        name:
+          rider.name ||
+          rider.riderName ||
+          '',
+
+        phone:
+          normalizePhone(
+            rider.phone ||
+            riderDoc.id ||
+            ''
+          ),
+
+        lineUserId:
+          rider.lineUserId ||
+          identity.lineUserId ||
+          '',
+
+        vehicle:
+          rider.vehicle ||
+          '',
+
         plateNumber:
           rider.plateNumber ||
           rider.plateNo ||
           rider.licensePlate ||
           '',
-        serviceArea: rider.serviceArea || rider.area || '',
-        approved: rider.approved === true || rider.status === 'approved',
-        status: rider.status || '',
-        online: rider.online === true,
-        busy: rider.busy === true,
-        currentOrderId: rider.currentOrderId || '',
+
+        serviceArea:
+          rider.serviceArea ||
+          rider.area ||
+          '',
+
+        approved:
+          rider.approved === true ||
+          rider.status === 'approved',
+
+        status:
+          rider.status ||
+          '',
+
+        online:
+          rider.online === true,
+
+        busy:
+          rider.busy === true,
+
+        currentOrderId:
+          rider.currentOrderId ||
+          '',
       },
+
       summary: {
-  todayCompleted,
-  todayIncome,
-  totalCompleted,
-  totalIncome,
+        // 今日
+        todayCompleted,
+        todayIncome,
 
-  weekIncome,
-  monthIncome,
+        // 累積
+        totalCompleted,
+        totalIncome,
 
-  pendingIncome,
-  settledIncome,
+        // 期間統計
+        weekIncome,
+        monthIncome,
 
-  platformIncome,
+        // 非現金單結算
+        pendingIncome,
+        settledIncome,
 
-  cashCollectedTotal,
-  cashDueToPlatform,
-  platformPayToRider,
-},
+        // 平台收入
+        platformIncome,
+
+        // ============================
+        // 現金單錢包
+        // ============================
+        cashCollectedTotal,
+
+        // rider.html 相容名稱
+        cashGrossCollected:
+          cashCollectedTotal,
+
+        cashCollectedAmount:
+          cashCollectedTotal,
+
+        cashCollected:
+          cashCollectedTotal,
+
+        cashReceived:
+          cashCollectedTotal,
+
+        // 騎士應回繳平台
+        cashDueToPlatform,
+
+        platformReceivable:
+          cashDueToPlatform,
+
+        riderDueToPlatform:
+          cashDueToPlatform,
+
+        // ============================
+        // 平台尚未撥給騎士
+        // ============================
+        riderReceivable,
+
+        platformPayableToRider:
+          riderReceivable,
+
+        // 舊版相容名稱
+        platformPayToRider:
+          riderReceivable,
+      },
     });
 
   } catch (err) {
-    console.error('❌ 取得騎士統計失敗：', err);
+    console.error(
+      '❌ 取得騎士統計失敗：',
+      err
+    );
 
     return res.status(500).json({
       success: false,
-      message: '取得騎士統計失敗，請稍後再試。',
+      message:
+        '取得騎士統計失敗，請稍後再試。',
       error: err.message,
     });
   }
