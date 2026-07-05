@@ -3841,9 +3841,12 @@ app.post('/api/rider/status', async (req, res) => {
 });
 
 // ===== UBee 騎士安全中心回報 API =====
+// 手機登入正式版：支援 phone / riderId / 舊 LINE 身分
 app.post('/api/rider/safety-report', async (req, res) => {
   try {
     const {
+      phone,
+      riderId,
       lineUserId,
       reportType,
       reportTitle,
@@ -3855,13 +3858,9 @@ app.post('/api/rider/safety-report', async (req, res) => {
       createdFrom,
     } = req.body || {};
 
-    if (!lineUserId || !String(lineUserId).startsWith('U')) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的騎士 LINE 身分。',
-      });
-    }
-
+    // ==============================
+    // 1. 安全回報分類
+    // ==============================
     const typeMap = {
       customer: '客人失聯 / 無法交付',
       store: '店家異常',
@@ -3870,17 +3869,47 @@ app.post('/api/rider/safety-report', async (req, res) => {
       account_system: '帳號與系統',
     };
 
-    const safeReportType = cleanText(reportType || '', 30);
+    const safeReportType = cleanText(
+      reportType || '',
+      30
+    );
+
     const safeReportTitle = cleanText(
-      reportTitle || typeMap[safeReportType] || '',
+      reportTitle ||
+      typeMap[safeReportType] ||
+      '',
       60
     );
-    const safeReportOption = cleanText(reportOption || '', 80);
-    const safeNote = cleanLongText(note || '', 500);
-    const safeOrderId = cleanText(orderId || '', 120).replace(/\//g, '');
-    const safeOrderNo = cleanText(orderNo || '', 120);
-    const safeOrderStatus = cleanText(orderStatus || '', 40);
-    const safeCreatedFrom = cleanText(createdFrom || 'rider-web', 40);
+
+    const safeReportOption = cleanText(
+      reportOption || '',
+      80
+    );
+
+    const safeNote = cleanLongText(
+      note || '',
+      500
+    );
+
+    const safeOrderId = cleanText(
+      orderId || '',
+      120
+    ).replace(/\//g, '');
+
+    const safeOrderNo = cleanText(
+      orderNo || '',
+      120
+    );
+
+    const safeOrderStatus = cleanText(
+      orderStatus || '',
+      40
+    );
+
+    const safeCreatedFrom = cleanText(
+      createdFrom || 'rider-web',
+      40
+    );
 
     if (!typeMap[safeReportType]) {
       return res.status(400).json({
@@ -3896,31 +3925,64 @@ app.post('/api/rider/safety-report', async (req, res) => {
       });
     }
 
-    const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
-
-    const riderOk = !riderSnap.empty && (
-      riderSnap.docs[0].data().approved === true ||
-      riderSnap.docs[0].data().status === 'approved'
-    );
-
-    if (!riderOk) {
-      return res.status(403).json({
-        success: false,
-        message: '你尚未通過 UBee 騎士審核，暫時無法使用安全中心回報。',
+    // ==============================
+    // 2. 驗證正式騎士身分
+    //
+    // 支援：
+    // phone
+    // riderId
+    // lineUserId
+    // ==============================
+    const riderResult =
+      await findApprovedRiderForApi({
+        phone,
+        riderId,
+        lineUserId,
       });
+
+    if (!riderResult.ok) {
+      return res
+        .status(riderResult.statusCode || 403)
+        .json({
+          success: false,
+          message:
+            riderResult.message ||
+            '騎士身分驗證失敗。',
+        });
     }
 
-    const riderDoc = riderSnap.docs[0];
-    const rider = riderDoc.data() || {};
+    const riderDoc =
+      riderResult.riderDoc;
 
+    const rider =
+      riderResult.rider || {};
+
+    // ==============================
+    // 3. 統一騎士身分
+    // ==============================
+    const identity =
+      buildRiderApiIdentity(
+        riderDoc,
+        rider,
+        {
+          phone,
+          riderId,
+          lineUserId,
+        }
+      );
+
+    // ==============================
+    // 4. 讀取關聯訂單
+    // ==============================
     let orderData = null;
 
     if (safeOrderId) {
       try {
-        const orderDoc = await db.collection('orders').doc(safeOrderId).get();
+        const orderDoc =
+          await db
+            .collection('orders')
+            .doc(safeOrderId)
+            .get();
 
         if (orderDoc.exists) {
           orderData = {
@@ -3928,57 +3990,184 @@ app.post('/api/rider/safety-report', async (req, res) => {
             ...orderDoc.data(),
           };
         }
+
       } catch (orderErr) {
-        console.warn('安全中心回報讀取訂單失敗：', orderErr.message);
+        console.warn(
+          '安全中心回報讀取訂單失敗：',
+          orderErr.message
+        );
       }
     }
 
-    const reportRef = db.collection('riderSafetyReports').doc();
-    const reportId = reportRef.id;
+    // ==============================
+    // 5. 建立安全回報
+    // ==============================
+    const reportRef =
+      db
+        .collection('riderSafetyReports')
+        .doc();
+
+    const reportId =
+      reportRef.id;
 
     const report = {
       id: reportId,
       reportId,
 
       status: 'open',
-      priority: safeReportType === 'accident' ? 'urgent' : 'normal',
 
-      reportType: safeReportType,
-      reportTitle: safeReportTitle || typeMap[safeReportType],
-      reportOption: safeReportOption,
-      note: safeNote,
+      priority:
+        safeReportType === 'accident'
+          ? 'urgent'
+          : 'normal',
 
-      riderDocId: riderDoc.id,
-      riderName: cleanText(rider.name || rider.riderName || '', 40),
-      riderPhone: normalizePhone(rider.phone || riderDoc.id || ''),
-      riderLineUserId: lineUserId,
-      riderPlateNumber: cleanText(rider.plateNumber || rider.plateNo || '', 30),
-      riderServiceArea: cleanText(rider.serviceArea || rider.area || '', 80),
+      reportType:
+        safeReportType,
 
-      orderId: orderData?.id || safeOrderId || '',
-      orderNo: cleanText(orderData?.orderNo || safeOrderNo || orderData?.id || '', 120),
-      orderStatus: cleanText(orderData?.status || safeOrderStatus || '', 40),
-      pickupAddress: cleanText(orderData?.pickupAddress || orderData?.fromAddress || '', 160),
-      dropoffAddress: cleanText(orderData?.dropoffAddress || orderData?.toAddress || '', 160),
+      reportTitle:
+        safeReportTitle ||
+        typeMap[safeReportType],
 
-      source: safeCreatedFrom,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdAtMs: Date.now(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      reportOption:
+        safeReportOption,
+
+      note:
+        safeNote,
+
+      // ==============================
+      // 騎士身分
+      // ==============================
+      riderDocId:
+        identity.riderDocId ||
+        riderDoc.id,
+
+      riderId:
+        identity.riderId ||
+        '',
+
+      riderName:
+        cleanText(
+          rider.name ||
+          rider.riderName ||
+          '',
+          40
+        ),
+
+      riderPhone:
+        identity.phone ||
+        normalizePhone(
+          rider.phone ||
+          riderDoc.id ||
+          ''
+        ),
+
+      riderLineUserId:
+        identity.lineUserId ||
+        '',
+
+      riderPlateNumber:
+        cleanText(
+          rider.plateNumber ||
+          rider.plateNo ||
+          '',
+          30
+        ),
+
+      riderServiceArea:
+        cleanText(
+          rider.serviceArea ||
+          rider.area ||
+          '',
+          80
+        ),
+
+      // ==============================
+      // 訂單資料
+      // ==============================
+      orderId:
+        orderData?.id ||
+        safeOrderId ||
+        '',
+
+      orderNo:
+        cleanText(
+          orderData?.orderNo ||
+          safeOrderNo ||
+          orderData?.id ||
+          '',
+          120
+        ),
+
+      orderStatus:
+        cleanText(
+          orderData?.status ||
+          safeOrderStatus ||
+          '',
+          40
+        ),
+
+      pickupAddress:
+        cleanText(
+          orderData?.pickupAddress ||
+          orderData?.fromAddress ||
+          '',
+          160
+        ),
+
+      dropoffAddress:
+        cleanText(
+          orderData?.dropoffAddress ||
+          orderData?.toAddress ||
+          '',
+          160
+        ),
+
+      source:
+        safeCreatedFrom,
+
+      createdAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+
+      createdAtMs:
+        Date.now(),
+
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
     };
 
     await reportRef.set(report);
 
+    // ==============================
+    // 6. 回寫訂單最後安全回報
+    // ==============================
     if (report.orderId) {
-      await db.collection('orders').doc(report.orderId).set({
-        lastSafetyReportId: reportId,
-        lastSafetyReportType: report.reportType,
-        lastSafetyReportTitle: report.reportTitle,
-        lastSafetyReportOption: report.reportOption,
-        lastSafetyReportAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      await db
+        .collection('orders')
+        .doc(report.orderId)
+        .set({
+          lastSafetyReportId:
+            reportId,
+
+          lastSafetyReportType:
+            report.reportType,
+
+          lastSafetyReportTitle:
+            report.reportTitle,
+
+          lastSafetyReportOption:
+            report.reportOption,
+
+          lastSafetyReportAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+
+        }, {
+          merge: true
+        });
     }
 
+    // ==============================
+    // 7. LINE 安全群通知
+    // ==============================
     const adminText =
 `🛡️ UBee 騎士安全中心回報
 
@@ -3988,8 +4177,9 @@ app.post('/api/rider/safety-report', async (req, res) => {
 
 騎士姓名：${report.riderName || '未提供'}
 騎士電話：${report.riderPhone || '未提供'}
+騎士 ID：${report.riderId || report.riderDocId || '未提供'}
 車牌：${report.riderPlateNumber || '未提供'}
-LINE：${report.riderLineUserId}
+LINE：${report.riderLineUserId || '未綁定'}
 
 訂單編號：${report.orderNo || report.orderId || '目前未綁定訂單'}
 訂單狀態：${report.orderStatus || '未提供'}
@@ -4000,11 +4190,26 @@ ${report.note || '未填寫'}
 回報編號：${reportId}`;
 
     try {
-      await pushToGroup(LINE_SAFETY_GROUP_ID, createTextMessage(adminText));
-      console.log('✅ 安全中心回報已推送到 LINE_SAFETY_GROUP_ID：', LINE_SAFETY_GROUP_ID);
+      await pushToGroup(
+        LINE_SAFETY_GROUP_ID,
+        createTextMessage(adminText)
+      );
+
+      console.log(
+        '✅ 安全中心回報已推送到 LINE_SAFETY_GROUP_ID：',
+        LINE_SAFETY_GROUP_ID
+      );
+
     } catch (pushErr) {
-      console.error('安全中心回報推送安全群失敗：', pushErr);
+      console.error(
+        '安全中心回報推送安全群失敗：',
+        pushErr
+      );
     }
+
+    // ==============================
+    // 8. 回傳成功
+    // ==============================
     return res.json({
       success: true,
       message: '安全中心回報已送出。',
@@ -4012,12 +4217,17 @@ ${report.note || '未填寫'}
     });
 
   } catch (err) {
-    console.error('❌ 騎士安全中心回報失敗：', err);
+    console.error(
+      '❌ 騎士安全中心回報失敗：',
+      err
+    );
 
     return res.status(500).json({
       success: false,
-      message: '安全中心回報失敗，請稍後再試。',
-      error: err.message,
+      message:
+        '安全中心回報失敗，請稍後再試。',
+      error:
+        err.message,
     });
   }
 });
