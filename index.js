@@ -5482,6 +5482,44 @@ function recalculateOrderFinancials(order) {
   order.customerTotalWithAdvance =
     customerPayableTotal;
 
+  // ==============================
+  // 現金單財務同步
+  // ==============================
+  const paymentMethod =
+    getOrderPaymentMethod(order);
+
+  const isCashOrder =
+    order.isCashOrder === true ||
+    paymentMethod === 'cash' ||
+    paymentMethod.includes('cash') ||
+    paymentMethod.includes('現金');
+
+  if (isCashOrder) {
+    // 客人最後實際要交給騎士的現金總額
+    order.cashCollectAmount =
+      customerPayableTotal;
+
+    // 現金單服務金額，不包含代墊
+    order.cashServiceNet =
+      financials.serviceSubtotal;
+
+    // 騎士收到現金後，需要回繳 UBee 的金額
+    const cashDueToPlatform = Math.max(
+      0,
+      financials.serviceSubtotal -
+      financials.driverFee
+    );
+
+    order.cashDueToPlatform =
+      cashDueToPlatform;
+
+    order.platformReceivable =
+      cashDueToPlatform;
+
+    order.riderDueToPlatform =
+      cashDueToPlatform;
+  }
+  
   return order;
 }
 
