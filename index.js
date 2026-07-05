@@ -1421,12 +1421,37 @@ const customerTotal = Number(
   0
 );
 
-const orderPlatformIncome = Number(
-  order.platformFee ||
-  order.platformIncome ||
-  order.serviceFee ||
-  (customerTotal > 0 ? Math.max(0, customerTotal - income) : 0)
+const summaryAdvancePayment =
+  getOrderAdvancePaymentAmount(order);
+
+const summaryServiceSubtotal = Math.max(
+  0,
+  Math.round(
+    Number(
+      order.serviceSubtotal ??
+      order.serviceTotal ??
+      (
+        customerTotal -
+        summaryAdvancePayment
+      )
+    ) || 0
+  )
 );
+
+const orderPlatformIncome = Math.max(
+  0,
+  Math.round(
+    Number(
+      order.platformFee ??
+      order.platformIncome ??
+      (
+        summaryServiceSubtotal -
+        income
+      )
+    ) || 0
+  )
+);
+
       totalIncome += income;
 
       platformIncome += orderPlatformIncome;
@@ -2180,9 +2205,47 @@ const directRiderIncome = Math.round(Number(
   0
 ) || 0);
 
-const riderIncome = directRiderIncome > 0
-  ? directRiderIncome
-  : Math.round(serviceNet * 0.7);
+const fallbackTaskSubtotal =
+  Math.max(
+    0,
+    Math.round(Number(order.deliveryFee || 0))
+  ) +
+  Math.max(
+    0,
+    Math.round(Number(order.speedFee || 0))
+  ) +
+  Math.max(
+    0,
+    Math.round(Number(order.upstairsFee || 0))
+  ) +
+  Math.max(
+    0,
+    Math.round(Number(order.waitingFee || 0))
+  );
+
+const fallbackServiceFee = Math.max(
+  0,
+  Math.round(Number(order.serviceFee || 0))
+);
+
+const fallbackRiderIncome =
+  fallbackTaskSubtotal > 0
+    ? Math.round(
+        fallbackTaskSubtotal *
+        Number(PRICING.driverRatio || 0.7)
+      )
+    : Math.round(
+        Math.max(
+          0,
+          serviceNet - fallbackServiceFee
+        ) *
+        Number(PRICING.driverRatio || 0.7)
+      );
+
+const riderIncome =
+  directRiderIncome > 0
+    ? directRiderIncome
+    : fallbackRiderIncome;
 
 const directCashDueToPlatform = Math.round(Number(
   order.cashDueToPlatform ??
@@ -4268,23 +4331,159 @@ function calculateDistanceTierFee(distanceKm) {
   return 130 + extraKm * 15;
 }
 
-function calculatePrice({ distanceMeters, durationSeconds, speedType, upstairsFee = 0 }) {
+// ==============================
+// UBee 唯一財務計算核心
+// ==============================
+// 正式規則：
+// 1. 任務費本體參與 70 / 30 分潤
+// 2. 平台服務費 100% 歸 UBee
+// 3. 代墊款不屬於平台收入，也不屬於騎士收入
+//
+// 任務費本體：
+// 配送費 + 急件費 + 樓層費 + 等候費
+//
+// 騎士收入：
+// 任務費本體 × 70%
+//
+// 平台收入：
+// 任務費本體剩餘 30% + 完整平台服務費
+function calculateFinancialSplit({
+  deliveryFee = 0,
+  serviceFee = 0,
+  speedFee = 0,
+  upstairsFee = 0,
+  waitingFee = 0,
+} = {}) {
+  const safeDeliveryFee = Math.max(
+    0,
+    Math.round(Number(deliveryFee || 0))
+  );
+
+  const safeServiceFee = Math.max(
+    0,
+    Math.round(Number(serviceFee || 0))
+  );
+
+  const safeSpeedFee = Math.max(
+    0,
+    Math.round(Number(speedFee || 0))
+  );
+
+  const safeUpstairsFee = Math.max(
+    0,
+    Math.round(Number(upstairsFee || 0))
+  );
+
+  const safeWaitingFee = Math.max(
+    0,
+    Math.round(Number(waitingFee || 0))
+  );
+
+  // 任務費本體：
+  // 這部分才參與騎士 70% / 平台 30%
+  const taskSubtotal =
+    safeDeliveryFee +
+    safeSpeedFee +
+    safeUpstairsFee +
+    safeWaitingFee;
+
+  // 平台服務費 100% 歸 UBee
+  const platformServiceFee = safeServiceFee;
+
+  // 服務總額，不含代墊款
+  const serviceSubtotal =
+    taskSubtotal +
+    platformServiceFee;
+
+  // 騎士只從任務費本體取得 70%
+  const driverFee = Math.round(
+    taskSubtotal * Number(PRICING.driverRatio || 0.7)
+  );
+
+  // 平台收入：
+  // 任務費剩餘部分 + 完整平台服務費
+  const platformFee = Math.max(
+    0,
+    serviceSubtotal - driverFee
+  );
+
+  return {
+    deliveryFee: safeDeliveryFee,
+    serviceFee: safeServiceFee,
+    platformServiceFee,
+
+    speedFee: safeSpeedFee,
+    upstairsFee: safeUpstairsFee,
+    waitingFee: safeWaitingFee,
+
+    taskSubtotal,
+    serviceSubtotal,
+
+    driverFee,
+    riderFee: driverFee,
+
+    platformFee,
+    platformIncome: platformFee,
+  };
+}
+
+function calculatePrice({
+  distanceMeters,
+  durationSeconds,
+  speedType,
+  upstairsFee = 0
+}) {
   const km = Number(distanceMeters || 0) / 1000;
   const minutes = Number(durationSeconds || 0) / 60;
 
   const speed = getSpeedOption(speedType);
-  const safeUpstairsFee = Math.max(0, Math.round(Number(upstairsFee || 0)));
 
-  const baseFee = Number(PRICING.baseFee || 0);
-  const distanceFee = Math.round(km * Number(PRICING.perKm || 0));
-  const timeFee = Math.round(minutes * Number(PRICING.perMinute || 0));
+  const baseFee = Math.max(
+    0,
+    Math.round(Number(PRICING.baseFee || 0))
+  );
 
-  const deliveryFee = Math.round(baseFee + distanceFee + timeFee);
-  const serviceFee = Math.round(Number(PRICING.serviceFee || 0));
-  const speedFee = Math.round(Number(speed.fee || 0));
+  const distanceFee = Math.max(
+    0,
+    Math.round(
+      km * Number(PRICING.perKm || 0)
+    )
+  );
 
-  const total = deliveryFee + serviceFee + speedFee + safeUpstairsFee;
-  const driverFee = Math.round(total * PRICING.driverRatio);
+  const timeFee = Math.max(
+    0,
+    Math.round(
+      minutes * Number(PRICING.perMinute || 0)
+    )
+  );
+
+  const deliveryFee =
+    baseFee +
+    distanceFee +
+    timeFee;
+
+  const serviceFee = Math.max(
+    0,
+    Math.round(Number(PRICING.serviceFee || 0))
+  );
+
+  const speedFee = Math.max(
+    0,
+    Math.round(Number(speed.fee || 0))
+  );
+
+  const safeUpstairsFee = Math.max(
+    0,
+    Math.round(Number(upstairsFee || 0))
+  );
+
+  const financials = calculateFinancialSplit({
+    deliveryFee,
+    serviceFee,
+    speedFee,
+    upstairsFee: safeUpstairsFee,
+    waitingFee: 0,
+  });
 
   return {
     fareMode: 'base_km_minute',
@@ -4296,29 +4495,88 @@ function calculatePrice({ distanceMeters, durationSeconds, speedType, upstairsFe
     distanceFee,
     timeFee,
 
-    deliveryFee,
-    serviceFee,
-    speedFee,
-    upstairsFee: safeUpstairsFee,
-    waitingFee: 0,
+    ...financials,
 
-    total,
-    driverFee,
-    riderFee: driverFee,
-    platformFee: total - driverFee,
+    // 此階段尚未加入代墊款
+    total: financials.serviceSubtotal,
   };
 }
 
 function recalculateOrderFinancials(order) {
-  const total =
-    Number(order.deliveryFee || 0) +
-    Number(order.serviceFee || 0) +
-    Number(order.speedFee || 0) +
-    Number(order.waitingFee || 0);
+  if (!order) {
+    return order;
+  }
 
-  order.total = Math.round(total);
-  order.driverFee = Math.round(order.total * PRICING.driverRatio);
-  order.platformFee = order.total - order.driverFee;
+  const financials = calculateFinancialSplit({
+    deliveryFee: order.deliveryFee,
+    serviceFee: order.serviceFee,
+    speedFee: order.speedFee,
+    upstairsFee: order.upstairsFee,
+    waitingFee: order.waitingFee,
+  });
+
+  const advancePayment = getOrderAdvancePaymentAmount(order);
+
+  const customerPayableTotal =
+    financials.serviceSubtotal +
+    advancePayment;
+
+  // 基本費用欄位
+  order.deliveryFee = financials.deliveryFee;
+  order.serviceFee = financials.serviceFee;
+  order.speedFee = financials.speedFee;
+  order.upstairsFee = financials.upstairsFee;
+  order.waitingFee = financials.waitingFee;
+
+  // 財務拆解
+  order.taskSubtotal = financials.taskSubtotal;
+
+  order.platformServiceFee =
+    financials.platformServiceFee;
+
+  order.serviceSubtotal =
+    financials.serviceSubtotal;
+
+  order.serviceTotal =
+    financials.serviceSubtotal;
+
+  // 騎士收入
+  order.driverFee =
+    financials.driverFee;
+
+  order.riderFee =
+    financials.riderFee;
+
+  // 平台收入
+  order.platformFee =
+    financials.platformFee;
+
+  order.platformIncome =
+    financials.platformIncome;
+
+  // 代墊款
+  order.advancePayment = advancePayment;
+  order.advanceAmount = advancePayment;
+
+  // 客人實際應付
+  order.customerPayableTotal =
+    customerPayableTotal;
+
+  order.payableTotal =
+    customerPayableTotal;
+
+  order.riderDisplayTotal =
+    customerPayableTotal;
+
+  order.total =
+    customerPayableTotal;
+
+  order.finalTotal =
+    customerPayableTotal;
+
+  order.customerTotalWithAdvance =
+    customerPayableTotal;
+
   return order;
 }
 
@@ -4948,27 +5206,77 @@ app.get('/api/quote', async (req, res) => {
       ? PRICING.queueLongTaskExtraFee
       : 0;
 
-  const waitingFee = queueTimeFee + longTaskExtraFee;
-  const serviceFee = PRICING.serviceFee;
-  const deliveryFee = PRICING.queueBaseFee;
-  const speedFee = speed.fee || 0;
+  const waitingFee =
+    queueTimeFee +
+    longTaskExtraFee;
 
-  const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
-  const driverFee = Math.round(total * PRICING.driverRatio);
+  const serviceFee = Math.max(
+    0,
+    Math.round(Number(PRICING.serviceFee || 0))
+  );
 
-  price = {
-    fareMode: 'queue',
+  const deliveryFee = Math.max(
+    0,
+    Math.round(Number(PRICING.queueBaseFee || 0))
+  );
+
+  const speedFee = Math.max(
+    0,
+    Math.round(Number(speed.fee || 0))
+  );
+
+  const financials = calculateFinancialSplit({
     deliveryFee,
     serviceFee,
     speedFee,
     upstairsFee,
     waitingFee,
+  });
+
+  price = {
+    fareMode: 'queue',
+
+    deliveryFee:
+      financials.deliveryFee,
+
+    serviceFee:
+      financials.serviceFee,
+
+    platformServiceFee:
+      financials.platformServiceFee,
+
+    speedFee:
+      financials.speedFee,
+
+    upstairsFee:
+      financials.upstairsFee,
+
+    waitingFee:
+      financials.waitingFee,
+
     queueTimeFee,
     longTaskExtraFee,
-    total,
-    driverFee,
-    riderFee: driverFee,
-    platformFee: total - driverFee,
+
+    taskSubtotal:
+      financials.taskSubtotal,
+
+    serviceSubtotal:
+      financials.serviceSubtotal,
+
+    total:
+      financials.serviceSubtotal,
+
+    driverFee:
+      financials.driverFee,
+
+    riderFee:
+      financials.riderFee,
+
+    platformFee:
+      financials.platformFee,
+
+    platformIncome:
+      financials.platformIncome,
   };
 } else {
       if (!from || !to) {
@@ -5363,9 +5671,20 @@ app.post('/api/orders', async (req, res) => {
     });
   }
 
-  const deliveryFee = PRICING.queueBaseFee;
-  const serviceFee = PRICING.serviceFee;
-  const upstairsFee = Math.max(0, Math.round(Number(data.upstairsFee || 0)));
+  const deliveryFee = Math.max(
+    0,
+    Math.round(Number(PRICING.queueBaseFee || 0))
+  );
+
+  const serviceFee = Math.max(
+    0,
+    Math.round(Number(PRICING.serviceFee || 0))
+  );
+
+  const upstairsFee = Math.max(
+    0,
+    Math.round(Number(data.upstairsFee || 0))
+  );
 
   const queueTimeFee = Math.max(
     0,
@@ -5377,29 +5696,71 @@ app.post('/api/orders', async (req, res) => {
       ? PRICING.queueLongTaskExtraFee
       : 0;
 
-  const waitingFee = queueTimeFee + longTaskExtraFee;
+  const waitingFee =
+    queueTimeFee +
+    longTaskExtraFee;
 
-  const speed = getSpeedOption(data.speedType || 'standard');
-  const speedFee = speed.fee || 0;
+  const speed = getSpeedOption(
+    data.speedType || 'standard'
+  );
 
-  const total = deliveryFee + waitingFee + serviceFee + speedFee + upstairsFee;
-  const driverFee = Math.round(total * PRICING.driverRatio);
+  const speedFee = Math.max(
+    0,
+    Math.round(Number(speed.fee || 0))
+  );
 
-  price = {
-    fareMode: 'queue',
+  const financials = calculateFinancialSplit({
     deliveryFee,
     serviceFee,
     speedFee,
     upstairsFee,
-
     waitingFee,
+  });
+
+  price = {
+    fareMode: 'queue',
+
+    deliveryFee:
+      financials.deliveryFee,
+
+    serviceFee:
+      financials.serviceFee,
+
+    platformServiceFee:
+      financials.platformServiceFee,
+
+    speedFee:
+      financials.speedFee,
+
+    upstairsFee:
+      financials.upstairsFee,
+
+    waitingFee:
+      financials.waitingFee,
+
     queueTimeFee,
     longTaskExtraFee,
 
-    total,
-    driverFee,
-    riderFee: driverFee,
-    platformFee: total - driverFee,
+    taskSubtotal:
+      financials.taskSubtotal,
+
+    serviceSubtotal:
+      financials.serviceSubtotal,
+
+    total:
+      financials.serviceSubtotal,
+
+    driverFee:
+      financials.driverFee,
+
+    riderFee:
+      financials.riderFee,
+
+    platformFee:
+      financials.platformFee,
+
+    platformIncome:
+      financials.platformIncome,
   };
 }else {
   distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
