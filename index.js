@@ -1647,59 +1647,123 @@ app.get('/api/rider/summary', async (req, res) => {
       totalCompleted += 1;
 
       // ------------------------------
-      // 騎士收入
-      // ------------------------------
-      const riderIncome =
-        getOrderMoneyValue(
-          order,
-          [
-            'driverFee',
-            'riderFee',
-            'riderIncome',
-            'riderEarning',
-            'riderPayout',
-            'riderShare',
-            'fee',
-          ]
-        ) || 0;
+// 代墊款
+// 不列入騎士收入
+// ------------------------------
+const advancePayment =
+  getOrderAdvancePaymentAmount(order);
 
-      // ------------------------------
-      // 代墊款
-      // 不列入騎士收入
-      // ------------------------------
-      const advancePayment =
-        getOrderAdvancePaymentAmount(order);
+// ------------------------------
+// 客人實際應付總額
+// 含代墊
+// ------------------------------
+const customerTotal =
+  getOrderCustomerPayableTotal(order);
 
-      // ------------------------------
-      // 客人實際應付總額
-      // 含代墊
-      // ------------------------------
-      const customerTotal =
-        getOrderCustomerPayableTotal(order);
+// ------------------------------
+// 服務費小計
+// 不含代墊
+// ------------------------------
+const directServiceSubtotal =
+  getOrderMoneyValue(
+    order,
+    [
+      'serviceSubtotal',
+      'serviceTotal',
+      'deliveryServiceFee',
+      'taskServiceFee',
+    ]
+  );
 
-      // ------------------------------
-      // 服務費小計
-      // 不含代墊
-      // ------------------------------
-      const directServiceSubtotal =
-        getOrderMoneyValue(
-          order,
-          [
-            'serviceSubtotal',
-            'serviceTotal',
-            'deliveryServiceFee',
-            'taskServiceFee',
-          ]
-        );
+const serviceSubtotal =
+  directServiceSubtotal !== null
+    ? directServiceSubtotal
+    : Math.max(
+        0,
+        customerTotal -
+        advancePayment
+      );
 
-      const serviceSubtotal =
-        directServiceSubtotal !== null
-          ? directServiceSubtotal
+// ------------------------------
+// 騎士收入
+//
+// 第一優先：使用訂單已儲存的正式騎士收入
+//
+// 第二優先：如果是舊訂單沒有 driverFee / riderFee，
+// 就從 taskSubtotal 或費用明細重新計算
+// ------------------------------
+const directRiderIncome =
+  getOrderMoneyValue(
+    order,
+    [
+      'driverFee',
+      'riderFee',
+      'riderIncome',
+      'riderEarning',
+      'riderPayout',
+      'riderShare',
+      'fee',
+    ]
+  );
+
+const directTaskSubtotal =
+  getOrderMoneyValue(
+    order,
+    [
+      'taskSubtotal',
+    ]
+  );
+
+const fallbackTaskSubtotal =
+  Math.max(
+    0,
+    Math.round(Number(order.deliveryFee || 0))
+  ) +
+  Math.max(
+    0,
+    Math.round(Number(order.speedFee || 0))
+  ) +
+  Math.max(
+    0,
+    Math.round(Number(order.upstairsFee || 0))
+  ) +
+  Math.max(
+    0,
+    Math.round(Number(order.waitingFee || 0))
+  );
+
+const platformServiceFee =
+  getOrderMoneyValue(
+    order,
+    [
+      'platformServiceFee',
+      'serviceFee',
+    ]
+  ) || 0;
+
+const calculatedTaskSubtotal =
+  directTaskSubtotal !== null
+    ? directTaskSubtotal
+    : (
+        fallbackTaskSubtotal > 0
+          ? fallbackTaskSubtotal
           : Math.max(
               0,
-              customerTotal -
-              advancePayment
-            );
+              serviceSubtotal -
+              platformServiceFee
+            )
+      );
+
+const fallbackRiderIncome =
+  Math.round(
+    calculatedTaskSubtotal *
+    Number(PRICING.driverRatio || 0.7)
+  );
+
+const riderIncome =
+  directRiderIncome !== null
+    ? directRiderIncome
+    : fallbackRiderIncome;
 
       // ------------------------------
       // 平台收入
