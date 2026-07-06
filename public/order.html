@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="UBee">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#ffffff">
 
   <title>UBee 跑腿｜建立任務</title>
 
@@ -19,23 +19,29 @@
 
   <style>
 :root{
-  --bg:#000;
-  --card:#101010;
-  --card2:#171717;
-  --card3:#202020;
-  --text:#fff;
-  --muted:#a8a8a8;
-  --muted2:#777;
-  --line:#2a2a2a;
-  --line2:#3a3a3a;
+  --bg:#f7f7f5;
+  --card:#ffffff;
+  --card2:#f7f7f7;
+  --card3:#eeeeec;
+
+  --text:#111111;
+  --muted:#737373;
+  --muted2:#9a9a9a;
+
+  --line:#e7e7e5;
+  --line2:#d6d6d3;
+
   --accent:#facc15;
-  --accentText:#111;
+  --accentText:#111111;
+
   --primary:#facc15;
   --primary2:#fbbf24;
-  --primaryText:#111;
+  --primaryText:#111111;
+
   --green:#22c55e;
   --red:#ef4444;
   --blue:#38bdf8;
+
   --radius:22px;
 }
 
@@ -654,8 +660,8 @@ select{
 }
 
 select option{
-  background:#111;
-  color:#fff;
+  background:#fff;
+  color:#111;
 }
 
 body.day-mode select option{
@@ -1597,7 +1603,7 @@ textarea::placeholder{
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:8px;
-  background:rgba(20,20,20,.94);
+  background:rgba(255,255,255,.94);
   border:1px solid var(--line);
   border-radius:24px;
   padding:8px;
@@ -1673,6 +1679,917 @@ body.day-mode .bottom-tabs{
     font-size:10px;
   }
 }
+/* ==============================
+   UBee 新版 STEP 1｜地圖首頁
+   ============================== */
+
+.step1-map-hero{
+  position:relative;
+  width:calc(100% + 32px);
+  margin-left:-16px;
+  margin-right:-16px;
+  margin-top:-6px;
+  margin-bottom:22px;
+  overflow:hidden;
+  background:#ecebe7;
+}
+
+.step1-map-canvas{
+  position:relative;
+  width:100%;
+  height:330px;
+  min-height:330px;
+  background:
+    linear-gradient(
+      135deg,
+      #ecebe7 0%,
+      #f5f4f0 50%,
+      #e8e7e2 100%
+    );
+}
+
+#customerMap{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  background:#ecebe7;
+}
+
+.step1-map-loading{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+  color:#777;
+  font-size:13px;
+  font-weight:900;
+  text-align:center;
+  padding:20px;
+}
+
+.step1-map-loading.hidden{
+  display:none;
+}
+
+.step1-map-header{
+  position:absolute;
+  z-index:4;
+  left:16px;
+  right:16px;
+  top:calc(10px + env(safe-area-inset-top));
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  pointer-events:none;
+}
+
+.step1-map-brand{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:44px;
+  padding:8px 13px;
+  border-radius:999px;
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 8px 24px rgba(0,0,0,.10);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  pointer-events:auto;
+}
+
+.step1-map-brand-logo{
+  width:28px;
+  height:28px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--accent);
+  color:#111;
+  font-size:15px;
+  font-weight:1000;
+}
+
+.step1-map-brand-text{
+  font-size:17px;
+  font-weight:1000;
+  color:#111;
+  letter-spacing:-.3px;
+}
+
+.step1-map-location{
+  min-height:44px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 13px;
+  border-radius:999px;
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 8px 24px rgba(0,0,0,.10);
+  color:#111;
+  font-size:13px;
+  font-weight:1000;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  pointer-events:auto;
+}
+
+.step1-map-location-dot{
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:var(--green);
+  box-shadow:0 0 0 4px rgba(34,197,94,.14);
+}
+
+.step1-map-center-btn{
+  position:absolute;
+  z-index:4;
+  right:16px;
+  bottom:78px;
+  width:46px;
+  height:46px;
+  border:none;
+  border-radius:16px;
+  background:#fff;
+  color:#111;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.14);
+  font-size:20px !important;
+}
+
+.step1-map-status{
+  position:absolute;
+  z-index:4;
+  left:16px;
+  bottom:78px;
+  max-width:calc(100% - 86px);
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  padding:9px 13px;
+  border-radius:14px;
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 8px 24px rgba(0,0,0,.10);
+  color:#666;
+  font-size:12px;
+  font-weight:900;
+  line-height:1.45;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+}
+
+.step1-map-sheet{
+  position:relative;
+  z-index:5;
+  margin:-58px 12px 0;
+  padding:20px 16px 18px;
+  border-radius:26px 26px 0 0;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.05);
+  box-shadow:0 -8px 28px rgba(0,0,0,.08);
+}
+
+.step1-map-sheet-handle{
+  width:42px;
+  height:5px;
+  border-radius:999px;
+  background:#dededb;
+  margin:0 auto 16px;
+}
+
+.step1-map-sheet-title{
+  font-size:24px;
+  font-weight:1000;
+  line-height:1.25;
+  letter-spacing:-.6px;
+  color:#111;
+}
+
+.step1-map-sheet-sub{
+  margin-top:7px;
+  color:#7b7b7b;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.6;
+}
+
+@media(max-width:380px){
+  .step1-map-hero{
+    width:calc(100% + 24px);
+    margin-left:-12px;
+    margin-right:-12px;
+  }
+
+  .step1-map-canvas{
+    height:300px;
+    min-height:300px;
+  }
+
+  .step1-map-header{
+    left:12px;
+    right:12px;
+  }
+
+  .step1-map-brand{
+    padding:7px 10px;
+  }
+
+  .step1-map-location{
+    padding:7px 10px;
+  }
+
+  .step1-map-sheet{
+    margin-left:8px;
+    margin-right:8px;
+  }
+}
+
+/* =========================================
+   UBee 2026 客戶端全面改版
+   ========================================= */
+
+.app{
+  max-width:520px;
+  padding:
+    calc(14px + env(safe-area-inset-top))
+    14px
+    120px;
+  background:#f5f6f7;
+}
+
+/* ---------- Topbar ---------- */
+
+.topbar{
+  position:relative;
+  z-index:50;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+}
+
+.icon-btn{
+  width:42px;
+  height:42px;
+  border:1px solid #e6e7e9;
+  border-radius:15px;
+  background:#fff;
+  color:#111;
+  box-shadow:0 6px 18px rgba(17,24,39,.06);
+}
+
+.brand{
+  color:#111;
+}
+
+.page-count{
+  color:#777;
+}
+
+/* ---------- STEP 1 地圖 ---------- */
+
+.home-map-shell{
+  position:relative;
+  width:calc(100% + 28px);
+  height:340px;
+  margin:
+    -4px
+    -14px
+    0;
+  overflow:hidden;
+  background:#e8eaed;
+}
+
+.map-canvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  background:#e8eaed;
+}
+
+.map-placeholder{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:30px;
+  text-align:center;
+  background:
+    linear-gradient(
+      135deg,
+      #e7e9eb,
+      #f3f4f4
+    );
+  color:#777;
+  transition:
+    opacity .2s ease,
+    visibility .2s ease;
+}
+
+.map-placeholder strong{
+  color:#444;
+  font-size:15px;
+  font-weight:1000;
+}
+
+.map-placeholder small{
+  max-width:280px;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.6;
+}
+
+.map-placeholder.is-ready{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
+
+.map-location-pill{
+  position:absolute;
+  z-index:4;
+  top:14px;
+  left:14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  border-radius:999px;
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(17,24,39,.06);
+  box-shadow:0 8px 24px rgba(17,24,39,.12);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  color:#111;
+  font-size:13px;
+  font-weight:1000;
+}
+
+.map-location-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#22c55e;
+  box-shadow:0 0 0 4px rgba(34,197,94,.15);
+}
+
+.route-badge{
+  position:absolute;
+  z-index:4;
+  top:14px;
+  right:14px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:2px;
+  padding:9px 12px;
+  border-radius:14px;
+  background:rgba(255,255,255,.95);
+  border:1px solid rgba(17,24,39,.06);
+  box-shadow:0 8px 24px rgba(17,24,39,.12);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+}
+
+.route-badge strong{
+  color:#111;
+  font-size:14px;
+  font-weight:1000;
+}
+
+.route-badge span{
+  color:#777;
+  font-size:11px;
+  font-weight:900;
+}
+
+.map-current-btn{
+  position:absolute;
+  z-index:5;
+  right:14px;
+  bottom:74px;
+  width:46px;
+  height:46px;
+  border:none;
+  border-radius:16px;
+  background:#fff;
+  color:#111;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 8px 24px rgba(17,24,39,.16);
+}
+
+.map-current-btn svg{
+  width:22px;
+  height:22px;
+}
+
+/* ---------- STEP 1 任務面板 ---------- */
+
+.task-sheet{
+  position:relative;
+  z-index:8;
+  margin:
+    -58px
+    -2px
+    0;
+  padding:
+    14px
+    16px
+    20px;
+  border-radius:28px 28px 0 0;
+  background:#fff;
+  box-shadow:0 -10px 35px rgba(17,24,39,.09);
+}
+
+.task-sheet-handle{
+  width:42px;
+  height:5px;
+  margin:0 auto 16px;
+  border-radius:999px;
+  background:#dedede;
+}
+
+.task-sheet-title{
+  color:#111;
+  font-size:25px;
+  font-weight:1000;
+  line-height:1.25;
+  letter-spacing:-.7px;
+}
+
+.task-sheet-sub{
+  margin-top:6px;
+  color:#7b7b7b;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.6;
+}
+
+/* ---------- 六大服務 ---------- */
+
+.category-tabs{
+  display:flex;
+  grid-template-columns:none;
+  gap:8px;
+  width:100%;
+  margin:18px 0;
+  padding:0 0 4px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+
+.category-tabs::-webkit-scrollbar{
+  display:none;
+}
+
+.category-tab{
+  flex:0 0 auto;
+  min-height:auto;
+  padding:10px 15px;
+  border:1px solid #e6e7e9;
+  border-radius:999px;
+  background:#f7f7f7;
+  color:#666;
+  box-shadow:none;
+  white-space:nowrap;
+  text-align:center;
+  display:block;
+  font-size:13px;
+  font-weight:1000;
+}
+
+.category-tab .tab-icon,
+.category-tab .tab-desc{
+  display:none;
+}
+
+.category-tab .tab-text{
+  display:inline;
+}
+
+.category-tab.active{
+  border-color:#111;
+  background:#111;
+  color:#fff;
+  box-shadow:none;
+}
+
+/* ---------- 地址卡 ---------- */
+
+.address-card{
+  border:1px solid #e6e7e9;
+  border-radius:20px;
+  background:#fff;
+  overflow:hidden;
+  box-shadow:0 8px 24px rgba(17,24,39,.05);
+}
+
+.address-row{
+  display:grid;
+  grid-template-columns:18px 1fr;
+  gap:11px;
+  align-items:center;
+  padding:14px 15px;
+  border-bottom:1px solid #eeeeee;
+}
+
+.address-row:last-child{
+  border-bottom:none;
+}
+
+.address-dot{
+  width:12px;
+  height:12px;
+  border-radius:50%;
+}
+
+.address-dot.pickup{
+  background:#111;
+  box-shadow:0 0 0 4px rgba(17,17,17,.08);
+}
+
+.address-dot.dropoff{
+  background:#f4bd00;
+  box-shadow:0 0 0 4px rgba(244,189,0,.16);
+}
+
+.address-main{
+  min-width:0;
+}
+
+.address-label{
+  margin-bottom:4px;
+  color:#8a8a8a;
+  font-size:11px;
+  font-weight:1000;
+}
+
+.address-main input{
+  color:#111;
+  font-size:15px;
+  font-weight:900;
+}
+
+/* ---------- 任務細項 ---------- */
+
+.section-label{
+  margin:18px 0 10px;
+  color:#222;
+  font-size:14px;
+  font-weight:1000;
+}
+
+.service-grid-new{
+  display:flex;
+  flex-wrap:wrap;
+  grid-template-columns:none;
+  gap:8px;
+  margin-bottom:12px;
+}
+
+.service-item{
+  width:auto;
+  min-height:0;
+  padding:10px 13px;
+  border:1px solid #e4e5e7;
+  border-radius:999px;
+  background:#f7f7f7;
+  box-shadow:none;
+}
+
+.service-item.active{
+  border-color:#111;
+  background:#111;
+  box-shadow:none;
+}
+
+.service-item-icon{
+  display:none;
+}
+
+.service-item-title{
+  color:#555;
+  font-size:12px;
+  font-weight:1000;
+}
+
+.service-item.active .service-item-title{
+  color:#fff;
+}
+
+.category-choice-box{
+  margin:10px 0 14px;
+  padding:13px;
+  border:1px solid #ececec;
+  border-radius:18px;
+  background:#fafafa;
+}
+
+.category-choice-title{
+  margin-bottom:10px;
+  color:#555;
+  font-size:12px;
+}
+
+.category-choice-grid{
+  display:flex;
+  flex-wrap:wrap;
+  grid-template-columns:none;
+  gap:7px;
+}
+
+.category-choice-item{
+  width:auto;
+  padding:9px 11px;
+  border:1px solid #e3e4e6;
+  border-radius:999px;
+  background:#fff;
+  color:#666;
+  font-size:12px;
+}
+
+.category-choice-item.active{
+  border-color:#f4bd00;
+  background:#fff4b5;
+  color:#111;
+}
+
+/* ---------- 首頁估價 ---------- */
+
+.home-estimate{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-top:16px;
+  padding:14px 0;
+  border-top:1px solid #eeeeee;
+}
+
+.home-estimate-label{
+  color:#111;
+  font-size:13px;
+  font-weight:1000;
+}
+
+.home-estimate-meta{
+  margin-top:4px;
+  color:#999;
+  font-size:11px;
+  font-weight:800;
+}
+
+.home-estimate-amount{
+  color:#111;
+  font-size:22px;
+  font-weight:1000;
+  white-space:nowrap;
+}
+
+.home-next-btn{
+  width:100%;
+  border:none;
+  border-radius:17px;
+  padding:16px;
+  background:#facc15;
+  color:#111;
+  font-size:16px !important;
+  font-weight:1000;
+}
+
+/* ---------- STEP 2 ---------- */
+
+#step2 .headline,
+#step3 .headline,
+#step4 .headline{
+  margin-top:6px;
+}
+
+.form-section{
+  margin-bottom:16px;
+}
+
+.input-card{
+  border:1px solid #e6e7e9;
+  background:#fff;
+  box-shadow:0 8px 24px rgba(17,24,39,.04);
+}
+
+.input-wrap{
+  padding:14px;
+}
+
+.input-icon{
+  width:30px;
+  height:30px;
+  flex:0 0 30px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#f3f3f3;
+  color:#555;
+  font-size:12px;
+  font-weight:1000;
+}
+
+/* ---------- STEP 3 ---------- */
+
+.speed-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.speed-card{
+  margin:0;
+  padding:17px;
+  border:1px solid #e6e7e9;
+  background:#fff;
+  box-shadow:0 8px 24px rgba(17,24,39,.04);
+}
+
+.speed-card.active{
+  border-color:#111;
+  background:#fff;
+  box-shadow:0 0 0 2px #111;
+}
+
+.speed-name{
+  color:#111;
+  font-size:19px;
+}
+
+.speed-time{
+  margin-top:4px;
+  color:#777;
+  font-size:12px;
+  font-weight:900;
+}
+
+.speed-card.active .speed-check{
+  background:#111;
+  border-color:#111;
+  color:#fff;
+}
+
+/* ---------- STEP 4 地圖 ---------- */
+
+#step4{
+  padding-bottom:155px;
+}
+
+.review-map-shell{
+  position:relative;
+  width:100%;
+  height:250px;
+  margin:10px 0 14px;
+  overflow:hidden;
+  border-radius:22px;
+  background:#e8eaed;
+  border:1px solid #e1e2e4;
+}
+
+.review-route-badge{
+  position:absolute;
+  z-index:4;
+  left:12px;
+  bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(255,255,255,.95);
+  box-shadow:0 8px 24px rgba(17,24,39,.13);
+  backdrop-filter:blur(12px);
+}
+
+.review-route-badge strong{
+  color:#111;
+  font-size:14px;
+  font-weight:1000;
+}
+
+.review-route-badge span{
+  color:#777;
+  font-size:12px;
+  font-weight:900;
+}
+
+.summary-card{
+  border:1px solid #e6e7e9;
+  background:#fff;
+  border-radius:22px;
+  box-shadow:0 10px 30px rgba(17,24,39,.06);
+}
+
+.summary-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:12px;
+  align-items:center;
+  padding:14px 15px;
+}
+
+.summary-icon{
+  display:none;
+}
+
+.summary-arrow{
+  color:#b3b6ba;
+  font-size:22px;
+  line-height:1;
+}
+
+.review-sticky-footer{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:calc(78px + env(safe-area-inset-bottom));
+  z-index:88;
+  width:calc(100% - 24px);
+  max-width:500px;
+  display:grid;
+  grid-template-columns:1fr minmax(138px,auto);
+  gap:10px;
+  align-items:center;
+  padding:11px;
+  border:1px solid #e1e2e4;
+  border-radius:22px;
+  background:rgba(255,255,255,.97);
+  box-shadow:0 18px 42px rgba(17,24,39,.16);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+}
+
+.review-total-label{
+  color:#888;
+  font-size:11px;
+  font-weight:900;
+  margin-bottom:3px;
+}
+
+.review-total-value{
+  color:#111;
+  font-size:22px;
+  font-weight:1000;
+  white-space:nowrap;
+}
+
+/* ---------- Bottom Tabs ---------- */
+
+.bottom-tabs{
+  background:rgba(255,255,255,.96);
+  box-shadow:0 12px 35px rgba(17,24,39,.13);
+}
+
+/* ---------- 響應式 ---------- */
+
+@media(max-width:380px){
+  .home-map-shell{
+    width:calc(100% + 24px);
+    height:310px;
+    margin-left:-12px;
+    margin-right:-12px;
+  }
+
+  .task-sheet{
+    margin-left:-2px;
+    margin-right:-2px;
+    padding-left:13px;
+    padding-right:13px;
+  }
+
+  .task-sheet-title{
+    font-size:23px;
+  }
+
+  .review-sticky-footer{
+    grid-template-columns:1fr 132px;
+  }
+}
   </style>
 </head>
 
@@ -1689,104 +2606,245 @@ body.day-mode .bottom-tabs{
     </div>
 
     <section class="step active" id="step1">
-      <div class="hero-card">
-        <div class="hero-kicker">UBee 跑腿</div>
-        <div class="hero-title">今天需要 UBee<br>幫你完成什麼？</div>
-        <div class="hero-sub">有事找 UBee，生活小事都幫你</div>
-        <button class="hero-btn" type="button" onclick="document.getElementById('serviceArea').scrollIntoView({behavior:'smooth'})">
-          開始下單 <span>›</span>
-        </button>
-        <div class="hero-illust">🐝</div>
-      </div>
 
-      <div id="merchantInfoBox" class="merchant-card hidden"></div>
+  <div class="home-map-shell">
 
-      <div class="section-label">選擇你要的服務</div>
+    <div id="customerMap" class="map-canvas"></div>
 
-      <div class="category-tabs">
-        <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">
-          <span class="tab-icon">🚚</span>
-          <span>
-            <span class="tab-text">幫我送</span>
-            <span class="tab-desc">文件、包裹、物品配送</span>
-          </span>
-        </button>
+    <div id="homeMapPlaceholder" class="map-placeholder">
+      <strong>正在準備 UBee 地圖</strong>
+      <small>
+        地圖暫時無法使用時，
+        不會影響 LINE 登入、填寫任務與付款流程。
+      </small>
+    </div>
 
-        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">
-          <span class="tab-icon">📦</span>
-          <span>
-            <span class="tab-text">幫我取</span>
-            <span class="tab-desc">包裹、文件、門市取件</span>
-          </span>
-        </button>
+    <div class="map-location-pill">
+      <span class="map-location-dot"></span>
+      台中市
+    </div>
 
-        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">
-          <span class="tab-icon">🛍️</span>
-          <span>
-            <span class="tab-text">幫代買</span>
-            <span class="tab-desc">餐點、飲料、生活用品</span>
-          </span>
-        </button>
+    <div id="homeRouteBadge" class="route-badge hidden">
+      <strong id="homeRouteDistance">-</strong>
+      <span id="homeRouteDuration">-</span>
+    </div>
 
-        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'queue')">
-          <span class="tab-icon">⏳</span>
-          <span>
-            <span class="tab-text">幫排隊</span>
-            <span class="tab-desc">餐廳、醫院、銀行、活動</span>
-          </span>
-        </button>
+    <button
+      class="map-current-btn"
+      type="button"
+      onclick="focusCurrentLocation()"
+      aria-label="回到目前位置"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M12 2v3"></path>
+        <path d="M12 19v3"></path>
+        <path d="M2 12h3"></path>
+        <path d="M19 12h3"></path>
+      </svg>
+    </button>
 
-        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'helper')">
-          <span class="tab-icon">⭐</span>
-          <span>
-            <span class="tab-text">全能跑腿</span>
-            <span class="tab-desc">想不到分類，就交給 UBee 跑腿</span>
-          </span>
-        </button>
+  </div>
 
-        <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">
-          <span class="tab-icon">⚡</span>
-          <span>
-            <span class="tab-text">急件專送</span>
-            <span class="tab-desc">限時、急送、快速處理</span>
-          </span>
-        </button>
-      </div>
+  <div class="task-sheet">
 
-      <div id="serviceArea" class="section-label">請選擇細項</div>
+    <div class="task-sheet-handle"></div>
 
-      <div class="service-grid-new" id="serviceGrid"></div>
+    <div class="task-sheet-title">
+      今天需要 UBee 幫你完成什麼？
+    </div>
 
-      <div id="serviceCategoryBox" class="category-choice-box hidden">
-        <div class="category-choice-title" id="serviceCategoryTitle">請選擇分類</div>
-        <div class="category-choice-grid" id="serviceCategoryGrid"></div>
-      </div>
+    <div class="task-sheet-sub">
+      先選任務類型，再填取件與送達位置。
+    </div>
 
-      <div class="trust-strip">
-        <div class="trust-item">
-          <div class="trust-icon">🧑‍💼</div>
-          <div class="trust-title">專人處理</div>
-          <div class="trust-desc">由合作騎士執行</div>
+    <div id="merchantInfoBox" class="merchant-card hidden"></div>
+
+    <div class="category-tabs">
+
+      <button
+        class="category-tab active"
+        type="button"
+        onclick="selectServiceFromTab(this,'send')"
+      >
+        幫我送
+      </button>
+
+      <button
+        class="category-tab"
+        type="button"
+        onclick="selectServiceFromTab(this,'pickup')"
+      >
+        幫我取
+      </button>
+
+      <button
+        class="category-tab"
+        type="button"
+        onclick="selectServiceFromTab(this,'buy')"
+      >
+        幫代買
+      </button>
+
+      <button
+        class="category-tab"
+        type="button"
+        onclick="selectServiceFromTab(this,'queue')"
+      >
+        幫排隊
+      </button>
+
+      <button
+        class="category-tab"
+        type="button"
+        onclick="selectServiceFromTab(this,'helper')"
+      >
+        全能跑腿
+      </button>
+
+      <button
+        class="category-tab"
+        type="button"
+        onclick="selectServiceFromTab(this,'urgent')"
+      >
+        急件專送
+      </button>
+
+    </div>
+
+    <div class="section-label">
+      路線
+    </div>
+
+    <div class="address-card">
+
+      <div class="address-row">
+        <span class="address-dot pickup"></span>
+
+        <div class="address-main">
+          <div
+            class="address-label"
+            id="pickupTitle"
+          >
+            取件資訊
+          </div>
+
+          <input
+            id="pickup"
+            maxlength="120"
+            autocomplete="street-address"
+            placeholder="輸入取件地址 / 店家地址"
+          >
         </div>
-        <div class="trust-item">
-          <div class="trust-icon">⏱️</div>
-          <div class="trust-title">即時追蹤</div>
-          <div class="trust-desc">任務進度清楚掌握</div>
-        </div>
-        <div class="trust-item">
-          <div class="trust-icon">🛡️</div>
-          <div class="trust-title">正式營運</div>
-          <div class="trust-desc">確認現金單後派單</div>
+      </div>
+
+      <div class="address-row">
+        <span class="address-dot dropoff"></span>
+
+        <div class="address-main">
+          <div
+            class="address-label"
+            id="dropoffTitle"
+          >
+            送達資訊
+          </div>
+
+          <input
+            id="dropoff"
+            maxlength="120"
+            autocomplete="street-address"
+            placeholder="輸入送達地址 / 交付地點"
+          >
         </div>
       </div>
 
-      <div class="info-box">
-        <div class="info-title">服務說明</div>
-        <div class="info-text" id="serviceDescription">
-          選擇服務類型後，系統會依照任務內容帶出對應欄位，協助你快速建立配送、代取、代買、排隊與生活跑腿任務。
+    </div>
+
+    <div id="serviceArea" class="section-label">
+      任務細項
+    </div>
+
+    <div
+      class="service-grid-new"
+      id="serviceGrid"
+    ></div>
+
+    <div
+      id="serviceCategoryBox"
+      class="category-choice-box hidden"
+    >
+      <div
+        class="category-choice-title"
+        id="serviceCategoryTitle"
+      >
+        請選擇分類
+      </div>
+
+      <div
+        class="category-choice-grid"
+        id="serviceCategoryGrid"
+      ></div>
+    </div>
+
+<div id="nearbyPlacesBox" class="nearby-box hidden">
+        <div class="nearby-head">
+          <div>
+            <div class="nearby-title">附近店家</div>
+            <div class="nearby-sub">依照你選擇的代買分類，自動搜尋附近可參考店家。點選後會帶入購買地點與電話。</div>
+          </div>
+          <button id="nearbyReloadBtn" class="nearby-btn" type="button" onclick="searchNearbyPlaces(true)">搜尋附近店家</button>
+        </div>
+        <div id="nearbyPlacesStatus" class="nearby-status">選擇代買分類後，系統會顯示附近店家。</div>
+        <div id="nearbyPlacesList" class="nearby-list"></div>
+      </div>
+      
+    <div
+      id="serviceDescription"
+      class="hidden"
+    ></div>
+
+    <div class="home-estimate">
+
+      <div>
+        <div class="home-estimate-label">
+          目前預估
+        </div>
+
+        <div
+          class="home-estimate-meta"
+          id="homeEstimateMeta"
+        >
+          填寫完整地址後顯示距離與費用
         </div>
       </div>
-    </section>
+
+      <div
+        class="home-estimate-amount"
+        id="homeEstimateAmount"
+      >
+        待估價
+      </div>
+
+    </div>
+
+    <button
+      class="home-next-btn"
+      type="button"
+      onclick="goNext()"
+    >
+      下一步
+    </button>
+
+  </div>
+
+</section>
 
     <section class="step" id="step2">
       <div class="headline">填寫任務資訊</div>
@@ -1819,31 +2877,38 @@ body.day-mode .bottom-tabs{
         <div class="quick-guide-text">急件專送適合小包裹、餐點、店家商品與生活用品等較高急迫性的配送任務，不屬於代辦服務。</div>
       </div>
 
-      <div id="nearbyPlacesBox" class="nearby-box hidden">
-        <div class="nearby-head">
-          <div>
-            <div class="nearby-title">附近店家</div>
-            <div class="nearby-sub">依照你選擇的代買分類，自動搜尋附近可參考店家。點選後會帶入購買地點與電話。</div>
-          </div>
-          <button id="nearbyReloadBtn" class="nearby-btn" type="button" onclick="searchNearbyPlaces(true)">搜尋附近店家</button>
-        </div>
-        <div id="nearbyPlacesStatus" class="nearby-status">選擇代買分類後，系統會顯示附近店家。</div>
-        <div id="nearbyPlacesList" class="nearby-list"></div>
+      <div class="form-section">
+  <div class="form-title">
+    聯絡電話
+  </div>
+  <div class="input-card">
+    <div class="input-wrap">
+      <div class="input-icon">
+        取
       </div>
 
-      <div class="form-section">
-        <div class="form-title" id="pickupTitle">取件資訊</div>
-        <div class="input-card">
-          <div class="input-wrap">
-            <div class="input-icon">📍</div>
-            <input id="pickup" maxlength="120" placeholder="取件地址 / 店家地址">
-          </div>
-          <div class="input-wrap">
-            <div class="input-icon">☎️</div>
-            <input id="pickupPhone" maxlength="20" inputmode="tel" placeholder="取件電話 / 店家電話">
-          </div>
-        </div>
+      <input
+        id="pickupPhone"
+        maxlength="20"
+        inputmode="tel"
+        placeholder="取件電話 / 店家電話"
+      >
+    </div>
+
+    <div class="input-wrap">
+      <div class="input-icon">
+        送
       </div>
+
+      <input
+        id="dropoffPhone"
+        maxlength="20"
+        inputmode="tel"
+        placeholder="收件電話 / 聯絡電話"
+      >
+    </div>
+  </div>
+</div>
 
       <div id="queueSection" class="form-section hidden">
         <div class="form-title">排隊資訊</div>
@@ -1860,25 +2925,11 @@ body.day-mode .bottom-tabs{
       </div>
 
       <div class="form-section">
-        <div class="form-title" id="dropoffTitle">送達資訊</div>
-        <div class="input-card">
-          <div class="input-wrap">
-            <div class="input-icon">🏁</div>
-            <input id="dropoff" maxlength="120" placeholder="送達地址 / 交付地點">
-          </div>
-          <div class="input-wrap">
-            <div class="input-icon">📱</div>
-            <input id="dropoffPhone" maxlength="20" inputmode="tel" placeholder="收件電話 / 聯絡電話">
-          </div>
-        </div>
-      </div>
-
-      <div class="form-section">
         <div class="form-title">是否需要上樓？</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon">🏢</div>
-            <select id="upstairsOption" onchange="renderEstimate()">
+            <select id="upstairsOption">
               <option value="none">不用上樓，門口交付</option>
               <option value="elevator">需要上樓，有電梯（+20）</option>
               <option value="no_elevator">需要上樓，無電梯（+30）</option>
@@ -1911,8 +2962,7 @@ body.day-mode .bottom-tabs{
           pattern="[0-9]*"
           value="0"
           placeholder="請填寫需要騎士代墊的金額，沒有請填 0"
-          oninput="renderEstimate()"
-        >
+         >
     </div>
   </div>
 </div>
@@ -1926,69 +2976,254 @@ body.day-mode .bottom-tabs{
     </section>
 
     <section class="step" id="step3">
-      <div class="headline">選擇任務速度</div>
-      <div class="subtext">平台會依照後端費率、路線距離、預估時間、任務速度、上樓需求與平台服務費計算金額。</div>
 
-      <div class="speed-card active" data-speed="standard" onclick="selectSpeed('standard')">
-        <div class="speed-top">
-          <div class="speed-name">一般件</div>
-          <div class="speed-check">✓</div>
+  <div class="headline">
+    選擇任務速度
+  </div>
+
+  <div class="subtext">
+    正式金額仍由 UBee 後端依路線距離、
+    預估時間、速度、上樓需求與平台服務費統一計算。
+  </div>
+
+  <div class="speed-list">
+
+    <div
+      class="speed-card active"
+      data-speed="standard"
+      onclick="selectSpeed('standard')"
+    >
+      <div class="speed-top">
+
+        <div>
+          <div class="speed-name">
+            一般件
+          </div>
+
+          <div class="speed-time">
+            90–120 分鐘
+          </div>
         </div>
-        <div class="speed-desc">適合一般配送與生活跑腿，依目前騎士媒合狀況安排。</div>
+
+        <div class="speed-check">
+          ✓
+        </div>
+
       </div>
 
-      <div class="speed-card" data-speed="priority" onclick="selectSpeed('priority')">
-        <div class="speed-top">
-          <div class="speed-name">標準件</div>
-          <div class="speed-check">✓</div>
+      <div class="speed-desc">
+        適合一般配送與生活跑腿，
+        依目前騎士媒合狀況安排。
+      </div>
+    </div>
+
+    <div
+      class="speed-card"
+      data-speed="priority"
+      onclick="selectSpeed('priority')"
+    >
+      <div class="speed-top">
+
+        <div>
+          <div class="speed-name">
+            標準件
+          </div>
+
+          <div class="speed-time">
+            60–90 分鐘
+          </div>
         </div>
-        <div class="speed-desc">適合較希望加快處理的任務，系統會以較高優先度處理。</div>
+
+        <div class="speed-check">
+          ✓
+        </div>
+
       </div>
 
-      <div class="speed-card" data-speed="express" onclick="selectSpeed('express')">
-        <div class="speed-top">
-          <div class="speed-name">優先件</div>
-          <div class="speed-check">✓</div>
-        </div>
-        <div class="speed-desc">適合急件、急送與高急迫性任務，費用會較高。</div>
+      <div class="speed-desc">
+        適合希望加快處理的任務，
+        系統會以較高優先度處理。
       </div>
-    </section>
+    </div>
+
+    <div
+      class="speed-card"
+      data-speed="express"
+      onclick="selectSpeed('express')"
+    >
+      <div class="speed-top">
+
+        <div>
+          <div class="speed-name">
+            優先件
+          </div>
+
+          <div class="speed-time">
+            45–60 分鐘
+          </div>
+        </div>
+
+        <div class="speed-check">
+          ✓
+        </div>
+
+      </div>
+
+      <div class="speed-desc">
+        適合急件、急送與高急迫性任務，
+        費用會較高。
+      </div>
+    </div>
+  </div>
+
+</section>
 
     <section class="step" id="step4">
-      <div class="headline">確認任務內容</div>
-      <div class="subtext">請確認內容正確。現階段 UBee 跑腿優先開放現金單，確認後系統會開始媒合騎士。</div>
 
-      <div class="summary-card" id="summaryBox"></div>
+  <div class="headline">
+    確認任務內容
+  </div>
 
-      <div class="price-box hidden" id="priceBox"></div>
+  <div class="subtext">
+    確認路線、內容與預估費用後，
+    再提交正式訂單。
+  </div>
 
-      <div class="notice">
-        <div class="notice-title">注意事項</div>
-        <ul>
-          <li>UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署等高風險任務。</li>
-          <li>代買商品請填清楚規格與替代方案；若有代墊費用，請正確填寫代墊金額。代墊款項達 NT$1,000（含）以上，需改由 UBee 跑腿客服人工確認。</li>
-          <li>目前正式營運版先開放現金單，任務完成時由騎士向客人收取現金。</li>
-          <li>確認使用現金單後，系統會開始媒合騎士。</li>
-          <li>騎士已接單或任務已開始後，取消可能產生相關費用。</li>
-        </ul>
+  <div class="review-map-shell">
+
+    <div
+      id="reviewMap"
+      class="map-canvas"
+    ></div>
+
+    <div
+      id="reviewMapPlaceholder"
+      class="map-placeholder"
+    >
+      <strong>
+        正在準備路線地圖
+      </strong>
+
+      <small>
+        路線地圖暫時無法顯示時，
+        正式估價仍以後端回傳結果為準。
+      </small>
+    </div>
+
+    <div
+      id="reviewRouteBadge"
+      class="review-route-badge hidden"
+    >
+      <strong id="reviewRouteDistance">
+        -
+      </strong>
+
+      <span id="reviewRouteDuration">
+        -
+      </span>
+    </div>
+
+  </div>
+
+  <div
+    class="summary-card"
+    id="summaryBox"
+  ></div>
+
+  <div
+    class="price-box hidden"
+    id="priceBox"
+  ></div>
+
+  <div class="notice">
+
+    <div class="notice-title">
+      注意事項
+    </div>
+
+    <ul>
+      <li>
+        UBee 跑腿不承接違法、管制、危險、
+        法律、金融、證件、授權簽署等高風險任務。
+      </li>
+
+      <li>
+        若有代墊費用，請正確填寫。
+        代墊款項達 NT$1,000（含）以上，
+        需改由客服人工確認。
+      </li>
+
+      <li>
+        目前正式營運版先開放現金單，
+        任務完成時由騎士向客人收取現金。
+      </li>
+
+      <li>
+        騎士已接單或任務已開始後，
+        取消可能產生相關費用。
+      </li>
+    </ul>
+
+  </div>
+
+  <label class="confirm-box">
+
+    <input
+      id="locationConfirmedCheck"
+      type="checkbox"
+    >
+
+    <div class="confirm-text">
+      我已確認取件地址與送達地址正確。
+      若定位、門牌、樓層或地標有誤，
+      我已補充清楚。
+    </div>
+
+  </label>
+
+  <label class="confirm-box">
+
+    <input
+      id="agreeCheck"
+      type="checkbox"
+    >
+
+    <div class="confirm-text">
+      我已確認任務內容正確，
+      並同意 UBee 跑腿依正式營運規則處理此任務。
+    </div>
+
+  </label>
+
+  <div class="review-sticky-footer">
+
+    <div>
+
+      <div class="review-total-label">
+        預估金額
       </div>
 
-      <label class="confirm-box">
-        <input id="locationConfirmedCheck" type="checkbox">
-        <div class="confirm-text">
-          我已確認取件地址與送達地址正確。若定位、門牌、樓層或地標有誤，我已在地址或備註中補充清楚。
-        </div>
-      </label>
+      <div
+        class="review-total-value"
+        id="reviewEstimatedTotal"
+      >
+        待估價
+      </div>
 
-      <label class="confirm-box">
-        <input id="agreeCheck" type="checkbox">
-        <div class="confirm-text">我已確認任務內容正確，並同意 UBee 跑腿依照正式營運規則處理此任務。</div>
-      </label>
+    </div>
 
-      <button id="createOrderBtn" class="btn btn-primary" type="button" onclick="createOrder()" style="margin-top:18px;">
-        確認並建立任務
-      </button>
-    </section>
+    <button
+      id="createOrderBtn"
+      class="btn btn-primary"
+      type="button"
+      onclick="createOrder()"
+    >
+      提交訂單
+    </button>
+
+  </div>
+
+</section>
 
     <section class="step" id="step5">
       <div class="success">
@@ -2269,22 +3504,6 @@ body.day-mode .bottom-tabs{
   </div>
 
 <script>
-function applyThemeByTime(){
-  const hour = new Date().getHours();
-  const isDay = hour >= 6 && hour < 18;
-
-  document.body.classList.toggle('day-mode', isDay);
-  document.body.classList.toggle('night-mode', !isDay);
-
-  const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if(metaTheme){
-    metaTheme.setAttribute('content', isDay ? '#f6f6f6' : '#000000');
-  }
-}
-
-applyThemeByTime();
-setInterval(applyThemeByTime, 5 * 60 * 1000);
-
 let userId = 'web-order';
 let liffId = '';
 let currentStep = 1;
@@ -2309,6 +3528,64 @@ let currentHistoryFilter = 'all';
 let currentCustomerPage = '';
 let initialOpenActionHandled = false;
 
+// ==============================
+// UBee Google Maps 前端狀態
+// ==============================
+
+// 從 /api/config 取得
+let googleMapsApiKey = '';
+let googleMapsMapId = '';
+
+// Google Maps 載入狀態
+let googleMapsLoadPromise = null;
+let googleMapsLibraries = null;
+
+// 地圖本體
+let customerMap = null;
+let reviewMap = null;
+
+// 真實道路路線
+let routePolyline = null;
+let reviewRoutePolyline = null;
+
+// 首頁地圖標記
+let pickupMarker = null;
+let dropoffMarker = null;
+
+// 確認頁地圖標記
+let reviewPickupMarker = null;
+let reviewDropoffMarker = null;
+
+// 目前位置
+let currentLocationMarker = null;
+
+// 取件地點
+let pickupLat = null;
+let pickupLng = null;
+let pickupPlaceId = '';
+
+// 送達地點
+let dropoffLat = null;
+let dropoffLng = null;
+let dropoffPlaceId = '';
+
+// 使用者目前位置
+let currentLocationLat = null;
+let currentLocationLng = null;
+let currentLocationPromise = null;
+
+// 最新正式資料
+let lastRouteData = null;
+let lastQuoteData = null;
+let lastEstimatedTotal = 0;
+
+// 防止重複 API
+let routeRefreshTimer = null;
+let quoteRefreshTimer = null;
+
+let routeRequestSequence = 0;
+let quoteRequestSequence = 0;
+
 const LINE_OFFICIAL_ID = '@686rwnvn';
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
 
@@ -2319,6 +3596,1301 @@ const MAX_ADVANCE_PAYMENT = 1000;
 
 function qs(id){
   return document.getElementById(id);
+}
+
+// ==============================
+// UBee Google Maps JavaScript API
+// ==============================
+
+async function loadGoogleMapsLibraries(){
+  if(googleMapsLibraries){
+    return googleMapsLibraries;
+  }
+
+  if(
+    !window.google ||
+    !window.google.maps ||
+    typeof window.google.maps.importLibrary !== 'function'
+  ){
+    throw new Error(
+      'Google Maps JavaScript API 尚未完成載入'
+    );
+  }
+
+  const [
+    mapsLibrary,
+    geometryLibrary,
+    markerLibrary
+  ] = await Promise.all([
+    window.google.maps.importLibrary(
+      'maps'
+    ),
+
+    window.google.maps.importLibrary(
+      'geometry'
+    ),
+
+    window.google.maps.importLibrary(
+      'marker'
+    )
+  ]);
+
+  googleMapsLibraries = {
+    maps:
+      mapsLibrary,
+
+    geometry:
+      geometryLibrary,
+
+    marker:
+      markerLibrary
+  };
+
+  return googleMapsLibraries;
+}
+
+// =========================================
+// UBee 地圖與路線工具
+// =========================================
+
+function toNullableNumber(value){
+  if(
+    value === null ||
+    value === undefined
+  ){
+    return null;
+  }
+
+  const text = String(value).trim();
+
+  if(!text){
+    return null;
+  }
+
+  const number = Number(text);
+
+  return Number.isFinite(number)
+    ? number
+    : null;
+}
+
+function hasValidLatLng(lat, lng){
+  // null、undefined、空字串都不能視為有效座標
+  if(
+    lat === null ||
+    lat === undefined ||
+    lng === null ||
+    lng === undefined
+  ){
+    return false;
+  }
+
+  const latText =
+    String(lat).trim();
+
+  const lngText =
+    String(lng).trim();
+
+  if(
+    !latText ||
+    !lngText
+  ){
+    return false;
+  }
+
+  const latNumber =
+    Number(latText);
+
+  const lngNumber =
+    Number(lngText);
+
+  return (
+    Number.isFinite(latNumber) &&
+    Number.isFinite(lngNumber) &&
+    latNumber >= -90 &&
+    latNumber <= 90 &&
+    lngNumber >= -180 &&
+    lngNumber <= 180
+  );
+}
+
+function clearMapObject(object){
+  if(!object){
+    return null;
+  }
+
+  try{
+    if(typeof object.setMap === 'function'){
+      object.setMap(null);
+    }
+  }catch(err){
+    console.warn(
+      '清除地圖物件失敗:',
+      err
+    );
+  }
+
+  return null;
+}
+
+function createMapMarker(
+  map,
+  position,
+  type,
+  title
+){
+  if(
+    !map ||
+    !hasValidLatLng(
+      position?.lat,
+      position?.lng
+    )
+  ){
+    return null;
+  }
+
+  const MarkerClass =
+  window.google
+    ?.maps
+    ?.Marker;
+
+if(
+  typeof MarkerClass !==
+  'function'
+){
+  console.warn(
+    'Google Maps Marker 尚未完成載入'
+  );
+
+  return null;
+}
+
+  const isPickup =
+    type === 'pickup';
+
+  return new MarkerClass({
+    map,
+
+    position,
+
+    title,
+
+    label:{
+      text:
+        isPickup
+          ? '取'
+          : '送',
+
+      color:
+        isPickup
+          ? '#ffffff'
+          : '#111111',
+
+      fontWeight:
+        '900'
+    },
+
+    icon:{
+      path:
+        google.maps.SymbolPath.CIRCLE,
+
+      scale:
+        14,
+
+      fillColor:
+        isPickup
+          ? '#111111'
+          : '#f4bd00',
+
+      fillOpacity:
+        1,
+
+      strokeColor:
+        '#ffffff',
+
+      strokeWeight:
+        2
+    }
+  });
+}
+
+async function ensureCustomerMapReady(){
+  const mapEl =
+    qs('customerMap');
+
+  if(!mapEl){
+    return null;
+  }
+
+  await loadGoogleMapsApi();
+
+  if(!customerMap){
+
+    const options = {
+      center:
+        hasValidLatLng(
+          currentLocationLat,
+          currentLocationLng
+        )
+          ? {
+              lat:
+                currentLocationLat,
+
+              lng:
+                currentLocationLng
+            }
+          : {
+              lat:
+                24.2521,
+
+              lng:
+                120.7214
+            },
+
+      zoom:
+        13,
+
+      disableDefaultUI:
+        true,
+
+      clickableIcons:
+        false,
+
+      gestureHandling:
+        'greedy',
+
+      backgroundColor:
+        '#e8eaed'
+    };
+
+    if(googleMapsMapId){
+      options.mapId =
+        googleMapsMapId;
+    }
+
+    customerMap =
+      new googleMapsLibraries.maps.Map(
+        mapEl,
+        options
+      );
+  }
+
+  qs('homeMapPlaceholder')
+    ?.classList
+    .add('is-ready');
+
+  renderCurrentLocationMarker();
+
+  if(lastRouteData){
+    renderRouteOnCustomerMap(
+      lastRouteData
+    );
+  }
+
+  return customerMap;
+}
+
+async function ensureReviewMapReady(){
+  const mapEl =
+    qs('reviewMap');
+
+  if(!mapEl){
+    return null;
+  }
+
+  await loadGoogleMapsApi();
+
+  if(!reviewMap){
+
+    const options = {
+      center:
+        hasValidLatLng(
+          currentLocationLat,
+          currentLocationLng
+        )
+          ? {
+              lat:
+                currentLocationLat,
+
+              lng:
+                currentLocationLng
+            }
+          : {
+              lat:
+                24.2521,
+
+              lng:
+                120.7214
+            },
+
+      zoom:
+        13,
+
+      disableDefaultUI:
+        true,
+
+      clickableIcons:
+        false,
+
+      gestureHandling:
+        'greedy',
+
+      backgroundColor:
+        '#e8eaed'
+    };
+
+    if(googleMapsMapId){
+      options.mapId =
+        googleMapsMapId;
+    }
+
+    reviewMap =
+      new googleMapsLibraries.maps.Map(
+        mapEl,
+        options
+      );
+  }
+
+  qs('reviewMapPlaceholder')
+    ?.classList
+    .add('is-ready');
+
+  if(lastRouteData){
+    renderRouteOnReviewMap(
+      lastRouteData
+    );
+  }
+
+  return reviewMap;
+}
+
+function renderCurrentLocationMarker(){
+  if(
+    !customerMap ||
+    !hasValidLatLng(
+      currentLocationLat,
+      currentLocationLng
+    )
+  ){
+    return;
+  }
+
+  currentLocationMarker =
+    clearMapObject(
+      currentLocationMarker
+    );
+
+  currentLocationMarker =
+    new google.maps.Circle({
+      map:
+        customerMap,
+
+      center:{
+        lat:
+          currentLocationLat,
+
+        lng:
+          currentLocationLng
+      },
+
+      radius:
+        32,
+
+      fillColor:
+        '#2563eb',
+
+      fillOpacity:
+        .16,
+
+      strokeColor:
+        '#2563eb',
+
+      strokeOpacity:
+        .9,
+
+      strokeWeight:
+        2
+    });
+}
+
+async function requestCurrentLocationForMap(){
+  try{
+    const position =
+      await getCurrentPosition();
+
+    currentLocationLat =
+      position.coords.latitude;
+
+    currentLocationLng =
+      position.coords.longitude;
+
+    if(customerMap){
+
+      renderCurrentLocationMarker();
+
+      customerMap.setCenter({
+        lat:
+          currentLocationLat,
+
+        lng:
+          currentLocationLng
+      });
+
+      customerMap.setZoom(15);
+    }
+
+    return position;
+
+  }catch(err){
+
+    console.warn(
+      '目前位置取得失敗:',
+      err
+    );
+
+    return null;
+  }
+}
+
+async function focusCurrentLocation(){
+  try{
+    await ensureCustomerMapReady();
+
+    if(
+      !hasValidLatLng(
+        currentLocationLat,
+        currentLocationLng
+      )
+    ){
+      await requestCurrentLocationForMap();
+    }
+
+    if(
+      hasValidLatLng(
+        currentLocationLat,
+        currentLocationLng
+      ) &&
+      customerMap
+    ){
+
+      customerMap.panTo({
+        lat:
+          currentLocationLat,
+
+        lng:
+          currentLocationLng
+      });
+
+      customerMap.setZoom(16);
+
+      renderCurrentLocationMarker();
+    }
+
+  }catch(err){
+
+    console.warn(
+      '回到目前位置失敗:',
+      err
+    );
+  }
+}
+
+function getRouteOriginLocation(data){
+  const lat =
+    toNullableNumber(
+      data?.routeStartLat ??
+      data?.originLocation?.lat ??
+      data?.pickupLat
+    );
+
+  const lng =
+    toNullableNumber(
+      data?.routeStartLng ??
+      data?.originLocation?.lng ??
+      data?.pickupLng
+    );
+
+  return hasValidLatLng(lat, lng)
+    ? { lat, lng }
+    : null;
+}
+
+function getRouteDestinationLocation(data){
+  const lat =
+    toNullableNumber(
+      data?.routeEndLat ??
+      data?.destinationLocation?.lat ??
+      data?.dropoffLat
+    );
+
+  const lng =
+    toNullableNumber(
+      data?.routeEndLng ??
+      data?.destinationLocation?.lng ??
+      data?.dropoffLng
+    );
+
+  return hasValidLatLng(lat, lng)
+    ? { lat, lng }
+    : null;
+}
+
+function drawRouteOnMap(
+  map,
+  data,
+  target
+){
+  if(
+    !map ||
+    !data?.encodedPolyline ||
+    !googleMapsLibraries
+      ?.geometry
+      ?.encoding
+  ){
+    return;
+  }
+
+  if(target === 'review'){
+
+    reviewRoutePolyline =
+      clearMapObject(
+        reviewRoutePolyline
+      );
+
+    reviewPickupMarker =
+      clearMapObject(
+        reviewPickupMarker
+      );
+
+    reviewDropoffMarker =
+      clearMapObject(
+        reviewDropoffMarker
+      );
+
+  }else{
+
+    routePolyline =
+      clearMapObject(
+        routePolyline
+      );
+
+    pickupMarker =
+      clearMapObject(
+        pickupMarker
+      );
+
+    dropoffMarker =
+      clearMapObject(
+        dropoffMarker
+      );
+  }
+
+  const path =
+    googleMapsLibraries
+      .geometry
+      .encoding
+      .decodePath(
+        data.encodedPolyline
+      );
+
+  if(!path.length){
+    return;
+  }
+
+  const polyline =
+    new google.maps.Polyline({
+      map,
+
+      path,
+
+      geodesic:
+        true,
+
+      strokeColor:
+        '#111111',
+
+      strokeOpacity:
+        .92,
+
+      strokeWeight:
+        6
+    });
+
+  const origin =
+    getRouteOriginLocation(data);
+
+  const destination =
+    getRouteDestinationLocation(data);
+
+  const startMarker =
+    origin
+      ? createMapMarker(
+          map,
+          origin,
+          'pickup',
+          '取件地點'
+        )
+      : null;
+
+  const endMarker =
+    destination
+      ? createMapMarker(
+          map,
+          destination,
+          'dropoff',
+          '送達地點'
+        )
+      : null;
+
+  if(target === 'review'){
+
+    reviewRoutePolyline =
+      polyline;
+
+    reviewPickupMarker =
+      startMarker;
+
+    reviewDropoffMarker =
+      endMarker;
+
+  }else{
+
+    routePolyline =
+      polyline;
+
+    pickupMarker =
+      startMarker;
+
+    dropoffMarker =
+      endMarker;
+  }
+
+  const bounds =
+    new google.maps.LatLngBounds();
+
+  path.forEach(point => {
+    bounds.extend(point);
+  });
+
+  if(origin){
+    bounds.extend(origin);
+  }
+
+  if(destination){
+    bounds.extend(destination);
+  }
+
+  if(!bounds.isEmpty()){
+    map.fitBounds(
+      bounds,
+      48
+    );
+  }
+}
+
+function renderRouteOnCustomerMap(data){
+  if(
+    !customerMap ||
+    !data
+  ){
+    return;
+  }
+
+  drawRouteOnMap(
+    customerMap,
+    data,
+    'customer'
+  );
+}
+
+function renderRouteOnReviewMap(data){
+  if(
+    !reviewMap ||
+    !data
+  ){
+    return;
+  }
+
+  drawRouteOnMap(
+    reviewMap,
+    data,
+    'review'
+  );
+}
+
+function updateRouteBadges(data){
+  const distanceText =
+    String(
+      data?.distanceText || ''
+    ).trim();
+
+  const durationText =
+    String(
+      data?.durationText || ''
+    ).trim();
+
+  const hasRoute =
+    !!(
+      distanceText ||
+      durationText
+    );
+
+  qs('homeRouteBadge')
+    ?.classList
+    .toggle(
+      'hidden',
+      !hasRoute
+    );
+
+  qs('reviewRouteBadge')
+    ?.classList
+    .toggle(
+      'hidden',
+      !hasRoute
+    );
+
+  if(qs('homeRouteDistance')){
+    qs('homeRouteDistance')
+      .innerText =
+        distanceText || '-';
+  }
+
+  if(qs('homeRouteDuration')){
+    qs('homeRouteDuration')
+      .innerText =
+        durationText || '-';
+  }
+
+  if(qs('reviewRouteDistance')){
+    qs('reviewRouteDistance')
+      .innerText =
+        distanceText || '-';
+  }
+
+  if(qs('reviewRouteDuration')){
+    qs('reviewRouteDuration')
+      .innerText =
+        durationText || '-';
+  }
+
+  if(
+    hasRoute &&
+    qs('homeEstimateMeta')
+  ){
+    qs('homeEstimateMeta')
+      .innerText =
+        [
+          distanceText,
+          durationText
+        ]
+          .filter(Boolean)
+          .join('・');
+  }
+}
+
+function clearRoutePreview(){
+  routeRequestSequence += 1;
+
+  lastRouteData = null;
+
+  updateRouteBadges(null);
+
+  routePolyline =
+    clearMapObject(
+      routePolyline
+    );
+
+  pickupMarker =
+    clearMapObject(
+      pickupMarker
+    );
+
+  dropoffMarker =
+    clearMapObject(
+      dropoffMarker
+    );
+
+  reviewRoutePolyline =
+    clearMapObject(
+      reviewRoutePolyline
+    );
+
+  reviewPickupMarker =
+    clearMapObject(
+      reviewPickupMarker
+    );
+
+  reviewDropoffMarker =
+    clearMapObject(
+      reviewDropoffMarker
+    );
+}
+
+function resetPickupGeo(){
+  pickupLat = null;
+  pickupLng = null;
+  pickupPlaceId = '';
+}
+
+function resetDropoffGeo(){
+  dropoffLat = null;
+  dropoffLng = null;
+  dropoffPlaceId = '';
+}
+
+function applyRouteDataToLocationState(data){
+  const origin =
+    getRouteOriginLocation(data);
+
+  const destination =
+    getRouteDestinationLocation(data);
+
+  // 已有真實店家 / 選點座標時，
+  // 不要被道路吸附座標覆蓋。
+  if(
+    origin &&
+    !hasValidLatLng(
+      pickupLat,
+      pickupLng
+    )
+  ){
+    pickupLat =
+      origin.lat;
+
+    pickupLng =
+      origin.lng;
+  }
+
+  if(
+    destination &&
+    !hasValidLatLng(
+      dropoffLat,
+      dropoffLng
+    )
+  ){
+    dropoffLat =
+      destination.lat;
+
+    dropoffLng =
+      destination.lng;
+  }
+
+  if(
+    !pickupPlaceId &&
+    (
+      data?.pickupPlaceId ||
+      data?.originPlaceId
+    )
+  ){
+    pickupPlaceId =
+      String(
+        data.pickupPlaceId ||
+        data.originPlaceId ||
+        ''
+      ).trim();
+  }
+
+  if(
+    !dropoffPlaceId &&
+    (
+      data?.dropoffPlaceId ||
+      data?.destinationPlaceId
+    )
+  ){
+    dropoffPlaceId =
+      String(
+        data.dropoffPlaceId ||
+        data.destinationPlaceId ||
+        ''
+      ).trim();
+  }
+}
+
+async function refreshRoutePreview(){
+  const pickup =
+    qs('pickup')
+      ?.value
+      .trim() || '';
+
+  const dropoff =
+    qs('dropoff')
+      ?.value
+      .trim() || '';
+
+  if(
+    !pickup ||
+    !dropoff
+  ){
+    clearRoutePreview();
+
+    return null;
+  }
+
+  const requestId =
+    ++routeRequestSequence;
+
+  try{
+
+    const res =
+      await fetch(
+        '/api/map-route',
+        {
+          method:
+            'POST',
+
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+
+          cache:
+            'no-store',
+
+          body:
+            JSON.stringify({
+              pickup,
+
+              pickupAddress:
+                pickup,
+
+              originAddress:
+                pickup,
+
+              pickupPlaceId,
+
+              originPlaceId:
+                pickupPlaceId,
+
+              pickupLat,
+
+              pickupLng,
+
+              originLat:
+                pickupLat,
+
+              originLng:
+                pickupLng,
+
+              dropoff,
+
+              dropoffAddress:
+                dropoff,
+
+              destinationAddress:
+                dropoff,
+
+              dropoffPlaceId,
+
+              destinationPlaceId:
+                dropoffPlaceId,
+
+              dropoffLat,
+
+              dropoffLng,
+
+              destinationLat:
+                dropoffLat,
+
+              destinationLng:
+                dropoffLng
+            })
+        }
+      );
+
+    const data =
+      await res
+        .json()
+        .catch(() => ({}));
+
+    if(
+      requestId !==
+      routeRequestSequence
+    ){
+      return null;
+    }
+
+    if(
+      !res.ok ||
+      data.success === false
+    ){
+      throw new Error(
+        data.error ||
+        data.message ||
+        '路線讀取失敗'
+      );
+    }
+
+    lastRouteData =
+      data;
+
+    applyRouteDataToLocationState(
+      data
+    );
+
+    updateRouteBadges(
+      data
+    );
+
+    try{
+      await ensureCustomerMapReady();
+
+      renderRouteOnCustomerMap(
+        data
+      );
+    }catch(err){
+
+      console.warn(
+        '首頁地圖路線顯示失敗:',
+        err
+      );
+    }
+
+    if(currentStep === 4){
+
+      try{
+        await ensureReviewMapReady();
+
+        renderRouteOnReviewMap(
+          data
+        );
+      }catch(err){
+
+        console.warn(
+          '確認頁地圖路線顯示失敗:',
+          err
+        );
+      }
+    }
+
+    return data;
+
+  }catch(err){
+
+    if(
+      requestId ===
+      routeRequestSequence
+    ){
+      console.warn(
+        '路線預覽失敗:',
+        err
+      );
+
+      clearRoutePreview();
+    }
+
+    return null;
+  }
+}
+
+function invalidateQuote(){
+  quoteRequestSequence += 1;
+
+  lastQuoteData = null;
+  lastEstimatedTotal = 0;
+
+  updateStickyEstimate();
+}
+
+function scheduleRouteAndQuoteRefresh(
+  delay = 650
+){
+  clearTimeout(
+    routeRefreshTimer
+  );
+
+  clearTimeout(
+    quoteRefreshTimer
+  );
+
+  routeRefreshTimer =
+    setTimeout(() => {
+      refreshRoutePreview();
+    }, delay);
+
+  quoteRefreshTimer =
+    setTimeout(() => {
+      renderEstimate();
+    }, delay + 80);
+}
+
+function scheduleQuoteRefresh(
+  delay = 300
+){
+  clearTimeout(
+    quoteRefreshTimer
+  );
+
+  quoteRefreshTimer =
+    setTimeout(() => {
+      renderEstimate();
+    }, delay);
+}
+
+function handleAddressInput(type){
+  if(type === 'pickup'){
+
+    resetPickupGeo();
+
+    selectedNearbyPlace = null;
+    selectedNearbyPlaceId = '';
+
+  }else{
+
+    resetDropoffGeo();
+  }
+
+  clearRoutePreview();
+  invalidateQuote();
+
+  scheduleRouteAndQuoteRefresh();
+}
+
+function handleEstimateAffectingChange(){
+  invalidateQuote();
+
+  scheduleQuoteRefresh();
+}
+
+function bindOrderInputEvents(){
+
+  qs('pickup')
+    ?.addEventListener(
+      'input',
+      () =>
+        handleAddressInput(
+          'pickup'
+        )
+    );
+
+  qs('pickup')
+    ?.addEventListener(
+      'change',
+      () =>
+        scheduleRouteAndQuoteRefresh(
+          120
+        )
+    );
+
+  qs('pickup')
+    ?.addEventListener(
+      'blur',
+      () =>
+        scheduleRouteAndQuoteRefresh(
+          120
+        )
+    );
+
+  qs('dropoff')
+    ?.addEventListener(
+      'input',
+      () =>
+        handleAddressInput(
+          'dropoff'
+        )
+    );
+
+  qs('dropoff')
+    ?.addEventListener(
+      'change',
+      () =>
+        scheduleRouteAndQuoteRefresh(
+          120
+        )
+    );
+
+  qs('dropoff')
+    ?.addEventListener(
+      'blur',
+      () =>
+        scheduleRouteAndQuoteRefresh(
+          120
+        )
+    );
+
+  qs('upstairsOption')
+    ?.addEventListener(
+      'change',
+      handleEstimateAffectingChange
+    );
+
+  qs('advancePayment')
+    ?.addEventListener(
+      'input',
+      handleEstimateAffectingChange
+    );
+
+  qs('queueMinutes')
+    ?.addEventListener(
+      'input',
+      handleEstimateAffectingChange
+    );
+
+  document.addEventListener(
+    'click',
+    event => {
+
+      if(
+        event.target.closest(
+          '.category-tab, .service-item, .category-choice-item'
+        )
+      ){
+        invalidateQuote();
+
+        scheduleRouteAndQuoteRefresh(
+          120
+        );
+      }
+
+      if(
+        event.target.closest(
+          '.speed-card'
+        )
+      ){
+        invalidateQuote();
+
+        scheduleQuoteRefresh(
+          120
+        );
+      }
+    }
+  );
+}
+
+function updateStickyEstimate(
+  customText
+){
+  const totalText =
+    customText
+      ? customText
+      : (
+          lastEstimatedTotal > 0
+            ? `NT$${Math.round(
+                lastEstimatedTotal
+              )}`
+            : '待估價'
+        );
+
+  if(qs('homeEstimateAmount')){
+    qs('homeEstimateAmount')
+      .innerText =
+        totalText;
+  }
+
+  if(qs('reviewEstimatedTotal')){
+    qs('reviewEstimatedTotal')
+      .innerText =
+        totalText;
+  }
+
+  if(
+    !lastRouteData &&
+    qs('homeEstimateMeta') &&
+    !customText
+  ){
+    qs('homeEstimateMeta')
+      .innerText =
+        '填寫完整地址後顯示距離與費用';
+  }
 }
 
 function getUpstairsOption(){
@@ -2897,12 +5469,12 @@ function getNearbyKeyword(){
     '麵包':'麵包店',
     '伴手禮':'伴手禮',
     '其他甜點':'甜點店',
-    '全聯':'全聯',
-    '家樂福':'家樂福',
+    '全聯':'全聯福利中心',
+    '康達盛通':'康達盛通',
     '寶雅':'寶雅',
     '小北百貨':'小北百貨',
-    '五金百貨':'五金百貨',
-    '其他賣場':'賣場'
+    '楓康超市':'楓康超市',
+    '美廉社':'美廉社'
   };
 
   if(map[cat]) return map[cat];
@@ -2916,31 +5488,111 @@ function getNearbyKeyword(){
 }
 
 function clearNearbyAutoFill(clearFields){
-  const pickupEl = qs('pickup');
-  const pickupPhoneEl = qs('pickupPhone');
+  const pickupEl =
+    qs('pickup');
+
+  const pickupPhoneEl =
+    qs('pickupPhone');
+
+
+  // ==============================
+  // 記住清除前是否真的有附近店家資料
+  // ==============================
+
+  const hadNearbySelection =
+    !!(
+      selectedNearbyPlace ||
+      selectedNearbyPlaceId ||
+      nearbyAutoFilledPickup ||
+      nearbyAutoFilledPhone
+    );
+
+
+  // ==============================
+  // 清除附近店家自動帶入的欄位
+  // ==============================
 
   if(clearFields){
-    if(pickupEl && nearbyAutoFilledPickup && pickupEl.value.trim() === nearbyAutoFilledPickup){
-      pickupEl.value = '';
+
+    if(
+      pickupEl &&
+      nearbyAutoFilledPickup &&
+      pickupEl.value.trim() ===
+        nearbyAutoFilledPickup
+    ){
+      pickupEl.value =
+        '';
     }
 
-    if(pickupPhoneEl && nearbyAutoFilledPhone && pickupPhoneEl.value.trim() === nearbyAutoFilledPhone){
-      pickupPhoneEl.value = '';
+    if(
+      pickupPhoneEl &&
+      nearbyAutoFilledPhone &&
+      pickupPhoneEl.value.trim() ===
+        nearbyAutoFilledPhone
+    ){
+      pickupPhoneEl.value =
+        '';
     }
   }
 
-  nearbyPlaces = [];
-  selectedNearbyPlace = null;
-  selectedNearbyPlaceId = '';
-  lastNearbySearchKey = '';
-  nearbyAutoFilledPickup = '';
-  nearbyAutoFilledPhone = '';
 
-  const list = qs('nearbyPlacesList');
-  const status = qs('nearbyPlacesStatus');
+  // ==============================
+  // 清除附近店家狀態
+  // ==============================
 
-  if(list) list.innerHTML = '';
-  if(status) status.innerText = '選擇代買分類後，系統會顯示附近店家。';
+  nearbyPlaces =
+    [];
+
+  selectedNearbyPlace =
+    null;
+
+  selectedNearbyPlaceId =
+    '';
+
+  lastNearbySearchKey =
+    '';
+
+  nearbyAutoFilledPickup =
+    '';
+
+  nearbyAutoFilledPhone =
+    '';
+
+
+  // ==============================
+  // 曾經選過附近店家時，
+  // 必須同步清除舊座標與舊路線
+  // ==============================
+
+  if(hadNearbySelection){
+
+    resetPickupGeo();
+
+    clearRoutePreview();
+
+    invalidateQuote();
+  }
+
+
+  // ==============================
+  // 清除附近店家畫面
+  // ==============================
+
+  const list =
+    qs('nearbyPlacesList');
+
+  const status =
+    qs('nearbyPlacesStatus');
+
+  if(list){
+    list.innerHTML =
+      '';
+  }
+
+  if(status){
+    status.innerText =
+      '選擇代買分類後，按「搜尋附近店家」開始搜尋。';
+  }
 }
   
 function updateNearbyPlacesVisibility(){
@@ -2966,18 +5618,49 @@ function handleServiceSelectionChanged(){
 }
   
 function getCurrentPosition(){
-  return new Promise((resolve, reject) => {
-    if(!navigator.geolocation){
-      reject(new Error('這個瀏覽器不支援定位功能。'));
-      return;
-    }
+  if(currentLocationPromise){
+    return currentLocationPromise;
+  }
 
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy:false,
-      timeout:6000,
-      maximumAge:300000
+  currentLocationPromise =
+    new Promise(
+      (resolve, reject) => {
+
+        if(!navigator.geolocation){
+
+          reject(
+            new Error(
+              '這個瀏覽器不支援定位功能。'
+            )
+          );
+
+          return;
+        }
+
+        navigator
+          .geolocation
+          .getCurrentPosition(
+            resolve,
+            reject,
+            {
+              enableHighAccuracy:
+                false,
+
+              timeout:
+                6000,
+
+              maximumAge:
+                300000
+            }
+          );
+      }
+    )
+    .finally(() => {
+      currentLocationPromise =
+        null;
     });
-  });
+
+  return currentLocationPromise;
 }
 
 function setNearbyStatus(text){
@@ -3028,11 +5711,35 @@ async function searchNearbyPlaces(force){
     isLoadingNearbyPlaces = true;
     setNearbyStatus(`正在搜尋附近「${keyword}」...`);
 
-    const position = await getCurrentPosition();
-    const lat = position.coords.latitude;
-    const lng = position.coords.longitude;
-    const key = `${keyword}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
+    const position =
+  await getCurrentPosition();
 
+const lat =
+  position.coords.latitude;
+
+const lng =
+  position.coords.longitude;
+
+
+// ==============================
+// 同步目前位置給首頁地圖
+// ==============================
+
+currentLocationLat =
+  lat;
+
+currentLocationLng =
+  lng;
+
+renderCurrentLocationMarker();
+
+
+// ==============================
+// 建立附近店家搜尋識別
+// ==============================
+
+const key =
+  `${keyword}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
     if(!force && key === lastNearbySearchKey && nearbyPlaces.length){
       setNearbyStatus(`已顯示附近「${keyword}」，可直接點選店家帶入購買地點。`);
       renderNearbyPlaces();
@@ -3082,27 +5789,87 @@ async function searchNearbyPlaces(force){
 }
 
 function selectNearbyPlace(index){
-  const place = nearbyPlaces[index];
-  if(!place) return;
+  const place =
+    nearbyPlaces[index];
 
-  selectedNearbyPlace = place;
-  selectedNearbyPlaceId = String(place.placeId || index);
+  if(!place){
+    return;
+  }
 
-  const pickupText = [place.name, place.address].filter(Boolean).join(' ');
-  const phoneText = place.phone || '';
+  selectedNearbyPlace =
+    place;
+
+  selectedNearbyPlaceId =
+    String(
+      place.placeId ||
+      index
+    );
+
+  const pickupText =
+    [
+      place.name,
+      place.address
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+  const phoneText =
+    place.phone || '';
 
   if(qs('pickup')){
-    qs('pickup').value = pickupText || place.name || place.address || '';
-    nearbyAutoFilledPickup = qs('pickup').value.trim();
+
+    qs('pickup').value =
+      pickupText ||
+      place.name ||
+      place.address ||
+      '';
+
+    nearbyAutoFilledPickup =
+      qs('pickup')
+        .value
+        .trim();
   }
 
   if(qs('pickupPhone')){
-    qs('pickupPhone').value = phoneText;
-    nearbyAutoFilledPhone = qs('pickupPhone').value.trim();
+
+    qs('pickupPhone').value =
+      phoneText;
+
+    nearbyAutoFilledPhone =
+      qs('pickupPhone')
+        .value
+        .trim();
   }
 
-  setNearbyStatus(`已選擇：${place.name || '附近店家'}。購買地點已帶入，可再確認店名、地址與電話。`);
+  pickupPlaceId =
+    String(
+      place.placeId || ''
+    ).trim();
+
+  pickupLat =
+    toNullableNumber(
+      place.lat
+    );
+
+  pickupLng =
+    toNullableNumber(
+      place.lng
+    );
+
+  setNearbyStatus(
+    `已選擇：${
+      place.name ||
+      '附近店家'
+    }。購買地點已帶入，可再確認地址與電話。`
+  );
+
   renderNearbyPlaces();
+
+  invalidateQuote();
+
+  scheduleRouteAndQuoteRefresh(
+    120
+  );
 }
 
 function updateServiceDescription(){
@@ -3238,9 +6005,24 @@ function setBottomTabActive(tabId){
 }
 
 function hideFooterButtons(){
-  qs('prevBtn').classList.add('hidden');
-  qs('nextBtn').classList.add('hidden');
-  qs('cancelOrderBtn').classList.add('hidden');
+  document
+    .querySelector(
+      '.footer-nav'
+    )
+    ?.classList
+    .add('hidden');
+
+  qs('prevBtn')
+    ?.classList
+    .add('hidden');
+
+  qs('nextBtn')
+    ?.classList
+    .add('hidden');
+
+  qs('cancelOrderBtn')
+    ?.classList
+    .add('hidden');
 }
 
 function showOnlyStep(step){
@@ -3250,23 +6032,165 @@ function showOnlyStep(step){
   currentCustomerPage = '';
   currentStep = step;
 
-  const el = qs(`step${step}`);
+  const el =
+    qs(`step${step}`);
+
   if(el){
     el.classList.add('active');
   }
 
-  qs('pageCount').innerText = `${step} / 5`;
+  qs('pageCount').innerText =
+    `${step} / 5`;
 
-  const prevBtn = qs('prevBtn');
-  const nextBtn = qs('nextBtn');
+  const prevBtn =
+    qs('prevBtn');
 
-  prevBtn.classList.toggle('hidden', step === 1 || step === 5);
-  nextBtn.classList.toggle('hidden', step === 4 || step === 5);
+  const nextBtn =
+    qs('nextBtn');
 
-  qs('cancelOrderBtn').classList.toggle('hidden', !currentOrderId || step !== 5);
+  const footerNav =
+    document.querySelector(
+      '.footer-nav'
+    );
 
-  setBottomTabActive('tabHome');
-  window.scrollTo({ top:0, behavior:'smooth' });
+  const footerButtonRow =
+    footerNav
+      ?.querySelector(
+        '.btn-row'
+      );
+
+  const shouldShowFooter =
+    (
+      step === 2 ||
+      step === 3 ||
+      step === 5
+    );
+
+  footerNav
+    ?.classList
+    .toggle(
+      'hidden',
+      !shouldShowFooter
+    );
+
+  footerButtonRow
+    ?.classList
+    .toggle(
+      'hidden',
+      step === 5
+    );
+
+  prevBtn
+    ?.classList
+    .toggle(
+      'hidden',
+      !(
+        step === 2 ||
+        step === 3
+      )
+    );
+
+  nextBtn
+    ?.classList
+    .toggle(
+      'hidden',
+      !(
+        step === 2 ||
+        step === 3
+      )
+    );
+
+  qs('cancelOrderBtn')
+    ?.classList
+    .toggle(
+      'hidden',
+      !currentOrderId ||
+      step !== 5
+    );
+
+  setBottomTabActive(
+    'tabHome'
+  );
+
+  window.scrollTo({
+    top:
+      0,
+
+    behavior:
+      'smooth'
+  });
+
+  if(step === 1){
+
+    setTimeout(() => {
+
+      ensureCustomerMapReady()
+        .then(() => {
+
+          if(
+            window.google
+              ?.maps
+              ?.event &&
+            customerMap
+          ){
+            google.maps.event.trigger(
+              customerMap,
+              'resize'
+            );
+          }
+
+          if(lastRouteData){
+            renderRouteOnCustomerMap(
+              lastRouteData
+            );
+          }
+        })
+        .catch(err => {
+
+          console.warn(
+            '首頁地圖顯示失敗:',
+            err
+          );
+        });
+
+    }, 80);
+  }
+
+  if(step === 4){
+
+    setTimeout(() => {
+
+      ensureReviewMapReady()
+        .then(() => {
+
+          if(
+            window.google
+              ?.maps
+              ?.event &&
+            reviewMap
+          ){
+            google.maps.event.trigger(
+              reviewMap,
+              'resize'
+            );
+          }
+
+          if(lastRouteData){
+            renderRouteOnReviewMap(
+              lastRouteData
+            );
+          }
+        })
+        .catch(err => {
+
+          console.warn(
+            '確認頁地圖顯示失敗:',
+            err
+          );
+        });
+
+    }, 80);
+  }
 }
 
 function showHomeTab(){
@@ -3400,6 +6324,44 @@ function openLineOfficialAccount(){
   window.location.href = url;
 }
 
+function validateStep1Addresses(){
+  const pickup =
+    qs('pickup')
+      ?.value
+      .trim() || '';
+
+  const dropoff =
+    qs('dropoff')
+      ?.value
+      .trim() || '';
+
+  if(!pickup){
+
+    alert(
+      '請先填寫取件地點 / 購買地點 / 任務地點。'
+    );
+
+    qs('pickup')
+      ?.focus();
+
+    return false;
+  }
+
+  if(!dropoff){
+
+    alert(
+      '請先填寫送達地址 / 交付地點。若此任務不需要送達，請填寫「同取件地點」或「現場完成」。'
+    );
+
+    qs('dropoff')
+      ?.focus();
+
+    return false;
+  }
+
+  return true;
+}
+
 function validateStep2(){
   const safeCleanPhone = (value) => {
     if(typeof cleanPhone === 'function'){
@@ -3520,35 +6482,76 @@ function validateStep2(){
   
 function goNext(){
   try{
+
     if(currentStep === 1){
+
+      if(
+        !validateStep1Addresses()
+      ){
+        return;
+      }
+
+      scheduleRouteAndQuoteRefresh(
+        50
+      );
+
       showOnlyStep(2);
+
       return;
     }
 
     if(currentStep === 2){
-      if(typeof validateStep2 !== 'function'){
-        alert('系統驗證功能尚未載入，請重新整理頁面後再試。');
+
+      if(
+        typeof validateStep2 !==
+        'function'
+      ){
+
+        alert(
+          '系統驗證功能尚未載入，請重新整理頁面後再試。'
+        );
+
         return;
       }
 
-      if(!validateStep2()) return;
+      if(!validateStep2()){
+        return;
+      }
 
       showOnlyStep(3);
+
       return;
     }
 
     if(currentStep === 3){
-      if(typeof renderSummary === 'function'){
-        renderSummary();
-      }
 
       showOnlyStep(4);
+
+      setTimeout(() => {
+
+        renderSummary();
+
+        refreshRoutePreview();
+
+      }, 60);
+
       return;
     }
 
   }catch(err){
-    console.error('下一步發生錯誤:', err);
-    alert('下一步發生錯誤：' + (err.message || '請稍後再試'));
+
+    console.error(
+      '下一步發生錯誤:',
+      err
+    );
+
+    alert(
+      '下一步發生錯誤：' +
+      (
+        err.message ||
+        '請稍後再試'
+      )
+    );
   }
 }
 
@@ -3574,360 +6577,1081 @@ function goPrev(){
 }
 
 function getPayload(){
-  const pickup = qs('pickup').value.trim();
-  const dropoff = qs('dropoff').value.trim();
-  const upstairsOption = getUpstairsOption();
-  const rawAdvancePayment = getAdvancePaymentAmount();
-  const advancePayment = Number.isFinite(rawAdvancePayment) ? rawAdvancePayment : 0;
-  const note = qs('note') ? qs('note').value.trim() : '';
-  const itemText = note || serviceType || 'UBee 跑腿任務';
+  const pickup =
+    qs('pickup')
+      .value
+      .trim();
+
+  const dropoff =
+    qs('dropoff')
+      .value
+      .trim();
+
+  const upstairsOption =
+    getUpstairsOption();
+
+  const rawAdvancePayment =
+    getAdvancePaymentAmount();
+
+  const advancePayment =
+    Number.isFinite(
+      rawAdvancePayment
+    )
+      ? rawAdvancePayment
+      : 0;
+
+  const note =
+    qs('note')
+      ? qs('note')
+          .value
+          .trim()
+      : '';
+
+  const itemText =
+    note ||
+    serviceType ||
+    'UBee 跑腿任務';
 
   if(qs('item')){
-    qs('item').value = itemText;
+    qs('item').value =
+      itemText;
   }
 
   return {
     userId,
-    customerId:userId,
 
-    serviceGroup:getServiceGroupForApi(),
-    serviceKey:getServiceKeyForApi(),
+    customerId:
+      userId,
+
+    serviceGroup:
+      getServiceGroupForApi(),
+
+    serviceKey:
+      getServiceKeyForApi(),
+
     serviceType,
+
     serviceCategory,
+
     serviceMode,
-    queueMinutes:Math.max(0, Math.round(Number(qs('queueMinutes').value || 0))),
+
+    queueMinutes:
+      Math.max(
+        0,
+        Math.round(
+          Number(
+            qs('queueMinutes')
+              ?.value ||
+            0
+          )
+        )
+      ),
 
     pickup,
-    pickupAddress:pickup,
-    pickupPhone:cleanPhone(qs('pickupPhone').value),
+
+    pickupAddress:
+      pickup,
+
+    pickupPhone:
+      cleanPhone(
+        qs('pickupPhone')
+          .value
+      ),
+
+    pickupLat,
+
+    pickupLng,
+
+    pickupPlaceId,
 
     dropoff,
-    dropoffAddress:dropoff,
-    dropoffPhone:cleanPhone(qs('dropoffPhone').value),
 
-    item:itemText,
+    dropoffAddress:
+      dropoff,
+
+    dropoffPhone:
+      cleanPhone(
+        qs('dropoffPhone')
+          .value
+      ),
+
+    dropoffLat,
+
+    dropoffLng,
+
+    dropoffPlaceId,
+
+    item:
+      itemText,
+
     note,
-    speedType,
-    speed:speedType,
 
-    locationConfirmed:!!qs('locationConfirmedCheck')?.checked,
+    speedType,
+
+    speed:
+      speedType,
+
+    locationConfirmed:
+      !!qs(
+        'locationConfirmedCheck'
+      )?.checked,
 
     advancePayment,
-    estimatedGoodsAmount:advancePayment,
-    purchaseAdvanceAllowed:advancePayment > 0,
-    riderAdvanceAmount:advancePayment,
-    purchasePaymentRule:advancePayment > 0 ? 'rider_advance_then_customer_pay' : 'no_advance',
 
-    paymentMethod:INITIAL_PAYMENT_METHOD,
-    paymentLabel:INITIAL_PAYMENT_LABEL,
-    paymentStatus:'unselected',
-    isCashOrder:false,
+    estimatedGoodsAmount:
+      advancePayment,
+
+    purchaseAdvanceAllowed:
+      advancePayment > 0,
+
+    riderAdvanceAmount:
+      advancePayment,
+
+    purchasePaymentRule:
+      advancePayment > 0
+        ? 'rider_advance_then_customer_pay'
+        : 'no_advance',
+
+    paymentMethod:
+      INITIAL_PAYMENT_METHOD,
+
+    paymentLabel:
+      INITIAL_PAYMENT_LABEL,
+
+    paymentStatus:
+      'unselected',
+
+    isCashOrder:
+      false,
 
     upstairsOption,
-    upstairsLabel:getUpstairsLabel(upstairsOption),
-    upstairsFee:calculateUpstairsFee(upstairsOption),
 
-    fareMode:'base_km_minute',
+    upstairsLabel:
+      getUpstairsLabel(
+        upstairsOption
+      ),
 
-    nearbyPlace:selectedNearbyPlace ? {
-      name:selectedNearbyPlace.name || '',
-      address:selectedNearbyPlace.address || '',
-      placeId:selectedNearbyPlace.placeId || '',
-      phone:selectedNearbyPlace.phone || '',
-      lat:selectedNearbyPlace.lat || '',
-      lng:selectedNearbyPlace.lng || ''
-    } : null,
+    upstairsFee:
+      calculateUpstairsFee(
+        upstairsOption
+      ),
 
-    merchantId:currentMerchant?.id || '',
-    merchantCode:currentMerchant?.merchantId || currentMerchant?.id || '',
-    merchantName:currentMerchant?.merchantName || '',
-    merchantPhone:currentMerchant?.merchantPhone || '',
-    merchantAddress:currentMerchant?.merchantAddress || '',
-    hasMerchant:merchantMode === true
+    fareMode:
+      'base_km_minute',
+
+    nearbyPlace:
+      selectedNearbyPlace
+        ? {
+            name:
+              selectedNearbyPlace
+                .name || '',
+
+            address:
+              selectedNearbyPlace
+                .address || '',
+
+            placeId:
+              selectedNearbyPlace
+                .placeId || '',
+
+            phone:
+              selectedNearbyPlace
+                .phone || '',
+
+            lat:
+              selectedNearbyPlace
+                .lat || '',
+
+            lng:
+              selectedNearbyPlace
+                .lng || ''
+          }
+        : null,
+
+    merchantId:
+      currentMerchant?.id || '',
+
+    merchantCode:
+      currentMerchant
+        ?.merchantId ||
+      currentMerchant
+        ?.id ||
+      '',
+
+    merchantName:
+      currentMerchant
+        ?.merchantName ||
+      '',
+
+    merchantPhone:
+      currentMerchant
+        ?.merchantPhone ||
+      '',
+
+    merchantAddress:
+      currentMerchant
+        ?.merchantAddress ||
+      '',
+
+    hasMerchant:
+      merchantMode === true
   };
 }
 
 function renderSummary(){
-  const payload = getPayload();
+  const payload =
+    getPayload();
 
-  qs('summaryBox').innerHTML = `
+  qs('summaryBox')
+    .innerHTML = `
+
     <div class="summary-row">
-      <div class="summary-icon">🐝</div>
       <div>
-        <div class="summary-label">服務項目</div>
-        <div class="summary-value">${escapeHtml(getServiceGroupLabel())}｜${escapeHtml(serviceType)}｜${escapeHtml(serviceCategory)}</div>
+        <div class="summary-label">
+          取件 / 購買 / 任務地點
+        </div>
+
+        <div class="summary-value">
+          ${escapeHtml(
+            payload.pickupAddress
+          )}
+        </div>
+      </div>
+
+      <div class="summary-arrow">
+        ›
       </div>
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">📍</div>
       <div>
-        <div class="summary-label">取件 / 購買 / 任務地點</div>
-        <div class="summary-value">${escapeHtml(payload.pickupAddress)}</div>
+        <div class="summary-label">
+          送達 / 交付地點
+        </div>
+
+        <div class="summary-value">
+          ${escapeHtml(
+            payload.dropoffAddress
+          )}
+        </div>
+      </div>
+
+      <div class="summary-arrow">
+        ›
       </div>
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">🏁</div>
       <div>
-        <div class="summary-label">送達 / 交付地點</div>
-        <div class="summary-value">${escapeHtml(payload.dropoffAddress)}</div>
+        <div class="summary-label">
+          服務項目
+        </div>
+
+        <div class="summary-value">
+          ${escapeHtml(
+            getServiceGroupLabel()
+          )}
+          ｜
+          ${escapeHtml(
+            serviceType
+          )}
+          ｜
+          ${escapeHtml(
+            serviceCategory
+          )}
+        </div>
+      </div>
+
+      <div class="summary-arrow">
+        ›
       </div>
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">▣</div>
       <div>
-        <div class="summary-label">任務內容</div>
-        <div class="summary-value">${escapeHtml(payload.item)}</div>
+        <div class="summary-label">
+          任務速度
+        </div>
+
+        <div class="summary-value">
+          ${escapeHtml(
+            getSpeedLabel(
+              speedType
+            )
+          )}
+        </div>
+      </div>
+
+      <div class="summary-arrow">
+        ›
       </div>
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">✎</div>
       <div>
-        <div class="summary-label">備註</div>
-        <div class="summary-value">${escapeHtml(payload.note || '無')}</div>
+        <div class="summary-label">
+          上樓需求
+        </div>
+
+        <div class="summary-value">
+          ${escapeHtml(
+            payload.upstairsLabel
+          )}
+
+          ${
+            payload.upstairsFee > 0
+              ? `｜NT$${payload.upstairsFee}`
+              : ''
+          }
+        </div>
+      </div>
+
+      <div class="summary-arrow">
+        ›
       </div>
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">⚡</div>
       <div>
-        <div class="summary-label">任務速度</div>
-        <div class="summary-value">${escapeHtml(getSpeedLabel(speedType))}</div>
+        <div class="summary-label">
+          備註 / 任務內容
+        </div>
+
+        <div class="summary-value">
+          ${escapeHtml(
+            payload.note ||
+            '無'
+          )}
+        </div>
+      </div>
+
+      <div class="summary-arrow">
+        ›
       </div>
     </div>
 
     <div class="summary-row">
-      <div class="summary-icon">🏢</div>
       <div>
-        <div class="summary-label">上樓需求</div>
-        <div class="summary-value">${escapeHtml(payload.upstairsLabel)}${payload.upstairsFee > 0 ? `｜上樓費 NT$${payload.upstairsFee}` : ''}</div>
+        <div class="summary-label">
+          代墊費用
+        </div>
+
+        <div class="summary-value">
+          ${
+            payload.advancePayment > 0
+              ? `NT$${payload.advancePayment}`
+              : '無需代墊'
+          }
+        </div>
+      </div>
+
+      <div class="summary-arrow">
+        ›
       </div>
     </div>
-
-    <div class="summary-row">
-  <div class="summary-icon">💰</div>
-  <div>
-    <div class="summary-label">代墊費用</div>
-    <div class="summary-value">${payload.advancePayment > 0 ? `NT$${payload.advancePayment}` : '無需代墊'}</div>
-  </div>
-</div>
-
-<div class="summary-row">
-  <div class="summary-icon">💳</div>
-  <div>
-    <div class="summary-label">付款方式</div>
-    <div class="summary-value">目前先開放現金單，確認後系統會開始媒合騎士</div>
-  </div>
-</div>
-
-<div class="summary-row">
-  <div class="summary-icon">🛡️</div>
-  <div>
-    <div class="summary-label">代墊提醒</div>
-    <div class="summary-value">若有填寫代墊費用，騎士端會顯示併入後的任務總金額</div>
-  </div>
-</div>
   `;
 
   renderEstimate();
+
+  ensureReviewMapReady()
+    .then(() => {
+
+      if(lastRouteData){
+
+        renderRouteOnReviewMap(
+          lastRouteData
+        );
+      }
+    })
+    .catch(err => {
+
+      console.warn(
+        '確認頁地圖準備失敗:',
+        err
+      );
+    });
 }
 
 async function renderEstimate(){
-  const box = qs('priceBox');
-  if(!box) return;
+  const box =
+    qs('priceBox');
 
-  const money = (value) => {
-    const num = Number(value);
-    return Number.isFinite(num) && num >= 0 ? Math.round(num) : 0;
-  };
-
-  const row = (label, value, className = '') => {
-    return `
-      <div class="price-row ${className}">
-        <span>${escapeHtml(label)}</span>
-        <strong>${escapeHtml(value)}</strong>
-      </div>
-    `;
-  };
-
-  const rowIf = (condition, label, value, className = '') => {
-    return condition ? row(label, value, className) : '';
-  };
-
-  box.classList.remove('hidden');
-  box.innerHTML = '<div class="price-row"><span>費用</span><strong>系統計算中</strong></div>';
-
-  const upstairsOption = getUpstairsOption();
-  const upstairsFee = calculateUpstairsFee(upstairsOption);
-  const upstairsLabel = getUpstairsLabel(upstairsOption);
-  const advancePayment = getAdvancePaymentAmount();
-
-  if(upstairsOption === 'heavy'){
-    box.innerHTML = `
-      <div class="price-row price-total"><span>費用</span><strong>人工確認</strong></div>
-      <div class="price-note">
-        此任務選擇「重物／大量物品」，需由 UBee 跑腿人工確認重量、樓層、搬運距離與可派單狀況後再報價。
-      </div>
-    `;
-    return;
+  if(!box){
+    return null;
   }
 
-  const pickup = qs('pickup') ? qs('pickup').value.trim() : '';
-  const dropoff = qs('dropoff') ? qs('dropoff').value.trim() : '';
-  const queueMinutes = Math.max(
-    0,
-    Math.round(Number(qs('queueMinutes') ? qs('queueMinutes').value : 0))
-  );
+  const requestId =
+    ++quoteRequestSequence;
 
-  const isQueueTask = serviceGroup === 'queue';
+  const money = value => {
+    const num =
+      Number(value);
 
-  if(isQueueTask && queueMinutes <= 0){
+    return (
+      Number.isFinite(num) &&
+      num >= 0
+    )
+      ? Math.round(num)
+      : 0;
+  };
+
+  const row = (
+    label,
+    value,
+    className = ''
+  ) => `
+    <div class="price-row ${className}">
+      <span>
+        ${escapeHtml(label)}
+      </span>
+
+      <strong>
+        ${escapeHtml(value)}
+      </strong>
+    </div>
+  `;
+
+  const rowIf = (
+    condition,
+    label,
+    value,
+    className = ''
+  ) =>
+    condition
+      ? row(
+          label,
+          value,
+          className
+        )
+      : '';
+
+  box.classList.remove(
+  'hidden'
+);
+
+
+// ==============================
+// 顯示重新估價狀態
+// ==============================
+
+updateStickyEstimate(
+  '估價中...'
+);
+
+
+box.innerHTML = `
+  <div class="price-row">
+    <span>費用</span>
+    <strong>估價中...</strong>
+  </div>
+
+  <div class="price-note">
+    正在重新計算最新配送費用。
+  </div>
+`;
+
+  const upstairsOption =
+    getUpstairsOption();
+
+  const upstairsFee =
+    calculateUpstairsFee(
+      upstairsOption
+    );
+
+  const upstairsLabel =
+    getUpstairsLabel(
+      upstairsOption
+    );
+
+  const advancePayment =
+    getAdvancePaymentAmount();
+
+  if(
+    upstairsOption ===
+    'heavy'
+  ){
+    lastQuoteData = null;
+    lastEstimatedTotal = 0;
+
+    updateStickyEstimate(
+      '人工確認'
+    );
+
     box.innerHTML = `
-      <div class="price-row price-total"><span>費用</span><strong>請先填寫排隊時間</strong></div>
+      <div class="price-row price-total">
+        <span>費用</span>
+        <strong>人工確認</strong>
+      </div>
+
       <div class="price-note">
-        排隊任務需要先填寫預估排隊時間，系統才能依照後端費率計算排隊費用。
+        此任務選擇「重物／大量物品」，
+        需由 UBee 跑腿人工確認重量、
+        樓層、搬運距離與可派單狀況後再報價。
       </div>
     `;
-    return;
+
+    return null;
   }
 
-  if(!isQueueTask && (!pickup || !dropoff)){
-    box.innerHTML = `
-      <div class="price-row price-total"><span>費用</span><strong>請先填寫地址</strong></div>
-      <div class="price-note">
-        請先填寫取件地址與送達地址，系統才能依照後端路線估算費用。
-      </div>
-    `;
-    return;
-  }
+  const pickup =
+    qs('pickup')
+      ?.value
+      .trim() || '';
 
-  try{
-    const params = new URLSearchParams();
+  const dropoff =
+    qs('dropoff')
+      ?.value
+      .trim() || '';
 
-    params.set('from', pickup);
-    params.set('to', dropoff);
-    params.set('pickup', pickup);
-    params.set('dropoff', dropoff);
-
-    params.set('speedType', speedType);
-    params.set('speed', speedType);
-
-    params.set('serviceMode', isQueueTask ? 'queue' : 'normal');
-    params.set('serviceType', getServiceGroupLabel());
-    params.set('serviceKey', getServiceKeyForApi());
-
-    params.set('queueMinutes', String(queueMinutes));
-    params.set('upstairsFee', String(upstairsFee));
-    params.set('advancePayment', String(advancePayment));
-
-    const res = await fetch(`/api/quote?${params.toString()}`, {
-      cache:'no-store'
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if(!res.ok || data.success === false){
-      throw new Error(data.error || data.message || '估價失敗');
-    }
-
-    const distanceKm = parseDistanceKmFromQuote(data);
-
-    const distanceText = isQueueTask
-      ? '排隊任務'
-      : (distanceKm > 0 ? `${distanceKm.toFixed(1)} 公里` : (data.distanceText || '-'));
-
-    const durationText = isQueueTask
-      ? `${queueMinutes} 分鐘`
-      : (data.durationText || (data.durationMinutes ? `${data.durationMinutes} 分鐘` : '-'));
-
-    const baseFee = money(data.baseFee);
-    const distanceFee = money(data.distanceFee);
-    const timeFee = money(data.timeFee);
-
-    const deliveryFee = money(data.deliveryFee);
-    const serviceFee = money(data.serviceFee);
-    const speedFee = money(data.speedFee);
-    const finalUpstairsFee = money(data.upstairsFee ?? upstairsFee);
-
-    const waitingFee = money(data.waitingFee);
-    const queueTimeFee = money(data.queueTimeFee);
-    const longTaskExtraFee = money(data.longTaskExtraFee);
-
-    const serviceSubtotal = money(
-      data.serviceSubtotal ??
-      data.serviceTotal ??
-      (
-        deliveryFee +
-        waitingFee +
-        serviceFee +
-        speedFee +
-        finalUpstairsFee
+  const queueMinutes =
+    Math.max(
+      0,
+      Math.round(
+        Number(
+          qs('queueMinutes')
+            ?.value ||
+          0
+        )
       )
     );
 
-    const serverAdvancePayment = money(data.advancePayment ?? advancePayment);
+  const isQueueTask =
+    serviceGroup === 'queue';
 
-    const payableTotal = money(
-      data.customerPayableTotal ??
-      data.payableTotal ??
-      data.total ??
-      (serviceSubtotal + serverAdvancePayment)
+  if(
+    isQueueTask &&
+    queueMinutes <= 0
+  ){
+    lastQuoteData = null;
+    lastEstimatedTotal = 0;
+
+    updateStickyEstimate(
+      '待填時間'
     );
+
+    box.innerHTML = `
+      <div class="price-row price-total">
+        <span>費用</span>
+        <strong>請先填寫排隊時間</strong>
+      </div>
+
+      <div class="price-note">
+        排隊任務需要先填寫預估排隊時間，
+        系統才能依後端費率計算。
+      </div>
+    `;
+
+    return null;
+  }
+
+  if(
+    !isQueueTask &&
+    (
+      !pickup ||
+      !dropoff
+    )
+  ){
+    lastQuoteData = null;
+    lastEstimatedTotal = 0;
+
+    updateStickyEstimate(
+      '待估價'
+    );
+
+    box.innerHTML = `
+      <div class="price-row price-total">
+        <span>費用</span>
+        <strong>請先填寫地址</strong>
+      </div>
+
+      <div class="price-note">
+        請先填寫取件地址與送達地址，
+        系統才能依後端路線估算費用。
+      </div>
+    `;
+
+    return null;
+  }
+
+  try{
+
+    const params =
+      new URLSearchParams();
+
+    params.set(
+      'from',
+      pickup
+    );
+
+    params.set(
+      'to',
+      dropoff
+    );
+
+    params.set(
+      'pickup',
+      pickup
+    );
+
+    params.set(
+      'dropoff',
+      dropoff
+    );
+
+    params.set(
+      'speedType',
+      speedType
+    );
+
+    params.set(
+      'speed',
+      speedType
+    );
+
+    params.set(
+      'serviceMode',
+      isQueueTask
+        ? 'queue'
+        : 'normal'
+    );
+
+    params.set(
+      'serviceType',
+      getServiceGroupLabel()
+    );
+
+    params.set(
+      'serviceKey',
+      getServiceKeyForApi()
+    );
+
+    params.set(
+      'queueMinutes',
+      String(
+        queueMinutes
+      )
+    );
+
+    params.set(
+      'upstairsFee',
+      String(
+        upstairsFee
+      )
+    );
+
+    params.set(
+      'advancePayment',
+      String(
+        advancePayment
+      )
+    );
+
+    if(pickupPlaceId){
+
+      params.set(
+        'pickupPlaceId',
+        pickupPlaceId
+      );
+    }
+
+    if(dropoffPlaceId){
+
+      params.set(
+        'dropoffPlaceId',
+        dropoffPlaceId
+      );
+    }
+
+    if(
+      hasValidLatLng(
+        pickupLat,
+        pickupLng
+      )
+    ){
+      params.set(
+        'pickupLat',
+        String(pickupLat)
+      );
+
+      params.set(
+        'pickupLng',
+        String(pickupLng)
+      );
+    }
+
+    if(
+      hasValidLatLng(
+        dropoffLat,
+        dropoffLng
+      )
+    ){
+      params.set(
+        'dropoffLat',
+        String(dropoffLat)
+      );
+
+      params.set(
+        'dropoffLng',
+        String(dropoffLng)
+      );
+    }
+
+    const res =
+      await fetch(
+        `/api/quote?${params.toString()}`,
+        {
+          cache:
+            'no-store'
+        }
+      );
+
+    const data =
+      await res
+        .json()
+        .catch(() => ({}));
+
+    if(
+      requestId !==
+      quoteRequestSequence
+    ){
+      return null;
+    }
+
+    if(
+      !res.ok ||
+      data.success === false
+    ){
+      throw new Error(
+        data.error ||
+        data.message ||
+        '估價失敗'
+      );
+    }
+
+    const distanceKm =
+      parseDistanceKmFromQuote(
+        data
+      );
+
+    const distanceText =
+      isQueueTask
+        ? '排隊任務'
+        : (
+            distanceKm > 0
+              ? `${distanceKm.toFixed(1)} 公里`
+              : (
+                  data.distanceText ||
+                  '-'
+                )
+          );
+
+    const durationText =
+      isQueueTask
+        ? `${queueMinutes} 分鐘`
+        : (
+            data.durationText ||
+            (
+              data.durationMinutes
+                ? `${data.durationMinutes} 分鐘`
+                : '-'
+            )
+          );
+
+    const baseFee =
+      money(
+        data.baseFee
+      );
+
+    const distanceFee =
+      money(
+        data.distanceFee
+      );
+
+    const timeFee =
+      money(
+        data.timeFee
+      );
+
+    const deliveryFee =
+      money(
+        data.deliveryFee
+      );
+
+    const serviceFee =
+      money(
+        data.serviceFee
+      );
+
+    const speedFee =
+      money(
+        data.speedFee
+      );
+
+    const finalUpstairsFee =
+      money(
+        data.upstairsFee ??
+        upstairsFee
+      );
+
+    const waitingFee =
+      money(
+        data.waitingFee
+      );
+
+    const queueTimeFee =
+      money(
+        data.queueTimeFee
+      );
+
+    const longTaskExtraFee =
+      money(
+        data.longTaskExtraFee
+      );
+
+    const serviceSubtotal =
+      money(
+        data.serviceSubtotal ??
+        data.serviceTotal ??
+        (
+          deliveryFee +
+          waitingFee +
+          serviceFee +
+          speedFee +
+          finalUpstairsFee
+        )
+      );
+
+    const serverAdvancePayment =
+      money(
+        data.advancePayment ??
+        advancePayment
+      );
+
+    const payableTotal =
+      money(
+        data.customerPayableTotal ??
+        data.payableTotal ??
+        data.total ??
+        (
+          serviceSubtotal +
+          serverAdvancePayment
+        )
+      );
+
+    lastQuoteData =
+      data;
+
+    lastEstimatedTotal =
+      payableTotal;
+
+    updateStickyEstimate();
+
+    if(qs('homeEstimateMeta')){
+
+      qs('homeEstimateMeta')
+        .innerText =
+          [
+            distanceText,
+            durationText
+          ]
+            .filter(Boolean)
+            .join('・');
+    }
 
     let html = '';
 
     if(isQueueTask){
-      html += row('任務類型', '排隊任務');
-      html += row('預估排隊時間', `${queueMinutes} 分鐘`);
-      html += row('排隊基本費', `NT$${deliveryFee}`);
-      html += rowIf(queueTimeFee > 0, '排隊時間費', `NT$${queueTimeFee}`);
-      html += rowIf(longTaskExtraFee > 0, '長時間任務費', `NT$${longTaskExtraFee}`);
-      html += rowIf(waitingFee > 0, '排隊費小計', `NT$${waitingFee}`);
+
+      html +=
+        row(
+          '任務類型',
+          '排隊任務'
+        );
+
+      html +=
+        row(
+          '預估排隊時間',
+          `${queueMinutes} 分鐘`
+        );
+
+      html +=
+        row(
+          '排隊基本費',
+          `NT$${deliveryFee}`
+        );
+
+      html +=
+        rowIf(
+          queueTimeFee > 0,
+          '排隊時間費',
+          `NT$${queueTimeFee}`
+        );
+
+      html +=
+        rowIf(
+          longTaskExtraFee > 0,
+          '長時間任務費',
+          `NT$${longTaskExtraFee}`
+        );
+
+      html +=
+        rowIf(
+          waitingFee > 0,
+          '排隊費小計',
+          `NT$${waitingFee}`
+        );
+
     }else{
-      html += row('距離', distanceText);
-      html += row('預估時間', durationText);
 
-      html += rowIf(baseFee > 0, '起步價', `NT$${baseFee}`);
-      html += rowIf(distanceFee > 0, '距離費', `NT$${distanceFee}`);
-      html += rowIf(timeFee > 0, '時間費', `NT$${timeFee}`);
+      html +=
+        row(
+          '距離',
+          distanceText
+        );
 
-      html += row('配送服務費', `NT$${deliveryFee}`);
+      html +=
+        row(
+          '預估時間',
+          durationText
+        );
+
+      html +=
+        rowIf(
+          baseFee > 0,
+          '起步價',
+          `NT$${baseFee}`
+        );
+
+      html +=
+        rowIf(
+          distanceFee > 0,
+          '距離費',
+          `NT$${distanceFee}`
+        );
+
+      html +=
+        rowIf(
+          timeFee > 0,
+          '時間費',
+          `NT$${timeFee}`
+        );
+
+      html +=
+        row(
+          '配送服務費',
+          `NT$${deliveryFee}`
+        );
     }
 
-    html += row('速度處理費', `NT$${speedFee}`);
-    html += row('上樓需求', upstairsLabel);
-    html += row('上樓費', `NT$${finalUpstairsFee}`);
-    html += row('平台服務費', `NT$${serviceFee}`);
+    html +=
+      row(
+        '速度處理費',
+        `NT$${speedFee}`
+      );
 
-    html += row('服務費小計', `NT$${serviceSubtotal}`, 'price-subtotal');
+    html +=
+      row(
+        '上樓需求',
+        upstairsLabel
+      );
 
-    if(serverAdvancePayment > 0){
-      html += row('代墊費用', `NT$${serverAdvancePayment}`);
+    html +=
+      row(
+        '上樓費',
+        `NT$${finalUpstairsFee}`
+      );
+
+    html +=
+      row(
+        '平台服務費',
+        `NT$${serviceFee}`
+      );
+
+    html +=
+      row(
+        '服務費小計',
+        `NT$${serviceSubtotal}`,
+        'price-subtotal'
+      );
+
+    if(
+      serverAdvancePayment > 0
+    ){
+      html +=
+        row(
+          '代墊費用',
+          `NT$${serverAdvancePayment}`
+        );
     }
 
-    html += row('預估應付總額', `NT$${payableTotal}`, 'price-total');
+    html +=
+      row(
+        '預估應付總額',
+        `NT$${payableTotal}`,
+        'price-total'
+      );
 
     html += `
       <div class="price-note">
-        費用由 UBee 後端統一計算並回傳。若有代墊費用，代墊金額會併入客人應付總額與騎士端顯示金額；實際距離與時間以系統路線估算為準。
+        費用由 UBee 後端統一計算並回傳。
+        實際距離與時間以正式路線估算為準。
       </div>
     `;
 
-    box.innerHTML = html;
+    box.innerHTML =
+      html;
+
+    return data;
 
   }catch(err){
-    console.warn('估價失敗:', err);
 
-    box.innerHTML = `
-      <div class="price-row"><span>費用</span><strong>系統計算中</strong></div>
-      <div class="price-note">
-        若系統暫時無法估價，UBee 跑腿會依後端費率、路線距離、上樓需求與任務內容確認費用。
-      </div>
-    `;
+  // ==============================
+  // 舊的估價請求已經過期
+  // 不可以覆蓋較新的估價結果
+  // ==============================
+
+  if(
+    requestId !==
+    quoteRequestSequence
+  ){
+    return null;
   }
+
+
+  // ==============================
+  // 只有目前最新的請求失敗
+  // 才能更新畫面為估價失敗
+  // ==============================
+
+  console.warn(
+    '估價失敗:',
+    err
+  );
+
+  lastQuoteData =
+    null;
+
+  lastEstimatedTotal =
+    0;
+
+  updateStickyEstimate(
+    '估價失敗'
+  );
+
+  box.innerHTML = `
+    <div class="price-row">
+      <span>費用</span>
+      <strong>暫時無法估價</strong>
+    </div>
+
+    <div class="price-note">
+      目前無法取得正式估價，
+      請稍後再試。
+    </div>
+  `;
+
+  return null;
+}
 }
   
 function getFirstMoneyValue(order, fields){
@@ -3988,6 +7712,7 @@ function getCustomerPayableTotal(order){
   ]) || 0;
 
   const directPayableTotal = getFirstMoneyValue(order, [
+    'customerPayableTotal',
     'customerPayTotal',
     'customerPayAmount',
     'customerTotalWithAdvance',
@@ -4022,69 +7747,264 @@ function getCustomerPayableTotal(order){
 }
 
 async function createOrder(){
-  if(isSubmittingOrder) return;
-
-  if(!qs('locationConfirmedCheck')?.checked){
-    alert('請先確認取件地址與送達地址正確。');
+  if(isSubmittingOrder){
     return;
   }
 
-  if(!qs('agreeCheck').checked){
-    alert('請先勾選確認同意。');
+  // ==============================
+  // 1. 基本確認
+  // ==============================
+
+  if(
+    !qs('locationConfirmedCheck')
+      ?.checked
+  ){
+    alert(
+      '請先確認取件地址與送達地址正確。'
+    );
+
     return;
   }
 
-  if(!validateStep2()) return;
+  if(
+    !qs('agreeCheck')
+      ?.checked
+  ){
+    alert(
+      '請先勾選確認同意。'
+    );
 
-  const btn = qs('createOrderBtn');
-  const originalText = btn.innerText;
+    return;
+  }
+
+  if(!validateStep2()){
+    return;
+  }
+
+  const btn =
+    qs('createOrderBtn');
+
+  if(!btn){
+    alert(
+      '找不到提交訂單按鈕，請重新整理頁面後再試。'
+    );
+
+    return;
+  }
+
+  const originalText =
+    btn.innerText;
 
   try{
-    isSubmittingOrder = true;
-    btn.disabled = true;
-    btn.innerText = '建立訂單中...';
 
-    const payload = getPayload();
+    // ==============================
+    // 2. 先鎖定按鈕
+    // 防止重複提交
+    // ==============================
 
-    const res = await fetch('/api/orders', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify(payload)
-    });
+    isSubmittingOrder =
+      true;
 
-    const data = await res.json().catch(() => ({}));
+    btn.disabled =
+      true;
 
-    if(!res.ok || data.success === false){
-      throw new Error(data.error || data.message || '建立訂單失敗');
+    btn.innerText =
+      '重新確認估價中...';
+
+
+    // ==============================
+// 3. 強制重新取得最新正式估價
+// ==============================
+
+// 先取消尚未執行的延遲估價。
+// 避免舊的 debounce 計時器在提交期間啟動，
+// 把這次正式估價判定為過期。
+clearTimeout(
+  quoteRefreshTimer
+);
+
+quoteRefreshTimer =
+  null;
+
+
+// 清除舊估價狀態
+invalidateQuote();
+
+
+// 立即重新取得提交前的最新正式估價
+const freshQuote =
+  await renderEstimate();
+
+    // ==============================
+    // 4. 正式估價失敗
+    // 禁止建立訂單
+    // ==============================
+
+    if(
+      !freshQuote ||
+      !lastQuoteData ||
+      !Number.isFinite(
+        Number(
+          lastEstimatedTotal
+        )
+      ) ||
+      Number(
+        lastEstimatedTotal
+      ) <= 0
+    ){
+      throw new Error(
+        '目前無法取得正式估價，為避免建立錯誤金額的訂單，請稍後重新估價後再提交。'
+      );
     }
 
-    currentOrderId = data.orderId || data.id || data.order?.id || '';
-    currentOrderData = data.order || {
-      id:currentOrderId,
-      ...payload,
-      status:'pending_payment',
-      total:data.total || 0
-    };
+
+    // ==============================
+    // 5. 開始正式建立訂單
+    // ==============================
+
+    btn.innerText =
+      '建立訂單中...';
+
+    const payload =
+      getPayload();
+
+    const res =
+      await fetch(
+        '/api/orders',
+        {
+          method:
+            'POST',
+
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+
+          body:
+            JSON.stringify(
+              payload
+            )
+        }
+      );
+
+    const data =
+      await res
+        .json()
+        .catch(() => ({}));
+
+
+    // ==============================
+    // 6. 後端建立失敗
+    // ==============================
+
+    if(
+      !res.ok ||
+      data.success === false
+    ){
+      throw new Error(
+        data.error ||
+        data.message ||
+        '建立訂單失敗'
+      );
+    }
+
+
+    // ==============================
+    // 7. 儲存正式訂單資料
+    // ==============================
+
+    currentOrderId =
+      data.orderId ||
+      data.id ||
+      data.order?.id ||
+      '';
+
+    currentOrderData =
+      data.order || {
+        id:
+          currentOrderId,
+
+        ...payload,
+
+        status:
+          'pending_payment',
+
+        total:
+          data.total || 0
+      };
+
+
+    // ==============================
+    // 8. 必須取得訂單編號
+    // ==============================
 
     if(!currentOrderId){
-      throw new Error('後端未回傳訂單編號');
+      throw new Error(
+        '後端未回傳訂單編號'
+      );
     }
 
-    localStorage.setItem('ubee_current_order_id', currentOrderId);
-    qs('orderNo').innerText = currentOrderId;
+
+    // ==============================
+    // 9. 儲存本機訂單
+    // ==============================
+
+    localStorage.setItem(
+      'ubee_current_order_id',
+      currentOrderId
+    );
+
+    qs('orderNo').innerText =
+      currentOrderId;
+
+
+    // ==============================
+    // 10. 進入 STEP 5
+    // ==============================
 
     showOnlyStep(5);
-    renderTimeline(currentOrderData?.status || 'pending_payment', currentOrderData);
-    startOrderListener(currentOrderId);
-    selectPaymentMethod('cash');
+
+    renderTimeline(
+      currentOrderData?.status ||
+      'pending_payment',
+
+      currentOrderData
+    );
+
+    startOrderListener(
+      currentOrderId
+    );
+
+    selectPaymentMethod(
+      'cash'
+    );
 
   }catch(err){
-    console.error('建立訂單失敗:', err);
-    alert(err.message || '建立訂單失敗，請稍後再試。');
+
+    console.error(
+      '建立訂單失敗:',
+      err
+    );
+
+    alert(
+      err.message ||
+      '建立訂單失敗，請稍後再試。'
+    );
+
   }finally{
-    isSubmittingOrder = false;
-    btn.disabled = false;
-    btn.innerText = originalText;
+
+    // ==============================
+    // 11. 恢復按鈕
+    // ==============================
+
+    isSubmittingOrder =
+      false;
+
+    btn.disabled =
+      false;
+
+    btn.innerText =
+      originalText;
   }
 }
 
@@ -5156,6 +9076,16 @@ function fillSavedAddress(){
     qs('dropoffPhone').value = saved.phone;
   }
 
+  resetDropoffGeo();
+
+clearRoutePreview();
+
+invalidateQuote();
+
+scheduleRouteAndQuoteRefresh(
+  120
+);
+
   setAddressActionStatus('已帶入常用地址到訂單。', false);
   showHomeTab();
 }
@@ -5224,15 +9154,55 @@ async function initMerchantContext(){
 
     selectServiceFromTab(buyTab, 'buy');
 
-    if(merchant.merchantAddress || merchant.pickupAddress){
-      qs('pickup').value = merchant.merchantAddress || merchant.pickupAddress || '';
-    }
+    if(
+  merchant.merchantAddress ||
+  merchant.pickupAddress
+){
+  qs('pickup').value =
+    merchant.merchantAddress ||
+    merchant.pickupAddress ||
+    '';
 
-    if(merchant.merchantPhone || merchant.phone){
-      qs('pickupPhone').value = merchant.merchantPhone || merchant.phone || '';
-    }
+  resetPickupGeo();
+}
+    if(
+  merchant.merchantPhone ||
+  merchant.phone
+){
+  qs('pickupPhone').value =
+    merchant.merchantPhone ||
+    merchant.phone ||
+    '';
+}
 
-  }catch(err){
+
+// ==============================
+// 合作店家地址是程式自動帶入，
+// 不會觸發 input / change 事件。
+// 因此需要主動同步地圖與估價狀態。
+// ==============================
+
+clearRoutePreview();
+
+invalidateQuote();
+
+
+// 只有取件與送達地址都完整時，
+// 才立即重新計算路線與正式估價。
+if(
+  qs('pickup')
+    ?.value
+    .trim() &&
+  qs('dropoff')
+    ?.value
+    .trim()
+){
+  scheduleRouteAndQuoteRefresh(
+    120
+  );
+}
+
+}catch(err){
     console.error("讀取合作店家失敗:", err);
     alert("合作店家資料讀取失敗，請稍後再試。");
   }
@@ -5274,7 +9244,60 @@ async function initPage(){
     ]);
 
     const cfg = await configRes.json();
-    liffId = cfg.liffId || '';
+
+liffId = cfg.liffId || '';
+
+googleMapsApiKey = String(
+  cfg.googleMapsApiKey || ''
+).trim();
+
+googleMapsMapId = String(
+  cfg.googleMapsMapId || ''
+).trim();
+
+// Google Maps 載入失敗不能影響 LINE 登入、下單與付款流程。
+// 因此這裡刻意不使用 await。
+if(googleMapsApiKey){
+
+  loadGoogleMapsApi()
+    .then(async () => {
+
+      console.log(
+        '✅ UBee 客戶端地圖基礎層準備完成',
+        {
+          hasMapId:
+            !!googleMapsMapId
+        }
+      );
+
+      try{
+
+        await ensureCustomerMapReady();
+
+        await requestCurrentLocationForMap();
+
+      }catch(err){
+
+        console.warn(
+          '⚠️ UBee 首頁地圖初始化失敗，但不影響下單：',
+          err
+        );
+      }
+    })
+    .catch(err => {
+
+      console.warn(
+        '⚠️ Google Maps 暫時無法載入，但不影響下單流程：',
+        err
+      );
+    });
+
+}else{
+
+  console.warn(
+    '⚠️ /api/config 沒有回傳 googleMapsApiKey，地圖功能暫時不啟用'
+  );
+}
 
     if(window.liff && liffId){
       await Promise.race([
@@ -5292,7 +9315,7 @@ async function initPage(){
 
         if(userId && userId.startsWith('U')){
           saveLineUserId(userId);
-          setSubmitButton('確認並建立任務', false);
+          setSubmitButton('提交訂單', false);
           renderCustomerMemberInfo();
           handleInitialOpenAction();
           return;
@@ -5301,7 +9324,7 @@ async function initPage(){
 
       if(cachedUserId && cachedUserId.startsWith('U')){
         userId = cachedUserId;
-        setSubmitButton('確認並建立任務', false);
+        setSubmitButton('提交訂單', false);
         renderCustomerMemberInfo();
         handleInitialOpenAction();
         return;
@@ -5316,7 +9339,7 @@ async function initPage(){
 
     if(cachedUserId && cachedUserId.startsWith('U')){
       userId = cachedUserId;
-      setSubmitButton('確認並建立任務', false);
+      setSubmitButton('提交訂單', false);
       renderCustomerMemberInfo();
       handleInitialOpenAction();
       return;
@@ -5332,7 +9355,7 @@ async function initPage(){
 
     if(cachedUserId && cachedUserId.startsWith('U')){
       userId = cachedUserId;
-      setSubmitButton('確認並建立任務', false);
+      setSubmitButton('提交訂單', false);
       renderCustomerMemberInfo();
       handleInitialOpenAction();
       return;
@@ -5385,11 +9408,15 @@ async function initCachedOrder(){
 }
 
 renderServiceGrid('send');
-renderCategoryBox(serviceGroups.send[0]);
+renderCategoryBox(
+  serviceGroups.send[0]
+);
 updateServiceDescription();
 updateTaskPathText();
 applyDynamicFields();
 updateNearbyPlacesVisibility();
+bindOrderInputEvents();
+updateStickyEstimate();
 showOnlyStep(1);
 initMerchantContext();
 initPage();
