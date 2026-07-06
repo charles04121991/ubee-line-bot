@@ -89,7 +89,10 @@
       min-height:100vh;
       min-height:100dvh;
       margin:0 auto;
-      padding:calc(10px + env(safe-area-inset-top)) 14px calc(116px + env(safe-area-inset-bottom));
+      padding:
+        calc(10px + env(safe-area-inset-top))
+        14px
+        calc(150px + env(safe-area-inset-bottom));
       background:var(--bg);
       color:var(--text);
       overflow-x:hidden;
@@ -1754,45 +1757,96 @@
     }
 
     .bottom-tabs{
-      position:fixed;
-      left:50%;
-      transform:translateX(-50%);
-      bottom:calc(4px + env(safe-area-inset-bottom));
-      width:calc(100% - 24px);
-      max-width:500px;
-      z-index:99;
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:6px;
-      padding:7px;
-      border:1px solid rgba(17,24,39,.08);
-      border-radius:22px;
-      background:rgba(255,255,255,.96);
-      box-shadow:0 16px 36px rgba(17,24,39,.14);
-      backdrop-filter:blur(16px);
-    }
+  position:fixed;
 
-    .bottom-tab{
-      border:none;
-      border-radius:16px;
-      padding:9px 4px;
-      background:transparent;
-      color:#8b9096;
-      font-size:11px !important;
-      font-weight:1000;
-    }
+  left:50%;
+  transform:translateX(-50%);
 
-    .bottom-tab.active{
-      background:#111;
-      color:#fff;
-    }
+  bottom:0;
 
-    .bottom-tab svg{
-      display:block;
-      width:20px;
-      height:20px;
-      margin:0 auto 3px;
-    }
+  width:100%;
+  max-width:520px;
+
+  z-index:99;
+
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+
+  gap:4px;
+
+  padding:
+    8px
+    12px
+    calc(8px + env(safe-area-inset-bottom));
+
+  border-top:
+    1px solid rgba(17,24,39,.08);
+
+  border-right:none;
+  border-bottom:none;
+  border-left:none;
+
+  border-radius:
+    22px
+    22px
+    0
+    0;
+
+  background:
+    rgba(255,255,255,.98);
+
+  box-shadow:
+    0 -8px 26px rgba(17,24,39,.08);
+
+  backdrop-filter:
+    blur(16px);
+}
+
+
+.bottom-tab{
+  position:relative;
+
+  min-height:56px;
+
+  border:none;
+  border-radius:14px;
+
+  padding:
+    7px
+    4px
+    6px;
+
+  background:transparent;
+
+  color:#8b9096;
+
+  font-size:11px !important;
+  font-weight:1000;
+}
+
+
+.bottom-tab.active{
+  width:82%;
+
+  justify-self:center;
+
+  background:#111;
+
+  color:#fff;
+}
+
+
+.bottom-tab svg{
+  display:block;
+
+  width:21px;
+  height:21px;
+
+  margin:
+    0
+    auto
+    4px;
+}
 
     .ubee-map-pin{
       min-width:30px;
