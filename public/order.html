@@ -2189,35 +2189,151 @@
           <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">急件專送</button>
         </div>
 
-        <div class="section-label">路線</div>
-        <div class="address-card">
-          <div class="address-row">
-            <span class="address-dot pickup"></span>
-            <div class="address-main">
-              <div class="address-label" id="pickupTitle">取件資訊</div>
-              <input id="pickup" maxlength="120" autocomplete="street-address" placeholder="輸入取件地址 / 店家地址">
-            </div>
-          </div>
+        <!-- ==============================
+     任務細項
+     ============================== -->
 
-          <div class="address-row">
-            <span class="address-dot dropoff"></span>
-            <div class="address-main">
-              <div class="address-label" id="dropoffTitle">送達資訊</div>
-              <input id="dropoff" maxlength="120" autocomplete="street-address" placeholder="輸入送達地址 / 交付地點">
-            </div>
-          </div>
-        </div>
+<div
+  id="serviceArea"
+  class="section-label"
+>
+  任務細項
+</div>
 
-        <div id="serviceArea" class="section-label">任務細項</div>
-        <div class="service-grid-new" id="serviceGrid"></div>
+<div
+  class="service-grid-new"
+  id="serviceGrid"
+></div>
 
-        <div id="serviceCategoryBox" class="category-choice-box hidden">
-          <div class="category-choice-title" id="serviceCategoryTitle">請選擇分類</div>
-          <div class="category-choice-grid" id="serviceCategoryGrid"></div>
-        </div>
 
-        <div id="serviceDescription" class="hidden"></div>
+<!-- ==============================
+     任務分類
+     ============================== -->
 
+<div
+  id="serviceCategoryBox"
+  class="category-choice-box hidden"
+>
+
+  <div
+    class="category-choice-title"
+    id="serviceCategoryTitle"
+  >
+    請選擇分類
+  </div>
+
+  <div
+    class="category-choice-grid"
+    id="serviceCategoryGrid"
+  ></div>
+
+</div>
+
+
+<!-- ==============================
+     幫代買：附近店家
+     只有選擇幫代買時才顯示
+     ============================== -->
+
+<div
+  id="nearbyPlacesBox"
+  class="nearby-box hidden"
+>
+
+  <div class="nearby-head">
+
+    <div>
+
+      <div class="nearby-title">
+        附近店家
+      </div>
+
+      <div class="nearby-sub">
+        依代買分類搜尋附近店家。
+        點選店家後，會自動帶入購買地點與電話。
+      </div>
+
+    </div>
+
+
+    <button
+      id="nearbyReloadBtn"
+      class="nearby-btn"
+      type="button"
+      onclick="searchNearbyPlaces(true)"
+    >
+      搜尋附近
+    </button>
+
+  </div>
+
+
+  <div
+    id="nearbyPlacesStatus"
+    class="nearby-status"
+  >
+    選擇代買分類後，
+    按「搜尋附近」即可搜尋店家。
+  </div>
+
+
+  <div
+    id="nearbyPlacesList"
+    class="nearby-list"
+  ></div>
+
+</div>
+
+
+<div
+  id="serviceDescription"
+  class="hidden"
+></div>
+
+
+<!-- ==============================
+     正式配送路線
+     ============================== -->
+
+<div class="section-label">
+  路線
+</div>
+<div class="address-card">
+  <div class="address-row">
+    <span class="address-dot pickup"></span>
+    <div class="address-main">
+      <div
+        class="address-label"
+        id="pickupTitle"
+      >
+        取件資訊
+      </div>
+      <input
+        id="pickup"
+        maxlength="120"
+        autocomplete="street-address"
+        placeholder="輸入取件地址 / 店家地址"
+      >
+    </div>
+  </div>
+  <div class="address-row">
+    <span class="address-dot dropoff"></span>
+    <div class="address-main">
+      <div
+        class="address-label"
+        id="dropoffTitle"
+      >
+        送達資訊
+      </div>
+      <input
+        id="dropoff"
+        maxlength="120"
+        autocomplete="street-address"
+        placeholder="輸入送達地址 / 交付地點"
+      >
+    </div>
+  </div>
+</div>
         <div class="home-estimate">
           <div>
             <div class="home-estimate-label">目前預估</div>
@@ -2232,7 +2348,9 @@
 
     <section class="step" id="step2">
       <div class="headline">補充任務資訊</div>
-      <div class="subtext">地址已在首頁填寫。這一步補上電話、任務內容、代墊與特殊需求。</div>
+      <div class="subtext">
+        店家與配送路線已在首頁確認。這一步只需補上電話、任務內容、代墊與特殊需求。
+    </div>
 
       <div class="task-path-box">
         <div class="task-path-title">目前任務</div>
@@ -2257,18 +2375,6 @@
       <div id="urgentGuide" class="quick-guide hidden">
         <div class="quick-guide-title">急件專送提醒</div>
         <div class="quick-guide-text">急件專送適合小包裹、餐點、店家商品與生活用品等較高急迫性的配送任務，不屬於代辦服務。</div>
-      </div>
-
-      <div id="nearbyPlacesBox" class="nearby-box hidden">
-        <div class="nearby-head">
-          <div>
-            <div class="nearby-title">附近店家</div>
-            <div class="nearby-sub">依代買分類搜尋附近店家。點選後會帶入購買地點與電話。</div>
-          </div>
-          <button id="nearbyReloadBtn" class="nearby-btn" type="button" onclick="searchNearbyPlaces(true)">搜尋附近</button>
-        </div>
-        <div id="nearbyPlacesStatus" class="nearby-status">選擇代買分類後，系統會顯示附近店家。</div>
-        <div id="nearbyPlacesList" class="nearby-list"></div>
       </div>
 
       <div class="form-section">
