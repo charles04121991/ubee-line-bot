@@ -84,6 +84,13 @@ const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_SERVER_API_KEY =
   process.env.GOOGLE_MAPS_SERVER_API_KEY || GOOGLE_MAPS_API_KEY;
+
+// 可選。
+// 未設定也可以正常顯示地圖；未來若建立正式 Google Maps Map ID，
+// 只要在 Render 增加 GOOGLE_MAPS_MAP_ID 即可。
+const GOOGLE_MAPS_MAP_ID =
+  process.env.GOOGLE_MAPS_MAP_ID || '';
+
 const LIFF_ID = process.env.LIFF_ID || '';
 
 // ===== 騎士 App 登入設定 =====
@@ -4758,24 +4765,113 @@ function normalizeAddress(address) {
   return String(address || '').trim().replace(/\s+/g, '');
 }
 
+const TAIWAN_CITY_COUNTY_NAMES = [
+  '台北市',
+  '新北市',
+  '桃園市',
+  '台中市',
+  '台南市',
+  '高雄市',
+
+  '基隆市',
+  '新竹市',
+  '嘉義市',
+
+  '新竹縣',
+  '苗栗縣',
+  '彰化縣',
+  '南投縣',
+  '雲林縣',
+  '嘉義縣',
+  '屏東縣',
+  '宜蘭縣',
+  '花蓮縣',
+  '台東縣',
+  '澎湖縣',
+  '金門縣',
+  '連江縣',
+];
+
+const TAICHUNG_DISTRICTS = [
+  '中區',
+  '東區',
+  '南區',
+  '西區',
+  '北區',
+
+  '西屯區',
+  '南屯區',
+  '北屯區',
+
+  '豐原區',
+  '東勢區',
+  '大甲區',
+  '清水區',
+  '沙鹿區',
+  '梧棲區',
+
+  '后里區',
+  '神岡區',
+  '潭子區',
+  '大雅區',
+
+  '新社區',
+  '石岡區',
+  '外埔區',
+  '大安區',
+
+  '烏日區',
+  '大肚區',
+  '龍井區',
+  '霧峰區',
+
+  '太平區',
+  '大里區',
+  '和平區',
+];
+
 function normalizeTaskAddressForMaps(address) {
-  let text = String(address || '')
-    .replace(/台灣/g, '')
-    .replace(/臺灣/g, '')
-    .replace(/\s+/g, '')
-    .trim();
+  let text = String(address || '').trim();
 
   if (!text) return '';
 
-  if (text.includes('台中市') || text.includes('臺中市')) {
+  // 全部統一成「台」
+  text = text.replace(/臺/g, '台');
+
+  // 已經有「台灣」
+  if (text.startsWith('台灣')) {
+    return text;
+  }
+
+  // 已經有完整縣市名稱
+  if (
+    TAIWAN_CITY_COUNTY_NAMES.some((name) =>
+      text.includes(name)
+    )
+  ) {
     return `台灣 ${text}`;
   }
 
-  if (text.includes('豐原區')) {
+  // 使用者只輸入「台中...」
+  // 例如：台中西屯區台灣大道
+  if (text.startsWith('台中')) {
+    text = text.replace(/^台中/, '台中市');
+    return `台灣 ${text}`;
+  }
+
+  // 只有台中行政區
+  // 例如：西屯區台灣大道、豐原區中正路
+  if (
+    TAICHUNG_DISTRICTS.some((district) =>
+      text.includes(district)
+    )
+  ) {
     return `台灣 台中市 ${text}`;
   }
 
-  return `台灣 台中市 豐原區 ${text}`;
+  // 只有道路、巷弄或地標時
+  // 預設以目前主要營運城市「台中市」補足
+  return `台灣 台中市 ${text}`;
 }
 
 function getDistanceCacheKey(origin, destination) {
@@ -6112,10 +6208,175 @@ function createFinanceFlex(order) {
   };
 }
 
+// ==============================
+// UBee 地圖與 Routes API 工具
+// ==============================
+
+function getNullableCoordinate(value) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  const text = String(value).trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const number = Number(text);
+
+  return Number.isFinite(number)
+    ? number
+    : null;
+}
+
+function isValidLatitude(value) {
+  const number = getNullableCoordinate(value);
+
+  return (
+    number !== null &&
+    number >= -90 &&
+    number <= 90
+  );
+}
+
+function isValidLongitude(value) {
+  const number = getNullableCoordinate(value);
+
+  return (
+    number !== null &&
+    number >= -180 &&
+    number <= 180
+  );
+}
+
+function buildRoutesWaypoint({
+  address,
+  placeId,
+  lat,
+  lng,
+} = {}) {
+  const safePlaceId = cleanText(
+    placeId || '',
+    200
+  );
+
+  // 第一優先：
+  // Place ID 最精準，未來地址選擇器取得 Place ID 後直接使用。
+  if (safePlaceId) {
+    return {
+      placeId: safePlaceId,
+    };
+  }
+
+  // 第二優先：
+  // 已有經緯度就直接使用。
+  if (
+    isValidLatitude(lat) &&
+    isValidLongitude(lng)
+  ) {
+    return {
+      location: {
+        latLng: {
+          latitude: Number(lat),
+          longitude: Number(lng),
+        },
+      },
+    };
+  }
+
+  // 第三優先：
+  // 使用地址字串，由 Routes API 進行路線用地址解析。
+  const safeAddress =
+    normalizeTaskAddressForMaps(address);
+
+  if (safeAddress) {
+    return {
+      address: safeAddress,
+    };
+  }
+
+  return null;
+}
+
+function parseGoogleDurationSeconds(value) {
+  const text = String(value || '')
+    .trim()
+    .replace(/s$/i, '');
+
+  const seconds = Number(text);
+
+  return Number.isFinite(seconds)
+    ? Math.max(0, Math.round(seconds))
+    : 0;
+}
+
+function formatRouteDistanceText(distanceMeters) {
+  const meters = Math.max(
+    0,
+    Math.round(Number(distanceMeters || 0))
+  );
+
+  if (meters <= 0) {
+    return '-';
+  }
+
+  if (meters < 1000) {
+    return `${meters} 公尺`;
+  }
+
+  const km = meters / 1000;
+
+  return `${km.toFixed(1)} 公里`;
+}
+
+function formatRouteDurationText(durationSeconds) {
+  const seconds = Math.max(
+    0,
+    Math.round(Number(durationSeconds || 0))
+  );
+
+  if (seconds <= 0) {
+    return '-';
+  }
+
+  const minutes = Math.max(
+    1,
+    Math.round(seconds / 60)
+  );
+
+  if (minutes < 60) {
+    return `${minutes} 分鐘`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainMinutes = minutes % 60;
+
+  if (remainMinutes <= 0) {
+    return `${hours} 小時`;
+  }
+
+  return `${hours} 小時 ${remainMinutes} 分鐘`;
+}
+
 function createOrderFromApi(data) {
-  const userId = cleanText(data.userId || data.customerId || '', 80);
-  const rawServiceGroup = cleanText(data.serviceGroup || '', ORDER_INPUT_LIMITS.serviceGroup);
-  const serviceKey = cleanText(data.serviceKey || rawServiceGroup || '', 40);
+  const userId = cleanText(
+    data.userId || data.customerId || '',
+    80
+  );
+
+  const rawServiceGroup = cleanText(
+    data.serviceGroup || '',
+    ORDER_INPUT_LIMITS.serviceGroup
+  );
+
+  const serviceKey = cleanText(
+    data.serviceKey || rawServiceGroup || '',
+    40
+  );
 
   const serviceGroupMap = {
     send: '幫我送',
@@ -6124,6 +6385,7 @@ function createOrderFromApi(data) {
     queue: '幫排隊',
     helper: '全能跑腿',
     urgent: '急件專送',
+
     life:
       serviceKey === 'urgent'
         ? '急件專送'
@@ -6132,54 +6394,230 @@ function createOrderFromApi(data) {
           : '生活跑腿',
   };
 
-  const serviceGroupLabel = serviceGroupMap[rawServiceGroup] || rawServiceGroup || '';
+  const serviceGroupLabel =
+    serviceGroupMap[rawServiceGroup] ||
+    rawServiceGroup ||
+    '';
 
-  const nearbyPlace = data.nearbyPlace && typeof data.nearbyPlace === 'object'
-    ? {
-        name: cleanText(data.nearbyPlace.name || '', 80),
-        address: cleanText(data.nearbyPlace.address || '', 120),
-        placeId: cleanText(data.nearbyPlace.placeId || '', 120),
-        phone: normalizePhone(cleanText(data.nearbyPlace.phone || '', 30)),
-        lat: Number(data.nearbyPlace.lat || 0) || '',
-        lng: Number(data.nearbyPlace.lng || 0) || '',
-      }
-    : null;
+  const nearbyPlace =
+    data.nearbyPlace &&
+    typeof data.nearbyPlace === 'object'
+      ? {
+          name: cleanText(
+            data.nearbyPlace.name || '',
+            80
+          ),
 
-  const merchantId = cleanText(data.merchantId || data.merchantCode || '', 80);
-  const merchantName = cleanText(data.merchantName || '', 80);
-  const merchantPhone = normalizePhone(cleanText(data.merchantPhone || '', 30));
-  const merchantAddress = cleanText(data.merchantAddress || '', 120);
+          address: cleanText(
+            data.nearbyPlace.address || '',
+            120
+          ),
 
-  const rawNote = cleanLongText(data.note || data.item || '', ORDER_INPUT_LIMITS.note);
-  const rawItem = cleanText(data.item || rawNote || data.serviceType || 'UBee 跑腿任務', ORDER_INPUT_LIMITS.item);
-  
+          placeId: cleanText(
+            data.nearbyPlace.placeId || '',
+            200
+          ),
+
+          phone: normalizePhone(
+            cleanText(
+              data.nearbyPlace.phone || '',
+              30
+            )
+          ),
+
+          lat: getNullableCoordinate(
+            data.nearbyPlace.lat
+          ),
+
+          lng: getNullableCoordinate(
+            data.nearbyPlace.lng
+          ),
+        }
+      : null;
+
+  const merchantId = cleanText(
+    data.merchantId ||
+    data.merchantCode ||
+    '',
+    80
+  );
+
+  const merchantName = cleanText(
+    data.merchantName || '',
+    80
+  );
+
+  const merchantPhone = normalizePhone(
+    cleanText(
+      data.merchantPhone || '',
+      30
+    )
+  );
+
+  const merchantAddress = cleanText(
+    data.merchantAddress || '',
+    120
+  );
+
+  const rawNote = cleanLongText(
+    data.note ||
+    data.item ||
+    '',
+    ORDER_INPUT_LIMITS.note
+  );
+
+  const rawItem = cleanText(
+    data.item ||
+    rawNote ||
+    data.serviceType ||
+    'UBee 跑腿任務',
+    ORDER_INPUT_LIMITS.item
+  );
+
+  const pickupLat =
+    getNullableCoordinate(data.pickupLat);
+
+  const pickupLng =
+    getNullableCoordinate(data.pickupLng);
+
+  const dropoffLat =
+    getNullableCoordinate(data.dropoffLat);
+
+  const dropoffLng =
+    getNullableCoordinate(data.dropoffLng);
+
   return {
     userId,
     customerId: userId,
+
     serviceGroup: serviceGroupLabel,
-    serviceType: cleanText(data.serviceType || ''),
-    serviceCategory: cleanText(data.serviceCategory || '', 40),
-    serviceMode: cleanText(data.serviceMode || 'normal'),
+
+    serviceType: cleanText(
+      data.serviceType || '',
+      40
+    ),
+
+    serviceCategory: cleanText(
+      data.serviceCategory || '',
+      60
+    ),
+
+    serviceMode: cleanText(
+      data.serviceMode || 'normal',
+      30
+    ),
+
     serviceKey,
-    queueMinutes: Math.max(0, Math.round(Number(data.queueMinutes || 0))),
+
+    queueMinutes: Math.max(
+      0,
+      Math.round(
+        Number(data.queueMinutes || 0)
+      )
+    ),
 
     item: rawItem,
-    pickupAddress: cleanText(data.pickup || data.pickupAddress || '', ORDER_INPUT_LIMITS.pickupAddress),
-    pickupPhone: normalizePhone(cleanText(data.pickupPhone || '', ORDER_INPUT_LIMITS.pickupPhone)),
-    dropoffAddress: cleanText(data.dropoff || data.dropoffAddress || '', ORDER_INPUT_LIMITS.dropoffAddress),
-    dropoffPhone: normalizePhone(cleanText(data.dropoffPhone || '', ORDER_INPUT_LIMITS.dropoffPhone)),
 
-    speedType: ['standard', 'priority', 'express'].includes(data.speedType || data.speed)
-      ? (data.speedType || data.speed)
+    pickupAddress: cleanText(
+      data.pickup ||
+      data.pickupAddress ||
+      '',
+      ORDER_INPUT_LIMITS.pickupAddress
+    ),
+
+    pickupPhone: normalizePhone(
+      cleanText(
+        data.pickupPhone || '',
+        ORDER_INPUT_LIMITS.pickupPhone
+      )
+    ),
+
+    pickupLat:
+      isValidLatitude(pickupLat)
+        ? pickupLat
+        : null,
+
+    pickupLng:
+      isValidLongitude(pickupLng)
+        ? pickupLng
+        : null,
+
+    pickupPlaceId: cleanText(
+      data.pickupPlaceId || '',
+      200
+    ),
+
+    dropoffAddress: cleanText(
+      data.dropoff ||
+      data.dropoffAddress ||
+      '',
+      ORDER_INPUT_LIMITS.dropoffAddress
+    ),
+
+    dropoffPhone: normalizePhone(
+      cleanText(
+        data.dropoffPhone || '',
+        ORDER_INPUT_LIMITS.dropoffPhone
+      )
+    ),
+
+    dropoffLat:
+      isValidLatitude(dropoffLat)
+        ? dropoffLat
+        : null,
+
+    dropoffLng:
+      isValidLongitude(dropoffLng)
+        ? dropoffLng
+        : null,
+
+    dropoffPlaceId: cleanText(
+      data.dropoffPlaceId || '',
+      200
+    ),
+
+    speedType: [
+      'standard',
+      'priority',
+      'express'
+    ].includes(
+      data.speedType || data.speed
+    )
+      ? (
+          data.speedType ||
+          data.speed
+        )
       : 'standard',
 
     note: rawNote,
-    advancePayment: parseNonNegativeMoney(data.advancePayment),
 
-    upstairsOption: cleanText(data.upstairsOption || 'none', 30),
-    upstairsLabel: cleanText(data.upstairsLabel || '', 60),
-    upstairsFee: Math.max(0, Math.round(Number(data.upstairsFee || 0))),
-    fareMode: cleanText(data.fareMode || 'distance_tier', 40),
+    advancePayment:
+      parseNonNegativeMoney(
+        data.advancePayment
+      ),
+
+    upstairsOption: cleanText(
+      data.upstairsOption || 'none',
+      30
+    ),
+
+    upstairsLabel: cleanText(
+      data.upstairsLabel || '',
+      80
+    ),
+
+    upstairsFee: Math.max(
+      0,
+      Math.round(
+        Number(data.upstairsFee || 0)
+      )
+    ),
+
+    fareMode: cleanText(
+      data.fareMode ||
+      'base_km_minute',
+      40
+    ),
 
     nearbyPlace,
 
@@ -6188,17 +6626,28 @@ function createOrderFromApi(data) {
     merchantName,
     merchantPhone,
     merchantAddress,
-    hasMerchant: data.hasMerchant === true || !!merchantId || !!merchantName,
+
+    hasMerchant:
+      data.hasMerchant === true ||
+      !!merchantId ||
+      !!merchantName,
   };
 }
 app.get('/api/config', (req, res) => {
   res.json({
     success: true,
+
     liffId: LIFF_ID,
     riderLiffId: RIDER_LIFF_ID,
+
     businessFormUrl: BUSINESS_FORM_URL,
     partnerFormUrl: PARTNER_FORM_URL,
+
+    // 瀏覽器端 Maps JavaScript API Key
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+
+    // 可選的正式 Map ID
+    googleMapsMapId: GOOGLE_MAPS_MAP_ID,
   });
 });
 
@@ -6296,6 +6745,351 @@ app.get('/api/nearby-places', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: err.message || '附近地點搜尋失敗'
+    });
+  }
+});
+
+// ==============================
+// UBee 客戶端地圖真實路線 API
+//
+// 功能：
+// 1. 取得真正道路路線
+// 2. 回傳 encoded polyline
+// 3. 回傳取件 / 送達實際路線座標
+// 4. 回傳 Place ID
+//
+// 注意：
+// 此 API 只負責地圖顯示。
+// 正式金額仍然全部由 /api/quote 計算。
+// ==============================
+app.post('/api/map-route', async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const originWaypoint =
+      buildRoutesWaypoint({
+        address:
+          body.originAddress ||
+          body.pickupAddress ||
+          body.origin ||
+          body.pickup ||
+          '',
+
+        placeId:
+          body.originPlaceId ||
+          body.pickupPlaceId ||
+          '',
+
+        lat:
+          body.originLat ??
+          body.pickupLat,
+
+        lng:
+          body.originLng ??
+          body.pickupLng,
+      });
+
+    const destinationWaypoint =
+      buildRoutesWaypoint({
+        address:
+          body.destinationAddress ||
+          body.dropoffAddress ||
+          body.destination ||
+          body.dropoff ||
+          '',
+
+        placeId:
+          body.destinationPlaceId ||
+          body.dropoffPlaceId ||
+          '',
+
+        lat:
+          body.destinationLat ??
+          body.dropoffLat,
+
+        lng:
+          body.destinationLng ??
+          body.dropoffLng,
+      });
+
+    if (
+      !originWaypoint ||
+      !destinationWaypoint
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          '請提供正確的取件地點與送達地點。',
+      });
+    }
+
+    if (!GOOGLE_MAPS_SERVER_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error:
+          'GOOGLE_MAPS_SERVER_API_KEY 尚未設定。',
+      });
+    }
+
+    const routesResponse = await fetch(
+      'https://routes.googleapis.com/directions/v2:computeRoutes',
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+
+          'X-Goog-Api-Key':
+            GOOGLE_MAPS_SERVER_API_KEY,
+
+          'X-Goog-FieldMask': [
+            'routes.distanceMeters',
+            'routes.duration',
+
+            'routes.polyline.encodedPolyline',
+
+            'routes.legs.startLocation',
+            'routes.legs.endLocation',
+
+            'geocodingResults.origin.placeId',
+            'geocodingResults.destination.placeId',
+          ].join(','),
+        },
+
+        body: JSON.stringify({
+          origin: originWaypoint,
+
+          destination:
+            destinationWaypoint,
+
+          travelMode: 'DRIVE',
+
+          // 與目前 Distance Matrix 正式估價邏輯保持接近，
+          // 地圖本身不另外改變財務計算。
+          routingPreference:
+            'TRAFFIC_UNAWARE',
+
+          computeAlternativeRoutes: false,
+
+          routeModifiers: {
+            avoidTolls: false,
+            avoidHighways: false,
+            avoidFerries: false,
+          },
+
+          languageCode: 'zh-TW',
+          regionCode: 'tw',
+          units: 'METRIC',
+
+          polylineQuality:
+            'HIGH_QUALITY',
+
+          polylineEncoding:
+            'ENCODED_POLYLINE',
+        }),
+      }
+    );
+
+    const routesData =
+      await routesResponse
+        .json()
+        .catch(() => ({}));
+
+    if (!routesResponse.ok) {
+      console.error(
+        '❌ Google Routes API 錯誤：',
+        {
+          status:
+            routesResponse.status,
+
+          data:
+            routesData,
+        }
+      );
+
+      return res.status(502).json({
+        success: false,
+
+        error:
+          routesData?.error?.message ||
+          'Google 路線取得失敗。',
+      });
+    }
+
+    const route =
+      routesData?.routes?.[0];
+
+    if (!route) {
+      return res.status(404).json({
+        success: false,
+        error:
+          '找不到可使用的道路路線。',
+      });
+    }
+
+    const distanceMeters =
+      Math.max(
+        0,
+        Math.round(
+          Number(
+            route.distanceMeters || 0
+          )
+        )
+      );
+
+    const durationSeconds =
+      parseGoogleDurationSeconds(
+        route.duration
+      );
+
+    const encodedPolyline =
+      String(
+        route?.polyline
+          ?.encodedPolyline ||
+        ''
+      );
+
+    if (!encodedPolyline) {
+      return res.status(502).json({
+        success: false,
+        error:
+          'Google 路線沒有回傳可顯示的路線資料。',
+      });
+    }
+
+    const firstLeg =
+      route?.legs?.[0] || {};
+
+    const startLatLng =
+      firstLeg?.startLocation
+        ?.latLng || {};
+
+    const endLatLng =
+      firstLeg?.endLocation
+        ?.latLng || {};
+
+    const originLat =
+      getNullableCoordinate(
+        startLatLng.latitude
+      );
+
+    const originLng =
+      getNullableCoordinate(
+        startLatLng.longitude
+      );
+
+    const destinationLat =
+      getNullableCoordinate(
+        endLatLng.latitude
+      );
+
+    const destinationLng =
+      getNullableCoordinate(
+        endLatLng.longitude
+      );
+
+    const originPlaceId =
+      String(
+        routesData
+          ?.geocodingResults
+          ?.origin
+          ?.placeId ||
+        body.originPlaceId ||
+        body.pickupPlaceId ||
+        ''
+      );
+
+    const destinationPlaceId =
+      String(
+        routesData
+          ?.geocodingResults
+          ?.destination
+          ?.placeId ||
+        body.destinationPlaceId ||
+        body.dropoffPlaceId ||
+        ''
+      );
+
+    return res.json({
+      success: true,
+
+      distanceMeters,
+
+      distanceKm:
+        Math.round(
+          (
+            distanceMeters /
+            1000
+          ) * 100
+        ) / 100,
+
+      distanceText:
+        formatRouteDistanceText(
+          distanceMeters
+        ),
+
+      durationSeconds,
+
+      durationMinutes:
+        Math.max(
+          1,
+          Math.round(
+            durationSeconds / 60
+          )
+        ),
+
+      durationText:
+        formatRouteDurationText(
+          durationSeconds
+        ),
+
+      encodedPolyline,
+
+      originLocation: {
+        lat: originLat,
+        lng: originLng,
+      },
+
+      destinationLocation: {
+        lat: destinationLat,
+        lng: destinationLng,
+      },
+
+      routeStartLat:
+  originLat,
+
+routeStartLng:
+  originLng,
+
+routeEndLat:
+  destinationLat,
+
+routeEndLng:
+  destinationLng,
+
+      originPlaceId,
+      destinationPlaceId,
+
+      pickupPlaceId:
+        originPlaceId,
+
+      dropoffPlaceId:
+        destinationPlaceId,
+    });
+
+  } catch (err) {
+    console.error(
+      '❌ /api/map-route 失敗：',
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      error:
+        err.message ||
+        '地圖路線取得失敗。',
     });
   }
 });
@@ -6951,84 +7745,271 @@ const serviceSubtotal = Math.max(0, Math.round(Number(price.total || 0)));
 const customerPayableTotal = serviceSubtotal + advancePayment;
 
     const order = {
-      id,
-      userId: data.userId,
-      customerId: data.customerId,
-      riderId: '',
-      status: 'pending_payment',
-      serviceGroup: data.serviceGroup,
-      serviceType: data.serviceType,
-      serviceMode: data.serviceMode,
-      serviceKey: data.serviceKey,
-      queueMinutes: data.queueMinutes,
-      item: data.item,
-      pickupAddress: data.pickupAddress,
-      pickupPhone: data.pickupPhone,
-      dropoffAddress: data.dropoffAddress,
-      dropoffPhone: data.dropoffPhone,
-      merchantId: data.merchantId || '',
-      merchantCode: data.merchantCode || data.merchantId || '',
-      merchantName: data.merchantName || '',
-      merchantPhone: data.merchantPhone || '',
-      merchantAddress: data.merchantAddress || '',
-      hasMerchant: data.hasMerchant || false,
-      speedType: data.speedType,
-      note: data.note,
+  id,
 
-      advancePayment,
-      advanceAmount: advancePayment,
-      estimatedGoodsAmount: advancePayment,
-      estimatedAdvancePayment: advancePayment,
-      estimatedAdvanceAmount: advancePayment,
-      riderAdvanceAmount: advancePayment,
-      purchaseAdvanceAllowed: advancePayment > 0,
-      purchasePaymentRule: advancePayment > 0
-        ? 'rider_advance_then_customer_pay'
-        : 'no_advance',
+  userId:
+    data.userId,
 
-      serviceSubtotal,
-      customerPayableTotal,
-      payableTotal: customerPayableTotal,
-      riderDisplayTotal: customerPayableTotal,
-      duplicateFingerprint: getDuplicateFingerprint(data),
-      distanceMeters: data.serviceMode === 'queue' ? 0 : distance.distanceMeters,
-      durationSeconds: data.serviceMode === 'queue' ? 0 : distance.durationSeconds,
-      distanceText: data.serviceMode === 'queue' ? '排隊任務' : distance.distanceText,
-      durationText: data.serviceMode === 'queue' ? `${data.queueMinutes} 分鐘內` : distance.durationText,
+  customerId:
+    data.customerId,
 
-      ...price,
+  riderId: '',
 
-      // 注意：...price 裡面的 total 是服務費小計，這裡要覆蓋成客人實際應付總額
-      total: customerPayableTotal,
-      finalTotal: customerPayableTotal,
-      customerTotalWithAdvance: customerPayableTotal,
-      serviceTotal: serviceSubtotal,
+  status:
+    'pending_payment',
 
-      etaMinutes: null,
+  // ==============================
+  // 服務資料
+  // ==============================
+  serviceGroup:
+    data.serviceGroup,
 
-      // UBee 第一階段正式營運版：建立訂單後先等待客人確認現金單
-      paymentMethod: '',
-      paymentMethodLabel: '尚未選擇',
-      paymentLabel: '尚未選擇',
-      paymentStatus: 'unselected',
+  serviceType:
+    data.serviceType,
 
-      isCashOrder: false,
-      cashCollectAmount: 0,
-      cashCollected: false,
+  serviceCategory:
+    data.serviceCategory,
 
-      isPaid: false,
-      paidAt: null,
-      waitingFeeRequested: false,
-      waitingFeeApproved: false,
-      waitingFeeRejected: false,
-      waitingFeeRequestedAt: null,
-      createdAt: Date.now(),
-      acceptedAt: null,
-      arrivedPickupAt: null,
-      pickedUpAt: null,
-      arrivedDropoffAt: null,
-      completedAt: null,
-    };
+  serviceMode:
+    data.serviceMode,
+
+  serviceKey:
+    data.serviceKey,
+
+  queueMinutes:
+    data.queueMinutes,
+
+  // ==============================
+  // 任務內容
+  // ==============================
+  item:
+    data.item,
+
+  note:
+    data.note,
+
+  // ==============================
+  // 取件資訊
+  // ==============================
+  pickupAddress:
+    data.pickupAddress,
+
+  pickupPhone:
+    data.pickupPhone,
+
+  pickupLat:
+    data.pickupLat,
+
+  pickupLng:
+    data.pickupLng,
+
+  pickupPlaceId:
+    data.pickupPlaceId || '',
+
+  // ==============================
+  // 送達資訊
+  // ==============================
+  dropoffAddress:
+    data.dropoffAddress,
+
+  dropoffPhone:
+    data.dropoffPhone,
+
+  dropoffLat:
+    data.dropoffLat,
+
+  dropoffLng:
+    data.dropoffLng,
+
+  dropoffPlaceId:
+    data.dropoffPlaceId || '',
+
+  // ==============================
+  // 任務設定
+  // ==============================
+  speedType:
+    data.speedType,
+
+  upstairsOption:
+    data.upstairsOption,
+
+  upstairsLabel:
+    data.upstairsLabel,
+
+  upstairsFee:
+    data.upstairsFee,
+
+  fareMode:
+    data.fareMode,
+
+  // ==============================
+  // 附近店家資料
+  // ==============================
+  nearbyPlace:
+    data.nearbyPlace || null,
+
+  // ==============================
+  // 合作店家資料
+  // ==============================
+  merchantId:
+    data.merchantId || '',
+
+  merchantCode:
+    data.merchantCode ||
+    data.merchantId ||
+    '',
+
+  merchantName:
+    data.merchantName || '',
+
+  merchantPhone:
+    data.merchantPhone || '',
+
+  merchantAddress:
+    data.merchantAddress || '',
+
+  hasMerchant:
+    data.hasMerchant || false,
+
+  // ==============================
+  // 代墊資料
+  // ==============================
+  advancePayment,
+
+  advanceAmount:
+    advancePayment,
+
+  estimatedGoodsAmount:
+    advancePayment,
+
+  estimatedAdvancePayment:
+    advancePayment,
+
+  estimatedAdvanceAmount:
+    advancePayment,
+
+  riderAdvanceAmount:
+    advancePayment,
+
+  purchaseAdvanceAllowed:
+    advancePayment > 0,
+
+  purchasePaymentRule:
+    advancePayment > 0
+      ? 'rider_advance_then_customer_pay'
+      : 'no_advance',
+
+  // ==============================
+  // 正式費用
+  // ==============================
+  serviceSubtotal,
+
+  customerPayableTotal,
+
+  payableTotal:
+    customerPayableTotal,
+
+  riderDisplayTotal:
+    customerPayableTotal,
+
+  duplicateFingerprint:
+    getDuplicateFingerprint(data),
+
+  // ==============================
+  // 路線資料
+  // ==============================
+  distanceMeters:
+    data.serviceMode === 'queue'
+      ? 0
+      : distance.distanceMeters,
+
+  durationSeconds:
+    data.serviceMode === 'queue'
+      ? 0
+      : distance.durationSeconds,
+
+  distanceText:
+    data.serviceMode === 'queue'
+      ? '排隊任務'
+      : distance.distanceText,
+
+  durationText:
+    data.serviceMode === 'queue'
+      ? `${data.queueMinutes} 分鐘內`
+      : distance.durationText,
+
+  // 正式價格計算結果。
+  // 這裡仍然完全使用你現在的 calculatePrice /
+  // calculateFinancialSplit。
+  ...price,
+
+  // ...price 裡面的 total 是服務費小計。
+  // 客人實際應付總額必須在這裡覆蓋回來。
+  total:
+    customerPayableTotal,
+
+  finalTotal:
+    customerPayableTotal,
+
+  customerTotalWithAdvance:
+    customerPayableTotal,
+
+  serviceTotal:
+    serviceSubtotal,
+
+  etaMinutes: null,
+
+  // ==============================
+  // UBee 現金單正式流程
+  // ==============================
+  paymentMethod: '',
+
+  paymentMethodLabel:
+    '尚未選擇',
+
+  paymentLabel:
+    '尚未選擇',
+
+  paymentStatus:
+    'unselected',
+
+  isCashOrder: false,
+
+  cashCollectAmount: 0,
+
+  cashCollected: false,
+
+  isPaid: false,
+
+  paidAt: null,
+
+  // ==============================
+  // 等候費
+  // ==============================
+  waitingFeeRequested: false,
+
+  waitingFeeApproved: false,
+
+  waitingFeeRejected: false,
+
+  waitingFeeRequestedAt: null,
+
+  // ==============================
+  // 時間
+  // ==============================
+  createdAt:
+    Date.now(),
+
+  acceptedAt: null,
+
+  arrivedPickupAt: null,
+
+  pickedUpAt: null,
+
+  arrivedDropoffAt: null,
+
+  completedAt: null,
+};
 
     await saveOrder(order);
 
