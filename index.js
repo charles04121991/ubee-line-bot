@@ -112,37 +112,400 @@ const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
 // ===== 已審核騎手白名單 =====
 const APPROVED_RIDER_IDS = [];
 
-async function sendNewOrderPushToRiders(order) {
+// ===== UBee 距離分段派單工具 =====
+
+function getDispatchPushCoordinate(value) {
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue)
+    ? numberValue
+    : null;
+}
+
+
+function getOrderPickupPointForPush(order = {}) {
+  const latCandidates = [
+    order.pickupLat,
+    order.pickupLatitude,
+    order.fromLat,
+    order.fromLatitude,
+    order.pickupLocation?.lat,
+    order.pickupLocation?.latitude,
+  ];
+
+  const lngCandidates = [
+    order.pickupLng,
+    order.pickupLongitude,
+    order.fromLng,
+    order.fromLongitude,
+    order.pickupLocation?.lng,
+    order.pickupLocation?.longitude,
+  ];
+
+  const lat = latCandidates
+    .map(getDispatchPushCoordinate)
+    .find(value =>
+      value !== null &&
+      value >= -90 &&
+      value <= 90
+    );
+
+  const lng = lngCandidates
+    .map(getDispatchPushCoordinate)
+    .find(value =>
+      value !== null &&
+      value >= -180 &&
+      value <= 180
+    );
+
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    return null;
+  }
+
+  return {
+    lat,
+    lng,
+  };
+}
+
+
+function getRiderCurrentPointForPush(rider = {}) {
+  const latCandidates = [
+    rider.currentLat,
+    rider.currentLocation?.lat,
+    rider.latitude,
+    rider.lat,
+  ];
+
+  const lngCandidates = [
+    rider.currentLng,
+    rider.currentLocation?.lng,
+    rider.longitude,
+    rider.lng,
+  ];
+
+  const lat = latCandidates
+    .map(getDispatchPushCoordinate)
+    .find(value =>
+      value !== null &&
+      value >= -90 &&
+      value <= 90
+    );
+
+  const lng = lngCandidates
+    .map(getDispatchPushCoordinate)
+    .find(value =>
+      value !== null &&
+      value >= -180 &&
+      value <= 180
+    );
+
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    return null;
+  }
+
+  return {
+    lat,
+    lng,
+  };
+}
+
+
+function getDispatchPushTimeMs(value) {
+  if (!value) {
+    return 0;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value)
+      ? value
+      : 0;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+
+    return Number.isFinite(parsed)
+      ? parsed
+      : 0;
+  }
+
+  if (
+    value &&
+    typeof value.toMillis === 'function'
+  ) {
+    return value.toMillis();
+  }
+
+  if (
+    value &&
+    typeof value.toDate === 'function'
+  ) {
+    return value.toDate().getTime();
+  }
+
+  if (
+    value &&
+    typeof value.seconds === 'number'
+  ) {
+    return value.seconds * 1000;
+  }
+
+  if (
+    value &&
+    typeof value._seconds === 'number'
+  ) {
+    return value._seconds * 1000;
+  }
+
+  return 0;
+}
+
+
+function isRiderLocationFreshForPush(
+  rider = {},
+  maxAgeMs = 120000
+) {
+  const updatedAtMs =
+    getDispatchPushTimeMs(
+      rider.locationUpdatedAtMs
+    ) ||
+    getDispatchPushTimeMs(
+      rider.locationUpdatedAt
+    ) ||
+    getDispatchPushTimeMs(
+      rider.currentLocation?.updatedAt
+    );
+
+  if (!updatedAtMs) {
+    return false;
+  }
+
+  const ageMs =
+    Date.now() - updatedAtMs;
+
+  return (
+    ageMs >= 0 &&
+    ageMs <= maxAgeMs
+  );
+}
+
+
+function calcDispatchPushDistanceKm(
+  lat1,
+  lng1,
+  lat2,
+  lng2
+) {
+  const values = [
+    lat1,
+    lng1,
+    lat2,
+    lng2,
+  ].map(Number);
+
+  if (
+    values.some(value =>
+      !Number.isFinite(value)
+    )
+  ) {
+    return null;
+  }
+
+  const [
+    safeLat1,
+    safeLng1,
+    safeLat2,
+    safeLng2,
+  ] = values;
+
+  const earthRadiusKm = 6371;
+
+  const toRadians = value =>
+    value * Math.PI / 180;
+
+  const deltaLat =
+    toRadians(
+      safeLat2 - safeLat1
+    );
+
+  const deltaLng =
+    toRadians(
+      safeLng2 - safeLng1
+    );
+
+  const a =
+    Math.sin(deltaLat / 2) *
+    Math.sin(deltaLat / 2) +
+    Math.cos(
+      toRadians(safeLat1)
+    ) *
+    Math.cos(
+      toRadians(safeLat2)
+    ) *
+    Math.sin(deltaLng / 2) *
+    Math.sin(deltaLng / 2);
+
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+  return Number(
+    (
+      earthRadiusKm * c
+    ).toFixed(2)
+  );
+}
+
+async function sendNewOrderPushToRiders(
+  order,
+  maxRadiusKm = null,
+  options = {}
+) {
   try {
-    const orderId = order.id || order.orderId || "";
-    if (!orderId) return;
+    const orderId =
+      order.id ||
+      order.orderId ||
+      "";
 
-    const fee = order.driverFee || order.riderFee || "未設定";
-    const pickup = order.pickupAddress || order.fromAddress || order.pickup || "附近取件地";
-    const dropoff = order.dropoffAddress || order.toAddress || order.dropoff || "送達地未提供";
+    if (!orderId) {
+      return;
+    }
 
+    const fee =
+      order.driverFee ||
+      order.riderFee ||
+      "未設定";
+
+    const pickup =
+      order.pickupAddress ||
+      order.fromAddress ||
+      order.pickup ||
+      "附近取件地";
+
+    const dropoff =
+      order.dropoffAddress ||
+      order.toAddress ||
+      order.dropoff ||
+      "送達地未提供";
+
+    const isRedispatch =
+      Number(order.transferCount || 0) > 0 ||
+      !!order.transferredAt ||
+      !!order.redispatchStartedAtMs;
+
+    const skippedRiderIds = new Set(
+      (
+        Array.isArray(order.skippedRiderIds)
+          ? order.skippedRiderIds
+          : []
+      )
+        .map(value =>
+          String(value || "").trim()
+        )
+        .filter(Boolean)
+    );
+
+        const normalizedMaxRadiusKm =
+      Number(maxRadiusKm);
+
+    const hasRadiusLimit =
+      Number.isFinite(normalizedMaxRadiusKm) &&
+      normalizedMaxRadiusKm > 0 &&
+      normalizedMaxRadiusKm < 999;
+
+    const pickupPoint =
+      getOrderPickupPointForPush(order);
+
+    const pushRadiusLabel =
+      hasRadiusLimit
+        ? `${normalizedMaxRadiusKm}km`
+        : "全區";
+
+        const safeOptions =
+      options &&
+      typeof options === "object"
+        ? options
+        : {};
+
+    const excludedRiderDocIds =
+      new Set(
+        (
+          Array.isArray(
+            safeOptions.excludedRiderDocIds
+          )
+            ? safeOptions.excludedRiderDocIds
+            : []
+        )
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      );
+
+    const sendLineAdmin =
+      safeOptions.sendLineAdmin !== false;
+
+    const notifiedRiderDocIds = [];
+    
+
+    if (
+      hasRadiusLimit &&
+      !pickupPoint
+    ) {
+      console.warn(
+        `⚠️ UBee 距離派單無法取得取件座標，orderId=${orderId}，radius=${normalizedMaxRadiusKm}km`
+      );
+    }
+    
     // ==============================
     // 1. iPhone / PWA Web Push 派單通知
     // ==============================
     try {
-      if (!WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) {
-        console.warn("⚠️ Web Push VAPID 尚未設定，略過 iPhone Web Push 派單通知");
+      if (
+        !WEB_PUSH_PUBLIC_KEY ||
+        !WEB_PUSH_PRIVATE_KEY
+      ) {
+        console.warn(
+          "⚠️ Web Push VAPID 尚未設定，略過 iPhone Web Push 派單通知"
+        );
+
       } else {
-        const ridersSnap = await db.collection("riders")
+        const ridersSnap = await db
+          .collection("riders")
           .limit(300)
           .get();
 
         let webPushSuccess = 0;
         let webPushFail = 0;
-
+        let skippedRiderCount = 0;
+        let distanceFilteredRiderCount = 0;
+        let staleLocationRiderCount = 0;
+        
         const pushPayload = JSON.stringify({
-          title: "UBee 新任務",
+          title:
+            isRedispatch
+              ? "UBee 轉派任務"
+              : "UBee 新任務",
+
           body:
-`有新的跑腿任務等待接單
+`${isRedispatch
+  ? "有一張任務重新開放接單"
+  : "有新的跑腿任務等待接單"}
 
 取件：${pickup}
 送達：${dropoff}
 騎士收入：$${fee}`,
+
           url: "/rider.html",
           orderId
         });
@@ -150,7 +513,8 @@ async function sendNewOrderPushToRiders(order) {
         const pushTasks = [];
 
         ridersSnap.forEach((riderDoc) => {
-          const rider = riderDoc.data() || {};
+          const rider =
+            riderDoc.data() || {};
 
           const riderApproved =
             rider.approved === true ||
@@ -162,8 +526,48 @@ async function sendNewOrderPushToRiders(order) {
           const webPushEnabled =
             rider.webPushEnabled === true;
 
-          const subscription = rider.webPushSubscription;
+          const subscription =
+            rider.webPushSubscription;
 
+          const riderIdentityKeys = [
+            riderDoc.id,
+            rider.riderId,
+            normalizePhone(
+              rider.phone ||
+              rider.mobile ||
+              ""
+            ),
+            rider.lineUserId
+          ]
+            .map(value =>
+              String(value || "").trim()
+            )
+            .filter(Boolean);
+
+          const riderAlreadySkipped =
+            riderIdentityKeys.some(
+              key => skippedRiderIds.has(key)
+            );
+
+          if (riderAlreadySkipped) {
+            skippedRiderCount += 1;
+            return;
+          }
+
+                    const riderDocId =
+            String(
+              riderDoc.id || ""
+            ).trim();
+
+          if (
+            riderDocId &&
+            excludedRiderDocIds.has(
+              riderDocId
+            )
+          ) {
+            return;
+          }
+          
           if (
             !riderApproved ||
             !riderOnline ||
@@ -174,29 +578,101 @@ async function sendNewOrderPushToRiders(order) {
             return;
           }
 
+                    if (hasRadiusLimit) {
+            if (!pickupPoint) {
+              distanceFilteredRiderCount += 1;
+              return;
+            }
+
+            const riderPoint =
+              getRiderCurrentPointForPush(rider);
+
+            const riderLocationFresh =
+              isRiderLocationFreshForPush(rider);
+
+            if (
+              !riderPoint ||
+              !riderLocationFresh
+            ) {
+              staleLocationRiderCount += 1;
+              return;
+            }
+
+            const distanceKm =
+              calcDispatchPushDistanceKm(
+                riderPoint.lat,
+                riderPoint.lng,
+                pickupPoint.lat,
+                pickupPoint.lng
+              );
+
+            if (
+              !Number.isFinite(distanceKm) ||
+              distanceKm > normalizedMaxRadiusKm
+            ) {
+              distanceFilteredRiderCount += 1;
+              return;
+            }
+          }
+          
           pushTasks.push(
-            webpush.sendNotification(subscription, pushPayload)
+            webpush
+              .sendNotification(
+                subscription,
+                pushPayload
+              )
               .then(() => {
                 webPushSuccess += 1;
+
+                if (riderDocId) {
+                  notifiedRiderDocIds.push(
+                    riderDocId
+                  );
+                }
               })
               .catch(async (pushErr) => {
                 webPushFail += 1;
 
                 console.error(
                   `UBee Web Push 發送失敗 rider=${riderDoc.id}:`,
-                  pushErr && pushErr.message ? pushErr.message : pushErr
+                  pushErr &&
+                  pushErr.message
+                    ? pushErr.message
+                    : pushErr
                 );
 
-                const statusCode = Number(pushErr && pushErr.statusCode);
+                const statusCode =
+                  Number(
+                    pushErr &&
+                    pushErr.statusCode
+                  );
 
-                // 404 / 410 代表這支手機的訂閱已失效，直接關閉避免之後一直失敗
-                if (statusCode === 404 || statusCode === 410) {
-                  await db.collection("riders").doc(riderDoc.id).set({
-                    webPushSubscription: admin.firestore.FieldValue.delete(),
-                    webPushEnabled: false,
-                    webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    webPushError: `expired_subscription_${statusCode}`
-                  }, { merge: true });
+                // 404 / 410 代表這支手機的訂閱已失效，
+                // 直接關閉避免之後一直失敗
+                if (
+                  statusCode === 404 ||
+                  statusCode === 410
+                ) {
+                  await db
+                    .collection("riders")
+                    .doc(riderDoc.id)
+                    .set(
+                      {
+                        webPushSubscription:
+                          admin.firestore.FieldValue.delete(),
+
+                        webPushEnabled: false,
+
+                        webPushUpdatedAt:
+                          admin.firestore.FieldValue.serverTimestamp(),
+
+                        webPushError:
+                          `expired_subscription_${statusCode}`
+                      },
+                      {
+                        merge: true
+                      }
+                    );
                 }
               })
           );
@@ -204,51 +680,557 @@ async function sendNewOrderPushToRiders(order) {
 
         await Promise.all(pushTasks);
 
-        console.log(
-          `UBee Web Push 新任務通知完成：${orderId}，成功 ${webPushSuccess}，失敗 ${webPushFail}`
+                console.log(
+          `UBee Web Push ${
+            isRedispatch
+              ? "轉派"
+              : "新任務"
+          }通知完成：${orderId}，範圍 ${pushRadiusLabel}，成功 ${webPushSuccess}，失敗 ${webPushFail}，略過已取消騎士 ${skippedRiderCount}，距離外 ${distanceFilteredRiderCount}，位置過期或缺失 ${staleLocationRiderCount}`
         );
       }
+
     } catch (webPushErr) {
-      console.error("UBee Web Push 新任務通知失敗:", webPushErr);
+      console.error(
+        "UBee Web Push 新任務通知失敗:",
+        webPushErr
+      );
     }
 
+        if (!sendLineAdmin) {
+      return {
+        success: true,
+        orderId,
+        notifiedRiderDocIds:
+          Array.from(
+            new Set(
+              notifiedRiderDocIds
+            )
+          ),
+      };
+    }
+    
     // ==============================
     // 2. 原本 LINE 管理通知保留
     // ==============================
-        try {
-      const targetGroupId = LINE_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID;
+    try {
+      const targetGroupId =
+        LINE_GROUP_ID ||
+        LINE_ADMIN_GROUP_ID ||
+        LINE_FINISH_GROUP_ID;
 
-if (!targetGroupId) {
-  console.warn(
-    `UBee LINE 新任務通知略過：未設定 LINE_GROUP_ID / LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
-  );
-} else {
-  await client.pushMessage(targetGroupId, {
-          type: "text",
-          text:
-`🔔 UBee 跑腿新任務通知
+      if (!targetGroupId) {
+        console.warn(
+          `UBee LINE 新任務通知略過：未設定 LINE_GROUP_ID / LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
+        );
 
-有新的跑腿任務等待接單
+      } else {
+        await client.pushMessage(
+          targetGroupId,
+          {
+            type: "text",
+
+            text:
+`${isRedispatch
+  ? "🔁 UBee 跑腿任務重新轉派"
+  : "🔔 UBee 跑腿新任務通知"}
+
+${isRedispatch
+  ? "原接單騎士已取消，任務重新開放接單"
+  : "有新的跑腿任務等待接單"}
 
 📍取件：${pickup}
 🏁送達：${dropoff}
 💰騎士收入：$${fee}`
-        });
+          }
+        );
 
-        console.log(`UBee LINE 新任務通知已送出：${orderId}`);
+        console.log(
+          `UBee LINE ${
+            isRedispatch
+              ? "轉派"
+              : "新任務"
+          }通知已送出：${orderId}`
+        );
       }
 
     } catch (lineErr) {
-      console.error("UBee LINE 新任務通知失敗:", {
-        orderId,
-        statusCode: lineErr?.statusCode || lineErr?.response?.status,
-        statusMessage: lineErr?.statusMessage || lineErr?.message,
-      });
+      console.error(
+        "UBee LINE 新任務通知失敗:",
+        {
+          orderId,
+
+          statusCode:
+            lineErr?.statusCode ||
+            lineErr?.response?.status,
+
+          statusMessage:
+            lineErr?.statusMessage ||
+            lineErr?.message,
+        }
+      );
     }
 
+      return {
+      success: true,
+      orderId,
+      notifiedRiderDocIds:
+        Array.from(
+          new Set(
+            notifiedRiderDocIds
+          )
+        ),
+    };
+
   } catch (err) {
-    console.error("UBee 新任務通知失敗:", err);
+    console.error(
+      "UBee 新任務通知失敗:",
+      err
+    );
+
+    return {
+      success: false,
+
+      orderId:
+        String(
+          order?.id ||
+          order?.orderId ||
+          ""
+        ).trim(),
+
+      notifiedRiderDocIds: [],
+
+      error:
+        err &&
+        err.message
+          ? err.message
+          : String(err || ""),
+    };
   }
+}
+
+// ===== UBee 3km → 5km → 全區派單排程 =====
+
+const dispatchPushTimers = new Map();
+
+
+function buildDispatchPushCycleId(orderId) {
+  const safeOrderId =
+    String(orderId || "")
+      .trim()
+      .toUpperCase();
+
+  return (
+    `${safeOrderId}_` +
+    `${Date.now()}_` +
+    `${Math.random()
+      .toString(36)
+      .slice(2, 8)}`
+  );
+}
+
+
+function clearDispatchPushTimers(orderId) {
+  const safeOrderId =
+    String(orderId || "")
+      .trim()
+      .toUpperCase();
+
+  if (!safeOrderId) {
+    return;
+  }
+
+  const timers =
+    dispatchPushTimers.get(
+      safeOrderId
+    );
+
+  if (Array.isArray(timers)) {
+    timers.forEach(timer => {
+      clearTimeout(timer);
+    });
+  }
+
+  dispatchPushTimers.delete(
+    safeOrderId
+  );
+}
+
+
+async function runDispatchPushWave(
+  orderId,
+  cycleId,
+  maxRadiusKm,
+  stage,
+  sendLineAdmin = false
+) {
+  const safeOrderId =
+    String(orderId || "")
+      .trim()
+      .toUpperCase();
+
+  const safeCycleId =
+    String(cycleId || "")
+      .trim();
+
+  if (
+    !safeOrderId ||
+    !safeCycleId
+  ) {
+    return false;
+  }
+
+  const orderRef =
+    db.collection("orders")
+      .doc(safeOrderId);
+
+  const orderDoc =
+    await orderRef.get();
+
+  if (!orderDoc.exists) {
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
+    return false;
+  }
+
+  const order = {
+    id: orderDoc.id,
+    ...orderDoc.data(),
+  };
+
+  // 已被接單／取消／完成，就停止後續擴圈
+  if (
+    String(order.status || "").trim() !==
+    "pending_dispatch"
+  ) {
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
+    return false;
+  }
+
+  // 防止舊計時器誤觸新的轉派週期
+  if (
+    String(
+      order.dispatchPushCycleId || ""
+    ).trim() !== safeCycleId
+  ) {
+    return false;
+  }
+
+  const alreadyNotified =
+    Array.isArray(
+      order.dispatchPushNotifiedRiderDocIds
+    )
+      ? order
+          .dispatchPushNotifiedRiderDocIds
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  const pushResult =
+    await sendNewOrderPushToRiders(
+      order,
+      maxRadiusKm,
+      {
+        excludedRiderDocIds:
+          alreadyNotified,
+
+        sendLineAdmin,
+      }
+    );
+
+  const newlyNotified =
+    Array.isArray(
+      pushResult?.notifiedRiderDocIds
+    )
+      ? pushResult
+          .notifiedRiderDocIds
+          .map(value =>
+            String(value || "").trim()
+          )
+          .filter(Boolean)
+      : [];
+
+  // 推播過程中可能剛好被別人接單，
+  // 寫入階段資料前再確認一次。
+  const latestOrderDoc =
+    await orderRef.get();
+
+  if (!latestOrderDoc.exists) {
+    return false;
+  }
+
+  const latestOrder =
+    latestOrderDoc.data() || {};
+
+  if (
+    String(
+      latestOrder.status || ""
+    ).trim() !== "pending_dispatch"
+  ) {
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
+    return false;
+  }
+
+  if (
+    String(
+      latestOrder.dispatchPushCycleId || ""
+    ).trim() !== safeCycleId
+  ) {
+    return false;
+  }
+
+  const nowMs = Date.now();
+
+  const updateData = {
+    dispatchPushStage: stage,
+
+    dispatchPushLastRadiusKm:
+      maxRadiusKm === null
+        ? 999
+        : Number(maxRadiusKm),
+
+    dispatchPushLastRunAtMs:
+      nowMs,
+
+    dispatchPushLastRunAt:
+      admin.firestore.FieldValue
+        .serverTimestamp(),
+  };
+
+  if (stage === "3km") {
+    updateData.dispatchPush3kmAt =
+      admin.firestore.FieldValue
+        .serverTimestamp();
+  }
+
+  if (stage === "5km") {
+    updateData.dispatchPush5kmAt =
+      admin.firestore.FieldValue
+        .serverTimestamp();
+  }
+
+  if (stage === "all") {
+    updateData.dispatchPushAllAt =
+      admin.firestore.FieldValue
+        .serverTimestamp();
+  }
+
+  if (newlyNotified.length) {
+    updateData
+      .dispatchPushNotifiedRiderDocIds =
+        admin.firestore.FieldValue
+          .arrayUnion(
+            ...newlyNotified
+          );
+  }
+
+  await orderRef.update(
+    updateData
+  );
+
+  console.log(
+    `UBee 分段派單完成：` +
+    `${safeOrderId}，` +
+    `階段 ${stage}，` +
+    `本次新通知 ${newlyNotified.length} 位騎士`
+  );
+
+  if (stage === "all") {
+    dispatchPushTimers.delete(
+      safeOrderId
+    );
+  }
+
+  return true;
+}
+
+
+async function startDispatchPushSequence(
+  order,
+  existingCycleId = ""
+) {
+  const safeOrderId =
+    String(
+      order?.id ||
+      order?.orderId ||
+      ""
+    )
+      .trim()
+      .toUpperCase();
+
+  if (!safeOrderId) {
+    throw new Error(
+      "DISPATCH_ORDER_ID_MISSING"
+    );
+  }
+
+  clearDispatchPushTimers(
+    safeOrderId
+  );
+
+  const cycleId =
+    String(
+      existingCycleId ||
+      order?.dispatchPushCycleId ||
+      buildDispatchPushCycleId(
+        safeOrderId
+      )
+    ).trim();
+
+  const startedAtMs =
+    Date.now();
+
+  const orderRef =
+    db.collection("orders")
+      .doc(safeOrderId);
+
+  await orderRef.set(
+    {
+      dispatchPushCycleId:
+        cycleId,
+
+      dispatchPushNotifiedRiderDocIds:
+        [],
+
+      dispatchPushStage:
+        "scheduled",
+
+      dispatchPushStartedAtMs:
+        startedAtMs,
+
+      dispatchPushStartedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp(),
+
+      dispatchStartedAtMs:
+        startedAtMs,
+
+      dispatchPush3kmAt:
+        null,
+
+      dispatchPush5kmAt:
+        null,
+
+      dispatchPushAllAt:
+        null,
+    },
+    {
+      merge: true,
+    }
+  );
+
+  order.dispatchPushCycleId =
+    cycleId;
+
+  order.dispatchPushNotifiedRiderDocIds =
+    [];
+
+  order.dispatchStartedAtMs =
+    startedAtMs;
+
+  // 第一階段：立即推 3km
+  const wave3KmCompleted =
+    await runDispatchPushWave(
+      safeOrderId,
+      cycleId,
+      3,
+      "3km",
+      true
+    );
+
+  // 如果 3km 波次完成前訂單已被接走、取消、完成，
+  // 或派單週期已經改變，就不要再建立任何後續計時器。
+  if (!wave3KmCompleted) {
+    return cycleId;
+  }
+
+  const elapsedMs =
+    Date.now() - startedAtMs;
+
+  const delayTo5Km =
+    Math.max(
+      0,
+      30000 - elapsedMs
+    );
+
+  // 第二階段：30 秒後擴大到 5km。
+  // 5km 必須完整執行完畢後，才允許建立全區計時器，
+  // 從結構上保證 5km 與全區絕對不會並行。
+  const timer5Km =
+    setTimeout(async () => {
+      try {
+        const wave5KmCompleted =
+          await runDispatchPushWave(
+            safeOrderId,
+            cycleId,
+            5,
+            "5km",
+            false
+          );
+
+        // 訂單已被接走、取消、完成，
+        // 或這已經不是目前的派單週期，就不再排全區。
+        if (!wave5KmCompleted) {
+          return;
+        }
+
+        const delayToAll =
+          Math.max(
+            0,
+            60000 -
+              (
+                Date.now() -
+                startedAtMs
+              )
+          );
+
+        // 第三階段：最早在派單開始 60 秒後進入全區。
+        // 如果 5km 波次執行超過 60 秒，則等 5km 完整結束後立即執行，
+        // 仍然不會與 5km 重疊。
+        const timerAll =
+          setTimeout(() => {
+            runDispatchPushWave(
+              safeOrderId,
+              cycleId,
+              null,
+              "all",
+              false
+            ).catch(err => {
+              console.error(
+                `❌ UBee 全區派單失敗：${safeOrderId}`,
+                err
+              );
+            });
+          }, delayToAll);
+
+        dispatchPushTimers.set(
+          safeOrderId,
+          [timerAll]
+        );
+
+      } catch (err) {
+        console.error(
+          `❌ UBee 5km 派單失敗：${safeOrderId}`,
+          err
+        );
+      }
+    }, delayTo5Km);
+
+  dispatchPushTimers.set(
+    safeOrderId,
+    [timer5Km]
+  );
+
+  return cycleId;
 }
 
 const PAYMENT_JKO_INFO =
@@ -1156,6 +2138,15 @@ app.get('/api/rider/tasks', async (req, res) => {
       });
     }
 
+        const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+
+    const identity = buildRiderApiIdentity(riderDoc, rider, {
+      lineUserId,
+      phone,
+      riderId,
+    });
+    
     const snap = await db
       .collection('orders')
       .where('status', '==', 'pending_dispatch')
@@ -1168,6 +2159,7 @@ app.get('/api/rider/tasks', async (req, res) => {
         ...doc.data()
       }))
       .filter(order => isRiderVisibleDispatchOrder(order))
+      .filter(order => !isOrderSkippedForRider(order, identity))
       .slice(0, 30);
 
     return res.json({
@@ -3768,6 +4760,34 @@ function isOrderBelongsToRider(order = {}, identity = {}) {
   return false;
 }
 
+function getRiderIdentityKeys(identity = {}) {
+  return Array.from(new Set([
+    identity.riderDocId,
+    identity.riderId,
+    identity.phone,
+    identity.lineUserId,
+  ]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)));
+}
+
+function isOrderSkippedForRider(order = {}, identity = {}) {
+  const skippedRiderIds = Array.isArray(order.skippedRiderIds)
+    ? order.skippedRiderIds
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+    : [];
+
+  if (!skippedRiderIds.length) {
+    return false;
+  }
+
+  const skippedSet = new Set(skippedRiderIds);
+
+  return getRiderIdentityKeys(identity)
+    .some(key => skippedSet.has(key));
+}
+
 // ===== 騎手上線 / 下線狀態 API =====
 // 手機登入正式版：支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/status', async (req, res) => {
@@ -4664,20 +5684,54 @@ const distanceCache = new Map();
 let orderCounter = 1;
 
 async function saveOrder(order) {
-  if (!order || !order.id) return order;
+  if (!order || !order.id) {
+    return order;
+  }
 
   orders[order.id] = order;
 
-  await db.collection('orders').doc(order.id).set(order, { merge: true });
+  await db
+    .collection('orders')
+    .doc(order.id)
+    .set(
+      order,
+      {
+        merge: true
+      }
+    );
 
-  if (order.status === 'pending_dispatch' && !order.pushSentAt) {
-    await sendNewOrderPushToRiders(order);
+  if (
+    order.status ===
+      'pending_dispatch' &&
+    !order.pushSentAt
+  ) {
+    const cycleId =
+      await startDispatchPushSequence(
+        order
+      );
 
-    await db.collection('orders').doc(order.id).set({
-      pushSentAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    await db
+      .collection('orders')
+      .doc(order.id)
+      .set(
+        {
+          pushSentAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
 
-    order.pushSentAt = Date.now();
+          dispatchPushCycleId:
+            cycleId,
+        },
+        {
+          merge: true
+        }
+      );
+
+    order.pushSentAt =
+      Date.now();
+
+    order.dispatchPushCycleId =
+      cycleId;
   }
 
   return order;
@@ -8344,6 +9398,10 @@ app.post('/api/rider/accept-order', async (req, res) => {
         throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
       }
 
+      if (isOrderSkippedForRider(order, identity)) {
+        throw new Error('RIDER_ALREADY_SKIPPED_ORDER');
+      }
+      
       const acceptedEtaPayload = getEtaPayloadByStatus('accepted');
 
       const acceptUpdateData = {
@@ -8385,6 +9443,10 @@ app.post('/api/rider/accept-order', async (req, res) => {
 
     orders[safeOrderId] = acceptedOrder;
 
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+    
     try {
       await notifyCustomer(
         acceptedOrder,
@@ -8435,6 +9497,13 @@ app.post('/api/rider/accept-order', async (req, res) => {
       });
     }
 
+    if (error.message === 'RIDER_ALREADY_SKIPPED_ORDER') {
+      return res.status(409).json({
+        success: false,
+        message: '你已略過或取消這張任務，系統已轉派給其他騎士。',
+      });
+    }
+    
     return res.status(500).json({
       success: false,
       message: '接單失敗，請稍後再試。',
@@ -8442,36 +9511,86 @@ app.post('/api/rider/accept-order', async (req, res) => {
   }
 });
 
-// ===== 騎士轉單 API =====
-// 已接單騎士可把任務退回待派遣，重新開放給其他騎士接單
+// ===== 騎士取消／轉派 API =====
+// 取消的是「騎士承接」，不是取消客人的訂單。
+// 只有 accepted 狀態可以直接取消／轉派。
+// 成功後訂單退回 pending_dispatch，重新開放給其他騎士。
 app.post('/api/rider/transfer-order', async (req, res) => {
   try {
-    const { orderId, lineUserId, reason } = req.body;
+    const {
+      orderId,
+      lineUserId,
+      phone,
+      riderId,
+      reason,
+    } = req.body || {};
 
-    if (!orderId || !lineUserId) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: '缺少訂單編號或騎士 LINE 身分。'
+        message: '缺少訂單編號。',
       });
     }
 
-    const orderRef = db.collection('orders').doc(String(orderId).toUpperCase());
+    const safeReason = String(reason || '')
+      .trim()
+      .slice(0, 120);
 
-    const riderSnap = await db.collection('riders')
-      .where('lineUserId', '==', lineUserId)
-      .limit(1)
-      .get();
-
-    if (riderSnap.empty) {
-      return res.status(403).json({
+    if (!safeReason) {
+      return res.status(400).json({
         success: false,
-        message: '找不到騎士資料。'
+        message: '請選擇取消／轉派原因。',
       });
     }
 
-    const riderDoc = riderSnap.docs[0];
-    const rider = riderDoc.data();
-    const riderRef = db.collection('riders').doc(riderDoc.id);
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
+        success: false,
+        message:
+          riderResult.message ||
+          '找不到可操作任務的騎士身分。',
+      });
+    }
+
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+
+    const identity = buildRiderApiIdentity(
+      riderDoc,
+      rider,
+      {
+        lineUserId,
+        phone,
+        riderId,
+      }
+    );
+
+    const safeOrderId = String(orderId)
+      .trim()
+      .toUpperCase();
+
+    const orderRef = db
+      .collection('orders')
+      .doc(safeOrderId);
+
+    const riderRef = db
+      .collection('riders')
+      .doc(riderDoc.id);
+
+    const nowMs = Date.now();
+
+    const redispatchPushCycleId =
+      buildDispatchPushCycleId(
+        safeOrderId
+      );
+    
+    let transferredOrder = null;
 
     await db.runTransaction(async (transaction) => {
       const orderDoc = await transaction.get(orderRef);
@@ -8480,80 +9599,259 @@ app.post('/api/rider/transfer-order', async (req, res) => {
         throw new Error('ORDER_NOT_FOUND');
       }
 
-      const order = orderDoc.data();
+      const order = orderDoc.data() || {};
 
-      if (order.riderLineUserId !== lineUserId && order.riderId !== lineUserId) {
+      const currentStatus = String(
+        order.status || ''
+      ).trim();
+
+      if (!isOrderBelongsToRider(order, identity)) {
         throw new Error('NOT_YOUR_ORDER');
       }
 
-      if (order.status !== 'accepted') {
+      if (currentStatus !== 'accepted') {
         throw new Error('ORDER_ALREADY_STARTED');
       }
 
-      transaction.update(orderRef, {
-  status: 'pending_dispatch',
-  riderStatus: 'pending_dispatch',
+      const riderSkipKeys =
+        getRiderIdentityKeys(identity);
 
-  previousRiderLineUserId: lineUserId,
-  previousRiderDocId: riderDoc.id,
-  previousRiderName: rider.name || '',
-  previousRiderPhone: rider.phone || '',
-  transferReason: reason || '',
-  transferredAt: admin.firestore.FieldValue.serverTimestamp(),
+      const transferUpdateData = {
+        status: 'pending_dispatch',
+        riderStatus: 'pending_dispatch',
 
-  riderId: '',
-  riderLineUserId: '',
-  riderDocId: '',
-  riderName: '',
-  riderPhone: '',
+        previousRiderLineUserId:
+          identity.lineUserId || '',
 
-  acceptedAt: null,
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  'statusTimes.transferred': admin.firestore.FieldValue.serverTimestamp(),
-  ...getEtaPayloadByStatus('pending_dispatch'),
-});
+        previousRiderDocId:
+          identity.riderDocId || '',
 
-      transaction.set(riderRef, {
-        busy: false,
-        currentOrderId: '',
-        lastActive: Date.now(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+        previousRiderId:
+          identity.riderId || '',
+
+        previousRiderName:
+          rider.name ||
+          rider.riderName ||
+          '',
+
+        previousRiderPhone:
+          identity.phone ||
+          rider.phone ||
+          '',
+
+        transferReason: safeReason,
+
+        transferCount:
+          admin.firestore.FieldValue.increment(1),
+
+        transferRequestedAtMs: nowMs,
+
+        transferredAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+
+        dispatchStartedAtMs: nowMs,
+
+        redispatchStartedAtMs: nowMs,
+
+        dispatchPushCycleId:
+          redispatchPushCycleId,
+
+        dispatchPushNotifiedRiderDocIds:
+          [],
+
+        dispatchPushStage:
+          'scheduled',
+        
+        dispatchUpdatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+
+        riderId: '',
+        riderLineUserId: '',
+        riderDocId: '',
+        riderName: '',
+        riderPhone: '',
+
+        acceptedAt: null,
+
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+
+        'statusTimes.transferred':
+          admin.firestore.FieldValue.serverTimestamp(),
+
+        ...getEtaPayloadByStatus('pending_dispatch'),
+      };
+
+      if (riderSkipKeys.length) {
+        transferUpdateData.skippedRiderIds =
+          admin.firestore.FieldValue.arrayUnion(
+            ...riderSkipKeys
+          );
+      }
+
+      transaction.update(
+        orderRef,
+        transferUpdateData
+      );
+
+      transaction.set(
+        riderRef,
+        {
+          busy: false,
+          currentOrderId: '',
+          lastActive: nowMs,
+
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+        },
+        {
+          merge: true,
+        }
+      );
+
+      transferredOrder = {
+        ...order,
+
+        id: safeOrderId,
+
+        status: 'pending_dispatch',
+        riderStatus: 'pending_dispatch',
+
+        riderId: '',
+        riderLineUserId: '',
+        riderDocId: '',
+        riderName: '',
+        riderPhone: '',
+
+        acceptedAt: null,
+
+        previousRiderLineUserId:
+          identity.lineUserId || '',
+
+        previousRiderDocId:
+          identity.riderDocId || '',
+
+        previousRiderId:
+          identity.riderId || '',
+
+        previousRiderName:
+          rider.name ||
+          rider.riderName ||
+          '',
+
+        previousRiderPhone:
+          identity.phone ||
+          rider.phone ||
+          '',
+
+        transferReason: safeReason,
+
+        transferRequestedAtMs: nowMs,
+
+        dispatchStartedAtMs: nowMs,
+
+        redispatchStartedAtMs: nowMs,
+
+        dispatchPushCycleId:
+          redispatchPushCycleId,
+
+        dispatchPushNotifiedRiderDocIds:
+          [],
+
+        dispatchPushStage:
+          'scheduled',
+        
+        skippedRiderIds: Array.from(
+          new Set([
+            ...(
+              Array.isArray(order.skippedRiderIds)
+                ? order.skippedRiderIds
+                : []
+            ),
+            ...riderSkipKeys,
+          ])
+        ),
+      };
     });
 
+    orders[safeOrderId] = transferredOrder;
+
+            try {
+      await startDispatchPushSequence(
+        transferredOrder,
+        redispatchPushCycleId
+      );
+
+      await orderRef.set(
+        {
+          redispatchPushSentAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          redispatchPushCycleId:
+            redispatchPushCycleId,
+        },
+        {
+          merge: true,
+        }
+      );
+
+    } catch (pushErr) {
+      console.error(
+        '⚠️ 任務已成功轉派，但重新分段派單失敗：',
+        pushErr
+      );
+    }
+    
     return res.json({
       success: true,
+
+      orderId: safeOrderId,
+
       status: 'pending_dispatch',
-      message: '轉單成功，任務已重新開放給其他騎士。'
+
+      order: transferredOrder,
+
+      message:
+        '已取消目前承接，任務正在轉派給其他騎士。',
     });
 
   } catch (error) {
-    console.error('❌ 騎士轉單失敗：', error);
+    console.error(
+      '❌ 騎士取消／轉派失敗：',
+      error
+    );
 
     if (error.message === 'ORDER_NOT_FOUND') {
       return res.status(404).json({
         success: false,
-        message: '找不到此訂單。'
+        message: '找不到此訂單。',
       });
     }
 
     if (error.message === 'NOT_YOUR_ORDER') {
       return res.status(403).json({
         success: false,
-        message: '此訂單不是你目前接的任務。'
+        message:
+          '此訂單不是你目前承接的任務。',
       });
     }
 
     if (error.message === 'ORDER_ALREADY_STARTED') {
       return res.status(409).json({
         success: false,
-        message: '任務已開始進行，不能轉單。'
+        message:
+          '任務已開始執行，不能直接取消／轉派。請改用安全中心回報 UBee。',
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: '轉單失敗，請稍後再試。'
+
+      message:
+        '取消／轉派失敗，請稍後再試。',
+
+      error: error.message,
     });
   }
 });
