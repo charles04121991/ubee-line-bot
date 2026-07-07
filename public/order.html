@@ -2522,14 +2522,14 @@ margin:
     
             <section class="step" id="step3">
       <div class="headline">選擇任務速度</div>
-      <div class="subtext">正式金額仍由 UBee 後端依路線距離、預估時間、速度、上樓需求與平台服務費統一計算。</div>
+      <div class="subtext">正式金額仍由 UBee 跑腿依路線距離、預估時間、速度、上樓需求與平台服務費統一計算。</div>
 
       <div class="speed-list">
         <div class="speed-card active" data-speed="standard" onclick="selectSpeed('standard')">
           <div class="speed-top">
             <div>
               <div class="speed-name">一般件</div>
-              <div class="speed-time">90–120 分鐘</div>
+              <div class="speed-time">60-90 分鐘</div>
             </div>
             <div class="speed-check">✓</div>
           </div>
@@ -2540,7 +2540,7 @@ margin:
           <div class="speed-top">
             <div>
               <div class="speed-name">標準件</div>
-              <div class="speed-time">60–90 分鐘</div>
+              <div class="speed-time">30-60 分鐘</div>
             </div>
             <div class="speed-check">✓</div>
           </div>
@@ -2551,7 +2551,7 @@ margin:
           <div class="speed-top">
             <div>
               <div class="speed-name">優先件</div>
-              <div class="speed-time">45–60 分鐘</div>
+              <div class="speed-time">20-30 分鐘</div>
             </div>
             <div class="speed-check">✓</div>
           </div>
@@ -5124,7 +5124,7 @@ async function renderEstimate(){
 
     html += `
       <div class="price-note">
-        費用由 UBee 後端統一計算並回傳。實際距離與時間以系統路線估算為準。
+        費用由 UBee 跑腿系統統一計算並回傳。實際距離與時間以系統路線估算為準。
       </div>
     `;
 
@@ -5709,7 +5709,7 @@ async function confirmPaid(){
 
       <div class="payment-card-note">
         現金單已進入派單流程。
-        騎士接單後，
+        騎士接單後
         請留意任務進度與電話聯繫。
       </div>
     `;
