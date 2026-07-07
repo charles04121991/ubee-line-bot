@@ -1030,30 +1030,103 @@
     .review-map-shell{
       position:relative;
       height:252px;
-      margin:0 -14px 14px;
+      margin:0 -14px 0;
       overflow:hidden;
       background:#e8eaed;
       border-top:1px solid var(--line);
       border-bottom:1px solid var(--line);
     }
 
-    .review-route-badge{
-      position:absolute;
-      left:14px;
-      right:14px;
-      bottom:14px;
-      z-index:5;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding:12px 14px;
-      border:1px solid rgba(17,24,39,.08);
-      border-radius:16px;
-      background:rgba(255,255,255,.96);
-      box-shadow:0 10px 24px rgba(17,24,39,.13);
-      backdrop-filter:blur(12px);
-    }
+    /* ==============================
+   STEP 4 路線距離 / 時間
+   不再懸浮在地圖上
+   ============================== */
+
+.review-route-badge{
+  position:relative;
+
+  display:grid;
+  grid-template-columns:1fr 1px 1fr;
+
+  align-items:center;
+
+  gap:16px;
+
+ width:auto;
+
+margin:
+  -1px
+  -14px
+  14px;
+
+  margin:
+    -1px
+    0
+    14px;
+
+  padding:
+    14px
+    18px;
+
+  border:
+    1px solid var(--line);
+
+  border-radius:
+    0
+    0
+    20px
+    20px;
+
+  background:#ffffff;
+
+  box-shadow:
+    0 8px 22px rgba(17,24,39,.05);
+
+  color:#111111;
+}
+
+
+.review-route-item{
+  min-width:0;
+}
+
+
+.review-route-item-right{
+  text-align:right;
+}
+
+
+.review-route-label{
+  margin-bottom:3px;
+
+  color:var(--muted);
+
+  font-size:11px;
+
+  font-weight:900;
+}
+
+
+.review-route-item strong{
+  display:block;
+
+  color:#111111;
+
+  font-size:20px;
+
+  font-weight:1000;
+
+  line-height:1.2;
+}
+
+
+.review-route-divider{
+  width:1px;
+
+  height:34px;
+
+  background:var(--line);
+}
 
     .review-route-badge strong{
       font-size:14px;
@@ -2492,16 +2565,68 @@
       <div class="subtext">確認路線、內容與預估費用後，再提交正式訂單。</div>
 
       <div class="review-map-shell">
-        <div id="reviewMap" class="map-canvas"></div>
-        <div id="reviewMapPlaceholder" class="map-placeholder">
-          <strong>正在準備路線地圖</strong>
-          <small>路線地圖暫時無法顯示時，正式估價仍以後端回傳結果為準。</small>
-        </div>
-        <div id="reviewRouteBadge" class="review-route-badge hidden">
-          <strong id="reviewRouteDistance">-</strong>
-          <span id="reviewRouteDuration">-</span>
-        </div>
-      </div>
+
+  <div
+    id="reviewMap"
+    class="map-canvas"
+  ></div>
+
+  <div
+    id="reviewMapPlaceholder"
+    class="map-placeholder"
+  >
+
+    <strong>
+      正在準備路線地圖
+    </strong>
+
+    <small>
+      路線地圖暫時無法顯示時，
+      正式估價仍以後端回傳結果為準。
+    </small>
+
+  </div>
+
+</div>
+
+
+<!-- 路線距離與時間
+     改成地圖下方獨立資訊列 -->
+
+<div
+  id="reviewRouteBadge"
+  class="review-route-badge hidden"
+>
+
+  <div class="review-route-item">
+
+    <div class="review-route-label">
+      路線距離
+    </div>
+
+    <strong id="reviewRouteDistance">
+      -
+    </strong>
+
+  </div>
+
+
+  <div class="review-route-divider"></div>
+
+
+  <div class="review-route-item review-route-item-right">
+
+    <div class="review-route-label">
+      預估時間
+    </div>
+
+    <strong id="reviewRouteDuration">
+      -
+    </strong>
+
+  </div>
+
+</div>
 
       <div class="summary-card" id="summaryBox"></div>
       <div class="price-box hidden" id="priceBox"></div>
