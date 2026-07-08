@@ -4541,6 +4541,332 @@ margin:
   text-align:right;
 }
 
+/* ==============================
+   第十五階段：
+   第四頁費用確認區
+   ============================== */
+
+
+/* 費用區標題 */
+
+#step4 .review-price-section-head{
+  margin-top:2px;
+}
+
+
+/* ==============================
+   移除舊 price-box 外觀
+   ============================== */
+
+#step4 .price-box{
+  overflow:hidden;
+
+  margin:
+    0
+    0
+    18px;
+
+  padding:0;
+
+  border:
+    1px solid
+    #e5e7e9;
+
+  border-radius:20px;
+
+  background:#ffffff;
+
+  box-shadow:
+    0
+    6px
+    22px
+    rgba(17,24,39,.045);
+}
+
+
+/* ==============================
+   最上方總金額區
+   ============================== */
+
+#step4 .review-price-hero{
+  padding:
+    18px
+    17px
+    16px;
+
+  border-bottom:
+    1px solid
+    #eee7bd;
+
+  background:
+    #fffbed;
+}
+
+
+#step4 .review-price-hero-top{
+  display:flex;
+
+  align-items:flex-start;
+
+  justify-content:space-between;
+
+  gap:12px;
+}
+
+
+/* 小標 */
+
+#step4 .review-price-kicker{
+  margin-bottom:5px;
+
+  color:#8d7300;
+
+  font-size:11px;
+
+  font-weight:1000;
+}
+
+
+/* 大金額 */
+
+#step4 .review-price-total{
+  color:#111111;
+
+  font-size:31px;
+
+  font-weight:1000;
+
+  letter-spacing:-1px;
+
+  line-height:1.1;
+}
+
+
+/* 路線資訊 */
+
+#step4 .review-price-route-meta{
+  margin-top:9px;
+
+  color:#776f4e;
+
+  font-size:12px;
+
+  font-weight:850;
+
+  line-height:1.5;
+}
+
+
+/* 代墊標籤 */
+
+#step4 .review-price-badge{
+  flex:0 0 auto;
+
+  max-width:150px;
+
+  padding:
+    7px
+    10px;
+
+  border:
+    1px solid
+    #e5cb50;
+
+  border-radius:999px;
+
+  background:#ffffff;
+
+  color:#5f4c00;
+
+  font-size:10px;
+
+  font-weight:1000;
+
+  line-height:1.4;
+
+  text-align:center;
+}
+
+
+/* ==============================
+   費用小計
+   ============================== */
+
+#step4 .review-price-summary{
+  padding:
+    7px
+    16px;
+
+  border-bottom:
+    1px solid
+    #eeeeef;
+}
+
+
+#step4 .review-price-summary-row{
+  min-height:42px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:14px;
+
+  color:#777b80;
+
+  font-size:13px;
+
+  font-weight:850;
+}
+
+
+#step4 .review-price-summary-row
++
+.review-price-summary-row{
+  border-top:
+    1px solid
+    #f0f1f2;
+}
+
+
+#step4 .review-price-summary-row strong{
+  flex:0 0 auto;
+
+  color:#111111;
+
+  font-size:14px;
+
+  font-weight:1000;
+}
+
+
+/* 最後總額 */
+
+#step4 .review-price-summary-row.total{
+  color:#111111;
+
+  font-weight:1000;
+}
+
+
+#step4 .review-price-summary-row.total strong{
+  font-size:17px;
+}
+
+
+/* ==============================
+   費用明細
+   ============================== */
+
+#step4 .review-price-details{
+  padding:
+    15px
+    16px
+    13px;
+}
+
+
+#step4 .review-price-details-title{
+  margin-bottom:8px;
+
+  color:#777b80;
+
+  font-size:11px;
+
+  font-weight:1000;
+}
+
+
+/* 每一筆費用 */
+
+#step4 .review-price-detail-row{
+  min-height:36px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:14px;
+
+  color:#777b80;
+
+  font-size:12px;
+
+  font-weight:800;
+}
+
+
+#step4 .review-price-detail-row strong{
+  flex:0 0 auto;
+
+  color:#333333;
+
+  font-size:12px;
+
+  font-weight:1000;
+}
+
+
+/* 沒有明細時 */
+
+#step4 .review-price-detail-empty{
+  padding:
+    7px
+    0;
+
+  color:#969a9f;
+
+  font-size:12px;
+
+  font-weight:800;
+}
+
+
+/* ==============================
+   費用說明
+   ============================== */
+
+#step4 .review-price-notice{
+  margin:
+    0
+    14px
+    14px;
+
+  padding:
+    12px
+    13px;
+
+  border-radius:14px;
+
+  background:#f7f7f8;
+}
+
+
+#step4 .review-price-notice-title{
+  margin-bottom:4px;
+
+  color:#55595e;
+
+  font-size:11px;
+
+  font-weight:1000;
+}
+
+
+#step4 .review-price-notice-text{
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:800;
+
+  line-height:1.65;
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -5250,6 +5576,19 @@ margin:
 ></div>
 
 
+<div class="review-section-head review-price-section-head">
+
+  <div class="review-section-title">
+    費用確認
+  </div>
+
+  <div class="review-section-edit-hint">
+    系統即時估價
+  </div>
+
+</div>
+
+
 <div
   class="price-box hidden"
   id="priceBox"
@@ -5277,7 +5616,7 @@ margin:
 
       <div class="review-sticky-footer">
         <div>
-          <div class="review-total-label">預估金額</div>
+          <div class="review-total-label">預估應付</div>
           <div class="review-total-value" id="reviewEstimatedTotal">待估價</div>
         </div>
         <button id="createOrderBtn" class="btn btn-primary" type="button" onclick="createOrder()">提交訂單</button>
@@ -8029,43 +8368,269 @@ async function renderEstimate(){
           .join('・');
     }
 
-    let html = '';
+    /* ==============================
+   建立客戶端費用明細
+   ============================== */
 
-    if(isQueueTask){
-      html += row('任務類型', '排隊任務');
-      html += row('預估排隊時間', `${queueMinutes} 分鐘`);
-      html += row('排隊基本費', `NT$${deliveryFee}`);
-      html += rowIf(queueTimeFee > 0, '排隊時間費', `NT$${queueTimeFee}`);
-      html += rowIf(longTaskExtraFee > 0, '長時間任務費', `NT$${longTaskExtraFee}`);
-      html += rowIf(waitingFee > 0, '排隊費小計', `NT$${waitingFee}`);
-    }else{
-      html += row('距離', distanceText);
-      html += row('預估時間', durationText);
-      html += rowIf(baseFee > 0, '起步價', `NT$${baseFee}`);
-      html += rowIf(distanceFee > 0, '距離費', `NT$${distanceFee}`);
-      html += rowIf(timeFee > 0, '時間費', `NT$${timeFee}`);
-      html += row('配送服務費', `NT$${deliveryFee}`);
-    }
+const detailRows = [];
 
-    html += row('速度處理費', `NT$${speedFee}`);
-    html += row('上樓需求', upstairsLabel);
-    html += row('上樓費', `NT$${finalUpstairsFee}`);
-    html += row('平台服務費', `NT$${serviceFee}`);
-    html += row('服務費小計', `NT$${serviceSubtotal}`, 'price-subtotal');
 
-    if(serverAdvancePayment > 0){
-      html += row('代墊費用', `NT$${serverAdvancePayment}`);
-    }
+if(isQueueTask){
 
-    html += row('預估應付總額', `NT$${payableTotal}`, 'price-total');
+  detailRows.push({
+    label:'排隊基本費',
+    value:deliveryFee
+  });
 
-    html += `
-      <div class="price-note">
-        費用由 UBee 跑腿系統統一計算並回傳。實際距離與時間以系統路線估算為準。
+  if(queueTimeFee > 0){
+    detailRows.push({
+      label:'排隊時間費',
+      value:queueTimeFee
+    });
+  }
+
+  if(longTaskExtraFee > 0){
+    detailRows.push({
+      label:'長時間任務費',
+      value:longTaskExtraFee
+    });
+  }
+
+  if(waitingFee > 0){
+    detailRows.push({
+      label:'等候費',
+      value:waitingFee
+    });
+  }
+
+}else{
+
+  if(baseFee > 0){
+    detailRows.push({
+      label:'起步價',
+      value:baseFee
+    });
+  }
+
+  if(distanceFee > 0){
+    detailRows.push({
+      label:'距離費',
+      value:distanceFee
+    });
+  }
+
+  if(timeFee > 0){
+    detailRows.push({
+      label:'時間費',
+      value:timeFee
+    });
+  }
+
+  if(deliveryFee > 0){
+    detailRows.push({
+      label:'配送服務費',
+      value:deliveryFee
+    });
+  }
+
+}
+
+
+if(speedFee > 0){
+  detailRows.push({
+    label:'速度處理費',
+    value:speedFee
+  });
+}
+
+
+if(finalUpstairsFee > 0){
+  detailRows.push({
+    label:'上樓費',
+    value:finalUpstairsFee
+  });
+}
+
+
+if(serviceFee > 0){
+  detailRows.push({
+    label:'平台服務費',
+    value:serviceFee
+  });
+}
+
+
+/* ==============================
+   詳細費用列
+   ============================== */
+
+const detailRowsHtml =
+  detailRows.length
+    ? detailRows.map(item => `
+
+        <div class="review-price-detail-row">
+
+          <span>
+            ${escapeHtml(item.label)}
+          </span>
+
+          <strong>
+            NT$${Math.round(item.value)}
+          </strong>
+
+        </div>
+
+      `).join('')
+
+    : `
+
+        <div class="review-price-detail-empty">
+          費用已由 UBee 系統完成計算
+        </div>
+
+      `;
+
+
+/* ==============================
+   路線摘要
+   ============================== */
+
+const routeSummaryText =
+  isQueueTask
+    ? `預估排隊 ${queueMinutes} 分鐘`
+    : [distanceText, durationText]
+        .filter(Boolean)
+        .join('・');
+
+
+/* ==============================
+   是否有代墊費用
+   ============================== */
+
+const advanceBadgeHtml =
+  serverAdvancePayment > 0
+    ? `
+
+        <div class="review-price-badge">
+          已含代墊 NT$${serverAdvancePayment}
+        </div>
+
+      `
+    : '';
+
+
+/* ==============================
+   正式顯示費用確認區
+   ============================== */
+
+box.innerHTML = `
+
+  <div class="review-price-hero">
+
+    <div class="review-price-hero-top">
+
+      <div>
+
+        <div class="review-price-kicker">
+          預估應付總額
+        </div>
+
+        <div class="review-price-total">
+          NT$${payableTotal}
+        </div>
+
       </div>
-    `;
 
-    box.innerHTML = html;
+      ${advanceBadgeHtml}
+
+    </div>
+
+
+    <div class="review-price-route-meta">
+      ${escapeHtml(routeSummaryText || '系統路線估價')}
+    </div>
+
+  </div>
+
+
+  <div class="review-price-summary">
+
+    <div class="review-price-summary-row">
+
+      <span>
+        服務費小計
+      </span>
+
+      <strong>
+        NT$${serviceSubtotal}
+      </strong>
+
+    </div>
+
+
+    ${
+      serverAdvancePayment > 0
+        ? `
+
+          <div class="review-price-summary-row">
+
+            <span>
+              代墊費用
+            </span>
+
+            <strong>
+              NT$${serverAdvancePayment}
+            </strong>
+
+          </div>
+
+        `
+        : ''
+    }
+
+
+    <div class="review-price-summary-row total">
+
+      <span>
+        預估應付
+      </span>
+
+      <strong>
+        NT$${payableTotal}
+      </strong>
+
+    </div>
+
+  </div>
+
+
+  <div class="review-price-details">
+
+    <div class="review-price-details-title">
+      費用明細
+    </div>
+
+    <div class="review-price-details-list">
+      ${detailRowsHtml}
+    </div>
+
+  </div>
+
+
+  <div class="review-price-notice">
+
+    <div class="review-price-notice-title">
+      費用說明
+    </div>
+
+    <div class="review-price-notice-text">
+      目前金額依路線、任務時效、上樓需求與其他任務條件即時計算。
+      提交訂單前，系統會再次取得最新正式估價。
+    </div>
+
+  </div>
+
+`;
 
     return data;
 
