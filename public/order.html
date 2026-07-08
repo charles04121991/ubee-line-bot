@@ -2472,6 +2472,127 @@ margin:
     var(--accentStrong);
 }
 
+/* ==============================
+   第五階段：第三層任務分類
+   改成簡潔推薦標籤
+   ============================== */
+
+
+/* 分類區整體 */
+
+.category-choice-box{
+  margin:
+    2px
+    -16px
+    14px;
+
+  padding:
+    10px
+    16px
+    12px;
+
+  border-top:
+    1px solid #f0f1f2;
+
+  border-bottom:
+    1px solid #f0f1f2;
+
+  background:
+    #fafafa;
+}
+
+
+/* 保持分類標題隱藏 */
+
+.category-choice-title{
+  display:none;
+}
+
+
+/* 分類橫向排列 */
+
+.category-choice-grid{
+  display:flex;
+
+  gap:8px;
+
+  overflow-x:auto;
+
+  margin:0;
+
+  padding:
+    2px
+    0;
+
+  scrollbar-width:none;
+
+  -webkit-overflow-scrolling:touch;
+}
+
+
+.category-choice-grid::-webkit-scrollbar{
+  display:none;
+}
+
+
+/* 一般狀態 */
+
+.category-choice-item{
+  flex:
+    0
+    0
+    auto;
+
+  min-height:34px;
+
+  padding:
+    8px
+    12px;
+
+  border:none;
+
+  border-radius:
+    999px;
+
+  background:
+    #f0f1f2;
+
+  color:
+    #777b80;
+
+  box-shadow:none;
+
+  font-size:
+    12px !important;
+
+  font-weight:
+    900;
+
+  white-space:
+    nowrap;
+}
+
+
+/* 選中狀態 */
+
+.category-choice-item.active{
+  border:none;
+
+  background:
+    #fff4bf;
+
+  color:
+    #111111;
+
+  box-shadow:
+    inset
+    0
+    0
+    0
+    1px
+    var(--accentStrong);
+}
+
 .map-location-pill{
   display:none !important;
 }
