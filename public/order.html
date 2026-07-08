@@ -2968,6 +2968,117 @@ margin:
     scale(.985);
 }
 
+/* ==============================
+   第八階段：
+   第三層任務分類移到第二頁
+   ============================== */
+
+
+/* 第二頁任務分類區 */
+
+#step2 .task-category-step2{
+  margin:
+    0
+    0
+    18px;
+}
+
+
+/* 取消首頁版本的大區塊樣式 */
+
+#step2 .category-choice-box{
+  margin:0;
+
+  padding:0;
+
+  border:none;
+
+  background:transparent;
+}
+
+
+/* 分類繼續維持橫向滑動 */
+
+#step2 .category-choice-grid{
+  display:flex;
+
+  gap:8px;
+
+  overflow-x:auto;
+
+  margin:0;
+
+  padding:
+    2px
+    0
+    4px;
+
+  scrollbar-width:none;
+
+  -webkit-overflow-scrolling:touch;
+}
+
+
+#step2 .category-choice-grid::-webkit-scrollbar{
+  display:none;
+}
+
+
+/* 第二頁一般分類 */
+
+#step2 .category-choice-item{
+  flex:
+    0
+    0
+    auto;
+
+  min-height:38px;
+
+  padding:
+    9px
+    13px;
+
+  border:
+    1px solid
+    #e6e7e9;
+
+  border-radius:
+    999px;
+
+  background:
+    #f7f7f8;
+
+  color:
+    #74787d;
+
+  box-shadow:none;
+
+  font-size:
+    12px !important;
+
+  font-weight:
+    900;
+
+  white-space:
+    nowrap;
+}
+
+
+/* 第二頁已選擇分類 */
+
+#step2 .category-choice-item.active{
+  border-color:
+    var(--accentStrong);
+
+  background:
+    #fff4bf;
+
+  color:
+    #111111;
+
+  box-shadow:none;
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -3172,31 +3283,6 @@ margin:
   id="serviceGrid"
 ></div>
 
-
-<!-- ==============================
-     任務分類
-     ============================== -->
-
-<div
-  id="serviceCategoryBox"
-  class="category-choice-box hidden"
->
-
-  <div
-    class="category-choice-title"
-    id="serviceCategoryTitle"
-  >
-    請選擇分類
-  </div>
-
-  <div
-    class="category-choice-grid"
-    id="serviceCategoryGrid"
-  ></div>
-
-</div>
-
-
 <!-- ==============================
      幫代買：附近店家
      只有選擇幫代買時才顯示
@@ -3346,13 +3432,40 @@ margin:
     <section class="step" id="step2">
       <div class="headline">補充任務資訊</div>
       <div class="subtext">
-        店家與配送路線已在首頁確認。這一步只需補上電話、任務內容、代墊與特殊需求。
+        確認任務分類後，再補上電話、任務內容、代墊與特殊需求。
     </div>
 
       <div class="task-path-box">
         <div class="task-path-title">目前任務</div>
         <div class="task-path-value" id="taskPathText">幫我送｜文件急送｜一般文件</div>
       </div>
+
+      <div class="form-section task-category-step2">
+
+  <div class="form-title">
+    任務分類
+  </div>
+
+  <div
+    id="serviceCategoryBox"
+    class="category-choice-box hidden"
+  >
+
+    <div
+      class="category-choice-title"
+      id="serviceCategoryTitle"
+    >
+      請選擇分類
+    </div>
+
+    <div
+      class="category-choice-grid"
+      id="serviceCategoryGrid"
+    ></div>
+
+  </div>
+
+</div>
 
       <div id="buyGuide" class="quick-guide hidden">
         <div class="quick-guide-title">代買提醒</div>
