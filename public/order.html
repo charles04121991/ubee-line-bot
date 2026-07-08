@@ -2203,6 +2203,129 @@ margin:
   background:#d5d5d5;
 }
 
+/* ==============================
+   第三階段：首頁主服務分類列
+   ============================== */
+
+
+/* 隱藏首頁大型標題與說明
+   讓服務分類直接出現在白色面板頂部 */
+
+.task-sheet-title,
+.task-sheet-sub{
+  display:none;
+}
+
+
+/* 六大服務改成平面文字分頁 */
+
+.category-tabs{
+  position:relative;
+
+  display:flex;
+
+  gap:0;
+
+  overflow-x:auto;
+
+  margin:
+    0
+    -16px
+    14px;
+
+  padding:
+    0
+    12px
+    0;
+
+  border-bottom:
+    1px solid var(--line);
+
+  scrollbar-width:none;
+
+  -webkit-overflow-scrolling:touch;
+}
+
+
+.category-tabs::-webkit-scrollbar{
+  display:none;
+}
+
+
+/* 每一個主分類 */
+
+.category-tab{
+  position:relative;
+
+  flex:
+    0
+    0
+    auto;
+
+  min-width:78px;
+
+  min-height:50px;
+
+  padding:
+    0
+    10px
+    14px;
+
+  border:none;
+
+  border-radius:0;
+
+  background:transparent;
+
+  color:#8a8d91;
+
+  box-shadow:none;
+
+  font-size:14px !important;
+
+  font-weight:900;
+
+  white-space:nowrap;
+}
+
+
+/* 取消原本黑色膠囊 */
+
+.category-tab.active{
+  border:none;
+
+  background:transparent;
+
+  color:#111111;
+
+  box-shadow:none;
+}
+
+
+/* 選中服務的黃色底線 */
+
+.category-tab.active::after{
+  content:"";
+
+  position:absolute;
+
+  left:50%;
+
+  bottom:0;
+
+  width:30px;
+
+  height:4px;
+
+  transform:
+    translateX(-50%);
+
+  border-radius:999px;
+
+  background:
+    var(--accentStrong);
+}
+
 .map-location-pill{
   display:none !important;
 }
