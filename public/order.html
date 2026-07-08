@@ -328,35 +328,6 @@
     .map-placeholder.is-ready{
       display:none;
     }
-
-    .map-location-pill{
-      position:absolute;
-      top:14px;
-      left:14px;
-      z-index:5;
-      display:inline-flex;
-      align-items:center;
-      gap:7px;
-      height:36px;
-      padding:0 13px;
-      border:1px solid rgba(17,24,39,.08);
-      border-radius:999px;
-      background:rgba(255,255,255,.95);
-      box-shadow:0 8px 22px rgba(17,24,39,.10);
-      color:#111;
-      font-size:13px;
-      font-weight:1000;
-      backdrop-filter:blur(12px);
-    }
-
-    .map-location-dot{
-      width:8px;
-      height:8px;
-      border-radius:50%;
-      background:var(--accentStrong);
-      box-shadow:0 0 0 4px rgba(250,204,21,.22);
-    }
-
     .map-current-btn{
       position:absolute;
       right:14px;
@@ -428,22 +399,6 @@
       border-radius:999px;
       background:#d8dadd;
       margin:0 auto 18px;
-    }
-
-    .task-sheet-title{
-      font-size:23px;
-      font-weight:1000;
-      letter-spacing:-.5px;
-      line-height:1.25;
-      margin-bottom:5px;
-    }
-
-    .task-sheet-sub{
-      color:var(--muted);
-      font-size:13px;
-      font-weight:800;
-      line-height:1.55;
-      margin-bottom:16px;
     }
 
     .merchant-card{
@@ -1148,40 +1103,6 @@ margin:
       margin-bottom:14px;
     }
 
-    .summary-row{
-      display:grid;
-      grid-template-columns:1fr auto;
-      gap:12px;
-      align-items:center;
-      padding:14px 15px;
-      border-bottom:1px solid var(--line);
-    }
-
-    .summary-row:last-child{
-      border-bottom:none;
-    }
-
-    .summary-label{
-      color:var(--muted);
-      font-size:12px;
-      font-weight:1000;
-      margin-bottom:4px;
-    }
-
-    .summary-value{
-      color:#111;
-      font-size:14px;
-      font-weight:900;
-      line-height:1.55;
-      word-break:break-word;
-    }
-
-    .summary-arrow{
-      color:#b3b6ba;
-      font-size:22px;
-      line-height:1;
-    }
-
     .price-box{
       border:1px solid var(--line);
       background:#fff;
@@ -1235,56 +1156,6 @@ margin:
       font-size:12px;
       font-weight:800;
       line-height:1.65;
-    }
-
-    .notice{
-      border:1px solid #f1d3d3;
-      background:#fff7f7;
-      border-radius:20px;
-      padding:15px;
-      margin:14px 0;
-    }
-
-    .notice-title{
-      color:#a72a2a;
-      font-size:15px;
-      font-weight:1000;
-      margin-bottom:7px;
-    }
-
-    .notice ul{
-      margin:0;
-      padding-left:18px;
-      color:#735c5c;
-      font-size:13px;
-      line-height:1.75;
-      font-weight:800;
-    }
-
-    .confirm-box{
-      display:flex;
-      align-items:flex-start;
-      gap:10px;
-      border:1px solid var(--line);
-      background:#fff;
-      border-radius:17px;
-      padding:13px;
-      margin-top:10px;
-      cursor:pointer;
-    }
-
-    .confirm-box input{
-      width:auto;
-      margin-top:3px;
-      accent-color:#111;
-      transform:scale(1.15);
-    }
-
-    .confirm-text{
-      font-size:13px;
-      line-height:1.65;
-      font-weight:850;
-      color:#333;
     }
 
     .review-sticky-footer{
@@ -1379,41 +1250,7 @@ margin:
       color:var(--red);
       border:1px solid #efbcbc;
     }
-
-    .success{
-      text-align:center;
-      padding:16px 0 8px;
-    }
-
-    .success-icon{
-      width:84px;
-      height:84px;
-      margin:10px auto 18px;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background:#fff7c7;
-      color:#111;
-      font-size:38px;
-      font-weight:1000;
-      border:1px solid #ecd34f;
-    }
-
-    .success-title{
-      font-size:27px;
-      font-weight:1000;
-      margin-bottom:8px;
-    }
-
-    .order-no{
-      color:#111;
-      font-size:21px;
-      font-weight:1000;
-      letter-spacing:.2px;
-      margin:8px 0 12px;
-    }
-
+    
     .status{
       background:#fff;
       border:1px solid var(--line);
@@ -2211,12 +2048,6 @@ margin:
 /* 隱藏首頁大型標題與說明
    讓服務分類直接出現在白色面板頂部 */
 
-.task-sheet-title,
-.task-sheet-sub{
-  display:none;
-}
-
-
 /* 六大服務改成平面文字分頁 */
 
 .category-tabs{
@@ -2332,11 +2163,6 @@ margin:
 
 
 /* 不再顯示「任務細項」文字 */
-
-#serviceArea{
-  display:none;
-}
-
 
 /* 細項服務改成圖示型入口 */
 
@@ -2599,11 +2425,6 @@ margin:
 
 
 /* 隱藏「路線」文字標題 */
-
-.route-section-label{
-  display:none;
-}
-
 
 /* 地址卡片整體 */
 
@@ -6691,11 +6512,6 @@ input:checked
 
 }
 
-
-.map-location-pill{
-  display:none !important;
-}
-  </style>
 </head>
 
 <body>
@@ -6830,12 +6646,7 @@ input:checked
   </button>
 
   <!-- 保留給原本 JavaScript 使用，但不顯示 -->
-  <div
-    id="pageCount"
-    class="page-count"
-  >
-    首頁
-  </div>
+  
 </div>
 
     <section class="step active" id="step1">
@@ -6844,11 +6655,6 @@ input:checked
         <div id="homeMapPlaceholder" class="map-placeholder">
           <strong>正在準備 UBee 地圖</strong>
           <small>地圖暫時無法使用時，不會影響 LINE 登入、填寫任務與付款流程。</small>
-        </div>
-
-        <div class="map-location-pill">
-          <span class="map-location-dot"></span>
-          台中市
         </div>
 
         <div id="homeRouteBadge" class="route-badge hidden">
@@ -6866,8 +6672,6 @@ input:checked
 
       <div class="task-sheet">
         <div class="task-sheet-handle"></div>
-        <div class="task-sheet-title">今天需要 UBee 幫你完成什麼？</div>
-        <div class="task-sheet-sub">先選任務類型，再填取件與送達位置。</div>
 
         <div id="merchantInfoBox" class="merchant-card hidden"></div>
 
@@ -6883,13 +6687,6 @@ input:checked
         <!-- ==============================
      任務細項
      ============================== -->
-
-<div
-  id="serviceArea"
-  class="section-label"
->
-  任務細項
-</div>
 
 <div
   class="service-grid-new"
@@ -6950,20 +6747,10 @@ input:checked
 
 </div>
 
-
-<div
-  id="serviceDescription"
-  class="hidden"
-></div>
-
-
 <!-- ==============================
      正式配送路線
      ============================== -->
 
-<div class="section-label route-section-label">
-  路線
-</div>
 <div class="address-card">
   <div class="address-row">
     <span class="address-dot pickup"></span>
@@ -7856,13 +7643,21 @@ input:checked
       </div>
     </section>
 
-    <div class="footer-nav hidden" id="footerNav">
-      <button id="cancelOrderBtn" class="btn btn-danger hidden" type="button" onclick="cancelOrder()" style="margin-bottom:10px;">取消訂單</button>
-      <div class="btn-row" id="footerButtonRow">
-        <button id="prevBtn" class="btn btn-secondary" type="button" onclick="goPrev()">上一步</button>
-        <button id="nextBtn" class="btn btn-primary" type="button" onclick="goNext()">下一步</button>
-      </div>
-    </div>
+    <div
+  class="footer-nav hidden"
+  id="footerNav"
+>
+
+  <button
+    id="cancelOrderBtn"
+    class="btn btn-danger hidden"
+    type="button"
+    onclick="cancelOrder()"
+  >
+    取消訂單
+  </button>
+
+</div>
 
     <div class="bottom-tabs">
       <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
@@ -8716,15 +8511,6 @@ if(window.firebase && !firebase.apps.length){
 
 const db = window.firebase ? firebase.firestore() : null;
 
-const serviceDescriptions = {
-  send:'需要配送文件、包裹、鑰匙或店家商品時，選擇幫我送。',
-  pickup:'需要代取包裹、文件、門市商品或生活用品時，選擇幫我取。',
-  buy:'需要代買餐點、飲料、超商商品、藥局用品或生活用品時，選擇幫代買。',
-  queue:'需要餐廳候位、醫院掛號、銀行辦理或活動排隊時，選擇幫排隊。',
-  helper:'找不到適合分類時，可以選擇全能跑腿。',
-  urgent:'需要較快處理的小包裹、餐點、店家商品或生活用品配送時，選擇急件專送。'
-};
-
 const serviceGroups = {
   send:[
     { icon:'📄', title:'文件急送', categories:['一般文件','合約文件','簽約文件','發票收據','公司文件','其他文件'] },
@@ -8775,10 +8561,6 @@ function escapeHtml(str){
     .replaceAll('>','&gt;')
     .replaceAll('"','&quot;')
     .replaceAll("'",'&#039;');
-}
-
-function escapeHtmlWithBreaks(str){
-  return escapeHtml(str).replace(/\n/g,'<br>');
 }
 
 function cleanPhone(value){
@@ -8970,7 +8752,7 @@ function selectServiceFromTab(el, group){
 
   renderServiceGrid(group);
   renderCategoryBox(list[0]);
-  updateServiceDescription();
+  
   updateTaskPathText();
   applyDynamicFields();
   handleServiceSelectionChanged();
@@ -9017,7 +8799,7 @@ function selectServiceItem(index){
   });
 
   renderCategoryBox(item);
-  updateServiceDescription();
+  pdateServiceDescription();
   updateTaskPathText();
   applyDynamicFields();
   handleServiceSelectionChanged();
@@ -9350,11 +9132,6 @@ function selectNearbyPlace(index){
   scheduleRouteAndQuoteRefresh(120);
 }
 
-function updateServiceDescription(){
-  if(qs('serviceDescription')){
-    qs('serviceDescription').innerText = serviceDescriptions[serviceGroup] || '請選擇服務。';
-  }
-}
 
 function updateTaskPathText(){
   if(qs('taskPathText')){
@@ -9483,10 +9260,14 @@ function setBottomTabActive(tabId){
 }
 
 function hideFooterButtons(){
-  qs('footerNav')?.classList.add('hidden');
-  qs('prevBtn')?.classList.add('hidden');
-  qs('nextBtn')?.classList.add('hidden');
-  qs('cancelOrderBtn')?.classList.add('hidden');
+
+  qs('footerNav')
+    ?.classList
+    .add('hidden');
+
+  qs('cancelOrderBtn')
+    ?.classList
+    .add('hidden');
 }
 
 function showOnlyStep(step){
@@ -9498,21 +9279,28 @@ function showOnlyStep(step){
 
   qs(`step${step}`)?.classList.add('active');
 
-  const pageText = step === 1 ? '首頁' : `${step} / 5`;
-  if(qs('pageCount')) qs('pageCount').innerText = pageText;
-
   qs('topbarBackBtn')?.classList.toggle('ghost', step === 1 || step === 5);
 
-  const footerNav = qs('footerNav');
-  const footerButtonRow = qs('footerButtonRow');
-  const shouldShowFooter = step === 5;
+  const footerNav =
+  qs('footerNav');
 
-  footerNav?.classList.toggle('hidden', !shouldShowFooter);
-  footerButtonRow?.classList.toggle('hidden', step === 5);
+  const shouldShowFooter =
+  step === 5;
 
-  qs('prevBtn')?.classList.toggle('hidden', !(step === 2 || step === 3));
-  qs('nextBtn')?.classList.toggle('hidden', !(step === 2 || step === 3));
-  qs('cancelOrderBtn')?.classList.toggle('hidden', !currentOrderId || step !== 5);
+  footerNav
+  ?.classList
+  .toggle(
+    'hidden',
+    !shouldShowFooter
+  );
+
+qs('cancelOrderBtn')
+  ?.classList
+  .toggle(
+    'hidden',
+    !currentOrderId ||
+    step !== 5
+  );
 
   setBottomTabActive('tabHome');
   window.scrollTo({ top:0, behavior:'smooth' });
@@ -9555,7 +9343,6 @@ function showTasksTab(){
 
   currentCustomerPage = 'customerTasksPage';
   qs('customerTasksPage')?.classList.add('active');
-  if(qs('pageCount')) qs('pageCount').innerText = '任務';
   qs('topbarBackBtn')?.classList.remove('ghost');
 
   hideFooterButtons();
@@ -9612,7 +9399,6 @@ function showProfileTab(){
 
   currentCustomerPage = 'customerProfilePage';
   qs('customerProfilePage')?.classList.add('active');
-  if(qs('pageCount')) qs('pageCount').innerText = '我的';
   qs('topbarBackBtn')?.classList.remove('ghost');
 
   hideFooterButtons();
@@ -9633,7 +9419,6 @@ function showCustomerSubPage(pageId, title){
 
   currentCustomerPage = pageId;
   page.classList.add('active');
-  if(qs('pageCount')) qs('pageCount').innerText = title || '我的';
   qs('topbarBackBtn')?.classList.remove('ghost');
 
   hideFooterButtons();
@@ -10254,15 +10039,6 @@ async function renderEstimate(){
     const num = Number(value);
     return Number.isFinite(num) && num >= 0 ? Math.round(num) : 0;
   };
-
-  const row = (label, value, className = '') => `
-    <div class="price-row ${className}">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value)}</strong>
-    </div>
-  `;
-
-  const rowIf = (condition, label, value, className = '') => condition ? row(label, value, className) : '';
 
   box.classList.remove('hidden');
 
@@ -11797,8 +11573,15 @@ function renderTimeline(status, order){
   if(statusBoxEl){
 
     statusBoxEl.classList.remove(
-      'payment-paid',
-      'payment-unpaid'
+      if(statusBoxEl){
+
+  statusBoxEl.innerHTML = `
+
+    ...
+
+  `;
+
+}
     );
 
 
@@ -13489,8 +13272,6 @@ renderServiceGrid('send');
 renderCategoryBox(
   serviceGroups.send[0]
 );
-
-updateServiceDescription();
 
 updateTaskPathText();
 
