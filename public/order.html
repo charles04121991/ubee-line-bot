@@ -6511,7 +6511,7 @@ input:checked
   letter-spacing:-.4px;
 
 }
-
+<style>
 </head>
 
 <body>
@@ -8799,7 +8799,6 @@ function selectServiceItem(index){
   });
 
   renderCategoryBox(item);
-  pdateServiceDescription();
   updateTaskPathText();
   applyDynamicFields();
   handleServiceSelectionChanged();
@@ -11572,21 +11571,8 @@ function renderTimeline(status, order){
 
   if(statusBoxEl){
 
-    statusBoxEl.classList.remove(
-      if(statusBoxEl){
-
-  statusBoxEl.innerHTML = `
-
-    ...
-
-  `;
-
-}
-    );
-
-
     statusBoxEl.innerHTML = `
-
+    
       <!-- ==============================
            最上方目前狀態
            ============================== -->
