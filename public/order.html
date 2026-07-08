@@ -4038,6 +4038,222 @@ margin:
     scale(.985);
 }
 
+/* ==============================
+   第十三階段：
+   第四頁上半部改成正式確認頁
+   ============================== */
+
+
+/* 第四頁本身 */
+
+#step4{
+  padding-bottom:150px;
+}
+
+
+/* ==============================
+   頁面小標題
+   ============================== */
+
+.step4-page-heading{
+  padding:
+    14px
+    2px
+    14px;
+
+  background:#ffffff;
+}
+
+
+.step4-page-title{
+  color:#111111;
+
+  font-size:22px;
+
+  font-weight:1000;
+
+  letter-spacing:-.4px;
+
+  line-height:1.25;
+}
+
+
+.step4-page-sub{
+  margin-top:4px;
+
+  color:#969a9f;
+
+  font-size:12px;
+
+  font-weight:800;
+
+  line-height:1.5;
+}
+
+/* ==============================
+   第四頁路線地圖
+   ============================== */
+
+#step4 .review-map-shell{
+  position:relative;
+
+  height:290px;
+
+  margin:
+    0
+    -14px
+    0;
+
+  overflow:hidden;
+
+  border-top:
+    1px solid
+    #eeeeef;
+
+  border-bottom:none;
+
+  background:#e8eaed;
+}
+
+/* 第四頁地圖載入提示 */
+
+#step4 .map-placeholder{
+  gap:6px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #eceff1,
+      #e5e8eb
+    );
+
+  color:#62676d;
+}
+
+
+#step4 .map-placeholder strong{
+  font-size:14px;
+
+  font-weight:1000;
+}
+
+
+#step4 .map-placeholder small{
+  max-width:260px;
+
+  color:#8f9499;
+
+  font-size:11px;
+
+  font-weight:800;
+
+  line-height:1.6;
+}
+
+/* ==============================
+   地圖下方距離與時間
+   ============================== */
+
+#step4 .review-route-badge{
+  position:relative;
+
+  display:grid;
+
+  grid-template-columns:
+    1fr
+    1px
+    1fr;
+
+  align-items:center;
+
+  gap:18px;
+
+  width:auto;
+
+  margin:
+    0
+    -14px
+    18px;
+
+  padding:
+    15px
+    20px;
+
+  border-top:none;
+
+  border-right:none;
+
+  border-bottom:
+    1px solid
+    #eceeef;
+
+  border-left:none;
+
+  border-radius:
+    0;
+
+  background:#ffffff;
+
+  box-shadow:
+    0
+    6px
+    18px
+    rgba(17,24,39,.035);
+}
+
+
+/* 左右資訊 */
+
+#step4 .review-route-item{
+  min-width:0;
+}
+
+
+#step4 .review-route-item-right{
+  text-align:right;
+}
+
+
+/* 小標 */
+
+#step4 .review-route-label{
+  margin-bottom:4px;
+
+  color:#969a9f;
+
+  font-size:11px;
+
+  font-weight:900;
+}
+
+
+/* 主要數字 */
+
+#step4 .review-route-item strong{
+  display:block;
+
+  color:#111111;
+
+  font-size:21px;
+
+  font-weight:1000;
+
+  letter-spacing:-.4px;
+
+  line-height:1.2;
+}
+
+
+/* 中間直線 */
+
+#step4 .review-route-divider{
+  width:1px;
+
+  height:36px;
+
+  background:#e5e7e9;
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -4650,11 +4866,22 @@ margin:
     </section>
 
     <section class="step" id="step4">
-      <div class="headline">確認任務內容</div>
-      <div class="subtext">確認路線、內容與預估費用後，再提交正式訂單。</div>
 
-      <div class="review-map-shell">
+  <div class="step4-page-heading">
 
+    <div class="step4-page-title">
+      確認訂單
+    </div>
+
+    <div class="step4-page-sub">
+      請確認路線與任務內容
+    </div>
+
+  </div>
+
+
+  <div class="review-map-shell">
+    
   <div
     id="reviewMap"
     class="map-canvas"
