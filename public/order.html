@@ -4867,6 +4867,323 @@ margin:
   line-height:1.65;
 }
 
+/* ==============================
+   第十六階段：
+   第四頁提交前確認區
+   ============================== */
+
+
+/* ==============================
+   區塊標題
+   ============================== */
+
+#step4 .review-confirm-section-head{
+  margin-top:2px;
+}
+
+
+/* ==============================
+   兩個確認項目
+   ============================== */
+
+#step4 .review-confirm-list{
+  overflow:hidden;
+
+  margin-bottom:12px;
+
+  border:
+    1px solid
+    #e6e7e9;
+
+  border-radius:20px;
+
+  background:#ffffff;
+
+  box-shadow:
+    0
+    5px
+    18px
+    rgba(17,24,39,.035);
+}
+
+
+/* 每一個確認項目 */
+
+#step4 .review-confirm-item{
+  position:relative;
+
+  width:100%;
+
+  min-height:78px;
+
+  display:grid;
+
+  grid-template-columns:
+    28px
+    minmax(0,1fr);
+
+  gap:12px;
+
+  align-items:flex-start;
+
+  padding:
+    15px
+    15px;
+
+  background:#ffffff;
+
+  cursor:pointer;
+}
+
+
+#step4 .review-confirm-item
++
+.review-confirm-item{
+  border-top:
+    1px solid
+    #eeeeef;
+}
+
+
+/* 隱藏原生 checkbox */
+
+#step4 .review-confirm-item input{
+  position:absolute;
+
+  opacity:0;
+
+  pointer-events:none;
+}
+
+
+/* ==============================
+   自訂 checkbox
+   ============================== */
+
+#step4 .review-confirm-custom-check{
+  width:26px;
+
+  height:26px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  margin-top:1px;
+
+  border:
+    2px solid
+    #d2d5d8;
+
+  border-radius:8px;
+
+  background:#ffffff;
+
+  color:transparent;
+
+  font-size:13px;
+
+  font-weight:1000;
+
+  transition:
+    background .15s ease,
+    border-color .15s ease;
+}
+
+
+/* 已勾選 */
+
+#step4 .review-confirm-item
+input:checked
++
+.review-confirm-custom-check{
+  border-color:
+    var(--accentStrong);
+
+  background:
+    var(--accent);
+
+  color:#111111;
+}
+
+
+/* ==============================
+   確認文字
+   ============================== */
+
+#step4 .review-confirm-content{
+  min-width:0;
+
+  display:block;
+}
+
+
+#step4 .review-confirm-title{
+  display:block;
+
+  margin-bottom:5px;
+
+  color:#111111;
+
+  font-size:14px;
+
+  font-weight:1000;
+
+  line-height:1.35;
+}
+
+
+#step4 .review-confirm-text{
+  display:block;
+
+  color:#8b8f94;
+
+  font-size:12px;
+
+  font-weight:800;
+
+  line-height:1.65;
+}
+
+/* ==============================
+   任務規則與注意事項
+   ============================== */
+
+#step4 .review-rules-details{
+  overflow:hidden;
+
+  margin:
+    0
+    0
+    18px;
+
+  border:
+    1px solid
+    #e6e7e9;
+
+  border-radius:18px;
+
+  background:#ffffff;
+}
+
+
+/* 移除瀏覽器預設箭頭 */
+
+#step4 .review-rules-details summary{
+  list-style:none;
+}
+
+
+#step4 .review-rules-details summary::-webkit-details-marker{
+  display:none;
+}
+
+
+/* 標題列 */
+
+#step4 .review-rules-details summary{
+  min-height:56px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:12px;
+
+  padding:
+    0
+    15px;
+
+  color:#55595e;
+
+  font-size:13px;
+
+  font-weight:1000;
+
+  cursor:pointer;
+}
+
+
+/* 箭頭 */
+
+#step4 .review-rules-arrow{
+  color:#9ca0a5;
+
+  font-size:18px;
+
+  line-height:1;
+
+  transition:
+    transform .18s ease;
+}
+
+
+/* 展開後箭頭旋轉 */
+
+#step4 .review-rules-details[open]
+.review-rules-arrow{
+  transform:
+    rotate(180deg);
+}
+
+
+/* ==============================
+   規則內容
+   ============================== */
+
+#step4 .review-rules-content{
+  padding:
+    4px
+    15px
+    14px;
+
+  border-top:
+    1px solid
+    #eeeeef;
+}
+
+
+#step4 .review-rule-item{
+  padding:
+    12px
+    0;
+}
+
+
+#step4 .review-rule-item
++
+.review-rule-item{
+  border-top:
+    1px solid
+    #f0f1f2;
+}
+
+
+#step4 .review-rule-title{
+  margin-bottom:4px;
+
+  color:#333333;
+
+  font-size:12px;
+
+  font-weight:1000;
+}
+
+
+#step4 .review-rule-text{
+  color:#85898e;
+
+  font-size:11px;
+
+  font-weight:800;
+
+  line-height:1.7;
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -5594,20 +5911,148 @@ margin:
   id="priceBox"
 ></div>
 
-      <div class="notice">
-        <div class="notice-title">注意事項</div>
-        <ul>
-          <li>UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署等高風險任務。</li>
-          <li>若有代墊費用，請正確填寫。代墊款項達 NT$1,000（含）以上，需改由客服人工確認。</li>
-          <li>目前正式營運版先開放現金單，任務完成時由騎士向客人收取現金。</li>
-          <li>騎士已接單或任務已開始後，取消可能產生相關費用。</li>
-        </ul>
+      <div class="review-section-head review-confirm-section-head">
+
+  <div class="review-section-title">
+    提交前確認
+  </div>
+
+  <div class="review-section-edit-hint">
+    請完成以下確認
+  </div>
+
+</div>
+
+
+<div class="review-confirm-list">
+
+  <label class="review-confirm-item">
+
+    <input
+      id="locationConfirmedCheck"
+      type="checkbox"
+    >
+
+    <span class="review-confirm-custom-check">
+      ✓
+    </span>
+
+
+    <span class="review-confirm-content">
+
+      <span class="review-confirm-title">
+        地址與地點
+      </span>
+
+      <span class="review-confirm-text">
+        我已確認取件與送達地址正確，門牌、樓層與地標資訊皆已補充完整。
+      </span>
+
+    </span>
+
+  </label>
+
+
+  <label class="review-confirm-item">
+
+    <input
+      id="agreeCheck"
+      type="checkbox"
+    >
+
+    <span class="review-confirm-custom-check">
+      ✓
+    </span>
+
+
+    <span class="review-confirm-content">
+
+      <span class="review-confirm-title">
+        訂單與服務規則
+      </span>
+
+      <span class="review-confirm-text">
+        我已確認任務內容與費用，並同意 UBee 跑腿依服務規則處理此任務。
+      </span>
+
+    </span>
+
+  </label>
+
+</div>
+
+
+<details class="review-rules-details">
+
+  <summary>
+
+    <span>
+      查看任務規則與注意事項
+    </span>
+
+    <span class="review-rules-arrow">
+     ⌄
+    </span>
+
+  </summary>
+
+
+  <div class="review-rules-content">
+
+    <div class="review-rule-item">
+
+      <div class="review-rule-title">
+        任務限制
       </div>
 
-      <label class="confirm-box">
-        <input id="locationConfirmedCheck" type="checkbox">
-        <div class="confirm-text">我已確認取件地址與送達地址正確。若定位、門牌、樓層或地標有誤，我已補充清楚。</div>
-      </label>
+      <div class="review-rule-text">
+        UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署等高風險任務。
+      </div>
+
+    </div>
+
+
+    <div class="review-rule-item">
+
+      <div class="review-rule-title">
+        代墊費用
+      </div>
+
+      <div class="review-rule-text">
+        若有代墊費用，請正確填寫。代墊款項達 NT$1,000（含）以上，需由客服人工確認。
+      </div>
+
+    </div>
+
+
+    <div class="review-rule-item">
+
+      <div class="review-rule-title">
+        付款方式
+      </div>
+
+      <div class="review-rule-text">
+        目前正式營運版先開放現金單，任務完成時由騎士向客人收取現金。
+      </div>
+
+    </div>
+
+
+    <div class="review-rule-item">
+
+      <div class="review-rule-title">
+        取消任務
+      </div>
+
+      <div class="review-rule-text">
+        騎士已接單或任務開始後，取消可能依實際執行狀況產生相關費用。
+      </div>
+
+    </div>
+
+  </div>
+
+</details>
 
       <label class="confirm-box">
         <input id="agreeCheck" type="checkbox">
