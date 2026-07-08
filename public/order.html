@@ -7562,11 +7562,6 @@ input:checked
 
 </details>
 
-      <label class="confirm-box">
-        <input id="agreeCheck" type="checkbox">
-        <div class="confirm-text">我已確認任務內容正確，並同意 UBee 跑腿依正式營運規則處理此任務。</div>
-      </label>
-
       <div class="review-sticky-footer">
 
   <div class="review-submit-price">
@@ -11996,25 +11991,6 @@ function renderTimeline(status, order){
       currentStep !== 5
     );
 
-}
-
-  const canCancel =
-    currentOrderId &&
-    ![
-      'picked_up',
-      'arrived_dropoff',
-      'completed',
-      'done',
-      'cancelled'
-    ].includes(currentStatus);
-
-  qs('cancelOrderBtn')
-    ?.classList
-    .toggle(
-      'hidden',
-      !canCancel ||
-      currentStep !== 5
-    );
 }
 
 function startOrderListener(orderId){
