@@ -441,85 +441,6 @@
       display:none;
     }
 
-    .address-card{
-      position:relative;
-      overflow:hidden;
-      border:1px solid var(--line);
-      border-radius:20px;
-      background:#fff;
-    }
-
-    .address-card::before{
-      content:"";
-      position:absolute;
-      left:23px;
-      top:41px;
-      bottom:41px;
-      width:2px;
-      border-radius:999px;
-      background:#d8dadd;
-    }
-
-    .address-row{
-      position:relative;
-      display:grid;
-      grid-template-columns:20px 1fr;
-      gap:10px;
-      align-items:center;
-      min-height:70px;
-      padding:12px 14px;
-    }
-
-    .address-row + .address-row{
-      border-top:1px solid var(--line);
-    }
-
-    .address-dot{
-      width:10px;
-      height:10px;
-      border-radius:50%;
-      position:relative;
-      z-index:2;
-      margin-left:4px;
-      box-shadow:0 0 0 4px #fff;
-    }
-
-    .address-dot.pickup{
-      background:#111;
-    }
-
-    .address-dot.dropoff{
-      background:var(--accentStrong);
-    }
-
-    .address-main{
-      min-width:0;
-    }
-
-    .address-label{
-      color:var(--muted);
-      font-size:11px;
-      line-height:1;
-      font-weight:1000;
-      margin-bottom:5px;
-    }
-
-    .address-main input{
-      width:100%;
-      border:none;
-      outline:none;
-      background:transparent;
-      color:#111;
-      font-size:16px;
-      line-height:1.4;
-      font-weight:900;
-      padding:0;
-    }
-
-    .address-main input::placeholder{
-      color:#b0b4b8;
-    }
-
     .service-item{
       flex:0 0 auto;
       border:1px solid var(--line);
@@ -539,53 +460,6 @@
       background:transparent;
     }
 
-    .home-estimate{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-top:14px;
-      padding:12px 14px;
-      border-radius:16px;
-      background:var(--surface2);
-      border:1px solid var(--line);
-    }
-
-    .home-estimate-label{
-      color:var(--muted);
-      font-size:12px;
-      font-weight:900;
-      margin-bottom:3px;
-    }
-
-    .home-estimate-meta{
-      color:#555;
-      font-size:12px;
-      line-height:1.45;
-      font-weight:900;
-    }
-
-    .home-estimate-amount{
-      flex:0 0 auto;
-      color:#111;
-      font-size:21px;
-      font-weight:1000;
-      letter-spacing:-.5px;
-    }
-
-    .home-next-btn{
-      width:100%;
-      border:none;
-      border-radius:17px;
-      margin-top:14px;
-      padding:16px;
-      background:var(--accent);
-      color:#111;
-      font-size:17px !important;
-      font-weight:1000;
-      box-shadow:0 12px 26px rgba(250,204,21,.24);
-    }
-    
         /* ==============================
        共用頁面與表單
        ============================== */
@@ -2629,6 +2503,8 @@ margin:
 
   font-weight:800;
 
+  line-height:1.45;
+  
   white-space:nowrap;
 
   text-overflow:ellipsis;
