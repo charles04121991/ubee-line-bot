@@ -2780,6 +2780,194 @@ margin:
   font-weight:800;
 }
 
+/* ==============================
+   第七階段：首頁固定費用操作列
+   ============================== */
+
+
+/* 預留底部空間
+   避免最後面的地址內容被固定操作列擋住 */
+
+#step1 .task-sheet{
+  padding-bottom:120px;
+}
+
+
+/* 固定在底部導覽列上方 */
+
+.home-action-footer{
+  position:fixed;
+
+  left:50%;
+
+  bottom:
+    calc(
+      78px
+      +
+      env(safe-area-inset-bottom)
+    );
+
+  transform:
+    translateX(-50%);
+
+  z-index:88;
+
+  width:
+    calc(100% - 24px);
+
+  max-width:500px;
+
+  display:grid;
+
+  grid-template-columns:
+    minmax(0,1fr)
+    148px;
+
+  gap:10px;
+
+  align-items:center;
+
+  padding:10px;
+
+  border:
+    1px solid
+    rgba(17,24,39,.08);
+
+  border-radius:20px;
+
+  background:
+    rgba(255,255,255,.97);
+
+  box-shadow:
+    0
+    12px
+    36px
+    rgba(17,24,39,.15);
+
+  backdrop-filter:
+    blur(16px);
+
+  -webkit-backdrop-filter:
+    blur(16px);
+}
+
+
+/* 移除原本預估卡片外觀 */
+
+#step1 .home-estimate{
+  display:flex;
+
+  align-items:center;
+
+  justify-content:flex-start;
+
+  gap:10px;
+
+  min-width:0;
+
+  margin:0;
+
+  padding:
+    0
+    4px;
+
+  border:none;
+
+  border-radius:0;
+
+  background:transparent;
+}
+
+
+/* 預估費用小標 */
+
+#step1 .home-estimate-label{
+  margin-bottom:2px;
+
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:900;
+
+  white-space:nowrap;
+}
+
+
+/* 距離與時間資訊 */
+
+#step1 .home-estimate-meta{
+  max-width:105px;
+
+  overflow:hidden;
+
+  color:#9da1a6;
+
+  font-size:10px;
+
+  font-weight:800;
+
+  white-space:nowrap;
+
+  text-overflow:ellipsis;
+}
+
+
+/* 金額 */
+
+#step1 .home-estimate-amount{
+  flex:0 0 auto;
+
+  color:#111111;
+
+  font-size:23px;
+
+  font-weight:1000;
+
+  letter-spacing:-.6px;
+
+  white-space:nowrap;
+}
+
+
+/* 下一步按鈕 */
+
+#step1 .home-next-btn{
+  width:100%;
+
+  height:54px;
+
+  margin:0;
+
+  padding:
+    0
+    16px;
+
+  border:none;
+
+  border-radius:16px;
+
+  background:
+    var(--accent);
+
+  color:#111111;
+
+  font-size:
+    16px !important;
+
+  font-weight:1000;
+
+  box-shadow:none;
+}
+
+
+/* 按下效果 */
+
+#step1 .home-next-btn:active{
+  transform:
+    scale(.985);
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -3113,15 +3301,45 @@ margin:
     </div>
   </div>
 </div>
-        <div class="home-estimate">
-          <div>
-            <div class="home-estimate-label">目前預估</div>
-            <div class="home-estimate-meta" id="homeEstimateMeta">填寫完整地址後顯示距離與費用</div>
-          </div>
-          <div class="home-estimate-amount" id="homeEstimateAmount">待估價</div>
-        </div>
+        <div class="home-action-footer">
 
-        <button class="home-next-btn" type="button" onclick="goNext()">下一步</button>
+  <div class="home-estimate">
+
+    <div>
+
+      <div class="home-estimate-label">
+        預估費用
+      </div>
+
+      <div
+        class="home-estimate-meta"
+        id="homeEstimateMeta"
+      >
+        填寫地址後自動估價
+      </div>
+
+    </div>
+
+
+    <div
+      class="home-estimate-amount"
+      id="homeEstimateAmount"
+    >
+      待估價
+    </div>
+
+  </div>
+
+
+  <button
+    class="home-next-btn"
+    type="button"
+    onclick="goNext()"
+  >
+    下一步
+  </button>
+
+</div>
       </div>
     </section>
 
