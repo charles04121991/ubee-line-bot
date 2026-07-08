@@ -3585,6 +3585,459 @@ margin:
     scale(.985);
 }
 
+/* ==============================
+   第十一階段：
+   第三頁改成任務時效方案選擇
+   ============================== */
+
+
+/* 第三頁整體 */
+
+#step3{
+  padding-top:4px;
+}
+
+
+/* 主標題 */
+
+#step3 .headline{
+  margin:
+    14px
+    0
+    6px;
+
+  color:#111111;
+
+  font-size:26px;
+
+  font-weight:1000;
+
+  letter-spacing:-.6px;
+
+  line-height:1.25;
+}
+
+
+/* 說明文字 */
+
+#step3 > .subtext{
+  margin-bottom:20px;
+
+  color:#8b8f94;
+
+  font-size:13px;
+
+  font-weight:800;
+
+  line-height:1.65;
+}
+
+
+/* ==============================
+   三個速度方案合併成一張列表
+   ============================== */
+
+#step3 .speed-list{
+  display:block;
+
+  overflow:hidden;
+
+  border:
+    1px solid
+    #e6e7e9;
+
+  border-radius:20px;
+
+  background:#ffffff;
+
+  box-shadow:
+    0
+    6px
+    22px
+    rgba(17,24,39,.045);
+}
+
+
+/* 每一個方案 */
+
+#step3 .speed-card{
+  position:relative;
+
+  min-height:92px;
+
+  padding:
+    17px
+    17px
+    16px
+    58px;
+
+  border:none;
+
+  border-radius:0;
+
+  background:#ffffff;
+
+  box-shadow:none;
+
+  transition:
+    background .15s ease;
+}
+
+
+/* 中間分隔線 */
+
+#step3 .speed-card + .speed-card{
+  border-top:
+    1px solid
+    #eeeeef;
+}
+
+
+/* 選中方案 */
+
+#step3 .speed-card.active{
+  border:none;
+
+  background:
+    #fffbed;
+
+  box-shadow:none;
+}
+
+
+/* 選中方案左側黃色線 */
+
+#step3 .speed-card.active::before{
+  content:"";
+
+  position:absolute;
+
+  left:0;
+
+  top:14px;
+
+  bottom:14px;
+
+  width:4px;
+
+  border-radius:
+    0
+    999px
+    999px
+    0;
+
+  background:
+    var(--accentStrong);
+}
+
+
+/* ==============================
+   方案上半部
+   ============================== */
+
+#step3 .speed-top{
+  display:grid;
+
+  grid-template-columns:
+    minmax(0,1fr)
+    auto;
+
+  align-items:start;
+
+  gap:12px;
+
+  margin-bottom:6px;
+}
+
+
+/* 方案名稱 */
+
+#step3 .speed-name{
+  color:#111111;
+
+  font-size:17px;
+
+  font-weight:1000;
+
+  line-height:1.3;
+}
+
+
+/* 時間移到名稱下面 */
+
+#step3 .speed-time{
+  margin-top:4px;
+
+  color:#686d72;
+
+  font-size:12px;
+
+  font-weight:900;
+}
+
+
+/* ==============================
+   左側選擇圓點
+   ============================== */
+
+#step3 .speed-check{
+  position:absolute;
+
+  left:18px;
+
+  top:50%;
+
+  transform:
+    translateY(-50%);
+
+  width:24px;
+
+  height:24px;
+
+  border:
+    2px solid
+    #c9cdd1;
+
+  border-radius:50%;
+
+  background:#ffffff;
+
+  color:transparent;
+
+  font-size:0;
+}
+
+
+/* 選中後改成 UBee 黃色 */
+
+#step3 .speed-card.active .speed-check{
+  border-color:
+    var(--accentStrong);
+
+  background:
+    var(--accent);
+}
+
+
+/* 選中圓點中央 */
+
+#step3 .speed-card.active .speed-check::after{
+  content:"";
+
+  width:8px;
+
+  height:8px;
+
+  border-radius:50%;
+
+  background:#111111;
+}
+
+
+/* ==============================
+   方案說明
+   ============================== */
+
+#step3 .speed-desc{
+  padding-right:8px;
+
+  color:#8b8f94;
+
+  font-size:12px;
+
+  font-weight:800;
+
+  line-height:1.55;
+}
+
+/* ==============================
+   第十二階段：
+   第三頁固定底部操作列
+   ============================== */
+
+
+/* 預留空間
+   避免最後一個時效方案被固定操作列擋住 */
+
+#step3{
+  padding-bottom:120px;
+}
+
+
+/* ==============================
+   第三頁固定操作列
+   ============================== */
+
+.step3-action-footer{
+  position:fixed;
+
+  left:50%;
+
+  bottom:
+    calc(
+      78px
+      +
+      env(safe-area-inset-bottom)
+    );
+
+  transform:
+    translateX(-50%);
+
+  z-index:88;
+
+  width:
+    calc(100% - 24px);
+
+  max-width:500px;
+
+  display:grid;
+
+  grid-template-columns:
+    108px
+    minmax(0,1fr);
+
+  gap:10px;
+
+  align-items:center;
+
+  padding:10px;
+
+  border:
+    1px solid
+    rgba(17,24,39,.08);
+
+  border-radius:20px;
+
+  background:
+    rgba(255,255,255,.97);
+
+  box-shadow:
+    0
+    12px
+    36px
+    rgba(17,24,39,.15);
+
+  backdrop-filter:
+    blur(16px);
+
+  -webkit-backdrop-filter:
+    blur(16px);
+}
+
+
+/* ==============================
+   上一步按鈕
+   ============================== */
+
+.step3-back-btn{
+  width:100%;
+
+  height:54px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  gap:5px;
+
+  padding:
+    0
+    10px;
+
+  border:
+    1px solid
+    #e2e3e5;
+
+  border-radius:16px;
+
+  background:#ffffff;
+
+  color:#55595e;
+
+  font-size:
+    13px !important;
+
+  font-weight:1000;
+
+  box-shadow:none;
+}
+
+
+.step3-back-btn svg{
+  width:18px;
+
+  height:18px;
+
+  flex:
+    0
+    0
+    18px;
+}
+
+
+/* ==============================
+   下一步按鈕
+   ============================== */
+
+.step3-next-btn{
+  width:100%;
+
+  height:54px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  gap:7px;
+
+  padding:
+    0
+    14px;
+
+  border:none;
+
+  border-radius:16px;
+
+  background:
+    var(--accent);
+
+  color:#111111;
+
+  font-size:
+    15px !important;
+
+  font-weight:1000;
+
+  box-shadow:none;
+
+  white-space:nowrap;
+}
+
+
+.step3-next-btn svg{
+  width:19px;
+
+  height:19px;
+
+  flex:
+    0
+    0
+    19px;
+}
+
+
+/* 按下效果 */
+
+.step3-back-btn:active,
+.step3-next-btn:active{
+  transform:
+    scale(.985);
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -4109,8 +4562,8 @@ margin:
     </section>
     
             <section class="step" id="step3">
-      <div class="headline">選擇任務速度</div>
-      <div class="subtext">正式金額仍由 UBee 跑腿依路線距離、預估時間、速度、上樓需求與平台服務費統一計算。</div>
+      <div class="headline">任務時效</div>
+      <div class="subtext">選擇你希望這筆任務多快完成，不同時效方案會影響系統的處理優先度與預估費用。</div>
 
       <div class="speed-list">
         <div class="speed-card active" data-speed="standard" onclick="selectSpeed('standard')">
@@ -4121,7 +4574,7 @@ margin:
             </div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">適合一般配送與生活跑腿，依目前騎士媒合狀況安排。</div>
+          <div class="speed-desc">適合一般生活跑腿與非急迫配送任務。</div>
         </div>
 
         <div class="speed-card" data-speed="priority" onclick="selectSpeed('priority')">
@@ -4132,7 +4585,7 @@ margin:
             </div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">適合希望加快處理的任務，系統會以較高優先度處理。</div>
+          <div class="speed-desc">適合希望更快開始處理的日常任務。</div>
         </div>
 
         <div class="speed-card" data-speed="express" onclick="selectSpeed('express')">
@@ -4143,9 +4596,57 @@ margin:
             </div>
             <div class="speed-check">✓</div>
           </div>
-          <div class="speed-desc">適合急件、急送與高急迫性任務，費用會較高。</div>
+          <div class="speed-desc">適合急件、限時配送與高急迫性任務。</div>
         </div>
       </div>
+      <div class="step3-action-footer">
+
+  <button
+    class="step3-back-btn"
+    type="button"
+    onclick="goPrev()"
+  >
+
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 18l-6-6 6-6"></path>
+    </svg>
+
+    <span>上一步</span>
+
+  </button>
+
+
+  <button
+    class="step3-next-btn"
+    type="button"
+    onclick="goNext()"
+  >
+
+    <span>確認時效並繼續</span>
+
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 18l6-6-6-6"></path>
+    </svg>
+
+  </button>
+
+</div>
     </section>
 
     <section class="step" id="step4">
@@ -6064,7 +6565,7 @@ function showOnlyStep(step){
 
   const footerNav = qs('footerNav');
   const footerButtonRow = qs('footerButtonRow');
-  const shouldShowFooter = step === 3 || step === 5;
+  const shouldShowFooter = step === 5;
 
   footerNav?.classList.toggle('hidden', !shouldShowFooter);
   footerButtonRow?.classList.toggle('hidden', step === 5);
