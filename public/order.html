@@ -5435,6 +5435,504 @@ input:checked
 
 }
 
+/* ==============================
+   第十八階段：
+   Step 5 訂單建立成功頁
+   ============================== */
+
+
+#step5{
+  padding-top:10px;
+  padding-bottom:120px;
+}
+
+
+/* ==============================
+   訂單建立成功 Hero
+   ============================== */
+
+#step5 .step5-created-hero{
+  position:relative;
+
+  overflow:hidden;
+
+  margin:
+    4px
+    0
+    16px;
+
+  padding:
+    20px
+    18px
+    16px;
+
+  border:
+    1px solid
+    #ece4b5;
+
+  border-radius:22px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #fffbed,
+      #ffffff
+    );
+
+  box-shadow:
+    0
+    7px
+    24px
+    rgba(17,24,39,.05);
+}
+
+/* 成功圖示 */
+
+#step5 .step5-created-icon{
+  width:52px;
+
+  height:52px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  margin-bottom:15px;
+
+  border:
+    1px solid
+    #e2c640;
+
+  border-radius:50%;
+
+  background:
+    var(--accent);
+
+  color:#111111;
+
+  font-size:23px;
+
+  font-weight:1000;
+
+  box-shadow:
+    0
+    8px
+    20px
+    rgba(250,204,21,.18);
+}
+
+/* 小標 */
+
+#step5 .step5-created-kicker{
+  margin-bottom:5px;
+
+  color:#947500;
+
+  font-size:11px;
+
+  font-weight:1000;
+}
+
+
+/* 主標題 */
+
+#step5 .step5-created-title{
+  color:#111111;
+
+  font-size:24px;
+
+  font-weight:1000;
+
+  letter-spacing:-.6px;
+
+  line-height:1.3;
+}
+
+
+/* 說明 */
+
+#step5 .step5-created-text{
+  max-width:360px;
+
+  margin-top:7px;
+
+  color:#7f8388;
+
+  font-size:13px;
+
+  font-weight:800;
+
+  line-height:1.7;
+}
+
+/* ==============================
+   訂單編號
+   ============================== */
+
+#step5 .step5-order-id-row{
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:14px;
+
+  margin-top:17px;
+
+  padding-top:14px;
+
+  border-top:
+    1px solid
+    rgba(148,117,0,.14);
+}
+
+
+#step5 .step5-order-id-row span{
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:900;
+}
+
+
+#step5 .step5-order-id-row strong{
+  min-width:0;
+
+  overflow:hidden;
+
+  color:#111111;
+
+  font-size:13px;
+
+  font-weight:1000;
+
+  text-align:right;
+
+  white-space:nowrap;
+
+  text-overflow:ellipsis;
+}
+
+/* ==============================
+   付款方式區
+   ============================== */
+
+#step5 .step5-payment-section{
+  margin:
+    16px
+    0;
+
+  padding:
+    16px;
+
+  border:
+    1px solid
+    #e6e7e9;
+
+  border-radius:22px;
+
+  background:#ffffff;
+
+  box-shadow:
+    0
+    6px
+    22px
+    rgba(17,24,39,.045);
+}
+
+
+/* 區塊標題 */
+
+#step5 .step5-section-head{
+  display:flex;
+
+  align-items:flex-start;
+
+  justify-content:space-between;
+
+  gap:12px;
+
+  margin-bottom:13px;
+}
+
+
+#step5 .step5-section-title{
+  color:#111111;
+
+  font-size:18px;
+
+  font-weight:1000;
+}
+
+
+#step5 .step5-section-sub{
+  margin-top:4px;
+
+  color:#969a9f;
+
+  font-size:11px;
+
+  font-weight:850;
+}
+
+/* ==============================
+   現金單選擇卡
+   ============================== */
+
+#step5 .step5-payment-choice{
+  width:100%;
+
+  min-height:74px;
+
+  display:grid;
+
+  grid-template-columns:
+    38px
+    minmax(0,1fr)
+    24px;
+
+  gap:12px;
+
+  align-items:center;
+
+  margin:0;
+
+  padding:
+    12px
+    14px;
+
+  border:
+    1px solid
+    #e3e5e7;
+
+  border-radius:17px;
+
+  background:#ffffff;
+
+  color:#111111;
+
+  text-align:left;
+
+  box-shadow:none;
+}
+
+
+/* 被選中 */
+
+#step5 .step5-payment-choice.selected{
+  border-color:
+    var(--accentStrong);
+
+  background:
+    #fffbed;
+
+  color:#111111;
+}
+
+
+/* 左側 $ */
+
+#step5 .step5-payment-choice-icon{
+  width:38px;
+
+  height:38px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  border-radius:50%;
+
+  background:#f1f2f3;
+
+  color:#55595e;
+
+  font-size:15px;
+
+  font-weight:1000;
+}
+
+
+#step5 .step5-payment-choice.selected
+.step5-payment-choice-icon{
+  background:
+    var(--accent);
+
+  color:#111111;
+}
+
+#step5 .step5-payment-choice-main{
+  min-width:0;
+
+  display:block;
+}
+
+
+#step5 .step5-payment-choice-title{
+  display:block;
+
+  color:#111111;
+
+  font-size:15px;
+
+  font-weight:1000;
+}
+
+
+#step5 .step5-payment-choice-desc{
+  display:block;
+
+  margin-top:4px;
+
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:800;
+
+  line-height:1.5;
+}
+
+
+/* 右側確認 */
+
+#step5 .step5-payment-choice-check{
+  width:23px;
+
+  height:23px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  border:
+    2px solid
+    #d2d5d8;
+
+  border-radius:50%;
+
+  background:#ffffff;
+
+  color:transparent;
+
+  font-size:11px;
+
+  font-weight:1000;
+}
+
+
+#step5 .step5-payment-choice.selected
+.step5-payment-choice-check{
+  border-color:
+    var(--accentStrong);
+
+  background:
+    var(--accent);
+
+  color:#111111;
+}
+
+/* ==============================
+   付款規則
+   ============================== */
+
+#step5 .step5-payment-rule{
+  margin-top:12px;
+
+  padding:
+    11px
+    12px;
+
+  border-radius:14px;
+
+  background:#f7f7f8;
+}
+
+
+#step5 .step5-payment-rule-title{
+  margin-bottom:4px;
+
+  color:#55595e;
+
+  font-size:11px;
+
+  font-weight:1000;
+}
+
+
+#step5 .step5-payment-rule-text{
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:800;
+
+  line-height:1.65;
+}
+
+/* ==============================
+   付款資訊
+   ============================== */
+
+#step5 .payment-info{
+  margin-top:12px;
+}
+
+
+/* ==============================
+   確認現金單按鈕
+   ============================== */
+
+#step5 .step5-confirm-cash-btn{
+  width:100%;
+
+  min-height:56px;
+
+  margin-top:12px !important;
+
+  border-radius:17px;
+
+  background:
+    var(--accent);
+
+  color:#111111;
+
+  font-size:
+    15px !important;
+
+  font-weight:1000;
+
+  box-shadow:
+    0
+    8px
+    20px
+    rgba(250,204,21,.18);
+}
+
+
+#step5 .step5-confirm-cash-btn:active{
+  transform:
+    scale(.985);
+}
+
+
+#step5 .step5-confirm-cash-btn:disabled{
+  opacity:.55;
+
+  transform:none;
+
+  box-shadow:none;
+}
+
+
 .map-location-pill{
   display:none !important;
 }
@@ -6345,31 +6843,124 @@ input:checked
     </section>
 
     <section class="step" id="step5">
-      <div class="success">
-        <div class="success-icon">✓</div>
-        <div class="success-title">訂單已建立</div>
-        <div class="subtext">確認使用現金單後，系統會開始媒合騎士。</div>
-        <div class="order-no" id="orderNo">-</div>
-      </div>
+      <div class="step5-created-hero">
+
+  <div class="step5-created-icon">
+    ✓
+  </div>
+
+
+  <div class="step5-created-kicker">
+    訂單建立成功
+  </div>
+
+
+  <div class="step5-created-title">
+    最後一步：確認現金單
+  </div>
+
+
+  <div class="step5-created-text">
+    確認使用現金單後，UBee 系統才會正式開始媒合附近騎士。
+  </div>
+
+
+  <div class="step5-order-id-row">
+
+    <span>
+      訂單編號
+    </span>
+
+    <strong id="orderNo">
+      -
+    </strong>
+
+  </div>
+
+</div>
 
       <div class="status" id="statusBox">訂單狀態：等待確認現金單</div>
 
-      <div class="content-card">
-        <div class="content-title">付款方式</div>
+      <div class="content-card step5-payment-section">
 
-        <div class="quick-guide">
-          <div class="quick-guide-title">正式營運付款規則</div>
-          <div class="quick-guide-text">現階段 UBee 跑腿先開放現金單。確認使用現金單後，系統會開始媒合騎士，任務完成時由騎士向客人收取現金。</div>
-        </div>
+  <div class="step5-section-head">
 
-        <div class="btn-row">
-          <button id="payCashBtn" class="btn btn-secondary black-outline" type="button" onclick="selectPaymentMethod('cash')">現金單</button>
-        </div>
+    <div>
 
-        <div id="paymentInfo" class="payment-info hidden"></div>
-
-        <button id="confirmPaidBtn" class="btn btn-primary hidden" type="button" onclick="confirmPaid()" style="margin-top:12px;">確認使用現金單，開始派單</button>
+      <div class="step5-section-title">
+        付款方式
       </div>
+
+      <div class="step5-section-sub">
+        確認後才會正式開始派單
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <button
+    id="payCashBtn"
+    class="btn btn-secondary black-outline step5-payment-choice"
+    type="button"
+    onclick="selectPaymentMethod('cash')"
+  >
+
+    <span class="step5-payment-choice-icon">
+      $
+    </span>
+
+
+    <span class="step5-payment-choice-main">
+
+      <span class="step5-payment-choice-title">
+        現金單
+      </span>
+
+      <span class="step5-payment-choice-desc">
+        任務完成時，由騎士向你收取現金
+      </span>
+
+    </span>
+
+
+    <span class="step5-payment-choice-check">
+      ✓
+    </span>
+
+  </button>
+
+
+  <div class="step5-payment-rule">
+
+    <div class="step5-payment-rule-title">
+      目前付款規則
+    </div>
+
+    <div class="step5-payment-rule-text">
+      現階段 UBee 跑腿先開放現金單。確認後系統會開始媒合騎士，任務完成時再將應付金額交付給騎士。
+    </div>
+
+  </div>
+
+
+  <div
+    id="paymentInfo"
+    class="payment-info hidden"
+  ></div>
+
+
+  <button
+    id="confirmPaidBtn"
+    class="btn btn-primary hidden step5-confirm-cash-btn"
+    type="button"
+    onclick="confirmPaid()"
+  >
+    確認使用現金單，開始派單
+  </button>
+
+</div>
     </section>
 
     <section class="app-section" id="customerTasksPage">
