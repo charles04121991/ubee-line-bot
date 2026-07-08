@@ -2593,6 +2593,193 @@ margin:
     var(--accentStrong);
 }
 
+/* ==============================
+   第六階段：首頁地址路線卡片
+   ============================== */
+
+
+/* 隱藏「路線」文字標題 */
+
+.route-section-label{
+  display:none;
+}
+
+
+/* 地址卡片整體 */
+
+#step1 .address-card{
+  position:relative;
+
+  margin:
+    4px
+    0
+    0;
+
+  overflow:hidden;
+
+  border:
+    1px solid #e7e8ea;
+
+  border-radius:
+    18px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0
+    5px
+    18px
+    rgba(17,24,39,.04);
+}
+
+
+/* 中間連接線 */
+
+#step1 .address-card::before{
+  content:"";
+
+  position:absolute;
+
+  left:25px;
+
+  top:43px;
+
+  bottom:43px;
+
+  width:2px;
+
+  border-radius:999px;
+
+  background:
+    #d9dbde;
+}
+
+
+/* 每一列地址 */
+
+#step1 .address-row{
+  position:relative;
+
+  display:grid;
+
+  grid-template-columns:
+    22px
+    minmax(0,1fr);
+
+  gap:11px;
+
+  align-items:center;
+
+  min-height:76px;
+
+  padding:
+    13px
+    15px;
+}
+
+
+/* 第二列分隔線 */
+
+#step1 .address-row + .address-row{
+  border-top:
+    1px solid #eeeeef;
+}
+
+
+/* 地址圓點 */
+
+#step1 .address-dot{
+  position:relative;
+
+  z-index:2;
+
+  width:11px;
+  height:11px;
+
+  margin-left:4px;
+
+  border-radius:50%;
+
+  box-shadow:
+    0
+    0
+    0
+    5px
+    #ffffff;
+}
+
+
+/* 取件點 */
+
+#step1 .address-dot.pickup{
+  background:#111111;
+}
+
+
+/* 送達點 */
+
+#step1 .address-dot.dropoff{
+  background:
+    var(--accentStrong);
+}
+
+
+/* 地址文字區 */
+
+#step1 .address-main{
+  min-width:0;
+}
+
+
+/* 小標題 */
+
+#step1 .address-label{
+  margin-bottom:5px;
+
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:900;
+
+  line-height:1.2;
+}
+
+
+/* 地址輸入框 */
+
+#step1 .address-main input{
+  width:100%;
+
+  min-height:28px;
+
+  padding:0;
+
+  border:none;
+
+  outline:none;
+
+  background:transparent;
+
+  color:#111111;
+
+  font-size:16px !important;
+
+  font-weight:900;
+
+  line-height:1.45;
+}
+
+
+/* 提示文字 */
+
+#step1 .address-main input::placeholder{
+  color:#b3b6ba;
+
+  font-weight:800;
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -2887,7 +3074,7 @@ margin:
      正式配送路線
      ============================== -->
 
-<div class="section-label">
+<div class="section-label route-section-label">
   路線
 </div>
 <div class="address-card">
@@ -4874,7 +5061,7 @@ function applyDynamicFields(){
       isQueue ? '排隊地點' :
       isHelper ? '任務地點' :
       isUrgent ? '急件取件地點' :
-      '取件資訊';
+      '取件地點';
   }
 
   if(qs('dropoffTitle')){
@@ -4882,7 +5069,7 @@ function applyDynamicFields(){
       isQueue ? '完成後通知 / 送達資訊' :
       isHelper ? '完成後交付地點' :
       isUrgent ? '急件送達地點' :
-      '送達資訊';
+      '送達地點';
   }
 
   if(qs('noteTitle')){
