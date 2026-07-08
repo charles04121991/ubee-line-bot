@@ -5932,6 +5932,765 @@ input:checked
   box-shadow:none;
 }
 
+/* ==============================
+   第十九階段：
+   Step 5 任務進度 statusBox
+   ============================== */
+
+
+/* ==============================
+   statusBox 整體
+   ============================== */
+
+#step5 #statusBox{
+
+  overflow:hidden;
+
+  margin:
+    16px
+    0;
+
+  padding:0;
+
+  border:
+    1px solid
+    #e6e7e9;
+
+  border-radius:22px;
+
+  background:#ffffff;
+
+  color:#111111;
+
+  text-align:left;
+
+  box-shadow:
+    0
+    6px
+    22px
+    rgba(17,24,39,.045);
+
+}
+
+/* ==============================
+   最上方狀態列
+   ============================== */
+
+#step5 .order-progress-head{
+
+  display:flex;
+
+  align-items:flex-start;
+
+  justify-content:space-between;
+
+  gap:14px;
+
+  padding:
+    16px
+    16px
+    13px;
+
+}
+
+
+/* 小標 */
+
+#step5 .order-progress-kicker{
+
+  margin-bottom:4px;
+
+  color:#969a9f;
+
+  font-size:11px;
+
+  font-weight:1000;
+
+}
+
+
+/* 目前狀態 */
+
+#step5 .order-progress-title{
+
+  color:#111111;
+
+  font-size:20px;
+
+  font-weight:1000;
+
+  letter-spacing:-.4px;
+
+  line-height:1.3;
+
+}
+
+/* ==============================
+   付款狀態標籤
+   ============================== */
+
+#step5 .order-progress-payment-badge{
+
+  flex:0 0 auto;
+
+  padding:
+    7px
+    10px;
+
+  border-radius:999px;
+
+  font-size:10px;
+
+  font-weight:1000;
+
+  white-space:nowrap;
+
+}
+
+
+/* 尚未選擇 */
+
+#step5 .order-progress-payment-badge.pending{
+
+  border:
+    1px solid
+    #dfe1e3;
+
+  background:
+    #f5f6f7;
+
+  color:#73777c;
+
+}
+
+
+/* 現金單 */
+
+#step5 .order-progress-payment-badge.cash{
+
+  border:
+    1px solid
+    #e5cb50;
+
+  background:
+    #fff7c7;
+
+  color:#655000;
+
+}
+
+
+/* 已付款 */
+
+#step5 .order-progress-payment-badge.success{
+
+  border:
+    1px solid
+    #b8dfc6;
+
+  background:
+    #eff9f2;
+
+  color:#13743a;
+
+}
+
+
+/* 已取消 */
+
+#step5 .order-progress-payment-badge.danger{
+
+  border:
+    1px solid
+    #efc4c4;
+
+  background:
+    #fff2f2;
+
+  color:#b02d2d;
+
+}
+
+/* ==============================
+   目前進度重點卡
+   ============================== */
+
+#step5 .order-progress-current{
+
+  display:grid;
+
+  grid-template-columns:
+    44px
+    minmax(0,1fr);
+
+  gap:12px;
+
+  align-items:center;
+
+  margin:
+    0
+    14px
+    14px;
+
+  padding:
+    14px;
+
+  border-radius:17px;
+
+  background:
+    #f7f7f8;
+
+}
+
+
+/* 左側階段編號 */
+
+#step5 .order-progress-current-icon{
+
+  width:42px;
+
+  height:42px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  border-radius:50%;
+
+  background:#111111;
+
+  color:#ffffff;
+
+  font-size:15px;
+
+  font-weight:1000;
+
+}
+
+
+/* 已取消 */
+
+#step5 .order-progress-current.cancelled{
+
+  background:
+    #fff5f5;
+
+}
+
+
+#step5 .order-progress-current.cancelled
+.order-progress-current-icon{
+
+  background:
+    #dc2626;
+
+  color:#ffffff;
+
+}
+
+
+/* 文字區 */
+
+#step5 .order-progress-current-main{
+
+  min-width:0;
+
+}
+
+
+#step5 .order-progress-current-title{
+
+  margin-bottom:4px;
+
+  color:#111111;
+
+  font-size:15px;
+
+  font-weight:1000;
+
+  line-height:1.35;
+
+}
+
+
+#step5 .order-progress-current-text{
+
+  color:#82868b;
+
+  font-size:12px;
+
+  font-weight:800;
+
+  line-height:1.6;
+
+}
+
+/* ==============================
+   任務進度百分比
+   ============================== */
+
+#step5 .order-progress-meter{
+
+  padding:
+    1px
+    16px
+    18px;
+
+}
+
+
+/* 進度文字 */
+
+#step5 .order-progress-meter-head{
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:12px;
+
+  margin-bottom:8px;
+
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:900;
+
+}
+
+
+#step5 .order-progress-meter-head strong{
+
+  color:#111111;
+
+  font-size:11px;
+
+  font-weight:1000;
+
+}
+
+
+/* 進度槽 */
+
+#step5 .order-progress-meter-track{
+
+  width:100%;
+
+  height:6px;
+
+  overflow:hidden;
+
+  border-radius:999px;
+
+  background:
+    #e8eaec;
+
+}
+
+
+/* 進度 */
+
+#step5 .order-progress-meter-fill{
+
+  height:100%;
+
+  border-radius:999px;
+
+  background:
+    var(--accentStrong);
+
+  transition:
+    width .25s ease;
+
+}
+
+/* ==============================
+   七階段垂直時間軸
+   ============================== */
+
+#step5 .order-progress-timeline{
+
+  padding:
+    2px
+    16px
+    14px;
+
+}
+
+
+/* 每一個階段 */
+
+#step5 .order-progress-step{
+
+  display:grid;
+
+  grid-template-columns:
+    30px
+    minmax(0,1fr);
+
+  gap:11px;
+
+  min-height:58px;
+
+}
+
+
+/* ==============================
+   左側軌道
+   ============================== */
+
+#step5 .order-progress-step-rail{
+
+  position:relative;
+
+  display:flex;
+
+  justify-content:center;
+
+}
+
+
+/* 圓點 */
+
+#step5 .order-progress-step-dot{
+
+  position:relative;
+
+  z-index:2;
+
+  width:24px;
+
+  height:24px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  border:
+    2px solid
+    #d5d8db;
+
+  border-radius:50%;
+
+  background:#ffffff;
+
+  color:transparent;
+
+  font-size:10px;
+
+  font-weight:1000;
+
+}
+
+
+/* 垂直連接線 */
+
+#step5 .order-progress-step-line{
+
+  position:absolute;
+
+  z-index:1;
+
+  top:25px;
+
+  bottom:-1px;
+
+  left:50%;
+
+  width:2px;
+
+  transform:
+    translateX(-50%);
+
+  background:
+    #e2e4e6;
+
+}
+
+/* ==============================
+   已完成
+   ============================== */
+
+#step5 .order-progress-step.done
+.order-progress-step-dot{
+
+  border-color:
+    var(--accentStrong);
+
+  background:
+    var(--accent);
+
+  color:#111111;
+
+}
+
+
+#step5 .order-progress-step.done
+.order-progress-step-line{
+
+  background:
+    var(--accentStrong);
+
+}
+
+
+/* ==============================
+   目前階段
+   ============================== */
+
+#step5 .order-progress-step.current
+.order-progress-step-dot{
+
+  border-color:#111111;
+
+  background:#111111;
+
+  color:#ffffff;
+
+  box-shadow:
+    0
+    0
+    0
+    5px
+    rgba(17,17,17,.07);
+
+}
+
+
+/* ==============================
+   尚未進行
+   ============================== */
+
+#step5 .order-progress-step.upcoming
+.order-progress-step-dot{
+
+  border-color:
+    #d6d9dc;
+
+  background:#ffffff;
+
+  color:transparent;
+
+}
+
+/* ==============================
+   階段文字
+   ============================== */
+
+#step5 .order-progress-step-body{
+
+  min-width:0;
+
+  padding:
+    1px
+    0
+    13px;
+
+}
+
+
+#step5 .order-progress-step-title{
+
+  margin-bottom:3px;
+
+  color:#8b8f94;
+
+  font-size:13px;
+
+  font-weight:900;
+
+  line-height:1.35;
+
+}
+
+
+#step5 .order-progress-step-desc{
+
+  color:#a0a4a8;
+
+  font-size:11px;
+
+  font-weight:800;
+
+  line-height:1.5;
+
+}
+
+
+/* 已完成文字 */
+
+#step5 .order-progress-step.done
+.order-progress-step-title{
+
+  color:#55595e;
+
+}
+
+
+/* 目前階段文字 */
+
+#step5 .order-progress-step.current
+.order-progress-step-title{
+
+  color:#111111;
+
+  font-size:14px;
+
+  font-weight:1000;
+
+}
+
+
+#step5 .order-progress-step.current
+.order-progress-step-desc{
+
+  color:#73777c;
+
+}
+
+/* ==============================
+   訂單取消狀態
+   ============================== */
+
+#step5 .order-progress-cancelled{
+
+  display:grid;
+
+  grid-template-columns:
+    40px
+    minmax(0,1fr);
+
+  gap:12px;
+
+  align-items:start;
+
+  margin:
+    0
+    0
+    2px;
+
+  padding:
+    14px;
+
+  border-radius:16px;
+
+  background:
+    #fff5f5;
+
+}
+
+
+#step5 .order-progress-cancelled-icon{
+
+  width:38px;
+
+  height:38px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  border-radius:50%;
+
+  background:
+    #dc2626;
+
+  color:#ffffff;
+
+  font-size:18px;
+
+  font-weight:1000;
+
+}
+
+
+#step5 .order-progress-cancelled-title{
+
+  margin-bottom:4px;
+
+  color:#a72a2a;
+
+  font-size:14px;
+
+  font-weight:1000;
+
+}
+
+
+#step5 .order-progress-cancelled-text{
+
+  color:#8f6868;
+
+  font-size:11px;
+
+  font-weight:800;
+
+  line-height:1.6;
+
+}
+
+/* ==============================
+   statusBox 最下方金額
+   ============================== */
+
+#step5 .order-progress-total{
+
+  min-height:60px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:14px;
+
+  padding:
+    13px
+    16px;
+
+  border-top:
+    1px solid
+    #eeeeef;
+
+  background:
+    #fafafa;
+
+}
+
+
+#step5 .order-progress-total span{
+
+  color:#777b80;
+
+  font-size:12px;
+
+  font-weight:900;
+
+}
+
+
+#step5 .order-progress-total strong{
+
+  color:#111111;
+
+  font-size:19px;
+
+  font-weight:1000;
+
+  letter-spacing:-.4px;
+
+}
+
 
 .map-location-pill{
   display:none !important;
@@ -10738,77 +11497,87 @@ function isOrderPaymentConfirmed(order, status){
 }
 
 function renderTimeline(status, order){
+
   const currentStatus =
     status ||
     'pending_payment';
 
+
+  /* ==============================
+     UBee 任務七階段
+     ============================== */
+
+  const steps = [
+
+    {
+      rank:0,
+      title:'訂單建立',
+      desc:'訂單已成功建立'
+    },
+
+    {
+      rank:1,
+      title:'等待派單',
+      desc:'系統正在媒合騎士'
+    },
+
+    {
+      rank:2,
+      title:'騎士接單',
+      desc:'騎士正在前往取件地點'
+    },
+
+    {
+      rank:3,
+      title:'抵達取件',
+      desc:'騎士已抵達取件地點'
+    },
+
+    {
+      rank:4,
+      title:'取件完成',
+      desc:'騎士已取件，任務進行中'
+    },
+
+    {
+      rank:5,
+      title:'抵達送達',
+      desc:'騎士已抵達送達地點'
+    },
+
+    {
+      rank:6,
+      title:'任務完成',
+      desc:'任務已完成'
+    }
+
+  ];
+
+
+  /* ==============================
+     判斷目前進度
+     ============================== */
+
+  const isCancelled =
+    currentStatus === 'cancelled';
+
+
   let displayRank =
     getStatusRank(currentStatus);
+
 
   if(currentStatus === 'merchant_pending'){
     displayRank = 1;
   }
 
+
   if(currentStatus === 'done'){
     displayRank = 6;
   }
 
-  const payableTotal =
-    getCustomerPayableTotal(order);
-
-  const totalText =
-    payableTotal !== null &&
-    payableTotal > 0
-      ? `NT$${Math.round(payableTotal)}`
-      : '系統計算中';
-
-  const steps = [
-    {
-      rank:0,
-      icon:'1',
-      title:'訂單建立',
-      shortDesc:'已建立'
-    },
-    {
-      rank:1,
-      icon:'2',
-      title:'等待派單',
-      shortDesc:'媒合中'
-    },
-    {
-      rank:2,
-      icon:'3',
-      title:'騎士接單',
-      shortDesc:'已接單'
-    },
-    {
-      rank:3,
-      icon:'4',
-      title:'抵達取件',
-      shortDesc:'已抵達'
-    },
-    {
-      rank:4,
-      icon:'5',
-      title:'取件完成',
-      shortDesc:'配送中'
-    },
-    {
-      rank:5,
-      icon:'6',
-      title:'抵達送達',
-      shortDesc:'快送達'
-    },
-    {
-      rank:6,
-      icon:'7',
-      title:'任務完成',
-      shortDesc:'已完成'
-    }
-  ];
 
   const safeRank =
-    currentStatus === 'cancelled'
+    isCancelled
       ? 0
       : Math.max(
           0,
@@ -10818,57 +11587,54 @@ function renderTimeline(status, order){
           )
         );
 
+
+  const currentStepData =
+    steps[safeRank] ||
+    steps[0];
+
+
+  /* ==============================
+     進度百分比
+     ============================== */
+
   const progressPercent =
-    currentStatus === 'cancelled'
+    isCancelled
       ? 0
-      : Math.max(
-          0,
-          Math.min(
-            100,
-            (
-              safeRank /
-              (steps.length - 1)
-            ) * 100
-          )
+      : Math.round(
+          (
+            (safeRank + 1) /
+            steps.length
+          ) * 100
         );
 
-  const timelineHtml =
-    steps.map(step => {
 
-      let cls = '';
+  /* ==============================
+     訂單金額
+     ============================== */
 
-      if(currentStatus === 'cancelled'){
+  const payableTotal =
+    getCustomerPayableTotal(order);
 
-        cls =
-          step.rank === 0
-            ? 'done'
-            : '';
 
-      }else if(step.rank < safeRank){
+  const totalText =
+    payableTotal !== null &&
+    payableTotal > 0
+      ? `NT$${Math.round(payableTotal)}`
+      : '系統計算中';
 
-        cls = 'done';
 
-      }else if(step.rank === safeRank){
+  const totalLabel =
+    [
+      'completed',
+      'done'
+    ].includes(currentStatus)
+      ? '訂單金額'
+      : '預估應付';
 
-        cls = 'current';
-      }
 
-      return `
-        <div class="timeline-item ${cls}">
-          <div class="timeline-dot">
-            ${escapeHtml(step.icon)}
-          </div>
-
-          <div class="timeline-title">
-            ${escapeHtml(step.title)}
-          </div>
-
-          <div class="timeline-desc">
-            ${escapeHtml(step.shortDesc)}
-          </div>
-        </div>
-      `;
-    }).join('');
+  /* ==============================
+     付款狀態
+     ============================== */
 
   const paymentConfirmed =
     isOrderPaymentConfirmed(
@@ -10876,91 +11642,361 @@ function renderTimeline(status, order){
       currentStatus
     );
 
-  const statusColorClass =
-    currentStatus === 'cancelled'
-      ? 'danger'
-      : (
-          paymentConfirmed
-            ? 'success'
-            : 'danger'
-        );
 
-  const statusBadgeText =
-    currentStatus === 'cancelled'
-      ? '已取消'
-      : (
-          paymentConfirmed
-            ? '已付款'
-            : '尚未付款'
-        );
+  const isCashOrder =
+    String(
+      order?.paymentMethod ||
+      ''
+    )
+      .trim()
+      .toLowerCase() === 'cash'
+    ||
+    order?.isCashOrder === true;
+
+
+  let paymentBadgeClass =
+    'pending';
+
+
+  let paymentBadgeText =
+    '待確認付款';
+
+
+  if(isCancelled){
+
+    paymentBadgeClass =
+      'danger';
+
+    paymentBadgeText =
+      '已取消';
+
+  }else if(paymentConfirmed){
+
+    paymentBadgeClass =
+      'success';
+
+    paymentBadgeText =
+      '已付款';
+
+  }else if(isCashOrder){
+
+    paymentBadgeClass =
+      'cash';
+
+    paymentBadgeText =
+      '現金單';
+
+  }
+
+
+  /* ==============================
+     七階段垂直時間軸
+     ============================== */
+
+  const stagesHtml =
+    isCancelled
+      ? `
+
+        <div class="order-progress-cancelled">
+
+          <div class="order-progress-cancelled-icon">
+            ×
+          </div>
+
+          <div>
+
+            <div class="order-progress-cancelled-title">
+              任務流程已停止
+            </div>
+
+            <div class="order-progress-cancelled-text">
+              此訂單已取消，系統不會再繼續媒合或執行任務。
+            </div>
+
+          </div>
+
+        </div>
+
+      `
+
+      : steps.map(step => {
+
+          let stepClass =
+            'upcoming';
+
+
+          let stepIcon =
+            '';
+
+
+          if(step.rank < safeRank){
+
+            stepClass =
+              'done';
+
+            stepIcon =
+              '✓';
+
+          }else if(step.rank === safeRank){
+
+            stepClass =
+              'current';
+
+            stepIcon =
+              '●';
+
+          }
+
+
+          return `
+
+            <div class="order-progress-step ${stepClass}">
+
+              <div class="order-progress-step-rail">
+
+                <div class="order-progress-step-dot">
+                  ${escapeHtml(stepIcon)}
+                </div>
+
+
+                ${
+                  step.rank < steps.length - 1
+                    ? `
+
+                      <div class="order-progress-step-line"></div>
+
+                    `
+                    : ''
+                }
+
+              </div>
+
+
+              <div class="order-progress-step-body">
+
+                <div class="order-progress-step-title">
+                  ${escapeHtml(step.title)}
+                </div>
+
+                <div class="order-progress-step-desc">
+                  ${escapeHtml(step.desc)}
+                </div>
+
+              </div>
+
+            </div>
+
+          `;
+
+        }).join('');
+
+
+  /* ==============================
+     渲染 statusBox
+     ============================== */
 
   const statusBoxEl =
     qs('statusBox');
 
+
   if(statusBoxEl){
 
-    statusBoxEl.classList.toggle(
+    statusBoxEl.classList.remove(
       'payment-paid',
-      paymentConfirmed &&
-      currentStatus !== 'cancelled'
+      'payment-unpaid'
     );
 
-    statusBoxEl.classList.toggle(
-      'payment-unpaid',
-      !paymentConfirmed &&
-      currentStatus !== 'cancelled'
-    );
 
     statusBoxEl.innerHTML = `
-      <div class="status-head">
+
+      <!-- ==============================
+           最上方目前狀態
+           ============================== -->
+
+      <div class="order-progress-head">
+
         <div>
-          <div class="status-label">
-            訂單狀態
+
+          <div class="order-progress-kicker">
+            目前進度
           </div>
 
-          <div class="status-title">
+          <div class="order-progress-title">
             ${escapeHtml(
               getStatusLabel(currentStatus)
             )}
           </div>
+
         </div>
 
-        <div class="status-badge ${statusColorClass}">
-          ${escapeHtml(statusBadgeText)}
+
+        <div
+          class="
+            order-progress-payment-badge
+            ${paymentBadgeClass}
+          "
+        >
+          ${escapeHtml(paymentBadgeText)}
         </div>
+
       </div>
+
+
+      <!-- ==============================
+           目前進度重點卡
+           ============================== -->
 
       <div
-        class="order-timeline"
-        style="--progress:${progressPercent}%;"
+        class="
+          order-progress-current
+          ${isCancelled ? 'cancelled' : ''}
+        "
       >
-        <div class="timeline-line">
-          <div class="timeline-line-fill"></div>
+
+        <div class="order-progress-current-icon">
+
+          ${
+            isCancelled
+              ? '×'
+              : safeRank + 1
+          }
+
         </div>
 
-        ${timelineHtml}
-      </div>
 
-      <div class="current-status-card">
-        <div class="current-status-kicker">
-          目前進度
+        <div class="order-progress-current-main">
+
+          <div class="order-progress-current-title">
+
+            ${
+              isCancelled
+                ? '訂單已取消'
+                : escapeHtml(
+                    currentStepData.title
+                  )
+            }
+
+          </div>
+
+
+          <div class="order-progress-current-text">
+
+            ${escapeHtml(
+              getCurrentStatusMessage(
+                currentStatus
+              )
+            )}
+
+          </div>
+
         </div>
 
-        <div class="current-status-text">
-          ${escapeHtml(
-            getCurrentStatusMessage(
-              currentStatus
-            )
-          )}
-        </div>
       </div>
 
-      <div class="status-total">
-        <span>費用</span>
-        <strong>${escapeHtml(totalText)}</strong>
+
+      <!-- ==============================
+           任務進度條
+           ============================== -->
+
+      ${
+        isCancelled
+          ? ''
+
+          : `
+
+            <div class="order-progress-meter">
+
+              <div class="order-progress-meter-head">
+
+                <span>
+                  任務進度
+                </span>
+
+                <strong>
+                  ${safeRank + 1}
+                  /
+                  ${steps.length}
+                </strong>
+
+              </div>
+
+
+              <div class="order-progress-meter-track">
+
+                <div
+                  class="order-progress-meter-fill"
+                  style="
+                    width:${progressPercent}%;
+                  "
+                ></div>
+
+              </div>
+
+            </div>
+
+          `
+      }
+
+
+      <!-- ==============================
+           七階段時間軸
+           ============================== -->
+
+      <div class="order-progress-timeline">
+
+        ${stagesHtml}
+
       </div>
+
+
+      <!-- ==============================
+           訂單金額
+           ============================== -->
+
+      <div class="order-progress-total">
+
+        <span>
+          ${escapeHtml(totalLabel)}
+        </span>
+
+        <strong>
+          ${escapeHtml(totalText)}
+        </strong>
+
+      </div>
+
     `;
+
   }
+
+
+  /* ==============================
+     原本取消訂單規則保留
+     ============================== */
+
+  const canCancel =
+
+    currentOrderId &&
+
+    ![
+      'picked_up',
+      'arrived_dropoff',
+      'completed',
+      'done',
+      'cancelled'
+    ].includes(currentStatus);
+
+
+  qs('cancelOrderBtn')
+    ?.classList
+    .toggle(
+      'hidden',
+
+      !canCancel ||
+      currentStep !== 5
+    );
+
+}
 
   const canCancel =
     currentOrderId &&
