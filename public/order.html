@@ -285,16 +285,6 @@
        STEP 1：地圖首頁
        ============================== */
 
-    .home-map-shell{
-      position:relative;
-      height:304px;
-      margin:0 -14px;
-      overflow:hidden;
-      background:#e8eaed;
-      border-top:1px solid var(--line);
-      border-bottom:1px solid var(--line);
-    }
-
     .map-canvas{
       width:100%;
       height:100%;
@@ -327,23 +317,6 @@
 
     .map-placeholder.is-ready{
       display:none;
-    }
-    .map-current-btn{
-      position:absolute;
-      right:14px;
-      bottom:18px;
-      z-index:6;
-      width:44px;
-      height:44px;
-      border:1px solid rgba(17,24,39,.08);
-      border-radius:15px;
-      background:rgba(255,255,255,.96);
-      color:#111;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      box-shadow:0 10px 24px rgba(17,24,39,.13);
-      padding:0;
     }
 
     .map-current-btn svg{
@@ -380,25 +353,6 @@
       color:var(--muted);
       font-size:12px;
       font-weight:900;
-    }
-
-    .task-sheet{
-      position:relative;
-      z-index:10;
-      margin:-34px 0 0;
-      padding:20px 16px 18px;
-      border:1px solid var(--line);
-      border-radius:30px 30px 24px 24px;
-      background:var(--surface);
-      box-shadow:var(--shadow);
-    }
-
-    .task-sheet-handle{
-      width:42px;
-      height:4px;
-      border-radius:999px;
-      background:#d8dadd;
-      margin:0 auto 18px;
     }
 
     .merchant-card{
@@ -1744,11 +1698,17 @@ margin:
 /* 地圖拉高，讓首頁更有即時跑腿平台的感覺 */
 
 .home-map-shell{
+  position:relative;
+
   height:350px;
 
   margin:
     0
     -14px;
+
+  overflow:hidden;
+
+  background:#e8eaed;
 
   border-top:none;
   border-bottom:none;
@@ -1758,24 +1718,48 @@ margin:
 /* 定位按鈕改成圓形 */
 
 .map-current-btn{
+  position:absolute;
+
   right:16px;
   bottom:22px;
 
+  z-index:6;
+
   width:46px;
   height:46px;
+
+  display:flex;
+
+  align-items:center;
+  justify-content:center;
+
+  padding:0;
+
+  border:
+    1px solid
+    rgba(17,24,39,.08);
 
   border-radius:50%;
 
   background:#ffffff;
 
+  color:#111111;
+
   box-shadow:
-    0 5px 18px rgba(17,24,39,.16);
+    0
+    5px
+    18px
+    rgba(17,24,39,.16);
 }
 
 
 /* 白色操作區改成接住地圖的底部面板 */
 
 .task-sheet{
+  position:relative;
+
+  z-index:10;
+
   margin:
     -20px
     -14px
@@ -1797,7 +1781,10 @@ margin:
   background:#ffffff;
 
   box-shadow:
-    0 -6px 22px rgba(17,24,39,.08);
+    0
+    -6px
+    22px
+    rgba(17,24,39,.08);
 }
 
 
@@ -1811,6 +1798,8 @@ margin:
     0
     auto
     15px;
+
+  border-radius:999px;
 
   background:#d5d5d5;
 }
