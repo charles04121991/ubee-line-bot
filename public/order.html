@@ -3079,6 +3079,512 @@ margin:
   box-shadow:none;
 }
 
+/* ==============================
+   第九階段：
+   第二頁改成正式訂單資訊頁
+   ============================== */
+
+
+/* 第二頁整體 */
+
+#step2{
+  padding-top:4px;
+}
+
+
+/* 頁面主標題 */
+
+#step2 .headline{
+  margin:
+    14px
+    0
+    6px;
+
+  color:#111111;
+
+  font-size:26px;
+
+  font-weight:1000;
+
+  letter-spacing:-.6px;
+
+  line-height:1.25;
+}
+
+
+/* 頁面說明 */
+
+#step2 > .subtext{
+  margin-bottom:18px;
+
+  color:#8b8f94;
+
+  font-size:13px;
+
+  font-weight:800;
+
+  line-height:1.65;
+}
+
+
+/* ==============================
+   已選任務
+   ============================== */
+
+#step2 .task-path-box{
+  position:relative;
+
+  margin:
+    0
+    0
+    18px;
+
+  padding:
+    15px
+    16px;
+
+  border:
+    1px solid
+    #ece7c9;
+
+  border-radius:
+    17px;
+
+  background:
+    #fffbed;
+
+  box-shadow:none;
+}
+
+
+/* 左側黃色標記 */
+
+#step2 .task-path-box::before{
+  content:"";
+
+  position:absolute;
+
+  left:0;
+
+  top:14px;
+
+  bottom:14px;
+
+  width:4px;
+
+  border-radius:
+    0
+    999px
+    999px
+    0;
+
+  background:
+    var(--accentStrong);
+}
+
+
+/* 小標 */
+
+#step2 .task-path-title{
+  margin-bottom:5px;
+
+  color:#9a7a00;
+
+  font-size:11px;
+
+  font-weight:1000;
+}
+
+
+/* 任務名稱 */
+
+#step2 .task-path-value{
+  color:#111111;
+
+  font-size:15px;
+
+  font-weight:1000;
+
+  line-height:1.5;
+}
+
+
+/* ==============================
+   第二頁每一個表單區塊
+   ============================== */
+
+#step2 .form-section{
+  margin:
+    0
+    0
+    18px;
+}
+
+
+/* 區塊標題 */
+
+#step2 .form-title{
+  margin:
+    0
+    0
+    9px;
+
+  color:#222222;
+
+  font-size:15px;
+
+  font-weight:1000;
+}
+
+
+/* 白色資訊卡 */
+
+#step2 .input-card{
+  overflow:hidden;
+
+  border:
+    1px solid
+    #e7e8ea;
+
+  border-radius:
+    18px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0
+    4px
+    16px
+    rgba(17,24,39,.035);
+}
+
+
+/* 每一列 */
+
+#step2 .input-wrap{
+  min-height:62px;
+
+  padding:
+    13px
+    15px;
+
+  gap:12px;
+
+  border-bottom:
+    1px solid
+    #eeeeef;
+}
+
+
+#step2 .input-wrap:last-child{
+  border-bottom:none;
+}
+
+
+/* 左邊小圖示 */
+
+#step2 .input-icon{
+  width:30px;
+
+  height:30px;
+
+  flex:
+    0
+    0
+    30px;
+
+  border-radius:50%;
+
+  background:
+    #f3f4f5;
+
+  color:#55595e;
+
+  font-size:12px;
+
+  font-weight:1000;
+}
+
+
+/* 輸入文字 */
+
+#step2 input,
+#step2 textarea,
+#step2 select{
+  color:#111111;
+
+  font-size:
+    16px !important;
+
+  font-weight:850;
+}
+
+
+/* placeholder */
+
+#step2 input::placeholder,
+#step2 textarea::placeholder{
+  color:#b0b4b8;
+
+  font-weight:750;
+}
+
+
+/* 多行任務內容 */
+
+#step2 textarea{
+  min-height:120px;
+
+  padding:
+    4px
+    0;
+
+  line-height:1.7;
+}
+
+
+/* 下拉選單 */
+
+#step2 select{
+  min-height:34px;
+
+  padding-right:8px;
+}
+
+/* ==============================
+   第二頁提醒訊息
+   ============================== */
+
+#step2 .quick-guide{
+  margin:
+    0
+    0
+    18px;
+
+  padding:
+    13px
+    14px;
+
+  border:
+    1px solid
+    #eee5b4;
+
+  border-radius:
+    15px;
+
+  background:
+    #fffbed;
+
+  box-shadow:none;
+}
+
+
+#step2 .quick-guide-title{
+  margin-bottom:5px;
+
+  color:#7d6300;
+
+  font-size:13px;
+
+  font-weight:1000;
+}
+
+
+#step2 .quick-guide-text{
+  color:#736b50;
+
+  font-size:12px;
+
+  font-weight:800;
+
+  line-height:1.7;
+}
+
+/* ==============================
+   第十階段：
+   第二頁固定底部操作列
+   ============================== */
+
+
+/* 預留底部空間
+   避免最後一個表單被固定操作列蓋住 */
+
+#step2{
+  padding-bottom:120px;
+}
+
+
+/* 第二頁固定操作列 */
+
+.step2-action-footer{
+  position:fixed;
+
+  left:50%;
+
+  bottom:
+    calc(
+      78px
+      +
+      env(safe-area-inset-bottom)
+    );
+
+  transform:
+    translateX(-50%);
+
+  z-index:88;
+
+  width:
+    calc(100% - 24px);
+
+  max-width:500px;
+
+  display:grid;
+
+  grid-template-columns:
+    108px
+    minmax(0,1fr);
+
+  gap:10px;
+
+  align-items:center;
+
+  padding:10px;
+
+  border:
+    1px solid
+    rgba(17,24,39,.08);
+
+  border-radius:20px;
+
+  background:
+    rgba(255,255,255,.97);
+
+  box-shadow:
+    0
+    12px
+    36px
+    rgba(17,24,39,.15);
+
+  backdrop-filter:
+    blur(16px);
+
+  -webkit-backdrop-filter:
+    blur(16px);
+}
+
+
+/* ==============================
+   上一步
+   ============================== */
+
+.step2-back-btn{
+  width:100%;
+
+  height:54px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  gap:5px;
+
+  padding:
+    0
+    10px;
+
+  border:
+    1px solid
+    #e2e3e5;
+
+  border-radius:16px;
+
+  background:#ffffff;
+
+  color:#55595e;
+
+  font-size:
+    13px !important;
+
+  font-weight:1000;
+
+  box-shadow:none;
+}
+
+
+.step2-back-btn svg{
+  width:18px;
+
+  height:18px;
+
+  flex:
+    0
+    0
+    18px;
+}
+
+
+/* ==============================
+   下一步
+   ============================== */
+
+.step2-next-btn{
+  width:100%;
+
+  height:54px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  gap:7px;
+
+  padding:
+    0
+    16px;
+
+  border:none;
+
+  border-radius:16px;
+
+  background:
+    var(--accent);
+
+  color:#111111;
+
+  font-size:
+    16px !important;
+
+  font-weight:1000;
+
+  box-shadow:none;
+}
+
+
+.step2-next-btn svg{
+  width:19px;
+
+  height:19px;
+
+  flex:
+    0
+    0
+    19px;
+}
+
+
+/* 按下效果 */
+
+.step2-back-btn:active,
+.step2-next-btn:active{
+  transform:
+    scale(.985);
+}
+
 .map-location-pill{
   display:none !important;
 }
@@ -3432,11 +3938,11 @@ margin:
     <section class="step" id="step2">
       <div class="headline">補充任務資訊</div>
       <div class="subtext">
-        確認任務分類後，再補上電話、任務內容、代墊與特殊需求。
+        請完成這筆任務的聯絡方式、需求內容與其他必要資訊。
     </div>
 
       <div class="task-path-box">
-        <div class="task-path-title">目前任務</div>
+        <div class="task-path-title">已選任務</div>
         <div class="task-path-value" id="taskPathText">幫我送｜文件急送｜一般文件</div>
       </div>
 
@@ -3488,15 +3994,15 @@ margin:
       </div>
 
       <div class="form-section">
-        <div class="form-title">聯絡電話</div>
+        <div class="form-title">聯絡資訊</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon">取</div>
-            <input id="pickupPhone" maxlength="20" inputmode="tel" placeholder="取件電話 / 店家電話">
+            <input id="pickupPhone" maxlength="20" inputmode="tel" placeholder="取件聯絡電話 / 店家電話">
           </div>
           <div class="input-wrap">
             <div class="input-icon">送</div>
-            <input id="dropoffPhone" maxlength="20" inputmode="tel" placeholder="收件電話 / 聯絡電話">
+            <input id="dropoffPhone" maxlength="20" inputmode="tel" placeholder="收件聯絡電話">
           </div>
         </div>
       </div>
@@ -3516,7 +4022,7 @@ margin:
       </div>
 
       <div class="form-section">
-        <div class="form-title">是否需要上樓？</div>
+        <div class="form-title">交付需求</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon">樓</div>
@@ -3555,6 +4061,51 @@ margin:
         <div class="quick-guide-title">代墊費用提醒</div>
         <div class="quick-guide-text">若任務需要騎士先代墊商品費、餐點費或其他必要費用，請填寫正確金額；沒有代墊請填 0。代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。</div>
       </div>
+      <div class="step2-action-footer">
+
+  <button
+    class="step2-back-btn"
+    type="button"
+    onclick="goPrev()"
+  >
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 18l-6-6 6-6"></path>
+    </svg>
+
+    <span>上一步</span>
+  </button>
+
+
+  <button
+    class="step2-next-btn"
+    type="button"
+    onclick="goNext()"
+  >
+    繼續下一步
+
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 18l6-6-6-6"></path>
+    </svg>
+  </button>
+
+</div>
+
     </section>
     
             <section class="step" id="step3">
@@ -5513,7 +6064,7 @@ function showOnlyStep(step){
 
   const footerNav = qs('footerNav');
   const footerButtonRow = qs('footerButtonRow');
-  const shouldShowFooter = step === 2 || step === 3 || step === 5;
+  const shouldShowFooter = step === 3 || step === 5;
 
   footerNav?.classList.toggle('hidden', !shouldShowFooter);
   footerButtonRow?.classList.toggle('hidden', step === 5);
