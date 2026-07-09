@@ -19,27 +19,19 @@
 
   <style>
     :root{
-      --bg:#f5f6f7;
-      --surface:#ffffff;
-      --surface2:#f8f8f8;
-      --surface3:#f1f2f3;
-      --text:#111111;
-      --muted:#6f7378;
-      --muted2:#9ca0a5;
-      --line:#e6e7e9;
-      --line2:#d7d9dc;
-      --accent:#facc15;
-      --accentStrong:#f4bd00;
-      --accentText:#111111;
-      --green:#16a34a;
-      --red:#dc2626;
-      --blue:#2563eb;
-      --shadow:0 18px 50px rgba(17,24,39,.10);
-      --shadowSoft:0 10px 30px rgba(17,24,39,.07);
-      --radiusXL:28px;
-      --radiusL:22px;
-      --radiusM:16px;
-    }
+  --bg:#f5f6f7;
+  --surface:#ffffff;
+  --surface2:#f8f8f8;
+  --surface3:#f1f2f3;
+  --text:#111111;
+  --muted:#6f7378;
+  --line:#e6e7e9;
+  --line2:#d7d9dc;
+  --accent:#facc15;
+  --accentStrong:#f4bd00;
+  --red:#dc2626;
+  --shadowSoft:0 10px 30px rgba(17,24,39,.07);
+}
 
     *{
       box-sizing:border-box;
@@ -106,9 +98,9 @@
   display:grid;
 
   grid-template-columns:
-    minmax(100px,1fr)
-    auto
-    44px;
+  1fr
+  auto
+  1fr;
 
   align-items:center;
 
@@ -140,9 +132,13 @@
 /* 左側 Logo / 返回按鈕 */
 
 .topbar-left{
+  grid-column:2;
+  grid-row:1;
+
   display:flex;
 
   align-items:center;
+  justify-content:center;
 
   min-width:0;
 }
@@ -167,12 +163,12 @@
 .brand-wrap{
   min-width:0;
 
-  text-align:left;
+  text-align:center;
 }
 
 
 .brand{
-  font-size:29px;
+  font-size:27px;
 
   font-weight:1000;
 
@@ -191,19 +187,17 @@
 
 /* 不再顯示 CITY TASK PLATFORM */
 
-.brand-sub{
-  display:none !important;
-}
-
-
 /* 中間城市 */
 
 .topbar-location{
+  grid-column:1;
+  grid-row:1;
+
   display:flex;
 
   align-items:center;
 
-  justify-content:center;
+  justify-content:flex-start;
 
   gap:5px;
 
@@ -215,7 +209,6 @@
 
   white-space:nowrap;
 }
-
 
 .topbar-location svg{
   width:17px;
@@ -238,6 +231,11 @@
 /* 右側客服按鈕 */
 
 .topbar-support{
+  grid-column:3;
+  grid-row:1;
+
+  justify-self:end;
+
   border:none;
 
   border-radius:0;
@@ -247,19 +245,13 @@
   box-shadow:none;
 }
 
-
 .topbar-support svg{
   width:23px;
 
   height:23px;
 }
 
-
 /* 不再顯示「首頁 / 2/5 / 3/5」第二排 */
-
-.page-count{
-  display:none !important;
-}
 
     .step,
     .app-section{
@@ -381,37 +373,6 @@
       font-size:13px;
       line-height:1.7;
       font-weight:800;
-    }
-
-    .section-label{
-      font-size:13px;
-      font-weight:1000;
-      color:var(--muted);
-      margin:16px 0 9px;
-    }
-
-    .category-tab .tab-desc,
-    .category-tab .tab-icon{
-      display:none;
-    }
-
-    .service-item{
-      flex:0 0 auto;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background:#fff;
-      color:#444;
-      min-height:40px;
-      padding:10px 13px;
-      text-align:center;
-      transition:.15s ease;
-    }
-
-    .category-choice-box{
-      margin:12px 0 0;
-      padding:0;
-      border:none;
-      background:transparent;
     }
 
         /* ==============================
@@ -632,84 +593,8 @@
     }
 
     /* ==============================
-       STEP 3：速度
-       ============================== */
-
-    .speed-list{
-      display:flex;
-      flex-direction:column;
-      gap:11px;
-    }
-
-    .speed-card{
-      border:1px solid var(--line);
-      background:#fff;
-      border-radius:20px;
-      padding:17px;
-      box-shadow:var(--shadowSoft);
-      transition:.16s ease;
-    }
-
-    .speed-card.active{
-      border-color:#111;
-      box-shadow:0 0 0 1px #111 inset, var(--shadowSoft);
-    }
-
-    .speed-top{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:7px;
-    }
-
-    .speed-name{
-      font-size:19px;
-      font-weight:1000;
-    }
-
-    .speed-time{
-      margin-top:3px;
-      color:#444;
-      font-size:13px;
-      font-weight:1000;
-    }
-
-    .speed-check{
-      width:25px;
-      height:25px;
-      flex:0 0 25px;
-      border:2px solid #c9cdd1;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:transparent;
-      background:#fff;
-      font-size:12px;
-      font-weight:1000;
-    }
-
-    .speed-card.active .speed-check{
-      border-color:#111;
-      background:#111;
-      color:#fff;
-    }
-
-    .speed-desc{
-      color:var(--muted);
-      font-size:13px;
-      font-weight:800;
-      line-height:1.65;
-    }
-
-    /* ==============================
        STEP 4：確認頁
        ============================== */
-
-    #step4{
-      padding-bottom:128px;
-    }
 
     /* ==============================
    STEP 4 路線距離 / 時間
@@ -738,11 +623,6 @@
       font-weight:1000;
     }
 
-    .price-row.price-subtotal{
-      color:#111;
-      font-weight:1000;
-    }
-
     .price-row.price-total{
       padding-top:12px;
       font-size:19px;
@@ -762,50 +642,9 @@
       line-height:1.65;
     }
 
-    .review-sticky-footer{
-      position:fixed;
-      left:50%;
-      transform:translateX(-50%);
-      bottom:calc(78px + env(safe-area-inset-bottom));
-      z-index:88;
-      width:calc(100% - 24px);
-      max-width:500px;
-      display:grid;
-      grid-template-columns:1fr minmax(138px,auto);
-      gap:10px;
-      align-items:center;
-      padding:11px;
-      border:1px solid var(--line);
-      border-radius:22px;
-      background:rgba(255,255,255,.96);
-      box-shadow:0 18px 42px rgba(17,24,39,.16);
-      backdrop-filter:blur(16px);
-    }
-
-    .review-total-label{
-      color:var(--muted);
-      font-size:11px;
-      font-weight:900;
-      margin-bottom:3px;
-    }
-
-    .review-total-value{
-      color:#111;
-      font-size:22px;
-      font-weight:1000;
-      letter-spacing:-.5px;
-      white-space:nowrap;
-    }
-
     /* ==============================
        按鈕、成功頁、狀態頁
        ============================== */
-
-    .btn-row{
-      display:flex;
-      gap:10px;
-      margin-top:18px;
-    }
 
     .btn{
       width:100%;
@@ -855,201 +694,6 @@
       border:1px solid #efbcbc;
     }
     
-    .status{
-      background:#fff;
-      border:1px solid var(--line);
-      border-radius:22px;
-      padding:15px;
-      margin-top:12px;
-      color:#111;
-      text-align:left;
-      box-shadow:var(--shadowSoft);
-    }
-
-    .status.payment-paid{
-      border-color:#b7dfc4;
-      background:#f7fff9;
-    }
-
-    .status.payment-unpaid{
-      border-color:#f0c8c8;
-      background:#fff9f9;
-    }
-
-    .status-head{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:12px;
-    }
-
-    .status-label{
-      color:var(--muted);
-      font-size:11px;
-      font-weight:1000;
-      margin-bottom:4px;
-    }
-
-    .status-title{
-      font-size:19px;
-      font-weight:1000;
-      line-height:1.35;
-    }
-
-    .status-badge{
-      flex:0 0 auto;
-      border-radius:999px;
-      padding:7px 10px;
-      font-size:11px;
-      font-weight:1000;
-      border:1px solid var(--line);
-    }
-
-    .status-badge.success{
-      color:#0d7a37;
-      border-color:#b6dfc5;
-      background:#edf9f1;
-    }
-
-    .status-badge.danger{
-      color:#a72a2a;
-      border-color:#efc2c2;
-      background:#fff1f1;
-    }
-
-    .order-timeline{
-      position:relative;
-      display:grid;
-      grid-template-columns:repeat(7,1fr);
-      gap:0;
-      margin:14px 0 12px;
-      padding:7px 0 4px;
-    }
-
-    .timeline-line{
-      position:absolute;
-      left:7.14%;
-      right:7.14%;
-      top:20px;
-      height:4px;
-      border-radius:999px;
-      background:#dfe1e4;
-      overflow:hidden;
-      z-index:0;
-    }
-
-    .timeline-line-fill{
-      height:100%;
-      width:var(--progress,0%);
-      background:linear-gradient(90deg,var(--accentStrong),var(--green));
-      border-radius:999px;
-      transition:width .25s ease;
-    }
-
-    .timeline-item{
-      position:relative;
-      z-index:1;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      text-align:center;
-      min-width:0;
-      padding:0 2px;
-    }
-
-    .timeline-dot{
-      width:28px;
-      height:28px;
-      border-radius:50%;
-      border:2px solid #cfd2d6;
-      background:#fff;
-      color:#9ca0a5;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:11px;
-      font-weight:1000;
-      margin-bottom:6px;
-      box-shadow:0 0 0 4px #fff;
-    }
-
-    .timeline-item.done .timeline-dot{
-      background:var(--accent);
-      border-color:var(--accentStrong);
-      color:#111;
-    }
-
-    .timeline-item.current .timeline-dot{
-      background:#111;
-      border-color:#111;
-      color:#fff;
-      box-shadow:0 0 0 5px rgba(17,17,17,.08);
-    }
-
-    .timeline-title{
-      font-size:10px;
-      line-height:1.25;
-      min-height:26px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight:1000;
-      color:#222;
-      word-break:keep-all;
-    }
-
-    .timeline-desc{
-      color:var(--muted);
-      font-size:9px;
-      font-weight:850;
-      line-height:1.2;
-      word-break:keep-all;
-    }
-
-    .current-status-card{
-      border:1px solid var(--line);
-      background:var(--surface2);
-      border-radius:15px;
-      padding:11px 12px;
-      margin:10px 0 12px;
-    }
-
-    .current-status-kicker{
-      color:var(--muted);
-      font-size:11px;
-      font-weight:1000;
-      margin-bottom:4px;
-    }
-
-    .current-status-text{
-      color:#222;
-      font-size:13px;
-      font-weight:850;
-      line-height:1.6;
-    }
-
-    .status-total{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      border-top:1px solid var(--line);
-      padding-top:12px;
-    }
-
-    .status-total span{
-      color:var(--muted);
-      font-size:13px;
-      font-weight:1000;
-    }
-
-    .status-total strong{
-      color:#111;
-      font-size:19px;
-      font-weight:1000;
-    }
-
     .content-card{
       padding:16px;
       margin:14px 0;
@@ -1499,71 +1143,9 @@
         max-width:calc(100% - 118px);
         padding:9px 11px;
       }
-
-      .review-sticky-footer{
-        grid-template-columns:1fr 132px;
-      }
-
-      .timeline-title{
-        font-size:9px;
-      }
-
-      .timeline-desc{
-        font-size:8px;
-      }
     }
     /* 城市已移到頂部導航列，
    地圖內不再重複顯示 */
-
-/* ==============================
-   第一階段：首頁頂部導航調整
-   ============================== */
-
-.topbar{
-  grid-template-columns:1fr auto 1fr;
-}
-
-
-/* 台中市移到左邊 */
-
-.topbar-location{
-  grid-column:1;
-  grid-row:1;
-
-  justify-content:flex-start;
-
-  font-size:14px;
-}
-
-
-/* UBee 品牌移到中間 */
-
-.topbar-left{
-  grid-column:2;
-  grid-row:1;
-
-  justify-content:center;
-}
-
-
-.brand-wrap{
-  text-align:center;
-}
-
-
-.brand{
-  font-size:27px;
-}
-
-
-/* 客服維持右邊 */
-
-.topbar-support{
-  grid-column:3;
-  grid-row:1;
-
-  justify-self:end;
-}
 
 /* ==============================
    第二階段：首頁地圖與白色操作區
@@ -1861,6 +1443,8 @@
   box-shadow:none;
 
   text-align:center;
+
+  transition:.15s ease;
 }
 
 
@@ -2551,6 +2135,7 @@
 
 #step2{
   padding-top:4px;
+  padding-bottom:120px;
 }
 
 
@@ -2872,11 +2457,6 @@
 /* 預留底部空間
    避免最後一個表單被固定操作列蓋住 */
 
-#step2{
-  padding-bottom:120px;
-}
-
-
 /* 第二頁固定操作列 */
 
 .step2-action-footer{
@@ -3057,6 +2637,7 @@
 
 #step3{
   padding-top:4px;
+  padding-bottom:120px;
 }
 
 
@@ -3256,6 +2837,11 @@
 
   height:24px;
 
+  display:flex;
+
+  align-items:center;
+  justify-content:center;
+  
   border:
     2px solid
     #c9cdd1;
@@ -3320,11 +2906,6 @@
 
 /* 預留空間
    避免最後一個時效方案被固定操作列擋住 */
-
-#step3{
-  padding-bottom:120px;
-}
-
 
 /* ==============================
    第三頁固定操作列
@@ -3504,14 +3085,6 @@
    第十三階段：
    第四頁上半部改成正式確認頁
    ============================== */
-
-
-/* 第四頁本身 */
-
-#step4{
-  padding-bottom:150px;
-}
-
 
 /* ==============================
    頁面小標題
@@ -4533,11 +4106,6 @@ input:checked
 
 /* 移除瀏覽器預設箭頭 */
 
-#step4 .review-rules-details summary{
-  list-style:none;
-}
-
-
 #step4 .review-rules-details summary::-webkit-details-marker{
   display:none;
 }
@@ -4565,6 +4133,8 @@ input:checked
   font-size:13px;
 
   font-weight:1000;
+
+  list-style:none;
 
   cursor:pointer;
 }
@@ -7061,7 +6631,7 @@ input:checked
 
 </div>
 
-      <div class="status" id="statusBox">訂單狀態：等待確認現金單</div>
+      <div id="statusBox">訂單狀態：等待確認現金單</div>
 
       <div class="content-card step5-payment-section">
 
@@ -7389,7 +6959,6 @@ let quoteRefreshTimer = null;
 let routeRequestSequence = 0;
 let quoteRequestSequence = 0;
 
-const LINE_OFFICIAL_ID = '@686rwnvn';
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
 
 const INITIAL_PAYMENT_METHOD = '';
@@ -7774,21 +7343,7 @@ function drawRouteOnMap(map, data, target){
     return;
   }
 
-  let polylineKey;
-  let pickupMarkerKey;
-  let dropoffMarkerKey;
-
-  if(target === 'review'){
-    polylineKey = 'reviewRoutePolyline';
-    pickupMarkerKey = 'reviewPickupMarker';
-    dropoffMarkerKey = 'reviewDropoffMarker';
-  }else{
-    polylineKey = 'routePolyline';
-    pickupMarkerKey = 'pickupMarker';
-    dropoffMarkerKey = 'dropoffMarker';
-  }
-
-  if(polylineKey === 'reviewRoutePolyline'){
+    if(target === 'review'){
     reviewRoutePolyline = clearMapObject(reviewRoutePolyline);
     reviewPickupMarker = clearMapObject(reviewPickupMarker);
     reviewDropoffMarker = clearMapObject(reviewDropoffMarker);
