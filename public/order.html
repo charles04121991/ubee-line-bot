@@ -6538,7 +6538,7 @@ input:checked
       </div>
 
       <div class="review-rule-text">
-        目前正式營運版先開放現金單，任務完成時由 小U 向客人收取現金。
+        目前僅開放現金單，任務完成時由 小U 向客人收取現金。
       </div>
 
     </div>
@@ -10468,9 +10468,9 @@ function getStatusLabel(status){
     draft_confirm:'草稿確認',
     pending_payment:'等待確認現金單',
     merchant_pending:'等待店家確認',
-    pending_dispatch:'等待媒合 小U ',
-    accepted:' 小U 已接單',
-    arrived_pickup:' 小U 已抵達取件地',
+    pending_dispatch:'正在為你尋找附近的 小U …',
+    accepted:' 小U 已接下你的任務',
+    arrived_pickup:'你的 小U 正在前往取件地點',
     picked_up:'配送中',
     arrived_dropoff:' 小U 已抵達送達地',
     completed:'已完成',
@@ -10506,8 +10506,8 @@ function getCurrentStatusMessage(status){
   const map = {
     pending_payment:'請確認使用現金單。確認後系統會開始媒合 小U ，任務完成時由 小U 向客人收取現金。',
     merchant_pending:'此訂單正在等待合作店家確認。',
-    pending_dispatch:'系統正在媒合附近 小U 。',
-    accepted:' 小U 已接單，正在前往取件地。',
+    pending_dispatch:'正在為你尋找附近的 小U …',
+    accepted:'  小U 已接下你的任務，正在前往取件地。',
     arrived_pickup:' 小U 已抵達取件地。',
     picked_up:' 小U 已取件，配送中。',
     arrived_dropoff:' 小U 已抵達送達地。',
@@ -10584,12 +10584,12 @@ function renderTimeline(status, order){
     {
       rank:1,
       title:'等待派單',
-      desc:'系統正在媒合 小U '
+      desc:'正在為你尋找附近的 小U … '
     },
 
     {
       rank:2,
-      title:' 小U 接單',
+      title:' 小U 已接下你的任務',
       desc:' 小U 正在前往取件地點'
     },
 
@@ -10602,7 +10602,7 @@ function renderTimeline(status, order){
     {
       rank:4,
       title:'取件完成',
-      desc:' 小U 已取件，任務進行中'
+      desc:' 小U 已完成取件'
     },
 
     {
@@ -10614,7 +10614,7 @@ function renderTimeline(status, order){
     {
       rank:6,
       title:'任務完成',
-      desc:'任務已完成'
+      desc:' 小U 已完成這次任務'
     }
 
   ];
