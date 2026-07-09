@@ -7255,24 +7255,89 @@ async function ensureReviewMapReady(){
 }
 
 function renderCurrentLocationMarker(){
-  if(!customerMap || !hasValidLatLng(currentLocationLat, currentLocationLng)){
+  if(
+    !customerMap ||
+    !hasValidLatLng(
+      currentLocationLat,
+      currentLocationLng
+    )
+  ){
     return;
   }
 
-  currentLocationMarker = clearMapObject(currentLocationMarker);
+  currentLocationMarker =
+    clearMapObject(currentLocationMarker);
 
-  currentLocationMarker = new google.maps.Circle({
-    map:customerMap,
-    center:{ lat:currentLocationLat, lng:currentLocationLng },
-    radius:32,
-    fillColor:'#2563eb',
-    fillOpacity:.16,
-    strokeColor:'#2563eb',
-    strokeOpacity:.9,
-    strokeWeight:2
-  });
+  const personSvg = `
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="48"
+      height="48"
+      viewBox="0 0 48 48"
+    >
+      <circle
+        cx="24"
+        cy="24"
+        r="20"
+        fill="#facc15"
+        stroke="#ffffff"
+        stroke-width="3"
+      />
+
+      <circle
+        cx="24"
+        cy="17"
+        r="6"
+        fill="#111111"
+      />
+
+      <path
+        d="M13 36
+           C14.8 28,
+           19.2 24,
+           24 24
+           C28.8 24,
+           33.2 28,
+           35 36
+           Z"
+        fill="#111111"
+      />
+    </svg>
+  `;
+
+  currentLocationMarker =
+    new google.maps.Marker({
+      map:customerMap,
+
+      position:{
+        lat:currentLocationLat,
+        lng:currentLocationLng
+      },
+
+      title:"你的目前位置",
+
+      icon:{
+        url:
+          "data:image/svg+xml;charset=UTF-8," +
+          encodeURIComponent(personSvg),
+
+        scaledSize:
+          new google.maps.Size(
+            44,
+            44
+          ),
+
+        anchor:
+          new google.maps.Point(
+            22,
+            22
+          )
+      },
+
+      zIndex:999
+    });
 }
-
+    
 async function requestCurrentLocationForMap(){
   try{
     const position = await getCurrentPosition();
