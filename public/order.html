@@ -6919,6 +6919,9 @@ let isCancellingOrder = false;
 let currentCustomerPage = '';
 let initialOpenActionHandled = false;
 
+let isStepTransitioning = false;
+let stepTransitionUnlockTimer = null;
+    
 // ==============================
 // UBee Google Maps 前端狀態
 // ==============================
@@ -8750,29 +8753,61 @@ function validateStep2(){
   return true;
 }
 
+function beginStepTransition(){
+  if(isStepTransitioning){
+    return false;
+  }
+
+  isStepTransitioning = true;
+
+  clearTimeout(stepTransitionUnlockTimer);
+
+  stepTransitionUnlockTimer = setTimeout(() => {
+    isStepTransitioning = false;
+  }, 450);
+
+  return true;
+}
+    
 function goNext(){
   try{
     if(currentStep === 1){
-      if(!validateStep1Addresses()) return;
-      scheduleRouteAndQuoteRefresh(50);
-      showOnlyStep(2);
-      return;
-    }
+  if(!validateStep1Addresses()) return;
+
+  if(!beginStepTransition()){
+    return;
+  }
+
+  scheduleRouteAndQuoteRefresh(50);
+  showOnlyStep(2);
+  return;
+}
 
     if(currentStep === 2){
-      if(!validateStep2()) return;
-      showOnlyStep(3);
-      return;
-    }
+  if(!validateStep2()) return;
+
+  if(!beginStepTransition()){
+    return;
+  }
+
+  showOnlyStep(3);
+  return;
+}
 
     if(currentStep === 3){
-      showOnlyStep(4);
-      setTimeout(() => {
-        renderSummary();
-        refreshRoutePreview();
-      }, 60);
-      return;
-    }
+  if(!beginStepTransition()){
+    return;
+  }
+
+  showOnlyStep(4);
+
+  setTimeout(() => {
+    renderSummary();
+    refreshRoutePreview();
+  }, 60);
+
+  return;
+}
   }catch(err){
     console.error('下一步發生錯誤:', err);
     alert('下一步發生錯誤：' + (err.message || '請稍後再試'));
