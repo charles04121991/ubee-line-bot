@@ -6858,6 +6858,151 @@ input:checked
   }
 
 }
+
+/* ==============================
+   Step 5：地圖上方即時狀態
+   ============================== */
+
+#step5 .step5-live-status-panel{
+  margin:
+    0
+    -14px;
+
+  padding:
+    15px
+    16px
+    14px;
+
+  border-bottom:
+    1px solid
+    #eceeef;
+
+  background:
+    #ffffff;
+}
+
+
+#step5 .step5-live-status-top{
+  display:flex;
+
+  align-items:flex-start;
+
+  justify-content:space-between;
+
+  gap:16px;
+}
+
+
+#step5 .step5-live-status-primary{
+  min-width:0;
+
+  color:#111111;
+
+  font-size:30px;
+
+  font-weight:1000;
+
+  letter-spacing:-1px;
+
+  line-height:1;
+
+  font-variant-numeric:
+    tabular-nums;
+}
+
+
+#step5 .step5-live-status-label{
+  flex:0 0 auto;
+
+  padding-top:4px;
+
+  color:#8b8f94;
+
+  font-size:11px;
+
+  font-weight:900;
+
+  line-height:1.4;
+
+  text-align:right;
+}
+
+
+#step5 .step5-live-status-title{
+  margin-top:12px;
+
+  color:#111111;
+
+  font-size:15px;
+
+  font-weight:1000;
+
+  line-height:1.45;
+}
+
+
+#step5 .step5-live-status-meta{
+  position:relative;
+
+  margin-top:6px;
+
+  padding-left:13px;
+
+  color:#7f8489;
+
+  font-size:11px;
+
+  font-weight:850;
+
+  line-height:1.55;
+}
+
+
+#step5 .step5-live-status-meta::before{
+  content:"";
+
+  position:absolute;
+
+  left:0;
+
+  top:.55em;
+
+  width:6px;
+
+  height:6px;
+
+  border-radius:50%;
+
+  background:
+    var(--accentStrong);
+}
+
+
+/* 地圖直接接住狀態資訊 */
+
+#step5 .step5-live-status-panel
++
+.step5-tracking-map-section{
+  margin-top:0;
+}
+
+
+@media(max-width:380px){
+
+  #step5 .step5-live-status-primary{
+    font-size:27px;
+  }
+
+  #step5 .step5-live-status-title{
+    font-size:14px;
+  }
+
+  #step5 .step5-live-status-label,
+  #step5 .step5-live-status-meta{
+    font-size:10px;
+  }
+
+}
     
 </style>
 </head>
@@ -7725,6 +7870,49 @@ input:checked
     </section>
 
     <section class="step" id="step5">
+
+            <!-- ==============================
+           Step 5：即時任務狀態
+           ============================== -->
+
+      <div
+        id="step5LiveStatusPanel"
+        class="step5-live-status-panel"
+      >
+
+        <div class="step5-live-status-top">
+
+          <div
+            id="step5LiveStatusPrimary"
+            class="step5-live-status-primary"
+          >
+            --:--
+          </div>
+
+          <div
+            id="step5LiveStatusLabel"
+            class="step5-live-status-label"
+          >
+            預計抵達時間
+          </div>
+
+        </div>
+
+        <div
+          id="step5LiveStatusTitle"
+          class="step5-live-status-title"
+        >
+          任務狀態更新中
+        </div>
+
+        <div
+          id="step5LiveStatusMeta"
+          class="step5-live-status-meta"
+        >
+          系統正在讀取最新任務資訊
+        </div>
+
+      </div>
       
       <div
         id="step5TrackingMapSection"
@@ -8110,6 +8298,10 @@ let trackingRouteLastOrigin = null;
 
 let trackingRouteLastStage = '';
 
+let trackingRouteLastData = null;
+
+let trackingRouteLastDataStage = '';
+    
 const TRACKING_ROUTE_MIN_INTERVAL_MS =
   15000;
 
@@ -9026,6 +9218,507 @@ function getTrackingRouteDestination(order){
   return null;
 }
 
+/* ==============================
+   Step 5：即時任務狀態資訊
+   ============================== */
+
+function getTrackingRouteDurationMinutes(data){
+
+  if(!data){
+    return null;
+  }
+
+  const directValues = [
+
+    data.durationMinutes,
+
+    data.duration_minutes,
+
+    data.minutes
+
+  ];
+
+  for(const value of directValues){
+
+    const number =
+      Number(value);
+
+    if(
+      Number.isFinite(number) &&
+      number > 0
+    ){
+      return Math.ceil(number);
+    }
+
+  }
+
+  const text =
+    String(
+      data.durationText || ''
+    ).trim();
+
+  if(!text){
+    return null;
+  }
+
+  let totalMinutes = 0;
+  let hasMatch = false;
+
+  const hourMatch =
+    text.match(
+      /([\d.]+)\s*(小時|hour|hours|hr|hrs|h)/i
+    );
+
+  if(hourMatch){
+
+    totalMinutes +=
+      Number(hourMatch[1]) * 60;
+
+    hasMatch = true;
+
+  }
+
+  const minuteMatch =
+    text.match(
+      /([\d.]+)\s*(分鐘|分|minute|minutes|min|mins)/i
+    );
+
+  if(minuteMatch){
+
+    totalMinutes +=
+      Number(minuteMatch[1]);
+
+    hasMatch = true;
+
+  }
+
+  const secondMatch =
+    text.match(
+      /([\d.]+)\s*(秒|second|seconds|sec|secs)/i
+    );
+
+  if(
+    secondMatch &&
+    !hasMatch
+  ){
+
+    totalMinutes =
+      Number(secondMatch[1]) / 60;
+
+    hasMatch = true;
+
+  }
+
+  if(
+    !hasMatch ||
+    !Number.isFinite(totalMinutes) ||
+    totalMinutes <= 0
+  ){
+    return null;
+  }
+
+  return Math.max(
+    1,
+    Math.ceil(totalMinutes)
+  );
+
+}
+
+
+function getTrackingRouteDistanceText(data){
+
+  const directText =
+    String(
+      data?.distanceText || ''
+    ).trim();
+
+  if(directText){
+    return directText;
+  }
+
+  const distanceKm =
+    parseDistanceKmFromQuote(data);
+
+  if(
+    !Number.isFinite(distanceKm) ||
+    distanceKm <= 0
+  ){
+    return '';
+  }
+
+  if(distanceKm < 1){
+
+    return `${
+      Math.max(
+        1,
+        Math.round(
+          distanceKm * 1000
+        )
+      )
+    } 公尺`;
+
+  }
+
+  return `${
+    distanceKm < 10
+      ? distanceKm.toFixed(1)
+      : Math.round(distanceKm)
+  } 公里`;
+
+}
+
+
+function getTrackingEtaTime(data){
+
+  const durationMinutes =
+    getTrackingRouteDurationMinutes(data);
+
+  if(!durationMinutes){
+    return '';
+  }
+
+  const eta =
+    new Date(
+      Date.now() +
+      durationMinutes * 60 * 1000
+    );
+
+  return eta.toLocaleTimeString(
+    'zh-TW',
+    {
+      hour:'2-digit',
+      minute:'2-digit',
+      hour12:false
+    }
+  );
+
+}
+
+
+function renderStep5LiveStatus(
+  order,
+  routeData = null
+){
+
+  const panel =
+    qs('step5LiveStatusPanel');
+
+  const primaryEl =
+    qs('step5LiveStatusPrimary');
+
+  const labelEl =
+    qs('step5LiveStatusLabel');
+
+  const titleEl =
+    qs('step5LiveStatusTitle');
+
+  const metaEl =
+    qs('step5LiveStatusMeta');
+
+  if(
+    !panel ||
+    !primaryEl ||
+    !labelEl ||
+    !titleEl ||
+    !metaEl
+  ){
+    return;
+  }
+
+  const data =
+    order ||
+    currentOrderData ||
+    {};
+
+  const status =
+    String(
+      data.status ||
+      'pending_payment'
+    )
+      .trim()
+      .toLowerCase();
+
+  const distanceText =
+    getTrackingRouteDistanceText(
+      routeData
+    );
+
+  const durationMinutes =
+    getTrackingRouteDurationMinutes(
+      routeData
+    );
+
+  const durationText =
+    String(
+      routeData?.durationText || ''
+    ).trim()
+    ||
+    (
+      durationMinutes
+        ? `${durationMinutes} 分鐘`
+        : ''
+    );
+
+  const etaTime =
+    getTrackingEtaTime(
+      routeData
+    );
+
+  let primaryText =
+    '--:--';
+
+  let labelText =
+    '預計抵達時間';
+
+  let titleText =
+    '任務狀態更新中';
+
+  let metaText =
+    '系統正在讀取最新任務資訊';
+
+
+  switch(status){
+
+    case 'pending_payment':
+
+      primaryText =
+        '待確認';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '確認現金單後開始派單';
+
+      metaText =
+        '確認後系統會開始媒合附近的小U';
+
+      break;
+
+
+    case 'merchant_pending':
+
+      primaryText =
+        '等待中';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '正在等待合作店家確認';
+
+      metaText =
+        '店家確認後系統會開始媒合小U';
+
+      break;
+
+
+    case 'pending_dispatch':
+
+      primaryText =
+        '媒合中';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '正在為你尋找附近的小U';
+
+      metaText =
+        '小U接單後會顯示距離與預計抵達時間';
+
+      break;
+
+
+    case 'accepted':
+
+    case 'going_to_pickup': {
+
+      primaryText =
+        etaTime ||
+        '定位中';
+
+      labelText =
+        '預計抵達時間';
+
+      titleText =
+        '小U正在前往取件地點';
+
+      const metaParts = [];
+
+      if(distanceText){
+
+        metaParts.push(
+          `距離取件點 ${distanceText}`
+        );
+
+      }
+
+      if(durationText){
+
+        metaParts.push(
+          `約 ${durationText}`
+        );
+
+      }
+
+      metaText =
+        metaParts.join('・')
+        ||
+        '正在取得小U即時位置';
+
+      break;
+
+    }
+
+
+    case 'arrived_pickup':
+
+      primaryText =
+        '已抵達';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '小U已抵達取件地點';
+
+      metaText =
+        '正在處理取件任務';
+
+      break;
+
+
+    case 'picked_up':
+
+    case 'going_to_dropoff': {
+
+      primaryText =
+        etaTime ||
+        '定位中';
+
+      labelText =
+        '預計抵達時間';
+
+      titleText =
+        '小U正在前往送達地點';
+
+      const metaParts = [];
+
+      if(distanceText){
+
+        metaParts.push(
+          `距離送達點 ${distanceText}`
+        );
+
+      }
+
+      if(durationText){
+
+        metaParts.push(
+          `約 ${durationText}`
+        );
+
+      }
+
+      metaText =
+        metaParts.join('・')
+        ||
+        '正在更新剩餘送達路程';
+
+      break;
+
+    }
+
+
+    case 'arrived_dropoff':
+
+      primaryText =
+        '已抵達';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '小U已抵達送達地點';
+
+      metaText =
+        '請準備完成交付';
+
+      break;
+
+
+    case 'completed':
+
+    case 'done':
+
+      primaryText =
+        '已完成';
+
+      labelText =
+        '任務狀態';
+
+      titleText =
+        '本次任務已完成';
+
+      metaText =
+        '感謝使用 UBee 跑腿';
+
+      break;
+
+
+    case 'cancelled':
+
+      primaryText =
+        '已取消';
+
+      labelText =
+        '任務狀態';
+
+      titleText =
+        '此筆任務已取消';
+
+      metaText =
+        '如需協助，請聯繫 UBee 跑腿客服';
+
+      break;
+
+
+    default:
+
+      primaryText =
+        '更新中';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '任務狀態更新中';
+
+      metaText =
+        '系統正在取得最新資訊';
+
+      break;
+
+  }
+
+  panel.dataset.status =
+    status;
+
+  primaryEl.innerText =
+    primaryText;
+
+  labelEl.innerText =
+    labelText;
+
+  titleEl.innerText =
+    titleText;
+
+  metaEl.innerText =
+    metaText;
+
+}
+    
 function getTrackingRouteMoveDistanceMeters(
   fromPosition,
   toPosition
@@ -9352,11 +10045,25 @@ async function refreshTrackingRoute(
 
 
     renderRouteOnTrackingMap(
-      data
-    );
+  data
+);
 
 
-    return data;
+trackingRouteLastData =
+  data;
+
+
+trackingRouteLastDataStage =
+  requestStage;
+
+
+renderStep5LiveStatus(
+  currentOrderData || order,
+  data
+);
+
+
+return data;
 
 
   }catch(err){
@@ -13992,7 +14699,10 @@ function stopTrackedRiderListener(){
 
   trackingRouteLastStage = '';
 
+  trackingRouteLastData = null;
 
+  trackingRouteLastDataStage = '';
+  
   // ==============================
   // 6. 清除 Step 5 小U Marker
   // ==============================
@@ -14229,12 +14939,45 @@ function syncCustomerLiveTracking(order){
       .toLowerCase();
 
 
-  const riderDocId =
-    getOrderRiderDocId(order);
+const riderDocId =
+  getOrderRiderDocId(order);
 
 
-  const activeTrackingStatuses = [
+const liveDestination =
+  getTrackingRouteDestination(
+    order
+  );
 
+
+const liveStage =
+  String(
+    liveDestination?.stage || ''
+  ).trim();
+
+
+if(
+  trackingRouteLastDataStage &&
+  trackingRouteLastDataStage !==
+    liveStage
+){
+
+  trackingRouteLastData =
+    null;
+
+
+  trackingRouteLastDataStage =
+    '';
+
+}
+
+
+renderStep5LiveStatus(
+  order,
+  trackingRouteLastData
+);
+
+
+const activeTrackingStatuses = [
     'accepted',
 
     'going_to_pickup',
@@ -14348,9 +15091,29 @@ function syncCustomerLiveTracking(order){
    * 開始監聽小U即時位置。
    */
 
-  startTrackedRiderListener(
-    order
+ startTrackedRiderListener(
+  order
+);
+
+
+/*
+ * 如果目前已經有小U位置，
+ * 訂單階段切換時立即更新新目的地路線，
+ * 不必等下一次 GPS 資料變化。
+ */
+
+if(trackedRiderPosition){
+
+  scheduleTrackingRouteRefresh(
+    order,
+    trackedRiderPosition,
+    {
+      force:
+        !trackingRouteLastData
+    }
   );
+
+}
 
 }
     
