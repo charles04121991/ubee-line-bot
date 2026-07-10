@@ -12475,25 +12475,41 @@ function syncCustomerLiveTracking(order){
 requestAnimationFrame(() => {
 
   ensureTrackingMapReady()
-    .then(() => {
+  .then(() => {
 
-      // 更新目前任務目標 Marker：
-      // 取件前顯示「取」，
-      // 取件後顯示「送」。
-      updateTrackingTargetMarker(
-        order
+    // Step 5 地圖原本是 hidden，
+    // 顯示後通知 Google Maps
+    // 重新計算完整容器尺寸。
+    if(
+      window.google?.maps?.event &&
+      trackingMap
+    ){
+
+      google.maps.event.trigger(
+        trackingMap,
+        'resize'
       );
 
+    }
 
-      // 即使小U此刻沒有新的 GPS 更新，
-      // 只要訂單階段改變，
-      // 也立即使用最後已知位置更新路線。
-      scheduleTrackingRouteRefresh(
-        order,
-        trackedRiderPosition
-      );
 
-    })
+    // 更新目前任務目標 Marker：
+    // 取件前顯示「取」，
+    // 取件後顯示「送」。
+    updateTrackingTargetMarker(
+      order
+    );
+
+
+    // 即使小U此刻沒有新的 GPS 更新，
+    // 只要訂單階段改變，
+    // 也立即使用最後已知位置更新路線。
+    scheduleTrackingRouteRefresh(
+      order,
+      trackedRiderPosition
+    );
+
+  })
     .catch(err => {
 
       console.warn(
