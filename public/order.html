@@ -5920,6 +5920,222 @@ input:checked
 
   background:#e8eaed;
 }
+
+/* ==============================
+   Step 5：UBee 外送詳細資訊
+   ============================== */
+
+
+/* 地圖直接接住外送詳細資訊 */
+
+#step5 .step5-tracking-map-section{
+  margin-bottom:0;
+}
+
+
+/* ==============================
+   外送詳細資訊主區塊
+   ============================== */
+
+#step5 #statusBox{
+  overflow:hidden;
+
+  margin:
+    0
+    -14px
+    16px;
+
+  padding:
+    0
+    16px;
+
+  border:none;
+
+  border-radius:0;
+
+  background:#ffffff;
+
+  color:#111111;
+
+  text-align:left;
+
+  box-shadow:none;
+}
+
+
+/* ==============================
+   標題
+   ============================== */
+
+#step5 .delivery-details-head{
+  padding:
+    18px
+    0
+    12px;
+
+  border-bottom:
+    1px solid
+    #eeeeef;
+}
+
+
+#step5 .delivery-details-title{
+  color:#111111;
+
+  font-size:20px;
+
+  font-weight:1000;
+
+  letter-spacing:-.3px;
+}
+
+
+#step5 .delivery-details-sub{
+  margin-top:4px;
+
+  color:#969a9f;
+
+  font-size:11px;
+
+  font-weight:850;
+}
+
+
+/* ==============================
+   費用列表
+   ============================== */
+
+#step5 .delivery-details-list{
+  background:#ffffff;
+}
+
+
+#step5 .delivery-detail-row{
+  min-height:58px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:16px;
+
+  border-bottom:
+    1px solid
+    #eeeeef;
+}
+
+
+#step5 .delivery-detail-label{
+  color:#55595e;
+
+  font-size:14px;
+
+  font-weight:900;
+}
+
+
+#step5 .delivery-detail-value{
+  flex:0 0 auto;
+
+  color:#111111;
+
+  font-size:15px;
+
+  font-weight:1000;
+
+  white-space:nowrap;
+}
+
+
+/* ==============================
+   客人選擇的時效方案
+   ============================== */
+
+#step5 .delivery-detail-speed-main{
+  min-width:0;
+
+  display:flex;
+
+  align-items:center;
+
+  gap:8px;
+}
+
+
+#step5 .delivery-detail-speed-tag{
+  flex:0 0 auto;
+
+  padding:
+    4px
+    7px;
+
+  border:
+    1px solid
+    #e5cb50;
+
+  border-radius:999px;
+
+  background:#fff7c7;
+
+  color:#655000;
+
+  font-size:10px;
+
+  font-weight:1000;
+
+  white-space:nowrap;
+}
+
+
+/* ==============================
+   總金額
+   ============================== */
+
+#step5 .delivery-details-total{
+  min-height:76px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  gap:16px;
+
+  margin:
+    0
+    -16px;
+
+  padding:
+    16px;
+
+  border-top:
+    1px solid
+    #eee7bd;
+
+  background:#fffbed;
+
+  color:#111111;
+
+  font-size:17px;
+
+  font-weight:1000;
+}
+
+
+#step5 .delivery-details-total strong{
+  color:#111111;
+
+  font-size:25px;
+
+  font-weight:1000;
+
+  letter-spacing:-.6px;
+
+  white-space:nowrap;
+}
     
 </style>
 </head>
@@ -6850,7 +7066,7 @@ input:checked
 
       </div>
 
-      <div id="statusBox">訂單狀態：等待確認現金單</div>
+      <div id="statusBox">跑腿資詳細資訊載入中...</div>
       
       <div class="content-card step5-payment-section">
         
@@ -11989,463 +12205,311 @@ function isOrderPaymentConfirmed(order, status){
 
 function renderTimeline(status, order){
 
-  const currentStatus =
-    status ||
-    'pending_payment';
+  const data =
+    order ||
+    currentOrderData ||
+    {};
 
+  const quoteData =
+    lastQuoteData ||
+    {};
 
   /* ==============================
-     UBee 任務七階段
+     從正式訂單資料優先讀取金額，
+     若訂單剛建立尚未同步完整欄位，
+     才使用最後一次正式估價資料補上。
      ============================== */
 
-  const steps = [
+  const readMoney = fields => {
 
-    {
-      rank:0,
-      title:'訂單建立',
-      desc:'訂單已成功建立'
-    },
+    const orderValue =
+      getFirstMoneyValue(
+        data,
+        fields
+      );
 
-    {
-      rank:1,
-      title:'等待派單',
-      desc:'正在為你尋找附近的 小U … '
-    },
-
-    {
-      rank:2,
-      title:' 小U 已接下你的任務',
-      desc:' 小U 正在前往取件地點'
-    },
-
-    {
-      rank:3,
-      title:'抵達取件',
-      desc:' 小U 已抵達取件地點'
-    },
-
-    {
-      rank:4,
-      title:'取件完成',
-      desc:' 小U 已完成取件'
-    },
-
-    {
-      rank:5,
-      title:'抵達送達',
-      desc:' 小U 已抵達送達地點'
-    },
-
-    {
-      rank:6,
-      title:'任務完成',
-      desc:' 小U 已完成這次任務'
+    if(orderValue !== null){
+      return orderValue;
     }
 
-  ];
-
-
-  /* ==============================
-     判斷目前進度
-     ============================== */
-
-  const isCancelled =
-    currentStatus === 'cancelled';
-
-
-  let displayRank =
-    getStatusRank(currentStatus);
-
-
-  if(currentStatus === 'merchant_pending'){
-    displayRank = 1;
-  }
-
-
-  if(currentStatus === 'done'){
-    displayRank = 6;
-  }
-
-
-  const safeRank =
-    isCancelled
-      ? 0
-      : Math.max(
-          0,
-          Math.min(
-            steps.length - 1,
-            displayRank
-          )
-        );
-
-
-  const currentStepData =
-    steps[safeRank] ||
-    steps[0];
-
-
-  /* ==============================
-     進度百分比
-     ============================== */
-
-  const progressPercent =
-    isCancelled
-      ? 0
-      : Math.round(
-          (
-            (safeRank + 1) /
-            steps.length
-          ) * 100
-        );
-
-
-  /* ==============================
-     訂單金額
-     ============================== */
-
-  const payableTotal =
-    getCustomerPayableTotal(order);
-
-
-  const totalText =
-    payableTotal !== null &&
-    payableTotal > 0
-      ? `NT$${Math.round(payableTotal)}`
-      : '系統計算中';
-
-
-  const totalLabel =
-    [
-      'completed',
-      'done'
-    ].includes(currentStatus)
-      ? '訂單金額'
-      : '預估應付';
-
-
-  /* ==============================
-     付款狀態
-     ============================== */
-
-  const paymentConfirmed =
-    isOrderPaymentConfirmed(
-      order,
-      currentStatus
+    return getFirstMoneyValue(
+      quoteData,
+      fields
     );
 
+  };
 
-  const isCashOrder =
+  const currentStatus =
     String(
-      order?.paymentMethod ||
-      ''
-    )
-      .trim()
-      .toLowerCase() === 'cash'
-    ||
-    order?.isCashOrder === true;
+      status ||
+      data.status ||
+      'pending_payment'
+    ).trim();
 
+  /* ==============================
+     外送詳細資訊金額
+     ============================== */
 
-  let paymentBadgeClass =
-    'pending';
+  const platformServiceFee =
+    readMoney([
+      'serviceFee',
+      'platformServiceFee',
+      'platformFee'
+    ]);
 
+  const selectedSpeedFee =
+    readMoney([
+      'speedFee',
+      'speedHandlingFee',
+      'priorityFee',
+      'expressFee',
+      'rushFee'
+    ]);
 
-  let paymentBadgeText =
-    '待確認付款';
+  const advancePayment =
+    readMoney([
+      'advancePayment',
+      'advanceAmount',
+      'estimatedAdvancePayment',
+      'estimatedAdvanceAmount',
+      'riderAdvanceAmount',
+      'estimatedGoodsAmount'
+    ]) ?? 0;
 
+  let serviceSubtotal =
+    readMoney([
+      'serviceSubtotal',
+      'serviceTotal'
+    ]);
 
-  if(isCancelled){
+  let payableTotal =
+    readMoney([
+      'customerPayableTotal',
+      'customerPayTotal',
+      'customerPayAmount',
+      'customerTotalWithAdvance',
+      'estimatedPayableTotal',
+      'payableTotal',
+      'finalPayAmount',
+      'collectAmount',
+      'cashCollectAmount',
+      'amountToCollect',
+      'total'
+    ]);
 
-    paymentBadgeClass =
-      'danger';
+  /*
+   * 訂單剛建立、Firestore 尚未同步完整欄位時，
+   * 使用提交前最後一次正式估價總額。
+   */
 
-    paymentBadgeText =
-      '已取消';
+  if(
+    payableTotal === null &&
+    Number.isFinite(
+      Number(lastEstimatedTotal)
+    ) &&
+    Number(lastEstimatedTotal) > 0
+  ){
 
-  }else if(paymentConfirmed){
-
-    paymentBadgeClass =
-      'success';
-
-    paymentBadgeText =
-      '已付款';
-
-  }else if(isCashOrder){
-
-    paymentBadgeClass =
-      'cash';
-
-    paymentBadgeText =
-      '現金單';
+    payableTotal =
+      Math.round(
+        Number(lastEstimatedTotal)
+      );
 
   }
 
+  /*
+   * 若後端有總金額但暫時沒有 serviceSubtotal，
+   * 以「總金額 - 代墊費用」還原服務費小計。
+   */
 
-  /* ==============================
-     七階段垂直時間軸
-     ============================== */
+  if(
+    serviceSubtotal === null &&
+    payableTotal !== null
+  ){
 
-  const stagesHtml =
-    isCancelled
+    serviceSubtotal =
+      Math.max(
+        0,
+        payableTotal - advancePayment
+      );
+
+  }
+
+  if(
+    payableTotal === null &&
+    serviceSubtotal !== null
+  ){
+
+    payableTotal =
+      serviceSubtotal + advancePayment;
+
+  }
+
+  /*
+   * 行程費用 = 服務費小計
+   *            - 平台服務費
+   *            - 客人選擇的時效方案費
+   *
+   * 這樣原本的起步、距離、時間、等候、上樓等
+   * 任務行程相關費用都會保留在「行程費用」內。
+   */
+
+  const tripFee =
+    serviceSubtotal !== null &&
+    platformServiceFee !== null &&
+    selectedSpeedFee !== null
+      ? Math.max(
+          0,
+          serviceSubtotal -
+          platformServiceFee -
+          selectedSpeedFee
+        )
+      : null;
+
+  const selectedSpeedType =
+    String(
+      data.speedType ||
+      data.speed ||
+      quoteData.speedType ||
+      quoteData.speed ||
+      speedType ||
+      'standard'
+    ).trim();
+
+  const selectedSpeedLabel =
+    getSpeedLabel(
+      selectedSpeedType
+    );
+
+  const formatMoney = value => {
+
+    if(
+      value === null ||
+      value === undefined ||
+      !Number.isFinite(Number(value))
+    ){
+      return '系統計算中';
+    }
+
+    return `NT$${Math.round(Number(value))}`;
+
+  };
+
+  /*
+   * 有代墊才顯示代墊費用。
+   * 沒有代墊就不佔畫面。
+   */
+
+  const advancePaymentRow =
+    advancePayment > 0
       ? `
 
-        <div class="order-progress-cancelled">
+        <div class="delivery-detail-row">
 
-          <div class="order-progress-cancelled-icon">
-            ×
-          </div>
+          <span class="delivery-detail-label">
+            代墊費用
+          </span>
 
-          <div>
-
-            <div class="order-progress-cancelled-title">
-              任務流程已停止
-            </div>
-
-            <div class="order-progress-cancelled-text">
-              此訂單已取消，系統不會再繼續媒合或執行任務。
-            </div>
-
-          </div>
+          <strong class="delivery-detail-value">
+            ${escapeHtml(
+              formatMoney(advancePayment)
+            )}
+          </strong>
 
         </div>
 
       `
-
-      : steps.map(step => {
-
-          let stepClass =
-            'upcoming';
-
-
-          let stepIcon =
-            '';
-
-
-          if(step.rank < safeRank){
-
-            stepClass =
-              'done';
-
-            stepIcon =
-              '✓';
-
-          }else if(step.rank === safeRank){
-
-            stepClass =
-              'current';
-
-            stepIcon =
-              '●';
-
-          }
-
-
-          return `
-
-            <div class="order-progress-step ${stepClass}">
-
-              <div class="order-progress-step-rail">
-
-                <div class="order-progress-step-dot">
-                  ${escapeHtml(stepIcon)}
-                </div>
-
-
-                ${
-                  step.rank < steps.length - 1
-                    ? `
-
-                      <div class="order-progress-step-line"></div>
-
-                    `
-                    : ''
-                }
-
-              </div>
-
-
-              <div class="order-progress-step-body">
-
-                <div class="order-progress-step-title">
-                  ${escapeHtml(step.title)}
-                </div>
-
-                <div class="order-progress-step-desc">
-                  ${escapeHtml(step.desc)}
-                </div>
-
-              </div>
-
-            </div>
-
-          `;
-
-        }).join('');
-
+      : '';
 
   /* ==============================
-     渲染 statusBox
+     正式渲染「外送詳細資訊」
      ============================== */
 
   const statusBoxEl =
     qs('statusBox');
 
-
   if(statusBoxEl){
 
     statusBoxEl.innerHTML = `
-    
-      <!-- ==============================
-           最上方目前狀態
-           ============================== -->
 
-      <div class="order-progress-head">
+      <div class="delivery-details-head">
 
-        <div>
+        <div class="delivery-details-title">
+          外送詳細資訊
+        </div>
 
-          <div class="order-progress-kicker">
-            目前進度
-          </div>
+        <div class="delivery-details-sub">
+          本筆任務費用明細
+        </div>
 
-          <div class="order-progress-title">
+      </div>
+
+      <div class="delivery-details-list">
+
+        <div class="delivery-detail-row">
+
+          <span class="delivery-detail-label">
+            行程費用
+          </span>
+
+          <strong class="delivery-detail-value">
             ${escapeHtml(
-              getStatusLabel(currentStatus)
+              formatMoney(tripFee)
             )}
-          </div>
+          </strong>
 
         </div>
 
+        <div class="delivery-detail-row">
 
-        <div
-          class="
-            order-progress-payment-badge
-            ${paymentBadgeClass}
-          "
-        >
-          ${escapeHtml(paymentBadgeText)}
-        </div>
+          <span class="delivery-detail-label">
+            平台服務費
+          </span>
 
-      </div>
-
-
-      <!-- ==============================
-           目前進度重點卡
-           ============================== -->
-
-      <div
-        class="
-          order-progress-current
-          ${isCancelled ? 'cancelled' : ''}
-        "
-      >
-
-        <div class="order-progress-current-icon">
-
-          ${
-            isCancelled
-              ? '×'
-              : safeRank + 1
-          }
-
-        </div>
-
-
-        <div class="order-progress-current-main">
-
-          <div class="order-progress-current-title">
-
-            ${
-              isCancelled
-                ? '訂單已取消'
-                : escapeHtml(
-                    currentStepData.title
-                  )
-            }
-
-          </div>
-
-
-          <div class="order-progress-current-text">
-
+          <strong class="delivery-detail-value">
             ${escapeHtml(
-              getCurrentStatusMessage(
-                currentStatus
-              )
+              formatMoney(platformServiceFee)
             )}
-
-          </div>
+          </strong>
 
         </div>
 
-      </div>
+        <div class="delivery-detail-row">
 
+          <div class="delivery-detail-speed-main">
 
-      <!-- ==============================
-           任務進度條
-           ============================== -->
+            <span class="delivery-detail-label">
+              ${escapeHtml(selectedSpeedLabel)}
+            </span>
 
-      ${
-        isCancelled
-          ? ''
+            <span class="delivery-detail-speed-tag">
+              已選擇
+            </span>
 
-          : `
+          </div>
 
-            <div class="order-progress-meter">
+          <strong class="delivery-detail-value">
+            ${escapeHtml(
+              formatMoney(selectedSpeedFee)
+            )}
+          </strong>
 
-              <div class="order-progress-meter-head">
+        </div>
 
-                <span>
-                  任務進度
-                </span>
-
-                <strong>
-                  ${safeRank + 1}
-                  /
-                  ${steps.length}
-                </strong>
-
-              </div>
-
-
-              <div class="order-progress-meter-track">
-
-                <div
-                  class="order-progress-meter-fill"
-                  style="
-                    width:${progressPercent}%;
-                  "
-                ></div>
-
-              </div>
-
-            </div>
-
-          `
-      }
-
-
-      <!-- ==============================
-           七階段時間軸
-           ============================== -->
-
-      <div class="order-progress-timeline">
-
-        ${stagesHtml}
+        ${advancePaymentRow}
 
       </div>
 
-
-      <!-- ==============================
-           訂單金額
-           ============================== -->
-
-      <div class="order-progress-total">
+      <div class="delivery-details-total">
 
         <span>
-          ${escapeHtml(totalLabel)}
+          總金額
         </span>
 
         <strong>
-          ${escapeHtml(totalText)}
+          ${escapeHtml(
+            formatMoney(payableTotal)
+          )}
         </strong>
 
       </div>
@@ -12453,7 +12517,6 @@ function renderTimeline(status, order){
     `;
 
   }
-
 
   /* ==============================
      原本取消訂單規則保留
@@ -12470,7 +12533,6 @@ function renderTimeline(status, order){
       'done',
       'cancelled'
     ].includes(currentStatus);
-
 
   qs('cancelOrderBtn')
     ?.classList
