@@ -6885,7 +6885,6 @@ input:checked
       ✓
     </span>
 
-
     <span class="review-confirm-content">
 
       <span class="review-confirm-title">
@@ -6902,7 +6901,6 @@ input:checked
 
 </div>
 
-
 <details class="review-rules-details">
 
   <summary>
@@ -6916,7 +6914,6 @@ input:checked
     </span>
 
   </summary>
-
 
   <div class="review-rules-content">
 
@@ -6932,7 +6929,6 @@ input:checked
 
     </div>
 
-
     <div class="review-rule-item">
 
       <div class="review-rule-title">
@@ -6945,7 +6941,6 @@ input:checked
 
     </div>
 
-
     <div class="review-rule-item">
 
       <div class="review-rule-title">
@@ -6957,7 +6952,6 @@ input:checked
       </div>
 
     </div>
-
 
     <div class="review-rule-item">
 
@@ -6996,7 +6990,6 @@ input:checked
 
   </div>
 
-
   <button
     id="createOrderBtn"
     class="btn btn-primary review-submit-btn"
@@ -7021,8 +7014,6 @@ input:checked
            這一步只先放 HTML，不啟動地圖、不新增 Marker 邏輯
            ============================== -->
 
-      
-
         <div class="step5-section-head">
 
           <div>
@@ -7038,7 +7029,6 @@ input:checked
           </div>
 
         </div>
-
 
         <div class="step5-tracking-map-shell">
 
@@ -7086,7 +7076,6 @@ input:checked
 
   </div>
 
-
   <button
     id="payCashBtn"
     class="btn btn-secondary black-outline step5-payment-choice"
@@ -7097,7 +7086,6 @@ input:checked
     <span class="step5-payment-choice-icon">
       $
     </span>
-
 
     <span class="step5-payment-choice-main">
 
@@ -7111,13 +7099,11 @@ input:checked
 
     </span>
 
-
     <span class="step5-payment-choice-check">
       ✓
     </span>
 
   </button>
-
 
   <div class="step5-payment-rule">
 
@@ -7131,23 +7117,52 @@ input:checked
 
   </div>
 
-
   <div
     id="paymentInfo"
     class="payment-info hidden"
   ></div>
 
-
-  <button
-    id="confirmPaidBtn"
-    class="btn btn-primary hidden step5-confirm-cash-btn"
-    type="button"
-    onclick="confirmPaid()"
-  >
-    確認使用現金單，開始派單
-  </button>
+<button
+  id="confirmPaidBtn"
+  class="btn btn-primary hidden step5-confirm-cash-btn"
+  type="button"
+  onclick="confirmPaid()"
+>
+  確認使用現金單，開始派單
+</button>
 
 </div>
+
+<!-- ==============================
+     Step 5：任務明細
+     ============================== -->
+
+<div
+  id="step5TaskDetailSection"
+  class="step5-task-detail-section"
+>
+
+  <div class="step5-task-detail-head">
+
+    <div class="step5-task-detail-title">
+      任務明細
+    </div>
+
+    <div class="step5-task-detail-sub">
+      本筆任務內容
+    </div>
+
+  </div>
+
+  <div
+    id="step5TaskDetailContent"
+    class="step5-task-detail-content"
+  >
+    任務明細載入中...
+  </div>
+
+</div>
+
     </section>
 
     <section class="app-section" id="customerTasksPage">
