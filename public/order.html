@@ -6410,6 +6410,454 @@ input:checked
   }
 
 }
+
+/* ==============================
+   Step 5：任務明細重新對齊
+   ＋付款區緊湊化
+   ============================== */
+
+
+/* ==============================
+   一、任務明細整體縮緊
+   ============================== */
+
+#step5 .step5-task-detail-section{
+  margin:
+    12px
+    -14px
+    16px;
+
+  padding:
+    15px
+    16px
+    18px;
+}
+
+
+/* 標題縮小一點 */
+
+#step5 .step5-task-detail-head{
+  padding-bottom:10px;
+}
+
+
+#step5 .step5-task-detail-title{
+  font-size:18px;
+}
+
+
+#step5 .step5-task-detail-sub{
+  margin-top:3px;
+
+  font-size:10px;
+}
+
+
+/* 內容上方距離縮短 */
+
+#step5 .step5-task-detail-content{
+  padding-top:11px;
+}
+
+
+/* ==============================
+   第一列服務項目縮緊
+   ============================== */
+
+#step5 .task-receipt-item{
+  grid-template-columns:
+    28px
+    minmax(0,1fr);
+
+  gap:10px;
+
+  align-items:start;
+}
+
+
+#step5 .task-receipt-count{
+  width:24px;
+  height:24px;
+
+  font-size:11px;
+}
+
+
+#step5 .task-receipt-item-title{
+  font-size:14px;
+
+  line-height:1.4;
+}
+
+
+#step5 .task-receipt-item-meta{
+  margin-top:3px;
+
+  font-size:11px;
+
+  line-height:1.45;
+}
+
+
+/* ==============================
+   分隔線距離縮小
+   ============================== */
+
+#step5 .task-receipt-separator{
+  margin:
+    12px
+    0;
+}
+
+
+/* ==============================
+   任務內容
+   ============================== */
+
+#step5 .task-receipt-section-title{
+  margin-bottom:7px;
+
+  font-size:12px;
+}
+
+
+#step5 .task-receipt-text{
+  font-size:13px;
+
+  line-height:1.6;
+}
+
+
+/* ==============================
+   取件 / 送達資訊
+   真正左右對齊
+   ============================== */
+
+#step5 .task-receipt-row{
+  display:grid;
+
+  grid-template-columns:
+    76px
+    minmax(0,1fr);
+
+  gap:12px;
+
+  align-items:start;
+
+  min-height:0;
+
+  padding:
+    9px
+    0;
+}
+
+
+/* 左邊欄位名稱 */
+
+#step5 .task-receipt-label{
+  padding-top:1px;
+
+  color:#85898e;
+
+  font-size:12px;
+
+  font-weight:900;
+
+  line-height:1.55;
+}
+
+
+/* 右邊真正改成左對齊 */
+
+#step5 .task-receipt-value{
+  min-width:0;
+
+  color:#111111;
+
+  font-size:13px;
+
+  font-weight:900;
+
+  line-height:1.6;
+
+  text-align:left;
+
+  white-space:pre-line;
+
+  word-break:break-word;
+}
+
+
+/* ==============================
+   二、付款方式整區縮小
+   ============================== */
+
+#step5 .step5-payment-section{
+  margin:
+    12px
+    0;
+
+  padding:
+    13px;
+
+  border-radius:18px;
+
+  box-shadow:
+    0
+    4px
+    16px
+    rgba(17,24,39,.035);
+}
+
+
+/* 付款標題縮小 */
+
+#step5 .step5-payment-section
+.step5-section-head{
+  margin-bottom:10px;
+}
+
+
+#step5 .step5-payment-section
+.step5-section-title{
+  font-size:17px;
+}
+
+
+#step5 .step5-payment-section
+.step5-section-sub{
+  margin-top:3px;
+
+  font-size:10px;
+}
+
+
+/* ==============================
+   現金單選擇卡縮小
+   ============================== */
+
+#step5 .step5-payment-choice{
+  min-height:60px;
+
+  grid-template-columns:
+    32px
+    minmax(0,1fr)
+    20px;
+
+  gap:10px;
+
+  padding:
+    9px
+    11px;
+
+  border-radius:14px;
+}
+
+
+/* 左側金額圖示縮小 */
+
+#step5 .step5-payment-choice-icon{
+  width:32px;
+  height:32px;
+
+  font-size:14px;
+}
+
+
+/* 標題 */
+
+#step5 .step5-payment-choice-title{
+  font-size:14px;
+}
+
+
+/* 說明 */
+
+#step5 .step5-payment-choice-desc{
+  margin-top:2px;
+
+  font-size:10px;
+
+  line-height:1.4;
+}
+
+
+/* 右側勾選縮小 */
+
+#step5 .step5-payment-choice-check{
+  width:20px;
+  height:20px;
+
+  font-size:10px;
+}
+
+
+/* ==============================
+   付款規則縮小
+   ============================== */
+
+#step5 .step5-payment-rule{
+  margin-top:9px;
+
+  padding:
+    9px
+    10px;
+
+  border-radius:12px;
+}
+
+
+#step5 .step5-payment-rule-title{
+  margin-bottom:3px;
+
+  font-size:10px;
+}
+
+
+#step5 .step5-payment-rule-text{
+  font-size:10px;
+
+  line-height:1.55;
+}
+
+
+/* ==============================
+   付款資訊卡縮小
+   ============================== */
+
+#step5 .payment-info{
+  margin-top:9px;
+
+  padding:
+    11px;
+
+  border-radius:14px;
+}
+
+
+/* 上方標題區 */
+
+#step5 .payment-card-head{
+  margin-bottom:8px;
+}
+
+
+#step5 .payment-card-kicker{
+  margin-bottom:3px;
+
+  font-size:9px;
+}
+
+
+#step5 .payment-card-title{
+  font-size:16px;
+}
+
+
+/* 確認後派單標籤 */
+
+#step5 .payment-card-badge{
+  padding:
+    5px
+    8px;
+
+  font-size:9px;
+}
+
+
+/* 中間明細 */
+
+#step5 .payment-card-body{
+  padding-top:7px;
+}
+
+
+#step5 .payment-card-row{
+  align-items:start;
+
+  padding:
+    6px
+    0;
+}
+
+
+#step5 .payment-card-label{
+  flex:
+    0
+    0
+    68px;
+
+  font-size:10px;
+}
+
+
+#step5 .payment-card-value{
+  font-size:11px;
+
+  line-height:1.5;
+}
+
+
+/* 底下提醒縮小 */
+
+#step5 .payment-card-note{
+  margin-top:8px;
+
+  padding:
+    9px
+    10px;
+
+  border-radius:11px;
+
+  font-size:10px;
+
+  line-height:1.55;
+}
+
+
+/* ==============================
+   確認按鈕縮小
+   ============================== */
+
+#step5 .step5-confirm-cash-btn{
+  min-height:48px;
+
+  margin-top:
+    9px !important;
+
+  border-radius:14px;
+
+  font-size:
+    14px !important;
+
+  box-shadow:
+    0
+    5px
+    14px
+    rgba(250,204,21,.14);
+}
+
+
+/* ==============================
+   小螢幕再微調
+   ============================== */
+
+@media(max-width:380px){
+
+  #step5 .task-receipt-row{
+    grid-template-columns:
+      70px
+      minmax(0,1fr);
+
+    gap:10px;
+  }
+
+
+  #step5 .task-receipt-value{
+    font-size:12px;
+  }
+
+}
     
 </style>
 </head>
