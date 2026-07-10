@@ -5722,6 +5722,82 @@ input:checked
   letter-spacing:-.4px;
 
 }
+
+/* ==============================
+   UBee 客人端：小U即時定位 Marker
+   ============================== */
+
+.ubee-live-rider-marker{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:54px;
+  height:54px;
+  transform:translateY(-4px);
+  pointer-events:none;
+}
+
+.ubee-live-rider-marker-pulse{
+  position:absolute;
+  width:46px;
+  height:46px;
+  border-radius:50%;
+  background:rgba(250,204,21,.22);
+  animation:ubeeRiderMarkerPulse 1.8s ease-out infinite;
+}
+
+.ubee-live-rider-marker-body{
+  position:relative;
+  z-index:2;
+  width:42px;
+  height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:#facc15;
+  border:3px solid #111111;
+  box-shadow:0 8px 20px rgba(17,24,39,.28);
+  color:#111111;
+  font-size:14px;
+  font-weight:1000;
+  letter-spacing:-.5px;
+  white-space:nowrap;
+}
+
+.ubee-live-rider-marker-badge{
+  position:absolute;
+  z-index:3;
+  left:50%;
+  top:-15px;
+  transform:translateX(-50%);
+  padding:4px 8px;
+  border-radius:999px;
+  background:#111111;
+  color:#ffffff;
+  box-shadow:0 5px 14px rgba(17,24,39,.22);
+  font-size:11px;
+  font-weight:1000;
+  white-space:nowrap;
+}
+
+@keyframes ubeeRiderMarkerPulse{
+  0%{
+    transform:scale(.75);
+    opacity:.85;
+  }
+
+  70%{
+    transform:scale(1.35);
+    opacity:0;
+  }
+
+  100%{
+    transform:scale(1.35);
+    opacity:0;
+  }
+}
 </style>
 </head>
 
@@ -6911,8 +6987,18 @@ let selectedPaymentMethod = '';
 let currentOrderData = null;
 let currentMerchant = null;
 let merchantMode = false;
+
 let orderUnsubscribe = null;
 let customerActiveOrdersUnsubscribe = null;
+
+// ==============================
+// UBee 客人端：小U即時追蹤狀態
+// ==============================
+
+let trackedRiderUnsubscribe = null;
+let trackedRiderDocId = '';
+let trackedRiderData = null;
+let trackedRiderPosition = null;
 let isSubmittingOrder = false;
 let isConfirmingPaid = false;
 let isCancellingOrder = false;
@@ -9835,14 +9921,18 @@ function clearCurrentOrderCache(){
   currentOrderData = null;
   selectedPaymentMethod = '';
 
-  if(orderUnsubscribe){
-    try{
-      orderUnsubscribe();
-    }catch(e){}
+ if(orderUnsubscribe){
+  try{
+    orderUnsubscribe();
+  }catch(e){}
 
-    orderUnsubscribe = null;
-  }
+  orderUnsubscribe = null;
+}
 
+
+// 同時停止小U即時定位監聽
+stopTrackedRiderListener();
+  
   if(qs('orderNo')){
     qs('orderNo').innerText = '-';
   }
@@ -11058,6 +11148,564 @@ function renderTimeline(status, order){
 
 }
 
+// ==============================
+// UBee 客人端：小U即時定位追蹤
+// 第一刀
+// ==============================
+
+function getOrderRiderDocId(order){
+
+  if(!order){
+    return '';
+  }
+
+  const candidates = [
+    order.riderDocId,
+    order.riderId,
+    order.riderPhone
+  ];
+
+  for(const value of candidates){
+
+    const safeValue =
+      String(
+        value || ''
+      ).trim();
+
+    if(safeValue){
+      return safeValue;
+    }
+  }
+
+  return '';
+}
+
+
+function getTrackedRiderPosition(rider){
+
+  if(!rider){
+    return null;
+  }
+
+  const latCandidates = [
+    rider.currentLat,
+    rider.currentLocation?.lat,
+    rider.latitude,
+    rider.lat
+  ];
+
+  const lngCandidates = [
+    rider.currentLng,
+    rider.currentLocation?.lng,
+    rider.longitude,
+    rider.lng
+  ];
+
+  let lat = null;
+  let lng = null;
+
+
+  for(const value of latCandidates){
+
+    const numberValue =
+      Number(value);
+
+    if(
+      Number.isFinite(numberValue) &&
+      numberValue >= -90 &&
+      numberValue <= 90
+    ){
+      lat = numberValue;
+      break;
+    }
+  }
+
+
+  for(const value of lngCandidates){
+
+    const numberValue =
+      Number(value);
+
+    if(
+      Number.isFinite(numberValue) &&
+      numberValue >= -180 &&
+      numberValue <= 180
+    ){
+      lng = numberValue;
+      break;
+    }
+  }
+
+
+  if(
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ){
+    return null;
+  }
+
+
+  return {
+    lat,
+    lng
+  };
+}
+
+// ==============================
+// 建立小U專屬 Marker DOM
+// ==============================
+
+function createTrackedRiderMarkerContent(){
+
+  const wrapper =
+    document.createElement('div');
+
+  wrapper.className =
+    'ubee-live-rider-marker';
+
+  wrapper.innerHTML = `
+
+    <div
+      class="ubee-live-rider-marker-pulse"
+    ></div>
+
+    <div
+      class="ubee-live-rider-marker-badge"
+    >
+      小U
+    </div>
+
+    <div
+      class="ubee-live-rider-marker-body"
+    >
+      小U
+    </div>
+
+  `;
+
+  return wrapper;
+}
+
+// ==============================
+// 清除小U Marker
+// ==============================
+
+function clearTrackedRiderMarker(){
+
+  if(!trackedRiderMarker){
+    return;
+  }
+
+  trackedRiderMarker =
+    clearMapObject(
+      trackedRiderMarker
+    );
+
+  console.log(
+    '🧹 客人地圖已清除小U Marker'
+  );
+}
+
+// ==============================
+// 建立或更新小U Marker
+// ==============================
+
+function updateTrackedRiderMarker(position){
+
+  if(
+    !position ||
+    !hasValidLatLng(
+      position.lat,
+      position.lng
+    )
+  ){
+    return;
+  }
+
+if(!customerMap){
+
+  console.log(
+    '⏳ 客人地圖尚未完成初始化，正在準備地圖'
+  );
+
+  ensureCustomerMapReady()
+    .then(() => {
+
+      if(customerMap){
+        updateTrackedRiderMarker(
+          position
+        );
+      }
+
+    })
+    .catch(err => {
+
+      console.warn(
+        '客人地圖初始化失敗，暫時無法顯示小U:',
+        err
+      );
+
+    });
+
+  return;
+}
+
+  const safePosition = {
+    lat:Number(position.lat),
+    lng:Number(position.lng)
+  };
+
+
+  // Marker 已存在，只更新位置
+  if(trackedRiderMarker){
+
+    try{
+
+      if(
+        typeof trackedRiderMarker.setPosition ===
+        'function'
+      ){
+
+        trackedRiderMarker.setPosition(
+          safePosition
+        );
+
+      }else{
+
+        trackedRiderMarker.position =
+          safePosition;
+
+      }
+
+      console.log(
+        '🛵 客人地圖已更新小U位置',
+        safePosition
+      );
+
+      return;
+
+    }catch(err){
+
+      console.warn(
+        '更新小U Marker 失敗，重新建立:',
+        err
+      );
+
+      clearTrackedRiderMarker();
+    }
+  }
+
+
+  // 優先使用 Advanced Marker
+  if(
+    googleMapsMapId &&
+    googleMapsLibraries
+      ?.marker
+      ?.AdvancedMarkerElement
+  ){
+
+    trackedRiderMarker =
+      new googleMapsLibraries
+        .marker
+        .AdvancedMarkerElement({
+
+          map:customerMap,
+
+          position:safePosition,
+
+          title:'你的小U目前位置',
+
+          content:
+            createTrackedRiderMarkerContent()
+
+        });
+
+    console.log(
+      '✅ 已建立小U Advanced Marker',
+      safePosition
+    );
+
+    return;
+  }
+
+
+  // 一般 Google Marker 相容模式
+  if(
+    window.google
+      ?.maps
+      ?.Marker
+  ){
+
+    trackedRiderMarker =
+      new google.maps.Marker({
+
+        map:customerMap,
+
+        position:safePosition,
+
+        title:'你的小U目前位置',
+
+        zIndex:999,
+
+        label:{
+          text:'U',
+          color:'#111111',
+          fontSize:'15px',
+          fontWeight:'900'
+        },
+
+        icon:{
+          path:
+            google.maps
+              .SymbolPath
+              .CIRCLE,
+
+          scale:19,
+
+          fillColor:'#facc15',
+          fillOpacity:1,
+
+          strokeColor:'#111111',
+          strokeWeight:4
+        }
+
+      });
+
+    console.log(
+      '✅ 已建立小U一般 Marker',
+      safePosition
+    );
+  }
+}
+    
+function stopTrackedRiderListener(){
+
+  if(trackedRiderUnsubscribe){
+
+    try{
+      trackedRiderUnsubscribe();
+    }catch(e){}
+
+    trackedRiderUnsubscribe = null;
+  }
+
+
+  trackedRiderDocId = '';
+
+  trackedRiderData = null;
+
+  trackedRiderPosition = null;
+  
+  clearTrackedRiderMarker();
+
+  console.log(
+    '🛑 UBee 客人端已停止小U定位監聽'
+  );
+}
+
+
+function startTrackedRiderListener(order){
+
+  if(
+    !db ||
+    !order
+  ){
+    return;
+  }
+
+
+  const riderDocId =
+    getOrderRiderDocId(order);
+
+
+  if(!riderDocId){
+
+    stopTrackedRiderListener();
+
+    console.log(
+      '⏳ UBee 客人端目前尚未有小U接單',
+      {
+        orderId:
+          order.id || '',
+        status:
+          order.status || ''
+      }
+    );
+
+    return;
+  }
+
+
+  // 已經在監聽同一位小U，
+  // 不重複建立 Firestore listener
+  if(
+    trackedRiderDocId === riderDocId &&
+    trackedRiderUnsubscribe
+  ){
+    return;
+  }
+
+
+  // 如果換了一位小U，
+  // 先關閉上一個 listener
+  stopTrackedRiderListener();
+
+
+  trackedRiderDocId =
+    riderDocId;
+
+
+  console.log(
+    '🔗 UBee 客人端開始連接小U定位',
+    {
+      orderId:
+        order.id || '',
+
+      riderDocId
+    }
+  );
+
+
+  trackedRiderUnsubscribe =
+    db
+      .collection('riders')
+      .doc(riderDocId)
+      .onSnapshot(
+
+        doc => {
+
+          if(!doc.exists){
+
+            console.warn(
+              '⚠️ 找不到小U資料文件:',
+              riderDocId
+            );
+
+            trackedRiderData = null;
+
+            trackedRiderPosition = null;
+
+            return;
+          }
+
+
+          const rider = {
+            id:doc.id,
+            ...doc.data()
+          };
+
+
+          const position =
+            getTrackedRiderPosition(rider);
+
+
+          trackedRiderData =
+            rider;
+
+
+          if(!position){
+
+            trackedRiderPosition = null;
+
+            console.log(
+              '📡 已找到小U，但目前尚未收到有效 GPS',
+              {
+                riderDocId
+              }
+            );
+
+            return;
+          }
+
+
+          trackedRiderPosition =
+  position;
+
+
+console.log(
+  '✅ 客人端收到小U最新定位',
+  {
+    riderDocId,
+
+    lat:
+      position.lat,
+
+    lng:
+      position.lng,
+
+    locationUpdatedAtMs:
+      rider.locationUpdatedAtMs ||
+      null
+  }
+);
+
+
+updateTrackedRiderMarker(
+  position
+);
+
+          // ==============================
+          // 第二刀會從這裡開始：
+          //
+          // updateTrackedRiderMarker(
+          //   position
+          // );
+          //
+          // 目前先只確認資料鏈成功
+          // ==============================
+        },
+
+
+        err => {
+
+          console.warn(
+            '❌ 小U即時定位監聽失敗:',
+            err
+          );
+
+        }
+      );
+}
+
+
+function syncCustomerLiveTracking(order){
+
+  if(!order){
+    stopTrackedRiderListener();
+    return;
+  }
+
+
+  const status =
+    String(
+      order.status || ''
+    )
+      .trim()
+      .toLowerCase();
+
+
+  // 任務結束，不再追蹤小U
+  if(
+    [
+      'completed',
+      'done',
+      'cancelled',
+      'canceled'
+    ].includes(status)
+  ){
+
+    stopTrackedRiderListener();
+
+    return;
+  }
+
+
+  // 其他狀態交給小U監聽函式判斷。
+  // 尚未接單時沒有 riderDocId，
+  // 自然不會建立定位監聽。
+  startTrackedRiderListener(order);
+}
+    
 function startOrderListener(orderId){
   if(orderUnsubscribe){
     try{
@@ -11115,12 +11763,19 @@ function startOrderListener(orderId){
           qs('orderNo').innerText =
             currentOrderId;
 
-          renderTimeline(
-            order.status ||
-            'pending_payment',
-            order
-          );
+        renderTimeline(
+  order.status ||
+  'pending_payment',
+  order
+);
 
+
+// ==============================
+// 同步小U即時定位追蹤
+// ==============================
+
+syncCustomerLiveTracking(order);
+          
           if(
             order.status === 'completed' ||
             order.status === 'done' ||
