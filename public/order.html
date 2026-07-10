@@ -4678,7 +4678,108 @@ input:checked
     rgba(17,24,39,.045);
 }
 
+/* ==============================
+   STEP 5：即時路線資訊
+   ============================== */
 
+#step5 .step5-tracking-metrics{
+  display:grid;
+
+  grid-template-columns:
+    minmax(0,1fr)
+    1px
+    minmax(0,1fr);
+
+  align-items:center;
+
+  gap:16px;
+
+  margin:
+    0
+    0
+    14px;
+
+  padding:
+    14px
+    15px;
+
+  border:
+    1px solid
+    #ece7c9;
+
+  border-radius:
+    17px;
+
+  background:
+    #fffbed;
+}
+
+
+/* 單一資訊欄 */
+
+#step5 .step5-tracking-metric{
+  min-width:0;
+}
+
+
+/* 左右資訊的分隔線 */
+
+#step5 .step5-tracking-metric-divider{
+  width:1px;
+
+  height:38px;
+
+  background:
+    #e4dfc5;
+}
+
+
+/* 小標題 */
+
+#step5 .step5-tracking-metric-label{
+  margin-bottom:5px;
+
+  color:
+    #8d7300;
+
+  font-size:
+    11px;
+
+  font-weight:
+    1000;
+
+  line-height:
+    1.35;
+}
+
+
+/* 距離與時間主要數字 */
+
+#step5 .step5-tracking-metric-value{
+  overflow:hidden;
+
+  color:
+    #111111;
+
+  font-size:
+    20px;
+
+  font-weight:
+    1000;
+
+  letter-spacing:
+    -.4px;
+
+  line-height:
+    1.2;
+
+  white-space:
+    nowrap;
+
+  text-overflow:
+    ellipsis;
+}
+    
 #step5 .step5-tracking-map-shell{
   position:
     relative;
@@ -6789,7 +6890,57 @@ input:checked
 
         </div>
 
+        <!-- ==============================
+     Step 5：即時路線資訊
+     ============================== -->
 
+<div
+  id="step5TrackingMetrics"
+  class="step5-tracking-metrics"
+>
+
+  <div class="step5-tracking-metric">
+
+    <div
+      id="step5TrackingDistanceLabel"
+      class="step5-tracking-metric-label"
+    >
+      距離取件點
+    </div>
+
+    <div
+      id="step5TrackingDistanceText"
+      class="step5-tracking-metric-value"
+    >
+      計算中...
+    </div>
+
+  </div>
+
+
+  <div class="step5-tracking-metric-divider"></div>
+
+
+  <div class="step5-tracking-metric">
+
+    <div
+      id="step5TrackingEtaLabel"
+      class="step5-tracking-metric-label"
+    >
+      預計抵達
+    </div>
+
+    <div
+      id="step5TrackingEtaText"
+      class="step5-tracking-metric-value"
+    >
+      計算中...
+    </div>
+
+  </div>
+
+</div>
+        
         <div class="step5-tracking-map-shell">
 
           <div
