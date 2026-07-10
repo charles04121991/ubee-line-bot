@@ -11864,9 +11864,20 @@ if(!trackingMap){
 
       if(trackingMap){
 
-        updateTrackedRiderMarker(
-          position
-        );
+  updateTrackedRiderMarker(
+    position
+);
+
+
+// 使用最新訂單資料，
+// 依目前任務階段更新：
+// 小U → 取件點
+// 或
+// 小U → 送達點
+scheduleTrackingRouteRefresh(
+  currentOrderData || order,
+  position
+);
 
       }
 
@@ -12462,26 +12473,38 @@ function syncCustomerLiveTracking(order){
   // 小U已接單，
   // 地圖區塊已經顯示，
   // 下一個畫面更新週期再初始化地圖。
-  requestAnimationFrame(() => {
+requestAnimationFrame(() => {
 
-    ensureTrackingMapReady()
-      .then(() => {
+  ensureTrackingMapReady()
+    .then(() => {
 
-        updateTrackingTargetMarker(
-          order
-        );
+      // 更新目前任務目標 Marker：
+      // 取件前顯示「取」，
+      // 取件後顯示「送」。
+      updateTrackingTargetMarker(
+        order
+      );
 
-      })
-      .catch(err => {
 
-        console.warn(
-          '❌ Step 5 追蹤地圖初始化失敗:',
-          err
-        );
+      // 即使小U此刻沒有新的 GPS 更新，
+      // 只要訂單階段改變，
+      // 也立即使用最後已知位置更新路線。
+      scheduleTrackingRouteRefresh(
+        order,
+        trackedRiderPosition
+      );
 
-      });
+    })
+    .catch(err => {
 
-  });
+      console.warn(
+        '❌ Step 5 追蹤地圖初始化失敗:',
+        err
+      );
+
+    });
+
+});
 
 
   // 同時開始監聽該位小U。
