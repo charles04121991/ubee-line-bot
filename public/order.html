@@ -8558,6 +8558,310 @@ async function refreshTrackingRoute(
   }
 }
 
+function scheduleTrackingRouteRefresh(
+  order,
+  position,
+  options = {}
+){
+
+  if(
+    !order ||
+    !position
+  ){
+    return;
+  }
+
+
+  const destination =
+    getTrackingRouteDestination(
+      order
+    );
+
+
+  if(!destination){
+    return;
+  }
+
+
+  const riderLat =
+    toNullableNumber(
+      position.lat
+    );
+
+  const riderLng =
+    toNullableNumber(
+      position.lng
+    );
+
+
+  if(
+    !hasValidLatLng(
+      riderLat,
+      riderLng
+    )
+  ){
+    return;
+  }
+
+
+  const safePosition = {
+    lat:riderLat,
+    lng:riderLng
+  };
+
+
+  const currentStage =
+    String(
+      destination.stage || ''
+    ).trim();
+
+
+  if(!currentStage){
+    return;
+  }
+
+
+  const now =
+    Date.now();
+
+
+  const elapsedSinceLastRequest =
+
+    trackingRouteLastRequestedAt > 0
+
+      ? (
+          now -
+          trackingRouteLastRequestedAt
+        )
+
+      : Infinity;
+
+
+  const movedDistanceMeters =
+
+    getTrackingRouteMoveDistanceMeters(
+
+      trackingRouteLastOrigin,
+
+      safePosition
+
+    );
+
+
+  const isFirstRequest =
+
+    !trackingRouteLastRequestedAt ||
+
+    !trackingRouteLastOrigin;
+
+
+  const hasStageChanged =
+
+    !!trackingRouteLastStage &&
+
+    trackingRouteLastStage !==
+      currentStage;
+
+
+  const hasMovedEnough =
+
+    movedDistanceMeters >=
+
+    TRACKING_ROUTE_MIN_MOVE_METERS;
+
+
+  const hasMinimumIntervalPassed =
+
+    elapsedSinceLastRequest >=
+
+    TRACKING_ROUTE_MIN_INTERVAL_MS;
+
+
+  const isRouteStale =
+
+    elapsedSinceLastRequest >=
+
+    TRACKING_ROUTE_MAX_STALE_MS;
+
+
+  const forceRefresh =
+
+    options.force === true;
+
+
+  const shouldRefreshNow =
+
+    forceRefresh ||
+
+    isFirstRequest ||
+
+    hasStageChanged ||
+
+    isRouteStale ||
+
+    (
+      hasMinimumIntervalPassed &&
+      hasMovedEnough
+    );
+
+
+  /* ==============================
+     需要立即更新
+     ============================== */
+
+  if(shouldRefreshNow){
+
+    if(trackingRouteRefreshTimer){
+
+      clearTimeout(
+        trackingRouteRefreshTimer
+      );
+
+      trackingRouteRefreshTimer =
+        null;
+
+    }
+
+
+    // 保留極短緩衝，
+    // 合併同一時間連續進來的 GPS 更新。
+    trackingRouteRefreshTimer =
+      setTimeout(
+        () => {
+
+          trackingRouteRefreshTimer =
+            null;
+
+
+          const latestOrder =
+            currentOrderData ||
+            order;
+
+
+          const latestPosition =
+            trackedRiderPosition ||
+            safePosition;
+
+
+          refreshTrackingRoute(
+            latestOrder,
+            latestPosition
+          );
+
+        },
+        300
+      );
+
+
+    return;
+  }
+
+
+  /* ==============================
+     已經有排程時，不重複建立
+     ============================== */
+
+  if(trackingRouteRefreshTimer){
+    return;
+  }
+
+
+  /* ==============================
+     計算下一個合理更新時間
+     ============================== */
+
+  let nextRefreshDelay =
+
+    Math.max(
+
+      0,
+
+      TRACKING_ROUTE_MAX_STALE_MS -
+
+      elapsedSinceLastRequest
+
+    );
+
+
+  // 小U已經移動超過門檻，
+  // 但尚未滿最短更新間隔時，
+  // 等最短間隔一到就重新判斷。
+  if(
+    hasMovedEnough &&
+    !hasMinimumIntervalPassed
+  ){
+
+    nextRefreshDelay =
+
+      Math.min(
+
+        nextRefreshDelay,
+
+        Math.max(
+
+          0,
+
+          TRACKING_ROUTE_MIN_INTERVAL_MS -
+
+          elapsedSinceLastRequest
+
+        )
+
+      );
+
+  }
+
+
+  trackingRouteRefreshTimer =
+    setTimeout(
+      () => {
+
+        trackingRouteRefreshTimer =
+          null;
+
+
+        const latestOrder =
+          currentOrderData ||
+          order;
+
+
+        const latestPosition =
+          trackedRiderPosition ||
+          safePosition;
+
+
+        scheduleTrackingRouteRefresh(
+
+          latestOrder,
+
+          latestPosition,
+
+          {
+
+            force:
+
+              (
+                Date.now() -
+
+                trackingRouteLastRequestedAt
+
+              ) >=
+
+              TRACKING_ROUTE_MAX_STALE_MS
+
+          }
+
+        );
+
+      },
+
+      Math.max(
+        300,
+        nextRefreshDelay
+      )
+    );
+}
+
 function updateRouteBadges(data){
   const distanceText = String(data?.distanceText || '').trim();
   const durationText = String(data?.durationText || '').trim();
