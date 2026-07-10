@@ -12046,14 +12046,46 @@ function stopTrackedRiderListener(){
   trackedRiderData = null;
 
   trackedRiderPosition = null;
-  
+
+
+  // 讓目前尚未完成的舊路線請求失效，
+  // 防止停止追蹤後，
+  // 舊 API 結果又回來覆蓋地圖。
+  trackingRouteRequestSequence += 1;
+
+
+  // 清除小U Marker。
   clearTrackedRiderMarker();
 
+
+  // 清除目前任務目標 Marker：
+  // 「取」或「送」。
+  trackingTargetMarker =
+    clearMapObject(
+      trackingTargetMarker
+    );
+
+
+  // 清除 step5 道路路線。
+  trackingRoutePolyline =
+    clearMapObject(
+      trackingRoutePolyline
+    );
+
+
+  // 重設 15 秒節流狀態，
+  // 下一位小U接單時可以立即重新取得路線。
+  lastTrackingRouteRefreshTime =
+    0;
+
+  lastTrackingRouteTargetType =
+    '';
+
+
   console.log(
-    '🛑 UBee 客人端已停止小U定位監聽'
+    '🛑 UBee 客人端已停止小U定位監聽與追蹤地圖'
   );
 }
-
 
 function startTrackedRiderListener(order){
 
