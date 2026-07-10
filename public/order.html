@@ -12218,6 +12218,317 @@ function isOrderPaymentConfirmed(order, status){
   ].includes(paymentStatus);
 }
 
+/* ==============================
+   Step 5：客人任務明細
+   ============================== */
+
+function renderStep5TaskDetail(order){
+
+  const target =
+    qs('step5TaskDetailContent');
+
+
+  if(!target){
+    return;
+  }
+
+
+  const data =
+    order ||
+    currentOrderData ||
+    {};
+
+
+  /* ==============================
+     服務分類
+     ============================== */
+
+  const serviceKey =
+    String(
+      data.serviceKey ||
+      data.serviceGroup ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const serviceGroupMap = {
+
+    send:'幫我送',
+
+    pickup:'幫我取',
+
+    buy:'幫代買',
+
+    queue:'幫排隊',
+
+    helper:'全能跑腿',
+
+    urgent:'急件專送',
+
+    life:'全能跑腿'
+
+  };
+
+
+  const serviceGroupLabel =
+    serviceGroupMap[serviceKey] ||
+    'UBee 跑腿';
+
+
+  const serviceTypeText =
+    String(
+      data.serviceType ||
+      'UBee 跑腿任務'
+    ).trim();
+
+
+  const serviceCategoryText =
+    String(
+      data.serviceCategory ||
+      ''
+    ).trim();
+
+
+  const serviceMetaText =
+
+    [
+      serviceGroupLabel,
+      serviceCategoryText
+    ]
+
+      .filter(Boolean)
+
+      .join('・');
+
+
+  /* ==============================
+     客人任務內容
+     ============================== */
+
+  const taskContent =
+
+    String(
+
+      data.note ||
+
+      data.item ||
+
+      ''
+
+    ).trim() ||
+
+    '未提供任務內容';
+
+
+  /* ==============================
+     取件資訊
+     ============================== */
+
+  const pickupAddress =
+
+    String(
+
+      data.pickup ||
+
+      data.pickupAddress ||
+
+      data.fromAddress ||
+
+      ''
+
+    ).trim() ||
+
+    '未提供地址';
+
+
+  const pickupPhone =
+
+    String(
+
+      data.pickupPhone ||
+
+      ''
+
+    ).trim() ||
+
+    '未填寫';
+
+
+  /* ==============================
+     送達資訊
+     ============================== */
+
+  const dropoffAddress =
+
+    String(
+
+      data.dropoff ||
+
+      data.dropoffAddress ||
+
+      data.toAddress ||
+
+      ''
+
+    ).trim() ||
+
+    '未提供地址';
+
+
+  const dropoffPhone =
+
+    String(
+
+      data.dropoffPhone ||
+
+      ''
+
+    ).trim() ||
+
+    '未填寫';
+
+  /* ==============================
+     依不同任務顯示不同地址名稱
+     ============================== */
+
+  let pickupTitle =
+    '取件地點';
+
+  let dropoffTitle =
+    '送達地點';
+
+
+  if(serviceKey === 'buy'){
+
+    pickupTitle =
+      '購買地點';
+
+  }
+
+  if(serviceKey === 'queue'){
+
+    pickupTitle =
+      '任務地點';
+
+    dropoffTitle =
+      '完成／交付地點';
+
+  }
+
+  /* ==============================
+     正式產生任務明細
+     ============================== */
+
+  target.innerHTML = `
+
+    <div class="task-receipt-item">
+
+      <span class="task-receipt-count">
+        1
+      </span>
+
+      <div class="task-receipt-item-main">
+
+        <div class="task-receipt-item-title">
+          ${escapeHtml(serviceTypeText)}
+        </div>
+
+        <div class="task-receipt-item-meta">
+          ${escapeHtml(serviceMetaText)}
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="task-receipt-separator"></div>
+
+    <div class="task-receipt-section">
+
+      <div class="task-receipt-section-title">
+        任務內容
+      </div>
+
+      <div class="task-receipt-text">
+        ${escapeHtml(taskContent)}
+      </div>
+
+    </div>
+
+    <div class="task-receipt-separator"></div>
+
+    <div class="task-receipt-section">
+
+      <div class="task-receipt-section-title">
+        取件資訊
+      </div>
+
+      <div class="task-receipt-row">
+
+        <span class="task-receipt-label">
+          ${escapeHtml(pickupTitle)}
+        </span>
+
+        <strong class="task-receipt-value">
+          ${escapeHtml(pickupAddress)}
+        </strong>
+
+      </div>
+
+      <div class="task-receipt-row">
+
+        <span class="task-receipt-label">
+          聯絡電話
+        </span>
+
+        <strong class="task-receipt-value">
+          ${escapeHtml(pickupPhone)}
+        </strong>
+
+      </div>
+
+    </div>
+
+    <div class="task-receipt-separator"></div>
+
+    <div class="task-receipt-section">
+
+      <div class="task-receipt-section-title">
+        送達資訊
+      </div>
+
+      <div class="task-receipt-row">
+
+        <span class="task-receipt-label">
+          ${escapeHtml(dropoffTitle)}
+        </span>
+
+        <strong class="task-receipt-value">
+          ${escapeHtml(dropoffAddress)}
+        </strong>
+
+      </div>
+
+      <div class="task-receipt-row">
+
+        <span class="task-receipt-label">
+          聯絡電話
+        </span>
+
+        <strong class="task-receipt-value">
+          ${escapeHtml(dropoffPhone)}
+        </strong>
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+    
 function renderTimeline(status, order){
 
   const data =
@@ -12533,6 +12844,8 @@ function renderTimeline(status, order){
 
   }
 
+  renderStep5TaskDetail(data);
+  
   /* ==============================
      原本取消訂單規則保留
      ============================== */
