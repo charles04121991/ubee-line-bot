@@ -4678,108 +4678,7 @@ input:checked
     rgba(17,24,39,.045);
 }
 
-/* ==============================
-   STEP 5：即時路線資訊
-   ============================== */
 
-#step5 .step5-tracking-metrics{
-  display:grid;
-
-  grid-template-columns:
-    minmax(0,1fr)
-    1px
-    minmax(0,1fr);
-
-  align-items:center;
-
-  gap:16px;
-
-  margin:
-    0
-    0
-    14px;
-
-  padding:
-    14px
-    15px;
-
-  border:
-    1px solid
-    #ece7c9;
-
-  border-radius:
-    17px;
-
-  background:
-    #fffbed;
-}
-
-
-/* 單一資訊欄 */
-
-#step5 .step5-tracking-metric{
-  min-width:0;
-}
-
-
-/* 左右資訊的分隔線 */
-
-#step5 .step5-tracking-metric-divider{
-  width:1px;
-
-  height:38px;
-
-  background:
-    #e4dfc5;
-}
-
-
-/* 小標題 */
-
-#step5 .step5-tracking-metric-label{
-  margin-bottom:5px;
-
-  color:
-    #8d7300;
-
-  font-size:
-    11px;
-
-  font-weight:
-    1000;
-
-  line-height:
-    1.35;
-}
-
-
-/* 距離與時間主要數字 */
-
-#step5 .step5-tracking-metric-value{
-  overflow:hidden;
-
-  color:
-    #111111;
-
-  font-size:
-    20px;
-
-  font-weight:
-    1000;
-
-  letter-spacing:
-    -.4px;
-
-  line-height:
-    1.2;
-
-  white-space:
-    nowrap;
-
-  text-overflow:
-    ellipsis;
-}
-    
 #step5 .step5-tracking-map-shell{
   position:
     relative;
@@ -6890,57 +6789,7 @@ input:checked
 
         </div>
 
-        <!-- ==============================
-     Step 5：即時路線資訊
-     ============================== -->
 
-<div
-  id="step5TrackingMetrics"
-  class="step5-tracking-metrics"
->
-
-  <div class="step5-tracking-metric">
-
-    <div
-      id="step5TrackingDistanceLabel"
-      class="step5-tracking-metric-label"
-    >
-      距離取件點
-    </div>
-
-    <div
-      id="step5TrackingDistanceText"
-      class="step5-tracking-metric-value"
-    >
-      計算中...
-    </div>
-
-  </div>
-
-
-  <div class="step5-tracking-metric-divider"></div>
-
-
-  <div class="step5-tracking-metric">
-
-    <div
-      id="step5TrackingEtaLabel"
-      class="step5-tracking-metric-label"
-    >
-      預計抵達
-    </div>
-
-    <div
-      id="step5TrackingEtaText"
-      class="step5-tracking-metric-value"
-    >
-      計算中...
-    </div>
-
-  </div>
-
-</div>
-        
         <div class="step5-tracking-map-shell">
 
           <div
@@ -7280,7 +7129,6 @@ let trackingMap = null;
 
 let routePolyline = null;
 let reviewRoutePolyline = null;
-let trackingRoutePolyline = null;
 
 let pickupMarker = null;
 let dropoffMarker = null;
@@ -7288,7 +7136,6 @@ let reviewPickupMarker = null;
 let reviewDropoffMarker = null;
 let currentLocationMarker = null;
 let trackedRiderMarker = null;
-let trackingTargetMarker = null;
 
 let pickupLat = null;
 let pickupLng = null;
@@ -7309,12 +7156,6 @@ let routeRefreshTimer = null;
 let quoteRefreshTimer = null;
 let routeRequestSequence = 0;
 let quoteRequestSequence = 0;
-let trackingRouteRequestSequence = 0;
-
-let lastTrackingRouteRefreshTime = 0;
-let lastTrackingRouteTargetType = '';
-
-const TRACKING_ROUTE_REFRESH_MS = 15000;
 
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
 
@@ -7574,28 +7415,33 @@ async function ensureCustomerMapReady(){
   return customerMap;
 }
 
+// ==============================
+// Step 4 確認訂單頁地圖初始化
+// ==============================
 async function ensureReviewMapReady(){
-
-  const mapEl =
-    qs('reviewMap');
-
+  const mapEl = qs('reviewMap');
 
   if(!mapEl){
     return null;
   }
 
-
   await loadGoogleMapsApi();
 
-
   if(!reviewMap){
-
     const options = {
-
-      center:{
-        lat:24.2521,
-        lng:120.7214
-      },
+      center:
+        hasValidLatLng(
+          pickupLat,
+          pickupLng
+        )
+          ? {
+              lat:Number(pickupLat),
+              lng:Number(pickupLng)
+            }
+          : {
+              lat:24.2521,
+              lng:120.7214
+            },
 
       zoom:13,
 
@@ -7606,37 +7452,33 @@ async function ensureReviewMapReady(){
       gestureHandling:'greedy',
 
       backgroundColor:'#e8eaed'
-
     };
 
-
     if(googleMapsMapId){
-
       options.mapId =
         googleMapsMapId;
-
     }
-
 
     reviewMap =
       new googleMapsLibraries.maps.Map(
         mapEl,
         options
       );
-
   }
 
-
-  qs(
-    'reviewMapPlaceholder'
-  )
+  qs('reviewMapPlaceholder')
     ?.classList
     .add('is-ready');
 
+  if(lastRouteData){
+    renderRouteOnReviewMap(
+      lastRouteData
+    );
+  }
 
   return reviewMap;
 }
-    
+
 async function ensureTrackingMapReady(){
 
   const mapEl =
@@ -7921,92 +7763,17 @@ function drawRouteOnMap(map, data, target){
     dropoffMarker = newDropoffMarker;
   }
 
-  const bounds =
-  new google.maps.LatLngBounds();
+  const bounds = new google.maps.LatLngBounds();
 
+  path.forEach(point => bounds.extend(point));
+  if(origin) bounds.extend(origin);
+  if(destination) bounds.extend(destination);
 
-// 先加入完整道路路線。
-path.forEach(point => {
-
-  bounds.extend(
-    point
-  );
-
-});
-
-
-// 再加入小U目前實際位置，
-// 確保小U Marker 不會被裁到畫面外。
-if(
-  hasValidLatLng(
-    trackedRiderPosition?.lat,
-    trackedRiderPosition?.lng
-  )
-){
-
-  bounds.extend({
-
-    lat:
-      Number(
-        trackedRiderPosition.lat
-      ),
-
-    lng:
-      Number(
-        trackedRiderPosition.lng
-      )
-
-  });
-
+  if(!bounds.isEmpty()){
+    map.fitBounds(bounds, 48);
+  }
 }
 
-
-// 再加入目前任務目標：
-// 取件前是取件點，
-// 取件後是送達點。
-const trackingTarget =
-  getCustomerTrackingTarget(
-    currentOrderData
-  );
-
-
-if(
-  trackingTarget &&
-  hasValidLatLng(
-    trackingTarget.lat,
-    trackingTarget.lng
-  )
-){
-
-  bounds.extend({
-
-    lat:
-      Number(
-        trackingTarget.lat
-      ),
-
-    lng:
-      Number(
-        trackingTarget.lng
-      )
-
-  });
-
-}
-
-
-// 最後才依完整範圍調整視野。
-if(!bounds.isEmpty()){
-
-  trackingMap.fitBounds(
-    bounds,
-    48
-  );
-
-}
-
-}
-  
 function renderRouteOnCustomerMap(data){
   if(!customerMap || !data) return;
   drawRouteOnMap(customerMap, data, 'customer');
@@ -8017,409 +7784,6 @@ function renderRouteOnReviewMap(data){
   drawRouteOnMap(reviewMap, data, 'review');
 }
 
-function renderTrackingRoute(data){
-
-  if(!trackingMap){
-    return;
-  }
-
-
-  // 每次繪製新路線前，
-  // 先清除上一條 step5 路線。
-  trackingRoutePolyline =
-    clearMapObject(
-      trackingRoutePolyline
-    );
-
-
-  if(
-    !data?.encodedPolyline ||
-    !googleMapsLibraries
-      ?.geometry
-      ?.encoding
-  ){
-    return;
-  }
-
-
-  const path =
-    googleMapsLibraries
-      .geometry
-      .encoding
-      .decodePath(
-        data.encodedPolyline
-      );
-
-
-  if(
-    !Array.isArray(path) ||
-    !path.length
-  ){
-    return;
-  }
-
-
-  trackingRoutePolyline =
-    new google.maps.Polyline({
-
-      map:
-        trackingMap,
-
-      path,
-
-      geodesic:
-        true,
-
-      strokeColor:
-        '#111111',
-
-      strokeOpacity:
-        .92,
-
-      strokeWeight:
-        6
-
-    });
-
-
-  const bounds =
-    new google.maps.LatLngBounds();
-
-
-  path.forEach(point => {
-
-    bounds.extend(
-      point
-    );
-
-  });
-
-
-  if(!bounds.isEmpty()){
-
-    trackingMap.fitBounds(
-      bounds,
-      48
-    );
-
-  }
-}
-
-async function refreshTrackingRoute(
-  order,
-  position
-){
-
-  const target =
-    getCustomerTrackingTarget(
-      order
-    );
-
-
-  const riderLat =
-    Number(
-      position?.lat
-    );
-
-  const riderLng =
-    Number(
-      position?.lng
-    );
-
-
-  // 訂單階段沒有追蹤目標，
-  // 或小U目前位置無效時，
-  // 不發送路線請求。
-  if(
-    !target ||
-    !hasValidLatLng(
-      riderLat,
-      riderLng
-    )
-  ){
-
-    trackingRouteRequestSequence += 1;
-
-    trackingRoutePolyline =
-      clearMapObject(
-        trackingRoutePolyline
-      );
-
-    return null;
-  }
-
-
-  // 每次建立新的 step5 路線請求，
-  // 都產生新的序號。
-  const requestId =
-    ++trackingRouteRequestSequence;
-
-
-  try{
-
-    const res =
-      await fetch(
-        '/api/map-route',
-        {
-
-          method:
-            'POST',
-
-          headers:{
-            'Content-Type':
-              'application/json'
-          },
-
-          cache:
-            'no-store',
-
-          body:
-            JSON.stringify({
-
-              originLat:
-                riderLat,
-
-              originLng:
-                riderLng,
-
-              destinationLat:
-                Number(
-                  target.lat
-                ),
-
-              destinationLng:
-                Number(
-                  target.lng
-                )
-
-            })
-
-        }
-      );
-
-
-    const data =
-      await res
-        .json()
-        .catch(
-          () => ({})
-        );
-
-
-    // 已經有更新的路線請求時，
-    // 舊結果不能覆蓋新結果。
-    if(
-      requestId !==
-      trackingRouteRequestSequence
-    ){
-
-      return null;
-
-    }
-
-
-    if(
-      !res.ok ||
-      data.success === false
-    ){
-
-      throw new Error(
-
-        data.error ||
-
-        data.message ||
-
-        '即時追蹤路線讀取失敗'
-
-      );
-
-    }
-
-
-    // 將最新道路路線
-// 畫到 step5 trackingMap。
-renderTrackingRoute(
-  data
-);
-
-
-// 將即時道路路線距離與時間
-// 寫入 Step 5 追蹤資訊。
-const distanceText =
-  String(
-    data?.distanceText || ''
-  ).trim();
-
-
-const durationText =
-  String(
-    data?.durationText || ''
-  ).trim();
-
-
-if(
-  qs('step5TrackingDistanceText')
-){
-
-  qs(
-    'step5TrackingDistanceText'
-  ).innerText =
-    distanceText ||
-    '計算中...';
-
-}
-
-
-if(
-  qs('step5TrackingEtaText')
-){
-
-  qs(
-    'step5TrackingEtaText'
-  ).innerText =
-    durationText ||
-    '計算中...';
-
-}
-
-
-return data;
-
-  }catch(err){
-
-
-    // 舊請求發生錯誤時，
-    // 直接忽略，不准干擾新路線。
-    if(
-      requestId !==
-      trackingRouteRequestSequence
-    ){
-
-      return null;
-
-    }
-
-
-    console.warn(
-      'Step 5 即時追蹤路線更新失敗:',
-      err
-    );
-
-
-    return null;
-
-  }
-}
-
-function scheduleTrackingRouteRefresh(
-  order,
-  position
-){
-
-  const target =
-    getCustomerTrackingTarget(
-      order
-    );
-
-
-  const riderLat =
-    Number(
-      position?.lat
-    );
-
-  const riderLng =
-    Number(
-      position?.lng
-    );
-
-
-  // 沒有有效目標，
-  // 或小U定位無效時，
-  // 清除舊路線與節流狀態。
-  if(
-    !target ||
-    !hasValidLatLng(
-      riderLat,
-      riderLng
-    )
-  ){
-
-    trackingRouteRequestSequence += 1;
-
-    trackingRoutePolyline =
-      clearMapObject(
-        trackingRoutePolyline
-      );
-
-    lastTrackingRouteRefreshTime =
-      0;
-
-    lastTrackingRouteTargetType =
-      '';
-
-    return false;
-  }
-
-
-  const now =
-    Date.now();
-
-
-  const targetChanged =
-
-    lastTrackingRouteTargetType !==
-    target.type;
-
-
-  const refreshIntervalReached =
-
-    !lastTrackingRouteRefreshTime ||
-
-    (
-      now -
-      lastTrackingRouteRefreshTime
-    ) >=
-    TRACKING_ROUTE_REFRESH_MS;
-
-
-  // 目標沒有改變，
-  // 而且距離上一次更新還不到 15 秒，
-  // 就不重新呼叫道路路線 API。
-  if(
-    !targetChanged &&
-    !refreshIntervalReached
-  ){
-
-    return false;
-  }
-
-
-  // 在發送請求前先記錄時間，
-  // 避免定位短時間連續更新時，
-  // 重複送出多個路線請求。
-  lastTrackingRouteRefreshTime =
-    now;
-
-
-  lastTrackingRouteTargetType =
-    target.type;
-
-
-  refreshTrackingRoute(
-    order,
-    {
-      lat:
-        riderLat,
-
-      lng:
-        riderLng
-    }
-  );
-
-
-  return true;
-}
-    
 function updateRouteBadges(data){
   const distanceText = String(data?.distanceText || '').trim();
   const durationText = String(data?.durationText || '').trim();
@@ -12189,17 +11553,17 @@ if(!trackingMap){
   );
 
   ensureTrackingMapReady()
-  .then(() => {
+    .then(() => {
 
-    if(trackingMap){
+      if(trackingMap){
 
-      updateTrackedRiderMarker(
-        position
-      );
+        updateTrackedRiderMarker(
+          position
+        );
 
-    }
+      }
 
-  })
+    })
     .catch(err => {
 
       console.warn(
@@ -12212,36 +11576,17 @@ if(!trackingMap){
   return;
 }
 
-    const safePosition = {
+  const safePosition = {
     lat:Number(position.lat),
     lng:Number(position.lng)
   };
 
 
-  // 還沒有道路路線時，
-// 先讓地圖跟到小U位置。
-//
-// 一旦已有完整道路路線，
-// 就由 fitBounds 負責維持
-// 「小U → 目前目標」的完整視野，
-// 避免每次 GPS 更新又把畫面拉回小U身上。
-if(!trackingRoutePolyline){
-
+  // 每次收到小U最新定位，
+  // 追蹤地圖同步跟到小U位置。
   trackingMap.panTo(
     safePosition
   );
-
-}
-
-  // 第一次顯示小U時，
-  // 將追蹤地圖拉近到適合觀看的位置。
-  if(!trackedRiderMarker){
-
-    trackingMap.setZoom(
-      16
-    );
-
-  }
 
 
   // Marker 已存在，只更新位置
@@ -12383,46 +11728,14 @@ function stopTrackedRiderListener(){
   trackedRiderData = null;
 
   trackedRiderPosition = null;
-
-
-  // 讓目前尚未完成的舊路線請求失效，
-  // 防止停止追蹤後，
-  // 舊 API 結果又回來覆蓋地圖。
-  trackingRouteRequestSequence += 1;
-
-
-  // 清除小U Marker。
+  
   clearTrackedRiderMarker();
 
-
-  // 清除目前任務目標 Marker：
-  // 「取」或「送」。
-  trackingTargetMarker =
-    clearMapObject(
-      trackingTargetMarker
-    );
-
-
-  // 清除 step5 道路路線。
-  trackingRoutePolyline =
-    clearMapObject(
-      trackingRoutePolyline
-    );
-
-
-  // 重設 15 秒節流狀態，
-  // 下一位小U接單時可以立即重新取得路線。
-  lastTrackingRouteRefreshTime =
-    0;
-
-  lastTrackingRouteTargetType =
-    '';
-
-
   console.log(
-    '🛑 UBee 客人端已停止小U定位監聽與追蹤地圖'
+    '🛑 UBee 客人端已停止小U定位監聽'
   );
 }
+
 
 function startTrackedRiderListener(order){
 
@@ -12559,18 +11872,8 @@ console.log(
   }
 );
 
+
 updateTrackedRiderMarker(
-  position
-);
-
-
-// 使用最新訂單資料，
-// 依目前任務階段更新：
-// 小U → 取件點
-// 或
-// 小U → 送達點
-scheduleTrackingRouteRefresh(
-  currentOrderData || order,
   position
 );
 
@@ -12597,173 +11900,7 @@ scheduleTrackingRouteRefresh(
       );
 }
 
-function getCustomerTrackingTarget(order){
 
-  if(!order){
-    return null;
-  }
-
-
-  const status =
-    String(
-      order.status || ''
-    )
-      .trim()
-      .toLowerCase();
-
-
-  const pickupStatuses = [
-
-    'accepted',
-
-    'going_to_pickup',
-
-    'arrived_pickup'
-
-  ];
-
-
-  const dropoffStatuses = [
-
-    'picked_up',
-
-    'going_to_dropoff',
-
-    'arrived_dropoff'
-
-  ];
-
-
-  let targetType = '';
-
-  let targetLat = null;
-
-  let targetLng = null;
-
-
-  if(
-    pickupStatuses
-      .includes(status)
-  ){
-
-    targetType =
-      'pickup';
-
-    targetLat =
-      Number(
-        order.pickupLat
-      );
-
-    targetLng =
-      Number(
-        order.pickupLng
-      );
-
-  }else if(
-    dropoffStatuses
-      .includes(status)
-  ){
-
-    targetType =
-      'dropoff';
-
-    targetLat =
-      Number(
-        order.dropoffLat
-      );
-
-    targetLng =
-      Number(
-        order.dropoffLng
-      );
-
-  }else{
-
-    return null;
-
-  }
-
-
-  if(
-    !hasValidLatLng(
-      targetLat,
-      targetLng
-    )
-  ){
-
-    return null;
-
-  }
-
-
-  return {
-
-    type:
-      targetType,
-
-    label:
-      targetType === 'pickup'
-        ? '取件點'
-        : '送達點',
-
-    lat:
-      targetLat,
-
-    lng:
-      targetLng
-
-  };
-}
-
-function updateTrackingTargetMarker(order){
-
-  if(!trackingMap){
-    return;
-  }
-
-
-  // 先清除上一個任務目標 Marker，
-  // 避免從取件階段切換到送達階段時，
-  // 地圖同時留下「取」與「送」。
-  trackingTargetMarker =
-    clearMapObject(
-      trackingTargetMarker
-    );
-
-
-  const target =
-    getCustomerTrackingTarget(
-      order
-    );
-
-
-  if(!target){
-    return;
-  }
-
-
-  trackingTargetMarker =
-    createMapMarker(
-
-      trackingMap,
-
-      {
-        lat:Number(
-          target.lat
-        ),
-
-        lng:Number(
-          target.lng
-        )
-      },
-
-      target.type,
-
-      target.label
-
-    );
-}
-    
 function syncCustomerLiveTracking(order){
 
   const trackingSection =
@@ -12841,54 +11978,19 @@ function syncCustomerLiveTracking(order){
   // 小U已接單，
   // 地圖區塊已經顯示，
   // 下一個畫面更新週期再初始化地圖。
-requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
 
-  ensureTrackingMapReady()
-  .then(() => {
+    ensureTrackingMapReady()
+      .catch(err => {
 
-    // Step 5 地圖原本是 hidden，
-    // 顯示後通知 Google Maps
-    // 重新計算完整容器尺寸。
-    if(
-      window.google?.maps?.event &&
-      trackingMap
-    ){
+        console.warn(
+          '❌ Step 5 追蹤地圖初始化失敗:',
+          err
+        );
 
-      google.maps.event.trigger(
-        trackingMap,
-        'resize'
-      );
+      });
 
-    }
-
-
-    // 更新目前任務目標 Marker：
-    // 取件前顯示「取」，
-    // 取件後顯示「送」。
-    updateTrackingTargetMarker(
-      order
-    );
-
-
-    // 即使小U此刻沒有新的 GPS 更新，
-    // 只要訂單階段改變，
-    // 也立即使用最後已知位置更新路線。
-    scheduleTrackingRouteRefresh(
-      order,
-      trackedRiderPosition
-    );
-
-  })
-    .catch(err => {
-
-      console.warn(
-        '❌ Step 5 追蹤地圖初始化失敗:',
-        err
-      );
-
-    });
-
-});
+  });
 
 
   // 同時開始監聽該位小U。
