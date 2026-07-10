@@ -12626,6 +12626,10 @@ if(!trackingMap){
     
 function stopTrackedRiderListener(){
 
+  // ==============================
+  // 1. 停止 Firestore 小U定位監聽
+  // ==============================
+
   if(trackedRiderUnsubscribe){
 
     try{
@@ -12636,19 +12640,82 @@ function stopTrackedRiderListener(){
   }
 
 
+  // ==============================
+  // 2. 停止尚未執行的路線更新排程
+  // ==============================
+
+  if(trackingRouteRefreshTimer){
+
+    clearTimeout(
+      trackingRouteRefreshTimer
+    );
+
+    trackingRouteRefreshTimer = null;
+  }
+
+
+  // ==============================
+  // 3. 讓尚未完成的舊路線請求失效
+  // ==============================
+
+  trackingRouteRequestSequence += 1;
+
+
+  // ==============================
+  // 4. 清除目前小U追蹤資料
+  // ==============================
+
   trackedRiderDocId = '';
 
   trackedRiderData = null;
 
   trackedRiderPosition = null;
-  
+
+
+  // ==============================
+  // 5. 重設 Step 5 路線更新狀態
+  // ==============================
+
+  trackingRouteLastRequestedAt = 0;
+
+  trackingRouteLastOrigin = null;
+
+  trackingRouteLastStage = '';
+
+
+  // ==============================
+  // 6. 清除 Step 5 小U Marker
+  // ==============================
+
   clearTrackedRiderMarker();
 
+
+  // ==============================
+  // 7. 清除 Step 5 專屬道路路線
+  // ==============================
+
+  trackingRoutePolyline =
+    clearMapObject(
+      trackingRoutePolyline
+    );
+
+
+  trackingPickupMarker =
+    clearMapObject(
+      trackingPickupMarker
+    );
+
+
+  trackingDropoffMarker =
+    clearMapObject(
+      trackingDropoffMarker
+    );
+
+
   console.log(
-    '🛑 UBee 客人端已停止小U定位監聽'
+    '🛑 UBee 客人端已停止小U定位監聽與即時路線追蹤'
   );
 }
-
 
 function startTrackedRiderListener(order){
 
