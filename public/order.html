@@ -11889,12 +11889,20 @@ if(!trackingMap){
   };
 
 
-  // 每次收到小U最新定位，
-  // 追蹤地圖同步跟到小U位置。
+  // 還沒有道路路線時，
+// 先讓地圖跟到小U位置。
+//
+// 一旦已有完整道路路線，
+// 就由 fitBounds 負責維持
+// 「小U → 目前目標」的完整視野，
+// 避免每次 GPS 更新又把畫面拉回小U身上。
+if(!trackingRoutePolyline){
+
   trackingMap.panTo(
     safePosition
   );
 
+}
 
   // 第一次顯示小U時，
   // 將追蹤地圖拉近到適合觀看的位置。
