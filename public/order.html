@@ -5854,6 +5854,73 @@ input:checked
     opacity:0;
   }
 }
+/* ==============================
+   Step 5 新版即時任務頁
+   第一階段：大型常駐地圖
+   ============================== */
+
+
+/* Step 5 頂部縮短 */
+
+#step5{
+  padding-top:0;
+}
+
+
+/* ==============================
+   地圖區塊
+   改成滿版大型地圖
+   ============================== */
+
+#step5 .step5-tracking-map-section{
+  position:relative;
+
+  margin:
+    0
+    -14px
+    18px;
+
+  padding:0;
+
+  border:none;
+
+  border-radius:0;
+
+  background:#e8eaed;
+
+  box-shadow:none;
+}
+
+
+/* 原本「小U 即時位置」標題先隱藏 */
+
+#step5 .step5-tracking-map-section
+>
+.step5-section-head{
+  display:none;
+}
+
+
+/* ==============================
+   大型地圖
+   ============================== */
+
+#step5 .step5-tracking-map-shell{
+  position:relative;
+
+  width:100%;
+
+  height:430px;
+
+  overflow:hidden;
+
+  border:none;
+
+  border-radius:0;
+
+  background:#e8eaed;
+}
+    
 </style>
 </head>
 
@@ -6730,7 +6797,7 @@ input:checked
       
       <div
         id="step5TrackingMapSection"
-        class="content-card step5-tracking-map-section hidden"
+        class="step5-tracking-map-section"
       >
 
       <!-- ==============================
@@ -9787,6 +9854,60 @@ qs('cancelOrderBtn')
   }
 }
 
+ if(step === 5){
+
+  setTimeout(() => {
+
+    qs('step5TrackingMapSection')
+      ?.classList
+      .remove('hidden');
+
+
+    ensureTrackingMapReady()
+
+      .then(() => {
+
+        if(
+          window.google?.maps?.event &&
+          trackingMap
+        ){
+
+          google.maps.event.trigger(
+            trackingMap,
+            'resize'
+          );
+
+        }
+
+
+        /*
+         * 尚未有小U接單時，
+         * 先顯示原本的任務路線。
+         */
+
+        if(lastRouteData){
+
+          renderRouteOnTrackingMap(
+            lastRouteData
+          );
+
+        }
+
+      })
+
+      .catch(err => {
+
+        console.warn(
+          'Step 5 地圖顯示失敗:',
+          err
+        );
+
+      });
+
+  }, 80);
+
+}
+    
 function showHomeTab(){
   currentCustomerPage = '';
   showOnlyStep(currentOrderId ? 5 : 1);
@@ -12868,15 +12989,22 @@ function syncCustomerLiveTracking(order){
     qs('step5TrackingMapSection');
 
 
-  if(!order){
+  /*
+   * 新版 Step 5：
+   * 地圖永遠顯示。
+   */
 
-    trackingSection
-      ?.classList
-      .add('hidden');
+  trackingSection
+    ?.classList
+    .remove('hidden');
+
+
+  if(!order){
 
     stopTrackedRiderListener();
 
     return;
+
   }
 
 
@@ -12909,7 +13037,13 @@ function syncCustomerLiveTracking(order){
   ];
 
 
-  const shouldShowTrackingMap =
+  /*
+   * 只有真的有小U接單，
+   * 而且正在任務流程中，
+   * 才啟動小U即時定位。
+   */
+
+  const shouldTrackRider =
 
     !!riderDocId &&
 
@@ -12917,31 +13051,61 @@ function syncCustomerLiveTracking(order){
       .includes(status);
 
 
-  trackingSection
-    ?.classList
-    .toggle(
-      'hidden',
-      !shouldShowTrackingMap
-    );
+  /*
+   * 尚未有小U接單時，
+   * 停止即時定位監聽，
+   * 但不再隱藏地圖。
+   */
 
-
-  // 尚未有小U接單、
-  // 任務被轉派回等待派單、
-  // 任務已完成或取消，
-  // 都停止即時定位追蹤。
-  if(!shouldShowTrackingMap){
+  if(!shouldTrackRider){
 
     stopTrackedRiderListener();
 
-    return;
   }
 
-  // 小U已接單，
-  // 地圖區塊已經顯示，
-  // 下一個畫面更新週期再初始化地圖。
+
+  /*
+   * 不論是否已有小U，
+   * Step 5 地圖都必須初始化。
+   */
+
   requestAnimationFrame(() => {
 
     ensureTrackingMapReady()
+
+      .then(() => {
+
+        if(
+          window.google?.maps?.event &&
+          trackingMap
+        ){
+
+          google.maps.event.trigger(
+            trackingMap,
+            'resize'
+          );
+
+        }
+
+
+        /*
+         * 尚未有小U接單：
+         * 顯示取件點 → 送達點。
+         */
+
+        if(
+          !shouldTrackRider &&
+          lastRouteData
+        ){
+
+          renderRouteOnTrackingMap(
+            lastRouteData
+          );
+
+        }
+
+      })
+
       .catch(err => {
 
         console.warn(
@@ -12954,8 +13118,27 @@ function syncCustomerLiveTracking(order){
   });
 
 
-  // 同時開始監聽該位小U。
-  startTrackedRiderListener(order);
+  /*
+   * 尚未有小U接單，
+   * 到這裡就停止。
+   */
+
+  if(!shouldTrackRider){
+
+    return;
+
+  }
+
+
+  /*
+   * 已有小U接單：
+   * 開始監聽小U即時位置。
+   */
+
+  startTrackedRiderListener(
+    order
+  );
+
 }
     
 function startOrderListener(orderId){
