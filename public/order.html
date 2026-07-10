@@ -7414,38 +7414,89 @@ async function ensureCustomerMapReady(){
   return customerMap;
 }
 
-async function ensureReviewMapReady(){
-  const mapEl = qs('reviewMap');
-  if(!mapEl) return null;
+async function ensureTrackingMapReady(){
+
+  const mapEl =
+    qs('step5TrackingMap');
+
+
+  if(!mapEl){
+    return null;
+  }
+
 
   await loadGoogleMapsApi();
 
-  if(!reviewMap){
+
+  if(!trackingMap){
+
+    const hasTrackedRiderPosition =
+      hasValidLatLng(
+        trackedRiderPosition?.lat,
+        trackedRiderPosition?.lng
+      );
+
+
     const options = {
-      center:hasValidLatLng(currentLocationLat, currentLocationLng)
-        ? { lat:currentLocationLat, lng:currentLocationLng }
-        : { lat:24.2521, lng:120.7214 },
-      zoom:13,
+
+      center:
+        hasTrackedRiderPosition
+
+          ? {
+              lat:Number(
+                trackedRiderPosition.lat
+              ),
+
+              lng:Number(
+                trackedRiderPosition.lng
+              )
+            }
+
+          : {
+              lat:24.2521,
+              lng:120.7214
+            },
+
+      zoom:
+        hasTrackedRiderPosition
+          ? 16
+          : 13,
+
       disableDefaultUI:true,
+
       clickableIcons:false,
+
       gestureHandling:'greedy',
+
       backgroundColor:'#e8eaed'
     };
 
+
     if(googleMapsMapId){
-      options.mapId = googleMapsMapId;
+
+      options.mapId =
+        googleMapsMapId;
+
     }
 
-    reviewMap = new googleMapsLibraries.maps.Map(mapEl, options);
+
+    trackingMap =
+      new googleMapsLibraries.maps.Map(
+        mapEl,
+        options
+      );
+
   }
 
-  qs('reviewMapPlaceholder')?.classList.add('is-ready');
 
-  if(lastRouteData){
-    renderRouteOnReviewMap(lastRouteData);
-  }
+  qs(
+    'step5TrackingMapPlaceholder'
+  )
+    ?.classList
+    .add('is-ready');
 
-  return reviewMap;
+
+  return trackingMap;
 }
 
 function renderCurrentLocationMarker(){
