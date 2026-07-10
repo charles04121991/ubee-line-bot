@@ -9793,118 +9793,219 @@ function hideFooterButtons(){
 }
 
 function showOnlyStep(step){
+
   hideCustomerPages();
   hideOrderSteps();
 
   currentCustomerPage = '';
   currentStep = step;
 
-  qs(`step${step}`)?.classList.add('active');
 
-  qs('topbarBackBtn')?.classList.toggle('ghost', step === 1 || step === 5);
+  qs(`step${step}`)
+    ?.classList
+    .add('active');
+
+
+  qs('topbarBackBtn')
+    ?.classList
+    .toggle(
+      'ghost',
+      step === 1 ||
+      step === 5
+    );
+
 
   const footerNav =
-  qs('footerNav');
+    qs('footerNav');
+
 
   const shouldShowFooter =
-  step === 5;
+    step === 5;
+
 
   footerNav
-  ?.classList
-  .toggle(
-    'hidden',
-    !shouldShowFooter
+    ?.classList
+    .toggle(
+      'hidden',
+      !shouldShowFooter
+    );
+
+
+  qs('cancelOrderBtn')
+    ?.classList
+    .toggle(
+      'hidden',
+      !currentOrderId ||
+      step !== 5
+    );
+
+
+  setBottomTabActive(
+    'tabHome'
   );
 
-qs('cancelOrderBtn')
-  ?.classList
-  .toggle(
-    'hidden',
-    !currentOrderId ||
-    step !== 5
-  );
 
-  setBottomTabActive('tabHome');
-  window.scrollTo({ top:0, behavior:'smooth' });
+  window.scrollTo({
+    top:0,
+    behavior:'smooth'
+  });
+
+
+  /* ==============================
+     Step 1：首頁地圖
+     ============================== */
 
   if(step === 1){
+
     setTimeout(() => {
+
       ensureCustomerMapReady()
+
         .then(() => {
-          if(window.google?.maps?.event && customerMap){
-            google.maps.event.trigger(customerMap, 'resize');
+
+          if(
+            window.google?.maps?.event &&
+            customerMap
+          ){
+
+            google.maps.event.trigger(
+              customerMap,
+              'resize'
+            );
+
           }
-          if(lastRouteData) renderRouteOnCustomerMap(lastRouteData);
+
+
+          if(lastRouteData){
+
+            renderRouteOnCustomerMap(
+              lastRouteData
+            );
+
+          }
+
         })
-        .catch(err => console.warn('首頁地圖顯示失敗:', err));
+
+        .catch(err => {
+
+          console.warn(
+            '首頁地圖顯示失敗:',
+            err
+          );
+
+        });
+
     }, 80);
+
   }
+
+
+  /* ==============================
+     Step 4：確認頁地圖
+     ============================== */
 
   if(step === 4){
+
     setTimeout(() => {
+
       ensureReviewMapReady()
+
         .then(() => {
-          if(window.google?.maps?.event && reviewMap){
-            google.maps.event.trigger(reviewMap, 'resize');
+
+          if(
+            window.google?.maps?.event &&
+            reviewMap
+          ){
+
+            google.maps.event.trigger(
+              reviewMap,
+              'resize'
+            );
+
           }
-          if(lastRouteData) renderRouteOnReviewMap(lastRouteData);
+
+
+          if(lastRouteData){
+
+            renderRouteOnReviewMap(
+              lastRouteData
+            );
+
+          }
+
         })
-        .catch(err => console.warn('確認頁地圖顯示失敗:', err));
+
+        .catch(err => {
+
+          console.warn(
+            '確認頁地圖顯示失敗:',
+            err
+          );
+
+        });
+
     }, 80);
+
   }
-}
-
- if(step === 5){
-
-  setTimeout(() => {
-
-    qs('step5TrackingMapSection')
-      ?.classList
-      .remove('hidden');
 
 
-    ensureTrackingMapReady()
+  /* ==============================
+     Step 5：即時任務地圖
+     ============================== */
 
-      .then(() => {
+  if(step === 5){
 
-        if(
-          window.google?.maps?.event &&
-          trackingMap
-        ){
+    setTimeout(() => {
 
-          google.maps.event.trigger(
-            trackingMap,
-            'resize'
+      qs('step5TrackingMapSection')
+        ?.classList
+        .remove('hidden');
+
+
+      ensureTrackingMapReady()
+
+        .then(() => {
+
+          if(
+            window.google?.maps?.event &&
+            trackingMap
+          ){
+
+            google.maps.event.trigger(
+              trackingMap,
+              'resize'
+            );
+
+          }
+
+
+          /*
+           * 尚未有小U接單時，
+           * 先顯示任務原始路線。
+           */
+
+          if(lastRouteData){
+
+            renderRouteOnTrackingMap(
+              lastRouteData
+            );
+
+          }
+
+        })
+
+        .catch(err => {
+
+          console.warn(
+            'Step 5 地圖顯示失敗:',
+            err
           );
 
-        }
+        });
 
+    }, 80);
 
-        /*
-         * 尚未有小U接單時，
-         * 先顯示原本的任務路線。
-         */
-
-        if(lastRouteData){
-
-          renderRouteOnTrackingMap(
-            lastRouteData
-          );
-
-        }
-
-      })
-
-      .catch(err => {
-
-        console.warn(
-          'Step 5 地圖顯示失敗:',
-          err
-        );
-
-      });
-
-  }, 80);
+  }
 
 }
     
