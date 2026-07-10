@@ -11777,8 +11777,18 @@ updateTrackedRiderMarker(
 
 function syncCustomerLiveTracking(order){
 
+  const trackingSection =
+    qs('step5TrackingMapSection');
+
+
   if(!order){
+
+    trackingSection
+      ?.classList
+      .add('hidden');
+
     stopTrackedRiderListener();
+
     return;
   }
 
@@ -11791,15 +11801,48 @@ function syncCustomerLiveTracking(order){
       .toLowerCase();
 
 
-  // 任務結束，不再追蹤小U
-  if(
-    [
-      'completed',
-      'done',
-      'cancelled',
-      'canceled'
-    ].includes(status)
-  ){
+  const riderDocId =
+    getOrderRiderDocId(order);
+
+
+  const activeTrackingStatuses = [
+
+    'accepted',
+
+    'going_to_pickup',
+
+    'arrived_pickup',
+
+    'picked_up',
+
+    'going_to_dropoff',
+
+    'arrived_dropoff'
+
+  ];
+
+
+  const shouldShowTrackingMap =
+
+    !!riderDocId &&
+
+    activeTrackingStatuses
+      .includes(status);
+
+
+  trackingSection
+    ?.classList
+    .toggle(
+      'hidden',
+      !shouldShowTrackingMap
+    );
+
+
+  // 尚未有小U接單、
+  // 任務被轉派回等待派單、
+  // 任務已完成或取消，
+  // 都停止即時定位追蹤。
+  if(!shouldShowTrackingMap){
 
     stopTrackedRiderListener();
 
@@ -11807,9 +11850,9 @@ function syncCustomerLiveTracking(order){
   }
 
 
-  // 其他狀態交給小U監聽函式判斷。
-  // 尚未接單時沒有 riderDocId，
-  // 自然不會建立定位監聽。
+  // 小U已接單，
+  // 顯示追蹤地圖區塊，
+  // 並開始監聽該位小U。
   startTrackedRiderListener(order);
 }
     
