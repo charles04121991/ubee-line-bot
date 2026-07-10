@@ -4867,6 +4867,409 @@ app.post('/api/rider/status', async (req, res) => {
   }
 });
 
+// ===== UBee 騎士即時定位同步 API =====
+// 正式營運版：
+// 1. 更新 riders/{騎士}
+// 2. 若騎士有進行中任務，同步更新 orders/{orderId}
+// 3. 客人端只需要監聽訂單文件，就能看到小U即時移動
+
+app.post('/api/rider/location', async (req, res) => {
+  try {
+    const {
+      phone,
+      riderId,
+      lineUserId,
+
+      orderId,
+
+      lat,
+      lng,
+
+      accuracy,
+      heading,
+      speed,
+    } = req.body || {};
+
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+
+    if (
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: '騎士定位座標格式錯誤。',
+      });
+    }
+
+    // ==============================
+    // 1. 驗證正式騎士身分
+    // ==============================
+    const riderResult =
+      await findApprovedRiderForApi({
+        phone,
+        riderId,
+        lineUserId,
+      });
+
+    if (!riderResult.ok) {
+      return res
+        .status(riderResult.statusCode)
+        .json({
+          success: false,
+          message:
+            riderResult.message ||
+            '騎士身分驗證失敗。',
+        });
+    }
+
+    const riderDoc =
+      riderResult.riderDoc;
+
+    const nowMs =
+      Date.now();
+
+    // ==============================
+    // 2. 安全整理 GPS 額外資訊
+    // ==============================
+    function getOptionalNumber(value) {
+      if (
+        value === null ||
+        value === undefined ||
+        value === ''
+      ) {
+        return null;
+      }
+
+      const numberValue =
+        Number(value);
+
+      return Number.isFinite(numberValue)
+        ? numberValue
+        : null;
+    }
+
+    const safeAccuracy =
+      getOptionalNumber(accuracy);
+
+    const rawHeading =
+      getOptionalNumber(heading);
+
+    const safeHeading =
+      rawHeading === null
+        ? null
+        : (
+            (
+              rawHeading % 360
+            ) + 360
+          ) % 360;
+
+    const rawSpeed =
+      getOptionalNumber(speed);
+
+    const safeSpeed =
+      rawSpeed === null
+        ? null
+        : Math.max(
+            0,
+            rawSpeed
+          );
+
+    // ==============================
+    // 3. 使用 Transaction
+    //
+    // 防止騎士剛好轉派或完成任務時，
+    // 舊騎士定位誤寫入訂單
+    // ==============================
+    const transactionResult =
+      await db.runTransaction(
+        async transaction => {
+
+          const latestRiderDoc =
+            await transaction.get(
+              riderDoc.ref
+            );
+
+          if (!latestRiderDoc.exists) {
+            throw new Error(
+              'RIDER_NOT_FOUND'
+            );
+          }
+
+          const latestRider =
+            latestRiderDoc.data() || {};
+
+          const identity =
+            buildRiderApiIdentity(
+              latestRiderDoc,
+              latestRider,
+              {
+                phone,
+                riderId,
+                lineUserId,
+              }
+            );
+
+          const activeOrderId =
+            String(
+              orderId ||
+              latestRider.currentOrderId ||
+              ''
+            )
+              .trim()
+              .toUpperCase();
+
+          let orderRef = null;
+          let orderDoc = null;
+          let order = null;
+
+          // 注意：
+          // Transaction 必須先完成讀取，
+          // 才能開始寫入。
+          if (activeOrderId) {
+            orderRef =
+              db
+                .collection('orders')
+                .doc(activeOrderId);
+
+            orderDoc =
+              await transaction.get(
+                orderRef
+              );
+
+            if (orderDoc.exists) {
+              order = {
+                id: orderDoc.id,
+                ...orderDoc.data(),
+              };
+            }
+          }
+
+          const liveLocation = {
+            lat: latitude,
+            lng: longitude,
+            updatedAtMs: nowMs,
+          };
+
+          if (safeAccuracy !== null) {
+            liveLocation.accuracy =
+              safeAccuracy;
+          }
+
+          if (safeHeading !== null) {
+            liveLocation.heading =
+              safeHeading;
+          }
+
+          if (safeSpeed !== null) {
+            liveLocation.speed =
+              safeSpeed;
+          }
+
+          // ==========================
+          // 4. 更新騎士主資料
+          // ==========================
+          transaction.set(
+            latestRiderDoc.ref,
+            {
+              currentLat:
+                latitude,
+
+              currentLng:
+                longitude,
+
+              currentLocation: {
+                ...liveLocation,
+
+                updatedAt:
+                  admin.firestore
+                    .FieldValue
+                    .serverTimestamp(),
+              },
+
+              locationUpdatedAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp(),
+
+              locationUpdatedAtMs:
+                nowMs,
+
+              lastActive:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp(),
+
+              lastActiveMs:
+                nowMs,
+            },
+            {
+              merge: true,
+            }
+          );
+
+          // ==========================
+          // 5. 同步進行中訂單
+          // ==========================
+          const activeStatuses = [
+            'accepted',
+            'going_to_pickup',
+            'arrived_pickup',
+            'picked_up',
+            'going_to_dropoff',
+            'arrived_dropoff',
+          ];
+
+          const orderIsActive =
+            order &&
+            activeStatuses.includes(
+              String(
+                order.status || ''
+              ).trim()
+            );
+
+          const orderBelongsToRider =
+            order &&
+            isOrderBelongsToRider(
+              order,
+              identity
+            );
+
+          if (
+            orderRef &&
+            orderIsActive &&
+            orderBelongsToRider
+          ) {
+            const orderLocationUpdate = {
+              riderCurrentLat:
+                latitude,
+
+              riderCurrentLng:
+                longitude,
+
+              riderCurrentLocation: {
+                ...liveLocation,
+
+                updatedAt:
+                  admin.firestore
+                    .FieldValue
+                    .serverTimestamp(),
+              },
+
+              riderLocationUpdatedAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp(),
+
+              riderLocationUpdatedAtMs:
+                nowMs,
+
+              riderTrackingStatus:
+                'live',
+
+              trackingUpdatedAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp(),
+
+              trackingUpdatedAtMs:
+                nowMs,
+            };
+
+            if (safeAccuracy !== null) {
+              orderLocationUpdate
+                .riderLocationAccuracy =
+                  safeAccuracy;
+            }
+
+            if (safeHeading !== null) {
+              orderLocationUpdate
+                .riderHeading =
+                  safeHeading;
+            }
+
+            if (safeSpeed !== null) {
+              orderLocationUpdate
+                .riderSpeed =
+                  safeSpeed;
+            }
+
+            transaction.set(
+              orderRef,
+              orderLocationUpdate,
+              {
+                merge: true,
+              }
+            );
+
+            return {
+              syncedOrder: true,
+              orderId: activeOrderId,
+            };
+          }
+
+          return {
+            syncedOrder: false,
+            orderId: '',
+          };
+        }
+      );
+
+    return res.json({
+      success: true,
+
+      riderId:
+        riderDoc.id,
+
+      syncedOrder:
+        transactionResult
+          .syncedOrder === true,
+
+      orderId:
+        transactionResult
+          .orderId ||
+        '',
+
+      locationUpdatedAtMs:
+        nowMs,
+    });
+
+  } catch (err) {
+    console.error(
+      '❌ 騎士即時定位同步失敗：',
+      err
+    );
+
+    if (
+      err.message ===
+      'RIDER_NOT_FOUND'
+    ) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message:
+            '找不到騎士資料。',
+        });
+    }
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message:
+          '騎士定位同步失敗，請稍後再試。',
+        error:
+          err.message,
+      });
+  }
+});
+
 // ===== UBee 騎士安全中心回報 API =====
 // 手機登入正式版：支援 phone / riderId / 舊 LINE 身分
 app.post('/api/rider/safety-report', async (req, res) => {
@@ -10087,35 +10490,186 @@ app.post('/api/rider/update-order-status', async (req, res) => {
 });
 
 app.get('/api/orders/:orderId', async (req, res) => {
-  const orderId = String(req.params.orderId || '').toUpperCase();
-  const requestUserId = String(req.query.userId || '').trim();
-  const order = await getOrder(orderId);
+  try {
+    const orderId =
+      String(
+        req.params.orderId || ''
+      )
+        .trim()
+        .toUpperCase();
 
-  if (!order) {
-    return res.status(404).json({ success: false, error: '查無此訂單' });
+    const requestUserId =
+      String(
+        req.query.userId || ''
+      ).trim();
+
+    const order =
+      await getOrder(orderId);
+
+    if (!order) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          error:
+            '查無此訂單',
+        });
+    }
+
+    if (
+      requestUserId &&
+      !isSameCustomerUserId(
+        order,
+        requestUserId
+      )
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          error:
+            '此訂單只能由原本下單的客人查詢',
+        });
+    }
+
+    const riderCurrentLat =
+      Number(
+        order.riderCurrentLat ??
+        order.riderCurrentLocation?.lat
+      );
+
+    const riderCurrentLng =
+      Number(
+        order.riderCurrentLng ??
+        order.riderCurrentLocation?.lng
+      );
+
+    return res.json({
+      success: true,
+
+      order: {
+        id:
+          order.id,
+
+        status:
+          order.status,
+
+        riderStatus:
+          order.riderStatus ||
+          order.status,
+
+        statusLabel:
+          getStatusLabel(
+            order.status
+          ),
+
+        speedType:
+          order.speedType,
+
+        speedLabel:
+          getSpeedOption(
+            order.speedType
+          ).label,
+
+        pickupAddress:
+          order.pickupAddress,
+
+        dropoffAddress:
+          order.dropoffAddress,
+
+        pickupLat:
+          order.pickupLat ??
+          null,
+
+        pickupLng:
+          order.pickupLng ??
+          null,
+
+        dropoffLat:
+          order.dropoffLat ??
+          null,
+
+        dropoffLng:
+          order.dropoffLng ??
+          null,
+
+        etaMinutes:
+          order.etaMinutes,
+
+        etaText:
+          order.etaText ||
+          order.estimatedTime ||
+          '',
+
+        total:
+          order.total,
+
+        isPaid:
+          order.isPaid,
+
+        paymentMethod:
+          order.paymentMethod,
+
+        paymentMethodLabel:
+          getPaymentMethodLabel(
+            order.paymentMethod
+          ),
+
+        // ============================
+        // 小U即時定位
+        // ============================
+        riderCurrentLat:
+          Number.isFinite(
+            riderCurrentLat
+          )
+            ? riderCurrentLat
+            : null,
+
+        riderCurrentLng:
+          Number.isFinite(
+            riderCurrentLng
+          )
+            ? riderCurrentLng
+            : null,
+
+        riderCurrentLocation:
+          order.riderCurrentLocation ||
+          null,
+
+        riderLocationUpdatedAtMs:
+          Number(
+            order.riderLocationUpdatedAtMs ||
+            0
+          ),
+
+        riderHeading:
+          order.riderHeading ??
+          null,
+
+        riderSpeed:
+          order.riderSpeed ??
+          null,
+
+        riderLocationAccuracy:
+          order.riderLocationAccuracy ??
+          null,
+      },
+    });
+
+  } catch (err) {
+    console.error(
+      '❌ 讀取客人訂單失敗：',
+      err
+    );
+
+    return res
+      .status(500)
+      .json({
+        success: false,
+        error:
+          '讀取訂單失敗',
+      });
   }
-
-  if (requestUserId && !isSameCustomerUserId(order, requestUserId)) {
-    return res.status(403).json({ success: false, error: '此訂單只能由原本下單的客人查詢' });
-  }
-
-  res.json({
-    success: true,
-    order: {
-      id: order.id,
-      status: order.status,
-      statusLabel: getStatusLabel(order.status),
-      speedType: order.speedType,
-      speedLabel: getSpeedOption(order.speedType).label,
-      pickupAddress: order.pickupAddress,
-      dropoffAddress: order.dropoffAddress,
-      etaMinutes: order.etaMinutes,
-      total: order.total,
-      isPaid: order.isPaid,
-      paymentMethod: order.paymentMethod,
-      paymentMethodLabel: getPaymentMethodLabel(order.paymentMethod),
-    },
-  });
 });
 
 app.post('/cancel-order', async (req, res) => {
