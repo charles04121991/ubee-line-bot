@@ -7160,6 +7160,11 @@ let routeRequestSequence = 0;
 let quoteRequestSequence = 0;
 let trackingRouteRequestSequence = 0;
 
+let lastTrackingRouteRefreshTime = 0;
+let lastTrackingRouteTargetType = '';
+
+const TRACKING_ROUTE_REFRESH_MS = 15000;
+
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
 
 const INITIAL_PAYMENT_METHOD = '';
@@ -7975,6 +7980,115 @@ async function refreshTrackingRoute(
     return null;
 
   }
+}
+
+function scheduleTrackingRouteRefresh(
+  order,
+  position
+){
+
+  const target =
+    getCustomerTrackingTarget(
+      order
+    );
+
+
+  const riderLat =
+    Number(
+      position?.lat
+    );
+
+  const riderLng =
+    Number(
+      position?.lng
+    );
+
+
+  // 沒有有效目標，
+  // 或小U定位無效時，
+  // 清除舊路線與節流狀態。
+  if(
+    !target ||
+    !hasValidLatLng(
+      riderLat,
+      riderLng
+    )
+  ){
+
+    trackingRouteRequestSequence += 1;
+
+    trackingRoutePolyline =
+      clearMapObject(
+        trackingRoutePolyline
+      );
+
+    lastTrackingRouteRefreshTime =
+      0;
+
+    lastTrackingRouteTargetType =
+      '';
+
+    return false;
+  }
+
+
+  const now =
+    Date.now();
+
+
+  const targetChanged =
+
+    lastTrackingRouteTargetType !==
+    target.type;
+
+
+  const refreshIntervalReached =
+
+    !lastTrackingRouteRefreshTime ||
+
+    (
+      now -
+      lastTrackingRouteRefreshTime
+    ) >=
+    TRACKING_ROUTE_REFRESH_MS;
+
+
+  // 目標沒有改變，
+  // 而且距離上一次更新還不到 15 秒，
+  // 就不重新呼叫道路路線 API。
+  if(
+    !targetChanged &&
+    !refreshIntervalReached
+  ){
+
+    return false;
+  }
+
+
+  // 在發送請求前先記錄時間，
+  // 避免定位短時間連續更新時，
+  // 重複送出多個路線請求。
+  lastTrackingRouteRefreshTime =
+    now;
+
+
+  lastTrackingRouteTargetType =
+    target.type;
+
+
+  refreshTrackingRoute(
+    order,
+    {
+      lat:
+        riderLat,
+
+      lng:
+        riderLng
+    }
+  );
+
+
+  return true;
 }
     
 function updateRouteBadges(data){
