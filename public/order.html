@@ -7106,6 +7106,29 @@ let trackedRiderUnsubscribe = null;
 let trackedRiderDocId = '';
 let trackedRiderData = null;
 let trackedRiderPosition = null;
+
+// ==============================
+// Step 5 即時路線更新控制
+// ==============================
+
+let trackingRouteRefreshTimer = null;
+
+let trackingRouteRequestSequence = 0;
+
+let trackingRouteLastRequestedAt = 0;
+
+let trackingRouteLastOrigin = null;
+
+let trackingRouteLastStage = '';
+
+const TRACKING_ROUTE_MIN_INTERVAL_MS =
+  15000;
+
+const TRACKING_ROUTE_MIN_MOVE_METERS =
+  80;
+
+const TRACKING_ROUTE_MAX_STALE_MS =
+  45000;
 let isSubmittingOrder = false;
 let isConfirmingPaid = false;
 let isCancellingOrder = false;
@@ -8012,6 +8035,527 @@ function getTrackingRouteDestination(order){
 
 
   return null;
+}
+
+function getTrackingRouteMoveDistanceMeters(
+  fromPosition,
+  toPosition
+){
+
+  if(
+    !fromPosition ||
+    !toPosition
+  ){
+    return Infinity;
+  }
+
+
+  const fromLat =
+    toNullableNumber(
+      fromPosition.lat
+    );
+
+  const fromLng =
+    toNullableNumber(
+      fromPosition.lng
+    );
+
+  const toLat =
+    toNullableNumber(
+      toPosition.lat
+    );
+
+  const toLng =
+    toNullableNumber(
+      toPosition.lng
+    );
+
+
+  if(
+    !hasValidLatLng(
+      fromLat,
+      fromLng
+    ) ||
+    !hasValidLatLng(
+      toLat,
+      toLng
+    )
+  ){
+    return Infinity;
+  }
+
+
+  const earthRadiusMeters =
+    6371000;
+
+
+  const toRadians =
+    degree =>
+      degree *
+      Math.PI /
+      180;
+
+
+  const lat1 =
+    toRadians(
+      fromLat
+    );
+
+  const lat2 =
+    toRadians(
+      toLat
+    );
+
+  const deltaLat =
+    toRadians(
+      toLat -
+      fromLat
+    );
+
+  const deltaLng =
+    toRadians(
+      toLng -
+      fromLng
+    );
+
+
+  const a =
+    Math.sin(
+      deltaLat / 2
+    ) ** 2
+    +
+    Math.cos(
+      lat1
+    )
+    *
+    Math.cos(
+      lat2
+    )
+    *
+    Math.sin(
+      deltaLng / 2
+    ) ** 2;
+
+
+  const c =
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    );
+
+
+  return (
+    earthRadiusMeters *
+    c
+  );
+}
+
+async function refreshTrackingRoute(
+  order,
+  position
+){
+
+  if(
+    !order ||
+    !position
+  ){
+    return null;
+  }
+
+
+  const destination =
+    getTrackingRouteDestination(
+      order
+    );
+
+
+  if(!destination){
+    return null;
+  }
+
+
+  const riderLat =
+    toNullableNumber(
+      position.lat
+    );
+
+  const riderLng =
+    toNullableNumber(
+      position.lng
+    );
+
+
+  if(
+    !hasValidLatLng(
+      riderLat,
+      riderLng
+    )
+  ){
+    return null;
+  }
+
+
+  const hasDestinationCoordinates =
+    hasValidLatLng(
+      destination.lat,
+      destination.lng
+    );
+
+
+  const hasDestinationPlaceId =
+    !!String(
+      destination.placeId || ''
+    ).trim();
+
+
+  const hasDestinationAddress =
+    !!String(
+      destination.address || ''
+    ).trim();
+
+
+  if(
+    !hasDestinationCoordinates &&
+    !hasDestinationPlaceId &&
+    !hasDestinationAddress
+  ){
+    return null;
+  }
+
+
+  // 每次真正準備更新路線，
+  // 都建立一個新的請求編號。
+  const requestId =
+    ++trackingRouteRequestSequence;
+
+
+  const requestedAt =
+    Date.now();
+
+
+  const requestOrigin = {
+    lat:riderLat,
+    lng:riderLng
+  };
+
+
+  const requestStage =
+    String(
+      destination.stage || ''
+    ).trim();
+
+
+  try{
+
+    await ensureTrackingMapReady();
+
+
+    // 等待地圖初始化期間，
+    // 如果已經有更新的路線請求，
+    // 這一筆舊請求直接停止。
+    if(
+      requestId !==
+      trackingRouteRequestSequence
+    ){
+      return null;
+    }
+
+
+    // 正式記錄這次送出的路線請求。
+    // 後面的節流系統會依這些資料判斷，
+    // 是否真的需要再次呼叫 Google Routes API。
+    trackingRouteLastRequestedAt =
+      requestedAt;
+
+
+    trackingRouteLastOrigin = {
+      ...requestOrigin
+    };
+
+
+    trackingRouteLastStage =
+      requestStage;
+
+
+    const res =
+      await fetch(
+        '/api/map-route',
+        {
+          method:'POST',
+
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+
+          cache:'no-store',
+
+          body:JSON.stringify({
+
+            originLat:
+              riderLat,
+
+            originLng:
+              riderLng,
+
+
+            destinationAddress:
+              destination.address,
+
+            destinationPlaceId:
+              destination.placeId,
+
+            destinationLat:
+              hasDestinationCoordinates
+                ? Number(
+                    destination.lat
+                  )
+                : null,
+
+            destinationLng:
+              hasDestinationCoordinates
+                ? Number(
+                    destination.lng
+                  )
+                : null
+
+          })
+        }
+      );
+
+
+    const data =
+      await res
+        .json()
+        .catch(
+          () => ({})
+        );
+
+
+    // API 回來後再次確認。
+    // 只要期間已經產生新的路線請求，
+    // 這一筆舊結果就不能顯示到地圖。
+    if(
+      requestId !==
+      trackingRouteRequestSequence
+    ){
+      return null;
+    }
+
+
+    if(
+      !res.ok ||
+      data.success === false
+    ){
+
+      throw new Error(
+
+        data.error ||
+
+        data.message ||
+
+        '即時追蹤路線讀取失敗'
+
+      );
+
+    }
+
+
+    renderRouteOnTrackingMap(
+      data
+    );
+
+
+    return data;
+
+
+  }catch(err){
+
+    // 如果這筆已經是過期請求，
+    // 不再輸出錯誤，也不干擾最新路線。
+    if(
+      requestId !==
+      trackingRouteRequestSequence
+    ){
+      return null;
+    }
+
+
+    console.warn(
+      'Step 5 即時追蹤路線更新失敗:',
+      err
+    );
+
+
+    return null;
+
+  }
+}
+  if(
+    !order ||
+    !position
+  ){
+    return null;
+  }
+
+
+  const destination =
+    getTrackingRouteDestination(
+      order
+    );
+
+
+  if(!destination){
+    return null;
+  }
+
+
+  const riderLat =
+    toNullableNumber(
+      position.lat
+    );
+
+  const riderLng =
+    toNullableNumber(
+      position.lng
+    );
+
+
+  if(
+    !hasValidLatLng(
+      riderLat,
+      riderLng
+    )
+  ){
+    return null;
+  }
+
+
+  const hasDestinationCoordinates =
+    hasValidLatLng(
+      destination.lat,
+      destination.lng
+    );
+
+
+  const hasDestinationPlaceId =
+    !!String(
+      destination.placeId || ''
+    ).trim();
+
+
+  const hasDestinationAddress =
+    !!String(
+      destination.address || ''
+    ).trim();
+
+
+  if(
+    !hasDestinationCoordinates &&
+    !hasDestinationPlaceId &&
+    !hasDestinationAddress
+  ){
+    return null;
+  }
+
+
+  try{
+
+    await ensureTrackingMapReady();
+
+
+    const res =
+      await fetch(
+        '/api/map-route',
+        {
+          method:'POST',
+
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+
+          cache:'no-store',
+
+          body:JSON.stringify({
+
+            originLat:
+              riderLat,
+
+            originLng:
+              riderLng,
+
+
+            destinationAddress:
+              destination.address,
+
+            destinationPlaceId:
+              destination.placeId,
+
+            destinationLat:
+              hasDestinationCoordinates
+                ? Number(
+                    destination.lat
+                  )
+                : null,
+
+            destinationLng:
+              hasDestinationCoordinates
+                ? Number(
+                    destination.lng
+                  )
+                : null
+
+          })
+        }
+      );
+
+
+    const data =
+      await res
+        .json()
+        .catch(
+          () => ({})
+        );
+
+
+    if(
+      !res.ok ||
+      data.success === false
+    ){
+
+      throw new Error(
+
+        data.error ||
+
+        data.message ||
+
+        '即時追蹤路線讀取失敗'
+
+      );
+
+    }
+
+
+    renderRouteOnTrackingMap(
+      data
+    );
+
+
+    return data;
+
+
+  }catch(err){
+
+    console.warn(
+      'Step 5 即時追蹤路線更新失敗:',
+      err
+    );
+
+    return null;
+
+  }
 }
 
 function updateRouteBadges(data){
