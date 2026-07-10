@@ -7908,6 +7908,112 @@ function renderRouteOnTrackingMap(data){
   );
 }
 
+function getTrackingRouteDestination(order){
+
+  if(!order){
+    return null;
+  }
+
+
+  const status =
+    String(
+      order.status || ''
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const pickupStatuses = [
+
+    'accepted',
+
+    'going_to_pickup',
+
+    'arrived_pickup'
+
+  ];
+
+
+  const dropoffStatuses = [
+
+    'picked_up',
+
+    'going_to_dropoff',
+
+    'arrived_dropoff'
+
+  ];
+
+
+  if(
+    pickupStatuses.includes(status)
+  ){
+
+    return {
+
+      stage:'pickup',
+
+      address:
+        String(
+          order.pickupAddress || ''
+        ).trim(),
+
+      placeId:
+        String(
+          order.pickupPlaceId || ''
+        ).trim(),
+
+      lat:
+        toNullableNumber(
+          order.pickupLat
+        ),
+
+      lng:
+        toNullableNumber(
+          order.pickupLng
+        )
+
+    };
+
+  }
+
+
+  if(
+    dropoffStatuses.includes(status)
+  ){
+
+    return {
+
+      stage:'dropoff',
+
+      address:
+        String(
+          order.dropoffAddress || ''
+        ).trim(),
+
+      placeId:
+        String(
+          order.dropoffPlaceId || ''
+        ).trim(),
+
+      lat:
+        toNullableNumber(
+          order.dropoffLat
+        ),
+
+      lng:
+        toNullableNumber(
+          order.dropoffLng
+        )
+
+    };
+
+  }
+
+
+  return null;
+}
+
 function updateRouteBadges(data){
   const distanceText = String(data?.distanceText || '').trim();
   const durationText = String(data?.durationText || '').trim();
