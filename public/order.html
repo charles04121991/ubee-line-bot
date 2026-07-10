@@ -7129,11 +7129,17 @@ let trackingMap = null;
 
 let routePolyline = null;
 let reviewRoutePolyline = null;
+let trackingRoutePolyline = null;
 
 let pickupMarker = null;
 let dropoffMarker = null;
+
 let reviewPickupMarker = null;
 let reviewDropoffMarker = null;
+
+let trackingPickupMarker = null;
+let trackingDropoffMarker = null;
+
 let currentLocationMarker = null;
 let trackedRiderMarker = null;
 
@@ -7722,14 +7728,57 @@ function drawRouteOnMap(map, data, target){
   }
 
     if(target === 'review'){
-    reviewRoutePolyline = clearMapObject(reviewRoutePolyline);
-    reviewPickupMarker = clearMapObject(reviewPickupMarker);
-    reviewDropoffMarker = clearMapObject(reviewDropoffMarker);
-  }else{
-    routePolyline = clearMapObject(routePolyline);
-    pickupMarker = clearMapObject(pickupMarker);
-    dropoffMarker = clearMapObject(dropoffMarker);
-  }
+
+  reviewRoutePolyline =
+    clearMapObject(
+      reviewRoutePolyline
+    );
+
+  reviewPickupMarker =
+    clearMapObject(
+      reviewPickupMarker
+    );
+
+  reviewDropoffMarker =
+    clearMapObject(
+      reviewDropoffMarker
+    );
+
+}else if(target === 'tracking'){
+
+  trackingRoutePolyline =
+    clearMapObject(
+      trackingRoutePolyline
+    );
+
+  trackingPickupMarker =
+    clearMapObject(
+      trackingPickupMarker
+    );
+
+  trackingDropoffMarker =
+    clearMapObject(
+      trackingDropoffMarker
+    );
+
+}else{
+
+  routePolyline =
+    clearMapObject(
+      routePolyline
+    );
+
+  pickupMarker =
+    clearMapObject(
+      pickupMarker
+    );
+
+  dropoffMarker =
+    clearMapObject(
+      dropoffMarker
+    );
+
+}
 
   const path = googleMapsLibraries.geometry.encoding.decodePath(data.encodedPolyline);
 
@@ -7754,14 +7803,39 @@ function drawRouteOnMap(map, data, target){
     : null;
 
   if(target === 'review'){
-    reviewRoutePolyline = newPolyline;
-    reviewPickupMarker = newPickupMarker;
-    reviewDropoffMarker = newDropoffMarker;
-  }else{
-    routePolyline = newPolyline;
-    pickupMarker = newPickupMarker;
-    dropoffMarker = newDropoffMarker;
-  }
+
+  reviewRoutePolyline =
+    newPolyline;
+
+  reviewPickupMarker =
+    newPickupMarker;
+
+  reviewDropoffMarker =
+    newDropoffMarker;
+
+}else if(target === 'tracking'){
+
+  trackingRoutePolyline =
+    newPolyline;
+
+  trackingPickupMarker =
+    newPickupMarker;
+
+  trackingDropoffMarker =
+    newDropoffMarker;
+
+}else{
+
+  routePolyline =
+    newPolyline;
+
+  pickupMarker =
+    newPickupMarker;
+
+  dropoffMarker =
+    newDropoffMarker;
+
+}
 
     const bounds =
     new google.maps.LatLngBounds();
@@ -7816,6 +7890,22 @@ function renderRouteOnCustomerMap(data){
 function renderRouteOnReviewMap(data){
   if(!reviewMap || !data) return;
   drawRouteOnMap(reviewMap, data, 'review');
+}
+
+function renderRouteOnTrackingMap(data){
+
+  if(
+    !trackingMap ||
+    !data
+  ){
+    return;
+  }
+
+  drawRouteOnMap(
+    trackingMap,
+    data,
+    'tracking'
+  );
 }
 
 function updateRouteBadges(data){
