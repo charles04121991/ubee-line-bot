@@ -11481,26 +11481,28 @@ function updateTrackedRiderMarker(position){
     return;
   }
 
-if(!customerMap){
+if(!trackingMap){
 
   console.log(
-    '⏳ 客人地圖尚未完成初始化，正在準備地圖'
+    '⏳ Step 5 追蹤地圖尚未完成初始化，正在準備地圖'
   );
 
-  ensureCustomerMapReady()
+  ensureTrackingMapReady()
     .then(() => {
 
-      if(customerMap){
+      if(trackingMap){
+
         updateTrackedRiderMarker(
           position
         );
+
       }
 
     })
     .catch(err => {
 
       console.warn(
-        '客人地圖初始化失敗，暫時無法顯示小U:',
+        'Step 5 追蹤地圖初始化失敗，暫時無法顯示小U:',
         err
       );
 
@@ -11568,7 +11570,7 @@ if(!customerMap){
         .marker
         .AdvancedMarkerElement({
 
-          map:customerMap,
+          map:trackingMap,
 
           position:safePosition,
 
@@ -11598,7 +11600,7 @@ if(!customerMap){
     trackedRiderMarker =
       new google.maps.Marker({
 
-        map:customerMap,
+        map:trackingMap,
 
         position:safePosition,
 
