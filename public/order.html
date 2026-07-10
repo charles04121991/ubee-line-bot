@@ -7707,17 +7707,90 @@ function drawRouteOnMap(map, data, target){
     dropoffMarker = newDropoffMarker;
   }
 
-  const bounds = new google.maps.LatLngBounds();
+  const bounds =
+  new google.maps.LatLngBounds();
 
-  path.forEach(point => bounds.extend(point));
-  if(origin) bounds.extend(origin);
-  if(destination) bounds.extend(destination);
 
-  if(!bounds.isEmpty()){
-    map.fitBounds(bounds, 48);
-  }
+// 先加入完整道路路線。
+path.forEach(point => {
+
+  bounds.extend(
+    point
+  );
+
+});
+
+
+// 再加入小U目前實際位置，
+// 確保小U Marker 不會被裁到畫面外。
+if(
+  hasValidLatLng(
+    trackedRiderPosition?.lat,
+    trackedRiderPosition?.lng
+  )
+){
+
+  bounds.extend({
+
+    lat:
+      Number(
+        trackedRiderPosition.lat
+      ),
+
+    lng:
+      Number(
+        trackedRiderPosition.lng
+      )
+
+  });
+
 }
 
+
+// 再加入目前任務目標：
+// 取件前是取件點，
+// 取件後是送達點。
+const trackingTarget =
+  getCustomerTrackingTarget(
+    currentOrderData
+  );
+
+
+if(
+  trackingTarget &&
+  hasValidLatLng(
+    trackingTarget.lat,
+    trackingTarget.lng
+  )
+){
+
+  bounds.extend({
+
+    lat:
+      Number(
+        trackingTarget.lat
+      ),
+
+    lng:
+      Number(
+        trackingTarget.lng
+      )
+
+  });
+
+}
+
+
+// 最後才依完整範圍調整視野。
+if(!bounds.isEmpty()){
+
+  trackingMap.fitBounds(
+    bounds,
+    48
+  );
+
+}
+  
 function renderRouteOnCustomerMap(data){
   if(!customerMap || !data) return;
   drawRouteOnMap(customerMap, data, 'customer');
