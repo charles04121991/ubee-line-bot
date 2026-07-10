@@ -7763,14 +7763,48 @@ function drawRouteOnMap(map, data, target){
     dropoffMarker = newDropoffMarker;
   }
 
-  const bounds = new google.maps.LatLngBounds();
+    const bounds =
+    new google.maps.LatLngBounds();
 
-  path.forEach(point => bounds.extend(point));
-  if(origin) bounds.extend(origin);
-  if(destination) bounds.extend(destination);
 
+  // 加入完整道路路線
+  path.forEach(point => {
+
+    bounds.extend(
+      point
+    );
+
+  });
+
+
+  // 加入取件點
+  if(origin){
+
+    bounds.extend(
+      origin
+    );
+
+  }
+
+
+  // 加入送達點
+  if(destination){
+
+    bounds.extend(
+      destination
+    );
+
+  }
+
+
+  // 依目前傳入的地圖調整完整路線視野
   if(!bounds.isEmpty()){
-    map.fitBounds(bounds, 48);
+
+    map.fitBounds(
+      bounds,
+      48
+    );
+
   }
 }
 
