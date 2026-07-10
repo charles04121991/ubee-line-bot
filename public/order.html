@@ -6707,10 +6707,63 @@ input:checked
 
 </div>
 
-      <div id="statusBox">訂單狀態：等待確認現金單</div>
+            <div id="statusBox">訂單狀態：等待確認現金單</div>
+
+      <!-- ==============================
+           Step 5：小U 即時追蹤地圖容器
+           這一步只先放 HTML，不啟動地圖、不新增 Marker 邏輯
+           ============================== -->
+
+      <div
+        id="step5TrackingMapSection"
+        class="content-card step5-tracking-map-section hidden"
+      >
+
+        <div class="step5-section-head">
+
+          <div>
+
+            <div class="step5-section-title">
+              小U 即時位置
+            </div>
+
+            <div class="step5-section-sub">
+              小U 接單後，這裡會顯示任務追蹤地圖
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="step5-tracking-map-shell">
+
+          <div
+            id="step5TrackingMap"
+            class="map-canvas"
+          ></div>
+
+          <div
+            id="step5TrackingMapPlaceholder"
+            class="map-placeholder"
+          >
+
+            <strong>
+              等待小U接單
+            </strong>
+
+            <small>
+              小U 接單並開始回傳定位後，系統會顯示即時位置。
+            </small>
+
+          </div>
+
+        </div>
+
+      </div>
 
       <div class="content-card step5-payment-section">
-
+        
   <div class="step5-section-head">
 
     <div>
