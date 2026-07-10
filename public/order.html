@@ -7574,6 +7574,69 @@ async function ensureCustomerMapReady(){
   return customerMap;
 }
 
+async function ensureReviewMapReady(){
+
+  const mapEl =
+    qs('reviewMap');
+
+
+  if(!mapEl){
+    return null;
+  }
+
+
+  await loadGoogleMapsApi();
+
+
+  if(!reviewMap){
+
+    const options = {
+
+      center:{
+        lat:24.2521,
+        lng:120.7214
+      },
+
+      zoom:13,
+
+      disableDefaultUI:true,
+
+      clickableIcons:false,
+
+      gestureHandling:'greedy',
+
+      backgroundColor:'#e8eaed'
+
+    };
+
+
+    if(googleMapsMapId){
+
+      options.mapId =
+        googleMapsMapId;
+
+    }
+
+
+    reviewMap =
+      new googleMapsLibraries.maps.Map(
+        mapEl,
+        options
+      );
+
+  }
+
+
+  qs(
+    'reviewMapPlaceholder'
+  )
+    ?.classList
+    .add('is-ready');
+
+
+  return reviewMap;
+}
+    
 async function ensureTrackingMapReady(){
 
   const mapEl =
