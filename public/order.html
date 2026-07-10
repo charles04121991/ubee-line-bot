@@ -11901,10 +11901,25 @@ function syncCustomerLiveTracking(order){
     return;
   }
 
-
   // 小U已接單，
-  // 顯示追蹤地圖區塊，
-  // 並開始監聽該位小U。
+  // 地圖區塊已經顯示，
+  // 下一個畫面更新週期再初始化地圖。
+  requestAnimationFrame(() => {
+
+    ensureTrackingMapReady()
+      .catch(err => {
+
+        console.warn(
+          '❌ Step 5 追蹤地圖初始化失敗:',
+          err
+        );
+
+      });
+
+  });
+
+
+  // 同時開始監聽該位小U。
   startTrackedRiderListener(order);
 }
     
