@@ -11511,10 +11511,28 @@ if(!trackingMap){
   return;
 }
 
-  const safePosition = {
+    const safePosition = {
     lat:Number(position.lat),
     lng:Number(position.lng)
   };
+
+
+  // 每次收到小U最新定位，
+  // 追蹤地圖同步跟到小U位置。
+  trackingMap.panTo(
+    safePosition
+  );
+
+
+  // 第一次顯示小U時，
+  // 將追蹤地圖拉近到適合觀看的位置。
+  if(!trackedRiderMarker){
+
+    trackingMap.setZoom(
+      16
+    );
+
+  }
 
 
   // Marker 已存在，只更新位置
