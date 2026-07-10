@@ -8174,13 +8174,53 @@ async function refreshTrackingRoute(
 
 
     // 將最新道路路線
-    // 畫到 step5 trackingMap。
-    renderTrackingRoute(
-      data
-    );
+// 畫到 step5 trackingMap。
+renderTrackingRoute(
+  data
+);
 
 
-    return data;
+// 將即時道路路線距離與時間
+// 寫入 Step 5 追蹤資訊。
+const distanceText =
+  String(
+    data?.distanceText || ''
+  ).trim();
+
+
+const durationText =
+  String(
+    data?.durationText || ''
+  ).trim();
+
+
+if(
+  qs('step5TrackingDistanceText')
+){
+
+  qs(
+    'step5TrackingDistanceText'
+  ).innerText =
+    distanceText ||
+    '計算中...';
+
+}
+
+
+if(
+  qs('step5TrackingEtaText')
+){
+
+  qs(
+    'step5TrackingEtaText'
+  ).innerText =
+    durationText ||
+    '計算中...';
+
+}
+
+
+return data;
 
   }catch(err){
 
