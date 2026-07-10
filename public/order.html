@@ -5203,7 +5203,7 @@ input:checked
 
 #step5 .order-progress-current{
 
-  display:grid;
+  display:none;
 
   grid-template-columns:
     44px
@@ -5421,7 +5421,7 @@ input:checked
 
   gap:11px;
 
-  min-height:58px;
+  min-height:42px;
 
 }
 
@@ -5599,6 +5599,8 @@ input:checked
 
 #step5 .order-progress-step-desc{
 
+  display:none;
+  
   color:#a0a4a8;
 
   font-size:11px;
@@ -6725,42 +6727,12 @@ input:checked
     </section>
 
     <section class="step" id="step5">
-      <div class="step5-created-hero">
-
-  <div class="step5-created-icon">
-    ✓
-  </div>
-
-
-  <div class="step5-created-kicker">
-    訂單建立成功
-  </div>
-
-
-  <div class="step5-created-title">
-    最後一步：確認現金單
-  </div>
-
-
-  <div class="step5-created-text">
-    確認使用現金單後，系統才會正式開始媒合附近 小U 接單。
-  </div>
-
-
-  <div class="step5-order-id-row">
-
-    <span>
-      訂單編號
-    </span>
-
-    <strong id="orderNo">
-      -
-    </strong>
-
-  </div>
-
-</div>
-
+      
+      <div
+        id="step5TrackingMapSection"
+        class="content-card step5-tracking-map-section hidden"
+      >
+        
             <div id="statusBox">訂單狀態：等待確認現金單</div>
 
       <!-- ==============================
@@ -6768,10 +6740,7 @@ input:checked
            這一步只先放 HTML，不啟動地圖、不新增 Marker 邏輯
            ============================== -->
 
-      <div
-        id="step5TrackingMapSection"
-        class="content-card step5-tracking-map-section hidden"
-      >
+      
 
         <div class="step5-section-head">
 
@@ -11238,8 +11207,15 @@ async function createOrder(){
       currentOrderId
     );
 
-    qs('orderNo').innerText =
-      currentOrderId;
+    const orderNoEl =
+  qs('orderNo');
+
+if(orderNoEl){
+
+  orderNoEl.innerText =
+    currentOrderId;
+
+}
 
     showOnlyStep(5);
 
@@ -13032,12 +13008,21 @@ function startOrderListener(orderId){
           currentOrderId = doc.id;
 
           localStorage.setItem(
-            'ubee_current_order_id',
-            currentOrderId
-          );
+         'ubee_current_order_id',
+         currentOrderId
+   );
 
-          qs('orderNo').innerText =
-            currentOrderId;
+        const orderNoEl =
+     qs('orderNo');
+
+      if(orderNoEl){
+
+  orderNoEl.innerText =
+    currentOrderId;
+
+}
+
+renderTimeline(
 
         renderTimeline(
   order.status ||
