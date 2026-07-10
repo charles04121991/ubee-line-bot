@@ -11860,28 +11860,17 @@ if(!trackingMap){
   );
 
   ensureTrackingMapReady()
-    .then(() => {
+  .then(() => {
 
-      if(trackingMap){
+    if(trackingMap){
 
-  updateTrackedRiderMarker(
-    position
-);
+      updateTrackedRiderMarker(
+        position
+      );
 
+    }
 
-// 使用最新訂單資料，
-// 依目前任務階段更新：
-// 小U → 取件點
-// 或
-// 小U → 送達點
-scheduleTrackingRouteRefresh(
-  currentOrderData || order,
-  position
-);
-
-      }
-
-    })
+  })
     .catch(err => {
 
       console.warn(
@@ -12201,8 +12190,18 @@ console.log(
   }
 );
 
-
 updateTrackedRiderMarker(
+  position
+);
+
+
+// 使用最新訂單資料，
+// 依目前任務階段更新：
+// 小U → 取件點
+// 或
+// 小U → 送達點
+scheduleTrackingRouteRefresh(
+  currentOrderData || order,
   position
 );
 
