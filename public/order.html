@@ -7129,12 +7129,15 @@ let trackingMap = null;
 
 let routePolyline = null;
 let reviewRoutePolyline = null;
+let trackingRoutePolyline = null;
 
 let pickupMarker = null;
 let dropoffMarker = null;
 let reviewPickupMarker = null;
 let reviewDropoffMarker = null;
 let currentLocationMarker = null;
+let trackedRiderMarker = null;
+let trackingTargetMarker = null;
 
 let pickupLat = null;
 let pickupLng = null;
@@ -7155,6 +7158,7 @@ let routeRefreshTimer = null;
 let quoteRefreshTimer = null;
 let routeRequestSequence = 0;
 let quoteRequestSequence = 0;
+let trackingRouteRequestSequence = 0;
 
 const LINE_OFFICIAL_URL = 'https://line.me/R/ti/p/@686rwnvn';
 
@@ -7719,6 +7723,260 @@ function renderRouteOnReviewMap(data){
   drawRouteOnMap(reviewMap, data, 'review');
 }
 
+function renderTrackingRoute(data){
+
+  if(!trackingMap){
+    return;
+  }
+
+
+  // 每次繪製新路線前，
+  // 先清除上一條 step5 路線。
+  trackingRoutePolyline =
+    clearMapObject(
+      trackingRoutePolyline
+    );
+
+
+  if(
+    !data?.encodedPolyline ||
+    !googleMapsLibraries
+      ?.geometry
+      ?.encoding
+  ){
+    return;
+  }
+
+
+  const path =
+    googleMapsLibraries
+      .geometry
+      .encoding
+      .decodePath(
+        data.encodedPolyline
+      );
+
+
+  if(
+    !Array.isArray(path) ||
+    !path.length
+  ){
+    return;
+  }
+
+
+  trackingRoutePolyline =
+    new google.maps.Polyline({
+
+      map:
+        trackingMap,
+
+      path,
+
+      geodesic:
+        true,
+
+      strokeColor:
+        '#111111',
+
+      strokeOpacity:
+        .92,
+
+      strokeWeight:
+        6
+
+    });
+
+
+  const bounds =
+    new google.maps.LatLngBounds();
+
+
+  path.forEach(point => {
+
+    bounds.extend(
+      point
+    );
+
+  });
+
+
+  if(!bounds.isEmpty()){
+
+    trackingMap.fitBounds(
+      bounds,
+      48
+    );
+
+  }
+}
+
+async function refreshTrackingRoute(
+  order,
+  position
+){
+
+  const target =
+    getCustomerTrackingTarget(
+      order
+    );
+
+
+  const riderLat =
+    Number(
+      position?.lat
+    );
+
+  const riderLng =
+    Number(
+      position?.lng
+    );
+
+
+  // 訂單階段沒有追蹤目標，
+  // 或小U目前位置無效時，
+  // 不發送路線請求。
+  if(
+    !target ||
+    !hasValidLatLng(
+      riderLat,
+      riderLng
+    )
+  ){
+
+    trackingRouteRequestSequence += 1;
+
+    trackingRoutePolyline =
+      clearMapObject(
+        trackingRoutePolyline
+      );
+
+    return null;
+  }
+
+
+  // 每次建立新的 step5 路線請求，
+  // 都產生新的序號。
+  const requestId =
+    ++trackingRouteRequestSequence;
+
+
+  try{
+
+    const res =
+      await fetch(
+        '/api/map-route',
+        {
+
+          method:
+            'POST',
+
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+
+          cache:
+            'no-store',
+
+          body:
+            JSON.stringify({
+
+              originLat:
+                riderLat,
+
+              originLng:
+                riderLng,
+
+              destinationLat:
+                Number(
+                  target.lat
+                ),
+
+              destinationLng:
+                Number(
+                  target.lng
+                )
+
+            })
+
+        }
+      );
+
+
+    const data =
+      await res
+        .json()
+        .catch(
+          () => ({})
+        );
+
+
+    // 已經有更新的路線請求時，
+    // 舊結果不能覆蓋新結果。
+    if(
+      requestId !==
+      trackingRouteRequestSequence
+    ){
+
+      return null;
+
+    }
+
+
+    if(
+      !res.ok ||
+      data.success === false
+    ){
+
+      throw new Error(
+
+        data.error ||
+
+        data.message ||
+
+        '即時追蹤路線讀取失敗'
+
+      );
+
+    }
+
+
+    // 將最新道路路線
+    // 畫到 step5 trackingMap。
+    renderTrackingRoute(
+      data
+    );
+
+
+    return data;
+
+  }catch(err){
+
+
+    // 舊請求發生錯誤時，
+    // 直接忽略，不准干擾新路線。
+    if(
+      requestId !==
+      trackingRouteRequestSequence
+    ){
+
+      return null;
+
+    }
+
+
+    console.warn(
+      'Step 5 即時追蹤路線更新失敗:',
+      err
+    );
+
+
+    return null;
+
+  }
+}
+    
 function updateRouteBadges(data){
   const distanceText = String(data?.distanceText || '').trim();
   const durationText = String(data?.durationText || '').trim();
@@ -11846,7 +12104,173 @@ updateTrackedRiderMarker(
       );
 }
 
+function getCustomerTrackingTarget(order){
 
+  if(!order){
+    return null;
+  }
+
+
+  const status =
+    String(
+      order.status || ''
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const pickupStatuses = [
+
+    'accepted',
+
+    'going_to_pickup',
+
+    'arrived_pickup'
+
+  ];
+
+
+  const dropoffStatuses = [
+
+    'picked_up',
+
+    'going_to_dropoff',
+
+    'arrived_dropoff'
+
+  ];
+
+
+  let targetType = '';
+
+  let targetLat = null;
+
+  let targetLng = null;
+
+
+  if(
+    pickupStatuses
+      .includes(status)
+  ){
+
+    targetType =
+      'pickup';
+
+    targetLat =
+      Number(
+        order.pickupLat
+      );
+
+    targetLng =
+      Number(
+        order.pickupLng
+      );
+
+  }else if(
+    dropoffStatuses
+      .includes(status)
+  ){
+
+    targetType =
+      'dropoff';
+
+    targetLat =
+      Number(
+        order.dropoffLat
+      );
+
+    targetLng =
+      Number(
+        order.dropoffLng
+      );
+
+  }else{
+
+    return null;
+
+  }
+
+
+  if(
+    !hasValidLatLng(
+      targetLat,
+      targetLng
+    )
+  ){
+
+    return null;
+
+  }
+
+
+  return {
+
+    type:
+      targetType,
+
+    label:
+      targetType === 'pickup'
+        ? '取件點'
+        : '送達點',
+
+    lat:
+      targetLat,
+
+    lng:
+      targetLng
+
+  };
+}
+
+function updateTrackingTargetMarker(order){
+
+  if(!trackingMap){
+    return;
+  }
+
+
+  // 先清除上一個任務目標 Marker，
+  // 避免從取件階段切換到送達階段時，
+  // 地圖同時留下「取」與「送」。
+  trackingTargetMarker =
+    clearMapObject(
+      trackingTargetMarker
+    );
+
+
+  const target =
+    getCustomerTrackingTarget(
+      order
+    );
+
+
+  if(!target){
+    return;
+  }
+
+
+  trackingTargetMarker =
+    createMapMarker(
+
+      trackingMap,
+
+      {
+        lat:Number(
+          target.lat
+        ),
+
+        lng:Number(
+          target.lng
+        )
+      },
+
+      target.type,
+
+      target.label
+
+    );
+}
+    
 function syncCustomerLiveTracking(order){
 
   const trackingSection =
@@ -11927,6 +12351,13 @@ function syncCustomerLiveTracking(order){
   requestAnimationFrame(() => {
 
     ensureTrackingMapReady()
+      .then(() => {
+
+        updateTrackingTargetMarker(
+          order
+        );
+
+      })
       .catch(err => {
 
         console.warn(
