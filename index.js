@@ -6872,18 +6872,116 @@ const ETA_OPTIONS = [5, 7, 8, 10, 12, 15, 17, 20, 25];
 const orders = {};
 const userSessions = {};
 const distanceCache = new Map();
+const dispatchStartInFlight = new Set();
 let orderCounter = 1;
+
+function startOrderDispatchInBackground(order) {
+  const orderId =
+    String(
+      order?.id || ''
+    )
+      .trim()
+      .toUpperCase();
+
+  if (
+    !orderId ||
+    dispatchStartInFlight.has(orderId)
+  ) {
+    return;
+  }
+
+  dispatchStartInFlight.add(orderId);
+
+  setImmediate(async () => {
+    try {
+      const orderRef =
+        db
+          .collection('orders')
+          .doc(orderId);
+
+      const orderDoc =
+        await orderRef.get();
+
+      if (!orderDoc.exists) {
+        return;
+      }
+
+      const latestOrder = {
+        id: orderDoc.id,
+        ...orderDoc.data(),
+      };
+
+      if (
+        String(
+          latestOrder.status || ''
+        ).trim() !== 'pending_dispatch' ||
+        latestOrder.pushSentAt
+      ) {
+        return;
+      }
+
+      const cycleId =
+        await startDispatchPushSequence(
+          latestOrder
+        );
+
+      await orderRef.set(
+        {
+          pushSentAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          dispatchPushCycleId:
+            cycleId,
+        },
+        {
+          merge: true,
+        }
+      );
+
+      if (orders[orderId]) {
+        orders[orderId].pushSentAt =
+          Date.now();
+
+        orders[orderId].dispatchPushCycleId =
+          cycleId;
+      }
+
+      console.log(
+        `✅ UBee 背景派單已啟動：${orderId}`
+      );
+
+    } catch (error) {
+      console.error(
+        `❌ UBee 背景派單啟動失敗：${orderId}`,
+        error
+      );
+
+    } finally {
+      dispatchStartInFlight.delete(
+        orderId
+      );
+    }
+  });
+}
 
 async function saveOrder(order) {
   if (!order || !order.id) {
     return order;
   }
 
-  orders[order.id] = order;
+  const orderId =
+    String(order.id)
+      .trim()
+      .toUpperCase();
+
+  order.id = orderId;
+
+  orders[orderId] = order;
 
   await db
     .collection('orders')
-    .doc(order.id)
+    .doc(orderId)
     .set(
       order,
       {
@@ -6896,33 +6994,9 @@ async function saveOrder(order) {
       'pending_dispatch' &&
     !order.pushSentAt
   ) {
-    const cycleId =
-      await startDispatchPushSequence(
-        order
-      );
-
-    await db
-      .collection('orders')
-      .doc(order.id)
-      .set(
-        {
-          pushSentAt:
-            admin.firestore.FieldValue
-              .serverTimestamp(),
-
-          dispatchPushCycleId:
-            cycleId,
-        },
-        {
-          merge: true
-        }
-      );
-
-    order.pushSentAt =
-      Date.now();
-
-    order.dispatchPushCycleId =
-      cycleId;
+    startOrderDispatchInBackground(
+      order
+    );
   }
 
   return order;
