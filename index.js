@@ -1876,7 +1876,7 @@ return {
 
   rider: buildRiderLoginPayload(updatedDoc),
 };
-
+}
 app.post('/api/rider/login', async (req, res) => {
   try {
     const { phone } = req.body || {};
