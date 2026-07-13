@@ -1942,9 +1942,25 @@ function getOrderPaymentMethod(order) {
     order?.payment ||
     order?.payType ||
     ''
-  ).trim().toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
 }
 
+
+// 取得訂單付款狀態
+function getOrderPaymentStatus(order) {
+  return String(
+    order?.paymentStatus ||
+    order?.payStatus ||
+    ''
+  )
+    .trim()
+    .toLowerCase();
+}
+
+
+// ===== UBee 現金訂單／騎士回繳狀態工具 =====
 // ===== UBee 現金訂單／騎士回繳狀態工具 =====
 
 // 統一判斷訂單是否為現金單
