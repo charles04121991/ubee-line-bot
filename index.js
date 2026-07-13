@@ -18,6 +18,256 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// =====================================================
+// UBee 小U Token 驗證開關
+// false：維持目前舊版登入與 API 流程
+// true：未來完成前後端 Token 串接後才開啟
+// =====================================================
+const RIDER_AUTH_ENFORCE =
+  String(
+    process.env.RIDER_AUTH_ENFORCE || 'false'
+  )
+    .trim()
+    .toLowerCase() === 'true';
+
+console.log(
+  `🔐 UBee 小U Token 強制驗證：${
+    RIDER_AUTH_ENFORCE
+      ? '已啟用'
+      : '尚未啟用（相容模式）'
+  }`
+);
+
+// =====================================================
+// 讀取 Authorization Bearer Token
+// 目前只建立工具函式，尚未套用到任何 API
+// =====================================================
+function getBearerToken(req) {
+  const authorization =
+    String(
+      req.headers.authorization || ''
+    ).trim();
+
+  if (!authorization) {
+    return '';
+  }
+
+  const match =
+    authorization.match(
+      /^Bearer\s+(.+)$/i
+    );
+
+  if (!match) {
+    return '';
+  }
+
+  return String(
+    match[1] || ''
+  ).trim();
+}
+
+// =====================================================
+// 驗證 Firebase ID Token
+// 目前只建立工具函式，尚未套用到任何 API
+// =====================================================
+async function verifyRiderFirebaseIdToken(req) {
+  const idToken =
+    getBearerToken(req);
+
+  if (!idToken) {
+    return {
+      ok: false,
+      statusCode: 401,
+      code: 'RIDER_TOKEN_REQUIRED',
+      message: '登入憑證不存在，請重新登入。',
+    };
+  }
+
+  try {
+    const decodedToken =
+      await admin
+        .auth()
+        .verifyIdToken(idToken);
+
+    return {
+      ok: true,
+      statusCode: 200,
+      idToken,
+      decodedToken,
+      uid:
+        String(
+          decodedToken.uid || ''
+        ).trim(),
+    };
+
+  } catch (error) {
+    console.warn(
+      '⚠️ 小U Firebase ID Token 驗證失敗：',
+      error &&
+      error.message
+        ? error.message
+        : error
+    );
+
+    return {
+      ok: false,
+      statusCode: 401,
+      code: 'RIDER_TOKEN_INVALID',
+      message: '登入憑證無效或已失效，請重新登入。',
+    };
+  }
+}
+
+// =====================================================
+// 建立小U專用的 Firebase Auth UID
+// 目前只建立工具函式，尚未套用到登入 API
+// =====================================================
+function buildRiderFirebaseUid(riderDocId) {
+  const safeRiderDocId =
+    String(riderDocId || '')
+      .trim()
+      .replace(
+        /[^a-zA-Z0-9_-]/g,
+        '_'
+      )
+      .slice(0, 110);
+
+  if (!safeRiderDocId) {
+    throw new Error(
+      'INVALID_RIDER_DOC_ID'
+    );
+  }
+
+  return `rider_${safeRiderDocId}`;
+}
+
+
+// =====================================================
+// 建立小U Firebase Custom Token
+// Custom Token 只能拿來登入 Firebase Auth，
+// 不能直接當成 API Bearer Token
+// =====================================================
+async function createRiderFirebaseCustomToken(
+  riderDoc
+) {
+  if (
+    !riderDoc ||
+    !riderDoc.exists
+  ) {
+    throw new Error(
+      'RIDER_DOCUMENT_NOT_FOUND'
+    );
+  }
+
+  const rider =
+    riderDoc.data() || {};
+
+  const riderDocId =
+    String(
+      riderDoc.id || ''
+    ).trim();
+
+  const firebaseUid =
+    buildRiderFirebaseUid(
+      riderDocId
+    );
+
+  const firebaseCustomToken =
+    await admin
+      .auth()
+      .createCustomToken(
+        firebaseUid,
+        {
+          role: 'rider',
+
+          riderDocId,
+
+          riderId:
+            String(
+              rider.riderId ||
+              riderDocId
+            ).trim(),
+        }
+      );
+
+  return {
+    firebaseUid,
+    firebaseCustomToken,
+  };
+}
+
+// =====================================================
+// 小U Firebase Token 驗證 Middleware
+// 目前只建立，不套用到任何 API
+// =====================================================
+async function riderAuthMiddleware(
+  req,
+  res,
+  next
+) {
+  try {
+    const idToken =
+      getBearerToken(req);
+
+    // 相容模式：
+    // rider.html 尚未傳 Token 時，維持目前舊版流程
+    if (!idToken) {
+      if (!RIDER_AUTH_ENFORCE) {
+        req.riderAuth = null;
+        return next();
+      }
+
+      return res.status(401).json({
+        success: false,
+        code: 'RIDER_TOKEN_REQUIRED',
+        message:
+          '登入憑證不存在，請重新登入。',
+      });
+    }
+
+    const tokenResult =
+      await verifyRiderFirebaseIdToken(
+        req
+      );
+
+    if (!tokenResult.ok) {
+      return res
+        .status(tokenResult.statusCode)
+        .json({
+          success: false,
+          code: tokenResult.code,
+          message: tokenResult.message,
+        });
+    }
+
+    req.riderAuth = {
+      idToken:
+        tokenResult.idToken,
+
+      decodedToken:
+        tokenResult.decodedToken,
+
+      uid:
+        tokenResult.uid,
+    };
+
+    return next();
+
+  } catch (error) {
+    console.error(
+      '❌ 小U Token Middleware 發生錯誤：',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      code: 'RIDER_AUTH_ERROR',
+      message:
+        '小U身分驗證失敗，請稍後再試。',
+    });
+  }
+}
+
 const WEB_PUSH_PUBLIC_KEY = process.env.WEB_PUSH_PUBLIC_KEY || '';
 const WEB_PUSH_PRIVATE_KEY = process.env.WEB_PUSH_PRIVATE_KEY || '';
 const WEB_PUSH_SUBJECT = process.env.WEB_PUSH_SUBJECT || 'mailto:ubee.service@gmail.com';
@@ -1617,12 +1867,15 @@ async function findRiderByPhoneForLogin(phone) {
 
   const updatedDoc = await riderDoc.ref.get();
 
-  return {
-    ok: true,
-    statusCode: 200,
-    rider: buildRiderLoginPayload(updatedDoc),
-  };
-}
+return {
+  ok: true,
+  statusCode: 200,
+
+  // 下一步建立 Firebase Custom Token 時會使用
+  riderDoc: updatedDoc,
+
+  rider: buildRiderLoginPayload(updatedDoc),
+};
 
 app.post('/api/rider/login', async (req, res) => {
   try {
@@ -1637,13 +1890,43 @@ app.post('/api/rider/login', async (req, res) => {
       });
     }
 
+    let firebaseUid = '';
+let firebaseCustomToken = '';
+
+try {
+  const tokenResult =
+    await createRiderFirebaseCustomToken(
+      result.riderDoc
+    );
+
+  firebaseUid =
+    tokenResult.firebaseUid;
+
+  firebaseCustomToken =
+    tokenResult.firebaseCustomToken;
+
+} catch (tokenError) {
+  console.warn(
+    '⚠️ 建立小U Firebase Custom Token 失敗，暫時維持舊版登入：',
+    tokenError &&
+    tokenError.message
+      ? tokenError.message
+      : tokenError
+  );
+}
+    
     return res.json({
-      success: true,
-      message: '登入成功。',
-      rider: result.rider,
-      riderId: result.rider.id,
-      phone: result.rider.phone,
-    });
+  success: true,
+  message: '登入成功.',
+  rider: result.rider,
+  riderId: result.rider.id,
+  phone: result.rider.phone,
+
+  // Firebase Auth 過渡期資料
+  // 目前 rider.html 尚未使用
+  firebaseUid,
+  firebaseCustomToken,
+});
 
   } catch (err) {
     console.error('❌ 騎士手機登入失敗：', err);
