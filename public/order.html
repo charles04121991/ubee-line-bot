@@ -7871,6 +7871,15 @@ input:checked
 
     <section class="step" id="step5">
 
+      <div class="content-card" style="margin-top:0;">
+
+  <div class="price-row">
+    <span>任務編號</span>
+    <strong id="orderNo">-</strong>
+  </div>
+
+</div>
+    
             <!-- ==============================
            Step 5：即時任務狀態
            ============================== -->
@@ -8375,6 +8384,20 @@ const MAX_ADVANCE_PAYMENT = 1000;
 
 function qs(id){
   return document.getElementById(id);
+}
+
+function setOrderNo(value = '-'){
+  const orderNoEl = qs('orderNo');
+
+  if(!orderNoEl){
+    return;
+  }
+
+  const safeValue =
+    String(value ?? '').trim();
+
+  orderNoEl.innerText =
+    safeValue || '-';
 }
 
 function toNullableNumber(value){
@@ -12921,9 +12944,7 @@ function clearCurrentOrderCache(){
 // 同時停止小U即時定位監聽
 stopTrackedRiderListener();
   
-  if(qs('orderNo')){
-    qs('orderNo').innerText = '-';
-  }
+  setOrderNo('-');
 
   if(qs('paymentInfo')){
     qs('paymentInfo').classList.add('hidden');
@@ -13089,15 +13110,7 @@ async function createOrder(){
       currentOrderId
     );
 
-    const orderNoEl =
-  qs('orderNo');
-
-if(orderNoEl){
-
-  orderNoEl.innerText =
-    currentOrderId;
-
-}
+    setOrderNo(currentOrderId);
 
     showOnlyStep(5);
 
@@ -15171,15 +15184,7 @@ function startOrderListener(orderId){
          currentOrderId
    );
 
-        const orderNoEl =
-     qs('orderNo');
-
-      if(orderNoEl){
-
-  orderNoEl.innerText =
-    currentOrderId;
-
-}
+        setOrderNo(currentOrderId);
 
 renderTimeline(
   order.status ||
@@ -16584,8 +16589,7 @@ async function initCachedOrder(){
     currentOrderData =
       order;
 
-    qs('orderNo').innerText =
-      currentOrderId;
+    setOrderNo(currentOrderId);
 
     showOnlyStep(5);
 
