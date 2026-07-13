@@ -10448,15 +10448,21 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
 
       await saveOrder(order);
 
-      try {
-        await notifyCustomer(order, createTextMessage(
-          `你已選擇付款方式：現金付款\n\n` +
-          `本單將由騎士於任務完成時向你收取現金。\n` +
-          `預計收取金額：NT$${customerPayableTotal}。`
-        ));
-      } catch (notifyErr) {
-        console.error('⚠️ 現金單設定成功，但通知客人失敗：', notifyErr);
-      }
+      setImmediate(() => {
+  notifyCustomer(
+    order,
+    createTextMessage(
+      `你已選擇付款方式：現金付款\n\n` +
+      `本單將由騎士於任務完成時向你收取現金。\n` +
+      `預計收取金額：NT$${customerPayableTotal}。`
+    )
+  ).catch((notifyErr) => {
+    console.error(
+      '⚠️ 現金單設定成功，但背景通知客人失敗：',
+      notifyErr
+    );
+  });
+});
 
       return res.json({
         success: true,
