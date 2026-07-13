@@ -16613,19 +16613,22 @@ async function initCachedOrder(){
       selectPaymentMethod('cash');
     }
 
-  }catch(err){
+    }catch(err){
 
     console.warn(
-      '檢查快取訂單失敗，清除本機快取:',
+      '檢查快取訂單失敗，暫時保留本機訂單:',
       err
     );
 
-    clearCurrentOrderCache();
+    currentOrderId =
+      cachedOrderId;
 
-    showOnlyStep(1);
+    setOrderNo(
+      cachedOrderId
+    );
   }
 }
-
+    
 renderServiceGrid('send');
 
 renderCategoryBox(
