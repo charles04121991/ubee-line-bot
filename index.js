@@ -195,11 +195,42 @@ async function riderAuthMiddleware(req, res, next) {
         });
     }
 
+    const decodedToken = tokenResult.decodedToken || {};
+    const riderDocId = String(decodedToken.riderDocId || '').trim();
+    const riderId = String(decodedToken.riderId || riderDocId || '').trim();
+
+    if (String(decodedToken.role || '').trim() !== 'rider' || !riderDocId) {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_TOKEN_FORBIDDEN',
+        message: '此登入憑證不具備小U權限，請重新登入。',
+      });
+    }
+
     req.riderAuth = {
       idToken: tokenResult.idToken,
-      decodedToken: tokenResult.decodedToken,
+      decodedToken,
       uid: tokenResult.uid,
+      riderDocId,
+      riderId,
     };
+
+    // Token 身分是唯一可信來源。保留舊參數相容，但覆蓋可被竄改的 riderId / phone。
+    const trustedPhone = /^09\d{8}$/.test(riderDocId) ? riderDocId : '';
+    if (req.body && typeof req.body === 'object') {
+      req.body.riderId = riderId;
+      if (trustedPhone) {
+        req.body.phone = trustedPhone;
+        req.body.riderPhone = trustedPhone;
+      }
+    }
+    if (req.query && typeof req.query === 'object') {
+      req.query.riderId = riderId;
+      if (trustedPhone) {
+        req.query.phone = trustedPhone;
+        req.query.riderPhone = trustedPhone;
+      }
+    }
 
     return next();
   } catch (error) {
@@ -1902,7 +1933,7 @@ app.get('/api/web-push/public-key', (req, res) => {
 });
 
 // 儲存騎士 iPhone / PWA Web Push 訂閱資料
-app.post('/api/rider/push-subscription', async (req, res) => {
+app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) => {
   try {
     const {
       lineUserId,
@@ -2041,8 +2072,47 @@ app.post('/api/rider/push-subscription', async (req, res) => {
 // ==============================
 
 // 1. 取得騎士資料：正式版，以手機綁定為最高優先，避免 LINE 綁錯人
-app.get('/api/rider/profile', async (req, res) => {
+app.get('/api/rider/profile', riderAuthMiddleware, async (req, res) => {
   try {
+    // 正式 Token 流程：直接以 Custom Claims 的 riderDocId 讀取本人資料。
+    if (req.riderAuth && req.riderAuth.riderDocId) {
+      const riderDoc = await db
+        .collection('riders')
+        .doc(req.riderAuth.riderDocId)
+        .get();
+
+      if (!riderDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到此小U帳號資料。',
+        });
+      }
+
+      const riderData = riderDoc.data() || {};
+
+      if (isBlockedRiderData(riderData)) {
+        return res.status(403).json({
+          success: false,
+          message: '此小U帳號目前無法使用，請聯繫 UBee 跑腿管理員。',
+        });
+      }
+
+      if (!isApprovedRiderData(riderData)) {
+        return res.status(403).json({
+          success: false,
+          message: '小U資料尚未審核通過。',
+        });
+      }
+
+      return res.json({
+        success: true,
+        rider: {
+          id: riderDoc.id,
+          ...riderData,
+        },
+      });
+    }
+
     const { lineUserId, phone } = req.query;
 
     if (!lineUserId || !String(lineUserId).startsWith('U')) {
@@ -2442,7 +2512,7 @@ function isRiderVisibleDispatchOrder(order) {
 
 // 2. 取得可接任務：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
-app.get('/api/rider/tasks', async (req, res) => {
+app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
   try {
     const { lineUserId, phone, riderId } = req.query || {};
 
@@ -2502,7 +2572,7 @@ app.get('/api/rider/tasks', async (req, res) => {
 
 // 3. 取得騎士目前進行中任務：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
-app.get('/api/rider/current-order', async (req, res) => {
+app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
   try {
     const { lineUserId, phone, riderId } = req.query || {};
 
@@ -2619,7 +2689,7 @@ app.get('/api/rider/current-order', async (req, res) => {
 
 // 3. 騎士今日 / 累積統計：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 舊版相容
-app.get('/api/rider/summary', async (req, res) => {
+app.get('/api/rider/summary', riderAuthMiddleware, async (req, res) => {
   try {
     const {
       lineUserId,
@@ -4557,7 +4627,7 @@ app.post('/api/admin/merchant-receivables/settle-order', async (req, res) => {
 
 // 4. 騎士完成訂單列表：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 舊版相容
-app.get('/api/rider/completed-orders', async (req, res) => {
+app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => {
   try {
     const {
       lineUserId,
@@ -5804,7 +5874,7 @@ function isOrderSkippedForRider(order = {}, identity = {}) {
 
 // ===== 騎手上線 / 下線狀態 API =====
 // 手機登入正式版：支援 phone / riderId，並保留 lineUserId 相容
-app.post('/api/rider/status', async (req, res) => {
+app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
   try {
     const { lineUserId, phone, riderId, online } = req.body || {};
 
@@ -5887,7 +5957,7 @@ app.post('/api/rider/status', async (req, res) => {
 // 2. 若騎士有進行中任務，同步更新 orders/{orderId}
 // 3. 客人端只需要監聽訂單文件，就能看到小U即時移動
 
-app.post('/api/rider/location', async (req, res) => {
+app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
   try {
     const {
       phone,
@@ -6286,7 +6356,7 @@ app.post('/api/rider/location', async (req, res) => {
 
 // ===== UBee 騎士安全中心回報 API =====
 // 手機登入正式版：支援 phone / riderId / 舊 LINE 身分
-app.post('/api/rider/safety-report', async (req, res) => {
+app.post('/api/rider/safety-report', riderAuthMiddleware, async (req, res) => {
   try {
     const {
       phone,
@@ -10724,7 +10794,7 @@ app.post('/api/orders/:orderId/paid', async (req, res) => {
   });
 });
 
-app.post('/api/rider-distance-to-pickup', async (req, res) => {
+app.post('/api/rider-distance-to-pickup', riderAuthMiddleware, async (req, res) => {
   try {
     const { riderLat, riderLng, pickupAddress } = req.body;
 
@@ -10820,7 +10890,7 @@ function getEtaPayloadByStatus(status) {
 
 // 3. 接受任務：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
-app.post('/api/rider/accept-order', async (req, res) => {
+app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
   try {
     const { orderId, lineUserId, phone, riderId } = req.body || {};
 
@@ -11012,7 +11082,7 @@ app.post('/api/rider/accept-order', async (req, res) => {
 // 取消的是「騎士承接」，不是取消客人的訂單。
 // 只有 accepted 狀態可以直接取消／轉派。
 // 成功後訂單退回 pending_dispatch，重新開放給其他騎士。
-app.post('/api/rider/transfer-order', async (req, res) => {
+app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
   try {
     const {
       orderId,
@@ -11356,7 +11426,7 @@ app.post('/api/rider/transfer-order', async (req, res) => {
 // ===== 騎士更新任務狀態 API =====
 // 4. 更新任務狀態：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
-app.post('/api/rider/update-order-status', async (req, res) => {
+app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res) => {
   try {
     const { orderId, status, lineUserId, phone, riderId } = req.body || {};
 
