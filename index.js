@@ -3769,6 +3769,347 @@ app.get(
   }
 );
 
+// ===== UBee 財務中心：確認騎士現金已回繳 =====
+
+app.post(
+  '/api/admin/cash-remittances/settle',
+  async (req, res) => {
+    try {
+      const body =
+        req.body &&
+        typeof req.body === 'object'
+          ? req.body
+          : {};
+
+      // 支援單筆 orderId，
+      // 也支援財務中心一次傳入多筆 orderIds。
+      const rawOrderIds = Array.isArray(
+        body.orderIds
+      )
+        ? body.orderIds
+        : [
+            body.orderId,
+          ];
+
+      const orderIds =
+        Array.from(
+          new Set(
+            rawOrderIds
+              .map(value =>
+                String(value || '')
+                  .trim()
+                  .toUpperCase()
+              )
+              .filter(Boolean)
+          )
+        );
+
+      if (!orderIds.length) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              '缺少需要確認回繳的訂單 ID。',
+          });
+      }
+
+      // 避免一次修改過多訂單，
+      // 同時保留在 Firestore Batch 限制內。
+      if (orderIds.length > 200) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              '單次最多只能確認 200 筆訂單。',
+          });
+      }
+
+      const remittedBy =
+        String(
+          body.remittedBy ||
+          body.adminUserId ||
+          body.operator ||
+          'finance_center'
+        )
+          .trim()
+          .slice(0, 100);
+
+      const orderRefs =
+        orderIds.map(orderId =>
+          db
+            .collection('orders')
+            .doc(orderId)
+        );
+
+      const orderDocs =
+        await Promise.all(
+          orderRefs.map(ref =>
+            ref.get()
+          )
+        );
+
+      const validOrders = [];
+      const skippedOrders = [];
+
+      let totalRemittedAmount = 0;
+
+      orderDocs.forEach(
+        (
+          orderDoc,
+          index
+        ) => {
+          const orderId =
+            orderIds[index];
+
+          if (!orderDoc.exists) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'order_not_found',
+            });
+
+            return;
+          }
+
+          const order = {
+            id: orderDoc.id,
+            ...orderDoc.data(),
+          };
+
+          const orderStatus =
+            String(
+              order.status || ''
+            )
+              .trim()
+              .toLowerCase();
+
+          // 只能結算已完成的訂單
+          if (
+            orderStatus !==
+              'completed' &&
+            orderStatus !==
+              'done'
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'order_not_completed',
+            });
+
+            return;
+          }
+
+          // 只能處理現金訂單
+          if (
+            !isCashPaymentOrder(
+              order
+            )
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'not_cash_order',
+            });
+
+            return;
+          }
+
+          // 已經回繳過，不重複處理
+          if (
+            isCashRemittanceSettled(
+              order
+            )
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'already_settled',
+            });
+
+            return;
+          }
+
+          // ==============================
+          // 計算這張訂單應回繳平台金額
+          // ==============================
+
+          const customerTotal =
+            getOrderCustomerPayableTotal(
+              order
+            );
+
+          const advancePayment =
+            getOrderAdvancePaymentAmount(
+              order
+            );
+
+          const riderIncome =
+            getOrderMoneyValue(
+              order,
+              [
+                'riderFee',
+                'driverFee',
+                'riderIncome',
+                'riderEarning',
+                'riderPayout',
+                'riderShare',
+                'fee',
+              ]
+            ) || 0;
+
+          const fallbackPlatformDue =
+            Math.max(
+              0,
+              Math.round(
+                customerTotal -
+                advancePayment -
+                riderIncome
+              )
+            );
+
+          const cashDueToPlatform =
+            getOrderCashDueToPlatformAmount(
+              order,
+              fallbackPlatformDue
+            );
+
+          if (
+            cashDueToPlatform <= 0
+          ) {
+            skippedOrders.push({
+              orderId,
+              reason:
+                'no_remittance_amount',
+            });
+
+            return;
+          }
+
+          validOrders.push({
+            ref: orderDoc.ref,
+            orderId,
+            cashDueToPlatform,
+          });
+
+          totalRemittedAmount +=
+            cashDueToPlatform;
+        }
+      );
+
+      if (!validOrders.length) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+
+            message:
+              '沒有可確認回繳的現金訂單。',
+
+            settledOrderCount: 0,
+
+            totalRemittedAmount: 0,
+
+            skippedOrders,
+          });
+      }
+
+      const batch =
+        db.batch();
+
+      const nowMs =
+        Date.now();
+
+      validOrders.forEach(item => {
+        batch.set(
+          item.ref,
+          {
+            // 現金回繳正式完成
+            cashRemittanceStatus:
+              'settled',
+
+            cashRemittedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            cashRemittedAtMs:
+              nowMs,
+
+            cashRemittedBy:
+              remittedBy,
+
+            cashRemittedAmount:
+              item.cashDueToPlatform,
+
+            // 現金單不屬於平台撥款流程
+            settlementStatus:
+              'not_applicable',
+
+            financialUpdatedAt:
+              admin.firestore
+                .FieldValue
+                .serverTimestamp(),
+
+            financialUpdatedAtMs:
+              nowMs,
+          },
+          {
+            merge: true,
+          }
+        );
+      });
+
+      await batch.commit();
+
+      return res.json({
+        success: true,
+
+        message:
+          '騎士現金回繳已確認。',
+
+        settledOrderCount:
+          validOrders.length,
+
+        settledOrderIds:
+          validOrders.map(
+            item =>
+              item.orderId
+          ),
+
+        totalRemittedAmount:
+          Math.round(
+            totalRemittedAmount
+          ),
+
+        skippedOrderCount:
+          skippedOrders.length,
+
+        skippedOrders,
+      });
+
+    } catch (err) {
+      console.error(
+        '❌ 確認騎士現金回繳失敗：',
+        err
+      );
+
+      return res
+        .status(500)
+        .json({
+          success: false,
+
+          message:
+            '確認騎士現金回繳失敗。',
+
+          error:
+            err.message,
+        });
+    }
+  }
+);
+
 // 讀取所有店家應收帳款
 app.get('/api/admin/merchant-receivables', async (req, res) => {
   try {
