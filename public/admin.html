@@ -5,14 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UBee 跑腿｜財務結算中心</title>
 <style>
+*{
+  box-sizing:border-box;
+}
 body{
   margin:0;
   background:#050505;
   color:#fff;
   font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;
 }
+button{
+  font-family:inherit;
+}
 .app{
-  max-width:520px;
+  max-width:620px;
   margin:0 auto;
   padding:22px 16px 80px;
 }
@@ -25,7 +31,19 @@ body{
   color:#aaa;
   font-size:14px;
   font-weight:800;
+  line-height:1.7;
   margin-bottom:20px;
+}
+.top-actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-bottom:16px;
+}
+.top-actions .btn{
+  margin-top:0;
+  padding:12px 8px;
+  font-size:14px;
 }
 .stat{
   background:#111;
@@ -45,6 +63,13 @@ body{
   color:#facc15;
   margin-top:8px;
 }
+.stat-meta{
+  color:#aaa;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.7;
+  margin-top:8px;
+}
 .card{
   background:#111;
   border:1px solid rgba(255,255,255,.12);
@@ -52,15 +77,87 @@ body{
   padding:16px;
   margin-bottom:14px;
 }
+.rider-card{
+  border-color:rgba(250,204,21,.38);
+}
+.rider-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  padding-bottom:13px;
+  margin-bottom:8px;
+  border-bottom:1px solid rgba(255,255,255,.1);
+}
+.rider-name{
+  font-size:20px;
+  font-weight:1000;
+  line-height:1.35;
+}
+.rider-meta{
+  color:#aaa;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.65;
+  margin-top:5px;
+  word-break:break-word;
+}
+.rider-total{
+  flex:0 0 auto;
+  color:#f87171;
+  font-size:24px;
+  font-weight:1000;
+  text-align:right;
+}
+.rider-count{
+  color:#aaa;
+  font-size:12px;
+  font-weight:800;
+  margin-top:5px;
+  text-align:right;
+}
+.order-card{
+  background:#181818;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:18px;
+  padding:14px;
+  margin-top:12px;
+}
+.order-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:7px;
+}
+.order-no{
+  font-size:15px;
+  font-weight:1000;
+  word-break:break-word;
+}
+.tag{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:5px 9px;
+  border-radius:999px;
+  background:rgba(248,113,113,.13);
+  color:#fca5a5;
+  font-size:12px;
+  font-weight:1000;
+}
 .row{
   display:flex;
   justify-content:space-between;
+  align-items:flex-start;
   gap:12px;
   padding:8px 0;
   border-bottom:1px solid rgba(255,255,255,.08);
   font-size:15px;
+  line-height:1.5;
 }
-.row:last-child{
+.row:last-of-type{
   border-bottom:none;
 }
 .label{
@@ -68,12 +165,19 @@ body{
   font-weight:800;
 }
 .value{
+  max-width:65%;
   font-weight:1000;
   text-align:right;
+  word-break:break-word;
 }
 .fee{
   color:#22c55e;
   font-size:24px;
+  font-weight:1000;
+}
+.due{
+  color:#f87171;
+  font-size:21px;
   font-weight:1000;
 }
 .btn{
@@ -86,9 +190,29 @@ body{
   color:#111;
   font-size:17px;
   font-weight:1000;
+  cursor:pointer;
 }
 .btn:disabled{
   opacity:.45;
+  cursor:not-allowed;
+}
+.btn-dark{
+  background:#222;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.14);
+}
+.btn-dark.active{
+  background:#facc15;
+  color:#111;
+  border-color:#facc15;
+}
+.btn-red{
+  background:#ef4444;
+  color:#fff;
+}
+.btn-small{
+  padding:12px;
+  font-size:15px;
 }
 .empty{
   text-align:center;
@@ -97,28 +221,17 @@ body{
   font-weight:800;
   line-height:1.7;
 }
-.top-actions{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-bottom:16px;
-}
-
-.top-actions .btn{
-  margin-top:0;
-  padding:12px 8px;
-  font-size:14px;
-}
-
-@media (max-width:420px){
+@media (max-width:520px){
   .top-actions{
     grid-template-columns:1fr;
   }
-}
-.btn-dark{
-  background:#222;
-  color:#fff;
-  border:1px solid rgba(255,255,255,.14);
+  .rider-header{
+    flex-direction:column;
+  }
+  .rider-total,
+  .rider-count{
+    text-align:left;
+  }
 }
 </style>
 </head>
@@ -126,29 +239,39 @@ body{
 <body>
 <div class="app">
   <div class="title">UBee 跑腿財務結算中心</div>
-  <div class="sub">管理騎士待撥款、街口支付結算與店家月結應收帳款。</div>
+  <div class="sub">管理騎士現金回繳與街口支付待撥款。店家應收款與店家月結功能已移除。</div>
 
   <div class="top-actions">
-  <button class="btn btn-dark" onclick="loadSettlements()">騎士待撥款(街口)</button>
-  <button class="btn btn-dark" onclick="loadMerchantReceivables()">店家應收款</button>
-  <button class="btn btn-dark" onclick="location.reload()">重載頁面Reset</button>
-</div>
+    <button id="cashTabButton" class="btn btn-dark active" onclick="loadCashRemittances()">
+      騎士現金回繳
+    </button>
+
+    <button id="settlementTabButton" class="btn btn-dark" onclick="loadSettlements()">
+      騎士待撥款（街口）
+    </button>
+
+    <button class="btn btn-dark" onclick="refreshCurrentView()">
+      重新整理
+    </button>
+  </div>
 
   <div class="stat">
-  <div class="stat-label" id="mainStatLabel">騎士待撥款總額</div>
-  <div class="stat-value" id="pendingTotal">$0</div>
-</div>
+    <div class="stat-label" id="mainStatLabel">騎士待回繳平台總額</div>
+    <div class="stat-value" id="pendingTotal">$0</div>
+    <div class="stat-meta" id="mainStatMeta">正在讀取現金回繳資料...</div>
+  </div>
 
   <div id="list">
-    <div class="empty">正在讀取待結算資料...</div>
+    <div class="empty">正在讀取財務資料...</div>
   </div>
 </div>
 
 <script>
 const API_BASE = window.location.origin;
+let currentView = "cash-remittances";
 
 function money(n){
-  return "$" + Number(n || 0).toLocaleString("zh-TW");
+  return "$" + Math.round(Number(n || 0)).toLocaleString("zh-TW");
 }
 
 function escapeHtml(str){
@@ -165,7 +288,6 @@ function getPaymentText(method){
 
   if(text.includes("jko") || text.includes("街口")) return "街口支付";
   if(text.includes("cash") || text.includes("現金")) return "現金";
-  if(text.includes("merchant")) return "店家月結";
   if(text.includes("platform")) return "平台收款";
 
   return method || "未設定";
@@ -183,37 +305,372 @@ function formatTime(value){
       return new Date(value.seconds * 1000).toLocaleString("zh-TW");
     }
 
-    return new Date(value).toLocaleString("zh-TW");
+    const date = new Date(value);
+
+    if(Number.isNaN(date.getTime())){
+      return "-";
+    }
+
+    return date.toLocaleString("zh-TW");
   }catch(e){
     return "-";
   }
 }
 
-async function loadSettlements(){
+function setActiveView(view){
+  currentView = view;
+
+  document.getElementById("cashTabButton").classList.toggle(
+    "active",
+    view === "cash-remittances"
+  );
+
+  document.getElementById("settlementTabButton").classList.toggle(
+    "active",
+    view === "settlements"
+  );
+}
+
+async function refreshCurrentView(){
+  if(currentView === "settlements"){
+    await loadSettlements();
+    return;
+  }
+
+  await loadCashRemittances();
+}
+
+async function readJsonResponse(res){
+  const data = await res.json().catch(() => ({}));
+
+  if(!res.ok || data.success === false){
+    throw new Error(
+      data.message ||
+      data.error ||
+      `HTTP ${res.status}`
+    );
+  }
+
+  return data;
+}
+
+async function loadCashRemittances(){
+  setActiveView("cash-remittances");
+
   const list = document.getElementById("list");
   const pendingTotal = document.getElementById("pendingTotal");
   const mainStatLabel = document.getElementById("mainStatLabel");
+  const mainStatMeta = document.getElementById("mainStatMeta");
 
-  if(mainStatLabel){
-    mainStatLabel.innerText = "騎士待撥款總額";
+  mainStatLabel.innerText = "騎士待回繳平台總額";
+  pendingTotal.innerText = "$0";
+  mainStatMeta.innerText = "正在讀取現金回繳資料...";
+  list.innerHTML = `<div class="empty">正在讀取騎士待回繳現金...</div>`;
+
+  try{
+    const res = await fetch(
+      `${API_BASE}/api/admin/cash-remittances?t=${Date.now()}`,
+      { cache:"no-store" }
+    );
+
+    const data = await readJsonResponse(res);
+
+    pendingTotal.innerText = money(data.totalDueToPlatform || 0);
+    mainStatMeta.innerText =
+      `共 ${Number(data.riderCount || 0)} 位騎士・` +
+      `${Number(data.pendingOrderCount || 0)} 筆待回繳・` +
+      `客人現金代收總額 ${money(data.totalCashCollected || 0)}`;
+
+    const riders = Array.isArray(data.riders)
+      ? data.riders
+      : [];
+
+    if(!riders.length){
+      list.innerHTML = `
+        <div class="empty">
+          目前沒有騎士待回繳現金。<br>
+          已完成回繳的訂單不會再顯示於此頁。
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = riders.map(rider => {
+      const orders = Array.isArray(rider.orders)
+        ? rider.orders
+        : [];
+
+      const orderIds = orders
+        .map(order => String(order.id || "").trim())
+        .filter(Boolean);
+
+      const encodedOrderIds = encodeURIComponent(
+        JSON.stringify(orderIds)
+      );
+
+      return `
+        <section class="card rider-card">
+          <div class="rider-header">
+            <div>
+              <div class="rider-name">
+                ${escapeHtml(rider.riderName || "未設定騎士姓名")}
+              </div>
+
+              <div class="rider-meta">
+                電話：${escapeHtml(rider.riderPhone || "-")}<br>
+                騎士識別：${escapeHtml(
+                  rider.riderId ||
+                  rider.riderDocId ||
+                  rider.riderLineUserId ||
+                  rider.riderKey ||
+                  "-"
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div class="rider-total">
+                ${money(rider.cashDueToPlatform || 0)}
+              </div>
+              <div class="rider-count">
+                ${Number(rider.orderCount || orders.length || 0)} 筆待回繳
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="label">客人現金代收總額</div>
+            <div class="value">${money(rider.cashCollectedTotal || 0)}</div>
+          </div>
+
+          ${orders.map(order => `
+            <div class="order-card">
+              <div class="order-head">
+                <div class="order-no">
+                  ${escapeHtml(order.orderNo || order.id || "-")}
+                </div>
+                <div class="tag">尚未回繳</div>
+              </div>
+
+              <div class="row">
+                <div class="label">付款方式</div>
+                <div class="value">
+                  ${escapeHtml(getPaymentText(order.paymentMethod))}
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="label">完成時間</div>
+                <div class="value">
+                  ${escapeHtml(formatTime(order.completedAt))}
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="label">客人支付現金</div>
+                <div class="value">${money(order.customerTotal || 0)}</div>
+              </div>
+
+              <div class="row">
+                <div class="label">騎士代墊款</div>
+                <div class="value">${money(order.advancePayment || 0)}</div>
+              </div>
+
+              <div class="row">
+                <div class="label">騎士任務收入</div>
+                <div class="value">${money(order.riderIncome || 0)}</div>
+              </div>
+
+              <div class="row">
+                <div class="label">應回繳平台</div>
+                <div class="due">${money(order.cashDueToPlatform || 0)}</div>
+              </div>
+
+              <button
+                class="btn btn-red btn-small cash-order-settle-button"
+                data-order-id="${escapeHtml(order.id || "")}"
+                data-amount="${Number(order.cashDueToPlatform || 0)}"
+              >
+                確認此筆已回繳
+              </button>
+            </div>
+          `).join("")}
+
+          ${orderIds.length > 1 ? `
+            <button
+              class="btn rider-batch-settle-button"
+              data-order-ids="${escapeHtml(encodedOrderIds)}"
+              data-rider-name="${escapeHtml(rider.riderName || "此騎士")}"
+              data-amount="${Number(rider.cashDueToPlatform || 0)}"
+            >
+              確認此騎士全部已回繳
+            </button>
+          ` : ""}
+        </section>
+      `;
+    }).join("");
+
+    bindCashRemittanceButtons();
+
+  }catch(err){
+    console.error(err);
+    mainStatMeta.innerText = "讀取失敗";
+    list.innerHTML = `
+      <div class="empty">
+        讀取騎士現金回繳失敗：${escapeHtml(err.message)}
+      </div>
+    `;
+  }
+}
+
+function bindCashRemittanceButtons(){
+  document.querySelectorAll(".cash-order-settle-button").forEach(button => {
+    button.addEventListener("click", () => {
+      const orderId = button.dataset.orderId || "";
+      const amount = Number(button.dataset.amount || 0);
+
+      settleCashRemittances({
+        orderIds:[orderId],
+        amount,
+        button,
+        confirmText:
+          `確認已收到此筆騎士現金回繳？\n\n` +
+          `訂單：${orderId}\n` +
+          `回繳金額：${money(amount)}\n\n` +
+          `確認後，這筆訂單會從待回繳清單移除，騎士端重新讀取後金額也會同步扣除。`
+      });
+    });
+  });
+
+  document.querySelectorAll(".rider-batch-settle-button").forEach(button => {
+    button.addEventListener("click", () => {
+      let orderIds = [];
+
+      try{
+        orderIds = JSON.parse(
+          decodeURIComponent(button.dataset.orderIds || "%5B%5D")
+        );
+      }catch(e){
+        orderIds = [];
+      }
+
+      const riderName = button.dataset.riderName || "此騎士";
+      const amount = Number(button.dataset.amount || 0);
+
+      settleCashRemittances({
+        orderIds,
+        amount,
+        button,
+        confirmText:
+          `確認已收到「${riderName}」全部現金回繳？\n\n` +
+          `共 ${orderIds.length} 筆訂單\n` +
+          `回繳總額：${money(amount)}\n\n` +
+          `確認後，這些訂單會一次從待回繳清單移除。`
+      });
+    });
+  });
+}
+
+async function settleCashRemittances({
+  orderIds,
+  amount,
+  button,
+  confirmText
+}){
+  const cleanOrderIds = Array.from(
+    new Set(
+      (Array.isArray(orderIds) ? orderIds : [])
+        .map(value => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if(!cleanOrderIds.length){
+    alert("缺少需要確認回繳的訂單 ID。");
+    return;
   }
 
-  pendingTotal.innerText = "$0";
-  list.innerHTML = `<div class="empty">正在讀取騎士待撥款資料...</div>`;
-  try{
-    const res = await fetch(`${API_BASE}/api/admin/pending-settlements?t=${Date.now()}`);
-    const data = await res.json();
+  const ok = confirm(confirmText);
+  if(!ok) return;
 
-    if(!res.ok || data.success === false){
-      throw new Error(data.message || data.error || "讀取失敗");
-    }
+  const originalText = button.innerText;
+  button.disabled = true;
+  button.innerText = "確認回繳中...";
+
+  try{
+    const requestBody = cleanOrderIds.length === 1
+      ? {
+          orderId:cleanOrderIds[0],
+          remittedBy:"finance_center"
+        }
+      : {
+          orderIds:cleanOrderIds,
+          remittedBy:"finance_center"
+        };
+
+    const res = await fetch(
+      `${API_BASE}/api/admin/cash-remittances/settle`,
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify(requestBody)
+      }
+    );
+
+    const data = await readJsonResponse(res);
+
+    alert(
+      `騎士現金回繳已確認。\n\n` +
+      `成功處理：${Number(data.settledOrderCount || 0)} 筆\n` +
+      `回繳總額：${money(data.totalRemittedAmount || amount || 0)}` +
+      `${Number(data.skippedOrderCount || 0) > 0
+        ? `\n略過：${Number(data.skippedOrderCount || 0)} 筆`
+        : ""}`
+    );
+
+    await loadCashRemittances();
+
+  }catch(err){
+    console.error(err);
+    alert("確認現金回繳失敗：" + err.message);
+    button.disabled = false;
+    button.innerText = originalText;
+  }
+}
+
+async function loadSettlements(){
+  setActiveView("settlements");
+
+  const list = document.getElementById("list");
+  const pendingTotal = document.getElementById("pendingTotal");
+  const mainStatLabel = document.getElementById("mainStatLabel");
+  const mainStatMeta = document.getElementById("mainStatMeta");
+
+  mainStatLabel.innerText = "騎士待撥款總額";
+  pendingTotal.innerText = "$0";
+  mainStatMeta.innerText = "正在讀取街口支付待撥款資料...";
+  list.innerHTML = `<div class="empty">正在讀取騎士待撥款資料...</div>`;
+
+  try{
+    const res = await fetch(
+      `${API_BASE}/api/admin/pending-settlements?t=${Date.now()}`,
+      { cache:"no-store" }
+    );
+
+    const data = await readJsonResponse(res);
 
     pendingTotal.innerText = money(data.pendingTotal || 0);
 
-    const orders = Array.isArray(data.orders) ? data.orders : [];
+    const orders = Array.isArray(data.orders)
+      ? data.orders
+      : [];
+
+    mainStatMeta.innerText = `共 ${orders.length} 筆街口支付待撥款`;
 
     if(!orders.length){
-      list.innerHTML = `<div class="empty">目前沒有待結算訂單。</div>`;
+      list.innerHTML = `<div class="empty">目前沒有待撥款訂單。</div>`;
       return;
     }
 
@@ -226,32 +683,50 @@ async function loadSettlements(){
 
         <div class="row">
           <div class="label">騎士</div>
-          <div class="value">${escapeHtml(order.riderName || order.driverName || order.riderId || "-")}</div>
+          <div class="value">
+            ${escapeHtml(order.riderName || order.driverName || order.riderId || "-")}
+          </div>
         </div>
 
         <div class="row">
           <div class="label">付款方式</div>
-          <div class="value">${escapeHtml(getPaymentText(order.paymentMethod || order.payMethod || order.paymentType))}</div>
+          <div class="value">
+            ${escapeHtml(getPaymentText(order.paymentMethod || order.payMethod || order.paymentType))}
+          </div>
         </div>
 
         <div class="row">
           <div class="label">完成時間</div>
-          <div class="value">${escapeHtml(formatTime(order.completedAt || order.updatedAt))}</div>
+          <div class="value">
+            ${escapeHtml(formatTime(order.completedAt || order.updatedAt))}
+          </div>
         </div>
 
         <div class="row">
           <div class="label">騎士收入</div>
-          <div class="fee">${money(order.riderFee || order.driverFee || order.fee || 0)}</div>
+          <div class="fee">
+            ${money(order.riderFee || order.driverFee || order.fee || 0)}
+          </div>
         </div>
 
-        <button class="btn" onclick="settleOrder('${escapeHtml(order.id)}', this)">
+        <button
+          class="btn settlement-button"
+          data-order-id="${escapeHtml(order.id || "")}"
+        >
           完成結算
         </button>
       </div>
     `).join("");
 
+    document.querySelectorAll(".settlement-button").forEach(button => {
+      button.addEventListener("click", () => {
+        settleOrder(button.dataset.orderId || "", button);
+      });
+    });
+
   }catch(err){
     console.error(err);
+    mainStatMeta.innerText = "讀取失敗";
     list.innerHTML = `<div class="empty">讀取失敗：${escapeHtml(err.message)}</div>`;
   }
 }
@@ -262,9 +737,13 @@ async function settleOrder(orderId, btn){
     return;
   }
 
-  const ok = confirm("確認已經撥款給騎士？\n\n確認後，這筆訂單會從待結算轉為已結算。");
+  const ok = confirm(
+    "確認已經撥款給騎士？\n\n確認後，這筆訂單會從待結算轉為已結算。"
+  );
+
   if(!ok) return;
 
+  const originalText = btn.innerText;
   btn.disabled = true;
   btn.innerText = "結算中...";
 
@@ -275,11 +754,7 @@ async function settleOrder(orderId, btn){
       body:JSON.stringify({ orderId })
     });
 
-    const data = await res.json();
-
-    if(!res.ok || data.success === false){
-      throw new Error(data.message || data.error || "結算失敗");
-    }
+    await readJsonResponse(res);
 
     alert("已完成結算");
     await loadSettlements();
@@ -288,148 +763,11 @@ async function settleOrder(orderId, btn){
     console.error(err);
     alert("結算失敗：" + err.message);
     btn.disabled = false;
-    btn.innerText = "完成結算";
+    btn.innerText = originalText;
   }
 }
 
-async function loadMerchantReceivables(){
-  const list = document.getElementById("list");
-  const pendingTotal = document.getElementById("pendingTotal");
-  const mainStatLabel = document.getElementById("mainStatLabel");
-
-  if(mainStatLabel){
-    mainStatLabel.innerText = "店家未結清總額";
-  }
-
-  pendingTotal.innerText = "$0";
-  list.innerHTML = `<div class="empty">正在讀取店家應收帳款...</div>`;
-
-  try{
-    const res = await fetch(`${API_BASE}/api/admin/merchant-receivables?t=${Date.now()}`);
-    const data = await res.json();
-
-    if(!res.ok || data.success === false){
-      throw new Error(data.message || data.error || "讀取失敗");
-    }
-
-    pendingTotal.innerText = money(data.unpaidTotal || 0);
-
-    const merchants = Array.isArray(data.merchants)
-  ? data.merchants.filter(merchant => Number(merchant.unpaidAmount || 0) > 0)
-  : [];
-
-    if(!merchants.length){
-      list.innerHTML = `<div class="empty">目前沒有店家未結清帳款。</div>`;
-      return;
-    }
-
-    list.innerHTML = merchants.map(merchant => `
-      <div class="card">
-        <div class="row">
-          <div class="label">店家名稱</div>
-          <div class="value">${escapeHtml(merchant.merchantName || "-")}</div>
-        </div>
-
-        <div class="row">
-          <div class="label">店家電話</div>
-          <div class="value">${escapeHtml(merchant.merchantPhone || "-")}</div>
-        </div>
-
-        <div class="row">
-          <div class="label">未結清金額</div>
-          <div class="fee">${money(merchant.unpaidAmount || 0)}</div>
-        </div>
-
-        <div class="row">
-          <div class="label">未結清筆數</div>
-          <div class="value">${Number(merchant.unpaidCount || 0)} 筆</div>
-        </div>
-
-        <div class="row">
-          <div class="label">已結清金額</div>
-          <div class="value">${money(merchant.paidAmount || 0)}</div>
-        </div>
-
-        ${(merchant.orders || []).length ? `
-          <div class="row">
-            <div class="label">未結清明細</div>
-            <div class="value">${Number((merchant.orders || []).length)} 筆</div>
-          </div>
-        ` : ""}
-
-        ${(merchant.orders || []).map(order => `
-          <div class="card" style="background:#181818;margin-top:12px;">
-            <div class="row">
-              <div class="label">訂單編號</div>
-              <div class="value">${escapeHtml(order.orderNo || order.id || "-")}</div>
-            </div>
-
-            <div class="row">
-              <div class="label">應收金額</div>
-              <div class="fee">${money(order.amount || 0)}</div>
-            </div>
-
-            <div class="row">
-              <div class="label">完成時間</div>
-              <div class="value">${escapeHtml(formatTime(order.completedAt || order.createdAt))}</div>
-            </div>
-
-            <div class="row">
-              <div class="label">付款方式</div>
-              <div class="value">${escapeHtml(getPaymentText(order.paymentMethod || order.paymentMethodLabel))}</div>
-            </div>
-
-            <button class="btn" onclick="settleMerchantReceivable('${escapeHtml(order.id)}', this)">
-              標記店家已結清
-            </button>
-          </div>
-        `).join("")}
-      </div>
-    `).join("");
-
-  }catch(err){
-    console.error(err);
-    list.innerHTML = `<div class="empty">讀取店家帳款失敗：${escapeHtml(err.message)}</div>`;
-  }
-}
-
-async function settleMerchantReceivable(orderId, btn){
-  if(!orderId){
-    alert("缺少訂單 ID");
-    return;
-  }
-
-  const ok = confirm("確認店家已完成付款？\n\n確認後，這筆店家應收款會標記為已結清。");
-  if(!ok) return;
-
-  btn.disabled = true;
-  btn.innerText = "結清中...";
-
-  try{
-    const res = await fetch(`${API_BASE}/api/admin/merchant-receivables/settle-order`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({ orderId })
-    });
-
-    const data = await res.json();
-
-    if(!res.ok || data.success === false){
-      throw new Error(data.message || data.error || "結清失敗");
-    }
-
-    alert("店家帳款已標記結清");
-    await loadMerchantReceivables();
-
-  }catch(err){
-    console.error(err);
-    alert("店家帳款結清失敗：" + err.message);
-    btn.disabled = false;
-    btn.innerText = "標記店家已結清";
-  }
-}
-  
-loadSettlements();
+loadCashRemittances();
 </script>
 </body>
 </html>
