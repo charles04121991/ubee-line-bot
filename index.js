@@ -1945,12 +1945,91 @@ function getOrderPaymentMethod(order) {
   ).trim().toLowerCase();
 }
 
-function getOrderPaymentStatus(order) {
-  return String(
-    order?.paymentStatus ||
-    order?.payStatus ||
-    ''
-  ).trim().toLowerCase();
+// ===== UBee 現金訂單／騎士回繳狀態工具 =====
+
+// 統一判斷訂單是否為現金單
+function isCashPaymentOrder(order) {
+  if (!order) {
+    return false;
+  }
+
+  const paymentMethod =
+    getOrderPaymentMethod(order);
+
+  const paymentStatus =
+    getOrderPaymentStatus(order);
+
+  return (
+    order.isCashOrder === true ||
+    paymentMethod === 'cash' ||
+    paymentMethod.includes('cash') ||
+    paymentMethod.includes('現金') ||
+    paymentStatus === 'cash_on_delivery' ||
+    paymentStatus === 'cash_pending' ||
+    paymentStatus.includes('現金')
+  );
+}
+
+
+// 取得現金回繳狀態
+function getOrderCashRemittanceStatus(order) {
+  const status = String(
+    order?.cashRemittanceStatus ||
+    order?.cashSettlementStatus ||
+    order?.remittanceStatus ||
+    'pending'
+  )
+    .trim()
+    .toLowerCase();
+
+  return status || 'pending';
+}
+
+
+// 判斷這張現金訂單是否已經完成回繳
+function isCashRemittanceSettled(order) {
+  const status =
+    getOrderCashRemittanceStatus(order);
+
+  return [
+    'settled',
+    'remitted',
+    'paid',
+    'completed',
+  ].includes(status);
+}
+
+
+// 取得騎士應繳回平台的金額
+function getOrderCashDueToPlatformAmount(
+  order,
+  fallbackAmount = 0
+) {
+  const directAmount =
+    getOrderMoneyValue(
+      order,
+      [
+        'cashDueToPlatform',
+        'platformReceivable',
+        'riderDueToPlatform',
+      ]
+    );
+
+  if (directAmount !== null) {
+    return directAmount;
+  }
+
+  const fallback =
+    Number(fallbackAmount);
+
+  if (
+    Number.isFinite(fallback) &&
+    fallback > 0
+  ) {
+    return Math.round(fallback);
+  }
+
+  return 0;
 }
 
 function getOrderMoneyValue(order, fields) {
@@ -2798,25 +2877,15 @@ const riderIncome =
       platformIncome +=
         orderPlatformIncome;
 
+            // ------------------------------
+      // 判斷付款方式與結算狀態
       // ------------------------------
-      // 判斷付款方式
-      // ------------------------------
-      const paymentMethodText =
-        getOrderPaymentMethod(order);
-
-      const paymentStatusText =
-        getOrderPaymentStatus(order);
-
       const isCashOrder =
-        order.isCashOrder === true ||
-        paymentMethodText === 'cash' ||
-        paymentMethodText.includes('cash') ||
-        paymentMethodText.includes('現金') ||
-        paymentStatusText ===
-          'cash_on_delivery' ||
-        paymentStatusText ===
-          'cash_pending' ||
-        paymentStatusText.includes('現金');
+        isCashPaymentOrder(order);
+
+      const cashRemittanceSettled =
+        isCashOrder &&
+        isCashRemittanceSettled(order);
 
       const settlementStatus =
         String(
@@ -2828,19 +2897,29 @@ const riderIncome =
 
       // ==============================
       // 現金單
+      //
+      // 只有尚未回繳的平台款項，
+      // 才會顯示在騎士錢包中。
       // ==============================
       if (isCashOrder) {
-        // 騎士從客人收到的現金總額
-        cashCollectedTotal +=
-          customerTotal;
+        if (!cashRemittanceSettled) {
+          // 騎士目前尚未結算的現金總額
+          cashCollectedTotal +=
+            customerTotal;
 
-        // 騎士需回繳給平台的金額
-        cashDueToPlatform +=
-          orderPlatformIncome;
+          // 騎士目前應回繳給平台的金額
+          cashDueToPlatform +=
+            getOrderCashDueToPlatformAmount(
+              order,
+              orderPlatformIncome
+            );
+        }
       }
 
       // ==============================
       // 非現金單
+      //
+      // 平台已收款，之後由平台撥款給騎士。
       // ==============================
       else {
         if (
@@ -2848,6 +2927,7 @@ const riderIncome =
         ) {
           settledIncome +=
             riderIncome;
+
         } else {
           pendingIncome +=
             riderIncome;
@@ -3321,6 +3401,357 @@ function isMerchantReceivableOrder(order) {
     notCancelled
   );
 }
+
+// ===== UBee 財務中心：讀取騎士待回繳現金 =====
+
+app.get(
+  '/api/admin/cash-remittances',
+  async (req, res) => {
+    try {
+      // 不使用複合索引：
+      // 先取得已完成訂單，再由後端判斷付款方式與回繳狀態。
+      const snap = await db
+        .collection('orders')
+        .where('status', '==', 'completed')
+        .limit(500)
+        .get();
+
+      const riderMap = new Map();
+
+      let totalCashCollected = 0;
+      let totalDueToPlatform = 0;
+      let pendingOrderCount = 0;
+
+      snap.forEach(doc => {
+        const order = {
+          id: doc.id,
+          ...doc.data(),
+        };
+
+        // 只處理現金訂單
+        if (!isCashPaymentOrder(order)) {
+          return;
+        }
+
+        // 已經完成回繳的訂單不再顯示
+        if (isCashRemittanceSettled(order)) {
+          return;
+        }
+
+        // ==============================
+        // 客人實際交給騎士的現金總額
+        // ==============================
+        const customerTotal =
+          getOrderMoneyValue(
+            order,
+            [
+              'customerPayableTotal',
+              'payableTotal',
+              'finalTotal',
+              'total',
+              'riderDisplayTotal',
+              'cashCollectAmount',
+              'cashCollectedAmount',
+              'cashGrossCollected',
+            ]
+          ) || 0;
+
+        // ==============================
+        // 騎士收入
+        // ==============================
+        const riderIncome =
+          getOrderMoneyValue(
+            order,
+            [
+              'riderFee',
+              'driverFee',
+              'riderIncome',
+              'riderEarning',
+              'riderPayout',
+              'riderShare',
+              'fee',
+              'price',
+            ]
+          ) || 0;
+
+        // ==============================
+        // 騎士代墊金額
+        // 這筆錢由騎士從客人現金中收回，
+        // 不屬於平台應收。
+        // ==============================
+        const advancePayment =
+          getOrderMoneyValue(
+            order,
+            [
+              'advancePayment',
+              'advanceAmount',
+              'advancePay',
+              'advanceFee',
+              'cashAdvanceRecovered',
+            ]
+          ) || 0;
+
+        // ==============================
+        // 舊訂單沒有直接儲存平台應收時：
+        //
+        // 客人現金總額
+        // - 騎士代墊款
+        // - 騎士收入
+        // = 騎士應繳回平台
+        // ==============================
+        const fallbackPlatformDue =
+          Math.max(
+            0,
+            Math.round(
+              customerTotal -
+              advancePayment -
+              riderIncome
+            )
+          );
+
+        const cashDueToPlatform =
+          getOrderCashDueToPlatformAmount(
+            order,
+            fallbackPlatformDue
+          );
+
+        // 沒有平台應收金額就不需要列入回繳清單
+        if (cashDueToPlatform <= 0) {
+          return;
+        }
+
+        // ==============================
+        // 建立騎士分組識別
+        // ==============================
+        const riderDocId =
+          String(
+            order.riderDocId || ''
+          ).trim();
+
+        const riderId =
+          String(
+            order.riderId ||
+            order.driverId ||
+            ''
+          ).trim();
+
+        const riderPhone =
+          normalizePhone(
+            order.riderPhone ||
+            order.driverPhone ||
+            ''
+          );
+
+        const riderLineUserId =
+          String(
+            order.riderLineUserId ||
+            order.lineUserId ||
+            ''
+          ).trim();
+
+        const riderKey =
+          riderDocId ||
+          riderId ||
+          riderPhone ||
+          riderLineUserId ||
+          `unknown_${doc.id}`;
+
+        const riderName =
+          String(
+            order.riderName ||
+            order.driverName ||
+            '未設定騎士姓名'
+          ).trim();
+
+        if (!riderMap.has(riderKey)) {
+          riderMap.set(
+            riderKey,
+            {
+              riderKey,
+
+              riderDocId,
+              riderId,
+              riderPhone,
+              riderLineUserId,
+              riderName,
+
+              cashCollectedTotal: 0,
+              cashDueToPlatform: 0,
+              orderCount: 0,
+              orderIds: [],
+              orders: [],
+            }
+          );
+        }
+
+        const riderGroup =
+          riderMap.get(riderKey);
+
+        riderGroup.cashCollectedTotal +=
+          customerTotal;
+
+        riderGroup.cashDueToPlatform +=
+          cashDueToPlatform;
+
+        riderGroup.orderCount += 1;
+
+        riderGroup.orderIds.push(
+          doc.id
+        );
+
+        riderGroup.orders.push({
+          id: doc.id,
+
+          orderNo:
+            order.orderNo ||
+            doc.id,
+
+          riderName,
+          riderId,
+          riderDocId,
+          riderPhone,
+          riderLineUserId,
+
+          paymentMethod:
+            getOrderPaymentMethod(order),
+
+          customerTotal,
+          riderIncome,
+          advancePayment,
+          cashDueToPlatform,
+
+          cashRemittanceStatus:
+            getOrderCashRemittanceStatus(
+              order
+            ),
+
+          completedAt:
+            order.completedAt ||
+            order.finishedAt ||
+            order.updatedAt ||
+            null,
+        });
+
+        totalCashCollected +=
+          customerTotal;
+
+        totalDueToPlatform +=
+          cashDueToPlatform;
+
+        pendingOrderCount += 1;
+      });
+
+      const riders =
+        Array.from(
+          riderMap.values()
+        );
+
+      // 金額較高的騎士排在前面
+      riders.sort(
+        (a, b) =>
+          Number(
+            b.cashDueToPlatform || 0
+          ) -
+          Number(
+            a.cashDueToPlatform || 0
+          )
+      );
+
+      // 每名騎士的訂單以完成時間新到舊排列
+      riders.forEach(rider => {
+        rider.orders.sort(
+          (a, b) => {
+            const getTimeMs = value => {
+              if (!value) {
+                return 0;
+              }
+
+              if (
+                typeof value.toDate ===
+                'function'
+              ) {
+                return value
+                  .toDate()
+                  .getTime();
+              }
+
+              if (
+                typeof value.seconds ===
+                'number'
+              ) {
+                return (
+                  value.seconds * 1000
+                );
+              }
+
+              if (
+                typeof value._seconds ===
+                'number'
+              ) {
+                return (
+                  value._seconds * 1000
+                );
+              }
+
+              const parsed =
+                new Date(value).getTime();
+
+              return Number.isFinite(
+                parsed
+              )
+                ? parsed
+                : 0;
+            };
+
+            return (
+              getTimeMs(b.completedAt) -
+              getTimeMs(a.completedAt)
+            );
+          }
+        );
+      });
+
+      return res.json({
+        success: true,
+
+        totalCashCollected:
+          Math.round(
+            totalCashCollected
+          ),
+
+        totalDueToPlatform:
+          Math.round(
+            totalDueToPlatform
+          ),
+
+        pendingOrderCount,
+
+        riderCount:
+          riders.length,
+
+        riders,
+      });
+
+    } catch (err) {
+      console.error(
+        '❌ 讀取騎士待回繳現金失敗：',
+        err
+      );
+
+      return res
+        .status(500)
+        .json({
+          success: false,
+
+          message:
+            '讀取騎士待回繳現金失敗。',
+
+          error:
+            err.message,
+        });
+    }
+  }
+);
 
 // 讀取所有店家應收帳款
 app.get('/api/admin/merchant-receivables', async (req, res) => {
@@ -10392,12 +10823,70 @@ app.post('/api/rider/update-order-status', async (req, res) => {
       }
 
       if (status === 'completed') {
-        updateData.completedAt = admin.firestore.FieldValue.serverTimestamp();
-        updateData.finishedAt = admin.firestore.FieldValue.serverTimestamp();
-        updateData.settlementStatus = 'pending';
-        updateData.settledAt = null;
-      }
+  const isCashOrder =
+    isCashPaymentOrder(order);
 
+  updateData.completedAt =
+    admin.firestore.FieldValue
+      .serverTimestamp();
+
+  updateData.finishedAt =
+    admin.firestore.FieldValue
+      .serverTimestamp();
+
+  // ==============================
+  // 現金訂單
+  //
+  // 客人的款項由騎士收取，
+  // 騎士之後需要把平台收入繳回平台。
+  // ==============================
+  if (isCashOrder) {
+    updateData.isCashOrder = true;
+
+    // 現金單不是平台撥款給騎士
+    updateData.settlementStatus =
+      'not_applicable';
+
+    updateData.settledAt = null;
+
+    // 建立現金回繳狀態
+    updateData.cashRemittanceStatus =
+      'pending';
+
+    updateData.cashRemittedAt = null;
+
+    updateData.cashRemittedBy = '';
+
+    updateData.cashRemittedAmount = 0;
+  }
+
+  // ==============================
+  // 非現金訂單
+  //
+  // 款項由平台收取，
+  // 平台之後需要撥款給騎士。
+  // ==============================
+  else {
+    updateData.isCashOrder = false;
+
+    // 建立平台待撥款狀態
+    updateData.settlementStatus =
+      'pending';
+
+    updateData.settledAt = null;
+
+    // 非現金單不需要騎士回繳
+    updateData.cashRemittanceStatus =
+      'not_applicable';
+
+    updateData.cashRemittedAt = null;
+
+    updateData.cashRemittedBy = '';
+
+    updateData.cashRemittedAmount = 0;
+  }
+}
+    
       transaction.update(orderRef, updateData);
 
       if (status === 'completed') {
