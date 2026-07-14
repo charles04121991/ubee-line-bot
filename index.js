@@ -1039,14 +1039,14 @@ ${isRedispatch
 // UBee 多層級距離擴圈派單
 //
 // 第 0 秒：3 公里
-// 第 15 秒：5 公里
-// 第 30 秒：8 公里
-// 第 45 秒：10 公里
-// 第 60 秒：12 公里
-// 第 80 秒：15 公里
-// 第 100 秒：17 公里
-// 第 120 秒：20 公里
-// 第 150 秒：全區
+// 第 10 秒：5 公里
+// 第 20 秒：8 公里
+// 第 30 秒：10 公里
+// 第 40 秒：12 公里
+// 第 50 秒：15 公里
+// 第 60 秒：17 公里
+// 第 70 秒：20 公里
+// 第 80 秒：全區
 //
 // 同一輪派單中：
 // 1. 已通知過的小U不重複通知。
@@ -1063,49 +1063,49 @@ const DISPATCH_PUSH_WAVES = [
     sendLineAdmin: true,
   },
   {
-    delayMs: 15000,
+    delayMs: 10000,
     radiusKm: 5,
     stage: "5km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 30000,
+    delayMs: 20000,
     radiusKm: 8,
     stage: "8km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 45000,
+    delayMs: 30000,
     radiusKm: 10,
     stage: "10km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 60000,
+    delayMs: 40000,
     radiusKm: 12,
     stage: "12km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 80000,
+    delayMs: 50000,
     radiusKm: 15,
     stage: "15km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 100000,
+    delayMs: 60000,
     radiusKm: 17,
     stage: "17km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 120000,
+    delayMs: 70000,
     radiusKm: 20,
     stage: "20km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 150000,
+    delayMs: 80000,
     radiusKm: null,
     stage: "all",
     sendLineAdmin: false,
