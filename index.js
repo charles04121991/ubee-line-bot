@@ -1035,7 +1035,82 @@ ${isRedispatch
   }
 }
 
-// ===== UBee 5km → 全區派單排程 =====
+// =====================================================
+// UBee 多層級距離擴圈派單
+//
+// 第 0 秒：3 公里
+// 第 15 秒：5 公里
+// 第 30 秒：8 公里
+// 第 45 秒：10 公里
+// 第 60 秒：12 公里
+// 第 80 秒：15 公里
+// 第 100 秒：17 公里
+// 第 120 秒：20 公里
+// 第 150 秒：全區
+//
+// 同一輪派單中：
+// 1. 已通知過的小U不重複通知。
+// 2. 訂單被接走、取消或完成後，停止後續擴圈。
+// 3. 使用 dispatchPushCycleId 避免舊計時器干擾新週期。
+// 4. LINE 管理群只在第一波通知一次。
+// =====================================================
+
+const DISPATCH_PUSH_WAVES = [
+  {
+    delayMs: 0,
+    radiusKm: 3,
+    stage: "3km",
+    sendLineAdmin: true,
+  },
+  {
+    delayMs: 15000,
+    radiusKm: 5,
+    stage: "5km",
+    sendLineAdmin: false,
+  },
+  {
+    delayMs: 30000,
+    radiusKm: 8,
+    stage: "8km",
+    sendLineAdmin: false,
+  },
+  {
+    delayMs: 45000,
+    radiusKm: 10,
+    stage: "10km",
+    sendLineAdmin: false,
+  },
+  {
+    delayMs: 60000,
+    radiusKm: 12,
+    stage: "12km",
+    sendLineAdmin: false,
+  },
+  {
+    delayMs: 80000,
+    radiusKm: 15,
+    stage: "15km",
+    sendLineAdmin: false,
+  },
+  {
+    delayMs: 100000,
+    radiusKm: 17,
+    stage: "17km",
+    sendLineAdmin: false,
+  },
+  {
+    delayMs: 120000,
+    radiusKm: 20,
+    stage: "20km",
+    sendLineAdmin: false,
+  },
+  {
+    delayMs: 150000,
+    radiusKm: null,
+    stage: "all",
+    sendLineAdmin: false,
+  },
+];
 
 const dispatchPushTimers = new Map();
 
@@ -1083,6 +1158,29 @@ function clearDispatchPushTimers(orderId) {
 }
 
 
+function getDispatchWaveTimestampField(stage) {
+  const safeStage =
+    String(stage || "")
+      .trim()
+      .toLowerCase();
+
+  if (safeStage === "all") {
+    return "dispatchPushAllAt";
+  }
+
+  const radiusMatch =
+    safeStage.match(/^(\d+)km$/);
+
+  if (!radiusMatch) {
+    return "";
+  }
+
+  return (
+    `dispatchPush${radiusMatch[1]}kmAt`
+  );
+}
+
+
 async function runDispatchPushWave(
   orderId,
   cycleId,
@@ -1099,9 +1197,15 @@ async function runDispatchPushWave(
     String(cycleId || "")
       .trim();
 
+  const safeStage =
+    String(stage || "")
+      .trim()
+      .toLowerCase();
+
   if (
     !safeOrderId ||
-    !safeCycleId
+    !safeCycleId ||
+    !safeStage
   ) {
     return false;
   }
@@ -1126,10 +1230,10 @@ async function runDispatchPushWave(
     ...orderDoc.data(),
   };
 
-  // 已被接單／取消／完成，就停止後續擴圈
+  // 訂單已被接單、取消或完成，停止所有後續擴圈。
   if (
-    String(order.status || "").trim() !==
-    "pending_dispatch"
+    String(order.status || "")
+      .trim() !== "pending_dispatch"
   ) {
     clearDispatchPushTimers(
       safeOrderId
@@ -1138,7 +1242,7 @@ async function runDispatchPushWave(
     return false;
   }
 
-  // 防止舊計時器誤觸新的轉派週期
+  // 防止上一輪派單的舊計時器誤觸新週期。
   if (
     String(
       order.dispatchPushCycleId || ""
@@ -1183,12 +1287,16 @@ async function runDispatchPushWave(
           .filter(Boolean)
       : [];
 
-  // 推播過程中可能剛好被別人接單，
-  // 寫入階段資料前再確認一次。
+  // 推播執行期間可能剛好有人接單，
+  // 寫入階段資料前再次確認訂單狀態。
   const latestOrderDoc =
     await orderRef.get();
 
   if (!latestOrderDoc.exists) {
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
     return false;
   }
 
@@ -1218,7 +1326,8 @@ async function runDispatchPushWave(
   const nowMs = Date.now();
 
   const updateData = {
-    dispatchPushStage: stage,
+    dispatchPushStage:
+      safeStage,
 
     dispatchPushLastRadiusKm:
       maxRadiusKm === null
@@ -1233,14 +1342,13 @@ async function runDispatchPushWave(
         .serverTimestamp(),
   };
 
-  if (stage === "5km") {
-    updateData.dispatchPush5kmAt =
-      admin.firestore.FieldValue
-        .serverTimestamp();
-  }
+  const timestampField =
+    getDispatchWaveTimestampField(
+      safeStage
+    );
 
-  if (stage === "all") {
-    updateData.dispatchPushAllAt =
+  if (timestampField) {
+    updateData[timestampField] =
       admin.firestore.FieldValue
         .serverTimestamp();
   }
@@ -1261,17 +1369,116 @@ async function runDispatchPushWave(
   console.log(
     `UBee 分段派單完成：` +
     `${safeOrderId}，` +
-    `階段 ${stage}，` +
-    `本次新通知 ${newlyNotified.length} 位騎士`
+    `階段 ${safeStage}，` +
+    `本次新通知 ${newlyNotified.length} 位小U`
   );
 
-  if (stage === "all") {
+  if (safeStage === "all") {
     dispatchPushTimers.delete(
       safeOrderId
     );
   }
 
   return true;
+}
+
+
+function scheduleDispatchPushWave(
+  orderId,
+  cycleId,
+  waveIndex,
+  startedAtMs
+) {
+  const safeOrderId =
+    String(orderId || "")
+      .trim()
+      .toUpperCase();
+
+  const safeCycleId =
+    String(cycleId || "")
+      .trim();
+
+  const wave =
+    DISPATCH_PUSH_WAVES[waveIndex];
+
+  if (
+    !safeOrderId ||
+    !safeCycleId ||
+    !wave
+  ) {
+    return;
+  }
+
+  const elapsedMs =
+    Date.now() - startedAtMs;
+
+  const remainingDelayMs =
+    Math.max(
+      0,
+      Number(wave.delayMs || 0) -
+        elapsedMs
+    );
+
+  const timer =
+    setTimeout(async () => {
+      try {
+        const waveCompleted =
+          await runDispatchPushWave(
+            safeOrderId,
+            safeCycleId,
+            wave.radiusKm,
+            wave.stage,
+            wave.sendLineAdmin
+          );
+
+        if (!waveCompleted) {
+          return;
+        }
+
+        const nextWaveIndex =
+          waveIndex + 1;
+
+        if (
+          nextWaveIndex <
+          DISPATCH_PUSH_WAVES.length
+        ) {
+          scheduleDispatchPushWave(
+            safeOrderId,
+            safeCycleId,
+            nextWaveIndex,
+            startedAtMs
+          );
+        } else {
+          dispatchPushTimers.delete(
+            safeOrderId
+          );
+        }
+      } catch (error) {
+        console.error(
+          `❌ UBee ${wave.stage} 派單失敗：${safeOrderId}`,
+          error
+        );
+      }
+    }, remainingDelayMs);
+
+  const existingTimers =
+    dispatchPushTimers.get(
+      safeOrderId
+    );
+
+  if (Array.isArray(existingTimers)) {
+    existingTimers.push(timer);
+
+    dispatchPushTimers.set(
+      safeOrderId,
+      existingTimers
+    );
+  } else {
+    dispatchPushTimers.set(
+      safeOrderId,
+      [timer]
+    );
+  }
 }
 
 
@@ -1335,7 +1542,28 @@ async function startDispatchPushSequence(
       dispatchStartedAtMs:
         startedAtMs,
 
+      dispatchPush3kmAt:
+        null,
+
       dispatchPush5kmAt:
+        null,
+
+      dispatchPush8kmAt:
+        null,
+
+      dispatchPush10kmAt:
+        null,
+
+      dispatchPush12kmAt:
+        null,
+
+      dispatchPush15kmAt:
+        null,
+
+      dispatchPush17kmAt:
+        null,
+
+      dispatchPush20kmAt:
         null,
 
       dispatchPushAllAt:
@@ -1355,54 +1583,20 @@ async function startDispatchPushSequence(
   order.dispatchStartedAtMs =
     startedAtMs;
 
-  // 第一階段：立即通知 5 公里內的小U
-  const wave5KmCompleted =
-    await runDispatchPushWave(
-      safeOrderId,
-      cycleId,
-      5,
-      "5km",
-      true
-    );
-
-  // 如果 5km 波次完成前訂單已被接走、取消、完成，
-  // 或派單週期已經改變，就不要建立全區計時器。
-  if (!wave5KmCompleted) {
-    return cycleId;
-  }
-
-  const delayToAll =
-    Math.max(
-      0,
-      60000 -
-        (
-          Date.now() -
-          startedAtMs
-        )
-    );
-
-  // 第二階段：派單開始最早 60 秒後通知全區。
-  // 5km 波次必須完整完成後，才會建立全區計時器，
-  // 因此兩個波次不會並行。
-  const timerAll =
-    setTimeout(() => {
-      runDispatchPushWave(
-        safeOrderId,
-        cycleId,
-        null,
-        "all",
-        false
-      ).catch(err => {
-        console.error(
-          `❌ UBee 全區派單失敗：${safeOrderId}`,
-          err
-        );
-      });
-    }, delayToAll);
-
-  dispatchPushTimers.set(
+  // 從第一波 3 公里開始。
+  // 第一波完成後，才依序建立下一波，
+  // 避免多個距離波次同時執行。
+  scheduleDispatchPushWave(
     safeOrderId,
-    [timerAll]
+    cycleId,
+    0,
+    startedAtMs
+  );
+
+  console.log(
+    `✅ UBee 多層級派單已啟動：` +
+    `${safeOrderId}，` +
+    `週期 ${cycleId}`
   );
 
   return cycleId;
