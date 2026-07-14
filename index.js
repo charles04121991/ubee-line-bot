@@ -305,7 +305,6 @@ const client = new line.Client(config);
 const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
-const LINE_GROUP_ID = process.env.LINE_GROUP_ID || '';
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
@@ -943,13 +942,12 @@ async function sendNewOrderPushToRiders(
     // ==============================
     try {
       const targetGroupId =
-        LINE_GROUP_ID ||
         LINE_ADMIN_GROUP_ID ||
         LINE_FINISH_GROUP_ID;
 
       if (!targetGroupId) {
         console.warn(
-          `UBee LINE 新任務通知略過：未設定 LINE_GROUP_ID / LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
+          `UBee LINE 新任務通知略過：未設定 LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
         );
 
       } else {
