@@ -1063,55 +1063,59 @@ const DISPATCH_PUSH_WAVES = [
     sendLineAdmin: true,
   },
   {
-    delayMs: 10000,
+    delayMs: 5000,
     radiusKm: 5,
     stage: "5km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 20000,
+    delayMs: 10000,
     radiusKm: 8,
     stage: "8km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 30000,
+    delayMs: 15000,
     radiusKm: 10,
     stage: "10km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 40000,
+    delayMs: 20000,
     radiusKm: 12,
     stage: "12km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 50000,
+    delayMs: 25000,
     radiusKm: 15,
     stage: "15km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 60000,
+    delayMs: 30000,
     radiusKm: 17,
     stage: "17km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 70000,
+    delayMs: 35000,
     radiusKm: 20,
     stage: "20km",
     sendLineAdmin: false,
   },
   {
-    delayMs: 80000,
+    delayMs: 40000,
     radiusKm: null,
     stage: "all",
     sendLineAdmin: false,
   },
 ];
 
+// 一輪派單跑完全區後，等待 60 秒再重新跑下一輪
+const DISPATCH_PUSH_RESTART_DELAY_MS =
+  60000;
+  
 const dispatchPushTimers = new Map();
 
 
@@ -1372,16 +1376,85 @@ async function runDispatchPushWave(
     `階段 ${safeStage}，` +
     `本次新通知 ${newlyNotified.length} 位小U`
   );
-
-  if (safeStage === "all") {
-    dispatchPushTimers.delete(
-      safeOrderId
-    );
-  }
-
   return true;
 }
 
+function scheduleNextDispatchPushRound(
+  orderId
+) {
+  const safeOrderId =
+    String(orderId || "")
+      .trim()
+      .toUpperCase();
+
+  if (!safeOrderId) {
+    return;
+  }
+
+  const restartTimer =
+    setTimeout(async () => {
+      try {
+        const orderRef =
+          db.collection("orders")
+            .doc(safeOrderId);
+
+        const orderDoc =
+          await orderRef.get();
+
+        if (!orderDoc.exists) {
+          clearDispatchPushTimers(
+            safeOrderId
+          );
+          return;
+        }
+
+        const order = {
+          id: orderDoc.id,
+          ...orderDoc.data(),
+        };
+
+        // 只有仍然等待派單，才重新開始
+        if (
+          String(order.status || "")
+            .trim() !==
+          "pending_dispatch"
+        ) {
+          clearDispatchPushTimers(
+            safeOrderId
+          );
+          return;
+        }
+
+        console.log(
+          `🔁 UBee 開始新一輪派單：${safeOrderId}`
+        );
+
+        const newCycleId =
+  buildDispatchPushCycleId(
+    safeOrderId
+  );
+
+await startDispatchPushSequence(
+  {
+    id: safeOrderId,
+  },
+  newCycleId
+);
+
+      } catch (error) {
+        console.error(
+          "重新派單失敗：",
+          error
+        );
+      }
+
+    }, DISPATCH_PUSH_RESTART_DELAY_MS);
+
+  dispatchPushTimers.set(
+    safeOrderId,
+    [restartTimer]
+  );
+}
 
 function scheduleDispatchPushWave(
   orderId,
@@ -1439,20 +1512,22 @@ function scheduleDispatchPushWave(
           waveIndex + 1;
 
         if (
-          nextWaveIndex <
-          DISPATCH_PUSH_WAVES.length
-        ) {
-          scheduleDispatchPushWave(
-            safeOrderId,
-            safeCycleId,
-            nextWaveIndex,
-            startedAtMs
-          );
-        } else {
-          dispatchPushTimers.delete(
-            safeOrderId
-          );
-        }
+  nextWaveIndex <
+  DISPATCH_PUSH_WAVES.length
+) {
+  scheduleDispatchPushWave(
+    safeOrderId,
+    safeCycleId,
+    nextWaveIndex,
+    startedAtMs
+  );
+} else {
+  // 全部距離波次已完成。
+  // 如果訂單仍無人接，等待設定時間後重新跑下一輪。
+  scheduleNextDispatchPushRound(
+    safeOrderId
+  );
+}
       } catch (error) {
         console.error(
           `❌ UBee ${wave.stage} 派單失敗：${safeOrderId}`,
