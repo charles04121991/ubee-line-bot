@@ -1035,7 +1035,7 @@ ${isRedispatch
   }
 }
 
-// ===== UBee 3km → 5km → 全區派單排程 =====
+// ===== UBee 5km → 全區派單排程 =====
 
 const dispatchPushTimers = new Map();
 
@@ -1233,12 +1233,6 @@ async function runDispatchPushWave(
         .serverTimestamp(),
   };
 
-  if (stage === "3km") {
-    updateData.dispatchPush3kmAt =
-      admin.firestore.FieldValue
-        .serverTimestamp();
-  }
-
   if (stage === "5km") {
     updateData.dispatchPush5kmAt =
       admin.firestore.FieldValue
@@ -1341,9 +1335,6 @@ async function startDispatchPushSequence(
       dispatchStartedAtMs:
         startedAtMs,
 
-      dispatchPush3kmAt:
-        null,
-
       dispatchPush5kmAt:
         null,
 
@@ -1364,97 +1355,54 @@ async function startDispatchPushSequence(
   order.dispatchStartedAtMs =
     startedAtMs;
 
-  // 第一階段：立即推 3km
-  const wave3KmCompleted =
+  // 第一階段：立即通知 5 公里內的小U
+  const wave5KmCompleted =
     await runDispatchPushWave(
       safeOrderId,
       cycleId,
-      3,
-      "3km",
+      5,
+      "5km",
       true
     );
 
-  // 如果 3km 波次完成前訂單已被接走、取消、完成，
-  // 或派單週期已經改變，就不要再建立任何後續計時器。
-  if (!wave3KmCompleted) {
+  // 如果 5km 波次完成前訂單已被接走、取消、完成，
+  // 或派單週期已經改變，就不要建立全區計時器。
+  if (!wave5KmCompleted) {
     return cycleId;
   }
 
-  const elapsedMs =
-    Date.now() - startedAtMs;
-
-  const delayTo5Km =
+  const delayToAll =
     Math.max(
       0,
-      30000 - elapsedMs
+      60000 -
+        (
+          Date.now() -
+          startedAtMs
+        )
     );
 
-  // 第二階段：30 秒後擴大到 5km。
-  // 5km 必須完整執行完畢後，才允許建立全區計時器，
-  // 從結構上保證 5km 與全區絕對不會並行。
-  const timer5Km =
-    setTimeout(async () => {
-      try {
-        const wave5KmCompleted =
-          await runDispatchPushWave(
-            safeOrderId,
-            cycleId,
-            5,
-            "5km",
-            false
-          );
-
-        // 訂單已被接走、取消、完成，
-        // 或這已經不是目前的派單週期，就不再排全區。
-        if (!wave5KmCompleted) {
-          return;
-        }
-
-        const delayToAll =
-          Math.max(
-            0,
-            60000 -
-              (
-                Date.now() -
-                startedAtMs
-              )
-          );
-
-        // 第三階段：最早在派單開始 60 秒後進入全區。
-        // 如果 5km 波次執行超過 60 秒，則等 5km 完整結束後立即執行，
-        // 仍然不會與 5km 重疊。
-        const timerAll =
-          setTimeout(() => {
-            runDispatchPushWave(
-              safeOrderId,
-              cycleId,
-              null,
-              "all",
-              false
-            ).catch(err => {
-              console.error(
-                `❌ UBee 全區派單失敗：${safeOrderId}`,
-                err
-              );
-            });
-          }, delayToAll);
-
-        dispatchPushTimers.set(
-          safeOrderId,
-          [timerAll]
-        );
-
-      } catch (err) {
+  // 第二階段：派單開始最早 60 秒後通知全區。
+  // 5km 波次必須完整完成後，才會建立全區計時器，
+  // 因此兩個波次不會並行。
+  const timerAll =
+    setTimeout(() => {
+      runDispatchPushWave(
+        safeOrderId,
+        cycleId,
+        null,
+        "all",
+        false
+      ).catch(err => {
         console.error(
-          `❌ UBee 5km 派單失敗：${safeOrderId}`,
+          `❌ UBee 全區派單失敗：${safeOrderId}`,
           err
         );
-      }
-    }, delayTo5Km);
+      });
+    }, delayToAll);
 
   dispatchPushTimers.set(
     safeOrderId,
-    [timer5Km]
+    [timerAll]
   );
 
   return cycleId;
