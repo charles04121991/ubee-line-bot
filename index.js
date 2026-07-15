@@ -1484,6 +1484,9 @@ if (Array.isArray(existingTimers)) {
   );
 }
 
+// 結束 scheduleNextDispatchPushRound
+}
+
 function scheduleDispatchPushWave(
   orderId,
   cycleId,
