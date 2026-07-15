@@ -1115,7 +1115,11 @@ const DISPATCH_PUSH_WAVES = [
 // 一輪派單跑完全區後，等待 60 秒再重新跑下一輪
 const DISPATCH_PUSH_RESTART_DELAY_MS =
   60000;
-  
+
+// 第一輪完成後，後續重新派單是否直接通知全區
+const DISPATCH_PUSH_REPEAT_ALL_ONLY =
+  true;
+
 const dispatchPushTimers = new Map();
 
 
@@ -1434,12 +1438,21 @@ function scheduleNextDispatchPushRound(
     safeOrderId
   );
 
-await startDispatchPushSequence(
-  {
-    id: safeOrderId,
-  },
-  newCycleId
-);
+if (DISPATCH_PUSH_REPEAT_ALL_ONLY) {
+  await startDispatchPushAllOnlyRound(
+    {
+      id: safeOrderId,
+    },
+    newCycleId
+  );
+} else {
+  await startDispatchPushSequence(
+    {
+      id: safeOrderId,
+    },
+    newCycleId
+  );
+}
 
       } catch (error) {
         console.error(
@@ -1450,6 +1463,21 @@ await startDispatchPushSequence(
 
     }, DISPATCH_PUSH_RESTART_DELAY_MS);
 
+  const existingTimers =
+  dispatchPushTimers.get(
+    safeOrderId
+  );
+
+if (Array.isArray(existingTimers)) {
+  existingTimers.push(
+    restartTimer
+  );
+
+  dispatchPushTimers.set(
+    safeOrderId,
+    existingTimers
+  );
+} else {
   dispatchPushTimers.set(
     safeOrderId,
     [restartTimer]
@@ -1556,7 +1584,121 @@ function scheduleDispatchPushWave(
   }
 }
 
+async function startDispatchPushAllOnlyRound(
+  order,
+  existingCycleId = ""
+) {
+  const safeOrderId =
+    String(
+      order?.id ||
+      order?.orderId ||
+      ""
+    )
+      .trim()
+      .toUpperCase();
 
+  if (!safeOrderId) {
+    throw new Error(
+      "DISPATCH_ORDER_ID_MISSING"
+    );
+  }
+
+  clearDispatchPushTimers(
+    safeOrderId
+  );
+
+  const cycleId =
+    String(
+      existingCycleId ||
+      buildDispatchPushCycleId(
+        safeOrderId
+      )
+    ).trim();
+
+  const startedAtMs =
+    Date.now();
+
+  const orderRef =
+    db.collection("orders")
+      .doc(safeOrderId);
+
+  const orderDoc =
+    await orderRef.get();
+
+  if (!orderDoc.exists) {
+    throw new Error(
+      "DISPATCH_ORDER_NOT_FOUND"
+    );
+  }
+
+  const currentOrder =
+    orderDoc.data() || {};
+
+  if (
+    String(
+      currentOrder.status || ""
+    ).trim() !== "pending_dispatch"
+  ) {
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
+    return cycleId;
+  }
+
+  await orderRef.set(
+    {
+      dispatchPushCycleId:
+        cycleId,
+
+      dispatchPushNotifiedRiderDocIds:
+        [],
+
+      dispatchPushStage:
+        "repeat_all_scheduled",
+
+      dispatchPushStartedAtMs:
+        startedAtMs,
+
+      dispatchPushStartedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp(),
+
+      dispatchStartedAtMs:
+        startedAtMs,
+
+      dispatchPushAllAt:
+        null,
+    },
+    {
+      merge: true,
+    }
+  );
+
+  console.log(
+    `✅ UBee 後續全區派單已啟動：` +
+    `${safeOrderId}，` +
+    `週期 ${cycleId}`
+  );
+
+  const allWaveCompleted =
+    await runDispatchPushWave(
+      safeOrderId,
+      cycleId,
+      null,
+      "all",
+      false
+    );
+
+  if (allWaveCompleted) {
+    scheduleNextDispatchPushRound(
+      safeOrderId
+    );
+  }
+
+  return cycleId;
+}
+  
 async function startDispatchPushSequence(
   order,
   existingCycleId = ""
