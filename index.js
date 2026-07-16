@@ -14241,7 +14241,17 @@ function customerCanAccessChat(order, userId) {
 }
 
 async function riderCanAccessChat(order, riderAuth, safeOrderId) {
-  if (!order || !riderAuth) return false;
+  if (!order || !riderAuth) {
+    console.warn(
+      '⚠️ 小U聊天室驗證失敗：缺少 order 或 riderAuth',
+      {
+        hasOrder: !!order,
+        hasRiderAuth: !!riderAuth,
+        safeOrderId: String(safeOrderId || ''),
+      }
+    );
+    return false;
+  }
 
   const normalizeIdentity = value =>
     String(value || '')
@@ -14249,74 +14259,197 @@ async function riderCanAccessChat(order, riderAuth, safeOrderId) {
       .toLowerCase()
       .replace(/\s+/g, '');
 
+  const normalizeOrderId = value =>
+    String(value || '')
+      .trim()
+      .toUpperCase();
+
+  const expectedOrderId =
+    normalizeOrderId(safeOrderId);
+
+  if (!expectedOrderId) {
+    console.warn(
+      '⚠️ 小U聊天室驗證失敗：缺少訂單編號'
+    );
+    return false;
+  }
+
+  const authRiderDocId = String(
+    riderAuth.riderDocId ||
+    riderAuth.decodedToken?.riderDocId ||
+    ''
+  ).trim();
+
+  const authRiderId = String(
+    riderAuth.riderId ||
+    riderAuth.decodedToken?.riderId ||
+    ''
+  ).trim();
+
+  if (!authRiderDocId) {
+    console.warn(
+      '⚠️ 小U聊天室驗證失敗：Token 缺少 riderDocId',
+      {
+        uid: String(riderAuth.uid || ''),
+        riderId: authRiderId,
+        orderId: expectedOrderId,
+      }
+    );
+    return false;
+  }
+
+  let riderDoc = null;
+  let riderData = {};
+
+  try {
+    riderDoc = await db
+      .collection('riders')
+      .doc(authRiderDocId)
+      .get();
+
+    if (!riderDoc.exists) {
+      console.warn(
+        '⚠️ 小U聊天室驗證失敗：找不到 Token 對應的 riders 文件',
+        {
+          riderDocId: authRiderDocId,
+          orderId: expectedOrderId,
+        }
+      );
+      return false;
+    }
+
+    riderData = riderDoc.data() || {};
+  } catch (error) {
+    console.warn(
+      '⚠️ 小U聊天室讀取 riders 文件失敗：',
+      error
+    );
+    return false;
+  }
+
+  const riderApproved =
+    riderData.approved === true ||
+    String(riderData.status || '')
+      .trim()
+      .toLowerCase() === 'approved';
+
+  if (!riderApproved) {
+    console.warn(
+      '⚠️ 小U聊天室驗證失敗：騎士目前不是已審核狀態',
+      {
+        riderDocId: riderDoc.id,
+        status: riderData.status || '',
+        approved: riderData.approved === true,
+        orderId: expectedOrderId,
+      }
+    );
+    return false;
+  }
+
   const trustedIds = [
-    riderAuth.riderDocId,
-    riderAuth.riderId,
+    riderDoc.id,
+    authRiderDocId,
+    authRiderId,
     riderAuth.uid,
     riderAuth.decodedToken?.riderDocId,
     riderAuth.decodedToken?.riderId,
+    riderData.riderId,
+    riderData.phone,
+    riderData.mobile,
+    riderData.riderPhone,
+    riderData.lineUserId,
+    riderData.firebaseUid,
   ]
     .map(normalizeIdentity)
     .filter(Boolean);
+
+  const trustedIdSet =
+    new Set(trustedIds);
 
   const orderRiderIds = [
     order.riderDocId,
     order.riderId,
     order.riderPhone,
     order.riderLineUserId,
-    order.driverId,
-    order.driverPhone,
+
     order.acceptedRiderDocId,
     order.acceptedRiderId,
+    order.acceptedRiderPhone,
+    order.acceptedRiderLineUserId,
+
     order.assignedRiderDocId,
     order.assignedRiderId,
+    order.assignedRiderPhone,
+    order.assignedRiderLineUserId,
+
+    order.driverDocId,
+    order.driverId,
+    order.driverPhone,
+    order.driverLineUserId,
+
+    order.riderUid,
+    order.acceptedBy,
+    order.assignedTo,
+    order.claimedBy,
   ]
     .map(normalizeIdentity)
     .filter(Boolean);
 
   if (
-    trustedIds.some(trustedId =>
-      orderRiderIds.includes(trustedId)
+    orderRiderIds.some(value =>
+      trustedIdSet.has(value)
     )
   ) {
     return true;
   }
 
-  // 最可靠的備援判斷：接單成功時，riders 文件會寫入 currentOrderId。
-  // 即使舊訂單的 riderId 欄位格式不同，只要目前小U正在執行這張訂單，仍可進入聊天室。
-  const riderDocId = String(
-    riderAuth.riderDocId ||
-    riderAuth.decodedToken?.riderDocId ||
-    ''
-  ).trim();
+  const riderActiveOrderIds = [
+    riderData.currentOrderId,
+    riderData.activeOrderId,
+    riderData.acceptedOrderId,
+    riderData.orderId,
+  ]
+    .map(normalizeOrderId)
+    .filter(Boolean);
 
-  if (!riderDocId || !safeOrderId) {
-    return false;
-  }
-
-  try {
-    const riderDoc = await db
-      .collection('riders')
-      .doc(riderDocId)
-      .get();
-
-    if (!riderDoc.exists) {
-      return false;
-    }
-
-    const riderData = riderDoc.data() || {};
-    const currentOrderId = String(
-      riderData.currentOrderId || ''
+  if (
+    riderActiveOrderIds.includes(
+      expectedOrderId
     )
-      .trim()
-      .toUpperCase();
-
-    return currentOrderId === String(safeOrderId).trim().toUpperCase();
-  } catch (error) {
-    console.warn('⚠️ 小U聊天室 currentOrderId 驗證失敗：', error);
-    return false;
+  ) {
+    return true;
   }
+
+  console.warn(
+    '⚠️ 小U聊天室訂單歸屬驗證未通過',
+    {
+      orderId: expectedOrderId,
+      riderDocId: riderDoc.id,
+      riderId: String(
+        riderData.riderId ||
+        authRiderId ||
+        ''
+      ),
+      riderCurrentOrderId:
+        normalizeOrderId(
+          riderData.currentOrderId
+        ),
+      orderRiderFields: {
+        riderDocId:
+          String(order.riderDocId || ''),
+        riderId:
+          String(order.riderId || ''),
+        riderPhone:
+          String(order.riderPhone || ''),
+        riderLineUserId:
+          String(order.riderLineUserId || ''),
+      },
+    }
+  );
+
+  return false;
 }
+
 
 async function listOrderChatMessages(safeOrderId) {
   const snap = await db.collection('orders').doc(safeOrderId)
@@ -14400,6 +14533,15 @@ app.get('/api/rider/orders/:orderId/chat', riderAuthMiddleware, async (req, res)
   try {
     const result = await getChatOrderOrResponse(req.params.orderId, res);
     if (!result) return;
+
+    if (!req.riderAuth) {
+      return res.status(401).json({
+        success: false,
+        code: 'RIDER_CHAT_TOKEN_REQUIRED',
+        message: '小U登入憑證不存在，請重新登入後再開啟聊天室。'
+      });
+    }
+
     if (!(await riderCanAccessChat(result.order, req.riderAuth, result.safeOrderId))) {
       return res.status(403).json({ success: false, message: '這張訂單目前不屬於你。' });
     }
@@ -14415,6 +14557,15 @@ app.post('/api/rider/orders/:orderId/chat', riderAuthMiddleware, async (req, res
   try {
     const result = await getChatOrderOrResponse(req.params.orderId, res);
     if (!result) return;
+
+    if (!req.riderAuth) {
+      return res.status(401).json({
+        success: false,
+        code: 'RIDER_CHAT_TOKEN_REQUIRED',
+        message: '小U登入憑證不存在，請重新登入後再開啟聊天室。'
+      });
+    }
+
     if (!(await riderCanAccessChat(result.order, req.riderAuth, result.safeOrderId))) {
       return res.status(403).json({ success: false, message: '這張訂單目前不屬於你。' });
     }
