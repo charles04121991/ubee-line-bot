@@ -14172,6 +14172,203 @@ async function handleEvent(event) {
   }
 }
 
+
+// =====================================================
+// UBee 訂單即時聊天室 API
+// 架構：orders/{orderId}/messages/{messageId}
+// 客人以訂單 userId/customerId 驗證；小U以 Firebase Rider Token 驗證。
+// =====================================================
+const UBEE_CHAT_MESSAGE_MAX_LENGTH = 500;
+const UBEE_CHAT_PAGE_SIZE = 100;
+
+function normalizeChatOrderId(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function normalizeChatText(value) {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
+    .slice(0, UBEE_CHAT_MESSAGE_MAX_LENGTH);
+}
+
+function chatTimestampToMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function serializeChatMessage(doc) {
+  const data = doc.data ? (doc.data() || {}) : (doc || {});
+  return {
+    id: String(doc.id || data.id || ''),
+    orderId: String(data.orderId || ''),
+    senderType: String(data.senderType || ''),
+    senderId: String(data.senderId || ''),
+    senderName: String(data.senderName || ''),
+    text: String(data.text || ''),
+    createdAtMs: chatTimestampToMillis(data.createdAt) || Number(data.createdAtMs || 0),
+  };
+}
+
+async function getChatOrderOrResponse(orderId, res) {
+  const safeOrderId = normalizeChatOrderId(orderId);
+  if (!safeOrderId) {
+    res.status(400).json({ success: false, message: '缺少訂單編號。' });
+    return null;
+  }
+  const orderDoc = await db.collection('orders').doc(safeOrderId).get();
+  if (!orderDoc.exists) {
+    res.status(404).json({ success: false, message: '找不到這張訂單。' });
+    return null;
+  }
+  return { safeOrderId, orderDoc, order: orderDoc.data() || {} };
+}
+
+function customerCanAccessChat(order, userId) {
+  const safeUserId = String(userId || '').trim();
+  if (!safeUserId || safeUserId === 'web-order') return false;
+  const ownerIds = [order.userId, order.customerId, order.lineUserId]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  return ownerIds.includes(safeUserId);
+}
+
+function riderCanAccessChat(order, riderAuth) {
+  if (!riderAuth) return false;
+  const trustedIds = [riderAuth.riderDocId, riderAuth.riderId, riderAuth.uid]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  const orderRiderIds = [order.riderDocId, order.riderId, order.riderLineUserId, order.riderPhone]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  return trustedIds.some(id => orderRiderIds.includes(id));
+}
+
+async function listOrderChatMessages(safeOrderId) {
+  const snap = await db.collection('orders').doc(safeOrderId)
+    .collection('messages')
+    .orderBy('createdAtMs', 'asc')
+    .limitToLast(UBEE_CHAT_PAGE_SIZE)
+    .get();
+  return snap.docs.map(serializeChatMessage);
+}
+
+async function createOrderChatMessage({ safeOrderId, senderType, senderId, senderName, text }) {
+  const messageText = normalizeChatText(text);
+  if (!messageText) throw new Error('CHAT_MESSAGE_EMPTY');
+  const now = Date.now();
+  const messageRef = db.collection('orders').doc(safeOrderId).collection('messages').doc();
+  const messageData = {
+    id: messageRef.id,
+    orderId: safeOrderId,
+    senderType,
+    senderId: String(senderId || ''),
+    senderName: String(senderName || ''),
+    text: messageText,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAtMs: now,
+  };
+  const orderRef = db.collection('orders').doc(safeOrderId);
+  const batch = db.batch();
+  batch.set(messageRef, messageData);
+  batch.set(orderRef, {
+    chatUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    chatUpdatedAtMs: now,
+    chatLastMessage: messageText.slice(0, 120),
+    chatLastSenderType: senderType,
+  }, { merge: true });
+  await batch.commit();
+  return { ...messageData, createdAtMs: now };
+}
+
+app.get('/api/orders/:orderId/chat', async (req, res) => {
+  try {
+    const result = await getChatOrderOrResponse(req.params.orderId, res);
+    if (!result) return;
+    const userId = String(req.query.userId || '').trim();
+    if (!customerCanAccessChat(result.order, userId)) {
+      return res.status(403).json({ success: false, message: '你沒有查看這個聊天室的權限。' });
+    }
+    const messages = await listOrderChatMessages(result.safeOrderId);
+    return res.json({ success: true, orderId: result.safeOrderId, messages });
+  } catch (error) {
+    console.error('❌ 客人讀取聊天室失敗：', error);
+    return res.status(500).json({ success: false, message: '聊天室讀取失敗，請稍後再試。' });
+  }
+});
+
+app.post('/api/orders/:orderId/chat', async (req, res) => {
+  try {
+    const result = await getChatOrderOrResponse(req.params.orderId, res);
+    if (!result) return;
+    const userId = String(req.body?.userId || '').trim();
+    if (!customerCanAccessChat(result.order, userId)) {
+      return res.status(403).json({ success: false, message: '你沒有傳送訊息到這個聊天室的權限。' });
+    }
+    const message = await createOrderChatMessage({
+      safeOrderId: result.safeOrderId,
+      senderType: 'customer',
+      senderId: userId,
+      senderName: String(req.body?.senderName || '客人').trim().slice(0, 40) || '客人',
+      text: req.body?.text,
+    });
+    return res.json({ success: true, message: serializeChatMessage(message) });
+  } catch (error) {
+    if (error?.message === 'CHAT_MESSAGE_EMPTY') {
+      return res.status(400).json({ success: false, message: '請輸入訊息內容。' });
+    }
+    console.error('❌ 客人傳送聊天室訊息失敗：', error);
+    return res.status(500).json({ success: false, message: '訊息傳送失敗，請稍後再試。' });
+  }
+});
+
+app.get('/api/rider/orders/:orderId/chat', riderAuthMiddleware, async (req, res) => {
+  try {
+    const result = await getChatOrderOrResponse(req.params.orderId, res);
+    if (!result) return;
+    if (!riderCanAccessChat(result.order, req.riderAuth)) {
+      return res.status(403).json({ success: false, message: '這張訂單目前不屬於你。' });
+    }
+    const messages = await listOrderChatMessages(result.safeOrderId);
+    return res.json({ success: true, orderId: result.safeOrderId, messages });
+  } catch (error) {
+    console.error('❌ 小U讀取聊天室失敗：', error);
+    return res.status(500).json({ success: false, message: '聊天室讀取失敗，請稍後再試。' });
+  }
+});
+
+app.post('/api/rider/orders/:orderId/chat', riderAuthMiddleware, async (req, res) => {
+  try {
+    const result = await getChatOrderOrResponse(req.params.orderId, res);
+    if (!result) return;
+    if (!riderCanAccessChat(result.order, req.riderAuth)) {
+      return res.status(403).json({ success: false, message: '這張訂單目前不屬於你。' });
+    }
+    const senderName = String(result.order.riderName || '小U').trim().slice(0, 40) || '小U';
+    const message = await createOrderChatMessage({
+      safeOrderId: result.safeOrderId,
+      senderType: 'rider',
+      senderId: req.riderAuth.riderDocId,
+      senderName,
+      text: req.body?.text,
+    });
+    return res.json({ success: true, message: serializeChatMessage(message) });
+  } catch (error) {
+    if (error?.message === 'CHAT_MESSAGE_EMPTY') {
+      return res.status(400).json({ success: false, message: '請輸入訊息內容。' });
+    }
+    console.error('❌ 小U傳送聊天室訊息失敗：', error);
+    return res.status(500).json({ success: false, message: '訊息傳送失敗，請稍後再試。' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`UBee OMS is running on port ${PORT}`);
 });
