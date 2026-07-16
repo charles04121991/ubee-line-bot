@@ -7757,18 +7757,26 @@ body{background:#eef0f2;}
 #step2 #serviceCategoryBox,
 #step2 #serviceCategoryGrid{
   position:relative !important;
-  z-index:30 !important;
+  z-index:300 !important;
   pointer-events:auto !important;
+  isolation:isolate !important;
+}
+
+#step2 #serviceCategoryGrid{
+  transform:translateZ(0);
+  -webkit-transform:translateZ(0);
 }
 
 #step2 #serviceCategoryGrid .category-choice-item{
   position:relative !important;
-  z-index:31 !important;
+  z-index:301 !important;
   pointer-events:auto !important;
-  touch-action:manipulation;
+  touch-action:manipulation !important;
   -webkit-user-select:none;
   user-select:none;
   cursor:pointer !important;
+  -webkit-appearance:none;
+  appearance:none;
 }
 
 #step2 #serviceCategoryGrid .category-choice-item::before,
@@ -11882,25 +11890,56 @@ function renderCategoryBox(item){
   box.classList.remove('hidden');
   title.innerText = `${item.title}分類`;
 
-  grid.innerHTML = item.categories.map((cat, index) => `
+  const currentCategory = String(serviceCategory || '').trim();
+
+  grid.innerHTML = item.categories.map((cat, index) => {
+    const categoryValue = String(cat || '').trim();
+    const isActive = currentCategory
+      ? categoryValue === currentCategory
+      : index === 0;
+
+    return `
     <button
-      class="category-choice-item ${index === 0 ? 'active' : ''}"
+      class="category-choice-item ${isActive ? 'active' : ''}"
       type="button"
       data-service-category="${escapeHtml(cat)}"
-      aria-pressed="${index === 0 ? 'true' : 'false'}"
+      aria-pressed="${isActive ? 'true' : 'false'}"
+      onclick="return handleTaskCategoryDirectClick(this, event)"
     >
       ${escapeHtml(cat)}
     </button>
-  `).join('');
+  `;
+  }).join('');
 
 }
 
 /* =====================================================
-   正式上線修復：任務分類採用事件委派
-   - 動態重新產生按鈕後不需要重新綁定
-   - 支援 LINE LIFF、iOS Safari、Android Chrome
-   - 即使後續估價或欄位更新發生錯誤，分類選取仍會立即生效
+   正式上線最終修復：任務分類雙重點擊機制
+   1. 每顆動態按鈕直接 onclick，避免事件重新渲染後失效
+   2. document 事件委派作為備援
+   3. 使用旗標避免同一次點擊重複執行
    ===================================================== */
+function handleTaskCategoryDirectClick(button, event){
+  if(event){
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if(!button || button.disabled) return false;
+
+  const category = String(button.getAttribute('data-service-category') || '').trim();
+  if(!category) return false;
+
+  button.dataset.ubeeCategoryHandled = '1';
+  selectCategory(button, category);
+
+  window.setTimeout(() => {
+    try{ delete button.dataset.ubeeCategoryHandled; }catch(_err){}
+  }, 0);
+
+  return false;
+}
+
 let taskCategoryInteractionBound = false;
 
 function bindTaskCategoryInteraction(){
@@ -11908,17 +11947,16 @@ function bindTaskCategoryInteraction(){
   taskCategoryInteractionBound = true;
 
   document.addEventListener('click', (event) => {
-    const button = event.target.closest('#serviceCategoryGrid .category-choice-item');
-    if(!button) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const button = target ? target.closest('#serviceCategoryGrid .category-choice-item') : null;
+    if(!button || button.dataset.ubeeCategoryHandled === '1') return;
 
-    event.preventDefault();
-    event.stopPropagation();
-
-    const category = String(button.dataset.serviceCategory || '').trim();
+    const category = String(button.getAttribute('data-service-category') || '').trim();
     if(!category) return;
 
+    event.preventDefault();
     selectCategory(button, category);
-  }, true);
+  }, false);
 }
 
 bindTaskCategoryInteraction();
@@ -12238,8 +12276,6 @@ function selectNearbyPlace(index){
 
 function updateTaskPathText(){
   if(qs('taskPathText')){
-    const selectedServiceItem = (serviceGroups[serviceGroup] || []).find(item => item.title === serviceType);
-    renderCategoryBox(selectedServiceItem || null);
     qs('taskPathText').innerText = `${getServiceGroupLabel()}｜${serviceType || '未選擇'}｜${serviceCategory || '未選擇'}`;
   }
 }
