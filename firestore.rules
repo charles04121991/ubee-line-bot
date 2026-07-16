@@ -1,0 +1,107 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =====================================================
+    // UBee 共用工具
+    // =====================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isRider() {
+      return isSignedIn()
+        && request.auth.token.role == "rider"
+        && request.auth.token.riderDocId != null;
+    }
+
+    function riderDocId() {
+      return request.auth.token.riderDocId;
+    }
+
+    function isOrderCustomer(orderData) {
+      return isSignedIn()
+        && (
+          orderData.userId == request.auth.uid
+          || orderData.customerId == request.auth.uid
+          || orderData.lineUserId == request.auth.uid
+        );
+    }
+
+    function isAssignedRider(orderData) {
+      return isRider()
+        && (
+          orderData.riderDocId == riderDocId()
+          || orderData.acceptedRiderDocId == riderDocId()
+          || orderData.assignedRiderDocId == riderDocId()
+          || orderData.riderId == request.auth.token.riderId
+        );
+    }
+
+    function canAccessOrder(orderId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/orders/$(orderId))
+        && (
+          isOrderCustomer(
+            get(/databases/$(database)/documents/orders/$(orderId)).data
+          )
+          || isAssignedRider(
+            get(/databases/$(database)/documents/orders/$(orderId)).data
+          )
+        );
+    }
+
+    // =====================================================
+    // 訂單
+    //
+    // 目前 UBee 訂單主要由後端 Admin SDK 管理。
+    // 前端只允許已驗證且屬於該訂單的人讀取。
+    // 所有新增、修改與刪除仍經由 index.js 後端處理。
+    // =====================================================
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn()
+        && (
+          isOrderCustomer(resource.data)
+          || isAssignedRider(resource.data)
+        );
+
+      allow create, update, delete: if false;
+
+      // ===================================================
+      // 訂單聊天室
+      //
+      // 訊息由 index.js 使用 Firebase Admin SDK 寫入。
+      // 客人與該訂單的小U只能讀取，不能直接從前端寫入，
+      // 可避免偽造 senderRole、senderId 或修改歷史訊息。
+      // ===================================================
+
+      match /messages/{messageId} {
+        allow read: if canAccessOrder(orderId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    // =====================================================
+    // 騎士資料
+    //
+    // 騎士只能讀取自己的文件。
+    // 寫入維持由後端 API / Admin SDK 處理。
+    // =====================================================
+
+    match /riders/{riderId} {
+      allow read: if isRider() && riderId == riderDocId();
+      allow create, update, delete: if false;
+    }
+
+    // =====================================================
+    // 其他未明確允許的資料全部拒絕
+    // =====================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
