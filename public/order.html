@@ -7267,75 +7267,462 @@ body{background:#eef0f2;}
 
 
 /* =====================================================
-   UBee 客戶端首頁：回復簡單版介面
-   僅保留精簡的在線小U狀態列，不改 API 或功能邏輯
+   UBee 客戶端首頁 V4：留白、服務狀態與第二頁分類
    ===================================================== */
+#step1{
+  padding-top:18px;
+}
+
+.ubee-v3-hero{
+  margin:4px 0 18px !important;
+  border-radius:24px !important;
+}
+
 .home-service-status{
-  margin:10px 0 12px;
-  padding:10px 13px;
+  margin:0 0 20px;
+  padding:17px;
   border:1px solid var(--line);
-  border-radius:14px;
-  background:#ffffff;
-  box-shadow:none;
+  border-radius:22px;
+  background:#fff;
+  box-shadow:var(--shadowSoft);
 }
 
 .home-service-status-head{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:space-between;
-  gap:10px;
+  gap:14px;
 }
 
 .home-service-status-kicker{
   display:flex;
   align-items:center;
-  gap:7px;
-  color:#55595e;
+  gap:8px;
+  color:#45484c;
   font-size:12px;
-  font-weight:900;
+  font-weight:1000;
 }
 
 .home-service-status-dot{
-  width:8px;
-  height:8px;
-  flex:0 0 8px;
+  width:9px;
+  height:9px;
+  flex:0 0 9px;
   border-radius:50%;
   background:#22c55e;
+  box-shadow:0 0 0 5px rgba(34,197,94,.12);
 }
 
 .home-service-status.is-fallback .home-service-status-dot{
-  background:var(--accentStrong);
+  background:#f4bd00;
+  box-shadow:0 0 0 5px rgba(244,189,0,.14);
 }
 
 .home-service-status-count{
-  margin-top:3px;
-  color:#111;
-  font-size:14px;
+  margin-top:7px;
+  font-size:27px;
   font-weight:1000;
-  line-height:1.35;
+  letter-spacing:-.6px;
+  line-height:1.2;
+}
+
+.home-service-status-count strong{
+  color:#111;
 }
 
 .home-service-status-count span{
-  color:#b88900;
+  color:var(--accentStrong);
 }
 
 .home-service-status-side{
-  flex:0 0 auto;
+  min-width:104px;
   text-align:right;
 }
 
 .home-service-status-label{
-  display:none;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:900;
 }
 
 .home-service-status-time{
-  color:#8b9096;
-  font-size:10px;
-  font-weight:800;
+  margin-top:5px;
+  color:#111;
+  font-size:13px;
+  font-weight:1000;
 }
 
 .home-service-status-note{
-  display:none;
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+  line-height:1.65;
+}
+
+.home-map-shell{
+  height:270px !important;
+  margin:0 -14px !important;
+}
+
+.task-sheet{
+  margin-top:-14px !important;
+  padding-top:21px !important;
+}
+
+.category-tabs{
+  gap:8px !important;
+  margin:0 -4px 18px !important;
+  padding:0 4px 8px !important;
+  border-bottom:none !important;
+}
+
+.category-tab{
+  min-width:104px !important;
+  min-height:58px !important;
+  padding:15px 15px !important;
+  border:1px solid var(--line) !important;
+  border-radius:17px !important;
+  background:#fff !important;
+  color:#62666b !important;
+  box-shadow:0 5px 16px rgba(17,24,39,.04) !important;
+  font-size:15px !important;
+}
+
+.category-tab.active{
+  border-color:#111 !important;
+  background:#111 !important;
+  color:#fff !important;
+}
+
+.category-tab.active::after{
+  display:none !important;
+}
+
+.service-grid-new{
+  margin:0 -4px 20px !important;
+  padding:0 4px 6px !important;
+  gap:10px !important;
+}
+
+.service-item{
+  flex:0 0 96px !important;
+  min-height:94px !important;
+  padding:13px 8px 12px !important;
+  border:1px solid var(--line) !important;
+  border-radius:18px !important;
+  background:#fff !important;
+  box-shadow:0 5px 16px rgba(17,24,39,.04) !important;
+}
+
+.service-item.active{
+  border-color:#e1b400 !important;
+  background:#fffbea !important;
+  color:#111 !important;
+  box-shadow:0 0 0 1px #e1b400 inset !important;
+}
+
+.service-item.active::after{
+  display:none !important;
+}
+
+.service-item-icon{
+  width:40px !important;
+  height:40px !important;
+  margin-bottom:7px !important;
+  font-size:27px !important;
+}
+
+.service-item-title{
+  font-size:13px !important;
+  white-space:normal !important;
+}
+
+#step1 .address-card{
+  margin-top:10px !important;
+}
+
+#step2 .task-category-step2{
+  margin-top:16px;
+  margin-bottom:22px;
+}
+
+#step2 .category-choice-box{
+  margin:0 !important;
+  padding:14px !important;
+  border:1px solid var(--line) !important;
+  border-radius:18px !important;
+  background:#fff !important;
+}
+
+#step2 .category-choice-title{
+  display:block !important;
+  margin-bottom:11px;
+  color:#555a60;
+  font-size:12px;
+  font-weight:1000;
+}
+
+#step2 .category-choice-grid{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px !important;
+  overflow:visible !important;
+}
+
+#step2 .category-choice-item{
+  width:100%;
+  min-height:44px;
+  padding:10px 9px;
+  border:1px solid var(--line) !important;
+  border-radius:14px !important;
+  background:var(--surface2) !important;
+  white-space:normal !important;
+  line-height:1.35;
+}
+
+#step2 .category-choice-item.active{
+  border-color:#d7aa00 !important;
+  background:#fff5c7 !important;
+  box-shadow:0 0 0 1px #d7aa00 inset !important;
+}
+
+@media(max-width:380px){
+  .home-map-shell{height:245px !important;}
+  .category-tab{min-width:96px !important;}
+  .service-item{flex-basis:90px !important;}
+}
+
+
+
+/* =====================================================
+   UBee 舊款簡潔首頁：依使用者提供截圖比例還原
+   只調整首頁視覺，保留全部新版功能與在線小U API
+   ===================================================== */
+#step1{padding-top:0!important;}
+.ubee-v3-hero{display:none!important;}
+
+.home-map-shell{
+  position:relative!important;
+  height:330px!important;
+  margin:0 -14px!important;
+  border:none!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+}
+.map-current-btn{
+  right:18px!important;
+  bottom:18px!important;
+  width:46px!important;
+  height:46px!important;
+}
+
+.task-sheet{
+  position:relative!important;
+  z-index:10!important;
+  margin:-18px -14px 0!important;
+  padding:18px 16px 118px!important;
+  border-radius:28px 28px 0 0!important;
+  background:#fff!important;
+  box-shadow:0 -5px 20px rgba(17,24,39,.07)!important;
+}
+.task-sheet::before{display:none!important;content:none!important;}
+.task-sheet-handle{
+  display:block!important;
+  width:38px!important;
+  height:5px!important;
+  margin:0 auto 16px!important;
+  border-radius:999px!important;
+  background:#d6d6d6!important;
+}
+
+.home-service-status{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  margin:0 0 13px!important;
+  padding:0 2px 12px!important;
+  border:none!important;
+  border-bottom:1px solid #eeeeef!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.home-service-status-head{
+  width:100%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+}
+.home-service-status-kicker{
+  font-size:11px!important;
+  color:#777b80!important;
+  gap:7px!important;
+}
+.home-service-status-dot{
+  width:8px!important;height:8px!important;flex-basis:8px!important;
+  box-shadow:0 0 0 4px rgba(34,197,94,.10)!important;
+}
+.home-service-status-count{
+  margin-top:3px!important;
+  font-size:14px!important;
+  line-height:1.2!important;
+  letter-spacing:0!important;
+}
+.home-service-status-count span,
+.home-service-status-count strong{font-size:14px!important;font-weight:1000!important;}
+.home-service-status-side{min-width:auto!important;text-align:right!important;}
+.home-service-status-label{display:none!important;}
+.home-service-status-time{margin-top:0!important;font-size:11px!important;color:#999da2!important;}
+.home-service-status-note{display:none!important;}
+
+.category-tabs{
+  display:flex!important;
+  gap:0!important;
+  overflow-x:auto!important;
+  margin:0 -16px 13px!important;
+  padding:0 12px!important;
+  border-bottom:1px solid #e8e9eb!important;
+  scrollbar-width:none!important;
+}
+.category-tab{
+  position:relative!important;
+  flex:0 0 auto!important;
+  min-width:78px!important;
+  min-height:52px!important;
+  padding:0 10px 15px!important;
+  border:none!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#96999d!important;
+  box-shadow:none!important;
+  font-size:14px!important;
+  font-weight:1000!important;
+  white-space:nowrap!important;
+}
+.category-tab.active{
+  background:transparent!important;
+  color:#111!important;
+  border:none!important;
+  box-shadow:none!important;
+}
+.category-tab.active::after{
+  display:block!important;
+  content:""!important;
+  position:absolute!important;
+  left:50%!important;
+  bottom:0!important;
+  width:30px!important;
+  height:4px!important;
+  transform:translateX(-50%)!important;
+  border-radius:999px!important;
+  background:var(--accentStrong)!important;
+}
+
+.service-grid-new{
+  display:flex!important;
+  gap:0!important;
+  overflow-x:auto!important;
+  margin:0 -16px 16px!important;
+  padding:3px 10px 7px!important;
+  scrollbar-width:none!important;
+}
+.service-grid-new > *{flex:0 0 78px!important;min-width:78px!important;}
+.service-item,
+.service-card-new,
+.service-option{
+  position:relative!important;
+  min-height:80px!important;
+  padding:7px 4px 12px!important;
+  border:none!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#85898e!important;
+  box-shadow:none!important;
+  text-align:center!important;
+}
+.service-item-icon{width:35px!important;height:35px!important;margin:0 auto 5px!important;font-size:25px!important;}
+.service-item-title{font-size:12px!important;font-weight:1000!important;line-height:1.3!important;white-space:nowrap!important;}
+.service-item.active,
+.service-card-new.active,
+.service-option.active,
+.service-item.selected,
+.service-card-new.selected,
+.service-option.selected{
+  border:none!important;
+  background:transparent!important;
+  color:#111!important;
+  box-shadow:none!important;
+}
+.service-item.active::after,
+.service-card-new.active::after,
+.service-option.active::after{
+  display:block!important;
+  content:""!important;
+  position:absolute!important;
+  left:50%!important;
+  bottom:0!important;
+  width:28px!important;
+  height:4px!important;
+  transform:translateX(-50%)!important;
+  border-radius:999px!important;
+  background:var(--accentStrong)!important;
+}
+
+#step1 .address-card{
+  position:relative!important;
+  margin:4px 0 0!important;
+  border:1px solid #e5e6e8!important;
+  border-radius:20px!important;
+  background:#fff!important;
+  box-shadow:0 5px 16px rgba(17,24,39,.04)!important;
+}
+#step1 .address-row{min-height:76px!important;padding:13px 15px!important;}
+#step1 .address-label{font-size:11px!important;margin-bottom:5px!important;color:#8c9095!important;}
+#step1 .address-main input{font-size:16px!important;font-weight:900!important;}
+
+.home-action-footer{
+  position:fixed!important;
+  left:50%!important;
+  bottom:calc(78px + env(safe-area-inset-bottom))!important;
+  transform:translateX(-50%)!important;
+  z-index:88!important;
+  width:calc(100% - 24px)!important;
+  max-width:500px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 145px!important;
+  gap:10px!important;
+  align-items:center!important;
+  margin:0!important;
+  padding:10px!important;
+  border:1px solid rgba(17,24,39,.08)!important;
+  border-radius:22px!important;
+  background:rgba(255,255,255,.98)!important;
+  box-shadow:0 10px 32px rgba(17,24,39,.14)!important;
+}
+#step1 .home-estimate{padding:0 4px!important;}
+#step1 .home-estimate-label{font-size:11px!important;}
+#step1 .home-estimate-meta{font-size:10px!important;max-width:115px!important;}
+#step1 .home-estimate-amount{font-size:24px!important;}
+#step1 .home-next-btn{height:56px!important;min-height:56px!important;border-radius:17px!important;font-size:17px!important;}
+
+.bottom-tabs{
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom))!important;
+  border-radius:24px 24px 0 0!important;
+}
+.bottom-tab{min-height:58px!important;border-radius:16px!important;font-size:12px!important;}
+.bottom-tab.active{width:82%!important;}
+.bottom-tab svg{width:22px!important;height:22px!important;}
+
+@media(max-width:390px){
+  .home-map-shell{height:305px!important;}
+  .category-tab{min-width:76px!important;padding-left:9px!important;padding-right:9px!important;}
+  .service-grid-new > *{flex-basis:74px!important;min-width:74px!important;}
+  .home-action-footer{grid-template-columns:minmax(0,1fr) 132px!important;}
 }
 
 </style>
@@ -7478,7 +7865,7 @@ body{background:#eef0f2;}
 
     <section class="step active" id="step1">
 
-      <div class="ubee-v3-hero" aria-label="UBee 即時服務資訊">
+      <div class="ubee-v3-hero hidden" aria-label="UBee 即時服務資訊">
         <div class="ubee-v3-hero-content">
           <div class="ubee-v3-eyebrow"><span class="ubee-v3-live-dot"></span>UBee 即時任務服務</div>
           <div class="ubee-v3-hero-title">今天需要 <strong>UBee</strong><br>幫你完成什麼？</div>
@@ -7489,27 +7876,6 @@ body{background:#eef0f2;}
           </div>
         </div>
         <div class="ubee-v3-mascot" aria-hidden="true">🐝</div>
-      </div>
-
-      <div id="homeServiceStatus" class="home-service-status" aria-live="polite">
-        <div class="home-service-status-head">
-          <div>
-            <div class="home-service-status-kicker">
-              <span class="home-service-status-dot" aria-hidden="true"></span>
-              即時服務狀態
-            </div>
-            <div class="home-service-status-count" id="homeOnlineRiderCount">
-              <strong>正在讀取</strong>
-            </div>
-          </div>
-          <div class="home-service-status-side">
-            <div class="home-service-status-label">資料更新時間</div>
-            <div class="home-service-status-time" id="homeServiceUpdatedAt">--:--</div>
-          </div>
-        </div>
-        <div class="home-service-status-note" id="homeServiceStatusNote">
-          正在確認目前可即時媒合的小U數量。
-        </div>
       </div>
 
       <div class="home-map-shell">
@@ -7534,6 +7900,28 @@ body{background:#eef0f2;}
 
       <div class="task-sheet">
         <div class="task-sheet-handle"></div>
+
+        <div id="homeServiceStatus" class="home-service-status" aria-live="polite">
+        <div class="home-service-status-head">
+          <div>
+            <div class="home-service-status-kicker">
+              <span class="home-service-status-dot" aria-hidden="true"></span>
+              即時服務狀態
+            </div>
+            <div class="home-service-status-count" id="homeOnlineRiderCount">
+              <strong>正在讀取</strong>
+            </div>
+          </div>
+          <div class="home-service-status-side">
+            <div class="home-service-status-label">資料更新時間</div>
+            <div class="home-service-status-time" id="homeServiceUpdatedAt">--:--</div>
+          </div>
+        </div>
+        <div class="home-service-status-note" id="homeServiceStatusNote">
+          正在確認目前可即時媒合的小U數量。
+        </div>
+      </div>
+
 
         <div id="merchantInfoBox" class="merchant-card hidden"></div>
 
