@@ -7004,6 +7004,266 @@ input:checked
 
 }
     
+
+
+/* =========================================================
+   UBee 3.0 完整介面覆蓋層（2026-07）
+   僅調整視覺與頁面編排，不變更既有 API、欄位 ID、估價、付款、
+   建單、Firestore 監聽、地圖與任務追蹤邏輯。
+   ========================================================= */
+:root{
+  --ubee-yellow:#ffc800;
+  --ubee-yellow-deep:#f4b900;
+  --ubee-yellow-soft:#fff8dc;
+  --ubee-black:#0b0b0c;
+  --ubee-bg:#f6f7f8;
+  --ubee-card:#ffffff;
+  --ubee-muted:#747980;
+  --ubee-line:#e7e8ea;
+  --ubee-green:#159447;
+  --ubee-blue:#1976d2;
+  --ubee-radius-xl:28px;
+  --ubee-radius-lg:22px;
+  --ubee-radius-md:17px;
+  --ubee-shadow:0 16px 44px rgba(15,23,42,.08);
+  --ubee-shadow-soft:0 8px 24px rgba(15,23,42,.055);
+}
+
+body{background:#eef0f2;}
+.app{
+  max-width:520px;
+  background:var(--ubee-bg);
+  padding-left:16px;
+  padding-right:16px;
+  padding-bottom:calc(148px + env(safe-area-inset-bottom));
+}
+
+.topbar{
+  min-height:70px;
+  margin-left:-16px;
+  margin-right:-16px;
+  padding-left:18px;
+  padding-right:18px;
+  border-bottom:1px solid rgba(15,23,42,.065);
+  box-shadow:0 5px 18px rgba(15,23,42,.035);
+}
+.brand{font-size:30px;letter-spacing:-1.8px;}
+.brand span{color:var(--ubee-yellow-deep);}
+.topbar-location{font-size:15px;gap:6px;}
+.topbar-support{width:42px;height:42px;display:flex;align-items:center;justify-content:center;}
+.topbar-support svg{width:25px;height:25px;}
+
+.ubee-v3-hero{
+  position:relative;
+  overflow:hidden;
+  margin:14px 0 14px;
+  padding:20px 18px;
+  min-height:176px;
+  border:1px solid rgba(244,185,0,.48);
+  border-radius:28px;
+  background:linear-gradient(135deg,#fff 0%,#fffdf4 56%,#fff1b8 100%);
+  box-shadow:var(--ubee-shadow-soft);
+}
+.ubee-v3-hero::before{
+  content:"";
+  position:absolute;
+  width:180px;height:180px;border-radius:50%;
+  right:-55px;top:-76px;
+  background:rgba(255,200,0,.12);
+}
+.ubee-v3-hero::after{
+  content:"";
+  position:absolute;
+  width:110px;height:110px;border-radius:50%;
+  right:35px;bottom:-70px;
+  background:rgba(255,200,0,.09);
+}
+.ubee-v3-hero-content{position:relative;z-index:2;max-width:74%;}
+.ubee-v3-eyebrow{display:flex;align-items:center;gap:7px;color:#765800;font-size:12px;font-weight:1000;margin-bottom:8px;}
+.ubee-v3-live-dot{width:8px;height:8px;border-radius:50%;background:#13a34a;box-shadow:0 0 0 5px rgba(19,163,74,.12);}
+.ubee-v3-hero-title{font-size:25px;line-height:1.25;font-weight:1000;letter-spacing:-.7px;color:#111;margin-bottom:7px;}
+.ubee-v3-hero-title strong{color:var(--ubee-yellow-deep);font-size:35px;}
+.ubee-v3-hero-sub{font-size:13px;line-height:1.65;font-weight:850;color:#555b62;}
+.ubee-v3-metrics{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px;}
+.ubee-v3-metric{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid rgba(15,23,42,.07);border-radius:999px;background:rgba(255,255,255,.82);font-size:11px;font-weight:950;color:#292d32;}
+.ubee-v3-metric b{font-size:12px;}
+.ubee-v3-mascot{position:absolute;right:15px;bottom:19px;z-index:2;width:84px;height:84px;border-radius:25px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.78);border:1px solid rgba(244,185,0,.25);font-size:50px;filter:drop-shadow(0 10px 14px rgba(15,23,42,.12));}
+
+.home-map-shell{
+  height:390px;
+  border-radius:26px;
+  overflow:hidden;
+  border:1px solid rgba(15,23,42,.08);
+  box-shadow:var(--ubee-shadow);
+  background:#e9edf1;
+}
+.map-current-btn{width:50px;height:50px;right:16px;bottom:17px;border-radius:50%;background:rgba(255,255,255,.96);box-shadow:0 10px 26px rgba(15,23,42,.16);}
+.route-badge{bottom:18px;border-radius:18px;}
+
+.task-sheet{
+  margin-top:14px;
+  padding:18px 0 0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.task-sheet-handle{display:none;}
+.task-sheet::before{
+  content:"今天需要 UBee 幫你完成什麼？";
+  display:block;
+  margin:0 0 15px;
+  font-size:21px;
+  font-weight:1000;
+  line-height:1.3;
+  letter-spacing:-.45px;
+}
+
+.category-tabs{
+  display:flex;
+  gap:9px;
+  overflow-x:auto;
+  padding:1px 1px 10px;
+  margin:0 -1px 5px;
+  scrollbar-width:none;
+}
+.category-tabs::-webkit-scrollbar{display:none;}
+.category-tab{
+  flex:0 0 auto;
+  min-height:48px;
+  padding:0 18px;
+  border:1px solid var(--ubee-line);
+  border-radius:999px;
+  background:#fff;
+  color:#666b72;
+  font-size:15px !important;
+  font-weight:1000;
+  box-shadow:none;
+}
+.category-tab.active{background:#111;color:#fff;border-color:#111;box-shadow:0 9px 20px rgba(15,23,42,.15);}
+
+.service-grid-new{
+  display:flex!important;
+  gap:10px!important;
+  overflow-x:auto;
+  padding:2px 1px 12px;
+  margin:0 -1px 7px;
+  scrollbar-width:none;
+}
+.service-grid-new::-webkit-scrollbar{display:none;}
+.service-grid-new > *{flex:0 0 112px!important;min-width:112px!important;}
+.service-card-new,.service-item,.service-option{
+  min-height:112px!important;
+  border:1px solid var(--ubee-line)!important;
+  border-radius:21px!important;
+  background:#fff!important;
+  box-shadow:var(--ubee-shadow-soft)!important;
+}
+.service-card-new.active,.service-item.active,.service-option.active,.service-card-new.selected,.service-item.selected,.service-option.selected{
+  border-color:var(--ubee-yellow-deep)!important;
+  box-shadow:0 0 0 1px var(--ubee-yellow-deep) inset,0 10px 25px rgba(244,185,0,.13)!important;
+  background:linear-gradient(180deg,#fffef8,#fff8d9)!important;
+}
+
+.address-card{
+  overflow:hidden;
+  margin-top:3px;
+  border:1px solid var(--ubee-line);
+  border-radius:24px;
+  background:#fff;
+  box-shadow:var(--ubee-shadow-soft);
+}
+.address-row{min-height:84px;padding:15px 16px;}
+.address-row+.address-row{border-top:1px solid var(--ubee-line);}
+.address-dot{width:13px;height:13px;box-shadow:0 0 0 5px rgba(15,23,42,.045);}
+.address-label{font-size:12px;color:#7a7f86;margin-bottom:5px;}
+.address-main input{font-size:16px!important;font-weight:950;color:#111;}
+.address-main input::placeholder{color:#b0b4ba;font-weight:850;}
+
+.home-action-footer,
+.step2-action-footer,
+.step3-action-footer,
+.step4-action-footer{
+  border:1px solid rgba(15,23,42,.07)!important;
+  background:rgba(255,255,255,.98)!important;
+  box-shadow:0 -10px 32px rgba(15,23,42,.09)!important;
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+.home-action-footer{margin-top:14px;border-radius:24px;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) 145px;gap:12px;align-items:center;}
+.home-estimate-label{font-size:11px;color:#7b8086;}
+.home-estimate-meta{font-size:11px;color:#92969c;}
+.home-estimate-amount{font-size:25px;font-weight:1000;white-space:nowrap;}
+.home-next-btn{min-height:60px;border-radius:18px;background:var(--ubee-yellow);color:#111;font-size:18px!important;font-weight:1000;border:none;}
+
+.ubee-v3-progress{margin:16px 0 18px;padding:15px 14px;border:1px solid var(--ubee-line);border-radius:21px;background:#fff;box-shadow:var(--ubee-shadow-soft);}
+.ubee-v3-progress-track{display:grid;grid-template-columns:repeat(4,1fr);align-items:start;position:relative;}
+.ubee-v3-progress-track::before{content:"";position:absolute;left:11%;right:11%;top:13px;height:2px;background:#e8e9eb;}
+.ubee-v3-progress-step{position:relative;z-index:1;text-align:center;color:#a0a4aa;}
+.ubee-v3-progress-dot{width:27px;height:27px;margin:0 auto 7px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eceef0;color:#8e9399;font-size:11px;font-weight:1000;border:3px solid #fff;box-shadow:0 0 0 1px #e6e7e9;}
+.ubee-v3-progress-step.done .ubee-v3-progress-dot,.ubee-v3-progress-step.active .ubee-v3-progress-dot{background:var(--ubee-yellow);color:#111;box-shadow:0 0 0 1px var(--ubee-yellow-deep);}
+.ubee-v3-progress-step.done .ubee-v3-progress-dot::after{content:"✓";}
+.ubee-v3-progress-step.done .ubee-v3-progress-dot{font-size:0;}
+.ubee-v3-progress-step.active{color:#111;}
+.ubee-v3-progress-label{font-size:10px;font-weight:950;line-height:1.35;}
+
+#step2,#step3,#step4,#step5{padding-top:1px;}
+.headline,.step4-page-title{font-size:26px!important;letter-spacing:-.7px!important;color:#111!important;}
+.subtext,.step4-page-sub{font-size:13px!important;line-height:1.7!important;color:#777c82!important;}
+.task-path-box{border-color:rgba(244,185,0,.35);background:linear-gradient(135deg,#fff,#fff9dd);box-shadow:none;padding:15px 16px;}
+.task-path-title{color:#8a6a00;}
+.task-path-value{font-size:16px;}
+.form-section{margin-bottom:17px;}
+.form-title{font-size:15px;color:#1f2328;margin-bottom:9px;}
+.input-card{border-radius:21px;box-shadow:var(--ubee-shadow-soft);}
+.input-wrap{padding:15px;min-height:58px;}
+.input-icon{width:31px;flex-basis:31px;height:31px;border-radius:11px;background:#fff7cc;color:#755800;}
+.quick-guide{border-radius:18px;background:#fff9df;border-color:#f0d979;padding:14px 15px;}
+
+.speed-list{display:grid;gap:11px;}
+.speed-card{border:1px solid var(--ubee-line);border-radius:22px;background:#fff;padding:17px;box-shadow:var(--ubee-shadow-soft);}
+.speed-card.active{border-color:var(--ubee-yellow-deep);background:linear-gradient(135deg,#fff,#fff8d8);box-shadow:0 0 0 1px var(--ubee-yellow-deep) inset,0 12px 30px rgba(244,185,0,.1);}
+.speed-name{font-size:19px;font-weight:1000;}
+.speed-time{color:#7d8289;font-weight:850;}
+.speed-check{background:var(--ubee-yellow)!important;color:#111!important;}
+
+.review-map-shell{height:300px;border-radius:25px;overflow:hidden;border:1px solid var(--ubee-line);box-shadow:var(--ubee-shadow);}
+.review-route-badge{border-radius:20px!important;background:#fff!important;border:1px solid var(--ubee-line)!important;box-shadow:var(--ubee-shadow-soft)!important;}
+.price-row{padding:11px 0;}
+.price-row.price-total{font-size:21px;}
+.content-card{border-radius:23px;box-shadow:var(--ubee-shadow-soft);}
+
+#step5 .step5-live-status-panel{border-radius:25px!important;box-shadow:var(--ubee-shadow)!important;}
+#step5 .step5-tracking-map-shell{border-radius:25px!important;overflow:hidden!important;box-shadow:var(--ubee-shadow)!important;}
+#step5 .step5-task-detail-section,#step5 .step5-payment-section{border-radius:23px!important;box-shadow:var(--ubee-shadow-soft)!important;}
+
+.bottom-tabs{
+  max-width:520px;
+  padding:9px 14px calc(10px + env(safe-area-inset-bottom));
+  border-radius:26px 26px 0 0;
+  box-shadow:0 -10px 32px rgba(15,23,42,.095);
+}
+.bottom-tab{min-height:62px;border-radius:18px;color:#777c82;font-size:13px!important;}
+.bottom-tab svg{width:23px;height:23px;}
+.bottom-tab.active{background:#111;color:#fff;box-shadow:0 10px 23px rgba(15,23,42,.17);}
+
+.app-section .member-card,.menu-list,.info-item,.address-display{border-radius:23px;}
+.member-card{background:linear-gradient(135deg,#fff,#fff8d8);}
+
+@media(max-width:390px){
+  .app{padding-left:12px;padding-right:12px;}
+  .topbar{margin-left:-12px;margin-right:-12px;padding-left:14px;padding-right:14px;}
+  .ubee-v3-hero{min-height:166px;padding:18px 15px;}
+  .ubee-v3-hero-content{max-width:76%;}
+  .ubee-v3-hero-title{font-size:22px;}
+  .ubee-v3-hero-title strong{font-size:31px;}
+  .ubee-v3-mascot{width:72px;height:72px;font-size:43px;right:11px;}
+  .home-map-shell{height:350px;}
+  .home-action-footer{grid-template-columns:minmax(0,1fr) 126px;}
+  .home-next-btn{font-size:17px!important;}
+  .ubee-v3-progress{padding:14px 8px;}
+  .ubee-v3-progress-label{font-size:9px;}
+}
+
 </style>
 </head>
 
@@ -7143,6 +7403,19 @@ input:checked
 </div>
 
     <section class="step active" id="step1">
+
+      <div class="ubee-v3-hero" aria-label="UBee 即時服務資訊">
+        <div class="ubee-v3-hero-content">
+          <div class="ubee-v3-eyebrow"><span class="ubee-v3-live-dot"></span>UBee 即時任務服務</div>
+          <div class="ubee-v3-hero-title">今天需要 <strong>UBee</strong><br>幫你完成什麼？</div>
+          <div class="ubee-v3-hero-sub">選擇服務、填入路線，系統會立即估價並開始媒合附近小U。</div>
+          <div class="ubee-v3-metrics">
+            <span class="ubee-v3-metric">⚡ <b>快速媒合</b></span>
+            <span class="ubee-v3-metric">🕒 <b>平均約 35 分鐘完成</b></span>
+          </div>
+        </div>
+        <div class="ubee-v3-mascot" aria-hidden="true">🐝</div>
+      </div>
       <div class="home-map-shell">
         <div id="customerMap" class="map-canvas"></div>
         <div id="homeMapPlaceholder" class="map-placeholder">
@@ -7323,6 +7596,16 @@ input:checked
     </section>
 
     <section class="step" id="step2">
+
+      <div class="ubee-v3-progress" aria-label="下單進度：填寫資訊">
+        <div class="ubee-v3-progress-track">
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+        </div>
+      </div>
+
       <div class="headline">補充任務資訊</div>
       <div class="subtext">
         請完成這筆任務的聯絡方式、需求內容與其他必要資訊。
@@ -7496,6 +7779,16 @@ input:checked
     </section>
     
             <section class="step" id="step3">
+
+      <div class="ubee-v3-progress" aria-label="下單進度：任務時效">
+        <div class="ubee-v3-progress-track">
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+        </div>
+      </div>
+
       <div class="headline">任務時效</div>
       <div class="subtext">選擇你希望這筆任務多快完成，不同時效方案會影響系統的處理優先度與預估費用。</div>
 
@@ -7584,6 +7877,16 @@ input:checked
     </section>
 
     <section class="step" id="step4">
+
+      <div class="ubee-v3-progress" aria-label="下單進度：確認估價">
+        <div class="ubee-v3-progress-track">
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+        </div>
+      </div>
+
 
   <div class="step4-page-heading">
 
@@ -7870,6 +8173,16 @@ input:checked
     </section>
 
     <section class="step" id="step5">
+
+      <div class="ubee-v3-progress" aria-label="下單進度：建立任務">
+        <div class="ubee-v3-progress-track">
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+        </div>
+      </div>
+
 
       <div class="content-card" style="margin-top:0;">
 
