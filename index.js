@@ -939,64 +939,12 @@ async function sendNewOrderPushToRiders(
     }
     
     // ==============================
-    // 2. 原本 LINE 管理通知保留
+    // 2. LINE 群組新任務通知已停用
+    //
+    // LINE_ADMIN_GROUP_ID 只保留給「新騎士申請審核通知」。
+    // 新任務與重新轉派不再推送到審核群組或財務群組。
+    // 小U的 Web Push 與騎士端任務卡仍照常運作。
     // ==============================
-    try {
-      const targetGroupId =
-        LINE_ADMIN_GROUP_ID ||
-        LINE_FINISH_GROUP_ID;
-
-      if (!targetGroupId) {
-        console.warn(
-          `UBee LINE 新任務通知略過：未設定 LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
-        );
-
-      } else {
-        await client.pushMessage(
-          targetGroupId,
-          {
-            type: "text",
-
-            text:
-`${isRedispatch
-  ? "🔁 UBee 跑腿任務重新轉派"
-  : "🔔 UBee 跑腿新任務通知"}
-
-${isRedispatch
-  ? "原接單騎士已取消，任務重新開放接單"
-  : "有新的跑腿任務等待接單"}
-
-📍取件：${pickup}
-🏁送達：${dropoff}
-💰騎士收入：$${fee}`
-          }
-        );
-
-        console.log(
-          `UBee LINE ${
-            isRedispatch
-              ? "轉派"
-              : "新任務"
-          }通知已送出：${orderId}`
-        );
-      }
-
-    } catch (lineErr) {
-      console.error(
-        "UBee LINE 新任務通知失敗:",
-        {
-          orderId,
-
-          statusCode:
-            lineErr?.statusCode ||
-            lineErr?.response?.status,
-
-          statusMessage:
-            lineErr?.statusMessage ||
-            lineErr?.message,
-        }
-      );
-    }
 
       return {
       success: true,
