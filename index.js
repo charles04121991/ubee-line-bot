@@ -14240,15 +14240,65 @@ function customerCanAccessChat(order, userId) {
   return ownerIds.includes(safeUserId);
 }
 
+function normalizeChatRiderIdentity(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
+}
+
 function riderCanAccessChat(order, riderAuth) {
-  if (!riderAuth) return false;
-  const trustedIds = [riderAuth.riderDocId, riderAuth.riderId, riderAuth.uid]
-    .map(value => String(value || '').trim())
+  if (!order || !riderAuth) {
+    return false;
+  }
+
+  const trustedIds = [
+    riderAuth.riderDocId,
+    riderAuth.riderId,
+    riderAuth.uid,
+    riderAuth.decodedToken?.riderDocId,
+    riderAuth.decodedToken?.riderId,
+    riderAuth.decodedToken?.phone,
+    riderAuth.decodedToken?.lineUserId
+  ]
+    .map(normalizeChatRiderIdentity)
     .filter(Boolean);
-  const orderRiderIds = [order.riderDocId, order.riderId, order.riderLineUserId, order.riderPhone]
-    .map(value => String(value || '').trim())
+
+  const orderRiderIds = [
+    order.riderDocId,
+    order.riderId,
+    order.riderUid,
+    order.riderPhone,
+    order.riderLineUserId,
+
+    order.acceptedRiderDocId,
+    order.acceptedRiderId,
+    order.acceptedRiderUid,
+    order.acceptedRiderPhone,
+    order.acceptedRiderLineUserId,
+
+    order.assignedRiderDocId,
+    order.assignedRiderId,
+    order.assignedRiderUid,
+    order.assignedRiderPhone,
+    order.assignedRiderLineUserId,
+
+    order.driverDocId,
+    order.driverId,
+    order.driverUid,
+    order.driverPhone,
+    order.driverLineUserId,
+
+    order.acceptedBy,
+    order.assignedTo,
+    order.claimedBy
+  ]
+    .map(normalizeChatRiderIdentity)
     .filter(Boolean);
-  return trustedIds.some(id => orderRiderIds.includes(id));
+
+  return trustedIds.some(trustedId =>
+    orderRiderIds.includes(trustedId)
+  );
 }
 
 async function listOrderChatMessages(safeOrderId) {
