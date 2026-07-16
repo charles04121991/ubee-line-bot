@@ -7264,6 +7264,80 @@ body{background:#eef0f2;}
   .ubee-v3-progress-label{font-size:9px;}
 }
 
+
+
+/* =====================================================
+   UBee 客戶端首頁：回復簡單版介面
+   僅保留精簡的在線小U狀態列，不改 API 或功能邏輯
+   ===================================================== */
+.home-service-status{
+  margin:10px 0 12px;
+  padding:10px 13px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#ffffff;
+  box-shadow:none;
+}
+
+.home-service-status-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.home-service-status-kicker{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#55595e;
+  font-size:12px;
+  font-weight:900;
+}
+
+.home-service-status-dot{
+  width:8px;
+  height:8px;
+  flex:0 0 8px;
+  border-radius:50%;
+  background:#22c55e;
+}
+
+.home-service-status.is-fallback .home-service-status-dot{
+  background:var(--accentStrong);
+}
+
+.home-service-status-count{
+  margin-top:3px;
+  color:#111;
+  font-size:14px;
+  font-weight:1000;
+  line-height:1.35;
+}
+
+.home-service-status-count span{
+  color:#b88900;
+}
+
+.home-service-status-side{
+  flex:0 0 auto;
+  text-align:right;
+}
+
+.home-service-status-label{
+  display:none;
+}
+
+.home-service-status-time{
+  color:#8b9096;
+  font-size:10px;
+  font-weight:800;
+}
+
+.home-service-status-note{
+  display:none;
+}
+
 </style>
 </head>
 
@@ -7416,6 +7490,28 @@ body{background:#eef0f2;}
         </div>
         <div class="ubee-v3-mascot" aria-hidden="true">🐝</div>
       </div>
+
+      <div id="homeServiceStatus" class="home-service-status" aria-live="polite">
+        <div class="home-service-status-head">
+          <div>
+            <div class="home-service-status-kicker">
+              <span class="home-service-status-dot" aria-hidden="true"></span>
+              即時服務狀態
+            </div>
+            <div class="home-service-status-count" id="homeOnlineRiderCount">
+              <strong>正在讀取</strong>
+            </div>
+          </div>
+          <div class="home-service-status-side">
+            <div class="home-service-status-label">資料更新時間</div>
+            <div class="home-service-status-time" id="homeServiceUpdatedAt">--:--</div>
+          </div>
+        </div>
+        <div class="home-service-status-note" id="homeServiceStatusNote">
+          正在確認目前可即時媒合的小U數量。
+        </div>
+      </div>
+
       <div class="home-map-shell">
         <div id="customerMap" class="map-canvas"></div>
         <div id="homeMapPlaceholder" class="map-placeholder">
@@ -8637,6 +8733,12 @@ let isConfirmingPaid = false;
 let isCancellingOrder = false;
 let currentCustomerPage = '';
 let initialOpenActionHandled = false;
+
+// ==============================
+// 首頁即時服務狀態
+// ==============================
+let homeServiceStatusTimer = null;
+const HOME_SERVICE_STATUS_REFRESH_MS = 60000;
 
 let isStepTransitioning = false;
 let stepTransitionUnlockTimer = null;
@@ -11653,6 +11755,8 @@ function selectNearbyPlace(index){
 
 function updateTaskPathText(){
   if(qs('taskPathText')){
+    const selectedServiceItem = (serviceGroups[serviceGroup] || []).find(item => item.title === serviceType);
+    renderCategoryBox(selectedServiceItem || null);
     qs('taskPathText').innerText = `${getServiceGroupLabel()}｜${serviceType || '未選擇'}｜${serviceCategory || '未選擇'}`;
   }
 }
@@ -16564,9 +16668,82 @@ async function initMerchantContext(){
   }
 }
 
+function formatHomeServiceUpdatedAt(value){
+  const date = value ? new Date(value) : new Date();
+  if(Number.isNaN(date.getTime())) return '--:--';
+  return date.toLocaleTimeString('zh-TW',{
+    hour:'2-digit',
+    minute:'2-digit',
+    hour12:false
+  });
+}
+
+function renderHomeServiceStatus(data, fallback = false){
+  const card = qs('homeServiceStatus');
+  const countEl = qs('homeOnlineRiderCount');
+  const timeEl = qs('homeServiceUpdatedAt');
+  const noteEl = qs('homeServiceStatusNote');
+  if(!card || !countEl || !timeEl || !noteEl) return;
+
+  card.classList.toggle('is-fallback', fallback);
+
+  if(fallback){
+    countEl.innerHTML = '<strong>服務媒合正常開放</strong>';
+    timeEl.innerText = formatHomeServiceUpdatedAt();
+    noteEl.innerText = '即時人數暫時無法取得；你仍可正常估價與建立任務，系統會在送出後媒合可服務的小U。';
+    return;
+  }
+
+  const onlineCount = Math.max(0, Number(data?.onlineRiderCount || 0));
+  countEl.innerHTML = `<span>${onlineCount}</span> <strong>位小U在線</strong>`;
+  timeEl.innerText = formatHomeServiceUpdatedAt(data?.updatedAt);
+
+  if(onlineCount > 0){
+    noteEl.innerText = `目前有 ${onlineCount} 位已通過審核、在線且定位有效的小U可參與即時媒合；實際接單仍依距離、任務與當下狀態為準。`;
+  }else{
+    noteEl.innerText = '目前未偵測到定位有效的在線小U；你仍可先建立任務，系統會持續等待可服務的小U上線。';
+  }
+}
+
+async function refreshHomeServiceStatus(){
+  try{
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch('/api/customer/service-status',{
+      method:'GET',
+      cache:'no-store',
+      signal:controller.signal
+    });
+    clearTimeout(timer);
+
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok || data.success === false){
+      throw new Error(data.message || data.error || '服務狀態讀取失敗');
+    }
+    renderHomeServiceStatus(data, false);
+  }catch(err){
+    console.warn('首頁即時服務狀態讀取失敗：', err);
+    renderHomeServiceStatus(null, true);
+  }
+}
+
+function startHomeServiceStatusRefresh(){
+  if(homeServiceStatusTimer){
+    clearInterval(homeServiceStatusTimer);
+  }
+  refreshHomeServiceStatus();
+  homeServiceStatusTimer = setInterval(
+    refreshHomeServiceStatus,
+    HOME_SERVICE_STATUS_REFRESH_MS
+  );
+}
+
 async function initPage(){
   const submitBtn =
     qs('createOrderBtn');
+
+  // 即時服務狀態獨立載入，不等待 LIFF 或地圖完成。
+  startHomeServiceStatusRefresh();
 
   function setSubmitButton(text, disabled){
     if(!submitBtn){
