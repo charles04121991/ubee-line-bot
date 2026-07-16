@@ -9608,6 +9608,58 @@ function createOrderFromApi(data) {
       !!merchantName,
   };
 }
+// =====================================================
+// 客戶端安全服務狀態 API
+//
+// 僅回傳匿名統計：
+// - 已審核、在線且定位仍新鮮的小U數量
+// - 統計更新時間與定位新鮮度門檻
+// 不回傳姓名、電話、文件 ID 或任何座標。
+// =====================================================
+app.get('/api/customer/service-status', async (req, res) => {
+  try {
+    const LOCATION_FRESH_MS = 120000;
+    const ridersSnap = await db
+      .collection('riders')
+      .limit(500)
+      .get();
+
+    let onlineRiderCount = 0;
+
+    ridersSnap.forEach((riderDoc) => {
+      const rider = riderDoc.data() || {};
+      const approved =
+        rider.approved === true ||
+        String(rider.status || '').trim().toLowerCase() === 'approved';
+      const online = rider.online === true;
+      const point = getRiderCurrentPointForPush(rider);
+      const fresh = isRiderLocationFreshForPush(rider, LOCATION_FRESH_MS);
+
+      if (approved && online && point && fresh) {
+        onlineRiderCount += 1;
+      }
+    });
+
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    return res.json({
+      success: true,
+      onlineRiderCount,
+      updatedAt: new Date().toISOString(),
+      locationFreshSeconds: Math.floor(LOCATION_FRESH_MS / 1000),
+      scope: 'available_for_realtime_matching',
+    });
+  } catch (error) {
+    console.error('❌ 客戶端服務狀態 API 讀取失敗：', error);
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    return res.status(503).json({
+      success: false,
+      code: 'SERVICE_STATUS_UNAVAILABLE',
+      message: '即時服務狀態暫時無法取得。',
+      updatedAt: new Date().toISOString(),
+    });
+  }
+});
+
 app.get('/api/config', (req, res) => {
   res.json({
     success: true,
