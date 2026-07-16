@@ -14240,17 +14240,14 @@ function customerCanAccessChat(order, userId) {
   return ownerIds.includes(safeUserId);
 }
 
-function normalizeChatRiderIdentity(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '');
-}
+async function riderCanAccessChat(order, riderAuth, safeOrderId) {
+  if (!order || !riderAuth) return false;
 
-function riderCanAccessChat(order, riderAuth) {
-  if (!order || !riderAuth) {
-    return false;
-  }
+  const normalizeIdentity = value =>
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '');
 
   const trustedIds = [
     riderAuth.riderDocId,
@@ -14258,47 +14255,67 @@ function riderCanAccessChat(order, riderAuth) {
     riderAuth.uid,
     riderAuth.decodedToken?.riderDocId,
     riderAuth.decodedToken?.riderId,
-    riderAuth.decodedToken?.phone,
-    riderAuth.decodedToken?.lineUserId
   ]
-    .map(normalizeChatRiderIdentity)
+    .map(normalizeIdentity)
     .filter(Boolean);
 
   const orderRiderIds = [
     order.riderDocId,
     order.riderId,
-    order.riderUid,
     order.riderPhone,
     order.riderLineUserId,
-
+    order.driverId,
+    order.driverPhone,
     order.acceptedRiderDocId,
     order.acceptedRiderId,
-    order.acceptedRiderUid,
-    order.acceptedRiderPhone,
-    order.acceptedRiderLineUserId,
-
     order.assignedRiderDocId,
     order.assignedRiderId,
-    order.assignedRiderUid,
-    order.assignedRiderPhone,
-    order.assignedRiderLineUserId,
-
-    order.driverDocId,
-    order.driverId,
-    order.driverUid,
-    order.driverPhone,
-    order.driverLineUserId,
-
-    order.acceptedBy,
-    order.assignedTo,
-    order.claimedBy
   ]
-    .map(normalizeChatRiderIdentity)
+    .map(normalizeIdentity)
     .filter(Boolean);
 
-  return trustedIds.some(trustedId =>
-    orderRiderIds.includes(trustedId)
-  );
+  if (
+    trustedIds.some(trustedId =>
+      orderRiderIds.includes(trustedId)
+    )
+  ) {
+    return true;
+  }
+
+  // 最可靠的備援判斷：接單成功時，riders 文件會寫入 currentOrderId。
+  // 即使舊訂單的 riderId 欄位格式不同，只要目前小U正在執行這張訂單，仍可進入聊天室。
+  const riderDocId = String(
+    riderAuth.riderDocId ||
+    riderAuth.decodedToken?.riderDocId ||
+    ''
+  ).trim();
+
+  if (!riderDocId || !safeOrderId) {
+    return false;
+  }
+
+  try {
+    const riderDoc = await db
+      .collection('riders')
+      .doc(riderDocId)
+      .get();
+
+    if (!riderDoc.exists) {
+      return false;
+    }
+
+    const riderData = riderDoc.data() || {};
+    const currentOrderId = String(
+      riderData.currentOrderId || ''
+    )
+      .trim()
+      .toUpperCase();
+
+    return currentOrderId === String(safeOrderId).trim().toUpperCase();
+  } catch (error) {
+    console.warn('⚠️ 小U聊天室 currentOrderId 驗證失敗：', error);
+    return false;
+  }
 }
 
 async function listOrderChatMessages(safeOrderId) {
@@ -14383,7 +14400,7 @@ app.get('/api/rider/orders/:orderId/chat', riderAuthMiddleware, async (req, res)
   try {
     const result = await getChatOrderOrResponse(req.params.orderId, res);
     if (!result) return;
-    if (!riderCanAccessChat(result.order, req.riderAuth)) {
+    if (!(await riderCanAccessChat(result.order, req.riderAuth, result.safeOrderId))) {
       return res.status(403).json({ success: false, message: '這張訂單目前不屬於你。' });
     }
     const messages = await listOrderChatMessages(result.safeOrderId);
@@ -14398,7 +14415,7 @@ app.post('/api/rider/orders/:orderId/chat', riderAuthMiddleware, async (req, res
   try {
     const result = await getChatOrderOrResponse(req.params.orderId, res);
     if (!result) return;
-    if (!riderCanAccessChat(result.order, req.riderAuth)) {
+    if (!(await riderCanAccessChat(result.order, req.riderAuth, result.safeOrderId))) {
       return res.status(403).json({ success: false, message: '這張訂單目前不屬於你。' });
     }
     const senderName = String(result.order.riderName || '小U').trim().slice(0, 40) || '小U';
