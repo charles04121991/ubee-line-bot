@@ -7725,6 +7725,29 @@ body{background:#eef0f2;}
   .home-action-footer{grid-template-columns:minmax(0,1fr) 132px!important;}
 }
 
+
+
+    /* 首頁匿名在線小U標記 */
+    .ubee-nearby-rider-pin{
+      width:42px;
+      height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:3px solid #ffffff;
+      border-radius:50%;
+      background:#facc15;
+      color:#111111;
+      box-shadow:0 8px 22px rgba(17,24,39,.26);
+      font-size:21px;
+      line-height:1;
+      font-weight:1000;
+    }
+
+    .ubee-nearby-rider-pin::after{
+      content:"U";
+    }
+
 </style>
 </head>
 
@@ -9127,6 +9150,8 @@ let initialOpenActionHandled = false;
 // ==============================
 let homeServiceStatusTimer = null;
 const HOME_SERVICE_STATUS_REFRESH_MS = 60000;
+let homeNearbyRiderMarkers = [];
+let homeNearbyRiderInfoWindow = null;
 
 let isStepTransitioning = false;
 let stepTransitionUnlockTimer = null;
@@ -17056,6 +17081,119 @@ async function initMerchantContext(){
   }
 }
 
+
+function clearHomeNearbyRiderMarkers(){
+  homeNearbyRiderMarkers.forEach(marker => {
+    clearMapObject(marker);
+  });
+  homeNearbyRiderMarkers = [];
+
+  try{
+    homeNearbyRiderInfoWindow?.close?.();
+  }catch(_err){}
+}
+
+function createNearbyRiderMarkerContent(){
+  const el = document.createElement('div');
+  el.className = 'ubee-nearby-rider-pin';
+  el.setAttribute('aria-label', '附近有小U');
+  return el;
+}
+
+async function renderHomeNearbyRiders(nearbyRiders = []){
+  clearHomeNearbyRiderMarkers();
+
+  const safeRiders = Array.isArray(nearbyRiders)
+    ? nearbyRiders.filter(item =>
+        hasValidLatLng(item?.lat, item?.lng)
+      )
+    : [];
+
+  if(!safeRiders.length){
+    return;
+  }
+
+  try{
+    const map = await ensureCustomerMapReady();
+    if(!map) return;
+
+    if(!homeNearbyRiderInfoWindow && window.google?.maps?.InfoWindow){
+      homeNearbyRiderInfoWindow = new google.maps.InfoWindow();
+    }
+
+    safeRiders.forEach(item => {
+      const position = {
+        lat:Number(item.lat),
+        lng:Number(item.lng)
+      };
+
+      let marker = null;
+
+      if(
+        googleMapsMapId &&
+        googleMapsLibraries?.marker?.AdvancedMarkerElement
+      ){
+        marker = new googleMapsLibraries.marker.AdvancedMarkerElement({
+          map,
+          position,
+          title:'附近有小U',
+          content:createNearbyRiderMarkerContent()
+        });
+
+        marker.addListener?.('click', () => {
+          if(!homeNearbyRiderInfoWindow) return;
+          homeNearbyRiderInfoWindow.setContent(
+            '<div style="padding:2px 4px;font-weight:900;color:#111">附近有小U</div>' +
+            '<div style="margin-top:4px;font-size:12px;color:#6f7378">位置已做約略偏移，僅供服務範圍參考</div>'
+          );
+          homeNearbyRiderInfoWindow.open({
+            map,
+            anchor:marker
+          });
+        });
+      }else if(window.google?.maps?.Marker){
+        marker = new google.maps.Marker({
+          map,
+          position,
+          title:'附近有小U',
+          icon:{
+            path:google.maps.SymbolPath.CIRCLE,
+            scale:17,
+            fillColor:'#facc15',
+            fillOpacity:1,
+            strokeColor:'#ffffff',
+            strokeWeight:3
+          },
+          label:{
+            text:'U',
+            color:'#111111',
+            fontWeight:'900',
+            fontSize:'14px'
+          }
+        });
+
+        marker.addListener('click', () => {
+          if(!homeNearbyRiderInfoWindow) return;
+          homeNearbyRiderInfoWindow.setContent(
+            '<div style="padding:2px 4px;font-weight:900;color:#111">附近有小U</div>' +
+            '<div style="margin-top:4px;font-size:12px;color:#6f7378">位置已做約略偏移，僅供服務範圍參考</div>'
+          );
+          homeNearbyRiderInfoWindow.open({
+            map,
+            anchor:marker
+          });
+        });
+      }
+
+      if(marker){
+        homeNearbyRiderMarkers.push(marker);
+      }
+    });
+  }catch(err){
+    console.warn('首頁匿名小U標記顯示失敗：', err);
+  }
+}
+
 function formatHomeServiceUpdatedAt(value){
   const date = value ? new Date(value) : new Date();
   if(Number.isNaN(date.getTime())) return '--:--';
@@ -17079,11 +17217,13 @@ function renderHomeServiceStatus(data, fallback = false){
     countEl.innerHTML = '<strong>服務媒合正常開放</strong>';
     timeEl.innerText = formatHomeServiceUpdatedAt();
     noteEl.innerText = '即時人數暫時無法取得；你仍可正常估價與建立任務，系統會在送出後媒合可服務的小U。';
+    clearHomeNearbyRiderMarkers();
     return;
   }
 
   const onlineCount = Math.max(0, Number(data?.onlineRiderCount || 0));
   countEl.innerHTML = `<span>${onlineCount}</span> <strong>位小U在線</strong>`;
+  renderHomeNearbyRiders(data?.nearbyRiders || []);
   timeEl.innerText = formatHomeServiceUpdatedAt(data?.updatedAt);
 
   if(onlineCount > 0){
