@@ -11856,10 +11856,29 @@ function renderCategoryBox(item){
   title.innerText = `${item.title}分類`;
 
   grid.innerHTML = item.categories.map((cat, index) => `
-    <button class="category-choice-item ${index === 0 ? 'active' : ''}" type="button" onclick="selectCategory(this,'${escapeHtml(cat)}')">
+    <button
+      class="category-choice-item ${index === 0 ? 'active' : ''}"
+      type="button"
+      data-service-category="${escapeHtml(cat)}"
+      aria-pressed="${index === 0 ? 'true' : 'false'}"
+    >
       ${escapeHtml(cat)}
     </button>
   `).join('');
+
+  // 第三層分類使用正式事件綁定，不依賴 inline onclick。
+  // 每次分類內容重新產生後重新綁定，避免動態 HTML 導致按鈕無反應。
+  grid.querySelectorAll('.category-choice-item').forEach((button) => {
+    button.addEventListener('click', () => {
+      const category = String(
+        button.dataset.serviceCategory || ''
+      ).trim();
+
+      if(!category) return;
+
+      selectCategory(button, category);
+    });
+  });
 }
 
 function selectCategory(el, cat){
@@ -11869,8 +11888,11 @@ function selectCategory(el, cat){
 
   serviceCategory = cat;
 
-  document.querySelectorAll('#serviceCategoryGrid .category-choice-item').forEach(btn => btn.classList.remove('active'));
-  el?.classList.add('active');
+  document.querySelectorAll('#serviceCategoryGrid .category-choice-item').forEach((btn) => {
+    const isSelected = btn === el;
+    btn.classList.toggle('active', isSelected);
+    btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+  });
 
   updateTaskPathText();
   applyDynamicFields();
