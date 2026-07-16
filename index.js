@@ -5,6 +5,7 @@ const fetch = require('node-fetch');
 const path = require('path');
 const admin = require('firebase-admin');
 const webpush = require('web-push');
+const crypto = require('crypto');
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -9611,20 +9612,87 @@ function createOrderFromApi(data) {
 // =====================================================
 // 客戶端安全服務狀態 API
 //
-// 僅回傳匿名統計：
+// 僅回傳匿名資訊：
 // - 已審核、在線且定位仍新鮮的小U數量
+// - 經 50～80 公尺穩定偏移後的匿名地圖位置
 // - 統計更新時間與定位新鮮度門檻
-// 不回傳姓名、電話、文件 ID 或任何座標。
+//
+// 絕不回傳姓名、電話、LINE ID、riderId、Firestore 文件 ID、
+// 真實座標或任何可讓客戶辨識特定小U的固定公開識別碼。
 // =====================================================
+const CUSTOMER_RIDER_LOCATION_FRESH_MS = 120000;
+const CUSTOMER_RIDER_OFFSET_MIN_METERS = 50;
+const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
+const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
+const CUSTOMER_RIDER_MAX_MARKERS = 80;
+
+function getCustomerRiderMapSecret() {
+  return String(
+    process.env.CUSTOMER_RIDER_MAP_SECRET ||
+    process.env.CHANNEL_SECRET ||
+    process.env.FIREBASE_PROJECT_ID ||
+    'ubee-customer-rider-map'
+  );
+}
+
+function buildStableAnonymousRiderOffset(riderDocId, nowMs = Date.now()) {
+  const bucket = Math.floor(nowMs / CUSTOMER_RIDER_OFFSET_BUCKET_MS);
+  const digest = crypto
+    .createHmac('sha256', getCustomerRiderMapSecret())
+    .update(`${String(riderDocId || '')}:${bucket}`)
+    .digest();
+
+  const distanceRatio = digest.readUInt32BE(0) / 0xffffffff;
+  const angleRatio = digest.readUInt32BE(4) / 0xffffffff;
+
+  return {
+    distanceMeters:
+      CUSTOMER_RIDER_OFFSET_MIN_METERS +
+      distanceRatio *
+        (CUSTOMER_RIDER_OFFSET_MAX_METERS - CUSTOMER_RIDER_OFFSET_MIN_METERS),
+    angleRadians: angleRatio * Math.PI * 2,
+  };
+}
+
+function offsetCustomerRiderPoint(point, riderDocId, nowMs = Date.now()) {
+  if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lng))) {
+    return null;
+  }
+
+  const sourceLat = Number(point.lat);
+  const sourceLng = Number(point.lng);
+  const { distanceMeters, angleRadians } =
+    buildStableAnonymousRiderOffset(riderDocId, nowMs);
+
+  const latitudeRadians = sourceLat * Math.PI / 180;
+  const metersPerDegreeLat = 111320;
+  const metersPerDegreeLng = Math.max(
+    1000,
+    111320 * Math.cos(latitudeRadians)
+  );
+
+  const latOffset =
+    Math.cos(angleRadians) * distanceMeters / metersPerDegreeLat;
+  const lngOffset =
+    Math.sin(angleRadians) * distanceMeters / metersPerDegreeLng;
+
+  return {
+    lat: Number((sourceLat + latOffset).toFixed(6)),
+    lng: Number((sourceLng + lngOffset).toFixed(6)),
+    label: '附近有小U',
+  };
+}
+
 app.get('/api/customer/service-status', async (req, res) => {
   try {
-    const LOCATION_FRESH_MS = 120000;
+    const nowMs = Date.now();
     const ridersSnap = await db
       .collection('riders')
       .limit(500)
       .get();
 
     let onlineRiderCount = 0;
+    const nearbyRiders = [];
 
     ridersSnap.forEach((riderDoc) => {
       const rider = riderDoc.data() || {};
@@ -9633,10 +9701,29 @@ app.get('/api/customer/service-status', async (req, res) => {
         String(rider.status || '').trim().toLowerCase() === 'approved';
       const online = rider.online === true;
       const point = getRiderCurrentPointForPush(rider);
-      const fresh = isRiderLocationFreshForPush(rider, LOCATION_FRESH_MS);
+      const fresh = isRiderLocationFreshForPush(
+        rider,
+        CUSTOMER_RIDER_LOCATION_FRESH_MS
+      );
 
-      if (approved && online && point && fresh) {
-        onlineRiderCount += 1;
+      if (!approved || !online || !point || !fresh) {
+        return;
+      }
+
+      onlineRiderCount += 1;
+
+      if (nearbyRiders.length >= CUSTOMER_RIDER_MAX_MARKERS) {
+        return;
+      }
+
+      const anonymousPoint = offsetCustomerRiderPoint(
+        point,
+        riderDoc.id,
+        nowMs
+      );
+
+      if (anonymousPoint) {
+        nearbyRiders.push(anonymousPoint);
       }
     });
 
@@ -9644,8 +9731,19 @@ app.get('/api/customer/service-status', async (req, res) => {
     return res.json({
       success: true,
       onlineRiderCount,
-      updatedAt: new Date().toISOString(),
-      locationFreshSeconds: Math.floor(LOCATION_FRESH_MS / 1000),
+      nearbyRiders,
+      updatedAt: new Date(nowMs).toISOString(),
+      locationFreshSeconds: Math.floor(
+        CUSTOMER_RIDER_LOCATION_FRESH_MS / 1000
+      ),
+      locationPrivacy: {
+        mode: 'stable_offset',
+        minOffsetMeters: CUSTOMER_RIDER_OFFSET_MIN_METERS,
+        maxOffsetMeters: CUSTOMER_RIDER_OFFSET_MAX_METERS,
+        refreshMinutes: Math.floor(
+          CUSTOMER_RIDER_OFFSET_BUCKET_MS / 60000
+        ),
+      },
       scope: 'available_for_realtime_matching',
     });
   } catch (error) {
