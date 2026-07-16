@@ -306,6 +306,15 @@ const client = new line.Client(config);
 const PORT = process.env.PORT || 3000;
 const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 
+const FIREBASE_STORAGE_BUCKET =
+  String(process.env.FIREBASE_STORAGE_BUCKET || '').trim();
+
+const CUSTOMER_ATTACHMENT_MAX_BYTES = 1572864;
+const CUSTOMER_ATTACHMENT_MAX_FILES_PER_ORDER = 3;
+const CUSTOMER_ATTACHMENT_UPLOAD_WINDOW_MS = 10 * 60 * 1000;
+const CUSTOMER_ATTACHMENT_UPLOAD_LIMIT = 12;
+const customerAttachmentUploadLog = new Map();
+
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
@@ -7899,14 +7908,21 @@ function isOrderCustomer(event, order) {
 }
 
 const ORDER_INPUT_LIMITS = {
-  serviceType: 30,
+  serviceType: 40,
   serviceGroup: 30,
+  serviceCategory: 60,
   item: 80,
   pickupAddress: 120,
   pickupPhone: 20,
+  pickupAddressNote: 160,
   dropoffAddress: 120,
   dropoffPhone: 20,
+  dropoffAddressNote: 160,
   note: 300,
+  clientSchemaVersion: 50,
+  shoppingItemName: 80,
+  shoppingItemQuantity: 20,
+  shoppingItemBudget: 8,
 };
 
 const MAX_ADVANCE_PAYMENT = 1000;
@@ -7929,6 +7945,243 @@ function cleanLongText(value, maxLength = 500) {
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
     .trim()
     .slice(0, maxLength);
+}
+
+
+function sanitizeShoppingItems(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .slice(0, 20)
+    .map((item) => {
+      const source =
+        item && typeof item === 'object'
+          ? item
+          : {};
+
+      const name = cleanText(
+        source.name || '',
+        ORDER_INPUT_LIMITS.shoppingItemName
+      );
+
+      if (!name) {
+        return null;
+      }
+
+      const quantity = cleanText(
+        source.quantity || '1',
+        ORDER_INPUT_LIMITS.shoppingItemQuantity
+      ) || '1';
+
+      const budget = parseNonNegativeMoney(
+        source.budget
+      );
+
+      const replacementPolicy = [
+        'contact',
+        'replace',
+        'skip',
+      ].includes(
+        String(
+          source.replacementPolicy || ''
+        ).trim()
+      )
+        ? String(
+            source.replacementPolicy
+          ).trim()
+        : 'contact';
+
+      return {
+        name,
+        quantity,
+        budget,
+        replacementPolicy,
+      };
+    })
+    .filter(Boolean);
+}
+
+function sanitizeCustomerAttachmentUrls(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const result = [];
+
+  for (const rawValue of value) {
+    if (
+      result.length >=
+      CUSTOMER_ATTACHMENT_MAX_FILES_PER_ORDER
+    ) {
+      break;
+    }
+
+    const raw = String(rawValue || '').trim();
+
+    if (!raw || raw.length > 1000) {
+      continue;
+    }
+
+    try {
+      const parsed = raw.startsWith('/')
+        ? new URL(raw, BASE_URL || 'https://ubee.invalid')
+        : new URL(raw);
+
+      if (
+        !/^\/api\/customer\/order-attachments\/[a-zA-Z0-9_-]{12,100}$/.test(
+          parsed.pathname
+        )
+      ) {
+        continue;
+      }
+
+      const token =
+        String(
+          parsed.searchParams.get('token') || ''
+        ).trim();
+
+      if (!/^[a-f0-9]{32,128}$/i.test(token)) {
+        continue;
+      }
+
+      result.push(raw);
+    } catch (error) {
+      // 非合法 URL 直接忽略。
+    }
+  }
+
+  return Array.from(new Set(result));
+}
+
+function parseCustomerAttachmentReference(rawUrl) {
+  const raw = String(rawUrl || '').trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = raw.startsWith('/')
+      ? new URL(raw, BASE_URL || 'https://ubee.invalid')
+      : new URL(raw);
+
+    const match = parsed.pathname.match(
+      /^\/api\/customer\/order-attachments\/([a-zA-Z0-9_-]{12,100})$/
+    );
+
+    const token =
+      String(
+        parsed.searchParams.get('token') || ''
+      ).trim();
+
+    if (
+      !match ||
+      !/^[a-f0-9]{32,128}$/i.test(token)
+    ) {
+      return null;
+    }
+
+    return {
+      attachmentId: match[1],
+      token,
+      url: raw,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function safeTokenEquals(left, right) {
+  const leftBuffer = Buffer.from(
+    String(left || ''),
+    'utf8'
+  );
+
+  const rightBuffer = Buffer.from(
+    String(right || ''),
+    'utf8'
+  );
+
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    leftBuffer.length > 0 &&
+    crypto.timingSafeEqual(
+      leftBuffer,
+      rightBuffer
+    )
+  );
+}
+
+async function verifyCustomerAttachmentUrls(
+  attachmentUrls,
+  userId
+) {
+  const safeUserId =
+    String(userId || '').trim();
+
+  const references =
+    sanitizeCustomerAttachmentUrls(
+      attachmentUrls
+    )
+      .map(
+        parseCustomerAttachmentReference
+      )
+      .filter(Boolean);
+
+  const verifiedUrls = [];
+
+  for (const reference of references) {
+    const doc = await db
+      .collection('customerOrderAttachments')
+      .doc(reference.attachmentId)
+      .get();
+
+    if (!doc.exists) {
+      throw new Error(
+        '其中一張任務照片不存在，請移除照片後重新選擇。'
+      );
+    }
+
+    const attachment = doc.data() || {};
+
+    if (
+      String(
+        attachment.userId || ''
+      ).trim() !== safeUserId
+    ) {
+      throw new Error(
+        '任務照片與目前下單者身分不符。'
+      );
+    }
+
+    if (
+      !safeTokenEquals(
+        attachment.accessToken,
+        reference.token
+      )
+    ) {
+      throw new Error(
+        '任務照片存取憑證無效，請重新選擇照片。'
+      );
+    }
+
+    if (
+      attachment.deleted === true ||
+      attachment.status === 'deleted'
+    ) {
+      throw new Error(
+        '任務照片已失效，請重新選擇照片。'
+      );
+    }
+
+    verifiedUrls.push(
+      reference.url
+    );
+  }
+
+  return verifiedUrls;
 }
 
 function normalizeAdvancePaymentText(text) {
@@ -8063,6 +8316,43 @@ function validateOrderInput(data) {
 
   if (detectedAdvancePayment >= MAX_ADVANCE_PAYMENT) {
     errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額，請先聯繫 UBee 跑腿客服人工確認。');
+  }
+
+  if (
+    Array.isArray(data.shoppingItems) &&
+    data.shoppingItems.length > 20
+  ) {
+    errors.push('代買商品最多可填寫 20 項。');
+  }
+
+  if (
+    Array.isArray(data.attachmentUrls) &&
+    data.attachmentUrls.length >
+      CUSTOMER_ATTACHMENT_MAX_FILES_PER_ORDER
+  ) {
+    errors.push(
+      `任務照片最多可附上 ${CUSTOMER_ATTACHMENT_MAX_FILES_PER_ORDER} 張。`
+    );
+  }
+
+  if (
+    data.estimatedCompletionMinutes !== null &&
+    data.estimatedCompletionMinutes !== undefined &&
+    (
+      !Number.isFinite(
+        Number(
+          data.estimatedCompletionMinutes
+        )
+      ) ||
+      Number(
+        data.estimatedCompletionMinutes
+      ) < 0 ||
+      Number(
+        data.estimatedCompletionMinutes
+      ) > 24 * 60
+    )
+  ) {
+    errors.push('預估完成時間格式錯誤。');
   }
 
   return errors;
@@ -9471,6 +9761,11 @@ function createOrderFromApi(data) {
       200
     ),
 
+    pickupAddressNote: cleanLongText(
+      data.pickupAddressNote || '',
+      ORDER_INPUT_LIMITS.pickupAddressNote
+    ),
+
     dropoffAddress: cleanText(
       data.dropoff ||
       data.dropoffAddress ||
@@ -9498,6 +9793,37 @@ function createOrderFromApi(data) {
     dropoffPlaceId: cleanText(
       data.dropoffPlaceId || '',
       200
+    ),
+
+    dropoffAddressNote: cleanLongText(
+      data.dropoffAddressNote || '',
+      ORDER_INPUT_LIMITS.dropoffAddressNote
+    ),
+
+    shoppingItems: sanitizeShoppingItems(
+      data.shoppingItems
+    ),
+
+    attachmentUrls: sanitizeCustomerAttachmentUrls(
+      data.attachmentUrls
+    ),
+
+    estimatedCompletionMinutes:
+      Math.min(
+        24 * 60,
+        Math.max(
+          0,
+          Math.round(
+            Number(
+              data.estimatedCompletionMinutes || 0
+            )
+          )
+        )
+      ) || null,
+
+    clientSchemaVersion: cleanText(
+      data.clientSchemaVersion || '',
+      ORDER_INPUT_LIMITS.clientSchemaVersion
     ),
 
     speedType: [
@@ -9631,15 +9957,730 @@ function offsetCustomerRiderPoint(point, riderDocId, nowMs = Date.now()) {
   };
 }
 
+
+function getCustomerAttachmentUploadKey(req, userId) {
+  const forwardedFor =
+    String(
+      req.headers['x-forwarded-for'] || ''
+    )
+      .split(',')[0]
+      .trim();
+
+  const ip =
+    forwardedFor ||
+    req.ip ||
+    req.socket?.remoteAddress ||
+    'unknown';
+
+  return `${String(userId || '').trim()}:${ip}`;
+}
+
+function enforceCustomerAttachmentUploadLimit(
+  req,
+  userId
+) {
+  const nowMs = Date.now();
+  const key =
+    getCustomerAttachmentUploadKey(
+      req,
+      userId
+    );
+
+  const recent =
+    (
+      customerAttachmentUploadLog.get(key) ||
+      []
+    ).filter(
+      (timestamp) =>
+        nowMs - timestamp <
+        CUSTOMER_ATTACHMENT_UPLOAD_WINDOW_MS
+    );
+
+  if (
+    recent.length >=
+    CUSTOMER_ATTACHMENT_UPLOAD_LIMIT
+  ) {
+    return false;
+  }
+
+  recent.push(nowMs);
+
+  customerAttachmentUploadLog.set(
+    key,
+    recent
+  );
+
+  return true;
+}
+
+function getMultipartBoundary(contentType) {
+  const match =
+    String(contentType || '').match(
+      /boundary=(?:"([^"]+)"|([^;]+))/i
+    );
+
+  return String(
+    match?.[1] ||
+    match?.[2] ||
+    ''
+  ).trim();
+}
+
+function parseSingleFileMultipart(
+  bodyBuffer,
+  contentType
+) {
+  if (!Buffer.isBuffer(bodyBuffer)) {
+    throw new Error(
+      'ATTACHMENT_BODY_INVALID'
+    );
+  }
+
+  const boundary =
+    getMultipartBoundary(contentType);
+
+  if (!boundary) {
+    throw new Error(
+      'ATTACHMENT_BOUNDARY_MISSING'
+    );
+  }
+
+  const boundaryBuffer =
+    Buffer.from(`--${boundary}`);
+
+  const parts = [];
+  let cursor = 0;
+
+  while (cursor < bodyBuffer.length) {
+    const boundaryIndex =
+      bodyBuffer.indexOf(
+        boundaryBuffer,
+        cursor
+      );
+
+    if (boundaryIndex < 0) {
+      break;
+    }
+
+    const partStart =
+      boundaryIndex +
+      boundaryBuffer.length;
+
+    const nextBoundaryIndex =
+      bodyBuffer.indexOf(
+        boundaryBuffer,
+        partStart
+      );
+
+    if (nextBoundaryIndex < 0) {
+      break;
+    }
+
+    let part =
+      bodyBuffer.subarray(
+        partStart,
+        nextBoundaryIndex
+      );
+
+    if (
+      part.length >= 2 &&
+      part[0] === 13 &&
+      part[1] === 10
+    ) {
+      part = part.subarray(2);
+    }
+
+    if (
+      part.length >= 2 &&
+      part[part.length - 2] === 13 &&
+      part[part.length - 1] === 10
+    ) {
+      part = part.subarray(
+        0,
+        part.length - 2
+      );
+    }
+
+    if (
+      part.length > 0 &&
+      !(
+        part.length === 2 &&
+        part.toString() === '--'
+      )
+    ) {
+      parts.push(part);
+    }
+
+    cursor = nextBoundaryIndex;
+  }
+
+  const fields = {};
+  let uploadedFile = null;
+
+  for (const part of parts) {
+    const headerEnd =
+      part.indexOf(
+        Buffer.from('\r\n\r\n')
+      );
+
+    if (headerEnd < 0) {
+      continue;
+    }
+
+    const headerText =
+      part
+        .subarray(0, headerEnd)
+        .toString('utf8');
+
+    const content =
+      part.subarray(
+        headerEnd + 4
+      );
+
+    const disposition =
+      headerText.match(
+        /content-disposition:\s*form-data;([^\r\n]+)/i
+      )?.[1] || '';
+
+    const name =
+      disposition.match(
+        /name="([^"]+)"/i
+      )?.[1] || '';
+
+    const filename =
+      disposition.match(
+        /filename="([^"]*)"/i
+      )?.[1] || '';
+
+    if (!name) {
+      continue;
+    }
+
+    if (filename) {
+      const mimeType =
+        headerText.match(
+          /content-type:\s*([^\r\n]+)/i
+        )?.[1]?.trim()
+        .toLowerCase() ||
+        'application/octet-stream';
+
+      uploadedFile = {
+        fieldName: name,
+        filename:
+          path.basename(filename),
+        mimeType,
+        buffer: content,
+      };
+    } else {
+      fields[name] =
+        content
+          .toString('utf8')
+          .trim();
+    }
+  }
+
+  return {
+    fields,
+    file: uploadedFile,
+  };
+}
+
+function detectCustomerAttachmentExtension(
+  mimeType,
+  buffer
+) {
+  const mime =
+    String(mimeType || '')
+      .trim()
+      .toLowerCase();
+
+  if (
+    mime === 'image/jpeg' &&
+    buffer?.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return 'jpg';
+  }
+
+  if (
+    mime === 'image/png' &&
+    buffer?.length >= 8 &&
+    buffer.subarray(0, 8).equals(
+      Buffer.from([
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        0x0d,
+        0x0a,
+        0x1a,
+        0x0a,
+      ])
+    )
+  ) {
+    return 'png';
+  }
+
+  if (
+    mime === 'image/webp' &&
+    buffer?.length >= 12 &&
+    buffer
+      .subarray(0, 4)
+      .toString('ascii') === 'RIFF' &&
+    buffer
+      .subarray(8, 12)
+      .toString('ascii') === 'WEBP'
+  ) {
+    return 'webp';
+  }
+
+  return '';
+}
+
+function buildCustomerAttachmentPublicUrl(
+  req,
+  attachmentId,
+  accessToken
+) {
+  const configuredBase =
+    BASE_URL ||
+    `${req.protocol}://${req.get('host')}`;
+
+  return (
+    `${configuredBase}` +
+    `/api/customer/order-attachments/` +
+    `${encodeURIComponent(attachmentId)}` +
+    `?token=${encodeURIComponent(accessToken)}`
+  );
+}
+
+app.post(
+  '/api/customer/order-attachments',
+  express.raw({
+    type: 'multipart/form-data',
+    limit:
+      CUSTOMER_ATTACHMENT_MAX_BYTES +
+      256 * 1024,
+  }),
+  async (req, res) => {
+    let uploadedStorageFile = null;
+
+    try {
+      if (!FIREBASE_STORAGE_BUCKET) {
+        return res.status(503).json({
+          success: false,
+          code:
+            'ATTACHMENT_STORAGE_NOT_CONFIGURED',
+          error:
+            '照片上傳服務尚未完成設定，請移除照片後再建立訂單。',
+        });
+      }
+
+      const parsed =
+        parseSingleFileMultipart(
+          req.body,
+          req.headers['content-type']
+        );
+
+      const userId =
+        cleanText(
+          parsed.fields.userId || '',
+          80
+        );
+
+      if (!isValidCustomerUserId(userId)) {
+        return res.status(401).json({
+          success: false,
+          code:
+            'CUSTOMER_IDENTITY_INVALID',
+          error:
+            'LINE 身分驗證失敗，請重新從官方帳號開啟下單頁。',
+        });
+      }
+
+      if (
+        !enforceCustomerAttachmentUploadLimit(
+          req,
+          userId
+        )
+      ) {
+        return res.status(429).json({
+          success: false,
+          code:
+            'ATTACHMENT_UPLOAD_RATE_LIMIT',
+          error:
+            '照片上傳次數過多，請稍後再試。',
+        });
+      }
+
+      const file = parsed.file;
+
+      if (
+        !file ||
+        file.fieldName !== 'file' ||
+        !Buffer.isBuffer(file.buffer)
+      ) {
+        return res.status(400).json({
+          success: false,
+          code:
+            'ATTACHMENT_FILE_MISSING',
+          error:
+            '沒有收到照片檔案。',
+        });
+      }
+
+      if (
+        file.buffer.length <= 0 ||
+        file.buffer.length >
+          CUSTOMER_ATTACHMENT_MAX_BYTES
+      ) {
+        return res.status(413).json({
+          success: false,
+          code:
+            'ATTACHMENT_FILE_TOO_LARGE',
+          error:
+            '照片大小不可超過 1.5MB。',
+        });
+      }
+
+      const extension =
+        detectCustomerAttachmentExtension(
+          file.mimeType,
+          file.buffer
+        );
+
+      if (!extension) {
+        return res.status(415).json({
+          success: false,
+          code:
+            'ATTACHMENT_TYPE_NOT_ALLOWED',
+          error:
+            '只支援 JPG、PNG 或 WEBP 圖片。',
+        });
+      }
+
+      const attachmentId =
+        crypto.randomUUID();
+
+      const accessToken =
+        crypto
+          .randomBytes(32)
+          .toString('hex');
+
+      const date = new Date();
+
+      const storagePath =
+        `customer-order-attachments/` +
+        `${date.getUTCFullYear()}/` +
+        `${String(
+          date.getUTCMonth() + 1
+        ).padStart(2, '0')}/` +
+        `${attachmentId}.${extension}`;
+
+      const bucket =
+        admin
+          .storage()
+          .bucket(
+            FIREBASE_STORAGE_BUCKET
+          );
+
+      uploadedStorageFile =
+        bucket.file(storagePath);
+
+      await uploadedStorageFile.save(
+        file.buffer,
+        {
+          resumable: false,
+          validation: 'md5',
+          metadata: {
+            contentType:
+              file.mimeType,
+            cacheControl:
+              'private, max-age=3600',
+            metadata: {
+              attachmentId,
+              userId,
+              originalFilename:
+                cleanText(
+                  file.filename,
+                  120
+                ),
+            },
+          },
+        }
+      );
+
+      const downloadUrl =
+        buildCustomerAttachmentPublicUrl(
+          req,
+          attachmentId,
+          accessToken
+        );
+
+      await db
+        .collection(
+          'customerOrderAttachments'
+        )
+        .doc(attachmentId)
+        .set({
+          attachmentId,
+          userId,
+          accessToken,
+          storageBucket:
+            FIREBASE_STORAGE_BUCKET,
+          storagePath,
+          originalFilename:
+            cleanText(
+              file.filename,
+              120
+            ),
+          mimeType:
+            file.mimeType,
+          sizeBytes:
+            file.buffer.length,
+          status:
+            'uploaded',
+          deleted:
+            false,
+          orderId:
+            '',
+          url:
+            downloadUrl,
+          createdAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+          createdAtMs:
+            Date.now(),
+          updatedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+        });
+
+      return res.status(201).json({
+        success: true,
+        attachmentId,
+        url: downloadUrl,
+        mimeType:
+          file.mimeType,
+        sizeBytes:
+          file.buffer.length,
+      });
+    } catch (error) {
+      if (uploadedStorageFile) {
+        try {
+          await uploadedStorageFile.delete({
+            ignoreNotFound: true,
+          });
+        } catch (cleanupError) {
+          console.error(
+            '⚠️ 任務照片失敗後清理檔案失敗：',
+            cleanupError
+          );
+        }
+      }
+
+      console.error(
+        '❌ 客人端任務照片上傳失敗：',
+        error
+      );
+
+      const isBodyTooLarge =
+        error?.type ===
+          'entity.too.large' ||
+        error?.status === 413;
+
+      return res
+        .status(
+          isBodyTooLarge
+            ? 413
+            : 500
+        )
+        .json({
+          success: false,
+          code:
+            isBodyTooLarge
+              ? 'ATTACHMENT_FILE_TOO_LARGE'
+              : 'ATTACHMENT_UPLOAD_FAILED',
+          error:
+            isBodyTooLarge
+              ? '照片大小不可超過 1.5MB。'
+              : '照片上傳失敗，請稍後再試。',
+        });
+    }
+  }
+);
+
+app.get(
+  '/api/customer/order-attachments/:attachmentId',
+  async (req, res) => {
+    try {
+      const attachmentId =
+        String(
+          req.params.attachmentId || ''
+        ).trim();
+
+      const accessToken =
+        String(
+          req.query.token || ''
+        ).trim();
+
+      if (
+        !/^[a-zA-Z0-9_-]{12,100}$/.test(
+          attachmentId
+        ) ||
+        !/^[a-f0-9]{32,128}$/i.test(
+          accessToken
+        )
+      ) {
+        return res.status(404).end();
+      }
+
+      const doc = await db
+        .collection(
+          'customerOrderAttachments'
+        )
+        .doc(attachmentId)
+        .get();
+
+      if (!doc.exists) {
+        return res.status(404).end();
+      }
+
+      const attachment =
+        doc.data() || {};
+
+      if (
+        attachment.deleted === true ||
+        attachment.status === 'deleted' ||
+        !safeTokenEquals(
+          attachment.accessToken,
+          accessToken
+        )
+      ) {
+        return res.status(404).end();
+      }
+
+      const storageBucket =
+        String(
+          attachment.storageBucket ||
+          FIREBASE_STORAGE_BUCKET ||
+          ''
+        ).trim();
+
+      const storagePath =
+        String(
+          attachment.storagePath || ''
+        ).trim();
+
+      if (
+        !storageBucket ||
+        !storagePath
+      ) {
+        return res.status(404).end();
+      }
+
+      const storageFile =
+        admin
+          .storage()
+          .bucket(storageBucket)
+          .file(storagePath);
+
+      const [exists] =
+        await storageFile.exists();
+
+      if (!exists) {
+        return res.status(404).end();
+      }
+
+      res.setHeader(
+        'Content-Type',
+        attachment.mimeType ||
+        'application/octet-stream'
+      );
+
+      res.setHeader(
+        'Content-Length',
+        String(
+          Math.max(
+            0,
+            Number(
+              attachment.sizeBytes || 0
+            )
+          )
+        )
+      );
+
+      res.setHeader(
+        'Cache-Control',
+        'private, max-age=3600'
+      );
+
+      return storageFile
+        .createReadStream()
+        .on('error', (streamError) => {
+          console.error(
+            '❌ 任務照片讀取失敗：',
+            streamError
+          );
+
+          if (!res.headersSent) {
+            res.status(500).end();
+          } else {
+            res.destroy(
+              streamError
+            );
+          }
+        })
+        .pipe(res);
+    } catch (error) {
+      console.error(
+        '❌ 任務照片下載失敗：',
+        error
+      );
+
+      if (!res.headersSent) {
+        return res
+          .status(500)
+          .end();
+      }
+
+      return res.end();
+    }
+  }
+);
+
 app.get('/api/customer/service-status', async (req, res) => {
   try {
     const nowMs = Date.now();
+
+    const pickupLat =
+      getNullableCoordinate(
+        req.query.pickupLat ||
+        req.query.lat
+      );
+
+    const pickupLng =
+      getNullableCoordinate(
+        req.query.pickupLng ||
+        req.query.lng
+      );
+
+    const hasPickupPoint =
+      isValidLatitude(pickupLat) &&
+      isValidLongitude(pickupLng);
+
     const ridersSnap = await db
       .collection('riders')
       .limit(500)
       .get();
 
     let onlineRiderCount = 0;
+    let nearbyRiderCount3km = 0;
+    let nearbyRiderCount5km = 0;
+    let nearbyRiderCount10km = 0;
+    let nearestRiderDistanceKm = null;
     const nearbyRiders = [];
 
     ridersSnap.forEach((riderDoc) => {
@@ -9659,6 +10700,39 @@ app.get('/api/customer/service-status', async (req, res) => {
       }
 
       onlineRiderCount += 1;
+
+      if (hasPickupPoint) {
+        const distanceKm =
+          calcDispatchPushDistanceKm(
+            pickupLat,
+            pickupLng,
+            point.lat,
+            point.lng
+          );
+
+        if (Number.isFinite(distanceKm)) {
+          if (
+            nearestRiderDistanceKm === null ||
+            distanceKm <
+              nearestRiderDistanceKm
+          ) {
+            nearestRiderDistanceKm =
+              distanceKm;
+          }
+
+          if (distanceKm <= 3) {
+            nearbyRiderCount3km += 1;
+          }
+
+          if (distanceKm <= 5) {
+            nearbyRiderCount5km += 1;
+          }
+
+          if (distanceKm <= 10) {
+            nearbyRiderCount10km += 1;
+          }
+        }
+      }
 
       if (nearbyRiders.length >= CUSTOMER_RIDER_MAX_MARKERS) {
         return;
@@ -9680,6 +10754,33 @@ app.get('/api/customer/service-status', async (req, res) => {
       success: true,
       onlineRiderCount,
       nearbyRiders,
+
+      pickupMatch:
+        hasPickupPoint
+          ? {
+              pickupLat,
+              pickupLng,
+              nearbyRiderCount3km,
+              nearbyRiderCount5km,
+              nearbyRiderCount10km,
+              nearestRiderDistanceKm:
+                nearestRiderDistanceKm === null
+                  ? null
+                  : Number(
+                      nearestRiderDistanceKm
+                        .toFixed(2)
+                    ),
+              matchLevel:
+                nearbyRiderCount3km >= 3
+                  ? 'good'
+                  : nearbyRiderCount5km > 0
+                    ? 'limited'
+                    : onlineRiderCount > 0
+                      ? 'expand_required'
+                      : 'none',
+            }
+          : null,
+
       updatedAt: new Date(nowMs).toISOString(),
       locationFreshSeconds: Math.floor(
         CUSTOMER_RIDER_LOCATION_FRESH_MS / 1000
@@ -10659,6 +11760,12 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
+    data.attachmentUrls =
+      await verifyCustomerAttachmentUrls(
+        data.attachmentUrls,
+        data.userId
+      );
+
     const duplicateOrder = await findRecentDuplicateOrder(data);
     if (duplicateOrder) {
       return res.status(409).json({
@@ -10879,6 +11986,9 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   pickupPlaceId:
     data.pickupPlaceId || '',
 
+  pickupAddressNote:
+    data.pickupAddressNote || '',
+
   // ==============================
   // 送達資訊
   // ==============================
@@ -10896,6 +12006,29 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   dropoffPlaceId:
     data.dropoffPlaceId || '',
+
+  dropoffAddressNote:
+    data.dropoffAddressNote || '',
+
+  // ==============================
+  // 新版客人端結構化資料
+  // ==============================
+  shoppingItems:
+    data.shoppingItems || [],
+
+  attachmentUrls:
+    data.attachmentUrls || [],
+
+  attachmentCount:
+    Array.isArray(data.attachmentUrls)
+      ? data.attachmentUrls.length
+      : 0,
+
+  estimatedCompletionMinutes:
+    data.estimatedCompletionMinutes,
+
+  clientSchemaVersion:
+    data.clientSchemaVersion || '',
 
   // ==============================
   // 任務設定
@@ -11085,6 +12218,41 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 };
 
     await saveOrder(order);
+
+    if (
+      Array.isArray(order.attachmentUrls) &&
+      order.attachmentUrls.length > 0
+    ) {
+      await Promise.all(
+        order.attachmentUrls
+          .map(
+            parseCustomerAttachmentReference
+          )
+          .filter(Boolean)
+          .map((reference) =>
+            db
+              .collection(
+                'customerOrderAttachments'
+              )
+              .doc(reference.attachmentId)
+              .set(
+                {
+                  orderId: order.id,
+                  status: 'claimed',
+                  claimedAt:
+                    admin.firestore.FieldValue
+                      .serverTimestamp(),
+                  updatedAt:
+                    admin.firestore.FieldValue
+                      .serverTimestamp(),
+                },
+                {
+                  merge: true,
+                }
+              )
+          )
+      );
+    }
 
     await notifyCustomer(order, createTextMessage(
       `✅ 訂單已建立：${order.id}\n\n` +
