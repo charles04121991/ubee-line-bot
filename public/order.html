@@ -7748,6 +7748,33 @@ body{background:#eef0f2;}
       content:"U";
     }
 
+
+
+/* =====================================================
+   正式上線修復：任務分類點擊層與觸控可靠性
+   ===================================================== */
+#step2 .task-category-step2,
+#step2 #serviceCategoryBox,
+#step2 #serviceCategoryGrid{
+  position:relative !important;
+  z-index:30 !important;
+  pointer-events:auto !important;
+}
+
+#step2 #serviceCategoryGrid .category-choice-item{
+  position:relative !important;
+  z-index:31 !important;
+  pointer-events:auto !important;
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
+  cursor:pointer !important;
+}
+
+#step2 #serviceCategoryGrid .category-choice-item::before,
+#step2 #serviceCategoryGrid .category-choice-item::after{
+  pointer-events:none !important;
+}
 </style>
 </head>
 
@@ -11866,27 +11893,48 @@ function renderCategoryBox(item){
     </button>
   `).join('');
 
-  // 第三層分類使用正式事件綁定，不依賴 inline onclick。
-  // 每次分類內容重新產生後重新綁定，避免動態 HTML 導致按鈕無反應。
-  grid.querySelectorAll('.category-choice-item').forEach((button) => {
-    button.addEventListener('click', () => {
-      const category = String(
-        button.dataset.serviceCategory || ''
-      ).trim();
-
-      if(!category) return;
-
-      selectCategory(button, category);
-    });
-  });
 }
 
+/* =====================================================
+   正式上線修復：任務分類採用事件委派
+   - 動態重新產生按鈕後不需要重新綁定
+   - 支援 LINE LIFF、iOS Safari、Android Chrome
+   - 即使後續估價或欄位更新發生錯誤，分類選取仍會立即生效
+   ===================================================== */
+let taskCategoryInteractionBound = false;
+
+function bindTaskCategoryInteraction(){
+  if(taskCategoryInteractionBound) return;
+  taskCategoryInteractionBound = true;
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('#serviceCategoryGrid .category-choice-item');
+    if(!button) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const category = String(button.dataset.serviceCategory || '').trim();
+    if(!category) return;
+
+    selectCategory(button, category);
+  }, true);
+}
+
+bindTaskCategoryInteraction();
+
 function selectCategory(el, cat){
-  if(serviceGroup === 'buy' && serviceCategory !== cat){
-    clearNearbyAutoFill(true);
+  const nextCategory = String(cat || '').trim();
+  if(!el || !nextCategory) return;
+
+  if(serviceGroup === 'buy' && serviceCategory !== nextCategory){
+    try{ clearNearbyAutoFill(true); }catch(err){
+      console.warn('清除附近店家資料失敗，不影響任務分類選擇：', err);
+    }
   }
 
-  serviceCategory = cat;
+  // 先更新正式狀態與畫面，確保使用者點擊後立即得到回饋。
+  serviceCategory = nextCategory;
 
   document.querySelectorAll('#serviceCategoryGrid .category-choice-item').forEach((btn) => {
     const isSelected = btn === el;
@@ -11894,12 +11942,12 @@ function selectCategory(el, cat){
     btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
   });
 
-  updateTaskPathText();
-  applyDynamicFields();
-  handleServiceSelectionChanged();
-
-  invalidateQuote();
-  scheduleQuoteRefresh(120);
+  // 後續衍生更新各自隔離，避免其中一個非核心功能錯誤讓分類按鈕失效。
+  try{ updateTaskPathText(); }catch(err){ console.error('更新任務路徑失敗：', err); }
+  try{ applyDynamicFields(); }catch(err){ console.error('更新動態欄位失敗：', err); }
+  try{ handleServiceSelectionChanged(); }catch(err){ console.error('處理服務分類變更失敗：', err); }
+  try{ invalidateQuote(); }catch(err){ console.error('重設估價失敗：', err); }
+  try{ scheduleQuoteRefresh(120); }catch(err){ console.error('重新估價排程失敗：', err); }
 }
 
 function getNearbyKeyword(){
