@@ -1824,6 +1824,69 @@
   font-weight:800;
 }
 
+/* 取件／送達地點交換按鈕 */
+#step1 .address-card{
+  padding-right:58px;
+}
+
+#step1 .address-swap-btn{
+  position:absolute;
+  z-index:8;
+  top:50%;
+  right:12px;
+  transform:translateY(-50%);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  width:38px;
+  height:38px;
+  padding:0;
+
+  border:1px solid #e4e5e7;
+  border-radius:50%;
+  background:#ffffff;
+  color:#111111;
+
+  box-shadow:0 5px 14px rgba(17,24,39,.10);
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .16s ease, box-shadow .16s ease, opacity .16s ease;
+}
+
+#step1 .address-swap-btn:hover{
+  box-shadow:0 7px 18px rgba(17,24,39,.14);
+}
+
+#step1 .address-swap-btn:active{
+  transform:translateY(-50%) scale(.94);
+}
+
+#step1 .address-swap-btn:disabled{
+  opacity:.38;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+#step1 .address-swap-btn svg{
+  width:20px;
+  height:20px;
+  pointer-events:none;
+}
+
+@media (max-width:420px){
+  #step1 .address-card{
+    padding-right:52px;
+  }
+
+  #step1 .address-swap-btn{
+    right:9px;
+    width:36px;
+    height:36px;
+  }
+}
+
 /* ==============================
    第七階段：首頁固定費用操作列
    ============================== */
@@ -8092,6 +8155,19 @@ body{background:#eef0f2;}
       >
     </div>
   </div>
+
+  <button
+    id="swapAddressBtn"
+    class="address-swap-btn"
+    type="button"
+    aria-label="交換取件地點與送達地點"
+    title="交換取件與送達地點"
+    onclick="swapPickupAndDropoff()"
+  >
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 4v14m0 0-3-3m3 3 3-3M16 20V6m0 0-3 3m3-3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
 </div>
 <div class="address-detail-grid">
   <label class="compact-field"><span>取件補充</span><input id="pickupAddressNote" maxlength="80" placeholder="樓層、店名、地標或交付方式"></label>
@@ -11428,18 +11504,87 @@ function handleEstimateAffectingChange(){
   scheduleQuoteRefresh();
 }
 
+function updateSwapAddressButtonState(){
+  const button = qs('swapAddressBtn');
+  if(!button) return;
+
+  const pickupValue = qs('pickup')?.value.trim() || '';
+  const dropoffValue = qs('dropoff')?.value.trim() || '';
+
+  button.disabled = !(pickupValue && dropoffValue);
+}
+
+function swapInputValues(firstId, secondId){
+  const first = qs(firstId);
+  const second = qs(secondId);
+
+  if(!first || !second) return;
+
+  const firstValue = first.value;
+  first.value = second.value;
+  second.value = firstValue;
+}
+
+function swapPickupAndDropoff(){
+  const pickupInput = qs('pickup');
+  const dropoffInput = qs('dropoff');
+
+  if(!pickupInput || !dropoffInput) return;
+
+  const pickupValue = pickupInput.value.trim();
+  const dropoffValue = dropoffInput.value.trim();
+
+  if(!pickupValue || !dropoffValue){
+    updateSwapAddressButtonState();
+    return;
+  }
+
+  // 交換畫面上的地點資料。
+  swapInputValues('pickup', 'dropoff');
+  swapInputValues('pickupAddressNote', 'dropoffAddressNote');
+  swapInputValues('pickupPhone', 'dropoffPhone');
+
+  // 交換 Google Maps 對應的座標與 Place ID。
+  [pickupLat, dropoffLat] = [dropoffLat, pickupLat];
+  [pickupLng, dropoffLng] = [dropoffLng, pickupLng];
+  [pickupPlaceId, dropoffPlaceId] = [dropoffPlaceId, pickupPlaceId];
+
+  // 附近店家選取狀態屬於原本取件點，交換後必須清除。
+  selectedNearbyPlace = null;
+  selectedNearbyPlaceId = '';
+  nearbyAutoFilledPickup = '';
+  nearbyAutoFilledPhone = '';
+
+  clearRoutePreview();
+  invalidateQuote();
+  updateSwapAddressButtonState();
+
+  // 立即依照交換後的方向重畫路線並重新估價。
+  scheduleRouteAndQuoteRefresh(50);
+
+  // 讓草稿、媒合狀態及其他首頁資訊同步更新。
+  try{
+    if(typeof scheduleDraft === 'function') scheduleDraft();
+    if(typeof updateMatchStatus === 'function') updateMatchStatus();
+  }catch(err){
+    console.warn('地址交換後同步首頁狀態失敗：', err);
+  }
+}
+
 function bindOrderInputEvents(){
-  qs('pickup')?.addEventListener('input', () => handleAddressInput('pickup'));
+  qs('pickup')?.addEventListener('input', () => { handleAddressInput('pickup'); updateSwapAddressButtonState(); });
   qs('pickup')?.addEventListener('change', () => scheduleRouteAndQuoteRefresh(120));
   qs('pickup')?.addEventListener('blur', () => scheduleRouteAndQuoteRefresh(120));
 
-  qs('dropoff')?.addEventListener('input', () => handleAddressInput('dropoff'));
+  qs('dropoff')?.addEventListener('input', () => { handleAddressInput('dropoff'); updateSwapAddressButtonState(); });
   qs('dropoff')?.addEventListener('change', () => scheduleRouteAndQuoteRefresh(120));
   qs('dropoff')?.addEventListener('blur', () => scheduleRouteAndQuoteRefresh(120));
 
   qs('upstairsOption')?.addEventListener('change', handleEstimateAffectingChange);
   qs('advancePayment')?.addEventListener('input', handleEstimateAffectingChange);
   qs('queueMinutes')?.addEventListener('input', handleEstimateAffectingChange);
+
+  updateSwapAddressButtonState();
 }
 
 function updateStickyEstimate(customText){
