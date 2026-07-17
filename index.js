@@ -5,6 +5,7 @@ const fetch = require('node-fetch');
 const path = require('path');
 const admin = require('firebase-admin');
 const webpush = require('web-push');
+const crypto = require('crypto');
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -9858,14 +9859,15 @@ function createOrderFromApi(data) {
 // 客戶端安全服務狀態 API
 //
 // 僅回傳匿名資訊：
-// - 已審核、在線且定位仍新鮮的小U數量
+// - 已審核且已按下上線的小U總數
+// - 其中定位仍新鮮、可顯示於地圖的小U數量
 // - 經 50～80 公尺穩定偏移後的匿名地圖位置
 // - 統計更新時間與定位新鮮度門檻
 //
 // 絕不回傳姓名、電話、LINE ID、riderId、Firestore 文件 ID、
 // 真實座標或任何可讓客戶辨識特定小U的固定公開識別碼。
 // =====================================================
-const CUSTOMER_RIDER_LOCATION_FRESH_MS = 90000;
+const CUSTOMER_RIDER_LOCATION_FRESH_MS = 5 * 60 * 1000;
 const CUSTOMER_RIDER_OFFSET_MIN_METERS = 50;
 const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
 const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
@@ -9955,6 +9957,7 @@ app.get('/api/customer/service-status', async (req, res) => {
       .get();
 
     let onlineRiderCount = 0;
+    let mapRiderCount = 0;
     let nearbyRiderCount3km = 0;
     let nearbyRiderCount5km = 0;
     let nearbyRiderCount10km = 0;
@@ -9967,17 +9970,28 @@ app.get('/api/customer/service-status', async (req, res) => {
         rider.approved === true ||
         String(rider.status || '').trim().toLowerCase() === 'approved';
       const online = rider.online === true;
+
+      // 「在線」只代表已審核且小U主動按下上線。
+      // 定位暫時過期時，不應把他從在線人數中扣除。
+      if (!approved || !online) {
+        return;
+      }
+
+      onlineRiderCount += 1;
+
       const point = getRiderCurrentPointForPush(rider);
       const fresh = isRiderLocationFreshForPush(
         rider,
         CUSTOMER_RIDER_LOCATION_FRESH_MS
       );
 
-      if (!approved || !online || !point || !fresh) {
+      // 沒有近期有效定位時，保留在線人數，
+      // 但不回傳地圖標記，也不納入距離媒合統計。
+      if (!point || !fresh) {
         return;
       }
 
-      onlineRiderCount += 1;
+      mapRiderCount += 1;
 
       if (hasPickupPoint) {
         const distanceKm =
@@ -10033,6 +10047,7 @@ app.get('/api/customer/service-status', async (req, res) => {
     return res.json({
       success: true,
       onlineRiderCount,
+      mapRiderCount,
       nearbyRiders,
 
       pickupMatch:
@@ -10055,7 +10070,7 @@ app.get('/api/customer/service-status', async (req, res) => {
                   ? 'good'
                   : nearbyRiderCount5km > 0
                     ? 'limited'
-                    : onlineRiderCount > 0
+                    : mapRiderCount > 0
                       ? 'expand_required'
                       : 'none',
             }
@@ -10073,7 +10088,7 @@ app.get('/api/customer/service-status', async (req, res) => {
           CUSTOMER_RIDER_OFFSET_BUCKET_MS / 60000
         ),
       },
-      scope: 'available_for_realtime_matching',
+      scope: 'online_riders_and_recent_map_locations',
     });
   } catch (error) {
     console.error('❌ 客戶端服務狀態 API 讀取失敗：', error);
