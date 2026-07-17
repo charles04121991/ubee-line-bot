@@ -8028,7 +8028,7 @@ body{background:#eef0f2;}
               即時服務狀態
             </div>
             <div class="home-service-status-count" id="homeOnlineRiderCount">
-              <strong>正在讀取</strong>
+              <span>0</span> <strong>位小U目前在線</strong>
             </div>
           </div>
           <div class="home-service-status-side">
@@ -8037,7 +8037,7 @@ body{background:#eef0f2;}
           </div>
         </div>
         <div class="home-service-status-note" id="homeServiceStatusNote">
-          正在確認目前可即時媒合的小U數量。
+          系統正在更新在線小U數量。
         </div>
       </div>
 
@@ -9216,6 +9216,8 @@ let initialOpenActionHandled = false;
 let homeServiceStatusTimer = null;
 const HOME_SERVICE_STATUS_REFRESH_MS = 10000;
 let homeServiceStatusRequestInFlight = false;
+let homeLastSuccessfulOnlineRiderCount = 0;
+let homeHasSuccessfulServiceStatus = false;
 let homeNearbyRiderMarkers = [];
 let homeNearbyRiderInfoWindow = null;
 
@@ -17410,27 +17412,78 @@ function renderHomeServiceStatus(data, fallback = false){
   const countEl = qs('homeOnlineRiderCount');
   const timeEl = qs('homeServiceUpdatedAt');
   const noteEl = qs('homeServiceStatusNote');
-  if(!card || !countEl || !timeEl || !noteEl) return;
 
-  card.classList.toggle('is-fallback', fallback);
-
-  if(fallback){
-    countEl.innerHTML = '<strong>服務媒合正常開放</strong>';
-    timeEl.innerText = formatHomeServiceUpdatedAt();
-    noteEl.innerText = '即時人數暫時無法取得；你仍可正常估價與建立任務，系統會在送出後媒合可服務的小U。';
-    clearHomeNearbyRiderMarkers();
+  if(
+    !card ||
+    !countEl ||
+    !timeEl ||
+    !noteEl
+  ){
     return;
   }
 
-  const onlineCount = Math.max(0, Number(data?.onlineRiderCount || 0));
-  countEl.innerHTML = `<span>${onlineCount}</span> <strong>位小U在線</strong>`;
-  renderHomeNearbyRiders(data?.nearbyRiders || []);
-  timeEl.innerText = formatHomeServiceUpdatedAt(data?.updatedAt);
+  /*
+   * API 某一次更新失敗時：
+   * - 保留最後一次成功取得的人數
+   * - 不顯示任何媒合備援文字
+   * - 不清除地圖上的小U標記
+   */
+  if(fallback){
+    const retainedCount =
+      Math.max(
+        0,
+        Number(
+          homeLastSuccessfulOnlineRiderCount || 0
+        )
+      );
+
+    countEl.innerHTML =
+      `<span>${retainedCount}</span> <strong>位小U目前在線</strong>`;
+
+    if(!homeHasSuccessfulServiceStatus){
+      noteEl.innerText =
+        '系統正在更新在線小U數量。';
+    }
+
+    return;
+  }
+
+  const onlineCount =
+    Math.max(
+      0,
+      Number(
+        data?.onlineRiderCount || 0
+      )
+    );
+
+  homeLastSuccessfulOnlineRiderCount =
+    onlineCount;
+
+  homeHasSuccessfulServiceStatus =
+    true;
+
+  card.classList.remove(
+    'is-fallback'
+  );
+
+  countEl.innerHTML =
+    `<span>${onlineCount}</span> <strong>位小U目前在線</strong>`;
+
+  renderHomeNearbyRiders(
+    data?.nearbyRiders || []
+  );
+
+  timeEl.innerText =
+    formatHomeServiceUpdatedAt(
+      data?.updatedAt
+    );
 
   if(onlineCount > 0){
-    noteEl.innerText = `目前有 ${onlineCount} 位已通過審核、在線且定位有效的小U可參與即時媒合；實際接單仍依距離、任務與當下狀態為準。`;
+    noteEl.innerText =
+      `目前有 ${onlineCount} 位已通過審核、在線且定位有效的小U。`;
   }else{
-    noteEl.innerText = '目前未偵測到定位有效的在線小U；你仍可先建立任務，系統會持續等待可服務的小U上線。';
+    noteEl.innerText =
+      '目前沒有定位有效的在線小U，系統會持續更新。';
   }
 }
 
@@ -26078,7 +26131,7 @@ body{background:#eef0f2;}
               即時服務狀態
             </div>
             <div class="home-service-status-count" id="homeOnlineRiderCount">
-              <strong>正在讀取</strong>
+              <span>0</span> <strong>位小U目前在線</strong>
             </div>
           </div>
           <div class="home-service-status-side">
@@ -26087,7 +26140,7 @@ body{background:#eef0f2;}
           </div>
         </div>
         <div class="home-service-status-note" id="homeServiceStatusNote">
-          正在確認目前可即時媒合的小U數量。
+          系統正在更新在線小U數量。
         </div>
       </div>
 
@@ -27266,6 +27319,8 @@ let initialOpenActionHandled = false;
 let homeServiceStatusTimer = null;
 const HOME_SERVICE_STATUS_REFRESH_MS = 10000;
 let homeServiceStatusRequestInFlight = false;
+let homeLastSuccessfulOnlineRiderCount = 0;
+let homeHasSuccessfulServiceStatus = false;
 let homeNearbyRiderMarkers = [];
 let homeNearbyRiderInfoWindow = null;
 
@@ -35460,27 +35515,78 @@ function renderHomeServiceStatus(data, fallback = false){
   const countEl = qs('homeOnlineRiderCount');
   const timeEl = qs('homeServiceUpdatedAt');
   const noteEl = qs('homeServiceStatusNote');
-  if(!card || !countEl || !timeEl || !noteEl) return;
 
-  card.classList.toggle('is-fallback', fallback);
-
-  if(fallback){
-    countEl.innerHTML = '<strong>服務媒合正常開放</strong>';
-    timeEl.innerText = formatHomeServiceUpdatedAt();
-    noteEl.innerText = '即時人數暫時無法取得；你仍可正常估價與建立任務，系統會在送出後媒合可服務的小U。';
-    clearHomeNearbyRiderMarkers();
+  if(
+    !card ||
+    !countEl ||
+    !timeEl ||
+    !noteEl
+  ){
     return;
   }
 
-  const onlineCount = Math.max(0, Number(data?.onlineRiderCount || 0));
-  countEl.innerHTML = `<span>${onlineCount}</span> <strong>位小U在線</strong>`;
-  renderHomeNearbyRiders(data?.nearbyRiders || []);
-  timeEl.innerText = formatHomeServiceUpdatedAt(data?.updatedAt);
+  /*
+   * API 某一次更新失敗時：
+   * - 保留最後一次成功取得的人數
+   * - 不顯示任何媒合備援文字
+   * - 不清除地圖上的小U標記
+   */
+  if(fallback){
+    const retainedCount =
+      Math.max(
+        0,
+        Number(
+          homeLastSuccessfulOnlineRiderCount || 0
+        )
+      );
+
+    countEl.innerHTML =
+      `<span>${retainedCount}</span> <strong>位小U目前在線</strong>`;
+
+    if(!homeHasSuccessfulServiceStatus){
+      noteEl.innerText =
+        '系統正在更新在線小U數量。';
+    }
+
+    return;
+  }
+
+  const onlineCount =
+    Math.max(
+      0,
+      Number(
+        data?.onlineRiderCount || 0
+      )
+    );
+
+  homeLastSuccessfulOnlineRiderCount =
+    onlineCount;
+
+  homeHasSuccessfulServiceStatus =
+    true;
+
+  card.classList.remove(
+    'is-fallback'
+  );
+
+  countEl.innerHTML =
+    `<span>${onlineCount}</span> <strong>位小U目前在線</strong>`;
+
+  renderHomeNearbyRiders(
+    data?.nearbyRiders || []
+  );
+
+  timeEl.innerText =
+    formatHomeServiceUpdatedAt(
+      data?.updatedAt
+    );
 
   if(onlineCount > 0){
-    noteEl.innerText = `目前有 ${onlineCount} 位已通過審核、在線且定位有效的小U可參與即時媒合；實際接單仍依距離、任務與當下狀態為準。`;
+    noteEl.innerText =
+      `目前有 ${onlineCount} 位已通過審核、在線且定位有效的小U。`;
   }else{
-    noteEl.innerText = '目前未偵測到定位有效的在線小U；你仍可先建立任務，系統會持續等待可服務的小U上線。';
+    noteEl.innerText =
+      '目前沒有定位有效的在線小U，系統會持續更新。';
   }
 }
 
