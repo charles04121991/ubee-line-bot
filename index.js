@@ -6184,7 +6184,17 @@ function isOrderSkippedForRider(order = {}, identity = {}) {
 // 手機登入正式版：支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
   try {
-    const { lineUserId, phone, riderId, online } = req.body || {};
+    const {
+      lineUserId,
+      phone,
+      riderId,
+      online,
+      lat,
+      lng,
+      accuracy,
+      heading,
+      speed,
+    } = req.body || {};
 
     if (typeof online !== 'boolean') {
       return res.status(400).json({
@@ -6209,16 +6219,153 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
     const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
 
+    const nowMs = Date.now();
+
+    const latitude =
+      lat === null ||
+      lat === undefined ||
+      lat === ''
+        ? null
+        : Number(lat);
+
+    const longitude =
+      lng === null ||
+      lng === undefined ||
+      lng === ''
+        ? null
+        : Number(lng);
+
+    const hasLocation =
+      Number.isFinite(latitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      Number.isFinite(longitude) &&
+      longitude >= -180 &&
+      longitude <= 180;
+
+    if (
+      online === true &&
+      !hasLocation
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: 'RIDER_LOCATION_REQUIRED',
+        message:
+          '開始接單前必須先取得有效定位，請確認定位權限後再試。',
+      });
+    }
+
+    const getOptionalNumber = value => {
+      if (
+        value === null ||
+        value === undefined ||
+        value === ''
+      ) {
+        return null;
+      }
+
+      const numberValue = Number(value);
+
+      return Number.isFinite(numberValue)
+        ? numberValue
+        : null;
+    };
+
+    const safeAccuracy =
+      getOptionalNumber(accuracy);
+
+    const rawHeading =
+      getOptionalNumber(heading);
+
+    const safeHeading =
+      rawHeading === null
+        ? null
+        : (
+            (
+              rawHeading % 360
+            ) + 360
+          ) % 360;
+
+    const rawSpeed =
+      getOptionalNumber(speed);
+
+    const safeSpeed =
+      rawSpeed === null
+        ? null
+        : Math.max(0, rawSpeed);
+
     const updateData = {
       online,
-      busy: rider.busy === true ? true : false,
-      currentOrderId: rider.currentOrderId || '',
-      lastActive: Date.now(),
-      onlineUpdatedAt: Date.now(),
-      onlineUpdatedAtMs: Date.now(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastIdentityMethod: phone || riderId ? 'phone' : 'line',
+      busy:
+        rider.busy === true
+          ? true
+          : false,
+      currentOrderId:
+        rider.currentOrderId || '',
+      lastActive:
+        admin.firestore.FieldValue
+          .serverTimestamp(),
+      lastActiveMs:
+        nowMs,
+      onlineUpdatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp(),
+      onlineUpdatedAtMs:
+        nowMs,
+      updatedAt:
+        admin.firestore.FieldValue
+          .serverTimestamp(),
+      lastIdentityMethod:
+        phone || riderId
+          ? 'phone'
+          : 'line',
     };
+
+    if (
+      online === true &&
+      hasLocation
+    ) {
+      const currentLocation = {
+        lat: latitude,
+        lng: longitude,
+        updatedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+        updatedAtMs:
+          nowMs,
+      };
+
+      if (safeAccuracy !== null) {
+        currentLocation.accuracy =
+          safeAccuracy;
+      }
+
+      if (safeHeading !== null) {
+        currentLocation.heading =
+          safeHeading;
+      }
+
+      if (safeSpeed !== null) {
+        currentLocation.speed =
+          safeSpeed;
+      }
+
+      updateData.currentLat =
+        latitude;
+
+      updateData.currentLng =
+        longitude;
+
+      updateData.currentLocation =
+        currentLocation;
+
+      updateData.locationUpdatedAt =
+        admin.firestore.FieldValue
+          .serverTimestamp();
+
+      updateData.locationUpdatedAtMs =
+        nowMs;
+    }
 
     if (!online && rider.busy === true && rider.currentOrderId) {
       return res.status(409).json({
@@ -6244,7 +6391,34 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
         name: rider.name || rider.riderName || '',
         online,
         busy: updateData.busy,
-        currentOrderId: updateData.currentOrderId,
+        currentOrderId:
+          updateData.currentOrderId,
+        currentLat:
+          online && hasLocation
+            ? latitude
+            : (
+                Number.isFinite(
+                  Number(rider.currentLat)
+                )
+                  ? Number(rider.currentLat)
+                  : null
+              ),
+        currentLng:
+          online && hasLocation
+            ? longitude
+            : (
+                Number.isFinite(
+                  Number(rider.currentLng)
+                )
+                  ? Number(rider.currentLng)
+                  : null
+              ),
+        locationUpdatedAtMs:
+          online && hasLocation
+            ? nowMs
+            : Number(
+                rider.locationUpdatedAtMs || 0
+              ),
       },
     });
 
