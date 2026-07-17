@@ -9691,7 +9691,7 @@ function createOrderFromApi(data) {
 // 絕不回傳姓名、電話、LINE ID、riderId、Firestore 文件 ID、
 // 真實座標或任何可讓客戶辨識特定小U的固定公開識別碼。
 // =====================================================
-const CUSTOMER_RIDER_LOCATION_FRESH_MS = 120000;
+const CUSTOMER_RIDER_LOCATION_FRESH_MS = 90000;
 const CUSTOMER_RIDER_OFFSET_MIN_METERS = 50;
 const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
 const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
@@ -9853,7 +9853,9 @@ app.get('/api/customer/service-status', async (req, res) => {
       }
     });
 
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.json({
       success: true,
       onlineRiderCount,
@@ -9901,7 +9903,9 @@ app.get('/api/customer/service-status', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ 客戶端服務狀態 API 讀取失敗：', error);
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.status(503).json({
       success: false,
       code: 'SERVICE_STATUS_UNAVAILABLE',
