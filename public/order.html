@@ -17443,6 +17443,9 @@ function renderHomeServiceStatus(data, fallback = false){
     if(!homeHasSuccessfulServiceStatus){
       noteEl.innerText =
         '系統正在更新在線小U數量。';
+
+      timeEl.innerText =
+        '更新中';
     }
 
     return;
@@ -17453,6 +17456,16 @@ function renderHomeServiceStatus(data, fallback = false){
       0,
       Number(
         data?.onlineRiderCount || 0
+      )
+    );
+
+  const mapRiderCount =
+    Math.max(
+      0,
+      Number(
+        data?.mapRiderCount ??
+        data?.nearbyRiders?.length ??
+        0
       )
     );
 
@@ -17480,10 +17493,12 @@ function renderHomeServiceStatus(data, fallback = false){
 
   if(onlineCount > 0){
     noteEl.innerText =
-      `目前有 ${onlineCount} 位已通過審核、在線且定位有效的小U。`;
+      mapRiderCount > 0
+        ? `目前有 ${onlineCount} 位小U在線，地圖顯示近期定位中的小U。`
+        : `目前有 ${onlineCount} 位小U在線，地圖位置正在更新。`;
   }else{
     noteEl.innerText =
-      '目前沒有定位有效的在線小U，系統會持續更新。';
+      '目前尚無小U在線，系統會持續更新。';
   }
 }
 
