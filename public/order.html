@@ -8559,44 +8559,17 @@ body{background:#eef0f2;}
 <div class="review-section-head review-confirm-section-head">
 
   <div class="review-section-title">
-    提交前確認
+    最後確認
   </div>
 
   <div class="review-section-edit-hint">
-    請完成以下確認
+    確認後即可建立任務
   </div>
 
 </div>
 
 
 <div class="review-confirm-list">
-
-  <label class="review-confirm-item">
-
-    <input
-      id="locationConfirmedCheck"
-      type="checkbox"
-    >
-
-    <span class="review-confirm-custom-check">
-      ✓
-    </span>
-
-
-    <span class="review-confirm-content">
-
-      <span class="review-confirm-title">
-        地址與地點
-      </span>
-
-      <span class="review-confirm-text">
-        我已確認取件與送達地址正確，門牌、樓層與地標資訊皆已補充完整。
-      </span>
-
-    </span>
-
-  </label>
-
 
   <label class="review-confirm-item">
 
@@ -8612,11 +8585,11 @@ body{background:#eef0f2;}
     <span class="review-confirm-content">
 
       <span class="review-confirm-title">
-        訂單與服務規則
+        確認訂單
       </span>
 
       <span class="review-confirm-text">
-        我已確認任務內容與費用，並同意 UBee 跑腿依服務規則處理此任務。
+        我已確認地址、任務內容與費用正確，並同意 UBee 跑腿服務規則。
       </span>
 
     </span>
@@ -8630,7 +8603,7 @@ body{background:#eef0f2;}
   <summary>
 
     <span>
-      查看任務規則與注意事項
+      查看服務規則
     </span>
 
     <span class="review-rules-arrow">
@@ -8642,51 +8615,27 @@ body{background:#eef0f2;}
   <div class="review-rules-content">
 
     <div class="review-rule-item">
-
-      <div class="review-rule-title">
-        任務限制
-      </div>
-
       <div class="review-rule-text">
-        UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署等高風險任務。
+        ・不得委託違法、危險或不適合配送的任務
       </div>
-
     </div>
 
     <div class="review-rule-item">
-
-      <div class="review-rule-title">
-        代墊費用
-      </div>
-
       <div class="review-rule-text">
-        若有代墊費用，請正確填寫。代墊款項達 NT$1,000（含）以上，需由客服人工確認。
+        ・代墊金額達 NT$1,000（含）以上需人工確認
       </div>
-
     </div>
 
     <div class="review-rule-item">
-
-      <div class="review-rule-title">
-        付款方式
-      </div>
-
       <div class="review-rule-text">
-        目前僅開放現金單，任務完成時由 小U 向客人收取現金。
+        ・目前以現金付款為主
       </div>
-
     </div>
 
     <div class="review-rule-item">
-
-      <div class="review-rule-title">
-        取消任務
-      </div>
-
       <div class="review-rule-text">
-         小U 已接單或任務開始後，取消可能依實際執行狀況產生相關費用。
+        ・最終費用可能依等候或實際執行情況調整
       </div>
-
     </div>
 
   </div>
@@ -9189,7 +9138,8 @@ let initialOpenActionHandled = false;
 // 首頁即時服務狀態
 // ==============================
 let homeServiceStatusTimer = null;
-const HOME_SERVICE_STATUS_REFRESH_MS = 60000;
+const HOME_SERVICE_STATUS_REFRESH_MS = 10000;
+let homeServiceStatusRequestInFlight = false;
 let homeNearbyRiderMarkers = [];
 let homeNearbyRiderInfoWindow = null;
 
@@ -12979,7 +12929,7 @@ function getPayload(){
     speedType,
     speed:speedType,
 
-    locationConfirmed:!!qs('locationConfirmedCheck')?.checked,
+    locationConfirmed:!!qs('agreeCheck')?.checked,
 
     advancePayment,
     estimatedGoodsAmount:advancePayment,
@@ -13958,13 +13908,8 @@ async function createOrder(){
     return;
   }
 
-  if(!qs('locationConfirmedCheck')?.checked){
-    alert('請先確認取件地址與送達地址正確。');
-    return;
-  }
-
   if(!qs('agreeCheck')?.checked){
-    alert('請先勾選確認同意。');
+    alert('請先確認地址、任務內容與費用，並同意服務規則。');
     return;
   }
 
@@ -17345,24 +17290,38 @@ function renderHomeServiceStatus(data, fallback = false){
 }
 
 async function refreshHomeServiceStatus(){
+  if(homeServiceStatusRequestInFlight){
+    return;
+  }
+
+  homeServiceStatusRequestInFlight = true;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 7000);
+
   try{
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch('/api/customer/service-status',{
+    const url = `/api/customer/service-status?_=${Date.now()}`;
+    const res = await fetch(url,{
       method:'GET',
       cache:'no-store',
+      headers:{
+        'Cache-Control':'no-cache, no-store, max-age=0',
+        'Pragma':'no-cache'
+      },
       signal:controller.signal
     });
-    clearTimeout(timer);
 
     const data = await res.json().catch(() => ({}));
     if(!res.ok || data.success === false){
       throw new Error(data.message || data.error || '服務狀態讀取失敗');
     }
+
     renderHomeServiceStatus(data, false);
   }catch(err){
     console.warn('首頁即時服務狀態讀取失敗：', err);
     renderHomeServiceStatus(null, true);
+  }finally{
+    clearTimeout(timer);
+    homeServiceStatusRequestInFlight = false;
   }
 }
 
@@ -17376,6 +17335,16 @@ function startHomeServiceStatusRefresh(){
     HOME_SERVICE_STATUS_REFRESH_MS
   );
 }
+
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible'){
+    refreshHomeServiceStatus();
+  }
+});
+
+window.addEventListener('pageshow', () => {
+  refreshHomeServiceStatus();
+});
 
 async function initPage(){
   const submitBtn =
