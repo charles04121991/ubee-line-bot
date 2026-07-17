@@ -9868,6 +9868,7 @@ function createOrderFromApi(data) {
 // 真實座標或任何可讓客戶辨識特定小U的固定公開識別碼。
 // =====================================================
 const CUSTOMER_RIDER_LOCATION_FRESH_MS = 5 * 60 * 1000;
+const CUSTOMER_RIDER_PUBLIC_ONLINE_MS = 30 * 60 * 1000;
 const CUSTOMER_RIDER_OFFSET_MIN_METERS = 50;
 const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
 const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
@@ -9956,6 +9957,7 @@ app.get('/api/customer/service-status', async (req, res) => {
       .limit(500)
       .get();
 
+    let declaredOnlineRiderCount = 0;
     let onlineRiderCount = 0;
     let mapRiderCount = 0;
     let nearbyRiderCount3km = 0;
@@ -9971,23 +9973,42 @@ app.get('/api/customer/service-status', async (req, res) => {
         String(rider.status || '').trim().toLowerCase() === 'approved';
       const online = rider.online === true;
 
-      // 「在線」只代表已審核且小U主動按下上線。
-      // 定位暫時過期時，不應把他從在線人數中扣除。
+      // Firestore 裡 online=true 只代表小U曾主動按下上線。
+      // 先保留這個原始數字供內部診斷，但不直接公開給客人端。
       if (!approved || !online) {
+        return;
+      }
+
+      declaredOnlineRiderCount += 1;
+
+      const point = getRiderCurrentPointForPush(rider);
+      const lastLocationAtMs =
+        getDispatchPushTimeMs(rider.locationUpdatedAtMs) ||
+        getDispatchPushTimeMs(rider.locationUpdatedAt) ||
+        getDispatchPushTimeMs(rider.currentLocation?.updatedAt);
+
+      const locationAgeMs = lastLocationAtMs
+        ? nowMs - lastLocationAtMs
+        : Number.POSITIVE_INFINITY;
+
+      const publicOnline =
+        !!point &&
+        Number.isFinite(locationAgeMs) &&
+        locationAgeMs >= 0 &&
+        locationAgeMs <= CUSTOMER_RIDER_PUBLIC_ONLINE_MS;
+
+      // 超過 30 分鐘沒有定位更新，客人端公開狀態視為離線。
+      if (!publicOnline) {
         return;
       }
 
       onlineRiderCount += 1;
 
-      const point = getRiderCurrentPointForPush(rider);
-      const fresh = isRiderLocationFreshForPush(
-        rider,
-        CUSTOMER_RIDER_LOCATION_FRESH_MS
-      );
+      const fresh =
+        locationAgeMs <= CUSTOMER_RIDER_LOCATION_FRESH_MS;
 
-      // 沒有近期有效定位時，保留在線人數，
-      // 但不回傳地圖標記，也不納入距離媒合統計。
-      if (!point || !fresh) {
+      // 5 分鐘內有定位才顯示匿名 U 圖案並納入即時媒合。
+      if (!fresh) {
         return;
       }
 
@@ -10046,6 +10067,7 @@ app.get('/api/customer/service-status', async (req, res) => {
     res.setHeader('Expires', '0');
     return res.json({
       success: true,
+      declaredOnlineRiderCount,
       onlineRiderCount,
       mapRiderCount,
       nearbyRiders,
@@ -10080,6 +10102,9 @@ app.get('/api/customer/service-status', async (req, res) => {
       locationFreshSeconds: Math.floor(
         CUSTOMER_RIDER_LOCATION_FRESH_MS / 1000
       ),
+      publicOnlineFreshSeconds: Math.floor(
+        CUSTOMER_RIDER_PUBLIC_ONLINE_MS / 1000
+      ),
       locationPrivacy: {
         mode: 'stable_offset',
         minOffsetMeters: CUSTOMER_RIDER_OFFSET_MIN_METERS,
@@ -10088,7 +10113,7 @@ app.get('/api/customer/service-status', async (req, res) => {
           CUSTOMER_RIDER_OFFSET_BUCKET_MS / 60000
         ),
       },
-      scope: 'online_riders_and_recent_map_locations',
+      scope: 'public_online_riders_and_realtime_matchable_locations',
     });
   } catch (error) {
     console.error('❌ 客戶端服務狀態 API 讀取失敗：', error);
