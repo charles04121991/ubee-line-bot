@@ -7781,6 +7781,750 @@ body{background:#eef0f2;}
 
 /* UBee 2026-07-16 正式營運整合功能 */
 .address-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.compact-field{display:block;border:1px solid var(--line);border-radius:14px;background:#fff;padding:9px 11px}.compact-field span{display:block;font-size:10px;font-weight:1000;color:var(--muted);margin-bottom:4px}.compact-field input{font-size:13px!important}.saved-address-quickbar{display:flex;gap:7px;overflow-x:auto;margin-top:10px;padding-bottom:2px}.quick-address-chip,.mini-action{border:1px solid #e4d174;background:#fffbed;color:#5f4c00;border-radius:999px;padding:8px 11px;font-size:12px!important;font-weight:1000;white-space:nowrap}.match-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#fafafa}.match-status-card strong,.match-status-card span{display:block}.match-status-card strong{font-size:13px}.match-status-card div span{font-size:11px;color:var(--muted);margin-top:3px}.status-badge{border-radius:999px;padding:6px 9px;font-size:10px!important;font-weight:1000}.status-badge.good{background:#e9f8ef;color:#16753a}.status-badge.warn{background:#fff4d6;color:#8a6200}.status-badge.neutral{background:#eef0f2;color:#62676d}.home-estimate-eta{font-size:10px;color:#72767b;font-weight:900;margin-top:2px}.form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.shopping-list{display:flex;flex-direction:column;gap:9px}.shopping-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}.shopping-item-grid{display:grid;grid-template-columns:1fr 92px;gap:8px}.shopping-item input,.shopping-item select{border:1px solid var(--line);border-radius:11px;padding:10px!important;background:#fafafa}.shopping-item-actions{display:flex;justify-content:flex-end;margin-top:8px}.danger-link{border:none;background:transparent;color:var(--red);font-size:12px!important;font-weight:1000}.field-help,.inline-status{font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;margin-top:8px}.system-check-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:13px;margin-bottom:18px}.system-check-row{display:flex;gap:9px;align-items:flex-start;padding:8px 0;font-size:12px;font-weight:850}.system-check-row+.system-check-row{border-top:1px solid #f0f1f2}.system-check-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 22px}.system-check-row.ok .system-check-icon{background:#e9f8ef;color:#16753a}.system-check-row.warn .system-check-icon{background:#fff4d6;color:#8a6200}.system-check-row.error .system-check-icon{background:#feecec;color:#b42318}.field-invalid{box-shadow:0 0 0 2px rgba(220,38,38,.22)!important;border-color:#dc2626!important}.field-error-text{font-size:11px;color:#dc2626;font-weight:900;margin-top:6px}.saved-address-list{display:flex;flex-direction:column;gap:9px}.saved-address-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa}.saved-address-card-head{display:flex;justify-content:space-between;gap:10px}.saved-address-card-title{font-weight:1000}.saved-address-card-text{font-size:12px;color:var(--muted);line-height:1.6;margin-top:5px}.saved-address-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.saved-address-actions button,.order-card-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px!important;font-weight:1000}.order-history-card{border:1px solid var(--line);background:var(--surface2);border-radius:17px;padding:13px;margin-bottom:10px}.order-card-actions{display:flex;gap:8px;margin-top:10px}.draft-banner{position:fixed;left:50%;top:calc(74px + env(safe-area-inset-top));transform:translateX(-50%);z-index:120;width:calc(100% - 28px);max-width:492px;border:1px solid #e8d05c;border-radius:17px;background:#fffbed;box-shadow:0 12px 30px rgba(17,24,39,.15);padding:12px}.draft-banner-actions{display:flex;gap:8px;margin-top:9px}.draft-banner-actions button{flex:1;border:none;border-radius:12px;padding:10px;font-weight:1000}.draft-continue{background:var(--accent)}.draft-discard{background:#fff;border:1px solid var(--line)}.empty-state{font-size:13px;color:var(--muted);font-weight:800}@media(max-width:380px){.address-detail-grid,.shopping-item-grid{grid-template-columns:1fr}}
+
+/* =========================================================
+   UBee Customer Experience V4
+   Apple × Uber × DoorDash × Wolt inspired visual system
+   僅調整介面與資訊層級，不修改既有 API、估價、建單與追蹤邏輯
+   ========================================================= */
+
+:root{
+  --bg:#f4f4f2;
+  --surface:#ffffff;
+  --surface2:#f7f7f5;
+  --surface3:#efefec;
+  --text:#0b0b0c;
+  --muted:#727277;
+  --muted2:#a2a2a7;
+  --line:rgba(15,15,16,.08);
+  --line2:rgba(15,15,16,.14);
+  --accent:#ffd60a;
+  --accentStrong:#f5c400;
+  --green:#23a55a;
+  --blue:#2378ff;
+  --red:#e5484d;
+  --shadowSoft:0 18px 50px rgba(15,15,16,.07);
+  --shadowCard:0 8px 30px rgba(15,15,16,.055);
+}
+
+html,body{
+  background:#fff;
+}
+
+body{
+  letter-spacing:-.01em;
+}
+
+.app{
+  max-width:560px;
+  background:var(--bg);
+  padding-left:18px;
+  padding-right:18px;
+  padding-bottom:calc(160px + env(safe-area-inset-bottom));
+}
+
+.topbar{
+  min-height:70px;
+  margin-left:-18px;
+  margin-right:-18px;
+  padding-left:18px;
+  padding-right:18px;
+  border-bottom:1px solid rgba(15,15,16,.06);
+  background:rgba(255,255,255,.92);
+  backdrop-filter:blur(22px);
+  -webkit-backdrop-filter:blur(22px);
+}
+
+.brand{
+  font-size:28px;
+  letter-spacing:-1.5px;
+}
+
+.topbar-location{
+  font-size:13px;
+  color:#303034;
+}
+
+.topbar-support{
+  width:42px;
+  height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:#f5f5f3;
+}
+
+.ubee-v3-hero{
+  display:flex !important;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:18px;
+  margin:22px 0 18px;
+  padding:0 2px;
+}
+
+.ubee-v3-hero-content{
+  min-width:0;
+  flex:1;
+}
+
+.ubee-v3-eyebrow{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#626267;
+  font-size:12px;
+  font-weight:900;
+  margin-bottom:10px;
+}
+
+.ubee-v3-live-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#25a75b;
+  box-shadow:0 0 0 5px rgba(37,167,91,.12);
+}
+
+.ubee-v3-hero-title{
+  color:#0b0b0c;
+  font-size:34px;
+  line-height:1.13;
+  font-weight:1000;
+  letter-spacing:-1.5px;
+}
+
+.ubee-v3-hero-title strong{
+  color:#c99d00;
+}
+
+.ubee-v3-hero-sub{
+  max-width:390px;
+  margin-top:11px;
+  color:#77777c;
+  font-size:14px;
+  line-height:1.65;
+  font-weight:700;
+}
+
+.ubee-v3-metrics{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px;
+}
+
+.ubee-v3-metric{
+  display:inline-flex;
+  align-items:center;
+  min-height:32px;
+  padding:7px 10px;
+  border:1px solid rgba(15,15,16,.07);
+  border-radius:999px;
+  background:#fff;
+  color:#55555a;
+  font-size:11px;
+  font-weight:800;
+}
+
+.ubee-v3-mascot{
+  width:68px;
+  height:68px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 68px;
+  border-radius:24px;
+  background:linear-gradient(145deg,#ffe65d,#ffd00a);
+  box-shadow:0 14px 30px rgba(245,196,0,.22);
+  font-size:34px;
+}
+
+.home-map-shell{
+  height:300px;
+  margin-left:-18px;
+  margin-right:-18px;
+  border-radius:0;
+}
+
+.task-sheet{
+  margin-left:-18px;
+  margin-right:-18px;
+  padding:18px 18px 26px;
+  border-radius:30px 30px 0 0;
+  box-shadow:0 -12px 35px rgba(15,15,16,.08);
+}
+
+.task-sheet-handle{
+  width:42px;
+  height:5px;
+  margin-bottom:18px;
+  background:#d7d7d5;
+}
+
+.home-service-status{
+  margin:0 0 18px;
+  padding:16px;
+  border:1px solid rgba(15,15,16,.07);
+  border-radius:22px;
+  background:linear-gradient(145deg,#fff,#fbfbf8);
+  box-shadow:var(--shadowCard);
+}
+
+.home-service-status-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+}
+
+.home-service-status-kicker{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#707075;
+  font-size:11px;
+  font-weight:900;
+}
+
+.home-service-status-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#25a75b;
+  box-shadow:0 0 0 4px rgba(37,167,91,.12);
+}
+
+.home-service-status-count{
+  margin-top:6px;
+  color:#111;
+  font-size:15px;
+  font-weight:850;
+}
+
+.home-service-status-count span{
+  font-size:28px;
+  line-height:1;
+  font-weight:1000;
+  letter-spacing:-1px;
+}
+
+.home-service-status-side{
+  text-align:right;
+}
+
+.home-service-status-label{
+  color:#99999e;
+  font-size:10px;
+  font-weight:850;
+}
+
+.home-service-status-time{
+  margin-top:5px;
+  color:#29292d;
+  font-size:14px;
+  font-weight:1000;
+}
+
+.home-service-status-note{
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px solid rgba(15,15,16,.06);
+  color:#747479;
+  font-size:12px;
+  line-height:1.6;
+  font-weight:750;
+}
+
+.category-tabs{
+  gap:8px;
+  margin:0 0 18px;
+  padding:0;
+  border:0;
+}
+
+.category-tab{
+  min-width:auto;
+  min-height:44px;
+  padding:0 15px;
+  border:1px solid rgba(15,15,16,.07);
+  border-radius:999px;
+  background:#f4f4f2;
+  color:#77777c;
+  font-size:13px !important;
+}
+
+.category-tab.active{
+  background:#111;
+  color:#fff;
+}
+
+.category-tab.active::after{
+  display:none;
+}
+
+.service-grid-new{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  overflow:visible;
+  margin:0 0 18px;
+  padding:0;
+}
+
+.service-item{
+  min-width:0;
+  min-height:88px;
+  padding:12px 6px 10px;
+  border:1px solid rgba(15,15,16,.07);
+  border-radius:18px;
+  background:#f8f8f6;
+  color:#66666b;
+}
+
+.service-item-icon{
+  width:38px;
+  height:38px;
+  margin-bottom:7px;
+  border-radius:13px;
+  background:#fff;
+  box-shadow:0 4px 12px rgba(15,15,16,.04);
+}
+
+.service-item.active{
+  border-color:#edc000;
+  background:#fff8d6;
+  color:#111;
+  box-shadow:0 0 0 1px rgba(237,192,0,.25) inset;
+}
+
+.service-item.active::after{
+  display:none;
+}
+
+.address-card{
+  border-radius:22px !important;
+  border:1px solid rgba(15,15,16,.08) !important;
+  box-shadow:var(--shadowCard) !important;
+}
+
+#step1 .address-row{
+  min-height:82px;
+  padding:15px 17px;
+}
+
+#step1 .address-main input{
+  font-size:17px !important;
+}
+
+.address-detail-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+
+.compact-field{
+  display:block;
+  padding:13px 14px;
+  border:1px solid rgba(15,15,16,.07);
+  border-radius:17px;
+  background:#f8f8f6;
+}
+
+.compact-field span{
+  display:block;
+  margin-bottom:5px;
+  color:#8c8c91;
+  font-size:10px;
+  font-weight:900;
+}
+
+.compact-field input{
+  font-size:13px !important;
+}
+
+.match-status-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:12px;
+  padding:14px 15px;
+  border:1px solid rgba(15,15,16,.07);
+  border-radius:17px;
+  background:#fff;
+}
+
+.match-status-card div{
+  min-width:0;
+}
+
+.match-status-card strong{
+  display:block;
+  margin-bottom:3px;
+  font-size:13px;
+  font-weight:1000;
+}
+
+#matchStatusText{
+  display:block;
+  color:#7e7e83;
+  font-size:11px;
+  line-height:1.45;
+  font-weight:750;
+}
+
+.status-badge{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:1000;
+}
+
+.status-badge.good{background:#eaf8ef;color:#147a3d}
+.status-badge.warn{background:#fff4d6;color:#946900}
+.status-badge.neutral{background:#f0f0ee;color:#68686d}
+
+.home-action-footer,
+.step2-action-footer,
+.step3-action-footer{
+  width:calc(100% - 24px);
+  max-width:536px;
+  border-radius:24px;
+  box-shadow:0 16px 46px rgba(15,15,16,.16);
+}
+
+#step1 .home-estimate-label{
+  font-size:10px;
+}
+
+#step1 .home-estimate-amount{
+  font-size:25px;
+}
+
+#step1 .home-estimate-eta{
+  margin-top:3px;
+  color:#5f5f64;
+  font-size:10px;
+  font-weight:850;
+  line-height:1.35;
+}
+
+#step1 .home-next-btn,
+.step2-next-btn,
+.step3-next-btn,
+.review-submit-btn{
+  border-radius:17px;
+  background:#111;
+  color:#fff;
+}
+
+.headline{
+  margin-top:22px;
+  font-size:32px;
+  line-height:1.15;
+  letter-spacing:-1.2px;
+}
+
+.subtext{
+  margin-bottom:22px;
+  font-size:14px;
+  line-height:1.65;
+}
+
+.ubee-v3-progress{
+  margin:16px 0 24px;
+}
+
+.ubee-v3-progress-track{
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+.ubee-v3-progress-step{
+  flex:1;
+}
+
+.ubee-v3-progress-label{
+  display:none;
+}
+
+.ubee-v3-progress-dot{
+  width:100%;
+  height:5px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#dededb;
+  color:transparent;
+  font-size:0;
+}
+
+.ubee-v3-progress-step.done .ubee-v3-progress-dot,
+.ubee-v3-progress-step.active .ubee-v3-progress-dot{
+  background:#111;
+}
+
+.task-path-box,
+.input-card,
+.quick-guide,
+.speed-list,
+.review-summary-group,
+.price-box,
+.review-confirm-list,
+.review-rules-details,
+.content-card,
+.member-card,
+.menu-list,
+.info-item,
+.address-display{
+  border-color:rgba(15,15,16,.075) !important;
+  box-shadow:var(--shadowCard) !important;
+}
+
+#step2 .form-title{
+  font-size:13px;
+  color:#606065;
+}
+
+#step2 .input-wrap{
+  min-height:68px;
+}
+
+#step2 textarea{
+  min-height:108px;
+}
+
+#step3 .speed-list{
+  border-radius:24px;
+}
+
+#step3 .speed-card{
+  min-height:104px;
+  padding-top:20px;
+  padding-bottom:20px;
+}
+
+.step4-page-title{
+  font-size:30px;
+  letter-spacing:-1px;
+}
+
+#step4 .review-map-shell{
+  height:260px;
+}
+
+.review-section-title{
+  font-size:21px;
+}
+
+#step4 .review-price-total{
+  font-size:36px;
+}
+
+#step4 .review-sticky-footer{
+  min-height:94px;
+}
+
+#step5{
+  padding-top:4px;
+}
+
+#step5 .content-card:first-of-type{
+  margin:14px 0 10px !important;
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+#step5 .content-card:first-of-type .price-row{
+  padding:0;
+  border:0;
+  font-size:11px;
+}
+
+.step5-live-status-panel{
+  margin:0 0 14px;
+  padding:22px;
+  border:0;
+  border-radius:28px;
+  background:#111;
+  color:#fff;
+  box-shadow:0 18px 44px rgba(15,15,16,.2);
+}
+
+.step5-live-status-top{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:14px;
+}
+
+.step5-live-status-primary{
+  color:#fff;
+  font-size:38px;
+  line-height:1;
+  font-weight:1000;
+  letter-spacing:-1.4px;
+}
+
+.step5-live-status-label{
+  color:rgba(255,255,255,.58);
+  font-size:11px;
+  font-weight:900;
+}
+
+.step5-live-status-title{
+  margin-top:18px;
+  color:#fff;
+  font-size:20px;
+  font-weight:1000;
+}
+
+.step5-live-status-meta{
+  margin-top:7px;
+  color:rgba(255,255,255,.68);
+  font-size:13px;
+  line-height:1.6;
+  font-weight:750;
+}
+
+.step5-tracking-map-section,
+.step5-payment-section,
+.step5-task-detail-section{
+  margin:14px 0;
+  padding:16px;
+  border:1px solid rgba(15,15,16,.075);
+  border-radius:24px;
+  background:#fff;
+  box-shadow:var(--shadowCard);
+}
+
+.step5-tracking-map-shell{
+  overflow:hidden;
+  border-radius:19px;
+}
+
+#statusBox{
+  overflow:hidden;
+  margin:14px 0;
+  border:1px solid rgba(15,15,16,.075);
+  border-radius:24px;
+  background:#fff;
+  box-shadow:var(--shadowCard);
+}
+
+.bottom-tabs{
+  max-width:560px;
+  padding-left:18px;
+  padding-right:18px;
+  border-radius:26px 26px 0 0;
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+}
+
+.bottom-tab{
+  min-height:58px;
+  border-radius:18px;
+}
+
+.bottom-tab.active{
+  width:88%;
+  background:#111;
+}
+
+.btn{
+  min-height:54px;
+  border-radius:17px;
+}
+
+.btn-primary{
+  background:#111;
+  color:#fff;
+}
+
+.btn-secondary{
+  background:#fff;
+}
+
+.content-title{
+  font-size:20px;
+}
+
+.member-card{
+  padding:22px;
+  border-radius:26px;
+  background:#fff;
+}
+
+.member-title{
+  font-size:27px;
+  letter-spacing:-.7px;
+}
+
+.menu-list{
+  border-radius:24px;
+}
+
+.menu-item{
+  min-height:66px;
+  padding:17px;
+}
+
+@media(max-width:420px){
+  .app{
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .topbar,
+  .home-map-shell,
+  .task-sheet{
+    margin-left:-14px;
+    margin-right:-14px;
+  }
+
+  .topbar{
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .ubee-v3-hero-title{
+    font-size:31px;
+  }
+
+  .ubee-v3-mascot{
+    width:58px;
+    height:58px;
+    flex-basis:58px;
+    font-size:29px;
+    border-radius:20px;
+  }
+
+  .service-grid-new{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:7px;
+  }
+
+  .service-item{
+    min-height:82px;
+    padding-left:3px;
+    padding-right:3px;
+  }
+
+  .service-item-title{
+    font-size:11px;
+  }
+
+  .address-detail-grid{
+    grid-template-columns:1fr;
+  }
+}
+
 </style>
 </head>
 
@@ -7921,7 +8665,7 @@ body{background:#eef0f2;}
 
     <section class="step active" id="step1">
 
-      <div class="ubee-v3-hero hidden" aria-label="UBee 即時服務資訊">
+      <div class="ubee-v3-hero" aria-label="UBee 即時服務資訊">
         <div class="ubee-v3-hero-content">
           <div class="ubee-v3-eyebrow"><span class="ubee-v3-live-dot"></span>UBee 即時任務服務</div>
           <div class="ubee-v3-hero-title">今天需要 <strong>UBee</strong><br>幫你完成什麼？</div>
