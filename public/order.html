@@ -8028,7 +8028,7 @@ body{background:#eef0f2;}
               即時服務狀態
             </div>
             <div class="home-service-status-count" id="homeOnlineRiderCount">
-              <span>0</span> <strong>位小U目前在線</strong>
+              <span>0</span> <strong>位小U可即時媒合</strong>
             </div>
           </div>
           <div class="home-service-status-side">
@@ -17438,7 +17438,7 @@ function renderHomeServiceStatus(data, fallback = false){
       );
 
     countEl.innerHTML =
-      `<span>${retainedCount}</span> <strong>位小U目前在線</strong>`;
+      `<span>${retainedCount}</span> <strong>位小U可即時媒合</strong>`;
 
     if(!homeHasSuccessfulServiceStatus){
       noteEl.innerText =
@@ -17465,12 +17465,16 @@ function renderHomeServiceStatus(data, fallback = false){
       Number(
         data?.mapRiderCount ??
         data?.nearbyRiders?.length ??
+        data?.onlineRiderCount ??
         0
       )
     );
 
+  // 客人端主數字只顯示 5 分鐘內有近期定位、可即時媒合的小U。
+  const displayCount = mapRiderCount;
+
   homeLastSuccessfulOnlineRiderCount =
-    onlineCount;
+    displayCount;
 
   homeHasSuccessfulServiceStatus =
     true;
@@ -17480,7 +17484,7 @@ function renderHomeServiceStatus(data, fallback = false){
   );
 
   countEl.innerHTML =
-    `<span>${onlineCount}</span> <strong>位小U目前在線</strong>`;
+    `<span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
 
   renderHomeNearbyRiders(
     data?.nearbyRiders || []
@@ -17491,14 +17495,15 @@ function renderHomeServiceStatus(data, fallback = false){
       data?.updatedAt
     );
 
-  if(onlineCount > 0){
+  if(displayCount > 0){
     noteEl.innerText =
-      mapRiderCount > 0
-        ? `目前有 ${onlineCount} 位小U在線，地圖顯示近期定位中的小U。`
-        : `目前有 ${onlineCount} 位小U在線，地圖位置正在更新。`;
+      `目前有 ${displayCount} 位小U可即時媒合，地圖顯示匿名約略位置。`;
+  }else if(onlineCount > 0){
+    noteEl.innerText =
+      `目前有 ${onlineCount} 位小U維持公開上線狀態，定位正在更新。`;
   }else{
     noteEl.innerText =
-      '目前尚無小U在線，系統會持續更新。';
+      '目前尚無可即時媒合的小U，系統會持續更新。';
   }
 }
 
@@ -18057,7 +18062,7 @@ const UBeeEnhancements = (() => {
 
   function etaMinutes(){const route=Math.max(1,Math.ceil(Number(lastRouteData?.durationMinutes||lastRouteData?.durationMin||0)));const handling=serviceGroup==='buy'?15:serviceGroup==='queue'?Math.max(10,Number(value('queueMinutes')||30)):8;const matching=speedType==='express'?3:speedType==='economy'?10:6;return matching+route+handling}
   function updateEta(){const el=qs('homeEstimateEta');if(!el)return;if(!lastRouteData){el.textContent='預計完成時間待計算';return}const mins=etaMinutes(),d=new Date(Date.now()+mins*60000);el.textContent=`預計約 ${d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} 前完成（${mins}-${mins+15} 分鐘）`}
-  function updateMatchStatus(){const text=qs('matchStatusText'),badge=qs('matchStatusBadge');if(!text||!badge)return;const count=Number(qs('homeOnlineRiderCount')?.innerText.match(/\d+/)?.[0]||0);if(!value('pickup')){text.textContent='填寫取件地址後顯示媒合狀況';badge.textContent='等待定位';badge.className='status-badge neutral'}else if(count>=5){text.textContent=`目前共有 ${count} 位小U在線，系統將從取件點附近開始媒合`;badge.textContent='媒合良好';badge.className='status-badge good'}else if(count>0){text.textContent=`目前 ${count} 位小U在線，系統會逐步擴大媒合範圍`;badge.textContent='小U較少';badge.className='status-badge warn'}else{text.textContent='目前無法取得即時在線資料，仍可正常建立任務';badge.textContent='資料更新中';badge.className='status-badge neutral'}}
+  function updateMatchStatus(){const text=qs('matchStatusText'),badge=qs('matchStatusBadge');if(!text||!badge)return;const count=Number(qs('homeOnlineRiderCount')?.innerText.match(/\d+/)?.[0]||0);if(!value('pickup')){text.textContent='填寫取件地址後顯示媒合狀況';badge.textContent='等待定位';badge.className='status-badge neutral'}else if(count>=5){text.textContent=`目前共有 ${count} 位小U可即時媒合，系統將從取件點附近開始媒合`;badge.textContent='媒合良好';badge.className='status-badge good'}else if(count>0){text.textContent=`目前 ${count} 位小U可即時媒合，系統會逐步擴大媒合範圍`;badge.textContent='小U較少';badge.className='status-badge warn'}else{text.textContent='目前尚無近期定位的小U，仍可正常建立任務';badge.textContent='持續搜尋';badge.className='status-badge neutral'}}
   function renderSystemCheck(){const el=qs('orderSystemCheck');if(!el)return;const checks=[['pickup','取件位置已填寫',!!value('pickup')],['dropoff','送達位置已填寫',!!value('dropoff')],['phone','至少一組聯絡電話已填寫',!!(value('pickupPhone')||value('dropoffPhone'))],['route','路線已成功計算',!!lastRouteData],['quote','正式估價資料可用',!!lastQuoteData&&Number(lastEstimatedTotal)>0],['note','任務內容已完成',!!value('note')]];el.innerHTML=checks.map(([,label,ok])=>`<div class="system-check-row ${ok?'ok':'warn'}"><span class="system-check-icon">${ok?'✓':'!'}</span><span>${label}</span></div>`).join('')}
 
   function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=order.serviceMode||'normal';speedType=order.speedType||order.speed||'standard';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
