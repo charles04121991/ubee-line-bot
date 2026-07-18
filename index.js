@@ -5652,6 +5652,138 @@ app.get('/order.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'order.html'));
 });
 
+// ============================================================
+// UBee 調度中心 V1：只讀監控 API
+// 建議放在 express.static(...) 之前。
+// 第一版只讀，不提供改價、完成訂單、付款狀態或人工指定小U寫入。
+// ============================================================
+app.get('/api/dispatch/dashboard', async (req, res) => {
+  try {
+    const nowMs = Date.now();
+    const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
+    const taipeiNow = new Date(nowMs + TAIPEI_OFFSET_MS);
+    const todayStartMs = Date.UTC(
+      taipeiNow.getUTCFullYear(),
+      taipeiNow.getUTCMonth(),
+      taipeiNow.getUTCDate(), 0, 0, 0, 0
+    ) - TAIPEI_OFFSET_MS;
+
+    const toMs = value => {
+      if (!value) return 0;
+      if (typeof value.toDate === 'function') return value.toDate().getTime();
+      if (typeof value.seconds === 'number') return value.seconds * 1000;
+      if (typeof value._seconds === 'number') return value._seconds * 1000;
+      if (typeof value === 'number') return value;
+      const parsed = new Date(value).getTime();
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const riderSnap = await db.collection('riders').limit(1000).get();
+    const riders = riderSnap.docs.map(doc => {
+      const r = doc.data() || {};
+      const locationUpdatedAtMs = Number(r.locationUpdatedAtMs || r.lastActiveMs || 0);
+      const isFresh = locationUpdatedAtMs > 0 && (nowMs - locationUpdatedAtMs) <= 5 * 60 * 1000;
+      const online = r.online === true && isFresh;
+      const busy = r.busy === true || !!String(r.currentOrderId || '').trim();
+      return {
+        riderId: r.riderId || doc.id,
+        name: r.name || '',
+        phone: r.phone || '',
+        district: r.district || '',
+        serviceArea: r.serviceArea || r.area || '',
+        online,
+        busy,
+        currentOrderId: r.currentOrderId || '',
+        currentLat: Number.isFinite(Number(r.currentLat)) ? Number(r.currentLat) : null,
+        currentLng: Number.isFinite(Number(r.currentLng)) ? Number(r.currentLng) : null,
+        locationUpdatedAtMs
+      };
+    }).filter(r => r.online);
+
+    const orderSnap = await db.collection('orders').limit(500).get();
+    const allOrders = orderSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+
+    const waitingStatuses = new Set(['pending', 'waiting', 'searching', 'dispatching', 'redispatching']);
+    const activeStatuses = new Set(['accepted', 'heading_to_pickup', 'arrived_pickup', 'picked_up', 'heading_to_dropoff', 'arrived_dropoff']);
+    const completedStatuses = new Set(['completed']);
+
+    const orderTimeMs = o =>
+      Number(o.createdAtMs || o.orderCreatedAtMs || o.submittedAtMs || 0) ||
+      toMs(o.createdAt) || toMs(o.orderCreatedAt) || toMs(o.submittedAt);
+
+    const completedTimeMs = o =>
+      Number(o.completedAtMs || o.completedAt || 0) ||
+      toMs(o.completedAt) ||
+      toMs(o.statusTimes && o.statusTimes.completed);
+
+    const liveOrders = allOrders
+      .filter(o => waitingStatuses.has(String(o.status || '').trim()) || activeStatuses.has(String(o.status || '').trim()))
+      .sort((a,b) => orderTimeMs(b) - orderTimeMs(a))
+      .slice(0,100)
+      .map(o => ({
+        id: o.id,
+        status: o.status || '',
+        statusLabel: typeof getStatusLabel === 'function' ? getStatusLabel(o.status) : (o.status || ''),
+        pickupAddress: o.pickupAddress || '',
+        dropoffAddress: o.dropoffAddress || '',
+        pickupLat: o.pickupLat ?? null,
+        pickupLng: o.pickupLng ?? null,
+        dropoffLat: o.dropoffLat ?? null,
+        dropoffLng: o.dropoffLng ?? null,
+        total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
+        riderName: o.riderName || o.driverName || '',
+        riderId: o.riderId || o.riderDocId || '',
+        createdAtMs: orderTimeMs(o)
+      }));
+
+    const waitingOrders = liveOrders.filter(o => waitingStatuses.has(String(o.status || '').trim()));
+    const activeOrders = liveOrders.filter(o => activeStatuses.has(String(o.status || '').trim()));
+    const todayCompleted = allOrders.filter(o =>
+      completedStatuses.has(String(o.status || '').trim()) &&
+      completedTimeMs(o) >= todayStartMs
+    ).length;
+
+    const alerts = [];
+    waitingOrders.forEach(o => {
+      const ageMs = nowMs - Number(o.createdAtMs || nowMs);
+      if (ageMs >= 5 * 60 * 1000) {
+        alerts.push({ type:'waiting_5m', title:'超過 5 分鐘無人接單', message:`${o.id} 已等待 ${Math.floor(ageMs/60000)} 分鐘` });
+      } else if (ageMs >= 3 * 60 * 1000) {
+        alerts.push({ type:'waiting_3m', title:'超過 3 分鐘無人接單', message:`${o.id} 已等待 ${Math.floor(ageMs/60000)} 分鐘` });
+      }
+    });
+
+    return res.json({
+      success: true,
+      generatedAtMs: nowMs,
+      summary: {
+        onlineRiders: riders.length,
+        availableRiders: riders.filter(r => !r.busy).length,
+        waitingOrders: waitingOrders.length,
+        activeOrders: activeOrders.length,
+        todayCompleted
+      },
+      orders: liveOrders,
+      riders: riders.slice(0,200),
+      alerts: alerts.slice(0,100)
+    });
+  } catch (err) {
+    console.error('❌ UBee 調度中心 dashboard 讀取失敗：', err);
+    return res.status(500).json({
+      success: false,
+      message: '調度中心資料讀取失敗，請稍後再試。',
+      error: err.message
+    });
+  }
+});
+
+app.get('/dispatch.html', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'public', 'dispatch.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
   lastModified: false,
