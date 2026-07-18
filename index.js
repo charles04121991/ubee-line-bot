@@ -7595,6 +7595,11 @@ app.get('/api/dispatch/riders', async (req, res) => {
 // 第一階段先做真實即時統計
 // ============================================================
 
+// ============================================================
+// UBee V3 調度中心：區域供需 API
+// 使用真實進行中訂單交叉驗證小U狀態
+// ============================================================
+
 app.get('/api/dispatch/regions', async (req, res) => {
 
   try {
@@ -7602,6 +7607,10 @@ app.get('/api/dispatch/regions', async (req, res) => {
     const nowMs =
       Date.now();
 
+
+    // ========================================================
+    // 狀態群組
+    // ========================================================
 
     const waitingStatuses =
       new Set([
@@ -7624,6 +7633,10 @@ app.get('/api/dispatch/regions', async (req, res) => {
       ]);
 
 
+    // ========================================================
+    // 同時讀取訂單與小U
+    // ========================================================
+
     const [
       orderSnap,
       riderSnap
@@ -7644,8 +7657,77 @@ app.get('/api/dispatch/regions', async (req, res) => {
       ]);
 
 
+    // ========================================================
+    // 建立訂單 Map
+    // ========================================================
+
+    const orderMap =
+      new Map();
+
+
+    const allOrders =
+      orderSnap.docs.map(
+        doc => {
+
+          const order = {
+
+            id:
+              doc.id,
+
+            ...(
+              doc.data() ||
+              {}
+            )
+
+          };
+
+
+          orderMap.set(
+
+            doc.id,
+
+            order
+
+          );
+
+
+          return order;
+
+        }
+      );
+
+
+    // ========================================================
+    // 區域容器
+    // ========================================================
+
     const regionMap =
       new Map();
+
+
+    function normalizeRegionName(
+      value
+    ) {
+
+      const text =
+        String(
+          value ||
+          ''
+        ).trim();
+
+
+      if (
+        !text
+      ) {
+
+        return '未分類';
+
+      }
+
+
+      return text;
+
+    }
 
 
     function ensureRegion(
@@ -7653,15 +7735,9 @@ app.get('/api/dispatch/regions', async (req, res) => {
     ) {
 
       const regionName =
-
-        String(
-          name ||
-          '未分類'
-        ).trim()
-
-        ||
-
-        '未分類';
+        normalizeRegionName(
+          name
+        );
 
 
       if (
@@ -7689,6 +7765,12 @@ app.get('/api/dispatch/regions', async (req, res) => {
               0,
 
             availableRiders:
+              0,
+
+            busyRiders:
+              0,
+
+            issueRiders:
               0
 
           }
@@ -7706,27 +7788,16 @@ app.get('/api/dispatch/regions', async (req, res) => {
 
 
     // ========================================================
-    // Orders
+    // 訂單 → 區域需求
     // ========================================================
 
-    orderSnap.docs.forEach(
-      doc => {
-
-        const order =
-          doc.data() ||
-          {};
-
+    allOrders.forEach(
+      order => {
 
         const status =
-
           String(
-
-            order.status
-
-            ||
-
+            order.status ||
             ''
-
           ).trim();
 
 
@@ -7755,11 +7826,15 @@ app.get('/api/dispatch/regions', async (req, res) => {
 
           ||
 
+          order.pickupArea
+
+          ||
+
           order.district
 
           ||
 
-          order.pickupArea
+          order.area
 
           ||
 
@@ -7800,7 +7875,7 @@ app.get('/api/dispatch/regions', async (req, res) => {
 
 
     // ========================================================
-    // Riders
+    // 小U → 區域供給
     // ========================================================
 
     riderSnap.docs.forEach(
@@ -7809,6 +7884,15 @@ app.get('/api/dispatch/regions', async (req, res) => {
         const rider =
           doc.data() ||
           {};
+
+
+        const riderId =
+
+          rider.riderId
+
+          ||
+
+          doc.id;
 
 
         const locationUpdatedAtMs =
@@ -7828,12 +7912,9 @@ app.get('/api/dispatch/regions', async (req, res) => {
           );
 
 
-        const online =
+        // 5 分鐘內有定位 / 活躍紀錄才算真正在線
 
-          rider.online ===
-          true
-
-          &&
+        const locationFresh =
 
           locationUpdatedAtMs >
           0
@@ -7852,6 +7933,16 @@ app.get('/api/dispatch/regions', async (req, res) => {
           1000;
 
 
+        const online =
+
+          rider.online ===
+          true
+
+          &&
+
+          locationFresh;
+
+
         if (
           !online
         ) {
@@ -7861,9 +7952,126 @@ app.get('/api/dispatch/regions', async (req, res) => {
         }
 
 
+        // ====================================================
+        // 真實任務狀態
+        // ====================================================
+
+        const currentOrderId =
+
+          String(
+
+            rider.currentOrderId
+
+            ||
+
+            ''
+
+          ).trim();
+
+
+        const currentOrder =
+
+          currentOrderId
+
+            ?
+
+            (
+              orderMap.get(
+                currentOrderId
+              )
+
+              ||
+
+              null
+            )
+
+            :
+
+            null;
+
+
+        const currentOrderStatus =
+
+          currentOrder
+
+            ?
+
+            String(
+
+              currentOrder.status
+
+              ||
+
+              ''
+
+            ).trim()
+
+            :
+
+            '';
+
+
+        const hasActiveOrder =
+
+          !!currentOrder
+
+          &&
+
+          activeStatuses.has(
+            currentOrderStatus
+          );
+
+
+        // ====================================================
+        // 狀態異常
+        // ====================================================
+
+        const rawBusy =
+
+          rider.busy ===
+          true;
+
+
+        let state =
+          'available';
+
+
+        if (
+          hasActiveOrder
+        ) {
+
+          state =
+            'busy';
+
+        }
+
+        else if (
+
+          rawBusy
+
+          ||
+
+          currentOrderId
+
+        ) {
+
+          state =
+            'issue';
+
+        }
+
+
+        // ====================================================
+        // 區域判斷
+        // ====================================================
+
         const regionName =
 
           rider.district
+
+          ||
+
+          rider.currentDistrict
 
           ||
 
@@ -7888,24 +8096,34 @@ app.get('/api/dispatch/regions', async (req, res) => {
           1;
 
 
-        const riderBusy =
-
-          rider.busy ===
-          true
-
-          ||
-
-          !!String(
-            rider.currentOrderId ||
-            ''
-          ).trim();
-
-
         if (
-          !riderBusy
+          state ===
+          'available'
         ) {
 
           region.availableRiders +=
+            1;
+
+        }
+
+
+        if (
+          state ===
+          'busy'
+        ) {
+
+          region.busyRiders +=
+            1;
+
+        }
+
+
+        if (
+          state ===
+          'issue'
+        ) {
+
+          region.issueRiders +=
             1;
 
         }
@@ -7923,21 +8141,49 @@ app.get('/api/dispatch/regions', async (req, res) => {
       Array.from(
         regionMap.values()
       )
+
       .map(
         region => {
+
+
+          const demand =
+
+            Number(
+              region.waitingOrders ||
+              0
+            );
+
+
+          const supply =
+
+            Number(
+              region.availableRiders ||
+              0
+            );
+
 
           let supplyStatus =
             'normal';
 
 
+          let supplyLabel =
+            '供需正常';
+
+
+          let shortage =
+            0;
+
+
+          // 有需求但完全沒有可接小U
+
           if (
 
-            region.waitingOrders >
+            demand >
             0
 
             &&
 
-            region.availableRiders ===
+            supply ===
             0
 
           ) {
@@ -7945,54 +8191,271 @@ app.get('/api/dispatch/regions', async (req, res) => {
             supplyStatus =
               'critical';
 
+            supplyLabel =
+              '運力不足';
+
+            shortage =
+              demand;
+
           }
+
+          // 待接訂單比可接小U多
 
           else if (
 
-            region.waitingOrders >
-
-            region.availableRiders
+            demand >
+            supply
 
           ) {
 
             supplyStatus =
               'tight';
 
+            supplyLabel =
+              '需求偏高';
+
+            shortage =
+
+              demand
+
+              -
+
+              supply;
+
           }
+
+          // 沒有等待訂單，但可接小U很多
+
+          else if (
+
+            demand ===
+            0
+
+            &&
+
+            supply >
+            0
+
+          ) {
+
+            supplyStatus =
+              'surplus';
+
+            supplyLabel =
+              '運力充足';
+
+          }
+
+
+          const supplyDemandRatio =
+
+            demand >
+            0
+
+              ?
+
+              Number(
+                (
+                  supply /
+                  demand
+                ).toFixed(
+                  2
+                )
+              )
+
+              :
+
+              null;
 
 
           return {
 
             ...region,
 
-            supplyStatus
+            demand,
+
+            supply,
+
+            shortage,
+
+            supplyDemandRatio,
+
+            supplyStatus,
+
+            supplyLabel
 
           };
 
         }
 
       )
+
       .sort(
         (
           a,
           b
-        ) =>
+        ) => {
 
-          b.waitingOrders
 
-          -
+          // critical 優先
+          const rank = {
 
-          a.waitingOrders
+            critical:
+              4,
+
+            tight:
+              3,
+
+            normal:
+              2,
+
+            surplus:
+              1
+
+          };
+
+
+          const rankDiff =
+
+            (
+              rank[
+                b.supplyStatus
+              ]
+
+              ||
+
+              0
+            )
+
+            -
+
+            (
+              rank[
+                a.supplyStatus
+              ]
+
+              ||
+
+              0
+            );
+
+
+          if (
+            rankDiff !==
+            0
+          ) {
+
+            return rankDiff;
+
+          }
+
+
+          return (
+
+            b.waitingOrders
+
+            -
+
+            a.waitingOrders
+
+          );
+
+        }
       );
 
+
+    // ========================================================
+    // 全區總覽
+    // ========================================================
+
+    const totals =
+
+      regions.reduce(
+
+        (
+          total,
+          region
+        ) => {
+
+
+          total.waitingOrders +=
+
+            region.waitingOrders;
+
+
+          total.activeOrders +=
+
+            region.activeOrders;
+
+
+          total.onlineRiders +=
+
+            region.onlineRiders;
+
+
+          total.availableRiders +=
+
+            region.availableRiders;
+
+
+          total.busyRiders +=
+
+            region.busyRiders;
+
+
+          total.issueRiders +=
+
+            region.issueRiders;
+
+
+          return total;
+
+        },
+
+        {
+
+          waitingOrders:
+            0,
+
+          activeOrders:
+            0,
+
+          onlineRiders:
+            0,
+
+          availableRiders:
+            0,
+
+          busyRiders:
+            0,
+
+          issueRiders:
+            0
+
+        }
+
+      );
+
+
+    // ========================================================
+    // Response
+    // ========================================================
 
     return res.json({
 
       success:
         true,
 
+      version:
+        'V3-regions',
+
       generatedAtMs:
         nowMs,
+
+      totals,
+
+      count:
+        regions.length,
 
       regions
 
