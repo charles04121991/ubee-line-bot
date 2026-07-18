@@ -6791,6 +6791,1244 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
 
 });
 
+// ============================================================
+// UBee V3 調度中心：即時訂單 API
+// ============================================================
+
+app.get('/api/dispatch/orders', async (req, res) => {
+
+  try {
+
+    const nowMs = Date.now();
+
+    const toMs = value => {
+
+      if (!value) return 0;
+
+      if (
+        typeof value.toDate ===
+        'function'
+      ) {
+        return value.toDate().getTime();
+      }
+
+      if (
+        typeof value.seconds ===
+        'number'
+      ) {
+        return value.seconds * 1000;
+      }
+
+      if (
+        typeof value._seconds ===
+        'number'
+      ) {
+        return value._seconds * 1000;
+      }
+
+      if (
+        typeof value ===
+        'number'
+      ) {
+        return value;
+      }
+
+      const parsed =
+        new Date(value).getTime();
+
+      return Number.isFinite(parsed)
+        ? parsed
+        : 0;
+
+    };
+
+
+    const waitingStatuses =
+      new Set([
+        'pending',
+        'waiting',
+        'searching',
+        'dispatching',
+        'redispatching'
+      ]);
+
+
+    const activeStatuses =
+      new Set([
+        'accepted',
+        'heading_to_pickup',
+        'arrived_pickup',
+        'picked_up',
+        'heading_to_dropoff',
+        'arrived_dropoff'
+      ]);
+
+
+    const orderSnap =
+      await db
+        .collection('orders')
+        .limit(1000)
+        .get();
+
+
+    const orders =
+      orderSnap.docs
+        .map(
+          doc => {
+
+            const order =
+              doc.data() ||
+              {};
+
+            const createdAtMs =
+
+              Number(
+                order.createdAtMs ||
+                order.orderCreatedAtMs ||
+                order.submittedAtMs ||
+                0
+              )
+
+              ||
+
+              toMs(
+                order.createdAt
+              )
+
+              ||
+
+              toMs(
+                order.orderCreatedAt
+              )
+
+              ||
+
+              toMs(
+                order.submittedAt
+              );
+
+
+            const status =
+              String(
+                order.status ||
+                ''
+              ).trim();
+
+
+            const ageMs =
+              createdAtMs
+                ? nowMs - createdAtMs
+                : 0;
+
+
+            let riskLevel =
+              'low';
+
+            let riskReason =
+              '目前正常';
+
+
+            if (
+              waitingStatuses.has(status) &&
+              ageMs >=
+              5 * 60 * 1000
+            ) {
+
+              riskLevel =
+                'high';
+
+              riskReason =
+                '等待接單超過 5 分鐘';
+
+            }
+
+            else if (
+              waitingStatuses.has(status) &&
+              ageMs >=
+              3 * 60 * 1000
+            ) {
+
+              riskLevel =
+                'warning';
+
+              riskReason =
+                '等待接單超過 3 分鐘';
+
+            }
+
+
+            return {
+
+              id:
+                doc.id,
+
+              status,
+
+              statusLabel:
+
+                typeof getStatusLabel ===
+                'function'
+
+                  ?
+
+                  getStatusLabel(status)
+
+                  :
+
+                  status,
+
+
+              pickupAddress:
+                order.pickupAddress ||
+                '',
+
+              dropoffAddress:
+                order.dropoffAddress ||
+                '',
+
+
+              pickupLat:
+
+                order.pickupLat
+
+                ??
+
+                null,
+
+              pickupLng:
+
+                order.pickupLng
+
+                ??
+
+                null,
+
+
+              dropoffLat:
+
+                order.dropoffLat
+
+                ??
+
+                null,
+
+              dropoffLng:
+
+                order.dropoffLng
+
+                ??
+
+                null,
+
+
+              total:
+
+                Number(
+
+                  order.total
+
+                  ||
+
+                  order.customerPayableTotal
+
+                  ||
+
+                  order.finalTotal
+
+                  ||
+
+                  0
+
+                ),
+
+
+              riderId:
+
+                order.riderId
+
+                ||
+
+                order.riderDocId
+
+                ||
+
+                '',
+
+
+              riderName:
+
+                order.riderName
+
+                ||
+
+                order.driverName
+
+                ||
+
+                '',
+
+
+              createdAtMs,
+
+              ageMs,
+
+              riskLevel,
+
+              riskReason,
+
+
+              waiting:
+
+                waitingStatuses.has(
+                  status
+                ),
+
+              active:
+
+                activeStatuses.has(
+                  status
+                )
+
+            };
+
+          }
+        )
+
+        .filter(
+          order =>
+
+            order.waiting
+
+            ||
+
+            order.active
+        )
+
+        .sort(
+          (
+            a,
+            b
+          ) =>
+
+            b.createdAtMs
+
+            -
+
+            a.createdAtMs
+        );
+
+
+    return res.json({
+
+      success:
+        true,
+
+      generatedAtMs:
+        nowMs,
+
+      count:
+        orders.length,
+
+      orders:
+
+        orders.slice(
+          0,
+          300
+        )
+
+    });
+
+
+  } catch (err) {
+
+    console.error(
+
+      '❌ UBee V3 dispatch/orders 讀取失敗：',
+
+      err
+
+    );
+
+
+    return res
+      .status(500)
+      .json({
+
+        success:
+          false,
+
+        message:
+          '即時訂單讀取失敗',
+
+        error:
+          err.message
+
+      });
+
+  }
+
+});
+
+// ============================================================
+// UBee V3 調度中心：小U狀態與位置 API
+// ============================================================
+
+app.get('/api/dispatch/riders', async (req, res) => {
+
+  try {
+
+    const nowMs =
+      Date.now();
+
+
+    const activeStatuses =
+      new Set([
+        'accepted',
+        'heading_to_pickup',
+        'arrived_pickup',
+        'picked_up',
+        'heading_to_dropoff',
+        'arrived_dropoff'
+      ]);
+
+
+    const orderSnap =
+      await db
+        .collection('orders')
+        .limit(1000)
+        .get();
+
+
+    const orderMap =
+      new Map();
+
+
+    orderSnap.docs.forEach(
+      doc => {
+
+        orderMap.set(
+
+          doc.id,
+
+          {
+
+            id:
+              doc.id,
+
+            ...(
+              doc.data() ||
+              {}
+            )
+
+          }
+
+        );
+
+      }
+    );
+
+
+    const riderSnap =
+      await db
+        .collection('riders')
+        .limit(1000)
+        .get();
+
+
+    const riders =
+      riderSnap.docs
+        .map(
+          doc => {
+
+            const rider =
+              doc.data() ||
+              {};
+
+
+            const riderId =
+
+              rider.riderId
+
+              ||
+
+              doc.id;
+
+
+            const locationUpdatedAtMs =
+
+              Number(
+
+                rider.locationUpdatedAtMs
+
+                ||
+
+                rider.lastActiveMs
+
+                ||
+
+                0
+
+              );
+
+
+            const locationFresh =
+
+              locationUpdatedAtMs >
+              0
+
+              &&
+
+              (
+                nowMs -
+                locationUpdatedAtMs
+              )
+
+              <=
+
+              5 *
+              60 *
+              1000;
+
+
+            const online =
+
+              rider.online ===
+              true
+
+              &&
+
+              locationFresh;
+
+
+            const currentOrderId =
+
+              String(
+
+                rider.currentOrderId
+
+                ||
+
+                ''
+
+              ).trim();
+
+
+            const currentOrder =
+
+              currentOrderId
+
+                ?
+
+                (
+                  orderMap.get(
+                    currentOrderId
+                  )
+
+                  ||
+
+                  null
+                )
+
+                :
+
+                null;
+
+
+            const currentOrderStatus =
+
+              currentOrder
+
+                ?
+
+                String(
+
+                  currentOrder.status
+
+                  ||
+
+                  ''
+
+                ).trim()
+
+                :
+
+                '';
+
+
+            const hasActiveOrder =
+
+              currentOrder
+
+              &&
+
+              activeStatuses.has(
+                currentOrderStatus
+              );
+
+
+            let state =
+              'available';
+
+
+            let stateIssue =
+              '';
+
+
+            if (
+              !online
+            ) {
+
+              state =
+                'offline';
+
+            }
+
+            else if (
+              hasActiveOrder
+            ) {
+
+              state =
+                'busy';
+
+            }
+
+            else if (
+              rider.busy === true ||
+              currentOrderId
+            ) {
+
+              state =
+                'issue';
+
+              stateIssue =
+                'rider_state_mismatch';
+
+            }
+
+
+            return {
+
+              riderId,
+
+              name:
+                rider.name ||
+                '',
+
+              phone:
+                rider.phone ||
+                '',
+
+              online,
+
+              state,
+
+              stateIssue,
+
+              busy:
+                hasActiveOrder,
+
+              rawBusy:
+
+                rider.busy ===
+                true,
+
+              currentOrderId,
+
+              currentOrderStatus,
+
+
+              district:
+
+                rider.district
+
+                ||
+
+                '',
+
+
+              serviceArea:
+
+                rider.serviceArea
+
+                ||
+
+                rider.area
+
+                ||
+
+                '',
+
+
+              currentLat:
+
+                Number.isFinite(
+                  Number(
+                    rider.currentLat
+                  )
+                )
+
+                  ?
+
+                  Number(
+                    rider.currentLat
+                  )
+
+                  :
+
+                  null,
+
+
+              currentLng:
+
+                Number.isFinite(
+                  Number(
+                    rider.currentLng
+                  )
+                )
+
+                  ?
+
+                  Number(
+                    rider.currentLng
+                  )
+
+                  :
+
+                  null,
+
+
+              locationUpdatedAtMs
+
+            };
+
+          }
+
+        )
+
+        .filter(
+          rider =>
+            rider.online
+        );
+
+
+    return res.json({
+
+      success:
+        true,
+
+      generatedAtMs:
+        nowMs,
+
+      summary:{
+
+        online:
+          riders.length,
+
+        available:
+
+          riders.filter(
+            rider =>
+              rider.state ===
+              'available'
+          ).length,
+
+        busy:
+
+          riders.filter(
+            rider =>
+              rider.state ===
+              'busy'
+          ).length,
+
+        issue:
+
+          riders.filter(
+            rider =>
+              rider.state ===
+              'issue'
+          ).length
+
+      },
+
+      riders:
+
+        riders.slice(
+          0,
+          500
+        )
+
+    });
+
+
+  } catch (err) {
+
+    console.error(
+
+      '❌ UBee V3 dispatch/riders 讀取失敗：',
+
+      err
+
+    );
+
+
+    return res
+      .status(500)
+      .json({
+
+        success:
+          false,
+
+        message:
+          '小U資料讀取失敗',
+
+        error:
+          err.message
+
+      });
+
+  }
+
+});
+
+// ============================================================
+// UBee V3 調度中心：區域供需 API
+// 第一階段先做真實即時統計
+// ============================================================
+
+app.get('/api/dispatch/regions', async (req, res) => {
+
+  try {
+
+    const nowMs =
+      Date.now();
+
+
+    const waitingStatuses =
+      new Set([
+        'pending',
+        'waiting',
+        'searching',
+        'dispatching',
+        'redispatching'
+      ]);
+
+
+    const activeStatuses =
+      new Set([
+        'accepted',
+        'heading_to_pickup',
+        'arrived_pickup',
+        'picked_up',
+        'heading_to_dropoff',
+        'arrived_dropoff'
+      ]);
+
+
+    const [
+      orderSnap,
+      riderSnap
+    ] =
+
+      await Promise.all([
+
+        db
+          .collection('orders')
+          .limit(1000)
+          .get(),
+
+        db
+          .collection('riders')
+          .limit(1000)
+          .get()
+
+      ]);
+
+
+    const regionMap =
+      new Map();
+
+
+    function ensureRegion(
+      name
+    ) {
+
+      const regionName =
+
+        String(
+          name ||
+          '未分類'
+        ).trim()
+
+        ||
+
+        '未分類';
+
+
+      if (
+        !regionMap.has(
+          regionName
+        )
+      ) {
+
+        regionMap.set(
+
+          regionName,
+
+          {
+
+            region:
+              regionName,
+
+            waitingOrders:
+              0,
+
+            activeOrders:
+              0,
+
+            onlineRiders:
+              0,
+
+            availableRiders:
+              0
+
+          }
+
+        );
+
+      }
+
+
+      return regionMap.get(
+        regionName
+      );
+
+    }
+
+
+    // ========================================================
+    // Orders
+    // ========================================================
+
+    orderSnap.docs.forEach(
+      doc => {
+
+        const order =
+          doc.data() ||
+          {};
+
+
+        const status =
+
+          String(
+
+            order.status
+
+            ||
+
+            ''
+
+          ).trim();
+
+
+        if (
+
+          !waitingStatuses.has(
+            status
+          )
+
+          &&
+
+          !activeStatuses.has(
+            status
+          )
+
+        ) {
+
+          return;
+
+        }
+
+
+        const regionName =
+
+          order.pickupDistrict
+
+          ||
+
+          order.district
+
+          ||
+
+          order.pickupArea
+
+          ||
+
+          '未分類';
+
+
+        const region =
+          ensureRegion(
+            regionName
+          );
+
+
+        if (
+          waitingStatuses.has(
+            status
+          )
+        ) {
+
+          region.waitingOrders +=
+            1;
+
+        }
+
+
+        if (
+          activeStatuses.has(
+            status
+          )
+        ) {
+
+          region.activeOrders +=
+            1;
+
+        }
+
+      }
+    );
+
+
+    // ========================================================
+    // Riders
+    // ========================================================
+
+    riderSnap.docs.forEach(
+      doc => {
+
+        const rider =
+          doc.data() ||
+          {};
+
+
+        const locationUpdatedAtMs =
+
+          Number(
+
+            rider.locationUpdatedAtMs
+
+            ||
+
+            rider.lastActiveMs
+
+            ||
+
+            0
+
+          );
+
+
+        const online =
+
+          rider.online ===
+          true
+
+          &&
+
+          locationUpdatedAtMs >
+          0
+
+          &&
+
+          (
+            nowMs -
+            locationUpdatedAtMs
+          )
+
+          <=
+
+          5 *
+          60 *
+          1000;
+
+
+        if (
+          !online
+        ) {
+
+          return;
+
+        }
+
+
+        const regionName =
+
+          rider.district
+
+          ||
+
+          rider.serviceArea
+
+          ||
+
+          rider.area
+
+          ||
+
+          '未分類';
+
+
+        const region =
+          ensureRegion(
+            regionName
+          );
+
+
+        region.onlineRiders +=
+          1;
+
+
+        const riderBusy =
+
+          rider.busy ===
+          true
+
+          ||
+
+          !!String(
+            rider.currentOrderId ||
+            ''
+          ).trim();
+
+
+        if (
+          !riderBusy
+        ) {
+
+          region.availableRiders +=
+            1;
+
+        }
+
+      }
+    );
+
+
+    // ========================================================
+    // 計算供需狀態
+    // ========================================================
+
+    const regions =
+
+      Array.from(
+        regionMap.values()
+      )
+      .map(
+        region => {
+
+          let supplyStatus =
+            'normal';
+
+
+          if (
+
+            region.waitingOrders >
+            0
+
+            &&
+
+            region.availableRiders ===
+            0
+
+          ) {
+
+            supplyStatus =
+              'critical';
+
+          }
+
+          else if (
+
+            region.waitingOrders >
+
+            region.availableRiders
+
+          ) {
+
+            supplyStatus =
+              'tight';
+
+          }
+
+
+          return {
+
+            ...region,
+
+            supplyStatus
+
+          };
+
+        }
+
+      )
+      .sort(
+        (
+          a,
+          b
+        ) =>
+
+          b.waitingOrders
+
+          -
+
+          a.waitingOrders
+      );
+
+
+    return res.json({
+
+      success:
+        true,
+
+      generatedAtMs:
+        nowMs,
+
+      regions
+
+    });
+
+
+  } catch (err) {
+
+    console.error(
+
+      '❌ UBee V3 dispatch/regions 讀取失敗：',
+
+      err
+
+    );
+
+
+    return res
+      .status(500)
+      .json({
+
+        success:
+          false,
+
+        message:
+          '區域供需資料讀取失敗',
+
+        error:
+          err.message
+
+      });
+
+  }
+
+});
+
 app.get('/dispatch.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
