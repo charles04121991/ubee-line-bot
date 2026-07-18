@@ -1910,10 +1910,13 @@ select{
 <script>
 
 /* ============================================================
-   UBee V3 STATE
+   UBee 智慧調度控制塔 V3
+   Multi API Data Layer
 ============================================================ */
 
 const state = {
+
+  dashboard:null,
 
   orders:[],
 
@@ -1921,9 +1924,13 @@ const state = {
 
   alerts:[],
 
+  regions:[],
+
   selectedOrderId:"",
 
-  filter:"all"
+  filter:"all",
+
+  loading:false
 
 };
 
@@ -1951,20 +1958,20 @@ function escapeHtml(value){
 
 
 /* ============================================================
-   AGE
+   TIME
 ============================================================ */
 
 function formatAge(ms){
 
   const timestamp =
     Number(
-      ms || 0
+      ms ||
+      0
     );
 
   if(
-    !Number.isFinite(
-      timestamp
-    ) ||
+    !Number.isFinite(timestamp)
+    ||
     timestamp <= 0
   ){
 
@@ -1972,16 +1979,29 @@ function formatAge(ms){
 
   }
 
+
   const seconds =
+
     Math.max(
+
       0,
+
       Math.floor(
+
         (
-          Date.now() -
+          Date.now()
+          -
           timestamp
-        ) / 1000
+        )
+
+        /
+
+        1000
+
       )
+
     );
+
 
   if(
     seconds < 60
@@ -1994,10 +2014,14 @@ function formatAge(ms){
 
   }
 
+
   const minutes =
+
     Math.floor(
-      seconds / 60
+      seconds /
+      60
     );
+
 
   if(
     minutes < 60
@@ -2010,10 +2034,17 @@ function formatAge(ms){
 
   }
 
-  return (
+
+  const hours =
+
     Math.floor(
-      minutes / 60
-    ) +
+      minutes /
+      60
+    );
+
+
+  return (
+    hours +
     " 小時前"
   );
 
@@ -2024,12 +2055,15 @@ function formatAge(ms){
    MONEY
 ============================================================ */
 
-function money(value){
+function formatMoney(value){
 
   const numberValue =
+
     Number(
-      value || 0
+      value ||
+      0
     );
+
 
   if(
     !Number.isFinite(
@@ -2040,6 +2074,7 @@ function money(value){
     return "0";
 
   }
+
 
   return Math.round(
     numberValue
@@ -2054,15 +2089,30 @@ function money(value){
    STATUS
 ============================================================ */
 
-function statusText(order){
+function getStatusText(order){
 
   if(
+    order &&
     order.statusLabel
   ){
 
     return order.statusLabel;
 
   }
+
+
+  const status =
+
+    String(
+
+      order?.status
+
+      ||
+
+      ""
+
+    ).trim();
+
 
   const map = {
 
@@ -2088,7 +2138,7 @@ function statusText(order){
       "前往取件",
 
     arrived_pickup:
-      "抵達取件",
+      "抵達取件點",
 
     picked_up:
       "已取件",
@@ -2107,17 +2157,16 @@ function statusText(order){
 
   };
 
+
   return (
 
     map[
-      String(
-        order.status || ""
-      ).trim()
+      status
     ]
 
     ||
 
-    order.status
+    status
 
     ||
 
@@ -2129,10 +2178,20 @@ function statusText(order){
 
 
 /* ============================================================
-   STATUS GROUP
+   ORDER STATUS GROUP
 ============================================================ */
 
-function isWaiting(order){
+function isWaitingOrder(order){
+
+  if(
+    order?.waiting ===
+    true
+  ){
+
+    return true;
+
+  }
+
 
   return [
 
@@ -2149,7 +2208,8 @@ function isWaiting(order){
   ].includes(
 
     String(
-      order.status || ""
+      order?.status ||
+      ""
     )
 
   );
@@ -2157,7 +2217,17 @@ function isWaiting(order){
 }
 
 
-function isActive(order){
+function isActiveOrder(order){
+
+  if(
+    order?.active ===
+    true
+  ){
+
+    return true;
+
+  }
+
 
   return [
 
@@ -2176,7 +2246,8 @@ function isActive(order){
   ].includes(
 
     String(
-      order.status || ""
+      order?.status ||
+      ""
     )
 
   );
@@ -2185,43 +2256,138 @@ function isActive(order){
 
 
 /* ============================================================
-   V3 BASIC RISK ENGINE
-   目前先使用真實等待時間規則
+   RISK
 ============================================================ */
 
-function deriveRisk(order){
+function getOrderRisk(order){
 
-  const minutes =
+  if(
+    order?.riskLevel
+  ){
 
-    order.createdAtMs
+    const risk =
 
-      ?
+      String(
+        order.riskLevel
+      );
 
-      Math.max(
-        0,
-        (
-          Date.now() -
-          Number(
-            order.createdAtMs
-          )
-        ) / 60000
-      )
 
-      :
+    if(
+      risk ===
+      "high"
+    ){
 
-      0;
+      return {
+
+        level:
+          "high",
+
+        label:
+          "高風險",
+
+        reason:
+
+          order.riskReason
+
+          ||
+
+          "需要優先處理"
+
+      };
+
+    }
+
+
+    if(
+      risk ===
+      "warning"
+      ||
+      risk ===
+      "mid"
+    ){
+
+      return {
+
+        level:
+          "mid",
+
+        label:
+          "注意",
+
+        reason:
+
+          order.riskReason
+
+          ||
+
+          "需要關注"
+
+      };
+
+    }
+
+  }
+
+
+  const createdAtMs =
+
+    Number(
+      order?.createdAtMs ||
+      0
+    );
 
 
   if(
-    isWaiting(order) &&
-    minutes >= 5
+    createdAtMs <= 0
   ){
 
     return {
 
-      level:"high",
+      level:
+        "low",
 
-      label:"高風險",
+      label:
+        "正常",
+
+      reason:
+        "目前正常"
+
+    };
+
+  }
+
+
+  const ageMs =
+
+    Date.now()
+
+    -
+
+    createdAtMs;
+
+
+  if(
+
+    isWaitingOrder(
+      order
+    )
+
+    &&
+
+    ageMs >=
+    5 *
+    60 *
+    1000
+
+  ){
+
+    return {
+
+      level:
+        "high",
+
+      label:
+        "高風險",
 
       reason:
         "等待接單已超過 5 分鐘"
@@ -2232,15 +2398,27 @@ function deriveRisk(order){
 
 
   if(
-    isWaiting(order) &&
-    minutes >= 3
+
+    isWaitingOrder(
+      order
+    )
+
+    &&
+
+    ageMs >=
+    3 *
+    60 *
+    1000
+
   ){
 
     return {
 
-      level:"mid",
+      level:
+        "mid",
 
-      label:"注意",
+      label:
+        "注意",
 
       reason:
         "等待接單已超過 3 分鐘"
@@ -2252,9 +2430,11 @@ function deriveRisk(order){
 
   return {
 
-    level:"low",
+    level:
+      "low",
 
-    label:"正常",
+    label:
+      "正常",
 
     reason:
       "目前未偵測到明顯風險"
@@ -2265,70 +2445,196 @@ function deriveRisk(order){
 
 
 /* ============================================================
+   API
+============================================================ */
+
+async function fetchJson(
+  url
+){
+
+  const response =
+
+    await fetch(
+
+      url,
+
+      {
+
+        method:
+          "GET",
+
+        cache:
+          "no-store",
+
+        headers:{
+
+          Accept:
+            "application/json"
+
+        }
+
+      }
+
+    );
+
+
+  let data;
+
+
+  try{
+
+    data =
+
+      await response.json();
+
+  }catch(error){
+
+    throw new Error(
+
+      url +
+
+      " 回傳格式錯誤"
+
+    );
+
+  }
+
+
+  if(
+
+    !response.ok
+
+    ||
+
+    data?.success !==
+    true
+
+  ){
+
+    throw new Error(
+
+      data?.message
+
+      ||
+
+      url +
+
+      " 讀取失敗"
+
+    );
+
+  }
+
+
+  return data;
+
+}
+
+
+/* ============================================================
    SUMMARY
 ============================================================ */
 
-function renderSummary(
-  summary = {}
-){
+function renderSummary(){
 
-  document.getElementById(
-    "online"
-  ).textContent =
+  const summary =
+
+    state.dashboard?.summary
+
+    ||
+
+    {};
+
+
+  const riderSummary =
+
+    state.riderSummary
+
+    ||
+
+    {};
+
+
+  const onlineValue =
 
     Number(
-      summary.onlineRiders ||
+
+      riderSummary.online
+
+      ??
+
+      summary.onlineRiders
+
+      ??
+
       0
+
     );
 
 
-  document.getElementById(
-    "available"
-  ).textContent =
+  const availableValue =
 
     Number(
-      summary.availableRiders ||
+
+      riderSummary.available
+
+      ??
+
+      summary.availableRiders
+
+      ??
+
       0
+
     );
 
 
-  document.getElementById(
-    "waiting"
-  ).textContent =
-
-    Number(
-      summary.waitingOrders ||
-      0
-    );
-
-
-  document.getElementById(
-    "active"
-  ).textContent =
-
-    Number(
-      summary.activeOrders ||
-      0
-    );
-
-
-  document.getElementById(
-    "completed"
-  ).textContent =
-
-    Number(
-      summary.todayCompleted ||
-      0
-    );
-
-
-  const highRiskCount =
+  const waitingValue =
 
     state.orders.filter(
 
       order =>
 
-        deriveRisk(
+        isWaitingOrder(
+          order
+        )
+
+    ).length;
+
+
+  const activeValue =
+
+    state.orders.filter(
+
+      order =>
+
+        isActiveOrder(
+          order
+        )
+
+    ).length;
+
+
+  const completedValue =
+
+    Number(
+
+      summary.todayCompleted
+
+      ||
+
+      0
+
+    );
+
+
+  const highRiskValue =
+
+    state.orders.filter(
+
+      order =>
+
+        getOrderRisk(
           order
         ).level ===
         "high"
@@ -2337,38 +2643,66 @@ function renderSummary(
 
 
   document.getElementById(
+    "online"
+  ).textContent =
+
+    onlineValue;
+
+
+  document.getElementById(
+    "available"
+  ).textContent =
+
+    availableValue;
+
+
+  document.getElementById(
+    "waiting"
+  ).textContent =
+
+    waitingValue;
+
+
+  document.getElementById(
+    "active"
+  ).textContent =
+
+    activeValue;
+
+
+  document.getElementById(
+    "completed"
+  ).textContent =
+
+    completedValue;
+
+
+  document.getElementById(
     "highRisk"
   ).textContent =
 
-    highRiskCount;
+    highRiskValue;
 
 
-  const onlineCount =
+  const availabilityPercentage =
 
-    Number(
-      summary.onlineRiders ||
-      0
-    );
-
-
-  const availableCount =
-
-    Number(
-      summary.availableRiders ||
-      0
-    );
-
-
-  const percentage =
-
-    onlineCount > 0
+    onlineValue >
+    0
 
       ?
 
       Math.round(
-        availableCount /
-        onlineCount *
+
+        availableValue
+
+        /
+
+        onlineValue
+
+        *
+
         100
+
       )
 
       :
@@ -2376,39 +2710,62 @@ function renderSummary(
       0;
 
 
-  document.getElementById(
-    "availabilityBar"
-  ).style.width =
+  const bar =
 
-    percentage +
-    "%";
+    document.getElementById(
+      "availabilityBar"
+    );
 
 
-  document.getElementById(
-    "availabilityPct"
-  ).textContent =
+  if(
+    bar
+  ){
 
-    percentage +
-    "%";
+    bar.style.width =
+
+      availabilityPercentage +
+      "%";
+
+  }
+
+
+  const pct =
+
+    document.getElementById(
+      "availabilityPct"
+    );
+
+
+  if(
+    pct
+  ){
+
+    pct.textContent =
+
+      availabilityPercentage +
+      "%";
+
+  }
 
 }
 
 
 /* ============================================================
-   FILTER
+   ORDERS
 ============================================================ */
 
-function filteredOrders(){
+function getFilteredOrders(){
 
   return state.orders.filter(
     order => {
+
 
       if(
         state.filter ===
         "waiting"
       ){
 
-        return isWaiting(
+        return isWaitingOrder(
           order
         );
 
@@ -2420,7 +2777,7 @@ function filteredOrders(){
         "active"
       ){
 
-        return isActive(
+        return isActiveOrder(
           order
         );
 
@@ -2434,7 +2791,7 @@ function filteredOrders(){
 
         return (
 
-          deriveRisk(
+          getOrderRisk(
             order
           ).level ===
           "high"
@@ -2447,29 +2804,38 @@ function filteredOrders(){
       return true;
 
     }
+
   );
 
 }
 
 
-/* ============================================================
-   ORDERS
-============================================================ */
-
 function renderOrders(){
 
-  const list =
-    filteredOrders();
-
-
   const container =
+
     document.getElementById(
       "orders"
     );
 
 
   if(
-    list.length === 0
+    !container
+  ){
+
+    return;
+
+  }
+
+
+  const orders =
+
+    getFilteredOrders();
+
+
+  if(
+    orders.length ===
+    0
   ){
 
     container.innerHTML = `
@@ -2489,137 +2855,198 @@ function renderOrders(){
 
   container.innerHTML =
 
-    list.map(
-      order => {
+    orders
 
-        const risk =
-          deriveRisk(
-            order
-          );
+      .map(
+
+        order => {
 
 
-        const selected =
+          const risk =
 
-          state.selectedOrderId ===
-          order.id
-
-            ?
-
-            "selected"
-
-            :
-
-            "";
+            getOrderRisk(
+              order
+            );
 
 
-        return `
+          const selected =
 
-          <div
-            class="order-card ${selected}"
-            onclick="selectOrder('${escapeHtml(order.id)}')"
-          >
+            state.selectedOrderId ===
+            order.id
+
+              ?
+
+              "selected"
+
+              :
+
+              "";
 
 
-            <div class="row">
+          return `
 
-              <span class="order-id">
+            <div
 
+              class="
+                order-card
+                ${selected}
+              "
+
+              data-order-id="
                 ${escapeHtml(
                   order.id
                 )}
+              "
 
-              </span>
+            >
 
 
-              <span class="status">
+              <div class="row">
+
+
+                <span class="order-id">
+
+                  ${escapeHtml(
+                    order.id
+                  )}
+
+                </span>
+
+
+                <span class="status">
+
+                  ${escapeHtml(
+                    getStatusText(
+                      order
+                    )
+                  )}
+
+                </span>
+
+
+              </div>
+
+
+              <div class="route">
+
+                📍
 
                 ${escapeHtml(
-                  statusText(
-                    order
+                  order.pickupAddress
+                  ||
+                  "-"
+                )}
+
+                <br>
+
+                ↓
+
+                <br>
+
+                🏁
+
+                ${escapeHtml(
+                  order.dropoffAddress
+                  ||
+                  "-"
+                )}
+
+              </div>
+
+
+              <div
+                class="row"
+                style="
+                  margin-top:8px;
+                "
+              >
+
+
+                <span class="muted">
+
+                  NT$
+
+                  ${formatMoney(
+                    order.total
+                  )}
+
+                  ·
+
+                  ${escapeHtml(
+                    order.riderName
+                    ||
+                    "尚未接單"
+                  )}
+
+                </span>
+
+
+                <span
+                  class="
+                    risk-${risk.level}
+                  "
+                >
+
+                  ${escapeHtml(
+                    risk.label
+                  )}
+
+                </span>
+
+
+              </div>
+
+
+              <div class="muted">
+
+                建立
+
+                ${escapeHtml(
+                  formatAge(
+                    order.createdAtMs
                   )
                 )}
 
-              </span>
+              </div>
+
 
             </div>
 
+          `;
 
-            <div class="route">
+        }
 
-              📍
+      )
 
-              ${escapeHtml(
-                order.pickupAddress ||
-                "-"
-              )}
-
-              <br>
-
-              ↓
-
-              <br>
-
-              🏁
-
-              ${escapeHtml(
-                order.dropoffAddress ||
-                "-"
-              )}
-
-            </div>
+      .join("");
 
 
-            <div
-              class="row"
-              style="margin-top:8px"
-            >
+  container
+    .querySelectorAll(
+      ".order-card"
+    )
+    .forEach(
+      card => {
 
-              <span class="muted">
+        card.addEventListener(
 
-                NT$
+          "click",
 
-                ${money(
-                  order.total
-                )}
+          () => {
 
-                ·
+            selectOrder(
 
-                ${escapeHtml(
-                  order.riderName ||
-                  "尚未接單"
-                )}
+              card.dataset.orderId
 
-              </span>
+            );
 
+          }
 
-              <span
-                class="risk-${risk.level}"
-              >
-
-                ${risk.label}
-
-              </span>
-
-            </div>
-
-
-            <div class="muted">
-
-              建立
-
-              ${formatAge(
-                order.createdAtMs
-              )}
-
-            </div>
-
-          </div>
-
-        `;
+        );
 
       }
 
-    ).join("");
+    );
 
 }
 
@@ -2631,21 +3058,51 @@ function renderOrders(){
 function renderRiders(){
 
   const container =
+
     document.getElementById(
       "riders"
     );
 
 
-  document.getElementById(
-    "riderCountText"
-  ).textContent =
+  if(
+    !container
+  ){
 
-    state.riders.length +
-    " 位";
+    return;
+
+  }
+
+
+  const riders =
+
+    state.riders
+
+    ||
+
+    [];
+
+
+  const riderCountText =
+
+    document.getElementById(
+      "riderCountText"
+    );
 
 
   if(
-    state.riders.length ===
+    riderCountText
+  ){
+
+    riderCountText.textContent =
+
+      riders.length +
+      " 位";
+
+  }
+
+
+  if(
+    riders.length ===
     0
   ){
 
@@ -2666,75 +3123,57 @@ function renderRiders(){
 
   container.innerHTML =
 
-    state.riders
+    riders
+
       .slice(
         0,
-        30
+        100
       )
+
       .map(
+
         rider => {
 
 
-          const locationStale =
-
-            rider.locationUpdatedAtMs
-
-            &&
-
-            (
-              Date.now() -
-              Number(
-                rider.locationUpdatedAtMs
-              )
-            )
-
-            >
-
-            5 *
-            60 *
-            1000;
+          let stateText =
+            "可接單";
 
 
-          const stateText =
-
-            locationStale
-
-              ?
-
-              "定位過久"
-
-              :
-
-              rider.busy
-
-                ?
-
-                "任務中"
-
-                :
-
-                "可接單";
+          let dotClass =
+            "green";
 
 
-          const dotClass =
+          if(
+            rider.state ===
+            "busy"
+            ||
+            rider.busy ===
+            true
+          ){
 
-            locationStale
+            stateText =
+              "任務中";
 
-              ?
+            dotClass =
+              "blue";
 
-              "gray"
+          }
 
-              :
 
-              rider.busy
+          if(
+            rider.state ===
+            "issue"
+            ||
+            rider.stateIssue
+          ){
 
-                ?
+            stateText =
+              "狀態異常";
 
-                "blue"
+            dotClass =
+              "gray";
 
-                :
-
-                "green";
+          }
 
 
           return `
@@ -2744,10 +3183,14 @@ function renderRiders(){
 
               <div class="row">
 
+
                 <b>
 
                   <i
-                    class="dot ${dotClass}"
+                    class="
+                      dot
+                      ${dotClass}
+                    "
                   ></i>
 
                   ${escapeHtml(
@@ -2769,9 +3212,12 @@ function renderRiders(){
 
                 <span class="muted">
 
-                  ${stateText}
+                  ${escapeHtml(
+                    stateText
+                  )}
 
                 </span>
+
 
               </div>
 
@@ -2780,13 +3226,15 @@ function renderRiders(){
 
                 最後定位：
 
-                ${formatAge(
-                  rider.locationUpdatedAtMs
+                ${escapeHtml(
+                  formatAge(
+                    rider.locationUpdatedAtMs
+                  )
                 )}
 
-
                 ${
-                  rider.district ||
+                  rider.district
+                  ||
                   rider.serviceArea
 
                     ?
@@ -2794,8 +3242,13 @@ function renderRiders(){
                     " · " +
 
                     escapeHtml(
-                      rider.district ||
+
+                      rider.district
+
+                      ||
+
                       rider.serviceArea
+
                     )
 
                     :
@@ -2805,13 +3258,41 @@ function renderRiders(){
 
               </div>
 
+
+              ${
+                rider.currentOrderId
+
+                  ?
+
+                  `
+
+                  <div class="muted">
+
+                    任務：
+
+                    ${escapeHtml(
+                      rider.currentOrderId
+                    )}
+
+                  </div>
+
+                  `
+
+                  :
+
+                  ""
+              }
+
+
             </div>
 
           `;
 
         }
 
-      ).join("");
+      )
+
+      .join("");
 
 }
 
@@ -2822,87 +3303,152 @@ function renderRiders(){
 
 function renderAlerts(){
 
-  const derived =
-    [
-      ...state.alerts
-    ];
-
-
-  state.orders.forEach(
-    order => {
-
-      const risk =
-        deriveRisk(
-          order
-        );
-
-
-      if(
-
-        risk.level ===
-        "high"
-
-        &&
-
-        !derived.some(
-
-          alert =>
-
-            String(
-              alert.message ||
-              ""
-            ).includes(
-              order.id
-            )
-
-        )
-
-      ){
-
-        derived.push({
-
-          title:
-            "高風險訂單",
-
-          message:
-
-            order.id +
-
-            "：" +
-
-            risk.reason
-
-        });
-
-      }
-
-    }
-  );
-
-
-  document.getElementById(
-    "alertCountText"
-  ).textContent =
-
-    derived.length +
-    " 件";
-
-
-  document.getElementById(
-    "alerts"
-  ).textContent =
-
-    derived.length;
-
-
   const container =
+
     document.getElementById(
       "alertList"
     );
 
 
   if(
-    derived.length ===
+    !container
+  ){
+
+    return;
+
+  }
+
+
+  const allAlerts =
+
+    [
+      ...(
+        state.alerts
+        ||
+        []
+      )
+    ];
+
+
+  state.orders.forEach(
+    order => {
+
+
+      const risk =
+
+        getOrderRisk(
+          order
+        );
+
+
+      if(
+        risk.level !==
+        "high"
+      ){
+
+        return;
+
+      }
+
+
+      const exists =
+
+        allAlerts.some(
+          alert =>
+
+            String(
+
+              alert.orderId
+
+              ||
+
+              alert.message
+
+              ||
+
+              ""
+
+            ).includes(
+
+              String(
+                order.id
+              )
+
+            )
+
+        );
+
+
+      if(
+        !exists
+      ){
+
+        allAlerts.push({
+
+          type:
+            "high_risk_order",
+
+          severity:
+            "high",
+
+          orderId:
+            order.id,
+
+          title:
+            "高風險訂單",
+
+          message:
+
+            `${order.id}：${risk.reason}`
+
+        });
+
+      }
+
+    }
+
+  );
+
+
+  const alertCount =
+
+    document.getElementById(
+      "alertCountText"
+    );
+
+
+  if(
+    alertCount
+  ){
+
+    alertCount.textContent =
+
+      allAlerts.length +
+      " 件";
+
+  }
+
+
+  const topAlert =
+
+    document.getElementById(
+      "alerts"
+    );
+
+
+  if(
+    topAlert
+  ){
+
+    topAlert.textContent =
+
+      allAlerts.length;
+
+  }
+
+
+  if(
+    allAlerts.length ===
     0
   ){
 
@@ -2923,35 +3469,304 @@ function renderAlerts(){
 
   container.innerHTML =
 
-    derived
+    allAlerts
+
+      .slice(
+        0,
+        50
+      )
+
+      .map(
+
+        alert => `
+
+          <div class="alert-card">
+
+            <b>
+
+              ${escapeHtml(
+                alert.title
+                ||
+                "異常提醒"
+              )}
+
+            </b>
+
+
+            <div class="muted">
+
+              ${escapeHtml(
+                alert.message
+                ||
+                ""
+              )}
+
+            </div>
+
+          </div>
+
+        `
+
+      )
+
+      .join("");
+
+}
+
+
+/* ============================================================
+   REGIONS
+============================================================ */
+
+function renderRegions(){
+
+  const container =
+
+    document.getElementById(
+      "regionDemand"
+    );
+
+
+  if(
+    !container
+  ){
+
+    return;
+
+  }
+
+
+  const regions =
+
+    state.regions
+
+    ||
+
+    [];
+
+
+  if(
+    regions.length ===
+    0
+  ){
+
+    container.innerHTML = `
+
+      <div class="empty">
+
+        目前沒有可顯示的區域資料
+
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  container.innerHTML =
+
+    regions
+
       .slice(
         0,
         30
       )
+
       .map(
-        alert => {
+
+        region => {
+
+
+          let riskClass =
+            "risk-low";
+
+
+          if(
+            region.supplyStatus ===
+            "critical"
+          ){
+
+            riskClass =
+              "risk-high";
+
+          }
+
+
+          else if(
+            region.supplyStatus ===
+            "tight"
+          ){
+
+            riskClass =
+              "risk-mid";
+
+          }
+
+
+          const label =
+
+            region.supplyLabel
+
+            ||
+
+            (
+              region.supplyStatus ===
+              "critical"
+
+                ?
+
+                "運力不足"
+
+                :
+
+                region.supplyStatus ===
+                "tight"
+
+                  ?
+
+                  "需求偏高"
+
+                  :
+
+                  region.supplyStatus ===
+                  "surplus"
+
+                    ?
+
+                    "運力充足"
+
+                    :
+
+                    "供需正常"
+            );
+
 
           return `
 
-            <div class="alert-card">
+            <div class="region-card">
 
-              <b>
 
-                ${escapeHtml(
-                  alert.title ||
-                  "異常提醒"
-                )}
+              <div class="row">
 
-              </b>
+                <b>
+
+                  ${escapeHtml(
+                    region.region
+                    ||
+                    "未分類"
+                  )}
+
+                </b>
+
+
+                <span
+                  class="${riskClass}"
+                >
+
+                  ${escapeHtml(
+                    label
+                  )}
+
+                </span>
+
+              </div>
+
 
               <div class="muted">
 
-                ${escapeHtml(
-                  alert.message ||
-                  ""
+                待接訂單：
+
+                ${Number(
+                  region.waitingOrders
+                  ||
+                  0
+                )}
+
+                ·
+
+                進行中：
+
+                ${Number(
+                  region.activeOrders
+                  ||
+                  0
                 )}
 
               </div>
+
+
+              <div class="muted">
+
+                在線小U：
+
+                ${Number(
+                  region.onlineRiders
+                  ||
+                  0
+                )}
+
+                ·
+
+                可接：
+
+                ${Number(
+                  region.availableRiders
+                  ||
+                  0
+                )}
+
+                ·
+
+                任務中：
+
+                ${Number(
+                  region.busyRiders
+                  ||
+                  0
+                )}
+
+              </div>
+
+
+              ${
+                Number(
+                  region.issueRiders
+                  ||
+                  0
+                ) >
+                0
+
+                  ?
+
+                  `
+
+                  <div
+                    class="risk-mid"
+                    style="
+                      font-size:12px;
+                      margin-top:4px;
+                    "
+                  >
+
+                    ⚠
+
+                    ${Number(
+                      region.issueRiders
+                    )}
+
+                    位小U狀態異常
+
+                  </div>
+
+                  `
+
+                  :
+
+                  ""
+              }
+
 
             </div>
 
@@ -2959,13 +3774,15 @@ function renderAlerts(){
 
         }
 
-      ).join("");
+      )
+
+      .join("");
 
 }
 
 
 /* ============================================================
-   ORDER SELECTION / AI PANEL
+   SELECT ORDER
 ============================================================ */
 
 function selectOrder(
@@ -2973,6 +3790,7 @@ function selectOrder(
 ){
 
   state.selectedOrderId =
+
     orderId;
 
 
@@ -2980,12 +3798,20 @@ function selectOrder(
 
 
   const order =
+
     state.orders.find(
 
       item =>
 
-        item.id ===
-        orderId
+        String(
+          item.id
+        )
+
+        ===
+
+        String(
+          orderId
+        )
 
     );
 
@@ -3000,37 +3826,55 @@ function selectOrder(
 
 
   const risk =
-    deriveRisk(
+
+    getOrderRisk(
       order
     );
 
 
-  const riskTitle =
+  const aiPanel =
 
+    document.getElementById(
+      "aiPanel"
+    );
+
+
+  if(
+    !aiPanel
+  ){
+
+    return;
+
+  }
+
+
+  let riskTitle =
+    "目前正常";
+
+
+  if(
     risk.level ===
     "high"
+  ){
 
-      ?
+    riskTitle =
+      "高風險";
 
-      "高風險"
-
-      :
-
-      risk.level ===
-      "mid"
-
-        ?
-
-        "需要關注"
-
-        :
-
-        "目前正常";
+  }
 
 
-  document.getElementById(
-    "aiPanel"
-  ).innerHTML = `
+  else if(
+    risk.level ===
+    "mid"
+  ){
+
+    riskTitle =
+      "需要關注";
+
+  }
+
+
+  aiPanel.innerHTML = `
 
 
     <div class="ai-box">
@@ -3047,7 +3891,9 @@ function selectOrder(
 
       <div class="ai-big">
 
-        ${riskTitle}
+        ${escapeHtml(
+          riskTitle
+        )}
 
       </div>
 
@@ -3062,6 +3908,51 @@ function selectOrder(
 
         ${escapeHtml(
           risk.reason
+        )}
+
+      </div>
+
+
+    </div>
+
+
+    <div class="recommend-card">
+
+      <div class="row">
+
+        <b>
+
+          任務狀態
+
+        </b>
+
+        <span class="status">
+
+          ${escapeHtml(
+            getStatusText(
+              order
+            )
+          )}
+
+        </span>
+
+      </div>
+
+
+      <div class="muted">
+
+        ${escapeHtml(
+          order.pickupAddress
+          ||
+          "-"
+        )}
+
+        →
+
+        ${escapeHtml(
+          order.dropoffAddress
+          ||
+          "-"
         )}
 
       </div>
@@ -3081,7 +3972,7 @@ function selectOrder(
 
         <span class="status">
 
-          數據累積中
+          待第四步
 
         </span>
 
@@ -3090,13 +3981,13 @@ function selectOrder(
 
       <div class="muted">
 
-        待後端提供距離、
+        下一階段將串接距離、
 
         ETA、
 
-        完成率、
+        小U狀態、
 
-        接單率與候選小U排序後啟用。
+        服務區域與候選排序。
 
       </div>
 
@@ -3116,13 +4007,13 @@ function selectOrder(
         <span class="status">
 
           ${
-            isWaiting(
+            isWaitingOrder(
               order
             )
 
               ?
 
-              "待評估"
+              "分析中"
 
               :
 
@@ -3142,11 +4033,11 @@ function selectOrder(
 
             ?
 
-            "建議調度員優先查看此訂單；自動擴大範圍功能待後端接入。"
+            "此訂單應優先進入人工調度檢查。"
 
             :
 
-            "目前維持既有派單策略。"
+            "目前可維持既有自動派單流程。"
         }
 
       </div>
@@ -3158,37 +4049,46 @@ function selectOrder(
 
 
       <button
-        class="action-btn primary"
+        class="
+          action-btn
+          primary
+        "
         disabled
       >
 
-        採用 AI 建議
+        推薦最佳小U
 
-        （待後端）
+        （第四步啟用）
 
       </button>
 
 
       <button
-        class="action-btn secondary"
+        class="
+          action-btn
+          secondary
+        "
         disabled
       >
 
         指定小U
 
-        （待後端）
+        （第四步啟用）
 
       </button>
 
 
       <button
-        class="action-btn danger"
+        class="
+          action-btn
+          danger
+        "
         disabled
       >
 
         重新派單
 
-        （待後端）
+        （第四步啟用）
 
       </button>
 
@@ -3201,149 +4101,204 @@ function selectOrder(
 
 
 /* ============================================================
-   LOAD DASHBOARD
+   LOAD V3
 ============================================================ */
 
 async function loadDashboard(){
 
+  if(
+    state.loading
+  ){
+
+    return;
+
+  }
+
+
+  state.loading =
+    true;
+
+
   try{
 
 
-    const response =
+    /*
+      四支 API 同時讀取
 
-      await fetch(
-
-        "/api/dispatch/dashboard",
-
-        {
-
-          cache:
-            "no-store",
-
-          headers:{
-
-            Accept:
-              "application/json"
-
-          }
-
-        }
-
-      );
+      dashboard
+      orders
+      riders
+      regions
+    */
 
 
-    const data =
+    const [
 
-      await response
-        .json()
-        .catch(
-          () => {
+      dashboardData,
 
-            throw new Error(
-              "後端回傳資料格式錯誤"
-            );
+      ordersData,
 
-          }
-        );
+      ridersData,
 
+      regionsData
 
-    if(
+    ] =
 
-      !response.ok
+      await Promise.all([
 
-      ||
+        fetchJson(
+          "/api/dispatch/dashboard"
+        ),
 
-      data.success !==
-      true
+        fetchJson(
+          "/api/dispatch/orders"
+        ),
 
-    ){
+        fetchJson(
+          "/api/dispatch/riders"
+        ),
 
-      throw new Error(
+        fetchJson(
+          "/api/dispatch/regions"
+        )
 
-        data.message
-
-        ||
-
-        "調度中心資料讀取失敗"
-
-      );
-
-    }
+      ]);
 
 
-    state.orders =
+    /* Dashboard */
 
-      Array.isArray(
-        data.orders
-      )
+    state.dashboard =
 
-        ?
-
-        data.orders
-
-        :
-
-        [];
-
-
-    state.riders =
-
-      Array.isArray(
-        data.riders
-      )
-
-        ?
-
-        data.riders
-
-        :
-
-        [];
+      dashboardData;
 
 
     state.alerts =
 
       Array.isArray(
-        data.alerts
+        dashboardData.alerts
       )
 
         ?
 
-        data.alerts
+        dashboardData.alerts
 
         :
 
         [];
 
 
-    renderSummary(
-      data.summary ||
-      {}
-    );
+    /* Orders */
 
+    state.orders =
+
+      Array.isArray(
+        ordersData.orders
+      )
+
+        ?
+
+        ordersData.orders
+
+        :
+
+        [];
+
+
+    /* Riders */
+
+    state.riders =
+
+      Array.isArray(
+        ridersData.riders
+      )
+
+        ?
+
+        ridersData.riders
+
+        :
+
+        [];
+
+
+    state.riderSummary =
+
+      ridersData.summary
+
+      ||
+
+      {};
+
+
+    /* Regions */
+
+    state.regions =
+
+      Array.isArray(
+        regionsData.regions
+      )
+
+        ?
+
+        regionsData.regions
+
+        :
+
+        [];
+
+
+    state.regionTotals =
+
+      regionsData.totals
+
+      ||
+
+      {};
+
+
+    /* Render */
+
+    renderSummary();
 
     renderOrders();
 
-
     renderRiders();
-
 
     renderAlerts();
 
+    renderRegions();
 
-    document.getElementById(
-      "lastUpdate"
-    ).textContent =
 
-      "最後更新：" +
+    const lastUpdate =
 
-      new Date()
-        .toLocaleString(
-          "zh-TW",
-          {
-            hour12:false
-          }
-        );
+      document.getElementById(
+        "lastUpdate"
+      );
+
+
+    if(
+      lastUpdate
+    ){
+
+      lastUpdate.textContent =
+
+        "最後更新：" +
+
+        new Date()
+          .toLocaleString(
+
+            "zh-TW",
+
+            {
+
+              hour12:
+                false
+
+            }
+
+          );
+
+    }
 
 
   }catch(error){
@@ -3351,44 +4306,73 @@ async function loadDashboard(){
 
     console.error(
 
-      "UBee V3 調度中心讀取失敗：",
+      "❌ UBee V3 調度中心讀取失敗：",
 
       error
 
     );
 
 
-    document.getElementById(
-      "alertList"
-    ).innerHTML = `
+    const alertList =
 
-      <div class="alert-card">
+      document.getElementById(
+        "alertList"
+      );
 
-        <b>
 
-          資料讀取失敗
+    if(
+      alertList
+    ){
 
-        </b>
+      alertList.innerHTML = `
 
-        <div class="muted">
+        <div class="alert-card">
 
-          ${escapeHtml(
-            error.message ||
-            "未知錯誤"
-          )}
+          <b>
+
+            V3 資料讀取失敗
+
+          </b>
+
+          <div class="muted">
+
+            ${escapeHtml(
+              error.message
+              ||
+              "未知錯誤"
+            )}
+
+          </div>
 
         </div>
 
-      </div>
+      `;
 
-    `;
+    }
 
 
-    document.getElementById(
-      "lastUpdate"
-    ).textContent =
+    const lastUpdate =
 
-      "更新失敗";
+      document.getElementById(
+        "lastUpdate"
+      );
+
+
+    if(
+      lastUpdate
+    ){
+
+      lastUpdate.textContent =
+
+        "更新失敗";
+
+    }
+
+
+  }finally{
+
+    state.loading =
+      false;
 
   }
 
@@ -3407,7 +4391,9 @@ document
     button => {
 
       button.addEventListener(
+
         "click",
+
         () => {
 
 
@@ -3433,15 +4419,21 @@ document
 
           state.filter =
 
-            button.dataset.filter;
+            button.dataset.filter
+
+            ||
+
+            "all";
 
 
           renderOrders();
 
         }
+
       );
 
     }
+
   );
 
 
