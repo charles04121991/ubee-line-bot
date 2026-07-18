@@ -5,7 +5,6 @@ const fetch = require('node-fetch');
 const path = require('path');
 const admin = require('firebase-admin');
 const webpush = require('web-push');
-const crypto = require('crypto');
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -939,12 +938,64 @@ async function sendNewOrderPushToRiders(
     }
     
     // ==============================
-    // 2. LINE 群組新任務通知已停用
-    //
-    // LINE_ADMIN_GROUP_ID 只保留給「新騎士申請審核通知」。
-    // 新任務與重新轉派不再推送到審核群組或財務群組。
-    // 小U的 Web Push 與騎士端任務卡仍照常運作。
+    // 2. 原本 LINE 管理通知保留
     // ==============================
+    try {
+      const targetGroupId =
+        LINE_ADMIN_GROUP_ID ||
+        LINE_FINISH_GROUP_ID;
+
+      if (!targetGroupId) {
+        console.warn(
+          `UBee LINE 新任務通知略過：未設定 LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
+        );
+
+      } else {
+        await client.pushMessage(
+          targetGroupId,
+          {
+            type: "text",
+
+            text:
+`${isRedispatch
+  ? "🔁 UBee 跑腿任務重新轉派"
+  : "🔔 UBee 跑腿新任務通知"}
+
+${isRedispatch
+  ? "原接單騎士已取消，任務重新開放接單"
+  : "有新的跑腿任務等待接單"}
+
+📍取件：${pickup}
+🏁送達：${dropoff}
+💰騎士收入：$${fee}`
+          }
+        );
+
+        console.log(
+          `UBee LINE ${
+            isRedispatch
+              ? "轉派"
+              : "新任務"
+          }通知已送出：${orderId}`
+        );
+      }
+
+    } catch (lineErr) {
+      console.error(
+        "UBee LINE 新任務通知失敗:",
+        {
+          orderId,
+
+          statusCode:
+            lineErr?.statusCode ||
+            lineErr?.response?.status,
+
+          statusMessage:
+            lineErr?.statusMessage ||
+            lineErr?.message,
+        }
+      );
+    }
 
       return {
       success: true,
@@ -5652,2853 +5703,6 @@ app.get('/order.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'order.html'));
 });
 
-// ============================================================
-// UBee 智慧調度中心 V3：Dashboard 基礎資料 API
-// 第一階段：精準訂單 / 小U狀態 / 異常偵測
-// ============================================================
-
-app.get('/api/dispatch/dashboard', async (req, res) => {
-
-  try {
-
-    const nowMs =
-      Date.now();
-
-    const TAIPEI_OFFSET_MS =
-      8 * 60 * 60 * 1000;
-
-    const taipeiNow =
-      new Date(
-        nowMs +
-        TAIPEI_OFFSET_MS
-      );
-
-    const todayStartMs =
-      Date.UTC(
-        taipeiNow.getUTCFullYear(),
-        taipeiNow.getUTCMonth(),
-        taipeiNow.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-      -
-      TAIPEI_OFFSET_MS;
-
-
-    // ========================================================
-    // 時間轉毫秒
-    // ========================================================
-
-    const toMs = value => {
-
-      if (!value) {
-        return 0;
-      }
-
-      if (
-        typeof value.toDate ===
-        'function'
-      ) {
-
-        return value
-          .toDate()
-          .getTime();
-
-      }
-
-      if (
-        typeof value.seconds ===
-        'number'
-      ) {
-
-        return (
-          value.seconds *
-          1000
-        );
-
-      }
-
-      if (
-        typeof value._seconds ===
-        'number'
-      ) {
-
-        return (
-          value._seconds *
-          1000
-        );
-
-      }
-
-      if (
-        typeof value ===
-        'number'
-      ) {
-
-        return value;
-
-      }
-
-      const parsed =
-        new Date(
-          value
-        ).getTime();
-
-      return Number.isFinite(
-        parsed
-      )
-        ?
-        parsed
-        :
-        0;
-
-    };
-
-
-    // ========================================================
-    // 訂單狀態群組
-    // ========================================================
-
-    const waitingStatuses =
-      new Set([
-        'pending',
-        'waiting',
-        'searching',
-        'dispatching',
-        'redispatching'
-      ]);
-
-
-    const activeStatuses =
-      new Set([
-        'accepted',
-        'heading_to_pickup',
-        'arrived_pickup',
-        'picked_up',
-        'heading_to_dropoff',
-        'arrived_dropoff'
-      ]);
-
-
-    const completedStatuses =
-      new Set([
-        'completed'
-      ]);
-
-
-    // ========================================================
-    // 先讀取訂單
-    // 重要：必須先讀訂單，才能正確判斷 rider 是否真的忙碌
-    // ========================================================
-
-    const orderSnap =
-      await db
-        .collection('orders')
-        .limit(1000)
-        .get();
-
-
-    const allOrders =
-      orderSnap.docs.map(
-        doc => ({
-          id:
-            doc.id,
-
-          ...(
-            doc.data() ||
-            {}
-          )
-        })
-      );
-
-
-    // 建立訂單 Map
-    // currentOrderId 可以快速核對實際訂單
-
-    const orderMap =
-      new Map();
-
-    allOrders.forEach(
-      order => {
-
-        orderMap.set(
-          String(
-            order.id
-          ),
-          order
-        );
-
-      }
-    );
-
-
-    // ========================================================
-    // 訂單時間
-    // ========================================================
-
-    const orderTimeMs = order =>
-
-      Number(
-        order.createdAtMs ||
-        order.orderCreatedAtMs ||
-        order.submittedAtMs ||
-        0
-      )
-
-      ||
-
-      toMs(
-        order.createdAt
-      )
-
-      ||
-
-      toMs(
-        order.orderCreatedAt
-      )
-
-      ||
-
-      toMs(
-        order.submittedAt
-      );
-
-
-    const completedTimeMs = order =>
-
-      Number(
-        order.completedAtMs ||
-        0
-      )
-
-      ||
-
-      toMs(
-        order.completedAt
-      )
-
-      ||
-
-      toMs(
-        order.statusTimes &&
-        order.statusTimes.completed
-      );
-
-
-    // ========================================================
-    // 讀取小U
-    // ========================================================
-
-    const riderSnap =
-      await db
-        .collection('riders')
-        .limit(1000)
-        .get();
-
-
-    const riderStateAlerts =
-      [];
-
-
-    const riders =
-      riderSnap.docs
-        .map(
-          doc => {
-
-            const rider =
-              doc.data() ||
-              {};
-
-
-            const riderId =
-
-              rider.riderId
-
-              ||
-
-              doc.id;
-
-
-            const locationUpdatedAtMs =
-
-              Number(
-
-                rider.locationUpdatedAtMs
-
-                ||
-
-                rider.lastActiveMs
-
-                ||
-
-                0
-
-              );
-
-
-            // GPS / 活躍時間
-            // 5 分鐘內才算即時在線
-
-            const isLocationFresh =
-
-              locationUpdatedAtMs >
-              0
-
-              &&
-
-              (
-                nowMs -
-                locationUpdatedAtMs
-              )
-
-              <=
-
-              5 *
-              60 *
-              1000;
-
-
-            const online =
-
-              rider.online ===
-              true
-
-              &&
-
-              isLocationFresh;
-
-
-            const currentOrderId =
-
-              String(
-
-                rider.currentOrderId
-
-                ||
-
-                ''
-
-              ).trim();
-
-
-            const rawBusy =
-
-              rider.busy ===
-              true;
-
-
-            // ==================================================
-            // 真實任務狀態判斷
-            // ==================================================
-
-            let currentOrder =
-              null;
-
-            let currentOrderStatus =
-              '';
-
-            let hasActiveOrder =
-              false;
-
-
-            if (
-              currentOrderId
-            ) {
-
-              currentOrder =
-                orderMap.get(
-                  currentOrderId
-                )
-
-                ||
-
-                null;
-
-
-              if (
-                currentOrder
-              ) {
-
-                currentOrderStatus =
-
-                  String(
-
-                    currentOrder.status
-
-                    ||
-
-                    ''
-
-                  ).trim();
-
-
-                hasActiveOrder =
-
-                  activeStatuses.has(
-                    currentOrderStatus
-                  );
-
-              }
-
-            }
-
-
-            // ==================================================
-            // 最終 busy
-            //
-            // 不再單純相信 rider.busy
-            // 只有真的存在有效進行中訂單才算任務中
-            // ==================================================
-
-            const busy =
-              hasActiveOrder;
-
-
-            // ==================================================
-            // 狀態異常偵測
-            // ==================================================
-
-            let stateIssue =
-              '';
-
-
-            // busy=true，但沒有 currentOrderId
-
-            if (
-              rawBusy &&
-              !currentOrderId
-            ) {
-
-              stateIssue =
-                'busy_true_without_order';
-
-              riderStateAlerts.push({
-
-                type:
-                  'rider_state_mismatch',
-
-                severity:
-                  'warning',
-
-                riderId,
-
-                title:
-                  '小U狀態不同步',
-
-                message:
-
-                  `${
-                    rider.name ||
-                    riderId
-                  } 顯示 busy=true，但沒有 currentOrderId`
-
-              });
-
-            }
-
-
-            // currentOrderId 有值，但訂單不存在
-
-            else if (
-              currentOrderId &&
-              !currentOrder
-            ) {
-
-              stateIssue =
-                'order_not_found';
-
-              riderStateAlerts.push({
-
-                type:
-                  'rider_order_missing',
-
-                severity:
-                  'warning',
-
-                riderId,
-
-                orderId:
-                  currentOrderId,
-
-                title:
-                  '小U任務資料異常',
-
-                message:
-
-                  `${
-                    rider.name ||
-                    riderId
-                  } 的 currentOrderId=${currentOrderId}，但找不到該訂單`
-
-              });
-
-            }
-
-
-            // 有 currentOrderId，但訂單已不是進行中
-
-            else if (
-              currentOrderId &&
-              currentOrder &&
-              !hasActiveOrder
-            ) {
-
-              stateIssue =
-                'stale_current_order';
-
-              riderStateAlerts.push({
-
-                type:
-                  'rider_stale_order',
-
-                severity:
-                  'warning',
-
-                riderId,
-
-                orderId:
-                  currentOrderId,
-
-                title:
-                  '小U任務狀態殘留',
-
-                message:
-
-                  `${
-                    rider.name ||
-                    riderId
-                  } 的 currentOrderId=${currentOrderId}，但訂單狀態為 ${currentOrderStatus || '未知'}`
-
-              });
-
-            }
-
-
-            // busy=true，但真實訂單不是 active
-
-            else if (
-              rawBusy &&
-              !hasActiveOrder
-            ) {
-
-              stateIssue =
-                'stale_busy';
-
-              riderStateAlerts.push({
-
-                type:
-                  'rider_busy_mismatch',
-
-                severity:
-                  'warning',
-
-                riderId,
-
-                title:
-                  '小U busy 狀態殘留',
-
-                message:
-
-                  `${
-                    rider.name ||
-                    riderId
-                  } 的 busy=true，但目前沒有有效進行中任務`
-
-              });
-
-            }
-
-
-            return {
-
-              riderId,
-
-              name:
-                rider.name ||
-                '',
-
-              phone:
-                rider.phone ||
-                '',
-
-              district:
-                rider.district ||
-                '',
-
-              serviceArea:
-
-                rider.serviceArea
-
-                ||
-
-                rider.area
-
-                ||
-
-                '',
-
-
-              online,
-
-              busy,
-
-              rawBusy,
-
-              hasActiveOrder,
-
-              stateIssue,
-
-
-              currentOrderId,
-
-              currentOrderStatus,
-
-
-              currentLat:
-
-                Number.isFinite(
-                  Number(
-                    rider.currentLat
-                  )
-                )
-
-                  ?
-
-                  Number(
-                    rider.currentLat
-                  )
-
-                  :
-
-                  null,
-
-
-              currentLng:
-
-                Number.isFinite(
-                  Number(
-                    rider.currentLng
-                  )
-                )
-
-                  ?
-
-                  Number(
-                    rider.currentLng
-                  )
-
-                  :
-
-                  null,
-
-
-              locationUpdatedAtMs
-
-            };
-
-          }
-
-        )
-
-        .filter(
-          rider =>
-            rider.online
-        );
-
-
-    // ========================================================
-    // 即時訂單
-    // ========================================================
-
-    const liveOrders =
-
-      allOrders
-
-        .filter(
-          order => {
-
-            const status =
-
-              String(
-
-                order.status
-
-                ||
-
-                ''
-
-              ).trim();
-
-
-            return (
-
-              waitingStatuses.has(
-                status
-              )
-
-              ||
-
-              activeStatuses.has(
-                status
-              )
-
-            );
-
-          }
-        )
-
-        .sort(
-          (
-            a,
-            b
-          ) =>
-
-            orderTimeMs(
-              b
-            )
-
-            -
-
-            orderTimeMs(
-              a
-            )
-        )
-
-        .slice(
-          0,
-          200
-        )
-
-        .map(
-          order => ({
-
-            id:
-              order.id,
-
-            status:
-              order.status ||
-              '',
-
-            statusLabel:
-
-              typeof getStatusLabel ===
-              'function'
-
-                ?
-
-                getStatusLabel(
-                  order.status
-                )
-
-                :
-
-                (
-                  order.status ||
-                  ''
-                ),
-
-
-            pickupAddress:
-              order.pickupAddress ||
-              '',
-
-            dropoffAddress:
-              order.dropoffAddress ||
-              '',
-
-
-            pickupLat:
-
-              order.pickupLat
-
-              ??
-
-              null,
-
-            pickupLng:
-
-              order.pickupLng
-
-              ??
-
-              null,
-
-
-            dropoffLat:
-
-              order.dropoffLat
-
-              ??
-
-              null,
-
-            dropoffLng:
-
-              order.dropoffLng
-
-              ??
-
-              null,
-
-
-            total:
-
-              Number(
-
-                order.total
-
-                ||
-
-                order.customerPayableTotal
-
-                ||
-
-                order.finalTotal
-
-                ||
-
-                0
-
-              ),
-
-
-            riderName:
-
-              order.riderName
-
-              ||
-
-              order.driverName
-
-              ||
-
-              '',
-
-
-            riderId:
-
-              order.riderId
-
-              ||
-
-              order.riderDocId
-
-              ||
-
-              '',
-
-
-            createdAtMs:
-
-              orderTimeMs(
-                order
-              )
-
-          })
-        );
-
-
-    // ========================================================
-    // 訂單分類
-    // ========================================================
-
-    const waitingOrders =
-
-      liveOrders.filter(
-        order =>
-
-          waitingStatuses.has(
-
-            String(
-              order.status ||
-              ''
-            ).trim()
-
-          )
-      );
-
-
-    const activeOrders =
-
-      liveOrders.filter(
-        order =>
-
-          activeStatuses.has(
-
-            String(
-              order.status ||
-              ''
-            ).trim()
-
-          )
-      );
-
-
-    const todayCompleted =
-
-      allOrders.filter(
-        order => {
-
-          const status =
-
-            String(
-
-              order.status
-
-              ||
-
-              ''
-
-            ).trim();
-
-
-          return (
-
-            completedStatuses.has(
-              status
-            )
-
-            &&
-
-            completedTimeMs(
-              order
-            )
-
-            >=
-
-            todayStartMs
-
-          );
-
-        }
-      ).length;
-
-
-    // ========================================================
-    // 異常中心
-    // ========================================================
-
-    const alerts =
-      [
-        ...riderStateAlerts
-      ];
-
-
-    waitingOrders.forEach(
-      order => {
-
-        const ageMs =
-
-          nowMs
-
-          -
-
-          Number(
-            order.createdAtMs ||
-            nowMs
-          );
-
-
-        if (
-          ageMs >=
-          5 *
-          60 *
-          1000
-        ) {
-
-          alerts.push({
-
-            type:
-              'waiting_5m',
-
-            severity:
-              'high',
-
-            orderId:
-              order.id,
-
-            title:
-              '超過 5 分鐘無人接單',
-
-            message:
-
-              `${order.id} 已等待 ${Math.floor(
-                ageMs /
-                60000
-              )} 分鐘`
-
-          });
-
-        }
-
-        else if (
-          ageMs >=
-          3 *
-          60 *
-          1000
-        ) {
-
-          alerts.push({
-
-            type:
-              'waiting_3m',
-
-            severity:
-              'warning',
-
-            orderId:
-              order.id,
-
-            title:
-              '超過 3 分鐘無人接單',
-
-            message:
-
-              `${order.id} 已等待 ${Math.floor(
-                ageMs /
-                60000
-              )} 分鐘`
-
-          });
-
-        }
-
-      }
-    );
-
-
-    // ========================================================
-    // 可接單小U
-    //
-    // 必須：
-    // online=true
-    // 沒有有效進行中訂單
-    // ========================================================
-
-    const availableRiders =
-
-      riders.filter(
-        rider =>
-          !rider.busy
-      );
-
-
-    // ========================================================
-    // Response
-    // ========================================================
-
-    return res.json({
-
-      success:
-        true,
-
-      version:
-        'V3-framework',
-
-      generatedAtMs:
-        nowMs,
-
-
-      summary:{
-
-        onlineRiders:
-          riders.length,
-
-        availableRiders:
-          availableRiders.length,
-
-        busyRiders:
-
-          riders.filter(
-            rider =>
-              rider.busy
-          ).length,
-
-        stateIssueRiders:
-
-          riders.filter(
-            rider =>
-              !!rider.stateIssue
-          ).length,
-
-        waitingOrders:
-          waitingOrders.length,
-
-        activeOrders:
-          activeOrders.length,
-
-        todayCompleted,
-
-        alertCount:
-          alerts.length
-
-      },
-
-
-      orders:
-        liveOrders,
-
-
-      riders:
-
-        riders.slice(
-          0,
-          300
-        ),
-
-
-      alerts:
-
-        alerts.slice(
-          0,
-          200
-        )
-
-    });
-
-
-  } catch (err) {
-
-    console.error(
-
-      '❌ UBee V3 調度中心 dashboard 讀取失敗：',
-
-      err
-
-    );
-
-
-    return res
-      .status(500)
-      .json({
-
-        success:
-          false,
-
-        message:
-
-          '調度中心資料讀取失敗，請稍後再試。',
-
-        error:
-
-          err.message
-
-      });
-
-  }
-
-});
-
-// ============================================================
-// UBee V3 調度中心：即時訂單 API
-// ============================================================
-
-app.get('/api/dispatch/orders', async (req, res) => {
-
-  try {
-
-    const nowMs = Date.now();
-
-    const toMs = value => {
-
-      if (!value) return 0;
-
-      if (
-        typeof value.toDate ===
-        'function'
-      ) {
-        return value.toDate().getTime();
-      }
-
-      if (
-        typeof value.seconds ===
-        'number'
-      ) {
-        return value.seconds * 1000;
-      }
-
-      if (
-        typeof value._seconds ===
-        'number'
-      ) {
-        return value._seconds * 1000;
-      }
-
-      if (
-        typeof value ===
-        'number'
-      ) {
-        return value;
-      }
-
-      const parsed =
-        new Date(value).getTime();
-
-      return Number.isFinite(parsed)
-        ? parsed
-        : 0;
-
-    };
-
-
-    const waitingStatuses =
-      new Set([
-        'pending',
-        'waiting',
-        'searching',
-        'dispatching',
-        'redispatching'
-      ]);
-
-
-    const activeStatuses =
-      new Set([
-        'accepted',
-        'heading_to_pickup',
-        'arrived_pickup',
-        'picked_up',
-        'heading_to_dropoff',
-        'arrived_dropoff'
-      ]);
-
-
-    const orderSnap =
-      await db
-        .collection('orders')
-        .limit(1000)
-        .get();
-
-
-    const orders =
-      orderSnap.docs
-        .map(
-          doc => {
-
-            const order =
-              doc.data() ||
-              {};
-
-            const createdAtMs =
-
-              Number(
-                order.createdAtMs ||
-                order.orderCreatedAtMs ||
-                order.submittedAtMs ||
-                0
-              )
-
-              ||
-
-              toMs(
-                order.createdAt
-              )
-
-              ||
-
-              toMs(
-                order.orderCreatedAt
-              )
-
-              ||
-
-              toMs(
-                order.submittedAt
-              );
-
-
-            const status =
-              String(
-                order.status ||
-                ''
-              ).trim();
-
-
-            const ageMs =
-              createdAtMs
-                ? nowMs - createdAtMs
-                : 0;
-
-
-            let riskLevel =
-              'low';
-
-            let riskReason =
-              '目前正常';
-
-
-            if (
-              waitingStatuses.has(status) &&
-              ageMs >=
-              5 * 60 * 1000
-            ) {
-
-              riskLevel =
-                'high';
-
-              riskReason =
-                '等待接單超過 5 分鐘';
-
-            }
-
-            else if (
-              waitingStatuses.has(status) &&
-              ageMs >=
-              3 * 60 * 1000
-            ) {
-
-              riskLevel =
-                'warning';
-
-              riskReason =
-                '等待接單超過 3 分鐘';
-
-            }
-
-
-            return {
-
-              id:
-                doc.id,
-
-              status,
-
-              statusLabel:
-
-                typeof getStatusLabel ===
-                'function'
-
-                  ?
-
-                  getStatusLabel(status)
-
-                  :
-
-                  status,
-
-
-              pickupAddress:
-                order.pickupAddress ||
-                '',
-
-              dropoffAddress:
-                order.dropoffAddress ||
-                '',
-
-
-              pickupLat:
-
-                order.pickupLat
-
-                ??
-
-                null,
-
-              pickupLng:
-
-                order.pickupLng
-
-                ??
-
-                null,
-
-
-              dropoffLat:
-
-                order.dropoffLat
-
-                ??
-
-                null,
-
-              dropoffLng:
-
-                order.dropoffLng
-
-                ??
-
-                null,
-
-
-              total:
-
-                Number(
-
-                  order.total
-
-                  ||
-
-                  order.customerPayableTotal
-
-                  ||
-
-                  order.finalTotal
-
-                  ||
-
-                  0
-
-                ),
-
-
-              riderId:
-
-                order.riderId
-
-                ||
-
-                order.riderDocId
-
-                ||
-
-                '',
-
-
-              riderName:
-
-                order.riderName
-
-                ||
-
-                order.driverName
-
-                ||
-
-                '',
-
-
-              createdAtMs,
-
-              ageMs,
-
-              riskLevel,
-
-              riskReason,
-
-
-              waiting:
-
-                waitingStatuses.has(
-                  status
-                ),
-
-              active:
-
-                activeStatuses.has(
-                  status
-                )
-
-            };
-
-          }
-        )
-
-        .filter(
-          order =>
-
-            order.waiting
-
-            ||
-
-            order.active
-        )
-
-        .sort(
-          (
-            a,
-            b
-          ) =>
-
-            b.createdAtMs
-
-            -
-
-            a.createdAtMs
-        );
-
-
-    return res.json({
-
-      success:
-        true,
-
-      generatedAtMs:
-        nowMs,
-
-      count:
-        orders.length,
-
-      orders:
-
-        orders.slice(
-          0,
-          300
-        )
-
-    });
-
-
-  } catch (err) {
-
-    console.error(
-
-      '❌ UBee V3 dispatch/orders 讀取失敗：',
-
-      err
-
-    );
-
-
-    return res
-      .status(500)
-      .json({
-
-        success:
-          false,
-
-        message:
-          '即時訂單讀取失敗',
-
-        error:
-          err.message
-
-      });
-
-  }
-
-});
-
-// ============================================================
-// UBee V3 調度中心：小U狀態與位置 API
-// ============================================================
-
-app.get('/api/dispatch/riders', async (req, res) => {
-
-  try {
-
-    const nowMs =
-      Date.now();
-
-
-    const activeStatuses =
-      new Set([
-        'accepted',
-        'heading_to_pickup',
-        'arrived_pickup',
-        'picked_up',
-        'heading_to_dropoff',
-        'arrived_dropoff'
-      ]);
-
-
-    const orderSnap =
-      await db
-        .collection('orders')
-        .limit(1000)
-        .get();
-
-
-    const orderMap =
-      new Map();
-
-
-    orderSnap.docs.forEach(
-      doc => {
-
-        orderMap.set(
-
-          doc.id,
-
-          {
-
-            id:
-              doc.id,
-
-            ...(
-              doc.data() ||
-              {}
-            )
-
-          }
-
-        );
-
-      }
-    );
-
-
-    const riderSnap =
-      await db
-        .collection('riders')
-        .limit(1000)
-        .get();
-
-
-    const riders =
-      riderSnap.docs
-        .map(
-          doc => {
-
-            const rider =
-              doc.data() ||
-              {};
-
-
-            const riderId =
-
-              rider.riderId
-
-              ||
-
-              doc.id;
-
-
-            const locationUpdatedAtMs =
-
-              Number(
-
-                rider.locationUpdatedAtMs
-
-                ||
-
-                rider.lastActiveMs
-
-                ||
-
-                0
-
-              );
-
-
-            const locationFresh =
-
-              locationUpdatedAtMs >
-              0
-
-              &&
-
-              (
-                nowMs -
-                locationUpdatedAtMs
-              )
-
-              <=
-
-              5 *
-              60 *
-              1000;
-
-
-            const online =
-
-              rider.online ===
-              true
-
-              &&
-
-              locationFresh;
-
-
-            const currentOrderId =
-
-              String(
-
-                rider.currentOrderId
-
-                ||
-
-                ''
-
-              ).trim();
-
-
-            const currentOrder =
-
-              currentOrderId
-
-                ?
-
-                (
-                  orderMap.get(
-                    currentOrderId
-                  )
-
-                  ||
-
-                  null
-                )
-
-                :
-
-                null;
-
-
-            const currentOrderStatus =
-
-              currentOrder
-
-                ?
-
-                String(
-
-                  currentOrder.status
-
-                  ||
-
-                  ''
-
-                ).trim()
-
-                :
-
-                '';
-
-
-            const hasActiveOrder =
-
-              currentOrder
-
-              &&
-
-              activeStatuses.has(
-                currentOrderStatus
-              );
-
-
-            let state =
-              'available';
-
-
-            let stateIssue =
-              '';
-
-
-            if (
-              !online
-            ) {
-
-              state =
-                'offline';
-
-            }
-
-            else if (
-              hasActiveOrder
-            ) {
-
-              state =
-                'busy';
-
-            }
-
-            else if (
-              rider.busy === true ||
-              currentOrderId
-            ) {
-
-              state =
-                'issue';
-
-              stateIssue =
-                'rider_state_mismatch';
-
-            }
-
-
-            return {
-
-              riderId,
-
-              name:
-                rider.name ||
-                '',
-
-              phone:
-                rider.phone ||
-                '',
-
-              online,
-
-              state,
-
-              stateIssue,
-
-              busy:
-                hasActiveOrder,
-
-              rawBusy:
-
-                rider.busy ===
-                true,
-
-              currentOrderId,
-
-              currentOrderStatus,
-
-
-              district:
-
-                rider.district
-
-                ||
-
-                '',
-
-
-              serviceArea:
-
-                rider.serviceArea
-
-                ||
-
-                rider.area
-
-                ||
-
-                '',
-
-
-              currentLat:
-
-                Number.isFinite(
-                  Number(
-                    rider.currentLat
-                  )
-                )
-
-                  ?
-
-                  Number(
-                    rider.currentLat
-                  )
-
-                  :
-
-                  null,
-
-
-              currentLng:
-
-                Number.isFinite(
-                  Number(
-                    rider.currentLng
-                  )
-                )
-
-                  ?
-
-                  Number(
-                    rider.currentLng
-                  )
-
-                  :
-
-                  null,
-
-
-              locationUpdatedAtMs
-
-            };
-
-          }
-
-        )
-
-        .filter(
-          rider =>
-            rider.online
-        );
-
-
-    return res.json({
-
-      success:
-        true,
-
-      generatedAtMs:
-        nowMs,
-
-      summary:{
-
-        online:
-          riders.length,
-
-        available:
-
-          riders.filter(
-            rider =>
-              rider.state ===
-              'available'
-          ).length,
-
-        busy:
-
-          riders.filter(
-            rider =>
-              rider.state ===
-              'busy'
-          ).length,
-
-        issue:
-
-          riders.filter(
-            rider =>
-              rider.state ===
-              'issue'
-          ).length
-
-      },
-
-      riders:
-
-        riders.slice(
-          0,
-          500
-        )
-
-    });
-
-
-  } catch (err) {
-
-    console.error(
-
-      '❌ UBee V3 dispatch/riders 讀取失敗：',
-
-      err
-
-    );
-
-
-    return res
-      .status(500)
-      .json({
-
-        success:
-          false,
-
-        message:
-          '小U資料讀取失敗',
-
-        error:
-          err.message
-
-      });
-
-  }
-
-});
-
-// ============================================================
-// UBee V3 調度中心：區域供需 API
-// 第一階段先做真實即時統計
-// ============================================================
-
-// ============================================================
-// UBee V3 調度中心：區域供需 API
-// 使用真實進行中訂單交叉驗證小U狀態
-// ============================================================
-
-app.get('/api/dispatch/regions', async (req, res) => {
-
-  try {
-
-    const nowMs =
-      Date.now();
-
-
-    // ========================================================
-    // 狀態群組
-    // ========================================================
-
-    const waitingStatuses =
-      new Set([
-        'pending',
-        'waiting',
-        'searching',
-        'dispatching',
-        'redispatching'
-      ]);
-
-
-    const activeStatuses =
-      new Set([
-        'accepted',
-        'heading_to_pickup',
-        'arrived_pickup',
-        'picked_up',
-        'heading_to_dropoff',
-        'arrived_dropoff'
-      ]);
-
-
-    // ========================================================
-    // 同時讀取訂單與小U
-    // ========================================================
-
-    const [
-      orderSnap,
-      riderSnap
-    ] =
-
-      await Promise.all([
-
-        db
-          .collection('orders')
-          .limit(1000)
-          .get(),
-
-        db
-          .collection('riders')
-          .limit(1000)
-          .get()
-
-      ]);
-
-
-    // ========================================================
-    // 建立訂單 Map
-    // ========================================================
-
-    const orderMap =
-      new Map();
-
-
-    const allOrders =
-      orderSnap.docs.map(
-        doc => {
-
-          const order = {
-
-            id:
-              doc.id,
-
-            ...(
-              doc.data() ||
-              {}
-            )
-
-          };
-
-
-          orderMap.set(
-
-            doc.id,
-
-            order
-
-          );
-
-
-          return order;
-
-        }
-      );
-
-
-    // ========================================================
-    // 區域容器
-    // ========================================================
-
-    const regionMap =
-      new Map();
-
-
-    function normalizeRegionName(
-      value
-    ) {
-
-      const text =
-        String(
-          value ||
-          ''
-        ).trim();
-
-
-      if (
-        !text
-      ) {
-
-        return '未分類';
-
-      }
-
-
-      return text;
-
-    }
-
-
-    function ensureRegion(
-      name
-    ) {
-
-      const regionName =
-        normalizeRegionName(
-          name
-        );
-
-
-      if (
-        !regionMap.has(
-          regionName
-        )
-      ) {
-
-        regionMap.set(
-
-          regionName,
-
-          {
-
-            region:
-              regionName,
-
-            waitingOrders:
-              0,
-
-            activeOrders:
-              0,
-
-            onlineRiders:
-              0,
-
-            availableRiders:
-              0,
-
-            busyRiders:
-              0,
-
-            issueRiders:
-              0
-
-          }
-
-        );
-
-      }
-
-
-      return regionMap.get(
-        regionName
-      );
-
-    }
-
-
-    // ========================================================
-    // 訂單 → 區域需求
-    // ========================================================
-
-    allOrders.forEach(
-      order => {
-
-        const status =
-          String(
-            order.status ||
-            ''
-          ).trim();
-
-
-        if (
-
-          !waitingStatuses.has(
-            status
-          )
-
-          &&
-
-          !activeStatuses.has(
-            status
-          )
-
-        ) {
-
-          return;
-
-        }
-
-
-        const regionName =
-
-          order.pickupDistrict
-
-          ||
-
-          order.pickupArea
-
-          ||
-
-          order.district
-
-          ||
-
-          order.area
-
-          ||
-
-          '未分類';
-
-
-        const region =
-          ensureRegion(
-            regionName
-          );
-
-
-        if (
-          waitingStatuses.has(
-            status
-          )
-        ) {
-
-          region.waitingOrders +=
-            1;
-
-        }
-
-
-        if (
-          activeStatuses.has(
-            status
-          )
-        ) {
-
-          region.activeOrders +=
-            1;
-
-        }
-
-      }
-    );
-
-
-    // ========================================================
-    // 小U → 區域供給
-    // ========================================================
-
-    riderSnap.docs.forEach(
-      doc => {
-
-        const rider =
-          doc.data() ||
-          {};
-
-
-        const riderId =
-
-          rider.riderId
-
-          ||
-
-          doc.id;
-
-
-        const locationUpdatedAtMs =
-
-          Number(
-
-            rider.locationUpdatedAtMs
-
-            ||
-
-            rider.lastActiveMs
-
-            ||
-
-            0
-
-          );
-
-
-        // 5 分鐘內有定位 / 活躍紀錄才算真正在線
-
-        const locationFresh =
-
-          locationUpdatedAtMs >
-          0
-
-          &&
-
-          (
-            nowMs -
-            locationUpdatedAtMs
-          )
-
-          <=
-
-          5 *
-          60 *
-          1000;
-
-
-        const online =
-
-          rider.online ===
-          true
-
-          &&
-
-          locationFresh;
-
-
-        if (
-          !online
-        ) {
-
-          return;
-
-        }
-
-
-        // ====================================================
-        // 真實任務狀態
-        // ====================================================
-
-        const currentOrderId =
-
-          String(
-
-            rider.currentOrderId
-
-            ||
-
-            ''
-
-          ).trim();
-
-
-        const currentOrder =
-
-          currentOrderId
-
-            ?
-
-            (
-              orderMap.get(
-                currentOrderId
-              )
-
-              ||
-
-              null
-            )
-
-            :
-
-            null;
-
-
-        const currentOrderStatus =
-
-          currentOrder
-
-            ?
-
-            String(
-
-              currentOrder.status
-
-              ||
-
-              ''
-
-            ).trim()
-
-            :
-
-            '';
-
-
-        const hasActiveOrder =
-
-          !!currentOrder
-
-          &&
-
-          activeStatuses.has(
-            currentOrderStatus
-          );
-
-
-        // ====================================================
-        // 狀態異常
-        // ====================================================
-
-        const rawBusy =
-
-          rider.busy ===
-          true;
-
-
-        let state =
-          'available';
-
-
-        if (
-          hasActiveOrder
-        ) {
-
-          state =
-            'busy';
-
-        }
-
-        else if (
-
-          rawBusy
-
-          ||
-
-          currentOrderId
-
-        ) {
-
-          state =
-            'issue';
-
-        }
-
-
-        // ====================================================
-        // 區域判斷
-        // ====================================================
-
-        const regionName =
-
-          rider.district
-
-          ||
-
-          rider.currentDistrict
-
-          ||
-
-          rider.serviceArea
-
-          ||
-
-          rider.area
-
-          ||
-
-          '未分類';
-
-
-        const region =
-          ensureRegion(
-            regionName
-          );
-
-
-        region.onlineRiders +=
-          1;
-
-
-        if (
-          state ===
-          'available'
-        ) {
-
-          region.availableRiders +=
-            1;
-
-        }
-
-
-        if (
-          state ===
-          'busy'
-        ) {
-
-          region.busyRiders +=
-            1;
-
-        }
-
-
-        if (
-          state ===
-          'issue'
-        ) {
-
-          region.issueRiders +=
-            1;
-
-        }
-
-      }
-    );
-
-
-    // ========================================================
-    // 計算供需狀態
-    // ========================================================
-
-    const regions =
-
-      Array.from(
-        regionMap.values()
-      )
-
-      .map(
-        region => {
-
-
-          const demand =
-
-            Number(
-              region.waitingOrders ||
-              0
-            );
-
-
-          const supply =
-
-            Number(
-              region.availableRiders ||
-              0
-            );
-
-
-          let supplyStatus =
-            'normal';
-
-
-          let supplyLabel =
-            '供需正常';
-
-
-          let shortage =
-            0;
-
-
-          // 有需求但完全沒有可接小U
-
-          if (
-
-            demand >
-            0
-
-            &&
-
-            supply ===
-            0
-
-          ) {
-
-            supplyStatus =
-              'critical';
-
-            supplyLabel =
-              '運力不足';
-
-            shortage =
-              demand;
-
-          }
-
-          // 待接訂單比可接小U多
-
-          else if (
-
-            demand >
-            supply
-
-          ) {
-
-            supplyStatus =
-              'tight';
-
-            supplyLabel =
-              '需求偏高';
-
-            shortage =
-
-              demand
-
-              -
-
-              supply;
-
-          }
-
-          // 沒有等待訂單，但可接小U很多
-
-          else if (
-
-            demand ===
-            0
-
-            &&
-
-            supply >
-            0
-
-          ) {
-
-            supplyStatus =
-              'surplus';
-
-            supplyLabel =
-              '運力充足';
-
-          }
-
-
-          const supplyDemandRatio =
-
-            demand >
-            0
-
-              ?
-
-              Number(
-                (
-                  supply /
-                  demand
-                ).toFixed(
-                  2
-                )
-              )
-
-              :
-
-              null;
-
-
-          return {
-
-            ...region,
-
-            demand,
-
-            supply,
-
-            shortage,
-
-            supplyDemandRatio,
-
-            supplyStatus,
-
-            supplyLabel
-
-          };
-
-        }
-
-      )
-
-      .sort(
-        (
-          a,
-          b
-        ) => {
-
-
-          // critical 優先
-          const rank = {
-
-            critical:
-              4,
-
-            tight:
-              3,
-
-            normal:
-              2,
-
-            surplus:
-              1
-
-          };
-
-
-          const rankDiff =
-
-            (
-              rank[
-                b.supplyStatus
-              ]
-
-              ||
-
-              0
-            )
-
-            -
-
-            (
-              rank[
-                a.supplyStatus
-              ]
-
-              ||
-
-              0
-            );
-
-
-          if (
-            rankDiff !==
-            0
-          ) {
-
-            return rankDiff;
-
-          }
-
-
-          return (
-
-            b.waitingOrders
-
-            -
-
-            a.waitingOrders
-
-          );
-
-        }
-      );
-
-
-    // ========================================================
-    // 全區總覽
-    // ========================================================
-
-    const totals =
-
-      regions.reduce(
-
-        (
-          total,
-          region
-        ) => {
-
-
-          total.waitingOrders +=
-
-            region.waitingOrders;
-
-
-          total.activeOrders +=
-
-            region.activeOrders;
-
-
-          total.onlineRiders +=
-
-            region.onlineRiders;
-
-
-          total.availableRiders +=
-
-            region.availableRiders;
-
-
-          total.busyRiders +=
-
-            region.busyRiders;
-
-
-          total.issueRiders +=
-
-            region.issueRiders;
-
-
-          return total;
-
-        },
-
-        {
-
-          waitingOrders:
-            0,
-
-          activeOrders:
-            0,
-
-          onlineRiders:
-            0,
-
-          availableRiders:
-            0,
-
-          busyRiders:
-            0,
-
-          issueRiders:
-            0
-
-        }
-
-      );
-
-
-    // ========================================================
-    // Response
-    // ========================================================
-
-    return res.json({
-
-      success:
-        true,
-
-      version:
-        'V3-regions',
-
-      generatedAtMs:
-        nowMs,
-
-      totals,
-
-      count:
-        regions.length,
-
-      regions
-
-    });
-
-
-  } catch (err) {
-
-    console.error(
-
-      '❌ UBee V3 dispatch/regions 讀取失敗：',
-
-      err
-
-    );
-
-
-    return res
-      .status(500)
-      .json({
-
-        success:
-          false,
-
-        message:
-          '區域供需資料讀取失敗',
-
-        error:
-          err.message
-
-      });
-
-  }
-
-});
-
-app.get('/dispatch.html', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, 'public', 'dispatch.html'));
-});
-
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
   lastModified: false,
@@ -9032,17 +6236,7 @@ function isOrderSkippedForRider(order = {}, identity = {}) {
 // 手機登入正式版：支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
   try {
-    const {
-      lineUserId,
-      phone,
-      riderId,
-      online,
-      lat,
-      lng,
-      accuracy,
-      heading,
-      speed,
-    } = req.body || {};
+    const { lineUserId, phone, riderId, online } = req.body || {};
 
     if (typeof online !== 'boolean') {
       return res.status(400).json({
@@ -9067,153 +6261,16 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
     const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
 
-    const nowMs = Date.now();
-
-    const latitude =
-      lat === null ||
-      lat === undefined ||
-      lat === ''
-        ? null
-        : Number(lat);
-
-    const longitude =
-      lng === null ||
-      lng === undefined ||
-      lng === ''
-        ? null
-        : Number(lng);
-
-    const hasLocation =
-      Number.isFinite(latitude) &&
-      latitude >= -90 &&
-      latitude <= 90 &&
-      Number.isFinite(longitude) &&
-      longitude >= -180 &&
-      longitude <= 180;
-
-    if (
-      online === true &&
-      !hasLocation
-    ) {
-      return res.status(400).json({
-        success: false,
-        code: 'RIDER_LOCATION_REQUIRED',
-        message:
-          '開始接單前必須先取得有效定位，請確認定位權限後再試。',
-      });
-    }
-
-    const getOptionalNumber = value => {
-      if (
-        value === null ||
-        value === undefined ||
-        value === ''
-      ) {
-        return null;
-      }
-
-      const numberValue = Number(value);
-
-      return Number.isFinite(numberValue)
-        ? numberValue
-        : null;
-    };
-
-    const safeAccuracy =
-      getOptionalNumber(accuracy);
-
-    const rawHeading =
-      getOptionalNumber(heading);
-
-    const safeHeading =
-      rawHeading === null
-        ? null
-        : (
-            (
-              rawHeading % 360
-            ) + 360
-          ) % 360;
-
-    const rawSpeed =
-      getOptionalNumber(speed);
-
-    const safeSpeed =
-      rawSpeed === null
-        ? null
-        : Math.max(0, rawSpeed);
-
     const updateData = {
       online,
-      busy:
-        rider.busy === true
-          ? true
-          : false,
-      currentOrderId:
-        rider.currentOrderId || '',
-      lastActive:
-        admin.firestore.FieldValue
-          .serverTimestamp(),
-      lastActiveMs:
-        nowMs,
-      onlineUpdatedAt:
-        admin.firestore.FieldValue
-          .serverTimestamp(),
-      onlineUpdatedAtMs:
-        nowMs,
-      updatedAt:
-        admin.firestore.FieldValue
-          .serverTimestamp(),
-      lastIdentityMethod:
-        phone || riderId
-          ? 'phone'
-          : 'line',
+      busy: rider.busy === true ? true : false,
+      currentOrderId: rider.currentOrderId || '',
+      lastActive: Date.now(),
+      onlineUpdatedAt: Date.now(),
+      onlineUpdatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastIdentityMethod: phone || riderId ? 'phone' : 'line',
     };
-
-    if (
-      online === true &&
-      hasLocation
-    ) {
-      const currentLocation = {
-        lat: latitude,
-        lng: longitude,
-        updatedAt:
-          admin.firestore.FieldValue
-            .serverTimestamp(),
-        updatedAtMs:
-          nowMs,
-      };
-
-      if (safeAccuracy !== null) {
-        currentLocation.accuracy =
-          safeAccuracy;
-      }
-
-      if (safeHeading !== null) {
-        currentLocation.heading =
-          safeHeading;
-      }
-
-      if (safeSpeed !== null) {
-        currentLocation.speed =
-          safeSpeed;
-      }
-
-      updateData.currentLat =
-        latitude;
-
-      updateData.currentLng =
-        longitude;
-
-      updateData.currentLocation =
-        currentLocation;
-
-      updateData.locationUpdatedAt =
-        admin.firestore.FieldValue
-          .serverTimestamp();
-
-      updateData.locationUpdatedAtMs =
-        nowMs;
-    }
 
     if (!online && rider.busy === true && rider.currentOrderId) {
       return res.status(409).json({
@@ -9239,34 +6296,7 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
         name: rider.name || rider.riderName || '',
         online,
         busy: updateData.busy,
-        currentOrderId:
-          updateData.currentOrderId,
-        currentLat:
-          online && hasLocation
-            ? latitude
-            : (
-                Number.isFinite(
-                  Number(rider.currentLat)
-                )
-                  ? Number(rider.currentLat)
-                  : null
-              ),
-        currentLng:
-          online && hasLocation
-            ? longitude
-            : (
-                Number.isFinite(
-                  Number(rider.currentLng)
-                )
-                  ? Number(rider.currentLng)
-                  : null
-              ),
-        locationUpdatedAtMs:
-          online && hasLocation
-            ? nowMs
-            : Number(
-                rider.locationUpdatedAtMs || 0
-              ),
+        currentOrderId: updateData.currentOrderId,
       },
     });
 
@@ -10920,21 +7950,14 @@ function isOrderCustomer(event, order) {
 }
 
 const ORDER_INPUT_LIMITS = {
-  serviceType: 40,
+  serviceType: 30,
   serviceGroup: 30,
-  serviceCategory: 60,
   item: 80,
   pickupAddress: 120,
   pickupPhone: 20,
-  pickupAddressNote: 160,
   dropoffAddress: 120,
   dropoffPhone: 20,
-  dropoffAddressNote: 160,
   note: 300,
-  clientSchemaVersion: 50,
-  shoppingItemName: 80,
-  shoppingItemQuantity: 20,
-  shoppingItemBudget: 8,
 };
 
 const MAX_ADVANCE_PAYMENT = 1000;
@@ -10957,62 +7980,6 @@ function cleanLongText(value, maxLength = 500) {
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
     .trim()
     .slice(0, maxLength);
-}
-
-
-function sanitizeShoppingItems(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .slice(0, 20)
-    .map((item) => {
-      const source =
-        item && typeof item === 'object'
-          ? item
-          : {};
-
-      const name = cleanText(
-        source.name || '',
-        ORDER_INPUT_LIMITS.shoppingItemName
-      );
-
-      if (!name) {
-        return null;
-      }
-
-      const quantity = cleanText(
-        source.quantity || '1',
-        ORDER_INPUT_LIMITS.shoppingItemQuantity
-      ) || '1';
-
-      const budget = parseNonNegativeMoney(
-        source.budget
-      );
-
-      const replacementPolicy = [
-        'contact',
-        'replace',
-        'skip',
-      ].includes(
-        String(
-          source.replacementPolicy || ''
-        ).trim()
-      )
-        ? String(
-            source.replacementPolicy
-          ).trim()
-        : 'contact';
-
-      return {
-        name,
-        quantity,
-        budget,
-        replacementPolicy,
-      };
-    })
-    .filter(Boolean);
 }
 
 function normalizeAdvancePaymentText(text) {
@@ -11147,34 +8114,6 @@ function validateOrderInput(data) {
 
   if (detectedAdvancePayment >= MAX_ADVANCE_PAYMENT) {
     errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額，請先聯繫 UBee 跑腿客服人工確認。');
-  }
-
-  if (
-    Array.isArray(data.shoppingItems) &&
-    data.shoppingItems.length > 20
-  ) {
-    errors.push('代買商品最多可填寫 20 項。');
-  }
-
-
-  if (
-    data.estimatedCompletionMinutes !== null &&
-    data.estimatedCompletionMinutes !== undefined &&
-    (
-      !Number.isFinite(
-        Number(
-          data.estimatedCompletionMinutes
-        )
-      ) ||
-      Number(
-        data.estimatedCompletionMinutes
-      ) < 0 ||
-      Number(
-        data.estimatedCompletionMinutes
-      ) > 24 * 60
-    )
-  ) {
-    errors.push('預估完成時間格式錯誤。');
   }
 
   return errors;
@@ -12583,11 +9522,6 @@ function createOrderFromApi(data) {
       200
     ),
 
-    pickupAddressNote: cleanLongText(
-      data.pickupAddressNote || '',
-      ORDER_INPUT_LIMITS.pickupAddressNote
-    ),
-
     dropoffAddress: cleanText(
       data.dropoff ||
       data.dropoffAddress ||
@@ -12615,34 +9549,6 @@ function createOrderFromApi(data) {
     dropoffPlaceId: cleanText(
       data.dropoffPlaceId || '',
       200
-    ),
-
-    dropoffAddressNote: cleanLongText(
-      data.dropoffAddressNote || '',
-      ORDER_INPUT_LIMITS.dropoffAddressNote
-    ),
-
-    shoppingItems: sanitizeShoppingItems(
-      data.shoppingItems
-    ),
-
-
-    estimatedCompletionMinutes:
-      Math.min(
-        24 * 60,
-        Math.max(
-          0,
-          Math.round(
-            Number(
-              data.estimatedCompletionMinutes || 0
-            )
-          )
-        )
-      ) || null,
-
-    clientSchemaVersion: cleanText(
-      data.clientSchemaVersion || '',
-      ORDER_INPUT_LIMITS.clientSchemaVersion
     ),
 
     speedType: [
@@ -12705,113 +9611,20 @@ function createOrderFromApi(data) {
 // =====================================================
 // 客戶端安全服務狀態 API
 //
-// 僅回傳匿名資訊：
-// - 已審核且已按下上線的小U總數
-// - 其中定位仍新鮮、可顯示於地圖的小U數量
-// - 經 50～80 公尺穩定偏移後的匿名地圖位置
+// 僅回傳匿名統計：
+// - 已審核、在線且定位仍新鮮的小U數量
 // - 統計更新時間與定位新鮮度門檻
-//
-// 絕不回傳姓名、電話、LINE ID、riderId、Firestore 文件 ID、
-// 真實座標或任何可讓客戶辨識特定小U的固定公開識別碼。
+// 不回傳姓名、電話、文件 ID 或任何座標。
 // =====================================================
-const CUSTOMER_RIDER_LOCATION_FRESH_MS = 5 * 60 * 1000;
-const CUSTOMER_RIDER_PUBLIC_ONLINE_MS = 30 * 60 * 1000;
-const CUSTOMER_RIDER_OFFSET_MIN_METERS = 50;
-const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
-const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
-const CUSTOMER_RIDER_MAX_MARKERS = 80;
-
-function getCustomerRiderMapSecret() {
-  return String(
-    process.env.CUSTOMER_RIDER_MAP_SECRET ||
-    process.env.CHANNEL_SECRET ||
-    process.env.FIREBASE_PROJECT_ID ||
-    'ubee-customer-rider-map'
-  );
-}
-
-function buildStableAnonymousRiderOffset(riderDocId, nowMs = Date.now()) {
-  const bucket = Math.floor(nowMs / CUSTOMER_RIDER_OFFSET_BUCKET_MS);
-  const digest = crypto
-    .createHmac('sha256', getCustomerRiderMapSecret())
-    .update(`${String(riderDocId || '')}:${bucket}`)
-    .digest();
-
-  const distanceRatio = digest.readUInt32BE(0) / 0xffffffff;
-  const angleRatio = digest.readUInt32BE(4) / 0xffffffff;
-
-  return {
-    distanceMeters:
-      CUSTOMER_RIDER_OFFSET_MIN_METERS +
-      distanceRatio *
-        (CUSTOMER_RIDER_OFFSET_MAX_METERS - CUSTOMER_RIDER_OFFSET_MIN_METERS),
-    angleRadians: angleRatio * Math.PI * 2,
-  };
-}
-
-function offsetCustomerRiderPoint(point, riderDocId, nowMs = Date.now()) {
-  if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lng))) {
-    return null;
-  }
-
-  const sourceLat = Number(point.lat);
-  const sourceLng = Number(point.lng);
-  const { distanceMeters, angleRadians } =
-    buildStableAnonymousRiderOffset(riderDocId, nowMs);
-
-  const latitudeRadians = sourceLat * Math.PI / 180;
-  const metersPerDegreeLat = 111320;
-  const metersPerDegreeLng = Math.max(
-    1000,
-    111320 * Math.cos(latitudeRadians)
-  );
-
-  const latOffset =
-    Math.cos(angleRadians) * distanceMeters / metersPerDegreeLat;
-  const lngOffset =
-    Math.sin(angleRadians) * distanceMeters / metersPerDegreeLng;
-
-  return {
-    lat: Number((sourceLat + latOffset).toFixed(6)),
-    lng: Number((sourceLng + lngOffset).toFixed(6)),
-    label: '附近有小U',
-  };
-}
-
-
 app.get('/api/customer/service-status', async (req, res) => {
   try {
-    const nowMs = Date.now();
-
-    const pickupLat =
-      getNullableCoordinate(
-        req.query.pickupLat ||
-        req.query.lat
-      );
-
-    const pickupLng =
-      getNullableCoordinate(
-        req.query.pickupLng ||
-        req.query.lng
-      );
-
-    const hasPickupPoint =
-      isValidLatitude(pickupLat) &&
-      isValidLongitude(pickupLng);
-
+    const LOCATION_FRESH_MS = 120000;
     const ridersSnap = await db
       .collection('riders')
       .limit(500)
       .get();
 
-    let declaredOnlineRiderCount = 0;
     let onlineRiderCount = 0;
-    let mapRiderCount = 0;
-    let nearbyRiderCount3km = 0;
-    let nearbyRiderCount5km = 0;
-    let nearbyRiderCount10km = 0;
-    let nearestRiderDistanceKm = null;
-    const nearbyRiders = [];
 
     ridersSnap.forEach((riderDoc) => {
       const rider = riderDoc.data() || {};
@@ -12819,154 +9632,25 @@ app.get('/api/customer/service-status', async (req, res) => {
         rider.approved === true ||
         String(rider.status || '').trim().toLowerCase() === 'approved';
       const online = rider.online === true;
-
-      // Firestore 裡 online=true 只代表小U曾主動按下上線。
-      // 先保留這個原始數字供內部診斷，但不直接公開給客人端。
-      if (!approved || !online) {
-        return;
-      }
-
-      declaredOnlineRiderCount += 1;
-
       const point = getRiderCurrentPointForPush(rider);
-      const lastLocationAtMs =
-        getDispatchPushTimeMs(rider.locationUpdatedAtMs) ||
-        getDispatchPushTimeMs(rider.locationUpdatedAt) ||
-        getDispatchPushTimeMs(rider.currentLocation?.updatedAt);
+      const fresh = isRiderLocationFreshForPush(rider, LOCATION_FRESH_MS);
 
-      const locationAgeMs = lastLocationAtMs
-        ? nowMs - lastLocationAtMs
-        : Number.POSITIVE_INFINITY;
-
-      const publicOnline =
-        !!point &&
-        Number.isFinite(locationAgeMs) &&
-        locationAgeMs >= 0 &&
-        locationAgeMs <= CUSTOMER_RIDER_PUBLIC_ONLINE_MS;
-
-      // 超過 30 分鐘沒有定位更新，客人端公開狀態視為離線。
-      if (!publicOnline) {
-        return;
-      }
-
-      onlineRiderCount += 1;
-
-      const fresh =
-        locationAgeMs <= CUSTOMER_RIDER_LOCATION_FRESH_MS;
-
-      // 5 分鐘內有定位才顯示匿名 U 圖案並納入即時媒合。
-      if (!fresh) {
-        return;
-      }
-
-      mapRiderCount += 1;
-
-      if (hasPickupPoint) {
-        const distanceKm =
-          calcDispatchPushDistanceKm(
-            pickupLat,
-            pickupLng,
-            point.lat,
-            point.lng
-          );
-
-        if (Number.isFinite(distanceKm)) {
-          if (
-            nearestRiderDistanceKm === null ||
-            distanceKm <
-              nearestRiderDistanceKm
-          ) {
-            nearestRiderDistanceKm =
-              distanceKm;
-          }
-
-          if (distanceKm <= 3) {
-            nearbyRiderCount3km += 1;
-          }
-
-          if (distanceKm <= 5) {
-            nearbyRiderCount5km += 1;
-          }
-
-          if (distanceKm <= 10) {
-            nearbyRiderCount10km += 1;
-          }
-        }
-      }
-
-      if (nearbyRiders.length >= CUSTOMER_RIDER_MAX_MARKERS) {
-        return;
-      }
-
-      const anonymousPoint = offsetCustomerRiderPoint(
-        point,
-        riderDoc.id,
-        nowMs
-      );
-
-      if (anonymousPoint) {
-        nearbyRiders.push(anonymousPoint);
+      if (approved && online && point && fresh) {
+        onlineRiderCount += 1;
       }
     });
 
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     return res.json({
       success: true,
-      declaredOnlineRiderCount,
       onlineRiderCount,
-      mapRiderCount,
-      nearbyRiders,
-
-      pickupMatch:
-        hasPickupPoint
-          ? {
-              pickupLat,
-              pickupLng,
-              nearbyRiderCount3km,
-              nearbyRiderCount5km,
-              nearbyRiderCount10km,
-              nearestRiderDistanceKm:
-                nearestRiderDistanceKm === null
-                  ? null
-                  : Number(
-                      nearestRiderDistanceKm
-                        .toFixed(2)
-                    ),
-              matchLevel:
-                nearbyRiderCount3km >= 3
-                  ? 'good'
-                  : nearbyRiderCount5km > 0
-                    ? 'limited'
-                    : mapRiderCount > 0
-                      ? 'expand_required'
-                      : 'none',
-            }
-          : null,
-
-      updatedAt: new Date(nowMs).toISOString(),
-      locationFreshSeconds: Math.floor(
-        CUSTOMER_RIDER_LOCATION_FRESH_MS / 1000
-      ),
-      publicOnlineFreshSeconds: Math.floor(
-        CUSTOMER_RIDER_PUBLIC_ONLINE_MS / 1000
-      ),
-      locationPrivacy: {
-        mode: 'stable_offset',
-        minOffsetMeters: CUSTOMER_RIDER_OFFSET_MIN_METERS,
-        maxOffsetMeters: CUSTOMER_RIDER_OFFSET_MAX_METERS,
-        refreshMinutes: Math.floor(
-          CUSTOMER_RIDER_OFFSET_BUCKET_MS / 60000
-        ),
-      },
-      scope: 'public_online_riders_and_realtime_matchable_locations',
+      updatedAt: new Date().toISOString(),
+      locationFreshSeconds: Math.floor(LOCATION_FRESH_MS / 1000),
+      scope: 'available_for_realtime_matching',
     });
   } catch (error) {
     console.error('❌ 客戶端服務狀態 API 讀取失敗：', error);
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     return res.status(503).json({
       success: false,
       code: 'SERVICE_STATUS_UNAVAILABLE',
@@ -13929,7 +10613,6 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
-
     const duplicateOrder = await findRecentDuplicateOrder(data);
     if (duplicateOrder) {
       return res.status(409).json({
@@ -14150,9 +10833,6 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   pickupPlaceId:
     data.pickupPlaceId || '',
 
-  pickupAddressNote:
-    data.pickupAddressNote || '',
-
   // ==============================
   // 送達資訊
   // ==============================
@@ -14170,22 +10850,6 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   dropoffPlaceId:
     data.dropoffPlaceId || '',
-
-  dropoffAddressNote:
-    data.dropoffAddressNote || '',
-
-  // ==============================
-  // 新版客人端結構化資料
-  // ==============================
-  shoppingItems:
-    data.shoppingItems || [],
-
-
-  estimatedCompletionMinutes:
-    data.estimatedCompletionMinutes,
-
-  clientSchemaVersion:
-    data.clientSchemaVersion || '',
 
   // ==============================
   // 任務設定
@@ -16293,6 +12957,731 @@ async function handleEvent(event) {
     return null;
   }
 }
+
+
+// ============================================================
+// UBee 調度中心 V4：人工調度寫入 API
+// 依賴既有核心函式：
+// - findApprovedRiderForApi()
+// - buildRiderApiIdentity()
+// - isRiderVisibleDispatchOrder()
+// - getEtaPayloadByStatus()
+// - buildDispatchPushCycleId()
+// - clearDispatchPushTimers()
+// - startDispatchPushSequence()
+// - runDispatchPushWave()
+// - notifyCustomer()
+// - createTextMessage()
+//
+// 重要原則：
+// 1. 不建立第二套派單核心。
+// 2. 指定小U沿用騎士接單的 Transaction 安全模型。
+// 3. 重新派單沿用既有多層級 dispatch cycle。
+// 4. 擴大半徑沿用既有 runDispatchPushWave()，避免重複通知。
+// ============================================================
+
+function normalizeDispatchRadiusKm(value, fallback = 3) {
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+
+  const allowed = [2, 3, 5, 8, 10, 12, 15, 17, 20];
+
+  if (allowed.includes(n)) {
+    return n;
+  }
+
+  // 前端目前有 2 / 3 / 5 / 8 / 12 / 20，
+  // 後端只允許固定安全級距，避免任意超大範圍。
+  return fallback;
+}
+
+function getDispatchApiErrorResponse(error) {
+  const code = String(error?.message || '').trim();
+
+  const map = {
+    ORDER_NOT_FOUND: [404, '找不到此訂單。'],
+    RIDER_NOT_FOUND: [404, '找不到指定的小U。'],
+    ORDER_NOT_DISPATCHABLE: [409, '此訂單目前已不是待派單狀態，請重新整理調度中心。'],
+    ORDER_PAYMENT_NOT_CONFIRMED: [409, '此訂單尚未符合可派送條件。'],
+    RIDER_OFFLINE: [409, '這位小U目前已離線，請重新選擇其他小U。'],
+    RIDER_ALREADY_BUSY: [409, '這位小U目前已有進行中的任務，請重新選擇。'],
+    RIDER_ALREADY_ASSIGNED: [409, '此訂單已經被其他小U接走。'],
+  };
+
+  if (map[code]) {
+    return {
+      status: map[code][0],
+      body: {
+        success: false,
+        code,
+        message: map[code][1],
+      },
+    };
+  }
+
+  return {
+    status: 500,
+    body: {
+      success: false,
+      code: code || 'DISPATCH_INTERNAL_ERROR',
+      message: '調度操作失敗，請稍後再試。',
+    },
+  };
+}
+
+
+// ------------------------------------------------------------
+// 1. 人工指定小U
+// POST /api/dispatch/orders/:orderId/assign
+//
+// body:
+// {
+//   riderId: "09xxxxxxxx",
+//   source: "dispatch_center"
+// }
+// ------------------------------------------------------------
+app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
+  try {
+    const safeOrderId = String(req.params.orderId || '')
+      .trim()
+      .toUpperCase();
+
+    const requestedRiderId = String(
+      req.body?.riderId || ''
+    ).trim();
+
+    if (!safeOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少訂單編號。',
+      });
+    }
+
+    if (!requestedRiderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少指定小U資料。',
+      });
+    }
+
+    const riderResult = await findApprovedRiderForApi({
+      riderId: requestedRiderId,
+    });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode || 404).json({
+        success: false,
+        message: riderResult.message || '找不到指定的小U。',
+      });
+    }
+
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+
+    const identity = buildRiderApiIdentity(
+      riderDoc,
+      rider,
+      {
+        riderId: requestedRiderId,
+      }
+    );
+
+    const orderRef = db
+      .collection('orders')
+      .doc(safeOrderId);
+
+    const riderRef = db
+      .collection('riders')
+      .doc(riderDoc.id);
+
+    const nowMs = Date.now();
+    let assignedOrder = null;
+
+    await db.runTransaction(async transaction => {
+      const orderDoc = await transaction.get(orderRef);
+
+      if (!orderDoc.exists) {
+        throw new Error('ORDER_NOT_FOUND');
+      }
+
+      const latestRiderDoc =
+        await transaction.get(riderRef);
+
+      if (!latestRiderDoc.exists) {
+        throw new Error('RIDER_NOT_FOUND');
+      }
+
+      const order = orderDoc.data() || {};
+      const latestRider =
+        latestRiderDoc.data() || {};
+
+      const currentStatus =
+        String(order.status || '').trim();
+
+      if (currentStatus !== 'pending_dispatch') {
+        if (
+          currentStatus === 'accepted' ||
+          String(order.riderId || '').trim() ||
+          String(order.riderDocId || '').trim()
+        ) {
+          throw new Error('RIDER_ALREADY_ASSIGNED');
+        }
+
+        throw new Error('ORDER_NOT_DISPATCHABLE');
+      }
+
+      if (!isRiderVisibleDispatchOrder(order)) {
+        throw new Error(
+          'ORDER_PAYMENT_NOT_CONFIRMED'
+        );
+      }
+
+      // 人工指定仍要求小U在線。
+      // 不用「候選畫面的舊資料」做最終判定，
+      // Transaction 內再次讀取 riders 文件。
+      if (latestRider.online !== true) {
+        throw new Error('RIDER_OFFLINE');
+      }
+
+      if (
+        latestRider.busy === true &&
+        String(
+          latestRider.currentOrderId || ''
+        ).trim() &&
+        String(
+          latestRider.currentOrderId || ''
+        ).trim().toUpperCase() !== safeOrderId
+      ) {
+        const oldOrderId = String(
+          latestRider.currentOrderId || ''
+        )
+          .trim()
+          .toUpperCase();
+
+        const oldOrderRef = db
+          .collection('orders')
+          .doc(oldOrderId);
+
+        const oldOrderDoc =
+          await transaction.get(oldOrderRef);
+
+        if (oldOrderDoc.exists) {
+          const oldOrder =
+            oldOrderDoc.data() || {};
+
+          if (
+            !['completed', 'cancelled']
+              .includes(
+                String(oldOrder.status || '')
+                  .trim()
+              )
+          ) {
+            throw new Error(
+              'RIDER_ALREADY_BUSY'
+            );
+          }
+        }
+      }
+
+      const acceptedEtaPayload =
+        getEtaPayloadByStatus('accepted');
+
+      const assignUpdateData = {
+        status: 'accepted',
+        riderStatus: 'accepted',
+
+        riderId: identity.riderId,
+        riderDocId: identity.riderDocId,
+        riderPhone: identity.phone,
+        riderLineUserId:
+          identity.lineUserId || '',
+
+        riderName:
+          rider.name ||
+          rider.riderName ||
+          '',
+
+        acceptedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+
+        updatedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+
+        'statusTimes.accepted':
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+
+        // 調度中心追蹤欄位
+        assignedByDispatch: true,
+        dispatchAssignedRiderId:
+          identity.riderId,
+        dispatchAssignedRiderDocId:
+          identity.riderDocId,
+        dispatchAssignedAtMs:
+          nowMs,
+        dispatchAssignedAt:
+          admin.firestore.FieldValue
+            .serverTimestamp(),
+        dispatchAssignedSource:
+          String(
+            req.body?.source ||
+            'dispatch_center'
+          ).trim(),
+
+        ...acceptedEtaPayload,
+      };
+
+      transaction.update(
+        orderRef,
+        assignUpdateData
+      );
+
+      transaction.set(
+        riderRef,
+        {
+          busy: true,
+          currentOrderId: safeOrderId,
+          lastActive: nowMs,
+          updatedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+        },
+        {
+          merge: true,
+        }
+      );
+
+      assignedOrder = {
+        ...order,
+        ...assignUpdateData,
+        id: safeOrderId,
+        status: 'accepted',
+        riderStatus: 'accepted',
+      };
+    });
+
+    // 訂單已被人工指定，停止舊派單波次。
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
+    // 舊記憶體快取同步。
+    if (
+      typeof orders === 'object' &&
+      orders
+    ) {
+      orders[safeOrderId] =
+        assignedOrder;
+    }
+
+    try {
+      await notifyCustomer(
+        assignedOrder,
+        createTextMessage(
+          `🟢 UBee 跑腿已為你安排小U\n\n` +
+          `訂單編號：${safeOrderId}\n` +
+          `小U將盡快前往取件。`
+        )
+      );
+    } catch (notifyErr) {
+      console.error(
+        '⚠️ 調度指定成功，但通知客人失敗：',
+        notifyErr
+      );
+    }
+
+    return res.json({
+      success: true,
+      orderId: safeOrderId,
+      status: 'accepted',
+      riderId: identity.riderId,
+      riderDocId: identity.riderDocId,
+      riderName:
+        rider.name ||
+        rider.riderName ||
+        '',
+      order: assignedOrder,
+      message: '已成功指定小U。',
+    });
+
+  } catch (error) {
+    console.error(
+      '❌ UBee 調度中心指定小U失敗：',
+      error
+    );
+
+    const result =
+      getDispatchApiErrorResponse(error);
+
+    return res
+      .status(result.status)
+      .json(result.body);
+  }
+});
+
+
+// ------------------------------------------------------------
+// 2. 人工重新派單
+// POST /api/dispatch/orders/:orderId/redispatch
+//
+// body:
+// {
+//   radiusKm: 3,
+//   source: "dispatch_center"
+// }
+// ------------------------------------------------------------
+app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
+  try {
+    const safeOrderId = String(
+      req.params.orderId || ''
+    )
+      .trim()
+      .toUpperCase();
+
+    if (!safeOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少訂單編號。',
+      });
+    }
+
+    const requestedRadiusKm =
+      normalizeDispatchRadiusKm(
+        req.body?.radiusKm,
+        3
+      );
+
+    const orderRef = db
+      .collection('orders')
+      .doc(safeOrderId);
+
+    const nowMs = Date.now();
+    const newCycleId =
+      buildDispatchPushCycleId(
+        safeOrderId
+      );
+
+    let currentOrder = null;
+
+    await db.runTransaction(
+      async transaction => {
+        const orderDoc =
+          await transaction.get(orderRef);
+
+        if (!orderDoc.exists) {
+          throw new Error(
+            'ORDER_NOT_FOUND'
+          );
+        }
+
+        const order =
+          orderDoc.data() || {};
+
+        if (
+          String(
+            order.status || ''
+          ).trim() !==
+          'pending_dispatch'
+        ) {
+          throw new Error(
+            'ORDER_NOT_DISPATCHABLE'
+          );
+        }
+
+        if (
+          !isRiderVisibleDispatchOrder(
+            order
+          )
+        ) {
+          throw new Error(
+            'ORDER_PAYMENT_NOT_CONFIRMED'
+          );
+        }
+
+        transaction.update(
+          orderRef,
+          {
+            dispatchPushCycleId:
+              newCycleId,
+
+            dispatchPushNotifiedRiderDocIds:
+              [],
+
+            dispatchPushStage:
+              'manual_redispatch_scheduled',
+
+            dispatchManualRedispatchCount:
+              admin.firestore.FieldValue
+                .increment(1),
+
+            dispatchManualRedispatchAtMs:
+              nowMs,
+
+            dispatchManualRedispatchAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            dispatchManualRedispatchRadiusKm:
+              requestedRadiusKm,
+
+            dispatchManualRedispatchSource:
+              String(
+                req.body?.source ||
+                'dispatch_center'
+              ).trim(),
+
+            dispatchUpdatedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            updatedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+          }
+        );
+
+        currentOrder = {
+          id: safeOrderId,
+          ...order,
+          dispatchPushCycleId:
+            newCycleId,
+        };
+      }
+    );
+
+    // 關閉舊週期，重新啟動正式既有多層級派單。
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
+    await startDispatchPushSequence(
+      currentOrder,
+      newCycleId
+    );
+
+    return res.json({
+      success: true,
+      orderId: safeOrderId,
+      status: 'pending_dispatch',
+      dispatchPushCycleId:
+        newCycleId,
+      radiusKm:
+        requestedRadiusKm,
+      message:
+        '已重新啟動派單。',
+    });
+
+  } catch (error) {
+    console.error(
+      '❌ UBee 調度中心重新派單失敗：',
+      error
+    );
+
+    const result =
+      getDispatchApiErrorResponse(error);
+
+    return res
+      .status(result.status)
+      .json(result.body);
+  }
+});
+
+
+// ------------------------------------------------------------
+// 3. 人工擴大派單半徑
+// POST /api/dispatch/orders/:orderId/expand-radius
+//
+// body:
+// {
+//   radiusKm: 8,
+//   previousRadiusKm: 5,
+//   source: "dispatch_center"
+// }
+// ------------------------------------------------------------
+app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
+  try {
+    const safeOrderId = String(
+      req.params.orderId || ''
+    )
+      .trim()
+      .toUpperCase();
+
+    if (!safeOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少訂單編號。',
+      });
+    }
+
+    const radiusKm =
+      normalizeDispatchRadiusKm(
+        req.body?.radiusKm,
+        3
+      );
+
+    const previousRadiusKm =
+      normalizeDispatchRadiusKm(
+        req.body?.previousRadiusKm,
+        3
+      );
+
+    const orderRef = db
+      .collection('orders')
+      .doc(safeOrderId);
+
+    let cycleId = '';
+    const nowMs = Date.now();
+
+    await db.runTransaction(
+      async transaction => {
+        const orderDoc =
+          await transaction.get(orderRef);
+
+        if (!orderDoc.exists) {
+          throw new Error(
+            'ORDER_NOT_FOUND'
+          );
+        }
+
+        const order =
+          orderDoc.data() || {};
+
+        if (
+          String(
+            order.status || ''
+          ).trim() !==
+          'pending_dispatch'
+        ) {
+          throw new Error(
+            'ORDER_NOT_DISPATCHABLE'
+          );
+        }
+
+        if (
+          !isRiderVisibleDispatchOrder(
+            order
+          )
+        ) {
+          throw new Error(
+            'ORDER_PAYMENT_NOT_CONFIRMED'
+          );
+        }
+
+        cycleId = String(
+          order.dispatchPushCycleId ||
+          buildDispatchPushCycleId(
+            safeOrderId
+          )
+        ).trim();
+
+        transaction.update(
+          orderRef,
+          {
+            dispatchPushCycleId:
+              cycleId,
+
+            dispatchManualRadiusKm:
+              radiusKm,
+
+            dispatchManualPreviousRadiusKm:
+              previousRadiusKm,
+
+            dispatchManualRadiusExpandedAtMs:
+              nowMs,
+
+            dispatchManualRadiusExpandedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            dispatchManualRadiusSource:
+              String(
+                req.body?.source ||
+                'dispatch_center'
+              ).trim(),
+
+            dispatchUpdatedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+
+            updatedAt:
+              admin.firestore.FieldValue
+                .serverTimestamp(),
+          }
+        );
+      }
+    );
+
+    // 直接沿用正式派單核心。
+    // runDispatchPushWave() 會讀取
+    // dispatchPushNotifiedRiderDocIds，
+    // 因此已通知過的小U不會重複收到。
+    const completed =
+      await runDispatchPushWave(
+        safeOrderId,
+        cycleId,
+        radiusKm,
+        `${radiusKm}km`,
+        false
+      );
+
+    if (!completed) {
+      // 最常見原因：呼叫期間剛好已被接走。
+      const latestDoc =
+        await orderRef.get();
+
+      const latestStatus =
+        latestDoc.exists
+          ? String(
+              latestDoc.data()?.status ||
+              ''
+            ).trim()
+          : '';
+
+      if (
+        latestStatus &&
+        latestStatus !==
+          'pending_dispatch'
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            '此訂單剛剛已被接走或狀態已變更，請重新整理。',
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      orderId: safeOrderId,
+      status: 'pending_dispatch',
+      radiusKm,
+      previousRadiusKm,
+      dispatchPushCycleId:
+        cycleId,
+      message:
+        `派單半徑已擴大至 ${radiusKm} km。`,
+    });
+
+  } catch (error) {
+    console.error(
+      '❌ UBee 調度中心擴大派單半徑失敗：',
+      error
+    );
+
+    const result =
+      getDispatchApiErrorResponse(error);
+
+    return res
+      .status(result.status)
+      .json(result.body);
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`UBee OMS is running on port ${PORT}`);
