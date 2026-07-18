@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover"
+>
+
+<title>UBee 調度中心</title>
+
+<style>
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  background:#f5f6f8;
+  color:#111;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Noto Sans TC",
+    sans-serif;
+}
+
+button{
+  font-family:inherit;
+}
+
+.app{
+  max-width:1280px;
+  margin:0 auto;
+  padding:20px;
+}
+
+/* =========================
+   頂部
+========================= */
+
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  margin-bottom:18px;
+}
+
+.brand{
+  font-size:28px;
+  font-weight:1000;
+}
+
+.brand b{
+  color:#f5b800;
+}
+
+.version-badge{
+  display:inline-block;
+  margin-left:8px;
+
+  background:#111;
+  color:#fff;
+
+  padding:7px 11px;
+  border-radius:999px;
+
+  font-size:12px;
+  font-weight:900;
+}
+
+.refresh-btn{
+  border:0;
+
+  background:#111;
+  color:#fff;
+
+  border-radius:12px;
+
+  padding:11px 16px;
+
+  font-size:14px;
+  font-weight:900;
+
+  cursor:pointer;
+}
+
+/* =========================
+   統計卡
+========================= */
+
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(6, 1fr);
+  gap:10px;
+}
+
+.stat-card{
+  background:#fff;
+
+  border:1px solid #e8e8e8;
+  border-radius:18px;
+
+  padding:16px;
+
+  box-shadow:
+    0 6px 20px rgba(0,0,0,.04);
+}
+
+.stat-title{
+  font-size:13px;
+  color:#666;
+  font-weight:800;
+}
+
+.stat-number{
+  margin-top:6px;
+
+  font-size:28px;
+  font-weight:1000;
+}
+
+/* =========================
+   主版面
+========================= */
+
+.main-layout{
+  display:grid;
+  grid-template-columns:1.5fr .8fr;
+  gap:14px;
+
+  margin-top:14px;
+}
+
+.panel{
+  background:#fff;
+
+  border:1px solid #e8e8e8;
+  border-radius:18px;
+
+  padding:16px;
+
+  box-shadow:
+    0 6px 20px rgba(0,0,0,.04);
+}
+
+.panel + .panel{
+  margin-top:14px;
+}
+
+.panel-title{
+  margin:0 0 14px;
+
+  font-size:19px;
+  font-weight:1000;
+}
+
+/* =========================
+   訂單卡片
+========================= */
+
+.order-card{
+  border:1px solid #ececec;
+  border-radius:14px;
+
+  padding:14px;
+
+  margin-bottom:10px;
+}
+
+.order-card:last-child{
+  margin-bottom:0;
+}
+
+.row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+
+.order-id{
+  font-weight:1000;
+}
+
+.status{
+  display:inline-block;
+
+  font-size:12px;
+  font-weight:900;
+
+  padding:5px 9px;
+
+  border-radius:999px;
+
+  background:#f1f1f1;
+}
+
+.route{
+  font-size:14px;
+  line-height:1.7;
+
+  margin-top:8px;
+}
+
+.order-bottom{
+  margin-top:10px;
+}
+
+.muted{
+  color:#777;
+
+  font-size:12px;
+  line-height:1.6;
+}
+
+/* =========================
+   小U
+========================= */
+
+.rider-item{
+  padding:11px 0;
+
+  border-bottom:1px solid #eee;
+}
+
+.rider-item:last-child{
+  border-bottom:0;
+}
+
+.dot{
+  display:inline-block;
+
+  width:9px;
+  height:9px;
+
+  border-radius:50%;
+
+  margin-right:7px;
+}
+
+.dot.green{
+  background:#27ae60;
+}
+
+.dot.blue{
+  background:#2f80ed;
+}
+
+.dot.gray{
+  background:#aaa;
+}
+
+/* =========================
+   異常
+========================= */
+
+.alert-card{
+  border-left:4px solid #e53935;
+
+  padding:10px 12px;
+
+  background:#fff7f7;
+
+  border-radius:10px;
+
+  margin-bottom:9px;
+
+  font-size:13px;
+  line-height:1.6;
+}
+
+/* =========================
+   空狀態
+========================= */
+
+.empty{
+  text-align:center;
+
+  color:#999;
+
+  padding:28px 10px;
+
+  font-size:14px;
+}
+
+/* =========================
+   更新時間
+========================= */
+
+.last-update{
+  margin-top:10px;
+
+  text-align:right;
+
+  font-size:12px;
+  color:#888;
+}
+
+/* =========================
+   手機版
+========================= */
+
+@media(max-width:900px){
+
+  .app{
+    padding:12px;
+  }
+
+  .top{
+    align-items:flex-start;
+  }
+
+  .brand{
+    font-size:23px;
+  }
+
+  .version-badge{
+    display:block;
+
+    width:max-content;
+
+    margin-left:0;
+    margin-top:6px;
+  }
+
+  .stats-grid{
+    grid-template-columns:repeat(2, 1fr);
+  }
+
+  .main-layout{
+    grid-template-columns:1fr;
+  }
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- =========================
+       頂部
+  ========================== -->
+
+  <div class="top">
+
+    <div>
+
+      <div class="brand">
+
+        U<b>Bee</b> 調度中心
+
+        <span class="version-badge">
+          V1 只讀監控
+        </span>
+
+      </div>
+
+    </div>
+
+    <button
+      class="refresh-btn"
+      onclick="loadDashboard()"
+    >
+      重新整理
+    </button>
+
+  </div>
+
+
+  <!-- =========================
+       統計
+  ========================== -->
+
+  <div class="stats-grid">
+
+    <div class="stat-card">
+
+      <div class="stat-title">
+        在線小U
+      </div>
+
+      <div
+        class="stat-number"
+        id="online"
+      >
+        -
+      </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+      <div class="stat-title">
+        可接單小U
+      </div>
+
+      <div
+        class="stat-number"
+        id="available"
+      >
+        -
+      </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+      <div class="stat-title">
+        待接訂單
+      </div>
+
+      <div
+        class="stat-number"
+        id="waiting"
+      >
+        -
+      </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+      <div class="stat-title">
+        進行中
+      </div>
+
+      <div
+        class="stat-number"
+        id="active"
+      >
+        -
+      </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+      <div class="stat-title">
+        今日完成
+      </div>
+
+      <div
+        class="stat-number"
+        id="completed"
+      >
+        -
+      </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+      <div class="stat-title">
+        異常提醒
+      </div>
+
+      <div
+        class="stat-number"
+        id="alerts"
+      >
+        -
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================
+       主內容
+  ========================== -->
+
+  <div class="main-layout">
+
+
+    <!-- =========================
+         即時訂單
+    ========================== -->
+
+    <div class="panel">
+
+      <h2 class="panel-title">
+        即時訂單
+      </h2>
+
+      <div id="orders">
+
+        <div class="empty">
+          正在讀取訂單資料...
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================
+         右側
+    ========================== -->
+
+    <div>
+
+
+      <!-- 在線小U -->
+
+      <div class="panel">
+
+        <h2 class="panel-title">
+          在線小U
+        </h2>
+
+        <div id="riders">
+
+          <div class="empty">
+            正在讀取小U資料...
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- 異常中心 -->
+
+      <div class="panel">
+
+        <h2 class="panel-title">
+          異常中心
+        </h2>
+
+        <div id="alertList">
+
+          <div class="empty">
+            正在檢查異常...
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <div
+    class="last-update"
+    id="lastUpdate"
+  >
+    尚未更新
+  </div>
+
+</div>
+
+
+<script>
+
+/* ============================================================
+   UBee 調度中心 V1
+   第一版只讀監控
+============================================================ */
+
+
+/* =========================
+   HTML 安全處理
+========================= */
+
+function escapeHtml(value){
+
+  return String(
+    value ?? ""
+  ).replace(
+    /[&<>"']/g,
+    char => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    }[char])
+  );
+
+}
+
+
+/* =========================
+   時間差
+========================= */
+
+function formatAge(ms){
+
+  const timestamp =
+    Number(ms || 0);
+
+  if(
+    !Number.isFinite(timestamp) ||
+    timestamp <= 0
+  ){
+    return "-";
+  }
+
+  const seconds =
+    Math.max(
+      0,
+      Math.floor(
+        (
+          Date.now() -
+          timestamp
+        ) / 1000
+      )
+    );
+
+  if(seconds < 60){
+
+    return (
+      seconds +
+      " 秒前"
+    );
+
+  }
+
+  const minutes =
+    Math.floor(
+      seconds / 60
+    );
+
+  if(minutes < 60){
+
+    return (
+      minutes +
+      " 分鐘前"
+    );
+
+  }
+
+  const hours =
+    Math.floor(
+      minutes / 60
+    );
+
+  return (
+    hours +
+    " 小時前"
+  );
+
+}
+
+
+/* =========================
+   金額格式
+========================= */
+
+function formatMoney(value){
+
+  const numberValue =
+    Number(value || 0);
+
+  if(!Number.isFinite(numberValue)){
+    return "0";
+  }
+
+  return Math.round(
+    numberValue
+  ).toLocaleString(
+    "zh-TW"
+  );
+
+}
+
+
+/* =========================
+   訂單狀態文字
+========================= */
+
+function getStatusText(order){
+
+  if(
+    order.statusLabel
+  ){
+    return order.statusLabel;
+  }
+
+  const status =
+    String(
+      order.status || ""
+    ).trim();
+
+  const map = {
+
+    pending:
+      "等待接單",
+
+    waiting:
+      "等待接單",
+
+    searching:
+      "搜尋小U",
+
+    dispatching:
+      "派單中",
+
+    redispatching:
+      "重新派單",
+
+    accepted:
+      "已接單",
+
+    heading_to_pickup:
+      "前往取件",
+
+    arrived_pickup:
+      "抵達取件點",
+
+    picked_up:
+      "已取件",
+
+    heading_to_dropoff:
+      "配送中",
+
+    arrived_dropoff:
+      "抵達送達點",
+
+    completed:
+      "已完成",
+
+    cancelled:
+      "已取消"
+
+  };
+
+  return (
+    map[status] ||
+    status ||
+    "未知"
+  );
+
+}
+
+
+/* =========================
+   渲染訂單
+========================= */
+
+function renderOrders(
+  orders
+){
+
+  const container =
+    document.getElementById(
+      "orders"
+    );
+
+  if(
+    !Array.isArray(orders) ||
+    orders.length === 0
+  ){
+
+    container.innerHTML =
+      `
+      <div class="empty">
+        目前沒有即時訂單
+      </div>
+      `;
+
+    return;
+
+  }
+
+  container.innerHTML =
+    orders
+      .map(order => {
+
+        const riderName =
+          order.riderName ||
+          "尚未接單";
+
+        return `
+          <div class="order-card">
+
+            <div class="row">
+
+              <span class="order-id">
+                ${escapeHtml(
+                  order.id
+                )}
+              </span>
+
+              <span class="status">
+                ${escapeHtml(
+                  getStatusText(
+                    order
+                  )
+                )}
+              </span>
+
+            </div>
+
+
+            <div class="route">
+
+              📍
+              ${escapeHtml(
+                order.pickupAddress ||
+                "-"
+              )}
+
+              <br>
+
+              ↓
+
+              <br>
+
+              🏁
+              ${escapeHtml(
+                order.dropoffAddress ||
+                "-"
+              )}
+
+            </div>
+
+
+            <div
+              class="row
+                     muted
+                     order-bottom"
+            >
+
+              <span>
+
+                NT$
+                ${formatMoney(
+                  order.total
+                )}
+
+                ·
+
+                ${escapeHtml(
+                  riderName
+                )}
+
+              </span>
+
+              <span>
+
+                建立
+                ${escapeHtml(
+                  formatAge(
+                    order.createdAtMs
+                  )
+                )}
+
+              </span>
+
+            </div>
+
+          </div>
+        `;
+
+      })
+      .join("");
+
+}
+
+
+/* =========================
+   渲染小U
+========================= */
+
+function renderRiders(
+  riders
+){
+
+  const container =
+    document.getElementById(
+      "riders"
+    );
+
+  if(
+    !Array.isArray(riders) ||
+    riders.length === 0
+  ){
+
+    container.innerHTML =
+      `
+      <div class="empty">
+        目前沒有在線小U
+      </div>
+      `;
+
+    return;
+
+  }
+
+  container.innerHTML =
+    riders
+      .map(rider => {
+
+        const name =
+          rider.name ||
+          rider.riderId ||
+          "小U";
+
+        const locationText =
+          rider.district ||
+          rider.serviceArea ||
+          "";
+
+        const stateText =
+          rider.busy
+            ? "任務中"
+            : "可接單";
+
+        const dotClass =
+          rider.busy
+            ? "blue"
+            : "green";
+
+        return `
+          <div class="rider-item">
+
+            <div class="row">
+
+              <b>
+
+                <span
+                  class="dot
+                         ${dotClass}"
+                ></span>
+
+                ${escapeHtml(
+                  name
+                )}
+
+              </b>
+
+              <span class="muted">
+
+                ${escapeHtml(
+                  stateText
+                )}
+
+              </span>
+
+            </div>
+
+
+            <div class="muted">
+
+              最後定位：
+
+              ${escapeHtml(
+                formatAge(
+                  rider.locationUpdatedAtMs
+                )
+              )}
+
+              ${
+                locationText
+                  ? " · " +
+                    escapeHtml(
+                      locationText
+                    )
+                  : ""
+              }
+
+            </div>
+
+          </div>
+        `;
+
+      })
+      .join("");
+
+}
+
+
+/* =========================
+   渲染異常
+========================= */
+
+function renderAlerts(
+  alerts
+){
+
+  const container =
+    document.getElementById(
+      "alertList"
+    );
+
+  if(
+    !Array.isArray(alerts) ||
+    alerts.length === 0
+  ){
+
+    container.innerHTML =
+      `
+      <div class="empty">
+        目前沒有異常
+      </div>
+      `;
+
+    return;
+
+  }
+
+  container.innerHTML =
+    alerts
+      .map(alert => {
+
+        return `
+          <div class="alert-card">
+
+            <b>
+              ${escapeHtml(
+                alert.title ||
+                "異常提醒"
+              )}
+            </b>
+
+            <br>
+
+            ${escapeHtml(
+              alert.message ||
+              ""
+            )}
+
+          </div>
+        `;
+
+      })
+      .join("");
+
+}
+
+
+/* =========================
+   更新統計
+========================= */
+
+function renderSummary(
+  summary
+){
+
+  const data =
+    summary || {};
+
+  document.getElementById(
+    "online"
+  ).textContent =
+    Number(
+      data.onlineRiders || 0
+    );
+
+
+  document.getElementById(
+    "available"
+  ).textContent =
+    Number(
+      data.availableRiders || 0
+    );
+
+
+  document.getElementById(
+    "waiting"
+  ).textContent =
+    Number(
+      data.waitingOrders || 0
+    );
+
+
+  document.getElementById(
+    "active"
+  ).textContent =
+    Number(
+      data.activeOrders || 0
+    );
+
+
+  document.getElementById(
+    "completed"
+  ).textContent =
+    Number(
+      data.todayCompleted || 0
+    );
+
+}
+
+
+/* =========================
+   主資料讀取
+========================= */
+
+async function loadDashboard(){
+
+  try{
+
+    const response =
+      await fetch(
+        "/api/dispatch/dashboard",
+        {
+          method:
+            "GET",
+
+          cache:
+            "no-store",
+
+          headers:{
+            "Accept":
+              "application/json"
+          }
+        }
+      );
+
+    let data = null;
+
+    try{
+
+      data =
+        await response.json();
+
+    }catch(error){
+
+      throw new Error(
+        "後端回傳資料格式錯誤"
+      );
+
+    }
+
+    if(
+      !response.ok ||
+      !data ||
+      data.success !== true
+    ){
+
+      throw new Error(
+        data?.message ||
+        "調度中心資料讀取失敗"
+      );
+
+    }
+
+
+    /* 統計 */
+
+    renderSummary(
+      data.summary
+    );
+
+
+    /* 訂單 */
+
+    renderOrders(
+      data.orders
+    );
+
+
+    /* 小U */
+
+    renderRiders(
+      data.riders
+    );
+
+
+    /* 異常 */
+
+    const alerts =
+      Array.isArray(
+        data.alerts
+      )
+        ? data.alerts
+        : [];
+
+    document.getElementById(
+      "alerts"
+    ).textContent =
+      alerts.length;
+
+    renderAlerts(
+      alerts
+    );
+
+
+    /* 更新時間 */
+
+    document.getElementById(
+      "lastUpdate"
+    ).textContent =
+      "最後更新：" +
+      new Date().toLocaleString(
+        "zh-TW",
+        {
+          hour12:false
+        }
+      );
+
+  }catch(error){
+
+    console.error(
+      "UBee 調度中心讀取失敗：",
+      error
+    );
+
+
+    document.getElementById(
+      "alertList"
+    ).innerHTML =
+      `
+      <div class="alert-card">
+
+        <b>
+          調度中心資料讀取失敗
+        </b>
+
+        <br>
+
+        ${escapeHtml(
+          error.message ||
+          "未知錯誤"
+        )}
+
+      </div>
+      `;
+
+
+    document.getElementById(
+      "lastUpdate"
+    ).textContent =
+      "更新失敗";
+
+  }
+
+}
+
+
+/* =========================
+   啟動
+========================= */
+
+loadDashboard();
+
+
+/* 每 10 秒重新取得資料 */
+
+setInterval(
+  loadDashboard,
+  10000
+);
+
+</script>
+
+</body>
+</html>
