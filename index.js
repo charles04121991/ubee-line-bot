@@ -5653,128 +5653,1142 @@ app.get('/order.html', (req, res) => {
 });
 
 // ============================================================
-// UBee 調度中心 V1：只讀監控 API
-// 建議放在 express.static(...) 之前。
-// 第一版只讀，不提供改價、完成訂單、付款狀態或人工指定小U寫入。
+// UBee 智慧調度中心 V3：Dashboard 基礎資料 API
+// 第一階段：精準訂單 / 小U狀態 / 異常偵測
 // ============================================================
+
 app.get('/api/dispatch/dashboard', async (req, res) => {
+
   try {
-    const nowMs = Date.now();
-    const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
-    const taipeiNow = new Date(nowMs + TAIPEI_OFFSET_MS);
-    const todayStartMs = Date.UTC(
-      taipeiNow.getUTCFullYear(),
-      taipeiNow.getUTCMonth(),
-      taipeiNow.getUTCDate(), 0, 0, 0, 0
-    ) - TAIPEI_OFFSET_MS;
+
+    const nowMs =
+      Date.now();
+
+    const TAIPEI_OFFSET_MS =
+      8 * 60 * 60 * 1000;
+
+    const taipeiNow =
+      new Date(
+        nowMs +
+        TAIPEI_OFFSET_MS
+      );
+
+    const todayStartMs =
+      Date.UTC(
+        taipeiNow.getUTCFullYear(),
+        taipeiNow.getUTCMonth(),
+        taipeiNow.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
+      -
+      TAIPEI_OFFSET_MS;
+
+
+    // ========================================================
+    // 時間轉毫秒
+    // ========================================================
 
     const toMs = value => {
-      if (!value) return 0;
-      if (typeof value.toDate === 'function') return value.toDate().getTime();
-      if (typeof value.seconds === 'number') return value.seconds * 1000;
-      if (typeof value._seconds === 'number') return value._seconds * 1000;
-      if (typeof value === 'number') return value;
-      const parsed = new Date(value).getTime();
-      return Number.isFinite(parsed) ? parsed : 0;
+
+      if (!value) {
+        return 0;
+      }
+
+      if (
+        typeof value.toDate ===
+        'function'
+      ) {
+
+        return value
+          .toDate()
+          .getTime();
+
+      }
+
+      if (
+        typeof value.seconds ===
+        'number'
+      ) {
+
+        return (
+          value.seconds *
+          1000
+        );
+
+      }
+
+      if (
+        typeof value._seconds ===
+        'number'
+      ) {
+
+        return (
+          value._seconds *
+          1000
+        );
+
+      }
+
+      if (
+        typeof value ===
+        'number'
+      ) {
+
+        return value;
+
+      }
+
+      const parsed =
+        new Date(
+          value
+        ).getTime();
+
+      return Number.isFinite(
+        parsed
+      )
+        ?
+        parsed
+        :
+        0;
+
     };
 
-    const riderSnap = await db.collection('riders').limit(1000).get();
-    const riders = riderSnap.docs.map(doc => {
-      const r = doc.data() || {};
-      const locationUpdatedAtMs = Number(r.locationUpdatedAtMs || r.lastActiveMs || 0);
-      const isFresh = locationUpdatedAtMs > 0 && (nowMs - locationUpdatedAtMs) <= 5 * 60 * 1000;
-      const online = r.online === true && isFresh;
-      const busy = r.busy === true || !!String(r.currentOrderId || '').trim();
-      return {
-        riderId: r.riderId || doc.id,
-        name: r.name || '',
-        phone: r.phone || '',
-        district: r.district || '',
-        serviceArea: r.serviceArea || r.area || '',
-        online,
-        busy,
-        currentOrderId: r.currentOrderId || '',
-        currentLat: Number.isFinite(Number(r.currentLat)) ? Number(r.currentLat) : null,
-        currentLng: Number.isFinite(Number(r.currentLng)) ? Number(r.currentLng) : null,
-        locationUpdatedAtMs
-      };
-    }).filter(r => r.online);
 
-    const orderSnap = await db.collection('orders').limit(500).get();
-    const allOrders = orderSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+    // ========================================================
+    // 訂單狀態群組
+    // ========================================================
 
-    const waitingStatuses = new Set(['pending', 'waiting', 'searching', 'dispatching', 'redispatching']);
-    const activeStatuses = new Set(['accepted', 'heading_to_pickup', 'arrived_pickup', 'picked_up', 'heading_to_dropoff', 'arrived_dropoff']);
-    const completedStatuses = new Set(['completed']);
+    const waitingStatuses =
+      new Set([
+        'pending',
+        'waiting',
+        'searching',
+        'dispatching',
+        'redispatching'
+      ]);
 
-    const orderTimeMs = o =>
-      Number(o.createdAtMs || o.orderCreatedAtMs || o.submittedAtMs || 0) ||
-      toMs(o.createdAt) || toMs(o.orderCreatedAt) || toMs(o.submittedAt);
 
-    const completedTimeMs = o =>
-      Number(o.completedAtMs || o.completedAt || 0) ||
-      toMs(o.completedAt) ||
-      toMs(o.statusTimes && o.statusTimes.completed);
+    const activeStatuses =
+      new Set([
+        'accepted',
+        'heading_to_pickup',
+        'arrived_pickup',
+        'picked_up',
+        'heading_to_dropoff',
+        'arrived_dropoff'
+      ]);
 
-    const liveOrders = allOrders
-      .filter(o => waitingStatuses.has(String(o.status || '').trim()) || activeStatuses.has(String(o.status || '').trim()))
-      .sort((a,b) => orderTimeMs(b) - orderTimeMs(a))
-      .slice(0,100)
-      .map(o => ({
-        id: o.id,
-        status: o.status || '',
-        statusLabel: typeof getStatusLabel === 'function' ? getStatusLabel(o.status) : (o.status || ''),
-        pickupAddress: o.pickupAddress || '',
-        dropoffAddress: o.dropoffAddress || '',
-        pickupLat: o.pickupLat ?? null,
-        pickupLng: o.pickupLng ?? null,
-        dropoffLat: o.dropoffLat ?? null,
-        dropoffLng: o.dropoffLng ?? null,
-        total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
-        riderName: o.riderName || o.driverName || '',
-        riderId: o.riderId || o.riderDocId || '',
-        createdAtMs: orderTimeMs(o)
-      }));
 
-    const waitingOrders = liveOrders.filter(o => waitingStatuses.has(String(o.status || '').trim()));
-    const activeOrders = liveOrders.filter(o => activeStatuses.has(String(o.status || '').trim()));
-    const todayCompleted = allOrders.filter(o =>
-      completedStatuses.has(String(o.status || '').trim()) &&
-      completedTimeMs(o) >= todayStartMs
-    ).length;
+    const completedStatuses =
+      new Set([
+        'completed'
+      ]);
 
-    const alerts = [];
-    waitingOrders.forEach(o => {
-      const ageMs = nowMs - Number(o.createdAtMs || nowMs);
-      if (ageMs >= 5 * 60 * 1000) {
-        alerts.push({ type:'waiting_5m', title:'超過 5 分鐘無人接單', message:`${o.id} 已等待 ${Math.floor(ageMs/60000)} 分鐘` });
-      } else if (ageMs >= 3 * 60 * 1000) {
-        alerts.push({ type:'waiting_3m', title:'超過 3 分鐘無人接單', message:`${o.id} 已等待 ${Math.floor(ageMs/60000)} 分鐘` });
+
+    // ========================================================
+    // 先讀取訂單
+    // 重要：必須先讀訂單，才能正確判斷 rider 是否真的忙碌
+    // ========================================================
+
+    const orderSnap =
+      await db
+        .collection('orders')
+        .limit(1000)
+        .get();
+
+
+    const allOrders =
+      orderSnap.docs.map(
+        doc => ({
+          id:
+            doc.id,
+
+          ...(
+            doc.data() ||
+            {}
+          )
+        })
+      );
+
+
+    // 建立訂單 Map
+    // currentOrderId 可以快速核對實際訂單
+
+    const orderMap =
+      new Map();
+
+    allOrders.forEach(
+      order => {
+
+        orderMap.set(
+          String(
+            order.id
+          ),
+          order
+        );
+
       }
-    });
+    );
+
+
+    // ========================================================
+    // 訂單時間
+    // ========================================================
+
+    const orderTimeMs = order =>
+
+      Number(
+        order.createdAtMs ||
+        order.orderCreatedAtMs ||
+        order.submittedAtMs ||
+        0
+      )
+
+      ||
+
+      toMs(
+        order.createdAt
+      )
+
+      ||
+
+      toMs(
+        order.orderCreatedAt
+      )
+
+      ||
+
+      toMs(
+        order.submittedAt
+      );
+
+
+    const completedTimeMs = order =>
+
+      Number(
+        order.completedAtMs ||
+        0
+      )
+
+      ||
+
+      toMs(
+        order.completedAt
+      )
+
+      ||
+
+      toMs(
+        order.statusTimes &&
+        order.statusTimes.completed
+      );
+
+
+    // ========================================================
+    // 讀取小U
+    // ========================================================
+
+    const riderSnap =
+      await db
+        .collection('riders')
+        .limit(1000)
+        .get();
+
+
+    const riderStateAlerts =
+      [];
+
+
+    const riders =
+      riderSnap.docs
+        .map(
+          doc => {
+
+            const rider =
+              doc.data() ||
+              {};
+
+
+            const riderId =
+
+              rider.riderId
+
+              ||
+
+              doc.id;
+
+
+            const locationUpdatedAtMs =
+
+              Number(
+
+                rider.locationUpdatedAtMs
+
+                ||
+
+                rider.lastActiveMs
+
+                ||
+
+                0
+
+              );
+
+
+            // GPS / 活躍時間
+            // 5 分鐘內才算即時在線
+
+            const isLocationFresh =
+
+              locationUpdatedAtMs >
+              0
+
+              &&
+
+              (
+                nowMs -
+                locationUpdatedAtMs
+              )
+
+              <=
+
+              5 *
+              60 *
+              1000;
+
+
+            const online =
+
+              rider.online ===
+              true
+
+              &&
+
+              isLocationFresh;
+
+
+            const currentOrderId =
+
+              String(
+
+                rider.currentOrderId
+
+                ||
+
+                ''
+
+              ).trim();
+
+
+            const rawBusy =
+
+              rider.busy ===
+              true;
+
+
+            // ==================================================
+            // 真實任務狀態判斷
+            // ==================================================
+
+            let currentOrder =
+              null;
+
+            let currentOrderStatus =
+              '';
+
+            let hasActiveOrder =
+              false;
+
+
+            if (
+              currentOrderId
+            ) {
+
+              currentOrder =
+                orderMap.get(
+                  currentOrderId
+                )
+
+                ||
+
+                null;
+
+
+              if (
+                currentOrder
+              ) {
+
+                currentOrderStatus =
+
+                  String(
+
+                    currentOrder.status
+
+                    ||
+
+                    ''
+
+                  ).trim();
+
+
+                hasActiveOrder =
+
+                  activeStatuses.has(
+                    currentOrderStatus
+                  );
+
+              }
+
+            }
+
+
+            // ==================================================
+            // 最終 busy
+            //
+            // 不再單純相信 rider.busy
+            // 只有真的存在有效進行中訂單才算任務中
+            // ==================================================
+
+            const busy =
+              hasActiveOrder;
+
+
+            // ==================================================
+            // 狀態異常偵測
+            // ==================================================
+
+            let stateIssue =
+              '';
+
+
+            // busy=true，但沒有 currentOrderId
+
+            if (
+              rawBusy &&
+              !currentOrderId
+            ) {
+
+              stateIssue =
+                'busy_true_without_order';
+
+              riderStateAlerts.push({
+
+                type:
+                  'rider_state_mismatch',
+
+                severity:
+                  'warning',
+
+                riderId,
+
+                title:
+                  '小U狀態不同步',
+
+                message:
+
+                  `${
+                    rider.name ||
+                    riderId
+                  } 顯示 busy=true，但沒有 currentOrderId`
+
+              });
+
+            }
+
+
+            // currentOrderId 有值，但訂單不存在
+
+            else if (
+              currentOrderId &&
+              !currentOrder
+            ) {
+
+              stateIssue =
+                'order_not_found';
+
+              riderStateAlerts.push({
+
+                type:
+                  'rider_order_missing',
+
+                severity:
+                  'warning',
+
+                riderId,
+
+                orderId:
+                  currentOrderId,
+
+                title:
+                  '小U任務資料異常',
+
+                message:
+
+                  `${
+                    rider.name ||
+                    riderId
+                  } 的 currentOrderId=${currentOrderId}，但找不到該訂單`
+
+              });
+
+            }
+
+
+            // 有 currentOrderId，但訂單已不是進行中
+
+            else if (
+              currentOrderId &&
+              currentOrder &&
+              !hasActiveOrder
+            ) {
+
+              stateIssue =
+                'stale_current_order';
+
+              riderStateAlerts.push({
+
+                type:
+                  'rider_stale_order',
+
+                severity:
+                  'warning',
+
+                riderId,
+
+                orderId:
+                  currentOrderId,
+
+                title:
+                  '小U任務狀態殘留',
+
+                message:
+
+                  `${
+                    rider.name ||
+                    riderId
+                  } 的 currentOrderId=${currentOrderId}，但訂單狀態為 ${currentOrderStatus || '未知'}`
+
+              });
+
+            }
+
+
+            // busy=true，但真實訂單不是 active
+
+            else if (
+              rawBusy &&
+              !hasActiveOrder
+            ) {
+
+              stateIssue =
+                'stale_busy';
+
+              riderStateAlerts.push({
+
+                type:
+                  'rider_busy_mismatch',
+
+                severity:
+                  'warning',
+
+                riderId,
+
+                title:
+                  '小U busy 狀態殘留',
+
+                message:
+
+                  `${
+                    rider.name ||
+                    riderId
+                  } 的 busy=true，但目前沒有有效進行中任務`
+
+              });
+
+            }
+
+
+            return {
+
+              riderId,
+
+              name:
+                rider.name ||
+                '',
+
+              phone:
+                rider.phone ||
+                '',
+
+              district:
+                rider.district ||
+                '',
+
+              serviceArea:
+
+                rider.serviceArea
+
+                ||
+
+                rider.area
+
+                ||
+
+                '',
+
+
+              online,
+
+              busy,
+
+              rawBusy,
+
+              hasActiveOrder,
+
+              stateIssue,
+
+
+              currentOrderId,
+
+              currentOrderStatus,
+
+
+              currentLat:
+
+                Number.isFinite(
+                  Number(
+                    rider.currentLat
+                  )
+                )
+
+                  ?
+
+                  Number(
+                    rider.currentLat
+                  )
+
+                  :
+
+                  null,
+
+
+              currentLng:
+
+                Number.isFinite(
+                  Number(
+                    rider.currentLng
+                  )
+                )
+
+                  ?
+
+                  Number(
+                    rider.currentLng
+                  )
+
+                  :
+
+                  null,
+
+
+              locationUpdatedAtMs
+
+            };
+
+          }
+
+        )
+
+        .filter(
+          rider =>
+            rider.online
+        );
+
+
+    // ========================================================
+    // 即時訂單
+    // ========================================================
+
+    const liveOrders =
+
+      allOrders
+
+        .filter(
+          order => {
+
+            const status =
+
+              String(
+
+                order.status
+
+                ||
+
+                ''
+
+              ).trim();
+
+
+            return (
+
+              waitingStatuses.has(
+                status
+              )
+
+              ||
+
+              activeStatuses.has(
+                status
+              )
+
+            );
+
+          }
+        )
+
+        .sort(
+          (
+            a,
+            b
+          ) =>
+
+            orderTimeMs(
+              b
+            )
+
+            -
+
+            orderTimeMs(
+              a
+            )
+        )
+
+        .slice(
+          0,
+          200
+        )
+
+        .map(
+          order => ({
+
+            id:
+              order.id,
+
+            status:
+              order.status ||
+              '',
+
+            statusLabel:
+
+              typeof getStatusLabel ===
+              'function'
+
+                ?
+
+                getStatusLabel(
+                  order.status
+                )
+
+                :
+
+                (
+                  order.status ||
+                  ''
+                ),
+
+
+            pickupAddress:
+              order.pickupAddress ||
+              '',
+
+            dropoffAddress:
+              order.dropoffAddress ||
+              '',
+
+
+            pickupLat:
+
+              order.pickupLat
+
+              ??
+
+              null,
+
+            pickupLng:
+
+              order.pickupLng
+
+              ??
+
+              null,
+
+
+            dropoffLat:
+
+              order.dropoffLat
+
+              ??
+
+              null,
+
+            dropoffLng:
+
+              order.dropoffLng
+
+              ??
+
+              null,
+
+
+            total:
+
+              Number(
+
+                order.total
+
+                ||
+
+                order.customerPayableTotal
+
+                ||
+
+                order.finalTotal
+
+                ||
+
+                0
+
+              ),
+
+
+            riderName:
+
+              order.riderName
+
+              ||
+
+              order.driverName
+
+              ||
+
+              '',
+
+
+            riderId:
+
+              order.riderId
+
+              ||
+
+              order.riderDocId
+
+              ||
+
+              '',
+
+
+            createdAtMs:
+
+              orderTimeMs(
+                order
+              )
+
+          })
+        );
+
+
+    // ========================================================
+    // 訂單分類
+    // ========================================================
+
+    const waitingOrders =
+
+      liveOrders.filter(
+        order =>
+
+          waitingStatuses.has(
+
+            String(
+              order.status ||
+              ''
+            ).trim()
+
+          )
+      );
+
+
+    const activeOrders =
+
+      liveOrders.filter(
+        order =>
+
+          activeStatuses.has(
+
+            String(
+              order.status ||
+              ''
+            ).trim()
+
+          )
+      );
+
+
+    const todayCompleted =
+
+      allOrders.filter(
+        order => {
+
+          const status =
+
+            String(
+
+              order.status
+
+              ||
+
+              ''
+
+            ).trim();
+
+
+          return (
+
+            completedStatuses.has(
+              status
+            )
+
+            &&
+
+            completedTimeMs(
+              order
+            )
+
+            >=
+
+            todayStartMs
+
+          );
+
+        }
+      ).length;
+
+
+    // ========================================================
+    // 異常中心
+    // ========================================================
+
+    const alerts =
+      [
+        ...riderStateAlerts
+      ];
+
+
+    waitingOrders.forEach(
+      order => {
+
+        const ageMs =
+
+          nowMs
+
+          -
+
+          Number(
+            order.createdAtMs ||
+            nowMs
+          );
+
+
+        if (
+          ageMs >=
+          5 *
+          60 *
+          1000
+        ) {
+
+          alerts.push({
+
+            type:
+              'waiting_5m',
+
+            severity:
+              'high',
+
+            orderId:
+              order.id,
+
+            title:
+              '超過 5 分鐘無人接單',
+
+            message:
+
+              `${order.id} 已等待 ${Math.floor(
+                ageMs /
+                60000
+              )} 分鐘`
+
+          });
+
+        }
+
+        else if (
+          ageMs >=
+          3 *
+          60 *
+          1000
+        ) {
+
+          alerts.push({
+
+            type:
+              'waiting_3m',
+
+            severity:
+              'warning',
+
+            orderId:
+              order.id,
+
+            title:
+              '超過 3 分鐘無人接單',
+
+            message:
+
+              `${order.id} 已等待 ${Math.floor(
+                ageMs /
+                60000
+              )} 分鐘`
+
+          });
+
+        }
+
+      }
+    );
+
+
+    // ========================================================
+    // 可接單小U
+    //
+    // 必須：
+    // online=true
+    // 沒有有效進行中訂單
+    // ========================================================
+
+    const availableRiders =
+
+      riders.filter(
+        rider =>
+          !rider.busy
+      );
+
+
+    // ========================================================
+    // Response
+    // ========================================================
 
     return res.json({
-      success: true,
-      generatedAtMs: nowMs,
-      summary: {
-        onlineRiders: riders.length,
-        availableRiders: riders.filter(r => !r.busy).length,
-        waitingOrders: waitingOrders.length,
-        activeOrders: activeOrders.length,
-        todayCompleted
+
+      success:
+        true,
+
+      version:
+        'V3-framework',
+
+      generatedAtMs:
+        nowMs,
+
+
+      summary:{
+
+        onlineRiders:
+          riders.length,
+
+        availableRiders:
+          availableRiders.length,
+
+        busyRiders:
+
+          riders.filter(
+            rider =>
+              rider.busy
+          ).length,
+
+        stateIssueRiders:
+
+          riders.filter(
+            rider =>
+              !!rider.stateIssue
+          ).length,
+
+        waitingOrders:
+          waitingOrders.length,
+
+        activeOrders:
+          activeOrders.length,
+
+        todayCompleted,
+
+        alertCount:
+          alerts.length
+
       },
-      orders: liveOrders,
-      riders: riders.slice(0,200),
-      alerts: alerts.slice(0,100)
+
+
+      orders:
+        liveOrders,
+
+
+      riders:
+
+        riders.slice(
+          0,
+          300
+        ),
+
+
+      alerts:
+
+        alerts.slice(
+          0,
+          200
+        )
+
     });
+
+
   } catch (err) {
-    console.error('❌ UBee 調度中心 dashboard 讀取失敗：', err);
-    return res.status(500).json({
-      success: false,
-      message: '調度中心資料讀取失敗，請稍後再試。',
-      error: err.message
-    });
+
+    console.error(
+
+      '❌ UBee V3 調度中心 dashboard 讀取失敗：',
+
+      err
+
+    );
+
+
+    return res
+      .status(500)
+      .json({
+
+        success:
+          false,
+
+        message:
+
+          '調度中心資料讀取失敗，請稍後再試。',
+
+        error:
+
+          err.message
+
+      });
+
   }
+
 });
 
 app.get('/dispatch.html', (req, res) => {
