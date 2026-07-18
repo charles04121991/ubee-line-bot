@@ -2,4457 +2,1184 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta
-  name="viewport"
-  content="width=device-width,initial-scale=1,viewport-fit=cover"
->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>UBee 跑腿｜調度中心</title>
 
-<title>UBee 智慧調度中心 V3</title>
+<!-- Leaflet：免 Google Maps API Key，即可顯示 OpenStreetMap -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIINfQ3ynNHDN1+1yNYz0KyjMZ83SkvXQfs="
+      crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
 
 <style>
-
-*{
-  box-sizing:border-box;
-}
-
 :root{
   --bg:#f4f5f7;
-  --card:#ffffff;
-  --line:#e8e8eb;
-  --text:#111111;
-  --muted:#757575;
-
+  --card:#fff;
+  --text:#101114;
+  --muted:#737780;
+  --line:#e8e9ed;
   --yellow:#f5b800;
-  --green:#27ae60;
-  --blue:#2f80ed;
-  --orange:#f2994a;
-  --red:#e53935;
-  --gray:#9aa0a6;
+  --yellow2:#ffd84d;
+  --black:#101114;
+  --green:#20a464;
+  --blue:#3478f6;
+  --orange:#f59e0b;
+  --red:#e5484d;
+  --purple:#7c5cff;
+  --shadow:0 10px 30px rgba(16,17,20,.06);
 }
-
-body{
-  margin:0;
-
-  background:var(--bg);
-  color:var(--text);
-
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Noto Sans TC",
-    sans-serif;
-}
-
-button,
-select{
-  font-family:inherit;
-}
-
-.app{
-  max-width:1500px;
-
-  margin:0 auto;
-
-  padding:18px;
-}
-
-
-/* ============================================================
-   頂部
-============================================================ */
-
-.top{
-  display:flex;
-
-  justify-content:
-    space-between;
-
-  align-items:center;
-
-  gap:14px;
-
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app{max-width:1600px;margin:0 auto;padding:18px}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
   margin-bottom:14px;
 }
-
-.brand{
-  display:flex;
-
-  align-items:center;
-
-  gap:8px;
-
-  flex-wrap:wrap;
-
-  font-size:28px;
-
-  font-weight:1000;
+.brand-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-size:28px;font-weight:1000;letter-spacing:-.6px}
+.brand .bee{color:var(--yellow)}
+.version{
+  display:inline-flex;align-items:center;gap:7px;
+  background:#111;color:#fff;padding:7px 11px;border-radius:999px;
+  font-size:12px;font-weight:900
 }
-
-.brand b{
-  color:var(--yellow);
+.status-live{
+  display:inline-flex;align-items:center;gap:7px;color:#42505d;font-size:13px;font-weight:800
 }
-
-.badge{
-  background:#111;
-
-  color:#fff;
-
-  border-radius:999px;
-
-  padding:7px 10px;
-
-  font-size:12px;
-
-  font-weight:900;
-}
-
-.top-actions{
-  display:flex;
-
-  gap:8px;
-
-  align-items:center;
-
-  flex-wrap:wrap;
-}
-
-.control{
-  border:1px solid var(--line);
-
-  background:#fff;
-
-  border-radius:12px;
-
-  padding:10px 12px;
-
-  font-weight:800;
-}
-
+.live-dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(32,164,100,.12)}
+.actions{display:flex;gap:8px;align-items:center}
 .btn{
-  border:0;
-
-  background:#111;
-
-  color:#fff;
-
-  border-radius:12px;
-
-  padding:10px 14px;
-
-  font-weight:900;
-
-  cursor:pointer;
+  border:1px solid var(--line);background:#fff;color:#111;border-radius:12px;
+  padding:10px 13px;font-weight:900;box-shadow:0 3px 10px rgba(0,0,0,.03)
 }
-
-.system{
-  font-size:13px;
-
-  font-weight:900;
-
-  color:var(--green);
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{background:#111;color:#fff;border-color:#111}
+.btn.yellow{background:var(--yellow);border-color:var(--yellow);color:#111}
+.btn.danger{background:#fff3f3;color:#c83238;border-color:#ffd6d8}
+.btn.small{padding:8px 10px;font-size:12px;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.kpis{
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px
 }
-
-
-/* ============================================================
-   統計卡
-============================================================ */
-
-.stats{
-  display:grid;
-
-  grid-template-columns:
-    repeat(7,1fr);
-
-  gap:10px;
+.kpi{
+  background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;
+  box-shadow:var(--shadow);min-width:0
 }
+.kpi .label{font-size:12px;font-weight:900;color:var(--muted)}
+.kpi .value{font-size:29px;font-weight:1000;margin-top:5px;line-height:1}
+.kpi .sub{font-size:11px;color:#8b8f97;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.stat{
-  background:#fff;
-
-  border:
-    1px solid
-    var(--line);
-
-  border-radius:18px;
-
-  padding:15px;
-
-  box-shadow:
-    0 6px 20px
-    rgba(0,0,0,.035);
+.main-grid{
+  display:grid;grid-template-columns:minmax(360px,.95fr) minmax(520px,1.35fr);gap:14px
 }
-
-.stat .t{
-  font-size:12px;
-
-  color:var(--muted);
-
-  font-weight:800;
-}
-
-.stat .n{
-  font-size:27px;
-
-  font-weight:1000;
-
-  margin-top:5px;
-}
-
-.stat .s{
-  font-size:11px;
-
-  color:var(--muted);
-
-  margin-top:4px;
-}
-
-
-/* ============================================================
-   主版面
-============================================================ */
-
-.grid{
-  display:grid;
-
-  grid-template-columns:
-    330px
-    minmax(0,1fr)
-    360px;
-
-  gap:12px;
-
-  margin-top:12px;
-}
-
 .panel{
-  background:#fff;
-
-  border:
-    1px solid
-    var(--line);
-
-  border-radius:18px;
-
-  padding:14px;
-
-  box-shadow:
-    0 6px 20px
-    rgba(0,0,0,.035);
+  background:var(--card);border:1px solid var(--line);border-radius:18px;
+  box-shadow:var(--shadow);overflow:hidden
 }
-
-.panel-title{
-  display:flex;
-
-  justify-content:
-    space-between;
-
-  align-items:center;
-
-  gap:8px;
-
-  margin-bottom:12px;
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:15px 16px;border-bottom:1px solid var(--line)
 }
+.panel-title{font-size:17px;font-weight:1000}
+.panel-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.panel-body{padding:14px}
+.left-stack,.right-stack{display:grid;gap:14px;align-content:start}
 
-.panel-title h2{
-  font-size:18px;
-
-  margin:0;
+.filters{display:flex;gap:7px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;
+  font-size:12px;font-weight:900;color:#565b63
 }
+.chip.active{background:#111;color:#fff;border-color:#111}
 
-.small{
-  font-size:12px;
-
-  color:var(--muted);
-}
-
-.stack{
-  display:grid;
-
-  gap:12px;
-}
-
-
-/* ============================================================
-   訂單
-============================================================ */
-
-.order-card,
-.alert-card,
-.recommend-card,
-.region-card,
-.rider-card{
-
-  border:
-    1px solid
-    var(--line);
-
-  border-radius:14px;
-
-  padding:12px;
-
-  background:#fff;
-
-  margin-bottom:9px;
-}
-
+.order-list{display:grid;gap:10px}
 .order-card{
-  cursor:pointer;
+  border:1px solid var(--line);border-radius:15px;padding:13px;background:#fff;
+  transition:.16s ease
 }
-
-.order-card.selected{
-  outline:
-    2px solid
-    #111;
+.order-card:hover{border-color:#d6d8de;box-shadow:0 8px 22px rgba(0,0,0,.04)}
+.order-card.selected{border:2px solid var(--yellow);padding:12px;background:#fffdf3}
+.order-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.order-id{font-weight:1000;font-size:14px;word-break:break-all}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.badge{
+  display:inline-flex;align-items:center;border-radius:999px;padding:4px 7px;
+  font-size:10px;font-weight:1000;background:#f1f2f4;color:#5b6068
 }
+.badge.warn{background:#fff4dc;color:#aa6500}
+.badge.danger{background:#ffe7e8;color:#bd2c33}
+.badge.blue{background:#eaf1ff;color:#2463cf}
+.badge.green{background:#e9f8ef;color:#157a49}
+.price{font-size:19px;font-weight:1000;white-space:nowrap}
+.route{margin-top:10px;display:grid;gap:6px}
+.route-line{display:grid;grid-template-columns:17px 1fr;gap:7px;font-size:12px;line-height:1.45}
+.pin{width:9px;height:9px;border-radius:50%;margin-top:4px;margin-left:3px}
+.pin.pickup{background:var(--green)}
+.pin.dropoff{background:var(--red)}
+.meta{display:flex;justify-content:space-between;gap:10px;margin-top:10px;color:var(--muted);font-size:11px}
+.order-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.wait{font-weight:1000;color:#50555d}
+.empty{padding:28px 10px;text-align:center;color:#9a9ea5;font-size:13px}
 
-.row{
-  display:flex;
-
-  justify-content:
-    space-between;
-
-  align-items:center;
-
-  gap:8px;
+.map-wrap{position:relative;height:520px;background:#e9ecef}
+#dispatchMap{width:100%;height:100%;z-index:1}
+.map-toolbar{
+  position:absolute;z-index:500;top:12px;left:12px;right:12px;
+  display:flex;justify-content:space-between;gap:8px;pointer-events:none
 }
-
-.order-id{
-  font-weight:1000;
-}
-
-.status{
-  font-size:11px;
-
-  font-weight:900;
-
-  border-radius:999px;
-
-  padding:5px 8px;
-
-  background:#f1f1f1;
-}
-
-.route{
-  font-size:13px;
-
-  line-height:1.65;
-
-  margin-top:7px;
-}
-
-.muted{
-  font-size:12px;
-
-  color:var(--muted);
-
-  line-height:1.55;
-}
-
-
-/* ============================================================
-   風險顏色
-============================================================ */
-
-.risk-high{
-  color:var(--red);
-
-  font-weight:1000;
-}
-
-.risk-mid{
-  color:var(--orange);
-
-  font-weight:1000;
-}
-
-.risk-low{
-  color:var(--green);
-
-  font-weight:1000;
-}
-
-
-/* ============================================================
-   地圖框架
-============================================================ */
-
-.map{
-  min-height:610px;
-
-  border-radius:16px;
-
-  position:relative;
-
-  overflow:hidden;
-
-  background:
-
-    radial-gradient(
-      circle at 30% 25%,
-      rgba(229,57,53,.14),
-      transparent 18%
-    ),
-
-    radial-gradient(
-      circle at 68% 40%,
-      rgba(242,153,74,.13),
-      transparent 18%
-    ),
-
-    radial-gradient(
-      circle at 55% 73%,
-      rgba(39,174,96,.12),
-      transparent 20%
-    ),
-
-    linear-gradient(
-      135deg,
-      #edf0f3,
-      #f8f9fa
-    );
-
-  border:
-    1px solid
-    var(--line);
-}
-
-.map::before{
-
-  content:"";
-
-  position:absolute;
-
-  inset:0;
-
-  opacity:.35;
-
-  background-image:
-
-    linear-gradient(
-      #dfe3e8 1px,
-      transparent 1px
-    ),
-
-    linear-gradient(
-      90deg,
-      #dfe3e8 1px,
-      transparent 1px
-    );
-
-  background-size:
-    42px 42px;
-}
-
-.map-note{
-  position:absolute;
-
-  left:14px;
-
-  top:14px;
-
-  z-index:2;
-
-  background:#fff;
-
-  border:
-    1px solid
-    var(--line);
-
-  border-radius:13px;
-
-  padding:10px 12px;
-
-  box-shadow:
-    0 5px 16px
-    rgba(0,0,0,.05);
-}
-
+.map-toolbar>*{pointer-events:auto}
 .legend{
-  display:flex;
-
-  gap:10px;
-
-  flex-wrap:wrap;
-
-  margin-top:8px;
+  display:flex;gap:7px;flex-wrap:wrap;background:rgba(255,255,255,.94);
+  backdrop-filter:blur(8px);padding:8px 10px;border:1px solid rgba(0,0,0,.08);
+  border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.08)
+}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:900;color:#535860}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+.map-status{
+  background:rgba(17,17,17,.9);color:#fff;padding:8px 10px;border-radius:11px;
+  font-size:10px;font-weight:900;box-shadow:0 4px 14px rgba(0,0,0,.12)
+}
+.map-note{
+  padding:10px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;
+  gap:10px;align-items:center;font-size:11px;color:var(--muted)
 }
 
-.legend span{
-  font-size:11px;
+.marker-rider,.marker-order{
+  width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:17px
+}
+.marker-rider.free{background:var(--green)}
+.marker-rider.busy{background:var(--blue)}
+.marker-order.waiting{background:var(--orange)}
+.marker-order.active{background:#111}
+.marker-order.selected{background:var(--yellow);transform:scale(1.13)}
 
-  font-weight:800;
+.dispatch-box{display:grid;gap:10px}
+.dispatch-order-summary{
+  border:1px solid var(--line);border-radius:13px;padding:12px;background:#fafafa
+}
+.dispatch-order-summary strong{font-size:14px}
+.radius-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.radius-select{
+  border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;font-weight:800
+}
+.candidate-list{display:grid;gap:8px;max-height:360px;overflow:auto}
+.candidate{
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  border:1px solid var(--line);border-radius:13px;padding:11px;background:#fff
+}
+.candidate.best{border-color:#f1c72e;background:#fffdf1}
+.candidate-name{font-size:13px;font-weight:1000}
+.candidate-meta{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.45}
+.distance{font-size:15px;font-weight:1000;text-align:right}
+.rank{
+  display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:50%;
+  background:#111;color:#fff;font-size:10px;font-weight:1000;margin-right:7px
 }
 
-.dot{
-  display:inline-block;
+.riders-list{display:grid;gap:0}
+.rider-row{
+  display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0
+}
+.rider-row:last-child{border-bottom:0}
+.rider-name{font-size:12px;font-weight:1000}
+.rider-meta{font-size:10px;color:var(--muted);margin-top:3px}
+.rider-state{font-size:10px;font-weight:1000}
+.state-free{color:var(--green)}
+.state-busy{color:var(--blue)}
 
-  width:9px;
+.alert-list{display:grid;gap:8px}
+.alert-item{
+  border-left:4px solid var(--red);background:#fff7f7;border-radius:10px;padding:10px 11px;
+  font-size:11px;line-height:1.5
+}
+.alert-item strong{font-size:12px}
 
-  height:9px;
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.48);display:none;align-items:center;justify-content:center;
+  z-index:9999;padding:16px
+}
+.modal-backdrop.show{display:flex}
+.modal{
+  width:min(650px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;
+  box-shadow:0 30px 80px rgba(0,0,0,.3)
+}
+.modal-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+.modal-title{font-size:18px;font-weight:1000}
+.modal-body{padding:16px 18px}
+.modal-foot{padding:14px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+.close-btn{border:0;background:#f1f2f4;border-radius:50%;width:34px;height:34px;font-weight:1000}
 
-  border-radius:50%;
+.toast{
+  position:fixed;right:16px;bottom:16px;z-index:12000;max-width:min(420px,calc(100vw - 32px));
+  background:#111;color:#fff;padding:12px 14px;border-radius:13px;box-shadow:0 14px 40px rgba(0,0,0,.3);
+  font-size:12px;font-weight:800;display:none;line-height:1.5
+}
+.toast.show{display:block}
 
-  margin-right:5px;
-
-  vertical-align:middle;
+.api-note{
+  background:#fff8dc;border:1px solid #f7dfa0;border-radius:12px;padding:10px 12px;
+  color:#765500;font-size:11px;line-height:1.55
 }
 
-.green{
-  background:var(--green);
+@media(max-width:1150px){
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .main-grid{grid-template-columns:1fr}
+  .map-wrap{height:480px}
 }
-
-.blue{
-  background:var(--blue);
+@media(max-width:680px){
+  .app{padding:10px}
+  .topbar{align-items:flex-start}
+  .brand{font-size:23px}
+  .status-live{display:none}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi .value{font-size:25px}
+  .panel-head{align-items:flex-start}
+  .map-wrap{height:430px}
+  .map-toolbar{top:8px;left:8px;right:8px;flex-direction:column;align-items:flex-start}
+  .legend{max-width:100%}
+  .map-status{align-self:flex-end}
 }
-
-.gray{
-  background:var(--gray);
-}
-
-.red{
-  background:var(--red);
-}
-
-.orange{
-  background:var(--orange);
-}
-
-.zone{
-
-  position:absolute;
-
-  z-index:1;
-
-  border-radius:999px;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  text-align:center;
-
-  font-size:12px;
-
-  font-weight:1000;
-
-  border:
-    2px solid
-    rgba(255,255,255,.9);
-
-  box-shadow:
-    0 7px 18px
-    rgba(0,0,0,.1);
-}
-
-.zone.red{
-
-  width:130px;
-
-  height:130px;
-
-  left:18%;
-
-  top:26%;
-
-  background:
-    rgba(229,57,53,.18);
-
-  color:#9f1f1b;
-}
-
-.zone.orange{
-
-  width:105px;
-
-  height:105px;
-
-  right:18%;
-
-  top:31%;
-
-  background:
-    rgba(242,153,74,.18);
-
-  color:#9c5a17;
-}
-
-.zone.green{
-
-  width:120px;
-
-  height:120px;
-
-  left:43%;
-
-  bottom:16%;
-
-  background:
-    rgba(39,174,96,.16);
-
-  color:#176c3c;
-}
-
-.pin{
-  position:absolute;
-
-  z-index:3;
-
-  background:#fff;
-
-  border:
-    2px solid
-    #111;
-
-  border-radius:999px;
-
-  padding:7px 9px;
-
-  font-size:11px;
-
-  font-weight:1000;
-
-  box-shadow:
-    0 6px 16px
-    rgba(0,0,0,.08);
-}
-
-.p1{
-  left:30%;
-
-  top:50%;
-}
-
-.p2{
-  left:45%;
-
-  top:38%;
-}
-
-.p3{
-  right:24%;
-
-  bottom:28%;
-}
-
-.p4{
-  left:57%;
-
-  bottom:18%;
-}
-
-
-/* ============================================================
-   AI 調度
-============================================================ */
-
-.ai-box{
-  background:#111;
-
-  color:#fff;
-
-  border-radius:16px;
-
-  padding:14px;
-
-  margin-bottom:10px;
-}
-
-.ai-title{
-  font-size:13px;
-
-  color:#cfcfcf;
-
-  font-weight:800;
-}
-
-.ai-big{
-  font-size:22px;
-
-  font-weight:1000;
-
-  margin-top:5px;
-}
-
-.ai-action{
-  margin-top:10px;
-
-  display:grid;
-
-  gap:7px;
-}
-
-.action-btn{
-  border:0;
-
-  border-radius:10px;
-
-  padding:10px;
-
-  font-weight:1000;
-
-  cursor:pointer;
-}
-
-.primary{
-  background:
-    var(--yellow);
-
-  color:#111;
-}
-
-.secondary{
-  background:#f1f1f1;
-
-  color:#111;
-}
-
-.danger{
-  background:#fff1f0;
-
-  color:#b3261e;
-}
-
-
-/* ============================================================
-   Tabs
-============================================================ */
-
-.tabs{
-
-  display:flex;
-
-  gap:6px;
-
-  overflow:auto;
-
-  margin-bottom:10px;
-}
-
-.tab{
-
-  border:
-    1px solid
-    var(--line);
-
-  background:#fff;
-
-  border-radius:999px;
-
-  padding:7px 10px;
-
-  font-size:12px;
-
-  font-weight:900;
-
-  white-space:nowrap;
-
-  cursor:pointer;
-}
-
-.tab.active{
-
-  background:#111;
-
-  color:#fff;
-
-  border-color:#111;
-}
-
-
-/* ============================================================
-   底部
-============================================================ */
-
-.bottom-grid{
-
-  display:grid;
-
-  grid-template-columns:
-    1.2fr 1fr 1fr;
-
-  gap:12px;
-
-  margin-top:12px;
-}
-
-.kpi-bars{
-  display:grid;
-
-  gap:8px;
-}
-
-.bar-row{
-
-  display:grid;
-
-  grid-template-columns:
-    65px 1fr 42px;
-
-  gap:8px;
-
-  align-items:center;
-
-  font-size:12px;
-}
-
-.bar{
-
-  height:9px;
-
-  background:#eee;
-
-  border-radius:999px;
-
-  overflow:hidden;
-}
-
-.fill{
-
-  height:100%;
-
-  background:#111;
-
-  border-radius:999px;
-}
-
-.empty{
-
-  padding:26px 10px;
-
-  text-align:center;
-
-  color:#999;
-
-  font-size:13px;
-}
-
-.notice{
-
-  background:#fff8dd;
-
-  border:
-    1px solid
-    #f5df8a;
-
-  border-radius:12px;
-
-  padding:10px;
-
-  font-size:12px;
-
-  line-height:1.6;
-
-  margin-bottom:10px;
-}
-
-.footer{
-
-  text-align:right;
-
-  color:#888;
-
-  font-size:11px;
-
-  margin-top:10px;
-}
-
-
-/* ============================================================
-   RWD
-============================================================ */
-
-@media(
-  max-width:1180px
-){
-
-  .stats{
-
-    grid-template-columns:
-      repeat(4,1fr);
-  }
-
-  .grid{
-
-    grid-template-columns:
-      300px 1fr;
-  }
-
-  .grid > div:last-child{
-
-    grid-column:
-      1 / -1;
-  }
-
-  .bottom-grid{
-
-    grid-template-columns:
-      1fr;
-  }
-
-}
-
-@media(
-  max-width:760px
-){
-
-  .app{
-
-    padding:10px;
-  }
-
-  .top{
-
-    align-items:flex-start;
-  }
-
-  .brand{
-
-    font-size:22px;
-  }
-
-  .stats{
-
-    grid-template-columns:
-      repeat(2,1fr);
-  }
-
-  .grid{
-
-    grid-template-columns:
-      1fr;
-  }
-
-  .map{
-
-    min-height:420px;
-  }
-
-  .bottom-grid{
-
-    grid-template-columns:
-      1fr;
-  }
-
-}
-
-
-/* ============================================================
-   小U
-============================================================ */
-
-.rider-card{
-  margin-bottom:8px;
-}
-
-
-/* ============================================================
-   異常
-============================================================ */
-
-.alert-card{
-
-  border-left:
-    4px solid
-    var(--red);
-}
-
 </style>
 </head>
 
-
 <body>
-
 <div class="app">
 
-
-<!-- ============================================================
-     TOP
-============================================================ -->
-
-<div class="top">
-
-  <div class="brand">
-
-    U<b>Bee</b>
-
-    智慧調度控制塔
-
-    <span class="badge">
-
-      V3 Framework
-
-    </span>
-
-  </div>
-
-
-  <div class="top-actions">
-
-    <span class="system">
-
-      ● 系統運作中
-
-    </span>
-
-
-    <select
-      id="regionSelect"
-      class="control"
-    >
-
-      <option value="all">
-        全區
-      </option>
-
-      <option value="taichung">
-        台中
-      </option>
-
-    </select>
-
-
-    <button
-      class="btn"
-      onclick="loadDashboard()"
-    >
-
-      重新整理
-
-    </button>
-
-  </div>
-
-</div>
-
-
-<!-- ============================================================
-     STATISTICS
-============================================================ -->
-
-<div class="stats">
-
-  <div class="stat">
-
-    <div class="t">
-      在線小U
+  <header class="topbar">
+    <div class="brand-wrap">
+      <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
+      <div class="version">DISPATCH CENTER</div>
+      <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
-
-    <div
-      class="n"
-      id="online"
-    >
-      -
+    <div class="actions">
+      <button class="btn" id="fitMapBtn">定位全部</button>
+      <button class="btn primary" id="refreshBtn">重新整理</button>
     </div>
-
-    <div class="s">
-      即時在線
-    </div>
-
-  </div>
-
-
-  <div class="stat">
-
-    <div class="t">
-      可接單小U
-    </div>
-
-    <div
-      class="n"
-      id="available"
-    >
-      -
-    </div>
-
-    <div class="s">
-      目前可媒合
-    </div>
-
-  </div>
-
-
-  <div class="stat">
-
-    <div class="t">
-      待接訂單
-    </div>
-
-    <div
-      class="n"
-      id="waiting"
-    >
-      -
-    </div>
-
-    <div class="s">
-      等待媒合
-    </div>
-
-  </div>
-
-
-  <div class="stat">
-
-    <div class="t">
-      進行中
-    </div>
-
-    <div
-      class="n"
-      id="active"
-    >
-      -
-    </div>
-
-    <div class="s">
-      任務執行中
-    </div>
-
-  </div>
-
-
-  <div class="stat">
-
-    <div class="t">
-      今日完成
-    </div>
-
-    <div
-      class="n"
-      id="completed"
-    >
-      -
-    </div>
-
-    <div class="s">
-      今日累積
-    </div>
-
-  </div>
-
-
-  <div class="stat">
-
-    <div class="t">
-      高風險
-    </div>
-
-    <div
-      class="n"
-      id="highRisk"
-    >
-      -
-    </div>
-
-    <div class="s">
-      需優先關注
-    </div>
-
-  </div>
-
-
-  <div class="stat">
-
-    <div class="t">
-      平均接單
-    </div>
-
-    <div
-      class="n"
-      id="avgAccept"
-    >
-      —
-    </div>
-
-    <div class="s">
-      後端接入後啟用
-    </div>
-
-  </div>
-
-</div>
-
-
-<!-- ============================================================
-     MAIN
-============================================================ -->
-
-<div class="grid">
-
-
-<!-- ============================================================
-     LEFT
-============================================================ -->
-
-<div class="stack">
-
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      AI 事件中心
-    </h2>
-
-    <span
-      class="small"
-      id="alertCountText"
-    >
-      0 件
-    </span>
-
-  </div>
-
-
-  <div class="notice">
-
-    目前 V3 介面會沿用 V1 的真實資料。
-
-    AI 預測、供需預測與自動調度在後端尚未接入前，
-
-    會顯示「數據累積中」，
-
-    不會產生假數據。
-
-  </div>
-
-
-  <div id="alertList">
-
-    <div class="empty">
-
-      正在分析...
-
-    </div>
-
-  </div>
-
-</div>
-
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      即時訂單
-    </h2>
-
-    <span class="small">
-
-      點選訂單查看建議
-
-    </span>
-
-  </div>
-
-
-  <div class="tabs">
-
-    <button
-      class="tab active"
-      data-filter="all"
-    >
-      全部
-    </button>
-
-    <button
-      class="tab"
-      data-filter="waiting"
-    >
-      待接
-    </button>
-
-    <button
-      class="tab"
-      data-filter="active"
-    >
-      進行中
-    </button>
-
-    <button
-      class="tab"
-      data-filter="risk"
-    >
-      高風險
-    </button>
-
-  </div>
-
-
-  <div id="orders">
-
-    <div class="empty">
-
-      正在讀取訂單...
-
-    </div>
-
-  </div>
-
-</div>
-
-</div>
-
-
-<!-- ============================================================
-     CENTER MAP
-============================================================ -->
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      即時供需地圖
-    </h2>
-
-    <span class="small">
-
-      V3 地圖框架
-
-    </span>
-
-  </div>
-
-
-  <div
-    id="map"
-    class="map"
-  >
-
-
-    <div class="map-note">
-
-      <b>
-        供需熱力圖
-      </b>
-
-
-      <div class="legend">
-
-        <span>
-
-          <i class="dot red"></i>
-
-          運力不足
-
-        </span>
-
-
-        <span>
-
-          <i class="dot orange"></i>
-
-          需求偏高
-
-        </span>
-
-
-        <span>
-
-          <i class="dot green"></i>
-
-          供需正常
-
-        </span>
-
-
-        <span>
-
-          <i class="dot blue"></i>
-
-          任務中
-
-        </span>
-
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><div class="label">在線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">即時定位中的小U</div></div>
+    <div class="kpi"><div class="label">可接單小U</div><div class="value" id="available">-</div><div class="sub">可進入推薦候選</div></div>
+    <div class="kpi"><div class="label">待派單</div><div class="value" id="waiting">-</div><div class="sub" id="waitingSub">等待媒合中的訂單</div></div>
+    <div class="kpi"><div class="label">配送中</div><div class="value" id="active">-</div><div class="sub">已由小U承接</div></div>
+    <div class="kpi"><div class="label">今日完成</div><div class="value" id="completed">-</div><div class="sub">今日完成任務</div></div>
+    <div class="kpi"><div class="label">異常提醒</div><div class="value" id="alerts">-</div><div class="sub">需人工關注</div></div>
+  </section>
+
+  <main class="main-grid">
+
+    <section class="left-stack">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">待派單／即時訂單</div>
+            <div class="panel-sub">點選訂單後，可查看附近小U候選與距離排序</div>
+          </div>
+          <div class="filters">
+            <button class="chip active" data-filter="all">全部</button>
+            <button class="chip" data-filter="waiting">待派單</button>
+            <button class="chip" data-filter="active">配送中</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="order-list" id="orders"><div class="empty">資料載入中…</div></div>
+        </div>
       </div>
 
-    </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">附近小U推薦</div>
+            <div class="panel-sub">依訂單取件點與小U即時座標計算直線距離並排序</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="dispatch-box">
+            <div id="selectedOrderSummary" class="dispatch-order-summary">
+              <div class="empty">請先選擇一筆訂單</div>
+            </div>
 
+            <div class="radius-row">
+              <strong style="font-size:12px">派單半徑</strong>
+              <select id="radiusSelect" class="radius-select">
+                <option value="2">2 km</option>
+                <option value="3" selected>3 km</option>
+                <option value="5">5 km</option>
+                <option value="8">8 km</option>
+                <option value="12">12 km</option>
+                <option value="20">20 km</option>
+              </select>
+              <button class="btn small yellow" id="expandRadiusBtn" disabled>擴大派單半徑</button>
+              <button class="btn small" id="redispatchBtn" disabled>重新派單</button>
+            </div>
 
-    <div class="zone red">
+            <div id="candidateList" class="candidate-list">
+              <div class="empty">選擇訂單後顯示候選小U</div>
+            </div>
 
-      西屯
+            <div class="api-note">
+              「附近推薦／距離排序」目前可直接使用現有 dashboard 回傳座標運作。
+              「指定小U、重新派單、擴大派單半徑」已完成前端流程，最後需在 index.js 補寫對應寫入 API 才會真正改變訂單派單狀態。
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-      <br>
-
-      數據累積中
-
-    </div>
-
-
-    <div class="zone orange">
-
-      北屯
-
-      <br>
-
-      數據累積中
-
-    </div>
-
-
-    <div class="zone green">
-
-      豐原
-
-      <br>
-
-      數據累積中
-
-    </div>
-
-
-    <div class="pin p1">
-
-      🟢 小U
-
-    </div>
-
-
-    <div class="pin p2">
-
-      📦 待接訂單
-
-    </div>
-
-
-    <div class="pin p3">
-
-      🔵 任務中
-
-    </div>
-
-
-    <div class="pin p4">
-
-      🟢 小U
-
-    </div>
-
-  </div>
-
-
-  <div class="footer">
-
-    正式 Google Maps / 熱力圖將於 index 後端與地圖 API 串接後啟用
-
-  </div>
-
-</div>
-
-
-<!-- ============================================================
-     RIGHT
-============================================================ -->
-
-<div class="stack">
-
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      AI 調度建議
-    </h2>
-
-    <span class="small">
-
-      Decision Assist
-
-    </span>
-
-  </div>
-
-
-  <div id="aiPanel">
-
-    <div class="ai-box">
-
-      <div class="ai-title">
-
-        目前狀態
-
+    <section class="right-stack">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">即時供需地圖</div>
+            <div class="panel-sub">綠色＝可接單小U、藍色＝任務中小U、橘色＝待派訂單、黑色＝進行中訂單</div>
+          </div>
+        </div>
+        <div class="map-wrap">
+          <div id="dispatchMap"></div>
+          <div class="map-toolbar">
+            <div class="legend">
+              <span class="legend-item"><i class="legend-dot" style="background:var(--green)"></i>可接單 <b id="legendFree">0</b></span>
+              <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>任務中 <b id="legendBusy">0</b></span>
+              <span class="legend-item"><i class="legend-dot" style="background:var(--orange)"></i>待派單 <b id="legendWaiting">0</b></span>
+              <span class="legend-item"><i class="legend-dot" style="background:#111"></i>配送中 <b id="legendActive">0</b></span>
+            </div>
+            <div class="map-status" id="mapStatus">地圖初始化中</div>
+          </div>
+        </div>
+        <div class="map-note">
+          <span id="mapInfo">目前顯示：台中地區</span>
+          <span id="lastUpdated">尚未更新</span>
+        </div>
       </div>
 
-
-      <div class="ai-big">
-
-        等待選擇訂單
-
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">在線小U</div>
+            <div class="panel-sub">只顯示後端判定為在線的小U</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="riders-list" id="riders"><div class="empty">資料載入中…</div></div>
+        </div>
       </div>
 
-    </div>
-
-
-    <div class="empty">
-
-      從左側點選一張訂單
-
-    </div>
-
-  </div>
-
-</div>
-
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      在線小U
-    </h2>
-
-    <span
-      class="small"
-      id="riderCountText"
-    >
-      0 位
-    </span>
-
-  </div>
-
-
-  <div
-    class="legend"
-    style="margin-bottom:8px"
-  >
-
-    <span>
-
-      <i class="dot green"></i>
-
-      可接單
-
-    </span>
-
-
-    <span>
-
-      <i class="dot blue"></i>
-
-      任務中
-
-    </span>
-
-
-    <span>
-
-      <i class="dot gray"></i>
-
-      狀態異常
-
-    </span>
-
-  </div>
-
-
-  <div id="riders">
-
-    <div class="empty">
-
-      正在讀取小U...
-
-    </div>
-
-  </div>
-
-</div>
-
-
-</div>
-
-</div>
-
-
-<!-- ============================================================
-     BOTTOM
-============================================================ -->
-
-<div class="bottom-grid">
-
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      區域供需
-    </h2>
-
-    <span class="small">
-
-      Demand / Supply
-
-    </span>
-
-  </div>
-
-
-  <div id="regionDemand">
-
-
-    <div class="region-card">
-
-      <div class="row">
-
-        <b>
-          西屯區
-        </b>
-
-        <span class="risk-mid">
-
-          數據累積中
-
-        </span>
-
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">異常中心</div>
+            <div class="panel-sub">等待過久、資料異常與需人工介入事件</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="alert-list" id="alertList"><div class="empty">資料載入中…</div></div>
+        </div>
       </div>
+    </section>
 
-      <div class="muted">
-
-        等待後端行政區統計 API
-
-      </div>
-
-    </div>
-
-
-    <div class="region-card">
-
-      <div class="row">
-
-        <b>
-          北屯區
-        </b>
-
-        <span class="risk-mid">
-
-          數據累積中
-
-        </span>
-
-      </div>
-
-      <div class="muted">
-
-        等待後端行政區統計 API
-
-      </div>
-
-    </div>
-
-
-    <div class="region-card">
-
-      <div class="row">
-
-        <b>
-          豐原區
-        </b>
-
-        <span class="risk-low">
-
-          數據累積中
-
-        </span>
-
-      </div>
-
-      <div class="muted">
-
-        等待後端行政區統計 API
-
-      </div>
-
-    </div>
-
-  </div>
-
+  </main>
 </div>
 
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      營運指標
-    </h2>
-
-    <span class="small">
-
-      Live KPI
-
-    </span>
-
-  </div>
-
-
-  <div class="kpi-bars">
-
-
-    <div class="bar-row">
-
-      <span>
-
-        可用運力
-
-      </span>
-
-      <div class="bar">
-
-        <div
-          id="availabilityBar"
-          class="fill"
-          style="width:0%"
-        ></div>
-
+<!-- 指定小U確認視窗 -->
+<div class="modal-backdrop" id="assignModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">指定小U</div>
+        <div class="panel-sub">確認人工指定派單</div>
       </div>
-
-      <b id="availabilityPct">
-
-        0%
-
-      </b>
-
+      <button class="close-btn" data-close-modal>×</button>
     </div>
-
-
-    <div class="bar-row">
-
-      <span>
-
-        接單效率
-
-      </span>
-
-      <div class="bar">
-
-        <div
-          class="fill"
-          style="width:0%"
-        ></div>
-
-      </div>
-
-      <b>
-
-        —
-
-      </b>
-
+    <div class="modal-body" id="assignModalBody"></div>
+    <div class="modal-foot">
+      <button class="btn" data-close-modal>取消</button>
+      <button class="btn yellow" id="confirmAssignBtn">確認指定</button>
     </div>
-
-
-    <div class="bar-row">
-
-      <span>
-
-        準時率
-
-      </span>
-
-      <div class="bar">
-
-        <div
-          class="fill"
-          style="width:0%"
-        ></div>
-
-      </div>
-
-      <b>
-
-        —
-
-      </b>
-
-    </div>
-
   </div>
-
-
-  <div
-    class="notice"
-    style="margin-top:12px"
-  >
-
-    接單效率與準時率需後端新增歷史統計後才會顯示真實數值。
-
-  </div>
-
 </div>
 
-
-<div class="panel">
-
-  <div class="panel-title">
-
-    <h2>
-      智慧調度模式
-    </h2>
-
-    <span class="small">
-
-      Safety First
-
-    </span>
-
-  </div>
-
-
-  <div class="recommend-card">
-
-    <div class="row">
-
-      <b>
-        人工模式
-      </b>
-
-      <span class="status">
-
-        目前啟用
-
-      </span>
-
-    </div>
-
-    <div class="muted">
-
-      只提供監控與建議，
-
-      不自動修改任何訂單。
-
-    </div>
-
-  </div>
-
-
-  <div class="recommend-card">
-
-    <div class="row">
-
-      <b>
-        半自動模式
-      </b>
-
-      <span class="muted">
-
-        待後端支援
-
-      </span>
-
-    </div>
-
-    <div class="muted">
-
-      AI 提出推薦，
-
-      由調度員確認後執行。
-
-    </div>
-
-  </div>
-
-
-  <div class="recommend-card">
-
-    <div class="row">
-
-      <b>
-        全自動模式
-      </b>
-
-      <span class="muted">
-
-        未啟用
-
-      </span>
-
-    </div>
-
-    <div class="muted">
-
-      正式營運前需權限、
-
-      稽核、
-
-      交易鎖與回滾機制。
-
-    </div>
-
-  </div>
-
-</div>
-
-
-</div>
-
-
-<div
-  class="footer"
-  id="lastUpdate"
->
-
-  尚未更新
-
-</div>
-
-</div>
-
+<div class="toast" id="toast"></div>
 
 <script>
+'use strict';
 
 /* ============================================================
-   UBee 智慧調度控制塔 V3
-   Multi API Data Layer
-============================================================ */
+   UBee 調度中心完整前端版
+   現有可直接使用：
+   GET /api/dispatch/dashboard
+
+   最後需 index.js 補上的寫入 API：
+   POST /api/dispatch/orders/:orderId/assign
+   POST /api/dispatch/orders/:orderId/redispatch
+   POST /api/dispatch/orders/:orderId/expand-radius
+   ============================================================ */
 
 const state = {
-
-  dashboard:null,
-
-  orders:[],
-
-  riders:[],
-
-  alerts:[],
-
-  regions:[],
-
-  selectedOrderId:"",
-
-  filter:"all",
-
-  loading:false
-
+  data: { summary:{}, orders:[], riders:[], alerts:[] },
+  filter: 'all',
+  selectedOrderId: '',
+  selectedCandidateRiderId: '',
+  radiusKm: 3,
+  map: null,
+  mapReady: false,
+  mapLayers: {
+    riders: null,
+    orders: null,
+    radius: null,
+    route: null
+  },
+  firstMapFitDone: false,
+  loading: false
 };
 
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+}[ch]));
 
-/* ============================================================
-   SAFE HTML
-============================================================ */
-
-function escapeHtml(value){
-
-  return String(
-    value ?? ""
-  ).replace(
-    /[&<>"']/g,
-    char => ({
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#39;"
-    }[char])
-  );
-
+function fmtAge(ms){
+  const n = Number(ms || 0);
+  if(!n) return '-';
+  const sec = Math.max(0, Math.floor((Date.now() - n) / 1000));
+  if(sec < 60) return sec + ' 秒';
+  const min = Math.floor(sec / 60);
+  if(min < 60) return min + ' 分鐘';
+  const hr = Math.floor(min / 60);
+  return hr + ' 小時 ' + (min % 60) + ' 分';
 }
 
-
-/* ============================================================
-   TIME
-============================================================ */
-
-function formatAge(ms){
-
-  const timestamp =
-    Number(
-      ms ||
-      0
-    );
-
-  if(
-    !Number.isFinite(timestamp)
-    ||
-    timestamp <= 0
-  ){
-
-    return "-";
-
+function fmtTime(ms){
+  const n = Number(ms || 0);
+  if(!n) return '-';
+  try{
+    return new Intl.DateTimeFormat('zh-TW',{
+      hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
+    }).format(new Date(n));
+  }catch{
+    return new Date(n).toLocaleTimeString();
   }
-
-
-  const seconds =
-
-    Math.max(
-
-      0,
-
-      Math.floor(
-
-        (
-          Date.now()
-          -
-          timestamp
-        )
-
-        /
-
-        1000
-
-      )
-
-    );
-
-
-  if(
-    seconds < 60
-  ){
-
-    return (
-      seconds +
-      " 秒前"
-    );
-
-  }
-
-
-  const minutes =
-
-    Math.floor(
-      seconds /
-      60
-    );
-
-
-  if(
-    minutes < 60
-  ){
-
-    return (
-      minutes +
-      " 分鐘前"
-    );
-
-  }
-
-
-  const hours =
-
-    Math.floor(
-      minutes /
-      60
-    );
-
-
-  return (
-    hours +
-    " 小時前"
-  );
-
 }
 
-
-/* ============================================================
-   MONEY
-============================================================ */
-
-function formatMoney(value){
-
-  const numberValue =
-
-    Number(
-      value ||
-      0
-    );
-
-
-  if(
-    !Number.isFinite(
-      numberValue
-    )
-  ){
-
-    return "0";
-
-  }
-
-
-  return Math.round(
-    numberValue
-  ).toLocaleString(
-    "zh-TW"
-  );
-
+function num(value){
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
-
-/* ============================================================
-   STATUS
-============================================================ */
-
-function getStatusText(order){
-
-  if(
-    order &&
-    order.statusLabel
-  ){
-
-    return order.statusLabel;
-
-  }
-
-
-  const status =
-
-    String(
-
-      order?.status
-
-      ||
-
-      ""
-
-    ).trim();
-
-
-  const map = {
-
-    pending:
-      "等待接單",
-
-    waiting:
-      "等待接單",
-
-    searching:
-      "搜尋小U",
-
-    dispatching:
-      "派單中",
-
-    redispatching:
-      "重新派單",
-
-    accepted:
-      "已接單",
-
-    heading_to_pickup:
-      "前往取件",
-
-    arrived_pickup:
-      "抵達取件點",
-
-    picked_up:
-      "已取件",
-
-    heading_to_dropoff:
-      "配送中",
-
-    arrived_dropoff:
-      "抵達送達點",
-
-    completed:
-      "已完成",
-
-    cancelled:
-      "已取消"
-
-  };
-
-
-  return (
-
-    map[
-      status
-    ]
-
-    ||
-
-    status
-
-    ||
-
-    "未知"
-
-  );
-
+function hasLatLng(lat,lng){
+  const a = num(lat), b = num(lng);
+  return a !== null && b !== null && Math.abs(a) <= 90 && Math.abs(b) <= 180;
 }
 
-
-/* ============================================================
-   ORDER STATUS GROUP
-============================================================ */
-
-function isWaitingOrder(order){
-
-  if(
-    order?.waiting ===
-    true
-  ){
-
-    return true;
-
-  }
-
-
-  return [
-
-    "pending",
-
-    "waiting",
-
-    "searching",
-
-    "dispatching",
-
-    "redispatching"
-
-  ].includes(
-
-    String(
-      order?.status ||
-      ""
-    )
-
-  );
-
+function haversineKm(lat1,lng1,lat2,lng2){
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2-lat1);
+  const dLng = toRad(lng2-lng1);
+  const a =
+    Math.sin(dLat/2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-
-function isActiveOrder(order){
-
-  if(
-    order?.active ===
-    true
-  ){
-
-    return true;
-
-  }
-
-
-  return [
-
-    "accepted",
-
-    "heading_to_pickup",
-
-    "arrived_pickup",
-
-    "picked_up",
-
-    "heading_to_dropoff",
-
-    "arrived_dropoff"
-
-  ].includes(
-
-    String(
-      order?.status ||
-      ""
-    )
-
-  );
-
+function statusKind(order){
+  const s = String(order?.status || '').trim();
+  const waiting = new Set(['pending','waiting','searching','dispatching','redispatching']);
+  return waiting.has(s) ? 'waiting' : 'active';
 }
 
-
-/* ============================================================
-   RISK
-============================================================ */
-
-function getOrderRisk(order){
-
-  if(
-    order?.riskLevel
-  ){
-
-    const risk =
-
-      String(
-        order.riskLevel
-      );
-
-
-    if(
-      risk ===
-      "high"
-    ){
-
-      return {
-
-        level:
-          "high",
-
-        label:
-          "高風險",
-
-        reason:
-
-          order.riskReason
-
-          ||
-
-          "需要優先處理"
-
-      };
-
-    }
-
-
-    if(
-      risk ===
-      "warning"
-      ||
-      risk ===
-      "mid"
-    ){
-
-      return {
-
-        level:
-          "mid",
-
-        label:
-          "注意",
-
-        reason:
-
-          order.riskReason
-
-          ||
-
-          "需要關注"
-
-      };
-
-    }
-
-  }
-
-
-  const createdAtMs =
-
-    Number(
-      order?.createdAtMs ||
-      0
-    );
-
-
-  if(
-    createdAtMs <= 0
-  ){
-
-    return {
-
-      level:
-        "low",
-
-      label:
-        "正常",
-
-      reason:
-        "目前正常"
-
-    };
-
-  }
-
-
-  const ageMs =
-
-    Date.now()
-
-    -
-
-    createdAtMs;
-
-
-  if(
-
-    isWaitingOrder(
-      order
-    )
-
-    &&
-
-    ageMs >=
-    5 *
-    60 *
-    1000
-
-  ){
-
-    return {
-
-      level:
-        "high",
-
-      label:
-        "高風險",
-
-      reason:
-        "等待接單已超過 5 分鐘"
-
-    };
-
-  }
-
-
-  if(
-
-    isWaitingOrder(
-      order
-    )
-
-    &&
-
-    ageMs >=
-    3 *
-    60 *
-    1000
-
-  ){
-
-    return {
-
-      level:
-        "mid",
-
-      label:
-        "注意",
-
-      reason:
-        "等待接單已超過 3 分鐘"
-
-    };
-
-  }
-
-
-  return {
-
-    level:
-      "low",
-
-    label:
-      "正常",
-
-    reason:
-      "目前未偵測到明顯風險"
-
-  };
-
+function waitBadge(order){
+  if(statusKind(order) !== 'waiting') return '<span class="badge blue">配送進行中</span>';
+  const age = Date.now() - Number(order.createdAtMs || Date.now());
+  if(age >= 5*60*1000) return '<span class="badge danger">超過 5 分鐘</span>';
+  if(age >= 2*60*1000) return '<span class="badge warn">超過 2 分鐘</span>';
+  return '<span class="badge">等待媒合</span>';
 }
 
+function toast(message, duration=3200){
+  const el = $('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(()=>el.classList.remove('show'), duration);
+}
 
-/* ============================================================
-   API
-============================================================ */
+function getSelectedOrder(){
+  return (state.data.orders || []).find(o => String(o.id) === String(state.selectedOrderId)) || null;
+}
 
-async function fetchJson(
-  url
-){
+/* =========================
+   地圖
+   ========================= */
+function initMap(){
+  if(state.mapReady) return true;
 
-  const response =
+  if(typeof L === 'undefined'){
+    $('mapStatus').textContent = '地圖套件載入失敗';
+    $('mapInfo').textContent = 'Leaflet 無法載入，請檢查網路或 CDN 存取';
+    return false;
+  }
 
-    await fetch(
+  state.map = L.map('dispatchMap',{
+    zoomControl:true,
+    attributionControl:true
+  }).setView([24.1477,120.6736], 11);
 
-      url,
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(state.map);
 
-      {
+  state.mapLayers.riders = L.layerGroup().addTo(state.map);
+  state.mapLayers.orders = L.layerGroup().addTo(state.map);
+  state.mapLayers.radius = L.layerGroup().addTo(state.map);
+  state.mapLayers.route = L.layerGroup().addTo(state.map);
 
-        method:
-          "GET",
+  state.mapReady = true;
+  $('mapStatus').textContent = '地圖已啟動';
 
-        cache:
-          "no-store",
+  setTimeout(()=>state.map.invalidateSize(), 80);
+  return true;
+}
 
-        headers:{
+function riderIcon(rider){
+  const cls = rider.busy ? 'busy' : 'free';
+  return L.divIcon({
+    className:'',
+    html:`<div class="marker-rider ${cls}" title="${esc(rider.name || rider.riderId || '小U')}">🐝</div>`,
+    iconSize:[34,34],
+    iconAnchor:[17,17],
+    popupAnchor:[0,-18]
+  });
+}
 
-          Accept:
-            "application/json"
+function orderIcon(order, selected=false){
+  const kind = statusKind(order);
+  return L.divIcon({
+    className:'',
+    html:`<div class="marker-order ${selected?'selected':kind}" title="${esc(order.id)}">📦</div>`,
+    iconSize:[34,34],
+    iconAnchor:[17,17],
+    popupAnchor:[0,-18]
+  });
+}
 
-        }
+function renderMap(){
+  if(!initMap()) return;
 
+  state.mapLayers.riders.clearLayers();
+  state.mapLayers.orders.clearLayers();
+  state.mapLayers.radius.clearLayers();
+  state.mapLayers.route.clearLayers();
+
+  const bounds = [];
+  let free = 0, busy = 0, waiting = 0, active = 0;
+
+  for(const rider of state.data.riders || []){
+    if(rider.busy) busy++; else free++;
+    if(!hasLatLng(rider.currentLat,rider.currentLng)) continue;
+
+    const lat = Number(rider.currentLat), lng = Number(rider.currentLng);
+    bounds.push([lat,lng]);
+
+    const marker = L.marker([lat,lng],{icon:riderIcon(rider)});
+    marker.bindPopup(`
+      <div style="min-width:180px">
+        <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
+        <span>${rider.busy ? '任務中' : '可接單'}</span><br>
+        <small>${esc(rider.district || rider.serviceArea || '')}</small><br>
+        <small>最後定位：${esc(fmtAge(rider.locationUpdatedAtMs))}</small>
+        ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
+      </div>
+    `);
+    marker.addTo(state.mapLayers.riders);
+  }
+
+  for(const order of state.data.orders || []){
+    const kind = statusKind(order);
+    if(kind === 'waiting') waiting++; else active++;
+    if(!hasLatLng(order.pickupLat,order.pickupLng)) continue;
+
+    const lat = Number(order.pickupLat), lng = Number(order.pickupLng);
+    bounds.push([lat,lng]);
+
+    const selected = String(order.id) === String(state.selectedOrderId);
+    const marker = L.marker([lat,lng],{icon:orderIcon(order,selected)});
+    marker.bindPopup(`
+      <div style="min-width:210px">
+        <b>${esc(order.id)}</b><br>
+        <small>${esc(order.statusLabel || order.status || '')}</small><hr style="border:0;border-top:1px solid #eee">
+        <small>取件：${esc(order.pickupAddress || '-')}</small><br>
+        <small>送達：${esc(order.dropoffAddress || '-')}</small><br>
+        <small>NT$ ${esc(order.total || 0)}</small>
+      </div>
+    `);
+    marker.on('click',()=>selectOrder(order.id,{pan:false}));
+    marker.addTo(state.mapLayers.orders);
+
+    if(selected){
+      if(hasLatLng(order.dropoffLat,order.dropoffLng)){
+        const dLat = Number(order.dropoffLat), dLng = Number(order.dropoffLng);
+        bounds.push([dLat,dLng]);
+        L.polyline([[lat,lng],[dLat,dLng]],{
+          weight:4,dashArray:'8 7',opacity:.75
+        }).addTo(state.mapLayers.route);
+        L.circleMarker([dLat,dLng],{
+          radius:8,weight:3,fillOpacity:1
+        }).bindPopup(`送達點：${esc(order.dropoffAddress || '-')}`).addTo(state.mapLayers.route);
       }
 
-    );
-
-
-  let data;
-
-
-  try{
-
-    data =
-
-      await response.json();
-
-  }catch(error){
-
-    throw new Error(
-
-      url +
-
-      " 回傳格式錯誤"
-
-    );
-
+      if(statusKind(order) === 'waiting'){
+        L.circle([lat,lng],{
+          radius:state.radiusKm*1000,
+          weight:2,fillOpacity:.06,dashArray:'8 6'
+        }).addTo(state.mapLayers.radius);
+      }
+    }
   }
 
+  $('legendFree').textContent = free;
+  $('legendBusy').textContent = busy;
+  $('legendWaiting').textContent = waiting;
+  $('legendActive').textContent = active;
 
-  if(
-
-    !response.ok
-
-    ||
-
-    data?.success !==
-    true
-
-  ){
-
-    throw new Error(
-
-      data?.message
-
-      ||
-
-      url +
-
-      " 讀取失敗"
-
-    );
-
+  if(!state.firstMapFitDone && bounds.length){
+    fitMapToData(bounds);
+    state.firstMapFitDone = true;
   }
 
-
-  return data;
-
+  setTimeout(()=>state.map.invalidateSize(),50);
 }
 
+function fitMapToData(customBounds){
+  if(!state.mapReady) return;
+  const bounds = customBounds || [];
 
-/* ============================================================
-   SUMMARY
-============================================================ */
+  if(!customBounds){
+    for(const rider of state.data.riders || []){
+      if(hasLatLng(rider.currentLat,rider.currentLng)) bounds.push([Number(rider.currentLat),Number(rider.currentLng)]);
+    }
+    for(const order of state.data.orders || []){
+      if(hasLatLng(order.pickupLat,order.pickupLng)) bounds.push([Number(order.pickupLat),Number(order.pickupLng)]);
+    }
+  }
+
+  if(!bounds.length){
+    state.map.setView([24.1477,120.6736],11);
+    toast('目前沒有可定位的座標資料');
+    return;
+  }
+
+  if(bounds.length === 1){
+    state.map.setView(bounds[0],14);
+  }else{
+    state.map.fitBounds(bounds,{padding:[35,35],maxZoom:14});
+  }
+}
+
+/* =========================
+   Dashboard 資料
+   ========================= */
+async function loadDashboard({silent=false}={}){
+  if(state.loading) return;
+  state.loading = true;
+  if(!silent) $('refreshBtn').disabled = true;
+  $('systemStatusText').textContent = '資料更新中';
+
+  try{
+    const response = await fetch('/api/dispatch/dashboard',{
+      cache:'no-store',
+      headers:{'Accept':'application/json'}
+    });
+    const data = await response.json().catch(()=>({}));
+
+    if(!response.ok || !data.success){
+      throw new Error(data.message || `讀取失敗 (${response.status})`);
+    }
+
+    state.data = {
+      summary:data.summary || {},
+      orders:Array.isArray(data.orders) ? data.orders : [],
+      riders:Array.isArray(data.riders) ? data.riders : [],
+      alerts:Array.isArray(data.alerts) ? data.alerts : []
+    };
+
+    if(state.selectedOrderId && !getSelectedOrder()){
+      state.selectedOrderId = '';
+      state.selectedCandidateRiderId = '';
+    }
+
+    renderAll();
+
+    const generated = Number(data.generatedAtMs || Date.now());
+    $('lastUpdated').textContent = '更新時間 ' + fmtTime(generated);
+    $('systemStatusText').textContent = '系統狀態：正常';
+    $('mapStatus').textContent = '自動更新中';
+
+  }catch(error){
+    console.error('UBee dispatch dashboard error:',error);
+    $('systemStatusText').textContent = '資料連線異常';
+    $('mapStatus').textContent = '資料讀取失敗';
+    $('alertList').innerHTML = `
+      <div class="alert-item"><strong>調度中心讀取失敗</strong><br>${esc(error.message)}</div>
+    `;
+    if(!silent) toast('調度中心讀取失敗：' + error.message,4500);
+  }finally{
+    state.loading = false;
+    $('refreshBtn').disabled = false;
+  }
+}
+
+function renderAll(){
+  renderSummary();
+  renderOrders();
+  renderRiders();
+  renderAlerts();
+  renderCandidates();
+  renderMap();
+}
 
 function renderSummary(){
-
-  const summary =
-
-    state.dashboard?.summary
-
-    ||
-
-    {};
-
-
-  const riderSummary =
-
-    state.riderSummary
-
-    ||
-
-    {};
-
-
-  const onlineValue =
-
-    Number(
-
-      riderSummary.online
-
-      ??
-
-      summary.onlineRiders
-
-      ??
-
-      0
-
-    );
-
-
-  const availableValue =
-
-    Number(
-
-      riderSummary.available
-
-      ??
-
-      summary.availableRiders
-
-      ??
-
-      0
-
-    );
-
-
-  const waitingValue =
-
-    state.orders.filter(
-
-      order =>
-
-        isWaitingOrder(
-          order
-        )
-
-    ).length;
-
-
-  const activeValue =
-
-    state.orders.filter(
-
-      order =>
-
-        isActiveOrder(
-          order
-        )
-
-    ).length;
-
-
-  const completedValue =
-
-    Number(
-
-      summary.todayCompleted
-
-      ||
-
-      0
-
-    );
-
-
-  const highRiskValue =
-
-    state.orders.filter(
-
-      order =>
-
-        getOrderRisk(
-          order
-        ).level ===
-        "high"
-
-    ).length;
-
-
-  document.getElementById(
-    "online"
-  ).textContent =
-
-    onlineValue;
-
-
-  document.getElementById(
-    "available"
-  ).textContent =
-
-    availableValue;
-
-
-  document.getElementById(
-    "waiting"
-  ).textContent =
-
-    waitingValue;
-
-
-  document.getElementById(
-    "active"
-  ).textContent =
-
-    activeValue;
-
-
-  document.getElementById(
-    "completed"
-  ).textContent =
-
-    completedValue;
-
-
-  document.getElementById(
-    "highRisk"
-  ).textContent =
-
-    highRiskValue;
-
-
-  const availabilityPercentage =
-
-    onlineValue >
-    0
-
-      ?
-
-      Math.round(
-
-        availableValue
-
-        /
-
-        onlineValue
-
-        *
-
-        100
-
-      )
-
-      :
-
-      0;
-
-
-  const bar =
-
-    document.getElementById(
-      "availabilityBar"
-    );
-
-
-  if(
-    bar
-  ){
-
-    bar.style.width =
-
-      availabilityPercentage +
-      "%";
-
+  const s = state.data.summary || {};
+  $('online').textContent = s.onlineRiders ?? state.data.riders.length ?? 0;
+  $('available').textContent = s.availableRiders ?? state.data.riders.filter(r=>!r.busy).length;
+  $('waiting').textContent = s.waitingOrders ?? state.data.orders.filter(o=>statusKind(o)==='waiting').length;
+  $('active').textContent = s.activeOrders ?? state.data.orders.filter(o=>statusKind(o)==='active').length;
+  $('completed').textContent = s.todayCompleted ?? 0;
+  $('alerts').textContent = state.data.alerts.length;
+
+  const withLocation = state.data.riders.filter(r=>hasLatLng(r.currentLat,r.currentLng)).length;
+  $('onlineSub').textContent = `${withLocation} 位具有即時座標`;
+
+  const waits = state.data.orders.filter(o=>statusKind(o)==='waiting');
+  if(waits.length){
+    const oldest = Math.max(...waits.map(o=>Date.now()-Number(o.createdAtMs||Date.now())));
+    $('waitingSub').textContent = `最久等待 ${fmtAge(Date.now()-oldest)}`;
+  }else{
+    $('waitingSub').textContent = '目前沒有等待媒合訂單';
   }
-
-
-  const pct =
-
-    document.getElementById(
-      "availabilityPct"
-    );
-
-
-  if(
-    pct
-  ){
-
-    pct.textContent =
-
-      availabilityPercentage +
-      "%";
-
-  }
-
 }
-
-
-/* ============================================================
-   ORDERS
-============================================================ */
-
-function getFilteredOrders(){
-
-  return state.orders.filter(
-    order => {
-
-
-      if(
-        state.filter ===
-        "waiting"
-      ){
-
-        return isWaitingOrder(
-          order
-        );
-
-      }
-
-
-      if(
-        state.filter ===
-        "active"
-      ){
-
-        return isActiveOrder(
-          order
-        );
-
-      }
-
-
-      if(
-        state.filter ===
-        "risk"
-      ){
-
-        return (
-
-          getOrderRisk(
-            order
-          ).level ===
-          "high"
-
-        );
-
-      }
-
-
-      return true;
-
-    }
-
-  );
-
-}
-
 
 function renderOrders(){
+  let list = [...(state.data.orders || [])];
 
-  const container =
+  if(state.filter === 'waiting') list = list.filter(o=>statusKind(o)==='waiting');
+  if(state.filter === 'active') list = list.filter(o=>statusKind(o)==='active');
 
-    document.getElementById(
-      "orders"
-    );
+  list.sort((a,b)=>{
+    const ak = statusKind(a), bk = statusKind(b);
+    if(ak !== bk) return ak === 'waiting' ? -1 : 1;
+    return Number(a.createdAtMs||0)-Number(b.createdAtMs||0);
+  });
 
-
-  if(
-    !container
-  ){
-
+  if(!list.length){
+    $('orders').innerHTML = '<div class="empty">目前沒有符合條件的訂單</div>';
     return;
-
   }
 
-
-  const orders =
-
-    getFilteredOrders();
-
-
-  if(
-    orders.length ===
-    0
-  ){
-
-    container.innerHTML = `
-
-      <div class="empty">
-
-        目前沒有符合條件的訂單
-
-      </div>
-
-    `;
-
-    return;
-
-  }
-
-
-  container.innerHTML =
-
-    orders
-
-      .map(
-
-        order => {
-
-
-          const risk =
-
-            getOrderRisk(
-              order
-            );
-
-
-          const selected =
-
-            state.selectedOrderId ===
-            order.id
-
-              ?
-
-              "selected"
-
-              :
-
-              "";
-
-
-          return `
-
-            <div
-
-              class="
-                order-card
-                ${selected}
-              "
-
-              data-order-id="
-                ${escapeHtml(
-                  order.id
-                )}
-              "
-
-            >
-
-
-              <div class="row">
-
-
-                <span class="order-id">
-
-                  ${escapeHtml(
-                    order.id
-                  )}
-
-                </span>
-
-
-                <span class="status">
-
-                  ${escapeHtml(
-                    getStatusText(
-                      order
-                    )
-                  )}
-
-                </span>
-
-
-              </div>
-
-
-              <div class="route">
-
-                📍
-
-                ${escapeHtml(
-                  order.pickupAddress
-                  ||
-                  "-"
-                )}
-
-                <br>
-
-                ↓
-
-                <br>
-
-                🏁
-
-                ${escapeHtml(
-                  order.dropoffAddress
-                  ||
-                  "-"
-                )}
-
-              </div>
-
-
-              <div
-                class="row"
-                style="
-                  margin-top:8px;
-                "
-              >
-
-
-                <span class="muted">
-
-                  NT$
-
-                  ${formatMoney(
-                    order.total
-                  )}
-
-                  ·
-
-                  ${escapeHtml(
-                    order.riderName
-                    ||
-                    "尚未接單"
-                  )}
-
-                </span>
-
-
-                <span
-                  class="
-                    risk-${risk.level}
-                  "
-                >
-
-                  ${escapeHtml(
-                    risk.label
-                  )}
-
-                </span>
-
-
-              </div>
-
-
-              <div class="muted">
-
-                建立
-
-                ${escapeHtml(
-                  formatAge(
-                    order.createdAtMs
-                  )
-                )}
-
-              </div>
-
-
+  $('orders').innerHTML = list.map(order=>{
+    const selected = String(order.id) === String(state.selectedOrderId);
+    const isWaiting = statusKind(order) === 'waiting';
+    return `
+      <article class="order-card ${selected?'selected':''}" data-order-id="${esc(order.id)}">
+        <div class="order-top">
+          <div>
+            <div class="order-id">${esc(order.id)}</div>
+            <div class="badges">
+              ${waitBadge(order)}
+              <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
             </div>
-
-          `;
-
-        }
-
-      )
-
-      .join("");
-
-
-  container
-    .querySelectorAll(
-      ".order-card"
-    )
-    .forEach(
-      card => {
-
-        card.addEventListener(
-
-          "click",
-
-          () => {
-
-            selectOrder(
-
-              card.dataset.orderId
-
-            );
-
-          }
-
-        );
-
-      }
-
-    );
-
-}
-
-
-/* ============================================================
-   RIDERS
-============================================================ */
-
-function renderRiders(){
-
-  const container =
-
-    document.getElementById(
-      "riders"
-    );
-
-
-  if(
-    !container
-  ){
-
-    return;
-
-  }
-
-
-  const riders =
-
-    state.riders
-
-    ||
-
-    [];
-
-
-  const riderCountText =
-
-    document.getElementById(
-      "riderCountText"
-    );
-
-
-  if(
-    riderCountText
-  ){
-
-    riderCountText.textContent =
-
-      riders.length +
-      " 位";
-
-  }
-
-
-  if(
-    riders.length ===
-    0
-  ){
-
-    container.innerHTML = `
-
-      <div class="empty">
-
-        目前沒有在線小U
-
-      </div>
-
-    `;
-
-    return;
-
-  }
-
-
-  container.innerHTML =
-
-    riders
-
-      .slice(
-        0,
-        100
-      )
-
-      .map(
-
-        rider => {
-
-
-          let stateText =
-            "可接單";
-
-
-          let dotClass =
-            "green";
-
-
-          if(
-            rider.state ===
-            "busy"
-            ||
-            rider.busy ===
-            true
-          ){
-
-            stateText =
-              "任務中";
-
-            dotClass =
-              "blue";
-
-          }
-
-
-          if(
-            rider.state ===
-            "issue"
-            ||
-            rider.stateIssue
-          ){
-
-            stateText =
-              "狀態異常";
-
-            dotClass =
-              "gray";
-
-          }
-
-
-          return `
-
-            <div class="rider-card">
-
-
-              <div class="row">
-
-
-                <b>
-
-                  <i
-                    class="
-                      dot
-                      ${dotClass}
-                    "
-                  ></i>
-
-                  ${escapeHtml(
-
-                    rider.name
-
-                    ||
-
-                    rider.riderId
-
-                    ||
-
-                    "小U"
-
-                  )}
-
-                </b>
-
-
-                <span class="muted">
-
-                  ${escapeHtml(
-                    stateText
-                  )}
-
-                </span>
-
-
-              </div>
-
-
-              <div class="muted">
-
-                最後定位：
-
-                ${escapeHtml(
-                  formatAge(
-                    rider.locationUpdatedAtMs
-                  )
-                )}
-
-                ${
-                  rider.district
-                  ||
-                  rider.serviceArea
-
-                    ?
-
-                    " · " +
-
-                    escapeHtml(
-
-                      rider.district
-
-                      ||
-
-                      rider.serviceArea
-
-                    )
-
-                    :
-
-                    ""
-                }
-
-              </div>
-
-
-              ${
-                rider.currentOrderId
-
-                  ?
-
-                  `
-
-                  <div class="muted">
-
-                    任務：
-
-                    ${escapeHtml(
-                      rider.currentOrderId
-                    )}
-
-                  </div>
-
-                  `
-
-                  :
-
-                  ""
-              }
-
-
-            </div>
-
-          `;
-
-        }
-
-      )
-
-      .join("");
-
-}
-
-
-/* ============================================================
-   ALERTS
-============================================================ */
-
-function renderAlerts(){
-
-  const container =
-
-    document.getElementById(
-      "alertList"
-    );
-
-
-  if(
-    !container
-  ){
-
-    return;
-
-  }
-
-
-  const allAlerts =
-
-    [
-      ...(
-        state.alerts
-        ||
-        []
-      )
-    ];
-
-
-  state.orders.forEach(
-    order => {
-
-
-      const risk =
-
-        getOrderRisk(
-          order
-        );
-
-
-      if(
-        risk.level !==
-        "high"
-      ){
-
-        return;
-
-      }
-
-
-      const exists =
-
-        allAlerts.some(
-          alert =>
-
-            String(
-
-              alert.orderId
-
-              ||
-
-              alert.message
-
-              ||
-
-              ""
-
-            ).includes(
-
-              String(
-                order.id
-              )
-
-            )
-
-        );
-
-
-      if(
-        !exists
-      ){
-
-        allAlerts.push({
-
-          type:
-            "high_risk_order",
-
-          severity:
-            "high",
-
-          orderId:
-            order.id,
-
-          title:
-            "高風險訂單",
-
-          message:
-
-            `${order.id}：${risk.reason}`
-
-        });
-
-      }
-
-    }
-
-  );
-
-
-  const alertCount =
-
-    document.getElementById(
-      "alertCountText"
-    );
-
-
-  if(
-    alertCount
-  ){
-
-    alertCount.textContent =
-
-      allAlerts.length +
-      " 件";
-
-  }
-
-
-  const topAlert =
-
-    document.getElementById(
-      "alerts"
-    );
-
-
-  if(
-    topAlert
-  ){
-
-    topAlert.textContent =
-
-      allAlerts.length;
-
-  }
-
-
-  if(
-    allAlerts.length ===
-    0
-  ){
-
-    container.innerHTML = `
-
-      <div class="empty">
-
-        目前沒有異常事件
-
-      </div>
-
-    `;
-
-    return;
-
-  }
-
-
-  container.innerHTML =
-
-    allAlerts
-
-      .slice(
-        0,
-        50
-      )
-
-      .map(
-
-        alert => `
-
-          <div class="alert-card">
-
-            <b>
-
-              ${escapeHtml(
-                alert.title
-                ||
-                "異常提醒"
-              )}
-
-            </b>
-
-
-            <div class="muted">
-
-              ${escapeHtml(
-                alert.message
-                ||
-                ""
-              )}
-
-            </div>
-
           </div>
-
-        `
-
-      )
-
-      .join("");
-
-}
-
-
-/* ============================================================
-   REGIONS
-============================================================ */
-
-function renderRegions(){
-
-  const container =
-
-    document.getElementById(
-      "regionDemand"
-    );
-
-
-  if(
-    !container
-  ){
-
-    return;
-
-  }
-
-
-  const regions =
-
-    state.regions
-
-    ||
-
-    [];
-
-
-  if(
-    regions.length ===
-    0
-  ){
-
-    container.innerHTML = `
-
-      <div class="empty">
-
-        目前沒有可顯示的區域資料
-
-      </div>
-
-    `;
-
-    return;
-
-  }
-
-
-  container.innerHTML =
-
-    regions
-
-      .slice(
-        0,
-        30
-      )
-
-      .map(
-
-        region => {
-
-
-          let riskClass =
-            "risk-low";
-
-
-          if(
-            region.supplyStatus ===
-            "critical"
-          ){
-
-            riskClass =
-              "risk-high";
-
-          }
-
-
-          else if(
-            region.supplyStatus ===
-            "tight"
-          ){
-
-            riskClass =
-              "risk-mid";
-
-          }
-
-
-          const label =
-
-            region.supplyLabel
-
-            ||
-
-            (
-              region.supplyStatus ===
-              "critical"
-
-                ?
-
-                "運力不足"
-
-                :
-
-                region.supplyStatus ===
-                "tight"
-
-                  ?
-
-                  "需求偏高"
-
-                  :
-
-                  region.supplyStatus ===
-                  "surplus"
-
-                    ?
-
-                    "運力充足"
-
-                    :
-
-                    "供需正常"
-            );
-
-
-          return `
-
-            <div class="region-card">
-
-
-              <div class="row">
-
-                <b>
-
-                  ${escapeHtml(
-                    region.region
-                    ||
-                    "未分類"
-                  )}
-
-                </b>
-
-
-                <span
-                  class="${riskClass}"
-                >
-
-                  ${escapeHtml(
-                    label
-                  )}
-
-                </span>
-
-              </div>
-
-
-              <div class="muted">
-
-                待接訂單：
-
-                ${Number(
-                  region.waitingOrders
-                  ||
-                  0
-                )}
-
-                ·
-
-                進行中：
-
-                ${Number(
-                  region.activeOrders
-                  ||
-                  0
-                )}
-
-              </div>
-
-
-              <div class="muted">
-
-                在線小U：
-
-                ${Number(
-                  region.onlineRiders
-                  ||
-                  0
-                )}
-
-                ·
-
-                可接：
-
-                ${Number(
-                  region.availableRiders
-                  ||
-                  0
-                )}
-
-                ·
-
-                任務中：
-
-                ${Number(
-                  region.busyRiders
-                  ||
-                  0
-                )}
-
-              </div>
-
-
-              ${
-                Number(
-                  region.issueRiders
-                  ||
-                  0
-                ) >
-                0
-
-                  ?
-
-                  `
-
-                  <div
-                    class="risk-mid"
-                    style="
-                      font-size:12px;
-                      margin-top:4px;
-                    "
-                  >
-
-                    ⚠
-
-                    ${Number(
-                      region.issueRiders
-                    )}
-
-                    位小U狀態異常
-
-                  </div>
-
-                  `
-
-                  :
-
-                  ""
-              }
-
-
-            </div>
-
-          `;
-
-        }
-
-      )
-
-      .join("");
-
-}
-
-
-/* ============================================================
-   SELECT ORDER
-============================================================ */
-
-function selectOrder(
-  orderId
-){
-
-  state.selectedOrderId =
-
-    orderId;
-
-
-  renderOrders();
-
-
-  const order =
-
-    state.orders.find(
-
-      item =>
-
-        String(
-          item.id
-        )
-
-        ===
-
-        String(
-          orderId
-        )
-
-    );
-
-
-  if(
-    !order
-  ){
-
-    return;
-
-  }
-
-
-  const risk =
-
-    getOrderRisk(
-      order
-    );
-
-
-  const aiPanel =
-
-    document.getElementById(
-      "aiPanel"
-    );
-
-
-  if(
-    !aiPanel
-  ){
-
-    return;
-
-  }
-
-
-  let riskTitle =
-    "目前正常";
-
-
-  if(
-    risk.level ===
-    "high"
-  ){
-
-    riskTitle =
-      "高風險";
-
-  }
-
-
-  else if(
-    risk.level ===
-    "mid"
-  ){
-
-    riskTitle =
-      "需要關注";
-
-  }
-
-
-  aiPanel.innerHTML = `
-
-
-    <div class="ai-box">
-
-
-      <div class="ai-title">
-
-        ${escapeHtml(
-          order.id
-        )}
-
-      </div>
-
-
-      <div class="ai-big">
-
-        ${escapeHtml(
-          riskTitle
-        )}
-
-      </div>
-
-
-      <div
-        class="muted"
-        style="
-          color:#ddd;
-          margin-top:6px;
-        "
-      >
-
-        ${escapeHtml(
-          risk.reason
-        )}
-
-      </div>
-
-
-    </div>
-
-
-    <div class="recommend-card">
-
-      <div class="row">
-
-        <b>
-
-          任務狀態
-
-        </b>
-
-        <span class="status">
-
-          ${escapeHtml(
-            getStatusText(
-              order
-            )
-          )}
-
-        </span>
-
-      </div>
-
-
-      <div class="muted">
-
-        ${escapeHtml(
-          order.pickupAddress
-          ||
-          "-"
-        )}
-
-        →
-
-        ${escapeHtml(
-          order.dropoffAddress
-          ||
-          "-"
-        )}
-
-      </div>
-
-    </div>
-
-
-    <div class="recommend-card">
-
-      <div class="row">
-
-        <b>
-
-          AI 推薦小U
-
-        </b>
-
-        <span class="status">
-
-          待第四步
-
-        </span>
-
-      </div>
-
-
-      <div class="muted">
-
-        下一階段將串接距離、
-
-        ETA、
-
-        小U狀態、
-
-        服務區域與候選排序。
-
-      </div>
-
-    </div>
-
-
-    <div class="recommend-card">
-
-      <div class="row">
-
-        <b>
-
-          建議派單策略
-
-        </b>
-
-        <span class="status">
-
-          ${
-            isWaitingOrder(
-              order
-            )
-
-              ?
-
-              "分析中"
-
-              :
-
-              "監控中"
-          }
-
-        </span>
-
-      </div>
-
-
-      <div class="muted">
-
-        ${
-          risk.level ===
-          "high"
-
-            ?
-
-            "此訂單應優先進入人工調度檢查。"
-
-            :
-
-            "目前可維持既有自動派單流程。"
-        }
-
-      </div>
-
-    </div>
-
-
-    <div class="ai-action">
-
-
-      <button
-        class="
-          action-btn
-          primary
-        "
-        disabled
-      >
-
-        推薦最佳小U
-
-        （第四步啟用）
-
-      </button>
-
-
-      <button
-        class="
-          action-btn
-          secondary
-        "
-        disabled
-      >
-
-        指定小U
-
-        （第四步啟用）
-
-      </button>
-
-
-      <button
-        class="
-          action-btn
-          danger
-        "
-        disabled
-      >
-
-        重新派單
-
-        （第四步啟用）
-
-      </button>
-
-
-    </div>
-
-  `;
-
-}
-
-
-/* ============================================================
-   LOAD V3
-============================================================ */
-
-async function loadDashboard(){
-
-  if(
-    state.loading
-  ){
-
-    return;
-
-  }
-
-
-  state.loading =
-    true;
-
-
-  try{
-
-
-    /*
-      四支 API 同時讀取
-
-      dashboard
-      orders
-      riders
-      regions
-    */
-
-
-    const [
-
-      dashboardData,
-
-      ordersData,
-
-      ridersData,
-
-      regionsData
-
-    ] =
-
-      await Promise.all([
-
-        fetchJson(
-          "/api/dispatch/dashboard"
-        ),
-
-        fetchJson(
-          "/api/dispatch/orders"
-        ),
-
-        fetchJson(
-          "/api/dispatch/riders"
-        ),
-
-        fetchJson(
-          "/api/dispatch/regions"
-        )
-
-      ]);
-
-
-    /* Dashboard */
-
-    state.dashboard =
-
-      dashboardData;
-
-
-    state.alerts =
-
-      Array.isArray(
-        dashboardData.alerts
-      )
-
-        ?
-
-        dashboardData.alerts
-
-        :
-
-        [];
-
-
-    /* Orders */
-
-    state.orders =
-
-      Array.isArray(
-        ordersData.orders
-      )
-
-        ?
-
-        ordersData.orders
-
-        :
-
-        [];
-
-
-    /* Riders */
-
-    state.riders =
-
-      Array.isArray(
-        ridersData.riders
-      )
-
-        ?
-
-        ridersData.riders
-
-        :
-
-        [];
-
-
-    state.riderSummary =
-
-      ridersData.summary
-
-      ||
-
-      {};
-
-
-    /* Regions */
-
-    state.regions =
-
-      Array.isArray(
-        regionsData.regions
-      )
-
-        ?
-
-        regionsData.regions
-
-        :
-
-        [];
-
-
-    state.regionTotals =
-
-      regionsData.totals
-
-      ||
-
-      {};
-
-
-    /* Render */
-
-    renderSummary();
-
-    renderOrders();
-
-    renderRiders();
-
-    renderAlerts();
-
-    renderRegions();
-
-
-    const lastUpdate =
-
-      document.getElementById(
-        "lastUpdate"
-      );
-
-
-    if(
-      lastUpdate
-    ){
-
-      lastUpdate.textContent =
-
-        "最後更新：" +
-
-        new Date()
-          .toLocaleString(
-
-            "zh-TW",
-
-            {
-
-              hour12:
-                false
-
-            }
-
-          );
-
-    }
-
-
-  }catch(error){
-
-
-    console.error(
-
-      "❌ UBee V3 調度中心讀取失敗：",
-
-      error
-
-    );
-
-
-    const alertList =
-
-      document.getElementById(
-        "alertList"
-      );
-
-
-    if(
-      alertList
-    ){
-
-      alertList.innerHTML = `
-
-        <div class="alert-card">
-
-          <b>
-
-            V3 資料讀取失敗
-
-          </b>
-
-          <div class="muted">
-
-            ${escapeHtml(
-              error.message
-              ||
-              "未知錯誤"
-            )}
-
-          </div>
-
+          <div class="price">NT$ ${esc(order.total || 0)}</div>
         </div>
 
-      `;
+        <div class="route">
+          <div class="route-line">
+            <span class="pin pickup"></span>
+            <div><b>取件</b>　${esc(order.pickupAddress || '-')}</div>
+          </div>
+          <div class="route-line">
+            <span class="pin dropoff"></span>
+            <div><b>送達</b>　${esc(order.dropoffAddress || '-')}</div>
+          </div>
+        </div>
 
-    }
+        <div class="meta">
+          <span>${esc(order.riderName || (isWaiting?'尚未接單':'已指派小U'))}</span>
+          <span class="wait">${isWaiting?'等待 '+fmtAge(order.createdAtMs):'建立 '+fmtAge(order.createdAtMs)}</span>
+        </div>
 
-
-    const lastUpdate =
-
-      document.getElementById(
-        "lastUpdate"
-      );
-
-
-    if(
-      lastUpdate
-    ){
-
-      lastUpdate.textContent =
-
-        "更新失敗";
-
-    }
-
-
-  }finally{
-
-    state.loading =
-      false;
-
-  }
-
+        <div class="order-actions">
+          <button class="btn small ${selected?'yellow':''}" data-action="select" data-id="${esc(order.id)}">
+            ${selected?'已選擇':'選擇訂單'}
+          </button>
+          ${isWaiting ? `
+            <button class="btn small" data-action="redispatch" data-id="${esc(order.id)}">重新派單</button>
+            <button class="btn small primary" data-action="candidates" data-id="${esc(order.id)}">指定小U</button>
+          ` : ''}
+        </div>
+      </article>
+    `;
+  }).join('');
 }
 
+function renderRiders(){
+  const riders = [...(state.data.riders || [])].sort((a,b)=>{
+    if(Boolean(a.busy)!==Boolean(b.busy)) return a.busy?1:-1;
+    return String(a.name||a.riderId||'').localeCompare(String(b.name||b.riderId||''),'zh-Hant');
+  });
 
-/* ============================================================
-   TABS
-============================================================ */
+  if(!riders.length){
+    $('riders').innerHTML = '<div class="empty">目前沒有在線小U</div>';
+    return;
+  }
 
-document
-  .querySelectorAll(
-    ".tab"
-  )
-  .forEach(
-    button => {
+  $('riders').innerHTML = riders.map(r=>`
+    <div class="rider-row">
+      <div>
+        <div class="rider-name">
+          <span class="legend-dot" style="display:inline-block;margin-right:6px;background:${r.busy?'var(--blue)':'var(--green)'}"></span>
+          ${esc(r.name || r.riderId || '小U')}
+        </div>
+        <div class="rider-meta">
+          ${esc(r.district || r.serviceArea || '未設定區域')} · 最後定位 ${esc(fmtAge(r.locationUpdatedAtMs))}
+          ${hasLatLng(r.currentLat,r.currentLng)?' · 有座標':' · 無座標'}
+        </div>
+      </div>
+      <div class="rider-state ${r.busy?'state-busy':'state-free'}">${r.busy?'任務中':'可接單'}</div>
+    </div>
+  `).join('');
+}
 
-      button.addEventListener(
+function renderAlerts(){
+  const list = state.data.alerts || [];
+  if(!list.length){
+    $('alertList').innerHTML = '<div class="empty">目前沒有異常提醒</div>';
+    return;
+  }
+  $('alertList').innerHTML = list.map(a=>`
+    <div class="alert-item">
+      <strong>${esc(a.title || '異常提醒')}</strong><br>
+      ${esc(a.message || '')}
+    </div>
+  `).join('');
+}
 
-        "click",
+/* =========================
+   候選小U推薦與距離排序
+   ========================= */
+function getCandidateRiders(order){
+  if(!order || !hasLatLng(order.pickupLat,order.pickupLng)) return [];
 
-        () => {
+  const pLat = Number(order.pickupLat);
+  const pLng = Number(order.pickupLng);
 
+  return (state.data.riders || [])
+    .filter(r=>!r.busy)
+    .filter(r=>hasLatLng(r.currentLat,r.currentLng))
+    .map(r=>({
+      ...r,
+      distanceKm:haversineKm(pLat,pLng,Number(r.currentLat),Number(r.currentLng))
+    }))
+    .filter(r=>r.distanceKm <= state.radiusKm)
+    .sort((a,b)=>{
+      if(a.distanceKm !== b.distanceKm) return a.distanceKm-b.distanceKm;
+      return Number(b.locationUpdatedAtMs||0)-Number(a.locationUpdatedAtMs||0);
+    });
+}
 
-          document
-            .querySelectorAll(
-              ".tab"
-            )
-            .forEach(
-              item => {
+function renderCandidates(){
+  const order = getSelectedOrder();
+  const isWaiting = order && statusKind(order)==='waiting';
 
-                item.classList.remove(
-                  "active"
-                );
+  $('redispatchBtn').disabled = !isWaiting;
+  $('expandRadiusBtn').disabled = !isWaiting;
+  $('radiusSelect').value = String(state.radiusKm);
 
-              }
-            );
+  if(!order){
+    $('selectedOrderSummary').innerHTML = '<div class="empty">請先選擇一筆訂單</div>';
+    $('candidateList').innerHTML = '<div class="empty">選擇訂單後顯示候選小U</div>';
+    return;
+  }
 
+  $('selectedOrderSummary').innerHTML = `
+    <strong>${esc(order.id)}</strong>
+    <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.55">
+      取件：${esc(order.pickupAddress || '-')}<br>
+      狀態：${esc(order.statusLabel || order.status || '-')}
+      ${!hasLatLng(order.pickupLat,order.pickupLng)?'<br><b style="color:var(--red)">此訂單缺少取件座標，無法計算附近小U。</b>':''}
+    </div>
+  `;
 
-          button.classList.add(
-            "active"
-          );
+  if(!isWaiting){
+    $('candidateList').innerHTML = '<div class="empty">此訂單已進入配送流程，不列入待派單候選推薦</div>';
+    return;
+  }
 
+  if(!hasLatLng(order.pickupLat,order.pickupLng)){
+    $('candidateList').innerHTML = '<div class="empty">訂單沒有 pickupLat / pickupLng，無法推薦附近小U</div>';
+    return;
+  }
 
-          state.filter =
+  const candidates = getCandidateRiders(order);
 
-            button.dataset.filter
+  if(!candidates.length){
+    $('candidateList').innerHTML = `
+      <div class="empty">
+        ${state.radiusKm} km 內沒有符合條件的可接單小U<br>
+        可使用「擴大派單半徑」
+      </div>
+    `;
+    return;
+  }
 
-            ||
+  $('candidateList').innerHTML = candidates.map((r,index)=>`
+    <div class="candidate ${index===0?'best':''}">
+      <div>
+        <div class="candidate-name">
+          <span class="rank">${index+1}</span>
+          ${esc(r.name || r.riderId || '小U')}
+          ${index===0?'<span class="badge green" style="margin-left:6px">最佳候選</span>':''}
+        </div>
+        <div class="candidate-meta">
+          ${esc(r.district || r.serviceArea || '未設定區域')}
+          · 定位更新 ${esc(fmtAge(r.locationUpdatedAtMs))}
+          · ${esc(r.riderId || '')}
+        </div>
+      </div>
+      <div>
+        <div class="distance">${r.distanceKm.toFixed(2)} km</div>
+        <button class="btn small yellow" style="margin-top:6px" data-action="assign" data-rider-id="${esc(r.riderId)}">指定</button>
+      </div>
+    </div>
+  `).join('');
+}
 
-            "all";
+function selectOrder(orderId,{pan=true}={}){
+  state.selectedOrderId = String(orderId || '');
+  state.selectedCandidateRiderId = '';
+  renderOrders();
+  renderCandidates();
+  renderMap();
 
+  const order = getSelectedOrder();
+  if(pan && order && state.mapReady && hasLatLng(order.pickupLat,order.pickupLng)){
+    state.map.setView([Number(order.pickupLat),Number(order.pickupLng)],13);
+  }
+}
 
-          renderOrders();
+/* =========================
+   真正派單寫入 API
+   ========================= */
+async function postJson(url,body={}){
+  const response = await fetch(url,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Accept':'application/json'
+    },
+    body:JSON.stringify(body)
+  });
 
-        }
+  const data = await response.json().catch(()=>({}));
+  if(!response.ok || data.success === false){
+    const error = new Error(data.message || `API 請求失敗 (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
 
-      );
+function backendNotReadyMessage(action){
+  return `${action}前端已完成，但 index.js 尚未建立對應寫入 API。下一步修改後端後即可正式啟用。`;
+}
 
+async function assignRider(orderId,riderId){
+  try{
+    const result = await postJson(`/api/dispatch/orders/${encodeURIComponent(orderId)}/assign`,{
+      riderId,
+      source:'dispatch_center'
+    });
+    closeAssignModal();
+    toast(result.message || '已成功指定小U');
+    await loadDashboard();
+  }catch(error){
+    if(error.status===404 || error.status===405){
+      toast(backendNotReadyMessage('指定小U'),5000);
+    }else{
+      toast('指定小U失敗：'+error.message,5000);
     }
+  }
+}
 
-  );
+async function redispatchOrder(orderId){
+  if(!orderId) return;
+  try{
+    const result = await postJson(`/api/dispatch/orders/${encodeURIComponent(orderId)}/redispatch`,{
+      radiusKm:state.radiusKm,
+      source:'dispatch_center'
+    });
+    toast(result.message || '已重新派單');
+    await loadDashboard();
+  }catch(error){
+    if(error.status===404 || error.status===405){
+      toast(backendNotReadyMessage('重新派單'),5000);
+    }else{
+      toast('重新派單失敗：'+error.message,5000);
+    }
+  }
+}
 
+async function expandRadius(orderId){
+  if(!orderId) return;
 
-/* ============================================================
-   START
-============================================================ */
+  const steps = [2,3,5,8,12,20];
+  const currentIndex = steps.findIndex(x=>x>=state.radiusKm);
+  const next = currentIndex >= 0 && currentIndex < steps.length-1 ? steps[currentIndex+1] : 20;
 
+  if(next === state.radiusKm && state.radiusKm >= 20){
+    toast('目前已是最大 20 km 派單半徑');
+    return;
+  }
+
+  const previous = state.radiusKm;
+  state.radiusKm = next;
+  $('radiusSelect').value = String(next);
+  renderCandidates();
+  renderMap();
+
+  try{
+    const result = await postJson(`/api/dispatch/orders/${encodeURIComponent(orderId)}/expand-radius`,{
+      radiusKm:next,
+      previousRadiusKm:previous,
+      source:'dispatch_center'
+    });
+    toast(result.message || `派單半徑已擴大至 ${next} km`);
+    await loadDashboard({silent:true});
+  }catch(error){
+    if(error.status===404 || error.status===405){
+      toast(`畫面已切換為 ${next} km；${backendNotReadyMessage('擴大派單半徑')}`,5200);
+    }else{
+      toast('擴大派單半徑失敗：'+error.message,5000);
+    }
+  }
+}
+
+/* =========================
+   指定確認 Modal
+   ========================= */
+function openAssignModal(riderId){
+  const order = getSelectedOrder();
+  if(!order) return toast('請先選擇訂單');
+
+  const rider = (state.data.riders||[]).find(r=>String(r.riderId)===String(riderId));
+  if(!rider) return toast('找不到這位小U');
+
+  state.selectedCandidateRiderId = String(riderId);
+
+  let distanceText = '-';
+  if(hasLatLng(order.pickupLat,order.pickupLng) && hasLatLng(rider.currentLat,rider.currentLng)){
+    distanceText = haversineKm(
+      Number(order.pickupLat),Number(order.pickupLng),
+      Number(rider.currentLat),Number(rider.currentLng)
+    ).toFixed(2)+' km';
+  }
+
+  $('assignModalBody').innerHTML = `
+    <div class="dispatch-order-summary">
+      <strong>訂單 ${esc(order.id)}</strong>
+      <div style="font-size:12px;line-height:1.65;margin-top:7px;color:var(--muted)">
+        取件：${esc(order.pickupAddress || '-')}<br>
+        指定小U：<b style="color:#111">${esc(rider.name || rider.riderId || '小U')}</b><br>
+        距離取件點：約 <b style="color:#111">${esc(distanceText)}</b><br>
+        小U狀態：${rider.busy?'任務中':'可接單'}
+      </div>
+    </div>
+    <div class="api-note" style="margin-top:10px">
+      確認後會呼叫人工指定 API。後端必須再次驗證：訂單仍可派、該小U仍在線且未被其他訂單占用，避免併發搶單。
+    </div>
+  `;
+
+  $('assignModal').classList.add('show');
+}
+
+function closeAssignModal(){
+  $('assignModal').classList.remove('show');
+  state.selectedCandidateRiderId = '';
+}
+
+/* =========================
+   事件
+   ========================= */
+document.addEventListener('click',event=>{
+  const actionBtn = event.target.closest('[data-action]');
+  if(actionBtn){
+    const action = actionBtn.dataset.action;
+    const id = actionBtn.dataset.id;
+
+    if(action==='select') selectOrder(id);
+    if(action==='candidates') selectOrder(id);
+    if(action==='redispatch'){
+      selectOrder(id);
+      redispatchOrder(id);
+    }
+    if(action==='assign') openAssignModal(actionBtn.dataset.riderId);
+  }
+
+  const chip = event.target.closest('.chip[data-filter]');
+  if(chip){
+    state.filter = chip.dataset.filter;
+    document.querySelectorAll('.chip[data-filter]').forEach(x=>x.classList.toggle('active',x===chip));
+    renderOrders();
+  }
+
+  if(event.target.closest('[data-close-modal]')) closeAssignModal();
+});
+
+$('refreshBtn').addEventListener('click',()=>loadDashboard());
+$('fitMapBtn').addEventListener('click',()=>fitMapToData());
+
+$('radiusSelect').addEventListener('change',event=>{
+  state.radiusKm = Number(event.target.value || 3);
+  renderCandidates();
+  renderMap();
+});
+
+$('redispatchBtn').addEventListener('click',()=>{
+  const order = getSelectedOrder();
+  if(order) redispatchOrder(order.id);
+});
+
+$('expandRadiusBtn').addEventListener('click',()=>{
+  const order = getSelectedOrder();
+  if(order) expandRadius(order.id);
+});
+
+$('confirmAssignBtn').addEventListener('click',()=>{
+  const order = getSelectedOrder();
+  const riderId = state.selectedCandidateRiderId;
+  if(order && riderId) assignRider(order.id,riderId);
+});
+
+$('assignModal').addEventListener('click',event=>{
+  if(event.target === $('assignModal')) closeAssignModal();
+});
+
+window.addEventListener('resize',()=>{
+  if(state.mapReady) setTimeout(()=>state.map.invalidateSize(),60);
+});
+
+/* =========================
+   啟動
+   ========================= */
+initMap();
 loadDashboard();
-
-
-setInterval(
-
-  loadDashboard,
-
-  10000
-
-);
-
+setInterval(()=>loadDashboard({silent:true}),10000);
 </script>
-
 </body>
 </html>
