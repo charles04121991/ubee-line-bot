@@ -148,15 +148,20 @@ button{cursor:pointer}
   gap:10px;align-items:center;font-size:11px;color:var(--muted)
 }
 
-.marker-rider,.marker-order{
-  width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:17px
+.marker-rider,.marker-order,.marker-dropoff{
+  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.18);font-size:12px;font-weight:1000;
+  letter-spacing:-.2px
 }
-.marker-rider.free{background:var(--green)}
-.marker-rider.busy{background:var(--blue)}
-.marker-order.waiting{background:var(--orange)}
-.marker-order.active{background:#111}
-.marker-order.selected{background:var(--yellow);transform:scale(1.13)}
+.marker-rider.free{background:var(--green);color:#fff}
+.marker-rider.busy{background:var(--blue);color:#fff}
+.marker-order.waiting{background:var(--orange);color:#fff}
+.marker-order.active{background:var(--blue);color:#fff}
+.marker-order.selected{outline:3px solid rgba(255,204,0,.55);transform:scale(1.10)}
+.marker-dropoff{background:#fff;color:var(--blue);border-color:var(--blue);width:30px;height:30px}
+.ubee-u{font-size:15px;font-weight:1000;line-height:1}
+.map-wrap .leaflet-container{background:#f4f5f7}
+.map-wrap .leaflet-tile{filter:saturate(.68) contrast(.96) brightness(1.02)}
 
 .dispatch-box{display:grid;gap:10px}
 .dispatch-order-summary{
@@ -336,7 +341,7 @@ button{cursor:pointer}
         <div class="panel-head">
           <div>
             <div class="panel-title">即時供需地圖</div>
-            <div class="panel-sub">綠色＝可接單小U、藍色＝任務中小U、橘色＝待派訂單、黑色＝進行中訂單</div>
+            <div class="panel-sub">綠色＝可接單小U、藍色＝任務中／配送中、橘色＝待派單；選取訂單後顯示取件與送達點</div>
           </div>
         </div>
         <div class="map-wrap">
@@ -346,7 +351,7 @@ button{cursor:pointer}
               <span class="legend-item"><i class="legend-dot" style="background:var(--green)"></i>可接單 <b id="legendFree">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>任務中 <b id="legendBusy">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--orange)"></i>待派單 <b id="legendWaiting">0</b></span>
-              <span class="legend-item"><i class="legend-dot" style="background:#111"></i>配送中 <b id="legendActive">0</b></span>
+              <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>配送中 <b id="legendActive">0</b></span>
             </div>
             <div class="map-status" id="mapStatus">地圖初始化中</div>
           </div>
@@ -409,7 +414,7 @@ button{cursor:pointer}
 'use strict';
 
 /* ============================================================
-   UBee 調度中心完整前端版
+   UBee 調度中心 V5 完整串接版
    現有可直接使用：
    GET /api/dispatch/dashboard
 
@@ -489,7 +494,7 @@ function haversineKm(lat1,lng1,lat2,lng2){
 
 function statusKind(order){
   const s = String(order?.status || '').trim();
-  const waiting = new Set(['pending','waiting','searching','dispatching','redispatching']);
+  const waiting = new Set(['pending_dispatch','pending','waiting','searching','dispatching','redispatching']);
   return waiting.has(s) ? 'waiting' : 'active';
 }
 
@@ -527,12 +532,15 @@ function initMap(){
 
   state.map = L.map('dispatchMap',{
     zoomControl:true,
-    attributionControl:true
+    attributionControl:true,
+    preferCanvas:true
   }).setView([24.1477,120.6736], 11);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:19,
-    attribution:'&copy; OpenStreetMap contributors'
+  // 淺灰白、低干擾底圖：更接近營運監控而非導航視角。
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+    subdomains:'abcd',
+    maxZoom:20,
+    attribution:'&copy; OpenStreetMap contributors &copy; CARTO'
   }).addTo(state.map);
 
   state.mapLayers.riders = L.layerGroup().addTo(state.map);
@@ -541,7 +549,7 @@ function initMap(){
   state.mapLayers.route = L.layerGroup().addTo(state.map);
 
   state.mapReady = true;
-  $('mapStatus').textContent = '地圖已啟動';
+  $('mapStatus').textContent = '營運監控地圖已啟動';
 
   setTimeout(()=>state.map.invalidateSize(), 80);
   return true;
@@ -551,9 +559,9 @@ function riderIcon(rider){
   const cls = rider.busy ? 'busy' : 'free';
   return L.divIcon({
     className:'',
-    html:`<div class="marker-rider ${cls}" title="${esc(rider.name || rider.riderId || '小U')}">🐝</div>`,
-    iconSize:[34,34],
-    iconAnchor:[17,17],
+    html:`<div class="marker-rider ${cls}" title="${esc(rider.name || rider.riderId || '小U')}"><span class="ubee-u">U</span></div>`,
+    iconSize:[32,32],
+    iconAnchor:[16,16],
     popupAnchor:[0,-18]
   });
 }
@@ -562,10 +570,20 @@ function orderIcon(order, selected=false){
   const kind = statusKind(order);
   return L.divIcon({
     className:'',
-    html:`<div class="marker-order ${selected?'selected':kind}" title="${esc(order.id)}">📦</div>`,
-    iconSize:[34,34],
-    iconAnchor:[17,17],
+    html:`<div class="marker-order ${kind} ${selected?'selected':''}" title="${esc(order.id)}">取</div>`,
+    iconSize:[32,32],
+    iconAnchor:[16,16],
     popupAnchor:[0,-18]
+  });
+}
+
+function dropoffIcon(order){
+  return L.divIcon({
+    className:'',
+    html:`<div class="marker-dropoff" title="送達：${esc(order.id)}">送</div>`,
+    iconSize:[30,30],
+    iconAnchor:[15,15],
+    popupAnchor:[0,-17]
   });
 }
 
@@ -587,7 +605,7 @@ function renderMap(){
     const lat = Number(rider.currentLat), lng = Number(rider.currentLng);
     bounds.push([lat,lng]);
 
-    const marker = L.marker([lat,lng],{icon:riderIcon(rider)});
+    const marker = L.marker([lat,lng],{icon:riderIcon(rider),zIndexOffset:300});
     marker.bindPopup(`
       <div style="min-width:180px">
         <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
@@ -609,13 +627,13 @@ function renderMap(){
     bounds.push([lat,lng]);
 
     const selected = String(order.id) === String(state.selectedOrderId);
-    const marker = L.marker([lat,lng],{icon:orderIcon(order,selected)});
+    const marker = L.marker([lat,lng],{icon:orderIcon(order,selected),zIndexOffset:selected?500:200});
     marker.bindPopup(`
       <div style="min-width:210px">
         <b>${esc(order.id)}</b><br>
         <small>${esc(order.statusLabel || order.status || '')}</small><hr style="border:0;border-top:1px solid #eee">
-        <small>取件：${esc(order.pickupAddress || '-')}</small><br>
-        <small>送達：${esc(order.dropoffAddress || '-')}</small><br>
+        <small><b>取件：</b>${esc(order.pickupAddress || '-')}</small><br>
+        <small><b>送達：</b>${esc(order.dropoffAddress || '-')}</small><br>
         <small>NT$ ${esc(order.total || 0)}</small>
       </div>
     `);
@@ -627,17 +645,22 @@ function renderMap(){
         const dLat = Number(order.dropoffLat), dLng = Number(order.dropoffLng);
         bounds.push([dLat,dLng]);
         L.polyline([[lat,lng],[dLat,dLng]],{
-          weight:4,dashArray:'8 7',opacity:.75
+          color:'#3478f6',weight:4,dashArray:'8 8',opacity:.58
         }).addTo(state.mapLayers.route);
-        L.circleMarker([dLat,dLng],{
-          radius:8,weight:3,fillOpacity:1
-        }).bindPopup(`送達點：${esc(order.dropoffAddress || '-')}`).addTo(state.mapLayers.route);
+        L.marker([dLat,dLng],{icon:dropoffIcon(order),zIndexOffset:450})
+          .bindPopup(`送達點：${esc(order.dropoffAddress || '-')}`)
+          .addTo(state.mapLayers.route);
       }
 
       if(statusKind(order) === 'waiting'){
         L.circle([lat,lng],{
           radius:state.radiusKm*1000,
-          weight:2,fillOpacity:.06,dashArray:'8 6'
+          color:'#f59e0b',
+          weight:1.5,
+          opacity:.30,
+          fillColor:'#f59e0b',
+          fillOpacity:.025,
+          dashArray:'7 7'
         }).addTo(state.mapLayers.radius);
       }
     }
@@ -996,7 +1019,7 @@ async function postJson(url,body={}){
 }
 
 function backendNotReadyMessage(action){
-  return `${action}前端已完成，但 index.js 尚未建立對應寫入 API。下一步修改後端後即可正式啟用。`;
+  return `${action} API 回傳 404/405，請確認已部署 V5 index.js 並重新部署後端服務。`;
 }
 
 async function assignRider(orderId,riderId){
