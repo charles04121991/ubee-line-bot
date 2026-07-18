@@ -2,23 +2,40 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-
 <meta
   name="viewport"
-  content="width=device-width, initial-scale=1, viewport-fit=cover"
+  content="width=device-width,initial-scale=1,viewport-fit=cover"
 >
 
-<title>UBee 調度中心</title>
+<title>UBee 智慧調度中心 V3</title>
 
 <style>
+
 *{
   box-sizing:border-box;
 }
 
+:root{
+  --bg:#f4f5f7;
+  --card:#ffffff;
+  --line:#e8e8eb;
+  --text:#111111;
+  --muted:#757575;
+
+  --yellow:#f5b800;
+  --green:#27ae60;
+  --blue:#2f80ed;
+  --orange:#f2994a;
+  --red:#e53935;
+  --gray:#9aa0a6;
+}
+
 body{
   margin:0;
-  background:#f5f6f8;
-  color:#111;
+
+  background:var(--bg);
+  color:var(--text);
+
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -26,159 +43,277 @@ body{
     sans-serif;
 }
 
-button{
+button,
+select{
   font-family:inherit;
 }
 
 .app{
-  max-width:1280px;
+  max-width:1500px;
+
   margin:0 auto;
-  padding:20px;
+
+  padding:18px;
 }
 
-/* =========================
+
+/* ============================================================
    頂部
-========================= */
+============================================================ */
 
 .top{
   display:flex;
-  justify-content:space-between;
+
+  justify-content:
+    space-between;
+
   align-items:center;
-  gap:16px;
-  margin-bottom:18px;
+
+  gap:14px;
+
+  margin-bottom:14px;
 }
 
 .brand{
+  display:flex;
+
+  align-items:center;
+
+  gap:8px;
+
+  flex-wrap:wrap;
+
   font-size:28px;
+
   font-weight:1000;
 }
 
 .brand b{
-  color:#f5b800;
+  color:var(--yellow);
 }
 
-.version-badge{
-  display:inline-block;
-  margin-left:8px;
-
+.badge{
   background:#111;
+
   color:#fff;
 
-  padding:7px 11px;
   border-radius:999px;
 
+  padding:7px 10px;
+
   font-size:12px;
+
   font-weight:900;
 }
 
-.refresh-btn{
+.top-actions{
+  display:flex;
+
+  gap:8px;
+
+  align-items:center;
+
+  flex-wrap:wrap;
+}
+
+.control{
+  border:1px solid var(--line);
+
+  background:#fff;
+
+  border-radius:12px;
+
+  padding:10px 12px;
+
+  font-weight:800;
+}
+
+.btn{
   border:0;
 
   background:#111;
+
   color:#fff;
 
   border-radius:12px;
 
-  padding:11px 16px;
+  padding:10px 14px;
 
-  font-size:14px;
   font-weight:900;
 
   cursor:pointer;
 }
 
-/* =========================
-   統計卡
-========================= */
+.system{
+  font-size:13px;
 
-.stats-grid{
+  font-weight:900;
+
+  color:var(--green);
+}
+
+
+/* ============================================================
+   統計卡
+============================================================ */
+
+.stats{
   display:grid;
-  grid-template-columns:repeat(6, 1fr);
+
+  grid-template-columns:
+    repeat(7,1fr);
+
   gap:10px;
 }
 
-.stat-card{
+.stat{
   background:#fff;
 
-  border:1px solid #e8e8e8;
+  border:
+    1px solid
+    var(--line);
+
   border-radius:18px;
 
-  padding:16px;
+  padding:15px;
 
   box-shadow:
-    0 6px 20px rgba(0,0,0,.04);
+    0 6px 20px
+    rgba(0,0,0,.035);
 }
 
-.stat-title{
-  font-size:13px;
-  color:#666;
+.stat .t{
+  font-size:12px;
+
+  color:var(--muted);
+
   font-weight:800;
 }
 
-.stat-number{
-  margin-top:6px;
+.stat .n{
+  font-size:27px;
 
-  font-size:28px;
   font-weight:1000;
+
+  margin-top:5px;
 }
 
-/* =========================
+.stat .s{
+  font-size:11px;
+
+  color:var(--muted);
+
+  margin-top:4px;
+}
+
+
+/* ============================================================
    主版面
-========================= */
+============================================================ */
 
-.main-layout{
+.grid{
   display:grid;
-  grid-template-columns:1.5fr .8fr;
-  gap:14px;
 
-  margin-top:14px;
+  grid-template-columns:
+    330px
+    minmax(0,1fr)
+    360px;
+
+  gap:12px;
+
+  margin-top:12px;
 }
 
 .panel{
   background:#fff;
 
-  border:1px solid #e8e8e8;
+  border:
+    1px solid
+    var(--line);
+
   border-radius:18px;
-
-  padding:16px;
-
-  box-shadow:
-    0 6px 20px rgba(0,0,0,.04);
-}
-
-.panel + .panel{
-  margin-top:14px;
-}
-
-.panel-title{
-  margin:0 0 14px;
-
-  font-size:19px;
-  font-weight:1000;
-}
-
-/* =========================
-   訂單卡片
-========================= */
-
-.order-card{
-  border:1px solid #ececec;
-  border-radius:14px;
 
   padding:14px;
 
-  margin-bottom:10px;
+  box-shadow:
+    0 6px 20px
+    rgba(0,0,0,.035);
 }
 
-.order-card:last-child{
-  margin-bottom:0;
+.panel-title{
+  display:flex;
+
+  justify-content:
+    space-between;
+
+  align-items:center;
+
+  gap:8px;
+
+  margin-bottom:12px;
+}
+
+.panel-title h2{
+  font-size:18px;
+
+  margin:0;
+}
+
+.small{
+  font-size:12px;
+
+  color:var(--muted);
+}
+
+.stack{
+  display:grid;
+
+  gap:12px;
+}
+
+
+/* ============================================================
+   訂單
+============================================================ */
+
+.order-card,
+.alert-card,
+.recommend-card,
+.region-card,
+.rider-card{
+
+  border:
+    1px solid
+    var(--line);
+
+  border-radius:14px;
+
+  padding:12px;
+
+  background:#fff;
+
+  margin-bottom:9px;
+}
+
+.order-card{
+  cursor:pointer;
+}
+
+.order-card.selected{
+  outline:
+    2px solid
+    #111;
 }
 
 .row{
   display:flex;
-  justify-content:space-between;
+
+  justify-content:
+    space-between;
+
   align-items:center;
-  gap:10px;
+
+  gap:8px;
 }
 
 .order-id{
@@ -186,367 +321,1457 @@ button{
 }
 
 .status{
-  display:inline-block;
+  font-size:11px;
 
-  font-size:12px;
   font-weight:900;
 
-  padding:5px 9px;
-
   border-radius:999px;
+
+  padding:5px 8px;
 
   background:#f1f1f1;
 }
 
 .route{
-  font-size:14px;
-  line-height:1.7;
+  font-size:13px;
+
+  line-height:1.65;
+
+  margin-top:7px;
+}
+
+.muted{
+  font-size:12px;
+
+  color:var(--muted);
+
+  line-height:1.55;
+}
+
+
+/* ============================================================
+   風險顏色
+============================================================ */
+
+.risk-high{
+  color:var(--red);
+
+  font-weight:1000;
+}
+
+.risk-mid{
+  color:var(--orange);
+
+  font-weight:1000;
+}
+
+.risk-low{
+  color:var(--green);
+
+  font-weight:1000;
+}
+
+
+/* ============================================================
+   地圖框架
+============================================================ */
+
+.map{
+  min-height:610px;
+
+  border-radius:16px;
+
+  position:relative;
+
+  overflow:hidden;
+
+  background:
+
+    radial-gradient(
+      circle at 30% 25%,
+      rgba(229,57,53,.14),
+      transparent 18%
+    ),
+
+    radial-gradient(
+      circle at 68% 40%,
+      rgba(242,153,74,.13),
+      transparent 18%
+    ),
+
+    radial-gradient(
+      circle at 55% 73%,
+      rgba(39,174,96,.12),
+      transparent 20%
+    ),
+
+    linear-gradient(
+      135deg,
+      #edf0f3,
+      #f8f9fa
+    );
+
+  border:
+    1px solid
+    var(--line);
+}
+
+.map::before{
+
+  content:"";
+
+  position:absolute;
+
+  inset:0;
+
+  opacity:.35;
+
+  background-image:
+
+    linear-gradient(
+      #dfe3e8 1px,
+      transparent 1px
+    ),
+
+    linear-gradient(
+      90deg,
+      #dfe3e8 1px,
+      transparent 1px
+    );
+
+  background-size:
+    42px 42px;
+}
+
+.map-note{
+  position:absolute;
+
+  left:14px;
+
+  top:14px;
+
+  z-index:2;
+
+  background:#fff;
+
+  border:
+    1px solid
+    var(--line);
+
+  border-radius:13px;
+
+  padding:10px 12px;
+
+  box-shadow:
+    0 5px 16px
+    rgba(0,0,0,.05);
+}
+
+.legend{
+  display:flex;
+
+  gap:10px;
+
+  flex-wrap:wrap;
 
   margin-top:8px;
 }
 
-.order-bottom{
-  margin-top:10px;
-}
+.legend span{
+  font-size:11px;
 
-.muted{
-  color:#777;
-
-  font-size:12px;
-  line-height:1.6;
-}
-
-/* =========================
-   小U
-========================= */
-
-.rider-item{
-  padding:11px 0;
-
-  border-bottom:1px solid #eee;
-}
-
-.rider-item:last-child{
-  border-bottom:0;
+  font-weight:800;
 }
 
 .dot{
   display:inline-block;
 
   width:9px;
+
   height:9px;
 
   border-radius:50%;
 
-  margin-right:7px;
+  margin-right:5px;
+
+  vertical-align:middle;
 }
 
-.dot.green{
-  background:#27ae60;
+.green{
+  background:var(--green);
 }
 
-.dot.blue{
-  background:#2f80ed;
+.blue{
+  background:var(--blue);
 }
 
-.dot.gray{
-  background:#aaa;
+.gray{
+  background:var(--gray);
 }
 
-/* =========================
-   異常
-========================= */
+.red{
+  background:var(--red);
+}
 
-.alert-card{
-  border-left:4px solid #e53935;
+.orange{
+  background:var(--orange);
+}
 
-  padding:10px 12px;
+.zone{
 
-  background:#fff7f7;
+  position:absolute;
+
+  z-index:1;
+
+  border-radius:999px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  text-align:center;
+
+  font-size:12px;
+
+  font-weight:1000;
+
+  border:
+    2px solid
+    rgba(255,255,255,.9);
+
+  box-shadow:
+    0 7px 18px
+    rgba(0,0,0,.1);
+}
+
+.zone.red{
+
+  width:130px;
+
+  height:130px;
+
+  left:18%;
+
+  top:26%;
+
+  background:
+    rgba(229,57,53,.18);
+
+  color:#9f1f1b;
+}
+
+.zone.orange{
+
+  width:105px;
+
+  height:105px;
+
+  right:18%;
+
+  top:31%;
+
+  background:
+    rgba(242,153,74,.18);
+
+  color:#9c5a17;
+}
+
+.zone.green{
+
+  width:120px;
+
+  height:120px;
+
+  left:43%;
+
+  bottom:16%;
+
+  background:
+    rgba(39,174,96,.16);
+
+  color:#176c3c;
+}
+
+.pin{
+  position:absolute;
+
+  z-index:3;
+
+  background:#fff;
+
+  border:
+    2px solid
+    #111;
+
+  border-radius:999px;
+
+  padding:7px 9px;
+
+  font-size:11px;
+
+  font-weight:1000;
+
+  box-shadow:
+    0 6px 16px
+    rgba(0,0,0,.08);
+}
+
+.p1{
+  left:30%;
+
+  top:50%;
+}
+
+.p2{
+  left:45%;
+
+  top:38%;
+}
+
+.p3{
+  right:24%;
+
+  bottom:28%;
+}
+
+.p4{
+  left:57%;
+
+  bottom:18%;
+}
+
+
+/* ============================================================
+   AI 調度
+============================================================ */
+
+.ai-box{
+  background:#111;
+
+  color:#fff;
+
+  border-radius:16px;
+
+  padding:14px;
+
+  margin-bottom:10px;
+}
+
+.ai-title{
+  font-size:13px;
+
+  color:#cfcfcf;
+
+  font-weight:800;
+}
+
+.ai-big{
+  font-size:22px;
+
+  font-weight:1000;
+
+  margin-top:5px;
+}
+
+.ai-action{
+  margin-top:10px;
+
+  display:grid;
+
+  gap:7px;
+}
+
+.action-btn{
+  border:0;
 
   border-radius:10px;
 
-  margin-bottom:9px;
+  padding:10px;
 
-  font-size:13px;
-  line-height:1.6;
+  font-weight:1000;
+
+  cursor:pointer;
 }
 
-/* =========================
-   空狀態
-========================= */
+.primary{
+  background:
+    var(--yellow);
+
+  color:#111;
+}
+
+.secondary{
+  background:#f1f1f1;
+
+  color:#111;
+}
+
+.danger{
+  background:#fff1f0;
+
+  color:#b3261e;
+}
+
+
+/* ============================================================
+   Tabs
+============================================================ */
+
+.tabs{
+
+  display:flex;
+
+  gap:6px;
+
+  overflow:auto;
+
+  margin-bottom:10px;
+}
+
+.tab{
+
+  border:
+    1px solid
+    var(--line);
+
+  background:#fff;
+
+  border-radius:999px;
+
+  padding:7px 10px;
+
+  font-size:12px;
+
+  font-weight:900;
+
+  white-space:nowrap;
+
+  cursor:pointer;
+}
+
+.tab.active{
+
+  background:#111;
+
+  color:#fff;
+
+  border-color:#111;
+}
+
+
+/* ============================================================
+   底部
+============================================================ */
+
+.bottom-grid{
+
+  display:grid;
+
+  grid-template-columns:
+    1.2fr 1fr 1fr;
+
+  gap:12px;
+
+  margin-top:12px;
+}
+
+.kpi-bars{
+  display:grid;
+
+  gap:8px;
+}
+
+.bar-row{
+
+  display:grid;
+
+  grid-template-columns:
+    65px 1fr 42px;
+
+  gap:8px;
+
+  align-items:center;
+
+  font-size:12px;
+}
+
+.bar{
+
+  height:9px;
+
+  background:#eee;
+
+  border-radius:999px;
+
+  overflow:hidden;
+}
+
+.fill{
+
+  height:100%;
+
+  background:#111;
+
+  border-radius:999px;
+}
 
 .empty{
+
+  padding:26px 10px;
+
   text-align:center;
 
   color:#999;
 
-  padding:28px 10px;
-
-  font-size:14px;
+  font-size:13px;
 }
 
-/* =========================
-   更新時間
-========================= */
+.notice{
 
-.last-update{
-  margin-top:10px;
+  background:#fff8dd;
+
+  border:
+    1px solid
+    #f5df8a;
+
+  border-radius:12px;
+
+  padding:10px;
+
+  font-size:12px;
+
+  line-height:1.6;
+
+  margin-bottom:10px;
+}
+
+.footer{
 
   text-align:right;
 
-  font-size:12px;
   color:#888;
+
+  font-size:11px;
+
+  margin-top:10px;
 }
 
-/* =========================
-   手機版
-========================= */
 
-@media(max-width:900px){
+/* ============================================================
+   RWD
+============================================================ */
+
+@media(
+  max-width:1180px
+){
+
+  .stats{
+
+    grid-template-columns:
+      repeat(4,1fr);
+  }
+
+  .grid{
+
+    grid-template-columns:
+      300px 1fr;
+  }
+
+  .grid > div:last-child{
+
+    grid-column:
+      1 / -1;
+  }
+
+  .bottom-grid{
+
+    grid-template-columns:
+      1fr;
+  }
+
+}
+
+@media(
+  max-width:760px
+){
 
   .app{
-    padding:12px;
+
+    padding:10px;
   }
 
   .top{
+
     align-items:flex-start;
   }
 
   .brand{
-    font-size:23px;
+
+    font-size:22px;
   }
 
-  .version-badge{
-    display:block;
+  .stats{
 
-    width:max-content;
-
-    margin-left:0;
-    margin-top:6px;
+    grid-template-columns:
+      repeat(2,1fr);
   }
 
-  .stats-grid{
-    grid-template-columns:repeat(2, 1fr);
+  .grid{
+
+    grid-template-columns:
+      1fr;
   }
 
-  .main-layout{
-    grid-template-columns:1fr;
+  .map{
+
+    min-height:420px;
   }
+
+  .bottom-grid{
+
+    grid-template-columns:
+      1fr;
+  }
+
+}
+
+
+/* ============================================================
+   小U
+============================================================ */
+
+.rider-card{
+  margin-bottom:8px;
+}
+
+
+/* ============================================================
+   異常
+============================================================ */
+
+.alert-card{
+
+  border-left:
+    4px solid
+    var(--red);
 }
 
 </style>
 </head>
 
+
 <body>
 
 <div class="app">
 
-  <!-- =========================
-       頂部
-  ========================== -->
 
-  <div class="top">
+<!-- ============================================================
+     TOP
+============================================================ -->
 
-    <div>
+<div class="top">
 
-      <div class="brand">
+  <div class="brand">
 
-        U<b>Bee</b> 調度中心
+    U<b>Bee</b>
 
-        <span class="version-badge">
-          V1 只讀監控
+    智慧調度控制塔
+
+    <span class="badge">
+
+      V3 Framework
+
+    </span>
+
+  </div>
+
+
+  <div class="top-actions">
+
+    <span class="system">
+
+      ● 系統運作中
+
+    </span>
+
+
+    <select
+      id="regionSelect"
+      class="control"
+    >
+
+      <option value="all">
+        全區
+      </option>
+
+      <option value="taichung">
+        台中
+      </option>
+
+    </select>
+
+
+    <button
+      class="btn"
+      onclick="loadDashboard()"
+    >
+
+      重新整理
+
+    </button>
+
+  </div>
+
+</div>
+
+
+<!-- ============================================================
+     STATISTICS
+============================================================ -->
+
+<div class="stats">
+
+  <div class="stat">
+
+    <div class="t">
+      在線小U
+    </div>
+
+    <div
+      class="n"
+      id="online"
+    >
+      -
+    </div>
+
+    <div class="s">
+      即時在線
+    </div>
+
+  </div>
+
+
+  <div class="stat">
+
+    <div class="t">
+      可接單小U
+    </div>
+
+    <div
+      class="n"
+      id="available"
+    >
+      -
+    </div>
+
+    <div class="s">
+      目前可媒合
+    </div>
+
+  </div>
+
+
+  <div class="stat">
+
+    <div class="t">
+      待接訂單
+    </div>
+
+    <div
+      class="n"
+      id="waiting"
+    >
+      -
+    </div>
+
+    <div class="s">
+      等待媒合
+    </div>
+
+  </div>
+
+
+  <div class="stat">
+
+    <div class="t">
+      進行中
+    </div>
+
+    <div
+      class="n"
+      id="active"
+    >
+      -
+    </div>
+
+    <div class="s">
+      任務執行中
+    </div>
+
+  </div>
+
+
+  <div class="stat">
+
+    <div class="t">
+      今日完成
+    </div>
+
+    <div
+      class="n"
+      id="completed"
+    >
+      -
+    </div>
+
+    <div class="s">
+      今日累積
+    </div>
+
+  </div>
+
+
+  <div class="stat">
+
+    <div class="t">
+      高風險
+    </div>
+
+    <div
+      class="n"
+      id="highRisk"
+    >
+      -
+    </div>
+
+    <div class="s">
+      需優先關注
+    </div>
+
+  </div>
+
+
+  <div class="stat">
+
+    <div class="t">
+      平均接單
+    </div>
+
+    <div
+      class="n"
+      id="avgAccept"
+    >
+      —
+    </div>
+
+    <div class="s">
+      後端接入後啟用
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- ============================================================
+     MAIN
+============================================================ -->
+
+<div class="grid">
+
+
+<!-- ============================================================
+     LEFT
+============================================================ -->
+
+<div class="stack">
+
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      AI 事件中心
+    </h2>
+
+    <span
+      class="small"
+      id="alertCountText"
+    >
+      0 件
+    </span>
+
+  </div>
+
+
+  <div class="notice">
+
+    目前 V3 介面會沿用 V1 的真實資料。
+
+    AI 預測、供需預測與自動調度在後端尚未接入前，
+
+    會顯示「數據累積中」，
+
+    不會產生假數據。
+
+  </div>
+
+
+  <div id="alertList">
+
+    <div class="empty">
+
+      正在分析...
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      即時訂單
+    </h2>
+
+    <span class="small">
+
+      點選訂單查看建議
+
+    </span>
+
+  </div>
+
+
+  <div class="tabs">
+
+    <button
+      class="tab active"
+      data-filter="all"
+    >
+      全部
+    </button>
+
+    <button
+      class="tab"
+      data-filter="waiting"
+    >
+      待接
+    </button>
+
+    <button
+      class="tab"
+      data-filter="active"
+    >
+      進行中
+    </button>
+
+    <button
+      class="tab"
+      data-filter="risk"
+    >
+      高風險
+    </button>
+
+  </div>
+
+
+  <div id="orders">
+
+    <div class="empty">
+
+      正在讀取訂單...
+
+    </div>
+
+  </div>
+
+</div>
+
+</div>
+
+
+<!-- ============================================================
+     CENTER MAP
+============================================================ -->
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      即時供需地圖
+    </h2>
+
+    <span class="small">
+
+      V3 地圖框架
+
+    </span>
+
+  </div>
+
+
+  <div
+    id="map"
+    class="map"
+  >
+
+
+    <div class="map-note">
+
+      <b>
+        供需熱力圖
+      </b>
+
+
+      <div class="legend">
+
+        <span>
+
+          <i class="dot red"></i>
+
+          運力不足
+
+        </span>
+
+
+        <span>
+
+          <i class="dot orange"></i>
+
+          需求偏高
+
+        </span>
+
+
+        <span>
+
+          <i class="dot green"></i>
+
+          供需正常
+
+        </span>
+
+
+        <span>
+
+          <i class="dot blue"></i>
+
+          任務中
+
         </span>
 
       </div>
 
     </div>
 
-    <button
-      class="refresh-btn"
-      onclick="loadDashboard()"
+
+    <div class="zone red">
+
+      西屯
+
+      <br>
+
+      數據累積中
+
+    </div>
+
+
+    <div class="zone orange">
+
+      北屯
+
+      <br>
+
+      數據累積中
+
+    </div>
+
+
+    <div class="zone green">
+
+      豐原
+
+      <br>
+
+      數據累積中
+
+    </div>
+
+
+    <div class="pin p1">
+
+      🟢 小U
+
+    </div>
+
+
+    <div class="pin p2">
+
+      📦 待接訂單
+
+    </div>
+
+
+    <div class="pin p3">
+
+      🔵 任務中
+
+    </div>
+
+
+    <div class="pin p4">
+
+      🟢 小U
+
+    </div>
+
+  </div>
+
+
+  <div class="footer">
+
+    正式 Google Maps / 熱力圖將於 index 後端與地圖 API 串接後啟用
+
+  </div>
+
+</div>
+
+
+<!-- ============================================================
+     RIGHT
+============================================================ -->
+
+<div class="stack">
+
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      AI 調度建議
+    </h2>
+
+    <span class="small">
+
+      Decision Assist
+
+    </span>
+
+  </div>
+
+
+  <div id="aiPanel">
+
+    <div class="ai-box">
+
+      <div class="ai-title">
+
+        目前狀態
+
+      </div>
+
+
+      <div class="ai-big">
+
+        等待選擇訂單
+
+      </div>
+
+    </div>
+
+
+    <div class="empty">
+
+      從左側點選一張訂單
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      在線小U
+    </h2>
+
+    <span
+      class="small"
+      id="riderCountText"
     >
-      重新整理
-    </button>
+      0 位
+    </span>
 
   </div>
 
 
-  <!-- =========================
-       統計
-  ========================== -->
+  <div
+    class="legend"
+    style="margin-bottom:8px"
+  >
 
-  <div class="stats-grid">
+    <span>
 
-    <div class="stat-card">
+      <i class="dot green"></i>
 
-      <div class="stat-title">
-        在線小U
-      </div>
+      可接單
 
-      <div
-        class="stat-number"
-        id="online"
-      >
-        -
-      </div>
-
-    </div>
+    </span>
 
 
-    <div class="stat-card">
+    <span>
 
-      <div class="stat-title">
-        可接單小U
-      </div>
+      <i class="dot blue"></i>
 
-      <div
-        class="stat-number"
-        id="available"
-      >
-        -
-      </div>
+      任務中
 
-    </div>
+    </span>
 
 
-    <div class="stat-card">
+    <span>
 
-      <div class="stat-title">
-        待接訂單
-      </div>
+      <i class="dot gray"></i>
 
-      <div
-        class="stat-number"
-        id="waiting"
-      >
-        -
-      </div>
+      狀態異常
 
-    </div>
+    </span>
+
+  </div>
 
 
-    <div class="stat-card">
+  <div id="riders">
 
-      <div class="stat-title">
-        進行中
-      </div>
+    <div class="empty">
 
-      <div
-        class="stat-number"
-        id="active"
-      >
-        -
-      </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-      <div class="stat-title">
-        今日完成
-      </div>
-
-      <div
-        class="stat-number"
-        id="completed"
-      >
-        -
-      </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-      <div class="stat-title">
-        異常提醒
-      </div>
-
-      <div
-        class="stat-number"
-        id="alerts"
-      >
-        -
-      </div>
+      正在讀取小U...
 
     </div>
 
   </div>
 
-
-  <!-- =========================
-       主內容
-  ========================== -->
-
-  <div class="main-layout">
+</div>
 
 
-    <!-- =========================
-         即時訂單
-    ========================== -->
+</div>
 
-    <div class="panel">
+</div>
 
-      <h2 class="panel-title">
-        即時訂單
-      </h2>
 
-      <div id="orders">
+<!-- ============================================================
+     BOTTOM
+============================================================ -->
 
-        <div class="empty">
-          正在讀取訂單資料...
-        </div>
+<div class="bottom-grid">
+
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      區域供需
+    </h2>
+
+    <span class="small">
+
+      Demand / Supply
+
+    </span>
+
+  </div>
+
+
+  <div id="regionDemand">
+
+
+    <div class="region-card">
+
+      <div class="row">
+
+        <b>
+          西屯區
+        </b>
+
+        <span class="risk-mid">
+
+          數據累積中
+
+        </span>
+
+      </div>
+
+      <div class="muted">
+
+        等待後端行政區統計 API
 
       </div>
 
     </div>
 
 
-    <!-- =========================
-         右側
-    ========================== -->
+    <div class="region-card">
 
-    <div>
+      <div class="row">
 
+        <b>
+          北屯區
+        </b>
 
-      <!-- 在線小U -->
+        <span class="risk-mid">
 
-      <div class="panel">
+          數據累積中
 
-        <h2 class="panel-title">
-          在線小U
-        </h2>
-
-        <div id="riders">
-
-          <div class="empty">
-            正在讀取小U資料...
-          </div>
-
-        </div>
+        </span>
 
       </div>
 
+      <div class="muted">
 
-      <!-- 異常中心 -->
-
-      <div class="panel">
-
-        <h2 class="panel-title">
-          異常中心
-        </h2>
-
-        <div id="alertList">
-
-          <div class="empty">
-            正在檢查異常...
-          </div>
-
-        </div>
+        等待後端行政區統計 API
 
       </div>
+
+    </div>
+
+
+    <div class="region-card">
+
+      <div class="row">
+
+        <b>
+          豐原區
+        </b>
+
+        <span class="risk-low">
+
+          數據累積中
+
+        </span>
+
+      </div>
+
+      <div class="muted">
+
+        等待後端行政區統計 API
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      營運指標
+    </h2>
+
+    <span class="small">
+
+      Live KPI
+
+    </span>
+
+  </div>
+
+
+  <div class="kpi-bars">
+
+
+    <div class="bar-row">
+
+      <span>
+
+        可用運力
+
+      </span>
+
+      <div class="bar">
+
+        <div
+          id="availabilityBar"
+          class="fill"
+          style="width:0%"
+        ></div>
+
+      </div>
+
+      <b id="availabilityPct">
+
+        0%
+
+      </b>
+
+    </div>
+
+
+    <div class="bar-row">
+
+      <span>
+
+        接單效率
+
+      </span>
+
+      <div class="bar">
+
+        <div
+          class="fill"
+          style="width:0%"
+        ></div>
+
+      </div>
+
+      <b>
+
+        —
+
+      </b>
+
+    </div>
+
+
+    <div class="bar-row">
+
+      <span>
+
+        準時率
+
+      </span>
+
+      <div class="bar">
+
+        <div
+          class="fill"
+          style="width:0%"
+        ></div>
+
+      </div>
+
+      <b>
+
+        —
+
+      </b>
 
     </div>
 
@@ -554,11 +1779,130 @@ button{
 
 
   <div
-    class="last-update"
-    id="lastUpdate"
+    class="notice"
+    style="margin-top:12px"
   >
-    尚未更新
+
+    接單效率與準時率需後端新增歷史統計後才會顯示真實數值。
+
   </div>
+
+</div>
+
+
+<div class="panel">
+
+  <div class="panel-title">
+
+    <h2>
+      智慧調度模式
+    </h2>
+
+    <span class="small">
+
+      Safety First
+
+    </span>
+
+  </div>
+
+
+  <div class="recommend-card">
+
+    <div class="row">
+
+      <b>
+        人工模式
+      </b>
+
+      <span class="status">
+
+        目前啟用
+
+      </span>
+
+    </div>
+
+    <div class="muted">
+
+      只提供監控與建議，
+
+      不自動修改任何訂單。
+
+    </div>
+
+  </div>
+
+
+  <div class="recommend-card">
+
+    <div class="row">
+
+      <b>
+        半自動模式
+      </b>
+
+      <span class="muted">
+
+        待後端支援
+
+      </span>
+
+    </div>
+
+    <div class="muted">
+
+      AI 提出推薦，
+
+      由調度員確認後執行。
+
+    </div>
+
+  </div>
+
+
+  <div class="recommend-card">
+
+    <div class="row">
+
+      <b>
+        全自動模式
+      </b>
+
+      <span class="muted">
+
+        未啟用
+
+      </span>
+
+    </div>
+
+    <div class="muted">
+
+      正式營運前需權限、
+
+      稽核、
+
+      交易鎖與回滾機制。
+
+    </div>
+
+  </div>
+
+</div>
+
+
+</div>
+
+
+<div
+  class="footer"
+  id="lastUpdate"
+>
+
+  尚未更新
+
+</div>
 
 </div>
 
@@ -566,14 +1910,27 @@ button{
 <script>
 
 /* ============================================================
-   UBee 調度中心 V1
-   第一版只讀監控
+   UBee V3 STATE
 ============================================================ */
 
+const state = {
 
-/* =========================
-   HTML 安全處理
-========================= */
+  orders:[],
+
+  riders:[],
+
+  alerts:[],
+
+  selectedOrderId:"",
+
+  filter:"all"
+
+};
+
+
+/* ============================================================
+   SAFE HTML
+============================================================ */
 
 function escapeHtml(value){
 
@@ -593,20 +1950,26 @@ function escapeHtml(value){
 }
 
 
-/* =========================
-   時間差
-========================= */
+/* ============================================================
+   AGE
+============================================================ */
 
 function formatAge(ms){
 
   const timestamp =
-    Number(ms || 0);
+    Number(
+      ms || 0
+    );
 
   if(
-    !Number.isFinite(timestamp) ||
+    !Number.isFinite(
+      timestamp
+    ) ||
     timestamp <= 0
   ){
+
     return "-";
+
   }
 
   const seconds =
@@ -620,7 +1983,9 @@ function formatAge(ms){
       )
     );
 
-  if(seconds < 60){
+  if(
+    seconds < 60
+  ){
 
     return (
       seconds +
@@ -634,7 +1999,9 @@ function formatAge(ms){
       seconds / 60
     );
 
-  if(minutes < 60){
+  if(
+    minutes < 60
+  ){
 
     return (
       minutes +
@@ -643,30 +2010,35 @@ function formatAge(ms){
 
   }
 
-  const hours =
+  return (
     Math.floor(
       minutes / 60
-    );
-
-  return (
-    hours +
+    ) +
     " 小時前"
   );
 
 }
 
 
-/* =========================
-   金額格式
-========================= */
+/* ============================================================
+   MONEY
+============================================================ */
 
-function formatMoney(value){
+function money(value){
 
   const numberValue =
-    Number(value || 0);
+    Number(
+      value || 0
+    );
 
-  if(!Number.isFinite(numberValue)){
+  if(
+    !Number.isFinite(
+      numberValue
+    )
+  ){
+
     return "0";
+
   }
 
   return Math.round(
@@ -678,22 +2050,19 @@ function formatMoney(value){
 }
 
 
-/* =========================
-   訂單狀態文字
-========================= */
+/* ============================================================
+   STATUS
+============================================================ */
 
-function getStatusText(order){
+function statusText(order){
 
   if(
     order.statusLabel
   ){
-    return order.statusLabel;
-  }
 
-  const status =
-    String(
-      order.status || ""
-    ).trim();
+    return order.statusLabel;
+
+  }
 
   const map = {
 
@@ -719,7 +2088,7 @@ function getStatusText(order){
       "前往取件",
 
     arrived_pickup:
-      "抵達取件點",
+      "抵達取件",
 
     picked_up:
       "已取件",
@@ -739,68 +2108,437 @@ function getStatusText(order){
   };
 
   return (
-    map[status] ||
-    status ||
+
+    map[
+      String(
+        order.status || ""
+      ).trim()
+    ]
+
+    ||
+
+    order.status
+
+    ||
+
     "未知"
+
   );
 
 }
 
 
-/* =========================
-   渲染訂單
-========================= */
+/* ============================================================
+   STATUS GROUP
+============================================================ */
 
-function renderOrders(
-  orders
+function isWaiting(order){
+
+  return [
+
+    "pending",
+
+    "waiting",
+
+    "searching",
+
+    "dispatching",
+
+    "redispatching"
+
+  ].includes(
+
+    String(
+      order.status || ""
+    )
+
+  );
+
+}
+
+
+function isActive(order){
+
+  return [
+
+    "accepted",
+
+    "heading_to_pickup",
+
+    "arrived_pickup",
+
+    "picked_up",
+
+    "heading_to_dropoff",
+
+    "arrived_dropoff"
+
+  ].includes(
+
+    String(
+      order.status || ""
+    )
+
+  );
+
+}
+
+
+/* ============================================================
+   V3 BASIC RISK ENGINE
+   目前先使用真實等待時間規則
+============================================================ */
+
+function deriveRisk(order){
+
+  const minutes =
+
+    order.createdAtMs
+
+      ?
+
+      Math.max(
+        0,
+        (
+          Date.now() -
+          Number(
+            order.createdAtMs
+          )
+        ) / 60000
+      )
+
+      :
+
+      0;
+
+
+  if(
+    isWaiting(order) &&
+    minutes >= 5
+  ){
+
+    return {
+
+      level:"high",
+
+      label:"高風險",
+
+      reason:
+        "等待接單已超過 5 分鐘"
+
+    };
+
+  }
+
+
+  if(
+    isWaiting(order) &&
+    minutes >= 3
+  ){
+
+    return {
+
+      level:"mid",
+
+      label:"注意",
+
+      reason:
+        "等待接單已超過 3 分鐘"
+
+    };
+
+  }
+
+
+  return {
+
+    level:"low",
+
+    label:"正常",
+
+    reason:
+      "目前未偵測到明顯風險"
+
+  };
+
+}
+
+
+/* ============================================================
+   SUMMARY
+============================================================ */
+
+function renderSummary(
+  summary = {}
 ){
+
+  document.getElementById(
+    "online"
+  ).textContent =
+
+    Number(
+      summary.onlineRiders ||
+      0
+    );
+
+
+  document.getElementById(
+    "available"
+  ).textContent =
+
+    Number(
+      summary.availableRiders ||
+      0
+    );
+
+
+  document.getElementById(
+    "waiting"
+  ).textContent =
+
+    Number(
+      summary.waitingOrders ||
+      0
+    );
+
+
+  document.getElementById(
+    "active"
+  ).textContent =
+
+    Number(
+      summary.activeOrders ||
+      0
+    );
+
+
+  document.getElementById(
+    "completed"
+  ).textContent =
+
+    Number(
+      summary.todayCompleted ||
+      0
+    );
+
+
+  const highRiskCount =
+
+    state.orders.filter(
+
+      order =>
+
+        deriveRisk(
+          order
+        ).level ===
+        "high"
+
+    ).length;
+
+
+  document.getElementById(
+    "highRisk"
+  ).textContent =
+
+    highRiskCount;
+
+
+  const onlineCount =
+
+    Number(
+      summary.onlineRiders ||
+      0
+    );
+
+
+  const availableCount =
+
+    Number(
+      summary.availableRiders ||
+      0
+    );
+
+
+  const percentage =
+
+    onlineCount > 0
+
+      ?
+
+      Math.round(
+        availableCount /
+        onlineCount *
+        100
+      )
+
+      :
+
+      0;
+
+
+  document.getElementById(
+    "availabilityBar"
+  ).style.width =
+
+    percentage +
+    "%";
+
+
+  document.getElementById(
+    "availabilityPct"
+  ).textContent =
+
+    percentage +
+    "%";
+
+}
+
+
+/* ============================================================
+   FILTER
+============================================================ */
+
+function filteredOrders(){
+
+  return state.orders.filter(
+    order => {
+
+      if(
+        state.filter ===
+        "waiting"
+      ){
+
+        return isWaiting(
+          order
+        );
+
+      }
+
+
+      if(
+        state.filter ===
+        "active"
+      ){
+
+        return isActive(
+          order
+        );
+
+      }
+
+
+      if(
+        state.filter ===
+        "risk"
+      ){
+
+        return (
+
+          deriveRisk(
+            order
+          ).level ===
+          "high"
+
+        );
+
+      }
+
+
+      return true;
+
+    }
+  );
+
+}
+
+
+/* ============================================================
+   ORDERS
+============================================================ */
+
+function renderOrders(){
+
+  const list =
+    filteredOrders();
+
 
   const container =
     document.getElementById(
       "orders"
     );
 
+
   if(
-    !Array.isArray(orders) ||
-    orders.length === 0
+    list.length === 0
   ){
 
-    container.innerHTML =
-      `
+    container.innerHTML = `
+
       <div class="empty">
-        目前沒有即時訂單
+
+        目前沒有符合條件的訂單
+
       </div>
-      `;
+
+    `;
 
     return;
 
   }
 
-  container.innerHTML =
-    orders
-      .map(order => {
 
-        const riderName =
-          order.riderName ||
-          "尚未接單";
+  container.innerHTML =
+
+    list.map(
+      order => {
+
+        const risk =
+          deriveRisk(
+            order
+          );
+
+
+        const selected =
+
+          state.selectedOrderId ===
+          order.id
+
+            ?
+
+            "selected"
+
+            :
+
+            "";
+
 
         return `
-          <div class="order-card">
+
+          <div
+            class="order-card ${selected}"
+            onclick="selectOrder('${escapeHtml(order.id)}')"
+          >
+
 
             <div class="row">
 
               <span class="order-id">
+
                 ${escapeHtml(
                   order.id
                 )}
+
               </span>
 
+
               <span class="status">
+
                 ${escapeHtml(
-                  getStatusText(
+                  statusText(
                     order
                   )
                 )}
+
               </span>
 
             </div>
@@ -809,6 +2547,7 @@ function renderOrders(
             <div class="route">
 
               📍
+
               ${escapeHtml(
                 order.pickupAddress ||
                 "-"
@@ -821,6 +2560,7 @@ function renderOrders(
               <br>
 
               🏁
+
               ${escapeHtml(
                 order.dropoffAddress ||
                 "-"
@@ -830,124 +2570,33 @@ function renderOrders(
 
 
             <div
-              class="row
-                     muted
-                     order-bottom"
+              class="row"
+              style="margin-top:8px"
             >
 
-              <span>
+              <span class="muted">
 
                 NT$
-                ${formatMoney(
+
+                ${money(
                   order.total
                 )}
 
                 ·
 
                 ${escapeHtml(
-                  riderName
+                  order.riderName ||
+                  "尚未接單"
                 )}
 
               </span>
 
-              <span>
 
-                建立
-                ${escapeHtml(
-                  formatAge(
-                    order.createdAtMs
-                  )
-                )}
+              <span
+                class="risk-${risk.level}"
+              >
 
-              </span>
-
-            </div>
-
-          </div>
-        `;
-
-      })
-      .join("");
-
-}
-
-
-/* =========================
-   渲染小U
-========================= */
-
-function renderRiders(
-  riders
-){
-
-  const container =
-    document.getElementById(
-      "riders"
-    );
-
-  if(
-    !Array.isArray(riders) ||
-    riders.length === 0
-  ){
-
-    container.innerHTML =
-      `
-      <div class="empty">
-        目前沒有在線小U
-      </div>
-      `;
-
-    return;
-
-  }
-
-  container.innerHTML =
-    riders
-      .map(rider => {
-
-        const name =
-          rider.name ||
-          rider.riderId ||
-          "小U";
-
-        const locationText =
-          rider.district ||
-          rider.serviceArea ||
-          "";
-
-        const stateText =
-          rider.busy
-            ? "任務中"
-            : "可接單";
-
-        const dotClass =
-          rider.busy
-            ? "blue"
-            : "green";
-
-        return `
-          <div class="rider-item">
-
-            <div class="row">
-
-              <b>
-
-                <span
-                  class="dot
-                         ${dotClass}"
-                ></span>
-
-                ${escapeHtml(
-                  name
-                )}
-
-              </b>
-
-              <span class="muted">
-
-                ${escapeHtml(
-                  stateText
-                )}
+                ${risk.label}
 
               </span>
 
@@ -956,285 +2605,789 @@ function renderRiders(
 
             <div class="muted">
 
-              最後定位：
+              建立
 
-              ${escapeHtml(
-                formatAge(
-                  rider.locationUpdatedAtMs
-                )
+              ${formatAge(
+                order.createdAtMs
               )}
-
-              ${
-                locationText
-                  ? " · " +
-                    escapeHtml(
-                      locationText
-                    )
-                  : ""
-              }
 
             </div>
 
           </div>
+
         `;
 
-      })
-      .join("");
+      }
+
+    ).join("");
 
 }
 
 
-/* =========================
-   渲染異常
-========================= */
+/* ============================================================
+   RIDERS
+============================================================ */
 
-function renderAlerts(
-  alerts
-){
+function renderRiders(){
+
+  const container =
+    document.getElementById(
+      "riders"
+    );
+
+
+  document.getElementById(
+    "riderCountText"
+  ).textContent =
+
+    state.riders.length +
+    " 位";
+
+
+  if(
+    state.riders.length ===
+    0
+  ){
+
+    container.innerHTML = `
+
+      <div class="empty">
+
+        目前沒有在線小U
+
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  container.innerHTML =
+
+    state.riders
+      .slice(
+        0,
+        30
+      )
+      .map(
+        rider => {
+
+
+          const locationStale =
+
+            rider.locationUpdatedAtMs
+
+            &&
+
+            (
+              Date.now() -
+              Number(
+                rider.locationUpdatedAtMs
+              )
+            )
+
+            >
+
+            5 *
+            60 *
+            1000;
+
+
+          const stateText =
+
+            locationStale
+
+              ?
+
+              "定位過久"
+
+              :
+
+              rider.busy
+
+                ?
+
+                "任務中"
+
+                :
+
+                "可接單";
+
+
+          const dotClass =
+
+            locationStale
+
+              ?
+
+              "gray"
+
+              :
+
+              rider.busy
+
+                ?
+
+                "blue"
+
+                :
+
+                "green";
+
+
+          return `
+
+            <div class="rider-card">
+
+
+              <div class="row">
+
+                <b>
+
+                  <i
+                    class="dot ${dotClass}"
+                  ></i>
+
+                  ${escapeHtml(
+
+                    rider.name
+
+                    ||
+
+                    rider.riderId
+
+                    ||
+
+                    "小U"
+
+                  )}
+
+                </b>
+
+
+                <span class="muted">
+
+                  ${stateText}
+
+                </span>
+
+              </div>
+
+
+              <div class="muted">
+
+                最後定位：
+
+                ${formatAge(
+                  rider.locationUpdatedAtMs
+                )}
+
+
+                ${
+                  rider.district ||
+                  rider.serviceArea
+
+                    ?
+
+                    " · " +
+
+                    escapeHtml(
+                      rider.district ||
+                      rider.serviceArea
+                    )
+
+                    :
+
+                    ""
+                }
+
+              </div>
+
+            </div>
+
+          `;
+
+        }
+
+      ).join("");
+
+}
+
+
+/* ============================================================
+   ALERTS
+============================================================ */
+
+function renderAlerts(){
+
+  const derived =
+    [
+      ...state.alerts
+    ];
+
+
+  state.orders.forEach(
+    order => {
+
+      const risk =
+        deriveRisk(
+          order
+        );
+
+
+      if(
+
+        risk.level ===
+        "high"
+
+        &&
+
+        !derived.some(
+
+          alert =>
+
+            String(
+              alert.message ||
+              ""
+            ).includes(
+              order.id
+            )
+
+        )
+
+      ){
+
+        derived.push({
+
+          title:
+            "高風險訂單",
+
+          message:
+
+            order.id +
+
+            "：" +
+
+            risk.reason
+
+        });
+
+      }
+
+    }
+  );
+
+
+  document.getElementById(
+    "alertCountText"
+  ).textContent =
+
+    derived.length +
+    " 件";
+
+
+  document.getElementById(
+    "alerts"
+  ).textContent =
+
+    derived.length;
+
 
   const container =
     document.getElementById(
       "alertList"
     );
 
+
   if(
-    !Array.isArray(alerts) ||
-    alerts.length === 0
+    derived.length ===
+    0
   ){
 
-    container.innerHTML =
-      `
+    container.innerHTML = `
+
       <div class="empty">
-        目前沒有異常
+
+        目前沒有異常事件
+
       </div>
-      `;
+
+    `;
 
     return;
 
   }
 
+
   container.innerHTML =
-    alerts
-      .map(alert => {
 
-        return `
-          <div class="alert-card">
+    derived
+      .slice(
+        0,
+        30
+      )
+      .map(
+        alert => {
 
-            <b>
-              ${escapeHtml(
-                alert.title ||
-                "異常提醒"
-              )}
-            </b>
+          return `
 
-            <br>
+            <div class="alert-card">
 
-            ${escapeHtml(
-              alert.message ||
-              ""
-            )}
+              <b>
 
-          </div>
-        `;
+                ${escapeHtml(
+                  alert.title ||
+                  "異常提醒"
+                )}
 
-      })
-      .join("");
+              </b>
+
+              <div class="muted">
+
+                ${escapeHtml(
+                  alert.message ||
+                  ""
+                )}
+
+              </div>
+
+            </div>
+
+          `;
+
+        }
+
+      ).join("");
 
 }
 
 
-/* =========================
-   更新統計
-========================= */
+/* ============================================================
+   ORDER SELECTION / AI PANEL
+============================================================ */
 
-function renderSummary(
-  summary
+function selectOrder(
+  orderId
 ){
 
-  const data =
-    summary || {};
+  state.selectedOrderId =
+    orderId;
 
-  document.getElementById(
-    "online"
-  ).textContent =
-    Number(
-      data.onlineRiders || 0
+
+  renderOrders();
+
+
+  const order =
+    state.orders.find(
+
+      item =>
+
+        item.id ===
+        orderId
+
     );
 
 
-  document.getElementById(
-    "available"
-  ).textContent =
-    Number(
-      data.availableRiders || 0
+  if(
+    !order
+  ){
+
+    return;
+
+  }
+
+
+  const risk =
+    deriveRisk(
+      order
     );
 
 
-  document.getElementById(
-    "waiting"
-  ).textContent =
-    Number(
-      data.waitingOrders || 0
-    );
+  const riskTitle =
+
+    risk.level ===
+    "high"
+
+      ?
+
+      "高風險"
+
+      :
+
+      risk.level ===
+      "mid"
+
+        ?
+
+        "需要關注"
+
+        :
+
+        "目前正常";
 
 
   document.getElementById(
-    "active"
-  ).textContent =
-    Number(
-      data.activeOrders || 0
-    );
+    "aiPanel"
+  ).innerHTML = `
 
 
-  document.getElementById(
-    "completed"
-  ).textContent =
-    Number(
-      data.todayCompleted || 0
-    );
+    <div class="ai-box">
+
+
+      <div class="ai-title">
+
+        ${escapeHtml(
+          order.id
+        )}
+
+      </div>
+
+
+      <div class="ai-big">
+
+        ${riskTitle}
+
+      </div>
+
+
+      <div
+        class="muted"
+        style="
+          color:#ddd;
+          margin-top:6px;
+        "
+      >
+
+        ${escapeHtml(
+          risk.reason
+        )}
+
+      </div>
+
+    </div>
+
+
+    <div class="recommend-card">
+
+      <div class="row">
+
+        <b>
+
+          AI 推薦小U
+
+        </b>
+
+        <span class="status">
+
+          數據累積中
+
+        </span>
+
+      </div>
+
+
+      <div class="muted">
+
+        待後端提供距離、
+
+        ETA、
+
+        完成率、
+
+        接單率與候選小U排序後啟用。
+
+      </div>
+
+    </div>
+
+
+    <div class="recommend-card">
+
+      <div class="row">
+
+        <b>
+
+          建議派單策略
+
+        </b>
+
+        <span class="status">
+
+          ${
+            isWaiting(
+              order
+            )
+
+              ?
+
+              "待評估"
+
+              :
+
+              "監控中"
+          }
+
+        </span>
+
+      </div>
+
+
+      <div class="muted">
+
+        ${
+          risk.level ===
+          "high"
+
+            ?
+
+            "建議調度員優先查看此訂單；自動擴大範圍功能待後端接入。"
+
+            :
+
+            "目前維持既有派單策略。"
+        }
+
+      </div>
+
+    </div>
+
+
+    <div class="ai-action">
+
+
+      <button
+        class="action-btn primary"
+        disabled
+      >
+
+        採用 AI 建議
+
+        （待後端）
+
+      </button>
+
+
+      <button
+        class="action-btn secondary"
+        disabled
+      >
+
+        指定小U
+
+        （待後端）
+
+      </button>
+
+
+      <button
+        class="action-btn danger"
+        disabled
+      >
+
+        重新派單
+
+        （待後端）
+
+      </button>
+
+
+    </div>
+
+  `;
 
 }
 
 
-/* =========================
-   主資料讀取
-========================= */
+/* ============================================================
+   LOAD DASHBOARD
+============================================================ */
 
 async function loadDashboard(){
 
   try{
 
+
     const response =
+
       await fetch(
+
         "/api/dispatch/dashboard",
+
         {
-          method:
-            "GET",
 
           cache:
             "no-store",
 
           headers:{
-            "Accept":
+
+            Accept:
               "application/json"
+
           }
+
         }
+
       );
 
-    let data = null;
 
-    try{
+    const data =
 
-      data =
-        await response.json();
+      await response
+        .json()
+        .catch(
+          () => {
 
-    }catch(error){
+            throw new Error(
+              "後端回傳資料格式錯誤"
+            );
 
-      throw new Error(
-        "後端回傳資料格式錯誤"
-      );
+          }
+        );
 
-    }
 
     if(
-      !response.ok ||
-      !data ||
-      data.success !== true
+
+      !response.ok
+
+      ||
+
+      data.success !==
+      true
+
     ){
 
       throw new Error(
-        data?.message ||
+
+        data.message
+
+        ||
+
         "調度中心資料讀取失敗"
+
       );
 
     }
 
 
-    /* 統計 */
+    state.orders =
 
-    renderSummary(
-      data.summary
-    );
+      Array.isArray(
+        data.orders
+      )
 
+        ?
 
-    /* 訂單 */
+        data.orders
 
-    renderOrders(
-      data.orders
-    );
+        :
 
-
-    /* 小U */
-
-    renderRiders(
-      data.riders
-    );
+        [];
 
 
-    /* 異常 */
+    state.riders =
 
-    const alerts =
+      Array.isArray(
+        data.riders
+      )
+
+        ?
+
+        data.riders
+
+        :
+
+        [];
+
+
+    state.alerts =
+
       Array.isArray(
         data.alerts
       )
-        ? data.alerts
-        : [];
 
-    document.getElementById(
-      "alerts"
-    ).textContent =
-      alerts.length;
+        ?
 
-    renderAlerts(
-      alerts
+        data.alerts
+
+        :
+
+        [];
+
+
+    renderSummary(
+      data.summary ||
+      {}
     );
 
 
-    /* 更新時間 */
+    renderOrders();
+
+
+    renderRiders();
+
+
+    renderAlerts();
+
 
     document.getElementById(
       "lastUpdate"
     ).textContent =
+
       "最後更新：" +
-      new Date().toLocaleString(
-        "zh-TW",
-        {
-          hour12:false
-        }
-      );
+
+      new Date()
+        .toLocaleString(
+          "zh-TW",
+          {
+            hour12:false
+          }
+        );
+
 
   }catch(error){
 
+
     console.error(
-      "UBee 調度中心讀取失敗：",
+
+      "UBee V3 調度中心讀取失敗：",
+
       error
+
     );
 
 
     document.getElementById(
       "alertList"
-    ).innerHTML =
-      `
+    ).innerHTML = `
+
       <div class="alert-card">
 
         <b>
-          調度中心資料讀取失敗
+
+          資料讀取失敗
+
         </b>
 
-        <br>
+        <div class="muted">
 
-        ${escapeHtml(
-          error.message ||
-          "未知錯誤"
-        )}
+          ${escapeHtml(
+            error.message ||
+            "未知錯誤"
+          )}
+
+        </div>
 
       </div>
-      `;
+
+    `;
 
 
     document.getElementById(
       "lastUpdate"
     ).textContent =
+
       "更新失敗";
 
   }
@@ -1242,18 +3395,69 @@ async function loadDashboard(){
 }
 
 
-/* =========================
-   啟動
-========================= */
+/* ============================================================
+   TABS
+============================================================ */
+
+document
+  .querySelectorAll(
+    ".tab"
+  )
+  .forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+
+          document
+            .querySelectorAll(
+              ".tab"
+            )
+            .forEach(
+              item => {
+
+                item.classList.remove(
+                  "active"
+                );
+
+              }
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          state.filter =
+
+            button.dataset.filter;
+
+
+          renderOrders();
+
+        }
+      );
+
+    }
+  );
+
+
+/* ============================================================
+   START
+============================================================ */
 
 loadDashboard();
 
 
-/* 每 10 秒重新取得資料 */
-
 setInterval(
+
   loadDashboard,
+
   10000
+
 );
 
 </script>
