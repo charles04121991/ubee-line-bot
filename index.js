@@ -3,6 +3,7 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
 const path = require('path');
+const crypto = require('crypto');
 const admin = require('firebase-admin');
 const webpush = require('web-push');
 
@@ -680,10 +681,8 @@ async function sendNewOrderPushToRiders(
           .filter(Boolean)
       );
 
-    // 管理／審核群組不再接收任何新任務或重新派單通知。
-    // 派單只通知符合條件的小U，避免浪費 LINE 訊息流量。
-    // 騎士申請審核通知由獨立的審核流程保留，不受此設定影響。
-    const sendLineAdmin = false;
+    const sendLineAdmin =
+      safeOptions.sendLineAdmin !== false;
 
     const notifiedRiderDocIds = [];
     
@@ -1054,7 +1053,7 @@ ${isRedispatch
 // 1. 已通知過的小U不重複通知。
 // 2. 訂單被接走、取消或完成後，停止後續擴圈。
 // 3. 使用 dispatchPushCycleId 避免舊計時器干擾新週期。
-// 4. LINE 管理／審核群不接收新任務通知；只保留騎士申請審核通知。
+// 4. LINE 管理群只在第一波通知一次。
 // =====================================================
 
 const DISPATCH_PUSH_WAVES = [
@@ -1062,7 +1061,7 @@ const DISPATCH_PUSH_WAVES = [
     delayMs: 0,
     radiusKm: 3,
     stage: "3km",
-    sendLineAdmin: false,
+    sendLineAdmin: true,
   },
   {
     delayMs: 5000,
@@ -5698,190 +5697,6 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
   }
 });
 
-// ============================================================
-// UBee 調度中心 V5：即時監控 Dashboard API + 頁面路由
-// 必須放在 express.static(...) 之前，避免調度頁重新整理/API 讀取 404。
-// ============================================================
-app.get('/api/dispatch/dashboard', async (req, res) => {
-  try {
-    const nowMs = Date.now();
-    const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
-    const taipeiNow = new Date(nowMs + TAIPEI_OFFSET_MS);
-    const todayStartMs = Date.UTC(
-      taipeiNow.getUTCFullYear(),
-      taipeiNow.getUTCMonth(),
-      taipeiNow.getUTCDate(), 0, 0, 0, 0
-    ) - TAIPEI_OFFSET_MS;
-
-    const toMs = value => {
-      if (!value) return 0;
-      if (typeof value.toDate === 'function') return value.toDate().getTime();
-      if (typeof value.seconds === 'number') return value.seconds * 1000;
-      if (typeof value._seconds === 'number') return value._seconds * 1000;
-      if (typeof value === 'number') return value;
-      const parsed = new Date(value).getTime();
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
-
-    const asNumberOrNull = value => {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : null;
-    };
-
-    const riderSnap = await db.collection('riders').limit(1000).get();
-    const riders = riderSnap.docs.map(doc => {
-      const r = doc.data() || {};
-      const locationUpdatedAtMs =
-        Number(r.locationUpdatedAtMs || r.lastActiveMs || 0) ||
-        toMs(r.locationUpdatedAt) ||
-        toMs(r.lastActive) ||
-        toMs(r.updatedAt);
-
-      // 與正式騎士端相容：online 必須為 true；若有活動時間則限定 5 分鐘內。
-      const isFresh = !locationUpdatedAtMs || (nowMs - locationUpdatedAtMs) <= 5 * 60 * 1000;
-      const online = r.online === true && isFresh;
-      const busy = r.busy === true || !!String(r.currentOrderId || '').trim();
-
-      return {
-        riderId: r.riderId || doc.id,
-        riderDocId: doc.id,
-        name: r.name || r.riderName || '',
-        phone: r.phone || '',
-        district: r.district || r.cityDistrict || '',
-        serviceArea: r.serviceArea || r.area || '',
-        online,
-        busy,
-        currentOrderId: r.currentOrderId || '',
-        currentLat: asNumberOrNull(r.currentLat ?? r.lat ?? r.latitude),
-        currentLng: asNumberOrNull(r.currentLng ?? r.lng ?? r.longitude),
-        locationUpdatedAtMs
-      };
-    }).filter(r => r.online);
-
-    // 不使用複合索引，避免新環境第一次部署因 Firestore index 造成讀取失敗。
-    const orderSnap = await db.collection('orders').limit(800).get();
-    const allOrders = orderSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
-
-    const waitingStatuses = new Set([
-      'pending_dispatch', 'pending', 'waiting', 'searching', 'dispatching', 'redispatching'
-    ]);
-    const activeStatuses = new Set([
-      'accepted',
-      'going_to_pickup', 'heading_to_pickup', 'arrived_pickup',
-      'picked_up',
-      'going_to_dropoff', 'heading_to_dropoff', 'arrived_dropoff'
-    ]);
-    const completedStatuses = new Set(['completed']);
-
-    const orderTimeMs = o =>
-      Number(o.createdAtMs || o.orderCreatedAtMs || o.submittedAtMs || 0) ||
-      toMs(o.createdAt) || toMs(o.orderCreatedAt) || toMs(o.submittedAt);
-
-    const completedTimeMs = o =>
-      Number(o.completedAtMs || 0) ||
-      toMs(o.completedAt) ||
-      toMs(o.statusTimes && o.statusTimes.completed);
-
-    const statusLabel = status => {
-      if (typeof getStatusLabel === 'function') {
-        try { return getStatusLabel(status); } catch (_) {}
-      }
-      const labels = {
-        pending_dispatch: '待派單', pending: '待派單', waiting: '待派單',
-        searching: '媒合中', dispatching: '派單中', redispatching: '重新派單中',
-        accepted: '小U已接單', going_to_pickup: '前往取件', heading_to_pickup: '前往取件',
-        arrived_pickup: '已抵達取件點', picked_up: '已取件',
-        going_to_dropoff: '配送中', heading_to_dropoff: '配送中', arrived_dropoff: '已抵達送達點',
-        completed: '已完成'
-      };
-      return labels[String(status || '').trim()] || String(status || '');
-    };
-
-    const liveOrders = allOrders
-      .filter(o => {
-        const status = String(o.status || '').trim();
-        return waitingStatuses.has(status) || activeStatuses.has(status);
-      })
-      .sort((a, b) => orderTimeMs(b) - orderTimeMs(a))
-      .slice(0, 150)
-      .map(o => ({
-        id: o.id,
-        orderNo: o.orderNo || o.id,
-        status: o.status || '',
-        statusLabel: statusLabel(o.status),
-        pickupAddress: o.pickupAddress || o.fromAddress || '',
-        dropoffAddress: o.dropoffAddress || o.toAddress || '',
-        pickupLat: asNumberOrNull(o.pickupLat ?? o.fromLat),
-        pickupLng: asNumberOrNull(o.pickupLng ?? o.fromLng),
-        dropoffLat: asNumberOrNull(o.dropoffLat ?? o.toLat),
-        dropoffLng: asNumberOrNull(o.dropoffLng ?? o.toLng),
-        total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
-        riderName: o.riderName || o.driverName || '',
-        riderId: o.riderId || o.riderDocId || '',
-        dispatchRadiusKm: Number(o.dispatchManualRadiusKm || o.dispatchManualRedispatchRadiusKm || 0) || null,
-        createdAtMs: orderTimeMs(o)
-      }));
-
-    const waitingOrders = liveOrders.filter(o => waitingStatuses.has(String(o.status || '').trim()));
-    const activeOrders = liveOrders.filter(o => activeStatuses.has(String(o.status || '').trim()));
-    const todayCompleted = allOrders.filter(o =>
-      completedStatuses.has(String(o.status || '').trim()) &&
-      completedTimeMs(o) >= todayStartMs
-    ).length;
-
-    const alerts = [];
-    waitingOrders.forEach(o => {
-      const createdAtMs = Number(o.createdAtMs || 0);
-      if (!createdAtMs) return;
-      const ageMs = nowMs - createdAtMs;
-      if (ageMs >= 5 * 60 * 1000) {
-        alerts.push({
-          type: 'waiting_5m',
-          title: '超過 5 分鐘無人接單',
-          message: `${o.id} 已等待 ${Math.floor(ageMs / 60000)} 分鐘`,
-          orderId: o.id
-        });
-      } else if (ageMs >= 3 * 60 * 1000) {
-        alerts.push({
-          type: 'waiting_3m',
-          title: '超過 3 分鐘無人接單',
-          message: `${o.id} 已等待 ${Math.floor(ageMs / 60000)} 分鐘`,
-          orderId: o.id
-        });
-      }
-    });
-
-    return res.json({
-      success: true,
-      generatedAtMs: nowMs,
-      summary: {
-        onlineRiders: riders.length,
-        availableRiders: riders.filter(r => !r.busy).length,
-        waitingOrders: waitingOrders.length,
-        activeOrders: activeOrders.length,
-        todayCompleted
-      },
-      orders: liveOrders,
-      riders: riders.slice(0, 300),
-      alerts: alerts.slice(0, 100)
-    });
-  } catch (err) {
-    console.error('❌ UBee 調度中心 dashboard 讀取失敗：', err);
-    return res.status(500).json({
-      success: false,
-      message: '調度中心資料讀取失敗，請稍後再試。',
-      error: err.message
-    });
-  }
-});
-
-app.get('/dispatch.html', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, 'public', 'dispatch.html'));
-});
-
 app.get('/order.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -9797,20 +9612,113 @@ function createOrderFromApi(data) {
 // =====================================================
 // 客戶端安全服務狀態 API
 //
-// 僅回傳匿名統計：
-// - 已審核、在線且定位仍新鮮的小U數量
+// 僅回傳匿名資訊：
+// - 已審核且已按下上線的小U總數
+// - 其中定位仍新鮮、可顯示於地圖的小U數量
+// - 經 50～80 公尺穩定偏移後的匿名地圖位置
 // - 統計更新時間與定位新鮮度門檻
-// 不回傳姓名、電話、文件 ID 或任何座標。
+//
+// 絕不回傳姓名、電話、LINE ID、riderId、Firestore 文件 ID、
+// 真實座標或任何可讓客戶辨識特定小U的固定公開識別碼。
 // =====================================================
+const CUSTOMER_RIDER_LOCATION_FRESH_MS = 5 * 60 * 1000;
+const CUSTOMER_RIDER_PUBLIC_ONLINE_MS = 30 * 60 * 1000;
+const CUSTOMER_RIDER_OFFSET_MIN_METERS = 50;
+const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
+const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
+const CUSTOMER_RIDER_MAX_MARKERS = 80;
+
+function getCustomerRiderMapSecret() {
+  return String(
+    process.env.CUSTOMER_RIDER_MAP_SECRET ||
+    process.env.CHANNEL_SECRET ||
+    process.env.FIREBASE_PROJECT_ID ||
+    'ubee-customer-rider-map'
+  );
+}
+
+function buildStableAnonymousRiderOffset(riderDocId, nowMs = Date.now()) {
+  const bucket = Math.floor(nowMs / CUSTOMER_RIDER_OFFSET_BUCKET_MS);
+  const digest = crypto
+    .createHmac('sha256', getCustomerRiderMapSecret())
+    .update(`${String(riderDocId || '')}:${bucket}`)
+    .digest();
+
+  const distanceRatio = digest.readUInt32BE(0) / 0xffffffff;
+  const angleRatio = digest.readUInt32BE(4) / 0xffffffff;
+
+  return {
+    distanceMeters:
+      CUSTOMER_RIDER_OFFSET_MIN_METERS +
+      distanceRatio *
+        (CUSTOMER_RIDER_OFFSET_MAX_METERS - CUSTOMER_RIDER_OFFSET_MIN_METERS),
+    angleRadians: angleRatio * Math.PI * 2,
+  };
+}
+
+function offsetCustomerRiderPoint(point, riderDocId, nowMs = Date.now()) {
+  if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lng))) {
+    return null;
+  }
+
+  const sourceLat = Number(point.lat);
+  const sourceLng = Number(point.lng);
+  const { distanceMeters, angleRadians } =
+    buildStableAnonymousRiderOffset(riderDocId, nowMs);
+
+  const latitudeRadians = sourceLat * Math.PI / 180;
+  const metersPerDegreeLat = 111320;
+  const metersPerDegreeLng = Math.max(
+    1000,
+    111320 * Math.cos(latitudeRadians)
+  );
+
+  const latOffset =
+    Math.cos(angleRadians) * distanceMeters / metersPerDegreeLat;
+  const lngOffset =
+    Math.sin(angleRadians) * distanceMeters / metersPerDegreeLng;
+
+  return {
+    lat: Number((sourceLat + latOffset).toFixed(6)),
+    lng: Number((sourceLng + lngOffset).toFixed(6)),
+    label: '附近有小U',
+  };
+}
+
+
 app.get('/api/customer/service-status', async (req, res) => {
   try {
-    const LOCATION_FRESH_MS = 120000;
+    const nowMs = Date.now();
+
+    const pickupLat =
+      getNullableCoordinate(
+        req.query.pickupLat ||
+        req.query.lat
+      );
+
+    const pickupLng =
+      getNullableCoordinate(
+        req.query.pickupLng ||
+        req.query.lng
+      );
+
+    const hasPickupPoint =
+      isValidLatitude(pickupLat) &&
+      isValidLongitude(pickupLng);
+
     const ridersSnap = await db
       .collection('riders')
       .limit(500)
       .get();
 
+    let declaredOnlineRiderCount = 0;
     let onlineRiderCount = 0;
+    let mapRiderCount = 0;
+    let nearbyRiderCount3km = 0;
+    let nearbyRiderCount5km = 0;
+    let nearbyRiderCount10km = 0;
+    let nearestRiderDistanceKm = null;
+    const nearbyRiders = [];
 
     ridersSnap.forEach((riderDoc) => {
       const rider = riderDoc.data() || {};
@@ -9818,25 +9726,154 @@ app.get('/api/customer/service-status', async (req, res) => {
         rider.approved === true ||
         String(rider.status || '').trim().toLowerCase() === 'approved';
       const online = rider.online === true;
-      const point = getRiderCurrentPointForPush(rider);
-      const fresh = isRiderLocationFreshForPush(rider, LOCATION_FRESH_MS);
 
-      if (approved && online && point && fresh) {
-        onlineRiderCount += 1;
+      // Firestore 裡 online=true 只代表小U曾主動按下上線。
+      // 先保留這個原始數字供內部診斷，但不直接公開給客人端。
+      if (!approved || !online) {
+        return;
+      }
+
+      declaredOnlineRiderCount += 1;
+
+      const point = getRiderCurrentPointForPush(rider);
+      const lastLocationAtMs =
+        getDispatchPushTimeMs(rider.locationUpdatedAtMs) ||
+        getDispatchPushTimeMs(rider.locationUpdatedAt) ||
+        getDispatchPushTimeMs(rider.currentLocation?.updatedAt);
+
+      const locationAgeMs = lastLocationAtMs
+        ? nowMs - lastLocationAtMs
+        : Number.POSITIVE_INFINITY;
+
+      const publicOnline =
+        !!point &&
+        Number.isFinite(locationAgeMs) &&
+        locationAgeMs >= 0 &&
+        locationAgeMs <= CUSTOMER_RIDER_PUBLIC_ONLINE_MS;
+
+      // 超過 30 分鐘沒有定位更新，客人端公開狀態視為離線。
+      if (!publicOnline) {
+        return;
+      }
+
+      onlineRiderCount += 1;
+
+      const fresh =
+        locationAgeMs <= CUSTOMER_RIDER_LOCATION_FRESH_MS;
+
+      // 5 分鐘內有定位才顯示匿名 U 圖案並納入即時媒合。
+      if (!fresh) {
+        return;
+      }
+
+      mapRiderCount += 1;
+
+      if (hasPickupPoint) {
+        const distanceKm =
+          calcDispatchPushDistanceKm(
+            pickupLat,
+            pickupLng,
+            point.lat,
+            point.lng
+          );
+
+        if (Number.isFinite(distanceKm)) {
+          if (
+            nearestRiderDistanceKm === null ||
+            distanceKm <
+              nearestRiderDistanceKm
+          ) {
+            nearestRiderDistanceKm =
+              distanceKm;
+          }
+
+          if (distanceKm <= 3) {
+            nearbyRiderCount3km += 1;
+          }
+
+          if (distanceKm <= 5) {
+            nearbyRiderCount5km += 1;
+          }
+
+          if (distanceKm <= 10) {
+            nearbyRiderCount10km += 1;
+          }
+        }
+      }
+
+      if (nearbyRiders.length >= CUSTOMER_RIDER_MAX_MARKERS) {
+        return;
+      }
+
+      const anonymousPoint = offsetCustomerRiderPoint(
+        point,
+        riderDoc.id,
+        nowMs
+      );
+
+      if (anonymousPoint) {
+        nearbyRiders.push(anonymousPoint);
       }
     });
 
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.json({
       success: true,
+      declaredOnlineRiderCount,
       onlineRiderCount,
-      updatedAt: new Date().toISOString(),
-      locationFreshSeconds: Math.floor(LOCATION_FRESH_MS / 1000),
-      scope: 'available_for_realtime_matching',
+      mapRiderCount,
+      nearbyRiders,
+
+      pickupMatch:
+        hasPickupPoint
+          ? {
+              pickupLat,
+              pickupLng,
+              nearbyRiderCount3km,
+              nearbyRiderCount5km,
+              nearbyRiderCount10km,
+              nearestRiderDistanceKm:
+                nearestRiderDistanceKm === null
+                  ? null
+                  : Number(
+                      nearestRiderDistanceKm
+                        .toFixed(2)
+                    ),
+              matchLevel:
+                nearbyRiderCount3km >= 3
+                  ? 'good'
+                  : nearbyRiderCount5km > 0
+                    ? 'limited'
+                    : mapRiderCount > 0
+                      ? 'expand_required'
+                      : 'none',
+            }
+          : null,
+
+      updatedAt: new Date(nowMs).toISOString(),
+      locationFreshSeconds: Math.floor(
+        CUSTOMER_RIDER_LOCATION_FRESH_MS / 1000
+      ),
+      publicOnlineFreshSeconds: Math.floor(
+        CUSTOMER_RIDER_PUBLIC_ONLINE_MS / 1000
+      ),
+      locationPrivacy: {
+        mode: 'stable_offset',
+        minOffsetMeters: CUSTOMER_RIDER_OFFSET_MIN_METERS,
+        maxOffsetMeters: CUSTOMER_RIDER_OFFSET_MAX_METERS,
+        refreshMinutes: Math.floor(
+          CUSTOMER_RIDER_OFFSET_BUCKET_MS / 60000
+        ),
+      },
+      scope: 'public_online_riders_and_realtime_matchable_locations',
     });
   } catch (error) {
     console.error('❌ 客戶端服務狀態 API 讀取失敗：', error);
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.status(503).json({
       success: false,
       code: 'SERVICE_STATUS_UNAVAILABLE',
