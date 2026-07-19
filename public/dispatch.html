@@ -5,13 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>UBee 跑腿｜調度中心</title>
 
-<!-- Leaflet：免 Google Maps API Key，即可顯示 OpenStreetMap -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIINfQ3ynNHDN1+1yNYz0KyjMZ83SkvXQfs="
-      crossorigin="">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-        crossorigin=""></script>
+<!-- Google Maps JavaScript API：由 /api/config 取得現有 UBee Google Maps 設定後動態載入 -->
 
 <style>
 :root{
@@ -414,11 +408,11 @@ button{cursor:pointer}
 'use strict';
 
 /* ============================================================
-   UBee 調度中心 V5 完整串接版
+   UBee 調度中心 V6 Google Maps 完整串接版
    現有可直接使用：
    GET /api/dispatch/dashboard
 
-   最後需 index.js 補上的寫入 API：
+   後端已對應的寫入 API：
    POST /api/dispatch/orders/:orderId/assign
    POST /api/dispatch/orders/:orderId/redispatch
    POST /api/dispatch/orders/:orderId/expand-radius
@@ -432,12 +426,14 @@ const state = {
   radiusKm: 3,
   map: null,
   mapReady: false,
-  mapLayers: {
-    riders: null,
-    orders: null,
-    radius: null,
-    route: null
-  },
+  googleMapsApiKey: '',
+  googleMapsMapId: '',
+  googleMapsLoadPromise: null,
+  mapObjects: [],
+  infoWindow: null,
+  directionsService: null,
+  directionsRenderer: null,
+  routeRequestSeq: 0,
   firstMapFitDone: false,
   loading: false
 };
@@ -519,103 +515,243 @@ function getSelectedOrder(){
 }
 
 /* =========================
-   地圖
+   地圖：Google Maps 營運監控版
+   - 底圖與 UBee 客戶端一致，使用現有 /api/config 的 Google Maps 設定
+   - 綠色 U：可接單小U
+   - 藍色 U：任務中小U
+   - 橘黃「取」：待派單
+   - 藍色「取」：配送中
+   - 黃色「送」：選中訂單送達點
+   - 黑色道路路線：優先使用 DirectionsService，失敗則以黑色直線備援
    ========================= */
-function initMap(){
-  if(state.mapReady) return true;
+async function ensureGoogleMapsLoaded(){
+  if(window.google && window.google.maps){
+    return true;
+  }
 
-  if(typeof L === 'undefined'){
-    $('mapStatus').textContent = '地圖套件載入失敗';
-    $('mapInfo').textContent = 'Leaflet 無法載入，請檢查網路或 CDN 存取';
+  if(state.googleMapsLoadPromise){
+    return state.googleMapsLoadPromise;
+  }
+
+  state.googleMapsLoadPromise = (async()=>{
+    const cfgRes = await fetch('/api/config',{cache:'no-store'});
+    if(!cfgRes.ok){
+      throw new Error(`Google Maps 設定讀取失敗 (${cfgRes.status})`);
+    }
+
+    const cfg = await cfgRes.json();
+    state.googleMapsApiKey = String(cfg.googleMapsApiKey || '').trim();
+    state.googleMapsMapId = String(cfg.googleMapsMapId || '').trim();
+
+    if(!state.googleMapsApiKey){
+      throw new Error('Google Maps API Key 尚未設定');
+    }
+
+    await new Promise((resolve,reject)=>{
+      const callbackName = '__ubeeDispatchGoogleMapsReady';
+      window[callbackName] = ()=>{
+        try{ delete window[callbackName]; }catch{}
+        resolve();
+      };
+
+      const script = document.createElement('script');
+      script.dataset.ubeeDispatchGoogleMaps = 'true';
+      script.src =
+        'https://maps.googleapis.com/maps/api/js' +
+        `?key=${encodeURIComponent(state.googleMapsApiKey)}` +
+        '&v=weekly' +
+        '&loading=async' +
+        `&callback=${encodeURIComponent(callbackName)}` +
+        '&language=zh-TW' +
+        '&region=TW';
+      script.async = true;
+      script.onerror = ()=>{
+        try{ delete window[callbackName]; }catch{}
+        reject(new Error('Google Maps JavaScript API 載入失敗'));
+      };
+      document.head.appendChild(script);
+    });
+
+    return true;
+  })().catch(err=>{
+    state.googleMapsLoadPromise = null;
+    throw err;
+  });
+
+  return state.googleMapsLoadPromise;
+}
+
+async function initMap(){
+  if(state.mapReady && state.map) return true;
+
+  try{
+    await ensureGoogleMapsLoaded();
+  }catch(error){
+    console.error('UBee dispatch Google Maps load error:',error);
+    $('mapStatus').textContent = 'Google 地圖載入失敗';
+    $('mapInfo').textContent = error.message;
     return false;
   }
 
-  state.map = L.map('dispatchMap',{
-    zoomControl:true,
-    attributionControl:true,
-    preferCanvas:true
-  }).setView([24.1477,120.6736], 11);
+  const options = {
+    center:{lat:24.1477,lng:120.6736},
+    zoom:11,
+    mapTypeId:'roadmap',
+    disableDefaultUI:false,
+    mapTypeControl:false,
+    streetViewControl:false,
+    fullscreenControl:true,
+    clickableIcons:false,
+    gestureHandling:'greedy',
+    backgroundColor:'#e8eaed'
+  };
 
-  // 淺灰白、低干擾底圖：更接近營運監控而非導航視角。
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
-    subdomains:'abcd',
-    maxZoom:20,
-    attribution:'&copy; OpenStreetMap contributors &copy; CARTO'
-  }).addTo(state.map);
+  if(state.googleMapsMapId){
+    options.mapId = state.googleMapsMapId;
+  }
 
-  state.mapLayers.riders = L.layerGroup().addTo(state.map);
-  state.mapLayers.orders = L.layerGroup().addTo(state.map);
-  state.mapLayers.radius = L.layerGroup().addTo(state.map);
-  state.mapLayers.route = L.layerGroup().addTo(state.map);
+  state.map = new google.maps.Map($('dispatchMap'),options);
+  state.infoWindow = new google.maps.InfoWindow();
+  state.directionsService = new google.maps.DirectionsService();
+  state.directionsRenderer = new google.maps.DirectionsRenderer({
+    map:state.map,
+    suppressMarkers:true,
+    preserveViewport:true,
+    polylineOptions:{
+      strokeColor:'#171717',
+      strokeWeight:6,
+      strokeOpacity:.92
+    }
+  });
 
   state.mapReady = true;
-  $('mapStatus').textContent = '營運監控地圖已啟動';
-
-  setTimeout(()=>state.map.invalidateSize(), 80);
+  $('mapStatus').textContent = 'Google 營運監控地圖已啟動';
   return true;
 }
 
-function riderIcon(rider){
-  const cls = rider.busy ? 'busy' : 'free';
-  return L.divIcon({
-    className:'',
-    html:`<div class="marker-rider ${cls}" title="${esc(rider.name || rider.riderId || '小U')}"><span class="ubee-u">U</span></div>`,
-    iconSize:[32,32],
-    iconAnchor:[16,16],
-    popupAnchor:[0,-18]
-  });
+function clearMapObjects(){
+  for(const obj of state.mapObjects){
+    try{ obj.setMap(null); }catch{}
+  }
+  state.mapObjects = [];
+  if(state.directionsRenderer){
+    try{ state.directionsRenderer.setDirections({routes:[]}); }catch{}
+  }
 }
 
-function orderIcon(order, selected=false){
-  const kind = statusKind(order);
-  return L.divIcon({
-    className:'',
-    html:`<div class="marker-order ${kind} ${selected?'selected':''}" title="${esc(order.id)}">取</div>`,
-    iconSize:[32,32],
-    iconAnchor:[16,16],
-    popupAnchor:[0,-18]
-  });
+function addMapObject(obj){
+  if(obj) state.mapObjects.push(obj);
+  return obj;
 }
 
-function dropoffIcon(order){
-  return L.divIcon({
-    className:'',
-    html:`<div class="marker-dropoff" title="送達：${esc(order.id)}">送</div>`,
-    iconSize:[30,30],
-    iconAnchor:[15,15],
-    popupAnchor:[0,-17]
-  });
+function markerSymbol(fillColor, scale=15){
+  return {
+    path:google.maps.SymbolPath.CIRCLE,
+    fillColor,
+    fillOpacity:1,
+    strokeColor:'#ffffff',
+    strokeOpacity:1,
+    strokeWeight:3,
+    scale
+  };
 }
 
-function renderMap(){
-  if(!initMap()) return;
+function createOpsMarker({position,label,fillColor,title,zIndex=1,onClick,infoHtml}){
+  const marker = new google.maps.Marker({
+    map:state.map,
+    position,
+    title:title || '',
+    zIndex,
+    icon:markerSymbol(fillColor,15),
+    label:{
+      text:String(label || ''),
+      color:'#111111',
+      fontWeight:'1000',
+      fontSize:'14px'
+    }
+  });
 
-  state.mapLayers.riders.clearLayers();
-  state.mapLayers.orders.clearLayers();
-  state.mapLayers.radius.clearLayers();
-  state.mapLayers.route.clearLayers();
+  if(onClick || infoHtml){
+    marker.addListener('click',()=>{
+      if(typeof onClick === 'function') onClick();
+      if(infoHtml && state.infoWindow){
+        state.infoWindow.setContent(infoHtml);
+        state.infoWindow.open({map:state.map,anchor:marker});
+      }
+    });
+  }
 
-  const bounds = [];
+  return addMapObject(marker);
+}
+
+async function drawSelectedOrderRoute(order,pickup,dropoff){
+  const requestSeq = ++state.routeRequestSeq;
+
+  if(!state.directionsService || !state.directionsRenderer) return;
+
+  try{
+    const result = await new Promise((resolve,reject)=>{
+      state.directionsService.route({
+        origin:pickup,
+        destination:dropoff,
+        travelMode:google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives:false
+      },(response,status)=>{
+        if(status === 'OK' && response) resolve(response);
+        else reject(new Error(`Directions ${status}`));
+      });
+    });
+
+    if(requestSeq !== state.routeRequestSeq) return;
+    state.directionsRenderer.setDirections(result);
+  }catch(error){
+    if(requestSeq !== state.routeRequestSeq) return;
+    console.warn('UBee dispatch route fallback:',error);
+
+    const line = new google.maps.Polyline({
+      map:state.map,
+      path:[pickup,dropoff],
+      strokeColor:'#171717',
+      strokeWeight:6,
+      strokeOpacity:.88,
+      geodesic:true,
+      zIndex:20
+    });
+    addMapObject(line);
+  }
+}
+
+async function renderMap(){
+  if(!(await initMap())) return;
+
+  clearMapObjects();
+
+  const bounds = new google.maps.LatLngBounds();
+  let hasBounds = false;
   let free = 0, busy = 0, waiting = 0, active = 0;
 
   for(const rider of state.data.riders || []){
     if(rider.busy) busy++; else free++;
     if(!hasLatLng(rider.currentLat,rider.currentLng)) continue;
 
-    const lat = Number(rider.currentLat), lng = Number(rider.currentLng);
-    bounds.push([lat,lng]);
+    const position = {lat:Number(rider.currentLat),lng:Number(rider.currentLng)};
+    bounds.extend(position); hasBounds = true;
 
-    const marker = L.marker([lat,lng],{icon:riderIcon(rider),zIndexOffset:300});
-    marker.bindPopup(`
-      <div style="min-width:180px">
-        <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
-        <span>${rider.busy ? '任務中' : '可接單'}</span><br>
-        <small>${esc(rider.district || rider.serviceArea || '')}</small><br>
-        <small>最後定位：${esc(fmtAge(rider.locationUpdatedAtMs))}</small>
-        ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
-      </div>
-    `);
-    marker.addTo(state.mapLayers.riders);
+    createOpsMarker({
+      position,
+      label:'U',
+      fillColor:rider.busy ? '#3478f6' : '#20a464',
+      title:rider.name || rider.riderId || '小U',
+      zIndex:300,
+      infoHtml:`
+        <div style="min-width:190px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
+          <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
+          <span>${rider.busy ? '任務中' : '可接單'}</span><br>
+          <small>${esc(rider.district || rider.serviceArea || '')}</small><br>
+          <small>最後定位：${esc(fmtAge(rider.locationUpdatedAtMs))}</small>
+          ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
+        </div>`
+    });
   }
 
   for(const order of state.data.orders || []){
@@ -623,45 +759,57 @@ function renderMap(){
     if(kind === 'waiting') waiting++; else active++;
     if(!hasLatLng(order.pickupLat,order.pickupLng)) continue;
 
-    const lat = Number(order.pickupLat), lng = Number(order.pickupLng);
-    bounds.push([lat,lng]);
+    const pickup = {lat:Number(order.pickupLat),lng:Number(order.pickupLng)};
+    bounds.extend(pickup); hasBounds = true;
 
     const selected = String(order.id) === String(state.selectedOrderId);
-    const marker = L.marker([lat,lng],{icon:orderIcon(order,selected),zIndexOffset:selected?500:200});
-    marker.bindPopup(`
-      <div style="min-width:210px">
-        <b>${esc(order.id)}</b><br>
-        <small>${esc(order.statusLabel || order.status || '')}</small><hr style="border:0;border-top:1px solid #eee">
-        <small><b>取件：</b>${esc(order.pickupAddress || '-')}</small><br>
-        <small><b>送達：</b>${esc(order.dropoffAddress || '-')}</small><br>
-        <small>NT$ ${esc(order.total || 0)}</small>
-      </div>
-    `);
-    marker.on('click',()=>selectOrder(order.id,{pan:false}));
-    marker.addTo(state.mapLayers.orders);
+    createOpsMarker({
+      position:pickup,
+      label:'取',
+      fillColor:kind === 'waiting' ? '#f5b800' : '#3478f6',
+      title:String(order.id || ''),
+      zIndex:selected ? 520 : 220,
+      onClick:()=>selectOrder(order.id,{pan:false}),
+      infoHtml:`
+        <div style="min-width:220px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
+          <b>${esc(order.id)}</b><br>
+          <small>${esc(order.statusLabel || order.status || '')}</small><hr style="border:0;border-top:1px solid #eee">
+          <small><b>取件：</b>${esc(order.pickupAddress || '-')}</small><br>
+          <small><b>送達：</b>${esc(order.dropoffAddress || '-')}</small><br>
+          <small>NT$ ${esc(order.total || 0)}</small>
+        </div>`
+    });
 
     if(selected){
       if(hasLatLng(order.dropoffLat,order.dropoffLng)){
-        const dLat = Number(order.dropoffLat), dLng = Number(order.dropoffLng);
-        bounds.push([dLat,dLng]);
-        L.polyline([[lat,lng],[dLat,dLng]],{
-          color:'#3478f6',weight:4,dashArray:'8 8',opacity:.58
-        }).addTo(state.mapLayers.route);
-        L.marker([dLat,dLng],{icon:dropoffIcon(order),zIndexOffset:450})
-          .bindPopup(`送達點：${esc(order.dropoffAddress || '-')}`)
-          .addTo(state.mapLayers.route);
+        const dropoff = {lat:Number(order.dropoffLat),lng:Number(order.dropoffLng)};
+        bounds.extend(dropoff); hasBounds = true;
+
+        createOpsMarker({
+          position:dropoff,
+          label:'送',
+          fillColor:'#f5b800',
+          title:`送達：${order.id}`,
+          zIndex:500,
+          infoHtml:`<div style="min-width:180px"><b>送達點</b><br><small>${esc(order.dropoffAddress || '-')}</small></div>`
+        });
+
+        drawSelectedOrderRoute(order,pickup,dropoff);
       }
 
-      if(statusKind(order) === 'waiting'){
-        L.circle([lat,lng],{
+      if(kind === 'waiting'){
+        const circle = new google.maps.Circle({
+          map:state.map,
+          center:pickup,
           radius:state.radiusKm*1000,
-          color:'#f59e0b',
-          weight:1.5,
-          opacity:.30,
+          strokeColor:'#f59e0b',
+          strokeOpacity:.26,
+          strokeWeight:1.5,
           fillColor:'#f59e0b',
-          fillOpacity:.025,
-          dashArray:'7 7'
-        }).addTo(state.mapLayers.radius);
+          fillOpacity:.035,
+          zIndex:5
+        });
+        addMapObject(circle);
       }
     }
   }
@@ -671,38 +819,51 @@ function renderMap(){
   $('legendWaiting').textContent = waiting;
   $('legendActive').textContent = active;
 
-  if(!state.firstMapFitDone && bounds.length){
+  if(!state.firstMapFitDone && hasBounds){
     fitMapToData(bounds);
     state.firstMapFitDone = true;
   }
-
-  setTimeout(()=>state.map.invalidateSize(),50);
 }
 
 function fitMapToData(customBounds){
-  if(!state.mapReady) return;
-  const bounds = customBounds || [];
+  if(!state.mapReady || !state.map) return;
 
-  if(!customBounds){
+  let bounds = customBounds;
+  if(!bounds){
+    bounds = new google.maps.LatLngBounds();
+    let hasAny = false;
+
     for(const rider of state.data.riders || []){
-      if(hasLatLng(rider.currentLat,rider.currentLng)) bounds.push([Number(rider.currentLat),Number(rider.currentLng)]);
+      if(hasLatLng(rider.currentLat,rider.currentLng)){
+        bounds.extend({lat:Number(rider.currentLat),lng:Number(rider.currentLng)});
+        hasAny = true;
+      }
     }
     for(const order of state.data.orders || []){
-      if(hasLatLng(order.pickupLat,order.pickupLng)) bounds.push([Number(order.pickupLat),Number(order.pickupLng)]);
+      if(hasLatLng(order.pickupLat,order.pickupLng)){
+        bounds.extend({lat:Number(order.pickupLat),lng:Number(order.pickupLng)});
+        hasAny = true;
+      }
+    }
+
+    if(!hasAny){
+      state.map.setCenter({lat:24.1477,lng:120.6736});
+      state.map.setZoom(11);
+      toast('目前沒有可定位的座標資料');
+      return;
     }
   }
 
-  if(!bounds.length){
-    state.map.setView([24.1477,120.6736],11);
-    toast('目前沒有可定位的座標資料');
+  if(bounds.isEmpty && bounds.isEmpty()){
+    state.map.setCenter({lat:24.1477,lng:120.6736});
+    state.map.setZoom(11);
     return;
   }
 
-  if(bounds.length === 1){
-    state.map.setView(bounds[0],14);
-  }else{
-    state.map.fitBounds(bounds,{padding:[35,35],maxZoom:14});
-  }
+  state.map.fitBounds(bounds,50);
+  google.maps.event.addListenerOnce(state.map,'idle',()=>{
+    if(state.map.getZoom() > 15) state.map.setZoom(15);
+  });
 }
 
 /* =========================
@@ -992,7 +1153,8 @@ function selectOrder(orderId,{pan=true}={}){
 
   const order = getSelectedOrder();
   if(pan && order && state.mapReady && hasLatLng(order.pickupLat,order.pickupLng)){
-    state.map.setView([Number(order.pickupLat),Number(order.pickupLng)],13);
+    state.map.setCenter({lat:Number(order.pickupLat),lng:Number(order.pickupLng)});
+    state.map.setZoom(13);
   }
 }
 
@@ -1019,7 +1181,7 @@ async function postJson(url,body={}){
 }
 
 function backendNotReadyMessage(action){
-  return `${action} API 回傳 404/405，請確認已部署 V5 index.js 並重新部署後端服務。`;
+  return `${action} API 回傳 404/405，請確認已部署 V6 index.js 並重新部署後端服務。`;
 }
 
 async function assignRider(orderId,riderId){
@@ -1194,7 +1356,7 @@ $('assignModal').addEventListener('click',event=>{
 });
 
 window.addEventListener('resize',()=>{
-  if(state.mapReady) setTimeout(()=>state.map.invalidateSize(),60);
+  if(state.mapReady && state.map) setTimeout(()=>google.maps.event.trigger(state.map,'resize'),60);
 });
 
 /* =========================
