@@ -680,8 +680,10 @@ async function sendNewOrderPushToRiders(
           .filter(Boolean)
       );
 
-    const sendLineAdmin =
-      safeOptions.sendLineAdmin !== false;
+    // 管理／審核群組不再接收任何新任務或重新派單通知。
+    // 派單只通知符合條件的小U，避免浪費 LINE 訊息流量。
+    // 騎士申請審核通知由獨立的審核流程保留，不受此設定影響。
+    const sendLineAdmin = false;
 
     const notifiedRiderDocIds = [];
     
@@ -1052,7 +1054,7 @@ ${isRedispatch
 // 1. 已通知過的小U不重複通知。
 // 2. 訂單被接走、取消或完成後，停止後續擴圈。
 // 3. 使用 dispatchPushCycleId 避免舊計時器干擾新週期。
-// 4. LINE 管理群只在第一波通知一次。
+// 4. LINE 管理／審核群不接收新任務通知；只保留騎士申請審核通知。
 // =====================================================
 
 const DISPATCH_PUSH_WAVES = [
@@ -1060,7 +1062,7 @@ const DISPATCH_PUSH_WAVES = [
     delayMs: 0,
     radiusKm: 3,
     stage: "3km",
-    sendLineAdmin: true,
+    sendLineAdmin: false,
   },
   {
     delayMs: 5000,
