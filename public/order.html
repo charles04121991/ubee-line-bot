@@ -12,6 +12,7 @@
   <meta name="theme-color" content="#ffffff">
 
   <title>UBee 跑腿｜用戶端建立任務</title>
+  <!-- Level 4：客戶端只提供原始需求；區域與預測特徵由後端可信任計算 -->
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -13109,7 +13110,12 @@ function getPayload(){
     merchantName:currentMerchant?.merchantName || '',
     merchantPhone:currentMerchant?.merchantPhone || '',
     merchantAddress:currentMerchant?.merchantAddress || '',
-    hasMerchant:merchantMode === true
+    hasMerchant:merchantMode === true,
+
+    // Level 4 診斷標記：真正的區域／時段特徵仍由 index.js 後端重新計算。
+    dispatchClientVersion:'level4-v1',
+    clientSubmittedAtMs:Date.now(),
+    clientTimeZone:(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Taipei')
   };
 }
 
