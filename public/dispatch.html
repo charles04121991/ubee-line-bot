@@ -391,7 +391,7 @@ button{cursor:pointer}
         <div class="panel-head">
           <div>
             <div class="panel-title">即時供需地圖</div>
-            <div class="panel-sub">綠色＝可接單、藍色＝任務中、黃色＝暫停接單、灰色＝離線最後位置；橘色＝待派單</div>
+            <div class="panel-sub">綠色＝可接單、藍色＝真正任務中、橘色＝待派單；暫停與離線保留在名單，不塞進地圖</div>
           </div>
         </div>
         <div class="map-wrap">
@@ -400,8 +400,6 @@ button{cursor:pointer}
             <div class="legend">
               <span class="legend-item"><i class="legend-dot" style="background:var(--green)"></i>可接單 <b id="legendFree">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>任務中 <b id="legendBusy">0</b></span>
-              <span class="legend-item"><i class="legend-dot" style="background:#f5b800"></i>暫停 <b id="legendPaused">0</b></span>
-              <span class="legend-item"><i class="legend-dot" style="background:#8b9098"></i>離線 <b id="legendOffline">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--orange)"></i>待派單 <b id="legendWaiting">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>配送中 <b id="legendActive">0</b></span>
             </div>
@@ -853,27 +851,26 @@ async function renderMap(){
     else if(visualState === 'paused') paused++;
     else offline++;
 
-    // 離線／暫停小U仍保留「最後已知位置」，但不可誤認成即時位置。
+    // 地圖只顯示具有即時調度價值的小U：可接單、真正任務中。
+    // 暫停接單與離線者仍保留在「全部小U」名單，但不畫進地圖，避免大量舊位置塞滿畫面。
+    if(!['online','busy'].includes(visualState)) continue;
     if(!hasLatLng(rider.currentLat,rider.currentLng)) continue;
 
     const position = {lat:Number(rider.currentLat),lng:Number(rider.currentLng)};
     bounds.extend(position); hasBounds = true;
-    const isLiveLocation = rider.online === true && String(rider.connectionState || '') === 'LIVE';
 
     createOpsMarker({
       position,
       label:'U',
       fillColor:riderStateColor(rider),
       title:`${rider.name || rider.riderId || '小U'} · ${riderStateLabel(rider)}`,
-      zIndex:visualState === 'online' || visualState === 'busy' ? 300 : 180,
+      zIndex:300,
       infoHtml:`
         <div style="min-width:210px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
           <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
           <span style="font-weight:900;color:${riderStateColor(rider)}">${esc(riderStateLabel(rider))}</span><br>
           <small>${esc(rider.district || rider.serviceArea || '未設定區域')}</small><br>
-          <small>最後活動：${esc(fmtAge(rider.lastActiveAtMs))}</small><br>
           <small>最後定位：${esc(fmtAge(rider.locationUpdatedAtMs))}</small>
-          ${!isLiveLocation ? '<br><small style="color:#b05e00;font-weight:900">⚠ 最後已知位置，非即時位置</small>' : ''}
           ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
         </div>`
     });
@@ -941,8 +938,6 @@ async function renderMap(){
 
   $('legendFree').textContent = free;
   $('legendBusy').textContent = busy;
-  $('legendPaused').textContent = paused;
-  $('legendOffline').textContent = offline;
   $('legendWaiting').textContent = waiting;
   $('legendActive').textContent = active;
 
@@ -1083,7 +1078,7 @@ function renderSummary(){
   const liveWithLocation = state.data.riders.filter(r=>r.online && hasLatLng(r.currentLat,r.currentLng)).length;
   const pausedCount = s.pausedRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='paused').length;
   const offlineCount = s.offlineRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='offline').length;
-  $('onlineSub').textContent = `${liveWithLocation} 位有即時座標 · 暫停 ${pausedCount} · 離線 ${offlineCount}`;
+  $('onlineSub').textContent = `${liveWithLocation} 位有即時座標 · 全部小U名單另含暫停 ${pausedCount}、離線 ${offlineCount}`;
 
   const waits = state.data.orders.filter(o=>statusKind(o)==='waiting');
   if(waits.length){
