@@ -3600,11 +3600,14 @@ const riderIncome =
       }
 
       // ==============================
-      // 非現金單
+      // 街口支付單
       //
-      // 平台已收款，之後由平台撥款給騎士。
+      // 財務中心正式規則：
+      // 平台待撥款只統計已付款確認的街口支付訂單。
+      // 應撥金額 = 騎士收入 + 騎士代墊款。
+      // 其他非現金類型不混入「街口待撥款」。
       // ==============================
-      else {
+      else if (isFinancePaidJkoOrder(order)) {
         if (
           settlementStatus === 'settled'
         ) {
@@ -3615,8 +3618,6 @@ const riderIncome =
           pendingIncome +=
             riderIncome;
 
-          // 平台未來要撥給騎士：
-          // 騎士收入 + 騎士代墊款
           riderReceivable +=
             riderIncome +
             advancePayment;
@@ -3802,206 +3803,868 @@ const riderIncome =
   }
 });
 
-app.get('/api/admin/pending-settlements', async (req, res) => {
+// ============================================================
+// UBee 財務結算中心 V2：共用工具
+// - 現金：小U -> UBee（回繳）
+// - 街口：UBee -> 小U（騎士收入 + 騎士代墊）
+// - 僅整理財務視圖與結算，不改動既有派單／付款／騎士審核流程
+// ============================================================
+function financeToMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  return 0;
+}
+
+function getFinanceCompletedAtMs(order = {}) {
+  return (
+    financeToMs(order.completedAt) ||
+    financeToMs(order.finishedAt) ||
+    financeToMs(order.completedAtMs) ||
+    financeToMs(order.updatedAt) ||
+    financeToMs(order.createdAt)
+  );
+}
+
+function getFinanceRiderIdentity(order = {}) {
+  const riderDocId = String(order.riderDocId || '').trim();
+  const riderId = String(
+    order.riderId ||
+    order.driverId ||
+    order.riderLineUserId ||
+    ''
+  ).trim();
+  const riderPhone = normalizePhone(
+    order.riderPhone ||
+    order.driverPhone ||
+    ''
+  );
+  const riderLineUserId = String(order.riderLineUserId || '').trim();
+  const riderName = String(
+    order.riderName ||
+    order.driverName ||
+    '未設定小U姓名'
+  ).trim();
+
+  return {
+    riderKey:
+      riderDocId ||
+      riderId ||
+      riderPhone ||
+      riderLineUserId ||
+      '',
+    riderDocId,
+    riderId,
+    riderPhone,
+    riderLineUserId,
+    riderName,
+  };
+}
+
+function isFinancePaidJkoOrder(order = {}) {
+  const paymentMethod = getOrderPaymentMethod(order);
+  const paymentStatus = getOrderPaymentStatus(order);
+
+  return (
+    String(order.status || '').trim().toLowerCase() === 'completed' &&
+    (
+      paymentMethod === 'jko' ||
+      paymentMethod === 'jkopay' ||
+      paymentMethod === 'jko_pay' ||
+      paymentMethod.includes('jko') ||
+      paymentMethod.includes('街口')
+    ) &&
+    (
+      paymentStatus === 'paid_confirmed' ||
+      paymentStatus === 'paid' ||
+      order.isPaid === true
+    ) &&
+    order.isCashOrder !== true
+  );
+}
+
+function getFinanceJkoAmounts(order = {}) {
+  const riderIncome =
+    getOrderMoneyValue(order, [
+      'riderFee',
+      'driverFee',
+      'riderIncome',
+      'riderEarning',
+      'riderPayout',
+      'riderShare',
+      'fee',
+    ]) || 0;
+
+  const advancePayment =
+    getOrderAdvancePaymentAmount(order);
+
+  return {
+    riderIncome: Math.max(0, Math.round(riderIncome)),
+    advancePayment: Math.max(0, Math.round(advancePayment)),
+    payoutTotal: Math.max(
+      0,
+      Math.round(riderIncome + advancePayment)
+    ),
+  };
+}
+
+function getFinanceCashAmounts(order = {}) {
+  const customerTotal =
+    getOrderCustomerPayableTotal(order);
+
+  const riderIncome =
+    getOrderMoneyValue(order, [
+      'riderFee',
+      'driverFee',
+      'riderIncome',
+      'riderEarning',
+      'riderPayout',
+      'riderShare',
+      'fee',
+      'price',
+    ]) || 0;
+
+  const advancePayment =
+    getOrderAdvancePaymentAmount(order);
+
+  const fallbackPlatformDue = Math.max(
+    0,
+    Math.round(
+      customerTotal -
+      advancePayment -
+      riderIncome
+    )
+  );
+
+  const cashDueToPlatform =
+    getOrderCashDueToPlatformAmount(
+      order,
+      fallbackPlatformDue
+    );
+
+  return {
+    customerTotal: Math.max(0, Math.round(customerTotal)),
+    riderIncome: Math.max(0, Math.round(riderIncome)),
+    advancePayment: Math.max(0, Math.round(advancePayment)),
+    cashDueToPlatform: Math.max(0, Math.round(cashDueToPlatform)),
+  };
+}
+
+// ============================================================
+// UBee 財務結算中心 V2：總覽／異常／結算紀錄
+// ============================================================
+app.get('/api/admin/finance-overview', async (req, res) => {
   try {
-    const snap = await db.collection('orders')
-      .where('status', '==', 'completed')
-      .where('settlementStatus', '==', 'pending')
-      .limit(100)
+    const snap = await db
+      .collection('orders')
+      .limit(1000)
       .get();
 
-    const orders = [];
-    let pendingTotal = 0;
+    const nowMs = Date.now();
+    const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
+    const taipeiNow = new Date(nowMs + TAIPEI_OFFSET_MS);
+    const todayStartMs = Date.UTC(
+      taipeiNow.getUTCFullYear(),
+      taipeiNow.getUTCMonth(),
+      taipeiNow.getUTCDate(),
+      0, 0, 0, 0
+    ) - TAIPEI_OFFSET_MS;
+    const tomorrowStartMs = todayStartMs + 24 * 60 * 60 * 1000;
+
+    let todayCompletedOrders = 0;
+    let cashPendingTotal = 0;
+    let jkoPendingTotal = 0;
+    let todayCashRemitted = 0;
+    let todayRiderPaid = 0;
+
+    const cashRiderKeys = new Set();
+    const jkoRiderKeys = new Set();
+    const alerts = [];
+    const history = [];
 
     snap.forEach(doc => {
       const order = {
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       };
 
-      const paymentMethod = String(
-        order.paymentMethod ||
-        order.payMethod ||
-        order.paymentType ||
-        order.payment ||
-        ''
-      ).toLowerCase();
+      const orderStatus = String(order.status || '')
+        .trim()
+        .toLowerCase();
+      const isCompleted =
+        orderStatus === 'completed' ||
+        orderStatus === 'done';
 
-      const paymentStatus = String(order.paymentStatus || '').toLowerCase();
+      const completedAtMs =
+        getFinanceCompletedAtMs(order);
 
-      const isPaidJkoOrder =
-        order.status === 'completed' &&
-        paymentMethod === 'jko' &&
-        paymentStatus === 'paid_confirmed' &&
-        order.isPaid === true &&
-        order.isCashOrder !== true;
-
-      // UBee 正式營運版：後台待撥款只顯示已完成、已付款、街口支付、非現金單
-      if (!isPaidJkoOrder) {
-        return;
+      if (
+        isCompleted &&
+        completedAtMs >= todayStartMs &&
+        completedAtMs < tomorrowStartMs
+      ) {
+        todayCompletedOrders += 1;
       }
 
-      const riderIncome = Number(
-        order.riderFee ||
-        order.driverFee ||
-        order.fee ||
-        0
-      );
+      const rider = getFinanceRiderIdentity(order);
+      const riderLabel =
+        rider.riderName ||
+        rider.riderId ||
+        rider.riderDocId ||
+        '未設定小U';
 
-      if (riderIncome <= 0) {
-        return;
+      // ------------------------------
+      // 現金待回繳
+      // ------------------------------
+      if (
+        isCompleted &&
+        isCashPaymentOrder(order)
+      ) {
+        const cashAmounts =
+          getFinanceCashAmounts(order);
+
+        if (!isCashRemittanceSettled(order)) {
+          if (cashAmounts.cashDueToPlatform > 0) {
+            cashPendingTotal +=
+              cashAmounts.cashDueToPlatform;
+
+            if (rider.riderKey) {
+              cashRiderKeys.add(rider.riderKey);
+            }
+
+            const ageMs = completedAtMs
+              ? Math.max(0, nowMs - completedAtMs)
+              : 0;
+
+            if (
+              cashAmounts.cashDueToPlatform >= 5000 ||
+              ageMs >= 24 * 60 * 60 * 1000 ||
+              !rider.riderKey
+            ) {
+              alerts.push({
+                id: `cash_${doc.id}`,
+                type: 'cash_remittance',
+                severity:
+                  cashAmounts.cashDueToPlatform >= 10000 ||
+                  ageMs >= 72 * 60 * 60 * 1000
+                    ? 'critical'
+                    : 'warning',
+                title:
+                  !rider.riderKey
+                    ? '現金回繳缺少小U識別資料'
+                    : cashAmounts.cashDueToPlatform >= 5000
+                      ? '高額現金待回繳'
+                      : '現金回繳等待時間偏長',
+                message:
+                  `${riderLabel}｜訂單 ${order.orderNo || doc.id}｜` +
+                  `待回繳 NT$${cashAmounts.cashDueToPlatform.toLocaleString('zh-TW')}`,
+                orderId: doc.id,
+                riderName: riderLabel,
+                amount: cashAmounts.cashDueToPlatform,
+                ageMs,
+                createdAtMs: completedAtMs,
+              });
+            }
+          }
+        } else {
+          const settledAtMs =
+            financeToMs(order.cashRemittedAtMs) ||
+            financeToMs(order.cashRemittedAt) ||
+            financeToMs(order.financialUpdatedAtMs) ||
+            financeToMs(order.financialUpdatedAt);
+
+          const amount =
+            getOrderMoneyValue(order, [
+              'cashRemittedAmount',
+              'cashDueToPlatform',
+              'platformReceivable',
+              'riderDueToPlatform',
+            ]) ||
+            cashAmounts.cashDueToPlatform;
+
+          if (
+            settledAtMs >= todayStartMs &&
+            settledAtMs < tomorrowStartMs
+          ) {
+            todayCashRemitted += amount;
+          }
+
+          if (settledAtMs) {
+            history.push({
+              id: `cash_${doc.id}`,
+              type: 'cash_remittance',
+              typeLabel: '現金回繳',
+              direction: 'rider_to_platform',
+              orderId: doc.id,
+              orderNo: order.orderNo || doc.id,
+              riderName: riderLabel,
+              riderId: rider.riderId || rider.riderDocId || '',
+              amount,
+              processedBy: order.cashRemittedBy || '',
+              processedAtMs: settledAtMs,
+            });
+          }
+        }
       }
 
-      const customerTotal = Number(
-        order.total ||
-        order.customerPayableTotal ||
-        order.finalTotal ||
-        0
-      );
+      // ------------------------------
+      // 街口待撥款／已撥款
+      // ------------------------------
+      if (isFinancePaidJkoOrder(order)) {
+        const jkoAmounts =
+          getFinanceJkoAmounts(order);
 
-      pendingTotal += riderIncome;
+        const settlementStatus = String(
+          order.settlementStatus || 'pending'
+        )
+          .trim()
+          .toLowerCase();
 
-      orders.push({
-        id: order.id,
-        orderNo: order.orderNo || order.id,
-        riderId: order.riderId || order.riderLineUserId || order.driverId || '',
-        riderName: order.riderName || order.driverName || '',
-        paymentMethod: 'jko',
-        paymentMethodLabel: '街口支付',
-        paymentStatus: 'paid_confirmed',
-        riderFee: riderIncome,
-        driverFee: riderIncome,
-        fee: riderIncome,
-        total: customerTotal,
-        completedAt: order.completedAt || null,
-        updatedAt: order.updatedAt || null
-      });
+        if (settlementStatus !== 'settled') {
+          if (jkoAmounts.payoutTotal > 0) {
+            jkoPendingTotal +=
+              jkoAmounts.payoutTotal;
+
+            if (rider.riderKey) {
+              jkoRiderKeys.add(rider.riderKey);
+            }
+
+            const ageMs = completedAtMs
+              ? Math.max(0, nowMs - completedAtMs)
+              : 0;
+
+            if (
+              jkoAmounts.payoutTotal >= 5000 ||
+              ageMs >= 24 * 60 * 60 * 1000 ||
+              !rider.riderKey
+            ) {
+              alerts.push({
+                id: `jko_${doc.id}`,
+                type: 'jko_payout',
+                severity:
+                  jkoAmounts.payoutTotal >= 10000 ||
+                  ageMs >= 72 * 60 * 60 * 1000
+                    ? 'critical'
+                    : 'warning',
+                title:
+                  !rider.riderKey
+                    ? '街口待撥款缺少小U識別資料'
+                    : jkoAmounts.payoutTotal >= 5000
+                      ? '高額街口待撥款'
+                      : '街口待撥款等待時間偏長',
+                message:
+                  `${riderLabel}｜訂單 ${order.orderNo || doc.id}｜` +
+                  `待撥 NT$${jkoAmounts.payoutTotal.toLocaleString('zh-TW')}`,
+                orderId: doc.id,
+                riderName: riderLabel,
+                amount: jkoAmounts.payoutTotal,
+                ageMs,
+                createdAtMs: completedAtMs,
+              });
+            }
+          }
+        } else {
+          const settledAtMs =
+            financeToMs(order.settledAtMs) ||
+            financeToMs(order.settledAt) ||
+            financeToMs(order.financialUpdatedAtMs) ||
+            financeToMs(order.financialUpdatedAt);
+
+          const amount =
+            getOrderMoneyValue(order, [
+              'settledAmount',
+              'platformPayableToRider',
+              'riderReceivable',
+            ]) ||
+            jkoAmounts.payoutTotal;
+
+          if (
+            settledAtMs >= todayStartMs &&
+            settledAtMs < tomorrowStartMs
+          ) {
+            todayRiderPaid += amount;
+          }
+
+          if (settledAtMs) {
+            history.push({
+              id: `jko_${doc.id}`,
+              type: 'jko_payout',
+              typeLabel: '街口撥款',
+              direction: 'platform_to_rider',
+              orderId: doc.id,
+              orderNo: order.orderNo || doc.id,
+              riderName: riderLabel,
+              riderId: rider.riderId || rider.riderDocId || '',
+              amount,
+              processedBy: order.settledBy || '',
+              processedAtMs: settledAtMs,
+            });
+          }
+        }
+      }
     });
 
-    orders.sort((a, b) => {
-      const getMs = value => {
-        if (!value) return 0;
-        if (value.toDate) return value.toDate().getTime();
-        if (value.seconds) return value.seconds * 1000;
-        return new Date(value).getTime() || 0;
+    alerts.sort((a, b) => {
+      const rank = {
+        critical: 3,
+        warning: 2,
+        info: 1,
       };
-
-      return getMs(b.completedAt || b.updatedAt) - getMs(a.completedAt || a.updatedAt);
+      return (
+        (rank[b.severity] || 0) -
+        (rank[a.severity] || 0) ||
+        Number(b.amount || 0) -
+        Number(a.amount || 0)
+      );
     });
 
-    res.json({
+    history.sort(
+      (a, b) =>
+        Number(b.processedAtMs || 0) -
+        Number(a.processedAtMs || 0)
+    );
+
+    const pendingRiderKeys = new Set([
+      ...cashRiderKeys,
+      ...jkoRiderKeys,
+    ]);
+
+    return res.json({
       success: true,
-      pendingTotal,
-      count: orders.length,
-      orders
+      updatedAtMs: nowMs,
+      summary: {
+        todayCompletedOrders,
+        cashPendingTotal: Math.round(cashPendingTotal),
+        jkoPendingTotal: Math.round(jkoPendingTotal),
+        pendingRiderCount: pendingRiderKeys.size,
+        cashPendingRiderCount: cashRiderKeys.size,
+        jkoPendingRiderCount: jkoRiderKeys.size,
+        todayCashRemitted: Math.round(todayCashRemitted),
+        todayRiderPaid: Math.round(todayRiderPaid),
+        todayProcessedTotal: Math.round(
+          todayCashRemitted + todayRiderPaid
+        ),
+        alertCount: alerts.length,
+      },
+      alerts: alerts.slice(0, 100),
+      history: history.slice(0, 100),
     });
-
   } catch (err) {
-    console.error('pending settlements error:', err);
-    res.status(500).json({
+    console.error('finance overview error:', err);
+    return res.status(500).json({
       success: false,
-      message: '讀取待結算資料失敗',
-      error: err.message
+      message: '讀取財務總覽失敗。',
+      error: err.message,
     });
   }
 });
 
+// ============================================================
+// UBee 財務結算中心 V2：街口待撥款
+// 回傳「騎士收入 + 騎士代墊款」作為平台實際應撥總額
+// ============================================================
+app.get('/api/admin/pending-settlements', async (req, res) => {
+  try {
+    // 不要求 settlementStatus 欄位一定已存在，
+    // 讓舊的已完成街口訂單也能由後端統一判斷是否待撥。
+    const snap = await db
+      .collection('orders')
+      .where('status', '==', 'completed')
+      .limit(500)
+      .get();
+
+    const orders = [];
+    const riderMap = new Map();
+
+    let pendingTotal = 0;
+    let riderIncomeTotal = 0;
+    let advancePaymentTotal = 0;
+
+    snap.forEach(doc => {
+      const order = {
+        id: doc.id,
+        ...doc.data(),
+      };
+
+      if (!isFinancePaidJkoOrder(order)) {
+        return;
+      }
+
+      if (
+        String(order.settlementStatus || 'pending')
+          .trim()
+          .toLowerCase() === 'settled'
+      ) {
+        return;
+      }
+
+      const amounts =
+        getFinanceJkoAmounts(order);
+
+      if (amounts.payoutTotal <= 0) {
+        return;
+      }
+
+      const customerTotal =
+        getOrderCustomerPayableTotal(order);
+
+      const rider =
+        getFinanceRiderIdentity(order);
+
+      const riderKey =
+        rider.riderKey ||
+        `unknown_${doc.id}`;
+
+      const item = {
+        id: order.id,
+        orderNo: order.orderNo || order.id,
+        riderKey,
+        riderId: rider.riderId,
+        riderDocId: rider.riderDocId,
+        riderPhone: rider.riderPhone,
+        riderLineUserId: rider.riderLineUserId,
+        riderName: rider.riderName,
+        paymentMethod: 'jko',
+        paymentMethodLabel: '街口支付',
+        paymentStatus: getOrderPaymentStatus(order),
+        riderFee: amounts.riderIncome,
+        driverFee: amounts.riderIncome,
+        fee: amounts.riderIncome,
+        riderIncome: amounts.riderIncome,
+        advancePayment: amounts.advancePayment,
+        payoutTotal: amounts.payoutTotal,
+        total: customerTotal,
+        completedAt: order.completedAt || order.finishedAt || null,
+        updatedAt: order.updatedAt || null,
+      };
+
+      orders.push(item);
+
+      pendingTotal += amounts.payoutTotal;
+      riderIncomeTotal += amounts.riderIncome;
+      advancePaymentTotal += amounts.advancePayment;
+
+      if (!riderMap.has(riderKey)) {
+        riderMap.set(riderKey, {
+          riderKey,
+          riderId: rider.riderId,
+          riderDocId: rider.riderDocId,
+          riderPhone: rider.riderPhone,
+          riderLineUserId: rider.riderLineUserId,
+          riderName: rider.riderName,
+          riderIncomeTotal: 0,
+          advancePaymentTotal: 0,
+          payoutTotal: 0,
+          orderCount: 0,
+          orderIds: [],
+          orders: [],
+        });
+      }
+
+      const group = riderMap.get(riderKey);
+      group.riderIncomeTotal += amounts.riderIncome;
+      group.advancePaymentTotal += amounts.advancePayment;
+      group.payoutTotal += amounts.payoutTotal;
+      group.orderCount += 1;
+      group.orderIds.push(order.id);
+      group.orders.push(item);
+    });
+
+    orders.sort(
+      (a, b) =>
+        getFinanceCompletedAtMs(b) -
+        getFinanceCompletedAtMs(a)
+    );
+
+    const riders = Array.from(riderMap.values());
+
+    riders.forEach(rider => {
+      rider.riderIncomeTotal = Math.round(rider.riderIncomeTotal);
+      rider.advancePaymentTotal = Math.round(rider.advancePaymentTotal);
+      rider.payoutTotal = Math.round(rider.payoutTotal);
+      rider.orders.sort(
+        (a, b) =>
+          getFinanceCompletedAtMs(b) -
+          getFinanceCompletedAtMs(a)
+      );
+    });
+
+    riders.sort(
+      (a, b) =>
+        Number(b.payoutTotal || 0) -
+        Number(a.payoutTotal || 0)
+    );
+
+    return res.json({
+      success: true,
+      pendingTotal: Math.round(pendingTotal),
+      riderIncomeTotal: Math.round(riderIncomeTotal),
+      advancePaymentTotal: Math.round(advancePaymentTotal),
+      count: orders.length,
+      riderCount: riders.length,
+      orders,
+      riders,
+    });
+  } catch (err) {
+    console.error('pending settlements error:', err);
+    return res.status(500).json({
+      success: false,
+      message: '讀取待撥款資料失敗',
+      error: err.message,
+    });
+  }
+});
+
+async function settleFinanceJkoOrders({
+  orderIds = [],
+  settledBy = 'finance_center',
+} = {}) {
+  const cleanOrderIds = Array.from(
+    new Set(
+      (Array.isArray(orderIds) ? orderIds : [])
+        .map(value =>
+          String(value || '')
+            .trim()
+            .toUpperCase()
+        )
+        .filter(Boolean)
+    )
+  );
+
+  if (!cleanOrderIds.length) {
+    const error = new Error('SETTLEMENT_ORDER_IDS_REQUIRED');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (cleanOrderIds.length > 200) {
+    const error = new Error('SETTLEMENT_TOO_MANY_ORDERS');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const refs = cleanOrderIds.map(orderId =>
+    db.collection('orders').doc(orderId)
+  );
+
+  const docs = await Promise.all(
+    refs.map(ref => ref.get())
+  );
+
+  const validOrders = [];
+  const skippedOrders = [];
+
+  let totalSettledAmount = 0;
+  let totalRiderIncome = 0;
+  let totalAdvancePayment = 0;
+
+  docs.forEach((doc, index) => {
+    const orderId = cleanOrderIds[index];
+
+    if (!doc.exists) {
+      skippedOrders.push({
+        orderId,
+        reason: 'order_not_found',
+      });
+      return;
+    }
+
+    const order = {
+      id: doc.id,
+      ...doc.data(),
+    };
+
+    if (!isFinancePaidJkoOrder(order)) {
+      skippedOrders.push({
+        orderId,
+        reason: 'not_paid_jko_order',
+      });
+      return;
+    }
+
+    if (
+      String(order.settlementStatus || 'pending')
+        .trim()
+        .toLowerCase() === 'settled'
+    ) {
+      skippedOrders.push({
+        orderId,
+        reason: 'already_settled',
+      });
+      return;
+    }
+
+    const amounts =
+      getFinanceJkoAmounts(order);
+
+    if (amounts.payoutTotal <= 0) {
+      skippedOrders.push({
+        orderId,
+        reason: 'no_payout_amount',
+      });
+      return;
+    }
+
+    validOrders.push({
+      ref: doc.ref,
+      orderId,
+      ...amounts,
+    });
+
+    totalSettledAmount += amounts.payoutTotal;
+    totalRiderIncome += amounts.riderIncome;
+    totalAdvancePayment += amounts.advancePayment;
+  });
+
+  if (!validOrders.length) {
+    const error = new Error('NO_SETTLEMENT_ORDERS');
+    error.statusCode = 400;
+    error.skippedOrders = skippedOrders;
+    throw error;
+  }
+
+  const batch = db.batch();
+  const nowMs = Date.now();
+  const safeSettledBy = String(
+    settledBy || 'finance_center'
+  )
+    .trim()
+    .slice(0, 100);
+
+  validOrders.forEach(item => {
+    batch.set(
+      item.ref,
+      {
+        settlementStatus: 'settled',
+        settledAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        settledAtMs: nowMs,
+        settledBy: safeSettledBy,
+        // 正式應撥：騎士收入 + 騎士代墊
+        settledAmount: item.payoutTotal,
+        settledRiderIncome: item.riderIncome,
+        settledAdvancePayment: item.advancePayment,
+        settlementPaymentMethod: 'jko',
+        financialUpdatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        financialUpdatedAtMs: nowMs,
+      },
+      { merge: true }
+    );
+  });
+
+  await batch.commit();
+
+  return {
+    settledOrderCount: validOrders.length,
+    settledOrderIds: validOrders.map(item => item.orderId),
+    totalSettledAmount: Math.round(totalSettledAmount),
+    totalRiderIncome: Math.round(totalRiderIncome),
+    totalAdvancePayment: Math.round(totalAdvancePayment),
+    skippedOrderCount: skippedOrders.length,
+    skippedOrders,
+  };
+}
+
+// 單筆街口撥款：保留舊 API，相容既有財務中心／外部流程
 app.post('/api/admin/settle-order', async (req, res) => {
   try {
-    const { orderId } = req.body || {};
+    const orderId = String(
+      req.body?.orderId || ''
+    ).trim();
 
     if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: '缺少 orderId'
+        message: '缺少 orderId',
       });
     }
 
-    const ref = db.collection('orders').doc(orderId);
-    const doc = await ref.get();
-
-    if (!doc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: '找不到訂單'
-      });
-    }
-
-    const order = doc.data() || {};
-
-    if (order.status !== 'completed') {
-      return res.status(400).json({
-        success: false,
-        message: '只有已完成訂單可以結算'
-      });
-    }
-
-    if (String(order.settlementStatus || 'pending').toLowerCase() === 'settled') {
-      return res.status(409).json({
-        success: false,
-        message: '此訂單已完成結算，請勿重複操作'
-      });
-    }
-
-    const paymentMethod = String(
-      order.paymentMethod ||
-      order.payMethod ||
-      order.paymentType ||
-      order.payment ||
-      ''
-    ).toLowerCase();
-
-    const paymentStatus = String(order.paymentStatus || '').toLowerCase();
-
-    const isPaidJkoOrder =
-      paymentMethod === 'jko' &&
-      paymentStatus === 'paid_confirmed' &&
-      order.isPaid === true &&
-      order.isCashOrder !== true;
-
-    if (!isPaidJkoOrder) {
-      return res.status(400).json({
-        success: false,
-        message: '此訂單不是已付款街口支付訂單，不能標記為平台撥款結算'
-      });
-    }
-
-    const riderIncome = Number(
-      order.riderFee ||
-      order.driverFee ||
-      order.fee ||
-      0
-    );
-
-    if (riderIncome <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: '此訂單缺少正確的騎士收入，不能結算'
-      });
-    }
-
-    await ref.update({
-      settlementStatus: 'settled',
-      settledAt: admin.firestore.FieldValue.serverTimestamp(),
-      settledBy: 'admin',
-      settledAmount: riderIncome,
-      settlementPaymentMethod: 'jko'
+    const result = await settleFinanceJkoOrders({
+      orderIds: [orderId],
+      settledBy:
+        req.body?.settledBy ||
+        req.body?.operator ||
+        'finance_center',
     });
 
-    res.json({
+    return res.json({
       success: true,
-      message: '已完成結算',
+      message: '已完成街口撥款結算',
       orderId,
-      settledAmount: riderIncome
+      settledAmount: result.totalSettledAmount,
+      ...result,
     });
-
   } catch (err) {
     console.error('settle order error:', err);
-    res.status(500).json({
-      success: false,
-      message: '完成結算失敗',
-      error: err.message
+
+    const messageMap = {
+      SETTLEMENT_ORDER_IDS_REQUIRED: '缺少需要結算的訂單 ID。',
+      SETTLEMENT_TOO_MANY_ORDERS: '單次最多只能結算 200 筆訂單。',
+      NO_SETTLEMENT_ORDERS: '沒有可結算的街口支付訂單。',
+    };
+
+    return res
+      .status(Number(err.statusCode || 500))
+      .json({
+        success: false,
+        message:
+          messageMap[err.message] ||
+          '完成結算失敗',
+        skippedOrders:
+          err.skippedOrders || [],
+        error: err.message,
+      });
+  }
+});
+
+// 批次街口撥款：財務中心可一次確認同一小U全部待撥訂單
+app.post('/api/admin/settle-orders', async (req, res) => {
+  try {
+    const rawOrderIds = Array.isArray(req.body?.orderIds)
+      ? req.body.orderIds
+      : [req.body?.orderId];
+
+    const result = await settleFinanceJkoOrders({
+      orderIds: rawOrderIds,
+      settledBy:
+        req.body?.settledBy ||
+        req.body?.operator ||
+        'finance_center',
     });
+
+    return res.json({
+      success: true,
+      message: '街口待撥款已完成結算。',
+      ...result,
+    });
+  } catch (err) {
+    console.error('settle orders error:', err);
+
+    const messageMap = {
+      SETTLEMENT_ORDER_IDS_REQUIRED: '缺少需要結算的訂單 ID。',
+      SETTLEMENT_TOO_MANY_ORDERS: '單次最多只能結算 200 筆訂單。',
+      NO_SETTLEMENT_ORDERS: '沒有可結算的街口支付訂單。',
+    };
+
+    return res
+      .status(Number(err.statusCode || 500))
+      .json({
+        success: false,
+        message:
+          messageMap[err.message] ||
+          '批次結算失敗。',
+        skippedOrders:
+          err.skippedOrders || [],
+        error: err.message,
+      });
   }
 });
 
