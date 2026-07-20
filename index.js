@@ -6889,40 +6889,90 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       return Number.isFinite(n) ? n : null;
     };
 
-    const riderSnap = await db.collection('riders').limit(1000).get();
-    const riders = riderSnap.docs.map(doc => {
-      const r = doc.data() || {};
-      const locationUpdatedAtMs =
-        Number(r.locationUpdatedAtMs || r.lastActiveMs || 0) ||
-        toMs(r.locationUpdatedAt) ||
-        toMs(r.lastActive) ||
-        toMs(r.updatedAt);
+    // 調度中心必須保留「全部已審核小U」，不能因暫停接單或失聯而消失。
+    // 目前先支援最多 5,000 名，對應 UBee 台中 5,000 小U密度計畫。
+    const riderSnap = await db.collection('riders').limit(5000).get();
+    const allApprovedRiders = riderSnap.docs
+      .map(doc => {
+        const r = doc.data() || {};
+        const approved =
+          r.approved === true ||
+          String(r.status || '').trim().toLowerCase() === 'approved';
 
-      // 與正式騎士端相容：online 必須為 true；若有活動時間則限定 5 分鐘內。
-      const isFresh = !locationUpdatedAtMs || (nowMs - locationUpdatedAtMs) <= 5 * 60 * 1000;
-      const online = r.online === true && isFresh;
-      const busy = r.busy === true || !!String(r.currentOrderId || '').trim();
+        if (!approved) {
+          return null;
+        }
 
-      return {
-        riderId: r.riderId || doc.id,
-        riderDocId: doc.id,
-        name: r.name || r.riderName || '',
-        phone: r.phone || '',
-        district: r.district || r.cityDistrict || '',
-        serviceArea: r.serviceArea || r.area || '',
-        online,
-        busy,
-        currentOrderId: r.currentOrderId || '',
-        currentLat: asNumberOrNull(r.currentLat ?? r.lat ?? r.latitude),
-        currentLng: asNumberOrNull(r.currentLng ?? r.lng ?? r.longitude),
-        locationUpdatedAtMs,
-        locationAgeMs: locationUpdatedAtMs ? Math.max(0, nowMs - locationUpdatedAtMs) : null,
-        connectionState: locationUpdatedAtMs && (nowMs - locationUpdatedAtMs) > 2 * 60 * 1000
-          ? 'STALE_LOCATION'
-          : 'LIVE',
-        dispatchState: busy ? 'BUSY' : 'AVAILABLE'
-      };
-    }).filter(r => r.online);
+        // 「最後定位」與「最後活動」分開計算。
+        // 即使位置已經很舊，仍保留最後已知座標供調度中心辨識，但必須標示非即時。
+        const locationUpdatedAtMs =
+          Number(r.locationUpdatedAtMs || 0) ||
+          toMs(r.locationUpdatedAt) ||
+          toMs(r.currentLocation && r.currentLocation.updatedAt);
+
+        const lastActiveAtMs =
+          Number(r.lastActiveMs || r.onlineUpdatedAtMs || 0) ||
+          toMs(r.lastActive) ||
+          toMs(r.onlineUpdatedAt) ||
+          toMs(r.updatedAt) ||
+          locationUpdatedAtMs;
+
+        const declaredOnline =
+          r.acceptingOrders === true ||
+          (r.acceptingOrders !== false && r.online === true);
+
+        const isFresh =
+          !!lastActiveAtMs &&
+          (nowMs - lastActiveAtMs) >= 0 &&
+          (nowMs - lastActiveAtMs) <= 5 * 60 * 1000;
+
+        // online 是「此刻可視為在線」；declaredOnline 是騎士最後一次選擇是否願意接單。
+        const online = declaredOnline && isFresh;
+        const busy = r.busy === true || !!String(r.currentOrderId || '').trim();
+
+        let dispatchState = 'OFFLINE';
+        if (busy) {
+          dispatchState = 'BUSY';
+        } else if (online) {
+          dispatchState = 'AVAILABLE';
+        } else if (!declaredOnline) {
+          dispatchState = 'PAUSED';
+        }
+
+        let connectionState = 'UNKNOWN';
+        if (isFresh) {
+          connectionState = 'LIVE';
+        } else if (lastActiveAtMs) {
+          connectionState = 'STALE';
+        }
+
+        return {
+          riderId: r.riderId || doc.id,
+          riderDocId: doc.id,
+          name: r.name || r.riderName || '',
+          phone: r.phone || '',
+          district: r.district || r.cityDistrict || '',
+          serviceArea: r.serviceArea || r.area || '',
+          approved: true,
+          declaredOnline,
+          online,
+          acceptingOrders: online && !busy,
+          busy,
+          currentOrderId: r.currentOrderId || '',
+          currentLat: asNumberOrNull(r.currentLat ?? r.lat ?? r.latitude),
+          currentLng: asNumberOrNull(r.currentLng ?? r.lng ?? r.longitude),
+          locationUpdatedAtMs,
+          lastActiveAtMs,
+          locationAgeMs: locationUpdatedAtMs ? Math.max(0, nowMs - locationUpdatedAtMs) : null,
+          lastActiveAgeMs: lastActiveAtMs ? Math.max(0, nowMs - lastActiveAtMs) : null,
+          connectionState,
+          dispatchState
+        };
+      })
+      .filter(Boolean);
+
+    // 智慧候選與既有派單判斷只使用真正在線的小U，避免把暫停／離線者誤列為可派單。
+    const activeRiders = allApprovedRiders.filter(r => r.online);
 
     // 不使用複合索引，避免新環境第一次部署因 Firestore index 造成讀取失敗。
     let orderSnap;
@@ -7030,7 +7080,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
     });
 
     const intelligence = await buildDispatchIntelligence({
-      riders,
+      riders: activeRiders,
       allOrders,
       waitingStatuses,
       activeStatuses,
@@ -7059,8 +7109,12 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       success: true,
       generatedAtMs: nowMs,
       summary: {
-        onlineRiders: riders.length,
-        availableRiders: riders.filter(r => !r.busy).length,
+        totalRiders: allApprovedRiders.length,
+        onlineRiders: activeRiders.length,
+        availableRiders: activeRiders.filter(r => !r.busy).length,
+        busyRiders: allApprovedRiders.filter(r => r.dispatchState === 'BUSY').length,
+        pausedRiders: allApprovedRiders.filter(r => r.dispatchState === 'PAUSED').length,
+        offlineRiders: allApprovedRiders.filter(r => r.dispatchState === 'OFFLINE').length,
         waitingOrders: waitingOrders.length,
         activeOrders: activeOrders.length,
         todayCompleted,
@@ -7070,7 +7124,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         expectedGap15m: intelligence.summary?.expectedGap15m || 0
       },
       orders: enrichedLiveOrders,
-      riders: riders.slice(0, 300),
+      // 回傳全部已審核小U；前端自行以狀態分組／篩選。
+      riders: allApprovedRiders,
       alerts: alerts.slice(0, 100),
       intelligence
     });
@@ -7638,7 +7693,9 @@ function isOrderSkippedForRider(order = {}, identity = {}) {
     .some(key => skippedSet.has(key));
 }
 
-// ===== 騎手上線 / 下線狀態 API =====
+// ===== 騎手接單 / 暫停接單狀態 API =====
+// 相容既有 online 欄位：online=true 代表願意接單；online=false 代表暫停接單。
+// 注意：暫停接單只影響派單資格，不會讓小U從調度中心消失。
 // 手機登入正式版：支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
   try {
@@ -7667,13 +7724,18 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
     const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
 
+    const nowMs = Date.now();
     const updateData = {
+      // 保留 online 相容既有派單與騎士端；新增 acceptingOrders 讓語意更清楚。
       online,
+      acceptingOrders: online,
       busy: rider.busy === true ? true : false,
       currentOrderId: rider.currentOrderId || '',
-      lastActive: Date.now(),
-      onlineUpdatedAt: Date.now(),
-      onlineUpdatedAtMs: Date.now(),
+      lastActive: nowMs,
+      lastActiveMs: nowMs,
+      onlineUpdatedAt: nowMs,
+      onlineUpdatedAtMs: nowMs,
+      dispatchPresenceState: online ? 'ACCEPTING' : 'PAUSED',
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       lastIdentityMethod: phone || riderId ? 'phone' : 'line',
     };
@@ -7681,7 +7743,7 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
     if (!online && rider.busy === true && rider.currentOrderId) {
       return res.status(409).json({
         success: false,
-        message: '你目前有進行中的任務，完成後才能下線。',
+        message: '你目前有進行中的任務，完成後才能暫停接單。',
       });
     }
 
@@ -7694,7 +7756,7 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
 
     return res.json({
       success: true,
-      message: online ? '已上線。' : '已下線。',
+      message: online ? '已開始接單。' : '已暫停接單。',
       online,
       rider: {
         id: riderDoc.id,
