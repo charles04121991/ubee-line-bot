@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>UBee 我的訂單</title>
+  <title>UBee 我的任務</title>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -607,12 +607,12 @@
       <div class="header-left">
         <button class="back-btn" type="button" onclick="goBack()">‹</button>
         <div class="header-title">
-          <strong>我的訂單</strong>
-          <span>UBee 跑腿任務追蹤</span>
+          <strong>我的任務</strong>
+          <span>進行中與歷史任務</span>
         </div>
       </div>
 
-      <button class="refresh-btn" type="button" onclick="refreshPage()">更新</button>
+      <span class="refresh-btn" style="cursor:default;background:#ecfdf3;color:#15803d;">● 即時更新中</span>
     </header>
 
     <section class="profile-card" id="profileCard">
@@ -656,7 +656,7 @@
       </div>
     </section>
 
-    <section class="card" id="progressCard" style="display:none;">
+    <section class="card" id="progressCard" style="display:none!important;">
       <div class="card-title">
         <h2>流程進度圖</h2>
         <span id="progressText">第 1 / 7 步</span>
@@ -673,18 +673,18 @@
 
     <section class="card" id="timelineCard" style="display:none;">
       <div class="card-title">
-        <h2>任務流程</h2>
+        <h2>目前進度</h2>
         <span>即時狀態</span>
       </div>
 
       <div class="timeline" id="timeline"></div>
     </section>
 
-    <section class="card" id="detailCard" style="display:none;">
-      <div class="card-title">
+    <details class="card" id="detailCard" style="display:none;">
+      <summary class="card-title" style="cursor:pointer;list-style:none;">
         <h2>訂單資訊</h2>
         <span>任務摘要</span>
-      </div>
+      </summary>
 
       <div class="detail-list">
         <div class="detail-row">
@@ -712,7 +712,7 @@
           <div class="detail-value" id="feeInfo">待系統確認</div>
         </div>
       </div>
-    </section>
+    </details>
 
     <div class="notice" id="noticeBox" style="display:none;">
       此頁面會依照騎士接單、取件、配送與完成狀態，即時更新 UBee 跑腿訂單流程。
@@ -720,7 +720,7 @@
 
     <div class="actions">
       <button class="action-btn secondary" type="button" onclick="contactService()">聯絡客服</button>
-      <button class="action-btn primary" type="button" onclick="goOrderPage()">返回下單</button>
+      <button class="action-btn primary" type="button" onclick="goOrderPage()">回到 UBee 首頁</button>
     </div>
 
     <section class="empty-state" id="emptyState">
@@ -752,81 +752,20 @@
     let unsubscribeOrder = null;
 
     const steps = [
-      {
-        key: "pending_payment",
-        title: "等待付款",
-        shortTitle: "付款",
-        desc: "訂單已建立，正在等待付款確認。",
-        activeTitle: "等待付款確認",
-        activeDesc: "請完成付款或等待系統確認付款狀態。"
-      },
-      {
-        key: "pending_dispatch",
-        title: "等待派單",
-        shortTitle: "派單",
-        desc: "系統正在媒合附近可服務的 UBee 跑腿騎士。",
-        activeTitle: "正在等待騎士接單",
-        activeDesc: "系統正在尋找附近可服務的 UBee 跑腿騎士。"
-      },
-      {
-        key: "accepted",
-        title: "騎士已接單",
-        shortTitle: "接單",
-        desc: "騎士已接受任務，準備前往取件地點。",
-        activeTitle: "騎士已成功接單",
-        activeDesc: "您的任務已有騎士接單，騎士即將前往取件地點。"
-      },
-      {
-        key: "arrived_pickup",
-        title: "抵達取件",
-        shortTitle: "抵達",
-        desc: "騎士已抵達取件地點，正在確認任務內容。",
-        activeTitle: "騎士已抵達取件地點",
-        activeDesc: "騎士已到達取件地點，正在確認物品或任務內容。"
-      },
-      {
-        key: "picked_up",
-        title: "已完成取件",
-        shortTitle: "已取",
-        desc: "騎士已完成取件，準備開始配送。",
-        activeTitle: "騎士已完成取件",
-        activeDesc: "物品已由騎士取件完成，接下來會前往送達地點。"
-      },
-      {
-        key: "arrived_dropoff",
-        title: "抵達送達",
-        shortTitle: "送達",
-        desc: "騎士已抵達送達地點，正在完成交付。",
-        activeTitle: "騎士已抵達送達地點",
-        activeDesc: "騎士已抵達送達地點，正在完成最後交付。"
-      },
-      {
-        key: "completed",
-        title: "已完成",
-        shortTitle: "完成",
-        desc: "任務已完成，感謝您使用 UBee 跑腿。",
-        activeTitle: "訂單已完成",
-        activeDesc: "本次任務已完成，感謝您使用 UBee 跑腿。"
-      }
+      { key:"pending_dispatch", title:"任務已建立", shortTitle:"建立", desc:"任務已建立並進入 UBee 系統。", activeTitle:"正在為你處理任務", activeDesc:"系統正在同步目前任務狀態。" },
+      { key:"accepted", title:"小U已接單", shortTitle:"接單", desc:"小U已接受任務。", activeTitle:"小U已接下你的任務", activeDesc:"小U正在依任務進度前往指定地點。" },
+      { key:"arrived_pickup", title:"前往／抵達取件", shortTitle:"取件", desc:"小U前往取件地並完成取件。", activeTitle:"小U正在處理取件", activeDesc:"請保持聯絡方式暢通，系統會持續更新進度。" },
+      { key:"picked_up", title:"配送中", shortTitle:"配送", desc:"小U已完成取件並前往送達地。", activeTitle:"任務配送中", activeDesc:"小U正在前往送達地，預計時間以即時資料為準。" },
+      { key:"completed", title:"已完成", shortTitle:"完成", desc:"任務已完成。", activeTitle:"任務已完成", activeDesc:"感謝使用 UBee 跑腿。" }
     ];
 
     const statusAlias = {
-      draft_confirm: 0,
-      pending_payment: 0,
-
-      merchant_pending: 1,
-      pending_dispatch: 1,
-
-      accepted: 2,
-
-      arrived_pickup: 3,
-
-      picked_up: 4,
-
-      arrived_dropoff: 5,
-
-      completed: 6,
-      done: 6
+      draft_confirm:0, pending_payment:0, merchant_pending:0, merchant_preparing:0, merchant_ready:0, pending_dispatch:0,
+      accepted:1,
+      arrived_pickup:2,
+      picked_up:3,
+      arrived_dropoff:3,
+      completed:4, done:4
     };
 
     const activeStatuses = [
@@ -886,36 +825,43 @@
     }
 
     function getEtaText(order, status) {
-  const manualEta =
-    order.etaText ||
-    order.estimatedCompletionText ||
-    order.estimatedTimeText ||
-    order.eta ||
-    order.estimatedTime ||
-    "";
+      const manualEta =
+        order.etaText ||
+        order.estimatedCompletionText ||
+        order.estimatedTimeText ||
+        order.eta ||
+        order.estimatedTime ||
+        "";
 
-  // 如果後端或訂單資料已經有明確 ETA，優先使用後端資料
-  if (manualEta) {
-    return manualEta;
-  }
+      if (manualEta) return String(manualEta);
 
-  const map = {
-    draft_confirm: "等待確認",
-    pending_payment: "付款完成後開始媒合",
-    merchant_pending: "等待店家確認",
-    pending_dispatch: "媒合騎士中",
-    accepted: "約 30～45 分鐘",
-    arrived_pickup: "約 20～30 分鐘",
-    picked_up: "約 10～20 分鐘",
-    arrived_dropoff: "即將完成",
-    completed: "已完成",
-    done: "已完成",
-    cancelled: "已取消"
-  };
+      const distance =
+        order.riderToPickupDistanceText ||
+        order.riderToDropoffDistanceText ||
+        order.remainingDistanceText ||
+        order.distanceToPickupText ||
+        order.distanceToDropoffText ||
+        "";
 
-  return map[status] || "約 35 分鐘";
-}
-    
+      if (distance) return `剩餘 ${distance}`;
+
+      const map = {
+        draft_confirm: "等待確認",
+        pending_payment: "等待付款確認",
+        merchant_pending: "等待店家確認",
+        pending_dispatch: "正在媒合小U",
+        accepted: "正在計算抵達時間",
+        arrived_pickup: "小U已抵達取件地",
+        picked_up: "正在計算送達時間",
+        arrived_dropoff: "即將完成",
+        completed: "已完成",
+        done: "已完成",
+        cancelled: "已取消"
+      };
+
+      return map[status] || "正在同步即時進度";
+    }
+
     function getRiderInfo(order) {
       if (order.riderName) return order.riderName;
       if (order.riderDisplayName) return order.riderDisplayName;
@@ -1208,10 +1154,10 @@
 
     function refreshPage() {
       if (currentOrderId) {
-        showToast("已更新訂單進度");
+        listenOrder(currentOrderId);
+        showToast("已重新同步即時進度");
         return;
       }
-
       initApp();
     }
 
