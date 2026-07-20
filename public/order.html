@@ -8326,77 +8326,61 @@ body{background:#eef0f2;}
 }
 
 .home-primary-service-grid{
-  display:flex;
-  align-items:flex-start;
-  gap:6px;
-  overflow-x:auto;
-  overflow-y:hidden;
-  margin:7px -16px 14px;
-  padding:3px 12px 9px;
-  scrollbar-width:none;
-  -webkit-overflow-scrolling:touch;
-  scroll-snap-type:x proximity;
-  overscroll-behavior-x:contain;
-}
-
-.home-primary-service-grid::-webkit-scrollbar{
-  display:none;
-}
-
-.home-primary-service-grid::after{
-  content:"";
-  flex:0 0 4px;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:15px 0;
 }
 
 .home-primary-service-card{
-  flex:0 0 68px;
-  min-width:68px;
-  min-height:76px;
+  min-width:0;
+  min-height:122px;
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:flex-start;
-  gap:5px;
-  padding:6px 3px 5px;
-  border:none;
-  border-radius:14px;
-  background:transparent;
+  justify-content:center;
+  gap:6px;
+  padding:14px 8px 12px;
+  border:1px solid #e6e7e9;
+  border-radius:20px;
+  background:#fff;
   color:#111;
-  box-shadow:none;
-  scroll-snap-align:start;
-  transition:transform .15s ease, background .15s ease;
+  box-shadow:0 5px 18px rgba(17,24,39,.045);
 }
 
 .home-primary-service-card:active{
-  transform:scale(.96);
-  background:#f7f7f7;
+  transform:scale(.98);
 }
 
 .home-primary-service-icon{
   display:flex;
   align-items:center;
   justify-content:center;
-  width:38px;
-  height:38px;
-  margin:0;
-  border-radius:12px;
-  background:#fff5c4;
-  font-size:22px;
+  width:52px;
+  height:52px;
+  margin-bottom:2px;
+  border-radius:16px;
+  background:#fff7cf;
+  font-size:29px;
   line-height:1;
 }
 
 .home-primary-service-card strong{
-  width:100%;
-  color:#222;
-  font-size:11px;
-  font-weight:950;
-  line-height:1.25;
-  text-align:center;
+  font-size:16px;
+  font-weight:1000;
   white-space:nowrap;
 }
 
 .home-primary-service-card small{
-  display:none;
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  color:#8b9096;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.4;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
 .home-service-status-simple{
@@ -8972,31 +8956,418 @@ body{background:#eef0f2;}
 
 @media(max-width:360px){
   .home-primary-service-grid{
-    gap:4px;
-    padding-left:10px;
-    padding-right:10px;
+    gap:7px;
   }
 
   .home-primary-service-card{
-    flex-basis:64px;
-    min-width:64px;
-    min-height:72px;
-    padding-left:2px;
-    padding-right:2px;
+    min-height:112px;
+    padding-left:5px;
+    padding-right:5px;
   }
 
   .home-primary-service-card strong{
-    font-size:10px;
+    font-size:14px;
   }
 
   .home-primary-service-icon{
-    width:36px;
-    height:36px;
-    font-size:21px;
+    width:46px;
+    height:46px;
+    font-size:25px;
   }
 
   .service-hub-grid{
     gap:8px;
+  }
+}
+
+
+/* =========================================================
+   UBee 首頁服務列｜最終精修覆寫
+   目的：小圖示、單排橫向滑動、直接露出更多常用服務
+   只調整首頁視覺，不改 API / serviceGroup / 後端資料流
+   ========================================================= */
+
+#homeLandingPanel .home-service-search{
+  display:none !important;
+}
+
+#homeLandingPanel .home-primary-service-grid{
+  display:flex !important;
+  grid-template-columns:none !important;
+  align-items:flex-start !important;
+  gap:8px !important;
+  overflow-x:auto !important;
+  overflow-y:hidden !important;
+  margin:4px -16px 10px !important;
+  padding:4px 14px 8px !important;
+  scrollbar-width:none !important;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+  overscroll-behavior-x:contain;
+}
+
+#homeLandingPanel .home-primary-service-grid::-webkit-scrollbar{
+  display:none !important;
+}
+
+#homeLandingPanel .home-primary-service-grid::after{
+  content:"";
+  flex:0 0 6px;
+}
+
+#homeLandingPanel .home-primary-service-card{
+  flex:0 0 64px !important;
+  width:64px !important;
+  min-width:64px !important;
+  min-height:68px !important;
+  height:auto !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:5px !important;
+  padding:4px 2px 5px !important;
+  border:none !important;
+  border-radius:12px !important;
+  background:transparent !important;
+  color:#111 !important;
+  box-shadow:none !important;
+  scroll-snap-align:start;
+  transition:transform .14s ease, background .14s ease !important;
+}
+
+#homeLandingPanel .home-primary-service-card:active{
+  transform:scale(.95) !important;
+  background:#f5f5f5 !important;
+}
+
+#homeLandingPanel .home-primary-service-icon{
+  width:36px !important;
+  height:36px !important;
+  margin:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  border:1px solid #ece7ce !important;
+  border-radius:12px !important;
+  background:#fffaf0 !important;
+  font-size:21px !important;
+  line-height:1 !important;
+  box-shadow:none !important;
+}
+
+#homeLandingPanel .home-primary-service-card strong{
+  width:100% !important;
+  margin:0 !important;
+  color:#333 !important;
+  font-size:10.5px !important;
+  font-weight:900 !important;
+  line-height:1.25 !important;
+  text-align:center !important;
+  letter-spacing:-.15px !important;
+  white-space:nowrap !important;
+}
+
+#homeLandingPanel .home-primary-service-card small{
+  display:none !important;
+}
+
+@media(max-width:380px){
+  #homeLandingPanel .home-primary-service-grid{
+    gap:6px !important;
+    padding-left:12px !important;
+    padding-right:12px !important;
+  }
+
+  #homeLandingPanel .home-primary-service-card{
+    flex-basis:61px !important;
+    width:61px !important;
+    min-width:61px !important;
+  }
+}
+
+
+/* =========================================================
+   UBee STEP 2｜消費者版精簡資訊頁最終覆寫
+   ========================================================= */
+
+#step2{
+  padding-top:8px !important;
+  padding-bottom:132px !important;
+}
+
+#step2 .step2-mini-progress{
+  margin:6px 0 18px;
+}
+
+#step2 .step2-mini-progress-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+  color:#777c82;
+  font-size:11px;
+  font-weight:900;
+}
+
+#step2 .step2-mini-progress-top strong{
+  color:#333;
+  font-size:12px;
+  font-weight:1000;
+}
+
+#step2 .step2-mini-progress-track{
+  height:4px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#e9eaec;
+}
+
+#step2 .step2-mini-progress-track span{
+  display:block;
+  width:50%;
+  height:100%;
+  border-radius:999px;
+  background:var(--accentStrong);
+}
+
+#step2 .headline{
+  margin:0 0 5px !important;
+  font-size:25px !important;
+  line-height:1.25 !important;
+}
+
+#step2 > .subtext{
+  margin-bottom:14px !important;
+  font-size:12.5px !important;
+  line-height:1.6 !important;
+}
+
+#step2 .step2-task-summary{
+  margin:0 0 12px !important;
+  padding:11px 13px !important;
+  border:1px solid #ececef !important;
+  border-radius:14px !important;
+  background:#fafafa !important;
+  box-shadow:none !important;
+}
+
+#step2 .step2-task-summary::before{
+  display:none !important;
+}
+
+#step2 .step2-task-summary .task-path-title{
+  margin-bottom:3px !important;
+  color:#999da2 !important;
+  font-size:10px !important;
+}
+
+#step2 .step2-task-summary .task-path-value{
+  color:#222 !important;
+  font-size:13px !important;
+  line-height:1.45 !important;
+}
+
+#step2 .task-category-step2{
+  margin:0 0 12px !important;
+}
+
+#step2 #serviceCategoryBox{
+  margin:0 !important;
+  padding:0 !important;
+  border:none !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+#step2 #serviceCategoryTitle{
+  display:none !important;
+}
+
+#step2 #serviceCategoryGrid{
+  display:flex !important;
+  gap:7px !important;
+  overflow-x:auto !important;
+  overflow-y:hidden !important;
+  padding:1px 0 4px !important;
+  scrollbar-width:none !important;
+  -webkit-overflow-scrolling:touch;
+}
+
+#step2 #serviceCategoryGrid::-webkit-scrollbar{
+  display:none !important;
+}
+
+#step2 #serviceCategoryGrid .category-choice-item{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-height:34px !important;
+  padding:8px 11px !important;
+  border:1px solid #e5e6e8 !important;
+  border-radius:999px !important;
+  background:#f6f6f7 !important;
+  color:#6f7378 !important;
+  box-shadow:none !important;
+  font-size:11px !important;
+  font-weight:900 !important;
+  line-height:1.2 !important;
+  white-space:nowrap !important;
+}
+
+#step2 #serviceCategoryGrid .category-choice-item.active{
+  border-color:#e0b300 !important;
+  background:#fff4bf !important;
+  color:#111 !important;
+  box-shadow:none !important;
+}
+
+#step2 .quick-guide{
+  margin:0 0 13px !important;
+  padding:10px 12px !important;
+  border-radius:13px !important;
+  background:#fffbed !important;
+  box-shadow:none !important;
+}
+
+#step2 .quick-guide-title{
+  margin-bottom:3px !important;
+  font-size:11px !important;
+}
+
+#step2 .quick-guide-text{
+  font-size:11px !important;
+  line-height:1.55 !important;
+}
+
+#step2 .form-section{
+  margin:0 0 14px !important;
+}
+
+#step2 .form-title{
+  margin:0 0 7px !important;
+  font-size:13px !important;
+}
+
+#step2 .input-card{
+  border-radius:16px !important;
+  box-shadow:none !important;
+}
+
+#step2 .input-wrap{
+  min-height:54px !important;
+  padding:11px 13px !important;
+  gap:10px !important;
+}
+
+#step2 .input-icon{
+  width:27px !important;
+  height:27px !important;
+  flex:0 0 27px !important;
+  border-radius:9px !important;
+  background:#f2f3f4 !important;
+  color:#60646a !important;
+  font-size:11px !important;
+}
+
+#step2 input,
+#step2 textarea,
+#step2 select{
+  font-size:15px !important;
+}
+
+#step2 .step2-note-card .input-wrap{
+  align-items:flex-start !important;
+}
+
+#step2 .step2-note-card .input-icon{
+  margin-top:2px;
+}
+
+#step2 textarea{
+  min-height:96px !important;
+  line-height:1.6 !important;
+}
+
+#step2 .step2-more-details{
+  margin:2px 0 16px;
+  overflow:hidden;
+  border:1px solid #e7e8ea;
+  border-radius:16px;
+  background:#fff;
+}
+
+#step2 .step2-more-details > summary{
+  min-height:62px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  list-style:none;
+  cursor:pointer;
+}
+
+#step2 .step2-more-details > summary::-webkit-details-marker{
+  display:none;
+}
+
+#step2 .step2-more-details > summary span{
+  min-width:0;
+  display:block;
+}
+
+#step2 .step2-more-details > summary strong{
+  display:block;
+  color:#222;
+  font-size:14px;
+  font-weight:1000;
+}
+
+#step2 .step2-more-details > summary small{
+  display:block;
+  margin-top:3px;
+  color:#93979c;
+  font-size:10.5px;
+  font-weight:800;
+}
+
+#step2 .step2-more-details > summary b{
+  color:#777b80;
+  font-size:20px;
+  font-weight:500;
+  transition:transform .15s ease;
+}
+
+#step2 .step2-more-details[open] > summary b{
+  transform:rotate(45deg);
+}
+
+#step2 .step2-more-details-body{
+  padding:0 13px 13px;
+  border-top:1px solid #f0f1f2;
+}
+
+#step2 .step2-more-details-body > .form-section:first-child{
+  padding-top:13px;
+}
+
+#step2 .step2-advance-guide{
+  margin-bottom:0 !important;
+}
+
+#step2 .step2-action-footer{
+  border-radius:18px !important;
+}
+
+@media(max-width:380px){
+  #step2 .headline{
+    font-size:23px !important;
+  }
+
+  #step2 .step2-action-footer{
+    grid-template-columns:96px minmax(0,1fr) !important;
   }
 }
 
@@ -9227,35 +9598,50 @@ body{background:#eef0f2;}
             </button>
           </div>
 
-          <div class="home-primary-service-grid" aria-label="主要服務，可左右滑動查看更多">
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')" aria-label="幫我送">
+          <div class="home-primary-service-grid" aria-label="常用服務，可左右滑動查看更多">
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')">
               <span class="home-primary-service-icon">📦</span>
               <strong>幫我送</strong>
             </button>
 
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')" aria-label="幫我取">
-              <span class="home-primary-service-icon">🤲</span>
-              <strong>幫我取</strong>
-            </button>
-
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('buy')" aria-label="幫我買">
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('buy')">
               <span class="home-primary-service-icon">🛍️</span>
               <strong>幫我買</strong>
             </button>
 
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')" aria-label="幫排隊">
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')">
+              <span class="home-primary-service-icon">🤲</span>
+              <strong>幫我取</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="applyCustomerHomeService({icon:'📄',title:'文件急送',group:'send',type:'文件急送',category:'一般文件'})">
+              <span class="home-primary-service-icon">📄</span>
+              <strong>文件急送</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="applyCustomerHomeService({icon:'🎂',title:'蛋糕花束',group:'send',type:'禮品配送',category:'蛋糕'})">
+              <span class="home-primary-service-icon">🎂</span>
+              <strong>蛋糕花束</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="applyCustomerHomeService({icon:'💊',title:'藥品代買',group:'buy',type:'藥局代買',category:'一般藥局'})">
+              <span class="home-primary-service-icon">💊</span>
+              <strong>藥品代買</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="applyCustomerHomeService({icon:'⏱️',title:'幫我排隊',group:'queue',type:'現場排隊',category:'一般排隊'})">
               <span class="home-primary-service-icon">⏱️</span>
-              <strong>幫排隊</strong>
+              <strong>幫我排隊</strong>
             </button>
 
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')" aria-label="全能跑腿">
-              <span class="home-primary-service-icon">⭐</span>
-              <strong>全能跑腿</strong>
-            </button>
-
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')" aria-label="急件專送">
+            <button class="home-primary-service-card" type="button" onclick="applyCustomerHomeService({icon:'⚡',title:'急件專送',group:'urgent',type:'急件專送',category:'限時取送'})">
               <span class="home-primary-service-icon">⚡</span>
               <strong>急件專送</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="applyCustomerHomeService({icon:'⭐',title:'全能跑腿',group:'helper',type:'全能跑腿',category:'臨時協助'})">
+              <span class="home-primary-service-icon">⭐</span>
+              <strong>全能跑腿</strong>
             </button>
           </div>
 
@@ -9381,74 +9767,64 @@ body{background:#eef0f2;}
 
     <section class="step" id="step2">
 
-      <div class="ubee-v3-progress" aria-label="下單進度：填寫資訊">
-        <div class="ubee-v3-progress-track">
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
-          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
-          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
-          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+      <div class="step2-mini-progress" aria-label="下單進度：第 2 步，共 4 步">
+        <div class="step2-mini-progress-top">
+          <span>2 / 4</span>
+          <strong>任務資訊</strong>
         </div>
+        <div class="step2-mini-progress-track"><span></span></div>
       </div>
 
-      <div class="headline">補充任務資訊</div>
+      <div class="headline">告訴小U要做什麼</div>
       <div class="subtext">
-        請完成這筆任務的聯絡方式、需求內容與其他必要資訊。
-    </div>
+        把任務內容和聯絡方式填好，其他需求有需要再補充就可以。
+      </div>
 
-      <div class="task-path-box">
-        <div class="task-path-title">已選任務</div>
+      <div class="task-path-box step2-task-summary">
+        <div class="task-path-title">目前選擇</div>
         <div class="task-path-value" id="taskPathText">幫我送｜文件急送｜一般文件</div>
       </div>
 
       <div class="form-section task-category-step2">
-
-  <div class="form-title">
-    任務分類
-  </div>
-
-  <div
-    id="serviceCategoryBox"
-    class="category-choice-box hidden"
-  >
-
-    <div
-      class="category-choice-title"
-      id="serviceCategoryTitle"
-    >
-      請選擇分類
-    </div>
-
-    <div
-      class="category-choice-grid"
-      id="serviceCategoryGrid"
-    ></div>
-
-  </div>
-
-</div>
+        <div id="serviceCategoryBox" class="category-choice-box hidden">
+          <div class="category-choice-title" id="serviceCategoryTitle">請選擇分類</div>
+          <div class="category-choice-grid" id="serviceCategoryGrid"></div>
+        </div>
+      </div>
 
       <div id="buyGuide" class="quick-guide hidden">
         <div class="quick-guide-title">代買提醒</div>
-        <div class="quick-guide-text">請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與購買注意事項。若需要 小U 先代墊，請填寫正確金額；沒有代墊請填 0。代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。</div>
+        <div class="quick-guide-text">商品名稱、規格與替代方式寫清楚即可；需要小U代墊時，再到「更多需求」填寫金額。</div>
       </div>
 
       <div id="queueGuide" class="quick-guide hidden">
         <div class="quick-guide-title">排隊提醒</div>
-        <div class="quick-guide-text">請填寫排隊位置、要排到什麼程度、是否需要拍照回報。排隊費會依預估等候時間計算。</div>
+        <div class="quick-guide-text">請說明排隊位置、要排到什麼程度，以及是否需要拍照回報。</div>
       </div>
 
       <div id="helperGuide" class="quick-guide hidden">
-        <div class="quick-guide-title">全能跑腿提醒</div>
-        <div class="quick-guide-text">請把任務內容、完成標準、注意事項寫清楚。UBee 跑腿不承接法律、金融、證件、授權簽署或高風險委託事項。</div>
+        <div class="quick-guide-title">跑腿提醒</div>
+        <div class="quick-guide-text">把要完成的事情、完成標準與重要注意事項寫清楚即可。</div>
       </div>
 
       <div id="urgentGuide" class="quick-guide hidden">
-        <div class="quick-guide-title">急件專送提醒</div>
-        <div class="quick-guide-text">急件專送適合小包裹、餐點、店家商品與生活用品等較高急迫性的配送任務，不屬於代辦服務。</div>
+        <div class="quick-guide-title">急件提醒</div>
+        <div class="quick-guide-text">請在任務內容補充急件內容與重要時間要求，方便小U快速判斷。</div>
+      </div>
+
+      <div class="form-section step2-main-task-section">
+        <div class="form-title" id="noteTitle">要小U幫你做什麼？</div>
+        <div class="input-card step2-note-card">
+          <input id="item" type="hidden" value="">
+          <div class="input-wrap" id="noteWrap">
+            <div class="input-icon">寫</div>
+            <textarea id="note" maxlength="300" placeholder="例如：到公司櫃台取一份文件，再送到指定地址；抵達後請先打電話。"></textarea>
+          </div>
+        </div>
       </div>
 
       <div class="form-section">
-        <div class="form-title">聯絡資訊</div>
+        <div class="form-title">聯絡方式</div>
         <div class="input-card">
           <div class="input-wrap">
             <div class="input-icon">取</div>
@@ -9475,96 +9851,72 @@ body{background:#eef0f2;}
         </div>
       </div>
 
-      <div class="form-section">
-        <div class="form-title">交付需求</div>
-        <div class="input-card">
-          <div class="input-wrap">
-            <div class="input-icon">樓</div>
-            <select id="upstairsOption">
-              <option value="none">不用上樓，門口交付</option>
-              <option value="elevator">需要上樓，有電梯（+20）</option>
-              <option value="no_elevator">需要上樓，無電梯（+30）</option>
-              <option value="heavy">重物／大量物品，需人工確認</option>
-            </select>
+      <details class="step2-more-details">
+        <summary>
+          <span>
+            <strong>更多需求</strong>
+            <small>上樓、商品清單、代墊費用等</small>
+          </span>
+          <b>＋</b>
+        </summary>
+
+        <div class="step2-more-details-body">
+          <div class="form-section">
+            <div class="form-title">交付需求</div>
+            <div class="input-card">
+              <div class="input-wrap">
+                <div class="input-icon">樓</div>
+                <select id="upstairsOption">
+                  <option value="none">不用上樓，門口交付</option>
+                  <option value="elevator">需要上樓，有電梯（+20）</option>
+                  <option value="no_elevator">需要上樓，無電梯（+30）</option>
+                  <option value="heavy">重物／大量物品，需人工確認</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section hidden" id="shoppingListSection">
+            <div class="form-title-row">
+              <div class="form-title">商品清單</div>
+              <button class="mini-action" type="button" onclick="UBeeEnhancements.addShoppingItem()">＋ 新增商品</button>
+            </div>
+            <div id="shoppingList" class="shopping-list"></div>
+            <div class="field-help">代買任務可逐項填寫品名、數量、預算與缺貨處理。</div>
+          </div>
+
+          <div class="form-section" id="advancePaymentBox">
+            <div class="form-title">代墊費用</div>
+            <div class="input-card">
+              <div class="input-wrap">
+                <div class="input-icon">$</div>
+                <input id="advancePayment" type="text" inputmode="numeric" pattern="[0-9]*" value="0" placeholder="沒有代墊請填 0">
+              </div>
+            </div>
+          </div>
+
+          <div id="advanceRuleBox" class="quick-guide step2-advance-guide">
+            <div class="quick-guide-title">代墊提醒</div>
+            <div class="quick-guide-text">沒有代墊請維持 0；代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。</div>
           </div>
         </div>
-      </div>
+      </details>
 
-      <div class="form-section">
-        <div class="form-title" id="noteTitle">備註</div>
-        <div class="input-card">
-          <input id="item" type="hidden" value="">
-          <div class="input-wrap" id="noteWrap">
-            <div class="input-icon">寫</div>
-            <textarea id="note" maxlength="300" placeholder="請填寫品項、數量、規格、地點補充、注意事項"></textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-section" id="shoppingListSection">
-        <div class="form-title-row"><div class="form-title">商品清單</div><button class="mini-action" type="button" onclick="UBeeEnhancements.addShoppingItem()">＋ 新增商品</button></div>
-        <div id="shoppingList" class="shopping-list"></div>
-        <div class="field-help">代買任務可逐項填寫品名、數量、預算與缺貨處理；非代買任務可不填。</div>
-      </div>
-
-      <div class="form-section" id="advancePaymentBox">
-        <div class="form-title">代墊費用</div>
-        <div class="input-card">
-          <div class="input-wrap">
-            <div class="input-icon">$</div>
-            <input id="advancePayment" type="text" inputmode="numeric" pattern="[0-9]*" value="0" placeholder="沒有代墊請填 0">
-          </div>
-        </div>
-      </div>
-
-      <div id="advanceRuleBox" class="quick-guide">
-        <div class="quick-guide-title">代墊費用提醒</div>
-        <div class="quick-guide-text">若任務需要 小U 先代墊商品費、餐點費或其他必要費用，請填寫正確金額；沒有代墊請填 0。代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。</div>
-      </div>
       <div class="step2-action-footer">
+        <button class="step2-back-btn" type="button" onclick="goPrev()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6"></path>
+          </svg>
+          <span>上一步</span>
+        </button>
 
-  <button
-    class="step2-back-btn"
-    type="button"
-    onclick="goPrev()"
-  >
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2.2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M15 18l-6-6 6-6"></path>
-    </svg>
-
-    <span>上一步</span>
-  </button>
-
-
-  <button
-    class="step2-next-btn"
-    type="button"
-    onclick="goNext()"
-  >
-    繼續下一步
-
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2.2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M9 18l6-6-6-6"></path>
-    </svg>
-  </button>
-
-</div>
+        <button class="step2-next-btn" type="button" onclick="goNext()">
+          繼續下一步
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 18l6-6-6-6"></path>
+          </svg>
+        </button>
+      </div>
 
     </section>
 
@@ -13723,6 +14075,7 @@ function applyDynamicFields(){
 
   qs('advancePaymentBox')?.classList.remove('hidden');
   qs('advanceRuleBox')?.classList.remove('hidden');
+  qs('shoppingListSection')?.classList.toggle('hidden', !isBuy);
   qs('noteWrap')?.classList.remove('hidden');
 
   if(qs('pickupTitle')){
