@@ -868,7 +868,58 @@
         font-size:21px;
       }
     }
-  </style>
+  
+/* 2026-07-20｜UBee 跑腿夥伴申請新版精簡 */
+.page{max-width:620px;padding:14px 14px 42px}
+.topbar{margin-bottom:10px}
+.logoU{width:44px;height:44px;border-radius:14px;font-size:25px}
+.brandText b{font-size:23px}
+.brandText span{font-size:11px;letter-spacing:.4px;text-transform:none}
+.hero{padding:24px 20px;border-radius:26px;margin-bottom:12px}
+.heroBadge{margin-bottom:12px;letter-spacing:.6px}
+h1{font-size:34px;margin-bottom:10px}
+.heroText{font-size:14px;line-height:1.7;margin-bottom:18px}
+.heroActions{display:grid;grid-template-columns:1fr;gap:8px}
+.heroBtn{border-radius:16px;width:100%;min-height:52px}
+.heroSubNote{text-align:center;font-size:12px}
+.quickStats{grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+.quickStat{min-height:94px;padding:12px;border-radius:17px}
+.quickIcon{font-size:20px}
+.quickTitle{font-size:13px}.quickText{font-size:11px}
+.processCard{border-radius:22px;padding:15px;margin-bottom:12px}
+.steps{grid-template-columns:repeat(3,1fr)}
+.step{min-height:92px;border-radius:16px;padding:12px 9px}
+.mainCard{border-radius:26px;padding:18px}
+.noticeBox{border-radius:18px;padding:14px;margin-bottom:20px}
+.noticeIcon{width:38px;height:38px;border-radius:12px}
+.noticeText{font-size:13px;line-height:1.65}.noticeText b{font-size:16px}
+.section{margin-top:24px}
+.sectionTitle{font-size:21px}
+.fieldGrid{grid-template-columns:1fr;gap:10px}
+.field{min-height:82px;border-radius:17px;padding:12px 14px}
+input,select,textarea{font-size:16px}
+.formHint{font-size:12px;border-radius:14px}
+.agreeGrid{grid-template-columns:1fr;gap:8px}
+.agreeBox{min-height:auto;border-radius:17px;padding:14px}
+.agreeIcon{width:36px;height:36px;border-radius:12px;font-size:18px}
+.agreeTitle{font-size:15px}
+.agreeDesc{font-size:12px;line-height:1.65}
+.finalAgreeBox{border-radius:18px;padding:14px}
+.agreeBtn{min-height:54px;border-radius:16px;font-size:15px}
+.note{font-size:12px;border-radius:15px;padding:13px}
+.submitBtn{min-height:60px;border-radius:18px;font-size:18px;background:var(--accent);color:#111}
+.footer{font-size:12px}
+@media(max-width:420px){
+  .quickStats{grid-template-columns:1fr 1fr 1fr}
+  .quickStat{display:block;min-height:100px}
+  .quickIcon{width:auto;margin-bottom:5px}
+  .steps{grid-template-columns:1fr 1fr 1fr}
+  .stepText{display:none}
+  .step{min-height:72px}
+  h1{font-size:31px}
+}
+
+</style>
 </head>
 
 <body>
@@ -880,7 +931,7 @@
       <div class="logoU">U</div>
       <div class="brandText">
         <b>UBee</b>
-        <span>City Task Platform</span>
+        <span>UBee 跑腿合作夥伴</span>
       </div>
     </div>
 
@@ -892,12 +943,12 @@
 
   <div class="hero">
     <div class="heroInner">
-      <div class="heroBadge">UBee Partner Application</div>
+      <div class="heroBadge">UBee 跑腿夥伴招募</div>
 
-      <h1>加入 UBee<br>跑腿合作夥伴</h1>
+      <h1>成為 UBee 小U</h1>
 
       <p class="heroText">
-        彈性接單、自由安排時間，加入 UBee 城市任務平台，一起完成文件急送、代買代送、物品取送與即時任務。
+        自由安排上線時間，依自己的狀況選擇是否接任務。完成審核後，即可使用 UBee 騎士端接收附近跑腿任務。
       </p>
 
       <div class="heroActions">
@@ -911,49 +962,31 @@
       </div>
 
       <div class="quickStats">
-        <div class="quickStat">
-          <div class="quickIcon">⏱️</div>
-          <div>
-            <div class="quickTitle">時間彈性</div>
-            <div class="quickText">可依自己的時間安排上線與接單。</div>
-          </div>
-        </div>
-
-        <div class="quickStat">
-          <div class="quickIcon">💰</div>
-          <div>
-            <div class="quickTitle">任務收入</div>
-            <div class="quickText">依實際完成任務進行報酬結算。</div>
-          </div>
-        </div>
-
-        <div class="quickStat">
-          <div class="quickIcon">🛡️</div>
-          <div>
-            <div class="quickTitle">平台規範</div>
-            <div class="quickText">審核通過後，依照平台流程接案。</div>
-          </div>
-        </div>
+        <div class="quickStat"><div class="quickIcon">⏱️</div><div><div class="quickTitle">自由上線</div><div class="quickText">有空再上線，不強制排班。</div></div></div>
+        <div class="quickStat"><div class="quickIcon">📍</div><div><div class="quickTitle">附近任務</div><div class="quickText">依你的服務區域接收可承接任務。</div></div></div>
+        <div class="quickStat"><div class="quickIcon">💰</div><div><div class="quickTitle">收入透明</div><div class="quickText">接單前先看任務與報酬，再決定是否承接。</div></div></div>
       </div>
+    </div>
+  </div>
     </div>
   </div>
 
   <div class="processCard">
     <div class="processTitle">
       <b>申請流程</b>
-      <span>約 1～3 分鐘完成填寫</span>
+      <span>約 2～3 分鐘</span>
     </div>
 
     <div class="steps">
-      <div class="step">
-        <div class="stepNo">1</div>
-        <div class="stepTitle">填寫基本資料</div>
-        <div class="stepText">留下姓名、手機、LINE ID 與居住地區。</div>
-      </div>
+      <div class="step"><div class="stepNo">1</div><div class="stepTitle">填寫資料</div><div class="stepText">你的資料、配送工具與服務區域。</div></div>
+      <div class="step"><div class="stepNo">2</div><div class="stepTitle">確認規範</div><div class="stepText">閱讀合作方式與平台規範。</div></div>
+      <div class="step"><div class="stepNo">3</div><div class="stepTitle">等待審核</div><div class="stepText">審核通過後即可進入騎士端。</div></div>
+    </div>
+  </div>
 
       <div class="step">
         <div class="stepNo">2</div>
-        <div class="stepTitle">填寫配送資料</div>
+        <div class="stepTitle">填寫接單設定</div>
         <div class="stepText">提供配送工具、車牌、服務區域與時段。</div>
       </div>
 
@@ -977,7 +1010,7 @@
       <div class="noticeIcon">✓</div>
       <div class="noticeText">
         <b>申請前請先確認</b>
-        UBee 合作夥伴為接案合作性質，非僱傭關係。申請資料將用於合作審核，不會對外公開。送出後請等待 UBee 審核，審核通過後才可以接單。
+        申請資料只用於 UBee 合作審核與必要營運聯繫。完成審核後，才會開通騎士端接單資格。
       </div>
     </div>
 
@@ -1051,7 +1084,7 @@
       <div class="section">
         <div class="sectionHeader">
           <h2 class="sectionTitle">配送資料</h2>
-          <div class="sectionHint">用於任務媒合與派單判斷</div>
+          <div class="sectionHint">設定你方便接單的方式</div>
         </div>
 
         <div class="fieldGrid">
@@ -1103,8 +1136,8 @@
 
       <div class="section">
         <div class="sectionHeader">
-          <h2 class="sectionTitle">合作規範確認</h2>
-          <div class="sectionHint">請閱讀後再送出</div>
+          <h2 class="sectionTitle">合作規範</h2>
+          <div class="sectionHint">送出前請確認</div>
         </div>
 
         <div class="agreeGrid">
