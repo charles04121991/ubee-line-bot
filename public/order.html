@@ -8281,6 +8281,556 @@ body{background:#eef0f2;}
   #step5 .step5-order-menu-popover{width:154px;}
 }
 
+
+/* =========================================================
+   UBee 客人端｜Uber 式即時任務首頁 + 三大服務入口
+   2026-07：只重組前端資訊架構，不改正式後端資料流
+   ========================================================= */
+
+#step1 .task-sheet{
+  padding-bottom:104px;
+}
+
+.home-landing-title{
+  margin:2px 0 14px;
+  color:#111;
+  font-size:26px;
+  font-weight:1000;
+  letter-spacing:-.5px;
+  line-height:1.28;
+}
+
+.home-service-search{
+  width:100%;
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 17px;
+  border:1px solid #e2e4e7;
+  border-radius:18px;
+  background:#fff;
+  color:#989da3;
+  font-size:15px !important;
+  font-weight:850;
+  text-align:left;
+  box-shadow:0 4px 16px rgba(17,24,39,.035);
+}
+
+.home-service-search svg{
+  width:24px;
+  height:24px;
+  flex:0 0 24px;
+  color:#111;
+}
+
+.home-primary-service-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:15px 0;
+}
+
+.home-primary-service-card{
+  min-width:0;
+  min-height:122px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:14px 8px 12px;
+  border:1px solid #e6e7e9;
+  border-radius:20px;
+  background:#fff;
+  color:#111;
+  box-shadow:0 5px 18px rgba(17,24,39,.045);
+}
+
+.home-primary-service-card:active{
+  transform:scale(.98);
+}
+
+.home-primary-service-icon{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:52px;
+  height:52px;
+  margin-bottom:2px;
+  border-radius:16px;
+  background:#fff7cf;
+  font-size:29px;
+  line-height:1;
+}
+
+.home-primary-service-card strong{
+  font-size:16px;
+  font-weight:1000;
+  white-space:nowrap;
+}
+
+.home-primary-service-card small{
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  color:#8b9096;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.4;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.home-service-status-simple{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:2px 0 18px;
+  padding:13px 14px;
+  border:1px solid #eceef0;
+  border-radius:18px;
+  background:#fafafa;
+  box-shadow:none;
+}
+
+.home-service-status-simple-icon{
+  width:44px;
+  height:44px;
+  flex:0 0 44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:#fff2b8;
+  font-size:23px;
+}
+
+.home-service-status-simple-main{
+  min-width:0;
+  flex:1;
+}
+
+.home-service-status-simple .home-service-status-count{
+  margin:0 0 2px;
+  color:#111;
+  font-size:16px;
+  font-weight:1000;
+}
+
+.home-service-status-simple .home-service-status-note{
+  overflow:hidden;
+  color:#8b9096;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.45;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.home-recent-section{
+  margin-top:4px;
+}
+
+.home-recent-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 2px 9px;
+}
+
+.home-recent-head strong{
+  color:#111;
+  font-size:17px;
+  font-weight:1000;
+}
+
+.home-recent-head span{
+  color:#a0a4a9;
+  font-size:11px;
+  font-weight:800;
+}
+
+.home-recent-card{
+  width:100%;
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr) 20px;
+  gap:12px;
+  align-items:center;
+  padding:13px 14px;
+  border:1px solid #e8e9eb;
+  border-radius:18px;
+  background:#fff;
+  color:#111;
+  text-align:left;
+  box-shadow:0 4px 16px rgba(17,24,39,.035);
+}
+
+.home-recent-icon{
+  width:48px;
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:14px;
+  background:#fff7cf;
+  font-size:25px;
+}
+
+.home-recent-main{
+  min-width:0;
+}
+
+.home-recent-main strong,
+.home-recent-main small{
+  display:block;
+}
+
+.home-recent-main strong{
+  margin-bottom:3px;
+  font-size:15px;
+  font-weight:1000;
+}
+
+.home-recent-main small{
+  overflow:hidden;
+  color:#8b9096;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.45;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.home-recent-arrow{
+  color:#9da1a6;
+  font-size:28px;
+  font-weight:400;
+}
+
+.home-selected-service-card{
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  margin:0 0 14px;
+  padding:12px;
+  border:1px solid #ece7c9;
+  border-radius:18px;
+  background:#fffbed;
+}
+
+.home-selected-service-back{
+  width:38px;
+  height:38px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  border:none;
+  border-radius:50%;
+  background:#fff;
+  color:#111;
+  font-size:29px !important;
+  line-height:1;
+  box-shadow:0 3px 10px rgba(17,24,39,.07);
+}
+
+.home-selected-service-copy{
+  min-width:0;
+}
+
+.home-selected-service-copy span,
+.home-selected-service-copy strong,
+.home-selected-service-copy small{
+  display:block;
+}
+
+.home-selected-service-copy span{
+  margin-bottom:2px;
+  color:#9a7a00;
+  font-size:10px;
+  font-weight:1000;
+}
+
+.home-selected-service-copy strong{
+  overflow:hidden;
+  color:#111;
+  font-size:15px;
+  font-weight:1000;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.home-selected-service-copy small{
+  margin-top:2px;
+  color:#8b8170;
+  font-size:10px;
+  font-weight:800;
+}
+
+.home-selected-service-change{
+  padding:8px 10px;
+  border:1px solid #e6d372;
+  border-radius:999px;
+  background:#fff;
+  color:#6f5600;
+  font-size:11px !important;
+  font-weight:1000;
+}
+
+#orderStartFlow .address-card{
+  margin-top:0;
+}
+
+#orderStartFlow .home-action-footer{
+  display:grid;
+}
+
+/* 第二層服務頁 */
+.service-hub-page{
+  position:fixed;
+  left:50%;
+  top:0;
+  bottom:0;
+  z-index:260;
+  width:100%;
+  max-width:520px;
+  transform:translateX(-50%);
+  overflow:hidden;
+  background:#fff;
+  color:#111;
+}
+
+.service-hub-topbar{
+  display:grid;
+  grid-template-columns:44px 1fr 44px;
+  align-items:center;
+  min-height:72px;
+  padding:
+    calc(10px + env(safe-area-inset-top))
+    14px
+    10px;
+  border-bottom:1px solid #f0f1f2;
+  background:#fff;
+}
+
+.service-hub-back,
+.service-hub-support{
+  width:42px;
+  height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  border:none;
+  border-radius:50%;
+  background:transparent;
+  color:#111;
+}
+
+.service-hub-back svg,
+.service-hub-support svg{
+  width:24px;
+  height:24px;
+}
+
+.service-hub-brand{
+  text-align:center;
+  font-size:25px;
+  font-weight:1000;
+  letter-spacing:-1px;
+}
+
+.service-hub-brand span{
+  color:var(--accentStrong);
+}
+
+.service-hub-scroll{
+  height:calc(100dvh - 72px - env(safe-area-inset-top));
+  overflow-y:auto;
+  padding:22px 18px calc(40px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch;
+}
+
+.service-hub-title{
+  margin:0 0 4px;
+  font-size:31px;
+  font-weight:1000;
+  letter-spacing:-.8px;
+  line-height:1.2;
+}
+
+.service-hub-subtitle{
+  margin-bottom:22px;
+  color:#8b9096;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.6;
+}
+
+.service-hub-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:11px;
+}
+
+.service-hub-item{
+  min-width:0;
+  min-height:124px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  padding:13px 8px;
+  border:1px solid #e7e8ea;
+  border-radius:20px;
+  background:#fff;
+  color:#111;
+  box-shadow:0 5px 18px rgba(17,24,39,.04);
+}
+
+.service-hub-item:active{
+  transform:scale(.98);
+}
+
+.service-hub-item.coming-soon{
+  opacity:.52;
+}
+
+.service-hub-item-icon{
+  min-height:50px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:34px;
+  line-height:1;
+}
+
+.service-hub-item strong{
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  font-size:14px;
+  font-weight:1000;
+  text-align:center;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.service-hub-item small{
+  display:block;
+  color:#a0a4a9;
+  font-size:9px;
+  font-weight:800;
+}
+
+.service-hub-quick{
+  margin-top:28px;
+}
+
+.service-hub-section-title{
+  margin-bottom:10px;
+  font-size:19px;
+  font-weight:1000;
+}
+
+.service-hub-quick-list{
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+}
+
+.service-hub-quick-item{
+  width:100%;
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr) 22px;
+  gap:12px;
+  align-items:center;
+  padding:12px 13px;
+  border:1px solid #e8e9eb;
+  border-radius:18px;
+  background:#fff;
+  color:#111;
+  text-align:left;
+}
+
+.service-hub-quick-icon{
+  width:48px;
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:14px;
+  background:#fff7cf;
+  font-size:25px;
+}
+
+.service-hub-quick-copy{
+  min-width:0;
+}
+
+.service-hub-quick-copy strong,
+.service-hub-quick-copy small{
+  display:block;
+}
+
+.service-hub-quick-copy strong{
+  margin-bottom:3px;
+  font-size:15px;
+  font-weight:1000;
+}
+
+.service-hub-quick-copy small{
+  overflow:hidden;
+  color:#8b9096;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.45;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.service-hub-quick-arrow{
+  color:#9da1a6;
+  font-size:28px;
+}
+
+@media(min-width:430px){
+  .service-hub-grid{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
+
+@media(max-width:360px){
+  .home-primary-service-grid{
+    gap:7px;
+  }
+
+  .home-primary-service-card{
+    min-height:112px;
+    padding-left:5px;
+    padding-right:5px;
+  }
+
+  .home-primary-service-card strong{
+    font-size:14px;
+  }
+
+  .home-primary-service-icon{
+    width:46px;
+    height:46px;
+    font-size:25px;
+  }
+
+  .service-hub-grid{
+    gap:8px;
+  }
+}
+
 </style>
 </head>
 
@@ -8419,6 +8969,41 @@ body{background:#eef0f2;}
 
 </div>
 
+
+    <!-- =====================================================
+         UBee 客人端｜三大服務入口第二層服務頁
+         只重組前端資訊架構，不改既有正式估價／訂單 API
+         ===================================================== -->
+    <section id="serviceHubPage" class="service-hub-page hidden" aria-hidden="true">
+      <div class="service-hub-topbar">
+        <button class="service-hub-back" type="button" onclick="closeServiceHub()" aria-label="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6"></path>
+          </svg>
+        </button>
+        <div class="service-hub-brand">U<span>Bee</span> 跑腿</div>
+        <button class="service-hub-support" type="button" onclick="openLineOfficialAccount()" aria-label="客服">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 13a8 8 0 0 1 16 0"></path>
+            <path d="M18 19h-2v-6h4v4a2 2 0 0 1-2 2Z"></path>
+            <path d="M6 19H4a2 2 0 0 1-2-2v-4h4v6Z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="service-hub-scroll">
+        <div class="service-hub-title" id="serviceHubTitle">選擇服務</div>
+        <div class="service-hub-subtitle" id="serviceHubSubtitle">選擇你需要小U協助的內容</div>
+
+        <div class="service-hub-grid" id="serviceHubGrid"></div>
+
+        <div class="service-hub-quick hidden" id="serviceHubQuickSection">
+          <div class="service-hub-section-title" id="serviceHubQuickTitle">常用快捷</div>
+          <div class="service-hub-quick-list" id="serviceHubQuickList"></div>
+        </div>
+      </div>
+    </section>
+
     <section class="step active" id="step1">
 
       <div class="ubee-v3-hero hidden" aria-label="UBee 即時服務資訊">
@@ -8457,199 +9042,155 @@ body{background:#eef0f2;}
       <div class="task-sheet">
         <div class="task-sheet-handle"></div>
 
-        <div id="homeServiceStatus" class="home-service-status" aria-live="polite">
-        <div class="home-service-status-head">
-          <div>
-            <div class="home-service-status-kicker">
-              <span class="home-service-status-dot" aria-hidden="true"></span>
-              即時服務狀態
-            </div>
-            <div class="home-service-status-count" id="homeOnlineRiderCount">
-              <span>0</span> <strong>位小U可即時媒合</strong>
-            </div>
+        <!-- 首頁：只負責開始一筆任務 -->
+        <div id="homeLandingPanel">
+          <div class="home-landing-title">今天需要小U幫你做什麼？</div>
+
+          <button class="home-service-search" type="button" onclick="openServiceHub('root')">
+            <span>輸入需求或選擇服務</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="M20 20l-3.5-3.5"></path>
+            </svg>
+          </button>
+
+          <div class="home-primary-service-grid" aria-label="主要服務">
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')">
+              <span class="home-primary-service-icon">📦</span>
+              <strong>幫我送</strong>
+              <small>文件、包裹、蛋糕花束</small>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('buy')">
+              <span class="home-primary-service-icon">🛍️</span>
+              <strong>幫我買</strong>
+              <small>餐點、藥品、生活用品</small>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')">
+              <span class="home-primary-service-icon">🏃</span>
+              <strong>幫我跑腿</strong>
+              <small>取件、排隊、代辦協助</small>
+            </button>
           </div>
-          <div class="home-service-status-side">
-            <div class="home-service-status-label">資料更新時間</div>
-            <div class="home-service-status-time" id="homeServiceUpdatedAt">--:--</div>
+
+          <div id="homeServiceStatus" class="home-service-status home-service-status-simple" aria-live="polite">
+            <div class="home-service-status-simple-icon">🐝</div>
+            <div class="home-service-status-simple-main">
+              <div class="home-service-status-count" id="homeOnlineRiderCount">
+                <span>0</span> <strong>位小U在線</strong>
+              </div>
+              <div class="home-service-status-note" id="homeServiceStatusNote">
+                系統正在更新附近媒合狀態。
+              </div>
+            </div>
+            <div class="home-service-status-time hidden" id="homeServiceUpdatedAt">--:--</div>
+          </div>
+
+          <div id="homeRecentServiceSection" class="home-recent-section hidden">
+            <div class="home-recent-head">
+              <strong>最近使用</strong>
+              <span>快速再次建立</span>
+            </div>
+            <button id="homeRecentServiceBtn" class="home-recent-card" type="button" onclick="useRecentHomeService()">
+              <span class="home-recent-icon" id="homeRecentServiceIcon">📄</span>
+              <span class="home-recent-main">
+                <strong id="homeRecentServiceTitle">文件配送</strong>
+                <small id="homeRecentServiceSub">再次使用相同服務類型</small>
+              </span>
+              <span class="home-recent-arrow">›</span>
+            </button>
           </div>
         </div>
-        <div class="home-service-status-note" id="homeServiceStatusNote">
-          系統正在更新在線小U數量。
+
+        <!-- 選完服務後才顯示正式地址／估價流程 -->
+        <div id="orderStartFlow" class="hidden">
+          <div class="home-selected-service-card">
+            <button class="home-selected-service-back" type="button" onclick="showHomeLanding()" aria-label="更換服務">‹</button>
+            <div class="home-selected-service-copy">
+              <span>已選服務</span>
+              <strong id="homeSelectedServiceTitle">幫我送・文件</strong>
+              <small id="homeSelectedServiceSub">設定取件與送達位置</small>
+            </div>
+            <button class="home-selected-service-change" type="button" onclick="openServiceHub(getCurrentHomeHubKind())">更換</button>
+          </div>
+
+          <div id="merchantInfoBox" class="merchant-card hidden"></div>
+
+          <!-- 保留原本正式服務選擇 DOM，避免既有 JS / 合作店家流程失去相容性 -->
+          <div class="home-legacy-service-selectors hidden" aria-hidden="true">
+            <div class="category-tabs">
+              <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
+              <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
+              <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
+              <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'queue')">幫排隊</button>
+              <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'helper')">全能跑腿</button>
+              <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">急件專送</button>
+            </div>
+            <div class="service-grid-new" id="serviceGrid"></div>
+          </div>
+
+          <div id="nearbyPlacesBox" class="nearby-box hidden">
+            <div class="nearby-head">
+              <div>
+                <div class="nearby-title">附近店家</div>
+                <div class="nearby-sub">依代買分類搜尋附近店家。點選後會自動帶入購買地點與電話。</div>
+              </div>
+              <button id="nearbyReloadBtn" class="nearby-btn" type="button" onclick="searchNearbyPlaces(true)">搜尋附近</button>
+            </div>
+            <div id="nearbyPlacesStatus" class="nearby-status">選擇代買分類後，按「搜尋附近」即可搜尋店家。</div>
+            <div id="nearbyPlacesList" class="nearby-list"></div>
+          </div>
+
+          <div class="address-card">
+            <div class="address-row">
+              <span class="address-dot pickup"></span>
+              <div class="address-main">
+                <div class="address-label" id="pickupTitle">取件資訊</div>
+                <input id="pickup" maxlength="120" autocomplete="street-address" placeholder="輸入取件地址 / 店家地址">
+              </div>
+            </div>
+
+            <div class="address-row">
+              <span class="address-dot dropoff"></span>
+              <div class="address-main">
+                <div class="address-label" id="dropoffTitle">送達資訊</div>
+                <input id="dropoff" maxlength="120" autocomplete="street-address" placeholder="輸入送達地址 / 交付地點">
+              </div>
+            </div>
+
+            <button id="swapAddressBtn" class="address-swap-btn" type="button" aria-label="交換取件地點與送達地點" title="交換取件與送達地點" onclick="swapPickupAndDropoff()">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 4v14m0 0-3-3m3 3 3-3M16 20V6m0 0-3 3m3-3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="address-detail-grid">
+            <label class="compact-field"><span>取件補充</span><input id="pickupAddressNote" maxlength="80" placeholder="樓層、店名、地標或交付方式"></label>
+            <label class="compact-field"><span>送達補充</span><input id="dropoffAddressNote" maxlength="80" placeholder="樓層、社區、管理室或地標"></label>
+          </div>
+
+          <div id="savedAddressQuickBar" class="saved-address-quickbar hidden" aria-label="常用地址快速帶入"></div>
+
+          <div id="matchStatusCard" class="match-status-card" aria-live="polite">
+            <div><strong>附近媒合狀態</strong><span id="matchStatusText">填寫取件地址後顯示媒合狀況</span></div>
+            <span id="matchStatusBadge" class="status-badge neutral">等待定位</span>
+          </div>
+
+          <div class="home-action-footer">
+            <div class="home-estimate">
+              <div>
+                <div class="home-estimate-label">預估費用</div>
+                <div class="home-estimate-meta" id="homeEstimateMeta">填寫地址後自動估價</div>
+                <div class="home-estimate-eta" id="homeEstimateEta">預計完成時間待計算</div>
+              </div>
+              <div class="home-estimate-amount" id="homeEstimateAmount">待估價</div>
+            </div>
+
+            <button class="home-next-btn" type="button" onclick="goNext()">下一步</button>
+          </div>
         </div>
-      </div>
-
-
-        <div id="merchantInfoBox" class="merchant-card hidden"></div>
-
-        <div class="category-tabs">
-          <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
-          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
-          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
-          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'queue')">幫排隊</button>
-          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'helper')">全能跑腿</button>
-          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">急件專送</button>
-        </div>
-
-        <!-- ==============================
-     任務細項
-     ============================== -->
-
-<div
-  class="service-grid-new"
-  id="serviceGrid"
-></div>
-
-<!-- ==============================
-     幫代買：附近店家
-     只有選擇幫代買時才顯示
-     ============================== -->
-
-<div
-  id="nearbyPlacesBox"
-  class="nearby-box hidden"
->
-
-  <div class="nearby-head">
-
-    <div>
-
-      <div class="nearby-title">
-        附近店家
-      </div>
-
-      <div class="nearby-sub">
-        依代買分類搜尋附近店家。
-        點選店家後，會自動帶入購買地點與電話。
-      </div>
-
-    </div>
-
-
-    <button
-      id="nearbyReloadBtn"
-      class="nearby-btn"
-      type="button"
-      onclick="searchNearbyPlaces(true)"
-    >
-      搜尋附近
-    </button>
-
-  </div>
-
-
-  <div
-    id="nearbyPlacesStatus"
-    class="nearby-status"
-  >
-    選擇代買分類後，
-    按「搜尋附近」即可搜尋店家。
-  </div>
-
-
-  <div
-    id="nearbyPlacesList"
-    class="nearby-list"
-  ></div>
-
-</div>
-
-<!-- ==============================
-     正式配送路線
-     ============================== -->
-
-<div class="address-card">
-  <div class="address-row">
-    <span class="address-dot pickup"></span>
-    <div class="address-main">
-      <div
-        class="address-label"
-        id="pickupTitle"
-      >
-        取件資訊
-      </div>
-      <input
-        id="pickup"
-        maxlength="120"
-        autocomplete="street-address"
-        placeholder="輸入取件地址 / 店家地址"
-      >
-    </div>
-  </div>
-  <div class="address-row">
-    <span class="address-dot dropoff"></span>
-    <div class="address-main">
-      <div
-        class="address-label"
-        id="dropoffTitle"
-      >
-        送達資訊
-      </div>
-      <input
-        id="dropoff"
-        maxlength="120"
-        autocomplete="street-address"
-        placeholder="輸入送達地址 / 交付地點"
-      >
-    </div>
-  </div>
-
-  <button
-    id="swapAddressBtn"
-    class="address-swap-btn"
-    type="button"
-    aria-label="交換取件地點與送達地點"
-    title="交換取件與送達地點"
-    onclick="swapPickupAndDropoff()"
-  >
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M8 4v14m0 0-3-3m3 3 3-3M16 20V6m0 0-3 3m3-3 3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  </button>
-</div>
-<div class="address-detail-grid">
-  <label class="compact-field"><span>取件補充</span><input id="pickupAddressNote" maxlength="80" placeholder="樓層、店名、地標或交付方式"></label>
-  <label class="compact-field"><span>送達補充</span><input id="dropoffAddressNote" maxlength="80" placeholder="樓層、社區、管理室或地標"></label>
-</div>
-<div id="savedAddressQuickBar" class="saved-address-quickbar hidden" aria-label="常用地址快速帶入"></div>
-<div id="matchStatusCard" class="match-status-card" aria-live="polite">
-  <div><strong>附近媒合狀態</strong><span id="matchStatusText">填寫取件地址後顯示媒合狀況</span></div>
-  <span id="matchStatusBadge" class="status-badge neutral">等待定位</span>
-</div>
-        <div class="home-action-footer">
-
-  <div class="home-estimate">
-
-    <div>
-
-      <div class="home-estimate-label">
-        預估費用
-      </div>
-
-      <div class="home-estimate-meta" id="homeEstimateMeta">填寫地址後自動估價</div>
-      <div class="home-estimate-eta" id="homeEstimateEta">預計完成時間待計算</div>
-
-    </div>
-
-
-    <div
-      class="home-estimate-amount"
-      id="homeEstimateAmount"
-    >
-      待估價
-    </div>
-
-  </div>
-
-
-  <button
-    class="home-next-btn"
-    type="button"
-    onclick="goNext()"
-  >
-    下一步
-  </button>
-
-</div>
       </div>
     </section>
 
@@ -11846,6 +12387,362 @@ const serviceGroups = {
   ]
 };
 
+/* =========================================================
+   UBee 客人端｜三大服務入口資訊架構
+   UI 只把原本 6 個底層服務重新分組，不改 serviceGroup/API 送出值
+   ========================================================= */
+
+const CUSTOMER_HOME_RECENT_SERVICE_KEY = 'ubee_customer_recent_service_v1';
+let activeCustomerServiceHub = 'root';
+
+const customerServiceHubs = {
+  root:{
+    title:'今天需要小U幫你做什麼？',
+    subtitle:'先選擇服務方向，再挑選最接近你的需求',
+    quickTitle:'',
+    items:[
+      { icon:'📦', title:'幫我送', note:'文件・包裹・急送', nextHub:'send' },
+      { icon:'🛍️', title:'幫我買', note:'餐點・藥品・用品', nextHub:'buy' },
+      { icon:'🏃', title:'幫我跑腿', note:'取件・排隊・代辦', nextHub:'runner' }
+    ],
+    quick:[]
+  },
+
+  send:{
+    title:'幫我送',
+    subtitle:'選擇你要配送的內容',
+    quickTitle:'常用快捷',
+    items:[
+      { icon:'📄', title:'文件', group:'send', type:'文件急送', category:'一般文件' },
+      { icon:'📦', title:'包裹', group:'send', type:'物品配送', category:'小型包裹' },
+      { icon:'🎂', title:'蛋糕 / 花束', group:'send', type:'禮品配送', category:'蛋糕' },
+      { icon:'🏪', title:'商家急送', group:'urgent', type:'急件專送', category:'急送店家商品' },
+      { icon:'🎒', title:'忘記帶東西', group:'send', type:'物品配送', category:'個人物品' },
+      { icon:'🤲', title:'交付物品', group:'send', type:'物品配送', category:'其他物品' },
+      { icon:'•••', title:'其他配送', group:'send', type:'物品配送', category:'其他物品' }
+    ],
+    quick:[
+      { icon:'📄', title:'文件配送', description:'重要文件、合約、證件等專人快速送達', group:'send', type:'文件急送', category:'一般文件' },
+      { icon:'🔑', title:'送鑰匙', description:'住家、辦公室、車鑰匙等快速送達', group:'send', type:'鑰匙急送', category:'住家鑰匙' },
+      { icon:'🏪', title:'商家急件', description:'餐點、商品、備品等商家快速配送', group:'urgent', type:'急件專送', category:'急送店家商品' }
+    ]
+  },
+
+  buy:{
+    title:'幫我買',
+    subtitle:'選擇你要代買的內容',
+    quickTitle:'附近常見需求',
+    items:[
+      { icon:'🍱', title:'餐點 / 飲料', group:'buy', type:'餐點代買', category:'便當店' },
+      { icon:'💊', title:'藥品', group:'buy', type:'藥局代買', category:'一般藥局' },
+      { icon:'🧻', title:'生活用品', group:'buy', type:'生活用品', category:'日用品' },
+      { icon:'🏪', title:'便利商店', group:'buy', type:'超商代買', category:'7-ELEVEN' },
+      { icon:'🍰', title:'蛋糕甜點', group:'buy', type:'蛋糕甜點', category:'生日蛋糕' },
+      { icon:'🍎', title:'生鮮水果', group:'buy', type:'生鮮代買', category:'水果' },
+      { icon:'•••', title:'其他代買', group:'buy', type:'生活用品', category:'其他生活用品' }
+    ],
+    quick:[
+      { icon:'7', title:'7-ELEVEN', description:'飲料、零食、日用品快速代買', group:'buy', type:'超商代買', category:'7-ELEVEN' },
+      { icon:'F', title:'全家 FamilyMart', description:'咖啡、熟食、生活用品快速代買', group:'buy', type:'超商代買', category:'全家' },
+      { icon:'✚', title:'藥局用品', description:'一般藥局與生活保健用品代買', group:'buy', type:'藥局代買', category:'一般藥局' }
+    ]
+  },
+
+  runner:{
+    title:'幫我跑腿',
+    subtitle:'選擇你需要小U協助的任務',
+    quickTitle:'常見任務',
+    items:[
+      { icon:'🤲', title:'幫我取東西', group:'pickup', type:'包裹代取', category:'其他包裹' },
+      { icon:'⏱️', title:'幫我排隊', group:'queue', type:'現場排隊', category:'一般排隊' },
+      { icon:'📋', title:'幫我代辦', group:'helper', type:'全能跑腿', category:'臨時協助' },
+      { icon:'📦', title:'幫我領貨', group:'pickup', type:'門市取件', category:'已付款商品' },
+      { icon:'📍', title:'多點任務', comingSoon:true },
+      { icon:'📄', title:'送件 / 取件', group:'pickup', type:'文件代取', category:'一般文件' },
+      { icon:'•••', title:'其他跑腿', group:'helper', type:'全能跑腿', category:'其他需求' }
+    ],
+    quick:[
+      { icon:'🔑', title:'幫我拿鑰匙', description:'住家、辦公室鑰匙等代取代送', group:'send', type:'鑰匙急送', category:'住家鑰匙' },
+      { icon:'📄', title:'幫我代領文件', description:'文件、資料等協助代領', group:'pickup', type:'文件代取', category:'一般文件' },
+      { icon:'🏪', title:'幫我去店家取貨', description:'到商店、超商或指定地點領貨', group:'pickup', type:'門市取件', category:'已付款商品' }
+    ]
+  }
+};
+
+function getCurrentHomeHubKind(){
+  if(serviceGroup === 'buy') return 'buy';
+  if(serviceGroup === 'send' || serviceGroup === 'urgent') return 'send';
+  return 'runner';
+}
+
+function openServiceHub(kind = 'root'){
+  const hubKind = customerServiceHubs[kind] ? kind : 'root';
+  const hub = customerServiceHubs[hubKind];
+  const page = qs('serviceHubPage');
+  const grid = qs('serviceHubGrid');
+  const quickSection = qs('serviceHubQuickSection');
+  const quickList = qs('serviceHubQuickList');
+
+  if(!page || !grid || !quickSection || !quickList) return;
+
+  activeCustomerServiceHub = hubKind;
+
+  if(qs('serviceHubTitle')) qs('serviceHubTitle').innerText = hub.title || '選擇服務';
+  if(qs('serviceHubSubtitle')) qs('serviceHubSubtitle').innerText = hub.subtitle || '';
+  if(qs('serviceHubQuickTitle')) qs('serviceHubQuickTitle').innerText = hub.quickTitle || '常用快捷';
+
+  grid.innerHTML = (hub.items || []).map((item, index) => `
+    <button
+      class="service-hub-item ${item.comingSoon ? 'coming-soon' : ''}"
+      type="button"
+      onclick="chooseCustomerHubItem('${hubKind}', ${index}, false)"
+      ${item.comingSoon ? 'aria-label="' + escapeHtml(item.title) + '，即將開放"' : ''}
+    >
+      <span class="service-hub-item-icon">${escapeHtml(item.icon || '●')}</span>
+      <strong>${escapeHtml(item.title || '服務')}</strong>
+      ${item.note ? `<small>${escapeHtml(item.note)}</small>` : (item.comingSoon ? '<small>即將開放</small>' : '')}
+    </button>
+  `).join('');
+
+  const quick = hub.quick || [];
+  quickSection.classList.toggle('hidden', !quick.length);
+
+  quickList.innerHTML = quick.map((item, index) => `
+    <button
+      class="service-hub-quick-item"
+      type="button"
+      onclick="chooseCustomerHubItem('${hubKind}', ${index}, true)"
+    >
+      <span class="service-hub-quick-icon">${escapeHtml(item.icon || '●')}</span>
+      <span class="service-hub-quick-copy">
+        <strong>${escapeHtml(item.title || '常用服務')}</strong>
+        <small>${escapeHtml(item.description || '')}</small>
+      </span>
+      <span class="service-hub-quick-arrow">›</span>
+    </button>
+  `).join('');
+
+  page.classList.remove('hidden');
+  page.setAttribute('aria-hidden','false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeServiceHub(){
+  const page = qs('serviceHubPage');
+  page?.classList.add('hidden');
+  page?.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+}
+
+function chooseCustomerHubItem(hubKind, index, isQuick){
+  const hub = customerServiceHubs[hubKind];
+  const list = isQuick ? (hub?.quick || []) : (hub?.items || []);
+  const item = list[index];
+
+  if(!item) return;
+
+  if(item.nextHub){
+    openServiceHub(item.nextHub);
+    return;
+  }
+
+  if(item.comingSoon){
+    alert('「多點任務」正在規劃中，目前可先使用「其他跑腿」並在任務內容說明需求。');
+    return;
+  }
+
+  applyCustomerHomeService(item);
+}
+
+function findLegacyServiceTab(group){
+  return Array
+    .from(document.querySelectorAll('.category-tab'))
+    .find(btn => String(btn.getAttribute('onclick') || '').includes(`'${group}'`));
+}
+
+function applyCustomerHomeService(item, options = {}){
+  if(!item || !item.group) return;
+
+  const tab = findLegacyServiceTab(item.group);
+  selectServiceFromTab(tab || null, item.group);
+
+  const list = serviceGroups[item.group] || [];
+  const index = Math.max(
+    0,
+    list.findIndex(entry => entry.title === item.type)
+  );
+  const selected = list[index] || list[0];
+
+  if(selected){
+    serviceType = selected.title || '';
+    serviceCategory =
+      selected.categories?.includes(item.category)
+        ? item.category
+        : (selected.categories?.[0] || '');
+
+    renderServiceGrid(item.group);
+    renderCategoryBox(selected);
+  }
+
+  updateTaskPathText();
+  applyDynamicFields();
+  handleServiceSelectionChanged();
+  invalidateQuote();
+
+  const hubKind =
+    item.hubKind ||
+    (
+      item.group === 'buy'
+        ? 'buy'
+        : (
+            item.group === 'send' ||
+            item.group === 'urgent'
+              ? 'send'
+              : 'runner'
+          )
+    );
+
+  if(qs('homeSelectedServiceTitle')){
+    qs('homeSelectedServiceTitle').innerText =
+      `${customerServiceHubs[hubKind]?.title || 'UBee 跑腿'}・${item.title || serviceType}`;
+  }
+
+  if(qs('homeSelectedServiceSub')){
+    qs('homeSelectedServiceSub').innerText =
+      item.group === 'buy'
+        ? '設定購買地點與送達位置'
+        : (
+            item.group === 'queue' ||
+            item.group === 'helper'
+              ? '設定任務地點與需求'
+              : '設定取件與送達位置'
+          );
+  }
+
+  showOrderEntryFlow();
+
+  if(options.saveRecent !== false){
+    try{
+      localStorage.setItem(
+        CUSTOMER_HOME_RECENT_SERVICE_KEY,
+        JSON.stringify({
+          icon:item.icon || '●',
+          title:item.title || serviceType || 'UBee 跑腿',
+          group:item.group,
+          type:item.type || serviceType,
+          category:item.category || serviceCategory,
+          hubKind
+        })
+      );
+    }catch(_err){}
+
+    renderRecentHomeService();
+  }
+
+  closeServiceHub();
+  scheduleRouteAndQuoteRefresh(120);
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function showOrderEntryFlow(){
+  qs('homeLandingPanel')?.classList.add('hidden');
+  qs('orderStartFlow')?.classList.remove('hidden');
+
+  if(merchantMode && qs('merchantInfoBox')){
+    qs('merchantInfoBox').classList.remove('hidden');
+  }
+}
+
+function showHomeLanding(){
+  closeServiceHub();
+  qs('orderStartFlow')?.classList.add('hidden');
+  qs('homeLandingPanel')?.classList.remove('hidden');
+  renderRecentHomeService();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function renderRecentHomeService(){
+  const section = qs('homeRecentServiceSection');
+  if(!section) return;
+
+  let recent = null;
+
+  try{
+    recent = JSON.parse(
+      localStorage.getItem(CUSTOMER_HOME_RECENT_SERVICE_KEY) || 'null'
+    );
+  }catch(_err){
+    recent = null;
+  }
+
+  const valid =
+    recent &&
+    recent.group &&
+    Array.isArray(serviceGroups[recent.group]);
+
+  section.classList.toggle('hidden', !valid);
+
+  if(!valid) return;
+
+  if(qs('homeRecentServiceIcon')){
+    qs('homeRecentServiceIcon').innerText = recent.icon || '●';
+  }
+
+  if(qs('homeRecentServiceTitle')){
+    qs('homeRecentServiceTitle').innerText = recent.title || '最近使用服務';
+  }
+
+  if(qs('homeRecentServiceSub')){
+    qs('homeRecentServiceSub').innerText =
+      `${customerServiceHubs[recent.hubKind]?.title || 'UBee 跑腿'}・再次建立相同服務`;
+  }
+}
+
+function useRecentHomeService(){
+  let recent = null;
+
+  try{
+    recent = JSON.parse(
+      localStorage.getItem(CUSTOMER_HOME_RECENT_SERVICE_KEY) || 'null'
+    );
+  }catch(_err){
+    recent = null;
+  }
+
+  if(!recent?.group) return;
+
+  applyCustomerHomeService(
+    {
+      icon:recent.icon || '●',
+      title:recent.title || recent.type || '最近使用服務',
+      group:recent.group,
+      type:recent.type,
+      category:recent.category,
+      hubKind:recent.hubKind
+    },
+    {
+      saveRecent:false
+    }
+  );
+}
+
+function initializeCustomerHomeLanding(){
+  renderRecentHomeService();
+
+  if(currentOrderId){
+    return;
+  }
+
+  if(merchantMode){
+    showOrderEntryFlow();
+    return;
+  }
+
+  qs('orderStartFlow')?.classList.add('hidden');
+  qs('homeLandingPanel')?.classList.remove('hidden');
+}
+
+
 function escapeHtml(str){
   return String(str ?? '')
     .replaceAll('&','&amp;')
@@ -12057,9 +12954,16 @@ function renderServiceGrid(group){
   const grid = qs('serviceGrid');
   const list = serviceGroups[group] || [];
 
-  grid.innerHTML = list.map((item, index) => `
+  if(!grid) return;
+
+  grid.innerHTML = list.map((item, index) => {
+    const isActive =
+      item.title === serviceType ||
+      (!serviceType && index === 0);
+
+    return `
     <button
-      class="service-item ${index === 0 ? 'active' : ''}"
+      class="service-item ${isActive ? 'active' : ''}"
       type="button"
       onclick="selectServiceItem(${index})"
     >
@@ -12071,7 +12975,8 @@ function renderServiceGrid(group){
         ${escapeHtml(item.title)}
       </div>
     </button>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function selectServiceItem(index){
@@ -12853,7 +13758,14 @@ function showOnlyStep(step){
 
 function showHomeTab(){
   currentCustomerPage = '';
-  showOnlyStep(currentOrderId ? 5 : 1);
+
+  if(currentOrderId){
+    showOnlyStep(5);
+    return;
+  }
+
+  showOnlyStep(1);
+  showHomeLanding();
 }
 
 function showTasksTab(){
@@ -17015,6 +17927,9 @@ async function initMerchantContext(){
       'buy'
     );
 
+    // 合作店家連結沿用原本自動帶入邏輯，直接進入正式地址流程。
+    showOrderEntryFlow();
+
     if(
       merchant.merchantAddress ||
       merchant.pickupAddress
@@ -17826,7 +18741,7 @@ const UBeeEnhancements = (() => {
   function renderAddressManager(){const el=qs('savedAddressList'),list=getAddresses();if(!el)return;el.innerHTML=list.length?list.map(a=>`<div class="saved-address-card"><div class="saved-address-card-head"><div><div class="saved-address-card-title">${escapeAttr(a.label||'常用地址')}</div><div class="saved-address-card-text">${escapeAttr(a.address)}${a.note?`<br>${escapeAttr(a.note)}`:''}${a.phone?`<br>${escapeAttr(a.contact||'聯絡人')}：${escapeAttr(a.phone)}`:''}</div></div><button class="danger-link" type="button" onclick="UBeeEnhancements.deleteAddress('${a.id}')">刪除</button></div><div class="saved-address-actions"><button type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','pickup')">帶入取件</button><button type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">帶入送達</button></div></div>`).join(''):'<div class="empty-state">尚未儲存常用地址。</div>';renderQuickAddresses()}
   function saveAddressFromManager(){const address=value('customerAddressInput');if(!address){setAddressActionStatus('請輸入完整地址。',true);return}const list=getAddresses();list.unshift({id:uid(),label:value('customerAddressLabelInput')||'常用地址',address,note:value('customerAddressNoteInput'),contact:value('customerAddressContactInput'),phone:value('customerAddressPhoneInput')});saveAddresses(list);['customerAddressLabelInput','customerAddressInput','customerAddressNoteInput','customerAddressContactInput','customerAddressPhoneInput'].forEach(id=>setValue(id,''));renderAddressManager();setAddressActionStatus('地址已儲存。',false)}
   function saveCurrentRouteAddress(){const address=value('dropoff')||value('pickup');if(!address){setAddressActionStatus('目前訂單尚未填寫地址。',true);return}setValue('customerAddressLabelInput','目前訂單');setValue('customerAddressInput',address);setValue('customerAddressNoteInput',value('dropoff')?value('dropoffAddressNote'):value('pickupAddressNote'));setValue('customerAddressPhoneInput',value('dropoff')?value('dropoffPhone'):value('pickupPhone'));setAddressActionStatus('已帶入目前訂單資料，確認後按「儲存新地址」。',false)}
-  function applyAddress(id,target){const a=getAddresses().find(x=>x.id===id);if(!a)return;const pickup=target==='pickup';setValue(pickup?'pickup':'dropoff',a.address);setValue(pickup?'pickupPhone':'dropoffPhone',a.phone);setValue(pickup?'pickupAddressNote':'dropoffAddressNote',a.note);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft();showHomeTab()}
+  function applyAddress(id,target){const a=getAddresses().find(x=>x.id===id);if(!a)return;const pickup=target==='pickup';setValue(pickup?'pickup':'dropoff',a.address);setValue(pickup?'pickupPhone':'dropoffPhone',a.phone);setValue(pickup?'pickupAddressNote':'dropoffAddressNote',a.note);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft();showHomeTab();showOrderEntryFlow()}
   function deleteAddress(id){saveAddresses(getAddresses().filter(x=>x.id!==id));renderAddressManager()}
 
   function addShoppingItem(item={}){state.shoppingItems.push({id:uid(),name:item.name||'',quantity:item.quantity||'1',budget:item.budget||'',replacementPolicy:item.replacementPolicy||'contact'});renderShoppingItems();scheduleDraft()}
@@ -17844,7 +18759,7 @@ const UBeeEnhancements = (() => {
   function updateMatchStatus(){const text=qs('matchStatusText'),badge=qs('matchStatusBadge');if(!text||!badge)return;const count=Number(qs('homeOnlineRiderCount')?.innerText.match(/\d+/)?.[0]||0);if(!value('pickup')){text.textContent='填寫取件地址後顯示媒合狀況';badge.textContent='等待定位';badge.className='status-badge neutral'}else if(count>=5){text.textContent=`目前共有 ${count} 位小U可即時媒合，系統將從取件點附近開始媒合`;badge.textContent='媒合良好';badge.className='status-badge good'}else if(count>0){text.textContent=`目前 ${count} 位小U可即時媒合，系統會逐步擴大媒合範圍`;badge.textContent='小U較少';badge.className='status-badge warn'}else{text.textContent='目前尚無近期定位的小U，仍可正常建立任務';badge.textContent='持續搜尋';badge.className='status-badge neutral'}}
   function renderSystemCheck(){const el=qs('orderSystemCheck');if(!el)return;const checks=[['pickup','取件位置已填寫',!!value('pickup')],['dropoff','送達位置已填寫',!!value('dropoff')],['phone','至少一組聯絡電話已填寫',!!(value('pickupPhone')||value('dropoffPhone'))],['route','路線已成功計算',!!lastRouteData],['quote','正式估價資料可用',!!lastQuoteData&&Number(lastEstimatedTotal)>0],['note','任務內容已完成',!!value('note')]];el.innerHTML=checks.map(([,label,ok])=>`<div class="system-check-row ${ok?'ok':'warn'}"><span class="system-check-icon">${ok?'✓':'!'}</span><span>${label}</span></div>`).join('')}
 
-  function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=order.serviceMode||'normal';speedType=order.speedType||order.speed||'standard';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
+  function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=order.serviceMode||'normal';speedType=order.speedType||order.speed||'standard';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();invalidateRoute();invalidateQuote();showHomeTab();showOrderEntryFlow();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
   function reorder(id){const order=state.lastOrders.get(id);if(order)applyOrder(order)}
   function openOrder(id){const order=state.lastOrders.get(id);if(!order)return;currentOrderId=id;currentOrderData=order;localStorage.setItem('ubee_current_order_id',id);setOrderNo(id);showOnlyStep(5);renderTimeline(order.status||'pending_payment',order);startOrderListener(id)}
   function renderOrderCards(el,orders,emptyText){if(!el)return;if(!orders.length){el.textContent=emptyText;return}state.lastOrders.clear();orders.forEach(o=>state.lastOrders.set(o.id,o));el.innerHTML=orders.map(o=>{const pickup=o.pickup||o.pickupAddress||'-',dropoff=o.dropoff||o.dropoffAddress||'-',total=getCustomerPayableTotal(o),status=getStatusLabel(o.status),done=['completed','done'].includes(String(o.status));return `<div class="order-history-card"><div style="font-size:15px;font-weight:1000">${escapeAttr(o.serviceType||'UBee 跑腿任務')}</div><div class="field-help">${escapeAttr(status)}・${escapeAttr(formatOrderTime(o.createdAt||o.updatedAt))}<br>${escapeAttr(pickup)} → ${escapeAttr(dropoff)}<br>金額：${total>0?`NT$${Math.round(total)}`:'-'}</div><div class="order-card-actions"><button type="button" onclick="UBeeEnhancements.openOrder('${o.id}')">查看明細</button>${done?`<button type="button" onclick="UBeeEnhancements.reorder('${o.id}')">再叫一次</button>`:''}</div></div>`}).join('')}
@@ -17890,6 +18805,7 @@ bindOrderInputEvents();
 
 updateStickyEstimate();
 
+initializeCustomerHomeLanding();
 showOnlyStep(1);
 
 initMerchantContext();
