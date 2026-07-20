@@ -57,7 +57,7 @@ button{cursor:pointer}
 .btn.small{padding:8px 10px;font-size:12px;border-radius:10px}
 .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .kpis{
-  display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:10px;margin-bottom:14px
+  display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:10px;margin-bottom:14px
 }
 .kpi{
   background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;
@@ -190,6 +190,10 @@ button{cursor:pointer}
 .rider-state{font-size:10px;font-weight:1000}
 .state-free{color:var(--green)}
 .state-busy{color:var(--blue)}
+.state-paused{color:#b77900}
+.state-offline{color:#7b8088}
+.rider-row.is-offline{opacity:.72}
+.rider-row.is-paused{background:#fffdf5}
 
 .alert-list{display:grid;gap:8px}
 .alert-item{
@@ -292,7 +296,8 @@ button{cursor:pointer}
   </div>
 
   <section class="kpis">
-    <div class="kpi"><div class="label">在線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">即時定位中的小U</div></div>
+    <div class="kpi"><div class="label">全部小U</div><div class="value" id="totalRiders">-</div><div class="sub">已審核且仍有效的運力名單</div></div>
+    <div class="kpi"><div class="label">在線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">目前連線中的小U</div></div>
     <div class="kpi"><div class="label">可接單小U</div><div class="value" id="available">-</div><div class="sub">可進入智慧候選</div></div>
     <div class="kpi"><div class="label">待派單</div><div class="value" id="waiting">-</div><div class="sub" id="waitingSub">等待媒合中的訂單</div></div>
     <div class="kpi"><div class="label">配送中</div><div class="value" id="active">-</div><div class="sub">已由小U承接</div></div>
@@ -386,7 +391,7 @@ button{cursor:pointer}
         <div class="panel-head">
           <div>
             <div class="panel-title">即時供需地圖</div>
-            <div class="panel-sub">綠色＝可接單小U、藍色＝任務中／配送中、橘色＝待派單；選取訂單後顯示取件與送達點</div>
+            <div class="panel-sub">綠色＝可接單、藍色＝任務中、黃色＝暫停接單、灰色＝離線最後位置；橘色＝待派單</div>
           </div>
         </div>
         <div class="map-wrap">
@@ -395,6 +400,8 @@ button{cursor:pointer}
             <div class="legend">
               <span class="legend-item"><i class="legend-dot" style="background:var(--green)"></i>可接單 <b id="legendFree">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>任務中 <b id="legendBusy">0</b></span>
+              <span class="legend-item"><i class="legend-dot" style="background:#f5b800"></i>暫停 <b id="legendPaused">0</b></span>
+              <span class="legend-item"><i class="legend-dot" style="background:#8b9098"></i>離線 <b id="legendOffline">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--orange)"></i>待派單 <b id="legendWaiting">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>配送中 <b id="legendActive">0</b></span>
             </div>
@@ -410,8 +417,15 @@ button{cursor:pointer}
       <div class="panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">在線小U</div>
-            <div class="panel-sub">只顯示後端判定為在線的小U</div>
+            <div class="panel-title">全部小U</div>
+            <div class="panel-sub">已審核小U永遠保留；離線只改變狀態，不會從調度中心消失</div>
+          </div>
+          <div class="filters">
+            <button class="chip active" data-rider-filter="all">全部</button>
+            <button class="chip" data-rider-filter="online">接單中</button>
+            <button class="chip" data-rider-filter="busy">任務中</button>
+            <button class="chip" data-rider-filter="paused">暫停接單</button>
+            <button class="chip" data-rider-filter="offline">離線</button>
           </div>
         </div>
         <div class="panel-body">
@@ -472,6 +486,7 @@ button{cursor:pointer}
 const state = {
   data: { summary:{}, orders:[], riders:[], alerts:[], intelligence:{summary:{},zones:[],orderInsights:[],recommendations:[]} },
   filter: 'all',
+  riderFilter: 'all',
   selectedOrderId: '',
   selectedCandidateRiderId: '',
   selectedOrderEvents: [],
@@ -544,6 +559,41 @@ function statusKind(order){
   const s = String(order?.status || '').trim();
   const waiting = new Set(['pending_dispatch','pending','waiting','searching','dispatching','redispatching']);
   return waiting.has(s) ? 'waiting' : 'active';
+}
+
+function riderStateKey(rider){
+  const stateKey = String(rider?.dispatchState || '').toUpperCase();
+  if(rider?.busy === true || stateKey === 'BUSY') return 'busy';
+  if(rider?.online === true || stateKey === 'AVAILABLE') return 'online';
+  if(stateKey === 'PAUSED') return 'paused';
+  return 'offline';
+}
+
+function riderStateLabel(rider){
+  return {
+    online:'接單中',
+    busy:'任務中',
+    paused:'暫停接單',
+    offline:'離線'
+  }[riderStateKey(rider)] || '離線';
+}
+
+function riderStateColor(rider){
+  return {
+    online:'#20a464',
+    busy:'#3478f6',
+    paused:'#f5b800',
+    offline:'#8b9098'
+  }[riderStateKey(rider)] || '#8b9098';
+}
+
+function riderStateClass(rider){
+  return {
+    online:'state-free',
+    busy:'state-busy',
+    paused:'state-paused',
+    offline:'state-offline'
+  }[riderStateKey(rider)] || 'state-offline';
 }
 
 function waitBadge(order){
@@ -794,27 +844,36 @@ async function renderMap(){
 
   const bounds = new google.maps.LatLngBounds();
   let hasBounds = false;
-  let free = 0, busy = 0, waiting = 0, active = 0;
+  let free = 0, busy = 0, paused = 0, offline = 0, waiting = 0, active = 0;
 
   for(const rider of state.data.riders || []){
-    if(rider.busy) busy++; else free++;
+    const visualState = riderStateKey(rider);
+    if(visualState === 'busy') busy++;
+    else if(visualState === 'online') free++;
+    else if(visualState === 'paused') paused++;
+    else offline++;
+
+    // 離線／暫停小U仍保留「最後已知位置」，但不可誤認成即時位置。
     if(!hasLatLng(rider.currentLat,rider.currentLng)) continue;
 
     const position = {lat:Number(rider.currentLat),lng:Number(rider.currentLng)};
     bounds.extend(position); hasBounds = true;
+    const isLiveLocation = rider.online === true && String(rider.connectionState || '') === 'LIVE';
 
     createOpsMarker({
       position,
       label:'U',
-      fillColor:rider.busy ? '#3478f6' : '#20a464',
-      title:rider.name || rider.riderId || '小U',
-      zIndex:300,
+      fillColor:riderStateColor(rider),
+      title:`${rider.name || rider.riderId || '小U'} · ${riderStateLabel(rider)}`,
+      zIndex:visualState === 'online' || visualState === 'busy' ? 300 : 180,
       infoHtml:`
-        <div style="min-width:190px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
+        <div style="min-width:210px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
           <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
-          <span>${rider.busy ? '任務中' : '可接單'}</span><br>
-          <small>${esc(rider.district || rider.serviceArea || '')}</small><br>
+          <span style="font-weight:900;color:${riderStateColor(rider)}">${esc(riderStateLabel(rider))}</span><br>
+          <small>${esc(rider.district || rider.serviceArea || '未設定區域')}</small><br>
+          <small>最後活動：${esc(fmtAge(rider.lastActiveAtMs))}</small><br>
           <small>最後定位：${esc(fmtAge(rider.locationUpdatedAtMs))}</small>
+          ${!isLiveLocation ? '<br><small style="color:#b05e00;font-weight:900">⚠ 最後已知位置，非即時位置</small>' : ''}
           ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
         </div>`
     });
@@ -882,6 +941,8 @@ async function renderMap(){
 
   $('legendFree').textContent = free;
   $('legendBusy').textContent = busy;
+  $('legendPaused').textContent = paused;
+  $('legendOffline').textContent = offline;
   $('legendWaiting').textContent = waiting;
   $('legendActive').textContent = active;
 
@@ -1007,8 +1068,9 @@ function renderAll(){
 
 function renderSummary(){
   const s = state.data.summary || {};
-  $('online').textContent = s.onlineRiders ?? state.data.riders.length ?? 0;
-  $('available').textContent = s.availableRiders ?? state.data.riders.filter(r=>!r.busy).length;
+  $('totalRiders').textContent = s.totalRiders ?? state.data.riders.length ?? 0;
+  $('online').textContent = s.onlineRiders ?? state.data.riders.filter(r=>r.online).length;
+  $('available').textContent = s.availableRiders ?? state.data.riders.filter(r=>r.online && !r.busy).length;
   $('waiting').textContent = s.waitingOrders ?? state.data.orders.filter(o=>statusKind(o)==='waiting').length;
   $('active').textContent = s.activeOrders ?? state.data.orders.filter(o=>statusKind(o)==='active').length;
   $('completed').textContent = s.todayCompleted ?? 0;
@@ -1018,8 +1080,10 @@ function renderSummary(){
   $('forecastGap').textContent = Number(gap) > 0 ? `+${gap}` : String(gap);
   $('alerts').textContent = state.data.alerts.length;
 
-  const withLocation = state.data.riders.filter(r=>hasLatLng(r.currentLat,r.currentLng)).length;
-  $('onlineSub').textContent = `${withLocation} 位具有即時座標`;
+  const liveWithLocation = state.data.riders.filter(r=>r.online && hasLatLng(r.currentLat,r.currentLng)).length;
+  const pausedCount = s.pausedRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='paused').length;
+  const offlineCount = s.offlineRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='offline').length;
+  $('onlineSub').textContent = `${liveWithLocation} 位有即時座標 · 暫停 ${pausedCount} · 離線 ${offlineCount}`;
 
   const waits = state.data.orders.filter(o=>statusKind(o)==='waiting');
   if(waits.length){
@@ -1141,31 +1205,44 @@ function renderOrders(){
 }
 
 function renderRiders(){
-  const riders = [...(state.data.riders || [])].sort((a,b)=>{
-    if(Boolean(a.busy)!==Boolean(b.busy)) return a.busy?1:-1;
-    return String(a.name||a.riderId||'').localeCompare(String(b.name||b.riderId||''),'zh-Hant');
-  });
+  const order = {online:0,busy:1,paused:2,offline:3};
+  let riders = [...(state.data.riders || [])]
+    .filter(r=>state.riderFilter === 'all' || riderStateKey(r) === state.riderFilter)
+    .sort((a,b)=>{
+      const stateDiff = (order[riderStateKey(a)] ?? 9) - (order[riderStateKey(b)] ?? 9);
+      if(stateDiff) return stateDiff;
+      return String(a.name||a.riderId||'').localeCompare(String(b.name||b.riderId||''),'zh-Hant');
+    });
 
   if(!riders.length){
-    $('riders').innerHTML = '<div class="empty">目前沒有在線小U</div>';
+    $('riders').innerHTML = '<div class="empty">目前這個狀態沒有小U</div>';
     return;
   }
 
-  $('riders').innerHTML = riders.map(r=>`
-    <div class="rider-row">
-      <div>
-        <div class="rider-name">
-          <span class="legend-dot" style="display:inline-block;margin-right:6px;background:${r.busy?'var(--blue)':'var(--green)'}"></span>
-          ${esc(r.name || r.riderId || '小U')}
+  $('riders').innerHTML = riders.map(r=>{
+    const stateKey = riderStateKey(r);
+    const rowClass = stateKey === 'offline' ? 'is-offline' : stateKey === 'paused' ? 'is-paused' : '';
+    const locationText = hasLatLng(r.currentLat,r.currentLng)
+      ? (r.online ? '即時座標' : '最後已知座標')
+      : '無座標';
+    return `
+      <div class="rider-row ${rowClass}">
+        <div>
+          <div class="rider-name">
+            <span class="legend-dot" style="display:inline-block;margin-right:6px;background:${riderStateColor(r)}"></span>
+            ${esc(r.name || r.riderId || '小U')}
+          </div>
+          <div class="rider-meta">
+            ${esc(r.district || r.serviceArea || '未設定區域')}
+            · 最後活動 ${esc(fmtAge(r.lastActiveAtMs))}
+            · 最後定位 ${esc(fmtAge(r.locationUpdatedAtMs))}
+            · ${esc(locationText)}
+          </div>
         </div>
-        <div class="rider-meta">
-          ${esc(r.district || r.serviceArea || '未設定區域')} · 最後定位 ${esc(fmtAge(r.locationUpdatedAtMs))}
-          ${hasLatLng(r.currentLat,r.currentLng)?' · 有座標':' · 無座標'}
-        </div>
+        <div class="rider-state ${riderStateClass(r)}">${esc(riderStateLabel(r))}</div>
       </div>
-      <div class="rider-state ${r.busy?'state-busy':'state-free'}">${r.busy?'任務中':'可接單'}</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function renderAlerts(){
@@ -1195,11 +1272,12 @@ function getCandidateRiders(order){
       .map(c=>{
         const base=(state.data.riders||[]).find(r=>String(r.riderId)===String(c.riderId)||String(r.riderDocId)===String(c.riderDocId))||{};
         return {...base,...c,distanceKm:Number(c.distanceKm),dispatchScore:Number(c.score||0)};
-      });
+      })
+      .filter(r=>r.online === true && r.busy !== true);
   }
   if(!hasLatLng(order.pickupLat,order.pickupLng)) return [];
   const pLat=Number(order.pickupLat),pLng=Number(order.pickupLng);
-  return (state.data.riders||[]).filter(r=>!r.busy).filter(r=>hasLatLng(r.currentLat,r.currentLng)).map(r=>({
+  return (state.data.riders||[]).filter(r=>r.online===true && !r.busy).filter(r=>hasLatLng(r.currentLat,r.currentLng)).map(r=>({
     ...r,distanceKm:haversineKm(pLat,pLng,Number(r.currentLat),Number(r.currentLng)),dispatchScore:0
   })).filter(r=>r.distanceKm<=state.radiusKm).sort((a,b)=>a.distanceKm-b.distanceKm);
 }
@@ -1446,7 +1524,7 @@ function openAssignModal(riderId){
         取件：${esc(order.pickupAddress || '-')}<br>
         指定小U：<b style="color:#111">${esc(rider.name || rider.riderId || '小U')}</b><br>
         距離取件點：約 <b style="color:#111">${esc(distanceText)}</b><br>
-        小U狀態：${rider.busy?'任務中':'可接單'}
+        小U狀態：${esc(riderStateLabel(rider))}
       </div>
     </div>
     <div class="api-note" style="margin-top:10px">
@@ -1514,6 +1592,13 @@ document.addEventListener('click',event=>{
     state.filter = chip.dataset.filter;
     document.querySelectorAll('.chip[data-filter]').forEach(x=>x.classList.toggle('active',x===chip));
     renderOrders();
+  }
+
+  const riderChip = event.target.closest('.chip[data-rider-filter]');
+  if(riderChip){
+    state.riderFilter = riderChip.dataset.riderFilter || 'all';
+    document.querySelectorAll('.chip[data-rider-filter]').forEach(x=>x.classList.toggle('active',x===riderChip));
+    renderRiders();
   }
 
   if(event.target.closest('[data-close-modal]')) closeAssignModal();
