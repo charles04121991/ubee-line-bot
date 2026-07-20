@@ -347,6 +347,18 @@
       text-align: center;
       font-weight: 700;
     }
+
+    /* 2026-07-20｜快速估價資訊架構統一 */
+    #serviceGroupGrid{grid-template-columns:repeat(3,1fr)}
+    #serviceGroupGrid .service-btn{text-align:center;min-height:62px}
+    #serviceGrid{grid-template-columns:repeat(2,1fr)}
+    .quote-details{margin-top:10px;border-top:1px solid rgba(255,255,255,.12);padding-top:4px}
+    .quote-details summary{cursor:pointer;list-style:none;padding:12px 0 4px;font-weight:900;color:#fde68a}
+    .quote-details summary::-webkit-details-marker{display:none}
+    .quote-details summary::after{content:"›";float:right;font-size:22px;transform:rotate(90deg);transition:.15s}
+    .quote-details[open] summary::after{transform:rotate(-90deg)}
+    @media(max-width:380px){#serviceGroupGrid{grid-template-columns:1fr 1fr 1fr}#serviceGroupGrid .service-btn{font-size:13px}}
+
   </style>
 </head>
 
@@ -362,38 +374,23 @@
     </section>
 
     <section class="card">
-      <h2 class="section-title">1. 選擇服務類型</h2>
+      <h2 class="section-title">1. 你需要什麼服務？</h2>
 
-      <div class="service-grid" id="serviceGrid">
-        <button class="service-btn active" type="button" data-service="幫我送">
-          幫我送
-          <span>文件、物品、包裹</span>
+      <div class="service-grid" id="serviceGroupGrid">
+        <button class="service-btn active" type="button" data-group="send">
+          📦 幫我送
         </button>
+        <button class="service-btn" type="button" data-group="buy">
+          🛍️ 幫我買
+        </button>
+        <button class="service-btn" type="button" data-group="runner">
+          🏃 幫我跑腿
+        </button>
+      </div>
 
-        <button class="service-btn" type="button" data-service="幫代買">
-          幫代買
-          <span>餐點、飲料、日用品</span>
-        </button>
-
-        <button class="service-btn" type="button" data-service="幫我取">
-          幫我取
-          <span>取貨、取件、取物</span>
-        </button>
-
-        <button class="service-btn" type="button" data-service="幫排隊">
-          幫排隊
-          <span>現場排隊服務</span>
-        </button>
-
-        <button class="service-btn" type="button" data-service="全能跑腿">
-          全能跑腿
-          <span>臨時任務協助</span>
-        </button>
-
-        <button class="service-btn" type="button" data-service="急件專送">
-          急件專送
-          <span>高急迫性任務</span>
-        </button>
+      <div class="field">
+        <label>選擇更接近你的需求</label>
+        <div class="service-grid" id="serviceGrid"></div>
       </div>
 
       <div id="serviceNotice" class="service-notice"></div>
@@ -433,14 +430,6 @@
           全能跑腿會依任務處理時間、是否需要送達、代墊費用等條件估算。
         </div>
       </div>
-
-      <div class="field hidden" id="taskNoteField">
-        <label for="taskNoteInput">任務內容簡述</label>
-        <textarea id="taskNoteInput" placeholder="例如：到現場協助詢問、購買指定物品、臨時處理生活任務等。"></textarea>
-        <div class="hint">
-          此欄位只協助估價判斷，正式下單時仍需填寫完整任務內容。
-        </div>
-      </div>
     </section>
 
     <section class="card">
@@ -449,17 +438,17 @@
       <div class="speed-grid" id="speedGrid">
         <button class="speed-btn active" type="button" data-speed="standard">
           一般件
-          <span>90–120 分鐘｜不加價</span>
+          <span>一般媒合｜不加價</span>
         </button>
 
         <button class="speed-btn" type="button" data-speed="priority">
           標準件
-          <span>60–90 分鐘｜加價 $30</span>
+          <span>較高媒合優先度｜加價 $30</span>
         </button>
 
         <button class="speed-btn" type="button" data-speed="express">
           優先件
-          <span>45–60 分鐘｜加價 $60</span>
+          <span>優先媒合附近小U｜加價 $60</span>
         </button>
       </div>
 
@@ -474,7 +463,7 @@
       <div class="result-label">預估應付總額</div>
       <p class="price" id="totalPrice">$0</p>
 
-      <div class="rows">
+      <details class="quote-details"><summary>費用明細</summary><div class="rows">
         <div class="row">
           <span>服務類型</span>
           <strong id="serviceText">幫我送</strong>
@@ -534,14 +523,14 @@
           <span>客人預估應付總額</span>
           <strong id="customerTotalText">$0</strong>
         </div>
-      </div>
+      </div></details>
 
       <div class="notice" id="resultNotice">
         此金額為系統初步估算。實際費用仍可能依任務內容、等候時間、代墊金額、地址完整度與現場狀況調整。
       </div>
 
       <button id="orderButton" class="secondary-btn" type="button">
-        我要正式下單
+        前往正式下單
       </button>
 
       <button id="resetButton" class="ghost-btn" type="button">
@@ -670,8 +659,29 @@
       },
     };
 
-    const serviceButtons = document.querySelectorAll('.service-btn');
+    const serviceGroupButtons = document.querySelectorAll('#serviceGroupGrid .service-btn');
+    const serviceGrid = document.getElementById('serviceGrid');
     const speedButtons = document.querySelectorAll('.speed-btn');
+
+    const SERVICE_GROUPS = {
+      send: [
+        { label:'文件／包裹', service:'幫我送' },
+        { label:'蛋糕／花束', service:'幫我送' },
+        { label:'急件專送', service:'急件專送' }
+      ],
+      buy: [
+        { label:'餐點／飲料', service:'幫代買' },
+        { label:'藥品／生活用品', service:'幫代買' },
+        { label:'其他代買', service:'幫代買' }
+      ],
+      runner: [
+        { label:'幫我取', service:'幫我取' },
+        { label:'幫排隊', service:'幫排隊' },
+        { label:'代辦／其他跑腿', service:'全能跑腿' }
+      ]
+    };
+
+    let selectedGroup = 'send';
 
     const serviceNotice = document.getElementById('serviceNotice');
 
@@ -695,9 +705,6 @@
 
     const taskMinutesField = document.getElementById('taskMinutesField');
     const taskMinutesInput = document.getElementById('taskMinutesInput');
-
-    const taskNoteField = document.getElementById('taskNoteField');
-    const taskNoteInput = document.getElementById('taskNoteInput');
 
     const quoteButton = document.getElementById('quoteButton');
     const orderButton = document.getElementById('orderButton');
@@ -792,7 +799,6 @@
       toggleField(advanceField, config.showAdvance);
       toggleField(queueField, config.showQueue);
       toggleField(taskMinutesField, config.showTaskMinutes);
-      toggleField(taskNoteField, config.showTaskNote);
 
       if (config.showAdvance) {
         advanceLabel.textContent = config.advanceLabel || '預估代墊費用';
@@ -882,8 +888,8 @@
 
       const advancePayment = numberValue(advanceInput);
 
-      if (advancePayment > 10000) {
-        showError('代墊費用過高，建議改由客服協助確認是否可承接。');
+      if (advancePayment >= 1000) {
+        showError('UBee 跑腿目前代墊金額達 NT$1,000（含）以上需由客服人工確認，快速估價暫不開放直接試算。');
         advanceInput.focus();
         return false;
       }
@@ -997,20 +1003,36 @@
           '全能跑腿屬於特殊任務，快速估價僅供初步參考。若任務內容複雜、等待時間較長或代墊金額較高，實際費用可能由客服確認。';
       }
 
-      if (advancePayment > 1000) {
-        notice += ' 此次預估代墊費用已超過 $1,000，正式下單後可能需要先付款或由 UBee 跑腿客服確認。';
-      }
-
       resultNotice.textContent = notice;
     }
 
-    serviceButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        serviceButtons.forEach((btn) => btn.classList.remove('active'));
-        button.classList.add('active');
-        selectedService = button.dataset.service || '幫我送';
-        updateServiceUI();
+    function renderServiceChoices(group){
+      selectedGroup = SERVICE_GROUPS[group] ? group : 'send';
+      serviceGroupButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.group === selectedGroup));
+
+      const items = SERVICE_GROUPS[selectedGroup];
+      serviceGrid.innerHTML = items.map((item, index) => `
+        <button class="service-btn ${index === 0 ? 'active' : ''}" type="button"
+          data-service="${item.service}" data-label="${item.label}">
+          ${item.label}
+        </button>
+      `).join('');
+
+      selectedService = items[0].service;
+      updateServiceUI();
+
+      serviceGrid.querySelectorAll('.service-btn').forEach(button => {
+        button.addEventListener('click', () => {
+          serviceGrid.querySelectorAll('.service-btn').forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+          selectedService = button.dataset.service || '幫我送';
+          updateServiceUI();
+        });
       });
+    }
+
+    serviceGroupButtons.forEach(button => {
+      button.addEventListener('click', () => renderServiceChoices(button.dataset.group || 'send'));
     });
 
     speedButtons.forEach((button) => {
@@ -1022,7 +1044,7 @@
       });
     });
 
-    [fromInput, toInput, advanceInput, queueMinutesInput, taskMinutesInput, taskNoteInput].forEach((input) => {
+    [fromInput, toInput, advanceInput, queueMinutesInput, taskMinutesInput].forEach((input) => {
       input.addEventListener('input', () => {
         clearError();
         hideResult();
@@ -1088,7 +1110,7 @@
       }, 80);
     });
 
-    updateServiceUI();
+    renderServiceChoices('send');
   </script>
 </body>
 </html>
