@@ -870,6 +870,13 @@ function fitMapToData(customBounds){
    Dashboard 資料
    ========================= */
 async function loadDashboard({silent=false}={}){
+  if(!navigator.onLine){
+    const statusEl = document.getElementById('systemStatusText');
+    const mapStatusEl = document.getElementById('mapStatus');
+    if(statusEl) statusEl.textContent = '系統狀態：裝置網路中斷';
+    if(mapStatusEl) mapStatusEl.textContent = '連線受阻';
+    return;
+  }
   if(state.loading) return;
   state.loading = true;
   if(!silent) $('refreshBtn').disabled = true;
@@ -1365,6 +1372,75 @@ window.addEventListener('resize',()=>{
 initMap();
 loadDashboard();
 setInterval(()=>loadDashboard({silent:true}),10000);
+
+/* =========================================================
+   UBee 調度中心｜網路／後端受阻監控與自動恢復 2026-07-20
+   - 瀏覽器離線：停止無意義的人工操作提示，保留畫面最後資料
+   - 瀏覽器在線但後端不可達：顯示「後端連線異常」
+   - 恢復後立即重新讀取 dashboard
+   ========================================================= */
+(function initUBeeDispatchNetworkResilience(){
+  let checking = false;
+  let reconnectTimer = null;
+
+  function setStatus(kind,message){
+    const system = document.getElementById('systemStatusText');
+    const map = document.getElementById('mapStatus');
+    if(system) system.textContent = message;
+    if(map) map.textContent = kind==='ok' ? '自動更新中' : '連線受阻';
+    document.body.dataset.networkState = kind;
+  }
+
+  function ensureBanner(){
+    let el=document.getElementById('dispatchNetworkBanner');
+    if(el) return el;
+    el=document.createElement('div');
+    el.id='dispatchNetworkBanner';
+    el.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:100000;max-width:min(760px,calc(100% - 24px));padding:10px 14px;border-radius:12px;background:#fff1f2;color:#b42318;border:1px solid #fecdd3;font-size:12px;font-weight:900;box-shadow:0 10px 28px rgba(0,0,0,.16);display:none;text-align:center;';
+    document.body.appendChild(el); return el;
+  }
+  function banner(msg,hide=false){ const el=ensureBanner(); el.textContent=msg; el.style.display='block'; if(hide)setTimeout(()=>el.style.display='none',2600); }
+
+  async function health(){
+    if(checking) return false;
+    if(!navigator.onLine) return false;
+    checking=true;
+    try{
+      const c=new AbortController(); const tm=setTimeout(()=>c.abort(),5000);
+      const r=await fetch('/api/health?t='+Date.now(),{cache:'no-store',signal:c.signal}); clearTimeout(tm);
+      return r.ok;
+    }catch(e){ return false; }
+    finally{ checking=false; }
+  }
+
+  async function recover(){
+    clearTimeout(reconnectTimer);
+    reconnectTimer=setTimeout(async()=>{
+      if(!navigator.onLine){ setStatus('offline','系統狀態：裝置網路中斷'); return; }
+      const ok=await health();
+      if(!ok){ setStatus('backend-down','系統狀態：UBee 後端連線異常'); banner('裝置有網路，但目前無法連上 UBee 後端。調度中心保留最後畫面，恢復後會自動同步。'); reconnectTimer=setTimeout(recover,5000); return; }
+      setStatus('ok','系統狀態：正常'); banner('連線已恢復，正在同步最新調度資料。',true);
+      try{ if(typeof window.loadDashboard==='function') await window.loadDashboard({silent:true}); }catch(e){ console.warn('調度中心恢復同步失敗:',e); }
+    },500);
+  }
+
+  function guardAction(name){
+    const original=window[name];
+    if(typeof original!=='function' || original.__ubeeNetworkGuard) return;
+    const guarded=async function(){
+      if(!navigator.onLine){ banner('目前網路中斷，為避免調度狀態不一致，已暫停人工派單操作。'); return; }
+      return original.apply(this,arguments);
+    };
+    guarded.__ubeeNetworkGuard=true;
+    window[name]=guarded;
+  }
+  ['assignRider','redispatchOrder','expandRadius'].forEach(guardAction);
+
+  window.addEventListener('offline',()=>{ setStatus('offline','系統狀態：裝置網路中斷'); banner('目前行動網路／網際網路受阻。調度中心已保留最後資料，請暫停人工指定與重新派單，恢復後會自動同步。'); });
+  window.addEventListener('online',recover);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) recover(); });
+  if(!navigator.onLine){ setStatus('offline','系統狀態：裝置網路中斷'); banner('目前網路連線受阻，調度中心顯示的是最後一次成功同步資料。'); }
+})();
 </script>
 </body>
 </html>
