@@ -858,6 +858,22 @@ async function sendNewOrderPushToRiders(
                     riderDocId
                   );
                 }
+
+                const dispatchRiderId = String(
+                  rider.riderId || riderDocId || riderDoc.id || ''
+                ).trim();
+                Promise.allSettled([
+                  logDispatchEvent({
+                    type:'RIDER_NOTIFIED',
+                    orderId,
+                    riderId:dispatchRiderId,
+                    riderDocId:riderDocId || riderDoc.id || '',
+                    radiusKm:normalizedMaxRadiusKm,
+                    dispatchStage:pushRadiusLabel,
+                    createdAtMs:Date.now(),
+                  }),
+                  updateRiderDispatchStats(dispatchRiderId, { receivedOrders:1 }),
+                ]).catch(()=>{});
               })
               .catch(async (pushErr) => {
                 webPushFail += 1;
@@ -5691,6 +5707,494 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
   }
 });
 
+
+// ============================================================
+// UBee Level 4 智慧調度中心 V1
+// 原則：分析、預測、建議與事件紀錄；不在未經人工確認下強制指定小U。
+// ============================================================
+const UBEE_DISPATCH_INTELLIGENCE_VERSION = 'level4-v1';
+const UBEE_DISPATCH_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+const UBEE_RIDER_STATS_CACHE_MS = 30 * 1000;
+let ubeeLastDispatchSnapshotMs = 0;
+let ubeeRiderDispatchStatsCacheAtMs = 0;
+let ubeeRiderDispatchStatsCache = new Map();
+
+const UBEE_TAICHUNG_DISTRICTS = [
+  '中區','東區','南區','西區','北區','西屯區','南屯區','北屯區',
+  '豐原區','東勢區','大甲區','清水區','沙鹿區','梧棲區','后里區','神岡區',
+  '潭子區','大雅區','新社區','石岡區','外埔區','大安區','烏日區','大肚區',
+  '龍井區','霧峰區','太平區','大里區','和平區'
+];
+
+function dispatchClamp(value, min = 0, max = 100) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+function dispatchToMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const n = Date.parse(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  return 0;
+}
+
+function getDispatchOrderCreatedAtMs(order = {}) {
+  return Number(
+    order.createdAtMs ||
+    order.orderCreatedAtMs ||
+    order.submittedAtMs ||
+    0
+  ) || dispatchToMs(order.createdAt) || dispatchToMs(order.orderCreatedAt) || dispatchToMs(order.submittedAt);
+}
+
+function getDispatchOrderCompletedAtMs(order = {}) {
+  return Number(order.completedAtMs || 0) ||
+    dispatchToMs(order.completedAt) ||
+    dispatchToMs(order.statusTimes?.completed);
+}
+
+function inferDispatchDistrict(value = '') {
+  const text = String(value || '').replace(/臺/g, '台');
+  for (const district of UBEE_TAICHUNG_DISTRICTS) {
+    if (text.includes(district)) return district;
+  }
+  return '';
+}
+
+function buildDispatchZoneId(district = '') {
+  const clean = String(district || '').trim();
+  return clean ? `taichung_${clean}` : 'taichung_unknown';
+}
+
+function getDispatchOrderZone(order = {}) {
+  const district = String(
+    order.pickupDistrict ||
+    inferDispatchDistrict(order.pickupAddress || order.fromAddress || order.pickup || '') ||
+    ''
+  ).trim();
+  return {
+    district: district || '未分區',
+    zoneId: String(order.pickupZoneId || buildDispatchZoneId(district)).trim() || 'taichung_unknown',
+  };
+}
+
+function getDispatchRiderZone(rider = {}) {
+  const district = String(
+    rider.district ||
+    rider.cityDistrict ||
+    inferDispatchDistrict(rider.serviceArea || rider.area || '') ||
+    ''
+  ).trim();
+  return {
+    district: district || '未分區',
+    zoneId: buildDispatchZoneId(district),
+  };
+}
+
+function dispatchHaversineKm(lat1, lng1, lat2, lng2) {
+  const values = [lat1, lng1, lat2, lng2].map(Number);
+  if (values.some(v => !Number.isFinite(v))) return null;
+  const [aLat, aLng, bLat, bLng] = values;
+  const rad = d => d * Math.PI / 180;
+  const dLat = rad(bLat - aLat);
+  const dLng = rad(bLng - aLng);
+  const x = Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function getTaipeiTimeParts(ms = Date.now()) {
+  const d = new Date(Number(ms || Date.now()) + 8 * 60 * 60 * 1000);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+    weekday: d.getUTCDay(),
+    hour: d.getUTCHours(),
+    minute: d.getUTCMinutes(),
+    slot15: Math.floor(d.getUTCMinutes() / 15),
+    dateKey: `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`,
+  };
+}
+
+function buildDispatchOrderMetadata(order = {}, nowMs = Date.now()) {
+  const pickupDistrict = inferDispatchDistrict(order.pickupAddress || order.fromAddress || order.pickup || '');
+  const dropoffDistrict = inferDispatchDistrict(order.dropoffAddress || order.toAddress || order.dropoff || '');
+  const t = getTaipeiTimeParts(nowMs);
+  return {
+    pickupDistrict: pickupDistrict || '',
+    dropoffDistrict: dropoffDistrict || '',
+    pickupZoneId: buildDispatchZoneId(pickupDistrict),
+    dropoffZoneId: buildDispatchZoneId(dropoffDistrict),
+    createdHour: t.hour,
+    createdWeekday: t.weekday,
+    createdTimeSlot: `${String(t.hour).padStart(2,'0')}:${String(t.slot15*15).padStart(2,'0')}`,
+    dispatchIntelligenceVersion: UBEE_DISPATCH_INTELLIGENCE_VERSION,
+  };
+}
+
+async function logDispatchEvent(payload = {}) {
+  try {
+    const eventType = String(payload.type || '').trim();
+    if (!eventType) return false;
+    await db.collection('dispatchEvents').add({
+      ...payload,
+      type: eventType,
+      intelligenceVersion: UBEE_DISPATCH_INTELLIGENCE_VERSION,
+      createdAtMs: Number(payload.createdAtMs || Date.now()),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return true;
+  } catch (error) {
+    console.warn('⚠️ Level4 dispatchEvents 紀錄失敗（不影響核心流程）：', error?.message || error);
+    return false;
+  }
+}
+
+async function updateRiderDispatchStats(riderId, changes = {}) {
+  const safeRiderId = String(riderId || '').trim();
+  if (!safeRiderId) return false;
+  try {
+    const update = {
+      riderId: safeRiderId,
+      updatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      intelligenceVersion: UBEE_DISPATCH_INTELLIGENCE_VERSION,
+    };
+    const incrementFields = [
+      'receivedOrders','acceptedOrders','skippedOrders','completedOrders','manualAssignments','transferredOrders'
+    ];
+    for (const key of incrementFields) {
+      const n = Number(changes[key] || 0);
+      if (Number.isFinite(n) && n !== 0) update[key] = admin.firestore.FieldValue.increment(n);
+    }
+    for (const key of ['lastAcceptedAtMs','lastSkippedAtMs','lastCompletedAtMs','lastAssignedAtMs']) {
+      if (Number.isFinite(Number(changes[key]))) update[key] = Number(changes[key]);
+    }
+    await db.collection('riderDispatchStats').doc(safeRiderId).set(update, { merge: true });
+    return true;
+  } catch (error) {
+    console.warn('⚠️ Level4 riderDispatchStats 更新失敗（不影響核心流程）：', error?.message || error);
+    return false;
+  }
+}
+
+async function loadRiderDispatchStatsMap() {
+  try {
+    if (Date.now() - ubeeRiderDispatchStatsCacheAtMs < UBEE_RIDER_STATS_CACHE_MS) {
+      return ubeeRiderDispatchStatsCache;
+    }
+    const snap = await db.collection('riderDispatchStats').limit(1500).get();
+    const map = new Map();
+    snap.docs.forEach(doc => {
+      const v = doc.data() || {};
+      const keys = [doc.id, v.riderId, v.riderDocId].filter(Boolean).map(String);
+      keys.forEach(key => map.set(key, v));
+    });
+    ubeeRiderDispatchStatsCache = map;
+    ubeeRiderDispatchStatsCacheAtMs = Date.now();
+    return map;
+  } catch (error) {
+    console.warn('⚠️ Level4 riderDispatchStats 讀取失敗，改用既有快取／中性分數：', error?.message || error);
+    return ubeeRiderDispatchStatsCache || new Map();
+  }
+}
+
+function buildRiderCandidateScore(order, rider, stats = {}, nowMs = Date.now()) {
+  const distanceKm = dispatchHaversineKm(
+    order.pickupLat ?? order.fromLat,
+    order.pickupLng ?? order.fromLng,
+    rider.currentLat,
+    rider.currentLng
+  );
+  if (distanceKm === null) return null;
+  const locationAgeMs = Math.max(0, nowMs - Number(rider.locationUpdatedAtMs || 0));
+  const orderZone = getDispatchOrderZone(order);
+  const riderZone = getDispatchRiderZone(rider);
+  const skippedIds = Array.isArray(order.skippedRiderIds) ? order.skippedRiderIds.map(String) : [];
+  const riderKeys = [rider.riderId, rider.riderDocId, rider.phone].filter(Boolean).map(String);
+  const skippedThisOrder = riderKeys.some(key => skippedIds.includes(key));
+
+  let score = 100;
+  score -= Math.min(55, distanceKm * 7.5);
+  if (locationAgeMs > 2 * 60 * 1000) score -= 24;
+  else if (locationAgeMs > 60 * 1000) score -= 12;
+  else if (locationAgeMs > 30 * 1000) score -= 5;
+  if (rider.busy) score -= 50;
+  if (orderZone.district !== '未分區' && riderZone.district === orderZone.district) score += 8;
+  if (skippedThisOrder) score -= 60;
+
+  const accepted = Number(stats.acceptedOrders || 0);
+  const skipped = Number(stats.skippedOrders || 0);
+  const received = Number(stats.receivedOrders || 0);
+  const decisions = Math.max(received, accepted + skipped);
+  const acceptanceRate = decisions > 0 ? accepted / decisions : null;
+  if (acceptanceRate !== null && decisions >= 5) {
+    score += (acceptanceRate - 0.5) * 16;
+  }
+
+  score = Math.round(dispatchClamp(score, 0, 100));
+  const etaMinutes = Math.max(3, Math.ceil(distanceKm / 0.32));
+  return {
+    riderId: rider.riderId,
+    riderDocId: rider.riderDocId,
+    name: rider.name || '',
+    district: riderZone.district,
+    distanceKm: Number(distanceKm.toFixed(2)),
+    estimatedPickupMinutes: etaMinutes,
+    score,
+    locationAgeMs,
+    connectionState: locationAgeMs > 2 * 60 * 1000 ? 'STALE_LOCATION' : 'LIVE',
+    acceptanceRate: acceptanceRate === null ? null : Number(acceptanceRate.toFixed(3)),
+    decisions,
+    skippedThisOrder,
+    reasons: [
+      `${distanceKm.toFixed(1)} km 距離取件點`,
+      locationAgeMs <= 30 * 1000 ? '定位新鮮' : `定位已 ${Math.floor(locationAgeMs/1000)} 秒`,
+      riderZone.district === orderZone.district ? '同區域運力' : '跨區候選',
+      skippedThisOrder ? '此小U已略過本任務' : '可列入候選',
+    ],
+  };
+}
+
+function buildOrderRiskInsight(order, riders, zoneSummary, statsMap, nowMs = Date.now()) {
+  const createdAtMs = getDispatchOrderCreatedAtMs(order);
+  const waitMinutes = createdAtMs ? Math.max(0, (nowMs - createdAtMs) / 60000) : 0;
+  const available = riders.filter(r => !r.busy && Number.isFinite(Number(r.currentLat)) && Number.isFinite(Number(r.currentLng)));
+  const candidates = available
+    .map(r => buildRiderCandidateScore(order, r, statsMap.get(String(r.riderId)) || statsMap.get(String(r.riderDocId)) || {}, nowMs))
+    .filter(Boolean)
+    .sort((a,b) => b.score - a.score || a.distanceKm - b.distanceKm);
+
+  const within3 = candidates.filter(c => c.distanceKm <= 3 && !c.skippedThisOrder).length;
+  const within5 = candidates.filter(c => c.distanceKm <= 5 && !c.skippedThisOrder).length;
+  const within8 = candidates.filter(c => c.distanceKm <= 8 && !c.skippedThisOrder).length;
+  const nearestKm = candidates.length ? Math.min(...candidates.filter(c=>!c.skippedThisOrder).map(c=>c.distanceKm).concat([999])) : null;
+  const skippedCount = Array.isArray(order.skippedRiderIds) ? order.skippedRiderIds.length : 0;
+  const radiusKm = Number(order.dispatchManualRadiusKm || order.dispatchManualRedispatchRadiusKm || order.dispatchRadiusKm || 3) || 3;
+  const speed = String(order.speedType || '').toLowerCase();
+
+  let score = Math.min(38, waitMinutes * 4.6);
+  const reasons = [];
+  if (waitMinutes >= 2) reasons.push(`已等待 ${Math.floor(waitMinutes)} 分鐘`);
+  if (within3 === 0) { score += 18; reasons.push('3 km 內無可接小U'); }
+  else if (within3 <= 1) { score += 8; reasons.push('3 km 內運力偏少'); }
+  if (within5 === 0) { score += 10; reasons.push('5 km 內仍無可接小U'); }
+  if (nearestKm !== null && nearestKm > 8 && nearestKm < 999) { score += 10; reasons.push(`最近可接小U約 ${nearestKm.toFixed(1)} km`); }
+  if (nearestKm === 999 || nearestKm === null) { score += 14; reasons.push('目前找不到可用候選小U'); }
+  if (skippedCount >= 2) { score += Math.min(12, skippedCount * 2); reasons.push(`已有 ${skippedCount} 次略過紀錄`); }
+  if (radiusKm >= 8) { score += 5; reasons.push(`已擴圈至 ${radiusKm} km`); }
+  if (['priority','express','instant','urgent'].includes(speed)) { score += 6; reasons.push('此任務時效要求較高'); }
+  if (zoneSummary && Number(zoneSummary.expectedGap15m) < 0) {
+    score += Math.min(12, Math.abs(Number(zoneSummary.expectedGap15m)) * 2);
+    reasons.push(`${zoneSummary.district} 預測運力缺口 ${zoneSummary.expectedGap15m}`);
+  }
+  score = Math.round(dispatchClamp(score, 0, 100));
+
+  let level = 'NORMAL';
+  if (score >= 80) level = 'CRITICAL';
+  else if (score >= 60) level = 'HIGH';
+  else if (score >= 35) level = 'WATCH';
+
+  const recommendations = [];
+  if (within3 === 0 && radiusKm < 5) recommendations.push({ type:'EXPAND_RADIUS', targetRadiusKm:5, label:'擴大派單至 5 km' });
+  else if (within5 === 0 && radiusKm < 8) recommendations.push({ type:'EXPAND_RADIUS', targetRadiusKm:8, label:'擴大派單至 8 km' });
+  else if (within8 === 0 && radiusKm < 12) recommendations.push({ type:'EXPAND_RADIUS', targetRadiusKm:12, label:'擴大派單至 12 km' });
+  if (candidates[0] && candidates[0].score >= 55) recommendations.push({ type:'REVIEW_CANDIDATE', riderId:candidates[0].riderId, label:`優先檢視 ${candidates[0].name || candidates[0].riderId}` });
+  if (score >= 60) recommendations.push({ type:'MANUAL_REVIEW', label:'進入人工調度確認' });
+
+  return {
+    orderId: String(order.id || order.orderId || ''),
+    score,
+    level,
+    waitMinutes: Number(waitMinutes.toFixed(1)),
+    within3,
+    within5,
+    within8,
+    nearestKm: nearestKm === null || nearestKm === 999 ? null : Number(nearestKm.toFixed(2)),
+    skippedCount,
+    radiusKm,
+    reasons: reasons.slice(0, 6),
+    recommendations,
+    candidates: candidates.slice(0, 8),
+  };
+}
+
+async function buildDispatchIntelligence({ riders = [], allOrders = [], waitingStatuses, activeStatuses, nowMs = Date.now(), todayStartMs = 0 }) {
+  const statsMap = await loadRiderDispatchStatsMap();
+  const zones = new Map();
+  const getZone = (district, zoneId) => {
+    const id = zoneId || buildDispatchZoneId(district);
+    if (!zones.has(id)) {
+      zones.set(id, {
+        zoneId:id,
+        district:district || '未分區',
+        onlineRiders:0, availableRiders:0, busyRiders:0,
+        waitingOrders:0, activeOrders:0, todayOrders:0,
+        recent15Orders:0, previous15Orders:0,
+        predictedOrders15m:0, predictedAvailableRiders15m:0,
+        expectedGap15m:0, confidence:'LOW', risk:'NORMAL',
+      });
+    }
+    return zones.get(id);
+  };
+
+  riders.forEach(r => {
+    const z = getDispatchRiderZone(r);
+    const bucket = getZone(z.district, z.zoneId);
+    bucket.onlineRiders += 1;
+    if (r.busy) bucket.busyRiders += 1; else bucket.availableRiders += 1;
+  });
+
+  const historical = new Map();
+  const nowParts = getTaipeiTimeParts(nowMs);
+  const historicalCutoff = nowMs - 28 * 24 * 60 * 60 * 1000;
+  allOrders.forEach(order => {
+    const createdAtMs = getDispatchOrderCreatedAtMs(order);
+    if (!createdAtMs) return;
+    const zone = getDispatchOrderZone(order);
+    const bucket = getZone(zone.district, zone.zoneId);
+    const status = String(order.status || '').trim();
+    if (createdAtMs >= todayStartMs) bucket.todayOrders += 1;
+    if (waitingStatuses.has(status)) bucket.waitingOrders += 1;
+    if (activeStatuses.has(status)) bucket.activeOrders += 1;
+    if (createdAtMs >= nowMs - 15*60*1000) bucket.recent15Orders += 1;
+    else if (createdAtMs >= nowMs - 30*60*1000) bucket.previous15Orders += 1;
+
+    if (createdAtMs >= historicalCutoff && createdAtMs < nowMs - 30*60*1000) {
+      const p = getTaipeiTimeParts(createdAtMs);
+      if (p.weekday === nowParts.weekday && p.hour === nowParts.hour && p.slot15 === nowParts.slot15) {
+        if (!historical.has(zone.zoneId)) historical.set(zone.zoneId, new Map());
+        const byDate = historical.get(zone.zoneId);
+        byDate.set(p.dateKey, (byDate.get(p.dateKey) || 0) + 1);
+      }
+    }
+  });
+
+  for (const bucket of zones.values()) {
+    const dateSamples = historical.get(bucket.zoneId) || new Map();
+    const counts = [...dateSamples.values()];
+    const histAvg = counts.length ? counts.reduce((a,b)=>a+b,0) / counts.length : 0;
+    let predicted;
+    if (counts.length) predicted = bucket.recent15Orders * 0.55 + bucket.previous15Orders * 0.15 + histAvg * 0.30;
+    else predicted = bucket.recent15Orders * 0.72 + bucket.previous15Orders * 0.28;
+    bucket.predictedOrders15m = Math.max(0, Math.round(predicted));
+    bucket.predictedAvailableRiders15m = Math.max(0, bucket.availableRiders + Math.round(bucket.activeOrders * 0.25));
+    bucket.expectedGap15m = bucket.predictedAvailableRiders15m - (bucket.waitingOrders + bucket.predictedOrders15m);
+    bucket.confidence = counts.length >= 4 ? 'HIGH' : counts.length >= 2 || (bucket.recent15Orders + bucket.previous15Orders) >= 5 ? 'MEDIUM' : 'LOW';
+    bucket.risk = bucket.expectedGap15m <= -5 ? 'CRITICAL' : bucket.expectedGap15m <= -2 ? 'HIGH' : bucket.expectedGap15m < 0 ? 'WATCH' : 'NORMAL';
+    bucket.historicalSampleDays = counts.length;
+    bucket.historicalSameSlotAvg = Number(histAvg.toFixed(1));
+    bucket.demandScore = Math.round(dispatchClamp((bucket.waitingOrders * 10) + (bucket.predictedOrders15m * 5), 0, 100));
+    bucket.supplyScore = Math.round(dispatchClamp((bucket.availableRiders * 7) + (bucket.predictedAvailableRiders15m * 3), 0, 100));
+  }
+
+  const zoneArray = [...zones.values()]
+    .filter(z => z.onlineRiders || z.waitingOrders || z.activeOrders || z.todayOrders || z.predictedOrders15m)
+    .sort((a,b) => a.expectedGap15m - b.expectedGap15m || b.waitingOrders - a.waitingOrders);
+  const zoneMap = new Map(zoneArray.map(z => [z.zoneId, z]));
+
+  const waitingRaw = allOrders.filter(o => waitingStatuses.has(String(o.status || '').trim()));
+  const orderInsights = waitingRaw.map(order => {
+    const z = getDispatchOrderZone(order);
+    return buildOrderRiskInsight(order, riders, zoneMap.get(z.zoneId), statsMap, nowMs);
+  }).sort((a,b)=>b.score-a.score);
+
+  const recommendations = [];
+  for (const insight of orderInsights.filter(x => x.score >= 60).slice(0, 10)) {
+    recommendations.push({
+      id:`order_${insight.orderId}`,
+      type:'ORDER_RISK',
+      severity:insight.level,
+      orderId:insight.orderId,
+      title:`${insight.orderId} 需要調度關注`,
+      message:insight.reasons.slice(0,3).join('；') || '系統判定此任務風險升高',
+      actions:insight.recommendations,
+      requiresHumanConfirmation:true,
+    });
+  }
+  for (const z of zoneArray.filter(x => x.expectedGap15m < 0).slice(0, 8)) {
+    recommendations.push({
+      id:`zone_${z.zoneId}`,
+      type:'ZONE_GAP',
+      severity:z.risk,
+      zoneId:z.zoneId,
+      title:`${z.district} 預測運力不足`,
+      message:`15 分鐘預測需求 ${z.predictedOrders15m}、待接 ${z.waitingOrders}、預測可用運力 ${z.predictedAvailableRiders15m}，缺口 ${z.expectedGap15m}`,
+      actions:[{type:'CROSS_ZONE_SUPPORT',label:'檢視鄰近區域支援'},{type:'MANUAL_REVIEW',label:'人工確認運力配置'}],
+      requiresHumanConfirmation:true,
+    });
+  }
+
+  const totalPredictedDemand15m = zoneArray.reduce((s,z)=>s+z.predictedOrders15m,0);
+  const totalPredictedAvailable15m = zoneArray.reduce((s,z)=>s+z.predictedAvailableRiders15m,0);
+  const totalExpectedGap15m = totalPredictedAvailable15m - (waitingRaw.length + totalPredictedDemand15m);
+  const highRiskOrders = orderInsights.filter(x => ['HIGH','CRITICAL'].includes(x.level)).length;
+  const criticalOrders = orderInsights.filter(x => x.level === 'CRITICAL').length;
+
+  return {
+    version:UBEE_DISPATCH_INTELLIGENCE_VERSION,
+    generatedAtMs:nowMs,
+    autoExecutionEnabled:false,
+    humanConfirmationRequired:true,
+    summary:{
+      highRiskOrders,
+      criticalOrders,
+      predictedDemand15m:totalPredictedDemand15m,
+      predictedAvailable15m:totalPredictedAvailable15m,
+      expectedGap15m:totalExpectedGap15m,
+      activeRiskZones:zoneArray.filter(z=>z.expectedGap15m<0).length,
+    },
+    zones:zoneArray,
+    orderInsights:orderInsights.slice(0,100),
+    recommendations:recommendations.slice(0,20),
+  };
+}
+
+async function maybePersistDispatchIntelligence(intelligence = {}) {
+  const nowMs = Date.now();
+  if (nowMs - ubeeLastDispatchSnapshotMs < UBEE_DISPATCH_SNAPSHOT_INTERVAL_MS) return;
+  ubeeLastDispatchSnapshotMs = nowMs;
+  try {
+    const slotMs = Math.floor(nowMs / UBEE_DISPATCH_SNAPSHOT_INTERVAL_MS) * UBEE_DISPATCH_SNAPSHOT_INTERVAL_MS;
+    const batch = db.batch();
+    (intelligence.zones || []).slice(0, 40).forEach(zone => {
+      const safeZone = String(zone.zoneId || 'unknown').replace(/[\\/]/g,'_');
+      const snapRef = db.collection('dispatchZoneSnapshots').doc(`${slotMs}_${safeZone}`);
+      batch.set(snapRef, {
+        ...zone,
+        snapshotAtMs:slotMs,
+        snapshotAt:admin.firestore.FieldValue.serverTimestamp(),
+        intelligenceVersion:UBEE_DISPATCH_INTELLIGENCE_VERSION,
+      }, {merge:true});
+      const forecastRef = db.collection('dispatchForecasts').doc(safeZone);
+      batch.set(forecastRef, {
+        zoneId:zone.zoneId,
+        district:zone.district,
+        forecast15m:zone.predictedOrders15m,
+        predictedAvailable15m:zone.predictedAvailableRiders15m,
+        expectedGap15m:zone.expectedGap15m,
+        confidence:zone.confidence,
+        risk:zone.risk,
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        intelligenceVersion:UBEE_DISPATCH_INTELLIGENCE_VERSION,
+      }, {merge:true});
+    });
+    await batch.commit();
+  } catch (error) {
+    console.warn('⚠️ Level4 區域快照寫入失敗（不影響調度）：', error?.message || error);
+  }
+}
+
 // ============================================================
 // UBee 調度中心：即時監控 Dashboard API
 // 僅恢復調度中心讀取資料，不修改派單／接單／財務核心流程。
@@ -5748,12 +6252,24 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         currentOrderId: r.currentOrderId || '',
         currentLat: asNumberOrNull(r.currentLat ?? r.lat ?? r.latitude),
         currentLng: asNumberOrNull(r.currentLng ?? r.lng ?? r.longitude),
-        locationUpdatedAtMs
+        locationUpdatedAtMs,
+        locationAgeMs: locationUpdatedAtMs ? Math.max(0, nowMs - locationUpdatedAtMs) : null,
+        connectionState: locationUpdatedAtMs && (nowMs - locationUpdatedAtMs) > 2 * 60 * 1000
+          ? 'STALE_LOCATION'
+          : 'LIVE',
+        dispatchState: busy ? 'BUSY' : 'AVAILABLE'
       };
     }).filter(r => r.online);
 
     // 不使用複合索引，避免新環境第一次部署因 Firestore index 造成讀取失敗。
-    const orderSnap = await db.collection('orders').limit(800).get();
+    let orderSnap;
+    try {
+      // Level 4 預測優先使用最近資料；createdAt 是單欄位索引，不需複合索引。
+      orderSnap = await db.collection('orders').orderBy('createdAt', 'desc').limit(800).get();
+    } catch (orderQueryError) {
+      console.warn('⚠️ Level4 最新訂單排序讀取失敗，退回既有安全查詢：', orderQueryError?.message || orderQueryError);
+      orderSnap = await db.collection('orders').limit(800).get();
+    }
     const allOrders = orderSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
 
     const waitingStatuses = new Set([
@@ -5813,6 +6329,11 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         riderName: o.riderName || o.driverName || '',
         riderId: o.riderId || o.riderDocId || '',
         dispatchRadiusKm: Number(o.dispatchManualRadiusKm || o.dispatchManualRedispatchRadiusKm || 0) || null,
+        speedType: o.speedType || '',
+        serviceType: o.serviceType || '',
+        pickupDistrict: o.pickupDistrict || inferDispatchDistrict(o.pickupAddress || o.fromAddress || ''),
+        pickupZoneId: o.pickupZoneId || buildDispatchZoneId(inferDispatchDistrict(o.pickupAddress || o.fromAddress || '')),
+        skippedRiderIds: Array.isArray(o.skippedRiderIds) ? o.skippedRiderIds : [],
         createdAtMs: orderTimeMs(o)
       }));
 
@@ -5845,6 +6366,32 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       }
     });
 
+    const intelligence = await buildDispatchIntelligence({
+      riders,
+      allOrders,
+      waitingStatuses,
+      activeStatuses,
+      nowMs,
+      todayStartMs,
+    });
+
+    const insightMap = new Map(
+      (intelligence.orderInsights || []).map(item => [String(item.orderId), item])
+    );
+    const enrichedLiveOrders = liveOrders.map(order => {
+      const insight = insightMap.get(String(order.id)) || null;
+      return {
+        ...order,
+        riskScore: insight?.score ?? 0,
+        riskLevel: insight?.level ?? 'NORMAL',
+        riskReasons: insight?.reasons || [],
+        candidateRecommendations: insight?.candidates || [],
+        intelligenceRecommendations: insight?.recommendations || [],
+      };
+    });
+
+    maybePersistDispatchIntelligence(intelligence).catch(()=>{});
+
     return res.json({
       success: true,
       generatedAtMs: nowMs,
@@ -5853,11 +6400,16 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         availableRiders: riders.filter(r => !r.busy).length,
         waitingOrders: waitingOrders.length,
         activeOrders: activeOrders.length,
-        todayCompleted
+        todayCompleted,
+        highRiskOrders: intelligence.summary?.highRiskOrders || 0,
+        predictedDemand15m: intelligence.summary?.predictedDemand15m || 0,
+        predictedAvailable15m: intelligence.summary?.predictedAvailable15m || 0,
+        expectedGap15m: intelligence.summary?.expectedGap15m || 0
       },
-      orders: liveOrders,
+      orders: enrichedLiveOrders,
       riders: riders.slice(0, 300),
-      alerts: alerts.slice(0, 100)
+      alerts: alerts.slice(0, 100),
+      intelligence
     });
   } catch (err) {
     console.error('❌ UBee 調度中心 dashboard 讀取失敗：', err);
@@ -5866,6 +6418,24 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       message: '調度中心資料讀取失敗，請稍後再試。',
       error: err.message
     });
+  }
+});
+
+
+// Level 4：單一訂單調度事件時間軸。
+// 不使用複合索引；依 orderId 讀取後在記憶體排序。
+app.get('/api/dispatch/orders/:orderId/events', async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || '').trim().toUpperCase();
+    if (!orderId) return res.status(400).json({success:false,message:'缺少訂單編號。'});
+    const snap = await db.collection('dispatchEvents').where('orderId','==',orderId).limit(120).get();
+    const events = snap.docs.map(doc => ({id:doc.id,...(doc.data()||{})}))
+      .sort((a,b)=>Number(b.createdAtMs||0)-Number(a.createdAtMs||0))
+      .slice(0,100);
+    return res.json({success:true,orderId,events});
+  } catch (error) {
+    console.error('❌ Level4 調度事件時間軸讀取失敗：',error);
+    return res.status(500).json({success:false,message:'調度事件讀取失敗。'});
   }
 });
 
@@ -11433,7 +12003,20 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   completedAt: null,
 };
 
+    // Level 4：由後端統一產生可信任的區域與時間特徵，不依賴前端判斷。
+    Object.assign(order, buildDispatchOrderMetadata(order, Date.now()));
+
     await saveOrder(order);
+
+    logDispatchEvent({
+      type:'ORDER_CREATED',
+      orderId:order.id,
+      zoneId:order.pickupZoneId || '',
+      district:order.pickupDistrict || '',
+      serviceType:order.serviceType || '',
+      speedType:order.speedType || '',
+      createdAtMs:getDispatchOrderCreatedAtMs(order) || Date.now(),
+    }).catch(()=>{});
 
     await notifyCustomer(order, createTextMessage(
       `✅ 訂單已建立：${order.id}\n\n` +
@@ -11695,6 +12278,33 @@ function getEtaPayloadByStatus(status) {
   };
 }
 
+
+// Level 4：騎士端輕量調度事件（目前只接受 SKIPPED）。
+// 失敗不得影響既有接單畫面流程。
+app.post('/api/rider/dispatch-event', riderAuthMiddleware, async (req, res) => {
+  try {
+    const { orderId, type, lineUserId, phone, riderId } = req.body || {};
+    const eventType = String(type || '').trim().toUpperCase();
+    if (!orderId || !['SKIPPED'].includes(eventType)) {
+      return res.status(400).json({ success:false, message:'調度事件資料不完整。' });
+    }
+    const riderResult = await findApprovedRiderForApi({ lineUserId, phone, riderId });
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode || 403).json({ success:false, message:riderResult.message || '騎士身分驗證失敗。' });
+    }
+    const identity = buildRiderApiIdentity(riderResult.riderDoc, riderResult.rider || {}, { lineUserId, phone, riderId });
+    const nowMs = Date.now();
+    await Promise.allSettled([
+      logDispatchEvent({ type:'RIDER_SKIPPED', orderId:String(orderId).trim().toUpperCase(), riderId:identity.riderId, riderDocId:identity.riderDocId, createdAtMs:nowMs }),
+      updateRiderDispatchStats(identity.riderId, { skippedOrders:1, lastSkippedAtMs:nowMs }),
+    ]);
+    return res.json({ success:true });
+  } catch (error) {
+    console.warn('⚠️ Level4 騎士調度事件失敗：', error?.message || error);
+    return res.status(500).json({ success:false, message:'調度事件紀錄失敗。' });
+  }
+});
+
 // 3. 接受任務：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
@@ -11820,6 +12430,21 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
     clearDispatchPushTimers(
       safeOrderId
     );
+
+    const acceptedNowMs = Date.now();
+    Promise.allSettled([
+      logDispatchEvent({
+        type:'RIDER_ACCEPTED',
+        orderId:safeOrderId,
+        riderId:identity.riderId,
+        riderDocId:identity.riderDocId,
+        createdAtMs:acceptedNowMs,
+      }),
+      updateRiderDispatchStats(identity.riderId, {
+        acceptedOrders:1,
+        lastAcceptedAtMs:acceptedNowMs,
+      }),
+    ]).catch(()=>{});
     
     try {
       await notifyCustomer(
@@ -12177,6 +12802,18 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
       );
     }
     
+    Promise.allSettled([
+      logDispatchEvent({
+        type:'RIDER_TRANSFERRED',
+        orderId:safeOrderId,
+        riderId:identity.riderId,
+        riderDocId:identity.riderDocId,
+        reason:safeReason,
+        createdAtMs:Date.now(),
+      }),
+      updateRiderDispatchStats(identity.riderId, { transferredOrders:1 }),
+    ]).catch(()=>{});
+
     return res.json({
       success: true,
 
@@ -12455,6 +13092,24 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     });
 
     orders[safeOrderId] = updatedOrder;
+
+    const statusEventType = status === 'completed'
+      ? 'ORDER_COMPLETED'
+      : `ORDER_STATUS_${String(status || '').toUpperCase()}`;
+    const statusEventTasks = [
+      logDispatchEvent({
+        type:statusEventType,
+        orderId:safeOrderId,
+        riderId:identity.riderId,
+        riderDocId:identity.riderDocId,
+        status,
+        createdAtMs:Date.now(),
+      })
+    ];
+    if (status === 'completed') {
+      statusEventTasks.push(updateRiderDispatchStats(identity.riderId, { completedOrders:1, lastCompletedAtMs:Date.now() }));
+    }
+    Promise.allSettled(statusEventTasks).catch(()=>{});
 
     try {
       await notifyCustomer(
@@ -13690,6 +14345,18 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
       );
     }
 
+    Promise.allSettled([
+      logDispatchEvent({
+        type:'MANUAL_ASSIGN',
+        orderId:safeOrderId,
+        riderId:identity.riderId,
+        riderDocId:identity.riderDocId,
+        source:String(req.body?.source || 'dispatch_center'),
+        createdAtMs:Date.now(),
+      }),
+      updateRiderDispatchStats(identity.riderId, { manualAssignments:1, lastAssignedAtMs:Date.now() }),
+    ]).catch(()=>{});
+
     return res.json({
       success: true,
       orderId: safeOrderId,
@@ -13858,6 +14525,14 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
       currentOrder,
       newCycleId
     );
+
+    logDispatchEvent({
+      type:'REDISPATCH',
+      orderId:safeOrderId,
+      radiusKm:requestedRadiusKm,
+      source:String(req.body?.source || 'dispatch_center'),
+      createdAtMs:Date.now(),
+    }).catch(()=>{});
 
     return res.json({
       success: true,
@@ -14049,6 +14724,15 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
         });
       }
     }
+
+    logDispatchEvent({
+      type:'RADIUS_EXPANDED',
+      orderId:safeOrderId,
+      radiusKm,
+      previousRadiusKm,
+      source:String(req.body?.source || 'dispatch_center'),
+      createdAtMs:Date.now(),
+    }).catch(()=>{});
 
     return res.json({
       success: true,
