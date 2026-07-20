@@ -6972,7 +6972,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       .filter(Boolean);
 
     // 智慧候選與既有派單判斷只使用真正在線的小U，避免把暫停／離線者誤列為可派單。
-    const activeRiders = allApprovedRiders.filter(r => r.online);
+    // 稍後會以 orders 的真實進行中訂單重新校正 BUSY，避免幽靈任務。
+    let activeRiders = [];
 
     // 不使用複合索引，避免新環境第一次部署因 Firestore index 造成讀取失敗。
     let orderSnap;
@@ -6995,6 +6996,128 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       'going_to_dropoff', 'heading_to_dropoff', 'arrived_dropoff'
     ]);
     const completedStatuses = new Set(['completed']);
+
+    // ============================================================
+    // UBee 調度真相層：任務中必須以 orders 真實進行中訂單為準
+    // riders.busy / riders.currentOrderId 只能當提示，不能單獨決定 BUSY。
+    // ============================================================
+    let authoritativeActiveOrders = [];
+    let activeOrderTruthReliable = false;
+
+    try {
+      const activeOrderSnap = await db
+        .collection('orders')
+        .where('status', 'in', Array.from(activeStatuses))
+        .limit(1000)
+        .get();
+
+      authoritativeActiveOrders = activeOrderSnap.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() || {})
+      }));
+      activeOrderTruthReliable = true;
+    } catch (activeOrderTruthError) {
+      console.warn(
+        '⚠️ 調度中心進行中訂單真相查詢失敗，暫以 dashboard 訂單資料判斷：',
+        activeOrderTruthError?.message || activeOrderTruthError
+      );
+      authoritativeActiveOrders = allOrders.filter(order =>
+        activeStatuses.has(String(order.status || '').trim())
+      );
+    }
+
+    const normalizeDispatchIdentity = value =>
+      String(value || '').trim().toLowerCase();
+
+    const normalizeDispatchPhone = value =>
+      String(value || '').replace(/\D/g, '');
+
+    const activeOrderForRider = rider => {
+      const riderIds = new Set([
+        rider.riderDocId,
+        rider.riderId
+      ].map(normalizeDispatchIdentity).filter(Boolean));
+      const riderPhone = normalizeDispatchPhone(rider.phone);
+
+      return authoritativeActiveOrders.find(order => {
+        const orderIds = [
+          order.riderDocId,
+          order.riderId,
+          order.driverId
+        ].map(normalizeDispatchIdentity).filter(Boolean);
+        const orderPhone = normalizeDispatchPhone(
+          order.riderPhone || order.driverPhone || ''
+        );
+
+        if (rider.currentOrderId &&
+            normalizeDispatchIdentity(order.id) === normalizeDispatchIdentity(rider.currentOrderId)) {
+          return true;
+        }
+
+        if (orderIds.some(id => riderIds.has(id))) {
+          return true;
+        }
+
+        return !!riderPhone && !!orderPhone && riderPhone === orderPhone;
+      }) || null;
+    };
+
+    const ghostBusyRiders = [];
+
+    for (const rider of allApprovedRiders) {
+      const matchedActiveOrder = activeOrderForRider(rider);
+      const hadBusyResidue =
+        rider.busy === true ||
+        !!String(rider.currentOrderId || '').trim();
+      const verifiedBusy = !!matchedActiveOrder;
+
+      rider.busy = verifiedBusy;
+      rider.currentOrderId = matchedActiveOrder
+        ? String(matchedActiveOrder.id || '').trim()
+        : '';
+      rider.acceptingOrders = rider.online === true && !verifiedBusy;
+      rider.ghostBusy = hadBusyResidue && !verifiedBusy;
+
+      if (verifiedBusy) {
+        rider.dispatchState = 'BUSY';
+      } else if (rider.online === true) {
+        rider.dispatchState = 'AVAILABLE';
+      } else if (rider.declaredOnline === false) {
+        rider.dispatchState = 'PAUSED';
+      } else {
+        rider.dispatchState = 'OFFLINE';
+      }
+
+      if (rider.ghostBusy) {
+        ghostBusyRiders.push(rider);
+      }
+    }
+
+    // 只有查詢真相成功時才自動清除 Firestore 殘留 busy/currentOrderId，避免誤修。
+    if (activeOrderTruthReliable && ghostBusyRiders.length) {
+      try {
+        const repairBatch = db.batch();
+        ghostBusyRiders.slice(0, 400).forEach(rider => {
+          repairBatch.set(
+            db.collection('riders').doc(rider.riderDocId),
+            {
+              busy: false,
+              currentOrderId: '',
+              ghostBusyRepairedAtMs: nowMs,
+              ghostBusyRepairedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        });
+        await repairBatch.commit();
+        console.log(`✅ 已自動修復 ${Math.min(ghostBusyRiders.length, 400)} 位小U幽靈任務狀態`);
+      } catch (ghostRepairError) {
+        console.warn('⚠️ 幽靈任務狀態自動修復失敗（不影響調度畫面）：', ghostRepairError?.message || ghostRepairError);
+      }
+    }
+
+    // 智慧候選只使用真正在線者；BUSY 已由 orders 真實狀態校正。
+    activeRiders = allApprovedRiders.filter(r => r.online);
 
     const orderTimeMs = o =>
       Number(o.createdAtMs || o.orderCreatedAtMs || o.submittedAtMs || 0) ||
@@ -7115,6 +7238,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         busyRiders: allApprovedRiders.filter(r => r.dispatchState === 'BUSY').length,
         pausedRiders: allApprovedRiders.filter(r => r.dispatchState === 'PAUSED').length,
         offlineRiders: allApprovedRiders.filter(r => r.dispatchState === 'OFFLINE').length,
+        ghostBusyRepaired: ghostBusyRiders.length,
         waitingOrders: waitingOrders.length,
         activeOrders: activeOrders.length,
         todayCompleted,
