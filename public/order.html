@@ -8326,61 +8326,77 @@ body{background:#eef0f2;}
 }
 
 .home-primary-service-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:10px;
-  margin:15px 0;
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  margin:7px -16px 14px;
+  padding:3px 12px 9px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+  overscroll-behavior-x:contain;
+}
+
+.home-primary-service-grid::-webkit-scrollbar{
+  display:none;
+}
+
+.home-primary-service-grid::after{
+  content:"";
+  flex:0 0 4px;
 }
 
 .home-primary-service-card{
-  min-width:0;
-  min-height:122px;
+  flex:0 0 68px;
+  min-width:68px;
+  min-height:76px;
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
-  gap:6px;
-  padding:14px 8px 12px;
-  border:1px solid #e6e7e9;
-  border-radius:20px;
-  background:#fff;
+  justify-content:flex-start;
+  gap:5px;
+  padding:6px 3px 5px;
+  border:none;
+  border-radius:14px;
+  background:transparent;
   color:#111;
-  box-shadow:0 5px 18px rgba(17,24,39,.045);
+  box-shadow:none;
+  scroll-snap-align:start;
+  transition:transform .15s ease, background .15s ease;
 }
 
 .home-primary-service-card:active{
-  transform:scale(.98);
+  transform:scale(.96);
+  background:#f7f7f7;
 }
 
 .home-primary-service-icon{
   display:flex;
   align-items:center;
   justify-content:center;
-  width:52px;
-  height:52px;
-  margin-bottom:2px;
-  border-radius:16px;
-  background:#fff7cf;
-  font-size:29px;
+  width:38px;
+  height:38px;
+  margin:0;
+  border-radius:12px;
+  background:#fff5c4;
+  font-size:22px;
   line-height:1;
 }
 
 .home-primary-service-card strong{
-  font-size:16px;
-  font-weight:1000;
+  width:100%;
+  color:#222;
+  font-size:11px;
+  font-weight:950;
+  line-height:1.25;
+  text-align:center;
   white-space:nowrap;
 }
 
 .home-primary-service-card small{
-  display:block;
-  max-width:100%;
-  overflow:hidden;
-  color:#8b9096;
-  font-size:10px;
-  font-weight:800;
-  line-height:1.4;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  display:none;
 }
 
 .home-service-status-simple{
@@ -8956,23 +8972,27 @@ body{background:#eef0f2;}
 
 @media(max-width:360px){
   .home-primary-service-grid{
-    gap:7px;
+    gap:4px;
+    padding-left:10px;
+    padding-right:10px;
   }
 
   .home-primary-service-card{
-    min-height:112px;
-    padding-left:5px;
-    padding-right:5px;
+    flex-basis:64px;
+    min-width:64px;
+    min-height:72px;
+    padding-left:2px;
+    padding-right:2px;
   }
 
   .home-primary-service-card strong{
-    font-size:14px;
+    font-size:10px;
   }
 
   .home-primary-service-icon{
-    width:46px;
-    height:46px;
-    font-size:25px;
+    width:36px;
+    height:36px;
+    font-size:21px;
   }
 
   .service-hub-grid{
@@ -9207,27 +9227,35 @@ body{background:#eef0f2;}
             </button>
           </div>
 
-          <button class="home-service-search" type="button" onclick="openServiceHub('root')">
-            <span>選擇你需要的服務</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M9 18l6-6-6-6"></path>
-            </svg>
-          </button>
-
-          <div class="home-primary-service-grid" aria-label="主要服務">
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')">
+          <div class="home-primary-service-grid" aria-label="主要服務，可左右滑動查看更多">
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')" aria-label="幫我送">
               <span class="home-primary-service-icon">📦</span>
               <strong>幫我送</strong>
             </button>
 
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('buy')">
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')" aria-label="幫我取">
+              <span class="home-primary-service-icon">🤲</span>
+              <strong>幫我取</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('buy')" aria-label="幫我買">
               <span class="home-primary-service-icon">🛍️</span>
               <strong>幫我買</strong>
             </button>
 
-            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')">
-              <span class="home-primary-service-icon">🏃</span>
-              <strong>幫我跑腿</strong>
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')" aria-label="幫排隊">
+              <span class="home-primary-service-icon">⏱️</span>
+              <strong>幫排隊</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')" aria-label="全能跑腿">
+              <span class="home-primary-service-icon">⭐</span>
+              <strong>全能跑腿</strong>
+            </button>
+
+            <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')" aria-label="急件專送">
+              <span class="home-primary-service-icon">⚡</span>
+              <strong>急件專送</strong>
             </button>
           </div>
 
