@@ -869,54 +869,76 @@
       }
     }
   
-/* 2026-07-20｜UBee 跑腿夥伴申請新版精簡 */
-.page{max-width:620px;padding:14px 14px 42px}
-.topbar{margin-bottom:10px}
-.logoU{width:44px;height:44px;border-radius:14px;font-size:25px}
-.brandText b{font-size:23px}
-.brandText span{font-size:11px;letter-spacing:.4px;text-transform:none}
-.hero{padding:24px 20px;border-radius:26px;margin-bottom:12px}
-.heroBadge{margin-bottom:12px;letter-spacing:.6px}
-h1{font-size:34px;margin-bottom:10px}
-.heroText{font-size:14px;line-height:1.7;margin-bottom:18px}
-.heroActions{display:grid;grid-template-columns:1fr;gap:8px}
-.heroBtn{border-radius:16px;width:100%;min-height:52px}
-.heroSubNote{text-align:center;font-size:12px}
-.quickStats{grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
-.quickStat{min-height:94px;padding:12px;border-radius:17px}
-.quickIcon{font-size:20px}
-.quickTitle{font-size:13px}.quickText{font-size:11px}
-.processCard{border-radius:22px;padding:15px;margin-bottom:12px}
-.steps{grid-template-columns:repeat(3,1fr)}
-.step{min-height:92px;border-radius:16px;padding:12px 9px}
-.mainCard{border-radius:26px;padding:18px}
-.noticeBox{border-radius:18px;padding:14px;margin-bottom:20px}
-.noticeIcon{width:38px;height:38px;border-radius:12px}
-.noticeText{font-size:13px;line-height:1.65}.noticeText b{font-size:16px}
+/* =========================================================
+   UBee 小U申請｜乾淨重製正式版
+   僅重整 UI 與資訊層級，不改申請 API、欄位名稱或 payload
+   ========================================================= */
+body{background:#f5f6f7;color:#111}
+.page{max-width:620px;padding:12px 14px 38px}
+.topbar{min-height:56px;margin-bottom:8px}
+.logoU{width:42px;height:42px;border-radius:14px;font-size:24px;box-shadow:none}
+.brandText b{font-size:22px}
+.brandText span{margin-top:2px;font-size:11px;letter-spacing:0;text-transform:none}
+.statusPill{padding:8px 11px;box-shadow:none}
+.hero{padding:24px 20px;margin-bottom:12px;border-radius:24px;background:#fff;box-shadow:none}
+.hero::after{width:160px;height:160px;right:-72px;bottom:-82px;background:rgba(250,204,21,.18)}
+.heroBadge{padding:7px 10px;margin-bottom:12px;letter-spacing:.4px;text-transform:none;font-size:11px}
+h1{font-size:34px;margin-bottom:10px;letter-spacing:-.7px}
+.heroText{max-width:none;margin-bottom:18px;font-size:14px;line-height:1.7;font-weight:750}
+.heroActions{display:block}
+.heroBtn{width:100%;min-height:52px;padding:13px 18px;border-radius:16px;background:#111;box-shadow:none}
+.heroSubNote{margin-top:9px;text-align:center;font-size:11px;line-height:1.55}
+.processCard{padding:14px 15px;margin-bottom:12px;border-radius:20px;box-shadow:none}
+.processTitle{margin-bottom:12px}
+.processTitle b{font-size:16px}.processTitle span{font-size:11px}
+.simpleSteps{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:8px;align-items:center}
+.simpleStep{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;color:#111}
+.simpleStep span{width:25px;height:25px;flex:0 0 25px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#111;color:#fff;font-size:11px;font-weight:1000}
+.simpleStep b{font-size:12px;font-weight:950;white-space:nowrap}
+.simpleArrow{color:#b0b3b7;font-size:20px;font-weight:900}
+.mainCard{padding:18px 16px;border-radius:24px;box-shadow:none}
+.noticeBox{gap:11px;padding:13px;margin-bottom:20px;border-radius:16px}
+.noticeIcon{width:36px;height:36px;border-radius:11px;font-size:17px}
+.noticeText{font-size:12px;line-height:1.65}.noticeText b{font-size:15px;margin-bottom:3px}
 .section{margin-top:24px}
-.sectionTitle{font-size:21px}
-.fieldGrid{grid-template-columns:1fr;gap:10px}
-.field{min-height:82px;border-radius:17px;padding:12px 14px}
-input,select,textarea{font-size:16px}
-.formHint{font-size:12px;border-radius:14px}
-.agreeGrid{grid-template-columns:1fr;gap:8px}
-.agreeBox{min-height:auto;border-radius:17px;padding:14px}
-.agreeIcon{width:36px;height:36px;border-radius:12px;font-size:18px}
-.agreeTitle{font-size:15px}
-.agreeDesc{font-size:12px;line-height:1.65}
-.finalAgreeBox{border-radius:18px;padding:14px}
-.agreeBtn{min-height:54px;border-radius:16px;font-size:15px}
-.note{font-size:12px;border-radius:15px;padding:13px}
-.submitBtn{min-height:60px;border-radius:18px;font-size:18px;background:var(--accent);color:#111}
-.footer{font-size:12px}
+.sectionHeader{align-items:flex-start;margin-bottom:11px;padding-bottom:9px}
+.sectionTitle{font-size:20px}.sectionHint{font-size:11px}
+.fieldGrid{grid-template-columns:1fr;gap:9px}
+.field{min-height:78px;padding:11px 13px;border-radius:16px;background:#fff}
+label{margin-bottom:7px;font-size:12px}
+input,select,textarea{min-height:36px;font-size:16px;font-weight:850}
+.formHint{padding:11px 12px;margin-top:9px;border-radius:13px;font-size:11px;line-height:1.6}
+.agreementChecklist{display:flex;flex-direction:column;gap:9px}
+.agreementCheck{position:relative;display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;align-items:flex-start;margin:0;padding:13px;border:1px solid var(--line);border-radius:15px;background:#fff;cursor:pointer}
+.agreementCheck input{position:absolute;opacity:0;pointer-events:none}
+.agreementBoxMark{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:2px solid #d1d5db;border-radius:7px;color:transparent;font-size:13px;font-weight:1000;transition:.15s ease}
+.agreementCheck input:checked + .agreementBoxMark{border-color:#111;background:#111;color:#fff}
+.agreementCheck b{display:block;color:#111;font-size:13px;line-height:1.45}
+.agreementCheck small{display:block;margin-top:4px;color:#6b7280;font-size:11px;line-height:1.55;font-weight:750}
+.fullRules{margin-top:11px;border:1px solid var(--line);border-radius:15px;background:#fafafa;overflow:hidden}
+.fullRules summary{position:relative;padding:13px 38px 13px 13px;cursor:pointer;list-style:none;color:#111;font-size:13px;font-weight:950}
+.fullRules summary::-webkit-details-marker{display:none}
+.fullRules summary::after{content:"＋";position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#6b7280;font-size:18px}
+.fullRules[open] summary::after{content:"－"}
+.fullRulesBody{padding:0 13px 13px;border-top:1px solid var(--line)}
+.fullRulesBody h3{margin:13px 0 4px;color:#111;font-size:13px}
+.fullRulesBody p{margin:0;color:#5f6368;font-size:11px;line-height:1.65;font-weight:750}
+.note{padding:11px 12px;margin-top:11px;border-radius:13px;font-size:11px;line-height:1.6}
+.submitArea{margin-top:20px;padding-top:15px}
+.submitBtn{min-height:58px;border-radius:16px;background:var(--accent);color:#111;font-size:18px;box-shadow:none}
+.submitMiniText{font-size:11px;margin-top:8px}
+.successBox,.errorBox{border-radius:15px;font-size:13px}
+.footer{padding-top:18px;font-size:11px}.footer b{font-size:13px}
 @media(max-width:420px){
-  .quickStats{grid-template-columns:1fr 1fr 1fr}
-  .quickStat{display:block;min-height:100px}
-  .quickIcon{width:auto;margin-bottom:5px}
-  .steps{grid-template-columns:1fr 1fr 1fr}
-  .stepText{display:none}
-  .step{min-height:72px}
+  .page{padding:10px 12px 34px}
+  .statusPill{display:inline-flex}
+  .hero{padding:21px 17px;border-radius:21px}
   h1{font-size:31px}
+  .mainCard{padding:16px 13px;border-radius:21px}
+  .simpleSteps{gap:5px}
+  .simpleStep{gap:5px}
+  .simpleStep b{font-size:11px}
+  .simpleArrow{font-size:17px}
 }
 
 </style>
@@ -948,59 +970,33 @@ input,select,textarea{font-size:16px}
       <h1>成為 UBee 小U</h1>
 
       <p class="heroText">
-        自由安排上線時間，依自己的狀況選擇是否接任務。完成審核後，即可使用 UBee 騎士端接收附近跑腿任務。
+        自由上線、彈性接單。完成審核後，即可使用 UBee 騎士端接收附近可承接的跑腿任務。
       </p>
 
       <div class="heroActions">
         <button class="heroBtn" type="button" onclick="document.getElementById('formCard').scrollIntoView({behavior:'smooth'})">
-          立即填寫申請 <span>›</span>
+          開始申請 <span>›</span>
         </button>
         <div class="heroSubNote">
-          送出後由 UBee 進行資料審核<br>
-          審核通過後才可開始接單
+          填寫約 2～3 分鐘<br>
+          審核通過後開通騎士資格
         </div>
       </div>
 
-      <div class="quickStats">
-        <div class="quickStat"><div class="quickIcon">⏱️</div><div><div class="quickTitle">自由上線</div><div class="quickText">有空再上線，不強制排班。</div></div></div>
-        <div class="quickStat"><div class="quickIcon">📍</div><div><div class="quickTitle">附近任務</div><div class="quickText">依你的服務區域接收可承接任務。</div></div></div>
-        <div class="quickStat"><div class="quickIcon">💰</div><div><div class="quickTitle">收入透明</div><div class="quickText">接單前先看任務與報酬，再決定是否承接。</div></div></div>
-      </div>
-    </div>
-  </div>
-    </div>
+          </div>
   </div>
 
   <div class="processCard">
     <div class="processTitle">
       <b>申請流程</b>
-      <span>約 2～3 分鐘</span>
+      <span>3 個步驟</span>
     </div>
-
-    <div class="steps">
-      <div class="step"><div class="stepNo">1</div><div class="stepTitle">填寫資料</div><div class="stepText">你的資料、配送工具與服務區域。</div></div>
-      <div class="step"><div class="stepNo">2</div><div class="stepTitle">確認規範</div><div class="stepText">閱讀合作方式與平台規範。</div></div>
-      <div class="step"><div class="stepNo">3</div><div class="stepTitle">等待審核</div><div class="stepText">審核通過後即可進入騎士端。</div></div>
-    </div>
-  </div>
-
-      <div class="step">
-        <div class="stepNo">2</div>
-        <div class="stepTitle">填寫接單設定</div>
-        <div class="stepText">提供配送工具、車牌、服務區域與時段。</div>
-      </div>
-
-      <div class="step">
-        <div class="stepNo">3</div>
-        <div class="stepTitle">確認合作規範</div>
-        <div class="stepText">閱讀平台規範、風險與資料使用說明。</div>
-      </div>
-
-      <div class="step">
-        <div class="stepNo">4</div>
-        <div class="stepTitle">等待審核通知</div>
-        <div class="stepText">審核通過後，UBee 會通知後續流程。</div>
-      </div>
+    <div class="simpleSteps" aria-label="申請流程">
+      <div class="simpleStep"><span>1</span><b>填寫資料</b></div>
+      <div class="simpleArrow">›</div>
+      <div class="simpleStep"><span>2</span><b>確認規範</b></div>
+      <div class="simpleArrow">›</div>
+      <div class="simpleStep"><span>3</span><b>等待審核</b></div>
     </div>
   </div>
 
@@ -1010,7 +1006,7 @@ input,select,textarea{font-size:16px}
       <div class="noticeIcon">✓</div>
       <div class="noticeText">
         <b>申請前請先確認</b>
-        申請資料只用於 UBee 合作審核與必要營運聯繫。完成審核後，才會開通騎士端接單資格。
+        請填寫真實資料。申請資料僅用於 UBee 合作審核、必要聯繫與營運管理；審核通過後才會開通騎士端接單資格。
       </div>
     </div>
 
@@ -1018,7 +1014,7 @@ input,select,textarea{font-size:16px}
 
       <div class="section">
         <div class="sectionHeader">
-          <h2 class="sectionTitle">基本資料</h2>
+          <h2 class="sectionTitle">你的資料</h2>
           <div class="sectionHint">請填寫真實資料</div>
         </div>
 
@@ -1083,7 +1079,7 @@ input,select,textarea{font-size:16px}
 
       <div class="section">
         <div class="sectionHeader">
-          <h2 class="sectionTitle">配送資料</h2>
+          <h2 class="sectionTitle">接單設定</h2>
           <div class="sectionHint">設定你方便接單的方式</div>
         </div>
 
@@ -1140,89 +1136,57 @@ input,select,textarea{font-size:16px}
           <div class="sectionHint">送出前請確認</div>
         </div>
 
-        <div class="agreeGrid">
+        <div class="agreementChecklist">
+          <label class="agreementCheck">
+            <input type="checkbox" id="agreePlatform">
+            <span class="agreementBoxMark">✓</span>
+            <span><b>我了解 UBee 為任務媒合平台</b><small>合作屬接案性質，非僱傭關係，UBee 不保證派單量。</small></span>
+          </label>
 
-          <div class="agreeBox">
-            <div class="agreeTop">
-              <div class="agreeIcon">📦</div>
-              <div class="agreeTitle">商務急件與物品遞送</div>
-            </div>
-            <p class="agreeDesc">
-              可接受文件、合約、發票、小型商務物件等即時任務，並重視準時與安全交付。
-            </p>
-          </div>
+          <label class="agreementCheck">
+            <input type="checkbox" id="agreePrivate">
+            <span class="agreementBoxMark">✓</span>
+            <span><b>我了解不得私接、私下收費</b><small>不得繞過平台交易、偽造完成紀錄或私自承接平台客戶。</small></span>
+          </label>
 
-          <div class="agreeBox">
-            <div class="agreeTop">
-              <div class="agreeIcon">🛡️</div>
-              <div class="agreeTitle">保險與風險確認</div>
-            </div>
-            <p class="agreeDesc">
-              本人或車輛已有機車強制險，並了解接案過程須自行承擔相關交通與執行風險。
-            </p>
-          </div>
+          <label class="agreementCheck">
+            <input type="checkbox" id="agreeRisk">
+            <span class="agreementBoxMark">✓</span>
+            <span><b>我了解接案風險與相關責任</b><small>須遵守交通規範，並配合處理本人疏失造成的貨損或其他爭議。</small></span>
+          </label>
 
-          <div class="agreeBox">
-            <div class="agreeTop">
-              <div class="agreeIcon">🚫</div>
-              <div class="agreeTitle">禁止私接客戶</div>
-            </div>
-            <p class="agreeDesc">
-              不私接客戶、不私下收價、不繞過平台交易。違規者 UBee 有權警告、暫停或終止合作。
-            </p>
-          </div>
-
-          <div class="agreeBox">
-            <div class="agreeTop">
-              <div class="agreeIcon">🤝</div>
-              <div class="agreeTitle">接案合作性質</div>
-            </div>
-            <p class="agreeDesc">
-              本合作為接案合作性質，非勞雇關係。UBee 不保證派單量，報酬依實際完成任務結算。
-            </p>
-          </div>
-
-          <div class="agreeBox">
-            <div class="agreeTop">
-              <div class="agreeIcon">📋</div>
-              <div class="agreeTitle">遵守騎手規範</div>
-            </div>
-            <p class="agreeDesc">
-              包含不得私接客戶、不得私下收費、不得偽造完成紀錄，並須依平台任務流程操作。
-            </p>
-          </div>
-
-          <div class="agreeBox">
-            <div class="agreeTop">
-              <div class="agreeIcon">⚠️</div>
-              <div class="agreeTitle">責任釐清與處理</div>
-            </div>
-            <p class="agreeDesc">
-              UBee 為任務媒合平台，若因本人疏失造成貨物遺失或損壞，須配合平台釐清與處理。
-            </p>
-          </div>
-
-          <div class="agreeBox">
-            <div class="agreeTop">
-              <div class="agreeIcon">🔐</div>
-              <div class="agreeTitle">個人資料使用</div>
-            </div>
-            <p class="agreeDesc">
-              本人同意 UBee 於合作審核、派單聯繫與必要營運範圍內，蒐集、處理及使用個人資料。
-            </p>
-          </div>
-
+          <label class="agreementCheck">
+            <input type="checkbox" id="agreePrivacy">
+            <span class="agreementBoxMark">✓</span>
+            <span><b>我同意必要的個人資料使用</b><small>資料僅用於合作審核、派單聯繫與必要營運管理。</small></span>
+          </label>
         </div>
 
-        <div class="finalAgreeBox">
-          <div class="finalAgreeText">
-            請確認你已閱讀上方全部合作規範。送出後，代表你同意 UBee 合作夥伴申請、審核、派單與平台管理相關規範。
-          </div>
+        <details class="fullRules">
+          <summary>查看完整合作規範</summary>
+          <div class="fullRulesBody">
+            <h3>商務急件與物品遞送</h3>
+            <p>可接受文件、合約、發票、小型商務物件等即時任務，並重視準時與安全交付。</p>
 
-          <button id="agreeBtn" type="button" class="agreeBtn">
-            我已閱讀並同意全部合作規範
-          </button>
-        </div>
+            <h3>保險與風險確認</h3>
+            <p>本人或車輛已有依法應備之相關保險，並了解接案過程須自行承擔相關交通與執行風險。</p>
+
+            <h3>禁止私接客戶</h3>
+            <p>不私接客戶、不私下收價、不繞過平台交易。違規者 UBee 有權警告、暫停或終止合作。</p>
+
+            <h3>接案合作性質</h3>
+            <p>本合作為接案合作性質，非勞雇關係。UBee 不保證派單量，報酬依實際完成任務結算。</p>
+
+            <h3>遵守騎手規範</h3>
+            <p>不得私接客戶、不得私下收費、不得偽造完成紀錄，並須依平台任務流程操作。</p>
+
+            <h3>責任釐清與處理</h3>
+            <p>UBee 為任務媒合平台，若因本人疏失造成貨物遺失或損壞，須配合平台釐清與處理。</p>
+
+            <h3>個人資料使用</h3>
+            <p>本人同意 UBee 於合作審核、派單聯繫與必要營運範圍內，蒐集、處理及使用個人資料。</p>
+          </div>
+        </details>
 
         <div class="note">
           ※ 送出申請後，UBee 會進行資料審核。審核通過後，系統會透過官方帳號通知你後續流程。
@@ -1243,7 +1207,7 @@ input,select,textarea{font-size:16px}
   </div>
 
   <div class="footer">
-    <b>UBee 城市任務平台</b><br>
+    <b>UBee 跑腿</b><br>
     合作夥伴申請資料僅供審核與派單必要流程使用。
   </div>
 
@@ -1276,10 +1240,14 @@ async function initLiff() {
 
 window.addEventListener('load', initLiff);
 
-document.getElementById('agreeBtn').addEventListener('click', function(){
-  hasAgreed = true;
-  this.classList.add('active');
-  this.innerText = '✅ 已閱讀並同意全部合作規範';
+const agreementCheckboxIds = ['agreePlatform','agreePrivate','agreeRisk','agreePrivacy'];
+
+function updateAgreementState(){
+  hasAgreed = agreementCheckboxIds.every(id => document.getElementById(id)?.checked === true);
+}
+
+agreementCheckboxIds.forEach(id => {
+  document.getElementById(id)?.addEventListener('change', updateAgreementState);
 });
 
 document.getElementById('riderForm').addEventListener('submit', async function(e) {
@@ -1353,7 +1321,7 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
 
   if (!hasAgreed) {
     errorBox.style.display = 'block';
-    errorBox.innerHTML = '請先點選「我已閱讀並同意全部合作規範」。';
+    errorBox.innerHTML = '請先完成上方 4 項合作規範確認。';
     return;
   }
 
