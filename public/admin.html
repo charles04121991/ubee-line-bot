@@ -2,772 +2,512 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UBee 跑腿｜財務結算中心</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>UBee 跑腿｜財務結算中心 V2</title>
 <style>
-*{
-  box-sizing:border-box;
+:root{
+  --bg:#f4f5f7;
+  --card:#ffffff;
+  --text:#111318;
+  --muted:#737780;
+  --line:#e6e8ec;
+  --yellow:#facc15;
+  --yellow-strong:#eab308;
+  --green:#169b62;
+  --blue:#2878f0;
+  --red:#dc3f45;
+  --orange:#e98a00;
+  --shadow:0 10px 30px rgba(17,19,24,.06);
 }
-body{
-  margin:0;
-  background:#050505;
-  color:#fff;
-  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;
-}
-button{
-  font-family:inherit;
-}
-.app{
-  max-width:620px;
-  margin:0 auto;
-  padding:22px 16px 80px;
-}
-.title{
-  font-size:28px;
-  font-weight:1000;
-  margin-bottom:6px;
-}
-.sub{
-  color:#aaa;
-  font-size:14px;
-  font-weight:800;
-  line-height:1.7;
-  margin-bottom:20px;
-}
-.top-actions{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-bottom:16px;
-}
-.top-actions .btn{
-  margin-top:0;
-  padding:12px 8px;
-  font-size:14px;
-}
-.stat{
-  background:#111;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:22px;
-  padding:18px;
-  margin-bottom:16px;
-}
-.stat-label{
-  color:#aaa;
-  font-size:14px;
-  font-weight:900;
-}
-.stat-value{
-  font-size:34px;
-  font-weight:1000;
-  color:#facc15;
-  margin-top:8px;
-}
-.stat-meta{
-  color:#aaa;
-  font-size:13px;
-  font-weight:800;
-  line-height:1.7;
-  margin-top:8px;
-}
-.card{
-  background:#111;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:22px;
-  padding:16px;
-  margin-bottom:14px;
-}
-.rider-card{
-  border-color:rgba(250,204,21,.38);
-}
-.rider-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:14px;
-  padding-bottom:13px;
-  margin-bottom:8px;
-  border-bottom:1px solid rgba(255,255,255,.1);
-}
-.rider-name{
-  font-size:20px;
-  font-weight:1000;
-  line-height:1.35;
-}
-.rider-meta{
-  color:#aaa;
-  font-size:13px;
-  font-weight:800;
-  line-height:1.65;
-  margin-top:5px;
-  word-break:break-word;
-}
-.rider-total{
-  flex:0 0 auto;
-  color:#f87171;
-  font-size:24px;
-  font-weight:1000;
-  text-align:right;
-}
-.rider-count{
-  color:#aaa;
-  font-size:12px;
-  font-weight:800;
-  margin-top:5px;
-  text-align:right;
-}
-.order-card{
-  background:#181818;
-  border:1px solid rgba(255,255,255,.09);
-  border-radius:18px;
-  padding:14px;
-  margin-top:12px;
-}
-.order-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  margin-bottom:7px;
-}
-.order-no{
-  font-size:15px;
-  font-weight:1000;
-  word-break:break-word;
-}
-.tag{
-  flex:0 0 auto;
-  display:inline-flex;
-  align-items:center;
-  min-height:28px;
-  padding:5px 9px;
-  border-radius:999px;
-  background:rgba(248,113,113,.13);
-  color:#fca5a5;
-  font-size:12px;
-  font-weight:1000;
-}
-.row{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:12px;
-  padding:8px 0;
-  border-bottom:1px solid rgba(255,255,255,.08);
-  font-size:15px;
-  line-height:1.5;
-}
-.row:last-of-type{
-  border-bottom:none;
-}
-.label{
-  color:#aaa;
-  font-weight:800;
-}
-.value{
-  max-width:65%;
-  font-weight:1000;
-  text-align:right;
-  word-break:break-word;
-}
-.fee{
-  color:#22c55e;
-  font-size:24px;
-  font-weight:1000;
-}
-.due{
-  color:#f87171;
-  font-size:21px;
-  font-weight:1000;
-}
-.btn{
-  width:100%;
-  border:0;
-  border-radius:16px;
-  padding:15px;
-  margin-top:14px;
-  background:#facc15;
-  color:#111;
-  font-size:17px;
-  font-weight:1000;
-  cursor:pointer;
-}
-.btn:disabled{
-  opacity:.45;
-  cursor:not-allowed;
-}
-.btn-dark{
-  background:#222;
-  color:#fff;
-  border:1px solid rgba(255,255,255,.14);
-}
-.btn-dark.active{
-  background:#facc15;
-  color:#111;
-  border-color:#facc15;
-}
-.btn-red{
-  background:#ef4444;
-  color:#fff;
-}
-.btn-small{
-  padding:12px;
-  font-size:15px;
-}
-.empty{
-  text-align:center;
-  color:#aaa;
-  padding:30px 10px;
-  font-weight:800;
-  line-height:1.7;
-}
-@media (max-width:520px){
-  .top-actions{
-    grid-template-columns:1fr;
-  }
-  .rider-header{
-    flex-direction:column;
-  }
-  .rider-total,
-  .rider-count{
-    text-align:left;
-  }
-}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+.app{max-width:1440px;margin:0 auto;padding:20px 18px 80px}
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.brand{font-size:29px;font-weight:1000;letter-spacing:-.8px}
+.brand .bee{color:var(--yellow-strong)}
+.sub{margin-top:6px;color:var(--muted);font-size:13px;font-weight:800;line-height:1.65}
+.top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.status-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid var(--line);border-radius:999px;background:#fff;color:#52606d;font-size:12px;font-weight:900}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(22,155,98,.12)}
+.status-pill.offline .status-dot{background:var(--red);box-shadow:0 0 0 4px rgba(220,63,69,.12)}
+.btn{border:1px solid var(--line);background:#fff;color:#111;border-radius:12px;padding:10px 13px;font-weight:950;box-shadow:0 3px 10px rgba(0,0,0,.03)}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn.primary{background:#111;color:#fff;border-color:#111}
+.btn.yellow{background:var(--yellow);border-color:var(--yellow);color:#111}
+.btn.red{background:#fff2f3;border-color:#ffd0d3;color:#bf252d}
+.btn.blue{background:#eef5ff;border-color:#d9e7ff;color:#1e63c7}
+.btn.small{padding:8px 10px;font-size:12px;border-radius:10px}
+.tabs{display:flex;gap:8px;overflow:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:950;color:#5c626c}
+.tab.active{background:#111;color:#fff;border-color:#111}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:var(--shadow);min-width:0}
+.kpi-label{font-size:12px;font-weight:900;color:var(--muted)}
+.kpi-value{font-size:28px;font-weight:1000;line-height:1.05;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-value.red{color:var(--red)}
+.kpi-value.blue{color:var(--blue)}
+.kpi-value.green{color:var(--green)}
+.kpi-value.yellow{color:#b47b00}
+.kpi-sub{font-size:11px;color:#92969e;font-weight:800;margin-top:7px;line-height:1.5}
+.content-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid var(--line)}
+.panel-title{font-size:17px;font-weight:1000}
+.panel-sub{margin-top:4px;font-size:11px;color:var(--muted);font-weight:800;line-height:1.55}
+.panel-body{padding:14px}
+.section-note{padding:11px 12px;border-radius:13px;background:#f8f9fa;border:1px solid var(--line);font-size:12px;line-height:1.65;color:#5e6570;font-weight:800;margin-bottom:12px}
+.section-note strong{color:#111}
+.flow-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.flow-card{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff}
+.flow-title{font-size:14px;font-weight:1000}
+.flow-dir{font-size:24px;font-weight:1000;margin:8px 0 3px}
+.flow-dir.in{color:var(--red)}
+.flow-dir.out{color:var(--blue)}
+.flow-desc{font-size:12px;color:var(--muted);font-weight:800;line-height:1.6}
+.rider-list{display:grid;gap:12px}
+.rider-card{border:1px solid var(--line);border-radius:17px;padding:14px;background:#fff}
+.rider-card.cash{border-left:4px solid var(--red)}
+.rider-card.jko{border-left:4px solid var(--blue)}
+.rider-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.rider-name{font-size:18px;font-weight:1000;line-height:1.35}
+.rider-meta{margin-top:4px;font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;word-break:break-all}
+.rider-total{text-align:right;flex:0 0 auto}
+.rider-total strong{display:block;font-size:23px;font-weight:1000}
+.rider-total.cash strong{color:var(--red)}
+.rider-total.jko strong{color:var(--blue)}
+.rider-total span{display:block;margin-top:4px;color:var(--muted);font-size:11px;font-weight:850}
+.summary-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.summary-mini{background:#f7f8fa;border:1px solid #eceef1;border-radius:13px;padding:10px}
+.summary-mini span{display:block;font-size:10px;color:var(--muted);font-weight:850}
+.summary-mini strong{display:block;font-size:15px;margin-top:4px;font-weight:1000}
+.rider-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-size:12px;font-weight:950;color:#444b55;list-style:none}
+summary::-webkit-details-marker{display:none}
+.order-list{display:grid;gap:8px;margin-top:10px}
+.order-card{border:1px solid var(--line);border-radius:14px;background:#fafbfc;padding:12px}
+.order-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.order-no{font-size:13px;font-weight:1000;word-break:break-all}
+.tag{display:inline-flex;align-items:center;min-height:24px;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:1000;white-space:nowrap}
+.tag.cash{background:#fff0f1;color:#bc2931}
+.tag.jko{background:#edf5ff;color:#2166c7}
+.tag.done{background:#ecf8f1;color:#197a4d}
+.rows{margin-top:8px}
+.row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #eceef1;font-size:12px;line-height:1.45}
+.row:last-child{border-bottom:none}
+.row .label{color:var(--muted);font-weight:800}
+.row .value{font-weight:950;text-align:right;word-break:break-word}
+.amount-red{color:var(--red)}
+.amount-blue{color:var(--blue)}
+.empty{padding:34px 12px;text-align:center;color:#999ea7;font-size:13px;font-weight:850;line-height:1.7}
+.alert-list,.history-list{display:grid;gap:9px}
+.alert-item{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fff}
+.alert-item.critical{border-color:#ffc7ca;background:#fff7f7}
+.alert-item.warning{border-color:#ffe0a6;background:#fffbf2}
+.alert-title{font-size:13px;font-weight:1000}
+.alert-message{font-size:12px;color:#676d76;font-weight:800;line-height:1.6;margin-top:4px}
+.alert-meta{font-size:10px;color:#9a9ea6;font-weight:800;margin-top:6px}
+.history-item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.history-item:last-child{border-bottom:none}
+.history-icon{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:1000;background:#f2f3f5}
+.history-main{min-width:0}
+.history-title{font-size:13px;font-weight:1000}
+.history-sub{font-size:11px;color:var(--muted);font-weight:800;line-height:1.5;margin-top:3px;word-break:break-all}
+.history-amount{text-align:right;font-size:14px;font-weight:1000;white-space:nowrap}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search{min-width:220px;flex:1;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fff;outline:none;font-size:13px;font-weight:800}
+.view{display:none}
+.view.active{display:block}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9999;max-width:min(520px,calc(100% - 28px));padding:11px 14px;border-radius:12px;background:#111;color:#fff;font-size:12px;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.2);display:none;text-align:center}
+@media(max-width:1050px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.content-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.app{padding:14px 12px 70px}.topbar{flex-direction:column}.top-actions{width:100%;justify-content:flex-start}.kpis{grid-template-columns:1fr 1fr}.flow-grid{grid-template-columns:1fr}.summary-row{grid-template-columns:1fr}.rider-head{flex-direction:column}.rider-total{text-align:left}.toolbar{align-items:stretch}.search{min-width:0;width:100%}}
+@media(max-width:430px){.kpis{grid-template-columns:1fr}.brand{font-size:25px}.kpi-value{font-size:25px}.history-item{grid-template-columns:auto 1fr}.history-amount{grid-column:2;text-align:left}}
 </style>
 </head>
-
 <body>
 <div class="app">
-  <div class="title">UBee 跑腿財務結算中心</div>
-  <div class="sub">管理騎士現金回繳與街口支付待撥款。店家應收款與店家月結功能已移除。</div>
+  <header class="topbar">
+    <div>
+      <div class="brand">UBee <span class="bee">財務結算中心</span></div>
+      <div class="sub">現金回繳與街口待撥款分流管理。回繳狀態與撥款狀態只由平台財務端確認，不由小U自行歸零。</div>
+    </div>
+    <div class="top-actions">
+      <div class="status-pill" id="systemStatus"><span class="status-dot"></span><span id="systemStatusText">連線檢查中</span></div>
+      <button class="btn" type="button" onclick="refreshAll(true)">重新整理</button>
+    </div>
+  </header>
 
-  <div class="top-actions">
-    <button id="cashTabButton" class="btn btn-dark active" onclick="loadCashRemittances()">
-      騎士現金回繳
-    </button>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="overview">財務總覽</button>
+    <button class="tab" data-view="cash">現金回繳</button>
+    <button class="tab" data-view="jko">街口待撥款</button>
+    <button class="tab" data-view="alerts">異常提醒 <span id="alertTabCount"></span></button>
+    <button class="tab" data-view="history">結算紀錄</button>
+  </nav>
 
-    <button id="settlementTabButton" class="btn btn-dark" onclick="loadSettlements()">
-      騎士待撥款（街口）
-    </button>
+  <section class="kpis">
+    <div class="kpi"><div class="kpi-label">今日完成訂單</div><div class="kpi-value" id="kpiTodayCompleted">0</div><div class="kpi-sub">今日已完成的任務數</div></div>
+    <div class="kpi"><div class="kpi-label">現金待回繳</div><div class="kpi-value red" id="kpiCashPending">$0</div><div class="kpi-sub" id="kpiCashSub">0 位小U待處理</div></div>
+    <div class="kpi"><div class="kpi-label">街口待撥款</div><div class="kpi-value blue" id="kpiJkoPending">$0</div><div class="kpi-sub" id="kpiJkoSub">0 位小U待處理</div></div>
+    <div class="kpi"><div class="kpi-label">待處理小U</div><div class="kpi-value yellow" id="kpiPendingRiders">0</div><div class="kpi-sub">現金／街口未結清聯集</div></div>
+    <div class="kpi"><div class="kpi-label">今日已處理金額</div><div class="kpi-value green" id="kpiProcessed">$0</div><div class="kpi-sub" id="kpiProcessedSub">回繳 $0・撥款 $0</div></div>
+  </section>
 
-    <button class="btn btn-dark" onclick="refreshCurrentView()">
-      重新整理
-    </button>
-  </div>
+  <main>
+    <section class="view active" id="view-overview">
+      <div class="content-grid">
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">今日財務工作台</div><div class="panel-sub">先看待處理總額與異常，再進入現金回繳或街口待撥款執行確認。</div></div></div>
+          <div class="panel-body">
+            <div class="flow-grid">
+              <div class="flow-card"><div class="flow-title">現金單</div><div class="flow-dir in">小U → UBee</div><div class="flow-desc">客人把現金交給小U。小U保留自己的任務收入與代墊回收，其餘平台應收款需回繳 UBee。</div><button class="btn red small" style="margin-top:12px" onclick="switchView('cash')">處理現金回繳</button></div>
+              <div class="flow-card"><div class="flow-title">街口支付</div><div class="flow-dir out">UBee → 小U</div><div class="flow-desc">平台已收客人款項。正式應撥給小U＝騎士任務收入＋騎士代墊款。</div><button class="btn blue small" style="margin-top:12px" onclick="switchView('jko')">處理街口待撥</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><div class="panel-title">需要優先注意</div><div class="panel-sub">高額、等待過久或缺少小U識別資料會出現在這裡。</div></div><button class="btn small" onclick="switchView('alerts')">全部</button></div>
+          <div class="panel-body"><div id="overviewAlerts" class="alert-list"><div class="empty">正在讀取異常資料...</div></div></div>
+        </div>
+      </div>
+    </section>
 
-  <div class="stat">
-    <div class="stat-label" id="mainStatLabel">騎士待回繳平台總額</div>
-    <div class="stat-value" id="pendingTotal">$0</div>
-    <div class="stat-meta" id="mainStatMeta">正在讀取現金回繳資料...</div>
-  </div>
+    <section class="view" id="view-cash">
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">小U現金回繳</div><div class="panel-sub">依「總額待回繳」由高到低排序；可單筆確認，也可一次確認同一小U全部回繳。</div></div>
+          <div class="toolbar"><input id="cashSearch" class="search" placeholder="搜尋小U姓名／電話／識別碼" oninput="renderCash()"><button class="btn small" onclick="loadCashRemittances(true)">更新</button></div>
+        </div>
+        <div class="panel-body">
+          <div class="section-note"><strong>現金公式：</strong>應回繳平台＝客人支付現金－小U代墊款－小U任務收入。財務確認後，該筆才會從小U「應回繳平台」扣除。</div>
+          <div id="cashList" class="rider-list"><div class="empty">正在讀取現金回繳資料...</div></div>
+        </div>
+      </div>
+    </section>
 
-  <div id="list">
-    <div class="empty">正在讀取財務資料...</div>
-  </div>
+    <section class="view" id="view-jko">
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">小U待撥款（街口）</div><div class="panel-sub">按小U彙總顯示平台實際應撥款，可單筆或整批確認。</div></div>
+          <div class="toolbar"><input id="jkoSearch" class="search" placeholder="搜尋小U姓名／電話／識別碼" oninput="renderJko()"><button class="btn small" onclick="loadSettlements(true)">更新</button></div>
+        </div>
+        <div class="panel-body">
+          <div class="section-note"><strong>街口公式：</strong>平台應撥＝小U任務收入＋小U代墊款。這兩項會分開顯示，避免只撥任務收入而漏掉代墊。</div>
+          <div id="jkoList" class="rider-list"><div class="empty">正在讀取街口待撥款資料...</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-alerts">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">財務異常提醒</div><div class="panel-sub">目前規則：單筆待處理 ≥ NT$5,000、等待超過 24 小時、或缺少小U識別資料會列入提醒。</div></div></div>
+        <div class="panel-body"><div id="alertList" class="alert-list"><div class="empty">正在讀取異常提醒...</div></div></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-history">
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">最近結算紀錄</div><div class="panel-sub">顯示最近的現金回繳確認與街口撥款確認，供對帳追溯。</div></div></div>
+        <div class="panel-body"><div id="historyList" class="history-list"><div class="empty">正在讀取結算紀錄...</div></div></div>
+      </div>
+    </section>
+  </main>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
 const API_BASE = window.location.origin;
-let currentView = "cash-remittances";
+const state = {
+  view:'overview',
+  overview:null,
+  cash:null,
+  jko:null,
+  loading:false,
+};
 
-function money(n){
-  return "$" + Math.round(Number(n || 0)).toLocaleString("zh-TW");
+function money(value){
+  return '$' + Math.round(Number(value || 0)).toLocaleString('zh-TW');
 }
-
-function escapeHtml(str){
-  return String(str ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+function esc(value){
+  return String(value ?? '')
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#039;');
 }
-
-function getPaymentText(method){
-  const text = String(method || "").toLowerCase();
-
-  if(text.includes("jko") || text.includes("街口")) return "街口支付";
-  if(text.includes("cash") || text.includes("現金")) return "現金";
-  if(text.includes("platform")) return "平台收款";
-
-  return method || "未設定";
+function toMs(value){
+  if(!value) return 0;
+  if(typeof value === 'number') return value;
+  if(value._seconds) return Number(value._seconds)*1000;
+  if(value.seconds) return Number(value.seconds)*1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
 }
-
 function formatTime(value){
-  if(!value) return "-";
-
-  try{
-    if(value._seconds){
-      return new Date(value._seconds * 1000).toLocaleString("zh-TW");
-    }
-
-    if(value.seconds){
-      return new Date(value.seconds * 1000).toLocaleString("zh-TW");
-    }
-
-    const date = new Date(value);
-
-    if(Number.isNaN(date.getTime())){
-      return "-";
-    }
-
-    return date.toLocaleString("zh-TW");
-  }catch(e){
-    return "-";
-  }
+  const ms = toMs(value);
+  if(!ms) return '-';
+  return new Date(ms).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});
 }
-
-function setActiveView(view){
-  currentView = view;
-
-  document.getElementById("cashTabButton").classList.toggle(
-    "active",
-    view === "cash-remittances"
-  );
-
-  document.getElementById("settlementTabButton").classList.toggle(
-    "active",
-    view === "settlements"
-  );
+function formatAge(ms){
+  const n = Number(ms || 0);
+  if(!n) return '-';
+  const min = Math.floor(n/60000);
+  if(min < 60) return `${min} 分鐘`;
+  const hour = Math.floor(min/60);
+  if(hour < 48) return `${hour} 小時`;
+  return `${Math.floor(hour/24)} 天`;
 }
-
-async function refreshCurrentView(){
-  if(currentView === "settlements"){
-    await loadSettlements();
-    return;
-  }
-
-  await loadCashRemittances();
+function showToast(message){
+  const el = document.getElementById('toast');
+  el.textContent = message;
+  el.style.display = 'block';
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(()=>el.style.display='none',3200);
 }
-
-async function readJsonResponse(res){
-  const data = await res.json().catch(() => ({}));
-
+async function readJson(res){
+  const data = await res.json().catch(()=>({}));
   if(!res.ok || data.success === false){
-    throw new Error(
-      data.message ||
-      data.error ||
-      `HTTP ${res.status}`
-    );
+    throw new Error(data.message || data.error || `HTTP ${res.status}`);
   }
-
   return data;
 }
-
-async function loadCashRemittances(){
-  setActiveView("cash-remittances");
-
-  const list = document.getElementById("list");
-  const pendingTotal = document.getElementById("pendingTotal");
-  const mainStatLabel = document.getElementById("mainStatLabel");
-  const mainStatMeta = document.getElementById("mainStatMeta");
-
-  mainStatLabel.innerText = "騎士待回繳平台總額";
-  pendingTotal.innerText = "$0";
-  mainStatMeta.innerText = "正在讀取現金回繳資料...";
-  list.innerHTML = `<div class="empty">正在讀取騎士待回繳現金...</div>`;
-
-  try{
-    const res = await fetch(
-      `${API_BASE}/api/admin/cash-remittances?t=${Date.now()}`,
-      { cache:"no-store" }
-    );
-
-    const data = await readJsonResponse(res);
-
-    pendingTotal.innerText = money(data.totalDueToPlatform || 0);
-    mainStatMeta.innerText =
-      `共 ${Number(data.riderCount || 0)} 位騎士・` +
-      `${Number(data.pendingOrderCount || 0)} 筆待回繳・` +
-      `客人現金代收總額 ${money(data.totalCashCollected || 0)}`;
-
-    const riders = Array.isArray(data.riders)
-      ? data.riders
-      : [];
-
-    if(!riders.length){
-      list.innerHTML = `
-        <div class="empty">
-          目前沒有騎士待回繳現金。<br>
-          已完成回繳的訂單不會再顯示於此頁。
-        </div>
-      `;
-      return;
-    }
-
-    list.innerHTML = riders.map(rider => {
-      const orders = Array.isArray(rider.orders)
-        ? rider.orders
-        : [];
-
-      const orderIds = orders
-        .map(order => String(order.id || "").trim())
-        .filter(Boolean);
-
-      const encodedOrderIds = encodeURIComponent(
-        JSON.stringify(orderIds)
-      );
-
-      return `
-        <section class="card rider-card">
-          <div class="rider-header">
-            <div>
-              <div class="rider-name">
-                ${escapeHtml(rider.riderName || "未設定騎士姓名")}
-              </div>
-
-              <div class="rider-meta">
-                電話：${escapeHtml(rider.riderPhone || "-")}<br>
-                騎士識別：${escapeHtml(
-                  rider.riderId ||
-                  rider.riderDocId ||
-                  rider.riderLineUserId ||
-                  rider.riderKey ||
-                  "-"
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div class="rider-total">
-                ${money(rider.cashDueToPlatform || 0)}
-              </div>
-              <div class="rider-count">
-                ${Number(rider.orderCount || orders.length || 0)} 筆待回繳
-              </div>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="label">客人現金代收總額</div>
-            <div class="value">${money(rider.cashCollectedTotal || 0)}</div>
-          </div>
-
-          ${orders.map(order => `
-            <div class="order-card">
-              <div class="order-head">
-                <div class="order-no">
-                  ${escapeHtml(order.orderNo || order.id || "-")}
-                </div>
-                <div class="tag">尚未回繳</div>
-              </div>
-
-              <div class="row">
-                <div class="label">付款方式</div>
-                <div class="value">
-                  ${escapeHtml(getPaymentText(order.paymentMethod))}
-                </div>
-              </div>
-
-              <div class="row">
-                <div class="label">完成時間</div>
-                <div class="value">
-                  ${escapeHtml(formatTime(order.completedAt))}
-                </div>
-              </div>
-
-              <div class="row">
-                <div class="label">客人支付現金</div>
-                <div class="value">${money(order.customerTotal || 0)}</div>
-              </div>
-
-              <div class="row">
-                <div class="label">騎士代墊款</div>
-                <div class="value">${money(order.advancePayment || 0)}</div>
-              </div>
-
-              <div class="row">
-                <div class="label">騎士任務收入</div>
-                <div class="value">${money(order.riderIncome || 0)}</div>
-              </div>
-
-              <div class="row">
-                <div class="label">應回繳平台</div>
-                <div class="due">${money(order.cashDueToPlatform || 0)}</div>
-              </div>
-
-              <button
-                class="btn btn-red btn-small cash-order-settle-button"
-                data-order-id="${escapeHtml(order.id || "")}"
-                data-amount="${Number(order.cashDueToPlatform || 0)}"
-              >
-                確認此筆已回繳
-              </button>
-            </div>
-          `).join("")}
-
-          ${orderIds.length > 1 ? `
-            <button
-              class="btn rider-batch-settle-button"
-              data-order-ids="${escapeHtml(encodedOrderIds)}"
-              data-rider-name="${escapeHtml(rider.riderName || "此騎士")}"
-              data-amount="${Number(rider.cashDueToPlatform || 0)}"
-            >
-              確認此騎士全部已回繳
-            </button>
-          ` : ""}
-        </section>
-      `;
-    }).join("");
-
-    bindCashRemittanceButtons();
-
-  }catch(err){
-    console.error(err);
-    mainStatMeta.innerText = "讀取失敗";
-    list.innerHTML = `
-      <div class="empty">
-        讀取騎士現金回繳失敗：${escapeHtml(err.message)}
-      </div>
-    `;
-  }
+async function getJson(path){
+  const sep = path.includes('?') ? '&' : '?';
+  const res = await fetch(`${API_BASE}${path}${sep}t=${Date.now()}`,{cache:'no-store'});
+  return readJson(res);
 }
-
-function bindCashRemittanceButtons(){
-  document.querySelectorAll(".cash-order-settle-button").forEach(button => {
-    button.addEventListener("click", () => {
-      const orderId = button.dataset.orderId || "";
-      const amount = Number(button.dataset.amount || 0);
-
-      settleCashRemittances({
-        orderIds:[orderId],
-        amount,
-        button,
-        confirmText:
-          `確認已收到此筆騎士現金回繳？\n\n` +
-          `訂單：${orderId}\n` +
-          `回繳金額：${money(amount)}\n\n` +
-          `確認後，這筆訂單會從待回繳清單移除，騎士端重新讀取後金額也會同步扣除。`
-      });
-    });
+async function postJson(path,body){
+  const res = await fetch(`${API_BASE}${path}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body || {})
   });
+  return readJson(res);
+}
+function switchView(view){
+  state.view = view;
+  document.querySelectorAll('.tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view));
+  document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id===`view-${view}`));
+  if(view==='cash' && !state.cash) loadCashRemittances();
+  if(view==='jko' && !state.jko) loadSettlements();
+  if(view==='alerts') renderAlerts();
+  if(view==='history') renderHistory();
+}
+document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));
 
-  document.querySelectorAll(".rider-batch-settle-button").forEach(button => {
-    button.addEventListener("click", () => {
-      let orderIds = [];
-
-      try{
-        orderIds = JSON.parse(
-          decodeURIComponent(button.dataset.orderIds || "%5B%5D")
-        );
-      }catch(e){
-        orderIds = [];
-      }
-
-      const riderName = button.dataset.riderName || "此騎士";
-      const amount = Number(button.dataset.amount || 0);
-
-      settleCashRemittances({
-        orderIds,
-        amount,
-        button,
-        confirmText:
-          `確認已收到「${riderName}」全部現金回繳？\n\n` +
-          `共 ${orderIds.length} 筆訂單\n` +
-          `回繳總額：${money(amount)}\n\n` +
-          `確認後，這些訂單會一次從待回繳清單移除。`
-      });
-    });
-  });
+function updateKpis(){
+  const s = state.overview?.summary || {};
+  document.getElementById('kpiTodayCompleted').textContent = Number(s.todayCompletedOrders || 0).toLocaleString('zh-TW');
+  document.getElementById('kpiCashPending').textContent = money(s.cashPendingTotal);
+  document.getElementById('kpiJkoPending').textContent = money(s.jkoPendingTotal);
+  document.getElementById('kpiPendingRiders').textContent = Number(s.pendingRiderCount || 0).toLocaleString('zh-TW');
+  document.getElementById('kpiProcessed').textContent = money(s.todayProcessedTotal);
+  document.getElementById('kpiCashSub').textContent = `${Number(s.cashPendingRiderCount || 0)} 位小U待回繳`;
+  document.getElementById('kpiJkoSub').textContent = `${Number(s.jkoPendingRiderCount || 0)} 位小U待撥款`;
+  document.getElementById('kpiProcessedSub').textContent = `回繳 ${money(s.todayCashRemitted)}・撥款 ${money(s.todayRiderPaid)}`;
+  const count = Number(s.alertCount || 0);
+  document.getElementById('alertTabCount').textContent = count ? `(${count})` : '';
 }
 
-async function settleCashRemittances({
-  orderIds,
-  amount,
-  button,
-  confirmText
-}){
-  const cleanOrderIds = Array.from(
-    new Set(
-      (Array.isArray(orderIds) ? orderIds : [])
-        .map(value => String(value || "").trim())
-        .filter(Boolean)
-    )
-  );
-
-  if(!cleanOrderIds.length){
-    alert("缺少需要確認回繳的訂單 ID。");
-    return;
-  }
-
-  const ok = confirm(confirmText);
-  if(!ok) return;
-
-  const originalText = button.innerText;
-  button.disabled = true;
-  button.innerText = "確認回繳中...";
-
-  try{
-    const requestBody = cleanOrderIds.length === 1
-      ? {
-          orderId:cleanOrderIds[0],
-          remittedBy:"finance_center"
-        }
-      : {
-          orderIds:cleanOrderIds,
-          remittedBy:"finance_center"
-        };
-
-    const res = await fetch(
-      `${API_BASE}/api/admin/cash-remittances/settle`,
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify(requestBody)
-      }
-    );
-
-    const data = await readJsonResponse(res);
-
-    alert(
-      `騎士現金回繳已確認。\n\n` +
-      `成功處理：${Number(data.settledOrderCount || 0)} 筆\n` +
-      `回繳總額：${money(data.totalRemittedAmount || amount || 0)}` +
-      `${Number(data.skippedOrderCount || 0) > 0
-        ? `\n略過：${Number(data.skippedOrderCount || 0)} 筆`
-        : ""}`
-    );
-
-    await loadCashRemittances();
-
-  }catch(err){
-    console.error(err);
-    alert("確認現金回繳失敗：" + err.message);
-    button.disabled = false;
-    button.innerText = originalText;
-  }
+function alertHtml(item){
+  const severity = item.severity === 'critical' ? 'critical' : 'warning';
+  return `<div class="alert-item ${severity}">
+    <div class="alert-title">${esc(item.title || '財務提醒')}</div>
+    <div class="alert-message">${esc(item.message || '')}</div>
+    <div class="alert-meta">等待 ${esc(formatAge(item.ageMs))}${item.amount ? `・金額 ${money(item.amount)}` : ''}</div>
+  </div>`;
 }
-
-async function loadSettlements(){
-  setActiveView("settlements");
-
-  const list = document.getElementById("list");
-  const pendingTotal = document.getElementById("pendingTotal");
-  const mainStatLabel = document.getElementById("mainStatLabel");
-  const mainStatMeta = document.getElementById("mainStatMeta");
-
-  mainStatLabel.innerText = "騎士待撥款總額";
-  pendingTotal.innerText = "$0";
-  mainStatMeta.innerText = "正在讀取街口支付待撥款資料...";
-  list.innerHTML = `<div class="empty">正在讀取騎士待撥款資料...</div>`;
-
-  try{
-    const res = await fetch(
-      `${API_BASE}/api/admin/pending-settlements?t=${Date.now()}`,
-      { cache:"no-store" }
-    );
-
-    const data = await readJsonResponse(res);
-
-    pendingTotal.innerText = money(data.pendingTotal || 0);
-
-    const orders = Array.isArray(data.orders)
-      ? data.orders
-      : [];
-
-    mainStatMeta.innerText = `共 ${orders.length} 筆街口支付待撥款`;
-
-    if(!orders.length){
-      list.innerHTML = `<div class="empty">目前沒有待撥款訂單。</div>`;
-      return;
-    }
-
-    list.innerHTML = orders.map(order => `
-      <div class="card">
-        <div class="row">
-          <div class="label">訂單編號</div>
-          <div class="value">${escapeHtml(order.orderNo || order.id || "-")}</div>
-        </div>
-
-        <div class="row">
-          <div class="label">騎士</div>
-          <div class="value">
-            ${escapeHtml(order.riderName || order.driverName || order.riderId || "-")}
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="label">付款方式</div>
-          <div class="value">
-            ${escapeHtml(getPaymentText(order.paymentMethod || order.payMethod || order.paymentType))}
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="label">完成時間</div>
-          <div class="value">
-            ${escapeHtml(formatTime(order.completedAt || order.updatedAt))}
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="label">騎士收入</div>
-          <div class="fee">
-            ${money(order.riderFee || order.driverFee || order.fee || 0)}
-          </div>
-        </div>
-
-        <button
-          class="btn settlement-button"
-          data-order-id="${escapeHtml(order.id || "")}"
-        >
-          完成結算
-        </button>
+function renderOverviewAlerts(){
+  const list = (state.overview?.alerts || []).slice(0,5);
+  document.getElementById('overviewAlerts').innerHTML = list.length ? list.map(alertHtml).join('') : '<div class="empty">目前沒有需要優先處理的財務異常。</div>';
+}
+function renderAlerts(){
+  const list = state.overview?.alerts || [];
+  document.getElementById('alertList').innerHTML = list.length ? list.map(alertHtml).join('') : '<div class="empty">目前沒有財務異常提醒。</div>';
+}
+function renderHistory(){
+  const list = state.overview?.history || [];
+  document.getElementById('historyList').innerHTML = list.length ? list.map(item=>{
+    const cash = item.type === 'cash_remittance';
+    return `<div class="history-item">
+      <div class="history-icon">${cash?'↑':'↓'}</div>
+      <div class="history-main">
+        <div class="history-title">${esc(item.typeLabel || (cash?'現金回繳':'街口撥款'))}・${esc(item.riderName || '未設定小U')}</div>
+        <div class="history-sub">訂單 ${esc(item.orderNo || item.orderId || '-')}・${esc(formatTime(item.processedAtMs))}${item.processedBy?`・${esc(item.processedBy)}`:''}</div>
       </div>
-    `).join("");
-
-    document.querySelectorAll(".settlement-button").forEach(button => {
-      button.addEventListener("click", () => {
-        settleOrder(button.dataset.orderId || "", button);
-      });
-    });
-
-  }catch(err){
-    console.error(err);
-    mainStatMeta.innerText = "讀取失敗";
-    list.innerHTML = `<div class="empty">讀取失敗：${escapeHtml(err.message)}</div>`;
-  }
+      <div class="history-amount" style="color:${cash?'var(--red)':'var(--blue)'}">${money(item.amount)}</div>
+    </div>`;
+  }).join('') : '<div class="empty">目前還沒有可顯示的結算紀錄。</div>';
 }
 
-async function settleOrder(orderId, btn){
-  if(!orderId){
-    alert("缺少訂單 ID");
-    return;
-  }
-
-  const ok = confirm(
-    "確認已經撥款給騎士？\n\n確認後，這筆訂單會從待結算轉為已結算。"
-  );
-
-  if(!ok) return;
-
-  const originalText = btn.innerText;
-  btn.disabled = true;
-  btn.innerText = "結算中...";
-
+async function loadOverview(silent=false){
   try{
-    const res = await fetch(`${API_BASE}/api/admin/settle-order`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({ orderId })
-    });
-
-    await readJsonResponse(res);
-
-    alert("已完成結算");
-    await loadSettlements();
-
+    state.overview = await getJson('/api/admin/finance-overview');
+    updateKpis();
+    renderOverviewAlerts();
+    renderAlerts();
+    renderHistory();
+    if(!silent) showToast('財務總覽已更新');
   }catch(err){
     console.error(err);
-    alert("結算失敗：" + err.message);
-    btn.disabled = false;
-    btn.innerText = originalText;
+    if(!silent) showToast('讀取財務總覽失敗：'+err.message);
   }
 }
 
-loadCashRemittances();
+function normalizeSearch(value){return String(value||'').trim().toLowerCase();}
+function riderMatches(rider,query){
+  if(!query) return true;
+  return [rider.riderName,rider.riderPhone,rider.riderId,rider.riderDocId,rider.riderLineUserId,rider.riderKey]
+    .map(normalizeSearch).some(v=>v.includes(query));
+}
+
+async function loadCashRemittances(silent=false){
+  const el = document.getElementById('cashList');
+  if(!silent) el.innerHTML='<div class="empty">正在讀取現金回繳資料...</div>';
+  try{
+    state.cash = await getJson('/api/admin/cash-remittances');
+    renderCash();
+  }catch(err){
+    console.error(err);
+    el.innerHTML=`<div class="empty">讀取現金回繳失敗：${esc(err.message)}</div>`;
+  }
+}
+function renderCash(){
+  const query = normalizeSearch(document.getElementById('cashSearch')?.value);
+  const riders = (state.cash?.riders || []).filter(r=>riderMatches(r,query));
+  const el = document.getElementById('cashList');
+  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的小U待回繳現金。</div>';return;}
+  el.innerHTML = riders.map(rider=>{
+    const orders = Array.isArray(rider.orders)?rider.orders:[];
+    const incomeTotal = orders.reduce((s,o)=>s+Number(o.riderIncome||0),0);
+    const advanceTotal = orders.reduce((s,o)=>s+Number(o.advancePayment||0),0);
+    const orderIds = orders.map(o=>String(o.id||'')).filter(Boolean);
+    return `<article class="rider-card cash">
+      <div class="rider-head">
+        <div><div class="rider-name">${esc(rider.riderName || '未設定小U姓名')}</div><div class="rider-meta">電話：${esc(rider.riderPhone||'-')}<br>識別：${esc(rider.riderId||rider.riderDocId||rider.riderLineUserId||rider.riderKey||'-')}</div></div>
+        <div class="rider-total cash"><strong>${money(rider.cashDueToPlatform)}</strong><span>${Number(rider.orderCount||orders.length)} 筆待回繳</span></div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-mini"><span>客人現金代收</span><strong>${money(rider.cashCollectedTotal)}</strong></div>
+        <div class="summary-mini"><span>小U任務收入</span><strong>${money(incomeTotal)}</strong></div>
+        <div class="summary-mini"><span>小U代墊回收</span><strong>${money(advanceTotal)}</strong></div>
+      </div>
+      <div class="rider-actions"><button class="btn red" onclick='settleCashBatch(${JSON.stringify(JSON.stringify(orderIds))},${JSON.stringify(rider.riderName||'此小U')},${Number(rider.cashDueToPlatform||0)},this)'>確認此小U全部已回繳</button></div>
+      <details><summary>查看 ${orders.length} 筆待回繳明細</summary><div class="order-list">
+        ${orders.map(order=>`<div class="order-card"><div class="order-top"><div class="order-no">${esc(order.orderNo||order.id||'-')}</div><span class="tag cash">尚未回繳</span></div><div class="rows">
+          <div class="row"><span class="label">完成時間</span><span class="value">${esc(formatTime(order.completedAt))}</span></div>
+          <div class="row"><span class="label">客人支付現金</span><span class="value">${money(order.customerTotal)}</span></div>
+          <div class="row"><span class="label">小U代墊款</span><span class="value">${money(order.advancePayment)}</span></div>
+          <div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome)}</span></div>
+          <div class="row"><span class="label">應回繳平台</span><span class="value amount-red">${money(order.cashDueToPlatform)}</span></div>
+        </div><button class="btn red small" onclick="settleCashSingle('${esc(order.id||'')}',${Number(order.cashDueToPlatform||0)},this)">確認此筆已回繳</button></div>`).join('')}
+      </div></details>
+    </article>`;
+  }).join('');
+}
+
+async function settleCashSingle(orderId,amount,button){
+  if(!orderId) return;
+  if(!confirm(`確認已收到此筆現金回繳？\n\n訂單：${orderId}\n回繳金額：${money(amount)}\n\n確認後會同步從小U應回繳金額扣除。`)) return;
+  await settleCash([orderId],button);
+}
+async function settleCashBatch(orderIdsJson,riderName,amount,button){
+  let ids=[]; try{ids=JSON.parse(orderIdsJson||'[]')}catch(e){}
+  if(!ids.length) return;
+  if(!confirm(`確認已收到「${riderName}」全部現金回繳？\n\n共 ${ids.length} 筆\n回繳總額：${money(amount)}\n\n此操作會一次結清這些訂單。`)) return;
+  await settleCash(ids,button);
+}
+async function settleCash(orderIds,button){
+  const old=button?.textContent; if(button){button.disabled=true;button.textContent='確認中...';}
+  try{
+    const data = await postJson('/api/admin/cash-remittances/settle',orderIds.length===1?{orderId:orderIds[0],remittedBy:'finance_center'}:{orderIds,remittedBy:'finance_center'});
+    showToast(`現金回繳已確認：${data.settledOrderCount||0} 筆・${money(data.totalRemittedAmount)}`);
+    await Promise.all([loadCashRemittances(true),loadOverview(true)]);
+  }catch(err){alert('確認現金回繳失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
+}
+
+async function loadSettlements(silent=false){
+  const el=document.getElementById('jkoList');
+  if(!silent) el.innerHTML='<div class="empty">正在讀取街口待撥款資料...</div>';
+  try{
+    state.jko=await getJson('/api/admin/pending-settlements');
+    renderJko();
+  }catch(err){console.error(err);el.innerHTML=`<div class="empty">讀取街口待撥款失敗：${esc(err.message)}</div>`;}
+}
+function renderJko(){
+  const query=normalizeSearch(document.getElementById('jkoSearch')?.value);
+  let riders=Array.isArray(state.jko?.riders)?state.jko.riders:[];
+  if(!riders.length && Array.isArray(state.jko?.orders)){
+    const map=new Map();
+    state.jko.orders.forEach(o=>{const key=o.riderKey||o.riderId||o.riderDocId||o.riderName||`unknown_${o.id}`;if(!map.has(key))map.set(key,{riderKey:key,riderName:o.riderName,riderId:o.riderId,riderPhone:o.riderPhone,orders:[],riderIncomeTotal:0,advancePaymentTotal:0,payoutTotal:0});const g=map.get(key);g.orders.push(o);g.riderIncomeTotal+=Number(o.riderIncome||o.riderFee||0);g.advancePaymentTotal+=Number(o.advancePayment||0);g.payoutTotal+=Number(o.payoutTotal||o.riderFee||0);});riders=[...map.values()];
+  }
+  riders=riders.filter(r=>riderMatches(r,query));
+  const el=document.getElementById('jkoList');
+  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的街口待撥款。</div>';return;}
+  el.innerHTML=riders.map(rider=>{
+    const orders=Array.isArray(rider.orders)?rider.orders:[];
+    const ids=orders.map(o=>String(o.id||'')).filter(Boolean);
+    return `<article class="rider-card jko"><div class="rider-head"><div><div class="rider-name">${esc(rider.riderName||'未設定小U姓名')}</div><div class="rider-meta">電話：${esc(rider.riderPhone||'-')}<br>識別：${esc(rider.riderId||rider.riderDocId||rider.riderLineUserId||rider.riderKey||'-')}</div></div><div class="rider-total jko"><strong>${money(rider.payoutTotal)}</strong><span>${Number(rider.orderCount||orders.length)} 筆待撥款</span></div></div>
+      <div class="summary-row"><div class="summary-mini"><span>小U任務收入</span><strong>${money(rider.riderIncomeTotal)}</strong></div><div class="summary-mini"><span>小U代墊款</span><strong>${money(rider.advancePaymentTotal)}</strong></div><div class="summary-mini"><span>平台實際應撥</span><strong style="color:var(--blue)">${money(rider.payoutTotal)}</strong></div></div>
+      <div class="rider-actions"><button class="btn blue" onclick='settleJkoBatch(${JSON.stringify(JSON.stringify(ids))},${JSON.stringify(rider.riderName||'此小U')},${Number(rider.payoutTotal||0)},this)'>確認已撥給此小U全部款項</button></div>
+      <details><summary>查看 ${orders.length} 筆待撥款明細</summary><div class="order-list">${orders.map(order=>`<div class="order-card"><div class="order-top"><div class="order-no">${esc(order.orderNo||order.id||'-')}</div><span class="tag jko">街口待撥</span></div><div class="rows"><div class="row"><span class="label">完成時間</span><span class="value">${esc(formatTime(order.completedAt||order.updatedAt))}</span></div><div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome||order.riderFee)}</span></div><div class="row"><span class="label">小U代墊款</span><span class="value">${money(order.advancePayment)}</span></div><div class="row"><span class="label">平台應撥</span><span class="value amount-blue">${money(order.payoutTotal)}</span></div></div><button class="btn blue small" onclick="settleJkoSingle('${esc(order.id||'')}',${Number(order.payoutTotal||0)},this)">確認此筆已撥款</button></div>`).join('')}</div></details>
+    </article>`;
+  }).join('');
+}
+async function settleJkoSingle(orderId,amount,button){
+  if(!orderId)return;
+  if(!confirm(`確認已經撥款給小U？\n\n訂單：${orderId}\n應撥總額：${money(amount)}\n\n此金額包含小U任務收入與代墊款。`))return;
+  await settleJko([orderId],button);
+}
+async function settleJkoBatch(orderIdsJson,riderName,amount,button){
+  let ids=[];try{ids=JSON.parse(orderIdsJson||'[]')}catch(e){}
+  if(!ids.length)return;
+  if(!confirm(`確認已經撥給「${riderName}」全部待撥款？\n\n共 ${ids.length} 筆\n撥款總額：${money(amount)}\n\n確認後會一次轉為已結算。`))return;
+  await settleJko(ids,button);
+}
+async function settleJko(orderIds,button){
+  const old=button?.textContent;if(button){button.disabled=true;button.textContent='結算中...';}
+  try{
+    const path=orderIds.length===1?'/api/admin/settle-order':'/api/admin/settle-orders';
+    const body=orderIds.length===1?{orderId:orderIds[0],settledBy:'finance_center'}:{orderIds,settledBy:'finance_center'};
+    const data=await postJson(path,body);
+    showToast(`街口撥款已確認：${data.settledOrderCount||1} 筆・${money(data.totalSettledAmount||data.settledAmount)}`);
+    await Promise.all([loadSettlements(true),loadOverview(true)]);
+  }catch(err){alert('確認街口撥款失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
+}
+
+async function healthCheck(){
+  const box=document.getElementById('systemStatus');
+  const text=document.getElementById('systemStatusText');
+  if(!navigator.onLine){box.classList.add('offline');text.textContent='裝置離線';return false;}
+  try{
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),5000);
+    const res=await fetch(`${API_BASE}/api/health?t=${Date.now()}`,{cache:'no-store',signal:controller.signal});clearTimeout(timer);
+    if(!res.ok)throw new Error('health');
+    box.classList.remove('offline');text.textContent='系統連線正常';return true;
+  }catch(err){box.classList.add('offline');text.textContent='後端連線異常';return false;}
+}
+
+async function refreshAll(showMessage=false){
+  if(state.loading)return;
+  state.loading=true;
+  try{
+    const ok=await healthCheck();
+    if(!ok){if(showMessage)showToast('目前無法連上 UBee 後端，保留畫面最後資料。');return;}
+    await Promise.all([loadOverview(true),loadCashRemittances(true),loadSettlements(true)]);
+    if(showMessage)showToast('財務資料已全部更新');
+  }finally{state.loading=false;}
+}
+window.addEventListener('online',()=>refreshAll(true));
+window.addEventListener('offline',()=>healthCheck());
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')healthCheck();});
+
+refreshAll(false);
 </script>
 </body>
 </html>
