@@ -14227,6 +14227,65 @@ async function confirmPaid(){
   }
 }
 
+/* ==============================
+   取消訂單成功後：
+   清空本次任務的地址 / 電話資料，並重設首頁路線狀態。
+   注意：不刪除「常用地址」內由客人主動儲存的資料。
+   ============================== */
+function clearCancelledOrderCustomerFields(){
+  [
+    'pickup',
+    'dropoff',
+    'pickupPhone',
+    'dropoffPhone',
+    'pickupAddressNote',
+    'dropoffAddressNote',
+    'queueLocation'
+  ].forEach(id => {
+    const el = qs(id);
+    if(el){
+      el.value = '';
+    }
+  });
+
+  // 清除可能仍留在本機草稿中的舊地址與電話，避免重新開啟時又被帶回。
+  localStorage.removeItem('ubee_order_draft_v2');
+
+  // 清除附近店家自動帶入狀態，但不影響客人自行儲存的常用地址。
+  clearNearbyAutoFill(false);
+
+  // 清除本次任務的地址座標、Place ID、路線與估價。
+  resetPickupGeo();
+  resetDropoffGeo();
+  clearRoutePreview();
+  invalidateQuote();
+
+  clearTimeout(routeRefreshTimer);
+  routeRefreshTimer = null;
+
+  clearTimeout(quoteRefreshTimer);
+  quoteRefreshTimer = null;
+
+  if(qs('homeEstimateEta')){
+    qs('homeEstimateEta').innerText =
+      '預計完成時間待計算';
+  }
+
+  if(qs('matchStatusText')){
+    qs('matchStatusText').innerText =
+      '填寫取件地址後顯示媒合狀況';
+  }
+
+  if(qs('matchStatusBadge')){
+    qs('matchStatusBadge').innerText =
+      '等待定位';
+    qs('matchStatusBadge').className =
+      'status-badge neutral';
+  }
+
+  updateSwapAddressButtonState();
+}
+
 async function cancelOrder(){
   if(!currentOrderId){
     alert('目前沒有可取消的訂單。');
@@ -14279,16 +14338,22 @@ async function cancelOrder(){
       );
     }
 
-    alert('訂單已取消。');
+    /*
+     * 只有後端確認取消成功後才清空：
+     * 1. 清除本次任務地址與電話
+     * 2. 清除目前訂單快取 / 監聽
+     * 3. 回到 UBee 主畫面
+     */
+    clearCancelledOrderCustomerFields();
+    clearCurrentOrderCache();
 
-    renderTimeline(
-      'cancelled',
-      currentOrderData
-    );
+    showHomeTab();
+    window.scrollTo({
+      top:0,
+      behavior:'auto'
+    });
 
-    qs('cancelOrderBtn')
-      .classList
-      .add('hidden');
+    alert('訂單已取消，地址與聯絡電話已清空。');
 
   }catch(err){
 
