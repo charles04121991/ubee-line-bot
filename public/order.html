@@ -18119,6 +18119,111 @@ initPage();
 
 initCachedOrder();
 UBeeEnhancements.init();
+
+/* =========================================================
+   UBee 客人端｜行動網路受阻／斷線韌性層 2026-07-20
+   - 只做狀態保護與恢復同步，不改動既有訂單／付款流程
+   - 斷線時禁止建立新訂單，避免請求結果不明造成重複下單
+   - 已存在訂單保留本機 orderId，恢復連線後重新接上 Firestore 追蹤
+   ========================================================= */
+(function initUBeeCustomerNetworkResilience(){
+  let reconnectTimer = null;
+  let backendReachable = true;
+
+  function ensureBanner(){
+    let el = document.getElementById('ubeeNetworkStatusBanner');
+    if(el) return el;
+    el = document.createElement('div');
+    el.id = 'ubeeNetworkStatusBanner';
+    el.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));z-index:99999;padding:11px 14px;border-radius:14px;font-size:13px;font-weight:900;line-height:1.45;text-align:center;box-shadow:0 10px 28px rgba(0,0,0,.16);display:none;';
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function showStatus(message, ok=false){
+    const el = ensureBanner();
+    el.textContent = message;
+    el.style.display = 'block';
+    el.style.background = ok ? '#ecfdf3' : '#fff1f2';
+    el.style.color = ok ? '#166534' : '#b42318';
+    el.style.border = ok ? '1px solid #bbf7d0' : '1px solid #fecdd3';
+    if(ok){ setTimeout(()=>{ if(el.textContent===message) el.style.display='none'; },2600); }
+  }
+
+  function setCreateOrderNetworkLock(locked){
+    const btn = document.getElementById('createOrderBtn');
+    if(!btn) return;
+    if(locked){
+      if(!btn.dataset.networkOriginalText) btn.dataset.networkOriginalText = btn.innerText || '建立訂單';
+      if(!(typeof isSubmittingOrder !== 'undefined' && isSubmittingOrder)) btn.disabled = true;
+      if(!(typeof isSubmittingOrder !== 'undefined' && isSubmittingOrder)) btn.innerText = '網路中斷，暫停送出';
+    }else if(!(typeof isSubmittingOrder !== 'undefined' && isSubmittingOrder) && btn.dataset.networkOriginalText){
+      btn.disabled = false;
+      btn.innerText = btn.dataset.networkOriginalText;
+      delete btn.dataset.networkOriginalText;
+    }
+  }
+
+  async function checkBackend(){
+    if(!navigator.onLine){ backendReachable=false; return false; }
+    try{
+      const controller = new AbortController();
+      const timer = setTimeout(()=>controller.abort(),5000);
+      const res = await fetch('/api/health?t='+Date.now(),{cache:'no-store',signal:controller.signal});
+      clearTimeout(timer);
+      backendReachable = !!res.ok;
+      return backendReachable;
+    }catch(e){ backendReachable=false; return false; }
+  }
+
+  async function recover(){
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(async()=>{
+      const ok = await checkBackend();
+      if(!ok){
+        showStatus('網路已恢復，但暫時無法連上 UBee 系統，系統會繼續重試。');
+        setCreateOrderNetworkLock(true);
+        reconnectTimer = setTimeout(recover,5000);
+        return;
+      }
+      setCreateOrderNetworkLock(false);
+      showStatus('連線已恢復，正在同步最新訂單狀態。',true);
+      try{
+        const cachedId = String((typeof currentOrderId !== 'undefined' ? currentOrderId : '') || localStorage.getItem('ubee_current_order_id') || '').trim();
+        if(cachedId && typeof window.startOrderListener === 'function') window.startOrderListener(cachedId);
+        if(typeof currentOrderData !== 'undefined' && currentOrderData && typeof window.syncCustomerLiveTracking === 'function') window.syncCustomerLiveTracking(currentOrderData);
+      }catch(e){ console.warn('UBee 客人端恢復同步失敗:',e); }
+    },500);
+  }
+
+  window.addEventListener('offline',()=>{
+    backendReachable=false;
+    setCreateOrderNetworkLock(true);
+    showStatus('目前行動網路／網際網路連線受阻。已存在的訂單不會消失；請勿重複下單，恢復連線後會自動同步。');
+  });
+  window.addEventListener('online',recover);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && navigator.onLine) recover(); });
+
+  // 在既有 createOrder 外再加一道斷線防護，避免 POST 結果不明時重複建立訂單。
+  const installGuard = ()=>{
+    if(typeof window.createOrder !== 'function' || window.createOrder.__ubeeNetworkGuard) return;
+    const original = window.createOrder;
+    const guarded = async function(){
+      const reachable = navigator.onLine && (await checkBackend());
+      if(!reachable){
+        setCreateOrderNetworkLock(true);
+        showStatus('目前無法連上 UBee 系統，為避免重複建立訂單，已暫停送出。');
+        return;
+      }
+      return original.apply(this,arguments);
+    };
+    guarded.__ubeeNetworkGuard = true;
+    window.createOrder = guarded;
+  };
+  installGuard();
+  setTimeout(installGuard,0);
+  if(!navigator.onLine){ setCreateOrderNetworkLock(true); showStatus('目前網路連線受阻，恢復後會自動同步。'); }
+})();
 </script>
 </body>
 </html>
