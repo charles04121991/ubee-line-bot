@@ -8589,6 +8589,155 @@ body{background:#eef0f2;}
   display:grid;
 }
 
+/* 首頁最終精修：三大入口只保留主名稱 */
+.home-primary-service-card{
+  min-height:104px;
+  padding:13px 7px 12px;
+  gap:7px;
+}
+
+.home-primary-service-card small{
+  display:none !important;
+}
+
+/* 在線小U改成一行輕量狀態，不再佔大型資訊卡 */
+.home-service-status-simple{
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:2px 0 16px;
+  padding:7px 2px;
+  border:none;
+  border-radius:0;
+  background:transparent;
+}
+
+.home-service-status-simple-icon{
+  width:9px;
+  height:9px;
+  flex:0 0 9px;
+  border-radius:50%;
+  background:#21a45b;
+  font-size:0;
+  box-shadow:0 0 0 4px rgba(33,164,91,.10);
+}
+
+.home-service-status-simple-main{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex:1;
+}
+
+.home-service-status-simple .home-service-status-count{
+  margin:0;
+  flex:0 0 auto;
+  font-size:13px;
+  line-height:1.35;
+}
+
+.home-service-status-simple .home-service-status-note{
+  min-width:0;
+  margin:0;
+  color:#8b9096;
+  font-size:11px;
+  line-height:1.35;
+}
+
+.home-service-status-simple .home-service-status-note::before{
+  content:'・';
+  margin-right:4px;
+  color:#b1b5ba;
+}
+
+/* 進行中任務卡：首頁只做摘要，點擊回正式 Step 5 追蹤 */
+.home-active-task-section{
+  margin:0 0 14px;
+}
+
+.home-active-task-card{
+  width:100%;
+  display:block;
+  padding:15px 16px;
+  border:1px solid #eadb91;
+  border-radius:20px;
+  background:linear-gradient(180deg,#fffdf3,#fff9d9);
+  color:#111;
+  text-align:left;
+  box-shadow:0 7px 20px rgba(17,24,39,.055);
+}
+
+.home-active-task-card:active{
+  transform:scale(.988);
+}
+
+.home-active-task-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+
+.home-active-task-kicker{
+  color:#8a6a00;
+  font-size:11px;
+  font-weight:1000;
+}
+
+.home-active-task-badge{
+  flex:0 0 auto;
+  padding:5px 8px;
+  border-radius:999px;
+  background:#111;
+  color:#fff;
+  font-size:10px;
+  font-weight:1000;
+}
+
+.home-active-task-title{
+  display:block;
+  margin-bottom:5px;
+  color:#111;
+  font-size:17px;
+  font-weight:1000;
+  line-height:1.35;
+}
+
+.home-active-task-meta{
+  display:block;
+  overflow:hidden;
+  color:#746d58;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.55;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.home-active-task-link{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:5px;
+  margin-top:10px;
+  color:#111;
+  font-size:12px;
+  font-weight:1000;
+}
+
+.home-active-task-link b{
+  font-size:20px;
+  line-height:1;
+}
+
+/* 第二頁不再要求客人替系統做第三層資料分類；底層 category 仍保留 */
+#step2 .task-category-step2{
+  display:none !important;
+}
+
 /* 第二層服務頁 */
 .service-hub-page{
   position:fixed;
@@ -9046,11 +9195,22 @@ body{background:#eef0f2;}
         <div id="homeLandingPanel">
           <div class="home-landing-title">今天需要小U幫你做什麼？</div>
 
+          <div id="homeActiveTaskSection" class="home-active-task-section hidden" aria-live="polite">
+            <button class="home-active-task-card" type="button" onclick="openCurrentHomeTask()">
+              <div class="home-active-task-top">
+                <span class="home-active-task-kicker">進行中的任務</span>
+                <span id="homeActiveTaskBadge" class="home-active-task-badge">處理中</span>
+              </div>
+              <strong id="homeActiveTaskTitle" class="home-active-task-title">任務狀態更新中</strong>
+              <span id="homeActiveTaskMeta" class="home-active-task-meta">正在讀取最新任務資訊</span>
+              <span class="home-active-task-link">查看任務進度 <b>›</b></span>
+            </button>
+          </div>
+
           <button class="home-service-search" type="button" onclick="openServiceHub('root')">
-            <span>輸入需求或選擇服務</span>
+            <span>選擇你需要的服務</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="7"></circle>
-              <path d="M20 20l-3.5-3.5"></path>
+              <path d="M9 18l6-6-6-6"></path>
             </svg>
           </button>
 
@@ -9058,19 +9218,16 @@ body{background:#eef0f2;}
             <button class="home-primary-service-card" type="button" onclick="openServiceHub('send')">
               <span class="home-primary-service-icon">📦</span>
               <strong>幫我送</strong>
-              <small>文件、包裹、蛋糕花束</small>
             </button>
 
             <button class="home-primary-service-card" type="button" onclick="openServiceHub('buy')">
               <span class="home-primary-service-icon">🛍️</span>
               <strong>幫我買</strong>
-              <small>餐點、藥品、生活用品</small>
             </button>
 
             <button class="home-primary-service-card" type="button" onclick="openServiceHub('runner')">
               <span class="home-primary-service-icon">🏃</span>
               <strong>幫我跑腿</strong>
-              <small>取件、排隊、代辦協助</small>
             </button>
           </div>
 
@@ -9078,10 +9235,10 @@ body{background:#eef0f2;}
             <div class="home-service-status-simple-icon">🐝</div>
             <div class="home-service-status-simple-main">
               <div class="home-service-status-count" id="homeOnlineRiderCount">
-                <span>0</span> <strong>位小U在線</strong>
+                <span>0</span> <strong>位小U可媒合</strong>
               </div>
               <div class="home-service-status-note" id="homeServiceStatusNote">
-                系統正在更新附近媒合狀態。
+                媒合狀態更新中
               </div>
             </div>
             <div class="home-service-status-time hidden" id="homeServiceUpdatedAt">--:--</div>
@@ -12475,7 +12632,16 @@ function getCurrentHomeHubKind(){
   return 'runner';
 }
 
+function hasActiveCustomerOrder(){
+  const status = String(currentOrderData?.status || '').trim().toLowerCase();
+  return !!(currentOrderId && !['completed','done','cancelled'].includes(status));
+}
+
 function openServiceHub(kind = 'root'){
+  if(hasActiveCustomerOrder()){
+    alert('目前已有進行中的任務，請先查看任務進度；任務完成或取消後即可建立下一筆任務。');
+    return;
+  }
   const hubKind = customerServiceHubs[kind] ? kind : 'root';
   const hub = customerServiceHubs[hubKind];
   const page = qs('serviceHubPage');
@@ -12657,6 +12823,7 @@ function showHomeLanding(){
   closeServiceHub();
   qs('orderStartFlow')?.classList.add('hidden');
   qs('homeLandingPanel')?.classList.remove('hidden');
+  renderHomeActiveTaskCard();
   renderRecentHomeService();
   window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -12699,6 +12866,11 @@ function renderRecentHomeService(){
 }
 
 function useRecentHomeService(){
+  if(hasActiveCustomerOrder()){
+    alert('目前已有進行中的任務，請先查看任務進度；任務完成或取消後即可建立下一筆任務。');
+    return;
+  }
+
   let recent = null;
 
   try{
@@ -12726,12 +12898,113 @@ function useRecentHomeService(){
   );
 }
 
+function getHomeActiveTaskPresentation(order){
+  const data = order || currentOrderData || {};
+  const status = String(data.status || 'pending_payment').trim().toLowerCase();
+
+  let badge = '處理中';
+  let title = '任務狀態更新中';
+  let meta = '點一下查看最新任務進度';
+
+  const routeData = trackingRouteLastData || null;
+  const distanceText = typeof getTrackingRouteDistanceText === 'function'
+    ? getTrackingRouteDistanceText(routeData)
+    : '';
+  const etaTime = typeof getTrackingEtaTime === 'function'
+    ? getTrackingEtaTime(routeData)
+    : '';
+
+  switch(status){
+    case 'pending_payment':
+      badge = '待確認';
+      title = '確認現金單後開始派單';
+      meta = '確認後系統會開始媒合附近的小U';
+      break;
+    case 'merchant_pending':
+      badge = '等待中';
+      title = '正在等待合作店家確認';
+      meta = '店家確認後系統會開始媒合小U';
+      break;
+    case 'pending_dispatch':
+      badge = '媒合中';
+      title = '正在為你尋找附近的小U';
+      meta = '媒合成功後會立即顯示小U進度';
+      break;
+    case 'accepted':
+    case 'going_to_pickup':
+      badge = '前往取件';
+      title = '小U正在前往取件地點';
+      meta = [
+        etaTime ? `預計 ${etaTime} 抵達` : '',
+        distanceText ? `距離取件點 ${distanceText}` : ''
+      ].filter(Boolean).join('・') || '正在取得小U即時位置';
+      break;
+    case 'arrived_pickup':
+      badge = '已抵達';
+      title = '小U已抵達取件地點';
+      meta = '正在處理取件任務';
+      break;
+    case 'picked_up':
+    case 'going_to_dropoff':
+      badge = '配送中';
+      title = '小U正在前往送達地點';
+      meta = [
+        etaTime ? `預計 ${etaTime} 抵達` : '',
+        distanceText ? `距離送達點 ${distanceText}` : ''
+      ].filter(Boolean).join('・') || '正在更新剩餘送達路程';
+      break;
+    case 'arrived_dropoff':
+      badge = '已抵達';
+      title = '小U已抵達送達地點';
+      meta = '請準備完成交付';
+      break;
+    default:
+      badge = '處理中';
+      title = typeof getStatusLabel === 'function'
+        ? getStatusLabel(status)
+        : '任務處理中';
+      meta = '點一下查看最新任務進度';
+  }
+
+  return { badge, title, meta };
+}
+
+function renderHomeActiveTaskCard(order = currentOrderData){
+  const section = qs('homeActiveTaskSection');
+  if(!section) return;
+
+  const data = order || null;
+  const status = String(data?.status || '').trim().toLowerCase();
+  const isTerminal = ['completed','done','cancelled'].includes(status);
+  const shouldShow = !!(currentOrderId && data && !isTerminal);
+
+  section.classList.toggle('hidden', !shouldShow);
+  if(!shouldShow) return;
+
+  const view = getHomeActiveTaskPresentation(data);
+  if(qs('homeActiveTaskBadge')) qs('homeActiveTaskBadge').innerText = view.badge;
+  if(qs('homeActiveTaskTitle')) qs('homeActiveTaskTitle').innerText = view.title;
+  if(qs('homeActiveTaskMeta')) qs('homeActiveTaskMeta').innerText = view.meta;
+}
+
+function openCurrentHomeTask(){
+  if(!currentOrderId) return;
+
+  showOnlyStep(5);
+
+  if(currentOrderData){
+    renderTimeline(
+      currentOrderData.status || 'pending_payment',
+      currentOrderData
+    );
+  }
+
+  startOrderListener(currentOrderId);
+}
+
 function initializeCustomerHomeLanding(){
   renderRecentHomeService();
-
-  if(currentOrderId){
-    return;
-  }
+  renderHomeActiveTaskCard();
 
   if(merchantMode){
     showOrderEntryFlow();
@@ -13758,12 +14031,6 @@ function showOnlyStep(step){
 
 function showHomeTab(){
   currentCustomerPage = '';
-
-  if(currentOrderId){
-    showOnlyStep(5);
-    return;
-  }
-
   showOnlyStep(1);
   showHomeLanding();
 }
@@ -14706,6 +14973,8 @@ stopTrackedRiderListener();
   qs('cancelOrderBtn')
     ?.classList
     .add('hidden');
+
+  renderHomeActiveTaskCard(null);
 }
 
 function getCustomerPayableTotal(order){
@@ -16902,6 +17171,7 @@ function startOrderListener(orderId){
 
           currentOrderData = order;
           currentOrderId = doc.id;
+          renderHomeActiveTaskCard(order);
 
           localStorage.setItem(
          'ubee_current_order_id',
@@ -18132,11 +18402,11 @@ function renderHomeServiceStatus(data, fallback = false){
       );
 
     countEl.innerHTML =
-      `<span>${retainedCount}</span> <strong>位小U可即時媒合</strong>`;
+      `<span>${retainedCount}</span> <strong>位小U可媒合</strong>`;
 
     if(!homeHasSuccessfulServiceStatus){
       noteEl.innerText =
-        '系統正在更新在線小U數量。';
+        '媒合狀態更新中';
 
       timeEl.innerText =
         '更新中';
@@ -18178,7 +18448,7 @@ function renderHomeServiceStatus(data, fallback = false){
   );
 
   countEl.innerHTML =
-    `<span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
+    `<span>${displayCount}</span> <strong>位小U可媒合</strong>`;
 
   renderHomeNearbyRiders(
     data?.nearbyRiders || []
@@ -18191,13 +18461,13 @@ function renderHomeServiceStatus(data, fallback = false){
 
   if(displayCount > 0){
     noteEl.innerText =
-      `目前有 ${displayCount} 位小U可即時媒合，地圖顯示匿名約略位置。`;
+      '附近可即時媒合';
   }else if(onlineCount > 0){
     noteEl.innerText =
-      `目前有 ${onlineCount} 位小U維持公開上線狀態，定位正在更新。`;
+      '定位更新中';
   }else{
     noteEl.innerText =
-      '目前尚無可即時媒合的小U，系統會持續更新。';
+      '系統持續搜尋附近小U';
   }
 }
 
