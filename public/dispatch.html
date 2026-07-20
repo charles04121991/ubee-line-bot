@@ -57,7 +57,7 @@ button{cursor:pointer}
 .btn.small{padding:8px 10px;font-size:12px;border-radius:10px}
 .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .kpis{
-  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px
+  display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:10px;margin-bottom:14px
 }
 .kpi{
   background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;
@@ -225,6 +225,31 @@ button{cursor:pointer}
   color:#765500;font-size:11px;line-height:1.55
 }
 
+
+/* ===== Level 4 智慧調度 ===== */
+.level4-banner{
+  margin-bottom:14px;padding:14px 16px;border-radius:18px;background:#111;color:#fff;
+  display:flex;justify-content:space-between;align-items:center;gap:14px;box-shadow:var(--shadow)
+}
+.level4-banner strong{font-size:15px}.level4-banner small{color:#cfd2d8;font-weight:700;line-height:1.5}
+.level4-badge{background:var(--yellow);color:#111;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:1000;white-space:nowrap}
+.intel-grid{display:grid;grid-template-columns:1.1fr 1.1fr .8fr;gap:14px;margin-bottom:14px}
+.intel-list,.zone-grid{display:grid;gap:9px}
+.intel-item{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fff}
+.intel-item.critical{border-color:#ffc6c9;background:#fff7f7}.intel-item.high{border-color:#ffdca0;background:#fffaf1}
+.intel-title{font-size:13px;font-weight:1000}.intel-message{font-size:11px;color:var(--muted);line-height:1.6;margin-top:5px}
+.intel-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.zone-card{border:1px solid var(--line);border-radius:13px;padding:11px;background:#fff;display:grid;grid-template-columns:1fr auto;gap:10px}
+.zone-card.critical{border-left:5px solid var(--red)}.zone-card.high{border-left:5px solid var(--orange)}.zone-card.watch{border-left:5px solid var(--yellow)}.zone-card.normal{border-left:5px solid var(--green)}
+.zone-name{font-size:13px;font-weight:1000}.zone-meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:4px}.zone-gap{font-size:18px;font-weight:1000;text-align:right}
+.forecast-big{font-size:34px;font-weight:1000}.forecast-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12px}.forecast-row:last-child{border-bottom:0}
+.risk-score{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:1000}
+.risk-normal{background:#e9f8ef;color:#157a49}.risk-watch{background:#fff5d8;color:#9a6500}.risk-high{background:#fff0dc;color:#b05e00}.risk-critical{background:#ffe7e8;color:#bd2c33}
+.candidate-score{font-size:20px;font-weight:1000;text-align:right}.candidate-score small{display:block;font-size:9px;color:var(--muted);font-weight:800}
+.timeline{display:grid;gap:0}.timeline-item{display:grid;grid-template-columns:78px 12px 1fr;gap:8px;padding:9px 0;border-bottom:1px solid #f1f1f1}.timeline-item:last-child{border-bottom:0}.timeline-time{font-size:10px;color:var(--muted);font-weight:800}.timeline-dot{width:9px;height:9px;border-radius:50%;background:var(--blue);margin-top:3px}.timeline-main{font-size:11px;line-height:1.5}.timeline-main strong{font-size:12px}
+@media(max-width:1200px){.intel-grid{grid-template-columns:1fr 1fr}.intel-grid>.panel:last-child{grid-column:1/-1}}
+@media(max-width:760px){.intel-grid{grid-template-columns:1fr}.intel-grid>.panel:last-child{grid-column:auto}.level4-banner{align-items:flex-start;flex-direction:column}}
+
 @media(max-width:1150px){
   .kpis{grid-template-columns:repeat(3,1fr)}
   .main-grid{grid-template-columns:1fr}
@@ -252,7 +277,7 @@ button{cursor:pointer}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">DISPATCH CENTER</div>
+      <div class="version">LEVEL 4 · HUMAN-IN-THE-LOOP</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -261,13 +286,36 @@ button{cursor:pointer}
     </div>
   </header>
 
+  <div class="level4-banner">
+    <div><strong>UBee Level 4 智慧調度中心 V1</strong><br><small>系統會分析、預測並提出建議；任何指定小U、擴圈或重新派單仍需人工確認。</small></div>
+    <div class="level4-badge">AUTO EXECUTION：OFF</div>
+  </div>
+
   <section class="kpis">
     <div class="kpi"><div class="label">在線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">即時定位中的小U</div></div>
-    <div class="kpi"><div class="label">可接單小U</div><div class="value" id="available">-</div><div class="sub">可進入推薦候選</div></div>
+    <div class="kpi"><div class="label">可接單小U</div><div class="value" id="available">-</div><div class="sub">可進入智慧候選</div></div>
     <div class="kpi"><div class="label">待派單</div><div class="value" id="waiting">-</div><div class="sub" id="waitingSub">等待媒合中的訂單</div></div>
     <div class="kpi"><div class="label">配送中</div><div class="value" id="active">-</div><div class="sub">已由小U承接</div></div>
     <div class="kpi"><div class="label">今日完成</div><div class="value" id="completed">-</div><div class="sub">今日完成任務</div></div>
+    <div class="kpi"><div class="label">高風險任務</div><div class="value" id="highRisk">-</div><div class="sub">需優先人工關注</div></div>
+    <div class="kpi"><div class="label">15分鐘預測需求</div><div class="value" id="forecastDemand">-</div><div class="sub">規則＋歷史樣本預測</div></div>
+    <div class="kpi"><div class="label">預測運力缺口</div><div class="value" id="forecastGap">-</div><div class="sub">負數代表可能缺員</div></div>
     <div class="kpi"><div class="label">異常提醒</div><div class="value" id="alerts">-</div><div class="sub">需人工關注</div></div>
+  </section>
+
+  <section class="intel-grid">
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">智慧調度建議</div><div class="panel-sub">只提出建議，不自動執行高風險操作</div></div></div>
+      <div class="panel-body"><div class="intel-list" id="recommendationList"><div class="empty">智慧分析載入中…</div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">區域供需與缺口</div><div class="panel-sub">依即時訂單、在線運力與 15 分鐘預測排序</div></div></div>
+      <div class="panel-body"><div class="zone-grid" id="zoneGrid"><div class="empty">區域分析載入中…</div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div><div class="panel-title">15 分鐘預測</div><div class="panel-sub">資料不足時會降低信心，不假裝精準</div></div></div>
+      <div class="panel-body" id="forecastPanel"><div class="empty">預測載入中…</div></div>
+    </div>
   </section>
 
   <main class="main-grid">
@@ -322,11 +370,14 @@ button{cursor:pointer}
             </div>
 
             <div class="api-note">
-              「附近推薦／距離排序」目前可直接使用現有 dashboard 回傳座標運作。
-              「指定小U、重新派單、擴大派單半徑」已完成前端流程，最後需在 index.js 補寫對應寫入 API 才會真正改變訂單派單狀態。
+              Level 4 會綜合距離、定位新鮮度、區域供需與既有調度統計排序。所有「指定小U／重新派單／擴圈」仍需人工確認後才會呼叫正式後端 API。
             </div>
           </div>
         </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">調度事件時間軸</div><div class="panel-sub">追蹤建立、通知、接單、擴圈、轉派與完成等事件</div></div></div>
+        <div class="panel-body"><div class="timeline" id="dispatchTimeline"><div class="empty">選擇訂單後顯示調度事件</div></div></div>
       </div>
     </section>
 
@@ -408,7 +459,7 @@ button{cursor:pointer}
 'use strict';
 
 /* ============================================================
-   UBee 調度中心 V6 Google Maps 完整串接版
+   UBee Level 4 智慧調度中心 V1｜Google Maps 完整串接版
    現有可直接使用：
    GET /api/dispatch/dashboard
 
@@ -419,10 +470,11 @@ button{cursor:pointer}
    ============================================================ */
 
 const state = {
-  data: { summary:{}, orders:[], riders:[], alerts:[] },
+  data: { summary:{}, orders:[], riders:[], alerts:[], intelligence:{summary:{},zones:[],orderInsights:[],recommendations:[]} },
   filter: 'all',
   selectedOrderId: '',
   selectedCandidateRiderId: '',
+  selectedOrderEvents: [],
   radiusKm: 3,
   map: null,
   mapReady: false,
@@ -512,6 +564,20 @@ function toast(message, duration=3200){
 
 function getSelectedOrder(){
   return (state.data.orders || []).find(o => String(o.id) === String(state.selectedOrderId)) || null;
+}
+
+
+function getOrderInsight(orderId){
+  return (state.data.intelligence?.orderInsights || []).find(x=>String(x.orderId)===String(orderId)) || null;
+}
+function riskBadge(level,score){
+  const safe=String(level||'NORMAL').toLowerCase();
+  const label={normal:'正常',watch:'注意',high:'高風險',critical:'緊急'}[safe]||level;
+  return `<span class="risk-score risk-${esc(safe)}">${esc(label)} ${Number(score||0)}</span>`;
+}
+function severityClass(value){
+  const v=String(value||'').toLowerCase();
+  return v==='critical'?'critical':v==='high'?'high':'';
 }
 
 /* =========================
@@ -897,12 +963,15 @@ async function loadDashboard({silent=false}={}){
       summary:data.summary || {},
       orders:Array.isArray(data.orders) ? data.orders : [],
       riders:Array.isArray(data.riders) ? data.riders : [],
-      alerts:Array.isArray(data.alerts) ? data.alerts : []
+      alerts:Array.isArray(data.alerts) ? data.alerts : [],
+      intelligence:data.intelligence || {summary:{},zones:[],orderInsights:[],recommendations:[]}
     };
 
     if(state.selectedOrderId && !getSelectedOrder()){
       state.selectedOrderId = '';
       state.selectedCandidateRiderId = '';
+      state.selectedOrderEvents = [];
+      renderDispatchTimeline();
     }
 
     renderAll();
@@ -928,6 +997,7 @@ async function loadDashboard({silent=false}={}){
 
 function renderAll(){
   renderSummary();
+  renderIntelligence();
   renderOrders();
   renderRiders();
   renderAlerts();
@@ -942,6 +1012,10 @@ function renderSummary(){
   $('waiting').textContent = s.waitingOrders ?? state.data.orders.filter(o=>statusKind(o)==='waiting').length;
   $('active').textContent = s.activeOrders ?? state.data.orders.filter(o=>statusKind(o)==='active').length;
   $('completed').textContent = s.todayCompleted ?? 0;
+  $('highRisk').textContent = s.highRiskOrders ?? state.data.intelligence?.summary?.highRiskOrders ?? 0;
+  $('forecastDemand').textContent = s.predictedDemand15m ?? state.data.intelligence?.summary?.predictedDemand15m ?? 0;
+  const gap = s.expectedGap15m ?? state.data.intelligence?.summary?.expectedGap15m ?? 0;
+  $('forecastGap').textContent = Number(gap) > 0 ? `+${gap}` : String(gap);
   $('alerts').textContent = state.data.alerts.length;
 
   const withLocation = state.data.riders.filter(r=>hasLatLng(r.currentLat,r.currentLng)).length;
@@ -954,6 +1028,51 @@ function renderSummary(){
   }else{
     $('waitingSub').textContent = '目前沒有等待媒合訂單';
   }
+}
+
+
+function renderIntelligence(){
+  const intel = state.data.intelligence || {};
+  const summary = intel.summary || {};
+  const recs = Array.isArray(intel.recommendations) ? intel.recommendations : [];
+  const zones = Array.isArray(intel.zones) ? intel.zones : [];
+
+  if(!recs.length){
+    $('recommendationList').innerHTML = '<div class="empty">目前沒有需要優先處理的智慧調度建議</div>';
+  }else{
+    $('recommendationList').innerHTML = recs.slice(0,10).map(rec=>`
+      <div class="intel-item ${severityClass(rec.severity)}">
+        <div class="intel-title">${esc(rec.title || '調度建議')}</div>
+        <div class="intel-message">${esc(rec.message || '')}</div>
+        <div class="intel-actions">
+          ${rec.orderId?`<button class="btn small" data-intel-action="select-order" data-order-id="${esc(rec.orderId)}">查看訂單</button>`:''}
+          ${rec.orderId?`<button class="btn small yellow" data-intel-action="apply-suggestion" data-order-id="${esc(rec.orderId)}">檢視／套用建議</button>`:''}
+          ${rec.zoneId?`<button class="btn small" data-intel-action="zone-review" data-zone-id="${esc(rec.zoneId)}">檢視區域</button>`:''}
+        </div>
+      </div>`).join('');
+  }
+
+  if(!zones.length){
+    $('zoneGrid').innerHTML = '<div class="empty">目前沒有足夠區域資料</div>';
+  }else{
+    $('zoneGrid').innerHTML = zones.slice(0,12).map(z=>`
+      <div class="zone-card ${String(z.risk||'normal').toLowerCase()}">
+        <div>
+          <div class="zone-name">${esc(z.district || '未分區')} · ${esc(z.risk || 'NORMAL')}</div>
+          <div class="zone-meta">可接 ${esc(z.availableRiders||0)}｜任務中 ${esc(z.busyRiders||0)}｜待接 ${esc(z.waitingOrders||0)}<br>15分鐘需求 ${esc(z.predictedOrders15m||0)}｜預測可用 ${esc(z.predictedAvailableRiders15m||0)}｜信心 ${esc(z.confidence||'LOW')}</div>
+        </div>
+        <div><div class="zone-gap">${Number(z.expectedGap15m)>0?'+':''}${esc(z.expectedGap15m||0)}</div><div class="candidate-meta">預測缺口</div></div>
+      </div>`).join('');
+  }
+
+  const gap = Number(summary.expectedGap15m || 0);
+  $('forecastPanel').innerHTML = `
+    <div class="forecast-big">${Number(summary.predictedDemand15m || 0)}</div>
+    <div class="candidate-meta" style="margin-bottom:8px">未來 15 分鐘預測新增需求</div>
+    <div class="forecast-row"><span>預測可用運力</span><b>${esc(summary.predictedAvailable15m || 0)}</b></div>
+    <div class="forecast-row"><span>全城預測缺口</span><b style="color:${gap<0?'var(--red)':'var(--green)'}">${gap>0?'+':''}${gap}</b></div>
+    <div class="forecast-row"><span>風險區域</span><b>${esc(summary.activeRiskZones || 0)}</b></div>
+    <div class="api-note" style="margin-top:10px">第一版預測採即時趨勢＋同星期同時段歷史樣本加權；資料不足時信心會顯示 LOW。</div>`;
 }
 
 function renderOrders(){
@@ -983,6 +1102,7 @@ function renderOrders(){
             <div class="order-id">${esc(order.id)}</div>
             <div class="badges">
               ${waitBadge(order)}
+              ${riskBadge(order.riskLevel,order.riskScore)}
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
             </div>
           </div>
@@ -1000,6 +1120,7 @@ function renderOrders(){
           </div>
         </div>
 
+        ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<div class="candidate-meta" style="margin-top:8px;color:${order.riskLevel==='CRITICAL'?'var(--red)':order.riskLevel==='HIGH'?'#b05e00':'var(--muted)'}">系統判斷：${esc(order.riskReasons.slice(0,3).join('；'))}</div>`:''}
         <div class="meta">
           <span>${esc(order.riderName || (isWaiting?'尚未接單':'已指派小U'))}</span>
           <span class="wait">${isWaiting?'等待 '+fmtAge(order.createdAtMs):'建立 '+fmtAge(order.createdAtMs)}</span>
@@ -1065,23 +1186,22 @@ function renderAlerts(){
    候選小U推薦與距離排序
    ========================= */
 function getCandidateRiders(order){
-  if(!order || !hasLatLng(order.pickupLat,order.pickupLng)) return [];
-
-  const pLat = Number(order.pickupLat);
-  const pLng = Number(order.pickupLng);
-
-  return (state.data.riders || [])
-    .filter(r=>!r.busy)
-    .filter(r=>hasLatLng(r.currentLat,r.currentLng))
-    .map(r=>({
-      ...r,
-      distanceKm:haversineKm(pLat,pLng,Number(r.currentLat),Number(r.currentLng))
-    }))
-    .filter(r=>r.distanceKm <= state.radiusKm)
-    .sort((a,b)=>{
-      if(a.distanceKm !== b.distanceKm) return a.distanceKm-b.distanceKm;
-      return Number(b.locationUpdatedAtMs||0)-Number(a.locationUpdatedAtMs||0);
-    });
+  if(!order) return [];
+  const insight = getOrderInsight(order.id);
+  if(insight && Array.isArray(insight.candidates) && insight.candidates.length){
+    return insight.candidates
+      .filter(c=>!c.skippedThisOrder)
+      .filter(c=>Number(c.distanceKm) <= state.radiusKm)
+      .map(c=>{
+        const base=(state.data.riders||[]).find(r=>String(r.riderId)===String(c.riderId)||String(r.riderDocId)===String(c.riderDocId))||{};
+        return {...base,...c,distanceKm:Number(c.distanceKm),dispatchScore:Number(c.score||0)};
+      });
+  }
+  if(!hasLatLng(order.pickupLat,order.pickupLng)) return [];
+  const pLat=Number(order.pickupLat),pLng=Number(order.pickupLng);
+  return (state.data.riders||[]).filter(r=>!r.busy).filter(r=>hasLatLng(r.currentLat,r.currentLng)).map(r=>({
+    ...r,distanceKm:haversineKm(pLat,pLng,Number(r.currentLat),Number(r.currentLng)),dispatchScore:0
+  })).filter(r=>r.distanceKm<=state.radiusKm).sort((a,b)=>a.distanceKm-b.distanceKm);
 }
 
 function renderCandidates(){
@@ -1102,7 +1222,9 @@ function renderCandidates(){
     <strong>${esc(order.id)}</strong>
     <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.55">
       取件：${esc(order.pickupAddress || '-')}<br>
-      狀態：${esc(order.statusLabel || order.status || '-')}
+      狀態：${esc(order.statusLabel || order.status || '-')}<br>
+      ${riskBadge(order.riskLevel,order.riskScore)}
+      ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<br>原因：${esc(order.riskReasons.slice(0,4).join('；'))}`:''}
       ${!hasLatLng(order.pickupLat,order.pickupLng)?'<br><b style="color:var(--red)">此訂單缺少取件座標，無法計算附近小U。</b>':''}
     </div>
   `;
@@ -1139,21 +1261,56 @@ function renderCandidates(){
         </div>
         <div class="candidate-meta">
           ${esc(r.district || r.serviceArea || '未設定區域')}
-          · 定位更新 ${esc(fmtAge(r.locationUpdatedAtMs))}
+          · 定位更新 ${esc(fmtAge(r.locationUpdatedAtMs || (Date.now()-Number(r.locationAgeMs||0))))}
+          · 預估取件 ${esc(r.estimatedPickupMinutes || '-')} 分
           · ${esc(r.riderId || '')}
         </div>
       </div>
       <div>
-        <div class="distance">${r.distanceKm.toFixed(2)} km</div>
+        <div class="candidate-score">${esc(r.dispatchScore ?? r.score ?? 0)}<small>Dispatch Score</small></div>
+        <div class="distance">${Number(r.distanceKm).toFixed(2)} km</div>
         <button class="btn small yellow" style="margin-top:6px" data-action="assign" data-rider-id="${esc(r.riderId)}">指定</button>
       </div>
     </div>
   `).join('');
 }
 
+
+function eventLabel(type){
+  const map={
+    ORDER_CREATED:'訂單建立',RIDER_NOTIFIED:'已通知小U',RIDER_ACCEPTED:'小U接單',RIDER_SKIPPED:'小U略過',
+    RIDER_TRANSFERRED:'騎士取消／轉派',MANUAL_ASSIGN:'人工指定小U',REDISPATCH:'重新派單',RADIUS_EXPANDED:'擴大派單半徑',
+    ORDER_STATUS_ARRIVED_PICKUP:'抵達取件點',ORDER_STATUS_PICKED_UP:'已取件',ORDER_STATUS_ARRIVED_DROPOFF:'抵達送達點',ORDER_COMPLETED:'任務完成'
+  };
+  return map[String(type||'')]||String(type||'調度事件');
+}
+function renderDispatchTimeline(){
+  const el=$('dispatchTimeline'); if(!el) return;
+  const list=state.selectedOrderEvents||[];
+  if(!state.selectedOrderId){el.innerHTML='<div class="empty">選擇訂單後顯示調度事件</div>';return;}
+  if(!list.length){el.innerHTML='<div class="empty">此訂單尚無 Level 4 調度事件紀錄；升級前的歷史事件不會自動回補。</div>';return;}
+  el.innerHTML=list.map(e=>`<div class="timeline-item"><div class="timeline-time">${esc(fmtTime(e.createdAtMs))}</div><div class="timeline-dot"></div><div class="timeline-main"><strong>${esc(eventLabel(e.type))}</strong><br>${e.riderId?`小U ${esc(e.riderId)} `:''}${e.radiusKm?`· ${esc(e.radiusKm)} km `:''}${e.reason?`· ${esc(e.reason)}`:''}</div></div>`).join('');
+}
+async function loadDispatchTimeline(orderId){
+  state.selectedOrderEvents=[];renderDispatchTimeline();
+  if(!orderId||!navigator.onLine) return;
+  try{
+    const r=await fetch(`/api/dispatch/orders/${encodeURIComponent(orderId)}/events`,{cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.success===false) throw new Error(d.message||'讀取事件失敗');
+    if(String(state.selectedOrderId)!==String(orderId)) return;
+    state.selectedOrderEvents=Array.isArray(d.events)?d.events:[];
+    renderDispatchTimeline();
+  }catch(e){
+    console.warn('Level4 timeline load failed:',e);
+    const el=$('dispatchTimeline');if(el)el.innerHTML=`<div class="empty">事件時間軸暫時無法讀取：${esc(e.message||'未知錯誤')}</div>`;
+  }
+}
+
 function selectOrder(orderId,{pan=true}={}){
   state.selectedOrderId = String(orderId || '');
   state.selectedCandidateRiderId = '';
+  loadDispatchTimeline(state.selectedOrderId);
   renderOrders();
   renderCandidates();
   renderMap();
@@ -1304,6 +1461,35 @@ function closeAssignModal(){
   $('assignModal').classList.remove('show');
   state.selectedCandidateRiderId = '';
 }
+
+document.addEventListener('click',event=>{
+  const btn=event.target.closest('[data-intel-action]');
+  if(!btn) return;
+  const action=btn.dataset.intelAction;
+  const orderId=btn.dataset.orderId||'';
+  if(action==='select-order' && orderId){ selectOrder(orderId); return; }
+  if(action==='apply-suggestion' && orderId){
+    const order=(state.data.orders||[]).find(o=>String(o.id)===String(orderId));
+    const insight=getOrderInsight(orderId);
+    if(!order||!insight) return toast('找不到此調度建議');
+    selectOrder(orderId);
+    const expand=(insight.recommendations||[]).find(x=>x.type==='EXPAND_RADIUS');
+    if(expand && Number(expand.targetRadiusKm)>state.radiusKm){
+      state.radiusKm=Number(expand.targetRadiusKm);
+      $('radiusSelect').value=String(state.radiusKm);
+      renderCandidates();renderMap();
+      toast(`已帶入建議半徑 ${state.radiusKm} km；請人工確認後再按「擴大派單半徑」`,5200);
+    }else{
+      toast('已選取此訂單，請人工檢視候選小U與系統判斷',4200);
+    }
+    return;
+  }
+  if(action==='zone-review'){
+    const zoneId=btn.dataset.zoneId||'';
+    const z=(state.data.intelligence?.zones||[]).find(x=>String(x.zoneId)===String(zoneId));
+    if(z) toast(`${z.district}：待接 ${z.waitingOrders}、可接 ${z.availableRiders}、15分鐘預測缺口 ${z.expectedGap15m}`,5200);
+  }
+});
 
 /* =========================
    事件
