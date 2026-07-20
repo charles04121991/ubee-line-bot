@@ -7845,6 +7845,442 @@ body{background:#eef0f2;}
 
 /* UBee 2026-07-16 正式營運整合功能 */
 .address-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.compact-field{display:block;border:1px solid var(--line);border-radius:14px;background:#fff;padding:9px 11px}.compact-field span{display:block;font-size:10px;font-weight:1000;color:var(--muted);margin-bottom:4px}.compact-field input{font-size:13px!important}.saved-address-quickbar{display:flex;gap:7px;overflow-x:auto;margin-top:10px;padding-bottom:2px}.quick-address-chip,.mini-action{border:1px solid #e4d174;background:#fffbed;color:#5f4c00;border-radius:999px;padding:8px 11px;font-size:12px!important;font-weight:1000;white-space:nowrap}.match-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#fafafa}.match-status-card strong,.match-status-card span{display:block}.match-status-card strong{font-size:13px}.match-status-card div span{font-size:11px;color:var(--muted);margin-top:3px}.status-badge{border-radius:999px;padding:6px 9px;font-size:10px!important;font-weight:1000}.status-badge.good{background:#e9f8ef;color:#16753a}.status-badge.warn{background:#fff4d6;color:#8a6200}.status-badge.neutral{background:#eef0f2;color:#62676d}.home-estimate-eta{font-size:10px;color:#72767b;font-weight:900;margin-top:2px}.form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.shopping-list{display:flex;flex-direction:column;gap:9px}.shopping-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}.shopping-item-grid{display:grid;grid-template-columns:1fr 92px;gap:8px}.shopping-item input,.shopping-item select{border:1px solid var(--line);border-radius:11px;padding:10px!important;background:#fafafa}.shopping-item-actions{display:flex;justify-content:flex-end;margin-top:8px}.danger-link{border:none;background:transparent;color:var(--red);font-size:12px!important;font-weight:1000}.field-help,.inline-status{font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;margin-top:8px}.system-check-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:13px;margin-bottom:18px}.system-check-row{display:flex;gap:9px;align-items:flex-start;padding:8px 0;font-size:12px;font-weight:850}.system-check-row+.system-check-row{border-top:1px solid #f0f1f2}.system-check-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 22px}.system-check-row.ok .system-check-icon{background:#e9f8ef;color:#16753a}.system-check-row.warn .system-check-icon{background:#fff4d6;color:#8a6200}.system-check-row.error .system-check-icon{background:#feecec;color:#b42318}.field-invalid{box-shadow:0 0 0 2px rgba(220,38,38,.22)!important;border-color:#dc2626!important}.field-error-text{font-size:11px;color:#dc2626;font-weight:900;margin-top:6px}.saved-address-list{display:flex;flex-direction:column;gap:9px}.saved-address-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa}.saved-address-card-head{display:flex;justify-content:space-between;gap:10px}.saved-address-card-title{font-weight:1000}.saved-address-card-text{font-size:12px;color:var(--muted);line-height:1.6;margin-top:5px}.saved-address-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.saved-address-actions button,.order-card-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px!important;font-weight:1000}.order-history-card{border:1px solid var(--line);background:var(--surface2);border-radius:17px;padding:13px;margin-bottom:10px}.order-card-actions{display:flex;gap:8px;margin-top:10px}.draft-banner{position:fixed;left:50%;top:calc(74px + env(safe-area-inset-top));transform:translateX(-50%);z-index:120;width:calc(100% - 28px);max-width:492px;border:1px solid #e8d05c;border-radius:17px;background:#fffbed;box-shadow:0 12px 30px rgba(17,24,39,.15);padding:12px}.draft-banner-actions{display:flex;gap:8px;margin-top:9px}.draft-banner-actions button{flex:1;border:none;border-radius:12px;padding:10px;font-weight:1000}.draft-continue{background:var(--accent)}.draft-discard{background:#fff;border:1px solid var(--line)}.empty-state{font-size:13px;color:var(--muted);font-weight:800}@media(max-width:380px){.address-detail-grid,.shopping-item-grid{grid-template-columns:1fr}}
+
+
+/* =========================================================
+   UBee 客人端｜第三、四步精簡正式營運版 2026-07-20
+   原則：只調整資訊層級與入口位置，不改 API／Firestore／估價／付款／取消／追蹤邏輯
+   ========================================================= */
+
+/* STEP 3（程式 step4）：確認訂單精簡 */
+#step4{
+  padding-bottom:132px;
+}
+#step4 .step4-page-heading-compact{
+  margin-bottom:10px;
+}
+#step4 .review-map-shell-compact{
+  height:190px;
+  border-radius:20px;
+  overflow:hidden;
+  margin-bottom:0;
+}
+#step4 .review-route-badge-compact{
+  margin-top:10px;
+  margin-bottom:14px;
+}
+#step4 .review-section-head-compact{
+  margin-top:14px;
+  margin-bottom:8px;
+}
+#step4 .review-summary-card{
+  margin-bottom:12px;
+}
+#step4 .review-summary-group + .review-summary-group{
+  margin-top:9px;
+}
+#step4 .review-summary-group-title{
+  padding:9px 13px 7px;
+}
+#step4 .review-summary-row-compact{
+  min-height:58px;
+  padding:11px 13px;
+}
+#step4 .review-summary-row-compact .review-summary-value{
+  font-size:13px;
+}
+#step4 .review-summary-note-preview{
+  margin-top:4px;
+  color:#85898e;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.45;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+#step4 .review-more-details{
+  overflow:hidden;
+  margin-top:9px;
+  border:1px solid #e7e8ea;
+  border-radius:16px;
+  background:#fff;
+}
+#step4 .review-more-details > summary{
+  list-style:none;
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 14px;
+  cursor:pointer;
+  color:#333;
+  font-size:13px;
+  font-weight:1000;
+}
+#step4 .review-more-details > summary::-webkit-details-marker{display:none;}
+#step4 .review-more-details-hint,
+#step4 .review-price-details-hint{
+  color:#969a9f;
+  font-size:11px;
+  font-weight:900;
+}
+#step4 .review-more-details-body{
+  border-top:1px solid #eeeeef;
+  padding:3px 13px;
+}
+#step4 .review-summary-mini-row{
+  width:100%;
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:8px 0;
+  border:none;
+  border-bottom:1px solid #f0f1f2;
+  background:transparent;
+  text-align:left;
+}
+#step4 .review-summary-mini-row:last-child{border-bottom:none;}
+#step4 .review-summary-mini-row span{
+  color:#85898e;
+  font-size:11px;
+  font-weight:900;
+  flex:0 0 72px;
+}
+#step4 .review-summary-mini-row strong{
+  min-width:0;
+  color:#222;
+  font-size:12px;
+  font-weight:900;
+  line-height:1.5;
+  text-align:right;
+}
+#step4 .price-box{
+  margin-bottom:10px;
+  border-radius:17px;
+}
+#step4 .review-price-compact-card{
+  padding:14px 15px 0;
+}
+#step4 .review-price-compact-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+#step4 .review-price-compact-card .review-price-total{
+  font-size:29px;
+}
+#step4 .review-price-compact-card .review-price-route-meta{
+  margin:7px 0 12px;
+}
+#step4 .review-price-details-toggle{
+  margin:0 -15px;
+  border-top:1px solid #eeeeef;
+}
+#step4 .review-price-details-toggle > summary{
+  list-style:none;
+  min-height:50px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 15px;
+  cursor:pointer;
+  color:#333;
+  font-size:13px;
+  font-weight:1000;
+}
+#step4 .review-price-details-toggle > summary::-webkit-details-marker{display:none;}
+#step4 .review-price-details-list-compact{
+  border-top:1px solid #f0f1f2;
+  padding:7px 15px 10px;
+}
+#step4 .review-system-check-wrap{
+  display:none;
+}
+#step4 .review-confirm-compact{
+  margin-top:10px;
+}
+#step4 .review-confirm-item-compact{
+  min-height:54px;
+  padding:11px 13px;
+}
+#step4 .review-confirm-item-compact .review-confirm-title{
+  display:none;
+}
+#step4 .review-confirm-item-compact .review-confirm-text{
+  font-size:12px;
+  line-height:1.55;
+}
+#step4 .review-rules-details-compact{
+  margin-top:7px;
+}
+#step4 .review-submit-meta{
+  display:none;
+}
+#step4 .review-sticky-footer{
+  grid-template-columns:minmax(105px,.7fr) minmax(0,1.3fr);
+}
+
+/* STEP 4（程式 step5）：任務狀態頁精簡 */
+#step5{
+  padding-top:6px;
+  padding-bottom:112px;
+}
+#step5 > .ubee-v3-progress{
+  display:none;
+}
+#step5 .step5-order-header{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:2px 0 12px;
+  padding:12px 14px;
+  border:1px solid #e7e8ea;
+  border-radius:18px;
+  background:#fff;
+}
+#step5 .step5-order-header-main{min-width:0;}
+#step5 .step5-order-kicker{
+  color:#8b8f94;
+  font-size:10px;
+  font-weight:1000;
+  margin-bottom:4px;
+}
+#step5 .step5-order-number{
+  color:#111;
+  font-size:13px;
+  font-weight:900;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#step5 .step5-order-number strong{font-weight:1000;}
+#step5 .step5-order-menu{position:relative;flex:0 0 auto;}
+#step5 .step5-order-menu > summary{
+  list-style:none;
+  width:40px;
+  height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #e4e5e7;
+  border-radius:50%;
+  background:#fff;
+  color:#111;
+  font-size:20px;
+  font-weight:1000;
+  letter-spacing:1px;
+  cursor:pointer;
+}
+#step5 .step5-order-menu > summary::-webkit-details-marker{display:none;}
+#step5 .step5-order-menu-popover{
+  position:absolute;
+  top:47px;
+  right:0;
+  z-index:120;
+  width:168px;
+  overflow:hidden;
+  border:1px solid #e3e4e6;
+  border-radius:15px;
+  background:#fff;
+  box-shadow:0 12px 30px rgba(17,24,39,.16);
+}
+#step5 .step5-order-menu-popover button{
+  width:100%;
+  min-height:46px;
+  border:none;
+  border-bottom:1px solid #eeeeef;
+  background:#fff;
+  padding:0 14px;
+  color:#222;
+  font-size:13px!important;
+  font-weight:1000;
+  text-align:left;
+}
+#step5 .step5-order-menu-popover button:last-child{border-bottom:none;}
+#step5 .step5-order-menu-popover .step5-order-menu-danger{color:var(--red);}
+#step5 .step5-live-status-panel{
+  margin-bottom:12px;
+}
+#step5 .step5-tracking-map-section{
+  margin-bottom:12px;
+}
+#step5 .step5-tracking-head-compact{
+  margin-bottom:8px;
+}
+#step5 .step5-tracking-map-shell{
+  height:240px;
+}
+#step5 .step5-compact-details,
+#step5 .step5-task-detail-collapsible{
+  overflow:hidden;
+  margin:0 0 12px;
+  border:1px solid #e7e8ea;
+  border-radius:18px;
+  background:#fff;
+  box-shadow:none;
+}
+#step5 .step5-compact-details > summary,
+#step5 .step5-task-detail-summary{
+  list-style:none;
+  min-height:54px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 14px;
+  cursor:pointer;
+}
+#step5 .step5-compact-details > summary::-webkit-details-marker,
+#step5 .step5-task-detail-summary::-webkit-details-marker{display:none;}
+#step5 .step5-compact-details > summary > span:first-child,
+#step5 .step5-task-detail-summary strong{
+  color:#222;
+  font-size:14px;
+  font-weight:1000;
+}
+#step5 .step5-task-detail-summary > span:first-child{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+#step5 .step5-task-detail-summary small{
+  color:#8b8f94;
+  font-size:10px;
+  font-weight:850;
+}
+#step5 .step5-details-hint{
+  flex:0 0 auto;
+  color:#969a9f;
+  font-size:10px;
+  font-weight:1000;
+}
+#step5 .step5-cost-details #statusBox{
+  margin:0;
+  border-top:1px solid #eeeeef;
+  border-radius:0;
+  box-shadow:none;
+}
+#step5 .step5-payment-section-compact{
+  margin:0 0 12px;
+  padding:14px;
+  border-radius:18px;
+  box-shadow:none;
+}
+#step5 .step5-payment-compact-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+#step5 .step5-payment-method-pill{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  background:#f2f3f4;
+  color:#222;
+  font-size:11px;
+  font-weight:1000;
+}
+#step5 #paymentInfo{
+  margin-top:11px;
+  padding:0;
+  border:none;
+  border-radius:0;
+  background:transparent;
+}
+#step5 .step5-payment-compact-info{
+  overflow:hidden;
+  border:1px solid #e7e8ea;
+  border-radius:14px;
+  background:#fafafa;
+}
+#step5 .step5-payment-compact-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 12px;
+}
+#step5 .step5-payment-compact-row span{
+  color:#777b80;
+  font-size:11px;
+  font-weight:900;
+}
+#step5 .step5-payment-compact-row strong{
+  color:#111;
+  font-size:17px;
+  font-weight:1000;
+}
+#step5 .step5-payment-compact-note{
+  border-top:1px solid #eceeef;
+  padding:9px 12px;
+  color:#7b7f84;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.55;
+}
+#step5 .step5-payment-confirmed-compact{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 12px;
+  border:1px solid #dce8df;
+  border-radius:14px;
+  background:#f4fbf6;
+}
+#step5 .step5-payment-confirmed-compact div{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+#step5 .step5-payment-confirmed-compact strong{
+  color:#164d27;
+  font-size:13px;
+  font-weight:1000;
+}
+#step5 .step5-payment-confirmed-compact div span{
+  color:#5c7463;
+  font-size:10px;
+  font-weight:850;
+}
+#step5 .step5-payment-card-badge{
+  flex:0 0 auto;
+  padding:6px 9px;
+  border-radius:999px;
+  background:#dff3e5;
+  color:#1a6833;
+  font-size:10px;
+  font-weight:1000;
+}
+#step5 .step5-confirm-cash-btn{
+  margin-top:11px;
+}
+#step5 .step5-task-detail-section{
+  padding:0;
+}
+#step5 .step5-task-detail-content{
+  border-top:1px solid #eeeeef;
+  padding:12px 14px 14px;
+}
+
+@media(max-width:380px){
+  #step4 .review-map-shell-compact{height:170px;}
+  #step5 .step5-tracking-map-shell{height:215px;}
+  #step5 .step5-order-menu-popover{width:154px;}
+}
+
 </style>
 </head>
 
@@ -8515,465 +8951,164 @@ body{background:#eef0f2;}
         </div>
       </div>
 
-
-  <div class="step4-page-heading">
-
-    <div class="step4-page-title">
-      確認訂單
-    </div>
-
-    <div class="step4-page-sub">
-      請確認路線與任務內容
-    </div>
-
-  </div>
-
-
-  <div class="review-map-shell">
-
-  <div
-    id="reviewMap"
-    class="map-canvas"
-  ></div>
-
-  <div
-    id="reviewMapPlaceholder"
-    class="map-placeholder"
-  >
-
-    <strong>
-      正在準備路線地圖
-    </strong>
-
-    <small>
-      路線地圖暫時無法顯示時，
-      正式估價仍以後端回傳結果為準。
-    </small>
-
-  </div>
-
-</div>
-
-
-<!-- 路線距離與時間
-     改成地圖下方獨立資訊列 -->
-
-<div
-  id="reviewRouteBadge"
-  class="review-route-badge hidden"
->
-
-  <div class="review-route-item">
-
-    <div class="review-route-label">
-      路線距離
-    </div>
-
-    <strong id="reviewRouteDistance">
-      -
-    </strong>
-
-  </div>
-
-
-  <div class="review-route-divider"></div>
-
-
-  <div class="review-route-item review-route-item-right">
-
-    <div class="review-route-label">
-      預估時間
-    </div>
-
-    <strong id="reviewRouteDuration">
-      -
-    </strong>
-
-  </div>
-
-</div>
-
-      <div class="review-section-head">
-
-  <div class="review-section-title">
-    訂單資訊
-  </div>
-
-  <div class="review-section-edit-hint">
-    點選項目可返回修改
-  </div>
-
-</div>
-
-
-<div
-  class="summary-card review-summary-card"
-  id="summaryBox"
-></div>
-
-
-<div class="review-section-head review-price-section-head">
-
-  <div class="review-section-title">
-    費用確認
-  </div>
-
-  <div class="review-section-edit-hint">
-    系統即時估價
-  </div>
-
-</div>
-
-
-<div
-  class="price-box hidden"
-  id="priceBox"
-></div>
-
-      <div class="review-section-head"><div class="review-section-title">系統檢查</div><div class="review-section-edit-hint">建立前自動驗證</div></div>
-<div id="orderSystemCheck" class="system-check-card" aria-live="polite"></div>
-
-<div class="review-section-head review-confirm-section-head">
-
-  <div class="review-section-title">
-    最後確認
-  </div>
-
-  <div class="review-section-edit-hint">
-    確認後即可建立任務
-  </div>
-
-</div>
-
-
-<div class="review-confirm-list">
-
-  <label class="review-confirm-item">
-
-    <input
-      id="agreeCheck"
-      type="checkbox"
-    >
-
-    <span class="review-confirm-custom-check">
-      ✓
-    </span>
-
-    <span class="review-confirm-content">
-
-      <span class="review-confirm-title">
-        確認訂單
-      </span>
-
-      <span class="review-confirm-text">
-        我已確認地址、任務內容與費用正確，並同意 UBee 跑腿服務規則。
-      </span>
-
-    </span>
-
-  </label>
-
-</div>
-
-<details class="review-rules-details">
-
-  <summary>
-
-    <span>
-      查看服務規則
-    </span>
-
-    <span class="review-rules-arrow">
-     ⌄
-    </span>
-
-  </summary>
-
-  <div class="review-rules-content">
-
-    <div class="review-rule-item">
-      <div class="review-rule-text">
-        ・不得委託違法、危險或不適合配送的任務
+      <div class="step4-page-heading step4-page-heading-compact">
+        <div class="step4-page-title">確認訂單</div>
+        <div class="step4-page-sub">確認路線、任務與費用後即可送出</div>
       </div>
-    </div>
 
-    <div class="review-rule-item">
-      <div class="review-rule-text">
-        ・代墊金額達 NT$1,000（含）以上需人工確認
+      <div class="review-map-shell review-map-shell-compact">
+        <div id="reviewMap" class="map-canvas"></div>
+        <div id="reviewMapPlaceholder" class="map-placeholder">
+          <strong>正在準備路線地圖</strong>
+          <small>地圖暫時無法顯示時，正式估價仍以後端結果為準。</small>
+        </div>
       </div>
-    </div>
 
-    <div class="review-rule-item">
-      <div class="review-rule-text">
-        ・目前以現金付款為主
+      <div id="reviewRouteBadge" class="review-route-badge hidden review-route-badge-compact">
+        <div class="review-route-item">
+          <div class="review-route-label">路線距離</div>
+          <strong id="reviewRouteDistance">-</strong>
+        </div>
+        <div class="review-route-divider"></div>
+        <div class="review-route-item review-route-item-right">
+          <div class="review-route-label">預估時間</div>
+          <strong id="reviewRouteDuration">-</strong>
+        </div>
       </div>
-    </div>
 
-    <div class="review-rule-item">
-      <div class="review-rule-text">
-        ・最終費用可能依等候或實際執行情況調整
+      <div class="review-section-head review-section-head-compact">
+        <div class="review-section-title">路線與任務</div>
+        <div class="review-section-edit-hint">點選內容可返回修改</div>
       </div>
-    </div>
 
-  </div>
+      <div class="summary-card review-summary-card" id="summaryBox"></div>
 
-</details>
+      <div class="review-section-head review-price-section-head review-section-head-compact">
+        <div class="review-section-title">預估費用</div>
+        <div class="review-section-edit-hint">明細可展開查看</div>
+      </div>
+
+      <div class="price-box hidden" id="priceBox"></div>
+
+      <!-- 系統檢查邏輯保留，正常情況不額外佔畫面 -->
+      <div class="review-system-check-wrap" aria-live="polite">
+        <div id="orderSystemCheck" class="system-check-card"></div>
+      </div>
+
+      <div class="review-confirm-compact">
+        <label class="review-confirm-item review-confirm-item-compact">
+          <input id="agreeCheck" type="checkbox">
+          <span class="review-confirm-custom-check">✓</span>
+          <span class="review-confirm-content">
+            <span class="review-confirm-text">我已確認訂單資訊並同意 UBee 跑腿服務規則。</span>
+          </span>
+        </label>
+
+        <details class="review-rules-details review-rules-details-compact">
+          <summary>
+            <span>查看服務規則</span>
+            <span class="review-rules-arrow">⌄</span>
+          </summary>
+          <div class="review-rules-content">
+            <div class="review-rule-item"><div class="review-rule-text">・不得委託違法、危險或不適合配送的任務</div></div>
+            <div class="review-rule-item"><div class="review-rule-text">・代墊金額達 NT$1,000（含）以上需人工確認</div></div>
+            <div class="review-rule-item"><div class="review-rule-text">・目前以現金付款為主</div></div>
+            <div class="review-rule-item"><div class="review-rule-text">・最終費用可能依等候或實際執行情況調整</div></div>
+          </div>
+        </details>
+      </div>
 
       <div class="review-sticky-footer">
-
-  <div class="review-submit-price">
-
-    <div class="review-total-label">
-      預估應付
-    </div>
-
-    <div
-      class="review-total-value"
-      id="reviewEstimatedTotal"
-    >
-      待估價
-    </div>
-
-    <div class="review-submit-meta">
-      提交前會再次確認最新金額
-    </div>
-
-  </div>
-
-  <button
-    id="createOrderBtn"
-    class="btn btn-primary review-submit-btn"
-    type="button"
-    onclick="createOrder()"
-  >
-    提交訂單
-  </button>
-
-</div>
+        <div class="review-submit-price">
+          <div class="review-total-label">預估應付</div>
+          <div class="review-total-value" id="reviewEstimatedTotal">待估價</div>
+        </div>
+        <button id="createOrderBtn" class="btn btn-primary review-submit-btn" type="button" onclick="createOrder()">確認並建立任務</button>
+      </div>
     </section>
 
     <section class="step" id="step5">
 
-      <div class="ubee-v3-progress" aria-label="下單進度：建立任務">
-        <div class="ubee-v3-progress-track">
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
-          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+      <div class="step5-order-header">
+        <div class="step5-order-header-main">
+          <div class="step5-order-kicker">任務進度</div>
+          <div class="step5-order-number">訂單 <strong id="orderNo">-</strong></div>
         </div>
+
+        <details class="step5-order-menu">
+          <summary aria-label="訂單選項">•••</summary>
+          <div class="step5-order-menu-popover">
+            <button type="button" onclick="openLineOfficialAccount()">聯繫客服</button>
+            <button id="cancelOrderBtn" class="step5-order-menu-danger hidden" type="button" onclick="cancelOrder()">取消訂單</button>
+          </div>
+        </details>
       </div>
 
-
-      <div class="content-card" style="margin-top:0;">
-
-  <div class="price-row">
-    <span>任務編號</span>
-    <strong id="orderNo">-</strong>
-  </div>
-
-</div>
-
-            <!-- ==============================
-           Step 5：即時任務狀態
-           ============================== -->
-
-      <div
-        id="step5LiveStatusPanel"
-        class="step5-live-status-panel"
-      >
-
+      <!-- 即時任務狀態：第四步第一優先資訊 -->
+      <div id="step5LiveStatusPanel" class="step5-live-status-panel">
         <div class="step5-live-status-top">
-
-          <div
-            id="step5LiveStatusPrimary"
-            class="step5-live-status-primary"
-          >
-            --:--
-          </div>
-
-          <div
-            id="step5LiveStatusLabel"
-            class="step5-live-status-label"
-          >
-            預計抵達時間
-          </div>
-
+          <div id="step5LiveStatusPrimary" class="step5-live-status-primary">--:--</div>
+          <div id="step5LiveStatusLabel" class="step5-live-status-label">預計抵達時間</div>
         </div>
-
-        <div
-          id="step5LiveStatusTitle"
-          class="step5-live-status-title"
-        >
-          任務狀態更新中
-        </div>
-
-        <div
-          id="step5LiveStatusMeta"
-          class="step5-live-status-meta"
-        >
-          系統正在讀取最新任務資訊
-        </div>
-
+        <div id="step5LiveStatusTitle" class="step5-live-status-title">任務狀態更新中</div>
+        <div id="step5LiveStatusMeta" class="step5-live-status-meta">系統正在讀取最新任務資訊</div>
       </div>
 
-      <div
-        id="step5TrackingMapSection"
-        class="step5-tracking-map-section"
-      >
-
-      <!-- ==============================
-           Step 5：小U 即時追蹤地圖容器
-           這一步只先放 HTML，不啟動地圖、不新增 Marker 邏輯
-           ============================== -->
-
-        <div class="step5-section-head">
-
+      <!-- 小U 即時追蹤地圖：保留正式追蹤邏輯 -->
+      <div id="step5TrackingMapSection" class="step5-tracking-map-section">
+        <div class="step5-section-head step5-tracking-head-compact">
           <div>
-
-            <div class="step5-section-title">
-              小U 即時位置
-            </div>
-
-            <div class="step5-section-sub">
-              小U 接單後，這裡會顯示任務追蹤地圖
-            </div>
-
+            <div class="step5-section-title">即時位置</div>
+            <div class="step5-section-sub">小U 接單後顯示即時位置與路線</div>
           </div>
-
         </div>
-
         <div class="step5-tracking-map-shell">
-
-          <div
-            id="step5TrackingMap"
-            class="map-canvas"
-          ></div>
-
-          <div
-            id="step5TrackingMapPlaceholder"
-            class="map-placeholder"
-          >
-
-            <strong>
-              等待小U接單
-            </strong>
-
-            <small>
-              小U 接單並開始回傳定位後，系統會顯示即時位置。
-            </small>
-
+          <div id="step5TrackingMap" class="map-canvas"></div>
+          <div id="step5TrackingMapPlaceholder" class="map-placeholder">
+            <strong>等待小U接單</strong>
+            <small>小U 接單並開始回傳定位後，系統會顯示即時位置。</small>
           </div>
+        </div>
+      </div>
 
+      <!-- 費用資訊預設收合，保留既有 renderTimeline() 正式資料 -->
+      <details class="step5-compact-details step5-cost-details">
+        <summary>
+          <span>費用明細</span>
+          <span class="step5-details-hint">查看</span>
+        </summary>
+        <div id="statusBox">跑腿詳細資訊載入中...</div>
+      </details>
+
+      <!-- 目前正式營運僅開放現金：不再要求客人做沒有第二選項的付款選擇 -->
+      <div class="content-card step5-payment-section step5-payment-section-compact">
+        <div class="step5-payment-compact-head">
+          <div>
+            <div class="step5-section-title">付款</div>
+            <div class="step5-section-sub">現金・任務完成時交付給小U</div>
+          </div>
+          <div class="step5-payment-method-pill">現金</div>
         </div>
 
+        <!-- 保留正式付款方法元件 ID，供既有邏輯安全呼叫；畫面不重複顯示 -->
+        <button id="payCashBtn" class="btn btn-secondary black-outline step5-payment-choice hidden" type="button" onclick="selectPaymentMethod('cash')">現金單</button>
+
+        <div id="paymentInfo" class="payment-info hidden"></div>
+
+        <button id="confirmPaidBtn" class="btn btn-primary hidden step5-confirm-cash-btn" type="button" onclick="confirmPaid()">確認現金單，開始尋找小U</button>
       </div>
 
-      <div id="statusBox">跑腿資詳細資訊載入中...</div>
-
-      <div class="content-card step5-payment-section">
-
-  <div class="step5-section-head">
-
-    <div>
-
-      <div class="step5-section-title">
-        付款方式
-      </div>
-
-      <div class="step5-section-sub">
-        確認後才會正式開始派單
-      </div>
-
-    </div>
-
-  </div>
-
-  <button
-    id="payCashBtn"
-    class="btn btn-secondary black-outline step5-payment-choice"
-    type="button"
-    onclick="selectPaymentMethod('cash')"
-  >
-
-    <span class="step5-payment-choice-icon">
-      $
-    </span>
-
-    <span class="step5-payment-choice-main">
-
-      <span class="step5-payment-choice-title">
-        現金單
-      </span>
-
-      <span class="step5-payment-choice-desc">
-        任務完成時，由 小U 向你收取現金
-      </span>
-
-    </span>
-
-    <span class="step5-payment-choice-check">
-      ✓
-    </span>
-
-  </button>
-
-  <div class="step5-payment-rule">
-
-    <div class="step5-payment-rule-title">
-      目前付款規則
-    </div>
-
-    <div class="step5-payment-rule-text">
-      現階段 UBee 跑腿先開放現金單。確認後系統會開始媒合 小U ，任務完成時再將應付金額交付給 小U 。
-    </div>
-
-  </div>
-
-  <div
-    id="paymentInfo"
-    class="payment-info hidden"
-  ></div>
-
-<button
-  id="confirmPaidBtn"
-  class="btn btn-primary hidden step5-confirm-cash-btn"
-  type="button"
-  onclick="confirmPaid()"
->
-  確認使用現金單，開始派單
-</button>
-
-</div>
-
-<!-- ==============================
-     Step 5：任務明細
-     ============================== -->
-
-<div
-  id="step5TaskDetailSection"
-  class="step5-task-detail-section"
->
-
-  <div class="step5-task-detail-head">
-
-    <div class="step5-task-detail-title">
-      任務明細
-    </div>
-
-    <div class="step5-task-detail-sub">
-      本筆任務內容
-    </div>
-
-  </div>
-
-  <div
-    id="step5TaskDetailContent"
-    class="step5-task-detail-content"
-  >
-    任務明細載入中...
-  </div>
-
-</div>
+      <!-- 完整任務內容預設收合，必要時再查看 -->
+      <details id="step5TaskDetailSection" class="step5-task-detail-section step5-task-detail-collapsible">
+        <summary class="step5-task-detail-summary">
+          <span>
+            <strong>訂單資訊</strong>
+            <small>地址、聯絡人與完整任務內容</small>
+          </span>
+          <span class="step5-details-hint">查看完整資訊</span>
+        </summary>
+        <div id="step5TaskDetailContent" class="step5-task-detail-content">任務明細載入中...</div>
+      </details>
 
     </section>
 
@@ -9109,21 +9244,6 @@ body{background:#eef0f2;}
       </div>
     </section>
 
-    <div
-  class="footer-nav hidden"
-  id="footerNav"
->
-
-  <button
-    id="cancelOrderBtn"
-    class="btn btn-danger hidden"
-    type="button"
-    onclick="cancelOrder()"
-  >
-    取消訂單
-  </button>
-
-</div>
 
     <div class="bottom-tabs">
       <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
@@ -13123,338 +13243,88 @@ function renderSummary(){
   const payload = getPayload();
 
   const pickupLabel =
-  qs('pickupTitle')?.innerText.trim() ||
-  '取件地點';
+    qs('pickupTitle')?.innerText.trim() ||
+    '取件地點';
 
-const dropoffLabel =
-  qs('dropoffTitle')?.innerText.trim() ||
-  '送達地點';
+  const dropoffLabel =
+    qs('dropoffTitle')?.innerText.trim() ||
+    '送達地點';
 
-const pickupPhoneText =
-  payload.pickupPhone ||
-  '未填寫';
+  const pickupPhoneText =
+    payload.pickupPhone ||
+    '未填寫';
 
-const dropoffPhoneText =
-  payload.dropoffPhone ||
-  '未填寫';
+  const dropoffPhoneText =
+    payload.dropoffPhone ||
+    '未填寫';
 
-const advancePaymentText =
-  payload.advancePayment > 0
-    ? `NT$${payload.advancePayment}`
-    : '無需代墊';
+  const advancePaymentText =
+    payload.advancePayment > 0
+      ? `NT$${payload.advancePayment}`
+      : '無需代墊';
 
+  const taskNoteText =
+    String(payload.note || '').trim() ||
+    '未填寫任務備註';
 
-qs('summaryBox').innerHTML = `
+  qs('summaryBox').innerHTML = `
+    <div class="review-summary-group review-summary-route-group">
+      <div class="review-summary-group-title">路線</div>
 
-  <!-- ==============================
-       配送路線
-       ============================== -->
+      <button class="review-summary-row review-summary-row-compact" type="button" onclick="showOnlyStep(1)">
+        <div class="review-summary-marker pickup">取</div>
+        <div class="review-summary-main">
+          <div class="review-summary-label">${escapeHtml(pickupLabel)}</div>
+          <div class="review-summary-value">${escapeHtml(payload.pickupAddress)}</div>
+        </div>
+        <div class="review-summary-chevron">›</div>
+      </button>
 
-  <div class="review-summary-group">
-
-    <div class="review-summary-group-title">
-      配送路線
+      <button class="review-summary-row review-summary-row-compact" type="button" onclick="showOnlyStep(1)">
+        <div class="review-summary-marker dropoff">送</div>
+        <div class="review-summary-main">
+          <div class="review-summary-label">${escapeHtml(dropoffLabel)}</div>
+          <div class="review-summary-value">${escapeHtml(payload.dropoffAddress)}</div>
+        </div>
+        <div class="review-summary-chevron">›</div>
+      </button>
     </div>
 
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(1)"
-    >
-
-      <div class="review-summary-marker pickup">
-        取
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          ${escapeHtml(pickupLabel)}
+    <div class="review-summary-group review-summary-task-group">
+      <button class="review-summary-row review-summary-row-compact" type="button" onclick="showOnlyStep(2)">
+        <div class="review-summary-icon">任</div>
+        <div class="review-summary-main">
+          <div class="review-summary-label">任務</div>
+          <div class="review-summary-value">
+            ${escapeHtml(getServiceGroupLabel())}・${escapeHtml(serviceType)}・${escapeHtml(getSpeedLabel(speedType))}
+          </div>
+          <div class="review-summary-note-preview">${escapeHtml(taskNoteText)}</div>
         </div>
-
-        <div class="review-summary-value">
-          ${escapeHtml(payload.pickupAddress)}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(1)"
-    >
-
-      <div class="review-summary-marker dropoff">
-        送
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          ${escapeHtml(dropoffLabel)}
-        </div>
-
-        <div class="review-summary-value">
-          ${escapeHtml(payload.dropoffAddress)}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-  </div>
-
-
-  <!-- ==============================
-       任務內容
-       ============================== -->
-
-  <div class="review-summary-group">
-
-    <div class="review-summary-group-title">
-      任務內容
+        <div class="review-summary-chevron">›</div>
+      </button>
     </div>
 
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(1)"
-    >
-
-      <div class="review-summary-icon">
-        任
+    <details class="review-more-details">
+      <summary>
+        <span>更多訂單資訊</span>
+        <span class="review-more-details-hint">查看</span>
+      </summary>
+      <div class="review-more-details-body">
+        <button class="review-summary-mini-row" type="button" onclick="showOnlyStep(2)">
+          <span>任務分類</span><strong>${escapeHtml(serviceCategory)}</strong>
+        </button>
+        <button class="review-summary-mini-row" type="button" onclick="showOnlyStep(2)">
+          <span>聯絡資訊</span><strong>取件 ${escapeHtml(pickupPhoneText)}・收件 ${escapeHtml(dropoffPhoneText)}</strong>
+        </button>
+        <button class="review-summary-mini-row" type="button" onclick="showOnlyStep(2)">
+          <span>交付需求</span><strong>${escapeHtml(payload.upstairsLabel)}${payload.upstairsFee > 0 ? `・NT$${payload.upstairsFee}` : ''}</strong>
+        </button>
+        <button class="review-summary-mini-row" type="button" onclick="showOnlyStep(2)">
+          <span>代墊費用</span><strong>${escapeHtml(advancePaymentText)}</strong>
+        </button>
       </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          服務項目
-        </div>
-
-        <div class="review-summary-value">
-          ${escapeHtml(getServiceGroupLabel())}
-          ｜
-          ${escapeHtml(serviceType)}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(2)"
-    >
-
-      <div class="review-summary-icon">
-        類
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          任務分類
-        </div>
-
-        <div class="review-summary-value">
-          ${escapeHtml(serviceCategory)}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(3)"
-    >
-
-      <div class="review-summary-icon">
-        時
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          任務時效
-        </div>
-
-        <div class="review-summary-value">
-          ${escapeHtml(getSpeedLabel(speedType))}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-  </div>
-
-
-  <!-- ==============================
-       聯絡與需求
-       ============================== -->
-
-  <div class="review-summary-group">
-
-    <div class="review-summary-group-title">
-      聯絡與需求
-    </div>
-
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(2)"
-    >
-
-      <div class="review-summary-icon">
-        電
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          聯絡資訊
-        </div>
-
-        <div class="review-summary-value review-summary-value-lines">
-          取件：${escapeHtml(pickupPhoneText)}
-          <br>
-          收件：${escapeHtml(dropoffPhoneText)}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(2)"
-    >
-
-      <div class="review-summary-icon">
-        樓
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          交付需求
-        </div>
-
-        <div class="review-summary-value">
-          ${escapeHtml(payload.upstairsLabel)}
-          ${
-            payload.upstairsFee > 0
-              ? `｜NT$${payload.upstairsFee}`
-              : ''
-          }
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-
-    <button
-      class="review-summary-row review-summary-note-row"
-      type="button"
-      onclick="showOnlyStep(2)"
-    >
-
-      <div class="review-summary-icon">
-        寫
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          任務內容
-        </div>
-
-        <div class="review-summary-value review-summary-note-value">
-          ${escapeHtml(payload.note || '無')}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-
-    <button
-      class="review-summary-row"
-      type="button"
-      onclick="showOnlyStep(2)"
-    >
-
-      <div class="review-summary-icon">
-        $
-      </div>
-
-      <div class="review-summary-main">
-
-        <div class="review-summary-label">
-          代墊費用
-        </div>
-
-        <div class="review-summary-value">
-          ${escapeHtml(advancePaymentText)}
-        </div>
-
-      </div>
-
-      <div class="review-summary-chevron">
-        ›
-      </div>
-
-    </button>
-
-  </div>
-
-`;
+    </details>
+  `;
 
   renderEstimate();
 
@@ -13802,112 +13672,34 @@ const advanceBadgeHtml =
    ============================== */
 
 box.innerHTML = `
-
-  <div class="review-price-hero">
-
-    <div class="review-price-hero-top">
-
+  <div class="review-price-compact-card">
+    <div class="review-price-compact-top">
       <div>
-
-        <div class="review-price-kicker">
-          預估應付總額
-        </div>
-
-        <div class="review-price-total">
-          NT$${payableTotal}
-        </div>
-
+        <div class="review-price-kicker">預估費用</div>
+        <div class="review-price-total">NT$${payableTotal}</div>
       </div>
-
       ${advanceBadgeHtml}
-
     </div>
-
 
     <div class="review-price-route-meta">
       ${escapeHtml(routeSummaryText || '系統路線估價')}
     </div>
 
+    <details class="review-price-details-toggle">
+      <summary>
+        <span>費用明細</span>
+        <span class="review-price-details-hint">查看</span>
+      </summary>
+      <div class="review-price-details-list review-price-details-list-compact">
+        ${detailRowsHtml}
+        ${
+          serverAdvancePayment > 0
+            ? `<div class="review-price-detail-row"><span>代墊費用</span><strong>NT$${serverAdvancePayment}</strong></div>`
+            : ''
+        }
+      </div>
+    </details>
   </div>
-
-
-  <div class="review-price-summary">
-
-    <div class="review-price-summary-row">
-
-      <span>
-        服務費小計
-      </span>
-
-      <strong>
-        NT$${serviceSubtotal}
-      </strong>
-
-    </div>
-
-
-    ${
-      serverAdvancePayment > 0
-        ? `
-
-          <div class="review-price-summary-row">
-
-            <span>
-              代墊費用
-            </span>
-
-            <strong>
-              NT$${serverAdvancePayment}
-            </strong>
-
-          </div>
-
-        `
-        : ''
-    }
-
-
-    <div class="review-price-summary-row total">
-
-      <span>
-        預估應付
-      </span>
-
-      <strong>
-        NT$${payableTotal}
-      </strong>
-
-    </div>
-
-  </div>
-
-
-  <div class="review-price-details">
-
-    <div class="review-price-details-title">
-      費用明細
-    </div>
-
-    <div class="review-price-details-list">
-      ${detailRowsHtml}
-    </div>
-
-  </div>
-
-
-  <div class="review-price-notice">
-
-    <div class="review-price-notice-title">
-      費用說明
-    </div>
-
-    <div class="review-price-notice-text">
-      目前金額依路線、任務時效、上樓需求與其他任務條件即時計算。
-      提交訂單前，系統會再次取得最新正式估價。
-    </div>
-
-  </div>
-
 `;
 
     return data;
@@ -14235,63 +14027,17 @@ function selectPaymentMethod(method){
       : '系統計算中';
 
   info.innerHTML = `
-    <div class="payment-card-head">
-      <div>
-        <div class="payment-card-kicker">
-          UBee 跑腿付款資訊
-        </div>
-
-        <div class="payment-card-title">
-          現金單
-        </div>
+    <div class="step5-payment-compact-info">
+      <div class="step5-payment-compact-row">
+        <span>預估應付</span>
+        <strong>${escapeHtml(totalText)}</strong>
       </div>
-
-      <div class="payment-card-badge">
-        確認後派單
-      </div>
-    </div>
-
-    <div class="payment-card-body">
-      <div class="payment-card-row">
-        <div class="payment-card-label">
-          付款方式
-        </div>
-
-        <div class="payment-card-value">
-          現金付款
-        </div>
-      </div>
-
-      <div class="payment-card-row">
-        <div class="payment-card-label">
-          費用
-        </div>
-
-        <div class="payment-card-value">
-          ${escapeHtml(totalText)}
-        </div>
-      </div>
-
-      <div class="payment-card-row">
-        <div class="payment-card-label">
-          付款狀態
-        </div>
-
-        <div class="payment-card-value">
-          任務完成時交付給 小U
-        </div>
-      </div>
-    </div>
-
-    <div class="payment-card-note">
-      按下「確認使用現金單，開始派單」後，
-      系統才會正式媒合 小U ；
-      派單開始後付款方式不能再更改。
+      <div class="step5-payment-compact-note">任務完成時由小U向你收取現金；確認後即開始媒合。</div>
     </div>
   `;
 
   qs('confirmPaidBtn').innerText =
-    '確認使用現金單，開始派單';
+    '確認現金單，開始尋找小U';
 
   qs('confirmPaidBtn')
     .classList
@@ -14443,50 +14189,12 @@ async function confirmPaid(){
     };
 
     qs('paymentInfo').innerHTML = `
-      <div class="payment-card-head">
+      <div class="step5-payment-confirmed-compact">
         <div>
-          <div class="payment-card-kicker">
-            UBee 跑腿付款資訊
-          </div>
-
-          <div class="payment-card-title">
-            現金單已確認
-          </div>
+          <strong>現金單已確認</strong>
+          <span>系統正在媒合附近小U</span>
         </div>
-
-        <div class="payment-card-badge">
-          派單中
-        </div>
-      </div>
-
-      <div class="payment-card-body">
-
-        <div class="payment-card-row">
-          <div class="payment-card-label">
-            目前狀態
-          </div>
-
-          <div class="payment-card-value">
-            系統已開始媒合 小U
-          </div>
-        </div>
-
-        <div class="payment-card-row">
-          <div class="payment-card-label">
-            付款方式
-          </div>
-
-          <div class="payment-card-value">
-            任務完成時由 小U 向客人收取現金
-          </div>
-        </div>
-
-      </div>
-
-      <div class="payment-card-note">
-        現金單已進入派單流程。
-         小U 接單後
-        請留意任務進度與電話聯繫。
+        <span class="step5-payment-card-badge">派單中</span>
       </div>
     `;
 
@@ -17826,7 +17534,7 @@ async function initPage(){
           );
 
           setSubmitButton(
-            '提交訂單',
+            '確認並建立任務',
             false
           );
 
@@ -17847,7 +17555,7 @@ async function initPage(){
           cachedUserId;
 
         setSubmitButton(
-          '提交訂單',
+          '確認並建立任務',
           false
         );
 
@@ -17880,7 +17588,7 @@ async function initPage(){
         cachedUserId;
 
       setSubmitButton(
-        '提交訂單',
+        '確認並建立任務',
         false
       );
 
@@ -17923,7 +17631,7 @@ async function initPage(){
         cachedUserId;
 
       setSubmitButton(
-        '提交訂單',
+        '確認並建立任務',
         false
       );
 
