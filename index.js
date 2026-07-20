@@ -925,7 +925,9 @@ async function sendNewOrderPushToRiders(
       );
     }
 
-        if (!sendLineAdmin) {
+        // 一般新任務不再推送舊版管理／審核群任務通知。
+    // 只有重新轉派等真正需要人工注意的異常情境，才保留 LINE 管理群警示。
+    if (!sendLineAdmin || !isRedispatch) {
       return {
         success: true,
         orderId,
@@ -958,13 +960,9 @@ async function sendNewOrderPushToRiders(
             type: "text",
 
             text:
-`${isRedispatch
-  ? "🔁 UBee 跑腿任務重新轉派"
-  : "🔔 UBee 跑腿新任務通知"}
+`🔁 UBee 跑腿任務重新轉派
 
-${isRedispatch
-  ? "原接單騎士已取消，任務重新開放接單"
-  : "有新的跑腿任務等待接單"}
+原接單騎士已取消或任務需要重新調度，任務已重新開放接單
 
 📍取件：${pickup}
 🏁送達：${dropoff}
@@ -973,11 +971,7 @@ ${isRedispatch
         );
 
         console.log(
-          `UBee LINE ${
-            isRedispatch
-              ? "轉派"
-              : "新任務"
-          }通知已送出：${orderId}`
+          `UBee LINE 重新轉派通知已送出：${orderId}`
         );
       }
 
@@ -14083,6 +14077,20 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
   }
 });
 
+
+// =====================================================
+// UBee 網路韌性健康檢查
+// 前端只用來判斷「瀏覽器有網路但 UBee 後端是否可達」，不寫入任何資料。
+// =====================================================
+app.get('/api/health', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({
+    success: true,
+    service: 'ubee-backend',
+    serverTime: new Date().toISOString(),
+    serverTimeMs: Date.now(),
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`UBee OMS is running on port ${PORT}`);
