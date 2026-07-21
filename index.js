@@ -941,74 +941,9 @@ async function sendNewOrderPushToRiders(
       );
     }
 
-        // 一般新任務不再推送舊版管理／審核群任務通知。
-    // 只有重新轉派等真正需要人工注意的異常情境，才保留 LINE 管理群警示。
-    if (!sendLineAdmin || !isRedispatch) {
-      return {
-        success: true,
-        orderId,
-        notifiedRiderDocIds:
-          Array.from(
-            new Set(
-              notifiedRiderDocIds
-            )
-          ),
-      };
-    }
-    
-    // ==============================
-    // 2. 原本 LINE 管理通知保留
-    // ==============================
-    try {
-      const targetGroupId =
-        LINE_ADMIN_GROUP_ID ||
-        LINE_FINISH_GROUP_ID;
-
-      if (!targetGroupId) {
-        console.warn(
-          `UBee LINE 新任務通知略過：未設定 LINE_ADMIN_GROUP_ID / LINE_FINISH_GROUP_ID，orderId=${orderId}`
-        );
-
-      } else {
-        await client.pushMessage(
-          targetGroupId,
-          {
-            type: "text",
-
-            text:
-`🔁 UBee 跑腿任務重新轉派
-
-原接單騎士已取消或任務需要重新調度，任務已重新開放接單
-
-📍取件：${pickup}
-🏁送達：${dropoff}
-💰騎士收入：$${fee}`
-          }
-        );
-
-        console.log(
-          `UBee LINE 重新轉派通知已送出：${orderId}`
-        );
-      }
-
-    } catch (lineErr) {
-      console.error(
-        "UBee LINE 新任務通知失敗:",
-        {
-          orderId,
-
-          statusCode:
-            lineErr?.statusCode ||
-            lineErr?.response?.status,
-
-          statusMessage:
-            lineErr?.statusMessage ||
-            lineErr?.message,
-        }
-      );
-    }
-
-      return {
+    // UBee 規則：派單／重新轉派只通知小U端，不推送「任務重新轉派」到審核／管理群。
+    // 保留重新開放接單、擴圈派單、Web Push 與調度邏輯。
+    return {
       success: true,
       orderId,
       notifiedRiderDocIds:
