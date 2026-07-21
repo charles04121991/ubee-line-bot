@@ -6966,7 +6966,12 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           locationAgeMs: locationUpdatedAtMs ? Math.max(0, nowMs - locationUpdatedAtMs) : null,
           lastActiveAgeMs: lastActiveAtMs ? Math.max(0, nowMs - lastActiveAtMs) : null,
           connectionState,
-          dispatchState
+          dispatchState,
+          taskTrackingStatus: r.taskTrackingStatus || '',
+          taskTrackingSource: r.taskTrackingSource || '',
+          taskTrackingUpdatedAtMs:
+            Number(r.taskTrackingUpdatedAtMs || 0) ||
+            toMs(r.taskTrackingUpdatedAt)
         };
       })
       .filter(Boolean);
@@ -7071,6 +7076,64 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         !!String(rider.currentOrderId || '').trim();
       const verifiedBusy = !!matchedActiveOrder;
 
+      // 任務中小U的位置以「riders + orders」兩份資料取最新者。
+      // 這讓調度中心不會因一般在線 5 分鐘新鮮度逾時而失去任務中的小U。
+      if (matchedActiveOrder) {
+        const orderLocationUpdatedAtMs =
+          Number(matchedActiveOrder.riderLocationUpdatedAtMs || 0) ||
+          toMs(matchedActiveOrder.riderLocationUpdatedAt) ||
+          toMs(matchedActiveOrder.riderCurrentLocation && matchedActiveOrder.riderCurrentLocation.updatedAt);
+
+        const orderLat = asNumberOrNull(
+          matchedActiveOrder.riderCurrentLat ??
+          matchedActiveOrder.riderCurrentLocation?.lat
+        );
+
+        const orderLng = asNumberOrNull(
+          matchedActiveOrder.riderCurrentLng ??
+          matchedActiveOrder.riderCurrentLocation?.lng
+        );
+
+        const hasOrderLocation =
+          orderLat !== null &&
+          orderLng !== null;
+
+        if (
+          hasOrderLocation &&
+          (
+            !Number.isFinite(Number(rider.currentLat)) ||
+            !Number.isFinite(Number(rider.currentLng)) ||
+            orderLocationUpdatedAtMs >= Number(rider.locationUpdatedAtMs || 0)
+          )
+        ) {
+          rider.currentLat = orderLat;
+          rider.currentLng = orderLng;
+          rider.locationUpdatedAtMs = orderLocationUpdatedAtMs || rider.locationUpdatedAtMs || 0;
+          rider.locationAgeMs = rider.locationUpdatedAtMs
+            ? Math.max(0, nowMs - rider.locationUpdatedAtMs)
+            : null;
+        }
+
+        rider.riderTrackingStatus =
+          matchedActiveOrder.riderTrackingStatus ||
+          rider.taskTrackingStatus ||
+          'starting';
+
+        rider.riderTrackingSource =
+          matchedActiveOrder.riderTrackingSource ||
+          rider.taskTrackingSource ||
+          '';
+
+        rider.trackingUpdatedAtMs =
+          Number(matchedActiveOrder.trackingUpdatedAtMs || 0) ||
+          orderLocationUpdatedAtMs ||
+          0;
+
+        rider.trackingSessionId =
+          matchedActiveOrder.trackingSessionId ||
+          '';
+      }
+
       rider.busy = verifiedBusy;
       rider.currentOrderId = matchedActiveOrder
         ? String(matchedActiveOrder.id || '').trim()
@@ -7164,6 +7227,27 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
         riderName: o.riderName || o.driverName || '',
         riderId: o.riderId || o.riderDocId || '',
+        riderDocId: o.riderDocId || '',
+        riderPhone: o.riderPhone || o.driverPhone || '',
+
+        // 任務中小U最後位置：即使 Web/PWA 暫時失去背景 GPS，也保留最後已知位置。
+        riderCurrentLat: asNumberOrNull(o.riderCurrentLat ?? o.riderCurrentLocation?.lat),
+        riderCurrentLng: asNumberOrNull(o.riderCurrentLng ?? o.riderCurrentLocation?.lng),
+        riderLocationUpdatedAtMs:
+          Number(o.riderLocationUpdatedAtMs || 0) ||
+          toMs(o.riderLocationUpdatedAt) ||
+          toMs(o.riderCurrentLocation && o.riderCurrentLocation.updatedAt),
+        riderTrackingStatus: o.riderTrackingStatus || '',
+        riderTrackingSource: o.riderTrackingSource || '',
+        riderTrackingIsBackground: o.riderTrackingIsBackground === true,
+        trackingSessionId: o.trackingSessionId || '',
+        trackingUpdatedAtMs:
+          Number(o.trackingUpdatedAtMs || 0) ||
+          toMs(o.trackingUpdatedAt),
+        riderHeading: o.riderHeading ?? null,
+        riderSpeed: o.riderSpeed ?? null,
+        riderLocationAccuracy: o.riderLocationAccuracy ?? null,
+
         dispatchRadiusKm: Number(o.dispatchManualRadiusKm || o.dispatchManualRedispatchRadiusKm || 0) || null,
         speedType: o.speedType || '',
         serviceType: o.serviceType || '',
@@ -7197,6 +7281,39 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           type: 'waiting_3m',
           title: '超過 3 分鐘無人接單',
           message: `${o.id} 已等待 ${Math.floor(ageMs / 60000)} 分鐘`,
+          orderId: o.id
+        });
+      }
+    });
+
+    // 任務中的 GPS 失聯只告警，不把小U從調度地圖移除。
+    activeOrders.forEach(o => {
+      const locationAtMs = Number(o.riderLocationUpdatedAtMs || 0);
+
+      if (!locationAtMs) {
+        alerts.push({
+          type: 'tracking_waiting',
+          title: '任務中尚未收到小U定位',
+          message: `${o.id} 已接單，但尚未收到任務 GPS。`,
+          orderId: o.id
+        });
+        return;
+      }
+
+      const locationAgeMs = Math.max(0, nowMs - locationAtMs);
+
+      if (locationAgeMs >= 10 * 60 * 1000) {
+        alerts.push({
+          type: 'tracking_stale_10m',
+          title: '小U定位長時間未更新',
+          message: `${o.id} 的小U定位已 ${Math.floor(locationAgeMs / 60000)} 分鐘未更新，地圖仍保留最後已知位置。`,
+          orderId: o.id
+        });
+      } else if (locationAgeMs >= 3 * 60 * 1000) {
+        alerts.push({
+          type: 'tracking_stale_3m',
+          title: '小U定位暫時中斷',
+          message: `${o.id} 的小U定位已 ${Math.floor(locationAgeMs / 60000)} 分鐘未更新。`,
           orderId: o.id
         });
       }
@@ -7924,6 +8041,11 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
       accuracy,
       heading,
       speed,
+
+      // 原生 App / Web 前景皆可沿用同一支 API。
+      // 舊版未提供時會自動視為 web_foreground，不影響相容性。
+      trackingSource,
+      isBackground,
     } = req.body || {};
 
     const latitude = Number(lat);
@@ -8015,6 +8137,13 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
             0,
             rawSpeed
           );
+
+    const safeTrackingSource = String(
+      trackingSource ||
+      (isBackground === true ? 'native_background' : 'web_foreground')
+    )
+      .trim()
+      .slice(0, 50) || 'web_foreground';
 
     // ==============================
     // 3. 使用 Transaction
@@ -8143,6 +8272,22 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
 
               lastActiveMs:
                 nowMs,
+
+              // 任務定位與一般上線狀態分離。
+              // 即使 online 新鮮度逾時，只要訂單仍在執行，調度仍可用最後位置追蹤。
+              taskTrackingStatus:
+                activeOrderId ? 'live' : (latestRider.taskTrackingStatus || 'idle'),
+
+              taskTrackingSource:
+                safeTrackingSource,
+
+              taskTrackingUpdatedAtMs:
+                nowMs,
+
+              taskTrackingUpdatedAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp(),
             },
             {
               merge: true,
@@ -8207,6 +8352,12 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
 
               riderTrackingStatus:
                 'live',
+
+              riderTrackingSource:
+                safeTrackingSource,
+
+              riderTrackingIsBackground:
+                isBackground === true || safeTrackingSource === 'native_background',
 
               trackingUpdatedAt:
                 admin.firestore
@@ -13192,6 +13343,14 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
     const orderRef = db.collection('orders').doc(safeOrderId);
     const riderRef = db.collection('riders').doc(riderDoc.id);
 
+    // UBee 任務即時追蹤：接單即建立 tracking session。
+    // 這個 session 與一般 online / heartbeat 分離，直到完成或轉派才結束。
+    const trackingStartedAtMs = Date.now();
+    const trackingSessionId =
+      typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : crypto.randomBytes(16).toString('hex');
+
     let acceptedOrder = null;
 
     await db.runTransaction(async (transaction) => {
@@ -13253,6 +13412,18 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         'statusTimes.accepted': admin.firestore.FieldValue.serverTimestamp(),
+
+        // 任務追蹤狀態：接單開始，第一筆 GPS 到達後會切換為 live。
+        trackingSessionId,
+        riderTrackingStatus: 'starting',
+        trackingStartedAtMs,
+        trackingStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingUpdatedAtMs: trackingStartedAtMs,
+        trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingEndedAtMs: null,
+        trackingEndedAt: null,
+        trackingStopReason: '',
+
         ...acceptedEtaPayload,
       };
 
@@ -13269,7 +13440,15 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       transaction.set(riderRef, {
         busy: true,
         currentOrderId: safeOrderId,
-        lastActive: Date.now(),
+        lastActive: trackingStartedAtMs,
+
+        // 與一般在線狀態分離的「任務追蹤」旗標。
+        activeTrackingOrderId: safeOrderId,
+        activeTrackingSessionId: trackingSessionId,
+        taskTrackingStatus: 'starting',
+        taskTrackingUpdatedAtMs: trackingStartedAtMs,
+        taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
     });
@@ -13521,6 +13700,14 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
 
         acceptedAt: null,
 
+        // 原承接小U的任務追蹤到此結束；保留最後位置供調度追溯。
+        riderTrackingStatus: 'stopped',
+        trackingEndedAtMs: nowMs,
+        trackingEndedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingUpdatedAtMs: nowMs,
+        trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingStopReason: 'transferred',
+
         updatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
 
@@ -13548,6 +13735,13 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
           busy: false,
           currentOrderId: '',
           lastActive: nowMs,
+
+          activeTrackingOrderId: '',
+          activeTrackingSessionId: '',
+          taskTrackingStatus: 'stopped',
+          taskTrackingUpdatedAtMs: nowMs,
+          taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          taskTrackingStopReason: 'transferred',
 
           updatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
@@ -13833,8 +14027,20 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
 
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         [`statusTimes.${status}`]: admin.firestore.FieldValue.serverTimestamp(),
+
+        // 任務未完成前 tracking session 持續有效；完成才正式停止。
+        riderTrackingStatus: status === 'completed' ? 'stopped' : 'live',
+        trackingUpdatedAtMs: Date.now(),
+        trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
         ...etaPayload,
       };
+
+      if (status === 'completed') {
+        updateData.trackingEndedAtMs = Date.now();
+        updateData.trackingEndedAt = admin.firestore.FieldValue.serverTimestamp();
+        updateData.trackingStopReason = 'completed';
+      }
 
       if (status === 'arrived_pickup') {
         updateData.arrivedPickupAt = admin.firestore.FieldValue.serverTimestamp();
@@ -13920,6 +14126,12 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           busy: false,
           currentOrderId: '',
           lastActive: Date.now(),
+          activeTrackingOrderId: '',
+          activeTrackingSessionId: '',
+          taskTrackingStatus: 'stopped',
+          taskTrackingUpdatedAtMs: Date.now(),
+          taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          taskTrackingStopReason: 'completed',
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       } else {
@@ -13927,6 +14139,10 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           busy: true,
           currentOrderId: safeOrderId,
           lastActive: Date.now(),
+          activeTrackingOrderId: safeOrderId,
+          taskTrackingStatus: 'live',
+          taskTrackingUpdatedAtMs: Date.now(),
+          taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }
@@ -14997,6 +15213,10 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
       .doc(riderDoc.id);
 
     const nowMs = Date.now();
+    const trackingSessionId =
+      typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : crypto.randomBytes(16).toString('hex');
     let assignedOrder = null;
 
     await db.runTransaction(async transaction => {
@@ -15132,6 +15352,17 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
             'dispatch_center'
           ).trim(),
 
+        // 人工指定也建立同一套任務追蹤 session。
+        trackingSessionId,
+        riderTrackingStatus: 'starting',
+        trackingStartedAtMs: nowMs,
+        trackingStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingUpdatedAtMs: nowMs,
+        trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingEndedAtMs: null,
+        trackingEndedAt: null,
+        trackingStopReason: '',
+
         ...acceptedEtaPayload,
       };
 
@@ -15146,6 +15377,11 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
           busy: true,
           currentOrderId: safeOrderId,
           lastActive: nowMs,
+          activeTrackingOrderId: safeOrderId,
+          activeTrackingSessionId: trackingSessionId,
+          taskTrackingStatus: 'starting',
+          taskTrackingUpdatedAtMs: nowMs,
+          taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt:
             admin.firestore.FieldValue
               .serverTimestamp(),
