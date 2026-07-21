@@ -251,6 +251,7 @@ button{cursor:pointer}
 .risk-normal{background:#e9f8ef;color:#157a49}.risk-watch{background:#fff5d8;color:#9a6500}.risk-high{background:#fff0dc;color:#b05e00}.risk-critical{background:#ffe7e8;color:#bd2c33}
 .candidate-score{font-size:20px;font-weight:1000;text-align:right}.candidate-score small{display:block;font-size:9px;color:var(--muted);font-weight:800}
 .timeline{display:grid;gap:0}.timeline-item{display:grid;grid-template-columns:78px 12px 1fr;gap:8px;padding:9px 0;border-bottom:1px solid #f1f1f1}.timeline-item:last-child{border-bottom:0}.timeline-time{font-size:10px;color:var(--muted);font-weight:800}.timeline-dot{width:9px;height:9px;border-radius:50%;background:var(--blue);margin-top:3px}.timeline-main{font-size:11px;line-height:1.5}.timeline-main strong{font-size:12px}
+.v3-risk-panel{display:none;border:1px solid #ffd6d8;border-left:5px solid var(--red);background:#fff8f8;border-radius:14px;padding:12px;line-height:1.55}.v3-risk-panel.show{display:block}.v3-risk-title{font-size:13px;font-weight:1000}.v3-risk-text{font-size:11px;color:var(--muted);margin-top:5px}.v3-risk-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.alert-item.watch{border-left-color:var(--yellow);background:#fffdf4}.alert-item.high{border-left-color:var(--orange);background:#fff9f1}.alert-item.critical{border-left-color:var(--red);background:#fff4f4}.alert-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.custody-lock{margin-top:8px;padding:8px 10px;border-radius:10px;background:#f3f4f6;font-size:10px;font-weight:800;color:#555b63}
 @media(max-width:1200px){.intel-grid{grid-template-columns:1fr 1fr}.intel-grid>.panel:last-child{grid-column:1/-1}}
 @media(max-width:760px){.intel-grid{grid-template-columns:1fr}.intel-grid>.panel:last-child{grid-column:auto}.level4-banner{align-items:flex-start;flex-direction:column}}
 
@@ -281,7 +282,7 @@ button{cursor:pointer}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">LEVEL 4 · HUMAN-IN-THE-LOOP</div>
+      <div class="version">LEVEL 4 · V3 CONTROL TOWER</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -291,8 +292,8 @@ button{cursor:pointer}
   </header>
 
   <div class="level4-banner">
-    <div><strong>UBee Level 4 智慧調度中心 V1</strong><br><small>系統會分析、預測並提出建議；任何指定小U、擴圈或重新派單仍需人工確認。</small></div>
-    <div class="level4-badge">AUTO EXECUTION：OFF</div>
+    <div><strong>UBee 智慧調度中心 V3</strong><br><small>自動偵測異常、風險分級、備援小U推薦與處置建議；高風險轉派仍由調度人員一鍵確認。</small></div>
+    <div class="level4-badge">AUTO MONITOR：ON · HUMAN CONFIRM</div>
   </div>
 
   <section class="kpis">
@@ -336,6 +337,8 @@ button{cursor:pointer}
             <button class="chip active" data-filter="all">全部</button>
             <button class="chip" data-filter="waiting">待派單</button>
             <button class="chip" data-filter="active">配送中</button>
+            <button class="chip" data-filter="risk">🟡以上風險</button>
+            <button class="chip" data-filter="critical">🔴緊急</button>
           </div>
         </div>
         <div class="panel-body">
@@ -356,6 +359,8 @@ button{cursor:pointer}
               <div class="empty">請先選擇一筆訂單</div>
             </div>
 
+            <div id="v3RiskActionPanel" class="v3-risk-panel"></div>
+
             <div class="radius-row">
               <strong style="font-size:12px">派單半徑</strong>
               <select id="radiusSelect" class="radius-select">
@@ -368,6 +373,7 @@ button{cursor:pointer}
               </select>
               <button class="btn small yellow" id="expandRadiusBtn" disabled>擴大派單半徑</button>
               <button class="btn small" id="redispatchBtn" disabled>重新派單</button>
+              <button class="btn small danger" id="emergencyRecoverBtn" disabled>啟動備援轉派</button>
             </div>
 
             <div id="candidateList" class="candidate-list">
@@ -375,7 +381,7 @@ button{cursor:pointer}
             </div>
 
             <div class="api-note">
-              Level 4 會綜合距離、定位新鮮度、區域供需與既有調度統計排序。所有「指定小U／重新派單／擴圈」仍需人工確認後才會呼叫正式後端 API。
+              V3 會綜合距離、定位新鮮度、任務階段、停留時間、區域供需與既有調度統計排序。取件前高風險任務可人工確認後啟動備援轉派；取件後啟用貨物安全鎖，禁止直接轉派。
             </div>
           </div>
         </div>
@@ -471,7 +477,7 @@ button{cursor:pointer}
 'use strict';
 
 /* ============================================================
-   UBee Level 4 智慧調度中心 V1｜Google Maps 完整串接版
+   UBee Level 4 智慧調度中心 V3｜異常監控 × 智慧處置 × 備援調度
    現有可直接使用：
    GET /api/dispatch/dashboard
 
@@ -479,6 +485,7 @@ button{cursor:pointer}
    POST /api/dispatch/orders/:orderId/assign
    POST /api/dispatch/orders/:orderId/redispatch
    POST /api/dispatch/orders/:orderId/expand-radius
+   POST /api/dispatch/orders/:orderId/recover
    ============================================================ */
 
 const state = {
@@ -1320,8 +1327,13 @@ function renderOrders(){
 
   if(state.filter === 'waiting') list = list.filter(o=>statusKind(o)==='waiting');
   if(state.filter === 'active') list = list.filter(o=>statusKind(o)==='active');
+  if(state.filter === 'risk') list = list.filter(o=>['WATCH','HIGH','CRITICAL'].includes(String(o.riskLevel||'').toUpperCase()));
+  if(state.filter === 'critical') list = list.filter(o=>String(o.riskLevel||'').toUpperCase()==='CRITICAL');
 
   list.sort((a,b)=>{
+    const rank={CRITICAL:4,HIGH:3,WATCH:2,NORMAL:1};
+    const riskDiff=(rank[String(b.riskLevel||'NORMAL').toUpperCase()]||0)-(rank[String(a.riskLevel||'NORMAL').toUpperCase()]||0);
+    if(riskDiff) return riskDiff;
     const ak = statusKind(a), bk = statusKind(b);
     if(ak !== bk) return ak === 'waiting' ? -1 : 1;
     return Number(a.createdAtMs||0)-Number(b.createdAtMs||0);
@@ -1373,6 +1385,8 @@ function renderOrders(){
           ${isWaiting ? `
             <button class="btn small" data-action="redispatch" data-id="${esc(order.id)}">重新派單</button>
             <button class="btn small primary" data-action="candidates" data-id="${esc(order.id)}">指定小U</button>
+          ` : ['WATCH','HIGH','CRITICAL'].includes(String(order.riskLevel||'').toUpperCase()) ? `
+            <button class="btn small danger" data-action="handle-risk" data-id="${esc(order.id)}">處理異常</button>
           ` : ''}
         </div>
       </article>
@@ -1430,12 +1444,17 @@ function renderAlerts(){
     $('alertList').innerHTML = '<div class="empty">目前沒有異常提醒</div>';
     return;
   }
-  $('alertList').innerHTML = list.map(a=>`
-    <div class="alert-item">
-      <strong>${esc(a.title || '異常提醒')}</strong><br>
-      ${esc(a.message || '')}
-    </div>
-  `).join('');
+  $('alertList').innerHTML = list.map(a=>{
+    const sev=String(a.severity||'').toLowerCase();
+    const order=(state.data.orders||[]).find(o=>String(o.id)===String(a.orderId));
+    const canRecover=order?.recoveryEligible===true && ['HIGH','CRITICAL'].includes(String(order?.riskLevel||'').toUpperCase());
+    return `
+      <div class="alert-item ${esc(sev)}">
+        <strong>${esc(a.title || '異常提醒')}</strong><br>
+        ${esc(a.message || '')}
+        ${a.orderId?`<div class="alert-actions"><button class="btn small" data-action="select" data-id="${esc(a.orderId)}">查看訂單</button>${canRecover?`<button class="btn small danger" data-action="emergency-recover" data-id="${esc(a.orderId)}">備援轉派</button>`:''}</div>`:''}
+      </div>`;
+  }).join('');
 }
 
 /* =========================
@@ -1464,10 +1483,18 @@ function getCandidateRiders(order){
 function renderCandidates(){
   const order = getSelectedOrder();
   const isWaiting = order && statusKind(order)==='waiting';
+  const isActive = order && statusKind(order)==='active';
+  const riskLevel=String(order?.riskLevel||'NORMAL').toUpperCase();
+  const highRisk=['HIGH','CRITICAL'].includes(riskLevel);
+  const canRecover=isActive && order?.recoveryEligible===true && highRisk;
 
   $('redispatchBtn').disabled = !isWaiting;
   $('expandRadiusBtn').disabled = !isWaiting;
+  $('emergencyRecoverBtn').disabled = !canRecover;
   $('radiusSelect').value = String(state.radiusKm);
+
+  const riskPanel=$('v3RiskActionPanel');
+  if(riskPanel){ riskPanel.classList.remove('show'); riskPanel.innerHTML=''; }
 
   if(!order){
     $('selectedOrderSummary').innerHTML = '<div class="empty">請先選擇一筆訂單</div>';
@@ -1486,8 +1513,25 @@ function renderCandidates(){
     </div>
   `;
 
-  if(!isWaiting){
-    $('candidateList').innerHTML = '<div class="empty">此訂單已進入配送流程，不列入待派單候選推薦</div>';
+  if(isActive && riskPanel){
+    const phone=String(order.riderPhone||'').replace(/[^0-9+]/g,'');
+    const lastGps=order.riderLocationUpdatedAtMs?fmtAge(order.riderLocationUpdatedAtMs):'尚未收到';
+    const custodyLock=order.custodyLocked===true;
+    riskPanel.innerHTML=`
+      <div class="v3-risk-title">V3 任務處置建議 · ${riskBadge(order.riskLevel,order.riskScore)}</div>
+      <div class="v3-risk-text">小U：${esc(order.riderName||order.riderId||'-')} · 最後定位 ${esc(lastGps)}${order.pickupDistanceKm!=null?` · 距取件約 ${esc(order.pickupDistanceKm)} km`:''}${order.dropoffDistanceKm!=null?` · 距送達約 ${esc(order.dropoffDistanceKm)} km`:''}</div>
+      <div class="v3-risk-actions">
+        <button class="btn small" data-action="focus-last-location" data-id="${esc(order.id)}">查看最後位置</button>
+        ${phone?`<button class="btn small" data-action="contact-rider" data-phone="${esc(phone)}">聯絡小U</button>`:''}
+        ${canRecover?`<button class="btn small danger" data-action="emergency-recover" data-id="${esc(order.id)}">啟動備援轉派</button>`:''}
+      </div>
+      ${custodyLock?'<div class="custody-lock">🔒 貨物安全鎖：此任務已到達取件或取件後階段，系統禁止直接轉派。請先聯絡小U並人工處置。</div>':''}
+    `;
+    riskPanel.classList.add('show');
+  }
+
+  if(!isWaiting && !isActive){
+    $('candidateList').innerHTML = '<div class="empty">此訂單目前不在可調度狀態</div>';
     return;
   }
 
@@ -1501,8 +1545,8 @@ function renderCandidates(){
   if(!candidates.length){
     $('candidateList').innerHTML = `
       <div class="empty">
-        ${state.radiusKm} km 內沒有符合條件的可接單小U<br>
-        可使用「擴大派單半徑」
+        ${state.radiusKm} km 內沒有符合條件的${isActive?'備援':'可接單'}小U<br>
+        ${isWaiting?'可使用「擴大派單半徑」':'可調整上方半徑查看更遠的備援候選'}
       </div>
     `;
     return;
@@ -1514,7 +1558,7 @@ function renderCandidates(){
         <div class="candidate-name">
           <span class="rank">${index+1}</span>
           ${esc(r.name || r.riderId || '小U')}
-          ${index===0?'<span class="badge green" style="margin-left:6px">最佳候選</span>':''}
+          ${index===0?`<span class="badge green" style="margin-left:6px">${isActive?'最佳備援':'最佳候選'}</span>`:''}
         </div>
         <div class="candidate-meta">
           ${esc(r.district || r.serviceArea || '未設定區域')}
@@ -1526,7 +1570,7 @@ function renderCandidates(){
       <div>
         <div class="candidate-score">${esc(r.dispatchScore ?? r.score ?? 0)}<small>Dispatch Score</small></div>
         <div class="distance">${Number(r.distanceKm).toFixed(2)} km</div>
-        <button class="btn small yellow" style="margin-top:6px" data-action="assign" data-rider-id="${esc(r.riderId)}">指定</button>
+        ${isWaiting?`<button class="btn small yellow" style="margin-top:6px" data-action="assign" data-rider-id="${esc(r.riderId)}">指定</button>`:'<span class="badge blue" style="margin-top:6px">備援候選</span>'}
       </div>
     </div>
   `).join('');
@@ -1536,7 +1580,7 @@ function renderCandidates(){
 function eventLabel(type){
   const map={
     ORDER_CREATED:'訂單建立',RIDER_NOTIFIED:'已通知小U',RIDER_ACCEPTED:'小U接單',RIDER_SKIPPED:'小U略過',
-    RIDER_TRANSFERRED:'騎士取消／轉派',MANUAL_ASSIGN:'人工指定小U',REDISPATCH:'重新派單',RADIUS_EXPANDED:'擴大派單半徑',
+    RIDER_TRANSFERRED:'騎士取消／轉派',MANUAL_ASSIGN:'人工指定小U',REDISPATCH:'重新派單',EMERGENCY_REDISPATCH:'V3 備援轉派',RADIUS_EXPANDED:'擴大派單半徑',
     ORDER_STATUS_ARRIVED_PICKUP:'抵達取件點',ORDER_STATUS_PICKED_UP:'已取件',ORDER_STATUS_ARRIVED_DROPOFF:'抵達送達點',ORDER_COMPLETED:'任務完成'
   };
   return map[String(type||'')]||String(type||'調度事件');
@@ -1602,7 +1646,7 @@ async function postJson(url,body={}){
 }
 
 function backendNotReadyMessage(action){
-  return `${action} API 回傳 404/405，請確認已部署 V6 index.js 並重新部署後端服務。`;
+  return `${action} API 回傳 404/405，請確認已部署最新 V3 智慧調度後端 index.js 並重新部署後端服務。`;
 }
 
 async function assignRider(orderId,riderId){
@@ -1637,6 +1681,45 @@ async function redispatchOrder(orderId){
       toast(backendNotReadyMessage('重新派單'),5000);
     }else{
       toast('重新派單失敗：'+error.message,5000);
+    }
+  }
+}
+
+
+async function emergencyRecoverOrder(orderId){
+  if(!orderId) return;
+  const order=(state.data.orders||[]).find(o=>String(o.id)===String(orderId));
+  if(!order) return toast('找不到此訂單');
+
+  if(order.custodyLocked===true){
+    toast('此任務已進入可能持有貨物的階段，禁止直接轉派。請先聯絡小U並人工處置。',6000);
+    return;
+  }
+  if(order.recoveryEligible!==true){
+    toast('此任務目前不符合安全備援轉派條件。',5000);
+    return;
+  }
+
+  const reason=(order.riskReasons||[]).slice(0,3).join('；') || 'V3 高風險任務人工確認備援轉派';
+  const confirmed=window.confirm(
+    `確認啟動備援轉派？\n\n訂單：${orderId}\n目前小U：${order.riderName||order.riderId||'-'}\n原因：${reason}\n\n確認後原承接會解除，訂單重新進入正式派單流程。`
+  );
+  if(!confirmed) return;
+
+  try{
+    const result=await postJson(`/api/dispatch/orders/${encodeURIComponent(orderId)}/recover`,{
+      radiusKm:state.radiusKm,
+      reason,
+      source:'dispatch_center_v3'
+    });
+    toast(result.message||'已啟動 V3 備援轉派',5200);
+    await loadDashboard();
+    selectOrder(orderId,{pan:false});
+  }catch(error){
+    if(error.status===404||error.status===405){
+      toast(backendNotReadyMessage('V3 備援轉派'),6000);
+    }else{
+      toast('備援轉派失敗：'+error.message,6000);
     }
   }
 }
@@ -1730,6 +1813,12 @@ document.addEventListener('click',event=>{
     const insight=getOrderInsight(orderId);
     if(!order||!insight) return toast('找不到此調度建議');
     selectOrder(orderId);
+    const emergency=(insight.recommendations||[]).find(x=>x.type==='EMERGENCY_REDISPATCH');
+    if(emergency && order.recoveryEligible===true){
+      toast('已選取高風險任務；請確認小U狀況後，可按「啟動備援轉派」。',5200);
+      renderCandidates();
+      return;
+    }
     const expand=(insight.recommendations||[]).find(x=>x.type==='EXPAND_RADIUS');
     if(expand && Number(expand.targetRadiusKm)>state.radiusKm){
       state.radiusKm=Number(expand.targetRadiusKm);
@@ -1759,9 +1848,26 @@ document.addEventListener('click',event=>{
 
     if(action==='select') selectOrder(id);
     if(action==='candidates') selectOrder(id);
+    if(action==='handle-risk') selectOrder(id);
     if(action==='redispatch'){
       selectOrder(id);
       redispatchOrder(id);
+    }
+    if(action==='emergency-recover'){
+      selectOrder(id);
+      emergencyRecoverOrder(id);
+    }
+    if(action==='focus-last-location'){
+      selectOrder(id);
+      const order=getSelectedOrder();
+      if(order&&state.mapReady&&hasLatLng(order.riderCurrentLat,order.riderCurrentLng)){
+        state.map.setCenter({lat:Number(order.riderCurrentLat),lng:Number(order.riderCurrentLng)});
+        state.map.setZoom(16);
+      }else{ toast('目前沒有可用的小U最後定位'); }
+    }
+    if(action==='contact-rider'){
+      const phone=String(actionBtn.dataset.phone||'').trim();
+      if(phone) window.location.href='tel:'+phone;
     }
     if(action==='assign') openAssignModal(actionBtn.dataset.riderId);
   }
@@ -1795,6 +1901,11 @@ $('radiusSelect').addEventListener('change',event=>{
 $('redispatchBtn').addEventListener('click',()=>{
   const order = getSelectedOrder();
   if(order) redispatchOrder(order.id);
+});
+
+$('emergencyRecoverBtn').addEventListener('click',()=>{
+  const order = getSelectedOrder();
+  if(order) emergencyRecoverOrder(order.id);
 });
 
 $('expandRadiusBtn').addEventListener('click',()=>{
