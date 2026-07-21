@@ -273,6 +273,26 @@ button{cursor:pointer}
   .legend{max-width:100%}
   .map-status{align-self:flex-end}
 }
+
+/* ===== V4 + V5 全局控制塔 ===== */
+.control-tower{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-bottom:14px}
+.control-box{background:#111;color:#fff;border-radius:20px;padding:16px;box-shadow:var(--shadow)}
+.control-title{font-size:12px;font-weight:1000;opacity:.68;letter-spacing:.4px}
+.control-main{font-size:30px;font-weight:1000;margin-top:5px}.control-main small{font-size:12px;opacity:.68}
+.risk-strip,.stage-strip,.health-strip{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.ops-pill{border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:1000;cursor:pointer}
+.ops-pill.active{background:var(--yellow);color:#111;border-color:var(--yellow)}
+.ops-pill.light{background:#fff;color:#25272b;border-color:var(--line)}
+.city-health{background:#fff;border:1px solid var(--line);border-radius:20px;padding:16px;box-shadow:var(--shadow)}
+.city-health-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.city-status{font-size:22px;font-weight:1000}
+.health-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:12px}.health-mini{background:#f7f7f8;border-radius:12px;padding:9px}.health-mini b{display:block;font-size:20px}.health-mini span{font-size:10px;color:var(--muted);font-weight:900}
+.zone-card{cursor:pointer}.zone-card:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,0,0,.05)}
+.zone-card.selected-zone{outline:3px solid rgba(245,184,0,.28);border-color:var(--yellow)}
+.rider-health-tag{display:inline-flex;margin-left:6px;padding:3px 6px;border-radius:999px;font-size:9px;font-weight:1000;background:#f1f2f4}
+.trail-note{font-size:10px;color:var(--muted);font-weight:800;margin-top:5px}
+@media(max-width:1000px){.control-tower{grid-template-columns:1fr}.health-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:680px){.health-grid{grid-template-columns:repeat(2,1fr)}}
+
 </style>
 </head>
 
@@ -282,7 +302,7 @@ button{cursor:pointer}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">LEVEL 4 · V3 CONTROL TOWER</div>
+      <div class="version">V4 + V5 · CITY CONTROL TOWER</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -292,8 +312,8 @@ button{cursor:pointer}
   </header>
 
   <div class="level4-banner">
-    <div><strong>UBee 智慧調度中心 V3</strong><br><small>自動偵測異常、風險分級、備援小U推薦與處置建議；高風險轉派仍由調度人員一鍵確認。</small></div>
-    <div class="level4-badge">AUTO MONITOR：ON · HUMAN CONFIRM</div>
+    <div><strong>UBee 智慧調度控制塔 V4 + V5</strong><br><small>V4 全局任務控制塔 × V5 智慧城市供需地圖；整合任務階段、小U健康、15分鐘預測、最近移動軌跡與 V3 異常處置。</small></div>
+    <div class="level4-badge">CITY OPS：LIVE · V3 SAFETY：ON</div>
   </div>
 
   <section class="kpis">
@@ -307,6 +327,38 @@ button{cursor:pointer}
     <div class="kpi"><div class="label">15分鐘預測需求</div><div class="value" id="forecastDemand">-</div><div class="sub">規則＋歷史樣本預測</div></div>
     <div class="kpi"><div class="label">預測運力缺口</div><div class="value" id="forecastGap">-</div><div class="sub">負數代表可能缺員</div></div>
     <div class="kpi"><div class="label">異常提醒</div><div class="value" id="alerts">-</div><div class="sub">需人工關注</div></div>
+  </section>
+
+  <section class="control-tower">
+    <div class="control-box">
+      <div class="control-title">V4 · 全局即時任務控制塔</div>
+      <div class="control-main"><span id="towerLiveOrders">-</span> <small>張即時任務</small></div>
+      <div class="risk-strip" id="riskStrip">
+        <button class="ops-pill active" data-tower-filter="all">全部</button>
+        <button class="ops-pill" data-tower-filter="NORMAL">🟢 正常 <span id="towerNormal">0</span></button>
+        <button class="ops-pill" data-tower-filter="WATCH">🟡 注意 <span id="towerWatch">0</span></button>
+        <button class="ops-pill" data-tower-filter="HIGH">🟠 高風險 <span id="towerHigh">0</span></button>
+        <button class="ops-pill" data-tower-filter="CRITICAL">🔴 緊急 <span id="towerCritical">0</span></button>
+      </div>
+      <div class="stage-strip" id="stageStrip">
+        <button class="ops-pill" data-stage-filter="waiting">等待接單 <span id="stageWaiting">0</span></button>
+        <button class="ops-pill" data-stage-filter="pickup">前往取件 <span id="stagePickup">0</span></button>
+        <button class="ops-pill" data-stage-filter="pickup_wait">等待取件 <span id="stagePickupWait">0</span></button>
+        <button class="ops-pill" data-stage-filter="delivery">配送中 <span id="stageDelivery">0</span></button>
+        <button class="ops-pill" data-stage-filter="dropoff">抵達送達 <span id="stageDropoff">0</span></button>
+        <button class="ops-pill" data-stage-filter="clear">清除階段篩選</button>
+      </div>
+    </div>
+    <div class="city-health">
+      <div class="city-health-head"><div><div class="control-title" style="color:var(--muted)">V5 · 城市與小U健康</div><div class="city-status" id="cityStatus">分析中</div></div><div class="badge" id="selectedZoneBadge">全台中</div></div>
+      <div class="health-grid">
+        <div class="health-mini"><b id="healthHealthy">0</b><span>🟢 狀態良好</span></div>
+        <div class="health-mini"><b id="healthTask">0</b><span>🔵 任務中</span></div>
+        <div class="health-mini"><b id="healthUnstable">0</b><span>🟡 連線不穩</span></div>
+        <div class="health-mini"><b id="healthCritical">0</b><span>🔴 任務異常</span></div>
+        <div class="health-mini"><b id="healthOffline">0</b><span>⚪ 離線</span></div>
+      </div>
+    </div>
   </section>
 
   <section class="intel-grid">
@@ -396,8 +448,8 @@ button{cursor:pointer}
       <div class="panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">即時供需地圖</div>
-            <div class="panel-sub">綠色＝目前開啟騎士端的小U、藍色＝真正任務中、橘色＝待派單；暫停與離線保留在名單，不塞進地圖</div>
+            <div class="panel-title">V5 智慧城市供需地圖</div>
+            <div class="panel-sub">區域供需風險圈＋訂單／小U＋選定任務最近移動軌跡；點區域卡可聚焦該區營運</div>
           </div>
         </div>
         <div class="map-wrap">
@@ -477,7 +529,7 @@ button{cursor:pointer}
 'use strict';
 
 /* ============================================================
-   UBee Level 4 智慧調度中心 V3｜異常監控 × 智慧處置 × 備援調度
+   UBee 智慧調度控制塔 V4 + V5｜全局控制 × 智慧地圖 × V3 安全處置
    現有可直接使用：
    GET /api/dispatch/dashboard
 
@@ -489,13 +541,16 @@ button{cursor:pointer}
    ============================================================ */
 
 const state = {
-  data: { summary:{}, orders:[], riders:[], alerts:[], intelligence:{summary:{},zones:[],orderInsights:[],recommendations:[]} },
+  data: { summary:{}, orders:[], riders:[], alerts:[], intelligence:{summary:{},zones:[],orderInsights:[],recommendations:[]}, operationsV5:{controlTower:{riskSummary:{},stageSummary:{}},riderHealthSummary:{},zones:[]} },
   filter: 'all',
   riderFilter: 'all',
   selectedOrderId: '',
   selectedCandidateRiderId: '',
   selectedOrderEvents: [],
   radiusKm: 3,
+  towerRiskFilter: 'all',
+  stageFilter: '',
+  zoneFilter: '',
   map: null,
   mapReady: false,
   googleMapsApiKey: '',
@@ -926,6 +981,9 @@ async function renderMap(){
 
   const bounds = new google.maps.LatLngBounds();
   let hasBounds = false;
+
+  // V5 區域供需風險圈。
+  renderZoneOperationalOverlays(bounds);
   let free = 0, busy = 0, paused = 0, offline = 0, waiting = 0, active = 0;
 
   const renderedTaskRiderKeys = new Set();
@@ -1097,6 +1155,9 @@ async function renderMap(){
     }
   }
 
+  // V5 選定任務最近移動軌跡。
+  renderSelectedOrderTrail(bounds);
+
   $('legendFree').textContent = free;
   $('legendBusy').textContent = busy;
   $('legendWaiting').textContent = waiting;
@@ -1221,8 +1282,78 @@ async function loadDashboard({silent=false}={}){
   }
 }
 
+function taskStageKey(order){
+  const s=String(order?.status||'').trim();
+  if(['pending_dispatch','pending','waiting','searching','dispatching','redispatching'].includes(s)) return 'waiting';
+  if(['accepted','going_to_pickup','heading_to_pickup'].includes(s)) return 'pickup';
+  if(s==='arrived_pickup') return 'pickup_wait';
+  if(['picked_up','going_to_dropoff','heading_to_dropoff'].includes(s)) return 'delivery';
+  if(s==='arrived_dropoff') return 'dropoff';
+  return '';
+}
+
+function cityStatusMeta(value){
+  const s=String(value||'NORMAL').toUpperCase();
+  if(s==='CRITICAL') return {label:'🔴 緊急營運狀態',color:'var(--red)'};
+  if(s==='HIGH') return {label:'🟠 高風險營運狀態',color:'#b05e00'};
+  if(s==='WATCH') return {label:'🟡 需要注意',color:'#a16207'};
+  return {label:'🟢 營運正常',color:'var(--green)'};
+}
+
+function renderControlTower(){
+  const ops=state.data.operationsV5||{};
+  const tower=ops.controlTower||{};
+  const risk=tower.riskSummary||{};
+  const stage=tower.stageSummary||{};
+  const health=ops.riderHealthSummary||{};
+  const set=(id,val)=>{const el=$(id);if(el)el.textContent=val??0;};
+  set('towerLiveOrders',tower.totalLiveOrders??state.data.orders.length);
+  set('towerNormal',risk.NORMAL||0); set('towerWatch',risk.WATCH||0); set('towerHigh',risk.HIGH||0); set('towerCritical',risk.CRITICAL||0);
+  set('stageWaiting',stage.waitingDispatch||0); set('stagePickup',stage.goingToPickup||0); set('stagePickupWait',stage.waitingPickup||0); set('stageDelivery',stage.delivering||0); set('stageDropoff',stage.arrivedDropoff||0);
+  set('healthHealthy',health.HEALTHY||0); set('healthTask',health.TASK||0); set('healthUnstable',health.UNSTABLE||0); set('healthCritical',health.CRITICAL||0); set('healthOffline',health.OFFLINE||0);
+  const meta=cityStatusMeta(ops.cityStatus); const cs=$('cityStatus'); if(cs){cs.textContent=meta.label;cs.style.color=meta.color;}
+  const zb=$('selectedZoneBadge'); if(zb) zb.textContent=state.zoneFilter||'全台中';
+}
+
+function zonePointPool(district){
+  const points=[];
+  for(const o of state.data.orders||[]){
+    const od=String(o.pickupDistrict||'').trim();
+    if(od===district && hasTaiwanMapLatLng(o.pickupLat,o.pickupLng)) points.push({lat:Number(o.pickupLat),lng:Number(o.pickupLng)});
+  }
+  for(const r of state.data.riders||[]){
+    const rd=String(r.district||r.serviceArea||'').trim();
+    if(rd===district && hasTaiwanMapLatLng(r.currentLat,r.currentLng)) points.push({lat:Number(r.currentLat),lng:Number(r.currentLng)});
+  }
+  return points;
+}
+
+function renderZoneOperationalOverlays(bounds){
+  const zones=state.data.operationsV5?.zones||state.data.intelligence?.zones||[];
+  zones.forEach(z=>{
+    const district=String(z.district||'').trim(); if(!district) return;
+    const pts=zonePointPool(district); if(!pts.length) return;
+    const center={lat:pts.reduce((s,p)=>s+p.lat,0)/pts.length,lng:pts.reduce((s,p)=>s+p.lng,0)/pts.length};
+    const st=String(z.operationalState||z.risk||'BALANCED').toUpperCase();
+    const color=st==='CRITICAL'?'#e5484d':st==='HIGH'?'#f59e0b':st==='WATCH'?'#f5b800':st==='SURPLUS'?'#3478f6':'#20a464';
+    const circle=new google.maps.Circle({map:state.map,center,radius:Math.max(1300,Math.min(4200,1600+Number(z.waitingOrders||0)*180)),strokeColor:color,strokeOpacity:.65,strokeWeight:2,fillColor:color,fillOpacity:.10,zIndex:5});
+    addMapObject(circle); bounds.extend(center);
+    circle.addListener('click',()=>{state.zoneFilter=state.zoneFilter===district?'':district;renderAll();});
+  });
+}
+
+function renderSelectedOrderTrail(bounds){
+  const order=getSelectedOrder();
+  if(!order||!Array.isArray(order.riderLocationTrail)) return;
+  const path=order.riderLocationTrail.filter(p=>hasTaiwanMapLatLng(p.lat,p.lng)).map(p=>({lat:Number(p.lat),lng:Number(p.lng)}));
+  if(path.length<2) return;
+  const line=new google.maps.Polyline({map:state.map,path,strokeColor:'#7c5cff',strokeOpacity:.82,strokeWeight:5,geodesic:true,zIndex:450});
+  addMapObject(line); path.forEach(p=>bounds.extend(p));
+}
+
 function renderAll(){
   renderSummary();
+  renderControlTower();
   renderIntelligence();
   renderOrders();
   renderRiders();
@@ -1303,9 +1434,9 @@ function renderIntelligence(){
     $('zoneGrid').innerHTML = '<div class="empty">目前沒有足夠區域資料</div>';
   }else{
     $('zoneGrid').innerHTML = zones.slice(0,12).map(z=>`
-      <div class="zone-card ${String(z.risk||'normal').toLowerCase()}">
+      <div class="zone-card ${String(z.risk||'normal').toLowerCase()} ${state.zoneFilter===String(z.district||'')?'selected-zone':''}" data-zone-district="${esc(z.district||'')}">
         <div>
-          <div class="zone-name">${esc(z.district || '未分區')} · ${esc(z.risk || 'NORMAL')}</div>
+          <div class="zone-name">${esc(z.district || '未分區')} · ${esc(z.operationalLabel || z.risk || 'NORMAL')}</div>
           <div class="zone-meta">可接 ${esc(z.availableRiders||0)}｜任務中 ${esc(z.busyRiders||0)}｜待接 ${esc(z.waitingOrders||0)}<br>15分鐘需求 ${esc(z.predictedOrders15m||0)}｜預測可用 ${esc(z.predictedAvailableRiders15m||0)}｜信心 ${esc(z.confidence||'LOW')}</div>
         </div>
         <div><div class="zone-gap">${Number(z.expectedGap15m)>0?'+':''}${esc(z.expectedGap15m||0)}</div><div class="candidate-meta">預測缺口</div></div>
@@ -1329,6 +1460,9 @@ function renderOrders(){
   if(state.filter === 'active') list = list.filter(o=>statusKind(o)==='active');
   if(state.filter === 'risk') list = list.filter(o=>['WATCH','HIGH','CRITICAL'].includes(String(o.riskLevel||'').toUpperCase()));
   if(state.filter === 'critical') list = list.filter(o=>String(o.riskLevel||'').toUpperCase()==='CRITICAL');
+  if(state.towerRiskFilter !== 'all') list = list.filter(o=>String(o.riskLevel||'NORMAL').toUpperCase()===state.towerRiskFilter);
+  if(state.stageFilter) list = list.filter(o=>taskStageKey(o)===state.stageFilter);
+  if(state.zoneFilter) list = list.filter(o=>String(o.pickupDistrict||'').trim()===state.zoneFilter);
 
   list.sort((a,b)=>{
     const rank={CRITICAL:4,HIGH:3,WATCH:2,NORMAL:1};
@@ -1423,9 +1557,10 @@ function renderRiders(){
         <div>
           <div class="rider-name">
             <span class="legend-dot" style="display:inline-block;margin-right:6px;background:${riderStateColor(r)}"></span>
-            ${esc(r.name || r.riderId || '小U')}
+            ${esc(r.name || r.riderId || '小U')}<span class="rider-health-tag">${esc(r.healthLabel||'')}</span>
           </div>
           <div class="rider-meta">
+            ${esc(r.healthReason||'')}<br>
             ${esc(r.district || r.serviceArea || '未設定區域')}
             · 最後活動 ${esc(fmtAge(r.lastActiveAtMs))}
             · 最後定位 ${esc(fmtAge(r.locationUpdatedAtMs))}
@@ -1509,6 +1644,7 @@ function renderCandidates(){
       狀態：${esc(order.statusLabel || order.status || '-')}<br>
       ${riskBadge(order.riskLevel,order.riskScore)}
       ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<br>原因：${esc(order.riskReasons.slice(0,4).join('；'))}`:''}
+       ${Array.isArray(order.riderLocationTrail)&&order.riderLocationTrail.length?`<br><span style="color:var(--purple)">V5 最近軌跡：${esc(order.riderLocationTrail.length)} 個定位採樣點</span>`:''}
       ${!hasLatLng(order.pickupLat,order.pickupLng)?'<br><b style="color:var(--red)">此訂單缺少取件座標，無法計算附近小U。</b>':''}
     </div>
   `;
@@ -1646,7 +1782,7 @@ async function postJson(url,body={}){
 }
 
 function backendNotReadyMessage(action){
-  return `${action} API 回傳 404/405，請確認已部署最新 V3 智慧調度後端 index.js 並重新部署後端服務。`;
+  return `${action} API 回傳 404/405，請確認已部署最新 V4+V5 智慧調度後端 index.js 並重新部署後端服務。`;
 }
 
 async function assignRider(orderId,riderId){
@@ -1921,6 +2057,31 @@ $('confirmAssignBtn').addEventListener('click',()=>{
 
 $('assignModal').addEventListener('click',event=>{
   if(event.target === $('assignModal')) closeAssignModal();
+});
+
+// V4 全局風險篩選
+document.addEventListener('click',event=>{
+  const riskBtn=event.target.closest('[data-tower-filter]');
+  if(riskBtn){
+    state.towerRiskFilter=String(riskBtn.dataset.towerFilter||'all');
+    document.querySelectorAll('[data-tower-filter]').forEach(btn=>btn.classList.toggle('active',btn===riskBtn));
+    renderOrders();
+    return;
+  }
+  const stageBtn=event.target.closest('[data-stage-filter]');
+  if(stageBtn){
+    const value=String(stageBtn.dataset.stageFilter||'');
+    state.stageFilter=value==='clear'?'':value;
+    document.querySelectorAll('[data-stage-filter]').forEach(btn=>btn.classList.toggle('active',value!=='clear'&&btn===stageBtn));
+    renderOrders(); renderMap();
+    return;
+  }
+  const zoneCard=event.target.closest('[data-zone-district]');
+  if(zoneCard){
+    const district=String(zoneCard.dataset.zoneDistrict||'');
+    state.zoneFilter=state.zoneFilter===district?'':district;
+    renderAll();
+  }
 });
 
 window.addEventListener('resize',()=>{
