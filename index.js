@@ -6372,10 +6372,10 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
 
 
 // ============================================================
-// UBee Level 4 智慧調度中心 V1
-// 原則：分析、預測、建議與事件紀錄；不在未經人工確認下強制指定小U。
+// UBee Level 4 智慧調度中心 V3
+// 原則：自動監控、風險分級、備援推薦與處置建議；高風險寫入操作仍需人工確認。
 // ============================================================
-const UBEE_DISPATCH_INTELLIGENCE_VERSION = 'level4-v1';
+const UBEE_DISPATCH_INTELLIGENCE_VERSION = 'level4-v3';
 const UBEE_DISPATCH_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 const UBEE_RIDER_STATS_CACHE_MS = 30 * 1000;
 let ubeeLastDispatchSnapshotMs = 0;
@@ -6691,6 +6691,288 @@ function buildOrderRiskInsight(order, riders, zoneSummary, statsMap, nowMs = Dat
   };
 }
 
+
+// ============================================================
+// UBee V3：進行中任務異常監控 / 備援建議
+// - 不靠單一條件直接判死刑，使用 GPS、新鮮度、任務階段、停留時間與距離綜合評分。
+// - 取件前可由調度中心人工確認後啟動備援轉派。
+// - 到達取件點後視為可能已發生貨物交接，禁止直接自動轉派，避免責任斷點。
+// ============================================================
+function getDispatchOrderStatusAtMs(order = {}, status = '') {
+  const keyMap = {
+    accepted: ['acceptedAtMs', 'acceptedAt'],
+    arrived_pickup: ['arrivedPickupAtMs', 'arrivedPickupAt'],
+    picked_up: ['pickedUpAtMs', 'pickedUpAt'],
+    arrived_dropoff: ['arrivedDropoffAtMs', 'arrivedDropoffAt'],
+  };
+  const keys = keyMap[status] || [];
+  for (const key of keys) {
+    const direct = Number(order[key] || 0);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const parsed = dispatchToMs(order[key]);
+    if (parsed) return parsed;
+  }
+  return dispatchToMs(order.statusTimes?.[status]);
+}
+
+function getDispatchOrderTrackingAtMs(order = {}) {
+  return Number(order.riderLocationUpdatedAtMs || 0) ||
+    dispatchToMs(order.riderLocationUpdatedAt) ||
+    dispatchToMs(order.riderCurrentLocation?.updatedAt) ||
+    Number(order.trackingUpdatedAtMs || 0) ||
+    dispatchToMs(order.trackingUpdatedAt);
+}
+
+function getDispatchOrderCurrentPoint(order = {}) {
+  const lat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+  const lng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function getDispatchOrderPickupPoint(order = {}) {
+  const lat = Number(order.pickupLat ?? order.fromLat ?? order.pickupLocation?.lat);
+  const lng = Number(order.pickupLng ?? order.fromLng ?? order.pickupLocation?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function getDispatchOrderDropoffPoint(order = {}) {
+  const lat = Number(order.dropoffLat ?? order.toLat ?? order.dropoffLocation?.lat);
+  const lng = Number(order.dropoffLng ?? order.toLng ?? order.dropoffLocation?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function buildActiveOrderRiskInsight(order, riders, statsMap, nowMs = Date.now()) {
+  const status = String(order.status || '').trim();
+  const prePickupStatuses = new Set(['accepted', 'going_to_pickup', 'heading_to_pickup']);
+  const pickupCustodyStatuses = new Set(['arrived_pickup']);
+  const postPickupStatuses = new Set(['picked_up', 'going_to_dropoff', 'heading_to_dropoff', 'arrived_dropoff']);
+
+  const acceptedAtMs = getDispatchOrderStatusAtMs(order, 'accepted') || getDispatchOrderCreatedAtMs(order);
+  const arrivedPickupAtMs = getDispatchOrderStatusAtMs(order, 'arrived_pickup');
+  const pickedUpAtMs = getDispatchOrderStatusAtMs(order, 'picked_up');
+  const arrivedDropoffAtMs = getDispatchOrderStatusAtMs(order, 'arrived_dropoff');
+  const trackingAtMs = getDispatchOrderTrackingAtMs(order);
+  const locationAgeMs = trackingAtMs ? Math.max(0, nowMs - trackingAtMs) : null;
+  const currentPoint = getDispatchOrderCurrentPoint(order);
+  const pickupPoint = getDispatchOrderPickupPoint(order);
+  const dropoffPoint = getDispatchOrderDropoffPoint(order);
+
+  const pickupDistanceKm = currentPoint && pickupPoint
+    ? dispatchHaversineKm(currentPoint.lat, currentPoint.lng, pickupPoint.lat, pickupPoint.lng)
+    : null;
+  const dropoffDistanceKm = currentPoint && dropoffPoint
+    ? dispatchHaversineKm(currentPoint.lat, currentPoint.lng, dropoffPoint.lat, dropoffPoint.lng)
+    : null;
+  const routeDistanceKm = pickupPoint && dropoffPoint
+    ? dispatchHaversineKm(pickupPoint.lat, pickupPoint.lng, dropoffPoint.lat, dropoffPoint.lng)
+    : null;
+
+  const currentRiderKeys = new Set([
+    order.riderId,
+    order.riderDocId,
+    order.riderPhone,
+    order.riderLineUserId,
+  ].map(v => String(v || '').trim()).filter(Boolean));
+
+  const available = riders.filter(r => {
+    if (r.busy) return false;
+    const keys = [r.riderId, r.riderDocId, r.phone, r.lineUserId]
+      .map(v => String(v || '').trim())
+      .filter(Boolean);
+    if (keys.some(k => currentRiderKeys.has(k))) return false;
+    return Number.isFinite(Number(r.currentLat)) && Number.isFinite(Number(r.currentLng));
+  });
+
+  const candidates = available
+    .map(r => buildRiderCandidateScore(
+      order,
+      r,
+      statsMap.get(String(r.riderId)) || statsMap.get(String(r.riderDocId)) || {},
+      nowMs
+    ))
+    .filter(Boolean)
+    .filter(c => !c.skippedThisOrder)
+    .sort((a, b) => b.score - a.score || a.distanceKm - b.distanceKm);
+
+  let score = 0;
+  const reasons = [];
+  const recommendations = [];
+  let stage = 'ACTIVE';
+  let stageElapsedMinutes = 0;
+
+  if (!String(order.riderId || order.riderDocId || '').trim()) {
+    score += 55;
+    reasons.push('任務進行中但缺少承接小U識別資料');
+  }
+
+  const acceptedElapsedMin = acceptedAtMs ? Math.max(0, (nowMs - acceptedAtMs) / 60000) : 0;
+
+  // GPS / 任務追蹤健康度
+  if (!trackingAtMs) {
+    if (acceptedElapsedMin >= 5) score += 55;
+    else if (acceptedElapsedMin >= 2) score += 35;
+    else score += 18;
+    reasons.push('尚未收到任務 GPS 定位');
+  } else if (locationAgeMs >= 10 * 60 * 1000) {
+    score += 55;
+    reasons.push(`小U定位已 ${Math.floor(locationAgeMs / 60000)} 分鐘未更新`);
+  } else if (locationAgeMs >= 5 * 60 * 1000) {
+    score += 38;
+    reasons.push(`小U定位已 ${Math.floor(locationAgeMs / 60000)} 分鐘未更新`);
+  } else if (locationAgeMs >= 3 * 60 * 1000) {
+    score += 22;
+    reasons.push(`小U定位暫停 ${Math.floor(locationAgeMs / 60000)} 分鐘`);
+  }
+
+  if (prePickupStatuses.has(status)) {
+    stage = 'PRE_PICKUP';
+    stageElapsedMinutes = acceptedElapsedMin;
+
+    if (acceptedElapsedMin >= 25) {
+      score += 34;
+      reasons.push(`接單後已 ${Math.floor(acceptedElapsedMin)} 分鐘仍未抵達取件點`);
+    } else if (acceptedElapsedMin >= 15) {
+      score += 22;
+      reasons.push(`接單後已 ${Math.floor(acceptedElapsedMin)} 分鐘仍在前往取件`);
+    } else if (acceptedElapsedMin >= 10) {
+      score += 10;
+      reasons.push(`取件進度已持續 ${Math.floor(acceptedElapsedMin)} 分鐘`);
+    }
+
+    if (pickupDistanceKm !== null && acceptedElapsedMin >= 10) {
+      if (pickupDistanceKm >= 5) {
+        score += 20;
+        reasons.push(`目前仍距取件點約 ${pickupDistanceKm.toFixed(1)} km`);
+      } else if (pickupDistanceKm >= 2) {
+        score += 10;
+        reasons.push(`目前距取件點約 ${pickupDistanceKm.toFixed(1)} km`);
+      }
+    }
+  } else if (pickupCustodyStatuses.has(status)) {
+    stage = 'AT_PICKUP';
+    const stageStart = arrivedPickupAtMs || acceptedAtMs;
+    stageElapsedMinutes = stageStart ? Math.max(0, (nowMs - stageStart) / 60000) : 0;
+
+    if (stageElapsedMinutes >= 35) {
+      score += 48;
+      reasons.push(`已在取件階段停留 ${Math.floor(stageElapsedMinutes)} 分鐘`);
+    } else if (stageElapsedMinutes >= 20) {
+      score += 30;
+      reasons.push(`取件等待已 ${Math.floor(stageElapsedMinutes)} 分鐘`);
+    } else if (stageElapsedMinutes >= 12) {
+      score += 16;
+      reasons.push(`取件階段停留時間偏長（${Math.floor(stageElapsedMinutes)} 分鐘）`);
+    }
+  } else if (postPickupStatuses.has(status)) {
+    stage = status === 'arrived_dropoff' ? 'AT_DROPOFF' : 'DELIVERY';
+
+    if (status === 'arrived_dropoff') {
+      const stageStart = arrivedDropoffAtMs || pickedUpAtMs || acceptedAtMs;
+      stageElapsedMinutes = stageStart ? Math.max(0, (nowMs - stageStart) / 60000) : 0;
+      if (stageElapsedMinutes >= 20) {
+        score += 42;
+        reasons.push(`抵達送達點後 ${Math.floor(stageElapsedMinutes)} 分鐘仍未完成`);
+      } else if (stageElapsedMinutes >= 10) {
+        score += 22;
+        reasons.push(`抵達送達點後等待 ${Math.floor(stageElapsedMinutes)} 分鐘`);
+      }
+    } else {
+      const stageStart = pickedUpAtMs || acceptedAtMs;
+      stageElapsedMinutes = stageStart ? Math.max(0, (nowMs - stageStart) / 60000) : 0;
+      const expectedMinutes = routeDistanceKm !== null
+        ? Math.max(15, Math.ceil(routeDistanceKm * 4 + 10))
+        : 35;
+
+      if (stageElapsedMinutes >= expectedMinutes * 2) {
+        score += 45;
+        reasons.push(`配送時間已明顯超過合理區間（${Math.floor(stageElapsedMinutes)} 分鐘）`);
+      } else if (stageElapsedMinutes >= expectedMinutes * 1.5) {
+        score += 28;
+        reasons.push(`配送進度可能延遲（已 ${Math.floor(stageElapsedMinutes)} 分鐘）`);
+      } else if (stageElapsedMinutes >= expectedMinutes * 1.2) {
+        score += 14;
+        reasons.push(`配送時間開始接近延遲門檻`);
+      }
+
+      if (
+        dropoffDistanceKm !== null &&
+        routeDistanceKm !== null &&
+        routeDistanceKm >= 1 &&
+        dropoffDistanceKm > Math.max(5, routeDistanceKm * 1.8)
+      ) {
+        score += 16;
+        reasons.push(`目前位置距送達點約 ${dropoffDistanceKm.toFixed(1)} km，明顯偏離一般配送區間`);
+      }
+    }
+  }
+
+  if (['priority', 'express', 'instant', 'urgent'].includes(String(order.speedType || '').toLowerCase())) {
+    score += 5;
+    reasons.push('此任務時效要求較高');
+  }
+
+  if (candidates.length === 0 && prePickupStatuses.has(status)) {
+    score += 8;
+    reasons.push('目前沒有可立即接手的空閒小U');
+  }
+
+  score = Math.round(dispatchClamp(score, 0, 100));
+  let level = 'NORMAL';
+  if (score >= 80) level = 'CRITICAL';
+  else if (score >= 60) level = 'HIGH';
+  else if (score >= 35) level = 'WATCH';
+
+  const recoveryEligible = prePickupStatuses.has(status);
+  const custodyLocked = pickupCustodyStatuses.has(status) || postPickupStatuses.has(status);
+
+  if (!trackingAtMs || (locationAgeMs !== null && locationAgeMs >= 3 * 60 * 1000)) {
+    recommendations.push({ type: 'CONTACT_RIDER', label: '聯絡小U確認狀況' });
+    recommendations.push({ type: 'VIEW_LAST_LOCATION', label: '查看最後定位' });
+  }
+
+  if (level === 'HIGH' || level === 'CRITICAL') {
+    if (recoveryEligible) {
+      if (candidates[0]) {
+        recommendations.push({
+          type: 'REVIEW_BACKUP_CANDIDATE',
+          riderId: candidates[0].riderId,
+          label: `檢視備援 ${candidates[0].name || candidates[0].riderId}`,
+        });
+      }
+      recommendations.push({
+        type: 'EMERGENCY_REDISPATCH',
+        label: '人工確認後啟動備援轉派',
+      });
+    } else if (custodyLocked) {
+      recommendations.push({
+        type: 'MANUAL_INCIDENT',
+        label: '進入人工異常處置（不可直接轉派）',
+      });
+    }
+  }
+
+  return {
+    orderId: String(order.id || order.orderId || ''),
+    kind: 'ACTIVE_TASK_RISK',
+    stage,
+    status,
+    score,
+    level,
+    stageElapsedMinutes: Number(stageElapsedMinutes.toFixed(1)),
+    locationAgeMs,
+    pickupDistanceKm: pickupDistanceKm === null ? null : Number(pickupDistanceKm.toFixed(2)),
+    dropoffDistanceKm: dropoffDistanceKm === null ? null : Number(dropoffDistanceKm.toFixed(2)),
+    recoveryEligible,
+    custodyLocked,
+    riderId: String(order.riderId || order.riderDocId || ''),
+    riderDocId: String(order.riderDocId || ''),
+    riderPhone: String(order.riderPhone || order.driverPhone || ''),
+    reasons: reasons.slice(0, 8),
+    recommendations,
+    candidates: candidates.slice(0, 8),
+  };
+}
+
 async function buildDispatchIntelligence({ riders = [], allOrders = [], waitingStatuses, activeStatuses, nowMs = Date.now(), todayStartMs = 0 }) {
   const statsMap = await loadRiderDispatchStatsMap();
   const zones = new Map();
@@ -6766,10 +7048,24 @@ async function buildDispatchIntelligence({ riders = [], allOrders = [], waitingS
   const zoneMap = new Map(zoneArray.map(z => [z.zoneId, z]));
 
   const waitingRaw = allOrders.filter(o => waitingStatuses.has(String(o.status || '').trim()));
-  const orderInsights = waitingRaw.map(order => {
+  const activeRaw = allOrders.filter(o => activeStatuses.has(String(o.status || '').trim()));
+
+  const waitingInsights = waitingRaw.map(order => {
     const z = getDispatchOrderZone(order);
-    return buildOrderRiskInsight(order, riders, zoneMap.get(z.zoneId), statsMap, nowMs);
-  }).sort((a,b)=>b.score-a.score);
+    return {
+      ...buildOrderRiskInsight(order, riders, zoneMap.get(z.zoneId), statsMap, nowMs),
+      kind: 'WAITING_DISPATCH_RISK',
+      recoveryEligible: false,
+      custodyLocked: false,
+    };
+  });
+
+  const activeInsights = activeRaw.map(order =>
+    buildActiveOrderRiskInsight(order, riders, statsMap, nowMs)
+  );
+
+  const orderInsights = [...waitingInsights, ...activeInsights]
+    .sort((a,b)=>b.score-a.score);
 
   const recommendations = [];
   for (const insight of orderInsights.filter(x => x.score >= 60).slice(0, 10)) {
@@ -6778,9 +7074,13 @@ async function buildDispatchIntelligence({ riders = [], allOrders = [], waitingS
       type:'ORDER_RISK',
       severity:insight.level,
       orderId:insight.orderId,
-      title:`${insight.orderId} 需要調度關注`,
+      title: insight.kind === 'ACTIVE_TASK_RISK'
+        ? `${insight.orderId} 任務執行異常`
+        : `${insight.orderId} 需要調度關注`,
       message:insight.reasons.slice(0,3).join('；') || '系統判定此任務風險升高',
       actions:insight.recommendations,
+      recoveryEligible: insight.recoveryEligible === true,
+      custodyLocked: insight.custodyLocked === true,
       requiresHumanConfirmation:true,
     });
   }
@@ -7283,7 +7583,23 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         pickupDistrict: o.pickupDistrict || inferDispatchDistrict(o.pickupAddress || o.fromAddress || ''),
         pickupZoneId: o.pickupZoneId || buildDispatchZoneId(inferDispatchDistrict(o.pickupAddress || o.fromAddress || '')),
         skippedRiderIds: Array.isArray(o.skippedRiderIds) ? o.skippedRiderIds : [],
-        createdAtMs: orderTimeMs(o)
+        createdAtMs: orderTimeMs(o),
+        acceptedAtMs:
+          Number(o.acceptedAtMs || 0) ||
+          toMs(o.acceptedAt) ||
+          toMs(o.statusTimes && o.statusTimes.accepted),
+        arrivedPickupAtMs:
+          Number(o.arrivedPickupAtMs || 0) ||
+          toMs(o.arrivedPickupAt) ||
+          toMs(o.statusTimes && o.statusTimes.arrived_pickup),
+        pickedUpAtMs:
+          Number(o.pickedUpAtMs || 0) ||
+          toMs(o.pickedUpAt) ||
+          toMs(o.statusTimes && o.statusTimes.picked_up),
+        arrivedDropoffAtMs:
+          Number(o.arrivedDropoffAtMs || 0) ||
+          toMs(o.arrivedDropoffAt) ||
+          toMs(o.statusTimes && o.statusTimes.arrived_dropoff)
       }));
 
     const waitingOrders = liveOrders.filter(o => waitingStatuses.has(String(o.status || '').trim()));
@@ -7366,11 +7682,52 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         ...order,
         riskScore: insight?.score ?? 0,
         riskLevel: insight?.level ?? 'NORMAL',
+        riskKind: insight?.kind || '',
+        riskStage: insight?.stage || '',
         riskReasons: insight?.reasons || [],
+        recoveryEligible: insight?.recoveryEligible === true,
+        custodyLocked: insight?.custodyLocked === true,
+        stageElapsedMinutes: insight?.stageElapsedMinutes ?? null,
+        locationAgeMs: insight?.locationAgeMs ?? null,
+        pickupDistanceKm: insight?.pickupDistanceKm ?? null,
+        dropoffDistanceKm: insight?.dropoffDistanceKm ?? null,
         candidateRecommendations: insight?.candidates || [],
         intelligenceRecommendations: insight?.recommendations || [],
       };
     });
+
+    // V3：進行中任務使用整合風險提醒，取代舊的單一 GPS 重複告警。
+    const activeRiskAlerts = (intelligence.orderInsights || [])
+      .filter(insight =>
+        insight.kind === 'ACTIVE_TASK_RISK' &&
+        insight.level !== 'NORMAL'
+      )
+      .map(insight => ({
+        type: 'v3_active_task_risk',
+        severity: insight.level,
+        title:
+          insight.level === 'CRITICAL'
+            ? '緊急任務異常'
+            : insight.level === 'HIGH'
+              ? '高風險任務'
+              : '任務需要注意',
+        message: `${insight.orderId}｜${(insight.reasons || []).slice(0, 3).join('；') || '任務風險升高'}`,
+        orderId: insight.orderId,
+        recoveryEligible: insight.recoveryEligible === true,
+        custodyLocked: insight.custodyLocked === true,
+        actions: insight.recommendations || [],
+      }));
+
+    const legacyNonTrackingAlerts = alerts.filter(alert =>
+      !String(alert.type || '').startsWith('tracking_')
+    );
+
+    const finalAlerts = [...activeRiskAlerts, ...legacyNonTrackingAlerts]
+      .sort((a, b) => {
+        const rank = { CRITICAL: 4, HIGH: 3, WATCH: 2, warning: 2, info: 1 };
+        return (rank[String(b.severity || '')] || 0) -
+          (rank[String(a.severity || '')] || 0);
+      });
 
     maybePersistDispatchIntelligence(intelligence).catch(()=>{});
 
@@ -7415,7 +7772,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       orders: enrichedLiveOrders,
       // 回傳全部已審核小U；前端自行以狀態分組／篩選。
       riders: allApprovedRiders,
-      alerts: alerts.slice(0, 100),
+      alerts: finalAlerts.slice(0, 100),
       intelligence
     });
   } catch (err) {
@@ -15407,6 +15764,8 @@ function getDispatchApiErrorResponse(error) {
     RIDER_OFFLINE: [409, '這位小U目前已離線，請重新選擇其他小U。'],
     RIDER_ALREADY_BUSY: [409, '這位小U目前已有進行中的任務，請重新選擇。'],
     RIDER_ALREADY_ASSIGNED: [409, '此訂單已經被其他小U接走。'],
+    ORDER_RECOVERY_NOT_ALLOWED: [409, '此任務目前不符合安全備援轉派條件，請重新整理後確認。'],
+    ORDER_CUSTODY_RISK: [409, '此任務已到達取件或取件後階段，可能已發生貨物交接，禁止直接轉派。請先聯絡小U並人工處置。'],
   };
 
   if (map[code]) {
@@ -15754,6 +16113,223 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
   }
 });
 
+
+
+// ------------------------------------------------------------
+// V3. 進行中任務：人工確認後啟動備援轉派
+// POST /api/dispatch/orders/:orderId/recover
+//
+// 安全邏輯：
+// - 只允許 accepted / going_to_pickup / heading_to_pickup。
+// - arrived_pickup 之後可能已發生貨物交接，禁止直接轉派。
+// - 這個 API 只在調度中心人工確認後呼叫，不做無人值守強制轉派。
+// ------------------------------------------------------------
+app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
+  try {
+    const safeOrderId = String(req.params.orderId || '').trim().toUpperCase();
+    if (!safeOrderId) {
+      return res.status(400).json({ success: false, message: '缺少訂單編號。' });
+    }
+
+    const requestedRadiusKm = normalizeDispatchRadiusKm(req.body?.radiusKm, 3);
+    const safeReason = String(req.body?.reason || '調度中心 V3 異常備援轉派')
+      .trim()
+      .slice(0, 160);
+    const source = String(req.body?.source || 'dispatch_center_v3').trim();
+    const nowMs = Date.now();
+    const newCycleId = buildDispatchPushCycleId(safeOrderId);
+    const orderRef = db.collection('orders').doc(safeOrderId);
+    let recoveredOrder = null;
+    let previousRiderId = '';
+    let previousRiderDocId = '';
+
+    await db.runTransaction(async transaction => {
+      const orderDoc = await transaction.get(orderRef);
+      if (!orderDoc.exists) throw new Error('ORDER_NOT_FOUND');
+
+      const order = orderDoc.data() || {};
+      const currentStatus = String(order.status || '').trim();
+      const recoverable = ['accepted', 'going_to_pickup', 'heading_to_pickup'];
+      const custodyRisk = [
+        'arrived_pickup', 'picked_up', 'going_to_dropoff',
+        'heading_to_dropoff', 'arrived_dropoff', 'completed'
+      ];
+
+      if (custodyRisk.includes(currentStatus)) {
+        throw new Error('ORDER_CUSTODY_RISK');
+      }
+      if (!recoverable.includes(currentStatus)) {
+        throw new Error('ORDER_RECOVERY_NOT_ALLOWED');
+      }
+
+      previousRiderId = String(order.riderId || '').trim();
+      previousRiderDocId = String(order.riderDocId || '').trim();
+      const previousIdentity = {
+        riderId: previousRiderId,
+        riderDocId: previousRiderDocId,
+        phone: normalizePhone(order.riderPhone || order.driverPhone || ''),
+        lineUserId: String(order.riderLineUserId || '').trim(),
+      };
+      const riderSkipKeys = getRiderIdentityKeys(previousIdentity);
+
+      let previousRiderRef = null;
+      let previousRiderDoc = null;
+      if (previousRiderDocId) {
+        previousRiderRef = db.collection('riders').doc(previousRiderDocId);
+        previousRiderDoc = await transaction.get(previousRiderRef);
+      }
+
+      const updateData = {
+        status: 'pending_dispatch',
+        riderStatus: 'pending_dispatch',
+        previousRiderId,
+        previousRiderDocId,
+        previousRiderPhone: previousIdentity.phone || '',
+        previousRiderLineUserId: previousIdentity.lineUserId || '',
+        previousRiderName: String(order.riderName || order.driverName || ''),
+        riderId: '',
+        riderDocId: '',
+        riderPhone: '',
+        riderLineUserId: '',
+        riderName: '',
+
+        // 保留原小U最後位置作追溯，但清除目前任務位置，避免待派單畫面誤認仍由原小U執行。
+        previousRiderLastLat: order.riderCurrentLat ?? order.riderCurrentLocation?.lat ?? null,
+        previousRiderLastLng: order.riderCurrentLng ?? order.riderCurrentLocation?.lng ?? null,
+        previousRiderLastLocationAtMs: getDispatchOrderTrackingAtMs(order) || null,
+        riderCurrentLat: null,
+        riderCurrentLng: null,
+        riderCurrentLocation: null,
+        riderLocationUpdatedAtMs: null,
+        riderLocationUpdatedAt: null,
+
+        acceptedAt: null,
+        emergencyRecoveryReason: safeReason,
+        emergencyRecoveryCount: admin.firestore.FieldValue.increment(1),
+        emergencyRecoveryAtMs: nowMs,
+        emergencyRecoveryAt: admin.firestore.FieldValue.serverTimestamp(),
+        emergencyRecoverySource: source,
+        dispatchStartedAtMs: nowMs,
+        redispatchStartedAtMs: nowMs,
+        dispatchPushCycleId: newCycleId,
+        dispatchPushNotifiedRiderDocIds: [],
+        dispatchPushStage: 'v3_emergency_redispatch_scheduled',
+        dispatchManualRedispatchRadiusKm: requestedRadiusKm,
+        riderTrackingStatus: 'stopped',
+        trackingEndedAtMs: nowMs,
+        trackingEndedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingUpdatedAtMs: nowMs,
+        trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        trackingStopReason: 'dispatch_v3_emergency_recovery',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        dispatchUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        'statusTimes.emergency_redispatch': admin.firestore.FieldValue.serverTimestamp(),
+        ...getEtaPayloadByStatus('pending_dispatch'),
+      };
+
+      if (riderSkipKeys.length) {
+        updateData.skippedRiderIds = admin.firestore.FieldValue.arrayUnion(...riderSkipKeys);
+      }
+
+      transaction.update(orderRef, updateData);
+
+      if (previousRiderRef && previousRiderDoc?.exists) {
+        const previousRider = previousRiderDoc.data() || {};
+        const currentOrderId = String(previousRider.currentOrderId || '').trim().toUpperCase();
+        if (!currentOrderId || currentOrderId === safeOrderId) {
+          transaction.set(previousRiderRef, {
+            busy: false,
+            currentOrderId: '',
+            activeTrackingOrderId: '',
+            activeTrackingSessionId: '',
+            taskTrackingStatus: 'stopped',
+            taskTrackingUpdatedAtMs: nowMs,
+            taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            taskTrackingStopReason: 'dispatch_v3_emergency_recovery',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
+      }
+
+      recoveredOrder = {
+        ...order,
+        id: safeOrderId,
+        status: 'pending_dispatch',
+        riderStatus: 'pending_dispatch',
+        riderId: '',
+        riderDocId: '',
+        riderPhone: '',
+        riderLineUserId: '',
+        riderName: '',
+        riderCurrentLat: null,
+        riderCurrentLng: null,
+        riderCurrentLocation: null,
+        riderLocationUpdatedAtMs: null,
+        acceptedAt: null,
+        previousRiderId,
+        previousRiderDocId,
+        skippedRiderIds: Array.from(new Set([
+          ...(Array.isArray(order.skippedRiderIds) ? order.skippedRiderIds : []),
+          ...riderSkipKeys,
+        ])),
+        dispatchPushCycleId: newCycleId,
+        dispatchManualRedispatchRadiusKm: requestedRadiusKm,
+        emergencyRecoveryReason: safeReason,
+      };
+    });
+
+    clearDispatchPushTimers(safeOrderId);
+    if (typeof orders === 'object' && orders) orders[safeOrderId] = recoveredOrder;
+
+    try {
+      await startDispatchPushSequence(recoveredOrder, newCycleId);
+    } catch (pushError) {
+      console.error('⚠️ V3 備援轉派已建立，但重新派單通知啟動失敗：', pushError);
+    }
+
+    try {
+      await notifyCustomer(
+        recoveredOrder,
+        createTextMessage(
+          `🟠 UBee 調度中心正在重新安排小U\n\n` +
+          `訂單編號：${safeOrderId}\n` +
+          `系統已啟動備援調度，將盡快重新安排配送夥伴。`
+        )
+      );
+    } catch (notifyError) {
+      console.error('⚠️ V3 備援轉派成功，但通知客人失敗：', notifyError);
+    }
+
+    Promise.allSettled([
+      logDispatchEvent({
+        type: 'EMERGENCY_REDISPATCH',
+        orderId: safeOrderId,
+        riderId: previousRiderId,
+        riderDocId: previousRiderDocId,
+        reason: safeReason,
+        radiusKm: requestedRadiusKm,
+        source,
+        createdAtMs: nowMs,
+      }),
+      previousRiderId
+        ? updateRiderDispatchStats(previousRiderId, { transferredOrders: 1 })
+        : Promise.resolve(false),
+    ]).catch(() => {});
+
+    return res.json({
+      success: true,
+      orderId: safeOrderId,
+      status: 'pending_dispatch',
+      dispatchPushCycleId: newCycleId,
+      radiusKm: requestedRadiusKm,
+      message: '已啟動 V3 備援轉派，訂單重新進入智慧派單。',
+    });
+  } catch (error) {
+    console.error('❌ UBee V3 備援轉派失敗：', error);
+    const result = getDispatchApiErrorResponse(error);
+    return res.status(result.status).json(result.body);
+  }
+});
 
 // ------------------------------------------------------------
 // 2. 人工重新派單
