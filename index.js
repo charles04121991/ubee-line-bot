@@ -7383,6 +7383,23 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         onlineRiders: activeRiders.length,
         // 地圖上綠色 U：小U自己仍保持上線，不受 5 分鐘 heartbeat 顯示門檻影響。
         mapOnlineRiders: allApprovedRiders.filter(r => r.mapOnline === true).length,
+
+        // 地圖可實際顯示的上線小U：只計入台灣營運範圍內的有效座標，
+        // 避免 0,0、測試座標或異常舊座標把 Google Maps 自動縮放到世界地圖。
+        mapOnlineWithLocationRiders: allApprovedRiders.filter(r => {
+          if (r.mapOnline !== true) return false;
+          const lat = Number(r.currentLat);
+          const lng = Number(r.currentLng);
+          return (
+            Number.isFinite(lat) &&
+            Number.isFinite(lng) &&
+            lat >= 21.5 &&
+            lat <= 26.5 &&
+            lng >= 118 &&
+            lng <= 123.8
+          );
+        }).length,
+
         availableRiders: activeRiders.filter(r => !r.busy).length,
         busyRiders: allApprovedRiders.filter(r => r.dispatchState === 'BUSY').length,
         pausedRiders: allApprovedRiders.filter(r => r.dispatchState === 'PAUSED').length,
