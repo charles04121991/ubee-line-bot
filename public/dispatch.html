@@ -391,7 +391,7 @@ button{cursor:pointer}
         <div class="panel-head">
           <div>
             <div class="panel-title">即時供需地圖</div>
-            <div class="panel-sub">綠色＝保持上線的小U、藍色＝真正任務中、橘色＝待派單；暫停與離線保留在名單，不塞進地圖</div>
+            <div class="panel-sub">綠色＝目前開啟騎士端的小U、藍色＝真正任務中、橘色＝待派單；暫停與離線保留在名單，不塞進地圖</div>
           </div>
         </div>
         <div class="map-wrap">
@@ -592,22 +592,28 @@ function riderStateLabel(rider){
   }[riderStateKey(rider)] || '離線';
 }
 
-// 地圖顯示狀態與「即時派單資格」分離。
-// 小U只要自己仍保持上線（declaredOnline / mapOnline），就保留綠色 U；
-// 真正任務中永遠優先顯示藍色 U。
-// rider.online 仍維持原本 5 分鐘新鮮度規則，供候選派單使用。
+// 地圖顯示邏輯：
+// - 綠色 U：只顯示目前真正開啟騎士端、近期 heartbeat 仍有效的小U。
+// - 藍色 U：真正任務中永遠優先保留。
+// rider.online 維持原本即時在線新鮮度規則。
 function riderMapStateKey(rider){
   const stateKey = String(rider?.mapState || '').toUpperCase();
-  if(rider?.busy === true || stateKey === 'BUSY' || String(rider?.dispatchState || '').toUpperCase() === 'BUSY'){
+
+  if(
+    rider?.busy === true ||
+    stateKey === 'BUSY' ||
+    String(rider?.dispatchState || '').toUpperCase() === 'BUSY'
+  ){
     return 'busy';
   }
+
   if(
-    rider?.mapOnline === true ||
-    rider?.declaredOnline === true ||
-    stateKey === 'ONLINE'
+    rider?.online === true ||
+    rider?.mapOnline === true
   ){
     return 'online';
   }
+
   return riderStateKey(rider);
 }
 
@@ -1221,13 +1227,12 @@ function renderAll(){
 function renderSummary(){
   const s = state.data.summary || {};
   const mapOnlineCount =
-    s.mapOnlineRiders ??
-    state.data.riders.filter(r=>riderMapStateKey(r)==='online').length;
+    s.onlineRiders ??
+    state.data.riders.filter(r=>r.online===true).length;
 
   const mapOnlineWithLocation =
-    s.mapOnlineWithLocationRiders ??
     state.data.riders.filter(
-      r=>riderMapStateKey(r)==='online' && hasTaiwanMapLatLng(r.currentLat,r.currentLng)
+      r=>r.online===true && hasTaiwanMapLatLng(r.currentLat,r.currentLng)
     ).length;
 
   const realtimeOnlineCount =
@@ -1236,8 +1241,8 @@ function renderSummary(){
 
   $('totalRiders').textContent = s.totalRiders ?? state.data.riders.length ?? 0;
 
-  // 「上線小U」顯示小U自己仍保持上線的人數，
-  // 不再被 5 分鐘 heartbeat 新鮮度歸零。
+  // 「上線小U」只顯示目前真的有開啟騎士端、
+  // 且近期 heartbeat 仍有效的小U。
   $('online').textContent = mapOnlineCount;
 
   // 可接單小U仍沿用真正即時在線／定位新鮮的安全判定。
