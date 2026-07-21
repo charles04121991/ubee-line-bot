@@ -6917,9 +6917,12 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           toMs(r.updatedAt) ||
           locationUpdatedAtMs;
 
+        // declaredOnline：小U自己最後一次選擇仍保持「上線」。
+        // online：再加上 5 分鐘活動新鮮度，只供即時派單／候選判斷使用。
+        // 兩者刻意分開，避免調度地圖因 heartbeat 逾時就看不到仍保持上線的小U。
         const declaredOnline =
-          r.acceptingOrders === true ||
-          (r.acceptingOrders !== false && r.online === true);
+          r.online === true ||
+          r.acceptingOrders === true;
 
         const isFresh =
           !!lastActiveAtMs &&
@@ -7151,6 +7154,33 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         rider.dispatchState = 'OFFLINE';
       }
 
+      // ============================================================
+      // 調度地圖顯示層
+      //
+      // mapOnline / mapVisible 只控制「地圖上要不要看得到」：
+      // - 小U自己保持上線：綠色 U，即使 5 分鐘 heartbeat 新鮮度已逾時仍保留最後位置。
+      // - 真正進行中任務：藍色 U，永遠優先保留。
+      //
+      // 注意：這裡不改 rider.online / acceptingOrders 的派單判定，
+      // 智慧候選仍只使用真正新鮮的 rider.online === true。
+      // ============================================================
+      rider.mapOnline =
+        rider.declaredOnline === true &&
+        !verifiedBusy;
+      rider.mapVisible =
+        verifiedBusy ||
+        rider.mapOnline;
+      rider.mapState =
+        verifiedBusy
+          ? 'BUSY'
+          : rider.mapOnline
+            ? 'ONLINE'
+            : rider.dispatchState;
+      rider.mapLocationFresh =
+        !!rider.locationUpdatedAtMs &&
+        (nowMs - Number(rider.locationUpdatedAtMs)) >= 0 &&
+        (nowMs - Number(rider.locationUpdatedAtMs)) <= 5 * 60 * 1000;
+
       if (rider.ghostBusy) {
         ghostBusyRiders.push(rider);
       }
@@ -7351,6 +7381,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       summary: {
         totalRiders: allApprovedRiders.length,
         onlineRiders: activeRiders.length,
+        // 地圖上綠色 U：小U自己仍保持上線，不受 5 分鐘 heartbeat 顯示門檻影響。
+        mapOnlineRiders: allApprovedRiders.filter(r => r.mapOnline === true).length,
         availableRiders: activeRiders.filter(r => !r.busy).length,
         busyRiders: allApprovedRiders.filter(r => r.dispatchState === 'BUSY').length,
         pausedRiders: allApprovedRiders.filter(r => r.dispatchState === 'PAUSED').length,
