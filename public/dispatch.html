@@ -391,14 +391,14 @@ button{cursor:pointer}
         <div class="panel-head">
           <div>
             <div class="panel-title">即時供需地圖</div>
-            <div class="panel-sub">綠色＝可接單、藍色＝真正任務中、橘色＝待派單；暫停與離線保留在名單，不塞進地圖</div>
+            <div class="panel-sub">綠色＝保持上線的小U、藍色＝真正任務中、橘色＝待派單；暫停與離線保留在名單，不塞進地圖</div>
           </div>
         </div>
         <div class="map-wrap">
           <div id="dispatchMap"></div>
           <div class="map-toolbar">
             <div class="legend">
-              <span class="legend-item"><i class="legend-dot" style="background:var(--green)"></i>可接單 <b id="legendFree">0</b></span>
+              <span class="legend-item"><i class="legend-dot" style="background:var(--green)"></i>上線小U <b id="legendFree">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>任務中 <b id="legendBusy">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--orange)"></i>待派單 <b id="legendWaiting">0</b></span>
               <span class="legend-item"><i class="legend-dot" style="background:var(--blue)"></i>配送中 <b id="legendActive">0</b></span>
@@ -576,6 +576,44 @@ function riderStateLabel(rider){
   }[riderStateKey(rider)] || '離線';
 }
 
+// 地圖顯示狀態與「即時派單資格」分離。
+// 小U只要自己仍保持上線（declaredOnline / mapOnline），就保留綠色 U；
+// 真正任務中永遠優先顯示藍色 U。
+// rider.online 仍維持原本 5 分鐘新鮮度規則，供候選派單使用。
+function riderMapStateKey(rider){
+  const stateKey = String(rider?.mapState || '').toUpperCase();
+  if(rider?.busy === true || stateKey === 'BUSY' || String(rider?.dispatchState || '').toUpperCase() === 'BUSY'){
+    return 'busy';
+  }
+  if(
+    rider?.mapOnline === true ||
+    rider?.declaredOnline === true ||
+    stateKey === 'ONLINE'
+  ){
+    return 'online';
+  }
+  return riderStateKey(rider);
+}
+
+function riderMapStateLabel(rider){
+  const key = riderMapStateKey(rider);
+  if(key === 'busy') return '任務中';
+  if(key === 'online'){
+    return rider?.online === true
+      ? '上線可接單'
+      : '已上線・定位待更新';
+  }
+  return riderStateLabel(rider);
+}
+
+function riderMapStateColor(rider){
+  return riderMapStateKey(rider) === 'busy'
+    ? '#3478f6'
+    : riderMapStateKey(rider) === 'online'
+      ? '#20a464'
+      : riderStateColor(rider);
+}
+
 function trackingHealth(updatedAtMs){
   const n = Number(updatedAtMs || 0);
   if(!n) return {key:'waiting',label:'尚未收到定位',color:'#f59e0b',ageMs:null};
@@ -648,7 +686,7 @@ function severityClass(value){
 /* =========================
    地圖：Google Maps 營運監控版
    - 底圖與 UBee 客戶端一致，使用現有 /api/config 的 Google Maps 設定
-   - 綠色 U：可接單小U
+   - 綠色 U：保持上線的小U（即使暫時沒有新 heartbeat，也保留最後位置）
    - 藍色 U：任務中小U
    - 橘黃「取」：待派單
    - 藍色「取」：配送中
@@ -865,10 +903,14 @@ async function renderMap(){
   const activeTaskOrders = (state.data.orders || []).filter(order=>statusKind(order)!=='waiting');
 
   for(const rider of state.data.riders || []){
-    const visualState = riderStateKey(rider);
+    // 名單狀態仍使用 riderStateKey；地圖顯示改用 riderMapStateKey。
+    // 因此「5 分鐘內無 heartbeat」不會讓仍保持上線的小U從地圖消失。
+    const listState = riderStateKey(rider);
+    const visualState = riderMapStateKey(rider);
+
     if(visualState === 'busy') busy++;
     else if(visualState === 'online') free++;
-    else if(visualState === 'paused') paused++;
+    else if(listState === 'paused') paused++;
     else offline++;
 
     // 任務中的小U：優先採用 orders 內該任務最後同步的位置。
@@ -888,7 +930,10 @@ async function renderMap(){
       ? taskOrder.riderLocationUpdatedAtMs
       : rider.locationUpdatedAtMs;
 
-    // 暫停與一般離線者仍不塞進地圖；真正任務中一定保留。
+    // 地圖同時顯示：
+    // 🟢 小U自己仍保持上線（mapOnline / declaredOnline）
+    // 🔵 真正任務中
+    // 暫停與真正離線者仍只保留在「全部小U」名單。
     if(!['online','busy'].includes(visualState)) continue;
     if(!hasLatLng(displayLat,displayLng)) continue;
 
@@ -903,19 +948,27 @@ async function renderMap(){
     if(riderKey) renderedTaskRiderKeys.add(riderKey);
     if(rider.currentOrderId) renderedTaskRiderKeys.add(String(rider.currentOrderId).trim().toLowerCase());
 
+    const mapStateLabel = riderMapStateLabel(rider);
+    const mapStateColor = riderMapStateColor(rider);
+    const locationFreshText =
+      visualState === 'online' && rider.online !== true
+        ? '<br><small style="color:#b77900;font-weight:800">目前顯示最後已知位置；即時派單仍需等待新定位／heartbeat</small>'
+        : '';
+
     createOpsMarker({
       position,
       label:'U',
-      fillColor:riderStateColor(rider),
-      title:`${rider.name || rider.riderId || '小U'} · ${riderStateLabel(rider)}`,
-      zIndex:300,
+      fillColor:mapStateColor,
+      title:`${rider.name || rider.riderId || '小U'} · ${mapStateLabel}`,
+      zIndex:visualState === 'busy' ? 310 : 300,
       infoHtml:`
         <div style="min-width:225px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
           <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
-          <span style="font-weight:900;color:${riderStateColor(rider)}">${esc(riderStateLabel(rider))}</span><br>
+          <span style="font-weight:900;color:${mapStateColor}">${esc(mapStateLabel)}</span><br>
           ${tracking ? `<span style="font-weight:900;color:${tracking.color}">● ${esc(tracking.label)}</span><br>` : ''}
           <small>${esc(rider.district || rider.serviceArea || '未設定區域')}</small><br>
           <small>最後定位：${esc(fmtAge(displayLocationAtMs))}</small>
+          ${locationFreshText}
           ${taskOrder?.riderTrackingSource ? `<br><small>定位來源：${esc(taskOrder.riderTrackingSource)}</small>` : ''}
           ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
         </div>`
@@ -1020,6 +1073,11 @@ async function renderMap(){
   $('legendWaiting').textContent = waiting;
   $('legendActive').textContent = active;
 
+  const mapInfo = $('mapInfo');
+  if(mapInfo){
+    mapInfo.textContent = `地圖顯示：上線小U ${free} 位｜任務中 ${busy} 位`;
+  }
+
   if(!state.firstMapFitDone && hasBounds){
     fitMapToData(bounds);
     state.firstMapFitDone = true;
@@ -1035,7 +1093,11 @@ function fitMapToData(customBounds){
     let hasAny = false;
 
     for(const rider of state.data.riders || []){
-      if(hasLatLng(rider.currentLat,rider.currentLng)){
+      const mapState = riderMapStateKey(rider);
+      if(
+        ['online','busy'].includes(mapState) &&
+        hasLatLng(rider.currentLat,rider.currentLng)
+      ){
         bounds.extend({lat:Number(rider.currentLat),lng:Number(rider.currentLng)});
         hasAny = true;
       }
