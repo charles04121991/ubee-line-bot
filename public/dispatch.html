@@ -297,7 +297,7 @@ button{cursor:pointer}
 
   <section class="kpis">
     <div class="kpi"><div class="label">全部小U</div><div class="value" id="totalRiders">-</div><div class="sub">已審核且仍有效的運力名單</div></div>
-    <div class="kpi"><div class="label">在線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">目前連線中的小U</div></div>
+    <div class="kpi"><div class="label">上線小U</div><div class="value" id="online">-</div><div class="sub" id="onlineSub">目前保持上線的小U</div></div>
     <div class="kpi"><div class="label">可接單小U</div><div class="value" id="available">-</div><div class="sub">可進入智慧候選</div></div>
     <div class="kpi"><div class="label">待派單</div><div class="value" id="waiting">-</div><div class="sub" id="waitingSub">等待媒合中的訂單</div></div>
     <div class="kpi"><div class="label">配送中</div><div class="value" id="active">-</div><div class="sub">已由小U承接</div></div>
@@ -539,6 +539,22 @@ function num(value){
 function hasLatLng(lat,lng){
   const a = num(lat), b = num(lng);
   return a !== null && b !== null && Math.abs(a) <= 90 && Math.abs(b) <= 180;
+}
+
+// 調度中心地圖只接受台灣營運範圍內的座標。
+// 目的不是限制 UBee 派單，而是防止 0,0、測試座標或異常舊座標
+// 被加入 fitBounds 後，把整張地圖縮到世界尺度。
+// 範圍包含台灣本島、澎湖、金門、馬祖等離島。
+function hasTaiwanMapLatLng(lat,lng){
+  const a = num(lat), b = num(lng);
+  return (
+    a !== null &&
+    b !== null &&
+    a >= 21.5 &&
+    a <= 26.5 &&
+    b >= 118 &&
+    b <= 123.8
+  );
 }
 
 function haversineKm(lat1,lng1,lat2,lng2){
@@ -935,7 +951,7 @@ async function renderMap(){
     // 🔵 真正任務中
     // 暫停與真正離線者仍只保留在「全部小U」名單。
     if(!['online','busy'].includes(visualState)) continue;
-    if(!hasLatLng(displayLat,displayLng)) continue;
+    if(!hasTaiwanMapLatLng(displayLat,displayLng)) continue;
 
     const position = {lat:Number(displayLat),lng:Number(displayLng)};
     bounds.extend(position); hasBounds = true;
@@ -978,7 +994,7 @@ async function renderMap(){
   // 防漏保底：若 orders 已確認有進行中任務，但 riders 名單暫時缺少該小U，
   // 仍使用訂單內最後已知 GPS 畫出藍色 U，不讓執行中小U從調度地圖消失。
   for(const order of activeTaskOrders){
-    if(!hasLatLng(order.riderCurrentLat,order.riderCurrentLng)) continue;
+    if(!hasTaiwanMapLatLng(order.riderCurrentLat,order.riderCurrentLng)) continue;
 
     const keys = [order.riderDocId,order.riderId,order.id]
       .map(v=>String(v||'').trim().toLowerCase())
@@ -1011,7 +1027,7 @@ async function renderMap(){
   for(const order of state.data.orders || []){
     const kind = statusKind(order);
     if(kind === 'waiting') waiting++; else active++;
-    if(!hasLatLng(order.pickupLat,order.pickupLng)) continue;
+    if(!hasTaiwanMapLatLng(order.pickupLat,order.pickupLng)) continue;
 
     const pickup = {lat:Number(order.pickupLat),lng:Number(order.pickupLng)};
     bounds.extend(pickup); hasBounds = true;
@@ -1035,7 +1051,7 @@ async function renderMap(){
     });
 
     if(selected){
-      if(hasLatLng(order.dropoffLat,order.dropoffLng)){
+      if(hasTaiwanMapLatLng(order.dropoffLat,order.dropoffLng)){
         const dropoff = {lat:Number(order.dropoffLat),lng:Number(order.dropoffLng)};
         bounds.extend(dropoff); hasBounds = true;
 
@@ -1096,14 +1112,14 @@ function fitMapToData(customBounds){
       const mapState = riderMapStateKey(rider);
       if(
         ['online','busy'].includes(mapState) &&
-        hasLatLng(rider.currentLat,rider.currentLng)
+        hasTaiwanMapLatLng(rider.currentLat,rider.currentLng)
       ){
         bounds.extend({lat:Number(rider.currentLat),lng:Number(rider.currentLng)});
         hasAny = true;
       }
     }
     for(const order of state.data.orders || []){
-      if(hasLatLng(order.pickupLat,order.pickupLng)){
+      if(hasTaiwanMapLatLng(order.pickupLat,order.pickupLng)){
         bounds.extend({lat:Number(order.pickupLat),lng:Number(order.pickupLng)});
         hasAny = true;
       }
@@ -1204,8 +1220,27 @@ function renderAll(){
 
 function renderSummary(){
   const s = state.data.summary || {};
+  const mapOnlineCount =
+    s.mapOnlineRiders ??
+    state.data.riders.filter(r=>riderMapStateKey(r)==='online').length;
+
+  const mapOnlineWithLocation =
+    s.mapOnlineWithLocationRiders ??
+    state.data.riders.filter(
+      r=>riderMapStateKey(r)==='online' && hasTaiwanMapLatLng(r.currentLat,r.currentLng)
+    ).length;
+
+  const realtimeOnlineCount =
+    s.onlineRiders ??
+    state.data.riders.filter(r=>r.online===true).length;
+
   $('totalRiders').textContent = s.totalRiders ?? state.data.riders.length ?? 0;
-  $('online').textContent = s.onlineRiders ?? state.data.riders.filter(r=>r.online).length;
+
+  // 「上線小U」顯示小U自己仍保持上線的人數，
+  // 不再被 5 分鐘 heartbeat 新鮮度歸零。
+  $('online').textContent = mapOnlineCount;
+
+  // 可接單小U仍沿用真正即時在線／定位新鮮的安全判定。
   $('available').textContent = s.availableRiders ?? state.data.riders.filter(r=>r.online && !r.busy).length;
   $('waiting').textContent = s.waitingOrders ?? state.data.orders.filter(o=>statusKind(o)==='waiting').length;
   $('active').textContent = s.activeOrders ?? state.data.orders.filter(o=>statusKind(o)==='active').length;
@@ -1216,10 +1251,10 @@ function renderSummary(){
   $('forecastGap').textContent = Number(gap) > 0 ? `+${gap}` : String(gap);
   $('alerts').textContent = state.data.alerts.length;
 
-  const liveWithLocation = state.data.riders.filter(r=>r.online && hasLatLng(r.currentLat,r.currentLng)).length;
   const pausedCount = s.pausedRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='paused').length;
   const offlineCount = s.offlineRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='offline').length;
-  $('onlineSub').textContent = `${liveWithLocation} 位有即時座標 · 全部小U名單另含暫停 ${pausedCount}、離線 ${offlineCount}`;
+  $('onlineSub').textContent =
+    `${mapOnlineWithLocation} 位有可顯示座標 · ${realtimeOnlineCount} 位即時連線 · 暫停 ${pausedCount}、離線 ${offlineCount}`;
 
   const waits = state.data.orders.filter(o=>statusKind(o)==='waiting');
   if(waits.length){
