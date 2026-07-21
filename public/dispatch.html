@@ -576,6 +576,23 @@ function riderStateLabel(rider){
   }[riderStateKey(rider)] || '離線';
 }
 
+function trackingHealth(updatedAtMs){
+  const n = Number(updatedAtMs || 0);
+  if(!n) return {key:'waiting',label:'尚未收到定位',color:'#f59e0b',ageMs:null};
+
+  const ageMs = Math.max(0,Date.now()-n);
+  if(ageMs <= 60*1000) return {key:'live',label:'GPS 即時',color:'#20a464',ageMs};
+  if(ageMs <= 3*60*1000) return {key:'delayed',label:'GPS 延遲',color:'#f59e0b',ageMs};
+  return {key:'stale',label:'定位暫時中斷',color:'#e5484d',ageMs};
+}
+
+function sameDispatchRider(rider,order){
+  if(!rider || !order) return false;
+  const norm=v=>String(v||'').trim().toLowerCase();
+  const keys=new Set([rider.riderDocId,rider.riderId,rider.currentOrderId].map(norm).filter(Boolean));
+  return [order.riderDocId,order.riderId,order.id].map(norm).some(v=>v && keys.has(v));
+}
+
 function riderStateColor(rider){
   return {
     online:'#20a464',
@@ -844,6 +861,9 @@ async function renderMap(){
   let hasBounds = false;
   let free = 0, busy = 0, paused = 0, offline = 0, waiting = 0, active = 0;
 
+  const renderedTaskRiderKeys = new Set();
+  const activeTaskOrders = (state.data.orders || []).filter(order=>statusKind(order)!=='waiting');
+
   for(const rider of state.data.riders || []){
     const visualState = riderStateKey(rider);
     if(visualState === 'busy') busy++;
@@ -851,13 +871,37 @@ async function renderMap(){
     else if(visualState === 'paused') paused++;
     else offline++;
 
-    // 地圖只顯示具有即時調度價值的小U：可接單、真正任務中。
-    // 暫停接單與離線者仍保留在「全部小U」名單，但不畫進地圖，避免大量舊位置塞滿畫面。
-    if(!['online','busy'].includes(visualState)) continue;
-    if(!hasLatLng(rider.currentLat,rider.currentLng)) continue;
+    // 任務中的小U：優先採用 orders 內該任務最後同步的位置。
+    // 即使一般 online/heartbeat 逾時，BUSY 仍保留在地圖。
+    const taskOrder = visualState === 'busy'
+      ? activeTaskOrders.find(order=>sameDispatchRider(rider,order)) || null
+      : null;
 
-    const position = {lat:Number(rider.currentLat),lng:Number(rider.currentLng)};
+    const orderLocationNewer =
+      taskOrder &&
+      hasLatLng(taskOrder.riderCurrentLat,taskOrder.riderCurrentLng) &&
+      Number(taskOrder.riderLocationUpdatedAtMs || 0) >= Number(rider.locationUpdatedAtMs || 0);
+
+    const displayLat = orderLocationNewer ? taskOrder.riderCurrentLat : rider.currentLat;
+    const displayLng = orderLocationNewer ? taskOrder.riderCurrentLng : rider.currentLng;
+    const displayLocationAtMs = orderLocationNewer
+      ? taskOrder.riderLocationUpdatedAtMs
+      : rider.locationUpdatedAtMs;
+
+    // 暫停與一般離線者仍不塞進地圖；真正任務中一定保留。
+    if(!['online','busy'].includes(visualState)) continue;
+    if(!hasLatLng(displayLat,displayLng)) continue;
+
+    const position = {lat:Number(displayLat),lng:Number(displayLng)};
     bounds.extend(position); hasBounds = true;
+
+    const tracking = visualState === 'busy'
+      ? trackingHealth(displayLocationAtMs)
+      : null;
+
+    const riderKey = String(rider.riderDocId || rider.riderId || rider.currentOrderId || '').trim().toLowerCase();
+    if(riderKey) renderedTaskRiderKeys.add(riderKey);
+    if(rider.currentOrderId) renderedTaskRiderKeys.add(String(rider.currentOrderId).trim().toLowerCase());
 
     createOpsMarker({
       position,
@@ -866,12 +910,47 @@ async function renderMap(){
       title:`${rider.name || rider.riderId || '小U'} · ${riderStateLabel(rider)}`,
       zIndex:300,
       infoHtml:`
-        <div style="min-width:210px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
+        <div style="min-width:225px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
           <b>${esc(rider.name || rider.riderId || '小U')}</b><br>
           <span style="font-weight:900;color:${riderStateColor(rider)}">${esc(riderStateLabel(rider))}</span><br>
+          ${tracking ? `<span style="font-weight:900;color:${tracking.color}">● ${esc(tracking.label)}</span><br>` : ''}
           <small>${esc(rider.district || rider.serviceArea || '未設定區域')}</small><br>
-          <small>最後定位：${esc(fmtAge(rider.locationUpdatedAtMs))}</small>
+          <small>最後定位：${esc(fmtAge(displayLocationAtMs))}</small>
+          ${taskOrder?.riderTrackingSource ? `<br><small>定位來源：${esc(taskOrder.riderTrackingSource)}</small>` : ''}
           ${rider.currentOrderId ? `<br><small>目前訂單：${esc(rider.currentOrderId)}</small>` : ''}
+        </div>`
+    });
+  }
+
+  // 防漏保底：若 orders 已確認有進行中任務，但 riders 名單暫時缺少該小U，
+  // 仍使用訂單內最後已知 GPS 畫出藍色 U，不讓執行中小U從調度地圖消失。
+  for(const order of activeTaskOrders){
+    if(!hasLatLng(order.riderCurrentLat,order.riderCurrentLng)) continue;
+
+    const keys = [order.riderDocId,order.riderId,order.id]
+      .map(v=>String(v||'').trim().toLowerCase())
+      .filter(Boolean);
+
+    if(keys.some(key=>renderedTaskRiderKeys.has(key))) continue;
+
+    const position={lat:Number(order.riderCurrentLat),lng:Number(order.riderCurrentLng)};
+    const tracking=trackingHealth(order.riderLocationUpdatedAtMs);
+    bounds.extend(position); hasBounds=true;
+
+    createOpsMarker({
+      position,
+      label:'U',
+      fillColor:'#3478f6',
+      title:`${order.riderName || order.riderId || '任務中小U'} · ${tracking.label}`,
+      zIndex:305,
+      infoHtml:`
+        <div style="min-width:225px;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif">
+          <b>${esc(order.riderName || order.riderId || '任務中小U')}</b><br>
+          <span style="font-weight:900;color:#3478f6">任務中</span><br>
+          <span style="font-weight:900;color:${tracking.color}">● ${esc(tracking.label)}</span><br>
+          <small>最後定位：${esc(fmtAge(order.riderLocationUpdatedAtMs))}</small><br>
+          <small>目前訂單：${esc(order.id || '')}</small>
+          ${order.riderTrackingSource ? `<br><small>定位來源：${esc(order.riderTrackingSource)}</small>` : ''}
         </div>`
     });
   }
@@ -1217,8 +1296,11 @@ function renderRiders(){
   $('riders').innerHTML = riders.map(r=>{
     const stateKey = riderStateKey(r);
     const rowClass = stateKey === 'offline' ? 'is-offline' : stateKey === 'paused' ? 'is-paused' : '';
+    const tracking = stateKey === 'busy' ? trackingHealth(r.locationUpdatedAtMs) : null;
     const locationText = hasLatLng(r.currentLat,r.currentLng)
-      ? (r.online ? '即時座標' : '最後已知座標')
+      ? (stateKey === 'busy'
+          ? `${tracking.label}／保留最後座標`
+          : (r.online ? '即時座標' : '最後已知座標'))
       : '無座標';
     return `
       <div class="rider-row ${rowClass}">
