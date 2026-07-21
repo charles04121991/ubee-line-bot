@@ -6372,7 +6372,7 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
 
 
 // ============================================================
-// UBee Level 4 智慧調度中心 V3
+// UBee 智慧調度控制塔 V4 + V5
 // 原則：自動監控、風險分級、備援推薦與處置建議；高風險寫入操作仍需人工確認。
 // ============================================================
 const UBEE_DISPATCH_INTELLIGENCE_VERSION = 'level4-v3';
@@ -7599,7 +7599,10 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         arrivedDropoffAtMs:
           Number(o.arrivedDropoffAtMs || 0) ||
           toMs(o.arrivedDropoffAt) ||
-          toMs(o.statusTimes && o.statusTimes.arrived_dropoff)
+          toMs(o.statusTimes && o.statusTimes.arrived_dropoff),
+        riderLocationTrail: Array.isArray(o.riderLocationTrail)
+          ? o.riderLocationTrail.slice(-40)
+          : []
       }));
 
     const waitingOrders = liveOrders.filter(o => waitingStatuses.has(String(o.status || '').trim()));
@@ -7729,6 +7732,127 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           (rank[String(a.severity || '')] || 0);
       });
 
+    // ============================================================
+    // V4 + V5：全局控制塔 / 任務階段 / 小U健康 / 城市供需視圖
+    // ============================================================
+    const stageSummary = {
+      waitingDispatch: waitingOrders.length,
+      goingToPickup: 0,
+      waitingPickup: 0,
+      delivering: 0,
+      arrivedDropoff: 0,
+    };
+
+    enrichedLiveOrders.forEach(order => {
+      const status = String(order.status || '').trim();
+      if (['accepted','going_to_pickup','heading_to_pickup'].includes(status)) {
+        stageSummary.goingToPickup += 1;
+      } else if (status === 'arrived_pickup') {
+        stageSummary.waitingPickup += 1;
+      } else if (['picked_up','going_to_dropoff','heading_to_dropoff'].includes(status)) {
+        stageSummary.delivering += 1;
+      } else if (status === 'arrived_dropoff') {
+        stageSummary.arrivedDropoff += 1;
+      }
+    });
+
+    const riskSummary = { NORMAL:0, WATCH:0, HIGH:0, CRITICAL:0 };
+    enrichedLiveOrders.forEach(order => {
+      const level = String(order.riskLevel || 'NORMAL').toUpperCase();
+      if (Object.prototype.hasOwnProperty.call(riskSummary, level)) riskSummary[level] += 1;
+      else riskSummary.NORMAL += 1;
+    });
+
+    const orderByRiderKey = new Map();
+    enrichedLiveOrders.forEach(order => {
+      [order.riderDocId, order.riderId, order.riderPhone].forEach(key => {
+        const safeKey = String(key || '').trim().toLowerCase();
+        if (safeKey) orderByRiderKey.set(safeKey, order);
+      });
+    });
+
+    const riderHealthSummary = { HEALTHY:0, TASK:0, UNSTABLE:0, CRITICAL:0, OFFLINE:0 };
+    const enrichedRiders = allApprovedRiders.map(rider => {
+      const riderKeys = [rider.riderDocId, rider.riderId, rider.phone]
+        .map(value => String(value || '').trim().toLowerCase())
+        .filter(Boolean);
+      const activeOrder = riderKeys.map(key => orderByRiderKey.get(key)).find(Boolean) || null;
+      const locationAgeMs = Number(rider.locationAgeMs ?? 0);
+      let healthState = 'OFFLINE';
+      let healthLabel = '離線';
+      let healthReason = '目前沒有即時連線';
+
+      if (activeOrder) {
+        const level = String(activeOrder.riskLevel || 'NORMAL').toUpperCase();
+        if (['HIGH','CRITICAL'].includes(level)) {
+          healthState = 'CRITICAL';
+          healthLabel = '任務異常';
+          healthReason = (activeOrder.riskReasons || []).slice(0,2).join('；') || '任務風險升高';
+        } else {
+          healthState = 'TASK';
+          healthLabel = '任務執行中';
+          healthReason = `訂單 ${activeOrder.id}｜${activeOrder.statusLabel || activeOrder.status || '進行中'}`;
+        }
+      } else if (rider.online === true) {
+        if (!rider.locationUpdatedAtMs || locationAgeMs > 3 * 60 * 1000) {
+          healthState = 'UNSTABLE';
+          healthLabel = '連線不穩';
+          healthReason = rider.locationUpdatedAtMs ? `定位已 ${Math.floor(locationAgeMs/60000)} 分鐘未更新` : '尚無有效定位';
+        } else {
+          healthState = 'HEALTHY';
+          healthLabel = '狀態良好';
+          healthReason = '在線且定位正常';
+        }
+      } else if (rider.declaredOnline === true) {
+        healthState = 'UNSTABLE';
+        healthLabel = '等待重新連線';
+        healthReason = '仍保持上線意願，但 heartbeat 已逾時';
+      }
+
+      riderHealthSummary[healthState] = (riderHealthSummary[healthState] || 0) + 1;
+      return {
+        ...rider,
+        healthState,
+        healthLabel,
+        healthReason,
+        healthOrderId: activeOrder?.id || '',
+        healthRiskLevel: activeOrder?.riskLevel || 'NORMAL',
+      };
+    });
+
+    const zoneOperations = (intelligence.zones || []).map(zone => ({
+      ...zone,
+      operationalState:
+        Number(zone.expectedGap15m || 0) <= -5 ? 'CRITICAL' :
+        Number(zone.expectedGap15m || 0) <= -2 ? 'HIGH' :
+        Number(zone.expectedGap15m || 0) < 0 ? 'WATCH' :
+        Number(zone.availableRiders || 0) >= Math.max(8, Number(zone.waitingOrders || 0) * 4) ? 'SURPLUS' :
+        'BALANCED',
+      operationalLabel:
+        Number(zone.expectedGap15m || 0) <= -5 ? '嚴重缺運力' :
+        Number(zone.expectedGap15m || 0) <= -2 ? '運力不足' :
+        Number(zone.expectedGap15m || 0) < 0 ? '需要注意' :
+        Number(zone.availableRiders || 0) >= Math.max(8, Number(zone.waitingOrders || 0) * 4) ? '運力充足' :
+        '供需平衡',
+    }));
+
+    const operationsV5 = {
+      version: 'V4+V5',
+      generatedAtMs: nowMs,
+      controlTower: {
+        totalLiveOrders: enrichedLiveOrders.length,
+        riskSummary,
+        stageSummary,
+      },
+      riderHealthSummary,
+      zones: zoneOperations,
+      cityStatus:
+        riskSummary.CRITICAL > 0 ? 'CRITICAL' :
+        riskSummary.HIGH > 0 || zoneOperations.some(z => ['CRITICAL','HIGH'].includes(z.operationalState)) ? 'HIGH' :
+        riskSummary.WATCH > 0 || zoneOperations.some(z => z.operationalState === 'WATCH') ? 'WATCH' :
+        'NORMAL',
+    };
+
     maybePersistDispatchIntelligence(intelligence).catch(()=>{});
 
     return res.json({
@@ -7771,9 +7895,10 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       },
       orders: enrichedLiveOrders,
       // 回傳全部已審核小U；前端自行以狀態分組／篩選。
-      riders: allApprovedRiders,
+      riders: enrichedRiders,
       alerts: finalAlerts.slice(0, 100),
-      intelligence
+      intelligence,
+      operationsV5
     });
   } catch (err) {
     console.error('❌ UBee 調度中心 dashboard 讀取失敗：', err);
@@ -8731,6 +8856,44 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
             orderIsActive &&
             orderBelongsToRider
           ) {
+            // V5 任務軌跡：只保留最近 40 個有效採樣點。
+            // 至少間隔 30 秒，或位移 >= 80 公尺才追加，避免 Firestore 文件無限制膨脹。
+            const existingTrail = Array.isArray(order.riderLocationTrail)
+              ? order.riderLocationTrail
+                  .filter(point => point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
+                  .slice(-39)
+              : [];
+            const lastTrailPoint = existingTrail.length
+              ? existingTrail[existingTrail.length - 1]
+              : null;
+            const trailDistanceKm = lastTrailPoint
+              ? calcDispatchPushDistanceKm(
+                  Number(lastTrailPoint.lat),
+                  Number(lastTrailPoint.lng),
+                  latitude,
+                  longitude
+                )
+              : null;
+            const shouldAppendTrail =
+              !lastTrailPoint ||
+              !Number(lastTrailPoint.updatedAtMs || 0) ||
+              (nowMs - Number(lastTrailPoint.updatedAtMs || 0)) >= 30 * 1000 ||
+              (Number.isFinite(trailDistanceKm) && trailDistanceKm >= 0.08);
+
+            const nextTrail = shouldAppendTrail
+              ? [
+                  ...existingTrail,
+                  {
+                    lat: latitude,
+                    lng: longitude,
+                    updatedAtMs: nowMs,
+                    heading: safeHeading,
+                    speed: safeSpeed,
+                    accuracy: safeAccuracy,
+                  },
+                ].slice(-40)
+              : existingTrail;
+
             const orderLocationUpdate = {
               riderCurrentLat:
                 latitude,
@@ -8771,6 +8934,9 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
 
               trackingUpdatedAtMs:
                 nowMs,
+
+              // V5 最近移動軌跡（有新採樣點才更新）。
+              ...(shouldAppendTrail ? { riderLocationTrail: nextTrail } : {}),
             };
 
             if (safeAccuracy !== null) {
