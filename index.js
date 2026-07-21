@@ -7158,14 +7158,13 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       // 調度地圖顯示層
       //
       // mapOnline / mapVisible 只控制「地圖上要不要看得到」：
-      // - 小U自己保持上線：綠色 U，即使 5 分鐘 heartbeat 新鮮度已逾時仍保留最後位置。
+      // - 綠色 U：只顯示目前真正開啟騎士端、近期 heartbeat 仍有效的小U。
       // - 真正進行中任務：藍色 U，永遠優先保留。
       //
-      // 注意：這裡不改 rider.online / acceptingOrders 的派單判定，
-      // 智慧候選仍只使用真正新鮮的 rider.online === true。
+      // rider.online 仍是即時在線與派單資格的主要判定。
       // ============================================================
       rider.mapOnline =
-        rider.declaredOnline === true &&
+        rider.online === true &&
         !verifiedBusy;
       rider.mapVisible =
         verifiedBusy ||
@@ -7381,7 +7380,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       summary: {
         totalRiders: allApprovedRiders.length,
         onlineRiders: activeRiders.length,
-        // 地圖上綠色 U：小U自己仍保持上線，不受 5 分鐘 heartbeat 顯示門檻影響。
+        // 地圖上綠色 U：只計目前真正在線、近期 heartbeat 仍有效的小U。
         mapOnlineRiders: allApprovedRiders.filter(r => r.mapOnline === true).length,
 
         // 地圖可實際顯示的上線小U：只計入台灣營運範圍內的有效座標，
