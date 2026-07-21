@@ -9272,6 +9272,36 @@ const PRICING = {
   waitingFee: 30,
 };
 
+// =====================================================
+// UBee「幫我取 / 幫代買」專用即時配送計價
+//
+// 僅套用：
+// - pickup / 幫我取
+// - buy / 幫代買 / 幫我買
+//
+// 其他服務全部維持原本 PRICING + calculatePrice() 邏輯不變。
+// 這兩種服務取消導航時間費（每分鐘 $2），避免短程因塞車被放大價格。
+// =====================================================
+const QUICK_SERVICE_PRICING = {
+  pickup: {
+    label: '幫我取',
+    baseFee: 65,          // 0～3 km：$65
+    upTo5KmExtra: 10,     // 3～5 km：總行程費 $75
+    upTo8KmExtra: 30,     // 5～8 km：總行程費 $95
+    extraPerKm: 12,       // 超過 8 km：每公里 +$12
+    serviceFee: 10,       // 專用平台服務費
+  },
+
+  buy: {
+    label: '幫代買',
+    baseFee: 70,          // 0～3 km：$70
+    upTo5KmExtra: 15,     // 3～5 km：總行程費 $85
+    upTo8KmExtra: 35,     // 5～8 km：總行程費 $105
+    extraPerKm: 12,       // 超過 8 km：每公里 +$12
+    serviceFee: 10,       // 專用平台服務費
+  },
+};
+
 const MAX_QUOTE_TIME_MINUTES = 480;
 
 const SPEED_OPTIONS = {
@@ -10385,6 +10415,171 @@ function calculateFinancialSplit({
 
     platformFee,
     platformIncome: platformFee,
+  };
+}
+
+// =====================================================
+// 僅辨識「幫我取 / 幫代買」兩種專用計價服務
+// 其他任何服務一律回傳空字串，繼續走原本 calculatePrice()。
+// =====================================================
+function getQuickServicePricingType({
+  serviceKey = '',
+  serviceGroup = '',
+  serviceType = '',
+} = {}) {
+  const values = [
+    serviceKey,
+    serviceGroup,
+    serviceType,
+  ]
+    .map(value =>
+      String(value || '')
+        .trim()
+        .toLowerCase()
+    )
+    .filter(Boolean);
+
+  const isPickup = values.some(value =>
+    value === 'pickup' ||
+    value === '幫我取'
+  );
+
+  if (isPickup) {
+    return 'pickup';
+  }
+
+  const isBuy = values.some(value =>
+    value === 'buy' ||
+    value === '幫代買' ||
+    value === '幫我買'
+  );
+
+  if (isBuy) {
+    return 'buy';
+  }
+
+  return '';
+}
+
+// =====================================================
+// UBee「幫我取 / 幫代買」專用計價
+//
+// 幫我取：
+// - 0～3 km：$65
+// - 3～5 km：$75
+// - 5～8 km：$95
+// - 超過 8 km：每公里 +$12
+//
+// 幫代買：
+// - 0～3 km：$70
+// - 3～5 km：$85
+// - 5～8 km：$105
+// - 超過 8 km：每公里 +$12
+//
+// 兩者：
+// - 平台服務費 $10
+// - 不收導航時間費
+// - 急件費、上樓費與 70/30 分潤全部沿用原本邏輯
+// =====================================================
+function calculateQuickServicePrice({
+  distanceMeters,
+  speedType,
+  upstairsFee = 0,
+  serviceType = '',
+}) {
+  const km =
+    Math.max(
+      0,
+      Number(distanceMeters || 0)
+    ) / 1000;
+
+  const pricing =
+    QUICK_SERVICE_PRICING[serviceType];
+
+  if (!pricing) {
+    throw new Error(
+      `不支援的快速服務計價類型：${serviceType}`
+    );
+  }
+
+  const speed = getSpeedOption(speedType);
+
+  const baseFee = Math.max(
+    0,
+    Math.round(Number(pricing.baseFee || 0))
+  );
+
+  let distanceFee = 0;
+
+  if (km > 3 && km <= 5) {
+    distanceFee =
+      Number(pricing.upTo5KmExtra || 0);
+
+  } else if (km > 5 && km <= 8) {
+    distanceFee =
+      Number(pricing.upTo8KmExtra || 0);
+
+  } else if (km > 8) {
+    const extraKm = Math.ceil(km - 8);
+
+    distanceFee =
+      Number(pricing.upTo8KmExtra || 0) +
+      extraKm *
+        Number(pricing.extraPerKm || 0);
+  }
+
+  distanceFee = Math.max(
+    0,
+    Math.round(distanceFee)
+  );
+
+  // 「幫我取 / 幫代買」不使用原本每分鐘 $2 的導航時間費。
+  const timeFee = 0;
+
+  const deliveryFee =
+    baseFee +
+    distanceFee;
+
+  const serviceFee = Math.max(
+    0,
+    Math.round(Number(pricing.serviceFee || 0))
+  );
+
+  // 急件速度費維持原本 SPEED_OPTIONS。
+  const speedFee = Math.max(
+    0,
+    Math.round(Number(speed.fee || 0))
+  );
+
+  // 上樓費維持原本前端傳入金額與既有分潤方式。
+  const safeUpstairsFee = Math.max(
+    0,
+    Math.round(Number(upstairsFee || 0))
+  );
+
+  // 沿用 UBee 唯一財務核心：任務費 70/30、平台服務費 100% 歸平台。
+  const financials = calculateFinancialSplit({
+    deliveryFee,
+    serviceFee,
+    speedFee,
+    upstairsFee: safeUpstairsFee,
+    waitingFee: 0,
+  });
+
+  return {
+    fareMode: `quick_${serviceType}`,
+
+    distanceKm: Math.round(km * 100) / 100,
+    durationMinutes: 0,
+
+    baseFee,
+    distanceFee,
+    timeFee,
+
+    ...financials,
+
+    // 此階段尚未加入代墊款。
+    total: financials.serviceSubtotal,
   };
 }
 
@@ -12122,6 +12317,8 @@ app.get('/api/quote', async (req, res) => {
   try {
     const serviceType = String(req.query.serviceType || '').trim();
     const serviceMode = String(req.query.serviceMode || '').trim();
+    const serviceKey = String(req.query.serviceKey || '').trim();
+    const serviceGroup = String(req.query.serviceGroup || '').trim();
 
     const from = req.query.from || req.query.pickup;
     const to = req.query.to || req.query.dropoff;
@@ -12259,12 +12456,31 @@ app.get('/api/quote', async (req, res) => {
 
       distance = await getDistanceMatrixCached(from, to);
 
-      price = calculatePrice({
-        distanceMeters: distance.distanceMeters,
-        durationSeconds: distance.durationSeconds,
-        speedType,
-        upstairsFee,
-      });
+      const quickServiceType =
+        getQuickServicePricingType({
+          serviceKey,
+          serviceGroup,
+          serviceType,
+        });
+
+      if (quickServiceType) {
+        // 只有「幫我取 / 幫代買」走專用即時配送計價。
+        price = calculateQuickServicePrice({
+          distanceMeters: distance.distanceMeters,
+          speedType,
+          upstairsFee,
+          serviceType: quickServiceType,
+        });
+
+      } else {
+        // 其他所有服務完全維持原本計價邏輯。
+        price = calculatePrice({
+          distanceMeters: distance.distanceMeters,
+          durationSeconds: distance.durationSeconds,
+          speedType,
+          upstairsFee,
+        });
+      }
     }
 
     const serviceSubtotal = Math.max(
@@ -12743,12 +12959,31 @@ app.post('/api/orders', async (req, res) => {
     });
   }
 
-  price = calculatePrice({
-    distanceMeters: distance.distanceMeters,
-    durationSeconds: distance.durationSeconds,
-    speedType: data.speedType,
-    upstairsFee: data.upstairsFee,
-  });
+  const quickServiceType =
+    getQuickServicePricingType({
+      serviceKey: data.serviceKey,
+      serviceGroup: data.serviceGroup,
+      serviceType: data.serviceType,
+    });
+
+  if (quickServiceType) {
+    // 只有「幫我取 / 幫代買」走專用即時配送計價。
+    price = calculateQuickServicePrice({
+      distanceMeters: distance.distanceMeters,
+      speedType: data.speedType,
+      upstairsFee: data.upstairsFee,
+      serviceType: quickServiceType,
+    });
+
+  } else {
+    // 幫我送、全能跑腿、急件專送與其他一般任務完全沿用原本公式。
+    price = calculatePrice({
+      distanceMeters: distance.distanceMeters,
+      durationSeconds: distance.durationSeconds,
+      speedType: data.speedType,
+      upstairsFee: data.upstairsFee,
+    });
+  }
 }    
     const id = generateOrderId();
 
