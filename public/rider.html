@@ -908,6 +908,13 @@ h1{font-size:34px;margin-bottom:10px;letter-spacing:-.7px}
 label{margin-bottom:7px;font-size:12px}
 input,select,textarea{min-height:36px;font-size:16px;font-weight:850}
 .formHint{padding:11px 12px;margin-top:9px;border-radius:13px;font-size:11px;line-height:1.6}
+.v4Requirement{margin:0 0 16px;padding:16px;border:1px solid #fde68a;border-radius:18px;background:linear-gradient(135deg,#fffbeb,#fff);box-shadow:0 8px 24px rgba(250,204,21,.10)}
+.v4RequirementTitle{font-size:16px;font-weight:1000;color:#111827;margin-bottom:9px}
+.v4RequirementText{font-size:12px;line-height:1.75;color:#4b5563;font-weight:800}
+.v4RequirementGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.v4RequirementItem{padding:11px;border:1px solid #f3f4f6;border-radius:13px;background:#fff;font-size:12px;line-height:1.55;color:#374151;font-weight:850}
+.v4RequirementItem b{display:block;color:#111827;font-size:13px;margin-bottom:3px}
+@media(max-width:560px){.v4RequirementGrid{grid-template-columns:1fr}}
 .agreementChecklist{display:flex;flex-direction:column;gap:9px}
 .agreementCheck{position:relative;display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;align-items:flex-start;margin:0;padding:13px;border:1px solid var(--line);border-radius:15px;background:#fff;cursor:pointer}
 .agreementCheck input{position:absolute;opacity:0;pointer-events:none}
@@ -1136,6 +1143,17 @@ input,select,textarea{min-height:36px;font-size:16px;font-weight:850}
           <div class="sectionHint">送出前請確認</div>
         </div>
 
+        <div class="v4Requirement">
+          <div class="v4RequirementTitle">V4 小U數位入職｜審核通過後必完成</div>
+          <div class="v4RequirementText">
+            審核通過不代表立即開放接單。你必須在 UBee 騎士端完成街口支付設定、加入三個指定 LINE 社群、完成 12 個完整教學單元與 20 題新手測驗（80 分以上）後，系統才會開通 L1 基礎接單資格。
+          </div>
+          <div class="v4RequirementGrid">
+            <div class="v4RequirementItem"><b>街口支付</b>平台款項統一使用街口支付回繳。UBee 街口支付：901871793。</div>
+            <div class="v4RequirementItem"><b>三個 LINE 社群</b>公告群、聊天群、回報群皆為必加入；審核通過後由騎士端提供入口，社群密碼 1234。</div>
+          </div>
+        </div>
+
         <div class="agreementChecklist">
           <label class="agreementCheck">
             <input type="checkbox" id="agreePlatform">
@@ -1159,6 +1177,18 @@ input,select,textarea{min-height:36px;font-size:16px;font-weight:850}
             <input type="checkbox" id="agreePrivacy">
             <span class="agreementBoxMark">✓</span>
             <span><b>我同意必要的個人資料使用</b><small>資料僅用於合作審核、派單聯繫與必要營運管理。</small></span>
+          </label>
+
+          <label class="agreementCheck">
+            <input type="checkbox" id="agreeJko">
+            <span class="agreementBoxMark">✓</span>
+            <span><b>我了解必須下載並使用街口支付</b><small>UBee 平台款項將透過街口支付回繳；審核通過後須完成設定才能開通接單資格。</small></span>
+          </label>
+
+          <label class="agreementCheck">
+            <input type="checkbox" id="agreeCommunity">
+            <span class="agreementBoxMark">✓</span>
+            <span><b>我了解必須加入 UBee 三個指定社群</b><small>公告群、聊天群、回報群皆為入職必要項目，完成後才可通過 V4 數位入職。</small></span>
           </label>
         </div>
 
@@ -1240,7 +1270,7 @@ async function initLiff() {
 
 window.addEventListener('load', initLiff);
 
-const agreementCheckboxIds = ['agreePlatform','agreePrivate','agreeRisk','agreePrivacy'];
+const agreementCheckboxIds = ['agreePlatform','agreePrivate','agreeRisk','agreePrivacy','agreeJko','agreeCommunity'];
 
 function updateAgreementState(){
   hasAgreed = agreementCheckboxIds.every(id => document.getElementById(id)?.checked === true);
@@ -1321,7 +1351,7 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
 
   if (!hasAgreed) {
     errorBox.style.display = 'block';
-    errorBox.innerHTML = '請先完成上方 4 項合作規範確認。';
+    errorBox.innerHTML = '請先完成上方 6 項合作與入職規範確認。';
     return;
   }
 
@@ -1363,7 +1393,10 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
         contractConfirm: true,
         riderRuleConfirm: true,
         liabilityConfirm: true,
-        privacyConfirm: true
+        privacyConfirm: true,
+        jkoRequirementAgree: document.getElementById('agreeJko')?.checked === true,
+        communityRequirementAgree: document.getElementById('agreeCommunity')?.checked === true,
+        applicationSource: 'liff_rider_apply_v4'
       })
     });
 
@@ -1392,7 +1425,7 @@ document.getElementById('riderForm').addEventListener('submit', async function(e
       successBox.style.display = 'block';
       successBox.innerHTML =
         '✅ 已送出申請，等待 UBee 跑腿審核。<br><br>' +
-        '資料已成功送到系統，請等待審核通知。';
+        '資料已成功送到系統，請等待審核通知。<br><br>審核通過後，請直接進入 UBee 騎士端完成街口支付、三個社群、12 個教學單元與 20 題測驗，完成後才會開通接單資格。<br><br><a href="https://ubee-rider-web.vercel.app/rider.html" target="_blank" rel="noopener">開啟 UBee 騎士端</a>';
 
       submitBtn.innerText = '已送出申請';
       submitBtn.disabled = true;
