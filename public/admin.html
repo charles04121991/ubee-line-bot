@@ -120,6 +120,9 @@ summary::-webkit-details-marker{display:none}
 .history-amount{text-align:right;font-size:14px;font-weight:1000;white-space:nowrap}
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .search{min-width:220px;flex:1;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fff;outline:none;font-size:13px;font-weight:800}
+.v4-admin-note{padding:12px 13px;border-radius:14px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;line-height:1.65;color:#6b5b00;font-weight:850;margin-bottom:12px}
+.v4-rider-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.v4-rider-card{border:1px solid var(--line);border-radius:17px;padding:14px;background:#fff}.v4-rider-top{display:flex;justify-content:space-between;gap:12px}.v4-life{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:1000}.v4-life.ACTIVE{background:#dcfce7;color:#166534}.v4-life.TRAINING,.v4-life.RETRAINING{background:#fef3c7;color:#92400e}.v4-life.RESTRICTED,.v4-life.SUSPENDED,.v4-life.BANNED{background:#fee2e2;color:#991b1b}.v4-cert-list{margin-top:10px}.v4-cert{display:inline-flex;margin:3px 3px 0 0;padding:5px 7px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:900}.v4-cert.on{background:#dcfce7;color:#166534}.v4-action-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}.v4-action-grid .btn{padding:7px 9px;font-size:11px}.v4-key-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}.v4-key-row input{flex:1;border:1px solid var(--line);border-radius:11px;padding:10px 11px;font-weight:800}
+@media(max-width:850px){.v4-rider-grid{grid-template-columns:1fr}}
 .view{display:none}
 .view.active{display:block}
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9999;max-width:min(520px,calc(100% - 28px));padding:11px 14px;border-radius:12px;background:#111;color:#fff;font-size:12px;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.2);display:none;text-align:center}
@@ -147,6 +150,7 @@ summary::-webkit-details-marker{display:none}
     <button class="tab" data-view="jko">街口待撥款</button>
     <button class="tab" data-view="alerts">異常提醒 <span id="alertTabCount"></span></button>
     <button class="tab" data-view="history">結算紀錄</button>
+    <button class="tab" data-view="riders">小U V4 資格</button>
   </nav>
 
   <section class="kpis">
@@ -215,6 +219,20 @@ summary::-webkit-details-marker{display:none}
         <div class="panel-body"><div id="historyList" class="history-list"><div class="empty">正在讀取結算紀錄...</div></div></div>
       </div>
     </section>
+
+    <section class="view" id="view-riders">
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">小U V4 資格與治理</div><div class="panel-sub">V2 個人資格、V3 違規／重新教育、V4 等級與專業認證管理。</div></div>
+          <div class="toolbar"><input id="v4RiderSearch" class="search" placeholder="搜尋姓名／電話／Rider ID" oninput="renderV4Riders()"><button class="btn small" onclick="loadV4Riders(true)">更新</button></div>
+        </div>
+        <div class="panel-body">
+          <div class="v4-admin-note">此頁為高權限管理功能。請在 Render 設定 <b>UBEE_RIDER_V4_ADMIN_KEY</b>；瀏覽器只會把管理金鑰保存在目前分頁的 sessionStorage。</div>
+          <div class="v4-key-row"><input id="v4AdminKey" type="password" placeholder="輸入 V4 管理金鑰"><button class="btn primary" onclick="saveV4AdminKey()">套用金鑰</button></div>
+          <div id="v4RiderList" class="v4-rider-grid"><div class="empty">輸入管理金鑰後即可讀取小U資格。</div></div>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 <div class="toast" id="toast"></div>
@@ -226,6 +244,7 @@ const state = {
   overview:null,
   cash:null,
   jko:null,
+  ridersV4:null,
   loading:false,
 };
 
@@ -297,6 +316,7 @@ function switchView(view){
   if(view==='jko' && !state.jko) loadSettlements();
   if(view==='alerts') renderAlerts();
   if(view==='history') renderHistory();
+  if(view==='riders' && !state.ridersV4) loadV4Riders();
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));
 
@@ -480,6 +500,30 @@ async function settleJko(orderIds,button){
     await Promise.all([loadSettlements(true),loadOverview(true)]);
   }catch(err){alert('確認街口撥款失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
 }
+
+
+function getV4AdminKey(){return String(sessionStorage.getItem('ubee_v4_admin_key')||'').trim();}
+function saveV4AdminKey(){const input=document.getElementById('v4AdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);loadV4Riders(true);}
+async function v4AdminFetch(path,options={}){const key=getV4AdminKey();if(!key)throw new Error('請先輸入 V4 管理金鑰。');const headers={...(options.headers||{}),'x-ubee-admin-key':key};if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';const res=await fetch(`${API_BASE}${path}`,{...options,headers,cache:'no-store'});return readJson(res);}
+async function loadV4Riders(showMessage=false){
+  const el=document.getElementById('v4RiderList'); if(!el)return;
+  const saved=getV4AdminKey();const input=document.getElementById('v4AdminKey');if(saved&&input&&!input.value)input.value=saved;
+  if(!saved){el.innerHTML='<div class="empty">請先輸入 V4 管理金鑰。</div>';return;}
+  el.innerHTML='<div class="empty">正在讀取小U V4 資格...</div>';
+  try{state.ridersV4=await v4AdminFetch('/api/admin/rider-v4/list?t='+Date.now());renderV4Riders();if(showMessage)showToast('V4 小U資格已更新');}catch(err){el.innerHTML=`<div class="empty">讀取失敗：${esc(err.message)}</div>`;}
+}
+function renderV4Riders(){
+  const el=document.getElementById('v4RiderList');if(!el)return;const q=normalizeSearch(document.getElementById('v4RiderSearch')?.value);let riders=Array.isArray(state.ridersV4?.riders)?state.ridersV4.riders:[];riders=riders.filter(r=>[r.name,r.phone,r.riderId,r.id].map(normalizeSearch).some(v=>v.includes(q)));
+  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的小U。</div>';return;}
+  const certLabels={basic:'L1基礎',high_value_advance:'高額代墊',cake_flower:'蛋糕花束',car_delivery:'汽車配送',business_documents:'商務文件',multi_stop:'多點配送'};
+  el.innerHTML=riders.map(r=>{const certs=r.certifications||{};const chips=Object.keys(certLabels).map(k=>`<span class="v4-cert ${certs[k]===true?'on':''}">${certs[k]===true?'✓':'○'} ${esc(certLabels[k])}</span>`).join('');return `<article class="v4-rider-card"><div class="v4-rider-top"><div><div class="rider-name">${esc(r.name||'未設定姓名')}</div><div class="rider-meta">${esc(r.phone||'-')}<br>${esc(r.riderId||r.id||'-')}</div></div><div><span class="v4-life ${esc(r.lifecycleStatus||'')}">${esc(r.lifecycleStatus||'-')}</span><div style="text-align:right;margin-top:7px;font-weight:1000">${esc(r.riderLevel||'L0')}</div></div></div><div class="summary-row"><div class="summary-mini"><span>接單資格</span><strong>${r.canAcceptOrders?'可接單':'受限'}</strong></div><div class="summary-mini"><span>警告</span><strong>${Number(r.governance?.warningCount||0)}</strong></div><div class="summary-mini"><span>測驗</span><strong>${Number(r.onboarding?.quizScore||0)}分</strong></div></div><div class="v4-cert-list">${chips}</div><div class="v4-action-grid"><button class="btn small" onclick="v4Action('${esc(r.riderId||r.id)}','warn')">警告</button><button class="btn small yellow" onclick="v4Action('${esc(r.riderId||r.id)}','retraining')">重新教育</button><button class="btn small" onclick="v4Action('${esc(r.riderId||r.id)}','restrict')">限制</button><button class="btn small red" onclick="v4Action('${esc(r.riderId||r.id)}','suspend')">暫停</button><button class="btn small blue" onclick="v4Action('${esc(r.riderId||r.id)}','restore')">恢復</button><button class="btn small" onclick="setV4Level('${esc(r.riderId||r.id)}')">等級</button><button class="btn small" onclick="setV4Cert('${esc(r.riderId||r.id)}')">認證</button></div></article>`}).join('');
+}
+async function v4Action(riderId,action){
+  let reason='';let value='';if(['warn','retraining','restrict','suspend'].includes(action)){reason=prompt('請輸入原因／說明：','')||'';if(!reason.trim())return;}if(action==='retraining'){value=prompt('指定重新教育課程代碼：','general_rules')||'general_rules';}if(action==='restore'&&!confirm('確認恢復此小U接單資格？'))return;
+  try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action,reason,value})});showToast('V4 資格已更新');await loadV4Riders();}catch(err){alert('操作失敗：'+err.message);}
+}
+async function setV4Level(riderId){const value=(prompt('設定等級：L1 / L2 / L3','L1')||'').toUpperCase();if(!['L1','L2','L3'].includes(value))return;try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action:'set_level',value})});await loadV4Riders();showToast('等級已更新');}catch(err){alert(err.message);}}
+async function setV4Cert(riderId){const cert=prompt('認證代碼：\nhigh_value_advance\ncake_flower\ncar_delivery\nbusiness_documents\nmulti_stop','high_value_advance');if(!cert)return;const grant=confirm('按「確定」＝授予認證；按「取消」＝撤銷認證。');try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action:grant?'grant_cert':'revoke_cert',value:cert})});await loadV4Riders();showToast('認證已更新');}catch(err){alert(err.message);}}
 
 async function healthCheck(){
   const box=document.getElementById('systemStatus');
