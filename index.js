@@ -762,7 +762,8 @@ async function sendNewOrderPushToRiders(
 送達：${dropoff}
 騎士收入：$${fee}`,
 
-          url: "/rider.html",
+          url: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=task&source=push`,
+          deepLink: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=task&source=push`,
           orderId
         });
 
@@ -2955,6 +2956,178 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
     });
   }
 });
+
+
+// ============================================================
+// UBee 騎士端 V5 Native Bridge API
+// - 原生 iOS / Android 裝置資訊與推播 Token 保存
+// - App 冷啟動 / Deep Link / Live Activity 重新同步目前任務
+// - 不建立第二套任務資料，永遠以 riders + orders 為唯一真相來源
+// ============================================================
+
+function buildRiderV5NativeTaskPayload(order = {}) {
+  if (!order || typeof order !== 'object') return null;
+
+  const orderId = String(
+    order.id || order.orderId || order.orderNo || ''
+  ).trim().toUpperCase();
+
+  if (!orderId) return null;
+
+  const status = String(order.status || order.riderStatus || '').trim();
+
+  const stageMap = {
+    accepted: ['前往取件', 'pickup'],
+    going_to_pickup: ['前往取件', 'pickup'],
+    heading_to_pickup: ['前往取件', 'pickup'],
+    arrived_pickup: ['已抵達取件點', 'pickup'],
+    picked_up: ['配送中', 'delivery'],
+    going_to_dropoff: ['配送中', 'delivery'],
+    heading_to_dropoff: ['配送中', 'delivery'],
+    arrived_dropoff: ['已抵達送達點', 'delivery'],
+    completed: ['任務完成', 'completed'],
+  };
+
+  const [stage, phase] = stageMap[status] || ['任務進行中', 'task'];
+
+  return {
+    orderId,
+    status,
+    stage,
+    phase,
+    pickupAddress: String(
+      order.pickupAddress || order.fromAddress || order.pickup || ''
+    ).slice(0, 180),
+    dropoffAddress: String(
+      order.dropoffAddress || order.toAddress || order.dropoff || ''
+    ).slice(0, 180),
+    riderFee: Number(order.riderFee || order.driverFee || 0) || 0,
+    estimatedArrivalTime:
+      order.estimatedArrivalTime ||
+      order.etaAt ||
+      order.eta ||
+      null,
+    remainingDistanceKm:
+      Number(order.remainingDistanceKm || order.distanceRemainingKm || 0) || 0,
+    deepLink:
+      `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=task&source=native`,
+    updatedAtMs: Date.now(),
+  };
+}
+
+app.post('/api/rider/v5/native-device', riderAuthMiddleware, async (req, res) => {
+  try {
+    const riderResult = await findApprovedRiderForApi(req.body || {});
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode || 403).json({
+        success: false,
+        message: riderResult.message || '找不到小U資料。',
+      });
+    }
+
+    const body = req.body || {};
+    const platform = String(body.platform || '').trim().toLowerCase().slice(0, 30);
+    const deviceToken = String(body.deviceToken || '').trim().slice(0, 500);
+    const liveActivityPushToken = String(
+      body.liveActivityPushToken || ''
+    ).trim().slice(0, 1000);
+    const appVersion = String(body.appVersion || '').trim().slice(0, 60);
+    const deviceId = String(body.deviceId || '').trim().slice(0, 160);
+
+    const update = {
+      nativeAppEnabled: true,
+      nativePlatform: platform || 'unknown',
+      nativeAppVersion: appVersion,
+      nativeDeviceId: deviceId,
+      nativeDeviceUpdatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+      nativeDeviceUpdatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (deviceToken) {
+      update.nativePushToken = deviceToken;
+    }
+
+    if (liveActivityPushToken) {
+      update.liveActivityPushToken = liveActivityPushToken;
+      update.liveActivityPushTokenUpdatedAt =
+        admin.firestore.FieldValue.serverTimestamp();
+      update.liveActivityPushTokenUpdatedAtMs = Date.now();
+    }
+
+    await db.collection('riders')
+      .doc(riderResult.riderDoc.id)
+      .set(update, { merge: true });
+
+    return res.json({
+      success: true,
+      riderId: riderResult.riderDoc.id,
+      message: 'V5 原生裝置資料已同步。',
+    });
+  } catch (error) {
+    console.error('❌ V5 原生裝置資料同步失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: '原生裝置資料同步失敗。',
+      error: error.message,
+    });
+  }
+});
+
+app.get('/api/rider/v5/native-state', riderAuthMiddleware, async (req, res) => {
+  try {
+    const riderResult = await findApprovedRiderForApi(req.query || {});
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode || 403).json({
+        success: false,
+        message: riderResult.message || '找不到小U資料。',
+      });
+    }
+
+    const rider = riderResult.rider || {};
+    const currentOrderId = String(rider.currentOrderId || '').trim().toUpperCase();
+
+    let order = null;
+
+    if (currentOrderId) {
+      const orderDoc = await db.collection('orders').doc(currentOrderId).get();
+      if (orderDoc.exists) {
+        order = {
+          id: orderDoc.id,
+          ...(orderDoc.data() || {}),
+        };
+      }
+    }
+
+    return res.json({
+      success: true,
+      version: '5.3.0',
+      rider: {
+        riderId: rider.riderId || riderResult.riderDoc.id,
+        phone: rider.phone || riderResult.riderDoc.id,
+        name: rider.name || rider.riderName || '',
+        online: rider.online === true,
+        busy: rider.busy === true,
+        currentOrderId,
+        lifecycleStatus: getRiderV4LifecycleStatus(rider),
+        riderLevel: rider.riderLevel || '',
+      },
+      task: buildRiderV5NativeTaskPayload(order),
+      generatedAtMs: Date.now(),
+    });
+  } catch (error) {
+    console.error('❌ V5 原生狀態讀取失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: 'V5 原生狀態讀取失敗。',
+      error: error.message,
+    });
+  }
+});
+
 
 // ==============================
 // UBee 騎士系統 API
