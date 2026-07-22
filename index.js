@@ -9567,6 +9567,59 @@ app.post('/api/rider/v4/learning/quiz/submit', riderAuthMiddleware, async (req, 
   }
 });
 
+
+// ============================================================
+// UBee 小U財務中心：街口訂單判斷／結算狀態
+// - rider/v4/finance 專用，避免呼叫不存在的舊函式名稱
+// - 不改動派單、接單、審核、財務中心既有結算核心
+// ============================================================
+function isRiderV4FinanceJkoOrder(order = {}) {
+  const paymentMethod = getOrderPaymentMethod(order);
+  const paymentStatus = getOrderPaymentStatus(order);
+
+  const isJko =
+    paymentMethod === 'jko' ||
+    paymentMethod === 'jkopay' ||
+    paymentMethod === 'jko_pay' ||
+    paymentMethod === 'jkpay' ||
+    paymentMethod.includes('jko') ||
+    paymentMethod.includes('jkpay') ||
+    paymentMethod.includes('街口');
+
+  const isPaid =
+    paymentStatus === 'paid_confirmed' ||
+    paymentStatus === 'paid' ||
+    paymentStatus === 'payment_confirmed' ||
+    paymentStatus.includes('paid_confirmed') ||
+    paymentStatus.includes('已付款') ||
+    paymentStatus.includes('付款完成') ||
+    order.isPaid === true;
+
+  return (
+    isJko &&
+    isPaid &&
+    order.isCashOrder !== true
+  );
+}
+
+function isRiderV4FinanceJkoSettled(order = {}) {
+  const status = String(
+    order.settlementStatus ||
+    order.jkoSettlementStatus ||
+    order.payoutStatus ||
+    'pending'
+  )
+    .trim()
+    .toLowerCase();
+
+  return [
+    'settled',
+    'paid',
+    'completed',
+    'done',
+  ].includes(status);
+}
+
 app.get('/api/rider/v4/finance', riderAuthMiddleware, async (req, res) => {
   try {
     const ctx = await getRiderV4ApiContext(req);
@@ -9601,9 +9654,9 @@ app.get('/api/rider/v4/finance', riderAuthMiddleware, async (req, res) => {
         }
       }
 
-      if (isJkoPaymentOrder(order)) {
+      if (isRiderV4FinanceJkoOrder(order)) {
         const amounts = getFinanceJkoAmounts(order);
-        if (isJkoSettlementSettled(order)) {
+        if (isRiderV4FinanceJkoSettled(order)) {
           settledJko += amounts.payoutTotal;
         } else if (amounts.payoutTotal > 0) {
           jkoPendingPayout += amounts.payoutTotal;
