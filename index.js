@@ -16245,7 +16245,8 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
   }
 });
 
-// ===== UBee Rider 任務執行 V2.2 TRUE Dock Only API 協作層 =====
+// ===== UBee Rider 任務執行 V2.3 TRUE Dock Only API 協作層 =====
+// 本版後端狀態機不變；前端新增完成任務後 UI Reset，確保五大 Tab 與一般接單畫面恢復。
 // 前端已真正刪除舊 Navigation HUD / V2.4 Context / Next Step 視覺層；後端狀態機維持不變。
 // 前端已統一為底部單一 Task Dock；本後端維持既有正式狀態機與導航階段欄位。
 // 狀態主流程：accepted -> arrived_pickup -> picked_up -> arrived_dropoff -> completed
