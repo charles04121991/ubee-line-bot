@@ -310,6 +310,35 @@ const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
+
+
+// =====================================================
+// UBee 小U營運管理系統 V4：固定營運設定
+// - 街口支付：平台款項回繳入口
+// - 三大 LINE 社群：公告 / 聊天 / 回報
+// - 審核群組只處理申請審核，不承接新任務／轉派通知
+// =====================================================
+const RIDER_WEB_URL =
+  process.env.RIDER_WEB_URL ||
+  'https://ubee-rider-web.vercel.app/rider.html';
+
+const UBEE_JKOPAY_ACCOUNT =
+  String(process.env.UBEE_JKOPAY_ACCOUNT || '901871793').trim();
+
+const UBEE_RIDER_COMMUNITY_PASSWORD =
+  String(process.env.UBEE_RIDER_COMMUNITY_PASSWORD || '1234').trim();
+
+const UBEE_RIDER_COMMUNITIES = Object.freeze({
+  announcement: process.env.UBEE_RIDER_ANNOUNCEMENT_GROUP ||
+    'https://line.me/ti/g2/B1CTRdDllLZN95W3NhMOcVLk4UK9BbwrZTOn-Q?utm_source=invitation&utm_medium=link_copy&utm_campaign=default',
+  chat: process.env.UBEE_RIDER_CHAT_GROUP ||
+    'https://line.me/ti/g2/18w2eLfCmxmZH21DkhcOGqTygoE4-C9F3J_SlA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default',
+  report: process.env.UBEE_RIDER_REPORT_GROUP ||
+    'https://line.me/ti/g2/tCKMgQyxBfiYgaq2mlI9J3iH9vv-swc7OjcjGA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default',
+});
+
+const UBEE_RIDER_V4_ADMIN_KEY =
+  String(process.env.UBEE_RIDER_V4_ADMIN_KEY || '').trim();
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_SERVER_API_KEY =
   process.env.GOOGLE_MAPS_SERVER_API_KEY || GOOGLE_MAPS_API_KEY;
@@ -681,8 +710,6 @@ async function sendNewOrderPushToRiders(
           .filter(Boolean)
       );
 
-    const sendLineAdmin =
-      safeOptions.sendLineAdmin !== false;
 
     const notifiedRiderDocIds = [];
     
@@ -747,7 +774,12 @@ async function sendNewOrderPushToRiders(
 
           const riderApproved =
             rider.approved === true ||
-            rider.status === "approved";
+            rider.status === "approved" ||
+            rider.status === "active";
+
+          const riderDispatchEligible =
+            canRiderAcceptOrdersV4(rider) &&
+            riderMeetsOrderV4Requirements(rider, order);
 
           const riderOnline =
             rider.online === true;
@@ -799,6 +831,7 @@ async function sendNewOrderPushToRiders(
           
           if (
             !riderApproved ||
+            !riderDispatchEligible ||
             !riderOnline ||
             !webPushEnabled ||
             !subscription ||
@@ -998,64 +1031,19 @@ async function sendNewOrderPushToRiders(
 // 1. 已通知過的小U不重複通知。
 // 2. 訂單被接走、取消或完成後，停止後續擴圈。
 // 3. 使用 dispatchPushCycleId 避免舊計時器干擾新週期。
-// 4. LINE 管理群只在第一波通知一次。
+// 4. 任務通知永遠只走小U端／Web Push，不送進審核群組。
 // =====================================================
 
 const DISPATCH_PUSH_WAVES = [
-  {
-    delayMs: 0,
-    radiusKm: 3,
-    stage: "3km",
-    sendLineAdmin: true,
-  },
-  {
-    delayMs: 5000,
-    radiusKm: 5,
-    stage: "5km",
-    sendLineAdmin: false,
-  },
-  {
-    delayMs: 10000,
-    radiusKm: 8,
-    stage: "8km",
-    sendLineAdmin: false,
-  },
-  {
-    delayMs: 15000,
-    radiusKm: 10,
-    stage: "10km",
-    sendLineAdmin: false,
-  },
-  {
-    delayMs: 20000,
-    radiusKm: 12,
-    stage: "12km",
-    sendLineAdmin: false,
-  },
-  {
-    delayMs: 25000,
-    radiusKm: 15,
-    stage: "15km",
-    sendLineAdmin: false,
-  },
-  {
-    delayMs: 30000,
-    radiusKm: 17,
-    stage: "17km",
-    sendLineAdmin: false,
-  },
-  {
-    delayMs: 35000,
-    radiusKm: 20,
-    stage: "20km",
-    sendLineAdmin: false,
-  },
-  {
-    delayMs: 40000,
-    radiusKm: null,
-    stage: "all",
-    sendLineAdmin: false,
-  },
+  { delayMs: 0, radiusKm: 3, stage: "3km" },
+  { delayMs: 5000, radiusKm: 5, stage: "5km" },
+  { delayMs: 10000, radiusKm: 8, stage: "8km" },
+  { delayMs: 15000, radiusKm: 10, stage: "10km" },
+  { delayMs: 20000, radiusKm: 12, stage: "12km" },
+  { delayMs: 25000, radiusKm: 15, stage: "15km" },
+  { delayMs: 30000, radiusKm: 17, stage: "17km" },
+  { delayMs: 35000, radiusKm: 20, stage: "20km" },
+  { delayMs: 40000, radiusKm: null, stage: "all" },
 ];
 
 // 一輪派單跑完全區後，等待 60 秒再重新跑下一輪
@@ -1139,8 +1127,7 @@ async function runDispatchPushWave(
   orderId,
   cycleId,
   maxRadiusKm,
-  stage,
-  sendLineAdmin = false
+  stage
 ) {
   const safeOrderId =
     String(orderId || "")
@@ -1224,8 +1211,6 @@ async function runDispatchPushWave(
       {
         excludedRiderDocIds:
           alreadyNotified,
-
-        sendLineAdmin,
       }
     );
 
@@ -1477,8 +1462,7 @@ function scheduleDispatchPushWave(
             safeOrderId,
             safeCycleId,
             wave.radiusKm,
-            wave.stage,
-            wave.sendLineAdmin
+            wave.stage
           );
 
         if (!waveCompleted) {
@@ -2050,6 +2034,186 @@ app.use(express.urlencoded({ extended: true }));
 // 第一階段：只允許 Firebase riders/{手機號碼} 且審核通過的騎士登入
 // ==============================
 
+// =====================================================
+// UBee 小U營運管理系統 V4：生命週期 / 教育 / 資格 / 治理
+// =====================================================
+const RIDER_V4_LIFECYCLE = Object.freeze({
+  APPLICANT: 'APPLICANT',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  TRAINING: 'TRAINING',
+  ACTIVE: 'ACTIVE',
+  RETRAINING: 'RETRAINING',
+  RESTRICTED: 'RESTRICTED',
+  SUSPENDED: 'SUSPENDED',
+  BANNED: 'BANNED',
+  REJECTED: 'REJECTED',
+});
+
+const RIDER_V4_REQUIRED_MODULES = Object.freeze([
+  'platform_rules',
+  'pre_accept_check',
+  'task_flow',
+  'pickup_handover',
+  'customer_communication',
+  'purchase_advance',
+  'finance_jkopay',
+  'fraud_prevention',
+  'incident_handling',
+  'location_privacy',
+  'fragile_special_items',
+  'professional_service',
+]);
+
+const RIDER_V4_CERTIFICATIONS = Object.freeze([
+  'basic',
+  'high_value_advance',
+  'cake_flower',
+  'car_delivery',
+  'business_documents',
+  'multi_stop',
+]);
+
+const RIDER_V4_QUIZ = Object.freeze([
+  { id:"q1", question:"接到任務通知後，第一件應確認的是什麼？", options:["立刻接單再說", "先確認取送地點、任務內容、金額與特殊要求", "只看騎士收入"], answer:1 },
+  { id:"q2", question:"接單後發現自己無法完成任務，正確作法是？", options:["直接關閉騎士端", "立即依平台流程回報並由調度處理", "私下丟給其他人"], answer:1 },
+  { id:"q3", question:"抵達取件點前，應如何處理任務狀態？", options:["依實際進度操作，不可提前亂按", "先全部按完成比較快", "完全不用操作"], answer:0 },
+  { id:"q4", question:"取件時發現品項或數量與訂單不同，應怎麼做？", options:["照拿就走", "先確認並回報，不可自行決定", "自己補買"], answer:1 },
+  { id:"q5", question:"客人要求把商品改送到另一個地址時，應怎麼做？", options:["直接照客人私訊改送", "先依 UBee 流程回報確認地址與可能的費用變更", "拒絕聯絡任何人"], answer:1 },
+  { id:"q6", question:"代買商品缺貨時，正確處理方式是？", options:["自行換成類似商品", "先聯絡客人確認或依平台流程回報", "直接取消不說明"], answer:1 },
+  { id:"q7", question:"進行代墊前最重要的是？", options:["確認任務內容、代墊金額與自己是否具備相應資格", "先付款再看", "只看商品價格"], answer:0 },
+  { id:"q8", question:"代買／代墊後的發票或收據應如何處理？", options:["直接丟掉", "依任務要求保存、交付或留下必要證明", "自己留著不用告知"], answer:1 },
+  { id:"q9", question:"現金訂單收到的款項是否全部都是小U收入？", options:["是", "不是，需依系統顯示區分小U收入與平台應收", "看心情決定"], answer:1 },
+  { id:"q10", question:"UBee 平台款項主要透過什麼方式回繳？", options:["街口支付", "現金放在店家", "私下轉給其他小U"], answer:0 },
+  { id:"q11", question:"UBee 平台街口支付代碼是哪一組？", options:["901871793", "1234", "0912345678"], answer:0 },
+  { id:"q12", question:"新小U審核通過後，三個指定 LINE 社群應如何處理？", options:["都必須加入", "只加入聊天群", "完全不用加入"], answer:0 },
+  { id:"q13", question:"遇到疑似詐騙、高額異常或不合理指示時，應怎麼做？", options:["先墊錢再說", "停止自行處理並立即回報 UBee", "刪除對話"], answer:1 },
+  { id:"q14", question:"任務途中發生車禍或人身事故，第一優先是？", options:["先按完成", "先確保人身安全並視情況報警／就醫，再回報 UBee", "繼續送完再處理"], answer:1 },
+  { id:"q15", question:"客戶姓名、電話、地址等資料可以拿去做什麼？", options:["只能用於完成該任務所必要的範圍", "可以存成私人客戶名單", "可以貼到公開社群"], answer:0 },
+  { id:"q16", question:"騎士定位資料的正確原則是？", options:["任務與營運必要範圍使用，不得任意分享", "可以截圖公開", "可以關閉定位但假裝在線"], answer:0 },
+  { id:"q17", question:"蛋糕、花束、易碎品等特殊物品應如何配送？", options:["與一般雜物完全相同", "確認固定、擺放方向與運送風險，必要時具備相應資格", "速度越快越好不用顧物品"], answer:1 },
+  { id:"q18", question:"UBee 是否允許小U私下加價、私接平台客戶？", options:["允許", "不允許，須依平台流程與價格規則", "只要客人同意就可以"], answer:1 },
+  { id:"q19", question:"完成任務交付時，應遵循什麼原則？", options:["依實際交付狀況完成必要確認與系統操作", "還沒送到也可以先完成", "交給任何人都算完成"], answer:0 },
+  { id:"q20", question:"V4 新手入職要在什麼情況下才正式開通 L1 接單資格？", options:["只要審核通過", "完成街口、三社群、全部必修教學且測驗達 80 分以上", "只要加入聊天群"], answer:1 }
+]);
+
+function getRiderV4LifecycleStatus(rider = {}) {
+  const explicit = String(rider.lifecycleStatus || '').trim().toUpperCase();
+  if (Object.values(RIDER_V4_LIFECYCLE).includes(explicit)) return explicit;
+
+  const status = String(rider.status || '').trim().toLowerCase();
+  if (status === 'rejected') return RIDER_V4_LIFECYCLE.REJECTED;
+  if (['banned','blocked'].includes(status) || rider.blocked === true) return RIDER_V4_LIFECYCLE.BANNED;
+  if (['suspended','disabled'].includes(status) || rider.suspended === true || rider.disabled === true) return RIDER_V4_LIFECYCLE.SUSPENDED;
+  if (status === 'training') return RIDER_V4_LIFECYCLE.TRAINING;
+  if (status === 'retraining') return RIDER_V4_LIFECYCLE.RETRAINING;
+  if (status === 'restricted') return RIDER_V4_LIFECYCLE.RESTRICTED;
+  if (rider.approved === true || status === 'approved' || status === 'active') return RIDER_V4_LIFECYCLE.ACTIVE;
+  return RIDER_V4_LIFECYCLE.UNDER_REVIEW;
+}
+
+function isRiderV4OnboardingComplete(rider = {}) {
+  // 舊版已審核小U沒有 onboarding 欄位時，視為既有有效帳號，避免升級造成全面停單。
+  if (rider.approved === true && !rider.onboarding && !rider.lifecycleStatus) return true;
+  return rider.onboarding?.completed === true || rider.trainingCompleted === true;
+}
+
+function canRiderAcceptOrdersV4(rider = {}) {
+  const lifecycle = getRiderV4LifecycleStatus(rider);
+  if (lifecycle !== RIDER_V4_LIFECYCLE.ACTIVE) return false;
+  if (rider.canAcceptOrders === false) return false;
+  if (!isRiderV4OnboardingComplete(rider) && (rider.onboarding || rider.lifecycleStatus)) return false;
+  return true;
+}
+
+function getRiderV4LevelNumber(rider = {}) {
+  const level = String(rider.riderLevel || 'L1').trim().toUpperCase();
+  const match = level.match(/^L(\d+)$/);
+  return match ? Number(match[1]) : 1;
+}
+
+function getOrderV4Requirements(order = {}) {
+  const certification = String(
+    order.requiredRiderCertification ||
+    order.requiredCertification ||
+    order.riderCertificationRequired ||
+    ''
+  ).trim();
+  const levelRaw = String(order.requiredRiderLevel || order.minimumRiderLevel || '').trim().toUpperCase();
+  const levelMatch = levelRaw.match(/^L(\d+)$/);
+  return {
+    certification,
+    minimumLevel: levelMatch ? Number(levelMatch[1]) : 1,
+  };
+}
+
+function riderMeetsOrderV4Requirements(rider = {}, order = {}) {
+  const req = getOrderV4Requirements(order);
+  if (getRiderV4LevelNumber(rider) < req.minimumLevel) return false;
+  if (!req.certification) return true;
+  return rider.certifications?.[req.certification] === true;
+}
+
+function buildRiderV4PublicConfig() {
+  return {
+    version: 'V4',
+    jkoPay: {
+      account: UBEE_JKOPAY_ACCOUNT,
+      required: true,
+    },
+    communities: {
+      required: true,
+      password: UBEE_RIDER_COMMUNITY_PASSWORD,
+      announcement: UBEE_RIDER_COMMUNITIES.announcement,
+      chat: UBEE_RIDER_COMMUNITIES.chat,
+      report: UBEE_RIDER_COMMUNITIES.report,
+    },
+    requiredModules: RIDER_V4_REQUIRED_MODULES,
+    passingScore: 80,
+    quiz: RIDER_V4_QUIZ.map(({ answer, ...publicQuestion }) => publicQuestion),
+    certifications: RIDER_V4_CERTIFICATIONS,
+  };
+}
+
+function getRiderV4Progress(rider = {}) {
+  const onboarding = rider.onboarding || {};
+  const modules = onboarding.modules || {};
+  const checklist = {
+    jkopayInstalled: onboarding.jkopayInstalled === true,
+    announcementGroupJoined: onboarding.announcementGroupJoined === true,
+    chatGroupJoined: onboarding.chatGroupJoined === true,
+    reportGroupJoined: onboarding.reportGroupJoined === true,
+  };
+  const completedModules = RIDER_V4_REQUIRED_MODULES.filter(id => modules[id] === true);
+  return {
+    lifecycleStatus: getRiderV4LifecycleStatus(rider),
+    canAcceptOrders: canRiderAcceptOrdersV4(rider),
+    riderLevel: String(rider.riderLevel || (isRiderV4OnboardingComplete(rider) ? 'L1' : 'L0')),
+    checklist,
+    modules,
+    completedModules,
+    quizScore: Number(onboarding.quizScore || rider.trainingQuizScore || 0),
+    quizPassed: onboarding.quizPassed === true || rider.trainingQuizPassed === true,
+    completed: isRiderV4OnboardingComplete(rider),
+    certifications: rider.certifications || {},
+    governance: rider.governance || {},
+    retraining: rider.retraining || null,
+  };
+}
+
+function requireRiderV4AdminKey(req, res, next) {
+  if (!UBEE_RIDER_V4_ADMIN_KEY) {
+    return res.status(503).json({
+      success: false,
+      message: '尚未設定 UBEE_RIDER_V4_ADMIN_KEY，V4 管理功能暫不開放。',
+    });
+  }
+  const key = String(req.headers['x-ubee-admin-key'] || req.body?.adminKey || '').trim();
+  if (!key || key !== UBEE_RIDER_V4_ADMIN_KEY) {
+    return res.status(401).json({ success:false, message:'V4 管理授權失敗。' });
+  }
+  return next();
+}
+
 function isApprovedRiderData(riderData) {
   if (!riderData) return false;
 
@@ -2071,7 +2235,11 @@ function isBlockedRiderData(riderData) {
     status === 'disabled' ||
     status === 'suspended' ||
     status === 'blocked' ||
-    status === 'rejected'
+    status === 'banned' ||
+    status === 'rejected' ||
+    String(riderData.lifecycleStatus || '').trim().toUpperCase() === RIDER_V4_LIFECYCLE.SUSPENDED ||
+    String(riderData.lifecycleStatus || '').trim().toUpperCase() === RIDER_V4_LIFECYCLE.BANNED ||
+    String(riderData.lifecycleStatus || '').trim().toUpperCase() === RIDER_V4_LIFECYCLE.REJECTED
   );
 }
 
@@ -7918,6 +8086,9 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm,
       liabilityConfirm,
       privacyConfirm,
+      jkoRequirementAgree,
+      communityRequirementAgree,
+      applicationSource,
     } = req.body || {};
 
     const cleanPhone = normalizePhone(phone || '');
@@ -7947,6 +8118,8 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm,
       liabilityConfirm,
       privacyConfirm,
+      jkoRequirementAgree,
+      communityRequirementAgree,
     ];
 
     if (!requiredAgreements.every(toBool)) {
@@ -8040,12 +8213,30 @@ app.post('/api/rider/register', async (req, res) => {
       status: 'pending',
       reviewStatus: 'pending',
 
+      // V4 生命週期：申請完成後進入審核中，通過後先進 TRAINING，不直接開放接單。
+      lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+      canAcceptOrders: false,
+      riderLevel: 'L0',
+      onboardingRequired: true,
+      onboarding: {
+        jkopayInstalled: false,
+        announcementGroupJoined: false,
+        chatGroupJoined: false,
+        reportGroupJoined: false,
+        modules: {},
+        quizScore: 0,
+        quizPassed: false,
+        completed: false,
+      },
+      certifications: { basic: false },
+      governance: { warningCount: 0, violationCount: 0 },
+
       online: false,
       busy: false,
       currentOrderId: '',
 
-      source: 'liff_rider_apply',
-      submittedFrom: 'rider.html',
+      source: cleanText(applicationSource || 'liff_rider_apply', 60),
+      submittedFrom: cleanText(applicationSource || 'rider_apply', 60),
       applicationType: 'rider',
 
       driverLicenseConfirmed: toBool(driverLicenseConfirmed),
@@ -8059,6 +8250,8 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm: toBool(riderRuleConfirm),
       liabilityConfirm: toBool(liabilityConfirm),
       privacyConfirm: toBool(privacyConfirm),
+      jkoRequirementAgree: toBool(jkoRequirementAgree),
+      communityRequirementAgree: toBool(communityRequirementAgree),
 
       adminNotifySent: false,
       adminNotifyStatus: 'pending',
@@ -8234,6 +8427,78 @@ app.post('/api/rider/register', async (req, res) => {
   }
 });
 
+
+// ============================================================
+// UBee 小U申請狀態查詢：供騎士端一體化入口使用
+// 只回傳必要狀態，不回傳敏感申請資料。
+// ============================================================
+app.get('/api/rider/application-status', async (req, res) => {
+  try {
+    const cleanPhone = normalizePhone(req.query?.phone || '');
+    if (!/^09\d{8}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: '請輸入 09 開頭的 10 碼手機號碼。',
+      });
+    }
+
+    let riderDoc = await db.collection('riders').doc(cleanPhone).get();
+
+    if (!riderDoc.exists) {
+      const snap = await db.collection('riders')
+        .where('phone', '==', cleanPhone)
+        .limit(1)
+        .get();
+      if (!snap.empty) riderDoc = snap.docs[0];
+    }
+
+    if (!riderDoc.exists) {
+      return res.json({
+        success: true,
+        found: false,
+        status: 'not_found',
+        lifecycleStatus: 'NOT_APPLIED',
+        message: '查無申請資料，可直接申請成為 UBee 小U。',
+      });
+    }
+
+    const rider = riderDoc.data() || {};
+    const lifecycleStatus = getRiderV4LifecycleStatus(rider);
+
+    const messageMap = {
+      UNDER_REVIEW: '申請已送出，正在等待 UBee 審核。',
+      TRAINING: '審核已通過，請登入騎士端完成 V4 數位入職。',
+      ACTIVE: '你的 UBee 小U資格已啟用，可以登入騎士端。',
+      RETRAINING: '目前需要完成重新教育，請登入騎士端查看。',
+      RESTRICTED: '目前接單資格受限，請登入騎士端查看。',
+      SUSPENDED: '目前資格暫停，請聯繫 UBee。',
+      BANNED: '目前帳號已停權，請聯繫 UBee。',
+      REJECTED: '此申請未通過審核，如需了解請聯繫 UBee。',
+    };
+
+    return res.json({
+      success: true,
+      found: true,
+      riderId: rider.riderId || riderDoc.id,
+      name: rider.name || '',
+      approved: rider.approved === true,
+      reviewStatus: rider.reviewStatus || rider.status || '',
+      status: rider.status || '',
+      lifecycleStatus,
+      canAcceptOrders: canRiderAcceptOrdersV4(rider),
+      riderLevel: rider.riderLevel || '',
+      message: messageMap[lifecycleStatus] || '已找到申請資料。',
+    });
+  } catch (err) {
+    console.error('❌ 查詢小U申請狀態失敗：', err);
+    return res.status(500).json({
+      success: false,
+      message: '查詢申請狀態失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
 // ===== 騎士身分查找工具：支援手機登入 / riderId / 舊 LINE 身分 =====
 async function findApprovedRiderForApi(source = {}) {
   const cleanPhone = normalizePhone(
@@ -8320,6 +8585,383 @@ async function findApprovedRiderForApi(source = {}) {
     },
   };
 }
+
+// ============================================================
+// UBee 小U營運管理系統 V4 API
+// ============================================================
+async function getRiderV4ApiContext(req) {
+  if (req.riderAuth?.riderDocId) {
+    const riderDoc = await db.collection('riders').doc(req.riderAuth.riderDocId).get();
+    if (!riderDoc.exists) return { ok:false, statusCode:404, message:'找不到小U資料。' };
+    const rider = { id:riderDoc.id, ...riderDoc.data() };
+    if (isBlockedRiderData(rider)) return { ok:false, statusCode:403, message:'此小U帳號目前無法使用。' };
+    if (!isApprovedRiderData(rider)) return { ok:false, statusCode:403, message:'小U尚未審核通過。' };
+    return { ok:true, riderDoc, rider };
+  }
+  return findApprovedRiderForApi({ ...(req.query || {}), ...(req.body || {}) });
+}
+
+app.get('/api/rider/v4/bootstrap', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+    return res.json({
+      success:true,
+      config:buildRiderV4PublicConfig(),
+      rider:ctx.rider,
+      progress:getRiderV4Progress(ctx.rider),
+    });
+  } catch (err) {
+    console.error('❌ V4 bootstrap 失敗：', err);
+    return res.status(500).json({ success:false, message:'讀取 V4 入職資料失敗。', error:err.message });
+  }
+});
+
+app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+
+    const step = String(req.body?.step || '').trim();
+    const allowed = new Set([
+      'jkopayInstalled',
+      'announcementGroupJoined',
+      'chatGroupJoined',
+      'reportGroupJoined',
+      ...RIDER_V4_REQUIRED_MODULES.map(id => `module:${id}`),
+    ]);
+    if (!allowed.has(step)) return res.status(400).json({ success:false, message:'不支援的入職進度項目。' });
+
+    const update = {
+      lifecycleStatus:RIDER_V4_LIFECYCLE.TRAINING,
+      status:'training',
+      canAcceptOrders:false,
+      onboardingRequired:true,
+      'onboarding.updatedAtMs':Date.now(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (step.startsWith('module:')) {
+      const moduleId = step.slice(7);
+      update[`onboarding.modules.${moduleId}`] = true;
+    } else {
+      update[`onboarding.${step}`] = true;
+    }
+
+    await ctx.riderDoc.ref.set(update, { merge:true });
+    let updated = await ctx.riderDoc.ref.get();
+    let rider = { id:updated.id, ...updated.data() };
+
+    // 若測驗已先通過，最後一個必修項目完成時也要自動開通，不要求重考。
+    const onboarding = rider.onboarding || {};
+    const modules = onboarding.modules || {};
+    const checklistComplete =
+      onboarding.jkopayInstalled === true &&
+      onboarding.announcementGroupJoined === true &&
+      onboarding.chatGroupJoined === true &&
+      onboarding.reportGroupJoined === true &&
+      RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
+
+    if (
+      checklistComplete &&
+      (onboarding.quizPassed === true || rider.trainingQuizPassed === true) &&
+      !canRiderAcceptOrdersV4(rider)
+    ) {
+      const nowMs = Date.now();
+      await ctx.riderDoc.ref.set({
+        status:'approved',
+        reviewStatus:'approved',
+        approved:true,
+        lifecycleStatus:RIDER_V4_LIFECYCLE.ACTIVE,
+        canAcceptOrders:true,
+        riderLevel:'L1',
+        onboardingRequired:false,
+        trainingCompleted:true,
+        trainingCompletedAtMs:nowMs,
+        'onboarding.completed':true,
+        'onboarding.completedAtMs':nowMs,
+        'certifications.basic':true,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+
+      updated = await ctx.riderDoc.ref.get();
+      rider = { id:updated.id, ...updated.data() };
+    }
+
+    return res.json({ success:true, rider, progress:getRiderV4Progress(rider) });
+  } catch (err) {
+    console.error('❌ V4 onboarding progress 失敗：', err);
+    return res.status(500).json({ success:false, message:'儲存入職進度失敗。', error:err.message });
+  }
+});
+
+app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+
+    const answers = req.body?.answers && typeof req.body.answers === 'object' ? req.body.answers : {};
+    let correct = 0;
+    RIDER_V4_QUIZ.forEach(q => {
+      if (Number(answers[q.id]) === q.answer) correct += 1;
+    });
+    const score = Math.round(correct / RIDER_V4_QUIZ.length * 100);
+    const passed = score >= 80;
+    const rider = ctx.rider || {};
+    const onboarding = rider.onboarding || {};
+    const modules = onboarding.modules || {};
+    const checklistComplete =
+      onboarding.jkopayInstalled === true &&
+      onboarding.announcementGroupJoined === true &&
+      onboarding.chatGroupJoined === true &&
+      onboarding.reportGroupJoined === true &&
+      RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
+
+    const nowMs = Date.now();
+    const update = {
+      'onboarding.quizScore':score,
+      'onboarding.quizPassed':passed,
+      'onboarding.quizAttempts':admin.firestore.FieldValue.increment(1),
+      'onboarding.quizLastAtMs':nowMs,
+      trainingQuizScore:score,
+      trainingQuizPassed:passed,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const activated = passed && checklistComplete;
+    if (activated) {
+      Object.assign(update, {
+        status:'approved',
+        reviewStatus:'approved',
+        approved:true,
+        lifecycleStatus:RIDER_V4_LIFECYCLE.ACTIVE,
+        canAcceptOrders:true,
+        riderLevel:'L1',
+        onboardingRequired:false,
+        trainingCompleted:true,
+        trainingCompletedAtMs:nowMs,
+        'onboarding.completed':true,
+        'onboarding.completedAtMs':nowMs,
+        'certifications.basic':true,
+      });
+    }
+
+    await ctx.riderDoc.ref.set(update, { merge:true });
+    const updated = await ctx.riderDoc.ref.get();
+    const updatedRider = { id:updated.id, ...updated.data() };
+    return res.json({
+      success:true,
+      score,
+      passed,
+      checklistComplete,
+      activated,
+      message: activated
+        ? '恭喜完成 V4 小U入職，L1 基礎接單資格已開通。'
+        : passed
+          ? '測驗已通過，請先完成所有必修入職項目。'
+          : '測驗未達 80 分，請複習後重新作答。',
+      rider:updatedRider,
+      progress:getRiderV4Progress(updatedRider),
+    });
+  } catch (err) {
+    console.error('❌ V4 quiz submit 失敗：', err);
+    return res.status(500).json({ success:false, message:'提交新手測驗失敗。', error:err.message });
+  }
+});
+
+app.get('/api/rider/v4/finance', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+    const identity = buildRiderApiIdentity(ctx.riderDoc, ctx.rider, req.query || {});
+    const snap = await db.collection('orders').limit(1500).get();
+    let cashDueToPlatform = 0;
+    let jkoPendingPayout = 0;
+    let settledCash = 0;
+    let settledJko = 0;
+    const cashOrders = [];
+    const jkoOrders = [];
+
+    snap.forEach(doc => {
+      const order = { id:doc.id, ...doc.data() };
+      if (!isOrderBelongsToRider(order, identity)) return;
+      const status = String(order.status || '').toLowerCase();
+      if (!['completed','done'].includes(status)) return;
+
+      if (isCashPaymentOrder(order)) {
+        const amounts = getFinanceCashAmounts(order);
+        if (isCashRemittanceSettled(order)) {
+          settledCash += amounts.cashDueToPlatform;
+        } else if (amounts.cashDueToPlatform > 0) {
+          cashDueToPlatform += amounts.cashDueToPlatform;
+          cashOrders.push({
+            id:doc.id,
+            orderNo:order.orderNo || doc.id,
+            amount:amounts.cashDueToPlatform,
+            completedAt:order.completedAt || order.updatedAt || null,
+          });
+        }
+      }
+
+      if (isJkoPaymentOrder(order)) {
+        const amounts = getFinanceJkoAmounts(order);
+        if (isJkoSettlementSettled(order)) {
+          settledJko += amounts.payoutTotal;
+        } else if (amounts.payoutTotal > 0) {
+          jkoPendingPayout += amounts.payoutTotal;
+          jkoOrders.push({
+            id:doc.id,
+            orderNo:order.orderNo || doc.id,
+            amount:amounts.payoutTotal,
+            completedAt:order.completedAt || order.updatedAt || null,
+          });
+        }
+      }
+    });
+
+    return res.json({
+      success:true,
+      jkoPayAccount:UBEE_JKOPAY_ACCOUNT,
+      summary:{
+        cashDueToPlatform:Math.round(cashDueToPlatform),
+        jkoPendingPayout:Math.round(jkoPendingPayout),
+        settledCash:Math.round(settledCash),
+        settledJko:Math.round(settledJko),
+      },
+      cashOrders:cashOrders.slice(0,100),
+      jkoOrders:jkoOrders.slice(0,100),
+    });
+  } catch (err) {
+    console.error('❌ V4 rider finance 失敗：', err);
+    return res.status(500).json({ success:false, message:'讀取我的財務失敗。', error:err.message });
+  }
+});
+
+app.get('/api/admin/rider-v4/list', requireRiderV4AdminKey, async (req, res) => {
+  try {
+    const snap = await db.collection('riders').limit(5000).get();
+    const riders = snap.docs.map(doc => {
+      const r = { id:doc.id, ...doc.data() };
+      return {
+        id:doc.id,
+        riderId:r.riderId || doc.id,
+        name:r.name || r.riderName || '',
+        phone:r.phone || doc.id,
+        lineUserId:r.lineUserId || '',
+        lifecycleStatus:getRiderV4LifecycleStatus(r),
+        canAcceptOrders:canRiderAcceptOrdersV4(r),
+        riderLevel:String(r.riderLevel || (isRiderV4OnboardingComplete(r) ? 'L1' : 'L0')),
+        onboarding:getRiderV4Progress(r),
+        certifications:r.certifications || {},
+        governance:r.governance || {},
+      };
+    });
+    return res.json({ success:true, riders });
+  } catch (err) {
+    return res.status(500).json({ success:false, message:'讀取 V4 小U名單失敗。', error:err.message });
+  }
+});
+
+app.post('/api/admin/rider-v4/action', requireRiderV4AdminKey, async (req, res) => {
+  try {
+    const riderId = String(req.body?.riderId || '').trim();
+    const action = String(req.body?.action || '').trim().toLowerCase();
+    const reason = cleanText(req.body?.reason || '', 300);
+    const value = String(req.body?.value || '').trim();
+    if (!riderId || !action) return res.status(400).json({ success:false, message:'缺少 riderId 或 action。' });
+
+    let doc = await db.collection('riders').doc(riderId).get();
+    if (!doc.exists) {
+      const snap = await db.collection('riders').where('riderId','==',riderId).limit(1).get();
+      if (!snap.empty) doc = snap.docs[0];
+    }
+    if (!doc.exists) return res.status(404).json({ success:false, message:'找不到小U資料。' });
+    const rider = doc.data() || {};
+    const nowMs = Date.now();
+    const update = { updatedAt:admin.firestore.FieldValue.serverTimestamp(), updatedAtMs:nowMs };
+    let eventType = action;
+
+    if (action === 'warn') {
+      update['governance.warningCount'] = admin.firestore.FieldValue.increment(1);
+      update['governance.lastWarningReason'] = reason;
+      update['governance.lastWarningAtMs'] = nowMs;
+    } else if (action === 'retraining') {
+      update.lifecycleStatus = RIDER_V4_LIFECYCLE.RETRAINING;
+      update.status = 'retraining';
+      update.canAcceptOrders = false;
+      update.online = false;
+      update.retraining = { required:true, courseId:value || 'general_rules', reason, assignedAtMs:nowMs };
+    } else if (action === 'restrict') {
+      update.lifecycleStatus = RIDER_V4_LIFECYCLE.RESTRICTED;
+      update.status = 'restricted';
+      update.canAcceptOrders = false;
+      update.online = false;
+      update['governance.restrictionReason'] = reason;
+      update['governance.restrictedAtMs'] = nowMs;
+    } else if (action === 'suspend') {
+      update.lifecycleStatus = RIDER_V4_LIFECYCLE.SUSPENDED;
+      update.status = 'suspended';
+      update.suspended = true;
+      update.canAcceptOrders = false;
+      update.online = false;
+      update['governance.suspensionReason'] = reason;
+      update['governance.suspendedAtMs'] = nowMs;
+    } else if (action === 'ban') {
+      update.lifecycleStatus = RIDER_V4_LIFECYCLE.BANNED;
+      update.status = 'banned';
+      update.blocked = true;
+      update.canAcceptOrders = false;
+      update.online = false;
+      update['governance.banReason'] = reason;
+      update['governance.bannedAtMs'] = nowMs;
+    } else if (action === 'restore') {
+      if (!isRiderV4OnboardingComplete(rider)) return res.status(409).json({ success:false, message:'此小U尚未完成入職，不能直接恢復 ACTIVE。' });
+      update.lifecycleStatus = RIDER_V4_LIFECYCLE.ACTIVE;
+      update.status = 'approved';
+      update.suspended = false;
+      update.blocked = false;
+      update.disabled = false;
+      update.canAcceptOrders = true;
+      update.retraining = null;
+    } else if (action === 'set_level') {
+      if (!['L1','L2','L3'].includes(value.toUpperCase())) return res.status(400).json({ success:false, message:'等級只能是 L1/L2/L3。' });
+      update.riderLevel = value.toUpperCase();
+    } else if (action === 'grant_cert' || action === 'revoke_cert') {
+      if (!RIDER_V4_CERTIFICATIONS.includes(value)) return res.status(400).json({ success:false, message:'未知的認證項目。' });
+      update[`certifications.${value}`] = action === 'grant_cert';
+    } else {
+      return res.status(400).json({ success:false, message:'不支援的 V4 管理動作。' });
+    }
+
+    await doc.ref.set(update, { merge:true });
+    await db.collection('riderGovernanceEvents').add({
+      riderDocId:doc.id,
+      riderId:rider.riderId || doc.id,
+      riderName:rider.name || '',
+      type:eventType,
+      value,
+      reason,
+      createdAtMs:nowMs,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    if (rider.lineUserId && ['warn','retraining','restrict','suspend','ban','restore'].includes(action)) {
+      const labelMap = {
+        warn:'收到平台提醒', retraining:'需要完成重新教育', restrict:'接單資格已限制',
+        suspend:'接單資格已暫停', ban:'帳號已停權', restore:'接單資格已恢復',
+      };
+      client.pushMessage(rider.lineUserId, {
+        type:'text',
+        text:`UBee 小U通知｜${labelMap[action] || action}${reason ? `\n\n原因：${reason}` : ''}\n\n請開啟騎士端查看最新資格狀態。`,
+      }).catch(err => console.warn('V4 管理通知小U失敗：', err?.message || err));
+    }
+
+    const updated = await doc.ref.get();
+    return res.json({ success:true, rider:{ id:updated.id, ...updated.data() } });
+  } catch (err) {
+    console.error('❌ V4 admin action 失敗：', err);
+    return res.status(500).json({ success:false, message:'V4 管理動作失敗。', error:err.message });
+  }
+});
 
 // ===== 騎士 API 身分整理：手機登入 / riderId / 舊 LINE 相容 =====
 function buildRiderApiIdentity(riderDoc, riderData = {}, source = {}) {
@@ -8429,6 +9071,15 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
 
     const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
+
+    if (online === true && !canRiderAcceptOrdersV4(rider)) {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_V4_NOT_ACTIVE',
+        message: '尚未完成 V4 入職／資格目前受限，暫時不能開啟接單。',
+        lifecycleStatus: getRiderV4LifecycleStatus(rider),
+      });
+    }
 
     const nowMs = Date.now();
     const updateData = {
@@ -14106,6 +14757,14 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       const latestRiderDoc = await transaction.get(riderRef);
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
 
+      if (!canRiderAcceptOrdersV4(latestRider)) {
+        throw new Error('RIDER_V4_NOT_ACTIVE');
+      }
+
+      if (!riderMeetsOrderV4Requirements(latestRider, order)) {
+        throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
+      }
+
       if (
         latestRider.busy === true &&
         latestRider.currentOrderId &&
@@ -14236,6 +14895,22 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
 
   } catch (error) {
     console.error('❌ 騎士網頁接單失敗：', error);
+
+    if (error.message === 'RIDER_V4_NOT_ACTIVE') {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_V4_NOT_ACTIVE',
+        message: '你的 V4 入職／接單資格尚未啟用，請先完成教學、測驗或聯繫 UBee。',
+      });
+    }
+
+    if (error.message === 'RIDER_V4_QUALIFICATION_REQUIRED') {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_V4_QUALIFICATION_REQUIRED',
+        message: '此任務需要更高等級或指定專業資格，目前無法承接。',
+      });
+    }
 
     if (error.message === 'ORDER_NOT_FOUND') {
       return res.status(404).json({
@@ -15268,23 +15943,48 @@ UBee 跑腿辦公室將會再依照您的需求，
     const rider = await getRiderOrReply(event.replyToken, riderId);
     if (!rider) return null;
 
-    if (rider.status === 'approved') {
-      return replyText(event.replyToken, '此騎士已經通過審核，不需要重複操作。');
+    if (
+      rider.approved === true ||
+      rider.reviewStatus === 'approved' ||
+      ['approved', 'training', 'active'].includes(String(rider.status || '').toLowerCase())
+    ) {
+      return replyText(event.replyToken, '此小U已經通過審核，不需要重複操作。');
     }
 
     if (rider.status === 'rejected') {
       return replyText(event.replyToken, '此騎士申請已被拒絕，不能再直接通過。');
     }
 
-    rider.status = 'approved';
+    rider.status = 'training';
     rider.approved = true;
+    rider.reviewStatus = 'approved';
+    rider.lifecycleStatus = RIDER_V4_LIFECYCLE.TRAINING;
+    rider.canAcceptOrders = false;
+    rider.riderLevel = rider.riderLevel || 'L0';
+    rider.onboardingRequired = true;
+    rider.onboarding = {
+      ...(rider.onboarding || {}),
+      jkopayInstalled: false,
+      announcementGroupJoined: false,
+      chatGroupJoined: false,
+      reportGroupJoined: false,
+      modules: {},
+      quizScore: 0,
+      quizPassed: false,
+      completed: false,
+      startedAtMs: Date.now(),
+    };
+    rider.certifications = { ...(rider.certifications || {}), basic: false };
     rider.approvedAt = Date.now();
     rider.approvedBy = userId;
     await saveRider(rider);
 
     await db.collection('riderApplications').doc(rider.riderId).set({
-  status: 'approved',
+  status: 'training',
   reviewStatus: 'approved',
+  lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
+  canAcceptOrders: false,
+  onboardingRequired: true,
   approved: true,
   approvedAt: rider.approvedAt,
   approvedBy: userId,
@@ -15297,18 +15997,16 @@ UBee 跑腿辦公室將會再依照您的需求，
       await client.pushMessage(rider.lineUserId, {
         type: 'text',
         text:
-          `🎉 恭喜您通過 UBee 跑腿騎士審核！\n\n` +
-          `歡迎加入 UBee 跑腿 🐝\n\n` +
-          `接下來請先加入「UBee｜騎士 SOP 教學區」：\n\n` +
-          `${RIDER_SOP_GROUP_LINK}\n\n` +
-          `加入後請先閱讀記事本上內容：\n\n` +
-          `1. 接單流程\n` +
-          `2. 任務操作方式\n` +
-          `3. 配送注意事項\n` +
-          `4. 異常回報規範\n` +
-          `5. 收入與結算說明\n\n` +
-          `完成教學後，再開始接收任務。\n\n` +
-          `— UBee 城市任務平台`
+          `🎉 恭喜您通過 UBee 跑腿小U審核！\n\n` +
+          `接下來請開啟 UBee 騎士端完成「V4 數位入職」。\n\n` +
+          `必完成項目：\n` +
+          `1. 下載並設定街口支付（平台款項以街口回繳）\n` +
+          `2. 加入公告群、聊天群、回報群\n` +
+          `3. 完成小U規範與任務教學\n` +
+          `4. 完成新手測驗並達 80 分\n\n` +
+          `完成前不會開放接單。\n\n` +
+          `騎士端：${RIDER_WEB_URL}\n\n` +
+          `— UBee 跑腿`
       });
     }
     
@@ -15326,8 +16024,12 @@ UBee 跑腿辦公室將會再依照您的需求，
     const rider = await getRiderOrReply(event.replyToken, riderId);
     if (!rider) return null;
 
-    if (rider.status === 'approved') {
-      return replyText(event.replyToken, '此騎士已通過審核，不能直接拒絕。');
+    if (
+      rider.approved === true ||
+      rider.reviewStatus === 'approved' ||
+      ['approved', 'training', 'active'].includes(String(rider.status || '').toLowerCase())
+    ) {
+      return replyText(event.replyToken, '此小U已通過審核，不能直接拒絕。');
     }
 
     if (rider.status === 'rejected') {
@@ -15335,6 +16037,8 @@ UBee 跑腿辦公室將會再依照您的需求，
     }
 
     rider.status = 'rejected';
+    rider.lifecycleStatus = RIDER_V4_LIFECYCLE.REJECTED;
+    rider.canAcceptOrders = false;
     rider.rejectedAt = Date.now();
     rider.rejectedBy = userId;
     await saveRider(rider);
@@ -15342,6 +16046,8 @@ UBee 跑腿辦公室將會再依照您的需求，
     await db.collection('riderApplications').doc(rider.riderId).set({
   status: 'rejected',
   reviewStatus: 'rejected',
+  lifecycleStatus: RIDER_V4_LIFECYCLE.REJECTED,
+  canAcceptOrders: false,
   approved: false,
   rejectedAt: rider.rejectedAt,
   rejectedBy: userId,
