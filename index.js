@@ -26,7 +26,7 @@ const db = admin.firestore();
 // false：相容模式。沒有 Bearer Token 時，仍維持現有舊版 API 流程。
 // true：強制模式。所有已掛上 riderAuthMiddleware 的 API 都必須有有效 Token。
 //
-// 目前 rider.html 尚未完成 Firebase Auth 串接，請保持 false。
+// rider.html 已完成 Firebase Custom Token -> ID Token 串接；正式切換強制模式前仍建議先保持 false 做相容驗證。
 // =====================================================
 const RIDER_AUTH_ENFORCE =
   String(process.env.RIDER_AUTH_ENFORCE || 'false')
@@ -2093,7 +2093,7 @@ const RIDER_V4_QUIZ = Object.freeze([
   { id:"q17", question:"蛋糕、花束、易碎品等特殊物品應如何配送？", options:["與一般雜物完全相同", "確認固定、擺放方向與運送風險，必要時具備相應資格", "速度越快越好不用顧物品"], answer:1 },
   { id:"q18", question:"UBee 是否允許小U私下加價、私接平台客戶？", options:["允許", "不允許，須依平台流程與價格規則", "只要客人同意就可以"], answer:1 },
   { id:"q19", question:"完成任務交付時，應遵循什麼原則？", options:["依實際交付狀況完成必要確認與系統操作", "還沒送到也可以先完成", "交給任何人都算完成"], answer:0 },
-  { id:"q20", question:"V4 新手入職要在什麼情況下才正式開通 L1 接單資格？", options:["只要審核通過", "完成街口、三社群、全部必修教學且測驗達 80 分以上", "只要加入聊天群"], answer:1 }
+  { id:"q20", question:"V4 新手入職要在什麼情況下才正式開通接單資格？", options:["只要審核通過", "完成街口、三社群、全部必修教學且測驗達 80 分以上", "只要加入聊天群"], answer:1 }
 ]);
 
 function getRiderV4LifecycleStatus(rider = {}) {
@@ -2174,16 +2174,107 @@ function buildRiderV4PublicConfig() {
   };
 }
 
+function getRiderUnifiedLearningModules(rider = {}) {
+  const onboardingModules = rider.onboarding?.modules || {};
+  const learningModules = rider.learning?.modules || {};
+  return {
+    ...onboardingModules,
+    ...learningModules,
+  };
+}
+
+function getRiderUnifiedLearningChecklist(rider = {}) {
+  const onboarding = rider.onboarding || {};
+  const learningChecklist = rider.learning?.checklist || {};
+  return {
+    jkopayInstalled:
+      onboarding.jkopayInstalled === true ||
+      learningChecklist.jkopayInstalled === true,
+    announcementGroupJoined:
+      onboarding.announcementGroupJoined === true ||
+      learningChecklist.announcementGroupJoined === true,
+    chatGroupJoined:
+      onboarding.chatGroupJoined === true ||
+      learningChecklist.chatGroupJoined === true,
+    reportGroupJoined:
+      onboarding.reportGroupJoined === true ||
+      learningChecklist.reportGroupJoined === true,
+  };
+}
+
+function getRiderUnifiedLearningQuiz(rider = {}) {
+  const learning = rider.learning || {};
+  const onboarding = rider.onboarding || {};
+  const scores = [
+    Number(learning.quizBestScore || 0),
+    Number(learning.quizScore || 0),
+    Number(onboarding.quizScore || 0),
+    Number(rider.trainingQuizScore || 0),
+  ].filter(Number.isFinite);
+  const score = scores.length ? Math.max(...scores) : 0;
+  const passed =
+    learning.quizPassed === true ||
+    onboarding.quizPassed === true ||
+    rider.trainingQuizPassed === true ||
+    score >= 80;
+  return { score, passed };
+}
+
+function isRiderL4LearningQualified(rider = {}) {
+  const modules = getRiderUnifiedLearningModules(rider);
+  const quiz = getRiderUnifiedLearningQuiz(rider);
+  return (
+    RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true) &&
+    quiz.passed === true &&
+    Number(quiz.score || 0) >= 80
+  );
+}
+
+function getSafeRiderLevel(level, fallback = 'L1') {
+  const normalized = String(level || '').trim().toUpperCase();
+  return /^L[0-4]$/.test(normalized) ? normalized : fallback;
+}
+
+function getNonDowngradeRiderLevel(rider = {}, minimumLevel = 'L1') {
+  if (isRiderL4LearningQualified(rider)) return 'L4';
+  const current = getSafeRiderLevel(rider.riderLevel, 'L0');
+  const currentRank = getRiderV4LevelNumber({ riderLevel: current });
+  const minimumRank = getRiderV4LevelNumber({ riderLevel: minimumLevel });
+  return currentRank >= minimumRank ? current : minimumLevel;
+}
+
+async function syncRiderL4Qualification(riderDoc, rider = {}) {
+  if (!riderDoc || !riderDoc.exists || !isRiderL4LearningQualified(rider)) {
+    return rider;
+  }
+
+  const alreadySynced =
+    String(rider.riderLevel || '').toUpperCase() === 'L4' &&
+    rider.learning?.l4Qualified === true;
+
+  if (alreadySynced) return rider;
+
+  const nowMs = Date.now();
+  await riderDoc.ref.set({
+    riderLevel:'L4',
+    'learning.l4Qualified':true,
+    'learning.l4QualifiedAtMs':
+      Number(rider.learning?.l4QualifiedAtMs || 0) || nowMs,
+    'learning.updatedAtMs':nowMs,
+    updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge:true });
+
+  const updated = await riderDoc.ref.get();
+  return { id:updated.id, ...updated.data() };
+}
+
 function getRiderV4Progress(rider = {}) {
   const onboarding = rider.onboarding || {};
-  const modules = onboarding.modules || {};
-  const checklist = {
-    jkopayInstalled: onboarding.jkopayInstalled === true,
-    announcementGroupJoined: onboarding.announcementGroupJoined === true,
-    chatGroupJoined: onboarding.chatGroupJoined === true,
-    reportGroupJoined: onboarding.reportGroupJoined === true,
-  };
+  const modules = getRiderUnifiedLearningModules(rider);
+  const checklist = getRiderUnifiedLearningChecklist(rider);
+  const quiz = getRiderUnifiedLearningQuiz(rider);
   const completedModules = RIDER_V4_REQUIRED_MODULES.filter(id => modules[id] === true);
+  const l4Qualified = isRiderL4LearningQualified(rider);
   return {
     lifecycleStatus: getRiderV4LifecycleStatus(rider),
     canAcceptOrders: canRiderAcceptOrdersV4(rider),
@@ -2191,8 +2282,10 @@ function getRiderV4Progress(rider = {}) {
     checklist,
     modules,
     completedModules,
-    quizScore: Number(onboarding.quizScore || rider.trainingQuizScore || 0),
-    quizPassed: onboarding.quizPassed === true || rider.trainingQuizPassed === true,
+    quizScore: Number(quiz.score || 0),
+    quizPassed: quiz.passed === true,
+    l4Qualified,
+    learning: rider.learning || {},
     completed: isRiderV4OnboardingComplete(rider),
     certifications: rider.certifications || {},
     governance: rider.governance || {},
@@ -8605,11 +8698,16 @@ app.get('/api/rider/v4/bootstrap', riderAuthMiddleware, async (req, res) => {
   try {
     const ctx = await getRiderV4ApiContext(req);
     if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+
+    // 只有真的完成全部 12 堂 + 測驗 >= 80 的帳號才同步成 L4。
+    // 既有小U不會因為「已加入平台」而自動升級。
+    const rider = await syncRiderL4Qualification(ctx.riderDoc, ctx.rider);
+
     return res.json({
       success:true,
       config:buildRiderV4PublicConfig(),
-      rider:ctx.rider,
-      progress:getRiderV4Progress(ctx.rider),
+      rider,
+      progress:getRiderV4Progress(rider),
     });
   } catch (err) {
     console.error('❌ V4 bootstrap 失敗：', err);
@@ -8632,65 +8730,146 @@ app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, r
     ]);
     if (!allowed.has(step)) return res.status(400).json({ success:false, message:'不支援的入職進度項目。' });
 
+    const rider = ctx.rider || {};
+    const lifecycle = getRiderV4LifecycleStatus(rider);
+    const isMandatoryOnboarding = lifecycle === RIDER_V4_LIFECYCLE.TRAINING;
+    const nowMs = Date.now();
     const update = {
-      lifecycleStatus:RIDER_V4_LIFECYCLE.TRAINING,
-      status:'training',
-      canAcceptOrders:false,
-      onboardingRequired:true,
-      'onboarding.updatedAtMs':Date.now(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (isMandatoryOnboarding) {
+      // 新申請小U：維持強制入職 gate。
+      Object.assign(update, {
+        lifecycleStatus:RIDER_V4_LIFECYCLE.TRAINING,
+        status:'training',
+        canAcceptOrders:false,
+        onboardingRequired:true,
+        'onboarding.updatedAtMs':nowMs,
+      });
+      if (step.startsWith('module:')) {
+        const moduleId = step.slice(7);
+        update[`onboarding.modules.${moduleId}`] = true;
+        update[`learning.modules.${moduleId}`] = true;
+      } else {
+        update[`onboarding.${step}`] = true;
+        update[`learning.checklist.${step}`] = true;
+      }
+      update['learning.updatedAtMs'] = nowMs;
+    } else {
+      // 既有 ACTIVE 小U：只記錄持續學習／工具確認，絕不改成 TRAINING、絕不停單。
+      if (step.startsWith('module:')) {
+        const moduleId = step.slice(7);
+        update[`learning.modules.${moduleId}`] = true;
+      } else {
+        update[`learning.checklist.${step}`] = true;
+      }
+      update['learning.updatedAtMs'] = nowMs;
+    }
+
+    await ctx.riderDoc.ref.set(update, { merge:true });
+    let updated = await ctx.riderDoc.ref.get();
+    let updatedRider = { id:updated.id, ...updated.data() };
+
+    if (isMandatoryOnboarding) {
+      // 若測驗已先通過，最後一個必修項目完成時也要自動開通，不要求重考。
+      const onboarding = updatedRider.onboarding || {};
+      const modules = onboarding.modules || {};
+      const checklistComplete =
+        onboarding.jkopayInstalled === true &&
+        onboarding.announcementGroupJoined === true &&
+        onboarding.chatGroupJoined === true &&
+        onboarding.reportGroupJoined === true &&
+        RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
+
+      const quiz = getRiderUnifiedLearningQuiz(updatedRider);
+      if (checklistComplete && quiz.passed === true && !canRiderAcceptOrdersV4(updatedRider)) {
+        const finalLevel = isRiderL4LearningQualified(updatedRider)
+          ? 'L4'
+          : getNonDowngradeRiderLevel(updatedRider, 'L1');
+        await ctx.riderDoc.ref.set({
+          status:'approved',
+          reviewStatus:'approved',
+          approved:true,
+          lifecycleStatus:RIDER_V4_LIFECYCLE.ACTIVE,
+          canAcceptOrders:true,
+          riderLevel:finalLevel,
+          onboardingRequired:false,
+          trainingCompleted:true,
+          trainingCompletedAtMs:nowMs,
+          'onboarding.completed':true,
+          'onboarding.completedAtMs':nowMs,
+          'certifications.basic':true,
+          ...(finalLevel === 'L4' ? {
+            'learning.l4Qualified':true,
+            'learning.l4QualifiedAtMs':nowMs,
+          } : {}),
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge:true });
+        updated = await ctx.riderDoc.ref.get();
+        updatedRider = { id:updated.id, ...updated.data() };
+      }
+    } else if (isRiderL4LearningQualified(updatedRider) && String(updatedRider.riderLevel || '').toUpperCase() !== 'L4') {
+      updatedRider = await syncRiderL4Qualification(ctx.riderDoc, updatedRider);
+    }
+
+    return res.json({ success:true, rider:updatedRider, progress:getRiderV4Progress(updatedRider) });
+  } catch (err) {
+    console.error('❌ V4 onboarding/learning progress 失敗：', err);
+    return res.status(500).json({ success:false, message:'儲存入職／學習進度失敗。', error:err.message });
+  }
+});
+
+// ============================================================
+// 所有新舊小U共用的持續學習進度 API
+// - 不改 lifecycleStatus
+// - 不改 canAcceptOrders
+// - 不會把既有 ACTIVE 小U誤切回 TRAINING
+// ============================================================
+app.post('/api/rider/v4/learning/progress', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+
+    const step = String(req.body?.step || '').trim();
+    const allowed = new Set([
+      'jkopayInstalled',
+      'announcementGroupJoined',
+      'chatGroupJoined',
+      'reportGroupJoined',
+      ...RIDER_V4_REQUIRED_MODULES.map(id => `module:${id}`),
+    ]);
+    if (!allowed.has(step)) return res.status(400).json({ success:false, message:'不支援的學習進度項目。' });
+
+    const nowMs = Date.now();
+    const update = {
+      'learning.updatedAtMs':nowMs,
       updatedAt:admin.firestore.FieldValue.serverTimestamp(),
     };
     if (step.startsWith('module:')) {
       const moduleId = step.slice(7);
-      update[`onboarding.modules.${moduleId}`] = true;
+      update[`learning.modules.${moduleId}`] = true;
     } else {
-      update[`onboarding.${step}`] = true;
+      update[`learning.checklist.${step}`] = true;
     }
 
     await ctx.riderDoc.ref.set(update, { merge:true });
     let updated = await ctx.riderDoc.ref.get();
     let rider = { id:updated.id, ...updated.data() };
 
-    // 若測驗已先通過，最後一個必修項目完成時也要自動開通，不要求重考。
-    const onboarding = rider.onboarding || {};
-    const modules = onboarding.modules || {};
-    const checklistComplete =
-      onboarding.jkopayInstalled === true &&
-      onboarding.announcementGroupJoined === true &&
-      onboarding.chatGroupJoined === true &&
-      onboarding.reportGroupJoined === true &&
-      RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
-
-    if (
-      checklistComplete &&
-      (onboarding.quizPassed === true || rider.trainingQuizPassed === true) &&
-      !canRiderAcceptOrdersV4(rider)
-    ) {
-      const nowMs = Date.now();
-      await ctx.riderDoc.ref.set({
-        status:'approved',
-        reviewStatus:'approved',
-        approved:true,
-        lifecycleStatus:RIDER_V4_LIFECYCLE.ACTIVE,
-        canAcceptOrders:true,
-        riderLevel:'L1',
-        onboardingRequired:false,
-        trainingCompleted:true,
-        trainingCompletedAtMs:nowMs,
-        'onboarding.completed':true,
-        'onboarding.completedAtMs':nowMs,
-        'certifications.basic':true,
-        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge:true });
-
-      updated = await ctx.riderDoc.ref.get();
-      rider = { id:updated.id, ...updated.data() };
+    if (isRiderL4LearningQualified(rider)) {
+      rider = await syncRiderL4Qualification(ctx.riderDoc, rider);
     }
 
-    return res.json({ success:true, rider, progress:getRiderV4Progress(rider) });
+    return res.json({
+      success:true,
+      rider,
+      progress:getRiderV4Progress(rider),
+      l4Qualified:isRiderL4LearningQualified(rider),
+    });
   } catch (err) {
-    console.error('❌ V4 onboarding progress 失敗：', err);
-    return res.status(500).json({ success:false, message:'儲存入職進度失敗。', error:err.message });
+    console.error('❌ V4 learning progress 失敗：', err);
+    return res.status(500).json({ success:false, message:'儲存學習進度失敗。', error:err.message });
   }
 });
 
@@ -8716,46 +8895,88 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
       onboarding.reportGroupJoined === true &&
       RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
 
+    const previousQuiz = getRiderUnifiedLearningQuiz(rider);
+    const effectivePassed = previousQuiz.passed === true || passed;
+    const effectiveBestScore = Math.max(Number(previousQuiz.score || 0), score);
     const nowMs = Date.now();
     const update = {
       'onboarding.quizScore':score,
-      'onboarding.quizPassed':passed,
+      'onboarding.quizPassed':effectivePassed,
       'onboarding.quizAttempts':admin.firestore.FieldValue.increment(1),
       'onboarding.quizLastAtMs':nowMs,
-      trainingQuizScore:score,
-      trainingQuizPassed:passed,
+      trainingQuizScore:effectiveBestScore,
+      trainingQuizPassed:effectivePassed,
+      'learning.quizScore':score,
+      'learning.quizLastScore':score,
+      'learning.quizBestScore':effectiveBestScore,
+      'learning.quizPassed':effectivePassed,
+      'learning.quizAttempts':admin.firestore.FieldValue.increment(1),
+      'learning.quizLastAtMs':nowMs,
+      'learning.updatedAtMs':nowMs,
       updatedAt:admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    const activated = passed && checklistComplete;
+    // 新申請者：仍必須街口 + 三社群 + 12課 + 測驗才可正式 ACTIVE。
+    const activated = effectivePassed && checklistComplete;
     if (activated) {
+      const projectedRider = {
+        ...rider,
+        onboarding:{
+          ...onboarding,
+          quizScore:effectiveBestScore,
+          quizPassed:true,
+        },
+        trainingQuizScore:effectiveBestScore,
+        trainingQuizPassed:true,
+        learning:{
+          ...(rider.learning || {}),
+          quizScore:score,
+          quizBestScore:effectiveBestScore,
+          quizPassed:true,
+        },
+      };
+      const finalLevel = isRiderL4LearningQualified(projectedRider)
+        ? 'L4'
+        : getNonDowngradeRiderLevel(rider, 'L1');
       Object.assign(update, {
         status:'approved',
         reviewStatus:'approved',
         approved:true,
         lifecycleStatus:RIDER_V4_LIFECYCLE.ACTIVE,
         canAcceptOrders:true,
-        riderLevel:'L1',
+        riderLevel:finalLevel,
         onboardingRequired:false,
         trainingCompleted:true,
         trainingCompletedAtMs:nowMs,
         'onboarding.completed':true,
         'onboarding.completedAtMs':nowMs,
         'certifications.basic':true,
+        ...(finalLevel === 'L4' ? {
+          'learning.l4Qualified':true,
+          'learning.l4QualifiedAtMs':nowMs,
+        } : {}),
       });
     }
 
     await ctx.riderDoc.ref.set(update, { merge:true });
     const updated = await ctx.riderDoc.ref.get();
-    const updatedRider = { id:updated.id, ...updated.data() };
+    let updatedRider = { id:updated.id, ...updated.data() };
+    if (isRiderL4LearningQualified(updatedRider)) {
+      updatedRider = await syncRiderL4Qualification(ctx.riderDoc, updatedRider);
+    }
+    const l4Qualified = isRiderL4LearningQualified(updatedRider);
+
     return res.json({
       success:true,
       score,
       passed,
       checklistComplete,
       activated,
+      l4Qualified,
       message: activated
-        ? '恭喜完成 V4 小U入職，L1 基礎接單資格已開通。'
+        ? (l4Qualified
+            ? '恭喜完成 V4 小U入職與全部學習要求，正式接單資格已開通並取得 L4。'
+            : '恭喜完成 V4 小U入職，正式接單資格已開通。')
         : passed
           ? '測驗已通過，請先完成所有必修入職項目。'
           : '測驗未達 80 分，請複習後重新作答。',
@@ -8764,7 +8985,86 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('❌ V4 quiz submit 失敗：', err);
-    return res.status(500).json({ success:false, message:'提交新手測驗失敗。', error:err.message });
+    return res.status(500).json({ success:false, message:'送出測驗失敗。', error:err.message });
+  }
+});
+
+// ============================================================
+// 全員 L4 學習測驗：既有 ACTIVE 小U也能參加
+// - 不變更 ACTIVE / canAcceptOrders
+// - 12 堂全部完成 + 80 分以上才由後端正式寫入 L4
+// - 已取得 L4 後重考失利不會自動撤銷既有資格
+// ============================================================
+app.post('/api/rider/v4/learning/quiz/submit', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+
+    const rider = ctx.rider || {};
+    const modules = getRiderUnifiedLearningModules(rider);
+    const modulesComplete = RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
+    if (!modulesComplete) {
+      return res.status(409).json({
+        success:false,
+        message:'請先完成全部 12 堂核心教學後再參加 L4 測驗。',
+      });
+    }
+
+    const answers = req.body?.answers && typeof req.body.answers === 'object' ? req.body.answers : {};
+    let correct = 0;
+    RIDER_V4_QUIZ.forEach(q => {
+      if (Number(answers[q.id]) === q.answer) correct += 1;
+    });
+    const score = Math.round(correct / RIDER_V4_QUIZ.length * 100);
+    const passedThisAttempt = score >= 80;
+    const previousQuiz = getRiderUnifiedLearningQuiz(rider);
+    const effectivePassed = previousQuiz.passed === true || passedThisAttempt;
+    const bestScore = Math.max(Number(previousQuiz.score || 0), score);
+    const nowMs = Date.now();
+
+    const update = {
+      'learning.quizScore':score,
+      'learning.quizLastScore':score,
+      'learning.quizBestScore':bestScore,
+      'learning.quizPassed':effectivePassed,
+      'learning.quizAttempts':admin.firestore.FieldValue.increment(1),
+      'learning.quizLastAtMs':nowMs,
+      'learning.updatedAtMs':nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (effectivePassed && modulesComplete) {
+      Object.assign(update, {
+        riderLevel:'L4',
+        'learning.l4Qualified':true,
+        'learning.l4QualifiedAtMs':
+          Number(rider.learning?.l4QualifiedAtMs || 0) || nowMs,
+      });
+    }
+
+    await ctx.riderDoc.ref.set(update, { merge:true });
+    const updated = await ctx.riderDoc.ref.get();
+    const updatedRider = { id:updated.id, ...updated.data() };
+    const l4Qualified = isRiderL4LearningQualified(updatedRider);
+
+    return res.json({
+      success:true,
+      score,
+      passed:passedThisAttempt,
+      bestScore,
+      l4Qualified,
+      promotedToL4:l4Qualified && String(rider.riderLevel || '').toUpperCase() !== 'L4',
+      message:l4Qualified
+        ? 'L4 學習資格已完成，後端已正式保存為 L4。'
+        : passedThisAttempt
+          ? '測驗已通過，正在確認完整 L4 學習條件。'
+          : '本次測驗未達 80 分，請複習後重新作答。',
+      rider:updatedRider,
+      progress:getRiderV4Progress(updatedRider),
+    });
+  } catch (err) {
+    console.error('❌ V4 learning quiz submit 失敗：', err);
+    return res.status(500).json({ success:false, message:'送出 L4 學習測驗失敗。', error:err.message });
   }
 });
 
@@ -8923,8 +9223,16 @@ app.post('/api/admin/rider-v4/action', requireRiderV4AdminKey, async (req, res) 
       update.canAcceptOrders = true;
       update.retraining = null;
     } else if (action === 'set_level') {
-      if (!['L1','L2','L3'].includes(value.toUpperCase())) return res.status(400).json({ success:false, message:'等級只能是 L1/L2/L3。' });
-      update.riderLevel = value.toUpperCase();
+      const targetLevel = value.toUpperCase();
+      if (!['L1','L2','L3','L4'].includes(targetLevel)) return res.status(400).json({ success:false, message:'等級只能是 L1/L2/L3/L4。' });
+      if (targetLevel === 'L4' && !isRiderL4LearningQualified(rider)) {
+        return res.status(409).json({ success:false, message:'此小U尚未完成全部 12 堂核心教學與 80 分以上測驗，不能設定為 L4。' });
+      }
+      update.riderLevel = targetLevel;
+      if (targetLevel === 'L4') {
+        update['learning.l4Qualified'] = true;
+        update['learning.l4QualifiedAtMs'] = Number(rider.learning?.l4QualifiedAtMs || 0) || nowMs;
+      }
     } else if (action === 'grant_cert' || action === 'revoke_cert') {
       if (!RIDER_V4_CERTIFICATIONS.includes(value)) return res.status(400).json({ success:false, message:'未知的認證項目。' });
       update[`certifications.${value}`] = action === 'grant_cert';
