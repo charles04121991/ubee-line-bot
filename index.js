@@ -2177,10 +2177,26 @@ function buildRiderV4PublicConfig() {
 function getRiderUnifiedLearningModules(rider = {}) {
   const onboardingModules = rider.onboarding?.modules || {};
   const learningModules = rider.learning?.modules || {};
-  return {
+  const merged = {
     ...onboardingModules,
     ...learningModules,
   };
+
+  // 相容舊資料：
+  // 過去若使用 set({ 'learning.modules.xxx': true }, { merge:true })，
+  // Firestore 可能留下 literal dotted field。這裡先讀回，避免已完成課程顯示 0/12。
+  for (const id of RIDER_V4_REQUIRED_MODULES) {
+    if (
+      onboardingModules[id] === true ||
+      learningModules[id] === true ||
+      rider[`onboarding.modules.${id}`] === true ||
+      rider[`learning.modules.${id}`] === true
+    ) {
+      merged[id] = true;
+    }
+  }
+
+  return merged;
 }
 
 function getRiderUnifiedLearningChecklist(rider = {}) {
@@ -2189,16 +2205,24 @@ function getRiderUnifiedLearningChecklist(rider = {}) {
   return {
     jkopayInstalled:
       onboarding.jkopayInstalled === true ||
-      learningChecklist.jkopayInstalled === true,
+      learningChecklist.jkopayInstalled === true ||
+      rider['onboarding.jkopayInstalled'] === true ||
+      rider['learning.checklist.jkopayInstalled'] === true,
     announcementGroupJoined:
       onboarding.announcementGroupJoined === true ||
-      learningChecklist.announcementGroupJoined === true,
+      learningChecklist.announcementGroupJoined === true ||
+      rider['onboarding.announcementGroupJoined'] === true ||
+      rider['learning.checklist.announcementGroupJoined'] === true,
     chatGroupJoined:
       onboarding.chatGroupJoined === true ||
-      learningChecklist.chatGroupJoined === true,
+      learningChecklist.chatGroupJoined === true ||
+      rider['onboarding.chatGroupJoined'] === true ||
+      rider['learning.checklist.chatGroupJoined'] === true,
     reportGroupJoined:
       onboarding.reportGroupJoined === true ||
-      learningChecklist.reportGroupJoined === true,
+      learningChecklist.reportGroupJoined === true ||
+      rider['onboarding.reportGroupJoined'] === true ||
+      rider['learning.checklist.reportGroupJoined'] === true,
   };
 }
 
@@ -2210,14 +2234,99 @@ function getRiderUnifiedLearningQuiz(rider = {}) {
     Number(learning.quizScore || 0),
     Number(onboarding.quizScore || 0),
     Number(rider.trainingQuizScore || 0),
+    Number(rider['learning.quizBestScore'] || 0),
+    Number(rider['learning.quizScore'] || 0),
+    Number(rider['onboarding.quizScore'] || 0),
   ].filter(Number.isFinite);
   const score = scores.length ? Math.max(...scores) : 0;
   const passed =
     learning.quizPassed === true ||
     onboarding.quizPassed === true ||
     rider.trainingQuizPassed === true ||
+    rider['learning.quizPassed'] === true ||
+    rider['onboarding.quizPassed'] === true ||
     score >= 80;
   return { score, passed };
+}
+
+
+function buildRiderV4LearningRepairPatch(rider = {}) {
+  const patch = {};
+  const learning = rider.learning || {};
+  const onboarding = rider.onboarding || {};
+  const learningModules = learning.modules || {};
+  const onboardingModules = onboarding.modules || {};
+  const unifiedModules = getRiderUnifiedLearningModules(rider);
+  const unifiedChecklist = getRiderUnifiedLearningChecklist(rider);
+  const unifiedQuiz = getRiderUnifiedLearningQuiz(rider);
+
+  for (const id of RIDER_V4_REQUIRED_MODULES) {
+    if (unifiedModules[id] === true && learningModules[id] !== true) {
+      patch[`learning.modules.${id}`] = true;
+    }
+
+    if (
+      (
+        onboardingModules[id] === true ||
+        rider[`onboarding.modules.${id}`] === true
+      ) &&
+      onboardingModules[id] !== true
+    ) {
+      patch[`onboarding.modules.${id}`] = true;
+    }
+  }
+
+  for (const key of [
+    'jkopayInstalled',
+    'announcementGroupJoined',
+    'chatGroupJoined',
+    'reportGroupJoined',
+  ]) {
+    if (unifiedChecklist[key] === true && learning.checklist?.[key] !== true) {
+      patch[`learning.checklist.${key}`] = true;
+    }
+
+    if (
+      (
+        onboarding[key] === true ||
+        rider[`onboarding.${key}`] === true
+      ) &&
+      onboarding[key] !== true
+    ) {
+      patch[`onboarding.${key}`] = true;
+    }
+  }
+
+  if (
+    Number(unifiedQuiz.score || 0) >
+    Number(learning.quizBestScore || learning.quizScore || 0)
+  ) {
+    patch['learning.quizBestScore'] = Number(unifiedQuiz.score || 0);
+    patch['learning.quizScore'] = Number(unifiedQuiz.score || 0);
+  }
+
+  if (unifiedQuiz.passed === true && learning.quizPassed !== true) {
+    patch['learning.quizPassed'] = true;
+  }
+
+  return patch;
+}
+
+async function repairRiderV4LearningPersistence(riderDoc, rider = {}) {
+  if (!riderDoc || !riderDoc.exists) return rider;
+
+  const patch = buildRiderV4LearningRepairPatch(rider);
+  if (!Object.keys(patch).length) return rider;
+
+  const nowMs = Date.now();
+  patch['learning.updatedAtMs'] = nowMs;
+  patch.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+  // update() 正確支援 dotted field path，將舊資料搬回正式 nested 結構。
+  await riderDoc.ref.update(patch);
+
+  const updated = await riderDoc.ref.get();
+  return { id:updated.id, ...updated.data() };
 }
 
 function isRiderL4LearningQualified(rider = {}) {
@@ -2255,14 +2364,14 @@ async function syncRiderL4Qualification(riderDoc, rider = {}) {
   if (alreadySynced) return rider;
 
   const nowMs = Date.now();
-  await riderDoc.ref.set({
+  await riderDoc.ref.update({
     riderLevel:'L4',
     'learning.l4Qualified':true,
     'learning.l4QualifiedAtMs':
       Number(rider.learning?.l4QualifiedAtMs || 0) || nowMs,
     'learning.updatedAtMs':nowMs,
     updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge:true });
+  });
 
   const updated = await riderDoc.ref.get();
   return { id:updated.id, ...updated.data() };
@@ -2282,6 +2391,19 @@ function getRiderV4Progress(rider = {}) {
     checklist,
     modules,
     completedModules,
+    completedModuleCount: completedModules.length,
+    requiredModuleCount: RIDER_V4_REQUIRED_MODULES.length,
+    courseProgressPercent: Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          completedModules.length /
+          Math.max(1, RIDER_V4_REQUIRED_MODULES.length) *
+          100
+        )
+      )
+    ),
     quizScore: Number(quiz.score || 0),
     quizPassed: quiz.passed === true,
     l4Qualified,
@@ -8680,7 +8802,7 @@ async function findApprovedRiderForApi(source = {}) {
 }
 
 // ============================================================
-// UBee 小U營運管理系統 V4 API
+// UBee 小U營運管理系統 V4 API｜學習進度永久同步修正版 2026-07-22
 // ============================================================
 async function getRiderV4ApiContext(req) {
   if (req.riderAuth?.riderDocId) {
@@ -8699,9 +8821,13 @@ app.get('/api/rider/v4/bootstrap', riderAuthMiddleware, async (req, res) => {
     const ctx = await getRiderV4ApiContext(req);
     if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
 
+    // 先修復舊版可能以 literal dotted field 寫入的學習紀錄，
+    // 確保換手機／重新登入後仍能正確取得 12/12 與測驗資格。
+    let rider = await repairRiderV4LearningPersistence(ctx.riderDoc, ctx.rider);
+
     // 只有真的完成全部 12 堂 + 測驗 >= 80 的帳號才同步成 L4。
     // 既有小U不會因為「已加入平台」而自動升級。
-    const rider = await syncRiderL4Qualification(ctx.riderDoc, ctx.rider);
+    rider = await syncRiderL4Qualification(ctx.riderDoc, rider);
 
     return res.json({
       success:true,
@@ -8767,7 +8893,7 @@ app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, r
       update['learning.updatedAtMs'] = nowMs;
     }
 
-    await ctx.riderDoc.ref.set(update, { merge:true });
+    await ctx.riderDoc.ref.update(update);
     let updated = await ctx.riderDoc.ref.get();
     let updatedRider = { id:updated.id, ...updated.data() };
 
@@ -8787,7 +8913,7 @@ app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, r
         const finalLevel = isRiderL4LearningQualified(updatedRider)
           ? 'L4'
           : getNonDowngradeRiderLevel(updatedRider, 'L1');
-        await ctx.riderDoc.ref.set({
+        await ctx.riderDoc.ref.update({
           status:'approved',
           reviewStatus:'approved',
           approved:true,
@@ -8805,7 +8931,7 @@ app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, r
             'learning.l4QualifiedAtMs':nowMs,
           } : {}),
           updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge:true });
+        });
         updated = await ctx.riderDoc.ref.get();
         updatedRider = { id:updated.id, ...updated.data() };
       }
@@ -8853,7 +8979,7 @@ app.post('/api/rider/v4/learning/progress', riderAuthMiddleware, async (req, res
       update[`learning.checklist.${step}`] = true;
     }
 
-    await ctx.riderDoc.ref.set(update, { merge:true });
+    await ctx.riderDoc.ref.update(update);
     let updated = await ctx.riderDoc.ref.get();
     let rider = { id:updated.id, ...updated.data() };
 
@@ -8958,7 +9084,7 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
       });
     }
 
-    await ctx.riderDoc.ref.set(update, { merge:true });
+    await ctx.riderDoc.ref.update(update);
     const updated = await ctx.riderDoc.ref.get();
     let updatedRider = { id:updated.id, ...updated.data() };
     if (isRiderL4LearningQualified(updatedRider)) {
@@ -9042,7 +9168,7 @@ app.post('/api/rider/v4/learning/quiz/submit', riderAuthMiddleware, async (req, 
       });
     }
 
-    await ctx.riderDoc.ref.set(update, { merge:true });
+    await ctx.riderDoc.ref.update(update);
     const updated = await ctx.riderDoc.ref.get();
     const updatedRider = { id:updated.id, ...updated.data() };
     const l4Qualified = isRiderL4LearningQualified(updatedRider);
