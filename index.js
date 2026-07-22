@@ -1765,7 +1765,7 @@ const BUSINESS_FORM_URL =
 
 const PARTNER_FORM_URL =
   process.env.PARTNER_FORM_URL ||
-  `${BASE_URL}/rider.html`;
+  RIDER_WEB_URL;
 
 if (!LINE_ADMIN_GROUP_ID) {
   console.warn('⚠️ 未設定 LINE_ADMIN_GROUP_ID 或 LINE_FINISH_GROUP_ID，審核與管理通知可能無法推送。');
@@ -2286,7 +2286,7 @@ async function findRiderByPhoneForLogin(phone) {
     return {
       ok: false,
       statusCode: 404,
-      message: '找不到此手機號碼的騎士資料，請確認是否已送出 UBee 跑腿夥伴申請。',
+      message: '找不到此手機號碼的小U資料，請回到 UBee 騎士端點選「申請成為小U」完成申請。',
     };
   }
 
@@ -8133,7 +8133,7 @@ app.post('/api/rider/register', async (req, res) => {
     if (!riderLineUserId || !riderLineUserId.startsWith('U')) {
       return res.status(400).json({
         success: false,
-        message: '缺少正確的 LINE 身分，請從 LINE 官方帳號內重新開啟申請頁。',
+        message: '缺少正確的 LINE 身分，請從 UBee 騎士端的「申請成為小U」入口重新進入申請流程。',
       });
     }
 
