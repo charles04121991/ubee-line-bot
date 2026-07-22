@@ -16245,7 +16245,7 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
   }
 });
 
-// ===== UBee Rider 任務執行 V2 API 協作層 =====
+// ===== UBee Rider 任務執行 V2 FINAL API 協作層 =====
 // 狀態主流程：accepted -> arrived_pickup -> picked_up -> arrived_dropoff -> completed
 // 前端各階段維持單一主 CTA；後端持續以狀態機驗證，不允許跳階。
 // ===== 騎士更新任務狀態 API =====
