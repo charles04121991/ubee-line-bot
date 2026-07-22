@@ -15713,6 +15713,12 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         status: 'accepted',
         riderStatus: 'accepted',
 
+        // UBee Rider 任務執行 V2：接單後正式進入取件導航階段。
+        navigationV24Stage: 'pickup',
+        navigationV24Status: 'accepted',
+        navigationV24StageUpdatedAtMs: trackingStartedAtMs,
+        navigationV24StageUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
         // 手機登入正式識別
         riderId: identity.riderId,
         riderDocId: identity.riderDocId,
@@ -16239,6 +16245,9 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
   }
 });
 
+// ===== UBee Rider 任務執行 V2 API 協作層 =====
+// 狀態主流程：accepted -> arrived_pickup -> picked_up -> arrived_dropoff -> completed
+// 前端各階段維持單一主 CTA；後端持續以狀態機驗證，不允許跳階。
 // ===== 騎士更新任務狀態 API =====
 // 4. 更新任務狀態：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
