@@ -11,8 +11,8 @@
   <meta name="apple-mobile-web-app-title" content="UBee">
   <meta name="theme-color" content="#ffffff">
 
-  <title>UBee 跑腿｜用戶端建立任務</title>
-  <!-- Level 4：客戶端只提供原始需求；區域與預測特徵由後端可信任計算 -->
+  <title>UBee 跑腿｜用戶端建立任務 V2 五步驟</title>
+  <!-- UBee 用戶端 V2：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -7259,8 +7259,8 @@ body{background:#eef0f2;}
 .home-next-btn{min-height:60px;border-radius:18px;background:var(--ubee-yellow);color:#111;font-size:18px!important;font-weight:1000;border:none;}
 
 .ubee-v3-progress{margin:16px 0 18px;padding:15px 14px;border:1px solid var(--ubee-line);border-radius:21px;background:#fff;box-shadow:var(--ubee-shadow-soft);}
-.ubee-v3-progress-track{display:grid;grid-template-columns:repeat(4,1fr);align-items:start;position:relative;}
-.ubee-v3-progress-track::before{content:"";position:absolute;left:11%;right:11%;top:13px;height:2px;background:#e8e9eb;}
+.ubee-v3-progress-track{display:grid;grid-template-columns:repeat(5,1fr);align-items:start;position:relative;}
+.ubee-v3-progress-track::before{content:"";position:absolute;left:9%;right:9%;top:13px;height:2px;background:#e8e9eb;}
 .ubee-v3-progress-step{position:relative;z-index:1;text-align:center;color:#a0a4aa;}
 .ubee-v3-progress-dot{width:27px;height:27px;margin:0 auto 7px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eceef0;color:#8e9399;font-size:11px;font-weight:1000;border:3px solid #fff;box-shadow:0 0 0 1px #e6e7e9;}
 .ubee-v3-progress-step.done .ubee-v3-progress-dot,.ubee-v3-progress-step.active .ubee-v3-progress-dot{background:var(--ubee-yellow);color:#111;box-shadow:0 0 0 1px var(--ubee-yellow-deep);}
@@ -8646,7 +8646,7 @@ body{background:#eef0f2;}
     type="button"
     onclick="goNext()"
   >
-    下一步
+    填寫任務資訊
   </button>
 
 </div>
@@ -8655,16 +8655,17 @@ body{background:#eef0f2;}
 
     <section class="step" id="step2">
 
-      <div class="ubee-v3-progress" aria-label="下單進度：填寫資訊">
+      <div class="ubee-v3-progress" aria-label="下單進度：第 2 步 任務資訊">
         <div class="ubee-v3-progress-track">
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
-          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
-          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
-          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">服務路線</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">任務資訊</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">任務時效</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">確認訂單</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">5</div><div class="ubee-v3-progress-label">任務進度</div></div>
         </div>
       </div>
 
-      <div class="headline">補充任務資訊</div>
+      <div class="headline">任務資訊</div>
       <div class="subtext">
         請完成這筆任務的聯絡方式、需求內容與其他必要資訊。
     </div>
@@ -8844,12 +8845,13 @@ body{background:#eef0f2;}
 
             <section class="step" id="step3">
 
-      <div class="ubee-v3-progress" aria-label="下單進度：任務時效">
+      <div class="ubee-v3-progress" aria-label="下單進度：第 3 步 任務時效">
         <div class="ubee-v3-progress-track">
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
-          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
-          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
-          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">服務路線</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">任務資訊</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">任務時效</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">確認訂單</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">5</div><div class="ubee-v3-progress-label">任務進度</div></div>
         </div>
       </div>
 
@@ -8942,12 +8944,13 @@ body{background:#eef0f2;}
 
     <section class="step" id="step4">
 
-      <div class="ubee-v3-progress" aria-label="下單進度：確認估價">
+      <div class="ubee-v3-progress" aria-label="下單進度：第 4 步 確認訂單">
         <div class="ubee-v3-progress-track">
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">選擇服務</div></div>
-          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">填寫資訊</div></div>
-          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">確認估價</div></div>
-          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">建立任務</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">服務路線</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">任務資訊</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">任務時效</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">確認訂單</div></div>
+          <div class="ubee-v3-progress-step"><div class="ubee-v3-progress-dot">5</div><div class="ubee-v3-progress-label">任務進度</div></div>
         </div>
       </div>
 
@@ -9028,6 +9031,16 @@ body{background:#eef0f2;}
     </section>
 
     <section class="step" id="step5">
+
+      <div class="ubee-v3-progress" aria-label="下單進度：第 5 步 任務進度">
+        <div class="ubee-v3-progress-track">
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">1</div><div class="ubee-v3-progress-label">服務路線</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">2</div><div class="ubee-v3-progress-label">任務資訊</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">3</div><div class="ubee-v3-progress-label">任務時效</div></div>
+          <div class="ubee-v3-progress-step done"><div class="ubee-v3-progress-dot">4</div><div class="ubee-v3-progress-label">確認訂單</div></div>
+          <div class="ubee-v3-progress-step active"><div class="ubee-v3-progress-dot">5</div><div class="ubee-v3-progress-label">任務進度</div></div>
+        </div>
+      </div>
 
       <div class="step5-order-header">
         <div class="step5-order-header-main">
