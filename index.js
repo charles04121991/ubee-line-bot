@@ -626,6 +626,616 @@ function calcDispatchPushDistanceKm(
   );
 }
 
+
+// =====================================================
+// UBee 預約任務 V1：時間模式、可接時段與預約媒合工具
+// - immediate：立即任務
+// - scheduled：指定時間預約
+// - flexible：彈性時段預約
+// =====================================================
+const UBEE_ORDER_TIMING_TYPES = Object.freeze({
+  IMMEDIATE: 'immediate',
+  SCHEDULED: 'scheduled',
+  FLEXIBLE: 'flexible',
+});
+
+const UBEE_SCHEDULE_CONFIRM_BEFORE_MS = 60 * 60 * 1000;
+const UBEE_SCHEDULE_START_EARLY_MS = 90 * 60 * 1000;
+const UBEE_SCHEDULE_EMERGENCY_BEFORE_MS = 15 * 60 * 1000;
+const UBEE_SCHEDULE_LATE_GRACE_MS = 15 * 60 * 1000;
+
+function normalizeOrderTimingType(value) {
+  const type = String(value || '').trim().toLowerCase();
+
+  if (
+    type === UBEE_ORDER_TIMING_TYPES.SCHEDULED ||
+    type === 'appointment' ||
+    type === 'fixed'
+  ) {
+    return UBEE_ORDER_TIMING_TYPES.SCHEDULED;
+  }
+
+  if (
+    type === UBEE_ORDER_TIMING_TYPES.FLEXIBLE ||
+    type === 'flex' ||
+    type === 'time_window'
+  ) {
+    return UBEE_ORDER_TIMING_TYPES.FLEXIBLE;
+  }
+
+  return UBEE_ORDER_TIMING_TYPES.IMMEDIATE;
+}
+
+function isScheduledOrderTiming(order = {}) {
+  return normalizeOrderTimingType(
+    order.orderTimingType ||
+    order.timingType ||
+    order.fulfillmentTiming ||
+    order.scheduleType
+  ) !== UBEE_ORDER_TIMING_TYPES.IMMEDIATE;
+}
+
+function getScheduleTimestampMs(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.round(value) : 0;
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Math.round(numeric);
+    }
+
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (typeof value?.toMillis === 'function') {
+    return value.toMillis();
+  }
+
+  if (typeof value?.toDate === 'function') {
+    return value.toDate().getTime();
+  }
+
+  if (typeof value?.seconds === 'number') {
+    return value.seconds * 1000;
+  }
+
+  return 0;
+}
+
+function getTaipeiDateParts(ms) {
+  const timestamp = getScheduleTimestampMs(ms);
+
+  if (!timestamp) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(new Date(timestamp))
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  );
+
+  const weekdayMap = {
+    Mon: 'mon',
+    Tue: 'tue',
+    Wed: 'wed',
+    Thu: 'thu',
+    Fri: 'fri',
+    Sat: 'sat',
+    Sun: 'sun',
+  };
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    dayKey: weekdayMap[parts.weekday] || '',
+    minutes: Number(parts.hour || 0) * 60 + Number(parts.minute || 0),
+  };
+}
+
+function parseHourMinuteToMinutes(value) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+}
+
+function normalizeRiderAvailabilitySchedule(input = {}) {
+  const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const result = {};
+
+  dayKeys.forEach(dayKey => {
+    const raw = input?.[dayKey];
+
+    if (!raw || typeof raw !== 'object') {
+      result[dayKey] = {
+        enabled: false,
+        start: '',
+        end: '',
+      };
+      return;
+    }
+
+    const start = String(raw.start || '').trim();
+    const end = String(raw.end || '').trim();
+    const startMinutes = parseHourMinuteToMinutes(start);
+    const endMinutes = parseHourMinuteToMinutes(end);
+
+    result[dayKey] = {
+      enabled:
+        raw.enabled === true &&
+        startMinutes !== null &&
+        endMinutes !== null &&
+        startMinutes !== endMinutes,
+      start:
+        startMinutes !== null
+          ? `${String(Math.floor(startMinutes / 60)).padStart(2, '0')}:${String(startMinutes % 60).padStart(2, '0')}`
+          : '',
+      end:
+        endMinutes !== null
+          ? `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
+          : '',
+    };
+  });
+
+  return result;
+}
+
+function normalizeTemporaryAvailability(input = {}) {
+  const start = String(input?.start || '').trim();
+  const end = String(input?.end || '').trim();
+  const date = String(input?.date || '').trim();
+  const startMinutes = parseHourMinuteToMinutes(start);
+  const endMinutes = parseHourMinuteToMinutes(end);
+
+  return {
+    enabled:
+      input?.enabled === true &&
+      /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+      startMinutes !== null &&
+      endMinutes !== null &&
+      startMinutes !== endMinutes,
+    date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '',
+    start:
+      startMinutes !== null
+        ? `${String(Math.floor(startMinutes / 60)).padStart(2, '0')}:${String(startMinutes % 60).padStart(2, '0')}`
+        : '',
+    end:
+      endMinutes !== null
+        ? `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
+        : '',
+  };
+}
+
+function isMinuteWithinAvailability(minutes, startMinutes, endMinutes) {
+  if (
+    !Number.isFinite(minutes) ||
+    !Number.isFinite(startMinutes) ||
+    !Number.isFinite(endMinutes) ||
+    startMinutes === endMinutes
+  ) {
+    return false;
+  }
+
+  if (endMinutes > startMinutes) {
+    return minutes >= startMinutes && minutes <= endMinutes;
+  }
+
+  // 支援跨午夜，例如 18:00～01:00。
+  return minutes >= startMinutes || minutes <= endMinutes;
+}
+
+function riderHasConfiguredAvailability(rider = {}) {
+  const schedule =
+    rider.availabilitySchedule &&
+    typeof rider.availabilitySchedule === 'object'
+      ? rider.availabilitySchedule
+      : {};
+
+  // 一旦小U曾儲存「我的接單時段」，即使七天全部關閉，也代表明確設定為不接預約。
+  const weeklyConfigured =
+    Object.keys(schedule).some(key => {
+      const day = schedule[key];
+
+      return (
+        day &&
+        typeof day === 'object' &&
+        (
+          Object.prototype.hasOwnProperty.call(day, 'enabled') ||
+          !!String(day.start || '').trim() ||
+          !!String(day.end || '').trim()
+        )
+      );
+    });
+
+  const temporary =
+    rider.temporaryAvailability;
+
+  const temporaryConfigured =
+    temporary &&
+    typeof temporary === 'object' &&
+    (
+      Object.prototype.hasOwnProperty.call(
+        temporary,
+        'enabled'
+      ) ||
+      !!String(temporary.date || '').trim()
+    );
+
+  return weeklyConfigured || temporaryConfigured;
+}
+
+function doAvailabilityRangesOverlap(
+  windowStartMinutes,
+  windowEndMinutes,
+  availableStartMinutes,
+  availableEndMinutes
+) {
+  const ws = Number(windowStartMinutes);
+  const we = Number(windowEndMinutes);
+  const as = Number(availableStartMinutes);
+  const ae = Number(availableEndMinutes);
+
+  if (
+    ![ws, we, as, ae].every(
+      Number.isFinite
+    )
+  ) {
+    return false;
+  }
+
+  const normalizeIntervals = (start, end) => {
+    if (start === end) {
+      return [[0, 1440]];
+    }
+
+    if (end > start) {
+      return [[start, end]];
+    }
+
+    return [
+      [start, 1440],
+      [0, end],
+    ];
+  };
+
+  const windowIntervals =
+    normalizeIntervals(ws, we);
+
+  const availableIntervals =
+    normalizeIntervals(as, ae);
+
+  return windowIntervals.some(
+    ([windowStart, windowEnd]) =>
+      availableIntervals.some(
+        ([availableStart, availableEnd]) =>
+          Math.max(
+            windowStart,
+            availableStart
+          ) <
+          Math.min(
+            windowEnd,
+            availableEnd
+          )
+      )
+  );
+}
+
+function riderMatchesScheduledOrderAvailability(rider = {}, order = {}) {
+  if (!isScheduledOrderTiming(order)) {
+    return true;
+  }
+
+  const timingType =
+    normalizeOrderTimingType(order.orderTimingType);
+
+  if (
+    timingType === UBEE_ORDER_TIMING_TYPES.SCHEDULED &&
+    rider.acceptScheduledOrders === false
+  ) {
+    return false;
+  }
+
+  if (
+    timingType === UBEE_ORDER_TIMING_TYPES.FLEXIBLE &&
+    rider.acceptFlexibleOrders === false
+  ) {
+    return false;
+  }
+
+  // 尚未設定精細時段的小U仍可看到預約單，避免既有小U突然失去任務。
+  if (!riderHasConfiguredAvailability(rider)) {
+    return true;
+  }
+
+  const startMs =
+    getScheduleTimestampMs(order.scheduledStartAtMs) ||
+    getScheduleTimestampMs(order.requestedScheduleAtMs) ||
+    getScheduleTimestampMs(order.desiredCompletionAtMs);
+
+  if (!startMs) {
+    return true;
+  }
+
+  const startTaipei =
+    getTaipeiDateParts(startMs);
+
+  if (!startTaipei) {
+    return true;
+  }
+
+  const isFlexible =
+    timingType ===
+    UBEE_ORDER_TIMING_TYPES.FLEXIBLE;
+
+  const endMs =
+    isFlexible
+      ? (
+          getScheduleTimestampMs(
+            order.scheduledEndAtMs
+          ) ||
+          getScheduleTimestampMs(
+            order.flexibleEndAtMs
+          )
+        )
+      : 0;
+
+  const endTaipei =
+    endMs
+      ? getTaipeiDateParts(endMs)
+      : null;
+
+  const matchesAvailability = availability => {
+    if (!availability?.enabled) {
+      return false;
+    }
+
+    const availableStart =
+      parseHourMinuteToMinutes(
+        availability.start
+      );
+
+    const availableEnd =
+      parseHourMinuteToMinutes(
+        availability.end
+      );
+
+    if (!isFlexible || !endTaipei) {
+      return isMinuteWithinAvailability(
+        startTaipei.minutes,
+        availableStart,
+        availableEnd
+      );
+    }
+
+    // 彈性預約採「時段有交集即可」，
+    // 例如客人給 18:00～20:00，小U 19:00～22:00 仍可承接。
+    if (
+      startTaipei.date ===
+      endTaipei.date
+    ) {
+      return doAvailabilityRangesOverlap(
+        startTaipei.minutes,
+        endTaipei.minutes,
+        availableStart,
+        availableEnd
+      );
+    }
+
+    // 跨日彈性時段保守視為涵蓋當日起點到午夜，
+    // 後續若開放多日預約再擴充為逐日比對。
+    return doAvailabilityRangesOverlap(
+      startTaipei.minutes,
+      1440,
+      availableStart,
+      availableEnd
+    );
+  };
+
+  const temporary =
+    normalizeTemporaryAvailability(
+      rider.temporaryAvailability || {}
+    );
+
+  if (
+    temporary.enabled &&
+    temporary.date === startTaipei.date &&
+    matchesAvailability(temporary)
+  ) {
+    return true;
+  }
+
+  const weekly =
+    normalizeRiderAvailabilitySchedule(
+      rider.availabilitySchedule || {}
+    );
+
+  const day =
+    weekly[startTaipei.dayKey];
+
+  return matchesAvailability(day);
+}
+
+function formatScheduleLabelFromMs(startMs, endMs = 0, timingType = 'scheduled') {
+  const start = getScheduleTimestampMs(startMs);
+  const end = getScheduleTimestampMs(endMs);
+
+  if (!start) {
+    return '';
+  }
+
+  const dateFormatter = new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const startText = dateFormatter.format(new Date(start));
+
+  if (
+    normalizeOrderTimingType(timingType) === UBEE_ORDER_TIMING_TYPES.FLEXIBLE &&
+    end > start
+  ) {
+    const timeFormatter = new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    return `${startText}～${timeFormatter.format(new Date(end))}`;
+  }
+
+  return startText;
+}
+
+function buildOrderScheduleMetadata(data = {}, durationSeconds = 0) {
+  const timingType =
+    normalizeOrderTimingType(data.orderTimingType);
+
+  if (timingType === UBEE_ORDER_TIMING_TYPES.IMMEDIATE) {
+    return {
+      orderTimingType: timingType,
+      scheduleGoal: 'immediate',
+      requestedScheduleAtMs: 0,
+      desiredCompletionAtMs: 0,
+      scheduledStartAtMs: 0,
+      scheduledEndAtMs: 0,
+      scheduleLabel: '立即任務',
+      scheduleStatus: 'not_applicable',
+      scheduleConfirmationRequired: false,
+    };
+  }
+
+  const routeDurationMs =
+    Math.max(0, Number(durationSeconds || 0)) * 1000;
+
+  const handlingBufferMs = 15 * 60 * 1000;
+
+  if (timingType === UBEE_ORDER_TIMING_TYPES.FLEXIBLE) {
+    const startMs =
+      getScheduleTimestampMs(data.flexibleStartAtMs);
+    const endMs =
+      getScheduleTimestampMs(data.flexibleEndAtMs);
+
+    return {
+      orderTimingType: timingType,
+      scheduleGoal: 'time_window',
+      requestedScheduleAtMs: startMs,
+      desiredCompletionAtMs: 0,
+      scheduledStartAtMs: startMs,
+      scheduledEndAtMs: endMs,
+      scheduleLabel:
+        formatScheduleLabelFromMs(
+          startMs,
+          endMs,
+          timingType
+        ),
+      scheduleStatus: 'awaiting_rider',
+      scheduleConfirmationRequired: false,
+      scheduleConfirmDueAtMs:
+        Math.max(
+          0,
+          startMs - UBEE_SCHEDULE_CONFIRM_BEFORE_MS
+        ),
+    };
+  }
+
+  const goal =
+    String(data.scheduleGoal || 'pickup_at')
+      .trim()
+      .toLowerCase() === 'complete_by'
+      ? 'complete_by'
+      : 'pickup_at';
+
+  const requestedMs =
+    getScheduleTimestampMs(data.requestedScheduleAtMs);
+
+  const plannedStartMs =
+    goal === 'complete_by'
+      ? Math.max(
+          Date.now(),
+          requestedMs -
+            routeDurationMs -
+            handlingBufferMs
+        )
+      : requestedMs;
+
+  const plannedEndMs =
+    goal === 'complete_by'
+      ? requestedMs
+      : plannedStartMs +
+        Math.max(
+          60 * 60 * 1000,
+          routeDurationMs + handlingBufferMs
+        );
+
+  return {
+    orderTimingType: timingType,
+    scheduleGoal: goal,
+    requestedScheduleAtMs: requestedMs,
+    desiredCompletionAtMs:
+      goal === 'complete_by'
+        ? requestedMs
+        : 0,
+    scheduledStartAtMs: plannedStartMs,
+    scheduledEndAtMs: plannedEndMs,
+    scheduleLabel:
+      formatScheduleLabelFromMs(
+        requestedMs,
+        0,
+        timingType
+      ),
+    scheduleStatus: 'awaiting_rider',
+    scheduleConfirmationRequired: false,
+    scheduleConfirmDueAtMs:
+      Math.max(
+        0,
+        plannedStartMs -
+          UBEE_SCHEDULE_CONFIRM_BEFORE_MS
+      ),
+  };
+}
+
 async function sendNewOrderPushToRiders(
   order,
   maxRadiusKm = null,
@@ -662,6 +1272,21 @@ async function sendNewOrderPushToRiders(
       Number(order.transferCount || 0) > 0 ||
       !!order.transferredAt ||
       !!order.redispatchStartedAtMs;
+
+    const isScheduledTask =
+      isScheduledOrderTiming(order);
+
+    const scheduleLabel =
+      String(
+        order.scheduleLabel ||
+        formatScheduleLabelFromMs(
+          order.scheduledStartAtMs ||
+          order.requestedScheduleAtMs,
+          order.scheduledEndAtMs,
+          order.orderTimingType
+        ) ||
+        ''
+      ).trim();
 
     const skippedRiderIds = new Set(
       (
@@ -751,14 +1376,18 @@ async function sendNewOrderPushToRiders(
         
         const pushPayload = JSON.stringify({
           title:
-            isRedispatch
-              ? "UBee 轉派任務"
-              : "UBee 新任務",
+            isScheduledTask
+              ? "UBee 預約任務"
+              : isRedispatch
+                ? "UBee 轉派任務"
+                : "UBee 新任務",
 
           body:
-`${isRedispatch
-  ? "有一張任務重新開放接單"
-  : "有新的跑腿任務等待接單"}
+`${isScheduledTask
+  ? `有新的預約任務等待承接${scheduleLabel ? `\n時間：${scheduleLabel}` : ""}`
+  : isRedispatch
+    ? "有一張任務重新開放接單"
+    : "有新的跑腿任務等待接單"}
 
 取件：${pickup}
 送達：${dropoff}
@@ -832,13 +1461,26 @@ async function sendNewOrderPushToRiders(
             return;
           }
           
+          const allowOffline =
+            safeOptions.allowOffline === true;
+
           if (
             !riderApproved ||
             !riderDispatchEligible ||
-            !riderOnline ||
+            (!riderOnline && !allowOffline) ||
             !webPushEnabled ||
             !subscription ||
             !subscription.endpoint
+          ) {
+            return;
+          }
+
+          if (
+            isScheduledTask &&
+            !riderMatchesScheduledOrderAvailability(
+              rider,
+              order
+            )
           ) {
             return;
           }
@@ -3655,11 +4297,37 @@ function isMerchantDispatchOrder(order) {
   );
 }
 
+function isRiderVisibleScheduledOrder(order) {
+  if (!order) return false;
+
+  const status =
+    String(order.status || '')
+      .trim()
+      .toLowerCase();
+
+  if (status !== 'pending_schedule') {
+    return false;
+  }
+
+  // 付款條件沿用正式派單規則，只把狀態暫時視為 pending_dispatch 檢查。
+  const paymentReadyShadow = {
+    ...order,
+    status: 'pending_dispatch',
+  };
+
+  return (
+    isPaidJkoDispatchOrder(paymentReadyShadow) ||
+    isCashDispatchOrder(paymentReadyShadow) ||
+    isMerchantDispatchOrder(paymentReadyShadow)
+  );
+}
+
 function isRiderVisibleDispatchOrder(order) {
   return (
     isPaidJkoDispatchOrder(order) ||
     isCashDispatchOrder(order) ||
-    isMerchantDispatchOrder(order)
+    isMerchantDispatchOrder(order) ||
+    isRiderVisibleScheduledOrder(order)
   );
 }
 
@@ -3667,6 +4335,8 @@ function isRiderVisibleDispatchOrder(order) {
 // 支援 phone / riderId，並保留 lineUserId 相容；待接單狀態也回傳 riderMapPickup。
 app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
   try {
+    await maintainScheduledOrders();
+
     const { lineUserId, phone, riderId } = req.query || {};
 
     const riderResult = await findApprovedRiderForApi({
@@ -3693,9 +4363,11 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
     
     const snap = await db
       .collection('orders')
-      .where('status', '==', 'pending_dispatch')
-      .limit(50)
+      .where('status', 'in', ['pending_dispatch', 'pending_schedule'])
+      .limit(80)
       .get();
+
+    const nowMs = Date.now();
 
     const orders = snap.docs
       .map(doc => ({
@@ -3704,6 +4376,26 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       }))
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => !isOrderSkippedForRider(order, identity))
+      .filter(order => {
+        const status = String(order.status || '').trim();
+
+        if (status !== 'pending_schedule') {
+          return true;
+        }
+
+        const endMs =
+          getScheduleTimestampMs(order.scheduledEndAtMs) ||
+          getScheduleTimestampMs(order.requestedScheduleAtMs);
+
+        if (endMs && endMs < nowMs) {
+          return false;
+        }
+
+        return riderMatchesScheduledOrderAvailability(
+          rider,
+          order
+        );
+      })
       .sort((a, b) => {
         const aTime = getDispatchPushTimeMs(
           a.createdAtMs || a.createdAt || a.updatedAtMs || a.updatedAt
@@ -3727,6 +4419,11 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
                 lng: pickupPoint.lng,
               }
             : null,
+
+          scheduleAvailabilityMatch:
+            String(order.status || '').trim() === 'pending_schedule'
+              ? riderMatchesScheduledOrderAvailability(rider, order)
+              : true,
         };
       });
 
@@ -3748,6 +4445,1010 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
     });
   }
 });
+
+
+// =====================================================
+// UBee 預約任務 V1：小U 可接時段、預約承接、再次確認與候補
+// =====================================================
+async function sendScheduledRiderReminder(
+  riderDocId,
+  {
+    title = 'UBee 預約任務提醒',
+    body = '',
+    orderId = '',
+  } = {}
+) {
+  try {
+    const safeRiderDocId =
+      String(riderDocId || '').trim();
+
+    if (!safeRiderDocId) {
+      return false;
+    }
+
+    const riderDoc =
+      await db
+        .collection('riders')
+        .doc(safeRiderDocId)
+        .get();
+
+    if (!riderDoc.exists) {
+      return false;
+    }
+
+    const rider = riderDoc.data() || {};
+
+    const tasks = [];
+
+    if (
+      WEB_PUSH_PUBLIC_KEY &&
+      WEB_PUSH_PRIVATE_KEY &&
+      rider.webPushEnabled === true &&
+      rider.webPushSubscription?.endpoint
+    ) {
+      tasks.push(
+        webpush.sendNotification(
+          rider.webPushSubscription,
+          JSON.stringify({
+            title,
+            body,
+            url: `/rider.html?tab=task&source=schedule_reminder${orderId ? `&orderId=${encodeURIComponent(orderId)}` : ''}`,
+            deepLink: `/rider.html?tab=task&source=schedule_reminder${orderId ? `&orderId=${encodeURIComponent(orderId)}` : ''}`,
+            orderId,
+          })
+        ).catch(async error => {
+          const statusCode =
+            Number(error?.statusCode || 0);
+
+          if (
+            statusCode === 404 ||
+            statusCode === 410
+          ) {
+            await db
+              .collection('riders')
+              .doc(safeRiderDocId)
+              .set(
+                {
+                  webPushSubscription:
+                    admin.firestore.FieldValue.delete(),
+                  webPushEnabled: false,
+                  webPushUpdatedAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
+          }
+        })
+      );
+    }
+
+    const lineUserId =
+      String(rider.lineUserId || '').trim();
+
+    if (lineUserId) {
+      tasks.push(
+        client
+          .pushMessage(
+            lineUserId,
+            createTextMessage(
+              `${title}\n\n${body}`
+            )
+          )
+          .catch(() => {})
+      );
+    }
+
+    await Promise.allSettled(tasks);
+
+    return true;
+  } catch (error) {
+    console.error(
+      '預約任務提醒小U失敗：',
+      error
+    );
+    return false;
+  }
+}
+
+async function releaseScheduledReservation(
+  order,
+  reason = 'rider_unavailable',
+  {
+    emergency = false,
+  } = {}
+) {
+  const orderId =
+    String(order?.id || order?.orderId || '')
+      .trim()
+      .toUpperCase();
+
+  if (!orderId) {
+    return null;
+  }
+
+  const nextStatus =
+    emergency
+      ? 'pending_dispatch'
+      : 'pending_schedule';
+
+  const nowMs = Date.now();
+
+  const updateData = {
+    status: nextStatus,
+    riderStatus: nextStatus,
+    scheduleStatus:
+      emergency
+        ? 'emergency_dispatch'
+        : 'awaiting_rider',
+    scheduleReleaseReason:
+      String(reason || 'rider_unavailable').slice(0, 80),
+    scheduleReleasedAtMs: nowMs,
+    scheduleReleasedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+    scheduleConfirmationRequired: false,
+    reservedRiderId: '',
+    reservedRiderDocId: '',
+    reservedRiderPhone: '',
+    reservedRiderName: '',
+    scheduleReservedAtMs: 0,
+    scheduleReservedAt: null,
+    riderConfirmedAtMs: 0,
+    riderConfirmedAt: null,
+    isScheduleEmergency: emergency === true,
+    updatedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  await db
+    .collection('orders')
+    .doc(orderId)
+    .set(
+      updateData,
+      { merge: true }
+    );
+
+  const updatedOrder = {
+    ...order,
+    ...updateData,
+    id: orderId,
+    status: nextStatus,
+    riderStatus: nextStatus,
+  };
+
+  orders[orderId] = updatedOrder;
+
+  if (emergency) {
+    startOrderDispatchInBackground(
+      updatedOrder
+    );
+  } else {
+    setImmediate(() => {
+      sendNewOrderPushToRiders(
+        updatedOrder,
+        null,
+        {
+          allowOffline: true,
+          scheduled: true,
+        }
+      ).catch(() => {});
+    });
+  }
+
+  return updatedOrder;
+}
+
+let scheduledMaintenanceRunning = false;
+
+async function maintainScheduledOrders() {
+  if (scheduledMaintenanceRunning) {
+    return;
+  }
+
+  scheduledMaintenanceRunning = true;
+
+  try {
+    const nowMs = Date.now();
+
+    const snap =
+      await db
+        .collection('orders')
+        .where(
+          'status',
+          'in',
+          [
+            'pending_schedule',
+            'scheduled_reserved',
+            'scheduled_confirmed',
+          ]
+        )
+        .limit(120)
+        .get();
+
+    for (const doc of snap.docs) {
+      const order = {
+        id: doc.id,
+        ...doc.data(),
+      };
+
+      const status =
+        String(order.status || '').trim();
+
+      const startMs =
+        getScheduleTimestampMs(
+          order.scheduledStartAtMs ||
+          order.requestedScheduleAtMs
+        );
+
+      const endMs =
+        getScheduleTimestampMs(
+          order.scheduledEndAtMs ||
+          order.desiredCompletionAtMs ||
+          order.requestedScheduleAtMs
+        );
+
+      if (!startMs) {
+        continue;
+      }
+
+      // 尚未有人承接，接近任務時間時自動轉為緊急即時派單。
+      if (
+        status === 'pending_schedule' &&
+        nowMs >=
+          startMs -
+            UBEE_SCHEDULE_EMERGENCY_BEFORE_MS
+      ) {
+        await releaseScheduledReservation(
+          order,
+          'schedule_near_start_no_rider',
+          { emergency: true }
+        );
+        continue;
+      }
+
+      if (status === 'scheduled_reserved') {
+        const confirmDueAtMs =
+          getScheduleTimestampMs(
+            order.scheduleConfirmDueAtMs
+          ) ||
+          Math.max(
+            0,
+            startMs -
+              UBEE_SCHEDULE_CONFIRM_BEFORE_MS
+          );
+
+        if (
+          nowMs >= confirmDueAtMs &&
+          order.scheduleConfirmationRequired !== true
+        ) {
+          await db
+            .collection('orders')
+            .doc(doc.id)
+            .set(
+              {
+                scheduleConfirmationRequired: true,
+                scheduleConfirmationRequestedAtMs:
+                  nowMs,
+                scheduleConfirmationRequestedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true }
+            );
+
+          await sendScheduledRiderReminder(
+            order.reservedRiderDocId,
+            {
+              title: '請確認 UBee 預約任務',
+              body:
+                `預約時間：${order.scheduleLabel || formatScheduleLabelFromMs(startMs, endMs, order.orderTimingType)}\n` +
+                `請進入騎士端「我的預約」確認是否可以準時執行。`,
+              orderId: doc.id,
+            }
+          );
+        }
+
+        // 預約前 30 分鐘仍未確認，釋放給候補小U。
+        if (
+          nowMs >= startMs - 30 * 60 * 1000 &&
+          !getScheduleTimestampMs(
+            order.riderConfirmedAtMs
+          )
+        ) {
+          await releaseScheduledReservation(
+            order,
+            'rider_not_confirmed_before_schedule',
+            {
+              emergency:
+                nowMs >=
+                startMs -
+                  UBEE_SCHEDULE_EMERGENCY_BEFORE_MS,
+            }
+          );
+
+          try {
+            await notifyCustomer(
+              order,
+              createTextMessage(
+                `📅 UBee 預約任務正在重新媒合\n\n` +
+                `訂單編號：${doc.id}\n` +
+                `原承接小U目前無法完成最終確認，系統已重新尋找可執行的小U。`
+              )
+            );
+          } catch (_) {}
+
+          continue;
+        }
+      }
+
+      // 已確認但超過預計開始 15 分鐘仍未開始，轉入緊急派單。
+      if (
+        status === 'scheduled_confirmed' &&
+        nowMs >
+          startMs +
+            UBEE_SCHEDULE_LATE_GRACE_MS
+      ) {
+        await releaseScheduledReservation(
+          order,
+          'confirmed_rider_did_not_start',
+          { emergency: true }
+        );
+
+        try {
+          await notifyCustomer(
+            order,
+            createTextMessage(
+              `⚠️ UBee 預約任務啟動候補媒合\n\n` +
+              `訂單編號：${doc.id}\n` +
+              `系統正在重新尋找可立即執行的小U。`
+            )
+          );
+        } catch (_) {}
+      }
+    }
+  } catch (error) {
+    console.error(
+      'UBee 預約任務維護失敗：',
+      error
+    );
+  } finally {
+    scheduledMaintenanceRunning = false;
+  }
+}
+
+setInterval(() => {
+  maintainScheduledOrders().catch(() => {});
+}, 5 * 60 * 1000).unref?.();
+
+app.get(
+  '/api/rider/schedule-preferences',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const riderResult =
+        await findApprovedRiderForApi(
+          req.query || {}
+        );
+
+      if (!riderResult.ok) {
+        return res
+          .status(riderResult.statusCode)
+          .json({
+            success: false,
+            message: riderResult.message,
+          });
+      }
+
+      const rider =
+        riderResult.rider || {};
+
+      return res.json({
+        success: true,
+        availabilitySchedule:
+          normalizeRiderAvailabilitySchedule(
+            rider.availabilitySchedule || {}
+          ),
+        temporaryAvailability:
+          normalizeTemporaryAvailability(
+            rider.temporaryAvailability || {}
+          ),
+        acceptImmediate:
+          rider.acceptImmediateOrders !== false,
+        acceptScheduled:
+          rider.acceptScheduledOrders !== false,
+        acceptFlexible:
+          rider.acceptFlexibleOrders !== false,
+      });
+    } catch (error) {
+      console.error(
+        '讀取小U可接時段失敗：',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: '讀取可接時段失敗。',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/rider/schedule-preferences',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const riderResult =
+        await findApprovedRiderForApi(
+          req.body || {}
+        );
+
+      if (!riderResult.ok) {
+        return res
+          .status(riderResult.statusCode)
+          .json({
+            success: false,
+            message: riderResult.message,
+          });
+      }
+
+      const availabilitySchedule =
+        normalizeRiderAvailabilitySchedule(
+          req.body?.availabilitySchedule || {}
+        );
+
+      const temporaryAvailability =
+        normalizeTemporaryAvailability(
+          req.body?.temporaryAvailability || {}
+        );
+
+      const updateData = {
+        availabilitySchedule,
+        temporaryAvailability,
+        acceptImmediateOrders:
+          req.body?.acceptImmediate !== false,
+        acceptScheduledOrders:
+          req.body?.acceptScheduled !== false,
+        acceptFlexibleOrders:
+          req.body?.acceptFlexible !== false,
+        availabilityUpdatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await db
+        .collection('riders')
+        .doc(riderResult.riderDoc.id)
+        .set(
+          updateData,
+          { merge: true }
+        );
+
+      return res.json({
+        success: true,
+        availabilitySchedule,
+        temporaryAvailability,
+        acceptImmediate:
+          updateData.acceptImmediateOrders,
+        acceptScheduled:
+          updateData.acceptScheduledOrders,
+        acceptFlexible:
+          updateData.acceptFlexibleOrders,
+        message: '可接時段已儲存。',
+      });
+    } catch (error) {
+      console.error(
+        '儲存小U可接時段失敗：',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: '儲存可接時段失敗。',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/rider/scheduled-orders',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      await maintainScheduledOrders();
+
+      const riderResult =
+        await findApprovedRiderForApi(
+          req.query || {}
+        );
+
+      if (!riderResult.ok) {
+        return res
+          .status(riderResult.statusCode)
+          .json({
+            success: false,
+            message: riderResult.message,
+          });
+      }
+
+      const snap =
+        await db
+          .collection('orders')
+          .where(
+            'reservedRiderDocId',
+            '==',
+            riderResult.riderDoc.id
+          )
+          .limit(50)
+          .get();
+
+      const scheduledOrders =
+        snap.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .filter(order =>
+            [
+              'scheduled_reserved',
+              'scheduled_confirmed',
+            ].includes(
+              String(order.status || '').trim()
+            )
+          )
+          .sort(
+            (a, b) =>
+              getScheduleTimestampMs(
+                a.scheduledStartAtMs
+              ) -
+              getScheduleTimestampMs(
+                b.scheduledStartAtMs
+              )
+          );
+
+      return res.json({
+        success: true,
+        orders: scheduledOrders,
+        count: scheduledOrders.length,
+      });
+    } catch (error) {
+      console.error(
+        '讀取小U預約任務失敗：',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: '讀取預約任務失敗。',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/rider/reserve-order',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const {
+        orderId,
+        lineUserId,
+        phone,
+        riderId,
+      } = req.body || {};
+
+      const riderResult =
+        await findApprovedRiderForApi({
+          lineUserId,
+          phone,
+          riderId,
+        });
+
+      if (!riderResult.ok) {
+        return res
+          .status(riderResult.statusCode)
+          .json({
+            success: false,
+            message: riderResult.message,
+          });
+      }
+
+      const safeOrderId =
+        String(orderId || '')
+          .trim()
+          .toUpperCase();
+
+      if (!safeOrderId) {
+        return res.status(400).json({
+          success: false,
+          message: '缺少訂單編號。',
+        });
+      }
+
+      const identity =
+        buildRiderApiIdentity(
+          riderResult.riderDoc,
+          riderResult.rider || {},
+          {
+            lineUserId,
+            phone,
+            riderId,
+          }
+        );
+
+      const orderRef =
+        db.collection('orders').doc(safeOrderId);
+
+      let reservedOrder = null;
+
+      await db.runTransaction(
+        async transaction => {
+          const orderDoc =
+            await transaction.get(orderRef);
+
+          if (!orderDoc.exists) {
+            throw new Error(
+              'ORDER_NOT_FOUND'
+            );
+          }
+
+          const order =
+            orderDoc.data() || {};
+
+          if (
+            String(order.status || '').trim() !==
+            'pending_schedule'
+          ) {
+            throw new Error(
+              'ORDER_NOT_AVAILABLE'
+            );
+          }
+
+          if (
+            !isRiderVisibleScheduledOrder(
+              order
+            )
+          ) {
+            throw new Error(
+              'ORDER_PAYMENT_NOT_CONFIRMED'
+            );
+          }
+
+          if (
+            !canRiderAcceptOrdersV4(
+              riderResult.rider || {}
+            )
+          ) {
+            throw new Error(
+              'RIDER_NOT_ELIGIBLE'
+            );
+          }
+
+          if (
+            !riderMeetsOrderV4Requirements(
+              riderResult.rider || {},
+              order
+            )
+          ) {
+            throw new Error(
+              'RIDER_V4_QUALIFICATION_REQUIRED'
+            );
+          }
+
+          if (
+            !riderMatchesScheduledOrderAvailability(
+              riderResult.rider || {},
+              order
+            )
+          ) {
+            throw new Error(
+              'RIDER_SCHEDULE_NOT_MATCHED'
+            );
+          }
+
+          const startMs =
+            getScheduleTimestampMs(
+              order.scheduledStartAtMs ||
+              order.requestedScheduleAtMs
+            );
+
+          if (
+            !startMs ||
+            startMs <= Date.now()
+          ) {
+            throw new Error(
+              'ORDER_SCHEDULE_EXPIRED'
+            );
+          }
+
+          const nowMs = Date.now();
+
+          const updateData = {
+            status: 'scheduled_reserved',
+            riderStatus: 'scheduled_reserved',
+            scheduleStatus: 'reserved',
+            reservedRiderId:
+              identity.riderId,
+            reservedRiderDocId:
+              identity.riderDocId,
+            reservedRiderPhone:
+              identity.phone,
+            reservedRiderName:
+              riderResult.rider?.name ||
+              riderResult.rider?.riderName ||
+              '',
+            scheduleReservedAtMs:
+              nowMs,
+            scheduleReservedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            scheduleConfirmDueAtMs:
+              Math.max(
+                0,
+                startMs -
+                  UBEE_SCHEDULE_CONFIRM_BEFORE_MS
+              ),
+            scheduleConfirmationRequired:
+              false,
+            updatedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+          };
+
+          transaction.update(
+            orderRef,
+            updateData
+          );
+
+          reservedOrder = {
+            ...order,
+            ...updateData,
+            id: safeOrderId,
+          };
+        }
+      );
+
+      orders[safeOrderId] =
+        reservedOrder;
+
+      try {
+        await notifyCustomer(
+          reservedOrder,
+          createTextMessage(
+            `📅 UBee 預約已成立\n\n` +
+            `訂單編號：${safeOrderId}\n` +
+            `預約時間：${reservedOrder.scheduleLabel || '-'}\n\n` +
+            `已有小U提前承接這筆預約。任務前系統會再次確認小U是否可以準時執行。`
+          )
+        );
+      } catch (_) {}
+
+      return res.json({
+        success: true,
+        orderId: safeOrderId,
+        status: 'scheduled_reserved',
+        order: reservedOrder,
+        message: '已成功預約承接這筆任務。',
+      });
+    } catch (error) {
+      const code =
+        String(error?.message || '');
+
+      const map = {
+        ORDER_NOT_FOUND:
+          [404, '找不到此預約任務。'],
+        ORDER_NOT_AVAILABLE:
+          [409, '這筆預約任務已被其他小U承接或狀態已更新。'],
+        ORDER_PAYMENT_NOT_CONFIRMED:
+          [409, '此預約任務尚未符合承接條件。'],
+        RIDER_NOT_ELIGIBLE:
+          [403, '你的帳號目前無法承接任務，請先確認接單資格。'],
+        RIDER_V4_QUALIFICATION_REQUIRED:
+          [403, '你的資格目前不符合這筆任務。'],
+        RIDER_SCHEDULE_NOT_MATCHED:
+          [409, '這筆預約時間不在你設定的可接時段內。'],
+        ORDER_SCHEDULE_EXPIRED:
+          [409, '這筆預約時間已過，無法再提前承接。'],
+      };
+
+      const response =
+        map[code] ||
+        [500, '預約承接失敗，請稍後再試。'];
+
+      return res
+        .status(response[0])
+        .json({
+          success: false,
+          code,
+          message: response[1],
+        });
+    }
+  }
+);
+
+app.post(
+  '/api/rider/confirm-scheduled-order',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const {
+        orderId,
+        canExecute,
+        lineUserId,
+        phone,
+        riderId,
+      } = req.body || {};
+
+      const riderResult =
+        await findApprovedRiderForApi({
+          lineUserId,
+          phone,
+          riderId,
+        });
+
+      if (!riderResult.ok) {
+        return res
+          .status(riderResult.statusCode)
+          .json({
+            success: false,
+            message: riderResult.message,
+          });
+      }
+
+      const safeOrderId =
+        String(orderId || '')
+          .trim()
+          .toUpperCase();
+
+      const identity =
+        buildRiderApiIdentity(
+          riderResult.riderDoc,
+          riderResult.rider || {},
+          {
+            lineUserId,
+            phone,
+            riderId,
+          }
+        );
+
+      const orderRef =
+        db.collection('orders').doc(safeOrderId);
+
+      const orderDoc =
+        await orderRef.get();
+
+      if (!orderDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到此預約任務。',
+        });
+      }
+
+      const order = {
+        id: orderDoc.id,
+        ...orderDoc.data(),
+      };
+
+      if (
+        String(
+          order.reservedRiderDocId || ''
+        ).trim() !== identity.riderDocId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: '這筆預約不是由目前的小U承接。',
+        });
+      }
+
+      if (
+        ![
+          'scheduled_reserved',
+          'scheduled_confirmed',
+        ].includes(
+          String(order.status || '').trim()
+        )
+      ) {
+        return res.status(409).json({
+          success: false,
+          message: '這筆預約狀態已更新，請重新整理。',
+        });
+      }
+
+      if (canExecute === false) {
+        const startMs =
+          getScheduleTimestampMs(
+            order.scheduledStartAtMs
+          );
+
+        const updated =
+          await releaseScheduledReservation(
+            order,
+            'rider_declined_final_confirmation',
+            {
+              emergency:
+                startMs > 0 &&
+                Date.now() >=
+                  startMs -
+                    UBEE_SCHEDULE_EMERGENCY_BEFORE_MS,
+            }
+          );
+
+        try {
+          await notifyCustomer(
+            order,
+            createTextMessage(
+              `📅 UBee 預約任務正在重新媒合\n\n` +
+              `訂單編號：${safeOrderId}\n` +
+              `原承接小U臨時無法執行，系統已立即尋找候補小U。`
+            )
+          );
+        } catch (_) {}
+
+        return res.json({
+          success: true,
+          order: updated,
+          message: '已回報無法執行，系統會重新媒合候補小U。',
+        });
+      }
+
+      const nowMs = Date.now();
+
+      const updateData = {
+        status: 'scheduled_confirmed',
+        riderStatus: 'scheduled_confirmed',
+        scheduleStatus: 'confirmed',
+        scheduleConfirmationRequired: false,
+        riderConfirmedAtMs: nowMs,
+        riderConfirmedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await orderRef.set(
+        updateData,
+        { merge: true }
+      );
+
+      const updatedOrder = {
+        ...order,
+        ...updateData,
+        id: safeOrderId,
+      };
+
+      orders[safeOrderId] =
+        updatedOrder;
+
+      try {
+        await notifyCustomer(
+          updatedOrder,
+          createTextMessage(
+            `✅ 小U已確認 UBee 預約任務\n\n` +
+            `訂單編號：${safeOrderId}\n` +
+            `預約時間：${updatedOrder.scheduleLabel || '-'}\n\n` +
+            `小U已完成任務前確認，請留意後續出發與取件進度。`
+          )
+        );
+      } catch (_) {}
+
+      return res.json({
+        success: true,
+        order: updatedOrder,
+        status: 'scheduled_confirmed',
+        message: '已確認可以準時執行。',
+      });
+    } catch (error) {
+      console.error(
+        '確認預約任務失敗：',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: '確認預約任務失敗。',
+      });
+    }
+  }
+);
 
 // 3. 取得騎士目前進行中任務：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
@@ -11815,6 +13516,9 @@ function getStatusLabel(status) {
   return ({
     draft_confirm: '📝 待確認',
     pending_payment: '🟡 待確認現金單',
+    pending_schedule: '📅 預約媒合中',
+    scheduled_reserved: '📅 預約已承接',
+    scheduled_confirmed: '✅ 預約已確認',
     pending_dispatch: '🟡 待派單',
     accepted: '🟢 已接單',
     arrived_pickup: '🟠 已抵達取件地點',
@@ -12029,6 +13733,55 @@ function validateOrderInput(data) {
     errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額，請先聯繫 UBee 跑腿客服人工確認。');
   }
 
+  const timingType =
+    normalizeOrderTimingType(
+      data.orderTimingType
+    );
+
+  const minimumFutureMs =
+    Date.now() + 30 * 60 * 1000;
+
+  if (
+    timingType ===
+    UBEE_ORDER_TIMING_TYPES.SCHEDULED
+  ) {
+    const requestedMs =
+      getScheduleTimestampMs(
+        data.requestedScheduleAtMs
+      );
+
+    if (!requestedMs) {
+      errors.push('請選擇正確的預約日期與時間。');
+    } else if (requestedMs < minimumFutureMs) {
+      errors.push('預約時間至少需要晚於現在 30 分鐘，請重新選擇。');
+    }
+  }
+
+  if (
+    timingType ===
+    UBEE_ORDER_TIMING_TYPES.FLEXIBLE
+  ) {
+    const startMs =
+      getScheduleTimestampMs(
+        data.flexibleStartAtMs
+      );
+
+    const endMs =
+      getScheduleTimestampMs(
+        data.flexibleEndAtMs
+      );
+
+    if (!startMs || !endMs) {
+      errors.push('請完整選擇彈性預約的開始與結束時間。');
+    } else if (startMs < minimumFutureMs) {
+      errors.push('彈性預約開始時間至少需要晚於現在 30 分鐘。');
+    } else if (endMs <= startMs) {
+      errors.push('彈性預約結束時間必須晚於開始時間。');
+    } else if (endMs - startMs > 12 * 60 * 60 * 1000) {
+      errors.push('單一彈性預約時段最長為 12 小時，請縮短時間範圍。');
+    }
+  }
+
   return errors;
 }
 
@@ -12043,6 +13796,10 @@ function getDuplicateFingerprint(data) {
     String(data.dropoffPhone || '').trim(),
     cleanText(data.item, ORDER_INPUT_LIMITS.item),
     String(data.speedType || 'standard'),
+    String(data.orderTimingType || 'immediate'),
+    String(data.requestedScheduleAtMs || ''),
+    String(data.flexibleStartAtMs || ''),
+    String(data.flexibleEndAtMs || ''),
   ].join('|');
 }
 
@@ -13642,6 +15399,43 @@ function createOrderFromApi(data) {
         )
       : 'standard',
 
+    // UBee 任務時間模式：立即／指定時間／彈性時段
+    orderTimingType:
+      normalizeOrderTimingType(
+        data.orderTimingType ||
+        data.timingType ||
+        data.fulfillmentTiming
+      ),
+
+    scheduleGoal:
+      String(
+        data.scheduleGoal ||
+        'pickup_at'
+      )
+        .trim()
+        .toLowerCase() === 'complete_by'
+          ? 'complete_by'
+          : 'pickup_at',
+
+    requestedScheduleAtMs:
+      getScheduleTimestampMs(
+        data.requestedScheduleAtMs ||
+        data.scheduledAtMs ||
+        data.scheduledAt
+      ),
+
+    flexibleStartAtMs:
+      getScheduleTimestampMs(
+        data.flexibleStartAtMs ||
+        data.scheduleWindowStartAtMs
+      ),
+
+    flexibleEndAtMs:
+      getScheduleTimestampMs(
+        data.flexibleEndAtMs ||
+        data.scheduleWindowEndAtMs
+      ),
+
     note: rawNote,
 
     advancePayment:
@@ -15111,6 +16905,14 @@ app.post('/api/orders', async (req, res) => {
 const serviceSubtotal = Math.max(0, Math.round(Number(price.total || 0)));
 const customerPayableTotal = serviceSubtotal + advancePayment;
 
+    const scheduleMetadata =
+      buildOrderScheduleMetadata(
+        data,
+        data.serviceMode === 'queue'
+          ? 0
+          : Number(distance?.durationSeconds || 0)
+      );
+
     const order = {
   id,
 
@@ -15196,6 +16998,9 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   // ==============================
   speedType:
     data.speedType,
+
+  // 立即／指定時間／彈性時段預約。
+  ...scheduleMetadata,
 
   upstairsOption:
     data.upstairsOption,
@@ -15503,19 +17308,65 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
       order.isPaid = false;
       order.paidAt = null;
 
-      // 現金單確認後，直接進入待派單
-      order.status = 'pending_dispatch';
+      const scheduledOrder =
+        isScheduledOrderTiming(order);
+
+      // 立即單：直接進入待派單。
+      // 預約單：進入預約任務池，不會立刻要求小U出發。
+      order.status =
+        scheduledOrder
+          ? 'pending_schedule'
+          : 'pending_dispatch';
+
+      order.riderStatus =
+        order.status;
+
+      order.scheduleStatus =
+        scheduledOrder
+          ? 'awaiting_rider'
+          : (
+              order.scheduleStatus ||
+              'not_applicable'
+            );
+
       order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
       await saveOrder(order);
+
+      if (scheduledOrder) {
+        setImmediate(() => {
+          sendNewOrderPushToRiders(
+            order,
+            null,
+            {
+              allowOffline: true,
+              scheduled: true,
+            }
+          ).catch((pushError) => {
+            console.error(
+              '⚠️ 預約任務已建立，但通知可承接小U失敗：',
+              pushError
+            );
+          });
+        });
+      }
 
       setImmediate(() => {
   notifyCustomer(
     order,
     createTextMessage(
-      `你已選擇付款方式：現金付款\n\n` +
-      `本單將由騎士於任務完成時向你收取現金。\n` +
-      `預計收取金額：NT$${customerPayableTotal}。`
+      scheduledOrder
+        ? (
+            `📅 UBee 預約需求已建立\n\n` +
+            `預約時間：${order.scheduleLabel || '-'}\n` +
+            `系統正在媒合可以在指定時間執行的小U。\n` +
+            `任務完成時由小U向你收取現金，預計收取 NT$${customerPayableTotal}。`
+          )
+        : (
+            `你已選擇付款方式：現金付款\n\n` +
+            `本單將由騎士於任務完成時向你收取現金。\n` +
+            `預計收取金額：NT$${customerPayableTotal}。`
+          )
     )
   ).catch((notifyErr) => {
     console.error(
@@ -15539,7 +17390,10 @@ app.post('/api/orders/:orderId/payment-method', async (req, res) => {
         customerPayableTotal,
         advancePayment,
         paymentInfo: getPaymentInfo('cash', customerPayableTotal),
-        message: '已選擇現金單，系統開始媒合騎士。',
+        message:
+          scheduledOrder
+            ? '已建立預約需求，系統開始媒合可於指定時間執行的小U。'
+            : '已選擇現金單，系統開始媒合騎士。',
       });
     }
 
@@ -15765,12 +17619,69 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         }
       }
 
-      if (order.status !== 'pending_dispatch') {
+      const orderStatus =
+        String(order.status || '').trim();
+
+      const isScheduledReservedForThisRider =
+        [
+          'scheduled_reserved',
+          'scheduled_confirmed',
+        ].includes(orderStatus) &&
+        String(
+          order.reservedRiderDocId || ''
+        ).trim() === identity.riderDocId;
+
+      if (
+        orderStatus !== 'pending_dispatch' &&
+        !isScheduledReservedForThisRider
+      ) {
         throw new Error('ORDER_ALREADY_ACCEPTED');
       }
 
-      if (!isRiderVisibleDispatchOrder(order)) {
+      if (
+        !isRiderVisibleDispatchOrder(order) &&
+        !isScheduledReservedForThisRider
+      ) {
         throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
+      }
+
+      if (isScheduledReservedForThisRider) {
+        const startMs =
+          getScheduleTimestampMs(
+            order.scheduledStartAtMs ||
+            order.requestedScheduleAtMs
+          );
+
+        const endMs =
+          getScheduleTimestampMs(
+            order.scheduledEndAtMs ||
+            order.desiredCompletionAtMs ||
+            order.requestedScheduleAtMs
+          );
+
+        const nowMs = Date.now();
+
+        if (
+          startMs &&
+          nowMs <
+            startMs -
+              UBEE_SCHEDULE_START_EARLY_MS
+        ) {
+          throw new Error(
+            'SCHEDULE_NOT_READY'
+          );
+        }
+
+        if (
+          endMs &&
+          nowMs >
+            endMs +
+              60 * 60 * 1000
+        ) {
+          throw new Error(
+            'ORDER_SCHEDULE_EXPIRED'
+          );
+        }
       }
 
       if (isOrderSkippedForRider(order, identity)) {
@@ -15805,6 +17716,16 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         trackingEndedAtMs: null,
         trackingEndedAt: null,
         trackingStopReason: '',
+
+        ...(isScheduledReservedForThisRider
+          ? {
+              scheduleStatus: 'in_progress',
+              scheduleStartedAtMs: trackingStartedAtMs,
+              scheduleStartedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+              scheduleConfirmationRequired: false,
+            }
+          : {}),
 
         ...acceptedEtaPayload,
       };
@@ -15926,6 +17847,22 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       return res.status(409).json({
         success: false,
         message: '你已略過或取消這張任務，系統已轉派給其他騎士。',
+      });
+    }
+
+    if (error.message === 'SCHEDULE_NOT_READY') {
+      return res.status(409).json({
+        success: false,
+        code: 'SCHEDULE_NOT_READY',
+        message: '這筆預約任務尚未進入可開始執行的時間，請依預約時間再開始任務。',
+      });
+    }
+
+    if (error.message === 'ORDER_SCHEDULE_EXPIRED') {
+      return res.status(409).json({
+        success: false,
+        code: 'ORDER_SCHEDULE_EXPIRED',
+        message: '這筆預約任務的執行時段已過，系統將重新確認調度狀態。',
       });
     }
     
