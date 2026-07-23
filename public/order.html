@@ -8282,6 +8282,149 @@ body{background:#eef0f2;}
 }
 
 </style>
+
+  <style id="ubee-order-timing-v1-style">
+    .ubee-timing-mode-list{
+      display:grid;
+      gap:10px;
+      margin:0 0 16px;
+    }
+    .ubee-timing-mode-card{
+      width:100%;
+      display:grid;
+      grid-template-columns:42px minmax(0,1fr) 24px;
+      align-items:center;
+      gap:12px;
+      padding:15px 16px;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#fff;
+      color:#111;
+      text-align:left;
+      box-shadow:0 8px 22px rgba(17,24,39,.04);
+    }
+    .ubee-timing-mode-card.active{
+      border-color:#e2b400;
+      background:#fffbed;
+      box-shadow:0 0 0 1px rgba(244,189,0,.18) inset;
+    }
+    .ubee-timing-mode-icon{
+      width:42px;
+      height:42px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:14px;
+      background:#f5f6f7;
+      font-size:21px;
+    }
+    .ubee-timing-mode-card.active .ubee-timing-mode-icon{
+      background:#facc15;
+    }
+    .ubee-timing-mode-main{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .ubee-timing-mode-main strong{
+      font-size:16px;
+      font-weight:1000;
+      line-height:1.35;
+    }
+    .ubee-timing-mode-main small{
+      color:#7b8086;
+      font-size:12px;
+      font-weight:800;
+      line-height:1.55;
+    }
+    .ubee-timing-mode-check{
+      width:22px;
+      height:22px;
+      border:2px solid #c9cdd1;
+      border-radius:50%;
+      position:relative;
+    }
+    .ubee-timing-mode-card.active .ubee-timing-mode-check{
+      border-color:#111;
+      background:#facc15;
+    }
+    .ubee-timing-mode-card.active .ubee-timing-mode-check::after{
+      content:"";
+      position:absolute;
+      inset:5px;
+      border-radius:50%;
+      background:#111;
+    }
+    .ubee-timing-panel{
+      margin:0 0 16px;
+      padding:15px;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#fff;
+      box-shadow:0 8px 22px rgba(17,24,39,.04);
+    }
+    .ubee-timing-panel-title{
+      margin-bottom:12px;
+      font-size:15px;
+      font-weight:1000;
+      color:#111;
+    }
+    .ubee-timing-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+    .ubee-timing-field{
+      display:block;
+      margin-bottom:10px;
+    }
+    .ubee-timing-field>span{
+      display:block;
+      margin-bottom:7px;
+      color:#555b61;
+      font-size:12px;
+      font-weight:900;
+    }
+    .ubee-timing-field input,
+    .ubee-timing-field select{
+      width:100%;
+      min-height:48px;
+      padding:10px 12px;
+      border:1px solid #e2e4e7;
+      border-radius:14px;
+      background:#f8f9fa;
+      color:#111;
+      font-weight:900;
+    }
+    .ubee-timing-note{
+      margin-top:4px;
+      padding:11px 12px;
+      border-radius:13px;
+      background:#f6f7f8;
+      color:#70757b;
+      font-size:12px;
+      font-weight:800;
+      line-height:1.6;
+    }
+    .review-schedule-highlight{
+      width:100%;
+      margin-top:10px;
+      padding:12px 14px;
+      text-align:left;
+      border:1px solid rgba(244,189,0,.32);
+      border-radius:15px;
+      background:#fffbed;
+      color:#594600;
+      font-size:13px;
+      font-weight:900;
+      line-height:1.55;
+    }
+    @media(max-width:390px){
+      .ubee-timing-grid{grid-template-columns:1fr;}
+    }
+  </style>
+
 </head>
 
 <body>
@@ -8855,43 +8998,127 @@ body{background:#eef0f2;}
         </div>
       </div>
 
-      <div class="headline">任務時效</div>
-      <div class="subtext">選擇你希望這筆任務多快完成，不同時效方案會影響系統的處理優先度與預估費用。</div>
+      <div class="headline">任務時效與預約</div>
+      <div class="subtext">選擇立即執行、指定時間預約或彈性時段預約。預約任務會先媒合可於指定時間執行的小U，不會要求小U現在立刻出發。</div>
 
-      <div class="speed-list">
-        <div class="speed-card active" data-speed="standard" onclick="selectSpeed('standard')">
-          <div class="speed-top">
-            <div>
-              <div class="speed-name">一般件</div>
-              <div class="speed-time">60-90 分鐘</div>
-            </div>
-            <div class="speed-check">✓</div>
-          </div>
-          <div class="speed-desc">適合一般生活跑腿與非急迫配送任務。</div>
-        </div>
+      <div class="ubee-timing-mode-list" id="timingModeList">
+        <button class="ubee-timing-mode-card active" type="button" data-timing="immediate" onclick="selectOrderTimingType('immediate')">
+          <span class="ubee-timing-mode-icon">⚡</span>
+          <span class="ubee-timing-mode-main">
+            <strong>立即任務</strong>
+            <small>現在開始媒合附近可接單的小U</small>
+          </span>
+          <span class="ubee-timing-mode-check"></span>
+        </button>
 
-        <div class="speed-card" data-speed="priority" onclick="selectSpeed('priority')">
-          <div class="speed-top">
-            <div>
-              <div class="speed-name">標準件</div>
-              <div class="speed-time">30-60 分鐘</div>
-            </div>
-            <div class="speed-check">✓</div>
-          </div>
-          <div class="speed-desc">適合希望更快開始處理的日常任務。</div>
-        </div>
+        <button class="ubee-timing-mode-card" type="button" data-timing="scheduled" onclick="selectOrderTimingType('scheduled')">
+          <span class="ubee-timing-mode-icon">📅</span>
+          <span class="ubee-timing-mode-main">
+            <strong>指定時間預約</strong>
+            <small>指定取件時間，或指定希望完成時間</small>
+          </span>
+          <span class="ubee-timing-mode-check"></span>
+        </button>
 
-        <div class="speed-card" data-speed="express" onclick="selectSpeed('express')">
-          <div class="speed-top">
-            <div>
-              <div class="speed-name">優先件</div>
-              <div class="speed-time">20-30 分鐘</div>
+        <button class="ubee-timing-mode-card" type="button" data-timing="flexible" onclick="selectOrderTimingType('flexible')">
+          <span class="ubee-timing-mode-icon">🕐</span>
+          <span class="ubee-timing-mode-main">
+            <strong>彈性時段預約</strong>
+            <small>提供一段可執行時段，讓有正職的小U更容易安排</small>
+          </span>
+          <span class="ubee-timing-mode-check"></span>
+        </button>
+      </div>
+
+      <div id="immediateTimingPanel" class="ubee-timing-panel">
+        <div class="ubee-timing-panel-title">立即任務處理速度</div>
+        <div class="speed-list">
+          <div class="speed-card active" data-speed="standard" onclick="selectSpeed('standard')">
+            <div class="speed-top">
+              <div>
+                <div class="speed-name">一般件</div>
+                <div class="speed-time">60-90 分鐘</div>
+              </div>
+              <div class="speed-check">✓</div>
             </div>
-            <div class="speed-check">✓</div>
+            <div class="speed-desc">適合一般生活跑腿與非急迫配送任務。</div>
           </div>
-          <div class="speed-desc">適合急件、限時配送與高急迫性任務。</div>
+
+          <div class="speed-card" data-speed="priority" onclick="selectSpeed('priority')">
+            <div class="speed-top">
+              <div>
+                <div class="speed-name">標準件</div>
+                <div class="speed-time">30-60 分鐘</div>
+              </div>
+              <div class="speed-check">✓</div>
+            </div>
+            <div class="speed-desc">適合希望更快開始處理的日常任務。</div>
+          </div>
+
+          <div class="speed-card" data-speed="express" onclick="selectSpeed('express')">
+            <div class="speed-top">
+              <div>
+                <div class="speed-name">優先件</div>
+                <div class="speed-time">20-30 分鐘</div>
+              </div>
+              <div class="speed-check">✓</div>
+            </div>
+            <div class="speed-desc">適合急件、限時配送與高急迫性任務。</div>
+          </div>
         </div>
       </div>
+
+      <div id="scheduledTimingPanel" class="ubee-timing-panel hidden">
+        <div class="ubee-timing-panel-title">指定時間預約</div>
+
+        <label class="ubee-timing-field">
+          <span>預約方式</span>
+          <select id="scheduleGoal" onchange="handleScheduleInputChanged()">
+            <option value="pickup_at">希望在指定時間取件</option>
+            <option value="complete_by">希望在指定時間前完成</option>
+          </select>
+        </label>
+
+        <div class="ubee-timing-grid">
+          <label class="ubee-timing-field">
+            <span>日期</span>
+            <input id="scheduledDate" type="date" onchange="handleScheduleInputChanged()">
+          </label>
+          <label class="ubee-timing-field">
+            <span>時間</span>
+            <input id="scheduledTime" type="time" step="300" onchange="handleScheduleInputChanged()">
+          </label>
+        </div>
+
+        <div class="ubee-timing-note" id="scheduledTimingHint">
+          預約建立後，系統會先媒合可以在指定時間執行的小U；有人承接後才會顯示「預約已成立」。
+        </div>
+      </div>
+
+      <div id="flexibleTimingPanel" class="ubee-timing-panel hidden">
+        <div class="ubee-timing-panel-title">彈性時段預約</div>
+
+        <label class="ubee-timing-field">
+          <span>日期</span>
+          <input id="flexibleDate" type="date" onchange="handleScheduleInputChanged()">
+        </label>
+
+        <div class="ubee-timing-grid">
+          <label class="ubee-timing-field">
+            <span>開始時間</span>
+            <input id="flexibleStartTime" type="time" step="300" onchange="handleScheduleInputChanged()">
+          </label>
+          <label class="ubee-timing-field">
+            <span>結束時間</span>
+            <input id="flexibleEndTime" type="time" step="300" onchange="handleScheduleInputChanged()">
+          </label>
+        </div>
+
+        <div class="ubee-timing-note">
+          例如「明天 18:30～20:30」；這類任務最適合可在下班後或特定空檔接單的小U。
+        </div>
+      </div>
+
       <div class="step3-action-footer">
 
   <button
@@ -9294,6 +9521,11 @@ let serviceType = '文件急送';
 let serviceCategory = '一般文件';
 let serviceMode = 'normal';
 let speedType = 'standard';
+
+// UBee 任務時間模式：立即／指定時間預約／彈性時段預約。
+let orderTimingType = 'immediate';
+let scheduleGoal = 'pickup_at';
+
 let currentOrderId = '';
 let selectedPaymentMethod = '';
 let currentOrderData = null;
@@ -10566,19 +10798,82 @@ function renderStep5LiveStatus(
       break;
 
 
-    case 'pending_dispatch':
+    case 'pending_schedule':
 
       primaryText =
-        '媒合中';
+        '預約媒合中';
 
       labelText =
         '目前狀態';
 
       titleText =
-        '正在為你尋找附近的小U';
+        '正在媒合可於指定時間執行的小U';
 
       metaText =
-        '小U接單後會顯示距離與預計抵達時間';
+        data.scheduleLabel
+          ? `預約時間 ${data.scheduleLabel}`
+          : '有人承接後，系統才會顯示預約已成立';
+
+      break;
+
+
+    case 'scheduled_reserved':
+
+      primaryText =
+        '預約已成立';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '已有小U提前承接這筆預約';
+
+      metaText =
+        data.scheduleLabel
+          ? `${data.scheduleLabel}・任務前會再次確認`
+          : '任務前系統會再次確認小U是否可以準時執行';
+
+      break;
+
+
+    case 'scheduled_confirmed':
+
+      primaryText =
+        '已確認';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        '小U已確認可以執行預約任務';
+
+      metaText =
+        data.scheduleLabel
+          ? `預約時間 ${data.scheduleLabel}`
+          : '請留意後續出發與取件進度';
+
+      break;
+
+
+    case 'pending_dispatch':
+
+      primaryText =
+        data.isScheduleEmergency === true
+          ? '候補媒合'
+          : '媒合中';
+
+      labelText =
+        '目前狀態';
+
+      titleText =
+        data.isScheduleEmergency === true
+          ? '正在緊急媒合候補小U'
+          : '正在為你尋找附近的小U';
+
+      metaText =
+        data.isScheduleEmergency === true && data.scheduleLabel
+          ? `原預約時間 ${data.scheduleLabel}`
+          : '小U接單後會顯示距離與預計抵達時間';
 
       break;
 
@@ -11982,6 +12277,9 @@ function isPaymentChangeLocked(order){
 
   const lockedStatuses = [
     'pending_dispatch',
+    'pending_schedule',
+    'scheduled_reserved',
+    'scheduled_confirmed',
     'merchant_pending',
     'accepted',
     'arrived_pickup',
@@ -12612,6 +12910,268 @@ function syncQueueLocation(){
   }
 }
 
+
+function getTaipeiNowParts(){
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA',{
+    timeZone:'Asia/Taipei',
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit',
+    hour:'2-digit',
+    minute:'2-digit',
+    hour12:false
+  }).formatToParts(now);
+
+  const map = {};
+  parts.forEach(part=>{
+    if(part.type !== 'literal') map[part.type] = part.value;
+  });
+
+  return {
+    date:`${map.year}-${map.month}-${map.day}`,
+    time:`${map.hour}:${map.minute}`
+  };
+}
+
+function combineTaipeiDateTime(dateText,timeText){
+  const date = String(dateText||'').trim();
+  const time = String(timeText||'').trim();
+
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)){
+    return 0;
+  }
+
+  // 台灣全年 UTC+8，直接轉成 ISO offset，避免瀏覽器本地時區造成偏移。
+  const parsed = Date.parse(`${date}T${time}:00+08:00`);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatOrderTimingDateTime(ms){
+  const value = Number(ms||0);
+  if(!Number.isFinite(value) || value<=0) return '';
+
+  return new Date(value).toLocaleString('zh-TW',{
+    timeZone:'Asia/Taipei',
+    month:'2-digit',
+    day:'2-digit',
+    hour:'2-digit',
+    minute:'2-digit',
+    hour12:false
+  });
+}
+
+function ensureScheduleInputDefaults(){
+  const nowParts=getTaipeiNowParts();
+
+  const toTaipeiParts=value=>{
+    const parts={};
+    new Intl.DateTimeFormat('en-CA',{
+      timeZone:'Asia/Taipei',
+      year:'numeric',
+      month:'2-digit',
+      day:'2-digit',
+      hour:'2-digit',
+      minute:'2-digit',
+      hour12:false
+    }).formatToParts(new Date(value)).forEach(part=>{
+      if(part.type!=='literal') parts[part.type]=part.value;
+    });
+
+    return {
+      date:`${parts.year}-${parts.month}-${parts.day}`,
+      time:`${parts.hour}:${parts.minute}`
+    };
+  };
+
+  const roundToFiveMinutes=value=>{
+    const step=5*60*1000;
+    return Math.ceil(Number(value||Date.now())/step)*step;
+  };
+
+  const startDefault=toTaipeiParts(
+    roundToFiveMinutes(Date.now()+2*60*60*1000)
+  );
+
+  const endDefault=toTaipeiParts(
+    roundToFiveMinutes(Date.now()+4*60*60*1000)
+  );
+
+  const scheduledDate=qs('scheduledDate');
+  const flexibleDate=qs('flexibleDate');
+
+  [scheduledDate,flexibleDate].forEach(el=>{
+    if(!el) return;
+    el.min=nowParts.date;
+    if(!el.value) el.value=startDefault.date;
+  });
+
+  const scheduledTime=qs('scheduledTime');
+  const flexibleStartTime=qs('flexibleStartTime');
+  const flexibleEndTime=qs('flexibleEndTime');
+
+  if(scheduledTime && !scheduledTime.value){
+    scheduledTime.value=startDefault.time;
+  }
+
+  if(flexibleStartTime && !flexibleStartTime.value){
+    flexibleStartTime.value=startDefault.time;
+  }
+
+  if(flexibleEndTime && !flexibleEndTime.value){
+    flexibleEndTime.value=endDefault.time;
+  }
+
+  // 若預設結束時間已跨日，彈性預約日期同步使用結束前的開始日，
+  // 並讓使用者手動調整；避免單純小時進位造成 23:xx → 00:xx 日期錯位。
+  if(
+    flexibleDate &&
+    !flexibleDate.value
+  ){
+    flexibleDate.value=startDefault.date;
+  }
+}
+
+function selectOrderTimingType(type){
+  const normalized=['immediate','scheduled','flexible'].includes(String(type||''))
+    ? String(type)
+    : 'immediate';
+
+  orderTimingType=normalized;
+
+  document.querySelectorAll('.ubee-timing-mode-card').forEach(card=>{
+    card.classList.toggle('active',card.dataset.timing===normalized);
+  });
+
+  qs('immediateTimingPanel')?.classList.toggle('hidden',normalized!=='immediate');
+  qs('scheduledTimingPanel')?.classList.toggle('hidden',normalized!=='scheduled');
+  qs('flexibleTimingPanel')?.classList.toggle('hidden',normalized!=='flexible');
+
+  if(normalized!=='immediate'){
+    // 預約單不額外套用急件速度費，避免客戶在預約模式被舊速度選項誤收費。
+    speedType='standard';
+    document.querySelectorAll('.speed-card').forEach(card=>{
+      card.classList.toggle('active',card.dataset.speed==='standard');
+    });
+  }
+
+  ensureScheduleInputDefaults();
+  invalidateQuote();
+  scheduleQuoteRefresh(120);
+  try{ if(typeof scheduleDraft==='function') scheduleDraft(); }catch(_){}
+}
+
+function handleScheduleInputChanged(){
+  scheduleGoal=String(qs('scheduleGoal')?.value||'pickup_at');
+  try{ if(typeof scheduleDraft==='function') scheduleDraft(); }catch(_){}
+}
+
+function getOrderTimingPayload(){
+  const timingType=String(orderTimingType||'immediate');
+
+  if(timingType==='scheduled'){
+    const goal=String(qs('scheduleGoal')?.value||scheduleGoal||'pickup_at');
+    const requestedScheduleAtMs=combineTaipeiDateTime(
+      qs('scheduledDate')?.value,
+      qs('scheduledTime')?.value
+    );
+
+    return {
+      orderTimingType:'scheduled',
+      timingType:'scheduled',
+      scheduleGoal:goal==='complete_by'?'complete_by':'pickup_at',
+      requestedScheduleAtMs
+    };
+  }
+
+  if(timingType==='flexible'){
+    const date=qs('flexibleDate')?.value||'';
+    const flexibleStartAtMs=combineTaipeiDateTime(
+      date,
+      qs('flexibleStartTime')?.value
+    );
+    const flexibleEndAtMs=combineTaipeiDateTime(
+      date,
+      qs('flexibleEndTime')?.value
+    );
+
+    return {
+      orderTimingType:'flexible',
+      timingType:'flexible',
+      scheduleGoal:'time_window',
+      flexibleStartAtMs,
+      flexibleEndAtMs
+    };
+  }
+
+  return {
+    orderTimingType:'immediate',
+    timingType:'immediate',
+    scheduleGoal:'immediate',
+    requestedScheduleAtMs:0,
+    flexibleStartAtMs:0,
+    flexibleEndAtMs:0
+  };
+}
+
+function getOrderTimingLabel(payload=getOrderTimingPayload()){
+  const type=String(payload?.orderTimingType||'immediate');
+
+  if(type==='scheduled'){
+    const prefix=payload.scheduleGoal==='complete_by'
+      ? '希望完成'
+      : '希望取件';
+    return `${prefix}：${formatOrderTimingDateTime(payload.requestedScheduleAtMs)}`;
+  }
+
+  if(type==='flexible'){
+    return `彈性時段：${formatOrderTimingDateTime(payload.flexibleStartAtMs)}～${new Date(Number(payload.flexibleEndAtMs||0)).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false})}`;
+  }
+
+  return `立即任務・${getSpeedLabel(speedType)}`;
+}
+
+function validateOrderTimingSelection(){
+  const payload=getOrderTimingPayload();
+  const minFuture=Date.now()+30*60*1000;
+
+  if(payload.orderTimingType==='scheduled'){
+    if(!payload.requestedScheduleAtMs){
+      alert('請選擇預約日期與時間。');
+      return false;
+    }
+
+    if(payload.requestedScheduleAtMs<minFuture){
+      alert('預約時間至少需要晚於現在 30 分鐘。');
+      return false;
+    }
+  }
+
+  if(payload.orderTimingType==='flexible'){
+    if(!payload.flexibleStartAtMs||!payload.flexibleEndAtMs){
+      alert('請完整選擇彈性預約的開始與結束時間。');
+      return false;
+    }
+
+    if(payload.flexibleStartAtMs<minFuture){
+      alert('彈性預約開始時間至少需要晚於現在 30 分鐘。');
+      return false;
+    }
+
+    if(payload.flexibleEndAtMs<=payload.flexibleStartAtMs){
+      alert('彈性預約結束時間必須晚於開始時間。');
+      return false;
+    }
+
+    if(payload.flexibleEndAtMs-payload.flexibleStartAtMs>12*60*60*1000){
+      alert('彈性預約時段最長為 12 小時。');
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function selectSpeed(type){
   speedType = type;
 
@@ -13129,6 +13689,8 @@ function goNext(){
 }
 
     if(currentStep === 3){
+  if(!validateOrderTimingSelection()) return;
+
   if(!beginStepTransition()){
     return;
   }
@@ -13180,6 +13742,8 @@ function getPayload(){
 
   if(qs('item')) qs('item').value = itemText;
 
+  const timingPayload = getOrderTimingPayload();
+
   return {
     userId,
     customerId:userId,
@@ -13209,6 +13773,8 @@ function getPayload(){
     note,
     speedType,
     speed:speedType,
+
+    ...timingPayload,
 
     locationConfirmed:!!qs('agreeCheck')?.checked,
 
@@ -13309,11 +13875,15 @@ function renderSummary(){
         <div class="review-summary-main">
           <div class="review-summary-label">任務</div>
           <div class="review-summary-value">
-            ${escapeHtml(getServiceGroupLabel())}・${escapeHtml(serviceType)}・${escapeHtml(getSpeedLabel(speedType))}
+            ${escapeHtml(getServiceGroupLabel())}・${escapeHtml(serviceType)}
           </div>
           <div class="review-summary-note-preview">${escapeHtml(taskNoteText)}</div>
         </div>
         <div class="review-summary-chevron">›</div>
+      </button>
+
+      <button class="review-schedule-highlight" type="button" onclick="showOnlyStep(3)">
+        ${escapeHtml(getOrderTimingLabel(payload))}
       </button>
     </div>
 
@@ -14045,12 +14615,18 @@ function selectPaymentMethod(method){
         <span>預估應付</span>
         <strong>${escapeHtml(totalText)}</strong>
       </div>
-      <div class="step5-payment-compact-note">任務完成時由小U向你收取現金；確認後即開始媒合。</div>
+      <div class="step5-payment-compact-note">${
+        String(currentOrderData?.orderTimingType || orderTimingType || 'immediate') === 'immediate'
+          ? '任務完成時由小U向你收取現金；確認後即開始媒合。'
+          : '任務完成時由小U向你收取現金；確認後會建立預約需求並媒合可於指定時間執行的小U。'
+      }</div>
     </div>
   `;
 
   qs('confirmPaidBtn').innerText =
-    '確認現金單，開始尋找小U';
+    String(currentOrderData?.orderTimingType || orderTimingType || 'immediate') === 'immediate'
+      ? '確認現金單，開始尋找小U'
+      : '確認現金單，建立預約需求';
 
   qs('confirmPaidBtn')
     .classList
@@ -14326,6 +14902,9 @@ function getStatusLabel(status){
     draft_confirm:'草稿確認',
     pending_payment:'等待確認現金單',
     merchant_pending:'等待店家確認',
+    pending_schedule:'預約需求已建立，正在媒合可執行的小U',
+    scheduled_reserved:'預約已成立',
+    scheduled_confirmed:'小U已確認執行',
     pending_dispatch:'正在為你尋找附近的 小U …',
     accepted:' 小U 已接下你的任務',
     arrived_pickup:'你的 小U 正在前往取件地點',
@@ -14346,6 +14925,9 @@ function getStatusRank(status){
   const map = {
     pending_payment:0,
     merchant_pending:1,
+    pending_schedule:1,
+    scheduled_reserved:1,
+    scheduled_confirmed:1,
     pending_dispatch:1,
     accepted:2,
     arrived_pickup:3,
@@ -14362,8 +14944,11 @@ function getStatusRank(status){
 
 function getCurrentStatusMessage(status){
   const map = {
-    pending_payment:'請確認使用現金單。確認後系統會開始媒合 小U ，任務完成時由 小U 向客人收取現金。',
+    pending_payment:'請確認使用現金單。確認後系統會依任務時間模式開始媒合小U。',
     merchant_pending:'此訂單正在等待合作店家確認。',
+    pending_schedule:'預約需求已建立，正在媒合可以在指定時間執行的小U。',
+    scheduled_reserved:'已有小U提前承接這筆預約，任務前系統會再次確認是否可以準時執行。',
+    scheduled_confirmed:'小U已完成任務前確認，請留意後續出發與取件進度。',
     pending_dispatch:'正在為你尋找附近的 小U …',
     accepted:'  小U 已接下你的任務，正在前往取件地。',
     arrived_pickup:' 小U 已抵達取件地。',
@@ -16033,6 +16618,9 @@ function getOrderStatusColor(status){
   const map = {
     pending_payment:'#b48800',
     pending_dispatch:'#b48800',
+    pending_schedule:'#b48800',
+    scheduled_reserved:'#2563eb',
+    scheduled_confirmed:'#16a34a',
     accepted:'#2563eb',
     arrived_pickup:'#2563eb',
     picked_up:'#16a34a',
@@ -16304,6 +16892,9 @@ function renderCustomerActiveTask(){
         [
           'pending_payment',
           'pending_dispatch',
+          'pending_schedule',
+          'scheduled_reserved',
+          'scheduled_confirmed',
           'merchant_pending',
           'accepted',
           'arrived_pickup',
@@ -17763,11 +18354,11 @@ const UBeeEnhancements = (() => {
   const uid=()=>`${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`;
   const escapeAttr=x=>escapeHtml(String(x??''));
 
-  function collectDraft(){return {version:2,savedAt:new Date().toISOString(),currentStep,serviceGroup,serviceType,serviceCategory,serviceMode,speedType,pickup:value('pickup'),dropoff:value('dropoff'),pickupPhone:value('pickupPhone'),dropoffPhone:value('dropoffPhone'),pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),note:value('note'),advancePayment:value('advancePayment'),queueMinutes:value('queueMinutes'),upstairsOption:value('upstairsOption'),shoppingItems:state.shoppingItems};}
+  function collectDraft(){const timing=getOrderTimingPayload();return {version:3,savedAt:new Date().toISOString(),currentStep,serviceGroup,serviceType,serviceCategory,serviceMode,speedType,orderTimingType,scheduleGoal:timing.scheduleGoal,requestedScheduleAtMs:timing.requestedScheduleAtMs,flexibleStartAtMs:timing.flexibleStartAtMs,flexibleEndAtMs:timing.flexibleEndAtMs,pickup:value('pickup'),dropoff:value('dropoff'),pickupPhone:value('pickupPhone'),dropoffPhone:value('dropoffPhone'),pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),note:value('note'),advancePayment:value('advancePayment'),queueMinutes:value('queueMinutes'),upstairsOption:value('upstairsOption'),shoppingItems:state.shoppingItems};}
   function saveDraft(){const d=collectDraft();if(!d.pickup&&!d.dropoff&&!d.note&&!d.pickupPhone&&!d.dropoffPhone)return;localStorage.setItem(KEYS.draft,JSON.stringify(d));}
   function scheduleDraft(){clearTimeout(state.draftTimer);state.draftTimer=setTimeout(saveDraft,500)}
   function clearDraft(){localStorage.removeItem(KEYS.draft)}
-  function restoreDraft(d){if(!d||d.version!==2)return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=d.serviceMode||serviceMode;speedType=d.speedType||speedType;setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
+  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=d.serviceMode||serviceMode;speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
   function offerDraft(){const d=safeParse(localStorage.getItem(KEYS.draft)||'',null);if(!d||!d.savedAt||Date.now()-new Date(d.savedAt).getTime()>7*86400000)return;const el=document.createElement('div');el.className='draft-banner';el.id='draftBanner';el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}<br>${new Date(d.savedAt).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;document.body.appendChild(el);el.querySelector('.draft-discard').onclick=()=>{clearDraft();el.remove()};el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};}
 
   function renderQuickAddresses(){const bar=qs('savedAddressQuickBar'),list=getAddresses();if(!bar)return;bar.classList.toggle('hidden',!list.length);bar.innerHTML=list.map(a=>`<button class="quick-address-chip" type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">${escapeAttr(a.label||'常用地址')}</button>`).join('')}
@@ -17792,7 +18383,7 @@ const UBeeEnhancements = (() => {
   function updateMatchStatus(){const text=qs('matchStatusText'),badge=qs('matchStatusBadge');if(!text||!badge)return;const count=Number(qs('homeOnlineRiderCount')?.innerText.match(/\d+/)?.[0]||0);if(!value('pickup')){text.textContent='填寫取件地址後顯示媒合狀況';badge.textContent='等待定位';badge.className='status-badge neutral'}else if(count>=5){text.textContent=`目前共有 ${count} 位小U可即時媒合，系統將從取件點附近開始媒合`;badge.textContent='媒合良好';badge.className='status-badge good'}else if(count>0){text.textContent=`目前 ${count} 位小U可即時媒合，系統會逐步擴大媒合範圍`;badge.textContent='小U較少';badge.className='status-badge warn'}else{text.textContent='目前尚無近期定位的小U，仍可正常建立任務';badge.textContent='持續搜尋';badge.className='status-badge neutral'}}
   function renderSystemCheck(){const el=qs('orderSystemCheck');if(!el)return;const checks=[['pickup','取件位置已填寫',!!value('pickup')],['dropoff','送達位置已填寫',!!value('dropoff')],['phone','至少一組聯絡電話已填寫',!!(value('pickupPhone')||value('dropoffPhone'))],['route','路線已成功計算',!!lastRouteData],['quote','正式估價資料可用',!!lastQuoteData&&Number(lastEstimatedTotal)>0],['note','任務內容已完成',!!value('note')]];el.innerHTML=checks.map(([,label,ok])=>`<div class="system-check-row ${ok?'ok':'warn'}"><span class="system-check-icon">${ok?'✓':'!'}</span><span>${label}</span></div>`).join('')}
 
-  function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=order.serviceMode||'normal';speedType=order.speedType||order.speed||'standard';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
+  function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=order.serviceMode||'normal';speedType=order.speedType||order.speed||'standard';orderTimingType=order.orderTimingType||'immediate';scheduleGoal=order.scheduleGoal||'pickup_at';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
   function reorder(id){const order=state.lastOrders.get(id);if(order)applyOrder(order)}
   function openOrder(id){const order=state.lastOrders.get(id);if(!order)return;currentOrderId=id;currentOrderData=order;localStorage.setItem('ubee_current_order_id',id);setOrderNo(id);showOnlyStep(5);renderTimeline(order.status||'pending_payment',order);startOrderListener(id)}
   function renderOrderCards(el,orders,emptyText){if(!el)return;if(!orders.length){el.textContent=emptyText;return}state.lastOrders.clear();orders.forEach(o=>state.lastOrders.set(o.id,o));el.innerHTML=orders.map(o=>{const pickup=o.pickup||o.pickupAddress||'-',dropoff=o.dropoff||o.dropoffAddress||'-',total=getCustomerPayableTotal(o),status=getStatusLabel(o.status),done=['completed','done'].includes(String(o.status));return `<div class="order-history-card"><div style="font-size:15px;font-weight:1000">${escapeAttr(o.serviceType||'UBee 跑腿任務')}</div><div class="field-help">${escapeAttr(status)}・${escapeAttr(formatOrderTime(o.createdAt||o.updatedAt))}<br>${escapeAttr(pickup)} → ${escapeAttr(dropoff)}<br>金額：${total>0?`NT$${Math.round(total)}`:'-'}</div><div class="order-card-actions"><button type="button" onclick="UBeeEnhancements.openOrder('${o.id}')">查看明細</button>${done?`<button type="button" onclick="UBeeEnhancements.reorder('${o.id}')">再叫一次</button>`:''}</div></div>`}).join('')}
