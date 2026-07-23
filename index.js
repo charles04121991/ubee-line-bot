@@ -2803,6 +2803,95 @@ app.post('/api/rider/login', async (req, res) => {
   }
 });
 
+
+// =====================================================
+// UBee 小U持久登入 Session Restore
+// - Firebase Auth 使用 LOCAL persistence，重新開啟騎士端時可直接恢復登入。
+// - 有 Bearer Token 時，以 Token 內 riderDocId 為唯一可信來源。
+// - 相容模式仍允許 phone / riderId / lineUserId 做舊版恢復。
+// - 不要求小U每次重新輸入手機號碼。
+// =====================================================
+app.get('/api/rider/session', riderAuthMiddleware, async (req, res) => {
+  try {
+    let riderDoc = null;
+
+    const trustedRiderDocId = String(
+      req.riderAuth?.riderDocId || ''
+    ).trim();
+
+    if (trustedRiderDocId) {
+      const doc = await db
+        .collection('riders')
+        .doc(trustedRiderDocId)
+        .get();
+
+      if (doc.exists) {
+        riderDoc = doc;
+      }
+    }
+
+    if (!riderDoc) {
+      const riderResult = await findApprovedRiderForApi({
+        lineUserId: req.query?.lineUserId,
+        phone: req.query?.phone,
+        riderId: req.query?.riderId,
+      });
+
+      if (!riderResult.ok) {
+        return res.status(riderResult.statusCode).json({
+          success: false,
+          message: riderResult.message,
+        });
+      }
+
+      riderDoc = riderResult.riderDoc;
+    }
+
+    const riderData = riderDoc?.data?.() || {};
+
+    if (!riderDoc || !riderDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到小U登入資料，請重新登入。',
+      });
+    }
+
+    if (isBlockedRiderData(riderData)) {
+      return res.status(403).json({
+        success: false,
+        message: '此騎士帳號目前無法登入，請聯繫 UBee 跑腿管理員。',
+      });
+    }
+
+    if (!isApprovedRiderData(riderData)) {
+      return res.status(403).json({
+        success: false,
+        message: '你的騎士資格目前尚未啟用，請聯繫 UBee 跑腿管理員。',
+      });
+    }
+
+    await riderDoc.ref.set({
+      lastSessionRestoreAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastSessionRestoreAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      restored: true,
+      rider: buildRiderLoginPayload(riderDoc),
+    });
+  } catch (err) {
+    console.error('❌ 小U Session Restore 失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '登入狀態恢復失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
 // ==============================
 // UBee Web Push API
 // ==============================
@@ -3572,8 +3661,8 @@ function isRiderVisibleDispatchOrder(order) {
   );
 }
 
-// 2. 取得可接任務：手機登入正式版
-// 支援 phone / riderId，並保留 lineUserId 相容
+// 2. 取得可接任務：手機登入正式版（V2 待接任務＋地圖取件點）
+// 支援 phone / riderId，並保留 lineUserId 相容；待接單狀態也回傳 riderMapPickup。
 app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
   try {
     const { lineUserId, phone, riderId } = req.query || {};
@@ -3613,12 +3702,38 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       }))
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => !isOrderSkippedForRider(order, identity))
-      .slice(0, 30);
+      .sort((a, b) => {
+        const aTime = getDispatchPushTimeMs(
+          a.createdAtMs || a.createdAt || a.updatedAtMs || a.updatedAt
+        );
+        const bTime = getDispatchPushTimeMs(
+          b.createdAtMs || b.createdAt || b.updatedAtMs || b.updatedAt
+        );
+        return bTime - aTime;
+      })
+      .slice(0, 30)
+      .map(order => {
+        const pickupPoint = getOrderPickupPointForPush(order);
+
+        return {
+          ...order,
+          // 騎士端待接任務地圖專用：即使尚未接單，也能可靠顯示取件點。
+          // 保留原始 pickupLat / pickupLng 與完整訂單欄位，避免破壞既有流程。
+          riderMapPickup: pickupPoint
+            ? {
+                lat: pickupPoint.lat,
+                lng: pickupPoint.lng,
+              }
+            : null,
+        };
+      });
 
     return res.json({
       success: true,
       orders,
-      tasks: orders
+      tasks: orders,
+      availableTaskCount: orders.length,
+      mapPickupEnabled: true,
     });
 
   } catch (err) {
