@@ -4448,6 +4448,42 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
 
 
 // =====================================================
+// UBee 預約任務：騎士身分解析
+// - 有 Firebase Bearer Token 時，以 Token 的 riderDocId 為唯一可信來源。
+// - 相容模式才回退到 phone / riderId / lineUserId。
+// =====================================================
+async function resolveScheduleRiderForRequest(req, source = {}) {
+  if (req?.riderAuth?.riderDocId) {
+    const riderDoc = await db
+      .collection('riders')
+      .doc(String(req.riderAuth.riderDocId).trim())
+      .get();
+
+    if (!riderDoc.exists) {
+      return { ok:false, statusCode:404, message:'找不到小U資料。' };
+    }
+
+    const rider = riderDoc.data() || {};
+
+    if (isBlockedRiderData(rider)) {
+      return { ok:false, statusCode:403, message:'此小U帳號目前無法使用。' };
+    }
+
+    if (!isApprovedRiderData(rider)) {
+      return { ok:false, statusCode:403, message:'小U尚未審核通過。' };
+    }
+
+    return {
+      ok:true,
+      riderDoc,
+      rider:{ id:riderDoc.id, ...rider },
+    };
+  }
+
+  return findApprovedRiderForApi(source || {});
+}
+
+// =====================================================
 // UBee 預約任務 V1：小U 可接時段、預約承接、再次確認與候補
 // =====================================================
 async function sendScheduledRiderReminder(
@@ -4522,22 +4558,9 @@ async function sendScheduledRiderReminder(
       );
     }
 
-    const lineUserId =
-      String(rider.lineUserId || '').trim();
-
-    if (lineUserId) {
-      tasks.push(
-        client
-          .pushMessage(
-            lineUserId,
-            createTextMessage(
-              `${title}\n\n${body}`
-            )
-          )
-          .catch(() => {})
-      );
-    }
-
+    // 預約「小U任務前確認」只走騎士端 Web Push／App 深連結。
+    // LINE 官方帳號屬於客戶溝通通道，不再把「請進入騎士端」文字推到 LINE，
+    // 避免測試帳號或身分綁定混用時，讓下單客戶收到騎士操作指示。
     await Promise.allSettled(tasks);
 
     return true;
@@ -4739,18 +4762,38 @@ async function maintainScheduledOrders() {
           await sendScheduledRiderReminder(
             order.reservedRiderDocId,
             {
-              title: '請確認 UBee 預約任務',
+              title: 'UBee 預約任務即將開始',
               body:
                 `預約時間：${order.scheduleLabel || formatScheduleLabelFromMs(startMs, endMs, order.orderTimingType)}\n` +
-                `請進入騎士端「我的預約」確認是否可以準時執行。`,
+                `請在騎士端「任務 → 我的任務」確認是否可以準時執行。`,
               orderId: doc.id,
             }
           );
+
+          // LINE 官方帳號通知下單客戶：只說明預約狀態，不出現騎士端操作指示。
+          try {
+            await notifyCustomer(
+              order,
+              createTextMessage(
+                `📅 UBee 預約任務即將開始\n\n` +
+                `訂單編號：${doc.id}\n` +
+                `預約時間：${order.scheduleLabel || formatScheduleLabelFromMs(startMs, endMs, order.orderTimingType)}\n\n` +
+                `系統正在向已承接的小U進行任務前確認，確認完成後會再通知您。`
+              )
+            );
+          } catch (_) {}
         }
 
-        // 預約前 30 分鐘仍未確認，釋放給候補小U。
+        // 超過這筆預約自己的最終確認期限仍未確認，才釋放給候補小U。
+        // 新近承接的任務會有最少確認緩衝，避免「剛接就消失」。
+        const confirmationDeadlineAtMs =
+          getScheduleTimestampMs(
+            order.scheduleConfirmationDeadlineAtMs
+          ) ||
+          (startMs - 30 * 60 * 1000);
+
         if (
-          nowMs >= startMs - 30 * 60 * 1000 &&
+          nowMs >= confirmationDeadlineAtMs &&
           !getScheduleTimestampMs(
             order.riderConfirmedAtMs
           )
@@ -4959,7 +5002,8 @@ app.get(
       await maintainScheduledOrders();
 
       const riderResult =
-        await findApprovedRiderForApi(
+        await resolveScheduleRiderForRequest(
+          req,
           req.query || {}
         );
 
@@ -4972,23 +5016,43 @@ app.get(
           });
       }
 
-      const snap =
-        await db
-          .collection('orders')
-          .where(
-            'reservedRiderDocId',
-            '==',
-            riderResult.riderDoc.id
-          )
-          .limit(50)
-          .get();
+      const identity = buildRiderApiIdentity(
+        riderResult.riderDoc,
+        riderResult.rider || {},
+        req.query || {}
+      );
 
-      const scheduledOrders =
-        snap.docs
-          .map(doc => ({
+      // 新資料以 reservedRiderDocId 為準；同時相容舊資料可能只存 riderId / phone。
+      // 這可避免「明明承接成功，但我的任務看不到預約」的身分欄位不一致問題。
+      const queryPairs = [
+        ['reservedRiderDocId', identity.riderDocId],
+        ['reservedRiderId', identity.riderId],
+        ['reservedRiderPhone', identity.phone],
+      ].filter(([, value]) => String(value || '').trim());
+
+      const snapshots = await Promise.all(
+        queryPairs.map(([field, value]) =>
+          db.collection('orders')
+            .where(field, '==', value)
+            .limit(50)
+            .get()
+            .catch(() => null)
+        )
+      );
+
+      const byId = new Map();
+      snapshots.forEach(snap => {
+        if (!snap) return;
+        snap.docs.forEach(doc => {
+          byId.set(doc.id, {
             id: doc.id,
             ...doc.data(),
-          }))
+          });
+        });
+      });
+
+      const scheduledOrders =
+        Array.from(byId.values())
           .filter(order =>
             [
               'scheduled_reserved',
@@ -5000,10 +5064,10 @@ app.get(
           .sort(
             (a, b) =>
               getScheduleTimestampMs(
-                a.scheduledStartAtMs
+                a.scheduledStartAtMs || a.requestedScheduleAtMs
               ) -
               getScheduleTimestampMs(
-                b.scheduledStartAtMs
+                b.scheduledStartAtMs || b.requestedScheduleAtMs
               )
           );
 
@@ -5011,6 +5075,7 @@ app.get(
         success: true,
         orders: scheduledOrders,
         count: scheduledOrders.length,
+        riderDocId: identity.riderDocId,
       });
     } catch (error) {
       console.error(
@@ -5039,11 +5104,10 @@ app.post(
       } = req.body || {};
 
       const riderResult =
-        await findApprovedRiderForApi({
-          lineUserId,
-          phone,
-          riderId,
-        });
+        await resolveScheduleRiderForRequest(
+          req,
+          { lineUserId, phone, riderId }
+        );
 
       if (!riderResult.ok) {
         return res
@@ -5184,12 +5248,23 @@ app.post(
               admin.firestore.FieldValue.serverTimestamp(),
             scheduleConfirmDueAtMs:
               Math.max(
-                0,
+                nowMs,
                 startMs -
                   UBEE_SCHEDULE_CONFIRM_BEFORE_MS
               ),
+            // 若小U是在接近預約時間才承接，至少保留一段實際可操作的確認時間，
+            // 避免剛承接就因「30 分鐘未確認」規則立刻被釋放。
+            scheduleConfirmationDeadlineAtMs:
+              Math.max(
+                startMs - 30 * 60 * 1000,
+                Math.min(
+                  startMs - 10 * 60 * 1000,
+                  nowMs + 10 * 60 * 1000
+                )
+              ),
             scheduleConfirmationRequired:
-              false,
+              startMs - nowMs <=
+                UBEE_SCHEDULE_CONFIRM_BEFORE_MS,
             updatedAt:
               admin.firestore.FieldValue.serverTimestamp(),
           };
@@ -5279,11 +5354,10 @@ app.post(
       } = req.body || {};
 
       const riderResult =
-        await findApprovedRiderForApi({
-          lineUserId,
-          phone,
-          riderId,
-        });
+        await resolveScheduleRiderForRequest(
+          req,
+          { lineUserId, phone, riderId }
+        );
 
       if (!riderResult.ok) {
         return res
