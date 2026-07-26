@@ -1,4 +1,4 @@
-require('dotenv').config();
+    require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
@@ -18992,21 +18992,16 @@ UBee 跑腿辦公室將會再依照您的需求，
 }, { merge: true });
     
     if (rider.lineUserId) {
-      await client.pushMessage(rider.lineUserId, {
-        type: 'text',
-        text:
-          `🎉 恭喜您通過 UBee 跑腿小U審核！\n\n` +
-          `接下來請開啟 UBee 騎士端完成「V4 數位入職」。\n\n` +
-          `必完成項目：\n` +
-          `1. 下載並設定街口支付（平台款項以街口回繳）\n` +
-          `2. 加入公告群、聊天群、回報群\n` +
-          `3. 完成小U規範與任務教學\n` +
-          `4. 完成新手測驗並達 80 分\n\n` +
-          `完成前不會開放接單。\n\n` +
-          `騎士端：${RIDER_WEB_URL}\n\n` +
-          `— UBee 跑腿`
-      });
-    }
+  await client.pushMessage(rider.lineUserId, {
+    type: 'text',
+    text:
+      `🎉 恭喜您通過 UBee 跑腿小U審核！\n\n` +
+      `請點擊下方連結進入 UBee 騎士端：\n\n` +
+      `https://ubee-rider-web.vercel.app/rider.html\n\n` +
+      `登入後，請依照騎士端畫面完成後續設定與數位入職流程。\n\n` +
+      `— UBee 跑腿`
+  });
+}
     
     return replyText(
       event.replyToken,
