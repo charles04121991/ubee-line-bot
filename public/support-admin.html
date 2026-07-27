@@ -1,62 +1,274 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>UBee｜客服管理中心</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>UBee｜客服管理中心 V3</title>
 <style>
-:root{--bg:#f4f5f7;--card:#fff;--text:#111;--muted:#73777d;--line:#e5e7ea;--yellow:#facc15;--blue:#2768d7;--green:#16834f;--red:#d93b42;--orange:#df8500;--shadow:0 10px 30px rgba(17,24,39,.06)}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}.app{max-width:1480px;margin:auto;padding:18px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.brand{font-size:27px;font-weight:1000}.brand span{color:#e4ad00}.sub{font-size:12px;color:var(--muted);font-weight:800;margin-top:4px}.actions{display:flex;gap:7px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;color:#111;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:1000}.btn.primary{background:#111;color:#fff;border-color:#111}.btn.yellow{background:var(--yellow);border-color:var(--yellow)}.btn.blue{background:#edf3ff;color:#2459b4;border-color:#d8e5ff}.btn.green{background:#e9f8ef;color:#156a42;border-color:#ccebd9}.btn.red{background:#fff0f1;color:#b92830;border-color:#ffd3d6}.btn:disabled{opacity:.45}.login-wrap{min-height:72vh;display:flex;align-items:center;justify-content:center}.login{width:min(440px,100%);background:#fff;border:1px solid var(--line);border-radius:24px;padding:22px;box-shadow:var(--shadow)}.login h1{font-size:26px;margin:0}.login p{color:var(--muted);line-height:1.65;font-size:13px}.field{margin-top:13px}label{display:block;font-size:13px;font-weight:1000;margin-bottom:7px}.input,.textarea{width:100%;border:1px solid var(--line);border-radius:14px;padding:12px 13px;background:#fafafa;outline:0}.textarea{min-height:110px;resize:vertical;line-height:1.65}.hint{font-size:11px;color:#777;line-height:1.6;margin-top:7px}.remember{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px;font-weight:900;color:#666}.hidden{display:none!important}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:var(--shadow)}.kpi span{display:block;color:var(--muted);font-size:11px;font-weight:900}.kpi b{display:block;margin-top:5px;font-size:29px}.workspace{display:grid;grid-template-columns:minmax(350px,.8fr) minmax(540px,1.2fr);gap:14px}.panel{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}.panel-head{padding:14px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.panel-title{font-size:17px;font-weight:1000}.panel-sub{font-size:11px;color:var(--muted);margin-top:3px}.panel-body{padding:14px}.filters{display:flex;gap:6px;flex-wrap:wrap}.filter{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:1000;color:#666}.filter.active{background:#111;color:#fff;border-color:#111}.search{width:100%;margin-top:10px;border:1px solid var(--line);border-radius:13px;padding:11px 12px;outline:0}.case-list{display:grid;gap:8px;max-height:calc(100vh - 270px);overflow:auto}.case-card{border:1px solid var(--line);border-radius:15px;padding:12px;background:#fff;text-align:left}.case-card.active{border:2px solid var(--yellow);padding:11px;background:#fffdf2}.case-top{display:flex;justify-content:space-between;gap:10px}.case-title{font-size:13px;font-weight:1000;line-height:1.4}.status{flex:0 0 auto;padding:5px 7px;border-radius:999px;background:#f1f2f4;color:#666;font-size:9px;font-weight:1000}.status.open{background:#fff4d6;color:#936100}.status.progress{background:#eaf1ff;color:#2459b4}.status.wait{background:#fff0df;color:#a35b00}.status.done{background:#eaf8ef;color:#16613e}.case-meta{font-size:10px;color:#888;line-height:1.55;margin-top:6px}.detail-empty{text-align:center;padding:60px 15px;color:#999}.detail-head{padding:17px;background:#111;color:#fff}.detail-head small{color:#bbb;font-weight:800}.detail-head h2{font-size:23px;margin:6px 0}.detail-head p{margin:0;color:#ddd;font-size:12px}.detail-body{padding:15px}.action-grid{display:flex;gap:7px;flex-wrap:wrap}.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:13px}.info{padding:10px;border-radius:13px;background:#f7f8f9}.info span{display:block;color:#888;font-size:9px;font-weight:900}.info b{display:block;margin-top:4px;font-size:12px;word-break:break-word}.section-title{font-size:14px;font-weight:1000;margin:18px 0 8px}.note{padding:12px;border-radius:14px;background:#f7f8f9;font-size:12px;color:#555;line-height:1.65;white-space:pre-line}.evidence{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.evidence a{display:block;padding:10px;border:1px solid var(--line);border-radius:13px;color:#2459b4;text-decoration:none;font-size:11px;font-weight:900}.timeline{display:grid}.event{display:grid;grid-template-columns:18px 1fr;gap:9px;position:relative;padding-bottom:14px}.event:not(:last-child):before{content:"";position:absolute;left:7px;top:16px;bottom:0;width:2px;background:#e3e5e7}.dot{width:16px;height:16px;border-radius:50%;background:#111;border:4px solid #f1f2f4;z-index:1}.event b{font-size:12px}.event p{font-size:11px;color:#666;line-height:1.55;margin:3px 0;white-space:pre-line}.event small{font-size:9px;color:#999}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}.modal-backdrop.show{display:flex}.modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:22px}.modal-head{display:flex;justify-content:space-between;gap:10px;padding:16px;border-bottom:1px solid var(--line)}.modal-head b{font-size:18px}.modal-body{padding:16px}.close{width:34px;height:34px;border:0;border-radius:50%;font-size:20px}.empty{text-align:center;color:#999;padding:30px 10px}.toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:11px 14px;border-radius:13px;font-size:12px;font-weight:900;display:none;z-index:200}.toast.show{display:block}@media(max-width:1050px){.workspace{grid-template-columns:1fr}.case-list{max-height:none}.info-grid{grid-template-columns:1fr 1fr}}@media(max-width:680px){.app{padding:10px}.topbar{align-items:flex-start}.kpis{grid-template-columns:1fr 1fr}.info-grid,.evidence{grid-template-columns:1fr}.brand{font-size:23px}}
+:root{
+  --bg:#f4f5f7;--card:#fff;--text:#111;--muted:#73777d;--line:#e5e7ea;
+  --yellow:#facc15;--blue:#2768d7;--green:#16834f;--red:#d93b42;
+  --orange:#df8500;--purple:#7652c7;--shadow:0 10px 30px rgba(17,24,39,.06)
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.app{max-width:1500px;margin:auto;padding:18px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.brand{font-size:27px;font-weight:1000}.brand span{color:#e4ad00}
+.sub{font-size:12px;color:var(--muted);font-weight:800;margin-top:4px;line-height:1.5}
+.actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:#fff;color:#111;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:1000;transition:.15s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{background:#111;color:#fff;border-color:#111}
+.btn.yellow{background:var(--yellow);border-color:var(--yellow)}
+.btn.blue{background:#edf3ff;color:#2459b4;border-color:#d8e5ff}
+.btn.green{background:#e9f8ef;color:#156a42;border-color:#ccebd9}
+.btn.red{background:#fff0f1;color:#b92830;border-color:#ffd3d6}
+.btn.purple{background:#f2edff;color:#6543b5;border-color:#e1d7ff}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.login-wrap{min-height:72vh;display:flex;align-items:center;justify-content:center}
+.login{width:min(440px,100%);background:#fff;border:1px solid var(--line);border-radius:24px;padding:22px;box-shadow:var(--shadow)}
+.login h1{font-size:26px;margin:0}.login p{color:var(--muted);line-height:1.65;font-size:13px}
+.field{margin-top:13px}label{display:block;font-size:13px;font-weight:1000;margin-bottom:7px}
+.input,.textarea,.select{width:100%;border:1px solid var(--line);border-radius:14px;padding:12px 13px;background:#fafafa;outline:0;color:#111}
+.textarea{min-height:110px;resize:vertical;line-height:1.65}
+.hint{font-size:11px;color:#777;line-height:1.6;margin-top:7px}
+.remember{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px;font-weight:900;color:#666}
+.remember input{width:auto}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:var(--shadow);text-align:left}
+.kpi span{display:block;color:var(--muted);font-size:11px;font-weight:900}.kpi b{display:block;margin-top:5px;font-size:29px}
+.kpi.trash b{color:var(--red)}
+.workspace{display:grid;grid-template-columns:minmax(360px,.82fr) minmax(560px,1.18fr);gap:14px;align-items:start}
+.panel{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
+.panel-head{padding:14px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.panel-title{font-size:17px;font-weight:1000}.panel-sub{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.panel-body{padding:14px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}.filter{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:1000;color:#666}
+.filter.active{background:#111;color:#fff;border-color:#111}.filter.trash.active{background:var(--red);border-color:var(--red)}
+.tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.search{width:100%;margin-top:10px;border:1px solid var(--line);border-radius:13px;padding:11px 12px;outline:0}
+.result-row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:10px 2px 8px;color:#85898f;font-size:10px;font-weight:900}
+.case-list{display:grid;gap:8px;max-height:calc(100vh - 350px);overflow:auto;padding-right:2px}
+.case-card{width:100%;border:1px solid var(--line);border-radius:15px;padding:12px;background:#fff;text-align:left;color:#111}
+.case-card:hover{background:#fafafa}.case-card.active{border:2px solid var(--yellow);padding:11px;background:#fffdf2}
+.case-card.deleted{border-style:dashed;background:#fff8f8}.case-card.deleted.active{border-style:solid;border-color:var(--red)}
+.case-top{display:flex;justify-content:space-between;gap:10px}.case-title{font-size:13px;font-weight:1000;line-height:1.4}
+.status{flex:0 0 auto;padding:5px 7px;border-radius:999px;background:#f1f2f4;color:#666;font-size:9px;font-weight:1000}
+.status.open{background:#fff4d6;color:#936100}.status.progress{background:#eaf1ff;color:#2459b4}.status.wait{background:#fff0df;color:#a35b00}.status.done{background:#eaf8ef;color:#16613e}.status.deleted{background:#fff0f1;color:#b92830}
+.case-meta{font-size:10px;color:#888;line-height:1.55;margin-top:6px}.case-flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.flag{font-size:9px;font-weight:900;padding:4px 6px;border-radius:999px;background:#f2f3f5;color:#666}.flag.high{background:#fff0e7;color:#a25300}.flag.refund{background:#f2edff;color:#6543b5}.flag.evidence{background:#edf8f1;color:#14683f}
+.detail-empty{text-align:center;padding:70px 15px;color:#999}.detail-head{padding:17px;background:#111;color:#fff}.detail-head.deleted{background:#7f1d1d}
+.detail-head-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.detail-head small{color:#bbb;font-weight:800}.detail-head h2{font-size:23px;margin:6px 0}.detail-head p{margin:0;color:#ddd;font-size:12px}
+.copy-group{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.copy-btn{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:#fff;border-radius:10px;padding:7px 9px;font-size:10px;font-weight:900}
+.detail-body{padding:15px}.action-grid{display:flex;gap:7px;flex-wrap:wrap}.danger-zone{margin-top:12px;padding:12px;border:1px solid #ffd3d6;border-radius:15px;background:#fff7f7}
+.danger-zone-title{font-size:12px;font-weight:1000;color:#a61f28;margin-bottom:7px}.danger-zone-text{font-size:11px;color:#83545a;line-height:1.6}
+.info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:13px}.info{padding:10px;border-radius:13px;background:#f7f8f9;min-width:0}
+.info span{display:block;color:#888;font-size:9px;font-weight:900}.info b{display:block;margin-top:4px;font-size:12px;word-break:break-word}
+.section-title{font-size:14px;font-weight:1000;margin:18px 0 8px}.note{padding:12px;border-radius:14px;background:#f7f8f9;font-size:12px;color:#555;line-height:1.65;white-space:pre-line;word-break:break-word}
+.note.warning{background:#fff7df;color:#765100}.note.danger{background:#fff0f1;color:#9f222a}.note.public{background:#fff8d5}.note.internal{background:#f0f2f5}
+.order-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.order-item{padding:11px;border:1px solid var(--line);border-radius:13px;background:#fff}.order-item span{font-size:9px;color:#888;font-weight:900}.order-item b{display:block;font-size:12px;margin-top:4px;line-height:1.55;word-break:break-word}
+.evidence{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.evidence a,.evidence .file{display:block;padding:10px;border:1px solid var(--line);border-radius:13px;color:#2459b4;text-decoration:none;font-size:11px;font-weight:900;line-height:1.5}
+.incident-list{display:grid;gap:7px}.incident{padding:10px;border:1px solid var(--line);border-radius:13px;background:#fafafa;font-size:11px;line-height:1.55}.incident b{font-size:12px}
+.timeline{display:grid}.event{display:grid;grid-template-columns:18px 1fr;gap:9px;position:relative;padding-bottom:14px}.event:not(:last-child):before{content:"";position:absolute;left:7px;top:16px;bottom:0;width:2px;background:#e3e5e7}.dot{width:16px;height:16px;border-radius:50%;background:#111;border:4px solid #f1f2f4;z-index:1}.event b{font-size:12px}.event p{font-size:11px;color:#666;line-height:1.55;margin:3px 0;white-space:pre-line}.event small{font-size:9px;color:#999}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:100;display:none;align-items:center;justify-content:center;padding:16px}.modal-backdrop.show{display:flex}.modal{width:min(580px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:22px}.modal-head{display:flex;justify-content:space-between;gap:10px;padding:16px;border-bottom:1px solid var(--line)}.modal-head b{font-size:18px}.modal-body{padding:16px}.close{width:34px;height:34px;border:0;border-radius:50%;font-size:20px}
+.confirm-box{padding:12px;border-radius:14px;background:#fff0f1;color:#99232b;font-size:12px;line-height:1.65;font-weight:800}.confirm-case-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:1000}
+.empty{text-align:center;color:#999;padding:30px 10px}.toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:11px 14px;border-radius:13px;font-size:12px;font-weight:900;display:none;z-index:200}.toast.show{display:block}
+.sync-pill{font-size:10px;font-weight:900;color:#777;padding:7px 9px;border-radius:999px;background:#fff;border:1px solid var(--line)}
+@media(max-width:1100px){.workspace{grid-template-columns:1fr}.case-list{max-height:none}.info-grid{grid-template-columns:1fr 1fr}.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.app{padding:10px}.topbar{align-items:flex-start;flex-direction:column}.actions{width:100%}.kpis{grid-template-columns:1fr 1fr}.tools-grid,.info-grid,.order-grid,.evidence{grid-template-columns:1fr}.brand{font-size:23px}.detail-head-row{flex-direction:column}.copy-group{justify-content:flex-start}.case-list{max-height:none}}
 </style>
 </head>
 <body>
 <div class="app">
-  <div id="loginScreen" class="login-wrap"><div class="login"><h1>UBee 客服管理中心</h1><p>這是 UBee 內部頁面。登入後可以處理案件、回覆客戶、建立退款審核與結案。</p><div class="field"><label>客服管理密碼</label><input id="adminKey" class="input" type="password" placeholder="填入 Render 的 UBEE_SUPPORT_ADMIN_KEY Value"><div class="hint">請填你在 Render 設定的實際密碼，不是填「UBEE_SUPPORT_ADMIN_KEY」這串名稱。</div></div><div class="field"><label>操作人員</label><input id="operator" class="input" value="Charles" placeholder="例如：Charles"><div class="hint">用來記錄是誰處理案件，不是另一組密碼。</div></div><label class="remember"><input id="rememberKey" type="checkbox">只在這台私人裝置記住管理密碼</label><button class="btn yellow" style="width:100%;margin-top:15px;padding:14px" onclick="login()">進入客服管理中心</button></div></div>
+  <div id="loginScreen" class="login-wrap">
+    <div class="login">
+      <h1>UBee 客服管理中心</h1>
+      <p>登入後可以處理客服案件、回覆客戶、建立退款審核、結案，以及管理垃圾桶。</p>
+      <div class="field"><label>客服管理密碼</label><input id="adminKey" class="input" type="password" placeholder="填入 Render 的 UBEE_SUPPORT_ADMIN_KEY Value"><div class="hint">請填 Render 環境變數的實際 Value，不是環境變數名稱。</div></div>
+      <div class="field"><label>操作人員</label><input id="operator" class="input" value="Charles" placeholder="例如：Charles"><div class="hint">用來記錄案件由誰操作，不是另一組密碼。</div></div>
+      <label class="remember"><input id="rememberKey" type="checkbox">只在這台私人裝置記住管理密碼</label>
+      <button class="btn yellow" style="width:100%;margin-top:15px;padding:14px" onclick="login()">進入客服管理中心</button>
+    </div>
+  </div>
 
   <div id="dashboard" class="hidden">
-    <header class="topbar"><div><div class="brand">U<span>Bee</span> 客服管理中心</div><div class="sub" id="operatorText"></div></div><div class="actions"><button class="btn" onclick="loadCases()">重新整理</button><button class="btn red" onclick="logout()">登出</button></div></header>
-    <section class="kpis"><div class="kpi"><span>待處理</span><b id="kpiOpen">0</b></div><div class="kpi"><span>處理中</span><b id="kpiProgress">0</b></div><div class="kpi"><span>等待回覆／財務</span><b id="kpiWaiting">0</b></div><div class="kpi"><span>已結案</span><b id="kpiDone">0</b></div></section>
+    <header class="topbar">
+      <div><div class="brand">U<span>Bee</span> 客服管理中心 V3</div><div class="sub" id="operatorText"></div></div>
+      <div class="actions">
+        <span class="sync-pill" id="syncText">尚未同步</span>
+        <label class="remember" style="margin:0"><input id="autoRefresh" type="checkbox" checked>每 30 秒自動更新</label>
+        <button class="btn" onclick="loadCases(true)">重新整理</button>
+        <button class="btn red" onclick="logout()">登出</button>
+      </div>
+    </header>
+
+    <section class="kpis">
+      <button class="kpi" onclick="setFilter('open')"><span>待處理</span><b id="kpiOpen">0</b></button>
+      <button class="kpi" onclick="setFilter('progress')"><span>處理中</span><b id="kpiProgress">0</b></button>
+      <button class="kpi" onclick="setFilter('waiting')"><span>等待回覆／財務</span><b id="kpiWaiting">0</b></button>
+      <button class="kpi" onclick="setFilter('done')"><span>已結案</span><b id="kpiDone">0</b></button>
+      <button class="kpi trash" onclick="setFilter('trash')"><span>垃圾桶</span><b id="kpiTrash">0</b></button>
+    </section>
+
     <main class="workspace">
-      <section class="panel"><div class="panel-head"><div><div class="panel-title">客服案件</div><div class="panel-sub">先選案件，再在右側處理。</div></div></div><div class="panel-body"><div class="filters"><button class="filter active" data-filter="all">全部</button><button class="filter" data-filter="open">待處理</button><button class="filter" data-filter="progress">處理中</button><button class="filter" data-filter="waiting">等待回覆</button><button class="filter" data-filter="done">已結案</button></div><input id="search" class="search" placeholder="搜尋案件、訂單、姓名或電話"><div id="caseList" class="case-list"><div class="empty">讀取中…</div></div></div></section>
-      <section id="detail" class="panel"><div class="detail-empty">請先選擇一筆案件。</div></section>
+      <section class="panel">
+        <div class="panel-head"><div><div class="panel-title">客服案件</div><div class="panel-sub">可搜尋、分類、排序；垃圾桶案件不會出現在一般清單。</div></div></div>
+        <div class="panel-body">
+          <div class="filters">
+            <button class="filter active" data-filter="all" onclick="setFilter('all')">全部</button>
+            <button class="filter" data-filter="open" onclick="setFilter('open')">待處理</button>
+            <button class="filter" data-filter="progress" onclick="setFilter('progress')">處理中</button>
+            <button class="filter" data-filter="waiting" onclick="setFilter('waiting')">等待回覆</button>
+            <button class="filter" data-filter="done" onclick="setFilter('done')">已結案</button>
+            <button class="filter trash" data-filter="trash" onclick="setFilter('trash')">垃圾桶</button>
+          </div>
+          <input id="search" class="search" placeholder="搜尋案件、訂單、姓名、電話或說明">
+          <div class="tools-grid">
+            <select id="sourceFilter" class="select"><option value="">所有來源</option><option value="customer">客戶</option><option value="merchant">店家</option><option value="rider">小U</option><option value="admin">內部</option></select>
+            <select id="categoryFilter" class="select"><option value="">所有問題類型</option></select>
+            <select id="sortOrder" class="select"><option value="newest">最近更新優先</option><option value="oldest">最早建立優先</option><option value="severity">嚴重程度優先</option></select>
+            <button class="btn" onclick="clearFilters()">清除篩選</button>
+          </div>
+          <div class="result-row"><span id="resultCount">0 筆案件</span><span id="listModeText">一般案件</span></div>
+          <div id="caseList" class="case-list"><div class="empty">讀取中…</div></div>
+        </div>
+      </section>
+
+      <section class="panel" id="detail"><div class="detail-empty">請從左側選擇一筆案件。</div></section>
     </main>
   </div>
 </div>
-<div id="modalBackdrop" class="modal-backdrop"><div class="modal"><div class="modal-head"><div><b id="modalTitle">案件操作</b><div class="panel-sub" id="modalSub"></div></div><button class="close" onclick="closeModal()">×</button></div><div id="modalBody" class="modal-body"></div></div></div><div id="toast" class="toast"></div>
+
+<div id="modalBackdrop" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-head"><div><b id="modalTitle">案件操作</b><div class="panel-sub" id="modalSub"></div></div><button class="close" onclick="closeModal()">×</button></div>
+    <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
 <script>
 'use strict';
 const API_BASE=location.origin;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const money=v=>'NT$'+Math.round(Number(v||0)).toLocaleString('zh-TW');
-let cases=[];let selectedId='';let selectedDetail=null;let filter='all';
+let cases=[];
+let selectedId='';
+let selectedDetail=null;
+let filter='all';
+let summary={};
+let autoTimer=null;
+
 function fmtTime(ms){const n=Number(ms||0);return n?new Date(n).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'-'}
-function statusLabel(s){return {OPEN:'待處理',IN_PROGRESS:'處理中',WAITING_USER:'等待回覆',WAITING_FINANCE:'財務審核中',RESOLVED:'已結案',CLOSED:'已關閉'}[s]||s||'-'}
-function statusClass(s){return s==='OPEN'?'open':s==='IN_PROGRESS'?'progress':['WAITING_USER','WAITING_FINANCE'].includes(s)?'wait':'done'}
-function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),3000)}
-async function readJson(res){const data=await res.json().catch(()=>({}));if(!res.ok||data.success===false)throw new Error(data.message||data.error||`HTTP ${res.status}`);return data}
+function statusLabel(s){return {OPEN:'待處理',IN_PROGRESS:'處理中',WAITING_USER:'等待回覆',WAITING_FINANCE:'財務審核中',RESOLVED:'已結案',CLOSED:'已關閉',DELETED:'垃圾桶'}[s]||s||'-'}
+function statusClass(s){return s==='OPEN'?'open':s==='IN_PROGRESS'?'progress':['WAITING_USER','WAITING_FINANCE'].includes(s)?'wait':s==='DELETED'?'deleted':'done'}
+function roleLabel(v){return {customer:'客戶',merchant:'店家',rider:'小U',admin:'內部'}[v]||v||'-'}
+function severityLabel(v){return {CRITICAL:'重大',HIGH:'高',MEDIUM:'一般',LOW:'低'}[v]||v||'-'}
+function severityRank(v){return {CRITICAL:4,HIGH:3,MEDIUM:2,LOW:1}[v]||0}
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),3200)}
+async function readJson(res){const data=await res.json().catch(()=>({}));if(!res.ok||data.success===false){const e=new Error(data.message||data.error||`HTTP ${res.status}`);e.status=res.status;throw e}return data}
 function key(){return sessionStorage.getItem('ubee_support_admin_key')||localStorage.getItem('ubee_support_admin_key_saved')||''}
 function operator(){return localStorage.getItem('ubee_support_operator')||'Charles'}
 function headers(){return {'Content-Type':'application/json','X-UBee-Support-Admin-Key':key(),'X-UBee-Support-Operator':operator()}}
 async function api(path,opt={}){return readJson(await fetch(API_BASE+path,{cache:'no-store',...opt,headers:{...headers(),...(opt.headers||{})}}))}
 
-async function login(){const k=$('adminKey').value.trim(),op=$('operator').value.trim()||'Charles';if(!k)return alert('請輸入客服管理密碼。');sessionStorage.setItem('ubee_support_admin_key',k);localStorage.setItem('ubee_support_operator',op);if($('rememberKey').checked)localStorage.setItem('ubee_support_admin_key_saved',k);else localStorage.removeItem('ubee_support_admin_key_saved');try{await api('/api/admin/support/cases?limit=1');showDashboard();loadCases()}catch(err){sessionStorage.removeItem('ubee_support_admin_key');alert('登入失敗：'+err.message)}}
+async function login(){
+  const k=$('adminKey').value.trim(),op=$('operator').value.trim()||'Charles';
+  if(!k)return alert('請輸入客服管理密碼。');
+  sessionStorage.setItem('ubee_support_admin_key',k);
+  localStorage.setItem('ubee_support_operator',op);
+  if($('rememberKey').checked)localStorage.setItem('ubee_support_admin_key_saved',k);else localStorage.removeItem('ubee_support_admin_key_saved');
+  try{await api('/api/admin/support/cases?limit=1');showDashboard();await loadCases()}catch(err){sessionStorage.removeItem('ubee_support_admin_key');alert('登入失敗：'+err.message)}
+}
 function logout(){sessionStorage.removeItem('ubee_support_admin_key');localStorage.removeItem('ubee_support_admin_key_saved');location.reload()}
-function showDashboard(){$('loginScreen').classList.add('hidden');$('dashboard').classList.remove('hidden');$('operatorText').textContent=`目前操作人員：${operator()}`}
-async function loadCases(){try{const data=await api('/api/admin/support/cases?limit=500');cases=data.cases||[];updateKpis();renderCases();if(selectedId&&cases.some(c=>c.caseId===selectedId))loadDetail(selectedId)}catch(err){if(/金鑰|不正確|401/.test(err.message))return logout();$('caseList').innerHTML=`<div class="empty">讀取失敗：${esc(err.message)}</div>`}}
-function updateKpis(){$('kpiOpen').textContent=cases.filter(c=>c.status==='OPEN').length;$('kpiProgress').textContent=cases.filter(c=>c.status==='IN_PROGRESS').length;$('kpiWaiting').textContent=cases.filter(c=>['WAITING_USER','WAITING_FINANCE'].includes(c.status)).length;$('kpiDone').textContent=cases.filter(c=>['RESOLVED','CLOSED'].includes(c.status)).length}
-function matchesFilter(c){if(filter==='open')return c.status==='OPEN';if(filter==='progress')return c.status==='IN_PROGRESS';if(filter==='waiting')return ['WAITING_USER','WAITING_FINANCE'].includes(c.status);if(filter==='done')return ['RESOLVED','CLOSED'].includes(c.status);return true}
-function renderCases(){const q=$('search').value.trim().toLowerCase();const list=cases.filter(matchesFilter).filter(c=>!q||[c.caseId,c.orderId,c.orderNo,c.sourceName,c.contactPhone,c.title,c.description].some(v=>String(v||'').toLowerCase().includes(q)));$('caseList').innerHTML=list.length?list.map(c=>`<button class="case-card ${c.caseId===selectedId?'active':''}" onclick="loadDetail('${esc(c.caseId)}')"><div class="case-top"><div class="case-title">${esc(c.categoryLabel||c.title||'客服案件')}</div><span class="status ${statusClass(c.status)}">${esc(statusLabel(c.status))}</span></div><div class="case-meta">${esc(c.caseId)}${c.orderId?`・訂單 ${esc(c.orderId)}`:''}<br>${esc(c.sourceName||c.contactPhone||c.sourceRole||'-')}・${esc(fmtTime(c.updatedAtMs))}</div></button>`).join(''):'<div class="empty">目前沒有符合條件的案件。</div>'}
-document.querySelectorAll('.filter').forEach(btn=>btn.onclick=()=>{filter=btn.dataset.filter;document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===btn));renderCases()});$('search').addEventListener('input',renderCases);
-async function loadDetail(id){selectedId=id;renderCases();$('detail').innerHTML='<div class="detail-empty">讀取案件中…</div>';try{selectedDetail=await api(`/api/admin/support/cases/${encodeURIComponent(id)}?t=${Date.now()}`);renderDetail()}catch(err){$('detail').innerHTML=`<div class="detail-empty">${esc(err.message)}</div>`}}
-function renderDetail(){const d=selectedDetail,c=d.case||{},events=d.events||[],evidence=d.evidence||[],finance=d.finance||{};const done=['RESOLVED','CLOSED'].includes(c.status);$('detail').innerHTML=`<div class="detail-head"><small>${esc(c.caseId||'')}</small><h2>${esc(c.categoryLabel||c.title||'客服案件')}</h2><p>${esc(statusLabel(c.status))}${c.orderId?`・訂單 ${esc(c.orderId)}`:''}</p></div><div class="detail-body"><div class="action-grid">${!done?`<button class="btn primary" onclick="startCase()">開始處理</button><button class="btn blue" onclick="openTextAction('PUBLIC_REPLY','回覆客戶','輸入客戶看得到的回覆')">回覆客戶</button><button class="btn" onclick="openTextAction('WAIT_USER','等待客戶回覆','請說明需要補充什麼資料')">等待回覆</button><button class="btn" onclick="openTextAction('INTERNAL_NOTE','內部備註','只有 UBee 內部看得到')">內部備註</button>${c.orderId?`<button class="btn yellow" onclick="openRefund()">申請退款審核</button>`:''}<button class="btn green" onclick="openTextAction('RESOLVE','結案','請填寫完整處理結果')">結案</button>`:`<button class="btn yellow" onclick="openTextAction('REOPEN','重新開啟','請說明重新開啟原因')">重新開啟</button>`}</div><div class="info-grid"><div class="info"><span>案件來源</span><b>${esc(c.sourceRole||'-')}・${esc(c.sourceName||'-')}</b></div><div class="info"><span>聯絡電話</span><b>${esc(c.contactPhone||'-')}</b></div><div class="info"><span>負責人</span><b>${esc(c.assignedTo||'尚未指派')}</b></div><div class="info"><span>建立時間</span><b>${esc(fmtTime(c.createdAtMs))}</b></div><div class="info"><span>退款狀態</span><b>${esc(c.refundRequestStatus||'未申請')}${c.refundRequestedAmount?`・${money(c.refundRequestedAmount)}`:''}</b></div><div class="info"><span>客戶實收</span><b>${money(finance.actualPaidAmount||finance.finalCustomerTotal)}</b></div></div><div class="section-title">問題說明</div><div class="note">${esc(c.description||'')}</div>${c.latestPublicReply?`<div class="section-title">最近對外回覆</div><div class="note" style="background:#fff8d5">${esc(c.latestPublicReply)}</div>`:''}${c.latestInternalNote?`<div class="section-title">最近內部備註</div><div class="note">${esc(c.latestInternalNote)}</div>`:''}<div class="section-title">任務證據</div><div class="evidence">${evidence.length?evidence.map(e=>e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.evidenceTypeLabel||'證據')}<br>${esc(e.originalName||'開啟檔案')}</a>`:`<div class="note">${esc(e.originalName||'證據檔案')}</div>`).join(''):'<div class="note">目前沒有上傳證據。</div>'}</div><div class="section-title">處理時間軸</div><div class="timeline">${events.length?events.map(e=>`<div class="event"><div class="dot"></div><div><b>${esc(e.title||e.type)}</b><p>${esc(e.message||'')}</p><small>${esc(fmtTime(e.createdAtMs))}・${esc(e.operator||'UBee')}</small></div></div>`).join(''):'<div class="empty">目前沒有處理紀錄。</div>'}</div></div>`}
+function showDashboard(){$('loginScreen').classList.add('hidden');$('dashboard').classList.remove('hidden');$('operatorText').textContent=`目前操作人員：${operator()}｜刪除案件會先進垃圾桶`}
+function listPath(){return filter==='trash'?'/api/admin/support/cases?limit=500&deleted=only':'/api/admin/support/cases?limit=500'}
+
+async function loadCases(showMessage=false){
+  try{
+    const data=await api(listPath());
+    cases=data.cases||[];
+    summary=data.summary||{};
+    fillCategories(data.categories||[]);
+    updateKpis();renderCases();
+    $('syncText').textContent='更新於 '+new Date().toLocaleTimeString('zh-TW',{hour12:false});
+    if(selectedId&&cases.some(c=>c.caseId===selectedId))await loadDetail(selectedId,false);
+    else if(selectedId){selectedId='';selectedDetail=null;$('detail').innerHTML='<div class="detail-empty">請從左側選擇一筆案件。</div>'}
+    if(showMessage)toast('客服案件已更新');
+  }catch(err){
+    if(err.status===401||/金鑰|不正確/.test(err.message))return logout();
+    $('caseList').innerHTML=`<div class="empty">讀取失敗：${esc(err.message)}</div>`;
+  }
+}
+function fillCategories(items){const select=$('categoryFilter');if(select.dataset.ready)return;items.forEach(item=>{const option=document.createElement('option');option.value=item.value;option.textContent=item.label;select.appendChild(option)});select.dataset.ready='1'}
+function updateKpis(){$('kpiOpen').textContent=Number(summary.open||0);$('kpiProgress').textContent=Number(summary.inProgress||0);$('kpiWaiting').textContent=Number(summary.waitingUser||0)+Number(summary.waitingFinance||0);$('kpiDone').textContent=Number(summary.resolved||0)+Number(summary.closed||0);$('kpiTrash').textContent=Number(summary.deleted||0)}
+function matchesFilter(c){if(filter==='open')return c.status==='OPEN';if(filter==='progress')return c.status==='IN_PROGRESS';if(filter==='waiting')return ['WAITING_USER','WAITING_FINANCE'].includes(c.status);if(filter==='done')return ['RESOLVED','CLOSED'].includes(c.status);if(filter==='trash')return c.status==='DELETED'||c.isDeleted;return !c.isDeleted}
+function getFilteredCases(){
+  const q=$('search').value.trim().toLowerCase(),source=$('sourceFilter').value,category=$('categoryFilter').value,sort=$('sortOrder').value;
+  const list=cases.filter(matchesFilter).filter(c=>!source||c.sourceRole===source).filter(c=>!category||c.category===category).filter(c=>!q||[c.caseId,c.orderId,c.orderNo,c.sourceName,c.contactPhone,c.title,c.description,c.assignedTo,c.deletedReason].some(v=>String(v||'').toLowerCase().includes(q)));
+  list.sort((a,b)=>sort==='oldest'?(a.createdAtMs-b.createdAtMs):sort==='severity'?(severityRank(b.severity)-severityRank(a.severity)||b.updatedAtMs-a.updatedAtMs):((b.isDeleted?b.deletedAtMs:b.updatedAtMs)-(a.isDeleted?a.deletedAtMs:a.updatedAtMs)));
+  return list;
+}
+function renderCases(){
+  const list=getFilteredCases();
+  $('resultCount').textContent=`${list.length} 筆案件`;
+  $('listModeText').textContent=filter==='trash'?'垃圾桶案件':'一般案件';
+  $('caseList').innerHTML=list.length?list.map(c=>`<button class="case-card ${c.caseId===selectedId?'active':''} ${c.isDeleted?'deleted':''}" onclick="loadDetail('${esc(c.caseId)}')"><div class="case-top"><div class="case-title">${esc(c.categoryLabel||c.title||'客服案件')}</div><span class="status ${statusClass(c.status)}">${esc(statusLabel(c.status))}</span></div><div class="case-meta">${esc(c.caseId)}${c.orderId?`・訂單 ${esc(c.orderId)}`:''}<br>${esc(c.sourceName||c.contactPhone||roleLabel(c.sourceRole))}・${esc(fmtTime(c.isDeleted?c.deletedAtMs:c.updatedAtMs))}</div><div class="case-flags"><span class="flag ${['HIGH','CRITICAL'].includes(c.severity)?'high':''}">${esc(severityLabel(c.severity))}</span>${Number(c.evidenceCount||0)>0?`<span class="flag evidence">證據 ${Number(c.evidenceCount)}</span>`:''}${c.refundRequestStatus?'<span class="flag refund">退款案件</span>':''}${c.assignedTo?`<span class="flag">${esc(c.assignedTo)}</span>`:''}</div></button>`).join(''):'<div class="empty">目前沒有符合條件的案件。</div>';
+}
+async function setFilter(next){filter=next;document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x.dataset.filter===next));selectedId='';selectedDetail=null;$('detail').innerHTML='<div class="detail-empty">請從左側選擇一筆案件。</div>';await loadCases()}
+function clearFilters(){$('search').value='';$('sourceFilter').value='';$('categoryFilter').value='';$('sortOrder').value='newest';renderCases()}
+
+async function loadDetail(id,rerenderList=true){
+  selectedId=id;if(rerenderList)renderCases();$('detail').innerHTML='<div class="detail-empty">讀取案件中…</div>';
+  try{selectedDetail=await api(`/api/admin/support/cases/${encodeURIComponent(id)}?t=${Date.now()}`);renderDetail()}catch(err){$('detail').innerHTML=`<div class="detail-empty">${esc(err.message)}</div>`}
+}
+function renderDetail(){
+  const d=selectedDetail,c=d.case||{},events=d.events||[],evidence=d.evidence||[],finance=d.finance||{},incidents=d.incidents||[],o=d.liveOrder||d.orderSnapshot||{};
+  const deleted=Boolean(c.isDeleted||c.status==='DELETED'),done=['RESOLVED','CLOSED'].includes(c.status);
+  const pickup=o.addresses?.pickup||o.pickupAddress||o.pickup||'-',dropoff=o.addresses?.dropoff||o.dropoffAddress||o.dropoff||'-';
+  const rider=o.people?.riderName||o.riderName||'-',item=o.itemName||o.item||o.serviceType||'-';
+  let actions='';
+  if(deleted){actions=`<button class="btn green" onclick="restoreCase()">復原案件</button><button class="btn red" onclick="openPermanentDelete()" ${c.refundRequestId||c.refundRequestStatus?'disabled title="有退款／財務紀錄，不能永久刪除"':''}>永久刪除</button>`}
+  else if(!done){actions=`<button class="btn primary" onclick="startCase()">開始處理</button><button class="btn blue" onclick="openTextAction('PUBLIC_REPLY','回覆客戶','輸入客戶看得到的回覆')">回覆客戶</button><button class="btn" onclick="openTextAction('WAIT_USER','等待客戶回覆','請說明需要補充什麼資料')">等待回覆</button><button class="btn" onclick="openTextAction('INTERNAL_NOTE','內部備註','只有 UBee 內部看得到')">內部備註</button>${c.orderId?`<button class="btn yellow" onclick="openRefund()">申請退款審核</button>`:''}<button class="btn green" onclick="openTextAction('RESOLVE','結案','請填寫完整處理結果')">結案</button><button class="btn red" onclick="openTrash()">刪除案件</button>`}
+  else{actions=`<button class="btn yellow" onclick="openTextAction('REOPEN','重新開啟','請說明重新開啟原因')">重新開啟</button><button class="btn red" onclick="openTrash()">刪除案件</button>`}
+  $('detail').innerHTML=`<div class="detail-head ${deleted?'deleted':''}"><div class="detail-head-row"><div><small>${esc(c.caseId||'')}</small><h2>${esc(c.categoryLabel||c.title||'客服案件')}</h2><p>${esc(statusLabel(c.status))}${c.orderId?`・訂單 ${esc(c.orderId)}`:''}</p></div><div class="copy-group"><button class="copy-btn" onclick="copyText('${esc(c.caseId||'')}','案件編號')">複製案件編號</button>${c.orderId?`<button class="copy-btn" onclick="copyText('${esc(c.orderId)}','訂單編號')">複製訂單編號</button>`:''}</div></div></div><div class="detail-body"><div class="action-grid">${actions}</div>${deleted?`<div class="danger-zone"><div class="danger-zone-title">此案件目前在垃圾桶</div><div class="danger-zone-text">刪除原因：${esc(c.deletedReason||'-')}<br>刪除人員：${esc(c.deletedBy||'-')}・${esc(fmtTime(c.deletedAtMs))}<br>復原後會回到刪除前的案件狀態。</div></div>`:''}<div class="info-grid"><div class="info"><span>案件來源</span><b>${esc(roleLabel(c.sourceRole))}・${esc(c.sourceName||'-')}</b></div><div class="info"><span>聯絡電話</span><b>${esc(c.contactPhone||'-')}</b></div><div class="info"><span>負責人</span><b>${esc(c.assignedTo||'尚未指派')}</b></div><div class="info"><span>嚴重程度</span><b>${esc(severityLabel(c.severity))}</b></div><div class="info"><span>建立時間</span><b>${esc(fmtTime(c.createdAtMs))}</b></div><div class="info"><span>最後更新</span><b>${esc(fmtTime(c.updatedAtMs))}</b></div><div class="info"><span>退款狀態</span><b>${esc(c.refundRequestStatus||'未申請')}${c.refundRequestedAmount?`・${money(c.refundRequestedAmount)}`:''}</b></div><div class="info"><span>客戶實收</span><b>${money(finance.actualPaidAmount||finance.finalCustomerTotal)}</b></div></div><div class="section-title">問題說明</div><div class="note">${esc(c.description||'')}</div>${c.requestedResolution?`<div class="section-title">希望處理方式</div><div class="note warning">${esc(c.requestedResolution)}</div>`:''}${c.latestPublicReply?`<div class="section-title">最近對外回覆</div><div class="note public">${esc(c.latestPublicReply)}</div>`:''}${c.latestInternalNote?`<div class="section-title">最近內部備註</div><div class="note internal">${esc(c.latestInternalNote)}</div>`:''}<div class="section-title">關聯訂單資料</div><div class="order-grid"><div class="order-item"><span>取件地址</span><b>${esc(pickup)}</b></div><div class="order-item"><span>送達地址</span><b>${esc(dropoff)}</b></div><div class="order-item"><span>配送內容</span><b>${esc(item)}</b></div><div class="order-item"><span>小U</span><b>${esc(rider)}</b></div></div><div class="section-title">任務證據</div><div class="evidence">${evidence.length?evidence.map(e=>e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.evidenceTypeLabel||'證據')}<br>${esc(e.originalName||'開啟檔案')}<br><small>${esc(fmtTime(e.uploadedAtMs))}</small></a>`:`<div class="file">${esc(e.originalName||'證據檔案')}</div>`).join(''):'<div class="note">目前沒有上傳證據。</div>'}</div>${incidents.length?`<div class="section-title">調度異常紀錄</div><div class="incident-list">${incidents.map(i=>`<div class="incident"><b>${esc(i.typeLabel||i.type||'異常')}</b><br>${esc(i.description||'')}<br><small>${esc(i.status||'-')}・${esc(fmtTime(i.updatedAtMs||i.createdAtMs))}</small></div>`).join('')}</div>`:''}<div class="section-title">處理時間軸</div><div class="timeline">${events.length?events.map(e=>`<div class="event"><div class="dot"></div><div><b>${esc(e.title||e.type)}</b><p>${esc(e.message||'')}</p><small>${esc(fmtTime(e.createdAtMs))}・${esc(e.operator||'UBee')}</small></div></div>`).join(''):'<div class="empty">目前沒有處理紀錄。</div>'}</div></div>`;
+}
+async function copyText(value,label){try{await navigator.clipboard.writeText(value);toast(`${label}已複製`)}catch(e){prompt(`請複製${label}`,value)}}
 async function action(type,payload={}){await api(`/api/admin/support/cases/${encodeURIComponent(selectedId)}/action`,{method:'POST',body:JSON.stringify({action:type,operator:operator(),...payload})});closeModal();toast('案件已更新');await loadCases()}
 async function startCase(){try{const c=selectedDetail?.case||{};if(!c.assignedTo)await action('ASSIGN',{assignedTo:operator()});await action('START',{message:'UBee 客服已開始處理此案件。'})}catch(err){alert(err.message)}}
 function openTextAction(type,title,placeholder){openModal(title,'',`<textarea id="modalText" class="textarea" placeholder="${esc(placeholder)}"></textarea><button class="btn primary" style="width:100%;margin-top:12px" onclick="submitTextAction('${esc(type)}')">確認送出</button>`)}
 async function submitTextAction(type){const message=$('modalText').value.trim();if(!message)return alert('請填寫內容。');try{await action(type,{message})}catch(err){alert(err.message)}}
 function openRefund(){const f=selectedDetail?.finance||{};openModal('送交財務退款審核','這不會直接退款。',`<div class="field"><label>退款申請金額</label><input id="refundAmount" class="input" type="number" min="1" value="${Number(f.actualPaidAmount||f.finalCustomerTotal||0)}"></div><div class="field"><label>退款原因</label><textarea id="refundReason" class="textarea" placeholder="請說明退款原因與判斷依據"></textarea></div><button class="btn yellow" style="width:100%;margin-top:12px" onclick="submitRefund()">送交財務審核</button>`)}
 async function submitRefund(){const amount=Number($('refundAmount').value||0),reason=$('refundReason').value.trim();if(amount<=0||!reason)return alert('請填寫退款金額與原因。');try{await api(`/api/admin/support/cases/${encodeURIComponent(selectedId)}/refund-request`,{method:'POST',body:JSON.stringify({amount,reason,operator:operator()})});closeModal();toast('已送交財務審核');await loadCases()}catch(err){alert(err.message)}}
+
+function openTrash(){const c=selectedDetail?.case||{};openModal('刪除客服案件','案件會先移到垃圾桶，可再復原。',`<div class="confirm-box">你正在刪除案件 <span class="confirm-case-id">${esc(c.caseId||'')}</span>。這不會立刻永久清除資料。</div><div class="field"><label>刪除原因 *</label><textarea id="deleteReason" class="textarea" placeholder="例如：重複建立、測試案件、誤建案件"></textarea></div><button class="btn red" style="width:100%;margin-top:12px;padding:13px" onclick="submitTrash()">確認移到垃圾桶</button>`)}
+async function submitTrash(){const reason=$('deleteReason').value.trim();if(!reason)return alert('請填寫刪除原因。');if(!confirm('確定要把這筆案件移到垃圾桶嗎？'))return;try{await api(`/api/admin/support/cases/${encodeURIComponent(selectedId)}/trash`,{method:'POST',body:JSON.stringify({reason,operator:operator()})});closeModal();toast('案件已移到垃圾桶');filter='trash';document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x.dataset.filter==='trash'));await loadCases()}catch(err){alert(err.message)}}
+async function restoreCase(){if(!confirm('確定要復原這筆客服案件嗎？'))return;try{await api(`/api/admin/support/cases/${encodeURIComponent(selectedId)}/restore`,{method:'POST',body:JSON.stringify({operator:operator(),message:'案件由客服管理中心復原。'})});toast('案件已復原');filter='all';document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));selectedId='';selectedDetail=null;await loadCases()}catch(err){alert(err.message)}}
+function openPermanentDelete(){const c=selectedDetail?.case||{};if(c.refundRequestId||c.refundRequestStatus)return alert('此案件已有退款／財務紀錄，不能永久刪除，只能留在垃圾桶。');openModal('永久刪除案件','此動作無法復原。',`<div class="confirm-box"><b>警告：</b>永久刪除會移除案件、處理時間軸、證據資料與 Firebase Storage 檔案，無法復原。<br><br>請完整輸入案件編號：<br><span class="confirm-case-id">${esc(c.caseId||'')}</span></div><div class="field"><label>輸入案件編號確認</label><input id="confirmDeleteId" class="input" autocomplete="off" placeholder="${esc(c.caseId||'')}"></div><button class="btn red" style="width:100%;margin-top:12px;padding:13px" onclick="submitPermanentDelete()">永久刪除，無法復原</button>`)}
+async function submitPermanentDelete(){const confirmCaseId=$('confirmDeleteId').value.trim().toUpperCase();if(confirmCaseId!==selectedId)return alert('案件編號不一致，已取消永久刪除。');if(!confirm('最後確認：永久刪除後完全無法復原，確定繼續嗎？'))return;try{const data=await api(`/api/admin/support/cases/${encodeURIComponent(selectedId)}`,{method:'DELETE',body:JSON.stringify({confirmCaseId,operator:operator()})});closeModal();toast(data.message||'案件已永久刪除');selectedId='';selectedDetail=null;$('detail').innerHTML='<div class="detail-empty">案件已永久刪除。</div>';await loadCases()}catch(err){alert(err.message)}}
+
 function openModal(title,sub,body){$('modalTitle').textContent=title;$('modalSub').textContent=sub||'';$('modalBody').innerHTML=body;$('modalBackdrop').classList.add('show')}
 function closeModal(){$('modalBackdrop').classList.remove('show')}
+function setupAutoRefresh(){clearInterval(autoTimer);autoTimer=setInterval(()=>{if($('autoRefresh').checked&&document.visibilityState==='visible')loadCases(false)},30000)}
 
-(function init(){const saved=localStorage.getItem('ubee_support_admin_key_saved');$('operator').value=operator();if(saved){$('adminKey').value=saved;$('rememberKey').checked=true;sessionStorage.setItem('ubee_support_admin_key',saved);showDashboard();loadCases()}else if(sessionStorage.getItem('ubee_support_admin_key')){showDashboard();loadCases()}})();
+['search','sourceFilter','categoryFilter','sortOrder'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',renderCases));
+$('modalBackdrop').addEventListener('click',e=>{if(e.target===$('modalBackdrop'))closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&$('autoRefresh')?.checked)loadCases(false)});
+
+(function init(){
+  const saved=localStorage.getItem('ubee_support_admin_key_saved');
+  $('operator').value=operator();
+  setupAutoRefresh();
+  if(saved){$('adminKey').value=saved;$('rememberKey').checked=true;sessionStorage.setItem('ubee_support_admin_key',saved);showDashboard();loadCases()}
+  else if(sessionStorage.getItem('ubee_support_admin_key')){showDashboard();loadCases()}
+})();
 </script>
 </body>
 </html>
