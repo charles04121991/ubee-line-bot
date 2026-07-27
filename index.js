@@ -10052,6 +10052,225 @@ async function maybePersistDispatchIntelligence(intelligence = {}) {
   }
 }
 
+
+
+// ============================================================
+// UBee 第二階段：調度異常案件中心
+// - 系統告警：即時判斷，不會直接改變訂單或自動結案。
+// - 異常案件：由調度中心建立後，可分派負責人、開始處理、補充紀錄、結案與重新開啟。
+// - 每張訂單、每種異常維持一份可追溯案件；再次發生時會重新開啟並保留歷史。
+// ============================================================
+const UBEE_DISPATCH_INCIDENT_TYPES = Object.freeze({
+  NO_RIDER_ACCEPT: {
+    label: '無人接單',
+    defaultSeverity: 'HIGH',
+  },
+  RIDER_UNREACHABLE: {
+    label: '小U接單後失聯',
+    defaultSeverity: 'CRITICAL',
+  },
+  LOCATION_STALE: {
+    label: '定位長時間未更新',
+    defaultSeverity: 'HIGH',
+  },
+  CUSTOMER_CANCEL: {
+    label: '客戶取消',
+    defaultSeverity: 'WATCH',
+  },
+  MERCHANT_OUT_OF_STOCK: {
+    label: '店家缺貨',
+    defaultSeverity: 'WATCH',
+  },
+  ADDRESS_ERROR: {
+    label: '地址錯誤',
+    defaultSeverity: 'HIGH',
+  },
+  CUSTOMER_UNREACHABLE: {
+    label: '聯絡不到客戶',
+    defaultSeverity: 'HIGH',
+  },
+  AMOUNT_DISPUTE: {
+    label: '金額爭議',
+    defaultSeverity: 'HIGH',
+  },
+  OTHER: {
+    label: '其他異常',
+    defaultSeverity: 'WATCH',
+  },
+});
+
+const UBEE_DISPATCH_INCIDENT_STATUSES = Object.freeze({
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  RESOLVED: 'RESOLVED',
+});
+
+const UBEE_DISPATCH_INCIDENT_SEVERITIES = Object.freeze([
+  'WATCH',
+  'HIGH',
+  'CRITICAL',
+]);
+
+function normalizeDispatchIncidentType(value) {
+  const safe = String(value || '').trim().toUpperCase();
+  return Object.prototype.hasOwnProperty.call(
+    UBEE_DISPATCH_INCIDENT_TYPES,
+    safe
+  ) ? safe : 'OTHER';
+}
+
+function normalizeDispatchIncidentSeverity(value, type = 'OTHER') {
+  const safe = String(value || '').trim().toUpperCase();
+  if (UBEE_DISPATCH_INCIDENT_SEVERITIES.includes(safe)) {
+    return safe;
+  }
+  return UBEE_DISPATCH_INCIDENT_TYPES[
+    normalizeDispatchIncidentType(type)
+  ]?.defaultSeverity || 'WATCH';
+}
+
+function normalizeDispatchIncidentStatus(value) {
+  const safe = String(value || '').trim().toUpperCase();
+  return Object.values(UBEE_DISPATCH_INCIDENT_STATUSES).includes(safe)
+    ? safe
+    : UBEE_DISPATCH_INCIDENT_STATUSES.OPEN;
+}
+
+function sanitizeDispatchIncidentText(value, maxLength = 500) {
+  return String(value || '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function buildDispatchIncidentId(orderId, type) {
+  const safeOrderId = String(orderId || '').trim().toUpperCase();
+  const safeType = normalizeDispatchIncidentType(type);
+  const digest = crypto
+    .createHash('sha1')
+    .update(`${safeOrderId}|${safeType}`)
+    .digest('hex')
+    .slice(0, 16);
+  return `incident_${digest}`;
+}
+
+function dispatchIncidentTimeMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (typeof value.toMillis === 'function') {
+    return value.toMillis();
+  }
+  if (typeof value.toDate === 'function') {
+    return value.toDate().getTime();
+  }
+  if (typeof value.seconds === 'number') {
+    return value.seconds * 1000;
+  }
+  if (typeof value._seconds === 'number') {
+    return value._seconds * 1000;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildDispatchIncidentHistoryEntry({
+  action,
+  actor,
+  note,
+  status,
+  severity,
+  createdAtMs = Date.now(),
+} = {}) {
+  return {
+    action: sanitizeDispatchIncidentText(action, 60),
+    actor: sanitizeDispatchIncidentText(actor || 'UBee 調度中心', 80),
+    note: sanitizeDispatchIncidentText(note, 800),
+    status: normalizeDispatchIncidentStatus(status),
+    severity: normalizeDispatchIncidentSeverity(severity),
+    createdAtMs: Number(createdAtMs || Date.now()),
+  };
+}
+
+function appendDispatchIncidentHistory(currentHistory, entry) {
+  const list = Array.isArray(currentHistory)
+    ? currentHistory.filter(item => item && typeof item === 'object')
+    : [];
+  return [...list, entry].slice(-60);
+}
+
+function inferDispatchIncidentTypeFromAlert(alert = {}) {
+  const explicit = String(alert.incidentType || '').trim().toUpperCase();
+  if (explicit && UBEE_DISPATCH_INCIDENT_TYPES[explicit]) {
+    return explicit;
+  }
+  const type = String(alert.type || '').trim().toLowerCase();
+  if (type.startsWith('waiting_')) return 'NO_RIDER_ACCEPT';
+  if (type.startsWith('tracking_')) return 'LOCATION_STALE';
+  if (type === 'v3_active_task_risk') {
+    const message = `${alert.title || ''} ${alert.message || ''}`;
+    if (/定位|gps/i.test(message)) return 'LOCATION_STALE';
+    return 'RIDER_UNREACHABLE';
+  }
+  return 'OTHER';
+}
+
+function serializeDispatchIncident(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  const incidentId = String(doc?.id || data.incidentId || '').trim();
+  const type = normalizeDispatchIncidentType(data.type);
+  const status = normalizeDispatchIncidentStatus(data.status);
+  const severity = normalizeDispatchIncidentSeverity(data.severity, type);
+  return {
+    incidentId,
+    id: incidentId,
+    orderId: String(data.orderId || '').trim().toUpperCase(),
+    type,
+    typeLabel:
+      sanitizeDispatchIncidentText(data.typeLabel, 80) ||
+      UBEE_DISPATCH_INCIDENT_TYPES[type].label,
+    title:
+      sanitizeDispatchIncidentText(data.title, 160) ||
+      UBEE_DISPATCH_INCIDENT_TYPES[type].label,
+    description: sanitizeDispatchIncidentText(data.description, 1000),
+    severity,
+    status,
+    source: sanitizeDispatchIncidentText(data.source || 'manual', 60),
+    assignedTo: sanitizeDispatchIncidentText(data.assignedTo, 100),
+    createdBy: sanitizeDispatchIncidentText(data.createdBy, 100),
+    updatedBy: sanitizeDispatchIncidentText(data.updatedBy, 100),
+    resolutionCode: sanitizeDispatchIncidentText(data.resolutionCode, 80),
+    resolutionNote: sanitizeDispatchIncidentText(data.resolutionNote, 1000),
+    createdAtMs:
+      Number(data.createdAtMs || 0) ||
+      dispatchIncidentTimeMs(data.createdAt),
+    updatedAtMs:
+      Number(data.updatedAtMs || 0) ||
+      dispatchIncidentTimeMs(data.updatedAt),
+    startedAtMs:
+      Number(data.startedAtMs || 0) ||
+      dispatchIncidentTimeMs(data.startedAt),
+    resolvedAtMs:
+      Number(data.resolvedAtMs || 0) ||
+      dispatchIncidentTimeMs(data.resolvedAt),
+    reopenedAtMs:
+      Number(data.reopenedAtMs || 0) ||
+      dispatchIncidentTimeMs(data.reopenedAt),
+    reopenCount: Number(data.reopenCount || 0),
+    history: Array.isArray(data.history)
+      ? data.history.slice(-60).map(item => ({
+          ...item,
+          createdAtMs:
+            Number(item?.createdAtMs || 0) ||
+            dispatchIncidentTimeMs(item?.createdAt),
+        }))
+      : [],
+  };
+}
+
+
 // ============================================================
 // UBee 調度中心：即時監控 Dashboard API
 // 僅恢復調度中心讀取資料，不修改派單／接單／財務核心流程。
@@ -10187,6 +10406,40 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       orderSnap = await db.collection('orders').limit(800).get();
     }
     const allOrders = orderSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+
+    // 第二階段：讀取異常案件。先不使用複合索引，全部在記憶體排序與分組。
+    let incidentSnap;
+    try {
+      incidentSnap = await db.collection('dispatchIncidents').limit(1000).get();
+    } catch (incidentQueryError) {
+      console.warn(
+        '⚠️ 調度異常案件讀取失敗，暫時只顯示即時系統告警：',
+        incidentQueryError?.message || incidentQueryError
+      );
+      incidentSnap = { docs: [] };
+    }
+
+    const allIncidents = incidentSnap.docs
+      .map(serializeDispatchIncident)
+      .filter(incident => incident.incidentId && incident.orderId)
+      .sort((a, b) => Number(b.updatedAtMs || 0) - Number(a.updatedAtMs || 0));
+
+    const activeIncidentStatuses = new Set([
+      UBEE_DISPATCH_INCIDENT_STATUSES.OPEN,
+      UBEE_DISPATCH_INCIDENT_STATUSES.IN_PROGRESS,
+    ]);
+
+    const openIncidents = allIncidents.filter(incident =>
+      activeIncidentStatuses.has(incident.status)
+    );
+
+    const incidentsByOrder = new Map();
+    allIncidents.forEach(incident => {
+      const key = String(incident.orderId || '').trim().toUpperCase();
+      if (!key) return;
+      if (!incidentsByOrder.has(key)) incidentsByOrder.set(key, []);
+      incidentsByOrder.get(key).push(incident);
+    });
 
     const waitingStatuses = new Set([
       'pending_dispatch', 'pending', 'waiting', 'searching', 'dispatching', 'redispatching'
@@ -10474,6 +10727,11 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         dispatchRadiusKm: Number(o.dispatchManualRadiusKm || o.dispatchManualRedispatchRadiusKm || 0) || null,
         speedType: o.speedType || '',
         serviceType: o.serviceType || '',
+        orderSource: o.orderSource || o.source || '',
+        merchantOrder: o.merchantOrder === true || String(o.orderSource || o.source || '').toLowerCase().includes('merchant'),
+        customerName: o.customerName || o.contactName || '',
+        customerPhone: o.customerPhone || o.contactPhone || '',
+        merchantName: o.merchantName || o.storeName || '',
         pickupDistrict: o.pickupDistrict || inferDispatchDistrict(o.pickupAddress || o.fromAddress || ''),
         pickupZoneId: o.pickupZoneId || buildDispatchZoneId(inferDispatchDistrict(o.pickupAddress || o.fromAddress || '')),
         skippedRiderIds: Array.isArray(o.skippedRiderIds) ? o.skippedRiderIds : [],
@@ -10514,6 +10772,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       if (ageMs >= 5 * 60 * 1000) {
         alerts.push({
           type: 'waiting_5m',
+          incidentType: 'NO_RIDER_ACCEPT',
+          severity: ageMs >= 10 * 60 * 1000 ? 'CRITICAL' : 'HIGH',
           title: '超過 5 分鐘無人接單',
           message: `${o.id} 已等待 ${Math.floor(ageMs / 60000)} 分鐘`,
           orderId: o.id
@@ -10521,6 +10781,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       } else if (ageMs >= 3 * 60 * 1000) {
         alerts.push({
           type: 'waiting_3m',
+          incidentType: 'NO_RIDER_ACCEPT',
+          severity: 'WATCH',
           title: '超過 3 分鐘無人接單',
           message: `${o.id} 已等待 ${Math.floor(ageMs / 60000)} 分鐘`,
           orderId: o.id
@@ -10535,6 +10797,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       if (!locationAtMs) {
         alerts.push({
           type: 'tracking_waiting',
+          incidentType: 'LOCATION_STALE',
+          severity: 'WATCH',
           title: '任務中尚未收到小U定位',
           message: `${o.id} 已接單，但尚未收到任務 GPS。`,
           orderId: o.id
@@ -10547,6 +10811,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       if (locationAgeMs >= 10 * 60 * 1000) {
         alerts.push({
           type: 'tracking_stale_10m',
+          incidentType: 'LOCATION_STALE',
+          severity: 'CRITICAL',
           title: '小U定位長時間未更新',
           message: `${o.id} 的小U定位已 ${Math.floor(locationAgeMs / 60000)} 分鐘未更新，地圖仍保留最後已知位置。`,
           orderId: o.id
@@ -10554,6 +10820,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       } else if (locationAgeMs >= 3 * 60 * 1000) {
         alerts.push({
           type: 'tracking_stale_3m',
+          incidentType: 'LOCATION_STALE',
+          severity: 'HIGH',
           title: '小U定位暫時中斷',
           message: `${o.id} 的小U定位已 ${Math.floor(locationAgeMs / 60000)} 分鐘未更新。`,
           orderId: o.id
@@ -10575,8 +10843,25 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
     );
     const enrichedLiveOrders = liveOrders.map(order => {
       const insight = insightMap.get(String(order.id)) || null;
+      const orderIncidents = incidentsByOrder.get(
+        String(order.id || '').trim().toUpperCase()
+      ) || [];
+      const activeOrderIncidents = orderIncidents.filter(incident =>
+        activeIncidentStatuses.has(incident.status)
+      );
       return {
         ...order,
+        incidents: orderIncidents.slice(0, 20),
+        openIncidents: activeOrderIncidents.slice(0, 20),
+        openIncidentCount: activeOrderIncidents.length,
+        highestIncidentSeverity:
+          activeOrderIncidents.some(item => item.severity === 'CRITICAL')
+            ? 'CRITICAL'
+            : activeOrderIncidents.some(item => item.severity === 'HIGH')
+              ? 'HIGH'
+              : activeOrderIncidents.length
+                ? 'WATCH'
+                : '',
         riskScore: insight?.score ?? 0,
         riskLevel: insight?.level ?? 'NORMAL',
         riskKind: insight?.kind || '',
@@ -10601,6 +10886,10 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       )
       .map(insight => ({
         type: 'v3_active_task_risk',
+        incidentType:
+          (insight.reasons || []).some(reason => /定位|GPS/i.test(String(reason || '')))
+            ? 'LOCATION_STALE'
+            : 'RIDER_UNREACHABLE',
         severity: insight.level,
         title:
           insight.level === 'CRITICAL'
@@ -10619,11 +10908,53 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       !String(alert.type || '').startsWith('tracking_')
     );
 
-    const finalAlerts = [...activeRiskAlerts, ...legacyNonTrackingAlerts]
+    const persistedIncidentAlerts = openIncidents.map(incident => ({
+      type: 'persisted_incident',
+      incidentType: incident.type,
+      incidentId: incident.incidentId,
+      incidentStatus: incident.status,
+      severity: incident.severity,
+      title: incident.title || incident.typeLabel || '異常案件',
+      message:
+        `${incident.orderId}｜${incident.description || incident.typeLabel}` +
+        `${incident.assignedTo ? `｜負責人：${incident.assignedTo}` : ''}`,
+      orderId: incident.orderId,
+      assignedTo: incident.assignedTo,
+      createdAtMs: incident.createdAtMs,
+      updatedAtMs: incident.updatedAtMs,
+      source: incident.source,
+    }));
+
+    const activeIncidentKeySet = new Set(
+      openIncidents.map(incident =>
+        `${incident.orderId}|${incident.type}`
+      )
+    );
+
+    const rawSystemAlerts = [...activeRiskAlerts, ...legacyNonTrackingAlerts]
+      .map(alert => ({
+        ...alert,
+        incidentType: inferDispatchIncidentTypeFromAlert(alert),
+        severity: normalizeDispatchIncidentSeverity(
+          alert.severity,
+          inferDispatchIncidentTypeFromAlert(alert)
+        ),
+      }))
+      .filter(alert =>
+        !activeIncidentKeySet.has(
+          `${String(alert.orderId || '').trim().toUpperCase()}|${alert.incidentType}`
+        )
+      );
+
+    const finalAlerts = [...persistedIncidentAlerts, ...rawSystemAlerts]
       .sort((a, b) => {
         const rank = { CRITICAL: 4, HIGH: 3, WATCH: 2, warning: 2, info: 1 };
-        return (rank[String(b.severity || '')] || 0) -
-          (rank[String(a.severity || '')] || 0);
+        const severityDiff =
+          (rank[String(b.severity || '').toUpperCase()] || 0) -
+          (rank[String(a.severity || '').toUpperCase()] || 0);
+        if (severityDiff) return severityDiff;
+        return Number(b.updatedAtMs || b.createdAtMs || 0) -
+          Number(a.updatedAtMs || a.createdAtMs || 0);
       });
 
     // ============================================================
@@ -10747,6 +11078,19 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         'NORMAL',
     };
 
+    const incidentSummary = {
+      open: allIncidents.filter(item => item.status === 'OPEN').length,
+      inProgress: allIncidents.filter(item => item.status === 'IN_PROGRESS').length,
+      resolvedToday: allIncidents.filter(item =>
+        item.status === 'RESOLVED' &&
+        Number(item.resolvedAtMs || 0) >= todayStartMs
+      ).length,
+      totalResolved: allIncidents.filter(item => item.status === 'RESOLVED').length,
+      totalActive: openIncidents.length,
+      criticalActive: openIncidents.filter(item => item.severity === 'CRITICAL').length,
+      highActive: openIncidents.filter(item => item.severity === 'HIGH').length,
+    };
+
     maybePersistDispatchIntelligence(intelligence).catch(()=>{});
 
     return res.json({
@@ -10785,12 +11129,23 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         highRiskOrders: intelligence.summary?.highRiskOrders || 0,
         predictedDemand15m: intelligence.summary?.predictedDemand15m || 0,
         predictedAvailable15m: intelligence.summary?.predictedAvailable15m || 0,
-        expectedGap15m: intelligence.summary?.expectedGap15m || 0
+        expectedGap15m: intelligence.summary?.expectedGap15m || 0,
+        openIncidents: incidentSummary.open,
+        inProgressIncidents: incidentSummary.inProgress,
+        resolvedIncidentsToday: incidentSummary.resolvedToday,
+        activeIncidentTotal: incidentSummary.totalActive
       },
       orders: enrichedLiveOrders,
       // 回傳全部已審核小U；前端自行以狀態分組／篩選。
       riders: enrichedRiders,
-      alerts: finalAlerts.slice(0, 100),
+      alerts: finalAlerts.slice(0, 150),
+      incidents: allIncidents.slice(0, 300),
+      incidentSummary,
+      incidentTypes: Object.entries(UBEE_DISPATCH_INCIDENT_TYPES).map(([value, meta]) => ({
+        value,
+        label: meta.label,
+        defaultSeverity: meta.defaultSeverity,
+      })),
       intelligence,
       operationsV5
     });
@@ -10800,6 +11155,288 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       success: false,
       message: '調度中心資料讀取失敗，請稍後再試。',
       error: err.message
+    });
+  }
+});
+
+
+// ============================================================
+// 第二階段：建立／重新開啟異常案件
+// 不會自動取消訂單、修改金額或直接重新派單；高風險動作仍由既有調度 API 處理。
+// ============================================================
+app.post('/api/dispatch/orders/:orderId/incidents', async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || '').trim().toUpperCase();
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: '缺少訂單編號。' });
+    }
+
+    const type = normalizeDispatchIncidentType(req.body?.type);
+    const severity = normalizeDispatchIncidentSeverity(req.body?.severity, type);
+    const meta = UBEE_DISPATCH_INCIDENT_TYPES[type];
+    const actor = sanitizeDispatchIncidentText(
+      req.body?.actor || req.body?.createdBy || 'UBee 調度中心',
+      100
+    );
+    const assignedTo = sanitizeDispatchIncidentText(req.body?.assignedTo, 100);
+    const title = sanitizeDispatchIncidentText(req.body?.title, 160) || meta.label;
+    const description = sanitizeDispatchIncidentText(req.body?.description, 1000);
+    const source = sanitizeDispatchIncidentText(req.body?.source || 'manual', 60);
+    const nowMs = Date.now();
+    const incidentId = buildDispatchIncidentId(orderId, type);
+    const incidentRef = db.collection('dispatchIncidents').doc(incidentId);
+    const orderRef = db.collection('orders').doc(orderId);
+
+    let result = null;
+
+    await db.runTransaction(async tx => {
+      const [orderDoc, incidentDoc] = await Promise.all([
+        tx.get(orderRef),
+        tx.get(incidentRef),
+      ]);
+
+      if (!orderDoc.exists) {
+        const error = new Error('ORDER_NOT_FOUND');
+        error.code = 'ORDER_NOT_FOUND';
+        throw error;
+      }
+
+      const current = incidentDoc.exists ? (incidentDoc.data() || {}) : {};
+      const previousStatus = normalizeDispatchIncidentStatus(current.status);
+      const isReopen = incidentDoc.exists && previousStatus === 'RESOLVED';
+      const nextStatus = isReopen
+        ? UBEE_DISPATCH_INCIDENT_STATUSES.OPEN
+        : previousStatus;
+
+      const historyEntry = buildDispatchIncidentHistoryEntry({
+        action: isReopen ? 'REOPENED' : incidentDoc.exists ? 'UPDATED' : 'CREATED',
+        actor,
+        note: description || (isReopen ? '異常再次發生，重新開啟案件。' : '建立異常案件。'),
+        status: nextStatus,
+        severity,
+        createdAtMs: nowMs,
+      });
+
+      const payload = {
+        incidentId,
+        orderId,
+        type,
+        typeLabel: meta.label,
+        title,
+        description: description || sanitizeDispatchIncidentText(current.description, 1000),
+        severity,
+        status: nextStatus,
+        source,
+        assignedTo: assignedTo || sanitizeDispatchIncidentText(current.assignedTo, 100),
+        createdBy: sanitizeDispatchIncidentText(current.createdBy, 100) || actor,
+        updatedBy: actor,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastDetectedAtMs: nowMs,
+        lastDetectedAt: admin.firestore.FieldValue.serverTimestamp(),
+        history: appendDispatchIncidentHistory(current.history, historyEntry),
+      };
+
+      if (!incidentDoc.exists) {
+        payload.createdAtMs = nowMs;
+        payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+        payload.firstDetectedAtMs = nowMs;
+        payload.firstDetectedAt = admin.firestore.FieldValue.serverTimestamp();
+        payload.reopenCount = 0;
+      }
+
+      if (isReopen) {
+        payload.reopenedAtMs = nowMs;
+        payload.reopenedAt = admin.firestore.FieldValue.serverTimestamp();
+        payload.reopenCount = Number(current.reopenCount || 0) + 1;
+        payload.resolvedAtMs = 0;
+        payload.resolutionCode = '';
+        payload.resolutionNote = '';
+      }
+
+      tx.set(incidentRef, payload, { merge: true });
+
+      result = serializeDispatchIncident({
+        id: incidentId,
+        data: () => ({ ...current, ...payload }),
+      });
+    });
+
+    await logDispatchEvent({
+      type: result?.reopenedAtMs ? 'INCIDENT_REOPENED' : 'INCIDENT_CREATED',
+      orderId,
+      incidentId,
+      incidentType: type,
+      severity,
+      reason: description || meta.label,
+      createdAtMs: nowMs,
+    });
+
+    const latest = await incidentRef.get();
+    return res.json({
+      success: true,
+      incident: serializeDispatchIncident(latest),
+      message: result?.reopenedAtMs
+        ? '異常案件已重新開啟。'
+        : '異常案件已建立。',
+    });
+  } catch (error) {
+    if (error?.code === 'ORDER_NOT_FOUND' || error?.message === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: '找不到此訂單。' });
+    }
+    console.error('❌ 建立調度異常案件失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: '異常案件建立失敗，請稍後再試。',
+    });
+  }
+});
+
+// ============================================================
+// 第二階段：異常案件狀態轉換
+// action: START / NOTE / RESOLVE / REOPEN / ASSIGN
+// ============================================================
+app.post('/api/dispatch/incidents/:incidentId/transition', async (req, res) => {
+  try {
+    const incidentId = String(req.params.incidentId || '').trim();
+    const action = String(req.body?.action || '').trim().toUpperCase();
+    const actor = sanitizeDispatchIncidentText(
+      req.body?.actor || req.body?.updatedBy || 'UBee 調度中心',
+      100
+    );
+    const note = sanitizeDispatchIncidentText(req.body?.note, 1000);
+    const assignedTo = sanitizeDispatchIncidentText(req.body?.assignedTo, 100);
+    const resolutionCode = sanitizeDispatchIncidentText(req.body?.resolutionCode, 80);
+
+    if (!incidentId) {
+      return res.status(400).json({ success: false, message: '缺少異常案件編號。' });
+    }
+
+    if (!['START', 'NOTE', 'RESOLVE', 'REOPEN', 'ASSIGN'].includes(action)) {
+      return res.status(400).json({ success: false, message: '不支援的異常處理動作。' });
+    }
+
+    if (['NOTE', 'RESOLVE'].includes(action) && !note) {
+      return res.status(400).json({
+        success: false,
+        message: action === 'RESOLVE' ? '結案時必須填寫處理結果。' : '請填寫處理紀錄。',
+      });
+    }
+
+    if (action === 'ASSIGN' && !assignedTo) {
+      return res.status(400).json({ success: false, message: '請填寫負責人。' });
+    }
+
+    const incidentRef = db.collection('dispatchIncidents').doc(incidentId);
+    const nowMs = Date.now();
+    let eventType = 'INCIDENT_NOTE';
+    let orderId = '';
+
+    await db.runTransaction(async tx => {
+      const incidentDoc = await tx.get(incidentRef);
+      if (!incidentDoc.exists) {
+        const error = new Error('INCIDENT_NOT_FOUND');
+        error.code = 'INCIDENT_NOT_FOUND';
+        throw error;
+      }
+
+      const current = incidentDoc.data() || {};
+      orderId = String(current.orderId || '').trim().toUpperCase();
+      const currentStatus = normalizeDispatchIncidentStatus(current.status);
+      let nextStatus = currentStatus;
+      const update = {
+        updatedBy: actor,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (action === 'START') {
+        nextStatus = UBEE_DISPATCH_INCIDENT_STATUSES.IN_PROGRESS;
+        update.startedAtMs = Number(current.startedAtMs || 0) || nowMs;
+        update.startedAt = admin.firestore.FieldValue.serverTimestamp();
+        if (assignedTo) update.assignedTo = assignedTo;
+        eventType = 'INCIDENT_STARTED';
+      } else if (action === 'ASSIGN') {
+        update.assignedTo = assignedTo;
+        if (currentStatus === UBEE_DISPATCH_INCIDENT_STATUSES.OPEN) {
+          nextStatus = UBEE_DISPATCH_INCIDENT_STATUSES.IN_PROGRESS;
+          update.startedAtMs = Number(current.startedAtMs || 0) || nowMs;
+          update.startedAt = admin.firestore.FieldValue.serverTimestamp();
+        }
+        eventType = 'INCIDENT_ASSIGNED';
+      } else if (action === 'RESOLVE') {
+        nextStatus = UBEE_DISPATCH_INCIDENT_STATUSES.RESOLVED;
+        update.resolvedAtMs = nowMs;
+        update.resolvedAt = admin.firestore.FieldValue.serverTimestamp();
+        update.resolutionCode = resolutionCode || 'OTHER';
+        update.resolutionNote = note;
+        eventType = 'INCIDENT_RESOLVED';
+      } else if (action === 'REOPEN') {
+        nextStatus = UBEE_DISPATCH_INCIDENT_STATUSES.OPEN;
+        update.reopenedAtMs = nowMs;
+        update.reopenedAt = admin.firestore.FieldValue.serverTimestamp();
+        update.reopenCount = Number(current.reopenCount || 0) + 1;
+        update.resolvedAtMs = 0;
+        update.resolutionCode = '';
+        update.resolutionNote = '';
+        eventType = 'INCIDENT_REOPENED';
+      }
+
+      update.status = nextStatus;
+      update.history = appendDispatchIncidentHistory(
+        current.history,
+        buildDispatchIncidentHistoryEntry({
+          action,
+          actor,
+          note:
+            note ||
+            (action === 'START'
+              ? '開始處理。'
+              : action === 'ASSIGN'
+                ? `指派給 ${assignedTo}`
+                : action === 'REOPEN'
+                  ? '重新開啟案件。'
+                  : ''),
+          status: nextStatus,
+          severity: current.severity,
+          createdAtMs: nowMs,
+        })
+      );
+
+      tx.set(incidentRef, update, { merge: true });
+    });
+
+    await logDispatchEvent({
+      type: eventType,
+      orderId,
+      incidentId,
+      reason: note || assignedTo || action,
+      createdAtMs: nowMs,
+    });
+
+    const latest = await incidentRef.get();
+    return res.json({
+      success: true,
+      incident: serializeDispatchIncident(latest),
+      message:
+        action === 'RESOLVE'
+          ? '異常案件已結案。'
+          : action === 'REOPEN'
+            ? '異常案件已重新開啟。'
+            : action === 'START'
+              ? '異常案件已開始處理。'
+              : action === 'ASSIGN'
+                ? '異常案件已指派負責人。'
+                : '處理紀錄已新增。',
+    });
+  } catch (error) {
+    if (error?.code === 'INCIDENT_NOT_FOUND' || error?.message === 'INCIDENT_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: '找不到此異常案件。' });
+    }
+    console.error('❌ 更新調度異常案件失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: '異常案件更新失敗，請稍後再試。',
     });
   }
 });
