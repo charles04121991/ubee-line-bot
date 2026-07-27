@@ -23062,6 +23062,508 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
 
 
 
+
+
+// ============================================================
+// UBee 第四階段：財務閉環 V4
+// - 訂單級財務快照、付款狀態、人工調整、對帳與完整稽核軌跡
+// - 不改動既有派單、騎士審核、重新轉派或店家完成通知規則
+// ============================================================
+const UBEE_FINANCE_ADJUSTABLE_FIELDS = Object.freeze({
+  finalCustomerTotal: ['finalTotal', 'customerPayableTotal', 'payableTotal'],
+  actualPaidAmount: ['actualPaidAmount', 'paidAmount', 'receivedAmount'],
+  riderAdvance: ['advancePayment', 'advanceAmount'],
+  riderIncome: ['riderIncome', 'riderFee', 'driverFee'],
+  platformIncome: ['platformIncome', 'platformFee'],
+  waitingFee: ['waitingFee'],
+  upstairsFee: ['upstairsFee'],
+  additionalFee: ['additionalFee'],
+  cancellationFee: ['cancellationFee'],
+  discountAmount: ['discountAmount'],
+  refundAmount: ['refundAmount'],
+});
+
+function financeNumber(value, fallback = 0) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const parsed = Number(String(value).replace(/[^\d.-]/g, ''));
+  return Number.isFinite(parsed) ? Math.round(parsed) : fallback;
+}
+
+function firstFinanceMoney(order = {}, fields = [], fallback = 0) {
+  for (const field of fields) {
+    const raw = order[field];
+    if (raw === null || raw === undefined || raw === '') continue;
+    const parsed = financeNumber(raw, NaN);
+    if (Number.isFinite(parsed)) return Math.max(0, parsed);
+  }
+  return Math.max(0, financeNumber(fallback, 0));
+}
+
+function normalizeFinancePaymentStatus(order = {}) {
+  const raw = String(
+    order.financePaymentStatus ||
+    order.paymentStatus ||
+    order.payStatus ||
+    ''
+  ).trim().toLowerCase();
+
+  if (['paid', 'paid_confirmed', 'settled', 'completed'].includes(raw) || order.isPaid === true) {
+    return 'paid';
+  }
+  if (['partial', 'partially_paid'].includes(raw)) return 'partial';
+  if (['refunded', 'refund_completed'].includes(raw)) return 'refunded';
+  if (['cancelled', 'void'].includes(raw)) return 'cancelled';
+  if (isCashPaymentOrder(order)) {
+    const orderStatus = String(order.status || '').trim().toLowerCase();
+    return ['completed', 'done'].includes(orderStatus) ? 'cash_collected' : 'cash_pending';
+  }
+  return raw || 'unpaid';
+}
+
+function getFinanceInitialEstimate(order = {}) {
+  return firstFinanceMoney(order, [
+    'initialEstimatedTotal',
+    'estimatedTotal',
+    'estimateTotal',
+    'quotedTotal',
+    'initialTotal',
+    'originalTotal',
+    'estimatedPayableTotal',
+    'serviceSubtotal',
+    'totalFee',
+  ], 0);
+}
+
+function getFinanceFinalCustomerTotal(order = {}) {
+  return firstFinanceMoney(order, [
+    'finalCustomerTotal',
+    'finalTotal',
+    'customerPayableTotal',
+    'payableTotal',
+    'customerPayAmount',
+    'customerTotalWithAdvance',
+    'collectAmount',
+    'amountToCollect',
+    'total',
+  ], getOrderCustomerPayableTotal(order));
+}
+
+function getFinanceActualPaidAmount(order = {}, finalCustomerTotal = 0) {
+  const fields = [
+    'actualPaidAmount',
+    'paidAmount',
+    'receivedAmount',
+    'customerPaidAmount',
+    'cashCollectedAmount',
+    'cashCollectAmount',
+    'cashGrossCollected',
+  ];
+
+  for (const field of fields) {
+    const raw = order[field];
+    if (raw === null || raw === undefined || raw === '') continue;
+    const parsed = financeNumber(raw, NaN);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+
+  const paymentStatus = normalizeFinancePaymentStatus(order);
+  if (['paid', 'cash_collected'].includes(paymentStatus)) return finalCustomerTotal;
+  return 0;
+}
+
+function getFinanceFeeBreakdown(order = {}) {
+  return {
+    baseFee: firstFinanceMoney(order, ['baseFee', 'startFee', 'startingFee'], 0),
+    distanceFee: firstFinanceMoney(order, ['distanceFee'], 0),
+    timeFee: firstFinanceMoney(order, ['timeFee'], 0),
+    platformServiceFee: firstFinanceMoney(order, ['platformServiceFee', 'serviceFee'], 0),
+    waitingFee: firstFinanceMoney(order, ['waitingFee'], 0),
+    upstairsFee: firstFinanceMoney(order, ['upstairsFee'], 0),
+    speedFee: firstFinanceMoney(order, ['speedFee', 'priorityFee'], 0),
+    additionalFee: firstFinanceMoney(order, ['additionalFee', 'extraFee', 'surcharge'], 0),
+    cancellationFee: firstFinanceMoney(order, ['cancellationFee'], 0),
+    discountAmount: firstFinanceMoney(order, ['discountAmount', 'discount'], 0),
+    refundAmount: firstFinanceMoney(order, ['refundAmount', 'refundedAmount'], 0),
+  };
+}
+
+function buildFinanceClosureSnapshot(order = {}) {
+  const orderStatus = String(order.status || '').trim().toLowerCase();
+  const isCompleted = ['completed', 'done'].includes(orderStatus);
+  const isCancelled = ['cancelled', 'canceled', 'merchant_cancelled'].includes(orderStatus);
+  const paymentMethod = getOrderPaymentMethod(order) || 'unknown';
+  const paymentStatus = normalizeFinancePaymentStatus(order);
+  const initialEstimatedTotal = getFinanceInitialEstimate(order);
+  const finalCustomerTotal = getFinanceFinalCustomerTotal(order);
+  const actualPaidAmount = getFinanceActualPaidAmount(order, finalCustomerTotal);
+  const riderAdvance = getOrderAdvancePaymentAmount(order);
+  const riderIncome = firstFinanceMoney(order, [
+    'riderIncome', 'riderFee', 'driverFee', 'riderEarning', 'riderPayout', 'riderShare', 'fee'
+  ], 0);
+  const expectedPlatformIncome = Math.max(0, Math.round(finalCustomerTotal - riderAdvance - riderIncome));
+  const recordedPlatformIncome = firstFinanceMoney(order, [
+    'platformIncome', 'platformFee', 'cashDueToPlatform', 'platformReceivable'
+  ], expectedPlatformIncome);
+  const feeBreakdown = getFinanceFeeBreakdown(order);
+
+  const customerVariance = Math.round(actualPaidAmount - finalCustomerTotal);
+  const platformVariance = Math.round(recordedPlatformIncome - expectedPlatformIncome);
+
+  let settlementExpected = 0;
+  let settlementActual = 0;
+  let settlementStatus = 'not_applicable';
+  if (isCashPaymentOrder(order)) {
+    settlementExpected = getFinanceCashAmounts(order).cashDueToPlatform;
+    settlementActual = isCashRemittanceSettled(order)
+      ? firstFinanceMoney(order, ['cashRemittedAmount'], settlementExpected)
+      : 0;
+    settlementStatus = isCashRemittanceSettled(order) ? 'settled' : 'pending';
+  } else if (isFinancePlatformPayoutOrder(order)) {
+    settlementExpected = getFinanceJkoAmounts(order).payoutTotal;
+    settlementActual = String(order.settlementStatus || '').trim().toLowerCase() === 'settled'
+      ? firstFinanceMoney(order, ['settledAmount'], settlementExpected)
+      : 0;
+    settlementStatus = String(order.settlementStatus || 'pending').trim().toLowerCase();
+  } else if (String(order.merchantBillingStatus || '').trim()) {
+    settlementExpected = firstFinanceMoney(order, [
+      'merchantPayableAmount', 'merchantFee', 'storePayableAmount'
+    ], 0);
+    settlementActual = String(order.merchantBillingStatus || '').trim().toLowerCase() === 'paid'
+      ? settlementExpected
+      : 0;
+    settlementStatus = String(order.merchantBillingStatus || 'pending').trim().toLowerCase();
+  }
+
+  const settlementVariance = Math.round(settlementActual - settlementExpected);
+  const discrepancyReasons = [];
+  if (Math.abs(customerVariance) > 1 && !['unpaid', 'cash_pending'].includes(paymentStatus)) {
+    discrepancyReasons.push('客戶實收與最終應收不一致');
+  }
+  if (Math.abs(platformVariance) > 1) {
+    discrepancyReasons.push('平台收入欄位與公式不一致');
+  }
+  if (settlementStatus === 'settled' && Math.abs(settlementVariance) > 1) {
+    discrepancyReasons.push('結算金額與應結算金額不一致');
+  }
+  if (isCompleted && !isCancelled && finalCustomerTotal <= 0) {
+    discrepancyReasons.push('完成訂單缺少最終金額');
+  }
+  if (isCompleted && !isCancelled && !isCashPaymentOrder(order) && paymentStatus === 'unpaid') {
+    discrepancyReasons.push('完成訂單仍顯示未付款');
+  }
+
+  let reconciliationStatus = String(order.financeReconciliationStatus || '').trim().toLowerCase();
+  if (!reconciliationStatus) {
+    if (!isCompleted && !isCancelled) reconciliationStatus = 'in_progress';
+    else if (discrepancyReasons.length) reconciliationStatus = 'needs_review';
+    else if (['unpaid', 'cash_pending'].includes(paymentStatus)) reconciliationStatus = 'unpaid';
+    else if (settlementStatus === 'pending') reconciliationStatus = 'pending_settlement';
+    else reconciliationStatus = 'ready';
+  }
+
+  if (String(order.financeReconciliationStatus || '').trim().toLowerCase() === 'reconciled') {
+    reconciliationStatus = 'reconciled';
+  }
+
+  return {
+    orderId: String(order.id || order.orderId || '').trim().toUpperCase(),
+    orderNo: String(order.orderNo || order.id || '').trim(),
+    orderStatus,
+    completedAtMs: getFinanceCompletedAtMs(order),
+    createdAtMs: financeToMs(order.createdAt) || financeToMs(order.createdAtMs),
+    paymentMethod,
+    paymentStatus,
+    initialEstimatedTotal,
+    finalCustomerTotal,
+    actualPaidAmount,
+    riderAdvance,
+    riderIncome,
+    expectedPlatformIncome,
+    recordedPlatformIncome,
+    feeBreakdown,
+    customerVariance,
+    platformVariance,
+    settlementExpected,
+    settlementActual,
+    settlementVariance,
+    settlementStatus,
+    reconciliationStatus,
+    discrepancyReasons,
+    financeAdjustmentCount: Math.max(0, financeNumber(order.financeAdjustmentCount, 0)),
+    lastAdjustmentReason: String(order.financeLastAdjustmentReason || ''),
+    reconciledBy: String(order.financeReconciledBy || ''),
+    reconciledAtMs: financeToMs(order.financeReconciledAtMs) || financeToMs(order.financeReconciledAt),
+    rider: getFinanceRiderIdentity(order),
+    customerName: String(order.customerName || order.userName || order.contactName || ''),
+    merchantName: String(order.merchantName || order.storeName || ''),
+    serviceType: String(order.serviceType || order.serviceName || order.orderType || ''),
+    source: String(order.source || order.createdFrom || ''),
+    updatedAtMs: financeToMs(order.financialUpdatedAtMs) || financeToMs(order.financialUpdatedAt) || financeToMs(order.updatedAt),
+  };
+}
+
+async function getFinanceOrderDoc(orderId) {
+  const raw = String(orderId || '').trim();
+  if (!raw) return null;
+  const candidates = Array.from(new Set([raw, raw.toUpperCase()]));
+  for (const id of candidates) {
+    const doc = await db.collection('orders').doc(id).get();
+    if (doc.exists) return doc;
+  }
+  return null;
+}
+
+async function writeFinanceAuditLog({ orderId, type, operator, reason, before = null, after = null, metadata = {} }) {
+  const nowMs = Date.now();
+  await db.collection('finance_audit_logs').add({
+    orderId: String(orderId || '').trim().toUpperCase(),
+    type: String(type || 'finance_update').trim(),
+    operator: String(operator || 'finance_center').trim().slice(0, 100),
+    reason: String(reason || '').trim().slice(0, 500),
+    before,
+    after,
+    metadata: metadata && typeof metadata === 'object' ? metadata : {},
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAtMs: nowMs,
+  });
+  return nowMs;
+}
+
+app.get('/api/admin/finance-ledger', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const query = String(req.query.q || req.query.query || '').trim().toLowerCase();
+    const statusFilter = String(req.query.status || 'all').trim().toLowerCase();
+    const limit = Math.min(1000, Math.max(50, Number(req.query.limit || 500)));
+    const snap = await db.collection('orders').limit(limit).get();
+    let items = [];
+    const nowMs = Date.now();
+    const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
+    const taipeiNow = new Date(nowMs + TAIPEI_OFFSET_MS);
+    const todayStartMs = Date.UTC(
+      taipeiNow.getUTCFullYear(), taipeiNow.getUTCMonth(), taipeiNow.getUTCDate(), 0, 0, 0, 0
+    ) - TAIPEI_OFFSET_MS;
+    const tomorrowStartMs = todayStartMs + 24 * 60 * 60 * 1000;
+
+    snap.forEach(doc => {
+      const order = { id: doc.id, ...doc.data() };
+      const item = buildFinanceClosureSnapshot(order);
+      const searchable = [
+        item.orderId, item.orderNo, item.customerName, item.merchantName,
+        item.rider?.riderName, item.rider?.riderPhone, item.serviceType,
+        item.paymentMethod, item.paymentStatus
+      ].join(' ').toLowerCase();
+      if (query && !searchable.includes(query)) return;
+      if (statusFilter !== 'all' && item.reconciliationStatus !== statusFilter) return;
+      items.push(item);
+    });
+
+    items.sort((a, b) => Number(b.completedAtMs || b.createdAtMs || 0) - Number(a.completedAtMs || a.createdAtMs || 0));
+
+    const summary = {
+      totalOrders: items.length,
+      needsReviewCount: 0,
+      unpaidCount: 0,
+      pendingSettlementCount: 0,
+      reconciledCount: 0,
+      unpaidAmount: 0,
+      todayCustomerRevenue: 0,
+      todayPlatformIncome: 0,
+      todayRiderIncome: 0,
+      todayRiderAdvance: 0,
+      totalVarianceAmount: 0,
+    };
+
+    items.forEach(item => {
+      if (item.reconciliationStatus === 'needs_review') summary.needsReviewCount += 1;
+      if (item.reconciliationStatus === 'unpaid') {
+        summary.unpaidCount += 1;
+        summary.unpaidAmount += Math.max(0, item.finalCustomerTotal - item.actualPaidAmount);
+      }
+      if (item.reconciliationStatus === 'pending_settlement') summary.pendingSettlementCount += 1;
+      if (item.reconciliationStatus === 'reconciled') summary.reconciledCount += 1;
+      summary.totalVarianceAmount += Math.abs(item.customerVariance) + Math.abs(item.platformVariance) + Math.abs(item.settlementVariance);
+
+      const when = Number(item.completedAtMs || item.createdAtMs || 0);
+      if (when >= todayStartMs && when < tomorrowStartMs) {
+        summary.todayCustomerRevenue += item.actualPaidAmount;
+        summary.todayPlatformIncome += item.expectedPlatformIncome;
+        summary.todayRiderIncome += item.riderIncome;
+        summary.todayRiderAdvance += item.riderAdvance;
+      }
+    });
+
+    Object.keys(summary).forEach(key => {
+      if (typeof summary[key] === 'number') summary[key] = Math.round(summary[key]);
+    });
+
+    return res.json({ success: true, updatedAtMs: nowMs, summary, orders: items.slice(0, 500) });
+  } catch (error) {
+    console.error('finance ledger error:', error);
+    return res.status(500).json({ success: false, message: '讀取訂單財務總帳失敗。', error: error.message });
+  }
+});
+
+app.get('/api/admin/finance-orders/:orderId', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const doc = await getFinanceOrderDoc(req.params.orderId);
+    if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
+    const order = { id: doc.id, ...doc.data() };
+    const auditSnap = await db.collection('finance_audit_logs')
+      .where('orderId', '==', doc.id.toUpperCase())
+      .limit(100)
+      .get();
+    const audit = auditSnap.docs.map(auditDoc => ({ id: auditDoc.id, ...auditDoc.data() }))
+      .sort((a, b) => financeToMs(b.createdAtMs) - financeToMs(a.createdAtMs));
+    return res.json({ success: true, order: buildFinanceClosureSnapshot(order), rawFinance: {
+      paymentMethod: getOrderPaymentMethod(order),
+      paymentStatus: normalizeFinancePaymentStatus(order),
+      cashRemittanceStatus: getOrderCashRemittanceStatus(order),
+      settlementStatus: String(order.settlementStatus || ''),
+      merchantBillingStatus: String(order.merchantBillingStatus || ''),
+      financeReconciliationNote: String(order.financeReconciliationNote || ''),
+    }, audit });
+  } catch (error) {
+    console.error('finance order detail error:', error);
+    return res.status(500).json({ success: false, message: '讀取訂單財務明細失敗。', error: error.message });
+  }
+});
+
+app.post('/api/admin/finance-orders/:orderId/adjust', async (req, res) => {
+  try {
+    const field = String(req.body?.field || '').trim();
+    const reason = String(req.body?.reason || '').trim();
+    const operator = String(req.body?.operator || 'finance_center').trim().slice(0, 100);
+    const value = financeNumber(req.body?.value, NaN);
+    if (!UBEE_FINANCE_ADJUSTABLE_FIELDS[field]) {
+      return res.status(400).json({ success: false, message: '不支援此財務欄位。' });
+    }
+    if (!Number.isFinite(value) || value < 0) {
+      return res.status(400).json({ success: false, message: '金額必須是大於或等於 0 的數字。' });
+    }
+    if (reason.length < 2) {
+      return res.status(400).json({ success: false, message: '請填寫金額調整原因。' });
+    }
+    const doc = await getFinanceOrderDoc(req.params.orderId);
+    if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
+    const beforeOrder = { id: doc.id, ...doc.data() };
+    const beforeSnapshot = buildFinanceClosureSnapshot(beforeOrder);
+    const update = {
+      financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      financialUpdatedAtMs: Date.now(),
+      financeLastAdjustmentReason: reason.slice(0, 500),
+      financeLastAdjustedBy: operator,
+      financeAdjustmentCount: admin.firestore.FieldValue.increment(1),
+      financeReconciliationStatus: 'needs_review',
+    };
+    UBEE_FINANCE_ADJUSTABLE_FIELDS[field].forEach(target => { update[target] = value; });
+    await doc.ref.set(update, { merge: true });
+    const updatedDoc = await doc.ref.get();
+    const afterOrder = { id: updatedDoc.id, ...updatedDoc.data() };
+    const afterSnapshot = buildFinanceClosureSnapshot(afterOrder);
+    await writeFinanceAuditLog({
+      orderId: doc.id,
+      type: 'amount_adjustment',
+      operator,
+      reason,
+      before: { field, value: beforeSnapshot[field] ?? null, snapshot: beforeSnapshot },
+      after: { field, value, snapshot: afterSnapshot },
+    });
+    return res.json({ success: true, message: '財務金額已更新，訂單已標記為待重新對帳。', order: afterSnapshot });
+  } catch (error) {
+    console.error('finance adjust error:', error);
+    return res.status(500).json({ success: false, message: '調整財務金額失敗。', error: error.message });
+  }
+});
+
+app.post('/api/admin/finance-orders/:orderId/payment-status', async (req, res) => {
+  try {
+    const allowed = new Set(['unpaid', 'partial', 'paid', 'cash_pending', 'cash_collected', 'refunded', 'cancelled']);
+    const status = String(req.body?.status || '').trim().toLowerCase();
+    const operator = String(req.body?.operator || 'finance_center').trim().slice(0, 100);
+    const reason = String(req.body?.reason || '').trim();
+    const paidAmount = req.body?.paidAmount === undefined ? null : financeNumber(req.body.paidAmount, NaN);
+    if (!allowed.has(status)) return res.status(400).json({ success: false, message: '付款狀態不正確。' });
+    if (reason.length < 2) return res.status(400).json({ success: false, message: '請填寫付款狀態修改原因。' });
+    if (paidAmount !== null && (!Number.isFinite(paidAmount) || paidAmount < 0)) {
+      return res.status(400).json({ success: false, message: '實收金額格式不正確。' });
+    }
+    const doc = await getFinanceOrderDoc(req.params.orderId);
+    if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
+    const beforeOrder = { id: doc.id, ...doc.data() };
+    const update = {
+      financePaymentStatus: status,
+      paymentStatus: status === 'cash_collected' ? 'cash_on_delivery' : status,
+      isPaid: ['paid', 'cash_collected'].includes(status),
+      financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      financialUpdatedAtMs: Date.now(),
+      financeReconciliationStatus: 'needs_review',
+    };
+    if (paidAmount !== null) {
+      update.actualPaidAmount = paidAmount;
+      update.paidAmount = paidAmount;
+    }
+    await doc.ref.set(update, { merge: true });
+    const updatedDoc = await doc.ref.get();
+    const afterOrder = { id: updatedDoc.id, ...updatedDoc.data() };
+    await writeFinanceAuditLog({
+      orderId: doc.id,
+      type: 'payment_status_change',
+      operator,
+      reason,
+      before: { paymentStatus: normalizeFinancePaymentStatus(beforeOrder), actualPaidAmount: getFinanceActualPaidAmount(beforeOrder, getFinanceFinalCustomerTotal(beforeOrder)) },
+      after: { paymentStatus: status, actualPaidAmount: getFinanceActualPaidAmount(afterOrder, getFinanceFinalCustomerTotal(afterOrder)) },
+    });
+    return res.json({ success: true, message: '付款狀態已更新。', order: buildFinanceClosureSnapshot(afterOrder) });
+  } catch (error) {
+    console.error('finance payment status error:', error);
+    return res.status(500).json({ success: false, message: '更新付款狀態失敗。', error: error.message });
+  }
+});
+
+app.post('/api/admin/finance-orders/:orderId/reconcile', async (req, res) => {
+  try {
+    const operator = String(req.body?.operator || 'finance_center').trim().slice(0, 100);
+    const note = String(req.body?.note || '').trim();
+    const force = req.body?.force === true;
+    const doc = await getFinanceOrderDoc(req.params.orderId);
+    if (!doc) return res.status(404).json({ success: false, message: '找不到訂單。' });
+    const order = { id: doc.id, ...doc.data() };
+    const snapshot = buildFinanceClosureSnapshot(order);
+    if (snapshot.discrepancyReasons.length && !force) {
+      return res.status(409).json({ success: false, code: 'FINANCE_DISCREPANCY_EXISTS', message: '這筆訂單仍有財務差異，請先修正或勾選強制結案。', discrepancyReasons: snapshot.discrepancyReasons, order: snapshot });
+    }
+    const nowMs = Date.now();
+    await doc.ref.set({
+      financeReconciliationStatus: 'reconciled',
+      financeReconciliationNote: note.slice(0, 1000),
+      financeReconciledBy: operator,
+      financeReconciledAt: admin.firestore.FieldValue.serverTimestamp(),
+      financeReconciledAtMs: nowMs,
+      financeCustomerVariance: snapshot.customerVariance,
+      financePlatformVariance: snapshot.platformVariance,
+      financeSettlementVariance: snapshot.settlementVariance,
+      financialUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      financialUpdatedAtMs: nowMs,
+    }, { merge: true });
+    await writeFinanceAuditLog({
+      orderId: doc.id,
+      type: force && snapshot.discrepancyReasons.length ? 'forced_reconciliation' : 'reconciliation',
+      operator,
+      reason: note || (force ? '強制完成對帳' : '完成對帳'),
+      before: snapshot,
+      after: { reconciliationStatus: 'reconciled' },
+      metadata: { force, discrepancyReasons: snapshot.discrepancyReasons },
+    });
+    const updatedDoc = await doc.ref.get();
+    return res.json({ success: true, message: '訂單財務已完成對帳。', order: buildFinanceClosureSnapshot({ id: updatedDoc.id, ...updatedDoc.data() }) });
+  } catch (error) {
+    console.error('finance reconcile error:', error);
+    return res.status(500).json({ success: false, message: '完成財務對帳失敗。', error: error.message });
+  }
+});
+
 // =====================================================
 // UBee 第三階段：客戶即時追蹤摘要 API
 // - 提供 order.html 與「我的任務」共同使用的單一追蹤資料來源。
