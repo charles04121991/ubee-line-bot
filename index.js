@@ -15031,8 +15031,10 @@ function getStatusLabel(status) {
     scheduled_confirmed: '✅ 預約已確認',
     pending_dispatch: '🟡 待派單',
     accepted: '🟢 已接單',
+    going_to_pickup: '🛵 前往取件地點',
     arrived_pickup: '🟠 已抵達取件地點',
     picked_up: '🔵 已取件',
+    going_to_dropoff: '🛵 配送中',
     arrived_dropoff: '🟣 已抵達送達地點',
     completed: '✅ 已完成',
     cancelled: '⚪ 已取消',
@@ -15478,6 +15480,10 @@ async function updateOrderStatus(order, status, extra = {}) {
     ...etaPayload,
     status,
     riderStatus: status,
+    customerTrackingStatus: status,
+    customerTrackingStatusLabel: getStatusLabel(status),
+    customerTrackingUpdatedAtMs: Date.now(),
+    customerTrackingUpdatedAt: now,
     updatedAt: now,
     statusTimes: {
       ...currentStatusTimes,
@@ -23054,6 +23060,255 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
 });
 
 
+
+
+// =====================================================
+// UBee 第三階段：客戶即時追蹤摘要 API
+// - 提供 order.html 與「我的任務」共同使用的單一追蹤資料來源。
+// - Firestore 即時監聽失敗、網路重新連線或 App 回到前景時，可用此 API 補抓最新狀態。
+// - 僅允許原下單 LINE userId 查詢；不回傳不必要的騎士個資。
+// =====================================================
+const UBEE_CUSTOMER_TRACKING_STAGES = Object.freeze([
+  { key:'created', label:'任務已成立' },
+  { key:'matching', label:'等待小U接單' },
+  { key:'accepted', label:'小U已接單' },
+  { key:'to_pickup', label:'前往取件' },
+  { key:'at_pickup', label:'抵達取件' },
+  { key:'delivery', label:'配送中' },
+  { key:'at_dropoff', label:'抵達送達' },
+  { key:'completed', label:'任務完成' },
+]);
+
+function normalizeCustomerTrackingStatus(status) {
+  const safe = String(status || '').trim().toLowerCase();
+  const aliases = {
+    done:'completed',
+    dispatching:'pending_dispatch',
+    searching:'pending_dispatch',
+    redispatching:'pending_dispatch',
+    going_pickup:'going_to_pickup',
+    to_pickup:'going_to_pickup',
+    delivering:'going_to_dropoff',
+    to_dropoff:'going_to_dropoff',
+  };
+  return aliases[safe] || safe || 'pending_dispatch';
+}
+
+function getCustomerTrackingStage(status) {
+  const safe = normalizeCustomerTrackingStatus(status);
+  const map = {
+    draft_confirm:0,
+    pending_payment:0,
+    merchant_pending:0,
+    merchant_preparing:0,
+    merchant_ready:0,
+    pending_schedule:0,
+    scheduled_reserved:1,
+    scheduled_confirmed:1,
+    pending_dispatch:1,
+    accepted:2,
+    going_to_pickup:3,
+    arrived_pickup:4,
+    picked_up:5,
+    going_to_dropoff:5,
+    arrived_dropoff:6,
+    completed:7,
+    cancelled:0,
+  };
+  const index = Number.isInteger(map[safe]) ? map[safe] : 1;
+  return {
+    index,
+    count:UBEE_CUSTOMER_TRACKING_STAGES.length,
+    ...UBEE_CUSTOMER_TRACKING_STAGES[index],
+  };
+}
+
+function getCustomerTrackingCopy(order = {}, incident = null) {
+  const status = normalizeCustomerTrackingStatus(order.status);
+  if (incident) {
+    return {
+      title:'UBee 正在協助處理異常',
+      description:incident.typeLabel || incident.title || '調度中心已介入處理，訂單資料會持續保留。',
+    };
+  }
+  const copy = {
+    draft_confirm:['任務資料確認中','系統正在確認本次任務資料。'],
+    pending_payment:['等待確認現金單','確認後系統會開始媒合附近的小U。'],
+    merchant_pending:['等待合作店家確認','店家確認後系統會開始媒合小U。'],
+    merchant_preparing:['店家準備中','店家正在準備本次任務內容。'],
+    merchant_ready:['店家已備妥','系統正在安排小U前往取件。'],
+    pending_schedule:['預約需求已建立','正在媒合可於指定時間執行的小U。'],
+    scheduled_reserved:['預約已成立','已有小U提前承接本次預約。'],
+    scheduled_confirmed:['預約已確認','小U已確認可以依預約時間執行。'],
+    pending_dispatch:['正在尋找附近的小U','小U接單後會顯示距離與預計抵達時間。'],
+    accepted:['小U已接下任務','小U正在準備前往取件地點。'],
+    going_to_pickup:['小U正在前往取件地點','請保持聯絡方式暢通。'],
+    arrived_pickup:['小U已抵達取件地點','正在處理取件。'],
+    picked_up:['小U已完成取件','任務進入配送階段。'],
+    going_to_dropoff:['小U正在前往送達地點','系統會持續更新剩餘路程。'],
+    arrived_dropoff:['小U已抵達送達地點','請準備完成交付。'],
+    completed:['任務已完成','感謝使用 UBee 跑腿。'],
+    cancelled:['任務已取消','如需協助，請聯繫 UBee 跑腿客服。'],
+  }[status] || ['任務狀態更新中','系統正在同步最新進度。'];
+  return { title:copy[0], description:copy[1] };
+}
+
+function getCustomerTrackingMoney(order = {}) {
+  const candidates = [
+    order.customerPayableTotal,
+    order.customerPayTotal,
+    order.customerPayAmount,
+    order.customerTotalWithAdvance,
+    order.payableTotal,
+    order.finalPayAmount,
+    order.total,
+    order.totalFee,
+    order.price,
+  ];
+  for (const value of candidates) {
+    const amount = Number(value);
+    if (Number.isFinite(amount) && amount >= 0) return Math.round(amount);
+  }
+  return null;
+}
+
+function getCustomerLocationHealth(order = {}, nowMs = Date.now()) {
+  const updatedAtMs =
+    Number(order.riderLocationUpdatedAtMs || 0) ||
+    Number(order.trackingUpdatedAtMs || 0) ||
+    dispatchIncidentTimeMs(order.riderLocationUpdatedAt) ||
+    dispatchIncidentTimeMs(order.trackingUpdatedAt);
+  if (!updatedAtMs) {
+    return { key:'waiting', label:'等待小U定位', updatedAtMs:0, ageMs:null };
+  }
+  const ageMs = Math.max(0, nowMs - updatedAtMs);
+  if (ageMs <= 90 * 1000) return { key:'live', label:'即時定位正常', updatedAtMs, ageMs };
+  if (ageMs <= 5 * 60 * 1000) return { key:'delayed', label:'定位更新稍有延遲', updatedAtMs, ageMs };
+  return { key:'stale', label:'定位暫時中斷', updatedAtMs, ageMs };
+}
+
+async function getCustomerActiveIncident(orderId) {
+  try {
+    const snap = await db.collection('dispatchIncidents')
+      .where('orderId', '==', String(orderId || '').trim().toUpperCase())
+      .limit(20)
+      .get();
+    return snap.docs
+      .map(serializeDispatchIncident)
+      .filter(item => ['OPEN','IN_PROGRESS'].includes(item.status))
+      .sort((a,b) => Number(b.updatedAtMs || 0) - Number(a.updatedAtMs || 0))[0] || null;
+  } catch (error) {
+    console.warn('⚠️ 客戶追蹤讀取異常案件失敗（不影響訂單追蹤）：', error?.message || error);
+    return null;
+  }
+}
+
+function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.now()) {
+  const status = normalizeCustomerTrackingStatus(order.status);
+  const stage = getCustomerTrackingStage(status);
+  const copy = getCustomerTrackingCopy(order, incident);
+  const locationHealth = getCustomerLocationHealth(order, nowMs);
+  const riderCurrentLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+  const riderCurrentLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+  const pickupLat = Number(order.pickupLat ?? order.pickupLocation?.lat);
+  const pickupLng = Number(order.pickupLng ?? order.pickupLocation?.lng);
+  const dropoffLat = Number(order.dropoffLat ?? order.dropoffLocation?.lat);
+  const dropoffLng = Number(order.dropoffLng ?? order.dropoffLocation?.lng);
+  const statusTimes = order.statusTimes && typeof order.statusTimes === 'object'
+    ? Object.fromEntries(Object.entries(order.statusTimes).map(([key,value]) => [key, dispatchIncidentTimeMs(value)]))
+    : {};
+
+  return {
+    trackingVersion:'customer-tracking-v3-2026-07-27',
+    serverTimeMs:nowMs,
+    orderId:String(order.id || '').trim().toUpperCase(),
+    status,
+    statusLabel:getStatusLabel(status),
+    stage,
+    title:copy.title,
+    description:copy.description,
+    isTerminal:['completed','cancelled'].includes(status),
+    serviceType:String(order.serviceType || order.serviceName || 'UBee 跑腿任務'),
+    serviceGroup:String(order.serviceGroup || order.serviceKey || ''),
+    pickupAddress:String(order.pickupAddress || order.pickup || order.fromAddress || ''),
+    dropoffAddress:String(order.dropoffAddress || order.dropoff || order.toAddress || ''),
+    pickupLat:Number.isFinite(pickupLat) ? pickupLat : null,
+    pickupLng:Number.isFinite(pickupLng) ? pickupLng : null,
+    dropoffLat:Number.isFinite(dropoffLat) ? dropoffLat : null,
+    dropoffLng:Number.isFinite(dropoffLng) ? dropoffLng : null,
+    rider:{
+      assigned:!!(order.riderDocId || order.riderId || order.riderName),
+      name:String(order.riderName || order.riderDisplayName || ''),
+      vehicleType:String(order.riderVehicleType || order.vehicleType || ''),
+      currentLat:Number.isFinite(riderCurrentLat) ? riderCurrentLat : null,
+      currentLng:Number.isFinite(riderCurrentLng) ? riderCurrentLng : null,
+      heading:Number.isFinite(Number(order.riderHeading)) ? Number(order.riderHeading) : null,
+      speed:Number.isFinite(Number(order.riderSpeed)) ? Number(order.riderSpeed) : null,
+      accuracy:Number.isFinite(Number(order.riderLocationAccuracy)) ? Number(order.riderLocationAccuracy) : null,
+      locationHealth,
+    },
+    eta:{
+      text:String(order.etaText || order.estimatedTime || order.estimatedCompletionText || ''),
+      minutes:Number.isFinite(Number(order.etaMinutes)) ? Number(order.etaMinutes) : null,
+      estimatedPickupMinutes:Number.isFinite(Number(order.estimatedPickupMinutes)) ? Number(order.estimatedPickupMinutes) : null,
+      estimatedCompletionMinutes:Number.isFinite(Number(order.estimatedCompletionMinutes)) ? Number(order.estimatedCompletionMinutes) : null,
+    },
+    route:{
+      riderToPickupDistanceText:String(order.riderToPickupDistanceText || order.distanceToPickupText || ''),
+      riderToDropoffDistanceText:String(order.riderToDropoffDistanceText || order.distanceToDropoffText || order.remainingDistanceText || ''),
+      remainingDistanceKm:Number.isFinite(Number(order.remainingDistanceKm)) ? Number(order.remainingDistanceKm) : null,
+    },
+    total:getCustomerTrackingMoney(order),
+    paymentMethod:String(order.paymentMethod || ''),
+    paymentStatus:String(order.paymentStatus || ''),
+    statusTimes,
+    activeIncident:incident ? {
+      incidentId:incident.incidentId,
+      type:incident.type,
+      typeLabel:incident.typeLabel,
+      title:incident.title,
+      description:incident.description,
+      severity:incident.severity,
+      status:incident.status,
+      assignedTo:incident.assignedTo,
+      updatedAtMs:incident.updatedAtMs,
+    } : null,
+    updatedAtMs:
+      Number(order.customerTrackingUpdatedAtMs || 0) ||
+      Number(order.trackingUpdatedAtMs || 0) ||
+      dispatchIncidentTimeMs(order.updatedAt) ||
+      nowMs,
+  };
+}
+
+app.get('/api/customer/orders/:orderId/tracking', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const orderId = String(req.params.orderId || '').trim().toUpperCase();
+    const requestUserId = String(req.query.userId || req.query.customerId || '').trim();
+    if (!orderId) {
+      return res.status(400).json({ success:false, error:'缺少訂單編號' });
+    }
+    if (!isValidCustomerUserId(requestUserId)) {
+      return res.status(401).json({ success:false, error:'LINE 身分驗證失敗' });
+    }
+    const order = await getOrder(orderId);
+    if (!order) {
+      return res.status(404).json({ success:false, error:'查無此訂單' });
+    }
+    if (!isSameCustomerUserId(order, requestUserId)) {
+      return res.status(403).json({ success:false, error:'此訂單只能由原本下單的客人查詢' });
+    }
+    const incident = await getCustomerActiveIncident(orderId);
+    return res.json({
+      success:true,
+      tracking:buildCustomerTrackingPayload(order, incident, Date.now()),
+    });
+  } catch (error) {
+    console.error('❌ 讀取客戶即時追蹤摘要失敗：', error);
+    return res.status(500).json({ success:false, error:'即時追蹤讀取失敗' });
+  }
+});
 
 // =====================================================
 // UBee 網路韌性健康檢查
