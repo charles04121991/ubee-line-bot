@@ -1,4 +1,4 @@
-    require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
 const fetch = require('node-fetch');
@@ -8,7 +8,6 @@ const admin = require('firebase-admin');
 const webpush = require('web-push');
 
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
-// UBee Merchant Platform V3 + 全台地區後端正式整合版｜2026-07-27
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -8968,7 +8967,12 @@ let ubeeLastDispatchSnapshotMs = 0;
 let ubeeRiderDispatchStatsCacheAtMs = 0;
 let ubeeRiderDispatchStatsCache = new Map();
 
-const UBEE_TAIWAN_DISPATCH_DISTRICTS = UBEE_TAIWAN_REGION_PAIRS;
+const UBEE_TAICHUNG_DISTRICTS = [
+  '中區','東區','南區','西區','北區','西屯區','南屯區','北屯區',
+  '豐原區','東勢區','大甲區','清水區','沙鹿區','梧棲區','后里區','神岡區',
+  '潭子區','大雅區','新社區','石岡區','外埔區','大安區','烏日區','大肚區',
+  '龍井區','霧峰區','太平區','大里區','和平區'
+];
 
 function dispatchClamp(value, min = 0, max = 100) {
   const n = Number(value);
@@ -9005,100 +9009,41 @@ function getDispatchOrderCompletedAtMs(order = {}) {
     dispatchToMs(order.statusTimes?.completed);
 }
 
-function inferDispatchRegion(value = '') {
-  return inferTaiwanRegion(value);
-}
-
 function inferDispatchDistrict(value = '') {
-  return inferDispatchRegion(value).district || '';
+  const text = String(value || '').replace(/臺/g, '台');
+  for (const district of UBEE_TAICHUNG_DISTRICTS) {
+    if (text.includes(district)) return district;
+  }
+  return '';
 }
 
-function buildDispatchZoneId(cityOrDistrict = '', districtMaybe = '') {
-  let city = normalizeTaiwanCityName(cityOrDistrict);
-  let district = normalizeTaiwanRegionText(districtMaybe);
-
-  if (!district) {
-    const inferred = inferDispatchRegion(cityOrDistrict);
-    city = city || inferred.city;
-    district = inferred.district || normalizeTaiwanRegionText(cityOrDistrict);
-  }
-
-  return buildNationwideDispatchZoneId(city, district);
+function buildDispatchZoneId(district = '') {
+  const clean = String(district || '').trim();
+  return clean ? `taichung_${clean}` : 'taichung_unknown';
 }
 
 function getDispatchOrderZone(order = {}) {
-  const pickupText =
-    order.pickupAddress ||
-    order.fromAddress ||
-    order.pickup ||
-    '';
-
-  const inferred = inferDispatchRegion(pickupText);
-
-  const city = normalizeTaiwanCityName(
-    order.pickupCity ||
-    order.city ||
-    inferred.city ||
-    ''
-  );
-
-  const district = normalizeTaiwanRegionText(
+  const district = String(
     order.pickupDistrict ||
-    inferred.district ||
+    inferDispatchDistrict(order.pickupAddress || order.fromAddress || order.pickup || '') ||
     ''
-  );
-
+  ).trim();
   return {
-    city: city || '未分縣市',
     district: district || '未分區',
-    zoneId:
-      String(order.pickupZoneId || '').trim() ||
-      buildNationwideDispatchZoneId(city, district),
+    zoneId: String(order.pickupZoneId || buildDispatchZoneId(district)).trim() || 'taichung_unknown',
   };
 }
 
 function getDispatchRiderZone(rider = {}) {
-  const residenceText =
+  const district = String(
     rider.district ||
     rider.cityDistrict ||
-    rider.residenceDistrict ||
-    rider.serviceArea ||
-    rider.area ||
-    '';
-
-  const inferred = inferDispatchRegion(residenceText);
-
-  const city = normalizeTaiwanCityName(
-    rider.residenceCity ||
-    rider.city ||
-    rider.serviceCity ||
-    inferred.city ||
+    inferDispatchDistrict(rider.serviceArea || rider.area || '') ||
     ''
-  );
-
-  let district = normalizeTaiwanRegionText(
-    rider.residenceDistrict ||
-    rider.cityDistrict ||
-    inferred.district ||
-    ''
-  );
-
-  if (!district) {
-    const serviceDistricts = normalizeTaiwanServiceDistricts(
-      rider.serviceDistricts ||
-      rider.serviceArea ||
-      rider.area ||
-      []
-    );
-
-    const serviceRegion = inferDispatchRegion(serviceDistricts[0] || '');
-    district = serviceRegion.district || '';
-  }
-
+  ).trim();
   return {
-    city: city || '未分縣市',
     district: district || '未分區',
-    zoneId: buildNationwideDispatchZoneId(city, district),
+    zoneId: buildDispatchZoneId(district),
   };
 }
 
@@ -10606,16 +10551,10 @@ app.post('/api/rider/register', async (req, res) => {
       userId,
       lineUserId,
       district,
-      city,
-      residenceCity,
-      residenceDistrict,
       vehicle,
       plateNumber,
       area,
       serviceArea,
-      serviceCity,
-      serviceCities,
-      serviceDistricts,
       availableTime,
 
       driverLicenseConfirmed,
@@ -10636,67 +10575,7 @@ app.post('/api/rider/register', async (req, res) => {
 
     const cleanPhone = normalizePhone(phone || '');
     const riderLineUserId = String(lineUserId || userId || '').trim();
-
-    const inferredResidence = inferTaiwanRegion(
-      district ||
-      `${residenceCity || city || ''}${residenceDistrict || ''}`
-    );
-
-    const finalResidenceCity = normalizeTaiwanCityName(
-      residenceCity ||
-      city ||
-      inferredResidence.city ||
-      ''
-    );
-
-    const finalResidenceDistrict = normalizeTaiwanRegionText(
-      residenceDistrict ||
-      inferredResidence.district ||
-      ''
-    );
-
-    const finalDistrict =
-      buildTaiwanFullDistrict(
-        finalResidenceCity,
-        finalResidenceDistrict,
-        district || ''
-      ) ||
-      normalizeTaiwanRegionText(district);
-
-    const normalizedServiceDistricts = normalizeTaiwanServiceDistricts(
-      serviceDistricts ||
-      serviceArea ||
-      area ||
-      []
-    );
-
-    const finalServiceArea =
-      normalizedServiceDistricts.join('、') ||
-      String(serviceArea || area || '').trim();
-
-    const normalizedServiceCities = [
-      ...new Set(
-        (
-          Array.isArray(serviceCities)
-            ? serviceCities
-            : [serviceCity]
-        )
-          .map(normalizeTaiwanCityName)
-          .filter(Boolean)
-          .concat(
-            normalizedServiceDistricts
-              .map(item => inferTaiwanRegion(item).city)
-              .filter(Boolean)
-          )
-      ),
-    ];
-
-    const finalServiceCity =
-      normalizeTaiwanCityName(serviceCity) ||
-      normalizedServiceCities[0] ||
-      finalResidenceCity ||
-      '';
-
+    const finalServiceArea = String(serviceArea || area || '').trim();
     const nowMs = Date.now();
 
     const submittedAtText = new Date(nowMs).toLocaleString('zh-TW', {
@@ -10740,7 +10619,7 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    if (!name || !phone || !lineId || !finalDistrict || !vehicle || !plateNumber || !finalServiceArea || !availableTime) {
+    if (!name || !phone || !lineId || !district || !vehicle || !plateNumber || !finalServiceArea || !availableTime) {
       return res.status(400).json({
         success: false,
         message: '資料不完整，請確認所有必填欄位都有填寫。',
@@ -10768,7 +10647,7 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    if (String(finalDistrict).trim().length < 2 || String(finalDistrict).trim().length > 80) {
+    if (String(district).trim().length < 2 || String(district).trim().length > 80) {
       return res.status(400).json({
         success: false,
         message: '居住地區請填寫完整，例如：台中市豐原區。',
@@ -10805,20 +10684,11 @@ app.post('/api/rider/register', async (req, res) => {
       userId: riderLineUserId,
       lineUserId: riderLineUserId,
 
-      district: cleanText(finalDistrict || '', 80),
-      city: cleanText(finalResidenceCity || '', 20),
-      residenceCity: cleanText(finalResidenceCity || '', 20),
-      residenceDistrict: cleanText(finalResidenceDistrict || '', 20),
-
+      district: cleanText(district || '', 80),
       vehicle: cleanText(vehicle || '', 40),
       plateNumber: cleanText(plateNumber || '', 20),
-
       area: cleanText(finalServiceArea || '', 80),
       serviceArea: cleanText(finalServiceArea || '', 80),
-      serviceCity: cleanText(finalServiceCity || '', 20),
-      serviceCities: normalizedServiceCities,
-      serviceDistricts: normalizedServiceDistricts,
-
       availableTime: cleanText(availableTime || '', 80),
 
       approved: false,
@@ -13036,344 +12906,6 @@ app.post('/api/business/register', async (req, res) => {
   }
 });
 
-// =====================================================
-// UBee 店家平台 V3：店家方案、佣金、結算與資料隔離
-// =====================================================
-const UBEE_MERCHANT_V3_VERSION = '3.0.0';
-const UBEE_MERCHANT_DEFAULT_PLAN = 'DIRECT_DISPATCH';
-const UBEE_MERCHANT_ORDER_SOURCES = new Set([
-  'MERCHANT_DIRECT',
-  'CUSTOMER_REQUEST',
-  'UBEE_MARKETPLACE',
-  'MANUAL_DISPATCH',
-  'API',
-]);
-
-function merchantV3ToMs(value) {
-  if (!value) return 0;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (typeof value.toMillis === 'function') return value.toMillis();
-  if (typeof value.toDate === 'function') return value.toDate().getTime();
-  if (typeof value.seconds === 'number') return value.seconds * 1000;
-  if (typeof value._seconds === 'number') return value._seconds * 1000;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function merchantV3Money(value) {
-  const amount = Number(value || 0);
-  return Number.isFinite(amount) ? Math.max(0, Math.round(amount)) : 0;
-}
-
-function normalizeMerchantCommissionRate(value) {
-  const rate = Number(value || 0);
-  if (!Number.isFinite(rate) || rate <= 0) return 0;
-  return rate > 1 ? Math.min(1, rate / 100) : Math.min(1, rate);
-}
-
-function buildMerchantV3Profile(merchantId, merchant = {}) {
-  const commissionRate = normalizeMerchantCommissionRate(
-    merchant.commissionRate || 0
-  );
-
-  return {
-    id: merchantId,
-    merchantId,
-    merchantName: merchant.merchantName || '',
-    contactPerson: merchant.contactPerson || '',
-    phone: merchant.phone || merchant.merchantPhone || '',
-    merchantPhone: merchant.phone || merchant.merchantPhone || '',
-    pickupAddress: merchant.pickupAddress || merchant.merchantAddress || '',
-    merchantAddress: merchant.pickupAddress || merchant.merchantAddress || '',
-    businessType: merchant.businessType || merchant.merchantType || '',
-    merchantType: merchant.businessType || merchant.merchantType || '',
-    settlementType: merchant.settlementType || 'merchant_settlement',
-    status: merchant.status || '',
-    approved: merchant.approved === true,
-
-    merchantPlan:
-      String(merchant.merchantPlan || UBEE_MERCHANT_DEFAULT_PLAN)
-        .trim()
-        .toUpperCase(),
-
-    platformMode:
-      String(merchant.platformMode || 'DELIVERY_ONLY')
-        .trim()
-        .toUpperCase(),
-
-    commissionEnabled: merchant.commissionEnabled === true,
-    commissionRate,
-    commissionRatePercent: Math.round(commissionRate * 10000) / 100,
-    commissionMinimum: merchantV3Money(merchant.commissionMinimum),
-    commissionMaximum: merchantV3Money(merchant.commissionMaximum),
-    monthlyFee: merchantV3Money(merchant.monthlyFee),
-    billingCycle:
-      String(merchant.billingCycle || 'MONTHLY')
-        .trim()
-        .toUpperCase(),
-
-    marketplaceEnabled: merchant.marketplaceEnabled === true,
-    directDispatchEnabled: merchant.directDispatchEnabled !== false,
-    maxStopsPerOrder: Math.max(
-      1,
-      Math.min(8, Number(merchant.maxStopsPerOrder || 5))
-    ),
-  };
-}
-
-function getMerchantLineUserIdFromRequest(req) {
-  return String(
-    req.headers['x-ubee-merchant-line-user-id'] ||
-    req.query?.lineUserId ||
-    req.body?.lineUserId ||
-    ''
-  ).trim();
-}
-
-async function resolveApprovedMerchantV3(req) {
-  const lineUserId = getMerchantLineUserIdFromRequest(req);
-
-  if (!lineUserId || !lineUserId.startsWith('U')) {
-    const error = new Error('缺少正確的店家 LINE 身分。');
-    error.statusCode = 401;
-    error.code = 'MERCHANT_IDENTITY_REQUIRED';
-    throw error;
-  }
-
-  const snap = await db
-    .collection('merchants')
-    .where('lineUserId', '==', lineUserId)
-    .limit(1)
-    .get();
-
-  if (snap.empty) {
-    const error = new Error('尚未綁定店家帳號。');
-    error.statusCode = 404;
-    error.code = 'MERCHANT_NOT_BOUND';
-    throw error;
-  }
-
-  const doc = snap.docs[0];
-  const merchant = doc.data() || {};
-
-  if (merchant.status !== 'approved' && merchant.approved !== true) {
-    const error = new Error('店家帳號尚未審核通過。');
-    error.statusCode = 403;
-    error.code = 'MERCHANT_NOT_APPROVED';
-    throw error;
-  }
-
-  return {
-    merchantDoc: doc,
-    merchantId: doc.id,
-    merchant,
-    profile: buildMerchantV3Profile(doc.id, merchant),
-    lineUserId,
-  };
-}
-
-function sendMerchantV3Error(res, error) {
-  const status = Number(error?.statusCode || 500);
-  return res.status(status).json({
-    success: false,
-    ok: false,
-    code: error?.code || 'MERCHANT_V3_ERROR',
-    message: error?.message || '店家平台處理失敗。',
-  });
-}
-
-function calculateMerchantCommissionV3({
-  merchant = {},
-  orderSource = 'MERCHANT_DIRECT',
-  goodsAmount = 0,
-}) {
-  const normalizedSource = String(orderSource || 'MERCHANT_DIRECT')
-    .trim()
-    .toUpperCase();
-
-  const commissionEnabled =
-    merchant.commissionEnabled === true &&
-    (
-      normalizedSource === 'UBEE_MARKETPLACE' ||
-      merchant.commissionApplyToDirectOrders === true
-    );
-
-  const commissionRate = normalizeMerchantCommissionRate(
-    merchant.commissionRate || 0
-  );
-
-  const baseAmount = merchantV3Money(goodsAmount);
-
-  if (!commissionEnabled || commissionRate <= 0 || baseAmount <= 0) {
-    return {
-      commissionEnabled: false,
-      commissionRate,
-      commissionBaseAmount: baseAmount,
-      commissionAmount: 0,
-      merchantNetAmount: baseAmount,
-    };
-  }
-
-  let commissionAmount = Math.round(baseAmount * commissionRate);
-
-  const minimum = merchantV3Money(merchant.commissionMinimum);
-  const maximum = merchantV3Money(merchant.commissionMaximum);
-
-  if (minimum > 0) commissionAmount = Math.max(minimum, commissionAmount);
-  if (maximum > 0) commissionAmount = Math.min(maximum, commissionAmount);
-  commissionAmount = Math.min(baseAmount, commissionAmount);
-
-  return {
-    commissionEnabled: true,
-    commissionRate,
-    commissionBaseAmount: baseAmount,
-    commissionAmount,
-    merchantNetAmount: Math.max(0, baseAmount - commissionAmount),
-  };
-}
-
-function getMerchantSettlementPeriodV3(value = Date.now()) {
-  const date = new Date(value);
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Taipei',
-    year: 'numeric',
-    month: '2-digit',
-  });
-  return formatter.format(date).slice(0, 7);
-}
-
-async function listMerchantOrdersV3(merchantId, merchantPhone, limit = 200) {
-  const safeLimit = Math.max(1, Math.min(300, Number(limit || 200)));
-  const refs = [];
-  const seenQuery = new Set();
-
-  const addQuery = (field, value) => {
-    const safe = String(value || '').trim();
-    const key = `${field}:${safe}`;
-    if (!safe || seenQuery.has(key)) return;
-    seenQuery.add(key);
-    refs.push(
-      db.collection('orders')
-        .where(field, '==', safe)
-        .limit(safeLimit)
-        .get()
-    );
-  };
-
-  addQuery('merchantId', merchantId);
-  addQuery('merchantCode', merchantId);
-  addQuery('merchantPhone', merchantPhone);
-
-  const snapshots = await Promise.all(refs);
-  const map = new Map();
-
-  snapshots.forEach(snapshot => {
-    snapshot.docs.forEach(doc => {
-      map.set(doc.id, {
-        id: doc.id,
-        ...(doc.data() || {}),
-      });
-    });
-  });
-
-  return Array.from(map.values())
-    .sort((a, b) =>
-      merchantV3ToMs(b.createdAt || b.createdAtMs) -
-      merchantV3ToMs(a.createdAt || a.createdAtMs)
-    )
-    .slice(0, safeLimit);
-}
-
-function buildMerchantSummaryV3(orders = []) {
-  const now = new Date();
-  const todayKey = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Taipei',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-
-  const summary = {
-    orderCount: orders.length,
-    activeOrderCount: 0,
-    completedOrderCount: 0,
-    cancelledOrderCount: 0,
-    todayOrderCount: 0,
-    deliveryFeeTotal: 0,
-    goodsAmountTotal: 0,
-    commissionAmountTotal: 0,
-    merchantNetAmountTotal: 0,
-    pendingMerchantBillingAmount: 0,
-    paidMerchantBillingAmount: 0,
-    pendingSettlementAmount: 0,
-    settledAmount: 0,
-  };
-
-  const activeStatuses = new Set([
-    'merchant_pending',
-    'merchant_preparing',
-    'merchant_ready',
-    'pending_dispatch',
-    'accepted',
-    'arrived_pickup',
-    'picked_up',
-    'arrived_dropoff',
-  ]);
-
-  orders.forEach(order => {
-    const status = String(order.status || '').trim().toLowerCase();
-    const createdAtMs = merchantV3ToMs(order.createdAt || order.createdAtMs);
-
-    if (activeStatuses.has(status)) summary.activeOrderCount += 1;
-    if (status === 'completed' || status === 'done') summary.completedOrderCount += 1;
-    if (status.includes('cancel')) summary.cancelledOrderCount += 1;
-
-    if (createdAtMs) {
-      const orderDay = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Taipei',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date(createdAtMs));
-      if (orderDay === todayKey) summary.todayOrderCount += 1;
-    }
-
-    summary.deliveryFeeTotal += merchantV3Money(
-      order.deliveryFee || order.merchantServiceFee || order.totalFee
-    );
-    summary.goodsAmountTotal += merchantV3Money(order.goodsAmount);
-    summary.commissionAmountTotal += merchantV3Money(order.commissionAmount);
-    summary.merchantNetAmountTotal += merchantV3Money(order.merchantNetAmount);
-
-    const billingStatus = String(order.merchantBillingStatus || '').toLowerCase();
-    const payable = merchantV3Money(
-      order.merchantPayableAmount || order.storePayableAmount
-    );
-
-    if (billingStatus === 'paid') {
-      summary.paidMerchantBillingAmount += payable;
-    } else if (billingStatus !== 'not_billable') {
-      summary.pendingMerchantBillingAmount += payable;
-    }
-
-    const settlementStatus = String(
-      order.settlementStatus || 'NOT_REQUIRED'
-    ).toUpperCase();
-
-    const merchantNet = merchantV3Money(order.merchantNetAmount);
-
-    if (settlementStatus === 'PENDING') {
-      summary.pendingSettlementAmount += merchantNet;
-    }
-    if (settlementStatus === 'SETTLED') {
-      summary.settledAmount += merchantNet;
-    }
-  });
-
-  return summary;
-}
-
-
 app.post('/api/merchant/register', async (req, res) => {
   try {
     const {
@@ -13432,20 +12964,6 @@ app.post('/api/merchant/register', async (req, res) => {
 
       status: 'pending_review',
       approved: false,
-
-      // 店家平台 V3 預設為「配送工具」方案：
-      // 店內商品不抽成，只有日後正式開通商城合作才啟用佣金。
-      merchantPlan: UBEE_MERCHANT_DEFAULT_PLAN,
-      platformMode: 'DELIVERY_ONLY',
-      directDispatchEnabled: true,
-      marketplaceEnabled: false,
-      commissionEnabled: false,
-      commissionRate: 0,
-      commissionMinimum: 0,
-      commissionMaximum: 0,
-      monthlyFee: 0,
-      billingCycle: 'MONTHLY',
-      maxStopsPerOrder: 5,
 
       lineUserId: '',
       boundAt: null,
@@ -13510,7 +13028,17 @@ app.get('/api/merchant/profile', async (req, res) => {
     return res.json({
       ok: true,
       needBind: false,
-      merchant: buildMerchantV3Profile(doc.id, merchant),
+      merchant: {
+        id: doc.id,
+        merchantName: merchant.merchantName || '',
+        contactPerson: merchant.contactPerson || '',
+        phone: merchant.phone || '',
+        pickupAddress: merchant.pickupAddress || '',
+        businessType: merchant.businessType || '',
+        settlementType: merchant.settlementType || '',
+        status: merchant.status || '',
+        approved: merchant.approved === true,
+      },
     });
   } catch (err) {
     console.error('❌ /api/merchant/profile error:', err);
@@ -13583,10 +13111,17 @@ app.post('/api/merchant/bind', async (req, res) => {
     return res.json({
       ok: true,
       message: '店家帳號綁定成功',
-      merchant: buildMerchantV3Profile(doc.id, {
-        ...merchant,
+      merchant: {
+        id: doc.id,
+        merchantName: merchant.merchantName || '',
+        contactPerson: merchant.contactPerson || '',
+        phone: merchant.phone || '',
+        pickupAddress: merchant.pickupAddress || '',
+        businessType: merchant.businessType || '',
+        settlementType: merchant.settlementType || '',
+        status: merchant.status || '',
         approved: true,
-      }),
+      },
     });
   } catch (err) {
     console.error('❌ /api/merchant/bind error:', err);
@@ -13893,133 +13428,70 @@ function normalizeAddress(address) {
   return String(address || '').trim().replace(/\s+/g, '');
 }
 
-const UBEE_TAIWAN_REGIONS = {"台北市":["中正區","大同區","中山區","松山區","大安區","萬華區","信義區","士林區","北投區","內湖區","南港區","文山區"],"新北市":["萬里區","金山區","板橋區","汐止區","深坑區","石碇區","瑞芳區","平溪區","雙溪區","貢寮區","新店區","坪林區","烏來區","永和區","中和區","土城區","三峽區","樹林區","鶯歌區","三重區","新莊區","泰山區","林口區","蘆洲區","五股區","八里區","淡水區","三芝區","石門區"],"桃園市":["桃園區","中壢區","平鎮區","八德區","楊梅區","蘆竹區","大溪區","龍潭區","龜山區","大園區","觀音區","新屋區","復興區"],"台中市":["中區","東區","南區","西區","北區","北屯區","西屯區","南屯區","太平區","大里區","霧峰區","烏日區","豐原區","后里區","石岡區","東勢區","和平區","新社區","潭子區","大雅區","神岡區","大肚區","沙鹿區","龍井區","梧棲區","清水區","大甲區","外埔區","大安區"],"台南市":["中西區","東區","南區","北區","安平區","安南區","永康區","歸仁區","新化區","左鎮區","玉井區","楠西區","南化區","仁德區","關廟區","龍崎區","官田區","麻豆區","佳里區","西港區","七股區","將軍區","學甲區","北門區","新營區","後壁區","白河區","東山區","六甲區","下營區","柳營區","鹽水區","善化區","大內區","山上區","新市區","安定區"],"高雄市":["鹽埕區","鼓山區","左營區","楠梓區","三民區","新興區","前金區","苓雅區","前鎮區","旗津區","小港區","鳳山區","林園區","大寮區","大樹區","大社區","仁武區","鳥松區","岡山區","橋頭區","燕巢區","田寮區","阿蓮區","路竹區","湖內區","茄萣區","永安區","彌陀區","梓官區","旗山區","美濃區","六龜區","甲仙區","杉林區","內門區","茂林區","桃源區","那瑪夏區"],"基隆市":["中正區","七堵區","暖暖區","仁愛區","中山區","安樂區","信義區"],"新竹市":["東區","北區","香山區"],"嘉義市":["東區","西區"],"新竹縣":["竹北市","關西鎮","新埔鎮","竹東鎮","湖口鄉","橫山鄉","新豐鄉","芎林鄉","寶山鄉","北埔鄉","峨眉鄉","尖石鄉","五峰鄉"],"苗栗縣":["苗栗市","苑裡鎮","通霄鎮","竹南鎮","頭份市","後龍鎮","卓蘭鎮","大湖鄉","公館鄉","銅鑼鄉","南庄鄉","頭屋鄉","三義鄉","西湖鄉","造橋鄉","三灣鄉","獅潭鄉","泰安鄉"],"彰化縣":["彰化市","鹿港鎮","和美鎮","線西鄉","伸港鄉","福興鄉","秀水鄉","花壇鄉","芬園鄉","員林市","溪湖鎮","田中鎮","大村鄉","埔鹽鄉","埔心鄉","永靖鄉","社頭鄉","二水鄉","北斗鎮","二林鎮","田尾鄉","埤頭鄉","芳苑鄉","大城鄉","竹塘鄉","溪州鄉"],"南投縣":["南投市","埔里鎮","草屯鎮","竹山鎮","集集鎮","名間鄉","鹿谷鄉","中寮鄉","魚池鄉","國姓鄉","水里鄉","信義鄉","仁愛鄉"],"雲林縣":["斗六市","斗南鎮","虎尾鎮","西螺鎮","土庫鎮","北港鎮","古坑鄉","大埤鄉","莿桐鄉","林內鄉","二崙鄉","崙背鄉","麥寮鄉","東勢鄉","褒忠鄉","台西鄉","元長鄉","四湖鄉","口湖鄉","水林鄉"],"嘉義縣":["太保市","朴子市","布袋鎮","大林鎮","民雄鄉","溪口鄉","新港鄉","六腳鄉","東石鄉","義竹鄉","鹿草鄉","水上鄉","中埔鄉","竹崎鄉","梅山鄉","番路鄉","大埔鄉","阿里山鄉"],"屏東縣":["屏東市","潮州鎮","東港鎮","恆春鎮","萬丹鄉","長治鄉","麟洛鄉","九如鄉","里港鄉","鹽埔鄉","高樹鄉","萬巒鄉","內埔鄉","竹田鄉","新埤鄉","枋寮鄉","新園鄉","崁頂鄉","林邊鄉","南州鄉","佳冬鄉","琉球鄉","車城鄉","滿州鄉","枋山鄉","三地門鄉","霧台鄉","瑪家鄉","泰武鄉","來義鄉","春日鄉","獅子鄉","牡丹鄉"],"宜蘭縣":["宜蘭市","羅東鎮","蘇澳鎮","頭城鎮","礁溪鄉","壯圍鄉","員山鄉","冬山鄉","五結鄉","三星鄉","大同鄉","南澳鄉"],"花蓮縣":["花蓮市","鳳林鎮","玉里鎮","新城鄉","吉安鄉","壽豐鄉","光復鄉","豐濱鄉","瑞穗鄉","富里鄉","秀林鄉","萬榮鄉","卓溪鄉"],"台東縣":["台東市","成功鎮","關山鎮","卑南鄉","鹿野鄉","池上鄉","東河鄉","長濱鄉","太麻里鄉","大武鄉","綠島鄉","海端鄉","延平鄉","金峰鄉","達仁鄉","蘭嶼鄉"],"澎湖縣":["馬公市","湖西鄉","白沙鄉","西嶼鄉","望安鄉","七美鄉"],"金門縣":["金城鎮","金沙鎮","金湖鎮","金寧鄉","烈嶼鄉","烏坵鄉"],"連江縣":["南竿鄉","北竿鄉","莒光鄉","東引鄉"]};
+const TAIWAN_CITY_COUNTY_NAMES = [
+  '台北市',
+  '新北市',
+  '桃園市',
+  '台中市',
+  '台南市',
+  '高雄市',
 
-const TAIWAN_CITY_COUNTY_NAMES = Object.keys(UBEE_TAIWAN_REGIONS);
+  '基隆市',
+  '新竹市',
+  '嘉義市',
 
-// 舊程式仍會引用台中行政區清單，因此保留相容別名。
-const TAICHUNG_DISTRICTS = UBEE_TAIWAN_REGIONS['台中市'] || [];
+  '新竹縣',
+  '苗栗縣',
+  '彰化縣',
+  '南投縣',
+  '雲林縣',
+  '嘉義縣',
+  '屏東縣',
+  '宜蘭縣',
+  '花蓮縣',
+  '台東縣',
+  '澎湖縣',
+  '金門縣',
+  '連江縣',
+];
 
-const UBEE_TAIWAN_REGION_PAIRS = Object.entries(UBEE_TAIWAN_REGIONS)
-  .flatMap(([city, districts]) =>
-    districts.map(district => ({
-      city,
-      district,
-      fullDistrict: `${city}${district}`,
-    }))
-  );
+const TAICHUNG_DISTRICTS = [
+  '中區',
+  '東區',
+  '南區',
+  '西區',
+  '北區',
 
-function normalizeTaiwanRegionText(value) {
-  return String(value || '')
-    .trim()
-    .replace(/臺/g, '台')
-    .replace(/\s+/g, '');
-}
+  '西屯區',
+  '南屯區',
+  '北屯區',
 
-function normalizeTaiwanCityName(value) {
-  const text = normalizeTaiwanRegionText(value);
-  if (!text) return '';
-  return TAIWAN_CITY_COUNTY_NAMES.find(city => text === city || text.includes(city)) || '';
-}
+  '豐原區',
+  '東勢區',
+  '大甲區',
+  '清水區',
+  '沙鹿區',
+  '梧棲區',
 
-function inferTaiwanRegion(value) {
-  const text = normalizeTaiwanRegionText(value);
-  if (!text) return { city: '', district: '', fullDistrict: '' };
+  '后里區',
+  '神岡區',
+  '潭子區',
+  '大雅區',
 
-  const explicitCity = TAIWAN_CITY_COUNTY_NAMES.find(city => text.includes(city)) || '';
+  '新社區',
+  '石岡區',
+  '外埔區',
+  '大安區',
 
-  if (explicitCity) {
-    const district =
-      (UBEE_TAIWAN_REGIONS[explicitCity] || [])
-        .find(item => text.includes(item)) || '';
+  '烏日區',
+  '大肚區',
+  '龍井區',
+  '霧峰區',
 
-    return {
-      city: explicitCity,
-      district,
-      fullDistrict: district ? `${explicitCity}${district}` : explicitCity,
-    };
-  }
-
-  const fullPair = UBEE_TAIWAN_REGION_PAIRS.find(pair =>
-    text.includes(pair.fullDistrict)
-  );
-
-  if (fullPair) return { ...fullPair };
-
-  const districtMatches = UBEE_TAIWAN_REGION_PAIRS
-    .filter(pair => text.includes(pair.district));
-
-  const uniqueCities = [...new Set(districtMatches.map(pair => pair.city))];
-
-  if (districtMatches.length && uniqueCities.length === 1) {
-    return { ...districtMatches[0] };
-  }
-
-  return {
-    city: '',
-    district: districtMatches[0]?.district || '',
-    fullDistrict: '',
-  };
-}
-
-function buildTaiwanFullDistrict(city, district, fallback = '') {
-  const safeCity = normalizeTaiwanCityName(city);
-  const safeDistrict = normalizeTaiwanRegionText(district);
-
-  if (
-    safeCity &&
-    safeDistrict &&
-    (UBEE_TAIWAN_REGIONS[safeCity] || []).includes(safeDistrict)
-  ) {
-    return `${safeCity}${safeDistrict}`;
-  }
-
-  const inferred = inferTaiwanRegion(fallback || `${safeCity}${safeDistrict}`);
-  return inferred.fullDistrict || normalizeTaiwanRegionText(fallback);
-}
-
-function normalizeTaiwanServiceDistricts(value) {
-  const source = Array.isArray(value)
-    ? value
-    : String(value || '').split(/[、,，\n]/);
-
-  const output = [];
-  const seen = new Set();
-
-  source.forEach(item => {
-    const text = normalizeTaiwanRegionText(item);
-    if (!text) return;
-
-    const inferred = inferTaiwanRegion(text);
-    const normalized = inferred.fullDistrict || text;
-
-    if (!seen.has(normalized)) {
-      seen.add(normalized);
-      output.push(normalized);
-    }
-  });
-
-  return output.slice(0, 8);
-}
-
-function buildNationwideDispatchZoneId(city, district) {
-  const safeCity = normalizeTaiwanCityName(city);
-  const safeDistrict = normalizeTaiwanRegionText(district);
-
-  if (safeCity === '台中市' && safeDistrict) {
-    return `taichung_${safeDistrict}`;
-  }
-
-  if (safeCity && safeDistrict) {
-    return `taiwan_${safeCity}_${safeDistrict}`;
-  }
-
-  if (safeCity) {
-    return `taiwan_${safeCity}_unknown`;
-  }
-
-  return 'taiwan_unknown';
-}
+  '太平區',
+  '大里區',
+  '和平區',
+];
 
 function normalizeTaskAddressForMaps(address) {
   let text = String(address || '').trim();
@@ -17308,770 +16780,6 @@ app.post('/api/merchant/order', async (req, res) => {
     });
   }
 });
-
-// =====================================================
-// UBee 店家平台 V3 API
-// 下一版 merchant-dashboard.html 將改由這組 API 建單、更新與讀取。
-// 舊 /api/merchant/order 暫時保留相容，不影響既有前端。
-// =====================================================
-
-function normalizeMerchantDeliveryStopsV3(payload = {}) {
-  const rawStops = Array.isArray(payload.deliveryStops)
-    ? payload.deliveryStops
-    : [{
-        customerName: payload.customerName || payload.receiverName || '',
-        customerPhone: payload.customerPhone || payload.dropoffPhone || '',
-        dropoffAddress: payload.dropoffAddress || payload.dropoff || '',
-        itemName: payload.itemName || payload.item || '',
-        note: payload.note || payload.customerNote || '',
-      }];
-
-  return rawStops
-    .slice(0, 8)
-    .map((stop, index) => ({
-      index: index + 1,
-      customerName: cleanText(
-        stop.customerName || stop.receiverName || '',
-        40
-      ),
-      customerPhone: normalizePhone(
-        stop.customerPhone || stop.dropoffPhone || ''
-      ),
-      dropoffAddress: cleanText(
-        stop.dropoffAddress || stop.dropoff || '',
-        160
-      ),
-      itemName: cleanLongText(
-        stop.itemName || stop.item || '',
-        240
-      ),
-      note: cleanLongText(stop.note || '', 240),
-    }))
-    .filter(stop => stop.dropoffAddress);
-}
-
-function validateMerchantDeliveryStopsV3(stops = []) {
-  if (!stops.length) return '請至少建立一個送達點。';
-
-  for (const stop of stops) {
-    if (!stop.customerName) return `第 ${stop.index} 點缺少收件人姓名。`;
-    if (!/^09\d{8}$/.test(stop.customerPhone)) {
-      return `第 ${stop.index} 點收件人手機格式不正確。`;
-    }
-    if (stop.dropoffAddress.length < 5) {
-      return `第 ${stop.index} 點送達地址不完整。`;
-    }
-    if (!stop.itemName) return `第 ${stop.index} 點缺少配送品項。`;
-  }
-
-  return '';
-}
-
-function calculateMerchantDeliveryFeeV3(distanceKm, stopCount = 1) {
-  const km = Number(distanceKm || 0);
-  const stops = Math.max(1, Number(stopCount || 1));
-
-  if (!Number.isFinite(km) || km <= 0) {
-    throw new Error('配送距離結果異常。');
-  }
-
-  let baseFee = 220;
-
-  if (km <= 5) baseFee = 70;
-  else if (km <= 7) baseFee = 80;
-  else if (km <= 9) baseFee = 90;
-  else if (km <= 10) baseFee = 110;
-  else if (km <= 12) baseFee = 130;
-  else if (km <= 14) baseFee = 150;
-  else if (km <= 16) baseFee = 170;
-  else if (km <= 18) baseFee = 200;
-  else if (km <= 20) baseFee = 220;
-  else baseFee = 220 + Math.ceil(km - 20) * 12;
-
-  const extraStopFee = Math.max(0, stops - 1) * 20;
-  return baseFee + extraStopFee;
-}
-
-async function calculateMerchantRouteV3(pickupAddress, stops = []) {
-  let origin = pickupAddress;
-  let distanceMeters = 0;
-  let durationSeconds = 0;
-  const routeSegments = [];
-
-  for (const stop of stops) {
-    const route = await getDistanceMatrixCached(
-      origin,
-      stop.dropoffAddress
-    );
-
-    const segmentDistanceMeters = Number(route.distanceMeters || 0);
-    const segmentDurationSeconds = Number(route.durationSeconds || 0);
-
-    distanceMeters += segmentDistanceMeters;
-    durationSeconds += segmentDurationSeconds;
-
-    routeSegments.push({
-      index: stop.index,
-      origin,
-      destination: stop.dropoffAddress,
-      distanceMeters: segmentDistanceMeters,
-      durationSeconds: segmentDurationSeconds,
-      distanceText: route.distanceText || formatRouteDistanceText(segmentDistanceMeters),
-      durationText: route.durationText || formatRouteDurationText(segmentDurationSeconds),
-    });
-
-    origin = stop.dropoffAddress;
-  }
-
-  return {
-    distanceMeters,
-    durationSeconds,
-    distanceKm: Math.round((distanceMeters / 1000) * 100) / 100,
-    distanceText: formatRouteDistanceText(distanceMeters),
-    durationText: formatRouteDurationText(durationSeconds),
-    routeSegments,
-  };
-}
-
-async function createMerchantOrderV3({
-  merchantContext,
-  payload = {},
-}) {
-  const { merchantId, merchant, profile, lineUserId } = merchantContext;
-
-  const deliveryMode =
-    String(payload.deliveryMode || payload.deliveryType || 'ubee')
-      .trim()
-      .toLowerCase() === 'merchant'
-      ? 'merchant'
-      : 'ubee';
-
-  const paymentMethodRaw = String(
-    payload.paymentMethod || 'merchant_settlement'
-  ).trim().toLowerCase();
-
-  const paymentMethod = new Set([
-    'merchant_settlement',
-    'cash',
-    'merchant_paid',
-  ]).has(paymentMethodRaw)
-    ? paymentMethodRaw
-    : 'merchant_settlement';
-
-  const orderSourceRaw = String(
-    payload.orderSource || 'MERCHANT_DIRECT'
-  ).trim().toUpperCase();
-
-  const orderSource = UBEE_MERCHANT_ORDER_SOURCES.has(orderSourceRaw)
-    ? orderSourceRaw
-    : 'MERCHANT_DIRECT';
-
-  const pickupAddress = cleanText(
-    profile.pickupAddress || '',
-    160
-  );
-
-  const merchantPhone = normalizePhone(profile.phone || '');
-  const stops = normalizeMerchantDeliveryStopsV3(payload);
-
-  const stopError = validateMerchantDeliveryStopsV3(stops);
-  if (stopError) {
-    const error = new Error(stopError);
-    error.statusCode = 400;
-    error.code = 'MERCHANT_ORDER_INVALID';
-    throw error;
-  }
-
-  if (!pickupAddress || !merchantPhone) {
-    const error = new Error('店家電話或取件地址尚未設定。');
-    error.statusCode = 400;
-    error.code = 'MERCHANT_PROFILE_INCOMPLETE';
-    throw error;
-  }
-
-  if (stops.length > profile.maxStopsPerOrder) {
-    const error = new Error(
-      `目前方案每筆最多 ${profile.maxStopsPerOrder} 個送達點。`
-    );
-    error.statusCode = 400;
-    error.code = 'MERCHANT_STOP_LIMIT';
-    throw error;
-  }
-
-  const route = await calculateMerchantRouteV3(
-    pickupAddress,
-    stops
-  );
-
-  const deliveryFee = deliveryMode === 'ubee'
-    ? calculateMerchantDeliveryFeeV3(route.distanceKm, stops.length)
-    : 0;
-
-  const goodsAmount = merchantV3Money(payload.goodsAmount);
-  const advanceAmount = merchantV3Money(payload.advanceAmount);
-
-  const commission = calculateMerchantCommissionV3({
-    merchant,
-    orderSource,
-    goodsAmount,
-  });
-
-  const orderId = generateOrderId();
-  const nowMs = Date.now();
-  const now = admin.firestore.FieldValue.serverTimestamp();
-
-  const primaryStop = stops[0];
-  const lastStop = stops[stops.length - 1];
-
-  const paymentStatusMap = {
-    merchant_settlement: 'merchant_settlement',
-    cash: 'cash_on_delivery',
-    merchant_paid: 'paid_by_merchant',
-  };
-
-  const paymentMethodLabelMap = {
-    merchant_settlement: '店家月結',
-    cash: '現金付款',
-    merchant_paid: '店家已收款',
-  };
-
-  const orderStatus =
-    deliveryMode === 'merchant'
-      ? 'merchant_self_delivery'
-      : 'merchant_ready';
-
-  const merchantBillingStatus =
-    deliveryMode !== 'ubee'
-      ? 'not_billable'
-      : paymentMethod === 'merchant_paid'
-        ? 'paid'
-        : 'unpaid';
-
-  const marketplaceSettlementRequired =
-    orderSource === 'UBEE_MARKETPLACE' &&
-    goodsAmount > 0;
-
-  const settlementStatus =
-    marketplaceSettlementRequired
-      ? 'PENDING'
-      : 'NOT_REQUIRED';
-
-  const itemSummary = stops.length === 1
-    ? primaryStop.itemName
-    : stops.map(stop => `第 ${stop.index} 點：${stop.itemName}`).join('；');
-
-  const noteSummary = stops.length === 1
-    ? primaryStop.note
-    : `【多點配送】共 ${stops.length} 點\n` +
-      stops.map(stop =>
-        `第 ${stop.index} 點：${stop.dropoffAddress}｜` +
-        `${stop.customerName}｜${stop.itemName}` +
-        `${stop.note ? `｜${stop.note}` : ''}`
-      ).join('\n');
-
-  const order = {
-    id: orderId,
-    orderNo: orderId,
-
-    source: 'merchant-dashboard',
-    createdFrom: 'merchant-dashboard',
-    orderSource,
-    orderType: 'merchant_dispatch',
-
-    merchantId,
-    merchantCode: merchantId,
-    merchantLineUserId: lineUserId,
-    merchantName: profile.merchantName,
-    merchantPhone,
-    merchantAddress: pickupAddress,
-    merchantPlan: profile.merchantPlan,
-    platformMode: profile.platformMode,
-    settlementType: profile.settlementType,
-
-    status: orderStatus,
-    deliveryType: deliveryMode,
-    deliveryTypeLabel:
-      deliveryMode === 'merchant'
-        ? '店家自送'
-        : 'UBee 跑腿派小U',
-
-    pickupName: profile.merchantName,
-    pickupPhone: merchantPhone,
-    pickupAddress,
-    pickup: pickupAddress,
-
-    customerName: primaryStop.customerName,
-    receiverName: primaryStop.customerName,
-    customerPhone: primaryStop.customerPhone,
-    dropoffPhone: primaryStop.customerPhone,
-    dropoffAddress: primaryStop.dropoffAddress,
-    dropoff: primaryStop.dropoffAddress,
-    primaryDropoffAddress: primaryStop.dropoffAddress,
-    finalDropoffAddress: lastStop.dropoffAddress,
-
-    itemName: itemSummary,
-    item: itemSummary,
-    serviceType:
-      stops.length > 1
-        ? '店家多點派單'
-        : '店家派單',
-
-    note: noteSummary,
-    customerNote: noteSummary,
-    merchantNote: cleanLongText(payload.note || noteSummary, 500),
-
-    deliveryStops: stops,
-    deliveryStopsText: noteSummary,
-    routeSegments: route.routeSegments,
-    multiDropoff: stops.length > 1,
-    stopCount: stops.length,
-    extraStopFee: Math.max(0, stops.length - 1) * 20,
-
-    distanceMeters: route.distanceMeters,
-    durationSeconds: route.durationSeconds,
-    distanceKm: route.distanceKm,
-    distanceText: route.distanceText,
-    durationText: route.durationText,
-
-    goodsAmount,
-    advanceAmount,
-    deliveryFee,
-    merchantServiceFee: deliveryFee,
-
-    totalFee: deliveryFee,
-    total: deliveryFee,
-    finalTotal: deliveryFee,
-    price: deliveryFee,
-    fee: deliveryFee,
-
-    // 保留現行店家派單：配送費全額作為小U任務收入。
-    // 日後若調整平台服務費，只需改後端，不需再改店家端。
-    riderFee: deliveryMode === 'ubee' ? deliveryFee : 0,
-    driverFee: deliveryMode === 'ubee' ? deliveryFee : 0,
-    platformFee: 0,
-
-    paymentMethod,
-    paymentMethodLabel: paymentMethodLabelMap[paymentMethod],
-    paymentStatus: paymentStatusMap[paymentMethod],
-    merchantPaid: paymentMethod === 'merchant_paid',
-    paidAmount:
-      paymentMethod === 'merchant_paid'
-        ? deliveryFee
-        : 0,
-
-    billedTo:
-      deliveryMode === 'ubee'
-        ? 'merchant'
-        : 'none',
-
-    merchantBillingType: 'merchant_dispatch',
-    merchantPayableAmount:
-      deliveryMode === 'ubee'
-        ? deliveryFee
-        : 0,
-
-    storePayableAmount:
-      deliveryMode === 'ubee'
-        ? deliveryFee
-        : 0,
-
-    merchantBillingStatus,
-    merchantPaidAmount:
-      merchantBillingStatus === 'paid'
-        ? deliveryFee
-        : 0,
-
-    commissionEnabled: commission.commissionEnabled,
-    commissionRate: commission.commissionRate,
-    commissionBaseAmount: commission.commissionBaseAmount,
-    commissionAmount: commission.commissionAmount,
-    platformCommissionAmount: commission.commissionAmount,
-    merchantNetAmount: commission.merchantNetAmount,
-
-    settlementStatus,
-    settlementDirection:
-      marketplaceSettlementRequired
-        ? 'PLATFORM_TO_MERCHANT'
-        : 'NOT_REQUIRED',
-
-    settlementPeriod: getMerchantSettlementPeriodV3(nowMs),
-    billingPeriod: getMerchantSettlementPeriodV3(nowMs),
-
-    riderId: '',
-    riderLineUserId: '',
-    riderName: '',
-    riderPhone: '',
-
-    createdAt: now,
-    createdAtMs: nowMs,
-    updatedAt: now,
-    updatedAtMs: nowMs,
-    merchantCreatedAt: now,
-    merchantBillingCreatedAt: now,
-
-    merchantBillingSettledAt:
-      merchantBillingStatus === 'paid'
-        ? now
-        : null,
-
-    merchantReadyAt:
-      deliveryMode === 'ubee'
-        ? now
-        : null,
-
-    selfDeliveryAt:
-      deliveryMode === 'merchant'
-        ? now
-        : null,
-  };
-
-  await db.collection('orders').doc(orderId).set(order, {
-    merge: true,
-  });
-
-  // 新單通知可保留；本模組不會將「重新轉派」通知送到辦公室或騎士審核群。
-  try {
-    if (deliveryMode === 'ubee') {
-      await pushToGroup(
-        LINE_ADMIN_GROUP_ID,
-        createAdminForceCancelFlex({
-          ...order,
-          createdAt: nowMs,
-        })
-      );
-    }
-  } catch (pushError) {
-    console.error('⚠️ 店家 V3 新單通知失敗：', pushError);
-  }
-
-  return {
-    orderId,
-    order: {
-      ...order,
-      createdAt: nowMs,
-      updatedAt: nowMs,
-      merchantCreatedAt: nowMs,
-      merchantBillingCreatedAt: nowMs,
-      merchantBillingSettledAt:
-        merchantBillingStatus === 'paid'
-          ? nowMs
-          : null,
-      merchantReadyAt:
-        deliveryMode === 'ubee'
-          ? nowMs
-          : null,
-      selfDeliveryAt:
-        deliveryMode === 'merchant'
-          ? nowMs
-          : null,
-    },
-  };
-}
-
-app.get('/api/merchant/v3/bootstrap', async (req, res) => {
-  try {
-    const context = await resolveApprovedMerchantV3(req);
-    const orders = await listMerchantOrdersV3(
-      context.merchantId,
-      context.profile.phone,
-      req.query.limit || 200
-    );
-
-    return res.json({
-      success: true,
-      ok: true,
-      version: UBEE_MERCHANT_V3_VERSION,
-      merchant: context.profile,
-      summary: buildMerchantSummaryV3(orders),
-      orders,
-      generatedAtMs: Date.now(),
-    });
-  } catch (error) {
-    console.error('❌ 店家 V3 bootstrap 失敗：', error);
-    return sendMerchantV3Error(res, error);
-  }
-});
-
-app.get('/api/merchant/v3/orders', async (req, res) => {
-  try {
-    const context = await resolveApprovedMerchantV3(req);
-    const orders = await listMerchantOrdersV3(
-      context.merchantId,
-      context.profile.phone,
-      req.query.limit || 200
-    );
-
-    return res.json({
-      success: true,
-      ok: true,
-      orders,
-      summary: buildMerchantSummaryV3(orders),
-    });
-  } catch (error) {
-    console.error('❌ 店家 V3 訂單讀取失敗：', error);
-    return sendMerchantV3Error(res, error);
-  }
-});
-
-app.post('/api/merchant/v3/orders', async (req, res) => {
-  try {
-    const merchantContext = await resolveApprovedMerchantV3(req);
-    const result = await createMerchantOrderV3({
-      merchantContext,
-      payload: req.body || {},
-    });
-
-    return res.json({
-      success: true,
-      ok: true,
-      ...result,
-      message: '配送已建立。',
-    });
-  } catch (error) {
-    console.error('❌ 店家 V3 建立配送失敗：', error);
-    return sendMerchantV3Error(res, error);
-  }
-});
-
-app.post('/api/merchant/v3/orders/:orderId/status', async (req, res) => {
-  try {
-    const context = await resolveApprovedMerchantV3(req);
-    const orderId = String(req.params.orderId || '').trim().toUpperCase();
-    const nextStatus = String(req.body?.status || '').trim();
-
-    const allowedStatuses = new Set([
-      'merchant_preparing',
-      'merchant_ready',
-      'pending_dispatch',
-      'completed',
-    ]);
-
-    if (!orderId || !allowedStatuses.has(nextStatus)) {
-      const error = new Error('訂單編號或目標狀態不正確。');
-      error.statusCode = 400;
-      error.code = 'MERCHANT_STATUS_INVALID';
-      throw error;
-    }
-
-    const orderRef = db.collection('orders').doc(orderId);
-
-    await db.runTransaction(async transaction => {
-      const snap = await transaction.get(orderRef);
-
-      if (!snap.exists) {
-        const error = new Error('找不到此訂單。');
-        error.statusCode = 404;
-        error.code = 'MERCHANT_ORDER_NOT_FOUND';
-        throw error;
-      }
-
-      const order = snap.data() || {};
-      const orderMerchantId = String(
-        order.merchantId || order.merchantCode || ''
-      ).trim();
-
-      if (orderMerchantId !== context.merchantId) {
-        const error = new Error('這筆訂單不屬於目前登入店家。');
-        error.statusCode = 403;
-        error.code = 'MERCHANT_ORDER_FORBIDDEN';
-        throw error;
-      }
-
-      const currentStatus = String(order.status || '').trim();
-
-      const allowedTransitions = {
-        merchant_pending: new Set(['merchant_preparing', 'merchant_ready']),
-        merchant_preparing: new Set(['merchant_ready']),
-        merchant_ready: new Set(['pending_dispatch']),
-        merchant_self_delivery: new Set(['completed']),
-      };
-
-      if (
-        !(allowedTransitions[currentStatus] || new Set())
-          .has(nextStatus)
-      ) {
-        const error = new Error(
-          `目前狀態「${currentStatus || '未知'}」不能直接改成「${nextStatus}」。`
-        );
-        error.statusCode = 409;
-        error.code = 'MERCHANT_STATUS_TRANSITION_DENIED';
-        throw error;
-      }
-
-      const update = {
-        status: nextStatus,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAtMs: Date.now(),
-      };
-
-      if (nextStatus === 'merchant_preparing') {
-        update.merchantAcceptedAt =
-          admin.firestore.FieldValue.serverTimestamp();
-      }
-      if (nextStatus === 'merchant_ready') {
-        update.merchantReadyAt =
-          admin.firestore.FieldValue.serverTimestamp();
-      }
-      if (nextStatus === 'pending_dispatch') {
-        update.dispatchedAt =
-          admin.firestore.FieldValue.serverTimestamp();
-      }
-      if (nextStatus === 'completed') {
-        update.completedAt =
-          admin.firestore.FieldValue.serverTimestamp();
-        update.completedAtMs = Date.now();
-      }
-
-      transaction.update(orderRef, update);
-    });
-
-    return res.json({
-      success: true,
-      ok: true,
-      orderId,
-      status: nextStatus,
-      message: '訂單狀態已更新。',
-    });
-  } catch (error) {
-    console.error('❌ 店家 V3 更新狀態失敗：', error);
-    return sendMerchantV3Error(res, error);
-  }
-});
-
-app.post('/api/merchant/v3/orders/:orderId/cancel', async (req, res) => {
-  try {
-    const context = await resolveApprovedMerchantV3(req);
-    const orderId = String(req.params.orderId || '').trim().toUpperCase();
-    const orderRef = db.collection('orders').doc(orderId);
-
-    const cancellableStatuses = new Set([
-      'merchant_pending',
-      'merchant_preparing',
-      'merchant_ready',
-      'merchant_self_delivery',
-    ]);
-
-    await db.runTransaction(async transaction => {
-      const snap = await transaction.get(orderRef);
-
-      if (!snap.exists) {
-        const error = new Error('找不到此訂單。');
-        error.statusCode = 404;
-        error.code = 'MERCHANT_ORDER_NOT_FOUND';
-        throw error;
-      }
-
-      const order = snap.data() || {};
-      const orderMerchantId = String(
-        order.merchantId || order.merchantCode || ''
-      ).trim();
-
-      if (orderMerchantId !== context.merchantId) {
-        const error = new Error('這筆訂單不屬於目前登入店家。');
-        error.statusCode = 403;
-        error.code = 'MERCHANT_ORDER_FORBIDDEN';
-        throw error;
-      }
-
-      const currentStatus = String(order.status || '').trim();
-
-      if (!cancellableStatuses.has(currentStatus)) {
-        const error = new Error(
-          '此訂單已進入小U接單或配送流程，請聯繫 UBee 協助。'
-        );
-        error.statusCode = 409;
-        error.code = 'MERCHANT_ORDER_NOT_CANCELLABLE';
-        throw error;
-      }
-
-      transaction.update(orderRef, {
-        status: 'merchant_cancelled',
-        cancelledBy: 'merchant',
-        cancelledReason:
-          cleanLongText(
-            req.body?.reason || '店家於派單中心取消',
-            200
-          ),
-        cancelledFromStatus: currentStatus,
-        cancelledMerchantId: context.merchantId,
-        cancelledMerchantName: context.profile.merchantName,
-        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAtMs: Date.now(),
-      });
-    });
-
-    return res.json({
-      success: true,
-      ok: true,
-      orderId,
-      status: 'merchant_cancelled',
-      message: '訂單已取消。',
-    });
-  } catch (error) {
-    console.error('❌ 店家 V3 取消訂單失敗：', error);
-    return sendMerchantV3Error(res, error);
-  }
-});
-
-app.get('/api/merchant/v3/settlements', async (req, res) => {
-  try {
-    const context = await resolveApprovedMerchantV3(req);
-    const orders = await listMerchantOrdersV3(
-      context.merchantId,
-      context.profile.phone,
-      req.query.limit || 300
-    );
-
-    const rows = orders
-      .filter(order => {
-        const billingAmount = merchantV3Money(
-          order.merchantPayableAmount ||
-          order.storePayableAmount
-        );
-        const merchantNet = merchantV3Money(order.merchantNetAmount);
-        return billingAmount > 0 || merchantNet > 0;
-      })
-      .map(order => ({
-        orderId: order.id,
-        orderNo: order.orderNo || order.id,
-        createdAtMs: merchantV3ToMs(
-          order.createdAt || order.createdAtMs
-        ),
-        completedAtMs: merchantV3ToMs(
-          order.completedAt || order.completedAtMs
-        ),
-        deliveryFee: merchantV3Money(order.deliveryFee),
-        goodsAmount: merchantV3Money(order.goodsAmount),
-        commissionAmount: merchantV3Money(order.commissionAmount),
-        merchantNetAmount: merchantV3Money(order.merchantNetAmount),
-        merchantPayableAmount: merchantV3Money(
-          order.merchantPayableAmount ||
-          order.storePayableAmount
-        ),
-        merchantBillingStatus:
-          order.merchantBillingStatus || 'unpaid',
-        settlementStatus:
-          order.settlementStatus || 'NOT_REQUIRED',
-        settlementPeriod:
-          order.settlementPeriod ||
-          order.billingPeriod ||
-          '',
-      }));
-
-    return res.json({
-      success: true,
-      ok: true,
-      merchant: context.profile,
-      summary: buildMerchantSummaryV3(orders),
-      settlements: rows,
-    });
-  } catch (error) {
-    console.error('❌ 店家 V3 結算讀取失敗：', error);
-    return sendMerchantV3Error(res, error);
-  }
-});
-
 
 app.post('/api/orders', async (req, res) => {
     try {
