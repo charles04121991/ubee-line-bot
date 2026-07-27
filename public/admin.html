@@ -4,7 +4,7 @@
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee 跑腿｜財務結算中心 V2</title>
+<title>UBee 跑腿｜財務結算中心 V4</title>
 <style>
 :root{
   --bg:#f4f5f7;
@@ -124,6 +124,17 @@ summary::-webkit-details-marker{display:none}
 .v4-admin-note{padding:12px 13px;border-radius:14px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;line-height:1.65;color:#6b5b00;font-weight:850;margin-bottom:12px}
 .v4-rider-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.v4-rider-card{border:1px solid var(--line);border-radius:17px;padding:14px;background:#fff}.v4-rider-top{display:flex;justify-content:space-between;gap:12px}.v4-life{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:1000}.v4-life.ACTIVE{background:#dcfce7;color:#166534}.v4-life.TRAINING,.v4-life.RETRAINING{background:#fef3c7;color:#92400e}.v4-life.RESTRICTED,.v4-life.SUSPENDED,.v4-life.BANNED{background:#fee2e2;color:#991b1b}.v4-cert-list{margin-top:10px}.v4-cert{display:inline-flex;margin:3px 3px 0 0;padding:5px 7px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:900}.v4-cert.on{background:#dcfce7;color:#166534}.v4-action-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}.v4-action-grid .btn{padding:7px 9px;font-size:11px}.v4-key-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}.v4-key-row input{flex:1;border:1px solid var(--line);border-radius:11px;padding:10px 11px;font-weight:800}
 @media(max-width:850px){.v4-rider-grid{grid-template-columns:1fr}}
+
+.finance-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.finance-summary-card{border:1px solid var(--line);border-radius:15px;padding:12px;background:#f9fafb}.finance-summary-card span{display:block;font-size:10px;color:var(--muted);font-weight:900}.finance-summary-card strong{display:block;margin-top:5px;font-size:20px;font-weight:1000}
+.finance-ledger-list{display:grid;gap:10px}.finance-order-card{border:1px solid var(--line);border-radius:16px;padding:13px;background:#fff}.finance-order-card.review{border-left:5px solid var(--red)}.finance-order-card.unpaid{border-left:5px solid var(--orange)}.finance-order-card.reconciled{border-left:5px solid var(--green)}
+.finance-order-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.finance-order-id{font-size:14px;font-weight:1000;word-break:break-all}.finance-order-meta{font-size:11px;color:var(--muted);font-weight:800;line-height:1.55;margin-top:4px}.finance-amount{font-size:22px;font-weight:1000;text-align:right;white-space:nowrap}
+.finance-mini-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}.finance-mini{background:#f7f8fa;border-radius:11px;padding:9px}.finance-mini span{display:block;font-size:9px;color:var(--muted);font-weight:900}.finance-mini strong{display:block;font-size:13px;margin-top:4px;font-weight:1000}.finance-variance{color:var(--red)}
+.finance-status-select{border:1px solid var(--line);border-radius:11px;padding:9px 10px;background:#fff;font-size:12px;font-weight:900}.finance-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.finance-modal-backdrop{position:fixed;inset:0;z-index:20000;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:16px}.finance-modal-backdrop.show{display:flex}.finance-modal{width:min(760px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.32)}.finance-modal-head{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:16px 18px;display:flex;justify-content:space-between;gap:12px;z-index:2}.finance-modal-title{font-size:19px;font-weight:1000}.finance-modal-body{padding:16px 18px}.finance-close{width:36px;height:36px;border:0;border-radius:50%;background:#f2f3f5;font-size:20px;font-weight:1000}.finance-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.finance-detail-item{border:1px solid var(--line);border-radius:13px;padding:10px}.finance-detail-item span{display:block;font-size:10px;color:var(--muted);font-weight:900}.finance-detail-item strong{display:block;margin-top:4px;font-size:15px;font-weight:1000;word-break:break-word}.finance-form{display:grid;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}.finance-form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.finance-input,.finance-textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:10px 11px;background:#fff;outline:none;font-size:13px;font-weight:800}.finance-textarea{min-height:78px;resize:vertical}.finance-audit-list{display:grid;gap:8px;margin-top:12px}.finance-audit-item{border-left:3px solid var(--blue);background:#f8fafc;border-radius:10px;padding:10px;font-size:11px;line-height:1.6}.finance-discrepancy{margin-top:12px;padding:11px 12px;border-radius:12px;background:#fff3f3;border:1px solid #ffd1d4;color:#9f1d24;font-size:12px;font-weight:850;line-height:1.65}
+@media(max-width:850px){.finance-summary-grid{grid-template-columns:1fr 1fr}.finance-mini-grid{grid-template-columns:1fr 1fr}.finance-detail-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.finance-summary-grid,.finance-mini-grid,.finance-detail-grid,.finance-form-row{grid-template-columns:1fr}.finance-order-head{flex-direction:column}.finance-amount{text-align:left}}
+
 .view{display:none}
 .view.active{display:block}
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9999;max-width:min(520px,calc(100% - 28px));padding:11px 14px;border-radius:12px;background:#111;color:#fff;font-size:12px;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.2);display:none;text-align:center}
@@ -137,7 +148,7 @@ summary::-webkit-details-marker{display:none}
   <header class="topbar">
     <div>
       <div class="brand">UBee <span class="bee">財務結算中心</span></div>
-      <div class="sub">現金回繳與街口待撥款分流管理。回繳狀態與撥款狀態只由平台財務端確認，不由小U自行歸零。</div>
+      <div class="sub">訂單財務閉環、現金回繳與街口待撥款分流管理。回繳狀態與撥款狀態只由平台財務端確認，不由小U自行歸零。</div>
     </div>
     <div class="top-actions">
       <div class="status-pill" id="systemStatus"><span class="status-dot"></span><span id="systemStatusText">連線檢查中</span></div>
@@ -151,6 +162,7 @@ summary::-webkit-details-marker{display:none}
     <button class="tab" data-view="jko">街口待撥款</button>
     <button class="tab" data-view="alerts">異常提醒 <span id="alertTabCount"></span></button>
     <button class="tab" data-view="history">結算紀錄</button>
+    <button class="tab" data-view="ledger">訂單財務</button>
     <button class="tab" data-view="riders">小U V4 資格</button>
   </nav>
 
@@ -160,6 +172,9 @@ summary::-webkit-details-marker{display:none}
     <div class="kpi"><div class="kpi-label">街口待撥款</div><div class="kpi-value blue" id="kpiJkoPending">$0</div><div class="kpi-sub" id="kpiJkoSub">0 位小U待處理</div></div>
     <div class="kpi"><div class="kpi-label">待處理小U</div><div class="kpi-value yellow" id="kpiPendingRiders">0</div><div class="kpi-sub">現金／街口未結清聯集</div></div>
     <div class="kpi"><div class="kpi-label">今日已處理金額</div><div class="kpi-value green" id="kpiProcessed">$0</div><div class="kpi-sub" id="kpiProcessedSub">回繳 $0・撥款 $0</div></div>
+    <div class="kpi"><div class="kpi-label">今日平台收入</div><div class="kpi-value green" id="kpiPlatformIncome">$0</div><div class="kpi-sub">依完成訂單財務公式</div></div>
+    <div class="kpi"><div class="kpi-label">待對帳訂單</div><div class="kpi-value red" id="kpiNeedsReview">0</div><div class="kpi-sub">金額差異或資料缺漏</div></div>
+    <div class="kpi"><div class="kpi-label">未收款金額</div><div class="kpi-value yellow" id="kpiUnpaidAmount">$0</div><div class="kpi-sub">已完成但尚未收齊</div></div>
   </section>
 
   <main>
@@ -221,6 +236,38 @@ summary::-webkit-details-marker{display:none}
       </div>
     </section>
 
+
+
+    <section class="view" id="view-ledger">
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">訂單財務總帳</div><div class="panel-sub">初始估價、最終應收、實收、小U代墊、小U收入、平台收入、追加費用與對帳差異完整閉環。</div></div>
+          <div class="toolbar">
+            <select id="financeStatusFilter" class="finance-status-select" onchange="loadFinanceLedger(true)">
+              <option value="all">全部狀態</option>
+              <option value="needs_review">待檢查</option>
+              <option value="unpaid">未收款</option>
+              <option value="pending_settlement">待結算</option>
+              <option value="ready">可對帳</option>
+              <option value="reconciled">已對帳</option>
+            </select>
+            <input id="financeSearch" class="search" placeholder="搜尋訂單、小U、客戶或店家" oninput="renderFinanceLedger()">
+            <button class="btn small" onclick="loadFinanceLedger(true)">更新</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="v4-admin-note">所有金額修改都必須填寫原因，後端會保留修改人、修改前後數值、時間與對帳紀錄。完成對帳不會改動派單、騎士審核或通知流程。</div>
+          <div class="finance-summary-grid">
+            <div class="finance-summary-card"><span>今日客戶實收</span><strong id="financeTodayRevenue">$0</strong></div>
+            <div class="finance-summary-card"><span>今日平台收入</span><strong id="financeTodayPlatform">$0</strong></div>
+            <div class="finance-summary-card"><span>今日小U收入</span><strong id="financeTodayRider">$0</strong></div>
+            <div class="finance-summary-card"><span>財務差異總額</span><strong id="financeVarianceTotal">$0</strong></div>
+          </div>
+          <div id="financeLedgerList" class="finance-ledger-list"><div class="empty">正在讀取訂單財務總帳...</div></div>
+        </div>
+      </div>
+    </section>
+
     <section class="view" id="view-riders">
       <div class="panel">
         <div class="panel-head">
@@ -236,6 +283,14 @@ summary::-webkit-details-marker{display:none}
     </section>
   </main>
 </div>
+
+<div class="finance-modal-backdrop" id="financeModalBackdrop" onclick="if(event.target===this)closeFinanceModal()">
+  <div class="finance-modal">
+    <div class="finance-modal-head"><div><div class="finance-modal-title" id="financeModalTitle">訂單財務</div><div class="panel-sub" id="financeModalSub"></div></div><button class="finance-close" onclick="closeFinanceModal()">×</button></div>
+    <div class="finance-modal-body" id="financeModalBody"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -246,6 +301,8 @@ const state = {
   cash:null,
   jko:null,
   ridersV4:null,
+  finance:null,
+  financeDetail:null,
   loading:false,
 };
 
@@ -317,6 +374,7 @@ function switchView(view){
   if(view==='jko' && !state.jko) loadSettlements();
   if(view==='alerts') renderAlerts();
   if(view==='history') renderHistory();
+  if(view==='ledger' && !state.finance) loadFinanceLedger();
   if(view==='riders' && !state.ridersV4) loadV4Riders();
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));
@@ -364,6 +422,89 @@ function renderHistory(){
       <div class="history-amount" style="color:${cash?'var(--red)':'var(--blue)'}">${money(item.amount)}</div>
     </div>`;
   }).join('') : '<div class="empty">目前還沒有可顯示的結算紀錄。</div>';
+}
+
+
+
+function financeStatusLabel(status){
+  return {needs_review:'待檢查',unpaid:'未收款',pending_settlement:'待結算',ready:'可對帳',reconciled:'已對帳',in_progress:'進行中'}[status]||status||'-';
+}
+function financeStatusClass(status){
+  return status==='needs_review'?'review':status==='unpaid'?'unpaid':status==='reconciled'?'reconciled':'';
+}
+function renderFinanceKpis(){
+  const s=state.finance?.summary||{};
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  set('kpiPlatformIncome',money(s.todayPlatformIncome));
+  set('kpiNeedsReview',Number(s.needsReviewCount||0).toLocaleString('zh-TW'));
+  set('kpiUnpaidAmount',money(s.unpaidAmount));
+  set('financeTodayRevenue',money(s.todayCustomerRevenue));
+  set('financeTodayPlatform',money(s.todayPlatformIncome));
+  set('financeTodayRider',money(s.todayRiderIncome));
+  set('financeVarianceTotal',money(s.totalVarianceAmount));
+}
+function renderFinanceLedger(){
+  const el=document.getElementById('financeLedgerList');if(!el)return;
+  const q=normalizeSearch(document.getElementById('financeSearch')?.value);
+  let orders=Array.isArray(state.finance?.orders)?state.finance.orders:[];
+  if(q){orders=orders.filter(o=>[o.orderId,o.orderNo,o.customerName,o.merchantName,o.rider?.riderName,o.rider?.riderPhone,o.serviceType,o.paymentMethod].map(normalizeSearch).some(v=>v.includes(q)));}
+  if(!orders.length){el.innerHTML='<div class="empty">目前沒有符合條件的訂單財務資料。</div>';return;}
+  el.innerHTML=orders.map(o=>{
+    const variance=Math.abs(Number(o.customerVariance||0))+Math.abs(Number(o.platformVariance||0))+Math.abs(Number(o.settlementVariance||0));
+    const who=o.merchantName||o.customerName||'一般客戶';
+    return `<article class="finance-order-card ${financeStatusClass(o.reconciliationStatus)}">
+      <div class="finance-order-head"><div><div class="finance-order-id">${esc(o.orderNo||o.orderId)}</div><div class="finance-order-meta">${esc(who)}・${esc(o.serviceType||'-')}<br>${esc(o.rider?.riderName||'尚未指派小U')}・${esc(formatTime(o.completedAtMs||o.createdAtMs))}</div></div><div><div class="finance-amount">${money(o.finalCustomerTotal)}</div><span class="tag ${o.reconciliationStatus==='reconciled'?'done':o.reconciliationStatus==='needs_review'?'cash':'jko'}">${esc(financeStatusLabel(o.reconciliationStatus))}</span></div></div>
+      <div class="finance-mini-grid"><div class="finance-mini"><span>初始估價</span><strong>${money(o.initialEstimatedTotal)}</strong></div><div class="finance-mini"><span>客戶實收</span><strong>${money(o.actualPaidAmount)}</strong></div><div class="finance-mini"><span>小U應得</span><strong>${money(Number(o.riderIncome||0)+Number(o.riderAdvance||0))}</strong></div><div class="finance-mini"><span>平台收入</span><strong>${money(o.expectedPlatformIncome)}</strong></div></div>
+      ${variance?`<div class="finance-discrepancy">差異總額 ${money(variance)}${o.discrepancyReasons?.length?`：${esc(o.discrepancyReasons.join('、'))}`:''}</div>`:''}
+      <div class="finance-actions"><button class="btn small primary" onclick="openFinanceOrder('${esc(o.orderId)}')">查看／調整</button>${o.reconciliationStatus!=='reconciled'?`<button class="btn small yellow" onclick="quickReconcile('${esc(o.orderId)}')">完成對帳</button>`:''}</div>
+    </article>`;
+  }).join('');
+}
+async function loadFinanceLedger(showMessage=false){
+  const filter=String(document.getElementById('financeStatusFilter')?.value||'all');
+  const el=document.getElementById('financeLedgerList');if(el&&!showMessage)el.innerHTML='<div class="empty">正在讀取訂單財務總帳...</div>';
+  try{state.finance=await getJson(`/api/admin/finance-ledger?status=${encodeURIComponent(filter)}&limit=800`);renderFinanceKpis();renderFinanceLedger();if(showMessage)showToast('訂單財務總帳已更新');}
+  catch(err){if(el)el.innerHTML=`<div class="empty">讀取財務總帳失敗：${esc(err.message)}</div>`;if(showMessage)showToast('讀取財務總帳失敗：'+err.message);}
+}
+function closeFinanceModal(){document.getElementById('financeModalBackdrop')?.classList.remove('show');state.financeDetail=null;}
+function financeDetailItem(label,value,cls=''){return `<div class="finance-detail-item"><span>${esc(label)}</span><strong class="${cls}">${esc(value)}</strong></div>`;}
+async function openFinanceOrder(orderId){
+  try{
+    const data=await getJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}`);state.financeDetail=data;
+    const o=data.order||{};document.getElementById('financeModalTitle').textContent=`訂單 ${o.orderNo||o.orderId}`;document.getElementById('financeModalSub').textContent=`${financeStatusLabel(o.reconciliationStatus)}・${o.paymentMethod||'-'}・${o.paymentStatus||'-'}`;
+    const fees=o.feeBreakdown||{};const reasons=Array.isArray(o.discrepancyReasons)?o.discrepancyReasons:[];
+    document.getElementById('financeModalBody').innerHTML=`
+      <div class="finance-detail-grid">
+        ${financeDetailItem('初始估價',money(o.initialEstimatedTotal))}${financeDetailItem('最終應收',money(o.finalCustomerTotal))}${financeDetailItem('客戶實收',money(o.actualPaidAmount))}
+        ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('平台收入',money(o.expectedPlatformIncome))}
+        ${financeDetailItem('等待費',money(fees.waitingFee))}${financeDetailItem('上樓費',money(fees.upstairsFee))}${financeDetailItem('追加費用',money(fees.additionalFee))}
+        ${financeDetailItem('取消費',money(fees.cancellationFee))}${financeDetailItem('退款',money(fees.refundAmount))}${financeDetailItem('結算狀態',o.settlementStatus||'-')}
+      </div>
+      ${reasons.length?`<div class="finance-discrepancy"><b>尚有差異：</b>${esc(reasons.join('、'))}</div>`:''}
+      <div class="finance-form"><div class="panel-title">調整金額</div><div class="finance-form-row"><select id="financeAdjustField" class="finance-input"><option value="finalCustomerTotal">最終應收</option><option value="actualPaidAmount">客戶實收</option><option value="riderAdvance">小U代墊</option><option value="riderIncome">小U任務收入</option><option value="platformIncome">平台收入</option><option value="waitingFee">等待費</option><option value="upstairsFee">上樓費</option><option value="additionalFee">追加費用</option><option value="cancellationFee">取消費</option><option value="discountAmount">折扣</option><option value="refundAmount">退款</option></select><input id="financeAdjustValue" class="finance-input" type="number" min="0" step="1" placeholder="新金額"></div><input id="financeOperator" class="finance-input" value="finance_center" placeholder="處理人員"><textarea id="financeAdjustReason" class="finance-textarea" placeholder="必填：金額調整原因"></textarea><button class="btn primary" onclick="submitFinanceAdjustment('${esc(o.orderId)}')">儲存金額調整</button></div>
+      <div class="finance-form"><div class="panel-title">付款狀態</div><div class="finance-form-row"><select id="financePaymentStatus" class="finance-input"><option value="unpaid">未付款</option><option value="partial">部分付款</option><option value="paid">已付款</option><option value="cash_pending">現金待收</option><option value="cash_collected">現金已收</option><option value="refunded">已退款</option><option value="cancelled">已取消</option></select><input id="financePaidAmount" class="finance-input" type="number" min="0" step="1" value="${Number(o.actualPaidAmount||0)}" placeholder="實收金額"></div><textarea id="financePaymentReason" class="finance-textarea" placeholder="必填：付款狀態修改原因"></textarea><button class="btn blue" onclick="submitPaymentStatus('${esc(o.orderId)}')">更新付款狀態</button></div>
+      <div class="finance-form"><div class="panel-title">對帳結案</div><textarea id="financeReconcileNote" class="finance-textarea" placeholder="對帳備註"></textarea><label style="font-size:12px;font-weight:900"><input id="financeForceReconcile" type="checkbox" style="width:auto"> 即使仍有差異，也由財務人工確認強制結案</label><button class="btn yellow" onclick="submitFinanceReconcile('${esc(o.orderId)}')">完成財務對帳</button></div>
+      <div class="finance-form"><div class="panel-title">財務操作紀錄</div><div class="finance-audit-list">${(data.audit||[]).length?(data.audit||[]).map(a=>`<div class="finance-audit-item"><b>${esc(a.type||'財務更新')}</b>・${esc(a.operator||'-')}・${esc(formatTime(a.createdAtMs))}<br>${esc(a.reason||'')}</div>`).join(''):'<div class="empty">目前沒有人工財務操作紀錄。</div>'}</div></div>`;
+    document.getElementById('financePaymentStatus').value=o.paymentStatus||'unpaid';document.getElementById('financeModalBackdrop').classList.add('show');
+  }catch(err){alert('讀取財務明細失敗：'+err.message);}
+}
+async function submitFinanceAdjustment(orderId){
+  const field=document.getElementById('financeAdjustField').value;const value=Number(document.getElementById('financeAdjustValue').value);const reason=document.getElementById('financeAdjustReason').value.trim();const operator=document.getElementById('financeOperator').value.trim()||'finance_center';
+  if(!Number.isFinite(value)||value<0){alert('請輸入正確的新金額。');return;}if(reason.length<2){alert('請填寫金額調整原因。');return;}
+  try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/adjust`,{field,value,reason,operator});showToast('財務金額已更新');await loadFinanceLedger(true);await openFinanceOrder(orderId);}catch(err){alert('調整失敗：'+err.message);}
+}
+async function submitPaymentStatus(orderId){
+  const status=document.getElementById('financePaymentStatus').value;const paidAmount=Number(document.getElementById('financePaidAmount').value||0);const reason=document.getElementById('financePaymentReason').value.trim();const operator=document.getElementById('financeOperator')?.value.trim()||'finance_center';if(reason.length<2){alert('請填寫付款狀態修改原因。');return;}
+  try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/payment-status`,{status,paidAmount,reason,operator});showToast('付款狀態已更新');await loadFinanceLedger(true);await openFinanceOrder(orderId);}catch(err){alert('更新付款狀態失敗：'+err.message);}
+}
+async function submitFinanceReconcile(orderId){
+  const note=document.getElementById('financeReconcileNote').value.trim();const force=document.getElementById('financeForceReconcile').checked;const operator=document.getElementById('financeOperator')?.value.trim()||'finance_center';
+  if(!confirm(force?'確認強制完成此筆財務對帳？':'確認完成此筆財務對帳？'))return;
+  try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/reconcile`,{note,force,operator});showToast('財務對帳已完成');closeFinanceModal();await loadFinanceLedger(true);}catch(err){alert('對帳失敗：'+err.message);}
+}
+async function quickReconcile(orderId){
+  if(!confirm(`確認將訂單 ${orderId} 完成財務對帳？\n若仍有差異，系統會阻擋並要求進入明細處理。`))return;
+  try{await postJson(`/api/admin/finance-orders/${encodeURIComponent(orderId)}/reconcile`,{note:'財務中心快速對帳',force:false,operator:'finance_center'});showToast('財務對帳已完成');await loadFinanceLedger(true);}catch(err){if(String(err.message).includes('仍有財務差異'))openFinanceOrder(orderId);else alert('對帳失敗：'+err.message);}
 }
 
 async function loadOverview(silent=false){
@@ -544,7 +685,7 @@ async function refreshAll(showMessage=false){
   try{
     const ok=await healthCheck();
     if(!ok){if(showMessage)showToast('目前無法連上 UBee 後端，保留畫面最後資料。');return;}
-    await Promise.all([loadOverview(true),loadCashRemittances(true),loadSettlements(true)]);
+    await Promise.all([loadOverview(true),loadCashRemittances(true),loadSettlements(true),loadFinanceLedger(false)]);
     if(showMessage)showToast('財務資料已全部更新');
   }finally{state.loading=false;}
 }
