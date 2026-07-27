@@ -224,6 +224,7 @@ button{cursor:pointer}
   font-size:12px;font-weight:800;display:none;line-height:1.5
 }
 .toast.show{display:block}
+.hidden{display:none!important}
 
 .api-note{
   background:#fff8dc;border:1px solid #f7dfa0;border-radius:12px;padding:10px 12px;
@@ -255,6 +256,37 @@ button{cursor:pointer}
 .v3-risk-panel{display:none;border:1px solid #ffd6d8;border-left:5px solid var(--red);background:#fff8f8;border-radius:14px;padding:12px;line-height:1.55}.v3-risk-panel.show{display:block}.v3-risk-title{font-size:13px;font-weight:1000}.v3-risk-text{font-size:11px;color:var(--muted);margin-top:5px}.v3-risk-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.alert-item.watch{border-left-color:var(--yellow);background:#fffdf4}.alert-item.high{border-left-color:var(--orange);background:#fff9f1}.alert-item.critical{border-left-color:var(--red);background:#fff4f4}.alert-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.custody-lock{margin-top:8px;padding:8px 10px;border-radius:10px;background:#f3f4f6;font-size:10px;font-weight:800;color:#555b63}
 @media(max-width:1200px){.intel-grid{grid-template-columns:1fr 1fr}.intel-grid>.panel:last-child{grid-column:1/-1}}
 @media(max-width:760px){.intel-grid{grid-template-columns:1fr}.intel-grid>.panel:last-child{grid-column:auto}.level4-banner{align-items:flex-start;flex-direction:column}}
+
+
+/* ===== UBee 第二階段：異常案件中心 ===== */
+.incident-summary{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.incident-filter{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:1000;color:#565b63}
+.incident-filter.active{background:#111;color:#fff;border-color:#111}
+.incident-card{border:1px solid var(--line);border-left:5px solid var(--yellow);border-radius:14px;padding:12px;background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.035)}
+.incident-card.high{border-left-color:var(--orange);background:#fffaf3}
+.incident-card.critical{border-left-color:var(--red);background:#fff6f6}
+.incident-card.resolved{border-left-color:var(--green);background:#f7fff9;opacity:.88}
+.incident-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.incident-title{font-size:13px;font-weight:1000;line-height:1.45}
+.incident-status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 7px;font-size:9px;font-weight:1000;white-space:nowrap}
+.incident-status.open{background:#ffe7e8;color:#bd2c33}
+.incident-status.in-progress{background:#fff0dc;color:#a95b00}
+.incident-status.resolved{background:#e9f8ef;color:#157a49}
+.incident-desc{font-size:11px;line-height:1.65;color:#555b63;margin-top:7px;white-space:pre-wrap}
+.incident-meta{font-size:10px;color:var(--muted);line-height:1.55;margin-top:7px}
+.incident-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.incident-signal{border:1px dashed #f0b8bb;background:#fffafa;border-radius:13px;padding:11px}
+.incident-signal .incident-title{color:#a72d32}
+.incident-count-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 7px;background:#ffe7e8;color:#bd2c33;font-size:10px;font-weight:1000;margin-left:6px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-field{display:grid;gap:6px}
+.form-field.full{grid-column:1/-1}
+.form-label{font-size:12px;font-weight:1000;color:#34373c}
+.form-control{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;color:#111;font:inherit}
+textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
+.incident-history{display:grid;gap:7px;margin-top:12px;max-height:220px;overflow:auto}
+.incident-history-item{border-left:3px solid #d9dce1;padding:7px 9px;background:#f8f8f9;border-radius:8px;font-size:10px;line-height:1.55;color:#555b63}
+@media(max-width:680px){.form-grid{grid-template-columns:1fr}.form-field.full{grid-column:auto}.incident-head{flex-direction:column}}
 
 @media(max-width:1150px){
   .kpis{grid-template-columns:repeat(3,1fr)}
@@ -303,7 +335,7 @@ button{cursor:pointer}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">V4 + V5 · CITY CONTROL TOWER</div>
+      <div class="version">V4 + V5 · INCIDENT OPS</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -493,11 +525,20 @@ button{cursor:pointer}
       <div class="panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">異常中心</div>
-            <div class="panel-sub">等待過久、資料異常與需人工介入事件</div>
+            <div class="panel-title">異常案件中心</div>
+            <div class="panel-sub">系統告警 → 建立案件 → 指派負責人 → 處理紀錄 → 結案</div>
           </div>
+          <button class="btn small danger" id="createIncidentBtn" disabled>建立異常</button>
         </div>
         <div class="panel-body">
+          <div class="incident-summary" style="margin-bottom:10px">
+            <button class="incident-filter active" data-incident-filter="active">未結案 <span id="incidentActiveCount">0</span></button>
+            <button class="incident-filter" data-incident-filter="open">待處理 <span id="incidentOpenCount">0</span></button>
+            <button class="incident-filter" data-incident-filter="in_progress">處理中 <span id="incidentProgressCount">0</span></button>
+            <button class="incident-filter" data-incident-filter="resolved">已結案 <span id="incidentResolvedCount">0</span></button>
+            <button class="incident-filter" data-incident-filter="signals">系統告警 <span id="incidentSignalCount">0</span></button>
+            <button class="incident-filter" data-incident-filter="all">全部</button>
+          </div>
           <div class="alert-list" id="alertList"><div class="empty">資料載入中…</div></div>
         </div>
       </div>
@@ -524,13 +565,81 @@ button{cursor:pointer}
   </div>
 </div>
 
+
+<!-- 第二階段：異常案件建立／處理視窗 -->
+<div class="modal-backdrop" id="incidentModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="incidentModalTitle">建立異常案件</div>
+        <div class="panel-sub" id="incidentModalSub">建立後可持續追蹤負責人、處理紀錄與結案結果</div>
+      </div>
+      <button class="close-btn" data-close-incident-modal>×</button>
+    </div>
+    <div class="modal-body">
+      <div class="dispatch-order-summary" id="incidentOrderSummary"></div>
+      <div class="form-grid" style="margin-top:12px" id="incidentCreateFields">
+        <div class="form-field">
+          <label class="form-label" for="incidentTypeSelect">異常類型</label>
+          <select class="form-control" id="incidentTypeSelect"></select>
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="incidentSeveritySelect">嚴重程度</label>
+          <select class="form-control" id="incidentSeveritySelect">
+            <option value="WATCH">注意</option>
+            <option value="HIGH">高風險</option>
+            <option value="CRITICAL">緊急</option>
+          </select>
+        </div>
+        <div class="form-field full">
+          <label class="form-label" for="incidentAssignedTo">負責人</label>
+          <input class="form-control" id="incidentAssignedTo" maxlength="100" placeholder="例如：Charles／台中調度" />
+        </div>
+        <div class="form-field full">
+          <label class="form-label" for="incidentDescription">異常說明</label>
+          <textarea class="form-control" id="incidentDescription" maxlength="1000" placeholder="請記錄發生什麼事情、已聯絡誰、目前需要什麼處置"></textarea>
+        </div>
+      </div>
+      <div class="form-grid hidden" style="margin-top:12px" id="incidentActionFields">
+        <div class="form-field full" id="incidentActionAssigneeField">
+          <label class="form-label" for="incidentActionAssignedTo">負責人</label>
+          <input class="form-control" id="incidentActionAssignedTo" maxlength="100" placeholder="負責處理的人員" />
+        </div>
+        <div class="form-field full" id="incidentResolutionCodeField">
+          <label class="form-label" for="incidentResolutionCode">結案結果</label>
+          <select class="form-control" id="incidentResolutionCode">
+            <option value="COMPLETED">已完成處理</option>
+            <option value="REASSIGNED">已重新派單／改派</option>
+            <option value="CUSTOMER_CANCELLED">客戶確認取消</option>
+            <option value="MERCHANT_RESOLVED">店家問題已處理</option>
+            <option value="ADDRESS_CORRECTED">地址已修正</option>
+            <option value="CUSTOMER_CONTACTED">已聯絡到客戶</option>
+            <option value="AMOUNT_AGREED">金額已確認</option>
+            <option value="FALSE_ALARM">確認為誤報</option>
+            <option value="OTHER">其他</option>
+          </select>
+        </div>
+        <div class="form-field full">
+          <label class="form-label" for="incidentActionNote" id="incidentActionNoteLabel">處理紀錄</label>
+          <textarea class="form-control" id="incidentActionNote" maxlength="1000" placeholder="請留下處理內容與下一步"></textarea>
+        </div>
+      </div>
+      <div class="incident-history" id="incidentHistory"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close-incident-modal>取消</button>
+      <button class="btn danger" id="confirmIncidentBtn">建立異常案件</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 'use strict';
 
 /* ============================================================
-   UBee 智慧調度控制塔 V4 + V5｜全局控制 × 智慧地圖 × V3 安全處置
+   UBee 智慧調度控制塔 V4 + V5｜第二階段異常案件中心 × V3 安全處置
    現有可直接使用：
    GET /api/dispatch/dashboard
 
@@ -542,12 +651,17 @@ button{cursor:pointer}
    ============================================================ */
 
 const state = {
-  data: { summary:{}, orders:[], riders:[], alerts:[], intelligence:{summary:{},zones:[],orderInsights:[],recommendations:[]}, operationsV5:{controlTower:{riskSummary:{},stageSummary:{}},riderHealthSummary:{},zones:[]} },
+  data: { summary:{}, orders:[], riders:[], alerts:[], incidents:[], incidentSummary:{}, incidentTypes:[], intelligence:{summary:{},zones:[],orderInsights:[],recommendations:[]}, operationsV5:{controlTower:{riskSummary:{},stageSummary:{}},riderHealthSummary:{},zones:[]} },
   filter: 'all',
   riderFilter: 'all',
   selectedOrderId: '',
   selectedCandidateRiderId: '',
   selectedOrderEvents: [],
+  incidentFilter: 'active',
+  incidentModalMode: 'create',
+  incidentModalOrderId: '',
+  incidentModalIncidentId: '',
+  incidentModalAction: '',
   radiusKm: 3,
   towerRiskFilter: 'all',
   stageFilter: '',
@@ -766,6 +880,58 @@ function riskBadge(level,score){
 function severityClass(value){
   const v=String(value||'').toLowerCase();
   return v==='critical'?'critical':v==='high'?'high':'';
+}
+
+
+const INCIDENT_TYPE_FALLBACK = [
+  {value:'NO_RIDER_ACCEPT',label:'無人接單',defaultSeverity:'HIGH'},
+  {value:'RIDER_UNREACHABLE',label:'小U接單後失聯',defaultSeverity:'CRITICAL'},
+  {value:'LOCATION_STALE',label:'定位長時間未更新',defaultSeverity:'HIGH'},
+  {value:'CUSTOMER_CANCEL',label:'客戶取消',defaultSeverity:'WATCH'},
+  {value:'MERCHANT_OUT_OF_STOCK',label:'店家缺貨',defaultSeverity:'WATCH'},
+  {value:'ADDRESS_ERROR',label:'地址錯誤',defaultSeverity:'HIGH'},
+  {value:'CUSTOMER_UNREACHABLE',label:'聯絡不到客戶',defaultSeverity:'HIGH'},
+  {value:'AMOUNT_DISPUTE',label:'金額爭議',defaultSeverity:'HIGH'},
+  {value:'OTHER',label:'其他異常',defaultSeverity:'WATCH'}
+];
+
+function incidentTypes(){
+  return Array.isArray(state.data.incidentTypes) && state.data.incidentTypes.length
+    ? state.data.incidentTypes
+    : INCIDENT_TYPE_FALLBACK;
+}
+
+function incidentTypeMeta(type){
+  const safe=String(type||'OTHER').toUpperCase();
+  return incidentTypes().find(item=>String(item.value||'').toUpperCase()===safe)
+    || INCIDENT_TYPE_FALLBACK.find(item=>item.value==='OTHER');
+}
+
+function incidentStatusLabel(status){
+  return {OPEN:'待處理',IN_PROGRESS:'處理中',RESOLVED:'已結案'}[String(status||'').toUpperCase()] || '待處理';
+}
+
+function incidentStatusClass(status){
+  const safe=String(status||'').toUpperCase();
+  return safe==='IN_PROGRESS'?'in-progress':safe==='RESOLVED'?'resolved':'open';
+}
+
+function incidentSeverityLabel(severity){
+  return {WATCH:'注意',HIGH:'高風險',CRITICAL:'緊急'}[String(severity||'').toUpperCase()] || '注意';
+}
+
+function incidentFromId(incidentId){
+  return (state.data.incidents||[]).find(item=>String(item.incidentId||item.id)===String(incidentId)) || null;
+}
+
+function suggestedIncidentTypeFromAlert(alert){
+  const explicit=String(alert?.incidentType||'').toUpperCase();
+  if(explicit) return explicit;
+  const type=String(alert?.type||'').toLowerCase();
+  if(type.startsWith('waiting_')) return 'NO_RIDER_ACCEPT';
+  if(type.startsWith('tracking_')) return 'LOCATION_STALE';
+  if(type==='v3_active_task_risk') return /定位|gps/i.test(String(alert?.message||''))?'LOCATION_STALE':'RIDER_UNREACHABLE';
+  return 'OTHER';
 }
 
 /* =========================
@@ -1252,7 +1418,11 @@ async function loadDashboard({silent=false}={}){
       orders:Array.isArray(data.orders) ? data.orders : [],
       riders:Array.isArray(data.riders) ? data.riders : [],
       alerts:Array.isArray(data.alerts) ? data.alerts : [],
-      intelligence:data.intelligence || {summary:{},zones:[],orderInsights:[],recommendations:[]}
+      incidents:Array.isArray(data.incidents) ? data.incidents : [],
+      incidentSummary:data.incidentSummary || {},
+      incidentTypes:Array.isArray(data.incidentTypes) ? data.incidentTypes : [],
+      intelligence:data.intelligence || {summary:{},zones:[],orderInsights:[],recommendations:[]},
+      operationsV5:data.operationsV5 || {controlTower:{riskSummary:{},stageSummary:{}},riderHealthSummary:{},zones:[]}
     };
 
     if(state.selectedOrderId && !getSelectedOrder()){
@@ -1393,7 +1563,13 @@ function renderSummary(){
   $('forecastDemand').textContent = s.predictedDemand15m ?? state.data.intelligence?.summary?.predictedDemand15m ?? 0;
   const gap = s.expectedGap15m ?? state.data.intelligence?.summary?.expectedGap15m ?? 0;
   $('forecastGap').textContent = Number(gap) > 0 ? `+${gap}` : String(gap);
-  $('alerts').textContent = state.data.alerts.length;
+  const incidentSummary=state.data.incidentSummary||{};
+  $('alerts').textContent = Number(incidentSummary.totalActive ?? 0) + (state.data.alerts||[]).filter(a=>!a.incidentId).length;
+  if($('incidentActiveCount')) $('incidentActiveCount').textContent=incidentSummary.totalActive??0;
+  if($('incidentOpenCount')) $('incidentOpenCount').textContent=incidentSummary.open??0;
+  if($('incidentProgressCount')) $('incidentProgressCount').textContent=incidentSummary.inProgress??0;
+  if($('incidentResolvedCount')) $('incidentResolvedCount').textContent=incidentSummary.totalResolved??incidentSummary.resolvedToday??0;
+  if($('incidentSignalCount')) $('incidentSignalCount').textContent=(state.data.alerts||[]).filter(a=>!a.incidentId).length;
 
   const pausedCount = s.pausedRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='paused').length;
   const offlineCount = s.offlineRiders ?? state.data.riders.filter(r=>riderStateKey(r)==='offline').length;
@@ -1491,6 +1667,7 @@ function renderOrders(){
               ${waitBadge(order)}
               ${riskBadge(order.riskLevel,order.riskScore)}
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
+              ${Number(order.openIncidentCount||0)>0?`<span class="badge danger">異常案件 ${esc(order.openIncidentCount)}</span>`:''}
             </div>
           </div>
           <div class="price">NT$ ${esc(order.total || 0)}</div>
@@ -1517,6 +1694,7 @@ function renderOrders(){
           <button class="btn small ${selected?'yellow':''}" data-action="select" data-id="${esc(order.id)}">
             ${selected?'已選擇':'選擇訂單'}
           </button>
+          <button class="btn small danger" data-action="create-incident" data-id="${esc(order.id)}">建立異常</button>
           ${isWaiting ? `
             <button class="btn small" data-action="redispatch" data-id="${esc(order.id)}">重新派單</button>
             <button class="btn small primary" data-action="candidates" data-id="${esc(order.id)}">指定小U</button>
@@ -1575,22 +1753,80 @@ function renderRiders(){
 }
 
 function renderAlerts(){
-  const list = state.data.alerts || [];
-  if(!list.length){
-    $('alertList').innerHTML = '<div class="empty">目前沒有異常提醒</div>';
-    return;
+  const allIncidents=[...(state.data.incidents||[])];
+  const signals=(state.data.alerts||[]).filter(item=>!item.incidentId);
+  const filter=state.incidentFilter||'active';
+
+  let incidents=allIncidents;
+  if(filter==='active') incidents=incidents.filter(item=>['OPEN','IN_PROGRESS'].includes(String(item.status||'').toUpperCase()));
+  if(filter==='open') incidents=incidents.filter(item=>String(item.status||'').toUpperCase()==='OPEN');
+  if(filter==='in_progress') incidents=incidents.filter(item=>String(item.status||'').toUpperCase()==='IN_PROGRESS');
+  if(filter==='resolved') incidents=incidents.filter(item=>String(item.status||'').toUpperCase()==='RESOLVED');
+  if(filter==='signals') incidents=[];
+
+  incidents.sort((a,b)=>{
+    const rank={CRITICAL:3,HIGH:2,WATCH:1};
+    const severityDiff=(rank[String(b.severity||'WATCH').toUpperCase()]||0)-(rank[String(a.severity||'WATCH').toUpperCase()]||0);
+    if(severityDiff) return severityDiff;
+    return Number(b.updatedAtMs||b.createdAtMs||0)-Number(a.updatedAtMs||a.createdAtMs||0);
+  });
+
+  const showSignals=['signals','all','active'].includes(filter);
+  const cards=[];
+
+  incidents.forEach(item=>{
+    const severity=String(item.severity||'WATCH').toLowerCase();
+    const status=String(item.status||'OPEN').toUpperCase();
+    const typeMeta=incidentTypeMeta(item.type);
+    const history=Array.isArray(item.history)?item.history:[];
+    const lastHistory=history.length?history[history.length-1]:null;
+    const orderExists=(state.data.orders||[]).some(order=>String(order.id)===String(item.orderId));
+    cards.push(`
+      <div class="incident-card ${esc(severity)} ${status==='RESOLVED'?'resolved':''}">
+        <div class="incident-head">
+          <div>
+            <div class="incident-title">${esc(item.title||typeMeta.label)} · ${esc(item.orderId||'-')}</div>
+            <div class="badges" style="margin-top:5px">
+              <span class="badge ${severity==='critical'?'danger':severity==='high'?'warn':''}">${esc(incidentSeverityLabel(item.severity))}</span>
+              <span class="badge">${esc(typeMeta.label)}</span>
+            </div>
+          </div>
+          <span class="incident-status ${incidentStatusClass(status)}">${esc(incidentStatusLabel(status))}</span>
+        </div>
+        <div class="incident-desc">${esc(item.description||'尚未填寫異常說明')}</div>
+        <div class="incident-meta">
+          負責人：${esc(item.assignedTo||'尚未指派')} · 更新 ${esc(fmtAge(item.updatedAtMs||item.createdAtMs))}
+          ${lastHistory?.note?`<br>最新紀錄：${esc(lastHistory.note)}`:''}
+          ${item.resolutionNote?`<br>結案結果：${esc(item.resolutionNote)}`:''}
+        </div>
+        <div class="incident-actions">
+          ${orderExists?`<button class="btn small" data-action="select" data-id="${esc(item.orderId)}">查看訂單</button>`:`<span class="badge green">訂單已離開即時清單</span>`}
+          ${status==='OPEN'?`<button class="btn small yellow" data-incident-action="start" data-incident-id="${esc(item.incidentId||item.id)}">開始處理</button>`:''}
+          ${status!=='RESOLVED'?`<button class="btn small" data-incident-action="note" data-incident-id="${esc(item.incidentId||item.id)}">新增紀錄</button><button class="btn small danger" data-incident-action="resolve" data-incident-id="${esc(item.incidentId||item.id)}">結案</button>`:`<button class="btn small" data-incident-action="reopen" data-incident-id="${esc(item.incidentId||item.id)}">重新開啟</button>`}
+        </div>
+      </div>`);
+  });
+
+  if(showSignals){
+    signals.forEach(a=>{
+      const sev=String(a.severity||'WATCH').toLowerCase();
+      const type=suggestedIncidentTypeFromAlert(a);
+      cards.push(`
+        <div class="incident-signal">
+          <div class="incident-head">
+            <div>
+              <div class="incident-title">系統告警｜${esc(a.title||'異常提醒')}</div>
+              <div class="badges" style="margin-top:5px"><span class="badge ${sev==='critical'?'danger':sev==='high'?'warn':''}">${esc(incidentSeverityLabel(a.severity))}</span><span class="badge">${esc(incidentTypeMeta(type).label)}</span></div>
+            </div>
+            <span class="incident-status open">尚未建案</span>
+          </div>
+          <div class="incident-desc">${esc(a.message||'')}</div>
+          ${a.orderId?`<div class="incident-actions"><button class="btn small" data-action="select" data-id="${esc(a.orderId)}">查看訂單</button><button class="btn small danger" data-incident-action="create" data-order-id="${esc(a.orderId)}" data-incident-type="${esc(type)}" data-description="${esc(a.message||'')}">建立異常案件</button></div>`:''}
+        </div>`);
+    });
   }
-  $('alertList').innerHTML = list.map(a=>{
-    const sev=String(a.severity||'').toLowerCase();
-    const order=(state.data.orders||[]).find(o=>String(o.id)===String(a.orderId));
-    const canRecover=order?.recoveryEligible===true && ['HIGH','CRITICAL'].includes(String(order?.riskLevel||'').toUpperCase());
-    return `
-      <div class="alert-item ${esc(sev)}">
-        <strong>${esc(a.title || '異常提醒')}</strong><br>
-        ${esc(a.message || '')}
-        ${a.orderId?`<div class="alert-actions"><button class="btn small" data-action="select" data-id="${esc(a.orderId)}">查看訂單</button>${canRecover?`<button class="btn small danger" data-action="emergency-recover" data-id="${esc(a.orderId)}">備援轉派</button>`:''}</div>`:''}
-      </div>`;
-  }).join('');
+
+  $('alertList').innerHTML=cards.length?cards.join(''):'<div class="empty">目前沒有符合條件的異常案件或系統告警</div>';
 }
 
 /* =========================
@@ -1633,6 +1869,7 @@ function renderCandidates(){
   if(riskPanel){ riskPanel.classList.remove('show'); riskPanel.innerHTML=''; }
 
   if(!order){
+    if($('createIncidentBtn')) $('createIncidentBtn').disabled=true;
     $('selectedOrderSummary').innerHTML = '<div class="empty">請先選擇一筆訂單</div>';
     $('candidateList').innerHTML = '<div class="empty">選擇訂單後顯示候選小U</div>';
     return;
@@ -1646,9 +1883,11 @@ function renderCandidates(){
       ${riskBadge(order.riskLevel,order.riskScore)}
       ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<br>原因：${esc(order.riskReasons.slice(0,4).join('；'))}`:''}
        ${Array.isArray(order.riderLocationTrail)&&order.riderLocationTrail.length?`<br><span style="color:var(--purple)">V5 最近軌跡：${esc(order.riderLocationTrail.length)} 個定位採樣點</span>`:''}
+      ${Number(order.openIncidentCount||0)>0?`<br><span style="color:var(--red);font-weight:1000">目前有 ${esc(order.openIncidentCount)} 件未結案異常</span>`:''}
       ${!hasLatLng(order.pickupLat,order.pickupLng)?'<br><b style="color:var(--red)">此訂單缺少取件座標，無法計算附近小U。</b>':''}
     </div>
   `;
+  if($('createIncidentBtn')) $('createIncidentBtn').disabled=false;
 
   if(isActive && riskPanel){
     const phone=String(order.riderPhone||'').replace(/[^0-9+]/g,'');
@@ -1718,7 +1957,8 @@ function eventLabel(type){
   const map={
     ORDER_CREATED:'訂單建立',RIDER_NOTIFIED:'已通知小U',RIDER_ACCEPTED:'小U接單',RIDER_SKIPPED:'小U略過',
     RIDER_TRANSFERRED:'騎士取消／轉派',MANUAL_ASSIGN:'人工指定小U',REDISPATCH:'重新派單',EMERGENCY_REDISPATCH:'V3 備援轉派',RADIUS_EXPANDED:'擴大派單半徑',
-    ORDER_STATUS_ARRIVED_PICKUP:'抵達取件點',ORDER_STATUS_PICKED_UP:'已取件',ORDER_STATUS_ARRIVED_DROPOFF:'抵達送達點',ORDER_COMPLETED:'任務完成'
+    ORDER_STATUS_ARRIVED_PICKUP:'抵達取件點',ORDER_STATUS_PICKED_UP:'已取件',ORDER_STATUS_ARRIVED_DROPOFF:'抵達送達點',ORDER_COMPLETED:'任務完成',
+    INCIDENT_CREATED:'建立異常案件',INCIDENT_STARTED:'開始處理異常',INCIDENT_ASSIGNED:'指派異常負責人',INCIDENT_NOTE:'新增異常紀錄',INCIDENT_RESOLVED:'異常案件結案',INCIDENT_REOPENED:'重新開啟異常'
   };
   return map[String(type||'')]||String(type||'調度事件');
 }
@@ -1974,10 +2214,134 @@ document.addEventListener('click',event=>{
   }
 });
 
+
+/* =========================
+   第二階段：異常案件操作
+   ========================= */
+function populateIncidentTypeOptions(selectedType='OTHER'){
+  const select=$('incidentTypeSelect'); if(!select) return;
+  select.innerHTML=incidentTypes().map(item=>`<option value="${esc(item.value)}">${esc(item.label)}</option>`).join('');
+  select.value=incidentTypes().some(item=>String(item.value)===String(selectedType))?String(selectedType):'OTHER';
+  const meta=incidentTypeMeta(select.value);
+  $('incidentSeveritySelect').value=String(meta.defaultSeverity||'WATCH');
+}
+
+function renderIncidentHistory(incident){
+  const el=$('incidentHistory'); if(!el) return;
+  const history=Array.isArray(incident?.history)?[...incident.history].reverse():[];
+  if(!history.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="form-label">處理歷程</div>`+history.slice(0,20).map(item=>`<div class="incident-history-item"><b>${esc(item.actor||'UBee 調度中心')}</b> · ${esc(fmtTime(item.createdAtMs))}<br>${esc(item.note||item.action||'更新案件')}</div>`).join('');
+}
+
+function openCreateIncidentModal(orderId, suggestedType='OTHER', description=''){
+  const order=(state.data.orders||[]).find(o=>String(o.id)===String(orderId));
+  if(!order) return toast('找不到此訂單');
+  state.incidentModalMode='create';
+  state.incidentModalOrderId=String(orderId);
+  state.incidentModalIncidentId='';
+  state.incidentModalAction='';
+  $('incidentModalTitle').textContent='建立異常案件';
+  $('incidentModalSub').textContent='案件建立後，可持續指派、補充處理紀錄與結案';
+  $('incidentCreateFields').classList.remove('hidden');
+  $('incidentActionFields').classList.add('hidden');
+  $('incidentOrderSummary').innerHTML=`<strong>訂單 ${esc(order.id)}</strong><div class="candidate-meta" style="margin-top:5px">${esc(order.statusLabel||order.status||'-')} · ${esc(order.pickupAddress||'-')} → ${esc(order.dropoffAddress||'-')}</div>`;
+  populateIncidentTypeOptions(suggestedType);
+  $('incidentAssignedTo').value='';
+  $('incidentDescription').value=String(description||'').slice(0,1000);
+  $('confirmIncidentBtn').textContent='建立異常案件';
+  $('confirmIncidentBtn').className='btn danger';
+  renderIncidentHistory(null);
+  $('incidentModal').classList.add('show');
+}
+
+function openIncidentActionModal(incidentId, action){
+  const incident=incidentFromId(incidentId);
+  if(!incident) return toast('找不到此異常案件');
+  const safeAction=String(action||'note').toLowerCase();
+  state.incidentModalMode='action';
+  state.incidentModalOrderId=String(incident.orderId||'');
+  state.incidentModalIncidentId=String(incident.incidentId||incident.id||'');
+  state.incidentModalAction=safeAction.toUpperCase();
+  $('incidentCreateFields').classList.add('hidden');
+  $('incidentActionFields').classList.remove('hidden');
+  $('incidentOrderSummary').innerHTML=`<strong>${esc(incident.title||incidentTypeMeta(incident.type).label)}</strong><div class="candidate-meta" style="margin-top:5px">訂單 ${esc(incident.orderId)} · ${esc(incidentStatusLabel(incident.status))} · 負責人 ${esc(incident.assignedTo||'尚未指派')}</div>`;
+  $('incidentActionAssignedTo').value=incident.assignedTo||'';
+  $('incidentActionNote').value='';
+  $('incidentActionAssigneeField').classList.toggle('hidden',!['START','ASSIGN'].includes(state.incidentModalAction));
+  $('incidentResolutionCodeField').classList.toggle('hidden',state.incidentModalAction!=='RESOLVE');
+  $('incidentActionNoteLabel').textContent=state.incidentModalAction==='RESOLVE'?'處理結果（必填）':state.incidentModalAction==='NOTE'?'新增處理紀錄（必填）':'處理說明';
+  const title={START:'開始處理異常',NOTE:'新增處理紀錄',RESOLVE:'異常案件結案',REOPEN:'重新開啟異常',ASSIGN:'指派負責人'}[state.incidentModalAction]||'更新異常案件';
+  $('incidentModalTitle').textContent=title;
+  $('incidentModalSub').textContent='所有操作都會保留在此訂單的調度事件與異常歷程中';
+  $('confirmIncidentBtn').textContent=title;
+  $('confirmIncidentBtn').className=state.incidentModalAction==='RESOLVE'?'btn danger':'btn yellow';
+  renderIncidentHistory(incident);
+  $('incidentModal').classList.add('show');
+}
+
+function closeIncidentModal(){
+  $('incidentModal').classList.remove('show');
+  state.incidentModalMode='create';
+  state.incidentModalOrderId='';
+  state.incidentModalIncidentId='';
+  state.incidentModalAction='';
+}
+
+async function createDispatchIncident(){
+  if(!navigator.onLine) return toast('目前網路中斷，無法建立異常案件');
+  const orderId=state.incidentModalOrderId;
+  const type=String($('incidentTypeSelect').value||'OTHER');
+  const severity=String($('incidentSeveritySelect').value||incidentTypeMeta(type).defaultSeverity||'WATCH');
+  const assignedTo=String($('incidentAssignedTo').value||'').trim();
+  const description=String($('incidentDescription').value||'').trim();
+  if(!description) return toast('請填寫異常說明');
+  const btn=$('confirmIncidentBtn'); btn.disabled=true;
+  try{
+    const response=await fetch(`/api/dispatch/orders/${encodeURIComponent(orderId)}/incidents`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,severity,assignedTo,description,source:'dispatch_center',actor:'UBee 調度中心'})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.success===false) throw new Error(data.message||`建立失敗 (${response.status})`);
+    closeIncidentModal(); toast(data.message||'異常案件已建立');
+    await loadDashboard({silent:true});
+    if(state.selectedOrderId) loadDispatchTimeline(state.selectedOrderId);
+  }catch(error){toast('異常案件建立失敗：'+error.message,4800);}
+  finally{btn.disabled=false;}
+}
+
+async function transitionDispatchIncident(){
+  if(!navigator.onLine) return toast('目前網路中斷，無法更新異常案件');
+  const incidentId=state.incidentModalIncidentId;
+  const action=state.incidentModalAction;
+  const assignedTo=String($('incidentActionAssignedTo').value||'').trim();
+  const note=String($('incidentActionNote').value||'').trim();
+  const resolutionCode=String($('incidentResolutionCode').value||'OTHER');
+  if(['NOTE','RESOLVE'].includes(action)&&!note) return toast(action==='RESOLVE'?'結案時必須填寫處理結果':'請填寫處理紀錄');
+  if(action==='START'&&!assignedTo) return toast('請填寫負責人');
+  const btn=$('confirmIncidentBtn'); btn.disabled=true;
+  try{
+    const response=await fetch(`/api/dispatch/incidents/${encodeURIComponent(incidentId)}/transition`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,assignedTo,note,resolutionCode,actor:'UBee 調度中心'})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.success===false) throw new Error(data.message||`更新失敗 (${response.status})`);
+    closeIncidentModal(); toast(data.message||'異常案件已更新');
+    await loadDashboard({silent:true});
+    if(state.selectedOrderId) loadDispatchTimeline(state.selectedOrderId);
+  }catch(error){toast('異常案件更新失敗：'+error.message,4800);}
+  finally{btn.disabled=false;}
+}
+
 /* =========================
    事件
    ========================= */
 document.addEventListener('click',event=>{
+  const incidentBtn=event.target.closest('[data-incident-action]');
+  if(incidentBtn){
+    const action=String(incidentBtn.dataset.incidentAction||'').toLowerCase();
+    if(action==='create'){
+      openCreateIncidentModal(incidentBtn.dataset.orderId,incidentBtn.dataset.incidentType||'OTHER',incidentBtn.dataset.description||'');
+    }else if(['start','note','resolve','reopen','assign'].includes(action)){
+      openIncidentActionModal(incidentBtn.dataset.incidentId,action);
+    }
+    return;
+  }
   const actionBtn = event.target.closest('[data-action]');
   if(actionBtn){
     const action = actionBtn.dataset.action;
@@ -1986,6 +2350,12 @@ document.addEventListener('click',event=>{
     if(action==='select') selectOrder(id);
     if(action==='candidates') selectOrder(id);
     if(action==='handle-risk') selectOrder(id);
+    if(action==='create-incident'){
+      selectOrder(id);
+      const order=(state.data.orders||[]).find(o=>String(o.id)===String(id));
+      const suggested=order&&statusKind(order)==='waiting'?'NO_RIDER_ACCEPT':order&&String(order.riskKind||'')==='ACTIVE_TASK_RISK'?'RIDER_UNREACHABLE':'OTHER';
+      openCreateIncidentModal(id,suggested,(order?.riskReasons||[]).slice(0,3).join('；'));
+    }
     if(action==='redispatch'){
       selectOrder(id);
       redispatchOrder(id);
@@ -2023,7 +2393,15 @@ document.addEventListener('click',event=>{
     renderRiders();
   }
 
+  const incidentFilterBtn=event.target.closest('[data-incident-filter]');
+  if(incidentFilterBtn){
+    state.incidentFilter=incidentFilterBtn.dataset.incidentFilter||'active';
+    document.querySelectorAll('[data-incident-filter]').forEach(btn=>btn.classList.toggle('active',btn===incidentFilterBtn));
+    renderAlerts();
+  }
+
   if(event.target.closest('[data-close-modal]')) closeAssignModal();
+  if(event.target.closest('[data-close-incident-modal]')) closeIncidentModal();
 });
 
 $('refreshBtn').addEventListener('click',()=>loadDashboard());
@@ -2054,6 +2432,24 @@ $('confirmAssignBtn').addEventListener('click',()=>{
   const order = getSelectedOrder();
   const riderId = state.selectedCandidateRiderId;
   if(order && riderId) assignRider(order.id,riderId);
+});
+
+$('createIncidentBtn').addEventListener('click',()=>{
+  const order=getSelectedOrder();
+  if(order) openCreateIncidentModal(order.id,statusKind(order)==='waiting'?'NO_RIDER_ACCEPT':'OTHER',(order.riskReasons||[]).slice(0,3).join('；'));
+});
+
+$('incidentTypeSelect').addEventListener('change',event=>{
+  $('incidentSeveritySelect').value=String(incidentTypeMeta(event.target.value).defaultSeverity||'WATCH');
+});
+
+$('confirmIncidentBtn').addEventListener('click',()=>{
+  if(state.incidentModalMode==='create') createDispatchIncident();
+  else transitionDispatchIncident();
+});
+
+$('incidentModal').addEventListener('click',event=>{
+  if(event.target===$('incidentModal')) closeIncidentModal();
 });
 
 $('assignModal').addEventListener('click',event=>{
@@ -2157,7 +2553,7 @@ setInterval(()=>loadDashboard({silent:true}),10000);
     guarded.__ubeeNetworkGuard=true;
     window[name]=guarded;
   }
-  ['assignRider','redispatchOrder','expandRadius'].forEach(guardAction);
+  ['assignRider','redispatchOrder','expandRadius','emergencyRecoverOrder','createDispatchIncident','transitionDispatchIncident'].forEach(guardAction);
 
   window.addEventListener('offline',()=>{ setStatus('offline','系統狀態：裝置網路中斷'); banner('目前行動網路／網際網路受阻。調度中心已保留最後資料，請暫停人工指定與重新派單，恢復後會自動同步。'); });
   window.addEventListener('online',recover);
