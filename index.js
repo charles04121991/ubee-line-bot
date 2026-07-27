@@ -285,7 +285,7 @@ app.use((req, res, next) => {
 
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-UBee-Support-Case-Id, X-UBee-Support-Access-Token, X-UBee-Support-Admin-Key, X-UBee-Support-Operator, X-UBee-Support-File-Name, X-UBee-Support-Evidence-Type');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -2671,6 +2671,14 @@ app.get('/rider-app-login', (req, res) => {
     </html>
   `);
 });
+
+
+// UBee 第五階段：證據檔案採 raw body，上傳路由必須放在 express.json() 前。
+app.post(
+  '/api/support/evidence/upload',
+  express.raw({ type: '*/*', limit: '8mb' }),
+  handleSupportEvidenceUpload
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -23570,6 +23578,1368 @@ app.post('/api/admin/finance-orders/:orderId/reconcile', async (req, res) => {
 // - Firestore 即時監聽失敗、網路重新連線或 App 回到前景時，可用此 API 補抓最新狀態。
 // - 僅允許原下單 LINE userId 查詢；不回傳不必要的騎士個資。
 // =====================================================
+
+// ============================================================
+// UBee 第五階段：客服、申訴與任務證據中心 V5
+// - 一般客戶／小U／店家案件
+// - 公開回覆與內部備註分離
+// - 證據檔案不可覆蓋，建立 SHA-256 與訂單快照
+// - 退款只建立財務審核申請，不直接改動款項
+// - 不改動重新轉派、店家完成通知或騎士審核群規則
+// ============================================================
+const UBEE_SUPPORT_ADMIN_KEY = String(
+  process.env.UBEE_SUPPORT_ADMIN_KEY ||
+  UBEE_RIDER_V4_ADMIN_KEY ||
+  ''
+).trim();
+
+const UBEE_SUPPORT_STORAGE_BUCKET = String(
+  process.env.FIREBASE_STORAGE_BUCKET ||
+  `${process.env.FIREBASE_PROJECT_ID || ''}.appspot.com`
+).trim();
+
+const UBEE_SUPPORT_CASE_STATUSES = Object.freeze({
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  WAITING_USER: 'WAITING_USER',
+  WAITING_FINANCE: 'WAITING_FINANCE',
+  RESOLVED: 'RESOLVED',
+  CLOSED: 'CLOSED',
+});
+
+const UBEE_SUPPORT_CATEGORIES = Object.freeze({
+  DELIVERY_DELAY: { label: '配送延遲', severity: 'MEDIUM', orderRequired: true },
+  ITEM_DAMAGED: { label: '商品損壞', severity: 'HIGH', orderRequired: true },
+  ITEM_LOST: { label: '商品遺失', severity: 'CRITICAL', orderRequired: true },
+  ITEM_MISSING: { label: '商品缺件', severity: 'HIGH', orderRequired: true },
+  NOT_RECEIVED: { label: '未收到商品', severity: 'CRITICAL', orderRequired: true },
+  SERVICE_ATTITUDE: { label: '服務態度問題', severity: 'MEDIUM', orderRequired: true },
+  AMOUNT_DISPUTE: { label: '金額爭議', severity: 'HIGH', orderRequired: true },
+  REFUND_REQUEST: { label: '退款申請', severity: 'HIGH', orderRequired: true },
+  ADDRESS_CONTACT: { label: '地址或聯絡問題', severity: 'MEDIUM', orderRequired: true },
+  RIDER_REPORT: { label: '小U任務回報', severity: 'MEDIUM', orderRequired: true },
+  MERCHANT_REPORT: { label: '店家配送回報', severity: 'MEDIUM', orderRequired: true },
+  GENERAL_INQUIRY: { label: '一般客服詢問', severity: 'LOW', orderRequired: false },
+  OTHER: { label: '其他問題', severity: 'MEDIUM', orderRequired: false },
+});
+
+const UBEE_SUPPORT_EVIDENCE_TYPES = Object.freeze({
+  PICKUP_PHOTO: '取件照片',
+  DROPOFF_PHOTO: '送達照片',
+  ITEM_PHOTO: '商品照片',
+  RECEIPT: '收據／代墊證明',
+  SIGNATURE: '簽收／確認證明',
+  CHAT_SCREENSHOT: '對話截圖',
+  OTHER: '其他證據',
+});
+
+function supportCleanText(value, maxLength = 500) {
+  return String(value || '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function supportNormalizePhone(value) {
+  const phone = String(value || '').replace(/\D/g, '');
+  return /^09\d{8}$/.test(phone) ? phone : phone.slice(0, 20);
+}
+
+function supportNormalizeRole(value) {
+  const role = String(value || '').trim().toLowerCase();
+  if (['customer', 'user', 'client'].includes(role)) return 'customer';
+  if (['rider', 'driver', 'courier'].includes(role)) return 'rider';
+  if (['merchant', 'store', 'business'].includes(role)) return 'merchant';
+  if (['admin', 'support', 'staff'].includes(role)) return 'admin';
+  return 'customer';
+}
+
+function supportNormalizeCaseStatus(value) {
+  const status = String(value || '').trim().toUpperCase();
+  return Object.prototype.hasOwnProperty.call(UBEE_SUPPORT_CASE_STATUSES, status)
+    ? status
+    : UBEE_SUPPORT_CASE_STATUSES.OPEN;
+}
+
+function supportNormalizeCategory(value) {
+  const category = String(value || '').trim().toUpperCase();
+  return Object.prototype.hasOwnProperty.call(UBEE_SUPPORT_CATEGORIES, category)
+    ? category
+    : 'OTHER';
+}
+
+function supportNormalizeSeverity(value, category) {
+  const severity = String(value || '').trim().toUpperCase();
+  if (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(severity)) return severity;
+  return UBEE_SUPPORT_CATEGORIES[category]?.severity || 'MEDIUM';
+}
+
+function supportSha256(value) {
+  return crypto
+    .createHash('sha256')
+    .update(Buffer.isBuffer(value) ? value : String(value || ''))
+    .digest('hex');
+}
+
+function supportGenerateAccessToken() {
+  return crypto.randomBytes(24).toString('hex');
+}
+
+function supportTaipeiParts(nowMs = Date.now()) {
+  const date = new Date(nowMs + 8 * 60 * 60 * 1000);
+  return {
+    year: date.getUTCFullYear(),
+    month: String(date.getUTCMonth() + 1).padStart(2, '0'),
+    day: String(date.getUTCDate()).padStart(2, '0'),
+    hour: String(date.getUTCHours()).padStart(2, '0'),
+    minute: String(date.getUTCMinutes()).padStart(2, '0'),
+    second: String(date.getUTCSeconds()).padStart(2, '0'),
+  };
+}
+
+function supportGenerateCaseId() {
+  const p = supportTaipeiParts();
+  return (
+    `UBS${p.year}${p.month}${p.day}` +
+    `${p.hour}${p.minute}${p.second}` +
+    crypto.randomBytes(2).toString('hex').toUpperCase()
+  );
+}
+
+function supportToMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return n;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  return 0;
+}
+
+function supportRemoveUndefined(value) {
+  if (
+    Buffer.isBuffer(value) ||
+    value instanceof Date ||
+    (value && typeof value.toMillis === 'function') ||
+    (value && typeof value.toDate === 'function') ||
+    (value && value.constructor && value.constructor.name === 'FieldValue') ||
+    (value && typeof value._methodName === 'string')
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map(item => supportRemoveUndefined(item))
+      .filter(item => item !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    const result = {};
+    Object.entries(value).forEach(([key, item]) => {
+      const cleaned = supportRemoveUndefined(item);
+      if (cleaned !== undefined) result[key] = cleaned;
+    });
+    return result;
+  }
+  return value === undefined ? undefined : value;
+}
+
+function supportGetAdminKey(req) {
+  const headerKey = supportCleanText(
+    req.headers['x-ubee-support-admin-key'] || '',
+    300
+  );
+  if (headerKey) return headerKey;
+  const bearer = getBearerToken(req);
+  return supportCleanText(bearer, 300);
+}
+
+function supportRequireAdmin(req, res, next) {
+  if (!UBEE_SUPPORT_ADMIN_KEY) {
+    return res.status(503).json({
+      success: false,
+      code: 'SUPPORT_ADMIN_KEY_NOT_CONFIGURED',
+      message: '客服中心管理金鑰尚未設定。請在 Render 設定 UBEE_SUPPORT_ADMIN_KEY。',
+    });
+  }
+
+  const supplied = supportGetAdminKey(req);
+  const expected = Buffer.from(UBEE_SUPPORT_ADMIN_KEY);
+  const actual = Buffer.from(supplied);
+  const valid =
+    expected.length === actual.length &&
+    expected.length > 0 &&
+    crypto.timingSafeEqual(expected, actual);
+
+  if (!valid) {
+    return res.status(401).json({
+      success: false,
+      code: 'SUPPORT_ADMIN_UNAUTHORIZED',
+      message: '客服管理金鑰不正確。',
+    });
+  }
+
+  req.supportAdmin = {
+    operator: supportCleanText(
+      req.headers['x-ubee-support-operator'] ||
+      req.body?.operator ||
+      req.query?.operator ||
+      'support_center',
+      100
+    ) || 'support_center',
+  };
+
+  return next();
+}
+
+function supportGetCaseToken(req) {
+  return supportCleanText(
+    req.headers['x-ubee-support-access-token'] ||
+    req.query?.accessToken ||
+    req.body?.accessToken ||
+    '',
+    300
+  );
+}
+
+function supportCaseTokenValid(caseData = {}, token = '') {
+  const storedHash = supportCleanText(caseData.accessTokenHash || '', 128);
+  if (!storedHash || !token) return false;
+  const suppliedHash = supportSha256(token);
+  const a = Buffer.from(storedHash);
+  const b = Buffer.from(suppliedHash);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function supportIdentitySet(order = {}, role = 'customer') {
+  const values = [];
+  const push = value => {
+    const text = supportCleanText(value, 200).toLowerCase();
+    if (text) values.push(text);
+    const phone = supportNormalizePhone(value);
+    if (phone) values.push(phone.toLowerCase());
+  };
+
+  if (role === 'merchant') {
+    [
+      order.merchantId,
+      order.merchantCode,
+      order.merchantPhone,
+      order.merchantLineUserId,
+      order.storeId,
+      order.storePhone,
+    ].forEach(push);
+  } else if (role === 'rider') {
+    [
+      order.riderId,
+      order.riderDocId,
+      order.riderPhone,
+      order.riderLineUserId,
+      order.driverId,
+      order.driverPhone,
+    ].forEach(push);
+  } else {
+    [
+      order.userId,
+      order.customerId,
+      order.lineUserId,
+      order.customerLineUserId,
+      order.customerPhone,
+      order.phone,
+      order.contactPhone,
+      order.dropoffPhone,
+    ].forEach(push);
+  }
+
+  return new Set(values);
+}
+
+function supportVerifyOrderIdentity(order = {}, role, payload = {}) {
+  const expected = supportIdentitySet(order, role);
+  const submitted = [
+    payload.identifier,
+    payload.contactPhone,
+    payload.lineUserId,
+  ]
+    .flatMap(value => {
+      const list = [];
+      const text = supportCleanText(value, 200).toLowerCase();
+      if (text) list.push(text);
+      const phone = supportNormalizePhone(value);
+      if (phone) list.push(phone.toLowerCase());
+      return list;
+    });
+
+  if (!expected.size) {
+    return {
+      verified: false,
+      verificationMode: 'ORDER_HAS_NO_IDENTITY_FIELDS',
+    };
+  }
+
+  const verified = submitted.some(value => expected.has(value));
+  return {
+    verified,
+    verificationMode: verified ? 'ORDER_IDENTITY_MATCHED' : 'ORDER_IDENTITY_MISMATCH',
+  };
+}
+
+function supportCollectExistingEvidence(order = {}) {
+  const fields = [
+    ['pickupPhotoUrl', 'PICKUP_PHOTO'],
+    ['pickupProofUrl', 'PICKUP_PHOTO'],
+    ['dropoffPhotoUrl', 'DROPOFF_PHOTO'],
+    ['deliveryPhotoUrl', 'DROPOFF_PHOTO'],
+    ['proofOfDeliveryUrl', 'DROPOFF_PHOTO'],
+    ['receiptUrl', 'RECEIPT'],
+    ['advanceReceiptUrl', 'RECEIPT'],
+    ['signatureUrl', 'SIGNATURE'],
+  ];
+
+  const evidence = [];
+  fields.forEach(([field, type]) => {
+    const raw = order[field];
+    const urls = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    urls.forEach(url => {
+      const safeUrl = supportCleanText(url, 2000);
+      if (!safeUrl) return;
+      evidence.push({
+        source: 'order_field',
+        field,
+        evidenceType: type,
+        evidenceTypeLabel: UBEE_SUPPORT_EVIDENCE_TYPES[type],
+        url: safeUrl,
+      });
+    });
+  });
+  return evidence;
+}
+
+function supportBuildOrderSnapshot(order = {}) {
+  const snapshot = {
+    orderId: supportCleanText(order.id || order.orderId || order.orderNo, 100).toUpperCase(),
+    orderNo: supportCleanText(order.orderNo || order.id, 100),
+    status: supportCleanText(order.status, 80),
+    source: supportCleanText(order.source || order.createdFrom, 100),
+    orderType: supportCleanText(order.orderType, 100),
+    serviceType: supportCleanText(order.serviceType || order.serviceName, 160),
+    itemName: supportCleanText(order.itemName || order.item, 600),
+    note: supportCleanText(order.note || order.customerNote || order.merchantNote, 1200),
+    pickup: {
+      name: supportCleanText(order.pickupName || order.merchantName, 160),
+      phone: supportCleanText(order.pickupPhone || order.merchantPhone, 40),
+      address: supportCleanText(order.pickupAddress || order.pickup, 600),
+      lat: Number(order.pickupLat || order.fromLat || 0) || 0,
+      lng: Number(order.pickupLng || order.fromLng || 0) || 0,
+    },
+    dropoff: {
+      name: supportCleanText(order.customerName || order.receiverName, 160),
+      phone: supportCleanText(order.customerPhone || order.dropoffPhone, 40),
+      address: supportCleanText(order.dropoffAddress || order.dropoff, 600),
+      lat: Number(order.dropoffLat || order.toLat || 0) || 0,
+      lng: Number(order.dropoffLng || order.toLng || 0) || 0,
+    },
+    merchant: {
+      id: supportCleanText(order.merchantId || order.merchantCode, 160),
+      lineUserId: supportCleanText(order.merchantLineUserId, 160),
+      name: supportCleanText(order.merchantName, 160),
+      phone: supportCleanText(order.merchantPhone, 40),
+    },
+    rider: {
+      id: supportCleanText(order.riderId || order.riderDocId, 160),
+      lineUserId: supportCleanText(order.riderLineUserId, 160),
+      name: supportCleanText(order.riderName, 160),
+      phone: supportCleanText(order.riderPhone, 40),
+    },
+    amounts: {
+      total: financeNumber(order.finalTotal ?? order.total ?? order.totalFee, 0),
+      paidAmount: financeNumber(order.paidAmount, 0),
+      advanceAmount: financeNumber(order.advanceAmount ?? order.advancePayment, 0),
+      riderFee: financeNumber(order.riderFee ?? order.driverFee, 0),
+      merchantPayableAmount: financeNumber(order.merchantPayableAmount, 0),
+      refundAmount: financeNumber(order.refundAmount, 0),
+    },
+    payment: {
+      method: supportCleanText(order.paymentMethod, 100),
+      status: supportCleanText(order.paymentStatus, 100),
+      merchantBillingStatus: supportCleanText(order.merchantBillingStatus, 100),
+      settlementStatus: supportCleanText(order.settlementStatus, 100),
+    },
+    timeline: {
+      createdAtMs: supportToMs(order.createdAtMs) || supportToMs(order.createdAt),
+      acceptedAtMs: supportToMs(order.acceptedAtMs) || supportToMs(order.acceptedAt),
+      arrivedPickupAtMs: supportToMs(order.arrivedPickupAtMs) || supportToMs(order.arrivedPickupAt),
+      pickedUpAtMs: supportToMs(order.pickedUpAtMs) || supportToMs(order.pickedUpAt),
+      arrivedDropoffAtMs: supportToMs(order.arrivedDropoffAtMs) || supportToMs(order.arrivedDropoffAt),
+      completedAtMs: supportToMs(order.completedAtMs) || supportToMs(order.completedAt),
+      cancelledAtMs: supportToMs(order.cancelledAtMs) || supportToMs(order.cancelledAt),
+      riderLocationUpdatedAtMs: supportToMs(order.riderLocationUpdatedAtMs) || supportToMs(order.riderLocationUpdatedAt),
+    },
+    riderLocation: {
+      lat: Number(order.riderCurrentLat || 0) || 0,
+      lng: Number(order.riderCurrentLng || 0) || 0,
+      source: supportCleanText(order.riderTrackingSource, 100),
+    },
+    deliveryStops: Array.isArray(order.deliveryStops)
+      ? order.deliveryStops.slice(0, 20).map(stop => ({
+          index: Number(stop.index || 0),
+          customerName: supportCleanText(stop.customerName, 160),
+          customerPhone: supportCleanText(stop.customerPhone, 40),
+          dropoffAddress: supportCleanText(stop.dropoffAddress, 600),
+          itemName: supportCleanText(stop.itemName, 400),
+          note: supportCleanText(stop.note, 600),
+          status: supportCleanText(stop.status, 100),
+          arrivedAtMs: supportToMs(stop.arrivedAtMs),
+          completedAtMs: supportToMs(stop.completedAtMs),
+        }))
+      : [],
+    existingEvidence: supportCollectExistingEvidence(order),
+  };
+
+  return supportRemoveUndefined(snapshot);
+}
+
+async function supportGetLinkedIncidents(orderId) {
+  if (!orderId) return [];
+  try {
+    const snap = await db
+      .collection('dispatchIncidents')
+      .where('orderId', '==', orderId)
+      .limit(20)
+      .get();
+
+    return snap.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        incidentId: doc.id,
+        type: supportCleanText(data.type, 100),
+        typeLabel: supportCleanText(data.typeLabel, 160),
+        status: supportCleanText(data.status, 80),
+        severity: supportCleanText(data.severity, 80),
+        description: supportCleanText(data.description, 1000),
+        assignedTo: supportCleanText(data.assignedTo, 160),
+        createdAtMs: supportToMs(data.createdAtMs) || supportToMs(data.createdAt),
+        updatedAtMs: supportToMs(data.updatedAtMs) || supportToMs(data.updatedAt),
+      };
+    });
+  } catch (error) {
+    console.warn('⚠️ 客服案件讀取調度異常失敗：', error?.message || error);
+    return [];
+  }
+}
+
+async function supportWriteEvent(caseId, event = {}) {
+  const nowMs = Date.now();
+  const payload = supportRemoveUndefined({
+    type: supportCleanText(event.type || 'NOTE', 100).toUpperCase(),
+    visibility: String(event.visibility || 'INTERNAL').toUpperCase() === 'PUBLIC'
+      ? 'PUBLIC'
+      : 'INTERNAL',
+    title: supportCleanText(event.title, 300),
+    message: supportCleanText(event.message, 3000),
+    operator: supportCleanText(event.operator || 'system', 160),
+    actorRole: supportNormalizeRole(event.actorRole || 'admin'),
+    metadata: event.metadata && typeof event.metadata === 'object'
+      ? supportRemoveUndefined(event.metadata)
+      : {},
+    createdAtMs: nowMs,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const ref = await db
+    .collection('supportCases')
+    .doc(caseId)
+    .collection('events')
+    .add(payload);
+
+  return { eventId: ref.id, ...payload, createdAt: undefined };
+}
+
+function supportSerializeCase(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  const caseId = supportCleanText(doc?.id || data.caseId, 100).toUpperCase();
+  return {
+    ...data,
+    caseId,
+    id: caseId,
+    accessTokenHash: undefined,
+    createdAtMs: supportToMs(data.createdAtMs) || supportToMs(data.createdAt),
+    updatedAtMs: supportToMs(data.updatedAtMs) || supportToMs(data.updatedAt),
+    resolvedAtMs: supportToMs(data.resolvedAtMs) || supportToMs(data.resolvedAt),
+    closedAtMs: supportToMs(data.closedAtMs) || supportToMs(data.closedAt),
+    createdAt: undefined,
+    updatedAt: undefined,
+    resolvedAt: undefined,
+    closedAt: undefined,
+  };
+}
+
+function supportSerializeEvent(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    ...data,
+    eventId: doc?.id || data.eventId || '',
+    createdAtMs: supportToMs(data.createdAtMs) || supportToMs(data.createdAt),
+    createdAt: undefined,
+  };
+}
+
+function supportSerializeEvidence(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    ...data,
+    evidenceId: doc?.id || data.evidenceId || '',
+    uploadedAtMs: supportToMs(data.uploadedAtMs) || supportToMs(data.uploadedAt),
+    uploadedAt: undefined,
+  };
+}
+
+async function supportReadCaseDetail(caseId, { includeInternal = false } = {}) {
+  const caseRef = db.collection('supportCases').doc(caseId);
+  const caseDoc = await caseRef.get();
+  if (!caseDoc.exists) return null;
+
+  const [eventsSnap, evidenceSnap] = await Promise.all([
+    caseRef.collection('events').limit(300).get(),
+    caseRef.collection('evidence').limit(100).get(),
+  ]);
+
+  let events = eventsSnap.docs
+    .map(supportSerializeEvent)
+    .sort((a, b) => a.createdAtMs - b.createdAtMs);
+  if (!includeInternal) {
+    events = events.filter(event => event.visibility === 'PUBLIC');
+  }
+
+  const evidence = evidenceSnap.docs
+    .map(supportSerializeEvidence)
+    .sort((a, b) => a.uploadedAtMs - b.uploadedAtMs);
+
+  return {
+    case: supportSerializeCase(caseDoc),
+    events,
+    evidence,
+  };
+}
+
+function supportPublicCaseView(detail) {
+  if (!detail) return null;
+  const data = detail.case || {};
+  return {
+    case: {
+      caseId: data.caseId,
+      orderId: data.orderId,
+      orderNo: data.orderNo,
+      sourceRole: data.sourceRole,
+      category: data.category,
+      categoryLabel: data.categoryLabel,
+      title: data.title,
+      description: data.description,
+      requestedResolution: data.requestedResolution,
+      severity: data.severity,
+      status: data.status,
+      statusLabel: data.statusLabel,
+      assignedTo: data.assignedTo,
+      latestPublicReply: data.latestPublicReply,
+      refundRequestStatus: data.refundRequestStatus,
+      refundRequestedAmount: data.refundRequestedAmount,
+      createdAtMs: data.createdAtMs,
+      updatedAtMs: data.updatedAtMs,
+      resolvedAtMs: data.resolvedAtMs,
+      resolution: data.resolution,
+    },
+    events: detail.events,
+    evidence: detail.evidence.map(item => ({
+      evidenceId: item.evidenceId,
+      evidenceType: item.evidenceType,
+      evidenceTypeLabel: item.evidenceTypeLabel,
+      originalName: item.originalName,
+      mimeType: item.mimeType,
+      sizeBytes: item.sizeBytes,
+      sha256: item.sha256,
+      url: item.url,
+      uploadedByRole: item.uploadedByRole,
+      uploadedAtMs: item.uploadedAtMs,
+    })),
+  };
+}
+
+async function supportValidateCaseAccess(caseId, req, { allowAdmin = true } = {}) {
+  const caseDoc = await db.collection('supportCases').doc(caseId).get();
+  if (!caseDoc.exists) {
+    const error = new Error('找不到客服案件。');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const data = caseDoc.data() || {};
+  if (allowAdmin && UBEE_SUPPORT_ADMIN_KEY) {
+    const supplied = supportGetAdminKey(req);
+    if (supplied) {
+      const expected = Buffer.from(UBEE_SUPPORT_ADMIN_KEY);
+      const actual = Buffer.from(supplied);
+      if (
+        expected.length === actual.length &&
+        expected.length > 0 &&
+        crypto.timingSafeEqual(expected, actual)
+      ) {
+        return { caseDoc, caseData: data, accessMode: 'admin' };
+      }
+    }
+  }
+
+  const token = supportGetCaseToken(req);
+  if (!supportCaseTokenValid(data, token)) {
+    const error = new Error('案件查詢憑證不正確。');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return { caseDoc, caseData: data, accessMode: 'public' };
+}
+
+function supportEvidenceExtension(mimeType, originalName = '') {
+  const extFromName = String(originalName || '').toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1];
+  const allowedNameExt = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'pdf']);
+  if (extFromName && allowedNameExt.has(extFromName)) return extFromName;
+  const map = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+    'application/pdf': 'pdf',
+  };
+  return map[mimeType] || 'bin';
+}
+
+async function handleSupportEvidenceUpload(req, res) {
+  try {
+    const caseId = supportCleanText(
+      req.headers['x-ubee-support-case-id'] || '',
+      100
+    ).toUpperCase();
+
+    if (!caseId || !Buffer.isBuffer(req.body) || !req.body.length) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少案件編號或證據檔案。',
+      });
+    }
+
+    const access = await supportValidateCaseAccess(caseId, req, { allowAdmin: true });
+    const contentType = supportCleanText(req.headers['content-type'] || '', 100).toLowerCase();
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+      'application/pdf',
+    ]);
+
+    if (!allowedMimeTypes.has(contentType)) {
+      return res.status(415).json({
+        success: false,
+        message: '證據檔案只支援 JPG、PNG、WEBP、HEIC 或 PDF。',
+      });
+    }
+
+    if (req.body.length > 6 * 1024 * 1024) {
+      return res.status(413).json({
+        success: false,
+        message: '單一證據檔案不可超過 6 MB。',
+      });
+    }
+
+    const rawOriginalName = supportCleanText(
+      req.headers['x-ubee-support-file-name'] || 'evidence',
+      500
+    );
+    let originalName = rawOriginalName;
+    try {
+      originalName = decodeURIComponent(rawOriginalName);
+    } catch (error) {}
+    originalName = supportCleanText(originalName, 300) || 'evidence';
+
+    const evidenceType = String(
+      req.headers['x-ubee-support-evidence-type'] || 'OTHER'
+    ).trim().toUpperCase();
+    const safeEvidenceType = Object.prototype.hasOwnProperty.call(
+      UBEE_SUPPORT_EVIDENCE_TYPES,
+      evidenceType
+    ) ? evidenceType : 'OTHER';
+
+    if (!UBEE_SUPPORT_STORAGE_BUCKET || UBEE_SUPPORT_STORAGE_BUCKET.startsWith('.')) {
+      return res.status(503).json({
+        success: false,
+        code: 'SUPPORT_STORAGE_NOT_CONFIGURED',
+        message: 'Firebase Storage Bucket 尚未設定。請設定 FIREBASE_STORAGE_BUCKET。',
+      });
+    }
+
+    const evidenceId = crypto.randomUUID();
+    const extension = supportEvidenceExtension(contentType, originalName);
+    const storagePath = `support-evidence/${caseId}/${Date.now()}_${evidenceId}.${extension}`;
+    const downloadToken = crypto.randomUUID();
+    const sha256 = supportSha256(req.body);
+    const bucket = admin.storage().bucket(UBEE_SUPPORT_STORAGE_BUCKET);
+    const file = bucket.file(storagePath);
+
+    await file.save(req.body, {
+      resumable: false,
+      validation: 'md5',
+      metadata: {
+        contentType,
+        cacheControl: 'private, max-age=0, no-transform',
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+          supportCaseId: caseId,
+          supportEvidenceId: evidenceId,
+          sha256,
+        },
+      },
+    });
+
+    const url =
+      `https://firebasestorage.googleapis.com/v0/b/` +
+      `${encodeURIComponent(bucket.name)}/o/` +
+      `${encodeURIComponent(storagePath)}?alt=media&token=${encodeURIComponent(downloadToken)}`;
+
+    const nowMs = Date.now();
+    const evidenceData = {
+      evidenceId,
+      caseId,
+      orderId: supportCleanText(access.caseData.orderId, 100).toUpperCase(),
+      evidenceType: safeEvidenceType,
+      evidenceTypeLabel: UBEE_SUPPORT_EVIDENCE_TYPES[safeEvidenceType],
+      originalName,
+      mimeType: contentType,
+      sizeBytes: req.body.length,
+      sha256,
+      storageBucket: bucket.name,
+      storagePath,
+      url,
+      immutable: true,
+      uploadedByRole: access.accessMode === 'admin'
+        ? 'admin'
+        : supportNormalizeRole(access.caseData.sourceRole),
+      uploadedBy: access.accessMode === 'admin'
+        ? supportCleanText(req.headers['x-ubee-support-operator'] || 'support_center', 160)
+        : supportCleanText(access.caseData.sourceName || access.caseData.sourceRole, 160),
+      uploadedAtMs: nowMs,
+      uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const caseRef = db.collection('supportCases').doc(caseId);
+    await Promise.all([
+      caseRef.collection('evidence').doc(evidenceId).set(evidenceData),
+      caseRef.set({
+        evidenceCount: admin.firestore.FieldValue.increment(1),
+        latestEvidenceAtMs: nowMs,
+        latestEvidenceAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true }),
+      supportWriteEvent(caseId, {
+        type: 'EVIDENCE_UPLOADED',
+        visibility: 'PUBLIC',
+        title: '已新增任務證據',
+        message: `${UBEE_SUPPORT_EVIDENCE_TYPES[safeEvidenceType]}：${originalName}`,
+        operator: evidenceData.uploadedBy,
+        actorRole: evidenceData.uploadedByRole,
+        metadata: { evidenceId, evidenceType: safeEvidenceType, sha256 },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      evidence: supportSerializeEvidence(evidenceData),
+    });
+  } catch (error) {
+    console.error('❌ 客服證據上傳失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || '證據上傳失敗。',
+    });
+  }
+}
+
+app.get('/api/support/config', (req, res) => {
+  return res.json({
+    success: true,
+    categories: Object.entries(UBEE_SUPPORT_CATEGORIES).map(([value, meta]) => ({
+      value,
+      label: meta.label,
+      severity: meta.severity,
+      orderRequired: meta.orderRequired,
+    })),
+    evidenceTypes: Object.entries(UBEE_SUPPORT_EVIDENCE_TYPES).map(([value, label]) => ({
+      value,
+      label,
+    })),
+    statuses: Object.values(UBEE_SUPPORT_CASE_STATUSES),
+    storageEnabled: Boolean(UBEE_SUPPORT_STORAGE_BUCKET && !UBEE_SUPPORT_STORAGE_BUCKET.startsWith('.')),
+    maxEvidenceSizeBytes: 6 * 1024 * 1024,
+  });
+});
+
+app.post('/api/support/cases', async (req, res) => {
+  try {
+    const sourceRole = supportNormalizeRole(req.body?.sourceRole);
+    if (sourceRole === 'admin') {
+      return res.status(400).json({ success: false, message: '請選擇客戶、小U或店家身分。' });
+    }
+
+    const category = supportNormalizeCategory(req.body?.category);
+    const categoryMeta = UBEE_SUPPORT_CATEGORIES[category];
+    const orderIdInput = supportCleanText(req.body?.orderId, 100).toUpperCase();
+    const description = supportCleanText(req.body?.description, 3000);
+    const title = supportCleanText(req.body?.title, 300) || categoryMeta.label;
+    const contactPhone = supportNormalizePhone(req.body?.contactPhone);
+    const sourceName = supportCleanText(req.body?.sourceName, 160);
+    const identifier = supportCleanText(req.body?.identifier, 200);
+    const lineUserId = supportCleanText(req.body?.lineUserId, 200);
+    const requestedResolution = supportCleanText(req.body?.requestedResolution, 1200);
+
+    if (!description) {
+      return res.status(400).json({ success: false, message: '請填寫問題經過。' });
+    }
+    if (categoryMeta.orderRequired && !orderIdInput) {
+      return res.status(400).json({ success: false, message: '此案件類型必須填寫訂單編號。' });
+    }
+    if (!contactPhone && !identifier && !lineUserId) {
+      return res.status(400).json({ success: false, message: '請至少填寫電話或身分識別資料。' });
+    }
+
+    let orderDoc = null;
+    let order = null;
+    let orderId = orderIdInput;
+    let identity = { verified: false, verificationMode: 'NO_ORDER' };
+    let orderSnapshot = null;
+    let financeSnapshot = null;
+    let linkedIncidents = [];
+
+    if (orderIdInput) {
+      orderDoc = await getFinanceOrderDoc(orderIdInput);
+      if (!orderDoc) {
+        return res.status(404).json({ success: false, message: '找不到此訂單，請確認訂單編號。' });
+      }
+      orderId = String(orderDoc.id || '').trim().toUpperCase();
+      order = { id: orderDoc.id, ...(orderDoc.data() || {}) };
+      identity = supportVerifyOrderIdentity(order, sourceRole, {
+        identifier,
+        contactPhone,
+        lineUserId,
+      });
+
+      if (!identity.verified && identity.verificationMode === 'ORDER_IDENTITY_MISMATCH') {
+        return res.status(403).json({
+          success: false,
+          code: 'SUPPORT_ORDER_IDENTITY_MISMATCH',
+          message: '提供的身分資料與訂單不一致，無法建立案件。',
+        });
+      }
+
+      orderSnapshot = supportBuildOrderSnapshot(order);
+      financeSnapshot = buildFinanceClosureSnapshot(order);
+      linkedIncidents = await supportGetLinkedIncidents(orderId);
+    }
+
+    const caseId = supportGenerateCaseId();
+    const accessToken = supportGenerateAccessToken();
+    const nowMs = Date.now();
+    const severity = supportNormalizeSeverity(req.body?.severity, category);
+    const caseRef = db.collection('supportCases').doc(caseId);
+    const payload = supportRemoveUndefined({
+      caseId,
+      caseNo: caseId,
+      orderId,
+      orderNo: supportCleanText(order?.orderNo || orderId, 100),
+      orderType: supportCleanText(order?.orderType, 100),
+      orderSource: supportCleanText(order?.source || order?.createdFrom, 100),
+      sourceRole,
+      sourceName,
+      sourceIdentifier: identifier,
+      sourceLineUserId: lineUserId,
+      contactPhone,
+      identityVerified: identity.verified,
+      identityVerificationMode: identity.verificationMode,
+      category,
+      categoryLabel: categoryMeta.label,
+      title,
+      description,
+      requestedResolution,
+      severity,
+      status: UBEE_SUPPORT_CASE_STATUSES.OPEN,
+      statusLabel: '待客服處理',
+      assignedTo: '',
+      latestPublicReply: '',
+      resolution: '',
+      refundRequestStatus: 'NOT_REQUESTED',
+      refundRequestedAmount: 0,
+      evidenceCount: 0,
+      messageCount: 1,
+      linkedIncidentIds: linkedIncidents.map(item => item.incidentId),
+      linkedIncidents,
+      orderSnapshot,
+      orderSnapshotHash: orderSnapshot ? supportSha256(JSON.stringify(orderSnapshot)) : '',
+      financeSnapshot,
+      accessTokenHash: supportSha256(accessToken),
+      active: true,
+      createdAtMs: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.runTransaction(async tx => {
+      tx.set(caseRef, payload);
+      if (orderDoc) {
+        tx.set(orderDoc.ref, {
+          supportCaseCount: admin.firestore.FieldValue.increment(1),
+          activeSupportCaseId: caseId,
+          supportStatus: 'OPEN',
+          latestSupportCaseAtMs: nowMs,
+          latestSupportCaseAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+    });
+
+    await supportWriteEvent(caseId, {
+      type: 'CASE_CREATED',
+      visibility: 'PUBLIC',
+      title: '客服案件已建立',
+      message: description,
+      operator: sourceName || sourceRole,
+      actorRole: sourceRole,
+      metadata: { category, orderId, identityVerified: identity.verified },
+    });
+
+    return res.status(201).json({
+      success: true,
+      caseId,
+      accessToken,
+      message: '客服案件已建立，請妥善保存案件編號與查詢憑證。',
+      case: supportSerializeCase(payload),
+    });
+  } catch (error) {
+    console.error('❌ 建立客服案件失敗：', error);
+    return res.status(500).json({ success: false, message: error.message || '建立客服案件失敗。' });
+  }
+});
+
+app.get('/api/support/cases/:caseId', async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const access = await supportValidateCaseAccess(caseId, req, { allowAdmin: false });
+    const detail = await supportReadCaseDetail(caseId, { includeInternal: false });
+    return res.json({ success: true, ...supportPublicCaseView(detail), accessMode: access.accessMode });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || '讀取客服案件失敗。',
+    });
+  }
+});
+
+app.post('/api/support/cases/:caseId/messages', async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const access = await supportValidateCaseAccess(caseId, req, { allowAdmin: false });
+    const message = supportCleanText(req.body?.message, 3000);
+    if (!message) {
+      return res.status(400).json({ success: false, message: '請填寫補充內容。' });
+    }
+
+    const nowMs = Date.now();
+    await Promise.all([
+      supportWriteEvent(caseId, {
+        type: 'PUBLIC_MESSAGE',
+        visibility: 'PUBLIC',
+        title: '案件補充說明',
+        message,
+        operator: supportCleanText(access.caseData.sourceName || access.caseData.sourceRole, 160),
+        actorRole: access.caseData.sourceRole,
+      }),
+      db.collection('supportCases').doc(caseId).set({
+        messageCount: admin.firestore.FieldValue.increment(1),
+        latestCustomerMessage: message,
+        latestCustomerMessageAtMs: nowMs,
+        latestCustomerMessageAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: access.caseData.status === 'WAITING_USER' ? 'IN_PROGRESS' : access.caseData.status,
+        statusLabel: access.caseData.status === 'WAITING_USER' ? '客服處理中' : access.caseData.statusLabel,
+      }, { merge: true }),
+    ]);
+
+    const detail = await supportReadCaseDetail(caseId, { includeInternal: false });
+    return res.json({ success: true, ...supportPublicCaseView(detail) });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || '新增案件訊息失敗。',
+    });
+  }
+});
+
+app.get('/api/admin/support/cases', supportRequireAdmin, async (req, res) => {
+  try {
+    const status = supportCleanText(req.query?.status, 80).toUpperCase();
+    const sourceRole = supportCleanText(req.query?.sourceRole, 80).toLowerCase();
+    const category = supportCleanText(req.query?.category, 100).toUpperCase();
+    const search = supportCleanText(req.query?.search, 200).toLowerCase();
+    const limit = Math.min(500, Math.max(1, Number(req.query?.limit || 300)));
+
+    const snap = await db.collection('supportCases').limit(1000).get();
+    let cases = snap.docs.map(supportSerializeCase);
+
+    if (status) cases = cases.filter(item => item.status === status);
+    if (sourceRole) cases = cases.filter(item => item.sourceRole === sourceRole);
+    if (category) cases = cases.filter(item => item.category === category);
+    if (search) {
+      cases = cases.filter(item => [
+        item.caseId,
+        item.orderId,
+        item.orderNo,
+        item.sourceName,
+        item.contactPhone,
+        item.title,
+        item.description,
+        item.assignedTo,
+      ].some(value => String(value || '').toLowerCase().includes(search)));
+    }
+
+    cases.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+    cases = cases.slice(0, limit);
+
+    const all = snap.docs.map(supportSerializeCase);
+    const summary = {
+      total: all.length,
+      open: all.filter(item => item.status === 'OPEN').length,
+      inProgress: all.filter(item => item.status === 'IN_PROGRESS').length,
+      waitingUser: all.filter(item => item.status === 'WAITING_USER').length,
+      waitingFinance: all.filter(item => item.status === 'WAITING_FINANCE').length,
+      resolved: all.filter(item => item.status === 'RESOLVED').length,
+      criticalActive: all.filter(item =>
+        item.severity === 'CRITICAL' &&
+        !['RESOLVED', 'CLOSED'].includes(item.status)
+      ).length,
+    };
+
+    return res.json({
+      success: true,
+      summary,
+      cases,
+      categories: Object.entries(UBEE_SUPPORT_CATEGORIES).map(([value, meta]) => ({ value, ...meta })),
+      statuses: Object.values(UBEE_SUPPORT_CASE_STATUSES),
+    });
+  } catch (error) {
+    console.error('❌ 讀取客服案件列表失敗：', error);
+    return res.status(500).json({ success: false, message: '讀取客服案件列表失敗。' });
+  }
+});
+
+app.get('/api/admin/support/cases/:caseId', supportRequireAdmin, async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const detail = await supportReadCaseDetail(caseId, { includeInternal: true });
+    if (!detail) return res.status(404).json({ success: false, message: '找不到客服案件。' });
+
+    let order = null;
+    let finance = null;
+    let incidents = [];
+    if (detail.case.orderId) {
+      const orderDoc = await getFinanceOrderDoc(detail.case.orderId);
+      if (orderDoc) {
+        order = { id: orderDoc.id, ...(orderDoc.data() || {}) };
+        finance = buildFinanceClosureSnapshot(order);
+      }
+      incidents = await supportGetLinkedIncidents(detail.case.orderId);
+    }
+
+    return res.json({
+      success: true,
+      ...detail,
+      orderSnapshot: detail.case.orderSnapshot || null,
+      liveOrder: order ? supportBuildOrderSnapshot(order) : null,
+      finance,
+      incidents,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || '讀取客服案件失敗。' });
+  }
+});
+
+async function supportUpdateLinkedOrder(orderId, update) {
+  const doc = await getFinanceOrderDoc(orderId);
+  if (!doc) return false;
+  await doc.ref.set(update, { merge: true });
+  return true;
+}
+
+app.post('/api/admin/support/cases/:caseId/action', supportRequireAdmin, async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const action = supportCleanText(req.body?.action, 100).toUpperCase();
+    const message = supportCleanText(req.body?.message, 3000);
+    const assignedTo = supportCleanText(req.body?.assignedTo, 160);
+    const operator = supportCleanText(req.body?.operator || req.supportAdmin?.operator, 160) || 'support_center';
+    const caseRef = db.collection('supportCases').doc(caseId);
+    const caseDoc = await caseRef.get();
+    if (!caseDoc.exists) return res.status(404).json({ success: false, message: '找不到客服案件。' });
+
+    const current = caseDoc.data() || {};
+    const nowMs = Date.now();
+    const update = {
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastHandledBy: operator,
+    };
+    let event = {
+      type: action,
+      visibility: 'INTERNAL',
+      title: '客服案件已更新',
+      message,
+      operator,
+      actorRole: 'admin',
+    };
+
+    if (action === 'ASSIGN') {
+      if (!assignedTo) return res.status(400).json({ success: false, message: '請填寫負責人。' });
+      update.assignedTo = assignedTo;
+      update.assignedAtMs = nowMs;
+      update.assignedAt = admin.firestore.FieldValue.serverTimestamp();
+      event.title = '已指派客服負責人';
+      event.message = `負責人：${assignedTo}${message ? `｜${message}` : ''}`;
+    } else if (action === 'START') {
+      update.status = 'IN_PROGRESS';
+      update.statusLabel = '客服處理中';
+      update.startedAtMs = nowMs;
+      update.startedAt = admin.firestore.FieldValue.serverTimestamp();
+      event.visibility = 'PUBLIC';
+      event.title = '客服已開始處理';
+      event.message = message || 'UBee 客服已開始處理此案件。';
+    } else if (action === 'WAIT_USER') {
+      update.status = 'WAITING_USER';
+      update.statusLabel = '等待回覆資料';
+      event.visibility = 'PUBLIC';
+      event.title = '客服等待補充資料';
+      event.message = message || '請補充客服所需的資料或證據。';
+    } else if (action === 'PUBLIC_REPLY') {
+      if (!message) return res.status(400).json({ success: false, message: '請填寫對外回覆。' });
+      update.latestPublicReply = message;
+      update.latestPublicReplyAtMs = nowMs;
+      update.latestPublicReplyAt = admin.firestore.FieldValue.serverTimestamp();
+      update.messageCount = admin.firestore.FieldValue.increment(1);
+      if (['OPEN', 'WAITING_USER'].includes(current.status)) {
+        update.status = 'IN_PROGRESS';
+        update.statusLabel = '客服處理中';
+      }
+      event.visibility = 'PUBLIC';
+      event.title = 'UBee 客服回覆';
+    } else if (action === 'INTERNAL_NOTE') {
+      if (!message) return res.status(400).json({ success: false, message: '請填寫內部備註。' });
+      update.latestInternalNote = message;
+      update.latestInternalNoteAtMs = nowMs;
+      event.title = '新增內部備註';
+    } else if (action === 'RESOLVE') {
+      if (!message) return res.status(400).json({ success: false, message: '請填寫結案結果。' });
+      update.status = 'RESOLVED';
+      update.statusLabel = '案件已解決';
+      update.resolution = message;
+      update.resolvedBy = operator;
+      update.resolvedAtMs = nowMs;
+      update.resolvedAt = admin.firestore.FieldValue.serverTimestamp();
+      update.active = false;
+      event.visibility = 'PUBLIC';
+      event.title = '客服案件已解決';
+    } else if (action === 'CLOSE') {
+      update.status = 'CLOSED';
+      update.statusLabel = '案件已關閉';
+      update.closedBy = operator;
+      update.closedAtMs = nowMs;
+      update.closedAt = admin.firestore.FieldValue.serverTimestamp();
+      update.active = false;
+      event.visibility = 'PUBLIC';
+      event.title = '客服案件已關閉';
+      event.message = message || '此客服案件已正式關閉。';
+    } else if (action === 'REOPEN') {
+      update.status = 'OPEN';
+      update.statusLabel = '待客服處理';
+      update.active = true;
+      update.reopenedBy = operator;
+      update.reopenedAtMs = nowMs;
+      update.reopenedAt = admin.firestore.FieldValue.serverTimestamp();
+      event.visibility = 'PUBLIC';
+      event.title = '客服案件已重新開啟';
+      event.message = message || '案件已重新開啟並等待客服處理。';
+    } else {
+      return res.status(400).json({ success: false, message: '不支援的客服案件操作。' });
+    }
+
+    await Promise.all([
+      caseRef.set(update, { merge: true }),
+      supportWriteEvent(caseId, event),
+      current.orderId
+        ? supportUpdateLinkedOrder(current.orderId, {
+            activeSupportCaseId: caseId,
+            supportStatus: update.status || current.status,
+            latestSupportCaseAtMs: nowMs,
+            latestSupportCaseAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch(() => false)
+        : Promise.resolve(),
+    ]);
+
+    const detail = await supportReadCaseDetail(caseId, { includeInternal: true });
+    return res.json({ success: true, ...detail });
+  } catch (error) {
+    console.error('❌ 更新客服案件失敗：', error);
+    return res.status(500).json({ success: false, message: error.message || '更新客服案件失敗。' });
+  }
+});
+
+app.post('/api/admin/support/cases/:caseId/refund-request', supportRequireAdmin, async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const operator = supportCleanText(req.body?.operator || req.supportAdmin?.operator, 160) || 'support_center';
+    const reason = supportCleanText(req.body?.reason, 2000);
+    const requestedAmount = Math.max(0, financeNumber(req.body?.amount, 0));
+    if (!reason || requestedAmount <= 0) {
+      return res.status(400).json({ success: false, message: '請填寫退款金額與原因。' });
+    }
+
+    const caseRef = db.collection('supportCases').doc(caseId);
+    const caseDoc = await caseRef.get();
+    if (!caseDoc.exists) return res.status(404).json({ success: false, message: '找不到客服案件。' });
+    const caseData = caseDoc.data() || {};
+    if (!caseData.orderId) {
+      return res.status(400).json({ success: false, message: '此案件沒有關聯訂單，不能送出退款申請。' });
+    }
+
+    const orderDoc = await getFinanceOrderDoc(caseData.orderId);
+    if (!orderDoc) return res.status(404).json({ success: false, message: '找不到關聯訂單。' });
+    const order = { id: orderDoc.id, ...(orderDoc.data() || {}) };
+    const finance = buildFinanceClosureSnapshot(order);
+    const maximumAmount = Math.max(
+      finance.finalCustomerTotal,
+      finance.actualPaidAmount,
+      finance.riderAdvance,
+      0
+    );
+
+    if (maximumAmount > 0 && requestedAmount > maximumAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `退款申請金額不可高於目前可核對金額 NT$${maximumAmount}。`,
+      });
+    }
+
+    const requestId = `refund_${caseId}_${Date.now()}`;
+    const nowMs = Date.now();
+    const refundRef = db.collection('financeRefundRequests').doc(requestId);
+    const payload = {
+      requestId,
+      caseId,
+      orderId: String(orderDoc.id).toUpperCase(),
+      orderNo: supportCleanText(order.orderNo || orderDoc.id, 100),
+      requestedAmount,
+      reason,
+      status: 'PENDING_FINANCE_REVIEW',
+      requestedBy: operator,
+      supportCaseCategory: caseData.category || '',
+      financeSnapshot: finance,
+      createdAtMs: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.runTransaction(async tx => {
+      tx.set(refundRef, payload);
+      tx.set(caseRef, {
+        status: 'WAITING_FINANCE',
+        statusLabel: '等待財務審核',
+        refundRequestId: requestId,
+        refundRequestStatus: 'PENDING_FINANCE_REVIEW',
+        refundRequestedAmount: requestedAmount,
+        refundRequestedReason: reason,
+        refundRequestedBy: operator,
+        refundRequestedAtMs: nowMs,
+        refundRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      tx.set(orderDoc.ref, {
+        refundRequestId: requestId,
+        refundRequestStatus: 'PENDING_FINANCE_REVIEW',
+        refundRequestedAmount: requestedAmount,
+        refundRequestedReason: reason,
+        refundRequestedAtMs: nowMs,
+        refundRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+        activeSupportCaseId: caseId,
+        supportStatus: 'WAITING_FINANCE',
+      }, { merge: true });
+    });
+
+    await Promise.all([
+      supportWriteEvent(caseId, {
+        type: 'REFUND_REQUESTED',
+        visibility: 'PUBLIC',
+        title: '退款申請已送交財務審核',
+        message: `申請金額：NT$${requestedAmount.toLocaleString('zh-TW')}。${reason}`,
+        operator,
+        actorRole: 'admin',
+        metadata: { requestId, requestedAmount },
+      }),
+      writeFinanceAuditLog({
+        orderId: orderDoc.id,
+        type: 'refund_requested_from_support',
+        operator,
+        reason,
+        before: { refundRequestStatus: order.refundRequestStatus || 'NOT_REQUESTED' },
+        after: { refundRequestStatus: 'PENDING_FINANCE_REVIEW', requestedAmount },
+        metadata: { caseId, requestId },
+      }).catch(() => {}),
+    ]);
+
+    return res.json({
+      success: true,
+      request: supportRemoveUndefined({ ...payload, createdAt: undefined, updatedAt: undefined }),
+      message: '退款申請已送交財務中心審核，不會自動退款。',
+    });
+  } catch (error) {
+    console.error('❌ 客服退款申請失敗：', error);
+    return res.status(500).json({ success: false, message: error.message || '退款申請失敗。' });
+  }
+});
+
+app.get('/api/admin/support/refund-requests', supportRequireAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('financeRefundRequests').limit(500).get();
+    const requests = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        ...data,
+        requestId: doc.id,
+        createdAtMs: supportToMs(data.createdAtMs) || supportToMs(data.createdAt),
+        updatedAtMs: supportToMs(data.updatedAtMs) || supportToMs(data.updatedAt),
+      };
+    }).sort((a, b) => b.createdAtMs - a.createdAtMs);
+
+    return res.json({ success: true, requests });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: '讀取退款申請失敗。' });
+  }
+});
+
+
 const UBEE_CUSTOMER_TRACKING_STAGES = Object.freeze([
   { key:'created', label:'任務已成立' },
   { key:'matching', label:'等待小U接單' },
