@@ -3515,16 +3515,50 @@ app.get('/api/rider/session', riderAuthMiddleware, async (req, res) => {
       });
     }
 
+    const nowMs = Date.now();
+
     await riderDoc.ref.set({
       lastSessionRestoreAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastSessionRestoreAtMs: Date.now(),
+      lastSessionRestoreAtMs: nowMs,
+      lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastSeenAtMs: nowMs,
+      connectionState: 'connected',
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+
+    const refreshedRiderDoc = await riderDoc.ref.get();
+
+    let firebaseUid = '';
+    let firebaseCustomToken = '';
+
+    try {
+      firebaseUid = buildRiderFirebaseUid(refreshedRiderDoc.id);
+
+      // 沒有 Bearer Token 代表瀏覽器 Firebase Session 可能遺失；
+      // 回傳新的 Custom Token，讓前端靜默恢復安全登入，不要求再輸入手機。
+      if (!req.riderAuth) {
+        const tokenResult = await createRiderFirebaseCustomToken(
+          refreshedRiderDoc
+        );
+        firebaseUid = tokenResult.firebaseUid;
+        firebaseCustomToken = tokenResult.firebaseCustomToken;
+      }
+    } catch (tokenError) {
+      console.warn(
+        '⚠️ Session Restore 建立小U Firebase Token 失敗，維持相容登入：',
+        tokenError && tokenError.message
+          ? tokenError.message
+          : tokenError
+      );
+    }
 
     return res.json({
       success: true,
       restored: true,
-      rider: buildRiderLoginPayload(riderDoc),
+      rider: buildRiderLoginPayload(refreshedRiderDoc),
+      firebaseUid,
+      firebaseCustomToken,
+      serverTimeMs: nowMs,
     });
   } catch (err) {
     console.error('❌ 小U Session Restore 失敗：', err);
@@ -3532,6 +3566,116 @@ app.get('/api/rider/session', riderAuthMiddleware, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: '登入狀態恢復失敗，請稍後再試。',
+      error: err.message,
+    });
+  }
+});
+
+// =====================================================
+// UBee 小U在線心跳
+// - 與 GPS 分離：定位權限被關閉時，調度中心仍可知道小U最後在線時間。
+// - 只更新在線／裝置／定位健康狀態，不改變 online 接單開關。
+// =====================================================
+app.post('/api/rider/heartbeat', riderAuthMiddleware, async (req, res) => {
+  try {
+    const {
+      lineUserId,
+      phone,
+      riderId,
+      reason,
+      visibilityState,
+      clientOnline,
+      locationState,
+      lastLocationSuccessAtMs,
+      userAgent,
+    } = req.body || {};
+
+    const riderResult = await findApprovedRiderForApi({
+      lineUserId,
+      phone,
+      riderId,
+    });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({
+        success: false,
+        message: riderResult.message,
+      });
+    }
+
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+    const nowMs = Date.now();
+    const safeLocationStates = new Set([
+      'starting',
+      'healthy',
+      'stale',
+      'error',
+      'unsupported',
+    ]);
+    const normalizedLocationState = String(
+      locationState || ''
+    ).trim().toLowerCase();
+    const safeLocationState = safeLocationStates.has(
+      normalizedLocationState
+    )
+      ? normalizedLocationState
+      : 'unknown';
+
+    const updateData = {
+      lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastSeenAtMs: nowMs,
+      lastHeartbeatAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastHeartbeatAtMs: nowMs,
+      lastHeartbeatReason: cleanText(reason || 'interval', 40),
+      clientVisibilityState: cleanText(visibilityState || 'unknown', 20),
+      clientNetworkOnline: clientOnline !== false,
+      connectionState: clientOnline === false ? 'client_offline' : 'connected',
+      locationHealthState: safeLocationState,
+      locationHealthUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      locationHealthUpdatedAtMs: nowMs,
+      lastClientUserAgent: cleanText(userAgent || '', 260),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const safeLastLocationSuccessAtMs = Number(
+      lastLocationSuccessAtMs || 0
+    );
+
+    if (
+      Number.isFinite(safeLastLocationSuccessAtMs) &&
+      safeLastLocationSuccessAtMs > 0
+    ) {
+      updateData.lastLocationSuccessAtMs =
+        safeLastLocationSuccessAtMs;
+    }
+
+    // 心跳只更新在線與定位健康狀態，不接受前端改寫任務歸屬。
+    // currentOrderId / busy 的修復統一由 /api/rider/current-order 驗證後處理。
+    await riderDoc.ref.set(updateData, { merge: true });
+
+    return res.json({
+      success: true,
+      serverTimeMs: nowMs,
+      rider: {
+        id: riderDoc.id,
+        riderId: rider.riderId || riderDoc.id,
+        phone: normalizePhone(rider.phone || riderDoc.id || ''),
+        online: rider.online === true,
+        acceptingOrders:
+          rider.acceptingOrders === true || rider.online === true,
+        busy: rider.busy === true,
+        currentOrderId: String(rider.currentOrderId || '').trim(),
+        lastSeenAtMs: nowMs,
+        locationHealthState: safeLocationState,
+      },
+    });
+  } catch (err) {
+    console.error('❌ 小U心跳同步失敗：', err);
+
+    return res.status(500).json({
+      success: false,
+      message: '小U在線狀態同步失敗，請稍後再試。',
       error: err.message,
     });
   }
@@ -4256,6 +4400,21 @@ function isPaidJkoDispatchOrder(order) {
   );
 }
 
+function isMerchantOrderRecord(order = {}) {
+  const source = String(order.source || '').trim().toLowerCase();
+  const createdFrom = String(order.createdFrom || '').trim().toLowerCase();
+  const orderType = String(order.orderType || '').trim().toLowerCase();
+
+  return (
+    source === 'merchant-dashboard' ||
+    source === 'merchant' ||
+    createdFrom === 'merchant-dashboard' ||
+    createdFrom === 'merchant' ||
+    orderType === 'merchant_dispatch' ||
+    orderType === 'merchant_delivery'
+  );
+}
+
 function isMerchantDispatchOrder(order) {
   if (!order) return false;
 
@@ -4263,17 +4422,9 @@ function isMerchantDispatchOrder(order) {
   const paymentMethod = getOrderPaymentMethod(order);
   const paymentStatus = getOrderPaymentStatus(order);
 
-  const source = String(order.source || '').trim().toLowerCase();
-  const createdFrom = String(order.createdFrom || '').trim().toLowerCase();
-  const orderType = String(order.orderType || '').trim().toLowerCase();
   const deliveryType = String(order.deliveryType || '').trim().toLowerCase();
 
-  const isMerchantOrder =
-    source === 'merchant-dashboard' ||
-    source === 'merchant' ||
-    createdFrom === 'merchant-dashboard' ||
-    orderType === 'merchant_dispatch' ||
-    orderType === 'merchant_delivery';
+  const isMerchantOrder = isMerchantOrderRecord(order);
 
   const isMerchantPaymentReady =
     paymentMethod === 'merchant_settlement' ||
@@ -5587,10 +5738,21 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
     // 第一優先：騎士資料上的 currentOrderId
     const directOrder = await returnOrderIfActive(rider.currentOrderId);
     if (directOrder) {
+      await riderDoc.ref.set({
+        busy: true,
+        currentOrderId: directOrder.id,
+        activeTrackingOrderId: directOrder.id,
+        taskTrackingStatus: 'live',
+        lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastSeenAtMs: Date.now(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
       return res.json({
         success: true,
         hasOrder: true,
         order: directOrder,
+        recoverySource: 'rider_current_order_id',
       });
     }
 
@@ -5605,7 +5767,7 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
     for (const [field, value] of queryFields) {
       const snap = await db.collection('orders')
         .where(field, '==', value)
-        .limit(20)
+        .limit(80)
         .get();
 
       const found = snap.docs
@@ -5619,18 +5781,44 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
         });
 
       if (found) {
+        // riders.currentOrderId 遺失或不同步時，自動修復，讓重新開啟騎士端仍能找回任務。
+        await riderDoc.ref.set({
+          busy: true,
+          currentOrderId: found.id,
+          activeTrackingOrderId: found.id,
+          taskTrackingStatus: 'live',
+          lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastSeenAtMs: Date.now(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
         return res.json({
           success: true,
           hasOrder: true,
           order: found,
+          recoverySource: `orders_${field}`,
         });
       }
+    }
+
+    // 已確認所有歸屬欄位都沒有進行中任務，才清理 riders 上的殘留 busy/currentOrderId。
+    if (rider.busy === true || rider.currentOrderId) {
+      await riderDoc.ref.set({
+        busy: false,
+        currentOrderId: '',
+        activeTrackingOrderId: '',
+        activeTrackingSessionId: '',
+        taskTrackingStatus: 'idle',
+        taskTrackingStopReason: 'no_active_order_found',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
     }
 
     return res.json({
       success: true,
       hasOrder: false,
       order: null,
+      recoverySource: 'none',
     });
 
   } catch (err) {
@@ -12340,6 +12528,23 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
                   .serverTimestamp(),
 
               lastActiveMs:
+                nowMs,
+
+              lastSeenAt:
+                admin.firestore
+                  .FieldValue
+                  .serverTimestamp(),
+
+              lastSeenAtMs:
+                nowMs,
+
+              connectionState:
+                'connected',
+
+              locationHealthState:
+                'healthy',
+
+              lastLocationSuccessAtMs:
                 nowMs,
 
               // 任務定位與一般上線狀態分離。
@@ -20286,8 +20491,20 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
 
     if (effectiveStatus === 'completed') {
       try {
-        if (LINE_FINISH_GROUP_ID) {
-          await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(updatedOrder));
+        // UBee 明確規則：店家派單完成資訊不得推送到騎士審核／完成群組。
+        // 店家單仍正常保存完成、財務與調度資料，只是不做此群組通知。
+        if (
+          LINE_FINISH_GROUP_ID &&
+          !isMerchantOrderRecord(updatedOrder)
+        ) {
+          await pushToGroup(
+            LINE_FINISH_GROUP_ID,
+            createFinanceFlex(updatedOrder)
+          );
+        } else if (isMerchantOrderRecord(updatedOrder)) {
+          console.log(
+            `✅ 店家派單完成，不推送騎士審核／完成群組：${safeOrderId}`
+          );
         }
       } catch (finishErr) {
         console.error('⚠️ 任務已完成，但推送財務明細失敗：', finishErr);
@@ -20985,7 +21202,13 @@ if (!riderSnap.empty) {
   }, { merge: true });
 }
 
-    await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(order));
+    // 舊 LINE 控制流程同樣遵守：店家派單完成後不推送騎士審核／完成群組。
+    if (LINE_FINISH_GROUP_ID && !isMerchantOrderRecord(order)) {
+      await pushToGroup(
+        LINE_FINISH_GROUP_ID,
+        createFinanceFlex(order)
+      );
+    }
 
     return replyText(event.replyToken, `✅ 已完成訂單：${order.id}`);
   }
