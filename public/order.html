@@ -8282,6 +8282,33 @@ body{background:#eef0f2;}
   #step5 .step5-order-menu-popover{width:154px;}
 }
 
+
+
+/* ===== UBee 第三階段：客戶即時追蹤穩定性與異常狀態 ===== */
+#step5 .customer-tracking-health-card,
+#step5 .customer-tracking-incident-card{
+  margin:12px 0;
+  border-radius:18px;
+  padding:13px 14px;
+  border:1px solid var(--line);
+  background:#fff;
+  box-shadow:0 8px 24px rgba(17,24,39,.05);
+}
+#step5 .customer-tracking-health-card{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+#step5 .customer-tracking-health-main{display:flex;align-items:center;gap:10px;min-width:0;}
+#step5 .customer-tracking-health-dot{width:11px;height:11px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 5px rgba(22,163,74,.12);flex:0 0 auto;}
+#step5 .customer-tracking-health-card.is-delayed .customer-tracking-health-dot{background:#f59e0b;box-shadow:0 0 0 5px rgba(245,158,11,.13);}
+#step5 .customer-tracking-health-card.is-offline .customer-tracking-health-dot,
+#step5 .customer-tracking-health-card.is-stale .customer-tracking-health-dot{background:#dc2626;box-shadow:0 0 0 5px rgba(220,38,38,.12);}
+#step5 .customer-tracking-health-title{font-size:13px;font-weight:1000;color:#111;}
+#step5 .customer-tracking-health-desc{font-size:11px;font-weight:800;color:var(--muted);margin-top:3px;line-height:1.5;}
+#step5 .customer-tracking-health-time{font-size:11px;font-weight:1000;color:#6b7280;white-space:nowrap;}
+#step5 .customer-tracking-incident-card{display:none;border-color:#fed7aa;background:#fff7ed;color:#9a3412;}
+#step5 .customer-tracking-incident-card.show{display:block;}
+#step5 .customer-tracking-incident-title{font-size:14px;font-weight:1000;}
+#step5 .customer-tracking-incident-text{font-size:12px;font-weight:800;line-height:1.65;margin-top:5px;}
+#step5 .customer-tracking-incident-meta{font-size:11px;font-weight:900;margin-top:7px;opacity:.82;}
+
 </style>
 
   <style id="ubee-order-timing-v1-style">
@@ -9295,7 +9322,26 @@ body{background:#eef0f2;}
         <div id="step5LiveStatusMeta" class="step5-live-status-meta">系統正在讀取最新任務資訊</div>
       </div>
 
-      <!-- 小U 即時追蹤地圖：保留正式追蹤邏輯 -->
+
+
+      <div id="customerTrackingHealthCard" class="customer-tracking-health-card">
+        <div class="customer-tracking-health-main">
+          <span class="customer-tracking-health-dot"></span>
+          <div>
+            <div id="customerTrackingHealthTitle" class="customer-tracking-health-title">即時連線正常</div>
+            <div id="customerTrackingHealthDesc" class="customer-tracking-health-desc">訂單狀態與小U位置會自動同步</div>
+          </div>
+        </div>
+        <div id="customerTrackingHealthTime" class="customer-tracking-health-time">剛剛更新</div>
+      </div>
+
+      <div id="customerTrackingIncidentCard" class="customer-tracking-incident-card">
+        <div id="customerTrackingIncidentTitle" class="customer-tracking-incident-title">UBee 正在協助處理異常</div>
+        <div id="customerTrackingIncidentText" class="customer-tracking-incident-text">調度中心已介入，訂單與進度資料不會消失。</div>
+        <div id="customerTrackingIncidentMeta" class="customer-tracking-incident-meta"></div>
+      </div>
+
+            <!-- 小U 即時追蹤地圖：保留正式追蹤邏輯 -->
       <div id="step5TrackingMapSection" class="step5-tracking-map-section">
         <div class="step5-section-head step5-tracking-head-compact">
           <div>
@@ -18510,7 +18556,7 @@ UBeeEnhancements.init();
       try{
         const cachedId = String((typeof currentOrderId !== 'undefined' ? currentOrderId : '') || localStorage.getItem('ubee_current_order_id') || '').trim();
         if(cachedId && typeof window.startOrderListener === 'function') window.startOrderListener(cachedId);
-        if(typeof currentOrderData !== 'undefined' && currentOrderData && typeof window.syncCustomerLiveTracking === 'function') window.syncCustomerLiveTracking(currentOrderData);
+        if(typeof currentOrderData !== 'undefined' && currentOrderData && typeof syncCustomerLiveTracking === 'function') syncCustomerLiveTracking(currentOrderData);
       }catch(e){ console.warn('UBee 客人端恢復同步失敗:',e); }
     },500);
   }
@@ -18543,6 +18589,218 @@ UBeeEnhancements.init();
   setTimeout(installGuard,0);
   if(!navigator.onLine){ setCreateOrderNetworkLock(true); showStatus('目前網路連線受阻，恢復後會自動同步。'); }
 })();
+
+
+/* =========================================================
+   UBee 第三階段｜客戶即時追蹤一致性層 2026-07-27
+   - Firestore 即時監聽為主，後端追蹤摘要 API 為斷線／回前景備援。
+   - 兩者都只更新既有 Step 5，不改下單、付款、取消與派單核心。
+   ========================================================= */
+(function initUBeeCustomerTrackingPhase3(){
+  const CACHE_PREFIX = 'ubee_customer_tracking_v3_';
+  const FALLBACK_INTERVAL_MS = 20000;
+  let fallbackTimer = null;
+  let fallbackRequestSeq = 0;
+  let lastTrackingUpdateAtMs = 0;
+
+  const el = id => document.getElementById(id);
+  const safeText = value => String(value ?? '').trim();
+
+  function formatAge(ms){
+    const timestamp = Number(ms || 0);
+    if(!timestamp) return '等待更新';
+    const seconds = Math.max(0,Math.floor((Date.now()-timestamp)/1000));
+    if(seconds < 15) return '剛剛更新';
+    if(seconds < 60) return `${seconds} 秒前`;
+    const minutes = Math.floor(seconds/60);
+    if(minutes < 60) return `${minutes} 分鐘前`;
+    return `${Math.floor(minutes/60)} 小時前`;
+  }
+
+  function cacheKey(orderId){ return CACHE_PREFIX + safeText(orderId).toUpperCase(); }
+
+  function saveTrackingCache(order){
+    const id = safeText(order?.id || currentOrderId).toUpperCase();
+    if(!id || !order) return;
+    try{
+      localStorage.setItem(cacheKey(id),JSON.stringify({savedAtMs:Date.now(),order}));
+    }catch(error){ console.warn('UBee 客戶追蹤快取寫入失敗:',error); }
+  }
+
+  function readTrackingCache(orderId){
+    try{
+      const raw = localStorage.getItem(cacheKey(orderId));
+      if(!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.order ? parsed : null;
+    }catch(error){ return null; }
+  }
+
+  function updateTrackingHealth(order, options={}){
+    const card = el('customerTrackingHealthCard');
+    if(!card) return;
+    const title = el('customerTrackingHealthTitle');
+    const desc = el('customerTrackingHealthDesc');
+    const time = el('customerTrackingHealthTime');
+    card.classList.remove('is-delayed','is-offline','is-stale');
+
+    const offline = !navigator.onLine || options.offline === true;
+    const locationAt = Number(
+      order?.riderLocationUpdatedAtMs ||
+      order?.trackingUpdatedAtMs ||
+      order?._trackingSummary?.rider?.locationHealth?.updatedAtMs ||
+      0
+    );
+    const hasRider = !!(order?.riderDocId || order?.riderId || order?._trackingSummary?.rider?.assigned);
+    const activeStatus = ['accepted','going_to_pickup','arrived_pickup','picked_up','going_to_dropoff','arrived_dropoff'].includes(safeText(order?.status).toLowerCase());
+
+    if(offline){
+      card.classList.add('is-offline');
+      title.textContent = '目前網路連線受阻';
+      desc.textContent = '已保留最後訂單資料，連線恢復後會自動同步。';
+    }else if(activeStatus && hasRider && locationAt && Date.now()-locationAt > 5*60*1000){
+      card.classList.add('is-stale');
+      title.textContent = '小U定位暫時中斷';
+      desc.textContent = '訂單仍在進行，UBee 調度中心可查看最後位置。';
+    }else if(activeStatus && hasRider && locationAt && Date.now()-locationAt > 90*1000){
+      card.classList.add('is-delayed');
+      title.textContent = '小U定位更新稍有延遲';
+      desc.textContent = '系統仍會持續重新取得最新位置。';
+    }else{
+      title.textContent = options.source === 'api' ? '已完成重新同步' : '即時連線正常';
+      desc.textContent = hasRider ? '訂單狀態與小U位置會自動同步。' : '訂單狀態會自動同步，小U接單後顯示即時位置。';
+    }
+    const updateAt = locationAt || Number(order?._trackingSummary?.updatedAtMs || 0) || lastTrackingUpdateAtMs || Date.now();
+    time.textContent = formatAge(updateAt);
+  }
+
+  function updateIncident(order){
+    const card = el('customerTrackingIncidentCard');
+    if(!card) return;
+    const incident = order?._customerIncident || order?._trackingSummary?.activeIncident || null;
+    card.classList.toggle('show',!!incident);
+    if(!incident) return;
+    el('customerTrackingIncidentTitle').textContent = incident.title || incident.typeLabel || 'UBee 正在協助處理異常';
+    el('customerTrackingIncidentText').textContent = incident.description || '調度中心已介入，訂單與進度資料不會消失。';
+    const statusLabel = incident.status === 'IN_PROGRESS' ? '處理中' : '待處理';
+    el('customerTrackingIncidentMeta').textContent = [statusLabel,incident.assignedTo ? `負責人：${incident.assignedTo}` : 'UBee 調度中心已收到'].join('・');
+
+    const liveTitle = el('step5LiveStatusTitle');
+    const liveMeta = el('step5LiveStatusMeta');
+    if(liveTitle) liveTitle.textContent = 'UBee 正在協助處理異常';
+    if(liveMeta) liveMeta.textContent = incident.typeLabel || incident.title || '調度中心已介入處理';
+  }
+
+  function trackingToOrder(summary){
+    const rider = summary?.rider || {};
+    return {
+      id:summary.orderId,
+      status:summary.status,
+      serviceType:summary.serviceType,
+      serviceGroup:summary.serviceGroup,
+      pickupAddress:summary.pickupAddress,
+      dropoffAddress:summary.dropoffAddress,
+      pickupLat:summary.pickupLat,
+      pickupLng:summary.pickupLng,
+      dropoffLat:summary.dropoffLat,
+      dropoffLng:summary.dropoffLng,
+      total:summary.total,
+      etaText:summary.eta?.text || '',
+      etaMinutes:summary.eta?.minutes,
+      estimatedPickupMinutes:summary.eta?.estimatedPickupMinutes,
+      estimatedCompletionMinutes:summary.eta?.estimatedCompletionMinutes,
+      riderName:rider.name || '',
+      riderId:rider.assigned ? (currentOrderData?.riderId || 'assigned') : '',
+      riderCurrentLat:rider.currentLat,
+      riderCurrentLng:rider.currentLng,
+      riderLocationUpdatedAtMs:rider.locationHealth?.updatedAtMs || 0,
+      riderHeading:rider.heading,
+      riderSpeed:rider.speed,
+      riderLocationAccuracy:rider.accuracy,
+      statusTimes:summary.statusTimes || {},
+      _trackingSummary:summary,
+      _customerIncident:summary.activeIncident || null,
+    };
+  }
+
+  function handleOrder(order, source='firestore'){
+    if(!order) return;
+    lastTrackingUpdateAtMs = Date.now();
+    saveTrackingCache(order);
+    updateTrackingHealth(order,{source});
+    updateIncident(order);
+  }
+
+  async function fetchTrackingSummary(orderId,{silent=false}={}){
+    const id = safeText(orderId || currentOrderId).toUpperCase();
+    const customerId = safeText(userId);
+    if(!id || !/^U[a-zA-Z0-9]{20,}$/.test(customerId) || !navigator.onLine) return null;
+    const seq = ++fallbackRequestSeq;
+    try{
+      const response = await fetch(`/api/customer/orders/${encodeURIComponent(id)}/tracking?userId=${encodeURIComponent(customerId)}&t=${Date.now()}`,{cache:'no-store'});
+      const data = await response.json().catch(()=>({}));
+      if(seq !== fallbackRequestSeq) return null;
+      if(!response.ok || data.success === false || !data.tracking) throw new Error(data.error || '追蹤資料讀取失敗');
+      const apiOrder = trackingToOrder(data.tracking);
+      const merged = {...(currentOrderData || {}),...apiOrder};
+      currentOrderData = merged;
+      currentOrderId = id;
+      if(typeof setOrderNo === 'function') setOrderNo(id);
+      if(typeof renderTimeline === 'function') renderTimeline(merged.status,merged);
+      if(typeof syncCustomerLiveTracking === 'function') syncCustomerLiveTracking(merged);
+      handleOrder(merged,'api');
+      if(!silent && typeof window.showStatus === 'function') window.showStatus('已同步最新任務進度',true);
+      return merged;
+    }catch(error){
+      console.warn('UBee 客戶追蹤摘要同步失敗:',error);
+      const cached = readTrackingCache(id);
+      if(cached?.order){
+        updateTrackingHealth(cached.order,{offline:!navigator.onLine});
+        updateIncident(cached.order);
+      }
+      return null;
+    }
+  }
+
+  function scheduleFallback(){
+    clearInterval(fallbackTimer);
+    fallbackTimer = setInterval(()=>{
+      if(!document.hidden && navigator.onLine && currentOrderId){
+        fetchTrackingSummary(currentOrderId,{silent:true});
+      }
+    },FALLBACK_INTERVAL_MS);
+  }
+
+  const originalRenderTimelinePhase3 = renderTimeline;
+  if(typeof originalRenderTimelinePhase3 === 'function'){
+    renderTimeline = function(status,order){
+      const result = originalRenderTimelinePhase3.apply(this,arguments);
+      handleOrder(order || currentOrderData || {status},'firestore');
+      return result;
+    };
+  }
+
+  window.ubeeFetchCustomerTrackingSummary = fetchTrackingSummary;
+  window.addEventListener('offline',()=>updateTrackingHealth(currentOrderData || {},{offline:true}));
+  window.addEventListener('online',()=>fetchTrackingSummary(currentOrderId));
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden && navigator.onLine && currentOrderId){
+      fetchTrackingSummary(currentOrderId,{silent:true});
+    }
+  });
+
+  const cachedId = safeText(currentOrderId || localStorage.getItem('ubee_current_order_id')).toUpperCase();
+  if(cachedId){
+    const cached = readTrackingCache(cachedId);
+    if(cached?.order){
+      updateTrackingHealth(cached.order,{offline:!navigator.onLine});
+      updateIncident(cached.order);
+    }
+  }
+  scheduleFallback();
+  setTimeout(()=>{ if(currentOrderId) fetchTrackingSummary(currentOrderId,{silent:true}); },1500);
+})();
+
 </script>
 </body>
 </html>
