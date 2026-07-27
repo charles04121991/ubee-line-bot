@@ -6193,7 +6193,7 @@ const riderIncome =
       // 應撥金額 = 騎士收入 + 騎士代墊款。
       // 其他非現金類型不混入「街口待撥款」。
       // ==============================
-      else if (isFinancePaidJkoOrder(order)) {
+      else if (isFinancePlatformPayoutOrder(order)) {
         if (
           settlementStatus === 'settled'
         ) {
@@ -6476,6 +6476,64 @@ function isFinancePaidJkoOrder(order = {}) {
   );
 }
 
+function isFinancePaidMerchantOrder(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  const paymentMethod = getOrderPaymentMethod(order);
+  const billingStatus = String(
+    order.merchantBillingStatus || ''
+  ).trim().toLowerCase();
+  const orderType = String(order.orderType || '').trim().toLowerCase();
+  const source = String(order.source || '').trim().toLowerCase();
+  const deliveryType = String(order.deliveryType || '').trim().toLowerCase();
+
+  const isMerchantOrder =
+    orderType === 'merchant_dispatch' ||
+    orderType === 'merchant_delivery' ||
+    source === 'merchant-dashboard' ||
+    source === 'merchant';
+
+  const isMerchantPayment =
+    paymentMethod === 'merchant_settlement' ||
+    paymentMethod === 'merchant_paid' ||
+    paymentMethod === 'merchant';
+
+  return (
+    status === 'completed' &&
+    isMerchantOrder &&
+    isMerchantPayment &&
+    deliveryType !== 'merchant' &&
+    billingStatus === 'paid' &&
+    order.isCashOrder !== true
+  );
+}
+
+function isFinancePlatformPayoutOrder(order = {}) {
+  return (
+    isFinancePaidJkoOrder(order) ||
+    isFinancePaidMerchantOrder(order)
+  );
+}
+
+function getFinancePlatformPaymentMeta(order = {}) {
+  if (isFinancePaidMerchantOrder(order)) {
+    return {
+      paymentMethod: getOrderPaymentMethod(order) || 'merchant_settlement',
+      paymentMethodLabel:
+        order.paymentMethodLabel ||
+        (getOrderPaymentMethod(order) === 'merchant_paid'
+          ? '店家已付款'
+          : '店家月結已入帳'),
+      settlementPaymentMethod: 'merchant',
+    };
+  }
+
+  return {
+    paymentMethod: 'jko',
+    paymentMethodLabel: '街口支付',
+    settlementPaymentMethod: 'jko',
+  };
+}
+
 function getFinanceJkoAmounts(order = {}) {
   const riderIncome =
     getOrderMoneyValue(order, [
@@ -6703,7 +6761,7 @@ app.get('/api/admin/finance-overview', async (req, res) => {
       // ------------------------------
       // 街口待撥款／已撥款
       // ------------------------------
-      if (isFinancePaidJkoOrder(order)) {
+      if (isFinancePlatformPayoutOrder(order)) {
         const jkoAmounts =
           getFinanceJkoAmounts(order);
 
@@ -6879,7 +6937,7 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         ...doc.data(),
       };
 
-      if (!isFinancePaidJkoOrder(order)) {
+      if (!isFinancePlatformPayoutOrder(order)) {
         return;
       }
 
@@ -6908,6 +6966,9 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         rider.riderKey ||
         `unknown_${doc.id}`;
 
+      const paymentMeta =
+        getFinancePlatformPaymentMeta(order);
+
       const item = {
         id: order.id,
         orderNo: order.orderNo || order.id,
@@ -6917,8 +6978,8 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         riderPhone: rider.riderPhone,
         riderLineUserId: rider.riderLineUserId,
         riderName: rider.riderName,
-        paymentMethod: 'jko',
-        paymentMethodLabel: '街口支付',
+        paymentMethod: paymentMeta.paymentMethod,
+        paymentMethodLabel: paymentMeta.paymentMethodLabel,
         paymentStatus: getOrderPaymentStatus(order),
         riderFee: amounts.riderIncome,
         driverFee: amounts.riderIncome,
@@ -7067,7 +7128,7 @@ async function settleFinanceJkoOrders({
       ...doc.data(),
     };
 
-    if (!isFinancePaidJkoOrder(order)) {
+    if (!isFinancePlatformPayoutOrder(order)) {
       skippedOrders.push({
         orderId,
         reason: 'not_paid_jko_order',
@@ -7098,10 +7159,15 @@ async function settleFinanceJkoOrders({
       return;
     }
 
+    const paymentMeta =
+      getFinancePlatformPaymentMeta(order);
+
     validOrders.push({
       ref: doc.ref,
       orderId,
       ...amounts,
+      settlementPaymentMethod:
+        paymentMeta.settlementPaymentMethod,
     });
 
     totalSettledAmount += amounts.payoutTotal;
@@ -7137,7 +7203,7 @@ async function settleFinanceJkoOrders({
         settledAmount: item.payoutTotal,
         settledRiderIncome: item.riderIncome,
         settledAdvancePayment: item.advancePayment,
-        settlementPaymentMethod: 'jko',
+        settlementPaymentMethod: item.settlementPaymentMethod || 'jko',
         financialUpdatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
         financialUpdatedAtMs: nowMs,
@@ -17392,11 +17458,92 @@ function calculateMerchantDeliveryFeeV3(distanceKm, stopCount = 1) {
   return baseFee + extraStopFee;
 }
 
+async function getMerchantRouteEndpointCoordinatesV3(originAddress, destinationAddress) {
+  if (!GOOGLE_MAPS_SERVER_API_KEY || !originAddress || !destinationAddress) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      'https://routes.googleapis.com/directions/v2:computeRoutes',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_MAPS_SERVER_API_KEY,
+          'X-Goog-FieldMask': [
+            'routes.legs.startLocation',
+            'routes.legs.endLocation',
+          ].join(','),
+        },
+        body: JSON.stringify({
+          origin: { address: originAddress },
+          destination: { address: destinationAddress },
+          travelMode: 'DRIVE',
+          routingPreference: 'TRAFFIC_UNAWARE',
+          computeAlternativeRoutes: false,
+          languageCode: 'zh-TW',
+          regionCode: 'tw',
+          units: 'METRIC',
+        }),
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+    const leg = data?.routes?.[0]?.legs?.[0];
+
+    if (!response.ok || !leg) {
+      console.warn(
+        '⚠️ 店家 V3 取送件座標取得失敗：',
+        data?.error?.message || response.status
+      );
+      return null;
+    }
+
+    const start = leg?.startLocation?.latLng || {};
+    const end = leg?.endLocation?.latLng || {};
+
+    const pickupLat = Number(start.latitude);
+    const pickupLng = Number(start.longitude);
+    const dropoffLat = Number(end.latitude);
+    const dropoffLng = Number(end.longitude);
+
+    if (
+      !Number.isFinite(pickupLat) ||
+      !Number.isFinite(pickupLng) ||
+      !Number.isFinite(dropoffLat) ||
+      !Number.isFinite(dropoffLng)
+    ) {
+      return null;
+    }
+
+    return {
+      pickupLat,
+      pickupLng,
+      dropoffLat,
+      dropoffLng,
+    };
+  } catch (error) {
+    console.warn(
+      '⚠️ 店家 V3 取送件座標取得例外：',
+      error?.message || error
+    );
+    return null;
+  }
+}
+
 async function calculateMerchantRouteV3(pickupAddress, stops = []) {
   let origin = pickupAddress;
   let distanceMeters = 0;
   let durationSeconds = 0;
   const routeSegments = [];
+
+  const primaryEndpointCoordinates = stops[0]
+    ? await getMerchantRouteEndpointCoordinatesV3(
+        pickupAddress,
+        stops[0].dropoffAddress
+      )
+    : null;
 
   for (const stop of stops) {
     const route = await getDistanceMatrixCached(
@@ -17430,6 +17577,10 @@ async function calculateMerchantRouteV3(pickupAddress, stops = []) {
     distanceText: formatRouteDistanceText(distanceMeters),
     durationText: formatRouteDurationText(durationSeconds),
     routeSegments,
+    pickupLat: primaryEndpointCoordinates?.pickupLat ?? null,
+    pickupLng: primaryEndpointCoordinates?.pickupLng ?? null,
+    dropoffLat: primaryEndpointCoordinates?.dropoffLat ?? null,
+    dropoffLng: primaryEndpointCoordinates?.dropoffLng ?? null,
   };
 }
 
@@ -17510,6 +17661,26 @@ async function createMerchantOrderV3({
   const goodsAmount = merchantV3Money(payload.goodsAmount);
   const advanceAmount = merchantV3Money(payload.advanceAmount);
 
+  if (deliveryMode === 'merchant' && advanceAmount > 0) {
+    const error = new Error('店家自送模式不能要求小U代墊。');
+    error.statusCode = 400;
+    error.code = 'MERCHANT_SELF_DELIVERY_ADVANCE_NOT_ALLOWED';
+    throw error;
+  }
+
+  const isCashOrder =
+    deliveryMode === 'ubee' && paymentMethod === 'cash';
+
+  const merchantChargeAmount =
+    deliveryMode === 'ubee' && !isCashOrder
+      ? deliveryFee + advanceAmount
+      : 0;
+
+  const customerCashCollectAmount =
+    isCashOrder
+      ? deliveryFee + advanceAmount
+      : 0;
+
   const commission = calculateMerchantCommissionV3({
     merchant,
     orderSource,
@@ -17535,13 +17706,15 @@ async function createMerchantOrderV3({
     merchant_paid: '店家已收款',
   };
 
+  // 店家選擇「UBee 派小U」後，建立訂單即視為正式派單。
+  // 不再停留在 merchant_ready，避免店家還要再按第二次「確認派遣騎士」。
   const orderStatus =
     deliveryMode === 'merchant'
       ? 'merchant_self_delivery'
-      : 'merchant_ready';
+      : 'pending_dispatch';
 
   const merchantBillingStatus =
-    deliveryMode !== 'ubee'
+    deliveryMode !== 'ubee' || isCashOrder
       ? 'not_billable'
       : paymentMethod === 'merchant_paid'
         ? 'paid'
@@ -17599,6 +17772,10 @@ async function createMerchantOrderV3({
     pickupPhone: merchantPhone,
     pickupAddress,
     pickup: pickupAddress,
+    pickupLat: route.pickupLat,
+    pickupLng: route.pickupLng,
+    fromLat: route.pickupLat,
+    fromLng: route.pickupLng,
 
     customerName: primaryStop.customerName,
     receiverName: primaryStop.customerName,
@@ -17608,6 +17785,10 @@ async function createMerchantOrderV3({
     dropoff: primaryStop.dropoffAddress,
     primaryDropoffAddress: primaryStop.dropoffAddress,
     finalDropoffAddress: lastStop.dropoffAddress,
+    dropoffLat: route.dropoffLat,
+    dropoffLng: route.dropoffLng,
+    toLat: route.dropoffLat,
+    toLng: route.dropoffLng,
 
     itemName: itemSummary,
     item: itemSummary,
@@ -17620,12 +17801,22 @@ async function createMerchantOrderV3({
     customerNote: noteSummary,
     merchantNote: cleanLongText(payload.note || noteSummary, 500),
 
-    deliveryStops: stops,
+    deliveryStops: stops.map((stop, index) => ({
+      ...stop,
+      status: index === 0 ? 'current' : 'pending',
+      completedAtMs: 0,
+      arrivedAtMs: 0,
+    })),
     deliveryStopsText: noteSummary,
     routeSegments: route.routeSegments,
     multiDropoff: stops.length > 1,
     stopCount: stops.length,
+    currentDeliveryStopIndex: 0,
+    completedDeliveryStopCount: 0,
     extraStopFee: Math.max(0, stops.length - 1) * 20,
+
+    // 新店家單立即從 3 公里開始分段派單；後續仍由原本派單核心擴圈。
+    dispatchRadiusKm: deliveryMode === 'ubee' ? 3 : 0,
 
     distanceMeters: route.distanceMeters,
     durationSeconds: route.durationSeconds,
@@ -17643,6 +17834,9 @@ async function createMerchantOrderV3({
     finalTotal: deliveryFee,
     price: deliveryFee,
     fee: deliveryFee,
+    customerPayableTotal: customerCashCollectAmount,
+    cashCollectAmount: customerCashCollectAmount,
+    amountToCollect: customerCashCollectAmount,
 
     // 保留現行店家派單：配送費全額作為小U任務收入。
     // 日後若調整平台服務費，只需改後端，不需再改店家端。
@@ -17654,31 +17848,29 @@ async function createMerchantOrderV3({
     paymentMethodLabel: paymentMethodLabelMap[paymentMethod],
     paymentStatus: paymentStatusMap[paymentMethod],
     merchantPaid: paymentMethod === 'merchant_paid',
+    isCashOrder,
+    isPaid: paymentMethod === 'merchant_paid',
     paidAmount:
       paymentMethod === 'merchant_paid'
-        ? deliveryFee
+        ? merchantChargeAmount
         : 0,
 
     billedTo:
-      deliveryMode === 'ubee'
-        ? 'merchant'
-        : 'none',
+      deliveryMode !== 'ubee'
+        ? 'none'
+        : isCashOrder
+          ? 'customer'
+          : 'merchant',
 
     merchantBillingType: 'merchant_dispatch',
-    merchantPayableAmount:
-      deliveryMode === 'ubee'
-        ? deliveryFee
-        : 0,
+    merchantPayableAmount: merchantChargeAmount,
 
-    storePayableAmount:
-      deliveryMode === 'ubee'
-        ? deliveryFee
-        : 0,
+    storePayableAmount: merchantChargeAmount,
 
     merchantBillingStatus,
     merchantPaidAmount:
       merchantBillingStatus === 'paid'
-        ? deliveryFee
+        ? merchantChargeAmount
         : 0,
 
     commissionEnabled: commission.commissionEnabled,
@@ -17729,19 +17921,54 @@ async function createMerchantOrderV3({
     merge: true,
   });
 
-  // 新單通知可保留；本模組不會將「重新轉派」通知送到辦公室或騎士審核群。
-  try {
-    if (deliveryMode === 'ubee') {
+  // 店家新單建立後立即啟動既有分段派單核心。
+  // 只保留「新單」通知；不會把重新轉派通知送到辦公室或騎士審核群。
+  if (deliveryMode === 'ubee') {
+    const dispatchPushCycleId = buildDispatchPushCycleId(orderId);
+
+    await db.collection('orders').doc(orderId).set(
+      {
+        status: 'pending_dispatch',
+        dispatchPushCycleId,
+        dispatchPushNotifiedRiderDocIds: [],
+        dispatchPushStage: 'scheduled',
+        dispatchStartedAtMs: nowMs,
+        dispatchStartedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        dispatchedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: nowMs,
+      },
+      { merge: true }
+    );
+
+    clearDispatchPushTimers(orderId);
+
+    await startDispatchPushSequence(
+      {
+        ...order,
+        status: 'pending_dispatch',
+        dispatchPushCycleId,
+        createdAt: nowMs,
+        createdAtMs: nowMs,
+      },
+      dispatchPushCycleId
+    );
+
+    try {
       await pushToGroup(
         LINE_ADMIN_GROUP_ID,
         createAdminForceCancelFlex({
           ...order,
+          status: 'pending_dispatch',
           createdAt: nowMs,
         })
       );
+    } catch (pushError) {
+      console.error('⚠️ 店家 V3 新單通知失敗：', pushError);
     }
-  } catch (pushError) {
-    console.error('⚠️ 店家 V3 新單通知失敗：', pushError);
   }
 
   return {
@@ -19727,6 +19954,9 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     const riderRef = db.collection('riders').doc(riderDoc.id);
 
     let updatedOrder = null;
+    let multiStopAdvanced = false;
+    let completedStopNumber = 0;
+    let nextStopNumber = 0;
 
     await db.runTransaction(async (transaction) => {
       const orderDoc = await transaction.get(orderRef);
@@ -19764,6 +19994,113 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
 
       if (!nextStatuses.includes(status)) {
         throw new Error('INVALID_TRANSITION');
+      }
+
+      // 多點配送：完成目前送達點時，如果後面還有站點，
+      // 不結束整張任務，而是切換到下一個送達點。
+      const deliveryStops = Array.isArray(order.deliveryStops)
+        ? order.deliveryStops.map(stop => ({ ...(stop || {}) }))
+        : [];
+      const currentDeliveryStopIndex = Math.max(
+        0,
+        Math.min(
+          deliveryStops.length ? deliveryStops.length - 1 : 0,
+          Number(order.currentDeliveryStopIndex || 0)
+        )
+      );
+      const shouldAdvanceMultiStop =
+        status === 'completed' &&
+        currentStatus === 'arrived_dropoff' &&
+        deliveryStops.length > 1 &&
+        currentDeliveryStopIndex < deliveryStops.length - 1;
+
+      if (shouldAdvanceMultiStop) {
+        const nowMs = Date.now();
+        const nextIndex = currentDeliveryStopIndex + 1;
+        const currentStop = deliveryStops[currentDeliveryStopIndex] || {};
+        const nextStop = deliveryStops[nextIndex] || {};
+
+        deliveryStops[currentDeliveryStopIndex] = {
+          ...currentStop,
+          status: 'completed',
+          completedAtMs: nowMs,
+        };
+        deliveryStops[nextIndex] = {
+          ...nextStop,
+          status: 'current',
+          arrivedAtMs: 0,
+        };
+
+        const nextEtaPayload = getEtaPayloadByStatus('picked_up');
+        const updateData = {
+          status: 'picked_up',
+          riderStatus: 'picked_up',
+          riderId: identity.riderId,
+          riderDocId: identity.riderDocId,
+          riderPhone: identity.phone,
+          riderLineUserId: identity.lineUserId || '',
+          deliveryStops,
+          currentDeliveryStopIndex: nextIndex,
+          completedDeliveryStopCount: nextIndex,
+          lastCompletedDeliveryStopIndex: currentDeliveryStopIndex,
+          lastCompletedDeliveryStopAtMs: nowMs,
+          lastCompletedDeliveryStopAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          customerName:
+            nextStop.customerName || nextStop.receiverName || '',
+          receiverName:
+            nextStop.customerName || nextStop.receiverName || '',
+          customerPhone:
+            nextStop.customerPhone || nextStop.dropoffPhone || '',
+          dropoffPhone:
+            nextStop.customerPhone || nextStop.dropoffPhone || '',
+          dropoffAddress:
+            nextStop.dropoffAddress || nextStop.dropoff || '',
+          dropoff:
+            nextStop.dropoffAddress || nextStop.dropoff || '',
+          itemName:
+            nextStop.itemName || nextStop.item || order.itemName || '',
+          item:
+            nextStop.itemName || nextStop.item || order.item || '',
+          currentStopNote: nextStop.note || '',
+          arrivedDropoffAt: null,
+          riderTrackingStatus: 'live',
+          trackingUpdatedAtMs: nowMs,
+          trackingUpdatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+          'statusTimes.next_stop_started':
+            admin.firestore.FieldValue.serverTimestamp(),
+          ...nextEtaPayload,
+        };
+
+        transaction.update(orderRef, updateData);
+        transaction.set(riderRef, {
+          busy: true,
+          currentOrderId: safeOrderId,
+          lastActive: nowMs,
+          activeTrackingOrderId: safeOrderId,
+          taskTrackingStatus: 'live',
+          taskTrackingUpdatedAtMs: nowMs,
+          taskTrackingUpdatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        multiStopAdvanced = true;
+        completedStopNumber = currentDeliveryStopIndex + 1;
+        nextStopNumber = nextIndex + 1;
+        updatedOrder = {
+          ...order,
+          ...updateData,
+          id: safeOrderId,
+          status: 'picked_up',
+          riderStatus: 'picked_up',
+        };
+        return;
       }
 
       const etaPayload = getEtaPayloadByStatus(status);
@@ -19908,22 +20245,28 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       };
     });
 
+    const effectiveStatus = String(
+      updatedOrder?.status || status
+    ).trim();
+
     orders[safeOrderId] = updatedOrder;
 
-    const statusEventType = status === 'completed'
+    const statusEventType = effectiveStatus === 'completed'
       ? 'ORDER_COMPLETED'
-      : `ORDER_STATUS_${String(status || '').toUpperCase()}`;
+      : multiStopAdvanced
+        ? 'ORDER_MULTI_STOP_ADVANCED'
+        : `ORDER_STATUS_${String(effectiveStatus || '').toUpperCase()}`;
     const statusEventTasks = [
       logDispatchEvent({
         type:statusEventType,
         orderId:safeOrderId,
         riderId:identity.riderId,
         riderDocId:identity.riderDocId,
-        status,
+        status:effectiveStatus,
         createdAtMs:Date.now(),
       })
     ];
-    if (status === 'completed') {
+    if (effectiveStatus === 'completed') {
       statusEventTasks.push(updateRiderDispatchStats(identity.riderId, { completedOrders:1, lastCompletedAtMs:Date.now() }));
     }
     Promise.allSettled(statusEventTasks).catch(()=>{});
@@ -19932,14 +20275,16 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       await notifyCustomer(
         updatedOrder,
         createTextMessage(
-          `UBee 跑腿任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(status)}`
+          multiStopAdvanced
+            ? `UBee 跑腿多點配送更新\n\n訂單編號：${updatedOrder.id}\n第 ${completedStopNumber} 點已完成，準備前往第 ${nextStopNumber} 點。`
+            : `UBee 跑腿任務狀態更新\n\n訂單編號：${updatedOrder.id}\n目前狀態：${getStatusLabel(effectiveStatus)}`
         )
       );
     } catch (notifyErr) {
       console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
     }
 
-    if (status === 'completed') {
+    if (effectiveStatus === 'completed') {
       try {
         if (LINE_FINISH_GROUP_ID) {
           await pushToGroup(LINE_FINISH_GROUP_ID, createFinanceFlex(updatedOrder));
@@ -19952,10 +20297,15 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     return res.json({
       success: true,
       orderId: safeOrderId,
-      status,
-      statusLabel: getStatusLabel(status),
+      status: effectiveStatus,
+      statusLabel: getStatusLabel(effectiveStatus),
       order: updatedOrder,
-      message: '任務狀態已更新',
+      multiStopAdvanced,
+      completedStopNumber,
+      nextStopNumber,
+      message: multiStopAdvanced
+        ? `第 ${completedStopNumber} 個送達點已完成，請前往第 ${nextStopNumber} 點。`
+        : '任務狀態已更新',
     });
 
   } catch (error) {
