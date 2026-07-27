@@ -23605,6 +23605,7 @@ const UBEE_SUPPORT_CASE_STATUSES = Object.freeze({
   WAITING_FINANCE: 'WAITING_FINANCE',
   RESOLVED: 'RESOLVED',
   CLOSED: 'CLOSED',
+  DELETED: 'DELETED',
 });
 
 const UBEE_SUPPORT_CATEGORIES = Object.freeze({
@@ -24072,10 +24073,16 @@ function supportSerializeCase(doc) {
     updatedAtMs: supportToMs(data.updatedAtMs) || supportToMs(data.updatedAt),
     resolvedAtMs: supportToMs(data.resolvedAtMs) || supportToMs(data.resolvedAt),
     closedAtMs: supportToMs(data.closedAtMs) || supportToMs(data.closedAt),
+    deletedAtMs: supportToMs(data.deletedAtMs) || supportToMs(data.deletedAt),
+    restoredAtMs: supportToMs(data.restoredAtMs) || supportToMs(data.restoredAt),
+    permanentlyDeletedRequestedAtMs: supportToMs(data.permanentlyDeletedRequestedAtMs),
+    isDeleted: Boolean(data.deletedAtMs || data.deletedAt || data.status === 'DELETED'),
     createdAt: undefined,
     updatedAt: undefined,
     resolvedAt: undefined,
     closedAt: undefined,
+    deletedAt: undefined,
+    restoredAt: undefined,
   };
 }
 
@@ -24178,6 +24185,12 @@ async function supportValidateCaseAccess(caseId, req, { allowAdmin = true } = {}
   }
 
   const data = caseDoc.data() || {};
+  const isDeleted = Boolean(data.deletedAtMs || data.deletedAt || data.status === 'DELETED');
+  if (isDeleted && !allowAdmin) {
+    const error = new Error('此客服案件已由 UBee 客服中心移除。');
+    error.statusCode = 410;
+    throw error;
+  }
   if (allowAdmin && UBEE_SUPPORT_ADMIN_KEY) {
     const supplied = supportGetAdminKey(req);
     if (supplied) {
@@ -24595,10 +24608,19 @@ app.get('/api/admin/support/cases', supportRequireAdmin, async (req, res) => {
     const sourceRole = supportCleanText(req.query?.sourceRole, 80).toLowerCase();
     const category = supportCleanText(req.query?.category, 100).toUpperCase();
     const search = supportCleanText(req.query?.search, 200).toLowerCase();
+    const deletedMode = supportCleanText(req.query?.deleted, 30).toLowerCase();
     const limit = Math.min(500, Math.max(1, Number(req.query?.limit || 300)));
 
-    const snap = await db.collection('supportCases').limit(1000).get();
-    let cases = snap.docs.map(supportSerializeCase);
+    const snap = await db.collection('supportCases').limit(1500).get();
+    const allCases = snap.docs.map(supportSerializeCase);
+    const activeCases = allCases.filter(item => !item.isDeleted);
+    const deletedCases = allCases.filter(item => item.isDeleted);
+
+    let cases = deletedMode === 'only'
+      ? deletedCases
+      : deletedMode === 'include'
+        ? allCases
+        : activeCases;
 
     if (status) cases = cases.filter(item => item.status === status);
     if (sourceRole) cases = cases.filter(item => item.sourceRole === sourceRole);
@@ -24613,21 +24635,27 @@ app.get('/api/admin/support/cases', supportRequireAdmin, async (req, res) => {
         item.title,
         item.description,
         item.assignedTo,
+        item.deletedReason,
       ].some(value => String(value || '').toLowerCase().includes(search)));
     }
 
-    cases.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+    cases.sort((a, b) => {
+      const aTime = a.isDeleted ? a.deletedAtMs : a.updatedAtMs;
+      const bTime = b.isDeleted ? b.deletedAtMs : b.updatedAtMs;
+      return bTime - aTime;
+    });
     cases = cases.slice(0, limit);
 
-    const all = snap.docs.map(supportSerializeCase);
     const summary = {
-      total: all.length,
-      open: all.filter(item => item.status === 'OPEN').length,
-      inProgress: all.filter(item => item.status === 'IN_PROGRESS').length,
-      waitingUser: all.filter(item => item.status === 'WAITING_USER').length,
-      waitingFinance: all.filter(item => item.status === 'WAITING_FINANCE').length,
-      resolved: all.filter(item => item.status === 'RESOLVED').length,
-      criticalActive: all.filter(item =>
+      total: activeCases.length,
+      open: activeCases.filter(item => item.status === 'OPEN').length,
+      inProgress: activeCases.filter(item => item.status === 'IN_PROGRESS').length,
+      waitingUser: activeCases.filter(item => item.status === 'WAITING_USER').length,
+      waitingFinance: activeCases.filter(item => item.status === 'WAITING_FINANCE').length,
+      resolved: activeCases.filter(item => item.status === 'RESOLVED').length,
+      closed: activeCases.filter(item => item.status === 'CLOSED').length,
+      deleted: deletedCases.length,
+      criticalActive: activeCases.filter(item =>
         item.severity === 'CRITICAL' &&
         !['RESOLVED', 'CLOSED'].includes(item.status)
       ).length,
@@ -24696,6 +24724,12 @@ app.post('/api/admin/support/cases/:caseId/action', supportRequireAdmin, async (
     if (!caseDoc.exists) return res.status(404).json({ success: false, message: '找不到客服案件。' });
 
     const current = caseDoc.data() || {};
+    if (current.deletedAtMs || current.deletedAt || current.status === 'DELETED') {
+      return res.status(409).json({
+        success: false,
+        message: '此案件目前在垃圾桶中，請先復原案件再進行處理。',
+      });
+    }
     const nowMs = Date.now();
     const update = {
       updatedAtMs: nowMs,
@@ -24802,6 +24836,238 @@ app.post('/api/admin/support/cases/:caseId/action', supportRequireAdmin, async (
   } catch (error) {
     console.error('❌ 更新客服案件失敗：', error);
     return res.status(500).json({ success: false, message: error.message || '更新客服案件失敗。' });
+  }
+});
+
+
+async function supportDeleteSubcollection(caseRef, subcollectionName) {
+  let deletedCount = 0;
+  while (true) {
+    const snap = await caseRef.collection(subcollectionName).limit(400).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    deletedCount += snap.size;
+    if (snap.size < 400) break;
+  }
+  return deletedCount;
+}
+
+async function supportSyncLinkedOrderAfterRemoval(orderId, removedCaseId) {
+  if (!orderId) return false;
+  const orderDoc = await getFinanceOrderDoc(orderId);
+  if (!orderDoc) return false;
+  const orderData = orderDoc.data() || {};
+  if (String(orderData.activeSupportCaseId || '').toUpperCase() !== String(removedCaseId || '').toUpperCase()) {
+    return false;
+  }
+
+  let replacement = null;
+  try {
+    const snap = await db.collection('supportCases').where('orderId', '==', String(orderId).toUpperCase()).limit(100).get();
+    replacement = snap.docs
+      .map(supportSerializeCase)
+      .filter(item => item.caseId !== removedCaseId && !item.isDeleted && item.active !== false)
+      .sort((a, b) => b.updatedAtMs - a.updatedAtMs)[0] || null;
+  } catch (error) {
+    console.warn('⚠️ 重新計算訂單客服案件失敗：', error?.message || error);
+  }
+
+  const update = replacement
+    ? {
+        activeSupportCaseId: replacement.caseId,
+        supportStatus: replacement.status,
+        latestSupportCaseAtMs: replacement.updatedAtMs || Date.now(),
+      }
+    : {
+        activeSupportCaseId: admin.firestore.FieldValue.delete(),
+        supportStatus: 'NONE',
+        latestSupportCaseAtMs: Date.now(),
+      };
+  update.latestSupportCaseAt = admin.firestore.FieldValue.serverTimestamp();
+  await orderDoc.ref.set(update, { merge: true });
+  return true;
+}
+
+app.post('/api/admin/support/cases/:caseId/trash', supportRequireAdmin, async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const operator = supportCleanText(req.body?.operator || req.supportAdmin?.operator, 160) || 'support_center';
+    const reason = supportCleanText(req.body?.reason, 1200);
+    if (!reason) {
+      return res.status(400).json({ success: false, message: '請填寫刪除案件的原因。' });
+    }
+
+    const caseRef = db.collection('supportCases').doc(caseId);
+    const caseDoc = await caseRef.get();
+    if (!caseDoc.exists) return res.status(404).json({ success: false, message: '找不到客服案件。' });
+    const current = caseDoc.data() || {};
+    if (current.deletedAtMs || current.deletedAt || current.status === 'DELETED') {
+      const detail = await supportReadCaseDetail(caseId, { includeInternal: true });
+      return res.json({ success: true, alreadyDeleted: true, ...detail });
+    }
+
+    const nowMs = Date.now();
+    await caseRef.set({
+      previousStatus: current.status || 'OPEN',
+      previousStatusLabel: current.statusLabel || '待客服處理',
+      previousActive: current.active !== false,
+      status: 'DELETED',
+      statusLabel: '已移至垃圾桶',
+      active: false,
+      deletedReason: reason,
+      deletedBy: operator,
+      deletedAtMs: nowMs,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastHandledBy: operator,
+    }, { merge: true });
+
+    await Promise.all([
+      supportWriteEvent(caseId, {
+        type: 'CASE_MOVED_TO_TRASH',
+        visibility: 'INTERNAL',
+        title: '案件已移至垃圾桶',
+        message: reason,
+        operator,
+        actorRole: 'admin',
+      }),
+      supportSyncLinkedOrderAfterRemoval(current.orderId, caseId).catch(() => false),
+    ]);
+
+    const detail = await supportReadCaseDetail(caseId, { includeInternal: true });
+    return res.json({ success: true, message: '案件已移至垃圾桶，可隨時復原。', ...detail });
+  } catch (error) {
+    console.error('❌ 刪除客服案件失敗：', error);
+    return res.status(500).json({ success: false, message: error.message || '刪除客服案件失敗。' });
+  }
+});
+
+app.post('/api/admin/support/cases/:caseId/restore', supportRequireAdmin, async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const operator = supportCleanText(req.body?.operator || req.supportAdmin?.operator, 160) || 'support_center';
+    const message = supportCleanText(req.body?.message, 1200) || '案件已從垃圾桶復原。';
+    const caseRef = db.collection('supportCases').doc(caseId);
+    const caseDoc = await caseRef.get();
+    if (!caseDoc.exists) return res.status(404).json({ success: false, message: '找不到客服案件。' });
+    const current = caseDoc.data() || {};
+    if (!(current.deletedAtMs || current.deletedAt || current.status === 'DELETED')) {
+      return res.status(409).json({ success: false, message: '此案件不在垃圾桶中。' });
+    }
+
+    const restoredStatus = String(current.previousStatus || 'OPEN').toUpperCase() === 'DELETED'
+      ? 'OPEN'
+      : String(current.previousStatus || 'OPEN').toUpperCase();
+    const restoredLabel = current.previousStatusLabel || (restoredStatus === 'OPEN' ? '待客服處理' : restoredStatus);
+    const restoredActive = !['RESOLVED', 'CLOSED'].includes(restoredStatus);
+    const nowMs = Date.now();
+
+    await caseRef.set({
+      status: restoredStatus,
+      statusLabel: restoredLabel,
+      active: restoredActive,
+      restoredBy: operator,
+      restoredAtMs: nowMs,
+      restoredAt: admin.firestore.FieldValue.serverTimestamp(),
+      deletedAtMs: admin.firestore.FieldValue.delete(),
+      deletedAt: admin.firestore.FieldValue.delete(),
+      deletedBy: admin.firestore.FieldValue.delete(),
+      deletedReason: admin.firestore.FieldValue.delete(),
+      previousStatus: admin.firestore.FieldValue.delete(),
+      previousStatusLabel: admin.firestore.FieldValue.delete(),
+      previousActive: admin.firestore.FieldValue.delete(),
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastHandledBy: operator,
+    }, { merge: true });
+
+    await Promise.all([
+      supportWriteEvent(caseId, {
+        type: 'CASE_RESTORED',
+        visibility: 'INTERNAL',
+        title: '案件已從垃圾桶復原',
+        message,
+        operator,
+        actorRole: 'admin',
+      }),
+      current.orderId && restoredActive
+        ? supportUpdateLinkedOrder(current.orderId, {
+            activeSupportCaseId: caseId,
+            supportStatus: restoredStatus,
+            latestSupportCaseAtMs: nowMs,
+            latestSupportCaseAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch(() => false)
+        : Promise.resolve(),
+    ]);
+
+    const detail = await supportReadCaseDetail(caseId, { includeInternal: true });
+    return res.json({ success: true, message: '案件已復原。', ...detail });
+  } catch (error) {
+    console.error('❌ 復原客服案件失敗：', error);
+    return res.status(500).json({ success: false, message: error.message || '復原客服案件失敗。' });
+  }
+});
+
+app.delete('/api/admin/support/cases/:caseId', supportRequireAdmin, async (req, res) => {
+  try {
+    const caseId = supportCleanText(req.params.caseId, 100).toUpperCase();
+    const confirmCaseId = supportCleanText(req.body?.confirmCaseId, 100).toUpperCase();
+    const operator = supportCleanText(req.body?.operator || req.supportAdmin?.operator, 160) || 'support_center';
+    if (!caseId || confirmCaseId !== caseId) {
+      return res.status(400).json({ success: false, message: '永久刪除前，必須完整輸入案件編號確認。' });
+    }
+
+    const caseRef = db.collection('supportCases').doc(caseId);
+    const caseDoc = await caseRef.get();
+    if (!caseDoc.exists) return res.status(404).json({ success: false, message: '找不到客服案件。' });
+    const current = caseDoc.data() || {};
+    if (!(current.deletedAtMs || current.deletedAt || current.status === 'DELETED')) {
+      return res.status(409).json({ success: false, message: '案件必須先移到垃圾桶，才能永久刪除。' });
+    }
+    if (current.refundRequestId || current.refundRequestStatus) {
+      return res.status(409).json({
+        success: false,
+        message: '此案件已有退款／財務審核紀錄，基於帳務稽核只能留在垃圾桶，不能永久刪除。',
+      });
+    }
+
+    const evidenceSnap = await caseRef.collection('evidence').limit(1000).get();
+    const storageTargets = evidenceSnap.docs.map(doc => doc.data() || {}).filter(item => item.storagePath);
+    const storageWarnings = [];
+    for (const item of storageTargets) {
+      try {
+        const bucketName = supportCleanText(item.storageBucket || UBEE_SUPPORT_STORAGE_BUCKET, 300);
+        if (bucketName) await admin.storage().bucket(bucketName).file(item.storagePath).delete({ ignoreNotFound: true });
+      } catch (error) {
+        storageWarnings.push(item.storagePath);
+        console.warn('⚠️ 永久刪除客服證據檔案失敗：', item.storagePath, error?.message || error);
+      }
+    }
+
+    const [deletedEvents, deletedEvidence] = await Promise.all([
+      supportDeleteSubcollection(caseRef, 'events'),
+      supportDeleteSubcollection(caseRef, 'evidence'),
+    ]);
+    await caseRef.delete();
+    await supportSyncLinkedOrderAfterRemoval(current.orderId, caseId).catch(() => false);
+
+    console.log(`🗑️ 客服案件已永久刪除：${caseId}，操作人員：${operator}`);
+    return res.json({
+      success: true,
+      caseId,
+      deletedEvents,
+      deletedEvidence,
+      storageWarnings,
+      message: storageWarnings.length
+        ? '案件資料已永久刪除，但部分 Storage 檔案刪除失敗，請至 Firebase Storage 人工確認。'
+        : '案件與任務證據已永久刪除，無法復原。',
+    });
+  } catch (error) {
+    console.error('❌ 永久刪除客服案件失敗：', error);
+    return res.status(500).json({ success: false, message: error.message || '永久刪除客服案件失敗。' });
   }
 });
 
