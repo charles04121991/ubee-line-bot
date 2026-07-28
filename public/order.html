@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="UBee">
   <meta name="theme-color" content="#ffffff">
 
-  <title>UBee 跑腿｜用戶端建立任務 V2</title>
+  <title>UBee 跑腿｜用戶端建立任務 V2＋區域動態定價 V3</title>
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -13842,6 +13842,11 @@ function getPayload(){
 
     fareMode:'base_km_minute',
 
+    quoteId:String(lastQuoteData?.quoteId || ''),
+    quotedAtMs:Number(lastQuoteData?.quotedAtMs || 0),
+    quoteExpiresAtMs:Number(lastQuoteData?.expiresAtMs || 0),
+    dynamicPricingFee:Math.max(0, Math.round(Number(lastQuoteData?.dynamicPricingFee || 0))),
+
     nearbyPlace:selectedNearbyPlace ? {
       name:selectedNearbyPlace.name || '',
       address:selectedNearbyPlace.address || '',
@@ -14108,6 +14113,10 @@ async function renderEstimate(){
     const waitingFee = money(data.waitingFee);
     const queueTimeFee = money(data.queueTimeFee);
     const longTaskExtraFee = money(data.longTaskExtraFee);
+    const dynamicPricingFee = money(data.dynamicPricingFee || data.dynamicFee);
+    const dynamicPricingComponents = Array.isArray(data.dynamicPricingComponents)
+      ? data.dynamicPricingComponents
+      : (Array.isArray(data.dynamicPricing?.components) ? data.dynamicPricing.components : []);
 
     const serviceSubtotal = money(
       data.serviceSubtotal ??
@@ -14237,6 +14246,25 @@ if(serviceFee > 0){
   });
 }
 
+if(dynamicPricingFee > 0){
+  if(dynamicPricingComponents.length){
+    dynamicPricingComponents.forEach(item => {
+      const fee = money(item?.fee);
+      if(fee > 0){
+        detailRows.push({
+          label:String(item?.label || '動態調度費'),
+          value:fee
+        });
+      }
+    });
+  }else{
+    detailRows.push({
+      label:'區域動態調度費',
+      value:dynamicPricingFee
+    });
+  }
+}
+
 
 /* ==============================
    詳細費用列
@@ -14313,6 +14341,9 @@ box.innerHTML = `
 
     <div class="review-price-route-meta">
       ${escapeHtml(routeSummaryText || '系統路線估價')}
+    </div>
+    <div class="price-note">
+      報價已由 UBee 後端鎖定 10 分鐘；動態調度費依取件區域、即時訂單與有效小U運力計算。
     </div>
 
     <details class="review-price-details-toggle">
@@ -14527,6 +14558,10 @@ async function createOrder(){
     btn.innerText = '建立訂單中...';
 
     const payload = getPayload();
+
+    if(!payload.quoteId){
+      throw new Error('正式報價識別碼不存在，請重新估價後再送出。');
+    }
 
     const res = await fetch('/api/orders', {
       method:'POST',
