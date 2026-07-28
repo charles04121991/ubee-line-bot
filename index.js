@@ -6,9 +6,10 @@ const path = require('path');
 const crypto = require('crypto');
 const admin = require('firebase-admin');
 const webpush = require('web-push');
+const multer = require('multer');
 
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
-// UBee Merchant Platform V3 + 全台地區後端正式整合版｜2026-07-27
+// UBee Merchant Platform V3 + 小U資料庫 V2 證件上傳整合版｜2026-07-28
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -21,6 +22,394 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+
+
+// =====================================================
+// UBee 小U資料庫 V2：申請層／正式騎士層分離
+// 第一階段採安全遷移：
+// - 新申請只寫入 riderApplicationsV2
+// - 審核通過後建立 ridersV2
+// - 過渡期同步鏡像到舊 riders，待騎士端與調度中心改讀 V2 後再移除
+// - 舊 riderApplications 不再新增資料
+// =====================================================
+const RIDER_V2_COLLECTIONS = Object.freeze({
+  applications: 'riderApplicationsV2',
+  riders: 'ridersV2',
+  presence: 'riderPresenceV2',
+  locations: 'riderLocationsV2',
+  stats: 'riderStatsV2',
+});
+
+const RIDER_V2_APPLICATION_ROUND = '2026_RIDER_RESET';
+const RIDER_V2_DATA_VERSION = 2;
+const RIDER_V2_MIRROR_TO_LEGACY_RIDERS =
+  String(process.env.RIDER_V2_MIRROR_TO_LEGACY_RIDERS || 'true')
+    .trim()
+    .toLowerCase() === 'true';
+
+const RIDER_DOCUMENT_STORAGE_BUCKET = String(
+  process.env.FIREBASE_STORAGE_BUCKET ||
+  `${process.env.FIREBASE_PROJECT_ID || ''}.appspot.com`
+).trim();
+
+const RIDER_DOCUMENT_MAX_BYTES = 6 * 1024 * 1024;
+
+const RIDER_REQUIRED_DOCUMENTS = Object.freeze({
+  idFront: 'id_front',
+  idBack: 'id_back',
+  driverLicense: 'driver_license',
+  vehicleLicense: 'vehicle_license',
+  compulsoryInsurance: 'compulsory_insurance',
+});
+
+const RIDER_DOCUMENT_LABELS = Object.freeze({
+  idFront: '身分證正面',
+  idBack: '身分證反面',
+  driverLicense: '駕照',
+  vehicleLicense: '行照',
+  compulsoryInsurance: '強制險證明',
+});
+
+// 證件先由 multer 存入記憶體，再立即寫入 Firebase Storage。
+// 不落地到 Render 本機磁碟，避免部署或重啟後遺失。
+const riderDocumentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 1,
+    fileSize: RIDER_DOCUMENT_MAX_BYTES,
+  },
+  fileFilter: (req, file, callback) => {
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
+
+    if (!allowedMimeTypes.has(String(file?.mimetype || '').toLowerCase())) {
+      return callback(new Error('RIDER_DOCUMENT_UNSUPPORTED_TYPE'));
+    }
+
+    return callback(null, true);
+  },
+});
+
+function normalizeRiderDocumentKey(value) {
+  const normalized = String(value || '')
+    .trim()
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase();
+
+  const aliases = {
+    idfront: 'idFront',
+    id_front: 'idFront',
+    identity_front: 'idFront',
+    idback: 'idBack',
+    id_back: 'idBack',
+    identity_back: 'idBack',
+    driverlicense: 'driverLicense',
+    driver_license: 'driverLicense',
+    vehiclelicense: 'vehicleLicense',
+    vehicle_license: 'vehicleLicense',
+    compulsoryinsurance: 'compulsoryInsurance',
+    compulsory_insurance: 'compulsoryInsurance',
+    insurance: 'compulsoryInsurance',
+  };
+
+  return aliases[normalized] || '';
+}
+
+function buildRiderApplicantStorageKey(phone, lineUserId) {
+  return crypto
+    .createHash('sha256')
+    .update(`${normalizePhone(phone)}:${String(lineUserId || '').trim()}`)
+    .digest('hex')
+    .slice(0, 40);
+}
+
+function riderDocumentExtension(mimeType, originalName = '') {
+  const extFromName = String(originalName || '')
+    .toLowerCase()
+    .match(/\.([a-z0-9]{1,8})$/)?.[1];
+
+  const allowedNameExt = new Set([
+    'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'
+  ]);
+
+  if (extFromName && allowedNameExt.has(extFromName)) {
+    return extFromName;
+  }
+
+  const map = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+  };
+
+  return map[mimeType] || 'bin';
+}
+
+async function handleRiderDocumentUpload(req, res) {
+  try {
+    const phone = normalizePhone(
+      req.body?.phone ||
+      req.headers['x-ubee-rider-phone'] ||
+      ''
+    );
+
+    const lineUserId = String(
+      req.body?.lineUserId ||
+      req.headers['x-ubee-rider-line-user-id'] ||
+      ''
+    ).trim();
+
+    const documentKey = normalizeRiderDocumentKey(
+      req.body?.documentType ||
+      req.body?.documentKey ||
+      req.headers['x-ubee-rider-document-type'] ||
+      ''
+    );
+
+    if (!/^09\d{8}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: '上傳證件前，請先輸入正確的手機號碼。',
+      });
+    }
+
+    if (!lineUserId.startsWith('U')) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的 LINE 身分，無法上傳證件。',
+      });
+    }
+
+    if (!documentKey || !RIDER_REQUIRED_DOCUMENTS[documentKey]) {
+      return res.status(400).json({
+        success: false,
+        message: '證件類型不正確。',
+      });
+    }
+
+    const uploadFile = req.file;
+    const fileBuffer = uploadFile?.buffer;
+
+    if (!uploadFile || !Buffer.isBuffer(fileBuffer) || !fileBuffer.length) {
+      return res.status(400).json({
+        success: false,
+        message: '沒有收到證件檔案，請重新選擇後上傳。',
+      });
+    }
+
+    if (fileBuffer.length > RIDER_DOCUMENT_MAX_BYTES) {
+      return res.status(413).json({
+        success: false,
+        message: '單一證件檔案不可超過 6 MB。',
+      });
+    }
+
+    const contentType = String(
+      uploadFile.mimetype || ''
+    ).trim().toLowerCase();
+
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
+
+    if (!allowedMimeTypes.has(contentType)) {
+      return res.status(415).json({
+        success: false,
+        message: '證件檔案只支援 JPG、PNG、WEBP 或 HEIC。',
+      });
+    }
+
+    if (
+      !RIDER_DOCUMENT_STORAGE_BUCKET ||
+      RIDER_DOCUMENT_STORAGE_BUCKET.startsWith('.')
+    ) {
+      return res.status(503).json({
+        success: false,
+        code: 'RIDER_DOCUMENT_STORAGE_NOT_CONFIGURED',
+        message: 'Firebase Storage Bucket 尚未設定。請在 Render 設定 FIREBASE_STORAGE_BUCKET。',
+      });
+    }
+
+    const originalName = cleanText(
+      uploadFile.originalname || documentKey,
+      180
+    );
+
+    const applicantKey = buildRiderApplicantStorageKey(
+      phone,
+      lineUserId
+    );
+
+    const uploadId = crypto.randomUUID();
+    const extension = riderDocumentExtension(
+      contentType,
+      originalName
+    );
+
+    const storagePath =
+      `rider-documents-v2/pending/${applicantKey}/` +
+      `${documentKey}/${Date.now()}_${uploadId}.${extension}`;
+
+    const sha256 = crypto
+      .createHash('sha256')
+      .update(fileBuffer)
+      .digest('hex');
+
+    const bucket = admin
+      .storage()
+      .bucket(RIDER_DOCUMENT_STORAGE_BUCKET);
+
+    const file = bucket.file(storagePath);
+
+    await file.save(fileBuffer, {
+      resumable: false,
+      validation: 'md5',
+      metadata: {
+        contentType,
+        cacheControl: 'private, max-age=0, no-transform',
+        metadata: {
+          riderApplicantKey: applicantKey,
+          riderDocumentKey: documentKey,
+          riderDocumentType: RIDER_REQUIRED_DOCUMENTS[documentKey],
+          sha256,
+          dataVersion: String(RIDER_V2_DATA_VERSION),
+        },
+      },
+    });
+
+    return res.json({
+      success: true,
+      document: {
+        documentKey,
+        documentType: RIDER_REQUIRED_DOCUMENTS[documentKey],
+        label: RIDER_DOCUMENT_LABELS[documentKey],
+        originalName,
+        mimeType: contentType,
+        sizeBytes: fileBuffer.length,
+        sha256,
+        storageBucket: bucket.name,
+        storagePath,
+        uploadedAtMs: Date.now(),
+      },
+    });
+  } catch (error) {
+    console.error('❌ 小U證件上傳失敗：', error);
+
+    return res.status(500).json({
+      success: false,
+      message: '證件上傳失敗，請稍後再試。',
+      error: error.message,
+    });
+  }
+}
+
+async function validateRiderApplicationDocuments(
+  documents,
+  phone,
+  lineUserId
+) {
+  const safeDocuments =
+    documents && typeof documents === 'object'
+      ? documents
+      : {};
+
+  const applicantKey = buildRiderApplicantStorageKey(
+    phone,
+    lineUserId
+  );
+
+  const bucket = admin
+    .storage()
+    .bucket(RIDER_DOCUMENT_STORAGE_BUCKET);
+
+  const normalized = {};
+
+  for (const [documentKey, documentType] of Object.entries(
+    RIDER_REQUIRED_DOCUMENTS
+  )) {
+    const item = safeDocuments[documentKey];
+
+    if (!item || typeof item !== 'object') {
+      return {
+        ok: false,
+        message: `請上傳${RIDER_DOCUMENT_LABELS[documentKey]}。`,
+      };
+    }
+
+    const storagePath = String(item.storagePath || '').trim();
+    const storageBucket = String(
+      item.storageBucket || RIDER_DOCUMENT_STORAGE_BUCKET
+    ).trim();
+
+    const expectedPrefix =
+      `rider-documents-v2/pending/${applicantKey}/` +
+      `${documentKey}/`;
+
+    if (
+      storageBucket !== bucket.name ||
+      !storagePath.startsWith(expectedPrefix)
+    ) {
+      return {
+        ok: false,
+        message: `${RIDER_DOCUMENT_LABELS[documentKey]}的上傳資料不正確，請重新上傳。`,
+      };
+    }
+
+    const file = bucket.file(storagePath);
+    const [exists] = await file.exists();
+
+    if (!exists) {
+      return {
+        ok: false,
+        message: `找不到${RIDER_DOCUMENT_LABELS[documentKey]}檔案，請重新上傳。`,
+      };
+    }
+
+    const [metadata] = await file.getMetadata();
+    const customMetadata = metadata.metadata || {};
+
+    if (
+      String(customMetadata.riderApplicantKey || '') !== applicantKey ||
+      String(customMetadata.riderDocumentKey || '') !== documentKey ||
+      String(customMetadata.riderDocumentType || '') !== documentType
+    ) {
+      return {
+        ok: false,
+        message: `${RIDER_DOCUMENT_LABELS[documentKey]}的檔案驗證失敗，請重新上傳。`,
+      };
+    }
+
+    normalized[documentKey] = {
+      documentKey,
+      documentType,
+      label: RIDER_DOCUMENT_LABELS[documentKey],
+      originalName: cleanText(item.originalName || '', 180),
+      mimeType: String(metadata.contentType || item.mimeType || '').trim(),
+      sizeBytes: Number(metadata.size || item.sizeBytes || 0),
+      sha256: String(customMetadata.sha256 || item.sha256 || '').trim(),
+      storageBucket: bucket.name,
+      storagePath,
+      reviewStatus: 'pending',
+      uploadedAtMs: Number(item.uploadedAtMs || Date.now()),
+    };
+  }
+
+  return {
+    ok: true,
+    documents: normalized,
+  };
+}
 
 
 // =====================================================
@@ -285,7 +674,7 @@ app.use((req, res, next) => {
 
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-UBee-Support-Case-Id, X-UBee-Support-Access-Token, X-UBee-Support-Admin-Key, X-UBee-Support-Operator, X-UBee-Support-File-Name, X-UBee-Support-Evidence-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-UBee-Support-Case-Id, X-UBee-Support-Access-Token, X-UBee-Support-Admin-Key, X-UBee-Support-Operator, X-UBee-Support-File-Name, X-UBee-Support-Evidence-Type, X-UBee-Rider-Phone, X-UBee-Rider-Line-User-Id, X-UBee-Rider-Document-Type, X-UBee-Rider-File-Name');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
@@ -2672,6 +3061,56 @@ app.get('/rider-app-login', (req, res) => {
   `);
 });
 
+
+// UBee 小U資料庫 V2：使用 multipart/form-data 上傳單一證件。
+// 欄位名稱固定為 file；其他欄位為 phone、lineUserId、documentType。
+app.post('/api/rider/documents/upload', (req, res) => {
+  riderDocumentUpload.single('file')(req, res, error => {
+    if (error) {
+      const isSizeError =
+        error instanceof multer.MulterError &&
+        error.code === 'LIMIT_FILE_SIZE';
+
+      const isTypeError =
+        String(error.message || '') ===
+        'RIDER_DOCUMENT_UNSUPPORTED_TYPE';
+
+      return res.status(isSizeError ? 413 : 415).json({
+        success: false,
+        message: isSizeError
+          ? '單一證件檔案不可超過 6 MB。'
+          : isTypeError
+            ? '證件檔案只支援 JPG、PNG、WEBP 或 HEIC。'
+            : '證件檔案格式不正確，請重新選擇。',
+      });
+    }
+
+    return handleRiderDocumentUpload(req, res);
+  });
+});
+
+app.get('/api/rider/application-v2/config', (req, res) => {
+  return res.json({
+    success: true,
+    dataVersion: RIDER_V2_DATA_VERSION,
+    applicationRound: RIDER_V2_APPLICATION_ROUND,
+    applicationCollection: RIDER_V2_COLLECTIONS.applications,
+    requiredDocuments: Object.keys(RIDER_REQUIRED_DOCUMENTS).map(key => ({
+      key,
+      type: RIDER_REQUIRED_DOCUMENTS[key],
+      label: RIDER_DOCUMENT_LABELS[key],
+      required: true,
+    })),
+    allowedMimeTypes: [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ],
+    maxFileSizeBytes: RIDER_DOCUMENT_MAX_BYTES,
+  });
+});
 
 // UBee 第五階段：證據檔案採 raw body，上傳路由必須放在 express.json() 前。
 app.post(
@@ -11492,10 +11931,14 @@ app.get("/", (req, res) => {
 // ===== 騎手資料（暫存記憶體）=====
 const riders = {};
 
-// ===== 騎手註冊 API：正式營運穩定版 =====
-// 寫入位置：
-// 1. riders/{手機號碼}：正式騎士主資料，審核與接單權限使用
-// 2. riderApplications/{手機號碼}：申請紀錄備份，方便 Firebase 後台查看申請資料
+// ============================================================
+// UBee 小U註冊 API V2
+// 正式分層規則：
+// 1. 申請送出時，只建立 riderApplicationsV2/{手機號碼}
+// 2. 不提前建立 ridersV2
+// 3. 審核通過後，才由審核流程建立正式 ridersV2
+// 4. 身分證、駕照、行照、強制險檔案只存 Firebase Storage 路徑
+// ============================================================
 app.post('/api/rider/register', async (req, res) => {
   try {
     const {
@@ -11504,18 +11947,26 @@ app.post('/api/rider/register', async (req, res) => {
       lineId,
       userId,
       lineUserId,
+      birthDate,
       district,
       city,
       residenceCity,
       residenceDistrict,
       vehicle,
       plateNumber,
+      vehicleOwnerType,
+      vehicleOwnerConsent,
+      compulsoryInsuranceExpiryDate,
       area,
       serviceArea,
       serviceCity,
       serviceCities,
       serviceDistricts,
       availableTime,
+      emergencyContactName,
+      emergencyContactRelationship,
+      emergencyContactPhone,
+      documents,
 
       driverLicenseConfirmed,
       vehicleLicenseConfirmed,
@@ -11528,13 +11979,22 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm,
       liabilityConfirm,
       privacyConfirm,
+      identityDocumentConsent,
+      documentAuthenticityConfirm,
+      locationDataConsent,
       jkoRequirementAgree,
       communityRequirementAgree,
       applicationSource,
     } = req.body || {};
 
     const cleanPhone = normalizePhone(phone || '');
-    const riderLineUserId = String(lineUserId || userId || '').trim();
+    const riderLineUserId = String(
+      lineUserId || userId || ''
+    ).trim();
+
+    const cleanEmergencyPhone = normalizePhone(
+      emergencyContactPhone || ''
+    );
 
     const inferredResidence = inferTaiwanRegion(
       district ||
@@ -11603,16 +12063,16 @@ app.post('/api/rider/register', async (req, res) => {
       hour12: false,
     });
 
-    const toBool = (value) =>
+    const toBool = value =>
       value === true ||
       value === 'true' ||
       value === 1 ||
       value === '1';
 
-        const requiredAgreements = [
+    // 良民證目前不列為申請必備文件，也不作為送出條件。
+    const requiredAgreements = [
       driverLicenseConfirmed,
       vehicleLicenseConfirmed,
-      policeRecordConfirmed,
       businessConditionAgree,
       insuranceConfirm,
       violationConfirm,
@@ -11620,6 +12080,9 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm,
       liabilityConfirm,
       privacyConfirm,
+      identityDocumentConsent,
+      documentAuthenticityConfirm,
+      locationDataConsent,
       jkoRequirementAgree,
       communityRequirementAgree,
     ];
@@ -11627,22 +12090,36 @@ app.post('/api/rider/register', async (req, res) => {
     if (!requiredAgreements.every(toBool)) {
       return res.status(400).json({
         success: false,
-        message: '請先閱讀並同意全部合作規範後再送出申請。',
-      });
-    }
-    
-    // ===== 1. 正式版欄位檢查 =====
-    if (!riderLineUserId || !riderLineUserId.startsWith('U')) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的 LINE 身分，請從 UBee 騎士端的「申請成為小U」入口重新進入申請流程。',
+        message: '請先閱讀並同意全部合作、個資與證件規範後再送出申請。',
       });
     }
 
-    if (!name || !phone || !lineId || !finalDistrict || !vehicle || !plateNumber || !finalServiceArea || !availableTime) {
+    if (!riderLineUserId || !riderLineUserId.startsWith('U')) {
       return res.status(400).json({
         success: false,
-        message: '資料不完整，請確認所有必填欄位都有填寫。',
+        message: '缺少正確的 LINE 身分，請從 UBee 騎士端的申請入口重新進入。',
+      });
+    }
+
+    if (
+      !name ||
+      !phone ||
+      !lineId ||
+      !birthDate ||
+      !finalDistrict ||
+      !vehicle ||
+      !plateNumber ||
+      !vehicleOwnerType ||
+      !compulsoryInsuranceExpiryDate ||
+      !finalServiceArea ||
+      !availableTime ||
+      !emergencyContactName ||
+      !emergencyContactRelationship ||
+      !emergencyContactPhone
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: '資料不完整，請確認基本資料、車輛資料、保險資料與緊急聯絡人都已填寫。',
       });
     }
 
@@ -11653,21 +12130,55 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    if (String(name).trim().length < 2 || String(name).trim().length > 20) {
+    if (!/^09\d{8}$/.test(cleanEmergencyPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: '請輸入正確的緊急聯絡人手機號碼。',
+      });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(birthDate || '').trim())) {
+      return res.status(400).json({
+        success: false,
+        message: '出生年月日格式不正確。',
+      });
+    }
+
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        String(compulsoryInsuranceExpiryDate || '').trim()
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: '強制險到期日格式不正確。',
+      });
+    }
+
+    if (
+      String(name).trim().length < 2 ||
+      String(name).trim().length > 20
+    ) {
       return res.status(400).json({
         success: false,
         message: '姓名長度需為 2～20 字。',
       });
     }
 
-    if (String(lineId).trim().length < 2 || String(lineId).trim().length > 60) {
+    if (
+      String(lineId).trim().length < 2 ||
+      String(lineId).trim().length > 60
+    ) {
       return res.status(400).json({
         success: false,
         message: 'LINE ID 長度不正確，請重新確認。',
       });
     }
 
-    if (String(finalDistrict).trim().length < 2 || String(finalDistrict).trim().length > 80) {
+    if (
+      String(finalDistrict).trim().length < 2 ||
+      String(finalDistrict).trim().length > 80
+    ) {
       return res.status(400).json({
         success: false,
         message: '居住地區請填寫完整，例如：台中市豐原區。',
@@ -11681,28 +12192,76 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    if (finalServiceArea.length < 2 || finalServiceArea.length > 80) {
+    if (
+      finalServiceArea.length < 2 ||
+      finalServiceArea.length > 80
+    ) {
       return res.status(400).json({
         success: false,
         message: '可服務區域請填寫 2～80 字。',
       });
     }
 
+    const normalizedVehicleOwnerType = String(
+      vehicleOwnerType || ''
+    ).trim().toLowerCase();
+
+    if (!['self', 'other'].includes(normalizedVehicleOwnerType)) {
+      return res.status(400).json({
+        success: false,
+        message: '請確認車輛是本人所有或經車主同意使用。',
+      });
+    }
+
+    if (
+      normalizedVehicleOwnerType === 'other' &&
+      !toBool(vehicleOwnerConsent)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: '使用他人車輛時，必須確認已取得車主同意。',
+      });
+    }
+
+    const documentValidation =
+      await validateRiderApplicationDocuments(
+        documents,
+        cleanPhone,
+        riderLineUserId
+      );
+
+    if (!documentValidation.ok) {
+      return res.status(400).json({
+        success: false,
+        message: documentValidation.message,
+      });
+    }
+
     const riderId = cleanPhone;
 
-    const riderRef = db.collection('riders').doc(riderId);
-    const applicationRef = db.collection('riderApplications').doc(riderId);
+    const applicationRef = db
+      .collection(RIDER_V2_COLLECTIONS.applications)
+      .doc(riderId);
 
-    const rider = {
+    const officialRiderRef = db
+      .collection(RIDER_V2_COLLECTIONS.riders)
+      .doc(riderId);
+
+    const application = {
       riderId,
       id: riderId,
       applicationId: riderId,
+
+      dataVersion: RIDER_V2_DATA_VERSION,
+      applicationRound: RIDER_V2_APPLICATION_ROUND,
+      sourceCollection: RIDER_V2_COLLECTIONS.applications,
 
       name: cleanText(name, 20),
       phone: cleanPhone,
       lineId: cleanText(lineId || '', 60),
       userId: riderLineUserId,
       lineUserId: riderLineUserId,
+      birthDate: String(birthDate || '').trim(),
 
       district: cleanText(finalDistrict || '', 80),
       city: cleanText(finalResidenceCity || '', 20),
@@ -11711,49 +12270,55 @@ app.post('/api/rider/register', async (req, res) => {
 
       vehicle: cleanText(vehicle || '', 40),
       plateNumber: cleanText(plateNumber || '', 20),
+      vehicleOwnerType: normalizedVehicleOwnerType,
+      vehicleOwnerConsent:
+        normalizedVehicleOwnerType === 'self'
+          ? true
+          : toBool(vehicleOwnerConsent),
+      compulsoryInsuranceExpiryDate:
+        String(compulsoryInsuranceExpiryDate || '').trim(),
 
       area: cleanText(finalServiceArea || '', 80),
       serviceArea: cleanText(finalServiceArea || '', 80),
       serviceCity: cleanText(finalServiceCity || '', 20),
       serviceCities: normalizedServiceCities,
       serviceDistricts: normalizedServiceDistricts,
-
       availableTime: cleanText(availableTime || '', 80),
+
+      emergencyContact: {
+        name: cleanText(emergencyContactName || '', 30),
+        relationship: cleanText(
+          emergencyContactRelationship || '',
+          30
+        ),
+        phone: cleanEmergencyPhone,
+      },
+
+      documents: documentValidation.documents,
+      documentsComplete: true,
+      documentReviewStatus: 'pending',
 
       approved: false,
       status: 'pending',
       reviewStatus: 'pending',
-
-      // V4 生命週期：申請完成後進入審核中，通過後先進 TRAINING，不直接開放接單。
       lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
       canAcceptOrders: false,
       riderLevel: 'L0',
       onboardingRequired: true,
-      onboarding: {
-        jkopayInstalled: false,
-        announcementGroupJoined: false,
-        chatGroupJoined: false,
-        reportGroupJoined: false,
-        modules: {},
-        quizScore: 0,
-        quizPassed: false,
-        completed: false,
-      },
-      certifications: { basic: false },
-      governance: { warningCount: 0, violationCount: 0 },
 
-      online: false,
-      busy: false,
-      currentOrderId: '',
-
-      source: cleanText(applicationSource || 'liff_rider_apply', 60),
-      submittedFrom: cleanText(applicationSource || 'rider_apply', 60),
-      applicationType: 'rider',
+      source: cleanText(
+        applicationSource || 'liff_rider_apply_v2',
+        60
+      ),
+      submittedFrom: cleanText(
+        applicationSource || 'rider_apply_v2',
+        60
+      ),
+      applicationType: 'rider_v2',
 
       driverLicenseConfirmed: toBool(driverLicenseConfirmed),
       vehicleLicenseConfirmed: toBool(vehicleLicenseConfirmed),
       policeRecordConfirmed: toBool(policeRecordConfirmed),
-
       businessConditionAgree: toBool(businessConditionAgree),
       insuranceConfirm: toBool(insuranceConfirm),
       violationConfirm: toBool(violationConfirm),
@@ -11761,8 +12326,15 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm: toBool(riderRuleConfirm),
       liabilityConfirm: toBool(liabilityConfirm),
       privacyConfirm: toBool(privacyConfirm),
+      identityDocumentConsent: toBool(identityDocumentConsent),
+      documentAuthenticityConfirm: toBool(
+        documentAuthenticityConfirm
+      ),
+      locationDataConsent: toBool(locationDataConsent),
       jkoRequirementAgree: toBool(jkoRequirementAgree),
-      communityRequirementAgree: toBool(communityRequirementAgree),
+      communityRequirementAgree: toBool(
+        communityRequirementAgree
+      ),
 
       adminNotifySent: false,
       adminNotifyStatus: 'pending',
@@ -11770,104 +12342,88 @@ app.post('/api/rider/register', async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-
       createdAtMs: nowMs,
       submittedAtMs: nowMs,
       updatedAtMs: nowMs,
       submittedAtText,
     };
 
-    const applicationPayload = {
-      ...rider,
-      applicationCollection: 'riderApplications',
-    };
-
-    // ===== 2. 正式版防重複：同手機 / 同 LINE 都不能重複建立 =====
     let duplicatePayload = null;
 
-    await db.runTransaction(async (tx) => {
-      const phoneDoc = await tx.get(riderRef);
+    await db.runTransaction(async tx => {
+      const [applicationDoc, officialRiderDoc] = await Promise.all([
+        tx.get(applicationRef),
+        tx.get(officialRiderRef),
+      ]);
 
-      if (phoneDoc.exists) {
-        const oldData = phoneDoc.data() || {};
+      if (officialRiderDoc.exists) {
+        const oldData = officialRiderDoc.data() || {};
+        duplicatePayload = {
+          riderId,
+          status: oldData.status || 'approved',
+          message: '此手機號碼已完成新版小U審核，不需要重複申請。',
+        };
+        return;
+      }
+
+      if (applicationDoc.exists) {
+        const oldData = applicationDoc.data() || {};
         const oldStatus = String(oldData.status || 'pending');
-
         duplicatePayload = {
           riderId,
           status: oldStatus,
           message:
-            oldStatus === 'approved'
-              ? '此手機號碼已通過 UBee 跑腿騎士審核。'
-              : oldStatus === 'rejected'
-                ? '此手機號碼的申請曾被拒絕，請聯繫 UBee 辦公室協助處理。'
-                : '此手機號碼已送出申請，請等待 UBee 跑腿審核通過。',
+            oldStatus === 'rejected'
+              ? '此手機號碼的新版申請曾被拒絕，請聯繫 UBee 辦公室協助處理。'
+              : oldStatus === 'training' || oldStatus === 'approved'
+                ? '此手機號碼已通過新版小U審核。'
+                : '此手機號碼已送出新版申請，請等待 UBee 審核。',
         };
-
         return;
       }
 
-      const lineSnap = await tx.get(
-        db.collection('riders')
+      const applicationLineSnap = await tx.get(
+        db.collection(RIDER_V2_COLLECTIONS.applications)
           .where('lineUserId', '==', riderLineUserId)
           .limit(1)
       );
 
-      if (!lineSnap.empty) {
-        const oldDoc = lineSnap.docs[0];
+      if (!applicationLineSnap.empty) {
+        const oldDoc = applicationLineSnap.docs[0];
         const oldData = oldDoc.data() || {};
-        const oldStatus = String(oldData.status || 'pending');
-
         duplicatePayload = {
           riderId: oldData.riderId || oldDoc.id,
-          status: oldStatus,
-          message:
-            oldStatus === 'approved'
-              ? '你已通過 UBee 跑腿騎士審核。'
-              : oldStatus === 'rejected'
-                ? '你的申請曾被拒絕，請聯繫 UBee 辦公室協助處理。'
-                : '你的資料已送出，請等待 UBee 跑腿審核通過。',
+          status: oldData.status || 'pending',
+          message: '此 LINE 帳號已送出新版小U申請，不能重複申請。',
         };
-
         return;
       }
 
-      tx.set(riderRef, rider, { merge: true });
-      tx.set(applicationRef, applicationPayload, { merge: true });
+      tx.set(applicationRef, application, { merge: false });
     });
 
     if (duplicatePayload) {
-  console.log('⚠️ 騎士重複申請，未新增新資料：', {
-    inputPhone: cleanPhone,
-    inputLineUserId: riderLineUserId,
-    existingRiderId: duplicatePayload.riderId,
-    existingStatus: duplicatePayload.status,
-    message: duplicatePayload.message,
-  });
+      return res.json({
+        success: true,
+        duplicate: true,
+        alreadyExists: true,
+        riderId: duplicatePayload.riderId,
+        status: duplicatePayload.status,
+        collection: RIDER_V2_COLLECTIONS.applications,
+        applicationCollection: RIDER_V2_COLLECTIONS.applications,
+        message: duplicatePayload.message,
+      });
+    }
 
-  return res.json({
-    success: true,
-    duplicate: true,
-    alreadyExists: true,
-    riderId: duplicatePayload.riderId,
-    status: duplicatePayload.status,
-    collection: 'riders',
-    applicationCollection: 'riderApplications',
-    message: duplicatePayload.message,
-  });
-}
-
-    riders[riderId] = rider;
-
-    console.log('✅ 新騎士申請已寫入 Firebase：', {
+    console.log('✅ 新版小U申請已寫入 Firebase：', {
       riderId,
-      name: rider.name,
-      phone: rider.phone,
-      lineUserId: rider.lineUserId,
-      collection: 'riders',
-      applicationCollection: 'riderApplications',
+      name: application.name,
+      phone: application.phone,
+      lineUserId: application.lineUserId,
+      applicationCollection: RIDER_V2_COLLECTIONS.applications,
+      documentsComplete: true,
     });
 
-    // ===== 3. LINE 審核通知：失敗不能影響 Firebase 寫入結果 =====
     let notifyOk = false;
     let notifyErrorMessage = '';
 
@@ -11879,56 +12435,49 @@ app.post('/api/rider/register', async (req, res) => {
       await pushToGroup(
         LINE_ADMIN_GROUP_ID,
         createRiderReviewFlex({
-          ...rider,
+          ...application,
           createdAt: submittedAtText,
           submittedAtText,
         })
       );
 
       notifyOk = true;
-      console.log('✅ 新騎士審核通知已送出：', riderId);
     } catch (notifyErr) {
       notifyOk = false;
-      notifyErrorMessage =
-        notifyErr && notifyErr.message
-          ? notifyErr.message
-          : String(notifyErr);
-
-      console.error('⚠️ 新騎士審核通知失敗，但 Firebase 已成功寫入：', {
-        riderId,
-        error: notifyErrorMessage,
-      });
+      notifyErrorMessage = notifyErr?.message || String(notifyErr);
+      console.error(
+        '⚠️ 新版小U審核通知失敗，但申請資料已成功寫入：',
+        notifyErrorMessage
+      );
     }
 
     const notifyUpdate = {
       adminNotifySent: notifyOk,
       adminNotifyStatus: notifyOk ? 'sent' : 'failed',
-      adminNotifyUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      adminNotifyUpdatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
       adminNotifyUpdatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: Date.now(),
     };
 
     if (!notifyOk) {
       notifyUpdate.adminNotifyError = notifyErrorMessage;
     }
 
-    await Promise.all([
-      riderRef.set(notifyUpdate, { merge: true }),
-      applicationRef.set(notifyUpdate, { merge: true }),
-    ]).catch((notifySaveErr) => {
-      console.error('⚠️ 儲存審核通知狀態失敗：', notifySaveErr);
-    });
+    await applicationRef.set(notifyUpdate, { merge: true });
 
     return res.json({
       success: true,
       riderId,
-      collection: 'riders',
-      applicationCollection: 'riderApplications',
+      collection: RIDER_V2_COLLECTIONS.applications,
+      applicationCollection: RIDER_V2_COLLECTIONS.applications,
+      officialRiderCreated: false,
       adminNotifySent: notifyOk,
-      message: '已送出申請，等待 UBee 跑腿審核。',
+      message: '已送出新版小U申請，等待 UBee 審核。',
     });
-
   } catch (err) {
-    console.error('❌ 騎士註冊失敗：', err);
+    console.error('❌ 新版小U註冊失敗：', err);
 
     return res.status(500).json({
       success: false,
@@ -11940,12 +12489,13 @@ app.post('/api/rider/register', async (req, res) => {
 
 
 // ============================================================
-// UBee 小U申請狀態查詢：供騎士端一體化入口使用
-// 只回傳必要狀態，不回傳敏感申請資料。
+// UBee 小U申請狀態查詢 V2
+// 查詢順序：ridersV2 -> riderApplicationsV2 -> 舊 riders 相容資料
 // ============================================================
 app.get('/api/rider/application-status', async (req, res) => {
   try {
     const cleanPhone = normalizePhone(req.query?.phone || '');
+
     if (!/^09\d{8}$/.test(cleanPhone)) {
       return res.status(400).json({
         success: false,
@@ -11953,55 +12503,110 @@ app.get('/api/rider/application-status', async (req, res) => {
       });
     }
 
-    let riderDoc = await db.collection('riders').doc(cleanPhone).get();
+    const officialDoc = await db
+      .collection(RIDER_V2_COLLECTIONS.riders)
+      .doc(cleanPhone)
+      .get();
 
-    if (!riderDoc.exists) {
+    if (officialDoc.exists) {
+      const rider = officialDoc.data() || {};
+      const lifecycleStatus = getRiderV4LifecycleStatus(rider);
+
+      return res.json({
+        success: true,
+        found: true,
+        source: RIDER_V2_COLLECTIONS.riders,
+        riderId: rider.riderId || officialDoc.id,
+        name: rider.name || '',
+        approved: rider.approved === true,
+        reviewStatus: rider.reviewStatus || rider.status || '',
+        status: rider.status || '',
+        lifecycleStatus,
+        canAcceptOrders: canRiderAcceptOrdersV4(rider),
+        riderLevel: rider.riderLevel || '',
+        message: '你的新版 UBee 小U資格已建立。',
+      });
+    }
+
+    const applicationDoc = await db
+      .collection(RIDER_V2_COLLECTIONS.applications)
+      .doc(cleanPhone)
+      .get();
+
+    if (applicationDoc.exists) {
+      const application = applicationDoc.data() || {};
+      const status = String(application.status || 'pending');
+
+      const messageMap = {
+        pending: '新版申請已送出，正在等待 UBee 審核。',
+        training: '審核已通過，請登入騎士端完成數位入職。',
+        approved: '審核已通過，正式小U資料正在建立。',
+        rejected: '此申請未通過審核，如需了解請聯繫 UBee。',
+      };
+
+      return res.json({
+        success: true,
+        found: true,
+        source: RIDER_V2_COLLECTIONS.applications,
+        riderId: application.riderId || applicationDoc.id,
+        name: application.name || '',
+        approved: application.approved === true,
+        reviewStatus:
+          application.reviewStatus || application.status || '',
+        status,
+        lifecycleStatus:
+          application.lifecycleStatus ||
+          RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+        canAcceptOrders: false,
+        riderLevel: application.riderLevel || 'L0',
+        documentsComplete:
+          application.documentsComplete === true,
+        message: messageMap[status] || '已找到新版申請資料。',
+      });
+    }
+
+    // 過渡期保留舊 riders 查詢，待全員重新申請完成後移除。
+    let legacyDoc = await db
+      .collection('riders')
+      .doc(cleanPhone)
+      .get();
+
+    if (!legacyDoc.exists) {
       const snap = await db.collection('riders')
         .where('phone', '==', cleanPhone)
         .limit(1)
         .get();
-      if (!snap.empty) riderDoc = snap.docs[0];
+      if (!snap.empty) legacyDoc = snap.docs[0];
     }
 
-    if (!riderDoc.exists) {
+    if (legacyDoc.exists) {
+      const rider = legacyDoc.data() || {};
       return res.json({
         success: true,
-        found: false,
-        status: 'not_found',
-        lifecycleStatus: 'NOT_APPLIED',
-        message: '查無申請資料，可直接申請成為 UBee 小U。',
+        found: true,
+        source: 'legacy_riders',
+        riderId: rider.riderId || legacyDoc.id,
+        name: rider.name || '',
+        approved: rider.approved === true,
+        reviewStatus: rider.reviewStatus || rider.status || '',
+        status: rider.status || '',
+        lifecycleStatus: 'LEGACY_REAPPLICATION_REQUIRED',
+        canAcceptOrders: canRiderAcceptOrdersV4(rider),
+        riderLevel: rider.riderLevel || '',
+        reapplicationRequired: true,
+        message: '此為舊版小U資料，請依公告重新提交新版申請。',
       });
     }
 
-    const rider = riderDoc.data() || {};
-    const lifecycleStatus = getRiderV4LifecycleStatus(rider);
-
-    const messageMap = {
-      UNDER_REVIEW: '申請已送出，正在等待 UBee 審核。',
-      TRAINING: '審核已通過，請登入騎士端完成 V4 數位入職。',
-      ACTIVE: '你的 UBee 小U資格已啟用，可以登入騎士端。',
-      RETRAINING: '目前需要完成重新教育，請登入騎士端查看。',
-      RESTRICTED: '目前接單資格受限，請登入騎士端查看。',
-      SUSPENDED: '目前資格暫停，請聯繫 UBee。',
-      BANNED: '目前帳號已停權，請聯繫 UBee。',
-      REJECTED: '此申請未通過審核，如需了解請聯繫 UBee。',
-    };
-
     return res.json({
       success: true,
-      found: true,
-      riderId: rider.riderId || riderDoc.id,
-      name: rider.name || '',
-      approved: rider.approved === true,
-      reviewStatus: rider.reviewStatus || rider.status || '',
-      status: rider.status || '',
-      lifecycleStatus,
-      canAcceptOrders: canRiderAcceptOrdersV4(rider),
-      riderLevel: rider.riderLevel || '',
-      message: messageMap[lifecycleStatus] || '已找到申請資料。',
+      found: false,
+      status: 'not_found',
+      lifecycleStatus: 'NOT_APPLIED',
+      message: '查無新版申請資料，可直接申請成為 UBee 小U。',
     });
   } catch (err) {
-    console.error('❌ 查詢小U申請狀態失敗：', err);
+    console.error('❌ 查詢新版小U申請狀態失敗：', err);
     return res.status(500).json({
       success: false,
       message: '查詢申請狀態失敗，請稍後再試。',
@@ -14767,18 +15372,203 @@ async function saveRider(rider) {
   return payload;
 }
 
+function buildApprovedRiderV2(application, approvedBy) {
+  const phone = normalizePhone(
+    application.phone || application.riderId || application.id || ''
+  );
+
+  if (!/^09\d{8}$/.test(phone)) {
+    throw new Error('RIDER_V2_PHONE_INVALID');
+  }
+
+  const nowMs = Date.now();
+
+  return {
+    riderId: phone,
+    id: phone,
+    applicationId: application.applicationId || phone,
+    applicationCollection: RIDER_V2_COLLECTIONS.applications,
+    dataVersion: RIDER_V2_DATA_VERSION,
+    applicationRound:
+      application.applicationRound || RIDER_V2_APPLICATION_ROUND,
+
+    name: cleanText(application.name || '', 20),
+    phone,
+    lineId: cleanText(application.lineId || '', 60),
+    userId: String(
+      application.lineUserId || application.userId || ''
+    ).trim(),
+    lineUserId: String(
+      application.lineUserId || application.userId || ''
+    ).trim(),
+
+    district: cleanText(application.district || '', 80),
+    city: cleanText(application.city || '', 20),
+    residenceCity: cleanText(
+      application.residenceCity || application.city || '',
+      20
+    ),
+    residenceDistrict: cleanText(
+      application.residenceDistrict || '',
+      20
+    ),
+
+    vehicle: cleanText(application.vehicle || '', 40),
+    plateNumber: cleanText(application.plateNumber || '', 20),
+    vehicleOwnerType: String(
+      application.vehicleOwnerType || 'self'
+    ).trim(),
+    compulsoryInsuranceExpiryDate: String(
+      application.compulsoryInsuranceExpiryDate || ''
+    ).trim(),
+
+    area: cleanText(
+      application.serviceArea || application.area || '',
+      80
+    ),
+    serviceArea: cleanText(
+      application.serviceArea || application.area || '',
+      80
+    ),
+    serviceCity: cleanText(application.serviceCity || '', 20),
+    serviceCities: Array.isArray(application.serviceCities)
+      ? application.serviceCities
+      : [],
+    serviceDistricts: Array.isArray(application.serviceDistricts)
+      ? application.serviceDistricts
+      : [],
+    availableTime: cleanText(application.availableTime || '', 80),
+
+    emergencyContact: {
+      name: cleanText(application.emergencyContact?.name || '', 30),
+      relationship: cleanText(
+        application.emergencyContact?.relationship || '',
+        30
+      ),
+      phone: normalizePhone(
+        application.emergencyContact?.phone || ''
+      ),
+    },
+
+    identityVerified: true,
+    driverLicenseVerified: true,
+    vehicleLicenseVerified: true,
+    compulsoryInsuranceVerified: true,
+    documentVerificationStatus: 'approved',
+
+    approved: true,
+    reviewStatus: 'approved',
+    status: 'training',
+    lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
+    canAcceptOrders: false,
+    riderLevel: 'L0',
+    onboardingRequired: true,
+    onboarding: {
+      jkopayInstalled: false,
+      announcementGroupJoined: false,
+      chatGroupJoined: false,
+      reportGroupJoined: false,
+      modules: {},
+      quizScore: 0,
+      quizPassed: false,
+      completed: false,
+      startedAtMs: nowMs,
+    },
+    certifications: { basic: false },
+    governance: { warningCount: 0, violationCount: 0 },
+
+    online: false,
+    busy: false,
+    currentOrderId: '',
+
+    approvedAt: nowMs,
+    approvedBy,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAtMs: nowMs,
+    updatedAtMs: nowMs,
+  };
+}
+
+async function saveRiderV2(rider, { mirrorLegacy = true } = {}) {
+  const phone = normalizePhone(rider?.phone || rider?.riderId || '');
+
+  if (!/^09\d{8}$/.test(phone)) {
+    throw new Error('RIDER_V2_PHONE_INVALID');
+  }
+
+  const payload = {
+    ...rider,
+    id: phone,
+    riderId: phone,
+    phone,
+    dataVersion: RIDER_V2_DATA_VERSION,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAtMs: Date.now(),
+  };
+
+  await db
+    .collection(RIDER_V2_COLLECTIONS.riders)
+    .doc(phone)
+    .set(payload, { merge: true });
+
+  if (mirrorLegacy && RIDER_V2_MIRROR_TO_LEGACY_RIDERS) {
+    await db
+      .collection('riders')
+      .doc(phone)
+      .set({
+        ...payload,
+        v2Mirror: true,
+        v2SourceCollection: RIDER_V2_COLLECTIONS.riders,
+      }, { merge: true });
+  }
+
+  riders[phone] = payload;
+  return payload;
+}
+
 async function getRider(riderId) {
   const id = String(riderId || '').trim();
   if (!id) return null;
 
+  // 審核按鈕必須優先讀取本輪新版申請，避免同手機的舊 riders 資料蓋過新申請。
+  const applicationDoc = await db
+    .collection(RIDER_V2_COLLECTIONS.applications)
+    .doc(id)
+    .get();
+
+  if (applicationDoc.exists) {
+    return {
+      id: applicationDoc.id,
+      ...applicationDoc.data(),
+      sourceCollection: RIDER_V2_COLLECTIONS.applications,
+    };
+  }
+
+  const officialDoc = await db
+    .collection(RIDER_V2_COLLECTIONS.riders)
+    .doc(id)
+    .get();
+
+  if (officialDoc.exists) {
+    const rider = {
+      id: officialDoc.id,
+      ...officialDoc.data(),
+      sourceCollection: RIDER_V2_COLLECTIONS.riders,
+    };
+    riders[id] = rider;
+    return rider;
+  }
+
   if (riders[id]) return riders[id];
 
-  const doc = await db.collection('riders').doc(id).get();
-  if (!doc.exists) return null;
+  const legacyDoc = await db.collection('riders').doc(id).get();
+  if (!legacyDoc.exists) return null;
 
   const rider = {
-    id: doc.id,
-    ...doc.data(),
+    id: legacyDoc.id,
+    ...legacyDoc.data(),
+    sourceCollection: 'riders',
   };
 
   riders[id] = rider;
@@ -15446,7 +16236,7 @@ async function getOrderOrReply(replyToken, orderId, notFoundText = '查無此訂
 async function getRiderOrReply(replyToken, riderId) {
   const rider = await getRider(riderId);
   if (!rider) {
-    await replyText(replyToken, '找不到此騎士申請，可能是系統重啟後暫存資料已消失。');
+    await replyText(replyToken, '找不到此新版小U申請資料，請確認申請編號是否正確。');
     return null;
   }
   return rider;
@@ -16188,6 +16978,16 @@ function createRiderReviewFlex(rider) {
       createInfoRow('車牌號碼', rider.plateNumber || '-'),
       createInfoRow('服務區域', rider.serviceArea || rider.area || '-'),
       createInfoRow('服務時段', rider.availableTime || '-'),
+      createInfoRow(
+        '證件資料',
+        rider.documentsComplete === true
+          ? '5 項已上傳，待管理端審核'
+          : '尚未完整'
+      ),
+      createInfoRow(
+        '強制險到期',
+        rider.compulsoryInsuranceExpiryDate || '-'
+      ),
       createInfoRow('狀態', rider.status === 'pending' ? '待審核' : rider.status),
       createInfoRow('申請時間', rider.createdAt),
       {
@@ -21494,74 +22294,89 @@ UBee 跑腿辦公室將會再依照您的需求，
     if (!permitted) return null;
 
     const riderId = getPostbackValue(data, 'approveRider');
-    const rider = await getRiderOrReply(event.replyToken, riderId);
-    if (!rider) return null;
+    const application = await getRiderOrReply(
+      event.replyToken,
+      riderId
+    );
+    if (!application) return null;
 
     if (
-      rider.approved === true ||
-      rider.reviewStatus === 'approved' ||
-      ['approved', 'training', 'active'].includes(String(rider.status || '').toLowerCase())
+      application.approved === true ||
+      application.reviewStatus === 'approved' ||
+      ['approved', 'training', 'active'].includes(
+        String(application.status || '').toLowerCase()
+      )
     ) {
-      return replyText(event.replyToken, '此小U已經通過審核，不需要重複操作。');
+      return replyText(
+        event.replyToken,
+        '此小U已經通過審核，不需要重複操作。'
+      );
     }
 
-    if (rider.status === 'rejected') {
-      return replyText(event.replyToken, '此騎士申請已被拒絕，不能再直接通過。');
+    if (application.status === 'rejected') {
+      return replyText(
+        event.replyToken,
+        '此騎士申請已被拒絕，不能再直接通過。'
+      );
     }
 
-    rider.status = 'training';
-    rider.approved = true;
-    rider.reviewStatus = 'approved';
-    rider.lifecycleStatus = RIDER_V4_LIFECYCLE.TRAINING;
-    rider.canAcceptOrders = false;
-    rider.riderLevel = rider.riderLevel || 'L0';
-    rider.onboardingRequired = true;
-    rider.onboarding = {
-      ...(rider.onboarding || {}),
-      jkopayInstalled: false,
-      announcementGroupJoined: false,
-      chatGroupJoined: false,
-      reportGroupJoined: false,
-      modules: {},
-      quizScore: 0,
-      quizPassed: false,
-      completed: false,
-      startedAtMs: Date.now(),
-    };
-    rider.certifications = { ...(rider.certifications || {}), basic: false };
-    rider.approvedAt = Date.now();
-    rider.approvedBy = userId;
-    await saveRider(rider);
+    if (application.documentsComplete !== true) {
+      return replyText(
+        event.replyToken,
+        '此新版申請的證件尚未完整，暫時不能通過審核。'
+      );
+    }
 
-    await db.collection('riderApplications').doc(rider.riderId).set({
-  status: 'training',
-  reviewStatus: 'approved',
-  lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
-  canAcceptOrders: false,
-  onboardingRequired: true,
-  approved: true,
-  approvedAt: rider.approvedAt,
-  approvedBy: userId,
-  reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-  reviewedAtMs: Date.now(),
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-}, { merge: true });
-    
-    if (rider.lineUserId) {
-  await client.pushMessage(rider.lineUserId, {
-    type: 'text',
-    text:
-      `🎉 恭喜您通過 UBee 跑腿小U審核！\n\n` +
-      `請點擊下方連結進入 UBee 騎士端：\n\n` +
-      `https://ubee-rider-web.vercel.app/rider.html\n\n` +
-      `登入後，請依照騎士端畫面完成後續設定與數位入職流程。\n\n` +
-      `— UBee 跑腿`
-  });
-}
-    
+    const approvedRider = buildApprovedRiderV2(
+      application,
+      userId
+    );
+
+    await saveRiderV2(approvedRider, {
+      mirrorLegacy: true,
+    });
+
+    await db
+      .collection(RIDER_V2_COLLECTIONS.applications)
+      .doc(approvedRider.riderId)
+      .set({
+        status: 'training',
+        reviewStatus: 'approved',
+        lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
+        canAcceptOrders: false,
+        onboardingRequired: true,
+        approved: true,
+        documentReviewStatus: 'approved',
+        officialRiderCollection: RIDER_V2_COLLECTIONS.riders,
+        officialRiderId: approvedRider.riderId,
+        approvedAt: approvedRider.approvedAt,
+        approvedBy: userId,
+        reviewedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        reviewedAtMs: Date.now(),
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: Date.now(),
+      }, { merge: true });
+
+    if (approvedRider.lineUserId) {
+      await client.pushMessage(approvedRider.lineUserId, {
+        type: 'text',
+        text:
+          `🎉 恭喜您通過 UBee 跑腿新版小U審核！\n\n` +
+          `請點擊下方連結進入 UBee 騎士端：\n\n` +
+          `${RIDER_WEB_URL}\n\n` +
+          `登入後，請依照騎士端畫面完成後續設定與數位入職流程。\n\n` +
+          `— UBee 跑腿`
+      });
+    }
+
     return replyText(
       event.replyToken,
-      `✅ 已通過騎士審核\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
+      `✅ 已通過新版小U審核\n\n` +
+      `姓名：${approvedRider.name}\n` +
+      `申請編號：${approvedRider.riderId}\n` +
+      `正式資料：${RIDER_V2_COLLECTIONS.riders}`
     );
   }
 
@@ -21570,44 +22385,56 @@ UBee 跑腿辦公室將會再依照您的需求，
     if (!permitted) return null;
 
     const riderId = getPostbackValue(data, 'rejectRider');
-    const rider = await getRiderOrReply(event.replyToken, riderId);
-    if (!rider) return null;
+    const application = await getRiderOrReply(
+      event.replyToken,
+      riderId
+    );
+    if (!application) return null;
 
     if (
-      rider.approved === true ||
-      rider.reviewStatus === 'approved' ||
-      ['approved', 'training', 'active'].includes(String(rider.status || '').toLowerCase())
+      application.approved === true ||
+      application.reviewStatus === 'approved' ||
+      ['approved', 'training', 'active'].includes(
+        String(application.status || '').toLowerCase()
+      )
     ) {
-      return replyText(event.replyToken, '此小U已通過審核，不能直接拒絕。');
+      return replyText(
+        event.replyToken,
+        '此小U已通過審核，不能直接拒絕。'
+      );
     }
 
-    if (rider.status === 'rejected') {
-      return replyText(event.replyToken, '此騎士申請已經被拒絕，不需要重複操作。');
+    if (application.status === 'rejected') {
+      return replyText(
+        event.replyToken,
+        '此騎士申請已經被拒絕，不需要重複操作。'
+      );
     }
 
-    rider.status = 'rejected';
-    rider.lifecycleStatus = RIDER_V4_LIFECYCLE.REJECTED;
-    rider.canAcceptOrders = false;
-    rider.rejectedAt = Date.now();
-    rider.rejectedBy = userId;
-    await saveRider(rider);
+    await db
+      .collection(RIDER_V2_COLLECTIONS.applications)
+      .doc(riderId)
+      .set({
+        status: 'rejected',
+        reviewStatus: 'rejected',
+        lifecycleStatus: RIDER_V4_LIFECYCLE.REJECTED,
+        canAcceptOrders: false,
+        approved: false,
+        rejectedAt: Date.now(),
+        rejectedBy: userId,
+        reviewedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        reviewedAtMs: Date.now(),
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: Date.now(),
+      }, { merge: true });
 
-    await db.collection('riderApplications').doc(rider.riderId).set({
-  status: 'rejected',
-  reviewStatus: 'rejected',
-  lifecycleStatus: RIDER_V4_LIFECYCLE.REJECTED,
-  canAcceptOrders: false,
-  approved: false,
-  rejectedAt: rider.rejectedAt,
-  rejectedBy: userId,
-  reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-  reviewedAtMs: Date.now(),
-  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-}, { merge: true });
-    
     return replyText(
       event.replyToken,
-      `已拒絕騎士申請\n\n姓名：${rider.name}\n申請編號：${rider.riderId}`
+      `已拒絕新版小U申請\n\n` +
+      `姓名：${application.name}\n` +
+      `申請編號：${riderId}`
     );
   }
 
