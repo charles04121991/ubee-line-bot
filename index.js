@@ -9,7 +9,7 @@ const webpush = require('web-push');
 const multer = require('multer');
 
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
-// UBee Merchant Platform V3 + 小U資料庫 V2 Final 正式版｜2026-07-28
+// UBee Merchant Platform V3 + 小U資料庫 V2 Final + 區域動態定價 V3 正式版｜2026-07-28
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
 
 admin.initializeApp({
@@ -11621,6 +11621,12 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
 
     maybePersistDispatchIntelligence(intelligence).catch(()=>{});
 
+    const dynamicPricingSettings = await loadDynamicPricingSettings();
+    const dynamicPricingDashboard = summarizeDynamicPricingForDashboard(
+      intelligence.zones || [],
+      dynamicPricingSettings.global || {}
+    );
+
     return res.json({
       success: true,
       generatedAtMs: nowMs,
@@ -11675,7 +11681,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         defaultSeverity: meta.defaultSeverity,
       })),
       intelligence,
-      operationsV5
+      operationsV5,
+      dynamicPricing: dynamicPricingDashboard
     });
   } catch (err) {
     console.error('❌ UBee 調度中心 dashboard 讀取失敗：', err);
@@ -11683,6 +11690,94 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       success: false,
       message: '調度中心資料讀取失敗，請稍後再試。',
       error: err.message
+    });
+  }
+});
+
+
+
+// =====================================================
+// UBee 區域動態定價 V3｜調度中心設定 API
+// 正式環境建議以 DISPATCH_ADMIN_KEY 保護寫入。
+// =====================================================
+function verifyDynamicPricingAdmin(req, res, next) {
+  const expected = String(
+    process.env.DISPATCH_ADMIN_KEY ||
+    process.env.UBEE_SUPPORT_ADMIN_KEY ||
+    ''
+  ).trim();
+
+  if (!expected) {
+    return res.status(503).json({
+      success: false,
+      message: '尚未設定 DISPATCH_ADMIN_KEY，動態定價設定禁止修改。',
+    });
+  }
+
+  const supplied = String(
+    req.headers['x-ubee-dispatch-admin-key'] ||
+    req.body?.adminKey ||
+    ''
+  ).trim();
+
+  if (!supplied || supplied !== expected) {
+    return res.status(403).json({
+      success: false,
+      message: '調度管理驗證失敗。',
+    });
+  }
+
+  return next();
+}
+
+app.get('/api/dispatch/dynamic-pricing', async (req, res) => {
+  try {
+    const cache = await loadDynamicPricingSettings();
+    return res.json({
+      success: true,
+      version: DYNAMIC_PRICING_V3.version,
+      global: cache.global || {},
+      regions: [...cache.regions.values()],
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: '讀取動態定價設定失敗。',
+      error: error.message,
+    });
+  }
+});
+
+app.post('/api/dispatch/dynamic-pricing', verifyDynamicPricingAdmin, async (req, res) => {
+  try {
+    const payload = req.body && typeof req.body === 'object' ? req.body : {};
+    const update = {
+      enabled: payload.enabled !== false,
+      manualAdjustment: {
+        enabled: payload.manualAdjustment?.enabled === true,
+        fee: Math.max(0, Math.min(100, Math.round(dynamicSafeNumber(payload.manualAdjustment?.fee)))),
+        label: cleanText(payload.manualAdjustment?.label || '', 80),
+        severe: payload.manualAdjustment?.severe === true,
+      },
+      standardMaxFee: Math.max(0, Math.min(100, Math.round(dynamicSafeNumber(payload.standardMaxFee, 60)))),
+      severeMaxFee: Math.max(0, Math.min(150, Math.round(dynamicSafeNumber(payload.severeMaxFee, 100)))),
+      updatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.doc(DYNAMIC_PRICING_SETTINGS_DOC).set(update, { merge: true });
+    dynamicPricingSettingsCache.expiresAtMs = 0;
+
+    return res.json({
+      success: true,
+      message: '區域動態定價設定已更新。',
+      settings: update,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: '更新動態定價設定失敗。',
+      error: error.message,
     });
   }
 });
@@ -15240,6 +15335,533 @@ const QUICK_SERVICE_PRICING = {
 
 const MAX_QUOTE_TIME_MINUTES = 480;
 
+
+// =====================================================
+// UBee 區域動態定價 V3｜正式營運版
+// - 依取件行政區、即時待派訂單與有效可接單小U計算
+// - 時段費採最高一項，不重複疊加
+// - 區域供需費＋時段費＋人工事件費受上限保護
+// - 動態調度費 100% 歸小U
+// - 正式報價鎖定 10 分鐘，建立訂單必須使用有效 quoteId
+// =====================================================
+const DYNAMIC_PRICING_V3 = Object.freeze({
+  version: 'V3',
+  enabled: true,
+  quoteTtlMs: 10 * 60 * 1000,
+  operationalCacheMs: 15 * 1000,
+  riderHeartbeatFreshMs: 5 * 60 * 1000,
+  riderLocationFreshMs: 10 * 60 * 1000,
+  defaultSupplyRadiusKm: 5,
+  standardMaxFee: 60,
+  severeMaxFee: 100,
+  timeRules: Object.freeze([
+    { start: '00:00', end: '06:00', fee: 50, label: '凌晨調度費', severe: true },
+    { start: '11:30', end: '13:30', fee: 10, label: '午餐尖峰調度費' },
+    { start: '17:30', end: '20:00', fee: 20, label: '晚餐尖峰調度費' },
+    { start: '22:00', end: '24:00', fee: 30, label: '夜間調度費', severe: true },
+  ]),
+  supplyTiers: Object.freeze([
+    { minRatio: 4, fee: 60, label: '區域嚴重缺車調度費', level: 'CRITICAL' },
+    { minRatio: 3, fee: 40, label: '區域高度吃緊調度費', level: 'HIGH' },
+    { minRatio: 2, fee: 20, label: '區域中度吃緊調度費', level: 'MEDIUM' },
+    { minRatio: 1, fee: 10, label: '區域輕度吃緊調度費', level: 'WATCH' },
+  ]),
+});
+
+const DYNAMIC_PRICING_SETTINGS_DOC = 'platformSettings/dynamicPricing';
+const DYNAMIC_PRICING_REGION_COLLECTION = 'regionPricingRules';
+const DYNAMIC_PRICING_SNAPSHOT_COLLECTION = 'dynamicPricingSnapshots';
+
+let dynamicPricingSettingsCache = {
+  expiresAtMs: 0,
+  global: null,
+  regions: new Map(),
+};
+
+let dynamicPricingOperationalCache = {
+  expiresAtMs: 0,
+  riders: [],
+  waitingOrders: [],
+};
+
+function dynamicSafeNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function dynamicToMs(value) {
+  if (!value) return 0;
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  if (typeof value === 'number') return value;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeTaiwanAddressText(value) {
+  return String(value || '')
+    .trim()
+    .replace(/臺/g, '台')
+    .replace(/\s+/g, '');
+}
+
+function buildDynamicRegionCode(city = '', district = '') {
+  const normalizedCity = normalizeTaiwanAddressText(city);
+  const normalizedDistrict = normalizeTaiwanAddressText(district);
+  if (!normalizedCity && !normalizedDistrict) return 'UNRESOLVED';
+  return crypto
+    .createHash('sha1')
+    .update(`${normalizedCity}|${normalizedDistrict}`)
+    .digest('hex')
+    .slice(0, 12)
+    .toUpperCase();
+}
+
+function extractTaiwanRegionFromAddress(address = '') {
+  const normalized = normalizeTaiwanAddressText(address);
+  const cityMatch = normalized.match(/(台北市|新北市|桃園市|台中市|台南市|高雄市|基隆市|新竹市|嘉義市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義縣|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
+  const city = cityMatch ? cityMatch[1] : '';
+  const addressAfterCity = city
+    ? normalized.slice(normalized.indexOf(city) + city.length)
+    : normalized;
+  const districtMatch = addressAfterCity.match(/([\u4e00-\u9fff]{1,6}(?:區|鄉|鎮|市))/);
+  const district = districtMatch ? districtMatch[1] : '';
+  return {
+    regionCode: buildDynamicRegionCode(city, district),
+    city,
+    district,
+    regionLabel: [city, district].filter(Boolean).join('') || '未辨識區域',
+    source: city || district ? 'address' : 'unresolved',
+  };
+}
+
+function getTaipeiMinuteOfDay(nowMs = Date.now()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(new Date(nowMs))
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  );
+  return Number(parts.hour || 0) * 60 + Number(parts.minute || 0);
+}
+
+function parseClockMinutes(value) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return 0;
+  return Math.min(24 * 60, Number(match[1]) * 60 + Number(match[2]));
+}
+
+function getDynamicTimeAdjustment(nowMs, settings) {
+  const minute = getTaipeiMinuteOfDay(nowMs);
+  const rules = Array.isArray(settings.timeRules)
+    ? settings.timeRules
+    : DYNAMIC_PRICING_V3.timeRules;
+
+  let selected = { fee: 0, label: '', severe: false };
+  for (const rule of rules) {
+    const start = parseClockMinutes(rule.start);
+    const end = parseClockMinutes(rule.end);
+    const active = end >= start
+      ? minute >= start && minute < end
+      : minute >= start || minute < end;
+    if (active && dynamicSafeNumber(rule.fee) > selected.fee) {
+      selected = {
+        fee: Math.max(0, Math.round(dynamicSafeNumber(rule.fee))),
+        label: String(rule.label || '時段調度費'),
+        severe: rule.severe === true,
+      };
+    }
+  }
+  return selected;
+}
+
+async function loadDynamicPricingSettings() {
+  const nowMs = Date.now();
+  if (dynamicPricingSettingsCache.expiresAtMs > nowMs) {
+    return dynamicPricingSettingsCache;
+  }
+
+  let global = {};
+  const regions = new Map();
+
+  try {
+    const [globalDoc, regionSnap] = await Promise.all([
+      db.doc(DYNAMIC_PRICING_SETTINGS_DOC).get(),
+      db.collection(DYNAMIC_PRICING_REGION_COLLECTION).limit(500).get(),
+    ]);
+
+    global = globalDoc.exists ? (globalDoc.data() || {}) : {};
+    regionSnap.docs.forEach(doc => {
+      regions.set(doc.id, { regionCode: doc.id, ...(doc.data() || {}) });
+    });
+  } catch (error) {
+    console.warn('⚠️ 動態定價設定讀取失敗，使用正式內建安全值：', error.message);
+  }
+
+  dynamicPricingSettingsCache = {
+    expiresAtMs: nowMs + 30 * 1000,
+    global,
+    regions,
+  };
+  return dynamicPricingSettingsCache;
+}
+
+async function loadDynamicPricingOperationalState() {
+  const nowMs = Date.now();
+  if (dynamicPricingOperationalCache.expiresAtMs > nowMs) {
+    return dynamicPricingOperationalCache;
+  }
+
+  const waitingStatuses = new Set([
+    'pending_dispatch', 'pending', 'waiting', 'searching', 'dispatching', 'redispatching'
+  ]);
+
+  const [presenceSnap, locationSnap, riderSnap, orderSnap] = await Promise.all([
+    db.collection(RIDER_V2_COLLECTIONS.presence).limit(5000).get(),
+    db.collection(RIDER_V2_COLLECTIONS.locations).limit(5000).get(),
+    db.collection(RIDER_V2_COLLECTIONS.riders).limit(5000).get(),
+    db.collection('orders').orderBy('createdAt', 'desc').limit(500).get()
+      .catch(() => db.collection('orders').limit(500).get()),
+  ]);
+
+  const presenceById = new Map(presenceSnap.docs.map(doc => [doc.id, doc.data() || {}]));
+  const locationById = new Map(locationSnap.docs.map(doc => [doc.id, doc.data() || {}]));
+
+  const riders = riderSnap.docs.map(doc => {
+    const master = doc.data() || {};
+    const presence = presenceById.get(doc.id) || {};
+    const location = locationById.get(doc.id) || {};
+    const heartbeatMs =
+      dynamicSafeNumber(presence.lastActiveMs) ||
+      dynamicSafeNumber(presence.onlineUpdatedAtMs) ||
+      dynamicToMs(presence.lastActive) ||
+      dynamicToMs(presence.onlineUpdatedAt) ||
+      dynamicToMs(presence.updatedAt);
+    const locationMs =
+      dynamicSafeNumber(location.locationUpdatedAtMs) ||
+      dynamicToMs(location.locationUpdatedAt) ||
+      dynamicToMs(location.updatedAt);
+    const approved =
+      master.approved === true ||
+      String(master.status || '').trim().toLowerCase() === 'approved';
+
+    return {
+      riderDocId: doc.id,
+      approved,
+      online: presence.online === true || presence.acceptingOrders === true,
+      acceptingOrders: presence.acceptingOrders === true,
+      busy: presence.busy === true || !!String(presence.currentOrderId || '').trim(),
+      heartbeatMs,
+      locationMs,
+      lat: dynamicSafeNumber(location.currentLat ?? location.lat ?? location.latitude, NaN),
+      lng: dynamicSafeNumber(location.currentLng ?? location.lng ?? location.longitude, NaN),
+      district: normalizeTaiwanAddressText(
+        master.district || master.cityDistrict || master.serviceArea || ''
+      ),
+    };
+  });
+
+  const waitingOrders = orderSnap.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(order => waitingStatuses.has(String(order.status || '').trim()));
+
+  dynamicPricingOperationalCache = {
+    expiresAtMs: nowMs + DYNAMIC_PRICING_V3.operationalCacheMs,
+    riders,
+    waitingOrders,
+  };
+  return dynamicPricingOperationalCache;
+}
+
+function countRegionWaitingOrders(waitingOrders, region) {
+  return waitingOrders.filter(order => {
+    const orderRegion = extractTaiwanRegionFromAddress(
+      order.pickupAddress || order.pickup || ''
+    );
+    return orderRegion.regionCode === region.regionCode;
+  }).length;
+}
+
+function countRegionAvailableRiders(riders, region, nowMs) {
+  return riders.filter(rider => {
+    if (!rider.approved || !rider.online || !rider.acceptingOrders || rider.busy) return false;
+    if (!rider.heartbeatMs || nowMs - rider.heartbeatMs > DYNAMIC_PRICING_V3.riderHeartbeatFreshMs) return false;
+    if (!rider.locationMs || nowMs - rider.locationMs > DYNAMIC_PRICING_V3.riderLocationFreshMs) return false;
+    if (region.district && rider.district) {
+      return rider.district.includes(region.district) || region.district.includes(rider.district);
+    }
+    return region.regionCode === 'UNRESOLVED';
+  }).length;
+}
+
+function getSupplyAdjustment(waitingOrders, availableRiders, settings) {
+  if (availableRiders <= 0) {
+    if (waitingOrders >= 4) return { fee: 60, label: '區域嚴重缺車調度費', level: 'CRITICAL', ratio: null };
+    if (waitingOrders >= 2) return { fee: 40, label: '區域運力不足調度費', level: 'HIGH', ratio: null };
+    if (waitingOrders >= 1) return { fee: 20, label: '區域運力媒合調度費', level: 'MEDIUM', ratio: null };
+    return { fee: 0, label: '', level: 'NORMAL', ratio: 0 };
+  }
+
+  const ratio = waitingOrders / availableRiders;
+  const tiers = Array.isArray(settings.supplyTiers)
+    ? [...settings.supplyTiers].sort((a, b) => dynamicSafeNumber(b.minRatio) - dynamicSafeNumber(a.minRatio))
+    : DYNAMIC_PRICING_V3.supplyTiers;
+
+  const tier = tiers.find(item => ratio >= dynamicSafeNumber(item.minRatio));
+  if (!tier) return { fee: 0, label: '', level: 'NORMAL', ratio };
+
+  return {
+    fee: Math.max(0, Math.round(dynamicSafeNumber(tier.fee))),
+    label: String(tier.label || '區域供需調度費'),
+    level: String(tier.level || 'WATCH'),
+    ratio,
+  };
+}
+
+async function calculateRegionalDynamicPricing({
+  pickupAddress = '',
+  nowMs = Date.now(),
+} = {}) {
+  const settingsCache = await loadDynamicPricingSettings();
+  const global = settingsCache.global || {};
+  const enabled = global.enabled !== false && DYNAMIC_PRICING_V3.enabled === true;
+  const region = extractTaiwanRegionFromAddress(pickupAddress);
+  const regionRule = settingsCache.regions.get(region.regionCode) || {};
+
+  if (!enabled || regionRule.enabled === false) {
+    return {
+      version: DYNAMIC_PRICING_V3.version,
+      enabled: false,
+      region,
+      fee: 0,
+      dynamicPricingFee: 0,
+      components: [],
+      waitingOrders: 0,
+      availableRiders: 0,
+      supplyRatio: 0,
+      level: 'NORMAL',
+      maxFee: 0,
+      calculatedAtMs: nowMs,
+    };
+  }
+
+  const state = await loadDynamicPricingOperationalState();
+  const waitingOrders = countRegionWaitingOrders(state.waitingOrders, region);
+  const availableRiders = countRegionAvailableRiders(state.riders, region, nowMs);
+  const supply = getSupplyAdjustment(waitingOrders, availableRiders, global);
+  const time = getDynamicTimeAdjustment(nowMs, global);
+
+  const manualEnabled =
+    global.manualAdjustment?.enabled === true ||
+    regionRule.manualAdjustment?.enabled === true;
+
+  const manualSource =
+    regionRule.manualAdjustment?.enabled === true
+      ? regionRule.manualAdjustment
+      : global.manualAdjustment || {};
+
+  const manual = manualEnabled
+    ? {
+        fee: Math.max(0, Math.round(dynamicSafeNumber(manualSource.fee))),
+        label: String(manualSource.label || '特殊營運調度費'),
+        severe: manualSource.severe === true,
+      }
+    : { fee: 0, label: '', severe: false };
+
+  const baseAdjustment = Math.max(
+    0,
+    Math.round(dynamicSafeNumber(regionRule.baseAdjustment))
+  );
+
+  const components = [];
+  if (baseAdjustment > 0) {
+    components.push({
+      type: 'region_base',
+      label: String(regionRule.baseAdjustmentLabel || '區域營運調度費'),
+      fee: baseAdjustment,
+    });
+  }
+  if (supply.fee > 0) components.push({ type: 'supply', label: supply.label, fee: supply.fee });
+  if (time.fee > 0) components.push({ type: 'time', label: time.label, fee: time.fee });
+  if (manual.fee > 0) components.push({ type: 'manual', label: manual.label, fee: manual.fee });
+
+  const severe = time.severe || manual.severe;
+  const configuredMax = dynamicSafeNumber(
+    regionRule.maxDynamicFee,
+    severe
+      ? dynamicSafeNumber(global.severeMaxFee, DYNAMIC_PRICING_V3.severeMaxFee)
+      : dynamicSafeNumber(global.standardMaxFee, DYNAMIC_PRICING_V3.standardMaxFee)
+  );
+
+  const rawFee = components.reduce((sum, item) => sum + item.fee, 0);
+  const maxFee = Math.max(0, Math.round(configuredMax));
+  const fee = Math.min(rawFee, maxFee);
+
+  return {
+    version: DYNAMIC_PRICING_V3.version,
+    enabled: true,
+    region,
+    fee,
+    dynamicPricingFee: fee,
+    rawFee,
+    maxFee,
+    capped: fee < rawFee,
+    components,
+    waitingOrders,
+    availableRiders,
+    supplyRatio: supply.ratio,
+    level: supply.level,
+    calculatedAtMs: nowMs,
+  };
+}
+
+function applyDynamicPricingToPrice(price, dynamicPricing) {
+  const result = { ...(price || {}) };
+  const dynamicPricingFee = Math.max(
+    0,
+    Math.round(dynamicSafeNumber(dynamicPricing?.dynamicPricingFee ?? dynamicPricing?.fee))
+  );
+
+  result.dynamicPricingFee = dynamicPricingFee;
+  result.dynamicFee = dynamicPricingFee;
+  result.dynamicPricing = dynamicPricing || null;
+  result.dynamicPricingComponents = Array.isArray(dynamicPricing?.components)
+    ? dynamicPricing.components
+    : [];
+  result.dynamicPricingRegion = dynamicPricing?.region || null;
+
+  result.taskSubtotal = Math.max(0, Math.round(dynamicSafeNumber(result.taskSubtotal))) + dynamicPricingFee;
+  result.serviceSubtotal = Math.max(0, Math.round(dynamicSafeNumber(result.serviceSubtotal ?? result.total))) + dynamicPricingFee;
+  result.total = result.serviceSubtotal;
+
+  // 動態調度費 100% 給小U，平台收入不因動態費增加。
+  result.driverFee = Math.max(0, Math.round(dynamicSafeNumber(result.driverFee))) + dynamicPricingFee;
+  result.riderFee = result.driverFee;
+  result.platformFee = Math.max(0, Math.round(dynamicSafeNumber(result.platformFee)));
+  result.platformIncome = result.platformFee;
+
+  return result;
+}
+
+async function createDynamicPricingQuoteSnapshot({
+  price,
+  requestData = {},
+  dynamicPricing,
+  source = 'customer_quote',
+} = {}) {
+  const quoteId = `Q-${Date.now()}-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+  const quotedAtMs = Date.now();
+  const expiresAtMs = quotedAtMs + DYNAMIC_PRICING_V3.quoteTtlMs;
+  const snapshot = {
+    quoteId,
+    source,
+    status: 'active',
+    quotedAtMs,
+    expiresAtMs,
+    serviceType: String(requestData.serviceType || ''),
+    serviceMode: String(requestData.serviceMode || ''),
+    serviceKey: String(requestData.serviceKey || ''),
+    speedType: String(requestData.speedType || requestData.speed || 'standard'),
+    pickupAddress: String(requestData.pickupAddress || requestData.pickup || requestData.from || ''),
+    dropoffAddress: String(requestData.dropoffAddress || requestData.dropoff || requestData.to || ''),
+    advancePayment: Math.max(0, Math.round(dynamicSafeNumber(requestData.advancePayment))),
+    price: JSON.parse(JSON.stringify(price || {})),
+    dynamicPricing: JSON.parse(JSON.stringify(dynamicPricing || {})),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  await db.collection(DYNAMIC_PRICING_SNAPSHOT_COLLECTION).doc(quoteId).set(snapshot);
+  return { quoteId, quotedAtMs, expiresAtMs };
+}
+
+async function loadValidDynamicPricingQuote(quoteId) {
+  const safeQuoteId = String(quoteId || '').trim();
+  if (!safeQuoteId) return { ok: false, code: 'QUOTE_REQUIRED', message: '正式報價不存在，請重新估價。' };
+
+  const doc = await db.collection(DYNAMIC_PRICING_SNAPSHOT_COLLECTION).doc(safeQuoteId).get();
+  if (!doc.exists) return { ok: false, code: 'QUOTE_NOT_FOUND', message: '找不到正式報價，請重新估價。' };
+
+  const data = doc.data() || {};
+  if (String(data.status || 'active') !== 'active') {
+    return { ok: false, code: 'QUOTE_USED', message: '此報價已使用或失效，請重新估價。' };
+  }
+  if (Date.now() > dynamicSafeNumber(data.expiresAtMs)) {
+    return { ok: false, code: 'QUOTE_EXPIRED', message: '即時運力狀況已變化，請確認更新後的價格。' };
+  }
+  return { ok: true, ref: doc.ref, data };
+}
+
+
+function normalizeQuoteComparisonText(value) {
+  return normalizeTaiwanAddressText(value)
+    .replace(/[，,。．.\-－]/g, '')
+    .toLowerCase();
+}
+
+function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
+  const quotePickup = normalizeQuoteComparisonText(lockedQuote.pickupAddress);
+  const orderPickup = normalizeQuoteComparisonText(orderData.pickupAddress || orderData.pickup);
+  const quoteDropoff = normalizeQuoteComparisonText(lockedQuote.dropoffAddress);
+  const orderDropoff = normalizeQuoteComparisonText(orderData.dropoffAddress || orderData.dropoff);
+  const quoteSpeed = String(lockedQuote.speedType || 'standard').trim();
+  const orderSpeed = String(orderData.speedType || orderData.speed || 'standard').trim();
+  const quoteMode = String(lockedQuote.serviceMode || 'normal').trim();
+  const orderMode = String(orderData.serviceMode || 'normal').trim();
+
+  if (!quotePickup || !orderPickup || quotePickup !== orderPickup) {
+    return { ok: false, message: '取件地址已變更，請重新估價。' };
+  }
+  if (quoteMode !== 'queue' && (!quoteDropoff || !orderDropoff || quoteDropoff !== orderDropoff)) {
+    return { ok: false, message: '送達地址已變更，請重新估價。' };
+  }
+  if (quoteSpeed !== orderSpeed) {
+    return { ok: false, message: '配送速度已變更，請重新估價。' };
+  }
+  if (quoteMode !== orderMode) {
+    return { ok: false, message: '任務型態已變更，請重新估價。' };
+  }
+
+  return { ok: true };
+}
+
+async function consumeDynamicPricingQuote(quoteRef, orderId) {
+  if (!quoteRef) return;
+  await quoteRef.set({
+    status: 'used',
+    usedAtMs: Date.now(),
+    usedAt: admin.firestore.FieldValue.serverTimestamp(),
+    orderId: String(orderId || ''),
+  }, { merge: true });
+}
+
+function summarizeDynamicPricingForDashboard(zones = [], globalSettings = {}) {
+  return {
+    version: DYNAMIC_PRICING_V3.version,
+    enabled: globalSettings.enabled !== false,
+    zones: (Array.isArray(zones) ? zones : []).map(zone => {
+      const waitingOrders = Math.max(0, Math.round(dynamicSafeNumber(zone.waitingOrders)));
+      const availableRiders = Math.max(0, Math.round(dynamicSafeNumber(zone.availableRiders)));
+      const supply = getSupplyAdjustment(waitingOrders, availableRiders, globalSettings);
+      return {
+        zoneId: zone.zoneId || '',
+        district: zone.district || '未分區',
+        waitingOrders,
+        availableRiders,
+        supplyRatio: supply.ratio,
+        dynamicFee: supply.fee,
+        level: supply.level,
+        label: supply.label || '供需正常',
+      };
+    }).sort((a, b) => b.dynamicFee - a.dynamicFee || b.waitingOrders - a.waitingOrders),
+  };
+}
+
+
 const SPEED_OPTIONS = {
   // 必須與前端快速估價頁 / 正式下單頁的速度費保持一致
   standard: {
@@ -16916,6 +17538,18 @@ function recalculateOrderFinancials(order) {
     upstairsFee: order.upstairsFee,
     waitingFee: order.waitingFee,
   });
+
+  const dynamicPricingFee = Math.max(
+    0,
+    Math.round(Number(order.dynamicPricingFee || order.dynamicFee || 0))
+  );
+
+  if (dynamicPricingFee > 0) {
+    financials.taskSubtotal += dynamicPricingFee;
+    financials.serviceSubtotal += dynamicPricingFee;
+    financials.driverFee += dynamicPricingFee;
+    financials.riderFee = financials.driverFee;
+  }
 
   const advancePayment = getOrderAdvancePaymentAmount(order);
 
@@ -18776,6 +19410,31 @@ app.get('/api/quote', async (req, res) => {
       }
     }
 
+    const dynamicPricing = await calculateRegionalDynamicPricing({
+      pickupAddress: from || '',
+      nowMs: Date.now(),
+    });
+
+    price = applyDynamicPricingToPrice(
+      price,
+      dynamicPricing
+    );
+
+    const quoteSnapshot = await createDynamicPricingQuoteSnapshot({
+      price,
+      requestData: {
+        serviceType,
+        serviceMode: isQueueTask ? 'queue' : 'normal',
+        serviceKey,
+        speedType,
+        pickupAddress: from || '',
+        dropoffAddress: to || '',
+        advancePayment,
+      },
+      dynamicPricing,
+      source: 'api_quote',
+    });
+
     const serviceSubtotal = Math.max(
       0,
       Math.round(Number(price.total || 0))
@@ -18806,6 +19465,14 @@ app.get('/api/quote', async (req, res) => {
       customerPayableTotal,
       payableTotal: customerPayableTotal,
 
+      quoteId: quoteSnapshot.quoteId,
+      quotedAtMs: quoteSnapshot.quotedAtMs,
+      expiresAtMs: quoteSnapshot.expiresAtMs,
+      quoteExpiresInSeconds: Math.max(
+        0,
+        Math.floor((quoteSnapshot.expiresAtMs - Date.now()) / 1000)
+      ),
+
       // 給快速估價頁直接顯示用
       total: customerPayableTotal,
     });
@@ -18830,16 +19497,25 @@ app.post('/estimate', async (req, res) => {
 
     const distance = await getDistanceMatrixCached(pickup, dropoff);
 
-    const price = calculatePrice({
+    let price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
       speedType: speed
     });
 
+    const dynamicPricing = await calculateRegionalDynamicPricing({
+      pickupAddress: pickup,
+      nowMs: Date.now(),
+    });
+
+    price = applyDynamicPricingToPrice(price, dynamicPricing);
+
     res.json({
       distanceText: distance.distanceText,
       durationText: distance.durationText,
-      totalFee: price.total
+      totalFee: price.total,
+      dynamicPricingFee: price.dynamicPricingFee,
+      dynamicPricing,
     });
 
   } catch (err) {
@@ -20079,6 +20755,33 @@ app.post('/api/orders', async (req, res) => {
 }
     const data = createOrderFromApi(req.body);
 
+    const quoteValidation = await loadValidDynamicPricingQuote(
+      req.body.quoteId || data.quoteId
+    );
+
+    if (!quoteValidation.ok) {
+      return res.status(409).json({
+        success: false,
+        code: quoteValidation.code,
+        error: quoteValidation.message,
+      });
+    }
+
+    const lockedQuote = quoteValidation.data || {};
+
+    const quoteOrderValidation = validateLockedQuoteAgainstOrder(
+      lockedQuote,
+      data
+    );
+
+    if (!quoteOrderValidation.ok) {
+      return res.status(409).json({
+        success: false,
+        code: 'QUOTE_ORDER_MISMATCH',
+        error: quoteOrderValidation.message,
+      });
+    }
+
     console.log('========== H5 建立訂單 ==========');
     console.log('req.body:', req.body);
 
@@ -20264,7 +20967,27 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
-const serviceSubtotal = Math.max(0, Math.round(Number(price.total || 0)));
+    // 正式下單使用 10 分鐘內已鎖定的後端報價，避免送出瞬間價格跳動。
+    const lockedPrice = lockedQuote.price && typeof lockedQuote.price === 'object'
+      ? lockedQuote.price
+      : null;
+
+    if (!lockedPrice) {
+      return res.status(409).json({
+        success: false,
+        code: 'QUOTE_PRICE_MISSING',
+        error: '正式報價資料不完整，請重新估價。',
+      });
+    }
+
+    price = {
+      ...lockedPrice,
+      quoteId: String(lockedQuote.quoteId || req.body.quoteId || ''),
+      quotedAtMs: Number(lockedQuote.quotedAtMs || 0),
+      quoteExpiresAtMs: Number(lockedQuote.expiresAtMs || 0),
+    };
+
+const serviceSubtotal = Math.max(0, Math.round(Number(price.total || price.serviceSubtotal || 0)));
 const customerPayableTotal = serviceSubtotal + advancePayment;
 
     const scheduleMetadata =
@@ -20436,6 +21159,15 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   // ==============================
   // 正式費用
   // ==============================
+  quoteId:
+    String(lockedQuote.quoteId || req.body.quoteId || ''),
+
+  quotedAtMs:
+    Number(lockedQuote.quotedAtMs || 0),
+
+  quoteExpiresAtMs:
+    Number(lockedQuote.expiresAtMs || 0),
+
   serviceSubtotal,
 
   customerPayableTotal,
@@ -20565,6 +21297,11 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
       `目前 UBee 跑腿先開放現金單。\n` +
       `請回到網頁確認使用現金單，確認後系統才會開始媒合騎士。`
     ));
+
+    await consumeDynamicPricingQuote(
+      quoteValidation.ref,
+      id
+    );
 
     res.json({
       success: true,
