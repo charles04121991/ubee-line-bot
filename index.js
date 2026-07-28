@@ -3751,6 +3751,97 @@ function isBlockedRiderData(riderData) {
   );
 }
 
+// =====================================================
+// UBee 小U資料庫 V2 第二階段：營運資料讀取相容層
+// - 所有核心身分查找優先讀取 ridersV2。
+// - 找不到時才回退舊 riders，避免遷移期間中斷既有小U。
+// - 回傳的 Firestore DocumentSnapshot 會保留實際來源集合，
+//   後續 riderDoc.ref.set() 將直接寫回正確集合。
+// =====================================================
+async function findRiderDocumentV2First(source = {}) {
+  const cleanPhone = normalizePhone(
+    source.phone || source.riderPhone || ''
+  );
+  const cleanRiderId = String(
+    source.riderId || source.id || ''
+  ).trim();
+  const cleanLineUserId = String(
+    source.lineUserId || ''
+  ).trim();
+
+  const collections = [
+    RIDER_V2_COLLECTIONS.riders,
+    'riders',
+  ];
+
+  for (const collectionName of collections) {
+    if (/^09\d{8}$/.test(cleanPhone)) {
+      let doc = await db.collection(collectionName).doc(cleanPhone).get();
+      if (doc.exists) return { riderDoc: doc, sourceCollection: collectionName };
+
+      const phoneSnap = await db.collection(collectionName)
+        .where('phone', '==', cleanPhone)
+        .limit(1)
+        .get();
+      if (!phoneSnap.empty) {
+        return { riderDoc: phoneSnap.docs[0], sourceCollection: collectionName };
+      }
+    }
+
+    if (cleanRiderId) {
+      let doc = await db.collection(collectionName).doc(cleanRiderId).get();
+      if (doc.exists) return { riderDoc: doc, sourceCollection: collectionName };
+
+      const riderIdSnap = await db.collection(collectionName)
+        .where('riderId', '==', cleanRiderId)
+        .limit(1)
+        .get();
+      if (!riderIdSnap.empty) {
+        return { riderDoc: riderIdSnap.docs[0], sourceCollection: collectionName };
+      }
+    }
+
+    if (cleanLineUserId.startsWith('U')) {
+      const lineSnap = await db.collection(collectionName)
+        .where('lineUserId', '==', cleanLineUserId)
+        .limit(1)
+        .get();
+      if (!lineSnap.empty) {
+        return { riderDoc: lineSnap.docs[0], sourceCollection: collectionName };
+      }
+    }
+  }
+
+  return { riderDoc: null, sourceCollection: '' };
+}
+
+async function writeRiderMigrationCompatible(riderDoc, updateData = {}) {
+  if (!riderDoc || !riderDoc.exists) {
+    throw new Error('RIDER_DOCUMENT_NOT_FOUND');
+  }
+
+  const docId = String(riderDoc.id || '').trim();
+  const sourceCollection = String(riderDoc.ref?.parent?.id || '').trim();
+  const writes = [riderDoc.ref.set(updateData, { merge: true })];
+
+  // 遷移期間：若另一份對應文件已存在，維持必要營運欄位同步；
+  // 不會替只有舊資料的帳號憑空建立 ridersV2。
+  const counterpartCollection =
+    sourceCollection === RIDER_V2_COLLECTIONS.riders
+      ? 'riders'
+      : RIDER_V2_COLLECTIONS.riders;
+
+  if (docId && counterpartCollection) {
+    const counterpartRef = db.collection(counterpartCollection).doc(docId);
+    const counterpartDoc = await counterpartRef.get();
+    if (counterpartDoc.exists) {
+      writes.push(counterpartRef.set(updateData, { merge: true }));
+    }
+  }
+
+  await Promise.all(writes);
+}
+
 function buildRiderLoginPayload(riderDoc) {
   const riderData = riderDoc.data() || {};
   const cleanPhone = normalizePhone(riderData.phone || riderDoc.id || '');
@@ -3774,23 +3865,10 @@ async function findRiderByPhoneForLogin(phone) {
     };
   }
 
-  // 第一優先：正式資料結構 riders/{手機號碼}
-  const phoneDocRef = db.collection('riders').doc(cleanPhone);
-  let riderDoc = await phoneDocRef.get();
+  const found = await findRiderDocumentV2First({ phone: cleanPhone });
+  let riderDoc = found.riderDoc;
 
-  // 保險：如果舊資料不是用手機當文件 ID，就用 phone 欄位補查
-  if (!riderDoc.exists) {
-    const phoneSnap = await db.collection('riders')
-      .where('phone', '==', cleanPhone)
-      .limit(1)
-      .get();
-
-    if (!phoneSnap.empty) {
-      riderDoc = phoneSnap.docs[0];
-    }
-  }
-
-  if (!riderDoc.exists) {
+  if (!riderDoc || !riderDoc.exists) {
     return {
       ok: false,
       statusCode: 404,
@@ -3816,7 +3894,7 @@ async function findRiderByPhoneForLogin(phone) {
     };
   }
 
-  await riderDoc.ref.set({
+  const loginUpdate = {
     phone: cleanPhone,
     riderId: riderData.riderId || riderDoc.id,
     phoneLoginEnabled: true,
@@ -3824,16 +3902,21 @@ async function findRiderByPhoneForLogin(phone) {
     lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
     lastLoginAtMs: Date.now(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+    operationalDataSource:
+      found.sourceCollection === RIDER_V2_COLLECTIONS.riders
+        ? 'ridersV2'
+        : 'legacy_riders',
+  };
 
-  const updatedDoc = await riderDoc.ref.get();
-
+  await writeRiderMigrationCompatible(riderDoc, loginUpdate);
+  riderDoc = await riderDoc.ref.get();
 
   return {
     ok: true,
     statusCode: 200,
-    riderDoc: updatedDoc,
-    rider: buildRiderLoginPayload(updatedDoc),
+    riderDoc,
+    rider: buildRiderLoginPayload(riderDoc),
+    sourceCollection: found.sourceCollection,
   };
 }
 
@@ -3912,13 +3995,12 @@ app.get('/api/rider/session', riderAuthMiddleware, async (req, res) => {
     ).trim();
 
     if (trustedRiderDocId) {
-      const doc = await db
-        .collection('riders')
-        .doc(trustedRiderDocId)
-        .get();
+      const found = await findRiderDocumentV2First({
+        riderId: trustedRiderDocId,
+      });
 
-      if (doc.exists) {
-        riderDoc = doc;
+      if (found.riderDoc?.exists) {
+        riderDoc = found.riderDoc;
       }
     }
 
@@ -3964,14 +4046,14 @@ app.get('/api/rider/session', riderAuthMiddleware, async (req, res) => {
 
     const nowMs = Date.now();
 
-    await riderDoc.ref.set({
+    await writeRiderMigrationCompatible(riderDoc, {
       lastSessionRestoreAt: admin.firestore.FieldValue.serverTimestamp(),
       lastSessionRestoreAtMs: nowMs,
       lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
       lastSeenAtMs: nowMs,
       connectionState: 'connected',
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    });
 
     const refreshedRiderDoc = await riderDoc.ref.get();
 
@@ -4099,7 +4181,7 @@ app.post('/api/rider/heartbeat', riderAuthMiddleware, async (req, res) => {
 
     // 心跳只更新在線與定位健康狀態，不接受前端改寫任務歸屬。
     // currentOrderId / busy 的修復統一由 /api/rider/current-order 驗證後處理。
-    await riderDoc.ref.set(updateData, { merge: true });
+    await writeRiderMigrationCompatible(riderDoc, updateData);
 
     return res.json({
       success: true,
@@ -4177,55 +4259,12 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
       });
     }
 
-    let riderDoc = null;
-
-    // 1. 手機登入正式版：優先用 riders/{手機號碼}
-    if (cleanPhone && /^09\d{8}$/.test(cleanPhone)) {
-      const phoneDoc = await db.collection('riders').doc(cleanPhone).get();
-
-      if (phoneDoc.exists) {
-        riderDoc = phoneDoc;
-      } else {
-        const phoneSnap = await db.collection('riders')
-          .where('phone', '==', cleanPhone)
-          .limit(1)
-          .get();
-
-        if (!phoneSnap.empty) {
-          riderDoc = phoneSnap.docs[0];
-        }
-      }
-    }
-
-    // 2. riderId 相容
-    if (!riderDoc && safeRiderId) {
-      const riderIdDoc = await db.collection('riders').doc(safeRiderId).get();
-
-      if (riderIdDoc.exists) {
-        riderDoc = riderIdDoc;
-      } else {
-        const riderIdSnap = await db.collection('riders')
-          .where('riderId', '==', safeRiderId)
-          .limit(1)
-          .get();
-
-        if (!riderIdSnap.empty) {
-          riderDoc = riderIdSnap.docs[0];
-        }
-      }
-    }
-
-    // 3. 舊版 LINE 登入相容
-    if (!riderDoc && safeLineUserId && safeLineUserId.startsWith('U')) {
-      const lineSnap = await db.collection('riders')
-        .where('lineUserId', '==', safeLineUserId)
-        .limit(1)
-        .get();
-
-      if (!lineSnap.empty) {
-        riderDoc = lineSnap.docs[0];
-      }
-    }
+    const found = await findRiderDocumentV2First({
+      phone: cleanPhone,
+      riderId: safeRiderId,
+      lineUserId: safeLineUserId,
+    });
+    const riderDoc = found.riderDoc;
 
     if (!riderDoc) {
       return res.status(404).json({
@@ -4247,7 +4286,7 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
       });
     }
 
-    await db.collection('riders').doc(riderDoc.id).set({
+    await writeRiderMigrationCompatible(riderDoc, {
       webPushSubscription: subscription,
       webPushEnabled: true,
       webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -4263,7 +4302,7 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
       pushLineUserId: safeLineUserId || riderData.lineUserId || '',
 
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    });
 
     return res.json({
       success: true,
@@ -12617,56 +12656,10 @@ app.get('/api/rider/application-status', async (req, res) => {
 
 // ===== 騎士身分查找工具：支援手機登入 / riderId / 舊 LINE 身分 =====
 async function findApprovedRiderForApi(source = {}) {
-  const cleanPhone = normalizePhone(
-    source.phone ||
-    source.riderPhone ||
-    ''
-  );
+  const found = await findRiderDocumentV2First(source);
+  const riderDoc = found.riderDoc;
 
-  const cleanRiderId = String(
-    source.riderId ||
-    source.id ||
-    ''
-  ).trim();
-
-  const cleanLineUserId = String(
-    source.lineUserId ||
-    ''
-  ).trim();
-
-  let riderDoc = null;
-
-  // 第一優先：手機號碼，也就是 riders/{手機號碼}
-  if (/^09\d{8}$/.test(cleanPhone)) {
-    const doc = await db.collection('riders').doc(cleanPhone).get();
-
-    if (doc.exists) {
-      riderDoc = doc;
-    }
-  }
-
-  // 第二優先：riderId。你目前申請表建立資料時 riderId 就是手機號碼。
-  if (!riderDoc && cleanRiderId) {
-    const doc = await db.collection('riders').doc(cleanRiderId).get();
-
-    if (doc.exists) {
-      riderDoc = doc;
-    }
-  }
-
-  // 第三優先：舊版 LINE 綁定，先保留，避免舊騎士資料壞掉。
-  if (!riderDoc && cleanLineUserId.startsWith('U')) {
-    const snap = await db.collection('riders')
-      .where('lineUserId', '==', cleanLineUserId)
-      .limit(1)
-      .get();
-
-    if (!snap.empty) {
-      riderDoc = snap.docs[0];
-    }
-  }
-
-  if (!riderDoc) {
+  if (!riderDoc || !riderDoc.exists) {
     return {
       ok: false,
       statusCode: 404,
@@ -12695,6 +12688,7 @@ async function findApprovedRiderForApi(source = {}) {
   return {
     ok: true,
     riderDoc,
+    sourceCollection: found.sourceCollection,
     rider: {
       id: riderDoc.id,
       ...rider,
@@ -12707,8 +12701,9 @@ async function findApprovedRiderForApi(source = {}) {
 // ============================================================
 async function getRiderV4ApiContext(req) {
   if (req.riderAuth?.riderDocId) {
-    const riderDoc = await db.collection('riders').doc(req.riderAuth.riderDocId).get();
-    if (!riderDoc.exists) return { ok:false, statusCode:404, message:'找不到小U資料。' };
+    const found = await findRiderDocumentV2First({ riderId:req.riderAuth.riderDocId });
+    const riderDoc = found.riderDoc;
+    if (!riderDoc || !riderDoc.exists) return { ok:false, statusCode:404, message:'找不到小U資料。' };
     const rider = { id:riderDoc.id, ...riderDoc.data() };
     if (isBlockedRiderData(rider)) return { ok:false, statusCode:403, message:'此小U帳號目前無法使用。' };
     if (!isApprovedRiderData(rider)) return { ok:false, statusCode:403, message:'小U尚未審核通過。' };
