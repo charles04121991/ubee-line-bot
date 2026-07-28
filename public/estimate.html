@@ -4,7 +4,7 @@
 <!-- UBee 店家平台 V3 相容：店家正式價格由後端 V3 建單 API 重新計算，本頁維持一般客戶估價。 -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>UBee 跑腿快速估價</title>
+  <title>UBee 跑腿快速估價｜區域動態定價 V3</title>
 
   <style>
     * {
@@ -505,6 +505,16 @@
           <strong id="speedFeeText">$0</strong>
         </div>
 
+        <div class="row hidden" id="dynamicPricingFeeRow">
+          <span>區域動態調度費</span>
+          <strong id="dynamicPricingFeeText">$0</strong>
+        </div>
+
+        <div class="row hidden" id="dynamicPricingRegionRow">
+          <span>動態定價區域</span>
+          <strong id="dynamicPricingRegionText">-</strong>
+        </div>
+
         <div class="row hidden" id="waitingFeeRow">
           <span>排隊／等待費</span>
           <strong id="waitingFeeText">$0</strong>
@@ -728,6 +738,10 @@
     const deliveryFeeText = document.getElementById('deliveryFeeText');
     const serviceFeeText = document.getElementById('serviceFeeText');
     const speedFeeText = document.getElementById('speedFeeText');
+    const dynamicPricingFeeRow = document.getElementById('dynamicPricingFeeRow');
+    const dynamicPricingFeeText = document.getElementById('dynamicPricingFeeText');
+    const dynamicPricingRegionRow = document.getElementById('dynamicPricingRegionRow');
+    const dynamicPricingRegionText = document.getElementById('dynamicPricingRegionText');
 
     const waitingFeeRow = document.getElementById('waitingFeeRow');
     const waitingFeeText = document.getElementById('waitingFeeText');
@@ -969,6 +983,24 @@
       serviceFeeText.textContent = money(data.serviceFee);
       speedFeeText.textContent = money(data.speedFee);
 
+      const dynamicPricingFee = Number(data.dynamicPricingFee || data.dynamicFee || 0);
+      const dynamicRegion =
+        data.dynamicPricingRegion ||
+        data.dynamicPricing?.region ||
+        {};
+
+      dynamicPricingFeeText.textContent = money(dynamicPricingFee);
+      dynamicPricingRegionText.textContent =
+        dynamicRegion.regionLabel ||
+        [dynamicRegion.city, dynamicRegion.district].filter(Boolean).join('') ||
+        '-';
+
+      setRowVisible(dynamicPricingFeeRow, dynamicPricingFee > 0);
+      setRowVisible(
+        dynamicPricingRegionRow,
+        dynamicPricingFee > 0 || !!dynamicRegion.regionLabel
+      );
+
       const waitingFee = Number(data.waitingFee || 0);
       const taskHandlingFee = Number(data.taskHandlingFee || 0);
 
@@ -1002,6 +1034,15 @@
       if (selectedService === '全能跑腿') {
         notice =
           '全能跑腿屬於特殊任務，快速估價僅供初步參考。若任務內容複雜、等待時間較長或代墊金額較高，實際費用可能由客服確認。';
+      }
+
+      if (Number(data.dynamicPricingFee || 0) > 0) {
+        const labels = Array.isArray(data.dynamicPricingComponents)
+          ? data.dynamicPricingComponents.map(item => item?.label).filter(Boolean)
+          : [];
+        notice += ` 本次已套用${labels.length ? labels.join('、') : '區域動態調度費'}；後端報價鎖定 10 分鐘。`;
+      } else {
+        notice += ' 本次區域供需正常，未收取動態調度費；後端報價鎖定 10 分鐘。';
       }
 
       resultNotice.textContent = notice;
