@@ -9,7 +9,8 @@ const webpush = require('web-push');
 const multer = require('multer');
 
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
-// UBee Merchant Platform V3 + 小U資料庫 V2 證件上傳整合版｜2026-07-28
+// UBee Merchant Platform V3 + 小U資料庫 V2 Final 正式版｜2026-07-28
+// V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -43,7 +44,7 @@ const RIDER_V2_COLLECTIONS = Object.freeze({
 const RIDER_V2_APPLICATION_ROUND = '2026_RIDER_RESET';
 const RIDER_V2_DATA_VERSION = 2;
 const RIDER_V2_MIRROR_TO_LEGACY_RIDERS =
-  String(process.env.RIDER_V2_MIRROR_TO_LEGACY_RIDERS || 'true')
+  String(process.env.RIDER_V2_MIRROR_TO_LEGACY_RIDERS || 'false')
     .trim()
     .toLowerCase() === 'true';
 
@@ -1754,7 +1755,7 @@ async function sendNewOrderPushToRiders(
 
       } else {
         const ridersSnap = await db
-          .collection("riders")
+          .collection(RIDER_V2_COLLECTIONS.riders)
           .limit(300)
           .get();
 
@@ -1967,7 +1968,7 @@ async function sendNewOrderPushToRiders(
                   statusCode === 410
                 ) {
                   await db
-                    .collection("riders")
+                    .collection(RIDER_V2_COLLECTIONS.riders)
                     .doc(riderDoc.id)
                     .set(
                       {
@@ -3771,7 +3772,6 @@ async function findRiderDocumentV2First(source = {}) {
 
   const collections = [
     RIDER_V2_COLLECTIONS.riders,
-    'riders',
   ];
 
   for (const collectionName of collections) {
@@ -3820,26 +3820,58 @@ async function writeRiderMigrationCompatible(riderDoc, updateData = {}) {
     throw new Error('RIDER_DOCUMENT_NOT_FOUND');
   }
 
-  const docId = String(riderDoc.id || '').trim();
-  const sourceCollection = String(riderDoc.ref?.parent?.id || '').trim();
-  const writes = [riderDoc.ref.set(updateData, { merge: true })];
+  await riderDoc.ref.set({
+    ...updateData,
+    operationalDataSource: 'ridersV2',
+    dataVersion: RIDER_V2_DATA_VERSION,
+  }, { merge: true });
+}
 
-  // 遷移期間：若另一份對應文件已存在，維持必要營運欄位同步；
-  // 不會替只有舊資料的帳號憑空建立 ridersV2。
-  const counterpartCollection =
-    sourceCollection === RIDER_V2_COLLECTIONS.riders
-      ? 'riders'
-      : RIDER_V2_COLLECTIONS.riders;
+function riderV2OperationalRefs(riderDocId) {
+  const safeId = String(riderDocId || '').trim();
+  if (!safeId) throw new Error('INVALID_RIDER_DOC_ID');
+  return {
+    rider: db.collection(RIDER_V2_COLLECTIONS.riders).doc(safeId),
+    presence: db.collection(RIDER_V2_COLLECTIONS.presence).doc(safeId),
+    location: db.collection(RIDER_V2_COLLECTIONS.locations).doc(safeId),
+    stats: db.collection(RIDER_V2_COLLECTIONS.stats).doc(safeId),
+  };
+}
 
-  if (docId && counterpartCollection) {
-    const counterpartRef = db.collection(counterpartCollection).doc(docId);
-    const counterpartDoc = await counterpartRef.get();
-    if (counterpartDoc.exists) {
-      writes.push(counterpartRef.set(updateData, { merge: true }));
-    }
-  }
-
-  await Promise.all(writes);
+async function ensureRiderV2OperationalDocuments(riderDoc, riderData = {}) {
+  if (!riderDoc || !riderDoc.exists) return;
+  const nowMs = Date.now();
+  const refs = riderV2OperationalRefs(riderDoc.id);
+  const identity = {
+    riderDocId: riderDoc.id,
+    riderId: String(riderData.riderId || riderDoc.id).trim(),
+    phone: normalizePhone(riderData.phone || riderDoc.id || ''),
+    lineUserId: String(riderData.lineUserId || '').trim(),
+    name: cleanText(riderData.name || riderData.riderName || '', 80),
+    dataVersion: RIDER_V2_DATA_VERSION,
+  };
+  await Promise.all([
+    refs.presence.set({
+      ...identity,
+      online: riderData.online === true,
+      acceptingOrders: riderData.acceptingOrders === true || riderData.online === true,
+      busy: riderData.busy === true,
+      currentOrderId: String(riderData.currentOrderId || '').trim(),
+      dispatchPresenceState: riderData.busy === true ? 'BUSY' : ((riderData.acceptingOrders === true || riderData.online === true) ? 'ACCEPTING' : 'PAUSED'),
+      initializedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    }, { merge: true }),
+    refs.stats.set({
+      ...identity,
+      completedOrders: Number(riderData.completedOrders || riderData.totalCompletedOrders || 0),
+      cancelledOrders: Number(riderData.cancelledOrders || 0),
+      totalEarnings: Number(riderData.totalEarnings || riderData.totalIncome || 0),
+      initializedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    }, { merge: true }),
+  ]);
 }
 
 function buildRiderLoginPayload(riderDoc) {
@@ -3902,14 +3934,12 @@ async function findRiderByPhoneForLogin(phone) {
     lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
     lastLoginAtMs: Date.now(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    operationalDataSource:
-      found.sourceCollection === RIDER_V2_COLLECTIONS.riders
-        ? 'ridersV2'
-        : 'legacy_riders',
+    operationalDataSource: 'ridersV2',
   };
 
   await writeRiderMigrationCompatible(riderDoc, loginUpdate);
   riderDoc = await riderDoc.ref.get();
+  await ensureRiderV2OperationalDocuments(riderDoc, riderDoc.data() || {});
 
   return {
     ok: true,
@@ -4421,7 +4451,7 @@ app.post('/api/rider/v5/native-device', riderAuthMiddleware, async (req, res) =>
       update.liveActivityPushTokenUpdatedAtMs = Date.now();
     }
 
-    await db.collection('riders')
+    await db.collection(RIDER_V2_COLLECTIONS.riders)
       .doc(riderResult.riderDoc.id)
       .set(update, { merge: true });
 
@@ -4503,7 +4533,7 @@ app.get('/api/rider/profile', riderAuthMiddleware, async (req, res) => {
     // 正式 Token 流程：直接以 Custom Claims 的 riderDocId 讀取本人資料。
     if (req.riderAuth && req.riderAuth.riderDocId) {
       const riderDoc = await db
-        .collection('riders')
+        .collection(RIDER_V2_COLLECTIONS.riders)
         .doc(req.riderAuth.riderDocId)
         .get();
 
@@ -4561,7 +4591,7 @@ app.get('/api/rider/profile', riderAuthMiddleware, async (req, res) => {
         });
       }
 
-      const phoneDocRef = db.collection('riders').doc(cleanPhone);
+      const phoneDocRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(cleanPhone);
       const phoneDoc = await phoneDocRef.get();
 
       if (!phoneDoc.exists) {
@@ -4581,7 +4611,7 @@ app.get('/api/rider/profile', riderAuthMiddleware, async (req, res) => {
       }
 
       // 清掉其他誤綁到同一個 lineUserId 的騎士資料，避免同一個 LINE 對到多人
-      const wrongBindSnap = await db.collection('riders')
+      const wrongBindSnap = await db.collection(RIDER_V2_COLLECTIONS.riders)
         .where('lineUserId', '==', lineUserId)
         .get();
 
@@ -4616,7 +4646,7 @@ app.get('/api/rider/profile', riderAuthMiddleware, async (req, res) => {
     }
 
     // 沒有帶手機時，才用 lineUserId 找已綁定騎士
-    const snap = await db.collection('riders')
+    const snap = await db.collection(RIDER_V2_COLLECTIONS.riders)
       .where('lineUserId', '==', lineUserId)
       .limit(1)
       .get();
@@ -5093,7 +5123,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
 async function resolveScheduleRiderForRequest(req, source = {}) {
   if (req?.riderAuth?.riderDocId) {
     const riderDoc = await db
-      .collection('riders')
+      .collection(RIDER_V2_COLLECTIONS.riders)
       .doc(String(req.riderAuth.riderDocId).trim())
       .get();
 
@@ -5142,7 +5172,7 @@ async function sendScheduledRiderReminder(
 
     const riderDoc =
       await db
-        .collection('riders')
+        .collection(RIDER_V2_COLLECTIONS.riders)
         .doc(safeRiderDocId)
         .get();
 
@@ -5179,7 +5209,7 @@ async function sendScheduledRiderReminder(
             statusCode === 410
           ) {
             await db
-              .collection('riders')
+              .collection(RIDER_V2_COLLECTIONS.riders)
               .doc(safeRiderDocId)
               .set(
                 {
@@ -5599,7 +5629,7 @@ app.post(
       };
 
       await db
-        .collection('riders')
+        .collection(RIDER_V2_COLLECTIONS.riders)
         .doc(riderResult.riderDoc.id)
         .set(
           updateData,
@@ -10790,10 +10820,22 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
 
     // 調度中心必須保留「全部已審核小U」，不能因暫停接單或失聯而消失。
     // 目前先支援最多 5,000 名，對應 UBee 台中 5,000 小U密度計畫。
-    const riderSnap = await db.collection('riders').limit(5000).get();
+    const [riderSnap, presenceSnap, locationSnap, statsSnap] = await Promise.all([
+      db.collection(RIDER_V2_COLLECTIONS.riders).limit(5000).get(),
+      db.collection(RIDER_V2_COLLECTIONS.presence).limit(5000).get(),
+      db.collection(RIDER_V2_COLLECTIONS.locations).limit(5000).get(),
+      db.collection(RIDER_V2_COLLECTIONS.stats).limit(5000).get(),
+    ]);
+    const presenceById = new Map(presenceSnap.docs.map(doc => [doc.id, doc.data() || {}]));
+    const locationById = new Map(locationSnap.docs.map(doc => [doc.id, doc.data() || {}]));
+    const statsById = new Map(statsSnap.docs.map(doc => [doc.id, doc.data() || {}]));
     const allApprovedRiders = riderSnap.docs
       .map(doc => {
-        const r = doc.data() || {};
+        const master = doc.data() || {};
+        const presence = presenceById.get(doc.id) || {};
+        const location = locationById.get(doc.id) || {};
+        const stats = statsById.get(doc.id) || {};
+        const r = { ...master, ...stats, ...location, ...presence };
         const approved =
           r.approved === true ||
           String(r.status || '').trim().toLowerCase() === 'approved';
@@ -11124,7 +11166,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         const repairBatch = db.batch();
         ghostBusyRiders.slice(0, 400).forEach(rider => {
           repairBatch.set(
-            db.collection('riders').doc(rider.riderDocId),
+            db.collection(RIDER_V2_COLLECTIONS.riders).doc(rider.riderDocId),
             {
               busy: false,
               currentOrderId: '',
@@ -12604,39 +12646,6 @@ app.get('/api/rider/application-status', async (req, res) => {
       });
     }
 
-    // 過渡期保留舊 riders 查詢，待全員重新申請完成後移除。
-    let legacyDoc = await db
-      .collection('riders')
-      .doc(cleanPhone)
-      .get();
-
-    if (!legacyDoc.exists) {
-      const snap = await db.collection('riders')
-        .where('phone', '==', cleanPhone)
-        .limit(1)
-        .get();
-      if (!snap.empty) legacyDoc = snap.docs[0];
-    }
-
-    if (legacyDoc.exists) {
-      const rider = legacyDoc.data() || {};
-      return res.json({
-        success: true,
-        found: true,
-        source: 'legacy_riders',
-        riderId: rider.riderId || legacyDoc.id,
-        name: rider.name || '',
-        approved: rider.approved === true,
-        reviewStatus: rider.reviewStatus || rider.status || '',
-        status: rider.status || '',
-        lifecycleStatus: 'LEGACY_REAPPLICATION_REQUIRED',
-        canAcceptOrders: canRiderAcceptOrdersV4(rider),
-        riderLevel: rider.riderLevel || '',
-        reapplicationRequired: true,
-        message: '此為舊版小U資料，請依公告重新提交新版申請。',
-      });
-    }
-
     return res.json({
       success: true,
       found: false,
@@ -13213,7 +13222,7 @@ app.get('/api/rider/v4/finance', riderAuthMiddleware, async (req, res) => {
 
 app.get('/api/admin/rider-v4/list', requireRiderV4AdminKey, async (req, res) => {
   try {
-    const snap = await db.collection('riders').limit(5000).get();
+    const snap = await db.collection(RIDER_V2_COLLECTIONS.riders).limit(5000).get();
     const riders = snap.docs.map(doc => {
       const r = { id:doc.id, ...doc.data() };
       return {
@@ -13244,9 +13253,9 @@ app.post('/api/admin/rider-v4/action', requireRiderV4AdminKey, async (req, res) 
     const value = String(req.body?.value || '').trim();
     if (!riderId || !action) return res.status(400).json({ success:false, message:'缺少 riderId 或 action。' });
 
-    let doc = await db.collection('riders').doc(riderId).get();
+    let doc = await db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderId).get();
     if (!doc.exists) {
-      const snap = await db.collection('riders').where('riderId','==',riderId).limit(1).get();
+      const snap = await db.collection(RIDER_V2_COLLECTIONS.riders).where('riderId','==',riderId).limit(1).get();
       if (!snap.empty) doc = snap.docs[0];
     }
     if (!doc.exists) return res.status(404).json({ success:false, message:'找不到小U資料。' });
@@ -13492,7 +13501,35 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
       updateData.currentOrderId = '';
     }
 
-    await db.collection('riders').doc(riderDoc.id).set(updateData, { merge: true });
+    const operationalRefs = riderV2OperationalRefs(riderDoc.id);
+    const presenceData = {
+      riderDocId: riderDoc.id,
+      riderId: rider.riderId || riderDoc.id,
+      phone: normalizePhone(rider.phone || riderDoc.id || ''),
+      lineUserId: String(rider.lineUserId || '').trim(),
+      name: cleanText(rider.name || rider.riderName || '', 80),
+      online,
+      acceptingOrders: online,
+      busy: updateData.busy,
+      currentOrderId: updateData.currentOrderId,
+      lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastSeenAtMs: nowMs,
+      lastHeartbeatAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastHeartbeatAtMs: nowMs,
+      connectionState: 'connected',
+      dispatchPresenceState: online ? 'ACCEPTING' : 'PAUSED',
+      dataVersion: RIDER_V2_DATA_VERSION,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    };
+    const statusBatch = db.batch();
+    statusBatch.set(operationalRefs.rider, {
+      ...updateData,
+      operationalDataSource: 'ridersV2',
+      dataVersion: RIDER_V2_DATA_VERSION,
+    }, { merge: true });
+    statusBatch.set(operationalRefs.presence, presenceData, { merge: true });
+    await statusBatch.commit();
 
     return res.json({
       success: true,
@@ -13591,6 +13628,8 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
 
     const nowMs =
       Date.now();
+
+    const operationalRefs = riderV2OperationalRefs(riderDoc.id);
 
     // ==============================
     // 2. 安全整理 GPS 額外資訊
@@ -13814,7 +13853,40 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
           );
 
           // ==========================
-          // 5. 同步進行中訂單
+          // 5. 更新獨立定位集合 riderLocationsV2
+          // ==========================
+          transaction.set(
+            operationalRefs.location,
+            {
+              riderDocId: latestRiderDoc.id,
+              riderId: latestRider.riderId || latestRiderDoc.id,
+              phone: normalizePhone(latestRider.phone || latestRiderDoc.id || ''),
+              lineUserId: String(latestRider.lineUserId || '').trim(),
+              name: cleanText(latestRider.name || latestRider.riderName || '', 80),
+              lat: latitude,
+              lng: longitude,
+              accuracy: safeAccuracy,
+              heading: safeHeading,
+              speed: safeSpeed,
+              currentLocation: {
+                ...liveLocation,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              trackingSource: safeTrackingSource,
+              isBackground: isBackground === true,
+              activeOrderId,
+              taskTrackingStatus: activeOrderId ? 'live' : 'idle',
+              locationHealthState: 'healthy',
+              connectionState: 'connected',
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: nowMs,
+              dataVersion: RIDER_V2_DATA_VERSION,
+            },
+            { merge: true }
+          );
+
+          // ==========================
+          // 6. 同步進行中訂單
           // ==========================
           const activeStatuses = [
             'accepted',
@@ -15362,7 +15434,7 @@ async function saveRider(rider) {
 
   riders[riderId] = payload;
 
-  await db.collection('riders').doc(riderId).set(payload, { merge: true });
+  await db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderId).set(payload, { merge: true });
 
   return payload;
 }
@@ -15507,9 +15579,9 @@ async function saveRiderV2(rider, { mirrorLegacy = true } = {}) {
     .doc(phone)
     .set(payload, { merge: true });
 
-  if (mirrorLegacy && RIDER_V2_MIRROR_TO_LEGACY_RIDERS) {
+  if (false && mirrorLegacy && RIDER_V2_MIRROR_TO_LEGACY_RIDERS) {
     await db
-      .collection('riders')
+      .collection(RIDER_V2_COLLECTIONS.riders)
       .doc(phone)
       .set({
         ...payload,
@@ -15557,13 +15629,13 @@ async function getRider(riderId) {
 
   if (riders[id]) return riders[id];
 
-  const legacyDoc = await db.collection('riders').doc(id).get();
+  const legacyDoc = await db.collection(RIDER_V2_COLLECTIONS.riders).doc(id).get();
   if (!legacyDoc.exists) return null;
 
   const rider = {
     id: legacyDoc.id,
     ...legacyDoc.data(),
-    sourceCollection: 'riders',
+    sourceCollection: RIDER_V2_COLLECTIONS.riders,
   };
 
   riders[id] = rider;
@@ -16156,7 +16228,7 @@ async function isApprovedRiderUser(userId) {
   if (APPROVED_RIDER_IDS.includes(userId)) return true;
 
   try {
-    const snap = await db.collection('riders')
+    const snap = await db.collection(RIDER_V2_COLLECTIONS.riders)
       .where('lineUserId', '==', userId)
       .limit(1)
       .get();
@@ -17897,7 +17969,7 @@ app.get('/api/customer/service-status', async (req, res) => {
       isValidLongitude(pickupLng);
 
     const ridersSnap = await db
-      .collection('riders')
+      .collection(RIDER_V2_COLLECTIONS.riders)
       .limit(500)
       .get();
 
@@ -20860,7 +20932,7 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
 
     const safeOrderId = String(orderId).toUpperCase();
     const orderRef = db.collection('orders').doc(safeOrderId);
-    const riderRef = db.collection('riders').doc(riderDoc.id);
+    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
 
     // UBee 任務即時追蹤：接單即建立 tracking session。
     // 這個 session 與一般 online / heartbeat 分離，直到完成或轉派才結束。
@@ -21232,7 +21304,7 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
       .doc(safeOrderId);
 
     const riderRef = db
-      .collection('riders')
+      .collection(RIDER_V2_COLLECTIONS.riders)
       .doc(riderDoc.id);
 
     const nowMs = Date.now();
@@ -21602,7 +21674,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
 
     const safeOrderId = String(orderId).toUpperCase();
     const orderRef = db.collection('orders').doc(safeOrderId);
-    const riderRef = db.collection('riders').doc(riderDoc.id);
+    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
 
     let updatedOrder = null;
     let multiStopAdvanced = false;
@@ -22661,7 +22733,7 @@ UBee 跑腿辦公室將會再依照您的需求，
       createTextMessage(`✅ UBee 跑腿任務已完成\n\n訂單編號：${order.id}\n感謝你使用 UBee 跑腿。`)
     );
     
-    const riderSnap = await db.collection('riders')
+    const riderSnap = await db.collection(RIDER_V2_COLLECTIONS.riders)
   .where('lineUserId', '==', userId)
   .limit(1)
   .get();
@@ -23035,7 +23107,7 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
       .doc(safeOrderId);
 
     const riderRef = db
-      .collection('riders')
+      .collection(RIDER_V2_COLLECTIONS.riders)
       .doc(riderDoc.id);
 
     const nowMs = Date.now();
@@ -23359,7 +23431,7 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
       let previousRiderRef = null;
       let previousRiderDoc = null;
       if (previousRiderDocId) {
-        previousRiderRef = db.collection('riders').doc(previousRiderDocId);
+        previousRiderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(previousRiderDocId);
         previousRiderDoc = await transaction.get(previousRiderRef);
       }
 
