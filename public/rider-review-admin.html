@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>UBee 小U申請審核管理</title>
+  <meta name="theme-color" content="#facc15" />
+  <style>
+    :root{
+      --bg:#f4f6f8;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:rgba(15,23,42,.10);
+      --yellow:#facc15;
+      --green:#16a34a;
+      --blue:#2563eb;
+      --orange:#f97316;
+      --red:#dc2626;
+      --shadow:0 18px 50px rgba(15,23,42,.10);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;background:var(--bg);color:var(--text)}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .hidden{display:none!important}
+    .topbar{
+      position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:14px;
+      min-height:72px;padding:12px 20px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)
+    }
+    .brand{display:flex;align-items:center;gap:12px;min-width:0}
+    .brand-mark{width:44px;height:44px;border-radius:15px;background:#111827;color:var(--yellow);display:grid;place-items:center;font-size:22px;font-weight:1000;box-shadow:0 10px 24px rgba(15,23,42,.16)}
+    .brand-title{font-size:19px;font-weight:1000;line-height:1.2}
+    .brand-subtitle{margin-top:3px;color:var(--muted);font-size:12px;font-weight:800}
+    .top-actions{display:flex;align-items:center;gap:9px}
+    .operator-pill{max-width:220px;padding:8px 11px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ghost-btn,.primary-btn,.danger-btn,.success-btn,.orange-btn{
+      min-height:44px;border:0;border-radius:14px;padding:10px 14px;font-weight:1000
+    }
+    .ghost-btn{background:#f3f4f6;color:#111827;border:1px solid var(--line)}
+    .primary-btn{background:var(--yellow);color:#111827}
+    .success-btn{background:var(--green);color:#fff}
+    .orange-btn{background:var(--orange);color:#fff}
+    .danger-btn{background:var(--red);color:#fff}
+    button:disabled{opacity:.48;cursor:not-allowed}
+    .layout{display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);min-height:calc(100vh - 72px)}
+    .sidebar{border-right:1px solid var(--line);background:#fff;padding:16px;overflow:auto;max-height:calc(100vh - 72px)}
+    .sidebar-head{display:grid;gap:10px;margin-bottom:14px}
+    .search-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+    .input,.select,.textarea{
+      width:100%;border:1px solid rgba(15,23,42,.14);border-radius:14px;background:#fff;color:#111827;
+      padding:12px 13px;outline:none;font-weight:800
+    }
+    .input:focus,.select:focus,.textarea:focus{border-color:#eab308;box-shadow:0 0 0 4px rgba(250,204,21,.16)}
+    .textarea{min-height:96px;resize:vertical;line-height:1.55}
+    .filter-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .filter-tab{border:1px solid var(--line);border-radius:13px;background:#f9fafb;padding:10px;font-size:13px;font-weight:1000;color:#4b5563}
+    .filter-tab.active{background:#111827;color:#fff;border-color:#111827}
+    .count-line{font-size:13px;color:var(--muted);font-weight:800}
+    .application-list{display:grid;gap:10px}
+    .application-card{width:100%;text-align:left;border:1px solid var(--line);border-radius:18px;background:#fff;padding:14px;box-shadow:0 8px 22px rgba(15,23,42,.05)}
+    .application-card:hover{border-color:rgba(250,204,21,.70);transform:translateY(-1px)}
+    .application-card.active{border-color:#eab308;box-shadow:0 0 0 3px rgba(250,204,21,.16)}
+    .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .card-name{font-size:17px;font-weight:1000;color:#111827}
+    .card-id{margin-top:3px;font-size:12px;color:#6b7280;font-weight:800;word-break:break-all}
+    .status-pill{flex:0 0 auto;padding:6px 9px;border-radius:999px;background:#f3f4f6;color:#4b5563;font-size:12px;font-weight:1000}
+    .status-pill.pending{background:#eff6ff;color:#1d4ed8}
+    .status-pill.needs_supplement{background:#fff7ed;color:#c2410c}
+    .status-pill.approved,.status-pill.training,.status-pill.active{background:#f0fdf4;color:#15803d}
+    .status-pill.rejected{background:#fef2f2;color:#b91c1c}
+    .card-copy{margin-top:10px;display:grid;gap:5px;font-size:13px;color:#4b5563;font-weight:800}
+    .document-meter{margin-top:11px;height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}
+    .document-meter>span{display:block;height:100%;background:var(--green);border-radius:999px}
+    .detail{padding:22px;overflow:auto;max-height:calc(100vh - 72px)}
+    .empty-state{min-height:70vh;display:grid;place-items:center;text-align:center;color:#6b7280}
+    .empty-icon{width:78px;height:78px;border-radius:28px;background:#fff;display:grid;place-items:center;margin:0 auto 15px;font-size:34px;box-shadow:var(--shadow)}
+    .detail-shell{max-width:1120px;margin:0 auto;display:grid;gap:16px;padding-bottom:60px}
+    .hero{border:1px solid var(--line);border-radius:28px;background:linear-gradient(145deg,#fff 0%,#fffbea 100%);padding:22px;box-shadow:var(--shadow)}
+    .hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+    .hero-title{font-size:30px;font-weight:1000;line-height:1.18}
+    .hero-copy{margin-top:7px;color:#4b5563;font-size:15px;font-weight:800;line-height:1.55}
+    .hero-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}
+    .meta-card{border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.84);padding:13px}
+    .meta-label{font-size:12px;color:#6b7280;font-weight:900}
+    .meta-value{margin-top:5px;font-size:15px;color:#111827;font-weight:1000;word-break:break-word}
+    .section{border:1px solid var(--line);border-radius:24px;background:#fff;padding:18px;box-shadow:0 12px 32px rgba(15,23,42,.06)}
+    .section-title{font-size:20px;font-weight:1000}
+    .section-copy{margin-top:5px;color:#6b7280;font-size:14px;line-height:1.55;font-weight:700}
+    .info-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+    .info-item{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa}
+    .documents{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:15px}
+    .document-card{border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
+    .document-preview{height:260px;background:#eef2f7;display:grid;place-items:center;overflow:hidden;position:relative}
+    .document-preview img{width:100%;height:100%;object-fit:contain;background:#f8fafc}
+    .document-preview-copy{text-align:center;color:#6b7280;font-size:14px;font-weight:900;padding:16px}
+    .document-content{padding:14px}
+    .document-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .document-title{font-size:17px;font-weight:1000}
+    .document-file{margin-top:4px;color:#6b7280;font-size:12px;font-weight:800;word-break:break-all}
+    .reason-box{margin-top:11px;padding:11px;border-radius:14px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px;font-weight:800;line-height:1.5}
+    .document-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .document-actions button{min-height:42px;border:0;border-radius:12px;font-size:13px;font-weight:1000}
+    .view-btn{background:#f3f4f6;color:#111827}
+    .approve-btn{background:#dcfce7;color:#15803d}
+    .supplement-btn{background:#ffedd5;color:#c2410c}
+    .reset-btn{background:#eff6ff;color:#1d4ed8}
+    .decision-panel{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:end}
+    .decision-note{font-size:13px;color:#6b7280;font-weight:800;line-height:1.55;margin-top:6px}
+    .login-overlay{position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:grid;place-items:center;padding:20px}
+    .login-card{width:min(460px,100%);border-radius:28px;background:#fff;padding:24px;box-shadow:0 35px 100px rgba(15,23,42,.28)}
+    .login-mark{width:58px;height:58px;border-radius:20px;background:#111827;color:var(--yellow);display:grid;place-items:center;font-size:28px;font-weight:1000}
+    .login-title{margin-top:16px;font-size:27px;font-weight:1000}
+    .login-copy{margin-top:7px;color:#6b7280;font-size:14px;line-height:1.6;font-weight:700}
+    .login-fields{display:grid;gap:11px;margin-top:18px}
+    .message{margin-top:11px;padding:11px 12px;border-radius:13px;font-size:13px;font-weight:900;line-height:1.5}
+    .message.error{background:#fef2f2;color:#b91c1c}
+    .message.success{background:#f0fdf4;color:#15803d}
+    .toast{position:fixed;right:18px;bottom:18px;z-index:120;max-width:min(420px,calc(100vw - 36px));padding:14px 16px;border-radius:16px;background:#111827;color:#fff;font-size:14px;font-weight:900;box-shadow:0 18px 50px rgba(15,23,42,.25)}
+    .loading{opacity:.62;pointer-events:none}
+    @media(max-width:1000px){
+      .layout{grid-template-columns:1fr}
+      .sidebar{max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+      .application-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .detail{max-height:none}
+      .hero-meta{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:680px){
+      .topbar{padding:10px 12px}
+      .brand-subtitle,.operator-pill{display:none}
+      .layout{display:block}
+      .sidebar{padding:12px}
+      .application-list{grid-template-columns:1fr}
+      .detail{padding:12px}
+      .hero{padding:17px;border-radius:22px}
+      .hero-top{display:grid}
+      .hero-title{font-size:25px}
+      .hero-meta,.info-grid,.documents{grid-template-columns:1fr}
+      .document-preview{height:220px}
+      .decision-panel{grid-template-columns:1fr}
+      .section{padding:15px;border-radius:20px}
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">U</div>
+      <div>
+        <div class="brand-title">UBee 小U申請審核管理</div>
+        <div class="brand-subtitle">五項證件逐項審核・補件・通過與拒絕</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="operator-pill" id="operatorPill">尚未登入</div>
+      <button class="ghost-btn" id="refreshButton" type="button" onclick="loadApplications()">重新整理</button>
+      <button class="ghost-btn" id="logoutButton" type="button" onclick="logoutAdmin()">登出</button>
+    </div>
+  </header>
+
+  <main class="layout" id="mainLayout">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="search-row">
+          <input class="input" id="searchInput" placeholder="搜尋姓名、手機或車牌" onkeydown="handleSearchKey(event)" />
+          <button class="primary-btn" type="button" onclick="loadApplications()">搜尋</button>
+        </div>
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-status="all" onclick="setStatusFilter('all',this)">全部</button>
+          <button class="filter-tab" data-status="pending" onclick="setStatusFilter('pending',this)">待審核</button>
+          <button class="filter-tab" data-status="needs_supplement" onclick="setStatusFilter('needs_supplement',this)">待補件</button>
+          <button class="filter-tab" data-status="approved" onclick="setStatusFilter('approved',this)">已通過</button>
+          <button class="filter-tab" data-status="rejected" onclick="setStatusFilter('rejected',this)">已拒絕</button>
+        </div>
+        <div class="count-line" id="countLine">尚未載入申請資料</div>
+      </div>
+      <div class="application-list" id="applicationList"></div>
+    </aside>
+
+    <section class="detail" id="detailPanel">
+      <div class="empty-state">
+        <div>
+          <div class="empty-icon">📋</div>
+          <div style="font-size:22px;font-weight:1000;color:#111827">選擇一筆小U申請</div>
+          <div style="margin-top:8px;line-height:1.65;font-weight:700">查看基本資料與五項證件，逐項完成審核。</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="login-overlay" id="loginOverlay">
+    <form class="login-card" onsubmit="loginAdmin(event)">
+      <div class="login-mark">U</div>
+      <div class="login-title">進入小U審核管理</div>
+      <div class="login-copy">請使用 Render 環境變數 <b>UBEE_RIDER_V4_ADMIN_KEY</b> 所設定的管理密碼登入。密碼只保存在目前瀏覽器。</div>
+      <div class="login-fields">
+        <input class="input" id="adminKeyInput" type="password" autocomplete="current-password" placeholder="管理密碼" required />
+        <input class="input" id="operatorInput" autocomplete="name" placeholder="審核人員名稱，例如 Charles" required />
+        <button class="primary-btn" id="loginButton" type="submit">登入審核管理</button>
+      </div>
+      <div id="loginMessage"></div>
+    </form>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script>
+    const API_BASE = location.protocol.startsWith('http')
+      ? location.origin
+      : 'https://ubee-line-bot-2-zezw.onrender.com';
+    const STORAGE_KEY = 'ubee_rider_review_admin_key';
+    const OPERATOR_KEY = 'ubee_rider_review_operator';
+    const STATUS_LABELS = {
+      pending:'待審核',
+      under_review:'待審核',
+      needs_supplement:'待補件',
+      approved:'已通過',
+      training:'數位入職',
+      active:'已開通',
+      rejected:'已拒絕'
+    };
+    const DOCUMENT_STATUS_LABELS = {
+      pending:'審核中',
+      approved:'已通過',
+      needs_supplement:'需要補件'
+    };
+
+    let adminKey = localStorage.getItem(STORAGE_KEY) || '';
+    let operatorName = localStorage.getItem(OPERATOR_KEY) || '';
+    let statusFilter = 'all';
+    let applications = [];
+    let selectedRiderId = '';
+    let selectedApplication = null;
+
+    function escapeHtml(value){
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      })[character]);
+    }
+
+    function formatDateTime(value){
+      const ms = Number(value || 0);
+      if(!ms) return '尚未記錄';
+      try{
+        return new Intl.DateTimeFormat('zh-TW',{
+          timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',
+          hour:'2-digit',minute:'2-digit',hour12:false
+        }).format(new Date(ms));
+      }catch(_){
+        return new Date(ms).toLocaleString('zh-TW');
+      }
+    }
+
+    function getAdminHeaders(json=false){
+      const headers = {'X-UBee-Admin-Key':adminKey};
+      if(json) headers['Content-Type']='application/json';
+      return headers;
+    }
+
+    async function apiFetch(path, options={}){
+      const response = await fetch(`${API_BASE}${path}`,{
+        cache:'no-store',
+        ...options,
+        headers:{...getAdminHeaders(Boolean(options.body)),...(options.headers||{})}
+      });
+      const data = await response.json().catch(()=>({}));
+      if(!response.ok || data.success===false){
+        const error = new Error(data.message || `HTTP ${response.status}`);
+        error.status=response.status;
+        throw error;
+      }
+      return data;
+    }
+
+    function setLoading(isLoading){
+      document.getElementById('mainLayout')?.classList.toggle('loading',isLoading);
+      document.getElementById('refreshButton').disabled=isLoading;
+    }
+
+    function showToast(message){
+      const toast=document.getElementById('toast');
+      toast.textContent=message;
+      toast.classList.remove('hidden');
+      clearTimeout(showToast.timer);
+      showToast.timer=setTimeout(()=>toast.classList.add('hidden'),3200);
+    }
+
+    function showLoginMessage(message,type='error'){
+      const box=document.getElementById('loginMessage');
+      box.innerHTML=message?`<div class="message ${escapeHtml(type)}">${escapeHtml(message)}</div>`:'';
+    }
+
+    async function loginAdmin(event){
+      event?.preventDefault();
+      const key=String(document.getElementById('adminKeyInput').value||'').trim();
+      const operator=String(document.getElementById('operatorInput').value||'').trim();
+      if(!key||!operator) return;
+      const button=document.getElementById('loginButton');
+      button.disabled=true;
+      button.textContent='驗證中...';
+      adminKey=key;
+      operatorName=operator;
+      try{
+        await apiFetch('/api/admin/rider-review/applications?status=all');
+        localStorage.setItem(STORAGE_KEY,adminKey);
+        localStorage.setItem(OPERATOR_KEY,operatorName);
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('operatorPill').textContent=`審核人員：${operatorName}`;
+        showLoginMessage('');
+        await loadApplications();
+        const riderId=new URLSearchParams(location.search).get('riderId');
+        if(riderId) await openApplication(riderId);
+      }catch(error){
+        adminKey='';
+        showLoginMessage(error.message||'管理密碼驗證失敗。');
+      }finally{
+        button.disabled=false;
+        button.textContent='登入審核管理';
+      }
+    }
+
+    function logoutAdmin(){
+      localStorage.removeItem(STORAGE_KEY);
+      adminKey='';
+      selectedRiderId='';
+      selectedApplication=null;
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('adminKeyInput').value='';
+      document.getElementById('operatorInput').value=operatorName;
+      document.getElementById('operatorPill').textContent='尚未登入';
+    }
+
+    function setStatusFilter(status,button){
+      statusFilter=status;
+      document.querySelectorAll('.filter-tab').forEach(item=>item.classList.toggle('active',item===button));
+      loadApplications();
+    }
+
+    function handleSearchKey(event){
+      if(event.key==='Enter') loadApplications();
+    }
+
+    function getApplicationStatus(item){
+      const lifecycle=String(item.lifecycleStatus||'').toLowerCase();
+      const status=String(item.status||item.reviewStatus||'pending').toLowerCase();
+      if(lifecycle==='active') return 'active';
+      if(lifecycle==='training') return 'training';
+      if(lifecycle==='rejected') return 'rejected';
+      if(Number(item.documentSummary?.supplementCount||0)>0) return 'needs_supplement';
+      return status;
+    }
+
+    async function loadApplications(){
+      if(!adminKey) return;
+      const query=String(document.getElementById('searchInput').value||'').trim();
+      setLoading(true);
+      try{
+        const params=new URLSearchParams({status:statusFilter,q:query,t:String(Date.now())});
+        const data=await apiFetch(`/api/admin/rider-review/applications?${params}`);
+        applications=Array.isArray(data.applications)?data.applications:[];
+        renderApplicationList();
+        document.getElementById('countLine').textContent=`共 ${applications.length} 筆申請`;
+      }catch(error){
+        if(error.status===401){logoutAdmin();showLoginMessage('管理密碼已失效，請重新登入。');return;}
+        document.getElementById('applicationList').innerHTML=`<div class="message error">${escapeHtml(error.message||'讀取申請失敗')}</div>`;
+      }finally{
+        setLoading(false);
+      }
+    }
+
+    function renderApplicationList(){
+      const list=document.getElementById('applicationList');
+      if(!applications.length){
+        list.innerHTML='<div class="message success">目前沒有符合條件的申請。</div>';
+        return;
+      }
+      list.innerHTML=applications.map(item=>{
+        const status=getApplicationStatus(item);
+        const approved=Number(item.documentSummary?.approvedCount||0);
+        const total=Math.max(1,Number(item.documentSummary?.totalCount||5));
+        const percent=Math.round(approved/total*100);
+        return `<button class="application-card ${selectedRiderId===item.riderId?'active':''}" type="button" onclick="openApplication('${escapeHtml(item.riderId)}')">
+          <div class="card-head"><div><div class="card-name">${escapeHtml(item.name||'未命名申請')}</div><div class="card-id">${escapeHtml(item.phone||item.riderId)}</div></div><span class="status-pill ${escapeHtml(status)}">${escapeHtml(STATUS_LABELS[status]||status)}</span></div>
+          <div class="card-copy"><div>${escapeHtml(item.district||'居住地區未填')}</div><div>${escapeHtml(item.vehicle||'-')}・${escapeHtml(item.plateNumber||'-')}</div><div>證件 ${approved}／${total} 項通過</div><div>${escapeHtml(formatDateTime(item.updatedAtMs||item.submittedAtMs))}</div></div>
+          <div class="document-meter"><span style="width:${percent}%"></span></div>
+        </button>`;
+      }).join('');
+    }
+
+    async function openApplication(riderId){
+      if(!riderId) return;
+      selectedRiderId=riderId;
+      renderApplicationList();
+      const panel=document.getElementById('detailPanel');
+      panel.innerHTML='<div class="empty-state"><div><div class="empty-icon">⏳</div><div style="font-size:20px;font-weight:1000">正在載入申請明細</div></div></div>';
+      try{
+        const data=await apiFetch(`/api/admin/rider-review/applications/${encodeURIComponent(riderId)}?t=${Date.now()}`);
+        selectedApplication=data.application;
+        renderApplicationDetail(selectedApplication);
+        const url=new URL(location.href);
+        url.searchParams.set('riderId',riderId);
+        history.replaceState(null,'',url);
+      }catch(error){
+        panel.innerHTML=`<div class="message error">${escapeHtml(error.message||'讀取申請明細失敗')}</div>`;
+      }
+    }
+
+    function infoItem(label,value){
+      return `<div class="info-item"><div class="meta-label">${escapeHtml(label)}</div><div class="meta-value">${escapeHtml(value||'-')}</div></div>`;
+    }
+
+    function renderApplicationDetail(application){
+      const panel=document.getElementById('detailPanel');
+      const status=getApplicationStatus(application);
+      const statusLabel=STATUS_LABELS[status]||status;
+      const allApproved=application.documentSummary?.allApproved===true;
+      const isFinal=['training','approved','active'].includes(String(application.status||'').toLowerCase()) || ['TRAINING','ACTIVE'].includes(String(application.lifecycleStatus||'').toUpperCase());
+      const isRejected=String(application.status||'').toLowerCase()==='rejected';
+      const emergency=application.emergencyContact||{};
+      const documents=Array.isArray(application.documents)?application.documents:[];
+
+      panel.innerHTML=`<div class="detail-shell">
+        <section class="hero">
+          <div class="hero-top"><div><span class="status-pill ${escapeHtml(status)}">${escapeHtml(statusLabel)}</span><div class="hero-title" style="margin-top:12px">${escapeHtml(application.name||'未命名申請')}</div><div class="hero-copy">申請編號：${escapeHtml(application.riderId||application.id)}・手機：${escapeHtml(application.phone||'-')}</div></div><button class="ghost-btn" type="button" onclick="openApplication('${escapeHtml(application.riderId)}')">更新明細</button></div>
+          <div class="hero-meta">
+            <div class="meta-card"><div class="meta-label">證件通過</div><div class="meta-value">${Number(application.documentSummary?.approvedCount||0)}／${Number(application.documentSummary?.totalCount||5)}</div></div>
+            <div class="meta-card"><div class="meta-label">申請時間</div><div class="meta-value">${escapeHtml(formatDateTime(application.submittedAtMs))}</div></div>
+            <div class="meta-card"><div class="meta-label">最後更新</div><div class="meta-value">${escapeHtml(formatDateTime(application.updatedAtMs))}</div></div>
+            <div class="meta-card"><div class="meta-label">接單資格</div><div class="meta-value">${application.canAcceptOrders?'已開通':'尚未開通'}</div></div>
+          </div>
+        </section>
+
+        ${application.supplementReason?`<div class="message error">目前補件要求：<br>${escapeHtml(application.supplementReason).replace(/\n/g,'<br>')}</div>`:''}
+        ${application.rejectionReason?`<div class="message error">拒絕原因：${escapeHtml(application.rejectionReason)}</div>`:''}
+
+        <section class="section">
+          <div class="section-title">申請資料</div>
+          <div class="section-copy">確認姓名、聯絡、居住、車輛、服務範圍與緊急聯絡資訊。</div>
+          <div class="info-grid">
+            ${infoItem('姓名',application.name)}
+            ${infoItem('手機',application.phone)}
+            ${infoItem('LINE ID',application.lineId)}
+            ${infoItem('出生年月日',application.birthDate)}
+            ${infoItem('居住地區',application.district)}
+            ${infoItem('配送工具',application.vehicle)}
+            ${infoItem('車牌號碼',application.plateNumber)}
+            ${infoItem('車輛所有權',application.vehicleOwnerType==='other'?'他人車輛・已取得同意':'本人車輛')}
+            ${infoItem('強制險到期',application.compulsoryInsuranceExpiryDate)}
+            ${infoItem('服務區域',application.serviceArea)}
+            ${infoItem('可服務時段',application.availableTime)}
+            ${infoItem('緊急聯絡人',`${emergency.name||'-'}・${emergency.relationship||'-'}・${emergency.phone||'-'}`)}
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">五項證件逐項審核</div>
+          <div class="section-copy">證件預覽網址僅短時間有效。每份證件必須標記為「已通過」，才能完成整體審核。</div>
+          <div class="documents">${documents.map(documentItem=>renderDocumentCard(documentItem,isFinal,isRejected)).join('')}</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">最終審核決定</div>
+          <div class="section-copy">通過後會建立正式 ridersV2 小U資料，生命週期進入 TRAINING，必須完成數位入職才能接單。</div>
+          <div class="decision-panel" style="margin-top:14px">
+            <div><textarea class="textarea" id="overallReason" placeholder="拒絕原因或管理備註（拒絕時必填）"></textarea><div class="decision-note">正式通過前，系統會再次確認五項證件是否全部通過。</div></div>
+            ${isRejected?`<button class="primary-btn" type="button" onclick="performOverallAction('reopen')">重新開啟申請</button>`:`<button class="danger-btn" type="button" ${isFinal?'disabled':''} onclick="performOverallAction('reject')">拒絕申請</button>`}
+            <button class="success-btn" type="button" ${(!allApproved||isFinal||isRejected)?'disabled':''} onclick="performOverallAction('approve')">通過並進入數位入職</button>
+          </div>
+        </section>
+      </div>`;
+    }
+
+    function renderDocumentCard(documentItem,isFinal,isRejected){
+      const status=String(documentItem.reviewStatus||'pending');
+      const disabled=isFinal||isRejected;
+      const preview=documentItem.previewUrl
+        ? `<img src="${escapeHtml(documentItem.previewUrl)}" alt="${escapeHtml(documentItem.label)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'document-preview-copy',textContent:'此圖片格式無法在瀏覽器直接預覽，請使用下方按鈕開啟原檔。'}))">`
+        : `<div class="document-preview-copy">找不到預覽檔案，請確認 Firebase Storage 設定或重新整理。</div>`;
+      return `<article class="document-card">
+        <div class="document-preview">${preview}</div>
+        <div class="document-content">
+          <div class="document-title-row"><div><div class="document-title">${escapeHtml(documentItem.label)}</div><div class="document-file">${escapeHtml(documentItem.originalName||'檔名未記錄')}・${Math.max(0,Math.round(Number(documentItem.sizeBytes||0)/1024))} KB</div></div><span class="status-pill ${escapeHtml(status)}">${escapeHtml(DOCUMENT_STATUS_LABELS[status]||status)}</span></div>
+          ${documentItem.reviewReason?`<div class="reason-box">補件原因：${escapeHtml(documentItem.reviewReason)}</div>`:''}
+          <div class="document-actions">
+            <button class="view-btn" type="button" ${documentItem.previewUrl?'':'disabled'} onclick="openDocumentPreview('${escapeHtml(documentItem.previewUrl||'')}')">開啟原檔</button>
+            <button class="approve-btn" type="button" ${disabled?'disabled':''} onclick="markDocument('${escapeHtml(documentItem.documentKey)}','approved')">標記通過</button>
+            <button class="supplement-btn" type="button" ${disabled?'disabled':''} onclick="markDocument('${escapeHtml(documentItem.documentKey)}','needs_supplement')">要求補件</button>
+            <button class="reset-btn" type="button" ${disabled?'disabled':''} onclick="markDocument('${escapeHtml(documentItem.documentKey)}','pending')">恢復待審核</button>
+          </div>
+        </div>
+      </article>`;
+    }
+
+    function openDocumentPreview(url){
+      if(!url){showToast('目前沒有可開啟的證件檔案。');return;}
+      window.open(url,'_blank','noopener,noreferrer');
+    }
+
+    async function postAction(payload){
+      if(!selectedRiderId) throw new Error('尚未選擇申請資料。');
+      return apiFetch(`/api/admin/rider-review/applications/${encodeURIComponent(selectedRiderId)}/action`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({operator:operatorName,...payload})
+      });
+    }
+
+    async function markDocument(documentKey,documentStatus){
+      let reason='';
+      if(documentStatus==='needs_supplement'){
+        reason=prompt('請輸入這份證件需要補件的明確原因：','照片不清楚，請重新拍攝完整且無反光的證件。')||'';
+        reason=reason.trim();
+        if(!reason) return;
+      }
+      if(!confirm(documentStatus==='approved'?'確定將這份證件標記為已通過？':documentStatus==='pending'?'確定恢復為待審核？':'確定要求申請者補交這份證件？')) return;
+      setLoading(true);
+      try{
+        const data=await postAction({action:'mark_document',documentKey,documentStatus,reason});
+        selectedApplication=data.application;
+        renderApplicationDetail(selectedApplication);
+        await loadApplications();
+        showToast(data.message||'證件狀態已更新。');
+      }catch(error){
+        alert(error.message||'證件審核失敗。');
+      }finally{setLoading(false);}
+    }
+
+    async function performOverallAction(action){
+      const reason=String(document.getElementById('overallReason')?.value||'').trim();
+      if(action==='reject'&&!reason){alert('拒絕申請時必須填寫原因。');return;}
+      const confirmation=action==='approve'
+        ? '確定通過此小U申請，並建立正式小U資料進入數位入職？'
+        : action==='reject'
+          ? '確定拒絕此小U申請？'
+          : '確定重新開啟此申請？';
+      if(!confirm(confirmation)) return;
+      setLoading(true);
+      try{
+        const data=await postAction({action,reason});
+        selectedApplication=data.application;
+        renderApplicationDetail(selectedApplication);
+        await loadApplications();
+        showToast(data.message||'審核狀態已更新。');
+      }catch(error){
+        alert(error.message||'審核動作失敗。');
+      }finally{setLoading(false);}
+    }
+
+    async function initialize(){
+      document.getElementById('operatorInput').value=operatorName;
+      if(!adminKey){
+        document.getElementById('loginOverlay').classList.remove('hidden');
+        return;
+      }
+      try{
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('operatorPill').textContent=`審核人員：${operatorName||'未命名'}`;
+        await loadApplications();
+        const riderId=new URLSearchParams(location.search).get('riderId');
+        if(riderId) await openApplication(riderId);
+      }catch(error){
+        logoutAdmin();
+        showLoginMessage('管理登入已失效，請重新輸入密碼。');
+      }
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
