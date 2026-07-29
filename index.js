@@ -121,10 +121,10 @@ function normalizeRiderDocumentKey(value) {
   return aliases[normalized] || '';
 }
 
-function buildRiderApplicantStorageKey(phone, lineUserId) {
+function buildRiderApplicantStorageKey(phone) {
   return crypto
     .createHash('sha256')
-    .update(`${normalizePhone(phone)}:${String(lineUserId || '').trim()}`)
+    .update(normalizePhone(phone))
     .digest('hex')
     .slice(0, 40);
 }
@@ -181,12 +181,6 @@ async function handleRiderDocumentUpload(req, res) {
       });
     }
 
-    if (!lineUserId.startsWith('U')) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的 LINE 身分，無法上傳證件。',
-      });
-    }
 
     if (!documentKey || !RIDER_REQUIRED_DOCUMENTS[documentKey]) {
       return res.status(400).json({
@@ -247,10 +241,7 @@ async function handleRiderDocumentUpload(req, res) {
       180
     );
 
-    const applicantKey = buildRiderApplicantStorageKey(
-      phone,
-      lineUserId
-    );
+    const applicantKey = buildRiderApplicantStorageKey(phone);
 
     const uploadId = crypto.randomUUID();
     const extension = riderDocumentExtension(
@@ -325,10 +316,7 @@ async function validateRiderApplicationDocuments(
       ? documents
       : {};
 
-  const applicantKey = buildRiderApplicantStorageKey(
-    phone,
-    lineUserId
-  );
+  const applicantKey = buildRiderApplicantStorageKey(phone);
 
   const bucket = admin
     .storage()
@@ -12270,12 +12258,6 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    if (!riderLineUserId || !riderLineUserId.startsWith('U')) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的 LINE 身分，請從 UBee 騎士端的申請入口重新進入。',
-      });
-    }
 
     if (
       !name ||
@@ -12402,8 +12384,7 @@ app.post('/api/rider/register', async (req, res) => {
     const documentValidation =
       await validateRiderApplicationDocuments(
         documents,
-        cleanPhone,
-        riderLineUserId
+        cleanPhone
       );
 
     if (!documentValidation.ok) {
@@ -12435,8 +12416,8 @@ app.post('/api/rider/register', async (req, res) => {
       name: cleanText(name, 20),
       phone: cleanPhone,
       lineId: cleanText(lineId || '', 60),
-      userId: riderLineUserId,
-      lineUserId: riderLineUserId,
+      userId: '',
+      lineUserId: '',
       birthDate: String(birthDate || '').trim(),
 
       district: cleanText(finalDistrict || '', 80),
@@ -12483,7 +12464,7 @@ app.post('/api/rider/register', async (req, res) => {
       onboardingRequired: true,
 
       source: cleanText(
-        applicationSource || 'liff_rider_apply_v2',
+        applicationSource || 'rider_web_apply_v2',
         60
       ),
       submittedFrom: cleanText(
@@ -12554,23 +12535,6 @@ app.post('/api/rider/register', async (req, res) => {
               : oldStatus === 'training' || oldStatus === 'approved'
                 ? '此手機號碼已通過新版小U審核。'
                 : '此手機號碼已送出新版申請，請等待 UBee 審核。',
-        };
-        return;
-      }
-
-      const applicationLineSnap = await tx.get(
-        db.collection(RIDER_V2_COLLECTIONS.applications)
-          .where('lineUserId', '==', riderLineUserId)
-          .limit(1)
-      );
-
-      if (!applicationLineSnap.empty) {
-        const oldDoc = applicationLineSnap.docs[0];
-        const oldData = oldDoc.data() || {};
-        duplicatePayload = {
-          riderId: oldData.riderId || oldDoc.id,
-          status: oldData.status || 'pending',
-          message: '此 LINE 帳號已送出新版小U申請，不能重複申請。',
         };
         return;
       }
