@@ -16671,6 +16671,11 @@ const PRICING = {
   // 平台服務費
   serviceFee: 20,
 
+  // 長距離保障費：只套用一般配送，不影響「幫我取 / 幫代買」專用計價
+  longDistanceThresholdKm: 8, // 超過 8 公里開始加價
+  longDistanceExtraPerKm: 10, // 超過門檻的距離，每公里加 $10
+  quoteRoundUnit: 10,         // 一般配送報價無條件進位至 $10
+
   // 排隊服務設定
   queueBaseFee: 80,
   queuePerMinute: 4,
@@ -18836,8 +18841,15 @@ function calculatePrice({
   speedType,
   upstairsFee = 0
 }) {
-  const km = Number(distanceMeters || 0) / 1000;
-  const minutes = Number(durationSeconds || 0) / 60;
+  const km = Math.max(
+    0,
+    Number(distanceMeters || 0)
+  ) / 1000;
+
+  const minutes = Math.max(
+    0,
+    Number(durationSeconds || 0)
+  ) / 60;
 
   const speed = getSpeedOption(speedType);
 
@@ -18860,10 +18872,25 @@ function calculatePrice({
     )
   );
 
-  const deliveryFee =
-    baseFee +
-    distanceFee +
-    timeFee;
+  // 超過門檻的距離才收長距離保障費。
+  // 例如 13 km：超過 8 km 的 5 km × $10 = $50。
+  const longDistanceThresholdKm = Math.max(
+    0,
+    Number(PRICING.longDistanceThresholdKm || 0)
+  );
+
+  const longDistanceKm = Math.max(
+    0,
+    km - longDistanceThresholdKm
+  );
+
+  const longDistanceFee = Math.max(
+    0,
+    Math.round(
+      longDistanceKm *
+      Number(PRICING.longDistanceExtraPerKm || 0)
+    )
+  );
 
   const serviceFee = Math.max(
     0,
@@ -18880,6 +18907,39 @@ function calculatePrice({
     Math.round(Number(upstairsFee || 0))
   );
 
+  const unroundedDeliveryFee =
+    baseFee +
+    distanceFee +
+    timeFee +
+    longDistanceFee;
+
+  // 將一般配送的最終服務總額無條件進位到指定單位。
+  // 進位差額歸入配送費，並依既有 70 / 30 財務核心分配。
+  const quoteRoundUnit = Math.max(
+    1,
+    Math.round(Number(PRICING.quoteRoundUnit || 1))
+  );
+
+  const unroundedServiceSubtotal =
+    unroundedDeliveryFee +
+    serviceFee +
+    speedFee +
+    safeUpstairsFee;
+
+  const roundedServiceSubtotal =
+    Math.ceil(
+      unroundedServiceSubtotal / quoteRoundUnit
+    ) * quoteRoundUnit;
+
+  const quoteRoundingFee = Math.max(
+    0,
+    roundedServiceSubtotal - unroundedServiceSubtotal
+  );
+
+  const deliveryFee =
+    unroundedDeliveryFee +
+    quoteRoundingFee;
+
   const financials = calculateFinancialSplit({
     deliveryFee,
     serviceFee,
@@ -18889,7 +18949,7 @@ function calculatePrice({
   });
 
   return {
-    fareMode: 'base_km_minute',
+    fareMode: 'base_km_minute_long_distance',
 
     distanceKm: Math.round(km * 100) / 100,
     durationMinutes: Math.round(minutes),
@@ -18897,6 +18957,13 @@ function calculatePrice({
     baseFee,
     distanceFee,
     timeFee,
+
+    longDistanceThresholdKm,
+    longDistanceKm:
+      Math.round(longDistanceKm * 100) / 100,
+    longDistanceFee,
+    quoteRoundUnit,
+    quoteRoundingFee,
 
     ...financials,
 
