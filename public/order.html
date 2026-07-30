@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="UBee">
   <meta name="theme-color" content="#ffffff">
 
-  <title>UBee 跑腿｜五步驟下單流程安全編排版</title>
+  <title>UBee 跑腿｜全台城市切換＋五步驟下單流程</title>
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -8406,6 +8406,97 @@ body{background:#eef0f2;}
   pointer-events:none !important;
 }
 
+
+
+/* ==============================
+   全台服務城市選擇器
+   ============================== */
+.topbar-location{
+  border:none;
+  padding:8px 4px;
+  background:transparent;
+  cursor:pointer;
+  text-align:left;
+}
+.topbar-location:active{opacity:.72;}
+.service-city-modal{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+.service-city-backdrop{
+  position:absolute;
+  inset:0;
+  width:100%;
+  border:none;
+  background:rgba(17,24,39,.46);
+}
+.service-city-sheet{
+  position:relative;
+  z-index:1;
+  width:100%;
+  max-width:520px;
+  max-height:min(82vh,760px);
+  overflow:auto;
+  padding:10px 16px calc(24px + env(safe-area-inset-bottom));
+  border-radius:26px 26px 0 0;
+  background:#fff;
+  box-shadow:0 -18px 50px rgba(17,24,39,.22);
+}
+.service-city-sheet-handle{
+  width:38px;
+  height:4px;
+  margin:0 auto 14px;
+  border-radius:999px;
+  background:#d8dade;
+}
+.service-city-sheet-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:16px;
+}
+.service-city-title{font-size:22px;font-weight:1000;}
+.service-city-subtitle{margin-top:5px;color:var(--muted);font-size:12px;font-weight:800;line-height:1.6;}
+.service-city-close{
+  flex:0 0 38px;
+  width:38px;
+  height:38px;
+  border:1px solid var(--line);
+  border-radius:50%;
+  background:#fff;
+  color:#111;
+  font-size:25px !important;
+  line-height:1;
+}
+.service-city-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+}
+.service-city-option{
+  min-height:46px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#f8f8f8;
+  color:#333;
+  font-size:14px !important;
+  font-weight:950;
+}
+.service-city-option.active{
+  border-color:var(--accentStrong);
+  background:#fff4bf;
+  color:#111;
+  box-shadow:inset 0 0 0 1px var(--accentStrong);
+}
+@media(max-width:370px){
+  .service-city-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+
 </style>
 
   <style id="ubee-order-timing-v1-style">
@@ -8597,46 +8688,22 @@ body{background:#eef0f2;}
   </div>
 
 
-  <!-- 中間：服務城市 -->
-  <div
+  <!-- 左側：可切換的服務城市 -->
+  <button
+    id="serviceCityButton"
     class="topbar-location"
-    aria-label="目前服務城市"
+    type="button"
+    onclick="openServiceCitySelector()"
+    aria-label="選擇服務城市"
+    aria-haspopup="dialog"
   >
-
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2.2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path
-        d="
-          M20 10
-          c0 5-8 12-8 12
-          S4 15 4 10
-          a8 8 0 1 1 16 0
-        "
-      ></path>
-
-      <circle
-        cx="12"
-        cy="10"
-        r="2.5"
-      ></circle>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0"></path>
+      <circle cx="12" cy="10" r="2.5"></circle>
     </svg>
-
-    <span>
-      台中市
-    </span>
-
-    <span class="topbar-location-arrow">
-      ⌄
-    </span>
-
-  </div>
+    <span id="serviceCityLabel">臺中市</span>
+    <span class="topbar-location-arrow" aria-hidden="true">⌄</span>
+  </button>
 
 
   <!-- 右側：客服 -->
@@ -8686,6 +8753,23 @@ body{background:#eef0f2;}
   <!-- 保留給原本 JavaScript 使用，但不顯示 -->
 
 </div>
+
+
+  <!-- 全台服務城市選擇器：僅設定任務所在地，不代表當地運力保證 -->
+  <div id="serviceCityModal" class="service-city-modal hidden" role="dialog" aria-modal="true" aria-labelledby="serviceCityModalTitle">
+    <button class="service-city-backdrop" type="button" onclick="closeServiceCitySelector()" aria-label="關閉城市選擇"></button>
+    <div class="service-city-sheet">
+      <div class="service-city-sheet-handle"></div>
+      <div class="service-city-sheet-head">
+        <div>
+          <div id="serviceCityModalTitle" class="service-city-title">選擇服務城市</div>
+          <div class="service-city-subtitle">選擇任務主要所在地；實際服務仍以地址、估價及媒合結果為準。</div>
+        </div>
+        <button class="service-city-close" type="button" onclick="closeServiceCitySelector()" aria-label="關閉">×</button>
+      </div>
+      <div id="serviceCityGrid" class="service-city-grid"></div>
+    </div>
+  </div>
 
     <section class="step active" id="step1">
 
@@ -9642,6 +9726,81 @@ body{background:#eef0f2;}
     </div>
   </div>
   <script>
+const UBEE_SERVICE_CITIES = [
+  {name:'基隆市',lat:25.1276,lng:121.7392},
+  {name:'臺北市',lat:25.0330,lng:121.5654},
+  {name:'新北市',lat:25.0169,lng:121.4628},
+  {name:'桃園市',lat:24.9937,lng:121.3010},
+  {name:'新竹市',lat:24.8138,lng:120.9675},
+  {name:'新竹縣',lat:24.8390,lng:121.0177},
+  {name:'苗栗縣',lat:24.5602,lng:120.8214},
+  {name:'臺中市',lat:24.1477,lng:120.6736},
+  {name:'彰化縣',lat:24.0756,lng:120.5440},
+  {name:'南投縣',lat:23.9609,lng:120.9719},
+  {name:'雲林縣',lat:23.7092,lng:120.4313},
+  {name:'嘉義市',lat:23.4801,lng:120.4491},
+  {name:'嘉義縣',lat:23.4518,lng:120.2555},
+  {name:'臺南市',lat:22.9999,lng:120.2269},
+  {name:'高雄市',lat:22.6273,lng:120.3014},
+  {name:'屏東縣',lat:22.5519,lng:120.5488},
+  {name:'宜蘭縣',lat:24.7021,lng:121.7378},
+  {name:'花蓮縣',lat:23.9911,lng:121.6112},
+  {name:'臺東縣',lat:22.7554,lng:121.1500},
+  {name:'澎湖縣',lat:23.5712,lng:119.5793},
+  {name:'金門縣',lat:24.4494,lng:118.3767},
+  {name:'連江縣',lat:26.1602,lng:119.9517}
+];
+
+function getSelectedServiceCityCenter(){
+  const city = UBEE_SERVICE_CITIES.find((item) => item.name === selectedServiceCity)
+    || UBEE_SERVICE_CITIES.find((item) => item.name === '臺中市');
+  return {lat:city.lat,lng:city.lng};
+}
+
+function renderServiceCitySelector(){
+  const grid = document.getElementById('serviceCityGrid');
+  const label = document.getElementById('serviceCityLabel');
+  if(label) label.textContent = selectedServiceCity;
+  if(!grid) return;
+  grid.innerHTML = UBEE_SERVICE_CITIES.map((city) => `
+    <button class="service-city-option ${city.name === selectedServiceCity ? 'active' : ''}"
+      type="button" onclick="selectServiceCity('${city.name}')">${city.name}</button>
+  `).join('');
+}
+
+function openServiceCitySelector(){
+  renderServiceCitySelector();
+  document.getElementById('serviceCityModal')?.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeServiceCitySelector(){
+  document.getElementById('serviceCityModal')?.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function selectServiceCity(cityName){
+  if(!UBEE_SERVICE_CITIES.some((item) => item.name === cityName)) return;
+  const changed = selectedServiceCity !== cityName;
+  selectedServiceCity = cityName;
+  localStorage.setItem('ubee_selected_service_city', selectedServiceCity);
+  renderServiceCitySelector();
+  closeServiceCitySelector();
+
+  if(customerMap){
+    customerMap.panTo(getSelectedServiceCityCenter());
+    customerMap.setZoom(12);
+  }
+
+  if(changed){
+    if(typeof invalidateRoute === 'function') invalidateRoute();
+    if(typeof invalidateQuote === 'function') invalidateQuote();
+    if(typeof scheduleRouteRefresh === 'function') scheduleRouteRefresh();
+    if(typeof scheduleQuoteRefresh === 'function') scheduleQuoteRefresh();
+    if(typeof renderSummary === 'function' && currentStep === 4) renderSummary();
+  }
+}
+
 function applyLightTheme(){
   document.body.classList.remove('night-mode');
   document.body.classList.add('day-mode');
@@ -9662,6 +9821,7 @@ let serviceType = '文件急送';
 let serviceCategory = '一般文件';
 let serviceMode = 'normal';
 let speedType = 'standard';
+let selectedServiceCity = localStorage.getItem('ubee_selected_service_city') || '臺中市';
 
 // UBee 任務時間模式：立即／指定時間預約／彈性時段預約。
 let orderTimingType = 'immediate';
@@ -10026,7 +10186,7 @@ async function ensureCustomerMapReady(){
     const options = {
       center:hasValidLatLng(currentLocationLat, currentLocationLng)
         ? { lat:currentLocationLat, lng:currentLocationLng }
-        : { lat:24.2521, lng:120.7214 },
+        : getSelectedServiceCityCenter(),
       zoom:13,
       disableDefaultUI:true,
       clickableIcons:false,
@@ -13893,6 +14053,8 @@ function getPayload(){
     serviceKey:getServiceKeyForApi(),
     serviceType,
     serviceCategory,
+    serviceCity:selectedServiceCity,
+    selectedServiceCity,
     serviceMode,
     queueMinutes:Math.max(0, Math.round(Number(qs('queueMinutes')?.value || 0))),
 
@@ -13994,7 +14156,16 @@ function renderSummary(){
 
   qs('summaryBox').innerHTML = `
     <div class="review-summary-group review-summary-route-group">
-      <div class="review-summary-group-title">路線</div>
+      <div class="review-summary-group-title">服務城市與路線</div>
+
+      <button class="review-summary-row review-summary-row-compact" type="button" onclick="openServiceCitySelector()">
+        <div class="review-summary-icon">城</div>
+        <div class="review-summary-main">
+          <div class="review-summary-label">服務城市</div>
+          <div class="review-summary-value">${escapeHtml(selectedServiceCity)}</div>
+        </div>
+        <div class="review-summary-chevron">›</div>
+      </button>
 
       <button class="review-summary-row review-summary-row-compact" type="button" onclick="showOnlyStep(1)">
         <div class="review-summary-marker pickup">取</div>
@@ -18929,6 +19100,16 @@ UBeeEnhancements.init();
   scheduleFallback();
   setTimeout(()=>{ if(currentOrderId) fetchTrackingSummary(currentOrderId,{silent:true}); },1500);
 })();
+
+
+
+window.addEventListener('DOMContentLoaded', () => {
+  renderServiceCitySelector();
+});
+
+document.addEventListener('keydown', (event) => {
+  if(event.key === 'Escape') closeServiceCitySelector();
+});
 
 </script>
 </body>
