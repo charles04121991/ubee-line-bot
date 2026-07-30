@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="UBee">
   <meta name="theme-color" content="#ffffff">
 
-  <title>UBee 跑腿｜用戶端建立任務 V2＋區域動態定價 V3</title>
+  <title>UBee 跑腿｜五步驟下單流程安全編排版</title>
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -8309,6 +8309,103 @@ body{background:#eef0f2;}
 #step5 .customer-tracking-incident-text{font-size:12px;font-weight:800;line-height:1.65;margin-top:5px;}
 #step5 .customer-tracking-incident-meta{font-size:11px;font-weight:900;margin-top:7px;opacity:.82;}
 
+
+
+/* =====================================================
+   UBee 正式營運安全編排：五步驟內容歸位
+   - 第一步：服務、細項、任務分類、路線與估價
+   - 第二步：聯絡方式、任務內容、交付與代墊資訊
+   - 不變更欄位 ID、API、Firestore、估價或建立訂單邏輯
+   ===================================================== */
+#step1 .task-category-step1{
+  position:relative;
+  z-index:20;
+  margin:0 0 14px;
+}
+
+#step1 .task-category-step1 > .form-title{
+  display:block;
+  margin:0 0 8px;
+  color:#333;
+  font-size:13px;
+  font-weight:1000;
+}
+
+#step1 #serviceCategoryBox{
+  position:relative !important;
+  z-index:20 !important;
+  margin:0 -16px !important;
+  padding:10px 16px 12px !important;
+  border-top:1px solid #f0f1f2 !important;
+  border-right:none !important;
+  border-bottom:1px solid #f0f1f2 !important;
+  border-left:none !important;
+  border-radius:0 !important;
+  background:#fafafa !important;
+  pointer-events:auto !important;
+  isolation:isolate !important;
+}
+
+#step1 #serviceCategoryTitle{
+  display:none !important;
+}
+
+#step1 #serviceCategoryGrid{
+  position:relative !important;
+  z-index:21 !important;
+  display:flex !important;
+  gap:8px !important;
+  overflow-x:auto !important;
+  margin:0 !important;
+  padding:2px 0 !important;
+  pointer-events:auto !important;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  transform:translateZ(0);
+  -webkit-transform:translateZ(0);
+}
+
+#step1 #serviceCategoryGrid::-webkit-scrollbar{
+  display:none;
+}
+
+#step1 #serviceCategoryGrid .category-choice-item{
+  position:relative !important;
+  z-index:22 !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-height:36px !important;
+  padding:8px 12px !important;
+  border:1px solid transparent !important;
+  border-radius:999px !important;
+  background:#f0f1f2 !important;
+  color:#777b80 !important;
+  box-shadow:none !important;
+  font-size:12px !important;
+  font-weight:900 !important;
+  line-height:1.35 !important;
+  white-space:nowrap !important;
+  pointer-events:auto !important;
+  touch-action:manipulation !important;
+  cursor:pointer !important;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-appearance:none;
+  appearance:none;
+}
+
+#step1 #serviceCategoryGrid .category-choice-item.active{
+  border-color:var(--accentStrong) !important;
+  background:#fff4bf !important;
+  color:#111 !important;
+  box-shadow:none !important;
+}
+
+#step1 #serviceCategoryGrid .category-choice-item::before,
+#step1 #serviceCategoryGrid .category-choice-item::after{
+  pointer-events:none !important;
+}
+
 </style>
 
   <style id="ubee-order-timing-v1-style">
@@ -8670,6 +8767,28 @@ body{background:#eef0f2;}
   id="serviceGrid"
 ></div>
 
+        <!-- 第一步：完成服務細項後，直接選擇任務分類 -->
+        <div class="task-category-step1">
+          <div class="form-title">任務分類</div>
+
+          <div
+            id="serviceCategoryBox"
+            class="category-choice-box hidden"
+          >
+            <div
+              class="category-choice-title"
+              id="serviceCategoryTitle"
+            >
+              請選擇分類
+            </div>
+
+            <div
+              class="category-choice-grid"
+              id="serviceCategoryGrid"
+            ></div>
+          </div>
+        </div>
+
 <!-- ==============================
      幫代買：附近店家
      只有選擇幫代買時才顯示
@@ -8846,32 +8965,7 @@ body{background:#eef0f2;}
         <div class="task-path-value" id="taskPathText">幫我送｜文件急送｜一般文件</div>
       </div>
 
-      <div class="form-section task-category-step2">
 
-  <div class="form-title">
-    任務分類
-  </div>
-
-  <div
-    id="serviceCategoryBox"
-    class="category-choice-box hidden"
-  >
-
-    <div
-      class="category-choice-title"
-      id="serviceCategoryTitle"
-    >
-      請選擇分類
-    </div>
-
-    <div
-      class="category-choice-grid"
-      id="serviceCategoryGrid"
-    ></div>
-
-  </div>
-
-</div>
 
       <div id="buyGuide" class="quick-guide hidden">
         <div class="quick-guide-title">代買提醒</div>
@@ -8995,7 +9089,7 @@ body{background:#eef0f2;}
     type="button"
     onclick="goNext()"
   >
-    繼續下一步
+    選擇任務時效
 
     <svg
       viewBox="0 0 24 24"
@@ -9026,7 +9120,7 @@ body{background:#eef0f2;}
         </div>
       </div>
 
-      <div class="headline">任務時效與預約</div>
+      <div class="headline">任務時效</div>
       <div class="subtext">選擇立即執行、指定時間預約或彈性時段預約。預約任務會先媒合可於指定時間執行的小U，不會要求小U現在立刻出發。</div>
 
       <div class="ubee-timing-mode-list" id="timingModeList">
@@ -9178,7 +9272,7 @@ body{background:#eef0f2;}
     onclick="goNext()"
   >
 
-    <span>確認時效並繼續</span>
+    <span>前往確認訂單</span>
 
     <svg
       viewBox="0 0 24 24"
