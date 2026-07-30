@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="UBee">
   <meta name="theme-color" content="#ffffff">
 
-  <title>UBee 跑腿｜用戶端建立任務 V2＋區域動態定價 V3</title>
+  <title>UBee 跑腿｜客人端 V4 完整五步驟下單流程</title>
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -8453,6 +8453,118 @@ body{background:#eef0f2;}
     }
   </style>
 
+
+<style id="ubeeV4FlowStyles">
+  body.ubee-v4-modal-open{overflow:hidden!important;touch-action:none}
+  .topbar-location{cursor:pointer;border:0;background:transparent;padding:8px 0;border-radius:12px}
+  .topbar-location:focus-visible{outline:3px solid rgba(250,204,21,.45);outline-offset:2px}
+
+  .ubee-v4-flow-progress{display:flex;align-items:flex-start;gap:5px;margin:0 0 14px;padding:0 1px;overflow:hidden}
+  .ubee-v4-flow-progress-item{flex:0 0 48px;display:flex;flex-direction:column;align-items:center;gap:5px;color:#a2a5a9;text-align:center}
+  .ubee-v4-flow-progress-item span{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eceef0;font-size:11px;font-weight:1000}
+  .ubee-v4-flow-progress-item b{font-size:9px;line-height:1.2;white-space:nowrap}
+  .ubee-v4-flow-progress-item.active{color:#111}
+  .ubee-v4-flow-progress-item.active span{background:var(--accent);color:#111}
+  .ubee-v4-flow-progress-line{flex:1;height:2px;margin-top:11px;background:#e5e7e9;border-radius:999px;min-width:5px}
+
+  #step1 .ubee-v4-step1-category{margin:0 0 12px;padding:0;border:0;background:transparent}
+  #step1 .ubee-v4-step1-category .form-title{display:block;margin:0 0 7px;font-size:13px;font-weight:1000}
+  #step1 .ubee-v4-step1-category .category-choice-box{margin:0 -16px 0;padding:8px 16px 11px;border-top:1px solid #f0f1f2;border-bottom:1px solid #f0f1f2;background:#fafafa}
+  #step1 .ubee-v4-step1-category .category-choice-grid{display:flex;gap:8px;overflow-x:auto;padding:2px 0;scrollbar-width:none}
+  #step1 .ubee-v4-step1-category .category-choice-grid::-webkit-scrollbar{display:none}
+  #step1 .ubee-v4-step1-category .category-choice-item{flex:0 0 auto;min-height:36px;padding:8px 12px;border:1px solid #e6e7e9;border-radius:999px;background:#f3f4f5;color:#777;font-size:12px!important;font-weight:900;white-space:nowrap}
+  #step1 .ubee-v4-step1-category .category-choice-item.active{border-color:var(--accentStrong);background:#fff4bf;color:#111}
+
+  .ubee-v4-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 8px}
+  .ubee-v4-section-heading>div{min-width:0}
+  .ubee-v4-section-heading strong{display:block;font-size:14px;font-weight:1000}
+  .ubee-v4-section-heading span{display:block;margin-top:3px;color:var(--muted);font-size:11px;font-weight:800;line-height:1.45}
+  .ubee-v4-section-heading button{flex:0 0 auto;border:1px solid #e6d270;border-radius:999px;background:#fff9d5;padding:8px 11px;color:#5d4900;font-size:11px!important;font-weight:1000}
+  #step1 .address-main input[readonly]{cursor:pointer}
+  #step1 .address-row{cursor:pointer}
+
+  .ubee-v4-step-summary{margin:0 0 18px;padding:14px 15px;border:1px solid #e5e7ea;border-radius:17px;background:#fff;box-shadow:0 5px 18px rgba(17,24,39,.04)}
+  .ubee-v4-step-summary-kicker{color:#8b8f94;font-size:10px;font-weight:1000;text-transform:uppercase;letter-spacing:.05em}
+  .ubee-v4-step-summary-title{margin-top:5px;color:#111;font-size:15px;font-weight:1000;line-height:1.5}
+  .ubee-v4-step-summary-meta{margin-top:4px;color:#797d82;font-size:11px;font-weight:800;line-height:1.55}
+
+  .ubee-v4-timing-quote{margin:18px 0 110px;padding:15px;border:1px solid #ead269;border-radius:18px;background:#fff9d9;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ubee-v4-timing-quote>div{min-width:0}
+  .ubee-v4-timing-quote span{display:block;color:#887000;font-size:10px;font-weight:1000}
+  .ubee-v4-timing-quote strong{display:block;margin-top:4px;color:#111;font-size:15px;font-weight:1000;line-height:1.35}
+  .ubee-v4-timing-quote small{grid-column:1/-1;color:#756d50;font-size:11px;font-weight:800;line-height:1.55}
+
+  .ubee-v4-created-card{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:14px 15px;border:1px solid #bfe3c7;border-radius:18px;background:#f2fff5}
+  .ubee-v4-created-check{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#16843d;color:#fff;font-size:18px;font-weight:1000}
+  .ubee-v4-created-card strong{display:block;font-size:15px;font-weight:1000}
+  .ubee-v4-created-card small{display:block;margin-top:3px;color:#52705a;font-size:11px;font-weight:800}
+
+  .ubee-v4-review-grid{display:flex;flex-direction:column;gap:10px}
+  .ubee-v4-review-card{width:100%;border:1px solid #e6e7e9;border-radius:17px;background:#fff;padding:14px;text-align:left;color:#111}
+  .ubee-v4-review-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .ubee-v4-review-card-head strong{font-size:13px;font-weight:1000}
+  .ubee-v4-review-card-head span{color:#9a7a00;font-size:11px;font-weight:1000}
+  .ubee-v4-review-card-value{font-size:14px;font-weight:900;line-height:1.6;word-break:break-word}
+  .ubee-v4-review-card-meta{margin-top:5px;color:#777c81;font-size:11px;font-weight:800;line-height:1.55}
+  .ubee-v4-review-route-line{display:grid;grid-template-columns:18px minmax(0,1fr);gap:9px;align-items:start;padding:4px 0}
+  .ubee-v4-review-route-dot{width:9px;height:9px;margin:6px 0 0 4px;border-radius:50%;background:#111}
+  .ubee-v4-review-route-dot.dropoff{background:var(--accentStrong)}
+
+  .ubee-v4-address-center{position:fixed;inset:0;z-index:9999;display:none}
+  .ubee-v4-address-center.open{display:block}
+  .ubee-v4-address-backdrop{position:absolute;inset:0;background:rgba(17,24,39,.42);backdrop-filter:blur(3px)}
+  .ubee-v4-address-sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:520px;max-height:92dvh;display:flex;flex-direction:column;border-radius:24px 24px 0 0;background:#fff;box-shadow:0 -18px 55px rgba(17,24,39,.2);overflow:hidden}
+  .ubee-v4-address-header{display:grid;grid-template-columns:42px minmax(0,1fr) 54px;align-items:center;gap:8px;padding:13px 14px;border-bottom:1px solid #eceef0;background:#fff}
+  .ubee-v4-address-header>div{text-align:center;min-width:0}
+  .ubee-v4-address-header strong{display:block;font-size:18px;font-weight:1000}
+  .ubee-v4-address-header small{display:block;margin-top:3px;color:#85898e;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ubee-v4-address-close,.ubee-v4-address-manage{border:0;background:transparent;color:#111;font-weight:1000}
+  .ubee-v4-address-close{font-size:32px!important;line-height:1}
+  .ubee-v4-address-manage{font-size:12px!important}
+  .ubee-v4-address-body{padding:14px 14px calc(24px + env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .ubee-v4-current-location{width:100%;display:grid;grid-template-columns:38px minmax(0,1fr) 20px;align-items:center;gap:10px;border:1px solid #e4e6e8;border-radius:17px;background:#fff;padding:13px;text-align:left;color:#111}
+  .ubee-v4-current-location>span{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fff4bf;color:#111;font-size:19px;font-weight:1000}
+  .ubee-v4-current-location strong{display:block;font-size:14px;font-weight:1000}
+  .ubee-v4-current-location small{display:block;margin-top:3px;color:#83878c;font-size:11px;font-weight:800;line-height:1.45}
+  .ubee-v4-current-location>b{font-size:20px}
+  .ubee-v4-same-pickup{margin-top:9px}
+  .ubee-v4-same-pickup button{width:100%;border:1px solid #e6d270;border-radius:14px;background:#fff9d9;padding:11px;color:#5d4900;font-size:12px!important;font-weight:1000}
+  .ubee-v4-address-search{display:grid;grid-template-columns:24px minmax(0,1fr) 32px;align-items:center;gap:7px;margin-top:12px;border:1px solid #dfe2e5;border-radius:16px;background:#f6f7f8;padding:0 8px 0 12px}
+  .ubee-v4-address-search>span{color:#666;font-size:20px}
+  .ubee-v4-address-search input{min-height:50px;padding:0;background:transparent;font-size:16px!important;font-weight:850}
+  .ubee-v4-address-search button{border:0;background:transparent;color:#888;font-size:23px!important}
+  .ubee-v4-address-status{min-height:18px;margin:9px 2px 5px;color:#7b8085;font-size:11px;font-weight:800;line-height:1.5}
+  .ubee-v4-address-results,.ubee-v4-address-list{display:flex;flex-direction:column;gap:7px}
+  .ubee-v4-google-attribution{display:flex;justify-content:flex-end;padding:8px 2px 0}
+  .ubee-v4-google-attribution img{display:block;width:120px;height:auto}
+  .ubee-v4-address-result,.ubee-v4-address-list-item{width:100%;display:grid;grid-template-columns:36px minmax(0,1fr) 20px;align-items:center;gap:10px;border:1px solid #e7e8ea;border-radius:15px;background:#fff;padding:11px;text-align:left;color:#111}
+  .ubee-v4-address-result-icon,.ubee-v4-address-list-icon{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#f1f2f3;font-size:14px;font-weight:1000}
+  .ubee-v4-address-result strong,.ubee-v4-address-list-item strong{display:block;font-size:13px;font-weight:1000;line-height:1.45}
+  .ubee-v4-address-result small,.ubee-v4-address-list-item small{display:block;margin-top:3px;color:#81858a;font-size:11px;font-weight:800;line-height:1.45}
+  .ubee-v4-address-result>b,.ubee-v4-address-list-item>b{font-size:18px}
+  .ubee-v4-manual-address{width:100%;margin-top:8px;border:1px dashed #d1b943;border-radius:14px;background:#fffdf0;padding:11px;color:#655000;font-size:12px!important;font-weight:1000}
+  .ubee-v4-address-list-section{margin-top:18px}
+  .ubee-v4-address-list-title{display:flex;justify-content:space-between;gap:10px;margin:0 2px 8px}
+  .ubee-v4-address-list-title strong{font-size:14px;font-weight:1000}
+  .ubee-v4-address-list-title span{color:#999da2;font-size:10px;font-weight:800}
+  .ubee-v4-address-empty{border:1px dashed #dfe1e4;border-radius:14px;padding:14px;color:#94989d;text-align:center;font-size:11px;font-weight:800}
+
+  .ubee-v4-creating-overlay{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(255,255,255,.92);backdrop-filter:blur(10px)}
+  .ubee-v4-creating-card{width:min(360px,100%);border:1px solid #e7e8ea;border-radius:24px;background:#fff;padding:26px 22px;text-align:center;box-shadow:0 22px 65px rgba(17,24,39,.16)}
+  .ubee-v4-creating-bee{font-size:46px;animation:ubeeV4BeeFloat .9s ease-in-out infinite alternate}
+  .ubee-v4-creating-card strong{display:block;margin-top:10px;font-size:19px;font-weight:1000}
+  .ubee-v4-creating-card small{display:block;margin-top:7px;color:#777d82;font-size:12px;font-weight:800;line-height:1.65}
+  .ubee-v4-creating-bar{height:6px;margin-top:18px;border-radius:999px;background:#eceef0;overflow:hidden}
+  .ubee-v4-creating-bar span{display:block;width:42%;height:100%;border-radius:inherit;background:var(--accentStrong);animation:ubeeV4Loading 1s ease-in-out infinite}
+  @keyframes ubeeV4BeeFloat{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-8px) rotate(4deg)}}
+  @keyframes ubeeV4Loading{0%{transform:translateX(-110%)}100%{transform:translateX(340%)}}
+
+  @media(max-width:380px){
+    .ubee-v4-flow-progress-item{flex-basis:42px}.ubee-v4-flow-progress-item b{font-size:8px}
+    .ubee-v4-address-sheet{max-height:95dvh}
+  }
+</style>
+
 </head>
 
 <body>
@@ -8503,7 +8615,12 @@ body{background:#eef0f2;}
   <!-- 中間：服務城市 -->
   <div
     class="topbar-location"
-    aria-label="目前服務城市"
+    id="topbarLocationButton"
+    role="button"
+    tabindex="0"
+    aria-label="開啟 UBee 地址中心"
+    onclick="UBeeV4Flow.openAddressCenter('service')"
+    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();UBeeV4Flow.openAddressCenter('service')}"
   >
 
     <svg
@@ -8531,7 +8648,7 @@ body{background:#eef0f2;}
       ></circle>
     </svg>
 
-    <span>
+    <span id="topbarLocationText">
       台中市
     </span>
 
@@ -8628,6 +8745,18 @@ body{background:#eef0f2;}
       <div class="task-sheet">
         <div class="task-sheet-handle"></div>
 
+        <div class="ubee-v4-flow-progress" aria-label="下單進度：第 1 步 服務路線">
+          <div class="ubee-v4-flow-progress-item active"><span>1</span><b>服務路線</b></div>
+          <div class="ubee-v4-flow-progress-line"></div>
+          <div class="ubee-v4-flow-progress-item"><span>2</span><b>任務資訊</b></div>
+          <div class="ubee-v4-flow-progress-line"></div>
+          <div class="ubee-v4-flow-progress-item"><span>3</span><b>任務時效</b></div>
+          <div class="ubee-v4-flow-progress-line"></div>
+          <div class="ubee-v4-flow-progress-item"><span>4</span><b>確認訂單</b></div>
+          <div class="ubee-v4-flow-progress-line"></div>
+          <div class="ubee-v4-flow-progress-item"><span>5</span><b>任務進度</b></div>
+        </div>
+
         <div id="homeServiceStatus" class="home-service-status" aria-live="polite">
         <div class="home-service-status-head">
           <div>
@@ -8669,6 +8798,14 @@ body{background:#eef0f2;}
   class="service-grid-new"
   id="serviceGrid"
 ></div>
+        <div class="form-section task-category-step2 ubee-v4-step1-category">
+          <div class="form-title">任務分類</div>
+          <div id="serviceCategoryBox" class="category-choice-box hidden">
+            <div class="category-choice-title" id="serviceCategoryTitle">請選擇分類</div>
+            <div class="category-choice-grid" id="serviceCategoryGrid"></div>
+          </div>
+        </div>
+
 
 <!-- ==============================
      幫代買：附近店家
@@ -8728,6 +8865,11 @@ body{background:#eef0f2;}
      正式配送路線
      ============================== -->
 
+<div class="ubee-v4-section-heading">
+  <div><strong>設定任務路線</strong><span>請先選擇取件／任務地點，再選擇送達／交付地點</span></div>
+  <button type="button" onclick="UBeeV4Flow.openAddressCenter('pickup')">地址中心</button>
+</div>
+
 <div class="address-card">
   <div class="address-row">
     <span class="address-dot pickup"></span>
@@ -8742,7 +8884,10 @@ body{background:#eef0f2;}
         id="pickup"
         maxlength="120"
         autocomplete="street-address"
-        placeholder="輸入取件地址 / 店家地址"
+        placeholder="點擊選擇取件地址 / 店家地址"
+        readonly
+        aria-readonly="true"
+        onclick="UBeeV4Flow.openAddressCenter('pickup')"
       >
     </div>
   </div>
@@ -8759,7 +8904,10 @@ body{background:#eef0f2;}
         id="dropoff"
         maxlength="120"
         autocomplete="street-address"
-        placeholder="輸入送達地址 / 交付地點"
+        placeholder="點擊選擇送達地址 / 交付地點"
+        readonly
+        aria-readonly="true"
+        onclick="UBeeV4Flow.openAddressCenter('dropoff')"
       >
     </div>
   </div>
@@ -8846,33 +8994,11 @@ body{background:#eef0f2;}
         <div class="task-path-value" id="taskPathText">幫我送｜文件急送｜一般文件</div>
       </div>
 
-      <div class="form-section task-category-step2">
-
-  <div class="form-title">
-    任務分類
-  </div>
-
-  <div
-    id="serviceCategoryBox"
-    class="category-choice-box hidden"
-  >
-
-    <div
-      class="category-choice-title"
-      id="serviceCategoryTitle"
-    >
-      請選擇分類
-    </div>
-
-    <div
-      class="category-choice-grid"
-      id="serviceCategoryGrid"
-    ></div>
-
-  </div>
-
-</div>
-
+      <div id="step2RouteSummary" class="ubee-v4-step-summary" aria-live="polite">
+        <div class="ubee-v4-step-summary-kicker">路線摘要</div>
+        <div class="ubee-v4-step-summary-title">尚未完成路線</div>
+        <div class="ubee-v4-step-summary-meta">返回第一步可修改服務與地址</div>
+      </div>
       <div id="buyGuide" class="quick-guide hidden">
         <div class="quick-guide-title">代買提醒</div>
         <div class="quick-guide-text">請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與購買注意事項。若需要 小U 先代墊，請填寫正確金額；沒有代墊請填 0。代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。</div>
@@ -8897,12 +9023,20 @@ body{background:#eef0f2;}
         <div class="form-title">聯絡資訊</div>
         <div class="input-card">
           <div class="input-wrap">
+            <div class="input-icon">人</div>
+            <input id="pickupContact" maxlength="30" placeholder="取件聯絡人 / 店家名稱（選填）">
+          </div>
+          <div class="input-wrap">
             <div class="input-icon">取</div>
             <input id="pickupPhone" maxlength="20" inputmode="tel" placeholder="取件聯絡電話 / 店家電話">
           </div>
           <div class="input-wrap">
             <div class="input-icon">送</div>
             <input id="dropoffPhone" maxlength="20" inputmode="tel" placeholder="收件聯絡電話">
+          </div>
+          <div class="input-wrap">
+            <div class="input-icon">人</div>
+            <input id="dropoffContact" maxlength="30" placeholder="收件聯絡人（選填）">
           </div>
         </div>
       </div>
@@ -8943,6 +9077,34 @@ body{background:#eef0f2;}
           <div class="input-wrap" id="noteWrap">
             <div class="input-icon">寫</div>
             <textarea id="note" maxlength="300" placeholder="請填寫品項、數量、規格、地點補充、注意事項"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" id="taskItemDetailSection">
+        <div class="form-title">物品與完成要求</div>
+        <div class="input-card">
+          <div class="input-wrap">
+            <div class="input-icon">量</div>
+            <input id="itemQuantity" maxlength="30" placeholder="數量，例如：1 份、2 箱（選填）">
+          </div>
+          <div class="input-wrap">
+            <div class="input-icon">型</div>
+            <select id="itemSize">
+              <option value="unspecified">未指定物品大小</option>
+              <option value="small">小型・可手提</option>
+              <option value="medium">中型・機車可載</option>
+              <option value="large">大型／大量・需人工確認</option>
+            </select>
+          </div>
+          <div class="input-wrap">
+            <div class="input-icon">證</div>
+            <select id="proofRequired">
+              <option value="none">不需要完成證明</option>
+              <option value="photo">完成後拍照回傳</option>
+              <option value="signature">需要收件人簽收</option>
+              <option value="photo_and_signature">拍照並簽收</option>
+            </select>
           </div>
         </div>
       </div>
@@ -9147,6 +9309,18 @@ body{background:#eef0f2;}
         </div>
       </div>
 
+      <div id="step3QuoteSummary" class="ubee-v4-timing-quote" aria-live="polite">
+        <div>
+          <span>目前選擇</span>
+          <strong id="step3TimingChoiceText">立即任務・一般件</strong>
+        </div>
+        <div>
+          <span>最新預估</span>
+          <strong id="step3QuoteTotalText">待估價</strong>
+        </div>
+        <small id="step3QuoteMetaText">切換處理速度後會自動重新估價</small>
+      </div>
+
       <div class="step3-action-footer">
 
   <button
@@ -9310,6 +9484,14 @@ body{background:#eef0f2;}
             <button id="cancelOrderBtn" class="step5-order-menu-danger hidden" type="button" onclick="cancelOrder()">取消訂單</button>
           </div>
         </details>
+      </div>
+
+      <div id="step5CreatedCard" class="ubee-v4-created-card hidden" aria-live="polite">
+        <span class="ubee-v4-created-check">✓</span>
+        <div>
+          <strong>任務已成功建立</strong>
+          <small id="step5CreatedMeta">系統正在準備媒合</small>
+        </div>
       </div>
 
       <!-- 即時任務狀態：第四步第一優先資訊 -->
@@ -9531,6 +9713,61 @@ body{background:#eef0f2;}
       </div>
     </section>
 
+
+    <div id="ubeeV4AddressCenter" class="ubee-v4-address-center" aria-hidden="true">
+      <div class="ubee-v4-address-backdrop" onclick="UBeeV4Flow.closeAddressCenter()"></div>
+      <section class="ubee-v4-address-sheet" role="dialog" aria-modal="true" aria-labelledby="ubeeV4AddressTitle">
+        <header class="ubee-v4-address-header">
+          <button type="button" class="ubee-v4-address-close" onclick="UBeeV4Flow.closeAddressCenter()" aria-label="關閉地址中心">‹</button>
+          <div>
+            <strong id="ubeeV4AddressTitle">UBee 地址中心</strong>
+            <small id="ubeeV4AddressTargetText">選擇地址</small>
+          </div>
+          <button type="button" class="ubee-v4-address-manage" onclick="UBeeV4Flow.openSavedAddressManager()">管理</button>
+        </header>
+
+        <div class="ubee-v4-address-body">
+          <button id="ubeeV4UseCurrentLocation" class="ubee-v4-current-location" type="button" onclick="UBeeV4Flow.useCurrentLocation()">
+            <span>◎</span><div><strong>使用目前位置</strong><small>允許定位後，自動取得附近門牌地址</small></div><b>›</b>
+          </button>
+
+          <div id="ubeeV4SamePickupWrap" class="ubee-v4-same-pickup hidden">
+            <button type="button" onclick="UBeeV4Flow.useSameAsPickup()">同取件地點／現場完成</button>
+          </div>
+
+          <label class="ubee-v4-address-search">
+            <span>⌕</span>
+            <input id="ubeeV4AddressSearchInput" maxlength="160" autocomplete="off" placeholder="搜尋台灣地址、店家或地標">
+            <button id="ubeeV4AddressClearBtn" type="button" onclick="UBeeV4Flow.clearAddressSearch()" aria-label="清除搜尋">×</button>
+          </label>
+
+          <div id="ubeeV4AddressStatus" class="ubee-v4-address-status">可使用目前位置、常用地址或搜尋地址。</div>
+          <div id="ubeeV4AddressSearchResults" class="ubee-v4-address-results"></div>
+          <div id="ubeeV4GoogleAttribution" class="ubee-v4-google-attribution hidden"><img src="https://maps.gstatic.com/mapfiles/api-3/images/powered-by-google-on-white3.png" alt="Powered by Google"></div>
+
+          <button id="ubeeV4ManualAddressBtn" class="ubee-v4-manual-address hidden" type="button" onclick="UBeeV4Flow.useManualAddress()">使用目前輸入文字作為地址</button>
+
+          <section class="ubee-v4-address-list-section">
+            <div class="ubee-v4-address-list-title"><strong>常用地址</strong><span>儲存在這台裝置</span></div>
+            <div id="ubeeV4SavedAddressList" class="ubee-v4-address-list"></div>
+          </section>
+
+          <section class="ubee-v4-address-list-section">
+            <div class="ubee-v4-address-list-title"><strong>最近使用</strong><span>最多顯示 6 筆</span></div>
+            <div id="ubeeV4RecentAddressList" class="ubee-v4-address-list"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <div id="ubeeV4CreatingOverlay" class="ubee-v4-creating-overlay hidden" aria-live="assertive">
+      <div class="ubee-v4-creating-card">
+        <div class="ubee-v4-creating-bee">🐝</div>
+        <strong>正在建立 UBee 任務</strong>
+        <small>系統正在重新確認價格與訂單資料，請不要重複送出。</small>
+        <div class="ubee-v4-creating-bar"><span></span></div>
+      </div>
+    </div>
 
     <div class="bottom-tabs">
       <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
@@ -18837,5 +19074,838 @@ UBeeEnhancements.init();
 })();
 
 </script>
+
+<script id="ubeeV4FlowScript">
+/* ================================================================
+   UBee 客人端 V4｜完整五步驟流程重編層｜2026-07-30
+   - 保留既有 /api/map-route、/api/quote、/api/orders 正式流程
+   - 地址中心統一管理目前位置、搜尋、常用地址與最近地址
+   - 第一步完成路線與初步估價，第二步填任務，第三步選時效
+   - 第四步僅供確認，第五步只在訂單建立成功後進入
+   ================================================================ */
+const UBeeV4Flow = (() => {
+  const SAVED_KEY = 'ubee_customer_saved_addresses_v2';
+  const RECENT_KEY = 'ubee_customer_recent_addresses_v4';
+  const SERVICE_LOCATION_KEY = 'ubee_customer_service_location_v4';
+  const EXTRA_DRAFT_KEY = 'ubee_order_extra_draft_v4';
+  const MAX_RECENT = 6;
+
+  let activeTarget = 'pickup';
+  let searchTimer = null;
+  let searchSequence = 0;
+  let currentPredictions = [];
+  let addressSessionToken = '';
+  let initialized = false;
+
+  const byId = id => document.getElementById(id);
+  const parseJSON = (raw, fallback) => {
+    try { return JSON.parse(raw); } catch (_) { return fallback; }
+  };
+  const text = value => String(value ?? '').trim();
+  const html = value => typeof escapeHtml === 'function'
+    ? escapeHtml(String(value ?? ''))
+    : String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+  const validCoordinate = value => Number.isFinite(Number(value));
+
+  function getSavedAddresses(){
+    const list = parseJSON(localStorage.getItem(SAVED_KEY) || '[]', []);
+    return Array.isArray(list) ? list : [];
+  }
+
+  function getRecentAddresses(){
+    const list = parseJSON(localStorage.getItem(RECENT_KEY) || '[]', []);
+    return Array.isArray(list) ? list : [];
+  }
+
+  function saveRecentAddress(address){
+    const normalized = normalizeAddress(address);
+    if(!normalized.address) return;
+
+    const fingerprint = [normalized.placeId, normalized.address].filter(Boolean).join('|').toLowerCase();
+    const next = getRecentAddresses()
+      .filter(item => [item.placeId, item.address].filter(Boolean).join('|').toLowerCase() !== fingerprint);
+
+    next.unshift({ ...normalized, usedAt:Date.now() });
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next.slice(0, MAX_RECENT)));
+  }
+
+  function normalizeAddress(source = {}){
+    return {
+      label:text(source.label || source.name || source.mainText || '地址'),
+      name:text(source.name || source.mainText || source.label || ''),
+      address:text(source.address || source.formattedAddress || source.description || ''),
+      note:text(source.note || ''),
+      contact:text(source.contact || ''),
+      phone:text(source.phone || ''),
+      city:text(source.city || ''),
+      district:text(source.district || ''),
+      postalCode:text(source.postalCode || ''),
+      placeId:text(source.placeId || source.place_id || ''),
+      lat:validCoordinate(source.lat) ? Number(source.lat) : null,
+      lng:validCoordinate(source.lng) ? Number(source.lng) : null,
+    };
+  }
+
+  function targetLabel(target = activeTarget){
+    if(target === 'service') return '選擇目前服務位置';
+    if(target === 'dropoff') return '選擇送達／交付地點';
+    return '選擇取件／購買／任務地點';
+  }
+
+  function setAddressStatus(message, isError = false){
+    const status = byId('ubeeV4AddressStatus');
+    if(!status) return;
+    status.textContent = message || '';
+    status.style.color = isError ? '#b42318' : '';
+  }
+
+  function openAddressCenter(target = 'pickup'){
+    activeTarget = ['pickup','dropoff','service'].includes(target) ? target : 'pickup';
+    addressSessionToken = (window.crypto && typeof window.crypto.randomUUID === 'function')
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const modal = byId('ubeeV4AddressCenter');
+    if(!modal) return;
+
+    byId('ubeeV4AddressTargetText').textContent = targetLabel(activeTarget);
+    byId('ubeeV4SamePickupWrap')?.classList.toggle('hidden', activeTarget !== 'dropoff');
+
+    const sourceValue = activeTarget === 'pickup'
+      ? text(byId('pickup')?.value)
+      : activeTarget === 'dropoff'
+        ? text(byId('dropoff')?.value)
+        : '';
+
+    const input = byId('ubeeV4AddressSearchInput');
+    if(input) input.value = sourceValue;
+
+    clearSearchResults(false);
+    renderAddressLists();
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.classList.add('ubee-v4-modal-open');
+    setAddressStatus('可使用目前位置、常用地址或搜尋地址。');
+
+    setTimeout(() => input?.focus({preventScroll:true}), 180);
+  }
+
+  function closeAddressCenter(){
+    const modal = byId('ubeeV4AddressCenter');
+    modal?.classList.remove('open');
+    modal?.setAttribute('aria-hidden','true');
+    document.body.classList.remove('ubee-v4-modal-open');
+    clearTimeout(searchTimer);
+  }
+
+  function clearAddressSearch(){
+    const input = byId('ubeeV4AddressSearchInput');
+    if(input) input.value = '';
+    clearSearchResults(true);
+    input?.focus();
+  }
+
+  function clearSearchResults(resetStatus = true){
+    currentPredictions = [];
+    if(byId('ubeeV4AddressSearchResults')) byId('ubeeV4AddressSearchResults').innerHTML = '';
+    byId('ubeeV4GoogleAttribution')?.classList.add('hidden');
+    byId('ubeeV4ManualAddressBtn')?.classList.add('hidden');
+    if(resetStatus) setAddressStatus('可使用目前位置、常用地址或搜尋地址。');
+  }
+
+  function formatLocationLabel(address){
+    const normalized = normalizeAddress(address);
+    return [normalized.city, normalized.district].filter(Boolean).join('') || normalized.district || normalized.city || '台中市';
+  }
+
+  function updateTopbarLocation(address){
+    const normalized = normalizeAddress(address);
+    const label = formatLocationLabel(normalized);
+    const target = byId('topbarLocationText');
+    if(target) target.textContent = label;
+    localStorage.setItem(SERVICE_LOCATION_KEY, JSON.stringify(normalized));
+  }
+
+  function applyAddressToRoute(target, source){
+    const address = normalizeAddress(source);
+    if(!address.address) return false;
+
+    const isPickup = target === 'pickup';
+    const field = byId(isPickup ? 'pickup' : 'dropoff');
+    if(field) field.value = address.address;
+
+    if(isPickup){
+      if(typeof resetPickupGeo === 'function') resetPickupGeo();
+      pickupLat = address.lat;
+      pickupLng = address.lng;
+      pickupPlaceId = address.placeId;
+      if(address.note && byId('pickupAddressNote')) byId('pickupAddressNote').value = address.note;
+      if(address.phone && byId('pickupPhone')) byId('pickupPhone').value = address.phone;
+      if(address.contact && byId('pickupContact')) byId('pickupContact').value = address.contact;
+      selectedNearbyPlace = null;
+      selectedNearbyPlaceId = '';
+    }else{
+      if(typeof resetDropoffGeo === 'function') resetDropoffGeo();
+      dropoffLat = address.lat;
+      dropoffLng = address.lng;
+      dropoffPlaceId = address.placeId;
+      if(address.note && byId('dropoffAddressNote')) byId('dropoffAddressNote').value = address.note;
+      if(address.phone && byId('dropoffPhone')) byId('dropoffPhone').value = address.phone;
+      if(address.contact && byId('dropoffContact')) byId('dropoffContact').value = address.contact;
+    }
+
+    if(address.city || address.district) updateTopbarLocation(address);
+    saveRecentAddress(address);
+
+    try { if(typeof clearRoutePreview === 'function') clearRoutePreview(); } catch (_) {}
+    try { if(typeof invalidateQuote === 'function') invalidateQuote(); } catch (_) {}
+    try { if(typeof updateSwapAddressButtonState === 'function') updateSwapAddressButtonState(); } catch (_) {}
+    try { if(typeof scheduleRouteAndQuoteRefresh === 'function') scheduleRouteAndQuoteRefresh(80); } catch (_) {}
+    try { if(typeof UBeeEnhancements?.saveDraft === 'function') UBeeEnhancements.saveDraft(); } catch (_) {}
+
+    syncAllSummaries();
+    updateStep1ButtonState();
+    return true;
+  }
+
+  function applySelectedAddress(source){
+    const address = normalizeAddress(source);
+    if(!address.address){
+      setAddressStatus('這筆地址資料不完整，請改用其他結果。', true);
+      return;
+    }
+
+    if(activeTarget === 'service'){
+      updateTopbarLocation(address);
+      saveRecentAddress(address);
+      closeAddressCenter();
+      return;
+    }
+
+    if(applyAddressToRoute(activeTarget, address)){
+      closeAddressCenter();
+    }
+  }
+
+  function renderAddressButton(address, iconText, onClick){
+    const normalized = normalizeAddress(address);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ubee-v4-address-list-item';
+    button.innerHTML = `
+      <span class="ubee-v4-address-list-icon">${html(iconText || '址')}</span>
+      <span><strong>${html(normalized.label || normalized.name || '常用地址')}</strong><small>${html(normalized.address)}</small></span>
+      <b>›</b>
+    `;
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
+  function renderAddressList(containerId, list, emptyText, iconText){
+    const container = byId(containerId);
+    if(!container) return;
+    container.innerHTML = '';
+
+    if(!list.length){
+      container.innerHTML = `<div class="ubee-v4-address-empty">${html(emptyText)}</div>`;
+      return;
+    }
+
+    list.forEach(item => {
+      container.appendChild(renderAddressButton(item, iconText, () => applySelectedAddress(item)));
+    });
+  }
+
+  function renderAddressLists(){
+    renderAddressList('ubeeV4SavedAddressList', getSavedAddresses(), '尚未儲存常用地址，可到「我的 → 常用地址」新增。', '★');
+    renderAddressList('ubeeV4RecentAddressList', getRecentAddresses(), '選過的地址會顯示在這裡。', '↻');
+  }
+
+  async function useCurrentLocation(){
+    const button = byId('ubeeV4UseCurrentLocation');
+    try{
+      if(button) button.disabled = true;
+      setAddressStatus('正在取得目前位置與門牌地址…');
+
+      const position = typeof getCurrentPosition === 'function'
+        ? await getCurrentPosition()
+        : await new Promise((resolve, reject) => {
+            if(!navigator.geolocation) return reject(new Error('這個裝置不支援定位功能。'));
+            navigator.geolocation.getCurrentPosition(resolve, reject, {enableHighAccuracy:true,timeout:10000,maximumAge:120000});
+          });
+
+      const lat = Number(position.coords.latitude);
+      const lng = Number(position.coords.longitude);
+      currentLocationLat = lat;
+      currentLocationLng = lng;
+      try { if(typeof renderCurrentLocationMarker === 'function') renderCurrentLocationMarker(); } catch (_) {}
+
+      const response = await fetch('/api/address/reverse-geocode', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        cache:'no-store',
+        body:JSON.stringify({lat,lng})
+      });
+      const data = await response.json().catch(() => ({}));
+      if(!response.ok || data.success === false || !data.address){
+        throw new Error(data.error || data.message || '目前位置無法轉成地址');
+      }
+
+      applySelectedAddress(data.address);
+    }catch(error){
+      console.warn('UBee 地址中心定位失敗：', error);
+      const message = error?.code === 1
+        ? '定位權限未開啟，請允許定位後再試，或直接搜尋地址。'
+        : (error?.message || '定位失敗，請改用地址搜尋。');
+      setAddressStatus(message, true);
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  function scheduleAddressSearch(){
+    clearTimeout(searchTimer);
+    const query = text(byId('ubeeV4AddressSearchInput')?.value);
+    byId('ubeeV4ManualAddressBtn')?.classList.toggle('hidden', query.length < 3);
+
+    if(query.length < 2){
+      clearSearchResults(false);
+      setAddressStatus('請輸入至少 2 個字搜尋地址或地標。');
+      return;
+    }
+
+    searchTimer = setTimeout(() => searchAddresses(query), 320);
+  }
+
+  async function searchAddresses(query){
+    const requestId = ++searchSequence;
+    setAddressStatus(`正在搜尋「${query}」…`);
+
+    try{
+      const body = { input:query, sessionToken:addressSessionToken };
+      if(validCoordinate(currentLocationLat) && validCoordinate(currentLocationLng)){
+        body.lat = Number(currentLocationLat);
+        body.lng = Number(currentLocationLng);
+      }
+
+      const response = await fetch('/api/address/search', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        cache:'no-store',
+        body:JSON.stringify(body)
+      });
+      const data = await response.json().catch(() => ({}));
+      if(requestId !== searchSequence) return;
+      if(!response.ok || data.success === false){
+        throw new Error(data.error || data.message || '地址搜尋失敗');
+      }
+
+      currentPredictions = Array.isArray(data.predictions) ? data.predictions : [];
+      renderSearchResults();
+      setAddressStatus(currentPredictions.length ? `找到 ${currentPredictions.length} 筆地址，請選擇正確結果。` : '沒有找到相符地址，可補充行政區、路名或店家名稱。');
+    }catch(error){
+      if(requestId !== searchSequence) return;
+      console.warn('UBee 地址搜尋失敗：', error);
+      currentPredictions = [];
+      renderSearchResults();
+      setAddressStatus(error?.message || '地址搜尋失敗，請稍後再試。', true);
+    }
+  }
+
+  function renderSearchResults(){
+    const container = byId('ubeeV4AddressSearchResults');
+    if(!container) return;
+    container.innerHTML = '';
+
+    byId('ubeeV4GoogleAttribution')?.classList.toggle('hidden', currentPredictions.length === 0);
+
+    currentPredictions.forEach((prediction, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ubee-v4-address-result';
+      button.innerHTML = `
+        <span class="ubee-v4-address-result-icon">⌖</span>
+        <span><strong>${html(prediction.mainText || prediction.description || '地址')}</strong><small>${html(prediction.secondaryText || prediction.description || '')}</small></span>
+        <b>›</b>
+      `;
+      button.addEventListener('click', () => selectPrediction(index));
+      container.appendChild(button);
+    });
+  }
+
+  async function selectPrediction(index){
+    const prediction = currentPredictions[index];
+    if(!prediction) return;
+    setAddressStatus('正在讀取完整門牌與座標…');
+
+    try{
+      const response = await fetch('/api/address/detail', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        cache:'no-store',
+        body:JSON.stringify({placeId:prediction.placeId, sessionToken:addressSessionToken})
+      });
+      const data = await response.json().catch(() => ({}));
+      if(!response.ok || data.success === false || !data.address){
+        throw new Error(data.error || data.message || '地址詳細資料讀取失敗');
+      }
+      applySelectedAddress(data.address);
+    }catch(error){
+      console.warn('地址詳細資料讀取失敗：', error);
+      setAddressStatus(error?.message || '地址詳細資料讀取失敗。', true);
+    }
+  }
+
+  function useManualAddress(){
+    const value = text(byId('ubeeV4AddressSearchInput')?.value);
+    if(value.length < 3){
+      setAddressStatus('請先輸入較完整的地址。', true);
+      return;
+    }
+    applySelectedAddress({label:'手動地址',address:value});
+  }
+
+  function useSameAsPickup(){
+    const pickup = text(byId('pickup')?.value);
+    if(!pickup){
+      setAddressStatus('請先設定取件／任務地點。', true);
+      return;
+    }
+    applySelectedAddress({
+      label:'現場完成',
+      address:pickup,
+      note:text(byId('pickupAddressNote')?.value) || '同取件地點／現場完成',
+      contact:text(byId('pickupContact')?.value),
+      phone:text(byId('pickupPhone')?.value),
+      placeId:text(pickupPlaceId),
+      lat:pickupLat,
+      lng:pickupLng,
+    });
+  }
+
+  function openSavedAddressManager(){
+    closeAddressCenter();
+    if(typeof showCustomerSubPage === 'function'){
+      showCustomerSubPage('customerAddressPage','常用地址');
+    }
+  }
+
+  function getRouteMeta(){
+    const distance = text(lastRouteData?.distanceText || byId('homeRouteDistance')?.textContent || '');
+    const duration = text(lastRouteData?.durationText || byId('homeRouteDuration')?.textContent || '');
+    return [distance, duration].filter(value => value && value !== '-').join('・');
+  }
+
+  function getQuoteText(){
+    return Number(lastEstimatedTotal) > 0 ? `NT$${Math.round(Number(lastEstimatedTotal))}` : '待估價';
+  }
+
+  function getTimingChoiceText(){
+    if(orderTimingType === 'scheduled') return '指定時間預約';
+    if(orderTimingType === 'flexible') return '彈性時段預約';
+    return `立即任務・${typeof getSpeedLabel === 'function' ? getSpeedLabel(speedType) : speedType}`;
+  }
+
+  function syncStep2Summary(){
+    const box = byId('step2RouteSummary');
+    if(!box) return;
+    const pickup = text(byId('pickup')?.value) || '尚未設定取件地點';
+    const dropoff = text(byId('dropoff')?.value) || '尚未設定送達地點';
+    box.querySelector('.ubee-v4-step-summary-title').textContent = `${pickup} → ${dropoff}`;
+    box.querySelector('.ubee-v4-step-summary-meta').textContent = [getRouteMeta(), getQuoteText(), '點上一步可修改服務與地址'].filter(Boolean).join('｜');
+  }
+
+  function syncStep3Quote(){
+    if(byId('step3TimingChoiceText')) byId('step3TimingChoiceText').textContent = getTimingChoiceText();
+    if(byId('step3QuoteTotalText')) byId('step3QuoteTotalText').textContent = getQuoteText();
+    if(byId('step3QuoteMetaText')){
+      const routeMeta = getRouteMeta();
+      byId('step3QuoteMetaText').textContent = routeMeta
+        ? `${routeMeta}；切換速度會向後端重新估價。`
+        : '切換處理速度後會向後端重新估價。';
+    }
+  }
+
+  function renderV4ReviewSummary(){
+    const box = byId('summaryBox');
+    if(!box) return;
+    const payload = getPayload();
+    const pickupContact = text(byId('pickupContact')?.value) || '未填姓名';
+    const dropoffContact = text(byId('dropoffContact')?.value) || '未填姓名';
+    const taskNote = text(payload.note) || '未填寫任務內容';
+    const timingLabel = typeof getOrderTimingLabel === 'function' ? getOrderTimingLabel(payload) : getTimingChoiceText();
+
+    box.innerHTML = `
+      <div class="ubee-v4-review-grid">
+        <button class="ubee-v4-review-card" type="button" onclick="UBeeV4Flow.editStep(1)">
+          <div class="ubee-v4-review-card-head"><strong>服務與路線</strong><span>修改</span></div>
+          <div class="ubee-v4-review-card-value">${html(typeof getServiceGroupLabel === 'function' ? getServiceGroupLabel() : serviceGroup)}・${html(serviceType)}・${html(serviceCategory)}</div>
+          <div class="ubee-v4-review-route-line"><i class="ubee-v4-review-route-dot"></i><div><strong>${html(payload.pickupAddress)}</strong><small>${html(text(byId('pickupAddressNote')?.value))}</small></div></div>
+          <div class="ubee-v4-review-route-line"><i class="ubee-v4-review-route-dot dropoff"></i><div><strong>${html(payload.dropoffAddress)}</strong><small>${html(text(byId('dropoffAddressNote')?.value))}</small></div></div>
+          <div class="ubee-v4-review-card-meta">${html(getRouteMeta() || '路線資料將以後端正式結果為準')}</div>
+        </button>
+
+        <button class="ubee-v4-review-card" type="button" onclick="UBeeV4Flow.editStep(2)">
+          <div class="ubee-v4-review-card-head"><strong>任務內容與聯絡資訊</strong><span>修改</span></div>
+          <div class="ubee-v4-review-card-value">${html(taskNote)}</div>
+          <div class="ubee-v4-review-card-meta">取件：${html(pickupContact)} ${html(payload.pickupPhone || '未填電話')}<br>送達：${html(dropoffContact)} ${html(payload.dropoffPhone || '未填電話')}</div>
+        </button>
+
+        <button class="ubee-v4-review-card" type="button" onclick="UBeeV4Flow.editStep(3)">
+          <div class="ubee-v4-review-card-head"><strong>任務時效</strong><span>修改</span></div>
+          <div class="ubee-v4-review-card-value">${html(timingLabel)}</div>
+          <div class="ubee-v4-review-card-meta">目前預估 ${html(getQuoteText())}；送出前系統會重新取得正式報價。</div>
+        </button>
+      </div>
+    `;
+  }
+
+  function renderStep5Created(order = currentOrderData){
+    const card = byId('step5CreatedCard');
+    if(!card || !currentOrderId) return;
+    card.classList.remove('hidden');
+    const total = Number(order?.customerPayableTotal || order?.payableTotal || order?.total || 0);
+    byId('step5CreatedMeta').textContent = `訂單 ${currentOrderId}${total > 0 ? `・預估 NT$${Math.round(total)}` : ''}・請確認現金單後開始媒合`;
+  }
+
+  function appendExtraTaskDetails(order = {}){
+    const container = byId('step5TaskDetailContent');
+    if(!container || byId('ubeeV4Step5ExtraDetails')) return;
+    const details = [
+      ['取件聯絡人', order.pickupContact],
+      ['送達聯絡人', order.dropoffContact],
+      ['取件補充', order.pickupAddressNote],
+      ['送達補充', order.dropoffAddressNote],
+      ['數量', order.itemQuantity],
+      ['物品大小', order.itemSizeLabel || order.itemSize],
+      ['完成證明', order.proofRequiredLabel || order.proofRequired],
+    ].filter(([,value]) => text(value));
+    if(!details.length) return;
+    const extra = document.createElement('div');
+    extra.id = 'ubeeV4Step5ExtraDetails';
+    extra.className = 'address-display';
+    extra.innerHTML = `<div class="address-display-label">補充任務資訊</div><div class="address-display-value">${details.map(([label,value]) => `${html(label)}：${html(value)}`).join('<br>')}</div>`;
+    container.appendChild(extra);
+  }
+
+  function syncAllSummaries(){
+    try { if(typeof updateTaskPathText === 'function') updateTaskPathText(); } catch (_) {}
+    syncStep2Summary();
+    syncStep3Quote();
+    if(currentStep === 4) renderV4ReviewSummary();
+    if(currentStep === 5) renderStep5Created(currentOrderData);
+  }
+
+  function updateDynamicFields(){
+    const isBuy = serviceGroup === 'buy';
+    const isQueue = serviceGroup === 'queue';
+    byId('shoppingListSection')?.classList.toggle('hidden', !isBuy);
+    byId('queueSection')?.classList.toggle('hidden', !isQueue);
+    byId('taskItemDetailSection')?.classList.toggle('hidden', isQueue);
+  }
+
+  function updateStep1ButtonState(){
+    const button = document.querySelector('#step1 .home-next-btn');
+    if(!button) return;
+    const hasService = !!text(serviceType) && !!text(serviceCategory);
+    const hasPickup = !!text(byId('pickup')?.value);
+    const hasDropoff = !!text(byId('dropoff')?.value) || (serviceGroup === 'queue' && hasPickup);
+    const quoteReady = serviceGroup === 'queue' || (Number(lastEstimatedTotal) > 0 && !!lastQuoteData);
+    button.disabled = !(hasService && hasPickup && hasDropoff && quoteReady);
+    button.title = button.disabled ? '請完成服務、地址與估價' : '';
+  }
+
+  async function validateAndPrepareStep1(){
+    if(!text(serviceType) || !text(serviceCategory)){
+      alert('請先選擇完整的服務類型與任務分類。');
+      return false;
+    }
+
+    const pickup = text(byId('pickup')?.value);
+    let dropoff = text(byId('dropoff')?.value);
+
+    if(!pickup){
+      alert('請先選擇取件／購買／任務地點。');
+      openAddressCenter('pickup');
+      return false;
+    }
+
+    if(!dropoff && serviceGroup === 'queue'){
+      applyAddressToRoute('dropoff', {
+        label:'現場完成', address:pickup, note:'同取件地點／現場完成',
+        placeId:pickupPlaceId, lat:pickupLat, lng:pickupLng
+      });
+      dropoff = pickup;
+    }
+
+    if(!dropoff){
+      alert('請先選擇送達／交付地點。');
+      openAddressCenter('dropoff');
+      return false;
+    }
+
+    if(serviceGroup === 'queue') return true;
+
+    const nextButton = document.querySelector('#step1 .home-next-btn');
+    const oldText = nextButton?.textContent;
+    try{
+      if(nextButton){ nextButton.disabled = true; nextButton.textContent = '確認路線與估價中…'; }
+      const route = await refreshRoutePreview();
+      const quote = await renderEstimate();
+      if(!route){
+        alert('目前無法建立道路路線，請確認取件與送達地址是否完整。');
+        return false;
+      }
+      if(!quote || !lastQuoteData || Number(lastEstimatedTotal) <= 0){
+        alert('目前無法取得正式估價，請確認地址後再試。');
+        return false;
+      }
+      return true;
+    }catch(error){
+      console.error('第一步路線與估價確認失敗：', error);
+      alert(error?.message || '路線或估價確認失敗，請稍後再試。');
+      return false;
+    }finally{
+      if(nextButton){ nextButton.textContent = oldText || '填寫任務資訊'; }
+      updateStep1ButtonState();
+    }
+  }
+
+  function validateExtraStep2(){
+    const size = text(byId('itemSize')?.value);
+    if(size === 'large'){
+      alert('大型／大量物品需要 UBee 客服人工確認，請先聯繫客服確認可派單與費用。');
+      return false;
+    }
+    return true;
+  }
+
+  function editStep(step){
+    if(typeof showOnlyStep === 'function') showOnlyStep(step);
+  }
+
+  function showCreatingOverlay(){
+    byId('ubeeV4CreatingOverlay')?.classList.remove('hidden');
+  }
+
+  function hideCreatingOverlay(){
+    byId('ubeeV4CreatingOverlay')?.classList.add('hidden');
+  }
+
+  function collectExtraDraft(){
+    return {
+      pickupContact:text(byId('pickupContact')?.value),
+      dropoffContact:text(byId('dropoffContact')?.value),
+      itemQuantity:text(byId('itemQuantity')?.value),
+      itemSize:text(byId('itemSize')?.value),
+      proofRequired:text(byId('proofRequired')?.value),
+      savedAt:Date.now(),
+    };
+  }
+
+  function saveExtraDraft(){
+    localStorage.setItem(EXTRA_DRAFT_KEY, JSON.stringify(collectExtraDraft()));
+  }
+
+  function restoreExtraDraft(){
+    const draft = parseJSON(localStorage.getItem(EXTRA_DRAFT_KEY) || '{}', {});
+    if(!draft || Date.now() - Number(draft.savedAt || 0) > 7 * 86400000) return;
+    if(byId('pickupContact')) byId('pickupContact').value = text(draft.pickupContact);
+    if(byId('dropoffContact')) byId('dropoffContact').value = text(draft.dropoffContact);
+    if(byId('itemQuantity')) byId('itemQuantity').value = text(draft.itemQuantity);
+    if(byId('itemSize') && draft.itemSize) byId('itemSize').value = draft.itemSize;
+    if(byId('proofRequired') && draft.proofRequired) byId('proofRequired').value = draft.proofRequired;
+  }
+
+  function clearExtraDraft(){
+    localStorage.removeItem(EXTRA_DRAFT_KEY);
+  }
+
+  function init(){
+    if(initialized) return;
+    initialized = true;
+
+    const serviceLocation = normalizeAddress(parseJSON(localStorage.getItem(SERVICE_LOCATION_KEY) || '{}', {}));
+    if(serviceLocation.address || serviceLocation.city || serviceLocation.district) updateTopbarLocation(serviceLocation);
+
+    restoreExtraDraft();
+    renderAddressLists();
+    updateDynamicFields();
+    syncAllSummaries();
+    updateStep1ButtonState();
+
+    const searchInput = byId('ubeeV4AddressSearchInput');
+    searchInput?.addEventListener('input', scheduleAddressSearch);
+    searchInput?.addEventListener('keydown', event => {
+      if(event.key === 'Escape') closeAddressCenter();
+      if(event.key === 'Enter' && text(searchInput.value).length >= 3 && currentPredictions.length === 0){
+        event.preventDefault();
+        useManualAddress();
+      }
+    });
+
+    document.addEventListener('keydown', event => {
+      if(event.key === 'Escape' && byId('ubeeV4AddressCenter')?.classList.contains('open')) closeAddressCenter();
+    });
+
+    ['pickupContact','dropoffContact','itemQuantity','itemSize','proofRequired'].forEach(id => {
+      byId(id)?.addEventListener('input', saveExtraDraft);
+      byId(id)?.addEventListener('change', saveExtraDraft);
+    });
+
+    ['pickup','dropoff'].forEach(id => {
+      byId(id)?.addEventListener('change', () => { syncAllSummaries(); updateStep1ButtonState(); });
+    });
+
+    const observer = new MutationObserver(() => {
+      syncStep2Summary();
+      syncStep3Quote();
+      updateStep1ButtonState();
+    });
+    ['homeEstimateAmount','homeEstimateMeta','homeRouteDistance','homeRouteDuration'].forEach(id => {
+      const node = byId(id);
+      if(node) observer.observe(node, {childList:true,subtree:true,characterData:true});
+    });
+
+    document.querySelectorAll('#step1 .address-row').forEach((row, index) => {
+      row.addEventListener('click', event => {
+        if(event.target.closest('.address-swap-btn')) return;
+        openAddressCenter(index === 0 ? 'pickup' : 'dropoff');
+      });
+    });
+  }
+
+  return {
+    init,
+    openAddressCenter,
+    closeAddressCenter,
+    clearAddressSearch,
+    useCurrentLocation,
+    useManualAddress,
+    useSameAsPickup,
+    openSavedAddressManager,
+    validateAndPrepareStep1,
+    validateExtraStep2,
+    editStep,
+    syncAllSummaries,
+    updateDynamicFields,
+    updateStep1ButtonState,
+    renderV4ReviewSummary,
+    renderStep5Created,
+    appendExtraTaskDetails,
+    showCreatingOverlay,
+    hideCreatingOverlay,
+    clearExtraDraft,
+  };
+})();
+
+// Inline HTML handlers resolve through window; expose the V4 controller explicitly.
+window.UBeeV4Flow = UBeeV4Flow;
+
+// Main payload extension. Backend V4 sanitizes and stores these fields.
+const __ubeeV4OriginalGetPayload = getPayload;
+getPayload = function(){
+  const payload = __ubeeV4OriginalGetPayload();
+  const itemSizeLabels = {unspecified:'未指定',small:'小型・可手提',medium:'中型・機車可載',large:'大型／大量'};
+  const proofLabels = {none:'不需要',photo:'拍照回傳',signature:'簽收',photo_and_signature:'拍照並簽收'};
+  const itemSize = String(document.getElementById('itemSize')?.value || 'unspecified');
+  const proofRequired = String(document.getElementById('proofRequired')?.value || 'none');
+  return {
+    ...payload,
+    pickupContact:String(document.getElementById('pickupContact')?.value || '').trim(),
+    dropoffContact:String(document.getElementById('dropoffContact')?.value || '').trim(),
+    pickupAddressNote:String(document.getElementById('pickupAddressNote')?.value || '').trim(),
+    dropoffAddressNote:String(document.getElementById('dropoffAddressNote')?.value || '').trim(),
+    itemQuantity:String(document.getElementById('itemQuantity')?.value || '').trim(),
+    itemSize,
+    itemSizeLabel:itemSizeLabels[itemSize] || itemSize,
+    proofRequired,
+    proofRequiredLabel:proofLabels[proofRequired] || proofRequired,
+    addressCenterVersion:'ubee-address-v4',
+    clientSchemaVersion:'customer-v4-flow-2026-07-30',
+  };
+};
+
+// Extra validation remains additive to the current formal validation.
+const __ubeeV4OriginalValidateStep2 = validateStep2;
+validateStep2 = function(){
+  return __ubeeV4OriginalValidateStep2() && UBeeV4Flow.validateExtraStep2();
+};
+
+// Step 1 is asynchronous because it must finish route + formal quote before continuing.
+const __ubeeV4OriginalGoNext = goNext;
+goNext = async function(){
+  if(currentStep !== 1) return __ubeeV4OriginalGoNext();
+  if(isStepTransitioning) return;
+  const ready = await UBeeV4Flow.validateAndPrepareStep1();
+  if(!ready) return;
+  if(!beginStepTransition()) return;
+  showOnlyStep(2);
+};
+
+// Keep summaries and maps synchronized whenever the active step changes.
+const __ubeeV4OriginalShowOnlyStep = showOnlyStep;
+showOnlyStep = function(step){
+  const result = __ubeeV4OriginalShowOnlyStep(step);
+  setTimeout(() => {
+    UBeeV4Flow.updateDynamicFields();
+    UBeeV4Flow.syncAllSummaries();
+    if(step === 4) UBeeV4Flow.renderV4ReviewSummary();
+    if(step === 5) UBeeV4Flow.renderStep5Created(currentOrderData);
+  }, 30);
+  return result;
+};
+
+// Replace the compact confirmation content with a full review structure after existing estimate logic runs.
+const __ubeeV4OriginalRenderSummary = renderSummary;
+renderSummary = function(){
+  const result = __ubeeV4OriginalRenderSummary();
+  UBeeV4Flow.renderV4ReviewSummary();
+  return result;
+};
+
+// Re-render derived fields whenever service/timing options change.
+[
+  'selectServiceFromTab','selectServiceItem','selectCategory','selectSpeed','selectOrderTimingType','handleScheduleInputChanged','swapPickupAndDropoff'
+].forEach(name => {
+  const original = window[name];
+  if(typeof original !== 'function') return;
+  window[name] = function(...args){
+    const result = original.apply(this,args);
+    setTimeout(() => {
+      UBeeV4Flow.updateDynamicFields();
+      UBeeV4Flow.syncAllSummaries();
+      UBeeV4Flow.updateStep1ButtonState();
+    }, 20);
+    return result;
+  };
+});
+
+// Creation overlay and successful Step 5 handoff.
+const __ubeeV4OriginalCreateOrder = createOrder;
+createOrder = async function(){
+  const beforeOrderId = currentOrderId;
+  UBeeV4Flow.showCreatingOverlay();
+  try{
+    await __ubeeV4OriginalCreateOrder();
+    if(currentOrderId && currentOrderId !== beforeOrderId){
+      UBeeV4Flow.clearExtraDraft();
+      UBeeV4Flow.renderStep5Created(currentOrderData);
+    }
+  }finally{
+    setTimeout(UBeeV4Flow.hideCreatingOverlay, currentOrderId && currentOrderId !== beforeOrderId ? 550 : 80);
+  }
+};
+
+// Preserve existing tracking render, then append V4 task fields.
+const __ubeeV4OriginalRenderTimeline = renderTimeline;
+renderTimeline = function(status, order){
+  const result = __ubeeV4OriginalRenderTimeline.apply(this, arguments);
+  setTimeout(() => UBeeV4Flow.appendExtraTaskDetails(order || currentOrderData || {}), 20);
+  return result;
+};
+
+UBeeV4Flow.init();
+</script>
+
 </body>
 </html>
