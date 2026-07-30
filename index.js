@@ -11223,6 +11223,76 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         dropoffLat: asNumberOrNull(o.dropoffLat ?? o.toLat),
         dropoffLng: asNumberOrNull(o.dropoffLng ?? o.toLng),
         total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
+        serviceSubtotal: Number(o.serviceSubtotal || o.serviceTotal || 0),
+        driverFee: Number(o.driverFee || o.riderFee || 0),
+        riderFee: Number(o.riderFee || o.driverFee || 0),
+        platformFee: Number(o.platformFee || o.platformIncome || 0),
+
+        deliveryFee: Number(o.deliveryFee || 0),
+        serviceFee: Number(o.serviceFee || 0),
+        speedFee: Number(o.speedFee || 0),
+        upstairsFee: Number(o.upstairsFee || 0),
+
+        itemSize: normalizeItemSize(o.itemSize),
+        itemSizeLabel:
+          o.itemSizeLabel ||
+          getItemSizePricing(o.itemSize).itemSizeLabel,
+        itemSizeFee: Number(o.itemSizeFee || 0),
+        itemSizeReviewStatus:
+          o.itemSizeReviewStatus || 'not_required',
+        reportedItemSize:
+          String(o.reportedItemSize || '').trim()
+            ? normalizeItemSize(o.reportedItemSize)
+            : '',
+        reportedItemSizeLabel:
+          o.reportedItemSizeLabel || '',
+        reportedItemSizeSuggestedFee:
+          Number(o.reportedItemSizeSuggestedFee || 0),
+        itemSizeReportNote:
+          o.itemSizeReportNote || '',
+
+        weatherType: o.weatherType || 'none',
+        weatherLabel: o.weatherLabel || '',
+        weatherFee: Number(o.weatherFee || 0),
+        dynamicPricingFee: Number(o.dynamicPricingFee || 0),
+
+        waitingFee: Number(o.waitingFee || 0),
+        baseWaitingFee: Number(o.baseWaitingFee || 0),
+        operationalWaitingFee:
+          Number(o.operationalWaitingFee || 0),
+        pickupWaitingStartedAtMs:
+          Number(o.pickupWaitingStartedAtMs || 0),
+        pickupWaitingEndedAtMs:
+          Number(o.pickupWaitingEndedAtMs || 0),
+        pickupWaitingElapsedMinutes:
+          Number(o.pickupWaitingElapsedMinutes || 0),
+        pickupWaitingChargeableMinutes:
+          Number(o.pickupWaitingChargeableMinutes || 0),
+        pickupWaitingFee:
+          Number(o.pickupWaitingFee || 0),
+        dropoffWaitingStartedAtMs:
+          Number(o.dropoffWaitingStartedAtMs || 0),
+        dropoffWaitingEndedAtMs:
+          Number(o.dropoffWaitingEndedAtMs || 0),
+        dropoffWaitingElapsedMinutes:
+          Number(o.dropoffWaitingElapsedMinutes || 0),
+        dropoffWaitingChargeableMinutes:
+          Number(o.dropoffWaitingChargeableMinutes || 0),
+        dropoffWaitingFee:
+          Number(o.dropoffWaitingFee || 0),
+        waitingActiveStage:
+          o.waitingActiveStage || '',
+        waitingActiveStageLabel:
+          o.waitingActiveStageLabel || '',
+        waitingFreeUntilMs:
+          Number(o.waitingFreeUntilMs || 0),
+        waitingFreeMinutes:
+          Number(o.waitingFreeMinutes || PRICING.waitingFreeMinutes),
+        waitingBaseCharge:
+          Number(o.waitingBaseCharge || PRICING.waitingBaseFee),
+        waitingPerMinuteCharge:
+          Number(o.waitingPerMinuteCharge || PRICING.waitingPerMinute),
+
         riderName: o.riderName || o.driverName || '',
         riderId: o.riderId || o.riderDocId || '',
         riderDocId: o.riderDocId || '',
@@ -11731,6 +11801,10 @@ app.get('/api/dispatch/dynamic-pricing', async (req, res) => {
       success: true,
       version: DYNAMIC_PRICING_V3.version,
       global: cache.global || {},
+      weatherAdjustment: normalizeWeatherAdjustment(
+        cache.global?.weatherAdjustment || {},
+        Date.now()
+      ),
       regions: [...cache.regions.values()],
     });
   } catch (error) {
@@ -11753,8 +11827,67 @@ app.post('/api/dispatch/dynamic-pricing', verifyDynamicPricingAdmin, async (req,
         label: cleanText(payload.manualAdjustment?.label || '', 80),
         severe: payload.manualAdjustment?.severe === true,
       },
+      weatherAdjustment: {
+        enabled: payload.weatherAdjustment?.enabled === true,
+        type: normalizeWeatherType(
+          payload.weatherAdjustment?.type ||
+          payload.weatherAdjustment?.weatherType
+        ),
+        weatherType: normalizeWeatherType(
+          payload.weatherAdjustment?.type ||
+          payload.weatherAdjustment?.weatherType
+        ),
+        fee: Math.max(
+          0,
+          Math.min(
+            Math.round(Number(PRICING.weatherMaxFee || 200)),
+            Math.round(
+              dynamicSafeNumber(
+                payload.weatherAdjustment?.fee,
+                getDefaultWeatherAdjustment(
+                  payload.weatherAdjustment?.type ||
+                  payload.weatherAdjustment?.weatherType
+                ).fee
+              )
+            )
+          )
+        ),
+        label: cleanText(
+          payload.weatherAdjustment?.label ||
+          getDefaultWeatherAdjustment(
+            payload.weatherAdjustment?.type ||
+            payload.weatherAdjustment?.weatherType
+          ).label,
+          80
+        ),
+        severe:
+          payload.weatherAdjustment?.severe === true ||
+          getDefaultWeatherAdjustment(
+            payload.weatherAdjustment?.type ||
+            payload.weatherAdjustment?.weatherType
+          ).severe === true,
+        startsAtMs: Math.max(
+          0,
+          Math.round(
+            dynamicSafeNumber(
+              payload.weatherAdjustment?.startsAtMs ||
+              payload.weatherAdjustment?.startAtMs
+            )
+          )
+        ),
+        endsAtMs: Math.max(
+          0,
+          Math.round(
+            dynamicSafeNumber(
+              payload.weatherAdjustment?.endsAtMs ||
+              payload.weatherAdjustment?.endAtMs
+            )
+          )
+        ),
+        updatedAtMs: Date.now(),
+      },
       standardMaxFee: Math.max(0, Math.min(100, Math.round(dynamicSafeNumber(payload.standardMaxFee, 60)))),
-      severeMaxFee: Math.max(0, Math.min(150, Math.round(dynamicSafeNumber(payload.severeMaxFee, 100)))),
+      severeMaxFee: Math.max(0, Math.min(250, Math.round(dynamicSafeNumber(payload.severeMaxFee, 100)))),
       updatedAtMs: Date.now(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -11775,6 +11908,276 @@ app.post('/api/dispatch/dynamic-pricing', verifyDynamicPricingAdmin, async (req,
     });
   }
 });
+
+
+// =====================================================
+// UBee 附加費管理：調度中心商品體積審核
+// - 客人先申報；小U可回報不符；最終費用由後端重新計算。
+// - feeOverride 僅允許 0～500 元，避免前端任意寫入金額。
+// =====================================================
+app.post(
+  '/api/dispatch/orders/:orderId/item-size',
+  verifyDynamicPricingAdmin,
+  async (req, res) => {
+    try {
+      const orderId = String(
+        req.params.orderId || ''
+      ).trim().toUpperCase();
+
+      const orderRef =
+        db.collection('orders').doc(orderId);
+
+      const orderDoc = await orderRef.get();
+
+      if (!orderDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到此訂單。',
+        });
+      }
+
+      const order = {
+        id: orderDoc.id,
+        ...(orderDoc.data() || {}),
+      };
+
+      const itemSizePricing =
+        getItemSizePricing(req.body?.itemSize);
+
+      const hasFeeOverride =
+        req.body &&
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          'feeOverride'
+        );
+
+      const itemSizeFee =
+        hasFeeOverride
+          ? Math.max(
+              0,
+              Math.min(
+                500,
+                Math.round(
+                  Number(req.body.feeOverride || 0)
+                )
+              )
+            )
+          : itemSizePricing.itemSizeFee;
+
+      const updatedOrder =
+        recalculateOrderFinancials({
+          ...order,
+          itemSize: itemSizePricing.itemSize,
+          itemSizeLabel:
+            itemSizePricing.itemSizeLabel,
+          itemSizeFee,
+          itemSizeReviewRequired:
+            itemSizePricing.itemSizeReviewRequired,
+          itemSizeReviewStatus: 'approved',
+          itemSizeReviewedAtMs: Date.now(),
+          itemSizeReviewedBy: cleanText(
+            req.body?.operator ||
+            req.body?.reviewedBy ||
+            'UBee 調度中心',
+            100
+          ),
+          itemSizeReviewNote: cleanLongText(
+            req.body?.note || '',
+            500
+          ),
+        });
+
+      await orderRef.set(
+        {
+          ...copyOrderFinancialFields(
+            {},
+            updatedOrder
+          ),
+          itemSize:
+            updatedOrder.itemSize,
+          itemSizeLabel:
+            updatedOrder.itemSizeLabel,
+          itemSizeFee:
+            updatedOrder.itemSizeFee,
+          itemSizeReviewRequired:
+            updatedOrder.itemSizeReviewRequired,
+          itemSizeReviewStatus:
+            updatedOrder.itemSizeReviewStatus,
+          itemSizeReviewedAtMs:
+            updatedOrder.itemSizeReviewedAtMs,
+          itemSizeReviewedBy:
+            updatedOrder.itemSizeReviewedBy,
+          itemSizeReviewNote:
+            updatedOrder.itemSizeReviewNote,
+          updatedAtMs: Date.now(),
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const savedOrder = {
+        ...order,
+        ...updatedOrder,
+      };
+
+      await notifyCustomer(
+        savedOrder,
+        createTextMessage(
+          `UBee 跑腿物品體積確認\n\n` +
+          `訂單編號：${orderId}\n` +
+          `確認尺寸：${savedOrder.itemSizeLabel}\n` +
+          `體積費：$${savedOrder.itemSizeFee}\n` +
+          `更新後應付總額：$${savedOrder.customerPayableTotal}`
+        )
+      ).catch(error => {
+        console.error(
+          '⚠️ 商品體積費已更新，但通知客人失敗：',
+          error
+        );
+      });
+
+      return res.json({
+        success: true,
+        message: '商品體積與費用已更新。',
+        order: savedOrder,
+      });
+    } catch (error) {
+      console.error(
+        '❌ 調度中心商品體積審核失敗：',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: '商品體積審核失敗。',
+        error: error.message,
+      });
+    }
+  }
+);
+
+// =====================================================
+// UBee 附加費管理：小U回報商品體積不符
+// 小U只能提出回報，不能自行修改客人應付金額。
+// =====================================================
+app.post(
+  '/api/rider/orders/:orderId/report-item-size',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const orderId = String(
+        req.params.orderId || ''
+      ).trim().toUpperCase();
+
+      const riderResult =
+        await findApprovedRiderForApi({
+          lineUserId: req.body?.lineUserId,
+          phone: req.body?.phone,
+          riderId: req.body?.riderId,
+        });
+
+      if (!riderResult.ok) {
+        return res
+          .status(riderResult.statusCode)
+          .json({
+            success: false,
+            message:
+              riderResult.message ||
+              '找不到小U身分。',
+          });
+      }
+
+      const riderDoc = riderResult.riderDoc;
+      const rider = riderResult.rider || {};
+      const identity =
+        buildRiderApiIdentity(
+          riderDoc,
+          rider,
+          req.body || {}
+        );
+
+      const orderRef =
+        db.collection('orders').doc(orderId);
+      const orderDoc = await orderRef.get();
+
+      if (!orderDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到此訂單。',
+        });
+      }
+
+      const order = orderDoc.data() || {};
+
+      if (!isOrderBelongsToRider(order, identity)) {
+        return res.status(403).json({
+          success: false,
+          message: '此任務不屬於目前登入的小U。',
+        });
+      }
+
+      const reportedPricing =
+        getItemSizePricing(
+          req.body?.reportedItemSize ||
+          req.body?.itemSize
+        );
+
+      const update = {
+        itemSizeReviewStatus: 'pending',
+        itemSizeReportedByRider: true,
+        reportedItemSize:
+          reportedPricing.itemSize,
+        reportedItemSizeLabel:
+          reportedPricing.itemSizeLabel,
+        reportedItemSizeSuggestedFee:
+          reportedPricing.itemSizeFee,
+        itemSizeReportNote: cleanLongText(
+          req.body?.note || '',
+          500
+        ),
+        itemSizeReportedAtMs: Date.now(),
+        itemSizeReportedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        itemSizeReportedByRiderId:
+          identity.riderId,
+        itemSizeReportedByRiderDocId:
+          identity.riderDocId,
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await orderRef.set(update, { merge: true });
+
+      return res.json({
+        success: true,
+        message:
+          '已送出商品體積不符回報，請等待調度中心確認。',
+        report: {
+          itemSize:
+            reportedPricing.itemSize,
+          itemSizeLabel:
+            reportedPricing.itemSizeLabel,
+          suggestedFee:
+            reportedPricing.itemSizeFee,
+          reviewStatus: 'pending',
+        },
+      });
+    } catch (error) {
+      console.error(
+        '❌ 小U回報商品體積失敗：',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: '商品體積回報失敗。',
+        error: error.message,
+      });
+    }
+  }
+);
+
 
 
 // ============================================================
@@ -16683,8 +17086,43 @@ const PRICING = {
   queueLongTaskExtraFee: 100,
   maxQuoteTimeMinutes: 480,
 
-  // 舊版相容欄位，先保留，避免其他地方還有引用
-  waitingFee: 30,
+  // 現場停留／等候費：取件點與送達點皆適用
+  // 前 10 分鐘免費；超過 10 分鐘先收 $50，之後每開始 1 分鐘加 $5。
+  waitingFreeMinutes: 10,
+  waitingBaseFee: 50,
+  waitingPerMinute: 5,
+  waitingMaxFeePerStop: 1000,
+
+  // 商品體積費：由客人端先申報，調度中心可依現場照片調整。
+  itemSizeFees: Object.freeze({
+    unspecified: 0,
+    small: 0,
+    medium: 50,
+    large: 100,
+    extra_large: 300,
+  }),
+
+  itemSizeLabels: Object.freeze({
+    unspecified: '未申報物品體積',
+    small: '小型｜可放機車置物箱',
+    medium: '中型｜占用部分腳踏空間',
+    large: '大型｜超過一般機車腳踏空間',
+    extra_large: '超大型｜需特殊承載或汽車配送',
+  }),
+
+  itemSizeReviewRequired: Object.freeze({
+    unspecified: false,
+    small: false,
+    medium: false,
+    large: false,
+    extra_large: true,
+  }),
+
+  // 雨天／寒流等天候保障費由調度中心啟用，100% 給小U。
+  weatherMaxFee: 200,
+
+  // 舊版 LINE 等候費流程相容欄位；新版騎士端採自動計時。
+  waitingFee: 50,
 };
 
 // =====================================================
@@ -16718,6 +17156,405 @@ const QUICK_SERVICE_PRICING = {
 };
 
 const MAX_QUOTE_TIME_MINUTES = 480;
+
+
+// =====================================================
+// UBee 附加費管理 V1｜商品體積、天候保障、現場等候
+// =====================================================
+const UBEE_SURCHARGE_VERSION = 'V1_2026_07_30';
+const UBEE_WAITING_POLICY_VERSION = 'V2_2026_07_30';
+
+function normalizeItemSize(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  const aliases = {
+    '': 'unspecified',
+    unspecified: 'unspecified',
+    unknown: 'unspecified',
+    none: 'unspecified',
+
+    small: 'small',
+    s: 'small',
+    小型: 'small',
+
+    medium: 'medium',
+    m: 'medium',
+    中型: 'medium',
+
+    large: 'large',
+    l: 'large',
+    大型: 'large',
+
+    extra_large: 'extra_large',
+    extralarge: 'extra_large',
+    xl: 'extra_large',
+    oversized: 'extra_large',
+    超大型: 'extra_large',
+  };
+
+  return aliases[normalized] || 'unspecified';
+}
+
+function getItemSizePricing(value) {
+  const itemSize = normalizeItemSize(value);
+  const fee = Math.max(
+    0,
+    Math.round(
+      Number(PRICING.itemSizeFees?.[itemSize] || 0)
+    )
+  );
+
+  return {
+    itemSize,
+    itemSizeLabel:
+      String(
+        PRICING.itemSizeLabels?.[itemSize] ||
+        PRICING.itemSizeLabels?.unspecified ||
+        '未申報物品體積'
+      ),
+    itemSizeFee: fee,
+    itemSizeReviewRequired:
+      PRICING.itemSizeReviewRequired?.[itemSize] === true,
+  };
+}
+
+function normalizeWeatherType(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  const aliases = {
+    '': 'none',
+    none: 'none',
+    normal: 'none',
+    clear: 'none',
+
+    rain: 'rain',
+    rainy: 'rain',
+    雨天: 'rain',
+
+    heavy_rain: 'heavy_rain',
+    heavyrain: 'heavy_rain',
+    storm: 'heavy_rain',
+    豪雨: 'heavy_rain',
+
+    cold_wave: 'cold_wave',
+    coldwave: 'cold_wave',
+    cold: 'cold_wave',
+    寒流: 'cold_wave',
+
+    severe_weather: 'severe_weather',
+    severe: 'severe_weather',
+    extreme: 'severe_weather',
+    惡劣天候: 'severe_weather',
+  };
+
+  return aliases[normalized] || 'none';
+}
+
+function getDefaultWeatherAdjustment(type) {
+  const weatherType = normalizeWeatherType(type);
+
+  const defaults = {
+    none: {
+      label: '',
+      fee: 0,
+      severe: false,
+    },
+    rain: {
+      label: '雨天配送保障費',
+      fee: 100,
+      severe: false,
+    },
+    heavy_rain: {
+      label: '豪雨配送保障費',
+      fee: 150,
+      severe: true,
+    },
+    cold_wave: {
+      label: '寒流配送保障費',
+      fee: 100,
+      severe: false,
+    },
+    severe_weather: {
+      label: '惡劣天候配送保障費',
+      fee: 200,
+      severe: true,
+    },
+  };
+
+  return {
+    weatherType,
+    ...(defaults[weatherType] || defaults.none),
+  };
+}
+
+function calculateStopWaitingCharge({
+  startedAtMs = 0,
+  endedAtMs = Date.now(),
+} = {}) {
+  const start = Number(startedAtMs || 0);
+  const end = Number(endedAtMs || Date.now());
+
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start <= 0 ||
+    end <= start
+  ) {
+    return {
+      elapsedMs: 0,
+      elapsedMinutes: 0,
+      chargeableMinutes: 0,
+      fee: 0,
+      freeMinutes: Number(PRICING.waitingFreeMinutes || 10),
+      policyVersion: UBEE_WAITING_POLICY_VERSION,
+    };
+  }
+
+  const elapsedMs = Math.max(0, end - start);
+  const freeMinutes = Math.max(
+    0,
+    Math.round(Number(PRICING.waitingFreeMinutes || 10))
+  );
+  const freeMs = freeMinutes * 60 * 1000;
+
+  if (elapsedMs <= freeMs) {
+    return {
+      elapsedMs,
+      elapsedMinutes: Math.ceil(elapsedMs / 60000),
+      chargeableMinutes: 0,
+      fee: 0,
+      freeMinutes,
+      policyVersion: UBEE_WAITING_POLICY_VERSION,
+    };
+  }
+
+  // 超過免費時間後，先收基本等候費；
+  // 超過門檻的每一個「已開始分鐘」再加收每分鐘費。
+  const chargeableMinutes = Math.max(
+    0,
+    Math.ceil((elapsedMs - freeMs) / 60000)
+  );
+
+  const rawFee =
+    Math.max(0, Math.round(Number(PRICING.waitingBaseFee || 50))) +
+    chargeableMinutes *
+      Math.max(0, Math.round(Number(PRICING.waitingPerMinute || 5)));
+
+  const fee = Math.min(
+    Math.max(0, rawFee),
+    Math.max(
+      0,
+      Math.round(Number(PRICING.waitingMaxFeePerStop || 1000))
+    )
+  );
+
+  return {
+    elapsedMs,
+    elapsedMinutes: Math.ceil(elapsedMs / 60000),
+    chargeableMinutes,
+    fee,
+    freeMinutes,
+    policyVersion: UBEE_WAITING_POLICY_VERSION,
+  };
+}
+
+function getOrderBaseWaitingFee(order = {}) {
+  const explicit = Number(order.baseWaitingFee);
+
+  if (Number.isFinite(explicit) && explicit >= 0) {
+    return Math.round(explicit);
+  }
+
+  const currentWaitingFee = Math.max(
+    0,
+    Math.round(Number(order.waitingFee || 0))
+  );
+
+  const operationalWaitingFee = Math.max(
+    0,
+    Math.round(Number(order.operationalWaitingFee || 0))
+  );
+
+  return Math.max(
+    0,
+    currentWaitingFee - operationalWaitingFee
+  );
+}
+
+function getOrderWaitingStageFields(stage) {
+  const normalizedStage =
+    String(stage || '').trim().toLowerCase() === 'dropoff'
+      ? 'dropoff'
+      : 'pickup';
+
+  return normalizedStage === 'dropoff'
+    ? {
+        stage: 'dropoff',
+        label: '送達點',
+        startedAtMs: 'dropoffWaitingStartedAtMs',
+        endedAtMs: 'dropoffWaitingEndedAtMs',
+        elapsedMinutes: 'dropoffWaitingElapsedMinutes',
+        chargeableMinutes: 'dropoffWaitingChargeableMinutes',
+        fee: 'dropoffWaitingFee',
+      }
+    : {
+        stage: 'pickup',
+        label: '取件點',
+        startedAtMs: 'pickupWaitingStartedAtMs',
+        endedAtMs: 'pickupWaitingEndedAtMs',
+        elapsedMinutes: 'pickupWaitingElapsedMinutes',
+        chargeableMinutes: 'pickupWaitingChargeableMinutes',
+        fee: 'pickupWaitingFee',
+      };
+}
+
+function buildWaitingStageStartUpdate(order = {}, stage, nowMs = Date.now()) {
+  const fields = getOrderWaitingStageFields(stage);
+  const existingStart = Number(order[fields.startedAtMs] || 0);
+  const safeNowMs = Math.max(1, Math.round(Number(nowMs || Date.now())));
+
+  return {
+    [fields.startedAtMs]:
+      existingStart > 0
+        ? existingStart
+        : safeNowMs,
+    [fields.endedAtMs]: 0,
+    waitingActiveStage: fields.stage,
+    waitingActiveStageLabel: fields.label,
+    waitingFreeUntilMs:
+      (existingStart > 0 ? existingStart : safeNowMs) +
+      Math.max(0, Number(PRICING.waitingFreeMinutes || 10)) *
+        60 *
+        1000,
+    waitingPolicyVersion: UBEE_WAITING_POLICY_VERSION,
+    waitingFreeMinutes: Math.max(
+      0,
+      Math.round(Number(PRICING.waitingFreeMinutes || 10))
+    ),
+    waitingBaseCharge: Math.max(
+      0,
+      Math.round(Number(PRICING.waitingBaseFee || 50))
+    ),
+    waitingPerMinuteCharge: Math.max(
+      0,
+      Math.round(Number(PRICING.waitingPerMinute || 5))
+    ),
+  };
+}
+
+function buildWaitingStageFinalization(order = {}, stage, nowMs = Date.now()) {
+  const fields = getOrderWaitingStageFields(stage);
+  const endedAtMs = Math.max(
+    1,
+    Math.round(Number(nowMs || Date.now()))
+  );
+  const startedAtMs = Number(order[fields.startedAtMs] || 0);
+
+  const calculation = calculateStopWaitingCharge({
+    startedAtMs,
+    endedAtMs,
+  });
+
+  const pickupFee =
+    fields.stage === 'pickup'
+      ? calculation.fee
+      : Math.max(
+          0,
+          Math.round(Number(order.pickupWaitingFee || 0))
+        );
+
+  const dropoffFee =
+    fields.stage === 'dropoff'
+      ? calculation.fee
+      : Math.max(
+          0,
+          Math.round(Number(order.dropoffWaitingFee || 0))
+        );
+
+  const operationalWaitingFee = pickupFee + dropoffFee;
+  const baseWaitingFee = getOrderBaseWaitingFee(order);
+  const waitingFee = baseWaitingFee + operationalWaitingFee;
+
+  return {
+    [fields.endedAtMs]:
+      startedAtMs > 0
+        ? endedAtMs
+        : 0,
+    [fields.elapsedMinutes]:
+      calculation.elapsedMinutes,
+    [fields.chargeableMinutes]:
+      calculation.chargeableMinutes,
+    [fields.fee]:
+      calculation.fee,
+
+    baseWaitingFee,
+    operationalWaitingFee,
+    waitingFee,
+
+    waitingActiveStage: '',
+    waitingActiveStageLabel: '',
+    waitingFreeUntilMs: 0,
+    waitingPolicyVersion: UBEE_WAITING_POLICY_VERSION,
+    waitingFreeMinutes: calculation.freeMinutes,
+    waitingBaseCharge: Math.max(
+      0,
+      Math.round(Number(PRICING.waitingBaseFee || 50))
+    ),
+    waitingPerMinuteCharge: Math.max(
+      0,
+      Math.round(Number(PRICING.waitingPerMinute || 5))
+    ),
+  };
+}
+
+function copyOrderFinancialFields(target, financialOrder) {
+  const fields = [
+    'deliveryFee',
+    'serviceFee',
+    'platformServiceFee',
+    'speedFee',
+    'upstairsFee',
+    'itemSizeFee',
+    'waitingFee',
+    'taskSubtotal',
+    'serviceSubtotal',
+    'serviceTotal',
+    'driverFee',
+    'riderFee',
+    'platformFee',
+    'platformIncome',
+    'advancePayment',
+    'advanceAmount',
+    'customerPayableTotal',
+    'payableTotal',
+    'riderDisplayTotal',
+    'total',
+    'finalTotal',
+    'customerTotalWithAdvance',
+    'cashCollectAmount',
+    'cashServiceNet',
+    'cashDueToPlatform',
+    'platformReceivable',
+    'riderDueToPlatform',
+  ];
+
+  fields.forEach(field => {
+    if (
+      financialOrder &&
+      Object.prototype.hasOwnProperty.call(financialOrder, field)
+    ) {
+      target[field] = financialOrder[field];
+    }
+  });
+
+  return target;
+}
 
 
 // =====================================================
@@ -16781,6 +17618,100 @@ function dynamicToMs(value) {
   if (typeof value === 'number') return value;
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeWeatherAdjustment(
+  input = {},
+  nowMs = Date.now()
+) {
+  const source =
+    input && typeof input === 'object'
+      ? input
+      : {};
+
+  const defaults =
+    getDefaultWeatherAdjustment(
+      source.type ||
+      source.weatherType ||
+      source.condition
+    );
+
+  const enabled = source.enabled === true;
+  const startsAtMs =
+    dynamicToMs(
+      source.startsAtMs ||
+      source.startAtMs ||
+      source.startsAt ||
+      source.startAt
+    );
+  const endsAtMs =
+    dynamicToMs(
+      source.endsAtMs ||
+      source.endAtMs ||
+      source.endsAt ||
+      source.endAt
+    );
+
+  const configuredFee = Number(
+    source.fee ??
+    source.weatherFee ??
+    defaults.fee
+  );
+
+  const fee = Math.max(
+    0,
+    Math.min(
+      Math.max(
+        0,
+        Math.round(Number(PRICING.weatherMaxFee || 200))
+      ),
+      Math.round(
+        Number.isFinite(configuredFee)
+          ? configuredFee
+          : defaults.fee
+      )
+    )
+  );
+
+  const active =
+    enabled &&
+    defaults.weatherType !== 'none' &&
+    fee > 0 &&
+    (!startsAtMs || Number(nowMs) >= startsAtMs) &&
+    (!endsAtMs || Number(nowMs) < endsAtMs);
+
+  return {
+    enabled,
+    active,
+    weatherType: defaults.weatherType,
+    type: defaults.weatherType,
+    label:
+      cleanText(
+        source.label ||
+        source.weatherLabel ||
+        defaults.label ||
+        '天候配送保障費',
+        80
+      ),
+    fee,
+    weatherFee: fee,
+    severe:
+      source.severe === true ||
+      defaults.severe === true,
+    startsAtMs,
+    endsAtMs,
+    updatedAtMs:
+      dynamicToMs(source.updatedAtMs || source.updatedAt),
+  };
+}
+
+async function getCurrentWeatherAdjustment(nowMs = Date.now()) {
+  const settings = await loadDynamicPricingSettings();
+
+  return normalizeWeatherAdjustment(
+    settings.global?.weatherAdjustment || {},
+    nowMs
+  );
 }
 
 function normalizeTaiwanAddressText(value) {
@@ -17133,6 +18064,113 @@ function applyDynamicPricingToPrice(price, dynamicPricing) {
   return result;
 }
 
+function applyItemSizeSurchargeToPrice(
+  price,
+  itemSizeValue
+) {
+  const result = { ...(price || {}) };
+  const itemSizePricing =
+    getItemSizePricing(itemSizeValue);
+
+  const financials = calculateFinancialSplit({
+    deliveryFee: result.deliveryFee,
+    serviceFee: result.serviceFee,
+    speedFee: result.speedFee,
+    upstairsFee: result.upstairsFee,
+    waitingFee: result.waitingFee,
+    itemSizeFee: itemSizePricing.itemSizeFee,
+  });
+
+  Object.assign(result, financials, {
+    itemSize: itemSizePricing.itemSize,
+    itemSizeLabel: itemSizePricing.itemSizeLabel,
+    itemSizeFee: itemSizePricing.itemSizeFee,
+    itemSizeReviewRequired:
+      itemSizePricing.itemSizeReviewRequired,
+    itemSizeReviewStatus:
+      itemSizePricing.itemSizeReviewRequired
+        ? 'pending'
+        : 'not_required',
+    surchargeVersion: UBEE_SURCHARGE_VERSION,
+    total: financials.serviceSubtotal,
+  });
+
+  return result;
+}
+
+function applyWeatherSurchargeToPrice(
+  price,
+  weatherAdjustment
+) {
+  const result = { ...(price || {}) };
+  const normalized = normalizeWeatherAdjustment(
+    weatherAdjustment || {},
+    Date.now()
+  );
+
+  const weatherFee =
+    normalized.active === true
+      ? Math.max(0, Math.round(Number(normalized.fee || 0)))
+      : 0;
+
+  result.weatherType =
+    weatherFee > 0
+      ? normalized.weatherType
+      : 'none';
+  result.weatherLabel =
+    weatherFee > 0
+      ? normalized.label
+      : '';
+  result.weatherFee = weatherFee;
+  result.weatherAdjustment =
+    weatherFee > 0
+      ? normalized
+      : {
+          ...normalized,
+          active: false,
+          fee: 0,
+          weatherFee: 0,
+        };
+
+  if (weatherFee <= 0) {
+    return result;
+  }
+
+  result.taskSubtotal =
+    Math.max(
+      0,
+      Math.round(dynamicSafeNumber(result.taskSubtotal))
+    ) + weatherFee;
+
+  result.serviceSubtotal =
+    Math.max(
+      0,
+      Math.round(
+        dynamicSafeNumber(
+          result.serviceSubtotal ?? result.total
+        )
+      )
+    ) + weatherFee;
+
+  result.total = result.serviceSubtotal;
+
+  // 天候保障費 100% 給小U。
+  result.driverFee =
+    Math.max(
+      0,
+      Math.round(dynamicSafeNumber(result.driverFee))
+    ) + weatherFee;
+  result.riderFee = result.driverFee;
+
+  result.platformFee = Math.max(
+    0,
+    Math.round(dynamicSafeNumber(result.platformFee))
+  );
+  result.platformIncome = result.platformFee;
+
+  return result;
+}
+
 async function createDynamicPricingQuoteSnapshot({
   price,
   requestData = {},
@@ -17152,9 +18190,11 @@ async function createDynamicPricingQuoteSnapshot({
     serviceMode: String(requestData.serviceMode || ''),
     serviceKey: String(requestData.serviceKey || ''),
     speedType: String(requestData.speedType || requestData.speed || 'standard'),
+    itemSize: normalizeItemSize(requestData.itemSize),
     pickupAddress: String(requestData.pickupAddress || requestData.pickup || requestData.from || ''),
     dropoffAddress: String(requestData.dropoffAddress || requestData.dropoff || requestData.to || ''),
     advancePayment: Math.max(0, Math.round(dynamicSafeNumber(requestData.advancePayment))),
+    weatherType: String(price?.weatherType || 'none'),
     price: JSON.parse(JSON.stringify(price || {})),
     dynamicPricing: JSON.parse(JSON.stringify(dynamicPricing || {})),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -17196,6 +18236,8 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
   const orderSpeed = String(orderData.speedType || orderData.speed || 'standard').trim();
   const quoteMode = String(lockedQuote.serviceMode || 'normal').trim();
   const orderMode = String(orderData.serviceMode || 'normal').trim();
+  const quoteItemSize = normalizeItemSize(lockedQuote.itemSize);
+  const orderItemSize = normalizeItemSize(orderData.itemSize);
 
   if (!quotePickup || !orderPickup || quotePickup !== orderPickup) {
     return { ok: false, message: '取件地址已變更，請重新估價。' };
@@ -17208,6 +18250,9 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
   }
   if (quoteMode !== orderMode) {
     return { ok: false, message: '任務型態已變更，請重新估價。' };
+  }
+  if (quoteItemSize !== orderItemSize) {
+    return { ok: false, message: '物品體積選項已變更，請重新估價。' };
   }
 
   return { ok: true };
@@ -17227,6 +18272,10 @@ function summarizeDynamicPricingForDashboard(zones = [], globalSettings = {}) {
   return {
     version: DYNAMIC_PRICING_V3.version,
     enabled: globalSettings.enabled !== false,
+    weatherAdjustment: normalizeWeatherAdjustment(
+      globalSettings.weatherAdjustment || {},
+      Date.now()
+    ),
     zones: (Array.isArray(zones) ? zones : []).map(zone => {
       const waitingOrders = Math.max(0, Math.round(dynamicSafeNumber(zone.waitingOrders)));
       const availableRiders = Math.max(0, Math.round(dynamicSafeNumber(zone.availableRiders)));
@@ -18596,6 +19645,7 @@ function calculateFinancialSplit({
   speedFee = 0,
   upstairsFee = 0,
   waitingFee = 0,
+  itemSizeFee = 0,
 } = {}) {
   const safeDeliveryFee = Math.max(
     0,
@@ -18622,13 +19672,19 @@ function calculateFinancialSplit({
     Math.round(Number(waitingFee || 0))
   );
 
+  const safeItemSizeFee = Math.max(
+    0,
+    Math.round(Number(itemSizeFee || 0))
+  );
+
   // 任務費本體：
   // 這部分才參與騎士 70% / 平台 30%
   const taskSubtotal =
     safeDeliveryFee +
     safeSpeedFee +
     safeUpstairsFee +
-    safeWaitingFee;
+    safeWaitingFee +
+    safeItemSizeFee;
 
   // 平台服務費 100% 歸 UBee
   const platformServiceFee = safeServiceFee;
@@ -18658,6 +19714,7 @@ function calculateFinancialSplit({
     speedFee: safeSpeedFee,
     upstairsFee: safeUpstairsFee,
     waitingFee: safeWaitingFee,
+    itemSizeFee: safeItemSizeFee,
 
     taskSubtotal,
     serviceSubtotal,
@@ -18977,41 +20034,112 @@ function recalculateOrderFinancials(order) {
     return order;
   }
 
+  const itemSizePricing = getItemSizePricing(
+    order.itemSize
+  );
+
+  const itemSizeFee =
+    Object.prototype.hasOwnProperty.call(order, 'itemSizeFee')
+      ? Math.max(
+          0,
+          Math.round(Number(order.itemSizeFee || 0))
+        )
+      : itemSizePricing.itemSizeFee;
+
   const financials = calculateFinancialSplit({
     deliveryFee: order.deliveryFee,
     serviceFee: order.serviceFee,
     speedFee: order.speedFee,
     upstairsFee: order.upstairsFee,
     waitingFee: order.waitingFee,
+    itemSizeFee,
   });
 
   const dynamicPricingFee = Math.max(
     0,
-    Math.round(Number(order.dynamicPricingFee || order.dynamicFee || 0))
+    Math.round(
+      Number(
+        order.dynamicPricingFee ||
+        order.dynamicFee ||
+        0
+      )
+    )
   );
 
-  if (dynamicPricingFee > 0) {
-    financials.taskSubtotal += dynamicPricingFee;
-    financials.serviceSubtotal += dynamicPricingFee;
-    financials.driverFee += dynamicPricingFee;
-    financials.riderFee = financials.driverFee;
+  const weatherFee = Math.max(
+    0,
+    Math.round(Number(order.weatherFee || 0))
+  );
+
+  // 動態調度費與天候保障費皆 100% 給小U。
+  const riderOnlySurcharges =
+    dynamicPricingFee +
+    weatherFee;
+
+  if (riderOnlySurcharges > 0) {
+    financials.taskSubtotal +=
+      riderOnlySurcharges;
+
+    financials.serviceSubtotal +=
+      riderOnlySurcharges;
+
+    financials.driverFee +=
+      riderOnlySurcharges;
+
+    financials.riderFee =
+      financials.driverFee;
+
+    // 這兩項不增加平台收入。
+    financials.platformFee = Math.max(
+      0,
+      financials.serviceSubtotal -
+      financials.driverFee
+    );
+
+    financials.platformIncome =
+      financials.platformFee;
   }
 
-  const advancePayment = getOrderAdvancePaymentAmount(order);
+  const advancePayment =
+    getOrderAdvancePaymentAmount(order);
 
   const customerPayableTotal =
     financials.serviceSubtotal +
     advancePayment;
 
   // 基本費用欄位
-  order.deliveryFee = financials.deliveryFee;
-  order.serviceFee = financials.serviceFee;
-  order.speedFee = financials.speedFee;
-  order.upstairsFee = financials.upstairsFee;
-  order.waitingFee = financials.waitingFee;
+  order.deliveryFee =
+    financials.deliveryFee;
+
+  order.serviceFee =
+    financials.serviceFee;
+
+  order.speedFee =
+    financials.speedFee;
+
+  order.upstairsFee =
+    financials.upstairsFee;
+
+  order.waitingFee =
+    financials.waitingFee;
+
+  order.itemSize =
+    itemSizePricing.itemSize;
+
+  order.itemSizeLabel =
+    order.itemSizeLabel ||
+    itemSizePricing.itemSizeLabel;
+
+  order.itemSizeFee =
+    financials.itemSizeFee;
+
+  order.itemSizeReviewRequired =
+    order.itemSizeReviewRequired === true ||
+    itemSizePricing.itemSizeReviewRequired;
 
   // 財務拆解
-  order.taskSubtotal = financials.taskSubtotal;
+  order.taskSubtotal =
+    financials.taskSubtotal;
 
   order.platformServiceFee =
     financials.platformServiceFee;
@@ -19037,8 +20165,11 @@ function recalculateOrderFinancials(order) {
     financials.platformIncome;
 
   // 代墊款
-  order.advancePayment = advancePayment;
-  order.advanceAmount = advancePayment;
+  order.advancePayment =
+    advancePayment;
+
+  order.advanceAmount =
+    advancePayment;
 
   // 客人實際應付
   order.customerPayableTotal =
@@ -19072,15 +20203,12 @@ function recalculateOrderFinancials(order) {
     paymentMethod.includes('現金');
 
   if (isCashOrder) {
-    // 客人最後實際要交給騎士的現金總額
     order.cashCollectAmount =
       customerPayableTotal;
 
-    // 現金單服務金額，不包含代墊
     order.cashServiceNet =
       financials.serviceSubtotal;
 
-    // 騎士收到現金後，需要回繳 UBee 的金額
     const cashDueToPlatform = Math.max(
       0,
       financials.serviceSubtotal -
@@ -19096,7 +20224,7 @@ function recalculateOrderFinancials(order) {
     order.riderDueToPlatform =
       cashDueToPlatform;
   }
-  
+
   return order;
 }
 
@@ -19917,10 +21045,8 @@ function createOrderFromApi(data) {
     pickupAddressNote: cleanLongText(data.pickupAddressNote || '', 200),
     dropoffAddressNote: cleanLongText(data.dropoffAddressNote || '', 200),
     itemQuantity: cleanText(data.itemQuantity || '', 40),
-    itemSize: ['unspecified', 'small', 'medium', 'large'].includes(String(data.itemSize || ''))
-      ? String(data.itemSize)
-      : 'unspecified',
-    itemSizeLabel: cleanText(data.itemSizeLabel || '', 80),
+    itemSize: getItemSizePricing(data.itemSize).itemSize,
+    itemSizeLabel: getItemSizePricing(data.itemSize).itemSizeLabel,
     proofRequired: ['none', 'photo', 'signature', 'photo_and_signature'].includes(String(data.proofRequired || ''))
       ? String(data.proofRequired)
       : 'none',
@@ -20736,6 +21862,10 @@ app.get('/api/quote', async (req, res) => {
       Math.round(Number(req.query.upstairsFee || 0))
     );
 
+    const itemSize = normalizeItemSize(
+      req.query.itemSize || 'unspecified'
+    );
+
     const isQueueTask =
       serviceMode === 'queue' ||
       serviceType === '幫排隊';
@@ -20883,6 +22013,12 @@ app.get('/api/quote', async (req, res) => {
       }
     }
 
+    // 商品體積費套用於所有服務，包括一般配送、幫我取、幫代買與排隊。
+    price = applyItemSizeSurchargeToPrice(
+      price,
+      itemSize
+    );
+
     const dynamicPricing = await calculateRegionalDynamicPricing({
       pickupAddress: from || '',
       nowMs: Date.now(),
@@ -20891,6 +22027,15 @@ app.get('/api/quote', async (req, res) => {
     price = applyDynamicPricingToPrice(
       price,
       dynamicPricing
+    );
+
+    // 天候保障費由調度中心啟用，且 100% 給小U。
+    const weatherAdjustment =
+      await getCurrentWeatherAdjustment(Date.now());
+
+    price = applyWeatherSurchargeToPrice(
+      price,
+      weatherAdjustment
     );
 
     const quoteSnapshot = await createDynamicPricingQuoteSnapshot({
@@ -20903,6 +22048,7 @@ app.get('/api/quote', async (req, res) => {
         pickupAddress: from || '',
         dropoffAddress: to || '',
         advancePayment,
+        itemSize,
       },
       dynamicPricing,
       source: 'api_quote',
@@ -20960,7 +22106,12 @@ app.get('/api/quote', async (req, res) => {
 
 app.post('/estimate', async (req, res) => {
   try {
-    const { pickup, dropoff, speed } = req.body;
+    const {
+      pickup,
+      dropoff,
+      speed,
+      itemSize = 'unspecified',
+    } = req.body;
 
     if (!pickup || !dropoff) {
       return res.status(400).json({
@@ -20976,6 +22127,11 @@ app.post('/estimate', async (req, res) => {
       speedType: speed
     });
 
+    price = applyItemSizeSurchargeToPrice(
+      price,
+      itemSize
+    );
+
     const dynamicPricing = await calculateRegionalDynamicPricing({
       pickupAddress: pickup,
       nowMs: Date.now(),
@@ -20983,11 +22139,25 @@ app.post('/estimate', async (req, res) => {
 
     price = applyDynamicPricingToPrice(price, dynamicPricing);
 
+    const weatherAdjustment =
+      await getCurrentWeatherAdjustment(Date.now());
+
+    price = applyWeatherSurchargeToPrice(
+      price,
+      weatherAdjustment
+    );
+
     res.json({
       distanceText: distance.distanceText,
       durationText: distance.durationText,
       totalFee: price.total,
       dynamicPricingFee: price.dynamicPricingFee,
+      itemSize: price.itemSize,
+      itemSizeLabel: price.itemSizeLabel,
+      itemSizeFee: price.itemSizeFee,
+      weatherType: price.weatherType,
+      weatherLabel: price.weatherLabel,
+      weatherFee: price.weatherFee,
       dynamicPricing,
     });
 
@@ -22980,14 +24150,41 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   paidAt: null,
 
   // ==============================
-  // 等候費
+  // 現場停留／等候費
+  // 前 10 分鐘免費；超過後 $50，之後每開始 1 分鐘 +$5。
+  // queue 任務既有排隊時間費保留在 baseWaitingFee，避免與現場等候費混淆。
   // ==============================
+  baseWaitingFee: Math.max(
+    0,
+    Math.round(Number(price.waitingFee || 0))
+  ),
+
+  operationalWaitingFee: 0,
+
+  pickupWaitingStartedAtMs: 0,
+  pickupWaitingEndedAtMs: 0,
+  pickupWaitingElapsedMinutes: 0,
+  pickupWaitingChargeableMinutes: 0,
+  pickupWaitingFee: 0,
+
+  dropoffWaitingStartedAtMs: 0,
+  dropoffWaitingEndedAtMs: 0,
+  dropoffWaitingElapsedMinutes: 0,
+  dropoffWaitingChargeableMinutes: 0,
+  dropoffWaitingFee: 0,
+
+  waitingActiveStage: '',
+  waitingActiveStageLabel: '',
+  waitingFreeUntilMs: 0,
+  waitingPolicyVersion: UBEE_WAITING_POLICY_VERSION,
+  waitingFreeMinutes: PRICING.waitingFreeMinutes,
+  waitingBaseCharge: PRICING.waitingBaseFee,
+  waitingPerMinuteCharge: PRICING.waitingPerMinute,
+
+  // 舊版 LINE 等候費欄位保留，但新版不再要求客人逐次同意。
   waitingFeeRequested: false,
-
   waitingFeeApproved: false,
-
   waitingFeeRejected: false,
-
   waitingFeeRequestedAt: null,
 
   // ==============================
@@ -24224,6 +25421,20 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         };
 
         const nextEtaPayload = getEtaPayloadByStatus('picked_up');
+
+        const multiStopWaitingUpdate =
+          buildWaitingStageFinalization(
+            order,
+            'dropoff',
+            nowMs
+          );
+
+        const multiStopFinancialOrder =
+          recalculateOrderFinancials({
+            ...order,
+            ...multiStopWaitingUpdate,
+          });
+
         const updateData = {
           status: 'picked_up',
           riderStatus: 'picked_up',
@@ -24265,6 +25476,13 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           updatedAtMs: nowMs,
           'statusTimes.next_stop_started':
             admin.firestore.FieldValue.serverTimestamp(),
+
+          ...multiStopWaitingUpdate,
+          ...copyOrderFinancialFields(
+            {},
+            multiStopFinancialOrder
+          ),
+
           ...nextEtaPayload,
         };
 
@@ -24295,6 +25513,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         return;
       }
 
+      const transitionNowMs = Date.now();
       const etaPayload = getEtaPayloadByStatus(status);
 
       const updateData = {
@@ -24312,13 +25531,86 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
 
         // 任務未完成前 tracking session 持續有效；完成才正式停止。
         riderTrackingStatus: status === 'completed' ? 'stopped' : 'live',
-        trackingUpdatedAtMs: Date.now(),
+        trackingUpdatedAtMs: transitionNowMs,
         trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-...etaPayload,
+        ...etaPayload,
       };
 
+      // 小U抵達取件／送達地時，後端立即開始可信任的等候計時。
+      if (status === 'arrived_pickup') {
+        Object.assign(
+          updateData,
+          buildWaitingStageStartUpdate(
+            order,
+            'pickup',
+            transitionNowMs
+          )
+        );
+      }
+
+      if (status === 'picked_up') {
+        const waitingUpdate =
+          buildWaitingStageFinalization(
+            order,
+            'pickup',
+            transitionNowMs
+          );
+
+        const financialOrder =
+          recalculateOrderFinancials({
+            ...order,
+            ...waitingUpdate,
+          });
+
+        Object.assign(
+          updateData,
+          waitingUpdate
+        );
+
+        copyOrderFinancialFields(
+          updateData,
+          financialOrder
+        );
+      }
+
+      if (status === 'arrived_dropoff') {
+        Object.assign(
+          updateData,
+          buildWaitingStageStartUpdate(
+            order,
+            'dropoff',
+            transitionNowMs
+          )
+        );
+      }
+
       if (status === 'completed') {
-        updateData.trackingEndedAtMs = Date.now();
+        const waitingUpdate =
+          buildWaitingStageFinalization(
+            order,
+            'dropoff',
+            transitionNowMs
+          );
+
+        const financialOrder =
+          recalculateOrderFinancials({
+            ...order,
+            ...waitingUpdate,
+          });
+
+        Object.assign(
+          updateData,
+          waitingUpdate
+        );
+
+        copyOrderFinancialFields(
+          updateData,
+          financialOrder
+        );
+      }
+
+      if (status === 'completed') {
+        updateData.trackingEndedAtMs = transitionNowMs;
         updateData.trackingEndedAt = admin.firestore.FieldValue.serverTimestamp();
         updateData.trackingStopReason = 'completed';
       }
@@ -24658,6 +25950,120 @@ app.get('/api/orders/:orderId', async (req, res) => {
 
         total:
           order.total,
+
+        serviceSubtotal:
+          order.serviceSubtotal ||
+          order.serviceTotal ||
+          0,
+
+        customerPayableTotal:
+          order.customerPayableTotal ||
+          order.payableTotal ||
+          order.total ||
+          0,
+
+        deliveryFee:
+          order.deliveryFee || 0,
+
+        serviceFee:
+          order.serviceFee || 0,
+
+        speedFee:
+          order.speedFee || 0,
+
+        upstairsFee:
+          order.upstairsFee || 0,
+
+        itemSize:
+          normalizeItemSize(order.itemSize),
+
+        itemSizeLabel:
+          order.itemSizeLabel ||
+          getItemSizePricing(order.itemSize).itemSizeLabel,
+
+        itemSizeFee:
+          Number(order.itemSizeFee || 0),
+
+        itemSizeReviewStatus:
+          order.itemSizeReviewStatus || 'not_required',
+
+        weatherType:
+          order.weatherType || 'none',
+
+        weatherLabel:
+          order.weatherLabel || '',
+
+        weatherFee:
+          Number(order.weatherFee || 0),
+
+        dynamicPricingFee:
+          Number(order.dynamicPricingFee || 0),
+
+        waitingFee:
+          Number(order.waitingFee || 0),
+
+        baseWaitingFee:
+          Number(order.baseWaitingFee || 0),
+
+        operationalWaitingFee:
+          Number(order.operationalWaitingFee || 0),
+
+        pickupWaitingStartedAtMs:
+          Number(order.pickupWaitingStartedAtMs || 0),
+
+        pickupWaitingEndedAtMs:
+          Number(order.pickupWaitingEndedAtMs || 0),
+
+        pickupWaitingElapsedMinutes:
+          Number(order.pickupWaitingElapsedMinutes || 0),
+
+        pickupWaitingChargeableMinutes:
+          Number(order.pickupWaitingChargeableMinutes || 0),
+
+        pickupWaitingFee:
+          Number(order.pickupWaitingFee || 0),
+
+        dropoffWaitingStartedAtMs:
+          Number(order.dropoffWaitingStartedAtMs || 0),
+
+        dropoffWaitingEndedAtMs:
+          Number(order.dropoffWaitingEndedAtMs || 0),
+
+        dropoffWaitingElapsedMinutes:
+          Number(order.dropoffWaitingElapsedMinutes || 0),
+
+        dropoffWaitingChargeableMinutes:
+          Number(order.dropoffWaitingChargeableMinutes || 0),
+
+        dropoffWaitingFee:
+          Number(order.dropoffWaitingFee || 0),
+
+        waitingActiveStage:
+          order.waitingActiveStage || '',
+
+        waitingActiveStageLabel:
+          order.waitingActiveStageLabel || '',
+
+        waitingFreeUntilMs:
+          Number(order.waitingFreeUntilMs || 0),
+
+        waitingFreeMinutes:
+          Number(
+            order.waitingFreeMinutes ||
+            PRICING.waitingFreeMinutes
+          ),
+
+        waitingBaseCharge:
+          Number(
+            order.waitingBaseCharge ||
+            PRICING.waitingBaseFee
+          ),
+
+        waitingPerMinuteCharge:
+          Number(
+            order.waitingPerMinuteCharge ||
+            PRICING.waitingPerMinute
+          ),
 
         isPaid:
           order.isPaid,
@@ -25236,87 +26642,15 @@ if (!riderSnap.empty) {
     return replyText(event.replyToken, `✅ 已完成訂單：${order.id}`);
   }
 
-  if (data.startsWith('requestWaitingFee=')) {
-    const orderId = getPostbackValue(data, 'requestWaitingFee');
-    const order = await getOrderOrReply(event.replyToken, orderId);
-    if (!order) return null;
-
-    const riderOk = await requireOrderRider(event, order);
-    if (!riderOk) return null;
-
-    const ok = await requireOrderStatus(
-      event,
-      order,
-      ['arrived_pickup'],
-      '目前只有抵達取件地點後可以申請等候費。'
+  if (
+    data.startsWith('requestWaitingFee=') ||
+    data.startsWith('waitingApprove=') ||
+    data.startsWith('waitingReject=')
+  ) {
+    return replyText(
+      event.replyToken,
+      'UBee 已改用新版自動等候計時：抵達後前 10 分鐘免費；超過 10 分鐘加收 $50，之後每開始 1 分鐘加收 $5。費用由後端依任務狀態自動計算，不需要再提出申請或逐次同意。'
     );
-    if (!ok) return null;
-
-    if (order.waitingFeeRequested && !order.waitingFeeRejected) {
-      return replyText(event.replyToken, '此訂單已申請過等候費，請等待客人回覆。');
-    }
-
-    order.waitingFeeRequested = true;
-    order.waitingFeeApproved = false;
-    order.waitingFeeRejected = false;
-    order.waitingFeeRequestedAt = Date.now();
-    await saveOrder(order);
-
-    await notifyCustomer(order, createWaitingFeeConfirmFlex(order));
-
-    return replyText(event.replyToken, '已向客人送出等候費確認。');
-  }
-
-  if (data.startsWith('waitingApprove=')) {
-    const orderId = getPostbackValue(data, 'waitingApprove');
-    const order = await getOrderOrReply(event.replyToken, orderId);
-    if (!order) return null;
-
-    const customerOk = await requireOrderCustomer(event, order);
-    if (!customerOk) return null;
-
-    if (!order.waitingFeeRequested) {
-      return replyText(event.replyToken, '目前沒有待確認的等候費申請。');
-    }
-
-    if (order.waitingFeeApproved) {
-      return replyText(event.replyToken, '此等候費已經同意，不需要重複操作。');
-    }
-
-    order.waitingFeeApproved = true;
-    order.waitingFeeRejected = false;
-    order.waitingFee = PRICING.waitingFee;
-    recalculateOrderFinancials(order);
-    await saveOrder(order);
-
-    await replyText(event.replyToken, `✅ 已同意加收等候費 $${PRICING.waitingFee}\n\n訂單編號：${order.id}`);
-    return null;
-  }
-
-  if (data.startsWith('waitingReject=')) {
-    const orderId = getPostbackValue(data, 'waitingReject');
-    const order = await getOrderOrReply(event.replyToken, orderId);
-    if (!order) return null;
-
-    const customerOk = await requireOrderCustomer(event, order);
-    if (!customerOk) return null;
-
-    if (!order.waitingFeeRequested) {
-      return replyText(event.replyToken, '目前沒有待確認的等候費申請。');
-    }
-
-    if (order.waitingFeeRejected) {
-      return replyText(event.replyToken, '此等候費已經拒絕，不需要重複操作。');
-    }
-
-    order.waitingFeeApproved = false;
-    order.waitingFeeRejected = true;
-    order.waitingFee = 0;
-    recalculateOrderFinancials(order);
-    await saveOrder(order);
-    
-    await replyText(event.replyToken, `已拒絕加收等候費\n\n訂單編號：${order.id}`);
-    return null;
   }
 
   return replyText(event.replyToken, '未識別的操作。');
