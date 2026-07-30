@@ -19845,6 +19845,30 @@ function createOrderFromApi(data) {
 
     note: rawNote,
 
+    pickupContact: cleanText(data.pickupContact || '', 60),
+    dropoffContact: cleanText(data.dropoffContact || '', 60),
+    pickupAddressNote: cleanLongText(data.pickupAddressNote || '', 200),
+    dropoffAddressNote: cleanLongText(data.dropoffAddressNote || '', 200),
+    itemQuantity: cleanText(data.itemQuantity || '', 40),
+    itemSize: ['unspecified', 'small', 'medium', 'large'].includes(String(data.itemSize || ''))
+      ? String(data.itemSize)
+      : 'unspecified',
+    itemSizeLabel: cleanText(data.itemSizeLabel || '', 80),
+    proofRequired: ['none', 'photo', 'signature', 'photo_and_signature'].includes(String(data.proofRequired || ''))
+      ? String(data.proofRequired)
+      : 'none',
+    proofRequiredLabel: cleanText(data.proofRequiredLabel || '', 80),
+    shoppingItems: Array.isArray(data.shoppingItems)
+      ? data.shoppingItems.slice(0, 20).map(item => ({
+          name: cleanText(item?.name || '', 120),
+          quantity: cleanText(item?.quantity || '', 30),
+          budget: cleanText(item?.budget || '', 30),
+          replacementPolicy: cleanText(item?.replacementPolicy || '', 40),
+        })).filter(item => item.name)
+      : [],
+    addressCenterVersion: cleanText(data.addressCenterVersion || '', 50),
+    clientSchemaVersion: cleanText(data.clientSchemaVersion || '', 80),
+
     advancePayment:
       parseNonNegativeMoney(
         data.advancePayment
@@ -21022,6 +21046,227 @@ app.post('/api/places/detail', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: err.message || 'places detail error'
+    });
+  }
+});
+
+
+
+// ============================================================
+// UBee 客人端 V4 地址中心 API｜2026-07-30
+// - 地址／店家／地標搜尋
+// - Place 詳細地址與座標
+// - 目前位置反向地理編碼
+// ============================================================
+function getGoogleAddressComponent(components = [], type = '') {
+  const item = Array.isArray(components)
+    ? components.find(component => Array.isArray(component?.types) && component.types.includes(type))
+    : null;
+  return cleanText(item?.long_name || item?.short_name || '', 80);
+}
+
+function normalizeGoogleAddressResult(result = {}) {
+  const components = Array.isArray(result.address_components)
+    ? result.address_components
+    : [];
+  const location = result.geometry?.location || {};
+
+  const city =
+    getGoogleAddressComponent(components, 'administrative_area_level_1') ||
+    getGoogleAddressComponent(components, 'administrative_area_level_2') ||
+    getGoogleAddressComponent(components, 'locality');
+
+  const district =
+    getGoogleAddressComponent(components, 'administrative_area_level_3') ||
+    getGoogleAddressComponent(components, 'sublocality_level_1') ||
+    getGoogleAddressComponent(components, 'sublocality');
+
+  return {
+    label: cleanText(result.name || district || city || '地址', 80),
+    name: cleanText(result.name || '', 120),
+    address: cleanText(result.formatted_address || result.vicinity || '', 240),
+    formattedAddress: cleanText(result.formatted_address || result.vicinity || '', 240),
+    placeId: cleanText(result.place_id || '', 240),
+    city,
+    district,
+    postalCode: getGoogleAddressComponent(components, 'postal_code'),
+    route: getGoogleAddressComponent(components, 'route'),
+    streetNumber: getGoogleAddressComponent(components, 'street_number'),
+    lat: getNullableCoordinate(location.lat),
+    lng: getNullableCoordinate(location.lng),
+  };
+}
+
+app.post('/api/address/search', async (req, res) => {
+  try {
+    const input = cleanText(req.body?.input || req.body?.query || '', 160);
+    if (input.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: '請輸入至少 2 個字搜尋地址。',
+      });
+    }
+
+    const params = new URLSearchParams({
+      input,
+      language: 'zh-TW',
+      components: 'country:tw',
+      key: GOOGLE_MAPS_API_KEY,
+    });
+
+    const lat = getNullableCoordinate(req.body?.lat);
+    const lng = getNullableCoordinate(req.body?.lng);
+    if (isValidLatitude(lat) && isValidLongitude(lng)) {
+      params.set('location', `${lat},${lng}`);
+      params.set('radius', '50000');
+    }
+
+    const sessionToken = cleanText(req.body?.sessionToken || '', 120);
+    if (sessionToken) params.set('sessiontoken', sessionToken);
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`
+    );
+    const data = await response.json();
+
+    if (!['OK', 'ZERO_RESULTS'].includes(String(data.status || ''))) {
+      return res.status(400).json({
+        success: false,
+        error: data.error_message || data.status || 'Google 地址搜尋失敗',
+      });
+    }
+
+    const predictions = (Array.isArray(data.predictions) ? data.predictions : [])
+      .slice(0, 12)
+      .map(item => ({
+        placeId: cleanText(item.place_id || '', 240),
+        description: cleanText(item.description || '', 240),
+        mainText: cleanText(item.structured_formatting?.main_text || item.description || '', 160),
+        secondaryText: cleanText(item.structured_formatting?.secondary_text || '', 200),
+        types: Array.isArray(item.types) ? item.types.slice(0, 12) : [],
+      }));
+
+    return res.json({
+      success: true,
+      predictions,
+      googleStatus: data.status,
+    });
+  } catch (error) {
+    console.error('❌ /api/address/search error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || '地址搜尋失敗',
+    });
+  }
+});
+
+app.post('/api/address/detail', async (req, res) => {
+  try {
+    const placeId = cleanText(req.body?.placeId || '', 240);
+    if (!placeId) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少 placeId',
+      });
+    }
+
+    const fields = [
+      'place_id',
+      'name',
+      'formatted_address',
+      'address_components',
+      'geometry',
+    ].join(',');
+
+    const params = new URLSearchParams({
+      place_id: placeId,
+      fields,
+      language: 'zh-TW',
+      key: GOOGLE_MAPS_API_KEY,
+    });
+
+    const sessionToken = cleanText(req.body?.sessionToken || '', 120);
+    if (sessionToken) params.set('sessiontoken', sessionToken);
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json?${params.toString()}`
+    );
+    const data = await response.json();
+
+    if (data.status !== 'OK' || !data.result) {
+      return res.status(400).json({
+        success: false,
+        error: data.error_message || data.status || '查無地址詳細資料',
+      });
+    }
+
+    const address = normalizeGoogleAddressResult(data.result);
+    if (!address.address) {
+      return res.status(422).json({
+        success: false,
+        error: 'Google 未回傳完整地址，請選擇其他結果。',
+      });
+    }
+
+    return res.json({ success: true, address });
+  } catch (error) {
+    console.error('❌ /api/address/detail error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || '地址詳細資料讀取失敗',
+    });
+  }
+});
+
+app.post('/api/address/reverse-geocode', async (req, res) => {
+  try {
+    const lat = getNullableCoordinate(req.body?.lat);
+    const lng = getNullableCoordinate(req.body?.lng);
+
+    if (!isValidLatitude(lat) || !isValidLongitude(lng)) {
+      return res.status(400).json({
+        success: false,
+        error: '定位座標格式不正確',
+      });
+    }
+
+    const params = new URLSearchParams({
+      latlng: `${lat},${lng}`,
+      language: 'zh-TW',
+      key: GOOGLE_MAPS_API_KEY,
+    });
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`
+    );
+    const data = await response.json();
+
+    if (!['OK', 'ZERO_RESULTS'].includes(String(data.status || ''))) {
+      return res.status(400).json({
+        success: false,
+        error: data.error_message || data.status || '反向地理編碼失敗',
+      });
+    }
+
+    const result = Array.isArray(data.results) ? data.results[0] : null;
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: '目前位置附近找不到可使用的門牌地址',
+      });
+    }
+
+    const address = normalizeGoogleAddressResult(result);
+    address.lat = lat;
+    address.lng = lng;
+    address.label = address.district || address.city || '目前位置';
+
+    return res.json({ success: true, address });
+  } catch (error) {
+    console.error('❌ /api/address/reverse-geocode error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || '目前位置轉換地址失敗',
     });
   }
 });
@@ -22424,6 +22669,30 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   note:
     data.note,
 
+  itemQuantity:
+    data.itemQuantity || '',
+
+  itemSize:
+    data.itemSize || 'unspecified',
+
+  itemSizeLabel:
+    data.itemSizeLabel || '',
+
+  proofRequired:
+    data.proofRequired || 'none',
+
+  proofRequiredLabel:
+    data.proofRequiredLabel || '',
+
+  shoppingItems:
+    Array.isArray(data.shoppingItems) ? data.shoppingItems : [],
+
+  addressCenterVersion:
+    data.addressCenterVersion || '',
+
+  clientSchemaVersion:
+    data.clientSchemaVersion || '',
+
   // ==============================
   // 取件資訊
   // ==============================
@@ -22432,6 +22701,12 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   pickupPhone:
     data.pickupPhone,
+
+  pickupContact:
+    data.pickupContact || '',
+
+  pickupAddressNote:
+    data.pickupAddressNote || '',
 
   pickupLat:
     data.pickupLat,
@@ -22450,6 +22725,12 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   dropoffPhone:
     data.dropoffPhone,
+
+  dropoffContact:
+    data.dropoffContact || '',
+
+  dropoffAddressNote:
+    data.dropoffAddressNote || '',
 
   dropoffLat:
     data.dropoffLat,
@@ -22701,6 +22982,8 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
       customerPayableTotal: order.customerPayableTotal,
       advancePayment: order.advancePayment,
       message: '訂單已建立，請確認使用現金單。',
+      apiVersion: 'customer-order-v4',
+      addressCenterVersion: order.addressCenterVersion || '',
     });
   } catch (error) {
   console.error('❌ API 建立訂單失敗：', error.message || error);
