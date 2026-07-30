@@ -13490,6 +13490,141 @@ app.post(
         });
       }
 
+      if (action === 'approve_all') {
+        if (['training', 'approved', 'active'].includes(status)) {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已經通過審核，不需要重複操作。',
+          });
+        }
+        if (status === 'rejected') {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已拒絕，請先重新開啟後再審核。',
+          });
+        }
+
+        const storedDocuments =
+          application.documents && typeof application.documents === 'object'
+            ? application.documents
+            : {};
+
+        const missingDocuments = Object.keys(RIDER_REQUIRED_DOCUMENTS)
+          .filter(documentKey => {
+            const document = storedDocuments[documentKey];
+            return (
+              !document ||
+              typeof document !== 'object' ||
+              !String(document.storagePath || '').trim()
+            );
+          })
+          .map(documentKey => RIDER_DOCUMENT_LABELS[documentKey]);
+
+        if (missingDocuments.length) {
+          return res.status(409).json({
+            success: false,
+            message: `以下證件尚未上傳完整，不能一鍵通過：${missingDocuments.join('、')}`,
+          });
+        }
+
+        const documentApprovalUpdate = {
+          documentReviewStatus: 'approved',
+          status: 'pending',
+          reviewStatus: 'pending',
+          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: false,
+          canAcceptOrders: false,
+          supplementReason: '',
+          reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+          reviewedAtMs: nowMs,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+        };
+
+        for (const documentKey of Object.keys(RIDER_REQUIRED_DOCUMENTS)) {
+          documentApprovalUpdate[`documents.${documentKey}.reviewStatus`] =
+            RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+          documentApprovalUpdate[`documents.${documentKey}.reviewReason`] = '';
+          documentApprovalUpdate[`documents.${documentKey}.reviewedBy`] =
+            operator;
+          documentApprovalUpdate[`documents.${documentKey}.reviewedAtMs`] =
+            nowMs;
+        }
+
+        await applicationDoc.ref.set(documentApprovalUpdate, { merge: true });
+
+        const approvedApplicationDoc = await applicationDoc.ref.get();
+        const approvedApplication = approvedApplicationDoc.data() || {};
+        const summary =
+          summarizeRiderApplicationDocuments(approvedApplication);
+
+        if (
+          summary.totalCount !== Object.keys(RIDER_REQUIRED_DOCUMENTS).length ||
+          !summary.allApproved
+        ) {
+          return res.status(409).json({
+            success: false,
+            message: '五項證件狀態更新不完整，系統已停止正式通過流程，請重新整理後再試。',
+          });
+        }
+
+        const approvedRider =
+          buildApprovedRiderV2(approvedApplication, operator);
+
+        await saveRiderV2(approvedRider, { mirrorLegacy: true });
+
+        await applicationDoc.ref.set(
+          {
+            status: 'training',
+            reviewStatus: 'approved',
+            lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
+            canAcceptOrders: false,
+            onboardingRequired: true,
+            approved: true,
+            documentReviewStatus: 'approved',
+            officialRiderCollection: RIDER_V2_COLLECTIONS.riders,
+            officialRiderId: approvedRider.riderId,
+            approvedAt: approvedRider.approvedAt,
+            approvedBy: operator,
+            quickApproved: true,
+            quickApprovedAt: admin.firestore.FieldValue.serverTimestamp(),
+            quickApprovedAtMs: nowMs,
+            quickApprovedBy: operator,
+            reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewedAtMs: nowMs,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          },
+          { merge: true }
+        );
+
+        const freshDoc = await applicationDoc.ref.get();
+        const freshApplication = freshDoc.data() || {};
+
+        await writeRiderApplicationReviewEvent({
+          application: freshApplication,
+          type: 'approve_all',
+          operator,
+          reason:
+            reason ||
+            '管理人員已確認五項證件並使用一鍵全部通過。',
+          metadata: {
+            approvedDocumentKeys: Object.keys(RIDER_REQUIRED_DOCUMENTS),
+          },
+        });
+
+        await notifyRiderApplicationReviewUpdate(
+          freshApplication,
+          'approved'
+        );
+
+        return res.json({
+          success: true,
+          message: '五項證件及小U申請已一鍵通過，已進入數位入職階段。',
+          application: await serializeRiderApplicationForAdmin(freshDoc),
+        });
+      }
+
       if (action === 'approve') {
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
