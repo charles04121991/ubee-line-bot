@@ -681,6 +681,10 @@ const state = {
   directionsRenderer: null,
   routeRequestSeq: 0,
   firstMapFitDone: false,
+  dynamicPricingSettings: {
+    global:{},
+    weatherAdjustment:{}
+  },
   loading: false
 };
 
@@ -1528,6 +1532,279 @@ function renderSelectedOrderTrail(bounds){
 }
 
 
+
+function getDispatchAdminKey(){
+  return String(
+    $('dispatchAdminKey')?.value ||
+    localStorage.getItem('ubee_dispatch_admin_key') ||
+    ''
+  ).trim();
+}
+
+function weatherDefaultMeta(type){
+  const map={
+    rain:{fee:100,label:'雨天配送保障費'},
+    heavy_rain:{fee:150,label:'豪雨／強風配送保障費'},
+    cold_wave:{fee:100,label:'寒流低溫配送保障費'},
+    severe_weather:{fee:200,label:'嚴重天候配送保障費'},
+    none:{fee:0,label:''}
+  };
+  return map[String(type||'none')]||map.none;
+}
+
+function renderWeatherPricingStatus(){
+  const box=$('weatherPricingStatus');
+  if(!box) return;
+
+  const weather=
+    state.dynamicPricingSettings?.weatherAdjustment||
+    {};
+
+  const enabled=
+    weather.enabled===true &&
+    String(weather.weatherType||weather.type||'none')!=='none' &&
+    Number(weather.fee||0)>0 &&
+    (
+      !Number(weather.endsAtMs||0) ||
+      Date.now()<Number(weather.endsAtMs)
+    );
+
+  box.classList.toggle('active',enabled);
+
+  if(!enabled){
+    box.innerHTML='<strong>目前未啟用天候保障費</strong><br>新報價不會增加雨天或寒流費用。';
+    return;
+  }
+
+  const endText=Number(weather.endsAtMs||0)
+    ? new Date(Number(weather.endsAtMs)).toLocaleString('zh-TW',{hour12:false})
+    : '未設定';
+
+  box.innerHTML=`
+    <strong>${esc(weather.label||'天候保障費')}：+NT$${esc(Number(weather.fee||0))}</strong><br>
+    類型：${esc(weather.weatherType||weather.type||'-')}｜結束時間：${esc(endText)}<br>
+    此費用 100% 計入小U收入。
+  `;
+}
+
+async function loadWeatherPricingSettings(){
+  try{
+    const response=await fetch('/api/dispatch/dynamic-pricing',{
+      cache:'no-store',
+      headers:{Accept:'application/json'}
+    });
+    const data=await response.json().catch(()=>({}));
+
+    if(!response.ok||data.success===false){
+      throw new Error(data.message||'讀取天候設定失敗');
+    }
+
+    state.dynamicPricingSettings={
+      global:data.global||{},
+      weatherAdjustment:data.weatherAdjustment||data.global?.weatherAdjustment||{}
+    };
+
+    const weather=state.dynamicPricingSettings.weatherAdjustment||{};
+    const type=String(weather.weatherType||weather.type||'none');
+
+    if($('weatherTypeSelect')) $('weatherTypeSelect').value=type;
+    if($('weatherFeeInput')) $('weatherFeeInput').value=String(Number(weather.fee||0));
+    if($('weatherLabelInput')) $('weatherLabelInput').value=String(weather.label||'');
+
+    renderWeatherPricingStatus();
+  }catch(error){
+    console.error('讀取天候保障費設定失敗:',error);
+    if($('weatherPricingStatus')){
+      $('weatherPricingStatus').innerHTML=`<strong>設定讀取失敗</strong><br>${esc(error.message)}`;
+    }
+  }
+}
+
+async function saveWeatherPricingSettings(){
+  const button=$('saveWeatherPricingBtn');
+  const adminKey=getDispatchAdminKey();
+
+  if(!adminKey){
+    toast('請先輸入調度管理金鑰');
+    $('dispatchAdminKey')?.focus();
+    return;
+  }
+
+  localStorage.setItem('ubee_dispatch_admin_key',adminKey);
+
+  const type=String($('weatherTypeSelect')?.value||'none');
+  const defaults=weatherDefaultMeta(type);
+  const fee=Math.max(
+    0,
+    Math.min(
+      200,
+      Math.round(Number($('weatherFeeInput')?.value||defaults.fee||0))
+    )
+  );
+  const durationMinutes=Math.max(
+    1,
+    Math.round(Number($('weatherDurationSelect')?.value||180))
+  );
+  const enabled=type!=='none'&&fee>0;
+  const nowMs=Date.now();
+  const global=state.dynamicPricingSettings?.global||{};
+
+  if(button) button.disabled=true;
+
+  try{
+    const response=await fetch('/api/dispatch/dynamic-pricing',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-UBee-Dispatch-Admin-Key':adminKey
+      },
+      body:JSON.stringify({
+        enabled:global.enabled!==false,
+        manualAdjustment:global.manualAdjustment||{
+          enabled:false,
+          fee:0,
+          label:'',
+          severe:false
+        },
+        standardMaxFee:Number(global.standardMaxFee||60),
+        severeMaxFee:Number(global.severeMaxFee||100),
+        weatherAdjustment:{
+          enabled,
+          type,
+          weatherType:type,
+          fee:enabled?fee:0,
+          label:String(
+            $('weatherLabelInput')?.value||
+            defaults.label||
+            ''
+          ).trim(),
+          severe:['heavy_rain','severe_weather'].includes(type),
+          startsAtMs:enabled?nowMs:0,
+          endsAtMs:enabled
+            ? nowMs+durationMinutes*60*1000
+            : 0
+        }
+      })
+    });
+
+    const data=await response.json().catch(()=>({}));
+
+    if(!response.ok||data.success===false){
+      throw new Error(data.message||data.error||'儲存失敗');
+    }
+
+    toast(enabled?'天候保障費已啟用':'天候保障費已停用');
+    await loadWeatherPricingSettings();
+    await loadDashboard({silent:true});
+  }catch(error){
+    console.error('儲存天候保障費失敗:',error);
+    toast('儲存失敗：'+error.message,5000);
+  }finally{
+    if(button) button.disabled=false;
+  }
+}
+
+function getWaitingLiveSummary(order){
+  const stage=String(order?.waitingActiveStage||'');
+  const startAtMs=Number(
+    stage==='dropoff'
+      ? order?.dropoffWaitingStartedAtMs
+      : order?.pickupWaitingStartedAtMs
+  );
+
+  if(!stage||!startAtMs) return '';
+
+  const elapsedMs=Math.max(
+    0,
+    Date.now()-startAtMs
+  );
+  const elapsed=Math.max(
+    0,
+    Math.ceil(elapsedMs/60000)
+  );
+  const free=Math.max(0,Number(order?.waitingFreeMinutes||10));
+  const freeMs=free*60*1000;
+  const base=Math.max(0,Number(order?.waitingBaseCharge||50));
+  const perMinute=Math.max(0,Number(order?.waitingPerMinuteCharge||5));
+  const stageLabel=order?.waitingActiveStageLabel||
+    (stage==='dropoff'?'送達點':'取件點');
+
+  if(elapsedMs<=freeMs){
+    return `${stageLabel}免費等候剩餘 ${Math.max(0,Math.ceil((freeMs-elapsedMs)/60000))} 分鐘`;
+  }
+
+  const extraMinutes=Math.max(
+    0,
+    Math.ceil((elapsedMs-freeMs)/60000)
+  );
+
+  return `${stageLabel}已等候 ${elapsed} 分鐘，目前費用 NT$${base+extraMinutes*perMinute}`;
+}
+
+async function approveSelectedOrderItemSize(){
+  const order=getSelectedOrder();
+  const adminKey=getDispatchAdminKey();
+
+  if(!order){
+    toast('請先選擇訂單');
+    return;
+  }
+
+  if(!adminKey){
+    toast('請先輸入上方調度管理金鑰');
+    $('dispatchAdminKey')?.focus();
+    return;
+  }
+
+  localStorage.setItem('ubee_dispatch_admin_key',adminKey);
+
+  const itemSize=String(
+    $('selectedItemSizeSelect')?.value||
+    order.reportedItemSize||
+    order.itemSize||
+    'small'
+  );
+  const feeOverride=Math.max(
+    0,
+    Math.min(
+      500,
+      Math.round(Number($('selectedItemSizeFee')?.value||0))
+    )
+  );
+  const note=String($('selectedItemSizeNote')?.value||'').trim();
+
+  try{
+    const response=await fetch(
+      `/api/dispatch/orders/${encodeURIComponent(order.id)}/item-size`,
+      {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'X-UBee-Dispatch-Admin-Key':adminKey
+        },
+        body:JSON.stringify({
+          itemSize,
+          feeOverride,
+          note,
+          operator:'UBee 調度中心'
+        })
+      }
+    );
+
+    const data=await response.json().catch(()=>({}));
+
+    if(!response.ok||data.success===false){
+      throw new Error(data.message||data.error||'商品體積審核失敗');
+    }
+
+    toast('商品體積與費用已更新');
+    await loadDashboard({silent:true});
+  }catch(error){
+    console.error('商品體積審核失敗:',error);
+    toast('審核失敗：'+error.message,5000);
+  }
+}
+
 function renderDynamicPricing(){
   const box = document.getElementById('dynamicPricingGrid');
   if(!box) return;
@@ -1927,6 +2204,21 @@ function renderCandidates(){
     return;
   }
 
+  const selectedItemSize=String(
+    order.reportedItemSize||
+    order.itemSize||
+    'small'
+  );
+  const selectedItemSizeFee=Math.max(
+    0,
+    Number(
+      order.itemSizeReviewStatus==='pending'
+        ? order.reportedItemSizeSuggestedFee
+        : order.itemSizeFee
+    )||0
+  );
+  const waitingLiveSummary=getWaitingLiveSummary(order);
+
   $('selectedOrderSummary').innerHTML = `
     <strong>${esc(order.id)}</strong>
     <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.55">
@@ -1937,8 +2229,47 @@ function renderCandidates(){
        ${Array.isArray(order.riderLocationTrail)&&order.riderLocationTrail.length?`<br><span style="color:var(--purple)">V5 最近軌跡：${esc(order.riderLocationTrail.length)} 個定位採樣點</span>`:''}
       ${Number(order.openIncidentCount||0)>0?`<br><span style="color:var(--red);font-weight:1000">目前有 ${esc(order.openIncidentCount)} 件未結案異常</span>`:''}
       ${!hasLatLng(order.pickupLat,order.pickupLng)?'<br><b style="color:var(--red)">此訂單缺少取件座標，無法計算附近小U。</b>':''}
+      <br>商品體積：${esc(order.itemSizeLabel||order.itemSize||'未申報')}｜體積費 NT$${esc(Number(order.itemSizeFee||0))}
+      ${Number(order.weatherFee||0)>0?`<br><span style="color:var(--blue);font-weight:1000">${esc(order.weatherLabel||'天候保障費')}：NT$${esc(Number(order.weatherFee||0))}（100% 給小U）</span>`:''}
+      ${Number(order.operationalWaitingFee||0)>0?`<br>已結算現場等候費：NT$${esc(Number(order.operationalWaitingFee||0))}`:''}
+      ${waitingLiveSummary?`<br><span style="color:var(--orange);font-weight:1000">${esc(waitingLiveSummary)}</span>`:''}
+      ${String(order.itemSizeReviewStatus||'')==='pending'?`<br><span style="color:var(--red);font-weight:1000">小U已回報體積不符，等待調度確認</span>`:''}
+    </div>
+
+    <div class="order-surcharge-box">
+      <strong style="font-size:12px">商品體積審核／人工調整</strong>
+      <div class="order-surcharge-grid">
+        <select id="selectedItemSizeSelect">
+          <option value="small" ${selectedItemSize==='small'?'selected':''}>小型｜不加價</option>
+          <option value="medium" ${selectedItemSize==='medium'?'selected':''}>中型｜建議 +50</option>
+          <option value="large" ${selectedItemSize==='large'?'selected':''}>大型｜建議 +100</option>
+          <option value="extra_large" ${selectedItemSize==='extra_large'?'selected':''}>超大型｜建議 +300</option>
+        </select>
+        <input id="selectedItemSizeFee" type="number" min="0" max="500" step="10" value="${esc(selectedItemSizeFee)}" placeholder="最終體積費">
+        <input id="selectedItemSizeNote" type="text" maxlength="500" value="${esc(order.itemSizeReportNote||'')}" placeholder="審核備註／承載方式">
+        <button class="btn small yellow" type="button" id="approveItemSizeBtn">確認體積與費用</button>
+      </div>
     </div>
   `;
+
+  $('selectedItemSizeSelect')?.addEventListener('change',event=>{
+    const defaults={
+      small:0,
+      medium:50,
+      large:100,
+      extra_large:300
+    };
+    if($('selectedItemSizeFee')){
+      $('selectedItemSizeFee').value=String(
+        defaults[String(event.target.value||'small')]||0
+      );
+    }
+  });
+
+  $('approveItemSizeBtn')?.addEventListener(
+    'click',
+    approveSelectedOrderItemSize
+  );
   if($('createIncidentBtn')) $('createIncidentBtn').disabled=false;
 
   if(isActive && riskPanel){
@@ -2459,6 +2790,23 @@ document.addEventListener('click',event=>{
 $('refreshBtn').addEventListener('click',()=>loadDashboard());
 $('fitMapBtn').addEventListener('click',()=>fitMapToData());
 
+if($('dispatchAdminKey')){
+  $('dispatchAdminKey').value=
+    localStorage.getItem('ubee_dispatch_admin_key')||
+    '';
+}
+
+$('weatherTypeSelect')?.addEventListener('change',event=>{
+  const meta=weatherDefaultMeta(event.target.value);
+  if($('weatherFeeInput')) $('weatherFeeInput').value=String(meta.fee);
+  if($('weatherLabelInput')) $('weatherLabelInput').value=meta.label;
+});
+
+$('saveWeatherPricingBtn')?.addEventListener(
+  'click',
+  saveWeatherPricingSettings
+);
+
 $('radiusSelect').addEventListener('change',event=>{
   state.radiusKm = Number(event.target.value || 3);
   renderCandidates();
@@ -2542,7 +2890,9 @@ window.addEventListener('resize',()=>{
    ========================= */
 initMap();
 loadDashboard();
+loadWeatherPricingSettings();
 setInterval(()=>loadDashboard({silent:true}),10000);
+setInterval(renderWeatherPricingStatus,30000);
 
 /* =========================================================
    UBee 調度中心｜網路／後端受阻監控與自動恢復 2026-07-20
