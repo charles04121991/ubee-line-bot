@@ -106,7 +106,7 @@
     .approve-btn{background:#dcfce7;color:#15803d}
     .supplement-btn{background:#ffedd5;color:#c2410c}
     .reset-btn{background:#eff6ff;color:#1d4ed8}
-    .decision-panel{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:end}
+    .decision-panel{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:end}
     .decision-note{font-size:13px;color:#6b7280;font-weight:800;line-height:1.55;margin-top:6px}
     .login-overlay{position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:grid;place-items:center;padding:20px}
     .login-card{width:min(460px,100%);border-radius:28px;background:#fff;padding:24px;box-shadow:0 35px 100px rgba(15,23,42,.28)}
@@ -464,8 +464,9 @@
           <div class="section-title">最終審核決定</div>
           <div class="section-copy">通過後會建立正式 ridersV2 小U資料，生命週期進入 TRAINING，必須完成數位入職才能接單。</div>
           <div class="decision-panel" style="margin-top:14px">
-            <div><textarea class="textarea" id="overallReason" placeholder="拒絕原因或管理備註（拒絕時必填）"></textarea><div class="decision-note">正式通過前，系統會再次確認五項證件是否全部通過。</div></div>
+            <div><textarea class="textarea" id="overallReason" placeholder="拒絕原因或管理備註（拒絕時必填）"></textarea><div class="decision-note">「一鍵全部通過」只適用於你已親自確認五項證件內容的情況；後端仍會檢查五項證件是否完整。</div></div>
             ${isRejected?`<button class="primary-btn" type="button" onclick="performOverallAction('reopen')">重新開啟申請</button>`:`<button class="danger-btn" type="button" ${isFinal?'disabled':''} onclick="performOverallAction('reject')">拒絕申請</button>`}
+            <button class="primary-btn" type="button" ${(isFinal||isRejected)?'disabled':''} onclick="performQuickApprove()">一鍵全部通過</button>
             <button class="success-btn" type="button" ${(!allApproved||isFinal||isRejected)?'disabled':''} onclick="performOverallAction('approve')">通過並進入數位入職</button>
           </div>
         </section>
@@ -525,6 +526,56 @@
       }catch(error){
         alert(error.message||'證件審核失敗。');
       }finally{setLoading(false);}
+    }
+
+    async function performQuickApprove(){
+      if(!selectedApplication||!selectedRiderId){
+        alert('尚未選擇申請資料。');
+        return;
+      }
+
+      const documents=Array.isArray(selectedApplication.documents)
+        ? selectedApplication.documents
+        : [];
+
+      if(documents.length<5){
+        alert(`目前只有 ${documents.length} 項證件，未達五項，不能一鍵通過。`);
+        return;
+      }
+
+      const missingDocuments=documents.filter(item=>!String(item.storagePath||'').trim());
+      if(missingDocuments.length){
+        alert(`以下證件資料不完整：${missingDocuments.map(item=>item.label||item.documentKey).join('、')}`);
+        return;
+      }
+
+      const applicantName=selectedApplication.name||'此申請者';
+      const confirmation=
+        `確定一鍵通過「${applicantName}」嗎？\n\n`+
+        `此操作將會：\n`+
+        `1. 將五項證件全部標記為已通過\n`+
+        `2. 通過整體小U申請\n`+
+        `3. 建立正式 ridersV2 小U資料\n`+
+        `4. 進入數位入職階段\n\n`+
+        `請確認你已實際檢查所有證件。`;
+
+      if(!confirm(confirmation)) return;
+
+      setLoading(true);
+      try{
+        const data=await postAction({
+          action:'approve_all',
+          reason:'管理人員已確認五項證件並使用一鍵全部通過。'
+        });
+        selectedApplication=data.application;
+        renderApplicationDetail(selectedApplication);
+        await loadApplications();
+        showToast(data.message||'五項證件及整體申請已全部通過。');
+      }catch(error){
+        alert(error.message||'一鍵全部通過失敗。');
+      }finally{
+        setLoading(false);
+      }
     }
 
     async function performOverallAction(action){
