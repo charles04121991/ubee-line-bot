@@ -11443,6 +11443,30 @@ function renderStep5LiveStatus(
 
   }
 
+  const waitingPreview =
+    getActiveWaitingPreview(data);
+
+  if(
+    waitingPreview &&
+    ['arrived_pickup', 'arrived_dropoff'].includes(status)
+  ){
+    primaryText =
+      waitingPreview.charge > 0
+        ? `NT$${waitingPreview.charge}`
+        : '免費等候';
+
+    labelText =
+      `${waitingPreview.stageLabel}等候`;
+
+    titleText =
+      waitingPreview.charge > 0
+        ? '現場等候已開始計費'
+        : '目前仍在免費等候時間';
+
+    metaText =
+      waitingPreview.text;
+  }
+
   panel.dataset.status =
     status;
 
@@ -12405,6 +12429,7 @@ function bindOrderInputEvents(){
   qs('dropoff')?.addEventListener('blur', () => scheduleRouteAndQuoteRefresh(120));
 
   qs('upstairsOption')?.addEventListener('change', handleEstimateAffectingChange);
+  qs('itemSize')?.addEventListener('change', handleEstimateAffectingChange);
   qs('advancePayment')?.addEventListener('input', handleEstimateAffectingChange);
   qs('queueMinutes')?.addEventListener('input', handleEstimateAffectingChange);
 
@@ -12455,6 +12480,123 @@ function calculateUpstairsFee(option){
     case 'heavy': return 0;
     default: return 0;
   }
+}
+
+function getItemSizeOption(){
+  const value = String(qs('itemSize')?.value || '').trim();
+
+  return [
+    'small',
+    'medium',
+    'large',
+    'extra_large'
+  ].includes(value)
+    ? value
+    : '';
+}
+
+function getItemSizeMeta(value = getItemSizeOption()){
+  const map = {
+    small: {
+      label:'小型｜可放機車置物箱',
+      fee:0,
+      reviewRequired:false
+    },
+    medium: {
+      label:'中型｜占用部分腳踏空間',
+      fee:50,
+      reviewRequired:false
+    },
+    large: {
+      label:'大型｜超過一般機車腳踏空間',
+      fee:100,
+      reviewRequired:false
+    },
+    extra_large: {
+      label:'超大型｜特殊承載／汽車配送',
+      fee:300,
+      reviewRequired:true
+    }
+  };
+
+  return map[value] || {
+    label:'尚未選擇商品體積',
+    fee:0,
+    reviewRequired:false
+  };
+}
+
+function getActiveWaitingPreview(order){
+  const data = order || {};
+  const stage = String(data.waitingActiveStage || '').trim();
+  const startAtMs = Number(
+    stage === 'dropoff'
+      ? data.dropoffWaitingStartedAtMs
+      : data.pickupWaitingStartedAtMs
+  );
+
+  if(!stage || !Number.isFinite(startAtMs) || startAtMs <= 0){
+    return null;
+  }
+
+  const elapsedMs = Math.max(
+    0,
+    Date.now() - startAtMs
+  );
+
+  const elapsedMinutes = Math.max(
+    0,
+    Math.ceil(elapsedMs / 60000)
+  );
+
+  const freeMinutes = Math.max(
+    0,
+    Math.round(Number(data.waitingFreeMinutes || 10))
+  );
+
+  const freeMs =
+    freeMinutes * 60 * 1000;
+
+  const baseCharge = Math.max(
+    0,
+    Math.round(Number(data.waitingBaseCharge || 50))
+  );
+
+  const perMinuteCharge = Math.max(
+    0,
+    Math.round(Number(data.waitingPerMinuteCharge || 5))
+  );
+
+  if(elapsedMs <= freeMs){
+    return {
+      stage,
+      stageLabel:
+        data.waitingActiveStageLabel ||
+        (stage === 'dropoff' ? '送達點' : '取件點'),
+      elapsedMinutes,
+      charge:0,
+      text:`免費等候剩餘 ${Math.max(0, Math.ceil((freeMs - elapsedMs) / 60000))} 分鐘`
+    };
+  }
+
+  const extraMinutes = Math.max(
+    0,
+    Math.ceil((elapsedMs - freeMs) / 60000)
+  );
+
+  const charge =
+    baseCharge +
+    extraMinutes * perMinuteCharge;
+
+  return {
+    stage,
+    stageLabel:
+      data.waitingActiveStageLabel ||
+      (stage === 'dropoff' ? '送達點' : '取件點'),
+    elapsedMinutes,
+    charge,
+    text:`已等候 ${elapsedMinutes} 分鐘・目前等候費 NT$${charge}`
+  };
 }
 
 function parseDistanceKmFromQuote(data){
@@ -13960,6 +14102,7 @@ function validateStep2(){
   const dropoffPhoneEl = qs('dropoffPhone');
   const noteEl = qs('note');
   const itemEl = qs('item');
+  const itemSizeEl = qs('itemSize');
   const queueLocationEl = qs('queueLocation');
 
   let pickup = pickupEl ? pickupEl.value.trim() : '';
@@ -14026,6 +14169,12 @@ function validateStep2(){
 
   if(!note){
     alert('請填寫備註，讓 UBee 跑腿 小U 知道這筆任務要處理什麼。');
+    return false;
+  }
+
+  if(!getItemSizeOption()){
+    alert('請選擇商品體積，系統才能正確計算體積費與安排安全承載方式。');
+    itemSizeEl?.focus();
     return false;
   }
 
@@ -14166,6 +14315,8 @@ function getPayload(){
 
     item:itemText,
     note,
+    itemSize:getItemSizeOption(),
+    itemSizeLabel:getItemSizeMeta().label,
     speedType,
     speed:speedType,
 
@@ -14312,6 +14463,9 @@ function renderSummary(){
           <span>交付需求</span><strong>${escapeHtml(payload.upstairsLabel)}${payload.upstairsFee > 0 ? `・NT$${payload.upstairsFee}` : ''}</strong>
         </button>
         <button class="review-summary-mini-row" type="button" onclick="showOnlyStep(2)">
+          <span>商品體積</span><strong>${escapeHtml(payload.itemSizeLabel)}${getItemSizeMeta(payload.itemSize).fee > 0 ? `・預估 NT$${getItemSizeMeta(payload.itemSize).fee}` : ''}</strong>
+        </button>
+        <button class="review-summary-mini-row" type="button" onclick="showOnlyStep(2)">
           <span>代墊費用</span><strong>${escapeHtml(advancePaymentText)}</strong>
         </button>
       </div>
@@ -14410,6 +14564,7 @@ async function renderEstimate(){
     params.set('serviceKey', getServiceKeyForApi());
     params.set('queueMinutes', String(queueMinutes));
     params.set('upstairsFee', String(upstairsFee));
+    params.set('itemSize', getItemSizeOption());
     params.set('advancePayment', String(advancePayment));
 
     if(pickupPlaceId) params.set('pickupPlaceId', pickupPlaceId);
@@ -14470,6 +14625,16 @@ async function renderEstimate(){
     const waitingFee = money(data.waitingFee);
     const queueTimeFee = money(data.queueTimeFee);
     const longTaskExtraFee = money(data.longTaskExtraFee);
+    const itemSizeFee = money(data.itemSizeFee);
+    const itemSizeLabel = String(
+      data.itemSizeLabel ||
+      getItemSizeMeta(data.itemSize || getItemSizeOption()).label
+    ).trim();
+    const weatherFee = money(data.weatherFee);
+    const weatherLabel = String(
+      data.weatherLabel ||
+      '天候保障費'
+    ).trim();
     const dynamicPricingFee = money(data.dynamicPricingFee || data.dynamicFee);
     const dynamicPricingComponents = Array.isArray(data.dynamicPricingComponents)
       ? data.dynamicPricingComponents
@@ -14483,7 +14648,10 @@ async function renderEstimate(){
         waitingFee +
         serviceFee +
         speedFee +
-        finalUpstairsFee
+        finalUpstairsFee +
+        itemSizeFee +
+        weatherFee +
+        dynamicPricingFee
       )
     );
 
@@ -14596,6 +14764,20 @@ if(finalUpstairsFee > 0){
 }
 
 
+if(itemSizeFee > 0){
+  detailRows.push({
+    label:itemSizeLabel || '商品體積費',
+    value:itemSizeFee
+  });
+}
+
+if(weatherFee > 0){
+  detailRows.push({
+    label:weatherLabel || '天候保障費',
+    value:weatherFee
+  });
+}
+
 if(serviceFee > 0){
   detailRows.push({
     label:'平台服務費',
@@ -14700,7 +14882,7 @@ box.innerHTML = `
       ${escapeHtml(routeSummaryText || '系統路線估價')}
     </div>
     <div class="price-note">
-      報價已由 UBee 後端鎖定 10 分鐘；動態調度費依取件區域、即時訂單與有效小U運力計算。
+      報價已由 UBee 後端鎖定 10 分鐘；商品體積費、天候保障費與動態調度費都會在送單前清楚顯示。現場等候前 10 分鐘免費，超過後依規則計費。
     </div>
 
     <details class="review-price-details-toggle">
@@ -15547,6 +15729,30 @@ function renderStep5TaskDetail(order){
 
     '未提供任務內容';
 
+  const itemSizeLabel =
+    String(
+      data.itemSizeLabel ||
+      getItemSizeMeta(data.itemSize).label
+    ).trim();
+
+  const itemSizeFee =
+    Math.max(
+      0,
+      Math.round(Number(data.itemSizeFee || 0))
+    );
+
+  const weatherFee =
+    Math.max(
+      0,
+      Math.round(Number(data.weatherFee || 0))
+    );
+
+  const weatherLabel =
+    String(
+      data.weatherLabel ||
+      '天候保障費'
+    ).trim();
+
 
   /* ==============================
      取件資訊
@@ -15679,6 +15885,34 @@ function renderStep5TaskDetail(order){
 
       <div class="task-receipt-text">
         ${escapeHtml(taskContent)}
+      </div>
+
+    </div>
+
+    <div class="task-receipt-separator"></div>
+
+    <div class="task-receipt-section">
+
+      <div class="task-receipt-section-title">
+        商品與附加費
+      </div>
+
+      <div class="task-receipt-row">
+        <span class="task-receipt-label">商品體積</span>
+        <strong class="task-receipt-value">
+          ${escapeHtml(itemSizeLabel)}${itemSizeFee > 0 ? `・NT$${itemSizeFee}` : ''}
+        </strong>
+      </div>
+
+      ${
+        weatherFee > 0
+          ? `<div class="task-receipt-row"><span class="task-receipt-label">天候保障</span><strong class="task-receipt-value">${escapeHtml(weatherLabel)}・NT$${weatherFee}</strong></div>`
+          : ''
+      }
+
+      <div class="task-receipt-row">
+        <span class="task-receipt-label">現場等候</span>
+        <strong class="task-receipt-value">前 10 分鐘免費；之後 NT$50，再每分鐘 NT$5</strong>
       </div>
 
     </div>
@@ -15828,6 +16062,38 @@ function renderTimeline(status, order){
       'estimatedGoodsAmount'
     ]) ?? 0;
 
+  const itemSizeFee =
+    readMoney([
+      'itemSizeFee'
+    ]) ?? 0;
+
+  const weatherFee =
+    readMoney([
+      'weatherFee'
+    ]) ?? 0;
+
+  const operationalWaitingFee =
+    readMoney([
+      'operationalWaitingFee'
+    ]) ?? 0;
+
+  const itemSizeLabel =
+    String(
+      data.itemSizeLabel ||
+      quoteData.itemSizeLabel ||
+      getItemSizeMeta(
+        data.itemSize ||
+        quoteData.itemSize
+      ).label
+    ).trim();
+
+  const weatherLabel =
+    String(
+      data.weatherLabel ||
+      quoteData.weatherLabel ||
+      '天候保障費'
+    ).trim();
+
   let serviceSubtotal =
     readMoney([
       'serviceSubtotal',
@@ -15952,6 +16218,28 @@ function renderTimeline(status, order){
    * 沒有代墊就不佔畫面。
    */
 
+  const surchargeRows = `
+
+    ${
+      itemSizeFee > 0
+        ? `<div class="delivery-detail-row"><span class="delivery-detail-label">${escapeHtml(itemSizeLabel || '商品體積費')}</span><strong class="delivery-detail-value">${escapeHtml(formatMoney(itemSizeFee))}</strong></div>`
+        : ''
+    }
+
+    ${
+      weatherFee > 0
+        ? `<div class="delivery-detail-row"><span class="delivery-detail-label">${escapeHtml(weatherLabel || '天候保障費')}</span><strong class="delivery-detail-value">${escapeHtml(formatMoney(weatherFee))}</strong></div>`
+        : ''
+    }
+
+    ${
+      operationalWaitingFee > 0
+        ? `<div class="delivery-detail-row"><span class="delivery-detail-label">現場等候費</span><strong class="delivery-detail-value">${escapeHtml(formatMoney(operationalWaitingFee))}</strong></div>`
+        : ''
+    }
+
+  `;
+
   const advancePaymentRow =
     advancePayment > 0
       ? `
@@ -16048,6 +16336,7 @@ function renderTimeline(status, order){
 
         </div>
 
+        ${surchargeRows}
         ${advancePaymentRow}
 
       </div>
@@ -18794,11 +19083,11 @@ const UBeeEnhancements = (() => {
   const uid=()=>`${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`;
   const escapeAttr=x=>escapeHtml(String(x??''));
 
-  function collectDraft(){const timing=getOrderTimingPayload();return {version:3,savedAt:new Date().toISOString(),currentStep,serviceGroup,serviceType,serviceCategory,serviceMode,speedType,orderTimingType,scheduleGoal:timing.scheduleGoal,requestedScheduleAtMs:timing.requestedScheduleAtMs,flexibleStartAtMs:timing.flexibleStartAtMs,flexibleEndAtMs:timing.flexibleEndAtMs,pickup:value('pickup'),dropoff:value('dropoff'),pickupPhone:value('pickupPhone'),dropoffPhone:value('dropoffPhone'),pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),note:value('note'),advancePayment:value('advancePayment'),queueMinutes:value('queueMinutes'),upstairsOption:value('upstairsOption'),shoppingItems:state.shoppingItems};}
+  function collectDraft(){const timing=getOrderTimingPayload();return {version:3,savedAt:new Date().toISOString(),currentStep,serviceGroup,serviceType,serviceCategory,serviceMode,speedType,orderTimingType,scheduleGoal:timing.scheduleGoal,requestedScheduleAtMs:timing.requestedScheduleAtMs,flexibleStartAtMs:timing.flexibleStartAtMs,flexibleEndAtMs:timing.flexibleEndAtMs,pickup:value('pickup'),dropoff:value('dropoff'),pickupPhone:value('pickupPhone'),dropoffPhone:value('dropoffPhone'),pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),note:value('note'),advancePayment:value('advancePayment'),queueMinutes:value('queueMinutes'),upstairsOption:value('upstairsOption'),itemSize:value('itemSize'),shoppingItems:state.shoppingItems};}
   function saveDraft(){const d=collectDraft();if(!d.pickup&&!d.dropoff&&!d.note&&!d.pickupPhone&&!d.dropoffPhone)return;localStorage.setItem(KEYS.draft,JSON.stringify(d));}
   function scheduleDraft(){clearTimeout(state.draftTimer);state.draftTimer=setTimeout(saveDraft,500)}
   function clearDraft(){localStorage.removeItem(KEYS.draft)}
-  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=d.serviceMode||serviceMode;speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
+  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=d.serviceMode||serviceMode;speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
   function offerDraft(){const d=safeParse(localStorage.getItem(KEYS.draft)||'',null);if(!d||!d.savedAt||Date.now()-new Date(d.savedAt).getTime()>7*86400000)return;const el=document.createElement('div');el.className='draft-banner';el.id='draftBanner';el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}<br>${new Date(d.savedAt).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;document.body.appendChild(el);el.querySelector('.draft-discard').onclick=()=>{clearDraft();el.remove()};el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};}
 
   function renderQuickAddresses(){const bar=qs('savedAddressQuickBar'),list=getAddresses();if(!bar)return;bar.classList.toggle('hidden',!list.length);bar.innerHTML=list.map(a=>`<button class="quick-address-chip" type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">${escapeAttr(a.label||'常用地址')}</button>`).join('')}
