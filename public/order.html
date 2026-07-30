@@ -10482,6 +10482,98 @@ async function focusCurrentLocation(){
 }
 
 
+// 依客戶裝置定位，自動判斷目前所在縣市。
+// 定位或反向地理編碼失敗時，保留使用者原本選擇，不阻斷下單。
+function normalizeTaiwanCityName(value){
+  const raw = String(value || '').trim().replace(/^台/, '臺');
+  if(!raw) return '';
+
+  const exact = UBEE_SERVICE_CITIES.find((city) => city.name === raw);
+  if(exact) return exact.name;
+
+  const partial = UBEE_SERVICE_CITIES.find((city) =>
+    raw.includes(city.name) || city.name.includes(raw)
+  );
+
+  return partial ? partial.name : '';
+}
+
+function getNearestServiceCityByCoordinates(lat, lng){
+  if(!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return '';
+
+  let nearest = null;
+  let nearestDistance = Infinity;
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+
+  UBEE_SERVICE_CITIES.forEach((city) => {
+    const latDiff = latitude - city.lat;
+    const lngDiff = (longitude - city.lng) * Math.cos(latitude * Math.PI / 180);
+    const distance = (latDiff * latDiff) + (lngDiff * lngDiff);
+
+    if(distance < nearestDistance){
+      nearestDistance = distance;
+      nearest = city;
+    }
+  });
+
+  return nearest ? nearest.name : '';
+}
+
+async function detectServiceCityFromCurrentLocation(){
+  try{
+    const position = await getCurrentPosition();
+    const lat = Number(position?.coords?.latitude);
+    const lng = Number(position?.coords?.longitude);
+
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return '';
+
+    currentLocationLat = lat;
+    currentLocationLng = lng;
+
+    let detectedCity = '';
+
+    if(window.google?.maps?.Geocoder){
+      try{
+        const geocoder = new google.maps.Geocoder();
+        const result = await geocoder.geocode({ location:{ lat, lng } });
+        const addressComponents = result?.results?.[0]?.address_components || [];
+
+        const level1 = addressComponents.find((component) =>
+          Array.isArray(component.types) &&
+          component.types.includes('administrative_area_level_1')
+        );
+
+        const locality = addressComponents.find((component) =>
+          Array.isArray(component.types) &&
+          component.types.includes('locality')
+        );
+
+        detectedCity = normalizeTaiwanCityName(
+          level1?.long_name || locality?.long_name || ''
+        );
+      }catch(err){
+        console.warn('目前縣市反向地理編碼失敗，改用最近城市判斷：', err);
+      }
+    }
+
+    if(!detectedCity){
+      detectedCity = getNearestServiceCityByCoordinates(lat, lng);
+    }
+
+    if(detectedCity){
+      selectServiceCity(detectedCity);
+      return detectedCity;
+    }
+
+    return '';
+  }catch(err){
+    console.warn('自動偵測服務城市失敗，保留原本城市：', err);
+    return '';
+  }
+}
+
+
   function getRouteOriginLocation(data){
   const lat = toNullableNumber(
     data?.routeStartLat ??
@@ -18420,6 +18512,7 @@ async function initPage(){
             await ensureCustomerMapReady();
 
             await requestCurrentLocationForMap();
+            await detectServiceCityFromCurrentLocation();
 
           }catch(err){
 
