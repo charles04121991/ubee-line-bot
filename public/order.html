@@ -19798,6 +19798,29 @@ body.uu-flow-active{overflow:hidden!important;background:var(--uu-bg)!important}
 .uu-loading{position:absolute;inset:0;background:rgba(255,255,255,.82);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;font-weight:1000}.uu-loading.show{display:flex}.uu-spinner{width:42px;height:42px;border:4px solid #eee;border-top-color:var(--uu-accent-strong);border-radius:50%;animation:uuSpin .8s linear infinite}@keyframes uuSpin{to{transform:rotate(360deg)}}
 body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-selector,body.uu-flow-active .service-city-overlay{z-index:14000!important}
 @media(max-width:390px){.uu-tab{font-size:12px!important}.uu-route{padding-left:14px;padding-right:14px}.uu-primary{width:calc(100% - 28px);margin-left:14px;margin-right:14px}.uu-speed-grid{grid-template-columns:1fr}.uu-field-row{grid-template-columns:66px 1fr auto}}
+
+/* UBee 正式營運版：台灣用語、可讀性、手機滑動與地圖修正 */
+#uuFlowRoot{--uu-text:#181818;--uu-subtext:#62676d;--uu-placeholder:#969ba1;--uu-link:#1769aa;overscroll-behavior:none}
+.uu-shell{height:100dvh;max-height:100dvh;overflow:hidden}
+.uu-page{height:100%;min-height:0;overflow:hidden;flex-direction:column}
+.uu-page.active{display:flex}
+.uu-scroll{min-height:0;overflow-y:auto!important;overflow-x:hidden!important;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding-bottom:calc(132px + env(safe-area-inset-bottom))}
+#uuPageBuy .uu-scroll,#uuPageQueue .uu-scroll,#uuPageSearch .uu-scroll,#uuPageDetail .uu-scroll{padding-bottom:calc(36px + env(safe-area-inset-bottom))}
+#uuPageConfirm .uu-scroll{padding-bottom:calc(128px + env(safe-area-inset-bottom))!important}
+.uu-header,.uu-back-header{flex:0 0 auto}
+.uu-page-title,.uu-panel-title,.uu-address-main strong,.uu-result strong,.uu-field-row input,.uu-field-row select{color:var(--uu-text)!important}
+.uu-page-sub,.uu-live-line,.uu-section-label,.uu-result small,.uu-field-row label,.uu-confirm-row span:last-child,.uu-price-box small{color:var(--uu-subtext)!important}
+.uu-search-box input::placeholder,.uu-textarea::placeholder,.uu-smart-fill textarea::placeholder,.uu-field-row input::placeholder{color:var(--uu-placeholder)!important;opacity:1}
+.uu-address-book,.uu-location-action strong{color:var(--uu-link)!important}
+.uu-address-main small{color:#c43c3c!important}
+.uu-primary{background:#f4bd00!important;color:#171717!important}
+.uu-search-clear{color:#1769aa!important}
+.uu-mini-map{height:240px;min-height:240px;border:1px solid #dfe2e5;position:relative}
+.uu-confirm-map{height:min(43vh,380px);min-height:290px;background:#dfe3e6!important;position:relative;overflow:hidden}
+.uu-confirm-map #reviewMap{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:290px!important;visibility:visible!important;opacity:1!important}
+.uu-map-message{position:absolute;left:14px;right:14px;bottom:14px;z-index:8;padding:10px 12px;border-radius:13px;background:rgba(255,255,255,.94);color:#555;font-size:12px;font-weight:850;box-shadow:0 5px 18px rgba(0,0,0,.12)}
+.uu-submit-bar{position:absolute!important;flex:0 0 auto}
+@media(max-width:390px){.uu-field-row{grid-template-columns:72px minmax(0,1fr) auto}.uu-field-row button{max-width:112px;white-space:normal;line-height:1.25}.uu-page-title{font-size:19px}.uu-page-sub{font-size:11px}.uu-confirm-map{height:34vh;min-height:260px}}
 </style>
 
 <div id="uuFlowRoot" aria-label="UBee 系統化下單">
@@ -19815,7 +19838,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
           <div id="uuServiceTabs" class="uu-tabs">
             <button class="uu-tab active" data-service="send" type="button">幫我送</button>
             <button class="uu-tab" data-service="pickup" type="button">幫我取</button>
-            <button class="uu-tab" data-service="helper" type="button">全能幫手</button>
+            <button class="uu-tab" data-service="helper" type="button">全能跑腿</button>
             <button class="uu-tab" data-service="buy" type="button">幫我買</button>
             <button class="uu-tab" data-service="queue" type="button">幫排隊</button>
           </div>
@@ -19823,13 +19846,13 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
           <div class="uu-route">
             <button id="uuPickupRow" class="uu-address-row" type="button">
               <span class="uu-marker"></span>
-              <span class="uu-address-main"><strong id="uuPickupText">從哪裡取件？</strong><small id="uuPickupHint">請完善取件人資訊</small></span>
-              <span class="uu-address-book">地址簿</span>
+              <span class="uu-address-main"><strong id="uuPickupText">從哪裡取件？</strong><small id="uuPickupHint">請補齊取件聯絡資訊</small></span>
+              <span class="uu-address-book">常用地址</span>
             </button>
             <button id="uuDropoffRow" class="uu-address-row" type="button">
               <span class="uu-marker drop"></span>
-              <span class="uu-address-main"><strong id="uuDropoffText">送到哪裡？</strong><small id="uuDropoffHint">請完善收件人資訊</small></span>
-              <span class="uu-address-book">地址簿</span>
+              <span class="uu-address-main"><strong id="uuDropoffText">送到哪裡？</strong><small id="uuDropoffHint">請補齊收件聯絡資訊</small></span>
+              <span class="uu-address-book">常用地址</span>
             </button>
           </div>
           <div id="uuTaskChip" class="uu-task-chip" hidden><span id="uuTaskChipText"></span><button id="uuEditTaskBtn" type="button">修改</button></div>
@@ -19841,20 +19864,20 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     </section>
 
     <section id="uuPageBuy" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">UBee 幫我買</div><div class="uu-page-sub">足不出戶・小U幫你跑一趟</div></div></header>
+      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">UBee 幫我買</div><div class="uu-page-sub">不用出門，小U幫你跑一趟</div></div></header>
       <div class="uu-scroll">
         <div class="uu-panel">
           <div class="uu-panel-title-row"><div class="uu-panel-title">想買些什麼</div><button type="button">服務介紹 ›</button></div>
           <div id="uuBuyCategories" class="uu-buy-categories"></div>
           <textarea id="uuBuyNote" class="uu-textarea" maxlength="500" placeholder="填寫想要購買的商品，例如：雞排 1 份、無糖綠茶 2 杯。"></textarea>
           <div id="uuBuyQuick" class="uu-quick-chips"></div>
-          <button id="uuBuyContinue" class="uu-primary" style="width:100%;margin:18px 0 0" type="button">去下單</button>
+          <button id="uuBuyContinue" class="uu-primary" style="width:100%;margin:18px 0 0" type="button">下一步</button>
         </div>
       </div>
     </section>
 
     <section id="uuPageQueue" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">UBee 幫我排隊</div><div class="uu-page-sub">省時省心・現場進度即時回報</div></div></header>
+      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">UBee 幫我排隊</div><div class="uu-page-sub">節省時間，現場進度即時回報</div></div></header>
       <div class="uu-scroll">
         <div class="uu-panel">
           <div class="uu-panel-title">去哪裡排隊</div>
@@ -19863,14 +19886,14 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
             <div class="uu-field-row"><label>預估時間</label><input id="uuQueueMinutes" type="number" min="10" max="480" step="5" value="30" inputmode="numeric"><span>分鐘</span></div>
           </div>
           <textarea id="uuQueueNote" class="uu-textarea" maxlength="500" placeholder="請說明排隊目的、輪到後如何處理、是否需要拍照回報。"></textarea>
-          <button id="uuQueueContinue" class="uu-primary" style="width:100%;margin:18px 0 0" type="button">去下單</button>
+          <button id="uuQueueContinue" class="uu-primary" style="width:100%;margin:18px 0 0" type="button">下一步</button>
         </div>
         <div class="uu-panel"><div class="uu-panel-title">幫排隊服務流程</div><div class="uu-confirm-row"><span>① 輸入需求</span><span>② 填寫地址</span></div><div class="uu-confirm-row"><span>③ 確認費用</span><span>④ 完成服務</span></div></div>
       </div>
     </section>
 
     <section id="uuPageSearch" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div id="uuSearchTitle" class="uu-page-title">搜尋地址</div><div id="uuSearchSub" class="uu-page-sub">選擇完整地點後再填門牌與聯絡資訊</div></div></header>
+      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div id="uuSearchTitle" class="uu-page-title">搜尋地址</div><div id="uuSearchSub" class="uu-page-sub">先選擇地點，再填寫門牌、樓層與聯絡資訊</div></div></header>
       <div class="uu-scroll">
         <div class="uu-search-box"><input id="uuAddressSearchInput" maxlength="160" placeholder="輸入地址、店家或地標"><button id="uuSearchClear" class="uu-search-clear" type="button">×</button></div>
         <button id="uuUseLocation" class="uu-location-action" type="button"><i>⌖</i><span><strong>使用目前位置</strong><small style="display:block;color:#888;margin-top:3px">定位後仍可補充門牌與樓層</small></span></button>
@@ -19881,18 +19904,18 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     </section>
 
     <section id="uuPageDetail" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="search" type="button">‹</button><div><div id="uuDetailTitle" class="uu-page-title">收貨資訊</div><div class="uu-page-sub">地址與聯絡資料會提供給接單小U</div></div></header>
+      <header class="uu-back-header"><button class="uu-back" data-back="search" type="button">‹</button><div><div id="uuDetailTitle" class="uu-page-title">收件資訊</div><div class="uu-page-sub">地址與聯絡資訊會提供給承接任務的小U</div></div></header>
       <div class="uu-scroll">
         <div id="uuAddressMap" class="uu-mini-map"></div>
         <div class="uu-panel">
-          <div class="uu-panel-title">智能填寫</div>
-          <div class="uu-smart-fill"><textarea id="uuSmartText" placeholder="可貼上：姓名、電話、地址與樓層"></textarea><button id="uuSmartParse" type="button">貼上並辨識</button></div>
+          <div class="uu-panel-title">快速填寫</div>
+          <div class="uu-smart-fill"><textarea id="uuSmartText" placeholder="可貼上：姓名、電話、地址與樓層"></textarea><button id="uuSmartParse" type="button">貼上並帶入</button></div>
         </div>
         <div class="uu-field-card">
-          <div class="uu-field-row"><label>地址</label><input id="uuDetailAddress" maxlength="240" readonly><button id="uuChangeAddress" type="button">地址簿</button></div>
-          <div class="uu-field-row"><label>門牌號</label><input id="uuDetailNote" maxlength="160" placeholder="單元、樓層、門牌、店名或管理室"></div>
-          <div class="uu-field-row"><label>姓名</label><input id="uuDetailName" maxlength="60" placeholder="聯絡人姓名"><button id="uuUseMyName" type="button">使用本人</button></div>
-          <div class="uu-field-row"><label>電話</label><input id="uuDetailPhone" maxlength="20" inputmode="tel" placeholder="09xxxxxxxx"><button id="uuUseSamePhone" type="button">同另一端</button></div>
+          <div class="uu-field-row"><label>地址</label><input id="uuDetailAddress" maxlength="240" readonly><button id="uuChangeAddress" type="button">常用地址</button></div>
+          <div class="uu-field-row"><label>門牌與樓層</label><input id="uuDetailNote" maxlength="160" placeholder="門牌、樓層、店名、管理室或其他補充說明"></div>
+          <div class="uu-field-row"><label>姓名</label><input id="uuDetailName" maxlength="60" placeholder="聯絡人姓名"><button id="uuUseMyName" type="button">帶入本人姓名</button></div>
+          <div class="uu-field-row"><label>電話</label><input id="uuDetailPhone" maxlength="20" inputmode="tel" placeholder="09xxxxxxxx"><button id="uuUseSamePhone" type="button">使用另一端電話</button></div>
           <div class="uu-field-row"><label>地址標籤</label><input id="uuDetailLabel" maxlength="40" placeholder="家、公司、店家"></div>
         </div>
         <label class="uu-save-row"><input id="uuSaveAddress" type="checkbox"><span>儲存為常用地址，下次可以直接選擇</span></label>
@@ -19904,7 +19927,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     <section id="uuPageConfirm" class="uu-page">
       <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">確認任務</div><div class="uu-page-sub">確認路線、任務內容與費用後建立訂單</div></div></header>
       <div class="uu-scroll" style="padding-top:0">
-        <div id="uuConfirmMap" class="uu-confirm-map"></div>
+        <div id="uuConfirmMap" class="uu-confirm-map"><div id="uuConfirmMapStatus" class="uu-map-message">正在載入取件點、送達點與詳細路線…</div></div>
         <div class="uu-confirm-summary">
           <div class="uu-route-summary">
             <div class="uu-route-line"><i></i><div><strong id="uuConfirmPickup">—</strong><small id="uuConfirmPickupMeta">取件資訊</small></div></div>
@@ -19943,10 +19966,10 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
   };
 
   const serviceText={
-    send:{pickup:'從哪裡取件？',dropoff:'送到哪裡？',pickupTitle:'發貨資訊',dropoffTitle:'收貨資訊'},
-    pickup:{pickup:'從哪裡取件？',dropoff:'送到哪裡？',pickupTitle:'取件資訊',dropoffTitle:'收貨資訊'},
+    send:{pickup:'從哪裡取件？',dropoff:'送到哪裡？',pickupTitle:'取件資訊',dropoffTitle:'收件資訊'},
+    pickup:{pickup:'從哪裡取件？',dropoff:'送到哪裡？',pickupTitle:'取件資訊',dropoffTitle:'收件資訊'},
     helper:{pickup:'任務在哪裡？',dropoff:'完成後送到哪裡？',pickupTitle:'任務地點',dropoffTitle:'交付資訊'},
-    buy:{pickup:'去哪裡購買？',dropoff:'送到哪裡？',pickupTitle:'購買地點',dropoffTitle:'收貨資訊'},
+    buy:{pickup:'去哪裡購買？',dropoff:'送到哪裡？',pickupTitle:'購買地點資訊',dropoffTitle:'收件資訊'},
     queue:{pickup:'去哪裡排隊？',dropoff:'服務完成地點',pickupTitle:'排隊資訊',dropoffTitle:'通知資訊'}
   };
 
@@ -20046,7 +20069,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
       const saved=await savedRes.json().catch(()=>({}));const recent=await recentRes.json().catch(()=>({}));
       if(savedRes.ok&&saved.success)state.savedAddresses=Array.isArray(saved.addresses)?saved.addresses:[];
       if(recentRes.ok&&recent.success)state.recentAddresses=Array.isArray(recent.addresses)?recent.addresses:[];
-    }catch(error){console.warn('地址簿讀取失敗，使用本機資料：',error)}
+    }catch(error){console.warn('常用地址讀取失敗，使用本機資料：',error)}
     renderAddressLists();
   }
 
@@ -20212,15 +20235,37 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     $('uuConfirmPickup').textContent=state.pickup?.address||'—';$('uuConfirmPickupMeta').textContent=`${state.pickup?.contactName||''} ${state.pickup?.phone||''}`.trim();
     $('uuConfirmDropoff').textContent=state.dropoff?.address||'—';$('uuConfirmDropoffMeta').textContent=`${state.dropoff?.contactName||''} ${state.dropoff?.phone||''}`.trim();
     $('uuConfirmNote').textContent=taskNote()||$('note')?.value||'—';
-    const review=$('reviewMap');if(review&&review.parentElement!==$('uuConfirmMap'))$('uuConfirmMap').appendChild(review);
-    setLoading(true,'正在取得路線與正式估價…');
+    const mapHost=$('uuConfirmMap');
+    const mapStatus=$('uuConfirmMapStatus');
+    const review=$('reviewMap');
+    if(review&&mapHost&&review.parentElement!==mapHost)mapHost.insertBefore(review,mapStatus||null);
+    if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='正在載入取件點、送達點與詳細路線…'}
+    setLoading(true,'正在取得詳細路線與正式估價…');
     try{
+      let route=null;
+      if(typeof refreshRoutePreview==='function')route=await refreshRoutePreview();
       if(typeof renderEstimate==='function')await renderEstimate();
-      const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);$('uuConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';
-      const route=typeof lastRouteData!=='undefined'?lastRouteData:null;
-      const distance=route?.distanceText||route?.distance||'';const duration=route?.durationText||route?.duration||'';$('uuConfirmRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||(state.service==='queue'?`預估排隊 ${state.queueMinutes} 分鐘`:'路線資料已送後端計算');
-      if(typeof ensureReviewMapReady==='function'){await ensureReviewMapReady();if(window.google?.maps?.event&&typeof reviewMap!=='undefined'&&reviewMap)google.maps.event.trigger(reviewMap,'resize');if(route&&typeof renderRouteOnReviewMap==='function')renderRouteOnReviewMap(route)}
-    }catch(error){console.error('確認頁估價失敗：',error);$('uuConfirmPrice').textContent='估價失敗';$('uuConfirmRouteMeta').textContent=error.message||'請返回確認地址'}finally{setLoading(false)}
+      if(!route&&typeof lastRouteData!=='undefined')route=lastRouteData;
+      const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);
+      $('uuConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';
+      const distance=route?.distanceText||route?.distance||'';
+      const duration=route?.durationText||route?.duration||'';
+      $('uuConfirmRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||(state.service==='queue'?`預估排隊 ${state.queueMinutes} 分鐘`:'正在計算路線');
+      if(typeof ensureReviewMapReady==='function')await ensureReviewMapReady();
+      if(window.google?.maps?.event&&typeof reviewMap!=='undefined'&&reviewMap){
+        google.maps.event.trigger(reviewMap,'resize');
+        await new Promise(resolve=>setTimeout(resolve,80));
+        if(route&&typeof drawRouteOnMap==='function')drawRouteOnMap(reviewMap,route,'review');
+        else if(route&&typeof renderRouteOnReviewMap==='function')renderRouteOnReviewMap(route);
+      }
+      if(route?.encodedPolyline){if(mapStatus)mapStatus.hidden=true}
+      else if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='目前無法顯示道路路線，請確認取件與送達地址後再試一次。'}
+    }catch(error){
+      console.error('確認頁路線或估價失敗：',error);
+      $('uuConfirmPrice').textContent='估價失敗';
+      $('uuConfirmRouteMeta').textContent='請返回確認取件與送達地址';
+      if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='路線載入失敗，請返回確認地址後再試一次。'}
+    }finally{setLoading(false)}
   }
 
   async function submitOrder(){
