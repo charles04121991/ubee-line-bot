@@ -19771,7 +19771,8 @@ body.uu-flow-active{overflow:hidden!important;background:var(--uu-bg)!important}
 #uuFlowRoot *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 .uu-shell{width:100%;max-width:520px;height:100%;margin:0 auto;background:var(--uu-bg);display:flex;flex-direction:column;position:relative;box-shadow:0 0 40px rgba(0,0,0,.06)}
 .uu-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px calc(112px + env(safe-area-inset-bottom))}
-.uu-page{display:none;min-height:100%;animation:uuFade .18s ease}.uu-page.active{display:block}@keyframes uuFade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+.uu-page{display:none;min-height:100%;animation:uuFade .18s ease}.uu-page.active{display:block}
+.uu-page .hidden{display:none!important}@keyframes uuFade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
 .uu-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:70px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:linear-gradient(135deg,#fff9dc,#fff);border-bottom:1px solid rgba(0,0,0,.04);position:sticky;top:0;z-index:30}
 .uu-brand{font-size:25px;font-weight:1000;letter-spacing:-1px}.uu-brand span{color:var(--uu-accent-strong)}
 .uu-city-btn,.uu-icon-btn{border:1px solid rgba(17,17,17,.08);background:rgba(255,255,255,.85);border-radius:999px;min-height:40px;padding:0 14px;font-weight:900;color:#222}.uu-city-btn{justify-self:center}.uu-icon-btn{justify-self:end;width:42px;padding:0;font-size:20px}
@@ -20025,8 +20026,9 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
   function openAddress(target){
     state.addressTarget=target;state.selectedBaseAddress=null;state.searchSession=`${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const labels=serviceText[state.service]||serviceText.send;
-    $('uuSearchTitle').textContent=target==='pickup'?labels.pickupTitle:labels.dropoffTitle;
-    $('uuAddressSearchInput').value='';$('uuSearchResults').innerHTML='<div class="uu-empty">輸入至少 2 個字開始搜尋</div>';
+    $('uuSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';
+    $('uuSearchSub').textContent=target==='pickup'?'搜尋取件地址，選好後再填聯絡資訊':'搜尋送達地址，選好後再填收件資訊';
+    $('uuAddressSearchInput').value='';setAddressSearchMode(false);$('uuSearchResults').innerHTML='<div class="uu-empty">輸入至少 2 個字開始搜尋</div>';
     page('search');loadAddressLists();
   }
 
@@ -20056,10 +20058,24 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     $('uuRecentList').innerHTML=state.recentAddresses.length?state.recentAddresses.map((x,i)=>resultHtml(x,i,'recent')).join(''):'<div class="uu-empty">尚無最近使用地址</div>';
   }
 
+  function setAddressSearchMode(active){
+    $('uuSavedSection')?.classList.toggle('hidden',!!active);
+    $('uuRecentSection')?.classList.toggle('hidden',!!active);
+  }
+
+  function friendlyAddressSearchError(error){
+    const text=String(error?.message||'').trim();
+    if(/referer restrictions|REQUEST_DENIED|API key/i.test(text)){
+      return '地址服務設定異常，請稍後再試或使用目前位置。';
+    }
+    if(/OVER_QUERY_LIMIT/i.test(text))return '地址服務目前忙碌，請稍後再試。';
+    return text||'地址搜尋失敗，請稍後再試。';
+  }
+
   async function searchAddress(query){
     const q=String(query||'').trim();
-    if(q.length<2){$('uuSearchResults').innerHTML='<div class="uu-empty">輸入至少 2 個字開始搜尋</div>';return}
-    $('uuSearchResults').innerHTML='<div class="uu-empty">正在搜尋地址…</div>';
+    if(q.length<2){setAddressSearchMode(false);$('uuSearchResults').innerHTML='<div class="uu-empty">輸入至少 2 個字開始搜尋</div>';return}
+    setAddressSearchMode(true);$('uuSearchResults').innerHTML='<div class="uu-empty">正在搜尋地址…</div>';
     try{
       const pos=state.pickup||state.dropoff||{};
       const res=await fetch('/api/address/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input:q,lat:pos.lat,lng:pos.lng,sessionToken:state.searchSession})});
@@ -20068,7 +20084,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
       const list=Array.isArray(data.predictions)?data.predictions:[];
       $('uuSearchResults').innerHTML=list.length?list.map((x,i)=>`<button class="uu-result" type="button" data-prediction="${i}"><span class="uu-result-icon">⌖</span><span><strong>${esc(x.mainText||x.description)}</strong><small>${esc(x.secondaryText||'')}</small></span><span class="uu-result-arrow">›</span></button>`).join(''):'<div class="uu-empty">找不到符合的地址</div>';
       $('uuSearchResults')._items=list;
-    }catch(error){$('uuSearchResults').innerHTML=`<div class="uu-empty">${esc(error.message||'地址搜尋失敗')}</div>`}
+    }catch(error){$('uuSearchResults').innerHTML=`<div class="uu-empty">${esc(friendlyAddressSearchError(error))}</div>`}
   }
 
   async function choosePrediction(index){
@@ -20097,7 +20113,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     state.selectedBaseAddress={...base};
     const existing=state.addressTarget==='pickup'?state.pickup:state.dropoff;
     const merged={...base,...(existing&&existing.address===base.address?existing:{})};
-    $('uuDetailTitle').textContent=state.addressTarget==='pickup'?(serviceText[state.service]?.pickupTitle||'取件資訊'):(serviceText[state.service]?.dropoffTitle||'收貨資訊');
+    $('uuDetailTitle').textContent=state.addressTarget==='pickup'?'填寫取件資訊':'填寫收件資訊';
     $('uuDetailAddress').value=merged.address||merged.formattedAddress||'';
     $('uuDetailNote').value=merged.addressDetail||merged.note||'';
     $('uuDetailName').value=merged.contactName||merged.name||'';
@@ -20236,7 +20252,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     $('uuBuyQuick').addEventListener('click',e=>{const btn=e.target.closest('[data-text]');if(!btn)return;const text=btn.dataset.text;$('uuBuyNote').value=[$('uuBuyNote').value.trim(),text].filter(Boolean).join('、')});
     $('uuBuyContinue').onclick=()=>{state.buyNote=$('uuBuyNote').value.trim();if(!state.buyNote){alert('請填寫要購買的商品。');return}syncLegacyFields();page('home');updateHome();startOrder()};
     $('uuQueueAddressBtn').onclick=()=>openAddress('pickup');$('uuQueueContinue').onclick=()=>{state.queueMinutes=Math.max(10,Math.min(480,Number($('uuQueueMinutes').value)||30));state.queueNote=$('uuQueueNote').value.trim();if(!state.pickup){openAddress('pickup');return}if(!state.queueNote){alert('請填寫排隊需求與完成方式。');return}state.dropoff={...state.pickup,label:'現場完成'};syncLegacyFields();page('home');updateHome();startOrder()};
-    $('uuAddressSearchInput').addEventListener('input',e=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(e.target.value),350)});$('uuSearchClear').onclick=()=>{$('uuAddressSearchInput').value='';searchAddress('')};$('uuUseLocation').onclick=useCurrentLocation;
+    $('uuAddressSearchInput').addEventListener('input',e=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(e.target.value),350)});$('uuAddressSearchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();clearTimeout(state.searchTimer);searchAddress(e.currentTarget.value)}});$('uuSearchClear').onclick=()=>{$('uuAddressSearchInput').value='';setAddressSearchMode(false);searchAddress('');$('uuAddressSearchInput').focus()};$('uuUseLocation').onclick=useCurrentLocation;
     $('uuSearchResults').addEventListener('click',e=>{const btn=e.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});
     const listClick=(type)=>e=>{const btn=e.target.closest(`[data-list="${type}"]`);if(!btn)return;const list=type==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})};$('uuSavedList').addEventListener('click',listClick('saved'));$('uuRecentList').addEventListener('click',listClick('recent'));
     $('uuSmartParse').onclick=smartParse;$('uuChangeAddress').onclick=()=>page('search');$('uuUseMyName').onclick=()=>{try{$('uuDetailName').value=String(liffProfile?.displayName||'')}catch(e){}};$('uuUseSamePhone').onclick=()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('uuDetailPhone').value=other.phone};$('uuSaveDetail').onclick=saveDetail;
