@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<!-- UBee 長期正式營運穩定版：地址搜尋精簡、任務內容精簡、全站共用導航、移除舊客戶頁面切換。 -->
+<!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
@@ -19656,6 +19656,36 @@ body.flow-active>.app{display:none!important}
 .flow-task-extra{margin-top:4px;border:1px solid var(--flow-line);border-radius:15px;background:#fafafa;overflow:hidden}.flow-task-extra summary{cursor:pointer;list-style:none;padding:13px 14px;color:#555b61;font-size:12px;font-weight:1000}.flow-task-extra summary::-webkit-details-marker{display:none}.flow-task-extra summary::after{content:"＋";float:right;color:#8a8f95}.flow-task-extra[open] summary::after{content:"－"}.flow-task-extra-body{padding:0 12px 12px}.flow-task-extra-body .flow-form-group{margin-bottom:0}
 .flow-search-results-section[hidden],.flow-quick-addresses[hidden]{display:none!important}.flow-address-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:13px 0 9px;padding:4px;border:1px solid var(--flow-line);border-radius:14px;background:#eef0f2}.flow-address-tab{min-height:42px;border:none;border-radius:11px;background:transparent;color:#777c82;font-size:13px!important;font-weight:1000}.flow-address-tab.active{background:#fff;color:#111;box-shadow:0 2px 8px rgba(17,24,39,.08)}
 .flow-profile-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-bottom:12px;padding:18px;border:1px solid #eadf9d;border-radius:20px;background:#fffbed}.flow-profile-hero small,.flow-profile-hero span{display:block;color:#817552;font-size:11px;font-weight:850}.flow-profile-hero strong{display:block;margin:4px 0;color:#111;font-size:21px;font-weight:1000}.flow-profile-stats{display:grid;grid-template-columns:repeat(2,64px);gap:7px}.flow-profile-stats div{padding:9px 5px;border:1px solid #eee4b5;border-radius:13px;background:#fff;text-align:center}.flow-profile-stats strong{margin:0;font-size:17px}.flow-profile-stats span{margin-top:2px;font-size:9px}.flow-profile-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}.flow-profile-section-head strong{display:block;font-size:15px;font-weight:1000}.flow-profile-section-head small{display:block;margin-top:3px;color:var(--flow-muted);font-size:10px;font-weight:800}.flow-profile-list{display:flex;flex-direction:column;gap:8px}.flow-profile-item{padding:11px 12px;border:1px solid var(--flow-line);border-radius:14px;background:#fafafa}.flow-profile-item strong{display:block;color:#111;font-size:13px;font-weight:1000;line-height:1.45}.flow-profile-item span{display:block;margin-top:4px;color:#73787e;font-size:10px;font-weight:800;line-height:1.5}.flow-profile-item-address{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 任務內容：App 式任務細項與品項分類 */
+.flow-compat-select{display:none!important}
+.flow-task-choice-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.flow-task-choice-title .flow-label{margin:0}.flow-task-choice-title small{color:var(--flow-muted);font-size:10px;font-weight:800}
+.flow-task-type-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.flow-task-type-card{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:9px;min-height:68px;padding:10px;border:1px solid var(--flow-line);border-radius:16px;background:#fff;color:#111;text-align:left}
+.flow-task-type-card .flow-task-type-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:#f4f5f6;font-size:20px}
+.flow-task-type-card strong{display:block;overflow:hidden;font-size:13px;font-weight:1000;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.flow-task-type-card small{display:block;margin-top:3px;color:var(--flow-muted);font-size:9px;font-weight:800}
+.flow-task-type-card.active{border-color:#d3aa00;background:#fff9d9;box-shadow:0 0 0 1px #d3aa00 inset}
+.flow-task-type-card.active .flow-task-type-icon{background:var(--flow-accent)}
+.flow-category-chips{display:flex;flex-wrap:wrap;gap:8px}
+.flow-category-chip{min-height:40px;padding:8px 13px;border:1px solid var(--flow-line);border-radius:999px;background:#fff;color:#555b61;font-size:12px!important;font-weight:900}
+.flow-category-chip.active{border-color:#111;background:#111;color:#fff}
+
+/* 我的：最近任務金額與詳細資訊 */
+.flow-profile-task-card{padding:12px;border:1px solid var(--flow-line);border-radius:16px;background:#fff}
+.flow-profile-task-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.flow-profile-task-title{min-width:0}.flow-profile-task-title strong{display:block;overflow:hidden;color:#111;font-size:14px;font-weight:1000;line-height:1.4;text-overflow:ellipsis;white-space:nowrap}.flow-profile-task-title small{display:block;margin-top:4px;color:var(--flow-muted);font-size:10px;font-weight:800}
+.flow-profile-task-status{flex:0 0 auto;padding:6px 8px;border-radius:999px;background:#f3f4f5;color:#555b61;font-size:10px;font-weight:1000;white-space:nowrap}
+.flow-profile-task-footer{display:flex;align-items:end;justify-content:space-between;gap:10px;margin-top:11px;padding-top:10px;border-top:1px solid #eef0f1}
+.flow-profile-task-amount small{display:block;color:var(--flow-muted);font-size:9px;font-weight:800}.flow-profile-task-amount strong{display:block;margin-top:2px;color:#111;font-size:17px;font-weight:1000}
+.flow-profile-detail-btn{flex:0 0 auto;min-height:38px;padding:0 13px;border:1px solid #d9dde0;border-radius:999px;background:#fff;color:#111;font-size:11px!important;font-weight:1000}
+.flow-profile-detail-hero{margin-bottom:12px;padding:16px;border:1px solid #ead77a;border-radius:20px;background:#fffbed}
+.flow-profile-detail-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.flow-profile-detail-top strong{display:block;color:#111;font-size:18px;font-weight:1000;line-height:1.4}.flow-profile-detail-top span{flex:0 0 auto;padding:6px 9px;border-radius:999px;background:#fff;color:#6f5a00;font-size:10px;font-weight:1000}
+.flow-profile-detail-amount{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid #ebdda0}.flow-profile-detail-amount span{color:#766a48;font-size:11px;font-weight:900}.flow-profile-detail-amount strong{color:#111;font-size:24px;font-weight:1000}
+.flow-detail-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff}.flow-detail-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;padding:12px 13px;border-bottom:1px solid #eef0f1}.flow-detail-row:last-child{border-bottom:none}.flow-detail-row span{color:var(--flow-muted);font-size:11px;font-weight:900}.flow-detail-row strong{color:#111;font-size:13px;font-weight:850;line-height:1.6;word-break:break-word;white-space:pre-line}
+@media(max-width:360px){.flow-task-type-grid{grid-template-columns:1fr}.flow-profile-task-footer{align-items:center}.flow-detail-row{grid-template-columns:80px minmax(0,1fr)}}
+
 body:not(.flow-active) .bottom-tabs{grid-template-columns:repeat(2,1fr)!important}.bottom-tabs #tabTasks{display:none!important}
 
 /* 正式訂單追蹤頁的底部導航同步同一套視覺 */
@@ -19718,8 +19748,16 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       <div class="flow-scroll">
         <div class="flow-card">
           <div class="flow-selected-service-card"><span>目前選擇</span><strong id="flowSelectedServiceLabel">幫我送</strong></div>
-          <div id="flowServiceTypeGroup" class="flow-form-group" hidden><label class="flow-label" for="flowServiceType">任務細項</label><select id="flowServiceType" class="flow-select"></select></div>
-          <div id="flowServiceCategoryGroup" class="flow-form-group" hidden><label class="flow-label" for="flowServiceCategory">品項分類</label><select id="flowServiceCategory" class="flow-select"></select></div>
+          <div id="flowServiceTypeGroup" class="flow-form-group" hidden>
+            <div class="flow-task-choice-title"><label class="flow-label">任務細項</label><small>選擇最接近的服務</small></div>
+            <div id="flowServiceTypeChoices" class="flow-task-type-grid" role="listbox" aria-label="任務細項"></div>
+            <select id="flowServiceType" class="flow-compat-select" aria-hidden="true" tabindex="-1"></select>
+          </div>
+          <div id="flowServiceCategoryGroup" class="flow-form-group" hidden>
+            <div class="flow-task-choice-title"><label class="flow-label">品項分類</label><small>可快速辨識任務內容</small></div>
+            <div id="flowServiceCategoryChoices" class="flow-category-chips" role="listbox" aria-label="品項分類"></div>
+            <select id="flowServiceCategory" class="flow-compat-select" aria-hidden="true" tabindex="-1"></select>
+          </div>
           <div class="flow-form-group"><label class="flow-label" for="flowTaskNote">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea id="flowTaskNote" class="flow-textarea" maxlength="500" placeholder="例如：到店內取兩杯飲料，確認品項後送到管理室；抵達前請先電話聯絡"></textarea><div class="flow-inline-note">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
           <div class="flow-form-group"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input id="flowTaskName" class="flow-input" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"></div>
           <div id="flowAdvanceWrap" class="flow-form-group flow-dynamic-field" hidden><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input id="flowAdvancePayment" class="flow-input" type="number" min="0" max="999" step="1" inputmode="numeric" value="0"><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
@@ -19867,6 +19905,22 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       </div>
     </section>
 
+    <section id="flowPageProfileDetail" class="flow-page" data-page="profileDetail">
+      <header class="flow-header">
+        <button class="flow-back-btn" data-go="profile" type="button" aria-label="返回我的">‹</button>
+        <div class="flow-title-wrap"><div class="flow-title">任務詳細資訊</div><div class="flow-subtitle">查看任務內容與金額</div></div>
+        <span></span>
+      </header>
+      <div class="flow-scroll">
+        <div class="flow-profile-detail-hero">
+          <div class="flow-profile-detail-top"><strong id="flowProfileDetailTitle">UBee 任務</strong><span id="flowProfileDetailStatus">任務處理中</span></div>
+          <div class="flow-profile-detail-amount"><span id="flowProfileDetailAmountLabel">任務金額</span><strong id="flowProfileDetailAmount">—</strong></div>
+        </div>
+        <div id="flowProfileDetailList" class="flow-detail-list"></div>
+        <button class="flow-secondary" data-go="profile" type="button" style="margin-top:12px">返回最近任務</button>
+      </div>
+    </section>
+
     <nav class="flow-bottom-nav" aria-label="主要導覽">
       <button id="flowNavHome" class="active" type="button"><span class="flow-nav-icon">U</span>首頁</button>
       <button id="flowNavMy" type="button"><span class="flow-nav-icon">◎</span>我的</button>
@@ -19883,7 +19937,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   const $=id=>document.getElementById(id);
   const root=$('productionOrderFlow');
   const serviceLabels={send:'幫我送',pickup:'幫我取',buy:'幫我買',queue:'幫排隊',helper:'全能跑腿'};
-  const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,profile:0};
+  const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,profile:0,profileDetail:0};
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
     pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
@@ -19891,7 +19945,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
-    mapRenderId:0,submitting:false
+    mapRenderId:0,submitting:false,profileOrders:[],selectedProfileOrder:null
   };
 
   function setLoading(show,text='系統處理中…'){$('flowLoadingText').textContent=text;$('flowLoading').classList.toggle('show',!!show)}
@@ -19945,7 +19999,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function showPage(name){
     state.page=name;
     root.querySelectorAll('.flow-page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
-    const isProfile=name==='profile';
+    const isProfile=name==='profile'||name==='profileDetail';
     $('flowNavHome').classList.toggle('active',!isProfile);
     $('flowNavMy').classList.toggle('active',isProfile);
     const scroller=root.querySelector(`.flow-page[data-page="${name}"] .flow-scroll`);
@@ -19958,18 +20012,29 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
   function syncServiceSelectors(){
     let list=[];try{list=serviceGroups?.[state.service]||[]}catch(_){list=[]}
-    if(!list.length)list=[{title:serviceLabels[state.service],categories:['其他']}];
+    if(!list.length)list=[{icon:'🐝',title:serviceLabels[state.service],categories:['其他']}];
     if(state.serviceTypeIndex>=list.length)state.serviceTypeIndex=0;
+
     const typeSelect=$('flowServiceType');
     typeSelect.innerHTML=list.map((item,index)=>`<option value="${index}">${escapeHtml(item.title)}</option>`).join('');
     typeSelect.value=String(state.serviceTypeIndex);
     $('flowServiceTypeGroup').hidden=list.length<=1;
+
+    const typeChoices=$('flowServiceTypeChoices');
+    typeChoices.innerHTML=list.map((item,index)=>`<button class="flow-task-type-card ${index===state.serviceTypeIndex?'active':''}" type="button" role="option" aria-selected="${index===state.serviceTypeIndex?'true':'false'}" data-service-type-index="${index}"><span class="flow-task-type-icon">${escapeHtml(item.icon||'🐝')}</span><span><strong>${escapeHtml(item.title||serviceLabels[state.service])}</strong><small>${index===state.serviceTypeIndex?'已選擇':'點一下選擇'}</small></span></button>`).join('');
+
     const selected=list[state.serviceTypeIndex]||list[0];
     const categories=Array.isArray(selected.categories)&&selected.categories.length?selected.categories:['其他'];
     if(!categories.includes(state.serviceCategory))state.serviceCategory=categories[0];
-    $('flowServiceCategory').innerHTML=categories.map(item=>`<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join('');
-    $('flowServiceCategory').value=state.serviceCategory;
+
+    const categorySelect=$('flowServiceCategory');
+    categorySelect.innerHTML=categories.map(item=>`<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join('');
+    categorySelect.value=state.serviceCategory;
     $('flowServiceCategoryGroup').hidden=categories.length<=1;
+
+    const categoryChoices=$('flowServiceCategoryChoices');
+    categoryChoices.innerHTML=categories.map(item=>`<button class="flow-category-chip ${item===state.serviceCategory?'active':''}" type="button" role="option" aria-selected="${item===state.serviceCategory?'true':'false'}" data-service-category="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('');
+
     $('flowSelectedServiceLabel').textContent=`${serviceLabels[state.service]}${selected.title&&selected.title!==serviceLabels[state.service]?`・${selected.title}`:''}`;
     if(!state.taskName)state.taskName=selected.title||serviceLabels[state.service];
     $('flowTaskName').value=state.taskName;
@@ -20238,6 +20303,85 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     el.innerHTML=state.savedAddresses.slice(0,3).map(item=>`<div class="flow-profile-item"><strong>${escapeHtml(item.label||item.name||'常用地址')}</strong><span class="flow-profile-item-address">${escapeHtml(item.address||item.formattedAddress||'')}</span></div>`).join('');
   }
 
+  function orderAmountInfo(order){
+    let amount=null;
+    try{if(typeof getCustomerPayableTotal==='function')amount=getCustomerPayableTotal(order)}catch(_){amount=null}
+    if(amount===null||!Number.isFinite(Number(amount))){
+      const candidates=[order?.customerPayableTotal,order?.payableTotal,order?.totalPrice,order?.totalFee,order?.total,order?.price];
+      amount=candidates.filter(value=>value!==null&&value!==undefined&&value!=='').map(Number).find(value=>Number.isFinite(value)&&value>=0);
+    }
+    const statusKey=String(order?.status||'').toLowerCase();
+    const completed=['completed','done'].includes(statusKey);
+    const cancelled=['cancelled','canceled'].includes(statusKey);
+    return{
+      amount:Number.isFinite(Number(amount))?Math.round(Number(amount)):null,
+      label:completed?'已付金額':cancelled?'任務金額':'預估金額'
+    };
+  }
+
+  function profileOrderTitle(order){
+    return String(order?.taskItemName||order?.serviceType||order?.itemName||order?.item||'UBee 任務').trim()||'UBee 任務';
+  }
+
+  function profileOrderAddress(order,type){
+    const isPickup=type==='pickup';
+    const candidates=isPickup
+      ?[order?.pickupAddress,order?.pickup,order?.fromAddress,order?.pickupAddressObject?.address]
+      :[order?.dropoffAddress,order?.dropoff,order?.toAddress,order?.dropoffAddressObject?.address];
+    return String(candidates.find(value=>String(value||'').trim())||'—').trim();
+  }
+
+  function profileOrderContact(order,type){
+    const isPickup=type==='pickup';
+    const name=String((isPickup?(order?.pickupContact||order?.pickupName||order?.pickupAddressObject?.contactName):(order?.dropoffContact||order?.dropoffName||order?.dropoffAddressObject?.contactName))||'').trim();
+    const phone=String((isPickup?(order?.pickupPhone||order?.pickupAddressObject?.phone):(order?.dropoffPhone||order?.dropoffAddressObject?.phone))||'').trim();
+    return [name,phone].filter(Boolean).join('・');
+  }
+
+  function profileOrderTiming(order){
+    const type=String(order?.orderTimingType||order?.timingType||'immediate').toLowerCase();
+    if(type==='scheduled')return String(order?.scheduledAtText||order?.scheduledDateTime||order?.scheduledAt||'指定時間預約');
+    if(type==='flexible')return String(order?.flexibleTimeText||order?.flexibleWindowText||'彈性時段預約');
+    return '立即任務';
+  }
+
+  function profileOrderPayment(order){
+    const value=String(order?.paymentMethod||order?.payMethod||'').toLowerCase();
+    if(value==='cash')return '現金';
+    if(value==='jkopay'||value==='jk_pay')return '街口支付';
+    return '依任務設定';
+  }
+
+  function openProfileOrderDetail(index){
+    const order=state.profileOrders[Number(index)];
+    if(!order)return;
+    state.selectedProfileOrder=order;
+    const amountInfo=orderAmountInfo(order);
+    $('flowProfileDetailTitle').textContent=profileOrderTitle(order);
+    $('flowProfileDetailStatus').textContent=orderStatusText(order.status);
+    $('flowProfileDetailAmountLabel').textContent=amountInfo.label;
+    $('flowProfileDetailAmount').textContent=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
+
+    const note=String(order?.note||order?.customerNote||order?.taskNote||order?.item||'').trim()||'—';
+    const category=String(order?.serviceCategory||order?.category||'').trim()||'—';
+    const pickupContact=profileOrderContact(order,'pickup');
+    const dropoffContact=profileOrderContact(order,'dropoff');
+    const rows=[
+      ['訂單編號',String(order?.orderNo||order?.id||'—')],
+      ['建立時間',orderTimeText(order)||'—'],
+      ['任務狀態',orderStatusText(order.status)],
+      ['任務項目',profileOrderTitle(order)],
+      ['品項分類',category],
+      ['任務內容',note],
+      ['取件地點',`${profileOrderAddress(order,'pickup')}${pickupContact?`\n${pickupContact}`:''}`],
+      ['送達地點',`${profileOrderAddress(order,'dropoff')}${dropoffContact?`\n${dropoffContact}`:''}`],
+      ['任務時間',profileOrderTiming(order)],
+      ['付款方式',profileOrderPayment(order)]
+    ];
+    $('flowProfileDetailList').innerHTML=rows.map(([label,value])=>`<div class="flow-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+    showPage('profileDetail');
+  }
+
   async function renderProfile(){
     showPage('profile');
     const displayName=String(typeof liffProfile!=='undefined'?(liffProfile?.displayName||''):'').trim();
@@ -20258,7 +20402,12 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       if(typeof loadCustomerOrders!=='function')throw new Error('任務資料尚未載入');
       const orders=await loadCustomerOrders();
       const recent=Array.isArray(orders)?orders.slice(0,3):[];
-      list.innerHTML=recent.length?recent.map(order=>`<div class="flow-profile-item"><strong>${escapeHtml(order.serviceType||order.taskItemName||order.item||'UBee 任務')}・${escapeHtml(orderStatusText(order.status))}</strong><span>${escapeHtml(orderTimeText(order))}${order.totalPrice||order.price?`・NT$${Math.round(Number(order.totalPrice||order.price||0))}`:''}</span></div>`).join(''):'<div class="flow-empty">目前還沒有最近任務</div>';
+      state.profileOrders=recent;
+      list.innerHTML=recent.length?recent.map((order,index)=>{
+        const amountInfo=orderAmountInfo(order);
+        const amountText=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
+        return `<div class="flow-profile-task-card"><div class="flow-profile-task-head"><div class="flow-profile-task-title"><strong>${escapeHtml(profileOrderTitle(order))}</strong><small>${escapeHtml(orderTimeText(order)||'任務時間確認中')}</small></div><span class="flow-profile-task-status">${escapeHtml(orderStatusText(order.status))}</span></div><div class="flow-profile-task-footer"><div class="flow-profile-task-amount"><small>${escapeHtml(amountInfo.label)}</small><strong>${escapeHtml(amountText)}</strong></div><button class="flow-profile-detail-btn" type="button" data-profile-order-index="${index}">詳細資訊</button></div></div>`;
+      }).join(''):'<div class="flow-empty">目前還沒有最近任務</div>';
     }catch(error){list.innerHTML='<div class="flow-empty">最近任務暫時無法讀取</div>'}
   }
 
@@ -20280,13 +20429,17 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));
     $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||!state.dropoff){status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}status('flowHomeStatus','');syncServiceSelectors();showPage('task')});$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
     root.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.go)));
-    $('flowServiceType').addEventListener('change',()=>{state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||state.taskName;syncServiceSelectors()});$('flowServiceCategory').addEventListener('change',()=>state.serviceCategory=$('flowServiceCategory').value);
+    $('flowServiceTypeChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-type-index]');if(!btn)return;state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceTypeIndex=Number(btn.dataset.serviceTypeIndex)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];syncServiceSelectors()});
+    $('flowServiceCategoryChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-category]');if(!btn)return;state.taskName=String($('flowTaskName')?.value||state.taskName).trim();state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceCategory=btn.dataset.serviceCategory||'';$('flowServiceCategory').value=state.serviceCategory;syncServiceSelectors()});
+    $('flowServiceType').addEventListener('change',()=>{state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||state.taskName;syncServiceSelectors()});
+    $('flowServiceCategory').addEventListener('change',()=>{state.taskName=String($('flowTaskName')?.value||state.taskName).trim();state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceCategory=$('flowServiceCategory').value;syncServiceSelectors()});
     $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
     $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn)setTiming(btn.dataset.timing)});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn)setSpeed(btn.dataset.speed)});$('flowOptionsNext').addEventListener('click',()=>{if(validateOptions())openConfirm()});
     $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
     $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];status('flowSearchStatus','');$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;$('flowSearchResults').innerHTML='';setQuickAddressTab(state.quickAddressTab)});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);root.querySelectorAll('[data-address-tab]').forEach(btn=>btn.addEventListener('click',()=>setQuickAddressTab(btn.dataset.addressTab)));
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
     $('flowUseProfileName').addEventListener('click',()=>{try{$('flowDetailName').value=String(typeof liffProfile!=='undefined'?(liffProfile?.displayName||''):'')}catch(_){ }});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
+    $('flowProfileTasksList').addEventListener('click',event=>{const btn=event.target.closest('[data-profile-order-index]');if(btn)openProfileOrderDetail(btn.dataset.profileOrderIndex)});
     $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavMy').addEventListener('click',renderProfile);const openSupport=()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}};$('flowSupportButton').addEventListener('click',openSupport);$('flowProfileSupportIcon').addEventListener('click',openSupport);$('flowProfileSupport').addEventListener('click',openSupport);$('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
