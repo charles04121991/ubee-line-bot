@@ -21804,6 +21804,37 @@ app.post('/api/map-route', async (req, res) => {
         endLatLng.longitude
       );
 
+    // 路線端點座標優先採用 Google Routes 實際結果；
+    // 若個別回應未帶端點，則退回客人端已確認的座標，
+    // 確保確認任務頁仍能顯示取件點與送達點。
+    const safeOriginLat =
+      originLat ??
+      getNullableCoordinate(
+        body.originLat ??
+        body.pickupLat
+      );
+
+    const safeOriginLng =
+      originLng ??
+      getNullableCoordinate(
+        body.originLng ??
+        body.pickupLng
+      );
+
+    const safeDestinationLat =
+      destinationLat ??
+      getNullableCoordinate(
+        body.destinationLat ??
+        body.dropoffLat
+      );
+
+    const safeDestinationLng =
+      destinationLng ??
+      getNullableCoordinate(
+        body.destinationLng ??
+        body.dropoffLng
+      );
+
     const originPlaceId =
       String(
         routesData
@@ -21865,26 +21896,25 @@ app.post('/api/map-route', async (req, res) => {
       polyline: encodedPolyline,
 
       originLocation: {
-        lat: originLat,
-        lng: originLng,
+        lat: safeOriginLat,
+        lng: safeOriginLng,
       },
 
       destinationLocation: {
-        lat: destinationLat,
-        lng: destinationLng,
+        lat: safeDestinationLat,
+        lng: safeDestinationLng,
       },
 
-      routeStartLat:
-  originLat,
+      routeStartLat: safeOriginLat,
+      routeStartLng: safeOriginLng,
+      routeEndLat: safeDestinationLat,
+      routeEndLng: safeDestinationLng,
 
-routeStartLng:
-  originLng,
-
-routeEndLat:
-  destinationLat,
-
-routeEndLng:
-  destinationLng,
+      // 客人端正式確認頁使用的明確別名。
+      pickupLat: safeOriginLat,
+      pickupLng: safeOriginLng,
+      dropoffLat: safeDestinationLat,
+      dropoffLng: safeDestinationLng,
 
       originPlaceId,
       destinationPlaceId,
