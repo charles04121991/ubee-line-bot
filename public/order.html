@@ -8836,10 +8836,9 @@ body{background:#eef0f2;}
         <div class="category-tabs">
           <button class="category-tab active" type="button" onclick="selectServiceFromTab(this,'send')">幫我送</button>
           <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'pickup')">幫我取</button>
-          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫代買</button>
+          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'buy')">幫我買</button>
           <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'queue')">幫排隊</button>
           <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'helper')">全能跑腿</button>
-          <button class="category-tab" type="button" onclick="selectServiceFromTab(this,'urgent')">急件專送</button>
         </div>
 
         <!-- ==============================
@@ -9075,12 +9074,20 @@ body{background:#eef0f2;}
         <div class="form-title">聯絡資訊</div>
         <div class="input-card">
           <div class="input-wrap">
+            <div class="input-icon">人</div>
+            <input id="pickupContact" maxlength="30" autocomplete="name" placeholder="取件聯絡人 / 店家名稱">
+          </div>
+          <div class="input-wrap">
             <div class="input-icon">取</div>
-            <input id="pickupPhone" maxlength="20" inputmode="tel" placeholder="取件聯絡電話 / 店家電話">
+            <input id="pickupPhone" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="取件聯絡電話 / 店家電話">
+          </div>
+          <div class="input-wrap">
+            <div class="input-icon">人</div>
+            <input id="dropoffContact" maxlength="30" autocomplete="name" placeholder="收件人姓名">
           </div>
           <div class="input-wrap">
             <div class="input-icon">送</div>
-            <input id="dropoffPhone" maxlength="20" inputmode="tel" placeholder="收件聯絡電話">
+            <input id="dropoffPhone" maxlength="20" inputmode="tel" autocomplete="tel" placeholder="收件聯絡電話">
           </div>
         </div>
       </div>
@@ -9137,7 +9144,24 @@ body{background:#eef0f2;}
           <input id="item" type="hidden" value="">
           <div class="input-wrap" id="noteWrap">
             <div class="input-icon">寫</div>
-            <textarea id="note" maxlength="300" placeholder="請填寫品項、數量、規格、地點補充、注意事項"></textarea>
+            <textarea id="note" maxlength="500" placeholder="請填寫品項、數量、規格、地點補充、注意事項"></textarea>
+          </div>
+        </div>
+
+        <div id="ubeeAdvancedTaskDetails" class="ubee-advanced-task-details">
+          <div class="form-title">任務細節</div>
+          <div class="input-card">
+            <div class="input-wrap"><div class="input-icon">名</div><input id="taskItemName" maxlength="120" placeholder="物品、商品或任務名稱"></div>
+            <div class="input-wrap"><div class="input-icon">量</div><input id="taskQuantity" maxlength="40" placeholder="數量，例如：2 件、3 份"></div>
+            <div class="input-wrap ubee-detail-send"><div class="input-icon">重</div><input id="taskWeight" maxlength="40" placeholder="重量，例如：約 3 公斤"></div>
+            <div class="input-wrap ubee-detail-pickup"><div class="input-icon">碼</div><input id="taskPickupCode" maxlength="80" placeholder="取件碼 / 訂單編號（沒有可不填）"></div>
+            <div class="input-wrap ubee-detail-pickup"><div class="input-icon">付</div><select id="taskPickupPaid"><option value="unknown">付款狀態不確定</option><option value="paid">已付款</option><option value="unpaid">尚未付款</option></select></div>
+            <div class="input-wrap ubee-detail-buy"><div class="input-icon">缺</div><select id="taskReplacementPolicy"><option value="contact">缺貨時先聯絡我</option><option value="skip">缺貨就不買</option><option value="similar">可改買相近商品</option></select></div>
+            <div class="input-wrap ubee-detail-buy"><div class="input-icon">票</div><select id="taskInvoice"><option value="need">需要發票</option><option value="no_need">不需要發票</option><option value="either">皆可</option></select></div>
+            <div class="input-wrap ubee-detail-queue"><div class="input-icon">排</div><input id="taskQueuePurpose" maxlength="120" placeholder="排隊目的，例如：掛號、取號碼牌、候位"></div>
+            <div class="input-wrap ubee-detail-queue"><div class="input-icon">輪</div><input id="taskQueueHandoff" maxlength="160" placeholder="輪到後如何處理，例如：通知我到場"></div>
+            <div class="input-wrap ubee-detail-helper"><div class="input-icon">限</div><input id="taskDeadline" maxlength="80" placeholder="希望完成時間或期限"></div>
+            <div class="input-wrap"><div class="input-icon">證</div><select id="proofRequired"><option value="none">不需要完成證明</option><option value="photo">需要完成照片</option><option value="signature">需要簽收</option><option value="photo_and_signature">需要照片與簽收</option></select></div>
           </div>
         </div>
       </div>
@@ -9342,7 +9366,24 @@ body{background:#eef0f2;}
         </div>
       </div>
 
-      <div class="step3-action-footer">
+            <div class="ubee-delivery-settings-card">
+        <div class="form-title">配送偏好</div>
+        <div class="ubee-chip-grid">
+          <label><input type="checkbox" data-ubee-delivery-pref value="call_before_arrival">抵達前聯絡</label>
+          <label><input type="checkbox" data-ubee-delivery-pref value="no_doorbell">不按門鈴</label>
+          <label><input type="checkbox" data-ubee-delivery-pref value="leave_reception">可放管理室</label>
+          <label><input type="checkbox" data-ubee-delivery-pref value="keep_warm">需要保溫</label>
+          <label><input type="checkbox" data-ubee-delivery-pref value="keep_dry">不可淋雨</label>
+        </div>
+        <div class="form-title" style="margin-top:14px">交通工具偏好</div>
+        <div class="ubee-radio-grid">
+          <label><input type="radio" name="ubeeVehiclePreference" value="any" checked>不限</label>
+          <label><input type="radio" name="ubeeVehiclePreference" value="motorcycle">機車</label>
+          <label><input type="radio" name="ubeeVehiclePreference" value="car">汽車</label>
+        </div>
+      </div>
+
+<div class="step3-action-footer">
 
   <button
     class="step3-back-btn"
@@ -9691,7 +9732,7 @@ body{background:#eef0f2;}
       <div class="info-list">
         <div class="info-item"><div class="info-item-title">UBee 跑腿是 App 嗎？</div><div class="info-item-text">UBee 跑腿目前是網頁版 App，首次使用請從官方帳號下單。之後可用手機瀏覽器開啟並加入主畫面。</div></div>
         <div class="info-item"><div class="info-item-title">服務範圍有哪些？</div><div class="info-item-text">目前服務範圍涵蓋豐原、潭子、神岡、大雅、后里，並持續擴展大台中地區。</div></div>
-        <div class="info-item"><div class="info-item-title">可以做哪些任務？</div><div class="info-item-text">可建立幫我送、幫我取、幫代買、幫排隊、全能跑腿與急件專送等任務。</div></div>
+        <div class="info-item"><div class="info-item-title">可以做哪些任務？</div><div class="info-item-text">可建立幫我送、幫我取、幫我買、幫排隊與全能跑腿等任務。</div></div>
         <div class="info-item"><div class="info-item-title">哪些任務不能接？</div><div class="info-item-text">UBee 跑腿不承接違法、管制、危險、法律、金融、證件、授權簽署或高風險委託事項。</div></div>
         <div class="info-item"><div class="info-item-title">付款方式有哪些？</div><div class="info-item-text">目前先開放現金單。確認後系統會開始媒合 小U ，任務完成時由 小U 向客人收取現金。</div></div>
         <div class="info-item"><div class="info-item-title">代買可以請 小U 先代墊嗎？</div><div class="info-item-text">可以在建立任務時填寫代墊費用。系統會把代墊金額併入任務總金額。</div></div>
@@ -14319,6 +14360,7 @@ function getPayload(){
     pickup,
     pickupAddress:pickup,
     pickupPhone:cleanPhone(qs('pickupPhone').value),
+    pickupContact:String(qs('pickupContact')?.value || '').trim(),
     pickupLat,
     pickupLng,
     pickupPlaceId,
@@ -14326,12 +14368,30 @@ function getPayload(){
     dropoff,
     dropoffAddress:dropoff,
     dropoffPhone:cleanPhone(qs('dropoffPhone').value),
+    dropoffContact:String(qs('dropoffContact')?.value || '').trim(),
     dropoffLat,
     dropoffLng,
     dropoffPlaceId,
 
     item:itemText,
     note,
+    itemQuantity:String(qs('taskQuantity')?.value || '').trim(),
+    proofRequired:String(qs('proofRequired')?.value || 'none'),
+    proofRequiredLabel:String(qs('proofRequired')?.selectedOptions?.[0]?.textContent || ''),
+    taskDetails:{
+      itemName:String(qs('taskItemName')?.value || '').trim(),
+      quantity:String(qs('taskQuantity')?.value || '').trim(),
+      weight:String(qs('taskWeight')?.value || '').trim(),
+      pickupCode:String(qs('taskPickupCode')?.value || '').trim(),
+      pickupPaid:String(qs('taskPickupPaid')?.value || 'unknown'),
+      replacementPolicy:String(qs('taskReplacementPolicy')?.value || 'contact'),
+      invoice:String(qs('taskInvoice')?.value || 'need'),
+      queuePurpose:String(qs('taskQueuePurpose')?.value || '').trim(),
+      queueHandoff:String(qs('taskQueueHandoff')?.value || '').trim(),
+      deadline:String(qs('taskDeadline')?.value || '').trim()
+    },
+    deliveryPreferences:Array.from(document.querySelectorAll('[data-ubee-delivery-pref]:checked')).map(el=>el.value),
+    vehiclePreference:String(document.querySelector('[name="ubeeVehiclePreference"]:checked')?.value || 'any'),
     itemSize:getItemSizeOption(),
     itemSizeLabel:getItemSizeMeta().label,
     speedType,
@@ -19511,5 +19571,36 @@ document.addEventListener('keydown', (event) => {
 });
 
 </script>
+
+<style id="ubee-v4-complete-flow-style">
+.ubee-advanced-task-details{margin:18px 0}.ubee-advanced-task-details .input-wrap.is-hidden{display:none!important}
+.ubee-delivery-settings-card{margin:16px 0;padding:15px;border:1px solid var(--line);border-radius:20px;background:#fff;box-shadow:var(--shadowSoft)}
+.ubee-chip-grid,.ubee-radio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.ubee-chip-grid label,.ubee-radio-grid label{display:flex;align-items:center;gap:8px;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:#fafafa;font-size:13px;font-weight:850}
+.ubee-chip-grid input,.ubee-radio-grid input{width:auto;accent-color:#f4bd00}
+@media(max-width:390px){.ubee-chip-grid,.ubee-radio-grid{grid-template-columns:1fr}}
+</style>
+<script id="ubee-v4-complete-flow-script">
+(function(){
+  function syncTaskDetailFields(){
+    const group=String(window.serviceGroup||serviceGroup||'send');
+    document.querySelectorAll('.ubee-detail-send,.ubee-detail-pickup,.ubee-detail-buy,.ubee-detail-queue,.ubee-detail-helper').forEach(el=>el.classList.add('is-hidden'));
+    const map={send:'.ubee-detail-send',pickup:'.ubee-detail-pickup',buy:'.ubee-detail-buy',queue:'.ubee-detail-queue',helper:'.ubee-detail-helper'};
+    document.querySelectorAll(map[group]||'').forEach(el=>el.classList.remove('is-hidden'));
+    const name=document.getElementById('taskItemName');
+    if(name){
+      const placeholders={send:'要送的物品名稱',pickup:'要取的物品或訂單',buy:'要購買的商品名稱',queue:'排隊任務名稱',helper:'要協助完成的任務'};
+      name.placeholder=placeholders[group]||'物品、商品或任務名稱';
+    }
+  }
+  const original=window.selectServiceFromTab;
+  if(typeof original==='function'){
+    window.selectServiceFromTab=function(){const result=original.apply(this,arguments);setTimeout(syncTaskDetailFields,0);return result};
+  }
+  document.addEventListener('DOMContentLoaded',syncTaskDetailFields);
+  setTimeout(syncTaskDetailFields,300);
+})();
+</script>
+
 </body>
 </html>
