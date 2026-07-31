@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<!-- UBee 長期正式營運穩定版：每次開啟新任務皆清空交易資料；執行中訂單追蹤保持獨立。 -->
+<!-- UBee 長期正式營運穩定版：確認頁操作列下移、移除技術性身分訊息、簡化客人操作。 -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
@@ -9812,7 +9812,7 @@ body{background:#eef0f2;}
 
       <div class="member-card">
         <div class="member-title">UBee 跑腿會員</div>
-        <div class="member-sub" id="memberInfoText">LINE 身分確認中｜請從官方帳號開啟</div>
+        <div class="member-sub" id="memberInfoText">會員資料載入中</div>
 
         <div class="member-stats">
           <div class="member-stat"><strong id="memberTaskCount">0</strong><span>任務</span></div>
@@ -17775,7 +17775,7 @@ async function renderRecentTasks(){
     userId === 'web-order'
   ){
     el.innerHTML =
-      'LINE 身分確認中，請稍後再查看最近任務。';
+      '會員資料載入中，請稍後再查看最近任務。';
     return;
   }
 
@@ -17823,7 +17823,7 @@ function renderCustomerActiveTask(){
     userId === 'web-order'
   ){
     el.innerHTML =
-      'LINE 身分確認中，請稍後再查看任務。';
+      '會員資料載入中，請稍後再查看任務。';
     return;
   }
 
@@ -18049,8 +18049,8 @@ async function renderCustomerMemberInfo(){
     info.innerText =
       userId &&
       userId !== 'web-order'
-        ? 'LINE 會員已確認｜可使用 UBee 跑腿服務'
-        : 'LINE 身分確認中｜請從官方帳號開啟';
+        ? '會員資料已載入｜可使用 UBee 跑腿服務'
+        : '會員資料載入中';
   }
 
   if(
@@ -18978,7 +18978,7 @@ async function initPage(){
 
   try{
     setSubmitButton(
-      '身分確認中...',
+      '準備中...',
       true
     );
 
@@ -19132,7 +19132,7 @@ async function initPage(){
       }
 
       setSubmitButton(
-        'LINE 登入中...',
+        '準備中...',
         true
       );
 
@@ -19165,12 +19165,12 @@ async function initPage(){
     }
 
     setSubmitButton(
-      '請從官方帳號開啟一次',
+      '請重新開啟下單頁',
       true
     );
 
-    alert(
-      '第一次使用請先從 UBee 跑腿官方帳號點「立即下單」，完成 LINE 身分綁定後，手機桌面捷徑就可以正常使用。'
+    console.warn(
+      '客人端初始化尚未完成，請重新開啟下單頁。'
     );
 
   }catch(err){
@@ -19208,12 +19208,12 @@ async function initPage(){
     }
 
     setSubmitButton(
-      '請從官方帳號開啟一次',
+      '請重新開啟下單頁',
       true
     );
 
-    alert(
-      '第一次使用請先從 UBee 跑腿官方帳號點「立即下單」，完成 LINE 身分綁定後，手機桌面捷徑就可以正常使用。'
+    console.warn(
+      '客人端初始化尚未完成，請重新開啟下單頁。'
     );
   }
 }
@@ -19766,6 +19766,7 @@ document.addEventListener('keydown', (event) => {
 </script>
 
 
+<!-- 2026-07-31 操作簡化修正：操作列貼齊底部、移除技術性會員身分提示。 -->
 <!-- =========================================================
      UBee 客人端｜長期正式營運穩定流程 2026-07-31
      流程：選擇地點 → 任務內容 → 配送設定 → 確認送出
@@ -19814,7 +19815,7 @@ body.flow-active>.app{display:none!important}
 .flow-progress-item{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;color:#989ca1;font-size:10px;font-weight:900;white-space:nowrap}
 .flow-progress-item::before{content:attr(data-number);display:grid;place-items:center;width:19px;height:19px;flex:0 0 19px;border-radius:50%;background:#eef0f2;color:#7e8388;font-size:10px}
 .flow-progress-item.active{color:#111}.flow-progress-item.active::before{background:var(--flow-accent);color:#111}.flow-progress-item.done::before{content:"✓";background:#111;color:#fff}
-.flow-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 150px}
+.flow-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 94px}
 .flow-home-scroll{padding-top:12px}
 .flow-card{margin-bottom:12px;padding:15px;border:1px solid var(--flow-line);border-radius:20px;background:#fff;box-shadow:0 8px 24px rgba(17,24,39,.045)}
 .flow-section-title{margin:0 0 9px;font-size:15px;font-weight:1000}.flow-help{color:var(--flow-muted);font-size:12px;font-weight:800;line-height:1.6}
@@ -19841,7 +19842,7 @@ body.flow-active>.app{display:none!important}
 .flow-summary-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff}.flow-summary-row{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:9px;align-items:start;padding:12px 13px;border-bottom:1px solid #eef0f1}.flow-summary-row:last-child{border-bottom:none}.flow-summary-label{color:#858a90;font-size:11px;font-weight:900}.flow-summary-value{color:#111;font-size:13px;font-weight:900;line-height:1.55;word-break:break-word}.flow-summary-edit{border:none;background:transparent;color:#876c00;font-size:11px!important;font-weight:1000}
 .flow-price-card{display:flex;align-items:center;justify-content:space-between;gap:12px}.flow-price-card small{display:block;color:#858a90;font-size:11px;font-weight:900}.flow-route-meta{margin-top:4px;color:#676c72;font-size:12px;font-weight:850}.flow-price{font-size:29px;font-weight:1000;white-space:nowrap}
 .flow-check{display:flex;align-items:flex-start;gap:10px;margin:12px 2px;padding:12px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#333;font-size:12px;font-weight:850;line-height:1.55}.flow-check input{width:20px;height:20px;flex:0 0 20px;margin:0;accent-color:#111}
-.flow-actionbar{position:absolute;left:0;right:0;bottom:var(--flow-nav-height);z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px;border-top:1px solid rgba(17,24,39,.08);background:rgba(255,255,255,.98);box-shadow:0 -8px 22px rgba(17,24,39,.07);backdrop-filter:blur(14px)}
+.flow-actionbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px;border-top:1px solid rgba(17,24,39,.08);background:#ffffff}
 .flow-actionbar.single{grid-template-columns:1fr}.flow-actionbar .flow-secondary,.flow-actionbar .flow-primary{min-height:54px}
 .flow-bottom-nav{position:absolute;left:0;right:0;bottom:0;z-index:40;height:var(--flow-nav-height);display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:7px 12px calc(7px + env(safe-area-inset-bottom));border-top:1px solid rgba(17,24,39,.08);background:rgba(255,255,255,.98);box-shadow:0 -8px 26px rgba(17,24,39,.08);backdrop-filter:blur(16px)}
 .flow-bottom-nav button{min-height:55px;border:none;border-radius:14px;background:transparent;color:#8b9096;font-size:11px!important;font-weight:1000}.flow-bottom-nav button.active{width:82%;justify-self:center;background:#111;color:#fff}.flow-nav-icon{display:block;width:31px;height:31px;margin:0 auto 2px;border-radius:50%;background:#f0f2f3;line-height:31px;font-size:17px}.flow-bottom-nav button.active .flow-nav-icon{background:var(--flow-accent);color:#111}
@@ -19849,7 +19850,7 @@ body.flow-active>.app{display:none!important}
 .flow-location-action{width:100%;display:flex;align-items:center;gap:10px;min-height:54px;margin-bottom:13px;padding:10px 12px;border:1px solid #d7e1f3;border-radius:15px;background:#f4f8ff;color:#2f4e7c;text-align:left;font-size:13px!important;font-weight:1000}.flow-location-action small{display:block;margin-top:2px;color:#6e7f96;font-size:10px;font-weight:800}
 .flow-section-label{margin:14px 2px 7px;color:#777c82;font-size:11px;font-weight:1000}.flow-results{display:flex;flex-direction:column;gap:8px}.flow-result{width:100%;display:grid;grid-template-columns:34px minmax(0,1fr) 20px;align-items:center;gap:9px;padding:11px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;text-align:left}.flow-result-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#f0f2f3}.flow-result strong{display:block;color:#111;font-size:13px;font-weight:1000;line-height:1.4}.flow-result small{display:block;margin-top:3px;color:#777c82;font-size:10px;font-weight:800;line-height:1.4}.flow-empty{padding:15px;border:1px dashed #d7dade;border-radius:15px;color:#858a90;font-size:12px;font-weight:850;text-align:center}
 .flow-detail-map{height:190px;margin-bottom:12px;border-radius:18px;background:#e8eaed}.flow-detail-actions{display:flex;gap:8px;margin-top:8px}.flow-small-btn{border:1px solid #e0e2e5;border-radius:999px;background:#fff;padding:8px 10px;color:#555;font-size:11px!important;font-weight:1000}
-.flow-status{min-height:20px;margin:7px 2px;color:#667078;font-size:12px;font-weight:850;line-height:1.5}.flow-status.error{color:var(--flow-danger)}
+.flow-status{min-height:20px;margin:7px 2px;color:#667078;font-size:12px;font-weight:850;line-height:1.5}.flow-status:empty{display:none}.flow-status.error{color:var(--flow-danger)}
 .flow-loading{position:absolute;inset:0;z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(255,255,255,.82);backdrop-filter:blur(3px);font-size:13px;font-weight:1000}.flow-loading.show{display:flex}.flow-spinner{width:34px;height:34px;border:4px solid #e5e7ea;border-top-color:#111;border-radius:50%;animation:flowSpin .75s linear infinite}@keyframes flowSpin{to{transform:rotate(360deg)}}
 /* 正式訂單追蹤頁的底部導航同步同一套視覺 */
 body:not(.flow-active) .bottom-tabs{height:var(--flow-nav-height)!important;max-width:520px!important;padding:7px 12px calc(7px + env(safe-area-inset-bottom))!important;border-radius:0!important;background:rgba(255,255,255,.98)!important;box-shadow:0 -8px 26px rgba(17,24,39,.08)!important}
@@ -19895,6 +19896,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
             </button>
           </div>
           <div id="flowTaskPreview" class="flow-task-preview"><div id="flowTaskPreviewText" class="flow-task-preview-text"></div><button id="flowEditTaskButton" class="flow-text-link" type="button">修改</button></div>
+          <div id="flowHomeStatus" class="flow-status"></div>
           <button id="flowHomeNext" class="flow-primary flow-home-next" type="button">下一步：填寫任務內容</button>
         </div>
       </div>
@@ -19993,6 +19995,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       <div class="flow-scroll">
         <div class="flow-search-box"><input id="flowAddressSearch" class="flow-input" maxlength="160" placeholder="輸入地址、店家或地標"><button id="flowSearchClear" class="flow-clear-btn" type="button">×</button></div>
         <button id="flowUseCurrentLocation" class="flow-location-action" type="button"><span>⌖</span><span><strong>使用目前位置</strong><small>定位後仍可補充門牌、樓層與聯絡資訊</small></span></button>
+        <div id="flowSearchStatus" class="flow-status"></div>
         <div class="flow-section-label">常用地址</div><div id="flowSavedAddresses" class="flow-results"><div class="flow-empty">讀取中…</div></div>
         <div class="flow-section-label">最近使用</div><div id="flowRecentAddresses" class="flow-results"></div>
         <div class="flow-section-label">搜尋結果</div><div id="flowSearchResults" class="flow-results"><div class="flow-empty">輸入至少 2 個字開始搜尋</div></div>
@@ -20053,7 +20056,40 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]))}
   function cleanPhone(value){return String(value||'').replace(/\D/g,'').slice(0,10)}
   function validPoint(point){return point&&Number.isFinite(Number(point.lat))&&Number.isFinite(Number(point.lng))&&Number(point.lat)>=-90&&Number(point.lat)<=90&&Number(point.lng)>=-180&&Number(point.lng)<=180}
-  function getUserId(){try{const profileId=typeof liffProfile!=='undefined'?liffProfile?.userId:'';return String(typeof liffUserId!=='undefined'?liffUserId:(profileId||localStorage.getItem('lineUserId')||'')).trim()}catch(_){return''}}
+  function getUserId(){
+    try{
+      const profileId=typeof liffProfile!=='undefined'?liffProfile?.userId:'';
+      const candidates=[
+        typeof userId!=='undefined'?userId:'',
+        typeof liffUserId!=='undefined'?liffUserId:'',
+        profileId,
+        localStorage.getItem('ubee_customer_line_user_id')||'',
+        localStorage.getItem('lineUserId')||''
+      ];
+      return String(candidates.find(value=>String(value||'').trim().startsWith('U'))||'').trim();
+    }catch(_){return''}
+  }
+
+  async function resolveCustomerIdForSubmit(){
+    let id=getUserId();
+    if(id.startsWith('U'))return id;
+    try{
+      if(window.liff&&typeof liff.isLoggedIn==='function'&&liff.isLoggedIn()&&typeof liff.getProfile==='function'){
+        const profile=await Promise.race([
+          liff.getProfile(),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error('CUSTOMER_SESSION_TIMEOUT')),3500))
+        ]);
+        id=String(profile?.userId||'').trim();
+        if(id.startsWith('U')){
+          try{userId=id}catch(_){ }
+          try{if(typeof saveLineUserId==='function')saveLineUserId(id)}catch(_){ }
+          try{localStorage.setItem('ubee_customer_line_user_id',id)}catch(_){ }
+          return id;
+        }
+      }
+    }catch(error){console.warn('客人資料自動確認失敗：',error)}
+    return getUserId();
+  }
   function activeOrder(){try{const s=String(currentOrderData?.status||'').toLowerCase();return !!currentOrderId&&!['completed','done','cancelled','canceled'].includes(s)}catch(_){return false}}
 
   function buildProgress(){
@@ -20118,7 +20154,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     else preview.classList.remove('show');
   }
 
-  function openAddress(target){state.addressTarget=target;$('flowSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';showPage('search');loadAddresses();$('flowAddressSearch').focus()}
+  function openAddress(target){state.addressTarget=target;status('flowSearchStatus','');$('flowSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';showPage('search');loadAddresses();$('flowAddressSearch').focus()}
 
   async function loadAddresses(){
     const uid=getUserId();
@@ -20154,15 +20190,15 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   async function choosePrediction(index){
     const item=state.searchItems[Number(index)];if(!item)return;
     setLoading(true,'正在讀取地址…');
-    try{const response=await fetch('/api/address/detail',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({placeId:item.placeId,sessionToken:state.searchSession})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'地址讀取失敗');openDetail(data.address||{})}catch(error){alert(error.message||'地址讀取失敗')}finally{setLoading(false)}
+    try{const response=await fetch('/api/address/detail',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({placeId:item.placeId,sessionToken:state.searchSession})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'地址讀取失敗');status('flowSearchStatus','');openDetail(data.address||{})}catch(error){status('flowSearchStatus',error.message||'地址讀取失敗，請重新搜尋。',true)}finally{setLoading(false)}
   }
 
   async function useCurrentLocation(){
-    if(!navigator.geolocation){alert('此裝置無法使用定位功能。');return}
+    if(!navigator.geolocation){status('flowSearchStatus','此裝置無法使用定位功能，請改用地址搜尋。',true);return}
     setLoading(true,'正在取得目前位置…');
     navigator.geolocation.getCurrentPosition(async position=>{
-      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);const response=await fetch('/api/address/reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'目前位置轉換失敗');openDetail({...data.address,lat,lng})}catch(error){alert(error.message||'無法讀取目前位置')}finally{setLoading(false)}
-    },()=>{setLoading(false);alert('無法取得定位權限，請改用地址搜尋。')},{enableHighAccuracy:true,timeout:12000,maximumAge:30000});
+      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);const response=await fetch('/api/address/reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'目前位置轉換失敗');status('flowSearchStatus','');openDetail({...data.address,lat,lng})}catch(error){status('flowSearchStatus',error.message||'無法讀取目前位置，請改用地址搜尋。',true)}finally{setLoading(false)}
+    },()=>{setLoading(false);status('flowSearchStatus','無法取得目前位置，請改用地址搜尋。',true)},{enableHighAccuracy:true,timeout:12000,maximumAge:30000});
   }
 
   function openDetail(base){
@@ -20303,7 +20339,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   }
 
   async function openConfirm(){
-    if(!state.pickup||!state.dropoff){showPage('home');alert('請先完成取件地點與送達地點。');return}
+    if(!state.pickup||!state.dropoff){showPage('home');status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}
     if(!validateTask()){showPage('task');return}
     if(!validateOptions()){showPage('options');return}
     syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在載入路線與正式估價…');
@@ -20314,7 +20350,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     if(state.submitting)return;if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
     syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
     try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
-    const uid=getUserId();if(!uid.startsWith('U')){status('flowConfirmStatus','LINE 身分尚未完成，請從 UBee 官方帳號重新開啟下單頁。',true);return}
+    const uid=await resolveCustomerIdForSubmit();if(!uid.startsWith('U')){status('flowConfirmStatus','目前無法建立任務，請關閉頁面後重新開啟再試。',true);return}
     state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
     try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');await createOrder();if(typeof currentOrderId!=='undefined'&&currentOrderId){root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true)}finally{state.submitting=false;setLoading(false)}
   }
@@ -20341,7 +20377,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function bind(){
     $('flowServiceTabs').addEventListener('click',event=>{const btn=event.target.closest('[data-service]');if(btn)setService(btn.dataset.service)});
     $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));
-    $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||!state.dropoff){alert('請先完成取件地點與送達地點。');return}syncServiceSelectors();showPage('task')});$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
+    $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||!state.dropoff){status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}status('flowHomeStatus','');syncServiceSelectors();showPage('task')});$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
     root.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.go)));
     $('flowServiceType').addEventListener('change',()=>{state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||state.taskName;syncServiceSelectors()});$('flowServiceCategory').addEventListener('change',()=>state.serviceCategory=$('flowServiceCategory').value);
     $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
