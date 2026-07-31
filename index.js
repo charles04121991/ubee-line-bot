@@ -730,6 +730,10 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_SERVER_API_KEY =
   process.env.GOOGLE_MAPS_SERVER_API_KEY || GOOGLE_MAPS_API_KEY;
 
+if (!process.env.GOOGLE_MAPS_SERVER_API_KEY) {
+  console.warn('⚠️ GOOGLE_MAPS_SERVER_API_KEY 尚未獨立設定；目前暫時沿用瀏覽器地圖金鑰。正式營運建議建立伺服器專用金鑰。');
+}
+
 // 可選。
 // 未設定也可以正常顯示地圖；未來若建立正式 Google Maps Map ID，
 // 只要在 Render 增加 GOOGLE_MAPS_MAP_ID 即可。
@@ -22596,13 +22600,113 @@ app.post('/api/address/reverse-geocode', async (req, res) => {
     address.lat = lat;
     address.lng = lng;
     address.label = address.district || address.city || '目前位置';
+    address.displayLocation = [address.city, address.district]
+      .filter(Boolean)
+      .filter((value, index, list) => list.indexOf(value) === index)
+      .join('');
+    address.displayAddress =
+      address.formattedAddress ||
+      address.address ||
+      [address.city, address.district, address.route, address.streetNumber]
+        .filter(Boolean)
+        .join('');
 
-    return res.json({ success: true, address });
+    return res.json({
+      success: true,
+      address,
+      location: {
+        lat,
+        lng,
+        city: address.city || '',
+        district: address.district || '',
+        displayLocation: address.displayLocation || '',
+        formattedAddress: address.displayAddress || '',
+        placeId: address.placeId || '',
+      },
+    });
   } catch (error) {
     console.error('❌ /api/address/reverse-geocode error:', error);
     return res.status(500).json({
       success: false,
       error: '目前位置暫時無法轉換為地址，請手動搜尋地址。',
+    });
+  }
+});
+
+
+
+// =====================================================
+// UBee 客人端目前位置資訊（正式營運穩定版）
+// 僅將座標轉成台灣縣市、行政區與地址，不會自動建立訂單。
+// =====================================================
+app.post('/api/customer/current-location', async (req, res) => {
+  if (!ensureGoogleMapsServerKeyForAddressApi(res)) return;
+
+  try {
+    const lat = getNullableCoordinate(req.body?.lat);
+    const lng = getNullableCoordinate(req.body?.lng);
+
+    if (!isValidLatitude(lat) || !isValidLongitude(lng)) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_LOCATION',
+        message: '無法判斷目前位置，請重新開啟定位權限或手動選擇服務地區。',
+      });
+    }
+
+    const params = new URLSearchParams({
+      latlng: `${lat},${lng}`,
+      language: 'zh-TW',
+      region: 'tw',
+      key: GOOGLE_MAPS_SERVER_API_KEY,
+    });
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`
+    );
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !['OK', 'ZERO_RESULTS'].includes(String(data.status || ''))) {
+      return res.status(502).json({
+        success: false,
+        code: 'LOCATION_LOOKUP_FAILED',
+        message: getSafeGoogleAddressApiError(data, '目前位置暫時無法轉換成地址。'),
+      });
+    }
+
+    const result = Array.isArray(data.results) ? data.results[0] : null;
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        code: 'LOCATION_NOT_FOUND',
+        message: '目前位置附近找不到可使用的地址，請手動選擇服務地區。',
+      });
+    }
+
+    const address = normalizeGoogleAddressResult(result);
+    const displayLocation = [address.city, address.district]
+      .filter(Boolean)
+      .filter((value, index, list) => list.indexOf(value) === index)
+      .join('');
+
+    return res.json({
+      success: true,
+      location: {
+        lat,
+        lng,
+        city: address.city || '',
+        district: address.district || '',
+        displayLocation: displayLocation || address.city || '目前位置',
+        formattedAddress: address.formattedAddress || address.address || '',
+        placeId: address.placeId || '',
+      },
+    });
+  } catch (error) {
+    console.error('❌ /api/customer/current-location error:', error);
+    return res.status(500).json({
+      success: false,
+      code: 'LOCATION_LOOKUP_ERROR',
+      message: '目前位置暫時無法取得，請稍後再試或手動選擇服務地區。',
     });
   }
 });
