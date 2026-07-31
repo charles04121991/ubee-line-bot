@@ -22489,7 +22489,7 @@ app.post('/api/address/search', async (req, res) => {
     console.error('❌ /api/address/search error:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || '地址搜尋失敗',
+      error: '地址搜尋服務暫時無法使用，請稍後再試。',
     });
   }
 });
@@ -22548,7 +22548,7 @@ app.post('/api/address/detail', async (req, res) => {
     console.error('❌ /api/address/detail error:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || '地址詳細資料讀取失敗',
+      error: '地址資料暫時無法讀取，請重新選擇或稍後再試。',
     });
   }
 });
@@ -22602,7 +22602,7 @@ app.post('/api/address/reverse-geocode', async (req, res) => {
     console.error('❌ /api/address/reverse-geocode error:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || '目前位置轉換地址失敗',
+      error: '目前位置暫時無法轉換為地址，請手動搜尋地址。',
     });
   }
 });
