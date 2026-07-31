@@ -21860,6 +21860,9 @@ app.post('/api/map-route', async (req, res) => {
         ),
 
       encodedPolyline,
+      routePolyline: encodedPolyline,
+      overviewPolyline: encodedPolyline,
+      polyline: encodedPolyline,
 
       originLocation: {
         lat: originLat,
