@@ -22400,7 +22400,38 @@ function normalizeGoogleAddressResult(result = {}) {
   };
 }
 
+function ensureGoogleMapsServerKeyForAddressApi(res) {
+  if (GOOGLE_MAPS_SERVER_API_KEY) return true;
+
+  res.status(503).json({
+    success: false,
+    code: 'GOOGLE_MAPS_SERVER_KEY_MISSING',
+    error: '地址服務暫時無法使用，請稍後再試。',
+  });
+  return false;
+}
+
+function getSafeGoogleAddressApiError(data, fallback) {
+  const status = String(data?.status || '').trim();
+
+  if (status === 'REQUEST_DENIED') {
+    console.error('❌ Google 地址 API REQUEST_DENIED：', data?.error_message || status);
+    return '地址服務設定異常，請聯繫 UBee 客服。';
+  }
+
+  if (status === 'OVER_QUERY_LIMIT') {
+    return '地址服務目前忙碌，請稍後再試。';
+  }
+
+  if (status === 'INVALID_REQUEST') {
+    return '地址資料不完整，請重新輸入。';
+  }
+
+  return fallback;
+}
+
 app.post('/api/address/search', async (req, res) => {
+  if (!ensureGoogleMapsServerKeyForAddressApi(res)) return;
   try {
     const input = cleanText(req.body?.input || req.body?.query || '', 160);
     if (input.length < 2) {
@@ -22414,7 +22445,7 @@ app.post('/api/address/search', async (req, res) => {
       input,
       language: 'zh-TW',
       components: 'country:tw',
-      key: GOOGLE_MAPS_API_KEY,
+      key: GOOGLE_MAPS_SERVER_API_KEY,
     });
 
     const lat = getNullableCoordinate(req.body?.lat);
@@ -22435,7 +22466,7 @@ app.post('/api/address/search', async (req, res) => {
     if (!['OK', 'ZERO_RESULTS'].includes(String(data.status || ''))) {
       return res.status(400).json({
         success: false,
-        error: data.error_message || data.status || 'Google 地址搜尋失敗',
+        error: getSafeGoogleAddressApiError(data, '地址搜尋失敗，請稍後再試。'),
       });
     }
 
@@ -22464,6 +22495,7 @@ app.post('/api/address/search', async (req, res) => {
 });
 
 app.post('/api/address/detail', async (req, res) => {
+  if (!ensureGoogleMapsServerKeyForAddressApi(res)) return;
   try {
     const placeId = cleanText(req.body?.placeId || '', 240);
     if (!placeId) {
@@ -22485,7 +22517,7 @@ app.post('/api/address/detail', async (req, res) => {
       place_id: placeId,
       fields,
       language: 'zh-TW',
-      key: GOOGLE_MAPS_API_KEY,
+      key: GOOGLE_MAPS_SERVER_API_KEY,
     });
 
     const sessionToken = cleanText(req.body?.sessionToken || '', 120);
@@ -22499,7 +22531,7 @@ app.post('/api/address/detail', async (req, res) => {
     if (data.status !== 'OK' || !data.result) {
       return res.status(400).json({
         success: false,
-        error: data.error_message || data.status || '查無地址詳細資料',
+        error: getSafeGoogleAddressApiError(data, '查無可使用的地址資料。'),
       });
     }
 
@@ -22522,6 +22554,7 @@ app.post('/api/address/detail', async (req, res) => {
 });
 
 app.post('/api/address/reverse-geocode', async (req, res) => {
+  if (!ensureGoogleMapsServerKeyForAddressApi(res)) return;
   try {
     const lat = getNullableCoordinate(req.body?.lat);
     const lng = getNullableCoordinate(req.body?.lng);
@@ -22536,7 +22569,7 @@ app.post('/api/address/reverse-geocode', async (req, res) => {
     const params = new URLSearchParams({
       latlng: `${lat},${lng}`,
       language: 'zh-TW',
-      key: GOOGLE_MAPS_API_KEY,
+      key: GOOGLE_MAPS_SERVER_API_KEY,
     });
 
     const response = await fetch(
@@ -22547,7 +22580,7 @@ app.post('/api/address/reverse-geocode', async (req, res) => {
     if (!['OK', 'ZERO_RESULTS'].includes(String(data.status || ''))) {
       return res.status(400).json({
         success: false,
-        error: data.error_message || data.status || '反向地理編碼失敗',
+        error: getSafeGoogleAddressApiError(data, '目前位置轉換地址失敗。'),
       });
     }
 
