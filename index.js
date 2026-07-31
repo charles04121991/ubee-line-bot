@@ -20793,7 +20793,7 @@ function createOrderFromApi(data) {
   const serviceGroupMap = {
     send: '幫我送',
     pickup: '幫我取',
-    buy: '幫代買',
+    buy: '幫我買',
     queue: '幫排隊',
     helper: '全能跑腿',
     urgent: '急件專送',
@@ -20898,6 +20898,41 @@ function createOrderFromApi(data) {
   const dropoffLng =
     getNullableCoordinate(data.dropoffLng);
 
+  const rawTaskDetails =
+    data.taskDetails && typeof data.taskDetails === 'object'
+      ? data.taskDetails
+      : {};
+
+  const taskDetails = {
+    itemName: cleanText(rawTaskDetails.itemName || '', 120),
+    quantity: cleanText(rawTaskDetails.quantity || data.itemQuantity || '', 40),
+    weight: cleanText(rawTaskDetails.weight || '', 40),
+    pickupCode: cleanText(rawTaskDetails.pickupCode || '', 80),
+    pickupPaid: ['paid', 'unpaid', 'unknown'].includes(String(rawTaskDetails.pickupPaid || ''))
+      ? String(rawTaskDetails.pickupPaid)
+      : 'unknown',
+    replacementPolicy: ['contact', 'skip', 'similar'].includes(String(rawTaskDetails.replacementPolicy || ''))
+      ? String(rawTaskDetails.replacementPolicy)
+      : 'contact',
+    invoice: ['need', 'no_need', 'either'].includes(String(rawTaskDetails.invoice || ''))
+      ? String(rawTaskDetails.invoice)
+      : 'need',
+    queuePurpose: cleanText(rawTaskDetails.queuePurpose || '', 120),
+    queueHandoff: cleanLongText(rawTaskDetails.queueHandoff || '', 200),
+    deadline: cleanText(rawTaskDetails.deadline || '', 80),
+  };
+
+  const deliveryPreferences = Array.isArray(data.deliveryPreferences)
+    ? data.deliveryPreferences
+        .map(value => cleanText(value, 40))
+        .filter(value => ['call_before_arrival', 'no_doorbell', 'leave_reception', 'keep_warm', 'keep_dry'].includes(value))
+        .slice(0, 5)
+    : [];
+
+  const vehiclePreference = ['any', 'motorcycle', 'car'].includes(String(data.vehiclePreference || ''))
+    ? String(data.vehiclePreference)
+    : 'any';
+
   return {
     userId,
     customerId: userId,
@@ -20929,6 +20964,9 @@ function createOrderFromApi(data) {
     ),
 
     item: rawItem,
+    taskDetails,
+    deliveryPreferences,
+    vehiclePreference,
 
     pickupAddress: cleanText(
       data.pickup ||
@@ -23923,6 +23961,19 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   shoppingItems:
     Array.isArray(data.shoppingItems) ? data.shoppingItems : [],
+
+  taskDetails:
+    data.taskDetails && typeof data.taskDetails === 'object'
+      ? data.taskDetails
+      : {},
+
+  deliveryPreferences:
+    Array.isArray(data.deliveryPreferences)
+      ? data.deliveryPreferences
+      : [],
+
+  vehiclePreference:
+    data.vehiclePreference || 'any',
 
   addressCenterVersion:
     data.addressCenterVersion || '',
