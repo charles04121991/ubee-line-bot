@@ -21100,6 +21100,34 @@ function createOrderFromApi(data) {
     addressCenterVersion: cleanText(data.addressCenterVersion || '', 50),
     clientSchemaVersion: cleanText(data.clientSchemaVersion || '', 80),
 
+    // 類 UU 流程使用的完整地址物件；舊欄位仍保留為正式派單相容欄位。
+    pickupAddressObject: normalizeCustomerSavedAddress(
+      data.pickupAddressObject || {
+        label: data.pickupAddressLabel,
+        name: data.pickupContact,
+        address: data.pickup || data.pickupAddress,
+        addressDetail: data.pickupAddressNote,
+        contactName: data.pickupContact,
+        phone: data.pickupPhone,
+        placeId: data.pickupPlaceId,
+        lat: data.pickupLat,
+        lng: data.pickupLng,
+      }
+    ),
+    dropoffAddressObject: normalizeCustomerSavedAddress(
+      data.dropoffAddressObject || {
+        label: data.dropoffAddressLabel,
+        name: data.dropoffContact,
+        address: data.dropoff || data.dropoffAddress,
+        addressDetail: data.dropoffAddressNote,
+        contactName: data.dropoffContact,
+        phone: data.dropoffPhone,
+        placeId: data.dropoffPlaceId,
+        lat: data.dropoffLat,
+        lng: data.dropoffLng,
+      }
+    ),
+
     advancePayment:
       parseNonNegativeMoney(
         data.advancePayment
@@ -23980,6 +24008,12 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   clientSchemaVersion:
     data.clientSchemaVersion || '',
+
+  pickupAddressObject:
+    data.pickupAddressObject || null,
+
+  dropoffAddressObject:
+    data.dropoffAddressObject || null,
 
   // ==============================
   // 取件資訊
@@ -30204,6 +30238,240 @@ app.get('/api/customer/orders/:orderId/tracking', async (req, res) => {
     return res.status(500).json({ success:false, error:'即時追蹤讀取失敗' });
   }
 });
+
+
+// =====================================================
+// UBee 客戶端「類 UU 跑腿」地址中心正式相容層｜2026-07-31
+// - 不建立第二套訂單核心
+// - 常用地址跨裝置保存於 Firestore
+// - 最近使用地址從既有 orders 彙整
+// - 前端仍使用既有 /api/address/*、/api/quote、/api/orders
+// =====================================================
+function normalizeCustomerSavedAddress(input = {}) {
+  const lat = getNullableCoordinate(input.lat);
+  const lng = getNullableCoordinate(input.lng);
+
+  return {
+    label: cleanText(input.label || input.addressLabel || '常用地址', 40),
+    name: cleanText(input.name || input.placeName || '', 100),
+    address: cleanText(input.address || input.formattedAddress || '', 240),
+    formattedAddress: cleanText(input.formattedAddress || input.address || '', 240),
+    addressDetail: cleanLongText(input.addressDetail || input.note || '', 160),
+    contactName: cleanText(input.contactName || input.contact || '', 60),
+    phone: normalizePhone(cleanText(input.phone || '', 30)),
+    placeId: cleanText(input.placeId || '', 240),
+    city: cleanText(input.city || '', 60),
+    district: cleanText(input.district || '', 60),
+    lat: isValidLatitude(lat) ? lat : null,
+    lng: isValidLongitude(lng) ? lng : null,
+  };
+}
+
+function getCustomerAddressTimeMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function validateCustomerAddressIdentity(userId) {
+  const normalized = String(userId || '').trim();
+  if (!isValidCustomerUserId(normalized)) {
+    const error = new Error('LINE 身分驗證失敗，請重新從 UBee 官方帳號進入。');
+    error.statusCode = 401;
+    throw error;
+  }
+  return normalized;
+}
+
+function customerAddressesCollection(userId) {
+  return db
+    .collection('customerProfiles')
+    .doc(userId)
+    .collection('addresses');
+}
+
+app.get('/api/customer/addresses', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const userId = validateCustomerAddressIdentity(
+      req.query.userId || req.query.customerId
+    );
+
+    const snap = await customerAddressesCollection(userId)
+      .limit(50)
+      .get();
+
+    const addresses = snap.docs
+      .map(doc => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          ...normalizeCustomerSavedAddress(data),
+          createdAtMs: getCustomerAddressTimeMs(data.createdAtMs || data.createdAt),
+          updatedAtMs: getCustomerAddressTimeMs(data.updatedAtMs || data.updatedAt),
+        };
+      })
+      .sort((a, b) => (b.updatedAtMs || b.createdAtMs) - (a.updatedAtMs || a.createdAtMs))
+      .slice(0, 20);
+
+    return res.json({ success: true, addresses });
+  } catch (error) {
+    console.error('❌ 讀取客戶常用地址失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || '常用地址讀取失敗',
+    });
+  }
+});
+
+app.post('/api/customer/addresses', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const userId = validateCustomerAddressIdentity(
+      req.body?.userId || req.body?.customerId
+    );
+    const address = normalizeCustomerSavedAddress(req.body?.address || req.body || {});
+
+    if (!address.address || address.address.length < 5) {
+      return res.status(400).json({
+        success: false,
+        error: '請先選擇或輸入完整地址。',
+      });
+    }
+
+    if (address.phone && !/^09\d{8}$/.test(address.phone)) {
+      return res.status(400).json({
+        success: false,
+        error: '常用地址電話格式不正確。',
+      });
+    }
+
+    const requestedId = cleanText(req.body?.addressId || '', 100);
+    const ref = requestedId
+      ? customerAddressesCollection(userId).doc(requestedId)
+      : customerAddressesCollection(userId).doc();
+
+    const nowMs = Date.now();
+    const previous = requestedId ? await ref.get() : null;
+    const previousData = previous?.exists ? previous.data() || {} : {};
+
+    await ref.set({
+      ...address,
+      createdAtMs: Number(previousData.createdAtMs || nowMs),
+      updatedAtMs: nowMs,
+      createdAt: previousData.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      dataVersion: 1,
+      source: 'customer-order-uu-flow',
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      address: {
+        id: ref.id,
+        ...address,
+        createdAtMs: Number(previousData.createdAtMs || nowMs),
+        updatedAtMs: nowMs,
+      },
+    });
+  } catch (error) {
+    console.error('❌ 儲存客戶常用地址失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || '常用地址儲存失敗',
+    });
+  }
+});
+
+app.post('/api/customer/addresses/:addressId/delete', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const userId = validateCustomerAddressIdentity(
+      req.body?.userId || req.body?.customerId
+    );
+    const addressId = cleanText(req.params.addressId || '', 100);
+
+    if (!addressId) {
+      return res.status(400).json({ success: false, error: '缺少地址識別碼。' });
+    }
+
+    await customerAddressesCollection(userId).doc(addressId).delete();
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('❌ 刪除客戶常用地址失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || '常用地址刪除失敗',
+    });
+  }
+});
+
+app.get('/api/customer/recent-addresses', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const userId = validateCustomerAddressIdentity(
+      req.query.userId || req.query.customerId
+    );
+
+    const snap = await db
+      .collection('orders')
+      .where('userId', '==', userId)
+      .limit(60)
+      .get();
+
+    const rows = snap.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .sort((a, b) => getCustomerAddressTimeMs(b.createdAt || b.createdAtMs) - getCustomerAddressTimeMs(a.createdAt || a.createdAtMs));
+
+    const seen = new Set();
+    const addresses = [];
+
+    const pushAddress = (order, target) => {
+      const isPickup = target === 'pickup';
+      const address = normalizeCustomerSavedAddress({
+        label: isPickup ? '最近取件' : '最近收件',
+        name: isPickup ? order.pickupContact : order.dropoffContact,
+        address: isPickup ? order.pickupAddress : order.dropoffAddress,
+        addressDetail: isPickup ? order.pickupAddressNote : order.dropoffAddressNote,
+        contactName: isPickup ? order.pickupContact : order.dropoffContact,
+        phone: isPickup ? order.pickupPhone : order.dropoffPhone,
+        placeId: isPickup ? order.pickupPlaceId : order.dropoffPlaceId,
+        lat: isPickup ? order.pickupLat : order.dropoffLat,
+        lng: isPickup ? order.pickupLng : order.dropoffLng,
+      });
+
+      const key = address.address.replace(/\s+/g, '').toLowerCase();
+      if (!address.address || seen.has(key)) return;
+      seen.add(key);
+      addresses.push({
+        id: `recent_${target}_${order.id}`,
+        recent: true,
+        ...address,
+        usedAtMs: getCustomerAddressTimeMs(order.createdAt || order.createdAtMs),
+      });
+    };
+
+    rows.forEach(order => {
+      if (addresses.length >= 12) return;
+      pushAddress(order, 'dropoff');
+      if (addresses.length < 12) pushAddress(order, 'pickup');
+    });
+
+    return res.json({ success: true, addresses: addresses.slice(0, 12) });
+  } catch (error) {
+    console.error('❌ 讀取客戶最近地址失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message || '最近地址讀取失敗',
+    });
+  }
+});
+
 
 // =====================================================
 // UBee 網路韌性健康檢查
