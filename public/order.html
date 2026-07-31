@@ -19767,1168 +19767,598 @@ document.addEventListener('keydown', (event) => {
 
 
 <!-- =========================================================
-     UBee 客戶端｜類 UU 跑腿系統化下單流程正式相容層
-     - 保留原本估價、建單、付款、派單、即時追蹤核心
-     - 只重整客戶端操作流程與地址中心
+     UBee 客人端｜長期正式營運穩定流程 2026-07-31
+     流程：選擇地點 → 任務內容 → 配送設定 → 確認送出
+     保留既有正式估價、建單、付款、派單與追蹤核心
      ========================================================= -->
-<style id="ubee-uu-flow-style">
-:root{--uu-accent:#facc15;--uu-accent-strong:#f4bd00;--uu-black:#111;--uu-bg:#f4f5f6;--uu-card:#fff;--uu-line:#e8e9eb;--uu-muted:#73777d;--uu-danger:#e5484d}
-body.uu-flow-active{overflow:hidden!important;background:var(--uu-bg)!important}
-#uuFlowRoot{position:fixed;inset:0;z-index:10000;background:var(--uu-bg);color:var(--uu-black);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;overflow:hidden}
-#uuFlowRoot *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-.uu-shell{width:100%;max-width:520px;height:100%;margin:0 auto;background:var(--uu-bg);display:flex;flex-direction:column;position:relative;box-shadow:0 0 40px rgba(0,0,0,.06)}
-.uu-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px calc(112px + env(safe-area-inset-bottom))}
-.uu-page{display:none;min-height:100%;animation:uuFade .18s ease}.uu-page.active{display:block}
-.uu-page .hidden{display:none!important}@keyframes uuFade{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
-.uu-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:70px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:linear-gradient(135deg,#fff9dc,#fff);border-bottom:1px solid rgba(0,0,0,.04);position:sticky;top:0;z-index:30}
-.uu-brand{font-size:25px;font-weight:1000;letter-spacing:-1px}.uu-brand span{color:var(--uu-accent-strong)}
-.uu-city-btn,.uu-icon-btn{border:1px solid rgba(17,17,17,.08);background:rgba(255,255,255,.85);border-radius:999px;min-height:40px;padding:0 14px;font-weight:900;color:#222}.uu-city-btn{justify-self:center}.uu-icon-btn{justify-self:end;width:42px;padding:0;font-size:20px}
-.uu-back-header{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;min-height:70px;background:#fff;position:sticky;top:0;z-index:30;border-bottom:1px solid var(--uu-line)}
-.uu-back{width:42px;height:42px;border:none;border-radius:14px;background:#f3f4f5;font-size:27px;line-height:1}.uu-page-title{font-size:20px;font-weight:1000;flex:1}.uu-page-sub{font-size:12px;color:var(--uu-muted);font-weight:800}
-.uu-service-card{margin-top:16px;background:#fff;border-radius:24px;box-shadow:0 12px 30px rgba(17,24,39,.07);overflow:hidden;border:1px solid rgba(17,17,17,.04)}
-.uu-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;padding:14px 8px 4px}.uu-tab{position:relative;border:none;background:transparent;padding:8px 2px 14px;color:#666;font-size:14px!important;font-weight:900;white-space:nowrap}.uu-tab.active{color:#111}.uu-tab.active:after{content:"";position:absolute;left:24%;right:24%;bottom:3px;height:4px;border-radius:999px;background:var(--uu-accent-strong)}
-.uu-live-line{display:flex;align-items:center;gap:10px;margin:8px 20px 4px;padding:10px 0;color:#73777d;font-size:13px;font-weight:800}.uu-live-dot{width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 5px rgba(34,197,94,.12)}.uu-live-line b{color:#111}.uu-live-line em{font-style:normal;color:#a67800}
-.uu-route{padding:8px 18px 4px;position:relative}.uu-route:before{content:"";position:absolute;left:30px;top:38px;bottom:38px;width:2px;background:#d7d9dc}.uu-address-row{width:100%;display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:10px;border:none;background:transparent;padding:13px 0;text-align:left}.uu-marker{width:15px;height:15px;border-radius:50%;border:4px solid #dff7f2;background:#13bfa6;z-index:1}.uu-marker.drop{border-color:#fff1dc;background:#ff8a00}.uu-address-main{min-width:0}.uu-address-main strong{display:block;font-size:17px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.uu-address-main small{display:block;color:var(--uu-danger);font-size:12px;font-weight:900;margin-top:3px}.uu-address-book{color:#777;font-size:13px;font-weight:900;padding-left:8px}
-.uu-task-chip{margin:6px 18px 0;padding:12px 14px;border:1px solid var(--uu-line);background:#fafafa;border-radius:15px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;font-weight:900}.uu-task-chip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.uu-task-chip button{border:none;background:transparent;color:#8a6800;font-weight:1000}
-.uu-primary{width:calc(100% - 36px);margin:18px;border:none;border-radius:18px;background:var(--uu-accent);color:#111;padding:17px;font-size:18px!important;font-weight:1000;box-shadow:0 8px 18px rgba(244,189,0,.22)}.uu-primary:disabled{opacity:.48;box-shadow:none}.uu-secondary{width:100%;border:1px solid var(--uu-line);border-radius:16px;background:#fff;color:#111;padding:14px;font-size:15px!important;font-weight:1000}
-.uu-watermark{text-align:center;margin:74px 0 30px;color:#e5e6e8;font-size:45px;font-weight:1000;letter-spacing:-3px}.uu-watermark small{display:block;font-size:12px;letter-spacing:0;margin-top:4px}
-.uu-bottom{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;padding:10px 30px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid var(--uu-line);z-index:35}.uu-bottom button{border:none;background:transparent;min-height:54px;font-size:12px!important;font-weight:900}.uu-bottom-icon{display:block;width:35px;height:35px;border-radius:50%;margin:0 auto 2px;line-height:35px;font-size:20px;background:#f1f2f3}.uu-bottom button.active .uu-bottom-icon{background:var(--uu-accent)}
-.uu-panel{background:#fff;border:1px solid var(--uu-line);border-radius:22px;margin:14px 0;padding:16px;box-shadow:0 10px 26px rgba(17,24,39,.05)}.uu-panel-title{font-size:21px;font-weight:1000;margin-bottom:12px}.uu-panel-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.uu-panel-title-row button{border:none;background:transparent;color:#777;font-weight:900}
-.uu-buy-categories{display:flex;gap:14px;overflow-x:auto;padding:4px 0 12px}.uu-buy-category{flex:0 0 72px;border:none;background:transparent;text-align:center;font-weight:900;color:#444}.uu-buy-category i{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto 6px;border-radius:18px;background:#fff8d8;font-style:normal;font-size:28px;border:2px solid transparent}.uu-buy-category.active i{border-color:var(--uu-accent-strong);background:#fff3b1}.uu-buy-category.active{color:#111}
-.uu-textarea{width:100%;min-height:190px;border:none;background:#f5f6f7;border-radius:18px;padding:16px;font-size:16px!important;line-height:1.65;resize:vertical;outline:none}.uu-quick-chips{display:flex;gap:8px;overflow-x:auto;margin-top:12px}.uu-quick-chips button{flex:0 0 auto;border:1px solid #d4d6d9;background:#fff;border-radius:999px;padding:8px 13px;font-size:13px!important;font-weight:850}
-.uu-search-box{position:relative;margin:14px 0}.uu-search-box input{width:100%;height:54px;border:1px solid var(--uu-line);border-radius:18px;padding:0 48px 0 18px;background:#fff;font-size:16px!important;font-weight:850;outline:none}.uu-search-clear{position:absolute;right:10px;top:8px;width:38px;height:38px;border:none;border-radius:50%;background:#f1f2f3;font-size:18px}.uu-location-action{width:100%;display:flex;align-items:center;gap:12px;border:none;background:#fff;border-radius:18px;padding:15px;margin-bottom:12px;text-align:left;font-weight:1000;box-shadow:0 6px 18px rgba(17,24,39,.04)}.uu-location-action i{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;background:#fff5bd;font-style:normal}
-.uu-section-label{font-size:13px;color:#777;font-weight:1000;margin:18px 4px 8px}.uu-result-list{display:flex;flex-direction:column;gap:8px}.uu-result{width:100%;display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;border:none;background:#fff;border-radius:16px;padding:13px;text-align:left;box-shadow:0 5px 16px rgba(17,24,39,.04)}.uu-result-icon{width:38px;height:38px;border-radius:12px;background:#f1f2f3;display:flex;align-items:center;justify-content:center}.uu-result strong{display:block;font-size:14px;line-height:1.4}.uu-result small{display:block;color:#888;margin-top:3px;line-height:1.4}.uu-result-arrow{color:#bbb;font-size:23px}.uu-empty{padding:20px;text-align:center;color:#888;font-size:13px;font-weight:800}
-.uu-smart-fill{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.uu-smart-fill textarea{min-height:72px;border:none;background:#f5f6f7;border-radius:14px;padding:12px;font-size:14px!important;resize:vertical}.uu-smart-fill button{border:1px solid #d3d5d8;background:#fff;border-radius:999px;padding:10px 12px;font-weight:900}
-.uu-field-card{background:#fff;border:1px solid var(--uu-line);border-radius:20px;overflow:hidden;margin:12px 0}.uu-field-row{display:grid;grid-template-columns:76px 1fr auto;align-items:center;gap:8px;min-height:62px;padding:10px 14px;border-bottom:1px solid var(--uu-line)}.uu-field-row:last-child{border-bottom:none}.uu-field-row label{color:#777;font-size:14px;font-weight:850}.uu-field-row input,.uu-field-row select{width:100%;border:none;outline:none;background:transparent;font-size:16px!important;font-weight:900;color:#111}.uu-field-row button{border:1px solid #d3d5d8;background:#fff;border-radius:999px;padding:8px 10px;font-size:12px!important;font-weight:900}.uu-save-row{display:flex;align-items:center;gap:10px;margin:14px 4px;color:#555;font-size:13px;font-weight:850}.uu-save-row input{width:20px;height:20px;accent-color:var(--uu-accent-strong)}
-.uu-mini-map{height:210px;border-radius:20px;overflow:hidden;background:#e7e9eb;margin:12px 0}.uu-status{min-height:22px;margin:8px 4px;color:#777;font-size:13px;font-weight:850}.uu-status.error{color:var(--uu-danger)}
-.uu-confirm-map{height:330px;margin:0 -14px;background:#e5e7e9;position:relative;overflow:hidden}.uu-confirm-map #reviewMap{width:100%!important;height:100%!important;border-radius:0!important}.uu-confirm-summary{margin-top:-28px;position:relative;z-index:5}.uu-route-summary{background:#fff;border-radius:22px;padding:16px;box-shadow:0 12px 28px rgba(17,24,39,.1)}.uu-route-line{display:grid;grid-template-columns:20px 1fr;gap:10px;padding:8px 0}.uu-route-line i{width:12px;height:12px;border-radius:50%;margin-top:4px;background:#13bfa6}.uu-route-line.drop i{background:#ff8a00}.uu-route-line strong{display:block;font-size:15px}.uu-route-line small{display:block;color:#888;margin-top:2px}.uu-confirm-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 2px;border-bottom:1px solid var(--uu-line);font-size:15px;font-weight:900}.uu-confirm-row:last-child{border-bottom:none}.uu-confirm-row span:last-child{color:#666;text-align:right}.uu-speed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.uu-speed{border:1px solid var(--uu-line);background:#fff;border-radius:15px;padding:12px 8px;text-align:center;font-size:12px!important;font-weight:900}.uu-speed.active{border-color:#111;box-shadow:0 0 0 1px #111 inset;background:#fffbea}.uu-price-box{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.uu-price-box small{color:#777;font-weight:850}.uu-price{font-size:30px;font-weight:1000}.uu-submit-bar{position:absolute;left:0;right:0;bottom:0;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--uu-line);z-index:40}.uu-submit-bar button{width:100%;border:none;border-radius:18px;background:#111;color:#fff;padding:17px;font-size:17px!important;font-weight:1000}.uu-submit-bar button span{color:var(--uu-accent)}
-.uu-loading{position:absolute;inset:0;background:rgba(255,255,255,.82);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;font-weight:1000}.uu-loading.show{display:flex}.uu-spinner{width:42px;height:42px;border:4px solid #eee;border-top-color:var(--uu-accent-strong);border-radius:50%;animation:uuSpin .8s linear infinite}@keyframes uuSpin{to{transform:rotate(360deg)}}
-body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-selector,body.uu-flow-active .service-city-overlay{z-index:14000!important}
-@media(max-width:390px){.uu-tab{font-size:12px!important}.uu-route{padding-left:14px;padding-right:14px}.uu-primary{width:calc(100% - 28px);margin-left:14px;margin-right:14px}.uu-speed-grid{grid-template-columns:1fr}.uu-field-row{grid-template-columns:66px 1fr auto}}
-
-/* UBee 正式營運版：台灣用語、可讀性、手機滑動與地圖修正 */
-#uuFlowRoot{--uu-text:#181818;--uu-subtext:#62676d;--uu-placeholder:#969ba1;--uu-link:#1769aa;overscroll-behavior:none}
-.uu-shell{height:100dvh;max-height:100dvh;overflow:hidden}
-.uu-page{height:100%;min-height:0;overflow:hidden;flex-direction:column}
-.uu-page.active{display:flex}
-.uu-scroll{min-height:0;overflow-y:auto!important;overflow-x:hidden!important;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding-bottom:calc(132px + env(safe-area-inset-bottom))}
-#uuPageBuy .uu-scroll,#uuPageQueue .uu-scroll,#uuPageSearch .uu-scroll,#uuPageDetail .uu-scroll{padding-bottom:calc(36px + env(safe-area-inset-bottom))}
-#uuPageConfirm .uu-scroll{padding-bottom:calc(128px + env(safe-area-inset-bottom))!important}
-.uu-header,.uu-back-header{flex:0 0 auto}
-.uu-page-title,.uu-panel-title,.uu-address-main strong,.uu-result strong,.uu-field-row input,.uu-field-row select{color:var(--uu-text)!important}
-.uu-page-sub,.uu-live-line,.uu-section-label,.uu-result small,.uu-field-row label,.uu-confirm-row span:last-child,.uu-price-box small{color:var(--uu-subtext)!important}
-.uu-search-box input::placeholder,.uu-textarea::placeholder,.uu-smart-fill textarea::placeholder,.uu-field-row input::placeholder{color:var(--uu-placeholder)!important;opacity:1}
-.uu-address-book,.uu-location-action strong{color:var(--uu-link)!important}
-.uu-address-main small{color:#c43c3c!important}
-.uu-primary{background:#f4bd00!important;color:#171717!important}
-.uu-search-clear{color:#1769aa!important}
-.uu-mini-map{height:240px;min-height:240px;border:1px solid #dfe2e5;position:relative}
-.uu-confirm-map{height:min(43vh,380px);min-height:290px;background:#dfe3e6!important;position:relative;overflow:hidden}
-.uu-confirm-map #reviewMap{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:290px!important;visibility:visible!important;opacity:1!important}
-.uu-map-message{position:absolute;left:14px;right:14px;bottom:14px;z-index:8;padding:10px 12px;border-radius:13px;background:rgba(255,255,255,.94);color:#555;font-size:12px;font-weight:850;box-shadow:0 5px 18px rgba(0,0,0,.12)}
-.uu-submit-bar{position:absolute!important;flex:0 0 auto}
-@media(max-width:390px){.uu-field-row{grid-template-columns:72px minmax(0,1fr) auto}.uu-field-row button{max-width:112px;white-space:normal;line-height:1.25}.uu-page-title{font-size:19px}.uu-page-sub{font-size:11px}.uu-confirm-map{height:34vh;min-height:260px}}
+<style id="ubee-production-flow-v4-style">
+:root{
+  --flow-accent:#facc15;
+  --flow-accent-strong:#e9b500;
+  --flow-bg:#f4f5f6;
+  --flow-card:#ffffff;
+  --flow-text:#111111;
+  --flow-muted:#6f747a;
+  --flow-line:#e5e7ea;
+  --flow-danger:#dc2626;
+  --flow-nav-height:76px;
+}
+body.flow-active{overflow:hidden!important;background:var(--flow-bg)!important}
+body.flow-active>.app{display:none!important}
+#productionOrderFlow{
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  display:none;
+  background:var(--flow-bg);
+  color:var(--flow-text);
+  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
+}
+#productionOrderFlow.active{display:block}
+#productionOrderFlow *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+#productionOrderFlow button,
+#productionOrderFlow input,
+#productionOrderFlow textarea,
+#productionOrderFlow select{font:inherit;font-size:16px}
+.flow-shell{position:relative;width:100%;max-width:520px;height:100%;margin:0 auto;background:var(--flow-bg);overflow:hidden}
+.flow-page{position:absolute;inset:0 0 var(--flow-nav-height);display:none;flex-direction:column;min-height:0;background:var(--flow-bg)}
+.flow-page.active{display:flex}
+.flow-header{flex:0 0 auto;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;min-height:64px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:#fff;border-bottom:1px solid var(--flow-line);z-index:5}
+.flow-header.home{grid-template-columns:minmax(0,1fr) auto 44px}
+.flow-brand{font-size:24px;font-weight:1000;letter-spacing:-1px;white-space:nowrap}.flow-brand span{color:var(--flow-accent-strong)}
+.flow-title-wrap{min-width:0;text-align:center}.flow-title{font-size:18px;font-weight:1000;line-height:1.25}.flow-subtitle{margin-top:2px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.35}
+.flow-icon-btn,.flow-back-btn,.flow-city-btn{border:none;background:transparent;color:#111;font-weight:1000}
+.flow-back-btn,.flow-icon-btn{width:42px;height:42px;border-radius:50%}.flow-back-btn{font-size:30px;line-height:1}.flow-icon-btn{font-size:20px}
+.flow-city-btn{max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:9px 10px;border-radius:999px;background:#f5f6f7;font-size:13px;text-align:center}
+.flow-progress{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:9px 10px;background:#fff;border-bottom:1px solid var(--flow-line)}
+.flow-progress-item{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;color:#989ca1;font-size:10px;font-weight:900;white-space:nowrap}
+.flow-progress-item::before{content:attr(data-number);display:grid;place-items:center;width:19px;height:19px;flex:0 0 19px;border-radius:50%;background:#eef0f2;color:#7e8388;font-size:10px}
+.flow-progress-item.active{color:#111}.flow-progress-item.active::before{background:var(--flow-accent);color:#111}.flow-progress-item.done::before{content:"✓";background:#111;color:#fff}
+.flow-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 150px}
+.flow-home-scroll{padding-top:12px}
+.flow-card{margin-bottom:12px;padding:15px;border:1px solid var(--flow-line);border-radius:20px;background:#fff;box-shadow:0 8px 24px rgba(17,24,39,.045)}
+.flow-section-title{margin:0 0 9px;font-size:15px;font-weight:1000}.flow-help{color:var(--flow-muted);font-size:12px;font-weight:800;line-height:1.6}
+.flow-service-tabs{display:flex;gap:0;overflow-x:auto;margin:0 -15px 13px;padding:0 9px 9px;border-bottom:1px solid var(--flow-line);scrollbar-width:none}.flow-service-tabs::-webkit-scrollbar{display:none}
+.flow-service-tab{position:relative;flex:0 0 auto;min-width:76px;min-height:42px;border:none;background:transparent;color:#85898e;font-size:14px!important;font-weight:900;white-space:nowrap}
+.flow-service-tab.active{color:#111}.flow-service-tab.active::after{content:"";position:absolute;left:50%;bottom:-9px;width:28px;height:4px;transform:translateX(-50%);border-radius:999px;background:var(--flow-accent-strong)}
+.flow-location-line{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px 12px;border-radius:14px;background:#f7f8f9;color:#555b61;font-size:12px;font-weight:850}.flow-location-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 4px rgba(22,163,74,.12)}
+.flow-route-card{position:relative;overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff}
+.flow-route-card::before{content:"";position:absolute;left:27px;top:39px;bottom:39px;width:2px;background:#d9dcdf}
+.flow-address-button{position:relative;z-index:1;width:100%;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:76px;padding:13px 14px;border:none;background:#fff;text-align:left}.flow-address-button+.flow-address-button{border-top:1px solid #eef0f1}
+.flow-address-dot{width:11px;height:11px;margin-left:5px;border-radius:50%;background:#111;box-shadow:0 0 0 5px #fff}.flow-address-dot.drop{background:var(--flow-accent-strong)}
+.flow-address-text{min-width:0}.flow-address-text small{display:block;margin-bottom:4px;color:#8c9197;font-size:11px;font-weight:900}.flow-address-text strong{display:block;overflow:hidden;color:#111;font-size:15px;font-weight:1000;line-height:1.45;text-overflow:ellipsis;white-space:nowrap}.flow-address-text em{display:block;overflow:hidden;margin-top:3px;color:#8a8f95;font-size:11px;font-style:normal;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
+.flow-address-arrow{color:#a4a8ad;font-size:22px}
+.flow-task-preview{display:none;margin-top:11px;padding:11px 12px;border:1px solid #ead77a;border-radius:15px;background:#fffbed}.flow-task-preview.show{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.flow-task-preview-text{min-width:0;color:#514400;font-size:12px;font-weight:850;line-height:1.55}.flow-text-link{flex:0 0 auto;border:none;background:transparent;color:#7c6200;font-size:12px!important;font-weight:1000}
+.flow-primary,.flow-secondary{width:100%;min-height:54px;border-radius:16px;font-weight:1000}.flow-primary{border:none;background:var(--flow-accent);color:#111}.flow-secondary{border:1px solid #dfe2e5;background:#fff;color:#333}.flow-primary:active,.flow-secondary:active{transform:scale(.985)}.flow-primary:disabled{opacity:.45}
+.flow-home-next{margin-top:13px}
+.flow-form-group{margin-bottom:14px}.flow-label{display:block;margin:0 0 7px;color:#25282b;font-size:13px;font-weight:1000}.flow-required{color:var(--flow-danger)}
+.flow-input,.flow-select,.flow-textarea{width:100%;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#111;outline:none}.flow-input,.flow-select{min-height:52px;padding:0 13px}.flow-textarea{min-height:126px;padding:12px 13px;line-height:1.65;resize:vertical}.flow-input:focus,.flow-select:focus,.flow-textarea:focus{border-color:#c79d00;box-shadow:0 0 0 3px rgba(250,204,21,.2)}
+.flow-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.flow-dynamic-field[hidden]{display:none!important}
+.flow-inline-note{margin-top:7px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.55}
+.flow-timing-list,.flow-speed-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.flow-choice{min-height:78px;padding:9px 7px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#73787e;font-size:12px!important;font-weight:900;line-height:1.35}.flow-choice strong{display:block;color:inherit;font-size:13px}.flow-choice small{display:block;margin-top:4px;color:inherit;font-size:10px;font-weight:800}.flow-choice.active{border-color:#d5aa00;background:#fff7d0;color:#111;box-shadow:0 0 0 1px #d5aa00 inset}
+.flow-schedule-panel{display:none;margin-top:11px;padding:12px;border:1px solid var(--flow-line);border-radius:16px;background:#fafafa}.flow-schedule-panel.show{display:block}
+.flow-map{position:relative;width:100%;height:310px;overflow:hidden;border-radius:19px;background:#e8eaed}.flow-map-canvas{position:absolute;inset:0}.flow-map-status{position:absolute;left:12px;right:12px;bottom:12px;z-index:5;padding:10px 12px;border:1px solid rgba(17,24,39,.08);border-radius:14px;background:rgba(255,255,255,.95);box-shadow:0 6px 20px rgba(17,24,39,.12);color:#555b61;font-size:11px;font-weight:900;line-height:1.5;text-align:center}.flow-map-status.success{display:none}.flow-map-retry{display:inline-block;margin-top:7px;border:1px solid #dbdde0;border-radius:999px;background:#fff;padding:7px 10px;color:#111;font-size:11px!important;font-weight:1000}
+.flow-summary-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff}.flow-summary-row{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:9px;align-items:start;padding:12px 13px;border-bottom:1px solid #eef0f1}.flow-summary-row:last-child{border-bottom:none}.flow-summary-label{color:#858a90;font-size:11px;font-weight:900}.flow-summary-value{color:#111;font-size:13px;font-weight:900;line-height:1.55;word-break:break-word}.flow-summary-edit{border:none;background:transparent;color:#876c00;font-size:11px!important;font-weight:1000}
+.flow-price-card{display:flex;align-items:center;justify-content:space-between;gap:12px}.flow-price-card small{display:block;color:#858a90;font-size:11px;font-weight:900}.flow-route-meta{margin-top:4px;color:#676c72;font-size:12px;font-weight:850}.flow-price{font-size:29px;font-weight:1000;white-space:nowrap}
+.flow-check{display:flex;align-items:flex-start;gap:10px;margin:12px 2px;padding:12px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#333;font-size:12px;font-weight:850;line-height:1.55}.flow-check input{width:20px;height:20px;flex:0 0 20px;margin:0;accent-color:#111}
+.flow-actionbar{position:absolute;left:0;right:0;bottom:var(--flow-nav-height);z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px;border-top:1px solid rgba(17,24,39,.08);background:rgba(255,255,255,.98);box-shadow:0 -8px 22px rgba(17,24,39,.07);backdrop-filter:blur(14px)}
+.flow-actionbar.single{grid-template-columns:1fr}.flow-actionbar .flow-secondary,.flow-actionbar .flow-primary{min-height:54px}
+.flow-bottom-nav{position:absolute;left:0;right:0;bottom:0;z-index:40;height:var(--flow-nav-height);display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:7px 12px calc(7px + env(safe-area-inset-bottom));border-top:1px solid rgba(17,24,39,.08);background:rgba(255,255,255,.98);box-shadow:0 -8px 26px rgba(17,24,39,.08);backdrop-filter:blur(16px)}
+.flow-bottom-nav button{min-height:55px;border:none;border-radius:14px;background:transparent;color:#8b9096;font-size:11px!important;font-weight:1000}.flow-bottom-nav button.active{width:82%;justify-self:center;background:#111;color:#fff}.flow-nav-icon{display:block;width:31px;height:31px;margin:0 auto 2px;border-radius:50%;background:#f0f2f3;line-height:31px;font-size:17px}.flow-bottom-nav button.active .flow-nav-icon{background:var(--flow-accent);color:#111}
+.flow-search-box{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:7px;margin-bottom:10px}.flow-search-box .flow-input{min-width:0}.flow-clear-btn{border:1px solid var(--flow-line);border-radius:14px;background:#fff;color:#555;font-size:21px}
+.flow-location-action{width:100%;display:flex;align-items:center;gap:10px;min-height:54px;margin-bottom:13px;padding:10px 12px;border:1px solid #d7e1f3;border-radius:15px;background:#f4f8ff;color:#2f4e7c;text-align:left;font-size:13px!important;font-weight:1000}.flow-location-action small{display:block;margin-top:2px;color:#6e7f96;font-size:10px;font-weight:800}
+.flow-section-label{margin:14px 2px 7px;color:#777c82;font-size:11px;font-weight:1000}.flow-results{display:flex;flex-direction:column;gap:8px}.flow-result{width:100%;display:grid;grid-template-columns:34px minmax(0,1fr) 20px;align-items:center;gap:9px;padding:11px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;text-align:left}.flow-result-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#f0f2f3}.flow-result strong{display:block;color:#111;font-size:13px;font-weight:1000;line-height:1.4}.flow-result small{display:block;margin-top:3px;color:#777c82;font-size:10px;font-weight:800;line-height:1.4}.flow-empty{padding:15px;border:1px dashed #d7dade;border-radius:15px;color:#858a90;font-size:12px;font-weight:850;text-align:center}
+.flow-detail-map{height:190px;margin-bottom:12px;border-radius:18px;background:#e8eaed}.flow-detail-actions{display:flex;gap:8px;margin-top:8px}.flow-small-btn{border:1px solid #e0e2e5;border-radius:999px;background:#fff;padding:8px 10px;color:#555;font-size:11px!important;font-weight:1000}
+.flow-status{min-height:20px;margin:7px 2px;color:#667078;font-size:12px;font-weight:850;line-height:1.5}.flow-status.error{color:var(--flow-danger)}
+.flow-loading{position:absolute;inset:0;z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(255,255,255,.82);backdrop-filter:blur(3px);font-size:13px;font-weight:1000}.flow-loading.show{display:flex}.flow-spinner{width:34px;height:34px;border:4px solid #e5e7ea;border-top-color:#111;border-radius:50%;animation:flowSpin .75s linear infinite}@keyframes flowSpin{to{transform:rotate(360deg)}}
+/* 正式訂單追蹤頁的底部導航同步同一套視覺 */
+body:not(.flow-active) .bottom-tabs{height:var(--flow-nav-height)!important;max-width:520px!important;padding:7px 12px calc(7px + env(safe-area-inset-bottom))!important;border-radius:0!important;background:rgba(255,255,255,.98)!important;box-shadow:0 -8px 26px rgba(17,24,39,.08)!important}
+body:not(.flow-active) .bottom-tab{min-height:55px!important;border-radius:14px!important;color:#8b9096!important;font-size:11px!important}
+body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:center!important;background:#111!important;color:#fff!important}
+@media(max-width:390px){
+  .flow-progress-item{font-size:9px}.flow-progress-item::before{width:17px;height:17px;flex-basis:17px}
+  .flow-grid-2{grid-template-columns:1fr}.flow-timing-list,.flow-speed-list{grid-template-columns:1fr 1fr}.flow-map{height:270px}
+}
 </style>
 
-<div id="uuFlowRoot" aria-label="UBee 系統化下單">
-  <div class="uu-shell">
-    <div id="uuLoading" class="uu-loading"><div class="uu-spinner"></div><div id="uuLoadingText">系統處理中…</div></div>
+<div id="productionOrderFlow" aria-label="UBee 客人端正式下單流程">
+  <div class="flow-shell">
+    <div id="flowLoading" class="flow-loading"><div class="flow-spinner"></div><div id="flowLoadingText">系統處理中…</div></div>
 
-    <section id="uuPageHome" class="uu-page active">
-      <header class="uu-header">
-        <div class="uu-brand"><span>U</span>Bee 跑腿</div>
-        <button id="uuCityBtn" class="uu-city-btn" type="button">臺中市⌄</button>
-        <button id="uuSupportBtn" class="uu-icon-btn" type="button" aria-label="客服">•••</button>
+    <section id="flowPageHome" class="flow-page active" data-page="home">
+      <header class="flow-header home">
+        <div class="flow-brand"><span>U</span>Bee 跑腿</div>
+        <button id="flowCityButton" class="flow-city-btn" type="button">正在取得位置…</button>
+        <button id="flowSupportButton" class="flow-icon-btn" type="button" aria-label="客服">•••</button>
       </header>
-      <div class="uu-scroll">
-        <div class="uu-service-card">
-          <div id="uuServiceTabs" class="uu-tabs">
-            <button class="uu-tab active" data-service="send" type="button">幫我送</button>
-            <button class="uu-tab" data-service="pickup" type="button">幫我取</button>
-            <button class="uu-tab" data-service="helper" type="button">全能跑腿</button>
-            <button class="uu-tab" data-service="buy" type="button">幫我買</button>
-            <button class="uu-tab" data-service="queue" type="button">幫排隊</button>
+      <div class="flow-progress" data-progress="0"></div>
+      <div class="flow-scroll flow-home-scroll">
+        <div class="flow-card">
+          <div id="flowServiceTabs" class="flow-service-tabs">
+            <button class="flow-service-tab active" data-service="send" type="button">幫我送</button>
+            <button class="flow-service-tab" data-service="pickup" type="button">幫我取</button>
+            <button class="flow-service-tab" data-service="buy" type="button">幫我買</button>
+            <button class="flow-service-tab" data-service="queue" type="button">幫排隊</button>
+            <button class="flow-service-tab" data-service="helper" type="button">全能跑腿</button>
           </div>
-          <div class="uu-live-line"><span class="uu-live-dot"></span><span>附近有 <b id="uuOnlineCount">—</b> 位小U，預計 <em id="uuMatchMinutes">計算中</em> 內接單</span></div>
-          <div class="uu-route">
-            <button id="uuPickupRow" class="uu-address-row" type="button">
-              <span class="uu-marker"></span>
-              <span class="uu-address-main"><strong id="uuPickupText">從哪裡取件？</strong><small id="uuPickupHint">請補齊取件聯絡資訊</small></span>
-              <span class="uu-address-book">常用地址</span>
+          <div class="flow-location-line"><span class="flow-location-dot"></span><span id="flowLocationText">正在確認目前服務地區</span></div>
+          <div class="flow-route-card">
+            <button id="flowPickupButton" class="flow-address-button" type="button">
+              <span class="flow-address-dot"></span>
+              <span class="flow-address-text"><small>取件地點</small><strong id="flowPickupText">請選擇取件地址</strong><em id="flowPickupMeta">填寫取件聯絡人與電話</em></span>
+              <span class="flow-address-arrow">›</span>
             </button>
-            <button id="uuDropoffRow" class="uu-address-row" type="button">
-              <span class="uu-marker drop"></span>
-              <span class="uu-address-main"><strong id="uuDropoffText">送到哪裡？</strong><small id="uuDropoffHint">請補齊收件聯絡資訊</small></span>
-              <span class="uu-address-book">常用地址</span>
+            <button id="flowDropoffButton" class="flow-address-button" type="button">
+              <span class="flow-address-dot drop"></span>
+              <span class="flow-address-text"><small>送達地點</small><strong id="flowDropoffText">請選擇送達地址</strong><em id="flowDropoffMeta">填寫收件人與電話</em></span>
+              <span class="flow-address-arrow">›</span>
             </button>
           </div>
-          <div id="uuTaskChip" class="uu-task-chip" hidden><span id="uuTaskChipText"></span><button id="uuEditTaskBtn" type="button">修改</button></div>
-          <button id="uuStartOrderBtn" class="uu-primary" type="button">立即下單</button>
-        </div>
-        <div class="uu-watermark">UBee<small>在地即時跑腿服務</small></div>
-      </div>
-      <nav class="uu-bottom"><button class="active" type="button"><span class="uu-bottom-icon">U</span>首頁</button><button id="uuMyBtn" type="button"><span class="uu-bottom-icon">◎</span>我的</button></nav>
-    </section>
-
-    <section id="uuPageBuy" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">UBee 幫我買</div><div class="uu-page-sub">不用出門，小U幫你跑一趟</div></div></header>
-      <div class="uu-scroll">
-        <div class="uu-panel">
-          <div class="uu-panel-title-row"><div class="uu-panel-title">想買些什麼</div><button type="button">服務介紹 ›</button></div>
-          <div id="uuBuyCategories" class="uu-buy-categories"></div>
-          <textarea id="uuBuyNote" class="uu-textarea" maxlength="500" placeholder="填寫想要購買的商品，例如：雞排 1 份、無糖綠茶 2 杯。"></textarea>
-          <div id="uuBuyQuick" class="uu-quick-chips"></div>
-          <button id="uuBuyContinue" class="uu-primary" style="width:100%;margin:18px 0 0" type="button">下一步</button>
+          <div id="flowTaskPreview" class="flow-task-preview"><div id="flowTaskPreviewText" class="flow-task-preview-text"></div><button id="flowEditTaskButton" class="flow-text-link" type="button">修改</button></div>
+          <button id="flowHomeNext" class="flow-primary flow-home-next" type="button">下一步：填寫任務內容</button>
         </div>
       </div>
     </section>
 
-    <section id="uuPageQueue" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">UBee 幫我排隊</div><div class="uu-page-sub">節省時間，現場進度即時回報</div></div></header>
-      <div class="uu-scroll">
-        <div class="uu-panel">
-          <div class="uu-panel-title">去哪裡排隊</div>
-          <button id="uuQueueAddressBtn" class="uu-location-action" type="button"><i>📍</i><span id="uuQueueAddressText">選擇排隊地點</span></button>
-          <div class="uu-field-card">
-            <div class="uu-field-row"><label>預估時間</label><input id="uuQueueMinutes" type="number" min="10" max="480" step="5" value="30" inputmode="numeric"><span>分鐘</span></div>
+    <section id="flowPageTask" class="flow-page" data-page="task">
+      <header class="flow-header">
+        <button class="flow-back-btn" data-go="home" type="button" aria-label="返回">‹</button>
+        <div class="flow-title-wrap"><div class="flow-title">任務內容</div><div class="flow-subtitle">請讓小U清楚知道要做什麼</div></div>
+        <span></span>
+      </header>
+      <div class="flow-progress" data-progress="1"></div>
+      <div class="flow-scroll">
+        <div class="flow-card">
+          <div class="flow-grid-2">
+            <div class="flow-form-group"><label class="flow-label" for="flowServiceType">任務類型</label><select id="flowServiceType" class="flow-select"></select></div>
+            <div class="flow-form-group"><label class="flow-label" for="flowServiceCategory">任務分類</label><select id="flowServiceCategory" class="flow-select"></select></div>
           </div>
-          <textarea id="uuQueueNote" class="uu-textarea" maxlength="500" placeholder="請說明排隊目的、輪到後如何處理、是否需要拍照回報。"></textarea>
-          <button id="uuQueueContinue" class="uu-primary" style="width:100%;margin:18px 0 0" type="button">下一步</button>
+          <div class="flow-form-group"><label class="flow-label" for="flowTaskName">任務名稱</label><input id="flowTaskName" class="flow-input" maxlength="120" placeholder="例如：文件配送、代買午餐"></div>
+          <div class="flow-form-group"><label class="flow-label" for="flowTaskNote">任務內容 <span class="flow-required">＊</span></label><textarea id="flowTaskNote" class="flow-textarea" maxlength="500" placeholder="請填寫品項、數量、規格、取件方式、交付方式與注意事項"></textarea><div class="flow-inline-note">請避免只寫「幫我送」；內容越完整，小U越容易正確執行。</div></div>
+          <div class="flow-grid-2">
+            <div class="flow-form-group"><label class="flow-label" for="flowItemSize">物品大小</label><select id="flowItemSize" class="flow-select"><option value="small">小型｜機車可載</option><option value="medium">中型｜需較大空間</option><option value="large">大型｜請先與客服確認</option></select></div>
+            <div class="flow-form-group"><label class="flow-label" for="flowUpstairs">搬上樓需求</label><select id="flowUpstairs" class="flow-select"><option value="none">不需要</option><option value="elevator">有電梯</option><option value="no_elevator">需要走樓梯</option></select></div>
+          </div>
+          <div id="flowAdvanceWrap" class="flow-form-group flow-dynamic-field"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input id="flowAdvancePayment" class="flow-input" type="number" min="0" max="999" step="1" inputmode="numeric" value="0"><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
+          <div id="flowQueueWrap" class="flow-form-group flow-dynamic-field" hidden><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input id="flowQueueMinutes" class="flow-input" type="number" min="10" max="480" step="5" inputmode="numeric" value="30"></div>
+          <div id="flowTaskStatus" class="flow-status"></div>
         </div>
-        <div class="uu-panel"><div class="uu-panel-title">幫排隊服務流程</div><div class="uu-confirm-row"><span>① 輸入需求</span><span>② 填寫地址</span></div><div class="uu-confirm-row"><span>③ 確認費用</span><span>④ 完成服務</span></div></div>
       </div>
+      <div class="flow-actionbar"><button class="flow-secondary" data-go="home" type="button">上一步</button><button id="flowTaskNext" class="flow-primary" type="button">下一步：配送設定</button></div>
     </section>
 
-    <section id="uuPageSearch" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div id="uuSearchTitle" class="uu-page-title">搜尋地址</div><div id="uuSearchSub" class="uu-page-sub">先選擇地點，再填寫門牌、樓層與聯絡資訊</div></div></header>
-      <div class="uu-scroll">
-        <div class="uu-search-box"><input id="uuAddressSearchInput" maxlength="160" placeholder="輸入地址、店家或地標"><button id="uuSearchClear" class="uu-search-clear" type="button">×</button></div>
-        <button id="uuUseLocation" class="uu-location-action" type="button"><i>⌖</i><span><strong>使用目前位置</strong><small style="display:block;color:#888;margin-top:3px">定位後仍可補充門牌與樓層</small></span></button>
-        <div id="uuSavedSection"><div class="uu-section-label">常用地址</div><div id="uuSavedList" class="uu-result-list"><div class="uu-empty">讀取中…</div></div></div>
-        <div id="uuRecentSection"><div class="uu-section-label">最近使用</div><div id="uuRecentList" class="uu-result-list"></div></div>
-        <div><div class="uu-section-label">搜尋結果</div><div id="uuSearchResults" class="uu-result-list"><div class="uu-empty">輸入至少 2 個字開始搜尋</div></div></div>
-      </div>
-    </section>
-
-    <section id="uuPageDetail" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="search" type="button">‹</button><div><div id="uuDetailTitle" class="uu-page-title">收件資訊</div><div class="uu-page-sub">地址與聯絡資訊會提供給承接任務的小U</div></div></header>
-      <div class="uu-scroll">
-        <div id="uuAddressMap" class="uu-mini-map"></div>
-        <div class="uu-field-card">
-          <div class="uu-field-row"><label>地址</label><input id="uuDetailAddress" maxlength="240" readonly><button id="uuChangeAddress" type="button">常用地址</button></div>
-          <div class="uu-field-row"><label>門牌與樓層</label><input id="uuDetailNote" maxlength="160" placeholder="門牌、樓層、店名、管理室或其他補充說明"></div>
-          <div class="uu-field-row"><label>姓名</label><input id="uuDetailName" maxlength="60" placeholder="聯絡人姓名"><button id="uuUseMyName" type="button">帶入本人姓名</button></div>
-          <div class="uu-field-row"><label>電話</label><input id="uuDetailPhone" maxlength="20" inputmode="tel" placeholder="09xxxxxxxx"><button id="uuUseSamePhone" type="button">使用另一端電話</button></div>
-          <div class="uu-field-row"><label>地址標籤</label><input id="uuDetailLabel" maxlength="40" placeholder="家、公司、店家"></div>
-        </div>
-        <label class="uu-save-row"><input id="uuSaveAddress" type="checkbox"><span>儲存為常用地址，下次可以直接選擇</span></label>
-        <div id="uuDetailStatus" class="uu-status"></div>
-        <button id="uuSaveDetail" class="uu-primary" style="width:100%;margin:12px 0 20px" type="button">確定</button>
-      </div>
-    </section>
-
-    <section id="uuPageConfirm" class="uu-page">
-      <header class="uu-back-header"><button class="uu-back" data-back="home" type="button">‹</button><div><div class="uu-page-title">確認任務</div><div class="uu-page-sub">確認路線、任務內容與費用後建立訂單</div></div></header>
-      <div class="uu-scroll" style="padding-top:0">
-        <div id="uuConfirmMap" class="uu-confirm-map"><div id="uuConfirmMapStatus" class="uu-map-message">正在載入取件點、送達點與詳細路線…</div></div>
-        <div class="uu-confirm-summary">
-          <div class="uu-route-summary">
-            <div class="uu-route-line"><i></i><div><strong id="uuConfirmPickup">—</strong><small id="uuConfirmPickupMeta">取件資訊</small></div></div>
-            <div class="uu-route-line drop"><i></i><div><strong id="uuConfirmDropoff">—</strong><small id="uuConfirmDropoffMeta">收件資訊</small></div></div>
+    <section id="flowPageOptions" class="flow-page" data-page="options">
+      <header class="flow-header">
+        <button class="flow-back-btn" data-go="task" type="button" aria-label="返回">‹</button>
+        <div class="flow-title-wrap"><div class="flow-title">配送設定</div><div class="flow-subtitle">選擇執行時間與處理速度</div></div>
+        <span></span>
+      </header>
+      <div class="flow-progress" data-progress="2"></div>
+      <div class="flow-scroll">
+        <div class="flow-card">
+          <div class="flow-section-title">任務時間</div>
+          <div id="flowTimingList" class="flow-timing-list">
+            <button class="flow-choice active" data-timing="immediate" type="button"><strong>立即任務</strong><small>現在開始媒合</small></button>
+            <button class="flow-choice" data-timing="scheduled" type="button"><strong>指定時間</strong><small>預約日期時間</small></button>
+            <button class="flow-choice" data-timing="flexible" type="button"><strong>彈性時段</strong><small>提供執行區間</small></button>
+          </div>
+          <div id="flowScheduledPanel" class="flow-schedule-panel">
+            <div class="flow-form-group"><label class="flow-label" for="flowScheduleGoal">預約目標</label><select id="flowScheduleGoal" class="flow-select"><option value="pickup_at">希望此時間取件</option><option value="complete_by">希望此時間前完成</option></select></div>
+            <div class="flow-grid-2"><div class="flow-form-group"><label class="flow-label" for="flowScheduledDate">日期</label><input id="flowScheduledDate" class="flow-input" type="date"></div><div class="flow-form-group"><label class="flow-label" for="flowScheduledTime">時間</label><input id="flowScheduledTime" class="flow-input" type="time" step="300"></div></div>
+          </div>
+          <div id="flowFlexiblePanel" class="flow-schedule-panel">
+            <div class="flow-form-group"><label class="flow-label" for="flowFlexibleDate">日期</label><input id="flowFlexibleDate" class="flow-input" type="date"></div>
+            <div class="flow-grid-2"><div class="flow-form-group"><label class="flow-label" for="flowFlexibleStart">開始時間</label><input id="flowFlexibleStart" class="flow-input" type="time" step="300"></div><div class="flow-form-group"><label class="flow-label" for="flowFlexibleEnd">結束時間</label><input id="flowFlexibleEnd" class="flow-input" type="time" step="300"></div></div>
           </div>
         </div>
-        <div class="uu-panel">
-          <div class="uu-confirm-row"><span>配送方案</span><span id="uuConfirmSpeedLabel">一般件</span></div>
-          <div id="uuSpeedGrid" class="uu-speed-grid"><button class="uu-speed active" data-speed="standard" type="button">一般件<br><small>經濟配送</small></button><button class="uu-speed" data-speed="priority" type="button">標準件<br><small>較快媒合</small></button><button class="uu-speed" data-speed="express" type="button">優先件<br><small>優先處理</small></button></div>
-          <div class="uu-confirm-row"><span>任務時間</span><span id="uuConfirmTiming">立即任務</span></div>
-          <div class="uu-confirm-row"><span>配送工具</span><span>不限配送工具</span></div>
-          <div class="uu-confirm-row"><span>任務備註</span><span id="uuConfirmNote">—</span></div>
+        <div id="flowSpeedCard" class="flow-card">
+          <div class="flow-section-title">處理速度</div>
+          <div id="flowSpeedList" class="flow-speed-list">
+            <button class="flow-choice active" data-speed="standard" type="button"><strong>一般件</strong><small>經濟配送</small></button>
+            <button class="flow-choice" data-speed="priority" type="button"><strong>標準件</strong><small>較快媒合</small></button>
+            <button class="flow-choice" data-speed="express" type="button"><strong>優先件</strong><small>優先處理</small></button>
+          </div>
         </div>
-        <div class="uu-panel"><div class="uu-price-box"><div><small>後端正式估價</small><div id="uuConfirmRouteMeta" style="font-size:13px;color:#777;margin-top:4px">正在計算路線</div></div><div id="uuConfirmPrice" class="uu-price">—</div></div></div>
-        <label class="uu-save-row"><input id="uuConfirmAgree" type="checkbox" checked><span>我已確認地址、聯絡資訊、任務內容與費用</span></label>
+        <div id="flowOptionsStatus" class="flow-status"></div>
       </div>
-      <div class="uu-submit-bar"><button id="uuSubmitOrder" type="button">確認並建立 <span>UBee 任務</span></button></div>
+      <div class="flow-actionbar"><button class="flow-secondary" data-go="task" type="button">上一步</button><button id="flowOptionsNext" class="flow-primary" type="button">下一步：確認任務</button></div>
     </section>
+
+    <section id="flowPageConfirm" class="flow-page" data-page="confirm">
+      <header class="flow-header">
+        <button class="flow-back-btn" data-go="options" type="button" aria-label="返回">‹</button>
+        <div class="flow-title-wrap"><div class="flow-title">確認任務</div><div class="flow-subtitle">確認地點、內容、路線與費用</div></div>
+        <span></span>
+      </header>
+      <div class="flow-progress" data-progress="3"></div>
+      <div class="flow-scroll">
+        <div class="flow-card" style="padding:0;border:none;box-shadow:none;background:transparent">
+          <div class="flow-map"><div id="flowConfirmMapCanvas" class="flow-map-canvas"></div><div id="flowMapStatus" class="flow-map-status">正在載入取件位置、送達位置與道路路線…</div></div>
+        </div>
+        <div class="flow-card"><div id="flowSummaryList" class="flow-summary-list"></div></div>
+        <div class="flow-card flow-price-card"><div><small>正式估價</small><div id="flowRouteMeta" class="flow-route-meta">正在計算路線與費用</div></div><div id="flowConfirmPrice" class="flow-price">—</div></div>
+        <label class="flow-check"><input id="flowAgree" type="checkbox"><span>我已確認取件地點、送達地點、聯絡資訊、任務內容、執行時間與費用。</span></label>
+        <div id="flowConfirmStatus" class="flow-status"></div>
+      </div>
+      <div class="flow-actionbar"><button class="flow-secondary" data-go="options" type="button">上一步</button><button id="flowSubmitOrder" class="flow-primary" type="button">確認並建立任務</button></div>
+    </section>
+
+    <section id="flowPageSearch" class="flow-page" data-page="search">
+      <header class="flow-header">
+        <button class="flow-back-btn" data-go="home" type="button" aria-label="返回">‹</button>
+        <div class="flow-title-wrap"><div id="flowSearchTitle" class="flow-title">搜尋地址</div><div class="flow-subtitle">先選擇地點，再填寫聯絡資訊</div></div>
+        <span></span>
+      </header>
+      <div class="flow-progress" data-progress="0"></div>
+      <div class="flow-scroll">
+        <div class="flow-search-box"><input id="flowAddressSearch" class="flow-input" maxlength="160" placeholder="輸入地址、店家或地標"><button id="flowSearchClear" class="flow-clear-btn" type="button">×</button></div>
+        <button id="flowUseCurrentLocation" class="flow-location-action" type="button"><span>⌖</span><span><strong>使用目前位置</strong><small>定位後仍可補充門牌、樓層與聯絡資訊</small></span></button>
+        <div class="flow-section-label">常用地址</div><div id="flowSavedAddresses" class="flow-results"><div class="flow-empty">讀取中…</div></div>
+        <div class="flow-section-label">最近使用</div><div id="flowRecentAddresses" class="flow-results"></div>
+        <div class="flow-section-label">搜尋結果</div><div id="flowSearchResults" class="flow-results"><div class="flow-empty">輸入至少 2 個字開始搜尋</div></div>
+      </div>
+    </section>
+
+    <section id="flowPageDetail" class="flow-page" data-page="detail">
+      <header class="flow-header">
+        <button class="flow-back-btn" data-go="search" type="button" aria-label="返回">‹</button>
+        <div class="flow-title-wrap"><div id="flowDetailTitle" class="flow-title">填寫地點資訊</div><div class="flow-subtitle">提供給承接任務的小U聯繫與辨識地點</div></div>
+        <span></span>
+      </header>
+      <div class="flow-progress" data-progress="0"></div>
+      <div class="flow-scroll">
+        <div id="flowDetailMap" class="flow-detail-map"></div>
+        <div class="flow-card">
+          <div class="flow-form-group"><label class="flow-label" for="flowDetailAddress">完整地址</label><input id="flowDetailAddress" class="flow-input" maxlength="240" readonly></div>
+          <div class="flow-form-group"><label class="flow-label" for="flowDetailNote">門牌、樓層及補充說明</label><input id="flowDetailNote" class="flow-input" maxlength="160" placeholder="例如：12號3樓、店名、管理室或入口說明"></div>
+          <div class="flow-form-group"><label class="flow-label" for="flowDetailName">聯絡人姓名 <span class="flow-required">＊</span></label><input id="flowDetailName" class="flow-input" maxlength="60" placeholder="取件聯絡人或收件人"></div>
+          <div class="flow-form-group"><label class="flow-label" for="flowDetailPhone">聯絡電話 <span class="flow-required">＊</span></label><input id="flowDetailPhone" class="flow-input" maxlength="20" inputmode="tel" placeholder="09xxxxxxxx"><div class="flow-detail-actions"><button id="flowUseProfileName" class="flow-small-btn" type="button">帶入本人姓名</button><button id="flowUseOtherPhone" class="flow-small-btn" type="button">使用另一端電話</button></div></div>
+          <div class="flow-form-group"><label class="flow-label" for="flowDetailLabel">常用地址名稱</label><input id="flowDetailLabel" class="flow-input" maxlength="40" placeholder="例如：家、公司、店家"></div>
+          <label class="flow-check" style="margin:0"><input id="flowSaveAddress" type="checkbox"><span>儲存為常用地址，下次可直接選擇。</span></label>
+          <div id="flowDetailStatus" class="flow-status"></div>
+          <button id="flowSaveDetail" class="flow-primary" type="button">儲存地點資訊</button>
+        </div>
+      </div>
+    </section>
+
+    <nav class="flow-bottom-nav" aria-label="主要導覽">
+      <button id="flowNavHome" class="active" type="button"><span class="flow-nav-icon">U</span>首頁</button>
+      <button id="flowNavMy" type="button"><span class="flow-nav-icon">◎</span>我的</button>
+    </nav>
   </div>
 </div>
 
-<script id="ubee-uu-flow-script">
-(function(){
+<script id="ubee-production-flow-v4-script">
+(() => {
   'use strict';
+  if(window.__UBEE_PRODUCTION_FLOW_V4__) return;
+  window.__UBEE_PRODUCTION_FLOW_V4__=true;
+
   const $=id=>document.getElementById(id);
-  const root=$('uuFlowRoot');
-  if(!root || window.__UBEE_UU_FLOW_LOADED__) return;
-  window.__UBEE_UU_FLOW_LOADED__=true;
-
-  const LOCAL_KEY='ubee_uu_flow_state_v1';
-  const LOCAL_ADDR_KEY='ubee_uu_local_addresses_v1';
+  const root=$('productionOrderFlow');
+  const serviceLabels={send:'幫我送',pickup:'幫我取',buy:'幫我買',queue:'幫排隊',helper:'全能跑腿'};
+  const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3};
   const state={
-    service:'send',page:'home',addressTarget:'pickup',selectedBaseAddress:null,
-    pickup:null,dropoff:null,buyCategoryIndex:0,buyNote:'',queueNote:'',queueMinutes:30,
-    savedAddresses:[],recentAddresses:[],searchSession:'',searchTimer:null,addressMap:null,addressMarker:null,
+    page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
+    pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
+    taskName:'',taskNote:'',itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,
+    timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
+    savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',
+    detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
+    mapRenderId:0,submitting:false
   };
 
-  const serviceText={
-    send:{pickup:'從哪裡取件？',dropoff:'送到哪裡？',pickupTitle:'取件資訊',dropoffTitle:'收件資訊'},
-    pickup:{pickup:'從哪裡取件？',dropoff:'送到哪裡？',pickupTitle:'取件資訊',dropoffTitle:'收件資訊'},
-    helper:{pickup:'任務在哪裡？',dropoff:'完成後送到哪裡？',pickupTitle:'任務地點',dropoffTitle:'交付資訊'},
-    buy:{pickup:'去哪裡購買？',dropoff:'送到哪裡？',pickupTitle:'購買地點資訊',dropoffTitle:'收件資訊'},
-    queue:{pickup:'去哪裡排隊？',dropoff:'服務完成地點',pickupTitle:'排隊資訊',dropoffTitle:'通知資訊'}
-  };
+  function setLoading(show,text='系統處理中…'){$('flowLoadingText').textContent=text;$('flowLoading').classList.toggle('show',!!show)}
+  function status(id,text='',error=false){const el=$(id);if(!el)return;el.textContent=text;el.classList.toggle('error',!!error)}
+  function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]))}
+  function cleanPhone(value){return String(value||'').replace(/\D/g,'').slice(0,10)}
+  function validPoint(point){return point&&Number.isFinite(Number(point.lat))&&Number.isFinite(Number(point.lng))&&Number(point.lat)>=-90&&Number(point.lat)<=90&&Number(point.lng)>=-180&&Number(point.lng)<=180}
+  function getUserId(){try{const profileId=typeof liffProfile!=='undefined'?liffProfile?.userId:'';return String(typeof liffUserId!=='undefined'?liffUserId:(profileId||localStorage.getItem('lineUserId')||'')).trim()}catch(_){return''}}
+  function activeOrder(){try{const s=String(currentOrderData?.status||'').toLowerCase();return !!currentOrderId&&!['completed','done','cancelled','canceled'].includes(s)}catch(_){return false}}
 
-  function esc(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));}
-  function cleanPhone(value){return String(value||'').replace(/\D/g,'').slice(0,10);}
-  function loadLocal(){
-    // 正式營運規則：每次重新開啟下單頁都建立全新任務。
-    // 僅保留使用者上次選擇的服務分頁，不載入地址、電話、備註或估價。
-    try{
-      const x=JSON.parse(localStorage.getItem(LOCAL_KEY)||'{}');
-      if(x&&typeof x==='object'&&['send','pickup','helper','buy','queue'].includes(x.service)){
-        state.service=x.service;
-      }
-    }catch(e){}
-  }
-  function saveLocal(){
-    try{
-      localStorage.setItem(LOCAL_KEY,JSON.stringify({
-        version:2,
-        service:state.service,
-        savedAtMs:Date.now()
-      }));
-    }catch(e){}
+  function buildProgress(){
+    document.querySelectorAll('#productionOrderFlow .flow-progress').forEach(bar=>{
+      const active=Number(bar.dataset.progress||0);
+      bar.innerHTML=['地點','任務內容','配送設定','確認送出'].map((label,index)=>`<div class="flow-progress-item ${index===active?'active':index<active?'done':''}" data-number="${index+1}">${label}</div>`).join('');
+    });
   }
 
-  function clearLegacyTaskFields(){
-    const ids=[
-      'pickup','pickupAddressNote','pickupContact','pickupPhone',
-      'dropoff','dropoffAddressNote','dropoffContact','dropoffPhone',
-      'note','item','taskItemName','taskQuantity','taskWeight','taskPickupCode',
-      'queueLocation','queueMinutes','advancePayment'
-    ];
-    ids.forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':''});
-    try{
-      pickupLat=null;pickupLng=null;pickupPlaceId='';
-      dropoffLat=null;dropoffLng=null;dropoffPlaceId='';
-      selectedNearbyPlace=null;selectedNearbyPlaceId='';
-      lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;
-      if(typeof invalidateRoute==='function')invalidateRoute();
-      if(typeof invalidateQuote==='function')invalidateQuote();
-      if(typeof clearRoutePreview==='function')clearRoutePreview();
-    }catch(e){}
+  function showPage(name){
+    state.page=name;
+    root.querySelectorAll('.flow-page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
+    $('flowNavHome').classList.toggle('active',name!=='profile');
+    const scroller=root.querySelector(`.flow-page[data-page="${name}"] .flow-scroll`);
+    if(scroller)scroller.scrollTop=0;
   }
 
-  function resetNewTaskState(){
-    state.page='home';
-    state.addressTarget='pickup';
-    state.selectedBaseAddress=null;
-    state.pickup=null;
-    state.dropoff=null;
-    state.buyCategoryIndex=0;
-    state.buyNote='';
-    state.queueNote='';
-    state.queueMinutes=30;
-    state.savedAddresses=[];
-    state.recentAddresses=[];
-    state.searchSession='';
-    clearTimeout(state.searchTimer);
-    state.searchTimer=null;
-    if(state.addressMarker){try{state.addressMarker.setMap(null)}catch(e){}}
-    state.addressMarker=null;
-    clearLegacyTaskFields();
-    try{
-      localStorage.removeItem('ubee_order_draft_v2');
-      localStorage.removeItem('ubee_uu_flow_state_v1');
-    }catch(e){}
-  }
-  function setLoading(show,text='系統處理中…'){$('uuLoadingText').textContent=text;$('uuLoading').classList.toggle('show',!!show);}
-  function page(name){state.page=name;root.querySelectorAll('.uu-page').forEach(el=>el.classList.toggle('active',el.id===`uuPage${name[0].toUpperCase()}${name.slice(1)}`));root.querySelectorAll('.uu-scroll').forEach(el=>{if(el.closest('.uu-page.active'))el.scrollTop=0});saveLocal();}
-  function getUserId(){try{return String(typeof userId!=='undefined'?userId:'').trim()||String(localStorage.getItem('ubee_customer_line_user_id')||'').trim();}catch(e){return String(localStorage.getItem('ubee_customer_line_user_id')||'').trim();}}
-  function selectedCity(){try{return String(selectedServiceCity||'臺中市')}catch(e){return '臺中市'}}
-  function setStatus(id,text,error=false){const el=$(id);if(!el)return;el.textContent=text||'';el.classList.toggle('error',!!error)}
-
-  function activateService(service){
-    state.service=service;
-    root.querySelectorAll('.uu-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.service===service));
-    try{selectServiceFromTab(null,service);}catch(error){console.warn('同步既有服務分類失敗：',error)}
-    updateHome();saveLocal();
+  function selectedServiceDefinition(){
+    try{const list=serviceGroups?.[state.service]||[];return list[state.serviceTypeIndex]||list[0]||{title:serviceLabels[state.service],categories:['其他']}}catch(_){return{title:serviceLabels[state.service],categories:['其他']}}
   }
 
-  function addressDisplay(item,fallback){return item?.address||fallback}
-  function detailComplete(item){return !!(item?.address&&item?.phone)}
+  function syncServiceSelectors(){
+    let list=[];try{list=serviceGroups?.[state.service]||[]}catch(_){list=[]}
+    if(!list.length)list=[{title:serviceLabels[state.service],categories:['其他']}];
+    if(state.serviceTypeIndex>=list.length)state.serviceTypeIndex=0;
+    const typeSelect=$('flowServiceType');
+    typeSelect.innerHTML=list.map((item,index)=>`<option value="${index}">${escapeHtml(item.title)}</option>`).join('');
+    typeSelect.value=String(state.serviceTypeIndex);
+    const selected=list[state.serviceTypeIndex]||list[0];
+    const categories=Array.isArray(selected.categories)&&selected.categories.length?selected.categories:['其他'];
+    if(!categories.includes(state.serviceCategory))state.serviceCategory=categories[0];
+    $('flowServiceCategory').innerHTML=categories.map(item=>`<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join('');
+    $('flowServiceCategory').value=state.serviceCategory;
+    if(!state.taskName)state.taskName=selected.title||serviceLabels[state.service];
+    $('flowTaskName').value=state.taskName;
+    $('flowTaskNote').value=state.taskNote;
+    $('flowItemSize').value=state.itemSize;
+    $('flowUpstairs').value=state.upstairs;
+    $('flowAdvancePayment').value=String(state.advancePayment||0);
+    $('flowQueueMinutes').value=String(state.queueMinutes||30);
+    $('flowQueueWrap').hidden=state.service!=='queue';
+    $('flowAdvanceWrap').hidden=false;
+  }
+
+  function setService(service){
+    if(!serviceLabels[service])return;
+    state.service=service;state.serviceTypeIndex=0;state.serviceCategory='';
+    root.querySelectorAll('.flow-service-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.service===service));
+    const def=selectedServiceDefinition();state.taskName=def.title||serviceLabels[service];
+    if(service==='queue'&&state.pickup&&!state.dropoff)state.dropoff={...state.pickup,label:'現場完成',_autoQueue:true};if(service!=='queue'&&state.dropoff?._autoQueue)state.dropoff=null;
+    syncServiceSelectors();updateHome();
+  }
+
   function updateHome(){
-    const labels=serviceText[state.service]||serviceText.send;
-    $('uuPickupText').textContent=addressDisplay(state.pickup,labels.pickup);
-    $('uuDropoffText').textContent=addressDisplay(state.dropoff,labels.dropoff);
-    $('uuPickupHint').textContent=detailComplete(state.pickup)?`${state.pickup.contactName||'聯絡人'}・${state.pickup.phone}`:`請完善${labels.pickupTitle}`;
-    $('uuDropoffHint').textContent=detailComplete(state.dropoff)?`${state.dropoff.contactName||'聯絡人'}・${state.dropoff.phone}`:`請完善${labels.dropoffTitle}`;
-    $('uuCityBtn').textContent=`${selectedCity()}⌄`;
-    const task=taskNote();
-    $('uuTaskChip').hidden=!task;
-    $('uuTaskChipText').textContent=task||'';
-    $('uuStartOrderBtn').textContent=state.service==='queue'?'建立排隊任務':'立即下單';
-    if(state.service==='queue'&&state.pickup)$('uuQueueAddressText').textContent=state.pickup.address;
+    const p=state.pickup,d=state.dropoff;
+    $('flowPickupText').textContent=p?.address||'請選擇取件地址';
+    $('flowPickupMeta').textContent=p?`${p.contactName||''} ${p.phone||''}`.trim()||'取件資訊已填寫':'填寫取件聯絡人與電話';
+    $('flowDropoffText').textContent=d?.address||'請選擇送達地址';
+    $('flowDropoffMeta').textContent=d?`${d.contactName||''} ${d.phone||''}`.trim()||'收件資訊已填寫':'填寫收件人與電話';
+    const preview=$('flowTaskPreview');
+    if(state.taskNote){preview.classList.add('show');$('flowTaskPreviewText').textContent=`${serviceLabels[state.service]}｜${state.taskName||selectedServiceDefinition().title}｜${state.taskNote}`}
+    else preview.classList.remove('show');
   }
 
-  function taskNote(){
-    if(state.service==='buy')return state.buyNote.trim();
-    if(state.service==='queue')return state.queueNote.trim();
-    try{return String($('note')?.value||'').trim()}catch(e){return ''}
-  }
+  function openAddress(target){state.addressTarget=target;$('flowSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';showPage('search');loadAddresses();$('flowAddressSearch').focus()}
 
-  function renderBuy(){
-    const list=(typeof serviceGroups!=='undefined'&&serviceGroups.buy)||[];
-    $('uuBuyCategories').innerHTML=list.map((item,i)=>`<button class="uu-buy-category ${i===state.buyCategoryIndex?'active':''}" data-index="${i}" type="button"><i>${esc(item.icon||'🛒')}</i>${esc(item.title.replace('代買',''))}</button>`).join('');
-    $('uuBuyNote').value=state.buyNote;
-    const quick=['雞排','便當','飲料','藥品','生活用品'];
-    $('uuBuyQuick').innerHTML=quick.map(x=>`<button type="button" data-text="${esc(x)}">${esc(x)}</button>`).join('');
-  }
-
-  function openTaskEditor(){
-    if(state.service==='buy'){renderBuy();page('buy');return}
-    if(state.service==='queue'){$('uuQueueNote').value=state.queueNote;$('uuQueueMinutes').value=state.queueMinutes;if(state.pickup)$('uuQueueAddressText').textContent=state.pickup.address;page('queue');return}
-    const current=taskNote();
-    const next=window.prompt('請補充物品、數量、規格或任務注意事項：',current||'');
-    if(next===null)return;
-    const note=String(next||'').trim();
-    const noteEl=$('note');if(noteEl)noteEl.value=note;
-    const itemEl=$('item');if(itemEl)itemEl.value=note;
-    updateHome();saveLocal();
-  }
-
-  function ensureTaskBeforeRoute(){
-    if(state.service==='buy'&&!state.buyNote.trim()){renderBuy();page('buy');return false}
-    if(state.service==='queue'&&!state.queueNote.trim()){page('queue');return false}
-    return true;
-  }
-
-  function startOrder(){
-    if(!ensureTaskBeforeRoute())return;
-    if(!state.pickup){openAddress('pickup');return}
-    if(state.service!=='queue'&&!state.dropoff){openAddress('dropoff');return}
-    if(state.service==='queue'&&!state.dropoff){state.dropoff={...state.pickup,label:'現場完成'};}
-    syncLegacyFields();openConfirm();
-  }
-
-  function openAddress(target){
-    state.addressTarget=target;state.selectedBaseAddress=null;state.searchSession=`${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const labels=serviceText[state.service]||serviceText.send;
-    $('uuSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';
-    $('uuSearchSub').textContent=target==='pickup'?'搜尋取件地址，選好後再填聯絡資訊':'搜尋送達地址，選好後再填收件資訊';
-    $('uuAddressSearchInput').value='';setAddressSearchMode(false);$('uuSearchResults').innerHTML='<div class="uu-empty">輸入至少 2 個字開始搜尋</div>';
-    page('search');loadAddressLists();
-  }
-
-  async function loadAddressLists(){
+  async function loadAddresses(){
     const uid=getUserId();
-    const local=(()=>{try{const x=JSON.parse(localStorage.getItem(LOCAL_ADDR_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}})();
-    state.savedAddresses=local;
-    renderAddressLists();
-    if(!uid||!uid.startsWith('U'))return;
-    try{
-      const [savedRes,recentRes]=await Promise.all([
-        fetch(`/api/customer/addresses?userId=${encodeURIComponent(uid)}`,{cache:'no-store'}),
-        fetch(`/api/customer/recent-addresses?userId=${encodeURIComponent(uid)}`,{cache:'no-store'})
-      ]);
-      const saved=await savedRes.json().catch(()=>({}));const recent=await recentRes.json().catch(()=>({}));
-      if(savedRes.ok&&saved.success)state.savedAddresses=Array.isArray(saved.addresses)?saved.addresses:[];
-      if(recentRes.ok&&recent.success)state.recentAddresses=Array.isArray(recent.addresses)?recent.addresses:[];
-    }catch(error){console.warn('常用地址讀取失敗，使用本機資料：',error)}
-    renderAddressLists();
-  }
-
-  function resultHtml(item,index,type){
-    return `<button class="uu-result" type="button" data-list="${type}" data-index="${index}"><span class="uu-result-icon">${type==='saved'?'★':'⌖'}</span><span><strong>${esc(item.label||item.name||item.address||'地址')}</strong><small>${esc(item.address||item.formattedAddress||'')}</small></span><span class="uu-result-arrow">›</span></button>`;
-  }
-  function renderAddressLists(){
-    $('uuSavedList').innerHTML=state.savedAddresses.length?state.savedAddresses.map((x,i)=>resultHtml(x,i,'saved')).join(''):'<div class="uu-empty">尚未儲存常用地址</div>';
-    $('uuRecentList').innerHTML=state.recentAddresses.length?state.recentAddresses.map((x,i)=>resultHtml(x,i,'recent')).join(''):'<div class="uu-empty">尚無最近使用地址</div>';
-  }
-
-  function setAddressSearchMode(active){
-    $('uuSavedSection')?.classList.toggle('hidden',!!active);
-    $('uuRecentSection')?.classList.toggle('hidden',!!active);
-  }
-
-  function friendlyAddressSearchError(error){
-    const text=String(error?.message||'').trim();
-    if(/referer restrictions|REQUEST_DENIED|API key/i.test(text)){
-      return '地址服務設定異常，請稍後再試或使用目前位置。';
+    let saved=[],recent=[];
+    if(uid.startsWith('U')){
+      try{const [a,b]=await Promise.all([fetch(`/api/customer/addresses?userId=${encodeURIComponent(uid)}`,{cache:'no-store'}),fetch(`/api/customer/recent-addresses?userId=${encodeURIComponent(uid)}`,{cache:'no-store'})]);const ad=await a.json().catch(()=>({}));const rd=await b.json().catch(()=>({}));saved=Array.isArray(ad.addresses)?ad.addresses:[];recent=Array.isArray(rd.addresses)?rd.addresses:[];}catch(error){console.warn('讀取常用地址失敗：',error)}
     }
-    if(/OVER_QUERY_LIMIT/i.test(text))return '地址服務目前忙碌，請稍後再試。';
-    return text||'地址搜尋失敗，請稍後再試。';
+    if(!saved.length){try{const local=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');saved=Array.isArray(local)?local:[]}catch(_){}}
+    state.savedAddresses=saved;state.recentAddresses=recent;
+    renderAddressList('flowSavedAddresses',saved,'saved','尚未儲存常用地址');
+    renderAddressList('flowRecentAddresses',recent,'recent','尚無最近使用地址');
+  }
+
+  function renderAddressList(id,list,type,emptyText){
+    const el=$(id);if(!el)return;
+    if(!list.length){el.innerHTML=`<div class="flow-empty">${escapeHtml(emptyText)}</div>`;return}
+    el.innerHTML=list.slice(0,12).map((item,index)=>`<button class="flow-result" type="button" data-address-list="${type}" data-index="${index}"><span class="flow-result-icon">⌖</span><span><strong>${escapeHtml(item.label||item.name||'常用地址')}</strong><small>${escapeHtml(item.address||item.formattedAddress||'')}</small></span><span>›</span></button>`).join('');
   }
 
   async function searchAddress(query){
     const q=String(query||'').trim();
-    if(q.length<2){setAddressSearchMode(false);$('uuSearchResults').innerHTML='<div class="uu-empty">輸入至少 2 個字開始搜尋</div>';return}
-    setAddressSearchMode(true);$('uuSearchResults').innerHTML='<div class="uu-empty">正在搜尋地址…</div>';
+    if(q.length<2){$('flowSearchResults').innerHTML='<div class="flow-empty">輸入至少 2 個字開始搜尋</div>';return}
+    $('flowSearchResults').innerHTML='<div class="flow-empty">正在搜尋地址…</div>';
     try{
-      const pos=state.pickup||state.dropoff||{};
-      const res=await fetch('/api/address/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input:q,lat:pos.lat,lng:pos.lng,sessionToken:state.searchSession})});
-      const data=await res.json().catch(()=>({}));
-      if(!res.ok||!data.success)throw new Error(data.error||'地址搜尋失敗');
-      const list=Array.isArray(data.predictions)?data.predictions:[];
-      $('uuSearchResults').innerHTML=list.length?list.map((x,i)=>`<button class="uu-result" type="button" data-prediction="${i}"><span class="uu-result-icon">⌖</span><span><strong>${esc(x.mainText||x.description)}</strong><small>${esc(x.secondaryText||'')}</small></span><span class="uu-result-arrow">›</span></button>`).join(''):'<div class="uu-empty">找不到符合的地址</div>';
-      $('uuSearchResults')._items=list;
-    }catch(error){$('uuSearchResults').innerHTML=`<div class="uu-empty">${esc(friendlyAddressSearchError(error))}</div>`}
+      const ref=state.pickup||state.dropoff||{};
+      const response=await fetch('/api/address/search',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({input:q,lat:ref.lat,lng:ref.lng,sessionToken:state.searchSession})});
+      const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'地址搜尋失敗');
+      state.searchItems=Array.isArray(data.predictions)?data.predictions:[];
+      $('flowSearchResults').innerHTML=state.searchItems.length?state.searchItems.map((item,index)=>`<button class="flow-result" type="button" data-prediction="${index}"><span class="flow-result-icon">⌖</span><span><strong>${escapeHtml(item.mainText||item.description||'')}</strong><small>${escapeHtml(item.secondaryText||'')}</small></span><span>›</span></button>`).join(''):'<div class="flow-empty">找不到符合的地址</div>';
+    }catch(error){$('flowSearchResults').innerHTML=`<div class="flow-empty">${escapeHtml(error.message||'地址搜尋失敗，請稍後再試')}</div>`}
   }
 
   async function choosePrediction(index){
-    const item=$('uuSearchResults')._items?.[Number(index)];if(!item)return;
-    setLoading(true,'讀取地址詳細資料…');
-    try{
-      const res=await fetch('/api/address/detail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({placeId:item.placeId,sessionToken:state.searchSession})});
-      const data=await res.json().catch(()=>({}));if(!res.ok||!data.success)throw new Error(data.error||'地址讀取失敗');
-      openDetail(data.address||{});
-    }catch(error){alert(error.message||'地址讀取失敗')}finally{setLoading(false)}
+    const item=state.searchItems[Number(index)];if(!item)return;
+    setLoading(true,'正在讀取地址…');
+    try{const response=await fetch('/api/address/detail',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({placeId:item.placeId,sessionToken:state.searchSession})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'地址讀取失敗');openDetail(data.address||{})}catch(error){alert(error.message||'地址讀取失敗')}finally{setLoading(false)}
   }
 
   async function useCurrentLocation(){
-    if(!navigator.geolocation){alert('此裝置不支援定位功能。');return}
+    if(!navigator.geolocation){alert('此裝置無法使用定位功能。');return}
     setLoading(true,'正在取得目前位置…');
-    navigator.geolocation.getCurrentPosition(async pos=>{
-      try{
-        const res=await fetch('/api/address/reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})});
-        const data=await res.json().catch(()=>({}));if(!res.ok||!data.success)throw new Error(data.error||'目前位置轉換失敗');
-        openDetail(data.address||{});
-      }catch(error){alert(error.message||'目前位置讀取失敗')}finally{setLoading(false)}
-    },error=>{setLoading(false);alert(error.message||'無法取得定位權限。')},{enableHighAccuracy:true,timeout:12000,maximumAge:30000});
+    navigator.geolocation.getCurrentPosition(async position=>{
+      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);const response=await fetch('/api/address/reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'目前位置轉換失敗');openDetail({...data.address,lat,lng})}catch(error){alert(error.message||'無法讀取目前位置')}finally{setLoading(false)}
+    },()=>{setLoading(false);alert('無法取得定位權限，請改用地址搜尋。')},{enableHighAccuracy:true,timeout:12000,maximumAge:30000});
   }
 
   function openDetail(base){
-    state.selectedBaseAddress={...base};
+    state.selectedAddress={...base};
     const existing=state.addressTarget==='pickup'?state.pickup:state.dropoff;
-    const merged={...base,...(existing&&existing.address===base.address?existing:{})};
-    $('uuDetailTitle').textContent=state.addressTarget==='pickup'?'填寫取件資訊':'填寫收件資訊';
-    $('uuDetailAddress').value=merged.address||merged.formattedAddress||'';
-    $('uuDetailNote').value=merged.addressDetail||merged.note||'';
-    $('uuDetailName').value=merged.contactName||merged.name||'';
-    $('uuDetailPhone').value=merged.phone||'';
-    $('uuDetailLabel').value=merged.label||'';
-    $('uuSaveAddress').checked=false;setStatus('uuDetailStatus','');
-    page('detail');setTimeout(()=>showAddressMap(merged),80);
+    const merged=existing&&existing.address===(base.address||base.formattedAddress)?{...base,...existing}:base;
+    $('flowDetailTitle').textContent=state.addressTarget==='pickup'?'填寫取件資訊':'填寫收件資訊';
+    $('flowDetailAddress').value=merged.address||merged.formattedAddress||'';
+    $('flowDetailNote').value=merged.addressDetail||merged.note||'';
+    $('flowDetailName').value=merged.contactName||merged.name||'';
+    $('flowDetailPhone').value=merged.phone||'';
+    $('flowDetailLabel').value=merged.label||'';
+    $('flowSaveAddress').checked=false;status('flowDetailStatus','');showPage('detail');setTimeout(()=>renderDetailMap(merged),80);
   }
 
-  async function showAddressMap(item){
-    try{
-      if(typeof ensureGoogleMapsLoaded==='function')await ensureGoogleMapsLoaded();
-      if(!window.google?.maps)return;
-      const center={lat:Number(item.lat)||24.2521,lng:Number(item.lng)||120.7214};
-      if(!state.addressMap)state.addressMap=new google.maps.Map($('uuAddressMap'),{center,zoom:item.lat?17:12,disableDefaultUI:true,gestureHandling:'greedy'});
-      else{state.addressMap.setCenter(center);state.addressMap.setZoom(item.lat?17:12)}
-      if(state.addressMarker)state.addressMarker.setMap(null);
-      if(item.lat&&item.lng)state.addressMarker=new google.maps.Marker({map:state.addressMap,position:center});
-    }catch(error){console.warn('地址預覽地圖失敗：',error)}
+  async function ensureMaps(){
+    if(typeof loadGoogleMapsApi==='function')return await loadGoogleMapsApi();
+    if(window.google?.maps){if(typeof loadGoogleMapsLibraries==='function')return await loadGoogleMapsLibraries();return window.google.maps}
+    throw new Error('Google 地圖尚未完成載入');
   }
 
-  async function smartParse(){
-    let text=String($('uuSmartText').value||'').trim();
-    if(!text&&navigator.clipboard?.readText){
-      try{text=String(await navigator.clipboard.readText()||'').trim();$('uuSmartText').value=text}catch(e){}
-    }
-    if(!text){setStatus('uuDetailStatus','請先貼上姓名、電話或地址文字。',true);return}
-    const phone=text.match(/09\d{8}/)?.[0]||'';
-    const lines=text.split(/[\n,，]/).map(x=>x.trim()).filter(Boolean);
-    const addressLine=lines.find(x=>/[縣市區鄉鎮路街巷弄號樓]/.test(x)&&x.length>=5);
-    const nameLine=lines.find(x=>x!==addressLine&&!/09\d{8}/.test(x)&&x.length<=20);
-    if(phone)$('uuDetailPhone').value=phone;
-    if(nameLine)$('uuDetailName').value=nameLine.replace(/姓名[:：]?/,'').trim();
-    if(addressLine){
-      const base=state.selectedBaseAddress||{};
-      if(!base.address)$('uuDetailAddress').value=addressLine;
-      else if(addressLine!==base.address)$('uuDetailNote').value=addressLine.replace(base.address,'').trim()||$('uuDetailNote').value;
-    }
-    setStatus('uuDetailStatus','已辨識可用資訊，請確認後按「確定」。');
+  async function geocodeAddress(address){
+    await ensureMaps();
+    const geocoder=new google.maps.Geocoder();
+    const result=await geocoder.geocode({address:String(address||''),region:'TW'});
+    const loc=result?.results?.[0]?.geometry?.location;
+    return loc?{lat:loc.lat(),lng:loc.lng()}:null;
+  }
+
+  async function renderDetailMap(item){
+    try{await ensureMaps();const point=validPoint(item)?{lat:Number(item.lat),lng:Number(item.lng)}:await geocodeAddress(item.address||item.formattedAddress);const center=point||{lat:24.1477,lng:120.6736};if(!state.detailMap)state.detailMap=new google.maps.Map($('flowDetailMap'),{center,zoom:point?17:12,disableDefaultUI:true,gestureHandling:'greedy'});else{state.detailMap.setCenter(center);state.detailMap.setZoom(point?17:12);google.maps.event.trigger(state.detailMap,'resize')}if(state.detailMarker)state.detailMarker.setMap(null);if(point)state.detailMarker=new google.maps.Marker({map:state.detailMap,position:point,title:'選擇的地點'})}catch(error){console.warn('地點預覽失敗：',error)}
   }
 
   async function saveDetail(){
-    const base=state.selectedBaseAddress||{};
-    const item={
-      label:String($('uuDetailLabel').value||'').trim()||(state.addressTarget==='pickup'?'取件地址':'收件地址'),
-      name:base.name||'',address:String($('uuDetailAddress').value||'').trim(),formattedAddress:String($('uuDetailAddress').value||'').trim(),
-      addressDetail:String($('uuDetailNote').value||'').trim(),contactName:String($('uuDetailName').value||'').trim(),phone:cleanPhone($('uuDetailPhone').value),
-      placeId:base.placeId||'',city:base.city||'',district:base.district||'',lat:Number(base.lat)||null,lng:Number(base.lng)||null
-    };
-    if(!item.address){setStatus('uuDetailStatus','請先選擇完整地址。',true);return}
-    if(!item.contactName){setStatus('uuDetailStatus','請填寫聯絡人姓名。',true);return}
-    if(!/^09\d{8}$/.test(item.phone)){setStatus('uuDetailStatus','請填寫正確的台灣手機號碼。',true);return}
-    if(state.addressTarget==='pickup')state.pickup=item;else state.dropoff=item;
-    if($('uuSaveAddress').checked)await persistAddress(item);
-    syncLegacyFields();updateHome();saveLocal();page(state.service==='queue'?'queue':'home');
+    const base=state.selectedAddress||{};
+    const address=String($('flowDetailAddress').value||'').trim();const contactName=String($('flowDetailName').value||'').trim();const phone=cleanPhone($('flowDetailPhone').value);
+    if(!address){status('flowDetailStatus','請先選擇完整地址。',true);return}
+    if(!contactName){status('flowDetailStatus','請填寫聯絡人姓名。',true);return}
+    if(!/^09\d{8}$/.test(phone)){status('flowDetailStatus','請填寫正確的台灣手機號碼。',true);return}
+    let lat=Number(base.lat),lng=Number(base.lng);if(!validPoint({lat,lng})){try{const point=await geocodeAddress(address);lat=point?.lat??null;lng=point?.lng??null}catch(_){lat=null;lng=null}}
+    const item={label:String($('flowDetailLabel').value||'').trim()||(state.addressTarget==='pickup'?'取件地址':'收件地址'),address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
+    if(state.addressTarget==='pickup'){state.pickup=item;if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};}else{state.dropoff={...item,_autoQueue:false};}
+    if($('flowSaveAddress').checked)await persistAddress(item);
+    updateHome();syncLegacy();showPage('home');
   }
 
   async function persistAddress(item){
     const uid=getUserId();
-    if(uid&&uid.startsWith('U')){
-      try{
-        const res=await fetch('/api/customer/addresses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid,address:item})});
-        const data=await res.json().catch(()=>({}));if(!res.ok||!data.success)throw new Error(data.error||'地址儲存失敗');return;
-      }catch(error){console.warn('跨裝置地址儲存失敗，改存本機：',error)}
-    }
-    try{const list=JSON.parse(localStorage.getItem(LOCAL_ADDR_KEY)||'[]');const arr=Array.isArray(list)?list:[];arr.unshift({...item,id:`local_${Date.now()}`});localStorage.setItem(LOCAL_ADDR_KEY,JSON.stringify(arr.slice(0,20)))}catch(e){}
+    if(uid.startsWith('U')){try{const response=await fetch('/api/customer/addresses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid,address:item})});const data=await response.json().catch(()=>({}));if(response.ok&&data.success)return}catch(error){console.warn('跨裝置地址儲存失敗：',error)}}
+    try{const list=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');const arr=Array.isArray(list)?list:[];arr.unshift({...item,id:`local_${Date.now()}`});localStorage.setItem('ubee_uu_local_addresses_v1',JSON.stringify(arr.slice(0,20)))}catch(_){ }
   }
 
-  function syncLegacyFields(){
-    const p=state.pickup||{};const d=state.dropoff||{};
-    const set=(id,val)=>{const el=$(id);if(el)el.value=val??''};
+  function collectTask(){
+    state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory=$('flowServiceCategory').value;
+    state.taskName=String($('flowTaskName').value||'').trim();state.taskNote=String($('flowTaskNote').value||'').trim();state.itemSize=$('flowItemSize').value;state.upstairs=$('flowUpstairs').value;state.advancePayment=Math.max(0,Math.round(Number($('flowAdvancePayment').value)||0));state.queueMinutes=Math.max(10,Math.min(480,Math.round(Number($('flowQueueMinutes').value)||30)));
+  }
+
+  function validateTask(){collectTask();if(!state.taskName)state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];if(!state.taskNote){status('flowTaskStatus','請完整填寫任務內容，才能進入下一步。',true);$('flowTaskNote').focus();return false}if(state.advancePayment>=1000){status('flowTaskStatus','代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。',true);return false}status('flowTaskStatus','');return true}
+
+  function ensureTimeDefaults(){
+    const round=ms=>Math.ceil(ms/(5*60*1000))*(5*60*1000);const start=new Date(round(Date.now()+2*60*60*1000));const end=new Date(round(Date.now()+4*60*60*1000));
+    const localParts=date=>{const p={};new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});return{date:`${p.year}-${p.month}-${p.day}`,time:`${p.hour}:${p.minute}`}};
+    const a=localParts(start),b=localParts(end),today=localParts(new Date()).date;['flowScheduledDate','flowFlexibleDate'].forEach(id=>{const el=$(id);el.min=today;if(!el.value)el.value=a.date});if(!$('flowScheduledTime').value)$('flowScheduledTime').value=a.time;if(!$('flowFlexibleStart').value)$('flowFlexibleStart').value=a.time;if(!$('flowFlexibleEnd').value)$('flowFlexibleEnd').value=b.time;
+  }
+
+  function setTiming(type){state.timing=['immediate','scheduled','flexible'].includes(type)?type:'immediate';root.querySelectorAll('[data-timing]').forEach(btn=>btn.classList.toggle('active',btn.dataset.timing===state.timing));$('flowScheduledPanel').classList.toggle('show',state.timing==='scheduled');$('flowFlexiblePanel').classList.toggle('show',state.timing==='flexible');$('flowSpeedCard').style.display=state.timing==='immediate'?'block':'none';if(state.timing!=='immediate')state.speed='standard';ensureTimeDefaults()}
+  function setSpeed(type){state.speed=['standard','priority','express'].includes(type)?type:'standard';root.querySelectorAll('[data-speed]').forEach(btn=>btn.classList.toggle('active',btn.dataset.speed===state.speed))}
+  function combineTaipei(date,time){return Date.parse(`${date}T${time}:00+08:00`)}
+  function validateOptions(){
+    state.scheduleGoal=$('flowScheduleGoal').value;state.scheduledDate=$('flowScheduledDate').value;state.scheduledTime=$('flowScheduledTime').value;state.flexibleDate=$('flowFlexibleDate').value;state.flexibleStart=$('flowFlexibleStart').value;state.flexibleEnd=$('flowFlexibleEnd').value;
+    const min=Date.now()+30*60*1000;
+    if(state.timing==='scheduled'){const ms=combineTaipei(state.scheduledDate,state.scheduledTime);if(!Number.isFinite(ms)||ms<min){status('flowOptionsStatus','指定時間至少需要晚於現在 30 分鐘。',true);return false}}
+    if(state.timing==='flexible'){const a=combineTaipei(state.flexibleDate,state.flexibleStart),b=combineTaipei(state.flexibleDate,state.flexibleEnd);if(!Number.isFinite(a)||!Number.isFinite(b)||a<min||b<=a){status('flowOptionsStatus','請選擇正確的彈性時段，開始時間至少晚於現在 30 分鐘。',true);return false}}
+    status('flowOptionsStatus','');return true;
+  }
+
+  function syncLegacy(){
+    const p=state.pickup||{},d=state.dropoff||{};const set=(id,value)=>{const el=$(id);if(el)el.value=value??''};
     set('pickup',p.address||'');set('pickupAddressNote',p.addressDetail||'');set('pickupContact',p.contactName||'');set('pickupPhone',p.phone||'');
     set('dropoff',d.address||'');set('dropoffAddressNote',d.addressDetail||'');set('dropoffContact',d.contactName||'');set('dropoffPhone',d.phone||'');
-    let note=taskNote();
-    if(!note){note=state.service==='send'?'請依地址取件並安全送達。':state.service==='pickup'?'請依資訊代為取件並送達。':state.service==='helper'?'請依照聯絡資訊完成跑腿任務。':'UBee 跑腿任務';}
-    set('note',note);set('item',note);set('taskItemName',serviceText[state.service]?.pickupTitle||'UBee 任務');
-    if(!$('itemSize')?.value)set('itemSize','small');
-    set('queueMinutes',state.service==='queue'?String(state.queueMinutes||30):'0');
-    if(state.service==='queue')set('queueLocation',p.address||'');
-    set('advancePayment',$('advancePayment')?.value||'0');
-    try{pickupLat=p.lat;pickupLng=p.lng;pickupPlaceId=p.placeId||'';dropoffLat=d.lat;dropoffLng=d.lng;dropoffPlaceId=d.placeId||'';}catch(e){}
-    try{if(state.service==='buy'){const list=serviceGroups.buy||[];const selected=list[state.buyCategoryIndex]||list[0];serviceType=selected?.title||'餐點代買';serviceCategory=selected?.categories?.[0]||'其他';}if(state.service==='queue'){serviceType='現場排隊';serviceCategory='一般排隊';serviceMode='queue';}}
-    catch(e){}
-    try{invalidateRoute();invalidateQuote();scheduleRouteAndQuoteRefresh(60);if(typeof UBeeEnhancements!=='undefined')UBeeEnhancements.saveDraft();}catch(e){console.warn('同步估價狀態失敗：',e)}
-  }
-
-  function extendPayloadObjects(){
-    if(typeof getPayload!=='function'||getPayload.__uuWrapped)return;
-    const original=getPayload;
-    const wrapped=function(){const payload=original.apply(this,arguments);return {...payload,pickupAddressObject:state.pickup||null,dropoffAddressObject:state.dropoff||null,addressCenterVersion:'uu-flow-v1',clientSchemaVersion:'customer-uu-compatible-2026-07-31'};};
-    wrapped.__uuWrapped=true;getPayload=wrapped;
-  }
-
-  async function openConfirm(){
-    syncLegacyFields();extendPayloadObjects();page('confirm');
-    $('uuConfirmPickup').textContent=state.pickup?.address||'—';$('uuConfirmPickupMeta').textContent=`${state.pickup?.contactName||''} ${state.pickup?.phone||''}`.trim();
-    $('uuConfirmDropoff').textContent=state.dropoff?.address||'—';$('uuConfirmDropoffMeta').textContent=`${state.dropoff?.contactName||''} ${state.dropoff?.phone||''}`.trim();
-    $('uuConfirmNote').textContent=taskNote()||$('note')?.value||'—';
-    const mapHost=$('uuConfirmMap');
-    const mapStatus=$('uuConfirmMapStatus');
-    if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='正在載入取件點、送達點與詳細路線…'}
-    setLoading(true,'正在取得詳細路線與正式估價…');
+    set('taskItemName',state.taskName||selectedServiceDefinition().title||serviceLabels[state.service]);set('note',state.taskNote);set('item',state.taskNote);set('itemSize',state.itemSize);set('upstairsOption',state.upstairs);set('advancePayment',String(state.advancePayment||0));set('queueMinutes',state.service==='queue'?String(state.queueMinutes||30):'0');if(state.service==='queue')set('queueLocation',p.address||'');
+    set('scheduledDate',state.scheduledDate);set('scheduledTime',state.scheduledTime);set('scheduleGoal',state.scheduleGoal);set('flexibleDate',state.flexibleDate);set('flexibleStartTime',state.flexibleStart);set('flexibleEndTime',state.flexibleEnd);
     try{
-      let route=null;
-      if(typeof refreshRoutePreview==='function')route=await refreshRoutePreview();
-      if(typeof renderEstimate==='function')await renderEstimate();
-      if(!route&&typeof lastRouteData!=='undefined')route=lastRouteData;
-      const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);
-      $('uuConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';
-      const distance=route?.distanceText||route?.distance||'';
-      const duration=route?.durationText||route?.duration||'';
-      $('uuConfirmRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||(state.service==='queue'?`預估排隊 ${state.queueMinutes} 分鐘`:'正在計算路線');
-      // 待確認頁使用獨立地圖，直接在正式 openConfirm 流程中繪製。
-      // 不再依賴外部包裝函式，避免函式作用域造成地圖完全沒有執行。
-      if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='正在建立待確認地圖…'}
-      if(typeof window.renderStableConfirmRoute==='function'){
-        await window.renderStableConfirmRoute(route||{});
-      }else if(typeof renderRouteOnReviewMap==='function'&&route){
-        try{
-          await ensureReviewMapReady();
-          renderRouteOnReviewMap(route);
-          if(mapStatus)mapStatus.hidden=true;
-        }catch(mapError){
-          console.warn('待確認頁備援地圖顯示失敗：',mapError);
-        }
-      }
-    }catch(error){
-      console.error('確認頁路線或估價失敗：',error);
-      $('uuConfirmPrice').textContent='估價失敗';
-      $('uuConfirmRouteMeta').textContent='請返回確認取件與送達地址';
-      if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='路線載入失敗，請返回確認地址後再試一次。'}
-    }finally{setLoading(false)}
+      serviceGroup=state.service;serviceMode=state.service==='queue'?'queue':'normal';const def=selectedServiceDefinition();serviceType=def.title||serviceLabels[state.service];serviceCategory=state.serviceCategory||def.categories?.[0]||'其他';speedType=state.timing==='immediate'?state.speed:'standard';orderTimingType=state.timing;scheduleGoal=state.scheduleGoal;
+      pickupLat=validPoint(p)?Number(p.lat):null;pickupLng=validPoint(p)?Number(p.lng):null;pickupPlaceId=p.placeId||'';dropoffLat=validPoint(d)?Number(d.lat):null;dropoffLng=validPoint(d)?Number(d.lng):null;dropoffPlaceId=d.placeId||'';
+      if(typeof selectOrderTimingType==='function')selectOrderTimingType(state.timing);if(typeof selectSpeed==='function')selectSpeed(speedType);if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();
+    }catch(error){console.warn('同步正式訂單欄位失敗：',error)}
   }
 
-  async function submitOrder(){
-    if(!$('uuConfirmAgree').checked){alert('請先確認地址、任務內容與費用。');return}
-    const uid=getUserId();if(!uid||!uid.startsWith('U')){alert('LINE 身分尚未完成，請從 UBee 官方帳號重新開啟下單頁。');return}
-    syncLegacyFields();extendPayloadObjects();const agree=$('agreeCheck');if(agree)agree.checked=true;
-    setLoading(true,'正在建立 UBee 任務…');
-    try{
-      if(typeof createOrder!=='function')throw new Error('找不到正式建單功能');
-      await createOrder();
-      if(typeof currentOrderId!=='undefined'&&currentOrderId){
-        // 正式訂單已建立後，清除新任務表單；訂單編號與追蹤快取仍保留。
-        resetNewTaskState();
-        root.style.display='none';
-        document.body.classList.remove('uu-flow-active');
-      }
-    }catch(error){alert(error.message||'建立訂單失敗')}finally{setLoading(false)}
+  function wrapPayload(){
+    try{if(typeof getPayload!=='function'||getPayload.__productionFlowWrapped)return;const original=getPayload;const wrapped=function(){const payload=original.apply(this,arguments);return{...payload,pickupAddressObject:state.pickup||null,dropoffAddressObject:state.dropoff||null,clientSchemaVersion:'customer-production-flow-v4-2026-07-31'}};wrapped.__productionFlowWrapped=true;getPayload=wrapped}catch(error){console.warn('擴充正式建單資料失敗：',error)}
   }
 
-  async function refreshServiceStatus(){
-    try{const p=state.pickup||{};const q=new URLSearchParams();if(p.lat&&p.lng){q.set('pickupLat',p.lat);q.set('pickupLng',p.lng)}const res=await fetch(`/api/customer/service-status?${q}`,{cache:'no-store'});const data=await res.json();if(res.ok&&data.success){const count=Number(data.mapRiderCount??data.onlineRiderCount??0);$('uuOnlineCount').textContent=String(count);const level=data.pickupMatch?.matchLevel;$('uuMatchMinutes').textContent=level==='good'?'約 3–8 分鐘':level==='limited'?'約 8–15 分鐘':count>0?'持續擴大媒合':'媒合時間未定';}}
-    catch(error){$('uuOnlineCount').textContent='—';$('uuMatchMinutes').textContent='持續搜尋'}
-  }
-
-  function hasActiveTrackedOrder(){
-    try{
-      const status=String(currentOrderData?.status||'').trim().toLowerCase();
-      return !!currentOrderId && !['completed','done','cancelled','canceled'].includes(status);
-    }catch(e){return false}
-  }
-
-  function showRoot(options={}){
-    if(options.fresh!==false&&!hasActiveTrackedOrder())resetNewTaskState();
-    root.style.display='block';
-    document.body.classList.add('uu-flow-active');
-    page('home');
-    updateHome();
-    refreshServiceStatus();
-  }
-  function ensureUnifiedFlowNavigation(){
-    let nav=$('uuUnifiedBottomNav');
-    if(nav)return nav;
-    nav=document.createElement('nav');
-    nav.id='uuUnifiedBottomNav';
-    nav.setAttribute('aria-label','主要導覽');
-    nav.innerHTML=
-      '<button id="uuUnifiedHomeBtn" class="active" type="button"><span class="uu-bottom-icon">U</span>首頁</button>'+
-      '<button id="uuUnifiedMyBtn" type="button"><span class="uu-bottom-icon">◎</span>我的</button>';
-    root.querySelector('.uu-shell')?.appendChild(nav);
-    $('uuUnifiedHomeBtn').onclick=()=>{page('home');updateHome()};
-    $('uuUnifiedMyBtn').onclick=()=>{
-      root.style.display='none';
-      document.body.classList.remove('uu-flow-active');
-      try{showProfileTab()}catch(e){}
-    };
-    return nav;
-  }
-
-  function bind(){
-    $('uuServiceTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-service]');if(!btn)return;activateService(btn.dataset.service);if(btn.dataset.service==='buy')renderBuy()});
-    $('uuPickupRow').onclick=()=>openAddress('pickup');$('uuDropoffRow').onclick=()=>openAddress('dropoff');$('uuStartOrderBtn').onclick=startOrder;$('uuEditTaskBtn').onclick=openTaskEditor;
-    $('uuSupportBtn').onclick=()=>{try{openLineOfficialAccount()}catch(e){location.href='https://lin.ee/'}};
-    $('uuCityBtn').onclick=()=>{try{openServiceCitySelector()}catch(e){}};
-    $('uuMyBtn').onclick=()=>{root.style.display='none';document.body.classList.remove('uu-flow-active');try{showProfileTab()}catch(e){}};
-    root.querySelectorAll('[data-back]').forEach(btn=>btn.addEventListener('click',()=>{const to=btn.dataset.back;if(to==='search')page('search');else{page('home');updateHome()}}));
-    $('uuBuyCategories').addEventListener('click',e=>{const btn=e.target.closest('[data-index]');if(!btn)return;state.buyCategoryIndex=Number(btn.dataset.index)||0;renderBuy()});
-    $('uuBuyQuick').addEventListener('click',e=>{const btn=e.target.closest('[data-text]');if(!btn)return;const text=btn.dataset.text;$('uuBuyNote').value=[$('uuBuyNote').value.trim(),text].filter(Boolean).join('、')});
-    $('uuBuyContinue').onclick=()=>{state.buyNote=$('uuBuyNote').value.trim();if(!state.buyNote){alert('請填寫要購買的商品。');return}syncLegacyFields();page('home');updateHome();startOrder()};
-    $('uuQueueAddressBtn').onclick=()=>openAddress('pickup');$('uuQueueContinue').onclick=()=>{state.queueMinutes=Math.max(10,Math.min(480,Number($('uuQueueMinutes').value)||30));state.queueNote=$('uuQueueNote').value.trim();if(!state.pickup){openAddress('pickup');return}if(!state.queueNote){alert('請填寫排隊需求與完成方式。');return}state.dropoff={...state.pickup,label:'現場完成'};syncLegacyFields();page('home');updateHome();startOrder()};
-    $('uuAddressSearchInput').addEventListener('input',e=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(e.target.value),350)});$('uuAddressSearchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();clearTimeout(state.searchTimer);searchAddress(e.currentTarget.value)}});$('uuSearchClear').onclick=()=>{$('uuAddressSearchInput').value='';setAddressSearchMode(false);searchAddress('');$('uuAddressSearchInput').focus()};$('uuUseLocation').onclick=useCurrentLocation;
-    $('uuSearchResults').addEventListener('click',e=>{const btn=e.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});
-    const listClick=(type)=>e=>{const btn=e.target.closest(`[data-list="${type}"]`);if(!btn)return;const list=type==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})};$('uuSavedList').addEventListener('click',listClick('saved'));$('uuRecentList').addEventListener('click',listClick('recent'));
-    $('uuChangeAddress').onclick=()=>page('search');$('uuUseMyName').onclick=()=>{try{$('uuDetailName').value=String(liffProfile?.displayName||'')}catch(e){}};$('uuUseSamePhone').onclick=()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('uuDetailPhone').value=other.phone};$('uuSaveDetail').onclick=saveDetail;
-    $('uuSpeedGrid').addEventListener('click',e=>{const btn=e.target.closest('[data-speed]');if(!btn)return;root.querySelectorAll('.uu-speed').forEach(x=>x.classList.toggle('active',x===btn));try{selectSpeed(btn.dataset.speed)}catch(error){}$('uuConfirmSpeedLabel').textContent=btn.textContent.trim().split(/\s/)[0];openConfirm()});
-    $('uuSubmitOrder').onclick=submitOrder;
-  }
-
-  function restoreFromLegacy(){
-    const val=id=>String($(id)?.value||'').trim();
-    if(!state.pickup&&val('pickup'))state.pickup={address:val('pickup'),addressDetail:val('pickupAddressNote'),contactName:val('pickupContact'),phone:cleanPhone(val('pickupPhone')),lat:typeof pickupLat!=='undefined'?pickupLat:null,lng:typeof pickupLng!=='undefined'?pickupLng:null,placeId:typeof pickupPlaceId!=='undefined'?pickupPlaceId:''};
-    if(!state.dropoff&&val('dropoff'))state.dropoff={address:val('dropoff'),addressDetail:val('dropoffAddressNote'),contactName:val('dropoffContact'),phone:cleanPhone(val('dropoffPhone')),lat:typeof dropoffLat!=='undefined'?dropoffLat:null,lng:typeof dropoffLng!=='undefined'?dropoffLng:null,placeId:typeof dropoffPlaceId!=='undefined'?dropoffPlaceId:''};
-  }
-
-  const originalSelectServiceCity=typeof window.selectServiceCity==='function'?window.selectServiceCity:null;
-  if(originalSelectServiceCity){
-    window.selectServiceCity=function(){const result=originalSelectServiceCity.apply(this,arguments);setTimeout(updateHome,0);return result};
-  }
-
-  const originalShowHome=typeof window.showHomeTab==='function'?window.showHomeTab:null;
-  window.showHomeTab=function(){try{if(typeof currentOrderId!=='undefined'&&currentOrderId){root.style.display='none';document.body.classList.remove('uu-flow-active');return originalShowHome?.apply(this,arguments)}}catch(e){}showRoot()};
-  window.openUBeeSystemOrderFlow=showRoot;
-  // 提供待確認頁獨立地圖讀取目前任務的取件與送達座標。
-  window.getUBeeUUFlowState=()=>({
-    pickup:state.pickup?{...state.pickup}:null,
-    dropoff:state.dropoff?{...state.dropoff}:null
-  });
-
-  resetNewTaskState();
-  loadLocal();
-  bind();
-  ensureUnifiedFlowNavigation();
-  activateService(state.service||'send');
-  renderBuy();
-  updateHome();
-  extendPayloadObjects();
-  showRoot({fresh:false});
-  setInterval(refreshServiceStatus,60000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&root.style.display!=='none')refreshServiceStatus()});
-  window.addEventListener('pageshow',event=>{
-    // iPhone / LINE 內建瀏覽器從記憶體快取返回時，也不得帶回上一筆未送出的地址。
-    if(event.persisted&&!hasActiveTrackedOrder()){
-      resetNewTaskState();
-      activateService(state.service||'send');
-      updateHome();
-      page('home');
-    }
-  });
-})();
-</script>
-
-
-
-
-<!-- =========================================================
-     UBee 客人端｜正式營運操作與地圖穩定化修正 2026-07-31
-     - 首頁自動定位：顯示縣市＋行政區
-     - 不自動填入取件地址，避免誤下單
-     - 待確認頁使用獨立地圖，不搬動舊地圖 DOM
-     - 路線失敗時仍顯示取件點與送達點
-     ========================================================= -->
-<style id="ubee-production-ux-stable-style">
-#uuCityBtn{
-  max-width:145px;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  color:#252525!important;
-}
-#uuCityBtn.is-locating{color:#777b80!important;font-weight:850!important}
-#uuCityBtn.is-location-error{color:#9a6700!important}
-.uu-location-caption{
-  margin:8px 2px 0;
-  color:#666b71;
-  font-size:12px;
-  font-weight:750;
-  line-height:1.55;
-}
-.uu-location-caption.error{color:#9a6700}
-.uu-progress-strip{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:6px;
-  padding:10px 14px 9px;
-  background:#fff;
-  border-bottom:1px solid #ececef;
-}
-.uu-progress-item{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:5px;
-  min-width:0;
-  color:#999da2;
-  font-size:11px;
-  font-weight:900;
-}
-.uu-progress-item::before{
-  content:attr(data-step);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  width:20px;
-  height:20px;
-  flex:0 0 20px;
-  border-radius:50%;
-  background:#eff0f1;
-  color:#85898e;
-}
-.uu-progress-item.active{color:#111}
-.uu-progress-item.active::before{background:#facc15;color:#111}
-.uu-progress-item.done::before{content:'✓';background:#111;color:#fff}
-#uuConfirmMap{
-  position:relative!important;
-  min-height:320px!important;
-  overflow:hidden!important;
-  background:#e8eaed!important;
-}
-#uuStableConfirmMap{
-  position:absolute;
-  inset:0;
-  z-index:3;
-}
-#uuConfirmMap > #reviewMap{
-  display:none!important;
-  visibility:hidden!important;
-  pointer-events:none!important;
-}
-#uuConfirmMapStatus{
-  z-index:5;
-  pointer-events:auto;
-}
-#uuConfirmMapStatus .uu-map-retry{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  margin-top:10px;
-  padding:9px 13px;
-  border:1px solid #dedfe1;
-  border-radius:999px;
-  background:#fff;
-  color:#111;
-  font-size:12px;
-  font-weight:1000;
-}
-
-/* UBee 正式流程共用底部導航：首頁與所有後續步驟使用同一個元件 */
-#uuFlowRoot .uu-bottom{display:none!important}
-#uuUnifiedBottomNav{
-  position:absolute;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:80;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:4px;
-  padding:8px 12px calc(8px + env(safe-area-inset-bottom));
-  border-top:1px solid rgba(17,24,39,.08);
-  border-radius:22px 22px 0 0;
-  background:rgba(255,255,255,.98);
-  box-shadow:0 -8px 26px rgba(17,24,39,.08);
-  backdrop-filter:blur(16px);
-  -webkit-backdrop-filter:blur(16px);
-}
-#uuUnifiedBottomNav button{
-  min-height:56px;
-  border:none;
-  border-radius:14px;
-  padding:7px 4px 6px;
-  background:transparent;
-  color:#8b9096;
-  font-size:11px!important;
-  font-weight:1000;
-}
-#uuUnifiedBottomNav button.active{
-  width:82%;
-  justify-self:center;
-  background:#111;
-  color:#fff;
-}
-#uuUnifiedBottomNav .uu-bottom-icon{
-  display:block;
-  width:35px;
-  height:35px;
-  margin:0 auto 2px;
-  border-radius:50%;
-  line-height:35px;
-  font-size:20px;
-  background:#f1f2f3;
-}
-#uuUnifiedBottomNav button.active .uu-bottom-icon{
-  background:var(--uu-accent);
-  color:#111;
-}
-
-</style>
-<script id="ubee-production-ux-stable-script">
-(() => {
-  'use strict';
-
-  const $id = (id) => document.getElementById(id);
-  let locationAttempted = false;
-  let stableConfirmMap = null;
-  let stableConfirmPolyline = null;
-  let stablePickupMarker = null;
-  let stableDropoffMarker = null;
-  let stableConfirmRenderToken = 0;
-
-  function validPoint(lat, lng){
-    const a=Number(lat), b=Number(lng);
-    return Number.isFinite(a)&&Number.isFinite(b)&&a>=-90&&a<=90&&b>=-180&&b<=180;
-  }
-
-  function setCityButton(text, mode='ready'){
-    const btn=$id('uuCityBtn');
-    if(!btn)return;
-    btn.textContent=`${text}⌄`;
-    btn.classList.toggle('is-locating',mode==='loading');
-    btn.classList.toggle('is-location-error',mode==='error');
-  }
-
-  function ensureLocationCaption(){
-    const home=$id('uuPageHome');
-    const live=home?.querySelector('.uu-live-line');
-    if(!home||!live)return null;
-    let el=$id('uuLocationCaption');
-    if(!el){
-      el=document.createElement('div');
-      el.id='uuLocationCaption';
-      el.className='uu-location-caption';
-      live.insertAdjacentElement('afterend',el);
-    }
-    return el;
-  }
-
-  function setLocationCaption(text,isError=false){
-    const el=ensureLocationCaption();
-    if(!el)return;
-    el.textContent=text;
-    el.classList.toggle('error',!!isError);
-  }
-
-  function normalizeCity(city){
-    return String(city||'').trim().replace(/^台/,'臺');
-  }
-
-  async function detectCustomerLocationStable(force=false){
-    if(locationAttempted&&!force)return;
-    locationAttempted=true;
-    setCityButton('正在取得位置…','loading');
-    setLocationCaption('正在確認你目前所在的服務地區，定位只用於顯示附近服務與地圖。');
-
-    try{
-      if(typeof getCurrentPosition!=='function')throw new Error('此裝置暫時無法使用定位功能');
-      const position=await getCurrentPosition();
-      const lat=Number(position?.coords?.latitude);
-      const lng=Number(position?.coords?.longitude);
-      if(!validPoint(lat,lng))throw new Error('定位座標不正確');
-
-      try{currentLocationLat=lat;currentLocationLng=lng}catch(e){}
-
-      const response=await fetch('/api/customer/current-location',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        cache:'no-store',
-        body:JSON.stringify({lat,lng})
-      });
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok||!data.success)throw new Error(data.message||data.error||'目前位置暫時無法辨識');
-
-      const loc=data.location||{};
-      const city=normalizeCity(loc.city);
-      const district=String(loc.district||'').trim();
-      const display=String(loc.displayLocation||[city,district].filter(Boolean).join('')||'目前位置').trim();
-
-      if(city&&typeof selectServiceCity==='function'){
-        try{selectServiceCity(city)}catch(e){console.warn('自動切換服務城市失敗：',e)}
-      }
-      setCityButton(display,'ready');
-      setLocationCaption(loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`);
-
-      try{
-        if(typeof ensureCustomerMapReady==='function')await ensureCustomerMapReady();
-        if(typeof renderCurrentLocationMarker==='function')renderCurrentLocationMarker();
-        if(typeof customerMap!=='undefined'&&customerMap){
-          customerMap.panTo({lat,lng});
-          customerMap.setZoom(15);
-        }
-      }catch(e){console.warn('首頁地圖移到目前位置失敗：',e)}
-    }catch(error){
-      console.warn('客人端自動定位失敗：',error);
-      const fallback=(()=>{try{return typeof selectedCity==='function'?selectedCity():String(typeof selectedServiceCity!=='undefined'?selectedServiceCity:'')}catch(e){return''}})();
-      setCityButton(fallback||'選擇服務地區','error');
-      setLocationCaption('無法自動取得目前位置。你仍可手動選擇服務地區並輸入地址。',true);
-    }
-  }
-
-  function addProgressBars(){
-    const configs={
-      uuPageHome:0, uuPageBuy:0, uuPageQueue:0,
-      uuPageSearch:0, uuPageDetail:0, uuPageConfirm:2
-    };
-    Object.entries(configs).forEach(([pageId,active])=>{
-      const page=$id(pageId);
-      const header=page?.querySelector('.uu-header,.uu-back-header');
-      if(!page||!header||page.querySelector('.uu-progress-strip'))return;
-      const strip=document.createElement('div');
-      strip.className='uu-progress-strip';
-      ['選擇地點','任務內容','確認送出'].forEach((label,index)=>{
-        const item=document.createElement('div');
-        item.className='uu-progress-item'+(index===active?' active':index<active?' done':'');
-        item.dataset.step=String(index+1);
-        item.textContent=label;
-        strip.appendChild(item);
-      });
-      header.insertAdjacentElement('afterend',strip);
-    });
-  }
-
-  function clearStableMapObjects(){
-    [stableConfirmPolyline,stablePickupMarker,stableDropoffMarker].forEach(obj=>{try{obj?.setMap(null)}catch(e){}});
-    stableConfirmPolyline=stablePickupMarker=stableDropoffMarker=null;
-  }
-
-  function routePolylineText(route){
-    return String(route?.encodedPolyline||route?.routePolyline||route?.overviewPolyline||route?.polyline||'').trim();
-  }
-
-  function routePoint(route,type){
-    let flowState=null;
-    try{flowState=typeof window.getUBeeUUFlowState==='function'?window.getUBeeUUFlowState():null}catch(e){}
-    const statePoint=flowState?.[type]||null;
-
-    const legacyLat=type==='pickup'
-      ? (typeof pickupLat!=='undefined'?pickupLat:null)
-      : (typeof dropoffLat!=='undefined'?dropoffLat:null);
-    const legacyLng=type==='pickup'
-      ? (typeof pickupLng!=='undefined'?pickupLng:null)
-      : (typeof dropoffLng!=='undefined'?dropoffLng:null);
-
-    const lat=type==='pickup'
-      ? route?.routeStartLat??route?.originLocation?.lat??route?.pickupLocation?.lat??route?.pickupLat??statePoint?.lat??legacyLat
-      : route?.routeEndLat??route?.destinationLocation?.lat??route?.dropoffLocation?.lat??route?.dropoffLat??statePoint?.lat??legacyLat;
-    const lng=type==='pickup'
-      ? route?.routeStartLng??route?.originLocation?.lng??route?.pickupLocation?.lng??route?.pickupLng??statePoint?.lng??legacyLng
-      : route?.routeEndLng??route?.destinationLocation?.lng??route?.dropoffLocation?.lng??route?.dropoffLng??statePoint?.lng??legacyLng;
-    return validPoint(lat,lng)?{lat:Number(lat),lng:Number(lng)}:null;
-  }
-
-  async function ensureStableConfirmMap(){
-    const host=$id('uuConfirmMap');
-    if(!host)return null;
-    let mapEl=$id('uuStableConfirmMap');
-    if(!mapEl){
-      mapEl=document.createElement('div');
-      mapEl.id='uuStableConfirmMap';
-      host.prepend(mapEl);
-    }
-    if(typeof loadGoogleMapsApi==='function')await loadGoogleMapsApi();
-    if(!window.google?.maps)throw new Error('地圖服務尚未載入');
-    if(!stableConfirmMap){
-      stableConfirmMap=new google.maps.Map(mapEl,{
-        center:{lat:24.1477,lng:120.6736},
-        zoom:13,
-        disableDefaultUI:true,
-        zoomControl:true,
-        gestureHandling:'greedy',
-        clickableIcons:false
-      });
-    }
-    google.maps.event.trigger(stableConfirmMap,'resize');
-    return stableConfirmMap;
-  }
-
-  function createStableMarker(map,point,label,type){
-    if(typeof createMapMarker==='function'){
-      try{return createMapMarker(map,point,type,label)}catch(e){}
-    }
-    return new google.maps.Marker({map,position:point,title:label,label:{text:type==='pickup'?'取':'送',color:type==='pickup'?'#fff':'#111',fontWeight:'900'}});
-  }
-
-  async function fetchStableRouteDirect(route={}){
-    const flowState=typeof window.getUBeeUUFlowState==='function'
-      ? window.getUBeeUUFlowState()
-      : {};
-    const pickup=flowState?.pickup||{};
-    const dropoff=flowState?.dropoff||{};
-    const payload={
-      pickupAddress:pickup.address||String(document.getElementById('pickup')?.value||'').trim(),
-      dropoffAddress:dropoff.address||String(document.getElementById('dropoff')?.value||'').trim(),
-      pickupPlaceId:pickup.placeId||'',
-      dropoffPlaceId:dropoff.placeId||'',
-      pickupLat:validPoint(pickup.lat,pickup.lng)?Number(pickup.lat):undefined,
-      pickupLng:validPoint(pickup.lat,pickup.lng)?Number(pickup.lng):undefined,
-      dropoffLat:validPoint(dropoff.lat,dropoff.lng)?Number(dropoff.lat):undefined,
-      dropoffLng:validPoint(dropoff.lat,dropoff.lng)?Number(dropoff.lng):undefined
-    };
-    if(!payload.pickupAddress&&!validPoint(payload.pickupLat,payload.pickupLng))return route;
-    if(!payload.dropoffAddress&&!validPoint(payload.dropoffLat,payload.dropoffLng))return route;
-    const response=await fetch('/api/map-route',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      cache:'no-store',
-      body:JSON.stringify(payload)
-    });
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok||!data.success)throw new Error(data.error||data.message||'無法取得道路路線');
-    try{lastRouteData=data}catch(e){}
+  async function requestRoute(){
+    syncLegacy();const p=state.pickup||{},d=state.dropoff||{};
+    const response=await fetch('/api/map-route',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({pickup:p.address,pickupAddress:p.address,pickupPlaceId:p.placeId||'',pickupLat:p.lat,pickupLng:p.lng,dropoff:d.address,dropoffAddress:d.address,dropoffPlaceId:d.placeId||'',dropoffLat:d.lat,dropoffLng:d.lng})});
+    const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false)throw new Error(data.message||data.error||'道路路線載入失敗');
+    const start=data.originLocation||{lat:data.routeStartLat??data.pickupLat,lng:data.routeStartLng??data.pickupLng};const end=data.destinationLocation||{lat:data.routeEndLat??data.dropoffLat,lng:data.routeEndLng??data.dropoffLng};if(validPoint(start)){state.pickup.lat=Number(start.lat);state.pickup.lng=Number(start.lng)}if(validPoint(end)){state.dropoff.lat=Number(end.lat);state.dropoff.lng=Number(end.lng)}
+    try{lastRouteData=data}catch(_){ }
     return data;
   }
 
-  async function renderStableConfirmRoute(route,allowRetry=true){
-    const token=++stableConfirmRenderToken;
-    const status=$id('uuConfirmMapStatus');
-    if(status){status.hidden=false;status.innerHTML='正在載入取件點、送達點與詳細路線…'}
+  function clearConfirmMap(){[state.confirmPolyline,state.confirmPickupMarker,state.confirmDropoffMarker].forEach(item=>{try{item?.setMap(null)}catch(_){}});state.confirmPolyline=state.confirmPickupMarker=state.confirmDropoffMarker=null;if(state.directionsRenderer){try{state.directionsRenderer.setMap(null)}catch(_){ }state.directionsRenderer=null}}
+  function routePolyline(route){return String(route?.encodedPolyline||route?.routePolyline||route?.overviewPolyline||route?.polyline||'').trim()}
+  async function pointForAddress(item){if(validPoint(item))return{lat:Number(item.lat),lng:Number(item.lng)};const point=await geocodeAddress(item?.address||'');if(point){item.lat=point.lat;item.lng=point.lng}return point}
+
+  async function renderConfirmMap(route=null){
+    const renderId=++state.mapRenderId;const statusEl=$('flowMapStatus');statusEl.className='flow-map-status';statusEl.innerHTML='正在載入取件位置、送達位置與道路路線…';
     try{
-      let activeRoute=route||{};
-      let pickup=routePoint(activeRoute,'pickup');
-      let dropoff=routePoint(activeRoute,'dropoff');
-      if(!pickup||!dropoff||!routePolylineText(activeRoute)){
-        try{
-          activeRoute=await fetchStableRouteDirect(activeRoute);
-          pickup=routePoint(activeRoute,'pickup');
-          dropoff=routePoint(activeRoute,'dropoff');
-        }catch(routeError){
-          console.warn('待確認頁直接取得道路路線失敗：',routeError);
-        }
-      }
-      const map=await ensureStableConfirmMap();
-      if(token!==stableConfirmRenderToken)return;
-      clearStableMapObjects();
-      const bounds=new google.maps.LatLngBounds();
-
-      if(pickup){stablePickupMarker=createStableMarker(map,pickup,'取件地點','pickup');bounds.extend(pickup)}
-      if(dropoff){stableDropoffMarker=createStableMarker(map,dropoff,'送達地點','dropoff');bounds.extend(dropoff)}
-
-      const encoded=routePolylineText(activeRoute);
-      if(encoded&&google.maps.geometry?.encoding){
-        const path=google.maps.geometry.encoding.decodePath(encoded);
-        stableConfirmPolyline=new google.maps.Polyline({map,path,geodesic:true,strokeColor:'#111111',strokeOpacity:.92,strokeWeight:6});
-        path.forEach(p=>bounds.extend(p));
-      }
-
-      google.maps.event.trigger(map,'resize');
-      await new Promise(resolve=>setTimeout(resolve,80));
-      if(!bounds.isEmpty())map.fitBounds(bounds,52);
-      else throw new Error('取件點與送達點尚未取得座標');
-
-      if(status){
-        if(encoded)status.hidden=true;
-        else{
-          status.hidden=false;
-          status.innerHTML='已顯示取件點與送達點，道路路線暫時無法載入。'+(allowRetry?'<br><button type="button" class="uu-map-retry">重新載入路線</button>':'');
-        }
-      }
-    }catch(error){
-      console.warn('待確認頁地圖顯示失敗：',error);
-      if(status){status.hidden=false;status.innerHTML='目前無法顯示地圖，請確認地址後重新載入。'+(allowRetry?'<br><button type="button" class="uu-map-retry">重新載入地圖</button>':'')}
-    }
+      await ensureMaps();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));if(renderId!==state.mapRenderId)return;
+      let p=await pointForAddress(state.pickup),d=await pointForAddress(state.dropoff);if(!route){try{route=await requestRoute()}catch(error){console.warn('後端道路路線失敗，改用地圖備援：',error)}}
+      const routeStart=route?.originLocation||{lat:route?.routeStartLat??route?.pickupLat,lng:route?.routeStartLng??route?.pickupLng};const routeEnd=route?.destinationLocation||{lat:route?.routeEndLat??route?.dropoffLat,lng:route?.routeEndLng??route?.dropoffLng};if(validPoint(routeStart))p={lat:Number(routeStart.lat),lng:Number(routeStart.lng)};if(validPoint(routeEnd))d={lat:Number(routeEnd.lat),lng:Number(routeEnd.lng)};
+      if(!p&&!d)throw new Error('無法取得取件與送達座標');const center=p||d;
+      if(!state.confirmMap)state.confirmMap=new google.maps.Map($('flowConfirmMapCanvas'),{center,zoom:p&&d?12:16,disableDefaultUI:true,gestureHandling:'greedy',clickableIcons:false});else{state.confirmMap.setCenter(center);google.maps.event.trigger(state.confirmMap,'resize')}
+      clearConfirmMap();const bounds=new google.maps.LatLngBounds();
+      if(p){state.confirmPickupMarker=new google.maps.Marker({map:state.confirmMap,position:p,title:'取件地點',label:{text:'取',color:'#fff',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#111111',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(p)}
+      if(d){state.confirmDropoffMarker=new google.maps.Marker({map:state.confirmMap,position:d,title:'送達地點',label:{text:'送',color:'#111',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#f4bd00',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(d)}
+      let routeDrawn=false;const encoded=routePolyline(route);
+      if(encoded){try{const libs=typeof loadGoogleMapsLibraries==='function'?await loadGoogleMapsLibraries():null;const path=libs?.geometry?.encoding?.decodePath?libs.geometry.encoding.decodePath(encoded):google.maps.geometry?.encoding?.decodePath(encoded);if(path?.length){state.confirmPolyline=new google.maps.Polyline({map:state.confirmMap,path,geodesic:true,strokeColor:'#111111',strokeOpacity:.9,strokeWeight:6});path.forEach(point=>bounds.extend(point));routeDrawn=true}}catch(error){console.warn('Polyline 繪製失敗：',error)}}
+      if(!routeDrawn&&p&&d&&google.maps.DirectionsService){try{const service=new google.maps.DirectionsService();const result=await service.route({origin:p,destination:d,travelMode:google.maps.TravelMode.DRIVING});state.directionsRenderer=new google.maps.DirectionsRenderer({map:state.confirmMap,directions:result,suppressMarkers:true,preserveViewport:true,polylineOptions:{strokeColor:'#111111',strokeOpacity:.9,strokeWeight:6}});const overview=result?.routes?.[0]?.overview_path||[];overview.forEach(point=>bounds.extend(point));routeDrawn=true}catch(error){console.warn('DirectionsService 備援失敗：',error)}}
+      if(!bounds.isEmpty())state.confirmMap.fitBounds(bounds,48);
+      setTimeout(()=>{try{google.maps.event.trigger(state.confirmMap,'resize');if(!bounds.isEmpty())state.confirmMap.fitBounds(bounds,48)}catch(_){ }},120);
+      if(routeDrawn){statusEl.className='flow-map-status success';statusEl.textContent=''}else{statusEl.className='flow-map-status';statusEl.textContent='已顯示取件與送達位置，道路路線暫時無法載入。'}
+      return route;
+    }catch(error){console.error('確認頁地圖載入失敗：',error);statusEl.className='flow-map-status';statusEl.innerHTML=`${escapeHtml(error.message||'地圖載入失敗')}<br><button id="flowRetryMap" class="flow-map-retry" type="button">重新載入地圖</button>`;$('flowRetryMap')?.addEventListener('click',()=>renderConfirmMap(null));return route}
   }
 
-  async function refreshStableConfirmRoute(){
-    const status=$id('uuConfirmMapStatus');
-    if(status){status.hidden=false;status.textContent='正在重新取得詳細路線…'}
-    let route=null;
-    try{
-      if(typeof refreshRoutePreview==='function')route=await refreshRoutePreview();
-      if(!route&&typeof lastRouteData!=='undefined')route=lastRouteData;
-    }catch(e){console.warn('重新取得確認頁路線失敗：',e)}
-    await renderStableConfirmRoute(route||{},false);
+  function timingLabel(){if(state.timing==='scheduled')return`${state.scheduleGoal==='complete_by'?'希望完成':'希望取件'}：${state.scheduledDate} ${state.scheduledTime}`;if(state.timing==='flexible')return`彈性時段：${state.flexibleDate} ${state.flexibleStart}～${state.flexibleEnd}`;return`立即任務・${{standard:'一般件',priority:'標準件',express:'優先件'}[state.speed]||'一般件'}`}
+  function renderSummary(){
+    const p=state.pickup||{},d=state.dropoff||{},def=selectedServiceDefinition();
+    const rows=[
+      ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home'],
+      ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}\n${d.contactName||''} ${d.phone||''}`,'home'],
+      ['任務內容',`${def.title||state.taskName}｜${state.serviceCategory||''}\n${state.taskNote||'—'}`,'task'],
+      ['配送設定',`${timingLabel()}\n物品大小：${$('flowItemSize').selectedOptions[0]?.textContent||state.itemSize}`,'options']
+    ];
+    $('flowSummaryList').innerHTML=rows.map(([label,value,target])=>`<div class="flow-summary-row"><span class="flow-summary-label">${escapeHtml(label)}</span><span class="flow-summary-value" style="white-space:pre-line">${escapeHtml(value)}</span><button class="flow-summary-edit" type="button" data-summary-go="${target}">修改</button></div>`).join('');
   }
 
-  function wrapConfirmFlow(){
-    if(typeof openConfirm==='function'&&!openConfirm.__ubeeStableWrapped){
-      const original=openConfirm;
-      const wrapped=async function(){
-        const result=await original.apply(this,arguments);
-        setTimeout(async()=>{
-          let route=null;
-          try{
-            if(typeof refreshRoutePreview==='function')route=await refreshRoutePreview();
-            if(!route&&typeof lastRouteData!=='undefined')route=lastRouteData;
-          }catch(e){}
-          renderStableConfirmRoute(route||{});
-        },120);
-        return result;
-      };
-      wrapped.__ubeeStableWrapped=true;
-      try{openConfirm=wrapped}catch(e){window.openConfirm=wrapped}
-    }
+  async function openConfirm(){
+    if(!state.pickup||!state.dropoff){showPage('home');alert('請先完成取件地點與送達地點。');return}
+    if(!validateTask()){showPage('task');return}
+    if(!validateOptions()){showPage('options');return}
+    syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在載入路線與正式估價…');
+    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);$('flowConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'路線已顯示，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
   }
 
-  document.addEventListener('click',(event)=>{
-    if(event.target.closest('#uuCityBtn')){
-      // 手動點選城市時仍使用既有城市選擇器。
-      return;
-    }
-    if(event.target.closest('.uu-map-retry')){
-      event.preventDefault();
-      refreshStableConfirmRoute();
-    }
-  });
+  async function submitOrder(){
+    if(state.submitting)return;if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
+    syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
+    try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
+    const uid=getUserId();if(!uid.startsWith('U')){status('flowConfirmStatus','LINE 身分尚未完成，請從 UBee 官方帳號重新開啟下單頁。',true);return}
+    state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
+    try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');await createOrder();if(typeof currentOrderId!=='undefined'&&currentOrderId){root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true)}finally{state.submitting=false;setLoading(false)}
+  }
 
-  document.addEventListener('DOMContentLoaded',()=>{
-    addProgressBars();
-    wrapConfirmFlow();
-    ensureLocationCaption();
-    setTimeout(()=>detectCustomerLocationStable(false),700);
+  function resetNewTask(clearLegacy=true){
+    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,taskName:'',taskNote:'',itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard'});
+    if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=null;pickupPlaceId=dropoffPlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;localStorage.removeItem('ubee_order_draft_v2')}catch(_){ }}
+    setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
+  }
 
-    const confirmPage=$id('uuPageConfirm');
-    if(confirmPage){
-      const observer=new MutationObserver(()=>{
-        if(confirmPage.classList.contains('active')){
-          setTimeout(()=>refreshStableConfirmRoute(),60);
-        }
-      });
-      observer.observe(confirmPage,{attributes:true,attributeFilter:['class']});
-    }
-  });
+  async function detectLocation(){
+    const cityButton=$('flowCityButton'),text=$('flowLocationText');cityButton.textContent='正在取得位置…';text.textContent='正在確認目前服務地區';
+    if(!navigator.geolocation){cityButton.textContent='選擇服務地區';text.textContent='請手動選擇服務地區';return}
+    navigator.geolocation.getCurrentPosition(async position=>{
+      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';text.textContent=loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`;if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'}
+    },()=>{cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+  }
 
-  window.addEventListener('pageshow',(event)=>{
-    if(event.persisted)setTimeout(()=>detectCustomerLocationStable(true),250);
-  });
+  function showFlow(options={}){
+    if(activeOrder()){root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }return}
+    if(options.fresh!==false)resetNewTask(true);root.classList.add('active');document.body.classList.add('flow-active');showPage('home');updateHome();
+  }
 
-  // 供既有程式或除錯使用。
-  window.detectCustomerLocationStable=detectCustomerLocationStable;
-  window.renderStableConfirmRoute=renderStableConfirmRoute;
+  function bind(){
+    $('flowServiceTabs').addEventListener('click',event=>{const btn=event.target.closest('[data-service]');if(btn)setService(btn.dataset.service)});
+    $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));
+    $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||!state.dropoff){alert('請先完成取件地點與送達地點。');return}syncServiceSelectors();showPage('task')});$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
+    root.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.go)));
+    $('flowServiceType').addEventListener('change',()=>{state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||state.taskName;syncServiceSelectors()});$('flowServiceCategory').addEventListener('change',()=>state.serviceCategory=$('flowServiceCategory').value);
+    $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
+    $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn)setTiming(btn.dataset.timing)});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn)setSpeed(btn.dataset.speed)});$('flowOptionsNext').addEventListener('click',()=>{if(validateOptions())openConfirm()});
+    $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
+    $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];$('flowSearchResults').innerHTML='<div class="flow-empty">輸入至少 2 個字開始搜尋</div>'});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);
+    $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
+    $('flowUseProfileName').addEventListener('click',()=>{try{$('flowDetailName').value=String(typeof liffProfile!=='undefined'?(liffProfile?.displayName||''):'')}catch(_){ }});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
+    $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavMy').addEventListener('click',()=>{root.classList.remove('active');document.body.classList.remove('flow-active');try{showProfileTab()}catch(_){ }});$('flowSupportButton').addEventListener('click',()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
+  }
+
+  buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();detectLocation();
+  const originalShowHome=typeof window.showHomeTab==='function'?window.showHomeTab:null;
+  window.showHomeTab=function(){if(activeOrder()){root.classList.remove('active');document.body.classList.remove('flow-active');return originalShowHome?.apply(this,arguments)}showFlow({fresh:true})};
+  window.openUBeeSystemOrderFlow=()=>showFlow({fresh:true});
+  showFlow({fresh:false});
+  window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())showFlow({fresh:true})});
 })();
 </script>
 
