@@ -20430,5 +20430,366 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
 </script>
 
 
+
+
+<!-- =========================================================
+     UBee 客人端｜正式營運操作與地圖穩定化修正 2026-07-31
+     - 首頁自動定位：顯示縣市＋行政區
+     - 不自動填入取件地址，避免誤下單
+     - 待確認頁使用獨立地圖，不搬動舊地圖 DOM
+     - 路線失敗時仍顯示取件點與送達點
+     ========================================================= -->
+<style id="ubee-production-ux-stable-style">
+#uuCityBtn{
+  max-width:145px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#252525!important;
+}
+#uuCityBtn.is-locating{color:#777b80!important;font-weight:850!important}
+#uuCityBtn.is-location-error{color:#9a6700!important}
+.uu-location-caption{
+  margin:8px 2px 0;
+  color:#666b71;
+  font-size:12px;
+  font-weight:750;
+  line-height:1.55;
+}
+.uu-location-caption.error{color:#9a6700}
+.uu-progress-strip{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:6px;
+  padding:10px 14px 9px;
+  background:#fff;
+  border-bottom:1px solid #ececef;
+}
+.uu-progress-item{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-width:0;
+  color:#999da2;
+  font-size:11px;
+  font-weight:900;
+}
+.uu-progress-item::before{
+  content:attr(data-step);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:20px;
+  height:20px;
+  flex:0 0 20px;
+  border-radius:50%;
+  background:#eff0f1;
+  color:#85898e;
+}
+.uu-progress-item.active{color:#111}
+.uu-progress-item.active::before{background:#facc15;color:#111}
+.uu-progress-item.done::before{content:'✓';background:#111;color:#fff}
+#uuConfirmMap{
+  position:relative!important;
+  min-height:320px!important;
+  overflow:hidden!important;
+  background:#e8eaed!important;
+}
+#uuStableConfirmMap{
+  position:absolute;
+  inset:0;
+  z-index:1;
+}
+#uuConfirmMapStatus{
+  z-index:5;
+  pointer-events:auto;
+}
+#uuConfirmMapStatus .uu-map-retry{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:10px;
+  padding:9px 13px;
+  border:1px solid #dedfe1;
+  border-radius:999px;
+  background:#fff;
+  color:#111;
+  font-size:12px;
+  font-weight:1000;
+}
+</style>
+<script id="ubee-production-ux-stable-script">
+(() => {
+  'use strict';
+
+  const $id = (id) => document.getElementById(id);
+  let locationAttempted = false;
+  let stableConfirmMap = null;
+  let stableConfirmPolyline = null;
+  let stablePickupMarker = null;
+  let stableDropoffMarker = null;
+  let stableConfirmRenderToken = 0;
+
+  function validPoint(lat, lng){
+    const a=Number(lat), b=Number(lng);
+    return Number.isFinite(a)&&Number.isFinite(b)&&a>=-90&&a<=90&&b>=-180&&b<=180;
+  }
+
+  function setCityButton(text, mode='ready'){
+    const btn=$id('uuCityBtn');
+    if(!btn)return;
+    btn.textContent=`${text}⌄`;
+    btn.classList.toggle('is-locating',mode==='loading');
+    btn.classList.toggle('is-location-error',mode==='error');
+  }
+
+  function ensureLocationCaption(){
+    const home=$id('uuPageHome');
+    const live=home?.querySelector('.uu-live-line');
+    if(!home||!live)return null;
+    let el=$id('uuLocationCaption');
+    if(!el){
+      el=document.createElement('div');
+      el.id='uuLocationCaption';
+      el.className='uu-location-caption';
+      live.insertAdjacentElement('afterend',el);
+    }
+    return el;
+  }
+
+  function setLocationCaption(text,isError=false){
+    const el=ensureLocationCaption();
+    if(!el)return;
+    el.textContent=text;
+    el.classList.toggle('error',!!isError);
+  }
+
+  function normalizeCity(city){
+    return String(city||'').trim().replace(/^台/,'臺');
+  }
+
+  async function detectCustomerLocationStable(force=false){
+    if(locationAttempted&&!force)return;
+    locationAttempted=true;
+    setCityButton('正在取得位置…','loading');
+    setLocationCaption('正在確認你目前所在的服務地區，定位只用於顯示附近服務與地圖。');
+
+    try{
+      if(typeof getCurrentPosition!=='function')throw new Error('此裝置暫時無法使用定位功能');
+      const position=await getCurrentPosition();
+      const lat=Number(position?.coords?.latitude);
+      const lng=Number(position?.coords?.longitude);
+      if(!validPoint(lat,lng))throw new Error('定位座標不正確');
+
+      try{currentLocationLat=lat;currentLocationLng=lng}catch(e){}
+
+      const response=await fetch('/api/customer/current-location',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        cache:'no-store',
+        body:JSON.stringify({lat,lng})
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.success)throw new Error(data.message||data.error||'目前位置暫時無法辨識');
+
+      const loc=data.location||{};
+      const city=normalizeCity(loc.city);
+      const district=String(loc.district||'').trim();
+      const display=String(loc.displayLocation||[city,district].filter(Boolean).join('')||'目前位置').trim();
+
+      if(city&&typeof selectServiceCity==='function'){
+        try{selectServiceCity(city)}catch(e){console.warn('自動切換服務城市失敗：',e)}
+      }
+      setCityButton(display,'ready');
+      setLocationCaption(loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`);
+
+      try{
+        if(typeof ensureCustomerMapReady==='function')await ensureCustomerMapReady();
+        if(typeof renderCurrentLocationMarker==='function')renderCurrentLocationMarker();
+        if(typeof customerMap!=='undefined'&&customerMap){
+          customerMap.panTo({lat,lng});
+          customerMap.setZoom(15);
+        }
+      }catch(e){console.warn('首頁地圖移到目前位置失敗：',e)}
+    }catch(error){
+      console.warn('客人端自動定位失敗：',error);
+      const fallback=(()=>{try{return typeof selectedCity==='function'?selectedCity():String(typeof selectedServiceCity!=='undefined'?selectedServiceCity:'')}catch(e){return''}})();
+      setCityButton(fallback||'選擇服務地區','error');
+      setLocationCaption('無法自動取得目前位置。你仍可手動選擇服務地區並輸入地址。',true);
+    }
+  }
+
+  function addProgressBars(){
+    const configs={
+      uuPageHome:0, uuPageBuy:0, uuPageQueue:0,
+      uuPageSearch:0, uuPageDetail:0, uuPageConfirm:2
+    };
+    Object.entries(configs).forEach(([pageId,active])=>{
+      const page=$id(pageId);
+      const header=page?.querySelector('.uu-header,.uu-back-header');
+      if(!page||!header||page.querySelector('.uu-progress-strip'))return;
+      const strip=document.createElement('div');
+      strip.className='uu-progress-strip';
+      ['選擇地點','任務內容','確認送出'].forEach((label,index)=>{
+        const item=document.createElement('div');
+        item.className='uu-progress-item'+(index===active?' active':index<active?' done':'');
+        item.dataset.step=String(index+1);
+        item.textContent=label;
+        strip.appendChild(item);
+      });
+      header.insertAdjacentElement('afterend',strip);
+    });
+  }
+
+  function clearStableMapObjects(){
+    [stableConfirmPolyline,stablePickupMarker,stableDropoffMarker].forEach(obj=>{try{obj?.setMap(null)}catch(e){}});
+    stableConfirmPolyline=stablePickupMarker=stableDropoffMarker=null;
+  }
+
+  function routePolylineText(route){
+    return String(route?.encodedPolyline||route?.routePolyline||route?.overviewPolyline||route?.polyline||'').trim();
+  }
+
+  function routePoint(route,type){
+    const statePoint=(typeof state!=='undefined'&&state)?state[type]:null;
+    const lat=type==='pickup'
+      ? route?.routeStartLat??route?.originLocation?.lat??route?.pickupLat??statePoint?.lat
+      : route?.routeEndLat??route?.destinationLocation?.lat??route?.dropoffLat??statePoint?.lat;
+    const lng=type==='pickup'
+      ? route?.routeStartLng??route?.originLocation?.lng??route?.pickupLng??statePoint?.lng
+      : route?.routeEndLng??route?.destinationLocation?.lng??route?.dropoffLng??statePoint?.lng;
+    return validPoint(lat,lng)?{lat:Number(lat),lng:Number(lng)}:null;
+  }
+
+  async function ensureStableConfirmMap(){
+    const host=$id('uuConfirmMap');
+    if(!host)return null;
+    let mapEl=$id('uuStableConfirmMap');
+    if(!mapEl){
+      mapEl=document.createElement('div');
+      mapEl.id='uuStableConfirmMap';
+      host.prepend(mapEl);
+    }
+    if(typeof loadGoogleMapsApi==='function')await loadGoogleMapsApi();
+    if(!window.google?.maps)throw new Error('地圖服務尚未載入');
+    if(!stableConfirmMap){
+      stableConfirmMap=new google.maps.Map(mapEl,{
+        center:{lat:24.1477,lng:120.6736},
+        zoom:13,
+        disableDefaultUI:true,
+        zoomControl:true,
+        gestureHandling:'greedy',
+        clickableIcons:false
+      });
+    }
+    google.maps.event.trigger(stableConfirmMap,'resize');
+    return stableConfirmMap;
+  }
+
+  function createStableMarker(map,point,label,type){
+    if(typeof createMapMarker==='function'){
+      try{return createMapMarker(map,point,type,label)}catch(e){}
+    }
+    return new google.maps.Marker({map,position:point,title:label,label:{text:type==='pickup'?'取':'送',color:type==='pickup'?'#fff':'#111',fontWeight:'900'}});
+  }
+
+  async function renderStableConfirmRoute(route,allowRetry=true){
+    const token=++stableConfirmRenderToken;
+    const status=$id('uuConfirmMapStatus');
+    if(status){status.hidden=false;status.innerHTML='正在載入取件點、送達點與詳細路線…'}
+    try{
+      const map=await ensureStableConfirmMap();
+      if(token!==stableConfirmRenderToken)return;
+      clearStableMapObjects();
+      const pickup=routePoint(route,'pickup');
+      const dropoff=routePoint(route,'dropoff');
+      const bounds=new google.maps.LatLngBounds();
+
+      if(pickup){stablePickupMarker=createStableMarker(map,pickup,'取件地點','pickup');bounds.extend(pickup)}
+      if(dropoff){stableDropoffMarker=createStableMarker(map,dropoff,'送達地點','dropoff');bounds.extend(dropoff)}
+
+      const encoded=routePolylineText(route);
+      if(encoded&&google.maps.geometry?.encoding){
+        const path=google.maps.geometry.encoding.decodePath(encoded);
+        stableConfirmPolyline=new google.maps.Polyline({map,path,geodesic:true,strokeColor:'#111111',strokeOpacity:.92,strokeWeight:6});
+        path.forEach(p=>bounds.extend(p));
+      }
+
+      if(!bounds.isEmpty())map.fitBounds(bounds,52);
+      else throw new Error('取件點與送達點尚未取得座標');
+
+      if(status){
+        if(encoded)status.hidden=true;
+        else{
+          status.hidden=false;
+          status.innerHTML='已顯示取件點與送達點，道路路線暫時無法載入。'+(allowRetry?'<br><button type="button" class="uu-map-retry">重新載入路線</button>':'');
+        }
+      }
+    }catch(error){
+      console.warn('待確認頁地圖顯示失敗：',error);
+      if(status){status.hidden=false;status.innerHTML='目前無法顯示地圖，請確認地址後重新載入。'+(allowRetry?'<br><button type="button" class="uu-map-retry">重新載入地圖</button>':'')}
+    }
+  }
+
+  async function refreshStableConfirmRoute(){
+    const status=$id('uuConfirmMapStatus');
+    if(status){status.hidden=false;status.textContent='正在重新取得詳細路線…'}
+    let route=null;
+    try{
+      if(typeof refreshRoutePreview==='function')route=await refreshRoutePreview();
+      if(!route&&typeof lastRouteData!=='undefined')route=lastRouteData;
+    }catch(e){console.warn('重新取得確認頁路線失敗：',e)}
+    await renderStableConfirmRoute(route||{},false);
+  }
+
+  function wrapConfirmFlow(){
+    if(typeof openConfirm==='function'&&!openConfirm.__ubeeStableWrapped){
+      const original=openConfirm;
+      const wrapped=async function(){
+        const result=await original.apply(this,arguments);
+        setTimeout(async()=>{
+          let route=null;
+          try{
+            if(typeof refreshRoutePreview==='function')route=await refreshRoutePreview();
+            if(!route&&typeof lastRouteData!=='undefined')route=lastRouteData;
+          }catch(e){}
+          renderStableConfirmRoute(route||{});
+        },120);
+        return result;
+      };
+      wrapped.__ubeeStableWrapped=true;
+      try{openConfirm=wrapped}catch(e){window.openConfirm=wrapped}
+    }
+  }
+
+  document.addEventListener('click',(event)=>{
+    if(event.target.closest('#uuCityBtn')){
+      // 手動點選城市時仍使用既有城市選擇器。
+      return;
+    }
+    if(event.target.closest('.uu-map-retry')){
+      event.preventDefault();
+      refreshStableConfirmRoute();
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    addProgressBars();
+    wrapConfirmFlow();
+    ensureLocationCaption();
+    setTimeout(()=>detectCustomerLocationStable(false),700);
+  });
+
+  window.addEventListener('pageshow',(event)=>{
+    if(event.persisted)setTimeout(()=>detectCustomerLocationStable(true),250);
+  });
+
+  // 供既有程式或除錯使用。
+  window.detectCustomerLocationStable=detectCustomerLocationStable;
+  window.renderStableConfirmRoute=renderStableConfirmRoute;
+})();
+</script>
+
 </body>
 </html>
