@@ -14634,14 +14634,13 @@ function renderSummary(){
     <div class="review-summary-group review-summary-route-group">
       <div class="review-summary-group-title">服務城市與路線</div>
 
-      <button class="review-summary-row review-summary-row-compact" type="button" onclick="openServiceCitySelector()">
+      <div class="review-summary-row review-summary-row-compact" aria-label="服務地區">
         <div class="review-summary-icon">城</div>
         <div class="review-summary-main">
-          <div class="review-summary-label">服務城市</div>
+          <div class="review-summary-label">服務地區</div>
           <div class="review-summary-value">${escapeHtml(selectedServiceCity)}</div>
         </div>
-        <div class="review-summary-chevron">›</div>
-      </button>
+      </div>
 
       <button class="review-summary-row review-summary-row-compact" type="button" onclick="showOnlyStep(1)">
         <div class="review-summary-marker pickup">取</div>
@@ -19915,10 +19914,6 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
       <header class="uu-back-header"><button class="uu-back" data-back="search" type="button">‹</button><div><div id="uuDetailTitle" class="uu-page-title">收件資訊</div><div class="uu-page-sub">地址與聯絡資訊會提供給承接任務的小U</div></div></header>
       <div class="uu-scroll">
         <div id="uuAddressMap" class="uu-mini-map"></div>
-        <div class="uu-panel">
-          <div class="uu-panel-title">快速填寫</div>
-          <div class="uu-smart-fill"><textarea id="uuSmartText" placeholder="可貼上：姓名、電話、地址與樓層"></textarea><button id="uuSmartParse" type="button">貼上並帶入</button></div>
-        </div>
         <div class="uu-field-card">
           <div class="uu-field-row"><label>地址</label><input id="uuDetailAddress" maxlength="240" readonly><button id="uuChangeAddress" type="button">常用地址</button></div>
           <div class="uu-field-row"><label>門牌與樓層</label><input id="uuDetailNote" maxlength="160" placeholder="門牌、樓層、店名、管理室或其他補充說明"></div>
@@ -20210,7 +20205,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     $('uuDetailName').value=merged.contactName||merged.name||'';
     $('uuDetailPhone').value=merged.phone||'';
     $('uuDetailLabel').value=merged.label||'';
-    $('uuSmartText').value='';$('uuSaveAddress').checked=false;setStatus('uuDetailStatus','');
+    $('uuSaveAddress').checked=false;setStatus('uuDetailStatus','');
     page('detail');setTimeout(()=>showAddressMap(merged),80);
   }
 
@@ -20305,8 +20300,6 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     $('uuConfirmNote').textContent=taskNote()||$('note')?.value||'—';
     const mapHost=$('uuConfirmMap');
     const mapStatus=$('uuConfirmMapStatus');
-    const review=$('reviewMap');
-    if(review&&mapHost&&review.parentElement!==mapHost)mapHost.insertBefore(review,mapStatus||null);
     if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='正在載入取件點、送達點與詳細路線…'}
     setLoading(true,'正在取得詳細路線與正式估價…');
     try{
@@ -20319,15 +20312,9 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
       const distance=route?.distanceText||route?.distance||'';
       const duration=route?.durationText||route?.duration||'';
       $('uuConfirmRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||(state.service==='queue'?`預估排隊 ${state.queueMinutes} 分鐘`:'正在計算路線');
-      if(typeof ensureReviewMapReady==='function')await ensureReviewMapReady();
-      if(window.google?.maps?.event&&typeof reviewMap!=='undefined'&&reviewMap){
-        google.maps.event.trigger(reviewMap,'resize');
-        await new Promise(resolve=>setTimeout(resolve,80));
-        if(route&&typeof drawRouteOnMap==='function')drawRouteOnMap(reviewMap,route,'review');
-        else if(route&&typeof renderRouteOnReviewMap==='function')renderRouteOnReviewMap(route);
-      }
-      if(route?.encodedPolyline){if(mapStatus)mapStatus.hidden=true}
-      else if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='目前無法顯示道路路線，請確認取件與送達地址後再試一次。'}
+      // 待確認頁使用獨立地圖，由正式穩定地圖模組繪製取件點、送達點與道路路線。
+      // 不再搬動或重複使用舊版 reviewMap，避免地圖被隱藏頁面與舊狀態干擾。
+      if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='正在建立待確認地圖…'}
     }catch(error){
       console.error('確認頁路線或估價失敗：',error);
       $('uuConfirmPrice').textContent='估價失敗';
@@ -20387,7 +20374,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     $('uuAddressSearchInput').addEventListener('input',e=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(e.target.value),350)});$('uuAddressSearchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();clearTimeout(state.searchTimer);searchAddress(e.currentTarget.value)}});$('uuSearchClear').onclick=()=>{$('uuAddressSearchInput').value='';setAddressSearchMode(false);searchAddress('');$('uuAddressSearchInput').focus()};$('uuUseLocation').onclick=useCurrentLocation;
     $('uuSearchResults').addEventListener('click',e=>{const btn=e.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});
     const listClick=(type)=>e=>{const btn=e.target.closest(`[data-list="${type}"]`);if(!btn)return;const list=type==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})};$('uuSavedList').addEventListener('click',listClick('saved'));$('uuRecentList').addEventListener('click',listClick('recent'));
-    $('uuSmartParse').onclick=smartParse;$('uuChangeAddress').onclick=()=>page('search');$('uuUseMyName').onclick=()=>{try{$('uuDetailName').value=String(liffProfile?.displayName||'')}catch(e){}};$('uuUseSamePhone').onclick=()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('uuDetailPhone').value=other.phone};$('uuSaveDetail').onclick=saveDetail;
+    $('uuChangeAddress').onclick=()=>page('search');$('uuUseMyName').onclick=()=>{try{$('uuDetailName').value=String(liffProfile?.displayName||'')}catch(e){}};$('uuUseSamePhone').onclick=()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('uuDetailPhone').value=other.phone};$('uuSaveDetail').onclick=saveDetail;
     $('uuSpeedGrid').addEventListener('click',e=>{const btn=e.target.closest('[data-speed]');if(!btn)return;root.querySelectorAll('.uu-speed').forEach(x=>x.classList.toggle('active',x===btn));try{selectSpeed(btn.dataset.speed)}catch(error){}$('uuConfirmSpeedLabel').textContent=btn.textContent.trim().split(/\s/)[0];openConfirm()});
     $('uuSubmitOrder').onclick=submitOrder;
   }
@@ -20406,6 +20393,11 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
   const originalShowHome=typeof window.showHomeTab==='function'?window.showHomeTab:null;
   window.showHomeTab=function(){try{if(typeof currentOrderId!=='undefined'&&currentOrderId){root.style.display='none';document.body.classList.remove('uu-flow-active');return originalShowHome?.apply(this,arguments)}}catch(e){}showRoot()};
   window.openUBeeSystemOrderFlow=showRoot;
+  // 提供待確認頁獨立地圖讀取目前任務的取件與送達座標。
+  window.getUBeeUUFlowState=()=>({
+    pickup:state.pickup?{...state.pickup}:null,
+    dropoff:state.dropoff?{...state.dropoff}:null
+  });
 
   resetNewTaskState();
   loadLocal();
@@ -20499,7 +20491,12 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
 #uuStableConfirmMap{
   position:absolute;
   inset:0;
-  z-index:1;
+  z-index:3;
+}
+#uuConfirmMap > #reviewMap{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
 }
 #uuConfirmMapStatus{
   z-index:5;
@@ -20652,13 +20649,23 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
   }
 
   function routePoint(route,type){
-    const statePoint=(typeof state!=='undefined'&&state)?state[type]:null;
+    let flowState=null;
+    try{flowState=typeof window.getUBeeUUFlowState==='function'?window.getUBeeUUFlowState():null}catch(e){}
+    const statePoint=flowState?.[type]||null;
+
+    const legacyLat=type==='pickup'
+      ? (typeof pickupLat!=='undefined'?pickupLat:null)
+      : (typeof dropoffLat!=='undefined'?dropoffLat:null);
+    const legacyLng=type==='pickup'
+      ? (typeof pickupLng!=='undefined'?pickupLng:null)
+      : (typeof dropoffLng!=='undefined'?dropoffLng:null);
+
     const lat=type==='pickup'
-      ? route?.routeStartLat??route?.originLocation?.lat??route?.pickupLat??statePoint?.lat
-      : route?.routeEndLat??route?.destinationLocation?.lat??route?.dropoffLat??statePoint?.lat;
+      ? route?.routeStartLat??route?.originLocation?.lat??route?.pickupLocation?.lat??route?.pickupLat??statePoint?.lat??legacyLat
+      : route?.routeEndLat??route?.destinationLocation?.lat??route?.dropoffLocation?.lat??route?.dropoffLat??statePoint?.lat??legacyLat;
     const lng=type==='pickup'
-      ? route?.routeStartLng??route?.originLocation?.lng??route?.pickupLng??statePoint?.lng
-      : route?.routeEndLng??route?.destinationLocation?.lng??route?.dropoffLng??statePoint?.lng;
+      ? route?.routeStartLng??route?.originLocation?.lng??route?.pickupLocation?.lng??route?.pickupLng??statePoint?.lng??legacyLng
+      : route?.routeEndLng??route?.destinationLocation?.lng??route?.dropoffLocation?.lng??route?.dropoffLng??statePoint?.lng??legacyLng;
     return validPoint(lat,lng)?{lat:Number(lat),lng:Number(lng)}:null;
   }
 
@@ -20716,6 +20723,8 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
         path.forEach(p=>bounds.extend(p));
       }
 
+      google.maps.event.trigger(map,'resize');
+      await new Promise(resolve=>setTimeout(resolve,80));
       if(!bounds.isEmpty())map.fitBounds(bounds,52);
       else throw new Error('取件點與送達點尚未取得座標');
 
