@@ -20312,9 +20312,20 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
       const distance=route?.distanceText||route?.distance||'';
       const duration=route?.durationText||route?.duration||'';
       $('uuConfirmRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||(state.service==='queue'?`預估排隊 ${state.queueMinutes} 分鐘`:'正在計算路線');
-      // 待確認頁使用獨立地圖，由正式穩定地圖模組繪製取件點、送達點與道路路線。
-      // 不再搬動或重複使用舊版 reviewMap，避免地圖被隱藏頁面與舊狀態干擾。
+      // 待確認頁使用獨立地圖，直接在正式 openConfirm 流程中繪製。
+      // 不再依賴外部包裝函式，避免函式作用域造成地圖完全沒有執行。
       if(mapStatus){mapStatus.hidden=false;mapStatus.textContent='正在建立待確認地圖…'}
+      if(typeof window.renderStableConfirmRoute==='function'){
+        await window.renderStableConfirmRoute(route||{});
+      }else if(typeof renderRouteOnReviewMap==='function'&&route){
+        try{
+          await ensureReviewMapReady();
+          renderRouteOnReviewMap(route);
+          if(mapStatus)mapStatus.hidden=true;
+        }catch(mapError){
+          console.warn('待確認頁備援地圖顯示失敗：',mapError);
+        }
+      }
     }catch(error){
       console.error('確認頁路線或估價失敗：',error);
       $('uuConfirmPrice').textContent='估價失敗';
@@ -20360,6 +20371,25 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     updateHome();
     refreshServiceStatus();
   }
+  function ensureUnifiedFlowNavigation(){
+    let nav=$('uuUnifiedBottomNav');
+    if(nav)return nav;
+    nav=document.createElement('nav');
+    nav.id='uuUnifiedBottomNav';
+    nav.setAttribute('aria-label','主要導覽');
+    nav.innerHTML=
+      '<button id="uuUnifiedHomeBtn" class="active" type="button"><span class="uu-bottom-icon">U</span>首頁</button>'+
+      '<button id="uuUnifiedMyBtn" type="button"><span class="uu-bottom-icon">◎</span>我的</button>';
+    root.querySelector('.uu-shell')?.appendChild(nav);
+    $('uuUnifiedHomeBtn').onclick=()=>{page('home');updateHome()};
+    $('uuUnifiedMyBtn').onclick=()=>{
+      root.style.display='none';
+      document.body.classList.remove('uu-flow-active');
+      try{showProfileTab()}catch(e){}
+    };
+    return nav;
+  }
+
   function bind(){
     $('uuServiceTabs').addEventListener('click',e=>{const btn=e.target.closest('[data-service]');if(!btn)return;activateService(btn.dataset.service);if(btn.dataset.service==='buy')renderBuy()});
     $('uuPickupRow').onclick=()=>openAddress('pickup');$('uuDropoffRow').onclick=()=>openAddress('dropoff');$('uuStartOrderBtn').onclick=startOrder;$('uuEditTaskBtn').onclick=openTaskEditor;
@@ -20402,6 +20432,7 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
   resetNewTaskState();
   loadLocal();
   bind();
+  ensureUnifiedFlowNavigation();
   activateService(state.service||'send');
   renderBuy();
   updateHome();
@@ -20515,6 +20546,57 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
   font-size:12px;
   font-weight:1000;
 }
+
+/* UBee 正式流程共用底部導航：首頁與所有後續步驟使用同一個元件 */
+#uuFlowRoot .uu-bottom{display:none!important}
+#uuUnifiedBottomNav{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:80;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px;
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top:1px solid rgba(17,24,39,.08);
+  border-radius:22px 22px 0 0;
+  background:rgba(255,255,255,.98);
+  box-shadow:0 -8px 26px rgba(17,24,39,.08);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+}
+#uuUnifiedBottomNav button{
+  min-height:56px;
+  border:none;
+  border-radius:14px;
+  padding:7px 4px 6px;
+  background:transparent;
+  color:#8b9096;
+  font-size:11px!important;
+  font-weight:1000;
+}
+#uuUnifiedBottomNav button.active{
+  width:82%;
+  justify-self:center;
+  background:#111;
+  color:#fff;
+}
+#uuUnifiedBottomNav .uu-bottom-icon{
+  display:block;
+  width:35px;
+  height:35px;
+  margin:0 auto 2px;
+  border-radius:50%;
+  line-height:35px;
+  font-size:20px;
+  background:#f1f2f3;
+}
+#uuUnifiedBottomNav button.active .uu-bottom-icon{
+  background:var(--uu-accent);
+  color:#111;
+}
+
 </style>
 <script id="ubee-production-ux-stable-script">
 (() => {
@@ -20701,22 +20783,62 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     return new google.maps.Marker({map,position:point,title:label,label:{text:type==='pickup'?'取':'送',color:type==='pickup'?'#fff':'#111',fontWeight:'900'}});
   }
 
+  async function fetchStableRouteDirect(route={}){
+    const flowState=typeof window.getUBeeUUFlowState==='function'
+      ? window.getUBeeUUFlowState()
+      : {};
+    const pickup=flowState?.pickup||{};
+    const dropoff=flowState?.dropoff||{};
+    const payload={
+      pickupAddress:pickup.address||String(document.getElementById('pickup')?.value||'').trim(),
+      dropoffAddress:dropoff.address||String(document.getElementById('dropoff')?.value||'').trim(),
+      pickupPlaceId:pickup.placeId||'',
+      dropoffPlaceId:dropoff.placeId||'',
+      pickupLat:validPoint(pickup.lat,pickup.lng)?Number(pickup.lat):undefined,
+      pickupLng:validPoint(pickup.lat,pickup.lng)?Number(pickup.lng):undefined,
+      dropoffLat:validPoint(dropoff.lat,dropoff.lng)?Number(dropoff.lat):undefined,
+      dropoffLng:validPoint(dropoff.lat,dropoff.lng)?Number(dropoff.lng):undefined
+    };
+    if(!payload.pickupAddress&&!validPoint(payload.pickupLat,payload.pickupLng))return route;
+    if(!payload.dropoffAddress&&!validPoint(payload.dropoffLat,payload.dropoffLng))return route;
+    const response=await fetch('/api/map-route',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      cache:'no-store',
+      body:JSON.stringify(payload)
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.success)throw new Error(data.error||data.message||'無法取得道路路線');
+    try{lastRouteData=data}catch(e){}
+    return data;
+  }
+
   async function renderStableConfirmRoute(route,allowRetry=true){
     const token=++stableConfirmRenderToken;
     const status=$id('uuConfirmMapStatus');
     if(status){status.hidden=false;status.innerHTML='正在載入取件點、送達點與詳細路線…'}
     try{
+      let activeRoute=route||{};
+      let pickup=routePoint(activeRoute,'pickup');
+      let dropoff=routePoint(activeRoute,'dropoff');
+      if(!pickup||!dropoff||!routePolylineText(activeRoute)){
+        try{
+          activeRoute=await fetchStableRouteDirect(activeRoute);
+          pickup=routePoint(activeRoute,'pickup');
+          dropoff=routePoint(activeRoute,'dropoff');
+        }catch(routeError){
+          console.warn('待確認頁直接取得道路路線失敗：',routeError);
+        }
+      }
       const map=await ensureStableConfirmMap();
       if(token!==stableConfirmRenderToken)return;
       clearStableMapObjects();
-      const pickup=routePoint(route,'pickup');
-      const dropoff=routePoint(route,'dropoff');
       const bounds=new google.maps.LatLngBounds();
 
       if(pickup){stablePickupMarker=createStableMarker(map,pickup,'取件地點','pickup');bounds.extend(pickup)}
       if(dropoff){stableDropoffMarker=createStableMarker(map,dropoff,'送達地點','dropoff');bounds.extend(dropoff)}
 
-      const encoded=routePolylineText(route);
+      const encoded=routePolylineText(activeRoute);
       if(encoded&&google.maps.geometry?.encoding){
         const path=google.maps.geometry.encoding.decodePath(encoded);
         stableConfirmPolyline=new google.maps.Polyline({map,path,geodesic:true,strokeColor:'#111111',strokeOpacity:.92,strokeWeight:6});
@@ -20788,6 +20910,16 @@ body.uu-flow-active .service-city-modal,body.uu-flow-active .service-city-select
     wrapConfirmFlow();
     ensureLocationCaption();
     setTimeout(()=>detectCustomerLocationStable(false),700);
+
+    const confirmPage=$id('uuPageConfirm');
+    if(confirmPage){
+      const observer=new MutationObserver(()=>{
+        if(confirmPage.classList.contains('active')){
+          setTimeout(()=>refreshStableConfirmRoute(),60);
+        }
+      });
+      observer.observe(confirmPage,{attributes:true,attributeFilter:['class']});
+    }
   });
 
   window.addEventListener('pageshow',(event)=>{
