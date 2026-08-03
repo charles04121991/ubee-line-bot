@@ -128,7 +128,7 @@
     .nav {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 14px;
       color: rgba(255, 255, 255, 0.78);
       font-size: 14px;
       white-space: nowrap;
@@ -139,12 +139,19 @@
     }
 
     .nav-cta {
-      background: #fff;
       color: #111 !important;
-      padding: 9px 16px;
+      padding: 9px 15px;
       border-radius: 999px;
       font-weight: 950;
       box-shadow: 0 10px 24px rgba(255, 255, 255, 0.12);
+    }
+
+    .nav-cta.user-entry {
+      background: var(--yellow);
+    }
+
+    .nav-cta.rider-entry {
+      background: #fff;
     }
 
     .hero-wrap {
@@ -460,6 +467,99 @@
       width: 68%;
       border-radius: 999px;
       background: var(--yellow);
+    }
+
+    .platform-entry-section {
+      position: relative;
+      z-index: 5;
+      margin-top: -18px;
+      padding: 0 0 18px;
+    }
+
+    .platform-entry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .platform-entry-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 210px;
+      padding: 26px;
+      border-radius: 30px;
+      border: 1px solid rgba(16, 16, 16, 0.08);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .platform-entry-card.user {
+      background: linear-gradient(135deg, var(--yellow), #ffeaa3);
+      color: #111;
+    }
+
+    .platform-entry-card.rider {
+      background: linear-gradient(135deg, #111 0%, #262626 68%, #3a310b 100%);
+      color: #fff;
+    }
+
+    .platform-entry-card::after {
+      content: "";
+      position: absolute;
+      width: 190px;
+      height: 190px;
+      right: -72px;
+      bottom: -92px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.16);
+      pointer-events: none;
+    }
+
+    .platform-entry-icon {
+      position: relative;
+      z-index: 2;
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 26px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
+    }
+
+    .platform-entry-card.rider .platform-entry-icon {
+      background: var(--yellow);
+      color: #111;
+    }
+
+    .platform-entry-card h2 {
+      position: relative;
+      z-index: 2;
+      margin: 0;
+      font-size: 27px;
+      line-height: 1.2;
+      font-weight: 1000;
+      letter-spacing: -0.7px;
+    }
+
+    .platform-entry-card p {
+      position: relative;
+      z-index: 2;
+      margin: 10px 0 20px;
+      max-width: 520px;
+      color: rgba(17, 17, 17, 0.68);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .platform-entry-card.rider p {
+      color: rgba(255, 255, 255, 0.68);
+    }
+
+    .platform-entry-card .btn {
+      position: relative;
+      z-index: 2;
     }
 
     .section {
@@ -1352,12 +1452,23 @@
       right: 14px;
       bottom: calc(14px + env(safe-area-inset-bottom));
       z-index: 120;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      padding: 8px;
+      border: 1px solid rgba(17, 24, 39, 0.10);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18);
+      backdrop-filter: blur(16px);
     }
 
     .floating-order a {
       width: 100%;
-      min-height: 54px;
-      border-radius: 18px;
+      min-height: 52px;
+      padding: 10px 8px;
+      border-radius: 16px;
+      font-size: 14px;
+      text-align: center;
     }
 
     @media (max-width: 980px) {
@@ -1459,8 +1570,20 @@
       .flow,
       .partner-points,
       .faq-grid,
-      .faq-stats {
+      .faq-stats,
+      .platform-entry-grid {
         grid-template-columns: 1fr;
+      }
+
+      .platform-entry-section {
+        margin-top: -8px;
+        padding-top: 18px;
+      }
+
+      .platform-entry-card {
+        min-height: 0;
+        padding: 23px;
+        border-radius: 26px;
       }
 
       .service-visual {
@@ -1519,7 +1642,7 @@
       }
 
       .floating-order {
-        display: block;
+        display: grid;
       }
 
       .footer-inner {
@@ -1549,7 +1672,8 @@
           <a href="#partner">店家使用</a>
           <a href="#faq">常見問題</a>
           <a href="#contact">聯絡我們</a>
-          <a class="nav-cta" href="/order.html">註冊／登入</a>
+          <a class="nav-cta user-entry" href="/order.html">UBee 用戶端</a>
+          <a class="nav-cta rider-entry" href="https://ubee-rider-web.vercel.app/rider.html">加入 UBee 騎士</a>
         </nav>
       </div>
     </header>
@@ -1573,7 +1697,10 @@
 
             <div class="hero-actions">
               <a class="btn btn-primary" href="/order.html">
-                註冊／登入開始下單
+                開啟 UBee 用戶端
+              </a>
+              <a class="btn btn-ghost" href="https://ubee-rider-web.vercel.app/rider.html">
+                加入 UBee 騎士
               </a>
               <a class="btn btn-ghost" href="#services">
                 查看服務項目
@@ -1651,6 +1778,26 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="platform-entry-section" id="platform-entry" aria-label="UBee 平台入口">
+        <div class="container">
+          <div class="platform-entry-grid">
+            <article class="platform-entry-card user">
+              <div class="platform-entry-icon">📱</div>
+              <h2>UBee 用戶端</h2>
+              <p>註冊或登入後即可快速估價、建立跑腿任務、查看任務進度，並管理會員與常用資料。</p>
+              <a class="btn btn-dark" href="/order.html">進入 UBee 用戶端</a>
+            </article>
+
+            <article class="platform-entry-card rider">
+              <div class="platform-entry-icon">🐝</div>
+              <h2>加入 UBee 騎士</h2>
+              <p>成為 UBee 配送夥伴，完成申請與審核後，即可透過騎士端查看及承接適合的跑腿任務。</p>
+              <a class="btn btn-primary" href="https://ubee-rider-web.vercel.app/rider.html">前往騎士端申請</a>
+            </article>
           </div>
         </div>
       </section>
@@ -2155,7 +2302,10 @@
 
               <div class="hero-actions">
                 <a class="btn btn-primary" href="/order.html">
-                  註冊／登入開始下單
+                  UBee 用戶端
+                </a>
+                <a class="btn btn-ghost" href="https://ubee-rider-web.vercel.app/rider.html">
+                  加入 UBee 騎士
                 </a>
               </div>
 
@@ -2194,8 +2344,13 @@
                 </div>
 
                 <div class="info-row">
-                  <div class="info-label">下單入口</div>
+                  <div class="info-label">UBee 用戶端</div>
                   <div class="info-value">https://ubee-line-bot-2-zezw.onrender.com/order.html</div>
+                </div>
+
+                <div class="info-row">
+                  <div class="info-label">加入 UBee 騎士</div>
+                  <div class="info-value">https://ubee-rider-web.vercel.app/rider.html</div>
                 </div>
               </div>
             </div>
@@ -2218,10 +2373,9 @@
       </div>
     </footer>
 
-    <div class="floating-order">
-      <a class="btn btn-primary" href="/order.html">
-        註冊／登入開始使用 UBee
-      </a>
+    <div class="floating-order" aria-label="UBee 快速入口">
+      <a class="btn btn-primary" href="/order.html">UBee 用戶端</a>
+      <a class="btn btn-dark" href="https://ubee-rider-web.vercel.app/rider.html">加入 UBee 騎士</a>
     </div>
 
   </div>
