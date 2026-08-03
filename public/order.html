@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" class="ubee-auth-pending">
 <head>
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
   <meta charset="utf-8">
@@ -21,11 +21,10 @@
   <title>UBee 跑腿｜全台城市切換＋五步驟下單流程</title>
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
   <style>
+    .ubee-auth-pending body{visibility:hidden;}
+
     :root{
   --bg:#f5f6f7;
   --surface:#ffffff;
@@ -353,34 +352,6 @@
       color:var(--muted);
       font-size:12px;
       font-weight:900;
-    }
-
-    .merchant-card{
-      border:1px solid rgba(244,189,0,.35);
-      background:#fff9d9;
-      border-radius:18px;
-      padding:14px;
-      margin:0 0 14px;
-    }
-
-    .merchant-card-title{
-      color:#8a6800;
-      font-size:12px;
-      font-weight:1000;
-      margin-bottom:5px;
-    }
-
-    .merchant-card-name{
-      font-size:18px;
-      font-weight:1000;
-      margin-bottom:5px;
-    }
-
-    .merchant-card-text{
-      color:var(--muted);
-      font-size:13px;
-      line-height:1.7;
-      font-weight:800;
     }
 
         /* ==============================
@@ -7079,7 +7050,7 @@ input:checked
 /* =========================================================
    UBee 3.0 完整介面覆蓋層（2026-07）
    僅調整視覺與頁面編排，不變更既有 API、欄位 ID、估價、付款、
-   建單、Firestore 監聽、地圖與任務追蹤邏輯。
+   建單、會員 API 同步、地圖與任務追蹤邏輯。
    ========================================================= */
 :root{
   --ubee-yellow:#ffc800;
@@ -7856,7 +7827,7 @@ body{background:#eef0f2;}
 
 /* =========================================================
    UBee 客人端｜第三、四步精簡正式營運版 2026-07-20
-   原則：只調整資訊層級與入口位置，不改 API／Firestore／估價／付款／取消／追蹤邏輯
+   原則：只調整資訊層級與入口位置，不改正式 API／估價／付款／取消／追蹤邏輯
    ========================================================= */
 
 /* STEP 3（程式 step4）：確認訂單精簡 */
@@ -8321,7 +8292,7 @@ body{background:#eef0f2;}
    UBee 正式營運安全編排：五步驟內容歸位
    - 第一步：服務、細項、任務分類、路線與估價
    - 第二步：聯絡方式、任務內容、交付與代墊資訊
-   - 不變更欄位 ID、API、Firestore、估價或建立訂單邏輯
+   - 不變更欄位 ID、正式 API、估價或建立訂單邏輯
    ===================================================== */
 #step1 .task-category-step1{
   position:relative;
@@ -8982,7 +8953,6 @@ body{background:#eef0f2;}
       </div>
 
 
-        <div id="merchantInfoBox" class="merchant-card hidden"></div>
 
         <div class="ubee-v4-service-title">選擇服務</div>
         <div class="category-tabs ubee-v4-service-tabs" role="tablist" aria-label="UBee 跑腿服務">
@@ -9898,8 +9868,55 @@ function applyLightTheme(){
 
 applyLightTheme();
 
-let userId = 'web-order';
-let liffId = '';
+let userId = '';
+let currentCustomer = null;
+
+function showCustomerAuthConnectionError(message){
+  document.documentElement.classList.remove('ubee-auth-pending');
+  document.body.innerHTML = `
+    <main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#f5f6f7;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC','Microsoft JhengHei',sans-serif;">
+      <section style="width:min(100%,430px);padding:26px;border:1px solid #e6e7e9;border-radius:24px;background:#fff;box-shadow:0 18px 48px rgba(17,24,39,.10);text-align:center;">
+        <img src="/ubee-customer-icon-192.png" alt="UBee" style="width:72px;height:72px;border-radius:20px;">
+        <h1 style="margin:18px 0 8px;font-size:24px;">需要連線確認會員身分</h1>
+        <p style="margin:0;color:#6f7378;line-height:1.7;font-weight:700;">${escapeHtml(message || '請確認網路後重新整理。未完成登入驗證時，UBee 不會開放估價或下單功能。')}</p>
+        <button type="button" onclick="location.reload()" style="width:100%;margin-top:20px;padding:14px;border:0;border-radius:16px;background:#facc15;color:#111;font-size:16px;font-weight:1000;">重新連線</button>
+        <button type="button" onclick="location.replace('/customer-auth.html?mode=login&redirect=%2Forder.html')" style="width:100%;margin-top:10px;padding:14px;border:1px solid #d7d9dc;border-radius:16px;background:#fff;color:#111;font-size:16px;font-weight:1000;">返回會員登入</button>
+      </section>
+    </main>`;
+}
+
+function redirectToCustomerLogin(){
+  const redirect = encodeURIComponent('/order.html' + window.location.search);
+  window.location.replace(`/customer-auth.html?mode=login&redirect=${redirect}`);
+}
+
+async function customerApiFetch(url, options = {}){
+  const response = await fetch(url, {
+    ...options,
+    credentials:'include',
+    cache:options.cache || 'no-store',
+    headers:{
+      'Accept':'application/json',
+      ...(options.body ? {'Content-Type':'application/json'} : {}),
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if(response.status === 401){
+    redirectToCustomerLogin();
+    const error = new Error(data.message || '請先登入 UBee 會員帳號。');
+    error.code = data.code || 'CUSTOMER_LOGIN_REQUIRED';
+    error.status = 401;
+    throw error;
+  }
+  if(!response.ok || data.success === false){
+    const error = new Error(data.message || data.error || `系統暫時無法處理（${response.status}）`);
+    error.code = data.code || '';
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
 let currentStep = 1;
 let serviceGroup = 'send';
 let serviceType = '文件急送';
@@ -9915,8 +9932,6 @@ let scheduleGoal = 'pickup_at';
 let currentOrderId = '';
 let selectedPaymentMethod = '';
 let currentOrderData = null;
-let currentMerchant = null;
-let merchantMode = false;
 
 let orderUnsubscribe = null;
 let customerActiveOrdersUnsubscribe = null;
@@ -12719,17 +12734,6 @@ let lastNearbySearchKey = '';
 let nearbyAutoFilledPickup = '';
 let nearbyAutoFilledPhone = '';
 
-const firebaseConfig = {
-  apiKey:"AIzaSyCNuP9x_GWDjmJx0-xyO316fa6jiFSfa-s",
-  authDomain:"ubee-oms.firebaseapp.com",
-  projectId:"ubee-oms"
-};
-
-if(window.firebase && !firebase.apps.length){
-  firebase.initializeApp(firebaseConfig);
-}
-
-const db = window.firebase ? firebase.firestore() : null;
 
 const serviceGroups = {
   send:[
@@ -13258,7 +13262,7 @@ function updateNearbyPlacesVisibility(){
   const box = qs('nearbyPlacesBox');
   if(!box) return;
 
-  const shouldShow = serviceGroup === 'buy' && merchantMode !== true;
+  const shouldShow = serviceGroup === 'buy';
   box.classList.toggle('hidden', !shouldShow);
 
   if(!shouldShow){
@@ -13269,7 +13273,7 @@ function updateNearbyPlacesVisibility(){
 function handleServiceSelectionChanged(){
   updateNearbyPlacesVisibility();
 
-  if(serviceGroup !== 'buy' || merchantMode === true) return;
+  if(serviceGroup !== 'buy') return;
   setNearbyStatus('已選擇代買分類，按「搜尋附近」即可定位並搜尋店家。');
 }
 
@@ -13329,7 +13333,7 @@ function renderNearbyPlaces(){
 async function searchNearbyPlaces(force){
   updateNearbyPlacesVisibility();
 
-  if(serviceGroup !== 'buy' || merchantMode === true || isLoadingNearbyPlaces){
+  if(serviceGroup !== 'buy' || isLoadingNearbyPlaces){
     return;
   }
 
@@ -14056,32 +14060,10 @@ function showTasksTab(){
 }
 
 function getInitialOpenAction(){
-  const allowedOrderActions = ['orders','my-orders','tasks'];
+  const allowedOrderActions = ['orders','my-orders','tasks','profile'];
   const params = new URLSearchParams(window.location.search);
   const directOpen = String(params.get('open') || params.get('page') || '').trim();
-
-  if(allowedOrderActions.includes(directOpen)) return 'orders';
-
-  const liffState = params.get('liff.state') || '';
-
-  if(liffState){
-    try{
-      const decodedState = decodeURIComponent(liffState);
-      if(
-        decodedState.includes('open=orders') ||
-        decodedState.includes('page=orders') ||
-        decodedState.includes('/orders') ||
-        decodedState.includes('my-orders') ||
-        decodedState.includes('tasks')
-      ){
-        return 'orders';
-      }
-    }catch(err){
-      console.warn('解析 LIFF state 失敗:', err);
-    }
-  }
-
-  return '';
+  return allowedOrderActions.includes(directOpen) ? 'orders' : '';
 }
 
 function handleInitialOpenAction(){
@@ -14109,17 +14091,10 @@ function showCustomerSubPage(){
 
 function openLineOfficialAccount(){
   const url = LINE_OFFICIAL_URL;
-
-  try{
-    if(window.liff && typeof liff.isInClient === 'function' && liff.isInClient()){
-      liff.openWindow({ url, external:true });
-      return;
-    }
-  }catch(err){
-    console.warn('LINE 官方帳號跳轉失敗，改用瀏覽器開啟:', err);
+  const opened = window.open(url, '_blank', 'noopener,noreferrer');
+  if(!opened){
+    window.location.href = url;
   }
-
-  window.location.href = url;
 }
 
 function validateStep1Addresses(){
@@ -14337,9 +14312,6 @@ function getPayload(){
   const timingPayload = getOrderTimingPayload();
 
   return {
-    userId,
-    customerId:userId,
-
     serviceGroup:getServiceGroupForApi(),
     serviceKey:getServiceKeyForApi(),
     serviceType,
@@ -14423,13 +14395,6 @@ function getPayload(){
       lat:selectedNearbyPlace.lat || '',
       lng:selectedNearbyPlace.lng || ''
     } : null,
-
-    merchantId:currentMerchant?.id || '',
-    merchantCode:currentMerchant?.merchantId || currentMerchant?.id || '',
-    merchantName:currentMerchant?.merchantName || '',
-    merchantPhone:currentMerchant?.merchantPhone || '',
-    merchantAddress:currentMerchant?.merchantAddress || '',
-    hasMerchant:merchantMode === true,
 
     // Level 4 診斷標記：真正的區域／時段特徵仍由 index.js 後端重新計算。
     dispatchClientVersion:'level4-v1',
@@ -15170,23 +15135,10 @@ async function createOrder(){
       throw new Error('正式報價識別碼不存在，請重新估價後再送出。');
     }
 
-    const res = await fetch('/api/orders', {
+    const data = await customerApiFetch('/api/orders', {
       method:'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
       body:JSON.stringify(payload)
     });
-
-    const data = await res.json().catch(() => ({}));
-
-    if(!res.ok || data.success === false){
-      throw new Error(
-        data.error ||
-        data.message ||
-        '建立訂單失敗'
-      );
-    }
 
     currentOrderId =
       data.orderId ||
@@ -15323,51 +15275,21 @@ function selectPaymentMethod(method){
 }
 
 async function submitPaymentMethodToServer(method){
-  const normalizedMethod =
-    String(method || '')
-      .trim()
-      .toLowerCase();
-
+  const normalizedMethod = String(method || '').trim().toLowerCase();
   if(normalizedMethod !== 'cash'){
-    throw new Error(
-      '街口支付目前尚未開放，請改用現金單。'
-    );
+    throw new Error('街口支付目前尚未開放，請改用現金單。');
   }
-
-  const res = await fetch(
+  return customerApiFetch(
     `/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`,
     {
       method:'POST',
-
-      headers:{
-        'Content-Type':'application/json'
-      },
-
       body:JSON.stringify({
-        userId,
-        customerId:userId,
         paymentMethod:normalizedMethod,
         paymentLabel:'現金付款',
         isCashOrder:true
       })
     }
   );
-
-  const data =
-    await res.json().catch(() => ({}));
-
-  if(
-    !res.ok ||
-    data.success === false
-  ){
-    throw new Error(
-      data.error ||
-      data.message ||
-      '設定付款方式失敗'
-    );
-  }
-
-  return data;
 }
 
 async function confirmPaid(){
@@ -15535,10 +15457,9 @@ async function cancelOrder(){
           'Content-Type':'application/json'
         },
 
+        credentials:'include',
         body:JSON.stringify({
-          orderId:currentOrderId,
-          userId,
-          customerId:userId
+          orderId:currentOrderId
         })
       }
     );
@@ -16184,7 +16105,7 @@ function renderTimeline(status, order){
     ]);
 
   /*
-   * 訂單剛建立、Firestore 尚未同步完整欄位時，
+   * 訂單剛建立、後端尚未同步完整欄位時，
    * 使用提交前最後一次正式估價總額。
    */
 
@@ -16798,7 +16719,7 @@ if(!trackingMap){
 function stopTrackedRiderListener(){
 
   // ==============================
-  // 1. 停止 Firestore 小U定位監聽
+  // 1. 停止小U定位與路線更新
   // ==============================
 
   if(trackedRiderUnsubscribe){
@@ -16892,171 +16813,33 @@ function stopTrackedRiderListener(){
 }
 
 function startTrackedRiderListener(order){
+  if(!order) return;
 
-  if(
-    !db ||
-    !order
-  ){
-    return;
-  }
-
-
-  const riderDocId =
-    getOrderRiderDocId(order);
-
-
-  if(!riderDocId){
-
-    stopTrackedRiderListener();
-
-    console.log(
-      '⏳ UBee 客人端目前尚未有小U接單',
-      {
-        orderId:
-          order.id || '',
-        status:
-          order.status || ''
-      }
-    );
-
-    return;
-  }
-
-
-  // 已經在監聽同一位小U，
-  // 不重複建立 Firestore listener
-  if(
-    trackedRiderDocId === riderDocId &&
-    trackedRiderUnsubscribe
-  ){
-    return;
-  }
-
-
-  // 如果換了一位小U，
-  // 先關閉上一個 listener
-  stopTrackedRiderListener();
-
-
-  trackedRiderDocId =
-    riderDocId;
-
-
-  console.log(
-    '🔗 UBee 客人端開始連接小U定位',
-    {
-      orderId:
-        order.id || '',
-
-      riderDocId
-    }
+  const lat = Number(
+    order.riderCurrentLat ??
+    order.riderCurrentLocation?.lat
+  );
+  const lng = Number(
+    order.riderCurrentLng ??
+    order.riderCurrentLocation?.lng
   );
 
-
-  trackedRiderUnsubscribe =
-    db
-      .collection('riders')
-      .doc(riderDocId)
-      .onSnapshot(
-
-        doc => {
-
-          if(!doc.exists){
-
-            console.warn(
-              '⚠️ 找不到小U資料文件:',
-              riderDocId
-            );
-
-            trackedRiderData = null;
-
-            trackedRiderPosition = null;
-
-            return;
-          }
-
-
-          const rider = {
-            id:doc.id,
-            ...doc.data()
-          };
-
-
-          const position =
-            getTrackedRiderPosition(rider);
-
-
-          trackedRiderData =
-            rider;
-
-
-          if(!position){
-
-            trackedRiderPosition = null;
-
-            console.log(
-              '📡 已找到小U，但目前尚未收到有效 GPS',
-              {
-                riderDocId
-              }
-            );
-
-            return;
-          }
-
-
-          trackedRiderPosition =
-  position;
-
-
-console.log(
-  '✅ 客人端收到小U最新定位',
-  {
-    riderDocId,
-
-    lat:
-      position.lat,
-
-    lng:
-      position.lng,
-
-    locationUpdatedAtMs:
-      rider.locationUpdatedAtMs ||
-      null
+  if(!Number.isFinite(lat) || !Number.isFinite(lng)){
+    trackedRiderPosition = null;
+    return;
   }
-);
 
+  const position = { lat, lng };
+  trackedRiderPosition = position;
+  trackedRiderData = {
+    id:String(order.riderDocId || order.riderId || ''),
+    currentLat:lat,
+    currentLng:lng,
+    locationUpdatedAtMs:Number(order.riderLocationUpdatedAtMs || 0)
+  };
 
-updateTrackedRiderMarker(
-  position
-);
-
-scheduleTrackingRouteRefresh(
-  currentOrderData || order,
-  position
-);
-
-          // ==============================
-          // 第二刀會從這裡開始：
-          //
-          // updateTrackedRiderMarker(
-          //   position
-          // );
-          //
-          // 目前先只確認資料鏈成功
-          // ==============================
-        },
-
-
-        err => {
-
-          console.warn(
-            '❌ 小U即時定位監聽失敗:',
-            err
-          );
-
-        }
-      );
+  updateTrackedRiderMarker(position);
+  scheduleTrackingRouteRefresh(currentOrderData || order, position);
 }
 
 
@@ -17273,104 +17056,68 @@ if(trackedRiderPosition){
 
 function startOrderListener(orderId){
   if(orderUnsubscribe){
-    try{
-      orderUnsubscribe();
-    }catch(e){}
-
+    try{ orderUnsubscribe(); }catch(_){ }
     orderUnsubscribe = null;
   }
 
-  if(!db || !orderId){
-    return;
-  }
+  const safeOrderId = String(orderId || '').trim().toUpperCase();
+  if(!safeOrderId) return;
 
-  orderUnsubscribe =
-    db
-      .collection('orders')
-      .doc(orderId)
-      .onSnapshot(
-        doc => {
+  let stopped = false;
+  let inFlight = false;
+  let timer = null;
 
-          if(!doc.exists){
+  const poll = async () => {
+    if(stopped || inFlight || document.visibilityState === 'hidden') return;
+    inFlight = true;
+    try{
+      const data = await customerApiFetch(`/api/orders/${encodeURIComponent(safeOrderId)}?t=${Date.now()}`);
+      const order = {
+        ...(currentOrderData || {}),
+        ...(data.summary || {}),
+        id:safeOrderId
+      };
 
-            console.warn(
-              '快取訂單不存在，已清除本機訂單狀態:',
-              orderId
-            );
+      currentOrderData = order;
+      currentOrderId = safeOrderId;
+      localStorage.setItem('ubee_current_order_id', safeOrderId);
+      setOrderNo(safeOrderId);
+      renderTimeline(order.status || 'pending_payment', order);
+      syncCustomerLiveTracking(order);
+      if(typeof cacheCustomerTrackingOrder === 'function'){
+        cacheCustomerTrackingOrder(order);
+      }
 
-            clearCurrentOrderCache();
+      if(['completed','done','cancelled','canceled'].includes(String(order.status || '').toLowerCase())){
+        if(currentCustomerPage === 'customerProfilePage') renderCustomerMemberInfo();
+        if(currentCustomerPage === 'customerTasksPage') renderRecentTasks();
+        clearCurrentOrderCache();
+        stopped = true;
+        if(timer) clearInterval(timer);
+      }
+    }catch(error){
+      if(error.status === 404){
+        clearCurrentOrderCache();
+      }else if(error.status !== 401){
+        console.warn('訂單狀態同步失敗：', error);
+      }
+    }finally{
+      inFlight = false;
+    }
+  };
 
-            if(currentStep === 5){
+  poll();
+  timer = setInterval(poll, 4000);
+  const visibilityHandler = () => {
+    if(document.visibilityState === 'visible') poll();
+  };
+  document.addEventListener('visibilitychange', visibilityHandler);
 
-              alert(
-                '這筆訂單已不存在，系統已回到首頁。'
-              );
-
-              showOnlyStep(1);
-            }
-
-            return;
-          }
-
-          const order = {
-            id:doc.id,
-            ...doc.data()
-          };
-
-          currentOrderData = order;
-          currentOrderId = doc.id;
-
-          localStorage.setItem(
-         'ubee_current_order_id',
-         currentOrderId
-   );
-
-        setOrderNo(currentOrderId);
-
-renderTimeline(
-  order.status ||
-  'pending_payment',
-  order
-);
-
-
-// ==============================
-// 同步小U即時定位追蹤
-// ==============================
-
-syncCustomerLiveTracking(order);
-
-          if(
-            order.status === 'completed' ||
-            order.status === 'done' ||
-            order.status === 'cancelled'
-          ){
-
-            if(
-              currentCustomerPage ===
-              'customerProfilePage'
-            ){
-              renderCustomerMemberInfo();
-            }
-
-            if(
-              currentCustomerPage ===
-              'customerTasksPage'
-            ){
-              renderRecentTasks();
-            }
-
-            clearCurrentOrderCache();
-          }
-        },
-
-        err => {
-          console.warn(
-            '訂單即時監聽失敗:',
-            err
-          );
-        }
-      );
+  orderUnsubscribe = () => {
+    stopped = true;
+    if(timer) clearInterval(timer);
+    document.removeEventListener('visibilitychange', visibilityHandler);
+  };
 }
 
 function formatOrderTime(value){
@@ -17537,59 +17284,8 @@ function renderOrderList(el, orders, emptyText){
 }
 
 async function loadCustomerOrders(){
-  if(
-    !db ||
-    !userId ||
-    userId === 'web-order'
-  ){
-    return [];
-  }
-
-  const snap =
-    await db
-      .collection('orders')
-      .where(
-        'userId',
-        '==',
-        userId
-      )
-      .limit(30)
-      .get();
-
-  const orders = [];
-
-  snap.forEach(doc =>
-    orders.push({
-      id:doc.id,
-      ...doc.data()
-    })
-  );
-
-  orders.sort((a, b) => {
-
-    const getTime = order => {
-      const value =
-        order.createdAt ||
-        order.updatedAt;
-
-      if(!value){
-        return 0;
-      }
-
-      if(value.toDate){
-        return value
-          .toDate()
-          .getTime();
-      }
-
-      return new Date(value)
-        .getTime() || 0;
-    };
-
-    return getTime(b) - getTime(a);
-  });
-
-  return orders;
+  const data = await customerApiFetch('/api/customer/orders?limit=100');
+  return Array.isArray(data.orders) ? data.orders : [];
 }
 
 async function renderRecentTasks(){
@@ -17600,16 +17296,7 @@ async function renderRecentTasks(){
     return;
   }
 
-  if(!db){
-    el.innerHTML =
-      '系統尚未連線，請稍後再試。';
-    return;
-  }
-
-  if(
-    !userId ||
-    userId === 'web-order'
-  ){
+  if(!userId){
     el.innerHTML =
       '會員資料載入中，請稍後再查看最近任務。';
     return;
@@ -17641,133 +17328,38 @@ async function renderRecentTasks(){
 }
 
 function renderCustomerActiveTask(){
-  const el =
-    qs('activeTaskText');
-
-  if(!el){
-    return;
-  }
-
-  if(!db){
-    el.innerHTML =
-      '系統尚未連線，請稍後再試。';
-    return;
-  }
-
-  if(
-    !userId ||
-    userId === 'web-order'
-  ){
-    el.innerHTML =
-      '會員資料載入中，請稍後再查看任務。';
-    return;
-  }
+  const el = qs('activeTaskText');
+  if(!el) return;
 
   if(customerActiveOrdersUnsubscribe){
-    try{
-      customerActiveOrdersUnsubscribe();
-    }catch(e){}
-
+    try{ customerActiveOrdersUnsubscribe(); }catch(_){ }
     customerActiveOrdersUnsubscribe = null;
   }
 
-  el.innerHTML =
-    '正在即時讀取進行中任務...';
+  let stopped = false;
+  let inFlight = false;
+  let timer = null;
 
-  customerActiveOrdersUnsubscribe =
-    db
-      .collection('orders')
-      .where(
-        'userId',
-        '==',
-        userId
-      )
-      .where(
-        'status',
-        'in',
-        [
-          'pending_payment',
-          'pending_dispatch',
-          'pending_schedule',
-          'scheduled_reserved',
-          'scheduled_confirmed',
-          'merchant_pending',
-          'accepted',
-          'arrived_pickup',
-          'picked_up',
-          'arrived_dropoff'
-        ]
-      )
-      .limit(30)
-      .onSnapshot(
-        snapshot => {
+  const refresh = async () => {
+    if(stopped || inFlight || document.visibilityState === 'hidden') return;
+    inFlight = true;
+    try{
+      const data = await customerApiFetch('/api/customer/orders?status=active&limit=30');
+      renderOrderList(el, Array.isArray(data.orders) ? data.orders : [], '目前沒有進行中的任務。');
+    }catch(error){
+      if(error.status !== 401) el.innerHTML = '進行中任務讀取失敗，請稍後再試。';
+    }finally{
+      inFlight = false;
+    }
+  };
 
-          const orders = [];
-
-          snapshot.forEach(doc =>
-            orders.push({
-              id:doc.id,
-              ...doc.data()
-            })
-          );
-
-          orders.sort((a, b) => {
-
-            const getTime = order => {
-              const value =
-                order.createdAt ||
-                order.updatedAt;
-
-              if(!value){
-                return 0;
-              }
-
-              if(value.toDate){
-                return value
-                  .toDate()
-                  .getTime();
-              }
-
-              return new Date(value)
-                .getTime() || 0;
-            };
-
-            return getTime(b) - getTime(a);
-          });
-
-          renderOrderList(
-            el,
-            orders,
-            '目前沒有進行中的任務。'
-          );
-        },
-
-        err => {
-
-          console.error(
-            '即時讀取進行中任務失敗:',
-            err
-          );
-
-          el.innerHTML =
-            '進行中任務即時讀取失敗，請稍後再試。';
-        }
-      );
-}
-
-function isCountableMemberTask(order){
-  const status =
-    String(
-      order?.status ||
-      ''
-    ).trim();
-
-  return ![
-    'cancelled',
-    'canceled',
-    'quote_only',
-    'draft_confirm'
-  ].includes(status);
+  el.innerHTML = '正在讀取進行中任務...';
+  refresh();
+  timer = setInterval(refresh, 8000);
+  customerActiveOrdersUnsubscribe = () => {
+    stopped = true;
+    if(timer) clearInterval(timer);
+  };
 }
 
 function getMemberLevelText(taskCount){
@@ -17790,80 +17382,10 @@ function getMemberLevelText(taskCount){
 }
 
 async function loadCustomerMemberStats(){
-  if(
-    !db ||
-    !userId ||
-    userId === 'web-order'
-  ){
-    return {
-      taskCount:0,
-      couponCount:0
-    };
-  }
-
-  const orderMap =
-    new Map();
-
-  const results =
-    await Promise.allSettled([
-      db
-        .collection('orders')
-        .where(
-          'userId',
-          '==',
-          userId
-        )
-        .limit(100)
-        .get(),
-
-      db
-        .collection('orders')
-        .where(
-          'customerId',
-          '==',
-          userId
-        )
-        .limit(100)
-        .get()
-    ]);
-
-  results.forEach(result => {
-
-    if(result.status !== 'fulfilled'){
-
-      console.warn(
-        '會員任務統計查詢失敗:',
-        result.reason
-      );
-
-      return;
-    }
-
-    result.value.forEach(doc => {
-
-      orderMap.set(
-        doc.id,
-        {
-          id:doc.id,
-          ...doc.data()
-        }
-      );
-
-    });
-  });
-
-  const orders =
-    Array.from(
-      orderMap.values()
-    );
-
+  const data = await customerApiFetch('/api/customer/orders?limit=100');
   return {
-    taskCount:
-      orders
-        .filter(isCountableMemberTask)
-        .length,
-
-    couponCount:0
+    taskCount:Number(data.stats?.taskCount || 0),
+    couponCount:Number(data.stats?.couponCount || 0)
   };
 }
 
@@ -17882,17 +17404,12 @@ async function renderCustomerMemberInfo(){
 
   if(info){
 
-    info.innerText =
-      userId &&
-      userId !== 'web-order'
-        ? '會員資料已載入｜可使用 UBee 跑腿服務'
-        : '會員資料載入中';
+    info.innerText = userId
+      ? `${currentCustomer?.name || 'UBee 會員'}｜${currentCustomer?.memberNumber || '會員資料已載入'}`
+      : '會員資料載入中';
   }
 
-  if(
-    !userId ||
-    userId === 'web-order'
-  ){
+  if(!userId){
 
     if(count){
       count.innerText = '0';
@@ -18235,168 +17752,7 @@ function clearSavedAddress(){
   );
 }
 
-async function initMerchantContext(){
-  const params =
-    new URLSearchParams(
-      window.location.search
-    );
 
-  const merchantId =
-    params.get('merchantId');
-
-  if(!merchantId || !db){
-    return;
-  }
-
-  try{
-    const doc =
-      await db
-        .collection('merchants')
-        .doc(merchantId)
-        .get();
-
-    if(!doc.exists){
-
-      alert(
-        '找不到合作店家資料，請確認連結是否正確。'
-      );
-
-      return;
-    }
-
-    const merchant = {
-      id:doc.id,
-      ...doc.data()
-    };
-
-    if(
-      merchant.status !== 'active' &&
-      merchant.status !== 'approved' &&
-      merchant.approved !== true
-    ){
-
-      alert(
-        '此合作店家目前尚未開放接單。'
-      );
-
-      return;
-    }
-
-    merchantMode = true;
-    currentMerchant = merchant;
-
-    if(qs('merchantInfoBox')){
-
-      qs('merchantInfoBox')
-        .classList
-        .remove('hidden');
-
-      qs('merchantInfoBox').innerHTML = `
-        <div class="merchant-card-title">
-          目前合作店家
-        </div>
-
-        <div class="merchant-card-name">
-          ${escapeHtml(
-            merchant.merchantName ||
-            merchant.name ||
-            '合作店家'
-          )}
-        </div>
-
-        <div class="merchant-card-text">
-          店家代碼：
-          ${escapeHtml(
-            merchant.merchantId ||
-            merchant.id ||
-            ''
-          )}
-          <br>
-
-          店家類型：
-          ${escapeHtml(
-            merchant.merchantType ||
-            merchant.businessType ||
-            ''
-          )}
-          <br>
-
-          店家地址：
-          ${escapeHtml(
-            merchant.merchantAddress ||
-            merchant.pickupAddress ||
-            ''
-          )}
-        </div>
-      `;
-    }
-
-    const buyTab =
-      Array
-        .from(
-          document.querySelectorAll(
-            '.category-tab'
-          )
-        )
-        .find(
-          btn =>
-            btn.textContent.includes(
-              '幫代買'
-            )
-        );
-
-    selectServiceFromTab(
-      buyTab,
-      'buy'
-    );
-
-    if(
-      merchant.merchantAddress ||
-      merchant.pickupAddress
-    ){
-
-      qs('pickup').value =
-        merchant.merchantAddress ||
-        merchant.pickupAddress ||
-        '';
-
-      resetPickupGeo();
-    }
-
-    if(
-      merchant.merchantPhone ||
-      merchant.phone
-    ){
-
-      qs('pickupPhone').value =
-        merchant.merchantPhone ||
-        merchant.phone ||
-        '';
-    }
-
-    clearRoutePreview();
-
-    invalidateQuote();
-
-    if(
-      qs('pickup')?.value.trim() &&
-      qs('dropoff')?.value.trim()
-    ){
-      scheduleRouteAndQuoteRefresh(120);
-    }
-
-  }catch(err){
-
-    console.error(
-      '讀取合作店家失敗:',
-      err
-    );
-
-    alert(
-      '合作店家資料讀取失敗，請稍後再試。'
-    );
-  }
-}
 
 
 function clearHomeNearbyRiderMarkers(){
@@ -18758,392 +18114,87 @@ window.addEventListener('pageshow', () => {
 });
 
 async function initPage(){
-  const submitBtn =
-    qs('createOrderBtn');
-
-  // 即時服務狀態獨立載入，不等待 LIFF 或地圖完成。
+  const submitBtn = qs('createOrderBtn');
   startHomeServiceStatusRefresh();
 
-  function setSubmitButton(text, disabled){
-    if(!submitBtn){
-      return;
-    }
-
-    submitBtn.disabled =
-      disabled;
-
-    submitBtn.innerText =
-      text;
-  }
-
-  function timeout(ms, message){
-    return new Promise(
-      (_, reject) => {
-
-        setTimeout(
-          () =>
-            reject(
-              new Error(message)
-            ),
-          ms
-        );
-
-      }
-    );
-  }
-
-  function getCachedLineUserId(){
-    return String(
-      localStorage.getItem(
-        'ubee_customer_line_user_id'
-      ) || ''
-    ).trim();
-  }
-
-  function saveLineUserId(id){
-    if(
-      id &&
-      String(id).startsWith('U')
-    ){
-      localStorage.setItem(
-        'ubee_customer_line_user_id',
-        id
-      );
-    }
-  }
+  const setSubmitButton = (text, disabled) => {
+    if(!submitBtn) return;
+    submitBtn.disabled = disabled;
+    submitBtn.innerText = text;
+  };
 
   try{
-    setSubmitButton(
-      '準備中...',
-      true
-    );
+    setSubmitButton('正在確認會員身分...', true);
 
-    const cachedUserId =
-      getCachedLineUserId();
+    const [authData, configResponse] = await Promise.all([
+      customerApiFetch('/api/customer-auth/me'),
+      fetch('/api/config', { cache:'no-store', credentials:'include' })
+    ]);
 
-    const configRes =
-      await Promise.race([
-        fetch(
-          '/api/config',
-          {
-            cache:'no-store'
-          }
-        ),
+    if(!authData.authenticated || !authData.customer?.customerId){
+      redirectToCustomerLogin();
+      return;
+    }
 
-        timeout(
-          10000,
-          '取得 LIFF 設定逾時'
-        )
-      ]);
+    currentCustomer = authData.customer;
+    userId = String(currentCustomer.customerId || '');
 
-    const cfg =
-      await configRes.json();
+    const cfg = await configResponse.json().catch(() => ({}));
+    googleMapsApiKey = String(cfg.googleMapsApiKey || '').trim();
+    googleMapsMapId = String(cfg.googleMapsMapId || '').trim();
 
-    liffId =
-      cfg.liffId || '';
-
-    googleMapsApiKey =
-      String(
-        cfg.googleMapsApiKey || ''
-      ).trim();
-
-    googleMapsMapId =
-      String(
-        cfg.googleMapsMapId || ''
-      ).trim();
+    document.documentElement.classList.remove('ubee-auth-pending');
+    setSubmitButton('確認並建立任務', false);
+    renderCustomerMemberInfo();
+    handleInitialOpenAction();
 
     if(googleMapsApiKey){
-
       loadGoogleMapsApi()
         .then(async () => {
-
-          console.log(
-            '✅ UBee 客戶端地圖基礎層準備完成',
-            {
-              hasMapId:
-                !!googleMapsMapId
-            }
-          );
-
           try{
             await ensureCustomerMapReady();
-
             await requestCurrentLocationForMap();
             await detectServiceCityFromCurrentLocation();
-
-          }catch(err){
-
-            console.warn(
-              '⚠️ UBee 首頁地圖初始化失敗，但不影響下單：',
-              err
-            );
+          }catch(error){
+            console.warn('UBee 首頁地圖初始化失敗：', error);
           }
         })
-        .catch(err => {
-
-          console.warn(
-            '⚠️ Google Maps 暫時無法載入，但不影響下單流程：',
-            err
-          );
-        });
-
-    }else{
-
-      console.warn(
-        '⚠️ /api/config 沒有回傳 googleMapsApiKey，地圖功能暫時不啟用'
-      );
+        .catch(error => console.warn('Google Maps 暫時無法載入：', error));
     }
-
-    if(
-      window.liff &&
-      liffId
-    ){
-
-      await Promise.race([
-        liff.init({
-          liffId
-        }),
-
-        timeout(
-          10000,
-          'LIFF 初始化逾時'
-        )
-      ]);
-
-      if(liff.isLoggedIn()){
-
-        const profile =
-          await Promise.race([
-            liff.getProfile(),
-
-            timeout(
-              10000,
-              '取得 LINE 使用者資料逾時'
-            )
-          ]);
-
-        userId =
-          profile.userId || '';
-
-        if(
-          userId &&
-          userId.startsWith('U')
-        ){
-
-          saveLineUserId(
-            userId
-          );
-
-          setSubmitButton(
-            '確認並建立任務',
-            false
-          );
-
-          renderCustomerMemberInfo();
-
-          handleInitialOpenAction();
-
-          return;
-        }
-      }
-
-      if(
-        cachedUserId &&
-        cachedUserId.startsWith('U')
-      ){
-
-        userId =
-          cachedUserId;
-
-        setSubmitButton(
-          '確認並建立任務',
-          false
-        );
-
-        renderCustomerMemberInfo();
-
-        handleInitialOpenAction();
-
-        return;
-      }
-
-      setSubmitButton(
-        '準備中...',
-        true
-      );
-
-      liff.login({
-        redirectUri:
-          window.location.href
-      });
-
-      return;
-    }
-
-    if(
-      cachedUserId &&
-      cachedUserId.startsWith('U')
-    ){
-
-      userId =
-        cachedUserId;
-
-      setSubmitButton(
-        '確認並建立任務',
-        false
-      );
-
-      renderCustomerMemberInfo();
-
-      handleInitialOpenAction();
-
-      return;
-    }
-
-    setSubmitButton(
-      '請重新開啟下單頁',
-      true
-    );
-
-    console.warn(
-      '客人端初始化尚未完成，請重新開啟下單頁。'
-    );
-
-  }catch(err){
-
-    console.warn(
-      'LIFF 初始化失敗:',
-      err
-    );
-
-    const cachedUserId =
-      String(
-        localStorage.getItem(
-          'ubee_customer_line_user_id'
-        ) || ''
-      ).trim();
-
-    if(
-      cachedUserId &&
-      cachedUserId.startsWith('U')
-    ){
-
-      userId =
-        cachedUserId;
-
-      setSubmitButton(
-        '確認並建立任務',
-        false
-      );
-
-      renderCustomerMemberInfo();
-
-      handleInitialOpenAction();
-
-      return;
-    }
-
-    setSubmitButton(
-      '請重新開啟下單頁',
-      true
-    );
-
-    console.warn(
-      '客人端初始化尚未完成，請重新開啟下單頁。'
-    );
+  }catch(error){
+    if(error.status === 401 || error.code === 'CUSTOMER_LOGIN_REQUIRED') return;
+    console.error('UBee 會員初始化失敗：', error);
+    showCustomerAuthConnectionError(error.message || '無法連線至 UBee 會員系統。');
   }
 }
 
 async function initCachedOrder(){
-  const cachedOrderId =
-    localStorage.getItem(
-      'ubee_current_order_id'
-    ) || '';
-
-  if(
-    !cachedOrderId ||
-    !db
-  ){
-    return;
-  }
+  const cachedOrderId = String(localStorage.getItem('ubee_current_order_id') || '').trim().toUpperCase();
+  if(!cachedOrderId) return;
 
   try{
-    const doc =
-      await db
-        .collection('orders')
-        .doc(cachedOrderId)
-        .get();
-
-    if(!doc.exists){
-
-      console.warn(
-        '本機快取訂單已不存在，清除快取:',
-        cachedOrderId
-      );
-
-      clearCurrentOrderCache();
-
-      showOnlyStep(1);
-
-      return;
-    }
-
-    const order = {
-      id:doc.id,
-      ...doc.data()
-    };
-
-    const cachedStatus = String(order.status || '').trim().toLowerCase();
-    if (['completed', 'done', 'cancelled', 'canceled'].includes(cachedStatus)) {
-      console.log('✅ 上一筆訂單已結束，清除本機追蹤快取：', cachedOrderId);
+    const data = await customerApiFetch(`/api/orders/${encodeURIComponent(cachedOrderId)}?t=${Date.now()}`);
+    const order = { ...(data.summary || {}), id:cachedOrderId };
+    const status = String(order.status || '').toLowerCase();
+    if(['completed','done','cancelled','canceled'].includes(status)){
       clearCurrentOrderCache();
       showOnlyStep(1);
       return;
     }
 
-    currentOrderId =
-      doc.id;
-
-    currentOrderData =
-      order;
-
-    setOrderNo(currentOrderId);
-
+    currentOrderId = cachedOrderId;
+    currentOrderData = order;
+    setOrderNo(cachedOrderId);
     showOnlyStep(5);
-
-    renderTimeline(
-      order.status ||
-      'pending_payment',
-      order
-    );
-
-    startOrderListener(
-      currentOrderId
-    );
-
-    if(
-      !isPaymentChangeLocked(order) &&
-      (
-        order.status ||
-        'pending_payment'
-      ) === 'pending_payment'
-    ){
-      selectPaymentMethod('cash');
+    renderTimeline(order.status || 'pending_payment', order);
+    startOrderListener(cachedOrderId);
+  }catch(error){
+    if(error.status === 404){
+      clearCurrentOrderCache();
+      showOnlyStep(1);
+    }else if(error.status !== 401){
+      console.warn('讀取本機快取訂單失敗：', error);
     }
-
-    }catch(err){
-
-    console.warn(
-      '檢查快取訂單失敗，暫時保留本機訂單:',
-      err
-    );
-
-    currentOrderId =
-      cachedOrderId;
-
-    setOrderNo(
-      cachedOrderId
-    );
   }
 }
 
@@ -19236,18 +18287,19 @@ updateStickyEstimate();
 
 showOnlyStep(1);
 
-initMerchantContext();
 
-initPage();
-
-initCachedOrder();
-UBeeEnhancements.init();
+initPage().then(() => {
+  if(userId){
+    initCachedOrder();
+    UBeeEnhancements.init();
+  }
+});
 
 /* =========================================================
    UBee 客人端｜行動網路受阻／斷線韌性層 2026-07-20
    - 只做狀態保護與恢復同步，不改動既有訂單／付款流程
    - 斷線時禁止建立新訂單，避免請求結果不明造成重複下單
-   - 已存在訂單保留本機 orderId，恢復連線後重新接上 Firestore 追蹤
+   - 已存在訂單保留本機 orderId，恢復連線後重新接上訂單狀態同步
    ========================================================= */
 (function initUBeeCustomerNetworkResilience(){
   let reconnectTimer = null;
@@ -19351,7 +18403,7 @@ UBeeEnhancements.init();
 
 /* =========================================================
    UBee 第三階段｜客戶即時追蹤一致性層 2026-07-27
-   - Firestore 即時監聽為主，後端追蹤摘要 API 為斷線／回前景備援。
+   - 以會員 API 輪詢訂單狀態，追蹤摘要 API 作為網路恢復與前景同步備援。
    - 兩者都只更新既有 Step 5，不改下單、付款、取消與派單核心。
    ========================================================= */
 (function initUBeeCustomerTrackingPhase3(){
@@ -19481,7 +18533,7 @@ UBeeEnhancements.init();
     };
   }
 
-  function handleOrder(order, source='firestore'){
+  function handleOrder(order, source='api'){
     if(!order) return;
     lastTrackingUpdateAtMs = Date.now();
     saveTrackingCache(order);
@@ -19491,11 +18543,10 @@ UBeeEnhancements.init();
 
   async function fetchTrackingSummary(orderId,{silent=false}={}){
     const id = safeText(orderId || currentOrderId).toUpperCase();
-    const customerId = safeText(userId);
-    if(!id || !/^U[a-zA-Z0-9]{20,}$/.test(customerId) || !navigator.onLine) return null;
+    if(!id || !navigator.onLine) return null;
     const seq = ++fallbackRequestSeq;
     try{
-      const response = await fetch(`/api/customer/orders/${encodeURIComponent(id)}/tracking?userId=${encodeURIComponent(customerId)}&t=${Date.now()}`,{cache:'no-store'});
+      const response = await fetch(`/api/customer/orders/${encodeURIComponent(id)}/tracking?t=${Date.now()}`,{cache:'no-store',credentials:'include'});
       const data = await response.json().catch(()=>({}));
       if(seq !== fallbackRequestSeq) return null;
       if(!response.ok || data.success === false || !data.tracking) throw new Error(data.error || '追蹤資料讀取失敗');
@@ -19533,7 +18584,7 @@ UBeeEnhancements.init();
   if(typeof originalRenderTimelinePhase3 === 'function'){
     renderTimeline = function(status,order){
       const result = originalRenderTimelinePhase3.apply(this,arguments);
-      handleOrder(order || currentOrderData || {status},'firestore');
+      handleOrder(order || currentOrderData || {status},'api');
       return result;
     };
   }
@@ -19908,6 +18959,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
           <div id="flowProfileAddressesList" class="flow-profile-list"><div class="flow-empty">正在讀取常用地址…</div></div>
         </div>
         <button id="flowProfileSupport" class="flow-secondary" type="button">聯繫 UBee 客服</button>
+        <button id="flowProfileLogout" class="flow-secondary" type="button">登出 UBee 帳號</button>
       </div>
     </section>
 
@@ -19960,38 +19012,16 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function cleanPhone(value){return String(value||'').replace(/\D/g,'').slice(0,10)}
   function validPoint(point){return point&&Number.isFinite(Number(point.lat))&&Number.isFinite(Number(point.lng))&&Number(point.lat)>=-90&&Number(point.lat)<=90&&Number(point.lng)>=-180&&Number(point.lng)<=180}
   function getUserId(){
-    try{
-      const profileId=typeof liffProfile!=='undefined'?liffProfile?.userId:'';
-      const candidates=[
-        typeof userId!=='undefined'?userId:'',
-        typeof liffUserId!=='undefined'?liffUserId:'',
-        profileId,
-        localStorage.getItem('ubee_customer_line_user_id')||'',
-        localStorage.getItem('lineUserId')||''
-      ];
-      return String(candidates.find(value=>String(value||'').trim().startsWith('U'))||'').trim();
-    }catch(_){return''}
+    return String(userId || currentCustomer?.customerId || '').trim();
   }
 
   async function resolveCustomerIdForSubmit(){
-    let id=getUserId();
-    if(id.startsWith('U'))return id;
-    try{
-      if(window.liff&&typeof liff.isLoggedIn==='function'&&liff.isLoggedIn()&&typeof liff.getProfile==='function'){
-        const profile=await Promise.race([
-          liff.getProfile(),
-          new Promise((_,reject)=>setTimeout(()=>reject(new Error('CUSTOMER_SESSION_TIMEOUT')),3500))
-        ]);
-        id=String(profile?.userId||'').trim();
-        if(id.startsWith('U')){
-          try{userId=id}catch(_){ }
-          try{if(typeof saveLineUserId==='function')saveLineUserId(id)}catch(_){ }
-          try{localStorage.setItem('ubee_customer_line_user_id',id)}catch(_){ }
-          return id;
-        }
-      }
-    }catch(error){console.warn('客人資料自動確認失敗：',error)}
-    return getUserId();
+    const id = getUserId();
+    if(!id){
+      redirectToCustomerLogin();
+      throw new Error('請先登入 UBee 會員帳號。');
+    }
+    return id;
   }
   function activeOrder(){try{const s=String(currentOrderData?.status||'').toLowerCase();return !!currentOrderId&&!['completed','done','cancelled','canceled'].includes(s)}catch(_){return false}}
 
@@ -20079,11 +19109,15 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function openAddress(target){state.addressTarget=target;state.searchItems=[];state.quickAddressTab='saved';status('flowSearchStatus','');$('flowSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';$('flowAddressSearch').value='';$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;setQuickAddressTab('saved');showPage('search');loadAddresses();setTimeout(()=>$('flowAddressSearch').focus(),80)}
 
   async function loadAddresses(){
-    const uid=getUserId();
     let saved=[],recent=[];
-    if(uid.startsWith('U')){
-      try{const [a,b]=await Promise.all([fetch(`/api/customer/addresses?userId=${encodeURIComponent(uid)}`,{cache:'no-store'}),fetch(`/api/customer/recent-addresses?userId=${encodeURIComponent(uid)}`,{cache:'no-store'})]);const ad=await a.json().catch(()=>({}));const rd=await b.json().catch(()=>({}));saved=Array.isArray(ad.addresses)?ad.addresses:[];recent=Array.isArray(rd.addresses)?rd.addresses:[];}catch(error){console.warn('讀取常用地址失敗：',error)}
-    }
+    try{
+      const [ad,rd]=await Promise.all([
+        customerApiFetch('/api/customer/addresses'),
+        customerApiFetch('/api/customer/recent-addresses')
+      ]);
+      saved=Array.isArray(ad.addresses)?ad.addresses:[];
+      recent=Array.isArray(rd.addresses)?rd.addresses:[];
+    }catch(error){console.warn('讀取常用地址失敗：',error)}
     if(!saved.length){try{const local=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');saved=Array.isArray(local)?local:[]}catch(_){}}
     state.savedAddresses=saved;state.recentAddresses=recent;
     renderAddressList('flowSavedAddresses',saved,'saved','尚未儲存常用地址',4);
@@ -20176,8 +19210,10 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   }
 
   async function persistAddress(item){
-    const uid=getUserId();
-    if(uid.startsWith('U')){try{const response=await fetch('/api/customer/addresses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:uid,address:item})});const data=await response.json().catch(()=>({}));if(response.ok&&data.success)return}catch(error){console.warn('跨裝置地址儲存失敗：',error)}}
+    try{
+      await customerApiFetch('/api/customer/addresses',{method:'POST',body:JSON.stringify({address:item})});
+      return;
+    }catch(error){console.warn('跨裝置地址儲存失敗：',error)}
     try{const list=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');const arr=Array.isArray(list)?list:[];arr.unshift({...item,id:`local_${Date.now()}`});localStorage.setItem('ubee_uu_local_addresses_v1',JSON.stringify(arr.slice(0,20)))}catch(_){ }
   }
 
@@ -20280,7 +19316,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     if(state.submitting)return;if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
     syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
     try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
-    const uid=await resolveCustomerIdForSubmit();if(!uid.startsWith('U')){status('flowConfirmStatus','目前無法建立任務，請關閉頁面後重新開啟再試。',true);return}
+    const uid=await resolveCustomerIdForSubmit();if(!/^customer_[a-f0-9]{32}$/.test(uid)){status('flowConfirmStatus','會員登入狀態失效，請重新登入後再試。',true);return}
     state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
     try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');await createOrder();if(typeof currentOrderId!=='undefined'&&currentOrderId){root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true)}finally{state.submitting=false;setLoading(false)}
   }
@@ -20390,7 +19426,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
   async function renderProfile(){
     showPage('profile');
-    const displayName=String(typeof liffProfile!=='undefined'?(liffProfile?.displayName||''):'').trim();
+    const displayName=String(currentCustomer?.name || '').trim();
     $('flowProfileName').textContent=displayName||'UBee 客戶';
     $('flowProfileSubtext').textContent='任務與常用資料集中在這裡';
     $('flowOpenActiveOrder').hidden=!activeOrder();
@@ -20421,7 +19457,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     const cityButton=$('flowCityButton'),text=$('flowLocationText');cityButton.textContent='正在取得位置…';text.textContent='正在確認目前服務地區';
     if(!navigator.geolocation){cityButton.textContent='選擇服務地區';text.textContent='請手動選擇服務地區';return}
     navigator.geolocation.getCurrentPosition(async position=>{
-      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';text.textContent=loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`;if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'}
+      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';text.textContent=loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`;if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'}
     },()=>{cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
   }
 
@@ -20444,9 +19480,9 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
     $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];status('flowSearchStatus','');$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;$('flowSearchResults').innerHTML='';setQuickAddressTab(state.quickAddressTab)});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);root.querySelectorAll('[data-address-tab]').forEach(btn=>btn.addEventListener('click',()=>setQuickAddressTab(btn.dataset.addressTab)));
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
-    $('flowUseProfileName').addEventListener('click',()=>{try{$('flowDetailName').value=String(typeof liffProfile!=='undefined'?(liffProfile?.displayName||''):'')}catch(_){ }});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
+    $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
     $('flowProfileTasksList').addEventListener('click',event=>{const btn=event.target.closest('[data-profile-order-index]');if(btn)openProfileOrderDetail(btn.dataset.profileOrderIndex)});
-    $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavMy').addEventListener('click',renderProfile);const openSupport=()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}};$('flowSupportButton').addEventListener('click',openSupport);$('flowProfileSupportIcon').addEventListener('click',openSupport);$('flowProfileSupport').addEventListener('click',openSupport);$('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
+    $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavMy').addEventListener('click',renderProfile);const openSupport=()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}};$('flowSupportButton').addEventListener('click',openSupport);$('flowProfileSupportIcon').addEventListener('click',openSupport);$('flowProfileSupport').addEventListener('click',openSupport);$('flowProfileLogout').addEventListener('click',async()=>{if(!confirm('確定要登出 UBee 帳號嗎？'))return;try{await customerApiFetch('/api/customer-auth/logout',{method:'POST',body:JSON.stringify({})})}catch(error){console.warn('登出失敗：',error)}finally{localStorage.removeItem('ubee_current_order_id');window.location.replace('/customer-auth.html?mode=login')}});$('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
   buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();detectLocation();
