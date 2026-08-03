@@ -5,19 +5,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
-  <link rel="manifest" href="/manifest-order.json?v=20260803-1">
-  <link rel="apple-touch-icon" sizes="180x180" href="/ubee-customer-icon-180.png?v=20260803-1">
-  <link rel="icon" type="image/png" sizes="192x192" href="/ubee-customer-icon-192.png?v=20260803-1">
-  <link rel="icon" type="image/png" sizes="512x512" href="/ubee-customer-icon-512.png?v=20260803-1">
+  <link rel="manifest" href="/manifest-order.json?v=2">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="UBee 跑腿">
-  <meta name="theme-color" content="#facc15">
+  <meta name="apple-mobile-web-app-title" content="UBee">
+  <meta name="theme-color" content="#ffffff">
 
   <title>UBee 跑腿｜全台城市切換＋五步驟下單流程</title>
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
@@ -8790,131 +8788,9 @@ body{background:#eef0f2;}
     }
   </style>
 
-
-<style id="ubee-customer-account-style">
-  .ubee-account-bar{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);z-index:1200;width:min(94vw,500px);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid rgba(17,17,17,.1);border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 10px 30px rgba(0,0,0,.12);backdrop-filter:blur(16px)}
-  .ubee-account-bar[hidden]{display:none!important}.ubee-account-copy{min-width:0}.ubee-account-copy strong{display:block;font-size:14px}.ubee-account-copy span{display:block;color:#666;font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ubee-account-btn{border:0;border-radius:12px;background:#facc15;color:#111;padding:10px 14px;font-weight:1000;white-space:nowrap}
-  .ubee-auth-overlay{position:fixed;inset:0;z-index:3000;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.48);padding:16px}.ubee-auth-overlay.show{display:flex}
-  .ubee-auth-card{width:min(100%,480px);max-height:92dvh;overflow:auto;background:#fff;border-radius:28px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.3)}
-  .ubee-auth-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.ubee-auth-head h2{margin:0;font-size:24px}.ubee-auth-close{border:0;background:#f1f2f3;width:40px;height:40px;border-radius:50%;font-size:24px}
-  .ubee-auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}.ubee-auth-tab{border:1px solid #ddd;background:#fff;border-radius:13px;padding:11px;font-weight:900}.ubee-auth-tab.active{background:#111;color:#fff;border-color:#111}
-  .ubee-auth-field{display:grid;gap:7px;margin:12px 0}.ubee-auth-field label{font-weight:900}.ubee-auth-field input{width:100%;border:1px solid #d8dadd;border-radius:14px;padding:13px 14px;font-size:16px}
-  .ubee-auth-submit{width:100%;border:0;border-radius:15px;background:#facc15;padding:14px;font-size:16px;font-weight:1000;margin-top:8px}.ubee-auth-status{min-height:24px;margin-top:10px;font-size:14px;color:#666}.ubee-auth-status.error{color:#c62828}
-  .ubee-install-hint{position:fixed;right:14px;bottom:calc(92px + env(safe-area-inset-bottom));z-index:1100;border:0;border-radius:999px;background:#111;color:#fff;padding:11px 15px;font-weight:900;box-shadow:0 10px 26px rgba(0,0,0,.2)}
-  @media(min-width:700px){.ubee-auth-overlay{align-items:center}}
-</style>
-
 </head>
 
 <body>
-
-<div id="ubeeCustomerAccountBar" class="ubee-account-bar" hidden>
-  <div class="ubee-account-copy"><strong id="ubeeCustomerAccountTitle">登入 UBee</strong><span id="ubeeCustomerAccountText">註冊或登入後即可正式建立任務</span></div>
-  <button id="ubeeCustomerAccountButton" class="ubee-account-btn" type="button">登入／註冊</button>
-</div>
-<button id="ubeeCustomerInstallButton" class="ubee-install-hint" type="button" hidden>安裝 UBee 跑腿</button>
-<div id="ubeeCustomerAuthOverlay" class="ubee-auth-overlay" role="dialog" aria-modal="true" aria-labelledby="ubeeAuthTitle">
-  <div class="ubee-auth-card">
-    <div class="ubee-auth-head"><div><h2 id="ubeeAuthTitle">UBee 會員</h2><div style="color:#666;margin-top:5px">不再需要 LINE 登入</div></div><button id="ubeeAuthClose" class="ubee-auth-close" type="button" aria-label="關閉">×</button></div>
-    <div class="ubee-auth-tabs"><button class="ubee-auth-tab active" data-auth-mode="login" type="button">登入</button><button class="ubee-auth-tab" data-auth-mode="register" type="button">註冊</button></div>
-    <form id="ubeeCustomerAuthForm">
-      <div id="ubeeRegisterNameField" class="ubee-auth-field" hidden><label for="ubeeRegisterName">姓名</label><input id="ubeeRegisterName" autocomplete="name" maxlength="40" placeholder="請輸入姓名"></div>
-      <div class="ubee-auth-field"><label for="ubeeAuthPhone">手機號碼</label><input id="ubeeAuthPhone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="09xxxxxxxx" required></div>
-      <div class="ubee-auth-field"><label for="ubeeAuthPassword">密碼</label><input id="ubeeAuthPassword" type="password" autocomplete="current-password" minlength="8" maxlength="72" placeholder="至少 8 個字元" required></div>
-      <button id="ubeeAuthSubmit" class="ubee-auth-submit" type="submit">登入 UBee</button>
-      <div id="ubeeAuthStatus" class="ubee-auth-status" aria-live="polite"></div>
-    </form>
-  </div>
-</div>
-
-<script id="ubee-customer-account-script">
-(() => {
-  'use strict';
-  const TOKEN_KEY='ubee_customer_session_token';
-  const ACCOUNT_KEY='ubee_customer_account_id';
-  let mode='login';
-  let deferredInstallPrompt=null;
-  const $=id=>document.getElementById(id);
-
-  function setMode(next){
-    mode=next==='register'?'register':'login';
-    document.querySelectorAll('[data-auth-mode]').forEach(btn=>btn.classList.toggle('active',btn.dataset.authMode===mode));
-    $('ubeeRegisterNameField').hidden=mode!=='register';
-    $('ubeeAuthSubmit').textContent=mode==='register'?'建立 UBee 帳號':'登入 UBee';
-    $('ubeeAuthPassword').autocomplete=mode==='register'?'new-password':'current-password';
-    setStatus('');
-  }
-  function setStatus(text,error=false){const el=$('ubeeAuthStatus');if(!el)return;el.textContent=text;el.classList.toggle('error',!!error)}
-  function open(next='login'){$('ubeeCustomerAuthOverlay')?.classList.add('show');setMode(next);setTimeout(()=>$('ubeeAuthPhone')?.focus(),80)}
-  function close(){$('ubeeCustomerAuthOverlay')?.classList.remove('show')}
-  function showBar(){
-    const bar=$('ubeeCustomerAccountBar'); if(bar) bar.hidden=false;
-    const accountId=localStorage.getItem(ACCOUNT_KEY)||'';
-    if(accountId){$('ubeeCustomerAccountTitle').textContent='UBee 會員已登入';$('ubeeCustomerAccountText').textContent=accountId;$('ubeeCustomerAccountButton').textContent='我的帳戶'}
-  }
-  function hideBar(){const bar=$('ubeeCustomerAccountBar');if(bar)bar.hidden=true}
-  async function restoreSession(){
-    const token=localStorage.getItem(TOKEN_KEY)||'';
-    if(!token){showBar();return null}
-    try{
-      const res=await fetch('/api/customer-auth/session',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'});
-      const data=await res.json().catch(()=>({}));
-      if(!res.ok||!data.success) throw new Error(data.message||'登入已失效');
-      localStorage.setItem(ACCOUNT_KEY,data.customer.customerId);
-      localStorage.setItem('ubee_customer_line_user_id',data.customer.customerId);
-      hideBar();
-      return data.customer;
-    }catch(error){
-      localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(ACCOUNT_KEY);localStorage.removeItem('ubee_customer_line_user_id');showBar();return null;
-    }
-  }
-  async function submit(event){
-    event.preventDefault();
-    const phone=String($('ubeeAuthPhone').value||'').replace(/\D/g,'');
-    const password=String($('ubeeAuthPassword').value||'');
-    const name=String($('ubeeRegisterName').value||'').trim();
-    if(!/^09\d{8}$/.test(phone)){setStatus('請輸入正確的台灣手機號碼。',true);return}
-    if(password.length<8){setStatus('密碼至少需要 8 個字元。',true);return}
-    if(mode==='register'&&!name){setStatus('請輸入姓名。',true);return}
-    const button=$('ubeeAuthSubmit');button.disabled=true;setStatus(mode==='register'?'正在建立帳號…':'正在登入…');
-    try{
-      const res=await fetch(`/api/customer-auth/${mode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,password})});
-      const data=await res.json().catch(()=>({}));
-      if(!res.ok||!data.success) throw new Error(data.message||'操作失敗');
-      localStorage.setItem(TOKEN_KEY,data.sessionToken);
-      localStorage.setItem(ACCOUNT_KEY,data.customer.customerId);
-      localStorage.setItem('ubee_customer_line_user_id',data.customer.customerId);
-      window.userId=data.customer.customerId;
-      close();hideBar();setStatus('');
-      document.dispatchEvent(new CustomEvent('ubee:customer-authenticated',{detail:data.customer}));
-      location.reload();
-    }catch(error){setStatus(error.message||'系統忙碌中，請稍後再試。',true)}
-    finally{button.disabled=false}
-  }
-
-  window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;const b=$('ubeeCustomerInstallButton');if(b)b.hidden=false});
-  window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;const b=$('ubeeCustomerInstallButton');if(b)b.hidden=true});
-  async function install(){
-    if(deferredInstallPrompt){deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;return}
-    const isiOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
-    alert(isiOS?'請點 Safari 下方「分享」按鈕，再選擇「加入主畫面」。':'請開啟瀏覽器選單，選擇「安裝應用程式」或「加到主畫面」。');
-  }
-
-  window.UBeeCustomerAuth={open,close,showBar,hideBar,restoreSession};
-  document.addEventListener('DOMContentLoaded',()=>{
-    $('ubeeCustomerAccountButton')?.addEventListener('click',()=>open('login'));
-    $('ubeeAuthClose')?.addEventListener('click',close);
-    $('ubeeCustomerAuthOverlay')?.addEventListener('click',event=>{if(event.target===$('ubeeCustomerAuthOverlay'))close()});
-    document.querySelectorAll('[data-auth-mode]').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.authMode)));
-    $('ubeeCustomerAuthForm')?.addEventListener('submit',submit);
-    $('ubeeCustomerInstallButton')?.addEventListener('click',install);
-    if('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(err=>console.error('UBee 用戶端 Service Worker 註冊失敗',err));
-    if(new URLSearchParams(location.search).get('install')==='1'){const b=$('ubeeCustomerInstallButton');if(b)b.hidden=false;}
-  });
-})();
-</script>
-
   <div class="app">
 
     <div
@@ -18876,51 +18752,299 @@ window.addEventListener('pageshow', () => {
 });
 
 async function initPage(){
-  const submitBtn = qs('createOrderBtn');
+  const submitBtn =
+    qs('createOrderBtn');
+
+  // 即時服務狀態獨立載入，不等待 LIFF 或地圖完成。
   startHomeServiceStatusRefresh();
 
   function setSubmitButton(text, disabled){
-    if(!submitBtn) return;
-    submitBtn.disabled = disabled;
-    submitBtn.innerText = text;
+    if(!submitBtn){
+      return;
+    }
+
+    submitBtn.disabled =
+      disabled;
+
+    submitBtn.innerText =
+      text;
+  }
+
+  function timeout(ms, message){
+    return new Promise(
+      (_, reject) => {
+
+        setTimeout(
+          () =>
+            reject(
+              new Error(message)
+            ),
+          ms
+        );
+
+      }
+    );
+  }
+
+  function getCachedLineUserId(){
+    return String(
+      localStorage.getItem(
+        'ubee_customer_line_user_id'
+      ) || ''
+    ).trim();
+  }
+
+  function saveLineUserId(id){
+    if(
+      id &&
+      String(id).startsWith('U')
+    ){
+      localStorage.setItem(
+        'ubee_customer_line_user_id',
+        id
+      );
+    }
   }
 
   try{
-    setSubmitButton('準備中...', true);
-    const configRes = await fetch('/api/config', {cache:'no-store'});
-    const cfg = await configRes.json();
-    googleMapsApiKey = String(cfg.googleMapsApiKey || '').trim();
-    googleMapsMapId = String(cfg.googleMapsMapId || '').trim();
+    setSubmitButton(
+      '準備中...',
+      true
+    );
+
+    const cachedUserId =
+      getCachedLineUserId();
+
+    const configRes =
+      await Promise.race([
+        fetch(
+          '/api/config',
+          {
+            cache:'no-store'
+          }
+        ),
+
+        timeout(
+          10000,
+          '取得 LIFF 設定逾時'
+        )
+      ]);
+
+    const cfg =
+      await configRes.json();
+
+    liffId =
+      cfg.liffId || '';
+
+    googleMapsApiKey =
+      String(
+        cfg.googleMapsApiKey || ''
+      ).trim();
+
+    googleMapsMapId =
+      String(
+        cfg.googleMapsMapId || ''
+      ).trim();
 
     if(googleMapsApiKey){
-      loadGoogleMapsApi().then(async()=>{
-        try{
-          await ensureCustomerMapReady();
-          await requestCurrentLocationForMap();
-          await detectServiceCityFromCurrentLocation();
-        }catch(err){
-          console.warn('⚠️ UBee 首頁地圖初始化失敗，但不影響下單：', err);
-        }
-      }).catch(err=>console.warn('⚠️ Google Maps 暫時無法載入：',err));
+
+      loadGoogleMapsApi()
+        .then(async () => {
+
+          console.log(
+            '✅ UBee 客戶端地圖基礎層準備完成',
+            {
+              hasMapId:
+                !!googleMapsMapId
+            }
+          );
+
+          try{
+            await ensureCustomerMapReady();
+
+            await requestCurrentLocationForMap();
+            await detectServiceCityFromCurrentLocation();
+
+          }catch(err){
+
+            console.warn(
+              '⚠️ UBee 首頁地圖初始化失敗，但不影響下單：',
+              err
+            );
+          }
+        })
+        .catch(err => {
+
+          console.warn(
+            '⚠️ Google Maps 暫時無法載入，但不影響下單流程：',
+            err
+          );
+        });
+
+    }else{
+
+      console.warn(
+        '⚠️ /api/config 沒有回傳 googleMapsApiKey，地圖功能暫時不啟用'
+      );
     }
 
-    const account = await window.UBeeCustomerAuth?.restoreSession();
-    if(account?.customerId){
-      userId = account.customerId;
-      localStorage.setItem('ubee_customer_account_id', account.customerId);
-      localStorage.setItem('ubee_customer_line_user_id', account.customerId);
-      setSubmitButton('確認並建立任務', false);
-      renderCustomerMemberInfo();
-    }else{
-      userId = '';
-      setSubmitButton('登入後建立任務', false);
-      window.UBeeCustomerAuth?.showBar();
+    if(
+      window.liff &&
+      liffId
+    ){
+
+      await Promise.race([
+        liff.init({
+          liffId
+        }),
+
+        timeout(
+          10000,
+          'LIFF 初始化逾時'
+        )
+      ]);
+
+      if(liff.isLoggedIn()){
+
+        const profile =
+          await Promise.race([
+            liff.getProfile(),
+
+            timeout(
+              10000,
+              '取得 LINE 使用者資料逾時'
+            )
+          ]);
+
+        userId =
+          profile.userId || '';
+
+        if(
+          userId &&
+          userId.startsWith('U')
+        ){
+
+          saveLineUserId(
+            userId
+          );
+
+          setSubmitButton(
+            '確認並建立任務',
+            false
+          );
+
+          renderCustomerMemberInfo();
+
+          handleInitialOpenAction();
+
+          return;
+        }
+      }
+
+      if(
+        cachedUserId &&
+        cachedUserId.startsWith('U')
+      ){
+
+        userId =
+          cachedUserId;
+
+        setSubmitButton(
+          '確認並建立任務',
+          false
+        );
+
+        renderCustomerMemberInfo();
+
+        handleInitialOpenAction();
+
+        return;
+      }
+
+      setSubmitButton(
+        '準備中...',
+        true
+      );
+
+      liff.login({
+        redirectUri:
+          window.location.href
+      });
+
+      return;
     }
-    handleInitialOpenAction();
+
+    if(
+      cachedUserId &&
+      cachedUserId.startsWith('U')
+    ){
+
+      userId =
+        cachedUserId;
+
+      setSubmitButton(
+        '確認並建立任務',
+        false
+      );
+
+      renderCustomerMemberInfo();
+
+      handleInitialOpenAction();
+
+      return;
+    }
+
+    setSubmitButton(
+      '請重新開啟下單頁',
+      true
+    );
+
+    console.warn(
+      '客人端初始化尚未完成，請重新開啟下單頁。'
+    );
+
   }catch(err){
-    console.warn('UBee 用戶端初始化失敗：', err);
-    setSubmitButton('重新整理後再試', true);
-    window.UBeeCustomerAuth?.showBar();
+
+    console.warn(
+      'LIFF 初始化失敗:',
+      err
+    );
+
+    const cachedUserId =
+      String(
+        localStorage.getItem(
+          'ubee_customer_line_user_id'
+        ) || ''
+      ).trim();
+
+    if(
+      cachedUserId &&
+      cachedUserId.startsWith('U')
+    ){
+
+      userId =
+        cachedUserId;
+
+      setSubmitButton(
+        '確認並建立任務',
+        false
+      );
+
+      renderCustomerMemberInfo();
+
+      handleInitialOpenAction();
+
+      return;
+    }
+
+    setSubmitButton(
+      '請重新開啟下單頁',
+      true
+    );
+
+    console.warn(
+      '客人端初始化尚未完成，請重新開啟下單頁。'
+    );
   }
 }
 
@@ -19836,7 +19960,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
         typeof userId!=='undefined'?userId:'',
         typeof liffUserId!=='undefined'?liffUserId:'',
         profileId,
-        localStorage.getItem('ubee_customer_account_id')||'',
         localStorage.getItem('ubee_customer_line_user_id')||'',
         localStorage.getItem('lineUserId')||''
       ];
@@ -19845,10 +19968,32 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   }
 
   async function resolveCustomerIdForSubmit(){
-    const id=getUserId();
-    if(id.startsWith('U')) return id;
-    window.UBeeCustomerAuth?.open('login');
-    return '';
+    let id=getUserId();
+    if(id.startsWith('U'))return id;
+    try{
+      if(window.liff&&typeof liff.isLoggedIn==='function'&&liff.isLoggedIn()&&typeof liff.getProfile==='function'){
+        const profile=await Promise.race([
+          liff.getProfile(),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error('CUSTOMER_SESSION_TIMEOUT')),3500))
+        ]);
+        id=String(profile?.userId||'').trim();
+        if(id.startsWith('U')){
+          try{userId=id}catch(_){ }
+          try{if(typeof saveLineUserId==='function')saveLineUserId(id)}catch(_){ }
+          try{localStorage.setItem('ubee_customer_line_user_id',id)}catch(_){ }
+          return id;
+        }
+      }
+    }catch(error){console.warn('客人資料自動確認失敗：',error)}
+    return getUserId();
+  }
+  function activeOrder(){try{const s=String(currentOrderData?.status||'').toLowerCase();return !!currentOrderId&&!['completed','done','cancelled','canceled'].includes(s)}catch(_){return false}}
+
+  function buildProgress(){
+    document.querySelectorAll('#productionOrderFlow .flow-progress').forEach(bar=>{
+      const active=Number(bar.dataset.progress||0);
+      bar.innerHTML=['地點','任務內容','配送設定','確認送出'].map((label,index)=>`<div class="flow-progress-item ${index===active?'active':index<active?'done':''}" data-number="${index+1}">${label}</div>`).join('');
+    });
   }
 
   function showPage(name){
@@ -20129,7 +20274,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     if(state.submitting)return;if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
     syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
     try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
-    const uid=await resolveCustomerIdForSubmit();if(!uid.startsWith('U')){status('flowConfirmStatus','請先登入或註冊 UBee 會員後再建立任務。',true);return}
+    const uid=await resolveCustomerIdForSubmit();if(!uid.startsWith('U')){status('flowConfirmStatus','目前無法建立任務，請關閉頁面後重新開啟再試。',true);return}
     state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
     try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');await createOrder();if(typeof currentOrderId!=='undefined'&&currentOrderId){root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true)}finally{state.submitting=false;setLoading(false)}
   }
@@ -20310,7 +20455,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())showFlow({fresh:true})});
 })();
 </script>
-
 
 </body>
 </html>
