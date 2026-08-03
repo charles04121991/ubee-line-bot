@@ -10788,6 +10788,176 @@ function serializeDispatchIncident(doc) {
 // ============================================================
 // UBee 調度中心：即時監控 Dashboard API
 // 僅恢復調度中心讀取資料，不修改派單／接單／財務核心流程。
+
+// ============================================================
+// UBee 用戶端會員系統｜手機號碼＋密碼｜正式營運版
+// 不再依賴 LINE LIFF 登入。
+// ============================================================
+const CUSTOMER_ACCOUNTS_COLLECTION = 'customerAccountsV1';
+const CUSTOMER_SESSIONS_COLLECTION = 'customerSessionsV1';
+const CUSTOMER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function normalizeCustomerPhone(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 10);
+}
+
+function customerPhoneDocId(phone) {
+  return crypto.createHash('sha256').update(phone).digest('hex');
+}
+
+function createCustomerId() {
+  return `U${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
+}
+
+function hashCustomerPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return { salt, hash };
+}
+
+function verifyCustomerPassword(password, salt, expectedHash) {
+  try {
+    const actual = crypto.scryptSync(String(password), String(salt), 64);
+    const expected = Buffer.from(String(expectedHash), 'hex');
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+  } catch (_) {
+    return false;
+  }
+}
+
+async function createCustomerSession(account) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const nowMs = Date.now();
+  await db.collection(CUSTOMER_SESSIONS_COLLECTION).doc(tokenHash).set({
+    customerId: account.customerId,
+    phone: account.phone,
+    accountDocId: account.accountDocId,
+    createdAtMs: nowMs,
+    expiresAtMs: nowMs + CUSTOMER_SESSION_TTL_MS,
+    lastSeenAtMs: nowMs
+  });
+  return token;
+}
+
+function customerAuthToken(req) {
+  const authorization = String(req.headers.authorization || '');
+  if (/^Bearer\s+/i.test(authorization)) return authorization.replace(/^Bearer\s+/i, '').trim();
+  return String(req.headers['x-ubee-customer-token'] || '').trim();
+}
+
+async function readCustomerSession(req) {
+  const token = customerAuthToken(req);
+  if (!token) return null;
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const ref = db.collection(CUSTOMER_SESSIONS_COLLECTION).doc(tokenHash);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const session = snap.data() || {};
+  if (Number(session.expiresAtMs || 0) <= Date.now()) {
+    await ref.delete().catch(() => {});
+    return null;
+  }
+  await ref.set({ lastSeenAtMs: Date.now() }, { merge: true }).catch(() => {});
+  return { tokenHash, ref, ...session };
+}
+
+app.post('/api/customer-auth/register', async (req, res) => {
+  try {
+    const name = cleanText(req.body?.name || '', 40);
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    const password = String(req.body?.password || '');
+    if (!name) return res.status(400).json({ success:false, message:'請輸入姓名。' });
+    if (!/^09\d{8}$/.test(phone)) return res.status(400).json({ success:false, message:'請輸入正確的台灣手機號碼。' });
+    if (password.length < 8 || password.length > 72) return res.status(400).json({ success:false, message:'密碼長度需為 8 到 72 個字元。' });
+
+    const accountDocId = customerPhoneDocId(phone);
+    const ref = db.collection(CUSTOMER_ACCOUNTS_COLLECTION).doc(accountDocId);
+    const existing = await ref.get();
+    if (existing.exists) return res.status(409).json({ success:false, message:'這個手機號碼已經註冊，請直接登入。' });
+
+    const customerId = createCustomerId();
+    const passwordData = hashCustomerPassword(password);
+    const nowMs = Date.now();
+    const account = {
+      accountDocId,
+      customerId,
+      name,
+      phone,
+      passwordSalt: passwordData.salt,
+      passwordHash: passwordData.hash,
+      status: 'active',
+      createdAtMs: nowMs,
+      updatedAtMs: nowMs,
+      authVersion: 1
+    };
+    await ref.create(account);
+    const sessionToken = await createCustomerSession(account);
+    return res.status(201).json({
+      success:true,
+      sessionToken,
+      customer:{ customerId, name, phone }
+    });
+  } catch (error) {
+    console.error('❌ customer register error:', error);
+    return res.status(500).json({ success:false, message:'註冊失敗，請稍後再試。' });
+  }
+});
+
+app.post('/api/customer-auth/login', async (req, res) => {
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    const password = String(req.body?.password || '');
+    if (!/^09\d{8}$/.test(phone) || !password) return res.status(400).json({ success:false, message:'手機號碼或密碼不正確。' });
+    const accountDocId = customerPhoneDocId(phone);
+    const snap = await db.collection(CUSTOMER_ACCOUNTS_COLLECTION).doc(accountDocId).get();
+    if (!snap.exists) return res.status(401).json({ success:false, message:'手機號碼或密碼不正確。' });
+    const account = { accountDocId, ...snap.data() };
+    if (account.status !== 'active') return res.status(403).json({ success:false, message:'此帳號目前無法登入，請聯繫客服。' });
+    if (!verifyCustomerPassword(password, account.passwordSalt, account.passwordHash)) {
+      return res.status(401).json({ success:false, message:'手機號碼或密碼不正確。' });
+    }
+    const sessionToken = await createCustomerSession(account);
+    await snap.ref.set({ lastLoginAtMs: Date.now(), updatedAtMs: Date.now() }, { merge:true });
+    return res.json({
+      success:true,
+      sessionToken,
+      customer:{ customerId:account.customerId, name:account.name, phone:account.phone }
+    });
+  } catch (error) {
+    console.error('❌ customer login error:', error);
+    return res.status(500).json({ success:false, message:'登入失敗，請稍後再試。' });
+  }
+});
+
+app.get('/api/customer-auth/session', async (req, res) => {
+  try {
+    const session = await readCustomerSession(req);
+    if (!session) return res.status(401).json({ success:false, message:'登入已失效，請重新登入。' });
+    const snap = await db.collection(CUSTOMER_ACCOUNTS_COLLECTION).doc(session.accountDocId).get();
+    if (!snap.exists) return res.status(401).json({ success:false, message:'找不到會員帳號。' });
+    const account = snap.data() || {};
+    if (account.status !== 'active') return res.status(403).json({ success:false, message:'此帳號目前無法使用。' });
+    return res.json({
+      success:true,
+      customer:{ customerId:account.customerId, name:account.name, phone:account.phone }
+    });
+  } catch (error) {
+    console.error('❌ customer session error:', error);
+    return res.status(500).json({ success:false, message:'讀取登入狀態失敗。' });
+  }
+});
+
+app.post('/api/customer-auth/logout', async (req, res) => {
+  try {
+    const session = await readCustomerSession(req);
+    if (session?.ref) await session.ref.delete().catch(() => {});
+    return res.json({ success:true });
+  } catch (error) {
+    return res.json({ success:true });
+  }
+});
+
+
 // 必須放在 express.static(...) 之前。
 // ============================================================
 app.get('/api/dispatch/dashboard', async (req, res) => {
@@ -23845,58 +24015,7 @@ app.get('/api/merchant/v3/settlements', async (req, res) => {
 });
 
 
-
-// =====================================================
-// UBee Customer Account V1：手機 OTP＋密碼會員制
-// 正式環境需設定 CUSTOMER_OTP_WEBHOOK_URL；未設定時 production 不會洩漏驗證碼。
-// =====================================================
-const CUSTOMER_COLLECTION = 'customersV1';
-const CUSTOMER_OTP_COLLECTION = 'customerOtpChallengesV1';
-const CUSTOMER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CUSTOMER_OTP_TTL_MS = 5 * 60 * 1000;
-
-function normalizeCustomerPhone(value){
-  const digits=String(value||'').replace(/\D/g,'');
-  if(/^09\d{8}$/.test(digits)) return digits;
-  if(/^8869\d{8}$/.test(digits)) return `0${digits.slice(3)}`;
-  return '';
-}
-function customerPhoneKey(phone){return crypto.createHash('sha256').update(phone).digest('hex');}
-function customerSecret(){return String(process.env.CUSTOMER_SESSION_SECRET||process.env.LINE_CHANNEL_SECRET||process.env.FIREBASE_PRIVATE_KEY||'').trim();}
-function b64url(input){return Buffer.from(input).toString('base64url');}
-function createCustomerSession(customer){
-  const secret=customerSecret(); if(!secret) throw new Error('CUSTOMER_SESSION_SECRET_NOT_CONFIGURED');
-  const payload={sub:customer.id,phone:customer.phone,role:'customer',iat:Date.now(),exp:Date.now()+CUSTOMER_SESSION_TTL_MS};
-  const body=b64url(JSON.stringify(payload));
-  const sig=crypto.createHmac('sha256',secret).update(body).digest('base64url');
-  return `${body}.${sig}`;
-}
-function verifyCustomerSession(token){
-  try{const [body,sig]=String(token||'').split('.');if(!body||!sig)return null;const secret=customerSecret();if(!secret)return null;const expected=crypto.createHmac('sha256',secret).update(body).digest('base64url');if(sig.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(expected)))return null;const p=JSON.parse(Buffer.from(body,'base64url').toString('utf8'));if(p.role!=='customer'||Number(p.exp||0)<Date.now())return null;return p;}catch(_){return null;}
-}
-function passwordHash(password,salt=crypto.randomBytes(16).toString('hex')){const hash=crypto.scryptSync(String(password),salt,64).toString('hex');return `${salt}:${hash}`;}
-function passwordMatches(password,stored){try{const [salt,hash]=String(stored||'').split(':');const actual=crypto.scryptSync(String(password),salt,64);const expected=Buffer.from(hash,'hex');return actual.length===expected.length&&crypto.timingSafeEqual(actual,expected);}catch(_){return false;}}
-async function customerAuthMiddleware(req,res,next){
-  const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'').trim();const session=verifyCustomerSession(token);
-  if(!session)return res.status(401).json({success:false,code:'AUTH_REQUIRED',message:'請先登入或註冊 UBee 帳號後再繼續。'});
-  const doc=await db.collection(CUSTOMER_COLLECTION).doc(session.sub).get();if(!doc.exists)return res.status(401).json({success:false,code:'ACCOUNT_NOT_FOUND',message:'找不到此帳號，請重新登入。'});
-  const customer={id:doc.id,...doc.data()};if(customer.accountStatus!=='active')return res.status(403).json({success:false,code:'ACCOUNT_UNAVAILABLE',message:'此帳號目前無法使用，請聯繫 UBee 客服。'});
-  if(customer.phoneVerified!==true)return res.status(403).json({success:false,code:'PHONE_VERIFICATION_REQUIRED',message:'請先完成手機驗證。'});
-  req.customer=customer;req.customerSession=session;next();
-}
-async function sendCustomerOtp(phone,code){
-  const webhook=String(process.env.CUSTOMER_OTP_WEBHOOK_URL||'').trim();
-  if(!webhook){if(process.env.NODE_ENV!=='production'){console.log(`[UBee DEV OTP] ${phone}: ${code}`);return {devCode:code};}throw new Error('CUSTOMER_OTP_PROVIDER_NOT_CONFIGURED');}
-  const response=await fetch(webhook,{method:'POST',headers:{'content-type':'application/json','authorization':process.env.CUSTOMER_OTP_WEBHOOK_TOKEN?`Bearer ${process.env.CUSTOMER_OTP_WEBHOOK_TOKEN}`:''},body:JSON.stringify({phone,message:`UBee 驗證碼：${code}，5 分鐘內有效。請勿提供給他人。`,code,purpose:'customer_register'})});
-  if(!response.ok)throw new Error('CUSTOMER_OTP_SEND_FAILED');return {};
-}
-app.post('/api/customer/auth/send-otp',async(req,res)=>{res.setHeader('Cache-Control','no-store');try{const phone=normalizeCustomerPhone(req.body?.phone);if(!phone)return res.status(400).json({success:false,message:'請輸入正確的台灣手機號碼。'});const key=customerPhoneKey(phone);const ref=db.collection(CUSTOMER_OTP_COLLECTION).doc(key);const old=await ref.get();const now=Date.now();const oldData=old.exists?old.data():{};if(now-Number(oldData.sentAtMs||0)<60000)return res.status(429).json({success:false,message:'請等待 60 秒後再重新取得驗證碼。'});const code=String(crypto.randomInt(100000,1000000));const salt=crypto.randomBytes(12).toString('hex');const codeHash=crypto.createHash('sha256').update(`${salt}:${code}`).digest('hex');await ref.set({phone,codeHash,salt,sentAtMs:now,expiresAtMs:now+CUSTOMER_OTP_TTL_MS,attemptCount:0,verifiedAtMs:0},{merge:true});const sent=await sendCustomerOtp(phone,code);return res.json({success:true,message:'驗證碼已發送。',retryAfterSeconds:60,...(sent.devCode?{devCode:sent.devCode}:{})});}catch(error){console.error('customer send otp',error);const provider=error.message==='CUSTOMER_OTP_PROVIDER_NOT_CONFIGURED';return res.status(provider?503:500).json({success:false,code:error.message,message:provider?'正式簡訊服務尚未設定，請先設定 CUSTOMER_OTP_WEBHOOK_URL。':'驗證碼發送失敗，請稍後再試。'});}});
-app.post('/api/customer/auth/register',async(req,res)=>{res.setHeader('Cache-Control','no-store');try{const phone=normalizeCustomerPhone(req.body?.phone),code=String(req.body?.code||'').trim(),name=String(req.body?.name||'').trim(),password=String(req.body?.password||'');if(!phone||!/^\d{6}$/.test(code))return res.status(400).json({success:false,message:'手機號碼或驗證碼格式不正確。'});if(name.length<2||name.length>30)return res.status(400).json({success:false,message:'姓名請輸入 2 至 30 個字。'});if(password.length<8||!/[A-Za-z]/.test(password)||!/[0-9]/.test(password))return res.status(400).json({success:false,message:'密碼至少 8 個字元，並包含英文與數字。'});if(req.body?.termsAccepted!==true||req.body?.privacyAccepted!==true)return res.status(400).json({success:false,message:'請先同意使用者服務條款與隱私權政策。'});const key=customerPhoneKey(phone),otpRef=db.collection(CUSTOMER_OTP_COLLECTION).doc(key),otpSnap=await otpRef.get();if(!otpSnap.exists)return res.status(400).json({success:false,message:'請先取得手機驗證碼。'});const otp=otpSnap.data(),now=Date.now();if(Number(otp.expiresAtMs||0)<now)return res.status(400).json({success:false,message:'驗證碼已失效，請重新取得。'});if(Number(otp.attemptCount||0)>=5)return res.status(429).json({success:false,message:'驗證錯誤次數過多，請重新取得驗證碼。'});const candidate=crypto.createHash('sha256').update(`${otp.salt}:${code}`).digest('hex');if(candidate!==otp.codeHash){await otpRef.set({attemptCount:Number(otp.attemptCount||0)+1},{merge:true});return res.status(400).json({success:false,message:'驗證碼不正確。'});}const existing=await db.collection(CUSTOMER_COLLECTION).where('phone','==',phone).limit(1).get();if(!existing.empty)return res.status(409).json({success:false,code:'PHONE_ALREADY_REGISTERED',message:'此手機號碼已註冊，請直接登入。'});const customerRef=db.collection(CUSTOMER_COLLECTION).doc();const customer={id:customerRef.id,name,phone,phoneNormalized:`+886${phone.slice(1)}`,phoneVerified:true,phoneVerifiedAtMs:now,passwordHash:passwordHash(password),email:String(req.body?.email||'').trim().toLowerCase(),referralCode:String(req.body?.referralCode||'').trim(),marketingConsent:req.body?.marketingConsent===true,accountStatus:'active',termsAcceptedAtMs:now,termsVersion:String(req.body?.termsVersion||'2026-08-03'),privacyAcceptedAtMs:now,privacyVersion:String(req.body?.privacyVersion||'2026-08-03'),createdAtMs:now,updatedAtMs:now,lastLoginAtMs:now};await customerRef.set(customer);await otpRef.set({verifiedAtMs:now,codeHash:'',expiresAtMs:0},{merge:true});const token=createCustomerSession(customer);return res.json({success:true,token,customer:{id:customer.id,name,phone,email:customer.email,phoneVerified:true,accountStatus:'active'}});}catch(error){console.error('customer register',error);return res.status(500).json({success:false,message:'註冊失敗，請稍後再試。'});}});
-app.post('/api/customer/auth/login',async(req,res)=>{res.setHeader('Cache-Control','no-store');try{const phone=normalizeCustomerPhone(req.body?.phone),password=String(req.body?.password||'');const snap=await db.collection(CUSTOMER_COLLECTION).where('phone','==',phone).limit(1).get();if(!phone||snap.empty)return res.status(401).json({success:false,message:'手機號碼或密碼不正確。'});const doc=snap.docs[0],customer={id:doc.id,...doc.data()};if(!passwordMatches(password,customer.passwordHash))return res.status(401).json({success:false,message:'手機號碼或密碼不正確。'});if(customer.accountStatus!=='active')return res.status(403).json({success:false,message:'此帳號目前無法登入，請聯繫 UBee 客服。'});await doc.ref.set({lastLoginAtMs:Date.now(),updatedAtMs:Date.now()},{merge:true});const token=createCustomerSession(customer);return res.json({success:true,token,customer:{id:customer.id,name:customer.name,phone:customer.phone,email:customer.email||'',phoneVerified:customer.phoneVerified===true,accountStatus:customer.accountStatus}});}catch(error){console.error('customer login',error);return res.status(500).json({success:false,message:'登入失敗，請稍後再試。'});}});
-app.get('/api/customer/auth/me',customerAuthMiddleware,(req,res)=>{res.setHeader('Cache-Control','no-store');const c=req.customer;return res.json({success:true,customer:{id:c.id,name:c.name,phone:c.phone,email:c.email||'',phoneVerified:c.phoneVerified===true,accountStatus:c.accountStatus}});});
-
-
-app.post('/api/orders', customerAuthMiddleware, async (req, res) => {
+app.post('/api/orders', async (req, res) => {
     try {
     if(!req.body || typeof req.body !== 'object'){
     return res.status(400).json({
@@ -23904,9 +24023,7 @@ app.post('/api/orders', customerAuthMiddleware, async (req, res) => {
     error:'訂單資料格式錯誤'
   });
 }
-    const data = createOrderFromApi({ ...req.body, userId: req.customer.id, customerId: req.customer.id, customerPhone: req.customer.phone, customerName: req.customer.name });
-    data.userId = req.customer.id;
-    data.customerId = req.customer.id;
+    const data = createOrderFromApi(req.body);
 
     const quoteValidation = await loadValidDynamicPricingQuote(
       req.body.quoteId || data.quoteId
