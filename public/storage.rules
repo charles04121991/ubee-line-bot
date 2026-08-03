@@ -1,0 +1,8 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 小U證件由後端 Admin SDK 存取；用戶端不得直接讀寫。
+    match /rider-documents-v2/{allPaths=**} { allow read, write: if false; }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
