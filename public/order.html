@@ -9625,14 +9625,85 @@ body{background:#eef0f2;}
     return Object.values(rules).every(Boolean);
   }
 
+  function authenticatedDestinationVisible(){
+    const flow=document.getElementById('productionOrderFlow');
+    const app=document.querySelector('body > .app');
+    const activeOrderVisible=
+      document.body.classList.contains('ubee-active-order') &&
+      app &&
+      getComputedStyle(app).display!=='none';
+    const orderFlowVisible=
+      flow &&
+      flow.classList.contains('active') &&
+      getComputedStyle(flow).display!=='none';
+    return Boolean(activeOrderVisible || orderFlowVisible);
+  }
+
+  async function ensureAuthenticatedDestination(){
+    if(authenticatedDestinationVisible()) return true;
+
+    if(typeof window.openUBeeSystemOrderFlow==='function'){
+      window.openUBeeSystemOrderFlow({fresh:false});
+    }else{
+      const flow=document.getElementById('productionOrderFlow');
+      if(flow){
+        document.body.classList.remove('ubee-active-order');
+        flow.classList.add('active');
+        document.body.classList.add('flow-active');
+      }
+    }
+
+    await new Promise(resolve =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(resolve)
+      )
+    );
+
+    return authenticatedDestinationVisible();
+  }
+
   async function finish(customer,target='order'){
     state.customer=customer||null;
-    hide();
-    if(typeof window.onUBeeCustomerAuthenticated==='function'){
-      try{ await window.onUBeeCustomerAuthenticated(state.customer,target); return; }
-      catch(error){ console.error('UBee 會員登入後初始化失敗：',error); show('login'); setStatus('ucaLoginStatus','登入成功，但用戶端初始化失敗，請重新嘗試。','error'); return; }
+    loading(true,'登入成功，正在開啟 UBee');
+
+    try{
+      if(typeof window.onUBeeCustomerAuthenticated==='function'){
+        const ready=await window.onUBeeCustomerAuthenticated(
+          state.customer,
+          target
+        );
+
+        if(ready===false){
+          throw new Error('會員資料已驗證，但用戶端尚未完成載入。');
+        }
+      }else{
+        window.location.replace('/order.html');
+        return;
+      }
+
+      const destinationReady=
+        await ensureAuthenticatedDestination();
+
+      if(!destinationReady){
+        throw new Error('UBee 用戶端畫面尚未完成載入。');
+      }
+
+      hide();
+    }catch(error){
+      console.error(
+        'UBee 會員登入後初始化失敗：',
+        error
+      );
+
+      show('login');
+      setStatus(
+        'ucaLoginStatus',
+        '登入已完成，但用戶端載入失敗。請按一次「登入 UBee」重新進入。',
+        'error'
+      );
+    }finally{
+      loading(false);
     }
-    window.location.replace('/order.html');
   }
 
   async function submitLogin(event){
@@ -19295,13 +19366,31 @@ async function activateUBeeCustomerRuntime(options = {}){
   }
 
   if(options.target === 'addresses'){
-    setTimeout(() => {
-      try{
-        window.openUBeeProfilePage?.();
-      }catch(error){
-        console.warn('UBee 常用地址頁開啟失敗：', error);
+    if(typeof window.openUBeeProfilePage === 'function'){
+      window.openUBeeProfilePage();
+    }else{
+      setTimeout(() => {
+        try{
+          window.openUBeeProfilePage?.();
+        }catch(error){
+          console.warn('UBee 常用地址頁開啟失敗：', error);
+        }
+      }, 0);
+    }
+  }else if(
+    !document.body.classList.contains('ubee-active-order')
+  ){
+    if(typeof window.openUBeeSystemOrderFlow === 'function'){
+      window.openUBeeSystemOrderFlow({fresh:false});
+    }else{
+      const flow =
+        document.getElementById('productionOrderFlow');
+
+      if(flow){
+        flow.classList.add('active');
+        document.body.classList.add('flow-active');
       }
-    }, 0);
+    }
   }
 
   return true;
@@ -20518,7 +20607,8 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   window.showProfileTab=window.openUBeeProfilePage;
   window.showTasksTab=window.openUBeeProfilePage;
   window.showCustomerSubPage=window.openUBeeProfilePage;
-  window.openUBeeSystemOrderFlow=()=>showFlow({fresh:true});
+  window.openUBeeSystemOrderFlow=(options={})=>
+    showFlow({fresh:options.fresh!==false});
   showFlow({fresh:false});
   window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())showFlow({fresh:true})});
 })();
