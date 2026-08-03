@@ -19891,6 +19891,25 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 #productionOrderFlow .ubee-my-panel-head strong{font-size:17px;font-weight:1000}
 #productionOrderFlow .ubee-my-panel-head button{border:none;background:transparent;color:#806600;font-size:12px!important;font-weight:1000}
 #productionOrderFlow .ubee-my-setting-button{width:100%;min-height:50px;border:1px solid #e7bcbc;border-radius:14px;background:#fff;color:#c52929;font-size:15px!important;font-weight:1000}
+#productionOrderFlow .ubee-my-menu-copy{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+#productionOrderFlow .ubee-my-badge{flex:0 0 auto;padding:4px 8px;border-radius:999px;background:#fff5c2;color:#725800;font-size:10px;font-weight:1000;line-height:1.2}
+#productionOrderFlow .ubee-my-info-list{display:flex;flex-direction:column;gap:9px}
+#productionOrderFlow .ubee-my-info-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:12px 13px;border:1px solid #e8eaec;border-radius:14px;background:#fff}
+#productionOrderFlow .ubee-my-info-row span{color:#858a90;font-size:12px;font-weight:850}
+#productionOrderFlow .ubee-my-info-row strong{max-width:68%;color:#111;font-size:14px;font-weight:1000;text-align:right;word-break:break-word}
+#productionOrderFlow .ubee-my-empty-state{padding:20px 14px;border:1px dashed #d9dcdf;border-radius:14px;background:#fff;color:#7d8288;font-size:13px;font-weight:850;line-height:1.7;text-align:center}
+#productionOrderFlow .ubee-my-feature-note{padding:14px;border:1px solid #eee2a9;border-radius:14px;background:#fffbed;color:#6f6240;font-size:13px;font-weight:850;line-height:1.7}
+#productionOrderFlow .ubee-my-feedback-form{display:flex;flex-direction:column;gap:12px}
+#productionOrderFlow .ubee-my-feedback-form label{display:flex;flex-direction:column;gap:7px;color:#333;font-size:13px;font-weight:1000}
+#productionOrderFlow .ubee-my-feedback-form select,
+#productionOrderFlow .ubee-my-feedback-form input,
+#productionOrderFlow .ubee-my-feedback-form textarea{width:100%;border:1px solid #dfe2e5;border-radius:13px;background:#fff;color:#111;padding:12px;font-size:16px!important;font-weight:800;outline:none}
+#productionOrderFlow .ubee-my-feedback-form textarea{min-height:118px;resize:vertical;line-height:1.65}
+#productionOrderFlow .ubee-my-feedback-form select:focus,
+#productionOrderFlow .ubee-my-feedback-form input:focus,
+#productionOrderFlow .ubee-my-feedback-form textarea:focus{border-color:#d7ad00;box-shadow:0 0 0 3px rgba(250,204,21,.18)}
+#productionOrderFlow .ubee-my-feedback-submit{width:100%;min-height:50px;border:none;border-radius:14px;background:var(--flow-accent,#facc15);color:#111;font-size:15px!important;font-weight:1000}
+#productionOrderFlow .ubee-my-feedback-status{min-height:18px;color:#73787e;font-size:12px;font-weight:850;line-height:1.5}
 @media(max-width:380px){#productionOrderFlow .ubee-my-scroll{padding-left:18px;padding-right:18px}#productionOrderFlow .ubee-my-account{grid-template-columns:minmax(0,1fr) 68px 18px}#productionOrderFlow .ubee-my-avatar{width:66px;height:66px}}
 
 </style>
@@ -20143,7 +20162,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
           <button type="button" class="ubee-my-menu-item" data-my-action="coupons"><span class="ubee-my-menu-icon">券</span><span>優惠券</span><b>›</b></button>
           <button type="button" class="ubee-my-menu-item" data-my-action="addresses"><span class="ubee-my-menu-icon">⌖</span><span>常用地址</span><b>›</b></button>
           <button type="button" class="ubee-my-menu-item" data-my-action="notifications"><span class="ubee-my-menu-icon">鈴</span><span>通知中心</span><b>›</b></button>
-          <button type="button" class="ubee-my-menu-item" data-my-action="rewards"><span class="ubee-my-menu-icon">禮</span><span>推薦獎勵</span><b>›</b></button>
+          <button type="button" class="ubee-my-menu-item" data-my-action="rewards"><span class="ubee-my-menu-icon">禮</span><span class="ubee-my-menu-copy"><span>推薦獎勵</span><small class="ubee-my-badge">即將推出</small></span><b>›</b></button>
           <button id="flowProfileSupport" type="button" class="ubee-my-menu-item" data-my-action="support"><span class="ubee-my-menu-icon">客</span><span>聯繫客服</span><b>›</b></button>
           <button type="button" class="ubee-my-menu-item" data-my-action="feedback"><span class="ubee-my-menu-icon">✎</span><span>意見回饋</span><b>›</b></button>
           <button type="button" class="ubee-my-menu-item" data-my-action="settings"><span class="ubee-my-menu-icon">⚙</span><span>設定</span><b>›</b></button>
@@ -20158,6 +20177,53 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
         <section id="ubeeMyAddressesPanel" class="ubee-my-panel" hidden>
           <div class="ubee-my-panel-head"><strong>常用地址</strong><button type="button" data-my-close>關閉</button></div>
           <div id="flowProfileAddressesList" class="flow-profile-list"><div class="flow-empty">正在讀取常用地址…</div></div>
+        </section>
+
+        <section id="ubeeMyAccountPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>會員資料</strong><button type="button" data-my-close>關閉</button></div>
+          <div class="ubee-my-info-list">
+            <div class="ubee-my-info-row"><span>會員姓名</span><strong id="ubeeMyAccountName">UBee 會員</strong></div>
+            <div class="ubee-my-info-row"><span>手機號碼</span><strong id="ubeeMyAccountPhone">尚未提供</strong></div>
+            <div class="ubee-my-info-row"><span>電子信箱</span><strong id="ubeeMyAccountEmail">尚未提供</strong></div>
+          </div>
+        </section>
+
+        <section id="ubeeMyCouponsPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>優惠券</strong><button type="button" data-my-close>關閉</button></div>
+          <div id="ubeeMyCouponsContent" class="ubee-my-empty-state">目前沒有可使用的優惠券。</div>
+        </section>
+
+        <section id="ubeeMyNotificationsPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>通知中心</strong><button type="button" data-my-close>關閉</button></div>
+          <div id="ubeeMyNotificationsContent" class="ubee-my-empty-state">目前沒有新的通知。</div>
+        </section>
+
+        <section id="ubeeMyRewardsPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>推薦獎勵</strong><button type="button" data-my-close>關閉</button></div>
+          <div class="ubee-my-feature-note"><strong>功能即將推出</strong><br>未來可在這裡查看推薦紀錄、符合資格的獎勵與活動說明。正式開放前，不會產生任何推薦獎勵。</div>
+        </section>
+
+        <section id="ubeeMyFeedbackPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>意見回饋</strong><button type="button" data-my-close>關閉</button></div>
+          <form id="ubeeMyFeedbackForm" class="ubee-my-feedback-form">
+            <label>回饋類型
+              <select id="ubeeMyFeedbackType" required>
+                <option value="使用問題">使用問題</option>
+                <option value="訂單問題">訂單問題</option>
+                <option value="功能建議">功能建議</option>
+                <option value="介面建議">介面建議</option>
+                <option value="其他意見">其他意見</option>
+              </select>
+            </label>
+            <label>回饋內容
+              <textarea id="ubeeMyFeedbackMessage" maxlength="800" required placeholder="請清楚說明你遇到的狀況或建議"></textarea>
+            </label>
+            <label>聯絡方式（選填）
+              <input id="ubeeMyFeedbackContact" maxlength="80" placeholder="手機號碼或電子信箱">
+            </label>
+            <div id="ubeeMyFeedbackStatus" class="ubee-my-feedback-status"></div>
+            <button class="ubee-my-feedback-submit" type="submit">送出意見回饋</button>
+          </form>
         </section>
 
         <section id="ubeeMySettingsPanel" class="ubee-my-panel" hidden>
@@ -20699,17 +20765,44 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       const btn=event.target.closest('[data-my-action]');
       if(!btn)return;
       const action=btn.dataset.myAction;
+      const openMyPanel=id=>{
+        closeMyPanels();
+        const panel=$(id);
+        if(!panel)return;
+        panel.hidden=false;
+        requestAnimationFrame(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}));
+      };
       if(action==='account'){
         if(!currentCustomer){root.classList.remove('active');document.body.classList.remove('flow-active');window.UBeeCustomerAuthHost?.show('login');return}
-        alert(`會員姓名：${currentCustomer.name||'UBee 會員'}\n手機號碼：${currentCustomer.phone||'尚未提供'}`);return;
+        $('ubeeMyAccountName').textContent=currentCustomer.name||'UBee 會員';
+        $('ubeeMyAccountPhone').textContent=currentCustomer.phone||'尚未提供';
+        $('ubeeMyAccountEmail').textContent=currentCustomer.email||'尚未提供';
+        openMyPanel('ubeeMyAccountPanel');return;
       }
-      if(action==='orders'){closeMyPanels();$('ubeeMyOrdersPanel').hidden=false;$('ubeeMyOrdersPanel').scrollIntoView({behavior:'smooth',block:'start'});return}
-      if(action==='addresses'){closeMyPanels();$('ubeeMyAddressesPanel').hidden=false;$('ubeeMyAddressesPanel').scrollIntoView({behavior:'smooth',block:'start'});return}
-      if(action==='settings'){closeMyPanels();$('ubeeMySettingsPanel').hidden=false;$('ubeeMySettingsPanel').scrollIntoView({behavior:'smooth',block:'start'});return}
-      if(action==='coupons'){alert('目前沒有可使用的優惠券。');return}
-      if(action==='notifications'){alert('目前沒有新的通知。');return}
-      if(action==='rewards'){alert('推薦獎勵功能準備中，開放後會在這裡顯示。');return}
-      if(action==='feedback'){location.href='mailto:service@ubee.tw?subject=UBee%20跑腿意見回饋';return}
+      if(action==='orders'){openMyPanel('ubeeMyOrdersPanel');return}
+      if(action==='addresses'){openMyPanel('ubeeMyAddressesPanel');return}
+      if(action==='settings'){openMyPanel('ubeeMySettingsPanel');return}
+      if(action==='coupons'){openMyPanel('ubeeMyCouponsPanel');return}
+      if(action==='notifications'){openMyPanel('ubeeMyNotificationsPanel');return}
+      if(action==='rewards'){openMyPanel('ubeeMyRewardsPanel');return}
+      if(action==='feedback'){
+        if(currentCustomer && !$('ubeeMyFeedbackContact').value){
+          $('ubeeMyFeedbackContact').value=currentCustomer.email||currentCustomer.phone||'';
+        }
+        openMyPanel('ubeeMyFeedbackPanel');return;
+      }
+    });
+    $('ubeeMyFeedbackForm')?.addEventListener('submit',event=>{
+      event.preventDefault();
+      const type=String($('ubeeMyFeedbackType')?.value||'其他意見').trim();
+      const message=String($('ubeeMyFeedbackMessage')?.value||'').trim();
+      const contact=String($('ubeeMyFeedbackContact')?.value||'').trim();
+      const statusEl=$('ubeeMyFeedbackStatus');
+      if(!message){if(statusEl){statusEl.textContent='請先填寫回饋內容。';statusEl.style.color='#c52929'}return}
+      const subject=encodeURIComponent(`UBee 跑腿意見回饋｜${type}`);
+      const body=encodeURIComponent(`回饋類型：${type}\n聯絡方式：${contact||'未提供'}\n會員：${currentCustomer?.name||'訪客'}\n\n回饋內容：\n${message}`);
+      if(statusEl){statusEl.textContent='即將開啟郵件 App，請確認內容後寄出。';statusEl.style.color='#73787e'}
+      window.location.href=`mailto:service@ubee.tw?subject=${subject}&body=${body}`;
     });
     $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavMy').addEventListener('click',renderProfile);const openSupport=()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}};$('flowSupportButton').addEventListener('click',openSupport);$('flowProfileSupportIcon').addEventListener('click',openSupport);$('flowProfileSupport').addEventListener('click',openSupport);$('flowProfileLogout').addEventListener('click',async()=>{if(!confirm('確定要登出 UBee 帳號嗎？'))return;try{await customerApiFetch('/api/customer-auth/logout',{method:'POST',body:JSON.stringify({})})}catch(error){console.warn('登出失敗：',error)}finally{localStorage.removeItem('ubee_current_order_id');currentCustomer=null;userId='';root.classList.remove('active');document.body.classList.remove('flow-active','ubee-active-order');window.UBeeCustomerAuthHost?.show('login')}});$('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
