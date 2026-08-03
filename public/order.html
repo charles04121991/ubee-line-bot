@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
-  <link rel="manifest" href="/manifest-order.json?v=2">
+  <link rel="manifest" href="/manifest-order.json?v=20260803">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -8788,6 +8788,11 @@ body{background:#eef0f2;}
     }
   </style>
 
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/order/ubee-order-icon-180.png?v=20260803">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/order/ubee-order-icon-192.png?v=20260803">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icons/order/ubee-order-icon-512.png?v=20260803">
+  <script defer src="/pwa-order.js?v=20260803"></script>
 </head>
 
 <body>
@@ -20453,6 +20458,35 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   window.openUBeeSystemOrderFlow=()=>showFlow({fresh:true});
   showFlow({fresh:false});
   window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())showFlow({fresh:true})});
+})();
+</script>
+
+
+<style id="ubeeCustomerAuthStyle">
+#ubeeCustomerAuth{position:fixed;inset:0;z-index:999999;display:none;align-items:flex-end;justify-content:center;background:rgba(15,23,42,.5);backdrop-filter:blur(5px)}#ubeeCustomerAuth.show{display:flex}.uca-sheet{width:min(520px,100%);max-height:92dvh;overflow:auto;background:#fff;border-radius:28px 28px 0 0;padding:22px 18px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -18px 60px #0003}.uca-head{display:flex;justify-content:space-between;gap:12px}.uca-title{font-size:25px;font-weight:1000}.uca-close{width:40px;height:40px;border:0;border-radius:50%;background:#f1f2f3;font-size:24px}.uca-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}.uca-tabs button{border:0;border-radius:14px;padding:12px;background:#f1f2f3;font-weight:900}.uca-tabs button.active{background:#111;color:#fff}.uca-pane{display:none}.uca-pane.active{display:block}.uca-field{margin:12px 0}.uca-field label{display:block;margin-bottom:6px;font-weight:900}.uca-field input{width:100%;min-height:50px;border:1px solid #d9dce0;border-radius:14px;padding:0 14px}.uca-otp{display:grid;grid-template-columns:1fr auto;gap:8px}.uca-btn{width:100%;min-height:52px;border:0;border-radius:16px;background:#facc15;font-weight:1000;font-size:16px}.uca-btn.secondary{width:auto;background:#111;color:#fff;padding:0 14px}.uca-check{display:flex;gap:8px;align-items:flex-start;margin:11px 0;font-size:14px;line-height:1.5}.uca-status{min-height:22px;margin:10px 0;color:#666;font-weight:800}.uca-status.error{color:#dc2626}.uca-account-pill{position:fixed;right:14px;bottom:calc(92px + env(safe-area-inset-bottom));z-index:8000;border:0;border-radius:999px;background:#111;color:#fff;padding:10px 14px;font-weight:900;box-shadow:0 8px 24px #0002}
+</style>
+<div id="ubeeCustomerAuth" aria-hidden="true"><div class="uca-sheet" role="dialog" aria-modal="true"><div class="uca-head"><div><div class="uca-title">UBee 會員</div><div style="color:#666;margin-top:4px">訪客可以快速估價，正式下單前必須登入。</div></div><button class="uca-close" type="button" onclick="UBeeCustomerAuth.close()">×</button></div><div class="uca-tabs"><button id="ucaTabLogin" class="active" type="button" onclick="UBeeCustomerAuth.tab('login')">登入</button><button id="ucaTabRegister" type="button" onclick="UBeeCustomerAuth.tab('register')">註冊</button></div><div id="ucaLogin" class="uca-pane active"><div class="uca-field"><label>手機號碼</label><input id="ucaLoginPhone" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="0912345678"></div><div class="uca-field"><label>密碼</label><input id="ucaLoginPassword" type="password" autocomplete="current-password" placeholder="請輸入密碼"></div><div id="ucaLoginStatus" class="uca-status"></div><button class="uca-btn" type="button" onclick="UBeeCustomerAuth.login()">登入並繼續下單</button></div><div id="ucaRegister" class="uca-pane"><div class="uca-field"><label>手機號碼</label><div class="uca-otp"><input id="ucaRegPhone" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="0912345678"><button id="ucaSendOtp" class="uca-btn secondary" type="button" onclick="UBeeCustomerAuth.sendOtp()">取得驗證碼</button></div></div><div class="uca-field"><label>簡訊驗證碼</label><input id="ucaRegCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位數驗證碼"></div><div class="uca-field"><label>姓名</label><input id="ucaRegName" maxlength="30" autocomplete="name" placeholder="請填寫真實姓名"></div><div class="uca-field"><label>設定密碼</label><input id="ucaRegPassword" type="password" autocomplete="new-password" placeholder="至少 8 字元，包含英文與數字"></div><div class="uca-field"><label>再次輸入密碼</label><input id="ucaRegPassword2" type="password" autocomplete="new-password" placeholder="再次輸入密碼"></div><label class="uca-check"><input id="ucaTerms" type="checkbox">我已閱讀並同意 UBee 使用者服務條款</label><label class="uca-check"><input id="ucaPrivacy" type="checkbox">我已閱讀並同意 UBee 隱私權政策</label><label class="uca-check"><input id="ucaMarketing" type="checkbox">我願意接收活動與優惠資訊（選填）</label><div id="ucaRegisterStatus" class="uca-status"></div><button class="uca-btn" type="button" onclick="UBeeCustomerAuth.register()">建立帳號並繼續下單</button></div></div></div>
+<button id="ucaAccountPill" class="uca-account-pill" type="button" onclick="UBeeCustomerAuth.accountClick()">登入／註冊</button>
+<script id="ubeeCustomerAuthScript">
+(function(){
+ const TOKEN='ubee_customer_token_v1',PROFILE='ubee_customer_profile_v1';let pendingAction=null;
+ const $=id=>document.getElementById(id);const status=(id,msg,error=false)=>{const el=$(id);if(el){el.textContent=msg||'';el.classList.toggle('error',!!error)}};
+ function token(){return localStorage.getItem(TOKEN)||''}function profile(){try{return JSON.parse(localStorage.getItem(PROFILE)||'null')}catch(_){return null}}
+ function save(data){localStorage.setItem(TOKEN,data.token);localStorage.setItem(PROFILE,JSON.stringify(data.customer));render()}
+ function render(){const p=profile(),b=$('ucaAccountPill');if(b)b.textContent=p?`我的｜${p.name||p.phone}`:'登入／註冊'}
+ async function api(url,options={}){const headers={'content-type':'application/json',...(options.headers||{})};if(token())headers.authorization=`Bearer ${token()}`;const r=await fetch(url,{...options,headers,cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw new Error(d.message||d.error||'操作失敗');return d}
+ window.UBeeCustomerAuth={
+  isLoggedIn:()=>!!token(),require:action=>{if(token())return true;pendingAction=action||null;UBeeCustomerAuth.open('login');return false},
+  open:p=>{$('ubeeCustomerAuth').classList.add('show');$('ubeeCustomerAuth').setAttribute('aria-hidden','false');UBeeCustomerAuth.tab(p||'login')},close:()=>{$('ubeeCustomerAuth').classList.remove('show');$('ubeeCustomerAuth').setAttribute('aria-hidden','true')},
+  tab:p=>{['login','register'].forEach(x=>{$(`uca${x[0].toUpperCase()+x.slice(1)}`).classList.toggle('active',x===p);$(`ucaTab${x[0].toUpperCase()+x.slice(1)}`).classList.toggle('active',x===p)})},
+  sendOtp:async()=>{const phone=$('ucaRegPhone').value.trim();status('ucaRegisterStatus','發送中…');try{const d=await api('/api/customer/auth/send-otp',{method:'POST',body:JSON.stringify({phone})});status('ucaRegisterStatus',d.devCode?`開發環境驗證碼：${d.devCode}`:'驗證碼已發送，請查看簡訊。');let n=60,btn=$('ucaSendOtp');btn.disabled=true;const t=setInterval(()=>{n--;btn.textContent=n>0?`${n} 秒`:'重新取得';if(n<=0){clearInterval(t);btn.disabled=false}},1000)}catch(e){status('ucaRegisterStatus',e.message,true)}},
+  register:async()=>{const password=$('ucaRegPassword').value;if(password!==$('ucaRegPassword2').value)return status('ucaRegisterStatus','兩次輸入的密碼不一致。',true);status('ucaRegisterStatus','建立帳號中…');try{const d=await api('/api/customer/auth/register',{method:'POST',body:JSON.stringify({phone:$('ucaRegPhone').value.trim(),code:$('ucaRegCode').value.trim(),name:$('ucaRegName').value.trim(),password,termsAccepted:$('ucaTerms').checked,privacyAccepted:$('ucaPrivacy').checked,marketingConsent:$('ucaMarketing').checked})});save(d);UBeeCustomerAuth.close();if(pendingAction){const fn=pendingAction;pendingAction=null;setTimeout(fn,0)}}catch(e){status('ucaRegisterStatus',e.message,true)}},
+  login:async()=>{status('ucaLoginStatus','登入中…');try{const d=await api('/api/customer/auth/login',{method:'POST',body:JSON.stringify({phone:$('ucaLoginPhone').value.trim(),password:$('ucaLoginPassword').value})});save(d);UBeeCustomerAuth.close();if(pendingAction){const fn=pendingAction;pendingAction=null;setTimeout(fn,0)}}catch(e){status('ucaLoginStatus',e.message,true)}},
+  accountClick:()=>{const p=profile();if(!p)return UBeeCustomerAuth.open('login');if(confirm(`${p.name||p.phone}\n已登入 UBee。\n\n按「確定」登出帳號。`)){localStorage.removeItem(TOKEN);localStorage.removeItem(PROFILE);render()}},token,profile
+ };
+ const nativeFetch=window.fetch.bind(window);window.fetch=function(input,init={}){try{const u=new URL(typeof input==='string'?input:input.url,location.href);if(u.origin===location.origin&&(u.pathname==='/api/orders'||u.pathname.startsWith('/api/customer/'))&&token()){init={...init,headers:{...(init.headers||{}),Authorization:`Bearer ${token()}`}}}}catch(_){}return nativeFetch(input,init)};
+ window.addEventListener('online',()=>document.body.classList.remove('ubee-offline'));window.addEventListener('offline',()=>document.body.classList.add('ubee-offline'));
+ window.addEventListener('DOMContentLoaded',()=>{render();const original=window.createOrder;if(typeof original==='function'&&!original.__customerGuard){const guarded=async function(){if(!navigator.onLine){alert('目前網路中斷，無法送出訂單。請恢復連線後重新確認價格。');return;}if(!token()){UBeeCustomerAuth.require(()=>guarded());return;}return original.apply(this,arguments)};guarded.__customerGuard=true;window.createOrder=guarded;}});
 })();
 </script>
 
