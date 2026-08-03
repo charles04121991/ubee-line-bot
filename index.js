@@ -13538,13 +13538,10 @@ app.get('/api/dispatch/orders/:orderId/events', async (req, res) => {
   }
 });
 
-app.get('/order.html', customerAuthOptional, (req, res) => {
+app.get('/order.html', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  if (!req.customerAuth) {
-    return res.redirect(302, '/customer-auth.html?mode=login&redirect=%2Forder.html');
-  }
   return res.sendFile(path.join(__dirname, 'public', 'order.html'));
 });
 
