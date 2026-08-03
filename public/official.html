@@ -10,7 +10,7 @@
   <meta name="keywords" content="UBee跑腿, 台中跑腿, 豐原跑腿, 潭子跑腿, 神岡跑腿, 大雅跑腿, 后里跑腿, 文件急送, 代送, 代買, 取件, 排隊, 急件專送, 店家外送合作" />
 
   <meta property="og:title" content="UBee 跑腿｜台中在地跑腿服務平台" />
-  <meta property="og:description" content="代送、代買、取件、排隊、文件急送、急件專送。使用網頁版 App 下單，不需下載 App" />
+  <meta property="og:description" content="代送、代買、取件、排隊、文件急送、急件專送。可安裝 UBee 跑腿 PWA，支援註冊、登入、下單與任務管理" />
   <meta property="og:type" content="website" />
 
   <style>
@@ -1527,6 +1527,26 @@
       }
     }
   </style>
+  <link rel="icon" type="image/png" sizes="192x192" href="/ubee-customer-icon-192.png?v=20260803-1">
+  <meta name="theme-color" content="#facc15">
+
+<style id="ubee-install-center-style">
+  .install-center{padding:84px 0;background:linear-gradient(180deg,#fff8da,#fff)}
+  .install-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:28px}
+  .install-card{background:#fff;border:1px solid #ececec;border-radius:30px;padding:24px;box-shadow:0 18px 48px rgba(0,0,0,.08)}
+  .install-card.dark{background:#111;color:#fff;border-color:#111}
+  .install-app-head{display:flex;align-items:center;gap:16px}.install-icon{width:86px;height:86px;border-radius:24px;object-fit:cover;box-shadow:0 10px 24px rgba(0,0,0,.16)}
+  .install-app-head h3{margin:0 0 6px;font-size:26px}.install-app-head p{margin:0;color:#666}.install-card.dark .install-app-head p{color:#c8c8c8}
+  .install-steps{margin:22px 0;display:grid;gap:10px}.install-step{display:flex;gap:12px;align-items:flex-start}.install-step b{flex:0 0 28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#facc15;color:#111}.install-step span{line-height:1.6}
+  .install-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.install-actions button,.install-actions a{border:0;border-radius:15px;padding:14px 12px;text-align:center;font-weight:1000;text-decoration:none;cursor:pointer}
+  .install-primary{background:#facc15;color:#111}.install-secondary{background:#f1f2f3;color:#111}.install-card.dark .install-secondary{background:#2a2a2a;color:#fff}
+  .official-auth-overlay{position:fixed;inset:0;z-index:5000;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.5)}.official-auth-overlay.show{display:flex}
+  .official-auth-card{width:min(100%,460px);background:#fff;border-radius:28px;padding:22px;box-shadow:0 25px 80px rgba(0,0,0,.3)}.official-auth-head{display:flex;justify-content:space-between;align-items:center}.official-auth-head h3{margin:0;font-size:24px}.official-auth-close{border:0;border-radius:50%;width:40px;height:40px;font-size:24px}
+  .official-auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}.official-auth-tab{border:1px solid #ddd;background:#fff;border-radius:13px;padding:11px;font-weight:900}.official-auth-tab.active{background:#111;color:#fff}
+  .official-auth-field{display:grid;gap:6px;margin:12px 0}.official-auth-field label{font-weight:900}.official-auth-field input{border:1px solid #d9dadd;border-radius:14px;padding:13px 14px;font-size:16px}.official-auth-submit{width:100%;border:0;border-radius:15px;padding:14px;background:#facc15;font-size:16px;font-weight:1000}.official-auth-status{min-height:24px;margin-top:10px;color:#666}.official-auth-status.error{color:#c62828}
+  @media(max-width:760px){.install-grid{grid-template-columns:1fr}.install-actions{grid-template-columns:1fr}}
+</style>
+
 </head>
 
 <body>
@@ -1549,7 +1569,7 @@
           <a href="#partner">店家合作</a>
           <a href="#faq">常見問題</a>
           <a href="#contact">聯絡我們</a>
-          <a class="nav-cta" href="https://liff.line.me/2009895876-eDSfemYo">立即下單</a>
+          <a class="nav-cta" href="/order.html">立即下單</a>
         </nav>
       </div>
     </header>
@@ -1568,11 +1588,11 @@
 
             <p class="hero-desc">
               UBee 跑腿提供代送、代買、取件、排隊、文件急送與急件專送等城市任務服務。
-              使用網頁版 App 下單，不需下載 App，讓日常任務更快速、更清楚、更有效率。
+              可安裝 UBee 跑腿 PWA，支援註冊、登入、下單與任務管理，讓日常任務更快速、更清楚、更有效率。
             </p>
 
             <div class="hero-actions">
-              <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
+              <a class="btn btn-primary" href="/order.html">
                 立即進入下單頁
               </a>
               <a class="btn btn-ghost" href="#services">
@@ -1586,7 +1606,7 @@
                 <div class="trust-label">代送、代買、取件、排隊、全能跑腿、急件專送</div>
               </div>
               <div class="trust-item">
-                <div class="trust-value">免下載</div>
+                <div class="trust-value">可安裝</div>
                 <div class="trust-label">透過網頁版 App 直接下單</div>
               </div>
               <div class="trust-item">
@@ -1600,7 +1620,7 @@
             <div class="phone-screen">
               <div class="app-head">
                 <div class="app-title">UBee 跑腿</div>
-                <div class="app-pill">免下載 App</div>
+                <div class="app-pill">可安裝 App</div>
               </div>
 
               <div class="app-card yellow">
@@ -1861,7 +1881,7 @@
               <strong>不知道該選哪一項？</strong>
               <span>先依照最接近的任務類型送出需求，UBee 跑腿會依任務內容協助確認服務方式。</span>
             </div>
-            <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
+            <a class="btn btn-primary" href="/order.html">
               立即進入下單頁
             </a>
           </div>
@@ -2004,7 +2024,7 @@
               </p>
 
               <div class="hero-actions">
-                <a class="btn btn-dark" href="https://liff.line.me/2009895876-eDSfemYo">
+                <a class="btn btn-dark" href="/order.html">
                   進入 UBee 跑腿下單頁
                 </a>
                 <a class="btn btn-dark" href="https://lin.ee/pKZCR9r">
@@ -2079,7 +2099,7 @@
 
             <details>
               <summary><span class="faq-icon">📱</span>UBee 需要下載 App 嗎？</summary>
-              <p>不需要。UBee 跑腿採用網頁版 App，下單入口可透過 LINE 開啟使用，不需要另外到 App Store 或 Google Play 下載。</p>
+              <p>不需要。UBee 跑腿採用網頁版 App，下單入口可可直接使用瀏覽器，也可依照頁面教學安裝到手機桌面。</p>
             </details>
 
             <details>
@@ -2172,7 +2192,52 @@
         </div>
       </section>
 
-      <section class="section" id="contact">
+      
+<section class="install-center" id="install">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">PWA INSTALL</div>
+      <h2>安裝 UBee 到手機桌面</h2>
+      <p>先看安裝說明，再進入對應版本。Android 可直接安裝；iPhone 請使用 Safari 的「加入主畫面」。</p>
+    </div>
+    <div class="install-grid">
+      <article class="install-card">
+        <div class="install-app-head"><img class="install-icon" src="/ubee-customer-icon-192.png" alt="UBee 跑腿用戶端圖示"><div><h3>UBee 跑腿</h3><p>用戶端｜註冊、登入、估價、下單與任務管理</p></div></div>
+        <div class="install-steps">
+          <div class="install-step"><b>1</b><span>點「查看安裝方式」，依手機系統確認步驟。</span></div>
+          <div class="install-step"><b>2</b><span>進入用戶端後，Android 點「安裝」；iPhone 點 Safari 分享後選「加入主畫面」。</span></div>
+          <div class="install-step"><b>3</b><span>安裝完成後，桌面會顯示黃色 UBee 跑腿圖示。</span></div>
+        </div>
+        <div class="install-actions"><button class="install-secondary" data-guide="customer" type="button">查看安裝方式</button><a class="install-primary" href="/order.html?install=1">開啟並安裝</a><button class="install-secondary" data-auth-open="register" type="button">免費註冊</button><button class="install-secondary" data-auth-open="login" type="button">會員登入</button></div>
+      </article>
+      <article class="install-card dark">
+        <div class="install-app-head"><img class="install-icon" src="/ubee-rider-icon-192.png" alt="UBee Driver 騎士端圖示"><div><h3>UBee Driver</h3><p>小U騎士端｜接單、導航、任務、收入與通知</p></div></div>
+        <div class="install-steps">
+          <div class="install-step"><b>1</b><span>先確認你要安裝的是黑色「UBee Driver」圖示。</span></div>
+          <div class="install-step"><b>2</b><span>進入騎士端後依瀏覽器提示安裝；iPhone 使用 Safari 加入主畫面。</span></div>
+          <div class="install-step"><b>3</b><span>完成後從桌面開啟，會直接進入騎士端。</span></div>
+        </div>
+        <div class="install-actions"><button class="install-secondary" data-guide="rider" type="button">查看安裝方式</button><a class="install-primary" href="/rider.html?install=1">開啟並安裝</a></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<div id="officialAuthOverlay" class="official-auth-overlay" role="dialog" aria-modal="true">
+  <div class="official-auth-card">
+    <div class="official-auth-head"><h3>UBee 會員</h3><button id="officialAuthClose" class="official-auth-close" type="button">×</button></div>
+    <div class="official-auth-tabs"><button class="official-auth-tab active" data-official-auth-mode="login" type="button">登入</button><button class="official-auth-tab" data-official-auth-mode="register" type="button">註冊</button></div>
+    <form id="officialAuthForm">
+      <div id="officialAuthNameField" class="official-auth-field" hidden><label for="officialAuthName">姓名</label><input id="officialAuthName" autocomplete="name" maxlength="40"></div>
+      <div class="official-auth-field"><label for="officialAuthPhone">手機號碼</label><input id="officialAuthPhone" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="09xxxxxxxx" required></div>
+      <div class="official-auth-field"><label for="officialAuthPassword">密碼</label><input id="officialAuthPassword" type="password" minlength="8" maxlength="72" required></div>
+      <button id="officialAuthSubmit" class="official-auth-submit" type="submit">登入 UBee</button>
+      <div id="officialAuthStatus" class="official-auth-status"></div>
+    </form>
+  </div>
+</div>
+
+<section class="section" id="contact">
         <div class="container">
           <div class="contact-panel">
             <div class="contact-card">
@@ -2183,13 +2248,13 @@
               </p>
 
               <div class="hero-actions">
-                <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
+                <a class="btn btn-primary" href="/order.html">
                   立即進入下單頁
                 </a>
               </div>
 
               <div class="notice">
-                UBee 跑腿使用網頁版 App 作為下單入口，使用者不需下載 App。
+                UBee 跑腿使用網頁版 App 作為下單入口，使用者可安裝到手機桌面。
               </div>
             </div>
 
@@ -2224,7 +2289,7 @@
 
                 <div class="info-row">
                   <div class="info-label">下單入口</div>
-                  <div class="info-value">https://liff.line.me/2009895876-eDSfemYo</div>
+                  <div class="info-value">/order.html</div>
                 </div>
               </div>
             </div>
@@ -2248,12 +2313,64 @@
     </footer>
 
     <div class="floating-order">
-      <a class="btn btn-primary" href="https://liff.line.me/2009895876-eDSfemYo">
+      <a class="btn btn-primary" href="/order.html">
         立即進入 UBee 跑腿下單頁
       </a>
     </div>
 
   </div>
-<a href="/order.html?auth=register" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#f8c832;color:#111;padding:14px 18px;border-radius:999px;font-weight:1000;box-shadow:0 12px 30px rgba(0,0,0,.18)">註冊／登入 UBee</a>
+
+<script id="ubee-official-pwa-script">
+(() => {
+  'use strict';
+  let authMode='login';
+  const $=id=>document.getElementById(id);
+  function platformGuide(app){
+    const isiOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isAndroid=/android/i.test(navigator.userAgent);
+    const appName=app==='rider'?'UBee Driver':'UBee 跑腿';
+    if(isiOS){alert(`${appName} 安裝方式：\n1. 請使用 Safari 開啟\n2. 點下方「分享」按鈕\n3. 選擇「加入主畫面」\n4. 確認名稱與圖示後按「加入」`);return}
+    if(isAndroid){alert(`${appName} 安裝方式：\n1. 點「開啟並安裝」\n2. 在 Chrome 點頁面上的「安裝」\n3. 若沒有按鈕，打開瀏覽器選單選「安裝應用程式」`);return}
+    alert(`${appName} 可在支援 PWA 的 Chrome、Edge 或 Safari 安裝。請開啟對應頁面後使用瀏覽器的安裝功能。`);
+  }
+  function setAuthMode(next){
+    authMode=next==='register'?'register':'login';
+    document.querySelectorAll('[data-official-auth-mode]').forEach(btn=>btn.classList.toggle('active',btn.dataset.officialAuthMode===authMode));
+    $('officialAuthNameField').hidden=authMode!=='register';
+    $('officialAuthSubmit').textContent=authMode==='register'?'建立 UBee 帳號':'登入 UBee';
+    $('officialAuthStatus').textContent='';
+  }
+  function openAuth(mode){setAuthMode(mode);$('officialAuthOverlay').classList.add('show');setTimeout(()=>$('officialAuthPhone').focus(),80)}
+  function closeAuth(){$('officialAuthOverlay').classList.remove('show')}
+  async function submitAuth(event){
+    event.preventDefault();
+    const phone=String($('officialAuthPhone').value||'').replace(/\D/g,'');
+    const password=String($('officialAuthPassword').value||'');
+    const name=String($('officialAuthName').value||'').trim();
+    const status=$('officialAuthStatus');
+    if(!/^09\d{8}$/.test(phone)){status.textContent='請輸入正確的台灣手機號碼。';status.classList.add('error');return}
+    if(password.length<8){status.textContent='密碼至少需要 8 個字元。';status.classList.add('error');return}
+    if(authMode==='register'&&!name){status.textContent='請輸入姓名。';status.classList.add('error');return}
+    const btn=$('officialAuthSubmit');btn.disabled=true;status.classList.remove('error');status.textContent='系統處理中…';
+    try{
+      const res=await fetch(`/api/customer-auth/${authMode}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,password})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||!data.success)throw new Error(data.message||'操作失敗');
+      localStorage.setItem('ubee_customer_session_token',data.sessionToken);
+      localStorage.setItem('ubee_customer_account_id',data.customer.customerId);
+      localStorage.setItem('ubee_customer_line_user_id',data.customer.customerId);
+      location.href='/order.html';
+    }catch(error){status.textContent=error.message||'系統忙碌中，請稍後再試。';status.classList.add('error')}
+    finally{btn.disabled=false}
+  }
+  document.querySelectorAll('[data-guide]').forEach(btn=>btn.addEventListener('click',()=>platformGuide(btn.dataset.guide)));
+  document.querySelectorAll('[data-auth-open]').forEach(btn=>btn.addEventListener('click',()=>openAuth(btn.dataset.authOpen)));
+  document.querySelectorAll('[data-official-auth-mode]').forEach(btn=>btn.addEventListener('click',()=>setAuthMode(btn.dataset.officialAuthMode)));
+  $('officialAuthClose')?.addEventListener('click',closeAuth);
+  $('officialAuthOverlay')?.addEventListener('click',e=>{if(e.target===$('officialAuthOverlay'))closeAuth()});
+  $('officialAuthForm')?.addEventListener('submit',submitAuth);
+})();
+</script>
+
 </body>
 </html>
