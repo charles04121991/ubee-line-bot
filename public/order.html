@@ -5,11 +5,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
-  <link rel="manifest" href="/manifest-order.json?v=2">
+  <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
+  <link rel="manifest" href="/manifest-order.json?v=20260803-1">
+  <link rel="apple-touch-icon" href="/ubee-customer-icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/ubee-customer-icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/ubee-customer-icon-512.png">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="UBee">
+  <meta name="apple-mobile-web-app-title" content="UBee 跑腿">
+  <meta name="application-name" content="UBee 跑腿">
   <meta name="theme-color" content="#ffffff">
 
   <title>UBee 跑腿｜全台城市切換＋五步驟下單流程</title>
@@ -20454,6 +20460,46 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   showFlow({fresh:false});
   window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())showFlow({fresh:true})});
 })();
+</script>
+
+
+<script data-ubee-customer-pwa="official">
+  /* UBee 跑腿用戶端 PWA｜唯一正式 Service Worker */
+  (() => {
+    'use strict';
+
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js';
+    const CUSTOMER_SW_SCOPE = '/';
+
+    if (!('serviceWorker' in navigator)) {
+      console.warn('⚠️ 此瀏覽器不支援 Service Worker。');
+      return;
+    }
+
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register(
+          CUSTOMER_SW_URL,
+          {
+            scope: CUSTOMER_SW_SCOPE,
+            updateViaCache: 'none'
+          }
+        );
+
+        await registration.update().catch(() => {});
+
+        console.log(
+          '✅ UBee 跑腿用戶端 Service Worker 已啟用：',
+          registration.scope
+        );
+      } catch (error) {
+        console.error(
+          '❌ UBee 跑腿用戶端 Service Worker 註冊失敗：',
+          error
+        );
+      }
+    });
+  })();
 </script>
 
 </body>
