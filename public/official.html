@@ -4,14 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
-  <title>UBee 跑腿｜系統化跑腿服務平台</title>
+  <title>安裝 UBee APP｜UBee 跑腿官方入口</title>
 
-  <meta name="description" content="UBee 跑腿是以台中為核心發展的系統化跑腿服務平台，提供幫我送、幫我取、幫我買、幫排隊與全能跑腿。使用手機號碼與密碼註冊登入，透過 PWA 用戶端快速估價、下單及追蹤任務。" />
+  <meta name="description" content="UBee 跑腿官方 APP 安裝入口。將 UBee 安裝到手機主畫面，即可直接快速估價、下單、查看任務與追蹤進度，不必每次回到 LINE 尋找入口。" />
   <meta name="keywords" content="UBee跑腿, 系統化跑腿平台, 台中跑腿, 跑腿PWA, 幫我送, 幫我取, 幫我買, 幫排隊, 全能跑腿, 文件急送, 代送, 代買, 任務追蹤, 快速估價" />
 
-  <meta property="og:title" content="UBee 跑腿｜系統化跑腿服務平台" />
-  <meta property="og:description" content="幫我送、幫我取、幫我買、幫排隊、全能跑腿。註冊登入後即可快速估價、下單與追蹤任務，也可加入手機主畫面使用。" />
+  <meta property="og:title" content="安裝 UBee APP｜UBee 跑腿官方入口" />
+  <meta property="og:description" content="把 UBee 安裝到手機主畫面，之後直接開啟 APP，即可快速估價、下單與追蹤任務。" />
   <meta property="og:type" content="website" />
+
+  <!-- UBee 跑腿用戶端 PWA｜正式安裝設定 -->
+  <link rel="manifest" href="/manifest-order.json?v=20260803-2" />
+  <link rel="apple-touch-icon" href="/ubee-customer-icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/ubee-customer-icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/ubee-customer-icon-512.png" />
+  <meta name="theme-color" content="#f8c832" />
+  <meta name="application-name" content="UBee 跑腿" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="UBee 跑腿" />
 
   <style>
     :root {
@@ -1649,6 +1661,428 @@
         padding-bottom: 92px;
       }
     }
+
+    /* ==============================
+       UBee APP 官方安裝入口
+       ============================== */
+
+    .install-section {
+      position: relative;
+      z-index: 8;
+      margin-top: -22px;
+      padding: 0 0 28px;
+    }
+
+    .install-panel {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 0.82fr 1.18fr;
+      gap: 28px;
+      align-items: stretch;
+      padding: 28px;
+      border: 1px solid rgba(17, 17, 17, 0.08);
+      border-radius: 34px;
+      background: #fff;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.14);
+    }
+
+    .install-panel::after {
+      content: "";
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      right: -120px;
+      top: -130px;
+      border-radius: 50%;
+      background: rgba(248, 200, 50, 0.22);
+      pointer-events: none;
+    }
+
+    .install-app-card {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 330px;
+      padding: 26px;
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at top right, rgba(248, 200, 50, 0.28), transparent 36%),
+        linear-gradient(145deg, #101010, #24200d);
+      color: #fff;
+    }
+
+    .install-app-icon {
+      width: 92px;
+      height: 92px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border-radius: 25px;
+      background: #fff;
+      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
+    }
+
+    .install-app-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .install-app-name {
+      margin-top: 22px;
+      font-size: 30px;
+      font-weight: 1000;
+      line-height: 1.16;
+      letter-spacing: -0.8px;
+    }
+
+    .install-app-sub {
+      margin-top: 8px;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .install-app-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 22px;
+    }
+
+    .install-app-badges span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .install-content {
+      position: relative;
+      z-index: 2;
+      padding: 8px 4px;
+    }
+
+    .install-kicker {
+      color: #8b6800;
+      font-size: 13px;
+      font-weight: 1000;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+    }
+
+    .install-content h2 {
+      margin: 8px 0 0;
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.1;
+      letter-spacing: -1.4px;
+      font-weight: 1000;
+    }
+
+    .install-content > p {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .install-main-action {
+      width: 100%;
+      min-height: 58px;
+      margin-top: 22px;
+      border: 0;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--yellow), #ffe28a);
+      color: #111;
+      box-shadow: 0 16px 34px rgba(248, 200, 50, 0.28);
+      font: inherit;
+      font-size: 17px;
+      font-weight: 1000;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .install-main-action:hover {
+      transform: translateY(-2px);
+    }
+
+    .install-main-action:active {
+      transform: scale(0.985);
+    }
+
+    .install-secondary-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .install-secondary-actions .btn {
+      border-radius: 18px;
+    }
+
+    .install-status {
+      min-height: 22px;
+      margin-top: 12px;
+      color: #777;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .install-benefits {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .install-benefit {
+      padding: 13px;
+      border: 1px solid #ececec;
+      border-radius: 17px;
+      background: #f8f8f8;
+    }
+
+    .install-benefit strong {
+      display: block;
+      color: #111;
+      font-size: 14px;
+      font-weight: 1000;
+    }
+
+    .install-benefit span {
+      display: block;
+      margin-top: 3px;
+      color: #777;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+
+    .line-browser-alert {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 15px;
+      border: 1px solid #f0d66c;
+      border-radius: 17px;
+      background: #fff8d9;
+      color: #5f4a00;
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1.65;
+    }
+
+    .line-browser-alert.show {
+      display: block;
+    }
+
+    .install-guide {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid #e8e8e8;
+      border-radius: 22px;
+      background: #fff;
+    }
+
+    .install-guide-title {
+      font-size: 16px;
+      font-weight: 1000;
+    }
+
+    .install-guide-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .install-guide-item {
+      padding: 14px;
+      border-radius: 17px;
+      background: #f6f6f6;
+      border: 1px solid #ededed;
+    }
+
+    .install-guide-item strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 1000;
+    }
+
+    .install-guide-item span {
+      display: block;
+      margin-top: 5px;
+      color: #666;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.6;
+    }
+
+    .install-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(0, 0, 0, 0.58);
+      backdrop-filter: blur(8px);
+    }
+
+    .install-modal.show {
+      display: flex;
+    }
+
+    .install-modal-card {
+      width: min(520px, 100%);
+      max-height: min(720px, calc(100dvh - 36px));
+      overflow: auto;
+      padding: 24px;
+      border-radius: 28px;
+      background: #fff;
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.32);
+    }
+
+    .install-modal-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .install-modal-title {
+      font-size: 24px;
+      font-weight: 1000;
+      line-height: 1.2;
+    }
+
+    .install-modal-close {
+      flex: 0 0 38px;
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 50%;
+      background: #f1f1f1;
+      color: #111;
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .install-steps {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .install-step {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid #ececec;
+      border-radius: 18px;
+      background: #fafafa;
+    }
+
+    .install-step-num {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #111;
+      color: var(--yellow);
+      font-weight: 1000;
+    }
+
+    .install-step strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 1000;
+    }
+
+    .install-step span {
+      display: block;
+      margin-top: 3px;
+      color: #666;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 860px) {
+      .install-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .install-app-card {
+        min-height: 280px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .install-section {
+        margin-top: -10px;
+        padding-top: 16px;
+      }
+
+      .install-panel {
+        gap: 18px;
+        padding: 16px;
+        border-radius: 27px;
+      }
+
+      .install-app-card {
+        min-height: 245px;
+        padding: 21px;
+        border-radius: 23px;
+      }
+
+      .install-app-icon {
+        width: 76px;
+        height: 76px;
+        border-radius: 22px;
+      }
+
+      .install-app-name {
+        font-size: 26px;
+      }
+
+      .install-content {
+        padding: 4px 2px;
+      }
+
+      .install-content h2 {
+        font-size: 34px;
+      }
+
+      .install-secondary-actions,
+      .install-benefits,
+      .install-guide-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .install-modal {
+        align-items: flex-end;
+        padding: 10px;
+      }
+
+      .install-modal-card {
+        border-radius: 25px;
+      }
+    }
+
   </style>
 </head>
 
@@ -1672,7 +2106,7 @@
           <a href="#partner">店家使用</a>
           <a href="#faq">常見問題</a>
           <a href="#contact">聯絡我們</a>
-          <a class="nav-cta user-entry" href="/order.html">UBee 用戶端</a>
+          <a class="nav-cta user-entry" href="#install-app">安裝 UBee APP</a>
           <a class="nav-cta rider-entry" href="https://ubee-rider-web.vercel.app/rider.html">加入 UBee 騎士</a>
         </nav>
       </div>
@@ -1683,24 +2117,24 @@
       <section class="hero-wrap">
         <div class="hero">
           <div>
-            <div class="eyebrow">系統化跑腿服務平台</div>
+            <div class="eyebrow">UBee APP 官方安裝入口</div>
 
             <h1>
-              生活中的大小事，<br />
-              <span class="highlight">交給 UBee。</span>
+              把 UBee 裝進手機，<br />
+              <span class="highlight">需要時直接打開。</span>
             </h1>
 
             <p class="hero-desc">
-              UBee 跑腿提供幫我送、幫我取、幫我買、幫排隊與全能跑腿等多元任務服務。
-              使用手機號碼與密碼完成註冊或登入，即可快速估價、送出任務、查看進度與管理常用資料。
+              不必再把 LINE 官方帳號當成唯一入口。將 UBee APP 安裝到手機主畫面，
+              之後直接開啟即可快速估價、下單、查看任務進度與管理會員資料。
             </p>
 
             <div class="hero-actions">
-              <a class="btn btn-primary" href="/order.html">
-                開啟 UBee 用戶端
+              <a class="btn btn-primary" href="#install-app">
+                立即安裝 UBee APP
               </a>
-              <a class="btn btn-ghost" href="https://ubee-rider-web.vercel.app/rider.html">
-                加入 UBee 騎士
+              <a class="btn btn-ghost" href="/order.html">
+                先開啟網頁版
               </a>
               <a class="btn btn-ghost" href="#services">
                 查看服務項目
@@ -1717,8 +2151,8 @@
                 <div class="trust-label">手機號碼＋密碼，登入後安全使用</div>
               </div>
               <div class="trust-item">
-                <div class="trust-value">PWA 用戶端</div>
-                <div class="trust-label">可直接開啟，也可加入手機主畫面</div>
+                <div class="trust-value">像 APP 一樣</div>
+                <div class="trust-label">安裝到手機桌面，不必每次回 LINE 找入口</div>
               </div>
             </div>
           </div>
@@ -1782,14 +2216,96 @@
         </div>
       </section>
 
+      <section class="install-section" id="install-app" aria-label="安裝 UBee APP">
+        <div class="container">
+          <div class="install-panel">
+
+            <div class="install-app-card">
+              <div>
+                <div class="install-app-icon">
+                  <img src="/ubee-customer-icon-512.png" alt="UBee 跑腿 APP 圖示" />
+                </div>
+                <div class="install-app-name">UBee 跑腿</div>
+                <div class="install-app-sub">官方用戶端｜快速估價・下單・任務追蹤</div>
+              </div>
+
+              <div class="install-app-badges">
+                <span>免應用程式商店</span>
+                <span>手機桌面直接開啟</span>
+                <span>Android・iPhone</span>
+              </div>
+            </div>
+
+            <div class="install-content">
+              <div class="install-kicker">Install UBee App</div>
+              <h2>立即安裝 UBee APP</h2>
+              <p>
+                UBee 採用 PWA 技術，不需要前往 App Store 或 Google Play。
+                完成安裝後，手機桌面會出現 UBee 圖示，以後直接點擊即可使用。
+              </p>
+
+              <div class="line-browser-alert" id="lineBrowserAlert">
+                你目前可能正在 LINE 內建瀏覽器中。請先點右上角選單，選擇「以預設瀏覽器開啟」，
+                再使用 Safari 或 Chrome 完成安裝。
+              </div>
+
+              <button class="install-main-action js-install-trigger" id="installAppButton" type="button">
+                安裝 UBee APP 到手機
+              </button>
+
+              <div class="install-secondary-actions">
+                <a class="btn btn-dark" href="/order.html">直接開啟 UBee</a>
+                <button class="btn btn-ghost js-install-guide" type="button" style="color:#111;border-color:#ddd;background:#fff;">
+                  查看安裝教學
+                </button>
+              </div>
+
+              <div class="install-status" id="installStatus" aria-live="polite">
+                正在確認你的裝置與安裝方式⋯
+              </div>
+
+              <div class="install-benefits">
+                <div class="install-benefit">
+                  <strong>入口獨立</strong>
+                  <span>不必透過 LINE 才能進入 UBee。</span>
+                </div>
+                <div class="install-benefit">
+                  <strong>快速開啟</strong>
+                  <span>從手機主畫面直接進入用戶端。</span>
+                </div>
+                <div class="install-benefit">
+                  <strong>完整功能</strong>
+                  <span>估價、下單、會員與任務進度集中管理。</span>
+                </div>
+              </div>
+
+              <div class="install-guide">
+                <div class="install-guide-title">不同手機的安裝方式</div>
+                <div class="install-guide-grid">
+                  <div class="install-guide-item">
+                    <strong>Android／Chrome</strong>
+                    <span>點擊上方「安裝 UBee APP」，依瀏覽器提示完成安裝。</span>
+                  </div>
+                  <div class="install-guide-item">
+                    <strong>iPhone／Safari</strong>
+                    <span>點 Safari 的分享按鈕，再選擇「加入主畫面」。</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       <section class="platform-entry-section" id="platform-entry" aria-label="UBee 平台入口">
         <div class="container">
           <div class="platform-entry-grid">
             <article class="platform-entry-card user">
-              <div class="platform-entry-icon">📱</div>
-              <h2>UBee 用戶端</h2>
-              <p>註冊或登入後即可快速估價、建立跑腿任務、查看任務進度，並管理會員與常用資料。</p>
-              <a class="btn btn-dark" href="/order.html">進入 UBee 用戶端</a>
+              <div class="platform-entry-icon">📲</div>
+              <h2>安裝 UBee APP</h2>
+              <p>把 UBee 加入手機主畫面，之後直接從桌面開啟，不必再回到 LINE 官方帳號尋找入口。</p>
+              <button class="btn btn-dark js-install-trigger" type="button">安裝到手機主畫面</button>
             </article>
 
             <article class="platform-entry-card rider">
@@ -2191,8 +2707,8 @@
             </div>
 
             <details>
-              <summary><span class="faq-icon">📱</span>UBee 需要下載 App 嗎？</summary>
-              <p>不需要到 App Store 或 Google Play 下載。UBee 採用 PWA 用戶端，可直接用瀏覽器開啟，也能加入手機主畫面，使用方式接近一般 App。</p>
+              <summary><span class="faq-icon">📱</span>UBee APP 要去哪裡下載？</summary>
+              <p>UBee 採用 PWA，不需要前往 App Store 或 Google Play。請在本頁點擊「安裝 UBee APP」；Android 可依瀏覽器提示安裝，iPhone 請使用 Safari 的分享功能選擇「加入主畫面」。</p>
             </details>
 
             <details>
@@ -2301,16 +2817,16 @@
               </p>
 
               <div class="hero-actions">
-                <a class="btn btn-primary" href="/order.html">
-                  UBee 用戶端
-                </a>
-                <a class="btn btn-ghost" href="https://ubee-rider-web.vercel.app/rider.html">
-                  加入 UBee 騎士
+                <button class="btn btn-primary js-install-trigger" type="button">
+                  安裝 UBee APP
+                </button>
+                <a class="btn btn-ghost" href="/order.html">
+                  直接開啟 UBee
                 </a>
               </div>
 
               <div class="notice">
-                UBee 使用 PWA 用戶端；第一次使用需註冊會員帳號，之後登入即可快速下單，也能加入手機主畫面。
+                LINE 官方帳號主要負責通知、公告與客服；UBee APP 才是快速估價、下單與查看任務的主要入口。
               </div>
             </div>
 
@@ -2373,11 +2889,265 @@
       </div>
     </footer>
 
-    <div class="floating-order" aria-label="UBee 快速入口">
-      <a class="btn btn-primary" href="/order.html">UBee 用戶端</a>
-      <a class="btn btn-dark" href="https://ubee-rider-web.vercel.app/rider.html">加入 UBee 騎士</a>
+    <div class="floating-order" aria-label="UBee APP 快速入口">
+      <button class="btn btn-primary js-install-trigger" type="button">安裝 UBee APP</button>
+      <a class="btn btn-dark" href="/order.html">直接開啟</a>
+    </div>
+
+
+    <div class="install-modal" id="installModal" role="dialog" aria-modal="true" aria-labelledby="installModalTitle">
+      <div class="install-modal-card">
+        <div class="install-modal-head">
+          <div>
+            <div class="install-modal-title" id="installModalTitle">安裝 UBee APP</div>
+            <div class="install-status" id="installModalSubtitle">請依照你的手機完成以下步驟。</div>
+          </div>
+          <button class="install-modal-close" id="installModalClose" type="button" aria-label="關閉">×</button>
+        </div>
+
+        <div class="install-steps" id="installSteps"></div>
+
+        <a class="btn btn-dark" href="/order.html" style="width:100%;margin-top:16px;border-radius:18px;">
+          暫時直接開啟 UBee
+        </a>
+      </div>
     </div>
 
   </div>
+
+  <script data-ubee-install-page="official">
+    (() => {
+      'use strict';
+
+      const CUSTOMER_APP_URL = '/order.html';
+      const CUSTOMER_SW_URL = '/ubee-customer-sw.js';
+
+      const installButtons = Array.from(
+        document.querySelectorAll('.js-install-trigger')
+      );
+
+      const guideButtons = Array.from(
+        document.querySelectorAll('.js-install-guide')
+      );
+
+      const installStatus = document.getElementById('installStatus');
+      const lineBrowserAlert = document.getElementById('lineBrowserAlert');
+      const modal = document.getElementById('installModal');
+      const modalClose = document.getElementById('installModalClose');
+      const modalTitle = document.getElementById('installModalTitle');
+      const modalSubtitle = document.getElementById('installModalSubtitle');
+      const installSteps = document.getElementById('installSteps');
+
+      let deferredInstallPrompt = null;
+
+      const ua = navigator.userAgent || '';
+      const isIOS = /iPad|iPhone|iPod/i.test(ua);
+      const isAndroid = /Android/i.test(ua);
+      const isLineBrowser = /\bLine\//i.test(ua) || /LIFF/i.test(ua);
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+
+      const setStatus = text => {
+        if (installStatus) installStatus.textContent = text;
+      };
+
+      const setInstallButtonText = text => {
+        installButtons.forEach(button => {
+          button.textContent = text;
+        });
+      };
+
+      const makeStep = (number, title, text) => {
+        const item = document.createElement('div');
+        item.className = 'install-step';
+
+        const num = document.createElement('div');
+        num.className = 'install-step-num';
+        num.textContent = String(number);
+
+        const body = document.createElement('div');
+        const strong = document.createElement('strong');
+        const span = document.createElement('span');
+
+        strong.textContent = title;
+        span.textContent = text;
+
+        body.append(strong, span);
+        item.append(num, body);
+
+        return item;
+      };
+
+      const showGuide = mode => {
+        if (!modal || !installSteps) return;
+
+        installSteps.replaceChildren();
+
+        if (mode === 'line') {
+          modalTitle.textContent = '先用手機瀏覽器開啟';
+          modalSubtitle.textContent = 'LINE 內建瀏覽器通常不會顯示完整的 PWA 安裝功能。';
+
+          installSteps.append(
+            makeStep(1, '打開 LINE 的頁面選單', '點右上角的「⋯」或瀏覽器選單。'),
+            makeStep(2, '改用外部瀏覽器', isIOS
+              ? '選擇以 Safari 開啟。'
+              : '選擇以 Chrome 或預設瀏覽器開啟。'),
+            makeStep(3, '回到本頁安裝', isIOS
+              ? '在 Safari 點分享，再選擇「加入主畫面」。'
+              : '再次點「安裝 UBee APP」，依提示完成安裝。')
+          );
+        } else if (mode === 'ios') {
+          modalTitle.textContent = 'iPhone 安裝方式';
+          modalSubtitle.textContent = '請使用 Safari 將 UBee 加入主畫面。';
+
+          installSteps.append(
+            makeStep(1, '使用 Safari 開啟本頁', '若你在 LINE、Facebook 或其他 App 內，請先改用 Safari 開啟。'),
+            makeStep(2, '點擊 Safari 分享按鈕', '在瀏覽器工具列找到方框向上箭頭的分享按鈕。'),
+            makeStep(3, '選擇「加入主畫面」', '確認名稱為「UBee」後，點右上角「加入」。')
+          );
+        } else if (mode === 'android') {
+          modalTitle.textContent = 'Android 安裝方式';
+          modalSubtitle.textContent = '請使用 Chrome 或支援安裝 PWA 的瀏覽器。';
+
+          installSteps.append(
+            makeStep(1, '使用 Chrome 開啟本頁', '若你在 LINE 內，請先選擇以外部瀏覽器開啟。'),
+            makeStep(2, '點擊「安裝 UBee APP」', '瀏覽器符合安裝條件時，會顯示正式安裝視窗。'),
+            makeStep(3, '完成安裝', '安裝完成後，手機桌面會出現 UBee 圖示。')
+          );
+        } else {
+          modalTitle.textContent = '安裝 UBee APP';
+          modalSubtitle.textContent = '你的瀏覽器目前沒有顯示自動安裝視窗。';
+
+          installSteps.append(
+            makeStep(1, '打開瀏覽器選單', '在 Chrome、Edge 或 Safari 中開啟本頁。'),
+            makeStep(2, '尋找安裝選項', '選擇「安裝應用程式」、「加到主畫面」或類似選項。'),
+            makeStep(3, '完成安裝', '之後可從桌面或應用程式列表直接開啟 UBee。')
+          );
+        }
+
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      };
+
+      const hideGuide = () => {
+        if (!modal) return;
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+      };
+
+      const handleInstall = async () => {
+        if (isStandalone) {
+          window.location.href = CUSTOMER_APP_URL;
+          return;
+        }
+
+        if (isLineBrowser) {
+          showGuide('line');
+          return;
+        }
+
+        if (deferredInstallPrompt) {
+          const promptEvent = deferredInstallPrompt;
+          deferredInstallPrompt = null;
+
+          try {
+            await promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+
+            if (choice && choice.outcome === 'accepted') {
+              setStatus('已接受安裝，完成後即可從手機桌面開啟 UBee。');
+            } else {
+              setStatus('你尚未完成安裝，之後仍可再次安裝 UBee APP。');
+            }
+          } catch (error) {
+            console.error('UBee PWA 安裝提示失敗：', error);
+            showGuide(isIOS ? 'ios' : (isAndroid ? 'android' : 'other'));
+          }
+
+          return;
+        }
+
+        showGuide(isIOS ? 'ios' : (isAndroid ? 'android' : 'other'));
+      };
+
+      installButtons.forEach(button => {
+        button.addEventListener('click', handleInstall);
+      });
+
+      guideButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          showGuide(
+            isLineBrowser
+              ? 'line'
+              : (isIOS ? 'ios' : (isAndroid ? 'android' : 'other'))
+          );
+        });
+      });
+
+      if (modalClose) {
+        modalClose.addEventListener('click', hideGuide);
+      }
+
+      if (modal) {
+        modal.addEventListener('click', event => {
+          if (event.target === modal) hideGuide();
+        });
+      }
+
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') hideGuide();
+      });
+
+      window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+
+        setInstallButtonText('安裝 UBee APP 到手機');
+        setStatus('你的裝置已準備好，可以直接安裝 UBee APP。');
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        setInstallButtonText('開啟 UBee APP');
+        setStatus('UBee APP 已安裝完成。');
+      });
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+          try {
+            const registration = await navigator.serviceWorker.register(
+              CUSTOMER_SW_URL,
+              {
+                scope: '/',
+                updateViaCache: 'none'
+              }
+            );
+
+            await registration.update().catch(() => {});
+          } catch (error) {
+            console.error('UBee Service Worker 註冊失敗：', error);
+          }
+        });
+      }
+
+      if (isStandalone) {
+        setInstallButtonText('開啟 UBee APP');
+        setStatus('你已經安裝 UBee APP，點擊按鈕即可直接開啟。');
+      } else if (isLineBrowser) {
+        lineBrowserAlert?.classList.add('show');
+        setInstallButtonText('查看如何安裝 UBee APP');
+        setStatus('請先從 LINE 改用 Safari 或 Chrome 開啟本頁。');
+      } else if (isIOS) {
+        setInstallButtonText('查看 iPhone 安裝方式');
+        setStatus('iPhone 請使用 Safari 的「加入主畫面」功能。');
+      } else if (isAndroid) {
+        setStatus('Android 建議使用 Chrome；安裝功能準備完成後會自動啟用。');
+      } else {
+        setStatus('你也可以先直接開啟網頁版，或使用瀏覽器選單安裝。');
+      }
+    })();
+  </script>
+
 </body>
 </html>
