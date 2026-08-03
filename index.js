@@ -646,6 +646,7 @@ if (WEB_PUSH_PUBLIC_KEY && WEB_PUSH_PRIVATE_KEY) {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ===== CORS：允許 UBee 騎士前端正式站呼叫 Render 後端 =====
 app.use((req, res, next) => {
@@ -3120,6 +3121,1060 @@ app.post(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// =====================================================
+// UBee Customer Account System｜正式會員驗證
+// - 手機簡訊驗證：Twilio Verify（可切換受控測試模式）
+// - 密碼：Node.js crypto.scrypt 雜湊
+// - Session：HttpOnly / SameSite=Lax Cookie，伺服器端 Firestore 驗證
+// - 客戶身分只接受 Session，禁止前端自行宣告 userId / customerId
+// =====================================================
+const CUSTOMER_AUTH = Object.freeze({
+  sessionCookie: 'ubee_customer_session',
+  sessionTtlMs: 30 * 24 * 60 * 60 * 1000,
+  sessionTouchIntervalMs: 12 * 60 * 60 * 1000,
+  verificationTokenTtlMs: 15 * 60 * 1000,
+  challengeTtlMs: 10 * 60 * 1000,
+  resendCooldownMs: 60 * 1000,
+  sendWindowMs: 10 * 60 * 1000,
+  maxSendsPerWindow: 5,
+  maxVerifyAttempts: 6,
+  maxLoginAttempts: 5,
+  loginLockMs: 15 * 60 * 1000,
+  passwordKeyLength: 64,
+  passwordN: 16384,
+  passwordR: 8,
+  passwordP: 1,
+});
+
+const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
+  accounts: 'customerAccounts',
+  phoneIndex: 'customerPhoneIndex',
+  sessions: 'customerSessions',
+  challenges: 'customerAuthChallenges',
+  verificationTokens: 'customerVerificationTokens',
+  sendLimits: 'customerAuthSendLimits',
+  counters: 'systemCounters',
+});
+
+const CUSTOMER_SMS_MODE = String(
+  process.env.CUSTOMER_AUTH_SMS_MODE ||
+  (
+    process.env.TWILIO_ACCOUNT_SID &&
+    process.env.TWILIO_AUTH_TOKEN &&
+    process.env.TWILIO_VERIFY_SERVICE_SID
+      ? 'twilio'
+      : 'disabled'
+  )
+).trim().toLowerCase();
+
+const CUSTOMER_AUTH_ALLOW_TEST_OTP =
+  String(process.env.CUSTOMER_AUTH_ALLOW_TEST_OTP || 'false')
+    .trim()
+    .toLowerCase() === 'true';
+
+const CUSTOMER_AUTH_EXPOSE_TEST_CODE =
+  String(process.env.CUSTOMER_AUTH_EXPOSE_TEST_CODE || 'false')
+    .trim()
+    .toLowerCase() === 'true';
+
+function customerAuthError(message, statusCode = 400, code = 'CUSTOMER_AUTH_ERROR') {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.code = code;
+  return error;
+}
+
+function normalizeCustomerPhone(value) {
+  return String(value || '')
+    .replace(/\D/g, '')
+    .slice(0, 10);
+}
+
+function isValidCustomerPhone(phone) {
+  return /^09\d{8}$/.test(normalizeCustomerPhone(phone));
+}
+
+function customerPhoneToE164(phone) {
+  const normalized = normalizeCustomerPhone(phone);
+  if (!isValidCustomerPhone(normalized)) {
+    throw customerAuthError('手機號碼格式不正確。', 400, 'CUSTOMER_PHONE_INVALID');
+  }
+  return `+886${normalized.slice(1)}`;
+}
+
+function maskCustomerPhone(phone) {
+  const normalized = normalizeCustomerPhone(phone);
+  if (normalized.length !== 10) return normalized;
+  return `${normalized.slice(0, 4)}-***-${normalized.slice(-3)}`;
+}
+
+function normalizeCustomerEmail(value) {
+  return String(value || '').trim().toLowerCase().slice(0, 120);
+}
+
+function isValidCustomerEmail(email) {
+  return !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validateCustomerPassword(password, phone = '') {
+  const value = String(password || '');
+  if (value.length < 8 || value.length > 72) {
+    throw customerAuthError(
+      '密碼需為 8 至 72 個字元。',
+      400,
+      'CUSTOMER_PASSWORD_INVALID'
+    );
+  }
+  if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+    throw customerAuthError(
+      '密碼必須同時包含英文字母與數字。',
+      400,
+      'CUSTOMER_PASSWORD_INVALID'
+    );
+  }
+  if (phone && value === normalizeCustomerPhone(phone)) {
+    throw customerAuthError(
+      '密碼不可與手機號碼完全相同。',
+      400,
+      'CUSTOMER_PASSWORD_INVALID'
+    );
+  }
+  return value;
+}
+
+function customerAuthRandomToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('base64url');
+}
+
+function customerAuthHash(value) {
+  return crypto
+    .createHash('sha256')
+    .update(String(value || ''))
+    .digest('hex');
+}
+
+function customerAuthIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim();
+  return forwarded || req.ip || req.socket?.remoteAddress || '';
+}
+
+function customerAuthClientFingerprint(req) {
+  return {
+    ipHash: customerAuthHash(customerAuthIp(req)).slice(0, 32),
+    userAgentHash: customerAuthHash(req.headers['user-agent'] || '').slice(0, 32),
+  };
+}
+
+function customerAuthScrypt(password, salt) {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(
+      password,
+      salt,
+      CUSTOMER_AUTH.passwordKeyLength,
+      {
+        N: CUSTOMER_AUTH.passwordN,
+        r: CUSTOMER_AUTH.passwordR,
+        p: CUSTOMER_AUTH.passwordP,
+        maxmem: 64 * 1024 * 1024,
+      },
+      (error, derivedKey) => {
+        if (error) return reject(error);
+        return resolve(derivedKey);
+      }
+    );
+  });
+}
+
+async function hashCustomerPassword(password, phone = '') {
+  const validated = validateCustomerPassword(password, phone);
+  const salt = crypto.randomBytes(16).toString('base64url');
+  const derivedKey = await customerAuthScrypt(validated, salt);
+  return {
+    algorithm: 'scrypt',
+    salt,
+    hash: derivedKey.toString('base64url'),
+    keyLength: CUSTOMER_AUTH.passwordKeyLength,
+    N: CUSTOMER_AUTH.passwordN,
+    r: CUSTOMER_AUTH.passwordR,
+    p: CUSTOMER_AUTH.passwordP,
+  };
+}
+
+async function verifyCustomerPassword(password, stored) {
+  if (!stored || stored.algorithm !== 'scrypt' || !stored.salt || !stored.hash) {
+    return false;
+  }
+  try {
+    const derivedKey = await customerAuthScrypt(String(password || ''), stored.salt);
+    const expected = Buffer.from(String(stored.hash), 'base64url');
+    return expected.length === derivedKey.length &&
+      crypto.timingSafeEqual(expected, derivedKey);
+  } catch (error) {
+    console.warn('⚠️ 客戶密碼驗證失敗：', error.message || error);
+    return false;
+  }
+}
+
+function parseCookies(req) {
+  const source = String(req.headers.cookie || '');
+  const result = {};
+  source.split(';').forEach(part => {
+    const index = part.indexOf('=');
+    if (index < 0) return;
+    const key = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    if (!key) return;
+    try {
+      result[key] = decodeURIComponent(value);
+    } catch (_) {
+      result[key] = value;
+    }
+  });
+  return result;
+}
+
+function customerSessionCookieOptions(req, maxAgeMs = CUSTOMER_AUTH.sessionTtlMs) {
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
+  const secure = req.secure || forwardedProto === 'https' || process.env.NODE_ENV === 'production';
+  return [
+    `${CUSTOMER_AUTH.sessionCookie}=`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    secure ? 'Secure' : '',
+    `Max-Age=${Math.max(0, Math.floor(maxAgeMs / 1000))}`,
+  ].filter(Boolean);
+}
+
+function setCustomerSessionCookie(req, res, rawToken) {
+  const parts = customerSessionCookieOptions(req);
+  parts[0] = `${CUSTOMER_AUTH.sessionCookie}=${encodeURIComponent(rawToken)}`;
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function clearCustomerSessionCookie(req, res) {
+  const parts = customerSessionCookieOptions(req, 0);
+  parts[0] = `${CUSTOMER_AUTH.sessionCookie}=`;
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function customerAccountResponse(account, customerId) {
+  const source = account || {};
+  return {
+    customerId,
+    memberNumber: String(source.memberNumber || ''),
+    name: String(source.name || ''),
+    maskedPhone: maskCustomerPhone(source.phone || ''),
+    phone: String(source.phone || ''),
+    email: String(source.email || ''),
+    serviceCity: String(source.serviceCity || ''),
+    serviceDistrict: String(source.serviceDistrict || ''),
+    status: String(source.status || 'active'),
+    preferences: source.preferences || {},
+    createdAtMs: Number(source.createdAtMs || 0),
+  };
+}
+
+async function enforceCustomerSmsSendLimit(phone, purpose) {
+  const key = `${purpose}_${phone}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const ref = db.collection(CUSTOMER_AUTH_COLLECTIONS.sendLimits).doc(key);
+  const nowMs = Date.now();
+
+  await db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(ref);
+    const data = snapshot.exists ? snapshot.data() || {} : {};
+    const lastSentAtMs = Number(data.lastSentAtMs || 0);
+    let windowStartedAtMs = Number(data.windowStartedAtMs || 0);
+    let sendCount = Number(data.sendCount || 0);
+
+    if (lastSentAtMs && nowMs - lastSentAtMs < CUSTOMER_AUTH.resendCooldownMs) {
+      const seconds = Math.ceil(
+        (CUSTOMER_AUTH.resendCooldownMs - (nowMs - lastSentAtMs)) / 1000
+      );
+      throw customerAuthError(
+        `請等待 ${seconds} 秒後再重新傳送驗證碼。`,
+        429,
+        'CUSTOMER_OTP_COOLDOWN'
+      );
+    }
+
+    if (!windowStartedAtMs || nowMs - windowStartedAtMs >= CUSTOMER_AUTH.sendWindowMs) {
+      windowStartedAtMs = nowMs;
+      sendCount = 0;
+    }
+
+    if (sendCount >= CUSTOMER_AUTH.maxSendsPerWindow) {
+      throw customerAuthError(
+        '驗證碼傳送次數過多，請稍後再試。',
+        429,
+        'CUSTOMER_OTP_RATE_LIMITED'
+      );
+    }
+
+    transaction.set(ref, {
+      phone,
+      purpose,
+      windowStartedAtMs,
+      sendCount: sendCount + 1,
+      lastSentAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+}
+
+function twilioVerifyCredentials() {
+  return {
+    accountSid: String(process.env.TWILIO_ACCOUNT_SID || '').trim(),
+    authToken: String(process.env.TWILIO_AUTH_TOKEN || '').trim(),
+    serviceSid: String(process.env.TWILIO_VERIFY_SERVICE_SID || '').trim(),
+  };
+}
+
+async function twilioVerifyRequest(pathSuffix, params) {
+  const credentials = twilioVerifyCredentials();
+  if (!credentials.accountSid || !credentials.authToken || !credentials.serviceSid) {
+    throw customerAuthError(
+      '手機簡訊驗證尚未完成設定。',
+      503,
+      'CUSTOMER_SMS_NOT_CONFIGURED'
+    );
+  }
+
+  const url =
+    `https://verify.twilio.com/v2/Services/${encodeURIComponent(credentials.serviceSid)}` +
+    pathSuffix;
+  const authorization = Buffer
+    .from(`${credentials.accountSid}:${credentials.authToken}`)
+    .toString('base64');
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${authorization}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json',
+    },
+    body: new URLSearchParams(params).toString(),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error('❌ Twilio Verify 呼叫失敗：', response.status, data);
+    throw customerAuthError(
+      data.message || '簡訊服務暫時無法使用，請稍後再試。',
+      response.status >= 500 ? 503 : 400,
+      'CUSTOMER_SMS_PROVIDER_ERROR'
+    );
+  }
+  return data;
+}
+
+async function sendCustomerVerificationCode(phone, purpose, challengeId) {
+  if (CUSTOMER_SMS_MODE === 'twilio') {
+    await twilioVerifyRequest('/Verifications', {
+      To: customerPhoneToE164(phone),
+      Channel: 'sms',
+    });
+    return { provider: 'twilio' };
+  }
+
+  if (CUSTOMER_SMS_MODE === 'console' && CUSTOMER_AUTH_ALLOW_TEST_OTP) {
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    console.log(`🧪 UBee 客戶驗證碼｜${purpose}｜${phone}｜${code}｜${challengeId}`);
+    return {
+      provider: 'console',
+      testCodeHash: customerAuthHash(`${challengeId}:${phone}:${code}`),
+      debugCode: CUSTOMER_AUTH_EXPOSE_TEST_CODE ? code : '',
+    };
+  }
+
+  throw customerAuthError(
+    '手機簡訊驗證尚未完成設定。請先設定 Twilio Verify。',
+    503,
+    'CUSTOMER_SMS_NOT_CONFIGURED'
+  );
+}
+
+async function verifyCustomerVerificationCode(challenge, code) {
+  if (challenge.provider === 'twilio') {
+    const result = await twilioVerifyRequest('/VerificationCheck', {
+      To: customerPhoneToE164(challenge.phone),
+      Code: String(code || '').trim(),
+    });
+    return String(result.status || '').toLowerCase() === 'approved';
+  }
+
+  if (challenge.provider === 'console' && CUSTOMER_AUTH_ALLOW_TEST_OTP) {
+    const actual = customerAuthHash(
+      `${challenge.id}:${challenge.phone}:${String(code || '').trim()}`
+    );
+    const expected = String(challenge.testCodeHash || '');
+    if (!expected || actual.length !== expected.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
+  }
+
+  return false;
+}
+
+async function findCustomerAccountByPhone(phone) {
+  const normalized = normalizeCustomerPhone(phone);
+  const indexDoc = await db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex)
+    .doc(normalized)
+    .get();
+  if (!indexDoc.exists) return null;
+  const customerId = String(indexDoc.data()?.customerId || '').trim();
+  if (!customerId) return null;
+  const accountDoc = await db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+    .doc(customerId)
+    .get();
+  if (!accountDoc.exists) return null;
+  return {
+    customerId,
+    ref: accountDoc.ref,
+    account: accountDoc.data() || {},
+  };
+}
+
+async function createCustomerAuthChallenge(req, purpose) {
+  const phone = normalizeCustomerPhone(req.body?.phone);
+  if (!isValidCustomerPhone(phone)) {
+    throw customerAuthError('請輸入正確的 10 碼台灣手機號碼。', 400, 'CUSTOMER_PHONE_INVALID');
+  }
+
+  const existing = await findCustomerAccountByPhone(phone);
+  if (purpose === 'register' && existing) {
+    throw customerAuthError(
+      '這個手機號碼已經是 UBee 會員，請直接登入。',
+      409,
+      'CUSTOMER_ALREADY_EXISTS'
+    );
+  }
+  if (purpose === 'password' && !existing) {
+    throw customerAuthError(
+      '找不到這個手機號碼的 UBee 帳號。',
+      404,
+      'CUSTOMER_NOT_FOUND'
+    );
+  }
+
+  await enforceCustomerSmsSendLimit(phone, purpose);
+
+  const challengeId = crypto.randomUUID();
+  const providerResult = await sendCustomerVerificationCode(phone, purpose, challengeId);
+  const nowMs = Date.now();
+  const fingerprint = customerAuthClientFingerprint(req);
+
+  await db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.challenges)
+    .doc(challengeId)
+    .set({
+      id: challengeId,
+      purpose,
+      phone,
+      provider: providerResult.provider,
+      testCodeHash: providerResult.testCodeHash || '',
+      status: 'pending',
+      attempts: 0,
+      expiresAtMs: nowMs + CUSTOMER_AUTH.challengeTtlMs,
+      createdAtMs: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...fingerprint,
+    });
+
+  return {
+    challengeId,
+    maskedPhone: maskCustomerPhone(phone),
+    expiresInSeconds: Math.floor(CUSTOMER_AUTH.challengeTtlMs / 1000),
+    debugCode: providerResult.debugCode || undefined,
+  };
+}
+
+async function verifyCustomerAuthChallenge(req, purpose) {
+  const phone = normalizeCustomerPhone(req.body?.phone);
+  const challengeId = String(req.body?.challengeId || '').trim();
+  const code = String(req.body?.code || '').replace(/\D/g, '').slice(0, 6);
+
+  if (!isValidCustomerPhone(phone) || !challengeId || !/^\d{6}$/.test(code)) {
+    throw customerAuthError('驗證資料不完整。', 400, 'CUSTOMER_OTP_INVALID_REQUEST');
+  }
+
+  const ref = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.challenges)
+    .doc(challengeId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    throw customerAuthError('驗證碼已失效，請重新傳送。', 410, 'CUSTOMER_OTP_EXPIRED');
+  }
+
+  const challenge = { id: challengeId, ...(snapshot.data() || {}) };
+  if (challenge.phone !== phone || challenge.purpose !== purpose) {
+    throw customerAuthError('驗證資料不相符。', 400, 'CUSTOMER_OTP_MISMATCH');
+  }
+  if (challenge.status === 'verified' || challenge.status === 'used') {
+    throw customerAuthError('此驗證碼已經使用。', 409, 'CUSTOMER_OTP_ALREADY_USED');
+  }
+  if (Number(challenge.expiresAtMs || 0) < Date.now()) {
+    await ref.set({ status: 'expired' }, { merge: true });
+    throw customerAuthError('驗證碼已失效，請重新傳送。', 410, 'CUSTOMER_OTP_EXPIRED');
+  }
+  if (Number(challenge.attempts || 0) >= CUSTOMER_AUTH.maxVerifyAttempts) {
+    throw customerAuthError('驗證錯誤次數過多，請重新傳送驗證碼。', 429, 'CUSTOMER_OTP_ATTEMPTS_EXCEEDED');
+  }
+
+  await ref.set({
+    attempts: admin.firestore.FieldValue.increment(1),
+    lastAttemptAtMs: Date.now(),
+  }, { merge: true });
+
+  const approved = await verifyCustomerVerificationCode(challenge, code);
+  if (!approved) {
+    throw customerAuthError('驗證碼不正確，請重新輸入。', 400, 'CUSTOMER_OTP_INCORRECT');
+  }
+
+  const rawVerificationToken = customerAuthRandomToken(32);
+  const verificationTokenHash = customerAuthHash(rawVerificationToken);
+  const nowMs = Date.now();
+
+  const batch = db.batch();
+  batch.set(ref, {
+    status: 'verified',
+    verifiedAtMs: nowMs,
+    verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  batch.set(
+    db.collection(CUSTOMER_AUTH_COLLECTIONS.verificationTokens).doc(verificationTokenHash),
+    {
+      phone,
+      purpose,
+      challengeId,
+      used: false,
+      expiresAtMs: nowMs + CUSTOMER_AUTH.verificationTokenTtlMs,
+      createdAtMs: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }
+  );
+  await batch.commit();
+
+  return {
+    verificationToken: rawVerificationToken,
+    expiresInSeconds: Math.floor(CUSTOMER_AUTH.verificationTokenTtlMs / 1000),
+  };
+}
+
+async function validateCustomerVerificationToken(rawToken, phone, purpose) {
+  const token = String(rawToken || '').trim();
+  if (!token) {
+    throw customerAuthError('手機驗證狀態不存在，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_REQUIRED');
+  }
+  const ref = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.verificationTokens)
+    .doc(customerAuthHash(token));
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
+  }
+  const data = snapshot.data() || {};
+  if (
+    data.used === true ||
+    data.phone !== normalizeCustomerPhone(phone) ||
+    data.purpose !== purpose ||
+    Number(data.expiresAtMs || 0) < Date.now()
+  ) {
+    throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
+  }
+  return { ref, data };
+}
+
+async function createCustomerSession(req, customerId, passwordVersion = 1) {
+  const rawToken = customerAuthRandomToken(32);
+  const sessionHash = customerAuthHash(rawToken);
+  const nowMs = Date.now();
+  const fingerprint = customerAuthClientFingerprint(req);
+  await db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.sessions)
+    .doc(sessionHash)
+    .set({
+      customerId,
+      passwordVersion: Number(passwordVersion || 1),
+      createdAtMs: nowMs,
+      lastSeenAtMs: nowMs,
+      expiresAtMs: nowMs + CUSTOMER_AUTH.sessionTtlMs,
+      revoked: false,
+      ...fingerprint,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  return rawToken;
+}
+
+async function loadCustomerAuth(req) {
+  const rawToken = String(parseCookies(req)[CUSTOMER_AUTH.sessionCookie] || '').trim();
+  if (!rawToken) return null;
+
+  const sessionHash = customerAuthHash(rawToken);
+  const sessionRef = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.sessions)
+    .doc(sessionHash);
+  const sessionDoc = await sessionRef.get();
+  if (!sessionDoc.exists) return null;
+  const session = sessionDoc.data() || {};
+  const nowMs = Date.now();
+
+  if (session.revoked === true || Number(session.expiresAtMs || 0) <= nowMs) {
+    sessionRef.delete().catch(() => {});
+    return null;
+  }
+
+  const customerId = String(session.customerId || '').trim();
+  if (!/^customer_[a-f0-9]{32}$/.test(customerId)) return null;
+  const accountDoc = await db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+    .doc(customerId)
+    .get();
+  if (!accountDoc.exists) return null;
+  const account = accountDoc.data() || {};
+
+  if (String(account.status || 'active') !== 'active') {
+    return null;
+  }
+  if (Number(account.passwordVersion || 1) !== Number(session.passwordVersion || 1)) {
+    sessionRef.set({ revoked: true, revokedAtMs: nowMs }, { merge: true }).catch(() => {});
+    return null;
+  }
+
+  if (nowMs - Number(session.lastSeenAtMs || 0) >= CUSTOMER_AUTH.sessionTouchIntervalMs) {
+    sessionRef.set({
+      lastSeenAtMs: nowMs,
+      expiresAtMs: nowMs + CUSTOMER_AUTH.sessionTtlMs,
+    }, { merge: true }).catch(() => {});
+  }
+
+  return {
+    rawToken,
+    sessionHash,
+    sessionRef,
+    session,
+    customerId,
+    account,
+  };
+}
+
+async function customerAuthOptional(req, res, next) {
+  try {
+    req.customerAuth = await loadCustomerAuth(req);
+    return next();
+  } catch (error) {
+    console.error('❌ 客戶 Session 讀取失敗：', error);
+    req.customerAuth = null;
+    return next();
+  }
+}
+
+async function requireCustomerAuth(req, res, next) {
+  try {
+    const auth = await loadCustomerAuth(req);
+    if (!auth) {
+      clearCustomerSessionCookie(req, res);
+      return res.status(401).json({
+        success: false,
+        authenticated: false,
+        code: 'CUSTOMER_LOGIN_REQUIRED',
+        message: '請先登入 UBee 會員帳號。',
+      });
+    }
+    req.customerAuth = auth;
+    return next();
+  } catch (error) {
+    console.error('❌ 客戶身分驗證失敗：', error);
+    return res.status(500).json({
+      success: false,
+      code: 'CUSTOMER_AUTH_ERROR',
+      message: '會員身分驗證失敗，請稍後再試。',
+    });
+  }
+}
+
+function sendCustomerAuthError(res, error) {
+  const statusCode = Number(error?.statusCode || 500);
+  return res.status(statusCode).json({
+    success: false,
+    code: error?.code || 'CUSTOMER_AUTH_ERROR',
+    message: error?.message || '會員系統暫時無法處理，請稍後再試。',
+  });
+}
+
+app.post('/api/customer-auth/register/start', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await createCustomerAuthChallenge(req, 'register');
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/register/verify', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await verifyCustomerAuthChallenge(req, 'register');
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/register/complete', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    if (!isValidCustomerPhone(phone)) {
+      throw customerAuthError('手機號碼格式不正確。', 400, 'CUSTOMER_PHONE_INVALID');
+    }
+
+    const verification = await validateCustomerVerificationToken(
+      req.body?.verificationToken,
+      phone,
+      'register'
+    );
+
+    const profile = req.body?.profile && typeof req.body.profile === 'object'
+      ? req.body.profile
+      : {};
+    const preferences = req.body?.preferences && typeof req.body.preferences === 'object'
+      ? req.body.preferences
+      : {};
+    const agreements = req.body?.agreements && typeof req.body.agreements === 'object'
+      ? req.body.agreements
+      : {};
+
+    const name = cleanText(profile.name || '', 40);
+    const email = normalizeCustomerEmail(profile.email);
+    const serviceCity = cleanText(profile.serviceCity || '', 30);
+    const serviceDistrict = cleanText(profile.serviceDistrict || '', 30);
+    const referralCode = cleanText(profile.referralCode || '', 24);
+
+    if (name.length < 2) {
+      throw customerAuthError('請輸入可供訂單與客服核對的姓名。', 400, 'CUSTOMER_NAME_INVALID');
+    }
+    if (!isValidCustomerEmail(email)) {
+      throw customerAuthError('電子信箱格式不正確。', 400, 'CUSTOMER_EMAIL_INVALID');
+    }
+    if (!serviceCity || !serviceDistrict) {
+      throw customerAuthError('請選擇常用服務縣市與行政區。', 400, 'CUSTOMER_AREA_REQUIRED');
+    }
+    if (!agreements.terms || !agreements.privacy || !agreements.pricing || !agreements.prohibitedTasks) {
+      throw customerAuthError('請完整同意服務條款與隱私權政策。', 400, 'CUSTOMER_AGREEMENTS_REQUIRED');
+    }
+
+    const passwordHash = await hashCustomerPassword(req.body?.password, phone);
+    const customerId = `customer_${crypto.randomBytes(16).toString('hex')}`;
+    const sessionRawToken = customerAuthRandomToken(32);
+    const sessionHash = customerAuthHash(sessionRawToken);
+    const nowMs = Date.now();
+    const fingerprint = customerAuthClientFingerprint(req);
+
+    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
+    const phoneIndexRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex).doc(phone);
+    const counterRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.counters).doc('customerMembers');
+    const sessionRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(sessionHash);
+
+    let memberNumber = '';
+
+    await db.runTransaction(async transaction => {
+      const [tokenDoc, phoneIndexDoc, counterDoc] = await Promise.all([
+        transaction.get(verification.ref),
+        transaction.get(phoneIndexRef),
+        transaction.get(counterRef),
+      ]);
+
+      const tokenData = tokenDoc.exists ? tokenDoc.data() || {} : {};
+      if (
+        !tokenDoc.exists ||
+        tokenData.used === true ||
+        tokenData.phone !== phone ||
+        tokenData.purpose !== 'register' ||
+        Number(tokenData.expiresAtMs || 0) < nowMs
+      ) {
+        throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
+      }
+      if (phoneIndexDoc.exists) {
+        throw customerAuthError('這個手機號碼已經是 UBee 會員。', 409, 'CUSTOMER_ALREADY_EXISTS');
+      }
+
+      const nextNumber = Number(counterDoc.data()?.nextNumber || 1);
+      memberNumber = `UBC${String(nextNumber).padStart(8, '0')}`;
+
+      transaction.set(counterRef, {
+        nextNumber: nextNumber + 1,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(accountRef, {
+        customerId,
+        memberNumber,
+        phone,
+        name,
+        email,
+        serviceCity,
+        serviceDistrict,
+        referralCode,
+        passwordHash,
+        passwordVersion: 1,
+        status: 'active',
+        failedLoginCount: 0,
+        lockedUntilMs: 0,
+        preferences: {
+          orderStatusNotifications: preferences.orderStatusNotifications !== false,
+          paymentAndSafetyNotifications: preferences.paymentAndSafetyNotifications !== false,
+          importantAnnouncements: preferences.importantAnnouncements !== false,
+          marketingNotifications: preferences.marketingNotifications === true,
+          setupAddressLater: preferences.setupAddressLater !== false,
+        },
+        agreements: {
+          terms: true,
+          privacy: true,
+          pricing: true,
+          prohibitedTasks: true,
+          agreedAtClient: cleanText(agreements.agreedAtClient || '', 50),
+          agreedAtMs: nowMs,
+        },
+        source: 'customer-pwa',
+        schemaVersion: 'customer-account-v1',
+        createdAtMs: nowMs,
+        updatedAtMs: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(phoneIndexRef, {
+        customerId,
+        phone,
+        memberNumber,
+        createdAtMs: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(sessionRef, {
+        customerId,
+        passwordVersion: 1,
+        createdAtMs: nowMs,
+        lastSeenAtMs: nowMs,
+        expiresAtMs: nowMs + CUSTOMER_AUTH.sessionTtlMs,
+        revoked: false,
+        ...fingerprint,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(verification.ref, {
+        used: true,
+        usedAtMs: nowMs,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    setCustomerSessionCookie(req, res, sessionRawToken);
+    const accountDoc = await accountRef.get();
+    return res.status(201).json({
+      success: true,
+      authenticated: true,
+      customer: customerAccountResponse(accountDoc.data() || {}, customerId),
+    });
+  } catch (error) {
+    console.error('❌ UBee 客戶註冊失敗：', error);
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/login', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    const password = String(req.body?.password || '');
+    if (!isValidCustomerPhone(phone) || !password) {
+      throw customerAuthError('手機號碼或密碼不正確。', 401, 'CUSTOMER_LOGIN_INVALID');
+    }
+
+    const record = await findCustomerAccountByPhone(phone);
+    if (!record) {
+      throw customerAuthError('手機號碼或密碼不正確。', 401, 'CUSTOMER_LOGIN_INVALID');
+    }
+
+    const nowMs = Date.now();
+    const account = record.account;
+    if (String(account.status || 'active') !== 'active') {
+      throw customerAuthError('此帳號目前無法登入，請聯繫 UBee 客服。', 403, 'CUSTOMER_ACCOUNT_UNAVAILABLE');
+    }
+    if (Number(account.lockedUntilMs || 0) > nowMs) {
+      const minutes = Math.max(1, Math.ceil((Number(account.lockedUntilMs) - nowMs) / 60000));
+      throw customerAuthError(
+        `登入錯誤次數過多，請於 ${minutes} 分鐘後再試。`,
+        423,
+        'CUSTOMER_ACCOUNT_LOCKED'
+      );
+    }
+
+    const passwordOk = await verifyCustomerPassword(password, account.passwordHash);
+    if (!passwordOk) {
+      const failedCount = Number(account.failedLoginCount || 0) + 1;
+      const lockedUntilMs = failedCount >= CUSTOMER_AUTH.maxLoginAttempts
+        ? nowMs + CUSTOMER_AUTH.loginLockMs
+        : 0;
+      await record.ref.set({
+        failedLoginCount: lockedUntilMs ? 0 : failedCount,
+        lockedUntilMs,
+        lastFailedLoginAtMs: nowMs,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      throw customerAuthError(
+        lockedUntilMs
+          ? '登入錯誤次數過多，帳號已暫時鎖定 15 分鐘。'
+          : '手機號碼或密碼不正確。',
+        lockedUntilMs ? 423 : 401,
+        lockedUntilMs ? 'CUSTOMER_ACCOUNT_LOCKED' : 'CUSTOMER_LOGIN_INVALID'
+      );
+    }
+
+    await record.ref.set({
+      failedLoginCount: 0,
+      lockedUntilMs: 0,
+      lastLoginAtMs: nowMs,
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    const rawToken = await createCustomerSession(
+      req,
+      record.customerId,
+      Number(account.passwordVersion || 1)
+    );
+    setCustomerSessionCookie(req, res, rawToken);
+
+    return res.json({
+      success: true,
+      authenticated: true,
+      customer: customerAccountResponse(account, record.customerId),
+    });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.get('/api/customer-auth/me', customerAuthOptional, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!req.customerAuth) {
+    return res.status(401).json({
+      success: false,
+      authenticated: false,
+      code: 'CUSTOMER_LOGIN_REQUIRED',
+      message: '尚未登入 UBee 會員帳號。',
+    });
+  }
+  return res.json({
+    success: true,
+    authenticated: true,
+    customer: customerAccountResponse(
+      req.customerAuth.account,
+      req.customerAuth.customerId
+    ),
+  });
+});
+
+app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    if (req.customerAuth?.sessionRef) {
+      await req.customerAuth.sessionRef.set({
+        revoked: true,
+        revokedAtMs: Date.now(),
+      }, { merge: true });
+    }
+    clearCustomerSessionCookie(req, res);
+    return res.json({ success: true, authenticated: false });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/password/start', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await createCustomerAuthChallenge(req, 'password');
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/password/verify', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const result = await verifyCustomerAuthChallenge(req, 'password');
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/password/reset', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    const verification = await validateCustomerVerificationToken(
+      req.body?.verificationToken,
+      phone,
+      'password'
+    );
+    const record = await findCustomerAccountByPhone(phone);
+    if (!record) {
+      throw customerAuthError('找不到此 UBee 帳號。', 404, 'CUSTOMER_NOT_FOUND');
+    }
+
+    const passwordHash = await hashCustomerPassword(req.body?.newPassword, phone);
+    const nowMs = Date.now();
+    const nextPasswordVersion = Number(record.account.passwordVersion || 1) + 1;
+
+    await db.runTransaction(async transaction => {
+      const tokenDoc = await transaction.get(verification.ref);
+      const tokenData = tokenDoc.exists ? tokenDoc.data() || {} : {};
+      if (
+        !tokenDoc.exists ||
+        tokenData.used === true ||
+        tokenData.phone !== phone ||
+        tokenData.purpose !== 'password' ||
+        Number(tokenData.expiresAtMs || 0) < nowMs
+      ) {
+        throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
+      }
+      transaction.set(record.ref, {
+        passwordHash,
+        passwordVersion: nextPasswordVersion,
+        failedLoginCount: 0,
+        lockedUntilMs: 0,
+        passwordChangedAtMs: nowMs,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      transaction.set(verification.ref, {
+        used: true,
+        usedAtMs: nowMs,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    return res.json({ success: true, message: '密碼已重新設定。' });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+console.log(`🔐 UBee 客戶會員系統已載入｜SMS 模式：${CUSTOMER_SMS_MODE}`);
+
 
 // ==============================
 // UBee 騎士手機登入 API
@@ -12483,11 +13538,14 @@ app.get('/api/dispatch/orders/:orderId/events', async (req, res) => {
   }
 });
 
-app.get('/order.html', (req, res) => {
+app.get('/order.html', customerAuthOptional, (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, 'public', 'order.html'));
+  if (!req.customerAuth) {
+    return res.redirect(302, '/customer-auth.html?mode=login&redirect=%2Forder.html');
+  }
+  return res.sendFile(path.join(__dirname, 'public', 'order.html'));
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -19131,24 +20189,20 @@ function getDetectedAdvancePaymentAmountFromOrderInput(data = {}) {
 }
 
 function isValidCustomerUserId(userId) {
-  return !!userId && userId !== 'web-order' && /^U[a-zA-Z0-9]{20,}$/.test(String(userId));
-}
-
-function getCustomerUserIdFromBody(body = {}) {
-  return String(body.userId || body.customerId || '').trim();
+  return /^customer_[a-f0-9]{32}$/.test(String(userId || '').trim());
 }
 
 function isSameCustomerUserId(order, requestUserId) {
   const orderUserId = String(order?.userId || order?.customerId || '').trim();
   const userId = String(requestUserId || '').trim();
-  return isValidCustomerUserId(userId) && orderUserId && orderUserId !== 'web-order' && orderUserId === userId;
+  return isValidCustomerUserId(userId) && orderUserId === userId;
 }
 
 function validateOrderInput(data) {
   const errors = [];
 
   if (!isValidCustomerUserId(data.userId)) {
-    errors.push('LINE 身分驗證失敗，請重新從官方帳號點「立即下單」。');
+    errors.push('會員登入狀態失效，請重新登入 UBee 帳號。');
   }
 
   const hasRemark = !!String(data.note || data.item || '').trim();
@@ -19545,15 +20599,51 @@ function createBubble(title, bodyContents, footerContents = []) {
   return bubble;
 }
 
-async function pushToUser(userId, messages) {
-  if (!userId || userId === 'web-order') return;
+function getCustomerNotificationText(messages) {
   const list = Array.isArray(messages) ? messages : [messages];
-  await client.pushMessage(userId, list);
+  for (const message of list) {
+    if (!message || typeof message !== 'object') continue;
+    if (message.type === 'text' && message.text) {
+      return cleanLongText(message.text, 500);
+    }
+    if (message.altText) {
+      return cleanLongText(message.altText, 500);
+    }
+    if (message.contents?.body?.contents) {
+      const text = message.contents.body.contents
+        .map(item => item?.text || '')
+        .filter(Boolean)
+        .join(' ');
+      if (text) return cleanLongText(text, 500);
+    }
+  }
+  return 'UBee 任務狀態已更新。';
 }
 
 async function notifyCustomer(order, messages) {
-  console.log(`UBee 客人 LINE 通知已暫停：${order?.id || 'UNKNOWN'}`);
-  return false;
+  const customerId = String(order?.userId || order?.customerId || '').trim();
+  if (!isValidCustomerUserId(customerId)) return false;
+
+  const notificationRef = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+    .doc(customerId)
+    .collection('notifications')
+    .doc();
+
+  const nowMs = Date.now();
+  await notificationRef.set({
+    id: notificationRef.id,
+    orderId: String(order?.id || ''),
+    type: 'order_update',
+    title: 'UBee 任務通知',
+    message: getCustomerNotificationText(messages),
+    status: String(order?.status || ''),
+    read: false,
+    createdAtMs: nowMs,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return true;
 }
 
 async function pushToGroup(groupId, messages) {
@@ -21942,7 +23032,7 @@ app.post('/api/map-route', async (req, res) => {
   }
 });
 
-app.get('/api/quote', async (req, res) => {
+app.get('/api/quote', requireCustomerAuth, async (req, res) => {
   try {
     const serviceType = String(req.query.serviceType || '').trim();
     const serviceMode = String(req.query.serviceMode || '').trim();
@@ -23845,7 +24935,7 @@ app.get('/api/merchant/v3/settlements', async (req, res) => {
 });
 
 
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', requireCustomerAuth, async (req, res) => {
     try {
     if(!req.body || typeof req.body !== 'object'){
     return res.status(400).json({
@@ -23853,6 +24943,11 @@ app.post('/api/orders', async (req, res) => {
     error:'訂單資料格式錯誤'
   });
 }
+    req.body.userId = req.customerAuth.customerId;
+    req.body.customerId = req.customerAuth.customerId;
+    req.body.customerMemberNumber = String(req.customerAuth.account.memberNumber || '');
+    req.body.customerName = String(req.customerAuth.account.name || '');
+    req.body.customerPhone = String(req.customerAuth.account.phone || '');
     const data = createOrderFromApi(req.body);
 
     const quoteValidation = await loadValidDynamicPricingQuote(
@@ -24513,11 +25608,11 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 }
 });
 
-app.post('/api/orders/:orderId/payment-method', async (req, res) => {
+app.post('/api/orders/:orderId/payment-method', requireCustomerAuth, async (req, res) => {
   try {
     const orderId = String(req.params.orderId || '').toUpperCase();
     const { paymentMethod } = req.body;
-    const requestUserId = getCustomerUserIdFromBody(req.body);
+    const requestUserId = req.customerAuth.customerId;
     const order = await getOrder(orderId);
 
     if (!order) {
@@ -26091,7 +27186,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
   }
 });
 
-app.get('/api/orders/:orderId', async (req, res) => {
+app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
   try {
     const orderId =
       String(
@@ -26100,10 +27195,7 @@ app.get('/api/orders/:orderId', async (req, res) => {
         .trim()
         .toUpperCase();
 
-    const requestUserId =
-      String(
-        req.query.userId || ''
-      ).trim();
+    const requestUserId = req.customerAuth.customerId;
 
     const order =
       await getOrder(orderId);
@@ -26119,7 +27211,6 @@ app.get('/api/orders/:orderId', async (req, res) => {
     }
 
     if (
-      requestUserId &&
       !isSameCustomerUserId(
         order,
         requestUserId
@@ -26146,8 +27237,11 @@ app.get('/api/orders/:orderId', async (req, res) => {
         order.riderCurrentLocation?.lng
       );
 
+    const customerOrderSummary = sanitizeCustomerOrderForApi(order);
+
     return res.json({
       success: true,
+      summary: customerOrderSummary,
 
       order: {
         id:
@@ -26388,10 +27482,10 @@ app.get('/api/orders/:orderId', async (req, res) => {
   }
 });
 
-app.post('/cancel-order', async (req, res) => {
+app.post('/cancel-order', requireCustomerAuth, async (req, res) => {
   try {
     const { orderId } = req.body;
-    const requestUserId = getCustomerUserIdFromBody(req.body);
+    const requestUserId = req.customerAuth.customerId;
     const order = await getOrder(orderId);
 
     if (!order) {
@@ -30380,16 +31474,139 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
   };
 }
 
-app.get('/api/customer/orders/:orderId/tracking', async (req, res) => {
+
+function customerOrderApiTimeMs(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sanitizeCustomerOrderForApi(order = {}) {
+  const riderCurrentLat = Number(
+    order.riderCurrentLat ?? order.riderCurrentLocation?.lat
+  );
+  const riderCurrentLng = Number(
+    order.riderCurrentLng ?? order.riderCurrentLocation?.lng
+  );
+  return {
+    id: String(order.id || ''),
+    status: String(order.status || ''),
+    serviceGroup: String(order.serviceGroup || ''),
+    serviceType: String(order.serviceType || 'UBee 跑腿任務'),
+    serviceCategory: String(order.serviceCategory || ''),
+    serviceMode: String(order.serviceMode || ''),
+    speedType: String(order.speedType || order.speed || 'standard'),
+    orderTimingType: String(order.orderTimingType || 'immediate'),
+    scheduleGoal: String(order.scheduleGoal || ''),
+    requestedScheduleAtMs: Number(order.requestedScheduleAtMs || 0),
+    flexibleStartAtMs: Number(order.flexibleStartAtMs || 0),
+    flexibleEndAtMs: Number(order.flexibleEndAtMs || 0),
+    pickup: String(order.pickup || order.pickupAddress || ''),
+    pickupAddress: String(order.pickupAddress || order.pickup || ''),
+    pickupAddressNote: String(order.pickupAddressNote || ''),
+    pickupContact: String(order.pickupContact || ''),
+    pickupPhone: String(order.pickupPhone || ''),
+    pickupLat: getNullableCoordinate(order.pickupLat),
+    pickupLng: getNullableCoordinate(order.pickupLng),
+    pickupPlaceId: String(order.pickupPlaceId || ''),
+    dropoff: String(order.dropoff || order.dropoffAddress || ''),
+    dropoffAddress: String(order.dropoffAddress || order.dropoff || ''),
+    dropoffAddressNote: String(order.dropoffAddressNote || ''),
+    dropoffContact: String(order.dropoffContact || ''),
+    dropoffPhone: String(order.dropoffPhone || ''),
+    dropoffLat: getNullableCoordinate(order.dropoffLat),
+    dropoffLng: getNullableCoordinate(order.dropoffLng),
+    dropoffPlaceId: String(order.dropoffPlaceId || ''),
+    item: String(order.item || ''),
+    note: String(order.note || ''),
+    itemSize: String(order.itemSize || ''),
+    itemSizeLabel: String(order.itemSizeLabel || ''),
+    shoppingItems: Array.isArray(order.shoppingItems) ? order.shoppingItems.slice(0, 50) : [],
+    paymentMethod: String(order.paymentMethod || ''),
+    paymentStatus: String(order.paymentStatus || ''),
+    total: Number(order.total || 0),
+    serviceSubtotal: Number(order.serviceSubtotal || order.serviceTotal || 0),
+    customerPayableTotal: Number(
+      order.customerPayableTotal || order.payableTotal || order.total || 0
+    ),
+    deliveryFee: Number(order.deliveryFee || 0),
+    serviceFee: Number(order.serviceFee || 0),
+    speedFee: Number(order.speedFee || 0),
+    upstairsFee: Number(order.upstairsFee || 0),
+    itemSizeFee: Number(order.itemSizeFee || 0),
+    dynamicPricingFee: Number(order.dynamicPricingFee || 0),
+    waitingFee: Number(order.waitingFee || 0),
+    advancePayment: Number(
+      order.advancePayment || order.riderAdvanceAmount || order.estimatedGoodsAmount || 0
+    ),
+    riderCurrentLat: Number.isFinite(riderCurrentLat) ? riderCurrentLat : null,
+    riderCurrentLng: Number.isFinite(riderCurrentLng) ? riderCurrentLng : null,
+    riderCurrentLocation: order.riderCurrentLocation || null,
+    riderLocationUpdatedAtMs: Number(order.riderLocationUpdatedAtMs || 0),
+    riderHeading: order.riderHeading ?? null,
+    riderSpeed: order.riderSpeed ?? null,
+    riderLocationAccuracy: order.riderLocationAccuracy ?? null,
+    createdAtMs: customerOrderApiTimeMs(order.createdAtMs || order.createdAt),
+    updatedAtMs: customerOrderApiTimeMs(order.updatedAtMs || order.updatedAt),
+  };
+}
+
+app.get('/api/customer/orders', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const requestedLimit = Math.max(1, Math.min(100, Number(req.query.limit || 50)));
+    const snapshot = await db
+      .collection('orders')
+      .where('userId', '==', customerId)
+      .limit(120)
+      .get();
+
+    let orders = snapshot.docs
+      .map(doc => sanitizeCustomerOrderForApi({ id: doc.id, ...(doc.data() || {}) }))
+      .sort((a, b) => (b.createdAtMs || b.updatedAtMs) - (a.createdAtMs || a.updatedAtMs));
+
+    const statusGroup = String(req.query.status || '').trim().toLowerCase();
+    if (statusGroup === 'active') {
+      const terminal = new Set(['completed', 'done', 'cancelled', 'canceled']);
+      orders = orders.filter(order => !terminal.has(String(order.status).toLowerCase()));
+    } else if (statusGroup === 'completed') {
+      const completed = new Set(['completed', 'done']);
+      orders = orders.filter(order => completed.has(String(order.status).toLowerCase()));
+    }
+
+    orders = orders.slice(0, requestedLimit);
+    const taskCount = snapshot.docs
+      .map(doc => String(doc.data()?.status || '').toLowerCase())
+      .filter(status => !['cancelled', 'canceled', 'quote_only', 'draft_confirm'].includes(status))
+      .length;
+
+    return res.json({
+      success: true,
+      orders,
+      stats: { taskCount, couponCount: 0 },
+    });
+  } catch (error) {
+    console.error('❌ 讀取客戶訂單清單失敗：', error);
+    return res.status(500).json({
+      success: false,
+      error: '訂單清單讀取失敗，請稍後再試。',
+    });
+  }
+});
+
+app.get('/api/customer/orders/:orderId/tracking', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const orderId = String(req.params.orderId || '').trim().toUpperCase();
-    const requestUserId = String(req.query.userId || req.query.customerId || '').trim();
+    const requestUserId = req.customerAuth.customerId;
     if (!orderId) {
       return res.status(400).json({ success:false, error:'缺少訂單編號' });
-    }
-    if (!isValidCustomerUserId(requestUserId)) {
-      return res.status(401).json({ success:false, error:'LINE 身分驗證失敗' });
     }
     const order = await getOrder(orderId);
     if (!order) {
@@ -30448,16 +31665,6 @@ function getCustomerAddressTimeMs(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function validateCustomerAddressIdentity(userId) {
-  const normalized = String(userId || '').trim();
-  if (!isValidCustomerUserId(normalized)) {
-    const error = new Error('LINE 身分驗證失敗，請重新從 UBee 官方帳號進入。');
-    error.statusCode = 401;
-    throw error;
-  }
-  return normalized;
-}
-
 function customerAddressesCollection(userId) {
   return db
     .collection('customerProfiles')
@@ -30465,12 +31672,10 @@ function customerAddressesCollection(userId) {
     .collection('addresses');
 }
 
-app.get('/api/customer/addresses', async (req, res) => {
+app.get('/api/customer/addresses', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const userId = validateCustomerAddressIdentity(
-      req.query.userId || req.query.customerId
-    );
+    const userId = req.customerAuth.customerId;
 
     const snap = await customerAddressesCollection(userId)
       .limit(50)
@@ -30499,12 +31704,10 @@ app.get('/api/customer/addresses', async (req, res) => {
   }
 });
 
-app.post('/api/customer/addresses', async (req, res) => {
+app.post('/api/customer/addresses', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const userId = validateCustomerAddressIdentity(
-      req.body?.userId || req.body?.customerId
-    );
+    const userId = req.customerAuth.customerId;
     const address = normalizeCustomerSavedAddress(req.body?.address || req.body || {});
 
     if (!address.address || address.address.length < 5) {
@@ -30558,12 +31761,10 @@ app.post('/api/customer/addresses', async (req, res) => {
   }
 });
 
-app.post('/api/customer/addresses/:addressId/delete', async (req, res) => {
+app.post('/api/customer/addresses/:addressId/delete', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const userId = validateCustomerAddressIdentity(
-      req.body?.userId || req.body?.customerId
-    );
+    const userId = req.customerAuth.customerId;
     const addressId = cleanText(req.params.addressId || '', 100);
 
     if (!addressId) {
@@ -30581,12 +31782,10 @@ app.post('/api/customer/addresses/:addressId/delete', async (req, res) => {
   }
 });
 
-app.get('/api/customer/recent-addresses', async (req, res) => {
+app.get('/api/customer/recent-addresses', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
-    const userId = validateCustomerAddressIdentity(
-      req.query.userId || req.query.customerId
-    );
+    const userId = req.customerAuth.customerId;
 
     const snap = await db
       .collection('orders')
