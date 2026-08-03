@@ -20654,5 +20654,82 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   })();
 </script>
 
+
+<style id="ubee-fixed-bottom-nav-yellow-service-tabs">
+  /* 2026-08-03：正式下單流程底部導覽固定於視窗底部，避免隨內容位移。 */
+  #productionOrderFlow{
+    --flow-nav-total-height:calc(var(--flow-nav-height) + env(safe-area-inset-bottom));
+  }
+
+  #productionOrderFlow .flow-page{
+    inset:0 0 var(--flow-nav-total-height) !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav{
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:0 !important;
+    transform:translateX(-50%) !important;
+    width:100% !important;
+    max-width:520px !important;
+    height:var(--flow-nav-total-height) !important;
+    margin:0 !important;
+    padding:7px 12px calc(7px + env(safe-area-inset-bottom)) !important;
+    border-radius:0 !important;
+    border-top:1px solid rgba(17,24,39,.10) !important;
+    background:#ffffff !important;
+    box-shadow:0 -8px 24px rgba(17,24,39,.08) !important;
+    z-index:2147482000 !important;
+  }
+
+  /* 進行中任務追蹤頁沿用同一個固定底部導覽規格。 */
+  body:not(.flow-active) .bottom-tabs{
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:0 !important;
+    transform:translateX(-50%) !important;
+    width:100% !important;
+    max-width:520px !important;
+    margin:0 !important;
+    border-radius:0 !important;
+    border-top:1px solid rgba(17,24,39,.10) !important;
+    background:#ffffff !important;
+    box-shadow:0 -8px 24px rgba(17,24,39,.08) !important;
+    z-index:2147482000 !important;
+  }
+
+  /* 幫我送／幫我取／幫我買／幫排隊／全能跑腿：整個頂部分類區改為 UBee 黃色。 */
+  #productionOrderFlow .flow-service-tabs{
+    margin:-15px -15px 14px !important;
+    padding:11px 9px !important;
+    gap:5px !important;
+    border-bottom:none !important;
+    border-radius:20px 20px 0 0 !important;
+    background:var(--flow-accent) !important;
+  }
+
+  #productionOrderFlow .flow-service-tab{
+    min-width:76px !important;
+    min-height:42px !important;
+    padding:0 12px !important;
+    border-radius:13px !important;
+    background:transparent !important;
+    color:#4b3b00 !important;
+    font-weight:1000 !important;
+  }
+
+  #productionOrderFlow .flow-service-tab.active{
+    background:#111111 !important;
+    color:#ffffff !important;
+    box-shadow:0 5px 14px rgba(17,24,39,.18) !important;
+  }
+
+  #productionOrderFlow .flow-service-tab.active::after{
+    display:none !important;
+  }
+</style>
+
 </body>
 </html>
