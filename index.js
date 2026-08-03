@@ -3124,7 +3124,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // =====================================================
 // UBee Customer Account System｜正式會員驗證
-// - 手機簡訊驗證：Twilio Verify（可切換受控測試模式）
+// - 註冊：手機號碼＋密碼（現階段不發送簡訊驗證碼）
 // - 密碼：Node.js crypto.scrypt 雜湊
 // - Session：HttpOnly / SameSite=Lax Cookie，伺服器端 Firestore 驗證
 // - 客戶身分只接受 Session，禁止前端自行宣告 userId / customerId
@@ -3133,12 +3133,6 @@ const CUSTOMER_AUTH = Object.freeze({
   sessionCookie: 'ubee_customer_session',
   sessionTtlMs: 30 * 24 * 60 * 60 * 1000,
   sessionTouchIntervalMs: 12 * 60 * 60 * 1000,
-  verificationTokenTtlMs: 15 * 60 * 1000,
-  challengeTtlMs: 10 * 60 * 1000,
-  resendCooldownMs: 60 * 1000,
-  sendWindowMs: 10 * 60 * 1000,
-  maxSendsPerWindow: 5,
-  maxVerifyAttempts: 6,
   maxLoginAttempts: 5,
   loginLockMs: 15 * 60 * 1000,
   passwordKeyLength: 64,
@@ -3151,32 +3145,8 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
   accounts: 'customerAccounts',
   phoneIndex: 'customerPhoneIndex',
   sessions: 'customerSessions',
-  challenges: 'customerAuthChallenges',
-  verificationTokens: 'customerVerificationTokens',
-  sendLimits: 'customerAuthSendLimits',
   counters: 'systemCounters',
 });
-
-const CUSTOMER_SMS_MODE = String(
-  process.env.CUSTOMER_AUTH_SMS_MODE ||
-  (
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN &&
-    process.env.TWILIO_VERIFY_SERVICE_SID
-      ? 'twilio'
-      : 'disabled'
-  )
-).trim().toLowerCase();
-
-const CUSTOMER_AUTH_ALLOW_TEST_OTP =
-  String(process.env.CUSTOMER_AUTH_ALLOW_TEST_OTP || 'false')
-    .trim()
-    .toLowerCase() === 'true';
-
-const CUSTOMER_AUTH_EXPOSE_TEST_CODE =
-  String(process.env.CUSTOMER_AUTH_EXPOSE_TEST_CODE || 'false')
-    .trim()
-    .toLowerCase() === 'true';
 
 function customerAuthError(message, statusCode = 400, code = 'CUSTOMER_AUTH_ERROR') {
   const error = new Error(message);
@@ -3193,14 +3163,6 @@ function normalizeCustomerPhone(value) {
 
 function isValidCustomerPhone(phone) {
   return /^09\d{8}$/.test(normalizeCustomerPhone(phone));
-}
-
-function customerPhoneToE164(phone) {
-  const normalized = normalizeCustomerPhone(phone);
-  if (!isValidCustomerPhone(normalized)) {
-    throw customerAuthError('手機號碼格式不正確。', 400, 'CUSTOMER_PHONE_INVALID');
-  }
-  return `+886${normalized.slice(1)}`;
 }
 
 function maskCustomerPhone(phone) {
@@ -3369,6 +3331,7 @@ function customerAccountResponse(account, customerId) {
     name: String(source.name || ''),
     maskedPhone: maskCustomerPhone(source.phone || ''),
     phone: String(source.phone || ''),
+    phoneVerified: source.phoneVerified === true,
     email: String(source.email || ''),
     serviceCity: String(source.serviceCity || ''),
     serviceDistrict: String(source.serviceDistrict || ''),
@@ -3376,147 +3339,6 @@ function customerAccountResponse(account, customerId) {
     preferences: source.preferences || {},
     createdAtMs: Number(source.createdAtMs || 0),
   };
-}
-
-async function enforceCustomerSmsSendLimit(phone, purpose) {
-  const key = `${purpose}_${phone}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const ref = db.collection(CUSTOMER_AUTH_COLLECTIONS.sendLimits).doc(key);
-  const nowMs = Date.now();
-
-  await db.runTransaction(async transaction => {
-    const snapshot = await transaction.get(ref);
-    const data = snapshot.exists ? snapshot.data() || {} : {};
-    const lastSentAtMs = Number(data.lastSentAtMs || 0);
-    let windowStartedAtMs = Number(data.windowStartedAtMs || 0);
-    let sendCount = Number(data.sendCount || 0);
-
-    if (lastSentAtMs && nowMs - lastSentAtMs < CUSTOMER_AUTH.resendCooldownMs) {
-      const seconds = Math.ceil(
-        (CUSTOMER_AUTH.resendCooldownMs - (nowMs - lastSentAtMs)) / 1000
-      );
-      throw customerAuthError(
-        `請等待 ${seconds} 秒後再重新傳送驗證碼。`,
-        429,
-        'CUSTOMER_OTP_COOLDOWN'
-      );
-    }
-
-    if (!windowStartedAtMs || nowMs - windowStartedAtMs >= CUSTOMER_AUTH.sendWindowMs) {
-      windowStartedAtMs = nowMs;
-      sendCount = 0;
-    }
-
-    if (sendCount >= CUSTOMER_AUTH.maxSendsPerWindow) {
-      throw customerAuthError(
-        '驗證碼傳送次數過多，請稍後再試。',
-        429,
-        'CUSTOMER_OTP_RATE_LIMITED'
-      );
-    }
-
-    transaction.set(ref, {
-      phone,
-      purpose,
-      windowStartedAtMs,
-      sendCount: sendCount + 1,
-      lastSentAtMs: nowMs,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-  });
-}
-
-function twilioVerifyCredentials() {
-  return {
-    accountSid: String(process.env.TWILIO_ACCOUNT_SID || '').trim(),
-    authToken: String(process.env.TWILIO_AUTH_TOKEN || '').trim(),
-    serviceSid: String(process.env.TWILIO_VERIFY_SERVICE_SID || '').trim(),
-  };
-}
-
-async function twilioVerifyRequest(pathSuffix, params) {
-  const credentials = twilioVerifyCredentials();
-  if (!credentials.accountSid || !credentials.authToken || !credentials.serviceSid) {
-    throw customerAuthError(
-      '手機簡訊驗證尚未完成設定。',
-      503,
-      'CUSTOMER_SMS_NOT_CONFIGURED'
-    );
-  }
-
-  const url =
-    `https://verify.twilio.com/v2/Services/${encodeURIComponent(credentials.serviceSid)}` +
-    pathSuffix;
-  const authorization = Buffer
-    .from(`${credentials.accountSid}:${credentials.authToken}`)
-    .toString('base64');
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${authorization}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json',
-    },
-    body: new URLSearchParams(params).toString(),
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    console.error('❌ Twilio Verify 呼叫失敗：', response.status, data);
-    throw customerAuthError(
-      data.message || '簡訊服務暫時無法使用，請稍後再試。',
-      response.status >= 500 ? 503 : 400,
-      'CUSTOMER_SMS_PROVIDER_ERROR'
-    );
-  }
-  return data;
-}
-
-async function sendCustomerVerificationCode(phone, purpose, challengeId) {
-  if (CUSTOMER_SMS_MODE === 'twilio') {
-    await twilioVerifyRequest('/Verifications', {
-      To: customerPhoneToE164(phone),
-      Channel: 'sms',
-    });
-    return { provider: 'twilio' };
-  }
-
-  if (CUSTOMER_SMS_MODE === 'console' && CUSTOMER_AUTH_ALLOW_TEST_OTP) {
-    const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-    console.log(`🧪 UBee 客戶驗證碼｜${purpose}｜${phone}｜${code}｜${challengeId}`);
-    return {
-      provider: 'console',
-      testCodeHash: customerAuthHash(`${challengeId}:${phone}:${code}`),
-      debugCode: CUSTOMER_AUTH_EXPOSE_TEST_CODE ? code : '',
-    };
-  }
-
-  throw customerAuthError(
-    '手機簡訊驗證尚未完成設定。請先設定 Twilio Verify。',
-    503,
-    'CUSTOMER_SMS_NOT_CONFIGURED'
-  );
-}
-
-async function verifyCustomerVerificationCode(challenge, code) {
-  if (challenge.provider === 'twilio') {
-    const result = await twilioVerifyRequest('/VerificationCheck', {
-      To: customerPhoneToE164(challenge.phone),
-      Code: String(code || '').trim(),
-    });
-    return String(result.status || '').toLowerCase() === 'approved';
-  }
-
-  if (challenge.provider === 'console' && CUSTOMER_AUTH_ALLOW_TEST_OTP) {
-    const actual = customerAuthHash(
-      `${challenge.id}:${challenge.phone}:${String(code || '').trim()}`
-    );
-    const expected = String(challenge.testCodeHash || '');
-    if (!expected || actual.length !== expected.length) return false;
-    return crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
-  }
-
-  return false;
 }
 
 async function findCustomerAccountByPhone(phone) {
@@ -3538,156 +3360,6 @@ async function findCustomerAccountByPhone(phone) {
     ref: accountDoc.ref,
     account: accountDoc.data() || {},
   };
-}
-
-async function createCustomerAuthChallenge(req, purpose) {
-  const phone = normalizeCustomerPhone(req.body?.phone);
-  if (!isValidCustomerPhone(phone)) {
-    throw customerAuthError('請輸入正確的 10 碼台灣手機號碼。', 400, 'CUSTOMER_PHONE_INVALID');
-  }
-
-  const existing = await findCustomerAccountByPhone(phone);
-  if (purpose === 'register' && existing) {
-    throw customerAuthError(
-      '這個手機號碼已經是 UBee 會員，請直接登入。',
-      409,
-      'CUSTOMER_ALREADY_EXISTS'
-    );
-  }
-  if (purpose === 'password' && !existing) {
-    throw customerAuthError(
-      '找不到這個手機號碼的 UBee 帳號。',
-      404,
-      'CUSTOMER_NOT_FOUND'
-    );
-  }
-
-  await enforceCustomerSmsSendLimit(phone, purpose);
-
-  const challengeId = crypto.randomUUID();
-  const providerResult = await sendCustomerVerificationCode(phone, purpose, challengeId);
-  const nowMs = Date.now();
-  const fingerprint = customerAuthClientFingerprint(req);
-
-  await db
-    .collection(CUSTOMER_AUTH_COLLECTIONS.challenges)
-    .doc(challengeId)
-    .set({
-      id: challengeId,
-      purpose,
-      phone,
-      provider: providerResult.provider,
-      testCodeHash: providerResult.testCodeHash || '',
-      status: 'pending',
-      attempts: 0,
-      expiresAtMs: nowMs + CUSTOMER_AUTH.challengeTtlMs,
-      createdAtMs: nowMs,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      ...fingerprint,
-    });
-
-  return {
-    challengeId,
-    maskedPhone: maskCustomerPhone(phone),
-    expiresInSeconds: Math.floor(CUSTOMER_AUTH.challengeTtlMs / 1000),
-    debugCode: providerResult.debugCode || undefined,
-  };
-}
-
-async function verifyCustomerAuthChallenge(req, purpose) {
-  const phone = normalizeCustomerPhone(req.body?.phone);
-  const challengeId = String(req.body?.challengeId || '').trim();
-  const code = String(req.body?.code || '').replace(/\D/g, '').slice(0, 6);
-
-  if (!isValidCustomerPhone(phone) || !challengeId || !/^\d{6}$/.test(code)) {
-    throw customerAuthError('驗證資料不完整。', 400, 'CUSTOMER_OTP_INVALID_REQUEST');
-  }
-
-  const ref = db
-    .collection(CUSTOMER_AUTH_COLLECTIONS.challenges)
-    .doc(challengeId);
-  const snapshot = await ref.get();
-  if (!snapshot.exists) {
-    throw customerAuthError('驗證碼已失效，請重新傳送。', 410, 'CUSTOMER_OTP_EXPIRED');
-  }
-
-  const challenge = { id: challengeId, ...(snapshot.data() || {}) };
-  if (challenge.phone !== phone || challenge.purpose !== purpose) {
-    throw customerAuthError('驗證資料不相符。', 400, 'CUSTOMER_OTP_MISMATCH');
-  }
-  if (challenge.status === 'verified' || challenge.status === 'used') {
-    throw customerAuthError('此驗證碼已經使用。', 409, 'CUSTOMER_OTP_ALREADY_USED');
-  }
-  if (Number(challenge.expiresAtMs || 0) < Date.now()) {
-    await ref.set({ status: 'expired' }, { merge: true });
-    throw customerAuthError('驗證碼已失效，請重新傳送。', 410, 'CUSTOMER_OTP_EXPIRED');
-  }
-  if (Number(challenge.attempts || 0) >= CUSTOMER_AUTH.maxVerifyAttempts) {
-    throw customerAuthError('驗證錯誤次數過多，請重新傳送驗證碼。', 429, 'CUSTOMER_OTP_ATTEMPTS_EXCEEDED');
-  }
-
-  await ref.set({
-    attempts: admin.firestore.FieldValue.increment(1),
-    lastAttemptAtMs: Date.now(),
-  }, { merge: true });
-
-  const approved = await verifyCustomerVerificationCode(challenge, code);
-  if (!approved) {
-    throw customerAuthError('驗證碼不正確，請重新輸入。', 400, 'CUSTOMER_OTP_INCORRECT');
-  }
-
-  const rawVerificationToken = customerAuthRandomToken(32);
-  const verificationTokenHash = customerAuthHash(rawVerificationToken);
-  const nowMs = Date.now();
-
-  const batch = db.batch();
-  batch.set(ref, {
-    status: 'verified',
-    verifiedAtMs: nowMs,
-    verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
-  batch.set(
-    db.collection(CUSTOMER_AUTH_COLLECTIONS.verificationTokens).doc(verificationTokenHash),
-    {
-      phone,
-      purpose,
-      challengeId,
-      used: false,
-      expiresAtMs: nowMs + CUSTOMER_AUTH.verificationTokenTtlMs,
-      createdAtMs: nowMs,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    }
-  );
-  await batch.commit();
-
-  return {
-    verificationToken: rawVerificationToken,
-    expiresInSeconds: Math.floor(CUSTOMER_AUTH.verificationTokenTtlMs / 1000),
-  };
-}
-
-async function validateCustomerVerificationToken(rawToken, phone, purpose) {
-  const token = String(rawToken || '').trim();
-  if (!token) {
-    throw customerAuthError('手機驗證狀態不存在，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_REQUIRED');
-  }
-  const ref = db
-    .collection(CUSTOMER_AUTH_COLLECTIONS.verificationTokens)
-    .doc(customerAuthHash(token));
-  const snapshot = await ref.get();
-  if (!snapshot.exists) {
-    throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
-  }
-  const data = snapshot.data() || {};
-  if (
-    data.used === true ||
-    data.phone !== normalizeCustomerPhone(phone) ||
-    data.purpose !== purpose ||
-    Number(data.expiresAtMs || 0) < Date.now()
-  ) {
-    throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
-  }
-  return { ref, data };
 }
 
 async function createCustomerSession(req, customerId, passwordVersion = 1) {
@@ -3807,49 +3479,37 @@ function sendCustomerAuthError(res, error) {
   });
 }
 
-app.post('/api/customer-auth/register/start', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const result = await createCustomerAuthChallenge(req, 'register');
-    return res.json({ success: true, ...result });
-  } catch (error) {
-    return sendCustomerAuthError(res, error);
-  }
-});
-
-app.post('/api/customer-auth/register/verify', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const result = await verifyCustomerAuthChallenge(req, 'register');
-    return res.json({ success: true, ...result });
-  } catch (error) {
-    return sendCustomerAuthError(res, error);
-  }
-});
-
 app.post('/api/customer-auth/register/complete', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+
   try {
     const phone = normalizeCustomerPhone(req.body?.phone);
+
     if (!isValidCustomerPhone(phone)) {
-      throw customerAuthError('手機號碼格式不正確。', 400, 'CUSTOMER_PHONE_INVALID');
+      throw customerAuthError(
+        '手機號碼格式不正確。',
+        400,
+        'CUSTOMER_PHONE_INVALID'
+      );
     }
 
-    const verification = await validateCustomerVerificationToken(
-      req.body?.verificationToken,
-      phone,
-      'register'
-    );
+    const profile =
+      req.body?.profile &&
+      typeof req.body.profile === 'object'
+        ? req.body.profile
+        : {};
 
-    const profile = req.body?.profile && typeof req.body.profile === 'object'
-      ? req.body.profile
-      : {};
-    const preferences = req.body?.preferences && typeof req.body.preferences === 'object'
-      ? req.body.preferences
-      : {};
-    const agreements = req.body?.agreements && typeof req.body.agreements === 'object'
-      ? req.body.agreements
-      : {};
+    const preferences =
+      req.body?.preferences &&
+      typeof req.body.preferences === 'object'
+        ? req.body.preferences
+        : {};
+
+    const agreements =
+      req.body?.agreements &&
+      typeof req.body.agreements === 'object'
+        ? req.body.agreements
+        : {};
 
     const name = cleanText(profile.name || '', 40);
     const email = normalizeCustomerEmail(profile.email);
@@ -3858,68 +3518,126 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
     const referralCode = cleanText(profile.referralCode || '', 24);
 
     if (name.length < 2) {
-      throw customerAuthError('請輸入可供訂單與客服核對的姓名。', 400, 'CUSTOMER_NAME_INVALID');
+      throw customerAuthError(
+        '請輸入可供訂單與客服核對的姓名。',
+        400,
+        'CUSTOMER_NAME_INVALID'
+      );
     }
+
     if (!isValidCustomerEmail(email)) {
-      throw customerAuthError('電子信箱格式不正確。', 400, 'CUSTOMER_EMAIL_INVALID');
+      throw customerAuthError(
+        '電子信箱格式不正確。',
+        400,
+        'CUSTOMER_EMAIL_INVALID'
+      );
     }
+
     if (!serviceCity || !serviceDistrict) {
-      throw customerAuthError('請選擇常用服務縣市與行政區。', 400, 'CUSTOMER_AREA_REQUIRED');
-    }
-    if (!agreements.terms || !agreements.privacy || !agreements.pricing || !agreements.prohibitedTasks) {
-      throw customerAuthError('請完整同意服務條款與隱私權政策。', 400, 'CUSTOMER_AGREEMENTS_REQUIRED');
+      throw customerAuthError(
+        '請選擇常用服務縣市與行政區。',
+        400,
+        'CUSTOMER_AREA_REQUIRED'
+      );
     }
 
-    const passwordHash = await hashCustomerPassword(req.body?.password, phone);
-    const customerId = `customer_${crypto.randomBytes(16).toString('hex')}`;
-    const sessionRawToken = customerAuthRandomToken(32);
-    const sessionHash = customerAuthHash(sessionRawToken);
+    if (
+      !agreements.terms ||
+      !agreements.privacy ||
+      !agreements.pricing ||
+      !agreements.prohibitedTasks
+    ) {
+      throw customerAuthError(
+        '請完整同意服務條款與隱私權政策。',
+        400,
+        'CUSTOMER_AGREEMENTS_REQUIRED'
+      );
+    }
+
+    const passwordHash =
+      await hashCustomerPassword(
+        req.body?.password,
+        phone
+      );
+
+    const customerId =
+      `customer_${crypto.randomBytes(16).toString('hex')}`;
+
+    const sessionRawToken =
+      customerAuthRandomToken(32);
+
+    const sessionHash =
+      customerAuthHash(sessionRawToken);
+
     const nowMs = Date.now();
-    const fingerprint = customerAuthClientFingerprint(req);
 
-    const accountRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId);
-    const phoneIndexRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex).doc(phone);
-    const counterRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.counters).doc('customerMembers');
-    const sessionRef = db.collection(CUSTOMER_AUTH_COLLECTIONS.sessions).doc(sessionHash);
+    const fingerprint =
+      customerAuthClientFingerprint(req);
+
+    const accountRef =
+      db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .doc(customerId);
+
+    const phoneIndexRef =
+      db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.phoneIndex)
+        .doc(phone);
+
+    const counterRef =
+      db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.counters)
+        .doc('customerMembers');
+
+    const sessionRef =
+      db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.sessions)
+        .doc(sessionHash);
 
     let memberNumber = '';
 
     await db.runTransaction(async transaction => {
-      const [tokenDoc, phoneIndexDoc, counterDoc] = await Promise.all([
-        transaction.get(verification.ref),
-        transaction.get(phoneIndexRef),
-        transaction.get(counterRef),
-      ]);
+      const [phoneIndexDoc, counterDoc] =
+        await Promise.all([
+          transaction.get(phoneIndexRef),
+          transaction.get(counterRef),
+        ]);
 
-      const tokenData = tokenDoc.exists ? tokenDoc.data() || {} : {};
-      if (
-        !tokenDoc.exists ||
-        tokenData.used === true ||
-        tokenData.phone !== phone ||
-        tokenData.purpose !== 'register' ||
-        Number(tokenData.expiresAtMs || 0) < nowMs
-      ) {
-        throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
-      }
       if (phoneIndexDoc.exists) {
-        throw customerAuthError('這個手機號碼已經是 UBee 會員。', 409, 'CUSTOMER_ALREADY_EXISTS');
+        throw customerAuthError(
+          '這個手機號碼已經是 UBee 會員，請直接登入。',
+          409,
+          'CUSTOMER_ALREADY_EXISTS'
+        );
       }
 
-      const nextNumber = Number(counterDoc.data()?.nextNumber || 1);
-      memberNumber = `UBC${String(nextNumber).padStart(8, '0')}`;
+      const nextNumber =
+        Number(counterDoc.data()?.nextNumber || 1);
 
-      transaction.set(counterRef, {
-        nextNumber: nextNumber + 1,
-        updatedAtMs: nowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      memberNumber =
+        `UBC${String(nextNumber).padStart(8, '0')}`;
+
+      transaction.set(
+        counterRef,
+        {
+          nextNumber: nextNumber + 1,
+          updatedAtMs: nowMs,
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
 
       transaction.set(accountRef, {
         customerId,
         memberNumber,
         phone,
+        phoneVerified: false,
+        phoneVerificationStatus: 'not_verified',
+        recoveryMethod: 'support',
         name,
         email,
+        emailVerified: false,
         serviceCity,
         serviceDistrict,
         referralCode,
@@ -3928,35 +3646,55 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         status: 'active',
         failedLoginCount: 0,
         lockedUntilMs: 0,
+
         preferences: {
-          orderStatusNotifications: preferences.orderStatusNotifications !== false,
-          paymentAndSafetyNotifications: preferences.paymentAndSafetyNotifications !== false,
-          importantAnnouncements: preferences.importantAnnouncements !== false,
-          marketingNotifications: preferences.marketingNotifications === true,
-          setupAddressLater: preferences.setupAddressLater !== false,
+          orderStatusNotifications:
+            preferences.orderStatusNotifications !== false,
+
+          paymentAndSafetyNotifications:
+            preferences.paymentAndSafetyNotifications !== false,
+
+          importantAnnouncements:
+            preferences.importantAnnouncements !== false,
+
+          marketingNotifications:
+            preferences.marketingNotifications === true,
+
+          setupAddressLater:
+            preferences.setupAddressLater !== false,
         },
+
         agreements: {
           terms: true,
           privacy: true,
           pricing: true,
           prohibitedTasks: true,
-          agreedAtClient: cleanText(agreements.agreedAtClient || '', 50),
+          agreedAtClient:
+            cleanText(
+              agreements.agreedAtClient || '',
+              50
+            ),
           agreedAtMs: nowMs,
         },
+
         source: 'customer-pwa',
-        schemaVersion: 'customer-account-v1',
+        schemaVersion: 'customer-account-v2-no-otp',
         createdAtMs: nowMs,
         updatedAtMs: nowMs,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
       });
 
       transaction.set(phoneIndexRef, {
         customerId,
         phone,
         memberNumber,
+        phoneVerified: false,
         createdAtMs: nowMs,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt:
+          admin.firestore.FieldValue.serverTimestamp(),
       });
 
       transaction.set(sessionRef, {
@@ -3964,29 +3702,43 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         passwordVersion: 1,
         createdAtMs: nowMs,
         lastSeenAtMs: nowMs,
-        expiresAtMs: nowMs + CUSTOMER_AUTH.sessionTtlMs,
+        expiresAtMs:
+          nowMs + CUSTOMER_AUTH.sessionTtlMs,
         revoked: false,
         ...fingerprint,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt:
+          admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      transaction.set(verification.ref, {
-        used: true,
-        usedAtMs: nowMs,
-        usedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
     });
 
-    setCustomerSessionCookie(req, res, sessionRawToken);
-    const accountDoc = await accountRef.get();
+    setCustomerSessionCookie(
+      req,
+      res,
+      sessionRawToken
+    );
+
+    const accountDoc =
+      await accountRef.get();
+
     return res.status(201).json({
       success: true,
       authenticated: true,
-      customer: customerAccountResponse(accountDoc.data() || {}, customerId),
+      customer:
+        customerAccountResponse(
+          accountDoc.data() || {},
+          customerId
+        ),
     });
   } catch (error) {
-    console.error('❌ UBee 客戶註冊失敗：', error);
-    return sendCustomerAuthError(res, error);
+    console.error(
+      '❌ UBee 客戶註冊失敗：',
+      error
+    );
+
+    return sendCustomerAuthError(
+      res,
+      error
+    );
   }
 });
 
@@ -4101,79 +3853,7 @@ app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => 
   }
 });
 
-app.post('/api/customer-auth/password/start', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const result = await createCustomerAuthChallenge(req, 'password');
-    return res.json({ success: true, ...result });
-  } catch (error) {
-    return sendCustomerAuthError(res, error);
-  }
-});
-
-app.post('/api/customer-auth/password/verify', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const result = await verifyCustomerAuthChallenge(req, 'password');
-    return res.json({ success: true, ...result });
-  } catch (error) {
-    return sendCustomerAuthError(res, error);
-  }
-});
-
-app.post('/api/customer-auth/password/reset', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const phone = normalizeCustomerPhone(req.body?.phone);
-    const verification = await validateCustomerVerificationToken(
-      req.body?.verificationToken,
-      phone,
-      'password'
-    );
-    const record = await findCustomerAccountByPhone(phone);
-    if (!record) {
-      throw customerAuthError('找不到此 UBee 帳號。', 404, 'CUSTOMER_NOT_FOUND');
-    }
-
-    const passwordHash = await hashCustomerPassword(req.body?.newPassword, phone);
-    const nowMs = Date.now();
-    const nextPasswordVersion = Number(record.account.passwordVersion || 1) + 1;
-
-    await db.runTransaction(async transaction => {
-      const tokenDoc = await transaction.get(verification.ref);
-      const tokenData = tokenDoc.exists ? tokenDoc.data() || {} : {};
-      if (
-        !tokenDoc.exists ||
-        tokenData.used === true ||
-        tokenData.phone !== phone ||
-        tokenData.purpose !== 'password' ||
-        Number(tokenData.expiresAtMs || 0) < nowMs
-      ) {
-        throw customerAuthError('手機驗證狀態已失效，請重新驗證。', 401, 'CUSTOMER_VERIFICATION_INVALID');
-      }
-      transaction.set(record.ref, {
-        passwordHash,
-        passwordVersion: nextPasswordVersion,
-        failedLoginCount: 0,
-        lockedUntilMs: 0,
-        passwordChangedAtMs: nowMs,
-        updatedAtMs: nowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-      transaction.set(verification.ref, {
-        used: true,
-        usedAtMs: nowMs,
-        usedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-    });
-
-    return res.json({ success: true, message: '密碼已重新設定。' });
-  } catch (error) {
-    return sendCustomerAuthError(res, error);
-  }
-});
-
-console.log(`🔐 UBee 客戶會員系統已載入｜SMS 模式：${CUSTOMER_SMS_MODE}`);
+console.log('🔐 UBee 客戶會員系統已載入｜註冊模式：手機號碼＋密碼（無簡訊驗證）');
 
 
 // ==============================
