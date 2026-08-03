@@ -19868,6 +19868,31 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   .flow-progress-item{font-size:9px}.flow-progress-item::before{width:17px;height:17px;flex-basis:17px}
   .flow-grid-2{grid-template-columns:1fr}.flow-timing-list,.flow-speed-list{grid-template-columns:1fr 1fr}.flow-map{height:270px}
 }
+
+
+/* ===== UBee 用戶端｜我的頁面（台灣用語、所有入口可點擊） ===== */
+#productionOrderFlow .ubee-my-page{background:#fff!important}
+#productionOrderFlow .ubee-my-scroll{height:100%;overflow-y:auto;padding:calc(18px + env(safe-area-inset-top)) 24px 110px;background:#fff;-webkit-overflow-scrolling:touch}
+#productionOrderFlow .ubee-my-top-actions{display:flex;justify-content:flex-end;min-height:48px}
+#productionOrderFlow .ubee-my-round-action{width:74px;height:42px;border:1px solid #eceef0;border-radius:999px;background:#fff;color:#222;font-size:20px!important;font-weight:1000;box-shadow:0 2px 8px rgba(17,24,39,.03)}
+#productionOrderFlow .ubee-my-account{position:relative;width:100%;display:grid;grid-template-columns:minmax(0,1fr) 78px 20px;align-items:center;gap:12px;margin:38px 0 24px;padding:0;border:none;background:transparent;text-align:left}
+#productionOrderFlow .ubee-my-account-copy small{display:block;margin-bottom:6px;color:#9a9da1;font-size:11px;font-weight:900}
+#productionOrderFlow .ubee-my-account-copy strong{display:block;color:#111;font-size:27px;font-weight:1000;letter-spacing:-.7px;line-height:1.25}
+#productionOrderFlow .ubee-my-account-copy span{display:block;margin-top:6px;color:#8b9096;font-size:11px;font-weight:800;line-height:1.5}
+#productionOrderFlow .ubee-my-avatar{display:grid;place-items:center;width:76px;height:76px;border-radius:50%;background:#fff7d6;font-size:38px;box-shadow:inset 0 0 0 1px #f4e7aa}
+#productionOrderFlow .ubee-my-account-arrow{color:#a8acb0;font-size:30px;font-weight:400}
+#productionOrderFlow .ubee-my-menu{display:flex;flex-direction:column}
+#productionOrderFlow .ubee-my-menu-item{width:100%;display:grid;grid-template-columns:48px minmax(0,1fr) 20px;align-items:center;gap:10px;min-height:66px;padding:0;border:none;border-bottom:1px solid #f1f2f3;background:#fff;color:#111;text-align:left;font-size:17px!important;font-weight:850}
+#productionOrderFlow .ubee-my-menu-item:active{background:#fafafa}
+#productionOrderFlow .ubee-my-menu-icon{display:grid;place-items:center;width:34px;height:34px;border:1.5px solid #85898d;border-radius:10px;color:#686d72;font-size:14px;font-weight:1000}
+#productionOrderFlow .ubee-my-menu-item b{color:#b9bdc1;font-size:27px;font-weight:400;text-align:right}
+#productionOrderFlow .ubee-my-panel{margin-top:18px;padding:15px;border:1px solid #e7e9eb;border-radius:18px;background:#fafafa}
+#productionOrderFlow .ubee-my-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+#productionOrderFlow .ubee-my-panel-head strong{font-size:17px;font-weight:1000}
+#productionOrderFlow .ubee-my-panel-head button{border:none;background:transparent;color:#806600;font-size:12px!important;font-weight:1000}
+#productionOrderFlow .ubee-my-setting-button{width:100%;min-height:50px;border:1px solid #e7bcbc;border-radius:14px;background:#fff;color:#c52929;font-size:15px!important;font-weight:1000}
+@media(max-width:380px){#productionOrderFlow .ubee-my-scroll{padding-left:18px;padding-right:18px}#productionOrderFlow .ubee-my-account{grid-template-columns:minmax(0,1fr) 68px 18px}#productionOrderFlow .ubee-my-avatar{width:66px;height:66px}}
+
 </style>
 
 <div id="productionOrderFlow" aria-label="UBee 客人端正式下單流程">
@@ -20097,27 +20122,50 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     </section>
 
 
-    <section id="flowPageProfile" class="flow-page" data-page="profile">
-      <header class="flow-header home">
-        <div class="flow-brand"><span>U</span>Bee 跑腿</div>
-        <div class="flow-title-wrap"><div class="flow-title">我的</div><div class="flow-subtitle">任務與常用資料</div></div>
-        <button id="flowProfileSupportIcon" class="flow-icon-btn" type="button" aria-label="客服">•••</button>
-      </header>
-      <div class="flow-scroll">
-        <div class="flow-profile-hero">
-          <div><small>UBee 跑腿</small><strong id="flowProfileName">我的帳戶</strong><span id="flowProfileSubtext">正在讀取資料</span></div>
-          <div class="flow-profile-stats"><div><strong id="flowProfileTaskCount">0</strong><span>任務</span></div><div><strong id="flowProfileLevel">一般</strong><span>等級</span></div></div>
+    <section id="flowPageProfile" class="flow-page ubee-my-page" data-page="profile">
+      <div class="ubee-my-scroll">
+        <div class="ubee-my-top-actions">
+          <button id="flowProfileSupportIcon" class="ubee-my-round-action" type="button" aria-label="聯繫客服">•••</button>
         </div>
-        <div class="flow-card">
-          <div class="flow-profile-section-head"><div><strong>最近任務</strong><small>最多顯示最近 3 筆</small></div><button id="flowOpenActiveOrder" class="flow-text-link" type="button" hidden>查看進行中任務</button></div>
-          <div id="flowProfileTasksList" class="flow-profile-list"><div class="flow-empty">正在讀取任務…</div></div>
+
+        <button id="ubeeMyAccountButton" class="ubee-my-account" type="button" data-my-action="account">
+          <div class="ubee-my-account-copy">
+            <small>UBee 跑腿</small>
+            <strong id="flowProfileName">立即登入</strong>
+            <span id="flowProfileSubtext">登入後可查看訂單與常用資料</span>
+          </div>
+          <div class="ubee-my-avatar" aria-hidden="true">🐝</div>
+          <span class="ubee-my-account-arrow">›</span>
+        </button>
+
+        <div class="ubee-my-menu" role="list">
+          <button type="button" class="ubee-my-menu-item" data-my-action="orders"><span class="ubee-my-menu-icon">▤</span><span>我的訂單</span><b>›</b></button>
+          <button type="button" class="ubee-my-menu-item" data-my-action="coupons"><span class="ubee-my-menu-icon">券</span><span>優惠券</span><b>›</b></button>
+          <button type="button" class="ubee-my-menu-item" data-my-action="addresses"><span class="ubee-my-menu-icon">⌖</span><span>常用地址</span><b>›</b></button>
+          <button type="button" class="ubee-my-menu-item" data-my-action="notifications"><span class="ubee-my-menu-icon">鈴</span><span>通知中心</span><b>›</b></button>
+          <button type="button" class="ubee-my-menu-item" data-my-action="rewards"><span class="ubee-my-menu-icon">禮</span><span>推薦獎勵</span><b>›</b></button>
+          <button id="flowProfileSupport" type="button" class="ubee-my-menu-item" data-my-action="support"><span class="ubee-my-menu-icon">客</span><span>聯繫客服</span><b>›</b></button>
+          <button type="button" class="ubee-my-menu-item" data-my-action="feedback"><span class="ubee-my-menu-icon">✎</span><span>意見回饋</span><b>›</b></button>
+          <button type="button" class="ubee-my-menu-item" data-my-action="settings"><span class="ubee-my-menu-icon">⚙</span><span>設定</span><b>›</b></button>
         </div>
-        <div class="flow-card">
-          <div class="flow-profile-section-head"><div><strong>常用地址</strong><small>下單選地址時可以直接使用</small></div></div>
+
+        <section id="ubeeMyOrdersPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>我的訂單</strong><button type="button" data-my-close>關閉</button></div>
+          <button id="flowOpenActiveOrder" class="flow-text-link" type="button" hidden>查看進行中任務</button>
+          <div id="flowProfileTasksList" class="flow-profile-list"><div class="flow-empty">正在讀取訂單…</div></div>
+        </section>
+
+        <section id="ubeeMyAddressesPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>常用地址</strong><button type="button" data-my-close>關閉</button></div>
           <div id="flowProfileAddressesList" class="flow-profile-list"><div class="flow-empty">正在讀取常用地址…</div></div>
-        </div>
-        <button id="flowProfileSupport" class="flow-secondary" type="button">聯繫 UBee 客服</button>
-        <button id="flowProfileLogout" class="flow-secondary" type="button">登出 UBee 帳號</button>
+        </section>
+
+        <section id="ubeeMySettingsPanel" class="ubee-my-panel" hidden>
+          <div class="ubee-my-panel-head"><strong>設定</strong><button type="button" data-my-close>關閉</button></div>
+          <button id="flowProfileLogout" class="ubee-my-setting-button" type="button">登出 UBee 帳號</button>
+        </section>
+
+        <span id="flowProfileTaskCount" hidden>0</span><span id="flowProfileLevel" hidden>一般</span>
       </div>
     </section>
 
@@ -20644,6 +20692,25 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
     $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
     $('flowProfileTasksList').addEventListener('click',event=>{const btn=event.target.closest('[data-profile-order-index]');if(btn)openProfileOrderDetail(btn.dataset.profileOrderIndex)});
+    const closeMyPanels=()=>root.querySelectorAll('.ubee-my-panel').forEach(panel=>panel.hidden=true);
+    root.addEventListener('click',event=>{
+      const closeBtn=event.target.closest('[data-my-close]');
+      if(closeBtn){closeMyPanels();return}
+      const btn=event.target.closest('[data-my-action]');
+      if(!btn)return;
+      const action=btn.dataset.myAction;
+      if(action==='account'){
+        if(!currentCustomer){root.classList.remove('active');document.body.classList.remove('flow-active');window.UBeeCustomerAuthHost?.show('login');return}
+        alert(`會員姓名：${currentCustomer.name||'UBee 會員'}\n手機號碼：${currentCustomer.phone||'尚未提供'}`);return;
+      }
+      if(action==='orders'){closeMyPanels();$('ubeeMyOrdersPanel').hidden=false;$('ubeeMyOrdersPanel').scrollIntoView({behavior:'smooth',block:'start'});return}
+      if(action==='addresses'){closeMyPanels();$('ubeeMyAddressesPanel').hidden=false;$('ubeeMyAddressesPanel').scrollIntoView({behavior:'smooth',block:'start'});return}
+      if(action==='settings'){closeMyPanels();$('ubeeMySettingsPanel').hidden=false;$('ubeeMySettingsPanel').scrollIntoView({behavior:'smooth',block:'start'});return}
+      if(action==='coupons'){alert('目前沒有可使用的優惠券。');return}
+      if(action==='notifications'){alert('目前沒有新的通知。');return}
+      if(action==='rewards'){alert('推薦獎勵功能準備中，開放後會在這裡顯示。');return}
+      if(action==='feedback'){location.href='mailto:service@ubee.tw?subject=UBee%20跑腿意見回饋';return}
+    });
     $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavMy').addEventListener('click',renderProfile);const openSupport=()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}};$('flowSupportButton').addEventListener('click',openSupport);$('flowProfileSupportIcon').addEventListener('click',openSupport);$('flowProfileSupport').addEventListener('click',openSupport);$('flowProfileLogout').addEventListener('click',async()=>{if(!confirm('確定要登出 UBee 帳號嗎？'))return;try{await customerApiFetch('/api/customer-auth/logout',{method:'POST',body:JSON.stringify({})})}catch(error){console.warn('登出失敗：',error)}finally{localStorage.removeItem('ubee_current_order_id');currentCustomer=null;userId='';root.classList.remove('active');document.body.classList.remove('flow-active','ubee-active-order');window.UBeeCustomerAuthHost?.show('login')}});$('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
