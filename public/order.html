@@ -19883,12 +19883,55 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       <div class="flow-progress" data-progress="0"></div>
       <div class="flow-scroll flow-home-scroll">
         <div class="flow-card">
-          <div id="flowServiceTabs" class="flow-service-tabs">
-            <button class="flow-service-tab active" data-service="send" type="button">幫我送</button>
-            <button class="flow-service-tab" data-service="pickup" type="button">幫我取</button>
-            <button class="flow-service-tab" data-service="buy" type="button">幫我買</button>
-            <button class="flow-service-tab" data-service="queue" type="button">幫排隊</button>
-            <button class="flow-service-tab" data-service="helper" type="button">全能跑腿</button>
+          <div id="flowServiceTabs" class="flow-service-tabs" role="tablist" aria-label="選擇跑腿服務">
+            <button class="flow-service-tab active" data-service="send" type="button" role="tab" aria-selected="true">
+              <span class="flow-service-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                  <path d="m3.3 7 8.7 5 8.7-5M12 22V12"/>
+                </svg>
+              </span>
+              <span class="flow-service-label">幫我送</span>
+            </button>
+
+            <button class="flow-service-tab" data-service="pickup" type="button" role="tab" aria-selected="false">
+              <span class="flow-service-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 8h12l1 13H5L6 8Z"/>
+                  <path d="M9 8V6a3 3 0 0 1 6 0v2M12 12v5M9.8 14.8 12 17l2.2-2.2"/>
+                </svg>
+              </span>
+              <span class="flow-service-label">幫我取</span>
+            </button>
+
+            <button class="flow-service-tab" data-service="buy" type="button" role="tab" aria-selected="false">
+              <span class="flow-service-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>
+                  <path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.9a2 2 0 0 0 2-1.6L21 8H7"/>
+                </svg>
+              </span>
+              <span class="flow-service-label">幫我買</span>
+            </button>
+
+            <button class="flow-service-tab" data-service="queue" type="button" role="tab" aria-selected="false">
+              <span class="flow-service-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                </svg>
+              </span>
+              <span class="flow-service-label">幫排隊</span>
+            </button>
+
+            <button class="flow-service-tab" data-service="helper" type="button" role="tab" aria-selected="false">
+              <span class="flow-service-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m12 3 1.2 3.4L16.5 8l-3.3 1.6L12 13l-1.2-3.4L7.5 8l3.3-1.6L12 3Z"/>
+                  <path d="m18 13 .8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8L18 13ZM6 14l.7 1.8L8.5 16.5l-1.8.7L6 19l-.7-1.8-1.8-.7 1.8-.7L6 14Z"/>
+                </svg>
+              </span>
+              <span class="flow-service-label">全能跑腿</span>
+            </button>
           </div>
           <div class="flow-location-line"><span class="flow-location-dot"></span><span id="flowLocationText">正在確認目前服務地區</span></div>
           <div class="flow-route-card">
@@ -20204,7 +20247,11 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function setService(service){
     if(!serviceLabels[service])return;
     state.service=service;state.serviceTypeIndex=0;state.serviceCategory='';
-    root.querySelectorAll('.flow-service-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.service===service));
+    root.querySelectorAll('.flow-service-tab').forEach(btn=>{
+      const selected=btn.dataset.service===service;
+      btn.classList.toggle('active',selected);
+      btn.setAttribute('aria-selected',selected?'true':'false');
+    });
     const def=selectedServiceDefinition();state.taskName=def.title||serviceLabels[service];
     if(service==='queue'&&state.pickup&&!state.dropoff)state.dropoff={...state.pickup,label:'現場完成',_autoQueue:true};if(service!=='queue'&&state.dropoff?._autoQueue)state.dropoff=null;
     syncServiceSelectors();updateHome();
@@ -20700,34 +20747,99 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     z-index:2147482000 !important;
   }
 
-  /* 幫我送／幫我取／幫我買／幫排隊／全能跑腿：整個頂部分類區改為 UBee 黃色。 */
+  /* 五大服務入口：App 圖示式設計，取代整條黃色分類列。 */
   #productionOrderFlow .flow-service-tabs{
-    margin:-15px -15px 14px !important;
-    padding:11px 9px !important;
+    display:grid !important;
+    grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+    overflow:visible !important;
+    margin:0 0 16px !important;
+    padding:3px 0 2px !important;
     gap:5px !important;
-    border-bottom:none !important;
-    border-radius:20px 20px 0 0 !important;
-    background:var(--flow-accent) !important;
+    border:none !important;
+    border-radius:0 !important;
+    background:transparent !important;
   }
 
   #productionOrderFlow .flow-service-tab{
-    min-width:76px !important;
-    min-height:42px !important;
-    padding:0 12px !important;
-    border-radius:13px !important;
+    min-width:0 !important;
+    min-height:76px !important;
+    padding:7px 1px 5px !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    gap:7px !important;
+    border:none !important;
+    border-radius:16px !important;
     background:transparent !important;
-    color:#4b3b00 !important;
+    color:#74787d !important;
+    box-shadow:none !important;
     font-weight:1000 !important;
+    -webkit-tap-highlight-color:transparent !important;
+    transition:transform .16s ease,color .16s ease !important;
+  }
+
+  #productionOrderFlow .flow-service-tab:active{
+    transform:scale(.94) !important;
+  }
+
+  #productionOrderFlow .flow-service-icon{
+    width:42px;
+    height:42px;
+    flex:0 0 42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid #eceef0;
+    border-radius:14px;
+    background:#f3f4f5;
+    color:#555a60;
+    box-shadow:0 3px 10px rgba(17,24,39,.035);
+    transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease;
+  }
+
+  #productionOrderFlow .flow-service-icon svg{
+    width:21px;
+    height:21px;
+    display:block;
+  }
+
+  #productionOrderFlow .flow-service-label{
+    display:block;
+    max-width:100%;
+    overflow:hidden;
+    color:inherit;
+    font-size:11px;
+    font-weight:1000;
+    line-height:1.2;
+    letter-spacing:-.15px;
+    white-space:nowrap;
+    text-overflow:clip;
   }
 
   #productionOrderFlow .flow-service-tab.active{
-    background:#111111 !important;
-    color:#ffffff !important;
-    box-shadow:0 5px 14px rgba(17,24,39,.18) !important;
+    background:transparent !important;
+    color:#111111 !important;
+    box-shadow:none !important;
+  }
+
+  #productionOrderFlow .flow-service-tab.active .flow-service-icon{
+    border-color:#e6b900;
+    background:var(--flow-accent);
+    color:#111111;
+    box-shadow:0 7px 16px rgba(244,189,0,.24);
+    transform:translateY(-1px);
   }
 
   #productionOrderFlow .flow-service-tab.active::after{
     display:none !important;
+  }
+
+  @media(max-width:360px){
+    #productionOrderFlow .flow-service-tabs{gap:2px !important;}
+    #productionOrderFlow .flow-service-icon{width:39px;height:39px;flex-basis:39px;border-radius:13px;}
+    #productionOrderFlow .flow-service-icon svg{width:20px;height:20px;}
+    #productionOrderFlow .flow-service-label{font-size:10px;letter-spacing:-.35px;}
   }
 </style>
 
