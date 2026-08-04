@@ -19,7 +19,7 @@
   <meta name="theme-color" content="#ffffff">
 
   <title>UBee 跑腿｜正式營運用戶端</title>
-  <!-- UBee 正式營運修復版：2026-08-04 R1｜唯一 App 導覽與原生操作層 -->
+  <!-- UBee 正式營運修復版：2026-08-04 R3｜底部導航完全貼底固定、滿版、無浮動樣式 -->
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
 
@@ -984,97 +984,16 @@
       margin-bottom:74px;
     }
 
-    .bottom-tabs{
-  position:fixed;
-
-  left:50%;
-  transform:translateX(-50%);
-
-  bottom:0;
-
-  width:100%;
-  max-width:520px;
-
-  z-index:99;
-
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-
-  gap:4px;
-
-  padding:
-    8px
-    12px
-    calc(8px + env(safe-area-inset-bottom));
-
-  border-top:
-    1px solid rgba(17,24,39,.08);
-
-  border-right:none;
-  border-bottom:none;
-  border-left:none;
-
-  border-radius:
-    22px
-    22px
-    0
-    0;
-
-  background:
-    rgba(255,255,255,.98);
-
-  box-shadow:
-    0 -8px 26px rgba(17,24,39,.08);
-
-  backdrop-filter:
-    blur(16px);
-}
+    
 
 
-.bottom-tab{
-  position:relative;
-
-  min-height:56px;
-
-  border:none;
-  border-radius:14px;
-
-  padding:
-    7px
-    4px
-    6px;
-
-  background:transparent;
-
-  color:#8b9096;
-
-  font-size:11px !important;
-  font-weight:1000;
-}
 
 
-.bottom-tab.active{
-  width:82%;
-
-  justify-self:center;
-
-  background:#111;
-
-  color:#fff;
-}
 
 
-.bottom-tab svg{
-  display:block;
 
-  width:21px;
-  height:21px;
 
-  margin:
-    0
-    auto
-    4px;
-}
+
 
     .ubee-map-pin{
       min-width:30px;
@@ -7277,15 +7196,10 @@ body{background:#eef0f2;}
 #step5 .step5-tracking-map-shell{border-radius:25px!important;overflow:hidden!important;box-shadow:var(--ubee-shadow)!important;}
 #step5 .step5-task-detail-section,#step5 .step5-payment-section{border-radius:23px!important;box-shadow:var(--ubee-shadow-soft)!important;}
 
-.bottom-tabs{
-  max-width:520px;
-  padding:9px 14px calc(10px + env(safe-area-inset-bottom));
-  border-radius:26px 26px 0 0;
-  box-shadow:0 -10px 32px rgba(15,23,42,.095);
-}
-.bottom-tab{min-height:62px;border-radius:18px;color:#777c82;font-size:13px!important;}
-.bottom-tab svg{width:23px;height:23px;}
-.bottom-tab.active{background:#111;color:#fff;box-shadow:0 10px 23px rgba(15,23,42,.17);}
+
+
+
+
 
 .app-section .member-card,.menu-list,.info-item,.address-display{border-radius:23px;}
 .member-card{background:linear-gradient(135deg,#fff,#fff8d8);}
@@ -7749,13 +7663,10 @@ body{background:#eef0f2;}
 #step1 .home-estimate-amount{font-size:24px!important;}
 #step1 .home-next-btn{height:56px!important;min-height:56px!important;border-radius:17px!important;font-size:17px!important;}
 
-.bottom-tabs{
-  padding:8px 12px calc(8px + env(safe-area-inset-bottom))!important;
-  border-radius:24px 24px 0 0!important;
-}
-.bottom-tab{min-height:58px!important;border-radius:16px!important;font-size:12px!important;}
-.bottom-tab.active{width:82%!important;}
-.bottom-tab svg{width:22px!important;height:22px!important;}
+
+
+
+
 
 @media(max-width:390px){
   .home-map-shell{height:305px!important;}
@@ -8830,15 +8741,203 @@ body{background:#eef0f2;}
   .ubee-customer-push-button[hidden]{display:none!important}
   #productionOrderFlow .ubee-customer-push-card{margin:0 0 12px}
 
-  body.ubee-active-order .bottom-tabs{grid-template-columns:repeat(3,1fr)!important;border-radius:0!important;background:rgba(255,255,255,.98)!important;box-shadow:0 -8px 25px rgba(17,24,39,.08)!important;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-  body.ubee-active-order .bottom-tabs #tabTasks{display:flex!important}
-  body.ubee-active-order .bottom-tab.active{width:88%!important}
-  #productionOrderFlow .flow-bottom-nav{grid-template-columns:repeat(3,1fr)!important}
+  
+  
+  
+  
 @media(max-width:390px){
     body.ubee-active-order #step5 .step5-live-status-primary{font-size:30px}
     body.ubee-active-order #step5 .step5-tracking-map-shell{height:285px!important}
     .ubee-customer-progress-item{font-size:8px}.ubee-customer-progress-dot{width:19px;height:19px}
     .ubee-customer-rider-card{grid-template-columns:48px minmax(0,1fr)}.ubee-customer-rider-avatar{width:48px;height:48px}.ubee-customer-rider-help{grid-column:1/-1;width:100%}
+  }
+</style>
+
+
+<style id="ubee-bottom-navigation-flat-fixed-final">
+  /* =========================================================
+     UBee 唯一正式底部導覽｜完全貼底固定版
+     - 滿螢幕寬度
+     - 無外距、無置中位移
+     - 無容器圓角、無按鈕圓角
+     - 無懸浮陰影、無毛玻璃
+     - 所有頁面狀態共用同一規格
+     ========================================================= */
+  :root{
+    --ubee-flat-nav-content-height:64px;
+    --ubee-flat-nav-total-height:calc(var(--ubee-flat-nav-content-height) + env(safe-area-inset-bottom));
+  }
+
+  #productionOrderFlow .flow-bottom-nav,
+  body:not(.flow-active) .bottom-tabs{
+    position:fixed !important;
+    left:0 !important;
+    right:0 !important;
+    bottom:0 !important;
+    top:auto !important;
+    transform:none !important;
+    translate:none !important;
+
+    width:100vw !important;
+    max-width:none !important;
+    min-width:100vw !important;
+    height:var(--ubee-flat-nav-total-height) !important;
+    min-height:var(--ubee-flat-nav-total-height) !important;
+
+    margin:0 !important;
+    padding:0 0 env(safe-area-inset-bottom) !important;
+
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    align-items:stretch !important;
+    gap:0 !important;
+
+    border:0 !important;
+    border-top:1px solid #e4e6e8 !important;
+    border-radius:0 !important;
+
+    background:#ffffff !important;
+    box-shadow:none !important;
+    filter:none !important;
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+
+    overflow:visible !important;
+    z-index:2147483000 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button,
+  body:not(.flow-active) .bottom-tabs .bottom-tab{
+    position:relative !important;
+    width:100% !important;
+    max-width:none !important;
+    min-width:0 !important;
+    height:var(--ubee-flat-nav-content-height) !important;
+    min-height:var(--ubee-flat-nav-content-height) !important;
+
+    margin:0 !important;
+    padding:6px 2px 5px !important;
+
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:2px !important;
+
+    border:0 !important;
+    border-radius:0 !important;
+    outline:none !important;
+
+    background:#ffffff !important;
+    color:#8a8f95 !important;
+    box-shadow:none !important;
+    filter:none !important;
+
+    font-size:10px !important;
+    font-weight:900 !important;
+    line-height:1.15 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button::before,
+  #productionOrderFlow .flow-bottom-nav button::after,
+  body:not(.flow-active) .bottom-tabs .bottom-tab::before,
+  body:not(.flow-active) .bottom-tabs .bottom-tab::after{
+    content:none !important;
+    display:none !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active,
+  body:not(.flow-active) .bottom-tabs .bottom-tab.active{
+    width:100% !important;
+    justify-self:stretch !important;
+    border-radius:0 !important;
+    background:#ffffff !important;
+    color:#111111 !important;
+    box-shadow:none !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active{
+    border-top:3px solid #f4bd00 !important;
+    padding-top:3px !important;
+  }
+
+  body:not(.flow-active) .bottom-tabs .bottom-tab.active{
+    border-top:3px solid #f4bd00 !important;
+    padding-top:3px !important;
+  }
+
+  #productionOrderFlow .flow-nav-icon,
+  body:not(.flow-active) .bottom-tabs .flow-nav-icon{
+    width:25px !important;
+    height:25px !important;
+    min-width:25px !important;
+    min-height:25px !important;
+
+    margin:0 auto !important;
+    padding:0 !important;
+
+    display:grid !important;
+    place-items:center !important;
+
+    border:0 !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    color:currentColor !important;
+    box-shadow:none !important;
+    filter:none !important;
+
+    font-size:0 !important;
+    line-height:1 !important;
+    transform:none !important;
+  }
+
+  #productionOrderFlow .flow-nav-icon svg,
+  body:not(.flow-active) .bottom-tabs .flow-nav-icon svg,
+  body:not(.flow-active) .bottom-tabs .bottom-tab > svg{
+    width:23px !important;
+    height:23px !important;
+    margin:0 auto !important;
+    display:block !important;
+    fill:none !important;
+    stroke:currentColor !important;
+    stroke-width:2 !important;
+    stroke-linecap:round !important;
+    stroke-linejoin:round !important;
+  }
+
+  #productionOrderFlow .flow-nav-label{
+    display:block !important;
+    margin:0 !important;
+    padding:0 !important;
+    font-size:10px !important;
+    font-weight:1000 !important;
+    line-height:1.1 !important;
+    white-space:nowrap !important;
+  }
+
+  /* 預留固定導覽高度，避免內容被貼底導覽遮住。 */
+  #productionOrderFlow .flow-page{
+    bottom:var(--ubee-flat-nav-total-height) !important;
+  }
+
+  body:not(.flow-active) .app{
+    padding-bottom:calc(var(--ubee-flat-nav-total-height) + 24px) !important;
+  }
+
+  /* 「我的」子頁仍保留同一條固定導覽，不因頁面切換消失或浮起。 */
+  body.ubee-my-subpage-open #productionOrderFlow .flow-bottom-nav{
+    display:grid !important;
+  }
+
+  @media(min-width:521px){
+    #productionOrderFlow .flow-bottom-nav,
+    body:not(.flow-active) .bottom-tabs{
+      width:100vw !important;
+      max-width:none !important;
+      left:0 !important;
+      right:0 !important;
+      transform:none !important;
+    }
   }
 </style>
 
@@ -19891,8 +19990,8 @@ body.flow-active>.app{display:none!important}
 .flow-check{display:flex;align-items:flex-start;gap:10px;margin:12px 2px;padding:12px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#333;font-size:12px;font-weight:850;line-height:1.55}.flow-check input{width:20px;height:20px;flex:0 0 20px;margin:0;accent-color:#111}
 .flow-actionbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px;border-top:1px solid rgba(17,24,39,.08);background:#ffffff}
 .flow-actionbar.single{grid-template-columns:1fr}.flow-actionbar .flow-secondary,.flow-actionbar .flow-primary{min-height:54px}
-.flow-bottom-nav{position:absolute;left:0;right:0;bottom:0;z-index:40;height:var(--flow-nav-height);display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:7px 12px calc(7px + env(safe-area-inset-bottom));border-top:1px solid rgba(17,24,39,.08);background:rgba(255,255,255,.98);box-shadow:0 -8px 26px rgba(17,24,39,.08);backdrop-filter:blur(16px)}
-.flow-bottom-nav button{min-height:55px;border:none;border-radius:14px;background:transparent;color:#8b9096;font-size:11px!important;font-weight:1000}.flow-bottom-nav button.active{width:82%;justify-self:center;background:#111;color:#fff}.flow-nav-icon{display:block;width:31px;height:31px;margin:0 auto 2px;border-radius:50%;background:#f0f2f3;line-height:31px;font-size:17px}.flow-bottom-nav button.active .flow-nav-icon{background:var(--flow-accent);color:#111}
+
+
 .flow-search-box{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:7px;margin-bottom:10px}.flow-search-box .flow-input{min-width:0}.flow-clear-btn{border:1px solid var(--flow-line);border-radius:14px;background:#fff;color:#555;font-size:21px}
 .flow-location-action{width:100%;display:flex;align-items:center;gap:10px;min-height:54px;margin-bottom:13px;padding:10px 12px;border:1px solid #d7e1f3;border-radius:15px;background:#f4f8ff;color:#2f4e7c;text-align:left;font-size:13px!important;font-weight:1000}.flow-location-action small{display:block;margin-top:2px;color:#6e7f96;font-size:10px;font-weight:800}
 .flow-section-label{margin:14px 2px 7px;color:#777c82;font-size:11px;font-weight:1000}.flow-results{display:flex;flex-direction:column;gap:8px}.flow-result{width:100%;display:grid;grid-template-columns:34px minmax(0,1fr) 20px;align-items:center;gap:9px;padding:11px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;text-align:left}.flow-result-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#f0f2f3}.flow-result strong{display:block;color:#111;font-size:13px;font-weight:1000;line-height:1.4}.flow-result small{display:block;margin-top:3px;color:#777c82;font-size:10px;font-weight:800;line-height:1.4}.flow-empty{padding:15px;border:1px dashed #d7dade;border-radius:15px;color:#858a90;font-size:12px;font-weight:850;text-align:center}
@@ -19934,12 +20033,12 @@ body.flow-active>.app{display:none!important}
 .flow-detail-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff}.flow-detail-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;padding:12px 13px;border-bottom:1px solid #eef0f1}.flow-detail-row:last-child{border-bottom:none}.flow-detail-row span{color:var(--flow-muted);font-size:11px;font-weight:900}.flow-detail-row strong{color:#111;font-size:13px;font-weight:850;line-height:1.6;word-break:break-word;white-space:pre-line}
 @media(max-width:360px){.flow-task-type-grid{grid-template-columns:1fr}.flow-profile-task-footer{align-items:center}.flow-detail-row{grid-template-columns:80px minmax(0,1fr)}}
 
-body:not(.flow-active) .bottom-tabs{grid-template-columns:repeat(2,1fr)!important}.bottom-tabs #tabTasks{display:none!important}
+
 
 /* 正式訂單追蹤頁的底部導航同步同一套視覺 */
-body:not(.flow-active) .bottom-tabs{height:var(--flow-nav-height)!important;max-width:520px!important;padding:7px 12px calc(7px + env(safe-area-inset-bottom))!important;border-radius:0!important;background:rgba(255,255,255,.98)!important;box-shadow:0 -8px 26px rgba(17,24,39,.08)!important}
-body:not(.flow-active) .bottom-tab{min-height:55px!important;border-radius:14px!important;color:#8b9096!important;font-size:11px!important}
-body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:center!important;background:#111!important;color:#fff!important}
+
+
+
 @media(max-width:390px){
   .flow-progress-item{font-size:9px}.flow-progress-item::before{width:17px;height:17px;flex-basis:17px}
   .flow-grid-2{grid-template-columns:1fr}.flow-timing-list,.flow-speed-list{grid-template-columns:1fr 1fr}.flow-map{height:270px}
@@ -21912,9 +22011,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     overflow:hidden !important;
   }
 
-  body.ubee-my-subpage-open #productionOrderFlow .flow-bottom-nav{
-    display:grid !important;
-  }
+  
 
   body.ubee-reduce-motion #productionOrderFlow .flow-page.active,
   body.ubee-reduce-motion #productionOrderFlow .ubee-my-panel.ubee-my-app-page.is-open{
@@ -22074,185 +22171,37 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   /* =========================================================
      唯一正式底部導覽｜固定貼底、滿版、無浮動容器
      ========================================================= */
-  #productionOrderFlow .flow-bottom-nav{
-    position:fixed !important;
-    left:50% !important;
-    right:auto !important;
-    bottom:0 !important;
-    transform:translateX(-50%) !important;
-    width:100% !important;
-    max-width:520px !important;
-    height:var(--flow-nav-total-height) !important;
-    min-height:var(--flow-nav-total-height) !important;
-    margin:0 !important;
-    padding:5px 8px calc(5px + env(safe-area-inset-bottom)) !important;
-    display:grid !important;
-    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-    align-items:stretch !important;
-    gap:0 !important;
-    border:0 !important;
-    border-top:1px solid rgba(17,24,39,.10) !important;
-    border-radius:0 !important;
-    background:#ffffff !important;
-    box-shadow:none !important;
-    -webkit-backdrop-filter:none !important;
-    backdrop-filter:none !important;
-    z-index:2147480000 !important;
-  }
+  
 
-  #productionOrderFlow .flow-bottom-nav button{
-    position:relative !important;
-    width:100% !important;
-    min-width:0 !important;
-    min-height:58px !important;
-    display:flex !important;
-    flex-direction:column !important;
-    align-items:center !important;
-    justify-content:center !important;
-    gap:2px !important;
-    padding:3px 2px !important;
-    border:0 !important;
-    border-radius:0 !important;
-    background:transparent !important;
-    color:#8b9096 !important;
-    font-size:10px !important;
-    font-weight:900 !important;
-    line-height:1.15 !important;
-    box-shadow:none !important;
-  }
+  
 
-  #productionOrderFlow .flow-bottom-nav button::before{
-    display:none !important;
-  }
+  
 
-  #productionOrderFlow .flow-bottom-nav button.active{
-    width:100% !important;
-    justify-self:stretch !important;
-    background:transparent !important;
-    color:#111111 !important;
-    box-shadow:none !important;
-  }
+  
 
-  #productionOrderFlow .flow-nav-icon{
-    width:36px !important;
-    height:31px !important;
-    margin:0 auto !important;
-    display:grid !important;
-    place-items:center !important;
-    border-radius:11px !important;
-    background:transparent !important;
-    color:currentColor !important;
-    line-height:1 !important;
-    font-size:0 !important;
-    transition:background .15s ease,transform .12s ease !important;
-  }
+  
 
-  #productionOrderFlow .flow-bottom-nav button.active .flow-nav-icon{
-    background:#fff1a8 !important;
-    color:#111111 !important;
-  }
+  
 
-  #productionOrderFlow .flow-bottom-nav button:active .flow-nav-icon{
-    transform:scale(.92) !important;
-  }
+  
 
-  #productionOrderFlow .flow-nav-icon svg{
-    width:22px !important;
-    height:22px !important;
-    margin:0 !important;
-    display:block !important;
-    fill:none !important;
-    stroke:currentColor !important;
-    stroke-width:2 !important;
-    stroke-linecap:round !important;
-    stroke-linejoin:round !important;
-  }
+  
 
-  #productionOrderFlow .flow-nav-label{
-    display:block !important;
-    font-size:10px !important;
-    font-weight:1000 !important;
-    white-space:nowrap !important;
-  }
+  
 
-  #productionOrderFlow .ubee-task-tab-busy .flow-nav-icon{
-    animation:ubeeTaskTabPulse .8s ease-in-out infinite alternate !important;
-  }
+  
 
-  body:not(.flow-active) .bottom-tabs{
-    position:fixed !important;
-    left:50% !important;
-    right:auto !important;
-    bottom:0 !important;
-    transform:translateX(-50%) !important;
-    width:100% !important;
-    max-width:520px !important;
-    height:var(--ubee-app-nav-total-height) !important;
-    min-height:var(--ubee-app-nav-total-height) !important;
-    margin:0 !important;
-    padding:5px 8px calc(5px + env(safe-area-inset-bottom)) !important;
-    display:grid !important;
-    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-    align-items:stretch !important;
-    gap:0 !important;
-    border:0 !important;
-    border-top:1px solid rgba(17,24,39,.10) !important;
-    border-radius:0 !important;
-    background:#ffffff !important;
-    box-shadow:none !important;
-    -webkit-backdrop-filter:none !important;
-    backdrop-filter:none !important;
-    z-index:2147480000 !important;
-  }
+  
 
-  body:not(.flow-active) .bottom-tab{
-    position:relative !important;
-    width:100% !important;
-    min-width:0 !important;
-    min-height:58px !important;
-    display:flex !important;
-    flex-direction:column !important;
-    align-items:center !important;
-    justify-content:center !important;
-    gap:2px !important;
-    padding:3px 2px !important;
-    border:0 !important;
-    border-radius:0 !important;
-    background:transparent !important;
-    color:#8b9096 !important;
-    font-size:10px !important;
-    font-weight:900 !important;
-    box-shadow:none !important;
-  }
+  
 
-  body:not(.flow-active) .bottom-tab.active{
-    width:100% !important;
-    justify-self:stretch !important;
-    background:transparent !important;
-    color:#111111 !important;
-    box-shadow:none !important;
-  }
+  
 
-  body:not(.flow-active) .bottom-tab .flow-nav-icon{
-    width:36px !important;
-    height:31px !important;
-    display:grid !important;
-    place-items:center !important;
-    border-radius:11px !important;
-    background:transparent !important;
-    color:currentColor !important;
-    font-size:0 !important;
-  }
+  
 
-  body:not(.flow-active) .bottom-tab.active .flow-nav-icon{
-    background:#fff1a8 !important;
-  }
+  
 
-  body:not(.flow-active) .bottom-tab .flow-nav-icon svg{
-    width:22px !important;
-    height:22px !important;
-    margin:0 !important;
-  }
+  
 
   @keyframes ubeeTaskTabPulse{
     from{opacity:.45;transform:scale(.94)}
