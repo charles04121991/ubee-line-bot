@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-04 R7｜我的頁面原生APP平面重構、底部導航舊浮動規則完全移除 -->
+<!-- UBee 正式營運修復版：2026-08-04 R10｜底部導航永久三欄單列、全站無浮動樣式 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -8711,59 +8711,177 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
   #productionOrderFlow .ubee-my-account-copy strong{font-size:18px!important;}
   #productionOrderFlow .ubee-my-menu-item{padding-left:12px!important;padding-right:12px!important;font-size:15px!important;}
 }
-</style><style id="ubee-permanent-flat-navigation-r9">
-/* =========================================================
-   UBee R9 永久規則：禁止底部導航與固定操作列使用浮動視覺。
-   後續修改不可加入置中浮層、圓角外框、陰影、毛玻璃或縮窄容器。
+</style><style id="ubee-flat-navigation-r10">/* =========================================================
+   UBee R10 永久版面規則
+   1. 底部導航永遠三欄、單列、滿版貼底。
+   2. 禁止圓角外框、陰影、毛玻璃、透明浮層、置中縮窄與換行。
+   3. 固定操作列必須是平面滿版列，不得以浮動卡片形式存在。
+   後續修改不得重新加入上述浮動樣式。
    ========================================================= */
-:root{--ubee-flat-nav-height:64px;}
+:root{
+  --ubee-bottom-nav-content-height:64px;
+  --ubee-bottom-nav-height:calc(64px + env(safe-area-inset-bottom));
+}
+
 #productionOrderFlow .flow-bottom-nav,
 body:not(.flow-active) .bottom-tabs{
-  position:fixed!important;left:0!important;right:0!important;bottom:0!important;
-  width:100vw!important;min-width:100vw!important;max-width:none!important;
-  height:calc(var(--ubee-flat-nav-height) + env(safe-area-inset-bottom))!important;
-  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  gap:0!important;margin:0!important;padding:0 0 env(safe-area-inset-bottom)!important;
-  border:0!important;border-top:1px solid #dfe2e5!important;border-radius:0!important;
-  background:#fff!important;box-shadow:none!important;filter:none!important;
-  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
-  transform:none!important;translate:none!important;overflow:visible!important;z-index:999!important;
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  transform:none!important;
+  translate:none!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:var(--ubee-bottom-nav-height)!important;
+  min-height:var(--ubee-bottom-nav-height)!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:var(--ubee-bottom-nav-content-height)!important;
+  grid-auto-flow:column!important;
+  grid-auto-columns:minmax(0,1fr)!important;
+  gap:0!important;
+  margin:0!important;
+  padding:0 0 env(safe-area-inset-bottom)!important;
+  overflow:hidden!important;
+  flex-wrap:nowrap!important;
+  border:0!important;
+  border-top:1px solid #dfe2e5!important;
+  border-radius:0!important;
+  background:#fff!important;
+  opacity:1!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  z-index:999!important;
+  box-sizing:border-box!important;
 }
-body:not(.flow-active) .bottom-tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
-#productionOrderFlow .flow-bottom-nav button,
-body:not(.flow-active) .bottom-tab{
-  position:relative!important;width:100%!important;min-width:0!important;max-width:none!important;
-  min-height:64px!important;height:64px!important;margin:0!important;padding:7px 4px 6px!important;
-  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:3px!important;
-  border:0!important;border-radius:0!important;background:#fff!important;color:#7f858c!important;
-  box-shadow:none!important;filter:none!important;transform:none!important;translate:none!important;
-  font-size:11px!important;font-weight:800!important;line-height:1.1!important;
+
+#productionOrderFlow .flow-bottom-nav > button,
+body:not(.flow-active) .bottom-tabs > .bottom-tab{
+  grid-row:1!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:var(--ubee-bottom-nav-content-height)!important;
+  min-height:var(--ubee-bottom-nav-content-height)!important;
+  display:flex!important;
+  flex-direction:column!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:3px!important;
+  margin:0!important;
+  padding:7px 4px 6px!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:#7f858c!important;
+  box-shadow:none!important;
+  filter:none!important;
+  transform:none!important;
+  translate:none!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+  text-align:center!important;
+  box-sizing:border-box!important;
 }
-#productionOrderFlow .flow-bottom-nav button::before,
-#productionOrderFlow .flow-bottom-nav button::after,
-body:not(.flow-active) .bottom-tab::before,
-body:not(.flow-active) .bottom-tab::after{content:none!important;display:none!important;}
-#productionOrderFlow .flow-bottom-nav button.active,
-body:not(.flow-active) .bottom-tab.active{
-  width:100%!important;justify-self:stretch!important;background:#fff!important;color:#111!important;
-  border-top:3px solid #f4bd00!important;box-shadow:none!important;transform:none!important;
+#productionOrderFlow .flow-bottom-nav > button:nth-child(1),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(1){grid-column:1!important;}
+#productionOrderFlow .flow-bottom-nav > button:nth-child(2),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(2){grid-column:2!important;}
+#productionOrderFlow .flow-bottom-nav > button:nth-child(3),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(3){grid-column:3!important;}
+
+#productionOrderFlow .flow-bottom-nav > button::before,
+#productionOrderFlow .flow-bottom-nav > button::after,
+body:not(.flow-active) .bottom-tabs > .bottom-tab::before,
+body:not(.flow-active) .bottom-tabs > .bottom-tab::after{
+  content:none!important;
+  display:none!important;
+}
+
+#productionOrderFlow .flow-bottom-nav > button.active,
+body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
+  width:100%!important;
+  background:#fff!important;
+  color:#111!important;
+  border-top:3px solid #f4bd00!important;
+  padding-top:4px!important;
+}
+
+#productionOrderFlow .flow-nav-icon,
+#productionOrderFlow .flow-nav-label,
+body:not(.flow-active) .bottom-tab svg{
+  flex:0 0 auto!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  filter:none!important;
+  transform:none!important;
+  translate:none!important;
 }
 #productionOrderFlow .flow-nav-icon,
 body:not(.flow-active) .bottom-tab svg{
-  width:23px!important;height:23px!important;min-width:23px!important;margin:0!important;padding:0!important;
-  display:grid!important;place-items:center!important;border:0!important;border-radius:0!important;
-  background:transparent!important;box-shadow:none!important;filter:none!important;transform:none!important;
+  width:23px!important;
+  height:23px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  font-size:20px!important;
+  line-height:1!important;
 }
-.home-action-footer,.step2-action-footer,.step3-action-footer,.step4-action-footer,
-.review-action-footer,.flow-action-footer{
-  position:fixed!important;left:0!important;right:0!important;
-  bottom:calc(var(--ubee-flat-nav-height) + env(safe-area-inset-bottom))!important;
-  width:100vw!important;max-width:none!important;margin:0!important;padding:10px 16px!important;
-  border:0!important;border-top:1px solid #dfe2e5!important;border-bottom:1px solid #dfe2e5!important;
-  border-radius:0!important;background:#fff!important;box-shadow:none!important;filter:none!important;
-  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;transform:none!important;translate:none!important;
+#productionOrderFlow .flow-nav-label{
+  display:block!important;
+  font-size:11px!important;
+  font-weight:850!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
 }
-/* 永久關閉所有殘留的浮動視覺效果 */
+
+/* 內容永遠預留完整導航高度，避免地圖、卡片與文字被遮住。 */
+#productionOrderFlow,
+#productionOrderFlow .flow-page,
+body:not(.flow-active) .app{
+  padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
+}
+
+/* 所有固定操作列一律改成平面滿版列，不得浮在頁面中央。 */
+.home-action-footer,
+.step2-action-footer,
+.step3-action-footer,
+.step4-action-footer,
+.step5-action-footer,
+.flow-action-footer,
+.flow-sticky-action,
+.tracking-action-footer{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  bottom:var(--ubee-bottom-nav-height)!important;
+  transform:none!important;
+  translate:none!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:10px 16px!important;
+  border:0!important;
+  border-top:1px solid #dfe2e5!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  box-sizing:border-box!important;
+}
+
+/* 全站永久禁用陰影與毛玻璃，避免後續舊規則重新產生浮動視覺。 */
 *,*::before,*::after{
   box-shadow:none!important;
   backdrop-filter:none!important;
@@ -22827,6 +22945,5 @@ body.flow-active>.app{display:none!important;}
   if(document.readyState !== 'loading') loadProfileFields();
 })();
 </script>
-
 </body>
 </html>
