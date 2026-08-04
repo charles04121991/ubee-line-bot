@@ -20223,35 +20223,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     </section>
 
 
-    <section id="flowPageTasks" class="flow-page flow-task-center-page" data-page="tasks">
-      <header class="flow-header flow-task-center-header">
-        <span></span>
-        <div class="flow-title-wrap"><div class="flow-title">任務中心</div><div class="flow-subtitle">查看所有任務、狀態與詳細內容</div></div>
-        <button id="flowTasksRefresh" class="flow-header-action" type="button" aria-label="重新整理任務">↻</button>
-      </header>
-      <div class="flow-scroll flow-task-center-scroll">
-        <button id="flowTasksActiveBanner" class="flow-active-task-banner" type="button" hidden>
-          <span><strong>目前有進行中的任務</strong><small>點一下查看即時任務進度</small></span><span>›</span>
-        </button>
-
-        <div class="flow-task-summary" aria-label="任務統計">
-          <div><strong id="flowTasksAllCount">0</strong><span>全部</span></div>
-          <div><strong id="flowTasksActiveCount">0</strong><span>進行中</span></div>
-          <div><strong id="flowTasksCompletedCount">0</strong><span>已完成</span></div>
-        </div>
-
-        <div id="flowTasksFilters" class="flow-task-filters" role="tablist" aria-label="任務篩選">
-          <button class="active" type="button" data-task-filter="all" role="tab" aria-selected="true">全部</button>
-          <button type="button" data-task-filter="active" role="tab" aria-selected="false">進行中</button>
-          <button type="button" data-task-filter="completed" role="tab" aria-selected="false">已完成</button>
-          <button type="button" data-task-filter="cancelled" role="tab" aria-selected="false">已取消</button>
-        </div>
-
-        <div id="flowTasksStatus" class="flow-status"></div>
-        <div id="flowTasksList" class="flow-task-center-list"><div class="flow-empty">正在讀取任務…</div></div>
-      </div>
-    </section>
-
     <section id="flowPageProfile" class="flow-page ubee-my-page" data-page="profile">
       <div class="ubee-my-scroll">
         <div class="ubee-my-top-actions">
@@ -20358,7 +20329,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
     <section id="flowPageProfileDetail" class="flow-page" data-page="profileDetail">
       <header class="flow-header">
-        <button class="flow-back-btn" data-order-detail-back type="button" aria-label="返回任務列表">‹</button>
+        <button class="flow-back-btn" data-go="profile" type="button" aria-label="返回我的">‹</button>
         <div class="flow-title-wrap"><div class="flow-title">任務詳細資訊</div><div class="flow-subtitle">查看任務內容與金額</div></div>
         <span></span>
       </header>
@@ -20368,14 +20339,12 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
           <div class="flow-profile-detail-amount"><span id="flowProfileDetailAmountLabel">任務金額</span><strong id="flowProfileDetailAmount">—</strong></div>
         </div>
         <div id="flowProfileDetailList" class="flow-detail-list"></div>
-        <button id="flowProfileDetailLive" class="flow-primary" type="button" style="margin-top:12px" hidden>查看即時任務進度</button>
-        <button class="flow-secondary" data-order-detail-back type="button" style="margin-top:10px">返回任務列表</button>
+        <button class="flow-secondary" data-go="profile" type="button" style="margin-top:12px">返回我的訂單</button>
       </div>
     </section>
 
     <nav class="flow-bottom-nav" aria-label="主要導覽">
       <button id="flowNavHome" class="active" type="button"><span class="flow-nav-icon">U</span>首頁</button>
-      <button id="flowNavTasks" type="button"><span class="flow-nav-icon">▣</span>任務</button>
       <button id="flowNavMy" type="button"><span class="flow-nav-icon">◎</span>我的</button>
     </nav>
   </div>
@@ -20390,7 +20359,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   const $=id=>document.getElementById(id);
   const root=$('productionOrderFlow');
   const serviceLabels={send:'幫我送',pickup:'幫我取',buy:'幫我買',queue:'幫排隊',helper:'全能跑腿'};
-  const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,tasks:0,profile:0,profileDetail:0};
+  const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,profile:0,profileDetail:0};
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
     pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
@@ -20398,7 +20367,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
-    mapRenderId:0,submitting:false,profileOrders:[],taskOrders:[],taskFilter:'all',selectedProfileOrder:null,detailReturnPage:'tasks'
+    mapRenderId:0,submitting:false,profileOrders:[],selectedProfileOrder:null
   };
 
   function setLoading(show,text='系統處理中…'){$('flowLoadingText').textContent=text;$('flowLoading').classList.toggle('show',!!show)}
@@ -20430,13 +20399,9 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function showPage(name){
     state.page=name;
     root.querySelectorAll('.flow-page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
-    const detailFromTasks=name==='profileDetail'&&state.detailReturnPage==='tasks';
-    const detailFromProfile=name==='profileDetail'&&state.detailReturnPage==='profile';
-    const isTasks=name==='tasks'||detailFromTasks;
-    const isProfile=name==='profile'||detailFromProfile;
-    $('flowNavHome')?.classList.toggle('active',!isTasks&&!isProfile);
-    $('flowNavTasks')?.classList.toggle('active',isTasks);
-    $('flowNavMy')?.classList.toggle('active',isProfile);
+    const isProfile=name==='profile'||name==='profileDetail';
+    $('flowNavHome').classList.toggle('active',!isProfile);
+    $('flowNavMy').classList.toggle('active',isProfile);
     const scroller=root.querySelector(`.flow-page[data-page="${name}"] .flow-scroll`);
     if(scroller)scroller.scrollTop=0;
   }
@@ -20797,29 +20762,10 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     return '依任務設定';
   }
 
-  function taskStatusGroup(order){
-    const value=String(order?.status||'').trim().toLowerCase();
-    if(['completed','done'].includes(value))return 'completed';
-    if(['cancelled','canceled'].includes(value))return 'cancelled';
-    return 'active';
-  }
-
-  function orderIdentity(order){
-    return String(order?.orderNo||order?.id||order?.orderId||'').trim();
-  }
-
-  function buildTaskCenterCard(order,index,attributeName='data-task-order-index'){
-    const amountInfo=orderAmountInfo(order);
-    const amountText=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
-    const pickup=profileOrderAddress(order,'pickup');
-    const dropoff=profileOrderAddress(order,'dropoff');
-    return `<button class="flow-task-center-card" type="button" ${attributeName}="${index}"><div class="flow-task-center-card-head"><div><strong>${escapeHtml(profileOrderTitle(order))}</strong><small>${escapeHtml(orderTimeText(order)||'任務時間確認中')}</small></div><span>${escapeHtml(orderStatusText(order.status))}</span></div><div class="flow-task-center-route"><div><i class="pickup">取</i><span>${escapeHtml(pickup)}</span></div><div><i class="dropoff">送</i><span>${escapeHtml(dropoff)}</span></div></div><div class="flow-task-center-card-footer"><div><small>${escapeHtml(amountInfo.label)}</small><strong>${escapeHtml(amountText)}</strong></div><span class="flow-task-center-enter">查看內容 ›</span></div></button>`;
-  }
-
-  function openOrderDetail(order,returnPage='tasks'){
+  function openProfileOrderDetail(index){
+    const order=state.profileOrders[Number(index)];
     if(!order)return;
     state.selectedProfileOrder=order;
-    state.detailReturnPage=returnPage==='profile'?'profile':'tasks';
     const amountInfo=orderAmountInfo(order);
     $('flowProfileDetailTitle').textContent=profileOrderTitle(order);
     $('flowProfileDetailStatus').textContent=orderStatusText(order.status);
@@ -20843,73 +20789,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       ['付款方式',profileOrderPayment(order)]
     ];
     $('flowProfileDetailList').innerHTML=rows.map(([label,value])=>`<div class="flow-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
-
-    const liveButton=$('flowProfileDetailLive');
-    if(liveButton){
-      const selectedId=orderIdentity(order);
-      const currentId=String(currentOrderId||'').trim();
-      liveButton.hidden=taskStatusGroup(order)!=='active'||!currentId||!selectedId||selectedId!==currentId;
-    }
     showPage('profileDetail');
-  }
-
-  function openProfileOrderDetail(index){
-    openOrderDetail(state.profileOrders[Number(index)],'profile');
-  }
-
-  function openTaskOrderDetail(index){
-    openOrderDetail(state.taskOrders[Number(index)],'tasks');
-  }
-
-  function returnFromOrderDetail(){
-    if(state.detailReturnPage==='profile'){
-      renderProfile();
-      return;
-    }
-    renderTaskCenter(state.taskFilter);
-  }
-
-  async function renderTaskCenter(filter=state.taskFilter){
-    root.classList.add('active');
-    document.body.classList.add('flow-active');
-    document.body.classList.remove('ubee-active-order');
-    state.taskFilter=['all','active','completed','cancelled'].includes(filter)?filter:'all';
-    showPage('tasks');
-
-    const list=$('flowTasksList');
-    const statusEl=$('flowTasksStatus');
-    if(statusEl)statusEl.textContent='';
-    if(list)list.innerHTML='<div class="flow-empty">正在讀取任務…</div>';
-    $('flowTasksActiveBanner').hidden=!activeOrder();
-
-    root.querySelectorAll('[data-task-filter]').forEach(button=>{
-      const selected=button.dataset.taskFilter===state.taskFilter;
-      button.classList.toggle('active',selected);
-      button.setAttribute('aria-selected',selected?'true':'false');
-    });
-
-    try{
-      if(typeof loadCustomerOrders!=='function')throw new Error('任務資料尚未載入');
-      const orders=await loadCustomerOrders();
-      state.taskOrders=Array.isArray(orders)?orders:[];
-      const groups={active:0,completed:0,cancelled:0};
-      state.taskOrders.forEach(order=>{groups[taskStatusGroup(order)]+=1});
-      $('flowTasksAllCount').textContent=String(state.taskOrders.length);
-      $('flowTasksActiveCount').textContent=String(groups.active);
-      $('flowTasksCompletedCount').textContent=String(groups.completed);
-
-      const filtered=state.taskFilter==='all'
-        ?state.taskOrders
-        :state.taskOrders.filter(order=>taskStatusGroup(order)===state.taskFilter);
-      const originalIndex=new Map(state.taskOrders.map((order,index)=>[order,index]));
-      list.innerHTML=filtered.length
-        ?filtered.map(order=>buildTaskCenterCard(order,originalIndex.get(order))).join('')
-        :'<div class="flow-empty">這個分類目前沒有任務。</div>';
-    }catch(error){
-      console.error('任務中心讀取失敗：',error);
-      if(list)list.innerHTML='<div class="flow-empty">任務讀取失敗，請稍後再試。</div>';
-      if(statusEl){statusEl.textContent=error.message||'任務讀取失敗';statusEl.classList.add('error')}
-    }
   }
 
   async function renderProfile(){
@@ -20931,12 +20811,12 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     try{
       if(typeof loadCustomerOrders!=='function')throw new Error('任務資料尚未載入');
       const orders=await loadCustomerOrders();
-      const recent=Array.isArray(orders)?orders.slice(0,3):[];
+      const recent=Array.isArray(orders)?orders.slice(0,100):[];
       state.profileOrders=recent;
       list.innerHTML=recent.length?recent.map((order,index)=>{
         const amountInfo=orderAmountInfo(order);
         const amountText=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
-        return `<button class="flow-profile-task-card flow-profile-task-card-button" type="button" data-profile-order-index="${index}"><div class="flow-profile-task-head"><div class="flow-profile-task-title"><strong>${escapeHtml(profileOrderTitle(order))}</strong><small>${escapeHtml(orderTimeText(order)||'任務時間確認中')}</small></div><span class="flow-profile-task-status">${escapeHtml(orderStatusText(order.status))}</span></div><div class="flow-profile-task-footer"><div class="flow-profile-task-amount"><small>${escapeHtml(amountInfo.label)}</small><strong>${escapeHtml(amountText)}</strong></div><span class="flow-profile-detail-btn">詳細資訊</span></div></button>`;
+        return `<div class="flow-profile-task-card" role="button" tabindex="0" data-profile-order-index="${index}"><div class="flow-profile-task-head"><div class="flow-profile-task-title"><strong>${escapeHtml(profileOrderTitle(order))}</strong><small>${escapeHtml(orderTimeText(order)||'任務時間確認中')}</small></div><span class="flow-profile-task-status">${escapeHtml(orderStatusText(order.status))}</span></div><div class="flow-profile-task-footer"><div class="flow-profile-task-amount"><small>${escapeHtml(amountInfo.label)}</small><strong>${escapeHtml(amountText)}</strong></div><button class="flow-profile-detail-btn" type="button" data-profile-order-index="${index}">詳細資訊</button></div></div>`;
       }).join(''):'<div class="flow-empty">目前還沒有最近任務</div>';
     }catch(error){list.innerHTML='<div class="flow-empty">最近任務暫時無法讀取</div>'}
   }
@@ -20970,12 +20850,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
     $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
     $('flowProfileTasksList').addEventListener('click',event=>{const btn=event.target.closest('[data-profile-order-index]');if(btn)openProfileOrderDetail(btn.dataset.profileOrderIndex)});
-    $('flowTasksList').addEventListener('click',event=>{const btn=event.target.closest('[data-task-order-index]');if(btn)openTaskOrderDetail(btn.dataset.taskOrderIndex)});
-    $('flowTasksFilters').addEventListener('click',event=>{const btn=event.target.closest('[data-task-filter]');if(btn)renderTaskCenter(btn.dataset.taskFilter)});
-    $('flowTasksRefresh').addEventListener('click',()=>renderTaskCenter(state.taskFilter));
-    $('flowTasksActiveBanner').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});
-    root.querySelectorAll('[data-order-detail-back]').forEach(btn=>btn.addEventListener('click',returnFromOrderDetail));
-    $('flowProfileDetailLive').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});
     const closeMyPanels=()=>root.querySelectorAll('.ubee-my-panel').forEach(panel=>panel.hidden=true);
     root.addEventListener('click',event=>{
       const closeBtn=event.target.closest('[data-my-close]');
@@ -20997,7 +20871,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
         $('ubeeMyAccountEmail').textContent=currentCustomer.email||'尚未提供';
         openMyPanel('ubeeMyAccountPanel');return;
       }
-      if(action==='orders'){closeMyPanels();renderTaskCenter();return}
+      if(action==='orders'){openMyPanel('ubeeMyOrdersPanel');return}
       if(action==='addresses'){openMyPanel('ubeeMyAddressesPanel');return}
       if(action==='settings'){openMyPanel('ubeeMySettingsPanel');return}
       if(action==='coupons'){openMyPanel('ubeeMyCouponsPanel');return}
@@ -21022,16 +20896,15 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       if(statusEl){statusEl.textContent='即將開啟郵件 App，請確認內容後寄出。';statusEl.style.color='#73787e'}
       window.location.href=`mailto:service@ubee.tw?subject=${subject}&body=${body}`;
     });
-    $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavTasks').addEventListener('click',()=>renderTaskCenter());$('flowNavMy').addEventListener('click',renderProfile);const openSupport=()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}};$('flowSupportButton').addEventListener('click',openSupport);$('flowProfileSupportIcon').addEventListener('click',openSupport);$('flowProfileSupport').addEventListener('click',openSupport);$('flowProfileLogout').addEventListener('click',async()=>{if(!confirm('確定要登出 UBee 帳號嗎？'))return;try{await customerApiFetch('/api/customer-auth/logout',{method:'POST',body:JSON.stringify({})})}catch(error){console.warn('登出失敗：',error)}finally{localStorage.removeItem('ubee_current_order_id');currentCustomer=null;userId='';root.classList.remove('active');document.body.classList.remove('flow-active','ubee-active-order');window.UBeeCustomerAuthHost?.show('login')}});$('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
+    $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});$('flowNavMy').addEventListener('click',renderProfile);const openSupport=()=>{try{openLineOfficialAccount()}catch(_){location.href='https://lin.ee/'}};$('flowSupportButton').addEventListener('click',openSupport);$('flowProfileSupportIcon').addEventListener('click',openSupport);$('flowProfileSupport').addEventListener('click',openSupport);$('flowProfileLogout').addEventListener('click',async()=>{if(!confirm('確定要登出 UBee 帳號嗎？'))return;try{await customerApiFetch('/api/customer-auth/logout',{method:'POST',body:JSON.stringify({})})}catch(error){console.warn('登出失敗：',error)}finally{localStorage.removeItem('ubee_current_order_id');currentCustomer=null;userId='';root.classList.remove('active');document.body.classList.remove('flow-active','ubee-active-order');window.UBeeCustomerAuthHost?.show('login')}});$('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});$('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
   buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();detectLocation();
   const originalShowHome=typeof window.showHomeTab==='function'?window.showHomeTab:null;
   window.showHomeTab=function(){if(activeOrder()){root.classList.remove('active');document.body.classList.remove('flow-active');return originalShowHome?.apply(this,arguments)}showFlow({fresh:true})};
-  window.openUBeeProfilePage=function(){root.classList.add('active');document.body.classList.add('flow-active');document.body.classList.remove('ubee-active-order');renderProfile()};
-  window.openUBeeTasksPage=function(){root.classList.add('active');document.body.classList.add('flow-active');document.body.classList.remove('ubee-active-order');renderTaskCenter()};
+  window.openUBeeProfilePage=function(){root.classList.add('active');document.body.classList.add('flow-active');renderProfile()};
   window.showProfileTab=window.openUBeeProfilePage;
-  window.showTasksTab=window.openUBeeTasksPage;
+  window.showTasksTab=window.openUBeeProfilePage;
   window.showCustomerSubPage=window.openUBeeProfilePage;
   window.openUBeeSystemOrderFlow=(options={})=>
     showFlow({fresh:options.fresh!==false});
@@ -21040,70 +20913,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 })();
 </script>
 
-
-<style id="ubee-app-navigation-pages-v1">
-  /* 2026-08-04：首頁／任務／我的改為真正 App 式三分頁。 */
-  #productionOrderFlow .flow-bottom-nav{grid-template-columns:repeat(3,1fr)!important}
-
-  #productionOrderFlow .flow-header-action{
-    width:42px;height:42px;border:1px solid #e4e6e8;border-radius:14px;background:#fff;color:#111;
-    font-size:22px!important;font-weight:1000;box-shadow:0 4px 14px rgba(17,24,39,.05)
-  }
-  #productionOrderFlow .flow-task-center-scroll{padding-top:16px;background:#f6f7f8}
-  #productionOrderFlow .flow-active-task-banner{
-    width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:15px 16px;
-    border:1px solid #ead168;border-radius:19px;background:#fff8d7;color:#111;text-align:left
-  }
-  #productionOrderFlow .flow-active-task-banner strong{display:block;font-size:15px;font-weight:1000}
-  #productionOrderFlow .flow-active-task-banner small{display:block;margin-top:4px;color:#756727;font-size:11px;font-weight:850}
-  #productionOrderFlow .flow-active-task-banner>span:last-child{font-size:27px;color:#8a7300}
-  #productionOrderFlow .flow-task-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
-  #productionOrderFlow .flow-task-summary>div{padding:13px 8px;border:1px solid #e5e7e9;border-radius:17px;background:#fff;text-align:center;box-shadow:0 5px 16px rgba(17,24,39,.04)}
-  #productionOrderFlow .flow-task-summary strong{display:block;color:#111;font-size:21px;font-weight:1000}
-  #productionOrderFlow .flow-task-summary span{display:block;margin-top:3px;color:#858a90;font-size:10px;font-weight:900}
-  #productionOrderFlow .flow-task-filters{display:flex;gap:8px;overflow-x:auto;margin:0 -2px 14px;padding:2px;scrollbar-width:none}
-  #productionOrderFlow .flow-task-filters::-webkit-scrollbar{display:none}
-  #productionOrderFlow .flow-task-filters button{flex:0 0 auto;min-height:39px;padding:0 14px;border:1px solid #dfe2e5;border-radius:999px;background:#fff;color:#71767b;font-size:12px!important;font-weight:1000}
-  #productionOrderFlow .flow-task-filters button.active{border-color:#111;background:#111;color:#fff}
-  #productionOrderFlow .flow-task-center-list{display:flex;flex-direction:column;gap:11px;padding-bottom:18px}
-  #productionOrderFlow .flow-task-center-card{
-    width:100%;padding:15px;border:1px solid #e4e6e8;border-radius:21px;background:#fff;color:#111;text-align:left;
-    box-shadow:0 7px 22px rgba(17,24,39,.055);touch-action:manipulation
-  }
-  #productionOrderFlow .flow-task-center-card:active{transform:scale(.992);background:#fcfcfc}
-  #productionOrderFlow .flow-task-center-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-  #productionOrderFlow .flow-task-center-card-head strong{display:block;font-size:16px;font-weight:1000;line-height:1.35}
-  #productionOrderFlow .flow-task-center-card-head small{display:block;margin-top:4px;color:#8a8f94;font-size:10px;font-weight:850}
-  #productionOrderFlow .flow-task-center-card-head>span{flex:0 0 auto;padding:6px 9px;border-radius:999px;background:#f2f3f4;color:#565c62;font-size:10px;font-weight:1000}
-  #productionOrderFlow .flow-task-center-route{display:flex;flex-direction:column;gap:8px;margin-top:13px;padding:12px;border-radius:15px;background:#f7f8f9}
-  #productionOrderFlow .flow-task-center-route>div{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:start}
-  #productionOrderFlow .flow-task-center-route i{display:grid;place-items:center;width:26px;height:26px;border-radius:9px;font-style:normal;font-size:10px;font-weight:1000}
-  #productionOrderFlow .flow-task-center-route i.pickup{background:#111;color:#fff}
-  #productionOrderFlow .flow-task-center-route i.dropoff{background:#facc15;color:#111}
-  #productionOrderFlow .flow-task-center-route span{padding-top:4px;color:#454a50;font-size:12px;font-weight:850;line-height:1.45;word-break:break-word}
-  #productionOrderFlow .flow-task-center-card-footer{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:12px;padding-top:11px;border-top:1px solid #eef0f1}
-  #productionOrderFlow .flow-task-center-card-footer small{display:block;color:#8a8f94;font-size:9px;font-weight:850}
-  #productionOrderFlow .flow-task-center-card-footer strong{display:block;margin-top:2px;font-size:18px;font-weight:1000}
-  #productionOrderFlow .flow-task-center-enter{color:#806600;font-size:11px;font-weight:1000}
-
-  /* 「我的」每一個入口改為全畫面子頁，而不是在原頁底部展開。 */
-  #productionOrderFlow .ubee-my-panel:not([hidden]){
-    position:fixed!important;left:50%!important;right:auto!important;top:0!important;bottom:var(--flow-nav-total-height)!important;
-    transform:translateX(-50%)!important;width:100%!important;max-width:520px!important;margin:0!important;
-    padding:calc(16px + env(safe-area-inset-top)) 18px 28px!important;border:0!important;border-radius:0!important;
-    background:#f6f7f8!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;z-index:2147481900!important;
-    animation:ubeeMyPageIn .18s ease both
-  }
-  #productionOrderFlow .ubee-my-panel-head{
-    position:sticky;top:calc(-16px - env(safe-area-inset-top));z-index:3;margin:calc(-16px - env(safe-area-inset-top)) -18px 16px!important;
-    padding:calc(16px + env(safe-area-inset-top)) 18px 13px;border-bottom:1px solid #e5e7e9;background:rgba(255,255,255,.97);backdrop-filter:blur(15px)
-  }
-  #productionOrderFlow .ubee-my-panel-head strong{font-size:20px!important}
-  #productionOrderFlow .ubee-my-panel-head button{min-width:54px;min-height:38px;border:1px solid #e2e4e6!important;border-radius:999px!important;background:#fff!important;color:#111!important}
-  #productionOrderFlow .flow-profile-task-card-button{appearance:none;-webkit-appearance:none;text-align:left;color:#111;cursor:pointer}
-  #productionOrderFlow .flow-profile-detail-btn{display:inline-flex;align-items:center;justify-content:center}
-  @keyframes ubeeMyPageIn{from{opacity:.35;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
-</style>
 
 <script data-ubee-customer-pwa="official">
   /* UBee 跑腿用戶端 PWA｜唯一正式 Service Worker */
@@ -21487,7 +21296,8 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
   function openActiveTask(){
     if(!hasActiveOrder()){
-      window.showTasksTab?.();
+      window.openUBeeProfilePage?.();
+      setTimeout(() => document.querySelector('[data-my-action="orders"]')?.click(),80);
       return;
     }
     byId('productionOrderFlow')?.classList.remove('active');
@@ -21696,6 +21506,452 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   syncPushUi();
   setInterval(() => renderAppTracking(typeof currentOrderData !== 'undefined' ? currentOrderData : null),5000);
   setTimeout(openPushOrderFromUrl,900);
+})();
+</script>
+
+
+
+<!-- =========================================================
+     UBee 用戶端 APP 導覽修正版｜2026-08-04
+     1. 任務按鈕固定可進入：有進行中任務時開啟追蹤；沒有時開啟我的訂單。
+     2. 我的頁面所有入口改為獨立 App 式內頁，提供明確返回操作。
+     3. 訂單卡整張可點擊，並保留既有詳細資訊頁與既有後端 API。
+     ========================================================= -->
+<style id="ubeeAppNavigationFix20260804">
+  #productionOrderFlow #flowPageProfile{
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+  }
+
+  #productionOrderFlow .flow-profile-task-card{
+    cursor:pointer;
+    transition:transform .14s ease, background .14s ease, border-color .14s ease;
+  }
+
+  #productionOrderFlow .flow-profile-task-card:active{
+    transform:scale(.992);
+    background:#fffdf2;
+    border-color:#e7cf63;
+  }
+
+  #productionOrderFlow .flow-profile-task-card:focus-visible{
+    outline:3px solid rgba(250,204,21,.42);
+    outline-offset:2px;
+  }
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+    position:absolute !important;
+    inset:0 !important;
+    z-index:120 !important;
+    display:block;
+    width:100%;
+    height:100%;
+    min-height:100%;
+    margin:0 !important;
+    padding:0 20px calc(34px + env(safe-area-inset-bottom)) !important;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    border:0 !important;
+    border-radius:0 !important;
+    background:#f7f8f9 !important;
+    box-shadow:none !important;
+    animation:ubeeMyPageIn .18s ease;
+  }
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page[hidden]{
+    display:none !important;
+  }
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-panel-head{
+    position:sticky;
+    top:0;
+    z-index:4;
+    display:grid;
+    grid-template-columns:46px minmax(0,1fr) 46px;
+    align-items:center;
+    min-height:64px;
+    margin:0 -20px 18px;
+    padding:calc(8px + env(safe-area-inset-top)) 14px 8px;
+    border-bottom:1px solid #e8eaec;
+    background:rgba(255,255,255,.97);
+    box-shadow:0 5px 18px rgba(17,24,39,.04);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+  }
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-panel-head strong{
+    grid-column:2;
+    grid-row:1;
+    display:block;
+    overflow:hidden;
+    color:#111;
+    font-size:18px;
+    font-weight:1000;
+    line-height:1.3;
+    text-align:center;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-panel-head [data-my-close]{
+    grid-column:1;
+    grid-row:1;
+    display:grid;
+    place-items:center;
+    width:42px;
+    height:42px;
+    padding:0;
+    border:1px solid #e4e6e8;
+    border-radius:50%;
+    background:#fff;
+    color:#111;
+    font-size:31px !important;
+    font-weight:500;
+    line-height:1;
+    box-shadow:0 2px 8px rgba(17,24,39,.04);
+  }
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .flow-profile-list,
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-info-list,
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-feature-note,
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-empty-state,
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-feedback-form,
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-setting-button{
+    margin-bottom:14px;
+  }
+
+  #productionOrderFlow .ubee-my-support-card{
+    padding:17px;
+    border:1px solid #e4e6e8;
+    border-radius:20px;
+    background:#fff;
+    box-shadow:0 8px 24px rgba(17,24,39,.05);
+  }
+
+  #productionOrderFlow .ubee-my-support-card strong{
+    display:block;
+    color:#111;
+    font-size:18px;
+    font-weight:1000;
+  }
+
+  #productionOrderFlow .ubee-my-support-card p{
+    margin:8px 0 16px;
+    color:#6f7479;
+    font-size:13px;
+    font-weight:800;
+    line-height:1.7;
+  }
+
+  #productionOrderFlow .ubee-my-support-actions{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+
+  #productionOrderFlow .ubee-my-support-actions button{
+    width:100%;
+    min-height:52px;
+    border:0;
+    border-radius:15px;
+    background:#facc15;
+    color:#111;
+    font-size:15px !important;
+    font-weight:1000;
+  }
+
+  #productionOrderFlow .ubee-my-support-actions button.secondary{
+    border:1px solid #dfe2e5;
+    background:#fff;
+  }
+
+  body.ubee-my-subpage-open #productionOrderFlow .flow-bottom-nav{
+    display:none !important;
+  }
+
+  body.ubee-my-subpage-open #productionOrderFlow .ubee-my-scroll{
+    overflow:hidden;
+  }
+
+  @keyframes ubeeMyPageIn{
+    from{opacity:.25;transform:translateX(12px)}
+    to{opacity:1;transform:translateX(0)}
+  }
+</style>
+
+<script id="ubeeAppNavigationFixScript20260804">
+(() => {
+  'use strict';
+
+  const root = document.getElementById('productionOrderFlow');
+  if(!root || root.dataset.ubeeAppNavigationFix === '20260804') return;
+  root.dataset.ubeeAppNavigationFix = '20260804';
+
+  const panelMap = Object.freeze({
+    account:'ubeeMyAccountPanel',
+    orders:'ubeeMyOrdersPanel',
+    coupons:'ubeeMyCouponsPanel',
+    addresses:'ubeeMyAddressesPanel',
+    notifications:'ubeeMyNotificationsPanel',
+    rewards:'ubeeMyRewardsPanel',
+    support:'ubeeMySupportPanel',
+    feedback:'ubeeMyFeedbackPanel',
+    settings:'ubeeMySettingsPanel'
+  });
+
+  function getCurrentCustomerSafe(){
+    try{
+      return typeof currentCustomer !== 'undefined' ? currentCustomer : null;
+    }catch(_){
+      return null;
+    }
+  }
+
+  function getCurrentOrderIdSafe(){
+    try{
+      const memoryId = typeof currentOrderId !== 'undefined' ? currentOrderId : '';
+      return String(memoryId || localStorage.getItem('ubee_current_order_id') || '').trim().toUpperCase();
+    }catch(_){
+      return '';
+    }
+  }
+
+  function getCurrentOrderStatusSafe(){
+    try{
+      return String(
+        (typeof currentOrderData !== 'undefined' && currentOrderData)
+          ? currentOrderData.status || currentOrderData.riderStatus || ''
+          : ''
+      ).trim().toLowerCase();
+    }catch(_){
+      return '';
+    }
+  }
+
+  function hasOpenableActiveTask(){
+    const orderId = getCurrentOrderIdSafe();
+    if(!orderId) return false;
+    const status = getCurrentOrderStatusSafe();
+    return !['completed','done','cancelled','canceled'].includes(status);
+  }
+
+  function ensureSupportPanel(){
+    let panel = document.getElementById('ubeeMySupportPanel');
+    if(panel) return panel;
+
+    const host = root.querySelector('#flowPageProfile .ubee-my-scroll');
+    if(!host) return null;
+
+    panel = document.createElement('section');
+    panel.id = 'ubeeMySupportPanel';
+    panel.className = 'ubee-my-panel';
+    panel.hidden = true;
+    panel.innerHTML = `
+      <div class="ubee-my-panel-head"><strong>聯繫客服</strong><button type="button" data-my-close aria-label="返回我的">‹</button></div>
+      <div class="ubee-my-support-card">
+        <strong>需要 UBee 協助嗎？</strong>
+        <p>可直接開啟 UBee 客服中心查看處理方式，或透過 LINE 官方帳號聯繫客服人員。</p>
+        <div class="ubee-my-support-actions">
+          <button id="ubeeOpenSupportCenter" type="button">開啟 UBee 客服中心</button>
+          <button id="ubeeOpenLineSupport" class="secondary" type="button">開啟 LINE 官方帳號</button>
+        </div>
+      </div>`;
+    host.appendChild(panel);
+
+    panel.querySelector('#ubeeOpenSupportCenter')?.addEventListener('click', () => {
+      window.location.href = '/support.html';
+    });
+    panel.querySelector('#ubeeOpenLineSupport')?.addEventListener('click', () => {
+      try{
+        if(typeof window.openLineOfficialAccount === 'function'){
+          window.openLineOfficialAccount();
+          return;
+        }
+      }catch(_){ }
+      window.location.href = 'https://lin.ee/';
+    });
+
+    return panel;
+  }
+
+  function preparePanels(){
+    ensureSupportPanel();
+    root.querySelectorAll('.ubee-my-panel').forEach(panel => {
+      panel.classList.add('ubee-my-app-page');
+      const close = panel.querySelector('[data-my-close]');
+      if(close){
+        close.textContent = '‹';
+        close.setAttribute('aria-label','返回我的');
+      }
+    });
+  }
+
+  function closeMySubPages(){
+    root.querySelectorAll('.ubee-my-panel').forEach(panel => {
+      panel.hidden = true;
+      panel.classList.remove('is-open');
+    });
+    document.body.classList.remove('ubee-my-subpage-open');
+  }
+
+  function fillAccountPanel(){
+    const customer = getCurrentCustomerSafe();
+    const name = document.getElementById('ubeeMyAccountName');
+    const phone = document.getElementById('ubeeMyAccountPhone');
+    const email = document.getElementById('ubeeMyAccountEmail');
+    if(name) name.textContent = customer?.name || 'UBee 會員';
+    if(phone) phone.textContent = customer?.phone || '尚未提供';
+    if(email) email.textContent = customer?.email || '尚未提供';
+  }
+
+  function fillFeedbackContact(){
+    const customer = getCurrentCustomerSafe();
+    const input = document.getElementById('ubeeMyFeedbackContact');
+    if(input && customer && !input.value){
+      input.value = customer.email || customer.phone || '';
+    }
+  }
+
+  function markBottomNav(mode){
+    const isTask = mode === 'task';
+    const flowTask = document.getElementById('flowNavTasks');
+    const flowMy = document.getElementById('flowNavMy');
+    const flowHome = document.getElementById('flowNavHome');
+    const legacyTask = document.getElementById('tabTasks');
+    const legacyMy = document.getElementById('tabProfile');
+    const legacyHome = document.getElementById('tabHome');
+
+    [flowTask,flowMy,flowHome,legacyTask,legacyMy,legacyHome].forEach(item => item?.classList.remove('active'));
+    if(isTask){
+      flowTask?.classList.add('active');
+      legacyTask?.classList.add('active');
+    }else{
+      flowMy?.classList.add('active');
+      legacyMy?.classList.add('active');
+    }
+  }
+
+  function showMyRoot(){
+    try{
+      window.openUBeeProfilePage?.();
+    }catch(error){
+      console.warn('UBee 我的頁面開啟失敗：', error);
+    }
+  }
+
+  function openMySection(action, options = {}){
+    const normalized = String(action || '').trim().toLowerCase();
+    const panelId = panelMap[normalized];
+    if(!panelId) return false;
+
+    if(normalized === 'account' && !getCurrentCustomerSafe()){
+      root.classList.remove('active');
+      document.body.classList.remove('flow-active','ubee-my-subpage-open');
+      window.UBeeCustomerAuthHost?.show('login');
+      return true;
+    }
+
+    showMyRoot();
+    preparePanels();
+    closeMySubPages();
+
+    if(normalized === 'account') fillAccountPanel();
+    if(normalized === 'feedback') fillFeedbackContact();
+
+    const panel = document.getElementById(panelId);
+    if(!panel) return false;
+
+    panel.hidden = false;
+    panel.classList.add('is-open');
+    document.body.classList.add('ubee-my-subpage-open');
+    markBottomNav(options.fromTask ? 'task' : 'my');
+    requestAnimationFrame(() => { panel.scrollTop = 0; });
+    return true;
+  }
+
+  function openTaskPage(){
+    closeMySubPages();
+
+    if(hasOpenableActiveTask()){
+      root.classList.remove('active');
+      document.body.classList.remove('flow-active','ubee-my-subpage-open');
+      try{
+        if(typeof window.showOnlyStep === 'function'){
+          window.showOnlyStep(5);
+        }else if(typeof showOnlyStep === 'function'){
+          showOnlyStep(5);
+        }
+      }catch(error){
+        console.warn('UBee 任務追蹤頁開啟失敗：', error);
+      }
+      markBottomNav('task');
+      return true;
+    }
+
+    return openMySection('orders',{fromTask:true});
+  }
+
+  window.openUBeeMySection = openMySection;
+  window.openUBeeTaskPage = openTaskPage;
+  window.showTasksTab = openTaskPage;
+
+  preparePanels();
+
+  document.addEventListener('click', event => {
+    const taskTab = event.target.closest('#tabTasks, #flowNavTasks');
+    if(taskTab){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openTaskPage();
+      return;
+    }
+
+    const closeButton = event.target.closest('#productionOrderFlow [data-my-close]');
+    if(closeButton){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeMySubPages();
+      markBottomNav('my');
+      return;
+    }
+
+    const detailTarget = event.target.closest('#flowProfileTasksList [data-profile-order-index]');
+    if(detailTarget){
+      closeMySubPages();
+      document.body.classList.remove('ubee-my-subpage-open');
+      return;
+    }
+
+    const supportButton = event.target.closest('#flowProfileSupportIcon, #flowProfileSupport');
+    if(supportButton){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openMySection('support');
+      return;
+    }
+
+    const actionButton = event.target.closest('#productionOrderFlow [data-my-action]');
+    if(actionButton){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openMySection(actionButton.dataset.myAction || '');
+    }
+  }, true);
+
+  document.addEventListener('keydown', event => {
+    const card = event.target.closest?.('#flowProfileTasksList .flow-profile-task-card[data-profile-order-index]');
+    if(!card || !['Enter',' '].includes(event.key)) return;
+    event.preventDefault();
+    card.click();
+  });
+
+  document.addEventListener('click', event => {
+    if(!event.target.closest('#flowPageProfileDetail [data-go="profile"]')) return;
+    setTimeout(() => openMySection('orders'), 0);
+  });
 })();
 </script>
 
