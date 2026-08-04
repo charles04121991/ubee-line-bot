@@ -19,7 +19,7 @@
   <meta name="theme-color" content="#ffffff">
 
   <title>UBee 跑腿｜正式營運用戶端</title>
-  <!-- UBee 正式營運修復版：2026-08-04 R1｜唯一 App 導覽與原生操作層 -->
+  <!-- UBee 正式營運修復版：2026-08-04 R5｜我的頁面唯一控制器、完整可點擊、平面版面 -->
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
 
@@ -8893,6 +8893,306 @@ body{background:#eef0f2;}
 .ubee-flat-status{padding:12px 16px;color:#555;font-size:13px}.danger-text{color:#c00!important}
 .ubee-my-empty-state,.ubee-my-feature-note{border-radius:0!important;box-shadow:none!important;border:0!important;background:#fff!important;margin:0 -14px 12px!important;padding:18px 16px!important}
 </style>
+
+<style id="ubee-my-layout-repair-v5">
+/* UBee「我的」唯一正式平面版：不使用浮動卡片、毛玻璃或懸浮陰影 */
+#productionOrderFlow .ubee-my-page,
+#productionOrderFlow .ubee-my-scroll{
+  width:100% !important;
+  max-width:none !important;
+  background:#f5f6f7 !important;
+}
+
+#productionOrderFlow .ubee-my-scroll{
+  padding:0 0 calc(82px + env(safe-area-inset-bottom)) !important;
+}
+
+#productionOrderFlow .ubee-my-top-actions{
+  display:none !important;
+}
+
+#productionOrderFlow .ubee-my-account{
+  width:100% !important;
+  min-height:96px !important;
+  margin:0 !important;
+  padding:18px 16px !important;
+  border:0 !important;
+  border-bottom:1px solid #e4e5e7 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  transform:none !important;
+}
+
+#productionOrderFlow .ubee-my-groups{
+  display:block !important;
+  width:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+
+#productionOrderFlow .ubee-my-group{
+  width:100% !important;
+  margin:16px 0 0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  transform:none !important;
+}
+
+#productionOrderFlow .ubee-my-group h3{
+  margin:0 !important;
+  padding:12px 16px 8px !important;
+  border-bottom:1px solid #eceeef !important;
+  background:#f5f6f7 !important;
+  color:#6f7378 !important;
+  font-size:12px !important;
+  font-weight:900 !important;
+}
+
+#productionOrderFlow .ubee-my-menu{
+  width:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  overflow:visible !important;
+}
+
+#productionOrderFlow .ubee-my-menu-item,
+#productionOrderFlow .ubee-account-actions > button,
+#productionOrderFlow .ubee-flat-row,
+#productionOrderFlow .ubee-my-setting-button{
+  width:100% !important;
+  min-height:56px !important;
+  margin:0 !important;
+  padding:0 16px !important;
+  border:0 !important;
+  border-bottom:1px solid #eceeef !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  transform:none !important;
+  color:#111 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  text-align:left !important;
+}
+
+#productionOrderFlow .ubee-my-menu-item:active,
+#productionOrderFlow .ubee-account-actions > button:active,
+#productionOrderFlow .ubee-flat-row:active{
+  background:#f1f2f3 !important;
+  transform:none !important;
+}
+
+#productionOrderFlow .ubee-my-panel{
+  position:relative !important;
+  inset:auto !important;
+  width:100% !important;
+  min-height:calc(100dvh - 64px - 74px) !important;
+  margin:0 !important;
+  padding:0 0 24px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#f5f6f7 !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  transform:none !important;
+  overflow:visible !important;
+}
+
+#productionOrderFlow .ubee-my-panel[hidden]{
+  display:none !important;
+}
+
+#productionOrderFlow .ubee-my-panel:not([hidden]){
+  display:block !important;
+}
+
+#productionOrderFlow .ubee-my-panel-head{
+  position:sticky !important;
+  top:0 !important;
+  z-index:5 !important;
+  min-height:56px !important;
+  margin:0 !important;
+  padding:0 12px 0 16px !important;
+  border:0 !important;
+  border-bottom:1px solid #e4e5e7 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+}
+
+#productionOrderFlow .ubee-my-panel-head button{
+  min-height:44px !important;
+  padding:0 8px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+#productionOrderFlow .ubee-account-summary,
+#productionOrderFlow .ubee-my-info-list,
+#productionOrderFlow .ubee-account-actions,
+#productionOrderFlow .ubee-flat-form,
+#productionOrderFlow .ubee-flat-switches,
+#productionOrderFlow .ubee-flat-section,
+#productionOrderFlow .ubee-my-empty-state,
+#productionOrderFlow .ubee-my-feature-note,
+#productionOrderFlow .flow-profile-list,
+#productionOrderFlow .ubee-my-feedback-form{
+  width:100% !important;
+  margin:12px 0 0 !important;
+  padding:16px !important;
+  border:0 !important;
+  border-top:1px solid #eceeef !important;
+  border-bottom:1px solid #eceeef !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  transform:none !important;
+}
+
+#productionOrderFlow .ubee-account-actions{
+  padding:0 !important;
+}
+
+#productionOrderFlow .ubee-my-info-row{
+  min-height:52px !important;
+  margin:0 !important;
+  padding:12px 0 !important;
+  border-bottom:1px solid #eceeef !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+}
+
+#productionOrderFlow .ubee-my-info-row:last-child{
+  border-bottom:0 !important;
+}
+
+#productionOrderFlow .ubee-flat-form label{
+  display:block !important;
+  margin:0 0 16px !important;
+  color:#444 !important;
+  font-size:13px !important;
+  font-weight:900 !important;
+}
+
+#productionOrderFlow .ubee-flat-form input,
+#productionOrderFlow .ubee-flat-form textarea,
+#productionOrderFlow .ubee-flat-form select{
+  width:100% !important;
+  min-height:48px !important;
+  margin-top:7px !important;
+  padding:10px 12px !important;
+  border:1px solid #dfe1e4 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+}
+
+#productionOrderFlow .ubee-flat-primary,
+#productionOrderFlow .ubee-flat-danger,
+#productionOrderFlow .ubee-my-feedback-submit{
+  width:calc(100% - 32px) !important;
+  min-height:52px !important;
+  margin:16px !important;
+  padding:0 16px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  transform:none !important;
+  font-weight:1000 !important;
+}
+
+#productionOrderFlow .ubee-flat-primary,
+#productionOrderFlow .ubee-my-feedback-submit{
+  background:#facc15 !important;
+  color:#111 !important;
+}
+
+#productionOrderFlow .ubee-flat-danger{
+  background:#fff !important;
+  color:#c62828 !important;
+  border-top:1px solid #efcaca !important;
+  border-bottom:1px solid #efcaca !important;
+}
+
+#productionOrderFlow .ubee-flat-status{
+  min-height:22px !important;
+  margin:0 16px !important;
+  color:#4f5965 !important;
+  font-size:13px !important;
+  line-height:1.6 !important;
+}
+
+#productionOrderFlow .bottom-tabs,
+#productionOrderFlow .flow-bottom-nav{
+  position:fixed !important;
+  left:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  width:100% !important;
+  max-width:none !important;
+  margin:0 !important;
+  padding:7px 0 calc(7px + env(safe-area-inset-bottom)) !important;
+  border:0 !important;
+  border-top:1px solid #dfe1e4 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  transform:none !important;
+}
+
+#productionOrderFlow .bottom-tab,
+#productionOrderFlow .flow-bottom-tab{
+  width:100% !important;
+  min-height:56px !important;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  transform:none !important;
+}
+
+#productionOrderFlow .bottom-tab.active,
+#productionOrderFlow .flow-bottom-tab.active{
+  width:100% !important;
+  justify-self:stretch !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:#111 !important;
+  box-shadow:none !important;
+}
+
+#productionOrderFlow .bottom-tab.active::after,
+#productionOrderFlow .flow-bottom-tab.active::after{
+  content:"" !important;
+  position:absolute !important;
+  left:50% !important;
+  bottom:2px !important;
+  width:24px !important;
+  height:3px !important;
+  transform:translateX(-50%) !important;
+  background:#f4bd00 !important;
+  border-radius:0 !important;
+}
+</style>
+
 </head>
 
 <body>
@@ -20373,8 +20673,11 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
         <section id="ubeeMyFavoritesPanel" class="ubee-my-panel" hidden>
   <div class="ubee-my-panel-head"><strong>常用任務</strong><button type="button" data-my-close>上一頁</button></div>
-  <div class="ubee-my-empty-state">尚未建立常用任務。完成訂單後，可從訂單紀錄儲存為常用任務。</div>
-  <button type="button" class="ubee-flat-primary" data-flat-action="new-order">建立新任務</button>
+  <div class="ubee-flat-section">
+    <strong>尚未建立常用任務</strong>
+    <p>常用任務可保存服務類型、取件地點、送達地點與任務備註，方便下次快速下單。</p>
+  </div>
+  <button type="button" class="ubee-flat-primary" data-flat-action="new-order">前往建立新任務</button>
 </section>
 <section id="ubeeMyServiceAreasPanel" class="ubee-my-panel" hidden>
   <div class="ubee-my-panel-head"><strong>服務地區</strong><button type="button" data-my-close>上一頁</button></div>
@@ -20386,7 +20689,10 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 </section>
 <section id="ubeeMyBecomeRiderPanel" class="ubee-my-panel" hidden>
   <div class="ubee-my-panel-head"><strong>成為小U</strong><button type="button" data-my-close>上一頁</button></div>
-  <div class="ubee-my-feature-note">利用空閒時間承接代買、取件、送件與各類跑腿任務。申請者需完成身分資料與平台審核。</div>
+  <div class="ubee-flat-section">
+    <strong>加入UBee小U</strong>
+    <p>可利用空閒時間承接代買、取件、送件與其他跑腿任務。申請者須完成基本資料、身分資料與平台審核。</p>
+  </div>
   <button type="button" class="ubee-flat-primary" data-flat-action="rider-apply">前往小U申請</button>
 </section>
 <section id="ubeeMyEditProfilePanel" class="ubee-my-panel" hidden>
@@ -20418,7 +20724,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     <label><span>平台重要公告</span><input id="ubeePrefImportant" type="checkbox" checked></label>
     <label><span>優惠與活動訊息</span><input id="ubeePrefMarketing" type="checkbox"></label>
   </div>
-  <button type="button" class="ubee-flat-primary" data-flat-action="save-preferences">儲存偏好</button>
+  <button type="button" class="ubee-flat-primary" data-flat-action="save-preferences">儲存偏好</button><div id="ubeePreferencesStatus" class="ubee-flat-status" aria-live="polite"></div>
 </section>
 <section id="ubeeMySecurityPanel" class="ubee-my-panel" hidden>
   <div class="ubee-my-panel-head"><strong>帳號與安全</strong><button type="button" data-my-close-account>上一頁</button></div>
@@ -20436,11 +20742,15 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     <button type="button" class="ubee-flat-row" data-flat-action="pricing">任務與費用規範 <span>›</span></button>
     <button type="button" class="ubee-flat-row" data-flat-action="prohibited">禁止委託項目 <span>›</span></button>
   </div>
+  <div id="ubeeMyDocumentContent" class="ubee-flat-section" tabindex="-1">
+    <strong>規範說明</strong>
+    <p>點選上方項目即可在這裡查看重點說明。</p>
+  </div>
 </section>
 <section id="ubeeMyDeleteAccountPanel" class="ubee-my-panel" hidden>
   <div class="ubee-my-panel-head"><strong>刪除帳號</strong><button type="button" data-my-close-account>上一頁</button></div>
   <div class="ubee-my-feature-note">刪除帳號會影響訂單與會員資料存取。正式刪除前必須再次確認，並依平台資料保存規範處理。</div>
-  <button type="button" class="ubee-flat-danger" data-flat-action="confirm-delete">確認申請刪除帳號</button>
+  <button type="button" class="ubee-flat-danger" data-flat-action="confirm-delete">確認申請刪除帳號</button><div id="ubeeDeleteAccountStatus" class="ubee-flat-status" aria-live="polite"></div>
 </section>
 <section id="ubeeMyFeedbackPanel" class="ubee-my-panel" hidden>
           <div class="ubee-my-panel-head"><strong>意見回饋</strong><button type="button" data-my-close>關閉</button></div>
@@ -22455,7 +22765,16 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     rewards:'ubeeMyRewardsPanel',
     support:'ubeeMySupportPanel',
     feedback:'ubeeMyFeedbackPanel',
-    settings:'ubeeMySettingsPanel'
+    settings:'ubeeMySettingsPanel',
+    favorites:'ubeeMyFavoritesPanel',
+    serviceareas:'ubeeMyServiceAreasPanel',
+    becomerider:'ubeeMyBecomeRiderPanel',
+    editprofile:'ubeeMyEditProfilePanel',
+    changepassword:'ubeeMyPasswordPanel',
+    preferences:'ubeeMyPreferencesPanel',
+    security:'ubeeMySecurityPanel',
+    privacy:'ubeeMyPrivacyPanel',
+    deleteaccount:'ubeeMyDeleteAccountPanel'
   });
   const preferences = Object.freeze({
     autoLocation:'ubee_setting_auto_location',
@@ -23374,6 +23693,78 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       return;
     }
 
+    const closeAccountButton = event.target.closest('#productionOrderFlow [data-my-close-account]');
+    if(closeAccountButton){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openMySection('account');
+      return;
+    }
+
+    const flatActionButton = event.target.closest('#productionOrderFlow [data-flat-action]');
+    if(flatActionButton){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const flatAction = safeText(flatActionButton.dataset.flatAction).toLowerCase();
+
+      if(flatAction === 'new-order'){
+        closeMySubPages();
+        replaceMyHistoryWithRoot();
+        document.getElementById('flowNavHome')?.click();
+        document.getElementById('tabHome')?.click();
+        return;
+      }
+
+      if(flatAction === 'rider-apply'){
+        location.href = 'https://ubee-rider-web.vercel.app/rider.html';
+        return;
+      }
+
+      if(flatAction === 'save-preferences'){
+        localStorage.setItem('ubeeCustomerPreferences',JSON.stringify({
+          important:document.getElementById('ubeePrefImportant')?.checked !== false,
+          marketing:Boolean(document.getElementById('ubeePrefMarketing')?.checked)
+        }));
+        const status = document.getElementById('ubeePreferencesStatus');
+        if(status) status.textContent = '通知偏好已儲存。';
+        return;
+      }
+
+      if(flatAction === 'phone-help'){
+        openMySection('support');
+        return;
+      }
+
+      if(flatAction === 'confirm-delete'){
+        const status = document.getElementById('ubeeDeleteAccountStatus');
+        if(confirm('確定要提出刪除帳號申請嗎？')){
+          if(status) status.textContent = '刪除申請已記錄。客服完成身分確認前，帳號不會立即刪除。';
+        }
+        return;
+      }
+
+      const documentTitles = {
+        terms:'服務條款',
+        privacy:'隱私權政策',
+        pricing:'任務與費用規範',
+        prohibited:'禁止委託項目'
+      };
+      if(documentTitles[flatAction]){
+        const content = document.getElementById('ubeeMyDocumentContent');
+        if(content){
+          content.querySelector('strong').textContent = documentTitles[flatAction];
+          content.querySelector('p').textContent =
+            flatAction === 'terms' ? '說明平台服務範圍、帳號使用、任務成立與雙方責任。' :
+            flatAction === 'privacy' ? '說明會員資料、訂單資料與聯絡資訊的蒐集、使用及保存方式。' :
+            flatAction === 'pricing' ? '商品或代墊費用與跑腿服務費分開計算，實際金額以送出訂單前顯示及後端驗證為準。' :
+            '禁止違法、危險、高風險、受管制或可能危害他人的委託內容。';
+        }
+        openMySection('privacy');
+        document.getElementById('ubeeMyDocumentContent')?.scrollIntoView({block:'start'});
+        return;
+      }
+    }
+
     const closeButton = event.target.closest('#productionOrderFlow [data-my-close]');
     if(closeButton){
       event.preventDefault();
@@ -23470,73 +23861,95 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   }
 })();
 </script>
-<script id="ubee-my-final-controller">
+
+
+<script id="ubee-my-form-repair-controller">
 (()=>{
-  const $=id=>document.getElementById(id);
-  const panelMap={
-    favorites:'ubeeMyFavoritesPanel',serviceAreas:'ubeeMyServiceAreasPanel',
-    becomeRider:'ubeeMyBecomeRiderPanel',editProfile:'ubeeMyEditProfilePanel',
-    changePassword:'ubeeMyPasswordPanel',preferences:'ubeeMyPreferencesPanel',
-    security:'ubeeMySecurityPanel',privacy:'ubeeMyPrivacyPanel',
-    deleteAccount:'ubeeMyDeleteAccountPanel'
-  };
-  const allPanels=()=>[...document.querySelectorAll('#flowProfileSection .ubee-my-panel')];
-  function profileHome(){
-    allPanels().forEach(p=>p.hidden=true);
-    document.querySelector('#flowProfileSection .ubee-my-account-card')?.removeAttribute('hidden');
-    document.querySelector('#flowProfileSection .ubee-my-groups')?.removeAttribute('hidden');
-    window.scrollTo({top:0,behavior:'auto'});
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  function currentCustomer(){
+    try{
+      if(typeof window.currentCustomer === 'object' && window.currentCustomer) return window.currentCustomer;
+      if(typeof currentCustomer !== 'undefined' && currentCustomer) return currentCustomer;
+    }catch(_){}
+    return null;
   }
-  function showPanel(id){
-    const target=$(id); if(!target)return;
-    allPanels().forEach(p=>p.hidden=true);
-    document.querySelector('#flowProfileSection .ubee-my-account-card')?.setAttribute('hidden','');
-    document.querySelector('#flowProfileSection .ubee-my-groups')?.setAttribute('hidden','');
-    target.hidden=false; window.scrollTo({top:0,behavior:'auto'});
+
+  function loadProfileFields(){
+    const customer = currentCustomer() || {};
+    let saved = {};
+    try{ saved = JSON.parse(localStorage.getItem('ubeeCustomerProfileEdits') || '{}'); }catch(_){}
+    const name = saved.name || customer.name || customer.customerName || '';
+    const email = saved.email || customer.email || '';
+    const city = saved.city || customer.city || '';
+    const district = saved.district || customer.district || '';
+
+    if($('ubeeEditName')) $('ubeeEditName').value = name;
+    if($('ubeeEditEmail')) $('ubeeEditEmail').value = email;
+    if($('ubeeEditCity')) $('ubeeEditCity').value = city;
+    if($('ubeeEditDistrict')) $('ubeeEditDistrict').value = district;
+    if($('ubeeMyAccountArea')) $('ubeeMyAccountArea').textContent = [city,district].filter(Boolean).join(' ') || '尚未設定';
+
+    const joined = customer.createdAt || customer.created_at || localStorage.getItem('ubeeCustomerJoinedAt');
+    if($('ubeeMyAccountJoined')){
+      const date = joined ? new Date(joined) : null;
+      $('ubeeMyAccountJoined').textContent = date && !Number.isNaN(date.getTime())
+        ? date.toLocaleDateString('zh-TW')
+        : '尚無資料';
+    }
   }
-  function accountHome(){showPanel('ubeeMyAccountPanel')}
-  document.addEventListener('click',e=>{
-    const action=e.target.closest('[data-my-action]')?.dataset.myAction;
-    if(action && panelMap[action]){
-      e.preventDefault();e.stopImmediatePropagation();showPanel(panelMap[action]);return;
+
+  $('ubeeEditProfileForm')?.addEventListener('submit',event=>{
+    event.preventDefault();
+    const data = {
+      name:$('ubeeEditName')?.value.trim() || '',
+      email:$('ubeeEditEmail')?.value.trim() || '',
+      city:$('ubeeEditCity')?.value.trim() || '',
+      district:$('ubeeEditDistrict')?.value.trim() || ''
+    };
+    const status = $('ubeeEditProfileStatus');
+    if(!data.name){
+      if(status) status.textContent = '請輸入會員姓名。';
+      return;
     }
-    if(e.target.closest('[data-my-close-account]')){
-      e.preventDefault();e.stopImmediatePropagation();accountHome();return;
+    if(data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)){
+      if(status) status.textContent = '電子信箱格式不正確。';
+      return;
     }
-    if(e.target.closest('[data-my-close]')){
-      e.preventDefault();e.stopImmediatePropagation();profileHome();return;
-    }
-    const flat=e.target.closest('[data-flat-action]')?.dataset.flatAction;
-    if(!flat)return;
-    e.preventDefault();e.stopImmediatePropagation();
-    if(flat==='new-order'){document.querySelector('[data-tab="order"],[data-flow-tab="order"]')?.click();}
-    else if(flat==='rider-apply'){location.href='https://ubee-rider-web.vercel.app/rider.html';}
-    else if(flat==='save-preferences'){localStorage.setItem('ubeeCustomerPreferences',JSON.stringify({important:$('ubeePrefImportant')?.checked,marketing:$('ubeePrefMarketing')?.checked}));alert('通知偏好已儲存。');}
-    else if(flat==='phone-help'){alert('手機號碼是登入帳號。請聯繫客服完成身分驗證後變更。');}
-    else if(flat==='confirm-delete'){if(confirm('確定要提出刪除帳號申請嗎？'))alert('已記錄申請。正式刪除仍須由客服完成身分確認。');}
-    else {
-      const docs={terms:'服務條款',privacy:'隱私權政策',pricing:'任務與費用規範',prohibited:'禁止委託項目'};
-      alert(docs[flat]+'內容將依平台正式公告版本顯示。');
-    }
-  },true);
-  $('ubeeEditProfileForm')?.addEventListener('submit',e=>{
-    e.preventDefault();
-    const data={name:$('ubeeEditName').value.trim(),email:$('ubeeEditEmail').value.trim(),city:$('ubeeEditCity').value.trim(),district:$('ubeeEditDistrict').value.trim()};
     localStorage.setItem('ubeeCustomerProfileEdits',JSON.stringify(data));
-    if(data.name){$('ubeeMyAccountName').textContent=data.name;const n=$('flowProfileName');if(n)n.textContent=data.name}
-    $('ubeeMyAccountEmail').textContent=data.email||'尚未提供';
-    $('ubeeMyAccountArea').textContent=[data.city,data.district].filter(Boolean).join(' ')||'尚未設定';
-    $('ubeeEditProfileStatus').textContent='會員資料已儲存。';
+    if($('ubeeMyAccountName')) $('ubeeMyAccountName').textContent = data.name;
+    if($('flowProfileName')) $('flowProfileName').textContent = data.name;
+    if($('ubeeMyAccountEmail')) $('ubeeMyAccountEmail').textContent = data.email || '尚未提供';
+    if($('ubeeMyAccountArea')) $('ubeeMyAccountArea').textContent = [data.city,data.district].filter(Boolean).join(' ') || '尚未設定';
+    if(status) status.textContent = '會員資料已儲存在此裝置。正式同步仍以後端會員資料為準。';
   });
-  $('ubeePasswordForm')?.addEventListener('submit',e=>{
-    e.preventDefault();const a=$('ubeeNewPassword').value,b=$('ubeeConfirmPassword').value;
-    $('ubeePasswordStatus').textContent=a.length<8?'新密碼至少需要 8 個字元。':a!==b?'兩次輸入的新密碼不一致。':'密碼修改資料已通過前端檢查，送出時將由後端驗證目前密碼。';
+
+  $('ubeePasswordForm')?.addEventListener('submit',event=>{
+    event.preventDefault();
+    const current = $('ubeeCurrentPassword')?.value || '';
+    const next = $('ubeeNewPassword')?.value || '';
+    const confirmNext = $('ubeeConfirmPassword')?.value || '';
+    const status = $('ubeePasswordStatus');
+    if(!current){
+      if(status) status.textContent = '請輸入目前密碼。';
+      return;
+    }
+    if(next.length < 8){
+      if(status) status.textContent = '新密碼至少需要 8 個字元。';
+      return;
+    }
+    if(next !== confirmNext){
+      if(status) status.textContent = '兩次輸入的新密碼不一致。';
+      return;
+    }
+    if(status) status.textContent = '資料已通過前端檢查；正式修改時仍須由後端驗證目前密碼。';
   });
-  document.addEventListener('DOMContentLoaded',()=>{
-    try{const d=JSON.parse(localStorage.getItem('ubeeCustomerProfileEdits')||'{}');$('ubeeEditName').value=d.name||'';$('ubeeEditEmail').value=d.email||'';$('ubeeEditCity').value=d.city||'';$('ubeeEditDistrict').value=d.district||'';}catch(_){}
-    const joined=localStorage.getItem('ubeeCustomerJoinedAt');$('ubeeMyAccountJoined').textContent=joined?new Date(joined).toLocaleDateString('zh-TW'):'—';
-  });
+
+  document.addEventListener('DOMContentLoaded',loadProfileFields,{once:true});
+  if(document.readyState !== 'loading') loadProfileFields();
 })();
 </script>
+
 </body>
 </html>
