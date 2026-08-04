@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-04 R11｜底部導航三欄單列、導航上方操作列全部回歸正常頁面流 -->
+<!-- UBee 正式營運修復版：2026-08-04 R10｜底部導航永久三欄單列、全站無浮動樣式 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -3982,7 +3982,68 @@ input:checked
    最終提交列
    ============================== */
 
+#step4 .review-sticky-footer{
+  position:fixed;
 
+  left:50%;
+
+  bottom:
+    calc(
+      72px
+      +
+      env(safe-area-inset-bottom)
+    );
+
+  transform:
+    translateX(-50%);
+
+  z-index:88;
+
+  width:100%;
+
+  max-width:520px;
+
+  min-height:88px;
+
+  display:grid;
+
+  grid-template-columns:
+    minmax(0,1fr)
+    150px;
+
+  gap:12px;
+
+  align-items:center;
+
+  padding:
+    12px
+    14px;
+
+  border-top:
+    1px solid
+    rgba(17,24,39,.08);
+
+  border-right:none;
+
+  border-bottom:none;
+
+  border-left:none;
+
+  border-radius:
+    22px
+    22px
+    0
+    0;
+
+  background:
+    rgba(255,255,255,.98);
+
+  
+
+  
+
+  
+}
 
 /* ==============================
    左側預估金額
@@ -4108,7 +4169,17 @@ input:checked
 
 @media(max-width:380px){
 
-  
+  #step4 .review-sticky-footer{
+    grid-template-columns:
+      minmax(0,1fr)
+      136px;
+
+    gap:9px;
+
+    padding:
+      10px
+      12px;
+  }
 
 
   #step4 .review-total-value{
@@ -7375,7 +7446,7 @@ body{background:#eef0f2;}
 }
 
 /* UBee 2026-07-16 正式營運整合功能 */
-.address-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}.compact-field{display:block;border:1px solid var(--line);border-radius:14px;background:#fff;padding:9px 11px;}.compact-field span{display:block;font-size:10px;font-weight:1000;color:var(--muted);margin-bottom:4px;}.compact-field input{font-size:13px!important;}.saved-address-quickbar{display:flex;gap:7px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}.quick-address-chip,.mini-action{border:1px solid #e4d174;background:#fffbed;color:#5f4c00;border-radius:999px;padding:8px 11px;font-size:12px!important;font-weight:1000;white-space:nowrap;}.match-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#fafafa;}.match-status-card strong,.match-status-card span{display:block;}.match-status-card strong{font-size:13px;}.match-status-card div span{font-size:11px;color:var(--muted);margin-top:3px;}.status-badge{border-radius:999px;padding:6px 9px;font-size:10px!important;font-weight:1000;}.status-badge.good{background:#e9f8ef;color:#16753a;}.status-badge.warn{background:#fff4d6;color:#8a6200;}.status-badge.neutral{background:#eef0f2;color:#62676d;}.home-estimate-eta{font-size:10px;color:#72767b;font-weight:900;margin-top:2px;}.form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}.shopping-list{display:flex;flex-direction:column;gap:9px;}.shopping-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px;}.shopping-item-grid{display:grid;grid-template-columns:1fr 92px;gap:8px;}.shopping-item input,.shopping-item select{border:1px solid var(--line);border-radius:11px;padding:10px!important;background:#fafafa;}.shopping-item-actions{display:flex;justify-content:flex-end;margin-top:8px;}.danger-link{border:none;background:transparent;color:var(--red);font-size:12px!important;font-weight:1000;}.field-help,.inline-status{font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;margin-top:8px;}.system-check-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:13px;margin-bottom:18px;}.system-check-row{display:flex;gap:9px;align-items:flex-start;padding:8px 0;font-size:12px;font-weight:850;}.system-check-row+.system-check-row{border-top:1px solid #f0f1f2;}.system-check-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 22px;}.system-check-row.ok .system-check-icon{background:#e9f8ef;color:#16753a;}.system-check-row.warn .system-check-icon{background:#fff4d6;color:#8a6200;}.system-check-row.error .system-check-icon{background:#feecec;color:#b42318;}.field-invalid{border-color:#dc2626!important;}.field-error-text{font-size:11px;color:#dc2626;font-weight:900;margin-top:6px;}.saved-address-list{display:flex;flex-direction:column;gap:9px;}.saved-address-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa;}.saved-address-card-head{display:flex;justify-content:space-between;gap:10px;}.saved-address-card-title{font-weight:1000;}.saved-address-card-text{font-size:12px;color:var(--muted);line-height:1.6;margin-top:5px;}.saved-address-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}.saved-address-actions button,.order-card-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px!important;font-weight:1000;}.order-history-card{border:1px solid var(--line);background:var(--surface2);border-radius:17px;padding:13px;margin-bottom:10px;}.order-card-actions{display:flex;gap:8px;margin-top:10px;}.draft-continue{background:var(--accent);}.draft-discard{background:#fff;border:1px solid var(--line);}.empty-state{font-size:13px;color:var(--muted);font-weight:800;}@media(max-width:380px){.address-detail-grid,.shopping-item-grid{grid-template-columns:1fr;}}
+.address-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}.compact-field{display:block;border:1px solid var(--line);border-radius:14px;background:#fff;padding:9px 11px;}.compact-field span{display:block;font-size:10px;font-weight:1000;color:var(--muted);margin-bottom:4px;}.compact-field input{font-size:13px!important;}.saved-address-quickbar{display:flex;gap:7px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}.quick-address-chip,.mini-action{border:1px solid #e4d174;background:#fffbed;color:#5f4c00;border-radius:999px;padding:8px 11px;font-size:12px!important;font-weight:1000;white-space:nowrap;}.match-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#fafafa;}.match-status-card strong,.match-status-card span{display:block;}.match-status-card strong{font-size:13px;}.match-status-card div span{font-size:11px;color:var(--muted);margin-top:3px;}.status-badge{border-radius:999px;padding:6px 9px;font-size:10px!important;font-weight:1000;}.status-badge.good{background:#e9f8ef;color:#16753a;}.status-badge.warn{background:#fff4d6;color:#8a6200;}.status-badge.neutral{background:#eef0f2;color:#62676d;}.home-estimate-eta{font-size:10px;color:#72767b;font-weight:900;margin-top:2px;}.form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}.shopping-list{display:flex;flex-direction:column;gap:9px;}.shopping-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px;}.shopping-item-grid{display:grid;grid-template-columns:1fr 92px;gap:8px;}.shopping-item input,.shopping-item select{border:1px solid var(--line);border-radius:11px;padding:10px!important;background:#fafafa;}.shopping-item-actions{display:flex;justify-content:flex-end;margin-top:8px;}.danger-link{border:none;background:transparent;color:var(--red);font-size:12px!important;font-weight:1000;}.field-help,.inline-status{font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;margin-top:8px;}.system-check-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:13px;margin-bottom:18px;}.system-check-row{display:flex;gap:9px;align-items:flex-start;padding:8px 0;font-size:12px;font-weight:850;}.system-check-row+.system-check-row{border-top:1px solid #f0f1f2;}.system-check-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 22px;}.system-check-row.ok .system-check-icon{background:#e9f8ef;color:#16753a;}.system-check-row.warn .system-check-icon{background:#fff4d6;color:#8a6200;}.system-check-row.error .system-check-icon{background:#feecec;color:#b42318;}.field-invalid{border-color:#dc2626!important;}.field-error-text{font-size:11px;color:#dc2626;font-weight:900;margin-top:6px;}.saved-address-list{display:flex;flex-direction:column;gap:9px;}.saved-address-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa;}.saved-address-card-head{display:flex;justify-content:space-between;gap:10px;}.saved-address-card-title{font-weight:1000;}.saved-address-card-text{font-size:12px;color:var(--muted);line-height:1.6;margin-top:5px;}.saved-address-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}.saved-address-actions button,.order-card-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px!important;font-weight:1000;}.order-history-card{border:1px solid var(--line);background:var(--surface2);border-radius:17px;padding:13px;margin-bottom:10px;}.order-card-actions{display:flex;gap:8px;margin-top:10px;}.draft-banner{position:fixed;left:50%;top:calc(74px + env(safe-area-inset-top));transform:translateX(-50%);z-index:120;width:calc(100% - 28px);max-width:492px;border:1px solid #e8d05c;border-radius:17px;background:#fffbed;padding:12px;}.draft-banner-actions{display:flex;gap:8px;margin-top:9px;}.draft-banner-actions button{flex:1;border:none;border-radius:12px;padding:10px;font-weight:1000;}.draft-continue{background:var(--accent);}.draft-discard{background:#fff;border:1px solid var(--line);}.empty-state{font-size:13px;color:var(--muted);font-weight:800;}@media(max-width:380px){.address-detail-grid,.shopping-item-grid{grid-template-columns:1fr;}}
 
 
 /* =========================================================
@@ -7554,7 +7625,9 @@ body{background:#eef0f2;}
 #step4 .review-submit-meta{
   display:none;
 }
-
+#step4 .review-sticky-footer{
+  grid-template-columns:minmax(105px,.7fr) minmax(0,1.3fr);
+}
 
 /* STEP 4（程式 step5）：任務狀態頁精簡 */
 #step5{
@@ -8476,7 +8549,169 @@ body{background:#eef0f2;}
 
 
 </style>
-<style id="ubee-flat-navigation-r10">/* =========================================================
+<style id="ubee-my-native-flat-r7">
+/* =========================================================
+   UBee 用戶端 R7｜我的頁面唯一原生 App 平面規格
+   重要：禁止底部導航與「我的」頁面使用浮動、陰影、毛玻璃、縮窄外框。
+   ========================================================= */
+:root{--ubee-nav-base-height:64px;--ubee-my-page-x:18px;--ubee-my-line:#e4e6e9;--ubee-my-bg:#f4f5f7;--ubee-my-text:#111;--ubee-my-muted:#747980;}
+
+/* 底部導航：唯一正式規格，滿版、貼底、無浮動視覺 */
+
+
+
+
+
+
+
+#productionOrderFlow .flow-shell{padding-bottom:calc(var(--ubee-nav-base-height) + env(safe-area-inset-bottom))!important;}
+
+/* 我的：頁面本體 */
+#productionOrderFlow .ubee-my-page{background:var(--ubee-my-bg)!important;color:var(--ubee-my-text)!important;}
+#productionOrderFlow .ubee-my-scroll{
+  width:100%!important;height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;
+  margin:0!important;padding:calc(14px + env(safe-area-inset-top)) var(--ubee-my-page-x) calc(28px + var(--ubee-nav-base-height) + env(safe-area-inset-bottom))!important;
+  background:var(--ubee-my-bg)!important;-webkit-overflow-scrolling:touch!important;
+}
+#productionOrderFlow .ubee-my-top-actions{
+  min-height:48px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;
+  margin:0 0 10px!important;padding:0!important;
+}
+#productionOrderFlow .ubee-my-top-actions::before{content:"我的";color:#111;font-size:28px;font-weight:1000;letter-spacing:-.7px;line-height:1.2;}
+#productionOrderFlow .ubee-my-round-action{
+  width:auto!important;height:42px!important;min-width:52px!important;margin:0!important;padding:0 4px!important;
+  border:0!important;border-radius:0!important;background:transparent!important;color:#555b62!important;
+  filter:none!important;transform:none!important;font-size:14px!important;font-weight:900!important;
+}
+
+/* 會員列：原生設定頁式平面列 */
+#productionOrderFlow .ubee-my-account{
+  position:relative!important;width:100%!important;display:grid!important;grid-template-columns:58px minmax(0,1fr) 22px!important;
+  align-items:center!important;gap:13px!important;min-height:84px!important;margin:0 0 22px!important;padding:12px 0!important;
+  border:0!important;border-top:1px solid var(--ubee-my-line)!important;border-bottom:1px solid var(--ubee-my-line)!important;
+  border-radius:0!important;background:transparent!important;filter:none!important;transform:none!important;text-align:left!important;
+}
+#productionOrderFlow .ubee-my-avatar{grid-column:1!important;grid-row:1!important;display:grid!important;place-items:center!important;width:54px!important;height:54px!important;border:0!important;border-radius:50%!important;background:#facc15!important;color:#111!important;}
+#productionOrderFlow .ubee-my-avatar svg{width:32px!important;height:32px!important;display:block!important;stroke:currentColor!important;stroke-width:1.8!important;fill:none!important;}
+#productionOrderFlow .ubee-my-account-copy{grid-column:2!important;grid-row:1!important;min-width:0!important;}
+#productionOrderFlow .ubee-my-account-copy small{display:block!important;margin:0 0 3px!important;color:#8a9097!important;font-size:11px!important;font-weight:800!important;line-height:1.3!important;}
+#productionOrderFlow .ubee-my-account-copy strong{display:block!important;overflow:hidden!important;color:#111!important;font-size:20px!important;font-weight:1000!important;line-height:1.3!important;text-overflow:ellipsis!important;white-space:nowrap!important;}
+#productionOrderFlow .ubee-my-account-copy span{display:block!important;overflow:hidden!important;margin:4px 0 0!important;color:#747a81!important;font-size:12px!important;font-weight:750!important;line-height:1.45!important;text-overflow:ellipsis!important;white-space:nowrap!important;}
+#productionOrderFlow .ubee-my-account-arrow{grid-column:3!important;grid-row:1!important;display:grid!important;place-items:center!important;color:#9aa0a6!important;}
+#productionOrderFlow .ubee-my-account-arrow svg{width:20px!important;height:20px!important;}
+
+/* 原生 App 分組清單：有留白、無陰影、無浮動 */
+#productionOrderFlow .ubee-my-groups{display:block!important;margin:0!important;padding:0!important;}
+#productionOrderFlow .ubee-my-group{margin:0 0 24px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;filter:none!important;transform:none!important;}
+#productionOrderFlow .ubee-my-group h3{margin:0 0 8px!important;padding:0 2px!important;color:#747a81!important;font-size:12px!important;font-weight:900!important;line-height:1.4!important;letter-spacing:.2px!important;}
+#productionOrderFlow .ubee-my-menu{width:100%!important;display:block!important;margin:0!important;padding:0!important;border:1px solid var(--ubee-my-line)!important;border-radius:0!important;background:#fff!important;overflow:hidden!important;}
+#productionOrderFlow .ubee-my-menu-item{
+  position:relative!important;width:100%!important;min-height:56px!important;display:grid!important;grid-template-columns:28px minmax(0,1fr) 18px!important;
+  align-items:center!important;gap:10px!important;margin:0!important;padding:0 14px!important;
+  border:0!important;border-bottom:1px solid #eceef0!important;border-radius:0!important;background:#fff!important;color:#111!important;
+  filter:none!important;transform:none!important;text-align:left!important;font-size:16px!important;font-weight:850!important;line-height:1.35!important;
+}
+#productionOrderFlow .ubee-my-menu-item:last-child{border-bottom:0!important;}
+#productionOrderFlow .ubee-my-menu-item:active{background:#f2f3f4!important;transform:none!important;}
+#productionOrderFlow .ubee-my-menu-item::before{display:grid!important;place-items:center!important;width:24px!important;height:24px!important;color:#555b62!important;font-size:17px!important;font-weight:900!important;line-height:1!important;}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="orders"]::before{content:"▤";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="favorites"]::before{content:"☆";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="addresses"]::before{content:"⌖";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="coupons"]::before{content:"◇";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="notifications"]::before{content:"♢";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="serviceAreas"]::before{content:"◎";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="rewards"]::before{content:"★";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="support"]::before{content:"◉";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="feedback"]::before{content:"✎";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="becomeRider"]::before{content:"U";}
+#productionOrderFlow .ubee-my-menu-item[data-my-action="settings"]::before{content:"⚙";}
+#productionOrderFlow .ubee-my-menu-item>span:first-of-type{min-width:0!important;overflow:visible!important;white-space:normal!important;text-overflow:clip!important;}
+#productionOrderFlow .ubee-my-menu-item>span:last-child{justify-self:end!important;color:#a1a6ac!important;font-size:22px!important;font-weight:400!important;line-height:1!important;}
+
+/* 開啟子頁時，只顯示該子頁；主頁內容完全退出版面 */
+body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-top-actions,
+body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-account,
+body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-groups{
+  display:none!important;
+}
+body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
+  padding-top:calc(8px + env(safe-area-inset-top))!important;
+}
+
+/* 子頁：直接佔據內容區，不是浮動面板 */
+#productionOrderFlow .ubee-my-panel{
+  position:static!important;inset:auto!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:0!important;
+  margin:0!important;padding:0 0 24px!important;border:0!important;border-radius:0!important;background:transparent!important;
+  filter:none!important;transform:none!important;translate:none!important;overflow:visible!important;
+}
+/* 控制器會把子頁移到 flow-shell；此處把它當成真正的 App 內頁，而不是浮動卡片 */
+#productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  position:absolute!important;inset:0!important;z-index:180!important;width:100%!important;height:100%!important;min-height:100%!important;
+  margin:0!important;padding:calc(8px + env(safe-area-inset-top)) var(--ubee-my-page-x) calc(28px + var(--ubee-nav-base-height) + env(safe-area-inset-bottom))!important;
+  border:0!important;border-radius:0!important;background:var(--ubee-my-bg)!important;filter:none!important;
+  transform:none!important;translate:none!important;overflow-x:hidden!important;overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+#productionOrderFlow .ubee-my-panel[hidden]{display:none!important;}
+#productionOrderFlow .ubee-my-panel:not([hidden]){display:block!important;}
+#productionOrderFlow .ubee-my-panel-head{
+  position:static!important;display:grid!important;grid-template-columns:44px minmax(0,1fr) 44px!important;align-items:center!important;
+  min-height:54px!important;margin:0 0 18px!important;padding:0!important;border:0!important;border-bottom:1px solid var(--ubee-my-line)!important;
+  border-radius:0!important;background:transparent!important;filter:none!important;
+}
+#productionOrderFlow .ubee-my-panel-head strong{grid-column:2!important;justify-self:center!important;min-width:0!important;color:#111!important;font-size:18px!important;font-weight:1000!important;line-height:1.35!important;text-align:center!important;white-space:normal!important;}
+#productionOrderFlow .ubee-my-panel-head button{grid-column:1!important;grid-row:1!important;width:44px!important;height:44px!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:transparent!important;filter:none!important;transform:none!important;font-size:0!important;}
+#productionOrderFlow .ubee-my-panel-head button>*{display:none!important;}
+#productionOrderFlow .ubee-my-panel-head button::before{content:"‹"!important;display:grid!important;place-items:center!important;width:44px!important;height:44px!important;color:#111!important;font-size:34px!important;font-weight:400!important;line-height:1!important;}
+
+/* 子頁內容元件 */
+#productionOrderFlow .ubee-my-info-list,#productionOrderFlow .ubee-account-actions,#productionOrderFlow .ubee-flat-switches{display:block!important;width:100%!important;margin:0 0 18px!important;padding:0!important;border:1px solid var(--ubee-my-line)!important;border-radius:0!important;background:#fff!important;overflow:hidden!important;}
+#productionOrderFlow .ubee-my-info-row,#productionOrderFlow .ubee-flat-row,#productionOrderFlow .ubee-account-actions button,#productionOrderFlow .ubee-flat-switches label{
+  width:100%!important;min-height:54px!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:16px!important;
+  margin:0!important;padding:12px 14px!important;border:0!important;border-bottom:1px solid #eceef0!important;border-radius:0!important;background:#fff!important;color:#111!important;
+  filter:none!important;transform:none!important;text-align:left!important;
+}
+#productionOrderFlow .ubee-my-info-row:last-child,#productionOrderFlow .ubee-flat-row:last-child,#productionOrderFlow .ubee-account-actions button:last-child,#productionOrderFlow .ubee-flat-switches label:last-child{border-bottom:0!important;}
+#productionOrderFlow .ubee-my-info-row span,#productionOrderFlow .ubee-flat-switches label span{min-width:0!important;color:#70767d!important;font-size:14px!important;font-weight:800!important;line-height:1.45!important;white-space:normal!important;}
+#productionOrderFlow .ubee-my-info-row strong{max-width:none!important;color:#111!important;font-size:14px!important;font-weight:1000!important;line-height:1.45!important;text-align:right!important;white-space:normal!important;word-break:break-word!important;}
+#productionOrderFlow .ubee-account-summary,#productionOrderFlow .ubee-flat-section,#productionOrderFlow .ubee-my-empty-state,#productionOrderFlow .ubee-my-feature-note{
+  width:100%!important;margin:0 0 18px!important;padding:16px!important;border:1px solid var(--ubee-my-line)!important;border-radius:0!important;background:#fff!important;color:#111!important;
+  filter:none!important;transform:none!important;line-height:1.7!important;
+}
+#productionOrderFlow .ubee-account-summary strong,#productionOrderFlow .ubee-flat-section strong{display:block!important;margin:0 0 5px!important;color:#111!important;font-size:17px!important;font-weight:1000!important;}
+#productionOrderFlow .ubee-account-summary span,#productionOrderFlow .ubee-flat-section p{display:block!important;margin:0!important;color:#747a81!important;font-size:13px!important;font-weight:750!important;line-height:1.7!important;}
+#productionOrderFlow .ubee-account-actions button{font-size:15px!important;font-weight:850!important;}
+#productionOrderFlow .ubee-account-actions button span,#productionOrderFlow .ubee-flat-row span{color:#9da2a8!important;font-size:21px!important;font-weight:400!important;}
+#productionOrderFlow .ubee-account-actions .danger-text,#productionOrderFlow .ubee-flat-danger{color:#c62828!important;}
+
+/* 表單與主要按鈕 */
+#productionOrderFlow .ubee-flat-form,#productionOrderFlow .ubee-my-feedback-form{display:flex!important;flex-direction:column!important;gap:14px!important;width:100%!important;margin:0!important;padding:0!important;}
+#productionOrderFlow .ubee-flat-form label,#productionOrderFlow .ubee-my-feedback-form label{display:flex!important;flex-direction:column!important;gap:7px!important;color:#555b62!important;font-size:13px!important;font-weight:900!important;}
+#productionOrderFlow .ubee-flat-form input,#productionOrderFlow .ubee-flat-form select,#productionOrderFlow .ubee-flat-form textarea,#productionOrderFlow .ubee-my-feedback-form input,#productionOrderFlow .ubee-my-feedback-form select,#productionOrderFlow .ubee-my-feedback-form textarea{
+  width:100%!important;min-height:50px!important;margin:0!important;padding:12px 13px!important;border:1px solid #dfe2e5!important;border-radius:10px!important;background:#fff!important;color:#111!important;
+  outline:none!important;font-size:16px!important;font-weight:800!important;line-height:1.5!important;
+}
+#productionOrderFlow .ubee-flat-form textarea,#productionOrderFlow .ubee-my-feedback-form textarea{min-height:120px!important;}
+#productionOrderFlow .ubee-flat-primary,#productionOrderFlow .ubee-my-feedback-submit,#productionOrderFlow .ubee-my-setting-button,#productionOrderFlow .ubee-flat-danger{
+  width:100%!important;min-height:52px!important;margin:4px 0 0!important;padding:12px 14px!important;border:1px solid #d9dcdf!important;border-radius:10px!important;background:#fff!important;color:#111!important;
+  filter:none!important;transform:none!important;font-size:15px!important;font-weight:1000!important;
+}
+#productionOrderFlow .ubee-flat-primary,#productionOrderFlow .ubee-my-feedback-submit{border-color:#f4bd00!important;background:#facc15!important;}
+#productionOrderFlow .ubee-flat-danger,#productionOrderFlow .ubee-my-setting-button{border-color:#e7bcbc!important;color:#c62828!important;background:#fff!important;}
+#productionOrderFlow .ubee-flat-status,#productionOrderFlow .ubee-my-feedback-status{min-height:20px!important;margin-top:8px!important;color:#6f757c!important;font-size:12px!important;font-weight:800!important;line-height:1.55!important;}
+
+/* 不讓任何文字被裁切 */
+#productionOrderFlow .ubee-my-page *,#productionOrderFlow .ubee-my-panel *{max-width:100%;}
+#productionOrderFlow .ubee-my-panel strong,#productionOrderFlow .ubee-my-panel span,#productionOrderFlow .ubee-my-panel p,#productionOrderFlow .ubee-my-panel button{overflow:visible!important;text-overflow:clip!important;}
+
+@media(max-width:380px){
+  :root{--ubee-my-page-x:16px;}
+  #productionOrderFlow .ubee-my-account{grid-template-columns:52px minmax(0,1fr) 20px!important;gap:10px!important;}
+  #productionOrderFlow .ubee-my-avatar{width:48px!important;height:48px!important;}
+  #productionOrderFlow .ubee-my-account-copy strong{font-size:18px!important;}
+  #productionOrderFlow .ubee-my-menu-item{padding-left:12px!important;padding-right:12px!important;font-size:15px!important;}
+}
+</style><style id="ubee-flat-navigation-r10">/* =========================================================
    UBee R10 永久版面規則
    1. 底部導航永遠三欄、單列、滿版貼底。
    2. 禁止圓角外框、陰影、毛玻璃、透明浮層、置中縮窄與換行。
@@ -8488,57 +8723,12 @@ body{background:#eef0f2;}
   --ubee-bottom-nav-height:calc(64px + env(safe-area-inset-bottom));
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* 內容永遠預留完整導航高度，避免地圖、卡片與文字被遮住。 */
-#productionOrderFlow,
-#productionOrderFlow .flow-page,
-body:not(.flow-active) .app{
-  padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
-}
-
-/* 所有固定操作列一律改成平面滿版列，不得浮在頁面中央。 */
-
-
-/* 全站永久禁用陰影與毛玻璃，避免後續舊規則重新產生浮動視覺。 */
-*,*::before,*::after{
-  box-shadow:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-}
-</style><style id="ubee-r11-no-floating-final">
-/* =========================================================
-   UBee R11 永久規格
-   1. 僅底部三欄導覽列允許 fixed 貼底。
-   2. 導覽列上方所有操作列、提交列、草稿提示全部回到正常頁面流。
-   3. 禁止任何圓角浮層、陰影、毛玻璃、置中浮動面板。
-   ========================================================= */
-:root{
-  --ubee-bottom-nav-content-height:64px;
-  --ubee-bottom-nav-height:calc(64px + env(safe-area-inset-bottom));
-}
-
-/* 唯一可固定貼底的 UI：底部三欄導覽列 */
 #productionOrderFlow .flow-bottom-nav,
 body:not(.flow-active) .bottom-tabs{
   position:fixed!important;
   inset:auto 0 0 0!important;
   left:0!important;
   right:0!important;
-  top:auto!important;
   bottom:0!important;
   transform:none!important;
   translate:none!important;
@@ -8556,19 +8746,22 @@ body:not(.flow-active) .bottom-tabs{
   margin:0!important;
   padding:0 0 env(safe-area-inset-bottom)!important;
   overflow:hidden!important;
+  flex-wrap:nowrap!important;
   border:0!important;
   border-top:1px solid #dfe2e5!important;
   border-radius:0!important;
   background:#fff!important;
+  opacity:1!important;
   box-shadow:none!important;
   filter:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
-  z-index:99!important;
+  z-index:999!important;
   box-sizing:border-box!important;
 }
-#productionOrderFlow .flow-bottom-nav>button,
-body:not(.flow-active) .bottom-tabs>.bottom-tab{
+
+#productionOrderFlow .flow-bottom-nav > button,
+body:not(.flow-active) .bottom-tabs > .bottom-tab{
   grid-row:1!important;
   width:100%!important;
   min-width:0!important;
@@ -8577,43 +8770,51 @@ body:not(.flow-active) .bottom-tabs>.bottom-tab{
   min-height:var(--ubee-bottom-nav-content-height)!important;
   display:flex!important;
   flex-direction:column!important;
+  flex-wrap:nowrap!important;
   align-items:center!important;
   justify-content:center!important;
-  gap:4px!important;
+  gap:3px!important;
   margin:0!important;
-  padding:6px 4px 5px!important;
+  padding:7px 4px 6px!important;
   overflow:hidden!important;
   border:0!important;
-  border-top:3px solid transparent!important;
   border-radius:0!important;
   background:#fff!important;
-  color:#8b9096!important;
+  color:#7f858c!important;
   box-shadow:none!important;
   filter:none!important;
   transform:none!important;
   translate:none!important;
+  line-height:1.1!important;
   white-space:nowrap!important;
+  text-align:center!important;
   box-sizing:border-box!important;
 }
-#productionOrderFlow .flow-bottom-nav>button:nth-child(1),body:not(.flow-active) .bottom-tabs>.bottom-tab:nth-child(1){grid-column:1!important;}
-#productionOrderFlow .flow-bottom-nav>button:nth-child(2),body:not(.flow-active) .bottom-tabs>.bottom-tab:nth-child(2){grid-column:2!important;}
-#productionOrderFlow .flow-bottom-nav>button:nth-child(3),body:not(.flow-active) .bottom-tabs>.bottom-tab:nth-child(3){grid-column:3!important;}
-#productionOrderFlow .flow-bottom-nav>button.active,
-body:not(.flow-active) .bottom-tabs>.bottom-tab.active{
-  background:#fff!important;
-  color:#111!important;
-  border-top-color:#f4bd00!important;
-}
-#productionOrderFlow .flow-bottom-nav>button::before,
-#productionOrderFlow .flow-bottom-nav>button::after,
-body:not(.flow-active) .bottom-tabs>.bottom-tab::before,
-body:not(.flow-active) .bottom-tabs>.bottom-tab::after{
+#productionOrderFlow .flow-bottom-nav > button:nth-child(1),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(1){grid-column:1!important;}
+#productionOrderFlow .flow-bottom-nav > button:nth-child(2),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(2){grid-column:2!important;}
+#productionOrderFlow .flow-bottom-nav > button:nth-child(3),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(3){grid-column:3!important;}
+
+#productionOrderFlow .flow-bottom-nav > button::before,
+#productionOrderFlow .flow-bottom-nav > button::after,
+body:not(.flow-active) .bottom-tabs > .bottom-tab::before,
+body:not(.flow-active) .bottom-tabs > .bottom-tab::after{
   content:none!important;
   display:none!important;
 }
+
+#productionOrderFlow .flow-bottom-nav > button.active,
+body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
+  width:100%!important;
+  background:#fff!important;
+  color:#111!important;
+  border-top:3px solid #f4bd00!important;
+  padding-top:4px!important;
+}
+
 #productionOrderFlow .flow-nav-icon,
 #productionOrderFlow .flow-nav-label,
 body:not(.flow-active) .bottom-tab svg{
+  flex:0 0 auto!important;
   margin:0!important;
   padding:0!important;
   border:0!important;
@@ -8631,6 +8832,7 @@ body:not(.flow-active) .bottom-tab svg{
   display:flex!important;
   align-items:center!important;
   justify-content:center!important;
+  font-size:20px!important;
   line-height:1!important;
 }
 #productionOrderFlow .flow-nav-label{
@@ -8641,7 +8843,14 @@ body:not(.flow-active) .bottom-tab svg{
   white-space:nowrap!important;
 }
 
-/* 導覽列上方所有操作列：完全取消 fixed / sticky / absolute 浮動 */
+/* 內容永遠預留完整導航高度，避免地圖、卡片與文字被遮住。 */
+#productionOrderFlow,
+#productionOrderFlow .flow-page,
+body:not(.flow-active) .app{
+  padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
+}
+
+/* 所有固定操作列一律改成平面滿版列，不得浮在頁面中央。 */
 .home-action-footer,
 .step2-action-footer,
 .step3-action-footer,
@@ -8649,68 +8858,30 @@ body:not(.flow-active) .bottom-tab svg{
 .step5-action-footer,
 .flow-action-footer,
 .flow-sticky-action,
-.tracking-action-footer,
-#step4 .review-sticky-footer,
-.review-sticky-footer{
-  position:static!important;
-  inset:auto!important;
-  left:auto!important;
-  right:auto!important;
-  top:auto!important;
-  bottom:auto!important;
+.tracking-action-footer{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  bottom:var(--ubee-bottom-nav-height)!important;
   transform:none!important;
   translate:none!important;
   width:100%!important;
   min-width:0!important;
   max-width:none!important;
-  height:auto!important;
-  min-height:0!important;
-  margin:18px 0 0!important;
-  padding:12px 0!important;
-  overflow:visible!important;
+  margin:0!important;
+  padding:10px 16px!important;
   border:0!important;
-  border-top:1px solid #e5e7ea!important;
+  border-top:1px solid #dfe2e5!important;
   border-radius:0!important;
-  background:transparent!important;
+  background:#fff!important;
   box-shadow:none!important;
   filter:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
-  z-index:auto!important;
   box-sizing:border-box!important;
 }
 
-/* 草稿提示也在頁面流內，不得漂浮於畫面上方 */
-.draft-banner{
-  position:static!important;
-  inset:auto!important;
-  width:100%!important;
-  max-width:none!important;
-  margin:12px 0!important;
-  padding:12px 0!important;
-  border:0!important;
-  border-top:1px solid #e8d05c!important;
-  border-bottom:1px solid #e8d05c!important;
-  border-radius:0!important;
-  background:#fffbed!important;
-  box-shadow:none!important;
-  transform:none!important;
-  z-index:auto!important;
-}
-
-/* 取消舊固定操作列所造成的超大底部空白，只保留底部導覽安全距離 */
-#step1 .task-sheet,
-#step2,
-#step3,
-#step4,
-#step5,
-#productionOrderFlow,
-#productionOrderFlow .flow-page,
-body:not(.flow-active) .app{
-  padding-bottom:calc(var(--ubee-bottom-nav-height) + 20px)!important;
-}
-
-/* 全域禁止浮動視覺效果 */
+/* 全站永久禁用陰影與毛玻璃，避免後續舊規則重新產生浮動視覺。 */
 *,*::before,*::after{
   box-shadow:none!important;
   backdrop-filter:none!important;
@@ -19072,7 +19243,7 @@ activateUBeeCustomerRuntime();
     if(el) return el;
     el = document.createElement('div');
     el.id = 'ubeeNetworkStatusBanner';
-    el.style.cssText = 'position:static;width:100%;margin:0;padding:11px 14px;border-radius:0;font-size:13px;font-weight:900;line-height:1.45;text-align:center;box-shadow:none;display:none;';
+    el.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));z-index:99999;padding:11px 14px;border-radius:14px;font-size:13px;font-weight:900;line-height:1.45;text-align:center;box-shadow:0 10px 28px rgba(0,0,0,.16);display:none;';
     document.body.appendChild(el);
     return el;
   }
@@ -19551,7 +19722,7 @@ body.flow-active>.app{display:none!important;}
 
 
 
-
+@media(max-width:380px){}
 
 </style>
 <div aria-label="UBee 客人端正式下單流程" id="productionOrderFlow">
@@ -21389,9 +21560,19 @@ body.flow-active>.app{display:none!important;}
     to{opacity:1;transform:translateX(0);}
   }
 
-  
+  @media(max-width:380px){
+    
 
-  
+    
+
+    
+
+    
+  }
+
+  @media(prefers-reduced-motion:reduce){
+    
+  }
 
 
   /* =========================================================
