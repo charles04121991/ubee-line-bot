@@ -11,6 +11,7 @@ const multer = require('multer');
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
 // UBee Merchant Platform V3 + 小U資料庫 V2 Final + 區域動態定價 V3 正式版｜2026-07-28
 // 2026-08-04｜快速估價重新串接：/api/quote 改為可公開估價（會員 Session 選用），並補齊全能跑腿 custom 模式。
+// 2026-08-04｜小U申請審核 V2：三大驗證、條件式證件、批次補件、多通道通知與審核紀錄。
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
 
 admin.initializeApp({
@@ -71,6 +72,75 @@ const RIDER_DOCUMENT_LABELS = Object.freeze({
   vehicleLicense: '行照',
   compulsoryInsurance: '強制險證明',
 });
+
+
+// =====================================================
+// UBee 小U申請審核 V2：三大驗證模型
+// - 對申請者與審核人員顯示三大驗證區塊
+// - Firestore 仍保留既有五個文件欄位，完整相容舊申請
+// - 機車／汽車需五份文件；自行車／步行只需身分驗證
+// =====================================================
+const RIDER_VERIFICATION_GROUPS = Object.freeze({
+  identity: Object.freeze({
+    key: 'identity',
+    label: '身分驗證',
+    description: '確認申請者本人身分與基本資料。',
+    documentKeys: Object.freeze(['idFront', 'idBack']),
+  }),
+  driving: Object.freeze({
+    key: 'driving',
+    label: '駕駛資格',
+    description: '確認申請者具備合法駕駛資格。',
+    documentKeys: Object.freeze(['driverLicense']),
+  }),
+  vehicleSafety: Object.freeze({
+    key: 'vehicleSafety',
+    label: '車輛安全',
+    description: '確認接單車輛、行照與強制險資料。',
+    documentKeys: Object.freeze(['vehicleLicense', 'compulsoryInsurance']),
+  }),
+});
+
+function normalizeRiderVehicleMode(value) {
+  const text = String(value || '').trim().toLowerCase();
+  if (/機車|motorcycle|scooter|motorbike/.test(text)) return 'motorcycle';
+  if (/汽車|car|auto|automobile/.test(text)) return 'car';
+  if (/自行車|腳踏車|單車|bicycle|bike/.test(text)) return 'bicycle';
+  if (/步行|徒步|walk|walking/.test(text)) return 'walking';
+  return text ? 'other' : '';
+}
+
+function isMotorizedRiderVehicle(value) {
+  return ['motorcycle', 'car'].includes(normalizeRiderVehicleMode(value));
+}
+
+function getRequiredRiderDocumentKeys(vehicle, savedKeys = []) {
+  const normalizedSavedKeys = Array.isArray(savedKeys)
+    ? savedKeys
+        .map(normalizeRiderDocumentKey)
+        .filter(key => Boolean(RIDER_REQUIRED_DOCUMENTS[key]))
+    : [];
+
+  if (normalizedSavedKeys.length) {
+    return [...new Set(normalizedSavedKeys)];
+  }
+
+  const mode = normalizeRiderVehicleMode(vehicle);
+  if (['bicycle', 'walking'].includes(mode)) {
+    return ['idFront', 'idBack'];
+  }
+
+  // 舊資料、未知車種與機動車輛維持五份文件要求，避免降低既有審核標準。
+  return Object.keys(RIDER_REQUIRED_DOCUMENTS);
+}
+
+function getRiderDocumentGroupKey(documentKey) {
+  const normalizedKey = normalizeRiderDocumentKey(documentKey);
+  const matched = Object.values(RIDER_VERIFICATION_GROUPS).find(group =>
+    group.documentKeys.includes(normalizedKey)
+  );
+  return matched?.key || 'identity';
+}
 
 // 證件先由 multer 存入記憶體，再立即寫入 Firebase Storage。
 // 不落地到 Render 本機磁碟，避免部署或重啟後遺失。
@@ -310,7 +380,8 @@ async function handleRiderDocumentUpload(req, res) {
 async function validateRiderApplicationDocuments(
   documents,
   phone,
-  lineUserId
+  lineUserId,
+  requiredDocumentKeys = Object.keys(RIDER_REQUIRED_DOCUMENTS)
 ) {
   const safeDocuments =
     documents && typeof documents === 'object'
@@ -324,10 +395,21 @@ async function validateRiderApplicationDocuments(
     .bucket(RIDER_DOCUMENT_STORAGE_BUCKET);
 
   const normalized = {};
+  const requiredKeys = [...new Set(
+    (Array.isArray(requiredDocumentKeys) ? requiredDocumentKeys : [])
+      .map(normalizeRiderDocumentKey)
+      .filter(key => Boolean(RIDER_REQUIRED_DOCUMENTS[key]))
+  )];
 
-  for (const [documentKey, documentType] of Object.entries(
-    RIDER_REQUIRED_DOCUMENTS
-  )) {
+  if (!requiredKeys.length) {
+    return {
+      ok: false,
+      message: '找不到此配送工具需要的驗證文件，請重新選擇配送工具。',
+    };
+  }
+
+  for (const documentKey of requiredKeys) {
+    const documentType = RIDER_REQUIRED_DOCUMENTS[documentKey];
     const item = safeDocuments[documentKey];
 
     if (!item || typeof item !== 'object') {
@@ -3091,16 +3173,37 @@ app.post('/api/rider/documents/upload', (req, res) => {
 });
 
 app.get('/api/rider/application-v2/config', (req, res) => {
+  const vehicle = String(req.query?.vehicle || '').trim();
+  const requiredDocumentKeys = getRequiredRiderDocumentKeys(vehicle);
+
   return res.json({
     success: true,
     dataVersion: RIDER_V2_DATA_VERSION,
     applicationRound: RIDER_V2_APPLICATION_ROUND,
+    verificationModelVersion: 2,
     applicationCollection: RIDER_V2_COLLECTIONS.applications,
+    vehicleMode: normalizeRiderVehicleMode(vehicle),
+    motorizedVehicle: isMotorizedRiderVehicle(vehicle),
+    verificationGroups: Object.values(RIDER_VERIFICATION_GROUPS).map(group => ({
+      key: group.key,
+      label: group.label,
+      description: group.description,
+      documentKeys: group.documentKeys.filter(key =>
+        requiredDocumentKeys.includes(key)
+      ),
+      required: group.documentKeys.some(key =>
+        requiredDocumentKeys.includes(key)
+      ),
+    })),
     requiredDocuments: Object.keys(RIDER_REQUIRED_DOCUMENTS).map(key => ({
       key,
       type: RIDER_REQUIRED_DOCUMENTS[key],
       label: RIDER_DOCUMENT_LABELS[key],
-      required: true,
+      groupKey: getRiderDocumentGroupKey(key),
+      required: requiredDocumentKeys.includes(key),
+      requiredWhen: ['driverLicense', 'vehicleLicense', 'compulsoryInsurance'].includes(key)
+        ? 'motorized_vehicle'
+        : 'all',
     })),
     allowedMimeTypes: [
       'image/jpeg',
@@ -13382,12 +13485,13 @@ app.post('/api/rider/register', async (req, res) => {
       value === 1 ||
       value === '1';
 
+    const motorizedVehicle = isMotorizedRiderVehicle(vehicle);
+    const requiredDocumentKeys = getRequiredRiderDocumentKeys(vehicle);
+
     // 良民證目前不列為申請必備文件，也不作為送出條件。
+    // 駕照、行照與強制險相關同意，只在機車／汽車申請時要求。
     const requiredAgreements = [
-      driverLicenseConfirmed,
-      vehicleLicenseConfirmed,
       businessConditionAgree,
-      insuranceConfirm,
       violationConfirm,
       contractConfirm,
       riderRuleConfirm,
@@ -13398,6 +13502,13 @@ app.post('/api/rider/register', async (req, res) => {
       locationDataConsent,
       jkoRequirementAgree,
       communityRequirementAgree,
+      ...(motorizedVehicle
+        ? [
+            driverLicenseConfirmed,
+            vehicleLicenseConfirmed,
+            insuranceConfirm,
+          ]
+        : []),
     ];
 
     if (!requiredAgreements.every(toBool)) {
@@ -13411,22 +13522,28 @@ app.post('/api/rider/register', async (req, res) => {
     if (
       !name ||
       !phone ||
-      !lineId ||
       !birthDate ||
       !finalDistrict ||
       !vehicle ||
-      !plateNumber ||
-      !vehicleOwnerType ||
-      !compulsoryInsuranceExpiryDate ||
       !finalServiceArea ||
       !availableTime ||
       !emergencyContactName ||
       !emergencyContactRelationship ||
-      !emergencyContactPhone
+      !emergencyContactPhone ||
+      (
+        motorizedVehicle &&
+        (
+          !plateNumber ||
+          !vehicleOwnerType ||
+          !compulsoryInsuranceExpiryDate
+        )
+      )
     ) {
       return res.status(400).json({
         success: false,
-        message: '資料不完整，請確認基本資料、車輛資料、保險資料與緊急聯絡人都已填寫。',
+        message: motorizedVehicle
+          ? '資料不完整，請確認基本資料、車輛資料、保險資料、服務區域與緊急聯絡人都已填寫。'
+          : '資料不完整，請確認基本資料、配送工具、服務區域與緊急聯絡人都已填寫。',
       });
     }
 
@@ -13452,6 +13569,7 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
     if (
+      motorizedVehicle &&
       !/^\d{4}-\d{2}-\d{2}$/.test(
         String(compulsoryInsuranceExpiryDate || '').trim()
       )
@@ -13473,8 +13591,11 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
     if (
-      String(lineId).trim().length < 2 ||
-      String(lineId).trim().length > 60
+      String(lineId || '').trim() &&
+      (
+        String(lineId || '').trim().length < 2 ||
+        String(lineId || '').trim().length > 60
+      )
     ) {
       return res.status(400).json({
         success: false,
@@ -13509,11 +13630,14 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    const normalizedVehicleOwnerType = String(
-      vehicleOwnerType || ''
-    ).trim().toLowerCase();
+    const normalizedVehicleOwnerType = motorizedVehicle
+      ? String(vehicleOwnerType || '').trim().toLowerCase()
+      : 'not_applicable';
 
-    if (!['self', 'other'].includes(normalizedVehicleOwnerType)) {
+    if (
+      motorizedVehicle &&
+      !['self', 'other'].includes(normalizedVehicleOwnerType)
+    ) {
       return res.status(400).json({
         success: false,
         message: '請確認車輛是本人所有或經車主同意使用。',
@@ -13521,6 +13645,7 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
     if (
+      motorizedVehicle &&
       normalizedVehicleOwnerType === 'other' &&
       !toBool(vehicleOwnerConsent)
     ) {
@@ -13533,7 +13658,9 @@ app.post('/api/rider/register', async (req, res) => {
     const documentValidation =
       await validateRiderApplicationDocuments(
         documents,
-        cleanPhone
+        cleanPhone,
+        riderLineUserId,
+        requiredDocumentKeys
       );
 
     if (!documentValidation.ok) {
@@ -13565,8 +13692,10 @@ app.post('/api/rider/register', async (req, res) => {
       name: cleanText(name, 20),
       phone: cleanPhone,
       lineId: cleanText(lineId || '', 60),
-      userId: '',
-      lineUserId: '',
+      // LINE 身分為選填：有合法 LINE User ID 時保存，用於額外通知；
+      // 未綁定 LINE 仍可完成申請、補件與審核，不影響主要流程。
+      userId: riderLineUserId.startsWith('U') ? riderLineUserId : '',
+      lineUserId: riderLineUserId.startsWith('U') ? riderLineUserId : '',
       birthDate: String(birthDate || '').trim(),
 
       district: cleanText(finalDistrict || '', 80),
@@ -13575,14 +13704,22 @@ app.post('/api/rider/register', async (req, res) => {
       residenceDistrict: cleanText(finalResidenceDistrict || '', 20),
 
       vehicle: cleanText(vehicle || '', 40),
-      plateNumber: cleanText(plateNumber || '', 20),
+      vehicleMode: normalizeRiderVehicleMode(vehicle),
+      motorizedVehicle,
+      plateNumber: motorizedVehicle
+        ? cleanText(plateNumber || '', 20)
+        : '',
       vehicleOwnerType: normalizedVehicleOwnerType,
-      vehicleOwnerConsent:
-        normalizedVehicleOwnerType === 'self'
-          ? true
-          : toBool(vehicleOwnerConsent),
-      compulsoryInsuranceExpiryDate:
-        String(compulsoryInsuranceExpiryDate || '').trim(),
+      vehicleOwnerConsent: motorizedVehicle
+        ? (
+            normalizedVehicleOwnerType === 'self'
+              ? true
+              : toBool(vehicleOwnerConsent)
+          )
+        : true,
+      compulsoryInsuranceExpiryDate: motorizedVehicle
+        ? String(compulsoryInsuranceExpiryDate || '').trim()
+        : '',
 
       area: cleanText(finalServiceArea || '', 80),
       serviceArea: cleanText(finalServiceArea || '', 80),
@@ -13601,26 +13738,31 @@ app.post('/api/rider/register', async (req, res) => {
       },
 
       documents: documentValidation.documents,
-      documentsComplete: true,
+      requiredDocumentKeys,
+      documentsComplete:
+        requiredDocumentKeys.every(key =>
+          Boolean(documentValidation.documents?.[key]?.storagePath)
+        ),
+      verificationModelVersion: 2,
       documentReviewStatus: 'pending',
 
       approved: false,
-      status: 'pending',
-      reviewStatus: 'pending',
+      status: 'submitted',
+      reviewStatus: 'under_review',
       lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
       canAcceptOrders: false,
       riderLevel: 'L0',
       onboardingRequired: true,
 
       source: cleanText(
-        applicationSource || 'rider_web_apply_v2',
+        applicationSource || 'rider_web_apply_v3',
         60
       ),
       submittedFrom: cleanText(
-        applicationSource || 'rider_apply_v2',
+        applicationSource || 'rider_apply_v3',
         60
       ),
-      applicationType: 'rider_v2',
+      applicationType: 'rider_v3_verification',
 
       driverLicenseConfirmed: toBool(driverLicenseConfirmed),
       vehicleLicenseConfirmed: toBool(vehicleLicenseConfirmed),
@@ -13756,6 +13898,12 @@ app.post('/api/rider/register', async (req, res) => {
 
     await applicationRef.set(notifyUpdate, { merge: true });
 
+    const submittedApplicationDoc = await applicationRef.get();
+    await notifyRiderApplicationReviewUpdate(
+      submittedApplicationDoc.data() || application,
+      'submitted'
+    );
+
     return res.json({
       success: true,
       riderId,
@@ -13779,11 +13927,11 @@ app.post('/api/rider/register', async (req, res) => {
 
 
 // ============================================================
-// UBee 小U申請審核與補件系統 V1｜2026-07-29
-// - 五項證件逐項審核
-// - 管理端短效簽名預覽網址
-// - 申請者補件後重新送審
-// - 審核事件留存
+// UBee 小U申請審核與補件系統 V2｜2026-08-04
+// - 三大驗證區塊，底層相容既有五份文件欄位
+// - 機動車與非機動配送採條件式文件要求
+// - 管理端短效簽名預覽網址、批次補件與審核紀錄
+// - 申請端通知中心為主，Web Push／LINE 為可選附加通道
 // ============================================================
 const RIDER_DOCUMENT_REVIEW_STATUS = Object.freeze({
   PENDING: 'pending',
@@ -13816,6 +13964,11 @@ function getRiderApplicationDocumentReviewItems(application = {}) {
       ? application.documents
       : {};
 
+  const requiredDocumentKeys = getRequiredRiderDocumentKeys(
+    application.vehicle,
+    application.requiredDocumentKeys
+  );
+
   const hasStoredDocuments = Object.keys(documents).length > 0;
   if (
     !hasStoredDocuments &&
@@ -13829,45 +13982,102 @@ function getRiderApplicationDocumentReviewItems(application = {}) {
     String(application.documentReviewStatus || '').trim().toLowerCase() ===
     RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
 
-  return Object.entries(RIDER_REQUIRED_DOCUMENTS).map(
-    ([documentKey, documentType]) => {
-      const document =
-        documents[documentKey] && typeof documents[documentKey] === 'object'
-          ? documents[documentKey]
-          : {};
+  return requiredDocumentKeys.map(documentKey => {
+    const documentType = RIDER_REQUIRED_DOCUMENTS[documentKey];
+    const document =
+      documents[documentKey] && typeof documents[documentKey] === 'object'
+        ? documents[documentKey]
+        : {};
 
-      let reviewStatus = normalizeRiderDocumentReviewStatus(
-        document.reviewStatus || document.status || ''
-      );
+    let reviewStatus = normalizeRiderDocumentReviewStatus(
+      document.reviewStatus || document.status || ''
+    );
 
-      // 舊資料曾只保存整體 approved；升級後仍視為逐項通過。
-      if (overallApproved && reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.PENDING) {
-        reviewStatus = RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
-      }
-
-      return {
-        documentKey,
-        documentType,
-        label: RIDER_DOCUMENT_LABELS[documentKey],
-        reviewStatus,
-        reviewReason: cleanText(
-          document.reviewReason || document.supplementReason || '',
-          500
-        ),
-        originalName: cleanText(document.originalName || '', 180),
-        mimeType: String(document.mimeType || '').trim(),
-        sizeBytes: Number(document.sizeBytes || 0),
-        storageBucket: String(
-          document.storageBucket || RIDER_DOCUMENT_STORAGE_BUCKET || ''
-        ).trim(),
-        storagePath: String(document.storagePath || '').trim(),
-        uploadedAtMs: Number(document.uploadedAtMs || 0),
-        reviewedAtMs: Number(document.reviewedAtMs || 0),
-        resubmittedAtMs: Number(document.resubmittedAtMs || 0),
-        reviewedBy: cleanText(document.reviewedBy || '', 100),
-      };
+    // 舊資料曾只保存整體 approved；升級後仍視為逐項通過。
+    if (
+      overallApproved &&
+      reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.PENDING
+    ) {
+      reviewStatus = RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
     }
+
+    const groupKey = getRiderDocumentGroupKey(documentKey);
+    const group = RIDER_VERIFICATION_GROUPS[groupKey];
+
+    return {
+      documentKey,
+      documentType,
+      label: RIDER_DOCUMENT_LABELS[documentKey],
+      groupKey,
+      groupLabel: group?.label || '驗證資料',
+      reviewStatus,
+      reviewReason: cleanText(
+        document.reviewReason || document.supplementReason || '',
+        500
+      ),
+      originalName: cleanText(document.originalName || '', 180),
+      mimeType: String(document.mimeType || '').trim(),
+      sizeBytes: Number(document.sizeBytes || 0),
+      storageBucket: String(
+        document.storageBucket || RIDER_DOCUMENT_STORAGE_BUCKET || ''
+      ).trim(),
+      storagePath: String(document.storagePath || '').trim(),
+      uploadedAtMs: Number(document.uploadedAtMs || 0),
+      reviewedAtMs: Number(document.reviewedAtMs || 0),
+      resubmittedAtMs: Number(document.resubmittedAtMs || 0),
+      reviewedBy: cleanText(document.reviewedBy || '', 100),
+    };
+  });
+}
+
+function buildRiderApplicationVerificationGroups(
+  application = {},
+  documents = getRiderApplicationDocumentReviewItems(application)
+) {
+  const requiredDocumentKeys = getRequiredRiderDocumentKeys(
+    application.vehicle,
+    application.requiredDocumentKeys
   );
+
+  return Object.values(RIDER_VERIFICATION_GROUPS).map(group => {
+    const groupDocumentKeys = group.documentKeys.filter(key =>
+      requiredDocumentKeys.includes(key)
+    );
+    const groupDocuments = documents.filter(item =>
+      groupDocumentKeys.includes(item.documentKey)
+    );
+    const approvedCount = groupDocuments.filter(
+      item => item.reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.APPROVED
+    ).length;
+    const supplementCount = groupDocuments.filter(
+      item =>
+        item.reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
+    ).length;
+    const pendingCount =
+      groupDocuments.length - approvedCount - supplementCount;
+    const required = groupDocumentKeys.length > 0;
+    const status = !required
+      ? 'not_required'
+      : supplementCount > 0
+        ? 'needs_supplement'
+        : approvedCount === groupDocuments.length && groupDocuments.length > 0
+          ? 'approved'
+          : 'pending';
+
+    return {
+      key: group.key,
+      label: group.label,
+      description: group.description,
+      required,
+      status,
+      documentKeys: groupDocumentKeys,
+      totalCount: groupDocuments.length,
+      approvedCount,
+      supplementCount,
+      pendingCount,
+      allApproved: required && approvedCount === groupDocuments.length,
+    };
+  });
 }
 
 function summarizeRiderApplicationDocuments(application = {}) {
@@ -13879,15 +14089,129 @@ function summarizeRiderApplicationDocuments(application = {}) {
     item => item.reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
   ).length;
   const pendingCount = documents.length - approvedCount - supplementCount;
+  const verificationGroups =
+    buildRiderApplicationVerificationGroups(application, documents);
+  const requiredGroups = verificationGroups.filter(group => group.required);
+  const approvedGroupCount = requiredGroups.filter(
+    group => group.status === 'approved'
+  ).length;
+  const supplementGroupCount = requiredGroups.filter(
+    group => group.status === 'needs_supplement'
+  ).length;
 
   return {
     documents,
+    verificationGroups,
     totalCount: documents.length,
     approvedCount,
     supplementCount,
     pendingCount,
+    requiredGroupCount: requiredGroups.length,
+    approvedGroupCount,
+    supplementGroupCount,
     allApproved: documents.length > 0 && approvedCount === documents.length,
+    allGroupsApproved:
+      requiredGroups.length > 0 &&
+      approvedGroupCount === requiredGroups.length,
     hasSupplementRequest: supplementCount > 0,
+  };
+}
+
+function buildRiderApplicationRiskChecks(application = {}, summary = null) {
+  const documentSummary =
+    summary || summarizeRiderApplicationDocuments(application);
+  const items = [];
+  const add = (level, code, label, detail) => {
+    items.push({ level, code, label, detail });
+  };
+
+  const birthDate = String(application.birthDate || '').trim();
+  if (birthDate) {
+    const birth = new Date(`${birthDate}T00:00:00+08:00`);
+    if (!Number.isNaN(birth.getTime())) {
+      const now = new Date();
+      let age = now.getFullYear() - birth.getFullYear();
+      const monthDelta = now.getMonth() - birth.getMonth();
+      if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < birth.getDate())) {
+        age -= 1;
+      }
+      if (age < 18) {
+        add('critical', 'UNDERAGE', '未滿 18 歲', `依出生年月日推算目前約 ${age} 歲。`);
+      }
+    }
+  }
+
+  const missingDocuments = documentSummary.documents
+    .filter(item => !String(item.storagePath || '').trim())
+    .map(item => item.label);
+  if (missingDocuments.length) {
+    add(
+      'critical',
+      'MISSING_DOCUMENTS',
+      '必要文件不完整',
+      missingDocuments.join('、')
+    );
+  }
+
+  const applicantPhone = normalizePhone(application.phone || '');
+  const emergencyPhone = normalizePhone(application.emergencyContact?.phone || '');
+  if (
+    applicantPhone &&
+    emergencyPhone &&
+    applicantPhone === emergencyPhone
+  ) {
+    add(
+      'warning',
+      'SAME_EMERGENCY_PHONE',
+      '緊急聯絡電話與本人相同',
+      '建議確認是否填入可在緊急狀況聯絡到的其他人。'
+    );
+  }
+
+  if (isMotorizedRiderVehicle(application.vehicle)) {
+    const expiryText = String(
+      application.compulsoryInsuranceExpiryDate || ''
+    ).trim();
+    const expiry = expiryText
+      ? new Date(`${expiryText}T23:59:59+08:00`)
+      : null;
+
+    if (!expiry || Number.isNaN(expiry.getTime())) {
+      add('critical', 'INSURANCE_DATE_MISSING', '強制險日期缺失', '請確認強制險到期日。');
+    } else {
+      const days = Math.ceil((expiry.getTime() - Date.now()) / 86400000);
+      if (days < 0) {
+        add('critical', 'INSURANCE_EXPIRED', '強制險已過期', `到期日：${expiryText}`);
+      } else if (days <= 30) {
+        add('warning', 'INSURANCE_EXPIRING', '強制險即將到期', `約剩 ${days} 天，到期日：${expiryText}`);
+      }
+    }
+
+    if (
+      String(application.vehicleOwnerType || '').toLowerCase() === 'other' &&
+      application.vehicleOwnerConsent !== true
+    ) {
+      add(
+        'critical',
+        'OWNER_CONSENT_MISSING',
+        '缺少車主授權確認',
+        '申請者使用他人車輛，但未記錄車主同意。'
+      );
+    }
+  }
+
+  if (
+    !String(application.residenceCity || application.city || '').trim() ||
+    !String(application.residenceDistrict || application.district || '').trim()
+  ) {
+    add('warning', 'RESIDENCE_INCOMPLETE', '居住地區可能不完整', '請核對縣市與行政區。');
+  }
+
+  return {
+    items,
+    criticalCount: items.filter(item => item.level === 'critical').length,
+    warningCount: items.filter(item => item.level === 'warning').length,
+    hasRisk: items.length > 0,
   };
 }
 
@@ -13918,8 +14242,8 @@ function getRiderApplicationLifecyclePresentation(application = {}, officialRide
       label: needsSupplement
         ? '證件需要補件'
         : documentSummary.allApproved
-          ? '五項證件已通過'
-          : '證件審核中',
+          ? '必要驗證已通過'
+          : '驗證資料審核中',
       status: needsSupplement
         ? 'action'
         : documentSummary.allApproved
@@ -13972,6 +14296,8 @@ function serializeRiderApplicationDocumentsForClient(application = {}) {
     documentKey: item.documentKey,
     documentType: item.documentType,
     label: item.label,
+    groupKey: item.groupKey,
+    groupLabel: item.groupLabel,
     reviewStatus: item.reviewStatus,
     reviewReason: item.reviewReason,
     originalName: item.originalName,
@@ -14037,40 +14363,141 @@ async function createRiderDocumentReviewSignedUrl(document = {}) {
   }
 }
 
+
+async function listRiderApplicationReviewEvents(application = {}, limit = 40) {
+  const riderId = String(
+    application.riderId || application.phone || application.applicationId || ''
+  ).trim();
+  if (!riderId) return [];
+
+  try {
+    const snap = await db
+      .collection('riderApplicationReviewEvents')
+      .where('riderId', '==', riderId)
+      .limit(Math.max(1, Math.min(100, Number(limit || 40))))
+      .get();
+
+    return snap.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .sort(
+        (a, b) => Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0)
+      )
+      .slice(0, limit)
+      .map(item => ({
+        id: item.id,
+        type: cleanText(item.type || '', 80),
+        operator: cleanText(item.operator || '', 100),
+        documentKey: normalizeRiderDocumentKey(item.documentKey || ''),
+        documentStatus: normalizeRiderDocumentReviewStatus(
+          item.documentStatus || ''
+        ),
+        reason: cleanText(item.reason || '', 1000),
+        metadata:
+          item.metadata && typeof item.metadata === 'object'
+            ? item.metadata
+            : {},
+        createdAtMs: Number(item.createdAtMs || 0),
+      }));
+  } catch (error) {
+    console.warn('⚠️ 讀取小U審核紀錄失敗：', error?.message || error);
+    return [];
+  }
+}
+
+async function listRiderApplicationNotifications(application = {}, limit = 12) {
+  const riderId = String(
+    application.riderId || application.phone || application.applicationId || ''
+  ).trim();
+  if (!riderId) return [];
+
+  try {
+    const snap = await db
+      .collection('riderApplicationNotifications')
+      .where('riderId', '==', riderId)
+      .limit(Math.max(1, Math.min(50, Number(limit || 12))))
+      .get();
+
+    return snap.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .sort(
+        (a, b) => Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0)
+      )
+      .slice(0, limit)
+      .map(item => ({
+        id: item.id,
+        type: cleanText(item.type || '', 80),
+        title: cleanText(item.title || '', 160),
+        body: cleanText(item.body || '', 2000),
+        reason: cleanText(item.reason || '', 1000),
+        createdAtMs: Number(item.createdAtMs || 0),
+        channels:
+          item.channels && typeof item.channels === 'object'
+            ? item.channels
+            : {},
+      }));
+  } catch (error) {
+    console.warn('⚠️ 讀取小U申請通知紀錄失敗：', error?.message || error);
+    return [];
+  }
+}
+
 async function serializeRiderApplicationForAdmin(applicationDoc) {
   const application = applicationDoc.data() || {};
   const presentation = getRiderApplicationLifecyclePresentation(application);
-  const documents = await Promise.all(
-    presentation.documentSummary.documents.map(async document => ({
-      documentKey: document.documentKey,
-      documentType: document.documentType,
-      label: document.label,
-      reviewStatus: document.reviewStatus,
-      reviewReason: document.reviewReason,
-      originalName: document.originalName,
-      mimeType: document.mimeType,
-      sizeBytes: document.sizeBytes,
-      uploadedAtMs: document.uploadedAtMs,
-      reviewedAtMs: document.reviewedAtMs,
-      resubmittedAtMs: document.resubmittedAtMs,
-      reviewedBy: document.reviewedBy,
-      previewUrl: await createRiderDocumentReviewSignedUrl(document),
-    }))
+  const riskChecks = buildRiderApplicationRiskChecks(
+    application,
+    presentation.documentSummary
   );
+
+  const [documents, reviewEvents, notifications] = await Promise.all([
+    Promise.all(
+      presentation.documentSummary.documents.map(async document => ({
+        documentKey: document.documentKey,
+        documentType: document.documentType,
+        label: document.label,
+        groupKey: document.groupKey,
+        groupLabel: document.groupLabel,
+        reviewStatus: document.reviewStatus,
+        reviewReason: document.reviewReason,
+        originalName: document.originalName,
+        mimeType: document.mimeType,
+        sizeBytes: document.sizeBytes,
+        storagePath: document.storagePath,
+        uploadedAtMs: document.uploadedAtMs,
+        reviewedAtMs: document.reviewedAtMs,
+        resubmittedAtMs: document.resubmittedAtMs,
+        reviewedBy: document.reviewedBy,
+        previewUrl: await createRiderDocumentReviewSignedUrl(document),
+      }))
+    ),
+    listRiderApplicationReviewEvents(application, 50),
+    listRiderApplicationNotifications(application, 15),
+  ]);
 
   return {
     id: applicationDoc.id,
     riderId: application.riderId || applicationDoc.id,
     applicationId: application.applicationId || applicationDoc.id,
+    verificationModelVersion: Number(application.verificationModelVersion || 1),
+    requiredDocumentKeys: getRequiredRiderDocumentKeys(
+      application.vehicle,
+      application.requiredDocumentKeys
+    ),
     name: application.name || '',
     phone: application.phone || applicationDoc.id,
     lineId: application.lineId || '',
+    lineLinked:
+      Boolean(
+        String(application.lineUserId || application.userId || '').trim()
+      ),
     birthDate: application.birthDate || '',
     district: application.district || '',
     city: application.city || application.residenceCity || '',
     residenceCity: application.residenceCity || application.city || '',
     residenceDistrict: application.residenceDistrict || '',
     vehicle: application.vehicle || '',
+    vehicleMode: normalizeRiderVehicleMode(application.vehicle),
+    motorizedVehicle: isMotorizedRiderVehicle(application.vehicle),
     plateNumber: application.plateNumber || '',
     vehicleOwnerType: application.vehicleOwnerType || '',
     vehicleOwnerConsent: application.vehicleOwnerConsent === true,
@@ -14086,26 +14513,48 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
       : [],
     availableTime: application.availableTime || '',
     emergencyContact: application.emergencyContact || {},
-    status: application.status || 'pending',
-    reviewStatus: application.reviewStatus || application.status || 'pending',
+    status: application.status || 'submitted',
+    reviewStatus:
+      application.reviewStatus || application.status || 'under_review',
     lifecycleStatus:
       application.lifecycleStatus || RIDER_V4_LIFECYCLE.UNDER_REVIEW,
     documentReviewStatus: application.documentReviewStatus || 'pending',
     approved: application.approved === true,
     canAcceptOrders: application.canAcceptOrders === true,
     submittedAtMs: Number(application.submittedAtMs || application.createdAtMs || 0),
+    reviewStartedAtMs: Number(application.reviewStartedAtMs || 0),
     updatedAtMs: Number(application.updatedAtMs || 0),
     reviewedAtMs: Number(application.reviewedAtMs || 0),
     supplementRequestedAtMs: Number(application.supplementRequestedAtMs || 0),
     supplementSubmittedAtMs: Number(application.supplementSubmittedAtMs || 0),
     supplementReason: cleanText(application.supplementReason || '', 1000),
     rejectionReason: cleanText(application.rejectionReason || '', 1000),
+    internalReviewNote: cleanText(application.internalReviewNote || '', 2000),
     documentSummary: {
       totalCount: presentation.documentSummary.totalCount,
       approvedCount: presentation.documentSummary.approvedCount,
       supplementCount: presentation.documentSummary.supplementCount,
       pendingCount: presentation.documentSummary.pendingCount,
       allApproved: presentation.documentSummary.allApproved,
+      requiredGroupCount:
+        presentation.documentSummary.requiredGroupCount,
+      approvedGroupCount:
+        presentation.documentSummary.approvedGroupCount,
+      supplementGroupCount:
+        presentation.documentSummary.supplementGroupCount,
+      allGroupsApproved:
+        presentation.documentSummary.allGroupsApproved,
+    },
+    verificationGroups: presentation.documentSummary.verificationGroups,
+    riskChecks,
+    reviewEvents,
+    notifications,
+    notificationSummary: {
+      totalCount: notifications.length,
+      lastNotificationAtMs: Number(
+        application.lastApplicationNotificationAtMs || 0
+      ),
+      unreadCount: Number(application.notificationUnreadCount || 0),
     },
     documents,
   };
@@ -14238,31 +14687,193 @@ async function writeRiderApplicationReviewEvent({
   }
 }
 
-async function notifyRiderApplicationReviewUpdate(application, type, reason = '') {
-  const lineUserId = String(
-    application.lineUserId || application.userId || ''
-  ).trim();
-  if (!lineUserId || !lineUserId.startsWith('U')) return false;
+function buildRiderApplicationNotificationContent(type, reason = '') {
+  const normalizedType = String(type || '').trim().toLowerCase();
+  const map = {
+    submitted: {
+      title: '小U申請已成功送出',
+      body: 'UBee 已收到你的申請資料，接下來會進行身分、駕駛資格與車輛安全驗證。',
+    },
+    under_review: {
+      title: 'UBee 已開始審核',
+      body: '你的申請已進入人工審核。審核結果或補件需求會顯示在 UBee Driver 的申請進度。',
+    },
+    needs_supplement: {
+      title: '小U申請需要補充資料',
+      body: reason
+        ? `需要處理的項目：\n${reason}\n\n只需重新上傳被標記為需要補件的資料。`
+        : '請開啟 UBee Driver 的申請進度，查看需要重新上傳的資料。',
+    },
+    supplement_submitted: {
+      title: '補件已成功送出',
+      body: 'UBee 已收到你重新提交的資料，該項目已回到審核中。',
+    },
+    approved: {
+      title: '你的小U申請已通過',
+      body: '身分驗證、必要駕駛資格與車輛安全資料均已完成確認。下一步請完成數位入職。',
+    },
+    rejected: {
+      title: '小U申請未通過',
+      body: reason
+        ? `說明：${reason}`
+        : '請開啟申請進度查看說明；如有疑問，可聯繫 UBee 客服。',
+    },
+    reopened: {
+      title: '小U申請已重新開啟',
+      body: '你的申請已重新進入人工審核流程。',
+    },
+  };
+  return map[normalizedType] || {
+    title: '小U申請狀態已更新',
+    body: reason || '請開啟 UBee Driver 查看最新申請進度。',
+  };
+}
 
-  const labelMap = {
-    needs_supplement: '你的申請需要補件',
-    approved: '你的申請已通過審核',
-    rejected: '你的申請未通過審核',
+async function notifyRiderApplicationReviewUpdate(
+  application,
+  type,
+  reason = '',
+  metadata = {}
+) {
+  const riderId = String(
+    application.riderId || application.phone || application.applicationId || ''
+  ).trim();
+  if (!riderId) {
+    return {
+      inAppSent: false,
+      webPushSent: false,
+      lineSent: false,
+    };
+  }
+
+  const content = buildRiderApplicationNotificationContent(type, reason);
+  const nowMs = Date.now();
+  const notificationId = crypto.randomUUID();
+  const channels = {
+    inApp: true,
+    webPush: false,
+    line: false,
   };
 
   try {
-    await client.pushMessage(lineUserId, {
-      type: 'text',
-      text:
-        `UBee 小U申請通知｜${labelMap[type] || '申請狀態已更新'}` +
-        `${reason ? `\n\n說明：${reason}` : ''}` +
-        `\n\n請開啟 UBee 騎士端查看最新進度：\n${RIDER_WEB_URL}`,
+    await db.collection('riderApplicationNotifications').doc(notificationId).set({
+      notificationId,
+      riderId,
+      applicationId:
+        application.applicationId || application.riderId || riderId,
+      riderName: application.name || '',
+      type: cleanText(type || '', 80),
+      title: cleanText(content.title || '', 160),
+      body: cleanText(content.body || '', 2000),
+      reason: cleanText(reason || '', 1000),
+      metadata:
+        metadata && typeof metadata === 'object' ? metadata : {},
+      channels,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAtMs: nowMs,
     });
-    return true;
+
+    await db
+      .collection(RIDER_V2_COLLECTIONS.applications)
+      .doc(riderId)
+      .set(
+        {
+          lastApplicationNotificationId: notificationId,
+          lastApplicationNotificationType: cleanText(type || '', 80),
+          lastApplicationNotificationTitle: cleanText(content.title || '', 160),
+          lastApplicationNotificationBody: cleanText(content.body || '', 2000),
+          lastApplicationNotificationAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          lastApplicationNotificationAtMs: nowMs,
+          notificationUnreadCount:
+            admin.firestore.FieldValue.increment(1),
+        },
+        { merge: true }
+      );
   } catch (error) {
-    console.warn('⚠️ 小U審核狀態通知失敗：', error?.message || error);
-    return false;
+    console.warn('⚠️ 寫入小U申請通知中心失敗：', error?.message || error);
+    channels.inApp = false;
   }
+
+  const pushSubscription =
+    application.webPushSubscription ||
+    application.applicationWebPushSubscription ||
+    null;
+
+  if (
+    WEB_PUSH_PUBLIC_KEY &&
+    WEB_PUSH_PRIVATE_KEY &&
+    pushSubscription?.endpoint
+  ) {
+    try {
+      await webpush.sendNotification(
+        pushSubscription,
+        JSON.stringify({
+          title: content.title,
+          body: content.body,
+          url:
+            `/rider.html?applicationStatus=1&phone=${encodeURIComponent(riderId)}`,
+          deepLink:
+            `/rider.html?applicationStatus=1&phone=${encodeURIComponent(riderId)}`,
+          type: 'rider_application_review',
+          applicationType: type,
+          riderId,
+        })
+      );
+      channels.webPush = true;
+    } catch (error) {
+      console.warn('⚠️ 小U申請 Web Push 通知失敗：', error?.message || error);
+      const statusCode = Number(error?.statusCode || 0);
+      if ([404, 410].includes(statusCode)) {
+        await db
+          .collection(RIDER_V2_COLLECTIONS.applications)
+          .doc(riderId)
+          .set(
+            {
+              webPushSubscription:
+                admin.firestore.FieldValue.delete(),
+              applicationWebPushSubscription:
+                admin.firestore.FieldValue.delete(),
+            },
+            { merge: true }
+          )
+          .catch(() => {});
+      }
+    }
+  }
+
+  const lineUserId = String(
+    application.lineUserId || application.userId || ''
+  ).trim();
+
+  if (lineUserId && lineUserId.startsWith('U')) {
+    try {
+      await client.pushMessage(lineUserId, {
+        type: 'text',
+        text:
+          `UBee 小U申請通知｜${content.title}\n\n` +
+          `${content.body}\n\n` +
+          `請開啟 UBee Driver 查看最新進度：\n${RIDER_WEB_URL}`,
+      });
+      channels.line = true;
+    } catch (error) {
+      console.warn('⚠️ 小U申請 LINE 通知失敗：', error?.message || error);
+    }
+  }
+
+  try {
+    await db
+      .collection('riderApplicationNotifications')
+      .doc(notificationId)
+      .set({ channels }, { merge: true });
+  } catch (_) {}
+
+  return {
+    inAppSent: channels.inApp,
+    webPushSent: channels.webPush,
+    lineSent: channels.line,
+    notificationId,
+  };
 }
 
 app.get(
@@ -14282,6 +14893,10 @@ app.get(
       let applications = snap.docs.map(doc => {
         const application = doc.data() || {};
         const summary = summarizeRiderApplicationDocuments(application);
+        const riskChecks = buildRiderApplicationRiskChecks(
+          application,
+          summary
+        );
         return {
           id: doc.id,
           riderId: application.riderId || doc.id,
@@ -14309,9 +14924,50 @@ app.get(
             supplementCount: summary.supplementCount,
             pendingCount: summary.pendingCount,
             allApproved: summary.allApproved,
+            requiredGroupCount: summary.requiredGroupCount,
+            approvedGroupCount: summary.approvedGroupCount,
+            supplementGroupCount: summary.supplementGroupCount,
+            allGroupsApproved: summary.allGroupsApproved,
           },
+          verificationGroups: summary.verificationGroups,
+          riskCount:
+            Number(riskChecks.criticalCount || 0) +
+            Number(riskChecks.warningCount || 0),
+          criticalRiskCount: Number(riskChecks.criticalCount || 0),
         };
       });
+
+      const dashboardStats = {
+        total: applications.length,
+        submitted: applications.filter(item =>
+          ['submitted'].includes(String(item.status || '').toLowerCase())
+        ).length,
+        pending: applications.filter(item =>
+          ['submitted', 'pending', 'under_review'].includes(
+            String(item.status || '').toLowerCase()
+          ) ||
+          String(item.lifecycleStatus || '').toLowerCase() === 'under_review'
+        ).length,
+        needsSupplement: applications.filter(item =>
+          String(item.status || '').toLowerCase() === 'needs_supplement' ||
+          Number(item.documentSummary?.supplementCount || 0) > 0
+        ).length,
+        approved: applications.filter(item =>
+          ['training', 'approved', 'active'].includes(
+            String(item.status || '').toLowerCase()
+          ) ||
+          ['training', 'active'].includes(
+            String(item.lifecycleStatus || '').toLowerCase()
+          )
+        ).length,
+        rejected: applications.filter(item =>
+          String(item.status || '').toLowerCase() === 'rejected' ||
+          String(item.lifecycleStatus || '').toLowerCase() === 'rejected'
+        ).length,
+        riskApplications: applications.filter(item =>
+          Number(item.riskCount || 0) > 0
+        ).length,
+      };
 
       if (queryText) {
         applications = applications.filter(item =>
@@ -14333,7 +14989,10 @@ app.get(
           const status = String(item.status || '').toLowerCase();
           const lifecycle = String(item.lifecycleStatus || '').toLowerCase();
           if (statusFilter === 'pending') {
-            return ['pending', 'under_review'].includes(status) ||
+            return ['submitted', 'pending', 'under_review'].includes(status) ||
+              ['submitted', 'under_review'].includes(
+                String(item.reviewStatus || '').toLowerCase()
+              ) ||
               lifecycle === 'under_review';
           }
           if (statusFilter === 'needs_supplement') {
@@ -14361,6 +15020,7 @@ app.get(
         success: true,
         applications,
         count: applications.length,
+        stats: dashboardStats,
       });
     } catch (error) {
       console.error('❌ 讀取小U申請審核名單失敗：', error);
@@ -14414,6 +15074,10 @@ app.post(
         100
       );
       const reason = cleanText(req.body?.reason || '', 1000);
+      const confirmationName = cleanText(
+        req.body?.confirmationName || '',
+        100
+      );
       const applicationDoc = await getRiderApplicationDocumentById(
         req.params.riderId
       );
@@ -14491,13 +15155,21 @@ app.post(
               : 'pending',
           status: summary.hasSupplementRequest
             ? 'needs_supplement'
-            : 'pending',
+            : 'under_review',
           reviewStatus: summary.hasSupplementRequest
             ? 'needs_supplement'
-            : 'pending',
+            : 'under_review',
           lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
           approved: false,
           canAcceptOrders: false,
+          reviewStartedAt:
+            application.reviewStartedAtMs
+              ? application.reviewStartedAt || null
+              : admin.firestore.FieldValue.serverTimestamp(),
+          reviewStartedAtMs:
+            Number(application.reviewStartedAtMs || nowMs),
+          reviewStartedBy:
+            application.reviewStartedBy || operator,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAtMs: Date.now(),
         };
@@ -14537,7 +15209,12 @@ app.post(
           await notifyRiderApplicationReviewUpdate(
             freshApplication,
             'needs_supplement',
-            reason
+            freshApplication.supplementReason || reason
+          );
+        } else if (!application.reviewStartedAtMs) {
+          await notifyRiderApplicationReviewUpdate(
+            freshApplication,
+            'under_review'
           );
         }
 
@@ -14550,6 +15227,163 @@ app.post(
                   RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
                 ? `已要求補交${RIDER_DOCUMENT_LABELS[documentKey]}。`
                 : `${RIDER_DOCUMENT_LABELS[documentKey]}已恢復待審核。`,
+          application: await serializeRiderApplicationForAdmin(freshDoc),
+        });
+      }
+
+      if (action === 'save_review_note') {
+        await applicationDoc.ref.set(
+          {
+            internalReviewNote: reason,
+            internalReviewNoteUpdatedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            internalReviewNoteUpdatedAtMs: nowMs,
+            internalReviewNoteUpdatedBy: operator,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          },
+          { merge: true }
+        );
+
+        const freshDoc = await applicationDoc.ref.get();
+        const freshApplication = freshDoc.data() || {};
+        await writeRiderApplicationReviewEvent({
+          application: freshApplication,
+          type: 'save_review_note',
+          operator,
+          reason,
+        });
+
+        return res.json({
+          success: true,
+          message: '審核備註已儲存。',
+          application: await serializeRiderApplicationForAdmin(freshDoc),
+        });
+      }
+
+      if (action === 'approve_group') {
+        if (['training', 'approved', 'active'].includes(status)) {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已通過審核，不能再修改驗證狀態。',
+          });
+        }
+        if (status === 'rejected') {
+          return res.status(409).json({
+            success: false,
+            message: '此申請已拒絕，請先重新開啟申請。',
+          });
+        }
+
+        const groupKey = String(req.body?.groupKey || '').trim();
+        const group = RIDER_VERIFICATION_GROUPS[groupKey];
+        if (!group) {
+          return res.status(400).json({
+            success: false,
+            message: '驗證區塊不正確。',
+          });
+        }
+
+        const requiredKeys = getRequiredRiderDocumentKeys(
+          application.vehicle,
+          application.requiredDocumentKeys
+        );
+        const groupDocumentKeys = group.documentKeys.filter(key =>
+          requiredKeys.includes(key)
+        );
+
+        if (!groupDocumentKeys.length) {
+          return res.status(409).json({
+            success: false,
+            message: `${group.label}不適用於此配送工具。`,
+          });
+        }
+
+        const missing = groupDocumentKeys.filter(key =>
+          !String(application.documents?.[key]?.storagePath || '').trim()
+        );
+
+        if (missing.length) {
+          return res.status(409).json({
+            success: false,
+            message:
+              `${group.label}仍缺少：` +
+              missing.map(key => RIDER_DOCUMENT_LABELS[key]).join('、'),
+          });
+        }
+
+        const update = {
+          status: 'under_review',
+          reviewStatus: 'under_review',
+          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: false,
+          canAcceptOrders: false,
+          reviewStartedAt:
+            application.reviewStartedAtMs
+              ? application.reviewStartedAt || null
+              : admin.firestore.FieldValue.serverTimestamp(),
+          reviewStartedAtMs: Number(application.reviewStartedAtMs || nowMs),
+          reviewStartedBy: application.reviewStartedBy || operator,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs: nowMs,
+        };
+
+        for (const documentKey of groupDocumentKeys) {
+          update[`documents.${documentKey}.reviewStatus`] =
+            RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
+          update[`documents.${documentKey}.reviewReason`] = '';
+          update[`documents.${documentKey}.reviewedBy`] = operator;
+          update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
+        }
+
+        await applicationDoc.ref.set(update, { merge: true });
+        let freshDoc = await applicationDoc.ref.get();
+        let freshApplication = freshDoc.data() || {};
+        const freshSummary =
+          summarizeRiderApplicationDocuments(freshApplication);
+
+        await applicationDoc.ref.set(
+          {
+            documentReviewStatus: freshSummary.allApproved
+              ? 'approved'
+              : freshSummary.hasSupplementRequest
+                ? 'needs_supplement'
+                : 'pending',
+            supplementReason: freshSummary.documents
+              .filter(
+                item =>
+                  item.reviewStatus ===
+                  RIDER_DOCUMENT_REVIEW_STATUS.NEEDS_SUPPLEMENT
+              )
+              .map(item => `${item.label}：${item.reviewReason}`)
+              .join('\n'),
+          },
+          { merge: true }
+        );
+
+        freshDoc = await applicationDoc.ref.get();
+        freshApplication = freshDoc.data() || {};
+        await writeRiderApplicationReviewEvent({
+          application: freshApplication,
+          type: 'approve_group',
+          operator,
+          reason: `${group.label}已整組確認通過。`,
+          metadata: {
+            groupKey,
+            documentKeys: groupDocumentKeys,
+          },
+        });
+
+        if (!application.reviewStartedAtMs) {
+          await notifyRiderApplicationReviewUpdate(
+            freshApplication,
+            'under_review'
+          );
+        }
+
+        return res.json({
+          success: true,
+          message: `${group.label}已全部標記為通過。`,
           application: await serializeRiderApplicationForAdmin(freshDoc),
         });
       }
@@ -14573,6 +15407,12 @@ app.post(
           lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
           approved: false,
           canAcceptOrders: false,
+          reviewStartedAt:
+            application.reviewStartedAtMs
+              ? application.reviewStartedAt || null
+              : admin.firestore.FieldValue.serverTimestamp(),
+          reviewStartedAtMs: Number(application.reviewStartedAtMs || nowMs),
+          reviewStartedBy: application.reviewStartedBy || operator,
           supplementRequestedAt:
             admin.firestore.FieldValue.serverTimestamp(),
           supplementRequestedAtMs: nowMs,
@@ -14634,6 +15474,16 @@ app.post(
       }
 
       if (action === 'approve_all') {
+        if (
+          !confirmationName ||
+          confirmationName !== String(application.name || '').trim()
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: '請正確輸入申請者姓名，才能確認所有驗證並通過。',
+          });
+        }
+
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
             success: false,
@@ -14652,7 +15502,12 @@ app.post(
             ? application.documents
             : {};
 
-        const missingDocuments = Object.keys(RIDER_REQUIRED_DOCUMENTS)
+        const requiredDocumentKeys = getRequiredRiderDocumentKeys(
+          application.vehicle,
+          application.requiredDocumentKeys
+        );
+
+        const missingDocuments = requiredDocumentKeys
           .filter(documentKey => {
             const document = storedDocuments[documentKey];
             return (
@@ -14666,7 +15521,7 @@ app.post(
         if (missingDocuments.length) {
           return res.status(409).json({
             success: false,
-            message: `以下證件尚未上傳完整，不能一鍵通過：${missingDocuments.join('、')}`,
+            message: `以下證件尚未上傳完整，不能確認通過：${missingDocuments.join('、')}`,
           });
         }
 
@@ -14684,7 +15539,7 @@ app.post(
           updatedAtMs: nowMs,
         };
 
-        for (const documentKey of Object.keys(RIDER_REQUIRED_DOCUMENTS)) {
+        for (const documentKey of requiredDocumentKeys) {
           documentApprovalUpdate[`documents.${documentKey}.reviewStatus`] =
             RIDER_DOCUMENT_REVIEW_STATUS.APPROVED;
           documentApprovalUpdate[`documents.${documentKey}.reviewReason`] = '';
@@ -14702,12 +15557,28 @@ app.post(
           summarizeRiderApplicationDocuments(approvedApplication);
 
         if (
-          summary.totalCount !== Object.keys(RIDER_REQUIRED_DOCUMENTS).length ||
+          summary.totalCount !== requiredDocumentKeys.length ||
           !summary.allApproved
         ) {
           return res.status(409).json({
             success: false,
-            message: '五項證件狀態更新不完整，系統已停止正式通過流程，請重新整理後再試。',
+            message: '必要驗證狀態更新不完整，系統已停止正式通過流程，請重新整理後再試。',
+          });
+        }
+
+        const riskChecks = buildRiderApplicationRiskChecks(
+          approvedApplication,
+          summary
+        );
+        if (riskChecks.criticalCount > 0) {
+          return res.status(409).json({
+            success: false,
+            message:
+              '仍有高風險項目未處理：' +
+              riskChecks.items
+                .filter(item => item.level === 'critical')
+                .map(item => item.label)
+                .join('、'),
           });
         }
 
@@ -14750,9 +15621,9 @@ app.post(
           operator,
           reason:
             reason ||
-            '管理人員已確認五項證件並使用一鍵全部通過。',
+            '管理人員已確認所有必要驗證並完成最終通過。',
           metadata: {
-            approvedDocumentKeys: Object.keys(RIDER_REQUIRED_DOCUMENTS),
+            approvedDocumentKeys: requiredDocumentKeys,
           },
         });
 
@@ -14763,7 +15634,7 @@ app.post(
 
         return res.json({
           success: true,
-          message: '五項證件及小U申請已一鍵通過，已進入數位入職階段。',
+          message: '所有必要驗證與小U申請已通過，已進入數位入職階段。',
           application: await serializeRiderApplicationForAdmin(freshDoc),
         });
       }
@@ -14793,6 +15664,22 @@ app.post(
           return res.status(409).json({
             success: false,
             message: `以下證件尚未全部通過：${unfinished.join('、')}`,
+          });
+        }
+
+        const riskChecks = buildRiderApplicationRiskChecks(
+          application,
+          summary
+        );
+        if (riskChecks.criticalCount > 0) {
+          return res.status(409).json({
+            success: false,
+            message:
+              '仍有高風險項目未處理：' +
+              riskChecks.items
+                .filter(item => item.level === 'critical')
+                .map(item => item.label)
+                .join('、'),
           });
         }
 
@@ -14902,8 +15789,8 @@ app.post(
 
         await applicationDoc.ref.set(
           {
-            status: 'pending',
-            reviewStatus: 'pending',
+            status: 'under_review',
+            reviewStatus: 'under_review',
             lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
             canAcceptOrders: false,
             approved: false,
@@ -14924,6 +15811,10 @@ app.post(
           type: 'reopen',
           operator,
         });
+        await notifyRiderApplicationReviewUpdate(
+          freshApplication,
+          'reopened'
+        );
 
         return res.json({
           success: true,
@@ -15044,10 +15935,10 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       {
         status: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
-          : 'pending',
+          : 'under_review',
         reviewStatus: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
-          : 'pending',
+          : 'under_review',
         documentReviewStatus: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
           : 'pending',
@@ -15077,6 +15968,12 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       operator: 'applicant',
       metadata: { documentKeys: Object.keys(validation.documents) },
     });
+    await notifyRiderApplicationReviewUpdate(
+      freshApplication,
+      'supplement_submitted',
+      '',
+      { documentKeys: Object.keys(validation.documents) }
+    );
 
     try {
       if (LINE_ADMIN_GROUP_ID) {
@@ -15147,6 +16044,10 @@ app.get('/api/rider/application-status', async (req, res) => {
         application,
         rider
       );
+      const notifications = await listRiderApplicationNotifications(
+        application,
+        10
+      );
 
       return res.json({
         success: true,
@@ -15171,7 +16072,18 @@ app.get('/api/rider/application-status', async (req, res) => {
           supplementCount: presentation.documentSummary.supplementCount,
           pendingCount: presentation.documentSummary.pendingCount,
           allApproved: presentation.documentSummary.allApproved,
+          requiredGroupCount:
+            presentation.documentSummary.requiredGroupCount,
+          approvedGroupCount:
+            presentation.documentSummary.approvedGroupCount,
+          supplementGroupCount:
+            presentation.documentSummary.supplementGroupCount,
+          allGroupsApproved:
+            presentation.documentSummary.allGroupsApproved,
         },
+        verificationGroups:
+          presentation.documentSummary.verificationGroups,
+        notifications,
         timeline: presentation.timeline,
         submittedAtMs: Number(
           application.submittedAtMs || application.createdAtMs || 0
@@ -15202,7 +16114,13 @@ app.get('/api/rider/application-status', async (req, res) => {
       const presentation = getRiderApplicationLifecyclePresentation(
         application
       );
+      const notifications = await listRiderApplicationNotifications(
+        application,
+        10
+      );
       const messageMap = {
+        submitted: '申請已送出，UBee 將開始審核你的資料。',
+        under_review: 'UBee 已開始進行人工審核。',
         pending: '申請已送出，UBee 正在審核你的資料。',
         needs_supplement: '申請需要補件，請依各項證件說明重新上傳。',
         training: '審核已通過，請登入騎士端完成數位入職。',
@@ -15235,7 +16153,18 @@ app.get('/api/rider/application-status', async (req, res) => {
           supplementCount: presentation.documentSummary.supplementCount,
           pendingCount: presentation.documentSummary.pendingCount,
           allApproved: presentation.documentSummary.allApproved,
+          requiredGroupCount:
+            presentation.documentSummary.requiredGroupCount,
+          approvedGroupCount:
+            presentation.documentSummary.approvedGroupCount,
+          supplementGroupCount:
+            presentation.documentSummary.supplementGroupCount,
+          allGroupsApproved:
+            presentation.documentSummary.allGroupsApproved,
         },
+        verificationGroups:
+          presentation.documentSummary.verificationGroups,
+        notifications,
         timeline: presentation.timeline,
         submittedAtMs: Number(
           application.submittedAtMs || application.createdAtMs || 0
@@ -21161,7 +22090,7 @@ function createRiderReviewFlex(rider) {
       createInfoRow('申請時間', rider.createdAt),
       {
         type: 'text',
-        text: '請至審核管理頁查看五項證件，逐項通過或要求補件後，再完成整體審核。',
+        text: '請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再做最終決定。',
         size: 'sm',
         color: '#666666',
         wrap: true,
@@ -27500,7 +28429,7 @@ UBee 跑腿辦公室將會再依照您的需求，
     if (!documentReviewSummary.allApproved) {
       return replyText(
         event.replyToken,
-        `五項證件尚未全部逐項通過。請至小U申請審核管理頁處理：\n\n` +
+        `必要驗證資料尚未全部通過。請至小U申請審核管理頁處理：\n\n` +
         `${RIDER_REVIEW_ADMIN_URL}?riderId=${encodeURIComponent(riderId)}`
       );
     }
