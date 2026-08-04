@@ -10887,11 +10887,15 @@ body{background:#eef0f2;}
 
 
     <div class="bottom-tabs" aria-label="主要導覽">
-      <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()">
+      <button id="tabHome" class="bottom-tab active" type="button" onclick="showHomeTab()" aria-label="首頁">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-7h6v7"></path></svg>
         首頁
       </button>
-      <button id="tabProfile" class="bottom-tab" type="button" onclick="showProfileTab()">
+      <button id="tabTasks" class="bottom-tab" type="button" aria-label="任務">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4.5V3h6v1.5"></path><path d="m8.5 11 2 2 5-5"></path><path d="M9 17h6"></path></svg>
+        任務
+      </button>
+      <button id="tabProfile" class="bottom-tab" type="button" onclick="showProfileTab()" aria-label="我的">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
         我的
       </button>
@@ -20334,8 +20338,9 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     </section>
 
     <nav class="flow-bottom-nav" aria-label="主要導覽">
-      <button id="flowNavHome" class="active" type="button"><span class="flow-nav-icon">U</span>首頁</button>
-      <button id="flowNavMy" type="button"><span class="flow-nav-icon">◎</span>我的</button>
+      <button id="flowNavHome" class="active" type="button" aria-label="首頁"><span class="flow-nav-icon">U</span><span class="flow-nav-label">首頁</span></button>
+      <button id="flowNavTasks" type="button" aria-label="任務"><span class="flow-nav-icon">▣</span><span class="flow-nav-label">任務</span></button>
+      <button id="flowNavMy" type="button" aria-label="我的"><span class="flow-nav-icon">◎</span><span class="flow-nav-label">我的</span></button>
     </nav>
   </div>
 </div>
@@ -21483,324 +21488,703 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
      - 設定新增通知、定位、震動、減少動畫、安裝 App、更新、清除草稿等功能。
      - 保留既有下單、估價、付款、地圖及即時追蹤核心流程。
      ========================================================= -->
-<style id="ubeeAppNavigationSettingsV2Style">
-  #productionOrderFlow .flow-profile-task-card{
-    cursor:pointer;
-    transition:transform .14s ease,background .14s ease,border-color .14s ease;
+<style id="ubeeAppNavigationSettingsV3Style">
+  /*
+   * UBee 正式營運 App 操作層｜2026-08-04
+   * 僅統一畫面層級、底部導覽、我的主頁與子頁操作感。
+   * 不修改估價、地圖、地址、下單、付款、訂單建立與任務追蹤核心。
+   */
+
+  #productionOrderFlow{
+    --ubee-nav-content-height:64px;
+    --flow-nav-height:var(--ubee-nav-content-height);
+    --flow-nav-total-height:calc(var(--ubee-nav-content-height) + env(safe-area-inset-bottom));
   }
-  #productionOrderFlow .flow-profile-task-card:active{
-    transform:scale(.992);
-    background:#fffdf2;
-    border-color:#e7cf63;
+
+  #productionOrderFlow,
+  #productionOrderFlow .flow-shell{
+    width:100%;
+    height:100%;
+    min-height:100%;
+    overscroll-behavior:none;
   }
-  #productionOrderFlow .flow-profile-task-card:focus-visible{
-    outline:3px solid rgba(250,204,21,.42);
+
+  #productionOrderFlow .flow-shell{
+    position:relative;
+    isolation:isolate;
+    background:#f5f6f7;
+  }
+
+  #productionOrderFlow button,
+  #productionOrderFlow [role="button"]{
+    touch-action:manipulation;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+
+  #productionOrderFlow button:focus-visible,
+  #productionOrderFlow [role="button"]:focus-visible{
+    outline:3px solid rgba(250,204,21,.38);
     outline-offset:2px;
   }
 
-  /* 我的子頁是 flow-shell 內的正式頁面，不再使用跨層 fixed 覆蓋。 */
-  #productionOrderFlow .flow-shell > .ubee-my-panel.ubee-my-app-page{
+  #productionOrderFlow .flow-page{
+    inset:0 0 var(--flow-nav-total-height) !important;
+    overflow:hidden;
+    background:#f5f6f7;
+  }
+
+  #productionOrderFlow .flow-page.active{
+    animation:ubeeAppScreenIn .20s cubic-bezier(.2,.75,.25,1);
+  }
+
+  #productionOrderFlow .flow-scroll{
+    overscroll-behavior-y:contain;
+    scroll-behavior:smooth;
+  }
+
+  #productionOrderFlow .flow-header{
+    position:relative;
+    z-index:10;
+    min-height:62px;
+    background:rgba(255,255,255,.98);
+    -webkit-backdrop-filter:blur(16px);
+    backdrop-filter:blur(16px);
+  }
+
+  #productionOrderFlow .flow-back-btn,
+  #productionOrderFlow .flow-icon-btn{
+    display:grid;
+    place-items:center;
+    min-width:44px;
+    min-height:44px;
+  }
+
+  #productionOrderFlow .flow-back-btn:active,
+  #productionOrderFlow .flow-icon-btn:active,
+  #productionOrderFlow .flow-city-btn:active,
+  #productionOrderFlow .flow-address-button:active,
+  #productionOrderFlow .flow-result:active,
+  #productionOrderFlow .ubee-my-menu-item:active,
+  #productionOrderFlow .ubee-settings-row:active{
+    transform:scale(.985);
+    opacity:.82;
+  }
+
+  /* =========================
+     固定貼底的 App 導覽列
+     ========================= */
+
+  #productionOrderFlow .flow-bottom-nav{
+    position:absolute !important;
+    left:0 !important;
+    right:0 !important;
+    bottom:0 !important;
+    width:100% !important;
+    max-width:none !important;
+    height:var(--flow-nav-total-height) !important;
+    margin:0 !important;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom)) !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:0 !important;
+    border:0 !important;
+    border-top:1px solid rgba(17,24,39,.09) !important;
+    border-radius:0 !important;
+    background:#ffffff !important;
+    box-shadow:none !important;
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+    z-index:90 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button{
+    position:relative;
+    width:100% !important;
+    min-width:0;
+    min-height:52px !important;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    padding:4px 2px !important;
+    border:0 !important;
+    border-radius:12px !important;
+    background:transparent !important;
+    color:#8a8f95 !important;
+    font-size:10px !important;
+    font-weight:900 !important;
+    line-height:1.15;
+    transition:background .16s ease,color .16s ease,transform .12s ease;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button::before{
+    content:"";
+    position:absolute;
+    top:-6px;
+    left:50%;
+    width:28px;
+    height:3px;
+    transform:translateX(-50%) scaleX(0);
+    border-radius:999px;
+    background:#f4bd00;
+    transition:transform .16s ease;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active{
+    width:100% !important;
+    justify-self:stretch !important;
+    background:#fff9dc !important;
+    color:#111111 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active::before{
+    transform:translateX(-50%) scaleX(1);
+  }
+
+  #productionOrderFlow .flow-bottom-nav button:active{
+    transform:scale(.96);
+  }
+
+  #productionOrderFlow .flow-nav-icon{
+    width:25px !important;
+    height:25px !important;
+    margin:0 auto !important;
+    display:grid !important;
+    place-items:center;
+    border-radius:0 !important;
+    background:transparent !important;
+    color:currentColor !important;
+    line-height:1 !important;
+    font-size:0 !important;
+  }
+
+  #productionOrderFlow .flow-nav-icon svg{
+    width:23px;
+    height:23px;
+    display:block;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+  }
+
+  #productionOrderFlow .flow-nav-label{
+    display:block;
+    font-size:10px;
+    font-weight:1000;
+    white-space:nowrap;
+  }
+
+  /* 舊追蹤畫面的底部導覽同步相同規格 */
+  body:not(.flow-active) .bottom-tabs{
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:0 !important;
+    transform:translateX(-50%) !important;
+    width:100% !important;
+    max-width:520px !important;
+    min-height:var(--flow-nav-total-height) !important;
+    margin:0 !important;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom)) !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:0 !important;
+    border:0 !important;
+    border-top:1px solid rgba(17,24,39,.09) !important;
+    border-radius:0 !important;
+    background:#fff !important;
+    box-shadow:none !important;
+    z-index:999 !important;
+  }
+
+  body:not(.flow-active) .bottom-tab{
+    position:relative;
+    width:100% !important;
+    min-height:52px !important;
+    padding:4px 2px !important;
+    display:flex !important;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    border:0 !important;
+    border-radius:12px !important;
+    background:transparent !important;
+    color:#8a8f95 !important;
+    font-size:10px !important;
+    font-weight:900 !important;
+  }
+
+  body:not(.flow-active) .bottom-tab.active{
+    width:100% !important;
+    justify-self:stretch !important;
+    background:#fff9dc !important;
+    color:#111 !important;
+  }
+
+  body:not(.flow-active) .bottom-tab svg{
+    width:23px !important;
+    height:23px !important;
+    margin:0 auto 1px !important;
+  }
+
+  body:not(.flow-active) .bottom-tabs .flow-nav-icon{
+    width:25px !important;
+    height:25px !important;
+    margin:0 auto !important;
+    display:grid !important;
+    place-items:center;
+    border-radius:0 !important;
+    background:transparent !important;
+    color:currentColor !important;
+    line-height:1 !important;
+    font-size:0 !important;
+  }
+
+  body:not(.flow-active) .bottom-tabs .flow-nav-icon svg{
+    width:23px !important;
+    height:23px !important;
+    margin:0 !important;
+  }
+
+  /* =========================
+     我的主頁
+     ========================= */
+
+  #productionOrderFlow .ubee-my-page{
+    background:#f5f6f7 !important;
+  }
+
+  #productionOrderFlow .ubee-my-scroll{
+    height:100%;
+    padding:0 16px 28px !important;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior-y:contain;
+    background:#f5f6f7 !important;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  #productionOrderFlow .ubee-my-top-actions{
+    position:sticky;
+    top:0;
+    z-index:12;
+    min-height:calc(62px + env(safe-area-inset-top));
+    margin:0 -16px;
+    padding:calc(8px + env(safe-area-inset-top)) 16px 8px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 44px;
+    align-items:center;
+    gap:10px;
+    background:rgba(255,255,255,.98);
+    border-bottom:1px solid rgba(17,24,39,.08);
+    -webkit-backdrop-filter:blur(16px);
+    backdrop-filter:blur(16px);
+  }
+
+  #productionOrderFlow .ubee-my-root-title{
+    color:#111;
+    font-size:25px;
+    font-weight:1000;
+    letter-spacing:-.5px;
+    line-height:1.2;
+  }
+
+  #productionOrderFlow .ubee-my-round-action{
+    width:44px !important;
+    height:44px !important;
+    display:grid;
+    place-items:center;
+    padding:0;
+    border:0 !important;
+    border-radius:50% !important;
+    background:#f1f2f3 !important;
+    color:#333 !important;
+    box-shadow:none !important;
+    font-size:0 !important;
+  }
+
+  #productionOrderFlow .ubee-my-round-action svg{
+    width:22px;
+    height:22px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+  }
+
+  #productionOrderFlow .ubee-my-account{
+    grid-template-columns:62px minmax(0,1fr) 20px !important;
+    gap:13px !important;
+    margin:16px 0 14px !important;
+    padding:16px !important;
+    border:1px solid #ece4b5 !important;
+    border-radius:20px !important;
+    background:linear-gradient(145deg,#fffdf1,#ffffff) !important;
+    box-shadow:0 7px 22px rgba(17,24,39,.045);
+  }
+
+  #productionOrderFlow .ubee-my-avatar{
+    grid-column:1;
+    grid-row:1;
+    width:58px !important;
+    height:58px !important;
+  }
+
+  #productionOrderFlow .ubee-my-account-copy{
+    grid-column:2;
+    grid-row:1;
+    min-width:0;
+  }
+
+  #productionOrderFlow .ubee-my-account-copy small{
+    margin-bottom:4px !important;
+  }
+
+  #productionOrderFlow .ubee-my-account-copy strong{
+    overflow:hidden;
+    font-size:20px !important;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  #productionOrderFlow .ubee-my-account-copy span{
+    overflow:hidden;
+    margin-top:4px !important;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  #productionOrderFlow .ubee-my-account-arrow{
+    grid-column:3;
+    grid-row:1;
+  }
+
+  #productionOrderFlow .ubee-my-menu{
+    overflow:hidden;
+    margin-bottom:18px;
+    border:1px solid #e7e9eb;
+    border-radius:19px;
+    background:#fff;
+    box-shadow:0 6px 20px rgba(17,24,39,.035);
+  }
+
+  #productionOrderFlow .ubee-my-menu-item{
+    min-height:61px !important;
+    padding:0 14px !important;
+    grid-template-columns:40px minmax(0,1fr) 20px !important;
+    gap:10px !important;
+    background:#fff !important;
+    font-size:15px !important;
+  }
+
+  #productionOrderFlow .ubee-my-menu-item:last-child{
+    border-bottom:0 !important;
+  }
+
+  #productionOrderFlow .ubee-my-menu-icon{
+    width:32px !important;
+    height:32px !important;
+    border:0 !important;
+    border-radius:10px !important;
+    background:#f2f3f4 !important;
+    color:#5d6268 !important;
+  }
+
+  /* =========================
+     我的子頁：真正 App 內頁
+     ========================= */
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
     position:absolute !important;
     left:0 !important;
     right:0 !important;
     top:0 !important;
-    bottom:var(--flow-nav-total-height, calc(var(--flow-nav-height, 76px) + env(safe-area-inset-bottom))) !important;
-    z-index:2147481500 !important;
-    display:block;
+    bottom:var(--flow-nav-total-height) !important;
+    z-index:80 !important;
     width:100% !important;
-    max-width:none !important;
     height:auto !important;
     min-height:0 !important;
     margin:0 !important;
-    padding:0 18px 24px !important;
-    overflow-x:hidden !important;
+    padding:0 16px 24px !important;
     overflow-y:auto !important;
-    overscroll-behavior:contain;
-    -webkit-overflow-scrolling:touch;
-    transform:none !important;
+    overflow-x:hidden !important;
+    overscroll-behavior-y:contain;
     border:0 !important;
     border-radius:0 !important;
-    background:#f6f7f8 !important;
-    background-clip:border-box !important;
+    background:#f5f6f7 !important;
     box-shadow:none !important;
-    animation:ubeeMyPageFadeIn .16s ease;
+    -webkit-overflow-scrolling:touch;
   }
-  #productionOrderFlow .flow-shell > .ubee-my-panel.ubee-my-app-page[hidden]{
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page[hidden]{
     display:none !important;
   }
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-panel-head{
-    position:sticky;
-    top:0;
-    z-index:5;
-    display:grid;
-    grid-template-columns:46px minmax(0,1fr) 46px;
-    align-items:center;
-    min-height:64px;
-    margin:0 -18px 18px;
-    padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
-    border-bottom:1px solid #e7e9eb;
-    background:rgba(255,255,255,.97);
-    box-shadow:0 5px 18px rgba(17,24,39,.04);
-    backdrop-filter:blur(16px);
-    -webkit-backdrop-filter:blur(16px);
+
+  #productionOrderFlow .ubee-my-panel.ubee-my-app-page.is-open{
+    display:block !important;
+    animation:ubeeMySubpageIn .22s cubic-bezier(.2,.75,.25,1);
   }
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-panel-head strong{
+
+  #productionOrderFlow .ubee-my-panel-head{
+    position:sticky !important;
+    top:0 !important;
+    z-index:8 !important;
+    min-height:calc(62px + env(safe-area-inset-top)) !important;
+    margin:0 -16px 14px !important;
+    padding:calc(8px + env(safe-area-inset-top)) 16px 8px !important;
+    display:grid !important;
+    grid-template-columns:44px minmax(0,1fr) 44px !important;
+    align-items:center !important;
+    gap:8px !important;
+    border:0 !important;
+    border-bottom:1px solid rgba(17,24,39,.08) !important;
+    background:rgba(255,255,255,.98) !important;
+    -webkit-backdrop-filter:blur(16px);
+    backdrop-filter:blur(16px);
+  }
+
+  #productionOrderFlow .ubee-my-panel-head strong{
     grid-column:2;
     grid-row:1;
-    overflow:hidden;
     color:#111;
     font-size:18px;
     font-weight:1000;
-    line-height:1.3;
     text-align:center;
-    text-overflow:ellipsis;
-    white-space:nowrap;
+    line-height:1.25;
   }
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-panel-head [data-my-close]{
+
+  #productionOrderFlow .ubee-my-panel-head [data-my-close]{
     grid-column:1;
     grid-row:1;
+    width:44px !important;
+    height:44px !important;
     display:grid;
     place-items:center;
-    width:42px;
-    height:42px;
-    padding:0;
-    border:1px solid #e1e4e6;
-    border-radius:50%;
-    background:#fff;
-    color:#111;
-    font-size:30px !important;
-    font-weight:500;
-    line-height:1;
-    box-shadow:0 2px 8px rgba(17,24,39,.04);
-  }
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .flow-profile-list,
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-info-list,
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-feature-note,
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-empty-state,
-  #productionOrderFlow .ubee-my-panel.ubee-my-app-page .ubee-my-feedback-form{
-    margin-bottom:14px;
+    padding:0 !important;
+    border:0 !important;
+    border-radius:50% !important;
+    background:transparent !important;
+    color:#111 !important;
+    font-size:0 !important;
   }
 
-  body.ubee-my-subpage-open{
-    overflow:hidden !important;
-  }
-  #productionOrderFlow .ubee-my-support-card,
-  #productionOrderFlow .ubee-settings-card{
-    margin-bottom:14px;
-    padding:16px;
-    border:1px solid #e3e6e8;
-    border-radius:20px;
-    background:#fff;
-    box-shadow:0 8px 24px rgba(17,24,39,.045);
-  }
-  #productionOrderFlow .ubee-my-support-card > strong{
-    display:block;
-    color:#111;
-    font-size:18px;
-    font-weight:1000;
-  }
-  #productionOrderFlow .ubee-my-support-card > p{
-    margin:8px 0 16px;
-    color:#6f7479;
-    font-size:13px;
-    font-weight:800;
-    line-height:1.7;
-  }
-  #productionOrderFlow .ubee-my-support-actions{
-    display:grid;
-    grid-template-columns:1fr;
-    gap:10px;
-  }
-  #productionOrderFlow .ubee-my-support-actions button,
-  #productionOrderFlow .ubee-settings-primary,
-  #productionOrderFlow .ubee-settings-secondary,
-  #productionOrderFlow .ubee-settings-danger{
-    width:100%;
-    min-height:52px;
-    padding:0 14px;
-    border-radius:15px;
-    font-size:15px !important;
-    font-weight:1000;
-  }
-  #productionOrderFlow .ubee-my-support-actions button,
-  #productionOrderFlow .ubee-settings-primary{
-    border:0;
-    background:#facc15;
-    color:#111;
-  }
-  #productionOrderFlow .ubee-my-support-actions button.secondary,
-  #productionOrderFlow .ubee-settings-secondary{
-    border:1px solid #dfe2e5;
-    background:#fff;
-    color:#222;
-  }
-  #productionOrderFlow .ubee-settings-danger{
-    border:1px solid #efc0c0;
-    background:#fff;
-    color:#c52929;
+  #productionOrderFlow .ubee-my-panel-head [data-my-close] svg{
+    width:25px;
+    height:25px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:2.2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
   }
 
+  #productionOrderFlow .ubee-my-panel-head [data-my-close]:active{
+    background:#eef0f2 !important;
+  }
+
+  #productionOrderFlow .flow-profile-list,
+  #productionOrderFlow .ubee-my-info-list,
+  #productionOrderFlow .ubee-my-feedback-form{
+    margin-bottom:16px;
+  }
+
+  #productionOrderFlow .flow-profile-task-card,
+  #productionOrderFlow .ubee-my-info-row,
+  #productionOrderFlow .ubee-my-empty-state,
+  #productionOrderFlow .ubee-my-feature-note,
+  #productionOrderFlow .ubee-my-support-card{
+    box-shadow:none !important;
+  }
+
+  /* 設定頁：使用原生 App 常見的分組清單 */
   #productionOrderFlow .ubee-settings-section-title{
-    margin:2px 2px 9px;
-    color:#757a80;
-    font-size:11px;
-    font-weight:1000;
-    letter-spacing:.4px;
+    margin:20px 4px 7px !important;
+    color:#73787f !important;
+    font-size:11px !important;
+    font-weight:1000 !important;
+    letter-spacing:.2px;
   }
+
+  #productionOrderFlow .ubee-settings-section-title:first-of-type{
+    margin-top:4px !important;
+  }
+
   #productionOrderFlow .ubee-settings-list{
     overflow:hidden;
-    margin-bottom:16px;
-    border:1px solid #e3e6e8;
-    border-radius:20px;
+    margin-bottom:4px;
+    border:1px solid #e5e7e9;
+    border-radius:17px;
     background:#fff;
-    box-shadow:0 8px 24px rgba(17,24,39,.035);
+    box-shadow:none;
   }
+
   #productionOrderFlow .ubee-settings-row{
     width:100%;
-    min-height:66px;
+    min-height:62px;
     display:grid;
-    grid-template-columns:38px minmax(0,1fr) auto;
+    grid-template-columns:36px minmax(0,1fr) auto;
     align-items:center;
     gap:11px;
-    padding:11px 14px;
+    padding:10px 13px;
     border:0;
     border-bottom:1px solid #eef0f1;
     background:#fff;
     color:#111;
     text-align:left;
   }
+
   #productionOrderFlow .ubee-settings-row:last-child{
     border-bottom:0;
   }
-  #productionOrderFlow button.ubee-settings-row:active{
-    background:#fafafa;
-  }
+
   #productionOrderFlow .ubee-settings-icon{
+    width:32px;
+    height:32px;
     display:grid;
     place-items:center;
-    width:34px;
-    height:34px;
-    border-radius:11px;
+    border-radius:10px;
     background:#f1f2f3;
-    font-size:17px;
+    color:#555b61;
+    font-size:16px;
   }
+
   #productionOrderFlow .ubee-settings-copy{
     min-width:0;
   }
+
   #productionOrderFlow .ubee-settings-copy strong{
     display:block;
     color:#111;
     font-size:14px;
     font-weight:1000;
-    line-height:1.4;
+    line-height:1.35;
   }
+
   #productionOrderFlow .ubee-settings-copy small{
     display:block;
     margin-top:3px;
     color:#858a90;
     font-size:10px;
     font-weight:800;
-    line-height:1.5;
+    line-height:1.45;
   }
-  #productionOrderFlow .ubee-settings-value{
-    max-width:120px;
-    color:#777c82;
+
+  #productionOrderFlow .ubee-settings-value,
+  #productionOrderFlow .ubee-settings-arrow{
+    color:#8a8f95;
     font-size:11px;
     font-weight:900;
-    line-height:1.45;
-    text-align:right;
-  }
-  #productionOrderFlow .ubee-settings-arrow{
-    color:#b5b9bd;
-    font-size:22px;
+    white-space:nowrap;
   }
 
   #productionOrderFlow .ubee-setting-switch{
-    position:relative;
-    width:48px;
-    height:28px;
-    flex:0 0 48px;
-    padding:0;
-    border:0;
-    border-radius:999px;
-    background:#d8dbde;
-    transition:background .16s ease;
+    width:49px !important;
+    height:29px !important;
+    flex:0 0 49px !important;
+    border-radius:999px !important;
+    background:#d4d7da !important;
   }
+
   #productionOrderFlow .ubee-setting-switch::after{
-    content:"";
-    position:absolute;
-    top:3px;
-    left:3px;
-    width:22px;
-    height:22px;
-    border-radius:50%;
-    background:#fff;
-    box-shadow:0 2px 7px rgba(17,24,39,.18);
-    transition:transform .16s ease;
+    top:3px !important;
+    left:3px !important;
+    width:23px !important;
+    height:23px !important;
   }
+
   #productionOrderFlow .ubee-setting-switch[aria-checked="true"]{
-    background:#111;
+    background:#f4bd00 !important;
   }
+
   #productionOrderFlow .ubee-setting-switch[aria-checked="true"]::after{
-    transform:translateX(20px);
-    background:#facc15;
+    transform:translateX(20px) !important;
+    background:#fff !important;
   }
 
-  #productionOrderFlow .ubee-settings-status{
-    min-height:20px;
-    margin:2px 2px 14px;
-    color:#697078;
-    font-size:11px;
-    font-weight:850;
-    line-height:1.55;
-  }
-  #productionOrderFlow .ubee-settings-status.success{color:#18733a}
-  #productionOrderFlow .ubee-settings-status.error{color:#c52929}
-
-  #productionOrderFlow .ubee-settings-about{
-    padding:15px;
-    border:1px solid #e3e6e8;
-    border-radius:18px;
+  #productionOrderFlow .ubee-settings-danger{
+    width:100%;
+    min-height:52px;
+    margin-bottom:14px;
+    border:1px solid #f0caca;
+    border-radius:15px;
     background:#fff;
-    color:#71767c;
-    font-size:11px;
-    font-weight:800;
-    line-height:1.7;
-    text-align:center;
-  }
-  #productionOrderFlow .ubee-settings-about strong{
-    display:block;
-    margin-bottom:3px;
-    color:#111;
+    color:#c52929;
     font-size:14px;
     font-weight:1000;
   }
 
-  #productionOrderFlow .ubee-task-tab-busy{
-    opacity:.58;
-    pointer-events:none;
+  #productionOrderFlow .ubee-settings-about{
+    margin-bottom:8px;
   }
 
-  body.ubee-reduce-motion *,
-  body.ubee-reduce-motion *::before,
-  body.ubee-reduce-motion *::after{
-    scroll-behavior:auto !important;
-    animation-duration:.001ms !important;
-    animation-iteration-count:1 !important;
-    transition-duration:.001ms !important;
+  body.ubee-my-subpage-open{
+    overflow:hidden !important;
   }
 
-  @keyframes ubeeMyPageFadeIn{
-    from{opacity:.25}
-    to{opacity:1}
+  body.ubee-my-subpage-open #productionOrderFlow .flow-bottom-nav{
+    display:grid !important;
+  }
+
+  body.ubee-reduce-motion #productionOrderFlow .flow-page.active,
+  body.ubee-reduce-motion #productionOrderFlow .ubee-my-panel.ubee-my-app-page.is-open{
+    animation:none !important;
+  }
+
+  @keyframes ubeeAppScreenIn{
+    from{opacity:.35;transform:translateX(10px)}
+    to{opacity:1;transform:translateX(0)}
+  }
+
+  @keyframes ubeeMySubpageIn{
+    from{opacity:.3;transform:translateX(18px)}
+    to{opacity:1;transform:translateX(0)}
+  }
+
+  @media(max-width:380px){
+    #productionOrderFlow .ubee-my-scroll,
+    #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+      padding-left:13px !important;
+      padding-right:13px !important;
+    }
+
+    #productionOrderFlow .ubee-my-top-actions,
+    #productionOrderFlow .ubee-my-panel-head{
+      margin-left:-13px !important;
+      margin-right:-13px !important;
+      padding-left:13px !important;
+      padding-right:13px !important;
+    }
+
+    #productionOrderFlow .ubee-my-account{
+      grid-template-columns:56px minmax(0,1fr) 18px !important;
+      padding:14px !important;
+    }
+
+    #productionOrderFlow .ubee-my-avatar{
+      width:53px !important;
+      height:53px !important;
+    }
+  }
+
+  @media(prefers-reduced-motion:reduce){
+    #productionOrderFlow .flow-page.active,
+    #productionOrderFlow .ubee-my-panel.ubee-my-app-page.is-open{
+      animation:none !important;
+    }
   }
 </style>
 
-<script id="ubeeAppNavigationSettingsV2Script">
+<script id="ubeeAppNavigationSettingsV3Script">
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.04.4';
+  const APP_VERSION = '2026.08.04.5';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -21822,6 +22206,59 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     haptics:'ubee_setting_haptics',
     reduceMotion:'ubee_setting_reduce_motion'
   });
+
+  const navDefinitions = Object.freeze({
+    flowNavHome:{
+      label:'首頁',
+      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/></svg>'
+    },
+    flowNavTasks:{
+      label:'任務',
+      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 2 2 5-5"/><path d="M9 17h6"/></svg>'
+    },
+    flowNavMy:{
+      label:'我的',
+      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>'
+    },
+    tabHome:{
+      label:'首頁',
+      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/></svg>'
+    },
+    tabTasks:{
+      label:'任務',
+      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 2 2 5-5"/><path d="M9 17h6"/></svg>'
+    },
+    tabProfile:{
+      label:'我的',
+      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>'
+    }
+  });
+
+  const backIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>';
+  const supportIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13v-2a8 8 0 0 1 16 0v2"/><path d="M4 13a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2v-2ZM20 13a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2v-2Z"/><path d="M17 19c-1 1-2.5 1.5-5 1.5"/></svg>';
+
+  function enhanceBottomNavigation(){
+    Object.entries(navDefinitions).forEach(([id,definition]) => {
+      const button = document.getElementById(id);
+      if(!button) return;
+      button.innerHTML = `<span class="flow-nav-icon">${definition.icon}</span><span class="flow-nav-label">${definition.label}</span>`;
+      button.setAttribute('aria-label',definition.label);
+    });
+  }
+
+  function ensureMyRootHeader(){
+    const actions = root.querySelector('#flowPageProfile .ubee-my-top-actions');
+    if(!actions) return;
+    if(!actions.querySelector('.ubee-my-root-title')){
+      actions.insertAdjacentHTML('afterbegin','<strong class="ubee-my-root-title">我的</strong>');
+    }
+    const support = document.getElementById('flowProfileSupportIcon');
+    if(support){
+      support.innerHTML = supportIcon;
+      support.setAttribute('aria-label','聯繫客服');
+      support.setAttribute('title','聯繫客服');
+    }
+  }
 
   let taskOpening = false;
   let deferredInstallPrompt = null;
@@ -22021,10 +22458,14 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       }
       const close = panel.querySelector('[data-my-close]');
       if(close){
-        close.textContent = '‹';
+        close.innerHTML = backIcon;
         close.setAttribute('aria-label','返回我的');
+        close.setAttribute('title','返回我的');
       }
     });
+
+    ensureMyRootHeader();
+    enhanceBottomNavigation();
   }
 
   function syncSettingsToggleUi(){
@@ -22148,6 +22589,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       panel.classList.remove('is-open');
     });
     document.body.classList.remove('ubee-my-subpage-open');
+    root.removeAttribute('data-my-section');
     currentMySection = '';
   }
 
@@ -22171,17 +22613,22 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
   function markBottomNav(mode){
     const ids = ['flowNavHome','flowNavTasks','flowNavMy','tabHome','tabTasks','tabProfile'];
-    ids.forEach(id => document.getElementById(id)?.classList.remove('active'));
-    if(mode === 'home'){
-      document.getElementById('flowNavHome')?.classList.add('active');
-      document.getElementById('tabHome')?.classList.add('active');
-    }else if(mode === 'task'){
-      document.getElementById('flowNavTasks')?.classList.add('active');
-      document.getElementById('tabTasks')?.classList.add('active');
-    }else{
-      document.getElementById('flowNavMy')?.classList.add('active');
-      document.getElementById('tabProfile')?.classList.add('active');
-    }
+    ids.forEach(id => {
+      const button = document.getElementById(id);
+      if(!button) return;
+      button.classList.remove('active');
+      button.removeAttribute('aria-current');
+    });
+    const activeIds = mode === 'home'
+      ? ['flowNavHome','tabHome']
+      : mode === 'task'
+        ? ['flowNavTasks','tabTasks']
+        : ['flowNavMy','tabProfile'];
+    activeIds.forEach(id => {
+      const button = document.getElementById(id);
+      button?.classList.add('active');
+      button?.setAttribute('aria-current','page');
+    });
   }
 
   function showMyRoot(){
@@ -22220,11 +22667,13 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     if(!panel) return false;
 
     panel.hidden = false;
-    panel.classList.add('is-open');
+    panel.classList.remove('is-open');
     panel.scrollTop = 0;
     currentMySection = normalized;
+    root.setAttribute('data-my-section',normalized);
     document.body.classList.add('ubee-my-subpage-open');
     markBottomNav(options.fromTask ? 'task' : 'my');
+    requestAnimationFrame(() => panel.classList.add('is-open'));
 
     if(normalized === 'settings'){
       refreshEnvironmentStatus();
@@ -22529,6 +22978,11 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   preparePanels();
   applyPreferences();
   refreshEnvironmentStatus();
+  requestAnimationFrame(() => {
+    ensureMyRootHeader();
+    enhanceBottomNavigation();
+  });
+  setTimeout(enhanceBottomNavigation,250);
 
   window.addEventListener('beforeinstallprompt',event => {
     event.preventDefault();
