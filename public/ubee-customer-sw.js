@@ -1,125 +1,78 @@
-/* UBee 跑腿用戶端 PWA｜正式營運版 */
+/* UBee 跑腿用戶端 PWA｜App 化＋即時訂單通知正式版 */
 
-const CACHE_NAME = 'ubee-customer-pwa-v20260803-1';
-
+const CACHE_NAME = 'ubee-customer-pwa-v20260804-app-v1';
 const OFFLINE_URL = '/offline.html';
 
 const PRECACHE_URLS = [
   '/order.html',
+  '/install.html',
   '/manifest-order.json',
   '/offline.html',
   '/ubee-customer-icon-192.png',
   '/ubee-customer-icon-512.png'
 ];
 
-/* 安裝 Service Worker，預先儲存基本檔案 */
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
   );
-
   self.skipWaiting();
 });
 
-/* 啟用新版並清除舊的用戶端快取 */
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches
-      .keys()
-      .then(cacheNames => {
-        return Promise.all(
-          cacheNames
-            .filter(cacheName => {
-              return (
-                cacheName.startsWith('ubee-customer-pwa-') &&
-                cacheName !== CACHE_NAME
-              );
-            })
-            .map(cacheName => caches.delete(cacheName))
-        );
-      })
+    caches.keys()
+      .then(cacheNames => Promise.all(
+        cacheNames
+          .filter(cacheName => cacheName.startsWith('ubee-customer-pwa-') && cacheName !== CACHE_NAME)
+          .map(cacheName => caches.delete(cacheName))
+      ))
       .then(() => self.clients.claim())
   );
 });
 
-/* 處理網頁與靜態檔案請求 */
 self.addEventListener('fetch', event => {
   const request = event.request;
-
-  if (request.method !== 'GET') {
-    return;
-  }
+  if (request.method !== 'GET') return;
 
   const requestUrl = new URL(request.url);
+  if (requestUrl.origin !== self.location.origin) return;
 
-  /* 不處理其他網站的檔案 */
-  if (requestUrl.origin !== self.location.origin) {
-    return;
+  if (requestUrl.pathname.startsWith('/api/')) return;
+
+  if (request.mode === 'navigate') {
+    const isOrderPage = requestUrl.pathname === '/' || requestUrl.pathname === '/order.html';
+    const isInstallPage = requestUrl.pathname === '/install.html';
+
+    if (isOrderPage || isInstallPage) {
+      event.respondWith(
+        fetch(request)
+          .then(response => {
+            if (response && response.ok) {
+              const responseCopy = response.clone();
+              const cacheKey = isInstallPage ? '/install.html' : '/order.html';
+              caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, responseCopy));
+            }
+            return response;
+          })
+          .catch(async () => {
+            const cachedPage = await caches.match(isInstallPage ? '/install.html' : '/order.html');
+            return cachedPage || caches.match(OFFLINE_URL);
+          })
+      );
+      return;
+    }
   }
 
-  /* API 必須永遠讀取最新資料，不進入 PWA 快取 */
-  if (requestUrl.pathname.startsWith('/api/')) {
-    return;
-  }
-
-  /* 用戶端頁面採用網路優先 */
-  if (
-    request.mode === 'navigate' &&
-    (
-      requestUrl.pathname === '/' ||
-      requestUrl.pathname === '/order.html'
-    )
-  ) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (response && response.ok) {
-            const responseCopy = response.clone();
-
-            caches
-              .open(CACHE_NAME)
-              .then(cache => cache.put('/order.html', responseCopy));
-          }
-
-          return response;
-        })
-        .catch(async () => {
-          const orderPage = await caches.match('/order.html');
-
-          if (orderPage) {
-            return orderPage;
-          }
-
-          return caches.match(OFFLINE_URL);
-        })
-    );
-
-    return;
-  }
-
-  /* 其他用戶端靜態檔案採用快取優先 */
-  if (
-    ['style', 'script', 'image', 'font'].includes(
-      request.destination
-    )
-  ) {
+  if (['style','script','image','font'].includes(request.destination)) {
     event.respondWith(
       caches.match(request).then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
+        if (cachedResponse) return cachedResponse;
         return fetch(request).then(networkResponse => {
           if (networkResponse && networkResponse.ok) {
             const responseCopy = networkResponse.clone();
-
-            caches
-              .open(CACHE_NAME)
-              .then(cache => cache.put(request, responseCopy));
+            caches.open(CACHE_NAME).then(cache => cache.put(request, responseCopy));
           }
-
           return networkResponse;
         });
       })
@@ -127,33 +80,34 @@ self.addEventListener('fetch', event => {
   }
 });
 
-/* 接收用戶端訂單通知 */
 self.addEventListener('push', event => {
   let data = {};
 
   try {
     data = event.data ? event.data.json() : {};
   } catch (_) {
-    data = {
-      body: event.data ? event.data.text() : ''
-    };
+    data = { body: event.data ? event.data.text() : '' };
   }
 
   const targetUrl = String(
     data.deepLink ||
     data.url ||
-    '/order.html?source=push'
+    (data.orderId
+      ? `/order.html?source=push&orderId=${encodeURIComponent(data.orderId)}`
+      : '/order.html?source=push')
   );
 
   const notificationOptions = {
     body: data.body || '你的 UBee 跑腿訂單有新的進度。',
     icon: data.icon || '/ubee-customer-icon-192.png',
     badge: data.badge || '/ubee-customer-icon-192.png',
-    tag: data.tag || 'ubee-customer-notification',
-    renotify: true,
-    vibrate: [200, 100, 200],
+    tag: data.tag || `ubee-customer-${data.orderId || 'notification'}`,
+    renotify: false,
+    vibrate: [200,100,200],
     data: {
-      url: targetUrl
+      url: targetUrl,
+      orderId: data.orderId || '',
+      status: data.status || ''
     }
   };
 
@@ -165,7 +119,6 @@ self.addEventListener('push', event => {
   );
 });
 
-/* 點擊通知後開啟用戶端 */
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
@@ -173,39 +126,24 @@ self.addEventListener('notificationclick', event => {
 
   try {
     targetUrl = new URL(
-      event.notification?.data?.url ||
-      '/order.html?source=push',
+      event.notification?.data?.url || '/order.html?source=push',
       self.location.origin
     );
 
     if (targetUrl.origin !== self.location.origin) {
-      targetUrl = new URL(
-        '/order.html?source=push',
-        self.location.origin
-      );
+      targetUrl = new URL('/order.html?source=push', self.location.origin);
     }
   } catch (_) {
-    targetUrl = new URL(
-      '/order.html?source=push',
-      self.location.origin
-    );
+    targetUrl = new URL('/order.html?source=push', self.location.origin);
   }
 
   event.waitUntil(
-    self.clients
-      .matchAll({
-        type: 'window',
-        includeUncontrolled: true
-      })
-      .then(windowClients => {
+    self.clients.matchAll({type:'window',includeUncontrolled:true})
+      .then(async windowClients => {
         const customerClient = windowClients.find(client => {
           try {
             const clientUrl = new URL(client.url);
-
-            return (
-              clientUrl.origin === self.location.origin &&
-              clientUrl.pathname === '/order.html'
-            );
+            return clientUrl.origin === self.location.origin && clientUrl.pathname === '/order.html';
           } catch (_) {
             return false;
           }
@@ -213,19 +151,12 @@ self.addEventListener('notificationclick', event => {
 
         if (customerClient) {
           if ('navigate' in customerClient) {
-            return customerClient
-              .navigate(targetUrl.href)
-              .then(() => customerClient.focus());
+            await customerClient.navigate(targetUrl.href);
           }
-
           return customerClient.focus();
         }
 
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(targetUrl.href);
-        }
-
-        return undefined;
+        return self.clients.openWindow ? self.clients.openWindow(targetUrl.href) : undefined;
       })
   );
 });
