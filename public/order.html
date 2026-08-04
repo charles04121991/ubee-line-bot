@@ -18,7 +18,8 @@
   <meta name="application-name" content="UBee 跑腿">
   <meta name="theme-color" content="#ffffff">
 
-  <title>UBee 跑腿｜全台城市切換＋五步驟下單流程</title>
+  <title>UBee 跑腿｜正式營運用戶端</title>
+  <!-- UBee 正式營運修復版：2026-08-04 R1｜唯一 App 導覽與原生操作層 -->
   <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 
 
@@ -8833,9 +8834,7 @@ body{background:#eef0f2;}
   body.ubee-active-order .bottom-tabs #tabTasks{display:flex!important}
   body.ubee-active-order .bottom-tab.active{width:88%!important}
   #productionOrderFlow .flow-bottom-nav{grid-template-columns:repeat(3,1fr)!important}
-  #productionOrderFlow #flowNavTasks{display:block!important}
-
-  @media(max-width:390px){
+@media(max-width:390px){
     body.ubee-active-order #step5 .step5-live-status-primary{font-size:30px}
     body.ubee-active-order #step5 .step5-tracking-map-shell{height:285px!important}
     .ubee-customer-progress-item{font-size:8px}.ubee-customer-progress-dot{width:19px;height:19px}
@@ -20395,8 +20394,15 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     state.page=name;
     root.querySelectorAll('.flow-page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
     const isProfile=name==='profile'||name==='profileDetail';
-    $('flowNavHome').classList.toggle('active',!isProfile);
-    $('flowNavMy').classList.toggle('active',isProfile);
+    const homeNav=$('flowNavHome');
+    const taskNav=$('flowNavTasks');
+    const myNav=$('flowNavMy');
+    homeNav?.classList.toggle('active',!isProfile);
+    taskNav?.classList.remove('active');
+    myNav?.classList.toggle('active',isProfile);
+    homeNav?.toggleAttribute('aria-current',!isProfile);
+    taskNav?.removeAttribute('aria-current');
+    myNav?.toggleAttribute('aria-current',isProfile);
     const scroller=root.querySelector(`.flow-page[data-page="${name}"] .flow-scroll`);
     if(scroller)scroller.scrollTop=0;
   }
@@ -20923,49 +20929,8 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
 
 <style id="ubee-fixed-bottom-nav-yellow-service-tabs">
-  /* 2026-08-03：正式下單流程底部導覽固定於視窗底部，避免隨內容位移。 */
-  #productionOrderFlow{
-    --flow-nav-total-height:calc(var(--flow-nav-height) + env(safe-area-inset-bottom));
-  }
+  /* 2026-08-04 正式清理：舊固定導航覆蓋已移除，底部導覽由唯一正式 App 導覽層管理。 */
 
-  #productionOrderFlow .flow-page{
-    inset:0 0 var(--flow-nav-total-height) !important;
-  }
-
-  #productionOrderFlow .flow-bottom-nav{
-    position:fixed !important;
-    left:50% !important;
-    right:auto !important;
-    bottom:0 !important;
-    transform:translateX(-50%) !important;
-    width:100% !important;
-    max-width:520px !important;
-    height:var(--flow-nav-total-height) !important;
-    margin:0 !important;
-    padding:7px 12px calc(7px + env(safe-area-inset-bottom)) !important;
-    border-radius:0 !important;
-    border-top:1px solid rgba(17,24,39,.10) !important;
-    background:#ffffff !important;
-    box-shadow:0 -8px 24px rgba(17,24,39,.08) !important;
-    z-index:2147482000 !important;
-  }
-
-  /* 進行中任務追蹤頁沿用同一個固定底部導覽規格。 */
-  body:not(.flow-active) .bottom-tabs{
-    position:fixed !important;
-    left:50% !important;
-    right:auto !important;
-    bottom:0 !important;
-    transform:translateX(-50%) !important;
-    width:100% !important;
-    max-width:520px !important;
-    margin:0 !important;
-    border-radius:0 !important;
-    border-top:1px solid rgba(17,24,39,.10) !important;
-    background:#ffffff !important;
-    box-shadow:0 -8px 24px rgba(17,24,39,.08) !important;
-    z-index:2147482000 !important;
-  }
 
   /* 五大服務入口：App 圖示式設計，取代整條黃色分類列。 */
   #productionOrderFlow .flow-service-tabs{
@@ -21687,7 +21652,8 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     transform:translateX(-50%) !important;
     width:100% !important;
     max-width:520px !important;
-    min-height:var(--flow-nav-total-height) !important;
+    height:var(--ubee-app-nav-total-height) !important;
+    min-height:var(--ubee-app-nav-total-height) !important;
     margin:0 !important;
     padding:6px 8px calc(6px + env(safe-area-inset-bottom)) !important;
     display:grid !important;
@@ -21717,6 +21683,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     color:#8a8f95 !important;
     font-size:10px !important;
     font-weight:900 !important;
+    box-shadow:none !important;
   }
 
   body:not(.flow-active) .bottom-tab.active{
@@ -22178,6 +22145,315 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       animation:none !important;
     }
   }
+
+
+  /* =========================================================
+     UBee 用戶端唯一正式 App 介面規格｜2026-08-04 R1
+     清除舊版固定導航位移、按鈕 display 衝突與首頁干擾卡片。
+     ========================================================= */
+  body{
+    --ubee-app-nav-content-height:68px;
+    --ubee-app-nav-total-height:calc(var(--ubee-app-nav-content-height) + env(safe-area-inset-bottom));
+  }
+
+  #productionOrderFlow{
+    --ubee-nav-content-height:var(--ubee-app-nav-content-height);
+    --flow-nav-height:var(--ubee-app-nav-content-height);
+    --flow-nav-total-height:var(--ubee-app-nav-total-height);
+    height:100vh !important;
+    height:100dvh !important;
+    background:#f4f5f6 !important;
+  }
+
+  #productionOrderFlow .flow-shell{
+    width:100% !important;
+    height:100vh !important;
+    height:100dvh !important;
+    max-height:100dvh !important;
+    overflow:hidden !important;
+    background:#f4f5f6 !important;
+  }
+
+  #productionOrderFlow .flow-page{
+    inset:0 0 var(--flow-nav-total-height) !important;
+  }
+
+  /* 首頁不再顯示舊式步驟列；進入填單後才顯示流程進度。 */
+  #productionOrderFlow #flowPageHome > .flow-progress{
+    display:none !important;
+  }
+
+  /* 通知權限改由「我的 → 設定」管理，不阻擋客人開始下單。 */
+  #productionOrderFlow #ubeeCustomerPushCardHome{
+    display:none !important;
+  }
+
+  #productionOrderFlow .flow-header{
+    min-height:64px !important;
+    padding:calc(8px + env(safe-area-inset-top)) 14px 8px !important;
+    border-bottom:1px solid rgba(17,24,39,.07) !important;
+    background:rgba(255,255,255,.98) !important;
+    box-shadow:0 2px 10px rgba(17,24,39,.025) !important;
+  }
+
+  #productionOrderFlow .flow-brand{
+    font-size:25px !important;
+    letter-spacing:-1.15px !important;
+  }
+
+  #productionOrderFlow .flow-city-btn{
+    min-height:40px !important;
+    max-width:158px !important;
+    padding:0 13px !important;
+    border:1px solid #eceef0 !important;
+    background:#f6f7f8 !important;
+    color:#2f3337 !important;
+    font-size:12px !important;
+  }
+
+  #productionOrderFlow .flow-home-scroll{
+    padding:14px 14px 28px !important;
+  }
+
+  #productionOrderFlow #flowPageHome .flow-card{
+    margin:0 !important;
+    padding:16px !important;
+    border:1px solid #e5e7e9 !important;
+    border-radius:23px !important;
+    background:#fff !important;
+    box-shadow:0 8px 24px rgba(17,24,39,.045) !important;
+  }
+
+  #productionOrderFlow .flow-location-line{
+    min-height:42px !important;
+    margin-bottom:12px !important;
+    border:1px solid #eceef0 !important;
+    background:#f7f8f9 !important;
+  }
+
+  #productionOrderFlow .flow-route-card{
+    border-radius:19px !important;
+    box-shadow:none !important;
+  }
+
+  #productionOrderFlow .flow-address-button{
+    min-height:79px !important;
+    transition:background .14s ease,transform .12s ease !important;
+  }
+
+  #productionOrderFlow .flow-address-button:active{
+    background:#f8f9fa !important;
+  }
+
+  #productionOrderFlow .flow-home-next{
+    min-height:55px !important;
+    margin-top:14px !important;
+    border-radius:17px !important;
+    box-shadow:0 7px 18px rgba(244,189,0,.18) !important;
+  }
+
+  /* 唯一正式底部導覽：固定在 App shell 底部，不再套用 translateX。 */
+  #productionOrderFlow .flow-bottom-nav{
+    position:absolute !important;
+    left:0 !important;
+    right:0 !important;
+    bottom:0 !important;
+    transform:none !important;
+    width:100% !important;
+    max-width:none !important;
+    height:var(--flow-nav-total-height) !important;
+    min-height:var(--flow-nav-total-height) !important;
+    margin:0 !important;
+    padding:5px 8px calc(5px + env(safe-area-inset-bottom)) !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    align-items:stretch !important;
+    gap:0 !important;
+    border:0 !important;
+    border-top:1px solid rgba(17,24,39,.09) !important;
+    border-radius:0 !important;
+    background:#fff !important;
+    box-shadow:0 -5px 18px rgba(17,24,39,.055) !important;
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+    z-index:100 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button{
+    position:relative !important;
+    width:100% !important;
+    min-width:0 !important;
+    min-height:58px !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:2px !important;
+    padding:3px 2px !important;
+    border:0 !important;
+    border-radius:14px !important;
+    background:transparent !important;
+    color:#8b9096 !important;
+    font-size:10px !important;
+    font-weight:900 !important;
+    line-height:1.15 !important;
+    box-shadow:none !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button::before{
+    display:none !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active{
+    width:100% !important;
+    justify-self:stretch !important;
+    background:transparent !important;
+    color:#111 !important;
+  }
+
+  #productionOrderFlow .flow-nav-icon{
+    width:36px !important;
+    height:31px !important;
+    margin:0 auto !important;
+    display:grid !important;
+    place-items:center !important;
+    border-radius:12px !important;
+    background:transparent !important;
+    color:currentColor !important;
+    line-height:1 !important;
+    font-size:0 !important;
+    transition:background .15s ease,transform .12s ease !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active .flow-nav-icon{
+    background:#fff1a8 !important;
+    color:#111 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button:active .flow-nav-icon{
+    transform:scale(.92) !important;
+  }
+
+  #productionOrderFlow .flow-nav-icon svg{
+    width:22px !important;
+    height:22px !important;
+    margin:0 !important;
+    display:block !important;
+    fill:none !important;
+    stroke:currentColor !important;
+    stroke-width:2 !important;
+    stroke-linecap:round !important;
+    stroke-linejoin:round !important;
+  }
+
+  #productionOrderFlow .flow-nav-label{
+    display:block !important;
+    font-size:10px !important;
+    font-weight:1000 !important;
+    white-space:nowrap !important;
+  }
+
+  #productionOrderFlow .ubee-task-tab-busy .flow-nav-icon{
+    animation:ubeeTaskTabPulse .8s ease-in-out infinite alternate !important;
+  }
+
+  /* 進行中任務的舊追蹤容器只保留內容，不再保留舊導航外觀。 */
+  body:not(.flow-active) .bottom-tabs{
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:0 !important;
+    transform:translateX(-50%) !important;
+    width:100% !important;
+    max-width:520px !important;
+    min-height:var(--flow-nav-total-height) !important;
+    margin:0 !important;
+    padding:5px 8px calc(5px + env(safe-area-inset-bottom)) !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:0 !important;
+    border:0 !important;
+    border-top:1px solid rgba(17,24,39,.09) !important;
+    border-radius:0 !important;
+    background:#fff !important;
+    box-shadow:0 -5px 18px rgba(17,24,39,.055) !important;
+    z-index:999 !important;
+  }
+
+  body:not(.flow-active) .bottom-tab{
+    width:100% !important;
+    min-width:0 !important;
+    min-height:58px !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:2px !important;
+    padding:3px 2px !important;
+    border:0 !important;
+    border-radius:14px !important;
+    background:transparent !important;
+    color:#8b9096 !important;
+    font-size:10px !important;
+    font-weight:900 !important;
+    box-shadow:none !important;
+  }
+
+  body:not(.flow-active) .bottom-tab.active{
+    width:100% !important;
+    justify-self:stretch !important;
+    background:transparent !important;
+    color:#111 !important;
+    box-shadow:none !important;
+  }
+
+  body:not(.flow-active) .bottom-tab .flow-nav-icon{
+    width:36px !important;
+    height:31px !important;
+    display:grid !important;
+    place-items:center !important;
+    border-radius:12px !important;
+    background:transparent !important;
+    color:currentColor !important;
+    font-size:0 !important;
+  }
+
+  body:not(.flow-active) .bottom-tab.active .flow-nav-icon{
+    background:#fff1a8 !important;
+  }
+
+  body:not(.flow-active) .bottom-tab .flow-nav-icon svg{
+    width:22px !important;
+    height:22px !important;
+    margin:0 !important;
+  }
+
+  @keyframes ubeeTaskTabPulse{
+    from{opacity:.45;transform:scale(.94)}
+    to{opacity:1;transform:scale(1)}
+  }
+
+  @media(min-width:521px){
+    #productionOrderFlow .flow-shell{
+      box-shadow:0 0 0 1px rgba(17,24,39,.05),0 18px 60px rgba(17,24,39,.10) !important;
+    }
+  }
+
+  @media(max-width:360px){
+    #productionOrderFlow .flow-home-scroll{
+      padding-left:11px !important;
+      padding-right:11px !important;
+    }
+    #productionOrderFlow #flowPageHome .flow-card{
+      padding:14px !important;
+      border-radius:21px !important;
+    }
+    #productionOrderFlow .flow-city-btn{
+      max-width:132px !important;
+      padding:0 10px !important;
+    }
+  }
+
 </style>
 
 <script id="ubeeAppNavigationSettingsV3Script">
@@ -22244,6 +22520,15 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       button.innerHTML = `<span class="flow-nav-icon">${definition.icon}</span><span class="flow-nav-label">${definition.label}</span>`;
       button.setAttribute('aria-label',definition.label);
     });
+  }
+
+
+  function enhanceHomeHeader(){
+    const support = document.getElementById('flowSupportButton');
+    if(!support) return;
+    support.innerHTML = supportIcon;
+    support.setAttribute('aria-label','聯繫客服');
+    support.setAttribute('title','聯繫客服');
   }
 
   function ensureMyRootHeader(){
@@ -22466,6 +22751,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
     ensureMyRootHeader();
     enhanceBottomNavigation();
+    enhanceHomeHeader();
   }
 
   function syncSettingsToggleUi(){
@@ -22981,8 +23267,12 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   requestAnimationFrame(() => {
     ensureMyRootHeader();
     enhanceBottomNavigation();
+    enhanceHomeHeader();
   });
-  setTimeout(enhanceBottomNavigation,250);
+  setTimeout(() => {
+    enhanceBottomNavigation();
+    enhanceHomeHeader();
+  },250);
 
   window.addEventListener('beforeinstallprompt',event => {
     event.preventDefault();
@@ -23019,6 +23309,22 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     const clickable = event.target.closest('button,[role="button"]');
     if(clickable && !clickable.classList.contains('ubee-setting-switch')){
       hapticPulse();
+    }
+
+    const homeTab = event.target.closest('#tabHome,#flowNavHome');
+    if(homeTab){
+      closeMySubPages();
+      markBottomNav('home');
+      setTimeout(() => markBottomNav('home'),0);
+      return;
+    }
+
+    const myTab = event.target.closest('#tabProfile,#flowNavMy');
+    if(myTab){
+      closeMySubPages();
+      markBottomNav('my');
+      setTimeout(() => markBottomNav('my'),0);
+      return;
     }
 
     const taskTab = event.target.closest('#tabTasks,#flowNavTasks');
