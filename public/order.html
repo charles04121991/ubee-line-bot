@@ -20414,6 +20414,27 @@ body.flow-active>.app{display:none!important}
 
   function setService(service){
     if(!serviceLabels[service])return;
+
+    const previousService=state.service;
+    if(previousService===service){
+      root.querySelectorAll('.flow-service-tab').forEach(btn=>{
+        const selected=btn.dataset.service===service;
+        btn.classList.toggle('active',selected);
+        btn.setAttribute('aria-selected',selected?'true':'false');
+      });
+      return;
+    }
+
+    // 切換任務型態時，舊報價立即失效；首次正常選擇不得彈出阻斷式警示。
+    try{
+      if(typeof quoteRequestSequence==='number')quoteRequestSequence+=1;
+      if(typeof lastQuoteData!=='undefined')lastQuoteData=null;
+      if(typeof lastEstimatedTotal!=='undefined')lastEstimatedTotal=0;
+      if(typeof updateStickyEstimate==='function')updateStickyEstimate('待估價');
+    }catch(error){
+      console.warn('清除舊估價狀態失敗：',error);
+    }
+
     state.service=service;state.serviceTypeIndex=0;state.serviceCategory='';
     root.querySelectorAll('.flow-service-tab').forEach(btn=>{
       const selected=btn.dataset.service===service;
@@ -23062,5 +23083,33 @@ body.flow-active>.app{display:none!important}
   if(document.readyState !== 'loading') loadProfileFields();
 })();
 </script>
+
+<script id="ubee-service-change-alert-guard-r8">
+(() => {
+  'use strict';
+  if(window.__UBEE_SERVICE_CHANGE_ALERT_GUARD_R8__) return;
+  window.__UBEE_SERVICE_CHANGE_ALERT_GUARD_R8__=true;
+
+  const nativeAlert=window.alert.bind(window);
+  const serviceChangeMessage='任務型態已變更，請重新估價。';
+
+  window.alert=function(message){
+    const text=String(message ?? '').trim();
+    if(text===serviceChangeMessage || text.includes('任務型態已變更')){
+      try{
+        if(typeof quoteRequestSequence==='number')quoteRequestSequence+=1;
+        if(typeof lastQuoteData!=='undefined')lastQuoteData=null;
+        if(typeof lastEstimatedTotal!=='undefined')lastEstimatedTotal=0;
+        if(typeof updateStickyEstimate==='function')updateStickyEstimate('待估價');
+      }catch(error){
+        console.warn('任務型態切換後重設估價失敗：',error);
+      }
+      return;
+    }
+    return nativeAlert(message);
+  };
+})();
+</script>
+
 </body>
 </html>
