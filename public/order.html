@@ -21500,27 +21500,27 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
   #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
     position:fixed !important;
-    inset:0 auto 0 50% !important;
+    left:50% !important;
+    right:auto !important;
     top:0 !important;
-    bottom:0 !important;
-    z-index:2147483000 !important;
+    bottom:var(--flow-nav-total-height, calc(76px + env(safe-area-inset-bottom))) !important;
+    z-index:2147481500 !important;
     display:block;
-    width:100%;
-    max-width:520px;
+    width:min(100vw,520px) !important;
+    max-width:520px !important;
+    height:auto !important;
+    min-height:0 !important;
     margin:0 !important;
-    min-height:100vh !important;
-    min-height:100dvh !important;
-    height:100dvh !important;
-    padding:0 18px max(24px, env(safe-area-inset-bottom)) !important;
-    overflow-x:hidden;
-    overflow-y:auto;
+    padding:0 18px 24px !important;
+    overflow-x:hidden !important;
+    overflow-y:auto !important;
     overscroll-behavior:contain;
     -webkit-overflow-scrolling:touch;
-    transform:translateX(-50%);
+    transform:translateX(-50%) !important;
     border:0 !important;
     border-radius:0 !important;
     background:#f6f7f8 !important;
-    background-clip:padding-box !important;
+    background-clip:border-box !important;
     box-shadow:none !important;
     animation:ubeeMyPageFadeIn .16s ease;
   }
@@ -21583,11 +21583,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   body.ubee-my-subpage-open{
     overflow:hidden !important;
   }
-  body.ubee-my-subpage-open #productionOrderFlow .flow-bottom-nav,
-  body.ubee-my-subpage-open .bottom-tabs{
-    display:none !important;
-  }
-
   #productionOrderFlow .ubee-my-support-card,
   #productionOrderFlow .ubee-settings-card{
     margin-bottom:14px;
@@ -21804,7 +21799,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.04.2';
+  const APP_VERSION = '2026.08.04.3';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -21901,7 +21896,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function ensureSupportPanel(){
     let panel = document.getElementById('ubeeMySupportPanel');
     if(panel) return panel;
-    const host = root.querySelector('#flowPageProfile .ubee-my-scroll');
+    const host = root;
     if(!host) return null;
 
     panel = document.createElement('section');
@@ -22016,8 +22011,17 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   function preparePanels(){
     ensureSupportPanel();
     ensureSettingsPanel();
+
+    /*
+     * 我的子頁不再留在 .ubee-my-scroll 舊捲動容器內。
+     * 舊容器會裁切 fixed 子頁並保留底部導航高度，
+     * 因此統一移到 #productionOrderFlow 直屬層，避免底部露白。
+     */
     root.querySelectorAll('.ubee-my-panel').forEach(panel => {
       panel.classList.add('ubee-my-app-page');
+      if(panel.parentElement !== root){
+        root.appendChild(panel);
+      }
       const close = panel.querySelector('[data-my-close]');
       if(close){
         close.textContent = '‹';
@@ -22674,31 +22678,131 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
 
 <style id="ubeeMySubpageVisualIsolation">
-  html:has(body.ubee-my-subpage-open),
+  /*
+   * 2026-08-04 V3：
+   * - 我的子頁固定在導航列上方，不再被舊 profile 捲動容器裁切。
+   * - 底部導航列所有頁面都固定貼底，不隱藏、不浮動、不保留空白。
+   */
+  html,
+  body{
+    min-height:100% !important;
+  }
+
   body.ubee-my-subpage-open{
     width:100% !important;
     height:100% !important;
-    min-height:100% !important;
     overflow:hidden !important;
     background:#f6f7f8 !important;
   }
-  body.ubee-my-subpage-open #productionOrderFlow{
-    background:#f6f7f8 !important;
+
+  #productionOrderFlow{
+    --flow-nav-height:68px;
+    --flow-nav-total-height:calc(68px + env(safe-area-inset-bottom));
   }
-  body.ubee-my-subpage-open #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
-    inset:0 auto 0 50% !important;
-    width:min(100%,520px) !important;
-    height:100vh !important;
-    height:100dvh !important;
-    min-height:100vh !important;
-    min-height:100dvh !important;
+
+  #productionOrderFlow .flow-page{
+    inset:0 0 var(--flow-nav-total-height) !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav{
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:0 !important;
+    transform:translateX(-50%) !important;
+    width:min(100vw,520px) !important;
+    max-width:520px !important;
+    height:var(--flow-nav-total-height) !important;
+    min-height:var(--flow-nav-total-height) !important;
     margin:0 !important;
-    padding-bottom:max(20px,env(safe-area-inset-bottom)) !important;
+    padding:6px 10px calc(6px + env(safe-area-inset-bottom)) !important;
+    border:0 !important;
+    border-top:1px solid #e5e7e9 !important;
+    border-radius:0 !important;
+    background:#ffffff !important;
+    box-shadow:none !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
+    z-index:2147483000 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button{
+    width:100% !important;
+    min-height:54px !important;
+    margin:0 !important;
+    padding:5px 4px 4px !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    color:#8b9096 !important;
+    box-shadow:none !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active{
+    width:100% !important;
+    justify-self:stretch !important;
+    background:transparent !important;
+    color:#111111 !important;
+    box-shadow:inset 0 3px 0 #f4bd00 !important;
+  }
+
+  #productionOrderFlow .flow-bottom-nav button.active .flow-nav-icon{
+    background:#facc15 !important;
+    color:#111111 !important;
+  }
+
+  body.ubee-my-subpage-open #productionOrderFlow .flow-bottom-nav{
+    display:grid !important;
+  }
+
+  body.ubee-my-subpage-open #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
+    top:0 !important;
+    bottom:var(--flow-nav-total-height) !important;
+    width:min(100vw,520px) !important;
+    max-width:520px !important;
+    height:auto !important;
+    min-height:0 !important;
+    margin:0 !important;
+    padding:0 18px 24px !important;
+    overflow-x:hidden !important;
+    overflow-y:auto !important;
     border:0 !important;
     border-radius:0 !important;
     background:#f6f7f8 !important;
     box-shadow:none !important;
     transform:translateX(-50%) !important;
+    z-index:2147481500 !important;
+  }
+
+  /* 舊追蹤頁底部導航同樣固定貼底，不使用浮動卡片外觀。 */
+  body:not(.flow-active) .bottom-tabs{
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
+    bottom:0 !important;
+    transform:translateX(-50%) !important;
+    width:min(100vw,520px) !important;
+    max-width:520px !important;
+    margin:0 !important;
+    border:0 !important;
+    border-top:1px solid #e5e7e9 !important;
+    border-radius:0 !important;
+    background:#ffffff !important;
+    box-shadow:none !important;
+    backdrop-filter:none !important;
+    -webkit-backdrop-filter:none !important;
+    z-index:2147483000 !important;
+  }
+
+  body:not(.flow-active) .bottom-tab,
+  body:not(.flow-active) .bottom-tab.active{
+    width:100% !important;
+    justify-self:stretch !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
   }
 </style>
 
