@@ -21537,188 +21537,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   }
 
   /* =========================
-     固定貼底的 App 導覽列
-     ========================= */
-
-  #productionOrderFlow .flow-bottom-nav{
-    position:absolute !important;
-    left:0 !important;
-    right:0 !important;
-    bottom:0 !important;
-    width:100% !important;
-    max-width:none !important;
-    height:var(--flow-nav-total-height) !important;
-    margin:0 !important;
-    padding:6px 8px calc(6px + env(safe-area-inset-bottom)) !important;
-    display:grid !important;
-    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-    gap:0 !important;
-    border:0 !important;
-    border-top:1px solid rgba(17,24,39,.09) !important;
-    border-radius:0 !important;
-    background:#ffffff !important;
-    box-shadow:none !important;
-    -webkit-backdrop-filter:none !important;
-    backdrop-filter:none !important;
-    z-index:90 !important;
-  }
-
-  #productionOrderFlow .flow-bottom-nav button{
-    position:relative;
-    width:100% !important;
-    min-width:0;
-    min-height:52px !important;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:2px;
-    padding:4px 2px !important;
-    border:0 !important;
-    border-radius:12px !important;
-    background:transparent !important;
-    color:#8a8f95 !important;
-    font-size:10px !important;
-    font-weight:900 !important;
-    line-height:1.15;
-    transition:background .16s ease,color .16s ease,transform .12s ease;
-  }
-
-  #productionOrderFlow .flow-bottom-nav button::before{
-    content:"";
-    position:absolute;
-    top:-6px;
-    left:50%;
-    width:28px;
-    height:3px;
-    transform:translateX(-50%) scaleX(0);
-    border-radius:999px;
-    background:#f4bd00;
-    transition:transform .16s ease;
-  }
-
-  #productionOrderFlow .flow-bottom-nav button.active{
-    width:100% !important;
-    justify-self:stretch !important;
-    background:#fff9dc !important;
-    color:#111111 !important;
-  }
-
-  #productionOrderFlow .flow-bottom-nav button.active::before{
-    transform:translateX(-50%) scaleX(1);
-  }
-
-  #productionOrderFlow .flow-bottom-nav button:active{
-    transform:scale(.96);
-  }
-
-  #productionOrderFlow .flow-nav-icon{
-    width:25px !important;
-    height:25px !important;
-    margin:0 auto !important;
-    display:grid !important;
-    place-items:center;
-    border-radius:0 !important;
-    background:transparent !important;
-    color:currentColor !important;
-    line-height:1 !important;
-    font-size:0 !important;
-  }
-
-  #productionOrderFlow .flow-nav-icon svg{
-    width:23px;
-    height:23px;
-    display:block;
-    fill:none;
-    stroke:currentColor;
-    stroke-width:2;
-    stroke-linecap:round;
-    stroke-linejoin:round;
-  }
-
-  #productionOrderFlow .flow-nav-label{
-    display:block;
-    font-size:10px;
-    font-weight:1000;
-    white-space:nowrap;
-  }
-
-  /* 舊追蹤畫面的底部導覽同步相同規格 */
-  body:not(.flow-active) .bottom-tabs{
-    position:fixed !important;
-    left:50% !important;
-    right:auto !important;
-    bottom:0 !important;
-    transform:translateX(-50%) !important;
-    width:100% !important;
-    max-width:520px !important;
-    height:var(--ubee-app-nav-total-height) !important;
-    min-height:var(--ubee-app-nav-total-height) !important;
-    margin:0 !important;
-    padding:6px 8px calc(6px + env(safe-area-inset-bottom)) !important;
-    display:grid !important;
-    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
-    gap:0 !important;
-    border:0 !important;
-    border-top:1px solid rgba(17,24,39,.09) !important;
-    border-radius:0 !important;
-    background:#fff !important;
-    box-shadow:none !important;
-    z-index:999 !important;
-  }
-
-  body:not(.flow-active) .bottom-tab{
-    position:relative;
-    width:100% !important;
-    min-height:52px !important;
-    padding:4px 2px !important;
-    display:flex !important;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:2px;
-    border:0 !important;
-    border-radius:12px !important;
-    background:transparent !important;
-    color:#8a8f95 !important;
-    font-size:10px !important;
-    font-weight:900 !important;
-    box-shadow:none !important;
-  }
-
-  body:not(.flow-active) .bottom-tab.active{
-    width:100% !important;
-    justify-self:stretch !important;
-    background:#fff9dc !important;
-    color:#111 !important;
-  }
-
-  body:not(.flow-active) .bottom-tab svg{
-    width:23px !important;
-    height:23px !important;
-    margin:0 auto 1px !important;
-  }
-
-  body:not(.flow-active) .bottom-tabs .flow-nav-icon{
-    width:25px !important;
-    height:25px !important;
-    margin:0 auto !important;
-    display:grid !important;
-    place-items:center;
-    border-radius:0 !important;
-    background:transparent !important;
-    color:currentColor !important;
-    line-height:1 !important;
-    font-size:0 !important;
-  }
-
-  body:not(.flow-active) .bottom-tabs .flow-nav-icon svg{
-    width:23px !important;
-    height:23px !important;
-    margin:0 !important;
-  }
-
-  /* =========================
      我的主頁
      ========================= */
 
@@ -22252,15 +22070,18 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     box-shadow:0 7px 18px rgba(244,189,0,.18) !important;
   }
 
-  /* 唯一正式底部導覽：固定在 App shell 底部，不再套用 translateX。 */
+
+  /* =========================================================
+     唯一正式底部導覽｜固定貼底、滿版、無浮動容器
+     ========================================================= */
   #productionOrderFlow .flow-bottom-nav{
-    position:absolute !important;
-    left:0 !important;
-    right:0 !important;
+    position:fixed !important;
+    left:50% !important;
+    right:auto !important;
     bottom:0 !important;
-    transform:none !important;
+    transform:translateX(-50%) !important;
     width:100% !important;
-    max-width:none !important;
+    max-width:520px !important;
     height:var(--flow-nav-total-height) !important;
     min-height:var(--flow-nav-total-height) !important;
     margin:0 !important;
@@ -22270,13 +22091,13 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     align-items:stretch !important;
     gap:0 !important;
     border:0 !important;
-    border-top:1px solid rgba(17,24,39,.09) !important;
+    border-top:1px solid rgba(17,24,39,.10) !important;
     border-radius:0 !important;
-    background:#fff !important;
-    box-shadow:0 -5px 18px rgba(17,24,39,.055) !important;
+    background:#ffffff !important;
+    box-shadow:none !important;
     -webkit-backdrop-filter:none !important;
     backdrop-filter:none !important;
-    z-index:100 !important;
+    z-index:2147480000 !important;
   }
 
   #productionOrderFlow .flow-bottom-nav button{
@@ -22291,7 +22112,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     gap:2px !important;
     padding:3px 2px !important;
     border:0 !important;
-    border-radius:14px !important;
+    border-radius:0 !important;
     background:transparent !important;
     color:#8b9096 !important;
     font-size:10px !important;
@@ -22308,7 +22129,8 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     width:100% !important;
     justify-self:stretch !important;
     background:transparent !important;
-    color:#111 !important;
+    color:#111111 !important;
+    box-shadow:none !important;
   }
 
   #productionOrderFlow .flow-nav-icon{
@@ -22317,7 +22139,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     margin:0 auto !important;
     display:grid !important;
     place-items:center !important;
-    border-radius:12px !important;
+    border-radius:11px !important;
     background:transparent !important;
     color:currentColor !important;
     line-height:1 !important;
@@ -22327,7 +22149,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
   #productionOrderFlow .flow-bottom-nav button.active .flow-nav-icon{
     background:#fff1a8 !important;
-    color:#111 !important;
+    color:#111111 !important;
   }
 
   #productionOrderFlow .flow-bottom-nav button:active .flow-nav-icon{
@@ -22357,7 +22179,6 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     animation:ubeeTaskTabPulse .8s ease-in-out infinite alternate !important;
   }
 
-  /* 進行中任務的舊追蹤容器只保留內容，不再保留舊導航外觀。 */
   body:not(.flow-active) .bottom-tabs{
     position:fixed !important;
     left:50% !important;
@@ -22366,21 +22187,26 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     transform:translateX(-50%) !important;
     width:100% !important;
     max-width:520px !important;
-    min-height:var(--flow-nav-total-height) !important;
+    height:var(--ubee-app-nav-total-height) !important;
+    min-height:var(--ubee-app-nav-total-height) !important;
     margin:0 !important;
     padding:5px 8px calc(5px + env(safe-area-inset-bottom)) !important;
     display:grid !important;
     grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    align-items:stretch !important;
     gap:0 !important;
     border:0 !important;
-    border-top:1px solid rgba(17,24,39,.09) !important;
+    border-top:1px solid rgba(17,24,39,.10) !important;
     border-radius:0 !important;
-    background:#fff !important;
-    box-shadow:0 -5px 18px rgba(17,24,39,.055) !important;
-    z-index:999 !important;
+    background:#ffffff !important;
+    box-shadow:none !important;
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+    z-index:2147480000 !important;
   }
 
   body:not(.flow-active) .bottom-tab{
+    position:relative !important;
     width:100% !important;
     min-width:0 !important;
     min-height:58px !important;
@@ -22391,7 +22217,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     gap:2px !important;
     padding:3px 2px !important;
     border:0 !important;
-    border-radius:14px !important;
+    border-radius:0 !important;
     background:transparent !important;
     color:#8b9096 !important;
     font-size:10px !important;
@@ -22403,7 +22229,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     width:100% !important;
     justify-self:stretch !important;
     background:transparent !important;
-    color:#111 !important;
+    color:#111111 !important;
     box-shadow:none !important;
   }
 
@@ -22412,7 +22238,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     height:31px !important;
     display:grid !important;
     place-items:center !important;
-    border-radius:12px !important;
+    border-radius:11px !important;
     background:transparent !important;
     color:currentColor !important;
     font-size:0 !important;
@@ -22460,7 +22286,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.04.5';
+  const APP_VERSION = '2026.08.04.6';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -22548,7 +22374,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   let taskOpening = false;
   let deferredInstallPrompt = null;
   let currentMySection = '';
-  let suppressHistoryPush = false;
+  let myHistoryTransition = false;
 
   const safeText = value => String(value ?? '').trim();
   const getPreference = (name, defaultValue = true) => {
@@ -22925,9 +22751,64 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     }
   }
 
-  function pushMyHistory(action){
-    if(suppressHistoryPush) return;
-    history.pushState({ubeeMySection:action},'',location.href);
+  function readHistoryState(){
+    const state = history.state;
+    return state && typeof state === 'object' ? {...state} : {};
+  }
+
+  function cleanMyHistoryState(source = history.state){
+    const state = source && typeof source === 'object' ? {...source} : {};
+    delete state.ubeeMySection;
+    delete state.ubeeMyRoute;
+    delete state.ubeeMyParent;
+    return state;
+  }
+
+  function replaceMyHistoryWithRoot(){
+    try{
+      history.replaceState(
+        {...cleanMyHistoryState(),ubeeMyRoute:'my-root'},
+        '',
+        location.href
+      );
+    }catch(error){
+      console.warn('UBee 我的頁面歷史狀態清理失敗：',error);
+    }
+  }
+
+  function setSingleMySubpageHistory(section){
+    try{
+      const current = readHistoryState();
+      const nextState = {
+        ...cleanMyHistoryState(current),
+        ubeeMyRoute:'my-subpage',
+        ubeeMySection:section,
+        ubeeMyParent:'profile'
+      };
+
+      if(currentMySection || current.ubeeMyRoute === 'my-subpage'){
+        history.replaceState(nextState,'',location.href);
+        return;
+      }
+
+      if(current.ubeeMySection){
+        history.replaceState(
+          {...cleanMyHistoryState(current),ubeeMyRoute:'my-root'},
+          '',
+          location.href
+        );
+      }
+
+      history.pushState(nextState,'',location.href);
+    }catch(error){
+      console.warn('UBee 我的子頁歷史狀態建立失敗：',error);
+    }
+  }
+
+  function returnToMyRoot({syncHistory = true} = {}){
+    closeMySubPages();
+    markBottomNav('my');
+    if(syncHistory) replaceMyHistoryWithRoot();
   }
 
   function openMySection(action, options = {}){
@@ -22965,7 +22846,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
       refreshEnvironmentStatus();
     }
 
-    if(!options.skipHistory) pushMyHistory(normalized);
+    setSingleMySubpageHistory(normalized);
     return true;
   }
 
@@ -23249,12 +23130,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   }
 
   function closeWithHistory(){
-    if(history.state?.ubeeMySection){
-      history.back();
-    }else{
-      closeMySubPages();
-      markBottomNav('my');
-    }
+    returnToMyRoot({syncHistory:true});
   }
 
   window.openUBeeMySection = openMySection;
@@ -23291,17 +23167,24 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   });
 
   window.addEventListener('popstate',event => {
-    const section = safeText(event.state?.ubeeMySection);
-    suppressHistoryPush = true;
+    if(myHistoryTransition) return;
+    myHistoryTransition = true;
     try{
-      if(section){
-        openMySection(section,{skipHistory:true});
-      }else{
-        closeMySubPages();
-        markBottomNav('my');
+      const state = event.state && typeof event.state === 'object' ? event.state : {};
+      const hadLegacyMyState = Boolean(
+        state.ubeeMySection ||
+        state.ubeeMyRoute === 'my-subpage' ||
+        document.body.classList.contains('ubee-my-subpage-open') ||
+        currentMySection
+      );
+
+      if(hadLegacyMyState){
+        showMyRoot();
+        returnToMyRoot({syncHistory:false});
+        replaceMyHistoryWithRoot();
       }
     }finally{
-      suppressHistoryPush = false;
+      myHistoryTransition = false;
     }
   });
 
@@ -23314,6 +23197,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     const homeTab = event.target.closest('#tabHome,#flowNavHome');
     if(homeTab){
       closeMySubPages();
+      replaceMyHistoryWithRoot();
       markBottomNav('home');
       setTimeout(() => markBottomNav('home'),0);
       return;
@@ -23321,8 +23205,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
 
     const myTab = event.target.closest('#tabProfile,#flowNavMy');
     if(myTab){
-      closeMySubPages();
-      markBottomNav('my');
+      returnToMyRoot({syncHistory:true});
       setTimeout(() => markBottomNav('my'),0);
       return;
     }
@@ -23331,6 +23214,8 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     if(taskTab){
       event.preventDefault();
       event.stopImmediatePropagation();
+      closeMySubPages();
+      replaceMyHistoryWithRoot();
       openTaskPage();
       return;
     }
@@ -23390,9 +23275,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
     const detailTarget = event.target.closest('#flowProfileTasksList [data-profile-order-index]');
     if(detailTarget){
       closeMySubPages();
-      if(history.state?.ubeeMySection){
-        history.replaceState(null,'',location.href);
-      }
+      replaceMyHistoryWithRoot();
       return;
     }
 
@@ -23425,6 +23308,7 @@ body:not(.flow-active) .bottom-tab.active{width:82%!important;justify-self:cente
   if(typeof previousProfilePage === 'function'){
     window.openUBeeProfilePage = function(){
       closeMySubPages();
+      replaceMyHistoryWithRoot();
       markBottomNav('my');
       return previousProfilePage.apply(this,arguments);
     };
