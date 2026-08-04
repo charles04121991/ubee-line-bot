@@ -10,7 +10,7 @@ const multer = require('multer');
 
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
 // UBee Merchant Platform V3 + 小U資料庫 V2 Final + 區域動態定價 V3 正式版｜2026-07-28
-// 2026-08-04｜快速估價重新串接：/api/quote 改為可公開估價（會員 Session 選用），並補齊全能跑腿 custom 模式。
+// 2026-08-04 R9｜全能跑腿 serviceMode 前後端一致：估價、建單與鎖價驗證統一為 custom。
 // 2026-08-04｜小U申請審核 V2：三大驗證、條件式證件、批次補件、多通道通知與審核紀錄。
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
 
@@ -20027,6 +20027,39 @@ async function loadValidDynamicPricingQuote(quoteId) {
 }
 
 
+function resolveCustomerServiceMode({
+  serviceMode = '',
+  serviceType = '',
+  serviceKey = '',
+  serviceGroup = '',
+} = {}) {
+  const rawMode = String(serviceMode || '').trim().toLowerCase();
+  const normalizedType = String(serviceType || '').trim();
+  const normalizedKey = String(serviceKey || '').trim().toLowerCase();
+  const normalizedGroup = String(serviceGroup || '').trim().toLowerCase();
+
+  if (
+    rawMode === 'queue' ||
+    normalizedType === '幫排隊' ||
+    normalizedKey === 'queue' ||
+    normalizedGroup === 'queue'
+  ) {
+    return 'queue';
+  }
+
+  if (
+    rawMode === 'custom' ||
+    normalizedType === '全能跑腿' ||
+    normalizedKey === 'helper' ||
+    normalizedGroup === 'helper' ||
+    (normalizedGroup === 'life' && normalizedKey === 'helper')
+  ) {
+    return 'custom';
+  }
+
+  return 'normal';
+}
+
 function normalizeQuoteComparisonText(value) {
   return normalizeTaiwanAddressText(value)
     .replace(/[，,。．.\-－]/g, '')
@@ -20040,8 +20073,18 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
   const orderDropoff = normalizeQuoteComparisonText(orderData.dropoffAddress || orderData.dropoff);
   const quoteSpeed = String(lockedQuote.speedType || 'standard').trim();
   const orderSpeed = String(orderData.speedType || orderData.speed || 'standard').trim();
-  const quoteMode = String(lockedQuote.serviceMode || 'normal').trim();
-  const orderMode = String(orderData.serviceMode || 'normal').trim();
+  const quoteMode = resolveCustomerServiceMode({
+    serviceMode: lockedQuote.serviceMode,
+    serviceType: lockedQuote.serviceType,
+    serviceKey: lockedQuote.serviceKey,
+    serviceGroup: lockedQuote.serviceGroup,
+  });
+  const orderMode = resolveCustomerServiceMode({
+    serviceMode: orderData.serviceMode,
+    serviceType: orderData.serviceType,
+    serviceKey: orderData.serviceKey,
+    serviceGroup: orderData.serviceGroup,
+  });
   const quoteItemSize = normalizeItemSize(lockedQuote.itemSize);
   const orderItemSize = normalizeItemSize(orderData.itemSize);
 
@@ -22914,6 +22957,18 @@ function createOrderFromApi(data) {
     rawServiceGroup ||
     '';
 
+  const normalizedServiceType = cleanText(
+    data.serviceType || '',
+    40
+  );
+
+  const normalizedServiceMode = resolveCustomerServiceMode({
+    serviceMode: data.serviceMode,
+    serviceType: normalizedServiceType,
+    serviceKey,
+    serviceGroup: rawServiceGroup,
+  });
+
   const nearbyPlace =
     data.nearbyPlace &&
     typeof data.nearbyPlace === 'object'
@@ -23042,20 +23097,14 @@ function createOrderFromApi(data) {
 
     serviceGroup: serviceGroupLabel,
 
-    serviceType: cleanText(
-      data.serviceType || '',
-      40
-    ),
+    serviceType: normalizedServiceType,
 
     serviceCategory: cleanText(
       data.serviceCategory || '',
       60
     ),
 
-    serviceMode: cleanText(
-      data.serviceMode || 'normal',
-      30
-    ),
+    serviceMode: normalizedServiceMode,
 
     serviceKey,
 
