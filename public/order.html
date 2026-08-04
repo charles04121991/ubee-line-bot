@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-04 R10｜底部導航永久三欄單列、全站無浮動樣式 -->
+<!-- UBee 正式營運修復版：2026-08-04 R12｜以R10為基準，只取消導航上方操作列固定浮動 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -8850,7 +8850,7 @@ body:not(.flow-active) .app{
   padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
 }
 
-/* 所有固定操作列一律改成平面滿版列，不得浮在頁面中央。 */
+/* R12｜僅取消導航列上方操作列的固定浮動定位；其他版面維持 R10。 */
 .home-action-footer,
 .step2-action-footer,
 .step3-action-footer,
@@ -8859,17 +8859,20 @@ body:not(.flow-active) .app{
 .flow-action-footer,
 .flow-sticky-action,
 .tracking-action-footer{
-  position:fixed!important;
-  left:0!important;
-  right:0!important;
-  bottom:var(--ubee-bottom-nav-height)!important;
+  position:static!important;
+  inset:auto!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
   transform:none!important;
   translate:none!important;
   width:100%!important;
   min-width:0!important;
   max-width:none!important;
-  margin:0!important;
+  margin:16px 0 0!important;
   padding:10px 16px!important;
+  z-index:auto!important;
   border:0!important;
   border-top:1px solid #dfe2e5!important;
   border-radius:0!important;
