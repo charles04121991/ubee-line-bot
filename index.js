@@ -5096,6 +5096,143 @@ app.get('/api/web-push/public-key', (req, res) => {
   });
 });
 
+
+
+// =====================================================
+// UBee 客戶端 Web Push 訂閱 API｜2026-08-04
+// - 每位會員可保存多台裝置；以 endpoint 雜湊作為文件 ID。
+// - 訂閱資料只接受已登入會員，不接受前端自行指定 customerId。
+// =====================================================
+const CUSTOMER_PUSH_SUBCOLLECTION = 'pushSubscriptions';
+
+function customerPushSubscriptionDocumentId(endpoint = '') {
+  return crypto
+    .createHash('sha256')
+    .update(String(endpoint || ''))
+    .digest('hex')
+    .slice(0, 48);
+}
+
+function normalizeCustomerPushSubscription(subscription = {}) {
+  if (
+    !subscription ||
+    typeof subscription !== 'object' ||
+    !subscription.endpoint ||
+    !subscription.keys?.p256dh ||
+    !subscription.keys?.auth
+  ) {
+    return null;
+  }
+
+  return {
+    endpoint: String(subscription.endpoint).slice(0, 1600),
+    expirationTime:
+      subscription.expirationTime === null ||
+      subscription.expirationTime === undefined
+        ? null
+        : Number(subscription.expirationTime),
+    keys: {
+      p256dh: String(subscription.keys.p256dh).slice(0, 600),
+      auth: String(subscription.keys.auth).slice(0, 300),
+    },
+  };
+}
+
+app.post('/api/customer/push-subscription', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const customerId = req.customerAuth.customerId;
+    const subscription = normalizeCustomerPushSubscription(req.body?.subscription);
+
+    if (!subscription) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的客戶端 Web Push subscription。',
+      });
+    }
+
+    const subscriptionId = customerPushSubscriptionDocumentId(
+      subscription.endpoint
+    );
+
+    const ref = db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .doc(customerId)
+      .collection(CUSTOMER_PUSH_SUBCOLLECTION)
+      .doc(subscriptionId);
+
+    const nowMs = Date.now();
+
+    await ref.set(
+      {
+        id: subscriptionId,
+        subscription,
+        endpoint: subscription.endpoint,
+        enabled: true,
+        app: cleanText(req.body?.app || 'ubee-customer-pwa', 80),
+        platform: cleanText(req.body?.platform || '', 120),
+        userAgent: cleanText(req.body?.userAgent || '', 500),
+        createdAtMs: nowMs,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return res.json({
+      success: true,
+      enabled: true,
+      subscriptionId,
+      message: 'UBee 訂單進度通知已開啟。',
+    });
+  } catch (error) {
+    console.error('❌ 儲存客戶 Web Push subscription 失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: '通知設定儲存失敗，請稍後再試。',
+    });
+  }
+});
+
+app.delete('/api/customer/push-subscription', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const customerId = req.customerAuth.customerId;
+    const endpoint = String(req.body?.endpoint || '').trim();
+
+    if (!endpoint) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少通知 endpoint。',
+      });
+    }
+
+    const subscriptionId = customerPushSubscriptionDocumentId(endpoint);
+
+    await db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .doc(customerId)
+      .collection(CUSTOMER_PUSH_SUBCOLLECTION)
+      .doc(subscriptionId)
+      .delete();
+
+    return res.json({
+      success: true,
+      enabled: false,
+      message: '這台裝置的 UBee 訂單通知已關閉。',
+    });
+  } catch (error) {
+    console.error('❌ 刪除客戶 Web Push subscription 失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: '通知設定移除失敗，請稍後再試。',
+    });
+  }
+});
+
+
 // 儲存騎士 iPhone / PWA Web Push 訂閱資料
 app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) => {
   try {
@@ -21227,6 +21364,130 @@ function getCustomerNotificationText(messages) {
   return 'UBee 任務狀態已更新。';
 }
 
+
+
+function getCustomerWebPushCopy(order = {}, messages = []) {
+  const status = String(order.status || '').trim().toLowerCase();
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+
+  const titleMap = {
+    accepted: '小U已接下你的任務',
+    going_to_pickup: '小U正在前往取件',
+    arrived_pickup: '小U已抵達取件地點',
+    picked_up: '小U已完成取件',
+    going_to_dropoff: '小U正在配送',
+    arrived_dropoff: '小U已抵達送達地點',
+    completed: 'UBee 任務已完成',
+    cancelled: 'UBee 任務已取消',
+    canceled: 'UBee 任務已取消',
+    pending_dispatch: 'UBee 正在媒合附近小U',
+  };
+
+  const rawMessage = getCustomerNotificationText(messages)
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const body = rawMessage
+    ? rawMessage.slice(0, 180)
+    : orderId
+      ? `訂單 ${orderId} 有新的進度。`
+      : '你的 UBee 任務有新的進度。';
+
+  const url = `/order.html?source=push&orderId=${encodeURIComponent(orderId)}`;
+
+  return {
+    title: titleMap[status] || 'UBee 任務進度更新',
+    body,
+    url,
+    deepLink: url,
+    icon: '/ubee-customer-icon-192.png',
+    badge: '/ubee-customer-icon-192.png',
+    tag: `ubee-customer-${orderId || 'order'}-${status || 'update'}`,
+    orderId,
+    status,
+  };
+}
+
+async function sendCustomerWebPush(order = {}, messages = []) {
+  if (!WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) {
+    return { sent: 0, skipped: true };
+  }
+
+  const customerId = String(order?.userId || order?.customerId || '').trim();
+  if (!isValidCustomerUserId(customerId)) {
+    return { sent: 0, skipped: true };
+  }
+
+  const collectionRef = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+    .doc(customerId)
+    .collection(CUSTOMER_PUSH_SUBCOLLECTION);
+
+  const snapshot = await collectionRef.limit(20).get();
+  if (snapshot.empty) return { sent: 0 };
+
+  const payload = JSON.stringify(getCustomerWebPushCopy(order, messages));
+  let sent = 0;
+  let removed = 0;
+
+  await Promise.allSettled(
+    snapshot.docs.map(async doc => {
+      const data = doc.data() || {};
+      if (data.enabled === false) return;
+
+      const subscription = normalizeCustomerPushSubscription(
+        data.subscription || data
+      );
+
+      if (!subscription) {
+        await doc.ref.delete().catch(() => {});
+        removed += 1;
+        return;
+      }
+
+      try {
+        await webpush.sendNotification(subscription, payload, {
+          TTL: 60 * 60,
+          urgency: 'high',
+        });
+
+        sent += 1;
+
+        await doc.ref.set(
+          {
+            lastSentAtMs: Date.now(),
+            lastOrderId: String(order.id || ''),
+            lastOrderStatus: String(order.status || ''),
+            lastError: '',
+          },
+          { merge: true }
+        ).catch(() => {});
+      } catch (error) {
+        const statusCode = Number(error?.statusCode || 0);
+
+        if (statusCode === 404 || statusCode === 410) {
+          await doc.ref.delete().catch(() => {});
+          removed += 1;
+          return;
+        }
+
+        await doc.ref.set(
+          {
+            lastError: cleanText(error?.message || 'push_failed', 300),
+            lastErrorAtMs: Date.now(),
+          },
+          { merge: true }
+        ).catch(() => {});
+
+        throw error;
+      }
+    })
+  );
+
+  return { sent, removed };
+}
+
+
 async function notifyCustomer(order, messages) {
   const customerId = String(order?.userId || order?.customerId || '').trim();
   if (!isValidCustomerUserId(customerId)) return false;
@@ -21238,7 +21499,8 @@ async function notifyCustomer(order, messages) {
     .doc();
 
   const nowMs = Date.now();
-  await notificationRef.set({
+
+  const inAppTask = notificationRef.set({
     id: notificationRef.id,
     orderId: String(order?.id || ''),
     type: 'order_update',
@@ -21249,6 +21511,24 @@ async function notifyCustomer(order, messages) {
     createdAtMs: nowMs,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  const pushTask = sendCustomerWebPush(order, messages);
+
+  const [inAppResult, pushResult] = await Promise.allSettled([
+    inAppTask,
+    pushTask,
+  ]);
+
+  if (inAppResult.status === 'rejected') {
+    throw inAppResult.reason;
+  }
+
+  if (pushResult.status === 'rejected') {
+    console.warn(
+      '⚠️ UBee 客戶 Web Push 發送失敗（不影響訂單狀態）：',
+      pushResult.reason?.message || pushResult.reason
+    );
+  }
 
   return true;
 }
