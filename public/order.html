@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-04 R12｜以R10為基準，只取消導航上方操作列固定浮動 -->
+<!-- UBee 正式營運修復版：2026-08-04 R13｜全頁移除底部灰色重複留白、固定三欄導航、設定獨立區塊 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -8889,6 +8889,79 @@ body:not(.flow-active) .app{
   box-shadow:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
+}
+</style><style id="ubee-r13-bottom-space-and-settings-fix">
+/* =========================================================
+   UBee R13｜底部空間唯一規格
+   1. 底部導航維持 fixed、三欄、滿版貼底。
+   2. flow-page 已透過 inset-bottom 避開導航，不再重複增加導航高度 padding。
+   3. 所有頁面只保留 14～18px 正常內容收尾，不得出現大塊灰色空白。
+   4. 「設定」為獨立且永遠可見的原生 App 分組。
+   ========================================================= */
+
+/* 底部導航保持固定，不更動 R10 三欄結構。 */
+#productionOrderFlow .flow-bottom-nav,
+body:not(.flow-active) .bottom-tabs{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+}
+
+/* 正式新流程：頁面本身已在導航上方結束，禁止再次預留導航高度。 */
+#productionOrderFlow,
+#productionOrderFlow .flow-shell,
+#productionOrderFlow .flow-page{
+  padding-bottom:0!important;
+}
+
+#productionOrderFlow .flow-scroll{
+  padding-bottom:16px!important;
+}
+
+/* 我的主頁與所有子頁：只保留正常收尾距離，不再加一整個導航高度。 */
+#productionOrderFlow .ubee-my-scroll{
+  padding-bottom:calc(16px + env(safe-area-inset-bottom))!important;
+}
+
+#productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  padding-bottom:calc(16px + env(safe-area-inset-bottom))!important;
+}
+
+/* 舊五步驟相容頁：移除 120px／180px 等舊固定操作列預留。 */
+body:not(.flow-active) .app{
+  padding-bottom:calc(var(--ubee-bottom-nav-height) + 12px)!important;
+}
+
+#step1 .task-sheet,
+#step2,
+#step3,
+#step4,
+#step5{
+  padding-bottom:16px!important;
+}
+
+.footer-nav{
+  margin-bottom:0!important;
+}
+
+/* 設定獨立區塊：不得被隱藏、裁切或擠到導航下方。 */
+#productionOrderFlow .ubee-my-settings-group{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  margin-bottom:16px!important;
+}
+
+#productionOrderFlow .ubee-my-settings-group .ubee-my-menu,
+#productionOrderFlow .ubee-my-settings-group .ubee-my-menu-item[data-my-action="settings"]{
+  display:grid!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+
+#productionOrderFlow .ubee-my-settings-group .ubee-my-menu{
+  display:block!important;
 }
 </style></head>
 <body>
@@ -19991,10 +20064,10 @@ body.flow-active>.app{display:none!important;}
 <button class="ubee-my-menu-item" data-my-action="support" id="flowProfileSupport" type="button"><span>聯繫客服</span><span aria-hidden="true">›</span></button>
 <button class="ubee-my-menu-item" data-my-action="feedback" type="button"><span>意見回饋</span><span aria-hidden="true">›</span></button>
 <button class="ubee-my-menu-item" data-my-action="becomeRider" type="button"><span>成為小U</span><span aria-hidden="true">›</span></button>
-<button class="ubee-my-menu-item" data-my-action="settings" type="button"><span>設定</span><span aria-hidden="true">›</span></button>
+
 </div>
 </section>
-</div>
+<section class="ubee-my-group ubee-my-settings-group"><h3>設定</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="settings" type="button"><span>設定</span><span aria-hidden="true">›</span></button></div></section></div>
 <section class="ubee-my-panel" hidden="" id="ubeeMyOrdersPanel">
 <div class="ubee-my-panel-head"><strong>我的訂單</strong><button data-my-close="" type="button">關閉</button></div>
 <button class="flow-text-link" hidden="" id="flowOpenActiveOrder" type="button">查看進行中任務</button>
