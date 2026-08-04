@@ -9055,6 +9055,59 @@ body:not(.flow-active) .app{
   #productionOrderFlow .ubee-my-menu-item{font-size:13px!important;}
 }
 </style>
+
+<style id="ubee-r15-bottom-readable-area-fix">
+/* =========================================================
+   UBee R15｜底部內容可完整閱讀
+   1. 底部導航維持 fixed、三欄、滿版貼底。
+   2. 有底部操作列的流程頁，捲動內容預留操作列實際高度。
+   3. 我的主頁與設定等子頁，預留固定導航高度，最後一行可捲至導航上方。
+   4. 不改字級、卡片、功能與頁面結構。
+   ========================================================= */
+
+/* 下單流程：操作列為 absolute，內容底部必須有同等可捲動空間。 */
+#productionOrderFlow .flow-page:has(> .flow-actionbar) .flow-scroll{
+  padding-bottom:88px!important;
+  scroll-padding-bottom:88px!important;
+}
+
+/* 相容不支援 :has() 的 WebView：指定實際含操作列的流程頁。 */
+#productionOrderFlow #flowPageTask .flow-scroll,
+#productionOrderFlow #flowPageOptions .flow-scroll,
+#productionOrderFlow #flowPageReview .flow-scroll,
+#productionOrderFlow #flowPageLocation .flow-scroll,
+#productionOrderFlow #flowPageDetail .flow-scroll{
+  padding-bottom:88px!important;
+  scroll-padding-bottom:88px!important;
+}
+
+/* 首頁若顯示底部操作列，同樣保留可閱讀空間。 */
+#productionOrderFlow #flowPageHome .flow-scroll{
+  padding-bottom:88px!important;
+  scroll-padding-bottom:88px!important;
+}
+
+/* 我的主頁：最後一個分組不能被固定導航遮住。 */
+#productionOrderFlow .ubee-my-scroll{
+  padding-bottom:calc(var(--ubee-bottom-nav-height) + 20px)!important;
+  scroll-padding-bottom:calc(var(--ubee-bottom-nav-height) + 20px)!important;
+}
+
+/* 設定、帳號、通知等子頁會直接佔滿 flow-shell，必須自行避開導航。 */
+#productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
+  scroll-padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
+}
+
+/* 底部導航保持原位，不得被本次修正改成一般內容。 */
+#productionOrderFlow .flow-bottom-nav,
+body:not(.flow-active) .bottom-tabs{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+}
+</style>
 </head>
 <body>
 <style id="ubee-direct-customer-auth-style">
