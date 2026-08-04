@@ -10,6 +10,7 @@ const multer = require('multer');
 
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
 // UBee Merchant Platform V3 + 小U資料庫 V2 Final + 區域動態定價 V3 正式版｜2026-07-28
+// 2026-08-04｜快速估價重新串接：/api/quote 改為可公開估價（會員 Session 選用），並補齊全能跑腿 custom 模式。
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
 
 admin.initializeApp({
@@ -20800,6 +20801,128 @@ function calculatePrice({
   };
 }
 
+
+// =====================================================
+// UBee 快速估價｜全能跑腿 custom 模式相容
+//
+// 原則：
+// 1. 有送達地點：沿用一般配送的距離／車程計價。
+// 2. 沒有送達地點：以單點任務基本費計價，不呼叫距離矩陣。
+// 3. 任務處理時間沿用既有每分鐘費率，並依既有 70 / 30 規則分潤。
+// =====================================================
+function calculateSinglePointCustomTaskPrice({
+  speedType,
+  upstairsFee = 0,
+} = {}) {
+  const speed = getSpeedOption(speedType);
+
+  const baseFee = Math.max(
+    0,
+    Math.round(Number(PRICING.baseFee || 0))
+  );
+
+  const serviceFee = Math.max(
+    0,
+    Math.round(Number(PRICING.serviceFee || 0))
+  );
+
+  const speedFee = Math.max(
+    0,
+    Math.round(Number(speed.fee || 0))
+  );
+
+  const safeUpstairsFee = Math.max(
+    0,
+    Math.round(Number(upstairsFee || 0))
+  );
+
+  const financials = calculateFinancialSplit({
+    deliveryFee: baseFee,
+    serviceFee,
+    speedFee,
+    upstairsFee: safeUpstairsFee,
+    waitingFee: 0,
+  });
+
+  return {
+    fareMode: 'custom_single_point',
+    distanceKm: 0,
+    durationMinutes: 0,
+    baseFee,
+    distanceFee: 0,
+    timeFee: 0,
+    longDistanceFee: 0,
+    ...financials,
+    total: financials.serviceSubtotal,
+  };
+}
+
+function applyCustomTaskHandlingFee(
+  price,
+  taskMinutes
+) {
+  const result = { ...(price || {}) };
+
+  const safeTaskMinutes = Math.max(
+    0,
+    Math.round(Number(taskMinutes || 0))
+  );
+
+  const taskHandlingFee = Math.max(
+    0,
+    Math.round(
+      safeTaskMinutes * Number(PRICING.perMinute || 0)
+    )
+  );
+
+  result.taskMinutes = safeTaskMinutes;
+  result.taskHandlingFee = taskHandlingFee;
+
+  if (taskHandlingFee <= 0) {
+    return result;
+  }
+
+  const riderShare = Math.max(
+    0,
+    Math.round(
+      taskHandlingFee * Number(PRICING.driverRatio || 0.7)
+    )
+  );
+
+  const platformShare = Math.max(
+    0,
+    taskHandlingFee - riderShare
+  );
+
+  result.taskSubtotal =
+    Math.max(0, Math.round(Number(result.taskSubtotal || 0))) +
+    taskHandlingFee;
+
+  result.serviceSubtotal =
+    Math.max(
+      0,
+      Math.round(
+        Number(result.serviceSubtotal ?? result.total ?? 0)
+      )
+    ) + taskHandlingFee;
+
+  result.total = result.serviceSubtotal;
+
+  result.driverFee =
+    Math.max(0, Math.round(Number(result.driverFee || 0))) +
+    riderShare;
+
+  result.riderFee = result.driverFee;
+
+  result.platformFee =
+    Math.max(0, Math.round(Number(result.platformFee || 0))) +
+    platformShare;
+
+  result.platformIncome = result.platformFee;
+
+  return result;
+}
+
 function recalculateOrderFinancials(order) {
   if (!order) {
     return order;
@@ -22709,23 +22832,34 @@ app.post('/api/map-route', async (req, res) => {
   }
 });
 
-app.get('/api/quote', requireCustomerAuth, async (req, res) => {
+app.get('/api/quote', customerAuthOptional, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
   try {
     const serviceType = String(req.query.serviceType || '').trim();
-    const serviceMode = String(req.query.serviceMode || '').trim();
+    const rawServiceMode = String(req.query.serviceMode || '').trim().toLowerCase();
     const serviceKey = String(req.query.serviceKey || '').trim();
     const serviceGroup = String(req.query.serviceGroup || '').trim();
 
-    const from = req.query.from || req.query.pickup;
-    const to = req.query.to || req.query.dropoff;
+    const from = String(req.query.from || req.query.pickup || '').trim();
+    const to = String(req.query.to || req.query.dropoff || '').trim();
 
-    const speedType = req.query.speed || req.query.speedType || 'standard';
+    const speedType = String(
+      req.query.speed || req.query.speedType || 'standard'
+    ).trim();
     const speed = getSpeedOption(speedType);
 
     const advancePayment = Math.max(
       0,
       Math.round(Number(req.query.advancePayment || 0))
     );
+
+    if (advancePayment >= MAX_ADVANCE_PAYMENT) {
+      return res.status(400).json({
+        success: false,
+        error: '代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。',
+      });
+    }
 
     const upstairsFee = Math.max(
       0,
@@ -22737,120 +22871,156 @@ app.get('/api/quote', requireCustomerAuth, async (req, res) => {
     );
 
     const isQueueTask =
-      serviceMode === 'queue' ||
+      rawServiceMode === 'queue' ||
       serviceType === '幫排隊';
+
+    const isCustomTask =
+      rawServiceMode === 'custom' ||
+      serviceType === '全能跑腿';
+
+    const resolvedServiceMode =
+      isQueueTask
+        ? 'queue'
+        : isCustomTask
+          ? 'custom'
+          : 'normal';
 
     let distance = null;
     let price = null;
     let queueMinutes = 0;
+    let taskMinutes = 0;
 
     if (isQueueTask) {
-  queueMinutes = Math.max(
-    0,
-    Math.round(Number(req.query.queueMinutes || 30))
-  );
+      if (!from) {
+        return res.status(400).json({
+          success: false,
+          error: '請輸入排隊地點',
+        });
+      }
 
-  if (queueMinutes <= 0) {
-    return res.status(400).json({
-      success: false,
-      error: '請輸入正確的預估排隊時間'
-    });
-  }
+      queueMinutes = Math.max(
+        0,
+        Math.round(Number(req.query.queueMinutes || 30))
+      );
 
-  if (queueMinutes > PRICING.maxQuoteTimeMinutes) {
-    return res.status(400).json({
-      success: false,
-      error: `排隊時間超過 ${PRICING.maxQuoteTimeMinutes} 分鐘，建議改由客服協助確認費用。`
-    });
-  }
+      if (queueMinutes <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: '請輸入正確的預估排隊時間',
+        });
+      }
 
-  const queueTimeFee = Math.max(
-    0,
-    queueMinutes * PRICING.queuePerMinute
-  );
+      if (queueMinutes > PRICING.maxQuoteTimeMinutes) {
+        return res.status(400).json({
+          success: false,
+          error: `排隊時間超過 ${PRICING.maxQuoteTimeMinutes} 分鐘，建議改由客服協助確認費用。`,
+        });
+      }
 
-  const longTaskExtraFee =
-    queueMinutes > PRICING.queueLongTaskThresholdMinutes
-      ? PRICING.queueLongTaskExtraFee
-      : 0;
+      const queueTimeFee = Math.max(
+        0,
+        queueMinutes * PRICING.queuePerMinute
+      );
 
-  const waitingFee =
-    queueTimeFee +
-    longTaskExtraFee;
+      const longTaskExtraFee =
+        queueMinutes > PRICING.queueLongTaskThresholdMinutes
+          ? PRICING.queueLongTaskExtraFee
+          : 0;
 
-  const serviceFee = Math.max(
-    0,
-    Math.round(Number(PRICING.serviceFee || 0))
-  );
+      const waitingFee =
+        queueTimeFee +
+        longTaskExtraFee;
 
-  const deliveryFee = Math.max(
-    0,
-    Math.round(Number(PRICING.queueBaseFee || 0))
-  );
+      const serviceFee = Math.max(
+        0,
+        Math.round(Number(PRICING.serviceFee || 0))
+      );
 
-  const speedFee = Math.max(
-    0,
-    Math.round(Number(speed.fee || 0))
-  );
+      const deliveryFee = Math.max(
+        0,
+        Math.round(Number(PRICING.queueBaseFee || 0))
+      );
 
-  const financials = calculateFinancialSplit({
-    deliveryFee,
-    serviceFee,
-    speedFee,
-    upstairsFee,
-    waitingFee,
-  });
+      const speedFee = Math.max(
+        0,
+        Math.round(Number(speed.fee || 0))
+      );
 
-  price = {
-    fareMode: 'queue',
+      const financials = calculateFinancialSplit({
+        deliveryFee,
+        serviceFee,
+        speedFee,
+        upstairsFee,
+        waitingFee,
+      });
 
-    deliveryFee:
-      financials.deliveryFee,
+      price = {
+        fareMode: 'queue',
+        deliveryFee: financials.deliveryFee,
+        serviceFee: financials.serviceFee,
+        platformServiceFee: financials.platformServiceFee,
+        speedFee: financials.speedFee,
+        upstairsFee: financials.upstairsFee,
+        waitingFee: financials.waitingFee,
+        queueTimeFee,
+        longTaskExtraFee,
+        taskSubtotal: financials.taskSubtotal,
+        serviceSubtotal: financials.serviceSubtotal,
+        total: financials.serviceSubtotal,
+        driverFee: financials.driverFee,
+        riderFee: financials.riderFee,
+        platformFee: financials.platformFee,
+        platformIncome: financials.platformIncome,
+      };
 
-    serviceFee:
-      financials.serviceFee,
+    } else if (isCustomTask) {
+      if (!from) {
+        return res.status(400).json({
+          success: false,
+          error: '請輸入任務地點',
+        });
+      }
 
-    platformServiceFee:
-      financials.platformServiceFee,
+      taskMinutes = Math.max(
+        0,
+        Math.round(Number(req.query.taskMinutes || 30))
+      );
 
-    speedFee:
-      financials.speedFee,
+      if (taskMinutes <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: '請輸入正確的預估任務處理時間',
+        });
+      }
 
-    upstairsFee:
-      financials.upstairsFee,
+      if (taskMinutes > PRICING.maxQuoteTimeMinutes) {
+        return res.status(400).json({
+          success: false,
+          error: `任務處理時間超過 ${PRICING.maxQuoteTimeMinutes} 分鐘，建議改由客服協助確認費用。`,
+        });
+      }
 
-    waitingFee:
-      financials.waitingFee,
+      if (to) {
+        distance = await getDistanceMatrixCached(from, to);
 
-    queueTimeFee,
-    longTaskExtraFee,
+        price = calculatePrice({
+          distanceMeters: distance.distanceMeters,
+          durationSeconds: distance.durationSeconds,
+          speedType,
+          upstairsFee,
+        });
+      } else {
+        price = calculateSinglePointCustomTaskPrice({
+          speedType,
+          upstairsFee,
+        });
+      }
 
-    taskSubtotal:
-      financials.taskSubtotal,
-
-    serviceSubtotal:
-      financials.serviceSubtotal,
-
-    total:
-      financials.serviceSubtotal,
-
-    driverFee:
-      financials.driverFee,
-
-    riderFee:
-      financials.riderFee,
-
-    platformFee:
-      financials.platformFee,
-
-    platformIncome:
-      financials.platformIncome,
-  };
-} else {
+    } else {
       if (!from || !to) {
         return res.status(400).json({
           success: false,
-          error: '請輸入取件地址與送達地址'
+          error: '請輸入取件地址與送達地址',
         });
       }
 
@@ -22864,16 +23034,13 @@ app.get('/api/quote', requireCustomerAuth, async (req, res) => {
         });
 
       if (quickServiceType) {
-        // 只有「幫我取 / 幫代買」走專用即時配送計價。
         price = calculateQuickServicePrice({
           distanceMeters: distance.distanceMeters,
           speedType,
           upstairsFee,
           serviceType: quickServiceType,
         });
-
       } else {
-        // 其他所有服務完全維持原本計價邏輯。
         price = calculatePrice({
           distanceMeters: distance.distanceMeters,
           durationSeconds: distance.durationSeconds,
@@ -22883,14 +23050,22 @@ app.get('/api/quote', requireCustomerAuth, async (req, res) => {
       }
     }
 
-    // 商品體積費套用於所有服務，包括一般配送、幫我取、幫代買與排隊。
+    // 商品體積費套用於所有服務。
     price = applyItemSizeSurchargeToPrice(
       price,
       itemSize
     );
 
+    // 全能跑腿再加上任務處理時間費；沿用既有每分鐘費率與 70 / 30 分潤。
+    if (isCustomTask) {
+      price = applyCustomTaskHandlingFee(
+        price,
+        taskMinutes
+      );
+    }
+
     const dynamicPricing = await calculateRegionalDynamicPricing({
-      pickupAddress: from || '',
+      pickupAddress: from,
       nowMs: Date.now(),
     });
 
@@ -22899,7 +23074,6 @@ app.get('/api/quote', requireCustomerAuth, async (req, res) => {
       dynamicPricing
     );
 
-    // 天候保障費由調度中心啟用，且 100% 給小U。
     const weatherAdjustment =
       await getCurrentWeatherAdjustment(Date.now());
 
@@ -22912,16 +23086,20 @@ app.get('/api/quote', requireCustomerAuth, async (req, res) => {
       price,
       requestData: {
         serviceType,
-        serviceMode: isQueueTask ? 'queue' : 'normal',
+        serviceMode: resolvedServiceMode,
         serviceKey,
         speedType,
-        pickupAddress: from || '',
-        dropoffAddress: to || '',
+        pickupAddress: from,
+        dropoffAddress: to,
         advancePayment,
         itemSize,
+        queueMinutes,
+        taskMinutes,
       },
       dynamicPricing,
-      source: 'api_quote',
+      source: req.customerAuth
+        ? 'api_quote_member'
+        : 'api_quote_public',
     });
 
     const serviceSubtotal = Math.max(
@@ -22929,20 +23107,38 @@ app.get('/api/quote', requireCustomerAuth, async (req, res) => {
       Math.round(Number(price.total || 0))
     );
 
-    const customerPayableTotal = serviceSubtotal + advancePayment;
+    const customerPayableTotal =
+      serviceSubtotal +
+      advancePayment;
+
+    const responseDistanceText =
+      isQueueTask
+        ? '排隊任務'
+        : isCustomTask && !to
+          ? '單點任務'
+          : distance?.distanceText || '';
+
+    const responseDurationText =
+      isQueueTask
+        ? `${queueMinutes} 分鐘內`
+        : isCustomTask && !to
+          ? `${taskMinutes} 分鐘內`
+          : distance?.durationText || '';
 
     return res.json({
       success: true,
+      authenticated: !!req.customerAuth,
 
       serviceType,
-      serviceMode: isQueueTask ? 'queue' : 'normal',
+      serviceMode: resolvedServiceMode,
 
-      distanceText: isQueueTask ? '排隊任務' : distance.distanceText,
-      durationText: isQueueTask ? `${queueMinutes} 分鐘內` : distance.durationText,
-      distanceMeters: isQueueTask ? 0 : distance.distanceMeters,
-      durationSeconds: isQueueTask ? 0 : distance.durationSeconds,
+      distanceText: responseDistanceText,
+      durationText: responseDurationText,
+      distanceMeters: distance?.distanceMeters || 0,
+      durationSeconds: distance?.durationSeconds || 0,
 
       queueMinutes,
+      taskMinutes,
 
       speedType,
       speedLabel: speed.label,
@@ -22959,17 +23155,22 @@ app.get('/api/quote', requireCustomerAuth, async (req, res) => {
       expiresAtMs: quoteSnapshot.expiresAtMs,
       quoteExpiresInSeconds: Math.max(
         0,
-        Math.floor((quoteSnapshot.expiresAtMs - Date.now()) / 1000)
+        Math.floor(
+          (quoteSnapshot.expiresAtMs - Date.now()) / 1000
+        )
       ),
 
-      // 給快速估價頁直接顯示用
       total: customerPayableTotal,
     });
+
   } catch (error) {
     console.error('❌ API 估價失敗：', error);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
-      error: '估價失敗，請確認地址是否正確'
+      error:
+        error?.message ||
+        '估價失敗，請確認地址是否正確',
     });
   }
 });
