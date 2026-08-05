@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R27 Native｜根治首頁導航浮動；視覺視窗即時校正；保留無白區啟動畫面 -->
+<!-- UBee 正式營運版：2026-08-05 R28 Native｜首頁改為固定App視窗；底部導航永久貼底；保留無白區啟動畫面 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -24288,164 +24288,228 @@ body:not(.ubee-r24-yellow-starting):not(.ubee-customer-auth-open) > #ubeePersist
 </style>
 
 
-<style id="ubee-r27-visual-viewport-navigation-fix">
+<style id="ubee-r28-fixed-app-viewport">
 /* =========================================================
-   UBee R27｜iPhone 首頁切入後底部導航浮動根治
-   問題來源：
-   啟動畫面解除 overflow:hidden 後，iOS 可能暫時沿用舊的 layout viewport，
-   fixed 導航會停在舊視窗底部，直到使用者手動拖動才重新計算。
+   UBee R28｜首頁固定 App 視窗＋底部導航永久貼底
+   問題根源：
+   首頁雖然有 fixed 導航，但 html/body 仍然可以成為外層捲動容器。
+   啟動畫面解除後，iPhone 可能保留外層頁面的暫時捲動偏移，
+   造成導航看起來浮在畫面底部上方，直到使用者手動拖動才復位。
 
-   修正方式：
-   1. 以 visualViewport 與 layout viewport 的即時差值校正導航 Y 位置。
-   2. 首頁切入後連續多幀重新測量，不依賴使用者手動滑動。
-   3. 導航仍是 body 直屬的同一個 fixed 節點，不重建、不浮動。
+   R28 改為：
+   1. 正式首頁啟用後，html/body 永遠不捲動。
+   2. productionOrderFlow 成為固定於視窗的唯一 App 根層。
+   3. 每一頁只在自己的 flow-scroll / flow-home-scroll 內捲動。
+   4. 底部導航是 body 直屬 fixed 層，完全不參與內容捲動。
    ========================================================= */
-:root{
-  --ubee-r27-nav-bottom-shift:0px;
-}
 
-body:not(.ubee-r24-yellow-starting):not(.ubee-customer-auth-open) > #ubeePersistentBottomNav{
-  position:fixed!important;
-  inset:auto 0 0 0!important;
-  left:0!important;
-  right:0!important;
-  top:auto!important;
-  bottom:0!important;
+html.ubee-r28-app-viewport,
+html.ubee-r28-app-viewport body{
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  max-height:100%!important;
   margin:0!important;
-  translate:none!important;
-  transform:translate3d(0,var(--ubee-r27-nav-bottom-shift),0)!important;
-  transform-origin:center bottom!important;
-  will-change:transform!important;
-  backface-visibility:hidden!important;
-  -webkit-backface-visibility:hidden!important;
-  contain:layout paint style!important;
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+  -webkit-overflow-scrolling:auto!important;
+  background:#ffffff!important;
 }
 
-/* 避免首頁切入時任何舊 transition 造成導航看起來漂移。 */
-body > #ubeePersistentBottomNav,
-body > #ubeePersistentBottomNav > button{
-  transition:none!important;
-  animation:none!important;
+html.ubee-r28-app-viewport body{
+  position:relative!important;
+  inset:auto!important;
+  touch-action:manipulation!important;
+}
+
+/* 正式首頁根層直接固定在視窗，不再受 body 捲動位置影響。 */
+html.ubee-r28-app-viewport #productionOrderFlow{
+  position:fixed!important;
+  inset:0!important;
+  top:0!important;
+  right:0!important;
+  bottom:0!important;
+  left:0!important;
+  width:100vw!important;
+  height:100vh!important;
+  height:100dvh!important;
+  min-height:0!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  transform:none!important;
+  translate:none!important;
+  background:#ffffff!important;
+}
+
+/* App 內容只佔到固定導航上緣。 */
+html.ubee-r28-app-viewport #productionOrderFlow .flow-shell{
+  position:absolute!important;
+  inset:0 0 var(--ubee-r24-nav-total-height) 0!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  transform:none!important;
+  translate:none!important;
+}
+
+html.ubee-r28-app-viewport #productionOrderFlow .flow-page{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  transform:none!important;
+  translate:none!important;
+}
+
+/* 只有頁面內部內容可以上下滑動。 */
+html.ubee-r28-app-viewport #productionOrderFlow .flow-scroll,
+html.ubee-r28-app-viewport #productionOrderFlow .flow-home-scroll,
+html.ubee-r28-app-viewport #productionOrderFlow .ubee-my-scroll,
+html.ubee-r28-app-viewport #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  min-height:0!important;
+  max-height:100%!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
 }
 
 /*
- * iOS 安全區只計算一次：
- * 導航總高度包含 safe-area，內容頁只避開相同總高度。
+ * 唯一正式導航：永遠貼齊視窗底部。
+ * 不使用 transform、不使用 viewport 差值、不依賴 scroll 事件。
  */
-#productionOrderFlow .flow-page{
-  bottom:var(--ubee-r24-nav-total-height)!important;
-  padding-bottom:0!important;
+html.ubee-r28-app-viewport body > #ubeePersistentBottomNav{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  top:auto!important;
+  right:0!important;
+  bottom:0!important;
+  left:0!important;
+  width:100vw!important;
+  min-width:100vw!important;
+  max-width:none!important;
+  height:var(--ubee-r24-nav-total-height)!important;
+  min-height:var(--ubee-r24-nav-total-height)!important;
+  margin:0!important;
+  padding:0 0 env(safe-area-inset-bottom)!important;
+  display:grid!important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  transform:none!important;
+  translate:none!important;
+  will-change:auto!important;
+  contain:none!important;
+  background:#ffffff!important;
+  z-index:2147483000!important;
 }
 
-html.ubee-r27-home-settling,
-body.ubee-r27-home-settling{
-  overscroll-behavior:none!important;
+/* 啟動畫面期間保留 R26：導航不可見，動畫結束後原位恢復。 */
+html.ubee-r28-app-viewport body.ubee-r24-yellow-starting > #ubeePersistentBottomNav{
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+
+/* 登入／註冊全畫面開啟時才隱藏正式導航。 */
+html.ubee-r28-app-viewport body.ubee-customer-auth-open > #ubeePersistentBottomNav{
+  display:none!important;
 }
 </style>
 
-<script id="ubee-r27-visual-viewport-navigation-controller">
+<script id="ubee-r28-fixed-app-viewport-controller">
 (()=>{
   'use strict';
 
-  let rafId = 0;
-  let settleTimers = [];
+  const root = document.documentElement;
 
-  const clearSettleTimers = () => {
-    settleTimers.forEach(timer => clearTimeout(timer));
-    settleTimers = [];
+  const resetOuterViewport = () => {
+    const scrollingElement = document.scrollingElement || document.documentElement;
+
+    try{
+      scrollingElement.scrollTop = 0;
+      scrollingElement.scrollLeft = 0;
+    }catch(_){}
+
+    try{
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }catch(_){}
+
+    try{
+      window.scrollTo(0,0);
+    }catch(_){}
   };
 
-  const getLayoutViewportHeight = () => {
-    const clientHeight = Number(document.documentElement?.clientHeight || 0);
-    const innerHeight = Number(window.innerHeight || 0);
-    return Math.max(clientHeight, innerHeight, 0);
+  const mountNavigationToBody = () => {
+    const nav =
+      document.getElementById('ubeePersistentBottomNav') ||
+      document.querySelector('#productionOrderFlow .flow-bottom-nav');
+
+    if(!nav) return;
+
+    nav.id = 'ubeePersistentBottomNav';
+    nav.classList.add('flow-bottom-nav');
+
+    if(nav.parentElement !== document.body){
+      document.body.appendChild(nav);
+    }
   };
 
-  const updateNavigationViewportPosition = () => {
-    const nav = document.getElementById('ubeePersistentBottomNav');
-    if(!nav || document.body.classList.contains('ubee-r24-yellow-starting')) return;
-
-    const vv = window.visualViewport;
-    const layoutHeight = getLayoutViewportHeight();
+  const activateFixedAppViewport = () => {
+    mountNavigationToBody();
+    resetOuterViewport();
+    root.classList.add('ubee-r28-app-viewport');
 
     /*
-     * visual viewport 若比目前 layout viewport 更向下延伸，
-     * fixed 導航會看起來浮在上方。將差值轉成向下位移即可貼齊真實底部。
+     * 加入固定 App 視窗後，再連續兩幀清除瀏覽器殘留的外層捲動偏移。
+     * 這不是計算導航位移，而是確保外層永遠保持 scrollTop = 0。
      */
-    let bottomGap = 0;
-    if(vv && layoutHeight > 0){
-      const visualBottom = Number(vv.offsetTop || 0) + Number(vv.height || 0);
-      bottomGap = Math.max(0, visualBottom - layoutHeight);
-    }
-
-    /*
-     * 只接受合理的瀏覽器工具列／視窗差值，避免鍵盤開啟時把導航推到鍵盤下方。
-     */
-    if(!Number.isFinite(bottomGap) || bottomGap < 0 || bottomGap > 160){
-      bottomGap = 0;
-    }
-
-    document.documentElement.style.setProperty(
-      '--ubee-r27-nav-bottom-shift',
-      `${bottomGap.toFixed(2)}px`
-    );
-
-    /* 強制讀取一次幾何資訊，讓 iOS 在本幀提交 fixed 位置。 */
-    void nav.getBoundingClientRect().bottom;
-  };
-
-  const scheduleNavigationUpdate = () => {
-    cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(()=>{
-      requestAnimationFrame(updateNavigationViewportPosition);
+    requestAnimationFrame(()=>{
+      resetOuterViewport();
+      requestAnimationFrame(resetOuterViewport);
     });
   };
 
-  const settleHomeViewport = () => {
-    clearSettleTimers();
-
-    document.documentElement.classList.add('ubee-r27-home-settling');
-    document.body.classList.add('ubee-r27-home-settling');
-
-    /*
-     * 啟動畫面曾鎖住 body；切回首頁時先將根捲動位置歸零，
-     * 再於 iOS 常見的 viewport 更新時間點重新校正。
-     */
-    try{
-      window.scrollTo({top:0,left:0,behavior:'auto'});
-    }catch(_){
-      window.scrollTo(0,0);
-    }
-
-    const delays = [0,40,100,180,320,520,800];
-    settleTimers = delays.map(delay => setTimeout(()=>{
-      scheduleNavigationUpdate();
-
-      if(delay === delays[delays.length - 1]){
-        document.documentElement.classList.remove('ubee-r27-home-settling');
-        document.body.classList.remove('ubee-r27-home-settling');
-      }
-    },delay));
-  };
-
-  window.addEventListener('ubee:customer-home-ready',settleHomeViewport);
-  window.addEventListener('pageshow',settleHomeViewport);
-  window.addEventListener('orientationchange',()=>{
-    setTimeout(settleHomeViewport,120);
-  });
-
-  window.addEventListener('resize',scheduleNavigationUpdate,{passive:true});
-  window.addEventListener('scroll',scheduleNavigationUpdate,{passive:true});
-
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize',scheduleNavigationUpdate,{passive:true});
-    window.visualViewport.addEventListener('scroll',scheduleNavigationUpdate,{passive:true});
-  }
+  /*
+   * 啟動畫面結束、首頁真正顯示時立即啟用固定 App 視窗。
+   */
+  window.addEventListener(
+    'ubee:customer-home-ready',
+    activateFixedAppViewport
+  );
 
   /*
-   * 首次載入也先校正一次；真正首頁切入時會由 home-ready 再完整校正。
+   * PWA 從背景回來或 bfcache 還原時，同樣重新鎖定外層視窗。
    */
-  scheduleNavigationUpdate();
+  window.addEventListener('pageshow',activateFixedAppViewport);
+
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState === 'visible'){
+      activateFixedAppViewport();
+    }
+  });
+
+  window.addEventListener('orientationchange',()=>{
+    setTimeout(activateFixedAppViewport,80);
+  });
+
+  /*
+   * 腳本位於 body 尾端，先掛載導航；啟動畫面期間由 R26 規則隱藏。
+   */
+  mountNavigationToBody();
+  resetOuterViewport();
 })();
 </script>
 
