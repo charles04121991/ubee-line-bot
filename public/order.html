@@ -8672,6 +8672,21 @@ body.ubee-app-starting::before{
 }
 </style>
 
+
+<style id="ubee-support-headset-icon-style">
+/* 首頁右上角客服：改為直覺的耳機客服圖示 */
+.ubee-support-headset-icon{
+  display:block;
+  width:25px;
+  height:25px;
+  pointer-events:none;
+}
+.flow-icon-btn .ubee-support-headset-icon,
+.uca-icon-btn .ubee-support-headset-icon{
+  width:23px;
+  height:23px;
+}
+</style>
 </head>
 <body class="ubee-app-starting" style="background:#facc15;">
 
@@ -9299,7 +9314,12 @@ body.ubee-app-starting::before{
 <header class="uca-topbar">
 <span></span>
 <div class="uca-brand"><span>U</span>Bee 跑腿</div>
-<button aria-label="客服" class="uca-icon-btn" data-uca-support="" type="button">•••</button>
+<button aria-label="客服中心" class="uca-icon-btn" data-uca-support="" title="客服中心" type="button"><svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M4 13v-1a8 8 0 0 1 16 0v1"></path>
+<path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path>
+<path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path>
+<path d="M17 18c0 2-1.5 3-4 3h-1"></path>
+</svg></button>
 </header>
 <div class="uca-scroll uca-welcome-scroll">
 <div class="uca-hero">
@@ -9422,10 +9442,10 @@ body.ubee-app-starting::before{
 </div>
 </div>
 <div class="uca-register-step" data-uca-step="4">
-<div class="uca-heading"><h2>設定使用偏好</h2><p class="uca-subtitle">必要的任務通知會維持開啟，其他訊息由你自行決定。</p></div>
+<div class="uca-heading"><h2>設定使用偏好</h2><p class="uca-subtitle">App 內會持續顯示必要任務狀態；裝置推播可在設定中開啟或關閉。</p></div>
 <div class="uca-panel">
 <div class="uca-choice-list">
-<label class="uca-choice"><input checked="" disabled="" type="checkbox"/><span><strong>任務狀態通知</strong><small>接單、取件、配送、完成及任務異常等必要通知。</small></span></label>
+<label class="uca-choice"><input checked="" disabled="" type="checkbox"/><span><strong>App 內任務狀態</strong><small>接單、取件、配送、完成及異常會在訂單頁持續同步；裝置推播可另外設定。</small></span></label>
 <label class="uca-choice"><input checked="" disabled="" type="checkbox"/><span><strong>付款與安全通知</strong><small>付款狀態、帳號安全及重要客服處理資訊。</small></span></label>
 <label class="uca-choice"><input checked="" id="ucaPrefImportant" type="checkbox"/><span><strong>平台重要公告</strong><small>服務區域、營運時間或系統重要調整。</small></span></label>
 <label class="uca-choice"><input id="ucaPrefMarketing" type="checkbox"/><span><strong>優惠與活動訊息</strong><small>不是註冊必要條件，之後可再調整。</small></span></label>
@@ -9822,26 +9842,11 @@ body.ubee-app-starting::before{
 </button>
 <!-- 右側：客服 -->
 <button aria-label="客服中心" class="icon-btn topbar-support" onclick="openUBeeSupportCenter()" type="button">
-<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<path d="
-          M4 5.5
-          A3.5 3.5 0 0 1 7.5 2
-          h9
-          A3.5 3.5 0 0 1 20 5.5
-          v6
-          A3.5 3.5 0 0 1 16.5 15
-          H11
-          l-4.5 4
-          v-4
-          A3.5 3.5 0 0 1 3 11.5
-          v-6
-          z
-        "></path>
-<path d="
-          M8 8h.01
-          M12 8h.01
-          M16 8h.01
-        "></path>
+<svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M4 13v-1a8 8 0 0 1 16 0v1"></path>
+<path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path>
+<path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path>
+<path d="M17 18c0 2-1.5 3-4 3h-1"></path>
 </svg>
 </button>
 <!-- 保留給原本 JavaScript 使用，但不顯示 -->
@@ -19574,7 +19579,12 @@ body.flow-active>.app{display:none!important;}
 <header class="flow-header home">
 <div class="flow-brand"><span>U</span>Bee 跑腿</div>
 <button class="flow-city-btn" id="flowCityButton" type="button">正在取得位置…</button>
-<button aria-label="客服" class="flow-icon-btn" id="flowSupportButton" type="button">•••</button>
+<button aria-label="客服中心" class="flow-icon-btn" id="flowSupportButton" title="客服中心" type="button"><svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<path d="M4 13v-1a8 8 0 0 1 16 0v1"></path>
+<path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path>
+<path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path>
+<path d="M17 18c0 2-1.5 3-4 3h-1"></path>
+</svg></button>
 </header>
 <div class="flow-progress" data-progress="0"></div>
 <div class="flow-scroll flow-home-scroll">
@@ -19731,6 +19741,11 @@ body.flow-active>.app{display:none!important;}
 </div>
 <div class="flow-card"><div class="flow-summary-list" id="flowSummaryList"></div></div>
 <div class="flow-card flow-price-card"><div><small>正式估價</small><div class="flow-route-meta" id="flowRouteMeta">正在計算路線與費用</div></div><div class="flow-price" id="flowConfirmPrice">—</div></div>
+<div class="ubee-order-push-row" id="ubeeOrderPushRow" data-push-state="checking">
+<span class="ubee-order-push-icon" aria-hidden="true">🔔</span>
+<span class="ubee-order-push-copy"><strong>接收訂單進度通知</strong><small id="ubeeOrderPushDescription">正在確認這台裝置的通知設定。</small></span>
+<button class="ubee-setting-switch" id="ubeeOrderPushToggle" type="button" role="switch" data-ubee-push-toggle aria-checked="false" aria-label="接收訂單進度通知"></button>
+</div>
 <label class="flow-check"><input id="flowAgree" type="checkbox"/><span>我已確認取件地點、送達地點、聯絡資訊、任務內容、執行時間與費用。</span></label>
 <div class="flow-status" id="flowConfirmStatus"></div>
 <div class="flow-actionbar"><button class="flow-secondary" data-go="options" type="button">上一步</button><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div></div>
@@ -20824,34 +20839,6 @@ body.flow-active>.app{display:none!important;}
       `);
     }
 
-    if(!byId('ubeeCustomerPushCardTracking')){
-      const rider = byId('ubeeCustomerRiderCard');
-      rider?.insertAdjacentHTML('afterend', pushCardHtml('ubeeCustomerPushCardTracking'));
-    }
-  }
-
-  function pushCardHtml(id){
-    return `
-      <section id="${id}" class="ubee-customer-push-card" data-ubee-push-card>
-        <div class="ubee-customer-push-main">
-          <div class="ubee-customer-push-icon">🔔</div>
-          <div class="ubee-customer-push-copy">
-            <strong data-ubee-push-title>開啟訂單進度通知</strong>
-            <span data-ubee-push-text>離開畫面後，小U接單、取件、配送與送達時仍可收到通知。</span>
-          </div>
-        </div>
-        <div class="ubee-customer-push-actions">
-          <button class="ubee-customer-push-button" type="button" data-ubee-push-enable>開啟通知</button>
-          <button class="ubee-customer-push-button secondary" type="button" data-ubee-push-disable hidden>關閉此裝置通知</button>
-        </div>
-      </section>
-    `;
-  }
-
-  function ensureHomePushCard(){
-    const scroll = document.querySelector('#productionOrderFlow .flow-home-scroll');
-    if(!scroll || byId('ubeeCustomerPushCardHome')) return;
-    scroll.insertAdjacentHTML('afterbegin', pushCardHtml('ubeeCustomerPushCardHome'));
   }
 
   function renderRider(order){
@@ -20909,7 +20896,6 @@ body.flow-active>.app{display:none!important;}
     ensureLegacyTaskTab();
     ensureFlowTaskTab();
     ensureTrackingCards();
-    ensureHomePushCard();
     renderRider(order || (typeof currentOrderData !== 'undefined' ? currentOrderData : null));
     renderProgress(order || (typeof currentOrderData !== 'undefined' ? currentOrderData : null));
     renderStage(order || (typeof currentOrderData !== 'undefined' ? currentOrderData : null));
@@ -20939,7 +20925,6 @@ body.flow-active>.app{display:none!important;}
     byId('flowNavHome')?.classList.add('active');
     byId('flowNavTasks')?.classList.remove('active');
     byId('flowNavMy')?.classList.remove('active');
-    ensureHomePushCard();
     syncPushUi();
     return true;
   }
@@ -21019,49 +21004,95 @@ body.flow-active>.app{display:none!important;}
     }finally{pushBusy = false}
   }
 
+  async function getCustomerPushState(){
+    try{
+      if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported';
+      if(Notification.permission === 'denied') return 'denied';
+      return (await currentPushSubscription()) ? 'enabled' : 'disabled';
+    }catch(_){
+      return 'disabled';
+    }
+  }
+
   async function syncPushUi(forcedState='',forcedMessage=''){
     const cards = [...document.querySelectorAll('[data-ubee-push-card]')];
-    if(!cards.length) return;
-    let state = forcedState;
-    let message = forcedMessage;
-    try{
-      if(!state){
-        if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) state = 'unsupported';
-        else if(Notification.permission === 'denied') state = 'denied';
-        else state = (await currentPushSubscription()) ? 'enabled' : 'disabled';
-      }
-    }catch(_){state = 'disabled'}
+    const toggles = [...document.querySelectorAll('[data-ubee-push-toggle]')];
+    let state = forcedState || await getCustomerPushState();
+    const message = forcedMessage || '';
+
+    const descriptions = {
+      enabled:'已開啟；小U接單、取件、配送與送達時會通知這台裝置。',
+      disabled:'開啟後，即使離開畫面也能收到訂單進度。',
+      denied:'通知權限已被封鎖，請到手機設定允許 UBee 通知。',
+      unsupported:'目前環境不支援推播，訂單頁仍會持續同步進度。',
+      error:message || '通知設定尚未完成，請稍後再試。'
+    };
+
+    toggles.forEach(toggle => {
+      toggle.setAttribute('aria-checked',state === 'enabled' ? 'true' : 'false');
+      toggle.setAttribute('aria-disabled',state === 'unsupported' ? 'true' : 'false');
+      toggle.dataset.pushState = state;
+      const row = toggle.closest('[data-push-state]');
+      if(row) row.dataset.pushState = state;
+    });
+
+    const settingsDescription = document.getElementById('ubeeSettingsPushDescription');
+    if(settingsDescription) settingsDescription.textContent = descriptions[state] || descriptions.disabled;
+    const orderDescription = document.getElementById('ubeeOrderPushDescription');
+    if(orderDescription){
+      orderDescription.textContent = state === 'enabled'
+        ? '已開啟；這台裝置會接收目前與後續訂單進度。'
+        : state === 'disabled'
+          ? '開啟後，可接收小U接單、取件、配送與送達通知。'
+          : descriptions[state] || descriptions.disabled;
+    }
 
     cards.forEach(card => {
       card.classList.toggle('is-enabled',state === 'enabled');
       card.classList.toggle('is-error',['error','denied','unsupported'].includes(state));
       const title = card.querySelector('[data-ubee-push-title]');
-      const text = card.querySelector('[data-ubee-push-text]');
+      const copy = card.querySelector('[data-ubee-push-text]');
       const enable = card.querySelector('[data-ubee-push-enable]');
       const disable = card.querySelector('[data-ubee-push-disable]');
+      if(!title || !copy || !enable || !disable) return;
       if(state === 'enabled'){
         title.textContent = '訂單進度通知已開啟';
-        text.textContent = '小U接單、取件、配送與送達時，這台裝置可以收到通知。';
-        enable.hidden = true; disable.hidden = false;
+        copy.textContent = descriptions.enabled;
+        enable.hidden = true;
+        disable.hidden = false;
       }else if(state === 'denied'){
         title.textContent = '通知權限目前被封鎖';
-        text.textContent = '請到手機或瀏覽器設定中允許 UBee 通知，再回到此頁重新開啟。';
-        enable.textContent = '重新檢查'; enable.hidden = false; disable.hidden = true;
+        copy.textContent = descriptions.denied;
+        enable.textContent = '重新檢查';
+        enable.hidden = false;
+        disable.hidden = true;
       }else if(state === 'unsupported'){
         title.textContent = '此環境暫時無法使用推播';
-        text.textContent = '訂單頁仍會自動同步最新進度，不影響即時追蹤。';
-        enable.hidden = true; disable.hidden = true;
+        copy.textContent = descriptions.unsupported;
+        enable.hidden = true;
+        disable.hidden = true;
       }else if(state === 'error'){
         title.textContent = '通知設定尚未完成';
-        text.textContent = message || '請稍後重新嘗試。';
-        enable.textContent = '重新開啟'; enable.hidden = false; disable.hidden = true;
+        copy.textContent = descriptions.error;
+        enable.textContent = '重新開啟';
+        enable.hidden = false;
+        disable.hidden = true;
       }else{
         title.textContent = '開啟訂單進度通知';
-        text.textContent = '離開畫面後，小U接單、取件、配送與送達時仍可收到通知。';
-        enable.textContent = '開啟通知'; enable.hidden = false; disable.hidden = true;
+        copy.textContent = descriptions.disabled;
+        enable.textContent = '開啟通知';
+        enable.hidden = false;
+        disable.hidden = true;
       }
     });
+
+    return state;
   }
+
+  window.ubeeSyncCustomerPushUi = syncPushUi;
+  window.ubeeEnableCustomerPush = enableCustomerPush;
+  window.ubeeDisableCustomerPush = disableCustomerPush;
+  window.ubeeGetCustomerPushState = getCustomerPushState;
 
   async function openPushOrderFromUrl(){
     const params = new URLSearchParams(location.search);
@@ -21079,9 +21110,28 @@ body.flow-active>.app{display:none!important;}
     return false;
   }
 
-  document.addEventListener('click', event => {
-    if(event.target.closest('[data-ubee-push-enable]')) enableCustomerPush();
-    if(event.target.closest('[data-ubee-push-disable]')) disableCustomerPush();
+  document.addEventListener('click', async event => {
+    const toggle = event.target.closest('[data-ubee-push-toggle]');
+    if(toggle){
+      event.preventDefault();
+      event.stopPropagation();
+      if(pushBusy) return;
+      const state = toggle.dataset.pushState || await getCustomerPushState();
+      if(state === 'enabled'){
+        await disableCustomerPush();
+      }else if(state === 'denied'){
+        alert('通知權限已被封鎖。請到手機或瀏覽器的網站設定中允許 UBee 通知，再回到這裡重新開啟。');
+        await syncPushUi('denied');
+      }else if(state === 'unsupported'){
+        alert('目前這個瀏覽器或開啟方式不支援訂單推播通知。');
+        await syncPushUi('unsupported');
+      }else{
+        await enableCustomerPush();
+      }
+      return;
+    }
+    if(event.target.closest('[data-ubee-push-enable]')) await enableCustomerPush();
+    if(event.target.closest('[data-ubee-push-disable]')) await disableCustomerPush();
     if(event.target.closest('[data-ubee-support]')){
       window.location.href = '/support.html';
     }
@@ -21112,7 +21162,7 @@ body.flow-active>.app{display:none!important;}
   if(typeof previousAuth === 'function'){
     window.onUBeeCustomerAuthenticated = async function(){
       const result = await previousAuth.apply(this,arguments);
-      setTimeout(() => {ensureHomePushCard();syncPushUi();openPushOrderFromUrl()},350);
+      setTimeout(() => {syncPushUi();openPushOrderFromUrl()},350);
       return result;
     };
   }
@@ -21123,7 +21173,6 @@ body.flow-active>.app{display:none!important;}
   ensureLegacyTaskTab();
   ensureFlowTaskTab();
   ensureTrackingCards();
-  ensureHomePushCard();
   renderAppTracking(typeof currentOrderData !== 'undefined' ? currentOrderData : null);
   syncPushUi();
   setInterval(() => renderAppTracking(typeof currentOrderData !== 'undefined' ? currentOrderData : null),5000);
@@ -21134,7 +21183,7 @@ body.flow-active>.app{display:none!important;}
      UBee 用戶端 APP 導覽與設定完整修正版｜2026-08-04 V2
      - 任務頁重新向後端確認進行中訂單，避免本機舊資料誤判。
      - 我的所有入口使用真正的 App 內頁，支援返回按鈕與手機返回鍵。
-     - 設定新增通知、定位、震動、減少動畫、安裝 App、更新、清除草稿等功能。
+     - 訂單通知改為設定列開關，並與確認任務頁同步；不再顯示重複大型通知卡。
      - 保留既有下單、估價、付款、地圖及即時追蹤核心流程。
      ========================================================= -->
 <style id="ubee-app-settings-style">
@@ -21291,18 +21340,34 @@ body.flow-active>.app{display:none!important;}
   }
 
   #productionOrderFlow .ubee-setting-switch{
+    position:relative !important;
     width:49px !important;
     height:29px !important;
+    min-width:49px !important;
     flex:0 0 49px !important;
+    padding:0 !important;
+    border:0 !important;
     border-radius:999px !important;
     background:#d4d7da !important;
+    box-shadow:none !important;
+    appearance:none !important;
+    -webkit-appearance:none !important;
+    cursor:pointer !important;
+    transition:background .18s ease,opacity .18s ease !important;
   }
 
   #productionOrderFlow .ubee-setting-switch::after{
+    content:"" !important;
+    position:absolute !important;
     top:3px !important;
     left:3px !important;
     width:23px !important;
     height:23px !important;
+    border-radius:50% !important;
+    background:#fff !important;
+    box-shadow:0 1px 4px rgba(0,0,0,.18) !important;
+    transform:translateX(0) !important;
+    transition:transform .18s ease !important;
   }
 
   #productionOrderFlow .ubee-setting-switch[aria-checked="true"]{
@@ -21312,6 +21377,71 @@ body.flow-active>.app{display:none!important;}
   #productionOrderFlow .ubee-setting-switch[aria-checked="true"]::after{
     transform:translateX(20px) !important;
     background:#fff !important;
+  }
+
+  #productionOrderFlow .ubee-setting-switch[aria-disabled="true"]{
+    opacity:.45 !important;
+    cursor:not-allowed !important;
+  }
+
+  #productionOrderFlow .ubee-settings-row[data-push-state="denied"] .ubee-settings-icon,
+  #productionOrderFlow .ubee-settings-row[data-push-state="error"] .ubee-settings-icon{
+    background:#fff0f0;
+    color:#c73535;
+  }
+
+  #productionOrderFlow .ubee-order-push-row{
+    display:grid;
+    grid-template-columns:38px minmax(0,1fr) auto;
+    align-items:center;
+    gap:11px;
+    margin:0 0 12px;
+    padding:12px 13px;
+    border:1px solid #e6e8ea;
+    border-radius:17px;
+    background:#fff;
+  }
+
+  #productionOrderFlow .ubee-order-push-icon{
+    display:grid;
+    place-items:center;
+    width:34px;
+    height:34px;
+    border-radius:11px;
+    background:#fff4bf;
+    font-size:17px;
+  }
+
+  #productionOrderFlow .ubee-order-push-copy{
+    min-width:0;
+  }
+
+  #productionOrderFlow .ubee-order-push-copy strong{
+    display:block;
+    color:#111;
+    font-size:14px;
+    font-weight:1000;
+    line-height:1.35;
+  }
+
+  #productionOrderFlow .ubee-order-push-copy small{
+    display:block;
+    margin-top:3px;
+    color:#7b8086;
+    font-size:11px;
+    font-weight:800;
+    line-height:1.45;
+  }
+
+  #productionOrderFlow .ubee-order-push-row[data-push-state="enabled"]{
+    border-color:#c7e4cf;
+    background:#f5fff8;
+  }
+
+  #productionOrderFlow .ubee-order-push-row[data-push-state="denied"],
+  #productionOrderFlow .ubee-order-push-row[data-push-state="error"]{
+    border-color:#efcaca;
+    background:#fff7f7;
   }
 
   #productionOrderFlow .ubee-settings-danger{
@@ -21367,10 +21497,7 @@ body.flow-active>.app{display:none!important;}
     display:none !important;
   }
 
-  /* 通知權限改由「我的 → 設定」管理，不阻擋客人開始下單。 */
-  #productionOrderFlow #ubeeCustomerPushCardHome{
-    display:none !important;
-  }
+  /* 通知權限改由「我的 → 設定」與確認任務頁的同步開關管理。 */
 
   #productionOrderFlow .flow-header{
     min-height:64px !important;
@@ -21470,7 +21597,7 @@ body.flow-active>.app{display:none!important;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.05.2';
+  const APP_VERSION = '2026.08.05.3';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -21665,21 +21792,6 @@ body.flow-active>.app{display:none!important;}
     panel.innerHTML = `
       <div class="ubee-my-panel-head"><strong>設定</strong><button type="button" data-my-close aria-label="返回我的">‹</button></div>
 
-      <div class="ubee-settings-section-title">訂單通知</div>
-      <section id="ubeeSettingsPushCard" class="ubee-customer-push-card" data-ubee-push-card>
-        <div class="ubee-customer-push-main">
-          <div class="ubee-customer-push-icon">🔔</div>
-          <div class="ubee-customer-push-copy">
-            <strong data-ubee-push-title>正在檢查通知狀態</strong>
-            <span data-ubee-push-text>請稍候，正在確認這台裝置的通知設定。</span>
-          </div>
-        </div>
-        <div class="ubee-customer-push-actions">
-          <button class="ubee-customer-push-button" type="button" data-ubee-push-enable>開啟通知</button>
-          <button class="ubee-customer-push-button secondary" type="button" data-ubee-push-disable hidden>關閉此裝置通知</button>
-        </div>
-      </section>
-
       <div class="ubee-settings-section-title">App 使用體驗</div>
       <div class="ubee-settings-list">
         <div class="ubee-settings-row">
@@ -21701,6 +21813,11 @@ body.flow-active>.app{display:none!important;}
 
       <div class="ubee-settings-section-title">權限與裝置</div>
       <div class="ubee-settings-list">
+        <div class="ubee-settings-row" id="ubeeSettingsPushRow" data-push-state="checking">
+          <span class="ubee-settings-icon">🔔</span>
+          <span class="ubee-settings-copy"><strong>訂單進度通知</strong><small id="ubeeSettingsPushDescription">正在確認這台裝置的通知設定。</small></span>
+          <button class="ubee-setting-switch" id="ubeeSettingsPushToggle" type="button" role="switch" data-ubee-push-toggle aria-checked="false" aria-label="訂單進度通知"></button>
+        </div>
         <button class="ubee-settings-row" type="button" data-settings-action="location">
           <span class="ubee-settings-icon">📍</span>
           <span class="ubee-settings-copy"><strong>重新取得目前位置</strong><small>重新檢查定位權限並更新目前服務地區</small></span>
@@ -21806,51 +21923,8 @@ body.flow-active>.app{display:none!important;}
   }
 
   async function refreshPushCard(){
-    const card = document.getElementById('ubeeSettingsPushCard');
-    if(!card) return;
-    const title = card.querySelector('[data-ubee-push-title]');
-    const copy = card.querySelector('[data-ubee-push-text]');
-    const enable = card.querySelector('[data-ubee-push-enable]');
-    const disable = card.querySelector('[data-ubee-push-disable]');
-    let state = 'disabled';
-
-    try{
-      if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)){
-        state = 'unsupported';
-      }else if(Notification.permission === 'denied'){
-        state = 'denied';
-      }else if(await currentPushSubscriptionSafe()){
-        state = 'enabled';
-      }
-    }catch(_){
-      state = 'disabled';
-    }
-
-    card.classList.toggle('is-enabled',state === 'enabled');
-    card.classList.toggle('is-error',['unsupported','denied'].includes(state));
-
-    if(state === 'enabled'){
-      title.textContent = '訂單進度通知已開啟';
-      copy.textContent = '小U接單、取件、配送與送達時，這台裝置可以收到通知。';
-      enable.hidden = true;
-      disable.hidden = false;
-    }else if(state === 'denied'){
-      title.textContent = '通知權限已被封鎖';
-      copy.textContent = '請到手機或瀏覽器設定中允許 UBee 通知，再回到這裡重新檢查。';
-      enable.textContent = '重新檢查';
-      enable.hidden = false;
-      disable.hidden = true;
-    }else if(state === 'unsupported'){
-      title.textContent = '此環境不支援推播通知';
-      copy.textContent = '訂單追蹤頁仍會持續同步最新進度，不影響查看任務。';
-      enable.hidden = true;
-      disable.hidden = true;
-    }else{
-      title.textContent = '開啟訂單進度通知';
-      copy.textContent = '離開畫面後，小U接單、取件、配送與送達時仍可收到通知。';
-      enable.textContent = '開啟通知';
-      enable.hidden = false;
-      disable.hidden = true;
+    if(typeof window.ubeeSyncCustomerPushUi === 'function'){
+      await window.ubeeSyncCustomerPushUi();
     }
   }
 
@@ -22586,9 +22660,6 @@ body.flow-active>.app{display:none!important;}
       return;
     }
 
-    if(event.target.closest('#ubeeSettingsPushCard [data-ubee-push-enable],#ubeeSettingsPushCard [data-ubee-push-disable]')){
-      setTimeout(refreshPushCard,900);
-    }
   },true);
 
   document.addEventListener('keydown',event => {
