@@ -6,13 +6,13 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260805-4" rel="manifest"/>
+<link href="/manifest-order.json?v=20260805-5" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
-<meta content="default" name="apple-mobile-web-app-status-bar-style"/>
+<meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 <meta content="UBee 跑腿" name="apple-mobile-web-app-title"/>
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#facc15" name="theme-color"/>
@@ -8712,78 +8712,167 @@ body.ubee-app-starting::before{
   if(!startup) return;
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  const reducedMotion =
-    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  const animationSelector = [
+    '.ubee-startup-u',
+    '.ubee-startup-bee',
+    '.ubee-startup-service-dark',
+    '.ubee-startup-service-light',
+    '.ubee-startup-promise'
+  ].join(',');
 
-  const minimumVisibleTime = reducedMotion ? 420 : 1750;
-  const removeDelay = 0;
-  let finished = false;
+  let running = false;
+  let initialFinished = false;
+  let hiddenAt = 0;
+  let lastReplayAt = 0;
+  let runToken = 0;
 
   window.__ubeeCustomerHomeReady = false;
   window.ubeeWaitForCustomerHomeReady = function(){
     if(window.__ubeeCustomerHomeReady) return Promise.resolve();
-
     return new Promise(resolve=>{
-      window.addEventListener(
-        'ubee:customer-home-ready',
-        ()=>resolve(),
-        {once:true}
-      );
+      window.addEventListener('ubee:customer-home-ready',()=>resolve(),{once:true});
     });
   };
 
-  document.documentElement.classList.add('ubee-app-starting');
-  document.body.classList.add('ubee-app-starting');
+  const wait = ms => new Promise(resolve => window.setTimeout(resolve,ms));
 
-  if(themeMeta){
-    themeMeta.setAttribute('content','#facc15');
+  function waitForDomParsed(){
+    if(document.readyState !== 'loading') return Promise.resolve();
+    return new Promise(resolve => document.addEventListener('DOMContentLoaded',resolve,{once:true}));
   }
 
-  const finishStartup = () => {
-    if(finished) return;
-    finished = true;
+  function waitForVisibleDocument(){
+    if(!document.hidden) return Promise.resolve();
+    return new Promise(resolve => {
+      const handler = () => {
+        if(document.hidden) return;
+        document.removeEventListener('visibilitychange',handler);
+        resolve();
+      };
+      document.addEventListener('visibilitychange',handler);
+    });
+  }
+
+  function waitForActualPaint(){
+    return new Promise(resolve => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.setTimeout(resolve,48);
+        });
+      });
+    });
+  }
+
+  function restartLogoAnimations(){
+    const nodes = [...startup.querySelectorAll(animationSelector)];
+    nodes.forEach(node => { node.style.animation = 'none'; });
+    void startup.offsetWidth;
+    nodes.forEach(node => { node.style.removeProperty('animation'); });
+  }
+
+  function enterStartupMode(){
+    startup.hidden = false;
+    startup.classList.remove('is-leaving');
+    startup.removeAttribute('aria-hidden');
+    startup.style.pointerEvents = 'auto';
+    document.documentElement.classList.add('ubee-app-starting');
+    document.body.classList.add('ubee-app-starting');
+    document.documentElement.style.background = '#facc15';
+    document.body.style.background = '#facc15';
+    if(themeMeta) themeMeta.setAttribute('content','#facc15');
+    restartLogoAnimations();
+  }
+
+  function leaveStartupMode(token){
+    if(token !== runToken) return;
 
     startup.classList.add('is-leaving');
     startup.setAttribute('aria-hidden','true');
     startup.style.pointerEvents = 'none';
 
-    window.setTimeout(()=>{
+    /* 黃色畫面維持到最後一幀，然後直接切換，不做透明淡出。 */
+    requestAnimationFrame(() => {
+      if(token !== runToken) return;
       startup.hidden = true;
       startup.classList.remove('is-leaving');
-
       document.documentElement.classList.remove('ubee-app-starting');
       document.body.classList.remove('ubee-app-starting');
       document.documentElement.style.removeProperty('background');
       document.body.style.removeProperty('background');
+      if(themeMeta) themeMeta.setAttribute('content','#ffffff');
+      running = false;
+      initialFinished = true;
+      lastReplayAt = Date.now();
 
-      if(themeMeta){
-        themeMeta.setAttribute('content','#ffffff');
-      }
-
-      /*
-       * 正式導航已是 body 直屬 fixed 元素。
-       * 啟動 class 移除後由 CSS 原位顯示，不搬移、不計算位移、不操作捲動。
-       */
-      requestAnimationFrame(()=>{
-        const navigation =
-          document.getElementById('ubeePersistentBottomNav');
-
-        if(navigation){
-          void navigation.getBoundingClientRect().bottom;
-        }
-
-        requestAnimationFrame(()=>{
-          window.__ubeeCustomerHomeReady = true;
-          window.dispatchEvent(
-            new CustomEvent('ubee:customer-home-ready')
-          );
-        });
+      requestAnimationFrame(() => {
+        window.__ubeeCustomerHomeReady = true;
+        window.dispatchEvent(new CustomEvent('ubee:customer-home-ready'));
       });
-    },removeDelay);
-  };
+    });
+  }
 
-  window.setTimeout(finishStartup,minimumVisibleTime);
-  window.setTimeout(finishStartup,3000);
+  async function playStartup({hold=1450,waitForDom=true}={}){
+    if(running) return false;
+    running = true;
+    const token = ++runToken;
+    enterStartupMode();
+
+    try{
+      if(waitForDom) await waitForDomParsed();
+      await waitForVisibleDocument();
+      await waitForActualPaint();
+      if(token !== runToken) return false;
+
+      /* 倒數從瀏覽器真正畫出啟動畫面的第一幀之後才開始。 */
+      await wait(hold);
+      leaveStartupMode(token);
+      return true;
+    }catch(error){
+      console.error('UBee 啟動動畫執行失敗：',error);
+      leaveStartupMode(token);
+      return false;
+    }
+  }
+
+  function replayStartup(hold=1100){
+    const now = Date.now();
+    if(running || now-lastReplayAt < 1600) return;
+    playStartup({hold,waitForDom:false});
+  }
+
+  window.UBeeStartupController = Object.freeze({
+    replay: replayStartup,
+    isRunning: () => running
+  });
+
+  /* 冷啟動：一定等到整份頁面解析並實際完成第一幀後，才開始計時。 */
+  playStartup({hold:1450,waitForDom:true});
+
+  /* 防止極端錯誤讓畫面永久停留，但不會早於正常首次繪製流程。 */
+  window.setTimeout(() => {
+    if(running && document.readyState !== 'loading') leaveStartupMode(runToken);
+  },9000);
+
+  window.addEventListener('pagehide',() => { hiddenAt = Date.now(); });
+
+  document.addEventListener('visibilitychange',() => {
+    if(document.hidden){
+      hiddenAt = Date.now();
+      return;
+    }
+    if(initialFinished && hiddenAt && Date.now()-hiddenAt > 700){
+      replayStartup(1050);
+    }
+    hiddenAt = 0;
+  });
+
+  window.addEventListener('pageshow',event => {
+    if(!initialFinished) return;
+    if(event.persisted || (hiddenAt && Date.now()-hiddenAt > 700)){
+      replayStartup(1050);
+    }
+    hiddenAt = 0;
+  });
 })();
 </script>
 
@@ -19801,7 +19890,7 @@ body.flow-active>.app{display:none!important;}
 <section class="flow-page ubee-my-page" data-page="profile" id="flowPageProfile">
 <div class="ubee-my-scroll">
 <div class="ubee-my-top-actions">
-<button aria-label="聯繫客服" class="ubee-my-round-action" id="flowProfileSupportIcon" type="button">客服</button>
+<button aria-label="聯繫客服" class="ubee-my-round-action" id="flowProfileSupportIcon" title="聯繫客服" type="button"><svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path><path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path><path d="M17 18c0 2-1.5 3-4 3h-1"></path></svg></button>
 </div>
 <button class="ubee-my-account" data-my-action="account" id="ubeeMyAccountButton" type="button">
 <div class="ubee-my-account-copy">
@@ -20602,7 +20691,7 @@ body.flow-active>.app{display:none!important;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-5';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22497,11 +22586,22 @@ body.flow-active>.app{display:none!important;}
 
   function closeSupportToHomeAnimated(){
     const panel = document.getElementById('ubeeMySupportPanel');
+    const transition = document.getElementById('ubeeSupportReturnTransition');
+
+    if(transition){
+      transition.hidden = false;
+      transition.setAttribute('aria-hidden','false');
+      transition.classList.remove('is-active','is-finishing');
+      void transition.offsetWidth;
+      transition.classList.add('is-active');
+    }
+
     if(panel){
       panel.classList.remove('is-open');
       panel.classList.add('is-returning-home');
     }
 
+    /* 先完整顯示返回首頁動畫，再切回首頁，避免瞬間跳頁。 */
     window.setTimeout(() => {
       if(panel) panel.classList.remove('is-returning-home');
       closeMySubPages();
@@ -22512,7 +22612,18 @@ body.flow-active>.app{display:none!important;}
       try{ showPage('home'); }catch(_){ }
       markBottomNav('home');
       replaceMyHistoryWithRoot();
-    },260);
+    },520);
+
+    window.setTimeout(() => {
+      transition?.classList.add('is-finishing');
+    },760);
+
+    window.setTimeout(() => {
+      if(!transition) return;
+      transition.hidden = true;
+      transition.classList.remove('is-active','is-finishing');
+      transition.setAttribute('aria-hidden','true');
+    },1040);
   }
 
   document.addEventListener('click',event => {
@@ -23591,21 +23702,84 @@ body > #ubeePersistentBottomNav > button.active{
 
 
 
+
+<div aria-hidden="true" hidden id="ubeeSupportReturnTransition" role="status">
+  <div class="ubee-support-return-inner">
+    <div class="ubee-support-return-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-7h6v7"></path></svg>
+    </div>
+    <div class="ubee-support-return-brand"><span>U</span>Bee 跑腿</div>
+    <div class="ubee-support-return-text">正在返回首頁</div>
+  </div>
+</div>
+
 <style id="ubee-startup-support-return-final-fix">
-/* 啟動畫面保留於 DOM，供 PWA 從背景重新開啟時再次播放。 */
-#ubeeStartupScreen[hidden]{
+/* =========================================================
+   UBee V5 最終修復
+   1. 啟動黃色背景延伸到 iOS／Android 頂部安全區。
+   2. 首頁與「我的」右上角統一為耳機客服圖示。
+   3. 客服返回首頁前，必須完整播放中間過場動畫。
+   ========================================================= */
+
+#ubeeStartupScreen[hidden],
+#ubeeSupportReturnTransition[hidden]{
   display:none!important;
 }
 
-/* 首頁客服統一為清楚的耳機圖示。 */
+html.ubee-app-starting,
+body.ubee-app-starting{
+  background:#facc15!important;
+}
+
+/* 禁用舊版 root/body 偽元素保險層：它會蓋住真正的 Logo 動畫。
+   黃色改由 html、body 與超出視窗的啟動畫面本體直接負責。 */
+html.ubee-app-starting::before,
+html.ubee-app-starting::after,
+body.ubee-app-starting::before,
+body.ubee-app-starting::after{
+  content:none!important;
+  display:none!important;
+}
+
+#ubeeStartupScreen{
+  top:-240px!important;
+  right:-240px!important;
+  bottom:-240px!important;
+  left:-240px!important;
+  min-width:calc(100vw + 480px)!important;
+  min-height:calc(100dvh + 480px)!important;
+}
+
+#ubeeStartupScreen .ubee-startup-lockup{
+  position:fixed!important;
+  top:calc(-1 * env(safe-area-inset-top))!important;
+  right:0!important;
+  bottom:calc(-1 * env(safe-area-inset-bottom))!important;
+  left:0!important;
+  width:100vw!important;
+  height:auto!important;
+  min-height:calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))!important;
+  padding:
+    calc(24px + env(safe-area-inset-top))
+    22px
+    calc(24px + env(safe-area-inset-bottom))!important;
+  background:#facc15!important;
+}
+
+/* 三個入口全部使用同一組耳機客服圖示。 */
 .topbar-support,
-#flowSupportButton{
+#flowSupportButton,
+#flowProfileSupportIcon{
   display:flex!important;
   align-items:center!important;
   justify-content:center!important;
+  color:#111!important;
 }
+
 .topbar-support svg,
-#flowSupportButton svg{
+#flowSupportButton svg,
+#flowProfileSupportIcon svg{
+  display:block!important;
   width:25px!important;
   height:25px!important;
   fill:none!important;
@@ -23613,18 +23787,27 @@ body > #ubeePersistentBottomNav > button.active{
   stroke-width:2!important;
   stroke-linecap:round!important;
   stroke-linejoin:round!important;
+  pointer-events:none!important;
 }
 
-/* 客服頁由右側進入，返回首頁時向右退出。 */
+#productionOrderFlow #flowProfileSupportIcon{
+  width:44px!important;
+  min-width:44px!important;
+  height:44px!important;
+  padding:0!important;
+  border-radius:50%!important;
+}
+
+/* 客服頁進場與離場。 */
 #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page:not([hidden]){
   will-change:transform,opacity;
 }
 #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-open{
-  animation:ubeeSupportEnter .26s cubic-bezier(.22,.8,.3,1) both!important;
+  animation:ubeeSupportEnter .30s cubic-bezier(.22,.8,.3,1) both!important;
 }
 #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-returning-home{
   display:block!important;
-  animation:ubeeSupportReturnHome .26s cubic-bezier(.4,0,.2,1) both!important;
+  animation:ubeeSupportReturnHome .52s cubic-bezier(.4,0,.2,1) both!important;
   pointer-events:none!important;
 }
 @keyframes ubeeSupportEnter{
@@ -23633,92 +23816,305 @@ body > #ubeePersistentBottomNav > button.active{
 }
 @keyframes ubeeSupportReturnHome{
   from{transform:translate3d(0,0,0);opacity:1;}
-  to{transform:translate3d(28%,0,0);opacity:0;}
+  to{transform:translate3d(38%,0,0);opacity:0;}
 }
+
+/* 返回首頁的中間動畫：黃色橫向覆蓋＋首頁符號脈衝。 */
+#ubeeSupportReturnTransition{
+  position:fixed!important;
+  top:-180px!important;
+  right:-180px!important;
+  bottom:-180px!important;
+  left:-180px!important;
+  z-index:2147483647!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  background:#facc15!important;
+  color:#111!important;
+  opacity:0;
+  transform:translate3d(100%,0,0);
+  pointer-events:none!important;
+}
+#ubeeSupportReturnTransition.is-active{
+  animation:ubeeSupportTransitionIn .46s cubic-bezier(.2,.8,.25,1) both!important;
+}
+#ubeeSupportReturnTransition.is-finishing{
+  animation:ubeeSupportTransitionOut .28s cubic-bezier(.4,0,.2,1) both!important;
+}
+.ubee-support-return-inner{
+  position:fixed;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  padding:calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+  text-align:center;
+}
+.ubee-support-return-mark{
+  width:76px;
+  height:76px;
+  display:grid;
+  place-items:center;
+  border:3px solid #111;
+  border-radius:24px;
+  background:#fff;
+  animation:ubeeSupportHomePulse .72s ease-in-out infinite alternate;
+}
+.ubee-support-return-mark svg{
+  width:39px;
+  height:39px;
+  fill:none;
+  stroke:#111;
+  stroke-width:2.2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.ubee-support-return-brand{
+  font-size:28px;
+  font-weight:1000;
+  letter-spacing:-1px;
+}
+.ubee-support-return-brand span{color:#fff;-webkit-text-stroke:1px #111;paint-order:stroke fill;}
+.ubee-support-return-text{
+  color:#5b4500;
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:.04em;
+}
+@keyframes ubeeSupportTransitionIn{
+  from{opacity:1;transform:translate3d(100%,0,0);}
+  to{opacity:1;transform:translate3d(0,0,0);}
+}
+@keyframes ubeeSupportTransitionOut{
+  from{opacity:1;transform:translate3d(0,0,0);}
+  to{opacity:0;transform:translate3d(-12%,0,0);}
+}
+@keyframes ubeeSupportHomePulse{
+  from{transform:scale(.94) translateY(2px);}
+  to{transform:scale(1.04) translateY(-2px);}
+}
+
 @media (prefers-reduced-motion:reduce){
   #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-open,
-  #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-returning-home{
-    animation-duration:.01ms!important;
+  #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-returning-home,
+  #ubeeSupportReturnTransition.is-active,
+  #ubeeSupportReturnTransition.is-finishing{
+    animation-duration:.18s!important;
   }
+  .ubee-support-return-mark{animation:none!important;}
 }
 </style>
 
 <script id="ubee-startup-replay-and-support-icon-controller">
 (()=>{
   'use strict';
-  if(window.__UBEE_STARTUP_REPLAY_SUPPORT_FIX__) return;
-  window.__UBEE_STARTUP_REPLAY_SUPPORT_FIX__ = true;
+  if(window.__UBEE_SUPPORT_ICON_FINAL_FIX__) return;
+  window.__UBEE_SUPPORT_ICON_FINAL_FIX__ = true;
 
-  const HEADSET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13v-2a8 8 0 0 1 16 0v2"/><path d="M4 13a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2v-2ZM20 13a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2v-2Z"/><path d="M17 19c-1 1-2.5 1.5-5 1.5"/></svg>';
-  const themeMeta = document.querySelector('meta[name="theme-color"]');
-  let hiddenAt = 0;
-  let replaying = false;
+  const HEADSET_ICON = '<svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path><path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path><path d="M17 18c0 2-1.5 3-4 3h-1"></path></svg>';
 
   function applySupportIcons(){
     const buttons = [
       document.getElementById('flowSupportButton'),
+      document.getElementById('flowProfileSupportIcon'),
       ...document.querySelectorAll('.topbar-support')
     ].filter(Boolean);
 
     buttons.forEach(button => {
-      if(button.dataset.ubeeHeadsetReady === 'true') return;
-      button.innerHTML = HEADSET_ICON;
-      button.dataset.ubeeHeadsetReady = 'true';
+      if(!button.querySelector('.ubee-support-headset-icon')){
+        button.innerHTML = HEADSET_ICON;
+      }
       button.setAttribute('aria-label','聯繫客服');
       button.setAttribute('title','聯繫客服');
     });
   }
 
-  function replayStartup(duration=1250){
-    const startup = document.getElementById('ubeeStartupScreen');
-    if(!startup || replaying || document.body.classList.contains('ubee-customer-auth-open')) return;
-    replaying = true;
-
-    startup.hidden = false;
-    startup.classList.remove('is-leaving');
-    startup.removeAttribute('aria-hidden');
-    startup.style.pointerEvents = 'auto';
-    document.documentElement.classList.add('ubee-app-starting');
-    document.body.classList.add('ubee-app-starting');
-    if(themeMeta) themeMeta.setAttribute('content','#facc15');
-
-    window.setTimeout(() => {
-      startup.classList.add('is-leaving');
-      startup.setAttribute('aria-hidden','true');
-      startup.style.pointerEvents = 'none';
-      window.setTimeout(() => {
-        startup.hidden = true;
-        startup.classList.remove('is-leaving');
-        document.documentElement.classList.remove('ubee-app-starting');
-        document.body.classList.remove('ubee-app-starting');
-        if(themeMeta) themeMeta.setAttribute('content','#ffffff');
-        replaying = false;
-        applySupportIcons();
-      },20);
-    },duration);
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded',applySupportIcons,{once:true});
+  }else{
+    applySupportIcons();
   }
-
-  document.addEventListener('DOMContentLoaded',applySupportIcons,{once:true});
   window.addEventListener('load',applySupportIcons,{once:true});
-  window.setTimeout(applySupportIcons,400);
-  window.setTimeout(applySupportIcons,1200);
+  window.addEventListener('pageshow',applySupportIcons);
+  window.setTimeout(applySupportIcons,300);
+  window.setTimeout(applySupportIcons,1000);
+})();
+</script>
 
-  window.addEventListener('pageshow',event => {
-    applySupportIcons();
-    if(event.persisted) replayStartup(1100);
-  });
 
-  document.addEventListener('visibilitychange',() => {
-    if(document.hidden){
-      hiddenAt = Date.now();
-      return;
+
+<!-- =========================================================
+     UBee 原生 App 整體互動層｜2026-08-05
+     不改動既有業務流程，只統一頁面切換、按壓、表單與底部導航手感。
+     ========================================================= -->
+<style id="ubee-native-app-experience-v1">
+:root{
+  --ubee-native-duration:260ms;
+  --ubee-native-fast:150ms;
+  --ubee-native-ease:cubic-bezier(.22,.8,.26,1);
+}
+
+html,body{
+  overscroll-behavior-y:none;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+button,[role="button"],a,input,select,textarea{
+  -webkit-tap-highlight-color:transparent;
+}
+
+button,[role="button"],.menu-item,.ubee-settings-row,.flow-service-tab,
+.flow-profile-task-card,.bottom-tab,.persistent-bottom-nav button{
+  touch-action:manipulation;
+}
+
+button:active,[role="button"]:active,.menu-item:active,.ubee-settings-row:active,
+.flow-service-tab:active,.flow-profile-task-card:active,.persistent-bottom-nav button:active{
+  transform:scale(.975);
+  transition:transform 90ms ease!important;
+}
+
+input:focus,textarea:focus,select:focus{
+  outline:none!important;
+}
+
+.input-card:focus-within,.flow-field:focus-within,.uca-field:focus-within,
+.address-card:focus-within,.flow-card:focus-within{
+  border-color:rgba(244,185,0,.72)!important;
+  box-shadow:0 0 0 3px rgba(250,204,21,.15)!important;
+  transition:border-color var(--ubee-native-fast) ease,box-shadow var(--ubee-native-fast) ease!important;
+}
+
+/* 原生式頁面推進／返回 */
+.flow-page.ubee-native-enter-forward,
+.app-section.ubee-native-enter-forward,
+.step.ubee-native-enter-forward{
+  animation:ubeeNativePushIn var(--ubee-native-duration) var(--ubee-native-ease) both!important;
+}
+.flow-page.ubee-native-enter-back,
+.app-section.ubee-native-enter-back,
+.step.ubee-native-enter-back{
+  animation:ubeeNativePopIn var(--ubee-native-duration) var(--ubee-native-ease) both!important;
+}
+.flow-page.ubee-native-tab-enter,
+.app-section.ubee-native-tab-enter{
+  animation:ubeeNativeTabIn 190ms ease-out both!important;
+}
+
+@keyframes ubeeNativePushIn{
+  from{opacity:.55;transform:translate3d(34px,0,0) scale(.992)}
+  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
+}
+@keyframes ubeeNativePopIn{
+  from{opacity:.55;transform:translate3d(-24px,0,0) scale(.992)}
+  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
+}
+@keyframes ubeeNativeTabIn{
+  from{opacity:.35;transform:translate3d(0,8px,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
+}
+
+/* 固定標頭與底部導航更接近原生容器 */
+.topbar,.flow-header,.uca-topbar,.ubee-my-panel-head{
+  -webkit-backdrop-filter:saturate(160%) blur(16px);
+  backdrop-filter:saturate(160%) blur(16px);
+}
+
+#ubeePersistentBottomNav,.persistent-bottom-nav,.bottom-tabs{
+  -webkit-backdrop-filter:saturate(180%) blur(18px)!important;
+  backdrop-filter:saturate(180%) blur(18px)!important;
+  background:rgba(255,255,255,.94)!important;
+}
+
+#ubeePersistentBottomNav button,.persistent-bottom-nav button,.bottom-tab{
+  min-height:50px;
+  transition:color var(--ubee-native-fast) ease,transform 90ms ease,opacity var(--ubee-native-fast) ease!important;
+}
+
+/* 最低觸控尺寸 */
+.icon-btn,.topbar-support,.flow-icon-btn,.uca-icon-btn,.flow-back-btn,
+[data-my-close],.menu-item,.ubee-settings-row{
+  min-width:44px;
+  min-height:44px;
+}
+
+/* 載入與狀態變化避免突兀 */
+.flow-loading,.flow-status,.profile-status,.ubee-settings-status{
+  transition:opacity var(--ubee-native-fast) ease,transform var(--ubee-native-fast) ease!important;
+}
+
+@media (prefers-reduced-motion:reduce){
+  .flow-page.ubee-native-enter-forward,
+  .flow-page.ubee-native-enter-back,
+  .flow-page.ubee-native-tab-enter,
+  .app-section.ubee-native-enter-forward,
+  .app-section.ubee-native-enter-back,
+  .app-section.ubee-native-tab-enter,
+  .step.ubee-native-enter-forward,
+  .step.ubee-native-enter-back{
+    animation:none!important;
+  }
+}
+</style>
+
+<script id="ubee-native-app-experience-controller-v1">
+(() => {
+  'use strict';
+  if(window.__UBEE_NATIVE_APP_EXPERIENCE_V1__) return;
+  window.__UBEE_NATIVE_APP_EXPERIENCE_V1__ = true;
+
+  let direction = 'forward';
+  let tabNavigation = false;
+  let lastActive = null;
+
+  const isBackControl = element => Boolean(element?.closest?.(
+    '[data-go="home"],[data-go="profile"],[data-go="options"],'+
+    '[data-go="details"],[data-go="service"],[data-my-close],'+
+    '.flow-back-btn,.step2-back-btn,.step3-back-btn,.uca-icon-btn[data-uca-back],'+
+    '.uca-icon-btn[data-uca-register-back]'
+  ));
+
+  const isBottomTab = element => Boolean(element?.closest?.(
+    '#ubeePersistentBottomNav button,.persistent-bottom-nav button,.bottom-tab,[data-bottom-tab]'
+  ));
+
+  document.addEventListener('pointerdown', event => {
+    const target = event.target;
+    tabNavigation = isBottomTab(target);
+    direction = isBackControl(target) ? 'back' : 'forward';
+
+    const clickable = target.closest?.('button,[role="button"],a,.menu-item,.ubee-settings-row');
+    if(clickable && navigator.vibrate){
+      try{ navigator.vibrate(6); }catch(_){ }
     }
-    applySupportIcons();
-    if(hiddenAt && Date.now()-hiddenAt > 900){
-      replayStartup(1100);
-    }
-    hiddenAt = 0;
-  });
+  }, {capture:true,passive:true});
+
+  const activePage = () => document.querySelector(
+    '.flow-page.active,.app-section.active,.step.active,'+
+    '#ubeeMySettingsPanel:not([hidden]),#ubeeMyOrdersPanel:not([hidden]),#ubeeMyProfilePanel:not([hidden])'
+  );
+
+  const animate = page => {
+    if(!page || page === lastActive || page.id === 'ubeeStartupScreen') return;
+    lastActive = page;
+    page.classList.remove('ubee-native-enter-forward','ubee-native-enter-back','ubee-native-tab-enter');
+    void page.offsetWidth;
+    page.classList.add(tabNavigation ? 'ubee-native-tab-enter' : (direction === 'back' ? 'ubee-native-enter-back' : 'ubee-native-enter-forward'));
+    const cleanup = () => page.classList.remove('ubee-native-enter-forward','ubee-native-enter-back','ubee-native-tab-enter');
+    page.addEventListener('animationend',cleanup,{once:true});
+    setTimeout(cleanup,420);
+    tabNavigation = false;
+  };
+
+  const observer = new MutationObserver(() => requestAnimationFrame(() => animate(activePage())));
+  observer.observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class','hidden','style','aria-hidden']});
+
+  window.addEventListener('pageshow',() => requestAnimationFrame(() => animate(activePage())));
 })();
 </script>
 
