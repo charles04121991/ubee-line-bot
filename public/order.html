@@ -23265,6 +23265,193 @@ body > #ubeePersistentBottomNav::after{
 }
 </style>
 
+
+<style id="ubee-customer-readable-font-scale">
+/* =========================================================
+   UBee 用戶端可讀性字級優化
+   - 整體放大一級，不改變原有流程與版面結構。
+   - 表單維持 16px 以上，避免 iPhone 聚焦時自動放大。
+   - 底部導航文字與圖示同步放大，提升單手操作辨識度。
+   ========================================================= */
+
+html,
+body{
+  font-size:16px!important;
+}
+
+/* 頁面標題與品牌 */
+.brand{
+  font-size:29px!important;
+}
+
+.headline,
+#step2 .headline,
+#step3 .headline{
+  font-size:28px!important;
+}
+
+.content-title{
+  font-size:19px!important;
+}
+
+.member-title{
+  font-size:23px!important;
+}
+
+/* 一般說明、卡片與狀態文字 */
+.subtext,
+#step2 > .subtext,
+#step3 > .subtext,
+.content-text,
+.member-sub,
+.info-item-text,
+.quick-guide-text,
+.payment-card-value,
+.payment-card-note,
+.profile-note,
+.profile-status{
+  font-size:14px!important;
+  line-height:1.7!important;
+}
+
+/* 小標題不低於 12px */
+.task-path-title,
+.payment-card-kicker,
+.payment-card-badge,
+.payment-card-label,
+.address-display-label,
+#step1 .address-label,
+#step1 .home-estimate-label,
+.member-stat span{
+  font-size:12px!important;
+}
+
+/* 主要內容與選項 */
+.task-path-value,
+.form-title,
+.nearby-title,
+.nearby-place-name,
+.address-display-value,
+.menu-item,
+.category-tab,
+.category-choice-item,
+.service-item-title,
+#step3 .speed-name{
+  font-size:15px!important;
+}
+
+#step3 .speed-time,
+#step3 .speed-desc,
+.nearby-sub,
+.nearby-status,
+.nearby-place-meta,
+.price-note{
+  font-size:13px!important;
+}
+
+/* 所有可輸入與可點擊控制維持清楚字級 */
+input,
+textarea,
+select,
+button,
+.btn,
+#step1 .address-main input,
+#step2 input,
+#step2 textarea,
+#step2 select{
+  font-size:16px!important;
+}
+
+/* 首頁服務分類 */
+.category-tab{
+  min-width:82px!important;
+}
+
+.service-item{
+  flex-basis:82px!important;
+}
+
+.service-item-title{
+  font-size:13px!important;
+}
+
+.category-choice-item{
+  font-size:13px!important;
+}
+
+/* 頂部城市與客服區 */
+.topbar-location{
+  font-size:15px!important;
+}
+
+.topbar-location-arrow{
+  font-size:13px!important;
+}
+
+/* 金額與重要數值 */
+#step1 .home-estimate-amount{
+  font-size:24px!important;
+}
+
+.price-row{
+  font-size:15px!important;
+}
+
+.price-row.price-total{
+  font-size:20px!important;
+}
+
+/* 底部固定導航：原本 10px 過小，正式提升到 12px */
+body > #ubeePersistentBottomNav .flow-nav-icon{
+  width:22px!important;
+  height:22px!important;
+  flex-basis:22px!important;
+  font-size:20px!important;
+}
+
+body > #ubeePersistentBottomNav .flow-nav-label{
+  font-size:12px!important;
+  font-weight:900!important;
+  line-height:1.15!important;
+}
+
+body > #ubeePersistentBottomNav > button{
+  gap:3px!important;
+  padding-top:3px!important;
+  padding-bottom:3px!important;
+}
+
+body > #ubeePersistentBottomNav > button.active{
+  padding-top:0!important;
+}
+
+/* 小尺寸手機避免橫向擠壓，但仍不退回過小字級 */
+@media (max-width:380px){
+  .brand{
+    font-size:27px!important;
+  }
+
+  .headline,
+  #step2 .headline,
+  #step3 .headline{
+    font-size:26px!important;
+  }
+
+  .category-tab{
+    min-width:78px!important;
+    font-size:14px!important;
+  }
+
+  .service-item{
+    flex-basis:78px!important;
+  }
+
+  body > #ubeePersistentBottomNav .flow-nav-label{
+    font-size:11.5px!important;
+  }
+}
+</style>
+
 <script id="ubee-bottom-nav-single-mount">
 (() => {
   'use strict';
