@@ -10484,15 +10484,15 @@ body.ubee-app-starting{
 </section>
 <div aria-label="主要導覽" class="bottom-tabs">
 <button aria-label="首頁" class="bottom-tab active" id="tabHome" onclick="showHomeTab()" type="button">
-<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-7h6v7"></path></svg>
+<svg aria-hidden="true" class="ubee-nav-brand-u" viewBox="0 0 24 24" fill="none"><path d="M5 4v8.5C5 17.2 7.8 20 12 20s7-2.8 7-7.5V4" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 5v7.4c0 2.2 1.1 3.4 3 3.4s3-1.2 3-3.4V5" stroke="#f4bd00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         首頁
       </button>
 <button aria-label="任務" class="bottom-tab" id="tabTasks" type="button">
-<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="17" rx="2" width="14" x="5" y="4"></rect><path d="M9 4.5V3h6v1.5"></path><path d="m8.5 11 2 2 5-5"></path><path d="M9 17h6"></path></svg>
+<svg aria-hidden="true" class="ubee-nav-task-board" viewBox="0 0 24 24" fill="none"><rect x="5" y="4.5" width="14" height="16" rx="2.5" stroke="currentColor" stroke-width="2.2"/><path d="M9 4.5V3h6v1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m8.5 11 1.8 1.8 3.2-3.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 16h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         任務
       </button>
 <button aria-label="我的" class="bottom-tab" id="tabProfile" onclick="showProfileTab()" type="button">
-<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
+<svg aria-hidden="true" class="ubee-nav-profile" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2.2"/><path d="M5 20.5c.8-4.1 3.2-6.2 7-6.2s6.2 2.1 7 6.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         我的
       </button>
 </div>
@@ -19986,9 +19986,9 @@ body.flow-active>.app{display:none!important;}
 </div>
 </div>
 <nav aria-label="主要導覽" class="flow-bottom-nav" id="ubeePersistentBottomNav">
-<button aria-label="首頁" class="active" id="flowNavHome" type="button"><span class="flow-nav-icon">U</span><span class="flow-nav-label">首頁</span></button>
-<button aria-label="任務" id="flowNavTasks" type="button"><span class="flow-nav-icon">▣</span><span class="flow-nav-label">任務</span></button>
-<button aria-label="我的" id="flowNavMy" type="button"><span class="flow-nav-icon">◎</span><span class="flow-nav-label">我的</span></button>
+<button aria-label="首頁" class="active" id="flowNavHome" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-brand-u" viewBox="0 0 24 24" fill="none"><path d="M5 4v8.5C5 17.2 7.8 20 12 20s7-2.8 7-7.5V4" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 5v7.4c0 2.2 1.1 3.4 3 3.4s3-1.2 3-3.4V5" stroke="#f4bd00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="flow-nav-label">首頁</span></button>
+<button aria-label="任務" id="flowNavTasks" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-task-board" viewBox="0 0 24 24" fill="none"><rect x="5" y="4.5" width="14" height="16" rx="2.5" stroke="currentColor" stroke-width="2.2"/><path d="M9 4.5V3h6v1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m8.5 11 1.8 1.8 3.2-3.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 16h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="flow-nav-label">任務</span></button>
+<button aria-label="我的" id="flowNavMy" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-profile" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2.2"/><path d="M5 20.5c.8-4.1 3.2-6.2 7-6.2s6.2 2.1 7 6.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="flow-nav-label">我的</span></button>
 </nav>
 <script id="ubee-production-flow-v4-script">
 (() => {
@@ -20759,7 +20759,7 @@ body.flow-active>.app{display:none!important;}
     const button = document.createElement('button');
     button.id = 'flowNavTasks';
     button.type = 'button';
-    button.innerHTML = '<span class="flow-nav-icon">▣</span>任務';
+    button.innerHTML = '<span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-task-board" viewBox="0 0 24 24" fill="none"><rect x="5" y="4.5" width="14" height="16" rx="2.5" stroke="currentColor" stroke-width="2.2"/><path d="M9 4.5V3h6v1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m8.5 11 1.8 1.8 3.2-3.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 16h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span class="flow-nav-label">任務</span>';
     button.addEventListener('click', () => {
       if(hasActiveOrder()){
         openActiveTask();
@@ -21509,15 +21509,15 @@ body.flow-active>.app{display:none!important;}
     },
     tabHome:{
       label:'首頁',
-      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/></svg>'
+      icon:'<svg aria-hidden="true" class="ubee-nav-brand-u" viewBox="0 0 24 24" fill="none"><path d="M5 4v8.5C5 17.2 7.8 20 12 20s7-2.8 7-7.5V4" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 5v7.4c0 2.2 1.1 3.4 3 3.4s3-1.2 3-3.4V5" stroke="#f4bd00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
     },
     tabTasks:{
       label:'任務',
-      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 2 2 5-5"/><path d="M9 17h6"/></svg>'
+      icon:'<svg aria-hidden="true" class="ubee-nav-task-board" viewBox="0 0 24 24" fill="none"><rect x="5" y="4.5" width="14" height="16" rx="2.5" stroke="currentColor" stroke-width="2.2"/><path d="M9 4.5V3h6v1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m8.5 11 1.8 1.8 3.2-3.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 16h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
     },
     tabProfile:{
       label:'我的',
-      icon:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>'
+      icon:'<svg aria-hidden="true" class="ubee-nav-profile" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2.2"/><path d="M5 20.5c.8-4.1 3.2-6.2 7-6.2s6.2 2.1 7 6.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
     }
   });
 
@@ -23394,6 +23394,27 @@ body > #ubeePersistentBottomNav > button.active{
 }
 </style>
 
+
+<style id="ubee-bottom-nav-brand-icons">
+body > #ubeePersistentBottomNav .flow-nav-icon svg{
+  display:block;
+  width:24px;
+  height:24px;
+  overflow:visible;
+}
+body > #ubeePersistentBottomNav .flow-nav-icon .ubee-nav-brand-u{
+  width:25px;
+  height:25px;
+}
+body > #ubeePersistentBottomNav > button:not(.active) .ubee-nav-task-board,
+body > #ubeePersistentBottomNav > button:not(.active) .ubee-nav-profile{
+  color:#777c82;
+}
+body > #ubeePersistentBottomNav > button.active .ubee-nav-task-board,
+body > #ubeePersistentBottomNav > button.active .ubee-nav-profile{
+  color:#111;
+}
+</style>
 <script id="ubee-bottom-nav-single-mount">
 (() => {
   'use strict';
