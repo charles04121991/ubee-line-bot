@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R25 Native｜黃色品牌文字啟動畫面無底部白區；動畫延長；首頁轉換導航永久固定 -->
+<!-- UBee 正式營運版：2026-08-05 R26 Native｜根治啟動頁底部白區；動畫期間隱藏固定導航；首頁後恢復永久固定 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -9288,14 +9288,19 @@ body.ubee-r24-yellow-starting{
 }
 
 #ubeeAppSplashR24{
-  position:fixed;
-  inset:-1px -1px -2px -1px;
+  position:fixed!important;
+  inset:0!important;
+  top:0!important;
+  right:0!important;
+  bottom:0!important;
+  left:0!important;
   z-index:2147483647;
-  width:auto;
-  min-width:calc(100% + 2px);
-  height:auto;
-  min-height:calc(100vh + 3px);
-  min-height:calc(100dvh + 3px);
+  width:100vw!important;
+  min-width:100vw!important;
+  max-width:none!important;
+  height:100vh!important;
+  height:100dvh!important;
+  min-height:-webkit-fill-available!important;
   display:grid;
   place-items:center;
   overflow:hidden;
@@ -9310,6 +9315,16 @@ body.ubee-r24-yellow-starting{
   pointer-events:auto;
   isolation:isolate;
   box-sizing:border-box;
+}
+
+#ubeeAppSplashR24::before{
+  content:"";
+  position:fixed;
+  inset:-160px;
+  z-index:-1;
+  display:block;
+  background:#facc15;
+  pointer-events:none;
 }
 
 #ubeeAppSplashR24,
@@ -9463,22 +9478,36 @@ body.ubee-r24-yellow-starting{
  */
 
 /*
- * 啟動畫面期間，導航仍保持 fixed，但所有可見區域同步使用 UBee 黃色。
- * 這可消除 iPhone safe-area 或 fixed 導航造成的底部白色區塊，
- * 且不需要移動、重建或隱藏導航。
+ * R26 修正：
+ * R25 的白色區域來自檔案尾端較晚載入的 active 按鈕白底規則。
+ * 動畫期間不再替導航逐項染色，而是讓同一組 fixed 導航保持原位置、
+ * 暫時完全不可見；黃色 splash 與其 overscan 底層負責覆蓋整個視窗。
+ * 動畫移除並取消 starting class 的同一幀，導航即恢復白色。
  */
-body.ubee-r24-yellow-starting > #ubeePersistentBottomNav{
-  background:#facc15!important;
-  border-top-color:#facc15!important;
+html.ubee-r24-yellow-starting,
+body.ubee-r24-yellow-starting{
+  background-color:#facc15!important;
 }
-body.ubee-r24-yellow-starting > #ubeePersistentBottomNav > button{
+
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav{
+  position:fixed!important;
+  bottom:0!important;
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+  background:#facc15!important;
+  border-color:#facc15!important;
+  transition:none!important;
+}
+
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav > button,
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav > button.active{
   background:#facc15!important;
   color:#facc15!important;
-  border-top-color:#facc15!important;
-}
-body.ubee-r24-yellow-starting > #ubeePersistentBottomNav .flow-nav-icon,
-body.ubee-r24-yellow-starting > #ubeePersistentBottomNav .flow-nav-label{
+  border-color:#facc15!important;
   opacity:0!important;
+  visibility:hidden!important;
+  transition:none!important;
 }
 
 body > #ubeePersistentBottomNav{
@@ -9552,7 +9581,7 @@ body > #ubeePersistentBottomNav{
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-  const minimumVisibleTime = reducedMotion ? 380 : 1580;
+  const minimumVisibleTime = reducedMotion ? 400 : 1680;
   const removeDelay = reducedMotion ? 120 : 280;
   let finished = false;
 
@@ -9600,7 +9629,7 @@ body > #ubeePersistentBottomNav{
   };
 
   window.setTimeout(finishSplash,minimumVisibleTime);
-  window.setTimeout(finishSplash,2600);
+  window.setTimeout(finishSplash,2800);
 })();
 </script>
 
@@ -24218,6 +24247,45 @@ body:not(.ubee-r24-legacy-navigation-enabled) .bottom-tabs{
   else document.addEventListener('DOMContentLoaded',startObserver,{once:true});
 })();
 </script>
+
+
+<style id="ubee-r26-splash-bottom-white-gap-final-fix">
+/* =========================================================
+   UBee R26｜啟動頁底部白區最終優先級修正
+   此 style 位於所有既有導航規則之後，避免 active 白底再次覆蓋。
+   ========================================================= */
+html.ubee-r24-yellow-starting,
+body.ubee-r24-yellow-starting{
+  background:#facc15!important;
+}
+
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav,
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav > button,
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav > button.active,
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav .flow-nav-icon,
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav .flow-nav-label{
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+  background:#facc15!important;
+  color:#facc15!important;
+  border-color:#facc15!important;
+  box-shadow:none!important;
+  filter:none!important;
+  transition:none!important;
+}
+
+/* 首頁狀態：同一組導航立即恢復，仍維持 body 直屬 fixed。 */
+body:not(.ubee-r24-yellow-starting):not(.ubee-customer-auth-open) > #ubeePersistentBottomNav{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  display:grid!important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  background:#ffffff!important;
+}
+</style>
 
 </body>
 </html>
