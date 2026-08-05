@@ -13,12 +13,12 @@
 <link as="image" href="/ubee-customer-splash-logo.png?v=20260805-2" rel="preload" type="image/png"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
-<meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
+<meta content="default" name="apple-mobile-web-app-status-bar-style"/>
 <meta content="UBee 跑腿" name="apple-mobile-web-app-title"/>
 <meta content="UBee 跑腿" name="application-name"/>
-<meta content="#000000" name="theme-color"/>
+<meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R20 Native｜保留R18固定導航零灰區結構，使用透明正式LOGO原生APP啟動畫面 -->
+<!-- UBee 正式營運版：2026-08-05 R21 Native｜白色原生啟動畫面；進入首頁後才詢問定位權限 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -9265,14 +9265,15 @@ body:not(.flow-active) .app{
 
 <style id="ubee-r19-native-splash-style">
 /* =========================================================
-   UBee R19 Native｜接近原生 App 的啟動畫面
-   - 參考騎士端：黑色全螢幕、中央正式 Logo、底部短載入線。
+   UBee R21 Native｜白色原生 App 啟動畫面
+   - 純白全螢幕、中央透明正式 Logo、底部短黃色載入線。
+   - 啟動畫面完全離場並進入首頁後，才允許自動要求定位權限。
    - 不使用卡片、灰色區域、陰影容器、毛玻璃或頁面浮動操作樣式。
    - 啟動完成後完整移除，不修改 R18 的固定導航與捲動結構。
    ========================================================= */
 html.ubee-r19-native-starting,
 body.ubee-r19-native-starting{
-  background:#000000!important;
+  background:#ffffff!important;
 }
 body.ubee-r19-native-starting{
   overflow:hidden!important;
@@ -9294,8 +9295,8 @@ body.ubee-r19-native-starting{
     calc(18px + env(safe-area-inset-top))
     22px
     calc(18px + env(safe-area-inset-bottom));
-  background:#000000;
-  color:#ffffff;
+  background:#ffffff;
+  color:#111111;
   opacity:1;
   visibility:visible;
   pointer-events:auto;
@@ -9319,18 +9320,8 @@ body.ubee-r19-native-starting{
   will-change:transform,opacity,filter;
 }
 #ubeeAppSplashR19 .ubee-r19-native-logo-wrap::after{
-  content:"";
-  position:absolute;
-  left:20%;
-  right:20%;
-  bottom:7%;
-  height:16px;
-  border-radius:999px;
-  background:rgba(250,204,21,.20);
-  filter:blur(22px)!important;
-  opacity:0;
-  animation:ubeeR19NativeGlow 1.05s .28s ease forwards;
-  pointer-events:none;
+  content:none;
+  display:none;
 }
 #ubeeAppSplashR19 .ubee-r19-native-logo{
   position:relative;
@@ -9352,7 +9343,7 @@ body.ubee-r19-native-starting{
   height:3px;
   overflow:hidden;
   border-radius:999px;
-  background:rgba(255,255,255,.15);
+  background:#e9eaec;
 }
 #ubeeAppSplashR19 .ubee-r19-native-loading::after{
   content:"";
@@ -9440,9 +9431,21 @@ body.ubee-r19-native-starting{
   const startedAt = performance.now();
   let finished = false;
 
+  /*
+   * 全域首頁就緒閘門：
+   * 自動定位必須等待啟動畫面離場、首頁完成第一次繪製後才能執行。
+   */
+  window.__ubeeCustomerHomeReady = false;
+  window.ubeeWaitForCustomerHomeReady = function(){
+    if(window.__ubeeCustomerHomeReady) return Promise.resolve();
+    return new Promise(resolve=>{
+      window.addEventListener('ubee:customer-home-ready',()=>resolve(),{once:true});
+    });
+  };
+
   document.documentElement.classList.add('ubee-r19-native-starting');
   document.body.classList.add('ubee-r19-native-starting');
-  if(themeMeta) themeMeta.setAttribute('content','#000000');
+  if(themeMeta) themeMeta.setAttribute('content','#ffffff');
 
   const finishSplash = () => {
     if(finished) return;
@@ -9456,6 +9459,18 @@ body.ubee-r19-native-starting{
       document.documentElement.classList.remove('ubee-r19-native-starting');
       document.body.classList.remove('ubee-r19-native-starting');
       if(themeMeta) themeMeta.setAttribute('content','#ffffff');
+
+      /*
+       * 先讓首頁真正繪製兩個 frame，再開放權限流程。
+       * 因此 iPhone 的「允許／不允許」只會出現在首頁上方，
+       * 不會壓在 Logo 啟動畫面上。
+       */
+      requestAnimationFrame(()=>{
+        requestAnimationFrame(()=>{
+          window.__ubeeCustomerHomeReady = true;
+          window.dispatchEvent(new CustomEvent('ubee:customer-home-ready'));
+        });
+      });
     },removeDelay);
   };
 
@@ -9489,7 +9504,7 @@ body.ubee-r19-native-starting{
     finishAfterMinimumTime();
   }
 
-  /* 最長 2.5 秒後必定解除，避免任何例外遮住 App。 */
+  /* 最長 2.3 秒後必定解除，避免任何例外遮住 App。 */
   window.setTimeout(finishSplash,2300);
 })();
 </script>
@@ -19633,6 +19648,10 @@ async function initPage(options = {}){
       loadGoogleMapsApi()
         .then(async () => {
           try{
+            if(typeof window.ubeeWaitForCustomerHomeReady === 'function'){
+              await window.ubeeWaitForCustomerHomeReady();
+            }
+            await new Promise(resolve=>setTimeout(resolve,220));
             await ensureCustomerMapReady();
             await requestCurrentLocationForMap();
             await detectServiceCityFromCurrentLocation();
@@ -21322,7 +21341,15 @@ body.flow-active>.app{display:none!important;}
     $('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
-  buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();if(localStorage.getItem('ubee_setting_auto_location')!=='false')detectLocation();
+  buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();
+  if(localStorage.getItem('ubee_setting_auto_location')!=='false'){
+    const runAutoLocationAfterHome = () => window.setTimeout(()=>detectLocation(),520);
+    if(window.__ubeeCustomerHomeReady){
+      runAutoLocationAfterHome();
+    }else{
+      window.addEventListener('ubee:customer-home-ready',runAutoLocationAfterHome,{once:true});
+    }
+  }
   const originalShowHome=typeof window.showHomeTab==='function'?window.showHomeTab:null;
   window.showHomeTab=function(){if(activeOrder()){root.classList.remove('active');document.body.classList.remove('flow-active');return originalShowHome?.apply(this,arguments)}showFlow({fresh:true})};
   window.openUBeeProfilePage=function(){root.classList.add('active');document.body.classList.add('flow-active');renderProfile()};
