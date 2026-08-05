@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 
-<html lang="zh-TW">
+<html lang="zh-TW" class="ubee-app-starting" style="background:#facc15;">
 <head>
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260805-2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260805-3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#facc15" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-05 V2｜固定導航單一控制、移除捲動重寫、更新快取版本 -->
+<!-- UBee 正式營運修復版：2026-08-05 V3｜啟動動畫底部白色徹底移除、固定導航單一控制 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -8372,88 +8372,108 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
 
 <style id="ubee-startup-screen-style">
 /* =========================================================
-   UBee 正式啟動頁
-   - 黃色背景完整覆蓋 Android、iOS、PWA 與安全區。
-   - 啟動期間底部導航完全不顯示，不會露出白色區塊。
-   - 品牌文字加大，保留原有進場節奏。
+   UBee 正式啟動頁 V3
+   - html 在原始標籤階段即為黃色，杜絕 CSS／JS 尚未執行前的白底。
+   - 啟動畫面實體層向四周超出 160px，不依賴單一 vh 單位。
+   - 品牌內容另以 viewport fixed 置中，不會因外層加大而偏移。
+   - 離場不透明淡出，避免底層或 iOS 安全區在過場中露白。
    ========================================================= */
+
 html.ubee-app-starting,
 body.ubee-app-starting{
   width:100%!important;
-  height:100%!important;
   min-width:100%!important;
+  height:100%!important;
   min-height:100%!important;
   margin:0!important;
+  padding:0!important;
   overflow:hidden!important;
   overscroll-behavior:none!important;
-  background:#facc15!important;
+  background-color:#facc15!important;
+  background-image:none!important;
+}
+
+html.ubee-app-starting{
+  height:-webkit-fill-available!important;
+  min-height:-webkit-fill-available!important;
 }
 
 body.ubee-app-starting{
+  position:fixed!important;
+  inset:0!important;
+  height:100vh!important;
+  min-height:100vh!important;
+  height:100dvh!important;
+  min-height:100dvh!important;
   touch-action:none!important;
 }
 
-/* 啟動期間只允許黃色啟動畫面顯示，避免任何白色頁面或導航列穿透。 */
-body.ubee-app-starting > :not(#ubeeStartupScreen){
-  visibility:hidden!important;
+/* 啟動期間只留下啟動畫面，其他 body 直屬介面完全移出繪製流程。 */
+body.ubee-app-starting > :not(#ubeeStartupScreen):not(script):not(style){
+  display:none!important;
 }
 
-body.ubee-app-starting > #ubeeStartupScreen{
-  visibility:visible!important;
-}
-
-/* 先於所有 App 介面鋪滿黃色，包含視窗外圍與安全區。 */
-html.ubee-app-starting::before{
+/* 視窗外圍永久鋪黃，處理 iOS／Android 安全區及視窗高度重算。 */
+html.ubee-app-starting::before,
+body.ubee-app-starting::before{
   content:"";
   position:fixed!important;
-  inset:-320px!important;
-  z-index:2147483645!important;
+  top:-320px!important;
+  right:-320px!important;
+  bottom:-320px!important;
+  left:-320px!important;
+  z-index:2147483644!important;
   display:block!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
   background:#facc15!important;
   pointer-events:none!important;
 }
 
 #ubeeStartupScreen{
   position:fixed!important;
-  inset:0!important;
-  top:0!important;
-  right:0!important;
-  bottom:0!important;
-  left:0!important;
+  top:-160px!important;
+  right:-160px!important;
+  bottom:-160px!important;
+  left:-160px!important;
   z-index:2147483647!important;
 
   width:auto!important;
-  min-width:0!important;
+  min-width:calc(100vw + 320px)!important;
   max-width:none!important;
-
   height:auto!important;
-  min-height:0!important;
+  min-height:calc(100vh + 320px)!important;
+  min-height:calc(100dvh + 320px)!important;
   max-height:none!important;
 
-  display:grid!important;
-  place-items:center!important;
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
   overflow:hidden!important;
 
-  padding:
-    calc(24px + env(safe-area-inset-top))
-    22px
-    calc(24px + env(safe-area-inset-bottom))!important;
-
-  background:#facc15!important;
+  border:0!important;
+  border-radius:0!important;
+  background-color:#facc15!important;
+  background-image:none!important;
   color:#111111!important;
-  opacity:1;
-  visibility:visible;
-  pointer-events:auto;
-  isolation:isolate;
-  box-sizing:border-box;
+
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  isolation:isolate!important;
+  box-sizing:border-box!important;
+  transform:none!important;
+  translate:none!important;
+  clip-path:none!important;
 }
 
-/* 額外向四周延伸黃色合成層，防止 iOS 底部出現 1px～數十 px 白縫。 */
+/* 再加一層固定黃色保險層；不使用負 z-index，避免 iOS 合成層忽略。 */
 #ubeeStartupScreen::before{
   content:"";
-  position:fixed!important;
-  inset:-320px!important;
-  z-index:-1!important;
+  position:absolute!important;
+  inset:0!important;
+  z-index:0!important;
   display:block!important;
   background:#facc15!important;
   pointer-events:none!important;
@@ -8468,13 +8488,30 @@ html.ubee-app-starting::before{
   -webkit-backdrop-filter:none!important;
 }
 
+/* 品牌內容以真正 viewport 為基準置中，外層超出視窗不會影響位置。 */
 #ubeeStartupScreen .ubee-startup-lockup{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  min-width:0;
-  text-align:center;
+  position:fixed!important;
+  inset:0!important;
+  z-index:1!important;
+
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+
+  width:100vw!important;
+  height:100vh!important;
+  height:100dvh!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:
+    calc(24px + env(safe-area-inset-top))
+    22px
+    calc(24px + env(safe-area-inset-bottom))!important;
+
+  overflow:hidden!important;
+  background:transparent!important;
+  text-align:center!important;
 }
 
 #ubeeStartupScreen .ubee-startup-wordmark{
@@ -8566,16 +8603,18 @@ html.ubee-app-starting::before{
   animation:ubeeStartupPromiseIn .50s .58s ease both;
 }
 
+/* 不做透明淡出；保持整片黃色直到節點被移除。 */
 #ubeeStartupScreen.is-leaving{
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
-  transition:opacity .24s ease,visibility 0s linear .24s;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:none!important;
+  transition:none!important;
+  animation:none!important;
 }
 
 #ubeeStartupScreen.is-leaving .ubee-startup-lockup{
-  opacity:0;
-  transition:opacity .18s ease;
+  opacity:1!important;
+  transition:none!important;
 }
 
 @keyframes ubeeStartupUIn{
@@ -8604,21 +8643,21 @@ html.ubee-app-starting::before{
 }
 
 @media(max-width:360px){
-  #ubeeStartupScreen .ubee-startup-u{
-    font-size:104px;
-  }
+  #ubeeStartupScreen .ubee-startup-u{font-size:104px;}
+  #ubeeStartupScreen .ubee-startup-bee{font-size:66px;}
+  #ubeeStartupScreen .ubee-startup-service{margin-top:21px;font-size:30px;}
+  #ubeeStartupScreen .ubee-startup-promise{font-size:12px;}
+}
 
-  #ubeeStartupScreen .ubee-startup-bee{
-    font-size:66px;
+@supports (height:100svh){
+  #ubeeStartupScreen .ubee-startup-lockup{
+    height:100svh!important;
   }
+}
 
-  #ubeeStartupScreen .ubee-startup-service{
-    margin-top:21px;
-    font-size:30px;
-  }
-
-  #ubeeStartupScreen .ubee-startup-promise{
-    font-size:12px;
+@supports (height:100dvh){
+  #ubeeStartupScreen .ubee-startup-lockup{
+    height:100dvh!important;
   }
 }
 
@@ -8630,15 +8669,11 @@ html.ubee-app-starting::before{
   #ubeeStartupScreen .ubee-startup-promise{
     animation:none!important;
   }
-
-  #ubeeStartupScreen.is-leaving{
-    transition-duration:.10s;
-  }
 }
 </style>
 
 </head>
-<body class="ubee-app-starting">
+<body class="ubee-app-starting" style="background:#facc15;">
 
 <div id="ubeeStartupScreen" role="status" aria-live="polite" aria-label="UBee 跑腿正在開啟">
   <div class="ubee-startup-lockup" aria-hidden="true">
@@ -8666,7 +8701,7 @@ html.ubee-app-starting::before{
     window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
 
   const minimumVisibleTime = reducedMotion ? 420 : 1750;
-  const removeDelay = reducedMotion ? 120 : 290;
+  const removeDelay = 0;
   let finished = false;
 
   window.__ubeeCustomerHomeReady = false;
@@ -8702,6 +8737,8 @@ html.ubee-app-starting::before{
 
       document.documentElement.classList.remove('ubee-app-starting');
       document.body.classList.remove('ubee-app-starting');
+      document.documentElement.style.removeProperty('background');
+      document.body.style.removeProperty('background');
 
       if(themeMeta){
         themeMeta.setAttribute('content','#ffffff');
@@ -20549,7 +20586,7 @@ body.flow-active>.app{display:none!important;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
