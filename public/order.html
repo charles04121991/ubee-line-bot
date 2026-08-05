@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-05 R18｜我的與全頁底部完整顯示、導航永久固定、零灰區零浮動操作層 -->
+<!-- UBee 正式營運版：2026-08-05 R19｜保留R18固定導航零灰區結構，新增路線抵達開啟動畫 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -9261,8 +9261,286 @@ body:not(.flow-active) .app{
 }
 </style>
 
+
+<style id="ubee-r19-route-arrival-splash-style">
+/* =========================================================
+   UBee R19｜路線抵達開啟動畫
+   - 純白全螢幕，無灰底、陰影、毛玻璃與浮動卡片。
+   - 只在頁面真正載入時短暫顯示；完成後由 JS 從 DOM 完整刪除。
+   - 不修改 R18 的頁面高度、捲動區、底部導航或安全區規則。
+   ========================================================= */
+#ubeeAppSplashR19{
+  position:fixed;
+  inset:0;
+  z-index:2147483647;
+  width:100%;
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  padding:
+    env(safe-area-inset-top)
+    24px
+    env(safe-area-inset-bottom);
+  background:#ffffff;
+  color:#111111;
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  isolation:isolate;
+  overscroll-behavior:none;
+  touch-action:none;
+  box-sizing:border-box;
+}
+#ubeeAppSplashR19,
+#ubeeAppSplashR19 *{
+  box-sizing:border-box;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+#ubeeAppSplashR19 .ubee-r19-splash-stage{
+  position:relative;
+  width:min(260px,76vw);
+  min-height:190px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+#ubeeAppSplashR19 .ubee-r19-route-stage,
+#ubeeAppSplashR19 .ubee-r19-brand-stage{
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+#ubeeAppSplashR19 .ubee-r19-route-stage{
+  animation:ubeeR19RouteStage 1.05s ease both;
+}
+#ubeeAppSplashR19 .ubee-r19-route{
+  position:relative;
+  width:168px;
+  height:34px;
+}
+#ubeeAppSplashR19 .ubee-r19-route-base,
+#ubeeAppSplashR19 .ubee-r19-route-progress{
+  position:absolute;
+  left:7px;
+  right:7px;
+  top:16px;
+  height:2px;
+  border-radius:0;
+}
+#ubeeAppSplashR19 .ubee-r19-route-base{
+  background:#e6e7e9;
+}
+#ubeeAppSplashR19 .ubee-r19-route-progress{
+  right:auto;
+  width:0;
+  background:#f4bd00;
+  animation:ubeeR19RouteProgress .7s cubic-bezier(.34,.7,.2,1) .12s forwards;
+}
+#ubeeAppSplashR19 .ubee-r19-route-start,
+#ubeeAppSplashR19 .ubee-r19-route-end{
+  position:absolute;
+  top:11px;
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  background:#ffffff;
+  border:2px solid #111111;
+}
+#ubeeAppSplashR19 .ubee-r19-route-start{left:0;}
+#ubeeAppSplashR19 .ubee-r19-route-end{right:0;border-color:#f4bd00;}
+#ubeeAppSplashR19 .ubee-r19-runner{
+  position:absolute;
+  left:0;
+  top:9px;
+  width:16px;
+  height:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  background:#facc15;
+  color:#111111;
+  font-size:10px;
+  font-weight:1000;
+  line-height:1;
+  transform:translateX(0);
+  animation:ubeeR19Runner .7s cubic-bezier(.34,.7,.2,1) .12s forwards;
+}
+#ubeeAppSplashR19 .ubee-r19-route-copy{
+  margin-top:16px;
+  color:#777b80;
+  font-size:12px;
+  font-weight:850;
+  letter-spacing:.08em;
+}
+#ubeeAppSplashR19 .ubee-r19-brand-stage{
+  opacity:0;
+  animation:ubeeR19BrandStage .62s cubic-bezier(.2,.8,.2,1) .72s forwards;
+}
+#ubeeAppSplashR19 .ubee-r19-logo{
+  width:88px;
+  height:88px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+#ubeeAppSplashR19 .ubee-r19-logo img{
+  display:block;
+  width:88px;
+  height:88px;
+  object-fit:contain;
+}
+#ubeeAppSplashR19 .ubee-r19-logo-fallback{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  width:72px;
+  height:72px;
+  border-radius:50%;
+  background:#facc15;
+  color:#111111;
+  font-size:38px;
+  font-weight:1000;
+  letter-spacing:-.05em;
+}
+#ubeeAppSplashR19 .ubee-r19-brand-name{
+  margin-top:12px;
+  color:#111111;
+  font-size:25px;
+  font-weight:1000;
+  line-height:1.15;
+  letter-spacing:-.04em;
+}
+#ubeeAppSplashR19 .ubee-r19-brand-name span{
+  color:#f4bd00;
+}
+#ubeeAppSplashR19 .ubee-r19-brand-subtitle{
+  margin-top:7px;
+  color:#7b7f84;
+  font-size:11px;
+  font-weight:850;
+  letter-spacing:.12em;
+}
+#ubeeAppSplashR19.is-leaving{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:opacity .24s ease,visibility 0s linear .24s;
+}
+@keyframes ubeeR19RouteProgress{
+  from{width:0;}
+  to{width:154px;}
+}
+@keyframes ubeeR19Runner{
+  0%{transform:translateX(0);}
+  80%{transform:translateX(152px);}
+  100%{transform:translateX(152px);opacity:0;}
+}
+@keyframes ubeeR19RouteStage{
+  0%,72%{opacity:1;}
+  100%{opacity:0;}
+}
+@keyframes ubeeR19BrandStage{
+  0%{opacity:0;transform:scale(.94);}
+  100%{opacity:1;transform:scale(1);}
+}
+@media (prefers-reduced-motion:reduce){
+  #ubeeAppSplashR19 .ubee-r19-route-stage{display:none;}
+  #ubeeAppSplashR19 .ubee-r19-brand-stage{
+    opacity:1;
+    animation:none;
+    transform:none;
+  }
+  #ubeeAppSplashR19.is-leaving{
+    transition-duration:.12s;
+  }
+}
+</style>
+
 </head>
 <body>
+
+<div id="ubeeAppSplashR19" role="status" aria-live="polite" aria-label="UBee 跑腿正在開啟">
+  <div class="ubee-r19-splash-stage">
+    <div class="ubee-r19-route-stage" aria-hidden="true">
+      <div class="ubee-r19-route">
+        <span class="ubee-r19-route-base"></span>
+        <span class="ubee-r19-route-progress"></span>
+        <span class="ubee-r19-route-start"></span>
+        <span class="ubee-r19-route-end"></span>
+        <span class="ubee-r19-runner">U</span>
+      </div>
+      <div class="ubee-r19-route-copy">任務出發・快速抵達</div>
+    </div>
+    <div class="ubee-r19-brand-stage">
+      <div class="ubee-r19-logo" aria-hidden="true">
+        <img id="ubeeR19SplashLogo" src="/ubee-customer-icon-192.png" alt="" decoding="async"/>
+        <span id="ubeeR19SplashLogoFallback" class="ubee-r19-logo-fallback">U</span>
+      </div>
+      <div class="ubee-r19-brand-name">U<span>Bee</span> 跑腿</div>
+      <div class="ubee-r19-brand-subtitle">即時跑腿・快速抵達</div>
+    </div>
+  </div>
+</div>
+
+<script id="ubee-r19-route-arrival-splash-controller">
+(()=>{
+  'use strict';
+
+  const splash = document.getElementById('ubeeAppSplashR19');
+  if(!splash) return;
+
+  const logo = document.getElementById('ubeeR19SplashLogo');
+  const fallback = document.getElementById('ubeeR19SplashLogoFallback');
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  const visibleDuration = reducedMotion ? 420 : 1580;
+  const removeDelay = reducedMotion ? 150 : 280;
+  let finished = false;
+
+  const showFallback = () => {
+    if(logo) logo.style.display = 'none';
+    if(fallback) fallback.style.display = 'flex';
+  };
+
+  if(logo){
+    logo.addEventListener('error',showFallback,{once:true});
+    if(logo.complete && logo.naturalWidth === 0) showFallback();
+  }
+
+  const finishSplash = () => {
+    if(finished) return;
+    finished = true;
+    splash.classList.add('is-leaving');
+    splash.setAttribute('aria-hidden','true');
+    splash.style.pointerEvents = 'none';
+    window.setTimeout(() => splash.remove(),removeDelay);
+  };
+
+  /*
+   * 只在這次完整文件載入時播放一次。
+   * 首頁／任務／我的切換不會重新建立此節點，因此不會重播。
+   */
+  window.setTimeout(finishSplash,visibleDuration);
+
+  /* 防呆：即使瀏覽器暫停動畫，也不允許啟動畫面長時間遮住操作。 */
+  window.setTimeout(finishSplash,2600);
+})();
+</script>
+
 <style id="ubee-direct-customer-auth-style">
   /* =====================================================
      UBee 客戶會員入口｜直接整合在 order.html
