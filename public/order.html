@@ -19466,7 +19466,14 @@ body.flow-active>.app{display:none!important;}
 .flow-progress-item::before{content:attr(data-number);display:grid;place-items:center;width:19px;height:19px;flex:0 0 19px;border-radius:50%;background:#eef0f2;color:#7e8388;font-size:10px;}
 .flow-progress-item.active{color:#111;}.flow-progress-item.active::before{background:var(--flow-accent);color:#111;}.flow-progress-item.done::before{content:"✓";background:#111;color:#fff;}
 .flow-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 94px;}
-.flow-home-scroll{padding-top:12px;}
+.flow-home-scroll{display:flex;flex-direction:column;min-height:100%;padding-top:12px;}
+.flow-home-scroll>*{width:100%;flex:0 0 auto;}
+.flow-home-watermark{margin-top:auto;min-height:210px;display:flex;align-items:center;justify-content:center;padding:26px 12px calc(30px + env(safe-area-inset-bottom));}
+.flow-home-watermark-inner{text-align:center;opacity:.38;user-select:none;pointer-events:none;}
+.flow-home-watermark-brand{display:inline-flex;align-items:flex-end;gap:0;font-size:46px;font-weight:1000;letter-spacing:-2px;line-height:1;white-space:nowrap;color:#111;}
+.flow-home-watermark-brand .u{color:var(--flow-accent-strong);}
+.flow-home-watermark-slogan{margin-top:10px;color:#6f747a;font-size:14px;font-weight:900;letter-spacing:.08em;}
+.flow-home-watermark-meta{margin-top:8px;color:#9aa0a6;font-size:11px;font-weight:800;letter-spacing:.06em;}
 .flow-card{margin-bottom:12px;padding:15px;border:1px solid var(--flow-line);border-radius:20px;background:#fff;}
 .flow-section-title{margin:0 0 9px;font-size:15px;font-weight:1000;}.flow-help{color:var(--flow-muted);font-size:12px;font-weight:800;line-height:1.6;}
 .flow-service-tabs{display:flex;gap:0;overflow-x:auto;margin:0 -15px 13px;padding:0 9px 9px;border-bottom:1px solid var(--flow-line);scrollbar-width:none;}.flow-service-tabs::-webkit-scrollbar{display:none;}
@@ -19621,6 +19628,13 @@ body.flow-active>.app{display:none!important;}
 <div class="flow-task-preview" id="flowTaskPreview"><div class="flow-task-preview-text" id="flowTaskPreviewText"></div><button class="flow-text-link" id="flowEditTaskButton" type="button">修改</button></div>
 <div class="flow-status" id="flowHomeStatus"></div>
 <button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步：填寫任務內容</button>
+</div>
+<div class="flow-home-watermark" aria-hidden="true">
+<div class="flow-home-watermark-inner">
+<div class="flow-home-watermark-brand"><span class="u">U</span><span>Bee 跑腿</span></div>
+<div class="flow-home-watermark-slogan">生活大小事，一叫就出發</div>
+<div class="flow-home-watermark-meta">代買・代送・取件・排隊・全能跑腿</div>
+</div>
 </div>
 </div>
 </section>
