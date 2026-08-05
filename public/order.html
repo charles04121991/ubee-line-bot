@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html class="ubee-native-launch-pending" lang="zh-TW">
+<html lang="zh-TW">
 <head>
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
 <meta charset="utf-8"/>
@@ -8,17 +8,17 @@
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
 <link href="/manifest-order.json?v=20260803-1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
-<link as="image" fetchpriority="high" href="/ubee-customer-icon-192.png" rel="preload"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
+<link as="image" href="/ubee-customer-splash-logo.jpg?v=20260805-1" rel="preload"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 <meta content="UBee 跑腿" name="apple-mobile-web-app-title"/>
 <meta content="UBee 跑腿" name="application-name"/>
-<meta content="#ffffff" name="theme-color"/>
+<meta content="#000000" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R20｜保留R18固定導航零灰區結構，改為原生App式靜態啟動畫面 -->
+<!-- UBee 正式營運版：2026-08-05 R19 Native｜保留R18固定導航零灰區結構，改為騎士端同系原生APP啟動畫面 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -9263,228 +9263,234 @@ body:not(.flow-active) .app{
 </style>
 
 
-<style id="ubee-r20-native-launch-style">
+<style id="ubee-r19-native-splash-style">
 /* =========================================================
-   UBee R20｜原生 App 式啟動畫面
-   - 採用純白 Launch Screen、中央 App Icon 與品牌名稱。
-   - 不使用路線、假進度條、說明文字、陰影、毛玻璃或浮動卡片。
-   - 最短顯示時間後與已完成初始化的 App 無縫交接。
-   - 動畫完成後完整移除，不修改 R18 的固定導航與頁面捲動結構。
+   UBee R19 Native｜接近原生 App 的啟動畫面
+   - 參考騎士端：黑色全螢幕、中央正式 Logo、底部短載入線。
+   - 不使用卡片、灰色區域、陰影容器、毛玻璃或頁面浮動操作樣式。
+   - 啟動完成後完整移除，不修改 R18 的固定導航與捲動結構。
    ========================================================= */
-html.ubee-native-launch-pending,
-html.ubee-native-launch-pending body{
-  background:#ffffff!important;
+html.ubee-r19-native-starting,
+body.ubee-r19-native-starting{
+  background:#000000!important;
 }
-#ubeeNativeSplashR20{
+body.ubee-r19-native-starting{
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+  touch-action:none!important;
+}
+#ubeeAppSplashR19{
   position:fixed;
   inset:0;
   z-index:2147483647;
   width:100%;
   height:100vh;
   height:100dvh;
-  display:grid;
-  place-items:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   overflow:hidden;
   padding:
-    env(safe-area-inset-top)
-    24px
-    env(safe-area-inset-bottom);
-  background:#ffffff;
-  color:#111111;
+    calc(18px + env(safe-area-inset-top))
+    22px
+    calc(18px + env(safe-area-inset-bottom));
+  background:#000000;
+  color:#ffffff;
   opacity:1;
   visibility:visible;
   pointer-events:auto;
   isolation:isolate;
-  overscroll-behavior:none;
-  touch-action:none;
   box-sizing:border-box;
 }
-#ubeeNativeSplashR20,
-#ubeeNativeSplashR20 *{
+#ubeeAppSplashR19,
+#ubeeAppSplashR19 *{
   box-sizing:border-box;
   box-shadow:none!important;
-  filter:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
 }
-#ubeeNativeSplashR20 .ubee-r20-native-stage{
-  width:min(260px,76vw);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  transform:translateY(-2.2vh);
-}
-#ubeeNativeSplashR20 .ubee-r20-native-logo{
+#ubeeAppSplashR19 .ubee-r19-native-logo-wrap{
   position:relative;
-  width:96px;
-  height:96px;
+  width:min(88vw,520px);
   display:flex;
   align-items:center;
   justify-content:center;
-  overflow:hidden;
-  border:0;
-  border-radius:0;
-  background:transparent;
-  opacity:1;
-  transform:scale(1);
+  animation:ubeeR19NativeLogoIn 1.12s cubic-bezier(.18,.8,.25,1) both;
+  will-change:transform,opacity,filter;
 }
-#ubeeNativeSplashR20.is-entering .ubee-r20-native-logo{
-  animation:ubeeR20NativeLogoSettle .28s cubic-bezier(.2,.72,.2,1) both;
-}
-#ubeeNativeSplashR20 .ubee-r20-native-logo img{
-  position:relative;
-  z-index:2;
-  display:block;
-  width:96px;
-  height:96px;
-  object-fit:contain;
-  background:#ffffff;
-}
-#ubeeNativeSplashR20 .ubee-r20-native-logo img.is-failed{
-  display:none;
-}
-#ubeeNativeSplashR20 .ubee-r20-native-logo-fallback{
+#ubeeAppSplashR19 .ubee-r19-native-logo-wrap::after{
+  content:"";
   position:absolute;
-  inset:0;
+  left:20%;
+  right:20%;
+  bottom:7%;
+  height:16px;
+  border-radius:999px;
+  background:rgba(250,204,21,.20);
+  filter:blur(22px)!important;
+  opacity:0;
+  animation:ubeeR19NativeGlow 1.05s .28s ease forwards;
+  pointer-events:none;
+}
+#ubeeAppSplashR19 .ubee-r19-native-logo{
+  position:relative;
   z-index:1;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  width:76px;
-  height:76px;
-  margin:auto;
-  border-radius:22px;
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:min(66dvh,620px);
+  object-fit:contain;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+#ubeeAppSplashR19 .ubee-r19-native-loading{
+  position:absolute;
+  left:50%;
+  bottom:calc(42px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  width:52px;
+  height:3px;
+  overflow:hidden;
+  border-radius:999px;
+  background:rgba(255,255,255,.15);
+}
+#ubeeAppSplashR19 .ubee-r19-native-loading::after{
+  content:"";
+  display:block;
+  width:40%;
+  height:100%;
+  border-radius:inherit;
   background:#facc15;
-  color:#111111;
-  font-size:40px;
-  font-weight:1000;
-  line-height:1;
-  letter-spacing:-.06em;
+  animation:ubeeR19NativeLoad 1.18s ease-in-out infinite;
 }
-#ubeeNativeSplashR20 .ubee-r20-native-brand{
-  margin-top:14px;
-  color:#111111;
-  font-size:25px;
-  font-weight:1000;
-  line-height:1.15;
-  letter-spacing:-.045em;
-  opacity:1;
-}
-#ubeeNativeSplashR20 .ubee-r20-native-brand span{
-  color:#f4bd00;
-}
-#ubeeNativeSplashR20.is-entering .ubee-r20-native-brand{
-  animation:ubeeR20NativeBrandSettle .3s ease-out .04s both;
-}
-#ubeeNativeSplashR20.is-leaving{
+#ubeeAppSplashR19.is-leaving{
   opacity:0;
   visibility:hidden;
   pointer-events:none;
-  transition:
-    opacity .18s cubic-bezier(.4,0,.2,1),
-    visibility 0s linear .18s;
+  transition:opacity .30s ease,visibility 0s linear .30s;
 }
-@keyframes ubeeR20NativeLogoSettle{
-  from{opacity:.88;transform:scale(.985);}
-  to{opacity:1;transform:scale(1);}
+#ubeeAppSplashR19.is-leaving .ubee-r19-native-logo-wrap{
+  animation:ubeeR19NativeLogoOut .34s ease forwards;
 }
-@keyframes ubeeR20NativeBrandSettle{
-  from{opacity:.82;transform:translateY(2px);}
-  to{opacity:1;transform:translateY(0);}
+@keyframes ubeeR19NativeLogoIn{
+  0%{opacity:0;transform:scale(.82) translateY(10px);filter:blur(5px)}
+  56%{opacity:1;filter:blur(0)}
+  100%{opacity:1;transform:scale(1) translateY(0);filter:blur(0)}
 }
-@media (prefers-reduced-motion:reduce){
-  #ubeeNativeSplashR20 .ubee-r20-native-logo,
-  #ubeeNativeSplashR20 .ubee-r20-native-brand{
-    animation:none!important;
-    transform:none!important;
+@keyframes ubeeR19NativeLogoOut{
+  to{opacity:0;transform:scale(1.028);filter:blur(2px)}
+}
+@keyframes ubeeR19NativeGlow{
+  to{opacity:1}
+}
+@keyframes ubeeR19NativeLoad{
+  0%{transform:translateX(-120%)}
+  55%{transform:translateX(85%)}
+  100%{transform:translateX(260%)}
+}
+@media(max-width:390px){
+  #ubeeAppSplashR19 .ubee-r19-native-logo-wrap{
+    width:min(90vw,430px);
   }
-  #ubeeNativeSplashR20.is-leaving{
-    transition-duration:.1s;
+  #ubeeAppSplashR19 .ubee-r19-native-loading{
+    bottom:calc(34px + env(safe-area-inset-bottom));
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  #ubeeAppSplashR19 .ubee-r19-native-logo-wrap,
+  #ubeeAppSplashR19 .ubee-r19-native-loading::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+  }
+  #ubeeAppSplashR19.is-leaving{
+    transition-duration:.12s;
   }
 }
 </style>
 
 </head>
-<body>
+<body class="ubee-r19-native-starting">
 
-<div id="ubeeNativeSplashR20" aria-hidden="true">
-  <div class="ubee-r20-native-stage">
-    <div class="ubee-r20-native-logo">
-      <span class="ubee-r20-native-logo-fallback">U</span>
-      <img id="ubeeR20NativeSplashLogo" src="/ubee-customer-icon-192.png" alt="" decoding="sync" fetchpriority="high"/>
-    </div>
-    <div class="ubee-r20-native-brand">U<span>Bee</span> 跑腿</div>
+<div id="ubeeAppSplashR19" role="status" aria-live="polite" aria-label="UBee 跑腿正在開啟">
+  <div class="ubee-r19-native-logo-wrap" aria-hidden="true">
+    <img
+      id="ubeeR19SplashLogo"
+      class="ubee-r19-native-logo"
+      src="/ubee-customer-splash-logo.jpg?v=20260805-1"
+      alt=""
+      decoding="sync"
+      fetchpriority="high"
+    />
   </div>
+  <div class="ubee-r19-native-loading" aria-hidden="true"></div>
 </div>
 
-<script id="ubee-r20-native-launch-controller">
+<script id="ubee-r19-native-splash-controller">
 (()=>{
   'use strict';
 
-  const root = document.documentElement;
-  const splash = document.getElementById('ubeeNativeSplashR20');
-  if(!splash){
-    root.classList.remove('ubee-native-launch-pending');
-    return;
-  }
+  const splash = document.getElementById('ubeeAppSplashR19');
+  if(!splash) return;
 
-  const logo = document.getElementById('ubeeR20NativeSplashLogo');
+  const logo = document.getElementById('ubeeR19SplashLogo');
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  const minimumVisibleTime = reducedMotion ? 360 : 1420;
+  const removeDelay = reducedMotion ? 140 : 340;
   const startedAt = performance.now();
-  const minimumVisible = reducedMotion ? 360 : 720;
-  const fadeDuration = reducedMotion ? 110 : 200;
-  const absoluteMaximum = 1800;
   let finished = false;
-  let readyScheduled = false;
 
-  const failLogo = () => logo?.classList.add('is-failed');
-  if(logo){
-    logo.addEventListener('error',failLogo,{once:true});
-    if(logo.complete && logo.naturalWidth === 0) failLogo();
-  }
-
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(()=>splash.classList.add('is-entering'));
-  });
+  document.documentElement.classList.add('ubee-r19-native-starting');
+  document.body.classList.add('ubee-r19-native-starting');
+  if(themeMeta) themeMeta.setAttribute('content','#000000');
 
   const finishSplash = () => {
     if(finished) return;
     finished = true;
     splash.classList.add('is-leaving');
+    splash.setAttribute('aria-hidden','true');
     splash.style.pointerEvents = 'none';
 
-    window.setTimeout(()=>{
+    window.setTimeout(() => {
       splash.remove();
-      root.classList.remove('ubee-native-launch-pending');
-    },fadeDuration);
+      document.documentElement.classList.remove('ubee-r19-native-starting');
+      document.body.classList.remove('ubee-r19-native-starting');
+      if(themeMeta) themeMeta.setAttribute('content','#ffffff');
+    },removeDelay);
   };
 
-  const scheduleFinishAfterMinimum = () => {
-    if(readyScheduled || finished) return;
-    readyScheduled = true;
+  const finishAfterMinimumTime = () => {
     const elapsed = performance.now() - startedAt;
-    window.setTimeout(finishSplash,Math.max(0,minimumVisible - elapsed));
+    const remaining = Math.max(0,minimumVisibleTime - elapsed);
+    window.setTimeout(finishSplash,remaining);
   };
 
-  const appShellReady = () => {
-    requestAnimationFrame(()=>requestAnimationFrame(scheduleFinishAfterMinimum));
-  };
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded',appShellReady,{once:true});
-  }else{
-    appShellReady();
+  if(logo){
+    logo.addEventListener('error',()=>{
+      if(logo.dataset.fallbackApplied === '1') return;
+      logo.dataset.fallbackApplied = '1';
+      logo.src = '/ubee-customer-icon-512.png';
+    });
   }
 
-  /* 從瀏覽器／PWA 背景快取返回時，不重新展示啟動畫面。 */
-  window.addEventListener('pageshow',(event)=>{
-    if(event.persisted) finishSplash();
-  },{once:true});
+  /*
+   * Logo 解碼完成後才開始離場，避免啟動時先看到空白。
+   * 即使圖片或初始化失敗，防呆計時仍會自動解除啟動畫面。
+   */
+  if(logo?.decode){
+    logo.decode().catch(()=>{}).finally(finishAfterMinimumTime);
+  }else if(logo){
+    if(logo.complete) finishAfterMinimumTime();
+    else{
+      logo.addEventListener('load',finishAfterMinimumTime,{once:true});
+      logo.addEventListener('error',finishAfterMinimumTime,{once:true});
+    }
+  }else{
+    finishAfterMinimumTime();
+  }
 
-  /* 防呆：任何初始化異常都不能讓啟動畫面持續遮住 App。 */
-  window.setTimeout(finishSplash,absoluteMaximum);
+  /* 最長 2.5 秒後必定解除，避免任何例外遮住 App。 */
+  window.setTimeout(finishSplash,2500);
 })();
 </script>
 
