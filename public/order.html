@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-05 R16｜流程精簡、底部導航永久固定、導航上方零浮動零灰區 -->
+<!-- UBee 正式營運修復版：2026-08-05 R17｜保留R16版面，修復iPhone表單聚焦造成整體介面自動放大 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -23319,5 +23319,56 @@ body.flow-active>.app{display:none!important;}
   if(document.readyState !== 'loading') loadProfileFields();
 })();
 </script>
+
+<style id="ubee-r17-ios-form-no-auto-zoom">
+/* =========================================================
+   UBee R17｜iPhone／PWA 表單聚焦禁止自動放大
+   - iOS Safari 對小於 16px 的 input／textarea／select 可能自動放大頁面。
+   - 僅將可輸入控制項的實際字級鎖定為 16px。
+   - 保留 R16 的卡片尺寸、內距、流程精簡、固定底部導航與零灰區結構。
+   ========================================================= */
+html,
+body{
+  -webkit-text-size-adjust:100%!important;
+  text-size-adjust:100%!important;
+}
+
+#productionOrderFlow input,
+#productionOrderFlow textarea,
+#productionOrderFlow select,
+body:not(.flow-active) .app input,
+body:not(.flow-active) .app textarea,
+body:not(.flow-active) .app select,
+#ubeeCustomerAuthRoot input,
+#ubeeCustomerAuthRoot textarea,
+#ubeeCustomerAuthRoot select{
+  font-size:16px!important;
+  -webkit-text-size-adjust:100%!important;
+  text-size-adjust:100%!important;
+}
+
+/* 維持緊湊高度，不因字級安全修正而把表單卡片重新放大。 */
+#productionOrderFlow .flow-input,
+#productionOrderFlow .flow-select{
+  min-height:46px!important;
+  padding-left:11px!important;
+  padding-right:11px!important;
+  line-height:1.3!important;
+}
+#productionOrderFlow .flow-textarea{
+  min-height:104px!important;
+  padding:10px 11px!important;
+  line-height:1.5!important;
+}
+#productionOrderFlow .ubee-flat-form input,
+#productionOrderFlow .ubee-flat-form select,
+#productionOrderFlow .ubee-flat-form textarea,
+#productionOrderFlow .ubee-my-feedback-form input,
+#productionOrderFlow .ubee-my-feedback-form select,
+#productionOrderFlow .ubee-my-feedback-form textarea,
+#ubeeCustomerAuthRoot .uca-input{
+  font-size:16px!important;
+}
+</style>
 </body>
 </html>
