@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-05 R17｜保留R16版面，修復iPhone表單聚焦造成整體介面自動放大 -->
+<!-- UBee 正式營運修復版：2026-08-05 R18｜我的與全頁底部完整顯示、導航永久固定、零灰區零浮動操作層 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -19469,7 +19469,7 @@ const UBeeEnhancements = (() => {
   function scheduleDraft(){clearTimeout(state.draftTimer);state.draftTimer=setTimeout(saveDraft,500)}
   function clearDraft(){localStorage.removeItem(KEYS.draft)}
   function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,d.serviceType||serviceType);speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
-  function offerDraft(){const d=safeParse(localStorage.getItem(KEYS.draft)||'',null);if(!d||!d.savedAt||Date.now()-new Date(d.savedAt).getTime()>7*86400000)return;const el=document.createElement('div');el.className='draft-banner';el.id='draftBanner';el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}<br>${new Date(d.savedAt).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;document.body.appendChild(el);el.querySelector('.draft-discard').onclick=()=>{clearDraft();el.remove()};el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};}
+  function offerDraft(){const d=safeParse(localStorage.getItem(KEYS.draft)||'',null);if(!d||!d.savedAt||Date.now()-new Date(d.savedAt).getTime()>7*86400000)return;const el=document.createElement('div');el.className='draft-banner';el.id='draftBanner';el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}<br>${new Date(d.savedAt).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;(document.querySelector('#productionOrderFlow #flowPageHome .flow-home-scroll')||document.querySelector('#productionOrderFlow #flowPageHome .flow-scroll')||document.querySelector('.app')||document.body).prepend(el);el.querySelector('.draft-discard').onclick=()=>{clearDraft();el.remove()};el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};}
 
   function renderQuickAddresses(){const bar=qs('savedAddressQuickBar'),list=getAddresses();if(!bar)return;bar.classList.toggle('hidden',!list.length);bar.innerHTML=list.map(a=>`<button class="quick-address-chip" type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">${escapeAttr(a.label||'常用地址')}</button>`).join('')}
   function renderAddressManager(){const el=qs('savedAddressList'),list=getAddresses();if(!el)return;el.innerHTML=list.length?list.map(a=>`<div class="saved-address-card"><div class="saved-address-card-head"><div><div class="saved-address-card-title">${escapeAttr(a.label||'常用地址')}</div><div class="saved-address-card-text">${escapeAttr(a.address)}${a.note?`<br>${escapeAttr(a.note)}`:''}${a.phone?`<br>${escapeAttr(a.contact||'聯絡人')}：${escapeAttr(a.phone)}`:''}</div></div><button class="danger-link" type="button" onclick="UBeeEnhancements.deleteAddress('${a.id}')">刪除</button></div><div class="saved-address-actions"><button type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','pickup')">帶入取件</button><button type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">帶入送達</button></div></div>`).join(''):'<div class="empty-state">尚未儲存常用地址。</div>';renderQuickAddresses()}
@@ -19617,7 +19617,7 @@ activateUBeeCustomerRuntime();
     if(el) return el;
     el = document.createElement('div');
     el.id = 'ubeeNetworkStatusBanner';
-    el.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));z-index:99999;padding:11px 14px;border-radius:14px;font-size:13px;font-weight:900;line-height:1.45;text-align:center;box-shadow:0 10px 28px rgba(0,0,0,.16);display:none;';
+    el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-radius:0;font-size:13px;font-weight:900;line-height:1.45;text-align:center;box-shadow:none;display:none;';
     document.body.appendChild(el);
     return el;
   }
@@ -23370,5 +23370,267 @@ body:not(.flow-active) .app select,
   font-size:16px!important;
 }
 </style>
+
+<style id="ubee-r18-visible-bottom-fixed-nav-no-gray">
+/* =========================================================
+   UBee R18｜底部完整可見、導航永久固定、零灰區
+   1. 底部導航是唯一固定於畫面底部的操作介面。
+   2. 我的主頁、設定與所有子頁直接結束在導航上緣。
+   3. 不再以導航高度 padding 製造灰色空白；只保留 16px 正常收尾。
+   4. 流程按鈕、追蹤標題與舊確認列都在正常內容流，不跟著頁面浮動。
+   ========================================================= */
+:root{
+  --ubee-r18-nav-content-height:58px;
+  --ubee-r18-nav-total-height:calc(58px + env(safe-area-inset-bottom));
+}
+
+html,
+body{
+  background:#fff!important;
+}
+
+#productionOrderFlow{
+  --ubee-bottom-nav-content-height:var(--ubee-r18-nav-content-height)!important;
+  --ubee-bottom-nav-height:var(--ubee-r18-nav-total-height)!important;
+  --flow-nav-height:var(--ubee-r18-nav-content-height)!important;
+  --flow-nav-total-height:var(--ubee-r18-nav-total-height)!important;
+  background:#fff!important;
+}
+
+#productionOrderFlow .flow-shell{
+  height:100vh!important;
+  height:100dvh!important;
+  min-height:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#fff!important;
+}
+
+/* 所有正式頁面直接止於固定導航上緣。 */
+#productionOrderFlow .flow-page{
+  inset:0 0 var(--ubee-r18-nav-total-height) 0!important;
+  min-height:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#fff!important;
+}
+
+/* 一般頁面只在自己的內容區捲動，不預留第二次導航高度。 */
+#productionOrderFlow .flow-scroll,
+#productionOrderFlow .flow-home-scroll,
+#productionOrderFlow #flowPageTask .flow-scroll,
+#productionOrderFlow #flowPageOptions .flow-scroll,
+#productionOrderFlow #flowPageConfirm .flow-scroll,
+#productionOrderFlow #flowPageSearch .flow-scroll,
+#productionOrderFlow #flowPageDetail .flow-scroll,
+#productionOrderFlow #flowPageProfileDetail .flow-scroll{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  box-sizing:border-box!important;
+  padding-bottom:16px!important;
+  scroll-padding-bottom:16px!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain!important;
+  background:#fff!important;
+}
+
+/* 我的主頁已位於 flow-page 內，不能再加入導航高度。 */
+#productionOrderFlow .ubee-my-page,
+#productionOrderFlow .ubee-my-scroll{
+  background:#fff!important;
+}
+#productionOrderFlow .ubee-my-scroll{
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+  padding-top:calc(12px + env(safe-area-inset-top))!important;
+  padding-right:var(--ubee-my-page-x)!important;
+  padding-bottom:16px!important;
+  padding-left:var(--ubee-my-page-x)!important;
+  scroll-padding-bottom:16px!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+#productionOrderFlow .ubee-my-group:last-child{
+  margin-bottom:0!important;
+}
+#productionOrderFlow .ubee-my-groups{
+  padding-bottom:0!important;
+}
+
+/*
+ * 我的子頁會被控制器移到 flow-shell，並非 flow-page 的子元素。
+ * 因此必須直接把其 bottom 設在導航上緣；不能使用底部 padding 補償。
+ */
+#productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  position:absolute!important;
+  inset:0 0 var(--ubee-r18-nav-total-height) 0!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+  padding-top:calc(8px + env(safe-area-inset-top))!important;
+  padding-right:var(--ubee-my-page-x)!important;
+  padding-bottom:16px!important;
+  padding-left:var(--ubee-my-page-x)!important;
+  scroll-padding-bottom:16px!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain!important;
+  background:#fff!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  translate:none!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+#productionOrderFlow .ubee-my-panel.ubee-my-app-page > :last-child{
+  margin-bottom:0!important;
+}
+
+/* 所有流程操作列回到內容末端；不固定、不黏住、不覆蓋文字。 */
+#productionOrderFlow .flow-actionbar,
+.home-action-footer,
+.step2-action-footer,
+.step3-action-footer,
+.step4-action-footer,
+.step5-action-footer,
+.flow-action-footer,
+.flow-sticky-action,
+.tracking-action-footer,
+#step4 .review-sticky-footer{
+  position:static!important;
+  inset:auto!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  z-index:auto!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  translate:none!important;
+}
+
+/* 任務追蹤頁標題跟著內容捲動，不再 sticky。 */
+body.ubee-active-order #step5 .step5-order-header{
+  position:static!important;
+  top:auto!important;
+  z-index:auto!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+/* 舊版內容只保留導航本身所需的精確高度，沒有額外 12/74/120px 灰色墊高。 */
+body:not(.flow-active) .app{
+  box-sizing:border-box!important;
+  padding-bottom:var(--ubee-r18-nav-total-height)!important;
+  scroll-padding-bottom:var(--ubee-r18-nav-total-height)!important;
+  background:#fff!important;
+}
+.footer-nav{
+  margin-bottom:0!important;
+}
+body.ubee-active-order #step5{
+  padding-bottom:16px!important;
+  background:#fff!important;
+}
+
+/* 草稿與網路狀態保留功能，但改為滿版平面狀態列，禁止浮動卡片視覺。 */
+.draft-banner{
+  position:static!important;
+  inset:auto!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0 0 12px!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+}
+#ubeeNetworkStatusBanner{
+  left:0!important;
+  right:0!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+}
+
+/* 底部導航永久固定：三欄、滿版、白底、無灰區與浮動外觀。 */
+#productionOrderFlow .flow-bottom-nav,
+body:not(.flow-active) .bottom-tabs{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:var(--ubee-r18-nav-total-height)!important;
+  min-height:var(--ubee-r18-nav-total-height)!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:var(--ubee-r18-nav-content-height)!important;
+  margin:0!important;
+  padding:0 0 env(safe-area-inset-bottom)!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-top:1px solid #dfe2e5!important;
+  border-radius:0!important;
+  background:#fff!important;
+  opacity:1!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  translate:none!important;
+  z-index:20000!important;
+}
+#productionOrderFlow .flow-bottom-nav > button,
+body:not(.flow-active) .bottom-tabs > .bottom-tab{
+  height:var(--ubee-r18-nav-content-height)!important;
+  min-height:var(--ubee-r18-nav-content-height)!important;
+  margin:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  filter:none!important;
+  transform:none!important;
+  translate:none!important;
+}
+</style>
+
 </body>
 </html>
