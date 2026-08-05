@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260805-3" rel="manifest"/>
+<link href="/manifest-order.json?v=20260805-4" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -8748,7 +8748,8 @@ body.ubee-app-starting::before{
     startup.style.pointerEvents = 'none';
 
     window.setTimeout(()=>{
-      startup.remove();
+      startup.hidden = true;
+      startup.classList.remove('is-leaving');
 
       document.documentElement.classList.remove('ubee-app-starting');
       document.body.classList.remove('ubee-app-starting');
@@ -20601,7 +20602,7 @@ body.flow-active>.app{display:none!important;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21670,11 +21671,16 @@ body.flow-active>.app{display:none!important;}
 
 
   function enhanceHomeHeader(){
-    const support = document.getElementById('flowSupportButton');
-    if(!support) return;
-    support.innerHTML = supportIcon;
-    support.setAttribute('aria-label','聯繫客服');
-    support.setAttribute('title','聯繫客服');
+    const buttons = [
+      document.getElementById('flowSupportButton'),
+      ...document.querySelectorAll('.topbar-support')
+    ].filter(Boolean);
+
+    buttons.forEach(support => {
+      support.innerHTML = supportIcon;
+      support.setAttribute('aria-label','聯繫客服');
+      support.setAttribute('title','聯繫客服');
+    });
   }
 
   function ensureMyRootHeader(){
@@ -22489,6 +22495,26 @@ body.flow-active>.app{display:none!important;}
     }
   });
 
+  function closeSupportToHomeAnimated(){
+    const panel = document.getElementById('ubeeMySupportPanel');
+    if(panel){
+      panel.classList.remove('is-open');
+      panel.classList.add('is-returning-home');
+    }
+
+    window.setTimeout(() => {
+      if(panel) panel.classList.remove('is-returning-home');
+      closeMySubPages();
+      currentMySection = '';
+      window.__UBEE_SUPPORT_OPENED_FROM_HOME__ = false;
+      document.body.classList.remove('ubee-my-subpage-open');
+      root.removeAttribute('data-my-section');
+      try{ showPage('home'); }catch(_){ }
+      markBottomNav('home');
+      replaceMyHistoryWithRoot();
+    },260);
+  }
+
   document.addEventListener('click',event => {
     const clickable = event.target.closest('button,[role="button"]');
     if(clickable && !clickable.classList.contains('ubee-setting-switch')){
@@ -22597,7 +22623,11 @@ body.flow-active>.app{display:none!important;}
     if(closeButton){
       event.preventDefault();
       event.stopImmediatePropagation();
-      closeWithHistory();
+      if(currentMySection === 'support' && window.__UBEE_SUPPORT_OPENED_FROM_HOME__){
+        closeSupportToHomeAnimated();
+      }else{
+        closeWithHistory();
+      }
       return;
     }
 
@@ -22614,6 +22644,15 @@ body.flow-active>.app{display:none!important;}
       event.preventDefault();
       event.stopImmediatePropagation();
       handleSettingsAction(settingsAction.dataset.settingsAction);
+      return;
+    }
+
+    const homeSupportButton = event.target.closest('#flowSupportButton,.topbar-support');
+    if(homeSupportButton){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      window.__UBEE_SUPPORT_OPENED_FROM_HOME__ = true;
+      openMySection('support',{fromHome:true});
       return;
     }
 
@@ -23547,6 +23586,139 @@ body > #ubeePersistentBottomNav > button.active{
   }
 
   window.addEventListener('pageshow',mountNavigationOnce);
+})();
+</script>
+
+
+
+<style id="ubee-startup-support-return-final-fix">
+/* 啟動畫面保留於 DOM，供 PWA 從背景重新開啟時再次播放。 */
+#ubeeStartupScreen[hidden]{
+  display:none!important;
+}
+
+/* 首頁客服統一為清楚的耳機圖示。 */
+.topbar-support,
+#flowSupportButton{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+.topbar-support svg,
+#flowSupportButton svg{
+  width:25px!important;
+  height:25px!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:2!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
+
+/* 客服頁由右側進入，返回首頁時向右退出。 */
+#productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page:not([hidden]){
+  will-change:transform,opacity;
+}
+#productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-open{
+  animation:ubeeSupportEnter .26s cubic-bezier(.22,.8,.3,1) both!important;
+}
+#productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-returning-home{
+  display:block!important;
+  animation:ubeeSupportReturnHome .26s cubic-bezier(.4,0,.2,1) both!important;
+  pointer-events:none!important;
+}
+@keyframes ubeeSupportEnter{
+  from{transform:translate3d(24%,0,0);opacity:.2;}
+  to{transform:translate3d(0,0,0);opacity:1;}
+}
+@keyframes ubeeSupportReturnHome{
+  from{transform:translate3d(0,0,0);opacity:1;}
+  to{transform:translate3d(28%,0,0);opacity:0;}
+}
+@media (prefers-reduced-motion:reduce){
+  #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-open,
+  #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-returning-home{
+    animation-duration:.01ms!important;
+  }
+}
+</style>
+
+<script id="ubee-startup-replay-and-support-icon-controller">
+(()=>{
+  'use strict';
+  if(window.__UBEE_STARTUP_REPLAY_SUPPORT_FIX__) return;
+  window.__UBEE_STARTUP_REPLAY_SUPPORT_FIX__ = true;
+
+  const HEADSET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13v-2a8 8 0 0 1 16 0v2"/><path d="M4 13a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2v-2ZM20 13a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2v-2Z"/><path d="M17 19c-1 1-2.5 1.5-5 1.5"/></svg>';
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  let hiddenAt = 0;
+  let replaying = false;
+
+  function applySupportIcons(){
+    const buttons = [
+      document.getElementById('flowSupportButton'),
+      ...document.querySelectorAll('.topbar-support')
+    ].filter(Boolean);
+
+    buttons.forEach(button => {
+      if(button.dataset.ubeeHeadsetReady === 'true') return;
+      button.innerHTML = HEADSET_ICON;
+      button.dataset.ubeeHeadsetReady = 'true';
+      button.setAttribute('aria-label','聯繫客服');
+      button.setAttribute('title','聯繫客服');
+    });
+  }
+
+  function replayStartup(duration=1250){
+    const startup = document.getElementById('ubeeStartupScreen');
+    if(!startup || replaying || document.body.classList.contains('ubee-customer-auth-open')) return;
+    replaying = true;
+
+    startup.hidden = false;
+    startup.classList.remove('is-leaving');
+    startup.removeAttribute('aria-hidden');
+    startup.style.pointerEvents = 'auto';
+    document.documentElement.classList.add('ubee-app-starting');
+    document.body.classList.add('ubee-app-starting');
+    if(themeMeta) themeMeta.setAttribute('content','#facc15');
+
+    window.setTimeout(() => {
+      startup.classList.add('is-leaving');
+      startup.setAttribute('aria-hidden','true');
+      startup.style.pointerEvents = 'none';
+      window.setTimeout(() => {
+        startup.hidden = true;
+        startup.classList.remove('is-leaving');
+        document.documentElement.classList.remove('ubee-app-starting');
+        document.body.classList.remove('ubee-app-starting');
+        if(themeMeta) themeMeta.setAttribute('content','#ffffff');
+        replaying = false;
+        applySupportIcons();
+      },20);
+    },duration);
+  }
+
+  document.addEventListener('DOMContentLoaded',applySupportIcons,{once:true});
+  window.addEventListener('load',applySupportIcons,{once:true});
+  window.setTimeout(applySupportIcons,400);
+  window.setTimeout(applySupportIcons,1200);
+
+  window.addEventListener('pageshow',event => {
+    applySupportIcons();
+    if(event.persisted) replayStartup(1100);
+  });
+
+  document.addEventListener('visibilitychange',() => {
+    if(document.hidden){
+      hiddenAt = Date.now();
+      return;
+    }
+    applySupportIcons();
+    if(hiddenAt && Date.now()-hiddenAt > 900){
+      replayStartup(1100);
+    }
+    hiddenAt = 0;
+  });
 })();
 </script>
 
