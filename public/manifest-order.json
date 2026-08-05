@@ -3,15 +3,15 @@
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
   "description": "UBee 跑腿用戶端：估價、下單、追蹤與管理跑腿任務。",
-  "start_url": "/order.html?source=pwa",
+  "start_url": "/order.html?source=pwa&v=20260805-4",
   "scope": "/",
   "display": "standalone",
   "display_override": [
     "window-controls-overlay",
     "standalone"
   ],
-  "background_color": "#facc15",
-  "theme_color": "#facc15",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "orientation": "portrait-primary",
   "categories": [
     "business",
