@@ -17,10 +17,9 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#facc15" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R30 Native｜僅修正底部導航；Android／iOS 永久貼齊視窗底部 -->
+<!-- UBee 正式營運版：2026-08-05 R31 Native｜底部導航單一邏輯清理；移除舊版覆蓋與無效空白 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
-
     :root{
   --bg:#f5f6f7;
   --surface:#ffffff;
@@ -131,7 +130,6 @@
     1px solid var(--line);
 }
 
-
 /* 左側 Logo / 返回按鈕 */
 
 .topbar-left{
@@ -146,20 +144,17 @@
   min-width:0;
 }
 
-
 .topbar-left .icon-btn{
   flex:0 0 42px;
 
   margin-right:6px;
 }
 
-
 /* 首頁不需要返回按鈕時，完全不佔位置 */
 
 .icon-btn.ghost{
   display:none;
 }
-
 
 /* UBee Logo */
 
@@ -168,7 +163,6 @@
 
   text-align:center;
 }
-
 
 .brand{
   font-size:27px;
@@ -182,11 +176,9 @@
   white-space:nowrap;
 }
 
-
 .brand span{
   color:var(--accentStrong);
 }
-
 
 /* 不再顯示 CITY TASK PLATFORM */
 
@@ -221,7 +213,6 @@
   display:block;
 }
 
-
 .topbar-location-arrow{
   color:#777;
 
@@ -229,7 +220,6 @@
 
   margin-left:1px;
 }
-
 
 /* 右側客服按鈕 */
 
@@ -245,7 +235,6 @@
 
   background:transparent;
 
-  
 }
 
 .topbar-support svg{
@@ -333,10 +322,10 @@
       border:1px solid rgba(17,24,39,.08);
       border-radius:16px;
       background:rgba(255,255,255,.96);
-      
+
       color:#111;
       white-space:nowrap;
-      
+
     }
 
     .route-badge strong{
@@ -380,7 +369,7 @@
       border:1px solid var(--line);
       background:var(--surface);
       border-radius:20px;
-      
+
     }
 
     .task-path-box{
@@ -406,7 +395,7 @@
       margin:12px 0 16px;
       background:#fffbea;
       border-color:#f1e29a;
-      
+
     }
 
     .quick-guide-title{
@@ -439,7 +428,7 @@
       border:1px solid var(--line);
       background:#fff;
       border-radius:18px;
-      
+
     }
 
     .input-wrap{
@@ -499,7 +488,7 @@
     .nearby-box{
       padding:14px;
       margin:12px 0 18px;
-      
+
     }
 
     .nearby-head{
@@ -558,7 +547,7 @@
 
     .nearby-place.active{
       border-color:#111;
-      
+
     }
 
     .nearby-place-name{
@@ -838,7 +827,7 @@
       border:1px solid var(--line);
       background:#fff;
       border-radius:20px;
-      
+
     }
 
     .menu-item{
@@ -892,7 +881,7 @@
 
     .info-item{
       padding:14px;
-      
+
     }
 
     .info-item-title{
@@ -911,7 +900,7 @@
     .address-display{
       padding:13px;
       margin:12px 0;
-      
+
       background:var(--surface2);
     }
 
@@ -980,17 +969,6 @@
       margin-bottom:74px;
     }
 
-    
-
-
-
-
-
-
-
-
-
-
     .ubee-map-pin{
       min-width:30px;
       height:30px;
@@ -1000,7 +978,7 @@
       align-items:center;
       justify-content:center;
       border:2px solid #fff;
-      
+
       font-size:11px;
       font-weight:1000;
       color:#fff;
@@ -1045,7 +1023,6 @@
    第二階段：首頁地圖與白色操作區
    ============================== */
 
-
 /* 地圖拉高，讓首頁更有即時跑腿平台的感覺 */
 
 .home-map-shell{
@@ -1064,7 +1041,6 @@
   border-top:none;
   border-bottom:none;
 }
-
 
 /* 定位按鈕改成圓形 */
 
@@ -1096,9 +1072,7 @@
 
   color:#111111;
 
-  
 }
-
 
 /* 白色操作區改成接住地圖的底部面板 */
 
@@ -1127,9 +1101,7 @@
 
   background:#ffffff;
 
-  
 }
-
 
 /* 上方小拉桿縮小 */
 
@@ -1150,7 +1122,6 @@
 /* ==============================
    第三階段：首頁主服務分類列
    ============================== */
-
 
 /* 隱藏首頁大型標題與說明
    讓服務分類直接出現在白色面板頂部 */
@@ -1184,11 +1155,9 @@
   -webkit-overflow-scrolling:touch;
 }
 
-
 .category-tabs::-webkit-scrollbar{
   display:none;
 }
-
 
 /* 每一個主分類 */
 
@@ -1217,15 +1186,12 @@
 
   color:#8a8d91;
 
-  
-
   font-size:14px !important;
 
   font-weight:900;
 
   white-space:nowrap;
 }
-
 
 /* 取消原本黑色膠囊 */
 
@@ -1236,9 +1202,7 @@
 
   color:#111111;
 
-  
 }
-
 
 /* 選中服務的黃色底線 */
 
@@ -1268,7 +1232,6 @@
    第四階段：任務細項改成圖示入口
    ============================== */
 
-
 /* 不再顯示「任務細項」文字 */
 
 /* 細項服務改成圖示型入口 */
@@ -1295,11 +1258,9 @@
   -webkit-overflow-scrolling:touch;
 }
 
-
 .service-grid-new::-webkit-scrollbar{
   display:none;
 }
-
 
 /* 每一個服務細項 */
 
@@ -1326,13 +1287,10 @@
 
   color:#777;
 
-  
-
   text-align:center;
 
   transition:.15s ease;
 }
-
 
 /* 圖示 */
 
@@ -1355,7 +1313,6 @@
   line-height:1;
 }
 
-
 /* 服務名稱 */
 
 .service-item-title{
@@ -1370,7 +1327,6 @@
   color:inherit;
 }
 
-
 /* 被選中的服務 */
 
 .service-item.active{
@@ -1380,9 +1336,7 @@
 
   color:#111;
 
-  
 }
-
 
 /* 被選中的黃色底線 */
 
@@ -1412,7 +1366,6 @@
    改成簡潔推薦標籤
    ============================== */
 
-
 /* 分類區整體 */
 
 .category-choice-box{
@@ -1436,13 +1389,11 @@
     #fafafa;
 }
 
-
 /* 保持分類標題隱藏 */
 
 .category-choice-title{
   display:none;
 }
-
 
 /* 分類橫向排列 */
 
@@ -1464,11 +1415,9 @@
   -webkit-overflow-scrolling:touch;
 }
 
-
 .category-choice-grid::-webkit-scrollbar{
   display:none;
 }
-
 
 /* 一般狀態 */
 
@@ -1495,8 +1444,6 @@
   color:
     #777b80;
 
-  
-
   font-size:
     12px !important;
 
@@ -1506,7 +1453,6 @@
   white-space:
     nowrap;
 }
-
 
 /* 選中狀態 */
 
@@ -1519,13 +1465,11 @@
   color:
     #111111;
 
-  
 }
 
 /* ==============================
    第六階段：首頁地址路線卡片
    ============================== */
-
 
 /* 隱藏「路線」文字標題 */
 
@@ -1550,9 +1494,7 @@
   background:
     #ffffff;
 
-  
 }
-
 
 /* 中間連接線 */
 
@@ -1574,7 +1516,6 @@
   background:
     #d9dbde;
 }
-
 
 /* 每一列地址 */
 
@@ -1598,14 +1539,12 @@
     15px;
 }
 
-
 /* 第二列分隔線 */
 
 #step1 .address-row + .address-row{
   border-top:
     1px solid #eeeeef;
 }
-
 
 /* 地址圓點 */
 
@@ -1621,16 +1560,13 @@
 
   border-radius:50%;
 
-  
 }
-
 
 /* 取件點 */
 
 #step1 .address-dot.pickup{
   background:#111111;
 }
-
 
 /* 送達點 */
 
@@ -1639,13 +1575,11 @@
     var(--accentStrong);
 }
 
-
 /* 地址文字區 */
 
 #step1 .address-main{
   min-width:0;
 }
-
 
 /* 小標題 */
 
@@ -1660,7 +1594,6 @@
 
   line-height:1.2;
 }
-
 
 /* 地址輸入框 */
 
@@ -1685,7 +1618,6 @@
 
   line-height:1.45;
 }
-
 
 /* 提示文字 */
 
@@ -1720,14 +1652,13 @@
   background:#ffffff;
   color:#111111;
 
-  
   cursor:pointer;
   -webkit-tap-highlight-color:transparent;
   transition:transform .16s ease, box-shadow .16s ease, opacity .16s ease;
 }
 
 #step1 .address-swap-btn:hover{
-  
+
 }
 
 #step1 .address-swap-btn:active{
@@ -1737,7 +1668,7 @@
 #step1 .address-swap-btn:disabled{
   opacity:.38;
   cursor:not-allowed;
-  
+
 }
 
 #step1 .address-swap-btn svg{
@@ -1762,7 +1693,6 @@
    第七階段：首頁固定費用操作列
    ============================== */
 
-
 /* 預留底部空間
    避免最後面的地址內容被固定操作列擋住 */
 
@@ -1770,11 +1700,7 @@
   padding-bottom:120px;
 }
 
-
 /* 固定在底部導覽列上方 */
-
-
-
 
 /* 移除原本預估卡片外觀 */
 
@@ -1802,7 +1728,6 @@
   background:transparent;
 }
 
-
 /* 預估費用小標 */
 
 #step1 .home-estimate-label{
@@ -1816,7 +1741,6 @@
 
   white-space:nowrap;
 }
-
 
 /* 距離與時間資訊 */
 
@@ -1838,7 +1762,6 @@
   text-overflow:ellipsis;
 }
 
-
 /* 金額 */
 
 #step1 .home-estimate-amount{
@@ -1854,7 +1777,6 @@
 
   white-space:nowrap;
 }
-
 
 /* 下一步按鈕 */
 
@@ -1883,9 +1805,7 @@
 
   font-weight:1000;
 
-  
 }
-
 
 /* 按下效果 */
 
@@ -1899,7 +1819,6 @@
    第三層任務分類移到第二頁
    ============================== */
 
-
 /* 第二頁任務分類區 */
 
 #step2 .task-category-step2{
@@ -1908,7 +1827,6 @@
     0
     18px;
 }
-
 
 /* 取消首頁版本的大區塊樣式 */
 
@@ -1921,7 +1839,6 @@
 
   background:transparent;
 }
-
 
 /* 分類繼續維持橫向滑動 */
 
@@ -1944,11 +1861,9 @@
   -webkit-overflow-scrolling:touch;
 }
 
-
 #step2 .category-choice-grid::-webkit-scrollbar{
   display:none;
 }
-
 
 /* 第二頁一般分類 */
 
@@ -1977,8 +1892,6 @@
   color:
     #74787d;
 
-  
-
   font-size:
     12px !important;
 
@@ -1988,7 +1901,6 @@
   white-space:
     nowrap;
 }
-
 
 /* 第二頁已選擇分類 */
 
@@ -2002,7 +1914,6 @@
   color:
     #111111;
 
-  
 }
 
 /* ==============================
@@ -2010,14 +1921,12 @@
    第二頁改成正式訂單資訊頁
    ============================== */
 
-
 /* 第二頁整體 */
 
 #step2{
   padding-top:4px;
   padding-bottom:120px;
 }
-
 
 /* 頁面主標題 */
 
@@ -2038,7 +1947,6 @@
   line-height:1.25;
 }
 
-
 /* 頁面說明 */
 
 #step2 > .subtext{
@@ -2052,7 +1960,6 @@
 
   line-height:1.65;
 }
-
 
 /* ==============================
    已選任務
@@ -2080,9 +1987,7 @@
   background:
     #fffbed;
 
-  
 }
-
 
 /* 左側黃色標記 */
 
@@ -2109,7 +2014,6 @@
     var(--accentStrong);
 }
 
-
 /* 小標 */
 
 #step2 .task-path-title{
@@ -2121,7 +2025,6 @@
 
   font-weight:1000;
 }
-
 
 /* 任務名稱 */
 
@@ -2135,7 +2038,6 @@
   line-height:1.5;
 }
 
-
 /* ==============================
    第二頁每一個表單區塊
    ============================== */
@@ -2146,7 +2048,6 @@
     0
     18px;
 }
-
 
 /* 區塊標題 */
 
@@ -2163,7 +2064,6 @@
   font-weight:1000;
 }
 
-
 /* 白色資訊卡 */
 
 #step2 .input-card{
@@ -2179,9 +2079,7 @@
   background:
     #ffffff;
 
-  
 }
-
 
 /* 每一列 */
 
@@ -2199,11 +2097,9 @@
     #eeeeef;
 }
 
-
 #step2 .input-wrap:last-child{
   border-bottom:none;
 }
-
 
 /* 左邊小圖示 */
 
@@ -2229,7 +2125,6 @@
   font-weight:1000;
 }
 
-
 /* 輸入文字 */
 
 #step2 input,
@@ -2243,7 +2138,6 @@
   font-weight:850;
 }
 
-
 /* placeholder */
 
 #step2 input::placeholder,
@@ -2252,7 +2146,6 @@
 
   font-weight:750;
 }
-
 
 /* 多行任務內容 */
 
@@ -2265,7 +2158,6 @@
 
   line-height:1.7;
 }
-
 
 /* 下拉選單 */
 
@@ -2299,9 +2191,7 @@
   background:
     #fffbed;
 
-  
 }
-
 
 #step2 .quick-guide-title{
   margin-bottom:5px;
@@ -2312,7 +2202,6 @@
 
   font-weight:1000;
 }
-
 
 #step2 .quick-guide-text{
   color:#736b50;
@@ -2329,14 +2218,10 @@
    第二頁固定底部操作列
    ============================== */
 
-
 /* 預留底部空間
    避免最後一個表單被固定操作列蓋住 */
 
 /* 第二頁固定操作列 */
-
-
-
 
 /* ==============================
    上一步
@@ -2374,9 +2259,7 @@
 
   font-weight:1000;
 
-  
 }
-
 
 .step2-back-btn svg{
   width:18px;
@@ -2388,7 +2271,6 @@
     0
     18px;
 }
-
 
 /* ==============================
    下一步
@@ -2425,9 +2307,7 @@
 
   font-weight:1000;
 
-  
 }
-
 
 .step2-next-btn svg{
   width:19px;
@@ -2439,7 +2319,6 @@
     0
     19px;
 }
-
 
 /* 按下效果 */
 
@@ -2454,14 +2333,12 @@
    第三頁改成任務時效方案選擇
    ============================== */
 
-
 /* 第三頁整體 */
 
 #step3{
   padding-top:4px;
   padding-bottom:120px;
 }
-
 
 /* 主標題 */
 
@@ -2482,7 +2359,6 @@
   line-height:1.25;
 }
 
-
 /* 說明文字 */
 
 #step3 > .subtext{
@@ -2496,7 +2372,6 @@
 
   line-height:1.65;
 }
-
 
 /* ==============================
    三個速度方案合併成一張列表
@@ -2515,9 +2390,7 @@
 
   background:#ffffff;
 
-  
 }
-
 
 /* 每一個方案 */
 
@@ -2538,12 +2411,9 @@
 
   background:#ffffff;
 
-  
-
   transition:
     background .15s ease;
 }
-
 
 /* 中間分隔線 */
 
@@ -2553,7 +2423,6 @@
     #eeeeef;
 }
 
-
 /* 選中方案 */
 
 #step3 .speed-card.active{
@@ -2562,9 +2431,7 @@
   background:
     #fffbed;
 
-  
 }
-
 
 /* 選中方案左側黃色線 */
 
@@ -2591,7 +2458,6 @@
     var(--accentStrong);
 }
 
-
 /* ==============================
    方案上半部
    ============================== */
@@ -2610,7 +2476,6 @@
   margin-bottom:6px;
 }
 
-
 /* 方案名稱 */
 
 #step3 .speed-name{
@@ -2623,7 +2488,6 @@
   line-height:1.3;
 }
 
-
 /* 時間移到名稱下面 */
 
 #step3 .speed-time{
@@ -2635,7 +2499,6 @@
 
   font-weight:900;
 }
-
 
 /* ==============================
    左側選擇圓點
@@ -2673,7 +2536,6 @@
   font-size:0;
 }
 
-
 /* 選中後改成 UBee 黃色 */
 
 #step3 .speed-card.active .speed-check{
@@ -2683,7 +2545,6 @@
   background:
     var(--accent);
 }
-
 
 /* 選中圓點中央 */
 
@@ -2698,7 +2559,6 @@
 
   background:#111111;
 }
-
 
 /* ==============================
    方案說明
@@ -2721,16 +2581,12 @@
    第三頁固定底部操作列
    ============================== */
 
-
 /* 預留空間
    避免最後一個時效方案被固定操作列擋住 */
 
 /* ==============================
    第三頁固定操作列
    ============================== */
-
-
-
 
 /* ==============================
    上一步按鈕
@@ -2768,9 +2624,7 @@
 
   font-weight:1000;
 
-  
 }
-
 
 .step3-back-btn svg{
   width:18px;
@@ -2782,7 +2636,6 @@
     0
     18px;
 }
-
 
 /* ==============================
    下一步按鈕
@@ -2819,11 +2672,8 @@
 
   font-weight:1000;
 
-  
-
   white-space:nowrap;
 }
-
 
 .step3-next-btn svg{
   width:19px;
@@ -2835,7 +2685,6 @@
     0
     19px;
 }
-
 
 /* 按下效果 */
 
@@ -2863,7 +2712,6 @@
   background:#ffffff;
 }
 
-
 .step4-page-title{
   color:#111111;
 
@@ -2875,7 +2723,6 @@
 
   line-height:1.25;
 }
-
 
 .step4-page-sub{
   margin-top:4px;
@@ -2929,13 +2776,11 @@
   color:#62676d;
 }
 
-
 #step4 .map-placeholder strong{
   font-size:14px;
 
   font-weight:1000;
 }
-
 
 #step4 .map-placeholder small{
   max-width:260px;
@@ -2993,9 +2838,7 @@
 
   background:#ffffff;
 
-  
 }
-
 
 /* 左右資訊 */
 
@@ -3003,11 +2846,9 @@
   min-width:0;
 }
 
-
 #step4 .review-route-item-right{
   text-align:right;
 }
-
 
 /* 小標 */
 
@@ -3020,7 +2861,6 @@
 
   font-weight:900;
 }
-
 
 /* 主要數字 */
 
@@ -3038,7 +2878,6 @@
   line-height:1.2;
 }
 
-
 /* 中間直線 */
 
 #step4 .review-route-divider{
@@ -3053,7 +2892,6 @@
    第十四階段：
    第四頁訂單資訊摘要
    ============================== */
-
 
 /* ==============================
    區塊標題
@@ -3074,7 +2912,6 @@
     10px;
 }
 
-
 .review-section-title{
   color:#111111;
 
@@ -3085,7 +2922,6 @@
   letter-spacing:-.3px;
 }
 
-
 .review-section-edit-hint{
   color:#9a9ea3;
 
@@ -3095,7 +2931,6 @@
 
   white-space:nowrap;
 }
-
 
 /* ==============================
    移除舊 summary-card 外觀
@@ -3115,9 +2950,7 @@
 
   background:transparent;
 
-  
 }
-
 
 /* ==============================
    每一組資訊
@@ -3134,16 +2967,13 @@
 
   background:#ffffff;
 
-  
 }
-
 
 #step4 .review-summary-group
 +
 .review-summary-group{
   margin-top:12px;
 }
-
 
 /* 組別名稱 */
 
@@ -3168,7 +2998,6 @@
 
   letter-spacing:.2px;
 }
-
 
 /* ==============================
    每一列
@@ -3204,9 +3033,7 @@
 
   text-align:left;
 
-  
 }
-
 
 #step4 .review-summary-row
 +
@@ -3216,13 +3043,11 @@
     #eeeeef;
 }
 
-
 /* 按下效果 */
 
 #step4 .review-summary-row:active{
   background:#f8f8f8;
 }
-
 
 /* ==============================
    左側圖示
@@ -3251,7 +3076,6 @@
   font-weight:1000;
 }
 
-
 /* 取件 */
 
 #step4 .review-summary-marker.pickup{
@@ -3259,7 +3083,6 @@
 
   color:#ffffff;
 }
-
 
 /* 送達 */
 
@@ -3270,7 +3093,6 @@
   color:#111111;
 }
 
-
 /* ==============================
    中間文字
    ============================== */
@@ -3278,7 +3100,6 @@
 #step4 .review-summary-main{
   min-width:0;
 }
-
 
 #step4 .review-summary-label{
   margin-bottom:4px;
@@ -3292,7 +3113,6 @@
   line-height:1.3;
 }
 
-
 #step4 .review-summary-value{
   color:#111111;
 
@@ -3305,16 +3125,13 @@
   word-break:break-word;
 }
 
-
 #step4 .review-summary-value-lines{
   line-height:1.7;
 }
 
-
 #step4 .review-summary-note-value{
   white-space:pre-line;
 }
-
 
 /* ==============================
    右側箭頭
@@ -3337,13 +3154,11 @@
    第四頁費用確認區
    ============================== */
 
-
 /* 費用區標題 */
 
 #step4 .review-price-section-head{
   margin-top:2px;
 }
-
 
 /* ==============================
    移除舊 price-box 外觀
@@ -3367,9 +3182,7 @@
 
   background:#ffffff;
 
-  
 }
-
 
 /* ==============================
    最上方總金額區
@@ -3389,7 +3202,6 @@
     #fffbed;
 }
 
-
 #step4 .review-price-hero-top{
   display:flex;
 
@@ -3399,7 +3211,6 @@
 
   gap:12px;
 }
-
 
 /* 小標 */
 
@@ -3412,7 +3223,6 @@
 
   font-weight:1000;
 }
-
 
 /* 大金額 */
 
@@ -3428,7 +3238,6 @@
   line-height:1.1;
 }
 
-
 /* 路線資訊 */
 
 #step4 .review-price-route-meta{
@@ -3442,7 +3251,6 @@
 
   line-height:1.5;
 }
-
 
 /* 代墊標籤 */
 
@@ -3474,7 +3282,6 @@
   text-align:center;
 }
 
-
 /* ==============================
    費用小計
    ============================== */
@@ -3488,7 +3295,6 @@
     1px solid
     #eeeeef;
 }
-
 
 #step4 .review-price-summary-row{
   min-height:42px;
@@ -3508,7 +3314,6 @@
   font-weight:850;
 }
 
-
 #step4 .review-price-summary-row
 +
 .review-price-summary-row{
@@ -3516,7 +3321,6 @@
     1px solid
     #f0f1f2;
 }
-
 
 #step4 .review-price-summary-row strong{
   flex:0 0 auto;
@@ -3528,7 +3332,6 @@
   font-weight:1000;
 }
 
-
 /* 最後總額 */
 
 #step4 .review-price-summary-row.total{
@@ -3537,11 +3340,9 @@
   font-weight:1000;
 }
 
-
 #step4 .review-price-summary-row.total strong{
   font-size:17px;
 }
-
 
 /* ==============================
    費用明細
@@ -3554,7 +3355,6 @@
     13px;
 }
 
-
 #step4 .review-price-details-title{
   margin-bottom:8px;
 
@@ -3564,7 +3364,6 @@
 
   font-weight:1000;
 }
-
 
 /* 每一筆費用 */
 
@@ -3586,7 +3385,6 @@
   font-weight:800;
 }
 
-
 #step4 .review-price-detail-row strong{
   flex:0 0 auto;
 
@@ -3596,7 +3394,6 @@
 
   font-weight:1000;
 }
-
 
 /* 沒有明細時 */
 
@@ -3611,7 +3408,6 @@
 
   font-weight:800;
 }
-
 
 /* ==============================
    費用說明
@@ -3632,7 +3428,6 @@
   background:#f7f7f8;
 }
 
-
 #step4 .review-price-notice-title{
   margin-bottom:4px;
 
@@ -3642,7 +3437,6 @@
 
   font-weight:1000;
 }
-
 
 #step4 .review-price-notice-text{
   color:#8b8f94;
@@ -3659,7 +3453,6 @@
    第四頁提交前確認區
    ============================== */
 
-
 /* ==============================
    區塊標題
    ============================== */
@@ -3667,7 +3460,6 @@
 #step4 .review-confirm-section-head{
   margin-top:2px;
 }
-
 
 /* ==============================
    兩個確認項目
@@ -3686,9 +3478,7 @@
 
   background:#ffffff;
 
-  
 }
-
 
 /* 每一個確認項目 */
 
@@ -3718,7 +3508,6 @@
   cursor:pointer;
 }
 
-
 #step4 .review-confirm-item
 +
 .review-confirm-item{
@@ -3726,7 +3515,6 @@
     1px solid
     #eeeeef;
 }
-
 
 /* 隱藏原生 checkbox */
 
@@ -3737,7 +3525,6 @@
 
   pointer-events:none;
 }
-
 
 /* ==============================
    自訂 checkbox
@@ -3775,7 +3562,6 @@
     border-color .15s ease;
 }
 
-
 /* 已勾選 */
 
 #step4 .review-confirm-item
@@ -3791,7 +3577,6 @@ input:checked
   color:#111111;
 }
 
-
 /* ==============================
    確認文字
    ============================== */
@@ -3801,7 +3586,6 @@ input:checked
 
   display:block;
 }
-
 
 #step4 .review-confirm-title{
   display:block;
@@ -3816,7 +3600,6 @@ input:checked
 
   line-height:1.35;
 }
-
 
 #step4 .review-confirm-text{
   display:block;
@@ -3851,13 +3634,11 @@ input:checked
   background:#ffffff;
 }
 
-
 /* 移除瀏覽器預設箭頭 */
 
 #step4 .review-rules-details summary::-webkit-details-marker{
   display:none;
 }
-
 
 /* 標題列 */
 
@@ -3887,7 +3668,6 @@ input:checked
   cursor:pointer;
 }
 
-
 /* 箭頭 */
 
 #step4 .review-rules-arrow{
@@ -3901,7 +3681,6 @@ input:checked
     transform .18s ease;
 }
 
-
 /* 展開後箭頭旋轉 */
 
 #step4 .review-rules-details[open]
@@ -3909,7 +3688,6 @@ input:checked
   transform:
     rotate(180deg);
 }
-
 
 /* ==============================
    規則內容
@@ -3926,13 +3704,11 @@ input:checked
     #eeeeef;
 }
 
-
 #step4 .review-rule-item{
   padding:
     12px
     0;
 }
-
 
 #step4 .review-rule-item
 +
@@ -3941,7 +3717,6 @@ input:checked
     1px solid
     #f0f1f2;
 }
-
 
 #step4 .review-rule-title{
   margin-bottom:4px;
@@ -3952,7 +3727,6 @@ input:checked
 
   font-weight:1000;
 }
-
 
 #step4 .review-rule-text{
   color:#85898e;
@@ -3969,14 +3743,12 @@ input:checked
    第四頁最終提交操作列
    ============================== */
 
-
 /* 預留更多底部空間
    避免最後的規則區被提交列擋住 */
 
 #step4{
   padding-bottom:180px;
 }
-
 
 /* ==============================
    最終提交列
@@ -4038,11 +3810,6 @@ input:checked
   background:
     rgba(255,255,255,.98);
 
-  
-
-  
-
-  
 }
 
 /* ==============================
@@ -4054,7 +3821,6 @@ input:checked
 
   padding-left:2px;
 }
-
 
 /* 預估應付 */
 
@@ -4069,7 +3835,6 @@ input:checked
 
   line-height:1.2;
 }
-
 
 /* 大金額 */
 
@@ -4086,7 +3851,6 @@ input:checked
 
   white-space:nowrap;
 }
-
 
 /* 小提醒 */
 
@@ -4137,11 +3901,8 @@ input:checked
 
   font-weight:1000;
 
-  
-
   white-space:nowrap;
 }
-
 
 /* 按下 */
 
@@ -4149,7 +3910,6 @@ input:checked
   transform:
     scale(.985);
 }
-
 
 /* 正在提交 */
 
@@ -4160,7 +3920,6 @@ input:checked
 
   transform:none;
 
-  
 }
 
 /* ==============================
@@ -4181,16 +3940,13 @@ input:checked
       12px;
   }
 
-
   #step4 .review-total-value{
     font-size:23px;
   }
 
-
   #step4 .review-submit-meta{
     max-width:145px;
   }
-
 
   #step4 .review-submit-btn{
     height:56px;
@@ -4210,12 +3966,10 @@ input:checked
    Step 5 訂單建立成功頁
    ============================== */
 
-
 #step5{
   padding-top:10px;
   padding-bottom:120px;
 }
-
 
 /* ==============================
    訂單建立成功 Hero
@@ -4249,7 +4003,6 @@ input:checked
       #ffffff
     );
 
-  
 }
 
 /* 成功圖示 */
@@ -4282,7 +4035,6 @@ input:checked
 
   font-weight:1000;
 
-  
 }
 
 /* 小標 */
@@ -4297,7 +4049,6 @@ input:checked
   font-weight:1000;
 }
 
-
 /* 主標題 */
 
 #step5 .step5-created-title{
@@ -4311,7 +4062,6 @@ input:checked
 
   line-height:1.3;
 }
-
 
 /* 說明 */
 
@@ -4351,7 +4101,6 @@ input:checked
     rgba(148,117,0,.14);
 }
 
-
 #step5 .step5-order-id-row span{
   color:#8b8f94;
 
@@ -4359,7 +4108,6 @@ input:checked
 
   font-weight:900;
 }
-
 
 #step5 .step5-order-id-row strong{
   min-width:0;
@@ -4401,9 +4149,7 @@ input:checked
   background:
     #ffffff;
 
-  
 }
-
 
 #step5 .step5-tracking-map-shell{
   position:
@@ -4449,9 +4195,7 @@ input:checked
 
   background:#ffffff;
 
-  
 }
-
 
 /* 區塊標題 */
 
@@ -4467,7 +4211,6 @@ input:checked
   margin-bottom:13px;
 }
 
-
 #step5 .step5-section-title{
   color:#111111;
 
@@ -4475,7 +4218,6 @@ input:checked
 
   font-weight:1000;
 }
-
 
 #step5 .step5-section-sub{
   margin-top:4px;
@@ -4525,9 +4267,7 @@ input:checked
 
   text-align:left;
 
-  
 }
-
 
 /* 被選中 */
 
@@ -4540,7 +4280,6 @@ input:checked
 
   color:#111111;
 }
-
 
 /* 左側 $ */
 
@@ -4566,7 +4305,6 @@ input:checked
   font-weight:1000;
 }
 
-
 #step5 .step5-payment-choice.selected
 .step5-payment-choice-icon{
   background:
@@ -4581,7 +4319,6 @@ input:checked
   display:block;
 }
 
-
 #step5 .step5-payment-choice-title{
   display:block;
 
@@ -4591,7 +4328,6 @@ input:checked
 
   font-weight:1000;
 }
-
 
 #step5 .step5-payment-choice-desc{
   display:block;
@@ -4606,7 +4342,6 @@ input:checked
 
   line-height:1.5;
 }
-
 
 /* 右側確認 */
 
@@ -4636,7 +4371,6 @@ input:checked
   font-weight:1000;
 }
 
-
 #step5 .step5-payment-choice.selected
 .step5-payment-choice-check{
   border-color:
@@ -4664,7 +4398,6 @@ input:checked
   background:#f7f7f8;
 }
 
-
 #step5 .step5-payment-rule-title{
   margin-bottom:4px;
 
@@ -4674,7 +4407,6 @@ input:checked
 
   font-weight:1000;
 }
-
 
 #step5 .step5-payment-rule-text{
   color:#8b8f94;
@@ -4693,7 +4425,6 @@ input:checked
 #step5 .payment-info{
   margin-top:12px;
 }
-
 
 /* ==============================
    確認現金單按鈕
@@ -4718,29 +4449,24 @@ input:checked
 
   font-weight:1000;
 
-  
 }
-
 
 #step5 .step5-confirm-cash-btn:active{
   transform:
     scale(.985);
 }
 
-
 #step5 .step5-confirm-cash-btn:disabled{
   opacity:.55;
 
   transform:none;
 
-  
 }
 
 /* ==============================
    第十九階段：
    Step 5 任務進度 statusBox
    ============================== */
-
 
 /* ==============================
    statusBox 整體
@@ -4768,8 +4494,6 @@ input:checked
 
   text-align:left;
 
-  
-
 }
 
 /* ==============================
@@ -4793,7 +4517,6 @@ input:checked
 
 }
 
-
 /* 小標 */
 
 #step5 .order-progress-kicker{
@@ -4807,7 +4530,6 @@ input:checked
   font-weight:1000;
 
 }
-
 
 /* 目前狀態 */
 
@@ -4847,7 +4569,6 @@ input:checked
 
 }
 
-
 /* 尚未選擇 */
 
 #step5 .order-progress-payment-badge.pending{
@@ -4862,7 +4583,6 @@ input:checked
   color:#73777c;
 
 }
-
 
 /* 現金單 */
 
@@ -4879,7 +4599,6 @@ input:checked
 
 }
 
-
 /* 已付款 */
 
 #step5 .order-progress-payment-badge.success{
@@ -4894,7 +4613,6 @@ input:checked
   color:#13743a;
 
 }
-
 
 /* 已取消 */
 
@@ -4942,7 +4660,6 @@ input:checked
 
 }
 
-
 /* 左側階段編號 */
 
 #step5 .order-progress-current-icon{
@@ -4969,7 +4686,6 @@ input:checked
 
 }
 
-
 /* 已取消 */
 
 #step5 .order-progress-current.cancelled{
@@ -4978,7 +4694,6 @@ input:checked
     #fff5f5;
 
 }
-
 
 #step5 .order-progress-current.cancelled
 .order-progress-current-icon{
@@ -4990,7 +4705,6 @@ input:checked
 
 }
 
-
 /* 文字區 */
 
 #step5 .order-progress-current-main{
@@ -4998,7 +4712,6 @@ input:checked
   min-width:0;
 
 }
-
 
 #step5 .order-progress-current-title{
 
@@ -5013,7 +4726,6 @@ input:checked
   line-height:1.35;
 
 }
-
 
 #step5 .order-progress-current-text{
 
@@ -5040,7 +4752,6 @@ input:checked
 
 }
 
-
 /* 進度文字 */
 
 #step5 .order-progress-meter-head{
@@ -5063,7 +4774,6 @@ input:checked
 
 }
 
-
 #step5 .order-progress-meter-head strong{
 
   color:#111111;
@@ -5073,7 +4783,6 @@ input:checked
   font-weight:1000;
 
 }
-
 
 /* 進度槽 */
 
@@ -5091,7 +4800,6 @@ input:checked
     #e8eaec;
 
 }
-
 
 /* 進度 */
 
@@ -5122,7 +4830,6 @@ input:checked
 
 }
 
-
 /* 每一個階段 */
 
 #step5 .order-progress-step{
@@ -5139,7 +4846,6 @@ input:checked
 
 }
 
-
 /* ==============================
    左側軌道
    ============================== */
@@ -5153,7 +4859,6 @@ input:checked
   justify-content:center;
 
 }
-
 
 /* 圓點 */
 
@@ -5188,7 +4893,6 @@ input:checked
   font-weight:1000;
 
 }
-
 
 /* 垂直連接線 */
 
@@ -5231,7 +4935,6 @@ input:checked
 
 }
 
-
 #step5 .order-progress-step.done
 .order-progress-step-line{
 
@@ -5239,7 +4942,6 @@ input:checked
     var(--accentStrong);
 
 }
-
 
 /* ==============================
    目前階段
@@ -5254,10 +4956,7 @@ input:checked
 
   color:#ffffff;
 
-  
-
 }
-
 
 /* ==============================
    尚未進行
@@ -5290,7 +4989,6 @@ input:checked
 
 }
 
-
 #step5 .order-progress-step-title{
 
   margin-bottom:3px;
@@ -5304,7 +5002,6 @@ input:checked
   line-height:1.35;
 
 }
-
 
 #step5 .order-progress-step-desc{
 
@@ -5320,7 +5017,6 @@ input:checked
 
 }
 
-
 /* 已完成文字 */
 
 #step5 .order-progress-step.done
@@ -5329,7 +5025,6 @@ input:checked
   color:#55595e;
 
 }
-
 
 /* 目前階段文字 */
 
@@ -5343,7 +5038,6 @@ input:checked
   font-weight:1000;
 
 }
-
 
 #step5 .order-progress-step.current
 .order-progress-step-desc{
@@ -5383,7 +5077,6 @@ input:checked
 
 }
 
-
 #step5 .order-progress-cancelled-icon{
 
   width:38px;
@@ -5409,7 +5102,6 @@ input:checked
 
 }
 
-
 #step5 .order-progress-cancelled-title{
 
   margin-bottom:4px;
@@ -5421,7 +5113,6 @@ input:checked
   font-weight:1000;
 
 }
-
 
 #step5 .order-progress-cancelled-text{
 
@@ -5464,7 +5155,6 @@ input:checked
 
 }
 
-
 #step5 .order-progress-total span{
 
   color:#777b80;
@@ -5474,7 +5164,6 @@ input:checked
   font-weight:900;
 
 }
-
 
 #step5 .order-progress-total strong{
 
@@ -5523,7 +5212,7 @@ input:checked
   border-radius:50%;
   background:#facc15;
   border:3px solid #111111;
-  
+
   color:#111111;
   font-size:14px;
   font-weight:1000;
@@ -5541,7 +5230,7 @@ input:checked
   border-radius:999px;
   background:#111111;
   color:#ffffff;
-  
+
   font-size:11px;
   font-weight:1000;
   white-space:nowrap;
@@ -5568,13 +5257,11 @@ input:checked
    第一階段：大型常駐地圖
    ============================== */
 
-
 /* Step 5 頂部縮短 */
 
 #step5{
   padding-top:0;
 }
-
 
 /* ==============================
    地圖區塊
@@ -5597,9 +5284,7 @@ input:checked
 
   background:#e8eaed;
 
-  
 }
-
 
 /* 原本「小U 即時位置」標題先隱藏 */
 
@@ -5608,7 +5293,6 @@ input:checked
 .step5-section-head{
   display:none;
 }
-
 
 /* ==============================
    大型地圖
@@ -5634,13 +5318,11 @@ input:checked
    Step 5：UBee 外送詳細資訊
    ============================== */
 
-
 /* 地圖直接接住外送詳細資訊 */
 
 #step5 .step5-tracking-map-section{
   margin-bottom:0;
 }
-
 
 /* ==============================
    外送詳細資訊主區塊
@@ -5668,9 +5350,7 @@ input:checked
 
   text-align:left;
 
-  
 }
-
 
 /* ==============================
    標題
@@ -5687,7 +5367,6 @@ input:checked
     #eeeeef;
 }
 
-
 #step5 .delivery-details-title{
   color:#111111;
 
@@ -5697,7 +5376,6 @@ input:checked
 
   letter-spacing:-.3px;
 }
-
 
 #step5 .delivery-details-sub{
   margin-top:4px;
@@ -5709,7 +5387,6 @@ input:checked
   font-weight:850;
 }
 
-
 /* ==============================
    費用列表
    ============================== */
@@ -5717,7 +5394,6 @@ input:checked
 #step5 .delivery-details-list{
   background:#ffffff;
 }
-
 
 #step5 .delivery-detail-row{
   min-height:58px;
@@ -5735,7 +5411,6 @@ input:checked
     #eeeeef;
 }
 
-
 #step5 .delivery-detail-label{
   color:#55595e;
 
@@ -5743,7 +5418,6 @@ input:checked
 
   font-weight:900;
 }
-
 
 #step5 .delivery-detail-value{
   flex:0 0 auto;
@@ -5756,7 +5430,6 @@ input:checked
 
   white-space:nowrap;
 }
-
 
 /* ==============================
    客人選擇的時效方案
@@ -5771,7 +5444,6 @@ input:checked
 
   gap:8px;
 }
-
 
 #step5 .delivery-detail-speed-tag{
   flex:0 0 auto;
@@ -5796,7 +5468,6 @@ input:checked
 
   white-space:nowrap;
 }
-
 
 /* ==============================
    總金額
@@ -5833,7 +5504,6 @@ input:checked
   font-weight:1000;
 }
 
-
 #step5 .delivery-details-total strong{
   color:#111111;
 
@@ -5869,9 +5539,7 @@ input:checked
     1px solid
     #eeeeef;
 
-  
 }
-
 
 /* ==============================
    區塊標題
@@ -5885,7 +5553,6 @@ input:checked
     #eeeeef;
 }
 
-
 #step5 .step5-task-detail-title{
   color:#111111;
 
@@ -5895,7 +5562,6 @@ input:checked
 
   letter-spacing:-.3px;
 }
-
 
 #step5 .step5-task-detail-sub{
   margin-top:4px;
@@ -5907,7 +5573,6 @@ input:checked
   font-weight:850;
 }
 
-
 /* ==============================
    任務明細內容本體
    ============================== */
@@ -5917,7 +5582,6 @@ input:checked
 
   color:#111111;
 }
-
 
 /* ==============================
    第一列：服務項目
@@ -5935,7 +5599,6 @@ input:checked
 
   align-items:start;
 }
-
 
 #step5 .task-receipt-count{
   width:26px;
@@ -5963,11 +5626,9 @@ input:checked
   line-height:1;
 }
 
-
 #step5 .task-receipt-item-main{
   min-width:0;
 }
-
 
 #step5 .task-receipt-item-title{
   color:#111111;
@@ -5978,7 +5639,6 @@ input:checked
 
   line-height:1.45;
 }
-
 
 #step5 .task-receipt-item-meta{
   margin-top:4px;
@@ -5992,7 +5652,6 @@ input:checked
   line-height:1.5;
 }
 
-
 /* ==============================
    中間分隔線
    ============================== */
@@ -6005,7 +5664,6 @@ input:checked
   background:#eeeeef;
 }
 
-
 /* ==============================
    每一段內容
    ============================== */
@@ -6013,7 +5671,6 @@ input:checked
 #step5 .task-receipt-section{
   display:block;
 }
-
 
 #step5 .task-receipt-section-title{
   margin-bottom:10px;
@@ -6026,7 +5683,6 @@ input:checked
 
   letter-spacing:.2px;
 }
-
 
 /* 任務內容文字 */
 
@@ -6043,7 +5699,6 @@ input:checked
 
   word-break:break-word;
 }
-
 
 /* ==============================
    地址 / 電話列
@@ -6062,7 +5717,6 @@ input:checked
   padding:10px 0;
 }
 
-
 #step5 .task-receipt-row
 +
 .task-receipt-row{
@@ -6070,7 +5724,6 @@ input:checked
     1px solid
     #f2f3f4;
 }
-
 
 #step5 .task-receipt-label{
   color:#7f8489;
@@ -6081,7 +5734,6 @@ input:checked
 
   line-height:1.6;
 }
-
 
 #step5 .task-receipt-value{
   color:#111111;
@@ -6098,7 +5750,6 @@ input:checked
 
   word-break:break-word;
 }
-
 
 /* ==============================
    小螢幕微調
@@ -6125,7 +5776,6 @@ input:checked
    ＋付款區緊湊化
    ============================== */
 
-
 /* ==============================
    一、任務明細整體縮緊
    ============================== */
@@ -6142,18 +5792,15 @@ input:checked
     18px;
 }
 
-
 /* 標題縮小一點 */
 
 #step5 .step5-task-detail-head{
   padding-bottom:10px;
 }
 
-
 #step5 .step5-task-detail-title{
   font-size:18px;
 }
-
 
 #step5 .step5-task-detail-sub{
   margin-top:3px;
@@ -6161,13 +5808,11 @@ input:checked
   font-size:10px;
 }
 
-
 /* 內容上方距離縮短 */
 
 #step5 .step5-task-detail-content{
   padding-top:11px;
 }
-
 
 /* ==============================
    第一列服務項目縮緊
@@ -6183,7 +5828,6 @@ input:checked
   align-items:start;
 }
 
-
 #step5 .task-receipt-count{
   width:24px;
   height:24px;
@@ -6191,13 +5835,11 @@ input:checked
   font-size:11px;
 }
 
-
 #step5 .task-receipt-item-title{
   font-size:14px;
 
   line-height:1.4;
 }
-
 
 #step5 .task-receipt-item-meta{
   margin-top:3px;
@@ -6206,7 +5848,6 @@ input:checked
 
   line-height:1.45;
 }
-
 
 /* ==============================
    分隔線距離縮小
@@ -6218,7 +5859,6 @@ input:checked
     0;
 }
 
-
 /* ==============================
    任務內容
    ============================== */
@@ -6229,13 +5869,11 @@ input:checked
   font-size:12px;
 }
 
-
 #step5 .task-receipt-text{
   font-size:13px;
 
   line-height:1.6;
 }
-
 
 /* ==============================
    取件 / 送達資訊
@@ -6260,7 +5898,6 @@ input:checked
     0;
 }
 
-
 /* 左邊欄位名稱 */
 
 #step5 .task-receipt-label{
@@ -6274,7 +5911,6 @@ input:checked
 
   line-height:1.55;
 }
-
 
 /* 右邊真正改成左對齊 */
 
@@ -6296,7 +5932,6 @@ input:checked
   word-break:break-word;
 }
 
-
 /* ==============================
    二、付款方式整區縮小
    ============================== */
@@ -6311,9 +5946,7 @@ input:checked
 
   border-radius:18px;
 
-  
 }
-
 
 /* 付款標題縮小 */
 
@@ -6322,12 +5955,10 @@ input:checked
   margin-bottom:10px;
 }
 
-
 #step5 .step5-payment-section
 .step5-section-title{
   font-size:17px;
 }
-
 
 #step5 .step5-payment-section
 .step5-section-sub{
@@ -6335,7 +5966,6 @@ input:checked
 
   font-size:10px;
 }
-
 
 /* ==============================
    現金單選擇卡縮小
@@ -6358,7 +5988,6 @@ input:checked
   border-radius:14px;
 }
 
-
 /* 左側金額圖示縮小 */
 
 #step5 .step5-payment-choice-icon{
@@ -6368,13 +5997,11 @@ input:checked
   font-size:14px;
 }
 
-
 /* 標題 */
 
 #step5 .step5-payment-choice-title{
   font-size:14px;
 }
-
 
 /* 說明 */
 
@@ -6386,7 +6013,6 @@ input:checked
   line-height:1.4;
 }
 
-
 /* 右側勾選縮小 */
 
 #step5 .step5-payment-choice-check{
@@ -6395,7 +6021,6 @@ input:checked
 
   font-size:10px;
 }
-
 
 /* ==============================
    付款規則縮小
@@ -6411,20 +6036,17 @@ input:checked
   border-radius:12px;
 }
 
-
 #step5 .step5-payment-rule-title{
   margin-bottom:3px;
 
   font-size:10px;
 }
 
-
 #step5 .step5-payment-rule-text{
   font-size:10px;
 
   line-height:1.55;
 }
-
 
 /* ==============================
    付款資訊卡縮小
@@ -6439,13 +6061,11 @@ input:checked
   border-radius:14px;
 }
 
-
 /* 上方標題區 */
 
 #step5 .payment-card-head{
   margin-bottom:8px;
 }
-
 
 #step5 .payment-card-kicker{
   margin-bottom:3px;
@@ -6453,11 +6073,9 @@ input:checked
   font-size:9px;
 }
 
-
 #step5 .payment-card-title{
   font-size:16px;
 }
-
 
 /* 確認後派單標籤 */
 
@@ -6469,13 +6087,11 @@ input:checked
   font-size:9px;
 }
 
-
 /* 中間明細 */
 
 #step5 .payment-card-body{
   padding-top:7px;
 }
-
 
 #step5 .payment-card-row{
   align-items:start;
@@ -6484,7 +6100,6 @@ input:checked
     6px
     0;
 }
-
 
 #step5 .payment-card-label{
   flex:
@@ -6495,13 +6110,11 @@ input:checked
   font-size:10px;
 }
 
-
 #step5 .payment-card-value{
   font-size:11px;
 
   line-height:1.5;
 }
-
 
 /* 底下提醒縮小 */
 
@@ -6519,7 +6132,6 @@ input:checked
   line-height:1.55;
 }
 
-
 /* ==============================
    確認按鈕縮小
    ============================== */
@@ -6535,9 +6147,7 @@ input:checked
   font-size:
     14px !important;
 
-  
 }
-
 
 /* ==============================
    小螢幕再微調
@@ -6552,7 +6162,6 @@ input:checked
 
     gap:10px;
   }
-
 
   #step5 .task-receipt-value{
     font-size:12px;
@@ -6582,7 +6191,6 @@ input:checked
     #ffffff;
 }
 
-
 #step5 .step5-live-status-top{
   display:flex;
 
@@ -6592,7 +6200,6 @@ input:checked
 
   gap:16px;
 }
-
 
 #step5 .step5-live-status-primary{
   min-width:0;
@@ -6611,7 +6218,6 @@ input:checked
     tabular-nums;
 }
 
-
 #step5 .step5-live-status-label{
   flex:0 0 auto;
 
@@ -6628,7 +6234,6 @@ input:checked
   text-align:right;
 }
 
-
 #step5 .step5-live-status-title{
   margin-top:12px;
 
@@ -6640,7 +6245,6 @@ input:checked
 
   line-height:1.45;
 }
-
 
 #step5 .step5-live-status-meta{
   position:relative;
@@ -6657,7 +6261,6 @@ input:checked
 
   line-height:1.55;
 }
-
 
 #step5 .step5-live-status-meta::before{
   content:"";
@@ -6678,7 +6281,6 @@ input:checked
     var(--accentStrong);
 }
 
-
 /* 地圖直接接住狀態資訊 */
 
 #step5 .step5-live-status-panel
@@ -6686,7 +6288,6 @@ input:checked
 .step5-tracking-map-section{
   margin-top:0;
 }
-
 
 @media(max-width:380px){
 
@@ -6704,7 +6305,6 @@ input:checked
   }
 
 }
-
 
 /* =========================================================
    UBee 3.0 完整介面覆蓋層（2026-07）
@@ -6745,7 +6345,7 @@ body{background:#eef0f2;}
   padding-left:18px;
   padding-right:18px;
   border-bottom:1px solid rgba(15,23,42,.065);
-  
+
 }
 .brand{font-size:30px;letter-spacing:-1.8px;}
 .brand span{color:var(--ubee-yellow-deep);}
@@ -6762,7 +6362,7 @@ body{background:#eef0f2;}
   border:1px solid rgba(244,185,0,.48);
   border-radius:28px;
   background:linear-gradient(135deg,#fff 0%,#fffdf4 56%,#fff1b8 100%);
-  
+
 }
 .ubee-v3-hero::before{
   content:"";
@@ -6794,7 +6394,7 @@ body{background:#eef0f2;}
   border-radius:26px;
   overflow:hidden;
   border:1px solid rgba(15,23,42,.08);
-  
+
   background:#e9edf1;
 }
 .map-current-btn{width:50px;height:50px;right:16px;bottom:17px;border-radius:50%;background:rgba(255,255,255,.96);}
@@ -6805,7 +6405,7 @@ body{background:#eef0f2;}
   padding:18px 0 0;
   border-radius:0;
   background:transparent;
-  
+
 }
 .task-sheet-handle{display:none;}
 .task-sheet::before{
@@ -6837,7 +6437,7 @@ body{background:#eef0f2;}
   color:#666b72;
   font-size:15px !important;
   font-weight:1000;
-  
+
 }
 .category-tab.active{background:#111;color:#fff;border-color:#111;}
 
@@ -6856,11 +6456,11 @@ body{background:#eef0f2;}
   border:1px solid var(--ubee-line)!important;
   border-radius:21px!important;
   background:#fff!important;
-  
+
 }
 .service-card-new.active,.service-item.active,.service-option.active,.service-card-new.selected,.service-item.selected,.service-option.selected{
   border-color:var(--ubee-yellow-deep)!important;
-  
+
   background:linear-gradient(180deg,#fffef8,#fff8d9)!important;
 }
 
@@ -6870,7 +6470,7 @@ body{background:#eef0f2;}
   border:1px solid var(--ubee-line);
   border-radius:24px;
   background:#fff;
-  
+
 }
 .address-row{min-height:84px;padding:15px 16px;}
 .address-row+.address-row{border-top:1px solid var(--ubee-line);}
@@ -6878,8 +6478,6 @@ body{background:#eef0f2;}
 .address-label{font-size:12px;color:#7a7f86;margin-bottom:5px;}
 .address-main input{font-size:16px!important;font-weight:950;color:#111;}
 .address-main input::placeholder{color:#b0b4ba;font-weight:850;}
-
-
 
 .home-estimate-label{font-size:11px;color:#7b8086;}
 .home-estimate-meta{font-size:11px;color:#92969c;}
@@ -6927,11 +6525,6 @@ body{background:#eef0f2;}
 #step5 .step5-tracking-map-shell{border-radius:25px!important;overflow:hidden!important;}
 #step5 .step5-task-detail-section,#step5 .step5-payment-section{border-radius:23px!important;}
 
-
-
-
-
-
 .app-section .member-card,.menu-list,.info-item,.address-display{border-radius:23px;}
 .member-card{background:linear-gradient(135deg,#fff,#fff8d8);}
 
@@ -6944,12 +6537,11 @@ body{background:#eef0f2;}
   .ubee-v3-hero-title strong{font-size:31px;}
   .ubee-v3-mascot{width:72px;height:72px;font-size:43px;right:11px;}
   .home-map-shell{height:350px;}
-  
+
   .home-next-btn{font-size:17px!important;}
   .ubee-v3-progress{padding:14px 8px;}
   .ubee-v3-progress-label{font-size:9px;}
 }
-
 
 /* =====================================================
    UBee 客戶端首頁 V4：留白、服務狀態與第二頁分類
@@ -6969,7 +6561,7 @@ body{background:#eef0f2;}
   border:1px solid var(--line);
   border-radius:22px;
   background:#fff;
-  
+
 }
 
 .home-service-status-head{
@@ -6994,12 +6586,12 @@ body{background:#eef0f2;}
   flex:0 0 9px;
   border-radius:50%;
   background:#22c55e;
-  
+
 }
 
 .home-service-status.is-fallback .home-service-status-dot{
   background:#f4bd00;
-  
+
 }
 
 .home-service-status-count{
@@ -7071,7 +6663,7 @@ body{background:#eef0f2;}
   border-radius:17px !important;
   background:#fff !important;
   color:#62666b !important;
-  
+
   font-size:15px !important;
 }
 
@@ -7098,14 +6690,14 @@ body{background:#eef0f2;}
   border:1px solid var(--line) !important;
   border-radius:18px !important;
   background:#fff !important;
-  
+
 }
 
 .service-item.active{
   border-color:#e1b400 !important;
   background:#fffbea !important;
   color:#111 !important;
-  
+
 }
 
 .service-item.active::after{
@@ -7170,7 +6762,7 @@ body{background:#eef0f2;}
 #step2 .category-choice-item.active{
   border-color:#d7aa00 !important;
   background:#fff5c7 !important;
-  
+
 }
 
 @media(max-width:380px){
@@ -7178,7 +6770,6 @@ body{background:#eef0f2;}
   .category-tab{min-width:96px !important;}
   .service-item{flex-basis:90px !important;}
 }
-
 
 /* =====================================================
    UBee 舊款簡潔首頁：依使用者提供截圖比例還原
@@ -7193,7 +6784,7 @@ body{background:#eef0f2;}
   margin:0 -14px!important;
   border:none!important;
   border-radius:0!important;
-  
+
   overflow:hidden!important;
 }
 .map-current-btn{
@@ -7210,7 +6801,7 @@ body{background:#eef0f2;}
   padding:18px 16px 118px!important;
   border-radius:28px 28px 0 0!important;
   background:#fff!important;
-  
+
 }
 .task-sheet::before{display:none!important;content:none!important;}
 .task-sheet-handle{
@@ -7233,7 +6824,7 @@ body{background:#eef0f2;}
   border-bottom:1px solid #eeeeef!important;
   border-radius:0!important;
   background:transparent!important;
-  
+
 }
 .home-service-status-head{
   width:100%!important;
@@ -7249,7 +6840,7 @@ body{background:#eef0f2;}
 }
 .home-service-status-dot{
   width:8px!important;height:8px!important;flex-basis:8px!important;
-  
+
 }
 .home-service-status-count{
   margin-top:3px!important;
@@ -7283,7 +6874,7 @@ body{background:#eef0f2;}
   border-radius:0!important;
   background:transparent!important;
   color:#96999d!important;
-  
+
   font-size:14px!important;
   font-weight:1000!important;
   white-space:nowrap!important;
@@ -7292,7 +6883,7 @@ body{background:#eef0f2;}
   background:transparent!important;
   color:#111!important;
   border:none!important;
-  
+
 }
 .category-tab.active::after{
   display:block!important;
@@ -7326,7 +6917,7 @@ body{background:#eef0f2;}
   border-radius:0!important;
   background:transparent!important;
   color:#85898e!important;
-  
+
   text-align:center!important;
 }
 .service-item-icon{width:35px!important;height:35px!important;margin:0 auto 5px!important;font-size:25px!important;}
@@ -7340,7 +6931,7 @@ body{background:#eef0f2;}
   border:none!important;
   background:transparent!important;
   color:#111!important;
-  
+
 }
 .service-item.active::after,
 .service-card-new.active::after,
@@ -7363,12 +6954,11 @@ body{background:#eef0f2;}
   border:1px solid #e5e6e8!important;
   border-radius:20px!important;
   background:#fff!important;
-  
+
 }
 #step1 .address-row{min-height:76px!important;padding:13px 15px!important;}
 #step1 .address-label{font-size:11px!important;margin-bottom:5px!important;color:#8c9095!important;}
 #step1 .address-main input{font-size:16px!important;font-weight:900!important;}
-
 
 #step1 .home-estimate{padding:0 4px!important;}
 #step1 .home-estimate-label{font-size:11px!important;}
@@ -7376,18 +6966,12 @@ body{background:#eef0f2;}
 #step1 .home-estimate-amount{font-size:24px!important;}
 #step1 .home-next-btn{height:56px!important;min-height:56px!important;border-radius:17px!important;font-size:17px!important;}
 
-
-
-
-
-
 @media(max-width:390px){
   .home-map-shell{height:305px!important;}
   .category-tab{min-width:76px!important;padding-left:9px!important;padding-right:9px!important;}
   .service-grid-new > *{flex-basis:74px!important;min-width:74px!important;}
-  
-}
 
+}
 
     /* 首頁匿名在線小U標記 */
     .ubee-nearby-rider-pin{
@@ -7400,7 +6984,7 @@ body{background:#eef0f2;}
       border-radius:50%;
       background:#facc15;
       color:#111111;
-      
+
       font-size:21px;
       line-height:1;
       font-weight:1000;
@@ -7409,7 +6993,6 @@ body{background:#eef0f2;}
     .ubee-nearby-rider-pin::after{
       content:"U";
     }
-
 
 /* =====================================================
    正式上線修復：任務分類點擊層與觸控可靠性
@@ -7447,7 +7030,6 @@ body{background:#eef0f2;}
 
 /* UBee 2026-07-16 正式營運整合功能 */
 .address-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}.compact-field{display:block;border:1px solid var(--line);border-radius:14px;background:#fff;padding:9px 11px;}.compact-field span{display:block;font-size:10px;font-weight:1000;color:var(--muted);margin-bottom:4px;}.compact-field input{font-size:13px!important;}.saved-address-quickbar{display:flex;gap:7px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}.quick-address-chip,.mini-action{border:1px solid #e4d174;background:#fffbed;color:#5f4c00;border-radius:999px;padding:8px 11px;font-size:12px!important;font-weight:1000;white-space:nowrap;}.match-status-card{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:15px;background:#fafafa;}.match-status-card strong,.match-status-card span{display:block;}.match-status-card strong{font-size:13px;}.match-status-card div span{font-size:11px;color:var(--muted);margin-top:3px;}.status-badge{border-radius:999px;padding:6px 9px;font-size:10px!important;font-weight:1000;}.status-badge.good{background:#e9f8ef;color:#16753a;}.status-badge.warn{background:#fff4d6;color:#8a6200;}.status-badge.neutral{background:#eef0f2;color:#62676d;}.home-estimate-eta{font-size:10px;color:#72767b;font-weight:900;margin-top:2px;}.form-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}.shopping-list{display:flex;flex-direction:column;gap:9px;}.shopping-item{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px;}.shopping-item-grid{display:grid;grid-template-columns:1fr 92px;gap:8px;}.shopping-item input,.shopping-item select{border:1px solid var(--line);border-radius:11px;padding:10px!important;background:#fafafa;}.shopping-item-actions{display:flex;justify-content:flex-end;margin-top:8px;}.danger-link{border:none;background:transparent;color:var(--red);font-size:12px!important;font-weight:1000;}.field-help,.inline-status{font-size:11px;color:var(--muted);font-weight:800;line-height:1.6;margin-top:8px;}.system-check-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:13px;margin-bottom:18px;}.system-check-row{display:flex;gap:9px;align-items:flex-start;padding:8px 0;font-size:12px;font-weight:850;}.system-check-row+.system-check-row{border-top:1px solid #f0f1f2;}.system-check-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 22px;}.system-check-row.ok .system-check-icon{background:#e9f8ef;color:#16753a;}.system-check-row.warn .system-check-icon{background:#fff4d6;color:#8a6200;}.system-check-row.error .system-check-icon{background:#feecec;color:#b42318;}.field-invalid{border-color:#dc2626!important;}.field-error-text{font-size:11px;color:#dc2626;font-weight:900;margin-top:6px;}.saved-address-list{display:flex;flex-direction:column;gap:9px;}.saved-address-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fafafa;}.saved-address-card-head{display:flex;justify-content:space-between;gap:10px;}.saved-address-card-title{font-weight:1000;}.saved-address-card-text{font-size:12px;color:var(--muted);line-height:1.6;margin-top:5px;}.saved-address-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;}.saved-address-actions button,.order-card-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 10px;font-size:11px!important;font-weight:1000;}.order-history-card{border:1px solid var(--line);background:var(--surface2);border-radius:17px;padding:13px;margin-bottom:10px;}.order-card-actions{display:flex;gap:8px;margin-top:10px;}.draft-banner{position:fixed;left:50%;top:calc(74px + env(safe-area-inset-top));transform:translateX(-50%);z-index:120;width:calc(100% - 28px);max-width:492px;border:1px solid #e8d05c;border-radius:17px;background:#fffbed;padding:12px;}.draft-banner-actions{display:flex;gap:8px;margin-top:9px;}.draft-banner-actions button{flex:1;border:none;border-radius:12px;padding:10px;font-weight:1000;}.draft-continue{background:var(--accent);}.draft-discard{background:#fff;border:1px solid var(--line);}.empty-state{font-size:13px;color:var(--muted);font-weight:800;}@media(max-width:380px){.address-detail-grid,.shopping-item-grid{grid-template-columns:1fr;}}
-
 
 /* =========================================================
    UBee 客人端｜第三、四步精簡正式營運版 2026-07-20
@@ -7693,7 +7275,7 @@ body{background:#eef0f2;}
   border:1px solid #e3e4e6;
   border-radius:15px;
   background:#fff;
-  
+
 }
 #step5 .step5-order-menu-popover button{
   width:100%;
@@ -7728,7 +7310,7 @@ body{background:#eef0f2;}
   border:1px solid #e7e8ea;
   border-radius:18px;
   background:#fff;
-  
+
 }
 #step5 .step5-compact-details > summary,
 #step5 .step5-task-detail-summary{
@@ -7770,13 +7352,13 @@ body{background:#eef0f2;}
   margin:0;
   border-top:1px solid #eeeeef;
   border-radius:0;
-  
+
 }
 #step5 .step5-payment-section-compact{
   margin:0 0 12px;
   padding:14px;
   border-radius:18px;
-  
+
 }
 #step5 .step5-payment-compact-head{
   display:flex;
@@ -7883,8 +7465,6 @@ body{background:#eef0f2;}
   #step5 .step5-order-menu-popover{width:154px;}
 }
 
-
-
 /* ===== UBee 第三階段：客戶即時追蹤穩定性與異常狀態 ===== */
 #step5 .customer-tracking-health-card,
 #step5 .customer-tracking-incident-card{
@@ -7893,7 +7473,7 @@ body{background:#eef0f2;}
   padding:13px 14px;
   border:1px solid var(--line);
   background:#fff;
-  
+
 }
 #step5 .customer-tracking-health-card{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 #step5 .customer-tracking-health-main{display:flex;align-items:center;gap:10px;min-width:0;}
@@ -7909,8 +7489,6 @@ body{background:#eef0f2;}
 #step5 .customer-tracking-incident-title{font-size:14px;font-weight:1000;}
 #step5 .customer-tracking-incident-text{font-size:12px;font-weight:800;line-height:1.65;margin-top:5px;}
 #step5 .customer-tracking-incident-meta{font-size:11px;font-weight:900;margin-top:7px;opacity:.82;}
-
-
 
 /* =====================================================
    UBee 正式營運安全編排：五步驟內容歸位
@@ -7981,7 +7559,7 @@ body{background:#eef0f2;}
   border-radius:999px !important;
   background:#f0f1f2 !important;
   color:#777b80 !important;
-  
+
   font-size:12px !important;
   font-weight:900 !important;
   line-height:1.35 !important;
@@ -7999,15 +7577,13 @@ body{background:#eef0f2;}
   border-color:var(--accentStrong) !important;
   background:#fff4bf !important;
   color:#111 !important;
-  
+
 }
 
 #step1 #serviceCategoryGrid .category-choice-item::before,
 #step1 #serviceCategoryGrid .category-choice-item::after{
   pointer-events:none !important;
 }
-
-
 
 /* ==============================
    全台服務城市選擇器
@@ -8045,7 +7621,7 @@ body{background:#eef0f2;}
   padding:10px 16px calc(24px + env(safe-area-inset-bottom));
   border-radius:26px 26px 0 0;
   background:#fff;
-  
+
 }
 .service-city-sheet-handle{
   width:38px;
@@ -8092,13 +7668,11 @@ body{background:#eef0f2;}
   border-color:var(--accentStrong);
   background:#fff4bf;
   color:#111;
-  
+
 }
 @media(max-width:370px){
   .service-city-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
-
-
 
     /* =====================================================
        UBee V4 客戶端首頁重建
@@ -8153,7 +7727,7 @@ body{background:#eef0f2;}
       margin: 0 -14px !important;
       padding: 18px 14px 28px !important;
       border-radius: 0 !important;
-      
+
       background: #f5f6f7 !important;
     }
 
@@ -8191,7 +7765,7 @@ body{background:#eef0f2;}
       border-radius: 20px !important;
       background: #fff !important;
       color: #111 !important;
-      
+
       text-align: left !important;
       font-size: 18px !important;
       font-weight: 1000 !important;
@@ -8206,7 +7780,7 @@ body{background:#eef0f2;}
     #step1 .ubee-v4-service-tabs .category-tab.active {
       border-color: #e5bd00 !important;
       background: linear-gradient(145deg, #fff9d8, #ffffff) !important;
-      
+
     }
 
     #step1 .ubee-v4-service-tabs .category-tab::after {
@@ -8244,8 +7818,7 @@ body{background:#eef0f2;}
         font-size: 17px !important;
       }
     }
-
-  </style>
+</style>
 <style id="ubee-order-timing-v1-style">
     .ubee-timing-mode-list{
       display:grid;
@@ -8264,12 +7837,12 @@ body{background:#eef0f2;}
       background:#fff;
       color:#111;
       text-align:left;
-      
+
     }
     .ubee-timing-mode-card.active{
       border-color:#e2b400;
       background:#fffbed;
-      
+
     }
     .ubee-timing-mode-icon{
       width:42px;
@@ -8325,7 +7898,7 @@ body{background:#eef0f2;}
       border:1px solid var(--line);
       border-radius:18px;
       background:#fff;
-      
+
     }
     .ubee-timing-panel-title{
       margin-bottom:12px;
@@ -8386,7 +7959,7 @@ body{background:#eef0f2;}
     @media(max-width:390px){
       .ubee-timing-grid{grid-template-columns:1fr;}
     }
-  </style>
+</style>
 <style id="ubee-customer-app-tracking-v1">
   /* =====================================================
      UBee 用戶端 App 化＋即時任務追蹤 V1｜2026-08-04
@@ -8451,10 +8024,6 @@ body{background:#eef0f2;}
   .ubee-customer-push-button[hidden]{display:none!important;}
   #productionOrderFlow .ubee-customer-push-card{margin:0 0 12px;}
 
-  
-  
-  
-  
 @media(max-width:390px){
     body.ubee-active-order #step5 .step5-live-status-primary{font-size:30px;}
     body.ubee-active-order #step5 .step5-tracking-map-shell{height:285px!important;}
@@ -8462,115 +8031,18 @@ body{background:#eef0f2;}
     .ubee-customer-rider-card{grid-template-columns:48px minmax(0,1fr);}.ubee-customer-rider-avatar{width:48px;height:48px;}.ubee-customer-rider-help{grid-column:1/-1;width:100%;}
   }
 </style>
-<style id="ubee-my-flat-final">
-/* UBee 我的頁面正式平面版：禁止浮動卡片、陰影、毛玻璃 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.danger-text{color:#c00!important;}
-
-</style>
-<style id="ubee-my-layout-repair-v5">
-/* UBee「我的」唯一正式平面版：不使用浮動卡片、毛玻璃或懸浮陰影 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</style>
 <style id="ubee-my-native-flat-r7">
 /* =========================================================
    UBee 用戶端 R7｜我的頁面唯一原生 App 平面規格
    重要：禁止底部導航與「我的」頁面使用浮動、陰影、毛玻璃、縮窄外框。
    ========================================================= */
-:root{--ubee-nav-base-height:64px;--ubee-my-page-x:18px;--ubee-my-line:#e4e6e9;--ubee-my-bg:#f4f5f7;--ubee-my-text:#111;--ubee-my-muted:#747980;}
-
-/* 底部導航：唯一正式規格，滿版、貼底、無浮動視覺 */
-
-
-
-
-
-
-
-#productionOrderFlow .flow-shell{padding-bottom:calc(var(--ubee-nav-base-height) + env(safe-area-inset-bottom))!important;}
+:root{--ubee-my-page-x:18px;--ubee-my-line:#e4e6e9;--ubee-my-bg:#f4f5f7;--ubee-my-text:#111;--ubee-my-muted:#747980;}
 
 /* 我的：頁面本體 */
 #productionOrderFlow .ubee-my-page{background:var(--ubee-my-bg)!important;color:var(--ubee-my-text)!important;}
 #productionOrderFlow .ubee-my-scroll{
   width:100%!important;height:100%!important;overflow-x:hidden!important;overflow-y:auto!important;
-  margin:0!important;padding:calc(14px + env(safe-area-inset-top)) var(--ubee-my-page-x) calc(28px + var(--ubee-nav-base-height) + env(safe-area-inset-bottom))!important;
+  margin:0!important;padding:calc(14px + env(safe-area-inset-top)) var(--ubee-my-page-x) 16px!important;
   background:var(--ubee-my-bg)!important;-webkit-overflow-scrolling:touch!important;
 }
 #productionOrderFlow .ubee-my-top-actions{
@@ -8647,7 +8119,7 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
 /* 控制器會把子頁移到 flow-shell；此處把它當成真正的 App 內頁，而不是浮動卡片 */
 #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
   position:absolute!important;inset:0!important;z-index:180!important;width:100%!important;height:100%!important;min-height:100%!important;
-  margin:0!important;padding:calc(8px + env(safe-area-inset-top)) var(--ubee-my-page-x) calc(28px + var(--ubee-nav-base-height) + env(safe-area-inset-bottom))!important;
+  margin:0!important;padding:calc(8px + env(safe-area-inset-top)) var(--ubee-my-page-x) 16px!important;
   border:0!important;border-radius:0!important;background:var(--ubee-my-bg)!important;filter:none!important;
   transform:none!important;translate:none!important;overflow-x:hidden!important;overflow-y:auto!important;
   -webkit-overflow-scrolling:touch!important;
@@ -8711,228 +8183,15 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
   #productionOrderFlow .ubee-my-account-copy strong{font-size:18px!important;}
   #productionOrderFlow .ubee-my-menu-item{padding-left:12px!important;padding-right:12px!important;font-size:15px!important;}
 }
-</style><style id="ubee-flat-navigation-r10">/* =========================================================
-   UBee R10 永久版面規則
-   1. 底部導航永遠三欄、單列、滿版貼底。
-   2. 禁止圓角外框、陰影、毛玻璃、透明浮層、置中縮窄與換行。
-   3. 固定操作列必須是平面滿版列，不得以浮動卡片形式存在。
-   後續修改不得重新加入上述浮動樣式。
-   ========================================================= */
-:root{
-  --ubee-bottom-nav-content-height:64px;
-  --ubee-bottom-nav-height:calc(64px + env(safe-area-inset-bottom));
-}
-
-#productionOrderFlow .flow-bottom-nav,
-body:not(.flow-active) .bottom-tabs{
-  position:fixed!important;
-  inset:auto 0 0 0!important;
-  left:0!important;
-  right:0!important;
-  bottom:0!important;
-  transform:none!important;
-  translate:none!important;
-  width:100%!important;
-  min-width:0!important;
-  max-width:none!important;
-  height:var(--ubee-bottom-nav-height)!important;
-  min-height:var(--ubee-bottom-nav-height)!important;
-  display:grid!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  grid-template-rows:var(--ubee-bottom-nav-content-height)!important;
-  grid-auto-flow:column!important;
-  grid-auto-columns:minmax(0,1fr)!important;
-  gap:0!important;
-  margin:0!important;
-  padding:0 0 env(safe-area-inset-bottom)!important;
-  overflow:hidden!important;
-  flex-wrap:nowrap!important;
-  border:0!important;
-  border-top:1px solid #dfe2e5!important;
-  border-radius:0!important;
-  background:#fff!important;
-  opacity:1!important;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  z-index:999!important;
-  box-sizing:border-box!important;
-}
-
-#productionOrderFlow .flow-bottom-nav > button,
-body:not(.flow-active) .bottom-tabs > .bottom-tab{
-  grid-row:1!important;
-  width:100%!important;
-  min-width:0!important;
-  max-width:none!important;
-  height:var(--ubee-bottom-nav-content-height)!important;
-  min-height:var(--ubee-bottom-nav-content-height)!important;
-  display:flex!important;
-  flex-direction:column!important;
-  flex-wrap:nowrap!important;
-  align-items:center!important;
-  justify-content:center!important;
-  gap:3px!important;
-  margin:0!important;
-  padding:7px 4px 6px!important;
-  overflow:hidden!important;
-  border:0!important;
-  border-radius:0!important;
-  background:#fff!important;
-  color:#7f858c!important;
-  box-shadow:none!important;
-  filter:none!important;
-  transform:none!important;
-  translate:none!important;
-  line-height:1.1!important;
-  white-space:nowrap!important;
-  text-align:center!important;
-  box-sizing:border-box!important;
-}
-#productionOrderFlow .flow-bottom-nav > button:nth-child(1),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(1){grid-column:1!important;}
-#productionOrderFlow .flow-bottom-nav > button:nth-child(2),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(2){grid-column:2!important;}
-#productionOrderFlow .flow-bottom-nav > button:nth-child(3),body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(3){grid-column:3!important;}
-
-#productionOrderFlow .flow-bottom-nav > button::before,
-#productionOrderFlow .flow-bottom-nav > button::after,
-body:not(.flow-active) .bottom-tabs > .bottom-tab::before,
-body:not(.flow-active) .bottom-tabs > .bottom-tab::after{
-  content:none!important;
-  display:none!important;
-}
-
-#productionOrderFlow .flow-bottom-nav > button.active,
-body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
-  width:100%!important;
-  background:#fff!important;
-  color:#111!important;
-  border-top:3px solid #f4bd00!important;
-  padding-top:4px!important;
-}
-
-#productionOrderFlow .flow-nav-icon,
-#productionOrderFlow .flow-nav-label,
-body:not(.flow-active) .bottom-tab svg{
-  flex:0 0 auto!important;
-  margin:0!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  filter:none!important;
-  transform:none!important;
-  translate:none!important;
-}
-#productionOrderFlow .flow-nav-icon,
-body:not(.flow-active) .bottom-tab svg{
-  width:23px!important;
-  height:23px!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  font-size:20px!important;
-  line-height:1!important;
-}
-#productionOrderFlow .flow-nav-label{
-  display:block!important;
-  font-size:11px!important;
-  font-weight:850!important;
-  line-height:1.1!important;
-  white-space:nowrap!important;
-}
-
-/* 內容永遠預留完整導航高度，避免地圖、卡片與文字被遮住。 */
-#productionOrderFlow,
-#productionOrderFlow .flow-page,
-body:not(.flow-active) .app{
-  padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
-}
-
-/* R12｜僅取消導航列上方操作列的固定浮動定位；其他版面維持 R10。 */
-.home-action-footer,
-.step2-action-footer,
-.step3-action-footer,
-.step4-action-footer,
-.step5-action-footer,
-.flow-action-footer,
-.flow-sticky-action,
-.tracking-action-footer{
-  position:static!important;
-  inset:auto!important;
-  left:auto!important;
-  right:auto!important;
-  top:auto!important;
-  bottom:auto!important;
-  transform:none!important;
-  translate:none!important;
-  width:100%!important;
-  min-width:0!important;
-  max-width:none!important;
-  margin:16px 0 0!important;
-  padding:10px 16px!important;
-  z-index:auto!important;
-  border:0!important;
-  border-top:1px solid #dfe2e5!important;
-  border-radius:0!important;
-  background:#fff!important;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  box-sizing:border-box!important;
-}
-
-/* 全站永久禁用陰影與毛玻璃，避免後續舊規則重新產生浮動視覺。 */
+</style><style id="ubee-flat-visual-guard-r10">
+/* UBee R10｜保留平面視覺防護；底部導航已移至 R31 單一系統。 */
 *,*::before,*::after{
   box-shadow:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
 }
-</style><style id="ubee-r13-bottom-space-and-settings-fix">
-/* =========================================================
-   UBee R13｜底部空間唯一規格
-   1. 底部導航維持 fixed、三欄、滿版貼底。
-   2. flow-page 已透過 inset-bottom 避開導航，不再重複增加導航高度 padding。
-   3. 所有頁面只保留 14～18px 正常內容收尾，不得出現大塊灰色空白。
-   4. 「設定」為獨立且永遠可見的原生 App 分組。
-   ========================================================= */
-
-/* 底部導航保持固定，不更動 R10 三欄結構。 */
-#productionOrderFlow .flow-bottom-nav,
-body:not(.flow-active) .bottom-tabs{
-  position:fixed!important;
-  left:0!important;
-  right:0!important;
-  bottom:0!important;
-}
-
-/* 正式新流程：頁面本身已在導航上方結束，禁止再次預留導航高度。 */
-#productionOrderFlow,
-#productionOrderFlow .flow-shell,
-#productionOrderFlow .flow-page{
-  padding-bottom:0!important;
-}
-
-#productionOrderFlow .flow-scroll{
-  padding-bottom:16px!important;
-}
-
-/* 我的主頁與所有子頁：只保留正常收尾距離，不再加一整個導航高度。 */
-#productionOrderFlow .ubee-my-scroll{
-  padding-bottom:calc(16px + env(safe-area-inset-bottom))!important;
-}
-
-#productionOrderFlow .ubee-my-panel.ubee-my-app-page{
-  padding-bottom:calc(16px + env(safe-area-inset-bottom))!important;
-}
-
-/* 舊五步驟相容頁：移除 120px／180px 等舊固定操作列預留。 */
-body:not(.flow-active) .app{
-  padding-bottom:calc(var(--ubee-bottom-nav-height) + 12px)!important;
-}
-
+</style><style id="ubee-r13-content-and-settings">
+/* UBee R13｜保留既有內容收尾與「設定」分組；不再控制底部導航。 */
 #step1 .task-sheet,
 #step2,
 #step3,
@@ -8941,11 +8200,6 @@ body:not(.flow-active) .app{
   padding-bottom:16px!important;
 }
 
-.footer-nav{
-  margin-bottom:0!important;
-}
-
-/* 設定獨立區塊：不得被隱藏、裁切或擠到導航下方。 */
 #productionOrderFlow .ubee-my-settings-group{
   display:block!important;
   visibility:visible!important;
@@ -8967,14 +8221,11 @@ body:not(.flow-active) .app{
 <style id="ubee-global-compact-layout-r14">
 /* =========================================================
    UBee R14｜全介面一致縮小
-   - 不改結構、不改功能、不改固定底部導航邏輯
+   - 不改結構、不改功能；底部導航由 R31 單一系統管理
    - 僅縮小字級、內距、高度、圖示與區塊間距
    - 禁止新增任何浮動、陰影、毛玻璃或縮放位移
    ========================================================= */
 :root{
-  --ubee-nav-base-height:58px;
-  --ubee-bottom-nav-content-height:58px;
-  --ubee-bottom-nav-height:calc(58px + env(safe-area-inset-bottom));
   --ubee-my-page-x:15px;
 }
 
@@ -9033,12 +8284,6 @@ body:not(.flow-active) .app{
 #productionOrderFlow .ubee-flat-form textarea,#productionOrderFlow .ubee-my-feedback-form textarea{min-height:96px!important;}
 #productionOrderFlow .ubee-flat-primary,#productionOrderFlow .ubee-my-feedback-submit,#productionOrderFlow .ubee-my-setting-button,#productionOrderFlow .ubee-flat-danger{min-height:46px!important;padding:10px 12px!important;font-size:14px!important;border-radius:8px!important;}
 
-/* 固定底部導航：維持固定貼底，只縮小高度與內容 */
-#productionOrderFlow .flow-bottom-nav,body:not(.flow-active) .bottom-tabs{height:var(--ubee-bottom-nav-height)!important;min-height:var(--ubee-bottom-nav-height)!important;grid-template-rows:var(--ubee-bottom-nav-content-height)!important;}
-#productionOrderFlow .flow-bottom-nav>button,body:not(.flow-active) .bottom-tabs>.bottom-tab{height:var(--ubee-bottom-nav-content-height)!important;min-height:var(--ubee-bottom-nav-content-height)!important;padding:4px 2px 3px!important;font-size:10px!important;}
-#productionOrderFlow .flow-nav-icon,body:not(.flow-active) .bottom-tab svg{width:20px!important;height:20px!important;font-size:18px!important;}
-#productionOrderFlow .flow-nav-label{font-size:10px!important;}
-
 /* 登入／註冊頁同步縮小 */
 #ubeeCustomerAuthRoot .uca-shell{max-width:430px!important;}
 #ubeeCustomerAuthRoot .uca-card{padding:18px!important;}
@@ -9057,77 +8302,12 @@ body:not(.flow-active) .app{
 </style>
 
 
-<style id="ubee-r16-stable-flow-layout">
-/* =========================================================
-   UBee R16｜唯一正式底部結構
-   1. 只有底部導航固定；所有流程按鈕都在正常捲動內容中。
-   2. 頁面本體直接止於導航上緣，不以灰色 padding 或空白墊高。
-   3. 任務內容只保留必要資訊；隱藏重複標題與額外配送需求區。
-   4. 禁止導航與流程操作列的浮動卡片、陰影、毛玻璃與位移。
-   ========================================================= */
-:root{
-  --ubee-r16-nav-content-height:58px;
-  --ubee-r16-nav-total-height:calc(58px + env(safe-area-inset-bottom));
-}
-
-#productionOrderFlow{
-  --ubee-bottom-nav-content-height:var(--ubee-r16-nav-content-height)!important;
-  --ubee-bottom-nav-height:var(--ubee-r16-nav-total-height)!important;
-  --flow-nav-height:var(--ubee-r16-nav-content-height)!important;
-  --flow-nav-total-height:var(--ubee-r16-nav-total-height)!important;
-  padding:0!important;
-  background:#fff!important;
-}
-
-#productionOrderFlow .flow-shell{
-  height:100vh!important;
-  height:100dvh!important;
-  min-height:100vh!important;
-  min-height:100dvh!important;
-  padding:0!important;
-  overflow:hidden!important;
-  background:#fff!important;
-}
-
-/* 每個頁面直接結束在固定導航上緣；導航不參與頁面排版，也不會跑動。 */
-#productionOrderFlow .flow-page{
-  inset:0 0 var(--ubee-r16-nav-total-height)!important;
-  padding:0!important;
-  overflow:hidden!important;
-  background:#fff!important;
-}
-
-/* 所有內容區只保留正常收尾間距，不再重複加入導航或操作列高度。 */
-#productionOrderFlow .flow-scroll,
-#productionOrderFlow #flowPageTask .flow-scroll,
-#productionOrderFlow #flowPageOptions .flow-scroll,
-#productionOrderFlow #flowPageConfirm .flow-scroll,
-#productionOrderFlow #flowPageSearch .flow-scroll,
-#productionOrderFlow #flowPageDetail .flow-scroll,
-#productionOrderFlow #flowPageProfileDetail .flow-scroll,
-#productionOrderFlow #flowPageHome .flow-scroll{
-  flex:1 1 auto!important;
-  min-height:0!important;
-  padding-bottom:16px!important;
-  scroll-padding-bottom:16px!important;
-  overflow-y:auto!important;
-  overflow-x:hidden!important;
-  background:#fff!important;
-}
-
-/* 我的主頁與各設定子頁同樣不再使用導航高度製造灰色空白。 */
-#productionOrderFlow .ubee-my-scroll,
-#productionOrderFlow .ubee-my-panel.ubee-my-app-page{
-  padding-bottom:18px!important;
-  scroll-padding-bottom:18px!important;
-}
-
-/* 重複、非必要的任務內容區塊保留 DOM 相容性，但不再呈現給使用者。 */
+<style id="ubee-r16-static-flow-actions">
+/* UBee R16｜保留流程內容與操作列規則；不再控制導航高度或定位。 */
 #productionOrderFlow .ubee-r16-unnecessary-field{
   display:none!important;
 }
 
-/* 上一步／下一步／確認任務全部回到捲動內容末端，不再固定或懸浮。 */
 #productionOrderFlow .flow-actionbar{
   position:static!important;
   inset:auto!important;
@@ -9155,11 +8335,11 @@ body:not(.flow-active) .app{
   transform:none!important;
   translate:none!important;
 }
+
 #productionOrderFlow .flow-actionbar.single{
   grid-template-columns:1fr!important;
 }
 
-/* 舊相容流程的操作列也只能存在於正常頁面流。 */
 .home-action-footer,
 .step2-action-footer,
 .step3-action-footer,
@@ -9188,76 +8368,6 @@ body:not(.flow-active) .app{
   -webkit-backdrop-filter:none!important;
   transform:none!important;
   translate:none!important;
-}
-
-/* 唯一允許固定於底部的元素：三欄導航。 */
-#productionOrderFlow .flow-bottom-nav,
-body:not(.flow-active) .bottom-tabs{
-  position:fixed!important;
-  inset:auto 0 0 0!important;
-  left:0!important;
-  right:0!important;
-  bottom:0!important;
-  width:100%!important;
-  min-width:0!important;
-  max-width:none!important;
-  height:var(--ubee-r16-nav-total-height)!important;
-  min-height:var(--ubee-r16-nav-total-height)!important;
-  display:grid!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  grid-template-rows:var(--ubee-r16-nav-content-height)!important;
-  gap:0!important;
-  margin:0!important;
-  padding:0 0 env(safe-area-inset-bottom)!important;
-  overflow:hidden!important;
-  border:0!important;
-  border-top:1px solid #dfe2e5!important;
-  border-radius:0!important;
-  background:#fff!important;
-  opacity:1!important;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  transform:none!important;
-  translate:none!important;
-  z-index:20000!important;
-  box-sizing:border-box!important;
-}
-
-#productionOrderFlow .flow-bottom-nav > button,
-body:not(.flow-active) .bottom-tabs > .bottom-tab{
-  width:100%!important;
-  min-width:0!important;
-  height:var(--ubee-r16-nav-content-height)!important;
-  min-height:var(--ubee-r16-nav-content-height)!important;
-  display:flex!important;
-  flex-direction:column!important;
-  align-items:center!important;
-  justify-content:center!important;
-  gap:2px!important;
-  margin:0!important;
-  padding:4px 2px 3px!important;
-  border:0!important;
-  border-radius:0!important;
-  background:#fff!important;
-  box-shadow:none!important;
-  filter:none!important;
-  transform:none!important;
-  translate:none!important;
-  white-space:nowrap!important;
-}
-
-#productionOrderFlow .flow-bottom-nav > button.active,
-body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
-  border-top:3px solid #f4bd00!important;
-  background:#fff!important;
-  color:#111!important;
-}
-
-/* 舊任務追蹤頁只預留真正導航高度，不再保留 120／150px 灰色墊高。 */
-body:not(.flow-active) .app{
-  padding-bottom:calc(var(--ubee-r16-nav-total-height) + 12px)!important;
 }
 </style>
 
@@ -9658,7 +8768,7 @@ body.ubee-r24-yellow-starting::before{
     padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
     border-bottom:1px solid var(--uca-line);
     background:rgba(255,255,255,.97);
-    
+
   }
   .uca-brand {
     text-align:center;
@@ -9714,7 +8824,7 @@ body.ubee-r24-yellow-starting::before{
     border-radius:30px;
     object-fit:cover;
     background:#fff;
-    
+
   }
   .uca-logo-badge {
     position:absolute;
@@ -9744,7 +8854,7 @@ body.ubee-r24-yellow-starting::before{
     height:8px;
     border-radius:50%;
     background:#22c55e;
-    
+
   }
   .uca-hero h1,
   .uca-heading h2,
@@ -9795,7 +8905,7 @@ body.ubee-r24-yellow-starting::before{
     border:1px solid var(--uca-line);
     border-radius:24px;
     background:#fff;
-    
+
   }
   .uca-heading { margin-bottom:18px; }
   .uca-heading .uca-subtitle { text-align:left; margin-left:0; }
@@ -9837,7 +8947,7 @@ body.ubee-r24-yellow-starting::before{
   .uca-select:focus {
     border-color:#111;
     background:#fff;
-    
+
   }
   .uca-input::placeholder { color:#adb1b5; font-weight:750; }
   .uca-input-action {
@@ -10031,7 +9141,7 @@ body.ubee-r24-yellow-starting::before{
     color:#fff;
     font-size:36px;
     font-weight:1000;
-    
+
   }
 
   .uca-modal {
@@ -10080,7 +9190,7 @@ body.ubee-r24-yellow-starting::before{
     justify-content:center;
     padding:24px;
     background:rgba(255,255,255,.82);
-    
+
   }
   .uca-loading.active { display:flex; }
   .uca-loading-card { min-width:210px; padding:22px; border-radius:22px; background:#111; color:#fff; text-align:center;  }
@@ -20259,7 +19369,6 @@ document.addEventListener('keydown', (event) => {
   --flow-muted:#6f747a;
   --flow-line:#e5e7ea;
   --flow-danger:#dc2626;
-  --flow-nav-height:76px;
 }
 body.flow-active{overflow:hidden!important;background:var(--flow-bg)!important;}
 body.flow-active>.app{display:none!important;}
@@ -20279,7 +19388,7 @@ body.flow-active>.app{display:none!important;}
 #productionOrderFlow textarea,
 #productionOrderFlow select{font:inherit;font-size:16px;}
 .flow-shell{position:relative;width:100%;max-width:520px;height:100%;margin:0 auto;background:var(--flow-bg);overflow:hidden;}
-.flow-page{position:absolute;inset:0 0 var(--flow-nav-height);display:none;flex-direction:column;min-height:0;background:var(--flow-bg);}
+.flow-page{position:absolute;inset:0;display:none;flex-direction:column;min-height:0;background:var(--flow-bg);}
 .flow-page.active{display:flex;}
 .flow-header{flex:0 0 auto;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;min-height:64px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:#fff;border-bottom:1px solid var(--flow-line);z-index:5;}
 .flow-header.home{grid-template-columns:minmax(0,1fr) auto 44px;}
@@ -20322,7 +19431,6 @@ body.flow-active>.app{display:none!important;}
 .flow-actionbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px;border-top:1px solid rgba(17,24,39,.08);background:#ffffff;}
 .flow-actionbar.single{grid-template-columns:1fr;}.flow-actionbar .flow-secondary,.flow-actionbar .flow-primary{min-height:54px;}
 
-
 .flow-search-box{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:7px;margin-bottom:10px;}.flow-search-box .flow-input{min-width:0;}.flow-clear-btn{border:1px solid var(--flow-line);border-radius:14px;background:#fff;color:#555;font-size:21px;}
 .flow-location-action{width:100%;display:flex;align-items:center;gap:10px;min-height:54px;margin-bottom:13px;padding:10px 12px;border:1px solid #d7e1f3;border-radius:15px;background:#f4f8ff;color:#2f4e7c;text-align:left;font-size:13px!important;font-weight:1000;}.flow-location-action small{display:block;margin-top:2px;color:#6e7f96;font-size:10px;font-weight:800;}
 .flow-section-label{margin:14px 2px 7px;color:#777c82;font-size:11px;font-weight:1000;}.flow-results{display:flex;flex-direction:column;gap:8px;}.flow-result{width:100%;display:grid;grid-template-columns:34px minmax(0,1fr) 20px;align-items:center;gap:9px;padding:11px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;text-align:left;}.flow-result-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#f0f2f3;}.flow-result strong{display:block;color:#111;font-size:13px;font-weight:1000;line-height:1.4;}.flow-result small{display:block;margin-top:3px;color:#777c82;font-size:10px;font-weight:800;line-height:1.4;}.flow-empty{padding:15px;border:1px dashed #d7dade;border-radius:15px;color:#858a90;font-size:12px;font-weight:850;text-align:center;}
@@ -20364,55 +19472,16 @@ body.flow-active>.app{display:none!important;}
 .flow-detail-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff;}.flow-detail-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;padding:12px 13px;border-bottom:1px solid #eef0f1;}.flow-detail-row:last-child{border-bottom:none;}.flow-detail-row span{color:var(--flow-muted);font-size:11px;font-weight:900;}.flow-detail-row strong{color:#111;font-size:13px;font-weight:850;line-height:1.6;word-break:break-word;white-space:pre-line;}
 @media(max-width:360px){.flow-task-type-grid{grid-template-columns:1fr;}.flow-profile-task-footer{align-items:center;}.flow-detail-row{grid-template-columns:80px minmax(0,1fr);}}
 
-
-
 /* 正式訂單追蹤頁的底部導航同步同一套視覺 */
-
-
 
 @media(max-width:390px){
   .flow-progress-item{font-size:9px;}.flow-progress-item::before{width:17px;height:17px;flex-basis:17px;}
   .flow-grid-2{grid-template-columns:1fr;}.flow-timing-list,.flow-speed-list{grid-template-columns:1fr 1fr;}.flow-map{height:270px;}
 }
 
-
 /* ===== UBee 用戶端｜我的頁面（台灣用語、所有入口可點擊） ===== */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @media(max-width:380px){}
-
 </style>
 <div aria-label="UBee 客人端正式下單流程" id="productionOrderFlow">
 <div class="flow-shell">
@@ -21468,7 +20537,6 @@ body.flow-active>.app{display:none!important;}
 <style id="ubee-fixed-bottom-nav-yellow-service-tabs">
   /* 2026-08-04 正式清理：舊固定導航覆蓋已移除，底部導覽由唯一正式 App 導覽層管理。 */
 
-
   /* 五大服務入口：App 圖示式設計，取代整條黃色分類列。 */
   #productionOrderFlow .flow-service-tabs{
     display:grid !important;
@@ -21495,7 +20563,7 @@ body.flow-active>.app{display:none!important;}
     border-radius:16px !important;
     background:transparent !important;
     color:#74787d !important;
-    
+
     font-weight:1000 !important;
     -webkit-tap-highlight-color:transparent !important;
     transition:transform .16s ease,color .16s ease !important;
@@ -21516,7 +20584,7 @@ body.flow-active>.app{display:none!important;}
     border-radius:14px;
     background:#f3f4f5;
     color:#555a60;
-    
+
     transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease;
   }
 
@@ -21542,14 +20610,14 @@ body.flow-active>.app{display:none!important;}
   #productionOrderFlow .flow-service-tab.active{
     background:transparent !important;
     color:#111111 !important;
-    
+
   }
 
   #productionOrderFlow .flow-service-tab.active .flow-service-icon{
     border-color:#e6b900;
     background:var(--flow-accent);
     color:#111111;
-    
+
     transform:translateY(-1px);
   }
 
@@ -21984,18 +21052,12 @@ body.flow-active>.app{display:none!important;}
      - 設定新增通知、定位、震動、減少動畫、安裝 App、更新、清除草稿等功能。
      - 保留既有下單、估價、付款、地圖及即時追蹤核心流程。
      ========================================================= -->
-<style id="ubeeAppNavigationSettingsV3Style">
-  /*
+<style id="ubeeAppSettingsV3Style">
+/*
    * UBee 正式營運 App 操作層｜2026-08-04
-   * 僅統一畫面層級、底部導覽、我的主頁與子頁操作感。
+   * 僅統一畫面層級、我的主頁與子頁操作感。
    * 不修改估價、地圖、地址、下單、付款、訂單建立與任務追蹤核心。
    */
-
-  #productionOrderFlow{
-    --ubee-nav-content-height:64px;
-    --flow-nav-height:var(--ubee-nav-content-height);
-    --flow-nav-total-height:calc(var(--ubee-nav-content-height) + env(safe-area-inset-bottom));
-  }
 
   #productionOrderFlow,
   #productionOrderFlow .flow-shell{
@@ -22025,7 +21087,6 @@ body.flow-active>.app{display:none!important;}
   }
 
   #productionOrderFlow .flow-page{
-    inset:0 0 var(--flow-nav-total-height) !important;
     overflow:hidden;
     background:#f5f6f7;
   }
@@ -22044,8 +21105,7 @@ body.flow-active>.app{display:none!important;}
     z-index:10;
     min-height:62px;
     background:rgba(255,255,255,.98);
-    
-    
+
   }
 
   #productionOrderFlow .flow-back-btn,
@@ -22056,69 +21116,13 @@ body.flow-active>.app{display:none!important;}
     min-height:44px;
   }
 
-  
-
   /* =========================
      我的主頁
      ========================= */
 
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
   /* =========================
      我的子頁：真正 App 內頁
      ========================= */
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
 
   /* 設定頁：使用原生 App 常見的分組清單 */
   #productionOrderFlow .ubee-settings-section-title{
@@ -22139,7 +21143,7 @@ body.flow-active>.app{display:none!important;}
     border:1px solid #e5e7e9;
     border-radius:17px;
     background:#fff;
-    
+
   }
 
   #productionOrderFlow .ubee-settings-row{
@@ -22241,12 +21245,6 @@ body.flow-active>.app{display:none!important;}
     margin-bottom:8px;
   }
 
-  
-
-  
-
-  
-
   @keyframes ubeeAppScreenIn{
     from{opacity:.35;transform:translateX(10px);}
     to{opacity:1;transform:translateX(0);}
@@ -22258,49 +21256,25 @@ body.flow-active>.app{display:none!important;}
   }
 
   @media(max-width:380px){
-    
 
-    
-
-    
-
-    
   }
 
   @media(prefers-reduced-motion:reduce){
-    
-  }
 
+  }
 
   /* =========================================================
      UBee 用戶端唯一正式 App 介面規格｜2026-08-04 R1
-     清除舊版固定導航位移、按鈕 display 衝突與首頁干擾卡片。
+     保留正式 App 畫面與按鈕操作規格；導航由 R31 單一系統管理。
      ========================================================= */
-  body{
-    --ubee-app-nav-content-height:68px;
-    --ubee-app-nav-total-height:calc(var(--ubee-app-nav-content-height) + env(safe-area-inset-bottom));
-  }
-
   #productionOrderFlow{
-    --ubee-nav-content-height:var(--ubee-app-nav-content-height);
-    --flow-nav-height:var(--ubee-app-nav-content-height);
-    --flow-nav-total-height:var(--ubee-app-nav-total-height);
-    height:100vh !important;
-    height:100dvh !important;
     background:#f4f5f6 !important;
   }
 
   #productionOrderFlow .flow-shell{
     width:100% !important;
-    height:100vh !important;
-    height:100dvh !important;
-    max-height:100dvh !important;
     overflow:hidden !important;
     background:#f4f5f6 !important;
-  }
-
-  #productionOrderFlow .flow-page{
-    inset:0 0 var(--flow-nav-total-height) !important;
   }
 
   /* 首頁不再顯示舊式步驟列；進入填單後才顯示流程進度。 */
@@ -22318,7 +21292,7 @@ body.flow-active>.app{display:none!important;}
     padding:calc(8px + env(safe-area-inset-top)) 14px 8px !important;
     border-bottom:1px solid rgba(17,24,39,.07) !important;
     background:rgba(255,255,255,.98) !important;
-    
+
   }
 
   #productionOrderFlow .flow-brand{
@@ -22346,7 +21320,7 @@ body.flow-active>.app{display:none!important;}
     border:1px solid #e5e7e9 !important;
     border-radius:23px !important;
     background:#fff !important;
-    
+
   }
 
   #productionOrderFlow .flow-location-line{
@@ -22358,7 +21332,7 @@ body.flow-active>.app{display:none!important;}
 
   #productionOrderFlow .flow-route-card{
     border-radius:19px !important;
-    
+
   }
 
   #productionOrderFlow .flow-address-button{
@@ -22374,44 +21348,12 @@ body.flow-active>.app{display:none!important;}
     min-height:55px !important;
     margin-top:14px !important;
     border-radius:17px !important;
-    
-  }
 
+  }
 
   /* =========================================================
      唯一正式底部導覽｜固定貼底、滿版、無浮動容器
      ========================================================= */
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
 
   @keyframes ubeeTaskTabPulse{
     from{opacity:.45;transform:scale(.94);}
@@ -22420,7 +21362,7 @@ body.flow-active>.app{display:none!important;}
 
   @media(min-width:521px){
     #productionOrderFlow .flow-shell{
-      
+
     }
   }
 
@@ -22438,7 +21380,6 @@ body.flow-active>.app{display:none!important;}
       padding:0 10px !important;
     }
   }
-
 </style>
 <script id="ubeeAppNavigationSettingsV3Script">
 (() => {
@@ -23694,75 +22635,18 @@ body:not(.flow-active) .app select,
 }
 </style>
 
-<style id="ubee-r18-visible-bottom-fixed-nav-no-gray">
-/* =========================================================
-   UBee R18｜底部完整可見、導航永久固定、零灰區
-   1. 底部導航是唯一固定於畫面底部的操作介面。
-   2. 我的主頁、設定與所有子頁直接結束在導航上緣。
-   3. 不再以導航高度 padding 製造灰色空白；只保留 16px 正常收尾。
-   4. 流程按鈕、追蹤標題與舊確認列都在正常內容流，不跟著頁面浮動。
-   ========================================================= */
-:root{
-  --ubee-r18-nav-content-height:58px;
-  --ubee-r18-nav-total-height:calc(58px + env(safe-area-inset-bottom));
-}
-
+<style id="ubee-r18-flat-page-visuals">
+/* UBee R18｜保留頁面、追蹤與狀態列平面視覺；導航由 R31 單一系統管理。 */
 html,
 body{
   background:#fff!important;
 }
 
-#productionOrderFlow{
-  --ubee-bottom-nav-content-height:var(--ubee-r18-nav-content-height)!important;
-  --ubee-bottom-nav-height:var(--ubee-r18-nav-total-height)!important;
-  --flow-nav-height:var(--ubee-r18-nav-content-height)!important;
-  --flow-nav-total-height:var(--ubee-r18-nav-total-height)!important;
-  background:#fff!important;
-}
-
-#productionOrderFlow .flow-shell{
-  height:100vh!important;
-  height:100dvh!important;
-  min-height:0!important;
-  padding:0!important;
-  overflow:hidden!important;
-  background:#fff!important;
-}
-
-/* 所有正式頁面直接止於固定導航上緣。 */
-#productionOrderFlow .flow-page{
-  inset:0 0 var(--ubee-r18-nav-total-height) 0!important;
-  min-height:0!important;
-  padding:0!important;
-  overflow:hidden!important;
-  background:#fff!important;
-}
-
-/* 一般頁面只在自己的內容區捲動，不預留第二次導航高度。 */
-#productionOrderFlow .flow-scroll,
-#productionOrderFlow .flow-home-scroll,
-#productionOrderFlow #flowPageTask .flow-scroll,
-#productionOrderFlow #flowPageOptions .flow-scroll,
-#productionOrderFlow #flowPageConfirm .flow-scroll,
-#productionOrderFlow #flowPageSearch .flow-scroll,
-#productionOrderFlow #flowPageDetail .flow-scroll,
-#productionOrderFlow #flowPageProfileDetail .flow-scroll{
-  flex:1 1 auto!important;
-  min-height:0!important;
-  box-sizing:border-box!important;
-  padding-bottom:16px!important;
-  scroll-padding-bottom:16px!important;
-  overflow-x:hidden!important;
-  overflow-y:auto!important;
-  overscroll-behavior-y:contain!important;
-  background:#fff!important;
-}
-
-/* 我的主頁已位於 flow-page 內，不能再加入導航高度。 */
 #productionOrderFlow .ubee-my-page,
 #productionOrderFlow .ubee-my-scroll{
   background:#fff!important;
 }
+
 #productionOrderFlow .ubee-my-scroll{
   width:100%!important;
   height:100%!important;
@@ -23779,22 +22663,17 @@ body{
   overscroll-behavior-y:contain!important;
   -webkit-overflow-scrolling:touch!important;
 }
+
 #productionOrderFlow .ubee-my-group:last-child{
   margin-bottom:0!important;
 }
+
 #productionOrderFlow .ubee-my-groups{
   padding-bottom:0!important;
 }
 
-/*
- * 我的子頁會被控制器移到 flow-shell，並非 flow-page 的子元素。
- * 因此必須直接把其 bottom 設在導航上緣；不能使用底部 padding 補償。
- */
 #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
-  position:absolute!important;
-  inset:0 0 var(--ubee-r18-nav-total-height) 0!important;
   width:100%!important;
-  height:auto!important;
   min-height:0!important;
   max-height:none!important;
   box-sizing:border-box!important;
@@ -23818,37 +22697,11 @@ body{
   translate:none!important;
   -webkit-overflow-scrolling:touch!important;
 }
+
 #productionOrderFlow .ubee-my-panel.ubee-my-app-page > :last-child{
   margin-bottom:0!important;
 }
 
-/* 所有流程操作列回到內容末端；不固定、不黏住、不覆蓋文字。 */
-#productionOrderFlow .flow-actionbar,
-.home-action-footer,
-.step2-action-footer,
-.step3-action-footer,
-.step4-action-footer,
-.step5-action-footer,
-.flow-action-footer,
-.flow-sticky-action,
-.tracking-action-footer,
-#step4 .review-sticky-footer{
-  position:static!important;
-  inset:auto!important;
-  left:auto!important;
-  right:auto!important;
-  top:auto!important;
-  bottom:auto!important;
-  z-index:auto!important;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  transform:none!important;
-  translate:none!important;
-}
-
-/* 任務追蹤頁標題跟著內容捲動，不再 sticky。 */
 body.ubee-active-order #step5 .step5-order-header{
   position:static!important;
   top:auto!important;
@@ -23859,22 +22712,11 @@ body.ubee-active-order #step5 .step5-order-header{
   -webkit-backdrop-filter:none!important;
 }
 
-/* 舊版內容只保留導航本身所需的精確高度，沒有額外 12/74/120px 灰色墊高。 */
-body:not(.flow-active) .app{
-  box-sizing:border-box!important;
-  padding-bottom:var(--ubee-r18-nav-total-height)!important;
-  scroll-padding-bottom:var(--ubee-r18-nav-total-height)!important;
-  background:#fff!important;
-}
-.footer-nav{
-  margin-bottom:0!important;
-}
 body.ubee-active-order #step5{
   padding-bottom:16px!important;
   background:#fff!important;
 }
 
-/* 草稿與網路狀態保留功能，但改為滿版平面狀態列，禁止浮動卡片視覺。 */
 .draft-banner{
   position:static!important;
   inset:auto!important;
@@ -23894,6 +22736,7 @@ body.ubee-active-order #step5{
   -webkit-backdrop-filter:none!important;
   transform:none!important;
 }
+
 #ubeeNetworkStatusBanner{
   left:0!important;
   right:0!important;
@@ -23909,50 +22752,6 @@ body.ubee-active-order #step5{
   -webkit-backdrop-filter:none!important;
   transform:none!important;
 }
-
-/* 底部導航永久固定：三欄、滿版、白底、無灰區與浮動外觀。 */
-#productionOrderFlow .flow-bottom-nav,
-body:not(.flow-active) .bottom-tabs{
-  position:fixed!important;
-  inset:auto 0 0 0!important;
-  left:0!important;
-  right:0!important;
-  bottom:0!important;
-  width:100%!important;
-  min-width:0!important;
-  max-width:none!important;
-  height:var(--ubee-r18-nav-total-height)!important;
-  min-height:var(--ubee-r18-nav-total-height)!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  grid-template-rows:var(--ubee-r18-nav-content-height)!important;
-  margin:0!important;
-  padding:0 0 env(safe-area-inset-bottom)!important;
-  overflow:hidden!important;
-  border:0!important;
-  border-top:1px solid #dfe2e5!important;
-  border-radius:0!important;
-  background:#fff!important;
-  opacity:1!important;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  transform:none!important;
-  translate:none!important;
-  z-index:20000!important;
-}
-#productionOrderFlow .flow-bottom-nav > button,
-body:not(.flow-active) .bottom-tabs > .bottom-tab{
-  height:var(--ubee-r18-nav-content-height)!important;
-  min-height:var(--ubee-r18-nav-content-height)!important;
-  margin:0!important;
-  border-radius:0!important;
-  background:#fff!important;
-  box-shadow:none!important;
-  filter:none!important;
-  transform:none!important;
-  translate:none!important;
-}
 </style>
 
 
@@ -23960,218 +22759,216 @@ body:not(.flow-active) .bottom-tabs > .bottom-tab{
 
 
 
-<style id="ubee-r29-clean-app-root-navigation">
+<style id="ubee-r31-single-bottom-navigation">
 /* =========================================================
-   UBee R29｜單一導航定位系統
-   - 不再把導航搬到 body。
-   - productionOrderFlow 本身已固定 inset:0；導航只需 absolute 貼在 App 根層底部。
-   - 首頁內容精確結束在導航上緣，不再重複 padding 導航高度。
-   - 不鎖死 html/body，不改寫既有首頁、我的頁面與表單介面。
+   UBee R31｜唯一正式底部導航系統
+   1. 正式流程與舊追蹤頁共用同一高度及安全區規格。
+   2. 導航直接 fixed 於手機視窗底部，不依賴 100dvh 或頁面捲動位置。
+   3. 正式頁面只避開一次導航總高度，不再疊加 padding 補丁。
+   4. 不使用 JavaScript 位移、viewport 差值或重新掛載導航。
    ========================================================= */
 :root{
-  --ubee-r29-nav-content-height:54px;
-  --ubee-r29-nav-total-height:calc(54px + env(safe-area-inset-bottom));
-}
-
-/* 啟動期間，包含 iPhone safe area 在內都維持 UBee 黃。 */
-html.ubee-r24-yellow-starting,
-body.ubee-r24-yellow-starting{
-  background:#facc15!important;
-}
-
-#ubeeAppSplashR24{
-  background:#facc15!important;
+  --ubee-nav-content-height:54px;
+  --ubee-nav-safe-bottom:env(safe-area-inset-bottom, 0px);
+  --ubee-nav-total-height:calc(
+    var(--ubee-nav-content-height) + var(--ubee-nav-safe-bottom)
+  );
 }
 
 #productionOrderFlow{
-  --ubee-bottom-nav-content-height:var(--ubee-r29-nav-content-height)!important;
-  --ubee-bottom-nav-height:var(--ubee-r29-nav-total-height)!important;
-  --flow-nav-height:var(--ubee-r29-nav-content-height)!important;
-  --flow-nav-total-height:var(--ubee-r29-nav-total-height)!important;
+  --flow-nav-height:var(--ubee-nav-content-height);
+  --flow-nav-total-height:var(--ubee-nav-total-height);
+  padding:0!important;
+  background:#fff!important;
 }
 
 #productionOrderFlow .flow-shell{
   position:relative!important;
   width:100%!important;
   max-width:520px!important;
-  height:100vh!important;
-  height:100dvh!important;
+  height:100%!important;
   min-height:0!important;
   margin:0 auto!important;
   padding:0!important;
   overflow:hidden!important;
-  background:#ffffff!important;
+  background:#fff!important;
 }
 
-/* 各頁只避開一次導航總高度。 */
 #productionOrderFlow .flow-page{
   position:absolute!important;
-  inset:0 0 var(--ubee-r29-nav-total-height) 0!important;
+  inset:0 0 var(--ubee-nav-total-height) 0!important;
   min-height:0!important;
   padding:0!important;
   overflow:hidden!important;
-  transform:none!important;
-  translate:none!important;
 }
 
 #productionOrderFlow .flow-scroll,
-#productionOrderFlow .flow-home-scroll,
-#productionOrderFlow .ubee-my-scroll{
+#productionOrderFlow .flow-home-scroll{
   min-height:0!important;
   padding-bottom:16px!important;
   scroll-padding-bottom:16px!important;
 }
 
-/* 導航直接固定於手機視窗底部，不再依賴 flow-shell 的 100dvh 高度。 */
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav{
+#productionOrderFlow .ubee-my-scroll{
+  padding-bottom:16px!important;
+  scroll-padding-bottom:16px!important;
+}
+
+#productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  position:absolute!important;
+  inset:0 0 var(--ubee-nav-total-height) 0!important;
+  height:auto!important;
+  min-height:0!important;
+  padding-bottom:16px!important;
+  scroll-padding-bottom:16px!important;
+}
+
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav,
+body:not(.flow-active) .bottom-tabs{
   position:fixed!important;
   inset:auto 0 0 0!important;
-  left:0!important;
-  right:0!important;
   top:auto!important;
+  right:0!important;
   bottom:0!important;
+  left:0!important;
   width:100%!important;
   min-width:0!important;
-  max-width:none!important;
-  height:var(--ubee-r29-nav-total-height)!important;
-  min-height:var(--ubee-r29-nav-total-height)!important;
+  max-width:520px!important;
+  height:var(--ubee-nav-total-height)!important;
+  min-height:var(--ubee-nav-total-height)!important;
   display:grid!important;
   grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  grid-template-rows:var(--ubee-r29-nav-content-height)!important;
+  grid-template-rows:var(--ubee-nav-content-height)!important;
+  grid-auto-flow:column!important;
   gap:0!important;
-  margin:0!important;
-  padding:0 0 env(safe-area-inset-bottom)!important;
+  margin:0 auto!important;
+  padding:0 0 var(--ubee-nav-safe-bottom)!important;
   overflow:hidden!important;
   border:0!important;
   border-top:1px solid #dfe2e5!important;
   border-radius:0!important;
-  background:#ffffff!important;
+  background:#fff!important;
   opacity:1!important;
   visibility:visible!important;
   pointer-events:auto!important;
-  transform:translate3d(0,0,0)!important;
-  translate:none!important;
-  transform-origin:center bottom!important;
-  backface-visibility:hidden!important;
-  -webkit-backface-visibility:hidden!important;
-  will-change:transform!important;
-  transition:none!important;
-  animation:none!important;
   box-shadow:none!important;
+  filter:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  translate:none!important;
+  transition:none!important;
+  animation:none!important;
   z-index:20000!important;
   box-sizing:border-box!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button{
-  height:var(--ubee-r29-nav-content-height)!important;
-  min-height:var(--ubee-r29-nav-content-height)!important;
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button,
+body:not(.flow-active) .bottom-tabs > .bottom-tab{
+  grid-row:1!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:var(--ubee-nav-content-height)!important;
+  min-height:var(--ubee-nav-content-height)!important;
+  display:flex!important;
+  flex-direction:column!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:2px!important;
   margin:0!important;
   padding:4px 2px 3px!important;
+  overflow:hidden!important;
+  border:0!important;
   border-radius:0!important;
-  background:#ffffff!important;
-  transition:none!important;
-  animation:none!important;
+  background:#fff!important;
+  color:#7f858c!important;
+  box-shadow:none!important;
+  filter:none!important;
   transform:none!important;
   translate:none!important;
+  transition:none!important;
+  animation:none!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+  text-align:center!important;
+  box-sizing:border-box!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button.active{
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button:nth-child(1),
+body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(1){
+  grid-column:1!important;
+}
+
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button:nth-child(2),
+body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(2){
+  grid-column:2!important;
+}
+
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button:nth-child(3),
+body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(3){
+  grid-column:3!important;
+}
+
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button::before,
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button::after,
+body:not(.flow-active) .bottom-tabs > .bottom-tab::before,
+body:not(.flow-active) .bottom-tabs > .bottom-tab::after{
+  content:none!important;
+  display:none!important;
+}
+
+#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button.active,
+body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
   border-top:3px solid #f4bd00!important;
   padding-top:1px!important;
-  background:#ffffff!important;
-  color:#111111!important;
+  background:#fff!important;
+  color:#111!important;
 }
 
-/* 啟動畫面在最上層完整遮住導航，不需要改色或移除導航。 */
-body.ubee-r24-yellow-starting #productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav{
-  opacity:1!important;
-  visibility:visible!important;
+#productionOrderFlow .flow-nav-icon,
+body:not(.flow-active) .bottom-tab svg{
+  width:20px!important;
+  height:20px!important;
+  display:flex!important;
+  flex:0 0 20px!important;
+  align-items:center!important;
+  justify-content:center!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:inherit!important;
+  font-size:18px!important;
+  line-height:1!important;
 }
 
-/* 舊追蹤頁保留自己的導航；正式流程啟用時只顯示正式導航。 */
+#productionOrderFlow .flow-nav-label{
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+  color:inherit!important;
+  font-size:10px!important;
+  font-weight:850!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+}
+
 body.flow-active .bottom-tabs{
   display:none!important;
 }
+
+body:not(.flow-active) .app{
+  box-sizing:border-box!important;
+  padding-bottom:var(--ubee-nav-total-height)!important;
+  scroll-padding-bottom:var(--ubee-nav-total-height)!important;
+}
+
+.footer-nav{
+  margin-bottom:0!important;
+}
 </style>
-
-
-<script id="ubee-r30-bottom-navigation-repaint-controller">
-(()=>{
-  'use strict';
-
-  const getNavigation = () =>
-    document.getElementById('ubeePersistentBottomNav');
-
-  let frameId = 0;
-
-  const pinNavigation = () => {
-    const nav = getNavigation();
-    if(!nav) return;
-
-    /*
-     * 只重申導航自己的 viewport fixed 定位。
-     * 不修改 html、body、flow-shell、首頁內容或任何捲動位置。
-     */
-    nav.style.setProperty('position','fixed','important');
-    nav.style.setProperty('top','auto','important');
-    nav.style.setProperty('right','0px','important');
-    nav.style.setProperty('bottom','0px','important');
-    nav.style.setProperty('left','0px','important');
-    nav.style.setProperty('transform','translate3d(0,0,0)','important');
-    nav.style.setProperty('translate','none','important');
-
-    /*
-     * 強制瀏覽器提交 fixed 合成層，避免 splash 結束後沿用舊的
-     * dynamic viewport / 100dvh 定位結果。
-     */
-    void nav.getBoundingClientRect().bottom;
-  };
-
-  const schedulePin = () => {
-    cancelAnimationFrame(frameId);
-    frameId = requestAnimationFrame(()=>{
-      pinNavigation();
-      requestAnimationFrame(pinNavigation);
-    });
-  };
-
-  /* 導航節點已解析，立即固定；啟動畫面仍位於最上層。 */
-  pinNavigation();
-
-  /* 啟動動畫完整結束、首頁完成繪製後再次提交正確位置。 */
-  window.addEventListener(
-    'ubee:customer-home-ready',
-    schedulePin
-  );
-
-  /* Android／iOS 不同尺寸、旋轉與 App 恢復時自動重新提交。 */
-  window.addEventListener('pageshow',schedulePin);
-  window.addEventListener('resize',schedulePin,{passive:true});
-  window.addEventListener('orientationchange',()=>{
-    window.setTimeout(schedulePin,80);
-  });
-
-  if(window.visualViewport){
-    window.visualViewport.addEventListener(
-      'resize',
-      schedulePin,
-      {passive:true}
-    );
-  }
-
-  /* 正式流程顯示狀態切換時，固定同一個導航節點，不重建導航。 */
-  const root = document.getElementById('productionOrderFlow');
-  if(root && 'MutationObserver' in window){
-    const observer = new MutationObserver(schedulePin);
-    observer.observe(root,{
-      attributes:true,
-      attributeFilter:['class','style']
-    });
-  }
-})();
-</script>
 
 </body>
 </html>
