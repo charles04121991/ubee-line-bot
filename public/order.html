@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#facc15" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R29 Native｜啟動頁完整全黃；恢復原生首頁介面；導航固定於App根層 -->
+<!-- UBee 正式營運版：2026-08-05 R30 Native｜僅修正底部導航；Android／iOS 永久貼齊視窗底部 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -24022,9 +24022,9 @@ body.ubee-r24-yellow-starting{
   scroll-padding-bottom:16px!important;
 }
 
-/* 導航固定於已經全螢幕 fixed 的 App 根層，而不是瀏覽器 body。 */
+/* 導航直接固定於手機視窗底部，不再依賴 flow-shell 的 100dvh 高度。 */
 #productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav{
-  position:absolute!important;
+  position:fixed!important;
   inset:auto 0 0 0!important;
   left:0!important;
   right:0!important;
@@ -24049,8 +24049,12 @@ body.ubee-r24-yellow-starting{
   opacity:1!important;
   visibility:visible!important;
   pointer-events:auto!important;
-  transform:none!important;
+  transform:translate3d(0,0,0)!important;
   translate:none!important;
+  transform-origin:center bottom!important;
+  backface-visibility:hidden!important;
+  -webkit-backface-visibility:hidden!important;
+  will-change:transform!important;
   transition:none!important;
   animation:none!important;
   box-shadow:none!important;
@@ -24091,6 +24095,83 @@ body.flow-active .bottom-tabs{
   display:none!important;
 }
 </style>
+
+
+<script id="ubee-r30-bottom-navigation-repaint-controller">
+(()=>{
+  'use strict';
+
+  const getNavigation = () =>
+    document.getElementById('ubeePersistentBottomNav');
+
+  let frameId = 0;
+
+  const pinNavigation = () => {
+    const nav = getNavigation();
+    if(!nav) return;
+
+    /*
+     * 只重申導航自己的 viewport fixed 定位。
+     * 不修改 html、body、flow-shell、首頁內容或任何捲動位置。
+     */
+    nav.style.setProperty('position','fixed','important');
+    nav.style.setProperty('top','auto','important');
+    nav.style.setProperty('right','0px','important');
+    nav.style.setProperty('bottom','0px','important');
+    nav.style.setProperty('left','0px','important');
+    nav.style.setProperty('transform','translate3d(0,0,0)','important');
+    nav.style.setProperty('translate','none','important');
+
+    /*
+     * 強制瀏覽器提交 fixed 合成層，避免 splash 結束後沿用舊的
+     * dynamic viewport / 100dvh 定位結果。
+     */
+    void nav.getBoundingClientRect().bottom;
+  };
+
+  const schedulePin = () => {
+    cancelAnimationFrame(frameId);
+    frameId = requestAnimationFrame(()=>{
+      pinNavigation();
+      requestAnimationFrame(pinNavigation);
+    });
+  };
+
+  /* 導航節點已解析，立即固定；啟動畫面仍位於最上層。 */
+  pinNavigation();
+
+  /* 啟動動畫完整結束、首頁完成繪製後再次提交正確位置。 */
+  window.addEventListener(
+    'ubee:customer-home-ready',
+    schedulePin
+  );
+
+  /* Android／iOS 不同尺寸、旋轉與 App 恢復時自動重新提交。 */
+  window.addEventListener('pageshow',schedulePin);
+  window.addEventListener('resize',schedulePin,{passive:true});
+  window.addEventListener('orientationchange',()=>{
+    window.setTimeout(schedulePin,80);
+  });
+
+  if(window.visualViewport){
+    window.visualViewport.addEventListener(
+      'resize',
+      schedulePin,
+      {passive:true}
+    );
+  }
+
+  /* 正式流程顯示狀態切換時，固定同一個導航節點，不重建導航。 */
+  const root = document.getElementById('productionOrderFlow');
+  if(root && 'MutationObserver' in window){
+    const observer = new MutationObserver(schedulePin);
+    observer.observe(root,{
+      attributes:true,
+      attributeFilter:['class','style']
+    });
+  }
+})();
+</script>
 
 </body>
 </html>
