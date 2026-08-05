@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260805-4" rel="manifest"/>
+<link href="/manifest-order.json?v=20260805-5" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 基準版精準修復：2026-08-05 V4｜白色啟動動畫、LINE 官方客服單一控制 -->
+<!-- UBee 基準版精準修復：2026-08-05 V5｜白色啟動動畫、LINE 官方客服單一控制 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -8371,16 +8371,15 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
 </style>
 
 <style id="ubee-startup-screen-style">
-/* UBee 白色啟動畫面｜唯一正式版本
-   - HTML 首次載入一定播放。
-   - PWA 從背景停留一段時間後重新開啟，可再次播放。
-   - 安全區與狀態列底色全程維持白色，不另外墊高內容。
+/* UBee 白色啟動畫面｜第一幀可見正式修復版
+   核心原則：
+   1. Logo 與文字預設直接可見，任何情況都不會只剩白底。
+   2. 動畫計時必須等 DOM 完成並至少繪製兩幀後才開始。
+   3. 啟動層本身完整遮住畫面，不再用 html/body 偽元素疊白色遮罩。
+   4. 動畫結束後以 hidden + display:none 雙重關閉，避免殘留遮罩。
 */
 html.ubee-app-starting,
 body.ubee-app-starting{
-  width:100%!important;
-  height:100%!important;
-  min-height:100%!important;
   margin:0!important;
   overflow:hidden!important;
   overscroll-behavior:none!important;
@@ -8388,36 +8387,14 @@ body.ubee-app-starting{
   background-image:none!important;
 }
 
-body.ubee-app-starting{
-  position:fixed!important;
-  inset:0!important;
-  min-height:100vh!important;
-  min-height:100dvh!important;
-  touch-action:none!important;
-}
-
-body.ubee-app-starting > :not(#ubeeStartupScreen):not(script):not(style){
-  display:none!important;
-}
-
-html.ubee-app-starting::before,
-body.ubee-app-starting::before{
-  content:"";
-  position:fixed!important;
-  inset:0!important;
-  z-index:2147483644!important;
-  display:block!important;
-  background:#ffffff!important;
-  pointer-events:none!important;
-}
-
 #ubeeStartupScreen{
   position:fixed!important;
   inset:0!important;
-  z-index:2147483647!important;
-  display:block!important;
+  z-index:999999!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
   width:100%!important;
-  min-width:100%!important;
   height:100%!important;
   min-height:100vh!important;
   min-height:100dvh!important;
@@ -8433,35 +8410,24 @@ body.ubee-app-starting::before{
   pointer-events:auto!important;
   isolation:isolate!important;
   box-sizing:border-box!important;
+  -webkit-transform:translateZ(0)!important;
+  transform:translateZ(0)!important;
 }
 
 #ubeeStartupScreen[hidden]{
   display:none!important;
   visibility:hidden!important;
-  pointer-events:none!important;
-}
-
-#ubeeStartupScreen::before{
-  content:"";
-  position:absolute!important;
-  inset:0!important;
-  z-index:0!important;
-  background:#ffffff!important;
+  opacity:0!important;
   pointer-events:none!important;
 }
 
 #ubeeStartupScreen,
 #ubeeStartupScreen *{
-  box-sizing:border-box;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
+  box-sizing:border-box!important;
 }
 
 #ubeeStartupScreen .ubee-startup-lockup{
-  position:absolute!important;
-  inset:0!important;
+  position:relative!important;
   z-index:1!important;
   display:flex!important;
   flex-direction:column!important;
@@ -8470,88 +8436,106 @@ body.ubee-app-starting::before{
   width:100%!important;
   min-height:100%!important;
   margin:0!important;
-  padding:
-    max(20px, env(safe-area-inset-top))
-    22px
-    max(20px, env(safe-area-inset-bottom))!important;
+  padding:max(24px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom))!important;
   overflow:hidden!important;
   background:#ffffff!important;
   text-align:center!important;
+  opacity:1!important;
+  visibility:visible!important;
 }
 
 #ubeeStartupScreen .ubee-startup-wordmark{
-  display:flex;
-  align-items:flex-end;
-  justify-content:center;
-  white-space:nowrap;
-  font-family:"Arial Black","Avenir Next Heavy","SF Pro Display",-apple-system,BlinkMacSystemFont,Arial,sans-serif;
-  line-height:.80;
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:center!important;
+  white-space:nowrap!important;
+  font-family:"Arial Black","Avenir Next Heavy","SF Pro Display",-apple-system,BlinkMacSystemFont,Arial,sans-serif!important;
+  line-height:.80!important;
+  opacity:1!important;
+  visibility:visible!important;
 }
 
 #ubeeStartupScreen .ubee-startup-u{
-  display:inline-block;
-  margin-right:-5px;
-  color:#f4bd00;
-  font-size:clamp(112px,30vw,158px);
-  font-weight:1000;
-  letter-spacing:-12px;
+  display:inline-block!important;
+  margin-right:-5px!important;
+  color:#f4bd00!important;
+  font-size:clamp(112px,30vw,158px)!important;
+  font-weight:1000!important;
+  letter-spacing:-12px!important;
+  opacity:1;
+  visibility:visible!important;
 }
 
 #ubeeStartupScreen .ubee-startup-bee{
-  display:inline-block;
-  padding-bottom:7px;
-  color:#111111;
-  font-size:clamp(72px,19vw,106px);
-  font-weight:1000;
-  letter-spacing:-7px;
+  display:inline-block!important;
+  padding-bottom:7px!important;
+  color:#111111!important;
+  font-size:clamp(72px,19vw,106px)!important;
+  font-weight:1000!important;
+  letter-spacing:-7px!important;
+  opacity:1;
+  visibility:visible!important;
 }
 
 #ubeeStartupScreen .ubee-startup-service{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:12px;
-  margin-top:25px;
-  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",-apple-system,BlinkMacSystemFont,sans-serif;
-  font-size:clamp(30px,8vw,42px);
-  font-weight:1000;
-  line-height:1;
-  letter-spacing:.08em;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:12px!important;
+  margin-top:25px!important;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",-apple-system,BlinkMacSystemFont,sans-serif!important;
+  font-size:clamp(30px,8vw,42px)!important;
+  font-weight:1000!important;
+  line-height:1!important;
+  letter-spacing:.08em!important;
+  opacity:1!important;
+  visibility:visible!important;
 }
 
-#ubeeStartupScreen .ubee-startup-service-dark{ color:#111111; }
-#ubeeStartupScreen .ubee-startup-service-light{ color:#f4bd00; }
+#ubeeStartupScreen .ubee-startup-service-dark{
+  color:#111111!important;
+  opacity:1;
+  visibility:visible!important;
+}
+
+#ubeeStartupScreen .ubee-startup-service-light{
+  color:#f4bd00!important;
+  opacity:1;
+  visibility:visible!important;
+}
 
 #ubeeStartupScreen .ubee-startup-promise{
-  margin-top:19px;
-  color:#73777c;
-  font-family:"Avenir Next","Noto Sans TC","PingFang TC",-apple-system,BlinkMacSystemFont,sans-serif;
-  font-size:clamp(12px,3.4vw,15px);
-  font-weight:900;
-  line-height:1.4;
-  letter-spacing:.17em;
+  margin-top:19px!important;
+  color:#73777c!important;
+  font-family:"Avenir Next","Noto Sans TC","PingFang TC",-apple-system,BlinkMacSystemFont,sans-serif!important;
+  font-size:clamp(12px,3.4vw,15px)!important;
+  font-weight:900!important;
+  line-height:1.4!important;
+  letter-spacing:.17em!important;
+  opacity:1;
+  visibility:visible!important;
 }
 
 #ubeeStartupScreen.is-playing .ubee-startup-u{
-  animation:ubeeStartupUIn .66s cubic-bezier(.18,.82,.22,1) both;
+  animation:ubeeStartupUIn .66s cubic-bezier(.18,.82,.22,1) both!important;
 }
 #ubeeStartupScreen.is-playing .ubee-startup-bee{
-  animation:ubeeStartupBeeIn .70s .07s cubic-bezier(.18,.82,.22,1) both;
+  animation:ubeeStartupBeeIn .70s .07s cubic-bezier(.18,.82,.22,1) both!important;
 }
 #ubeeStartupScreen.is-playing .ubee-startup-service-dark{
-  animation:ubeeStartupServiceDarkIn .50s .28s ease both;
+  animation:ubeeStartupServiceDarkIn .50s .28s ease both!important;
 }
 #ubeeStartupScreen.is-playing .ubee-startup-service-light{
-  animation:ubeeStartupServiceLightIn .50s .36s ease both;
+  animation:ubeeStartupServiceLightIn .50s .36s ease both!important;
 }
 #ubeeStartupScreen.is-playing .ubee-startup-promise{
-  animation:ubeeStartupPromiseIn .46s .54s ease both;
+  animation:ubeeStartupPromiseIn .46s .54s ease both!important;
 }
 
 #ubeeStartupScreen.is-leaving{
   opacity:0!important;
   pointer-events:none!important;
-  transition:opacity .22s ease!important;
+  transition:opacity .24s ease!important;
 }
 
 @keyframes ubeeStartupUIn{
@@ -8576,10 +8560,10 @@ body.ubee-app-starting::before{
 }
 
 @media(max-width:360px){
-  #ubeeStartupScreen .ubee-startup-u{font-size:104px;}
-  #ubeeStartupScreen .ubee-startup-bee{font-size:66px;}
-  #ubeeStartupScreen .ubee-startup-service{margin-top:21px;font-size:30px;}
-  #ubeeStartupScreen .ubee-startup-promise{font-size:12px;}
+  #ubeeStartupScreen .ubee-startup-u{font-size:104px!important;}
+  #ubeeStartupScreen .ubee-startup-bee{font-size:66px!important;}
+  #ubeeStartupScreen .ubee-startup-service{margin-top:21px!important;font-size:30px!important;}
+  #ubeeStartupScreen .ubee-startup-promise{font-size:12px!important;}
 }
 
 @media(prefers-reduced-motion:reduce){
@@ -8588,7 +8572,7 @@ body.ubee-app-starting::before{
   #ubeeStartupScreen.is-playing .ubee-startup-service-dark,
   #ubeeStartupScreen.is-playing .ubee-startup-service-light,
   #ubeeStartupScreen.is-playing .ubee-startup-promise{
-    animation-duration:.28s!important;
+    animation-duration:.30s!important;
     animation-delay:0s!important;
   }
 }
@@ -8636,15 +8620,17 @@ body.ubee-app-starting::before{
   if(!startup) return;
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  const lockup = startup.querySelector('.ubee-startup-lockup');
-  const INITIAL_VISIBLE_MS = 1750;
-  const LEAVE_MS = 230;
-  const FAIL_SAFE_MS = 3000;
+  const INITIAL_VISIBLE_MS = 1900;
+  const RESUME_VISIBLE_MS = 1350;
+  const INITIAL_PAINT_DELAY_MS = 260;
+  const RESUME_PAINT_DELAY_MS = 90;
+  const LEAVE_MS = 250;
   const RESUME_THRESHOLD_MS = 2500;
 
   let playToken = 0;
   let hiddenAt = 0;
-  let initialReadySent = false;
+  let initialStarted = false;
+  let homeReadySent = false;
 
   window.__ubeeCustomerHomeReady = false;
   window.ubeeWaitForCustomerHomeReady = function(){
@@ -8657,50 +8643,89 @@ body.ubee-app-starting::before{
   const setStartingState = active => {
     document.documentElement.classList.toggle('ubee-app-starting',active);
     document.body.classList.toggle('ubee-app-starting',active);
-    document.documentElement.style.background = '#ffffff';
-    document.body.style.background = '#ffffff';
+    document.documentElement.style.backgroundColor = '#ffffff';
+    document.body.style.backgroundColor = '#ffffff';
     if(themeMeta) themeMeta.setAttribute('content','#ffffff');
   };
 
   const announceHomeReady = () => {
-    if(initialReadySent) return;
-    initialReadySent = true;
+    if(homeReadySent) return;
+    homeReadySent = true;
     window.__ubeeCustomerHomeReady = true;
     window.dispatchEvent(new CustomEvent('ubee:customer-home-ready'));
   };
 
+  const showStartupImmediately = () => {
+    setStartingState(true);
+    startup.hidden = false;
+    startup.style.removeProperty('display');
+    startup.style.removeProperty('visibility');
+    startup.style.removeProperty('opacity');
+    startup.removeAttribute('aria-hidden');
+    startup.classList.remove('is-playing','is-leaving');
+  };
+
   const hideStartup = token => {
     if(token !== playToken) return;
+
+    startup.classList.remove('is-playing');
     startup.classList.add('is-leaving');
     startup.setAttribute('aria-hidden','true');
 
     window.setTimeout(()=>{
       if(token !== playToken) return;
       startup.hidden = true;
+      startup.style.setProperty('display','none','important');
       startup.classList.remove('is-playing','is-leaving');
       setStartingState(false);
       requestAnimationFrame(()=>requestAnimationFrame(announceHomeReady));
     },LEAVE_MS);
   };
 
-  const playStartup = ({resume = false} = {}) => {
+  const playAfterRealPaint = ({resume = false} = {}) => {
     const token = ++playToken;
-    setStartingState(true);
+    showStartupImmediately();
 
-    startup.hidden = false;
-    startup.removeAttribute('aria-hidden');
-    startup.classList.remove('is-playing','is-leaving');
+    /*
+      先讓瀏覽器真正繪製至少兩幀，再啟動 keyframes 與倒數。
+      這可避免 iOS PWA 原生啟動畫面尚未消失時，HTML 動畫已在背後播完。
+    */
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        window.setTimeout(()=>{
+          if(token !== playToken) return;
 
-    /* 重新觸發同一組 keyframes，不建立第二個動畫節點。 */
-    void (lockup || startup).offsetWidth;
-    startup.classList.add('is-playing');
+          startup.classList.remove('is-playing','is-leaving');
+          void startup.offsetWidth;
+          startup.classList.add('is-playing');
 
-    const visibleMs = resume ? 1250 : INITIAL_VISIBLE_MS;
-    window.setTimeout(()=>hideStartup(token),visibleMs);
-    window.setTimeout(()=>hideStartup(token),FAIL_SAFE_MS);
+          const visibleMs = resume ? RESUME_VISIBLE_MS : INITIAL_VISIBLE_MS;
+          window.setTimeout(()=>hideStartup(token),visibleMs);
+          window.setTimeout(()=>hideStartup(token),visibleMs + 1200);
+        },resume ? RESUME_PAINT_DELAY_MS : INITIAL_PAINT_DELAY_MS);
+      });
+    });
   };
 
-  window.ubeePlayStartupAnimation = () => playStartup({resume:true});
+  const startInitialAnimation = () => {
+    if(initialStarted) return;
+    initialStarted = true;
+    playAfterRealPaint({resume:false});
+  };
+
+  /* Logo 先靜態可見；DOM 完成後才正式播放與開始計時。 */
+  showStartupImmediately();
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded',startInitialAnimation,{once:true});
+  }else{
+    startInitialAnimation();
+  }
+
+  /* 極端情況保護：DOMContentLoaded 若未被接收到，仍會啟動。 */
+  window.setTimeout(startInitialAnimation,4500);
+
+  window.ubeePlayStartupAnimation = () => playAfterRealPaint({resume:true});
 
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState === 'hidden'){
@@ -8714,15 +8739,13 @@ body.ubee-app-starting::before{
       Date.now() - hiddenAt >= RESUME_THRESHOLD_MS
     ){
       hiddenAt = 0;
-      playStartup({resume:true});
+      playAfterRealPaint({resume:true});
     }
   });
 
   window.addEventListener('pageshow',event=>{
-    if(event.persisted) playStartup({resume:true});
+    if(event.persisted) playAfterRealPaint({resume:true});
   });
-
-  playStartup({resume:false});
 })();
 </script>
 <script id="ubee-line-official-support-controller">
@@ -20539,7 +20562,7 @@ body.flow-active>.app{display:none!important;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-5';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
