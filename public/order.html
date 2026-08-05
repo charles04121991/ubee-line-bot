@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運修復版：2026-08-04 R13｜全頁移除底部灰色重複留白、固定三欄導航、設定獨立區塊 -->
+<!-- UBee 正式營運修復版：2026-08-05 R16｜流程精簡、底部導航永久固定、導航上方零浮動零灰區 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -9056,58 +9056,211 @@ body:not(.flow-active) .app{
 }
 </style>
 
-<style id="ubee-r15-bottom-readable-area-fix">
-/* =========================================================
-   UBee R15｜底部內容可完整閱讀
-   1. 底部導航維持 fixed、三欄、滿版貼底。
-   2. 有底部操作列的流程頁，捲動內容預留操作列實際高度。
-   3. 我的主頁與設定等子頁，預留固定導航高度，最後一行可捲至導航上方。
-   4. 不改字級、卡片、功能與頁面結構。
-   ========================================================= */
 
-/* 下單流程：操作列為 absolute，內容底部必須有同等可捲動空間。 */
-#productionOrderFlow .flow-page:has(> .flow-actionbar) .flow-scroll{
-  padding-bottom:88px!important;
-  scroll-padding-bottom:88px!important;
+<style id="ubee-r16-stable-flow-layout">
+/* =========================================================
+   UBee R16｜唯一正式底部結構
+   1. 只有底部導航固定；所有流程按鈕都在正常捲動內容中。
+   2. 頁面本體直接止於導航上緣，不以灰色 padding 或空白墊高。
+   3. 任務內容只保留必要資訊；隱藏重複標題與額外配送需求區。
+   4. 禁止導航與流程操作列的浮動卡片、陰影、毛玻璃與位移。
+   ========================================================= */
+:root{
+  --ubee-r16-nav-content-height:58px;
+  --ubee-r16-nav-total-height:calc(58px + env(safe-area-inset-bottom));
 }
 
-/* 相容不支援 :has() 的 WebView：指定實際含操作列的流程頁。 */
+#productionOrderFlow{
+  --ubee-bottom-nav-content-height:var(--ubee-r16-nav-content-height)!important;
+  --ubee-bottom-nav-height:var(--ubee-r16-nav-total-height)!important;
+  --flow-nav-height:var(--ubee-r16-nav-content-height)!important;
+  --flow-nav-total-height:var(--ubee-r16-nav-total-height)!important;
+  padding:0!important;
+  background:#fff!important;
+}
+
+#productionOrderFlow .flow-shell{
+  height:100vh!important;
+  height:100dvh!important;
+  min-height:100vh!important;
+  min-height:100dvh!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#fff!important;
+}
+
+/* 每個頁面直接結束在固定導航上緣；導航不參與頁面排版，也不會跑動。 */
+#productionOrderFlow .flow-page{
+  inset:0 0 var(--ubee-r16-nav-total-height)!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#fff!important;
+}
+
+/* 所有內容區只保留正常收尾間距，不再重複加入導航或操作列高度。 */
+#productionOrderFlow .flow-scroll,
 #productionOrderFlow #flowPageTask .flow-scroll,
 #productionOrderFlow #flowPageOptions .flow-scroll,
-#productionOrderFlow #flowPageReview .flow-scroll,
-#productionOrderFlow #flowPageLocation .flow-scroll,
-#productionOrderFlow #flowPageDetail .flow-scroll{
-  padding-bottom:88px!important;
-  scroll-padding-bottom:88px!important;
-}
-
-/* 首頁若顯示底部操作列，同樣保留可閱讀空間。 */
+#productionOrderFlow #flowPageConfirm .flow-scroll,
+#productionOrderFlow #flowPageSearch .flow-scroll,
+#productionOrderFlow #flowPageDetail .flow-scroll,
+#productionOrderFlow #flowPageProfileDetail .flow-scroll,
 #productionOrderFlow #flowPageHome .flow-scroll{
-  padding-bottom:88px!important;
-  scroll-padding-bottom:88px!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  padding-bottom:16px!important;
+  scroll-padding-bottom:16px!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  background:#fff!important;
 }
 
-/* 我的主頁：最後一個分組不能被固定導航遮住。 */
-#productionOrderFlow .ubee-my-scroll{
-  padding-bottom:calc(var(--ubee-bottom-nav-height) + 20px)!important;
-  scroll-padding-bottom:calc(var(--ubee-bottom-nav-height) + 20px)!important;
-}
-
-/* 設定、帳號、通知等子頁會直接佔滿 flow-shell，必須自行避開導航。 */
+/* 我的主頁與各設定子頁同樣不再使用導航高度製造灰色空白。 */
+#productionOrderFlow .ubee-my-scroll,
 #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
-  padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
-  scroll-padding-bottom:calc(var(--ubee-bottom-nav-height) + 24px)!important;
+  padding-bottom:18px!important;
+  scroll-padding-bottom:18px!important;
 }
 
-/* 底部導航保持原位，不得被本次修正改成一般內容。 */
+/* 重複、非必要的任務內容區塊保留 DOM 相容性，但不再呈現給使用者。 */
+#productionOrderFlow .ubee-r16-unnecessary-field{
+  display:none!important;
+}
+
+/* 上一步／下一步／確認任務全部回到捲動內容末端，不再固定或懸浮。 */
+#productionOrderFlow .flow-actionbar{
+  position:static!important;
+  inset:auto!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  z-index:auto!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  display:grid!important;
+  grid-template-columns:106px minmax(0,1fr)!important;
+  gap:9px!important;
+  margin:12px -14px 0!important;
+  padding:12px 14px 4px!important;
+  border:0!important;
+  border-top:1px solid #eceeef!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  translate:none!important;
+}
+#productionOrderFlow .flow-actionbar.single{
+  grid-template-columns:1fr!important;
+}
+
+/* 舊相容流程的操作列也只能存在於正常頁面流。 */
+.home-action-footer,
+.step2-action-footer,
+.step3-action-footer,
+.step4-action-footer,
+.step5-action-footer,
+.flow-action-footer,
+.flow-sticky-action,
+.tracking-action-footer{
+  position:static!important;
+  inset:auto!important;
+  left:auto!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:auto!important;
+  z-index:auto!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:12px 0 0!important;
+  padding:10px 0 0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  translate:none!important;
+}
+
+/* 唯一允許固定於底部的元素：三欄導航。 */
 #productionOrderFlow .flow-bottom-nav,
 body:not(.flow-active) .bottom-tabs{
   position:fixed!important;
+  inset:auto 0 0 0!important;
   left:0!important;
   right:0!important;
   bottom:0!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:var(--ubee-r16-nav-total-height)!important;
+  min-height:var(--ubee-r16-nav-total-height)!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:var(--ubee-r16-nav-content-height)!important;
+  gap:0!important;
+  margin:0!important;
+  padding:0 0 env(safe-area-inset-bottom)!important;
+  overflow:hidden!important;
+  border:0!important;
+  border-top:1px solid #dfe2e5!important;
+  border-radius:0!important;
+  background:#fff!important;
+  opacity:1!important;
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transform:none!important;
+  translate:none!important;
+  z-index:20000!important;
+  box-sizing:border-box!important;
+}
+
+#productionOrderFlow .flow-bottom-nav > button,
+body:not(.flow-active) .bottom-tabs > .bottom-tab{
+  width:100%!important;
+  min-width:0!important;
+  height:var(--ubee-r16-nav-content-height)!important;
+  min-height:var(--ubee-r16-nav-content-height)!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:2px!important;
+  margin:0!important;
+  padding:4px 2px 3px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  filter:none!important;
+  transform:none!important;
+  translate:none!important;
+  white-space:nowrap!important;
+}
+
+#productionOrderFlow .flow-bottom-nav > button.active,
+body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
+  border-top:3px solid #f4bd00!important;
+  background:#fff!important;
+  color:#111!important;
+}
+
+/* 舊任務追蹤頁只預留真正導航高度，不再保留 120／150px 灰色墊高。 */
+body:not(.flow-active) .app{
+  padding-bottom:calc(var(--ubee-r16-nav-total-height) + 12px)!important;
 }
 </style>
+
 </head>
 <body>
 <style id="ubee-direct-customer-auth-style">
@@ -20032,7 +20185,7 @@ body.flow-active>.app{display:none!important;}
 <div class="flow-progress" data-progress="1"></div>
 <div class="flow-scroll">
 <div class="flow-card">
-<div class="flow-selected-service-card"><span>目前選擇</span><strong id="flowSelectedServiceLabel">幫我送</strong></div>
+<div class="flow-selected-service-card ubee-r16-unnecessary-field"><span>目前選擇</span><strong id="flowSelectedServiceLabel">幫我送</strong></div>
 <div class="flow-form-group" hidden="" id="flowServiceTypeGroup">
 <div class="flow-task-choice-title"><label class="flow-label">任務細項</label><small>選擇最接近的服務</small></div>
 <div aria-label="任務細項" class="flow-task-type-grid" id="flowServiceTypeChoices" role="listbox"></div>
@@ -20044,10 +20197,10 @@ body.flow-active>.app{display:none!important;}
 <select aria-hidden="true" class="flow-compat-select" id="flowServiceCategory" tabindex="-1"></select>
 </div>
 <div class="flow-form-group"><label class="flow-label" for="flowTaskNote">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="例如：到店內取兩杯飲料，確認品項後送到管理室；抵達前請先電話聯絡"></textarea><div class="flow-inline-note">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
-<div class="flow-form-group"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
+<div class="flow-form-group ubee-r16-unnecessary-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="999" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowQueueWrap"><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/></div>
-<details class="flow-task-extra" id="flowExtraTaskDetails">
+<details class="flow-task-extra ubee-r16-unnecessary-field" id="flowExtraTaskDetails">
 <summary>其他配送需求（選填）</summary>
 <div class="flow-task-extra-body">
 <div class="flow-grid-2">
@@ -20058,8 +20211,8 @@ body.flow-active>.app{display:none!important;}
 </details>
 <div class="flow-status" id="flowTaskStatus"></div>
 </div>
-</div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="home" type="button">上一步</button><button class="flow-primary" id="flowTaskNext" type="button">下一步：配送設定</button></div>
+<div class="flow-actionbar"><button class="flow-secondary" data-go="home" type="button">上一步</button><button class="flow-primary" id="flowTaskNext" type="button">下一步：配送設定</button></div></div>
+
 </section>
 <section class="flow-page" data-page="options" id="flowPageOptions">
 <header class="flow-header">
@@ -20094,8 +20247,8 @@ body.flow-active>.app{display:none!important;}
 </div>
 </div>
 <div class="flow-status" id="flowOptionsStatus"></div>
-</div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="task" type="button">上一步</button><button class="flow-primary" id="flowOptionsNext" type="button">下一步：確認任務</button></div>
+<div class="flow-actionbar"><button class="flow-secondary" data-go="task" type="button">上一步</button><button class="flow-primary" id="flowOptionsNext" type="button">下一步：確認任務</button></div></div>
+
 </section>
 <section class="flow-page" data-page="confirm" id="flowPageConfirm">
 <header class="flow-header">
@@ -20112,8 +20265,8 @@ body.flow-active>.app{display:none!important;}
 <div class="flow-card flow-price-card"><div><small>正式估價</small><div class="flow-route-meta" id="flowRouteMeta">正在計算路線與費用</div></div><div class="flow-price" id="flowConfirmPrice">—</div></div>
 <label class="flow-check"><input id="flowAgree" type="checkbox"/><span>我已確認取件地點、送達地點、聯絡資訊、任務內容、執行時間與費用。</span></label>
 <div class="flow-status" id="flowConfirmStatus"></div>
-</div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="options" type="button">上一步</button><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div>
+<div class="flow-actionbar"><button class="flow-secondary" data-go="options" type="button">上一步</button><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div></div>
+
 </section>
 <section class="flow-page" data-page="search" id="flowPageSearch">
 <header class="flow-header">
@@ -20733,7 +20886,7 @@ body.flow-active>.app{display:none!important;}
       ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home'],
       ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}\n${d.contactName||''} ${d.phone||''}`,'home'],
       ['任務內容',`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}\n${state.taskNote||'—'}`,'task'],
-      ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:`\n物品大小：${$('flowItemSize')?.selectedOptions?.[0]?.textContent||state.itemSize}${state.upstairs&&state.upstairs!=='none'?`\n搬上樓：${$('flowUpstairs')?.selectedOptions?.[0]?.textContent||state.upstairs}`:''}`}`,'options']
+      ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:''}`,'options']
     ];
     $('flowSummaryList').innerHTML=rows.map(([label,value,target])=>`<div class="flow-summary-row"><span class="flow-summary-label">${escapeHtml(label)}</span><span class="flow-summary-value" style="white-space:pre-line">${escapeHtml(value)}</span><button class="flow-summary-edit" type="button" data-summary-go="${target}">修改</button></div>`).join('');
   }
