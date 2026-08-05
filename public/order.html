@@ -8393,6 +8393,15 @@ body.ubee-app-starting{
   touch-action:none!important;
 }
 
+/* 啟動期間只允許黃色啟動畫面顯示，避免任何白色頁面或導航列穿透。 */
+body.ubee-app-starting > :not(#ubeeStartupScreen){
+  visibility:hidden!important;
+}
+
+body.ubee-app-starting > #ubeeStartupScreen{
+  visibility:visible!important;
+}
+
 /* 先於所有 App 介面鋪滿黃色，包含視窗外圍與安全區。 */
 html.ubee-app-starting::before{
   content:"";
@@ -8406,20 +8415,20 @@ html.ubee-app-starting::before{
 
 #ubeeStartupScreen{
   position:fixed!important;
+  inset:0!important;
   top:0!important;
   right:0!important;
+  bottom:0!important;
   left:0!important;
-  bottom:auto!important;
   z-index:2147483647!important;
 
-  width:100vw!important;
-  min-width:100vw!important;
+  width:auto!important;
+  min-width:0!important;
   max-width:none!important;
 
-  height:100vh!important;
-  min-height:100vh!important;
-  height:100lvh!important;
-  min-height:100lvh!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
 
   display:grid!important;
   place-items:center!important;
@@ -8643,7 +8652,6 @@ html.ubee-app-starting::before{
     </div>
     <div class="ubee-startup-promise">即時跑腿・快速抵達</div>
   </div>
-</div>
 </div>
 
 <script id="ubee-startup-screen-controller">
@@ -23101,6 +23109,187 @@ body:not(.flow-active) .app{
   margin-bottom:0!important;
 }
 </style>
+
+
+<style id="ubee-mobile-bottom-and-startup-final-fix">
+/* =========================================================
+   UBee 2026-08-05 行動裝置最終修復
+   1. 啟動畫面完整覆蓋視窗與安全區，不再出現底部白色區塊。
+   2. 首頁底部導航不依賴父層排版，永久固定於 viewport 最底部。
+   ========================================================= */
+
+html.ubee-app-starting,
+body.ubee-app-starting{
+  position:relative!important;
+  width:100%!important;
+  min-width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#facc15!important;
+}
+
+html.ubee-app-starting::after,
+body.ubee-app-starting::after{
+  content:"";
+  position:fixed!important;
+  inset:-2px!important;
+  z-index:2147483644!important;
+  display:block!important;
+  background:#facc15!important;
+  pointer-events:none!important;
+}
+
+#ubeeStartupScreen{
+  position:fixed!important;
+  inset:0!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  margin:0!important;
+  background:#facc15!important;
+  contain:layout paint!important;
+}
+
+/* 以雙重 ID 提高最終修復優先權；即使前面有 !important 舊規則也不會蓋回去。 */
+html body #ubeePersistentBottomNav#ubeePersistentBottomNav{
+  position:fixed!important;
+  top:auto!important;
+  right:auto!important;
+  bottom:0!important;
+  left:50%!important;
+
+  width:min(100%,520px)!important;
+  min-width:0!important;
+  max-width:520px!important;
+  height:var(--ubee-nav-total-height)!important;
+  min-height:var(--ubee-nav-total-height)!important;
+  max-height:var(--ubee-nav-total-height)!important;
+
+  margin:0!important;
+  padding:0 0 var(--ubee-nav-safe-bottom)!important;
+  overflow:hidden!important;
+
+  border:0!important;
+  border-top:1px solid #dfe2e5!important;
+  border-radius:0!important;
+  background:#ffffff!important;
+
+  box-shadow:none!important;
+  filter:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+
+  transform:translate3d(-50%,0,0)!important;
+  translate:none!important;
+  transition:none!important;
+  animation:none!important;
+
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  z-index:2147483000!important;
+  box-sizing:border-box!important;
+}
+
+body.flow-active:not(.ubee-app-starting):not(.ubee-customer-auth-open)
+#ubeePersistentBottomNav{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:var(--ubee-nav-content-height)!important;
+  grid-auto-flow:column!important;
+  gap:0!important;
+}
+
+body.ubee-app-starting #ubeePersistentBottomNav,
+body.ubee-customer-auth-open #ubeePersistentBottomNav,
+body:not(.flow-active) #ubeePersistentBottomNav{
+  display:none!important;
+}
+
+/* 內容區只預留一次導航高度，避免底部內容被導航遮住。 */
+body.flow-active #productionOrderFlow .flow-page,
+body.flow-active #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  bottom:var(--ubee-nav-total-height)!important;
+}
+
+@supports (height:100dvh){
+  html.ubee-app-starting,
+  body.ubee-app-starting{
+    min-height:100dvh!important;
+  }
+}
+</style>
+
+<script id="ubee-mobile-bottom-nav-dom-guard">
+(() => {
+  'use strict';
+
+  if(window.__UBEE_MOBILE_BOTTOM_NAV_DOM_GUARD__) return;
+  window.__UBEE_MOBILE_BOTTOM_NAV_DOM_GUARD__ = true;
+
+  const secureBottomNavigation = () => {
+    const nav = document.getElementById('ubeePersistentBottomNav');
+    if(!nav || !document.body) return;
+
+    /* fixed 導航直接掛在 body，排除任何父層 transform、overflow 或高度計算干擾。 */
+    if(nav.parentElement !== document.body){
+      document.body.appendChild(nav);
+    }
+
+    nav.style.setProperty('position','fixed','important');
+    nav.style.setProperty('top','auto','important');
+    nav.style.setProperty('right','auto','important');
+    nav.style.setProperty('bottom','0','important');
+    nav.style.setProperty('left','50%','important');
+    nav.style.setProperty('width','min(100%, 520px)','important');
+    nav.style.setProperty('max-width','520px','important');
+    nav.style.setProperty('margin','0','important');
+    nav.style.setProperty('transform','translate3d(-50%, 0, 0)','important');
+    nav.style.setProperty('z-index','2147483000','important');
+  };
+
+  const syncViewportHeight = () => {
+    const height = Math.round(
+      window.visualViewport?.height ||
+      window.innerHeight ||
+      document.documentElement.clientHeight ||
+      0
+    );
+
+    if(height > 0){
+      document.documentElement.style.setProperty(
+        '--ubee-visible-viewport-height',
+        `${height}px`
+      );
+    }
+
+    secureBottomNavigation();
+  };
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', syncViewportHeight, {once:true});
+  }else{
+    syncViewportHeight();
+  }
+
+  window.addEventListener('load', syncViewportHeight, {once:true});
+  window.addEventListener('pageshow', syncViewportHeight);
+  window.addEventListener('orientationchange', syncViewportHeight);
+  window.visualViewport?.addEventListener('resize', syncViewportHeight);
+  window.visualViewport?.addEventListener('scroll', secureBottomNavigation);
+
+  new MutationObserver(secureBottomNavigation).observe(document.documentElement, {
+    childList:true,
+    subtree:true
+  });
+})();
+</script>
 
 </body>
 </html>
