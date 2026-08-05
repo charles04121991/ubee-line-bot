@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R26 Native｜根治啟動頁底部白區；動畫期間隱藏固定導航；首頁後恢復永久固定 -->
+<!-- UBee 正式營運版：2026-08-05 R27 Native｜根治首頁導航浮動；視覺視窗即時校正；保留無白區啟動畫面 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -24286,6 +24286,168 @@ body:not(.ubee-r24-yellow-starting):not(.ubee-customer-auth-open) > #ubeePersist
   background:#ffffff!important;
 }
 </style>
+
+
+<style id="ubee-r27-visual-viewport-navigation-fix">
+/* =========================================================
+   UBee R27｜iPhone 首頁切入後底部導航浮動根治
+   問題來源：
+   啟動畫面解除 overflow:hidden 後，iOS 可能暫時沿用舊的 layout viewport，
+   fixed 導航會停在舊視窗底部，直到使用者手動拖動才重新計算。
+
+   修正方式：
+   1. 以 visualViewport 與 layout viewport 的即時差值校正導航 Y 位置。
+   2. 首頁切入後連續多幀重新測量，不依賴使用者手動滑動。
+   3. 導航仍是 body 直屬的同一個 fixed 節點，不重建、不浮動。
+   ========================================================= */
+:root{
+  --ubee-r27-nav-bottom-shift:0px;
+}
+
+body:not(.ubee-r24-yellow-starting):not(.ubee-customer-auth-open) > #ubeePersistentBottomNav{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  left:0!important;
+  right:0!important;
+  top:auto!important;
+  bottom:0!important;
+  margin:0!important;
+  translate:none!important;
+  transform:translate3d(0,var(--ubee-r27-nav-bottom-shift),0)!important;
+  transform-origin:center bottom!important;
+  will-change:transform!important;
+  backface-visibility:hidden!important;
+  -webkit-backface-visibility:hidden!important;
+  contain:layout paint style!important;
+}
+
+/* 避免首頁切入時任何舊 transition 造成導航看起來漂移。 */
+body > #ubeePersistentBottomNav,
+body > #ubeePersistentBottomNav > button{
+  transition:none!important;
+  animation:none!important;
+}
+
+/*
+ * iOS 安全區只計算一次：
+ * 導航總高度包含 safe-area，內容頁只避開相同總高度。
+ */
+#productionOrderFlow .flow-page{
+  bottom:var(--ubee-r24-nav-total-height)!important;
+  padding-bottom:0!important;
+}
+
+html.ubee-r27-home-settling,
+body.ubee-r27-home-settling{
+  overscroll-behavior:none!important;
+}
+</style>
+
+<script id="ubee-r27-visual-viewport-navigation-controller">
+(()=>{
+  'use strict';
+
+  let rafId = 0;
+  let settleTimers = [];
+
+  const clearSettleTimers = () => {
+    settleTimers.forEach(timer => clearTimeout(timer));
+    settleTimers = [];
+  };
+
+  const getLayoutViewportHeight = () => {
+    const clientHeight = Number(document.documentElement?.clientHeight || 0);
+    const innerHeight = Number(window.innerHeight || 0);
+    return Math.max(clientHeight, innerHeight, 0);
+  };
+
+  const updateNavigationViewportPosition = () => {
+    const nav = document.getElementById('ubeePersistentBottomNav');
+    if(!nav || document.body.classList.contains('ubee-r24-yellow-starting')) return;
+
+    const vv = window.visualViewport;
+    const layoutHeight = getLayoutViewportHeight();
+
+    /*
+     * visual viewport 若比目前 layout viewport 更向下延伸，
+     * fixed 導航會看起來浮在上方。將差值轉成向下位移即可貼齊真實底部。
+     */
+    let bottomGap = 0;
+    if(vv && layoutHeight > 0){
+      const visualBottom = Number(vv.offsetTop || 0) + Number(vv.height || 0);
+      bottomGap = Math.max(0, visualBottom - layoutHeight);
+    }
+
+    /*
+     * 只接受合理的瀏覽器工具列／視窗差值，避免鍵盤開啟時把導航推到鍵盤下方。
+     */
+    if(!Number.isFinite(bottomGap) || bottomGap < 0 || bottomGap > 160){
+      bottomGap = 0;
+    }
+
+    document.documentElement.style.setProperty(
+      '--ubee-r27-nav-bottom-shift',
+      `${bottomGap.toFixed(2)}px`
+    );
+
+    /* 強制讀取一次幾何資訊，讓 iOS 在本幀提交 fixed 位置。 */
+    void nav.getBoundingClientRect().bottom;
+  };
+
+  const scheduleNavigationUpdate = () => {
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(()=>{
+      requestAnimationFrame(updateNavigationViewportPosition);
+    });
+  };
+
+  const settleHomeViewport = () => {
+    clearSettleTimers();
+
+    document.documentElement.classList.add('ubee-r27-home-settling');
+    document.body.classList.add('ubee-r27-home-settling');
+
+    /*
+     * 啟動畫面曾鎖住 body；切回首頁時先將根捲動位置歸零，
+     * 再於 iOS 常見的 viewport 更新時間點重新校正。
+     */
+    try{
+      window.scrollTo({top:0,left:0,behavior:'auto'});
+    }catch(_){
+      window.scrollTo(0,0);
+    }
+
+    const delays = [0,40,100,180,320,520,800];
+    settleTimers = delays.map(delay => setTimeout(()=>{
+      scheduleNavigationUpdate();
+
+      if(delay === delays[delays.length - 1]){
+        document.documentElement.classList.remove('ubee-r27-home-settling');
+        document.body.classList.remove('ubee-r27-home-settling');
+      }
+    },delay));
+  };
+
+  window.addEventListener('ubee:customer-home-ready',settleHomeViewport);
+  window.addEventListener('pageshow',settleHomeViewport);
+  window.addEventListener('orientationchange',()=>{
+    setTimeout(settleHomeViewport,120);
+  });
+
+  window.addEventListener('resize',scheduleNavigationUpdate,{passive:true});
+  window.addEventListener('scroll',scheduleNavigationUpdate,{passive:true});
+
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',scheduleNavigationUpdate,{passive:true});
+    window.visualViewport.addEventListener('scroll',scheduleNavigationUpdate,{passive:true});
+  }
+
+  /*
+   * 首次載入也先校正一次；真正首頁切入時會由 home-ready 再完整校正。
+   */
+  scheduleNavigationUpdate();
+})();
+</script>
 
 </body>
 </html>
