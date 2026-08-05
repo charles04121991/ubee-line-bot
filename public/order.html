@@ -8469,6 +8469,18 @@ body.ubee-app-starting::before{
 }
 
 /* 再加一層固定黃色保險層；不使用負 z-index，避免 iOS 合成層忽略。 */
+/* hidden 屬性必須能真正關閉啟動畫面；避免 display:block!important 讓遮罩永久卡住。 */
+#ubeeStartupScreen[hidden]{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+#ubeeStartupScreen.is-leaving{
+  pointer-events:none!important;
+}
+
 #ubeeStartupScreen::before{
   content:"";
   position:absolute!important;
@@ -8772,14 +8784,17 @@ body.ubee-app-starting::before{
 
   function enterStartupMode(){
     startup.hidden = false;
+    startup.style.removeProperty('display');
+    startup.style.removeProperty('visibility');
+    startup.style.removeProperty('opacity');
     startup.classList.remove('is-leaving');
     startup.removeAttribute('aria-hidden');
     startup.style.pointerEvents = 'auto';
     document.documentElement.classList.add('ubee-app-starting');
     document.body.classList.add('ubee-app-starting');
-    document.documentElement.style.background = '#facc15';
-    document.body.style.background = '#facc15';
-    if(themeMeta) themeMeta.setAttribute('content','#facc15');
+    document.documentElement.style.background = '#ffffff';
+    document.body.style.background = '#ffffff';
+    if(themeMeta) themeMeta.setAttribute('content','#ffffff');
     restartLogoAnimations();
   }
 
@@ -8794,6 +8809,9 @@ body.ubee-app-starting::before{
     requestAnimationFrame(() => {
       if(token !== runToken) return;
       startup.hidden = true;
+      startup.style.setProperty('display','none','important');
+      startup.style.setProperty('visibility','hidden','important');
+      startup.style.setProperty('opacity','0','important');
       startup.classList.remove('is-leaving');
       document.documentElement.classList.remove('ubee-app-starting');
       document.body.classList.remove('ubee-app-starting');
