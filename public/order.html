@@ -10,7 +10,7 @@
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
-<link as="image" href="/ubee-customer-splash-logo.jpg?v=20260805-1" rel="preload"/>
+<link as="image" href="/ubee-customer-splash-logo.png?v=20260805-2" rel="preload" type="image/png"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
@@ -18,7 +18,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#000000" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R19 Native｜保留R18固定導航零灰區結構，改為騎士端同系原生APP啟動畫面 -->
+<!-- UBee 正式營運版：2026-08-05 R20 Native｜保留R18固定導航零灰區結構，使用透明正式LOGO原生APP啟動畫面 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -9311,11 +9311,11 @@ body.ubee-r19-native-starting{
 }
 #ubeeAppSplashR19 .ubee-r19-native-logo-wrap{
   position:relative;
-  width:min(88vw,520px);
+  width:min(84vw,470px);
   display:flex;
   align-items:center;
   justify-content:center;
-  animation:ubeeR19NativeLogoIn 1.12s cubic-bezier(.18,.8,.25,1) both;
+  animation:ubeeR19NativeLogoIn 1.08s cubic-bezier(.18,.8,.25,1) both;
   will-change:transform,opacity,filter;
 }
 #ubeeAppSplashR19 .ubee-r19-native-logo-wrap::after{
@@ -9338,7 +9338,7 @@ body.ubee-r19-native-starting{
   display:block;
   width:100%;
   height:auto;
-  max-height:min(66dvh,620px);
+  max-height:min(62dvh,560px);
   object-fit:contain;
   user-select:none;
   -webkit-user-drag:none;
@@ -9373,12 +9373,12 @@ body.ubee-r19-native-starting{
   animation:ubeeR19NativeLogoOut .34s ease forwards;
 }
 @keyframes ubeeR19NativeLogoIn{
-  0%{opacity:0;transform:scale(.82) translateY(10px);filter:blur(5px)}
+  0%{opacity:0;transform:scale(.88) translateY(8px);filter:blur(4px)}
   56%{opacity:1;filter:blur(0)}
   100%{opacity:1;transform:scale(1) translateY(0);filter:blur(0)}
 }
 @keyframes ubeeR19NativeLogoOut{
-  to{opacity:0;transform:scale(1.028);filter:blur(2px)}
+  to{opacity:0;transform:scale(1.018);filter:blur(1.5px)}
 }
 @keyframes ubeeR19NativeGlow{
   to{opacity:1}
@@ -9416,7 +9416,7 @@ body.ubee-r19-native-starting{
     <img
       id="ubeeR19SplashLogo"
       class="ubee-r19-native-logo"
-      src="/ubee-customer-splash-logo.jpg?v=20260805-1"
+      src="/ubee-customer-splash-logo.png?v=20260805-2"
       alt=""
       decoding="sync"
       fetchpriority="high"
@@ -9435,8 +9435,8 @@ body.ubee-r19-native-starting{
   const logo = document.getElementById('ubeeR19SplashLogo');
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-  const minimumVisibleTime = reducedMotion ? 360 : 1420;
-  const removeDelay = reducedMotion ? 140 : 340;
+  const minimumVisibleTime = reducedMotion ? 320 : 1320;
+  const removeDelay = reducedMotion ? 120 : 300;
   const startedAt = performance.now();
   let finished = false;
 
@@ -9490,7 +9490,7 @@ body.ubee-r19-native-starting{
   }
 
   /* 最長 2.5 秒後必定解除，避免任何例外遮住 App。 */
-  window.setTimeout(finishSplash,2500);
+  window.setTimeout(finishSplash,2300);
 })();
 </script>
 
