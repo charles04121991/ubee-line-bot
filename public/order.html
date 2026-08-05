@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#facc15" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R31 Native｜底部導航單一邏輯清理；移除舊版覆蓋與無效空白 -->
+<!-- UBee 正式營運清理版：2026-08-05｜單一啟動頁、單一固定底部導航、移除舊版覆蓋邏輯 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -8031,9 +8031,9 @@ body{background:#eef0f2;}
     .ubee-customer-rider-card{grid-template-columns:48px minmax(0,1fr);}.ubee-customer-rider-avatar{width:48px;height:48px;}.ubee-customer-rider-help{grid-column:1/-1;width:100%;}
   }
 </style>
-<style id="ubee-my-native-flat-r7">
+<style id="ubee-my-page-style">
 /* =========================================================
-   UBee 用戶端 R7｜我的頁面唯一原生 App 平面規格
+   UBee 用戶端｜我的頁面唯一原生 App 平面規格
    重要：禁止底部導航與「我的」頁面使用浮動、陰影、毛玻璃、縮窄外框。
    ========================================================= */
 :root{--ubee-my-page-x:18px;--ubee-my-line:#e4e6e9;--ubee-my-bg:#f4f5f7;--ubee-my-text:#111;--ubee-my-muted:#747980;}
@@ -8183,15 +8183,15 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
   #productionOrderFlow .ubee-my-account-copy strong{font-size:18px!important;}
   #productionOrderFlow .ubee-my-menu-item{padding-left:12px!important;padding-right:12px!important;font-size:15px!important;}
 }
-</style><style id="ubee-flat-visual-guard-r10">
-/* UBee R10｜保留平面視覺防護；底部導航已移至 R31 單一系統。 */
+</style><style id="ubee-flat-visual-guard">
+/* UBee 平面視覺防護｜禁止陰影與毛玻璃。 */
 *,*::before,*::after{
   box-shadow:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
 }
-</style><style id="ubee-r13-content-and-settings">
-/* UBee R13｜保留既有內容收尾與「設定」分組；不再控制底部導航。 */
+</style><style id="ubee-content-and-settings-style">
+/* UBee 內容收尾與設定分組。 */
 #step1 .task-sheet,
 #step2,
 #step3,
@@ -8218,10 +8218,10 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
   display:block!important;
 }
 </style>
-<style id="ubee-global-compact-layout-r14">
+<style id="ubee-compact-layout-style">
 /* =========================================================
-   UBee R14｜全介面一致縮小
-   - 不改結構、不改功能；底部導航由 R31 單一系統管理
+   UBee 全介面一致密度
+   - 不改結構、不改功能；底部導航由唯一正式系統管理
    - 僅縮小字級、內距、高度、圖示與區塊間距
    - 禁止新增任何浮動、陰影、毛玻璃或縮放位移
    ========================================================= */
@@ -8301,10 +8301,9 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
 }
 </style>
 
-
-<style id="ubee-r16-static-flow-actions">
-/* UBee R16｜保留流程內容與操作列規則；不再控制導航高度或定位。 */
-#productionOrderFlow .ubee-r16-unnecessary-field{
+<style id="ubee-static-flow-actions-style">
+/* UBee 流程內容與靜態操作列規則。 */
+#productionOrderFlow .ubee-hidden-duplicate-field{
   display:none!important;
 }
 
@@ -8371,64 +8370,68 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
 }
 </style>
 
-
-<style id="ubee-r24-yellow-brand-splash-style">
+<style id="ubee-startup-screen-style">
 /* =========================================================
-   UBee R24｜黃色品牌文字原生 App 啟動畫面
-   - UBee 黃色滿版背景。
-   - 黑色大型 U、白色描邊 Bee、黑白交錯「跑腿」。
-   - 僅使用文字，不載入任何 Logo 圖片。
-   - 無卡片、無陰影、無毛玻璃、無灰色區域。
-   - 首頁與永久導航完成繪製後，才開放定位權限詢問。
+   UBee 正式啟動頁
+   - 黃色背景完整覆蓋 Android、iOS、PWA 與安全區。
+   - 啟動期間底部導航完全不顯示，不會露出白色區塊。
+   - 品牌文字加大，保留原有進場節奏。
    ========================================================= */
-html.ubee-r24-yellow-starting,
-body.ubee-r24-yellow-starting{
+html.ubee-app-starting,
+body.ubee-app-starting{
   width:100%!important;
+  height:100%!important;
+  min-width:100%!important;
   min-height:100%!important;
-  background:#facc15!important;
-  overscroll-behavior:none!important;
-}
-html.ubee-r24-yellow-starting{
-  background-color:#facc15!important;
-}
-body.ubee-r24-yellow-starting{
+  margin:0!important;
   overflow:hidden!important;
   overscroll-behavior:none!important;
+  background:#facc15!important;
+}
+
+body.ubee-app-starting{
   touch-action:none!important;
 }
 
-/*
- * 啟動期的獨立黃色底層，超出視窗四周，覆蓋 iPhone 安全區與合成縫隙。
- * 它位於 App 內容上方、品牌文字 splash 下方；首頁後隨 starting class 一起消失。
- */
-body.ubee-r24-yellow-starting::before{
+/* 先於所有 App 介面鋪滿黃色，包含視窗外圍與安全區。 */
+html.ubee-app-starting::before{
   content:"";
   position:fixed!important;
-  inset:-160px!important;
-  z-index:2147483646!important;
+  inset:-320px!important;
+  z-index:2147483645!important;
   display:block!important;
   background:#facc15!important;
   pointer-events:none!important;
 }
 
-#ubeeAppSplashR24{
+#ubeeStartupScreen{
   position:fixed!important;
-  inset:0!important;
-  z-index:2147483647;
-  width:auto!important;
-  min-width:100%!important;
+  top:0!important;
+  right:0!important;
+  left:0!important;
+  bottom:auto!important;
+  z-index:2147483647!important;
+
+  width:100vw!important;
+  min-width:100vw!important;
   max-width:none!important;
-  height:auto!important;
-  min-height:100%!important;
-  display:grid;
-  place-items:center;
-  overflow:hidden;
+
+  height:100vh!important;
+  min-height:100vh!important;
+  height:100lvh!important;
+  min-height:100lvh!important;
+
+  display:grid!important;
+  place-items:center!important;
+  overflow:hidden!important;
+
   padding:
-    calc(22px + env(safe-area-inset-top))
-    24px
-    calc(22px + env(safe-area-inset-bottom));
-  background:#facc15;
-  color:#111111;
+    calc(24px + env(safe-area-inset-top))
+    22px
+    calc(24px + env(safe-area-inset-bottom))!important;
+
+  background:#facc15!important;
+  color:#111111!important;
   opacity:1;
   visibility:visible;
   pointer-events:auto;
@@ -8436,8 +8439,19 @@ body.ubee-r24-yellow-starting::before{
   box-sizing:border-box;
 }
 
-#ubeeAppSplashR24,
-#ubeeAppSplashR24 *{
+/* 額外向四周延伸黃色合成層，防止 iOS 底部出現 1px～數十 px 白縫。 */
+#ubeeStartupScreen::before{
+  content:"";
+  position:fixed!important;
+  inset:-320px!important;
+  z-index:-1!important;
+  display:block!important;
+  background:#facc15!important;
+  pointer-events:none!important;
+}
+
+#ubeeStartupScreen,
+#ubeeStartupScreen *{
   box-sizing:border-box;
   box-shadow:none!important;
   filter:none!important;
@@ -8445,7 +8459,7 @@ body.ubee-r24-yellow-starting::before{
   -webkit-backdrop-filter:none!important;
 }
 
-#ubeeAppSplashR24 .ubee-r24-lockup{
+#ubeeStartupScreen .ubee-startup-lockup{
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -8454,7 +8468,7 @@ body.ubee-r24-yellow-starting::before{
   text-align:center;
 }
 
-#ubeeAppSplashR24 .ubee-r24-wordmark{
+#ubeeStartupScreen .ubee-startup-wordmark{
   display:flex;
   align-items:flex-end;
   justify-content:center;
@@ -8468,37 +8482,37 @@ body.ubee-r24-yellow-starting::before{
     BlinkMacSystemFont,
     Arial,
     sans-serif;
-  line-height:.82;
+  line-height:.80;
 }
 
-#ubeeAppSplashR24 .ubee-r24-u{
+#ubeeStartupScreen .ubee-startup-u{
   display:inline-block;
-  margin-right:-4px;
+  margin-right:-5px;
   color:#111111;
-  font-size:clamp(92px,24vw,128px);
+  font-size:clamp(112px,30vw,158px);
   font-weight:1000;
-  letter-spacing:-10px;
-  animation:ubeeR24UIn .64s cubic-bezier(.18,.82,.22,1) both;
+  letter-spacing:-12px;
+  animation:ubeeStartupUIn .68s cubic-bezier(.18,.82,.22,1) both;
 }
 
-#ubeeAppSplashR24 .ubee-r24-bee{
+#ubeeStartupScreen .ubee-startup-bee{
   display:inline-block;
-  padding-bottom:5px;
+  padding-bottom:7px;
   color:#ffffff;
-  font-size:clamp(57px,15vw,82px);
+  font-size:clamp(72px,19vw,106px);
   font-weight:1000;
-  letter-spacing:-6px;
-  -webkit-text-stroke:2px #111111;
+  letter-spacing:-7px;
+  -webkit-text-stroke:2.2px #111111;
   paint-order:stroke fill;
-  animation:ubeeR24BeeIn .68s .08s cubic-bezier(.18,.82,.22,1) both;
+  animation:ubeeStartupBeeIn .72s .08s cubic-bezier(.18,.82,.22,1) both;
 }
 
-#ubeeAppSplashR24 .ubee-r24-service{
+#ubeeStartupScreen .ubee-startup-service{
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:10px;
-  margin-top:20px;
+  gap:12px;
+  margin-top:25px;
   font-family:
     "Noto Sans TC",
     "PingFang TC",
@@ -8506,28 +8520,28 @@ body.ubee-r24-yellow-starting::before{
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
-  font-size:clamp(24px,6.2vw,32px);
+  font-size:clamp(30px,8vw,42px);
   font-weight:1000;
   line-height:1;
   letter-spacing:.08em;
 }
 
-#ubeeAppSplashR24 .ubee-r24-service-dark{
+#ubeeStartupScreen .ubee-startup-service-dark{
   display:inline-block;
   color:#111111;
-  animation:ubeeR24ServiceDarkIn .50s .28s ease both;
+  animation:ubeeStartupServiceDarkIn .54s .30s ease both;
 }
 
-#ubeeAppSplashR24 .ubee-r24-service-light{
+#ubeeStartupScreen .ubee-startup-service-light{
   display:inline-block;
   color:#ffffff;
-  -webkit-text-stroke:1.4px #111111;
+  -webkit-text-stroke:1.6px #111111;
   paint-order:stroke fill;
-  animation:ubeeR24ServiceLightIn .50s .36s ease both;
+  animation:ubeeStartupServiceLightIn .54s .39s ease both;
 }
 
-#ubeeAppSplashR24 .ubee-r24-promise{
-  margin-top:16px;
+#ubeeStartupScreen .ubee-startup-promise{
+  margin-top:19px;
   color:#4c3900;
   font-family:
     "Avenir Next",
@@ -8536,151 +8550,179 @@ body.ubee-r24-yellow-starting::before{
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
-  font-size:clamp(10px,2.8vw,12px);
+  font-size:clamp(12px,3.4vw,15px);
   font-weight:1000;
   line-height:1.4;
-  letter-spacing:.18em;
-  animation:ubeeR24PromiseIn .48s .52s ease both;
+  letter-spacing:.17em;
+  animation:ubeeStartupPromiseIn .50s .58s ease both;
 }
 
-#ubeeAppSplashR24.is-leaving{
+#ubeeStartupScreen.is-leaving{
   opacity:0;
   visibility:hidden;
   pointer-events:none;
-  transition:opacity .22s ease,visibility 0s linear .22s;
+  transition:opacity .24s ease,visibility 0s linear .24s;
 }
 
-#ubeeAppSplashR24.is-leaving .ubee-r24-lockup{
+#ubeeStartupScreen.is-leaving .ubee-startup-lockup{
   opacity:0;
-  transition:opacity .16s ease;
+  transition:opacity .18s ease;
 }
 
-@keyframes ubeeR24UIn{
-  from{opacity:0;transform:translateY(18px) scale(.92)}
+@keyframes ubeeStartupUIn{
+  from{opacity:0;transform:translateY(20px) scale(.91)}
   to{opacity:1;transform:translateY(0) scale(1)}
 }
 
-@keyframes ubeeR24BeeIn{
+@keyframes ubeeStartupBeeIn{
+  from{opacity:0;transform:translateX(38px)}
+  to{opacity:1;transform:translateX(0)}
+}
+
+@keyframes ubeeStartupServiceDarkIn{
+  from{opacity:0;transform:translateX(-18px)}
+  to{opacity:1;transform:translateX(0)}
+}
+
+@keyframes ubeeStartupServiceLightIn{
   from{opacity:0;transform:translateX(18px)}
   to{opacity:1;transform:translateX(0)}
 }
 
-@keyframes ubeeR24ServiceDarkIn{
-  from{opacity:0;transform:translateX(-9px)}
-  to{opacity:1;transform:translateX(0)}
-}
-
-@keyframes ubeeR24ServiceLightIn{
-  from{opacity:0;transform:translateX(9px)}
-  to{opacity:1;transform:translateX(0)}
-}
-
-@keyframes ubeeR24PromiseIn{
+@keyframes ubeeStartupPromiseIn{
   from{opacity:0;letter-spacing:.30em}
-  to{opacity:1;letter-spacing:.18em}
+  to{opacity:1;letter-spacing:.17em}
 }
 
 @media(max-width:360px){
-  #ubeeAppSplashR24 .ubee-r24-u{
-    font-size:82px;
+  #ubeeStartupScreen .ubee-startup-u{
+    font-size:104px;
   }
-  #ubeeAppSplashR24 .ubee-r24-bee{
-    font-size:53px;
+
+  #ubeeStartupScreen .ubee-startup-bee{
+    font-size:66px;
   }
-  #ubeeAppSplashR24 .ubee-r24-service{
-    margin-top:17px;
+
+  #ubeeStartupScreen .ubee-startup-service{
+    margin-top:21px;
+    font-size:30px;
+  }
+
+  #ubeeStartupScreen .ubee-startup-promise{
+    font-size:12px;
   }
 }
 
 @media(prefers-reduced-motion:reduce){
-  #ubeeAppSplashR24 .ubee-r24-u,
-  #ubeeAppSplashR24 .ubee-r24-bee,
-  #ubeeAppSplashR24 .ubee-r24-service-dark,
-  #ubeeAppSplashR24 .ubee-r24-service-light,
-  #ubeeAppSplashR24 .ubee-r24-promise{
+  #ubeeStartupScreen .ubee-startup-u,
+  #ubeeStartupScreen .ubee-startup-bee,
+  #ubeeStartupScreen .ubee-startup-service-dark,
+  #ubeeStartupScreen .ubee-startup-service-light,
+  #ubeeStartupScreen .ubee-startup-promise{
     animation:none!important;
   }
-  #ubeeAppSplashR24.is-leaving{
+
+  #ubeeStartupScreen.is-leaving{
     transition-duration:.10s;
   }
 }
 </style>
 
 </head>
-<body class="ubee-r24-yellow-starting">
+<body class="ubee-app-starting">
 
-<div id="ubeeAppSplashR24" role="status" aria-live="polite" aria-label="UBee 跑腿正在開啟">
-  <div class="ubee-r24-lockup" aria-hidden="true">
-    <div class="ubee-r24-wordmark">
-      <span class="ubee-r24-u">U</span>
-      <span class="ubee-r24-bee">Bee</span>
+<div id="ubeeStartupScreen" role="status" aria-live="polite" aria-label="UBee 跑腿正在開啟">
+  <div class="ubee-startup-lockup" aria-hidden="true">
+    <div class="ubee-startup-wordmark">
+      <span class="ubee-startup-u">U</span>
+      <span class="ubee-startup-bee">Bee</span>
     </div>
-    <div class="ubee-r24-service">
-      <span class="ubee-r24-service-dark">跑</span>
-      <span class="ubee-r24-service-light">腿</span>
+    <div class="ubee-startup-service">
+      <span class="ubee-startup-service-dark">跑</span>
+      <span class="ubee-startup-service-light">腿</span>
     </div>
-    <div class="ubee-r24-promise">即時跑腿・快速抵達</div>
+    <div class="ubee-startup-promise">即時跑腿・快速抵達</div>
   </div>
 </div>
+</div>
 
-<script id="ubee-r24-yellow-brand-splash-controller">
+<script id="ubee-startup-screen-controller">
 (()=>{
   'use strict';
 
-  const splash = document.getElementById('ubeeAppSplashR24');
-  if(!splash) return;
+  const startup = document.getElementById('ubeeStartupScreen');
+  if(!startup) return;
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-  const minimumVisibleTime = reducedMotion ? 400 : 1680;
-  const removeDelay = reducedMotion ? 120 : 280;
+  const reducedMotion =
+    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+
+  const minimumVisibleTime = reducedMotion ? 420 : 1750;
+  const removeDelay = reducedMotion ? 120 : 290;
   let finished = false;
 
-  /*
-   * 首頁就緒閘門：
-   * 黃色動畫完整移除、首頁與永久導航完成繪製後，
-   * 才開放定位與系統「允許／不允許」權限視窗。
-   */
   window.__ubeeCustomerHomeReady = false;
   window.ubeeWaitForCustomerHomeReady = function(){
     if(window.__ubeeCustomerHomeReady) return Promise.resolve();
+
     return new Promise(resolve=>{
-      window.addEventListener('ubee:customer-home-ready',()=>resolve(),{once:true});
+      window.addEventListener(
+        'ubee:customer-home-ready',
+        ()=>resolve(),
+        {once:true}
+      );
     });
   };
 
-  document.documentElement.classList.add('ubee-r24-yellow-starting');
-  document.body.classList.add('ubee-r24-yellow-starting');
-  if(themeMeta) themeMeta.setAttribute('content','#facc15');
+  document.documentElement.classList.add('ubee-app-starting');
+  document.body.classList.add('ubee-app-starting');
 
-  const finishSplash = () => {
+  if(themeMeta){
+    themeMeta.setAttribute('content','#facc15');
+  }
+
+  const finishStartup = () => {
     if(finished) return;
     finished = true;
-    splash.classList.add('is-leaving');
-    splash.setAttribute('aria-hidden','true');
-    splash.style.pointerEvents = 'none';
 
-    window.setTimeout(() => {
-      splash.remove();
-      document.documentElement.classList.remove('ubee-r24-yellow-starting');
-      document.body.classList.remove('ubee-r24-yellow-starting');
-      if(themeMeta) themeMeta.setAttribute('content','#ffffff');
+    startup.classList.add('is-leaving');
+    startup.setAttribute('aria-hidden','true');
+    startup.style.pointerEvents = 'none';
+
+    window.setTimeout(()=>{
+      startup.remove();
+
+      document.documentElement.classList.remove('ubee-app-starting');
+      document.body.classList.remove('ubee-app-starting');
+
+      if(themeMeta){
+        themeMeta.setAttribute('content','#ffffff');
+      }
 
       /*
-       * 導航不在這裡重新建立或切換顯示狀態。
-       * 它已經是 body 直屬 fixed 層，首頁轉換期間保持同一位置。
+       * 正式導航已是 body 直屬 fixed 元素。
+       * 啟動 class 移除後由 CSS 原位顯示，不搬移、不計算位移、不操作捲動。
        */
       requestAnimationFrame(()=>{
+        const navigation =
+          document.getElementById('ubeePersistentBottomNav');
+
+        if(navigation){
+          void navigation.getBoundingClientRect().bottom;
+        }
+
         requestAnimationFrame(()=>{
           window.__ubeeCustomerHomeReady = true;
-          window.dispatchEvent(new CustomEvent('ubee:customer-home-ready'));
+          window.dispatchEvent(
+            new CustomEvent('ubee:customer-home-ready')
+          );
         });
       });
     },removeDelay);
   };
 
-  window.setTimeout(finishSplash,minimumVisibleTime);
-  window.setTimeout(finishSplash,2800);
+  window.setTimeout(finishStartup,minimumVisibleTime);
+  window.setTimeout(finishStartup,3000);
 })();
 </script>
 
@@ -19569,7 +19611,7 @@ body.flow-active>.app{display:none!important;}
 <div class="flow-progress" data-progress="1"></div>
 <div class="flow-scroll">
 <div class="flow-card">
-<div class="flow-selected-service-card ubee-r16-unnecessary-field"><span>目前選擇</span><strong id="flowSelectedServiceLabel">幫我送</strong></div>
+<div class="flow-selected-service-card ubee-hidden-duplicate-field"><span>目前選擇</span><strong id="flowSelectedServiceLabel">幫我送</strong></div>
 <div class="flow-form-group" hidden="" id="flowServiceTypeGroup">
 <div class="flow-task-choice-title"><label class="flow-label">任務細項</label><small>選擇最接近的服務</small></div>
 <div aria-label="任務細項" class="flow-task-type-grid" id="flowServiceTypeChoices" role="listbox"></div>
@@ -19581,10 +19623,10 @@ body.flow-active>.app{display:none!important;}
 <select aria-hidden="true" class="flow-compat-select" id="flowServiceCategory" tabindex="-1"></select>
 </div>
 <div class="flow-form-group"><label class="flow-label" for="flowTaskNote">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="例如：到店內取兩杯飲料，確認品項後送到管理室；抵達前請先電話聯絡"></textarea><div class="flow-inline-note">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
-<div class="flow-form-group ubee-r16-unnecessary-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
+<div class="flow-form-group ubee-hidden-duplicate-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="999" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowQueueWrap"><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/></div>
-<details class="flow-task-extra ubee-r16-unnecessary-field" id="flowExtraTaskDetails">
+<details class="flow-task-extra ubee-hidden-duplicate-field" id="flowExtraTaskDetails">
 <summary>其他配送需求（選填）</summary>
 <div class="flow-task-extra-body">
 <div class="flow-grid-2">
@@ -19918,13 +19960,14 @@ body.flow-active>.app{display:none!important;}
 <button class="flow-secondary" data-go="profile" style="margin-top:12px" type="button">返回我的訂單</button>
 </div>
 </section>
+
+</div>
+</div>
 <nav aria-label="主要導覽" class="flow-bottom-nav" id="ubeePersistentBottomNav">
 <button aria-label="首頁" class="active" id="flowNavHome" type="button"><span class="flow-nav-icon">U</span><span class="flow-nav-label">首頁</span></button>
 <button aria-label="任務" id="flowNavTasks" type="button"><span class="flow-nav-icon">▣</span><span class="flow-nav-label">任務</span></button>
 <button aria-label="我的" id="flowNavMy" type="button"><span class="flow-nav-icon">◎</span><span class="flow-nav-label">我的</span></button>
 </nav>
-</div>
-</div>
 <script id="ubee-production-flow-v4-script">
 (() => {
   'use strict';
@@ -20692,7 +20735,7 @@ body.flow-active>.app{display:none!important;}
   }
 
   function ensureFlowTaskTab(){
-    const nav = document.querySelector('#productionOrderFlow .flow-bottom-nav');
+    const nav = document.getElementById('ubeePersistentBottomNav');
     if(!nav || byId('flowNavTasks')) return;
     const my = byId('flowNavMy');
     const button = document.createElement('button');
@@ -21052,7 +21095,7 @@ body.flow-active>.app{display:none!important;}
      - 設定新增通知、定位、震動、減少動畫、安裝 App、更新、清除草稿等功能。
      - 保留既有下單、估價、付款、地圖及即時追蹤核心流程。
      ========================================================= -->
-<style id="ubeeAppSettingsV3Style">
+<style id="ubee-app-settings-style">
 /*
    * UBee 正式營運 App 操作層｜2026-08-04
    * 僅統一畫面層級、我的主頁與子頁操作感。
@@ -21264,8 +21307,8 @@ body.flow-active>.app{display:none!important;}
   }
 
   /* =========================================================
-     UBee 用戶端唯一正式 App 介面規格｜2026-08-04 R1
-     保留正式 App 畫面與按鈕操作規格；導航由 R31 單一系統管理。
+     UBee 用戶端唯一正式 App 介面規格
+     保留正式 App 畫面與按鈕操作規格。
      ========================================================= */
   #productionOrderFlow{
     background:#f4f5f6 !important;
@@ -21381,7 +21424,7 @@ body.flow-active>.app{display:none!important;}
     }
   }
 </style>
-<script id="ubeeAppNavigationSettingsV3Script">
+<script id="ubee-app-settings-controller">
 (() => {
   'use strict';
 
@@ -22584,12 +22627,12 @@ body.flow-active>.app{display:none!important;}
 })();
 </script>
 
-<style id="ubee-r17-ios-form-no-auto-zoom">
+<style id="ubee-ios-form-no-auto-zoom">
 /* =========================================================
-   UBee R17｜iPhone／PWA 表單聚焦禁止自動放大
+   UBee iPhone／PWA 表單聚焦禁止自動放大
    - iOS Safari 對小於 16px 的 input／textarea／select 可能自動放大頁面。
    - 僅將可輸入控制項的實際字級鎖定為 16px。
-   - 保留 R16 的卡片尺寸、內距、流程精簡、固定底部導航與零灰區結構。
+   - 保留既有卡片尺寸、內距與流程精簡結構。
    ========================================================= */
 html,
 body{
@@ -22635,8 +22678,8 @@ body:not(.flow-active) .app select,
 }
 </style>
 
-<style id="ubee-r18-flat-page-visuals">
-/* UBee R18｜保留頁面、追蹤與狀態列平面視覺；導航由 R31 單一系統管理。 */
+<style id="ubee-flat-page-visuals">
+/* UBee 頁面、追蹤與狀態列平面視覺。 */
 html,
 body{
   background:#fff!important;
@@ -22754,25 +22797,18 @@ body.ubee-active-order #step5{
 }
 </style>
 
-
-
-
-
-
-<style id="ubee-r31-single-bottom-navigation">
+<style id="ubee-bottom-navigation-style">
 /* =========================================================
-   UBee R31｜唯一正式底部導航系統
-   1. 正式流程與舊追蹤頁共用同一高度及安全區規格。
-   2. 導航直接 fixed 於手機視窗底部，不依賴 100dvh 或頁面捲動位置。
-   3. 正式頁面只避開一次導航總高度，不再疊加 padding 補丁。
-   4. 不使用 JavaScript 位移、viewport 差值或重新掛載導航。
+   UBee 唯一正式底部導航
+   - 正式導航是 body 直屬 fixed 元素，永久貼齊手機視窗底部。
+   - 不依賴 flow-shell、100dvh、視窗差值、transform 或 scrollTo。
+   - Android 與 iOS 共用同一內容高度；安全區只計算一次。
    ========================================================= */
 :root{
   --ubee-nav-content-height:54px;
   --ubee-nav-safe-bottom:env(safe-area-inset-bottom, 0px);
-  --ubee-nav-total-height:calc(
-    var(--ubee-nav-content-height) + var(--ubee-nav-safe-bottom)
-  );
+  --ubee-nav-total-height:
+    calc(var(--ubee-nav-content-height) + var(--ubee-nav-safe-bottom));
 }
 
 #productionOrderFlow{
@@ -22794,6 +22830,7 @@ body.ubee-active-order #step5{
   background:#fff!important;
 }
 
+/* 正式頁面只避開一次導航總高度。 */
 #productionOrderFlow .flow-page{
   position:absolute!important;
   inset:0 0 var(--ubee-nav-total-height) 0!important;
@@ -22803,13 +22840,9 @@ body.ubee-active-order #step5{
 }
 
 #productionOrderFlow .flow-scroll,
-#productionOrderFlow .flow-home-scroll{
-  min-height:0!important;
-  padding-bottom:16px!important;
-  scroll-padding-bottom:16px!important;
-}
-
+#productionOrderFlow .flow-home-scroll,
 #productionOrderFlow .ubee-my-scroll{
+  min-height:0!important;
   padding-bottom:16px!important;
   scroll-padding-bottom:16px!important;
 }
@@ -22823,112 +22856,132 @@ body.ubee-active-order #step5{
   scroll-padding-bottom:16px!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav,
-body:not(.flow-active) .bottom-tabs{
+/* 正式首頁導航：真正依附 viewport，不再位於 flow-shell 裡。 */
+body > #ubeePersistentBottomNav{
   position:fixed!important;
   inset:auto 0 0 0!important;
   top:auto!important;
   right:0!important;
   bottom:0!important;
   left:0!important;
+
   width:100%!important;
   min-width:0!important;
   max-width:520px!important;
   height:var(--ubee-nav-total-height)!important;
   min-height:var(--ubee-nav-total-height)!important;
-  display:grid!important;
+  max-height:var(--ubee-nav-total-height)!important;
+
+  display:none!important;
   grid-template-columns:repeat(3,minmax(0,1fr))!important;
   grid-template-rows:var(--ubee-nav-content-height)!important;
   grid-auto-flow:column!important;
   gap:0!important;
+
   margin:0 auto!important;
   padding:0 0 var(--ubee-nav-safe-bottom)!important;
   overflow:hidden!important;
+
   border:0!important;
   border-top:1px solid #dfe2e5!important;
   border-radius:0!important;
-  background:#fff!important;
+  background:#ffffff!important;
+
   opacity:1!important;
   visibility:visible!important;
   pointer-events:auto!important;
+
   box-shadow:none!important;
   filter:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
+
   transform:none!important;
   translate:none!important;
   transition:none!important;
   animation:none!important;
-  z-index:20000!important;
+
+  z-index:2147483000!important;
   box-sizing:border-box!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button,
-body:not(.flow-active) .bottom-tabs > .bottom-tab{
+/* 只有正式流程啟用且非登入畫面時顯示正式導航。 */
+body.flow-active:not(.ubee-app-starting):not(.ubee-customer-auth-open)
+  > #ubeePersistentBottomNav{
+  display:grid!important;
+}
+
+/* 啟動期間完全不顯示導航，避免任何白色區塊穿透。 */
+body.ubee-app-starting > #ubeePersistentBottomNav,
+body.ubee-customer-auth-open > #ubeePersistentBottomNav,
+body:not(.flow-active) > #ubeePersistentBottomNav{
+  display:none!important;
+}
+
+/* 正式導航按鈕。 */
+body > #ubeePersistentBottomNav > button{
   grid-row:1!important;
   width:100%!important;
   min-width:0!important;
   max-width:none!important;
   height:var(--ubee-nav-content-height)!important;
   min-height:var(--ubee-nav-content-height)!important;
+
   display:flex!important;
   flex-direction:column!important;
   flex-wrap:nowrap!important;
   align-items:center!important;
   justify-content:center!important;
   gap:2px!important;
+
   margin:0!important;
   padding:4px 2px 3px!important;
   overflow:hidden!important;
+
   border:0!important;
   border-radius:0!important;
-  background:#fff!important;
+  background:#ffffff!important;
   color:#7f858c!important;
+
   box-shadow:none!important;
   filter:none!important;
   transform:none!important;
   translate:none!important;
   transition:none!important;
   animation:none!important;
+
   line-height:1.1!important;
   white-space:nowrap!important;
   text-align:center!important;
   box-sizing:border-box!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button:nth-child(1),
-body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(1){
+body > #ubeePersistentBottomNav > button:nth-child(1){
   grid-column:1!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button:nth-child(2),
-body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(2){
+body > #ubeePersistentBottomNav > button:nth-child(2){
   grid-column:2!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button:nth-child(3),
-body:not(.flow-active) .bottom-tabs > .bottom-tab:nth-child(3){
+body > #ubeePersistentBottomNav > button:nth-child(3){
   grid-column:3!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button::before,
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button::after,
-body:not(.flow-active) .bottom-tabs > .bottom-tab::before,
-body:not(.flow-active) .bottom-tabs > .bottom-tab::after{
+body > #ubeePersistentBottomNav > button::before,
+body > #ubeePersistentBottomNav > button::after{
   content:none!important;
   display:none!important;
 }
 
-#productionOrderFlow .flow-bottom-nav#ubeePersistentBottomNav > button.active,
-body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
+body > #ubeePersistentBottomNav > button.active{
   border-top:3px solid #f4bd00!important;
   padding-top:1px!important;
-  background:#fff!important;
-  color:#111!important;
+  background:#ffffff!important;
+  color:#111111!important;
 }
 
-#productionOrderFlow .flow-nav-icon,
-body:not(.flow-active) .bottom-tab svg{
+body > #ubeePersistentBottomNav .flow-nav-icon{
   width:20px!important;
   height:20px!important;
   display:flex!important;
@@ -22944,7 +22997,7 @@ body:not(.flow-active) .bottom-tab svg{
   line-height:1!important;
 }
 
-#productionOrderFlow .flow-nav-label{
+body > #ubeePersistentBottomNav .flow-nav-label{
   display:block!important;
   margin:0!important;
   padding:0!important;
@@ -22955,8 +23008,87 @@ body:not(.flow-active) .bottom-tab svg{
   white-space:nowrap!important;
 }
 
-body.flow-active .bottom-tabs{
+/*
+ * 既有任務追蹤畫面使用原本 bottom-tabs，但共用同一高度與固定規格。
+ * 它不是第二套正式首頁導航，只在 production flow 關閉時顯示。
+ */
+body:not(.flow-active):not(.ubee-app-starting):not(.ubee-customer-auth-open)
+  .bottom-tabs{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  width:100%!important;
+  max-width:520px!important;
+  height:var(--ubee-nav-total-height)!important;
+  min-height:var(--ubee-nav-total-height)!important;
+
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:var(--ubee-nav-content-height)!important;
+
+  margin:0 auto!important;
+  padding:0 0 var(--ubee-nav-safe-bottom)!important;
+  overflow:hidden!important;
+
+  border:0!important;
+  border-top:1px solid #dfe2e5!important;
+  border-radius:0!important;
+  background:#ffffff!important;
+
+  box-shadow:none!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+
+  z-index:20000!important;
+  box-sizing:border-box!important;
+}
+
+body.flow-active .bottom-tabs,
+body.ubee-app-starting .bottom-tabs,
+body.ubee-customer-auth-open .bottom-tabs{
   display:none!important;
+}
+
+body:not(.flow-active) .bottom-tabs > .bottom-tab{
+  width:100%!important;
+  height:var(--ubee-nav-content-height)!important;
+  min-height:var(--ubee-nav-content-height)!important;
+
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:2px!important;
+
+  margin:0!important;
+  padding:4px 2px 3px!important;
+
+  border:0!important;
+  border-radius:0!important;
+  background:#ffffff!important;
+  color:#7f858c!important;
+
+  box-shadow:none!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+
+  font-size:10px!important;
+  font-weight:850!important;
+  line-height:1.1!important;
+}
+
+body:not(.flow-active) .bottom-tabs > .bottom-tab.active{
+  border-top:3px solid #f4bd00!important;
+  padding-top:1px!important;
+  color:#111111!important;
+}
+
+body:not(.flow-active) .bottom-tabs > .bottom-tab svg{
+  width:20px!important;
+  height:20px!important;
+  flex:0 0 20px!important;
+  margin:0!important;
 }
 
 body:not(.flow-active) .app{
