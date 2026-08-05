@@ -17,6 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#facc15" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
+<!-- 2026-08-05 V4：刪除舊客服頁、舊客服返回動畫與重複啟動控制；客服唯一導向 LINE 官方帳號。 -->
 <!-- UBee 正式營運修復版：2026-08-05 V3｜啟動動畫底部白色徹底移除、固定導航單一控制 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
@@ -8413,7 +8414,7 @@ body.ubee-app-starting > :not(#ubeeStartupScreen):not(script):not(style){
   display:none!important;
 }
 
-/* 視窗外圍永久鋪黃，處理 iOS／Android 安全區及視窗高度重算。 */
+/* 視窗外圍永久鋪白，處理 iOS／Android 安全區及視窗高度重算。 */
 html.ubee-app-starting::before,
 body.ubee-app-starting::before{
   content:"";
@@ -8468,14 +8469,9 @@ body.ubee-app-starting::before{
   clip-path:none!important;
 }
 
-/* 再加一層固定黃色保險層；不使用負 z-index，避免 iOS 合成層忽略。 */
+/* 再加一層固定白色保險層；不使用負 z-index，避免 iOS 合成層忽略。 */
 /* hidden 屬性必須能真正關閉啟動畫面；避免 display:block!important 讓遮罩永久卡住。 */
-#ubeeStartupScreen[hidden]{
-  display:none!important;
-  visibility:hidden!important;
-  opacity:0!important;
-  pointer-events:none!important;
-}
+#ubeeStartupScreen[hidden]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;}
 
 #ubeeStartupScreen.is-leaving{
   pointer-events:none!important;
@@ -8723,173 +8719,73 @@ body.ubee-app-starting::before{
   const startup = document.getElementById('ubeeStartupScreen');
   if(!startup) return;
 
+  const root = document.documentElement;
+  const body = document.body;
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  const animationSelector = [
-    '.ubee-startup-u',
-    '.ubee-startup-bee',
-    '.ubee-startup-service-dark',
-    '.ubee-startup-service-light',
-    '.ubee-startup-promise'
-  ].join(',');
+  const appTheme = themeMeta?.getAttribute('content') || '#facc15';
+  let closed = false;
+  let failSafeTimer = 0;
 
-  let running = false;
-  let initialFinished = false;
-  let hiddenAt = 0;
-  let lastReplayAt = 0;
-  let runToken = 0;
-
-  window.__ubeeCustomerHomeReady = false;
-  window.ubeeWaitForCustomerHomeReady = function(){
-    if(window.__ubeeCustomerHomeReady) return Promise.resolve();
-    return new Promise(resolve=>{
-      window.addEventListener('ubee:customer-home-ready',()=>resolve(),{once:true});
-    });
-  };
-
-  const wait = ms => new Promise(resolve => window.setTimeout(resolve,ms));
-
-  function waitForDomParsed(){
-    if(document.readyState !== 'loading') return Promise.resolve();
-    return new Promise(resolve => document.addEventListener('DOMContentLoaded',resolve,{once:true}));
-  }
-
-  function waitForVisibleDocument(){
-    if(!document.hidden) return Promise.resolve();
-    return new Promise(resolve => {
-      const handler = () => {
-        if(document.hidden) return;
-        document.removeEventListener('visibilitychange',handler);
-        resolve();
-      };
-      document.addEventListener('visibilitychange',handler);
-    });
-  }
-
-  function waitForActualPaint(){
-    return new Promise(resolve => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.setTimeout(resolve,48);
-        });
-      });
-    });
-  }
-
-  function restartLogoAnimations(){
-    const nodes = [...startup.querySelectorAll(animationSelector)];
-    nodes.forEach(node => { node.style.animation = 'none'; });
-    void startup.offsetWidth;
-    nodes.forEach(node => { node.style.removeProperty('animation'); });
-  }
-
-  function enterStartupMode(){
+  function showStartup(){
+    closed = false;
+    window.clearTimeout(failSafeTimer);
     startup.hidden = false;
+    startup.removeAttribute('aria-hidden');
     startup.style.removeProperty('display');
     startup.style.removeProperty('visibility');
     startup.style.removeProperty('opacity');
-    startup.classList.remove('is-leaving');
-    startup.removeAttribute('aria-hidden');
     startup.style.pointerEvents = 'auto';
-    document.documentElement.classList.add('ubee-app-starting');
-    document.body.classList.add('ubee-app-starting');
-    document.documentElement.style.background = '#ffffff';
-    document.body.style.background = '#ffffff';
+    root.classList.add('ubee-app-starting');
+    body.classList.add('ubee-app-starting');
     if(themeMeta) themeMeta.setAttribute('content','#ffffff');
-    restartLogoAnimations();
-  }
 
-  function leaveStartupMode(token){
-    if(token !== runToken) return;
-
-    startup.classList.add('is-leaving');
-    startup.setAttribute('aria-hidden','true');
-    startup.style.pointerEvents = 'none';
-
-    /* 黃色畫面維持到最後一幀，然後直接切換，不做透明淡出。 */
-    requestAnimationFrame(() => {
-      if(token !== runToken) return;
-      startup.hidden = true;
-      startup.style.setProperty('display','none','important');
-      startup.style.setProperty('visibility','hidden','important');
-      startup.style.setProperty('opacity','0','important');
-      startup.classList.remove('is-leaving');
-      document.documentElement.classList.remove('ubee-app-starting');
-      document.body.classList.remove('ubee-app-starting');
-      document.documentElement.style.removeProperty('background');
-      document.body.style.removeProperty('background');
-      if(themeMeta) themeMeta.setAttribute('content','#ffffff');
-      running = false;
-      initialFinished = true;
-      lastReplayAt = Date.now();
-
-      requestAnimationFrame(() => {
-        window.__ubeeCustomerHomeReady = true;
-        window.dispatchEvent(new CustomEvent('ubee:customer-home-ready'));
-      });
+    startup.querySelectorAll('.ubee-startup-u,.ubee-startup-bee,.ubee-startup-service-dark,.ubee-startup-service-light,.ubee-startup-promise').forEach(node=>{
+      node.style.animation='none';
+      void node.offsetWidth;
+      node.style.removeProperty('animation');
     });
+
+    /* 絕對保險：即使其他初始化程式發生例外，也不能讓啟動畫面鎖住 App。 */
+    failSafeTimer = window.setTimeout(hideStartup,3200);
   }
 
-  async function playStartup({hold=1450,waitForDom=true}={}){
-    if(running) return false;
-    running = true;
-    const token = ++runToken;
-    enterStartupMode();
+  function hideStartup(){
+    if(closed) return;
+    closed = true;
+    window.clearTimeout(failSafeTimer);
 
-    try{
-      if(waitForDom) await waitForDomParsed();
-      await waitForVisibleDocument();
-      await waitForActualPaint();
-      if(token !== runToken) return false;
+    startup.setAttribute('aria-hidden','true');
+    startup.style.pointerEvents='none';
+    startup.classList.add('is-leaving');
 
-      /* 倒數從瀏覽器真正畫出啟動畫面的第一幀之後才開始。 */
-      await wait(hold);
-      leaveStartupMode(token);
-      return true;
-    }catch(error){
-      console.error('UBee 啟動動畫執行失敗：',error);
-      leaveStartupMode(token);
-      return false;
-    }
+    window.setTimeout(()=>{
+      startup.hidden=true;
+      startup.style.display='none';
+      startup.style.visibility='hidden';
+      startup.style.opacity='0';
+      startup.classList.remove('is-leaving');
+      root.classList.remove('ubee-app-starting');
+      body.classList.remove('ubee-app-starting');
+      if(themeMeta) themeMeta.setAttribute('content',appTheme);
+      window.dispatchEvent(new CustomEvent('ubee:startup-finished'));
+    },180);
   }
 
-  function replayStartup(hold=1100){
-    const now = Date.now();
-    if(running || now-lastReplayAt < 1600) return;
-    playStartup({hold,waitForDom:false});
+  function begin(){
+    showStartup();
+    /* 冷啟動固定播放；不等待地圖、登入或網路，避免任何依賴造成卡死。 */
+    window.setTimeout(hideStartup,1650);
   }
 
-  window.UBeeStartupController = Object.freeze({
-    replay: replayStartup,
-    isRunning: () => running
-  });
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',begin,{once:true});
+  }else{
+    begin();
+  }
 
-  /* 冷啟動：一定等到整份頁面解析並實際完成第一幀後，才開始計時。 */
-  playStartup({hold:1450,waitForDom:true});
-
-  /* 防止極端錯誤讓畫面永久停留，但不會早於正常首次繪製流程。 */
-  window.setTimeout(() => {
-    if(running && document.readyState !== 'loading') leaveStartupMode(runToken);
-  },9000);
-
-  window.addEventListener('pagehide',() => { hiddenAt = Date.now(); });
-
-  document.addEventListener('visibilitychange',() => {
-    if(document.hidden){
-      hiddenAt = Date.now();
-      return;
-    }
-    if(initialFinished && hiddenAt && Date.now()-hiddenAt > 700){
-      replayStartup(1050);
-    }
-    hiddenAt = 0;
-  });
-
-  window.addEventListener('pageshow',event => {
-    if(!initialFinished) return;
-    if(event.persisted || (hiddenAt && Date.now()-hiddenAt > 700)){
-      replayStartup(1050);
-    }
-    hiddenAt = 0;
+  /* bfcache 回復時只確保遮罩已關閉，不重播、不阻塞操作。 */
+  window.addEventListener('pageshow',event=>{
+    if(event.persisted) hideStartup();
   });
 })();
 </script>
@@ -14946,7 +14842,7 @@ function showCustomerSubPage(){
 }
 
 function openUBeeSupportCenter(){
-  window.location.href = 'https://lin.ee/8HLQtl4';
+  window.location.assign('https://lin.ee/8HLQtl4');
 }
 
 function validateStep1Addresses(){
@@ -19908,7 +19804,7 @@ body.flow-active>.app{display:none!important;}
 <section class="flow-page ubee-my-page" data-page="profile" id="flowPageProfile">
 <div class="ubee-my-scroll">
 <div class="ubee-my-top-actions">
-<button aria-label="聯繫客服" class="ubee-my-round-action" id="flowProfileSupportIcon" title="聯繫客服" type="button"><svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path><path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path><path d="M17 18c0 2-1.5 3-4 3h-1"></path></svg></button>
+<button aria-label="前往 UBee LINE 官方帳號" class="ubee-my-round-action" id="flowProfileSupportIcon" title="UBee LINE 官方帳號" type="button"><svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path><path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path><path d="M17 18c0 2-1.5 3-4 3h-1"></path></svg></button>
 </div>
 <button class="ubee-my-account" data-my-action="account" id="ubeeMyAccountButton" type="button">
 <div class="ubee-my-account-copy">
@@ -21705,7 +21601,7 @@ body.flow-active>.app{display:none!important;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.05.3';
+  const APP_VERSION = '2026.08.05.4';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -21718,7 +21614,6 @@ body.flow-active>.app{display:none!important;}
     addresses:'ubeeMyAddressesPanel',
     notifications:'ubeeMyNotificationsPanel',
     rewards:'ubeeMyRewardsPanel',
-    support:'ubeeMySupportPanel',
     feedback:'ubeeMyFeedbackPanel',
     settings:'ubeeMySettingsPanel',
     favorites:'ubeeMyFavoritesPanel',
@@ -21785,8 +21680,8 @@ body.flow-active>.app{display:none!important;}
 
     buttons.forEach(support => {
       support.innerHTML = supportIcon;
-      support.setAttribute('aria-label','聯繫客服');
-      support.setAttribute('title','聯繫客服');
+      support.setAttribute('aria-label','前往 UBee LINE 官方帳號');
+      support.setAttribute('title','UBee LINE 官方帳號');
     });
   }
 
@@ -21799,8 +21694,8 @@ body.flow-active>.app{display:none!important;}
     const support = document.getElementById('flowProfileSupportIcon');
     if(support){
       support.innerHTML = supportIcon;
-      support.setAttribute('aria-label','聯繫客服');
-      support.setAttribute('title','聯繫客服');
+      support.setAttribute('aria-label','前往 UBee LINE 官方帳號');
+      support.setAttribute('title','UBee LINE 官方帳號');
     }
   }
 
@@ -21873,29 +21768,6 @@ body.flow-active>.app{display:none!important;}
     try{
       if(typeof navigator.vibrate === 'function') navigator.vibrate(duration);
     }catch(_){ }
-  }
-
-  function ensureSupportPanel(){
-    let panel = document.getElementById('ubeeMySupportPanel');
-    if(panel) return panel;
-    const host = root.querySelector('.flow-shell') || root;
-    if(!host) return null;
-
-    panel = document.createElement('section');
-    panel.id = 'ubeeMySupportPanel';
-    panel.className = 'ubee-my-panel';
-    panel.hidden = true;
-    panel.innerHTML = `
-      <div class="ubee-my-panel-head"><strong>聯繫客服</strong><button type="button" data-my-close aria-label="返回我的">‹</button></div>
-      <div class="ubee-my-support-card">
-        <strong>需要 UBee 協助嗎？</strong>
-        <p>可直接前往 UBee 客服中心建立、查看與追蹤客服案件。</p>
-        <div class="ubee-my-support-actions">
-          <button type="button" data-support-action="center">開啟 UBee 客服中心</button>
-        </div>
-      </div>`;
-    host.appendChild(panel);
-    return panel;
   }
 
   function ensureSettingsPanel(){
@@ -21981,7 +21853,6 @@ body.flow-active>.app{display:none!important;}
   }
 
   function preparePanels(){
-    ensureSupportPanel();
     ensureSettingsPanel();
 
     const shell = root.querySelector('.flow-shell') || root;
@@ -22602,48 +22473,6 @@ body.flow-active>.app{display:none!important;}
     }
   });
 
-  function closeSupportToHomeAnimated(){
-    const panel = document.getElementById('ubeeMySupportPanel');
-    const transition = document.getElementById('ubeeSupportReturnTransition');
-
-    if(transition){
-      transition.hidden = false;
-      transition.setAttribute('aria-hidden','false');
-      transition.classList.remove('is-active','is-finishing');
-      void transition.offsetWidth;
-      transition.classList.add('is-active');
-    }
-
-    if(panel){
-      panel.classList.remove('is-open');
-      panel.classList.add('is-returning-home');
-    }
-
-    /* 先完整顯示返回首頁動畫，再切回首頁，避免瞬間跳頁。 */
-    window.setTimeout(() => {
-      if(panel) panel.classList.remove('is-returning-home');
-      closeMySubPages();
-      currentMySection = '';
-      window.__UBEE_SUPPORT_OPENED_FROM_HOME__ = false;
-      document.body.classList.remove('ubee-my-subpage-open');
-      root.removeAttribute('data-my-section');
-      try{ showPage('home'); }catch(_){ }
-      markBottomNav('home');
-      replaceMyHistoryWithRoot();
-    },520);
-
-    window.setTimeout(() => {
-      transition?.classList.add('is-finishing');
-    },760);
-
-    window.setTimeout(() => {
-      if(!transition) return;
-      transition.hidden = true;
-      transition.classList.remove('is-active','is-finishing');
-      transition.setAttribute('aria-hidden','true');
-    },1040);
-  }
-
   document.addEventListener('click',event => {
     const clickable = event.target.closest('button,[role="button"]');
     if(clickable && !clickable.classList.contains('ubee-setting-switch')){
@@ -22752,11 +22581,7 @@ body.flow-active>.app{display:none!important;}
     if(closeButton){
       event.preventDefault();
       event.stopImmediatePropagation();
-      if(currentMySection === 'support' && window.__UBEE_SUPPORT_OPENED_FROM_HOME__){
-        closeSupportToHomeAnimated();
-      }else{
-        closeWithHistory();
-      }
+      closeWithHistory();
       return;
     }
 
@@ -22776,40 +22601,11 @@ body.flow-active>.app{display:none!important;}
       return;
     }
 
-    const homeSupportButton = event.target.closest('#flowSupportButton,.topbar-support');
-    if(homeSupportButton){
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      window.__UBEE_SUPPORT_OPENED_FROM_HOME__ = true;
-      window.location.href='https://lin.ee/8HLQtl4';
-      return;
-    }
-
-    const supportAction = event.target.closest('#productionOrderFlow [data-support-action]');
-    if(supportAction){
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if(supportAction.dataset.supportAction === 'center'){
-        location.href = 'https://lin.ee/8HLQtl4';
-      }else{
-        try{
-          if(typeof window.openUBeeSupportCenter === 'function'){
-            window.openUBeeSupportCenter();
-          }else{
-            location.href = 'https://lin.ee/8HLQtl4';
-          }
-        }catch(_){
-          location.href = 'https://lin.ee/8HLQtl4';
-        }
-      }
-      return;
-    }
-
-    const supportButton = event.target.closest('#flowProfileSupportIcon,#flowProfileSupport');
+    const supportButton = event.target.closest('#flowSupportButton,.topbar-support,#flowProfileSupportIcon,#flowProfileSupport,[data-uca-support],[data-support-action]');
     if(supportButton){
       event.preventDefault();
       event.stopImmediatePropagation();
-      window.location.href='https://lin.ee/8HLQtl4';
+      window.openUBeeSupportCenter();
       return;
     }
 
@@ -22824,7 +22620,9 @@ body.flow-active>.app{display:none!important;}
     if(actionButton){
       event.preventDefault();
       event.stopImmediatePropagation();
-      openMySection(actionButton.dataset.myAction || '');
+      const requestedSection = actionButton.dataset.myAction || '';
+      if(requestedSection === 'support'){ window.openUBeeSupportCenter(); return; }
+      openMySection(requestedSection);
       return;
     }
 
@@ -23723,48 +23521,5 @@ body > #ubeePersistentBottomNav > button.active{
 
 
 
-<!-- UBee 客服與白色啟動動畫正式整合｜2026-08-05 -->
-<style id="ubee-clean-final-ui-20260805">
-html.ubee-app-starting,body.ubee-app-starting{background:#fff!important;}
-html.ubee-app-starting::before,body.ubee-app-starting::before{background:#fff!important;}
-#ubeeStartupScreen,#ubeeStartupScreen::before,#ubeeStartupScreen .ubee-startup-lockup{background:#fff!important;}
-#ubeeStartupScreen .ubee-startup-u{color:#f4bd00!important;-webkit-text-stroke:0!important;}
-#ubeeStartupScreen .ubee-startup-bee{color:#111!important;-webkit-text-stroke:0!important;}
-#ubeeStartupScreen .ubee-startup-service-dark{color:#111!important;}
-#ubeeStartupScreen .ubee-startup-service-light{color:#f4bd00!important;-webkit-text-stroke:0!important;}
-#ubeeStartupScreen .ubee-startup-promise{color:#6f7378!important;}
-/* 清除舊版客服子頁造成的版面殘留。 */
-#ubeeMySupportPanel{display:none!important;}
-.topbar-support,#flowSupportButton,#flowProfileSupportIcon{display:flex!important;align-items:center!important;justify-content:center!important;}
-.topbar-support svg,#flowSupportButton svg,#flowProfileSupportIcon svg{width:25px!important;height:25px!important;display:block!important;}
-/* 回歸穩定版面：避免全域 active transform 與重複模糊層改變卡片尺寸。 */
-button:active,[role="button"]:active{transform:none;}
-.topbar,.flow-header,.uca-topbar,.ubee-my-panel-head{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
-</style>
-<script id="ubee-line-official-support-router-20260805">
-(()=>{
-  'use strict';
-  const LINE_URL='https://lin.ee/8HLQtl4';
-  const HEADSET='<svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path><path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path><path d="M17 18c0 2-1.5 3-4 3h-1"></path></svg>';
-  const goLine=()=>{ window.location.href=LINE_URL; };
-  window.openUBeeSupportCenter=goLine;
-  function normalize(){
-    document.querySelectorAll('.topbar-support,#flowSupportButton,#flowProfileSupportIcon,[data-uca-support],#flowProfileSupport,[data-support-action]').forEach(el=>{
-      if(el.matches('.topbar-support,#flowSupportButton,#flowProfileSupportIcon') && !el.querySelector('.ubee-support-headset-icon')) el.innerHTML=HEADSET;
-      el.setAttribute('aria-label','前往 UBee LINE 官方帳號');
-      el.setAttribute('title','UBee LINE 官方帳號');
-    });
-  }
-  document.addEventListener('click',event=>{
-    const target=event.target.closest('.topbar-support,#flowSupportButton,#flowProfileSupportIcon,[data-uca-support],#flowProfileSupport,[data-support-action]');
-    if(!target) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    goLine();
-  },true);
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',normalize,{once:true}); else normalize();
-  window.addEventListener('pageshow',normalize);
-})();
-</script>
 </body>
 </html>
