@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 正式營運版：2026-08-05 R24 Native｜黃色品牌文字啟動畫面；首頁顯示後才詢問權限；底部導航轉換期間永久固定 -->
+<!-- UBee 正式營運版：2026-08-05 R25 Native｜黃色品牌文字啟動畫面無底部白區；動畫延長；首頁轉換導航永久固定 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
 
@@ -9273,7 +9273,13 @@ body:not(.flow-active) .app{
    ========================================================= */
 html.ubee-r24-yellow-starting,
 body.ubee-r24-yellow-starting{
+  width:100%!important;
+  min-height:100%!important;
   background:#facc15!important;
+  overscroll-behavior:none!important;
+}
+html.ubee-r24-yellow-starting{
+  background-color:#facc15!important;
 }
 body.ubee-r24-yellow-starting{
   overflow:hidden!important;
@@ -9283,11 +9289,13 @@ body.ubee-r24-yellow-starting{
 
 #ubeeAppSplashR24{
   position:fixed;
-  inset:0;
+  inset:-1px -1px -2px -1px;
   z-index:2147483647;
-  width:100%;
-  height:100vh;
-  height:100dvh;
+  width:auto;
+  min-width:calc(100% + 2px);
+  height:auto;
+  min-height:calc(100vh + 3px);
+  min-height:calc(100dvh + 3px);
   display:grid;
   place-items:center;
   overflow:hidden;
@@ -9346,7 +9354,7 @@ body.ubee-r24-yellow-starting{
   font-size:clamp(92px,24vw,128px);
   font-weight:1000;
   letter-spacing:-10px;
-  animation:ubeeR24UIn .52s cubic-bezier(.18,.82,.22,1) both;
+  animation:ubeeR24UIn .64s cubic-bezier(.18,.82,.22,1) both;
 }
 
 #ubeeAppSplashR24 .ubee-r24-bee{
@@ -9358,7 +9366,7 @@ body.ubee-r24-yellow-starting{
   letter-spacing:-6px;
   -webkit-text-stroke:2px #111111;
   paint-order:stroke fill;
-  animation:ubeeR24BeeIn .58s .04s cubic-bezier(.18,.82,.22,1) both;
+  animation:ubeeR24BeeIn .68s .08s cubic-bezier(.18,.82,.22,1) both;
 }
 
 #ubeeAppSplashR24 .ubee-r24-service{
@@ -9383,7 +9391,7 @@ body.ubee-r24-yellow-starting{
 #ubeeAppSplashR24 .ubee-r24-service-dark{
   display:inline-block;
   color:#111111;
-  animation:ubeeR24ServiceDarkIn .42s .19s ease both;
+  animation:ubeeR24ServiceDarkIn .50s .28s ease both;
 }
 
 #ubeeAppSplashR24 .ubee-r24-service-light{
@@ -9391,7 +9399,7 @@ body.ubee-r24-yellow-starting{
   color:#ffffff;
   -webkit-text-stroke:1.4px #111111;
   paint-order:stroke fill;
-  animation:ubeeR24ServiceLightIn .42s .25s ease both;
+  animation:ubeeR24ServiceLightIn .50s .36s ease both;
 }
 
 #ubeeAppSplashR24 .ubee-r24-promise{
@@ -9408,7 +9416,7 @@ body.ubee-r24-yellow-starting{
   font-weight:1000;
   line-height:1.4;
   letter-spacing:.18em;
-  animation:ubeeR24PromiseIn .40s .36s ease both;
+  animation:ubeeR24PromiseIn .48s .52s ease both;
 }
 
 #ubeeAppSplashR24.is-leaving{
@@ -9453,6 +9461,26 @@ body.ubee-r24-yellow-starting{
  * 導航節點一被解析並移到 body，就立即使用固定位置，
  * 不必等到整份大型程式碼載入完畢。
  */
+
+/*
+ * 啟動畫面期間，導航仍保持 fixed，但所有可見區域同步使用 UBee 黃色。
+ * 這可消除 iPhone safe-area 或 fixed 導航造成的底部白色區塊，
+ * 且不需要移動、重建或隱藏導航。
+ */
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav{
+  background:#facc15!important;
+  border-top-color:#facc15!important;
+}
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav > button{
+  background:#facc15!important;
+  color:#facc15!important;
+  border-top-color:#facc15!important;
+}
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav .flow-nav-icon,
+body.ubee-r24-yellow-starting > #ubeePersistentBottomNav .flow-nav-label{
+  opacity:0!important;
+}
+
 body > #ubeePersistentBottomNav{
   position:fixed!important;
   inset:auto 0 0 0!important;
@@ -9524,8 +9552,8 @@ body > #ubeePersistentBottomNav{
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-  const minimumVisibleTime = reducedMotion ? 320 : 1120;
-  const removeDelay = reducedMotion ? 110 : 230;
+  const minimumVisibleTime = reducedMotion ? 380 : 1580;
+  const removeDelay = reducedMotion ? 120 : 280;
   let finished = false;
 
   /*
@@ -9572,7 +9600,7 @@ body > #ubeePersistentBottomNav{
   };
 
   window.setTimeout(finishSplash,minimumVisibleTime);
-  window.setTimeout(finishSplash,1950);
+  window.setTimeout(finishSplash,2600);
 })();
 </script>
 
