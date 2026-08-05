@@ -1,14 +1,23 @@
 {
   "id": "/order.html",
   "name": "UBee 跑腿",
-  "short_name": "UBee",
-  "description": "UBee 跑腿客戶下單系統",
-  "start_url": "/order.html",
+  "short_name": "UBee 跑腿",
+  "description": "UBee 跑腿用戶端：估價、下單、追蹤與管理跑腿任務。",
+  "start_url": "/order.html?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "background_color": "#facc15",
+  "theme_color": "#facc15",
   "orientation": "portrait-primary",
+  "categories": [
+    "business",
+    "lifestyle",
+    "navigation"
+  ],
   "icons": [
     {
       "src": "/ubee-customer-icon-192.png",
@@ -20,13 +29,31 @@
       "src": "/ubee-customer-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "立即下單",
+      "short_name": "下單",
+      "url": "/order.html?action=new",
+      "icons": [
+        {
+          "src": "/ubee-customer-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "src": "/ubee-customer-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "name": "我的任務",
+      "short_name": "任務",
+      "url": "/order.html?action=profile",
+      "icons": [
+        {
+          "src": "/ubee-customer-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
