@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="zh-TW" class="ubee-app-starting" style="background:#facc15;">
+<html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
 <meta charset="utf-8"/>
@@ -8389,7 +8389,7 @@ body.ubee-app-starting{
   padding:0!important;
   overflow:hidden!important;
   overscroll-behavior:none!important;
-  background-color:#facc15!important;
+  background-color:#ffffff!important;
   background-image:none!important;
 }
 
@@ -8427,7 +8427,7 @@ body.ubee-app-starting::before{
   margin:0!important;
   padding:0!important;
   border:0!important;
-  background:#facc15!important;
+  background:#ffffff!important;
   pointer-events:none!important;
 }
 
@@ -8454,7 +8454,7 @@ body.ubee-app-starting::before{
 
   border:0!important;
   border-radius:0!important;
-  background-color:#facc15!important;
+  background-color:#ffffff!important;
   background-image:none!important;
   color:#111111!important;
 
@@ -8475,7 +8475,7 @@ body.ubee-app-starting::before{
   inset:0!important;
   z-index:0!important;
   display:block!important;
-  background:#facc15!important;
+  background:#ffffff!important;
   pointer-events:none!important;
 }
 
@@ -8534,7 +8534,7 @@ body.ubee-app-starting::before{
 #ubeeStartupScreen .ubee-startup-u{
   display:inline-block;
   margin-right:-5px;
-  color:#111111;
+  color:#f4bd00;
   font-size:clamp(112px,30vw,158px);
   font-weight:1000;
   letter-spacing:-12px;
@@ -8544,11 +8544,11 @@ body.ubee-app-starting::before{
 #ubeeStartupScreen .ubee-startup-bee{
   display:inline-block;
   padding-bottom:7px;
-  color:#ffffff;
+  color:#111111;
   font-size:clamp(72px,19vw,106px);
   font-weight:1000;
   letter-spacing:-7px;
-  -webkit-text-stroke:2.2px #111111;
+  -webkit-text-stroke:0 transparent;
   paint-order:stroke fill;
   animation:ubeeStartupBeeIn .72s .08s cubic-bezier(.18,.82,.22,1) both;
 }
@@ -8580,15 +8580,15 @@ body.ubee-app-starting::before{
 
 #ubeeStartupScreen .ubee-startup-service-light{
   display:inline-block;
-  color:#ffffff;
-  -webkit-text-stroke:1.6px #111111;
+  color:#f4bd00;
+  -webkit-text-stroke:0 transparent;
   paint-order:stroke fill;
   animation:ubeeStartupServiceLightIn .54s .39s ease both;
 }
 
 #ubeeStartupScreen .ubee-startup-promise{
   margin-top:19px;
-  color:#4c3900;
+  color:#6f7378;
   font-family:
     "Avenir Next",
     "Noto Sans TC",
@@ -8688,7 +8688,7 @@ body.ubee-app-starting::before{
 }
 </style>
 </head>
-<body class="ubee-app-starting" style="background:#facc15;">
+<body class="ubee-app-starting" style="background:#ffffff;">
 
 <div id="ubeeStartupScreen" role="status" aria-live="polite" aria-label="UBee 跑腿正在開啟">
   <div class="ubee-startup-lockup" aria-hidden="true">
@@ -9867,7 +9867,7 @@ body.ubee-app-starting::before{
 
   function openDocument(type){const item=documents[type];if(!item)return;state.activeDocument=type;$('ucaDocumentTitle').textContent=item.title;$('ucaDocumentBody').innerHTML=item.html;$('ucaDocumentModal').classList.add('active');$('ucaDocumentModal').setAttribute('aria-hidden','false')}
   function closeDocument(){$('ucaDocumentModal').classList.remove('active');$('ucaDocumentModal').setAttribute('aria-hidden','true');state.activeDocument=''}
-  function support(){try{if(typeof openUBeeSupportCenter==='function'){openUBeeSupportCenter();return}}catch(_){ }window.open('/support.html','_blank','noopener,noreferrer')}
+  function support(){ window.location.href='https://lin.ee/8HLQtl4'; }
 
   function show(mode='welcome'){
     root.classList.add('active'); root.setAttribute('aria-hidden','false'); document.body.classList.add('ubee-customer-auth-open');
@@ -14928,7 +14928,7 @@ function showCustomerSubPage(){
 }
 
 function openUBeeSupportCenter(){
-  window.location.href = '/support.html';
+  window.location.href = 'https://lin.ee/8HLQtl4';
 }
 
 function validateStep1Addresses(){
@@ -20657,7 +20657,7 @@ body.flow-active>.app{display:none!important;}
     });
     $('flowNavHome').addEventListener('click',()=>{showPage('home');updateHome()});
     $('flowNavMy').addEventListener('click',renderProfile);
-    const openSupportCenter=()=>{ window.location.href='/support.html'; };
+    const openSupportCenter=()=>{ window.location.href='https://lin.ee/8HLQtl4'; };
     $('flowSupportButton').addEventListener('click',openSupportCenter);
     $('flowProfileSupportIcon').addEventListener('click',openSupportCenter);
     $('flowProfileSupport').addEventListener('click',openSupportCenter);
@@ -21223,7 +21223,7 @@ body.flow-active>.app{display:none!important;}
     if(event.target.closest('[data-ubee-push-enable]')) await enableCustomerPush();
     if(event.target.closest('[data-ubee-push-disable]')) await disableCustomerPush();
     if(event.target.closest('[data-ubee-support]')){
-      window.location.href = '/support.html';
+      window.location.href = 'https://lin.ee/8HLQtl4';
     }
   });
 
@@ -22696,7 +22696,7 @@ body.flow-active>.app{display:none!important;}
       }
 
       if(flatAction === 'phone-help'){
-        openMySection('support');
+        window.location.href='https://lin.ee/8HLQtl4';
         return;
       }
 
@@ -22763,7 +22763,7 @@ body.flow-active>.app{display:none!important;}
       event.preventDefault();
       event.stopImmediatePropagation();
       window.__UBEE_SUPPORT_OPENED_FROM_HOME__ = true;
-      openMySection('support',{fromHome:true});
+      window.location.href='https://lin.ee/8HLQtl4';
       return;
     }
 
@@ -22772,16 +22772,16 @@ body.flow-active>.app{display:none!important;}
       event.preventDefault();
       event.stopImmediatePropagation();
       if(supportAction.dataset.supportAction === 'center'){
-        location.href = '/support.html';
+        location.href = 'https://lin.ee/8HLQtl4';
       }else{
         try{
           if(typeof window.openUBeeSupportCenter === 'function'){
             window.openUBeeSupportCenter();
           }else{
-            location.href = '/support.html';
+            location.href = 'https://lin.ee/8HLQtl4';
           }
         }catch(_){
-          location.href = '/support.html';
+          location.href = 'https://lin.ee/8HLQtl4';
         }
       }
       return;
@@ -22791,7 +22791,7 @@ body.flow-active>.app{display:none!important;}
     if(supportButton){
       event.preventDefault();
       event.stopImmediatePropagation();
-      openMySection('support');
+      window.location.href='https://lin.ee/8HLQtl4';
       return;
     }
 
@@ -23703,420 +23703,50 @@ body > #ubeePersistentBottomNav > button.active{
 
 
 
-<div aria-hidden="true" hidden id="ubeeSupportReturnTransition" role="status">
-  <div class="ubee-support-return-inner">
-    <div class="ubee-support-return-mark" aria-hidden="true">
-      <svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-7h6v7"></path></svg>
-    </div>
-    <div class="ubee-support-return-brand"><span>U</span>Bee 跑腿</div>
-    <div class="ubee-support-return-text">正在返回首頁</div>
-  </div>
-</div>
 
-<style id="ubee-startup-support-return-final-fix">
-/* =========================================================
-   UBee V5 最終修復
-   1. 啟動黃色背景延伸到 iOS／Android 頂部安全區。
-   2. 首頁與「我的」右上角統一為耳機客服圖示。
-   3. 客服返回首頁前，必須完整播放中間過場動畫。
-   ========================================================= */
 
-#ubeeStartupScreen[hidden],
-#ubeeSupportReturnTransition[hidden]{
-  display:none!important;
-}
-
-html.ubee-app-starting,
-body.ubee-app-starting{
-  background:#facc15!important;
-}
-
-/* 禁用舊版 root/body 偽元素保險層：它會蓋住真正的 Logo 動畫。
-   黃色改由 html、body 與超出視窗的啟動畫面本體直接負責。 */
-html.ubee-app-starting::before,
-html.ubee-app-starting::after,
-body.ubee-app-starting::before,
-body.ubee-app-starting::after{
-  content:none!important;
-  display:none!important;
-}
-
-#ubeeStartupScreen{
-  top:-240px!important;
-  right:-240px!important;
-  bottom:-240px!important;
-  left:-240px!important;
-  min-width:calc(100vw + 480px)!important;
-  min-height:calc(100dvh + 480px)!important;
-}
-
-#ubeeStartupScreen .ubee-startup-lockup{
-  position:fixed!important;
-  top:calc(-1 * env(safe-area-inset-top))!important;
-  right:0!important;
-  bottom:calc(-1 * env(safe-area-inset-bottom))!important;
-  left:0!important;
-  width:100vw!important;
-  height:auto!important;
-  min-height:calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))!important;
-  padding:
-    calc(24px + env(safe-area-inset-top))
-    22px
-    calc(24px + env(safe-area-inset-bottom))!important;
-  background:#facc15!important;
-}
-
-/* 三個入口全部使用同一組耳機客服圖示。 */
-.topbar-support,
-#flowSupportButton,
-#flowProfileSupportIcon{
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  color:#111!important;
-}
-
-.topbar-support svg,
-#flowSupportButton svg,
-#flowProfileSupportIcon svg{
-  display:block!important;
-  width:25px!important;
-  height:25px!important;
-  fill:none!important;
-  stroke:currentColor!important;
-  stroke-width:2!important;
-  stroke-linecap:round!important;
-  stroke-linejoin:round!important;
-  pointer-events:none!important;
-}
-
-#productionOrderFlow #flowProfileSupportIcon{
-  width:44px!important;
-  min-width:44px!important;
-  height:44px!important;
-  padding:0!important;
-  border-radius:50%!important;
-}
-
-/* 客服頁進場與離場。 */
-#productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page:not([hidden]){
-  will-change:transform,opacity;
-}
-#productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-open{
-  animation:ubeeSupportEnter .30s cubic-bezier(.22,.8,.3,1) both!important;
-}
-#productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-returning-home{
-  display:block!important;
-  animation:ubeeSupportReturnHome .52s cubic-bezier(.4,0,.2,1) both!important;
-  pointer-events:none!important;
-}
-@keyframes ubeeSupportEnter{
-  from{transform:translate3d(24%,0,0);opacity:.2;}
-  to{transform:translate3d(0,0,0);opacity:1;}
-}
-@keyframes ubeeSupportReturnHome{
-  from{transform:translate3d(0,0,0);opacity:1;}
-  to{transform:translate3d(38%,0,0);opacity:0;}
-}
-
-/* 返回首頁的中間動畫：黃色橫向覆蓋＋首頁符號脈衝。 */
-#ubeeSupportReturnTransition{
-  position:fixed!important;
-  top:-180px!important;
-  right:-180px!important;
-  bottom:-180px!important;
-  left:-180px!important;
-  z-index:2147483647!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  overflow:hidden!important;
-  background:#facc15!important;
-  color:#111!important;
-  opacity:0;
-  transform:translate3d(100%,0,0);
-  pointer-events:none!important;
-}
-#ubeeSupportReturnTransition.is-active{
-  animation:ubeeSupportTransitionIn .46s cubic-bezier(.2,.8,.25,1) both!important;
-}
-#ubeeSupportReturnTransition.is-finishing{
-  animation:ubeeSupportTransitionOut .28s cubic-bezier(.4,0,.2,1) both!important;
-}
-.ubee-support-return-inner{
-  position:fixed;
-  inset:0;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:14px;
-  padding:calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
-  text-align:center;
-}
-.ubee-support-return-mark{
-  width:76px;
-  height:76px;
-  display:grid;
-  place-items:center;
-  border:3px solid #111;
-  border-radius:24px;
-  background:#fff;
-  animation:ubeeSupportHomePulse .72s ease-in-out infinite alternate;
-}
-.ubee-support-return-mark svg{
-  width:39px;
-  height:39px;
-  fill:none;
-  stroke:#111;
-  stroke-width:2.2;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-.ubee-support-return-brand{
-  font-size:28px;
-  font-weight:1000;
-  letter-spacing:-1px;
-}
-.ubee-support-return-brand span{color:#fff;-webkit-text-stroke:1px #111;paint-order:stroke fill;}
-.ubee-support-return-text{
-  color:#5b4500;
-  font-size:14px;
-  font-weight:900;
-  letter-spacing:.04em;
-}
-@keyframes ubeeSupportTransitionIn{
-  from{opacity:1;transform:translate3d(100%,0,0);}
-  to{opacity:1;transform:translate3d(0,0,0);}
-}
-@keyframes ubeeSupportTransitionOut{
-  from{opacity:1;transform:translate3d(0,0,0);}
-  to{opacity:0;transform:translate3d(-12%,0,0);}
-}
-@keyframes ubeeSupportHomePulse{
-  from{transform:scale(.94) translateY(2px);}
-  to{transform:scale(1.04) translateY(-2px);}
-}
-
-@media (prefers-reduced-motion:reduce){
-  #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-open,
-  #productionOrderFlow #ubeeMySupportPanel.ubee-my-app-page.is-returning-home,
-  #ubeeSupportReturnTransition.is-active,
-  #ubeeSupportReturnTransition.is-finishing{
-    animation-duration:.18s!important;
-  }
-  .ubee-support-return-mark{animation:none!important;}
-}
+<!-- UBee 客服與白色啟動動畫正式整合｜2026-08-05 -->
+<style id="ubee-clean-final-ui-20260805">
+html.ubee-app-starting,body.ubee-app-starting{background:#fff!important;}
+html.ubee-app-starting::before,body.ubee-app-starting::before{background:#fff!important;}
+#ubeeStartupScreen,#ubeeStartupScreen::before,#ubeeStartupScreen .ubee-startup-lockup{background:#fff!important;}
+#ubeeStartupScreen .ubee-startup-u{color:#f4bd00!important;-webkit-text-stroke:0!important;}
+#ubeeStartupScreen .ubee-startup-bee{color:#111!important;-webkit-text-stroke:0!important;}
+#ubeeStartupScreen .ubee-startup-service-dark{color:#111!important;}
+#ubeeStartupScreen .ubee-startup-service-light{color:#f4bd00!important;-webkit-text-stroke:0!important;}
+#ubeeStartupScreen .ubee-startup-promise{color:#6f7378!important;}
+/* 清除舊版客服子頁造成的版面殘留。 */
+#ubeeMySupportPanel{display:none!important;}
+.topbar-support,#flowSupportButton,#flowProfileSupportIcon{display:flex!important;align-items:center!important;justify-content:center!important;}
+.topbar-support svg,#flowSupportButton svg,#flowProfileSupportIcon svg{width:25px!important;height:25px!important;display:block!important;}
+/* 回歸穩定版面：避免全域 active transform 與重複模糊層改變卡片尺寸。 */
+button:active,[role="button"]:active{transform:none;}
+.topbar,.flow-header,.uca-topbar,.ubee-my-panel-head{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
 </style>
-
-<script id="ubee-startup-replay-and-support-icon-controller">
+<script id="ubee-line-official-support-router-20260805">
 (()=>{
   'use strict';
-  if(window.__UBEE_SUPPORT_ICON_FINAL_FIX__) return;
-  window.__UBEE_SUPPORT_ICON_FINAL_FIX__ = true;
-
-  const HEADSET_ICON = '<svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path><path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path><path d="M17 18c0 2-1.5 3-4 3h-1"></path></svg>';
-
-  function applySupportIcons(){
-    const buttons = [
-      document.getElementById('flowSupportButton'),
-      document.getElementById('flowProfileSupportIcon'),
-      ...document.querySelectorAll('.topbar-support')
-    ].filter(Boolean);
-
-    buttons.forEach(button => {
-      if(!button.querySelector('.ubee-support-headset-icon')){
-        button.innerHTML = HEADSET_ICON;
-      }
-      button.setAttribute('aria-label','聯繫客服');
-      button.setAttribute('title','聯繫客服');
+  const LINE_URL='https://lin.ee/8HLQtl4';
+  const HEADSET='<svg aria-hidden="true" class="ubee-support-headset-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 13v-1a8 8 0 0 1 16 0v1"></path><path d="M4 13a2 2 0 0 1 2-2h1v7H6a2 2 0 0 1-2-2v-3Z"></path><path d="M20 13a2 2 0 0 0-2-2h-1v7h1a2 2 0 0 0 2-2v-3Z"></path><path d="M17 18c0 2-1.5 3-4 3h-1"></path></svg>';
+  const goLine=()=>{ window.location.href=LINE_URL; };
+  window.openUBeeSupportCenter=goLine;
+  function normalize(){
+    document.querySelectorAll('.topbar-support,#flowSupportButton,#flowProfileSupportIcon,[data-uca-support],#flowProfileSupport,[data-support-action]').forEach(el=>{
+      if(el.matches('.topbar-support,#flowSupportButton,#flowProfileSupportIcon') && !el.querySelector('.ubee-support-headset-icon')) el.innerHTML=HEADSET;
+      el.setAttribute('aria-label','前往 UBee LINE 官方帳號');
+      el.setAttribute('title','UBee LINE 官方帳號');
     });
   }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded',applySupportIcons,{once:true});
-  }else{
-    applySupportIcons();
-  }
-  window.addEventListener('load',applySupportIcons,{once:true});
-  window.addEventListener('pageshow',applySupportIcons);
-  window.setTimeout(applySupportIcons,300);
-  window.setTimeout(applySupportIcons,1000);
+  document.addEventListener('click',event=>{
+    const target=event.target.closest('.topbar-support,#flowSupportButton,#flowProfileSupportIcon,[data-uca-support],#flowProfileSupport,[data-support-action]');
+    if(!target) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    goLine();
+  },true);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',normalize,{once:true}); else normalize();
+  window.addEventListener('pageshow',normalize);
 })();
 </script>
-
-
-
-<!-- =========================================================
-     UBee 原生 App 整體互動層｜2026-08-05
-     不改動既有業務流程，只統一頁面切換、按壓、表單與底部導航手感。
-     ========================================================= -->
-<style id="ubee-native-app-experience-v1">
-:root{
-  --ubee-native-duration:260ms;
-  --ubee-native-fast:150ms;
-  --ubee-native-ease:cubic-bezier(.22,.8,.26,1);
-}
-
-html,body{
-  overscroll-behavior-y:none;
-  -webkit-font-smoothing:antialiased;
-  text-rendering:optimizeLegibility;
-}
-
-button,[role="button"],a,input,select,textarea{
-  -webkit-tap-highlight-color:transparent;
-}
-
-button,[role="button"],.menu-item,.ubee-settings-row,.flow-service-tab,
-.flow-profile-task-card,.bottom-tab,.persistent-bottom-nav button{
-  touch-action:manipulation;
-}
-
-button:active,[role="button"]:active,.menu-item:active,.ubee-settings-row:active,
-.flow-service-tab:active,.flow-profile-task-card:active,.persistent-bottom-nav button:active{
-  transform:scale(.975);
-  transition:transform 90ms ease!important;
-}
-
-input:focus,textarea:focus,select:focus{
-  outline:none!important;
-}
-
-.input-card:focus-within,.flow-field:focus-within,.uca-field:focus-within,
-.address-card:focus-within,.flow-card:focus-within{
-  border-color:rgba(244,185,0,.72)!important;
-  box-shadow:0 0 0 3px rgba(250,204,21,.15)!important;
-  transition:border-color var(--ubee-native-fast) ease,box-shadow var(--ubee-native-fast) ease!important;
-}
-
-/* 原生式頁面推進／返回 */
-.flow-page.ubee-native-enter-forward,
-.app-section.ubee-native-enter-forward,
-.step.ubee-native-enter-forward{
-  animation:ubeeNativePushIn var(--ubee-native-duration) var(--ubee-native-ease) both!important;
-}
-.flow-page.ubee-native-enter-back,
-.app-section.ubee-native-enter-back,
-.step.ubee-native-enter-back{
-  animation:ubeeNativePopIn var(--ubee-native-duration) var(--ubee-native-ease) both!important;
-}
-.flow-page.ubee-native-tab-enter,
-.app-section.ubee-native-tab-enter{
-  animation:ubeeNativeTabIn 190ms ease-out both!important;
-}
-
-@keyframes ubeeNativePushIn{
-  from{opacity:.55;transform:translate3d(34px,0,0) scale(.992)}
-  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
-}
-@keyframes ubeeNativePopIn{
-  from{opacity:.55;transform:translate3d(-24px,0,0) scale(.992)}
-  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
-}
-@keyframes ubeeNativeTabIn{
-  from{opacity:.35;transform:translate3d(0,8px,0)}
-  to{opacity:1;transform:translate3d(0,0,0)}
-}
-
-/* 固定標頭與底部導航更接近原生容器 */
-.topbar,.flow-header,.uca-topbar,.ubee-my-panel-head{
-  -webkit-backdrop-filter:saturate(160%) blur(16px);
-  backdrop-filter:saturate(160%) blur(16px);
-}
-
-#ubeePersistentBottomNav,.persistent-bottom-nav,.bottom-tabs{
-  -webkit-backdrop-filter:saturate(180%) blur(18px)!important;
-  backdrop-filter:saturate(180%) blur(18px)!important;
-  background:rgba(255,255,255,.94)!important;
-}
-
-#ubeePersistentBottomNav button,.persistent-bottom-nav button,.bottom-tab{
-  min-height:50px;
-  transition:color var(--ubee-native-fast) ease,transform 90ms ease,opacity var(--ubee-native-fast) ease!important;
-}
-
-/* 最低觸控尺寸 */
-.icon-btn,.topbar-support,.flow-icon-btn,.uca-icon-btn,.flow-back-btn,
-[data-my-close],.menu-item,.ubee-settings-row{
-  min-width:44px;
-  min-height:44px;
-}
-
-/* 載入與狀態變化避免突兀 */
-.flow-loading,.flow-status,.profile-status,.ubee-settings-status{
-  transition:opacity var(--ubee-native-fast) ease,transform var(--ubee-native-fast) ease!important;
-}
-
-@media (prefers-reduced-motion:reduce){
-  .flow-page.ubee-native-enter-forward,
-  .flow-page.ubee-native-enter-back,
-  .flow-page.ubee-native-tab-enter,
-  .app-section.ubee-native-enter-forward,
-  .app-section.ubee-native-enter-back,
-  .app-section.ubee-native-tab-enter,
-  .step.ubee-native-enter-forward,
-  .step.ubee-native-enter-back{
-    animation:none!important;
-  }
-}
-</style>
-
-<script id="ubee-native-app-experience-controller-v1">
-(() => {
-  'use strict';
-  if(window.__UBEE_NATIVE_APP_EXPERIENCE_V1__) return;
-  window.__UBEE_NATIVE_APP_EXPERIENCE_V1__ = true;
-
-  let direction = 'forward';
-  let tabNavigation = false;
-  let lastActive = null;
-
-  const isBackControl = element => Boolean(element?.closest?.(
-    '[data-go="home"],[data-go="profile"],[data-go="options"],'+
-    '[data-go="details"],[data-go="service"],[data-my-close],'+
-    '.flow-back-btn,.step2-back-btn,.step3-back-btn,.uca-icon-btn[data-uca-back],'+
-    '.uca-icon-btn[data-uca-register-back]'
-  ));
-
-  const isBottomTab = element => Boolean(element?.closest?.(
-    '#ubeePersistentBottomNav button,.persistent-bottom-nav button,.bottom-tab,[data-bottom-tab]'
-  ));
-
-  document.addEventListener('pointerdown', event => {
-    const target = event.target;
-    tabNavigation = isBottomTab(target);
-    direction = isBackControl(target) ? 'back' : 'forward';
-
-    const clickable = target.closest?.('button,[role="button"],a,.menu-item,.ubee-settings-row');
-    if(clickable && navigator.vibrate){
-      try{ navigator.vibrate(6); }catch(_){ }
-    }
-  }, {capture:true,passive:true});
-
-  const activePage = () => document.querySelector(
-    '.flow-page.active,.app-section.active,.step.active,'+
-    '#ubeeMySettingsPanel:not([hidden]),#ubeeMyOrdersPanel:not([hidden]),#ubeeMyProfilePanel:not([hidden])'
-  );
-
-  const animate = page => {
-    if(!page || page === lastActive || page.id === 'ubeeStartupScreen') return;
-    lastActive = page;
-    page.classList.remove('ubee-native-enter-forward','ubee-native-enter-back','ubee-native-tab-enter');
-    void page.offsetWidth;
-    page.classList.add(tabNavigation ? 'ubee-native-tab-enter' : (direction === 'back' ? 'ubee-native-enter-back' : 'ubee-native-enter-forward'));
-    const cleanup = () => page.classList.remove('ubee-native-enter-forward','ubee-native-enter-back','ubee-native-tab-enter');
-    page.addEventListener('animationend',cleanup,{once:true});
-    setTimeout(cleanup,420);
-    tabNavigation = false;
-  };
-
-  const observer = new MutationObserver(() => requestAnimationFrame(() => animate(activePage())));
-  observer.observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class','hidden','style','aria-hidden']});
-
-  window.addEventListener('pageshow',() => requestAnimationFrame(() => animate(activePage())));
-})();
-</script>
-
 </body>
 </html>
