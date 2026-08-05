@@ -13,6 +13,7 @@ const multer = require('multer');
 // 2026-08-04 R9｜全能跑腿 serviceMode 前後端一致：估價、建單與鎖價驗證統一為 custom。
 // 2026-08-04｜小U申請審核 V2：三大驗證、條件式證件、批次補件、多通道通知與審核紀錄。
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
+// 2026-08-05｜待接任務隱私預覽：接單前僅回傳行政區、路線、收入與必要摘要。
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -5973,6 +5974,309 @@ function isRiderVisibleDispatchOrder(order) {
   );
 }
 
+// =====================================================
+// UBee 待接任務隱私預覽 V1
+// - 尚未接單只回傳判斷是否承接所需資料。
+// - 完整地址、姓名、電話、地址補充、客戶留言與取件碼不回傳。
+// - 接單／預約承接成功後，再由 current-order 或 scheduled-orders 回傳完整任務。
+// =====================================================
+function getRiderPendingAreaLabel(value, fallback = '區域待確認') {
+  const text = String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/^\d{3,5}/, '')
+    .replace(/臺/g, '台');
+
+  if (!text) {
+    return fallback;
+  }
+
+  const countyMatch = text.match(
+    /(台北市|新北市|桃園市|台中市|台南市|高雄市|基隆市|新竹市|嘉義市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義縣|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/
+  );
+
+  if (!countyMatch) {
+    return fallback;
+  }
+
+  const county = countyMatch[1];
+  const afterCounty = text.slice(
+    Number(countyMatch.index || 0) + county.length
+  );
+  const districtMatch = afterCounty.match(
+    /^(.{1,8}?(?:區|鄉|鎮|市))/
+  );
+
+  if (!districtMatch) {
+    return county;
+  }
+
+  return `${county}${districtMatch[1]}`;
+}
+
+function sanitizeRiderPendingPreviewText(value, maxLength = 160) {
+  const clean = String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\t ]+/g, ' ')
+    .replace(/09\d{8}/g, '［電話接單後顯示］')
+    .replace(/0\d{1,2}[-\s]?\d{6,8}/g, '［電話接單後顯示］')
+    .replace(/\b(?:LINE|Line|line)\s*(?:ID|Id|id)?\s*[:：]?\s*[A-Za-z0-9._-]{4,}\b/g, '［聯絡資料接單後顯示］')
+    .trim();
+
+  return clean.slice(0, Math.max(0, Number(maxLength) || 160));
+}
+
+function buildRiderPendingTaskPreview(order = {}) {
+  const status = String(order.status || '').trim();
+  const orderId = String(
+    order.id || order.orderId || order.orderNo || ''
+  ).trim().toUpperCase();
+
+  const pickupAddress =
+    order.pickupAddress ||
+    order.fromAddress ||
+    order.pickup ||
+    '';
+
+  const dropoffAddress =
+    order.dropoffAddress ||
+    order.toAddress ||
+    order.dropoff ||
+    '';
+
+  const pickupArea = getRiderPendingAreaLabel(
+    pickupAddress,
+    '取件區域待確認'
+  );
+
+  const dropoffArea = getRiderPendingAreaLabel(
+    dropoffAddress,
+    '送達區域待確認'
+  );
+
+  const pickupPoint = getOrderPickupPointForPush(order);
+  const taskDetails =
+    order.taskDetails && typeof order.taskDetails === 'object'
+      ? order.taskDetails
+      : {};
+
+  const itemName = sanitizeRiderPendingPreviewText(
+    taskDetails.itemName ||
+    order.itemName ||
+    order.item ||
+    order.goodsName ||
+    order.goodsType ||
+    order.itemType ||
+    '',
+    100
+  );
+
+  const previewTaskDetails = {
+    itemName,
+    quantity: sanitizeRiderPendingPreviewText(
+      taskDetails.quantity || order.quantity || '',
+      40
+    ),
+    weight: sanitizeRiderPendingPreviewText(
+      taskDetails.weight || order.weightText || order.weight || '',
+      40
+    ),
+    pickupPaid: String(taskDetails.pickupPaid || '').trim(),
+    replacementPolicy: String(
+      taskDetails.replacementPolicy || ''
+    ).trim(),
+    invoice: String(taskDetails.invoice || '').trim(),
+    queuePurpose: sanitizeRiderPendingPreviewText(
+      taskDetails.queuePurpose || '',
+      100
+    ),
+    queueHandoff: sanitizeRiderPendingPreviewText(
+      taskDetails.queueHandoff || '',
+      100
+    ),
+    deadline: sanitizeRiderPendingPreviewText(
+      taskDetails.deadline || '',
+      60
+    ),
+  };
+
+  const shoppingItems = Array.isArray(order.shoppingItems)
+    ? order.shoppingItems
+        .slice(0, 20)
+        .map(item => ({
+          name: sanitizeRiderPendingPreviewText(item?.name || '', 100),
+          quantity: sanitizeRiderPendingPreviewText(
+            item?.quantity || '1',
+            30
+          ),
+          budget: Number.isFinite(Number(item?.budget))
+            ? Math.max(0, Math.round(Number(item.budget)))
+            : 0,
+          replacementPolicy: String(
+            item?.replacementPolicy || ''
+          ).trim(),
+        }))
+        .filter(item => item.name)
+    : [];
+
+  const previewNote = sanitizeRiderPendingPreviewText(
+    order.riderPreviewNote ||
+    order.taskPreviewNote ||
+    order.publicTaskNote ||
+    order.publicNote ||
+    '',
+    220
+  );
+
+  return {
+    id: orderId,
+    orderId,
+    orderNo: String(order.orderNo || orderId).trim(),
+    status,
+    riderStatus: status,
+
+    // 接單前畫面只顯示行政區，不回傳門牌與聯絡資料。
+    pickupArea,
+    dropoffArea,
+    pickupAddress: pickupArea,
+    fromAddress: pickupArea,
+    pickup: pickupArea,
+    dropoffAddress: dropoffArea,
+    toAddress: dropoffArea,
+    dropoff: dropoffArea,
+
+    // 待接任務地圖只保留取件座標；送達座標接單後才回傳。
+    riderMapPickup: pickupPoint
+      ? { lat: pickupPoint.lat, lng: pickupPoint.lng }
+      : null,
+    pickupLat: pickupPoint?.lat ?? null,
+    pickupLng: pickupPoint?.lng ?? null,
+
+    createdAtMs:
+      order.createdAtMs ||
+      getDispatchPushTimeMs(order.createdAt || order.updatedAtMs || order.updatedAt) ||
+      Date.now(),
+    dispatchRadiusKm: Number(order.dispatchRadiusKm || 0),
+    skippedRiderIds: Array.isArray(order.skippedRiderIds)
+      ? order.skippedRiderIds
+      : [],
+
+    orderTimingType: String(order.orderTimingType || '').trim(),
+    timingType: String(order.timingType || '').trim(),
+    scheduleLabel: sanitizeRiderPendingPreviewText(
+      order.scheduleLabel || '',
+      80
+    ),
+    scheduledStartAtMs: order.scheduledStartAtMs || 0,
+    scheduledEndAtMs: order.scheduledEndAtMs || 0,
+    requestedScheduleAtMs: order.requestedScheduleAtMs || 0,
+    desiredCompletionAtMs: order.desiredCompletionAtMs || 0,
+
+    serviceMode: String(order.serviceMode || '').trim(),
+    serviceType: String(order.serviceType || '').trim(),
+    serviceName: sanitizeRiderPendingPreviewText(
+      order.serviceName || '',
+      80
+    ),
+    category: String(order.category || '').trim(),
+    orderType: String(order.orderType || '').trim(),
+    deliveryType: String(order.deliveryType || '').trim(),
+    speedName: sanitizeRiderPendingPreviewText(order.speedName || '', 60),
+    speedLabel: sanitizeRiderPendingPreviewText(order.speedLabel || '', 60),
+    speedType: String(order.speedType || '').trim(),
+    serviceSpeed: String(order.serviceSpeed || '').trim(),
+
+    paymentMethod: String(order.paymentMethod || '').trim(),
+    payType: String(order.payType || '').trim(),
+    paymentStatus: String(order.paymentStatus || '').trim(),
+    payStatus: String(order.payStatus || '').trim(),
+    isPaid: order.isPaid === true,
+    isCashOrder: order.isCashOrder === true,
+    merchantPaid: order.merchantPaid === true,
+    source: String(order.source || '').trim(),
+    createdFrom: String(order.createdFrom || '').trim(),
+
+    estimatedRiderIncome: Number(order.estimatedRiderIncome || 0),
+    riderIncome: Number(order.riderIncome || 0),
+    riderFee: Number(order.riderFee || 0),
+    riderEarning: Number(order.riderEarning || 0),
+    driverIncome: Number(order.driverIncome || 0),
+    courierIncome: Number(order.courierIncome || 0),
+
+    distanceText: sanitizeRiderPendingPreviewText(
+      order.distanceText || '',
+      40
+    ),
+    routeDistanceText: sanitizeRiderPendingPreviewText(
+      order.routeDistanceText || '',
+      40
+    ),
+    distanceKm: Number(order.distanceKm || 0),
+    estimatedDurationText: sanitizeRiderPendingPreviewText(
+      order.estimatedDurationText || '',
+      40
+    ),
+    durationText: sanitizeRiderPendingPreviewText(
+      order.durationText || '',
+      40
+    ),
+    routeDurationText: sanitizeRiderPendingPreviewText(
+      order.routeDurationText || '',
+      40
+    ),
+
+    itemName,
+    item: itemName,
+    itemType: sanitizeRiderPendingPreviewText(order.itemType || '', 60),
+    goodsName: itemName,
+    goodsType: sanitizeRiderPendingPreviewText(order.goodsType || '', 60),
+    quantity: previewTaskDetails.quantity,
+    weight: previewTaskDetails.weight,
+    weightText: previewTaskDetails.weight,
+    size: sanitizeRiderPendingPreviewText(order.size || '', 60),
+    taskDetails: previewTaskDetails,
+    shoppingItems,
+
+    itemSizeLabel: sanitizeRiderPendingPreviewText(
+      order.itemSizeLabel || '未申報物品體積',
+      80
+    ),
+    itemSizeFee: Math.max(0, Math.round(Number(order.itemSizeFee || 0))),
+    weatherFee: Math.max(0, Math.round(Number(order.weatherFee || 0))),
+    weatherLabel: sanitizeRiderPendingPreviewText(
+      order.weatherLabel || '天候保障費',
+      60
+    ),
+    operationalWaitingFee: Math.max(
+      0,
+      Math.round(Number(order.operationalWaitingFee || 0))
+    ),
+    advancePayment: Math.max(
+      0,
+      Math.round(Number(
+        order.advancePayment ||
+        order.advanceAmount ||
+        order.estimatedAdvancePayment ||
+        order.estimatedAdvanceAmount ||
+        order.riderAdvanceAmount ||
+        0
+      ))
+    ),
+
+    deliveryPreferences: Array.isArray(order.deliveryPreferences)
+      ? order.deliveryPreferences.slice(0, 20)
+      : [],
+    vehiclePreference: String(order.vehiclePreference || '').trim(),
+    previewNote,
+    scheduleAvailabilityMatch:
+      status === 'pending_schedule'
+        ? order.scheduleAvailabilityMatch !== false
+        : true,
+    detailsLocked: true,
+    previewDataVersion: 1,
+  };
+}
+
 // 2. 取得可接任務：手機登入正式版（V2 待接任務＋地圖取件點）
 // 支援 phone / riderId，並保留 lineUserId 相容；待接單狀態也回傳 riderMapPickup。
 app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
@@ -6048,26 +6352,15 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
         return bTime - aTime;
       })
       .slice(0, 30)
-      .map(order => {
-        const pickupPoint = getOrderPickupPointForPush(order);
-
-        return {
+      .map(order =>
+        buildRiderPendingTaskPreview({
           ...order,
-          // 騎士端待接任務地圖專用：即使尚未接單，也能可靠顯示取件點。
-          // 保留原始 pickupLat / pickupLng 與完整訂單欄位，避免破壞既有流程。
-          riderMapPickup: pickupPoint
-            ? {
-                lat: pickupPoint.lat,
-                lng: pickupPoint.lng,
-              }
-            : null,
-
           scheduleAvailabilityMatch:
             String(order.status || '').trim() === 'pending_schedule'
               ? riderMatchesScheduledOrderAvailability(rider, order)
               : true,
-        };
-      });
+        })
+      );
 
     return res.json({
       success: true,
