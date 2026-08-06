@@ -3,7 +3,7 @@
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
   "description": "UBee 跑腿用戶端：估價、下單、追蹤與管理跑腿任務。",
-  "start_url": "/order.html?source=pwa&v=20260806-13",
+  "start_url": "/order.html?source=pwa&v=20260806-14",
   "scope": "/",
   "display": "standalone",
   "display_override": [
