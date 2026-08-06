@@ -36,7 +36,7 @@
     {
       "name": "立即下單",
       "short_name": "下單",
-      "url": "/order.html?action=new&v=20260806-8",
+      "url": "/order.html?action=new",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -47,7 +47,7 @@
     {
       "name": "我的任務",
       "short_name": "任務",
-      "url": "/order.html?action=tasks&v=20260806-8",
+      "url": "/order.html?action=tasks",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
