@@ -1,43 +1,64 @@
 /* UBee 跑腿用戶端 PWA｜App 化＋即時訂單通知正式修復版
- * 版本：2026-08-06 Customer V2.3 Instant Navigation
- * 重點：
- * 1. order.html 與 install.html 使用 Network First，強制優先取得最新版本。
- * 2. Service Worker 更新後立即接管，並刪除舊版 UBee 快取。
- * 3. 靜態程式檔採 Network First；圖片與字型採 Stale While Revalidate。
- * 4. 預快取單一檔案失敗時，不會讓整個 Service Worker 安裝失敗。
+ * 版本：2026-08-06 Customer V2.3 Bottom Navigation
+ *
+ * 本版重點：
+ * 1. 與新版底部導航 order.html 統一使用 20260806-7。
+ * 2. order.html、install.html 採 Network First，優先取得最新頁面。
+ * 3. Service Worker 更新後立即接管，並刪除所有舊版 UBee 用戶端快取。
+ * 4. CSS、JavaScript、Worker、Manifest 與店家 JSON 採 Network First。
+ * 5. 圖片與字型採 Stale While Revalidate。
+ * 6. 預快取單一檔案失敗時，不會讓整個 Service Worker 安裝失敗。
+ * 7. 保留 UBee 用戶端推播與點擊通知開啟訂單功能。
  */
 
-const CACHE_NAME = 'ubee-customer-pwa-v20260806-customer-v23-instant-nav';
+'use strict';
+
+const CACHE_NAME = 'ubee-customer-pwa-v20260806-customer-v23-bottom-nav';
 const CACHE_PREFIX = 'ubee-customer-pwa-';
 const APP_VERSION = '20260806-7';
 
 const OFFLINE_URL = '/offline.html';
 const ORDER_CACHE_KEY = '/order.html';
 const INSTALL_CACHE_KEY = '/install.html';
+const MANIFEST_CACHE_KEY = '/manifest-order.json';
+const STORES_CACHE_KEY = '/stores-taichung.json';
 
 const PRECACHE_ENTRIES = [
   { url: `/order.html?v=${APP_VERSION}`, key: ORDER_CACHE_KEY },
   { url: `/install.html?v=${APP_VERSION}`, key: INSTALL_CACHE_KEY },
-  { url: `/manifest-order.json?v=${APP_VERSION}`, key: '/manifest-order.json' },
+  { url: `/manifest-order.json?v=${APP_VERSION}`, key: MANIFEST_CACHE_KEY },
   { url: OFFLINE_URL, key: OFFLINE_URL },
-  { url: `/stores-taichung.json?v=${APP_VERSION}`, key: '/stores-taichung.json' },
+  { url: `/stores-taichung.json?v=${APP_VERSION}`, key: STORES_CACHE_KEY },
   { url: '/ubee-customer-icon-192.png', key: '/ubee-customer-icon-192.png' },
   { url: '/ubee-customer-icon-512.png', key: '/ubee-customer-icon-512.png' }
 ];
 
-async function fetchFresh(request) {
-  return fetch(new Request(request, {
+function createFreshRequest(request) {
+  return new Request(request, {
     cache: 'no-store',
     credentials: request.credentials,
     redirect: request.redirect
-  }));
+  });
+}
+
+async function fetchFresh(request) {
+  return fetch(createFreshRequest(request));
 }
 
 async function putResponse(cacheKey, response) {
   if (!response || !response.ok) return;
 
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(cacheKey, response.clone());
+  } catch (error) {
+    console.warn('UBee 快取寫入失敗：', cacheKey, error);
+  }
+}
+
+async function matchCurrentCache(cacheKey) {
   const cache = await caches.open(CACHE_NAME);
-  await cache.put(cacheKey, response.clone());
+  return cache.match(cacheKey);
 }
 
 async function precacheAppShell() {
@@ -45,13 +66,16 @@ async function precacheAppShell() {
 
   await Promise.allSettled(
     PRECACHE_ENTRIES.map(async ({ url, key }) => {
-      const response = await fetch(url, { cache: 'reload' });
+      const response = await fetch(url, {
+        cache: 'reload',
+        credentials: 'same-origin'
+      });
 
       if (!response.ok) {
         throw new Error(`預快取失敗：${url}（HTTP ${response.status}）`);
       }
 
-      await cache.put(key, response);
+      await cache.put(key, response.clone());
     })
   );
 }
@@ -107,14 +131,18 @@ async function networkFirstPage(event, cacheKey) {
 
     if (networkResponse?.ok) {
       event.waitUntil(putResponse(cacheKey, networkResponse));
+      return networkResponse;
     }
+
+    const cachedPage = await matchCurrentCache(cacheKey);
+    if (cachedPage) return cachedPage;
 
     return networkResponse;
   } catch (_) {
-    const cachedPage = await caches.match(cacheKey);
+    const cachedPage = await matchCurrentCache(cacheKey);
     if (cachedPage) return cachedPage;
 
-    const offlinePage = await caches.match(OFFLINE_URL);
+    const offlinePage = await matchCurrentCache(OFFLINE_URL);
     if (offlinePage) return offlinePage;
 
     return new Response('目前無法連線，請稍後再試。', {
@@ -124,17 +152,19 @@ async function networkFirstPage(event, cacheKey) {
   }
 }
 
-async function networkFirstAsset(request) {
+async function networkFirstAsset(request, cacheKey = request) {
   try {
-    const response = await fetchFresh(request);
+    const networkResponse = await fetchFresh(request);
 
-    if (response?.ok) {
-      await putResponse(request, response);
+    if (networkResponse?.ok) {
+      await putResponse(cacheKey, networkResponse);
+      return networkResponse;
     }
 
-    return response;
+    const cachedResponse = await matchCurrentCache(cacheKey);
+    return cachedResponse || networkResponse;
   } catch (_) {
-    const cachedResponse = await caches.match(request);
+    const cachedResponse = await matchCurrentCache(cacheKey);
     return cachedResponse || Response.error();
   }
 }
@@ -143,13 +173,16 @@ async function staleWhileRevalidate(event) {
   const request = event.request;
   const cachedResponsePromise = caches.match(request);
 
-  const networkResponsePromise = fetch(request, { cache: 'no-cache' })
-    .then(async response => {
-      if (response?.ok) {
-        await putResponse(request, response);
-      }
-      return response;
-    });
+  const networkResponsePromise = fetch(request, {
+    cache: 'no-cache',
+    credentials: 'same-origin'
+  }).then(async response => {
+    if (response?.ok) {
+      await putResponse(request, response);
+    }
+
+    return response;
+  });
 
   event.waitUntil(networkResponsePromise.catch(() => {}));
 
@@ -191,6 +224,16 @@ self.addEventListener('fetch', event => {
       return;
     }
 
+    return;
+  }
+
+  if (requestUrl.pathname === '/stores-taichung.json') {
+    event.respondWith(networkFirstAsset(request, STORES_CACHE_KEY));
+    return;
+  }
+
+  if (requestUrl.pathname === '/manifest-order.json') {
+    event.respondWith(networkFirstAsset(request, MANIFEST_CACHE_KEY));
     return;
   }
 
