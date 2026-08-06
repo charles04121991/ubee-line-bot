@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260806-8" rel="manifest"/>
+<link href="/manifest-order.json?v=20260806-9" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 V2.4：2026-08-06｜正式導航狀態單一化＋舊返回歷史移除＋非同步切頁防回跳 -->
+<!-- UBee 用戶端 V2.5：2026-08-06｜單一導航狀態來源＋頁面模組禁止覆寫＋初始跳頁可取消 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -14811,12 +14811,18 @@ function handleInitialOpenAction(){
   if(!action) return;
 
   initialOpenActionHandled = true;
-  setTimeout(() => {
-    if(action === 'task') return window.openUBeeTaskPage?.();
-    if(action === 'store') return window.openUBeeStorePage?.();
-    if(action === 'my') return window.openUBeeProfilePage?.();
-    return window.openUBeeHomePage?.() || showHomeTab();
-  },120);
+  window.__UBEE_PENDING_INITIAL_NAV__=action;
+
+  if(window.UBeePrimaryNavigation?.open){
+    window.UBeePrimaryNavigation.open(action,{source:'initial-url'});
+    window.__UBEE_PENDING_INITIAL_NAV__='';
+    return;
+  }
+
+  if(action === 'task') return window.openUBeeTaskPage?.();
+  if(action === 'store') return window.openUBeeStorePage?.();
+  if(action === 'my') return window.openUBeeProfilePage?.();
+  return window.openUBeeHomePage?.() || showHomeTab();
 }
 
 function showProfileTab(){
@@ -20132,16 +20138,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     state.page=name;
     if(!['stores','storeDetail'].includes(name)) document.body.classList.remove('ubee-store-active');
     root.querySelectorAll('.flow-page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
-    const isProfile=name==='profile'||name==='profileDetail';
-    const homeNav=$('flowNavHome');
-    const taskNav=$('flowNavTasks');
-    const myNav=$('flowNavMy');
-    homeNav?.classList.toggle('active',!isProfile);
-    taskNav?.classList.remove('active');
-    myNav?.classList.toggle('active',isProfile);
-    homeNav?.toggleAttribute('aria-current',!isProfile);
-    taskNav?.removeAttribute('aria-current');
-    myNav?.toggleAttribute('aria-current',isProfile);
     const scroller=root.querySelector(`.flow-page[data-page="${name}"] .flow-scroll`);
     if(scroller)scroller.scrollTop=0;
   }
@@ -20929,7 +20925,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-8';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-9';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22148,13 +22144,9 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   }
 
   function markBottomNav(mode){
-    const targetId={home:'flowNavHome',task:'flowNavTasks',store:'flowNavStores',my:'flowNavMy'}[mode]||'flowNavHome';
-    document.querySelectorAll('#ubeePersistentBottomNav > button').forEach(button=>{
-      const active=button.id===targetId;
-      button.classList.toggle('active',active);
-      if(active) button.setAttribute('aria-current','page');
-      else button.removeAttribute('aria-current');
-    });
+    const target=['home','task','store','my'].includes(mode)?mode:'home';
+    window.__UBEE_PENDING_NAV_TARGET__=target;
+    window.__UBEE_SET_NAV_ACTIVE__?.(target);
   }
 
   function showMyRoot(options={}){
@@ -24134,17 +24126,11 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
   }
 
   function markStoreNavigation(){
-    document.querySelectorAll('#ubeePersistentBottomNav > button').forEach(button=>{
-      const active=button.id==='flowNavStores';
-      button.classList.toggle('active',active);
-      if(active) button.setAttribute('aria-current','page');
-      else button.removeAttribute('aria-current');
-    });
+    window.__UBEE_PENDING_NAV_TARGET__='store';
+    window.__UBEE_SET_NAV_ACTIVE__?.('store');
   }
 
   function clearStoreNavigation(){
-    $('flowNavStores')?.classList.remove('active');
-    $('flowNavStores')?.removeAttribute('aria-current');
     document.body.classList.remove('ubee-store-active');
   }
 
@@ -24216,7 +24202,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     if(storeState.catalogLoaded&&!force){applyLocalFilters();return;}
     storeState.loading=true;renderStores();
     try{
-      const response=await fetch('/stores-taichung.json?v=20260806-8',{cache:'force-cache'});
+      const response=await fetch('/stores-taichung.json?v=20260806-9',{cache:'no-store'});
       if(!response.ok)throw new Error(`本地店家目錄讀取失敗（HTTP ${response.status}）`);
       const payload=await response.json();
       const rows=Array.isArray(payload)?payload:Array.isArray(payload?.stores)?payload.stores:[];
@@ -24474,19 +24460,26 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
 
 
 
-<script id="ubee-bottom-navigation-controller-v24">
+<script id="ubee-bottom-navigation-controller-v25">
 (() => {
   'use strict';
-  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V24__) return;
-  window.__UBEE_BOTTOM_NAV_CONTROLLER_V24__=true;
+  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V25__) return;
+  window.__UBEE_BOTTOM_NAV_CONTROLLER_V25__=true;
 
   const targetToId={home:'flowNavHome',task:'flowNavTasks',store:'flowNavStores',my:'flowNavMy'};
   let navigation=null;
   let navigationToken=0;
   let activeTarget='home';
+  let userHasNavigated=false;
+
+  function normalizeTarget(target){
+    return targetToId[target]?target:'home';
+  }
 
   function setActive(target){
-    activeTarget=targetToId[target]?target:'home';
+    activeTarget=normalizeTarget(target);
+    window.__UBEE_PENDING_NAV_TARGET__=activeTarget;
+    if(document.body) document.body.dataset.ubeePrimaryNav=activeTarget;
     const activeId=targetToId[activeTarget];
     navigation?.querySelectorAll(':scope > button').forEach(button=>{
       const active=button.id===activeId;
@@ -24495,6 +24488,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
       else button.removeAttribute('aria-current');
     });
   }
+
   window.__UBEE_SET_NAV_ACTIVE__=setActive;
   window.__UBEE_GET_NAV_TARGET__=()=>activeTarget;
 
@@ -24502,30 +24496,36 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     if(target!=='task') window.__UBEE_CANCEL_TASK_OPEN__?.();
   }
 
-  async function openTarget(target,token){
+  async function openTarget(target){
     if(target==='home'){
       return window.openUBeeHomePage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-navigation'});
     }
     if(target==='task') return window.openUBeeTaskPage?.();
     if(target==='store') return window.openUBeeStorePage?.();
-    if(target==='my') return window.openUBeeProfilePage?.();
+    if(target==='my') return window.openUBeeProfilePage?.({navMode:'my'});
   }
 
-  async function navigate(target){
-    if(!targetToId[target]) target='home';
+  async function navigate(target,options={}){
+    target=normalizeTarget(target);
+    if(options.source!=='initial-url') userHasNavigated=true;
     const token=++navigationToken;
     cancelPendingNavigation(target);
     setActive(target);
 
     try{
-      await Promise.resolve(openTarget(target,token));
+      await Promise.resolve(openTarget(target));
     }catch(error){
       console.warn('UBee 底部導航切換失敗：',error);
     }
 
     if(token===navigationToken) setActive(target);
   }
-  window.UBeePrimaryNavigation=Object.freeze({open:navigate,getCurrent:()=>activeTarget});
+
+  window.UBeePrimaryNavigation=Object.freeze({
+    open:navigate,
+    getCurrent:()=>activeTarget,
+    hasUserNavigated:()=>userHasNavigated
+  });
 
   function scrollCurrentPageToTop(){
     const scroller=document.querySelector(
@@ -24544,9 +24544,10 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     event.preventDefault();
     event.stopPropagation();
 
-    const target=button.dataset.navTarget||'home';
+    const target=normalizeTarget(button.dataset.navTarget||'home');
+    window.__UBEE_PENDING_INITIAL_NAV__='';
     if(target===activeTarget) scrollCurrentPageToTop();
-    navigate(target);
+    navigate(target,{source:'user'});
   }
 
   function onPointerDown(event){
@@ -24560,25 +24561,12 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     navigation?.querySelectorAll('.ubee-nav-pressed').forEach(item=>item.classList.remove('ubee-nav-pressed'));
   }
 
-  function detectVisibleTarget(){
-    if(document.body.classList.contains('ubee-store-active')) return 'store';
-    if(document.body.classList.contains('ubee-active-order')) return 'task';
-    if(document.body.classList.contains('ubee-my-subpage-open')){
-      return document.getElementById('flowNavTasks')?.classList.contains('active')?'task':'my';
-    }
-    const activePage=document.querySelector('#productionOrderFlow .flow-page.active')?.dataset.page||'';
-    if(activePage==='stores'||activePage==='storeDetail') return 'store';
-    if(activePage==='profile'||activePage==='profileDetail') return 'my';
-    return 'home';
-  }
-
   function mount(){
     const existing=document.getElementById('ubeePersistentBottomNav');
     if(!existing||!document.body) return;
 
-    /* 用乾淨複本取代舊節點，徹底移除所有舊版導航監聽器。 */
     const clean=existing.cloneNode(true);
-    clean.dataset.ubeeNavController='v24';
+    clean.dataset.ubeeNavController='v25';
     existing.replaceWith(clean);
     navigation=clean;
 
@@ -24589,7 +24577,14 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
       navigation.addEventListener(type,()=>setTimeout(clearPressed,45),{passive:true});
     });
 
-    setActive(detectVisibleTarget());
+    const pending=normalizeTarget(window.__UBEE_PENDING_NAV_TARGET__||'home');
+    setActive(pending);
+
+    const initial=window.__UBEE_PENDING_INITIAL_NAV__;
+    if(initial&&!userHasNavigated){
+      window.__UBEE_PENDING_INITIAL_NAV__='';
+      navigate(initial,{source:'initial-url'});
+    }
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',mount,{once:true});
@@ -24597,7 +24592,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
 
   window.addEventListener('pageshow',()=>{
     clearPressed();
-    setActive(detectVisibleTarget());
+    setActive(document.body?.dataset.ubeePrimaryNav||activeTarget);
   });
 })();
 </script>
