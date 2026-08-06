@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260806-9" rel="manifest"/>
+<link href="/manifest-order.json?v=20260806-10" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 V2.5：2026-08-06｜單一導航狀態來源＋頁面模組禁止覆寫＋初始跳頁可取消 -->
+<!-- UBee 用戶端 V2.6：2026-08-06｜首頁、任務、店家、我的四大獨立頁＋全域返回箭頭移除＋舊導航殘留刪除 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -130,7 +130,7 @@
     1px solid var(--line);
 }
 
-/* 左側 Logo / 返回按鈕 */
+/* 中央 UBee 品牌 */
 
 .topbar-left{
   grid-column:2;
@@ -144,17 +144,6 @@
   min-width:0;
 }
 
-.topbar-left .icon-btn{
-  flex:0 0 42px;
-
-  margin-right:6px;
-}
-
-/* 首頁不需要返回按鈕時，完全不佔位置 */
-
-.icon-btn.ghost{
-  display:none;
-}
 
 /* UBee Logo */
 
@@ -9798,13 +9787,8 @@ body.ubee-app-starting{
 </script>
 <div class="app">
 <div class="topbar" id="globalTopbar">
-<!-- 左側：返回按鈕 + UBee Logo -->
+<!-- 中央 UBee 品牌；四大主頁不提供返回按鈕 -->
 <div class="topbar-left">
-<button aria-label="返回" class="icon-btn ghost" id="topbarBackBtn" onclick="goPrev()" type="button">
-<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24">
-<path d="M15 18l-6-6 6-6"></path>
-</svg>
-</button>
 <div class="brand-wrap">
 <div class="brand">
 <span>U</span>Bee
@@ -14521,14 +14505,6 @@ function hideCustomerPages(){
   document.querySelectorAll('.app-section').forEach(s => s.classList.remove('active'));
 }
 
-function setBottomTabActive(activeId){
-  document.querySelectorAll('#ubeePersistentBottomNav > button').forEach(btn=>{
-    const active=btn.id===activeId;
-    btn.classList.toggle('active',active);
-    btn.toggleAttribute('aria-current',active);
-    if(active) btn.setAttribute('aria-current','page');
-  });
-}
 
 function hideFooterButtons(){
 
@@ -14563,14 +14539,6 @@ function showOnlyStep(step){
     .add('active');
 
 
-  qs('topbarBackBtn')
-    ?.classList
-    .toggle(
-      'ghost',
-      step === 1 ||
-      step === 5
-    );
-
 
   const footerNav =
     qs('footerNav');
@@ -14597,9 +14565,7 @@ function showOnlyStep(step){
     );
 
 
-  setBottomTabActive(
-    step === 5 ? 'flowNavTasks' : 'flowNavHome'
-  );
+  window.UBeePrimaryNavigation?.activate(step === 5 ? 'task' : 'home');
 
 
   window.scrollTo(0,0);
@@ -19858,6 +19824,19 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 </div>
 </section>
+<section class="flow-page ubee-primary-task-page" data-page="tasksRoot" id="flowPageTasksRoot">
+<header class="flow-header home ubee-primary-page-header">
+<div class="flow-title-wrap"><div class="flow-title">任務</div><div class="flow-subtitle">查看進行中與歷史跑腿任務</div></div>
+<span></span>
+<button aria-label="LINE 官方客服" class="flow-icon-btn" data-ubee-line-support title="LINE 官方客服" type="button"><svg aria-hidden="true" class="ubee-line-support-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#06C755"/><path fill="#fff" d="M18.3 11.2c0-3.1-2.9-5.6-6.4-5.6s-6.4 2.5-6.4 5.6c0 2.8 2.4 5.1 5.6 5.5.2 0 .5.1.5.3.1.2 0 .6 0 .8l-.1.7c0 .2-.2.9.8.5s5.2-3.1 7.1-5.3c1.3-1.4 1.9-2.8 1.9-4.5Z"/></svg></button>
+</header>
+<div class="flow-scroll ubee-primary-task-scroll">
+<section class="ubee-primary-task-shell">
+<div class="ubee-primary-task-heading"><div><small>UBee 跑腿</small><strong>我的任務</strong><span>點選任務可查看完整內容與目前狀態。</span></div><button class="flow-text-link" hidden="" id="flowOpenActiveOrder" type="button">查看進行中任務</button></div>
+<div class="flow-profile-list" id="flowProfileTasksList"><div class="flow-empty">正在讀取任務…</div></div>
+</section>
+</div>
+</section>
 <section class="flow-page ubee-my-page" data-page="profile" id="flowPageProfile">
 <div class="ubee-my-scroll">
 <div class="ubee-my-top-actions">
@@ -19910,11 +19889,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 </section>
 <section class="ubee-my-group ubee-my-settings-group"><h3>設定</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="settings" type="button"><span>設定</span><span aria-hidden="true">›</span></button></div></section></div>
-<section class="ubee-my-panel" hidden="" id="ubeeMyOrdersPanel">
-<div class="ubee-my-panel-head"><strong>我的訂單</strong><button data-my-close="" type="button">關閉</button></div>
-<button class="flow-text-link" hidden="" id="flowOpenActiveOrder" type="button">查看進行中任務</button>
-<div class="flow-profile-list" id="flowProfileTasksList"><div class="flow-empty">正在讀取訂單…</div></div>
-</section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyAddressesPanel">
 <div class="ubee-my-panel-head"><strong>常用地址</strong><button data-my-close="" type="button">關閉</button></div>
 <div class="flow-profile-list" id="flowProfileAddressesList"><div class="flow-empty">正在讀取常用地址…</div></div>
@@ -20733,6 +20707,16 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   function openProfileOrderDetail(index){
     const order=state.profileOrders[Number(index)];
     if(!order)return;
+    const returnPage=state.page==='tasksRoot'?'tasksRoot':'profile';
+    state.profileDetailReturnPage=returnPage;
+    root.querySelectorAll('#flowPageProfileDetail [data-go]').forEach(button=>{
+      button.dataset.go=returnPage;
+      if(button.classList.contains('flow-back-btn')){
+        button.setAttribute('aria-label',returnPage==='tasksRoot'?'返回任務':'返回我的');
+      }else{
+        button.textContent=returnPage==='tasksRoot'?'返回任務':'返回我的';
+      }
+    });
     state.selectedProfileOrder=order;
     const amountInfo=orderAmountInfo(order);
     $('flowProfileDetailTitle').textContent=profileOrderTitle(order);
@@ -20760,12 +20744,38 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     showPage('profileDetail');
   }
 
+  async function renderTaskList(){
+    const list=$('flowProfileTasksList');
+    if(!list) return;
+    list.innerHTML='<div class="flow-empty">正在讀取任務…</div>';
+    try{
+      if(typeof loadCustomerOrders!=='function') throw new Error('任務資料尚未載入');
+      const orders=await loadCustomerOrders();
+      const recent=Array.isArray(orders)?orders.slice(0,100):[];
+      state.profileOrders=recent;
+      list.innerHTML=recent.length?recent.map((order,index)=>{
+        const amountInfo=orderAmountInfo(order);
+        const amountText=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
+        return `<div class="flow-profile-task-card" role="button" tabindex="0" data-profile-order-index="${index}"><div class="flow-profile-task-head"><div class="flow-profile-task-title"><strong>${escapeHtml(profileOrderTitle(order))}</strong><small>${escapeHtml(orderTimeText(order)||'任務時間確認中')}</small></div><span class="flow-profile-task-status">${escapeHtml(orderStatusText(order.status))}</span></div><div class="flow-profile-task-footer"><div class="flow-profile-task-amount"><small>${escapeHtml(amountInfo.label)}</small><strong>${escapeHtml(amountText)}</strong></div><button class="flow-profile-detail-btn" type="button" data-profile-order-index="${index}">詳細資訊</button></div></div>`;
+      }).join(''):'<div class="flow-empty">目前還沒有任務</div>';
+    }catch(error){
+      console.warn('UBee 任務清單讀取失敗：',error);
+      list.innerHTML='<div class="flow-empty">任務暫時無法讀取，請稍後再試。</div>';
+    }
+  }
+
+  async function renderTaskRoot(){
+    showPage('tasksRoot');
+    const activeButton=$('flowOpenActiveOrder');
+    if(activeButton) activeButton.hidden=!activeOrder();
+    await renderTaskList();
+  }
+
   async function renderProfile(){
     showPage('profile');
     const displayName=String(currentCustomer?.name || '').trim();
     $('flowProfileName').textContent=displayName||'UBee 客戶';
-    $('flowProfileSubtext').textContent='任務與常用資料集中在這裡';
-    $('flowOpenActiveOrder').hidden=!activeOrder();
+    $('flowProfileSubtext').textContent='會員、常用資料與設定集中在這裡';
     await loadAddresses();
     renderProfileAddressList();
     try{
@@ -20775,18 +20785,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
         $('flowProfileLevel').textContent=typeof getMemberLevelText==='function'?getMemberLevelText(stats?.taskCount||0):'一般';
       }
     }catch(error){console.warn('讀取會員統計失敗：',error)}
-    const list=$('flowProfileTasksList');
-    try{
-      if(typeof loadCustomerOrders!=='function')throw new Error('任務資料尚未載入');
-      const orders=await loadCustomerOrders();
-      const recent=Array.isArray(orders)?orders.slice(0,100):[];
-      state.profileOrders=recent;
-      list.innerHTML=recent.length?recent.map((order,index)=>{
-        const amountInfo=orderAmountInfo(order);
-        const amountText=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
-        return `<div class="flow-profile-task-card" role="button" tabindex="0" data-profile-order-index="${index}"><div class="flow-profile-task-head"><div class="flow-profile-task-title"><strong>${escapeHtml(profileOrderTitle(order))}</strong><small>${escapeHtml(orderTimeText(order)||'任務時間確認中')}</small></div><span class="flow-profile-task-status">${escapeHtml(orderStatusText(order.status))}</span></div><div class="flow-profile-task-footer"><div class="flow-profile-task-amount"><small>${escapeHtml(amountInfo.label)}</small><strong>${escapeHtml(amountText)}</strong></div><button class="flow-profile-detail-btn" type="button" data-profile-order-index="${index}">詳細資訊</button></div></div>`;
-      }).join(''):'<div class="flow-empty">目前還沒有最近任務</div>';
-    }catch(error){list.innerHTML='<div class="flow-empty">最近任務暫時無法讀取</div>'}
   }
 
   async function detectLocation(){
@@ -20850,6 +20848,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }
   }
   window.openUBeeHomePage=function(){
+    window.UBeePrimaryNavigation?.activate('home');
     document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
     root.classList.add('active');
     document.body.classList.add('flow-active');
@@ -20857,7 +20856,22 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     return true;
   };
   window.showHomeTab=window.openUBeeHomePage;
-  window.openUBeeProfilePage=function(){root.classList.add('active');document.body.classList.add('flow-active');renderProfile();return true};
+  window.openUBeeTaskRoot=async function(){
+    window.UBeePrimaryNavigation?.activate('task');
+    document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
+    root.classList.add('active');
+    document.body.classList.add('flow-active');
+    await renderTaskRoot();
+    return true;
+  };
+  window.openUBeeProfilePage=function(){
+    window.UBeePrimaryNavigation?.activate('my');
+    document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
+    root.classList.add('active');
+    document.body.classList.add('flow-active');
+    renderProfile();
+    return true;
+  };
   window.showProfileTab=window.openUBeeProfilePage;
   window.showCustomerSubPage=window.openUBeeProfilePage;
   window.openUBeeSystemOrderFlow=(options={})=>
@@ -20925,7 +20939,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-9';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-10';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21762,20 +21776,63 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       padding:0 10px !important;
     }
   }
+
+  #productionOrderFlow .ubee-primary-page-header{
+    grid-template-columns:minmax(0,1fr) auto!important;
+  }
+  #productionOrderFlow .ubee-primary-task-scroll{
+    padding:14px 14px calc(104px + env(safe-area-inset-bottom))!important;
+  }
+  #productionOrderFlow .ubee-primary-task-shell{
+    width:100%;
+    min-height:calc(100dvh - 190px);
+  }
+  #productionOrderFlow .ubee-primary-task-heading{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:14px;
+    margin:2px 0 16px;
+    padding:16px;
+    border:1px solid #e6e7e9;
+    border-radius:18px;
+    background:#fff;
+  }
+  #productionOrderFlow .ubee-primary-task-heading small,
+  #productionOrderFlow .ubee-primary-task-heading strong,
+  #productionOrderFlow .ubee-primary-task-heading span{
+    display:block;
+  }
+  #productionOrderFlow .ubee-primary-task-heading small{
+    color:#8b8f94;
+    font-size:11px;
+    font-weight:900;
+  }
+  #productionOrderFlow .ubee-primary-task-heading strong{
+    margin-top:3px;
+    color:#111;
+    font-size:22px;
+    font-weight:1000;
+  }
+  #productionOrderFlow .ubee-primary-task-heading span{
+    margin-top:5px;
+    color:#73787e;
+    font-size:12px;
+    font-weight:800;
+    line-height:1.55;
+  }
 </style>
 <script id="ubee-app-settings-controller">
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.06.7';
+  const APP_VERSION = '2026.08.06.10';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
 
-  const TERMINAL_STATUSES = new Set(['completed','done','cancelled','canceled']);
   const panelMap = Object.freeze({
     account:'ubeeMyAccountPanel',
-    orders:'ubeeMyOrdersPanel',
     coupons:'ubeeMyCouponsPanel',
     addresses:'ubeeMyAddressesPanel',
     notifications:'ubeeMyNotificationsPanel',
@@ -21864,39 +21921,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }catch(_){
       return null;
     }
-  }
-
-  function getMemoryOrder(){
-    try{
-      return typeof currentOrderData !== 'undefined' && currentOrderData
-        ? currentOrderData
-        : null;
-    }catch(_){
-      return null;
-    }
-  }
-
-  function getMemoryOrderId(){
-    try{
-      const memory = typeof currentOrderId !== 'undefined' ? currentOrderId : '';
-      return safeText(memory || localStorage.getItem('ubee_current_order_id')).toUpperCase();
-    }catch(_){
-      return '';
-    }
-  }
-
-  function orderIdOf(order){
-    return safeText(order?.id || order?.orderId || order?.orderNo).toUpperCase();
-  }
-
-  function orderStatusOf(order){
-    return safeText(order?.status || order?.riderStatus).toLowerCase();
-  }
-
-  function isActiveOrder(order){
-    const id = orderIdOf(order);
-    const status = orderStatusOf(order);
-    return Boolean(id && status) && !TERMINAL_STATUSES.has(status);
   }
 
   function applyPreferences(){
@@ -22143,15 +22167,10 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }
   }
 
-  function markBottomNav(mode){
-    const target=['home','task','store','my'].includes(mode)?mode:'home';
-    window.__UBEE_PENDING_NAV_TARGET__=target;
-    window.__UBEE_SET_NAV_ACTIVE__?.(target);
-  }
 
-  function showMyRoot(options={}){
+  function showMyRoot(){
     try{
-      window.openUBeeProfilePage?.(options);
+      window.openUBeeProfilePage?.();
     }catch(error){
       console.warn('UBee 我的頁面開啟失敗：',error);
     }
@@ -22159,11 +22178,18 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function returnToMyRoot(){
     closeMySubPages();
-    markBottomNav('my');
   }
 
-  function openMySection(action, options = {}){
+  function openMySection(action){
     const normalized = safeText(action).toLowerCase();
+    if(normalized === 'orders'){
+      if(window.UBeePrimaryNavigation?.open){
+        window.UBeePrimaryNavigation.open('task',{source:'my-orders'});
+      }else{
+        window.openUBeeTaskPage?.();
+      }
+      return true;
+    }
     if(normalized === 'support'){
       window.openUBeeOfficialAccount?.();
       return true;
@@ -22178,7 +22204,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       return true;
     }
 
-    showMyRoot({navMode:options.fromTask?'task':'my'});
+    showMyRoot();
     preparePanels();
     closeMySubPages();
 
@@ -22194,113 +22220,12 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     currentMySection = normalized;
     root.setAttribute('data-my-section',normalized);
     document.body.classList.add('ubee-my-subpage-open');
-    markBottomNav(options.fromTask ? 'task' : 'my');
     requestAnimationFrame(() => panel.classList.add('is-open'));
 
     if(normalized === 'settings'){
       refreshEnvironmentStatus();
     }
 
-    return true;
-  }
-
-  async function fetchActiveOrders(){
-    try{
-      if(typeof customerApiFetch === 'function'){
-        const data = await customerApiFetch('/api/customer/orders?status=active&limit=20');
-        return {
-          verified:true,
-          orders:Array.isArray(data?.orders) ? data.orders : []
-        };
-      }
-      const response = await fetch('/api/customer/orders?status=active&limit=20',{
-        credentials:'include',
-        cache:'no-store',
-        headers:{Accept:'application/json'}
-      });
-      const data = await response.json().catch(() => ({}));
-      if(!response.ok) throw new Error(data.message || data.error || '任務資料讀取失敗');
-      return {
-        verified:true,
-        orders:Array.isArray(data?.orders) ? data.orders : []
-      };
-    }catch(error){
-      console.warn('UBee 進行中任務查詢失敗：',error);
-      return {verified:false,orders:[],error};
-    }
-  }
-
-  async function resolveActiveOrder(){
-    const memoryOrder = getMemoryOrder();
-    if(isActiveOrder(memoryOrder)) return {order:memoryOrder,verified:true};
-
-    const result = await fetchActiveOrders();
-    const active = result.orders.find(isActiveOrder) || null;
-    if(active) return {order:active,verified:true};
-
-    const cachedId = getMemoryOrderId();
-    if(!result.verified && cachedId){
-      try{
-        const response = await fetch(`/api/customer/orders/${encodeURIComponent(cachedId)}/tracking?t=${Date.now()}`,{
-          credentials:'include',
-          cache:'no-store',
-          headers:{Accept:'application/json'}
-        });
-        const data = await response.json().catch(() => ({}));
-        const tracking = data.tracking || data.order || null;
-        if(response.ok && tracking && isActiveOrder({...tracking,id:tracking.id || cachedId})){
-          return {order:{...tracking,id:tracking.id || cachedId},verified:true};
-        }
-      }catch(error){
-        console.warn('UBee 快取任務追蹤確認失敗：',error);
-      }
-    }
-
-    if(result.verified){
-      localStorage.removeItem('ubee_current_order_id');
-      try{
-        if(typeof currentOrderId !== 'undefined') currentOrderId = '';
-        if(typeof currentOrderData !== 'undefined') currentOrderData = null;
-      }catch(_){ }
-    }
-
-    return {order:null,verified:result.verified,error:result.error};
-  }
-
-  function openTrackedOrder(order){
-    const id = orderIdOf(order);
-    if(!id) return false;
-
-    closeMySubPages();
-    root.classList.remove('active');
-    document.body.classList.remove('flow-active','ubee-my-subpage-open');
-
-    try{
-      if(typeof currentOrderId !== 'undefined') currentOrderId = id;
-      if(typeof currentOrderData !== 'undefined') currentOrderData = {...order,id};
-    }catch(_){ }
-    localStorage.setItem('ubee_current_order_id',id);
-
-    try{ if(typeof setOrderNo === 'function') setOrderNo(id); }catch(_){ }
-    try{
-      if(typeof showOnlyStep === 'function') showOnlyStep(5);
-      else window.showOnlyStep?.(5);
-    }catch(error){
-      console.warn('UBee 任務追蹤頁顯示失敗：',error);
-    }
-    try{
-      if(typeof renderTimeline === 'function'){
-        renderTimeline(orderStatusOf(order) || 'pending_payment',{...order,id});
-      }
-    }catch(error){
-      console.warn('UBee 任務進度顯示失敗：',error);
-    }
-    try{
-      if(typeof startOrderListener === 'function') startOrderListener(id);
-    }catch(error){
-      console.warn('UBee 任務即時同步啟動失敗：',error);
-    }
-    markBottomNav('task');
     return true;
   }
 
@@ -22314,7 +22239,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   }
 
   async function openTaskPage(){
-    const requestToken = ++taskRequestToken;
+    const requestToken=++taskRequestToken;
 
     if(!getCurrentCustomerSafe()){
       root.classList.remove('active');
@@ -22325,27 +22250,13 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
     setTaskBusy(true);
     closeMySubPages();
-    markBottomNav('task');
-
-    /* 每次點擊任務都先回到任務根頁；不保留上一次開啟的子頁或舊選擇。 */
-    openMySection('orders',{fromTask:true});
-    await new Promise(resolve=>requestAnimationFrame(resolve));
 
     try{
-      const result = await resolveActiveOrder();
-      const currentTarget = window.__UBEE_GET_NAV_TARGET__?.();
-      if(requestToken !== taskRequestToken || currentTarget !== 'task') return true;
-
-      if(result.order){
-        return openTrackedOrder(result.order);
-      }
-
-      if(!result.verified){
-        setSettingsStatus('目前無法確認進行中任務，已先開啟訂單清單。','error');
-      }
+      await window.openUBeeTaskRoot?.();
+      if(requestToken!==taskRequestToken) return true;
       return true;
     }finally{
-      if(requestToken === taskRequestToken) setTaskBusy(false);
+      if(requestToken===taskRequestToken) setTaskBusy(false);
     }
   }
 
@@ -22716,16 +22627,11 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     card.click();
   });
 
-  document.addEventListener('click',event => {
-    if(!event.target.closest('#flowPageProfileDetail [data-go="profile"]')) return;
-    setTimeout(() => openMySection('orders'),0);
-  });
 
   const previousProfilePage = window.openUBeeProfilePage;
   if(typeof previousProfilePage === 'function'){
-    window.openUBeeProfilePage = function(options={}){
+    window.openUBeeProfilePage = function(){
       closeMySubPages();
-      markBottomNav(options?.navMode === 'task' ? 'task' : 'my');
       return previousProfilePage.apply(this,arguments);
     };
     window.showProfileTab = window.openUBeeProfilePage;
@@ -24125,10 +24031,6 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     setButtonIcon($('flowNavMy'),navIcons.profile,'我的');
   }
 
-  function markStoreNavigation(){
-    window.__UBEE_PENDING_NAV_TARGET__='store';
-    window.__UBEE_SET_NAV_ACTIVE__?.('store');
-  }
 
   function clearStoreNavigation(){
     document.body.classList.remove('ubee-store-active');
@@ -24139,7 +24041,6 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     document.body.classList.remove('ubee-active-order','ubee-customer-auth-open');
     document.body.classList.add('flow-active','ubee-store-active');
     root.querySelectorAll('.flow-page').forEach(item=>item.classList.toggle('active',item.dataset.page===page));
-    markStoreNavigation();
     const scroller=root.querySelector(`.flow-page[data-page="${page}"] .flow-scroll`);
     if(scroller)scroller.scrollTop=0;
   }
@@ -24202,7 +24103,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     if(storeState.catalogLoaded&&!force){applyLocalFilters();return;}
     storeState.loading=true;renderStores();
     try{
-      const response=await fetch('/stores-taichung.json?v=20260806-9',{cache:'no-store'});
+      const response=await fetch('/stores-taichung.json?v=20260806-10',{cache:'no-store'});
       if(!response.ok)throw new Error(`本地店家目錄讀取失敗（HTTP ${response.status}）`);
       const payload=await response.json();
       const rows=Array.isArray(payload)?payload:Array.isArray(payload?.stores)?payload.stores:[];
@@ -24353,6 +24254,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
   }
 
   function openStoreList(){
+    window.UBeePrimaryNavigation?.activate('store');
     activateStorePage('stores');
     renderCategories();
     loadLocalCatalog();
@@ -24460,11 +24362,11 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
 
 
 
-<script id="ubee-bottom-navigation-controller-v25">
+<script id="ubee-bottom-navigation-controller-v26">
 (() => {
   'use strict';
-  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V25__) return;
-  window.__UBEE_BOTTOM_NAV_CONTROLLER_V25__=true;
+  if(window.__UBEE_BOTTOM_NAV_CONTROLLER_V26__) return;
+  window.__UBEE_BOTTOM_NAV_CONTROLLER_V26__=true;
 
   const targetToId={home:'flowNavHome',task:'flowNavTasks',store:'flowNavStores',my:'flowNavMy'};
   let navigation=null;
@@ -24478,7 +24380,6 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
 
   function setActive(target){
     activeTarget=normalizeTarget(target);
-    window.__UBEE_PENDING_NAV_TARGET__=activeTarget;
     if(document.body) document.body.dataset.ubeePrimaryNav=activeTarget;
     const activeId=targetToId[activeTarget];
     navigation?.querySelectorAll(':scope > button').forEach(button=>{
@@ -24489,8 +24390,6 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     });
   }
 
-  window.__UBEE_SET_NAV_ACTIVE__=setActive;
-  window.__UBEE_GET_NAV_TARGET__=()=>activeTarget;
 
   function cancelPendingNavigation(target){
     if(target!=='task') window.__UBEE_CANCEL_TASK_OPEN__?.();
@@ -24523,6 +24422,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
 
   window.UBeePrimaryNavigation=Object.freeze({
     open:navigate,
+    activate:setActive,
     getCurrent:()=>activeTarget,
     hasUserNavigated:()=>userHasNavigated
   });
@@ -24566,7 +24466,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     if(!existing||!document.body) return;
 
     const clean=existing.cloneNode(true);
-    clean.dataset.ubeeNavController='v25';
+    clean.dataset.ubeeNavController='v26';
     existing.replaceWith(clean);
     navigation=clean;
 
@@ -24577,8 +24477,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
       navigation.addEventListener(type,()=>setTimeout(clearPressed,45),{passive:true});
     });
 
-    const pending=normalizeTarget(window.__UBEE_PENDING_NAV_TARGET__||'home');
-    setActive(pending);
+    setActive(normalizeTarget(document.body.dataset.ubeePrimaryNav||'home'));
 
     const initial=window.__UBEE_PENDING_INITIAL_NAV__;
     if(initial&&!userHasNavigated){
