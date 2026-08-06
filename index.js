@@ -16,6 +16,7 @@ const multer = require('multer');
 // 2026-08-05｜待接任務隱私預覽：接單前僅回傳行政區、路線、收入與必要摘要。
 // 2026-08-06 Store V2｜Google Places API 僅由客戶主動點擊「搜尋更多附近店家」時呼叫；一般店家瀏覽改由 Vercel 靜態 JSON 提供。
 // 2026-08-06 Store V2.1｜代買任務改為商品、數量、規格、缺貨處理與其他需求的結構化欄位。
+// 2026-08-06 Rider Purchase V1｜騎士端待接預覽與接單後任務詳情支援結構化代買資料。
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -6111,6 +6112,10 @@ function buildRiderPendingTaskPreview(order = {}) {
             item?.quantity || '1',
             30
           ),
+          specification: sanitizeRiderPendingPreviewText(
+            item?.specification || item?.spec || '',
+            120
+          ),
           budget: Number.isFinite(Number(item?.budget))
             ? Math.max(0, Math.round(Number(item.budget)))
             : 0,
@@ -6120,6 +6125,77 @@ function buildRiderPendingTaskPreview(order = {}) {
         }))
         .filter(item => item.name)
     : [];
+
+  const rawPurchaseDetails =
+    order.purchaseDetails && typeof order.purchaseDetails === 'object'
+      ? order.purchaseDetails
+      : {};
+
+  const firstShoppingItem = shoppingItems[0] || {};
+
+  const purchaseServiceText = [
+    order.serviceKey,
+    order.serviceMode,
+    order.serviceGroup,
+    order.serviceType,
+    order.serviceName,
+    order.orderType,
+    order.category,
+  ]
+    .map(value => String(value || '').trim().toLowerCase())
+    .join(' ');
+
+  const isPurchasePreview =
+    /(^|\s)buy(\s|$)|代買|幫我買/.test(purchaseServiceText) ||
+    Boolean(
+      String(
+        rawPurchaseDetails.productName ||
+        rawPurchaseDetails.itemName ||
+        rawPurchaseDetails.quantity ||
+        ''
+      ).trim()
+    ) ||
+    shoppingItems.length > 0;
+
+  const previewPurchaseDetails = {
+    productName: isPurchasePreview
+      ? sanitizeRiderPendingPreviewText(
+          rawPurchaseDetails.productName ||
+          firstShoppingItem.name ||
+          previewTaskDetails.itemName ||
+          '',
+          100
+        )
+      : '',
+    quantity: isPurchasePreview
+      ? sanitizeRiderPendingPreviewText(
+          rawPurchaseDetails.quantity ||
+          firstShoppingItem.quantity ||
+          previewTaskDetails.quantity ||
+          '',
+          40
+        )
+      : '',
+    specification: isPurchasePreview
+      ? sanitizeRiderPendingPreviewText(
+          rawPurchaseDetails.specification ||
+          rawPurchaseDetails.spec ||
+          firstShoppingItem.specification ||
+          '',
+          140
+        )
+      : '',
+    outOfStockAction: isPurchasePreview
+      ? normalizePurchaseOutOfStockAction(
+          rawPurchaseDetails.outOfStockAction ||
+          rawPurchaseDetails.replacementPolicy ||
+          firstShoppingItem.replacementPolicy ||
+          previewTaskDetails.replacementPolicy
+        )
+      : '',
+    // 其他需求可能含個人聯絡或現場資訊；接單前不回傳，接單後由 current-order 顯示。
+    additionalNote: '',
+  };
 
   const previewNote = sanitizeRiderPendingPreviewText(
     order.riderPreviewNote ||
@@ -6238,6 +6314,18 @@ function buildRiderPendingTaskPreview(order = {}) {
     size: sanitizeRiderPendingPreviewText(order.size || '', 60),
     taskDetails: previewTaskDetails,
     shoppingItems,
+    purchaseDetails: previewPurchaseDetails,
+    hasStructuredPurchaseDetails: Boolean(
+      previewPurchaseDetails.productName ||
+      previewPurchaseDetails.quantity
+    ),
+    purchaseAdditionalNoteLocked: Boolean(
+      String(
+        rawPurchaseDetails.additionalNote ||
+        rawPurchaseDetails.note ||
+        ''
+      ).trim()
+    ),
 
     itemSizeLabel: sanitizeRiderPendingPreviewText(
       order.itemSizeLabel || '未申報物品體積',
@@ -6275,7 +6363,7 @@ function buildRiderPendingTaskPreview(order = {}) {
         ? order.scheduleAvailabilityMatch !== false
         : true,
     detailsLocked: true,
-    previewDataVersion: 1,
+    previewDataVersion: 2,
   };
 }
 
