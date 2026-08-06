@@ -1,8 +1,8 @@
 /* UBee 跑腿用戶端 PWA｜App 化＋即時訂單通知正式修復版
- * 版本：2026-08-06 Customer V2.9 Navigation and Support Cleanup
+ * 版本：2026-08-06 Customer V2.10 Legal Documents
  *
  * 本版重點：
- * 1. 與新版導航及客服單一化 order.html 統一使用 20260806-13。
+ * 1. 與新版規範與隱私長版文件 order.html 統一使用 20260806-14。
  * 2. order.html、install.html 採 Network First，優先取得最新頁面。
  * 3. Service Worker 更新後立即接管，並刪除所有舊版 UBee 用戶端快取。
  * 4. CSS、JavaScript、Worker、Manifest 與店家 JSON 採 Network First。
@@ -13,9 +13,9 @@
 
 'use strict';
 
-const CACHE_NAME = 'ubee-customer-pwa-v20260806-customer-v29-navigation-support';
+const CACHE_NAME = 'ubee-customer-pwa-v20260806-customer-v210-legal-documents';
 const CACHE_PREFIX = 'ubee-customer-pwa-';
-const APP_VERSION = '20260806-13';
+const APP_VERSION = '20260806-14';
 
 const OFFLINE_URL = '/offline.html';
 const ORDER_CACHE_KEY = '/order.html';
