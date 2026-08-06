@@ -23322,6 +23322,49 @@ function createOrderFromApi(data) {
     120
   );
 
+
+  // =====================================================
+  // UBee 店家探索：公開店家資訊只用來建立客人的代買委託。
+  // 不代表該店家與 UBee 存在合作、授權、上架或抽成關係。
+  // =====================================================
+  const rawStoreDiscovery =
+    data.storeDiscovery && typeof data.storeDiscovery === 'object'
+      ? data.storeDiscovery
+      : null;
+
+  const storeDiscovery = rawStoreDiscovery
+    ? {
+        placeId: cleanText(
+          rawStoreDiscovery.placeId || rawStoreDiscovery.id || '',
+          200
+        ),
+        name: cleanText(rawStoreDiscovery.name || '', 120),
+        category: cleanText(rawStoreDiscovery.category || '', 60),
+        typeLabel: cleanText(rawStoreDiscovery.typeLabel || '', 80),
+        address: cleanText(rawStoreDiscovery.address || '', 160),
+        phone: normalizePhone(
+          cleanText(rawStoreDiscovery.phone || '', 40)
+        ),
+        lat: getNullableCoordinate(rawStoreDiscovery.lat),
+        lng: getNullableCoordinate(rawStoreDiscovery.lng),
+        googleMapsUri: cleanText(
+          rawStoreDiscovery.googleMapsUri || '',
+          500
+        ),
+        source: cleanText(
+          rawStoreDiscovery.source || 'google_places',
+          40
+        ),
+        sourceLabel: cleanText(
+          rawStoreDiscovery.sourceLabel || 'Google Maps 公開店家資訊',
+          80
+        ),
+        isPartnerStore: rawStoreDiscovery.isPartnerStore === true,
+        isFeatured: rawStoreDiscovery.isFeatured === true,
+        isSponsored: rawStoreDiscovery.isSponsored === true,
+      }
+    : null;
+
   const rawNote = cleanLongText(
     data.note ||
     data.item ||
@@ -23602,6 +23645,16 @@ function createOrderFromApi(data) {
     ),
 
     nearbyPlace,
+
+    storeDiscovery,
+    storePlaceId: storeDiscovery?.placeId || '',
+    storeName: storeDiscovery?.name || '',
+    storeCategory: storeDiscovery?.category || '',
+    storeAddress: storeDiscovery?.address || '',
+    storePhone: storeDiscovery?.phone || '',
+    storeGoogleMapsUri: storeDiscovery?.googleMapsUri || '',
+    storeSource: storeDiscovery?.source || '',
+    isPartnerStore: storeDiscovery?.isPartnerStore === true,
 
     merchantId,
     merchantCode: merchantId,
@@ -26364,6 +26417,550 @@ app.get('/api/merchant/v3/settlements', async (req, res) => {
 });
 
 
+
+// =====================================================
+// UBee 店家探索 V1
+//
+// 核心原則：
+// 1. 使用 Google Places API (New) 搜尋公開店家資訊。
+// 2. 不把一般搜尋結果標示為 UBee 合作店家。
+// 3. Firestore storeDirectory 僅供後端套用精選、贊助、隱藏與自訂說明；
+//    客戶端不直接讀寫該集合。
+// 4. 相片不快取；每次以近期 photo resource name 向 Google 取得。
+// =====================================================
+const UBEE_STORE_DIRECTORY_COLLECTION = 'storeDirectory';
+const UBEE_STORE_SEARCH_MAX_RESULTS = 20;
+const UBEE_STORE_SEARCH_DEFAULT_RADIUS_METERS = 6000;
+
+const UBEE_STORE_CATEGORY_QUERY = Object.freeze({
+  all: '附近店家 餐飲 飲料 藥局 生活用品',
+  food: '附近美食 餐廳 小吃',
+  drink: '附近飲料店 咖啡店 手搖飲',
+  dessert: '附近甜點 蛋糕 麵包店',
+  gift: '附近花店 禮品店',
+  pharmacy: '附近藥局',
+  daily: '附近生活用品 日用品 五金 百貨',
+  other: '附近商店',
+});
+
+const UBEE_STORE_CATEGORY_LABEL = Object.freeze({
+  all: '全部',
+  food: '美食',
+  drink: '飲料',
+  dessert: '甜點蛋糕',
+  gift: '花束禮品',
+  pharmacy: '藥局',
+  daily: '生活用品',
+  other: '其他',
+});
+
+function normalizeStoreCategory(value) {
+  const key = String(value || 'all').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(UBEE_STORE_CATEGORY_QUERY, key)
+    ? key
+    : 'all';
+}
+
+function getStorePlacesApiKey() {
+  return String(
+    process.env.GOOGLE_PLACES_SERVER_API_KEY ||
+    GOOGLE_MAPS_SERVER_API_KEY ||
+    GOOGLE_MAPS_API_KEY ||
+    ''
+  ).trim();
+}
+
+function isValidStoreCoordinate(lat, lng) {
+  return isValidLatitude(Number(lat)) && isValidLongitude(Number(lng));
+}
+
+function calculateStoreDistanceMeters(lat1, lng1, lat2, lng2) {
+  if (!isValidStoreCoordinate(lat1, lng1) || !isValidStoreCoordinate(lat2, lng2)) {
+    return null;
+  }
+
+  const toRadians = value => Number(value) * Math.PI / 180;
+  const earthRadius = 6371000;
+  const dLat = toRadians(Number(lat2) - Number(lat1));
+  const dLng = toRadians(Number(lng2) - Number(lng1));
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) ** 2;
+
+  return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function formatStoreDistance(distanceMeters) {
+  if (!Number.isFinite(Number(distanceMeters))) return '';
+  const meters = Math.max(0, Math.round(Number(distanceMeters)));
+  if (meters < 1000) return `${meters} 公尺`;
+  return `${(meters / 1000).toFixed(meters < 10000 ? 1 : 0)} 公里`;
+}
+
+function normalizeStorePhoto(photo, width = 720) {
+  const name = cleanText(photo?.name || '', 500);
+  if (!/^places\/[^/]+\/photos\/[^/]+$/.test(name)) return null;
+
+  const attributions = Array.isArray(photo?.authorAttributions)
+    ? photo.authorAttributions.slice(0, 3).map(item => ({
+        displayName: cleanText(item?.displayName || '', 120),
+        uri: cleanText(item?.uri || '', 500),
+        photoUri: cleanText(item?.photoUri || '', 500),
+      }))
+    : [];
+
+  return {
+    name,
+    widthPx: Math.max(0, Math.round(Number(photo?.widthPx || 0))),
+    heightPx: Math.max(0, Math.round(Number(photo?.heightPx || 0))),
+    url: `/api/customer/store-photo?name=${encodeURIComponent(name)}&w=${Math.max(240, Math.min(1200, Number(width) || 720))}`,
+    authorAttributions: attributions,
+  };
+}
+
+function getStoreTypeLabel(place, fallbackCategory = 'all') {
+  const apiLabel = cleanText(place?.primaryTypeDisplayName?.text || '', 80);
+  if (apiLabel) return apiLabel;
+
+  const typeMap = {
+    restaurant: '餐廳',
+    meal_takeaway: '外帶餐飲',
+    cafe: '咖啡店',
+    bakery: '烘焙甜點',
+    pharmacy: '藥局',
+    florist: '花店',
+    convenience_store: '便利商店',
+    supermarket: '超市',
+    department_store: '百貨',
+    home_goods_store: '生活用品',
+  };
+
+  return typeMap[String(place?.primaryType || '')] ||
+    UBEE_STORE_CATEGORY_LABEL[fallbackCategory] ||
+    '店家';
+}
+
+function normalizeGoogleStorePlace(place, options = {}) {
+  const latitude = getNullableCoordinate(place?.location?.latitude);
+  const longitude = getNullableCoordinate(place?.location?.longitude);
+  const distanceMeters = calculateStoreDistanceMeters(
+    options.originLat,
+    options.originLng,
+    latitude,
+    longitude
+  );
+  const openingHours = place?.currentOpeningHours && typeof place.currentOpeningHours === 'object'
+    ? place.currentOpeningHours
+    : {};
+  const businessStatus = cleanText(place?.businessStatus || '', 50);
+  const permanentlyClosed = businessStatus === 'CLOSED_PERMANENTLY';
+  const temporarilyClosed = businessStatus === 'CLOSED_TEMPORARILY';
+  const openNow = permanentlyClosed || temporarilyClosed
+    ? false
+    : typeof openingHours.openNow === 'boolean'
+      ? openingHours.openNow
+      : null;
+  const photo = normalizeStorePhoto(
+    Array.isArray(place?.photos) ? place.photos[0] : null,
+    720
+  );
+
+  return {
+    id: cleanText(place?.id || '', 200),
+    placeId: cleanText(place?.id || '', 200),
+    name: cleanText(place?.displayName?.text || '', 120),
+    category: normalizeStoreCategory(options.category),
+    categoryLabel: UBEE_STORE_CATEGORY_LABEL[normalizeStoreCategory(options.category)],
+    type: cleanText(place?.primaryType || '', 80),
+    typeLabel: getStoreTypeLabel(place, normalizeStoreCategory(options.category)),
+    address: cleanText(
+      place?.formattedAddress || place?.shortFormattedAddress || '',
+      180
+    ),
+    lat: isValidLatitude(latitude) ? latitude : null,
+    lng: isValidLongitude(longitude) ? longitude : null,
+    distanceMeters,
+    distanceText: formatStoreDistance(distanceMeters),
+    businessStatus,
+    openNow,
+    openStatusLabel: permanentlyClosed
+      ? '已永久停業'
+      : temporarilyClosed
+        ? '暫停營業'
+        : openNow === true
+          ? '營業中'
+          : openNow === false
+            ? '休息中'
+            : '營業時間請向店家確認',
+    googleMapsUri: cleanText(place?.googleMapsUri || '', 600),
+    photo,
+    photoUrl: photo?.url || '',
+    source: 'google_places',
+    sourceLabel: 'Google Maps 公開店家資訊',
+    canRequestPurchase: !permanentlyClosed,
+    purchaseLabel: '可委託小U前往代買',
+    isPartnerStore: false,
+    isFeatured: false,
+    isSponsored: false,
+    isVerified: false,
+  };
+}
+
+function normalizeStoreDirectoryOverride(data) {
+  const source = data && typeof data === 'object' ? data : {};
+  return {
+    hidden: source.hidden === true,
+    purchaseEnabled: source.purchaseEnabled !== false,
+    isFeatured: source.isFeatured === true,
+    isSponsored: source.isSponsored === true,
+    isVerified: source.isVerified === true,
+    isPartnerStore: source.isPartnerStore === true,
+    customName: cleanText(source.customName || '', 120),
+    customCategory: cleanText(source.customCategory || '', 60),
+    customTypeLabel: cleanText(source.customTypeLabel || '', 80),
+    customDescription: cleanLongText(source.customDescription || '', 800),
+    customCoverUrl: cleanText(source.customCoverUrl || '', 800),
+    sponsorLabel: cleanText(source.sponsorLabel || '贊助推薦', 40),
+    sortWeight: Number.isFinite(Number(source.sortWeight))
+      ? Number(source.sortWeight)
+      : 0,
+  };
+}
+
+async function loadStoreDirectoryOverrides(placeIds) {
+  const ids = [...new Set(
+    (Array.isArray(placeIds) ? placeIds : [])
+      .map(value => cleanText(value, 200))
+      .filter(Boolean)
+  )].slice(0, UBEE_STORE_SEARCH_MAX_RESULTS);
+
+  if (!ids.length) return new Map();
+
+  try {
+    const refs = ids.map(id => db.collection(UBEE_STORE_DIRECTORY_COLLECTION).doc(id));
+    const snapshots = await db.getAll(...refs);
+    const map = new Map();
+    snapshots.forEach(snapshot => {
+      if (snapshot.exists) {
+        map.set(snapshot.id, normalizeStoreDirectoryOverride(snapshot.data()));
+      }
+    });
+    return map;
+  } catch (error) {
+    console.warn('⚠️ UBee 店家探索自訂資料讀取失敗：', error.message || error);
+    return new Map();
+  }
+}
+
+function applyStoreDirectoryOverride(store, override) {
+  if (!override) return store;
+  return {
+    ...store,
+    name: override.customName || store.name,
+    categoryLabel: override.customCategory || store.categoryLabel,
+    typeLabel: override.customTypeLabel || store.typeLabel,
+    description: override.customDescription || store.description || '',
+    photoUrl: override.customCoverUrl || store.photoUrl,
+    customCoverUrl: override.customCoverUrl || '',
+    canRequestPurchase: store.canRequestPurchase && override.purchaseEnabled,
+    isFeatured: override.isFeatured,
+    isSponsored: override.isSponsored,
+    isVerified: override.isVerified,
+    isPartnerStore: override.isPartnerStore,
+    sponsorLabel: override.sponsorLabel,
+    sortWeight: override.sortWeight,
+    hidden: override.hidden,
+  };
+}
+
+async function callGooglePlacesApi(url, options = {}) {
+  const apiKey = getStorePlacesApiKey();
+  if (!apiKey) {
+    const error = new Error('Google Places API 金鑰尚未設定。');
+    error.code = 'GOOGLE_PLACES_KEY_MISSING';
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Goog-Api-Key': apiKey,
+  };
+  if (options.fieldMask) headers['X-Goog-FieldMask'] = options.fieldMask;
+
+  const response = await fetch(url, {
+    method: options.method || 'GET',
+    headers,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.error?.message ||
+      data?.message ||
+      `Google Places API 回應錯誤（HTTP ${response.status}）`
+    );
+    error.code = data?.error?.status || 'GOOGLE_PLACES_ERROR';
+    error.statusCode = response.status >= 400 && response.status < 500
+      ? 400
+      : 502;
+    throw error;
+  }
+
+  return data;
+}
+
+app.get('/api/customer/stores', requireCustomerAuth, async (req, res) => {
+  try {
+    const category = normalizeStoreCategory(req.query.category);
+    const query = cleanText(req.query.query || '', 100);
+    const area = cleanText(req.query.area || '', 80);
+    const lat = getNullableCoordinate(req.query.lat);
+    const lng = getNullableCoordinate(req.query.lng);
+    const hasLocation = isValidStoreCoordinate(lat, lng);
+    const radius = Math.max(
+      500,
+      Math.min(
+        20000,
+        Math.round(Number(req.query.radius || UBEE_STORE_SEARCH_DEFAULT_RADIUS_METERS))
+      )
+    );
+    const limit = Math.max(
+      1,
+      Math.min(
+        UBEE_STORE_SEARCH_MAX_RESULTS,
+        Math.round(Number(req.query.limit || UBEE_STORE_SEARCH_MAX_RESULTS))
+      )
+    );
+
+    if (!hasLocation && !area) {
+      return res.status(400).json({
+        success: false,
+        code: 'STORE_LOCATION_REQUIRED',
+        message: '請允許定位，或手動輸入要搜尋的地區。',
+      });
+    }
+
+    const baseQuery = query || UBEE_STORE_CATEGORY_QUERY[category];
+    const textQuery = [baseQuery, area].filter(Boolean).join(' ');
+    const body = {
+      textQuery,
+      languageCode: 'zh-TW',
+      regionCode: 'TW',
+      pageSize: limit,
+      includePureServiceAreaBusinesses: false,
+    };
+
+    if (hasLocation) {
+      body.locationBias = {
+        circle: {
+          center: {
+            latitude: Number(lat),
+            longitude: Number(lng),
+          },
+          radius,
+        },
+      };
+      body.rankPreference = 'DISTANCE';
+    }
+
+    const result = await callGooglePlacesApi(
+      'https://places.googleapis.com/v1/places:searchText',
+      {
+        method: 'POST',
+        body,
+        fieldMask: [
+          'places.id',
+          'places.displayName',
+          'places.formattedAddress',
+          'places.shortFormattedAddress',
+          'places.location',
+          'places.businessStatus',
+          'places.primaryType',
+          'places.primaryTypeDisplayName',
+          'places.currentOpeningHours',
+          'places.googleMapsUri',
+          'places.photos',
+        ].join(','),
+      }
+    );
+
+    const rawPlaces = Array.isArray(result?.places) ? result.places : [];
+    const overrides = await loadStoreDirectoryOverrides(
+      rawPlaces.map(place => place?.id)
+    );
+
+    const stores = rawPlaces
+      .map(place => applyStoreDirectoryOverride(
+        normalizeGoogleStorePlace(place, {
+          category,
+          originLat: hasLocation ? lat : null,
+          originLng: hasLocation ? lng : null,
+        }),
+        overrides.get(cleanText(place?.id || '', 200))
+      ))
+      .filter(store => store.placeId && store.name && !store.hidden)
+      .sort((a, b) => {
+        const aDistance = Number.isFinite(Number(a.distanceMeters))
+          ? Number(a.distanceMeters)
+          : Number.MAX_SAFE_INTEGER;
+        const bDistance = Number.isFinite(Number(b.distanceMeters))
+          ? Number(b.distanceMeters)
+          : Number.MAX_SAFE_INTEGER;
+        return aDistance - bDistance;
+      });
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({
+      success: true,
+      category,
+      categoryLabel: UBEE_STORE_CATEGORY_LABEL[category],
+      query,
+      area,
+      location: hasLocation ? { lat: Number(lat), lng: Number(lng) } : null,
+      stores,
+      count: stores.length,
+      source: 'google_places',
+      sourceLabel: 'Google Maps 公開店家資訊',
+      disclosure: '一般搜尋結果不代表店家與 UBee 存在合作關係。',
+    });
+  } catch (error) {
+    console.error('❌ UBee 店家探索搜尋失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      code: error.code || 'STORE_SEARCH_FAILED',
+      message: error.message || '附近店家暫時無法搜尋，請稍後再試。',
+    });
+  }
+});
+
+app.get('/api/customer/stores/:placeId', requireCustomerAuth, async (req, res) => {
+  try {
+    const placeId = cleanText(req.params.placeId || '', 200);
+    if (!placeId || !/^[A-Za-z0-9_-]+$/.test(placeId)) {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_STORE_PLACE_ID',
+        message: '店家識別資料不正確。',
+      });
+    }
+
+    const url =
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}` +
+      '?languageCode=zh-TW&regionCode=TW';
+    const place = await callGooglePlacesApi(url, {
+      fieldMask: [
+        'id',
+        'displayName',
+        'formattedAddress',
+        'shortFormattedAddress',
+        'location',
+        'businessStatus',
+        'primaryType',
+        'primaryTypeDisplayName',
+        'currentOpeningHours',
+        'regularOpeningHours',
+        'nationalPhoneNumber',
+        'internationalPhoneNumber',
+        'websiteUri',
+        'googleMapsUri',
+        'editorialSummary',
+        'photos',
+      ].join(','),
+    });
+
+    const overrideMap = await loadStoreDirectoryOverrides([placeId]);
+    const baseStore = normalizeGoogleStorePlace(place, {
+      category: normalizeStoreCategory(req.query.category),
+      originLat: getNullableCoordinate(req.query.lat),
+      originLng: getNullableCoordinate(req.query.lng),
+    });
+    const store = applyStoreDirectoryOverride(baseStore, overrideMap.get(placeId));
+    const photos = (Array.isArray(place?.photos) ? place.photos : [])
+      .slice(0, 6)
+      .map(photo => normalizeStorePhoto(photo, 1200))
+      .filter(Boolean);
+    const weekdayDescriptions = Array.isArray(place?.regularOpeningHours?.weekdayDescriptions)
+      ? place.regularOpeningHours.weekdayDescriptions
+          .map(value => cleanText(value, 160))
+          .filter(Boolean)
+      : [];
+
+    const detail = {
+      ...store,
+      phone: cleanText(
+        place?.nationalPhoneNumber || place?.internationalPhoneNumber || '',
+        40
+      ),
+      websiteUri: cleanText(place?.websiteUri || '', 600),
+      description:
+        store.description ||
+        cleanLongText(place?.editorialSummary?.text || '', 800) ||
+        '此頁提供公開店家資訊，客人可直接委託小U前往代買。商品、價格與庫存以店家現場為準。',
+      weekdayDescriptions,
+      photos,
+      photoUrl: store.photoUrl || photos[0]?.url || '',
+      purchaseNotes: [
+        '商品名稱、價格與庫存以店家現場為準。',
+        '若遇缺貨、規格不同或價格差異，小U會依訂單聯絡方式與你確認。',
+        '商品費用與 UBee 跑腿服務費分開計算。',
+        store.isPartnerStore
+          ? '此店家已標示為 UBee 合作店家。'
+          : '此公開資訊不代表店家與 UBee 存在合作關係。',
+      ],
+    };
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({
+      success: true,
+      store: detail,
+      source: 'google_places',
+      sourceLabel: 'Google Maps 公開店家資訊',
+    });
+  } catch (error) {
+    console.error('❌ UBee 店家詳細資訊讀取失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      code: error.code || 'STORE_DETAIL_FAILED',
+      message: error.message || '店家資訊暫時無法讀取，請稍後再試。',
+    });
+  }
+});
+
+app.get('/api/customer/store-photo', requireCustomerAuth, async (req, res) => {
+  try {
+    const name = cleanText(req.query.name || '', 600);
+    if (!/^places\/[^/]+\/photos\/[^/]+$/.test(name)) {
+      return res.status(400).send('店家圖片識別資料不正確。');
+    }
+
+    const apiKey = getStorePlacesApiKey();
+    if (!apiKey) return res.status(503).send('店家圖片服務尚未設定。');
+
+    const width = Math.max(240, Math.min(1600, Math.round(Number(req.query.w || 720))));
+    const mediaUrl =
+      `https://places.googleapis.com/v1/${name}/media` +
+      `?maxWidthPx=${width}&skipHttpRedirect=true&key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(mediaUrl, { method: 'GET' });
+    const data = await response.json().catch(() => ({}));
+    const photoUri = cleanText(data?.photoUri || '', 2000);
+
+    if (!response.ok || !/^https:\/\//i.test(photoUri)) {
+      return res.status(response.status || 404).send('店家圖片暫時無法載入。');
+    }
+
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    return res.redirect(302, photoUri);
+  } catch (error) {
+    console.error('❌ UBee 店家圖片載入失敗：', error);
+    return res.status(500).send('店家圖片暫時無法載入。');
+  }
+});
+
+
 app.post('/api/orders', requireCustomerAuth, async (req, res) => {
     try {
     if(!req.body || typeof req.body !== 'object'){
@@ -26783,6 +27380,37 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   // ==============================
   nearbyPlace:
     data.nearbyPlace || null,
+
+  // ==============================
+  // UBee 店家探索資料
+  // 一般搜尋結果不等於正式合作店家。
+  // ==============================
+  storeDiscovery:
+    data.storeDiscovery || null,
+
+  storePlaceId:
+    data.storePlaceId || '',
+
+  storeName:
+    data.storeName || '',
+
+  storeCategory:
+    data.storeCategory || '',
+
+  storeAddress:
+    data.storeAddress || '',
+
+  storePhone:
+    data.storePhone || '',
+
+  storeGoogleMapsUri:
+    data.storeGoogleMapsUri || '',
+
+  storeSource:
+    data.storeSource || '',
+
+  isPartnerStore:
+    data.isPartnerStore === true,
 
   // ==============================
   // 合作店家資料
