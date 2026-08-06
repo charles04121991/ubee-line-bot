@@ -1,8 +1,8 @@
 /* UBee 跑腿用戶端 PWA｜App 化＋即時訂單通知正式修復版
- * 版本：2026-08-06 Customer V2.6 Independent Primary Pages
+ * 版本：2026-08-06 Customer V2.8 Top UI Cleanup
  *
  * 本版重點：
- * 1. 與新版四大獨立主頁 order.html 統一使用 20260806-10。
+ * 1. 與以 V2.7 為基準的頂部介面清理版 order.html 統一使用 20260806-12。
  * 2. order.html、install.html 採 Network First，優先取得最新頁面。
  * 3. Service Worker 更新後立即接管，並刪除所有舊版 UBee 用戶端快取。
  * 4. CSS、JavaScript、Worker、Manifest 與店家 JSON 採 Network First。
@@ -13,9 +13,9 @@
 
 'use strict';
 
-const CACHE_NAME = 'ubee-customer-pwa-v20260806-customer-v26-independent-pages';
+const CACHE_NAME = 'ubee-customer-pwa-v20260806-customer-v28-top-ui-cleanup';
 const CACHE_PREFIX = 'ubee-customer-pwa-';
-const APP_VERSION = '20260806-10';
+const APP_VERSION = '20260806-12';
 
 const OFFLINE_URL = '/offline.html';
 const ORDER_CACHE_KEY = '/order.html';
