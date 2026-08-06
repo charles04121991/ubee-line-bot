@@ -1,5 +1,5 @@
 /* UBee 跑腿用戶端 PWA｜App 化＋即時訂單通知正式修復版
- * 版本：2026-08-06 Store V1
+ * 版本：2026-08-06 Store V1.1
  * 重點：
  * 1. order.html 與 install.html 使用 Network First，強制優先取得最新版本。
  * 2. Service Worker 更新後立即接管，並刪除舊版 UBee 快取。
@@ -7,9 +7,9 @@
  * 4. 預快取單一檔案失敗時，不會讓整個 Service Worker 安裝失敗。
  */
 
-const CACHE_NAME = 'ubee-customer-pwa-v20260806-store-v1';
+const CACHE_NAME = 'ubee-customer-pwa-v20260806-store-v11';
 const CACHE_PREFIX = 'ubee-customer-pwa-';
-const APP_VERSION = '20260806-1';
+const APP_VERSION = '20260806-2';
 
 const OFFLINE_URL = '/offline.html';
 const ORDER_CACHE_KEY = '/order.html';
