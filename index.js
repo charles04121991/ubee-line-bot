@@ -14,6 +14,7 @@ const multer = require('multer');
 // 2026-08-04｜小U申請審核 V2：三大驗證、條件式證件、批次補件、多通道通知與審核紀錄。
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
 // 2026-08-05｜待接任務隱私預覽：接單前僅回傳行政區、路線、收入與必要摘要。
+// 2026-08-06 Store V2｜Google Places API 僅由客戶主動點擊「搜尋更多附近店家」時呼叫；一般店家瀏覽改由 Vercel 靜態 JSON 提供。
 
 admin.initializeApp({
   credential: admin.credential.cert({
