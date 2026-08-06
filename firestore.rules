@@ -54,11 +54,7 @@ service cloud.firestore {
     }
 
     // =====================================================
-    // 訂單
-    //
-    // 目前 UBee 訂單主要由後端 Admin SDK 管理。
-    // 前端只允許已驗證且屬於該訂單的人讀取。
-    // 所有新增、修改與刪除仍經由 index.js 後端處理。
+    // 訂單：所有新增、修改與刪除都經由 index.js Admin SDK。
     // =====================================================
 
     match /orders/{orderId} {
@@ -70,14 +66,6 @@ service cloud.firestore {
 
       allow create, update, delete: if false;
 
-      // ===================================================
-      // 訂單聊天室
-      //
-      // 訊息由 index.js 使用 Firebase Admin SDK 寫入。
-      // 客人與該訂單的小U只能讀取，不能直接從前端寫入，
-      // 可避免偽造 senderRole、senderId 或修改歷史訊息。
-      // ===================================================
-
       match /messages/{messageId} {
         allow read: if canAccessOrder(orderId);
         allow create, update, delete: if false;
@@ -85,15 +73,23 @@ service cloud.firestore {
     }
 
     // =====================================================
-    // 騎士資料
-    //
-    // 騎士只能讀取自己的文件。
-    // 寫入維持由後端 API / Admin SDK 處理。
+    // 騎士資料：騎士只能讀取自己的文件。
     // =====================================================
 
     match /riders/{riderId} {
       allow read: if isRider() && riderId == riderDocId();
       allow create, update, delete: if false;
+    }
+
+    // =====================================================
+    // UBee 店家探索後台自訂資料
+    //
+    // 用戶端只能透過 /api/customer/stores 讀取後端整理後的安全欄位；
+    // 不直接讀取 Firestore，也不能自行新增精選、贊助或合作標章。
+    // =====================================================
+
+    match /storeDirectory/{storeId} {
+      allow read, create, update, delete: if false;
     }
 
     // =====================================================
