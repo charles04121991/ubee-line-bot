@@ -1,0 +1,29 @@
+{
+  "stores": [
+    {
+      "id": "taichung-example-001",
+      "enabled": false,
+      "name": "請替換為已確認店家名稱",
+      "category": "daily",
+      "categoryLabel": "生活用品",
+      "typeLabel": "生活用品",
+      "address": "請填寫已確認地址",
+      "phone": "",
+      "latitude": null,
+      "longitude": null,
+      "coverImage": "/store-images/default-daily.webp",
+      "description": "店家介紹",
+      "businessHours": [],
+      "purchaseNotes": [
+        "商品依店內實際售價。",
+        "請填寫品項、數量、規格及缺貨處理方式。"
+      ],
+      "purchaseEnabled": true,
+      "featured": false,
+      "sponsored": false,
+      "partner": false,
+      "sortWeight": 0,
+      "googleMapsUri": ""
+    }
+  ]
+}
