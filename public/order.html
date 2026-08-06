@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260805-5" rel="manifest"/>
+<link href="/manifest-order.json?v=20260806-1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 基準版精準修復：2026-08-05 V5｜白色啟動動畫、LINE 官方客服單一控制 -->
+<!-- UBee 店家探索正式整合版：2026-08-06 V1｜首頁、任務、店家、我的＋Google Places＋代買下單串接 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -20021,7 +20021,8 @@ body.flow-active>.app{display:none!important;}
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
-    mapRenderId:0,submitting:false,profileOrders:[],selectedProfileOrder:null
+    mapRenderId:0,submitting:false,profileOrders:[],selectedProfileOrder:null,
+    storeContext:null
   };
 
   function setLoading(show,text='系統處理中…'){$('flowLoadingText').textContent=text;$('flowLoading').classList.toggle('show',!!show)}
@@ -20305,7 +20306,52 @@ body.flow-active>.app{display:none!important;}
   }
 
   function wrapPayload(){
-    try{if(typeof getPayload!=='function'||getPayload.__productionFlowWrapped)return;const original=getPayload;const wrapped=function(){const payload=original.apply(this,arguments);return{...payload,serviceMode:resolveClientServiceMode(state.service,payload.serviceType||serviceLabels[state.service]),pickupAddressObject:state.pickup||null,dropoffAddressObject:state.dropoff||null,clientSchemaVersion:'customer-production-flow-v4-2026-08-04-r9'}};wrapped.__productionFlowWrapped=true;getPayload=wrapped}catch(error){console.warn('擴充正式建單資料失敗：',error)}
+    try{
+      if(typeof getPayload!=='function'||getPayload.__productionFlowWrapped)return;
+      const original=getPayload;
+      const wrapped=function(){
+        const payload=original.apply(this,arguments);
+        const store=state.storeContext&&typeof state.storeContext==='object'
+          ? state.storeContext
+          : null;
+        const storeDiscovery=store?{
+          placeId:String(store.placeId||store.id||'').trim(),
+          name:String(store.name||'').trim(),
+          category:String(store.categoryLabel||store.category||'').trim(),
+          typeLabel:String(store.typeLabel||'').trim(),
+          address:String(store.address||'').trim(),
+          phone:String(store.phone||'').trim(),
+          lat:Number.isFinite(Number(store.lat))?Number(store.lat):null,
+          lng:Number.isFinite(Number(store.lng))?Number(store.lng):null,
+          googleMapsUri:String(store.googleMapsUri||'').trim(),
+          source:String(store.source||'google_places').trim(),
+          sourceLabel:String(store.sourceLabel||'Google Maps 公開店家資訊').trim(),
+          isPartnerStore:store.isPartnerStore===true,
+          isFeatured:store.isFeatured===true,
+          isSponsored:store.isSponsored===true
+        }:null;
+        return{
+          ...payload,
+          serviceMode:resolveClientServiceMode(state.service,payload.serviceType||serviceLabels[state.service]),
+          pickupAddressObject:state.pickup||null,
+          dropoffAddressObject:state.dropoff||null,
+          nearbyPlace:storeDiscovery?{
+            name:storeDiscovery.name,
+            address:storeDiscovery.address,
+            placeId:storeDiscovery.placeId,
+            phone:storeDiscovery.phone,
+            lat:storeDiscovery.lat,
+            lng:storeDiscovery.lng
+          }:payload.nearbyPlace,
+          storeDiscovery,
+          clientSchemaVersion:'customer-production-flow-v4-store-discovery-v1-2026-08-06'
+        };
+      };
+      wrapped.__productionFlowWrapped=true;
+      getPayload=wrapped;
+    }catch(error){
+      console.warn('擴充正式建單資料失敗：',error);
+    }
   }
 
   async function requestRoute(){
@@ -20372,7 +20418,7 @@ body.flow-active>.app{display:none!important;}
   }
 
   function resetNewTask(clearLegacy=true){
-    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard'});
+    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
     if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=null;pickupPlaceId=dropoffPlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;localStorage.removeItem('ubee_order_draft_v2')}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
   }
@@ -20567,6 +20613,65 @@ body.flow-active>.app{display:none!important;}
   window.showCustomerSubPage=window.openUBeeProfilePage;
   window.openUBeeSystemOrderFlow=(options={})=>
     showFlow({fresh:options.fresh!==false});
+
+  window.openUBeeStorePurchase=function(rawStore={}){
+    const store=rawStore&&typeof rawStore==='object'?rawStore:{};
+    const name=String(store.name||'指定店家').trim()||'指定店家';
+    const address=String(store.address||'').trim();
+    if(!address){
+      throw new Error('店家地址不存在，請改用搜尋地址建立代買任務。');
+    }
+
+    showFlow({fresh:true});
+    state.storeContext={...store};
+    setService('buy');
+
+    const category=String(store.category||store.categoryLabel||'').trim();
+    const typeIndexMap={
+      food:0,'美食':0,
+      drink:1,'飲料':1,
+      pharmacy:3,'藥局':3,
+      daily:4,'生活用品':4,
+      dessert:6,'甜點蛋糕':6,
+      gift:6,'花束禮品':6,
+      other:7,'其他':7
+    };
+    state.serviceTypeIndex=Number.isFinite(Number(typeIndexMap[category]))
+      ? Number(typeIndexMap[category])
+      : 0;
+    state.serviceCategory='';
+    state.pickup={
+      label:name,
+      name,
+      address,
+      addressDetail:'',
+      contactName:name,
+      phone:String(store.phone||'').trim(),
+      placeId:String(store.placeId||store.id||'').trim(),
+      lat:Number.isFinite(Number(store.lat))?Number(store.lat):null,
+      lng:Number.isFinite(Number(store.lng))?Number(store.lng):null,
+      source:'store_discovery'
+    };
+    state.dropoff=null;
+    state.addressTarget='dropoff';
+    state.taskName=`${name}代買`;
+    state.taskNote=[
+      `購買店家：${name}`,
+      '要購買的商品：',
+      '數量／規格：',
+      '預算上限：',
+      '缺貨時：請聯絡我確認'
+    ].join('\n');
+    state.advancePayment=0;
+    state.itemSize='small';
+    syncServiceSelectors();
+    updateHome();
+    syncLegacy();
+    showPage('home');
+    status('flowHomeStatus',`已帶入「${name}」，接下來請選擇送達地址。`);
+    window.setTimeout(()=>openAddress('dropoff'),160);
+  };
+
   showFlow({fresh:false});
   window.addEventListener('pageshow',event=>{if(event.persisted&&!activeOrder())showFlow({fresh:true})});
 })();
@@ -20576,7 +20681,7 @@ body.flow-active>.app{display:none!important;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260805-5';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23453,6 +23558,960 @@ body > #ubeePersistentBottomNav > button.active .ubee-nav-profile{
   }
 
   window.addEventListener('pageshow',mountNavigationOnce);
+})();
+</script>
+
+
+<style id="ubee-store-discovery-style">
+:root{
+  --ubee-store-accent:#facc15;
+  --ubee-store-accent-strong:#f4bd00;
+  --ubee-store-line:#e5e7ea;
+  --ubee-store-muted:#6f7378;
+}
+body > #ubeePersistentBottomNav{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+}
+body:not(.flow-active) .bottom-tabs{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+}
+body.ubee-store-active #productionOrderFlow{
+  display:block!important;
+}
+#productionOrderFlow #flowPageStores,
+#productionOrderFlow #flowPageStoreDetail{
+  background:#f5f6f7;
+}
+#productionOrderFlow .ubee-store-scroll{
+  padding:0 14px 24px;
+  background:#f5f6f7;
+}
+#productionOrderFlow .ubee-store-search-shell{
+  position:sticky;
+  top:0;
+  z-index:8;
+  margin:0 -14px;
+  padding:10px 14px 9px;
+  background:rgba(245,246,247,.96);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+#productionOrderFlow .ubee-store-search{
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr) 36px;
+  align-items:center;
+  gap:8px;
+  min-height:48px;
+  padding:0 8px 0 13px;
+  border:1px solid var(--ubee-store-line);
+  border-radius:16px;
+  background:#fff;
+}
+#productionOrderFlow .ubee-store-search svg{
+  width:20px;
+  height:20px;
+  color:#74797f;
+}
+#productionOrderFlow .ubee-store-search input{
+  min-width:0;
+  border:0!important;
+  background:transparent!important;
+  font-size:15px!important;
+  font-weight:800;
+}
+#productionOrderFlow .ubee-store-search button{
+  width:34px;
+  height:34px;
+  border:0;
+  border-radius:10px;
+  background:#f2f3f4;
+  color:#111;
+  font-size:18px!important;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-category-strip{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  margin:3px -14px 12px;
+  padding:2px 14px 6px;
+  scrollbar-width:none;
+}
+#productionOrderFlow .ubee-store-category-strip::-webkit-scrollbar{display:none;}
+#productionOrderFlow .ubee-store-category{
+  flex:0 0 auto;
+  min-height:38px;
+  padding:8px 13px;
+  border:1px solid var(--ubee-store-line);
+  border-radius:999px;
+  background:#fff;
+  color:#41454a;
+  font-size:13px!important;
+  font-weight:950;
+  white-space:nowrap;
+}
+#productionOrderFlow .ubee-store-category.active{
+  border-color:#111;
+  background:#111;
+  color:#fff;
+}
+#productionOrderFlow .ubee-store-location-card{
+  margin-bottom:13px;
+  padding:14px;
+  border:1px solid #eadb8f;
+  border-radius:18px;
+  background:#fffceb;
+}
+#productionOrderFlow .ubee-store-location-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+#productionOrderFlow .ubee-store-location-copy strong{
+  display:block;
+  color:#111;
+  font-size:15px;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-location-copy span{
+  display:block;
+  margin-top:4px;
+  color:#746a4a;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.55;
+}
+#productionOrderFlow .ubee-store-location-btn{
+  flex:0 0 auto;
+  min-height:38px;
+  padding:8px 12px;
+  border:0;
+  border-radius:999px;
+  background:var(--ubee-store-accent);
+  color:#111;
+  font-size:12px!important;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-manual-location{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  margin-top:11px;
+}
+#productionOrderFlow .ubee-store-manual-location[hidden]{display:none!important;}
+#productionOrderFlow .ubee-store-manual-location input{
+  min-width:0;
+  min-height:42px;
+  padding:9px 11px!important;
+  border:1px solid #ddd4a8!important;
+  border-radius:12px!important;
+  background:#fff!important;
+  font-size:14px!important;
+}
+#productionOrderFlow .ubee-store-manual-location button{
+  min-height:42px;
+  padding:9px 12px;
+  border:0;
+  border-radius:12px;
+  background:#111;
+  color:#fff;
+  font-size:13px!important;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-list-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:2px 0 10px;
+}
+#productionOrderFlow .ubee-store-list-title strong{
+  display:block;
+  font-size:18px;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-list-title span{
+  display:block;
+  margin-top:3px;
+  color:var(--ubee-store-muted);
+  font-size:11px;
+  font-weight:850;
+}
+#productionOrderFlow .ubee-store-sort{
+  width:auto;
+  min-width:112px;
+  min-height:38px;
+  padding:7px 30px 7px 10px!important;
+  border:1px solid var(--ubee-store-line)!important;
+  border-radius:12px!important;
+  background:#fff!important;
+  font-size:12px!important;
+  font-weight:950;
+}
+#productionOrderFlow .ubee-store-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+#productionOrderFlow .ubee-store-card{
+  overflow:hidden;
+  border:1px solid var(--ubee-store-line);
+  border-radius:20px;
+  background:#fff;
+}
+#productionOrderFlow .ubee-store-card-media{
+  position:relative;
+  height:154px;
+  background:linear-gradient(135deg,#fff8c4,#f2f3f4);
+}
+#productionOrderFlow .ubee-store-card-media img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+#productionOrderFlow .ubee-store-photo-fallback{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#7e6d1d;
+  font-size:40px;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-badges{
+  position:absolute;
+  left:10px;
+  top:10px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+#productionOrderFlow .ubee-store-badge{
+  padding:6px 8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.94);
+  color:#111;
+  font-size:10px;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-badge.sponsored{
+  background:#111;
+  color:#fff;
+}
+#productionOrderFlow .ubee-store-card-body{padding:14px;}
+#productionOrderFlow .ubee-store-card-title-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+#productionOrderFlow .ubee-store-card-title{
+  min-width:0;
+}
+#productionOrderFlow .ubee-store-card-title strong{
+  display:block;
+  color:#111;
+  font-size:17px;
+  font-weight:1000;
+  line-height:1.35;
+}
+#productionOrderFlow .ubee-store-card-title span{
+  display:block;
+  margin-top:4px;
+  color:var(--ubee-store-muted);
+  font-size:12px;
+  font-weight:850;
+}
+#productionOrderFlow .ubee-store-open-state{
+  flex:0 0 auto;
+  padding:6px 8px;
+  border-radius:999px;
+  background:#eff8ef;
+  color:#25733b;
+  font-size:10px;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-open-state.closed{
+  background:#f3f4f5;
+  color:#777;
+}
+#productionOrderFlow .ubee-store-address{
+  margin-top:10px;
+  color:#555b61;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.6;
+}
+#productionOrderFlow .ubee-store-purchase-note{
+  margin-top:9px;
+  padding:9px 10px;
+  border-radius:12px;
+  background:#fffbea;
+  color:#6f5a00;
+  font-size:11px;
+  font-weight:900;
+  line-height:1.5;
+}
+#productionOrderFlow .ubee-store-card-actions{
+  display:grid;
+  grid-template-columns:1fr 1.35fr;
+  gap:8px;
+  margin-top:12px;
+}
+#productionOrderFlow .ubee-store-card-actions button{
+  min-height:44px;
+  padding:10px;
+  border-radius:13px;
+  font-size:13px!important;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-view-btn{
+  border:1px solid #d9dcdf;
+  background:#fff;
+  color:#111;
+}
+#productionOrderFlow .ubee-store-buy-btn{
+  border:0;
+  background:var(--ubee-store-accent);
+  color:#111;
+}
+#productionOrderFlow .ubee-store-buy-btn:disabled{
+  opacity:.45;
+}
+#productionOrderFlow .ubee-store-empty,
+#productionOrderFlow .ubee-store-loading,
+#productionOrderFlow .ubee-store-error{
+  padding:28px 18px;
+  border:1px dashed #d9dcdf;
+  border-radius:18px;
+  background:#fff;
+  color:#6f7378;
+  text-align:center;
+  font-size:13px;
+  font-weight:850;
+  line-height:1.7;
+}
+#productionOrderFlow .ubee-store-error{color:#a22b2b;}
+#productionOrderFlow .ubee-store-source-note{
+  margin:14px 2px 0;
+  color:#85898e;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.6;
+  text-align:center;
+}
+#productionOrderFlow .ubee-store-detail-scroll{
+  padding:0 14px 28px;
+  background:#f5f6f7;
+}
+#productionOrderFlow .ubee-store-detail-hero{
+  position:relative;
+  height:230px;
+  margin:0 -14px;
+  overflow:hidden;
+  background:linear-gradient(135deg,#fff4a8,#eceeef);
+}
+#productionOrderFlow .ubee-store-detail-hero img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+#productionOrderFlow .ubee-store-detail-card{
+  position:relative;
+  z-index:2;
+  margin:-24px 0 12px;
+  padding:17px;
+  border:1px solid var(--ubee-store-line);
+  border-radius:22px;
+  background:#fff;
+}
+#productionOrderFlow .ubee-store-detail-title-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+#productionOrderFlow .ubee-store-detail-title-row h2{
+  margin:0;
+  color:#111;
+  font-size:22px;
+  line-height:1.35;
+}
+#productionOrderFlow .ubee-store-detail-meta{
+  margin-top:6px;
+  color:var(--ubee-store-muted);
+  font-size:12px;
+  font-weight:850;
+}
+#productionOrderFlow .ubee-store-detail-section{
+  margin:12px 0;
+  padding:15px;
+  border:1px solid var(--ubee-store-line);
+  border-radius:18px;
+  background:#fff;
+}
+#productionOrderFlow .ubee-store-detail-section h3{
+  margin:0 0 9px;
+  font-size:15px;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-detail-section p,
+#productionOrderFlow .ubee-store-detail-section li{
+  color:#555b61;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.75;
+}
+#productionOrderFlow .ubee-store-detail-section ul{
+  margin:0;
+  padding-left:20px;
+}
+#productionOrderFlow .ubee-store-info-row{
+  display:grid;
+  grid-template-columns:72px minmax(0,1fr);
+  gap:10px;
+  padding:9px 0;
+  border-bottom:1px solid #eef0f1;
+}
+#productionOrderFlow .ubee-store-info-row:last-child{border-bottom:0;}
+#productionOrderFlow .ubee-store-info-row span{
+  color:#868a8f;
+  font-size:11px;
+  font-weight:900;
+}
+#productionOrderFlow .ubee-store-info-row strong,
+#productionOrderFlow .ubee-store-info-row a{
+  color:#111;
+  font-size:12px;
+  font-weight:900;
+  line-height:1.6;
+  word-break:break-word;
+}
+#productionOrderFlow .ubee-store-gallery{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+#productionOrderFlow .ubee-store-gallery figure{
+  margin:0;
+}
+#productionOrderFlow .ubee-store-gallery img{
+  width:100%;
+  aspect-ratio:4/3;
+  object-fit:cover;
+  border-radius:13px;
+  background:#eee;
+}
+#productionOrderFlow .ubee-store-gallery figcaption{
+  margin-top:3px;
+  color:#909398;
+  font-size:9px;
+  line-height:1.35;
+}
+#productionOrderFlow .ubee-store-detail-actions{
+  position:sticky;
+  bottom:4px;
+  z-index:6;
+  display:grid;
+  grid-template-columns:1fr;
+  margin-top:12px;
+  padding:8px;
+  border:1px solid rgba(17,24,39,.08);
+  border-radius:18px;
+  background:rgba(255,255,255,.94);
+  backdrop-filter:blur(12px);
+}
+#productionOrderFlow .ubee-store-detail-buy{
+  min-height:50px;
+  border:0;
+  border-radius:14px;
+  background:var(--ubee-store-accent);
+  color:#111;
+  font-size:15px!important;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-permission-modal{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(15,18,20,.48);
+}
+#productionOrderFlow .ubee-store-permission-modal[hidden]{display:none!important;}
+#productionOrderFlow .ubee-store-permission-dialog{
+  width:min(100%,360px);
+  padding:20px;
+  border-radius:22px;
+  background:#fff;
+}
+#productionOrderFlow .ubee-store-permission-dialog strong{
+  display:block;
+  font-size:19px;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-permission-dialog p{
+  margin:8px 0 16px;
+  color:#666b70;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.65;
+}
+#productionOrderFlow .ubee-store-permission-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+#productionOrderFlow .ubee-store-permission-actions button{
+  min-height:44px;
+  border-radius:13px;
+  font-size:13px!important;
+  font-weight:1000;
+}
+#productionOrderFlow .ubee-store-permission-cancel{
+  border:1px solid #ddd;
+  background:#fff;
+}
+#productionOrderFlow .ubee-store-permission-allow{
+  border:0;
+  background:var(--ubee-store-accent);
+}
+body > #ubeePersistentBottomNav .ubee-nav-store,
+.bottom-tabs .ubee-nav-store{
+  width:24px;
+  height:24px;
+}
+@media(max-width:380px){
+  #productionOrderFlow .ubee-store-card-actions{grid-template-columns:1fr;}
+  #productionOrderFlow .ubee-store-card-media{height:140px;}
+}
+</style>
+<script id="ubee-store-discovery-v1">
+(() => {
+  'use strict';
+  if(window.__UBEE_STORE_DISCOVERY_V1__) return;
+  window.__UBEE_STORE_DISCOVERY_V1__=true;
+
+  const $=id=>document.getElementById(id);
+  const root=$('productionOrderFlow');
+  const shell=root?.querySelector('.flow-shell');
+  if(!root||!shell) return;
+
+  const categoryDefinitions=[
+    ['all','全部'],['food','美食'],['drink','飲料'],['dessert','甜點蛋糕'],
+    ['gift','花束禮品'],['pharmacy','藥局'],['daily','生活用品'],['other','其他']
+  ];
+  const storeState={
+    category:'all',query:'',area:'',lat:null,lng:null,locationLabel:'',
+    stores:[],selectedStore:null,loading:false,initialized:false,sort:'distance',
+    searchTimer:null,requestId:0
+  };
+  const storeCache=new Map();
+  const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+  }[ch]));
+  const storeIcon='<svg aria-hidden="true" class="ubee-nav-store" viewBox="0 0 24 24" fill="none"><path d="M4 9h16l-1-5H5L4 9Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M5 9v11h14V9" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/><path d="M9 20v-6h6v6M4 9c0 1.7 1.1 3 2.5 3S9 10.7 9 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.1 3 2.5 3S20 10.7 20 9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function createPages(){
+    if($('flowPageStores')) return;
+    const listPage=document.createElement('section');
+    listPage.className='flow-page';
+    listPage.dataset.page='stores';
+    listPage.id='flowPageStores';
+    listPage.innerHTML=`
+      <header class="flow-header home">
+        <div class="flow-brand"><span>U</span>Bee 店家探索</div>
+        <span></span>
+        <button aria-label="LINE 官方客服" class="flow-icon-btn" data-ubee-line-support title="LINE 官方客服" type="button"><svg aria-hidden="true" class="ubee-line-support-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#06C755"/><path fill="#fff" d="M18.3 11.2c0-3.1-2.9-5.6-6.4-5.6s-6.4 2.5-6.4 5.6c0 2.8 2.4 5.1 5.6 5.5.2 0 .5.1.5.3.1.2 0 .6 0 .8l-.1.7c0 .2-.2.9.8.5s5.2-3.1 7.1-5.3c1.3-1.4 1.9-2.8 1.9-4.5Z"/></svg></button>
+      </header>
+      <div class="flow-scroll ubee-store-scroll">
+        <div class="ubee-store-search-shell">
+          <div class="ubee-store-search">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="ubeeStoreSearchInput" maxlength="100" placeholder="搜尋店家、商品或地區" autocomplete="off"/>
+            <button id="ubeeStoreSearchButton" type="button" aria-label="搜尋">›</button>
+          </div>
+        </div>
+        <div class="ubee-store-category-strip" id="ubeeStoreCategories"></div>
+        <section class="ubee-store-location-card">
+          <div class="ubee-store-location-head">
+            <div class="ubee-store-location-copy">
+              <strong id="ubeeStoreLocationTitle">開啟定位，尋找附近店家</strong>
+              <span id="ubeeStoreLocationText">允許定位後，系統會依距離顯示附近店家。</span>
+            </div>
+            <button class="ubee-store-location-btn" id="ubeeStoreLocationButton" type="button">搜尋附近店家</button>
+          </div>
+          <div class="ubee-store-manual-location" id="ubeeStoreManualLocation" hidden>
+            <input id="ubeeStoreAreaInput" maxlength="80" placeholder="例如：台中市西屯區"/>
+            <button id="ubeeStoreAreaButton" type="button">搜尋地區</button>
+          </div>
+        </section>
+        <div class="ubee-store-list-head">
+          <div class="ubee-store-list-title"><strong>附近店家</strong><span id="ubeeStoreResultMeta">請先開啟定位或輸入地區</span></div>
+          <select class="ubee-store-sort" id="ubeeStoreSort" aria-label="店家排序">
+            <option value="distance">距離最近</option>
+            <option value="open">營業中優先</option>
+            <option value="recommended">推薦排序</option>
+          </select>
+        </div>
+        <div class="ubee-store-list" id="ubeeStoreList"><div class="ubee-store-empty">找到想買的店家後，可直接委託小U前往代買。<br>UBee 的本質仍是跑腿服務，不是美食外送商城。</div></div>
+        <div class="ubee-store-source-note">店家資訊來源為 Google Maps 公開資料；一般搜尋結果不代表店家與 UBee 存在合作關係。</div>
+      </div>
+      <div class="ubee-store-permission-modal" id="ubeeStorePermissionModal" hidden>
+        <div class="ubee-store-permission-dialog" role="dialog" aria-modal="true" aria-labelledby="ubeeStorePermissionTitle">
+          <strong id="ubeeStorePermissionTitle">是否允許 UBee 開啟定位？</strong>
+          <p>定位只用來搜尋你附近的店家與計算距離。接著瀏覽器會再顯示系統定位權限視窗。</p>
+          <div class="ubee-store-permission-actions">
+            <button class="ubee-store-permission-cancel" id="ubeeStorePermissionCancel" type="button">暫時不要</button>
+            <button class="ubee-store-permission-allow" id="ubeeStorePermissionAllow" type="button">允許定位</button>
+          </div>
+        </div>
+      </div>`;
+
+    const detailPage=document.createElement('section');
+    detailPage.className='flow-page';
+    detailPage.dataset.page='storeDetail';
+    detailPage.id='flowPageStoreDetail';
+    detailPage.innerHTML=`
+      <header class="flow-header">
+        <button aria-label="返回店家列表" class="flow-back-btn" id="ubeeStoreDetailBack" type="button">‹</button>
+        <div class="flow-title-wrap"><div class="flow-title">店家資訊</div><div class="flow-subtitle">查看公開資訊並委託小U代買</div></div>
+        <span></span>
+      </header>
+      <div class="flow-scroll ubee-store-detail-scroll" id="ubeeStoreDetailContent"><div class="ubee-store-loading">店家資訊載入中…</div></div>`;
+    shell.appendChild(listPage);
+    shell.appendChild(detailPage);
+  }
+
+  function ensureNavButtons(){
+    const persistent=$('ubeePersistentBottomNav');
+    if(persistent&&!$('flowNavStores')){
+      const button=document.createElement('button');
+      button.id='flowNavStores';
+      button.type='button';
+      button.setAttribute('aria-label','店家');
+      button.innerHTML=`<span class="flow-nav-icon">${storeIcon}</span><span class="flow-nav-label">店家</span>`;
+      persistent.insertBefore(button,$('flowNavMy')||null);
+    }
+    const legacy=document.querySelector('.bottom-tabs');
+    if(legacy&&!$('tabStores')){
+      const button=document.createElement('button');
+      button.id='tabStores';
+      button.type='button';
+      button.className='bottom-tab';
+      button.setAttribute('aria-label','店家');
+      button.innerHTML=`${storeIcon}店家`;
+      legacy.insertBefore(button,$('tabProfile')||null);
+    }
+  }
+
+  function markStoreNavigation(){
+    ['flowNavHome','flowNavTasks','flowNavMy','tabHome','tabTasks','tabProfile'].forEach(id=>$(id)?.classList.remove('active'));
+    ['flowNavStores','tabStores'].forEach(id=>{
+      $(id)?.classList.add('active');
+      $(id)?.setAttribute('aria-current','page');
+    });
+  }
+
+  function clearStoreNavigation(){
+    ['flowNavStores','tabStores'].forEach(id=>{
+      $(id)?.classList.remove('active');
+      $(id)?.removeAttribute('aria-current');
+    });
+    document.body.classList.remove('ubee-store-active');
+  }
+
+  function activateStorePage(page='stores'){
+    root.classList.add('active');
+    document.body.classList.remove('ubee-active-order','ubee-customer-auth-open');
+    document.body.classList.add('flow-active','ubee-store-active');
+    root.querySelectorAll('.flow-page').forEach(item=>item.classList.toggle('active',item.dataset.page===page));
+    markStoreNavigation();
+    const scroller=root.querySelector(`.flow-page[data-page="${page}"] .flow-scroll`);
+    if(scroller)scroller.scrollTop=0;
+  }
+
+  function renderCategories(){
+    const box=$('ubeeStoreCategories');
+    if(!box)return;
+    box.innerHTML=categoryDefinitions.map(([key,label])=>`<button class="ubee-store-category ${storeState.category===key?'active':''}" type="button" data-store-category="${key}">${escape(label)}</button>`).join('');
+  }
+
+  function getSortedStores(){
+    const rows=[...storeState.stores];
+    const distance=value=>Number.isFinite(Number(value?.distanceMeters))?Number(value.distanceMeters):Number.MAX_SAFE_INTEGER;
+    if(storeState.sort==='open'){
+      rows.sort((a,b)=>Number(b.openNow===true)-Number(a.openNow===true)||distance(a)-distance(b));
+    }else if(storeState.sort==='recommended'){
+      rows.sort((a,b)=>
+        Number(b.isSponsored===true)-Number(a.isSponsored===true)||
+        Number(b.isFeatured===true)-Number(a.isFeatured===true)||
+        Number(b.openNow===true)-Number(a.openNow===true)||
+        Number(b.sortWeight||0)-Number(a.sortWeight||0)||
+        distance(a)-distance(b)
+      );
+    }else{
+      rows.sort((a,b)=>distance(a)-distance(b));
+    }
+    return rows;
+  }
+
+  function storePhotoMarkup(store){
+    const fallback='<div class="ubee-store-photo-fallback" aria-hidden="true">🏪</div>';
+    if(!store.photoUrl)return fallback;
+    return `${fallback}<img src="${escape(store.photoUrl)}" alt="${escape(store.name)}店家照片" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"/>`;
+  }
+
+  function renderStores(){
+    const list=$('ubeeStoreList');
+    if(!list)return;
+    if(storeState.loading){
+      list.innerHTML='<div class="ubee-store-loading">正在搜尋附近店家…</div>';
+      return;
+    }
+    const stores=getSortedStores();
+    if(!stores.length){
+      list.innerHTML='<div class="ubee-store-empty">目前找不到符合條件的店家。<br>可以更換分類、搜尋關鍵字或擴大地區後再試。</div>';
+      return;
+    }
+    list.innerHTML=stores.map(store=>{
+      storeCache.set(store.placeId,store);
+      const badges=[
+        store.isSponsored?`<span class="ubee-store-badge sponsored">${escape(store.sponsorLabel||'贊助推薦')}</span>`:'',
+        store.isFeatured?'<span class="ubee-store-badge">UBee 精選</span>':'',
+        store.isPartnerStore?'<span class="ubee-store-badge">合作店家</span>':''
+      ].join('');
+      const distance=store.distanceText?`・距離 ${escape(store.distanceText)}`:'';
+      return `<article class="ubee-store-card" data-store-id="${escape(store.placeId)}">
+        <div class="ubee-store-card-media">${storePhotoMarkup(store)}<div class="ubee-store-badges">${badges}</div></div>
+        <div class="ubee-store-card-body">
+          <div class="ubee-store-card-title-row">
+            <div class="ubee-store-card-title"><strong>${escape(store.name)}</strong><span>${escape(store.typeLabel||store.categoryLabel||'店家')}${distance}</span></div>
+            <span class="ubee-store-open-state ${store.openNow===true?'':'closed'}">${escape(store.openStatusLabel||'營業時間請確認')}</span>
+          </div>
+          <div class="ubee-store-address">${escape(store.address||'地址請至 Google Maps 確認')}</div>
+          <div class="ubee-store-purchase-note">商品依店內實際售價・${escape(store.purchaseLabel||'可委託小U前往代買')}</div>
+          <div class="ubee-store-card-actions">
+            <button class="ubee-store-view-btn" type="button" data-store-view="${escape(store.placeId)}">查看店家</button>
+            <button class="ubee-store-buy-btn" type="button" data-store-buy="${escape(store.placeId)}" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button>
+          </div>
+        </div>
+      </article>`;
+    }).join('');
+  }
+
+  function setLocationDisplay(title,text,showManual=false){
+    if($('ubeeStoreLocationTitle'))$('ubeeStoreLocationTitle').textContent=title;
+    if($('ubeeStoreLocationText'))$('ubeeStoreLocationText').textContent=text;
+    if($('ubeeStoreManualLocation'))$('ubeeStoreManualLocation').hidden=!showManual;
+  }
+
+  async function reverseLocationLabel(lat,lng){
+    try{
+      const response=await fetch('/api/customer/current-location',{
+        method:'POST',credentials:'include',cache:'no-store',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({lat,lng})
+      });
+      const data=await response.json().catch(()=>({}));
+      if(response.ok&&data.success){
+        const loc=data.location||{};
+        return String(loc.displayLocation||loc.formattedAddress||'目前位置').replace(/^臺/,'台');
+      }
+    }catch(_){ }
+    return '目前位置';
+  }
+
+  async function loadStores(){
+    if(storeState.loading)return;
+    const hasLocation=Number.isFinite(Number(storeState.lat))&&Number.isFinite(Number(storeState.lng));
+    if(!hasLocation&&!storeState.area){
+      setLocationDisplay('開啟定位，尋找附近店家','允許定位後，系統會依距離顯示附近店家。',false);
+      $('ubeeStoreResultMeta').textContent='請先開啟定位或輸入地區';
+      return;
+    }
+    const requestId=++storeState.requestId;
+    storeState.loading=true;
+    renderStores();
+    $('ubeeStoreResultMeta').textContent='搜尋中…';
+    try{
+      const params=new URLSearchParams({category:storeState.category,query:storeState.query,area:storeState.area,limit:'20'});
+      if(hasLocation){params.set('lat',String(storeState.lat));params.set('lng',String(storeState.lng));}
+      const response=await fetch(`/api/customer/stores?${params.toString()}`,{credentials:'include',cache:'no-store'});
+      const data=await response.json().catch(()=>({}));
+      if(requestId!==storeState.requestId)return;
+      if(!response.ok||!data.success)throw new Error(data.message||'附近店家搜尋失敗');
+      storeState.stores=Array.isArray(data.stores)?data.stores:[];
+      $('ubeeStoreResultMeta').textContent=`找到 ${storeState.stores.length} 家・${data.categoryLabel||'全部'}`;
+    }catch(error){
+      storeState.stores=[];
+      $('ubeeStoreResultMeta').textContent='搜尋失敗';
+      $('ubeeStoreList').innerHTML=`<div class="ubee-store-error">${escape(error.message||'附近店家暫時無法搜尋，請稍後再試。')}</div>`;
+    }finally{
+      if(requestId===storeState.requestId){storeState.loading=false;renderStores();}
+    }
+  }
+
+  function requestLocation(showBrowserPrompt=true){
+    if(!navigator.geolocation){
+      setLocationDisplay('此裝置不支援定位','請手動輸入縣市或行政區搜尋店家。',true);
+      return;
+    }
+    setLocationDisplay('正在取得目前位置','請稍候，系統正在鎖定你的位置。',false);
+    navigator.geolocation.getCurrentPosition(async position=>{
+      storeState.lat=Number(position.coords.latitude);
+      storeState.lng=Number(position.coords.longitude);
+      storeState.area='';
+      try{sessionStorage.setItem('ubee_store_location_v1',JSON.stringify({lat:storeState.lat,lng:storeState.lng,savedAt:Date.now()}));}catch(_){ }
+      const label=await reverseLocationLabel(storeState.lat,storeState.lng);
+      storeState.locationLabel=label;
+      setLocationDisplay(`目前位置：${label}`,'已依你的位置搜尋並計算附近店家距離。',false);
+      $('ubeeStoreLocationButton').textContent='重新定位';
+      loadStores();
+    },error=>{
+      const denied=Number(error?.code)===1;
+      setLocationDisplay(
+        denied?'定位權限未開啟':'無法取得目前位置',
+        denied?'請到瀏覽器或手機設定允許定位，或改用手動地區搜尋。':'請改用手動輸入地區搜尋店家。',
+        true
+      );
+      $('ubeeStoreLocationButton').textContent='再次要求定位';
+    },{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
+  }
+
+  function showPermissionModal(){
+    $('ubeeStorePermissionModal').hidden=false;
+  }
+
+  async function initializeLocation(){
+    if(storeState.initialized)return;
+    storeState.initialized=true;
+    try{
+      const saved=JSON.parse(sessionStorage.getItem('ubee_store_location_v1')||'null');
+      if(saved&&Date.now()-Number(saved.savedAt||0)<30*60*1000&&Number.isFinite(Number(saved.lat))&&Number.isFinite(Number(saved.lng))){
+        storeState.lat=Number(saved.lat);storeState.lng=Number(saved.lng);
+        const label=await reverseLocationLabel(storeState.lat,storeState.lng);
+        storeState.locationLabel=label;
+        setLocationDisplay(`目前位置：${label}`,'已依你的位置搜尋並計算附近店家距離。',false);
+        $('ubeeStoreLocationButton').textContent='重新定位';
+        loadStores();
+        return;
+      }
+    }catch(_){ }
+    if(navigator.permissions?.query){
+      try{
+        const permission=await navigator.permissions.query({name:'geolocation'});
+        if(permission.state==='granted'){requestLocation(false);return;}
+        if(permission.state==='denied'){
+          setLocationDisplay('定位權限未開啟','請到瀏覽器或手機設定允許定位，或改用手動地區搜尋。',true);
+          return;
+        }
+      }catch(_){ }
+    }
+    setLocationDisplay('開啟定位，尋找附近店家','點擊「搜尋附近店家」後，系統會詢問是否允許定位。',false);
+  }
+
+  function openStoreList(){
+    activateStorePage('stores');
+    renderCategories();
+    renderStores();
+    initializeLocation();
+  }
+
+  async function openStoreDetail(placeId){
+    const basic=storeCache.get(placeId)||storeState.stores.find(item=>item.placeId===placeId)||null;
+    storeState.selectedStore=basic;
+    activateStorePage('storeDetail');
+    $('ubeeStoreDetailContent').innerHTML='<div class="ubee-store-loading">店家資訊載入中…</div>';
+    try{
+      const params=new URLSearchParams({category:storeState.category});
+      if(Number.isFinite(Number(storeState.lat))&&Number.isFinite(Number(storeState.lng))){params.set('lat',String(storeState.lat));params.set('lng',String(storeState.lng));}
+      const response=await fetch(`/api/customer/stores/${encodeURIComponent(placeId)}?${params.toString()}`,{credentials:'include',cache:'no-store'});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.success)throw new Error(data.message||'店家資訊讀取失敗');
+      storeState.selectedStore={...(basic||{}),...(data.store||{})};
+      storeCache.set(placeId,storeState.selectedStore);
+      renderStoreDetail(storeState.selectedStore);
+    }catch(error){
+      $('ubeeStoreDetailContent').innerHTML=`<div class="ubee-store-error">${escape(error.message||'店家資訊暫時無法讀取。')}<br><button class="ubee-store-view-btn" id="ubeeStoreDetailRetry" type="button" style="margin-top:12px;min-height:42px;padding:8px 14px">重新載入</button></div>`;
+      $('ubeeStoreDetailRetry')?.addEventListener('click',()=>openStoreDetail(placeId));
+    }
+  }
+
+  function renderPhotoAttribution(photo){
+    const rows=Array.isArray(photo?.authorAttributions)?photo.authorAttributions:[];
+    if(!rows.length)return'';
+    return rows.map(item=>item.uri?`<a href="${escape(item.uri)}" target="_blank" rel="noopener">${escape(item.displayName||'圖片提供者')}</a>`:escape(item.displayName||'')).join('、');
+  }
+
+  function renderStoreDetail(store){
+    const photos=Array.isArray(store.photos)&&store.photos.length?store.photos:(store.photoUrl?[{url:store.photoUrl,authorAttributions:store.photo?.authorAttributions||[]}]:[]);
+    const hero=store.photoUrl?`<img src="${escape(store.photoUrl)}" alt="${escape(store.name)}店家封面" referrerpolicy="no-referrer" onerror="this.remove()"/>`:'<div class="ubee-store-photo-fallback">🏪</div>';
+    const hours=Array.isArray(store.weekdayDescriptions)&&store.weekdayDescriptions.length
+      ? store.weekdayDescriptions.map(item=>`<li>${escape(item)}</li>`).join('')
+      : '<li>營業時間請向店家或 Google Maps 確認。</li>';
+    const gallery=photos.length?`<div class="ubee-store-gallery">${photos.map(photo=>`<figure><img src="${escape(photo.url)}" alt="${escape(store.name)}照片" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()"/>${renderPhotoAttribution(photo)?`<figcaption>${renderPhotoAttribution(photo)}</figcaption>`:''}</figure>`).join('')}</div>`:'<p>目前沒有可顯示的店家照片。</p>';
+    $('ubeeStoreDetailContent').innerHTML=`
+      <div class="ubee-store-detail-hero">${hero}</div>
+      <section class="ubee-store-detail-card">
+        <div class="ubee-store-detail-title-row"><div><h2>${escape(store.name)}</h2><div class="ubee-store-detail-meta">${escape(store.typeLabel||store.categoryLabel||'店家')}${store.distanceText?`・距離 ${escape(store.distanceText)}`:''}</div></div><span class="ubee-store-open-state ${store.openNow===true?'':'closed'}">${escape(store.openStatusLabel||'營業時間請確認')}</span></div>
+        <div class="ubee-store-purchase-note">商品依店內實際售價・可委託小U前往代買</div>
+      </section>
+      <section class="ubee-store-detail-section"><h3>店家資訊</h3>
+        <div class="ubee-store-info-row"><span>地址</span><strong>${escape(store.address||'請至 Google Maps 確認')}</strong></div>
+        <div class="ubee-store-info-row"><span>電話</span><strong>${escape(store.phone||'未提供')}</strong></div>
+        <div class="ubee-store-info-row"><span>導航</span>${store.googleMapsUri?`<a href="${escape(store.googleMapsUri)}" target="_blank" rel="noopener">使用 Google Maps 導航</a>`:'<strong>暫無導航連結</strong>'}</div>
+        ${store.websiteUri?`<div class="ubee-store-info-row"><span>網站</span><a href="${escape(store.websiteUri)}" target="_blank" rel="noopener">開啟店家網站</a></div>`:''}
+      </section>
+      <section class="ubee-store-detail-section"><h3>營業時間</h3><ul>${hours}</ul></section>
+      <section class="ubee-store-detail-section"><h3>店家介紹</h3><p>${escape(store.description||'此頁提供公開店家資訊，客人可直接委託小U前往代買。')}</p></section>
+      <section class="ubee-store-detail-section"><h3>商品與店家照片</h3>${gallery}</section>
+      <section class="ubee-store-detail-section"><h3>代買注意事項</h3><ul>${(Array.isArray(store.purchaseNotes)?store.purchaseNotes:[]).map(item=>`<li>${escape(item)}</li>`).join('')}</ul></section>
+      <div class="ubee-store-detail-actions"><button class="ubee-store-detail-buy" id="ubeeStoreDetailBuy" type="button" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button></div>
+      <div class="ubee-store-source-note">資料與圖片來源：Google Maps 公開資料。一般搜尋結果不代表店家與 UBee 存在合作關係。</div>`;
+    $('ubeeStoreDetailBuy')?.addEventListener('click',()=>startPurchase(store));
+  }
+
+  function startPurchase(store){
+    if(!store||!store.address){alert('店家地址不存在，請改用地址搜尋建立代買任務。');return;}
+    try{localStorage.setItem('ubee_store_purchase_context_v1',JSON.stringify({...store,savedAt:Date.now()}));}catch(_){ }
+    if(typeof window.openUBeeStorePurchase==='function'){
+      try{window.openUBeeStorePurchase(store);clearStoreNavigation();return;}catch(error){alert(error.message||'店家資料帶入失敗，請稍後再試。');return;}
+    }
+    alert('下單系統尚未完成載入，請重新整理後再試。');
+  }
+
+  createPages();
+  ensureNavButtons();
+  renderCategories();
+
+  $('ubeeStoreLocationButton')?.addEventListener('click',showPermissionModal);
+  $('ubeeStorePermissionCancel')?.addEventListener('click',()=>{$('ubeeStorePermissionModal').hidden=true;setLocationDisplay('尚未開啟定位','仍可手動輸入縣市或行政區搜尋店家。',true);});
+  $('ubeeStorePermissionAllow')?.addEventListener('click',()=>{$('ubeeStorePermissionModal').hidden=true;requestLocation(true);});
+  $('ubeeStorePermissionModal')?.addEventListener('click',event=>{if(event.target===$('ubeeStorePermissionModal'))$('ubeeStorePermissionModal').hidden=true;});
+  $('ubeeStoreAreaButton')?.addEventListener('click',()=>{storeState.area=String($('ubeeStoreAreaInput')?.value||'').trim();if(!storeState.area){$('ubeeStoreAreaInput')?.focus();return;}storeState.lat=null;storeState.lng=null;setLocationDisplay(`搜尋地區：${storeState.area}`,'已改用手動地區搜尋；距離資訊可能不會顯示。',true);loadStores();});
+  $('ubeeStoreAreaInput')?.addEventListener('keydown',event=>{if(event.key==='Enter')$('ubeeStoreAreaButton')?.click();});
+  $('ubeeStoreSearchButton')?.addEventListener('click',()=>{storeState.query=String($('ubeeStoreSearchInput')?.value||'').trim();loadStores();});
+  $('ubeeStoreSearchInput')?.addEventListener('input',event=>{storeState.query=String(event.target.value||'').trim();clearTimeout(storeState.searchTimer);storeState.searchTimer=setTimeout(()=>{if(storeState.query.length>=2||storeState.query==='')loadStores();},450);});
+  $('ubeeStoreSearchInput')?.addEventListener('keydown',event=>{if(event.key==='Enter'){$('ubeeStoreSearchButton')?.click();}});
+  $('ubeeStoreCategories')?.addEventListener('click',event=>{const button=event.target.closest('[data-store-category]');if(!button)return;storeState.category=button.dataset.storeCategory||'all';renderCategories();loadStores();});
+  $('ubeeStoreSort')?.addEventListener('change',event=>{storeState.sort=event.target.value||'distance';renderStores();});
+  $('ubeeStoreList')?.addEventListener('click',event=>{const view=event.target.closest('[data-store-view]');if(view){openStoreDetail(view.dataset.storeView);return;}const buy=event.target.closest('[data-store-buy]');if(buy){startPurchase(storeCache.get(buy.dataset.storeBuy));}});
+  $('ubeeStoreDetailBack')?.addEventListener('click',openStoreList);
+
+  document.addEventListener('click',event=>{
+    const storeTab=event.target.closest('#flowNavStores,#tabStores');
+    if(storeTab){event.preventDefault();event.stopImmediatePropagation();openStoreList();return;}
+    if(event.target.closest('#flowNavHome,#flowNavTasks,#flowNavMy,#tabHome,#tabTasks,#tabProfile'))clearStoreNavigation();
+  },true);
+
+  const observer=new MutationObserver(()=>ensureNavButtons());
+  observer.observe(document.body,{childList:true,subtree:true});
+  window.openUBeeStorePage=openStoreList;
 })();
 </script>
 
