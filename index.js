@@ -15,6 +15,7 @@ const multer = require('multer');
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
 // 2026-08-05｜待接任務隱私預覽：接單前僅回傳行政區、路線、收入與必要摘要。
 // 2026-08-06 Store V2｜Google Places API 僅由客戶主動點擊「搜尋更多附近店家」時呼叫；一般店家瀏覽改由 Vercel 靜態 JSON 提供。
+// 2026-08-06 Store V2.1｜代買任務改為商品、數量、規格、缺貨處理與其他需求的結構化欄位。
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -21149,7 +21150,7 @@ const ORDER_INPUT_LIMITS = {
   pickupPhone: 20,
   dropoffAddress: 120,
   dropoffPhone: 20,
-  note: 300,
+  note: 700,
 };
 
 const MAX_ADVANCE_PAYMENT = 1000;
@@ -21290,6 +21291,24 @@ function validateOrderInput(data) {
 
   if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !hasRemark) {
     errors.push('請完整填寫取件地址、送達地址、電話與備註。');
+  }
+
+  const isPurchaseOrder =
+    String(data.serviceKey || '').trim() === 'buy' ||
+    String(data.serviceMode || '').trim() === 'buy' ||
+    String(data.serviceGroup || '').includes('幫我買') ||
+    String(data.serviceType || '').includes('代買');
+
+  if (isPurchaseOrder) {
+    const purchaseDetails = normalizePurchaseDetailsInput(data.purchaseDetails);
+
+    if (!purchaseDetails.productName) {
+      errors.push('請填寫要購買的商品名稱。');
+    }
+
+    if (!purchaseDetails.quantity) {
+      errors.push('請填寫商品數量。');
+    }
   }
 
   Object.entries(ORDER_INPUT_LIMITS).forEach(([key, limit]) => {
@@ -23214,6 +23233,63 @@ function formatRouteDurationText(durationSeconds) {
   return `${hours} 小時 ${remainMinutes} 分鐘`;
 }
 
+function normalizePurchaseOutOfStockAction(value) {
+  const action = String(value || '').trim();
+
+  if (['contact_customer', 'contact'].includes(action)) {
+    return 'contact_customer';
+  }
+
+  if (['similar_item', 'similar', 'replace'].includes(action)) {
+    return 'similar_item';
+  }
+
+  if (['skip_item', 'skip'].includes(action)) {
+    return 'skip_item';
+  }
+
+  return 'contact_customer';
+}
+
+function getPurchaseOutOfStockLabel(value) {
+  return {
+    contact_customer: '請先聯絡客人',
+    similar_item: '可接受相近商品',
+    skip_item: '缺貨就不購買',
+  }[normalizePurchaseOutOfStockAction(value)];
+}
+
+function normalizePurchaseDetailsInput(value) {
+  const source = value && typeof value === 'object' ? value : {};
+
+  return {
+    productName: cleanText(source.productName || source.itemName || '', 100),
+    quantity: cleanText(source.quantity || '', 40),
+    specification: cleanLongText(source.specification || source.spec || '', 140),
+    outOfStockAction: normalizePurchaseOutOfStockAction(
+      source.outOfStockAction || source.replacementPolicy
+    ),
+    additionalNote: cleanLongText(
+      source.additionalNote || source.note || '',
+      220
+    ),
+  };
+}
+
+function buildPurchaseDetailsTaskNote(value) {
+  const details = normalizePurchaseDetailsInput(value);
+
+  return [
+    details.productName ? `商品：${details.productName}` : '',
+    details.quantity ? `數量：${details.quantity}` : '',
+    details.specification ? `規格：${details.specification}` : '',
+    `缺貨處理：${getPurchaseOutOfStockLabel(details.outOfStockAction)}`,
+    details.additionalNote ? `其他需求：${details.additionalNote}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function createOrderFromApi(data) {
   const userId = cleanText(
     data.userId || data.customerId || '',
@@ -23348,8 +23424,18 @@ function createOrderFromApi(data) {
         phone: normalizePhone(
           cleanText(rawStoreDiscovery.phone || '', 40)
         ),
-        source: 'google_places',
-        sourceLabel: 'Google Maps 公開店家資訊',
+        source:
+          String(rawStoreDiscovery.source || '').trim().toLowerCase() === 'ubee_local_catalog' ||
+          String(rawStoreDiscovery.source || '').trim().toLowerCase() === 'local' ||
+          String(rawStoreDiscovery.placeId || rawStoreDiscovery.id || '').startsWith('local:')
+            ? 'ubee_local_catalog'
+            : 'google_places',
+        sourceLabel:
+          String(rawStoreDiscovery.source || '').trim().toLowerCase() === 'ubee_local_catalog' ||
+          String(rawStoreDiscovery.source || '').trim().toLowerCase() === 'local' ||
+          String(rawStoreDiscovery.placeId || rawStoreDiscovery.id || '').startsWith('local:')
+            ? 'UBee 本地店家目錄'
+            : 'Google Maps 公開店家資訊',
         isPartnerStore: false,
         isFeatured: false,
         isSponsored: false,
@@ -23357,14 +23443,25 @@ function createOrderFromApi(data) {
       }
     : null;
 
+  const purchaseDetails = normalizePurchaseDetailsInput(
+    data.purchaseDetails
+  );
+
+  const generatedPurchaseNote =
+    purchaseDetails.productName || purchaseDetails.quantity
+      ? buildPurchaseDetailsTaskNote(purchaseDetails)
+      : '';
+
   const rawNote = cleanLongText(
     data.note ||
+    generatedPurchaseNote ||
     data.item ||
     '',
     ORDER_INPUT_LIMITS.note
   );
 
   const rawItem = cleanText(
+    purchaseDetails.productName ||
     data.item ||
     rawNote ||
     data.serviceType ||
@@ -23390,8 +23487,14 @@ function createOrderFromApi(data) {
       : {};
 
   const taskDetails = {
-    itemName: cleanText(rawTaskDetails.itemName || '', 120),
-    quantity: cleanText(rawTaskDetails.quantity || data.itemQuantity || '', 40),
+    itemName: cleanText(
+      rawTaskDetails.itemName || purchaseDetails.productName || '',
+      120
+    ),
+    quantity: cleanText(
+      rawTaskDetails.quantity || purchaseDetails.quantity || data.itemQuantity || '',
+      40
+    ),
     weight: cleanText(rawTaskDetails.weight || '', 40),
     pickupCode: cleanText(rawTaskDetails.pickupCode || '', 80),
     pickupPaid: ['paid', 'unpaid', 'unknown'].includes(String(rawTaskDetails.pickupPaid || ''))
@@ -23399,7 +23502,11 @@ function createOrderFromApi(data) {
       : 'unknown',
     replacementPolicy: ['contact', 'skip', 'similar'].includes(String(rawTaskDetails.replacementPolicy || ''))
       ? String(rawTaskDetails.replacementPolicy)
-      : 'contact',
+      : purchaseDetails.outOfStockAction === 'similar_item'
+        ? 'similar'
+        : purchaseDetails.outOfStockAction === 'skip_item'
+          ? 'skip'
+          : 'contact',
     invoice: ['need', 'no_need', 'either'].includes(String(rawTaskDetails.invoice || ''))
       ? String(rawTaskDetails.invoice)
       : 'need',
@@ -23444,6 +23551,7 @@ function createOrderFromApi(data) {
     ),
 
     item: rawItem,
+    purchaseDetails,
     taskDetails,
     deliveryPreferences,
     vehiclePreference,
@@ -23573,10 +23681,24 @@ function createOrderFromApi(data) {
       ? data.shoppingItems.slice(0, 20).map(item => ({
           name: cleanText(item?.name || '', 120),
           quantity: cleanText(item?.quantity || '', 30),
+          specification: cleanLongText(item?.specification || item?.spec || '', 160),
           budget: cleanText(item?.budget || '', 30),
           replacementPolicy: cleanText(item?.replacementPolicy || '', 40),
         })).filter(item => item.name)
-      : [],
+      : purchaseDetails.productName
+        ? [{
+            name: purchaseDetails.productName,
+            quantity: purchaseDetails.quantity,
+            specification: purchaseDetails.specification,
+            budget: cleanText(data.advancePayment || '', 30),
+            replacementPolicy:
+              purchaseDetails.outOfStockAction === 'similar_item'
+                ? 'similar'
+                : purchaseDetails.outOfStockAction === 'skip_item'
+                  ? 'skip'
+                  : 'contact',
+          }]
+        : [],
     addressCenterVersion: cleanText(data.addressCenterVersion || '', 50),
     clientSchemaVersion: cleanText(data.clientSchemaVersion || '', 80),
 
@@ -26931,7 +27053,7 @@ async function verifyStoreDiscoveryForOrder(rawStoreDiscovery) {
     200
   );
 
-  if (!placeId || !/^[A-Za-z0-9_-]+$/.test(placeId)) {
+  if (!placeId || !/^[A-Za-z0-9:_-]+$/.test(placeId)) {
     return {
       ok: false,
       statusCode: 400,
@@ -26979,6 +27101,10 @@ async function verifyStoreDiscoveryForOrder(rawStoreDiscovery) {
 
   const category = normalizeStoreCategory(rawStoreDiscovery.category);
   const safeCategory = category === 'all' ? 'other' : category;
+  const isLocalCatalogStore =
+    placeId.startsWith('local:') ||
+    String(rawStoreDiscovery.source || '').trim().toLowerCase() === 'ubee_local_catalog' ||
+    String(rawStoreDiscovery.source || '').trim().toLowerCase() === 'local';
   const storeDiscovery = {
     placeId,
     name: cleanText(rawStoreDiscovery.name || '', 120),
@@ -26986,8 +27112,10 @@ async function verifyStoreDiscoveryForOrder(rawStoreDiscovery) {
     typeLabel: cleanText(rawStoreDiscovery.typeLabel || '', 80),
     address: cleanText(rawStoreDiscovery.address || '', 160),
     phone: normalizePhone(cleanText(rawStoreDiscovery.phone || '', 40)),
-    source: 'google_places',
-    sourceLabel: 'Google Maps 公開店家資訊',
+    source: isLocalCatalogStore ? 'ubee_local_catalog' : 'google_places',
+    sourceLabel: isLocalCatalogStore
+      ? 'UBee 本地店家目錄'
+      : 'Google Maps 公開店家資訊',
     isPartnerStore: override?.isPartnerStore === true,
     isFeatured: override?.isFeatured === true,
     isSponsored: override?.isSponsored === true,
@@ -27660,6 +27788,11 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   shoppingItems:
     Array.isArray(data.shoppingItems) ? data.shoppingItems : [],
+
+  purchaseDetails:
+    data.purchaseDetails && typeof data.purchaseDetails === 'object'
+      ? data.purchaseDetails
+      : null,
 
   taskDetails:
     data.taskDetails && typeof data.taskDetails === 'object'
