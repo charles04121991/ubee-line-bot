@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260806-3" rel="manifest"/>
+<link href="/manifest-order.json?v=20260806-4" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 店家探索正式整合版：2026-08-06 V1.1｜安全、費用、來源標示與統一底部圖示修正版 -->
+<!-- UBee 店家探索 V2：2026-08-06｜本地店家目錄優先，Google 僅於使用者主動搜尋時呼叫 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -20698,7 +20698,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21599,7 +21599,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.06.3';
+  const APP_VERSION = '2026.08.06.4';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -24109,7 +24109,7 @@ body > #ubeePersistentBottomNav .ubee-nav-store,
 
 
 /* =====================================================
-   UBee 店家探索 V1.1：來源標示、相片資訊與統一底部圖示
+   UBee 店家探索 V2：本地目錄優先、按需搜尋 Google、統一底部圖示
    ===================================================== */
 #productionOrderFlow .ubee-store-source-note,
 #productionOrderFlow .ubee-store-google-attribution{
@@ -24186,12 +24186,19 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
   display:block!important;
   color:currentColor!important;
 }
+
+#productionOrderFlow .ubee-store-source-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 14px;padding:12px;border:1px solid #e5e7e9;border-radius:16px;background:#fff;}
+#productionOrderFlow .ubee-store-source-actions span{color:#74787d;font-size:11px;font-weight:800;line-height:1.5;text-align:right;}
+#productionOrderFlow .ubee-store-google-search-btn{flex:0 0 auto;min-height:40px;padding:0 14px;border:1px solid #111;border-radius:999px;background:#111;color:#fff;font-size:12px!important;font-weight:1000;}
+#productionOrderFlow .ubee-store-source-chip{display:inline-flex;align-items:center;min-height:22px;padding:3px 8px;border-radius:999px;background:#f1f2f3;color:#62676d;font-size:10px;font-weight:1000;}
+#productionOrderFlow .ubee-store-source-chip.google{background:#eef4ff;color:#315d9b;}
+@media(max-width:390px){#productionOrderFlow .ubee-store-source-actions{align-items:stretch;flex-direction:column;}#productionOrderFlow .ubee-store-source-actions span{text-align:left;}}
 </style>
-<script id="ubee-store-discovery-v11">
+<script id="ubee-store-discovery-v2">
 (() => {
   'use strict';
-  if(window.__UBEE_STORE_DISCOVERY_V11__) return;
-  window.__UBEE_STORE_DISCOVERY_V11__=true;
+  if(window.__UBEE_STORE_DISCOVERY_V2__) return;
+  window.__UBEE_STORE_DISCOVERY_V2__=true;
 
   const $=id=>document.getElementById(id);
   const root=$('productionOrderFlow');
@@ -24211,7 +24218,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
   const storeState={
     category:'all',query:'',area:'',lat:null,lng:null,locationLabel:'',
     stores:[],selectedStore:null,loading:false,initialized:false,sort:'distance',
-    searchTimer:null,requestId:0,requestController:null
+    searchTimer:null,requestId:0,requestController:null,localCatalog:[],googleStores:[],sourceMode:'local',catalogLoaded:false
   };
   const storeCache=new Map();
   const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({
@@ -24228,7 +24235,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
 
   function setButtonIcon(button,icon,label,persistent=false){
     if(!button)return;
-    const version=`v11:${persistent?'persistent':'legacy'}:${label}`;
+    const version=`v2:${persistent?'persistent':'legacy'}:${label}`;
     if(button.dataset.ubeeUnifiedNavIcon===version&&button.querySelector('.ubee-nav-unified'))return;
     button.setAttribute('aria-label',label);
     button.innerHTML=persistent
@@ -24253,7 +24260,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
         <div class="ubee-store-search-shell">
           <div class="ubee-store-search">
             <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <input id="ubeeStoreSearchInput" maxlength="100" placeholder="搜尋店家、商品或地區" autocomplete="off"/>
+            <input id="ubeeStoreSearchInput" maxlength="100" placeholder="搜尋本地店家名稱、分類或地區" autocomplete="off"/>
             <button id="ubeeStoreSearchButton" type="button" aria-label="搜尋">›</button>
           </div>
         </div>
@@ -24272,14 +24279,15 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
           </div>
         </section>
         <div class="ubee-store-list-head">
-          <div class="ubee-store-list-title"><strong>附近店家</strong><span id="ubeeStoreResultMeta">請先開啟定位或輸入地區</span></div>
+          <div class="ubee-store-list-title"><strong>UBee 店家目錄</strong><span id="ubeeStoreResultMeta">本地資料載入中…</span></div>
           <select class="ubee-store-sort" id="ubeeStoreSort" aria-label="店家排序">
             <option value="distance">距離最近</option>
             <option value="recommended">推薦排序</option>
           </select>
         </div>
-        <div class="ubee-store-list" id="ubeeStoreList"><div class="ubee-store-empty">找到想買的店家後，可直接委託小U前往代買。<br>UBee 的本質仍是跑腿服務，不是美食外送商城。</div></div>
-        ${googleAttributionMarkup('提供店家名稱、地址、分類、照片與營業資訊')}
+        <div class="ubee-store-source-actions"><button class="ubee-store-google-search-btn" id="ubeeStoreGoogleSearchButton" type="button">搜尋更多附近店家</button><span>只有按下此按鈕才會使用 Google 店家搜尋。</span></div>
+        <div class="ubee-store-list" id="ubeeStoreList"><div class="ubee-store-loading">正在載入 UBee 本地店家目錄…</div></div>
+        <div id="ubeeStoreGoogleAttribution" hidden>${googleAttributionMarkup('提供 Google 即時搜尋結果')}</div>
       </div>
       <div class="ubee-store-permission-modal" id="ubeeStorePermissionModal" hidden>
         <div class="ubee-store-permission-dialog" role="dialog" aria-modal="true" aria-labelledby="ubeeStorePermissionTitle">
@@ -24370,63 +24378,109 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     box.innerHTML=categoryDefinitions.map(([key,label])=>`<button class="ubee-store-category ${storeState.category===key?'active':''}" type="button" data-store-category="${key}">${escape(label)}</button>`).join('');
   }
 
+  function distanceMeters(lat1,lng1,lat2,lng2){
+    const values=[lat1,lng1,lat2,lng2].map(Number);
+    if(!values.every(Number.isFinite))return null;
+    const [a,b,c,d]=values.map(value=>value*Math.PI/180);
+    const x=Math.sin((c-a)/2)**2+Math.cos(a)*Math.cos(c)*Math.sin((d-b)/2)**2;
+    return Math.round(6371000*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)));
+  }
+
+  function distanceText(value){
+    const meters=Number(value);
+    if(!Number.isFinite(meters))return'';
+    return meters<1000?`${Math.max(1,Math.round(meters))} 公尺`:`${(meters/1000).toFixed(meters<10000?1:0)} 公里`;
+  }
+
+  function normalizeLocalStore(raw,index){
+    const id=String(raw?.id||`store-${index+1}`).trim();
+    const category=String(raw?.category||'other').trim();
+    const lat=Number(raw?.latitude);
+    const lng=Number(raw?.longitude);
+    const distance=distanceMeters(storeState.lat,storeState.lng,lat,lng);
+    return {
+      source:'local',placeId:`local:${id}`,localId:id,name:String(raw?.name||'未命名店家'),
+      category,categoryLabel:String(raw?.categoryLabel||categoryDefinitions.find(item=>item[0]===category)?.[1]||'其他'),
+      typeLabel:String(raw?.typeLabel||raw?.categoryLabel||categoryDefinitions.find(item=>item[0]===category)?.[1]||'店家'),
+      address:String(raw?.address||''),phone:String(raw?.phone||''),latitude:Number.isFinite(lat)?lat:null,longitude:Number.isFinite(lng)?lng:null,
+      distanceMeters:distance,distanceText:distanceText(distance),photoUrl:String(raw?.coverImage||raw?.image||''),customCoverUrl:String(raw?.coverImage||raw?.image||''),
+      description:String(raw?.description||'此店家已收錄於 UBee 本地店家目錄，可直接委託小U前往代買。'),
+      weekdayDescriptions:Array.isArray(raw?.businessHours)?raw.businessHours:[],purchaseNotes:Array.isArray(raw?.purchaseNotes)?raw.purchaseNotes:['商品依店內實際售價。','請在任務內容填寫品項、數量、規格與缺貨處理方式。'],
+      googleMapsUri:String(raw?.googleMapsUri||''),openNow:typeof raw?.openNow==='boolean'?raw.openNow:null,openStatusLabel:String(raw?.openStatusLabel||'營業狀態請確認'),
+      canRequestPurchase:raw?.purchaseEnabled!==false,purchaseLabel:raw?.purchaseEnabled===false?'目前不提供代買':'可委託小U前往代買',
+      isFeatured:raw?.featured===true,isSponsored:raw?.sponsored===true,isPartnerStore:raw?.partner===true,sortWeight:Number(raw?.sortWeight||0),photos:[]
+    };
+  }
+
+  function localStoreMatches(store){
+    if(storeState.category!=='all'&&store.category!==storeState.category)return false;
+    const query=storeState.query.toLowerCase();
+    if(query){
+      const haystack=[store.name,store.address,store.typeLabel,store.categoryLabel,store.description].join(' ').toLowerCase();
+      if(!haystack.includes(query))return false;
+    }
+    if(storeState.area){
+      const area=storeState.area.replace(/\s+/g,'').toLowerCase();
+      if(!String(store.address||'').replace(/\s+/g,'').toLowerCase().includes(area))return false;
+    }
+    return true;
+  }
+
+  async function loadLocalCatalog(force=false){
+    if(storeState.catalogLoaded&&!force){applyLocalFilters();return;}
+    storeState.loading=true;renderStores();
+    try{
+      const response=await fetch('/stores-taichung.json?v=20260806-4',{cache:'force-cache'});
+      if(!response.ok)throw new Error(`本地店家目錄讀取失敗（HTTP ${response.status}）`);
+      const payload=await response.json();
+      const rows=Array.isArray(payload)?payload:Array.isArray(payload?.stores)?payload.stores:[];
+      storeState.localCatalog=rows.filter(item=>item&&item.enabled!==false);
+      storeState.catalogLoaded=true;
+      applyLocalFilters();
+    }catch(error){
+      storeState.localCatalog=[];storeState.catalogLoaded=true;storeState.stores=[];
+      $('ubeeStoreResultMeta').textContent='本地目錄尚未建立';
+      $('ubeeStoreList').innerHTML=`<div class="ubee-store-error">${escape(error.message||'本地店家目錄暫時無法讀取。')}<br>仍可按「搜尋更多附近店家」使用即時搜尋。</div>`;
+    }finally{storeState.loading=false;renderStores();}
+  }
+
+  function applyLocalFilters(){
+    storeState.sourceMode='local';
+    storeState.stores=storeState.localCatalog.map(normalizeLocalStore).filter(localStoreMatches);
+    $('ubeeStoreResultMeta').textContent=`本地目錄 ${storeState.stores.length} 家・不使用 Google API`;
+    $('ubeeStoreGoogleAttribution').hidden=true;
+    renderStores();
+  }
+
   function getSortedStores(){
     const rows=[...storeState.stores];
     const distance=value=>Number.isFinite(Number(value?.distanceMeters))?Number(value.distanceMeters):Number.MAX_SAFE_INTEGER;
     if(storeState.sort==='recommended'){
-      rows.sort((a,b)=>
-        Number(b.isSponsored===true)-Number(a.isSponsored===true)||
-        Number(b.isFeatured===true)-Number(a.isFeatured===true)||
-        Number(b.sortWeight||0)-Number(a.sortWeight||0)||
-        distance(a)-distance(b)
-      );
-    }else{
-      rows.sort((a,b)=>distance(a)-distance(b));
-    }
+      rows.sort((a,b)=>Number(b.isSponsored===true)-Number(a.isSponsored===true)||Number(b.isFeatured===true)-Number(a.isFeatured===true)||Number(b.sortWeight||0)-Number(a.sortWeight||0)||distance(a)-distance(b));
+    }else rows.sort((a,b)=>distance(a)-distance(b));
     return rows;
   }
 
   function storePhotoMarkup(store){
-    const fallback='<div class="ubee-store-photo-fallback" aria-hidden="true">🏪</div>';
+    const icons={food:'🍜',drink:'🥤',dessert:'🍰',gift:'💐',pharmacy:'💊',daily:'🧻',other:'🏪'};
+    const fallback=`<div class="ubee-store-photo-fallback" aria-hidden="true">${icons[store.category]||'🏪'}</div>`;
     if(!store.photoUrl)return fallback;
     return `${fallback}<img src="${escape(store.photoUrl)}" alt="${escape(store.name)}店家照片" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"/>`;
   }
 
   function renderStores(){
-    const list=$('ubeeStoreList');
-    if(!list)return;
-    if(storeState.loading){
-      list.innerHTML='<div class="ubee-store-loading">正在搜尋附近店家…</div>';
-      return;
-    }
+    const list=$('ubeeStoreList');if(!list)return;
+    if(storeState.loading){list.innerHTML='<div class="ubee-store-loading">正在載入店家資料…</div>';return;}
     const stores=getSortedStores();
     if(!stores.length){
-      list.innerHTML='<div class="ubee-store-empty">目前找不到符合條件的店家。<br>可以更換分類、搜尋關鍵字或擴大地區後再試。</div>';
-      return;
+      list.innerHTML=`<div class="ubee-store-empty">${storeState.sourceMode==='local'?'本地目錄目前沒有符合條件的店家。<br>可更換分類，或按「搜尋更多附近店家」。':'Google 即時搜尋目前沒有符合條件的店家。'}</div>`;return;
     }
     list.innerHTML=stores.map(store=>{
       storeCache.set(store.placeId,store);
-      const badges=[
-        store.isSponsored?`<span class="ubee-store-badge sponsored">${escape(store.sponsorLabel||'贊助推薦')}</span>`:'',
-        store.isFeatured?'<span class="ubee-store-badge">UBee 精選</span>':'',
-        store.isPartnerStore?'<span class="ubee-store-badge">合作店家</span>':''
-      ].join('');
+      const badges=[store.isSponsored?`<span class="ubee-store-badge sponsored">${escape(store.sponsorLabel||'贊助推薦')}</span>`:'',store.isFeatured?'<span class="ubee-store-badge">UBee 精選</span>':'',store.isPartnerStore?'<span class="ubee-store-badge">合作店家</span>':''].join('');
       const distance=store.distanceText?`・距離 ${escape(store.distanceText)}`:'';
-      return `<article class="ubee-store-card" data-store-id="${escape(store.placeId)}">
-        <div class="ubee-store-card-media">${storePhotoMarkup(store)}<div class="ubee-store-badges">${badges}</div></div>
-        <div class="ubee-store-card-body">
-          <div class="ubee-store-card-title-row">
-            <div class="ubee-store-card-title"><strong>${escape(store.name)}</strong><span>${escape(store.typeLabel||store.categoryLabel||'店家')}${distance}</span></div>
-            <span class="ubee-store-open-state ${store.openNow===true?'':'closed'}">${escape(store.openStatusLabel||'營業狀態請確認')}</span>
-          </div>
-          <div class="ubee-store-address">${escape(store.address||'地址請至 Google Maps 確認')}</div>
-          <div class="ubee-store-purchase-note">商品依店內實際售價・${escape(store.purchaseLabel||'可委託小U前往代買')}</div>
-          <div class="ubee-store-card-actions">
-            <button class="ubee-store-view-btn" type="button" data-store-view="${escape(store.placeId)}">查看店家</button>
-            <button class="ubee-store-buy-btn" type="button" data-store-buy="${escape(store.placeId)}" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button>
-          </div>
-        </div>
-      </article>`;
+      const sourceLabel=store.source==='google'?'<span class="ubee-store-source-chip google">Google 即時</span>':'<span class="ubee-store-source-chip">UBee 目錄</span>';
+      return `<article class="ubee-store-card" data-store-id="${escape(store.placeId)}"><div class="ubee-store-card-media">${storePhotoMarkup(store)}<div class="ubee-store-badges">${badges}</div></div><div class="ubee-store-card-body"><div class="ubee-store-card-title-row"><div class="ubee-store-card-title"><strong>${escape(store.name)}</strong><span>${escape(store.typeLabel||store.categoryLabel||'店家')}${distance}</span></div><span class="ubee-store-open-state ${store.openNow===true?'':'closed'}">${escape(store.openStatusLabel||'營業狀態請確認')}</span></div><div style="margin:6px 0">${sourceLabel}</div><div class="ubee-store-address">${escape(store.address||'地址請確認')}</div><div class="ubee-store-purchase-note">商品依店內實際售價・${escape(store.purchaseLabel||'可委託小U前往代買')}</div><div class="ubee-store-card-actions"><button class="ubee-store-view-btn" type="button" data-store-view="${escape(store.placeId)}">查看店家</button><button class="ubee-store-buy-btn" type="button" data-store-buy="${escape(store.placeId)}" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button></div></div></article>`;
     }).join('');
   }
 
@@ -24436,59 +24490,35 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     if($('ubeeStoreManualLocation'))$('ubeeStoreManualLocation').hidden=!showManual;
   }
 
-  async function reverseLocationLabel(lat,lng){
-    try{
-      const response=await fetch('/api/customer/current-location',{
-        method:'POST',credentials:'include',cache:'no-store',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({lat,lng})
-      });
-      const data=await response.json().catch(()=>({}));
-      if(response.ok&&data.success){
-        const loc=data.location||{};
-        return String(loc.displayLocation||loc.formattedAddress||'目前位置').replace(/^臺/,'台');
-      }
-    }catch(_){ }
+  async function reverseLocationLabel(){
     return '目前位置';
   }
 
   async function loadStores(){
+    applyLocalFilters();
+  }
+
+  async function loadGoogleStores(){
     const hasLocation=Number.isFinite(Number(storeState.lat))&&Number.isFinite(Number(storeState.lng));
-    if(!hasLocation&&!storeState.area){
-      setLocationDisplay('開啟定位，尋找附近店家','允許定位後，系統會依距離顯示附近店家。',false);
-      $('ubeeStoreResultMeta').textContent='請先開啟定位或輸入地區';
-      return;
-    }
-
+    if(!hasLocation&&!storeState.area){setLocationDisplay('請先開啟定位或輸入地區','Google 即時搜尋需要位置或地區條件。',true);return;}
     if(storeState.requestController)storeState.requestController.abort();
-    const controller=new AbortController();
-    storeState.requestController=controller;
-    const requestId=++storeState.requestId;
-    storeState.loading=true;
-    renderStores();
-    $('ubeeStoreResultMeta').textContent='搜尋中…';
-
+    const controller=new AbortController();storeState.requestController=controller;const requestId=++storeState.requestId;
+    storeState.loading=true;storeState.sourceMode='google';renderStores();$('ubeeStoreResultMeta').textContent='正在搜尋 Google 即時店家…';
     try{
       const params=new URLSearchParams({category:storeState.category,query:storeState.query,area:storeState.area,limit:'20',radius:'6000'});
       if(hasLocation){params.set('lat',String(storeState.lat));params.set('lng',String(storeState.lng));}
       const response=await fetch(`/api/customer/stores?${params.toString()}`,{credentials:'include',cache:'no-store',signal:controller.signal});
       const data=await response.json().catch(()=>({}));
       if(requestId!==storeState.requestId)return;
-      if(!response.ok||!data.success)throw new Error(data.message||'附近店家搜尋失敗');
-      storeState.stores=Array.isArray(data.stores)?data.stores:[];
-      $('ubeeStoreResultMeta').textContent=`找到 ${storeState.stores.length} 家・${data.categoryLabel||'全部'}`;
+      if(!response.ok||!data.success)throw new Error(data.message||'Google 店家搜尋失敗');
+      storeState.googleStores=(Array.isArray(data.stores)?data.stores:[]).map(item=>({...item,source:'google'}));storeState.stores=storeState.googleStores;
+      $('ubeeStoreResultMeta').textContent=`Google 即時搜尋 ${storeState.stores.length} 家`;
+      $('ubeeStoreGoogleAttribution').hidden=false;
     }catch(error){
       if(error?.name==='AbortError')return;
-      storeState.stores=[];
-      $('ubeeStoreResultMeta').textContent='搜尋失敗';
-      $('ubeeStoreList').innerHTML=`<div class="ubee-store-error">${escape(error.message||'附近店家暫時無法搜尋，請稍後再試。')}</div>`;
-    }finally{
-      if(requestId===storeState.requestId){
-        storeState.loading=false;
-        storeState.requestController=null;
-        renderStores();
-      }
-    }
+      storeState.stores=[];$('ubeeStoreResultMeta').textContent='Google 搜尋失敗';
+      $('ubeeStoreList').innerHTML=`<div class="ubee-store-error">${escape(error.message||'Google 即時店家暫時無法搜尋。')}</div>`;
+    }finally{if(requestId===storeState.requestId){storeState.loading=false;storeState.requestController=null;renderStores();}}
   }
 
   function requestLocation(){
@@ -24501,10 +24531,10 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
       storeState.lat=Number(position.coords.latitude);
       storeState.lng=Number(position.coords.longitude);
       storeState.area='';
-      try{sessionStorage.setItem('ubee_store_location_v11',JSON.stringify({lat:storeState.lat,lng:storeState.lng,savedAt:Date.now()}));}catch(_){ }
+      try{sessionStorage.setItem('ubee_store_location_v2',JSON.stringify({lat:storeState.lat,lng:storeState.lng,savedAt:Date.now()}));}catch(_){ }
       const label=await reverseLocationLabel(storeState.lat,storeState.lng);
       storeState.locationLabel=label;
-      setLocationDisplay(`目前位置：${label}`,'已依你的位置搜尋並計算附近店家距離。',false);
+      setLocationDisplay(`目前位置：${label}`,'距離由手機直接計算，不使用 Google 路線 API。',false);
       $('ubeeStoreLocationButton').textContent='重新定位';
       loadStores();
     },error=>{
@@ -24526,12 +24556,12 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     if(storeState.initialized)return;
     storeState.initialized=true;
     try{
-      const saved=JSON.parse(sessionStorage.getItem('ubee_store_location_v11')||'null');
+      const saved=JSON.parse(sessionStorage.getItem('ubee_store_location_v2')||'null');
       if(saved&&Date.now()-Number(saved.savedAt||0)<30*60*1000&&Number.isFinite(Number(saved.lat))&&Number.isFinite(Number(saved.lng))){
         storeState.lat=Number(saved.lat);storeState.lng=Number(saved.lng);
         const label=await reverseLocationLabel(storeState.lat,storeState.lng);
         storeState.locationLabel=label;
-        setLocationDisplay(`目前位置：${label}`,'已依你的位置搜尋並計算附近店家距離。',false);
+        setLocationDisplay(`目前位置：${label}`,'距離由手機直接計算，不使用 Google 路線 API。',false);
         $('ubeeStoreLocationButton').textContent='重新定位';
         loadStores();
         return;
@@ -24553,7 +24583,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
   function openStoreList(){
     activateStorePage('stores');
     renderCategories();
-    renderStores();
+    loadLocalCatalog();
     initializeLocation();
   }
 
@@ -24561,6 +24591,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     const basic=storeCache.get(placeId)||storeState.stores.find(item=>item.placeId===placeId)||null;
     storeState.selectedStore=basic;
     activateStorePage('storeDetail');
+    if(basic?.source==='local'||String(placeId).startsWith('local:')){renderStoreDetail(basic);return;}
     $('ubeeStoreDetailContent').innerHTML='<div class="ubee-store-loading">店家資訊載入中…</div>';
     try{
       const params=new URLSearchParams({category:storeState.category});
@@ -24617,7 +24648,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
       <section class="ubee-store-detail-section"><h3>商品與店家照片</h3>${gallery}</section>
       <section class="ubee-store-detail-section"><h3>代買注意事項</h3><ul>${(Array.isArray(store.purchaseNotes)?store.purchaseNotes:[]).map(item=>`<li>${escape(item)}</li>`).join('')}</ul></section>
       <div class="ubee-store-detail-actions"><button class="ubee-store-detail-buy" id="ubeeStoreDetailBuy" type="button" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button></div>
-      ${googleAttributionMarkup('提供本頁店家與照片資料',store.attributions)}`;
+      ${store.source==='google'?googleAttributionMarkup('提供本頁店家與照片資料',store.attributions):'<div class="ubee-store-google-attribution"><span>資料來源：UBee 本地店家目錄</span></div>'}`;
     $('ubeeStoreDetailBuy')?.addEventListener('click',()=>startPurchase(store));
   }
 
@@ -24632,18 +24663,20 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
   createPages();
   ensureNavButtons();
   renderCategories();
+  loadLocalCatalog();
 
   $('ubeeStoreLocationButton')?.addEventListener('click',showPermissionModal);
   $('ubeeStorePermissionCancel')?.addEventListener('click',()=>{$('ubeeStorePermissionModal').hidden=true;setLocationDisplay('尚未開啟定位','仍可手動輸入縣市或行政區搜尋店家。',true);});
   $('ubeeStorePermissionAllow')?.addEventListener('click',()=>{$('ubeeStorePermissionModal').hidden=true;requestLocation();});
   $('ubeeStorePermissionModal')?.addEventListener('click',event=>{if(event.target===$('ubeeStorePermissionModal'))$('ubeeStorePermissionModal').hidden=true;});
-  $('ubeeStoreAreaButton')?.addEventListener('click',()=>{storeState.area=String($('ubeeStoreAreaInput')?.value||'').trim();if(!storeState.area){$('ubeeStoreAreaInput')?.focus();return;}storeState.lat=null;storeState.lng=null;setLocationDisplay(`搜尋地區：${storeState.area}`,'已改用手動地區搜尋；距離資訊可能不會顯示。',true);loadStores();});
+  $('ubeeStoreAreaButton')?.addEventListener('click',()=>{storeState.area=String($('ubeeStoreAreaInput')?.value||'').trim();if(!storeState.area){$('ubeeStoreAreaInput')?.focus();return;}storeState.lat=null;storeState.lng=null;setLocationDisplay(`篩選地區：${storeState.area}`,'正在篩選 UBee 本地店家目錄；不呼叫 Google API。',true);applyLocalFilters();});
   $('ubeeStoreAreaInput')?.addEventListener('keydown',event=>{if(event.key==='Enter')$('ubeeStoreAreaButton')?.click();});
-  $('ubeeStoreSearchButton')?.addEventListener('click',()=>{clearTimeout(storeState.searchTimer);storeState.query=String($('ubeeStoreSearchInput')?.value||'').trim();loadStores();});
-  $('ubeeStoreSearchInput')?.addEventListener('input',event=>{storeState.query=String(event.target.value||'').trim();clearTimeout(storeState.searchTimer);storeState.searchTimer=setTimeout(()=>{if(storeState.query.length>=2||storeState.query==='')loadStores();},900);});
+  $('ubeeStoreSearchButton')?.addEventListener('click',()=>{clearTimeout(storeState.searchTimer);storeState.query=String($('ubeeStoreSearchInput')?.value||'').trim();applyLocalFilters();});
+  $('ubeeStoreSearchInput')?.addEventListener('input',event=>{storeState.query=String(event.target.value||'').trim();clearTimeout(storeState.searchTimer);storeState.searchTimer=setTimeout(()=>applyLocalFilters(),250);});
   $('ubeeStoreSearchInput')?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('ubeeStoreSearchButton')?.click();}});
-  $('ubeeStoreCategories')?.addEventListener('click',event=>{const button=event.target.closest('[data-store-category]');if(!button)return;storeState.category=button.dataset.storeCategory||'all';renderCategories();loadStores();});
+  $('ubeeStoreCategories')?.addEventListener('click',event=>{const button=event.target.closest('[data-store-category]');if(!button)return;storeState.category=button.dataset.storeCategory||'all';renderCategories();applyLocalFilters();});
   $('ubeeStoreSort')?.addEventListener('change',event=>{storeState.sort=event.target.value||'distance';renderStores();});
+  $('ubeeStoreGoogleSearchButton')?.addEventListener('click',loadGoogleStores);
   $('ubeeStoreList')?.addEventListener('click',event=>{const view=event.target.closest('[data-store-view]');if(view){openStoreDetail(view.dataset.storeView);return;}const buy=event.target.closest('[data-store-buy]');if(buy){startPurchase(storeCache.get(buy.dataset.storeBuy));}});
   $('ubeeStoreDetailBack')?.addEventListener('click',openStoreList);
 
