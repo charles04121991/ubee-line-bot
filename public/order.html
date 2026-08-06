@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260806-4" rel="manifest"/>
+<link href="/manifest-order.json?v=20260806-5" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 店家探索 V2：2026-08-06｜本地店家目錄優先，Google 僅於使用者主動搜尋時呼叫 -->
+<!-- UBee 店家探索 V2.1：2026-08-06｜本地目錄優先＋代買內容結構化表單 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -19502,8 +19502,6 @@ body.flow-active>.app{display:none!important;}
 #flowTaskNote{min-height:138px;max-height:280px;resize:none;overflow-y:auto;}
 .flow-buy-note-example{display:none;margin-top:8px;color:#858a90;font-size:11px;font-weight:800;line-height:1.65;}
 body.ubee-buy-task-active .flow-buy-note-example{display:block;}
-body.ubee-buy-task-active #flowAdvanceWrap .flow-label::before{content:"預計商品金額";font-size:13px;}
-body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
 
 .flow-input,.flow-select,.flow-textarea{width:100%;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#111;outline:none;}.flow-input,.flow-select{min-height:52px;padding:0 13px;}.flow-textarea{min-height:126px;padding:12px 13px;line-height:1.65;resize:vertical;}.flow-input:focus,.flow-select:focus,.flow-textarea:focus{border-color:#c79d00;}
 .flow-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.flow-dynamic-field[hidden]{display:none!important;}
@@ -19568,6 +19566,34 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
 /* ===== UBee 用戶端｜我的頁面（台灣用語、所有入口可點擊） ===== */
 
 @media(max-width:380px){}
+
+/* =====================================================
+   UBee 店家探索 V2.1｜代買內容結構化表單
+   ===================================================== */
+.flow-buy-structured{display:none;}
+body.ubee-buy-task-active .flow-buy-structured{display:block;}
+body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
+.flow-purchase-form{margin:0 0 18px;padding:0;}
+.flow-purchase-form-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.flow-purchase-form-head strong{display:block;color:#111;font-size:16px;font-weight:1000;line-height:1.4;}
+.flow-purchase-form-head small{display:block;margin-top:3px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.5;}
+.flow-purchase-required{color:#dc2626;}
+.flow-purchase-grid{display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:10px;}
+.flow-purchase-field{margin-bottom:12px;}
+.flow-purchase-field:last-child{margin-bottom:0;}
+.flow-purchase-field label{display:block;margin:0 0 7px;color:#303236;font-size:13px;font-weight:1000;}
+.flow-purchase-field .flow-input,
+.flow-purchase-field .flow-textarea{background:#fff;}
+.flow-purchase-note{min-height:92px!important;max-height:180px!important;resize:none!important;}
+.flow-stock-options{display:flex;flex-wrap:wrap;gap:8px;}
+.flow-stock-option{min-height:42px;padding:9px 13px;border:1px solid var(--flow-line);border-radius:999px;background:#fff;color:#565b61;font-size:12px!important;font-weight:900;line-height:1.3;}
+.flow-stock-option.active{border-color:#111;background:#111;color:#fff;}
+.flow-purchase-help{margin-top:8px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.65;}
+.flow-purchase-preview{margin-top:12px;padding:11px 12px;border:1px solid #efe2a2;border-radius:14px;background:#fffbea;color:#6a5b23;font-size:11px;font-weight:850;line-height:1.65;}
+@media(max-width:360px){
+  .flow-purchase-grid{grid-template-columns:1fr;}
+  .flow-stock-option{flex:1 1 calc(50% - 8px);}
+}
 </style>
 <div aria-label="UBee 客人端正式下單流程" id="productionOrderFlow">
 <div class="flow-shell">
@@ -19674,7 +19700,24 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
 <select aria-hidden="true" class="flow-compat-select" id="flowServiceCategory" tabindex="-1"></select>
 </div>
 <div class="flow-store-summary" id="flowStorePurchaseSummary"><div class="flow-store-summary-kicker">購買店家</div><div class="flow-store-summary-main"><div class="flow-store-summary-name" id="flowStorePurchaseName">尚未選擇店家</div><span class="flow-store-summary-badge">已自動帶入</span></div></div>
-<div class="flow-form-group"><label class="flow-label" for="flowTaskNote" id="flowTaskNoteLabel">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="請說明任務內容與注意事項"></textarea><div class="flow-buy-note-example" id="flowBuyNoteExample">請填寫商品名稱、數量、規格及缺貨處理方式。</div><div class="flow-inline-note" id="flowTaskNoteHelp">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
+<div class="flow-form-group" id="flowTaskNoteGroup"><label class="flow-label" for="flowTaskNote" id="flowTaskNoteLabel">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="請說明任務內容與注意事項"></textarea><div class="flow-inline-note" id="flowTaskNoteHelp">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
+<div class="flow-buy-structured" id="flowPurchaseDetailsForm">
+  <div class="flow-purchase-form">
+    <div class="flow-purchase-form-head"><div><strong>請告訴小U要買什麼 <span class="flow-purchase-required">＊</span></strong><small>分開填寫後，系統會自動整理成清楚的代買任務。</small></div></div>
+    <div class="flow-purchase-field"><label for="flowPurchaseProductName">商品名稱 <span class="flow-purchase-required">＊</span></label><input class="flow-input" id="flowPurchaseProductName" maxlength="100" placeholder="例如：生日蛋糕"/></div>
+    <div class="flow-purchase-grid">
+      <div class="flow-purchase-field"><label for="flowPurchaseQuantity">數量 <span class="flow-purchase-required">＊</span></label><input class="flow-input" id="flowPurchaseQuantity" maxlength="40" placeholder="例如：1 個"/></div>
+      <div class="flow-purchase-field"><label for="flowPurchaseSpecification">規格</label><input class="flow-input" id="flowPurchaseSpecification" maxlength="140" placeholder="例如：8 吋、巧克力口味"/></div>
+    </div>
+    <div class="flow-purchase-field"><label>缺貨時怎麼處理？</label><div aria-label="缺貨處理方式" class="flow-stock-options" id="flowPurchaseStockOptions" role="radiogroup">
+      <button aria-pressed="true" class="flow-stock-option active" data-purchase-stock-policy="contact_customer" type="button">先聯絡我</button>
+      <button aria-pressed="false" class="flow-stock-option" data-purchase-stock-policy="similar_item" type="button">可接受相近商品</button>
+      <button aria-pressed="false" class="flow-stock-option" data-purchase-stock-policy="skip_item" type="button">缺貨就不買</button>
+    </div></div>
+    <div class="flow-purchase-field"><label for="flowPurchaseAdditionalNote">其他需求</label><textarea class="flow-textarea flow-purchase-note" id="flowPurchaseAdditionalNote" maxlength="220" placeholder="例如：需要蠟燭、生日牌、發票"></textarea><div class="flow-purchase-help">可補充品牌、保存期限、發票、包裝或交付注意事項。</div></div>
+    <div class="flow-purchase-preview">小U會看到：商品、數量、規格、缺貨處理方式與其他需求。</div>
+  </div>
+</div>
 <div class="flow-form-group ubee-hidden-duplicate-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="999" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowQueueWrap"><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/></div>
@@ -20033,7 +20076,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
     pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
-    taskName:'',taskNote:'',itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,
+    taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
@@ -20088,6 +20131,101 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
     try{const list=serviceGroups?.[state.service]||[];return list[state.serviceTypeIndex]||list[0]||{title:serviceLabels[state.service],categories:['其他']}}catch(_){return{title:serviceLabels[state.service],categories:['其他']}}
   }
 
+  function emptyPurchaseDetails(){
+    return{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''};
+  }
+
+  function normalizePurchaseDetails(value){
+    const source=value&&typeof value==='object'?value:{};
+    const action=['contact_customer','similar_item','skip_item'].includes(String(source.outOfStockAction||''))
+      ? String(source.outOfStockAction)
+      : 'contact_customer';
+    return{
+      productName:String(source.productName||'').trim().slice(0,100),
+      quantity:String(source.quantity||'').trim().slice(0,40),
+      specification:String(source.specification||'').trim().slice(0,140),
+      outOfStockAction:action,
+      additionalNote:String(source.additionalNote||'').trim().slice(0,220)
+    };
+  }
+
+  function purchasePolicyLabel(action){
+    return{
+      contact_customer:'請先聯絡客人',
+      similar_item:'可接受相近商品',
+      skip_item:'缺貨就不購買'
+    }[action]||'請先聯絡客人';
+  }
+
+  function purchaseLegacyPolicy(action){
+    return action==='similar_item'?'similar':action==='skip_item'?'skip':'contact';
+  }
+
+  function purchaseFieldExamples(){
+    const text=[
+      state.serviceCategory,
+      selectedServiceDefinition()?.title,
+      state.storeContext?.category,
+      state.storeContext?.categoryLabel,
+      state.storeContext?.typeLabel
+    ].filter(Boolean).join(' ').toLowerCase();
+    if(/蛋糕|甜點|麵包|dessert|bakery|cake/.test(text))return{product:'生日蛋糕',quantity:'1 個',spec:'8 吋、巧克力口味',note:'需要蠟燭、生日牌或發票'};
+    if(/花束|花店|禮品|florist|gift/.test(text))return{product:'玫瑰花束',quantity:'1 束',spec:'紅玫瑰、約 12 朵',note:'卡片內容、包裝顏色或送禮注意事項'};
+    if(/飲料|咖啡|茶|drink|cafe|coffee/.test(text))return{product:'珍珠奶茶',quantity:'2 杯',spec:'大杯、微糖少冰',note:'需要封膜或分開裝袋'};
+    if(/藥局|藥品|pharmacy|drug/.test(text))return{product:'退熱貼',quantity:'1 盒',spec:'成人用',note:'品牌不限時可註明，處方藥不提供代買'};
+    if(/生活用品|清潔|衛生|daily|household/.test(text))return{product:'衛生紙',quantity:'2 串',spec:'三層抽取式',note:'品牌不限、請確認包裝完整'};
+    if(/生鮮|蔬果|fresh|grocery/.test(text))return{product:'鮮奶',quantity:'2 瓶',spec:'低脂、936ml 左右',note:'請選保存期限較久的商品'};
+    if(/美食|餐點|便當|food|restaurant/.test(text))return{product:'雞腿便當',quantity:'2 份',spec:'不辣、飯少',note:'需要餐具或發票可在這裡補充'};
+    return{product:'商品名稱',quantity:'1 個',spec:'品牌、尺寸、口味或型號',note:'品牌、發票、包裝、保存期限或其他注意事項'};
+  }
+
+  function readPurchaseDetailsFromForm(){
+    return normalizePurchaseDetails({
+      productName:$('flowPurchaseProductName')?.value,
+      quantity:$('flowPurchaseQuantity')?.value,
+      specification:$('flowPurchaseSpecification')?.value,
+      outOfStockAction:root.querySelector('[data-purchase-stock-policy].active')?.dataset.purchaseStockPolicy||state.purchaseDetails?.outOfStockAction,
+      additionalNote:$('flowPurchaseAdditionalNote')?.value
+    });
+  }
+
+  function buildPurchaseTaskNote(value){
+    const details=normalizePurchaseDetails(value);
+    const lines=[
+      details.productName?`商品：${details.productName}`:'',
+      details.quantity?`數量：${details.quantity}`:'',
+      details.specification?`規格：${details.specification}`:'',
+      `缺貨處理：${purchasePolicyLabel(details.outOfStockAction)}`,
+      details.additionalNote?`其他需求：${details.additionalNote}`:''
+    ].filter(Boolean);
+    return lines.join('\n');
+  }
+
+  function syncPurchaseForm(){
+    const details=normalizePurchaseDetails(state.purchaseDetails);
+    state.purchaseDetails=details;
+    const examples=purchaseFieldExamples();
+    if($('flowPurchaseProductName')){$('flowPurchaseProductName').value=details.productName;$('flowPurchaseProductName').placeholder=`例如：${examples.product}`;}
+    if($('flowPurchaseQuantity')){$('flowPurchaseQuantity').value=details.quantity;$('flowPurchaseQuantity').placeholder=`例如：${examples.quantity}`;}
+    if($('flowPurchaseSpecification')){$('flowPurchaseSpecification').value=details.specification;$('flowPurchaseSpecification').placeholder=`例如：${examples.spec}`;}
+    if($('flowPurchaseAdditionalNote')){$('flowPurchaseAdditionalNote').value=details.additionalNote;$('flowPurchaseAdditionalNote').placeholder=`例如：${examples.note}`;}
+    root.querySelectorAll('[data-purchase-stock-policy]').forEach(button=>{
+      const active=button.dataset.purchaseStockPolicy===details.outOfStockAction;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',active?'true':'false');
+    });
+  }
+
+  function captureCurrentTaskDraft(){
+    state.taskName=String($('flowTaskName')?.value||state.taskName).trim();
+    if(state.service==='buy'){
+      state.purchaseDetails=readPurchaseDetailsFromForm();
+      state.taskNote=buildPurchaseTaskNote(state.purchaseDetails);
+    }else{
+      state.taskNote=String($('flowTaskNote')?.value||state.taskNote).trim();
+    }
+  }
+
   function syncServiceSelectors(){
     let list=[];try{list=serviceGroups?.[state.service]||[]}catch(_){list=[]}
     if(!list.length)list=[{icon:'🐝',title:serviceLabels[state.service],categories:['其他']}];
@@ -20124,9 +20262,12 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
     const taskNoteInput=$('flowTaskNote');
     const storeSummary=$('flowStorePurchaseSummary');
     const storeName=$('flowStorePurchaseName');
-    if(taskNoteLabel)taskNoteLabel.innerHTML=isBuyTask?'請告訴小U要買什麼 <span class="flow-required">＊</span>':'要請小U完成什麼？ <span class="flow-required">＊</span>';
-    if(taskNoteHelp)taskNoteHelp.textContent=isBuyTask?'商品、數量、規格與缺貨處理方式寫清楚即可。':'寫清楚品項、數量、取件方式、交付方式與注意事項即可。';
-    if(taskNoteInput)taskNoteInput.placeholder=isBuyTask?'例如：衛生紙 2 串，三層抽取式；缺貨時請先聯絡我':'請說明任務內容與注意事項';
+    const advanceLabel=$('flowAdvanceWrap')?.querySelector('.flow-label');
+    if(taskNoteLabel)taskNoteLabel.innerHTML='要請小U完成什麼？ <span class="flow-required">＊</span>';
+    if(taskNoteHelp)taskNoteHelp.textContent='寫清楚品項、數量、取件方式、交付方式與注意事項即可。';
+    if(taskNoteInput)taskNoteInput.placeholder='請說明任務內容與注意事項';
+    if(advanceLabel)advanceLabel.textContent=isBuyTask?'預計商品金額':'預估代墊金額';
+    syncPurchaseForm();
     const purchaseStore=state.storeContext&&typeof state.storeContext==='object'?state.storeContext:null;
     if(storeSummary)storeSummary.classList.toggle('active',Boolean(isBuyTask&&purchaseStore));
     if(storeName)storeName.textContent=purchaseStore?String(purchaseStore.name||purchaseStore.displayName||'已選擇店家'):'尚未選擇店家';
@@ -20298,11 +20439,47 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
   }
 
   function collectTask(){
-    state.serviceTypeIndex=Number($('flowServiceType')?.value)||0;state.serviceCategory=$('flowServiceCategory')?.value||state.serviceCategory;
-    state.taskName=String($('flowTaskName')?.value||'').trim();state.taskNote=String($('flowTaskNote')?.value||'').trim();state.itemSize=$('flowItemSize')?.value||'small';state.upstairs=$('flowUpstairs')?.value||'none';state.advancePayment=$('flowAdvanceWrap')?.hidden?0:Math.max(0,Math.round(Number($('flowAdvancePayment')?.value)||0));state.queueMinutes=Math.max(10,Math.min(480,Math.round(Number($('flowQueueMinutes')?.value)||30)));
+    state.serviceTypeIndex=Number($('flowServiceType')?.value)||0;
+    state.serviceCategory=$('flowServiceCategory')?.value||state.serviceCategory;
+    state.taskName=String($('flowTaskName')?.value||'').trim();
+    if(state.service==='buy'){
+      state.purchaseDetails=readPurchaseDetailsFromForm();
+      state.taskNote=buildPurchaseTaskNote(state.purchaseDetails);
+    }else{
+      state.taskNote=String($('flowTaskNote')?.value||'').trim();
+    }
+    state.itemSize=$('flowItemSize')?.value||'small';
+    state.upstairs=$('flowUpstairs')?.value||'none';
+    state.advancePayment=$('flowAdvanceWrap')?.hidden?0:Math.max(0,Math.round(Number($('flowAdvancePayment')?.value)||0));
+    state.queueMinutes=Math.max(10,Math.min(480,Math.round(Number($('flowQueueMinutes')?.value)||30)));
   }
 
-  function validateTask(){collectTask();if(!state.taskName)state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];if(!state.taskNote){status('flowTaskStatus','請完整填寫任務內容，才能進入下一步。',true);$('flowTaskNote').focus();return false}if(state.advancePayment>=1000){status('flowTaskStatus','代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。',true);return false}status('flowTaskStatus','');return true}
+  function validateTask(){
+    collectTask();
+    if(!state.taskName)state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];
+    if(state.service==='buy'){
+      if(!state.purchaseDetails.productName){
+        status('flowTaskStatus','請填寫要購買的商品名稱。',true);
+        $('flowPurchaseProductName')?.focus();
+        return false;
+      }
+      if(!state.purchaseDetails.quantity){
+        status('flowTaskStatus','請填寫商品數量。',true);
+        $('flowPurchaseQuantity')?.focus();
+        return false;
+      }
+    }else if(!state.taskNote){
+      status('flowTaskStatus','請完整填寫任務內容，才能進入下一步。',true);
+      $('flowTaskNote')?.focus();
+      return false;
+    }
+    if(state.advancePayment>=1000){
+      status('flowTaskStatus','代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。',true);
+      return false;
+    }
+    status('flowTaskStatus','');
+    return true;
+  }
 
   function ensureTimeDefaults(){
     const round=ms=>Math.ceil(ms/(5*60*1000))*(5*60*1000);const start=new Date(round(Date.now()+2*60*60*1000));const end=new Date(round(Date.now()+4*60*60*1000));
@@ -20325,7 +20502,11 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
     const p=state.pickup||{},d=state.dropoff||{};const set=(id,value)=>{const el=$(id);if(el)el.value=value??''};
     set('pickup',p.address||'');set('pickupAddressNote',p.addressDetail||'');set('pickupContact',p.contactName||'');set('pickupPhone',p.phone||'');
     set('dropoff',d.address||'');set('dropoffAddressNote',d.addressDetail||'');set('dropoffContact',d.contactName||'');set('dropoffPhone',d.phone||'');
-    set('taskItemName',state.taskName||selectedServiceDefinition().title||serviceLabels[state.service]);set('note',state.taskNote);set('item',state.taskNote);set('itemSize',state.itemSize);set('upstairsOption',state.upstairs);set('advancePayment',String(state.advancePayment||0));set('queueMinutes',state.service==='queue'?String(state.queueMinutes||30):'0');if(state.service==='queue')set('queueLocation',p.address||'');
+    const purchase=state.service==='buy'?normalizePurchaseDetails(state.purchaseDetails):null;
+    set('taskItemName',purchase?.productName||state.taskName||selectedServiceDefinition().title||serviceLabels[state.service]);
+    set('taskQuantity',purchase?.quantity||'');
+    set('taskReplacementPolicy',purchaseLegacyPolicy(purchase?.outOfStockAction));
+    set('note',state.taskNote);set('item',state.taskNote);set('itemSize',state.itemSize);set('upstairsOption',state.upstairs);set('advancePayment',String(state.advancePayment||0));set('queueMinutes',state.service==='queue'?String(state.queueMinutes||30):'0');if(state.service==='queue')set('queueLocation',p.address||'');
     set('scheduledDate',state.scheduledDate);set('scheduledTime',state.scheduledTime);set('scheduleGoal',state.scheduleGoal);set('flexibleDate',state.flexibleDate);set('flexibleStartTime',state.flexibleStart);set('flexibleEndTime',state.flexibleEnd);
     try{
       serviceGroup=state.service;serviceMode=resolveClientServiceMode(state.service,serviceLabels[state.service]);const def=selectedServiceDefinition();serviceType=def.title||serviceLabels[state.service];serviceCategory=state.serviceCategory||def.categories?.[0]||'其他';speedType=state.timing==='immediate'?state.speed:'standard';orderTimingType=state.timing;scheduleGoal=state.scheduleGoal;
@@ -20350,11 +20531,32 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
           typeLabel:String(store.typeLabel||'').trim(),
           address:String(store.address||'').trim(),
           phone:String(store.phone||'').trim(),
-          source:'google_places',
-          sourceLabel:'Google Maps 公開店家資訊'
+          source:String(store.source||'').toLowerCase()==='local'?'ubee_local_catalog':'google_places',
+          sourceLabel:String(store.source||'').toLowerCase()==='local'?'UBee 本地店家目錄':'Google Maps 公開店家資訊'
         }:null;
+        const purchase=state.service==='buy'
+          ? normalizePurchaseDetails(state.purchaseDetails)
+          : null;
+        const compiledNote=purchase?buildPurchaseTaskNote(purchase):state.taskNote;
         return{
           ...payload,
+          item:compiledNote||payload.item,
+          note:compiledNote||payload.note,
+          itemQuantity:purchase?.quantity||payload.itemQuantity||'',
+          purchaseDetails:purchase,
+          shoppingItems:purchase?[{
+            name:purchase.productName,
+            quantity:purchase.quantity,
+            specification:purchase.specification,
+            budget:String(state.advancePayment||''),
+            replacementPolicy:purchaseLegacyPolicy(purchase.outOfStockAction)
+          }]:payload.shoppingItems,
+          taskDetails:{
+            ...(payload.taskDetails&&typeof payload.taskDetails==='object'?payload.taskDetails:{}),
+            itemName:purchase?.productName||payload.taskDetails?.itemName||'',
+            quantity:purchase?.quantity||payload.taskDetails?.quantity||'',
+            replacementPolicy:purchaseLegacyPolicy(purchase?.outOfStockAction)
+          },
           serviceMode:resolveClientServiceMode(state.service,payload.serviceType||serviceLabels[state.service]),
           pickupAddressObject:state.pickup||null,
           dropoffAddressObject:state.dropoff||null,
@@ -20367,7 +20569,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
             lng:Number.isFinite(Number(store?.lng))?Number(store.lng):null
           }:payload.nearbyPlace,
           storeDiscovery,
-          clientSchemaVersion:'customer-production-flow-v4-store-discovery-v11-2026-08-06'
+          clientSchemaVersion:'customer-production-flow-v4-store-v21-purchase-details-2026-08-06'
         };
       };
       wrapped.__productionFlowWrapped=true;
@@ -20441,7 +20643,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
   }
 
   function resetNewTask(clearLegacy=true){
-    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
+    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
     if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=null;pickupPlaceId=dropoffPlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;localStorage.removeItem('ubee_order_draft_v2')}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
   }
@@ -20590,10 +20792,11 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
     $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));
     $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||!state.dropoff){status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}status('flowHomeStatus','');syncServiceSelectors();showPage('task')});$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
     root.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.go)));
-    $('flowServiceTypeChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-type-index]');if(!btn)return;state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceTypeIndex=Number(btn.dataset.serviceTypeIndex)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];syncServiceSelectors()});
-    $('flowServiceCategoryChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-category]');if(!btn)return;state.taskName=String($('flowTaskName')?.value||state.taskName).trim();state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceCategory=btn.dataset.serviceCategory||'';$('flowServiceCategory').value=state.serviceCategory;syncServiceSelectors()});
-    $('flowServiceType').addEventListener('change',()=>{state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||state.taskName;syncServiceSelectors()});
-    $('flowServiceCategory').addEventListener('change',()=>{state.taskName=String($('flowTaskName')?.value||state.taskName).trim();state.taskNote=String($('flowTaskNote')?.value||state.taskNote);state.serviceCategory=$('flowServiceCategory').value;syncServiceSelectors()});
+    $('flowServiceTypeChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-type-index]');if(!btn)return;captureCurrentTaskDraft();state.serviceTypeIndex=Number(btn.dataset.serviceTypeIndex)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];syncServiceSelectors()});
+    $('flowServiceCategoryChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-category]');if(!btn)return;captureCurrentTaskDraft();state.serviceCategory=btn.dataset.serviceCategory||'';$('flowServiceCategory').value=state.serviceCategory;syncServiceSelectors()});
+    $('flowServiceType').addEventListener('change',()=>{captureCurrentTaskDraft();state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||state.taskName;syncServiceSelectors()});
+    $('flowServiceCategory').addEventListener('change',()=>{captureCurrentTaskDraft();state.serviceCategory=$('flowServiceCategory').value;syncServiceSelectors()});
+    $('flowPurchaseStockOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-purchase-stock-policy]');if(!button)return;root.querySelectorAll('[data-purchase-stock-policy]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active?'true':'false')});state.purchaseDetails=readPurchaseDetailsFromForm();});
     $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
     $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn)setTiming(btn.dataset.timing)});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn)setSpeed(btn.dataset.speed)});$('flowOptionsNext').addEventListener('click',()=>{if(validateOptions())openConfirm()});
     $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
@@ -20679,6 +20882,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
     state.addressTarget='dropoff';
     state.taskName=`${name}代買`;
     state.taskNote='';
+    state.purchaseDetails=emptyPurchaseDetails();
     state.advancePayment=0;
     state.itemSize='small';
     syncServiceSelectors();
@@ -20698,7 +20902,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-5';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21599,7 +21803,7 @@ body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.06.4';
+  const APP_VERSION = '2026.08.06.5';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -24430,7 +24634,7 @@ body > #ubeePersistentBottomNav .ubee-nav-unified,
     if(storeState.catalogLoaded&&!force){applyLocalFilters();return;}
     storeState.loading=true;renderStores();
     try{
-      const response=await fetch('/stores-taichung.json?v=20260806-4',{cache:'force-cache'});
+      const response=await fetch('/stores-taichung.json?v=20260806-5',{cache:'force-cache'});
       if(!response.ok)throw new Error(`本地店家目錄讀取失敗（HTTP ${response.status}）`);
       const payload=await response.json();
       const rows=Array.isArray(payload)?payload:Array.isArray(payload?.stores)?payload.stores:[];
