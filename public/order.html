@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260806-2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260806-3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19492,6 +19492,19 @@ body.flow-active>.app{display:none!important;}
 .flow-primary,.flow-secondary{width:100%;min-height:54px;border-radius:16px;font-weight:1000;}.flow-primary{border:none;background:var(--flow-accent);color:#111;}.flow-secondary{border:1px solid #dfe2e5;background:#fff;color:#333;}.flow-primary:active,.flow-secondary:active{transform:scale(.985);}.flow-primary:disabled{opacity:.45;}
 .flow-home-next{margin-top:13px;}
 .flow-form-group{margin-bottom:14px;}.flow-label{display:block;margin:0 0 7px;color:#25282b;font-size:13px;font-weight:1000;}.flow-required{color:var(--flow-danger);}
+/* UBee V1.2｜代買任務內容精簡版 */
+.flow-store-summary{display:none;margin:0 0 16px;padding:14px 15px;border:1px solid #e4e6e9;border-radius:16px;background:#fafafa;}
+.flow-store-summary.active{display:block;}
+.flow-store-summary-kicker{margin-bottom:5px;color:#7a7f85;font-size:11px;font-weight:1000;}
+.flow-store-summary-main{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.flow-store-summary-name{min-width:0;color:#111;font-size:15px;font-weight:1000;line-height:1.45;overflow-wrap:anywhere;}
+.flow-store-summary-badge{flex:0 0 auto;padding:5px 8px;border-radius:999px;background:#fff3b0;color:#6f5700;font-size:10px;font-weight:1000;}
+#flowTaskNote{min-height:138px;max-height:280px;resize:none;overflow-y:auto;}
+.flow-buy-note-example{display:none;margin-top:8px;color:#858a90;font-size:11px;font-weight:800;line-height:1.65;}
+body.ubee-buy-task-active .flow-buy-note-example{display:block;}
+body.ubee-buy-task-active #flowAdvanceWrap .flow-label::before{content:"預計商品金額";font-size:13px;}
+body.ubee-buy-task-active #flowAdvanceWrap .flow-label{font-size:0;}
+
 .flow-input,.flow-select,.flow-textarea{width:100%;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#111;outline:none;}.flow-input,.flow-select{min-height:52px;padding:0 13px;}.flow-textarea{min-height:126px;padding:12px 13px;line-height:1.65;resize:vertical;}.flow-input:focus,.flow-select:focus,.flow-textarea:focus{border-color:#c79d00;}
 .flow-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.flow-dynamic-field[hidden]{display:none!important;}
 .flow-inline-note{margin-top:7px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.55;}
@@ -19660,7 +19673,8 @@ body.flow-active>.app{display:none!important;}
 <div aria-label="品項分類" class="flow-category-chips" id="flowServiceCategoryChoices" role="listbox"></div>
 <select aria-hidden="true" class="flow-compat-select" id="flowServiceCategory" tabindex="-1"></select>
 </div>
-<div class="flow-form-group"><label class="flow-label" for="flowTaskNote">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="例如：到店內取兩杯飲料，確認品項後送到管理室；抵達前請先電話聯絡"></textarea><div class="flow-inline-note">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
+<div class="flow-store-summary" id="flowStorePurchaseSummary"><div class="flow-store-summary-kicker">購買店家</div><div class="flow-store-summary-main"><div class="flow-store-summary-name" id="flowStorePurchaseName">尚未選擇店家</div><span class="flow-store-summary-badge">已自動帶入</span></div></div>
+<div class="flow-form-group"><label class="flow-label" for="flowTaskNote" id="flowTaskNoteLabel">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="請說明任務內容與注意事項"></textarea><div class="flow-buy-note-example" id="flowBuyNoteExample">請填寫商品名稱、數量、規格及缺貨處理方式。</div><div class="flow-inline-note" id="flowTaskNoteHelp">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
 <div class="flow-form-group ubee-hidden-duplicate-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="999" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowQueueWrap"><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/></div>
@@ -20103,6 +20117,19 @@ body.flow-active>.app{display:none!important;}
     if(!state.taskName)state.taskName=selected.title||serviceLabels[state.service];
     $('flowTaskName').value=state.taskName;
     $('flowTaskNote').value=state.taskNote;
+    const isBuyTask=state.service==='buy';
+    document.body.classList.toggle('ubee-buy-task-active',isBuyTask);
+    const taskNoteLabel=$('flowTaskNoteLabel');
+    const taskNoteHelp=$('flowTaskNoteHelp');
+    const taskNoteInput=$('flowTaskNote');
+    const storeSummary=$('flowStorePurchaseSummary');
+    const storeName=$('flowStorePurchaseName');
+    if(taskNoteLabel)taskNoteLabel.innerHTML=isBuyTask?'請告訴小U要買什麼 <span class="flow-required">＊</span>':'要請小U完成什麼？ <span class="flow-required">＊</span>';
+    if(taskNoteHelp)taskNoteHelp.textContent=isBuyTask?'商品、數量、規格與缺貨處理方式寫清楚即可。':'寫清楚品項、數量、取件方式、交付方式與注意事項即可。';
+    if(taskNoteInput)taskNoteInput.placeholder=isBuyTask?'例如：衛生紙 2 串，三層抽取式；缺貨時請先聯絡我':'請說明任務內容與注意事項';
+    const purchaseStore=state.storeContext&&typeof state.storeContext==='object'?state.storeContext:null;
+    if(storeSummary)storeSummary.classList.toggle('active',Boolean(isBuyTask&&purchaseStore));
+    if(storeName)storeName.textContent=purchaseStore?String(purchaseStore.name||purchaseStore.displayName||'已選擇店家'):'尚未選擇店家';
     $('flowItemSize').value=state.itemSize;
     $('flowUpstairs').value=state.upstairs;
     $('flowAdvancePayment').value=String(state.advancePayment||0);
@@ -20651,13 +20678,7 @@ body.flow-active>.app{display:none!important;}
     state.dropoff=null;
     state.addressTarget='dropoff';
     state.taskName=`${name}代買`;
-    state.taskNote=[
-      `購買店家：${name}`,
-      '要購買的商品：',
-      '數量／規格：',
-      '預算上限：',
-      '缺貨時：請聯絡我確認'
-    ].join('\n');
+    state.taskNote='';
     state.advancePayment=0;
     state.itemSize='small';
     syncServiceSelectors();
@@ -20677,7 +20698,7 @@ body.flow-active>.app{display:none!important;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260806-3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21578,7 +21599,7 @@ body.flow-active>.app{display:none!important;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.06.2';
+  const APP_VERSION = '2026.08.06.3';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
