@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260807-1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260807-2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 V2.11：2026-08-07｜沿用 V2.10，僅移除店家搜尋結果與詳細頁的 emoji 封面 -->
+<!-- UBee 用戶端 V2.12：2026-08-07｜沿用 V2.11，僅重整我的設定頁位置權限與裝置項目 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -21005,7 +21005,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260807-1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260807-2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21840,7 +21840,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.06.13';
+  const APP_VERSION = '2026.08.07.2';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -21865,8 +21865,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   });
   const preferences = Object.freeze({
     autoLocation:'ubee_setting_auto_location',
-    haptics:'ubee_setting_haptics',
-    reduceMotion:'ubee_setting_reduce_motion'
+    haptics:'ubee_setting_haptics'
   });
 
   const backIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>';
@@ -21875,7 +21874,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
 
   let taskRequestToken = 0;
-  let deferredInstallPrompt = null;
   let currentMySection = '';
 
   const safeText = value => String(value ?? '').trim();
@@ -21900,7 +21898,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   }
 
   function applyPreferences(){
-    document.body.classList.toggle('ubee-reduce-motion',getPreference('reduceMotion',false));
+    localStorage.removeItem('ubee_setting_reduce_motion');
+    document.body.classList.remove('ubee-reduce-motion');
     syncSettingsToggleUi();
   }
 
@@ -21925,39 +21924,19 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
           <span class="ubee-settings-copy"><strong>訂單進度通知</strong><small id="ubeeSettingsPushText">正在確認這台裝置的通知設定</small></span>
           <button class="ubee-setting-switch" id="ubeeSettingsPushSwitch" type="button" role="switch" data-setting-toggle="pushNotifications" aria-label="訂單進度通知" aria-checked="false"></button>
         </div>
-        <div class="ubee-settings-row" data-setting-row="autoLocation">
-          <span class="ubee-settings-icon">⌖</span>
-          <span class="ubee-settings-copy"><strong>自動辨識服務地區</strong><small>開啟 App 時使用目前位置判斷所在縣市與行政區</small></span>
-          <button class="ubee-setting-switch" type="button" role="switch" data-setting-toggle="autoLocation" aria-label="自動辨識服務地區"></button>
-        </div>
         <div class="ubee-settings-row" data-setting-row="haptics">
           <span class="ubee-settings-icon">〰</span>
           <span class="ubee-settings-copy"><strong>按鈕震動回饋</strong><small>支援的手機在操作主要按鈕時提供短暫震動</small></span>
           <button class="ubee-setting-switch" type="button" role="switch" data-setting-toggle="haptics" aria-label="按鈕震動回饋"></button>
         </div>
-        <div class="ubee-settings-row" data-setting-row="reduceMotion">
-          <span class="ubee-settings-icon">◫</span>
-          <span class="ubee-settings-copy"><strong>減少動態效果</strong><small>降低頁面切換與按鈕動畫，適合偏好穩定畫面的使用者</small></span>
-          <button class="ubee-setting-switch" type="button" role="switch" data-setting-toggle="reduceMotion" aria-label="減少動態效果"></button>
-        </div>
       </div>
 
-      <div class="ubee-settings-section-title">權限與裝置</div>
+      <div class="ubee-settings-section-title">位置權限</div>
       <div class="ubee-settings-list">
-        <button class="ubee-settings-row" type="button" data-settings-action="location">
-          <span class="ubee-settings-icon">📍</span>
-          <span class="ubee-settings-copy"><strong>重新取得目前位置</strong><small>重新檢查定位權限並更新目前服務地區</small></span>
-          <span id="ubeeSettingsLocationState" class="ubee-settings-value">檢查中</span>
-        </button>
-        <button class="ubee-settings-row" type="button" data-settings-action="install">
-          <span class="ubee-settings-icon">＋</span>
-          <span class="ubee-settings-copy"><strong>安裝 UBee App</strong><small>加入手機主畫面，以獨立 App 模式開啟</small></span>
-          <span id="ubeeSettingsInstallState" class="ubee-settings-value">檢查中</span>
-        </button>
-        <div class="ubee-settings-row">
-          <span class="ubee-settings-icon">↕</span>
-          <span class="ubee-settings-copy"><strong>網路連線</strong><small>顯示目前裝置是否已連上網路</small></span>
-          <span id="ubeeSettingsNetworkState" class="ubee-settings-value">檢查中</span>
+        <div class="ubee-settings-row" id="ubeeSettingsLocationRow" data-setting-row="autoLocation">
+          <span class="ubee-settings-icon" aria-hidden="true">⌖</span>
+          <span class="ubee-settings-copy"><strong>使用目前位置</strong><small id="ubeeSettingsLocationText">開啟後可取得目前位置並更新服務地區</small></span>
+          <button class="ubee-setting-switch" id="ubeeSettingsLocationSwitch" type="button" role="switch" data-setting-toggle="autoLocation" aria-label="使用目前位置"></button>
         </div>
       </div>
 
@@ -21975,7 +21954,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
         </button>
         <button class="ubee-settings-row" type="button" data-settings-action="resetPreferences">
           <span class="ubee-settings-icon">↺</span>
-          <span class="ubee-settings-copy"><strong>恢復 App 預設設定</strong><small>重設自動定位、震動回饋與動態效果偏好</small></span>
+          <span class="ubee-settings-copy"><strong>恢復 App 預設設定</strong><small>重設位置使用與震動回饋偏好</small></span>
           <span class="ubee-settings-arrow">›</span>
         </button>
       </div>
@@ -22039,8 +22018,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     root.querySelectorAll('[data-setting-toggle]').forEach(button => {
       const name = button.dataset.settingToggle;
       if(name === 'pushNotifications') return;
-      const defaultValue = name === 'reduceMotion' ? false : true;
-      button.setAttribute('aria-checked',getPreference(name,defaultValue) ? 'true' : 'false');
+      button.setAttribute('aria-checked',getPreference(name,true) ? 'true' : 'false');
     });
   }
 
@@ -22049,13 +22027,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     if(!element) return;
     element.textContent = message;
     element.className = `ubee-settings-status${type ? ` ${type}` : ''}`;
-  }
-
-  function isStandalone(){
-    return Boolean(
-      window.matchMedia?.('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true
-    );
   }
 
   async function currentPushSubscriptionSafe(){
@@ -22104,32 +22075,36 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   window.__UBEE_REFRESH_PUSH_SETTING__ = refreshPushCard;
 
   async function refreshEnvironmentStatus(){
-    const locationState = document.getElementById('ubeeSettingsLocationState');
-    const installState = document.getElementById('ubeeSettingsInstallState');
-    const networkState = document.getElementById('ubeeSettingsNetworkState');
+    const locationSwitch = document.getElementById('ubeeSettingsLocationSwitch');
+    const locationText = document.getElementById('ubeeSettingsLocationText');
 
-    if(networkState) networkState.textContent = navigator.onLine ? '已連線' : '目前離線';
-    if(installState){
-      installState.textContent = isStandalone()
-        ? '已安裝'
-        : deferredInstallPrompt
-          ? '可以安裝'
-          : '可加入主畫面';
-    }
+    if(locationSwitch && locationText){
+      locationSwitch.disabled = false;
+      locationSwitch.removeAttribute('data-permission-state');
 
-    if(locationState){
       if(!navigator.geolocation){
-        locationState.textContent = '不支援';
+        setPreference('autoLocation',false);
+        locationSwitch.disabled = true;
+        locationSwitch.dataset.permissionState = 'unsupported';
+        locationText.textContent = '目前使用環境不支援定位，仍可手動輸入地址';
       }else if(navigator.permissions?.query){
         try{
           const permission = await navigator.permissions.query({name:'geolocation'});
-          const labels = {granted:'已允許',prompt:'尚未決定',denied:'已封鎖'};
-          locationState.textContent = labels[permission.state] || '可使用';
+          locationSwitch.dataset.permissionState = permission.state;
+
+          if(permission.state === 'granted'){
+            locationText.textContent = '已允許定位；開啟時會更新目前服務地區';
+          }else if(permission.state === 'denied'){
+            setPreference('autoLocation',false);
+            locationText.textContent = '定位權限已封鎖，請到手機或瀏覽器設定中允許';
+          }else{
+            locationText.textContent = '開啟後會詢問定位權限並更新服務地區';
+          }
         }catch(_){
-          locationState.textContent = '可使用';
+          locationText.textContent = '開啟後可取得目前位置並更新服務地區';
         }
       }else{
-        locationState.textContent = '可使用';
+        locationText.textContent = '開啟後可取得目前位置並更新服務地區';
       }
     }
 
@@ -22266,49 +22241,69 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   window.openUBeeTaskPage=openTaskPage;
 
   async function requestCurrentLocation(){
+    if(!navigator.geolocation){
+      throw new Error('目前使用環境不支援定位，請手動輸入地址。');
+    }
+
     setSettingsStatus('正在取得目前位置…');
+
+    const position = await new Promise((resolve,reject) => {
+      navigator.geolocation.getCurrentPosition(resolve,reject,{
+        enableHighAccuracy:true,
+        timeout:10000,
+        maximumAge:60000
+      });
+    });
+
+    const lat = Number(position?.coords?.latitude);
+    const lng = Number(position?.coords?.longitude);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)){
+      throw new Error('目前位置資料無效，請稍後再試。');
+    }
+
     try{
-      if(typeof detectLocation === 'function'){
-        detectLocation();
-        setSettingsStatus('已重新要求定位，首頁會更新目前服務地區。','success');
-      }else{
-        throw new Error('定位功能尚未載入');
-      }
-    }catch(error){
-      setSettingsStatus(error.message || '目前無法取得位置。','error');
-    }
-    setTimeout(refreshEnvironmentStatus,800);
-  }
+      currentLocationLat = lat;
+      currentLocationLng = lng;
+    }catch(_){ }
 
-  async function installApp(){
-    if(isStandalone()){
-      setSettingsStatus('UBee 已經以 App 模式安裝在這台裝置。','success');
-      return;
+    const response = await fetch('/api/customer/current-location',{
+      method:'POST',
+      credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      cache:'no-store',
+      body:JSON.stringify({lat,lng})
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok || !data.success){
+      throw new Error(data.message || '位置辨識失敗，請稍後再試。');
     }
 
-    if(deferredInstallPrompt){
+    const location = data.location || {};
+    const city = String(location.city || '').replace(/^臺/,'台');
+    const district = String(location.district || '');
+    const display = String(
+      location.displayLocation ||
+      `${city}${district}` ||
+      '目前位置'
+    ).replace(/^臺/,'台');
+
+    const cityButton = document.getElementById('flowCityButton');
+    const locationText = document.getElementById('flowLocationText');
+    if(cityButton) cityButton.textContent = display || '目前位置';
+    if(locationText){
+      locationText.textContent = location.formattedAddress
+        ? `目前位置：${location.formattedAddress}`
+        : `目前服務地區：${display}`;
+    }
+
+    if(city && typeof selectServiceCity === 'function'){
       try{
-        deferredInstallPrompt.prompt();
-        const choice = await deferredInstallPrompt.userChoice;
-        deferredInstallPrompt = null;
-        setSettingsStatus(
-          choice?.outcome === 'accepted'
-            ? '已送出安裝，完成後可從主畫面開啟 UBee。'
-            : '已取消安裝。',
-          choice?.outcome === 'accepted' ? 'success' : ''
-        );
-      }catch(error){
-        setSettingsStatus('目前無法啟動安裝，請改用瀏覽器選單加入主畫面。','error');
-      }
-    }else{
-      const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
-      setSettingsStatus(
-        isiOS
-          ? '請點 Safari 的「分享」按鈕，再選擇「加入主畫面」。'
-          : '請開啟瀏覽器選單，選擇「安裝應用程式」或「加入主畫面」。'
-      );
+        selectServiceCity(city.replace(/^台/,'臺'));
+      }catch(_){ }
     }
-    refreshEnvironmentStatus();
+
+    setSettingsStatus('目前位置已更新，首頁服務地區已同步。','success');
+    return true;
   }
 
   async function refreshApp(){
@@ -22443,25 +22438,51 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       return;
     }
 
-    const defaultValue = name === 'reduceMotion' ? false : true;
-    const nextValue = !getPreference(name,defaultValue);
+    if(name === 'autoLocation'){
+      const currentlyEnabled = getPreference('autoLocation',true);
+
+      if(currentlyEnabled){
+        setPreference('autoLocation',false);
+        applyPreferences();
+        hapticPulse(12);
+        setSettingsStatus('目前位置使用已關閉；下單時仍可手動輸入地址。','success');
+        await refreshEnvironmentStatus();
+        return;
+      }
+
+      button.disabled = true;
+      try{
+        await requestCurrentLocation();
+        setPreference('autoLocation',true);
+        hapticPulse(12);
+      }catch(error){
+        setPreference('autoLocation',false);
+        const denied = Number(error?.code) === 1;
+        setSettingsStatus(
+          denied
+            ? '定位權限未允許，請到手機或瀏覽器設定中開啟後再試。'
+            : (error?.message || '目前無法取得位置。'),
+          'error'
+        );
+      }finally{
+        applyPreferences();
+        button.disabled = false;
+        await refreshEnvironmentStatus();
+      }
+      return;
+    }
+
+    const nextValue = !getPreference(name,true);
     setPreference(name,nextValue);
     applyPreferences();
     hapticPulse(12);
-
-    if(name === 'autoLocation' && nextValue){
-      requestCurrentLocation();
-    }else{
-      setSettingsStatus(
-        `${name === 'haptics' ? '按鈕震動回饋' : name === 'reduceMotion' ? '減少動態效果' : '自動辨識服務地區'}已${nextValue ? '開啟' : '關閉'}。`,
-        'success'
-      );
-    }
+    setSettingsStatus(
+      `按鈕震動回饋已${nextValue ? '開啟' : '關閉'}。`,
+      'success'
+    );
   }
 
   async function handleSettingsAction(action){
-    if(action === 'location') return requestCurrentLocation();
-    if(action === 'install') return installApp();
     if(action === 'refresh') return refreshApp();
     if(action === 'clearDraft') return clearDraft();
     if(action === 'resetPreferences') return resetPreferences();
@@ -22484,18 +22505,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   setTimeout(() => {
   },250);
 
-  window.addEventListener('beforeinstallprompt',event => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    refreshEnvironmentStatus();
-  });
-  window.addEventListener('appinstalled',() => {
-    deferredInstallPrompt = null;
-    setSettingsStatus('UBee App 已完成安裝。','success');
-    refreshEnvironmentStatus();
-  });
-  window.addEventListener('online',refreshEnvironmentStatus);
-  window.addEventListener('offline',refreshEnvironmentStatus);
   document.addEventListener('visibilitychange',() => {
     if(!document.hidden && currentMySection === 'settings') refreshEnvironmentStatus();
   });
@@ -24467,7 +24476,7 @@ body.ubee-store-active #productionOrderFlow{
     if(storeState.catalogLoaded&&!force){applyLocalFilters();return;}
     storeState.loading=true;renderStores();
     try{
-      const response=await fetch('/stores-taichung.json?v=20260807-1',{cache:'no-store'});
+      const response=await fetch('/stores-taichung.json?v=20260807-2',{cache:'no-store'});
       if(!response.ok)throw new Error(`本地店家目錄讀取失敗（HTTP ${response.status}）`);
       const payload=await response.json();
       const rows=Array.isArray(payload)?payload:Array.isArray(payload?.stores)?payload.stores:[];
