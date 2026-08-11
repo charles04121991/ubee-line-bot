@@ -1,7 +1,7 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.08.11.4
+ * Version: 2026.08.11.5
  * File: ubee-customer-sw.js
  *
  * 2026-08-11 Identity V3 自動認證更新：
@@ -15,7 +15,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.08.11.4';
+const UBEE_CUSTOMER_SW_VERSION = '2026.08.11.5';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
