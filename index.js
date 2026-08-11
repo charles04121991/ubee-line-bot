@@ -3257,7 +3257,7 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
 });
 
 // =====================================================
-// UBee Customer Identity Verification V3.2｜自動身分資料審核＋安全照片預覽
+// UBee Customer Identity Verification V3.3｜自動身分資料審核＋後端上傳確認
 // - 客戶上傳：身分證正面、身分證反面、本人自拍。
 // - 送出時輸入台灣國民身分證字號；完整字號只在單次 HTTPS 請求記憶體中驗證，絕不寫入 Firestore / audit log。
 // - 自動檢查：會員姓名存在、國民身分證格式與檢查碼、三張檔案完整性、私有 Storage 所有權、檔案大小與三張 SHA-256 不重複。
@@ -3265,10 +3265,25 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
 // - 自動判定完成（通過或拒絕）後刪除三張敏感照片，只保留必要結果與稽核紀錄。
 // - CUSTOMER_IDENTITY_ENFORCE 預設 false；完整測試通過後再決定是否強制下單前完成。
 // =====================================================
-const CUSTOMER_IDENTITY_STORAGE_BUCKET = String(
-  process.env.FIREBASE_STORAGE_BUCKET ||
-  `${process.env.FIREBASE_PROJECT_ID || ''}.appspot.com`
-).trim();
+function buildCustomerIdentityStorageBucketCandidates() {
+  const projectId = String(process.env.FIREBASE_PROJECT_ID || '').trim();
+  const configured = String(process.env.FIREBASE_STORAGE_BUCKET || '').trim();
+  const appConfigured = String(admin.app()?.options?.storageBucket || '').trim();
+
+  return [...new Set([
+    configured,
+    appConfigured,
+    projectId ? `${projectId}.firebasestorage.app` : '',
+    projectId ? `${projectId}.appspot.com` : '',
+  ].filter(Boolean))];
+}
+
+const CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES =
+  buildCustomerIdentityStorageBucketCandidates();
+
+// 僅作為相容欄位；真正寫入時會逐一嘗試候選 bucket，並把實際成功的 bucket 寫入 Firestore。
+const CUSTOMER_IDENTITY_STORAGE_BUCKET =
+  CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES[0] || '';
 
 const CUSTOMER_IDENTITY = Object.freeze({
   enforce:
@@ -3277,14 +3292,13 @@ const CUSTOMER_IDENTITY = Object.freeze({
       .toLowerCase() === 'true',
   providerEnabled:
     Boolean(
-      CUSTOMER_IDENTITY_STORAGE_BUCKET &&
-      !CUSTOMER_IDENTITY_STORAGE_BUCKET.startsWith('.')
+      CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES.length > 0
     ),
   provider: 'ubee_auto',
   method: 'id_card_selfie_auto_structural_review',
   verificationMode: 'automatic',
-  reviewVersion: 3.2,
-  maxFileBytes: 12 * 1024 * 1024,
+  reviewVersion: 3.3,
+  maxFileBytes: 20 * 1024 * 1024,
   minFileBytes: 20 * 1024,
   documentTypes: Object.freeze({
     idFront: '身分證正面',
@@ -3312,16 +3326,42 @@ function customerIdentityUploadSingle(req, res, next) {
       return res.status(413).json({
         success: false,
         code: 'CUSTOMER_IDENTITY_FILE_TOO_LARGE',
-        message: '單張照片不可超過 12 MB。',
+        message: '單張照片不可超過 20 MB。',
       });
     }
 
     return res.status(Number(error.statusCode || 400)).json({
       success: false,
       code: error.code || 'CUSTOMER_IDENTITY_UPLOAD_ERROR',
-      message: error.message || '身分認證照片上傳失敗。',
+      message: error.message || '照片上傳解析失敗，後端未收到完整檔案。',
     });
   });
+}
+
+async function saveCustomerIdentityFileToAvailableBucket(storagePath, fileBuffer, saveOptions) {
+  let lastError = null;
+
+  for (const bucketName of CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES) {
+    try {
+      const bucket = admin.storage().bucket(bucketName);
+      const file = bucket.file(storagePath);
+      await file.save(fileBuffer, saveOptions);
+      return { bucket, file, bucketName: bucket.name || bucketName };
+    } catch (error) {
+      lastError = error;
+      console.warn(
+        '⚠️ UBee 身分認證 Storage bucket 寫入失敗，嘗試下一個：',
+        bucketName,
+        error?.message || error
+      );
+    }
+  }
+
+  throw customerAuthError(
+    `身分認證照片無法寫入 Firebase Storage。${lastError?.message ? ` ${lastError.message}` : ''}`,
+    503,
+    'CUSTOMER_IDENTITY_STORAGE_WRITE_FAILED'
+  );
 }
 
 function normalizeCustomerIdentityDocumentType(value) {
@@ -3555,7 +3595,7 @@ async function validateCustomerIdentityDocumentOwnership(
     return false;
   }
 
-  if (item.storageBucket !== CUSTOMER_IDENTITY_STORAGE_BUCKET) {
+  if (!CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES.includes(String(item.storageBucket || ''))) {
     return false;
   }
 
@@ -3570,7 +3610,7 @@ async function validateCustomerIdentityDocumentOwnership(
     return false;
   }
 
-  const bucket = admin.storage().bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+  const bucket = admin.storage().bucket(item.storageBucket);
   const file = bucket.file(item.storagePath);
   const [exists] = await file.exists();
   if (!exists) return false;
@@ -3587,13 +3627,13 @@ async function validateCustomerIdentityDocumentOwnership(
 
 async function deleteCustomerIdentityDocuments(identityVerification) {
   const identity = normalizeCustomerIdentityVerification(identityVerification);
-  if (!CUSTOMER_IDENTITY_STORAGE_BUCKET) return;
-  const bucket = admin.storage().bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+  if (!CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES.length) return;
 
   await Promise.all(
     Object.values(identity.documents).map(async item => {
-      if (!item?.storagePath) return;
+      if (!item?.storagePath || !item?.storageBucket) return;
       try {
+        const bucket = admin.storage().bucket(item.storageBucket);
         await bucket.file(item.storagePath).delete({ ignoreNotFound: true });
       } catch (error) {
         console.warn(
@@ -4476,7 +4516,7 @@ app.get(
         );
       }
 
-      const bucket = admin.storage().bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+      const bucket = admin.storage().bucket(item.storageBucket);
       const file = bucket.file(item.storagePath);
       const [metadata] = await file.getMetadata();
       const contentType = String(metadata.contentType || item.mimeType || 'application/octet-stream');
@@ -4511,6 +4551,8 @@ app.post(
   customerIdentityUploadSingle,
   async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
+    let newlyStoredFile = null;
+    let uploadStage = 'request_received';
 
     try {
       if (!CUSTOMER_IDENTITY.providerEnabled) {
@@ -4547,6 +4589,7 @@ app.post(
         );
       }
 
+      uploadStage = 'multipart_parsed';
       const uploadFile = req.file;
       const fileBuffer = uploadFile?.buffer;
 
@@ -4569,6 +4612,7 @@ app.post(
       const reportedContentType = String(uploadFile.mimetype || '')
         .trim()
         .toLowerCase();
+      uploadStage = 'file_received';
       const detectedImage = detectCustomerIdentityImageType(fileBuffer);
 
       if (!detectedImage) {
@@ -4593,34 +4637,37 @@ app.post(
         .update(fileBuffer)
         .digest('hex');
 
-      const bucket = admin
-        .storage()
-        .bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
-
-      const storageFile = bucket.file(storagePath);
-
-      await storageFile.save(fileBuffer, {
-        resumable: false,
-        validation: 'md5',
-        metadata: {
-          contentType,
-          cacheControl: 'private, max-age=0, no-store, no-transform',
+      uploadStage = 'storage_write';
+      const saveResult = await saveCustomerIdentityFileToAvailableBucket(
+        storagePath,
+        fileBuffer,
+        {
+          resumable: false,
+          validation: 'md5',
           metadata: {
-            customerIdentityKey: identityKey,
-            customerIdentityDocumentType: documentType,
-            sha256,
-            reportedContentType: cleanText(reportedContentType || '', 100),
-            dataVersion: '3.2',
+            contentType,
+            cacheControl: 'private, max-age=0, no-store, no-transform',
+            metadata: {
+              customerIdentityKey: identityKey,
+              customerIdentityDocumentType: documentType,
+              sha256,
+              reportedContentType: cleanText(reportedContentType || '', 100),
+              dataVersion: '3.3',
+            },
           },
-        },
-      });
+        }
+      );
 
+      const bucket = saveResult.bucket;
+      const storageFile = saveResult.file;
+      newlyStoredFile = storageFile;
+      uploadStage = 'storage_written';
       const oldItem = current.documents[documentType];
       const nowMs = Date.now();
       const nextItem = {
         documentType,
         label: CUSTOMER_IDENTITY.documentTypes[documentType],
-        storageBucket: bucket.name,
+        storageBucket: saveResult.bucketName,
         storagePath,
         mimeType: contentType,
         originalName: cleanText(uploadFile.originalname || '', 180),
@@ -4638,6 +4685,7 @@ app.post(
         ? 'not_verified'
         : current.status;
 
+      uploadStage = 'firestore_write';
       await db
         .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
         .doc(customerId)
@@ -4667,6 +4715,36 @@ app.post(
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
 
+      uploadStage = 'firestore_written';
+
+      // V3.3：寫入後立刻從 Firestore 讀回確認。
+      // 只有 Storage + Firestore 兩邊都確認成功，API 才回 success:true。
+      const persistedAccountDoc = await db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .doc(customerId)
+        .get();
+      const persistedIdentity = normalizeCustomerIdentityVerification(
+        persistedAccountDoc.data()?.identityVerification
+      );
+      const persistedItem = persistedIdentity.documents[documentType];
+
+      if (
+        !persistedAccountDoc.exists ||
+        !persistedItem?.storagePath ||
+        persistedItem.storagePath !== storagePath ||
+        persistedItem.storageBucket !== nextItem.storageBucket ||
+        persistedItem.sha256 !== sha256
+      ) {
+        await storageFile.delete({ ignoreNotFound: true }).catch(() => {});
+        throw customerAuthError(
+          '照片已送達伺服器，但會員上傳紀錄未能完成確認，請再試一次。',
+          503,
+          'CUSTOMER_IDENTITY_PERSIST_CONFIRM_FAILED'
+        );
+      }
+
+      uploadStage = 'persist_confirmed';
+
       if (
         oldItem?.storagePath &&
         oldItem.storagePath !== storagePath &&
@@ -4690,17 +4768,37 @@ app.post(
         checks: {},
       });
 
+      uploadStage = 'completed';
+      newlyStoredFile = null;
+
       return res.json({
         success: true,
         documentType,
         label: CUSTOMER_IDENTITY.documentTypes[documentType],
         uploaded: true,
+        serverConfirmed: true,
+        storageBucket: nextItem.storageBucket,
+        sizeBytes: nextItem.sizeBytes,
         identityVerification: publicIdentity,
         message: `${CUSTOMER_IDENTITY.documentTypes[documentType]}已安全上傳。`,
       });
     } catch (error) {
-      console.error('❌ 客戶身分認證照片上傳失敗：', error);
-      return sendCustomerAuthError(res, error);
+      if (newlyStoredFile) {
+        await newlyStoredFile.delete({ ignoreNotFound: true }).catch(() => {});
+      }
+      console.error('❌ 客戶身分認證照片上傳未完成：', {
+        stage: uploadStage,
+        code: error?.code || '',
+        message: error?.message || error,
+      });
+      return res.status(Number(error?.statusCode || 500)).json({
+        success: false,
+        uploaded: false,
+        serverConfirmed: false,
+        stage: uploadStage,
+        code: error?.code || 'CUSTOMER_IDENTITY_UPLOAD_FAILED',
+        message: error?.message || '後端未能完成照片上傳，請稍後再試。',
+      });
     }
   }
 );
