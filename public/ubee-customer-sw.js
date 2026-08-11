@@ -1,336 +1,435 @@
-/* UBee 跑腿用戶端 PWA｜App 化＋即時訂單通知正式修復版
- * 版本：2026-08-07 Customer V2.12 Settings Permission Cleanup
+/*
+ * ============================================================
+ * UBee 跑腿｜用戶端 Service Worker
+ * Version: 2026.08.11.1
+ * File: ubee-customer-sw.js
  *
- * 本版重點：
- * 1. 與新版設定頁位置權限清理 order.html 統一使用 20260807-2。
- * 2. order.html、install.html 採 Network First，優先取得最新頁面。
- * 3. Service Worker 更新後立即接管，並刪除所有舊版 UBee 用戶端快取。
- * 4. CSS、JavaScript、Worker、Manifest 與店家 JSON 採 Network First。
- * 5. 圖片與字型採 Stale While Revalidate。
- * 6. 預快取單一檔案失敗時，不會讓整個 Service Worker 安裝失敗。
- * 7. 保留 UBee 用戶端推播與點擊通知開啟訂單功能。
+ * 2026-08-11 Identity V1 更新：
+ * 1. 實名制 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
+ * 2. HTML / navigation 採 Network First，避免 PWA 長期停在舊版 order.html。
+ * 3. 靜態資源採 Stale While Revalidate。
+ * 4. 啟用新版 SW 時清除舊版 UBee Customer Cache。
+ * 5. 保留 Web Push、通知點擊與 App Badge 基本能力。
+ * ============================================================
  */
 
 'use strict';
 
-const CACHE_NAME = 'ubee-customer-pwa-v20260807-customer-v212-settings-permission-cleanup';
-const CACHE_PREFIX = 'ubee-customer-pwa-';
-const APP_VERSION = '20260807-2';
+const UBEE_CUSTOMER_SW_VERSION = '2026.08.11.1';
 
-const OFFLINE_URL = '/offline.html';
-const ORDER_CACHE_KEY = '/order.html';
-const INSTALL_CACHE_KEY = '/install.html';
-const MANIFEST_CACHE_KEY = '/manifest-order.json';
-const STORES_CACHE_KEY = '/stores-taichung.json';
+const CACHE_PREFIX = 'ubee-customer-';
+const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
+const PAGE_CACHE = `${CACHE_PREFIX}page-${UBEE_CUSTOMER_SW_VERSION}`;
 
-const PRECACHE_ENTRIES = [
-  { url: `/order.html?v=${APP_VERSION}`, key: ORDER_CACHE_KEY },
-  { url: `/install.html?v=${APP_VERSION}`, key: INSTALL_CACHE_KEY },
-  { url: `/manifest-order.json?v=${APP_VERSION}`, key: MANIFEST_CACHE_KEY },
-  { url: OFFLINE_URL, key: OFFLINE_URL },
-  { url: `/stores-taichung.json?v=${APP_VERSION}`, key: STORES_CACHE_KEY },
-  { url: '/ubee-customer-icon-192.png', key: '/ubee-customer-icon-192.png' },
-  { url: '/ubee-customer-icon-512.png', key: '/ubee-customer-icon-512.png' }
+const APP_SHELL = [
+  '/order.html',
+  '/manifest-order.json',
+  '/ubee-customer-icon-192.png',
+  '/ubee-customer-icon-512.png'
 ];
 
-function createFreshRequest(request) {
-  return new Request(request, {
-    cache: 'no-store',
-    credentials: request.credentials,
-    redirect: request.redirect
-  });
+/*
+ * 這些路徑包含登入 Session、會員資料、實名狀態、訂單與即時資訊。
+ * 永遠不得由 Service Worker Cache 回傳。
+ */
+const NETWORK_ONLY_PATH_PREFIXES = [
+  '/api/',
+  '/api/customer-auth/',
+  '/api/customer-identity/',
+  '/api/customer/',
+  '/api/orders',
+  '/api/order',
+  '/api/quote'
+];
+
+function isSameOrigin(url) {
+  return url.origin === self.location.origin;
 }
 
-async function fetchFresh(request) {
-  return fetch(createFreshRequest(request));
+function isNetworkOnlyRequest(request, url) {
+  if (!isSameOrigin(url)) return false;
+
+  if (request.method !== 'GET') return true;
+
+  return NETWORK_ONLY_PATH_PREFIXES.some(prefix =>
+    url.pathname === prefix ||
+    url.pathname.startsWith(prefix)
+  );
 }
 
-async function putResponse(cacheKey, response) {
+function isNavigationRequest(request) {
+  return (
+    request.mode === 'navigate' ||
+    request.destination === 'document'
+  );
+}
+
+function isStaticAssetRequest(request, url) {
+  if (!isSameOrigin(url)) return false;
+
+  if (
+    ['style', 'script', 'image', 'font'].includes(request.destination)
+  ) {
+    return true;
+  }
+
+  return /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf)$/i
+    .test(url.pathname);
+}
+
+async function putResponse(cacheName, request, response) {
   if (!response || !response.ok) return;
 
+  if (response.type !== 'basic' && response.type !== 'default') return;
+
   try {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.put(cacheKey, response.clone());
+    const cache = await caches.open(cacheName);
+    await cache.put(request, response.clone());
   } catch (error) {
-    console.warn('UBee 快取寫入失敗：', cacheKey, error);
+    console.warn('UBee Customer SW cache put failed:', error);
   }
 }
 
-async function matchCurrentCache(cacheKey) {
-  const cache = await caches.open(CACHE_NAME);
-  return cache.match(cacheKey);
+async function networkOnly(request) {
+  /*
+   * API 不經 Service Worker Cache。
+   * 後端實名 API 同時已使用 Cache-Control: no-store。
+   */
+  return fetch(request);
 }
 
-async function precacheAppShell() {
-  const cache = await caches.open(CACHE_NAME);
-
-  await Promise.allSettled(
-    PRECACHE_ENTRIES.map(async ({ url, key }) => {
-      const response = await fetch(url, {
-        cache: 'reload',
-        credentials: 'same-origin'
-      });
-
-      if (!response.ok) {
-        throw new Error(`預快取失敗：${url}（HTTP ${response.status}）`);
-      }
-
-      await cache.put(key, response.clone());
-    })
-  );
-}
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    (async () => {
-      await precacheAppShell();
-      await self.skipWaiting();
-    })()
-  );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    (async () => {
-      const cacheNames = await caches.keys();
-
-      await Promise.all(
-        cacheNames
-          .filter(cacheName => (
-            cacheName.startsWith(CACHE_PREFIX) &&
-            cacheName !== CACHE_NAME
-          ))
-          .map(cacheName => caches.delete(cacheName))
-      );
-
-      if ('navigationPreload' in self.registration) {
-        await self.registration.navigationPreload.enable().catch(() => {});
-      }
-
-      await self.clients.claim();
-    })()
-  );
-});
-
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-async function networkFirstPage(event, cacheKey) {
+async function networkFirstPage(request) {
   try {
-    const preloadResponse = await event.preloadResponse;
-
-    if (preloadResponse?.ok) {
-      event.waitUntil(putResponse(cacheKey, preloadResponse));
-      return preloadResponse;
-    }
-
-    const networkResponse = await fetchFresh(event.request);
-
-    if (networkResponse?.ok) {
-      event.waitUntil(putResponse(cacheKey, networkResponse));
-      return networkResponse;
-    }
-
-    const cachedPage = await matchCurrentCache(cacheKey);
-    if (cachedPage) return cachedPage;
-
-    return networkResponse;
-  } catch (_) {
-    const cachedPage = await matchCurrentCache(cacheKey);
-    if (cachedPage) return cachedPage;
-
-    const offlinePage = await matchCurrentCache(OFFLINE_URL);
-    if (offlinePage) return offlinePage;
-
-    return new Response('目前無法連線，請稍後再試。', {
-      status: 503,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    const response = await fetch(request, {
+      cache: 'no-store'
     });
-  }
-}
 
-async function networkFirstAsset(request, cacheKey = request) {
-  try {
-    const networkResponse = await fetchFresh(request);
-
-    if (networkResponse?.ok) {
-      await putResponse(cacheKey, networkResponse);
-      return networkResponse;
-    }
-
-    const cachedResponse = await matchCurrentCache(cacheKey);
-    return cachedResponse || networkResponse;
-  } catch (_) {
-    const cachedResponse = await matchCurrentCache(cacheKey);
-    return cachedResponse || Response.error();
-  }
-}
-
-async function staleWhileRevalidate(event) {
-  const request = event.request;
-  const cachedResponsePromise = caches.match(request);
-
-  const networkResponsePromise = fetch(request, {
-    cache: 'no-cache',
-    credentials: 'same-origin'
-  }).then(async response => {
-    if (response?.ok) {
-      await putResponse(request, response);
+    if (response && response.ok) {
+      await putResponse(PAGE_CACHE, request, response);
     }
 
     return response;
-  });
+  } catch (error) {
+    const cached = await caches.match(request, {
+      ignoreSearch: true
+    });
 
-  event.waitUntil(networkResponsePromise.catch(() => {}));
+    if (cached) return cached;
 
-  const cachedResponse = await cachedResponsePromise;
-  if (cachedResponse) return cachedResponse;
+    const fallback = await caches.match('/order.html', {
+      ignoreSearch: true
+    });
 
-  try {
-    return await networkResponsePromise;
-  } catch (_) {
-    return Response.error();
+    if (fallback) return fallback;
+
+    throw error;
   }
 }
 
+async function staleWhileRevalidate(request) {
+  const cached = await caches.match(request, {
+    ignoreSearch: false
+  });
+
+  const networkPromise = fetch(request)
+    .then(async response => {
+      if (response && response.ok) {
+        await putResponse(STATIC_CACHE, request, response);
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  if (cached) {
+    return cached;
+  }
+
+  const networkResponse = await networkPromise;
+
+  if (networkResponse) {
+    return networkResponse;
+  }
+
+  return new Response('', {
+    status: 504,
+    statusText: 'Gateway Timeout'
+  });
+}
+
+/* ============================================================
+ * INSTALL
+ * ============================================================
+ */
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    try {
+      const cache = await caches.open(STATIC_CACHE);
+
+      /*
+       * addAll 任何一項失敗會讓整批失敗，因此逐項加入，
+       * 避免單一 icon 或 manifest 暫時不可用造成 SW 安裝失敗。
+       */
+      await Promise.all(
+        APP_SHELL.map(async url => {
+          try {
+            const response = await fetch(url, {
+              cache: 'reload'
+            });
+
+            if (response && response.ok) {
+              await cache.put(url, response.clone());
+            }
+          } catch (_) {
+            // 安裝時單項預快取失敗不阻擋新版 Service Worker。
+          }
+        })
+      );
+    } finally {
+      await self.skipWaiting();
+    }
+  })());
+});
+
+/* ============================================================
+ * ACTIVATE
+ * ============================================================
+ */
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+
+    await Promise.all(
+      keys.map(key => {
+        if (
+          key.startsWith(CACHE_PREFIX) &&
+          key !== STATIC_CACHE &&
+          key !== PAGE_CACHE
+        ) {
+          return caches.delete(key);
+        }
+
+        return Promise.resolve(false);
+      })
+    );
+
+    await self.clients.claim();
+
+    const clientList = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    for (const client of clientList) {
+      client.postMessage({
+        type: 'UBEE_CUSTOMER_SW_UPDATED',
+        version: UBEE_CUSTOMER_SW_VERSION
+      });
+    }
+  })());
+});
+
+/* ============================================================
+ * FETCH
+ * ============================================================
+ */
 self.addEventListener('fetch', event => {
   const request = event.request;
 
-  if (request.method !== 'GET') return;
-  if (request.headers.has('range')) return;
+  if (!request || !request.url) return;
 
-  const requestUrl = new URL(request.url);
+  const url = new URL(request.url);
 
-  if (requestUrl.origin !== self.location.origin) return;
-  if (requestUrl.pathname.startsWith('/api/')) return;
-
-  if (request.mode === 'navigate') {
-    const isOrderPage = (
-      requestUrl.pathname === '/' ||
-      requestUrl.pathname === '/order.html'
-    );
-    const isInstallPage = requestUrl.pathname === '/install.html';
-
-    if (isOrderPage) {
-      event.respondWith(networkFirstPage(event, ORDER_CACHE_KEY));
-      return;
-    }
-
-    if (isInstallPage) {
-      event.respondWith(networkFirstPage(event, INSTALL_CACHE_KEY));
-      return;
-    }
-
+  /*
+   * 非 HTTP(S) scheme 不處理。
+   */
+  if (!/^https?:$/.test(url.protocol)) {
     return;
   }
 
-  if (requestUrl.pathname === '/stores-taichung.json') {
-    event.respondWith(networkFirstAsset(request, STORES_CACHE_KEY));
+  /*
+   * POST / PUT / PATCH / DELETE，以及 UBee API：
+   * 全部直接走網路，不進 Cache。
+   */
+  if (isNetworkOnlyRequest(request, url)) {
+    event.respondWith(networkOnly(request));
     return;
   }
 
-  if (requestUrl.pathname === '/manifest-order.json') {
-    event.respondWith(networkFirstAsset(request, MANIFEST_CACHE_KEY));
+  /*
+   * 跨網域資源不由 UBee Customer SW 管理，
+   * 例如 Google Maps、第三方服務。
+   */
+  if (!isSameOrigin(url)) {
     return;
   }
 
-  if (['style', 'script', 'worker', 'manifest'].includes(request.destination)) {
-    event.respondWith(networkFirstAsset(request));
+  /*
+   * order.html / navigation：
+   * 一律優先取得伺服器最新版。
+   * 只有離線時才使用本機快取。
+   */
+  if (isNavigationRequest(request)) {
+    event.respondWith(networkFirstPage(request));
     return;
   }
 
-  if (['image', 'font'].includes(request.destination)) {
-    event.respondWith(staleWhileRevalidate(event));
+  /*
+   * 靜態檔案：
+   * 先快速回傳快取，同時背景更新。
+   */
+  if (request.method === 'GET' && isStaticAssetRequest(request, url)) {
+    event.respondWith(staleWhileRevalidate(request));
   }
 });
 
+/* ============================================================
+ * WEB PUSH
+ * ============================================================
+ */
 self.addEventListener('push', event => {
   let data = {};
 
   try {
     data = event.data ? event.data.json() : {};
   } catch (_) {
-    data = { body: event.data ? event.data.text() : '' };
+    data = {
+      body: event.data
+        ? event.data.text()
+        : 'UBee 跑腿有新的通知。'
+    };
   }
 
+  const orderId = String(
+    data.orderId ||
+    data.id ||
+    ''
+  ).trim().toUpperCase();
+
+  const fallbackUrl = orderId
+    ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
+    : '/order.html?source=push';
+
   const targetUrl = String(
-    data.deepLink ||
     data.url ||
-    (data.orderId
-      ? `/order.html?source=push&orderId=${encodeURIComponent(data.orderId)}`
-      : '/order.html?source=push')
+    data.deepLink ||
+    fallbackUrl
   );
 
-  const notificationOptions = {
-    body: data.body || '你的 UBee 跑腿訂單有新的進度。',
+  const options = {
+    body: data.body || 'UBee 跑腿有新的任務進度通知。',
     icon: data.icon || '/ubee-customer-icon-192.png',
     badge: data.badge || '/ubee-customer-icon-192.png',
-    tag: data.tag || `ubee-customer-${data.orderId || 'notification'}`,
-    renotify: false,
-    vibrate: [200, 100, 200],
+    tag: data.tag || (
+      orderId
+        ? `ubee-customer-order-${orderId}`
+        : 'ubee-customer-notification'
+    ),
+    renotify: data.renotify !== false,
     data: {
+      orderId,
       url: targetUrl,
-      orderId: data.orderId || '',
-      status: data.status || ''
+      type: data.type || 'UBEE_CUSTOMER_PUSH'
     }
   };
 
-  event.waitUntil(
-    self.registration.showNotification(
+  event.waitUntil((async () => {
+    await self.registration.showNotification(
       data.title || 'UBee 跑腿',
-      notificationOptions
-    )
-  );
+      options
+    );
+
+    if (self.registration.setAppBadge) {
+      await self.registration.setAppBadge(1).catch(() => {});
+    }
+  })());
 });
 
+/* ============================================================
+ * NOTIFICATION CLICK
+ * ============================================================
+ */
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
-  let targetUrl;
+  const data = event.notification.data || {};
+  const orderId = String(data.orderId || '')
+    .trim()
+    .toUpperCase();
 
-  try {
-    targetUrl = new URL(
-      event.notification?.data?.url || '/order.html?source=push',
-      self.location.origin
-    );
+  const targetUrl = new URL(
+    data.url ||
+      (
+        orderId
+          ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
+          : '/order.html?source=push'
+      ),
+    self.location.origin
+  ).href;
 
-    if (targetUrl.origin !== self.location.origin) {
-      targetUrl = new URL('/order.html?source=push', self.location.origin);
+  event.waitUntil((async () => {
+    const clientList = await clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    for (const client of clientList) {
+      try {
+        const clientUrl = new URL(client.url);
+
+        if (clientUrl.origin === self.location.origin) {
+          if ('navigate' in client) {
+            await client.navigate(targetUrl);
+          }
+
+          await client.focus();
+
+          client.postMessage({
+            type: 'UBEE_CUSTOMER_OPEN_ORDER',
+            orderId,
+            url: targetUrl
+          });
+
+          if (self.registration.clearAppBadge) {
+            await self.registration.clearAppBadge().catch(() => {});
+          }
+
+          return;
+        }
+      } catch (_) {
+        // 繼續尋找下一個可用 client。
+      }
     }
-  } catch (_) {
-    targetUrl = new URL('/order.html?source=push', self.location.origin);
+
+    if (clients.openWindow) {
+      await clients.openWindow(targetUrl);
+    }
+
+    if (self.registration.clearAppBadge) {
+      await self.registration.clearAppBadge().catch(() => {});
+    }
+  })());
+});
+
+/* ============================================================
+ * MESSAGE
+ * ============================================================
+ */
+self.addEventListener('message', event => {
+  const data = event.data || {};
+
+  if (data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
   }
 
-  event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then(async windowClients => {
-        const customerClient = windowClients.find(client => {
-          try {
-            const clientUrl = new URL(client.url);
-            return (
-              clientUrl.origin === self.location.origin &&
-              (clientUrl.pathname === '/order.html' || clientUrl.pathname === '/')
-            );
-          } catch (_) {
-            return false;
-          }
-        });
-
-        if (customerClient) {
-          if ('navigate' in customerClient) {
-            await customerClient.navigate(targetUrl.href);
-          }
-
-          return customerClient.focus();
-        }
-
-        return self.clients.openWindow
-          ? self.clients.openWindow(targetUrl.href)
-          : undefined;
-      })
-  );
+  if (
+    data.type === 'UBEE_CLEAR_BADGE' ||
+    data.type === 'UBEE_CUSTOMER_CLEAR_BADGE'
+  ) {
+    if (self.registration.clearAppBadge) {
+      event.waitUntil(
+        self.registration.clearAppBadge().catch(() => {})
+      );
+    }
+  }
 });
