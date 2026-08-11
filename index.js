@@ -3257,182 +3257,30 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
 });
 
 // =====================================================
-// UBee Customer Identity Verification V3.4｜自動身分資料審核＋後端上傳確認
-// - 客戶上傳：身分證正面、身分證反面、本人自拍。
-// - 送出時輸入台灣國民身分證字號；完整字號只在單次 HTTPS 請求記憶體中驗證，絕不寫入 Firestore / audit log。
-// - 自動檢查：會員姓名存在、國民身分證格式與檢查碼、三張檔案完整性、私有 Storage 所有權、檔案大小與三張 SHA-256 不重複。
-// - 本版不宣稱具備戶政資料庫查驗、證件防偽、OCR、活體偵測或人臉 1:1 比對；level 固定為 1（UBee 基礎自動身分資料驗證）。
-// - 自動判定完成（通過或拒絕）後刪除三張敏感照片，只保留必要結果與稽核紀錄。
-// - CUSTOMER_IDENTITY_ENFORCE 預設 false；完整測試通過後再決定是否強制下單前完成。
+// UBee Customer Identity Verification V1
+// - 主方式：內政部行動自然人憑證（MOICA Mobile Citizen Certificate）
+// - 與手機號碼驗證完全分離；手機僅作登入帳號與聯絡方式。
+// - 正式介接需先取得內政部 UAT 測試環境與規格文件。
+// - CUSTOMER_IDENTITY_ENFORCE 預設 false，避免正式介接完成前阻擋既有訂單。
 // =====================================================
-function buildCustomerIdentityStorageBucketCandidates() {
-  const normalizeBucketName = value =>
-    String(value || '')
-      .trim()
-      .replace(/^gs:\/\//i, '')
-      .replace(/\/+$/, '');
-
-  const projectId = normalizeBucketName(process.env.FIREBASE_PROJECT_ID || '');
-  const configured = normalizeBucketName(process.env.FIREBASE_STORAGE_BUCKET || '');
-  const appConfigured = normalizeBucketName(admin.app()?.options?.storageBucket || '');
-
-  return [...new Set([
-    configured,
-    appConfigured,
-    projectId ? `${projectId}.firebasestorage.app` : '',
-    projectId ? `${projectId}.appspot.com` : '',
-  ].filter(Boolean))];
-}
-
-const CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES =
-  buildCustomerIdentityStorageBucketCandidates();
-
-// 僅作為相容欄位；真正寫入時會逐一嘗試候選 bucket，並把實際成功的 bucket 寫入 Firestore。
-const CUSTOMER_IDENTITY_STORAGE_BUCKET =
-  CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES[0] || '';
-
 const CUSTOMER_IDENTITY = Object.freeze({
   enforce:
     String(process.env.CUSTOMER_IDENTITY_ENFORCE || 'false')
       .trim()
       .toLowerCase() === 'true',
   providerEnabled:
-    Boolean(
-      CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES.length > 0
-    ),
-  provider: 'ubee_auto',
-  method: 'id_card_selfie_auto_structural_review',
-  verificationMode: 'automatic',
-  reviewVersion: 3.4,
-  maxFileBytes: 20 * 1024 * 1024,
-  minFileBytes: 20 * 1024,
-  documentTypes: Object.freeze({
-    idFront: '身分證正面',
-    idBack: '身分證反面',
-    selfie: '本人自拍',
-  }),
+    String(process.env.MOICA_FIDO_ENABLED || 'false')
+      .trim()
+      .toLowerCase() === 'true',
+  provider: 'moica_mobile',
+  method: 'mobile_citizen_certificate',
 });
-
-const customerIdentityUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    files: 1,
-    fileSize: CUSTOMER_IDENTITY.maxFileBytes,
-  },
-  // V3.1：不在 multer 階段相信瀏覽器回報的 MIME type。
-  // iPhone / PWA / 相簿可能回報 HEIC、octet-stream 或空字串；
-  // 讀入 memory 後再由實際 magic bytes 驗證。
-});
-
-function customerIdentityUploadSingle(req, res, next) {
-  customerIdentityUpload.single('file')(req, res, error => {
-    if (!error) return next();
-
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({
-        success: false,
-        code: 'CUSTOMER_IDENTITY_FILE_TOO_LARGE',
-        message: '單張照片不可超過 20 MB。',
-      });
-    }
-
-    return res.status(Number(error.statusCode || 400)).json({
-      success: false,
-      code: error.code || 'CUSTOMER_IDENTITY_UPLOAD_ERROR',
-      message: error.message || '照片上傳解析失敗，後端未收到完整檔案。',
-    });
-  });
-}
-
-async function saveCustomerIdentityFileToAvailableBucket(storagePath, fileBuffer, saveOptions) {
-  let lastError = null;
-
-  for (const bucketName of CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES) {
-    try {
-      const bucket = admin.storage().bucket(bucketName);
-      const file = bucket.file(storagePath);
-      await file.save(fileBuffer, saveOptions);
-      return { bucket, file, bucketName: bucket.name || bucketName };
-    } catch (error) {
-      lastError = error;
-      console.warn(
-        '⚠️ UBee 身分認證 Storage bucket 寫入失敗，嘗試下一個：',
-        bucketName,
-        error?.message || error
-      );
-    }
-  }
-
-  throw customerAuthError(
-    `身分認證照片無法寫入 Firebase Storage。${lastError?.message ? ` ${lastError.message}` : ''}`,
-    503,
-    'CUSTOMER_IDENTITY_STORAGE_WRITE_FAILED'
-  );
-}
-
-function normalizeCustomerIdentityDocumentType(value) {
-  const normalized = String(value || '')
-    .trim()
-    .replace(/[\s-]+/g, '_')
-    .toLowerCase();
-
-  const aliases = {
-    idfront: 'idFront',
-    id_front: 'idFront',
-    front: 'idFront',
-    idback: 'idBack',
-    id_back: 'idBack',
-    back: 'idBack',
-    selfie: 'selfie',
-    face: 'selfie',
-    portrait: 'selfie',
-  };
-
-  return aliases[normalized] || '';
-}
-
-function normalizeCustomerIdentityDocuments(value) {
-  const source = value && typeof value === 'object' ? value : {};
-  const result = {};
-
-  Object.keys(CUSTOMER_IDENTITY.documentTypes).forEach(key => {
-    const item = source[key];
-    if (!item || typeof item !== 'object') return;
-
-    result[key] = {
-      documentType: key,
-      label: CUSTOMER_IDENTITY.documentTypes[key],
-      storageBucket: cleanText(item.storageBucket || '', 300),
-      storagePath: cleanText(item.storagePath || '', 900),
-      mimeType: cleanText(item.mimeType || '', 100),
-      originalName: cleanText(item.originalName || '', 180),
-      sha256: cleanText(item.sha256 || '', 100),
-      sizeBytes: Math.max(0, Number(item.sizeBytes || 0)),
-      uploadedAtMs: Math.max(0, Number(item.uploadedAtMs || 0)),
-    };
-  });
-
-  return result;
-}
-
-function normalizeCustomerIdentityChecks(value) {
-  const source = value && typeof value === 'object' ? value : {};
-  return {
-    accountNamePresent: source.accountNamePresent === true,
-    nationalIdFormat: source.nationalIdFormat === true,
-    nationalIdChecksum: source.nationalIdChecksum === true,
-    documentsComplete: source.documentsComplete === true,
-    documentOwnership: source.documentOwnership === true,
-    fileIntegrity: source.fileIntegrity === true,
-    filesDistinct: source.filesDistinct === true,
-  };
-}
 
 function normalizeCustomerIdentityVerification(value) {
   const source = value && typeof value === 'object' ? value : {};
   const allowedStatus = new Set([
     'not_verified',
-    'pending', // 相容 Identity V2 既有待人工審核資料
+    'pending',
     'verified',
     'rejected',
   ]);
@@ -3446,54 +3294,11 @@ function normalizeCustomerIdentityVerification(value) {
     level: Math.max(0, Math.min(3, Number(source.level || 0))),
     provider: cleanText(source.provider || '', 60),
     method: cleanText(source.method || '', 80),
-    verificationMode: cleanText(source.verificationMode || '', 40),
-    reviewVersion: Math.max(0, Number(source.reviewVersion || 0)),
     verifiedName: cleanText(source.verifiedName || '', 80),
     verificationId: cleanText(source.verificationId || '', 200),
     verifiedAtMs: Number(source.verifiedAtMs || 0),
     lastAttemptAtMs: Number(source.lastAttemptAtMs || 0),
-    submittedAtMs: Number(source.submittedAtMs || 0),
-    reviewedAtMs: Number(source.reviewedAtMs || 0),
-    reviewedBy: cleanText(source.reviewedBy || '', 100),
-    rejectedAtMs: Number(source.rejectedAtMs || 0),
-    rejectionReason: cleanText(source.rejectionReason || '', 500),
     failureCode: cleanText(source.failureCode || '', 100),
-    checks: normalizeCustomerIdentityChecks(source.checks),
-    documents: normalizeCustomerIdentityDocuments(source.documents),
-  };
-}
-
-function customerIdentityPublicStatus(value) {
-  const identity = normalizeCustomerIdentityVerification(value);
-  const documents = {};
-
-  Object.keys(CUSTOMER_IDENTITY.documentTypes).forEach(key => {
-    const item = identity.documents[key];
-    documents[key] = {
-      uploaded: Boolean(item?.storagePath),
-      uploadedAtMs: Number(item?.uploadedAtMs || 0),
-      label: CUSTOMER_IDENTITY.documentTypes[key],
-    };
-  });
-
-  return {
-    status: identity.status,
-    verified: identity.verified,
-    level: identity.level,
-    provider: identity.provider,
-    method: identity.method,
-    verificationMode: identity.verificationMode || CUSTOMER_IDENTITY.verificationMode,
-    reviewVersion: identity.reviewVersion || CUSTOMER_IDENTITY.reviewVersion,
-    verifiedName: identity.verifiedName,
-    verifiedAtMs: identity.verifiedAtMs,
-    submittedAtMs: identity.submittedAtMs,
-    reviewedAtMs: identity.reviewedAtMs,
-    rejectionReason:
-      identity.status === 'rejected'
-        ? identity.rejectionReason
-        : '',
-    checks: identity.checks,
-    documents,
   };
 }
 
@@ -3501,191 +3306,6 @@ function isCustomerIdentityVerified(account) {
   return normalizeCustomerIdentityVerification(
     account?.identityVerification
   ).verified;
-}
-
-function customerIdentityStorageKey(customerId) {
-  return crypto
-    .createHash('sha256')
-    .update(String(customerId || ''))
-    .digest('hex')
-    .slice(0, 40);
-}
-
-function detectCustomerIdentityImageType(buffer) {
-  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return null;
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return { mimeType: 'image/jpeg', extension: 'jpg' };
-  }
-  if (buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) {
-    return { mimeType: 'image/png', extension: 'png' };
-  }
-  if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
-    return { mimeType: 'image/webp', extension: 'webp' };
-  }
-  if (buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
-    const brand = buffer.subarray(8, 12).toString('ascii').toLowerCase();
-    const heifBrands = new Set(['heic','heix','hevc','hevx','heim','heis','hevm','hevs','mif1','msf1']);
-    if (heifBrands.has(brand)) return { mimeType: 'image/heic', extension: 'heic' };
-    if (brand === 'avif' || brand === 'avis') return { mimeType: 'image/avif', extension: 'avif' };
-  }
-  return null;
-}
-
-function customerIdentityFileExtension(mimeType) {
-  return {
-    'image/jpeg':'jpg',
-    'image/png':'png',
-    'image/webp':'webp',
-    'image/heic':'heic',
-    'image/heif':'heic',
-    'image/avif':'avif',
-  }[String(mimeType || '').toLowerCase()] || 'bin';
-}
-
-function customerIdentityImageSignatureValid(buffer, mimeType) {
-  const detected = detectCustomerIdentityImageType(buffer);
-  if (!detected) return false;
-  const reported = String(mimeType || '').trim().toLowerCase();
-  if (!reported || ['application/octet-stream','binary/octet-stream'].includes(reported)) return true;
-  if (reported === 'image/heif' && detected.mimeType === 'image/heic') return true;
-  return reported === detected.mimeType;
-}
-
-function normalizeTaiwanNationalId(value) {
-  return String(value || '')
-    .normalize('NFKC')
-    .replace(/\s+/g, '')
-    .toUpperCase();
-}
-
-function isTaiwanNationalIdFormatValid(value) {
-  return /^[A-Z][12]\d{8}$/.test(normalizeTaiwanNationalId(value));
-}
-
-function isTaiwanNationalIdChecksumValid(value) {
-  const id = normalizeTaiwanNationalId(value);
-  if (!isTaiwanNationalIdFormatValid(id)) return false;
-
-  const letterCodes = {
-    A:10,B:11,C:12,D:13,E:14,F:15,G:16,H:17,I:34,
-    J:18,K:19,L:20,M:21,N:22,O:35,P:23,Q:24,R:25,
-    S:26,T:27,U:28,V:29,W:32,X:30,Y:31,Z:33,
-  };
-
-  const code = letterCodes[id[0]];
-  if (!code) return false;
-
-  const digits = id.slice(1).split('').map(Number);
-  let sum = Math.floor(code / 10) + (code % 10) * 9;
-  const weights = [8,7,6,5,4,3,2,1,1];
-  digits.forEach((digit, index) => {
-    sum += digit * weights[index];
-  });
-
-  return sum % 10 === 0;
-}
-
-function normalizedIdentityAccountName(value) {
-  return String(value || '')
-    .normalize('NFKC')
-    .replace(/\s+/g, '')
-    .trim();
-}
-
-async function validateCustomerIdentityDocumentOwnership(
-  customerId,
-  documentType,
-  item
-) {
-  if (!item?.storagePath || !item?.storageBucket) {
-    return false;
-  }
-
-  if (!CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES.includes(String(item.storageBucket || ''))) {
-    return false;
-  }
-
-  const storageKey = customerIdentityStorageKey(customerId);
-  const allowedPrefixes = [
-    `customer-identity-v3/pending/${storageKey}/${documentType}/`,
-    // 相容 V2 已上傳、尚未人工審核的資料，可直接轉為 V3 自動審核。
-    `customer-identity-v2/pending/${storageKey}/${documentType}/`,
-  ];
-
-  if (!allowedPrefixes.some(prefix => String(item.storagePath).startsWith(prefix))) {
-    return false;
-  }
-
-  const bucket = admin.storage().bucket(item.storageBucket);
-  const file = bucket.file(item.storagePath);
-  const [exists] = await file.exists();
-  if (!exists) return false;
-
-  const [metadata] = await file.getMetadata();
-  const custom = metadata.metadata || {};
-
-  return (
-    String(custom.customerIdentityKey || '') === storageKey &&
-    String(custom.customerIdentityDocumentType || '') === documentType &&
-    String(custom.sha256 || '') === String(item.sha256 || '')
-  );
-}
-
-async function deleteCustomerIdentityDocuments(identityVerification) {
-  const identity = normalizeCustomerIdentityVerification(identityVerification);
-  if (!CUSTOMER_IDENTITY_STORAGE_BUCKET_CANDIDATES.length) return;
-
-  await Promise.all(
-    Object.values(identity.documents).map(async item => {
-      if (!item?.storagePath || !item?.storageBucket) return;
-      try {
-        const bucket = admin.storage().bucket(item.storageBucket);
-        await bucket.file(item.storagePath).delete({ ignoreNotFound: true });
-      } catch (error) {
-        console.warn(
-          '⚠️ 客戶身分認證敏感照片刪除失敗：',
-          item.storagePath,
-          error?.message || error
-        );
-      }
-    })
-  );
-}
-
-function customerIdentityAutoChecks({ account, nationalId, identity, ownershipOk }) {
-  const documents = identity.documents || {};
-  const requiredTypes = Object.keys(CUSTOMER_IDENTITY.documentTypes);
-  const hashes = requiredTypes
-    .map(type => String(documents[type]?.sha256 || '').trim())
-    .filter(Boolean);
-
-  const documentsComplete = requiredTypes.every(type => {
-    const item = documents[type];
-    return Boolean(item?.storagePath && item?.storageBucket && item?.sha256);
-  });
-
-  const fileIntegrity = requiredTypes.every(type => {
-    const item = documents[type];
-    return (
-      Number(item?.sizeBytes || 0) >= CUSTOMER_IDENTITY.minFileBytes &&
-      Number(item?.sizeBytes || 0) <= CUSTOMER_IDENTITY.maxFileBytes &&
-      /^[a-f0-9]{64}$/i.test(String(item?.sha256 || ''))
-    );
-  });
-
-  return {
-    accountNamePresent: normalizedIdentityAccountName(account?.name).length >= 2,
-    nationalIdFormat: isTaiwanNationalIdFormatValid(nationalId),
-    nationalIdChecksum: isTaiwanNationalIdChecksumValid(nationalId),
-    documentsComplete,
-    documentOwnership: ownershipOk === true,
-    fileIntegrity,
-    filesDistinct: hashes.length === requiredTypes.length && new Set(hashes).size === hashes.length,
-  };
-}
-
-function customerIdentityAutoChecksPassed(checks) {
-  return Object.values(normalizeCustomerIdentityChecks(checks)).every(Boolean);
 }
 
 function customerAuthError(message, statusCode = 400, code = 'CUSTOMER_AUTH_ERROR') {
@@ -3886,7 +3506,15 @@ function customerAccountResponse(account, customerId) {
     createdAtMs: Number(source.createdAtMs || 0),
 
     identityVerified: identityVerification.verified,
-    identityVerification: customerIdentityPublicStatus(identityVerification),
+    identityVerification: {
+      status: identityVerification.status,
+      verified: identityVerification.verified,
+      level: identityVerification.level,
+      provider: identityVerification.provider,
+      method: identityVerification.method,
+      verifiedName: identityVerification.verifiedName,
+      verifiedAtMs: identityVerification.verifiedAtMs,
+    },
     identityProviderAvailable: CUSTOMER_IDENTITY.providerEnabled,
   };
 }
@@ -4021,9 +3649,9 @@ async function requireCustomerAuth(req, res, next) {
 }
 
 // =====================================================
-// UBee 身分認證下單 Middleware
-// - CUSTOMER_IDENTITY_ENFORCE=false：先完成 V3 自動認證實測，不阻擋既有訂單。
-// - 自動判定、刪檔與下單流程穩定後，如要強制下單前完成認證，再將環境變數切為 true。
+// UBee 實名制下單 Middleware
+// - CUSTOMER_IDENTITY_ENFORCE=false：只建置能力，不阻擋既有訂單。
+// - 正式上線行動自然人憑證後再切 true。
 // =====================================================
 async function requireCustomerIdentity(req, res, next) {
   try {
@@ -4039,22 +3667,40 @@ async function requireCustomerIdentity(req, res, next) {
     return res.status(403).json({
       success: false,
       code: 'CUSTOMER_IDENTITY_REQUIRED',
-      message: '完成身分認證後即可送出 UBee 跑腿任務。',
+      message: '完成實名認證後即可送出 UBee 跑腿任務。',
       identityVerification: normalizeCustomerIdentityVerification(
         account.identityVerification
       ),
     });
   } catch (error) {
-    console.error('❌ UBee 客戶身分認證狀態檢查失敗：', error);
+    console.error('❌ UBee 客戶實名狀態檢查失敗：', error);
     return res.status(500).json({
       success: false,
       code: 'CUSTOMER_IDENTITY_CHECK_ERROR',
-      message: '目前無法確認身分認證狀態，請稍後再試。',
+      message: '目前無法確認實名認證狀態，請稍後再試。',
     });
   }
 }
 
-// UBee Identity V3 使用自有基礎自動身分資料審核，不依賴 MOICA / MID 第三方 adapter。
+// 內政部 UAT 規格尚未核發前，不虛構任何 FIDO API URL、簽章欄位或 callback 參數。
+// 取得正式介接文件後，只需要把此 adapter 換成真實的 UAT/PROD 呼叫即可。
+async function startCustomerMoicaIdentityVerification({ customerId, account }) {
+  if (!CUSTOMER_IDENTITY.providerEnabled) {
+    throw customerAuthError(
+      '行動自然人憑證介接尚未開通。UBee 完成內政部測試環境申請後即可啟用。',
+      503,
+      'CUSTOMER_IDENTITY_PROVIDER_NOT_READY'
+    );
+  }
+
+  // 防止僅設定 MOICA_FIDO_ENABLED=true 就誤以為已完成正式串接。
+  // 正式版必須依內政部提供的介接規格，在這裡建立驗證交易並取得導轉資訊。
+  throw customerAuthError(
+    '行動自然人憑證 UAT adapter 尚未設定，請完成正式介接規格後再啟用。',
+    503,
+    'CUSTOMER_IDENTITY_ADAPTER_NOT_CONFIGURED'
+  );
+}
 
 function sendCustomerAuthError(res, error) {
   const statusCode = Number(error?.statusCode || 500);
@@ -4221,26 +3867,17 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         phoneVerified: false,
         phoneVerificationStatus: 'not_verified',
 
-        // UBee 身分認證與手機登入完全分離。
+        // UBee 實名制與手機驗證完全分離。
         identityVerification: {
           status: 'not_verified',
           level: 0,
-          provider: CUSTOMER_IDENTITY.provider,
-          method: CUSTOMER_IDENTITY.method,
-          verificationMode: CUSTOMER_IDENTITY.verificationMode,
-          reviewVersion: CUSTOMER_IDENTITY.reviewVersion,
+          provider: '',
+          method: '',
           verifiedName: '',
           verificationId: '',
           verifiedAtMs: 0,
           lastAttemptAtMs: 0,
-          submittedAtMs: 0,
-          reviewedAtMs: 0,
-          reviewedBy: '',
-          rejectedAtMs: 0,
-          rejectionReason: '',
           failureCode: '',
-          checks: {},
-          documents: {},
           updatedAtMs: nowMs,
         },
 
@@ -4448,11 +4085,10 @@ app.get('/api/customer-auth/me', customerAuthOptional, (req, res) => {
 });
 
 // =====================================================
-// UBee Customer Identity API V3｜身分證＋本人自拍＋自動身分資料審核
+// UBee Customer Identity API V1
 // =====================================================
 app.get('/api/customer-identity/status', requireCustomerAuth, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-
   const identityVerification = normalizeCustomerIdentityVerification(
     req.customerAuth.account?.identityVerification
   );
@@ -4462,374 +4098,24 @@ app.get('/api/customer-identity/status', requireCustomerAuth, (req, res) => {
     available: CUSTOMER_IDENTITY.providerEnabled,
     enforce: CUSTOMER_IDENTITY.enforce,
     identityVerified: identityVerification.verified,
-    identityVerification: customerIdentityPublicStatus(identityVerification),
+    identityVerification: {
+      status: identityVerification.status,
+      verified: identityVerification.verified,
+      level: identityVerification.level,
+      provider: identityVerification.provider,
+      method: identityVerification.method,
+      verifiedName: identityVerification.verifiedName,
+      verifiedAtMs: identityVerification.verifiedAtMs,
+    },
   });
 });
 
-
-app.get(
-  '/api/customer-identity/document/:documentType/preview',
-  requireCustomerAuth,
-  async (req, res) => {
-    res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-
-    try {
-      if (!CUSTOMER_IDENTITY.providerEnabled) {
-        throw customerAuthError(
-          '身分認證照片儲存空間尚未設定。',
-          503,
-          'CUSTOMER_IDENTITY_STORAGE_NOT_CONFIGURED'
-        );
-      }
-
-      const customerId = req.customerAuth.customerId;
-      const account = req.customerAuth.account || {};
-      const documentType = normalizeCustomerIdentityDocumentType(req.params.documentType);
-
-      if (!documentType || !CUSTOMER_IDENTITY.documentTypes[documentType]) {
-        throw customerAuthError(
-          '身分認證照片類型不正確。',
-          400,
-          'CUSTOMER_IDENTITY_DOCUMENT_TYPE_INVALID'
-        );
-      }
-
-      const current = normalizeCustomerIdentityVerification(account.identityVerification);
-      const item = current.documents[documentType];
-
-      if (!item?.storagePath || !item?.storageBucket) {
-        throw customerAuthError(
-          '這張身分認證照片尚未上傳。',
-          404,
-          'CUSTOMER_IDENTITY_DOCUMENT_NOT_FOUND'
-        );
-      }
-
-      const owned = await validateCustomerIdentityDocumentOwnership(
-        customerId,
-        documentType,
-        item
-      );
-
-      if (!owned) {
-        throw customerAuthError(
-          '無法確認這張照片屬於目前登入會員。',
-          403,
-          'CUSTOMER_IDENTITY_DOCUMENT_FORBIDDEN'
-        );
-      }
-
-      const bucket = admin.storage().bucket(item.storageBucket);
-      const file = bucket.file(item.storagePath);
-      const [metadata] = await file.getMetadata();
-      const contentType = String(metadata.contentType || item.mimeType || 'application/octet-stream');
-
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', 'inline');
-
-      const stream = file.createReadStream();
-      stream.on('error', error => {
-        console.error('❌ 讀取客戶身分認證照片預覽失敗：', error);
-        if (!res.headersSent) {
-          res.status(500).json({
-            success: false,
-            code: 'CUSTOMER_IDENTITY_PREVIEW_ERROR',
-            message: '照片預覽暫時無法讀取。',
-          });
-        } else {
-          res.destroy(error);
-        }
-      });
-      stream.pipe(res);
-    } catch (error) {
-      if (res.headersSent) return;
-      return sendCustomerAuthError(res, error);
-    }
-  }
-);
-
-app.post(
-  '/api/customer-identity/document/:documentType',
-  requireCustomerAuth,
-  customerIdentityUploadSingle,
-  async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-
-    let newlyStoredFile = null;
-    let uploadStage = 'request_received';
-
-    try {
-      if (!CUSTOMER_IDENTITY.providerEnabled) {
-        throw customerAuthError(
-          '身分認證照片儲存空間尚未設定。',
-          503,
-          'CUSTOMER_IDENTITY_STORAGE_NOT_CONFIGURED'
-        );
-      }
-
-      const customerId = req.customerAuth.customerId;
-      const account = req.customerAuth.account || {};
-      const documentType = normalizeCustomerIdentityDocumentType(
-        req.params.documentType
-      );
-
-      if (!documentType || !CUSTOMER_IDENTITY.documentTypes[documentType]) {
-        throw customerAuthError(
-          '身分認證照片類型不正確。',
-          400,
-          'CUSTOMER_IDENTITY_DOCUMENT_TYPE_INVALID'
-        );
-      }
-
-      const current = normalizeCustomerIdentityVerification(
-        account.identityVerification
-      );
-
-      if (current.verified) {
-        throw customerAuthError(
-          '此帳號已完成身分認證，不需要再次上傳。',
-          409,
-          'CUSTOMER_IDENTITY_ALREADY_VERIFIED'
-        );
-      }
-
-      uploadStage = 'multipart_parsed';
-
-      const uploadFile = req.file;
-      const fileBuffer = uploadFile?.buffer;
-
-      if (!uploadFile || !Buffer.isBuffer(fileBuffer) || !fileBuffer.length) {
-        throw customerAuthError(
-          '後端沒有收到照片檔案，請重新選擇後上傳。',
-          400,
-          'CUSTOMER_IDENTITY_FILE_REQUIRED'
-        );
-      }
-
-      if (fileBuffer.length < CUSTOMER_IDENTITY.minFileBytes) {
-        throw customerAuthError(
-          '照片檔案過小，請重新拍攝清楚且完整的照片。',
-          400,
-          'CUSTOMER_IDENTITY_FILE_TOO_SMALL'
-        );
-      }
-
-      uploadStage = 'file_received';
-
-      const detectedImage = detectCustomerIdentityImageType(fileBuffer);
-
-      if (!detectedImage) {
-        throw customerAuthError(
-          '無法辨識照片格式。請使用 JPG、PNG、WEBP、HEIC / HEIF 或 AVIF。',
-          415,
-          'CUSTOMER_IDENTITY_FILE_SIGNATURE_INVALID'
-        );
-      }
-
-      const reportedContentType = String(uploadFile.mimetype || '')
-        .trim()
-        .toLowerCase();
-
-      const contentType = detectedImage.mimeType;
-      const extension = detectedImage.extension;
-
-      const identityKey = customerIdentityStorageKey(customerId);
-      const uploadId = crypto.randomUUID();
-
-      const storagePath =
-        `customer-identity-v3/pending/${identityKey}/` +
-        `${documentType}/${Date.now()}_${uploadId}.${extension}`;
-
-      const sha256 = crypto
-        .createHash('sha256')
-        .update(fileBuffer)
-        .digest('hex');
-
-      uploadStage = 'storage_write';
-
-      const saveResult = await saveCustomerIdentityFileToAvailableBucket(
-        storagePath,
-        fileBuffer,
-        {
-          resumable: false,
-          validation: 'md5',
-          metadata: {
-            contentType,
-            cacheControl: 'private, max-age=0, no-store, no-transform',
-            metadata: {
-              customerIdentityKey: identityKey,
-              customerIdentityDocumentType: documentType,
-              sha256,
-              reportedContentType: cleanText(reportedContentType || '', 100),
-              dataVersion: '3.4',
-            },
-          },
-        }
-      );
-
-      const storageFile = saveResult.file;
-      newlyStoredFile = storageFile;
-
-      uploadStage = 'storage_written';
-
-      const oldItem = current.documents[documentType];
-      const nowMs = Date.now();
-
-      const nextItem = {
-        documentType,
-        label: CUSTOMER_IDENTITY.documentTypes[documentType],
-        storageBucket: saveResult.bucketName,
-        storagePath,
-        mimeType: contentType,
-        originalName: cleanText(uploadFile.originalname || '', 180),
-        sha256,
-        sizeBytes: fileBuffer.length,
-        uploadedAtMs: nowMs,
-      };
-
-      const nextDocuments = {
-        ...current.documents,
-        [documentType]: nextItem,
-      };
-
-      const nextStatus = ['rejected', 'pending'].includes(current.status)
-        ? 'not_verified'
-        : current.status;
-
-      const nextIdentity = {
-        ...current,
-        status: nextStatus,
-        level: 0,
-        provider: CUSTOMER_IDENTITY.provider,
-        method: CUSTOMER_IDENTITY.method,
-        verificationMode: CUSTOMER_IDENTITY.verificationMode,
-        reviewVersion: 3.4,
-        verifiedName: '',
-        verifiedAtMs: 0,
-        submittedAtMs: 0,
-        reviewedAtMs: 0,
-        reviewedBy: '',
-        rejectedAtMs: 0,
-        rejectionReason: '',
-        failureCode: '',
-        checks: {},
-        lastAttemptAtMs: nowMs,
-        documents: nextDocuments,
-        updatedAtMs: nowMs,
-      };
-
-      uploadStage = 'firestore_write';
-
-      await db
-        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-        .doc(customerId)
-        .set(
-          {
-            identityVerification: nextIdentity,
-            updatedAtMs: nowMs,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-      uploadStage = 'firestore_written';
-
-      // V3.4：Storage save + Firestore set 都完成，就算上傳成功。
-      // 不再做第二次 Firestore readback，也不要求額外 serverConfirmed 才承認成功。
-      const publicIdentity = customerIdentityPublicStatus(nextIdentity);
-
-      // 成功後再清除同類型舊檔；失敗不影響這次成功回應。
-      if (
-        oldItem?.storagePath &&
-        oldItem.storagePath !== storagePath &&
-        oldItem.storageBucket
-      ) {
-        try {
-          await admin
-            .storage()
-            .bucket(oldItem.storageBucket)
-            .file(oldItem.storagePath)
-            .delete({ ignoreNotFound: true });
-        } catch (cleanupError) {
-          console.warn(
-            '⚠️ 舊身分認證照片清理失敗，不影響新照片上傳：',
-            cleanupError?.message || cleanupError
-          );
-        }
-      }
-
-      uploadStage = 'completed';
-      newlyStoredFile = null;
-
-      return res.status(200).json({
-        success: true,
-        uploaded: true,
-        documentType,
-        label: CUSTOMER_IDENTITY.documentTypes[documentType],
-        uploadedAtMs: nowMs,
-        sizeBytes: nextItem.sizeBytes,
-        identityVerification: publicIdentity,
-
-        // 保留欄位只為舊前端相容；新版前端不再依賴它。
-        serverConfirmed: true,
-        stage: 'completed',
-
-        message: `${CUSTOMER_IDENTITY.documentTypes[documentType]}已安全上傳。`,
-      });
-
-    } catch (error) {
-      if (newlyStoredFile) {
-        await newlyStoredFile
-          .delete({ ignoreNotFound: true })
-          .catch(() => {});
-      }
-
-      const statusCode = Number(error?.statusCode || 500);
-      const code = error?.code || 'CUSTOMER_IDENTITY_UPLOAD_FAILED';
-      const message =
-        error?.message ||
-        '後端未能完成照片上傳，請稍後再試。';
-
-      console.error('❌ 客戶身分認證照片上傳未完成：', {
-        stage: uploadStage,
-        statusCode,
-        code,
-        message,
-      });
-
-      return res.status(statusCode).json({
-        success: false,
-        uploaded: false,
-        stage: uploadStage,
-        code,
-        message,
-      });
-    }
-  }
-);
-
-app.post('/api/customer-identity/submit', requireCustomerAuth, async (req, res) => {
+app.post('/api/customer-identity/start', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
 
   try {
     const customerId = req.customerAuth.customerId;
-    const accountRef = db
-      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-      .doc(customerId);
-    const accountDoc = await accountRef.get();
-
-    if (!accountDoc.exists) {
-      throw customerAuthError(
-        '找不到會員帳號。',
-        404,
-        'CUSTOMER_ACCOUNT_NOT_FOUND'
-      );
-    }
-
-    const account = accountDoc.data() || {};
+    const account = req.customerAuth.account || {};
     const current = normalizeCustomerIdentityVerification(
       account.identityVerification
     );
@@ -4839,171 +4125,74 @@ app.post('/api/customer-identity/submit', requireCustomerAuth, async (req, res) 
         success: true,
         alreadyVerified: true,
         identityVerified: true,
-        identityVerification: customerIdentityPublicStatus(current),
-        message: '此 UBee 帳號已完成身分認證。',
+        identityVerification: current,
+        message: '此 UBee 帳號已完成實名認證。',
       });
     }
-
-    if (req.body?.privacyConsent !== true) {
-      throw customerAuthError(
-        '請先同意身分認證資料蒐集與自動檢查說明。',
-        400,
-        'CUSTOMER_IDENTITY_CONSENT_REQUIRED'
-      );
-    }
-
-    const nationalId = normalizeTaiwanNationalId(req.body?.nationalId);
-
-    // 先檢查字號；輸入錯誤時保留已上傳照片，避免使用者因打字錯誤重拍三張照片。
-    if (!isTaiwanNationalIdFormatValid(nationalId)) {
-      throw customerAuthError(
-        '國民身分證字號格式不正確，請重新確認。',
-        400,
-        'CUSTOMER_IDENTITY_NATIONAL_ID_FORMAT_INVALID'
-      );
-    }
-
-    if (!isTaiwanNationalIdChecksumValid(nationalId)) {
-      throw customerAuthError(
-        '國民身分證字號檢查碼不正確，請重新確認。',
-        400,
-        'CUSTOMER_IDENTITY_NATIONAL_ID_CHECKSUM_INVALID'
-      );
-    }
-
-    const requiredTypes = Object.keys(CUSTOMER_IDENTITY.documentTypes);
-
-    for (const documentType of requiredTypes) {
-      const item = current.documents[documentType];
-      if (!item?.storagePath) {
-        throw customerAuthError(
-          `請先上傳${CUSTOMER_IDENTITY.documentTypes[documentType]}。`,
-          400,
-          'CUSTOMER_IDENTITY_DOCUMENTS_INCOMPLETE'
-        );
-      }
-    }
-
-    const ownershipResults = await Promise.all(
-      requiredTypes.map(documentType =>
-        validateCustomerIdentityDocumentOwnership(
-          customerId,
-          documentType,
-          current.documents[documentType]
-        )
-      )
-    );
-
-    const ownershipOk = ownershipResults.every(Boolean);
-    const checks = customerIdentityAutoChecks({
-      account,
-      nationalId,
-      identity: current,
-      ownershipOk,
-    });
 
     const nowMs = Date.now();
-    const verificationId =
-      `CID_AUTO_${nowMs}_${crypto.randomBytes(6).toString('hex')}`;
-    const passed = customerIdentityAutoChecksPassed(checks);
+    await db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .doc(customerId)
+      .set({
+        identityVerification: {
+          ...current,
+          status: 'pending',
+          provider: CUSTOMER_IDENTITY.provider,
+          method: CUSTOMER_IDENTITY.method,
+          lastAttemptAtMs: nowMs,
+          failureCode: '',
+          updatedAtMs: nowMs,
+        },
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
 
-    let rejectionReason = '';
-    let failureCode = '';
+    const providerSession = await startCustomerMoicaIdentityVerification({
+      customerId,
+      account,
+    });
 
-    if (!passed) {
-      if (!checks.accountNamePresent) {
-        rejectionReason = '會員姓名資料不完整，請先到會員資料填寫真實姓名。';
-        failureCode = 'ACCOUNT_NAME_MISSING';
-      } else if (!checks.documentsComplete || !checks.documentOwnership) {
-        rejectionReason = '上傳的身分認證照片驗證失敗，請重新上傳。';
-        failureCode = 'DOCUMENT_VALIDATION_FAILED';
-      } else if (!checks.fileIntegrity) {
-        rejectionReason = '照片檔案品質或完整性不符合要求，請重新拍攝。';
-        failureCode = 'FILE_INTEGRITY_FAILED';
-      } else if (!checks.filesDistinct) {
-        rejectionReason = '三張認證照片不可使用相同檔案，請分別拍攝證件正面、反面與本人自拍。';
-        failureCode = 'DUPLICATE_IDENTITY_FILES';
-      } else {
-        rejectionReason = '身分資料自動檢查未通過，請重新確認後再試。';
-        failureCode = 'AUTO_REVIEW_FAILED';
+    return res.json({
+      success: true,
+      identityVerified: false,
+      identityVerification: {
+        status: 'pending',
+        provider: CUSTOMER_IDENTITY.provider,
+        method: CUSTOMER_IDENTITY.method,
+      },
+      ...providerSession,
+    });
+  } catch (error) {
+    // Provider 尚未開通時不讓帳號永久卡在 pending。
+    if (
+      ['CUSTOMER_IDENTITY_PROVIDER_NOT_READY', 'CUSTOMER_IDENTITY_ADAPTER_NOT_CONFIGURED']
+        .includes(String(error?.code || ''))
+    ) {
+      const customerId = req.customerAuth?.customerId;
+      if (customerId) {
+        db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+          .doc(customerId)
+          .set({
+            identityVerification: {
+              status: 'not_verified',
+              level: 0,
+              provider: '',
+              method: '',
+              verifiedName: '',
+              verificationId: '',
+              verifiedAtMs: 0,
+              lastAttemptAtMs: Date.now(),
+              failureCode: String(error.code || ''),
+              updatedAtMs: Date.now(),
+            },
+          }, { merge: true })
+          .catch(() => {});
       }
     }
 
-    const nextIdentity = {
-      ...current,
-      status: passed ? 'verified' : 'rejected',
-      level: passed ? 1 : 0,
-      provider: CUSTOMER_IDENTITY.provider,
-      method: CUSTOMER_IDENTITY.method,
-      verificationMode: CUSTOMER_IDENTITY.verificationMode,
-      reviewVersion: CUSTOMER_IDENTITY.reviewVersion,
-      verifiedName: passed ? cleanText(account.name || '', 80) : '',
-      verificationId,
-      verifiedAtMs: passed ? nowMs : 0,
-      lastAttemptAtMs: nowMs,
-      submittedAtMs: nowMs,
-      reviewedAtMs: nowMs,
-      reviewedBy: 'ubee_auto_v3',
-      rejectedAtMs: passed ? 0 : nowMs,
-      rejectionReason: passed ? '' : rejectionReason,
-      failureCode: passed ? '' : failureCode,
-      checks,
-      // 自動判定完成後 Firestore 不保留照片 metadata；實體檔案於下方立即清除。
-      documents: {},
-      updatedAtMs: nowMs,
-    };
-
-    await accountRef.set({
-      identityVerification: nextIdentity,
-      updatedAtMs: nowMs,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-
-    await db
-      .collection('customerIdentityAuditLogs')
-      .doc(crypto.randomUUID())
-      .set({
-        customerId,
-        verificationId,
-        event: passed ? 'auto_verified' : 'auto_rejected',
-        provider: CUSTOMER_IDENTITY.provider,
-        method: CUSTOMER_IDENTITY.method,
-        verificationMode: CUSTOMER_IDENTITY.verificationMode,
-        reviewVersion: CUSTOMER_IDENTITY.reviewVersion,
-        level: passed ? 1 : 0,
-        checks,
-        failureCode: passed ? '' : failureCode,
-        // 刻意不記錄完整身分證字號、照片路徑、照片雜湊或生物特徵。
-        createdAtMs: nowMs,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-    // Firestore 結果先落盤，再清除敏感照片；刪除失敗只記警告，不回滾驗證結果。
-    await deleteCustomerIdentityDocuments(current);
-
-    return res.status(passed ? 200 : 422).json({
-      success: passed,
-      identityVerified: passed,
-      code: passed ? 'CUSTOMER_IDENTITY_AUTO_VERIFIED' : 'CUSTOMER_IDENTITY_AUTO_REJECTED',
-      identityVerification: customerIdentityPublicStatus(nextIdentity),
-      message: passed
-        ? '身分資料自動檢查已通過，UBee 身分認證完成。'
-        : rejectionReason,
-    });
-  } catch (error) {
-    console.error('❌ 客戶身分認證自動檢查失敗：', error);
     return sendCustomerAuthError(res, error);
   }
-});
-
-// 舊 Identity V1 start 入口保留相容；V3 用戶端統一呼叫 /submit。
-app.post('/api/customer-identity/start', requireCustomerAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  return res.status(409).json({
-    success: false,
-    code: 'CUSTOMER_IDENTITY_CLIENT_UPDATE_REQUIRED',
-    message: 'UBee 身分認證已升級為 V3 自動檢查，請更新用戶端後重新操作。',
-  });
 });
 
 app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => {
@@ -28616,7 +27805,7 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     req.body.customerPhone = String(req.customerAuth.account.phone || '');
     const data = createOrderFromApi(req.body);
 
-    // 訂單只記錄是否通過身分認證，不複製證件照片或其他敏感資料。
+    // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
     data.customerIdentityVerified = isCustomerIdentityVerified(
       req.customerAuth.account
     );
