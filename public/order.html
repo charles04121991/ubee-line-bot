@@ -21087,7 +21087,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-5';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-6';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22594,6 +22594,10 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const sizeMb = (file.size / 1024 / 1024).toFixed(1);
     setIdentityUiStatus(`${sourceLabel}正在安全上傳…（${sizeMb} MB）`,'pending');
 
+    let data = null;
+
+    // V3.3：只有真正的 upload POST 失敗，才顯示「上傳失敗」。
+    // 後續會員狀態 refresh 即使暫時失敗，也不可覆蓋已成功的 Storage 上傳結果。
     try{
       const body = new FormData();
       body.append('file',file,file.name || `${documentType}.jpg`);
@@ -22607,21 +22611,11 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
           body
         }
       );
-      const data = await response.json().catch(()=>({}));
+      data = await response.json().catch(()=>({}));
 
       if(!response.ok || data.success === false){
         throw new Error(data.message || '照片上傳失敗。');
       }
-
-      identityUploadInFlight.delete(documentType);
-      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
-      await refreshCustomerIdentity();
-      const updatedCustomer=getCurrentCustomerSafe();
-      const uploadedAtMs=updatedCustomer?.identityVerification?.documents?.[documentType]?.uploadedAtMs || Date.now();
-      showIdentityServerPreview(documentType,uploadedAtMs);
-      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認上方照片預覽。`,'success');
-      syncIdentitySubmitAvailability(updatedCustomer);
-      return true;
     }catch(error){
       identityUploadInFlight.delete(documentType);
       setIdentityDocumentState(documentType,'上傳失敗，請重試','error');
@@ -22629,6 +22623,58 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       syncIdentitySubmitAvailability();
       return false;
     }
+
+    // POST 已成功：先立即將 server 回傳的 identityVerification 合併進目前會員狀態。
+    // 這一步不依賴 /api/customer-auth/me，因此送出按鈕能立刻知道三張照片已完成。
+    identityUploadInFlight.delete(documentType);
+
+    const baseCustomer = getCurrentCustomerSafe() || {};
+    const serverIdentity = data?.identityVerification && typeof data.identityVerification === 'object'
+      ? data.identityVerification
+      : null;
+    const optimisticCustomer = serverIdentity
+      ? { ...baseCustomer, identityVerification: serverIdentity }
+      : baseCustomer;
+
+    try{ currentCustomer = optimisticCustomer; }catch(_){ }
+
+    setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+
+    const uploadedAtMs = Number(
+      serverIdentity?.documents?.[documentType]?.uploadedAtMs || Date.now()
+    );
+    showIdentityServerPreview(documentType,uploadedAtMs);
+
+    // 以 server response 直接重繪，避免狀態還停留在「尚未上傳」。
+    if(serverIdentity){
+      renderIdentityPanel(optimisticCustomer);
+    }else{
+      syncIdentitySubmitAvailability(optimisticCustomer);
+    }
+
+    setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+    setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
+
+    // 背景再同步一次完整會員資料；同步失敗只記錄 warning，不得改成「上傳失敗」。
+    try{
+      await refreshCustomerIdentity();
+      const refreshedCustomer = getCurrentCustomerSafe();
+      const refreshedUploadedAtMs = Number(
+        refreshedCustomer?.identityVerification?.documents?.[documentType]?.uploadedAtMs || uploadedAtMs
+      );
+      showIdentityServerPreview(documentType,refreshedUploadedAtMs);
+      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
+      syncIdentitySubmitAvailability(refreshedCustomer);
+    }catch(refreshError){
+      console.warn('UBee 身分認證：照片已成功上傳，但會員狀態背景同步暫時失敗。',refreshError);
+      // 保留 optimisticCustomer 與成功狀態，讓使用者仍可繼續完成認證。
+      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
+      syncIdentitySubmitAvailability(optimisticCustomer);
+    }
+
+    return true;
   }
 
   async function submitCustomerIdentity(){
