@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 V2.13 Identity V1：2026-08-11｜新增行動自然人憑證實名骨架、驗證徽章與下單前實名導流 -->
+<!-- UBee 用戶端 V2.14 Identity V2：2026-08-11｜新增自有身分認證：身分證正反面＋本人自拍＋人工審核 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -8170,91 +8170,6 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
 }
 </style>
 
-<style id="ubee-customer-identity-style-v1">
-/* =====================================================
-   UBee Customer Identity V1｜實名徽章＋行動自然人憑證頁
-   ===================================================== */
-#productionOrderFlow .ubee-verified-name{
-  display:inline-flex!important;
-  align-items:center!important;
-  gap:6px!important;
-  width:max-content!important;
-  max-width:100%!important;
-}
-#productionOrderFlow .ubee-verified-name::after{
-  content:"✓";
-  width:18px;
-  height:18px;
-  flex:0 0 18px;
-  margin-left:6px;
-  vertical-align:middle;
-  display:inline-grid;
-  place-items:center;
-  background:#ecfdf3;
-  color:#16a34a;
-  font-size:12px;
-  font-weight:1000;
-  line-height:1;
-  clip-path:polygon(
-    50% 0%,61% 8%,74% 4%,82% 16%,96% 18%,92% 32%,100% 43%,90% 53%,96% 66%,82% 73%,82% 88%,67% 88%,57% 100%,47% 91%,33% 98%,26% 84%,12% 82%,14% 67%,2% 58%,10% 46%,3% 33%,17% 26%,18% 11%,33% 13%,43% 2%
-  );
-  filter:drop-shadow(0 0 0.5px #15803d);
-}
-#productionOrderFlow .ubee-identity-status-row strong.is-verified{
-  color:#15803d!important;
-}
-#productionOrderFlow .ubee-identity-card{
-  width:100%;
-  margin:0 0 14px;
-  padding:18px 16px;
-  border:1px solid #e1e5e8;
-  background:#fff;
-  text-align:center;
-}
-#productionOrderFlow .ubee-identity-large-seal{
-  width:54px;
-  height:54px;
-  margin:0 auto 12px;
-  display:grid;
-  place-items:center;
-  background:#ecfdf3;
-  color:#16a34a;
-  font-size:30px;
-  font-weight:1000;
-  line-height:1;
-  clip-path:polygon(
-    50% 0%,61% 8%,74% 4%,82% 16%,96% 18%,92% 32%,100% 43%,90% 53%,96% 66%,82% 73%,82% 88%,67% 88%,57% 100%,47% 91%,33% 98%,26% 84%,12% 82%,14% 67%,2% 58%,10% 46%,3% 33%,17% 26%,18% 11%,33% 13%,43% 2%
-  );
-}
-#productionOrderFlow .ubee-identity-large-seal.is-unverified{
-  background:#f3f4f6;
-  color:#9ca3af;
-}
-#productionOrderFlow .ubee-identity-card strong{
-  display:block;
-  margin:0 0 6px;
-  color:#111;
-  font-size:18px;
-  font-weight:1000;
-}
-#productionOrderFlow .ubee-identity-card p{
-  margin:0;
-  color:#6f757c;
-  font-size:13px;
-  font-weight:750;
-  line-height:1.7;
-}
-#productionOrderFlow .ubee-identity-privacy-note{
-  margin:12px 0 0;
-  padding:12px 13px;
-  border:1px solid #d8e9dd;
-  background:#f6fff8;
-  color:#52635a;
-  font-size:12px;
-  font-weight:800;
-  line-height:1.7;
-}
-</style>
 <style id="ubee-legal-document-style-v210">
 /* V2.10 僅供「我的 → 規範與隱私」長版文件使用，不影響其他頁面。 */
 #productionOrderFlow #ubeeMyDocumentContent{
@@ -16053,18 +15968,10 @@ async function createOrder(){
       err
     );
 
-    if(err?.code === 'CUSTOMER_IDENTITY_REQUIRED'){
-      alert('完成實名認證後即可送出 UBee 跑腿任務。');
-      try{
-        window.openUBeeProfilePage?.();
-        setTimeout(() => window.openUBeeMySection?.('identity'),80);
-      }catch(_){ }
-    }else{
-      alert(
-        err.message ||
-        '建立訂單失敗，請稍後再試。'
-      );
-    }
+    alert(
+      err.message ||
+      '建立訂單失敗，請稍後再試。'
+    );
 
   }finally{
 
@@ -20077,6 +19984,46 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <button class="danger-text" data-my-action="deleteAccount" type="button">刪除帳號 <span>›</span></button>
 </div>
 </section>
+<section class="ubee-my-panel" hidden="" id="ubeeMyIdentityPanel">
+<div class="ubee-my-panel-head"><strong>身分認證</strong><button data-my-close-account="" type="button">上一頁</button></div>
+
+<div class="ubee-identity-card" id="ubeeIdentityStatusCard">
+<div class="ubee-identity-seal is-unverified" id="ubeeIdentitySeal">✓</div>
+<strong id="ubeeIdentityTitle">尚未完成身分認證</strong>
+<p id="ubeeIdentityDescription">請上傳身分證正面、反面與本人自拍。資料送出後由 UBee 人工審核。</p>
+</div>
+
+<div class="ubee-identity-upload-area" id="ubeeIdentityUploadArea">
+<div class="ubee-identity-upload-row">
+<div><strong>身分證正面</strong><span id="ubeeIdentityIdFrontState">尚未上傳</span></div>
+<label class="ubee-identity-upload-button">拍照／選擇
+<input accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" data-identity-upload="idFront" type="file"/>
+</label>
+</div>
+<div class="ubee-identity-upload-row">
+<div><strong>身分證反面</strong><span id="ubeeIdentityIdBackState">尚未上傳</span></div>
+<label class="ubee-identity-upload-button">拍照／選擇
+<input accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" data-identity-upload="idBack" type="file"/>
+</label>
+</div>
+<div class="ubee-identity-upload-row">
+<div><strong>本人自拍</strong><span id="ubeeIdentitySelfieState">尚未上傳</span></div>
+<label class="ubee-identity-upload-button">拍攝自拍
+<input accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="user" data-identity-upload="selfie" type="file"/>
+</label>
+</div>
+
+<label class="ubee-identity-consent">
+<input id="ubeeIdentityConsent" type="checkbox"/>
+<span>我同意 UBee 為確認帳號本人身分，在人工審核期間處理上述照片。審核完成後，系統將刪除此次上傳的敏感照片，只保留必要的審核結果與紀錄。</span>
+</label>
+
+<button class="ubee-flat-primary" data-identity-action="submit" id="ubeeIdentitySubmitButton" type="button">送出身分認證</button>
+</div>
+
+<div class="ubee-identity-review-note" id="ubeeIdentityReviewNote">照片僅供 UBee 授權審核人員確認本人與證件是否一致；請勿在其他任務備註或客服訊息中重複上傳身分證。</div>
+<div aria-live="polite" class="ubee-flat-status" id="ubeeIdentityStatus"></div>
+</section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyCouponsPanel">
 <div class="ubee-my-panel-head"><strong>優惠券</strong><button data-my-close="" type="button">關閉</button></div>
 <div class="ubee-my-empty-state" id="ubeeMyCouponsContent">目前沒有可使用的優惠券。</div>
@@ -20143,17 +20090,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <label><span>優惠與活動訊息</span><input id="ubeePrefMarketing" type="checkbox"/></label>
 </div>
 <button class="ubee-flat-primary" data-flat-action="save-preferences" type="button">儲存偏好</button><div aria-live="polite" class="ubee-flat-status" id="ubeePreferencesStatus"></div>
-</section>
-<section class="ubee-my-panel" hidden="" id="ubeeMyIdentityPanel">
-<div class="ubee-my-panel-head"><strong>身分認證</strong><button data-my-close-account="" type="button">上一頁</button></div>
-<div class="ubee-identity-card">
-<div class="ubee-identity-large-seal is-unverified" id="ubeeIdentityLargeSeal">✓</div>
-<strong id="ubeeIdentityTitle">尚未完成實名認證</strong>
-<p id="ubeeIdentityDescription">使用內政部行動自然人憑證完成身分識別。UBee 不要求你上傳身分證正反面照片。</p>
-</div>
-<button class="ubee-flat-primary" data-flat-action="identity-start" id="ubeeIdentityStartButton" type="button">使用行動自然人憑證認證</button>
-<div class="ubee-identity-privacy-note">驗證會透過行動自然人憑證 App 與裝置 Face ID／指紋完成。UBee 僅保存必要的驗證結果與時間，不保存你的 Face ID、指紋或身分證照片。</div>
-<div aria-live="polite" class="ubee-flat-status" id="ubeeIdentityStatus"></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMySecurityPanel">
 <div class="ubee-my-panel-head"><strong>帳號與安全</strong><button data-my-close-account="" type="button">上一頁</button></div>
@@ -20946,22 +20882,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   async function renderProfile(){
     showPage('profile');
     const displayName=String(currentCustomer?.name || '').trim();
-    const profileNameEl=$('flowProfileName');
-    profileNameEl.textContent=displayName||'UBee 客戶';
-    const identityVerified=Boolean(
-      currentCustomer?.identityVerified === true ||
-      currentCustomer?.identityVerification?.verified === true ||
-      String(currentCustomer?.identityVerification?.status || '').toLowerCase() === 'verified'
-    );
-    profileNameEl.classList.toggle('ubee-verified-name',identityVerified);
-    if(identityVerified){
-      profileNameEl.title='已完成 UBee 實名認證';
-    }else{
-      profileNameEl.removeAttribute('title');
-    }
-    $('flowProfileSubtext').textContent=identityVerified
-      ? '✓ 已完成實名認證｜會員、常用資料與設定集中在這裡'
-      : '會員、常用資料與設定集中在這裡';
+    $('flowProfileName').textContent=displayName||'UBee 客戶';
+    $('flowProfileSubtext').textContent='會員、常用資料與設定集中在這裡';
     await loadAddresses();
     renderProfileAddressList();
     try{
@@ -21125,7 +21047,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260807-2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21956,17 +21878,60 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     line-height:1.55;
   }
 </style>
+<style id="ubee-customer-identity-v2-style">
+#productionOrderFlow .ubee-identity-status-row strong.is-verified{color:#15803d!important;}
+#productionOrderFlow .ubee-identity-status-row strong.is-pending{color:#9a6700!important;}
+#productionOrderFlow .ubee-identity-status-row strong.is-rejected{color:#b42318!important;}
+#productionOrderFlow .ubee-identity-card{
+  width:100%;margin:0 0 14px;padding:18px 16px;border:1px solid #e1e5e8;background:#fff;text-align:center;
+}
+#productionOrderFlow .ubee-identity-seal{
+  width:54px;height:54px;margin:0 auto 12px;display:grid;place-items:center;background:#ecfdf3;color:#16a34a;
+  font-size:30px;font-weight:1000;clip-path:polygon(50% 0%,61% 8%,74% 4%,82% 16%,96% 18%,92% 32%,100% 43%,90% 53%,96% 66%,82% 73%,82% 88%,67% 88%,57% 100%,47% 91%,33% 98%,26% 84%,12% 82%,14% 67%,2% 58%,10% 46%,3% 33%,17% 26%,18% 11%,33% 13%,43% 2%);
+}
+#productionOrderFlow .ubee-identity-seal.is-unverified{background:#f3f4f6;color:#9ca3af;}
+#productionOrderFlow .ubee-identity-seal.is-pending{background:#fff8db;color:#b7791f;}
+#productionOrderFlow .ubee-identity-seal.is-rejected{background:#fff0f0;color:#c2413a;}
+#productionOrderFlow .ubee-identity-card>strong{display:block;margin:0 0 6px;color:#111;font-size:18px;font-weight:1000;}
+#productionOrderFlow .ubee-identity-card>p{margin:0;color:#6f757c;font-size:13px;font-weight:750;line-height:1.7;}
+#productionOrderFlow .ubee-identity-upload-area{width:100%;margin:0 0 14px;border:1px solid #e1e5e8;background:#fff;}
+#productionOrderFlow .ubee-identity-upload-row{
+  min-height:68px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #eceef0;
+}
+#productionOrderFlow .ubee-identity-upload-row>div{min-width:0;}
+#productionOrderFlow .ubee-identity-upload-row strong{display:block;color:#111;font-size:14px;font-weight:1000;}
+#productionOrderFlow .ubee-identity-upload-row span{display:block;margin-top:4px;color:#858a90;font-size:11px;font-weight:850;}
+#productionOrderFlow .ubee-identity-upload-row span.is-uploaded{color:#15803d;}
+#productionOrderFlow .ubee-identity-upload-button{
+  min-height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border:1px solid #d8dadd;
+  background:#f7f8f9;color:#111;font-size:12px;font-weight:1000;cursor:pointer;white-space:nowrap;
+}
+#productionOrderFlow .ubee-identity-upload-button input{position:absolute;width:1px!important;height:1px!important;opacity:0;pointer-events:none;}
+#productionOrderFlow .ubee-identity-upload-button.is-disabled{opacity:.45;pointer-events:none;}
+#productionOrderFlow .ubee-identity-consent{
+  display:grid;grid-template-columns:22px minmax(0,1fr);align-items:flex-start;gap:10px;padding:13px 14px;border-bottom:1px solid #eceef0;
+  color:#555d64;font-size:11px;font-weight:800;line-height:1.65;text-align:left;
+}
+#productionOrderFlow .ubee-identity-consent input{
+  width:20px!important;height:20px!important;margin:1px 0 0!important;appearance:auto!important;-webkit-appearance:checkbox!important;accent-color:#f4bd00;
+}
+#productionOrderFlow .ubee-identity-upload-area .ubee-flat-primary{width:calc(100% - 28px);margin:14px;}
+#productionOrderFlow .ubee-identity-review-note{
+  margin:0 0 12px;padding:12px 13px;border:1px solid #dbe4e9;background:#f8fbfc;color:#5d6870;font-size:11px;font-weight:800;line-height:1.7;
+}
+</style>
 <script id="ubee-app-settings-controller">
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.07.2';
+  const APP_VERSION = '2026.08.11.2';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
 
   const panelMap = Object.freeze({
     account:'ubeeMyAccountPanel',
+    identity:'ubeeMyIdentityPanel',
     coupons:'ubeeMyCouponsPanel',
     addresses:'ubeeMyAddressesPanel',
     notifications:'ubeeMyNotificationsPanel',
@@ -21979,7 +21944,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     editprofile:'ubeeMyEditProfilePanel',
     changepassword:'ubeeMyPasswordPanel',
     preferences:'ubeeMyPreferencesPanel',
-    identity:'ubeeMyIdentityPanel',
     security:'ubeeMySecurityPanel',
     privacy:'ubeeMyPrivacyPanel',
     deleteaccount:'ubeeMyDeleteAccountPanel'
@@ -22243,130 +22207,12 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     currentMySection = '';
   }
 
-  function customerIdentityVerified(customer){
-    return Boolean(
-      customer?.identityVerified === true ||
-      customer?.identityVerification?.verified === true ||
-      String(customer?.identityVerification?.status || '').toLowerCase() === 'verified'
-    );
-  }
-
-  function applyVerifiedNameBadge(element, customer){
-    if(!element) return;
-    const verified = customerIdentityVerified(customer);
-    element.classList.toggle('ubee-verified-name',verified);
-    if(verified){
-      element.setAttribute('title','已完成 UBee 實名認證');
-      element.setAttribute('aria-label',`${element.textContent || 'UBee 會員'}，已完成實名認證`);
-    }else{
-      element.removeAttribute('title');
-      element.removeAttribute('aria-label');
-    }
-  }
-
-  function fillIdentityUi(customer = getCurrentCustomerSafe()){
-    const verified = customerIdentityVerified(customer);
-    const identity = customer?.identityVerification || {};
-    const accountStatus = document.getElementById('ubeeMyAccountIdentityStatus');
-    const seal = document.getElementById('ubeeIdentityLargeSeal');
-    const title = document.getElementById('ubeeIdentityTitle');
-    const description = document.getElementById('ubeeIdentityDescription');
-    const startButton = document.getElementById('ubeeIdentityStartButton');
-    const status = document.getElementById('ubeeIdentityStatus');
-
-    if(accountStatus){
-      accountStatus.textContent = verified ? '✓ 已完成' : '尚未認證';
-      accountStatus.classList.toggle('is-verified',verified);
-    }
-
-    if(seal) seal.classList.toggle('is-unverified',!verified);
-    if(title) title.textContent = verified ? '已完成實名認證' : '尚未完成實名認證';
-    if(description){
-      description.textContent = verified
-        ? `${identity.verifiedName || customer?.name || '此會員'}已通過行動自然人憑證身分驗證。`
-        : '使用內政部行動自然人憑證完成身分識別。UBee 不要求你上傳身分證正反面照片。';
-    }
-    if(startButton){
-      const available = customer?.identityProviderAvailable === true;
-      startButton.hidden = verified;
-      startButton.disabled = !verified && !available;
-      startButton.textContent = available
-        ? '使用行動自然人憑證認證'
-        : '行動自然人憑證認證（介接中）';
-    }
-    if(status){
-      if(verified){
-        const verifiedAt = Number(identity.verifiedAtMs || 0);
-        status.textContent = verifiedAt
-          ? `驗證完成：${new Date(verifiedAt).toLocaleString('zh-TW')}`
-          : '此帳號已通過實名認證。';
-      }else if(customer?.identityProviderAvailable !== true){
-        status.textContent = '行動自然人憑證認證功能正在完成正式介接。';
-      }else{
-        status.textContent = '';
-      }
-    }
-
-    applyVerifiedNameBadge(document.getElementById('flowProfileName'),customer);
-    applyVerifiedNameBadge(document.getElementById('ubeeMyAccountName'),customer);
-    const profileSubtext = document.getElementById('flowProfileSubtext');
-    if(profileSubtext && customer){
-      profileSubtext.textContent = verified
-        ? '✓ 已完成實名認證｜會員、常用資料與設定集中在這裡'
-        : '會員、常用資料與設定集中在這裡';
-    }
-  }
-
-  async function refreshCustomerIdentity(){
-    try{
-      if(typeof customerApiFetch !== 'function'){
-        fillIdentityUi();
-        return getCurrentCustomerSafe();
-      }
-      const data = await customerApiFetch('/api/customer-auth/me');
-      if(data?.customer){
-        try{ currentCustomer = data.customer; }catch(_){ }
-      }
-      const customer = data?.customer || getCurrentCustomerSafe();
-      fillIdentityUi(customer);
-      return customer;
-    }catch(error){
-      fillIdentityUi();
-      throw error;
-    }
-  }
-
-  async function startCustomerIdentityVerification(){
-    const button = document.getElementById('ubeeIdentityStartButton');
-    const status = document.getElementById('ubeeIdentityStatus');
-    if(button) button.disabled = true;
-    if(status) status.textContent = '正在建立行動自然人憑證驗證…';
-
-    try{
-      const data = await customerApiFetch('/api/customer-identity/start',{
-        method:'POST',
-        body:JSON.stringify({})
-      });
-
-      if(data?.alreadyVerified || data?.identityVerified){
-        await refreshCustomerIdentity();
-        if(status) status.textContent = '此帳號已完成實名認證。';
-        return true;
-      }
-
-      const redirectUrl = String(data?.redirectUrl || data?.url || '').trim();
-      if(/^https:\/\//i.test(redirectUrl) || /^ubee:/i.test(redirectUrl)){
-        location.href = redirectUrl;
-        return true;
-      }
-
-      throw new Error('身分驗證服務尚未回傳有效的認證入口。');
-    }catch(error){
-      if(status) status.textContent = error.message || '目前無法啟動身分認證，請稍後再試。';
-      return false;
-    }finally{
-      if(button) button.disabled = false;
-    }
+  function identityStatusLabel(identity){
+    const status = safeText(identity?.status || 'not_verified');
+    if(status === 'verified') return '已完成認證';
+    if(status === 'pending') return '審核中';
+    if(status === 'rejected') return '需重新認證';
+    return '尚未認證';
   }
 
   function fillAccountPanel(){
@@ -22374,13 +22220,247 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const name = document.getElementById('ubeeMyAccountName');
     const phone = document.getElementById('ubeeMyAccountPhone');
     const email = document.getElementById('ubeeMyAccountEmail');
-    if(name){
-      name.textContent = customer?.name || 'UBee 會員';
-      applyVerifiedNameBadge(name,customer);
-    }
+    const identityEl = document.getElementById('ubeeMyAccountIdentityStatus');
+    const identity = customer?.identityVerification || {};
+    if(name) name.textContent = customer?.name || 'UBee 會員';
     if(phone) phone.textContent = customer?.phone || '尚未提供';
     if(email) email.textContent = customer?.email || '尚未提供';
-    fillIdentityUi(customer);
+    if(identityEl){
+      identityEl.textContent = identityStatusLabel(identity);
+      identityEl.classList.toggle('is-verified',identity.status === 'verified');
+      identityEl.classList.toggle('is-pending',identity.status === 'pending');
+      identityEl.classList.toggle('is-rejected',identity.status === 'rejected');
+    }
+  }
+
+  function setIdentityUiStatus(message='',type=''){
+    const status = document.getElementById('ubeeIdentityStatus');
+    if(!status) return;
+    status.textContent = message;
+    status.dataset.state = type || '';
+  }
+
+  function identityDocumentsFromCustomer(customer){
+    const source = customer?.identityVerification?.documents;
+    return source && typeof source === 'object' ? source : {};
+  }
+
+  function renderIdentityPanel(customer = getCurrentCustomerSafe()){
+    const identity = customer?.identityVerification || {};
+    const statusValue = safeText(identity.status || 'not_verified');
+    const documents = identityDocumentsFromCustomer(customer);
+    const verified = statusValue === 'verified';
+    const pending = statusValue === 'pending';
+    const rejected = statusValue === 'rejected';
+
+    const seal = document.getElementById('ubeeIdentitySeal');
+    const title = document.getElementById('ubeeIdentityTitle');
+    const description = document.getElementById('ubeeIdentityDescription');
+    const uploadArea = document.getElementById('ubeeIdentityUploadArea');
+    const reviewNote = document.getElementById('ubeeIdentityReviewNote');
+    const submitButton = document.getElementById('ubeeIdentitySubmitButton');
+    const consent = document.getElementById('ubeeIdentityConsent');
+
+    if(seal){
+      seal.classList.toggle('is-unverified',!verified && !pending && !rejected);
+      seal.classList.toggle('is-pending',pending);
+      seal.classList.toggle('is-rejected',rejected);
+      seal.textContent = verified ? '✓' : pending ? '…' : rejected ? '!' : '✓';
+    }
+
+    if(title){
+      title.textContent = verified
+        ? '已完成身分認證'
+        : pending
+          ? '身分資料審核中'
+          : rejected
+            ? '身分認證需要重新提交'
+            : '尚未完成身分認證';
+    }
+
+    if(description){
+      description.textContent = verified
+        ? `${identity.verifiedName || customer?.name || '此會員'}已通過 UBee 身分人工審核。`
+        : pending
+          ? 'UBee 已收到你的身分證與本人自拍，請等待授權人員完成審核。'
+          : rejected
+            ? (identity.rejectionReason || '上次送審資料未通過，請重新拍攝清楚照片後送出。')
+            : '請上傳身分證正面、反面與本人自拍。資料送出後由 UBee 人工審核。';
+    }
+
+    if(uploadArea) uploadArea.hidden = verified || pending;
+    if(reviewNote) reviewNote.hidden = verified;
+
+    const stateMap = [
+      ['idFront','ubeeIdentityIdFrontState'],
+      ['idBack','ubeeIdentityIdBackState'],
+      ['selfie','ubeeIdentitySelfieState']
+    ];
+
+    stateMap.forEach(([key,id]) => {
+      const el = document.getElementById(id);
+      const uploaded = documents?.[key]?.uploaded === true;
+      if(el){
+        el.textContent = uploaded ? '已安全上傳' : '尚未上傳';
+        el.classList.toggle('is-uploaded',uploaded);
+      }
+    });
+
+    root.querySelectorAll('[data-identity-upload]').forEach(input => {
+      input.disabled = verified || pending;
+      input.closest('.ubee-identity-upload-button')?.classList.toggle(
+        'is-disabled',
+        verified || pending
+      );
+    });
+
+    if(consent){
+      consent.disabled = verified || pending;
+      if(verified || pending) consent.checked = false;
+    }
+
+    const allUploaded =
+      documents?.idFront?.uploaded === true &&
+      documents?.idBack?.uploaded === true &&
+      documents?.selfie?.uploaded === true;
+
+    if(submitButton){
+      submitButton.hidden = verified || pending;
+      submitButton.disabled = !allUploaded || !consent?.checked;
+      submitButton.textContent = rejected ? '重新送出身分認證' : '送出身分認證';
+    }
+
+    if(verified){
+      const time = Number(identity.verifiedAtMs || 0);
+      setIdentityUiStatus(
+        time
+          ? `驗證完成：${new Date(time).toLocaleString('zh-TW')}`
+          : '此帳號已完成身分認證。',
+        'success'
+      );
+    }else if(pending){
+      const time = Number(identity.submittedAtMs || 0);
+      setIdentityUiStatus(
+        time
+          ? `送審時間：${new Date(time).toLocaleString('zh-TW')}`
+          : '身分資料已送審。',
+        'pending'
+      );
+    }else if(rejected){
+      setIdentityUiStatus(
+        identity.rejectionReason
+          ? `退回原因：${identity.rejectionReason}`
+          : '請重新上傳資料後再送審。',
+        'error'
+      );
+    }else{
+      setIdentityUiStatus('');
+    }
+
+    fillAccountPanel();
+
+    const rootSubtext = document.getElementById('flowProfileSubtext');
+    if(rootSubtext && customer){
+      rootSubtext.textContent = verified
+        ? '✓ 已完成身分認證｜會員、常用資料與設定集中在這裡'
+        : '會員、常用資料與設定集中在這裡';
+    }
+  }
+
+  async function refreshCustomerIdentity(){
+    try{
+      const response = await fetch('/api/customer-auth/me',{
+        credentials:'include',
+        cache:'no-store',
+        headers:{'Accept':'application/json'}
+      });
+      const data = await response.json().catch(()=>({}));
+      if(!response.ok || !data?.customer){
+        throw new Error(data?.message || '目前無法讀取身分認證狀態。');
+      }
+      try{ currentCustomer = data.customer; }catch(_){ }
+      renderIdentityPanel(data.customer);
+      return data.customer;
+    }catch(error){
+      setIdentityUiStatus(error?.message || '目前無法讀取身分認證狀態。','error');
+      throw error;
+    }
+  }
+
+  async function uploadCustomerIdentityDocument(documentType,file){
+    if(!file) return false;
+    if(file.size > 6 * 1024 * 1024){
+      setIdentityUiStatus('單張照片不可超過 6 MB。','error');
+      return false;
+    }
+
+    setIdentityUiStatus('照片正在安全上傳…','pending');
+
+    try{
+      const body = new FormData();
+      body.append('file',file,file.name || `${documentType}.jpg`);
+
+      const response = await fetch(
+        `/api/customer-identity/document/${encodeURIComponent(documentType)}`,
+        {
+          method:'POST',
+          credentials:'include',
+          cache:'no-store',
+          body
+        }
+      );
+      const data = await response.json().catch(()=>({}));
+
+      if(!response.ok || data.success === false){
+        throw new Error(data.message || '照片上傳失敗。');
+      }
+
+      await refreshCustomerIdentity();
+      setIdentityUiStatus(data.message || '照片已安全上傳。','success');
+      return true;
+    }catch(error){
+      setIdentityUiStatus(error?.message || '照片上傳失敗，請稍後再試。','error');
+      return false;
+    }
+  }
+
+  async function submitCustomerIdentity(){
+    const consent = document.getElementById('ubeeIdentityConsent');
+    const button = document.getElementById('ubeeIdentitySubmitButton');
+
+    if(!consent?.checked){
+      setIdentityUiStatus('請先勾選身分認證資料蒐集與人工審核說明。','error');
+      return false;
+    }
+
+    if(button) button.disabled = true;
+    setIdentityUiStatus('正在送出身分資料…','pending');
+
+    try{
+      const response = await fetch('/api/customer-identity/submit',{
+        method:'POST',
+        credentials:'include',
+        cache:'no-store',
+        headers:{
+          'Accept':'application/json',
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({privacyConsent:true})
+      });
+      const data = await response.json().catch(()=>({}));
+
+      if(!response.ok || data.success === false){
+        throw new Error(data.message || '身分資料送出失敗。');
+      }
+
+      await refreshCustomerIdentity();
+      setIdentityUiStatus(data.message || '身分資料已送交 UBee 審核。','success');
+      return true;
+    }catch(error){
+      setIdentityUiStatus(error?.message || '身分資料送出失敗，請稍後再試。','error');
+      if(button) button.disabled = false;
+      return false;
+    }
   }
 
   function fillFeedbackContact(){
@@ -22421,7 +22501,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const panelId = panelMap[normalized];
     if(!panelId) return false;
 
-    if(normalized === 'account' && !getCurrentCustomerSafe()){
+    if(['account','identity'].includes(normalized) && !getCurrentCustomerSafe()){
       root.classList.remove('active');
       document.body.classList.remove('flow-active','ubee-my-subpage-open');
       window.UBeeCustomerAuthHost?.show('login');
@@ -22433,10 +22513,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     closeMySubPages();
 
     if(normalized === 'account') fillAccountPanel();
-    if(normalized === 'identity') refreshCustomerIdentity().catch(error => {
-      const status = document.getElementById('ubeeIdentityStatus');
-      if(status) status.textContent = error.message || '目前無法更新實名認證狀態。';
-    });
+    if(normalized === 'identity') renderIdentityPanel();
     if(normalized === 'feedback') fillFeedbackContact();
 
     const panel = document.getElementById(panelId);
@@ -22452,6 +22529,9 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
     if(normalized === 'settings'){
       refreshEnvironmentStatus();
+    }
+    if(normalized === 'identity'){
+      refreshCustomerIdentity().catch(()=>{});
     }
 
     return true;
@@ -22764,10 +22844,34 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     if(!document.hidden && currentMySection === 'settings') refreshEnvironmentStatus();
   });
 
+  document.addEventListener('change',event => {
+    const uploadInput = event.target.closest?.('#productionOrderFlow [data-identity-upload]');
+    if(uploadInput){
+      const documentType = safeText(uploadInput.dataset.identityUpload);
+      const file = uploadInput.files?.[0] || null;
+      uploadInput.value = '';
+      if(file) uploadCustomerIdentityDocument(documentType,file);
+      return;
+    }
+
+    if(event.target?.id === 'ubeeIdentityConsent'){
+      renderIdentityPanel();
+    }
+  },true);
+
   document.addEventListener('click',event => {
     const clickable = event.target.closest('button,[role="button"]');
     if(clickable && !clickable.classList.contains('ubee-setting-switch') && !clickable.closest('#ubeePersistentBottomNav')){
       hapticPulse();
+    }
+
+    const identityAction = event.target.closest('#productionOrderFlow [data-identity-action]');
+    if(identityAction){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const action = safeText(identityAction.dataset.identityAction).toLowerCase();
+      if(action === 'submit') submitCustomerIdentity();
+      return;
     }
 
     const closeAccountButton = event.target.closest('#productionOrderFlow [data-my-close-account]');
@@ -22783,11 +22887,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       event.preventDefault();
       event.stopImmediatePropagation();
       const flatAction = safeText(flatActionButton.dataset.flatAction).toLowerCase();
-
-      if(flatAction === 'identity-start'){
-        startCustomerIdentityVerification();
-        return;
-      }
 
       if(flatAction === 'new-order'){
         closeMySubPages();
@@ -23026,8 +23125,9 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
             <h3>十六、未成年人資料</h3>
             <p>未成年人使用服務時，應依其年齡與法律行為能力取得法定代理人同意。平台發現未經適當同意而蒐集未成年人資料時，得限制帳號並依實際情況刪除或停止利用。</p>
 
-            <h3>十七、敏感或不必要資料</h3>
-            <p>使用者不應在任務備註、照片或客服訊息中提供與任務無關的身分證完整影本、金融密碼、信用卡安全碼、醫療、基因、性生活、犯罪前科或其他高度敏感資料。確因合法任務需要時，應先透過客服確認安全的提供方式及必要範圍。</p>
+            <h3>十七、敏感或不必要資料與身分認證</h3>
+            <p>除「我的 → 會員帳號 → 身分認證」專用頁面外，使用者不應在任務備註、一般照片或客服訊息中提供身分證完整影本、金融密碼、信用卡安全碼、醫療、基因、性生活、犯罪前科或其他高度敏感資料。</p>
+            <p>使用 UBee 身分認證時，平台會在使用者同意後暫時處理身分證正面、反面與本人自拍，僅供授權審核人員確認帳號本人與證件是否一致。審核完成後，系統會刪除此輪上傳的敏感照片，僅保留驗證結果、時間、審核者及必要稽核紀錄；使用者不需另外輸入完整身分證字號。</p>
 
             <h3>十八、資料事件處理</h3>
             <p>如發生可能影響個人權益的資料外洩、遭竄改或其他安全事件，平台會依事件性質進行控制、調查、修復、保存紀錄，並依適用法令通知受影響使用者或主管機關。</p>
@@ -23393,16 +23493,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       return;
     }
     localStorage.setItem('ubeeCustomerProfileEdits',JSON.stringify(data));
-    if($('ubeeMyAccountName')){
-      $('ubeeMyAccountName').textContent = data.name;
-      const verified=Boolean(currentCustomer?.identityVerified || currentCustomer?.identityVerification?.verified || currentCustomer?.identityVerification?.status==='verified');
-      $('ubeeMyAccountName').classList.toggle('ubee-verified-name',verified);
-    }
-    if($('flowProfileName')){
-      $('flowProfileName').textContent = data.name;
-      const verified=Boolean(currentCustomer?.identityVerified || currentCustomer?.identityVerification?.verified || currentCustomer?.identityVerification?.status==='verified');
-      $('flowProfileName').classList.toggle('ubee-verified-name',verified);
-    }
+    if($('ubeeMyAccountName')) $('ubeeMyAccountName').textContent = data.name;
+    if($('flowProfileName')) $('flowProfileName').textContent = data.name;
     if($('ubeeMyAccountEmail')) $('ubeeMyAccountEmail').textContent = data.email || '尚未提供';
     if($('ubeeMyAccountArea')) $('ubeeMyAccountArea').textContent = [data.city,data.district].filter(Boolean).join(' ') || '尚未設定';
     if(status) status.textContent = '會員資料已儲存在此裝置。正式同步仍以後端會員資料為準。';
