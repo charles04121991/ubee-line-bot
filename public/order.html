@@ -20009,20 +20009,30 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="ubee-identity-upload-area" id="ubeeIdentityUploadArea">
 <div class="ubee-identity-upload-row">
 <div><strong>身分證正面</strong><span id="ubeeIdentityIdFrontState">尚未上傳</span></div>
-<label class="ubee-identity-upload-button">拍照／選擇
-<input accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" data-identity-upload="idFront" type="file"/>
+<div class="ubee-identity-upload-actions">
+<label class="ubee-identity-upload-button">拍攝
+<input accept="image/*" capture="environment" data-identity-upload="idFront" data-identity-source="camera" type="file"/>
 </label>
+<label class="ubee-identity-upload-button secondary">從相簿選擇
+<input accept="image/*" data-identity-upload="idFront" data-identity-source="library" type="file"/>
+</label>
+</div>
 </div>
 <div class="ubee-identity-upload-row">
 <div><strong>身分證反面</strong><span id="ubeeIdentityIdBackState">尚未上傳</span></div>
-<label class="ubee-identity-upload-button">拍照／選擇
-<input accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" data-identity-upload="idBack" type="file"/>
+<div class="ubee-identity-upload-actions">
+<label class="ubee-identity-upload-button">拍攝
+<input accept="image/*" capture="environment" data-identity-upload="idBack" data-identity-source="camera" type="file"/>
 </label>
+<label class="ubee-identity-upload-button secondary">從相簿選擇
+<input accept="image/*" data-identity-upload="idBack" data-identity-source="library" type="file"/>
+</label>
+</div>
 </div>
 <div class="ubee-identity-upload-row">
 <div><strong>本人自拍</strong><span id="ubeeIdentitySelfieState">尚未上傳</span></div>
-<label class="ubee-identity-upload-button">拍攝自拍
-<input accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="user" data-identity-upload="selfie" type="file"/>
+<label class="ubee-identity-upload-button">開啟前鏡頭自拍
+<input accept="image/*" capture="user" data-identity-upload="selfie" data-identity-source="selfie" type="file"/>
 </label>
 </div>
 
@@ -21060,7 +21070,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21915,11 +21925,13 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 #productionOrderFlow .ubee-identity-upload-row strong{display:block;color:#111;font-size:14px;font-weight:1000;}
 #productionOrderFlow .ubee-identity-upload-row span{display:block;margin-top:4px;color:#858a90;font-size:11px;font-weight:850;}
 #productionOrderFlow .ubee-identity-upload-row span.is-uploaded{color:#15803d;}
+#productionOrderFlow .ubee-identity-upload-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:190px;}
 #productionOrderFlow .ubee-identity-upload-button{
-  min-height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border:1px solid #d8dadd;
-  background:#f7f8f9;color:#111;font-size:12px;font-weight:1000;cursor:pointer;white-space:nowrap;
+  position:relative;min-height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border:1px solid #d8dadd;
+  background:#f7f8f9;color:#111;font-size:12px;font-weight:1000;cursor:pointer;white-space:nowrap;overflow:hidden;
 }
-#productionOrderFlow .ubee-identity-upload-button input{position:absolute;width:1px!important;height:1px!important;opacity:0;pointer-events:none;}
+#productionOrderFlow .ubee-identity-upload-button.secondary{background:#fff;color:#555b62;}
+#productionOrderFlow .ubee-identity-upload-button input{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;cursor:pointer;font-size:0!important;}
 #productionOrderFlow .ubee-identity-upload-button.is-disabled{opacity:.45;pointer-events:none;}
 #productionOrderFlow .ubee-identity-field-area{width:100%;margin:0 0 14px;border:1px solid #e1e5e8;background:#fff;padding:14px;}
 #productionOrderFlow .ubee-identity-field{display:block;margin:0 0 14px;}
@@ -21944,7 +21956,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.11.3';
+  const APP_VERSION = '2026.08.11.4';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -22445,8 +22457,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   async function uploadCustomerIdentityDocument(documentType,file){
     if(!file) return false;
-    if(file.size > 6 * 1024 * 1024){
-      setIdentityUiStatus('單張照片不可超過 6 MB。','error');
+    if(file.size > 12 * 1024 * 1024){
+      setIdentityUiStatus('單張照片不可超過 12 MB。請降低相機解析度或改從相簿選擇較小的照片。','error');
       return false;
     }
     if(file.size < 20 * 1024){
@@ -22454,7 +22466,9 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       return false;
     }
 
-    setIdentityUiStatus('照片正在安全上傳…','pending');
+    const sourceLabel = documentType === 'selfie' ? '本人自拍' : (documentType === 'idFront' ? '身分證正面' : '身分證反面');
+    const sizeMb = (file.size / 1024 / 1024).toFixed(1);
+    setIdentityUiStatus(`${sourceLabel}正在安全上傳…（${sizeMb} MB）`,'pending');
 
     try{
       const body = new FormData();
