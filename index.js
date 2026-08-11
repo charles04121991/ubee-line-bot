@@ -3257,24 +3257,130 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
 });
 
 // =====================================================
-// UBee Customer Identity Verification V1
-// - 主方式：內政部行動自然人憑證（MOICA Mobile Citizen Certificate）
-// - 與手機號碼驗證完全分離；手機僅作登入帳號與聯絡方式。
-// - 正式介接需先取得內政部 UAT 測試環境與規格文件。
-// - CUSTOMER_IDENTITY_ENFORCE 預設 false，避免正式介接完成前阻擋既有訂單。
+// UBee Customer Identity Verification V2｜自有人工審核
+// - 客戶上傳：身分證正面、身分證反面、本人自拍。
+// - 不要求輸入完整身分證字號，不做 OCR，不保存生物特徵模板。
+// - 檔案存 Firebase Storage private bucket；Firestore 只保存必要 metadata。
+// - 審核完成（通過或退回）後自動刪除三張敏感照片。
+// - CUSTOMER_IDENTITY_ENFORCE 預設 false；測試穩定後再決定是否強制下單前完成。
 // =====================================================
+const CUSTOMER_IDENTITY_STORAGE_BUCKET = String(
+  process.env.FIREBASE_STORAGE_BUCKET ||
+  `${process.env.FIREBASE_PROJECT_ID || ''}.appspot.com`
+).trim();
+
 const CUSTOMER_IDENTITY = Object.freeze({
   enforce:
     String(process.env.CUSTOMER_IDENTITY_ENFORCE || 'false')
       .trim()
       .toLowerCase() === 'true',
   providerEnabled:
-    String(process.env.MOICA_FIDO_ENABLED || 'false')
-      .trim()
-      .toLowerCase() === 'true',
-  provider: 'moica_mobile',
-  method: 'mobile_citizen_certificate',
+    Boolean(
+      CUSTOMER_IDENTITY_STORAGE_BUCKET &&
+      !CUSTOMER_IDENTITY_STORAGE_BUCKET.startsWith('.')
+    ),
+  provider: 'ubee_manual',
+  method: 'id_card_selfie_manual_review',
+  maxFileBytes: 6 * 1024 * 1024,
+  documentTypes: Object.freeze({
+    idFront: '身分證正面',
+    idBack: '身分證反面',
+    selfie: '本人自拍',
+  }),
 });
+
+const customerIdentityUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 1,
+    fileSize: CUSTOMER_IDENTITY.maxFileBytes,
+  },
+  fileFilter: (req, file, callback) => {
+    const allowed = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
+    const mimeType = String(file?.mimetype || '').trim().toLowerCase();
+    if (!allowed.has(mimeType)) {
+      return callback(
+        customerAuthError(
+          '身分認證照片只支援 JPG、PNG、WEBP 或 HEIC。',
+          415,
+          'CUSTOMER_IDENTITY_FILE_TYPE_UNSUPPORTED'
+        )
+      );
+    }
+    return callback(null, true);
+  },
+});
+
+function customerIdentityUploadSingle(req, res, next) {
+  customerIdentityUpload.single('file')(req, res, error => {
+    if (!error) return next();
+
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        success: false,
+        code: 'CUSTOMER_IDENTITY_FILE_TOO_LARGE',
+        message: '單張照片不可超過 6 MB。',
+      });
+    }
+
+    return res.status(Number(error.statusCode || 400)).json({
+      success: false,
+      code: error.code || 'CUSTOMER_IDENTITY_UPLOAD_ERROR',
+      message: error.message || '身分認證照片上傳失敗。',
+    });
+  });
+}
+
+function normalizeCustomerIdentityDocumentType(value) {
+  const normalized = String(value || '')
+    .trim()
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase();
+
+  const aliases = {
+    idfront: 'idFront',
+    id_front: 'idFront',
+    front: 'idFront',
+    idback: 'idBack',
+    id_back: 'idBack',
+    back: 'idBack',
+    selfie: 'selfie',
+    face: 'selfie',
+    portrait: 'selfie',
+  };
+
+  return aliases[normalized] || '';
+}
+
+function normalizeCustomerIdentityDocuments(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const result = {};
+
+  Object.keys(CUSTOMER_IDENTITY.documentTypes).forEach(key => {
+    const item = source[key];
+    if (!item || typeof item !== 'object') return;
+
+    result[key] = {
+      documentType: key,
+      label: CUSTOMER_IDENTITY.documentTypes[key],
+      storageBucket: cleanText(item.storageBucket || '', 300),
+      storagePath: cleanText(item.storagePath || '', 900),
+      mimeType: cleanText(item.mimeType || '', 100),
+      originalName: cleanText(item.originalName || '', 180),
+      sha256: cleanText(item.sha256 || '', 100),
+      sizeBytes: Math.max(0, Number(item.sizeBytes || 0)),
+      uploadedAtMs: Math.max(0, Number(item.uploadedAtMs || 0)),
+    };
+  });
+
+  return result;
+}
 
 function normalizeCustomerIdentityVerification(value) {
   const source = value && typeof value === 'object' ? value : {};
@@ -3298,7 +3404,44 @@ function normalizeCustomerIdentityVerification(value) {
     verificationId: cleanText(source.verificationId || '', 200),
     verifiedAtMs: Number(source.verifiedAtMs || 0),
     lastAttemptAtMs: Number(source.lastAttemptAtMs || 0),
+    submittedAtMs: Number(source.submittedAtMs || 0),
+    reviewedAtMs: Number(source.reviewedAtMs || 0),
+    reviewedBy: cleanText(source.reviewedBy || '', 100),
+    rejectedAtMs: Number(source.rejectedAtMs || 0),
+    rejectionReason: cleanText(source.rejectionReason || '', 500),
     failureCode: cleanText(source.failureCode || '', 100),
+    documents: normalizeCustomerIdentityDocuments(source.documents),
+  };
+}
+
+function customerIdentityPublicStatus(value) {
+  const identity = normalizeCustomerIdentityVerification(value);
+  const documents = {};
+
+  Object.keys(CUSTOMER_IDENTITY.documentTypes).forEach(key => {
+    const item = identity.documents[key];
+    documents[key] = {
+      uploaded: Boolean(item?.storagePath),
+      uploadedAtMs: Number(item?.uploadedAtMs || 0),
+      label: CUSTOMER_IDENTITY.documentTypes[key],
+    };
+  });
+
+  return {
+    status: identity.status,
+    verified: identity.verified,
+    level: identity.level,
+    provider: identity.provider,
+    method: identity.method,
+    verifiedName: identity.verifiedName,
+    verifiedAtMs: identity.verifiedAtMs,
+    submittedAtMs: identity.submittedAtMs,
+    reviewedAtMs: identity.reviewedAtMs,
+    rejectionReason:
+      identity.status === 'rejected'
+        ? identity.rejectionReason
+        : '',
+    documents,
   };
 }
 
@@ -3306,6 +3449,141 @@ function isCustomerIdentityVerified(account) {
   return normalizeCustomerIdentityVerification(
     account?.identityVerification
   ).verified;
+}
+
+function customerIdentityStorageKey(customerId) {
+  return crypto
+    .createHash('sha256')
+    .update(String(customerId || ''))
+    .digest('hex')
+    .slice(0, 40);
+}
+
+function customerIdentityFileExtension(mimeType, originalName = '') {
+  const ext = String(originalName || '')
+    .toLowerCase()
+    .match(/\.([a-z0-9]{1,8})$/)?.[1];
+
+  if (new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']).has(ext)) {
+    return ext;
+  }
+
+  return {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+  }[String(mimeType || '').toLowerCase()] || 'bin';
+}
+
+async function validateCustomerIdentityDocumentOwnership(
+  customerId,
+  documentType,
+  item
+) {
+  if (!item?.storagePath || !item?.storageBucket) {
+    return false;
+  }
+
+  if (item.storageBucket !== CUSTOMER_IDENTITY_STORAGE_BUCKET) {
+    return false;
+  }
+
+  const expectedPrefix =
+    `customer-identity-v2/pending/${customerIdentityStorageKey(customerId)}/` +
+    `${documentType}/`;
+
+  if (!String(item.storagePath).startsWith(expectedPrefix)) {
+    return false;
+  }
+
+  const bucket = admin.storage().bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+  const file = bucket.file(item.storagePath);
+  const [exists] = await file.exists();
+  if (!exists) return false;
+
+  const [metadata] = await file.getMetadata();
+  const custom = metadata.metadata || {};
+
+  return (
+    String(custom.customerIdentityKey || '') ===
+      customerIdentityStorageKey(customerId) &&
+    String(custom.customerIdentityDocumentType || '') === documentType
+  );
+}
+
+async function deleteCustomerIdentityDocuments(identityVerification) {
+  const identity = normalizeCustomerIdentityVerification(identityVerification);
+  const bucket = admin.storage().bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+
+  await Promise.all(
+    Object.values(identity.documents).map(async item => {
+      if (!item?.storagePath) return;
+      try {
+        await bucket.file(item.storagePath).delete({ ignoreNotFound: true });
+      } catch (error) {
+        console.warn(
+          '⚠️ 客戶身分認證敏感照片刪除失敗：',
+          item.storagePath,
+          error?.message || error
+        );
+      }
+    })
+  );
+}
+
+function customerIdentityAdminKey(req) {
+  return String(
+    req.headers['x-ubee-support-admin-key'] ||
+    req.headers['x-ubee-admin-key'] ||
+    ''
+  ).trim();
+}
+
+function requireCustomerIdentityAdmin(req, res, next) {
+  const expected = String(
+    process.env.UBEE_SUPPORT_ADMIN_KEY ||
+    process.env.UBEE_RIDER_V4_ADMIN_KEY ||
+    ''
+  ).trim();
+
+  if (!expected) {
+    return res.status(503).json({
+      success: false,
+      code: 'CUSTOMER_IDENTITY_ADMIN_KEY_NOT_CONFIGURED',
+      message: '尚未設定 UBEE_SUPPORT_ADMIN_KEY，身分認證後台暫不開放。',
+    });
+  }
+
+  const supplied = customerIdentityAdminKey(req);
+  const expectedBuffer = Buffer.from(expected);
+  const suppliedBuffer = Buffer.from(supplied);
+
+  const valid =
+    expectedBuffer.length > 0 &&
+    expectedBuffer.length === suppliedBuffer.length &&
+    crypto.timingSafeEqual(expectedBuffer, suppliedBuffer);
+
+  if (!valid) {
+    return res.status(401).json({
+      success: false,
+      code: 'CUSTOMER_IDENTITY_ADMIN_UNAUTHORIZED',
+      message: '身分認證管理授權失敗。',
+    });
+  }
+
+  req.customerIdentityAdmin = {
+    operator: cleanText(
+      req.headers['x-ubee-support-operator'] ||
+      req.headers['x-ubee-admin-operator'] ||
+      req.body?.operator ||
+      'identity_review',
+      100
+    ),
+  };
+
+  return next();
 }
 
 function customerAuthError(message, statusCode = 400, code = 'CUSTOMER_AUTH_ERROR') {
@@ -3506,15 +3784,7 @@ function customerAccountResponse(account, customerId) {
     createdAtMs: Number(source.createdAtMs || 0),
 
     identityVerified: identityVerification.verified,
-    identityVerification: {
-      status: identityVerification.status,
-      verified: identityVerification.verified,
-      level: identityVerification.level,
-      provider: identityVerification.provider,
-      method: identityVerification.method,
-      verifiedName: identityVerification.verifiedName,
-      verifiedAtMs: identityVerification.verifiedAtMs,
-    },
+    identityVerification: customerIdentityPublicStatus(identityVerification),
     identityProviderAvailable: CUSTOMER_IDENTITY.providerEnabled,
   };
 }
@@ -3649,9 +3919,9 @@ async function requireCustomerAuth(req, res, next) {
 }
 
 // =====================================================
-// UBee 實名制下單 Middleware
-// - CUSTOMER_IDENTITY_ENFORCE=false：只建置能力，不阻擋既有訂單。
-// - 正式上線行動自然人憑證後再切 true。
+// UBee 身分認證下單 Middleware
+// - CUSTOMER_IDENTITY_ENFORCE=false：先測試上傳與人工審核，不阻擋既有訂單。
+// - 後台審核流程穩定後，如要強制下單前完成認證，再將環境變數切為 true。
 // =====================================================
 async function requireCustomerIdentity(req, res, next) {
   try {
@@ -3667,7 +3937,7 @@ async function requireCustomerIdentity(req, res, next) {
     return res.status(403).json({
       success: false,
       code: 'CUSTOMER_IDENTITY_REQUIRED',
-      message: '完成實名認證後即可送出 UBee 跑腿任務。',
+      message: '完成身分認證後即可送出 UBee 跑腿任務。',
       identityVerification: normalizeCustomerIdentityVerification(
         account.identityVerification
       ),
@@ -3682,25 +3952,7 @@ async function requireCustomerIdentity(req, res, next) {
   }
 }
 
-// 內政部 UAT 規格尚未核發前，不虛構任何 FIDO API URL、簽章欄位或 callback 參數。
-// 取得正式介接文件後，只需要把此 adapter 換成真實的 UAT/PROD 呼叫即可。
-async function startCustomerMoicaIdentityVerification({ customerId, account }) {
-  if (!CUSTOMER_IDENTITY.providerEnabled) {
-    throw customerAuthError(
-      '行動自然人憑證介接尚未開通。UBee 完成內政部測試環境申請後即可啟用。',
-      503,
-      'CUSTOMER_IDENTITY_PROVIDER_NOT_READY'
-    );
-  }
-
-  // 防止僅設定 MOICA_FIDO_ENABLED=true 就誤以為已完成正式串接。
-  // 正式版必須依內政部提供的介接規格，在這裡建立驗證交易並取得導轉資訊。
-  throw customerAuthError(
-    '行動自然人憑證 UAT adapter 尚未設定，請完成正式介接規格後再啟用。',
-    503,
-    'CUSTOMER_IDENTITY_ADAPTER_NOT_CONFIGURED'
-  );
-}
+// UBee Identity V2 使用自有人工審核，不再依賴 MOICA / MID 第三方 adapter。
 
 function sendCustomerAuthError(res, error) {
   const statusCode = Number(error?.statusCode || 500);
@@ -3867,17 +4119,23 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         phoneVerified: false,
         phoneVerificationStatus: 'not_verified',
 
-        // UBee 實名制與手機驗證完全分離。
+        // UBee 身分認證與手機登入完全分離。
         identityVerification: {
           status: 'not_verified',
           level: 0,
-          provider: '',
-          method: '',
+          provider: CUSTOMER_IDENTITY.provider,
+          method: CUSTOMER_IDENTITY.method,
           verifiedName: '',
           verificationId: '',
           verifiedAtMs: 0,
           lastAttemptAtMs: 0,
+          submittedAtMs: 0,
+          reviewedAtMs: 0,
+          reviewedBy: '',
+          rejectedAtMs: 0,
+          rejectionReason: '',
           failureCode: '',
+          documents: {},
           updatedAtMs: nowMs,
         },
 
@@ -4085,10 +4343,11 @@ app.get('/api/customer-auth/me', customerAuthOptional, (req, res) => {
 });
 
 // =====================================================
-// UBee Customer Identity API V1
+// UBee Customer Identity API V2｜身分證＋本人自拍＋人工審核
 // =====================================================
 app.get('/api/customer-identity/status', requireCustomerAuth, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
+
   const identityVerification = normalizeCustomerIdentityVerification(
     req.customerAuth.account?.identityVerification
   );
@@ -4098,24 +4357,217 @@ app.get('/api/customer-identity/status', requireCustomerAuth, (req, res) => {
     available: CUSTOMER_IDENTITY.providerEnabled,
     enforce: CUSTOMER_IDENTITY.enforce,
     identityVerified: identityVerification.verified,
-    identityVerification: {
-      status: identityVerification.status,
-      verified: identityVerification.verified,
-      level: identityVerification.level,
-      provider: identityVerification.provider,
-      method: identityVerification.method,
-      verifiedName: identityVerification.verifiedName,
-      verifiedAtMs: identityVerification.verifiedAtMs,
-    },
+    identityVerification: customerIdentityPublicStatus(identityVerification),
   });
 });
 
-app.post('/api/customer-identity/start', requireCustomerAuth, async (req, res) => {
+app.post(
+  '/api/customer-identity/document/:documentType',
+  requireCustomerAuth,
+  customerIdentityUploadSingle,
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+
+    try {
+      if (!CUSTOMER_IDENTITY.providerEnabled) {
+        throw customerAuthError(
+          '身分認證照片儲存空間尚未設定。',
+          503,
+          'CUSTOMER_IDENTITY_STORAGE_NOT_CONFIGURED'
+        );
+      }
+
+      const customerId = req.customerAuth.customerId;
+      const account = req.customerAuth.account || {};
+      const documentType = normalizeCustomerIdentityDocumentType(
+        req.params.documentType
+      );
+
+      if (!documentType || !CUSTOMER_IDENTITY.documentTypes[documentType]) {
+        throw customerAuthError(
+          '身分認證照片類型不正確。',
+          400,
+          'CUSTOMER_IDENTITY_DOCUMENT_TYPE_INVALID'
+        );
+      }
+
+      const current = normalizeCustomerIdentityVerification(
+        account.identityVerification
+      );
+
+      if (current.verified) {
+        throw customerAuthError(
+          '此帳號已完成身分認證，不需要再次上傳。',
+          409,
+          'CUSTOMER_IDENTITY_ALREADY_VERIFIED'
+        );
+      }
+
+      if (current.status === 'pending') {
+        throw customerAuthError(
+          '身分資料已送審，審核完成前不可更換照片。',
+          409,
+          'CUSTOMER_IDENTITY_REVIEW_PENDING'
+        );
+      }
+
+      const uploadFile = req.file;
+      const fileBuffer = uploadFile?.buffer;
+
+      if (!uploadFile || !Buffer.isBuffer(fileBuffer) || !fileBuffer.length) {
+        throw customerAuthError(
+          '沒有收到照片，請重新選擇後上傳。',
+          400,
+          'CUSTOMER_IDENTITY_FILE_REQUIRED'
+        );
+      }
+
+      const contentType = String(uploadFile.mimetype || '')
+        .trim()
+        .toLowerCase();
+
+      const extension = customerIdentityFileExtension(
+        contentType,
+        uploadFile.originalname
+      );
+
+      const identityKey = customerIdentityStorageKey(customerId);
+      const uploadId = crypto.randomUUID();
+      const storagePath =
+        `customer-identity-v2/pending/${identityKey}/` +
+        `${documentType}/${Date.now()}_${uploadId}.${extension}`;
+
+      const sha256 = crypto
+        .createHash('sha256')
+        .update(fileBuffer)
+        .digest('hex');
+
+      const bucket = admin
+        .storage()
+        .bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+
+      const storageFile = bucket.file(storagePath);
+
+      await storageFile.save(fileBuffer, {
+        resumable: false,
+        validation: 'md5',
+        metadata: {
+          contentType,
+          cacheControl: 'private, max-age=0, no-store, no-transform',
+          metadata: {
+            customerIdentityKey: identityKey,
+            customerIdentityDocumentType: documentType,
+            sha256,
+            dataVersion: '2',
+          },
+        },
+      });
+
+      const oldItem = current.documents[documentType];
+      const nowMs = Date.now();
+      const nextItem = {
+        documentType,
+        label: CUSTOMER_IDENTITY.documentTypes[documentType],
+        storageBucket: bucket.name,
+        storagePath,
+        mimeType: contentType,
+        originalName: cleanText(uploadFile.originalname || '', 180),
+        sha256,
+        sizeBytes: fileBuffer.length,
+        uploadedAtMs: nowMs,
+      };
+
+      const nextDocuments = {
+        ...current.documents,
+        [documentType]: nextItem,
+      };
+
+      await db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .doc(customerId)
+        .set({
+          identityVerification: {
+            ...current,
+            status: current.status === 'rejected' ? 'not_verified' : current.status,
+            level: 0,
+            provider: CUSTOMER_IDENTITY.provider,
+            method: CUSTOMER_IDENTITY.method,
+            verifiedName: '',
+            verifiedAtMs: 0,
+            submittedAtMs: 0,
+            reviewedAtMs: 0,
+            reviewedBy: '',
+            rejectedAtMs: 0,
+            rejectionReason: '',
+            failureCode: '',
+            lastAttemptAtMs: nowMs,
+            documents: nextDocuments,
+            updatedAtMs: nowMs,
+          },
+          updatedAtMs: nowMs,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+      if (
+        oldItem?.storagePath &&
+        oldItem.storagePath !== storagePath &&
+        oldItem.storageBucket === bucket.name
+      ) {
+        bucket
+          .file(oldItem.storagePath)
+          .delete({ ignoreNotFound: true })
+          .catch(() => {});
+      }
+
+      const publicIdentity = customerIdentityPublicStatus({
+        ...current,
+        status: current.status === 'rejected' ? 'not_verified' : current.status,
+        documents: nextDocuments,
+        rejectionReason: '',
+      });
+
+      return res.json({
+        success: true,
+        documentType,
+        label: CUSTOMER_IDENTITY.documentTypes[documentType],
+        uploaded: true,
+        identityVerification: publicIdentity,
+        message: `${CUSTOMER_IDENTITY.documentTypes[documentType]}已安全上傳。`,
+      });
+    } catch (error) {
+      if (error?.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({
+          success: false,
+          code: 'CUSTOMER_IDENTITY_FILE_TOO_LARGE',
+          message: '單張照片不可超過 6 MB。',
+        });
+      }
+
+      console.error('❌ 客戶身分認證照片上傳失敗：', error);
+      return sendCustomerAuthError(res, error);
+    }
+  }
+);
+
+app.post('/api/customer-identity/submit', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
 
   try {
     const customerId = req.customerAuth.customerId;
-    const account = req.customerAuth.account || {};
+    const accountRef = db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .doc(customerId);
+    const accountDoc = await accountRef.get();
+
+    if (!accountDoc.exists) {
+      throw customerAuthError(
+        '找不到會員帳號。',
+        404,
+        'CUSTOMER_ACCOUNT_NOT_FOUND'
+      );
+    }
+
+    const account = accountDoc.data() || {};
     const current = normalizeCustomerIdentityVerification(
       account.identityVerification
     );
@@ -4125,75 +4577,368 @@ app.post('/api/customer-identity/start', requireCustomerAuth, async (req, res) =
         success: true,
         alreadyVerified: true,
         identityVerified: true,
-        identityVerification: current,
-        message: '此 UBee 帳號已完成實名認證。',
+        identityVerification: customerIdentityPublicStatus(current),
+        message: '此 UBee 帳號已完成身分認證。',
       });
     }
 
-    const nowMs = Date.now();
-    await db
-      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-      .doc(customerId)
-      .set({
-        identityVerification: {
-          ...current,
-          status: 'pending',
-          provider: CUSTOMER_IDENTITY.provider,
-          method: CUSTOMER_IDENTITY.method,
-          lastAttemptAtMs: nowMs,
-          failureCode: '',
-          updatedAtMs: nowMs,
-        },
-        updatedAtMs: nowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+    if (current.status === 'pending') {
+      return res.json({
+        success: true,
+        alreadySubmitted: true,
+        identityVerified: false,
+        identityVerification: customerIdentityPublicStatus(current),
+        message: '身分資料已送交 UBee 審核。',
+      });
+    }
 
-    const providerSession = await startCustomerMoicaIdentityVerification({
-      customerId,
-      account,
-    });
+    const requiredTypes = Object.keys(CUSTOMER_IDENTITY.documentTypes);
+
+    for (const documentType of requiredTypes) {
+      const item = current.documents[documentType];
+
+      if (!item?.storagePath) {
+        throw customerAuthError(
+          `請先上傳${CUSTOMER_IDENTITY.documentTypes[documentType]}。`,
+          400,
+          'CUSTOMER_IDENTITY_DOCUMENTS_INCOMPLETE'
+        );
+      }
+
+      const valid = await validateCustomerIdentityDocumentOwnership(
+        customerId,
+        documentType,
+        item
+      );
+
+      if (!valid) {
+        throw customerAuthError(
+          `${CUSTOMER_IDENTITY.documentTypes[documentType]}驗證失敗，請重新上傳。`,
+          400,
+          'CUSTOMER_IDENTITY_DOCUMENT_INVALID'
+        );
+      }
+    }
+
+    if (req.body?.privacyConsent !== true) {
+      throw customerAuthError(
+        '請先同意身分認證資料蒐集與人工審核說明。',
+        400,
+        'CUSTOMER_IDENTITY_CONSENT_REQUIRED'
+      );
+    }
+
+    const nowMs = Date.now();
+    const verificationId =
+      `CID_${nowMs}_${crypto.randomBytes(6).toString('hex')}`;
+
+    const nextIdentity = {
+      ...current,
+      status: 'pending',
+      level: 0,
+      provider: CUSTOMER_IDENTITY.provider,
+      method: CUSTOMER_IDENTITY.method,
+      verificationId,
+      submittedAtMs: nowMs,
+      lastAttemptAtMs: nowMs,
+      reviewedAtMs: 0,
+      reviewedBy: '',
+      rejectedAtMs: 0,
+      rejectionReason: '',
+      failureCode: '',
+      updatedAtMs: nowMs,
+    };
+
+    await accountRef.set({
+      identityVerification: nextIdentity,
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    await db
+      .collection('customerIdentityAuditLogs')
+      .doc(crypto.randomUUID())
+      .set({
+        customerId,
+        verificationId,
+        event: 'submitted',
+        provider: CUSTOMER_IDENTITY.provider,
+        method: CUSTOMER_IDENTITY.method,
+        documentTypes: requiredTypes,
+        createdAtMs: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
     return res.json({
       success: true,
       identityVerified: false,
-      identityVerification: {
-        status: 'pending',
-        provider: CUSTOMER_IDENTITY.provider,
-        method: CUSTOMER_IDENTITY.method,
-      },
-      ...providerSession,
+      identityVerification: customerIdentityPublicStatus(nextIdentity),
+      message: '身分資料已送出，UBee 將進行人工審核。',
     });
   } catch (error) {
-    // Provider 尚未開通時不讓帳號永久卡在 pending。
-    if (
-      ['CUSTOMER_IDENTITY_PROVIDER_NOT_READY', 'CUSTOMER_IDENTITY_ADAPTER_NOT_CONFIGURED']
-        .includes(String(error?.code || ''))
-    ) {
-      const customerId = req.customerAuth?.customerId;
-      if (customerId) {
-        db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-          .doc(customerId)
-          .set({
-            identityVerification: {
-              status: 'not_verified',
-              level: 0,
-              provider: '',
-              method: '',
-              verifiedName: '',
-              verificationId: '',
-              verifiedAtMs: 0,
-              lastAttemptAtMs: Date.now(),
-              failureCode: String(error.code || ''),
-              updatedAtMs: Date.now(),
-            },
-          }, { merge: true })
-          .catch(() => {});
-      }
-    }
-
+    console.error('❌ 客戶身分認證送審失敗：', error);
     return sendCustomerAuthError(res, error);
   }
 });
+
+// 舊 Identity V1 入口保留相容；新版用戶端請改呼叫 /submit。
+app.post('/api/customer-identity/start', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(409).json({
+    success: false,
+    code: 'CUSTOMER_IDENTITY_MANUAL_REVIEW_REQUIRED',
+    message: 'UBee 身分認證已改為身分證與本人自拍人工審核，請更新用戶端後重新操作。',
+  });
+});
+
+// =====================================================
+// UBee 身分認證管理 API
+// 使用既有 UBEE_SUPPORT_ADMIN_KEY，不新增另一組敏感金鑰。
+// =====================================================
+app.get(
+  '/api/admin/customer-identity/pending',
+  requireCustomerIdentityAdmin,
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+
+    try {
+      const limit = Math.max(
+        1,
+        Math.min(100, Number(req.query.limit || 50))
+      );
+
+      const snapshot = await db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .where('identityVerification.status', '==', 'pending')
+        .limit(limit)
+        .get();
+
+      const items = snapshot.docs
+        .map(doc => {
+          const account = doc.data() || {};
+          const identity = normalizeCustomerIdentityVerification(
+            account.identityVerification
+          );
+
+          return {
+            customerId: doc.id,
+            memberNumber: String(account.memberNumber || ''),
+            name: String(account.name || ''),
+            maskedPhone: maskCustomerPhone(account.phone || ''),
+            email: String(account.email || ''),
+            submittedAtMs: identity.submittedAtMs,
+            verificationId: identity.verificationId,
+            documents: customerIdentityPublicStatus(identity).documents,
+          };
+        })
+        .sort((a, b) => a.submittedAtMs - b.submittedAtMs);
+
+      return res.json({
+        success: true,
+        count: items.length,
+        items,
+      });
+    } catch (error) {
+      console.error('❌ 身分認證待審列表讀取失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '待審身分資料讀取失敗。',
+      });
+    }
+  }
+);
+
+app.get(
+  '/api/admin/customer-identity/:customerId/document/:documentType',
+  requireCustomerIdentityAdmin,
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+
+    try {
+      const customerId = String(req.params.customerId || '').trim();
+      const documentType = normalizeCustomerIdentityDocumentType(
+        req.params.documentType
+      );
+
+      if (!customerId || !documentType) {
+        return res.status(400).json({
+          success: false,
+          message: '身分認證文件參數不正確。',
+        });
+      }
+
+      const accountDoc = await db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .doc(customerId)
+        .get();
+
+      if (!accountDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到會員帳號。',
+        });
+      }
+
+      const identity = normalizeCustomerIdentityVerification(
+        accountDoc.data()?.identityVerification
+      );
+
+      if (identity.status !== 'pending') {
+        return res.status(409).json({
+          success: false,
+          message: '此身分認證目前不在待審狀態。',
+        });
+      }
+
+      const item = identity.documents[documentType];
+      const valid = await validateCustomerIdentityDocumentOwnership(
+        customerId,
+        documentType,
+        item
+      );
+
+      if (!valid) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到有效的身分認證照片。',
+        });
+      }
+
+      const bucket = admin
+        .storage()
+        .bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+      const [buffer] = await bucket.file(item.storagePath).download();
+
+      res.setHeader(
+        'Content-Type',
+        item.mimeType || 'application/octet-stream'
+      );
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.send(buffer);
+    } catch (error) {
+      console.error('❌ 身分認證照片讀取失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '身分認證照片讀取失敗。',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/admin/customer-identity/:customerId/decision',
+  requireCustomerIdentityAdmin,
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+
+    try {
+      const customerId = String(req.params.customerId || '').trim();
+      const decision = String(req.body?.decision || '')
+        .trim()
+        .toLowerCase();
+      const reason = cleanText(req.body?.reason || '', 500);
+      const operator = req.customerIdentityAdmin?.operator || 'identity_review';
+
+      if (!['approve', 'reject'].includes(decision)) {
+        return res.status(400).json({
+          success: false,
+          message: '審核結果必須是 approve 或 reject。',
+        });
+      }
+
+      if (decision === 'reject' && reason.length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: '退回身分認證時請填寫原因。',
+        });
+      }
+
+      const accountRef = db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .doc(customerId);
+      const accountDoc = await accountRef.get();
+
+      if (!accountDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: '找不到會員帳號。',
+        });
+      }
+
+      const account = accountDoc.data() || {};
+      const current = normalizeCustomerIdentityVerification(
+        account.identityVerification
+      );
+
+      if (current.status !== 'pending') {
+        return res.status(409).json({
+          success: false,
+          message: '此會員目前沒有待審身分認證。',
+        });
+      }
+
+      const nowMs = Date.now();
+      const approved = decision === 'approve';
+
+      const nextIdentity = {
+        ...current,
+        status: approved ? 'verified' : 'rejected',
+        level: approved ? 1 : 0,
+        provider: CUSTOMER_IDENTITY.provider,
+        method: CUSTOMER_IDENTITY.method,
+        verifiedName: approved ? cleanText(account.name || '', 80) : '',
+        verifiedAtMs: approved ? nowMs : 0,
+        reviewedAtMs: nowMs,
+        reviewedBy: operator,
+        rejectedAtMs: approved ? 0 : nowMs,
+        rejectionReason: approved ? '' : reason,
+        failureCode: approved ? '' : 'MANUAL_REVIEW_REJECTED',
+        documents: {},
+        updatedAtMs: nowMs,
+      };
+
+      await accountRef.set({
+        identityVerification: nextIdentity,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      await db
+        .collection('customerIdentityAuditLogs')
+        .doc(crypto.randomUUID())
+        .set({
+          customerId,
+          verificationId: current.verificationId,
+          event: approved ? 'approved' : 'rejected',
+          operator,
+          reason: approved ? '' : reason,
+          createdAtMs: nowMs,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+      // 先完成 Firestore 狀態寫入，再清除敏感照片；刪除失敗只記錄警告，
+      // 不回滾已完成的審核結果。
+      await deleteCustomerIdentityDocuments(current);
+
+      return res.json({
+        success: true,
+        decision,
+        identityVerified: approved,
+        identityVerification: customerIdentityPublicStatus(nextIdentity),
+        message: approved
+          ? '身分認證已通過，敏感照片已清除。'
+          : '身分認證已退回，敏感照片已清除。',
+      });
+    } catch (error) {
+      console.error('❌ 身分認證人工審核失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '身分認證審核失敗。',
+        error: error.message,
+      });
+    }
+  }
+);
 
 app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -27805,7 +28550,7 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     req.body.customerPhone = String(req.customerAuth.account.phone || '');
     const data = createOrderFromApi(req.body);
 
-    // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
+    // 訂單只記錄是否通過身分認證，不複製證件照片或其他敏感資料。
     data.customerIdentityVerified = isCustomerIdentityVerified(
       req.customerAuth.account
     );
