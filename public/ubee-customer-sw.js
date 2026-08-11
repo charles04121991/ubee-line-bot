@@ -1,11 +1,11 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.08.11.10
+ * Version: 2026.08.11.1
  * File: ubee-customer-sw.js
  *
- * 2026-08-11 Identity V3 自動認證更新：
- * 1. 身分認證照片 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
+ * 2026-08-11 Identity V1 更新：
+ * 1. 實名制 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
  * 2. HTML / navigation 採 Network First，避免 PWA 長期停在舊版 order.html。
  * 3. 靜態資源採 Stale While Revalidate。
  * 4. 啟用新版 SW 時清除舊版 UBee Customer Cache。
@@ -15,7 +15,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.08.11.10';
+const UBEE_CUSTOMER_SW_VERSION = '2026.08.11.1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
