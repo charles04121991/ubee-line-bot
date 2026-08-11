@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>UBee｜身分認證審核</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f6f7;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif}
+button,input,textarea{font:inherit}button{cursor:pointer}.wrap{width:min(100% - 24px,980px);margin:0 auto;padding:24px 0 60px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.top h1{margin:0;font-size:26px}.top small{color:#777}
+.card{background:#fff;border:1px solid #e2e4e7;padding:16px;margin-bottom:14px}.login{display:grid;grid-template-columns:1fr auto;gap:8px}.login input{min-width:0;border:1px solid #cfd3d7;padding:12px}.btn{border:0;padding:11px 15px;font-weight:900}.primary{background:#facc15;color:#111}.secondary{background:#f1f2f3;color:#111}.danger{background:#b42318;color:#fff}.ok{background:#15803d;color:#fff}
+.status{min-height:22px;margin:10px 0;color:#667085;font-size:13px}.list{display:grid;gap:12px}.item{background:#fff;border:1px solid #dfe2e5;padding:16px}.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.name{font-size:20px;font-weight:1000}.meta{margin-top:5px;color:#6f757c;font-size:13px;line-height:1.65}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.docs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.doc{border:1px solid #e1e4e7;background:#fafafa;padding:10px}.doc strong{display:block;margin-bottom:8px}.doc img{width:100%;max-height:320px;object-fit:contain;background:#eee}.empty{padding:30px;text-align:center;color:#777;background:#fff;border:1px solid #e1e4e7}
+textarea{width:100%;min-height:80px;border:1px solid #cfd3d7;padding:10px;resize:vertical}
+@media(max-width:720px){.docs{grid-template-columns:1fr}.login{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>UBee 身分認證審核</h1><small>Identity V2｜人工審核</small></div>
+    <button class="btn secondary" id="refreshBtn" type="button">重新整理</button>
+  </div>
+
+  <div class="card">
+    <div class="login">
+      <input id="adminKey" type="password" autocomplete="off" placeholder="UBEE_SUPPORT_ADMIN_KEY">
+      <button class="btn primary" id="saveKeyBtn" type="button">套用管理金鑰</button>
+    </div>
+    <div class="status" id="status">請輸入管理金鑰後讀取待審資料。</div>
+  </div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const state={items:[],objectUrls:[]};
+
+function key(){return sessionStorage.getItem('ubee_identity_admin_key')||''}
+function headers(json=false){
+  const h={'x-ubee-support-admin-key':key(),'x-ubee-support-operator':'identity_admin'};
+  if(json) h['Content-Type']='application/json';
+  return h;
+}
+function status(msg){$('status').textContent=msg}
+function clearObjectUrls(){
+  state.objectUrls.forEach(url=>{try{URL.revokeObjectURL(url)}catch(_){}});
+  state.objectUrls=[];
+}
+function fmt(ms){return ms?new Date(ms).toLocaleString('zh-TW'):'—'}
+function escapeHtml(v){
+  return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+async function api(url,options={}){
+  const response=await fetch(url,{cache:'no-store',...options,headers:{...headers(Boolean(options.body)),...(options.headers||{})}});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data.success===false) throw new Error(data.message||`HTTP ${response.status}`);
+  return data;
+}
+
+function render(){
+  clearObjectUrls();
+  const list=$('list');
+  if(!state.items.length){
+    list.innerHTML='<div class="empty">目前沒有待審身分認證。</div>';
+    return;
+  }
+  list.innerHTML=state.items.map(item=>`
+    <article class="item" data-customer-id="${escapeHtml(item.customerId)}">
+      <div class="head">
+        <div>
+          <div class="name">${escapeHtml(item.name||'UBee 會員')}</div>
+          <div class="meta">
+            會員編號：${escapeHtml(item.memberNumber||'—')}<br>
+            手機：${escapeHtml(item.maskedPhone||'—')}<br>
+            Email：${escapeHtml(item.email||'—')}<br>
+            送審時間：${escapeHtml(fmt(item.submittedAtMs))}<br>
+            驗證編號：${escapeHtml(item.verificationId||'—')}
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn secondary" data-action="load-docs" type="button">查看三張資料</button>
+        <button class="btn ok" data-action="approve" type="button">通過認證</button>
+        <button class="btn danger" data-action="reject" type="button">退回重傳</button>
+      </div>
+
+      <div class="docs" hidden data-docs>
+        <div class="doc"><strong>身分證正面</strong><div data-doc="idFront">尚未載入</div></div>
+        <div class="doc"><strong>身分證反面</strong><div data-doc="idBack">尚未載入</div></div>
+        <div class="doc"><strong>本人自拍</strong><div data-doc="selfie">尚未載入</div></div>
+      </div>
+    </article>
+  `).join('');
+}
+
+async function loadPending(){
+  if(!key()){
+    status('請先輸入 UBEE_SUPPORT_ADMIN_KEY。');
+    return;
+  }
+  status('正在讀取待審資料…');
+  try{
+    const data=await api('/api/admin/customer-identity/pending?limit=100');
+    state.items=Array.isArray(data.items)?data.items:[];
+    render();
+    status(`目前待審：${state.items.length} 筆`);
+  }catch(error){
+    status(error.message||'待審資料讀取失敗。');
+  }
+}
+
+async function loadDocument(card,customerId,type){
+  const target=card.querySelector(`[data-doc="${type}"]`);
+  if(!target)return;
+  target.textContent='載入中…';
+  try{
+    const response=await fetch(
+      `/api/admin/customer-identity/${encodeURIComponent(customerId)}/document/${encodeURIComponent(type)}`,
+      {headers:headers(false),cache:'no-store'}
+    );
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(data.message||`HTTP ${response.status}`);
+    }
+    const blob=await response.blob();
+    const url=URL.createObjectURL(blob);
+    state.objectUrls.push(url);
+    target.innerHTML='';
+    const img=document.createElement('img');
+    img.src=url;
+    img.alt=type;
+    target.appendChild(img);
+  }catch(error){
+    target.textContent=error.message||'載入失敗';
+  }
+}
+
+async function loadDocs(card,customerId){
+  const docs=card.querySelector('[data-docs]');
+  docs.hidden=false;
+  await Promise.all(['idFront','idBack','selfie'].map(type=>loadDocument(card,customerId,type)));
+}
+
+async function decision(customerId,decision){
+  let reason='';
+  if(decision==='reject'){
+    reason=prompt('請輸入退回原因（會顯示給會員）：','照片不清楚，請重新拍攝後送出。')||'';
+    if(reason.trim().length<2)return;
+  }else{
+    if(!confirm('確認三張資料一致，並通過此會員的身分認證？'))return;
+  }
+
+  status('正在寫入審核結果…');
+  try{
+    const data=await api(
+      `/api/admin/customer-identity/${encodeURIComponent(customerId)}/decision`,
+      {method:'POST',body:JSON.stringify({decision,reason,operator:'identity_admin'})}
+    );
+    status(data.message||'審核完成。');
+    await loadPending();
+  }catch(error){
+    status(error.message||'審核失敗。');
+  }
+}
+
+$('saveKeyBtn').addEventListener('click',()=>{
+  const value=$('adminKey').value.trim();
+  if(!value){status('請輸入管理金鑰。');return}
+  sessionStorage.setItem('ubee_identity_admin_key',value);
+  $('adminKey').value='';
+  loadPending();
+});
+$('refreshBtn').addEventListener('click',loadPending);
+
+$('list').addEventListener('click',event=>{
+  const button=event.target.closest('[data-action]');
+  if(!button)return;
+  const card=button.closest('[data-customer-id]');
+  const customerId=card?.dataset.customerId||'';
+  if(!customerId)return;
+  const action=button.dataset.action;
+  if(action==='load-docs') loadDocs(card,customerId);
+  if(action==='approve') decision(customerId,'approve');
+  if(action==='reject') decision(customerId,'reject');
+});
+
+if(key()) loadPending();
+})();
+</script>
+</body>
+</html>
