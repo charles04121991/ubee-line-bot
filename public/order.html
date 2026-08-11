@@ -20019,7 +20019,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 <div class="ubee-identity-upload-preview" id="ubeeIdentityIdFrontPreview" hidden>
 <img alt="身分證正面預覽" id="ubeeIdentityIdFrontPreviewImage"/>
-<div><strong>✓ 已上傳成功</strong><span>請確認照片清楚、完整且沒有被裁切。</span></div>
+<div><strong id="ubeeIdentityIdFrontPreviewStatus">本機照片預覽</strong><span>後端確認完成後才會標示為已上傳成功。</span></div>
 </div>
 </div>
 <div class="ubee-identity-upload-row" data-identity-row="idBack">
@@ -20034,7 +20034,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 <div class="ubee-identity-upload-preview" id="ubeeIdentityIdBackPreview" hidden>
 <img alt="身分證反面預覽" id="ubeeIdentityIdBackPreviewImage"/>
-<div><strong>✓ 已上傳成功</strong><span>請確認照片清楚、完整且沒有被裁切。</span></div>
+<div><strong id="ubeeIdentityIdBackPreviewStatus">本機照片預覽</strong><span>後端確認完成後才會標示為已上傳成功。</span></div>
 </div>
 </div>
 <div class="ubee-identity-upload-row" data-identity-row="selfie">
@@ -20049,7 +20049,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 <div class="ubee-identity-upload-preview selfie" id="ubeeIdentitySelfiePreview" hidden>
 <img alt="本人自拍預覽" id="ubeeIdentitySelfiePreviewImage"/>
-<div><strong>✓ 已上傳成功</strong><span>請確認是本人正面、五官清楚且沒有遮擋。</span></div>
+<div><strong id="ubeeIdentitySelfiePreviewStatus">本機照片預覽</strong><span>後端確認完成後才會標示為已上傳成功。</span></div>
 </div>
 </div>
 
@@ -21087,13 +21087,22 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-6';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-9';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
       console.warn('⚠️ 此瀏覽器不支援 Service Worker。');
       return;
     }
+
+    // V3.5：iOS PWA 在新版 Service Worker 接管時自動重新載入一次，
+    // 避免畫面仍執行上一版 order.html 的 JavaScript。
+    let ubeeSwControllerReloading=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(ubeeSwControllerReloading) return;
+      ubeeSwControllerReloading=true;
+      window.location.reload();
+    });
 
     window.addEventListener('load', async () => {
       try {
@@ -22327,12 +22336,15 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   const identityUploadInFlight = new Set();
   const identityPreviewObjectUrls = new Map();
+  // V3.5 唯一前端確認集合：只有後端回應、status API 或私有預覽真正讀回成功才加入。
+  // 不再保留舊版 attemptSeq / force-error / late-callback 覆蓋邏輯。
+  const identityConfirmedDocuments = new Map();
   let identitySubmitInFlight = false;
 
   const identityPreviewMap = Object.freeze({
-    idFront:{wrap:'ubeeIdentityIdFrontPreview',image:'ubeeIdentityIdFrontPreviewImage',state:'ubeeIdentityIdFrontState'},
-    idBack:{wrap:'ubeeIdentityIdBackPreview',image:'ubeeIdentityIdBackPreviewImage',state:'ubeeIdentityIdBackState'},
-    selfie:{wrap:'ubeeIdentitySelfiePreview',image:'ubeeIdentitySelfiePreviewImage',state:'ubeeIdentitySelfieState'},
+    idFront:{wrap:'ubeeIdentityIdFrontPreview',image:'ubeeIdentityIdFrontPreviewImage',state:'ubeeIdentityIdFrontState',previewStatus:'ubeeIdentityIdFrontPreviewStatus'},
+    idBack:{wrap:'ubeeIdentityIdBackPreview',image:'ubeeIdentityIdBackPreviewImage',state:'ubeeIdentityIdBackState',previewStatus:'ubeeIdentityIdBackPreviewStatus'},
+    selfie:{wrap:'ubeeIdentitySelfiePreview',image:'ubeeIdentitySelfiePreviewImage',state:'ubeeIdentitySelfieState',previewStatus:'ubeeIdentitySelfiePreviewStatus'},
   });
 
   function setIdentityDocumentState(documentType,text,mode=''){
@@ -22340,6 +22352,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     if(!config) return;
     const stateEl=document.getElementById(config.state);
     if(!stateEl) return;
+
     stateEl.textContent=text || '';
     stateEl.classList.toggle('is-uploaded',mode==='uploaded');
     stateEl.classList.toggle('is-uploading',mode==='uploading');
@@ -22367,6 +22380,11 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }
     image.src=src;
     wrap.hidden=false;
+    const previewStatus=config.previewStatus ? document.getElementById(config.previewStatus) : null;
+    if(previewStatus){
+      previewStatus.textContent=uploaded ? '✓ 後端已確認上傳成功' : '本機照片預覽';
+      previewStatus.style.color=uploaded ? '#15803d' : '#687079';
+    }
     if(uploaded) setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
   }
 
@@ -22380,20 +22398,35 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function showIdentityServerPreview(documentType,uploadedAtMs=0){
     revokeIdentityLocalPreview(documentType);
+    const config=identityPreviewMap[documentType];
+    const image=config ? document.getElementById(config.image) : null;
     const stamp=Number(uploadedAtMs || Date.now());
-    showIdentityPreview(
-      documentType,
-      `/api/customer-identity/document/${encodeURIComponent(documentType)}/preview?v=${encodeURIComponent(stamp)}`,
-      {uploaded:true}
-    );
+    const src=`/api/customer-identity/document/${encodeURIComponent(documentType)}/preview?v=${encodeURIComponent(stamp)}`;
+
+    if(image){
+      image.onload=()=>{
+        // 圖片能從受 Session 保護的預覽 API 真正讀回，這就是最終的伺服器成功證據。
+        identityConfirmedDocuments.set(documentType,stamp);
+        const previewStatus=config?.previewStatus ? document.getElementById(config.previewStatus) : null;
+        if(previewStatus){ previewStatus.textContent='✓ 後端已確認上傳成功'; previewStatus.style.color='#15803d'; }
+        setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+        syncIdentitySubmitAvailability();
+      };
+      image.onerror=()=>{
+        // 不在這裡直接判定照片狀態；可能只是圖片解碼或網路暫時中斷。
+        console.warn('UBee 身分認證照片預覽暫時無法載入：',documentType);
+      };
+    }
+
+    showIdentityPreview(documentType,src,{uploaded:false});
   }
 
   function missingIdentitySubmissionItems(customer = getCurrentCustomerSafe()){
     const documents=identityDocumentsFromCustomer(customer);
     const missing=[];
-    if(documents?.idFront?.uploaded !== true) missing.push('身分證正面');
-    if(documents?.idBack?.uploaded !== true) missing.push('身分證反面');
-    if(documents?.selfie?.uploaded !== true) missing.push('本人自拍');
+    if(documents?.idFront?.uploaded !== true && !identityConfirmedDocuments.has('idFront')) missing.push('身分證正面');
+    if(documents?.idBack?.uploaded !== true && !identityConfirmedDocuments.has('idBack')) missing.push('身分證反面');
+    if(documents?.selfie?.uploaded !== true && !identityConfirmedDocuments.has('selfie')) missing.push('本人自拍');
     const nationalIdInput=document.getElementById('ubeeIdentityNationalId');
     if(!isTaiwanNationalIdChecksumValidClient(nationalIdInput?.value || '')) missing.push('正確的國民身分證字號');
     const consent=document.getElementById('ubeeIdentityConsent');
@@ -22485,6 +22518,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
         return;
       }
       if(uploaded){
+        identityConfirmedDocuments.set(key,Number(documents?.[key]?.uploadedAtMs || Date.now()));
         setIdentityDocumentState(key,'✓ 已上傳成功','uploaded');
         const localUrl=identityPreviewObjectUrls.get(key);
         if(localUrl){
@@ -22568,15 +22602,50 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }
   }
 
+  async function reconcileIdentityDocumentFromServer(documentType){
+    try{
+      const response=await fetch('/api/customer-identity/status',{
+        credentials:'include',
+        cache:'no-store',
+        headers:{'Accept':'application/json'}
+      });
+      const data=await response.json().catch(()=>({}));
+      const item=data?.identityVerification?.documents?.[documentType];
+
+      if(response.ok && data?.success !== false && item?.uploaded === true){
+        const uploadedAtMs=Number(item.uploadedAtMs || Date.now());
+        identityConfirmedDocuments.set(documentType,uploadedAtMs);
+
+        const baseCustomer=getCurrentCustomerSafe() || {};
+        const nextIdentity={
+          ...(baseCustomer.identityVerification || {}),
+          ...(data.identityVerification || {})
+        };
+        try{ currentCustomer={...baseCustomer,identityVerification:nextIdentity}; }catch(_){ }
+
+        showIdentityServerPreview(documentType,uploadedAtMs);
+        setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+        syncIdentitySubmitAvailability();
+        return {ok:true, uploadedAtMs, customer:getCurrentCustomerSafe()};
+      }
+    }catch(error){
+      console.warn('UBee 身分認證：暫時無法同步照片狀態。',documentType,error);
+    }
+    return {ok:false};
+  }
+
   async function uploadCustomerIdentityDocument(documentType,file){
     if(!file) return false;
-    const sourceLabel = documentType === 'selfie' ? '本人自拍' : (documentType === 'idFront' ? '身分證正面' : '身分證反面');
+
+    const sourceLabel = documentType === 'selfie'
+      ? '本人自拍'
+      : (documentType === 'idFront' ? '身分證正面' : '身分證反面');
 
     showIdentityLocalPreview(documentType,file);
 
-    if(file.size > 12 * 1024 * 1024){
-      setIdentityDocumentState(documentType,'照片超過 12 MB','error');
-      setIdentityUiStatus('單張照片不可超過 12 MB。請降低相機解析度或改從相簿選擇較小的照片。','error');
+    if(file.size > 20 * 1024 * 1024){
+      setIdentityDocumentState(documentType,'照片超過 20 MB','error');
+      setIdentityUiStatus('單張照片不可超過 20 MB。請降低相機解析度或改從相簿選擇較小的照片。','error');
       syncIdentitySubmitAvailability();
       return false;
     }
@@ -22588,21 +22657,21 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }
 
     identityUploadInFlight.add(documentType);
+    identityConfirmedDocuments.delete(documentType);
     setIdentityDocumentState(documentType,'正在上傳…','uploading');
     syncIdentitySubmitAvailability();
 
-    const sizeMb = (file.size / 1024 / 1024).toFixed(1);
+    const sizeMb=(file.size / 1024 / 1024).toFixed(1);
     setIdentityUiStatus(`${sourceLabel}正在安全上傳…（${sizeMb} MB）`,'pending');
 
-    let data = null;
+    let uploadResponse=null;
+    let uploadData={};
+    let uploadNetworkError=null;
 
-    // V3.3：只有真正的 upload POST 失敗，才顯示「上傳失敗」。
-    // 後續會員狀態 refresh 即使暫時失敗，也不可覆蓋已成功的 Storage 上傳結果。
     try{
-      const body = new FormData();
+      const body=new FormData();
       body.append('file',file,file.name || `${documentType}.jpg`);
-
-      const response = await fetch(
+      uploadResponse=await fetch(
         `/api/customer-identity/document/${encodeURIComponent(documentType)}`,
         {
           method:'POST',
@@ -22611,70 +22680,83 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
           body
         }
       );
-      data = await response.json().catch(()=>({}));
-
-      if(!response.ok || data.success === false){
-        throw new Error(data.message || '照片上傳失敗。');
-      }
+      uploadData=await uploadResponse.json().catch(()=>({}));
     }catch(error){
-      identityUploadInFlight.delete(documentType);
-      setIdentityDocumentState(documentType,'上傳失敗，請重試','error');
-      setIdentityUiStatus(error?.message || '照片上傳失敗，請稍後再試。','error');
-      syncIdentitySubmitAvailability();
-      return false;
+      uploadNetworkError=error;
     }
 
-    // POST 已成功：先立即將 server 回傳的 identityVerification 合併進目前會員狀態。
-    // 這一步不依賴 /api/customer-auth/me，因此送出按鈕能立刻知道三張照片已完成。
+    // V3.5：舊版 POST error 直接寫紅字的邏輯已完全移除。
+    // 第一順位：POST 本身明確成功，就直接採用伺服器回傳狀態。
+    const serverIdentity=(
+      uploadResponse?.ok &&
+      uploadData?.success === true &&
+      uploadData?.serverConfirmed === true &&
+      uploadData?.identityVerification &&
+      typeof uploadData.identityVerification === 'object'
+    ) ? uploadData.identityVerification : null;
+
+    if(serverIdentity?.documents?.[documentType]?.uploaded === true){
+      const baseCustomer=getCurrentCustomerSafe() || {};
+      const nextCustomer={...baseCustomer,identityVerification:serverIdentity};
+      try{ currentCustomer=nextCustomer; }catch(_){ }
+
+      const uploadedAtMs=Number(
+        serverIdentity.documents[documentType].uploadedAtMs || Date.now()
+      );
+      identityConfirmedDocuments.set(documentType,uploadedAtMs);
+      identityUploadInFlight.delete(documentType);
+      showIdentityServerPreview(documentType,uploadedAtMs);
+      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
+      syncIdentitySubmitAvailability(nextCustomer);
+      return true;
+    }
+
+    // 第二順位：不管 POST 回傳什麼，都再問一次 status API。
+    // 只要後端資料已存在，結果就是成功；不受舊 callback 或 HTTP 中斷影響。
+    const reconciled=await reconcileIdentityDocumentFromServer(documentType);
     identityUploadInFlight.delete(documentType);
 
-    const baseCustomer = getCurrentCustomerSafe() || {};
-    const serverIdentity = data?.identityVerification && typeof data.identityVerification === 'object'
-      ? data.identityVerification
-      : null;
-    const optimisticCustomer = serverIdentity
-      ? { ...baseCustomer, identityVerification: serverIdentity }
-      : baseCustomer;
-
-    try{ currentCustomer = optimisticCustomer; }catch(_){ }
-
-    setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
-
-    const uploadedAtMs = Number(
-      serverIdentity?.documents?.[documentType]?.uploadedAtMs || Date.now()
-    );
-    showIdentityServerPreview(documentType,uploadedAtMs);
-
-    // 以 server response 直接重繪，避免狀態還停留在「尚未上傳」。
-    if(serverIdentity){
-      renderIdentityPanel(optimisticCustomer);
-    }else{
-      syncIdentitySubmitAvailability(optimisticCustomer);
-    }
-
-    setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
-    setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
-
-    // 背景再同步一次完整會員資料；同步失敗只記錄 warning，不得改成「上傳失敗」。
-    try{
-      await refreshCustomerIdentity();
-      const refreshedCustomer = getCurrentCustomerSafe();
-      const refreshedUploadedAtMs = Number(
-        refreshedCustomer?.identityVerification?.documents?.[documentType]?.uploadedAtMs || uploadedAtMs
-      );
-      showIdentityServerPreview(documentType,refreshedUploadedAtMs);
+    if(reconciled.ok){
       setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
       setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
-      syncIdentitySubmitAvailability(refreshedCustomer);
-    }catch(refreshError){
-      console.warn('UBee 身分認證：照片已成功上傳，但會員狀態背景同步暫時失敗。',refreshError);
-      // 保留 optimisticCustomer 與成功狀態，讓使用者仍可繼續完成認證。
-      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
-      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
-      syncIdentitySubmitAvailability(optimisticCustomer);
+      syncIdentitySubmitAvailability(reconciled.customer || getCurrentCustomerSafe());
+      return true;
     }
 
-    return true;
+    // 第三順位：status 暫時查不到時，再直接測試私有預覽 API。
+    // 若 Storage 中真的存在照片，image.onload 會把狀態改為成功。
+    const previewConfirmed=await new Promise(resolve=>{
+      const img=new Image();
+      const timeout=setTimeout(()=>resolve(false),5000);
+      img.onload=()=>{ clearTimeout(timeout); resolve(true); };
+      img.onerror=()=>{ clearTimeout(timeout); resolve(false); };
+      img.src=`/api/customer-identity/document/${encodeURIComponent(documentType)}/preview?v=${Date.now()}`;
+    });
+
+    if(previewConfirmed){
+      const uploadedAtMs=Date.now();
+      identityConfirmedDocuments.set(documentType,uploadedAtMs);
+      showIdentityServerPreview(documentType,uploadedAtMs);
+      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+      setIdentityUiStatus(`${sourceLabel}已確認上傳成功，請確認照片預覽。`,'success');
+      syncIdentitySubmitAvailability();
+      return true;
+    }
+
+    // 真的沒有在伺服器確認到檔案時，只回到「尚未上傳」。
+    // 不再存在舊版失敗字樣狀態，避免成功照片被錯誤 callback 覆蓋。
+    console.warn('UBee 身分認證：尚未在伺服器確認照片。',{
+      documentType,
+      httpStatus:uploadResponse?.status || 0,
+      message:uploadData?.message || uploadNetworkError?.message || ''
+    });
+    const backendMessage=safeText(uploadData?.message || uploadNetworkError?.message || '後端沒有確認收到照片');
+    const backendCode=safeText(uploadData?.code || '');
+    setIdentityDocumentState(documentType,'後端尚未確認收到照片','error');
+    setIdentityUiStatus(`${sourceLabel}未完成上傳：${backendMessage}${backendCode ? `（${backendCode}）` : ''}`,'error');
+    syncIdentitySubmitAvailability();
+    return false;
   }
 
   async function submitCustomerIdentity(){
