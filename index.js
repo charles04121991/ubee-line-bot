@@ -3283,8 +3283,8 @@ const CUSTOMER_IDENTITY = Object.freeze({
   provider: 'ubee_auto',
   method: 'id_card_selfie_auto_structural_review',
   verificationMode: 'automatic',
-  reviewVersion: 3,
-  maxFileBytes: 6 * 1024 * 1024,
+  reviewVersion: 3.1,
+  maxFileBytes: 12 * 1024 * 1024,
   minFileBytes: 20 * 1024,
   documentTypes: Object.freeze({
     idFront: '身分證正面',
@@ -3299,26 +3299,9 @@ const customerIdentityUpload = multer({
     files: 1,
     fileSize: CUSTOMER_IDENTITY.maxFileBytes,
   },
-  fileFilter: (req, file, callback) => {
-    const allowed = new Set([
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'image/heic',
-      'image/heif',
-    ]);
-    const mimeType = String(file?.mimetype || '').trim().toLowerCase();
-    if (!allowed.has(mimeType)) {
-      return callback(
-        customerAuthError(
-          '身分認證照片只支援 JPG、PNG、WEBP 或 HEIC。',
-          415,
-          'CUSTOMER_IDENTITY_FILE_TYPE_UNSUPPORTED'
-        )
-      );
-    }
-    return callback(null, true);
-  },
+  // V3.1：不在 multer 階段相信瀏覽器回報的 MIME type。
+  // iPhone / PWA / 相簿可能回報 HEIC、octet-stream 或空字串；
+  // 讀入 memory 後再由實際 magic bytes 驗證。
 });
 
 function customerIdentityUploadSingle(req, res, next) {
@@ -3329,7 +3312,7 @@ function customerIdentityUploadSingle(req, res, next) {
       return res.status(413).json({
         success: false,
         code: 'CUSTOMER_IDENTITY_FILE_TOO_LARGE',
-        message: '單張照片不可超過 6 MB。',
+        message: '單張照片不可超過 12 MB。',
       });
     }
 
@@ -3482,53 +3465,44 @@ function customerIdentityStorageKey(customerId) {
     .slice(0, 40);
 }
 
-function customerIdentityFileExtension(mimeType, originalName = '') {
-  const ext = String(originalName || '')
-    .toLowerCase()
-    .match(/\.([a-z0-9]{1,8})$/)?.[1];
-
-  if (new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']).has(ext)) {
-    return ext;
+function detectCustomerIdentityImageType(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return null;
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { mimeType: 'image/jpeg', extension: 'jpg' };
   }
+  if (buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) {
+    return { mimeType: 'image/png', extension: 'png' };
+  }
+  if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
+    return { mimeType: 'image/webp', extension: 'webp' };
+  }
+  if (buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = buffer.subarray(8, 12).toString('ascii').toLowerCase();
+    const heifBrands = new Set(['heic','heix','hevc','hevx','heim','heis','hevm','hevs','mif1','msf1']);
+    if (heifBrands.has(brand)) return { mimeType: 'image/heic', extension: 'heic' };
+    if (brand === 'avif' || brand === 'avis') return { mimeType: 'image/avif', extension: 'avif' };
+  }
+  return null;
+}
 
+function customerIdentityFileExtension(mimeType) {
   return {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/heic': 'heic',
-    'image/heif': 'heif',
+    'image/jpeg':'jpg',
+    'image/png':'png',
+    'image/webp':'webp',
+    'image/heic':'heic',
+    'image/heif':'heic',
+    'image/avif':'avif',
   }[String(mimeType || '').toLowerCase()] || 'bin';
 }
 
 function customerIdentityImageSignatureValid(buffer, mimeType) {
-  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return false;
-  const mime = String(mimeType || '').toLowerCase();
-
-  if (mime === 'image/jpeg') {
-    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-  }
-
-  if (mime === 'image/png') {
-    return buffer.subarray(0, 8).equals(
-      Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])
-    );
-  }
-
-  if (mime === 'image/webp') {
-    return (
-      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
-      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
-    );
-  }
-
-  if (mime === 'image/heic' || mime === 'image/heif') {
-    // ISO BMFF / HEIF family: size(4) + "ftyp" + brand.
-    if (buffer.subarray(4, 8).toString('ascii') !== 'ftyp') return false;
-    const brand = buffer.subarray(8, 12).toString('ascii').toLowerCase();
-    return ['heic','heix','hevc','hevx','mif1','msf1'].includes(brand);
-  }
-
-  return false;
+  const detected = detectCustomerIdentityImageType(buffer);
+  if (!detected) return false;
+  const reported = String(mimeType || '').trim().toLowerCase();
+  if (!reported || ['application/octet-stream','binary/octet-stream'].includes(reported)) return true;
+  if (reported === 'image/heif' && detected.mimeType === 'image/heic') return true;
+  return reported === detected.mimeType;
 }
 
 function normalizeTaiwanNationalId(value) {
@@ -4507,22 +4481,21 @@ app.post(
         );
       }
 
-      const contentType = String(uploadFile.mimetype || '')
+      const reportedContentType = String(uploadFile.mimetype || '')
         .trim()
         .toLowerCase();
+      const detectedImage = detectCustomerIdentityImageType(fileBuffer);
 
-      if (!customerIdentityImageSignatureValid(fileBuffer, contentType)) {
+      if (!detectedImage) {
         throw customerAuthError(
-          '照片實際格式與檔案類型不一致，請重新拍攝或選擇原始照片。',
+          '無法辨識這張照片的實際格式。請使用手機相機拍攝，或選擇 JPG、PNG、WEBP、HEIC / HEIF、AVIF 圖片。',
           415,
           'CUSTOMER_IDENTITY_FILE_SIGNATURE_INVALID'
         );
       }
 
-      const extension = customerIdentityFileExtension(
-        contentType,
-        uploadFile.originalname
-      );
+      const contentType = detectedImage.mimeType;
+      const extension = detectedImage.extension;
 
       const identityKey = customerIdentityStorageKey(customerId);
       const uploadId = crypto.randomUUID();
@@ -4551,7 +4524,8 @@ app.post(
             customerIdentityKey: identityKey,
             customerIdentityDocumentType: documentType,
             sha256,
-            dataVersion: '3',
+            reportedContentType: cleanText(reportedContentType || '', 100),
+            dataVersion: '3.1',
           },
         },
       });
