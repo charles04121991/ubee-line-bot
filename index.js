@@ -3257,7 +3257,7 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
 });
 
 // =====================================================
-// UBee Customer Identity Verification V3｜自動身分資料審核
+// UBee Customer Identity Verification V3.2｜自動身分資料審核＋安全照片預覽
 // - 客戶上傳：身分證正面、身分證反面、本人自拍。
 // - 送出時輸入台灣國民身分證字號；完整字號只在單次 HTTPS 請求記憶體中驗證，絕不寫入 Firestore / audit log。
 // - 自動檢查：會員姓名存在、國民身分證格式與檢查碼、三張檔案完整性、私有 Storage 所有權、檔案大小與三張 SHA-256 不重複。
@@ -3283,7 +3283,7 @@ const CUSTOMER_IDENTITY = Object.freeze({
   provider: 'ubee_auto',
   method: 'id_card_selfie_auto_structural_review',
   verificationMode: 'automatic',
-  reviewVersion: 3.1,
+  reviewVersion: 3.2,
   maxFileBytes: 12 * 1024 * 1024,
   minFileBytes: 20 * 1024,
   documentTypes: Object.freeze({
@@ -4420,6 +4420,91 @@ app.get('/api/customer-identity/status', requireCustomerAuth, (req, res) => {
   });
 });
 
+
+app.get(
+  '/api/customer-identity/document/:documentType/preview',
+  requireCustomerAuth,
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    try {
+      if (!CUSTOMER_IDENTITY.providerEnabled) {
+        throw customerAuthError(
+          '身分認證照片儲存空間尚未設定。',
+          503,
+          'CUSTOMER_IDENTITY_STORAGE_NOT_CONFIGURED'
+        );
+      }
+
+      const customerId = req.customerAuth.customerId;
+      const account = req.customerAuth.account || {};
+      const documentType = normalizeCustomerIdentityDocumentType(req.params.documentType);
+
+      if (!documentType || !CUSTOMER_IDENTITY.documentTypes[documentType]) {
+        throw customerAuthError(
+          '身分認證照片類型不正確。',
+          400,
+          'CUSTOMER_IDENTITY_DOCUMENT_TYPE_INVALID'
+        );
+      }
+
+      const current = normalizeCustomerIdentityVerification(account.identityVerification);
+      const item = current.documents[documentType];
+
+      if (!item?.storagePath || !item?.storageBucket) {
+        throw customerAuthError(
+          '這張身分認證照片尚未上傳。',
+          404,
+          'CUSTOMER_IDENTITY_DOCUMENT_NOT_FOUND'
+        );
+      }
+
+      const owned = await validateCustomerIdentityDocumentOwnership(
+        customerId,
+        documentType,
+        item
+      );
+
+      if (!owned) {
+        throw customerAuthError(
+          '無法確認這張照片屬於目前登入會員。',
+          403,
+          'CUSTOMER_IDENTITY_DOCUMENT_FORBIDDEN'
+        );
+      }
+
+      const bucket = admin.storage().bucket(CUSTOMER_IDENTITY_STORAGE_BUCKET);
+      const file = bucket.file(item.storagePath);
+      const [metadata] = await file.getMetadata();
+      const contentType = String(metadata.contentType || item.mimeType || 'application/octet-stream');
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', 'inline');
+
+      const stream = file.createReadStream();
+      stream.on('error', error => {
+        console.error('❌ 讀取客戶身分認證照片預覽失敗：', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            code: 'CUSTOMER_IDENTITY_PREVIEW_ERROR',
+            message: '照片預覽暫時無法讀取。',
+          });
+        } else {
+          res.destroy(error);
+        }
+      });
+      stream.pipe(res);
+    } catch (error) {
+      if (res.headersSent) return;
+      return sendCustomerAuthError(res, error);
+    }
+  }
+);
+
 app.post(
   '/api/customer-identity/document/:documentType',
   requireCustomerAuth,
@@ -4525,7 +4610,7 @@ app.post(
             customerIdentityDocumentType: documentType,
             sha256,
             reportedContentType: cleanText(reportedContentType || '', 100),
-            dataVersion: '3.1',
+            dataVersion: '3.2',
           },
         },
       });
