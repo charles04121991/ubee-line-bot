@@ -3231,7 +3231,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =====================================================
-// UBee Customer Account System｜正式會員驗證
+// UBee Customer Account System｜正式會員驗證＋Identity V1
 // - 註冊：手機號碼＋密碼（現階段不發送簡訊驗證碼）
 // - 密碼：Node.js crypto.scrypt 雜湊
 // - Session：HttpOnly / SameSite=Lax Cookie，伺服器端 Firestore 驗證
@@ -3255,6 +3255,58 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
   sessions: 'customerSessions',
   counters: 'systemCounters',
 });
+
+// =====================================================
+// UBee Customer Identity Verification V1
+// - 主方式：內政部行動自然人憑證（MOICA Mobile Citizen Certificate）
+// - 與手機號碼驗證完全分離；手機僅作登入帳號與聯絡方式。
+// - 正式介接需先取得內政部 UAT 測試環境與規格文件。
+// - CUSTOMER_IDENTITY_ENFORCE 預設 false，避免正式介接完成前阻擋既有訂單。
+// =====================================================
+const CUSTOMER_IDENTITY = Object.freeze({
+  enforce:
+    String(process.env.CUSTOMER_IDENTITY_ENFORCE || 'false')
+      .trim()
+      .toLowerCase() === 'true',
+  providerEnabled:
+    String(process.env.MOICA_FIDO_ENABLED || 'false')
+      .trim()
+      .toLowerCase() === 'true',
+  provider: 'moica_mobile',
+  method: 'mobile_citizen_certificate',
+});
+
+function normalizeCustomerIdentityVerification(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const allowedStatus = new Set([
+    'not_verified',
+    'pending',
+    'verified',
+    'rejected',
+  ]);
+  const status = allowedStatus.has(String(source.status || '').trim())
+    ? String(source.status).trim()
+    : 'not_verified';
+
+  return {
+    status,
+    verified: status === 'verified',
+    level: Math.max(0, Math.min(3, Number(source.level || 0))),
+    provider: cleanText(source.provider || '', 60),
+    method: cleanText(source.method || '', 80),
+    verifiedName: cleanText(source.verifiedName || '', 80),
+    verificationId: cleanText(source.verificationId || '', 200),
+    verifiedAtMs: Number(source.verifiedAtMs || 0),
+    lastAttemptAtMs: Number(source.lastAttemptAtMs || 0),
+    failureCode: cleanText(source.failureCode || '', 100),
+  };
+}
+
+function isCustomerIdentityVerified(account) {
+  return normalizeCustomerIdentityVerification(
+    account?.identityVerification
+  ).verified;
+}
 
 function customerAuthError(message, statusCode = 400, code = 'CUSTOMER_AUTH_ERROR') {
   const error = new Error(message);
@@ -3433,6 +3485,12 @@ function clearCustomerSessionCookie(req, res) {
 
 function customerAccountResponse(account, customerId) {
   const source = account || {};
+  const identityVerification = normalizeCustomerIdentityVerification(
+    source.identityVerification
+  );
+
+  // 不把身分證號、憑證原始資料或生物特徵資料送到前端。
+  // 前端只取得顯示與流程控制所需的最小驗證結果。
   return {
     customerId,
     memberNumber: String(source.memberNumber || ''),
@@ -3446,6 +3504,18 @@ function customerAccountResponse(account, customerId) {
     status: String(source.status || 'active'),
     preferences: source.preferences || {},
     createdAtMs: Number(source.createdAtMs || 0),
+
+    identityVerified: identityVerification.verified,
+    identityVerification: {
+      status: identityVerification.status,
+      verified: identityVerification.verified,
+      level: identityVerification.level,
+      provider: identityVerification.provider,
+      method: identityVerification.method,
+      verifiedName: identityVerification.verifiedName,
+      verifiedAtMs: identityVerification.verifiedAtMs,
+    },
+    identityProviderAvailable: CUSTOMER_IDENTITY.providerEnabled,
   };
 }
 
@@ -3576,6 +3646,60 @@ async function requireCustomerAuth(req, res, next) {
       message: '會員身分驗證失敗，請稍後再試。',
     });
   }
+}
+
+// =====================================================
+// UBee 實名制下單 Middleware
+// - CUSTOMER_IDENTITY_ENFORCE=false：只建置能力，不阻擋既有訂單。
+// - 正式上線行動自然人憑證後再切 true。
+// =====================================================
+async function requireCustomerIdentity(req, res, next) {
+  try {
+    if (!CUSTOMER_IDENTITY.enforce) {
+      return next();
+    }
+
+    const account = req.customerAuth?.account || {};
+    if (isCustomerIdentityVerified(account)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      code: 'CUSTOMER_IDENTITY_REQUIRED',
+      message: '完成實名認證後即可送出 UBee 跑腿任務。',
+      identityVerification: normalizeCustomerIdentityVerification(
+        account.identityVerification
+      ),
+    });
+  } catch (error) {
+    console.error('❌ UBee 客戶實名狀態檢查失敗：', error);
+    return res.status(500).json({
+      success: false,
+      code: 'CUSTOMER_IDENTITY_CHECK_ERROR',
+      message: '目前無法確認實名認證狀態，請稍後再試。',
+    });
+  }
+}
+
+// 內政部 UAT 規格尚未核發前，不虛構任何 FIDO API URL、簽章欄位或 callback 參數。
+// 取得正式介接文件後，只需要把此 adapter 換成真實的 UAT/PROD 呼叫即可。
+async function startCustomerMoicaIdentityVerification({ customerId, account }) {
+  if (!CUSTOMER_IDENTITY.providerEnabled) {
+    throw customerAuthError(
+      '行動自然人憑證介接尚未開通。UBee 完成內政部測試環境申請後即可啟用。',
+      503,
+      'CUSTOMER_IDENTITY_PROVIDER_NOT_READY'
+    );
+  }
+
+  // 防止僅設定 MOICA_FIDO_ENABLED=true 就誤以為已完成正式串接。
+  // 正式版必須依內政部提供的介接規格，在這裡建立驗證交易並取得導轉資訊。
+  throw customerAuthError(
+    '行動自然人憑證 UAT adapter 尚未設定，請完成正式介接規格後再啟用。',
+    503,
+    'CUSTOMER_IDENTITY_ADAPTER_NOT_CONFIGURED'
+  );
 }
 
 function sendCustomerAuthError(res, error) {
@@ -3742,6 +3866,21 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         phone,
         phoneVerified: false,
         phoneVerificationStatus: 'not_verified',
+
+        // UBee 實名制與手機驗證完全分離。
+        identityVerification: {
+          status: 'not_verified',
+          level: 0,
+          provider: '',
+          method: '',
+          verifiedName: '',
+          verificationId: '',
+          verifiedAtMs: 0,
+          lastAttemptAtMs: 0,
+          failureCode: '',
+          updatedAtMs: nowMs,
+        },
+
         recoveryMethod: 'support',
         name,
         email,
@@ -3943,6 +4082,117 @@ app.get('/api/customer-auth/me', customerAuthOptional, (req, res) => {
       req.customerAuth.customerId
     ),
   });
+});
+
+// =====================================================
+// UBee Customer Identity API V1
+// =====================================================
+app.get('/api/customer-identity/status', requireCustomerAuth, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const identityVerification = normalizeCustomerIdentityVerification(
+    req.customerAuth.account?.identityVerification
+  );
+
+  return res.json({
+    success: true,
+    available: CUSTOMER_IDENTITY.providerEnabled,
+    enforce: CUSTOMER_IDENTITY.enforce,
+    identityVerified: identityVerification.verified,
+    identityVerification: {
+      status: identityVerification.status,
+      verified: identityVerification.verified,
+      level: identityVerification.level,
+      provider: identityVerification.provider,
+      method: identityVerification.method,
+      verifiedName: identityVerification.verifiedName,
+      verifiedAtMs: identityVerification.verifiedAtMs,
+    },
+  });
+});
+
+app.post('/api/customer-identity/start', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const customerId = req.customerAuth.customerId;
+    const account = req.customerAuth.account || {};
+    const current = normalizeCustomerIdentityVerification(
+      account.identityVerification
+    );
+
+    if (current.verified) {
+      return res.json({
+        success: true,
+        alreadyVerified: true,
+        identityVerified: true,
+        identityVerification: current,
+        message: '此 UBee 帳號已完成實名認證。',
+      });
+    }
+
+    const nowMs = Date.now();
+    await db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .doc(customerId)
+      .set({
+        identityVerification: {
+          ...current,
+          status: 'pending',
+          provider: CUSTOMER_IDENTITY.provider,
+          method: CUSTOMER_IDENTITY.method,
+          lastAttemptAtMs: nowMs,
+          failureCode: '',
+          updatedAtMs: nowMs,
+        },
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+    const providerSession = await startCustomerMoicaIdentityVerification({
+      customerId,
+      account,
+    });
+
+    return res.json({
+      success: true,
+      identityVerified: false,
+      identityVerification: {
+        status: 'pending',
+        provider: CUSTOMER_IDENTITY.provider,
+        method: CUSTOMER_IDENTITY.method,
+      },
+      ...providerSession,
+    });
+  } catch (error) {
+    // Provider 尚未開通時不讓帳號永久卡在 pending。
+    if (
+      ['CUSTOMER_IDENTITY_PROVIDER_NOT_READY', 'CUSTOMER_IDENTITY_ADAPTER_NOT_CONFIGURED']
+        .includes(String(error?.code || ''))
+    ) {
+      const customerId = req.customerAuth?.customerId;
+      if (customerId) {
+        db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+          .doc(customerId)
+          .set({
+            identityVerification: {
+              status: 'not_verified',
+              level: 0,
+              provider: '',
+              method: '',
+              verifiedName: '',
+              verificationId: '',
+              verifiedAtMs: 0,
+              lastAttemptAtMs: Date.now(),
+              failureCode: String(error.code || ''),
+              updatedAtMs: Date.now(),
+            },
+          }, { merge: true })
+          .catch(() => {});
+      }
+    }
+
+    return sendCustomerAuthError(res, error);
+  }
 });
 
 app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => {
@@ -27540,7 +27790,7 @@ app.get(
 );
 
 
-app.post('/api/orders', requireCustomerAuth, async (req, res) => {
+app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req, res) => {
     try {
     if(!req.body || typeof req.body !== 'object'){
     return res.status(400).json({
@@ -27554,6 +27804,11 @@ app.post('/api/orders', requireCustomerAuth, async (req, res) => {
     req.body.customerName = String(req.customerAuth.account.name || '');
     req.body.customerPhone = String(req.customerAuth.account.phone || '');
     const data = createOrderFromApi(req.body);
+
+    // 訂單只記錄是否通過實名，不複製身分證號或憑證原始資料。
+    data.customerIdentityVerified = isCustomerIdentityVerified(
+      req.customerAuth.account
+    );
 
     const verifiedStoreResult = await verifyStoreDiscoveryForOrder(
       data.storeDiscovery
