@@ -21087,7 +21087,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-9';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-10';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22649,6 +22649,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       syncIdentitySubmitAvailability();
       return false;
     }
+
     if(file.size < 20 * 1024){
       setIdentityDocumentState(documentType,'照片檔案過小','error');
       setIdentityUiStatus('照片檔案過小，請重新拍攝清楚且完整的照片。','error');
@@ -22664,14 +22665,14 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const sizeMb=(file.size / 1024 / 1024).toFixed(1);
     setIdentityUiStatus(`${sourceLabel}正在安全上傳…（${sizeMb} MB）`,'pending');
 
-    let uploadResponse=null;
-    let uploadData={};
-    let uploadNetworkError=null;
+    let response=null;
+    let data={};
 
     try{
       const body=new FormData();
       body.append('file',file,file.name || `${documentType}.jpg`);
-      uploadResponse=await fetch(
+
+      response=await fetch(
         `/api/customer-identity/document/${encodeURIComponent(documentType)}`,
         {
           method:'POST',
@@ -22680,83 +22681,94 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
           body
         }
       );
-      uploadData=await uploadResponse.json().catch(()=>({}));
-    }catch(error){
-      uploadNetworkError=error;
-    }
 
-    // V3.5：舊版 POST error 直接寫紅字的邏輯已完全移除。
-    // 第一順位：POST 本身明確成功，就直接採用伺服器回傳狀態。
-    const serverIdentity=(
-      uploadResponse?.ok &&
-      uploadData?.success === true &&
-      uploadData?.serverConfirmed === true &&
-      uploadData?.identityVerification &&
-      typeof uploadData.identityVerification === 'object'
-    ) ? uploadData.identityVerification : null;
+      data=await response.json().catch(()=>({}));
 
-    if(serverIdentity?.documents?.[documentType]?.uploaded === true){
-      const baseCustomer=getCurrentCustomerSafe() || {};
-      const nextCustomer={...baseCustomer,identityVerification:serverIdentity};
-      try{ currentCustomer=nextCustomer; }catch(_){ }
+      // V3.7：
+      // 不再強制依賴 serverConfirmed 欄位。
+      // 只要後端 HTTP 成功，且 success 不是 false，
+      // 並明確回報 uploaded=true 或 identityVerification 中該文件 uploaded=true，
+      // 就視為真正上傳成功。
+      const responseIdentity =
+        data?.identityVerification &&
+        typeof data.identityVerification === 'object'
+          ? data.identityVerification
+          : null;
 
-      const uploadedAtMs=Number(
-        serverIdentity.documents[documentType].uploadedAtMs || Date.now()
+      const responseDocument =
+        responseIdentity?.documents?.[documentType] || null;
+
+      const uploadSucceeded = Boolean(
+        response.ok &&
+        data?.success !== false &&
+        (
+          data?.uploaded === true ||
+          responseDocument?.uploaded === true
+        )
       );
-      identityConfirmedDocuments.set(documentType,uploadedAtMs);
+
+      if(uploadSucceeded){
+        const uploadedAtMs=Number(
+          responseDocument?.uploadedAtMs ||
+          data?.uploadedAtMs ||
+          Date.now()
+        );
+
+        const baseCustomer=getCurrentCustomerSafe() || {};
+        if(responseIdentity){
+          try{
+            currentCustomer={
+              ...baseCustomer,
+              identityVerification:responseIdentity
+            };
+          }catch(_){}
+        }
+
+        identityConfirmedDocuments.set(documentType,uploadedAtMs);
+        showIdentityServerPreview(documentType,uploadedAtMs);
+        setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+        setIdentityUiStatus(`${sourceLabel}已上傳成功，後端已完成儲存。`,'success');
+        return true;
+      }
+
+      // 相容舊後端：如果 POST 回 2xx / success:true，但舊格式沒有 uploaded 欄位，
+      // 再查一次 status。這只是版本相容，不會覆蓋真正的 POST 錯誤原因。
+      if(response.ok && data?.success === true){
+        const reconciled=await reconcileIdentityDocumentFromServer(documentType);
+        if(reconciled.ok){
+          setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+          setIdentityUiStatus(`${sourceLabel}已上傳成功，後端已完成儲存。`,'success');
+          return true;
+        }
+      }
+
+      const backendMessage=safeText(
+        data?.message ||
+        `伺服器回傳 HTTP ${response.status || 0}，未完成照片儲存。`
+      );
+      const backendCode=safeText(data?.code || 'CUSTOMER_IDENTITY_UPLOAD_NOT_CONFIRMED');
+      const backendStage=safeText(data?.stage || 'unknown');
+
+      setIdentityDocumentState(documentType,'尚未完成上傳','error');
+      setIdentityUiStatus(
+        `${sourceLabel}未完成上傳：${backendMessage}（${backendCode}｜階段：${backendStage}）`,
+        'error'
+      );
+      return false;
+
+    }catch(error){
+      const message=safeText(error?.message || '網路連線中斷，伺服器沒有完成回應。');
+      setIdentityDocumentState(documentType,'尚未完成上傳','error');
+      setIdentityUiStatus(
+        `${sourceLabel}未完成上傳：${message}（CUSTOMER_IDENTITY_UPLOAD_NETWORK_ERROR）`,
+        'error'
+      );
+      return false;
+
+    }finally{
       identityUploadInFlight.delete(documentType);
-      showIdentityServerPreview(documentType,uploadedAtMs);
-      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
-      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
-      syncIdentitySubmitAvailability(nextCustomer);
-      return true;
+      syncIdentitySubmitAvailability(getCurrentCustomerSafe());
     }
-
-    // 第二順位：不管 POST 回傳什麼，都再問一次 status API。
-    // 只要後端資料已存在，結果就是成功；不受舊 callback 或 HTTP 中斷影響。
-    const reconciled=await reconcileIdentityDocumentFromServer(documentType);
-    identityUploadInFlight.delete(documentType);
-
-    if(reconciled.ok){
-      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
-      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認照片預覽。`,'success');
-      syncIdentitySubmitAvailability(reconciled.customer || getCurrentCustomerSafe());
-      return true;
-    }
-
-    // 第三順位：status 暫時查不到時，再直接測試私有預覽 API。
-    // 若 Storage 中真的存在照片，image.onload 會把狀態改為成功。
-    const previewConfirmed=await new Promise(resolve=>{
-      const img=new Image();
-      const timeout=setTimeout(()=>resolve(false),5000);
-      img.onload=()=>{ clearTimeout(timeout); resolve(true); };
-      img.onerror=()=>{ clearTimeout(timeout); resolve(false); };
-      img.src=`/api/customer-identity/document/${encodeURIComponent(documentType)}/preview?v=${Date.now()}`;
-    });
-
-    if(previewConfirmed){
-      const uploadedAtMs=Date.now();
-      identityConfirmedDocuments.set(documentType,uploadedAtMs);
-      showIdentityServerPreview(documentType,uploadedAtMs);
-      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
-      setIdentityUiStatus(`${sourceLabel}已確認上傳成功，請確認照片預覽。`,'success');
-      syncIdentitySubmitAvailability();
-      return true;
-    }
-
-    // 真的沒有在伺服器確認到檔案時，只回到「尚未上傳」。
-    // 不再存在舊版失敗字樣狀態，避免成功照片被錯誤 callback 覆蓋。
-    console.warn('UBee 身分認證：尚未在伺服器確認照片。',{
-      documentType,
-      httpStatus:uploadResponse?.status || 0,
-      message:uploadData?.message || uploadNetworkError?.message || ''
-    });
-    const backendMessage=safeText(uploadData?.message || uploadNetworkError?.message || '後端沒有確認收到照片');
-    const backendCode=safeText(uploadData?.code || '');
-    setIdentityDocumentState(documentType,'後端尚未確認收到照片','error');
-    setIdentityUiStatus(`${sourceLabel}未完成上傳：${backendMessage}${backendCode ? `（${backendCode}）` : ''}`,'error');
-    syncIdentitySubmitAvailability();
-    return false;
   }
 
   async function submitCustomerIdentity(){
