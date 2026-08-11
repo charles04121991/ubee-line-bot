@@ -3257,7 +3257,7 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
 });
 
 // =====================================================
-// UBee Customer Identity Verification V3.3｜自動身分資料審核＋後端上傳確認
+// UBee Customer Identity Verification V3.4｜自動身分資料審核＋後端上傳確認
 // - 客戶上傳：身分證正面、身分證反面、本人自拍。
 // - 送出時輸入台灣國民身分證字號；完整字號只在單次 HTTPS 請求記憶體中驗證，絕不寫入 Firestore / audit log。
 // - 自動檢查：會員姓名存在、國民身分證格式與檢查碼、三張檔案完整性、私有 Storage 所有權、檔案大小與三張 SHA-256 不重複。
@@ -3266,9 +3266,15 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
 // - CUSTOMER_IDENTITY_ENFORCE 預設 false；完整測試通過後再決定是否強制下單前完成。
 // =====================================================
 function buildCustomerIdentityStorageBucketCandidates() {
-  const projectId = String(process.env.FIREBASE_PROJECT_ID || '').trim();
-  const configured = String(process.env.FIREBASE_STORAGE_BUCKET || '').trim();
-  const appConfigured = String(admin.app()?.options?.storageBucket || '').trim();
+  const normalizeBucketName = value =>
+    String(value || '')
+      .trim()
+      .replace(/^gs:\/\//i, '')
+      .replace(/\/+$/, '');
+
+  const projectId = normalizeBucketName(process.env.FIREBASE_PROJECT_ID || '');
+  const configured = normalizeBucketName(process.env.FIREBASE_STORAGE_BUCKET || '');
+  const appConfigured = normalizeBucketName(admin.app()?.options?.storageBucket || '');
 
   return [...new Set([
     configured,
@@ -3297,7 +3303,7 @@ const CUSTOMER_IDENTITY = Object.freeze({
   provider: 'ubee_auto',
   method: 'id_card_selfie_auto_structural_review',
   verificationMode: 'automatic',
-  reviewVersion: 3.3,
+  reviewVersion: 3.4,
   maxFileBytes: 20 * 1024 * 1024,
   minFileBytes: 20 * 1024,
   documentTypes: Object.freeze({
@@ -4551,6 +4557,7 @@ app.post(
   customerIdentityUploadSingle,
   async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
+
     let newlyStoredFile = null;
     let uploadStage = 'request_received';
 
@@ -4590,12 +4597,13 @@ app.post(
       }
 
       uploadStage = 'multipart_parsed';
+
       const uploadFile = req.file;
       const fileBuffer = uploadFile?.buffer;
 
       if (!uploadFile || !Buffer.isBuffer(fileBuffer) || !fileBuffer.length) {
         throw customerAuthError(
-          '沒有收到照片，請重新選擇後上傳。',
+          '後端沒有收到照片檔案，請重新選擇後上傳。',
           400,
           'CUSTOMER_IDENTITY_FILE_REQUIRED'
         );
@@ -4609,25 +4617,28 @@ app.post(
         );
       }
 
-      const reportedContentType = String(uploadFile.mimetype || '')
-        .trim()
-        .toLowerCase();
       uploadStage = 'file_received';
+
       const detectedImage = detectCustomerIdentityImageType(fileBuffer);
 
       if (!detectedImage) {
         throw customerAuthError(
-          '無法辨識這張照片的實際格式。請使用手機相機拍攝，或選擇 JPG、PNG、WEBP、HEIC / HEIF、AVIF 圖片。',
+          '無法辨識照片格式。請使用 JPG、PNG、WEBP、HEIC / HEIF 或 AVIF。',
           415,
           'CUSTOMER_IDENTITY_FILE_SIGNATURE_INVALID'
         );
       }
+
+      const reportedContentType = String(uploadFile.mimetype || '')
+        .trim()
+        .toLowerCase();
 
       const contentType = detectedImage.mimeType;
       const extension = detectedImage.extension;
 
       const identityKey = customerIdentityStorageKey(customerId);
       const uploadId = crypto.randomUUID();
+
       const storagePath =
         `customer-identity-v3/pending/${identityKey}/` +
         `${documentType}/${Date.now()}_${uploadId}.${extension}`;
@@ -4638,6 +4649,7 @@ app.post(
         .digest('hex');
 
       uploadStage = 'storage_write';
+
       const saveResult = await saveCustomerIdentityFileToAvailableBucket(
         storagePath,
         fileBuffer,
@@ -4652,18 +4664,20 @@ app.post(
               customerIdentityDocumentType: documentType,
               sha256,
               reportedContentType: cleanText(reportedContentType || '', 100),
-              dataVersion: '3.3',
+              dataVersion: '3.4',
             },
           },
         }
       );
 
-      const bucket = saveResult.bucket;
       const storageFile = saveResult.file;
       newlyStoredFile = storageFile;
+
       uploadStage = 'storage_written';
+
       const oldItem = current.documents[documentType];
       const nowMs = Date.now();
+
       const nextItem = {
         documentType,
         label: CUSTOMER_IDENTITY.documentTypes[documentType],
@@ -4681,123 +4695,117 @@ app.post(
         [documentType]: nextItem,
       };
 
-      const nextStatus = ['rejected','pending'].includes(current.status)
+      const nextStatus = ['rejected', 'pending'].includes(current.status)
         ? 'not_verified'
         : current.status;
 
-      uploadStage = 'firestore_write';
-      await db
-        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-        .doc(customerId)
-        .set({
-          identityVerification: {
-            ...current,
-            status: nextStatus,
-            level: 0,
-            provider: CUSTOMER_IDENTITY.provider,
-            method: CUSTOMER_IDENTITY.method,
-            verificationMode: CUSTOMER_IDENTITY.verificationMode,
-            reviewVersion: CUSTOMER_IDENTITY.reviewVersion,
-            verifiedName: '',
-            verifiedAtMs: 0,
-            submittedAtMs: 0,
-            reviewedAtMs: 0,
-            reviewedBy: '',
-            rejectedAtMs: 0,
-            rejectionReason: '',
-            failureCode: '',
-            checks: {},
-            lastAttemptAtMs: nowMs,
-            documents: nextDocuments,
-            updatedAtMs: nowMs,
-          },
-          updatedAtMs: nowMs,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-      uploadStage = 'firestore_written';
-
-      // V3.3：寫入後立刻從 Firestore 讀回確認。
-      // 只有 Storage + Firestore 兩邊都確認成功，API 才回 success:true。
-      const persistedAccountDoc = await db
-        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
-        .doc(customerId)
-        .get();
-      const persistedIdentity = normalizeCustomerIdentityVerification(
-        persistedAccountDoc.data()?.identityVerification
-      );
-      const persistedItem = persistedIdentity.documents[documentType];
-
-      if (
-        !persistedAccountDoc.exists ||
-        !persistedItem?.storagePath ||
-        persistedItem.storagePath !== storagePath ||
-        persistedItem.storageBucket !== nextItem.storageBucket ||
-        persistedItem.sha256 !== sha256
-      ) {
-        await storageFile.delete({ ignoreNotFound: true }).catch(() => {});
-        throw customerAuthError(
-          '照片已送達伺服器，但會員上傳紀錄未能完成確認，請再試一次。',
-          503,
-          'CUSTOMER_IDENTITY_PERSIST_CONFIRM_FAILED'
-        );
-      }
-
-      uploadStage = 'persist_confirmed';
-
-      if (
-        oldItem?.storagePath &&
-        oldItem.storagePath !== storagePath &&
-        oldItem.storageBucket === bucket.name
-      ) {
-        bucket
-          .file(oldItem.storagePath)
-          .delete({ ignoreNotFound: true })
-          .catch(() => {});
-      }
-
-      const publicIdentity = customerIdentityPublicStatus({
+      const nextIdentity = {
         ...current,
         status: nextStatus,
+        level: 0,
         provider: CUSTOMER_IDENTITY.provider,
         method: CUSTOMER_IDENTITY.method,
         verificationMode: CUSTOMER_IDENTITY.verificationMode,
-        reviewVersion: CUSTOMER_IDENTITY.reviewVersion,
-        documents: nextDocuments,
+        reviewVersion: 3.4,
+        verifiedName: '',
+        verifiedAtMs: 0,
+        submittedAtMs: 0,
+        reviewedAtMs: 0,
+        reviewedBy: '',
+        rejectedAtMs: 0,
         rejectionReason: '',
+        failureCode: '',
         checks: {},
-      });
+        lastAttemptAtMs: nowMs,
+        documents: nextDocuments,
+        updatedAtMs: nowMs,
+      };
+
+      uploadStage = 'firestore_write';
+
+      await db
+        .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+        .doc(customerId)
+        .set(
+          {
+            identityVerification: nextIdentity,
+            updatedAtMs: nowMs,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+      uploadStage = 'firestore_written';
+
+      // V3.4：Storage save + Firestore set 都完成，就算上傳成功。
+      // 不再做第二次 Firestore readback，也不要求額外 serverConfirmed 才承認成功。
+      const publicIdentity = customerIdentityPublicStatus(nextIdentity);
+
+      // 成功後再清除同類型舊檔；失敗不影響這次成功回應。
+      if (
+        oldItem?.storagePath &&
+        oldItem.storagePath !== storagePath &&
+        oldItem.storageBucket
+      ) {
+        try {
+          await admin
+            .storage()
+            .bucket(oldItem.storageBucket)
+            .file(oldItem.storagePath)
+            .delete({ ignoreNotFound: true });
+        } catch (cleanupError) {
+          console.warn(
+            '⚠️ 舊身分認證照片清理失敗，不影響新照片上傳：',
+            cleanupError?.message || cleanupError
+          );
+        }
+      }
 
       uploadStage = 'completed';
       newlyStoredFile = null;
 
-      return res.json({
+      return res.status(200).json({
         success: true,
+        uploaded: true,
         documentType,
         label: CUSTOMER_IDENTITY.documentTypes[documentType],
-        uploaded: true,
-        serverConfirmed: true,
-        storageBucket: nextItem.storageBucket,
+        uploadedAtMs: nowMs,
         sizeBytes: nextItem.sizeBytes,
         identityVerification: publicIdentity,
+
+        // 保留欄位只為舊前端相容；新版前端不再依賴它。
+        serverConfirmed: true,
+        stage: 'completed',
+
         message: `${CUSTOMER_IDENTITY.documentTypes[documentType]}已安全上傳。`,
       });
+
     } catch (error) {
       if (newlyStoredFile) {
-        await newlyStoredFile.delete({ ignoreNotFound: true }).catch(() => {});
+        await newlyStoredFile
+          .delete({ ignoreNotFound: true })
+          .catch(() => {});
       }
+
+      const statusCode = Number(error?.statusCode || 500);
+      const code = error?.code || 'CUSTOMER_IDENTITY_UPLOAD_FAILED';
+      const message =
+        error?.message ||
+        '後端未能完成照片上傳，請稍後再試。';
+
       console.error('❌ 客戶身分認證照片上傳未完成：', {
         stage: uploadStage,
-        code: error?.code || '',
-        message: error?.message || error,
+        statusCode,
+        code,
+        message,
       });
-      return res.status(Number(error?.statusCode || 500)).json({
+
+      return res.status(statusCode).json({
         success: false,
         uploaded: false,
-        serverConfirmed: false,
         stage: uploadStage,
-        code: error?.code || 'CUSTOMER_IDENTITY_UPLOAD_FAILED',
-        message: error?.message || '後端未能完成照片上傳，請稍後再試。',
+        code,
+        message,
       });
     }
   }
