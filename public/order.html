@@ -20007,7 +20007,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 
 <div class="ubee-identity-upload-area" id="ubeeIdentityUploadArea">
-<div class="ubee-identity-upload-row">
+<div class="ubee-identity-upload-row" data-identity-row="idFront">
 <div><strong>身分證正面</strong><span id="ubeeIdentityIdFrontState">尚未上傳</span></div>
 <div class="ubee-identity-upload-actions">
 <label class="ubee-identity-upload-button">拍攝
@@ -20017,8 +20017,12 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <input accept="image/*" data-identity-upload="idFront" data-identity-source="library" type="file"/>
 </label>
 </div>
+<div class="ubee-identity-upload-preview" id="ubeeIdentityIdFrontPreview" hidden>
+<img alt="身分證正面預覽" id="ubeeIdentityIdFrontPreviewImage"/>
+<div><strong>✓ 已上傳成功</strong><span>請確認照片清楚、完整且沒有被裁切。</span></div>
 </div>
-<div class="ubee-identity-upload-row">
+</div>
+<div class="ubee-identity-upload-row" data-identity-row="idBack">
 <div><strong>身分證反面</strong><span id="ubeeIdentityIdBackState">尚未上傳</span></div>
 <div class="ubee-identity-upload-actions">
 <label class="ubee-identity-upload-button">拍攝
@@ -20028,12 +20032,25 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <input accept="image/*" data-identity-upload="idBack" data-identity-source="library" type="file"/>
 </label>
 </div>
+<div class="ubee-identity-upload-preview" id="ubeeIdentityIdBackPreview" hidden>
+<img alt="身分證反面預覽" id="ubeeIdentityIdBackPreviewImage"/>
+<div><strong>✓ 已上傳成功</strong><span>請確認照片清楚、完整且沒有被裁切。</span></div>
 </div>
-<div class="ubee-identity-upload-row">
+</div>
+<div class="ubee-identity-upload-row" data-identity-row="selfie">
 <div><strong>本人自拍</strong><span id="ubeeIdentitySelfieState">尚未上傳</span></div>
+<div class="ubee-identity-upload-actions">
 <label class="ubee-identity-upload-button">開啟前鏡頭自拍
 <input accept="image/*" capture="user" data-identity-upload="selfie" data-identity-source="selfie" type="file"/>
 </label>
+<label class="ubee-identity-upload-button secondary">從相簿選擇
+<input accept="image/*" data-identity-upload="selfie" data-identity-source="library" type="file"/>
+</label>
+</div>
+<div class="ubee-identity-upload-preview selfie" id="ubeeIdentitySelfiePreview" hidden>
+<img alt="本人自拍預覽" id="ubeeIdentitySelfiePreviewImage"/>
+<div><strong>✓ 已上傳成功</strong><span>請確認是本人正面、五官清楚且沒有遮擋。</span></div>
+</div>
 </div>
 
 <label class="ubee-identity-consent">
@@ -21070,7 +21087,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260811-5';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21925,7 +21942,21 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 #productionOrderFlow .ubee-identity-upload-row strong{display:block;color:#111;font-size:14px;font-weight:1000;}
 #productionOrderFlow .ubee-identity-upload-row span{display:block;margin-top:4px;color:#858a90;font-size:11px;font-weight:850;}
 #productionOrderFlow .ubee-identity-upload-row span.is-uploaded{color:#15803d;}
-#productionOrderFlow .ubee-identity-upload-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:190px;}
+#productionOrderFlow .ubee-identity-upload-row span.is-uploading{color:#9a6700;}
+#productionOrderFlow .ubee-identity-upload-row span.is-upload-error{color:#b42318;}
+#productionOrderFlow .ubee-identity-upload-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:210px;}
+#productionOrderFlow .ubee-identity-upload-preview{
+  grid-column:1/-1;display:grid;grid-template-columns:112px minmax(0,1fr);align-items:center;gap:12px;
+  margin:2px 0 2px;padding:10px;border:1px solid #d9eadf;background:#f7fcf8;
+}
+#productionOrderFlow .ubee-identity-upload-preview[hidden]{display:none!important;}
+#productionOrderFlow .ubee-identity-upload-preview img{
+  width:112px;height:72px;display:block;object-fit:contain;border:1px solid #d8dde1;background:#eef1f3;
+}
+#productionOrderFlow .ubee-identity-upload-preview.selfie img{width:82px;height:82px;object-fit:cover;}
+#productionOrderFlow .ubee-identity-upload-preview>div{min-width:0;}
+#productionOrderFlow .ubee-identity-upload-preview>div>strong{display:block;color:#15803d;font-size:13px;font-weight:1000;}
+#productionOrderFlow .ubee-identity-upload-preview>div>span{display:block;margin-top:4px;color:#687079;font-size:11px;font-weight:800;line-height:1.55;}
 #productionOrderFlow .ubee-identity-upload-button{
   position:relative;min-height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border:1px solid #d8dadd;
   background:#f7f8f9;color:#111;font-size:12px;font-weight:1000;cursor:pointer;white-space:nowrap;overflow:hidden;
@@ -21956,7 +21987,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.08.11.4';
+  const APP_VERSION = '2026.08.11.5';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -22294,21 +22325,98 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     return source && typeof source === 'object' ? source : {};
   }
 
+  const identityUploadInFlight = new Set();
+  const identityPreviewObjectUrls = new Map();
+  let identitySubmitInFlight = false;
+
+  const identityPreviewMap = Object.freeze({
+    idFront:{wrap:'ubeeIdentityIdFrontPreview',image:'ubeeIdentityIdFrontPreviewImage',state:'ubeeIdentityIdFrontState'},
+    idBack:{wrap:'ubeeIdentityIdBackPreview',image:'ubeeIdentityIdBackPreviewImage',state:'ubeeIdentityIdBackState'},
+    selfie:{wrap:'ubeeIdentitySelfiePreview',image:'ubeeIdentitySelfiePreviewImage',state:'ubeeIdentitySelfieState'},
+  });
+
+  function setIdentityDocumentState(documentType,text,mode=''){
+    const config=identityPreviewMap[documentType];
+    if(!config) return;
+    const stateEl=document.getElementById(config.state);
+    if(!stateEl) return;
+    stateEl.textContent=text || '';
+    stateEl.classList.toggle('is-uploaded',mode==='uploaded');
+    stateEl.classList.toggle('is-uploading',mode==='uploading');
+    stateEl.classList.toggle('is-upload-error',mode==='error');
+  }
+
+  function revokeIdentityLocalPreview(documentType){
+    const url=identityPreviewObjectUrls.get(documentType);
+    if(url){
+      try{ URL.revokeObjectURL(url); }catch(_){ }
+      identityPreviewObjectUrls.delete(documentType);
+    }
+  }
+
+  function showIdentityPreview(documentType,src,{uploaded=false}={}){
+    const config=identityPreviewMap[documentType];
+    if(!config) return;
+    const wrap=document.getElementById(config.wrap);
+    const image=document.getElementById(config.image);
+    if(!wrap || !image) return;
+    if(!src){
+      image.removeAttribute('src');
+      wrap.hidden=true;
+      return;
+    }
+    image.src=src;
+    wrap.hidden=false;
+    if(uploaded) setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
+  }
+
+  function showIdentityLocalPreview(documentType,file){
+    if(!file) return;
+    revokeIdentityLocalPreview(documentType);
+    const url=URL.createObjectURL(file);
+    identityPreviewObjectUrls.set(documentType,url);
+    showIdentityPreview(documentType,url,{uploaded:false});
+  }
+
+  function showIdentityServerPreview(documentType,uploadedAtMs=0){
+    revokeIdentityLocalPreview(documentType);
+    const stamp=Number(uploadedAtMs || Date.now());
+    showIdentityPreview(
+      documentType,
+      `/api/customer-identity/document/${encodeURIComponent(documentType)}/preview?v=${encodeURIComponent(stamp)}`,
+      {uploaded:true}
+    );
+  }
+
+  function missingIdentitySubmissionItems(customer = getCurrentCustomerSafe()){
+    const documents=identityDocumentsFromCustomer(customer);
+    const missing=[];
+    if(documents?.idFront?.uploaded !== true) missing.push('身分證正面');
+    if(documents?.idBack?.uploaded !== true) missing.push('身分證反面');
+    if(documents?.selfie?.uploaded !== true) missing.push('本人自拍');
+    const nationalIdInput=document.getElementById('ubeeIdentityNationalId');
+    if(!isTaiwanNationalIdChecksumValidClient(nationalIdInput?.value || '')) missing.push('正確的國民身分證字號');
+    const consent=document.getElementById('ubeeIdentityConsent');
+    if(!consent?.checked) missing.push('資料處理同意勾選');
+    return missing;
+  }
+
   function syncIdentitySubmitAvailability(customer = getCurrentCustomerSafe()){
     const identity = customer?.identityVerification || {};
-    const documents = identityDocumentsFromCustomer(customer);
     const verified = safeText(identity.status) === 'verified';
-    const consent = document.getElementById('ubeeIdentityConsent');
-    const nationalIdInput = document.getElementById('ubeeIdentityNationalId');
     const submitButton = document.getElementById('ubeeIdentitySubmitButton');
-    const allUploaded =
-      documents?.idFront?.uploaded === true &&
-      documents?.idBack?.uploaded === true &&
-      documents?.selfie?.uploaded === true;
-    const nationalIdValid = isTaiwanNationalIdChecksumValidClient(nationalIdInput?.value || '');
+    const uploading = identityUploadInFlight.size > 0;
     if(submitButton){
       submitButton.hidden = verified;
-      submitButton.disabled = verified || !allUploaded || !consent?.checked || !nationalIdValid;
+      // V3.2：資料不完整時仍可按，按下後明確提示缺少項目；只有上傳/送出進行中才暫時停用。
+      submitButton.disabled = verified || uploading || identitySubmitInFlight;
+      submitButton.textContent = uploading
+        ? '等待照片上傳完成…'
+        : identitySubmitInFlight
+          ? '正在自動認證…'
+          : (safeText(identity.status) === 'rejected' || safeText(identity.status) === 'pending')
+            ? '重新執行自動認證'
+            : '立即自動認證';
     }
   }
 
@@ -22371,11 +22479,22 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     ];
 
     stateMap.forEach(([key,id]) => {
-      const el = document.getElementById(id);
       const uploaded = documents?.[key]?.uploaded === true;
-      if(el){
-        el.textContent = uploaded ? '已安全上傳' : '尚未上傳';
-        el.classList.toggle('is-uploaded',uploaded);
+      if(identityUploadInFlight.has(key)){
+        setIdentityDocumentState(key,'正在上傳…','uploading');
+        return;
+      }
+      if(uploaded){
+        setIdentityDocumentState(key,'✓ 已上傳成功','uploaded');
+        const localUrl=identityPreviewObjectUrls.get(key);
+        if(localUrl){
+          showIdentityPreview(key,localUrl,{uploaded:true});
+        }else{
+          showIdentityServerPreview(key,documents?.[key]?.uploadedAtMs || 0);
+        }
+      }else{
+        setIdentityDocumentState(key,'尚未上傳','');
+        if(!identityPreviewObjectUrls.has(key)) showIdentityPreview(key,'');
       }
     });
 
@@ -22395,12 +22514,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     if(nationalIdInput){
       nationalIdInput.disabled = verified;
       if(verified) nationalIdInput.value = '';
-    }
-
-    if(submitButton){
-      submitButton.textContent = rejected || legacyPending
-        ? '重新執行自動認證'
-        : '立即自動認證';
     }
 
     if(verified){
@@ -22457,16 +22570,27 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   async function uploadCustomerIdentityDocument(documentType,file){
     if(!file) return false;
+    const sourceLabel = documentType === 'selfie' ? '本人自拍' : (documentType === 'idFront' ? '身分證正面' : '身分證反面');
+
+    showIdentityLocalPreview(documentType,file);
+
     if(file.size > 12 * 1024 * 1024){
+      setIdentityDocumentState(documentType,'照片超過 12 MB','error');
       setIdentityUiStatus('單張照片不可超過 12 MB。請降低相機解析度或改從相簿選擇較小的照片。','error');
+      syncIdentitySubmitAvailability();
       return false;
     }
     if(file.size < 20 * 1024){
+      setIdentityDocumentState(documentType,'照片檔案過小','error');
       setIdentityUiStatus('照片檔案過小，請重新拍攝清楚且完整的照片。','error');
+      syncIdentitySubmitAvailability();
       return false;
     }
 
-    const sourceLabel = documentType === 'selfie' ? '本人自拍' : (documentType === 'idFront' ? '身分證正面' : '身分證反面');
+    identityUploadInFlight.add(documentType);
+    setIdentityDocumentState(documentType,'正在上傳…','uploading');
+    syncIdentitySubmitAvailability();
+
     const sizeMb = (file.size / 1024 / 1024).toFixed(1);
     setIdentityUiStatus(`${sourceLabel}正在安全上傳…（${sizeMb} MB）`,'pending');
 
@@ -22489,11 +22613,20 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
         throw new Error(data.message || '照片上傳失敗。');
       }
 
+      identityUploadInFlight.delete(documentType);
+      setIdentityDocumentState(documentType,'✓ 已上傳成功','uploaded');
       await refreshCustomerIdentity();
-      setIdentityUiStatus(data.message || '照片已安全上傳。','success');
+      const updatedCustomer=getCurrentCustomerSafe();
+      const uploadedAtMs=updatedCustomer?.identityVerification?.documents?.[documentType]?.uploadedAtMs || Date.now();
+      showIdentityServerPreview(documentType,uploadedAtMs);
+      setIdentityUiStatus(`${sourceLabel}已上傳成功，請確認上方照片預覽。`,'success');
+      syncIdentitySubmitAvailability(updatedCustomer);
       return true;
     }catch(error){
+      identityUploadInFlight.delete(documentType);
+      setIdentityDocumentState(documentType,'上傳失敗，請重試','error');
       setIdentityUiStatus(error?.message || '照片上傳失敗，請稍後再試。','error');
+      syncIdentitySubmitAvailability();
       return false;
     }
   }
@@ -22501,21 +22634,22 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   async function submitCustomerIdentity(){
     const consent = document.getElementById('ubeeIdentityConsent');
     const nationalIdInput = document.getElementById('ubeeIdentityNationalId');
-    const button = document.getElementById('ubeeIdentitySubmitButton');
     const nationalId = normalizeTaiwanNationalIdClient(nationalIdInput?.value || '');
 
-    if(!isTaiwanNationalIdChecksumValidClient(nationalId)){
-      setIdentityUiStatus('請輸入正確的台灣國民身分證字號。','error');
-      nationalIdInput?.focus();
+    if(identityUploadInFlight.size){
+      setIdentityUiStatus('照片仍在上傳中，請等三張都顯示「✓ 已上傳成功」後再送出。','pending');
       return false;
     }
 
-    if(!consent?.checked){
-      setIdentityUiStatus('請先勾選身分認證資料蒐集與自動檢查說明。','error');
+    const missing=missingIdentitySubmissionItems();
+    if(missing.length){
+      setIdentityUiStatus(`還缺少：${missing.join('、')}。完成後即可送出自動認證。`,'error');
+      if(missing.includes('正確的國民身分證字號')) nationalIdInput?.focus();
       return false;
     }
 
-    if(button) button.disabled = true;
+    identitySubmitInFlight = true;
+    syncIdentitySubmitAvailability();
     setIdentityUiStatus('正在自動檢查身分資料…','pending');
 
     try{
@@ -22534,8 +22668,10 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       // 422 代表後端已完成自動判定但未通過；仍要刷新狀態顯示退回原因。
       if(response.status === 422){
         if(nationalIdInput) nationalIdInput.value = '';
+        identitySubmitInFlight = false;
         await refreshCustomerIdentity();
         setIdentityUiStatus(data.message || '身分資料自動檢查未通過。','error');
+        syncIdentitySubmitAvailability();
         return false;
       }
 
@@ -22544,10 +22680,13 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       }
 
       if(nationalIdInput) nationalIdInput.value = '';
+      identitySubmitInFlight = false;
       await refreshCustomerIdentity();
       setIdentityUiStatus(data.message || '身分認證已自動完成。','success');
+      syncIdentitySubmitAvailability();
       return true;
     }catch(error){
+      identitySubmitInFlight = false;
       setIdentityUiStatus(error?.message || '身分資料自動檢查失敗，請稍後再試。','error');
       syncIdentitySubmitAvailability();
       return false;
@@ -22946,7 +23085,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }
 
     if(event.target?.id === 'ubeeIdentityConsent'){
-      renderIdentityPanel();
+      syncIdentitySubmitAvailability();
     }
   },true);
 
