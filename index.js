@@ -15153,6 +15153,50 @@ async function getRiderApplicationDocumentById(riderId) {
   return null;
 }
 
+// ============================================================
+// 正式小U證件續期 / 補件維護工具｜2026-08-13
+// - 已建立 ridersV2 的小U仍可被要求補件
+// - 補件期間保留登入，但以 RESTRICTED 暫停新任務資格
+// - 最終複審通過後恢復補件前生命週期，不重建或重置原有入職資料
+// ============================================================
+async function getOfficialRiderDocumentForApplication(
+  application = {},
+  fallbackId = ''
+) {
+  const phone = normalizePhone(
+    application.phone ||
+    application.riderId ||
+    application.applicationId ||
+    fallbackId ||
+    ''
+  );
+
+  if (!/^09\d{8}$/.test(phone)) return null;
+
+  const doc = await db
+    .collection(RIDER_V2_COLLECTIONS.riders)
+    .doc(phone)
+    .get();
+
+  return doc.exists ? doc : null;
+}
+
+function getRiderStatusFromLifecycle(lifecycle, fallback = 'approved') {
+  const value = String(lifecycle || '').trim().toUpperCase();
+  const map = {
+    [RIDER_V4_LIFECYCLE.APPLICANT]: 'applicant',
+    [RIDER_V4_LIFECYCLE.UNDER_REVIEW]: 'under_review',
+    [RIDER_V4_LIFECYCLE.TRAINING]: 'training',
+    [RIDER_V4_LIFECYCLE.ACTIVE]: 'active',
+    [RIDER_V4_LIFECYCLE.RETRAINING]: 'retraining',
+    [RIDER_V4_LIFECYCLE.RESTRICTED]: 'restricted',
+    [RIDER_V4_LIFECYCLE.SUSPENDED]: 'suspended',
+    [RIDER_V4_LIFECYCLE.BANNED]: 'banned',
+    [RIDER_V4_LIFECYCLE.REJECTED]: 'rejected',
+  };
+  return map[value] || String(fallback || 'approved').trim().toLowerCase();
+}
+
 async function createRiderDocumentReviewSignedUrl(document = {}) {
   const storagePath = String(document.storagePath || '').trim();
   const storageBucket = String(
@@ -15350,6 +15394,24 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
     supplementSubmittedAtMs: Number(application.supplementSubmittedAtMs || 0),
     supplementReason: cleanText(application.supplementReason || '', 1000),
     rejectionReason: cleanText(application.rejectionReason || '', 1000),
+    credentialMaintenanceActive:
+      application.credentialMaintenanceActive === true,
+    credentialMaintenancePreviousLifecycleStatus: cleanText(
+      application.credentialMaintenancePreviousLifecycleStatus || '',
+      40
+    ),
+    credentialMaintenancePreviousStatus: cleanText(
+      application.credentialMaintenancePreviousStatus || '',
+      40
+    ),
+    credentialMaintenancePreviousCanAcceptOrders:
+      application.credentialMaintenancePreviousCanAcceptOrders === true,
+    credentialMaintenanceRequestedAtMs: Number(
+      application.credentialMaintenanceRequestedAtMs || 0
+    ),
+    credentialMaintenanceCompletedAtMs: Number(
+      application.credentialMaintenanceCompletedAtMs || 0
+    ),
     internalReviewNote: cleanText(application.internalReviewNote || '', 2000),
     documentSummary: {
       totalCount: presentation.documentSummary.totalCount,
@@ -15532,6 +15594,10 @@ function buildRiderApplicationNotificationContent(type, reason = '') {
     approved: {
       title: '你的小U申請已通過',
       body: '身分驗證、必要駕駛資格與車輛安全資料均已完成確認。下一步請完成數位入職。',
+    },
+    credential_approved: {
+      title: '小U證件複審已完成',
+      body: '你補交的資格文件已完成確認。若原本具備接單資格，系統已恢復資格；請重新登入或重新整理 UBee Driver 查看最新狀態。',
     },
     rejected: {
       title: '小U申請未通過',
@@ -16210,10 +16276,10 @@ app.post(
       }
 
       if (action === 'request_supplement') {
-        if (['training', 'approved', 'active'].includes(status)) {
+        if (status === 'rejected') {
           return res.status(409).json({
             success: false,
-            message: '此申請已通過審核，不能要求補件。',
+            message: '此申請已拒絕，請先重新開啟申請。',
           });
         }
 
@@ -16221,12 +16287,36 @@ app.post(
           req.body?.documents && typeof req.body.documents === 'object'
             ? req.body.documents
             : {};
+
+        const officialRiderDoc =
+          await getOfficialRiderDocumentForApplication(
+            application,
+            req.params.riderId
+          );
+        const officialRider = officialRiderDoc
+          ? officialRiderDoc.data() || {}
+          : null;
+        const officialLifecycle = officialRider
+          ? getRiderV4LifecycleStatus(officialRider)
+          : '';
+        const wasMaintenanceActive =
+          application.credentialMaintenanceActive === true;
+        const maintenanceActive =
+          wasMaintenanceActive || Boolean(officialRiderDoc);
+        const blockedLifecycle = [
+          RIDER_V4_LIFECYCLE.SUSPENDED,
+          RIDER_V4_LIFECYCLE.BANNED,
+          RIDER_V4_LIFECYCLE.REJECTED,
+        ].includes(officialLifecycle);
+
         const update = {
           status: 'needs_supplement',
           reviewStatus: 'needs_supplement',
           documentReviewStatus: 'needs_supplement',
-          lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
-          approved: false,
+          lifecycleStatus: maintenanceActive
+            ? RIDER_V4_LIFECYCLE.RESTRICTED
+            : RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+          approved: maintenanceActive,
           canAcceptOrders: false,
           reviewStartedAt:
             application.reviewStartedAtMs
@@ -16237,10 +16327,32 @@ app.post(
           supplementRequestedAt:
             admin.firestore.FieldValue.serverTimestamp(),
           supplementRequestedAtMs: nowMs,
+          credentialMaintenanceActive: maintenanceActive,
+          credentialMaintenanceRequestedAt:
+            maintenanceActive
+              ? admin.firestore.FieldValue.serverTimestamp()
+              : application.credentialMaintenanceRequestedAt || null,
+          credentialMaintenanceRequestedAtMs:
+            maintenanceActive
+              ? nowMs
+              : Number(application.credentialMaintenanceRequestedAtMs || 0),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAtMs: nowMs,
         };
+
+        if (officialRider && !wasMaintenanceActive) {
+          update.credentialMaintenancePreviousLifecycleStatus =
+            officialLifecycle || RIDER_V4_LIFECYCLE.ACTIVE;
+          update.credentialMaintenancePreviousStatus = String(
+            officialRider.status ||
+            getRiderStatusFromLifecycle(officialLifecycle, 'approved')
+          ).trim();
+          update.credentialMaintenancePreviousCanAcceptOrders =
+            canRiderAcceptOrdersV4(officialRider);
+        }
+
         const reasonLines = [];
+        const normalizedRequestedKeys = [];
 
         for (const [rawKey, rawReason] of Object.entries(requestedDocuments)) {
           const documentKey = normalizeRiderDocumentKey(rawKey);
@@ -16257,6 +16369,7 @@ app.post(
           update[`documents.${documentKey}.reviewReason`] = documentReason;
           update[`documents.${documentKey}.reviewedBy`] = operator;
           update[`documents.${documentKey}.reviewedAtMs`] = nowMs;
+          normalizedRequestedKeys.push(documentKey);
           reasonLines.push(
             `${RIDER_DOCUMENT_LABELS[documentKey]}：${documentReason}`
           );
@@ -16271,6 +16384,59 @@ app.post(
 
         update.supplementReason = reasonLines.join('\n');
         await applicationDoc.ref.update(update);
+
+        if (officialRiderDoc) {
+          const riderUpdate = {
+            credentialReviewRequired: true,
+            credentialReviewReason: reasonLines.join('\n'),
+            credentialReviewRequestedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            credentialReviewRequestedAtMs: nowMs,
+            documentVerificationStatus: 'needs_supplement',
+            canAcceptOrders: false,
+            online: false,
+            acceptingOrders: false,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          };
+
+          if (!blockedLifecycle) {
+            riderUpdate.status = 'restricted';
+            riderUpdate.lifecycleStatus = RIDER_V4_LIFECYCLE.RESTRICTED;
+          }
+
+          await officialRiderDoc.ref.set(riderUpdate, { merge: true });
+          try {
+            const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
+            riders[officialRiderDoc.id] = {
+              id: refreshedOfficialRiderDoc.id,
+              ...(refreshedOfficialRiderDoc.data() || {}),
+            };
+          } catch (_) {}
+
+          try {
+            await db
+              .collection(RIDER_V2_COLLECTIONS.presence)
+              .doc(officialRiderDoc.id)
+              .set(
+                {
+                  online: false,
+                  acceptingOrders: false,
+                  dispatchPresenceState: 'PAUSED',
+                  credentialReviewRequired: true,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAtMs: nowMs,
+                },
+                { merge: true }
+              );
+          } catch (presenceError) {
+            console.warn(
+              '⚠️ 證件補件期間暫停小U presence 失敗：',
+              presenceError?.message || presenceError
+            );
+          }
+        }
+
         const freshDoc = await applicationDoc.ref.get();
         const freshApplication = freshDoc.data() || {};
 
@@ -16279,22 +16445,38 @@ app.post(
           type: 'request_supplement',
           operator,
           reason: reasonLines.join('\n'),
-          metadata: { documentKeys: Object.keys(requestedDocuments) },
+          metadata: {
+            documentKeys: normalizedRequestedKeys,
+            credentialMaintenance: maintenanceActive,
+          },
         });
         await notifyRiderApplicationReviewUpdate(
           freshApplication,
           'needs_supplement',
-          reasonLines.join('\n')
+          reasonLines.join('\n'),
+          {
+            documentKeys: normalizedRequestedKeys,
+            credentialMaintenance: maintenanceActive,
+          }
         );
 
         return res.json({
           success: true,
-          message: '補件要求已送出。',
+          message: maintenanceActive
+            ? '已要求正式小U補件；補件與複審完成前已暫停新任務資格。'
+            : '補件要求已送出。',
           application: await serializeRiderApplicationForAdmin(freshDoc),
         });
       }
 
       if (action === 'approve_all') {
+        if (application.credentialMaintenanceActive === true) {
+          return res.status(409).json({
+            success: false,
+            message: '此為正式小U證件複審，請使用「確認補件並恢復資格」，不要重新建立入職資料。',
+          });
+        }
+
         if (
           !confirmationName ||
           confirmationName !== String(application.name || '').trim()
@@ -16504,6 +16686,174 @@ app.post(
           });
         }
 
+        if (application.credentialMaintenanceActive === true) {
+          const officialRiderDoc =
+            await getOfficialRiderDocumentForApplication(
+              application,
+              req.params.riderId
+            );
+
+          if (!officialRiderDoc) {
+            return res.status(409).json({
+              success: false,
+              message: '找不到正式 ridersV2 小U資料，無法完成證件複審恢復。',
+            });
+          }
+
+          const officialRider = officialRiderDoc.data() || {};
+          const currentOfficialLifecycle =
+            getRiderV4LifecycleStatus(officialRider);
+
+          if (
+            [
+              RIDER_V4_LIFECYCLE.SUSPENDED,
+              RIDER_V4_LIFECYCLE.BANNED,
+              RIDER_V4_LIFECYCLE.REJECTED,
+            ].includes(currentOfficialLifecycle)
+          ) {
+            return res.status(409).json({
+              success: false,
+              message: '此小U目前另有停權、封鎖或拒絕狀態，證件通過後不可自動恢復接單，請先處理資格狀態。',
+            });
+          }
+
+          const previousLifecycleRaw = String(
+            application.credentialMaintenancePreviousLifecycleStatus ||
+            RIDER_V4_LIFECYCLE.ACTIVE
+          ).trim().toUpperCase();
+          const restoredLifecycle = Object.values(RIDER_V4_LIFECYCLE).includes(
+            previousLifecycleRaw
+          )
+            ? previousLifecycleRaw
+            : RIDER_V4_LIFECYCLE.ACTIVE;
+          const restoredStatus = getRiderStatusFromLifecycle(
+            restoredLifecycle,
+            application.credentialMaintenancePreviousStatus || 'approved'
+          );
+          const restoredCanAcceptOrders =
+            restoredLifecycle === RIDER_V4_LIFECYCLE.ACTIVE &&
+            application.credentialMaintenancePreviousCanAcceptOrders === true;
+
+          const officialUpdate = {
+            status: restoredStatus,
+            lifecycleStatus: restoredLifecycle,
+            canAcceptOrders: restoredCanAcceptOrders,
+            approved: true,
+            credentialReviewRequired: false,
+            credentialReviewReason: '',
+            credentialReviewCompletedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            credentialReviewCompletedAtMs: nowMs,
+            credentialReviewCompletedBy: operator,
+            pendingCompulsoryInsuranceExpiryDate: '',
+            documentVerificationStatus: 'approved',
+            identityVerified: true,
+            driverLicenseVerified:
+              isMotorizedRiderVehicle(application.vehicle)
+                ? true
+                : officialRider.driverLicenseVerified === true,
+            vehicleLicenseVerified:
+              isMotorizedRiderVehicle(application.vehicle)
+                ? true
+                : officialRider.vehicleLicenseVerified === true,
+            compulsoryInsuranceVerified:
+              isMotorizedRiderVehicle(application.vehicle)
+                ? true
+                : officialRider.compulsoryInsuranceVerified === true,
+            compulsoryInsuranceExpiryDate: String(
+              application.compulsoryInsuranceExpiryDate ||
+              officialRider.compulsoryInsuranceExpiryDate ||
+              ''
+            ).trim(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          };
+
+          await officialRiderDoc.ref.set(officialUpdate, { merge: true });
+          try {
+            const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
+            riders[officialRiderDoc.id] = {
+              id: refreshedOfficialRiderDoc.id,
+              ...(refreshedOfficialRiderDoc.data() || {}),
+            };
+          } catch (_) {}
+
+          await applicationDoc.ref.set(
+            {
+              status: restoredStatus,
+              reviewStatus: 'approved',
+              lifecycleStatus: restoredLifecycle,
+              canAcceptOrders: restoredCanAcceptOrders,
+              approved: true,
+              documentReviewStatus: 'approved',
+              supplementReason: '',
+              credentialMaintenanceActive: false,
+              credentialMaintenanceCompletedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
+              credentialMaintenanceCompletedAtMs: nowMs,
+              credentialMaintenanceCompletedBy: operator,
+              reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+              reviewedAtMs: nowMs,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: nowMs,
+            },
+            { merge: true }
+          );
+
+          try {
+            await db
+              .collection(RIDER_V2_COLLECTIONS.presence)
+              .doc(officialRiderDoc.id)
+              .set(
+                {
+                  online: false,
+                  acceptingOrders: false,
+                  dispatchPresenceState: 'PAUSED',
+                  credentialReviewRequired: false,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  updatedAtMs: nowMs,
+                },
+                { merge: true }
+              );
+          } catch (presenceError) {
+            console.warn(
+              '⚠️ 證件複審完成後更新小U presence 失敗：',
+              presenceError?.message || presenceError
+            );
+          }
+
+          const freshDoc = await applicationDoc.ref.get();
+          const freshApplication = freshDoc.data() || {};
+
+          await writeRiderApplicationReviewEvent({
+            application: freshApplication,
+            type: 'credential_maintenance_approved',
+            operator,
+            reason: reason || '正式小U補件複審已完成。',
+            metadata: {
+              restoredLifecycle,
+              restoredCanAcceptOrders,
+            },
+          });
+          await notifyRiderApplicationReviewUpdate(
+            freshApplication,
+            'credential_approved',
+            reason || '正式小U補件複審已完成。',
+            {
+              restoredLifecycle,
+              restoredCanAcceptOrders,
+            }
+          );
+
+          return res.json({
+            success: true,
+            message: restoredCanAcceptOrders
+              ? '補件複審已通過，小U接單資格已恢復；請重新上線接單。'
+              : '補件複審已通過，已恢復補件前的小U資格狀態。',
+            application: await serializeRiderApplicationForAdmin(freshDoc),
+          });
+        }
+
         const approvedRider = buildApprovedRiderV2(application, operator);
         await saveRiderV2(approvedRider, { mirrorLegacy: true });
         await applicationDoc.ref.set(
@@ -16666,6 +17016,9 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       req.body?.documents && typeof req.body.documents === 'object'
         ? req.body.documents
         : {};
+    const compulsoryInsuranceExpiryDate = String(
+      req.body?.compulsoryInsuranceExpiryDate || ''
+    ).trim();
 
     if (!/^09\d{8}$/.test(phone)) {
       return res.status(400).json({
@@ -16684,12 +17037,6 @@ app.post('/api/rider/application-supplement', async (req, res) => {
 
     const application = applicationDoc.data() || {};
     const applicationStatus = String(application.status || '').toLowerCase();
-    if (['training', 'approved', 'active'].includes(applicationStatus)) {
-      return res.status(409).json({
-        success: false,
-        message: '此申請已通過審核，不需要再補件。',
-      });
-    }
     if (applicationStatus === 'rejected') {
       return res.status(409).json({
         success: false,
@@ -16725,7 +17072,33 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       });
     }
 
+    const includesInsurance = Object.prototype.hasOwnProperty.call(
+      validation.documents,
+      'compulsoryInsurance'
+    );
+
+    if (includesInsurance) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(compulsoryInsuranceExpiryDate)) {
+        return res.status(400).json({
+          success: false,
+          message: '補交強制險時，必須填寫新的強制險到期日。',
+        });
+      }
+
+      const expiry = new Date(
+        `${compulsoryInsuranceExpiryDate}T23:59:59+08:00`
+      );
+      if (Number.isNaN(expiry.getTime()) || expiry.getTime() < Date.now()) {
+        return res.status(400).json({
+          success: false,
+          message: '新的強制險到期日必須是今天或未來日期。',
+        });
+      }
+    }
+
     const nowMs = Date.now();
+    const maintenanceActive =
+      application.credentialMaintenanceActive === true;
     const update = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAtMs: nowMs,
@@ -16734,6 +17107,14 @@ app.post('/api/rider/application-supplement', async (req, res) => {
       supplementSubmittedAtMs: nowMs,
       lastSupplementDocumentKeys: Object.keys(validation.documents),
     };
+
+    if (includesInsurance) {
+      update.compulsoryInsuranceExpiryDate =
+        compulsoryInsuranceExpiryDate;
+      update.compulsoryInsuranceExpiryUpdatedAt =
+        admin.firestore.FieldValue.serverTimestamp();
+      update.compulsoryInsuranceExpiryUpdatedAtMs = nowMs;
+    }
 
     for (const [documentKey, document] of Object.entries(
       validation.documents
@@ -16763,8 +17144,10 @@ app.post('/api/rider/application-supplement', async (req, res) => {
         documentReviewStatus: freshSummary.hasSupplementRequest
           ? 'needs_supplement'
           : 'pending',
-        lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
-        approved: false,
+        lifecycleStatus: maintenanceActive
+          ? RIDER_V4_LIFECYCLE.RESTRICTED
+          : RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+        approved: maintenanceActive,
         canAcceptOrders: false,
         supplementReason: freshSummary.documents
           .filter(
@@ -16783,17 +17166,65 @@ app.post('/api/rider/application-supplement', async (req, res) => {
     freshDoc = await applicationDoc.ref.get();
     freshApplication = freshDoc.data() || {};
 
+    if (maintenanceActive) {
+      const officialRiderDoc =
+        await getOfficialRiderDocumentForApplication(freshApplication, phone);
+      if (officialRiderDoc) {
+        await officialRiderDoc.ref.set(
+          {
+            status: 'restricted',
+            lifecycleStatus: RIDER_V4_LIFECYCLE.RESTRICTED,
+            canAcceptOrders: false,
+            online: false,
+            acceptingOrders: false,
+            credentialReviewRequired: true,
+            credentialReviewSubmittedAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            credentialReviewSubmittedAtMs: nowMs,
+            pendingCompulsoryInsuranceExpiryDate: includesInsurance
+              ? compulsoryInsuranceExpiryDate
+              : String(
+                  officialRiderDoc.data()?.pendingCompulsoryInsuranceExpiryDate ||
+                  ''
+                ).trim(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs,
+          },
+          { merge: true }
+        );
+        try {
+          const refreshedOfficialRiderDoc = await officialRiderDoc.ref.get();
+          riders[officialRiderDoc.id] = {
+            id: refreshedOfficialRiderDoc.id,
+            ...(refreshedOfficialRiderDoc.data() || {}),
+          };
+        } catch (_) {}
+      }
+    }
+
     await writeRiderApplicationReviewEvent({
       application: freshApplication,
       type: 'supplement_submitted',
       operator: 'applicant',
-      metadata: { documentKeys: Object.keys(validation.documents) },
+      metadata: {
+        documentKeys: Object.keys(validation.documents),
+        compulsoryInsuranceExpiryDate: includesInsurance
+          ? compulsoryInsuranceExpiryDate
+          : '',
+        credentialMaintenance: maintenanceActive,
+      },
     });
     await notifyRiderApplicationReviewUpdate(
       freshApplication,
       'supplement_submitted',
       '',
-      { documentKeys: Object.keys(validation.documents) }
+      {
+        documentKeys: Object.keys(validation.documents),
+        compulsoryInsuranceExpiryDate: includesInsurance
+          ? compulsoryInsuranceExpiryDate
+          : '',
+        credentialMaintenance: maintenanceActive,
+      }
     );
 
     try {
@@ -16806,8 +17237,11 @@ app.post('/api/rider/application-supplement', async (req, res) => {
             `申請編號：${freshApplication.riderId || phone}\n` +
             `補件項目：${Object.keys(validation.documents)
               .map(key => RIDER_DOCUMENT_LABELS[key])
-              .join('、')}\n\n` +
-            `請至小U申請審核管理頁重新審核：\n` +
+              .join('、')}\n` +
+            (includesInsurance
+              ? `新強制險到期日：${compulsoryInsuranceExpiryDate}\n`
+              : '') +
+            `\n請至小U申請審核管理頁重新審核：\n` +
             `${RIDER_REVIEW_ADMIN_URL}?riderId=${encodeURIComponent(
               freshApplication.riderId || phone
             )}`,
@@ -16819,7 +17253,12 @@ app.post('/api/rider/application-supplement', async (req, res) => {
 
     return res.json({
       success: true,
-      message: '補件已成功送出，請等待 UBee 重新審核。',
+      message: maintenanceActive
+        ? '補件已成功送出；複審完成前接單資格維持暫停。'
+        : '補件已成功送出，請等待 UBee 重新審核。',
+      compulsoryInsuranceExpiryDate: includesInsurance
+        ? compulsoryInsuranceExpiryDate
+        : String(freshApplication.compulsoryInsuranceExpiryDate || '').trim(),
       documents: serializeRiderApplicationDocumentsForClient(
         freshApplication
       ),
@@ -16869,6 +17308,11 @@ app.get('/api/rider/application-status', async (req, res) => {
         application,
         10
       );
+      const maintenanceActive =
+        application.credentialMaintenanceActive === true ||
+        rider.credentialReviewRequired === true;
+      const canSupplement = presentation.needsSupplement;
+      const maintenanceWaiting = maintenanceActive && !canSupplement;
 
       return res.json({
         success: true,
@@ -16879,13 +17323,23 @@ app.get('/api/rider/application-status', async (req, res) => {
         approved: rider.approved === true,
         reviewStatus:
           application.reviewStatus || rider.reviewStatus || rider.status || '',
-        status: rider.status || application.status || '',
+        status: maintenanceActive
+          ? application.status || rider.status || ''
+          : rider.status || application.status || '',
         lifecycleStatus,
         canAcceptOrders: canRiderAcceptOrdersV4(rider),
         riderLevel: rider.riderLevel || '',
         documentsComplete: application.documentsComplete === true,
         documentReviewStatus:
-          application.documentReviewStatus || 'approved',
+          application.documentReviewStatus ||
+          rider.documentVerificationStatus ||
+          'approved',
+        compulsoryInsuranceExpiryDate: String(
+          application.compulsoryInsuranceExpiryDate ||
+          rider.compulsoryInsuranceExpiryDate ||
+          ''
+        ).trim(),
+        credentialMaintenanceActive: maintenanceActive,
         documents: serializeRiderApplicationDocumentsForClient(application),
         documentSummary: {
           totalCount: presentation.documentSummary.totalCount,
@@ -16909,24 +17363,41 @@ app.get('/api/rider/application-status', async (req, res) => {
         submittedAtMs: Number(
           application.submittedAtMs || application.createdAtMs || 0
         ),
-        updatedAtMs: Number(
-          rider.updatedAtMs || application.updatedAtMs || 0
+        updatedAtMs: Math.max(
+          Number(rider.updatedAtMs || 0),
+          Number(application.updatedAtMs || 0)
         ),
-        canSupplement: false,
+        supplementRequestedAtMs: Number(
+          application.supplementRequestedAtMs || 0
+        ),
+        supplementSubmittedAtMs: Number(
+          application.supplementSubmittedAtMs || 0
+        ),
+        canSupplement,
         rejectionReason: application.rejectionReason || '',
         supplementReason: application.supplementReason || '',
-        nextAction:
-          lifecycleStatus === RIDER_V4_LIFECYCLE.TRAINING
-            ? 'LOGIN_ONBOARDING'
-            : lifecycleStatus === RIDER_V4_LIFECYCLE.ACTIVE
-              ? 'LOGIN_ACTIVE'
-              : 'CONTACT_SUPPORT',
-        message:
-          lifecycleStatus === RIDER_V4_LIFECYCLE.TRAINING
-            ? '審核已通過，請登入騎士端完成數位入職。'
-            : lifecycleStatus === RIDER_V4_LIFECYCLE.ACTIVE
-              ? '你的 UBee 小U資格已正式開通。'
-              : '你的新版 UBee 小U資格已建立。',
+        nextAction: canSupplement
+          ? 'SUPPLEMENT'
+          : maintenanceWaiting
+            ? 'WAIT_REVIEW'
+            : lifecycleStatus === RIDER_V4_LIFECYCLE.TRAINING
+              ? 'LOGIN_ONBOARDING'
+              : lifecycleStatus === RIDER_V4_LIFECYCLE.ACTIVE
+                ? 'LOGIN_ACTIVE'
+                : lifecycleStatus === RIDER_V4_LIFECYCLE.RESTRICTED
+                  ? 'WAIT_REVIEW'
+                  : 'CONTACT_SUPPORT',
+        message: canSupplement
+          ? '你的資格文件需要補件，請依各項說明重新上傳。補件與複審完成前暫停新任務資格。'
+          : maintenanceWaiting
+            ? '補件已送出，UBee 正在重新審核；完成前暫停新任務資格。'
+            : lifecycleStatus === RIDER_V4_LIFECYCLE.TRAINING
+              ? '審核已通過，請登入騎士端完成數位入職。'
+              : lifecycleStatus === RIDER_V4_LIFECYCLE.ACTIVE
+                ? '你的 UBee 小U資格已正式開通。'
+                : lifecycleStatus === RIDER_V4_LIFECYCLE.RESTRICTED
+                  ? '你的小U接單資格目前受限，請查看最新資格狀態。'
+                  : '你的新版 UBee 小U資格已建立。',
       });
     }
 
@@ -16967,6 +17438,11 @@ app.get('/api/rider/application-status', async (req, res) => {
         documentsComplete: application.documentsComplete === true,
         documentReviewStatus:
           application.documentReviewStatus || 'pending',
+        compulsoryInsuranceExpiryDate: String(
+          application.compulsoryInsuranceExpiryDate || ''
+        ).trim(),
+        credentialMaintenanceActive:
+          application.credentialMaintenanceActive === true,
         documents: serializeRiderApplicationDocumentsForClient(application),
         documentSummary: {
           totalCount: presentation.documentSummary.totalCount,
