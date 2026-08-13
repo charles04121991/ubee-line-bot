@@ -3,9 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee 店家平台 V3｜全台正式營運版</title>
+<title>UBee 店家平台 V4｜PWA 正式版</title>
+<link rel="manifest" href="/merchant-manifest.json?v=20260813-v4" />
+<link rel="apple-touch-icon" sizes="180x180" href="/ubee-merchant-icon-192.png?v=20260813-v4" />
+<meta name="theme-color" content="#facc15" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="UBee Merchant" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
@@ -1089,12 +1094,22 @@ button.secondary{background:#fff;color:#111;border:1px solid var(--line2)}
 <body>
 <div class="wrap">
 
-  <div class="login" id="loginBox">
+  <div class="login merchant-v4-login" id="loginBox">
+    <div class="merchant-v4-login-badge">UBee Merchant PWA</div>
     <h2>店家登入</h2>
-    <label id="merchantKeyLabel">申請合作時填寫的手機號碼</label>
-    <input id="merchantKey" type="tel" inputmode="tel" placeholder="例如：0912345678" />
-    <button id="loginBtn" type="button" onclick="loginMerchant()">進入派單中心</button>
-    <div class="notice">審核通過的店家，第一次使用時請輸入申請合作時填寫的手機號碼完成 LINE 綁定。</div>
+    <div class="small">不需要 LINE。使用申請合作時的手機號碼與店家密碼即可登入。</div>
+    <label>手機號碼</label>
+    <input id="merchantKey" type="tel" inputmode="tel" autocomplete="username" placeholder="例如：0912345678" />
+    <label>密碼</label>
+    <input id="merchantPassword" type="password" autocomplete="current-password" maxlength="72" placeholder="至少 8 個字元" />
+    <div id="merchantActivationFields" class="hidden">
+      <label>店家編號</label>
+      <input id="merchantActivationId" type="text" autocomplete="off" placeholder="第一次啟用舊店家帳號時填寫" />
+      <div class="notice">舊店家第一次改用 PWA，請輸入 UBee 提供的店家編號並設定新密碼；完成後以手機＋密碼登入即可。</div>
+    </div>
+    <button id="loginBtn" type="button" onclick="loginMerchant()">登入店家平台</button>
+    <button id="merchantActivationToggle" class="secondary" type="button" onclick="toggleMerchantActivationMode()">第一次使用？啟用店家帳號</button>
+    <div class="notice">登入成功後會保留 Session；之後從手機主畫面開啟即可直接進入店家平台。</div>
     <div class="error" id="errorBox"></div>
   </div>
 
@@ -1104,7 +1119,7 @@ button.secondary{background:#fff;color:#111;border:1px solid var(--line2)}
       <div class="brandBox">
         <div class="brandLogo">U</div>
         <div>
-          <div class="brandTitle">UBee 店家平台 V3</div>
+          <div class="brandTitle">UBee 店家平台 V4</div>
           <div class="brandSub">建立派單｜訂單處理｜配送追蹤｜帳款總覽</div>
         </div>
       </div>
@@ -1233,7 +1248,7 @@ button.secondary{background:#fff;color:#111;border:1px solid var(--line2)}
         </div>
 
         <input id="newDeliveryMode" type="hidden" value="ubee" />
-        <input id="newPaymentMethod" type="hidden" value="merchant_settlement" />
+        <input id="newPaymentMethod" type="hidden" value="rider_advance_cod" />
         <select id="newStopCount" class="hidden" onchange="renderExtraStopFields()">
           <option value="1">1</option><option value="2">2</option><option value="3">3</option>
           <option value="4">4</option><option value="5">5</option><option value="6">6</option>
@@ -1297,10 +1312,10 @@ button.secondary{background:#fff;color:#111;border:1px solid var(--line2)}
 
           <div id="extraStopsContentBox"></div>
 
-          <div class="merchant-advance-card">
+          <div class="merchant-advance-card merchant-cod-card">
             <div>
-              <strong>需要小U代墊？</strong>
-              <span>沒有代墊請維持 NT$0</span>
+              <strong>商品金額</strong>
+              <span>小U取貨時先支付這筆金額給店家；送達後向客人收「商品金額＋配送費」。沒有商品款請填 NT$0。</span>
             </div>
             <div class="merchant-money-input"><span>NT$</span><input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="0" /></div>
           </div>
@@ -3212,7 +3227,7 @@ window.addEventListener("load", async () => {
 
 <script id="ubee-merchant-v3-runtime">
 /* =========================================================
-   UBee 店家平台 V3｜全台正式營運版
+   UBee 店家平台 V4｜全台正式營運版
    - 所有訂單新增、狀態更新與取消改走後端 V3 API
    - 不再由瀏覽器直接寫入 orders
    - 8 秒同步訂單；帳款資料由 V3 settlements API 提供
@@ -3332,7 +3347,7 @@ function enterMerchantDashboardV3(merchant, initialOrders = []){
   }
 
   safeSetText("homeMerchantName", currentMerchant.merchantName || "UBee 合作店家");
-  safeSetText("homeMerchantStatus", "V3 全台配送工作台運作中");
+  safeSetText("homeMerchantStatus", "V4 店家 PWA 配送工作台運作中");
   safeSetText("createPickupMerchantName", currentMerchant.merchantName || "UBee 合作店家");
   safeSetText("createPickupMerchantAddress", currentMerchant.merchantAddress || "尚未設定店家取件地址");
 
@@ -3634,6 +3649,332 @@ merchantV3ApplyOrders = function(orders){
 };
 
 setTimeout(injectMerchantSupportButtons, 800);
+</script>
+
+
+<style id="ubee-merchant-v4-auth-style">
+.merchant-v4-login-badge{display:inline-flex;padding:7px 10px;border-radius:999px;background:#111;color:#facc15;font-size:11px;font-weight:1000;margin-bottom:10px}
+.merchant-v4-login .secondary{background:#fff;color:#111;border:1px solid var(--line2);box-shadow:none}
+.merchant-v4-login .small{margin-bottom:12px}.merchant-cod-card{background:#fffbea;border-color:rgba(250,204,21,.48)}
+.merchant-v4-cashflow{margin-top:10px;padding:12px;border-radius:16px;background:#111;color:#fff}.merchant-v4-cashflow div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px}.merchant-v4-cashflow b{color:#facc15}
+</style>
+<script id="ubee-merchant-v4-runtime">
+/* UBee Merchant PWA V4｜2026-08-13 */
+const MERCHANT_SESSION_TOKEN_KEY = "ubee_merchant_session_v1";
+let merchantActivationMode = false;
+
+function getMerchantSessionToken(){
+  return String(localStorage.getItem(MERCHANT_SESSION_TOKEN_KEY) || "").trim();
+}
+
+function setMerchantSessionToken(token){
+  const value = String(token || "").trim();
+  if(value) localStorage.setItem(MERCHANT_SESSION_TOKEN_KEY, value);
+  else localStorage.removeItem(MERCHANT_SESSION_TOKEN_KEY);
+}
+
+forceEnableLoginButton = function(){
+  const loginBtn = document.getElementById("loginBtn");
+  if(loginBtn && !merchantAuthed){
+    loginBtn.disabled = false;
+    loginBtn.removeAttribute("disabled");
+    loginBtn.style.pointerEvents = "auto";
+    loginBtn.textContent = merchantActivationMode ? "啟用並登入" : "登入店家平台";
+  }
+};
+
+function toggleMerchantActivationMode(force){
+  merchantActivationMode = typeof force === "boolean" ? force : !merchantActivationMode;
+  document.getElementById("merchantActivationFields")?.classList.toggle("hidden", !merchantActivationMode);
+  const btn = document.getElementById("merchantActivationToggle");
+  const loginBtn = document.getElementById("loginBtn");
+  if(btn) btn.textContent = merchantActivationMode ? "返回一般登入" : "第一次使用？啟用店家帳號";
+  if(loginBtn) loginBtn.textContent = merchantActivationMode ? "啟用並登入" : "登入店家平台";
+}
+
+// 舊 load callback 仍會呼叫這個名稱；V4 改為檢查本機 Session，不再初始化 LIFF。
+initMerchantLiff = async function(){
+  merchantLineUserId = getMerchantSessionToken() ? "PWA_SESSION" : "";
+};
+
+merchantV3ApiHeaders = function(){
+  const headers = {"Content-Type":"application/json"};
+  const token = getMerchantSessionToken();
+  if(token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+};
+
+merchantV3Fetch = async function(path, options = {}){
+  const config = {...options};
+  config.headers = {...merchantV3ApiHeaders(), ...(options.headers || {})};
+  const res = await fetch(path, config);
+  const data = await res.json().catch(() => ({}));
+
+  if(res.status === 401){
+    setMerchantSessionToken("");
+    merchantLineUserId = "";
+    merchantAuthed = false;
+  }
+
+  if(!res.ok || data.success === false || data.ok === false){
+    const error = new Error(data.message || data.error || `店家平台連線失敗（${res.status}）`);
+    error.code = data.code || "MERCHANT_V4_REQUEST_FAILED";
+    error.status = res.status;
+    throw error;
+  }
+  return data;
+};
+
+loadMerchantProfile = async function(){
+  if(!getMerchantSessionToken()){
+    document.getElementById("loginBox")?.classList.remove("hidden");
+    document.getElementById("dashboard")?.classList.add("hidden");
+    forceEnableLoginButton("登入店家平台");
+    return;
+  }
+
+  try{
+    const data = await merchantV3Fetch(`/api/merchant/v3/bootstrap?limit=200&t=${Date.now()}`, {cache:"no-store"});
+    merchantLineUserId = "PWA_SESSION";
+    enterMerchantDashboardV3(data.merchant, data.orders || []);
+  }catch(err){
+    console.error("店家 V4 Session bootstrap 失敗:", err);
+    setMerchantSessionToken("");
+    merchantLineUserId = "";
+    document.getElementById("loginBox")?.classList.remove("hidden");
+    document.getElementById("dashboard")?.classList.add("hidden");
+    showError(err.message || "登入狀態已失效，請重新登入。");
+    forceEnableLoginButton("登入店家平台");
+  }
+};
+
+loginMerchant = async function(){
+  hideError();
+  const phone = normalizePhone(document.getElementById("merchantKey")?.value || "");
+  const password = String(document.getElementById("merchantPassword")?.value || "");
+  const merchantId = String(document.getElementById("merchantActivationId")?.value || "").trim();
+  const btn = document.getElementById("loginBtn");
+
+  if(!/^09\d{8}$/.test(phone)){
+    showError("請輸入正確的手機號碼，例如：0912345678。");
+    return;
+  }
+  if(password.length < 8){
+    showError("密碼至少需要 8 個字元。");
+    return;
+  }
+  if(merchantActivationMode && !merchantId){
+    showError("第一次啟用請輸入 UBee 提供的店家編號。");
+    return;
+  }
+
+  if(btn){ btn.disabled = true; btn.textContent = merchantActivationMode ? "帳號啟用中..." : "登入中..."; }
+  try{
+    const path = merchantActivationMode ? "/api/merchant/auth/activate" : "/api/merchant/auth/login";
+    const res = await fetch(path, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({phone,password,merchantId})
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok || !data.ok || !data.token) throw new Error(data.message || "店家登入失敗。");
+
+    setMerchantSessionToken(data.token);
+    merchantLineUserId = "PWA_SESSION";
+    merchantActivationMode = false;
+    document.getElementById("merchantActivationFields")?.classList.add("hidden");
+    const bootstrap = await merchantV3Fetch(`/api/merchant/v3/bootstrap?limit=200&t=${Date.now()}`, {cache:"no-store"});
+    enterMerchantDashboardV3(bootstrap.merchant, bootstrap.orders || []);
+  }catch(err){
+    console.error("店家 V4 登入失敗:", err);
+    showError(err.message || "店家登入失敗，請稍後再試。");
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = merchantActivationMode ? "啟用並登入" : "登入店家平台"; }
+  }
+};
+
+const merchantV4LegacyLogout = logoutMerchant;
+logoutMerchant = async function(){
+  const token = getMerchantSessionToken();
+  if(token){
+    fetch("/api/merchant/auth/logout", {method:"POST", headers:{Authorization:`Bearer ${token}`}}).catch(()=>{});
+  }
+  setMerchantSessionToken("");
+  merchantLineUserId = "";
+  merchantV4LegacyLogout();
+  forceEnableLoginButton("登入店家平台");
+};
+
+refreshMerchantV3Orders = async function({silent=false} = {}){
+  if(!merchantAuthed || !getMerchantSessionToken()) return;
+  try{
+    const data = await merchantV3Fetch(`/api/merchant/v3/orders?limit=200&t=${Date.now()}`, {cache:"no-store"});
+    merchantV3ApplyOrders(data.orders || []);
+    if(currentView === "overview") await loadMerchantV3Settlements();
+  }catch(err){
+    console.error("店家 V4 訂單同步失敗:", err);
+    if(!silent){
+      const box = document.getElementById("ordersBox");
+      if(box) box.insertAdjacentHTML("afterbegin", `<div class="merchant-v3-api-error">${escapeHtml(err.message || "訂單同步失敗")}</div>`);
+    }
+  }
+};
+
+loadMerchantV3Settlements = async function(){
+  if(!merchantAuthed || !getMerchantSessionToken()) return;
+  const data = await merchantV3Fetch(`/api/merchant/v3/settlements?limit=300&t=${Date.now()}`, {cache:"no-store"});
+  merchantV3Settlements = data.settlements || [];
+  renderMerchantV3Settlements(data.summary || {});
+};
+
+calculateMerchantDeliveryFee = function(distanceKm, stopCount = 1){
+  const km = Number(distanceKm);
+  const stops = Math.max(1, Number(stopCount || 1));
+  if(!Number.isFinite(km) || km <= 0) throw new Error("距離結果異常");
+
+  let baseFee = 150;
+  if(km <= 2) baseFee = 60;
+  else if(km <= 3) baseFee = 70;
+  else if(km <= 4) baseFee = 80;
+  else if(km < 5) baseFee = 90;
+  else if(km <= 5) baseFee = 105;
+  else if(km <= 6) baseFee = 120;
+  else if(km <= 7) baseFee = 135;
+  else if(km <= 8) baseFee = 150;
+  else baseFee = 150 + Math.ceil(km - 8) * 15;
+
+  return baseFee + Math.max(0, stops - 1) * EXTRA_STOP_FEE;
+};
+
+prepareMerchantOrderReview = async function(){
+  clearCreateOrderMsg();
+  const step1Error = validateMerchantCreateStep1();
+  if(step1Error){ showCreateOrderMsg("err", step1Error); showMerchantCreateStep(1); return false; }
+  const step2Error = validateMerchantCreateStep2();
+  if(step2Error){ showCreateOrderMsg("err", step2Error); return false; }
+  if(!currentMerchant?.merchantAddress || !currentMerchant?.merchantPhone){
+    showCreateOrderMsg("err", "店家電話或取件地址未設定，請先確認店家資料。"); return false;
+  }
+
+  const btn = document.getElementById("merchantReviewBtn");
+  if(btn){ btn.disabled = true; btn.textContent = "計算配送費用中..."; }
+  try{
+    const stops = collectDeliveryStops();
+    const estimateResult = await estimateMultiStopRoute(currentMerchant.merchantAddress, stops);
+    const distanceKm = Math.round(estimateResult.totalKm * 100) / 100;
+    const deliveryFee = calculateMerchantDeliveryFee(distanceKm, stops.length);
+    const goodsAmount = Math.max(0, Math.round(Number(document.getElementById("newAdvanceAmount")?.value || 0)));
+    const customerTotal = goodsAmount + deliveryFee;
+
+    merchantPendingEstimate = {
+      signature:getMerchantOrderInputSignature(), stops, stopCount:stops.length,
+      advanceAmount:goodsAmount, goodsAmount, distanceKm,
+      distanceText:estimateResult.distanceText, routeSegments:estimateResult.routeSegments, deliveryFee
+    };
+
+    const review = document.getElementById("merchantOrderReview");
+    if(review){
+      review.innerHTML = `
+        <div class="merchant-review-head"><small>確認配送</small><strong>${escapeHtml(currentMerchant.merchantName || "UBee 合作店家")}</strong></div>
+        <div class="merchant-review-route">
+          <div class="merchant-review-stop"><span class="merchant-review-dot"></span><div><b>取件</b><span>${escapeHtml(currentMerchant.merchantAddress || "")}</span></div></div>
+          ${stops.map(stop => `<div class="merchant-review-stop"><span class="merchant-review-dot drop"></span><div><b>第 ${escapeHtml(stop.index)} 點・${escapeHtml(stop.customerName || "收件人")}</b><span>${escapeHtml(stop.dropoffAddress)}<br>${escapeHtml(stop.itemName || "")}</span></div></div>`).join("")}
+        </div>
+        <div class="merchant-review-summary">
+          <div class="merchant-review-row"><span>配送距離</span><strong>${escapeHtml(estimateResult.distanceText)}</strong></div>
+          <div class="merchant-review-row"><span>商品金額</span><strong>NT$${goodsAmount.toLocaleString("zh-TW")}</strong></div>
+          <div class="merchant-review-row"><span>配送費</span><strong>NT$${deliveryFee.toLocaleString("zh-TW")}</strong></div>
+          <div class="merchant-review-row total"><span>客戶應付</span><strong>NT$${customerTotal.toLocaleString("zh-TW")}</strong></div>
+          <div class="merchant-v4-cashflow">
+            <div><span>小U取貨時支付店家</span><b>NT$${goodsAmount.toLocaleString("zh-TW")}</b></div>
+            <div><span>小U送達向客戶收取</span><b>NT$${customerTotal.toLocaleString("zh-TW")}</b></div>
+            <div><span>小U本單配送收入</span><b>NT$${deliveryFee.toLocaleString("zh-TW")}</b></div>
+          </div>
+        </div>`;
+    }
+    document.getElementById("newPaymentMethod").value = "rider_advance_cod";
+    showMerchantCreateStep(3);
+    return true;
+  }catch(err){
+    console.error("店家 V4 配送距離計算失敗:", err);
+    merchantPendingEstimate = null;
+    showCreateOrderMsg("err", "距離計算失敗，請確認所有送達地址是否完整，或稍後再試。");
+    return false;
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = "查看配送費用"; }
+  }
+};
+
+createMerchantOrder = async function(){
+  clearCreateOrderMsg();
+  if(isCreatingMerchantOrder) return;
+  if(!currentMerchant || !merchantAuthed){ showCreateOrderMsg("err", "店家資料尚未完成登入，請重新登入店家平台。"); return; }
+
+  const stops = collectDeliveryStops();
+  const validateMsg = validateDeliveryStops(stops);
+  if(validateMsg){ showCreateOrderMsg("err", validateMsg); return; }
+  const goodsAmount = Math.max(0, Math.round(Number(document.getElementById("newAdvanceAmount")?.value || 0)));
+
+  if(!merchantPendingEstimate || merchantPendingEstimate.signature !== getMerchantOrderInputSignature()){
+    const ok = await prepareMerchantOrderReview();
+    if(!ok) return;
+  }
+
+  const btn = document.getElementById("createOrderBtn");
+  isCreatingMerchantOrder = true;
+  if(btn){ btn.disabled = true; btn.textContent = "V4 建立配送中..."; }
+  try{
+    const data = await merchantV3Fetch("/api/merchant/v3/orders", {
+      method:"POST",
+      body:JSON.stringify({
+        deliveryMode:"ubee",
+        paymentMethod:"rider_advance_cod",
+        orderSource:"MERCHANT_DIRECT",
+        advanceAmount:goodsAmount,
+        goodsAmount,
+        deliveryStops:stops,
+        note:getInputValue("newNote")
+      })
+    });
+    const order = data.order || {};
+    const fee = Number(order.deliveryFee || order.totalFee || 0);
+    const collect = Number(order.customerPayableTotal || order.cashCollectAmount || goodsAmount + fee);
+    const orderId = data.orderId || order.id || "";
+    showCreateOrderMsg("ok", `配送已建立。小U到店支付 NT$${goodsAmount}，送達向客戶收 NT$${collect}，小U配送收入 NT$${fee}。訂單：${orderId}`);
+    resetCreateOrderForm();
+    await refreshMerchantV3Orders({silent:true});
+    setTab("todo");
+    switchMerchantView("orders");
+  }catch(err){
+    console.error("店家 V4 建立配送失敗:", err);
+    showCreateOrderMsg("err", err.message || "建立配送失敗，請稍後再試。");
+  }finally{
+    isCreatingMerchantOrder = false;
+    if(btn){ btn.disabled = false; btn.textContent = "確認建立配送"; }
+  }
+};
+
+const merchantV4LegacyReset = resetCreateOrderForm;
+resetCreateOrderForm = function(){
+  merchantV4LegacyReset();
+  const payment = document.getElementById("newPaymentMethod");
+  if(payment) payment.value = "rider_advance_cod";
+};
+
+window.addEventListener("load", () => {
+  const payment = document.getElementById("newPaymentMethod");
+  if(payment) payment.value = "rider_advance_cod";
+  setTimeout(()=>forceEnableLoginButton(), 50);
+  const action = new URLSearchParams(location.search).get("action");
+  if(["create","orders","overview"].includes(action)){
+    setTimeout(()=>{ if(merchantAuthed) switchMerchantView(action); }, 700);
+  }
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("/ubee-merchant-sw.js", {scope:"/merchant-dashboard.html"}).catch(err => {
+      console.warn("UBee Merchant SW 註冊失敗:", err);
+    });
+  }
+});
 </script>
 
 </body>
