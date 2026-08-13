@@ -6145,18 +6145,63 @@ function isPaidJkoDispatchOrder(order) {
 }
 
 function isMerchantOrderRecord(order = {}) {
-  const source = String(order.source || '').trim().toLowerCase();
-  const createdFrom = String(order.createdFrom || '').trim().toLowerCase();
-  const orderType = String(order.orderType || '').trim().toLowerCase();
+  // 店家訂單的來源歷史上有多種命名；這裡統一做「寬鬆辨識」。
+  // 目的：任何店家建立的配送任務都不得再被當成一般客戶單推送到審核／完成群組。
+  const values = [
+    order.source,
+    order.createdFrom,
+    order.orderType,
+    order.serviceType,
+    order.orderSource,
+    order.sourceType,
+    order.createdBy,
+    order.channel,
+    order.platformSource,
+  ]
+    .map(value => String(value || '').trim().toLowerCase().replace(/[-\s]+/g, '_'))
+    .filter(Boolean);
 
-  return (
-    source === 'merchant-dashboard' ||
-    source === 'merchant' ||
-    createdFrom === 'merchant-dashboard' ||
-    createdFrom === 'merchant' ||
-    orderType === 'merchant_dispatch' ||
-    orderType === 'merchant_delivery'
+  const merchantMarkers = new Set([
+    'merchant',
+    'merchant_dashboard',
+    'merchant_center',
+    'merchant_direct',
+    'merchant_dispatch',
+    'merchant_delivery',
+    'merchant_order',
+    'merchant_pwa',
+    'store',
+    'store_delivery',
+  ]);
+
+  if (values.some(value => merchantMarkers.has(value))) {
+    return true;
+  }
+
+  if (
+    order.isMerchantOrder === true ||
+    order.merchantOrder === true ||
+    String(order.settlementMode || '').trim().toLowerCase() === 'rider_advance_cod'
+  ) {
+    return true;
+  }
+
+  // V3 / V4 店家平台正式訂單通常一定會帶 merchantId / merchantName，
+  // 並伴隨店家付款／配送欄位。避免只靠單一 source 字串而漏判。
+  const hasMerchantIdentity = Boolean(
+    String(order.merchantId || '').trim() ||
+    String(order.merchantName || '').trim()
   );
+
+  const hasMerchantOrderShape = Boolean(
+    String(order.deliveryFeePayer || '').trim() ||
+    String(order.merchantBillingStatus || '').trim() ||
+    String(order.merchantPlan || '').trim() ||
+    String(order.settlementType || '').trim().toLowerCase().includes('merchant') ||
+    String(order.paymentMethod || '').trim().toLowerCase().includes('merchant')
+  );
+
+  return hasMerchantIdentity && hasMerchantOrderShape;
 }
 
 function isMerchantDispatchOrder(order) {
@@ -23613,36 +23658,6 @@ function createOrderConfirmFlex(order) {
 }
 
 // ✅ 新增：辦公室審核群組專用強制取消卡
-function createAdminForceCancelFlex(order) {
-  return createFlexMessage('UBee 辦公室訂單管理', createBubble(
-    'UBee 辦公室訂單管理',
-    [
-      createInfoRow('訂單編號', order.id),
-      createInfoRow('目前狀態', getStatusLabel(order.status)),
-      createInfoRow('服務類型', order.serviceType),
-      createInfoRow('取件地址', order.pickupAddress),
-      createInfoRow('取件電話', order.pickupPhone),
-      createInfoRow('送達地址', order.dropoffAddress),
-      createInfoRow('送達電話', order.dropoffPhone),
-      createInfoRow('物品內容', order.item),
-      createInfoRow('備註', order.note || '無'),
-      createInfoRow('客戶總金額', formatCurrency(order.total)),
-      createInfoRow('付款方式', getPaymentMethodLabel(order.paymentMethod)),
-      {
-        type: 'text',
-        text: '此卡片僅供 UBee 辦公室管理使用。必要時可強制取消此訂單。',
-        size: 'sm',
-        color: '#666666',
-        wrap: true,
-        margin: 'md',
-      },
-    ],
-    [
-      createActionButton('⚠️ 強制取消此訂單', `forceCancel=${order.id}`, 'primary'),
-    ]
-  ));
-}
-
 function createEtaRow(orderId, minutesList) {
   return {
     type: 'box',
@@ -26313,7 +26328,8 @@ app.post('/api/merchant/order', async (req, res) => {
 
     await saveOrder(order);
 
-    await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
+    // 店家配送單只進入騎士派單流程，不推送到 LINE_ADMIN_GROUP_ID（審核／管理群組）。
+    // 審核群組僅保留小U、店家合作申請等真正需要人工審核的通知。
 
     return res.json({
       success: true,
@@ -26973,18 +26989,9 @@ async function createMerchantOrderV3({
       dispatchPushCycleId
     );
 
-    try {
-      await pushToGroup(
-        LINE_ADMIN_GROUP_ID,
-        createAdminForceCancelFlex({
-          ...order,
-          status: 'pending_dispatch',
-          createdAt: nowMs,
-        })
-      );
-    } catch (pushError) {
-      console.error('⚠️ 店家 V3 新單通知失敗：', pushError);
-    }
+    // 店家 V3 新單不推送到 LINE_ADMIN_GROUP_ID（審核／管理群組）。
+    // 訂單仍會正常啟動 startDispatchPushSequence()，送到符合條件的小U。
+    // 審核群組因此不再被一般店家配送單洗版。
   }
 
   return {
