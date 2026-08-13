@@ -1,0 +1,59 @@
+{
+  "id": "/merchant-dashboard.html",
+  "name": "UBee 店家平台",
+  "short_name": "UBee 店家",
+  "description": "UBee 店家端：建立配送、查看訂單、追蹤小U與管理店家帳款。",
+  "start_url": "/merchant-dashboard.html?source=pwa&v=20260813-v4",
+  "scope": "/merchant-dashboard.html",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "background_color": "#ffffff",
+  "theme_color": "#facc15",
+  "orientation": "portrait-primary",
+  "categories": [
+    "business",
+    "productivity",
+    "navigation"
+  ],
+  "icons": [
+    {
+      "src": "/ubee-merchant-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ubee-merchant-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "建立配送",
+      "short_name": "派單",
+      "url": "/merchant-dashboard.html?action=create",
+      "icons": [
+        {
+          "src": "/ubee-merchant-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "查看訂單",
+      "short_name": "訂單",
+      "url": "/merchant-dashboard.html?action=orders",
+      "icons": [
+        {
+          "src": "/ubee-merchant-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
