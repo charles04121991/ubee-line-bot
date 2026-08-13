@@ -26313,8 +26313,7 @@ app.post('/api/merchant/order', async (req, res) => {
 
     await saveOrder(order);
 
-    // 店家配送單只進入騎士派單流程，不推送到 LINE_ADMIN_GROUP_ID（審核／管理群組）。
-    // 審核群組僅保留小U、店家合作申請等真正需要人工審核的通知。
+    await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
 
     return res.json({
       success: true,
@@ -26974,9 +26973,18 @@ async function createMerchantOrderV3({
       dispatchPushCycleId
     );
 
-    // 店家 V3 新單不推送到 LINE_ADMIN_GROUP_ID（審核／管理群組）。
-    // 訂單仍會正常啟動 startDispatchPushSequence()，送到符合條件的小U。
-    // 審核群組因此不再被一般店家配送單洗版。
+    try {
+      await pushToGroup(
+        LINE_ADMIN_GROUP_ID,
+        createAdminForceCancelFlex({
+          ...order,
+          status: 'pending_dispatch',
+          createdAt: nowMs,
+        })
+      );
+    } catch (pushError) {
+      console.error('⚠️ 店家 V3 新單通知失敗：', pushError);
+    }
   }
 
   return {
