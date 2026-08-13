@@ -1,11 +1,11 @@
 /*
  * UBee Merchant PWA｜Service Worker
- * Version: 2026.08.13.1
+ * Version: 2026.08.13.2
  * Scope: /merchant-dashboard.html
  */
 'use strict';
 
-const UBEE_MERCHANT_SW_VERSION = '2026.08.13.1';
+const UBEE_MERCHANT_SW_VERSION = '2026.08.13.2';
 const CACHE_PREFIX = 'ubee-merchant-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_MERCHANT_SW_VERSION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}page-${UBEE_MERCHANT_SW_VERSION}`;
