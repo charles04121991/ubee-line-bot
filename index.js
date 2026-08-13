@@ -19495,7 +19495,7 @@ app.post('/api/merchant/auth/login', async (req, res) => {
         success: false,
         ok: false,
         code: 'MERCHANT_ACTIVATION_REQUIRED',
-        message: '此店家尚未啟用密碼登入，請使用「第一次啟用」。',
+        message: '此店家尚未設定登入密碼，請聯絡 UBee 管理端協助設定。',
       });
     }
 
@@ -19531,7 +19531,7 @@ app.post('/api/merchant/auth/login', async (req, res) => {
   }
 });
 
-// 舊店家第一次改用 PWA：以「申請手機 + merchantId」核對後設定密碼。
+// 舊店家相容用啟用 API：目前不再由公開登入畫面使用；保留供管理端必要時協助轉移舊帳號。
 app.post('/api/merchant/auth/activate', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
