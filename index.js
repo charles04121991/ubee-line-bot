@@ -9,7 +9,7 @@ const webpush = require('web-push');
 const multer = require('multer');
 
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
-// UBee Merchant Platform V3 + 小U資料庫 V2 Final + 區域動態定價 V3 正式版｜2026-07-28
+// UBee Merchant PWA V4 + 小U資料庫 V2 Final｜2026-08-13：店家獨立密碼登入、COD 墊付配送、店家近距離費率。
 // 2026-08-04 R9｜全能跑腿 serviceMode 前後端一致：估價、建單與鎖價驗證統一為 custom。
 // 2026-08-04｜小U申請審核 V2：三大驗證、條件式證件、批次補件、多通道通知與審核紀錄。
 // V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
@@ -6521,6 +6521,12 @@ function buildRiderPendingTaskPreview(order = {}) {
     isPaid: order.isPaid === true,
     isCashOrder: order.isCashOrder === true,
     merchantPaid: order.merchantPaid === true,
+    settlementMode: String(order.settlementMode || '').trim(),
+    goodsAmount: Math.max(0, Math.round(Number(order.goodsAmount || 0))),
+    riderAdvanceAmount: Math.max(0, Math.round(Number(order.riderAdvanceAmount || order.advanceAmount || 0))),
+    customerPayableTotal: Math.max(0, Math.round(Number(order.customerPayableTotal || order.cashCollectAmount || 0))),
+    cashCollectAmount: Math.max(0, Math.round(Number(order.cashCollectAmount || order.customerPayableTotal || 0))),
+    riderCollectAmount: Math.max(0, Math.round(Number(order.riderCollectAmount || order.cashCollectAmount || 0))),
     source: String(order.source || '').trim(),
     createdFrom: String(order.createdFrom || '').trim(),
 
@@ -19025,6 +19031,192 @@ function buildMerchantV3Profile(merchantId, merchant = {}) {
   };
 }
 
+// =====================================================
+// UBee Merchant PWA V4｜店家獨立登入（不依賴 LINE）
+// - 手機號碼 + 密碼登入
+// - 隨機 Session Token 僅保存雜湊於 Firestore，可撤銷、可過期
+// - 舊店家第一次啟用：手機號碼 + merchantId + 新密碼
+// - merchantId 僅作既有店家一次性啟用核對，不作日常登入憑證
+// =====================================================
+const MERCHANT_AUTH_SESSION_COLLECTION = 'merchantSessionsV1';
+const MERCHANT_AUTH_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const MERCHANT_AUTH_PASSWORD_VERSION = 1;
+
+function normalizeMerchantLoginPhone(value) {
+  return normalizePhone(value);
+}
+
+function validateMerchantPassword(value) {
+  const password = String(value || '');
+  if (password.length < 8) return '密碼至少需要 8 個字元。';
+  if (password.length > 72) return '密碼不可超過 72 個字元。';
+  return '';
+}
+
+function buildMerchantPasswordCredential(password) {
+  const salt = crypto.randomBytes(18).toString('hex');
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return {
+    merchantPasswordHash: hash,
+    merchantPasswordSalt: salt,
+    merchantPasswordVersion: MERCHANT_AUTH_PASSWORD_VERSION,
+    merchantPasswordUpdatedAtMs: Date.now(),
+  };
+}
+
+function verifyMerchantPassword(password, merchant = {}) {
+  const storedHash = String(merchant.merchantPasswordHash || '').trim();
+  const salt = String(merchant.merchantPasswordSalt || '').trim();
+  if (!storedHash || !salt) return false;
+
+  try {
+    const actual = Buffer.from(
+      crypto.scryptSync(String(password || ''), salt, 64).toString('hex'),
+      'hex'
+    );
+    const expected = Buffer.from(storedHash, 'hex');
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+  } catch (_) {
+    return false;
+  }
+}
+
+function merchantSessionDocumentId(rawToken) {
+  return crypto
+    .createHash('sha256')
+    .update(String(rawToken || ''))
+    .digest('hex');
+}
+
+async function findMerchantByLoginPhone(phone) {
+  const cleanPhone = normalizeMerchantLoginPhone(phone);
+  if (!/^09\d{8}$/.test(cleanPhone)) return null;
+
+  const snap = await db
+    .collection('merchants')
+    .where('phone', '==', cleanPhone)
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return { doc, merchant: doc.data() || {}, phone: cleanPhone };
+}
+
+async function issueMerchantSession(req, merchantDoc, merchant = {}) {
+  const rawToken = crypto.randomBytes(32).toString('base64url');
+  const sessionId = merchantSessionDocumentId(rawToken);
+  const nowMs = Date.now();
+  const expiresAtMs = nowMs + MERCHANT_AUTH_SESSION_TTL_MS;
+
+  await db.collection(MERCHANT_AUTH_SESSION_COLLECTION).doc(sessionId).set({
+    sessionId,
+    merchantId: merchantDoc.id,
+    phone: normalizeMerchantLoginPhone(merchant.phone || merchant.merchantPhone || ''),
+    createdAtMs: nowMs,
+    updatedAtMs: nowMs,
+    expiresAtMs,
+    userAgent: cleanText(req.headers['user-agent'] || '', 500),
+    ipHash: crypto
+      .createHash('sha256')
+      .update(String(req.ip || req.headers['x-forwarded-for'] || ''))
+      .digest('hex')
+      .slice(0, 32),
+  });
+
+  return { token: rawToken, expiresAtMs };
+}
+
+function getMerchantSessionToken(req) {
+  const authorization = String(req.headers.authorization || '').trim();
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match ? String(match[1] || '').trim() : '';
+}
+
+async function merchantAuthMiddleware(req, res, next) {
+  try {
+    const token = getMerchantSessionToken(req);
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        ok: false,
+        code: 'MERCHANT_SESSION_REQUIRED',
+        message: '店家登入已失效，請重新登入。',
+      });
+    }
+
+    const sessionId = merchantSessionDocumentId(token);
+    const sessionDoc = await db
+      .collection(MERCHANT_AUTH_SESSION_COLLECTION)
+      .doc(sessionId)
+      .get();
+
+    if (!sessionDoc.exists) {
+      return res.status(401).json({
+        success: false,
+        ok: false,
+        code: 'MERCHANT_SESSION_INVALID',
+        message: '店家登入憑證無效，請重新登入。',
+      });
+    }
+
+    const session = sessionDoc.data() || {};
+    if (Number(session.expiresAtMs || 0) <= Date.now()) {
+      await sessionDoc.ref.delete().catch(() => {});
+      return res.status(401).json({
+        success: false,
+        ok: false,
+        code: 'MERCHANT_SESSION_EXPIRED',
+        message: '店家登入已逾期，請重新登入。',
+      });
+    }
+
+    const merchantId = String(session.merchantId || '').trim();
+    const merchantDoc = merchantId
+      ? await db.collection('merchants').doc(merchantId).get()
+      : null;
+
+    if (!merchantDoc || !merchantDoc.exists) {
+      await sessionDoc.ref.delete().catch(() => {});
+      return res.status(401).json({
+        success: false,
+        ok: false,
+        code: 'MERCHANT_ACCOUNT_NOT_FOUND',
+        message: '找不到店家帳號，請聯絡 UBee 客服。',
+      });
+    }
+
+    const merchant = merchantDoc.data() || {};
+    if (merchant.status !== 'approved' && merchant.approved !== true) {
+      return res.status(403).json({
+        success: false,
+        ok: false,
+        code: 'MERCHANT_NOT_APPROVED',
+        message: '店家帳號尚未審核通過。',
+      });
+    }
+
+    req.merchantAuth = {
+      sessionId,
+      sessionDoc,
+      session,
+      merchantId: merchantDoc.id,
+      merchantDoc,
+      merchant,
+    };
+
+    return next();
+  } catch (error) {
+    console.error('❌ 店家 Session 驗證失敗：', error);
+    return res.status(500).json({
+      success: false,
+      ok: false,
+      code: 'MERCHANT_AUTH_ERROR',
+      message: '店家登入驗證失敗，請稍後再試。',
+    });
+  }
+}
+
 function getMerchantLineUserIdFromRequest(req) {
   return String(
     req.headers['x-ubee-merchant-line-user-id'] ||
@@ -19035,31 +19227,16 @@ function getMerchantLineUserIdFromRequest(req) {
 }
 
 async function resolveApprovedMerchantV3(req) {
-  const lineUserId = getMerchantLineUserIdFromRequest(req);
+  const auth = req.merchantAuth;
 
-  if (!lineUserId || !lineUserId.startsWith('U')) {
-    const error = new Error('缺少正確的店家 LINE 身分。');
+  if (!auth || !auth.merchantDoc || !auth.merchantDoc.exists) {
+    const error = new Error('缺少有效的店家登入 Session。');
     error.statusCode = 401;
     error.code = 'MERCHANT_IDENTITY_REQUIRED';
     throw error;
   }
 
-  const snap = await db
-    .collection('merchants')
-    .where('lineUserId', '==', lineUserId)
-    .limit(1)
-    .get();
-
-  if (snap.empty) {
-    const error = new Error('尚未綁定店家帳號。');
-    error.statusCode = 404;
-    error.code = 'MERCHANT_NOT_BOUND';
-    throw error;
-  }
-
-  const doc = snap.docs[0];
-  const merchant = doc.data() || {};
-
+  const merchant = auth.merchant || auth.merchantDoc.data() || {};
   if (merchant.status !== 'approved' && merchant.approved !== true) {
     const error = new Error('店家帳號尚未審核通過。');
     error.statusCode = 403;
@@ -19068,11 +19245,12 @@ async function resolveApprovedMerchantV3(req) {
   }
 
   return {
-    merchantDoc: doc,
-    merchantId: doc.id,
+    merchantDoc: auth.merchantDoc,
+    merchantId: auth.merchantDoc.id,
     merchant,
-    profile: buildMerchantV3Profile(doc.id, merchant),
-    lineUserId,
+    profile: buildMerchantV3Profile(auth.merchantDoc.id, merchant),
+    lineUserId: '',
+    sessionId: auth.sessionId,
   };
 }
 
@@ -19278,6 +19456,180 @@ function buildMerchantSummaryV3(orders = []) {
 }
 
 
+// ===== UBee Merchant PWA V4：店家帳號登入 =====
+app.post('/api/merchant/auth/login', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeMerchantLoginPhone(req.body?.phone || '');
+    const password = String(req.body?.password || '');
+
+    if (!/^09\d{8}$/.test(phone) || !password) {
+      return res.status(400).json({
+        success: false,
+        ok: false,
+        message: '請輸入正確的手機號碼與密碼。',
+      });
+    }
+
+    const result = await findMerchantByLoginPhone(phone);
+    if (!result) {
+      return res.status(401).json({
+        success: false,
+        ok: false,
+        message: '手機號碼或密碼不正確。',
+      });
+    }
+
+    const { doc, merchant } = result;
+    if (merchant.status !== 'approved' && merchant.approved !== true) {
+      return res.status(403).json({
+        success: false,
+        ok: false,
+        code: 'MERCHANT_NOT_APPROVED',
+        message: '店家合作申請尚未審核通過。',
+      });
+    }
+
+    if (!merchant.merchantPasswordHash || !merchant.merchantPasswordSalt) {
+      return res.status(409).json({
+        success: false,
+        ok: false,
+        code: 'MERCHANT_ACTIVATION_REQUIRED',
+        message: '此店家尚未啟用密碼登入，請使用「第一次啟用」。',
+      });
+    }
+
+    if (!verifyMerchantPassword(password, merchant)) {
+      return res.status(401).json({
+        success: false,
+        ok: false,
+        message: '手機號碼或密碼不正確。',
+      });
+    }
+
+    const session = await issueMerchantSession(req, doc, merchant);
+    await doc.ref.set({
+      merchantLastLoginAtMs: Date.now(),
+      merchantLastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      ok: true,
+      token: session.token,
+      expiresAtMs: session.expiresAtMs,
+      merchant: buildMerchantV3Profile(doc.id, merchant),
+    });
+  } catch (error) {
+    console.error('❌ 店家密碼登入失敗：', error);
+    return res.status(500).json({
+      success: false,
+      ok: false,
+      message: '店家登入失敗，請稍後再試。',
+    });
+  }
+});
+
+// 舊店家第一次改用 PWA：以「申請手機 + merchantId」核對後設定密碼。
+app.post('/api/merchant/auth/activate', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeMerchantLoginPhone(req.body?.phone || '');
+    const merchantId = String(req.body?.merchantId || '').trim();
+    const password = String(req.body?.password || '');
+    const passwordError = validateMerchantPassword(password);
+
+    if (!/^09\d{8}$/.test(phone) || !merchantId || passwordError) {
+      return res.status(400).json({
+        success: false,
+        ok: false,
+        message: passwordError || '請輸入申請手機、店家編號與新密碼。',
+      });
+    }
+
+    const doc = await db.collection('merchants').doc(merchantId).get();
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        ok: false,
+        message: '找不到此店家編號。',
+      });
+    }
+
+    const merchant = doc.data() || {};
+    if (normalizeMerchantLoginPhone(merchant.phone || merchant.merchantPhone || '') !== phone) {
+      return res.status(403).json({
+        success: false,
+        ok: false,
+        message: '店家編號與申請手機不相符。',
+      });
+    }
+
+    if (merchant.status !== 'approved' && merchant.approved !== true) {
+      return res.status(403).json({
+        success: false,
+        ok: false,
+        message: '店家合作申請尚未審核通過。',
+      });
+    }
+
+    if (merchant.merchantPasswordHash && merchant.merchantPasswordSalt) {
+      return res.status(409).json({
+        success: false,
+        ok: false,
+        message: '此店家已啟用密碼登入，請直接登入。',
+      });
+    }
+
+    const credential = buildMerchantPasswordCredential(password);
+    await doc.ref.set({
+      ...credential,
+      merchantAuthActivatedAtMs: Date.now(),
+      merchantAuthActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    const latestMerchant = { ...merchant, ...credential };
+    const session = await issueMerchantSession(req, doc, latestMerchant);
+
+    return res.json({
+      success: true,
+      ok: true,
+      token: session.token,
+      expiresAtMs: session.expiresAtMs,
+      merchant: buildMerchantV3Profile(doc.id, latestMerchant),
+      message: '店家 PWA 帳號已啟用。',
+    });
+  } catch (error) {
+    console.error('❌ 店家帳號啟用失敗：', error);
+    return res.status(500).json({
+      success: false,
+      ok: false,
+      message: '店家帳號啟用失敗，請稍後再試。',
+    });
+  }
+});
+
+app.get('/api/merchant/auth/session', merchantAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({
+    success: true,
+    ok: true,
+    expiresAtMs: Number(req.merchantAuth?.session?.expiresAtMs || 0),
+    merchant: buildMerchantV3Profile(
+      req.merchantAuth.merchantId,
+      req.merchantAuth.merchant
+    ),
+  });
+});
+
+app.post('/api/merchant/auth/logout', merchantAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  await req.merchantAuth.sessionDoc.ref.delete().catch(() => {});
+  return res.json({ success: true, ok: true });
+});
+
 app.post('/api/merchant/register', async (req, res) => {
   try {
     const {
@@ -19290,9 +19642,16 @@ app.post('/api/merchant/register', async (req, res) => {
       settlementType,
       dispatchFrequency,
       note,
+      password,
     } = req.body || {};
 
     const cleanPhone = String(phone || '').replace(/\s+/g, '').replace(/-/g, '');
+    const merchantPassword = String(password || '');
+    const merchantPasswordError = merchantPassword ? validateMerchantPassword(merchantPassword) : '';
+
+    if (merchantPasswordError) {
+      return res.status(400).json({ ok:false, message:merchantPasswordError });
+    }
 
     if (!merchantName || !contactPerson || !cleanPhone || !pickupAddress || !businessType || !settlementType) {
       return res.status(400).json({
@@ -19353,6 +19712,9 @@ app.post('/api/merchant/register', async (req, res) => {
 
       lineUserId: '',
       boundAt: null,
+
+      ...(merchantPassword ? buildMerchantPasswordCredential(merchantPassword) : {}),
+      merchantAuthReady: Boolean(merchantPassword),
 
       source: 'merchant-register',
       createdAt: now,
@@ -19966,6 +20328,10 @@ function copyOrderFinancialFields(target, financialOrder) {
     'serviceTotal',
     'driverFee',
     'riderFee',
+    'riderIncome',
+    'estimatedRiderIncome',
+    'riderAdvanceAmount',
+    'riderCollectAmount',
     'platformFee',
     'platformIncome',
     'advancePayment',
@@ -22828,6 +23194,57 @@ function applyCustomTaskHandlingFee(
 
 function recalculateOrderFinancials(order) {
   if (!order) {
+    return order;
+  }
+
+  // 店家 COD 單維持「配送費全額給小U、平台不抽配送費」的財務模型。
+  // 等候費 / 體積費 / 天候與動態調度加價仍直接加到客戶應付，並全額給小U。
+  const merchantSettlementMode = String(order.settlementMode || '').trim().toLowerCase();
+  const merchantPaymentMethod = getOrderPaymentMethod(order);
+  if (merchantSettlementMode === 'rider_advance_cod' || merchantPaymentMethod === 'rider_advance_cod') {
+    const itemSizePricing = getItemSizePricing(order.itemSize);
+    const itemSizeFee = Object.prototype.hasOwnProperty.call(order, 'itemSizeFee')
+      ? Math.max(0, Math.round(Number(order.itemSizeFee || 0)))
+      : itemSizePricing.itemSizeFee;
+    const baseDeliveryFee = Math.max(0, Math.round(Number(order.deliveryFee || 0)));
+    const speedFee = Math.max(0, Math.round(Number(order.speedFee || 0)));
+    const upstairsFee = Math.max(0, Math.round(Number(order.upstairsFee || 0)));
+    const waitingFee = Math.max(0, Math.round(Number(order.waitingFee || 0)));
+    const dynamicPricingFee = Math.max(0, Math.round(Number(order.dynamicPricingFee || order.dynamicFee || 0)));
+    const weatherFee = Math.max(0, Math.round(Number(order.weatherFee || 0)));
+    const riderServiceIncome = baseDeliveryFee + speedFee + upstairsFee + waitingFee + itemSizeFee + dynamicPricingFee + weatherFee;
+    const advancePayment = getOrderAdvancePaymentAmount(order);
+    const customerPayableTotal = riderServiceIncome + advancePayment;
+
+    order.itemSize = itemSizePricing.itemSize;
+    order.itemSizeLabel = order.itemSizeLabel || itemSizePricing.itemSizeLabel;
+    order.itemSizeFee = itemSizeFee;
+    order.serviceFee = 0;
+    order.platformServiceFee = 0;
+    order.taskSubtotal = riderServiceIncome;
+    order.serviceSubtotal = riderServiceIncome;
+    order.serviceTotal = riderServiceIncome;
+    order.driverFee = riderServiceIncome;
+    order.riderFee = riderServiceIncome;
+    order.riderIncome = riderServiceIncome;
+    order.estimatedRiderIncome = riderServiceIncome;
+    order.platformFee = 0;
+    order.platformIncome = 0;
+    order.advancePayment = advancePayment;
+    order.advanceAmount = advancePayment;
+    order.riderAdvanceAmount = advancePayment;
+    order.customerPayableTotal = customerPayableTotal;
+    order.payableTotal = customerPayableTotal;
+    order.riderDisplayTotal = customerPayableTotal;
+    order.total = customerPayableTotal;
+    order.finalTotal = customerPayableTotal;
+    order.customerTotalWithAdvance = customerPayableTotal;
+    order.cashCollectAmount = customerPayableTotal;
+    order.riderCollectAmount = customerPayableTotal;
+    order.cashServiceNet = riderServiceIncome;
+    order.cashDueToPlatform = 0;
+    order.platformReceivable = 0;
+    order.riderDueToPlatform = 0;
     return order;
   }
 
@@ -25964,18 +26381,17 @@ function calculateMerchantDeliveryFeeV3(distanceKm, stopCount = 1) {
     throw new Error('配送距離結果異常。');
   }
 
-  let baseFee = 220;
-
-  if (km <= 5) baseFee = 70;
-  else if (km <= 7) baseFee = 80;
-  else if (km <= 9) baseFee = 90;
-  else if (km <= 10) baseFee = 110;
-  else if (km <= 12) baseFee = 130;
-  else if (km <= 14) baseFee = 150;
-  else if (km <= 16) baseFee = 170;
-  else if (km <= 18) baseFee = 200;
-  else if (km <= 20) baseFee = 220;
-  else baseFee = 220 + Math.ceil(km - 20) * 12;
+  // UBee 店家近距離配送 V4：採固定距離級距，讓店家與小U都能快速理解。
+  let baseFee = 150;
+  if (km <= 2) baseFee = 60;
+  else if (km <= 3) baseFee = 70;
+  else if (km <= 4) baseFee = 80;
+  else if (km < 5) baseFee = 90;
+  else if (km <= 5) baseFee = 105;
+  else if (km <= 6) baseFee = 120;
+  else if (km <= 7) baseFee = 135;
+  else if (km <= 8) baseFee = 150;
+  else baseFee = 150 + Math.ceil(km - 8) * 15;
 
   const extraStopFee = Math.max(0, stops - 1) * 20;
   return baseFee + extraStopFee;
@@ -26128,6 +26544,7 @@ async function createMerchantOrderV3({
     'merchant_settlement',
     'cash',
     'merchant_paid',
+    'rider_advance_cod',
   ]).has(paymentMethodRaw)
     ? paymentMethodRaw
     : 'merchant_settlement';
@@ -26181,8 +26598,20 @@ async function createMerchantOrderV3({
     ? calculateMerchantDeliveryFeeV3(route.distanceKm, stops.length)
     : 0;
 
-  const goodsAmount = merchantV3Money(payload.goodsAmount);
-  const advanceAmount = merchantV3Money(payload.advanceAmount);
+  const isRiderAdvanceCod =
+    deliveryMode === 'ubee' && paymentMethod === 'rider_advance_cod';
+
+  const goodsAmount = merchantV3Money(
+    isRiderAdvanceCod
+      ? (payload.goodsAmount ?? payload.advanceAmount)
+      : payload.goodsAmount
+  );
+
+  const advanceAmount = merchantV3Money(
+    isRiderAdvanceCod
+      ? goodsAmount
+      : payload.advanceAmount
+  );
 
   if (deliveryMode === 'merchant' && advanceAmount > 0) {
     const error = new Error('店家自送模式不能要求小U代墊。');
@@ -26192,13 +26621,15 @@ async function createMerchantOrderV3({
   }
 
   const isCashOrder =
-    deliveryMode === 'ubee' && paymentMethod === 'cash';
+    deliveryMode === 'ubee' &&
+    (paymentMethod === 'cash' || isRiderAdvanceCod);
 
   const merchantChargeAmount =
     deliveryMode === 'ubee' && !isCashOrder
       ? deliveryFee + advanceAmount
       : 0;
 
+  // rider_advance_cod：小U取貨時先付商品款給店家，送達後向客戶收商品款 + 配送費。
   const customerCashCollectAmount =
     isCashOrder
       ? deliveryFee + advanceAmount
@@ -26221,12 +26652,14 @@ async function createMerchantOrderV3({
     merchant_settlement: 'merchant_settlement',
     cash: 'cash_on_delivery',
     merchant_paid: 'paid_by_merchant',
+    rider_advance_cod: 'cash_on_delivery',
   };
 
   const paymentMethodLabelMap = {
     merchant_settlement: '店家月結',
     cash: '現金付款',
     merchant_paid: '店家已收款',
+    rider_advance_cod: '小U墊付・客戶貨到付款',
   };
 
   // 店家選擇「UBee 派小U」後，建立訂單即視為正式派單。
@@ -26349,8 +26782,12 @@ async function createMerchantOrderV3({
 
     goodsAmount,
     advanceAmount,
+    riderAdvanceAmount: advanceAmount,
     deliveryFee,
     merchantServiceFee: deliveryFee,
+    riderCollectAmount: customerCashCollectAmount,
+    merchantReceivableAtPickup: isRiderAdvanceCod ? advanceAmount : 0,
+    settlementMode: isRiderAdvanceCod ? 'rider_advance_cod' : paymentMethod,
 
     totalFee: deliveryFee,
     total: deliveryFee,
@@ -26365,6 +26802,8 @@ async function createMerchantOrderV3({
     // 日後若調整平台服務費，只需改後端，不需再改店家端。
     riderFee: deliveryMode === 'ubee' ? deliveryFee : 0,
     driverFee: deliveryMode === 'ubee' ? deliveryFee : 0,
+    riderIncome: deliveryMode === 'ubee' ? deliveryFee : 0,
+    estimatedRiderIncome: deliveryMode === 'ubee' ? deliveryFee : 0,
     platformFee: 0,
 
     paymentMethod,
@@ -26518,7 +26957,7 @@ async function createMerchantOrderV3({
   };
 }
 
-app.get('/api/merchant/v3/bootstrap', async (req, res) => {
+app.get('/api/merchant/v3/bootstrap', merchantAuthMiddleware, async (req, res) => {
   try {
     const context = await resolveApprovedMerchantV3(req);
     const orders = await listMerchantOrdersV3(
@@ -26542,7 +26981,7 @@ app.get('/api/merchant/v3/bootstrap', async (req, res) => {
   }
 });
 
-app.get('/api/merchant/v3/orders', async (req, res) => {
+app.get('/api/merchant/v3/orders', merchantAuthMiddleware, async (req, res) => {
   try {
     const context = await resolveApprovedMerchantV3(req);
     const orders = await listMerchantOrdersV3(
@@ -26563,7 +27002,7 @@ app.get('/api/merchant/v3/orders', async (req, res) => {
   }
 });
 
-app.post('/api/merchant/v3/orders', async (req, res) => {
+app.post('/api/merchant/v3/orders', merchantAuthMiddleware, async (req, res) => {
   try {
     const merchantContext = await resolveApprovedMerchantV3(req);
     const result = await createMerchantOrderV3({
@@ -26583,7 +27022,7 @@ app.post('/api/merchant/v3/orders', async (req, res) => {
   }
 });
 
-app.post('/api/merchant/v3/orders/:orderId/status', async (req, res) => {
+app.post('/api/merchant/v3/orders/:orderId/status', merchantAuthMiddleware, async (req, res) => {
   try {
     const context = await resolveApprovedMerchantV3(req);
     const orderId = String(req.params.orderId || '').trim().toUpperCase();
@@ -26731,7 +27170,7 @@ app.post('/api/merchant/v3/orders/:orderId/status', async (req, res) => {
   }
 });
 
-app.post('/api/merchant/v3/orders/:orderId/cancel', async (req, res) => {
+app.post('/api/merchant/v3/orders/:orderId/cancel', merchantAuthMiddleware, async (req, res) => {
   try {
     const context = await resolveApprovedMerchantV3(req);
     const orderId = String(req.params.orderId || '').trim().toUpperCase();
@@ -26810,7 +27249,7 @@ app.post('/api/merchant/v3/orders/:orderId/cancel', async (req, res) => {
   }
 });
 
-app.get('/api/merchant/v3/settlements', async (req, res) => {
+app.get('/api/merchant/v3/settlements', merchantAuthMiddleware, async (req, res) => {
   try {
     const context = await resolveApprovedMerchantV3(req);
     const orders = await listMerchantOrdersV3(
