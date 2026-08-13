@@ -1102,13 +1102,7 @@ button.secondary{background:#fff;color:#111;border:1px solid var(--line2)}
     <input id="merchantKey" type="tel" inputmode="tel" autocomplete="username" placeholder="例如：0912345678" />
     <label>密碼</label>
     <input id="merchantPassword" type="password" autocomplete="current-password" maxlength="72" placeholder="至少 8 個字元" />
-    <div id="merchantActivationFields" class="hidden">
-      <label>店家編號</label>
-      <input id="merchantActivationId" type="text" autocomplete="off" placeholder="第一次啟用舊店家帳號時填寫" />
-      <div class="notice">舊店家第一次改用 PWA，請輸入 UBee 提供的店家編號並設定新密碼；完成後以手機＋密碼登入即可。</div>
-    </div>
     <button id="loginBtn" type="button" onclick="loginMerchant()">登入店家平台</button>
-    <button id="merchantActivationToggle" class="secondary" type="button" onclick="toggleMerchantActivationMode()">第一次使用？啟用店家帳號</button>
     <div class="notice">登入成功後會保留 Session；之後從手機主畫面開啟即可直接進入店家平台。</div>
     <div class="error" id="errorBox"></div>
   </div>
@@ -3661,7 +3655,6 @@ setTimeout(injectMerchantSupportButtons, 800);
 <script id="ubee-merchant-v4-runtime">
 /* UBee Merchant PWA V4｜2026-08-13 */
 const MERCHANT_SESSION_TOKEN_KEY = "ubee_merchant_session_v1";
-let merchantActivationMode = false;
 
 function getMerchantSessionToken(){
   return String(localStorage.getItem(MERCHANT_SESSION_TOKEN_KEY) || "").trim();
@@ -3679,18 +3672,9 @@ forceEnableLoginButton = function(){
     loginBtn.disabled = false;
     loginBtn.removeAttribute("disabled");
     loginBtn.style.pointerEvents = "auto";
-    loginBtn.textContent = merchantActivationMode ? "啟用並登入" : "登入店家平台";
+    loginBtn.textContent = "登入店家平台";
   }
 };
-
-function toggleMerchantActivationMode(force){
-  merchantActivationMode = typeof force === "boolean" ? force : !merchantActivationMode;
-  document.getElementById("merchantActivationFields")?.classList.toggle("hidden", !merchantActivationMode);
-  const btn = document.getElementById("merchantActivationToggle");
-  const loginBtn = document.getElementById("loginBtn");
-  if(btn) btn.textContent = merchantActivationMode ? "返回一般登入" : "第一次使用？啟用店家帳號";
-  if(loginBtn) loginBtn.textContent = merchantActivationMode ? "啟用並登入" : "登入店家平台";
-}
 
 // 舊 load callback 仍會呼叫這個名稱；V4 改為檢查本機 Session，不再初始化 LIFF。
 initMerchantLiff = async function(){
@@ -3752,7 +3736,6 @@ loginMerchant = async function(){
   hideError();
   const phone = normalizePhone(document.getElementById("merchantKey")?.value || "");
   const password = String(document.getElementById("merchantPassword")?.value || "");
-  const merchantId = String(document.getElementById("merchantActivationId")?.value || "").trim();
   const btn = document.getElementById("loginBtn");
 
   if(!/^09\d{8}$/.test(phone)){
@@ -3763,33 +3746,26 @@ loginMerchant = async function(){
     showError("密碼至少需要 8 個字元。");
     return;
   }
-  if(merchantActivationMode && !merchantId){
-    showError("第一次啟用請輸入 UBee 提供的店家編號。");
-    return;
-  }
 
-  if(btn){ btn.disabled = true; btn.textContent = merchantActivationMode ? "帳號啟用中..." : "登入中..."; }
+  if(btn){ btn.disabled = true; btn.textContent = "登入中..."; }
   try{
-    const path = merchantActivationMode ? "/api/merchant/auth/activate" : "/api/merchant/auth/login";
-    const res = await fetch(path, {
+    const res = await fetch("/api/merchant/auth/login", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({phone,password,merchantId})
+      body:JSON.stringify({phone,password})
     });
     const data = await res.json().catch(() => ({}));
     if(!res.ok || !data.ok || !data.token) throw new Error(data.message || "店家登入失敗。");
 
     setMerchantSessionToken(data.token);
     merchantLineUserId = "PWA_SESSION";
-    merchantActivationMode = false;
-    document.getElementById("merchantActivationFields")?.classList.add("hidden");
     const bootstrap = await merchantV3Fetch(`/api/merchant/v3/bootstrap?limit=200&t=${Date.now()}`, {cache:"no-store"});
     enterMerchantDashboardV3(bootstrap.merchant, bootstrap.orders || []);
   }catch(err){
     console.error("店家 V4 登入失敗:", err);
     showError(err.message || "店家登入失敗，請稍後再試。");
   }finally{
-    if(btn){ btn.disabled = false; btn.textContent = merchantActivationMode ? "啟用並登入" : "登入店家平台"; }
+    if(btn){ btn.disabled = false; btn.textContent = "登入店家平台"; }
   }
 };
 
