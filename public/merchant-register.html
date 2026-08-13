@@ -486,13 +486,9 @@
         if (!res.ok || !data.ok) {
           throw new Error(data.message || "送出失敗，請稍後再試。");
         }
-
-        const merchantId = String(data.merchantId || "").trim();
-
         showMsg(
           "ok",
-          `合作申請已送出！${merchantId ? `店家編號：${merchantId}。` : ""} ` +
-          `UBee 管理端審核通過後，請直接使用「${payload.phone}＋你剛設定的密碼」登入 UBee 店家平台，不需要再進行 LINE 綁定。`
+          `合作申請已送出！UBee 管理端審核通過後，請直接使用「${payload.phone}＋你剛設定的密碼」登入 UBee 店家平台，不需要店家編號，也不需要 LINE 綁定。`
         );
 
         form.reset();
