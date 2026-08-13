@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>UBee 店家平台 V4｜PWA 正式版</title>
+<title>UBee 店家平台 V4.1｜配送費付款人正式版</title>
 <link rel="manifest" href="/merchant-manifest.json?v=20260813-v4" />
 <link rel="apple-touch-icon" sizes="180x180" href="/ubee-merchant-icon-192.png?v=20260813-v4" />
 <meta name="theme-color" content="#facc15" />
@@ -1309,9 +1309,30 @@ button.secondary{background:#fff;color:#111;border:1px solid var(--line2)}
           <div class="merchant-advance-card merchant-cod-card">
             <div>
               <strong>商品金額</strong>
-              <span>小U取貨時先支付這筆金額給店家；送達後向客人收「商品金額＋配送費」。沒有商品款請填 NT$0。</span>
+              <span>小U取貨時先支付這筆商品款給店家。沒有商品款請填 NT$0。</span>
             </div>
             <div class="merchant-money-input"><span>NT$</span><input id="newAdvanceAmount" type="number" inputmode="numeric" min="0" value="0" placeholder="0" /></div>
+          </div>
+
+          <div class="merchant-fee-payer-box">
+            <div class="merchant-fee-payer-title">配送費由誰支付？</div>
+            <div class="merchant-fee-payer-desc">每一筆訂單都要明確選擇，避免客人與店家重複負擔配送費。</div>
+            <div class="merchant-fee-payer-grid">
+              <label class="merchant-fee-payer-option">
+                <input type="radio" name="deliveryFeePayer" value="customer" checked />
+                <span>
+                  <b>客戶支付配送費</b>
+                  <small>小U向客戶收「商品金額＋配送費」</small>
+                </span>
+              </label>
+              <label class="merchant-fee-payer-option">
+                <input type="radio" name="deliveryFeePayer" value="merchant" />
+                <span>
+                  <b>店家支付配送費</b>
+                  <small>小U只向客戶收商品金額；配送費列入店家帳款</small>
+                </span>
+              </label>
+            </div>
           </div>
 
           <div class="merchant-step-actions">
@@ -2645,10 +2666,17 @@ function goMerchantCreateNext(){
   showMerchantCreateStep(2);
 }
 
+function getMerchantDeliveryFeePayer(){
+  return document.querySelector('input[name="deliveryFeePayer"]:checked')?.value === "merchant"
+    ? "merchant"
+    : "customer";
+}
+
 function getMerchantOrderInputSignature(){
   const payload = {
     merchantAddress:currentMerchant?.merchantAddress || "",
     advanceAmount:Math.round(Number(document.getElementById("newAdvanceAmount")?.value || 0)),
+    deliveryFeePayer:getMerchantDeliveryFeePayer(),
     stops:collectDeliveryStops()
   };
   return JSON.stringify(payload);
@@ -3651,6 +3679,14 @@ setTimeout(injectMerchantSupportButtons, 800);
 .merchant-v4-login .secondary{background:#fff;color:#111;border:1px solid var(--line2);box-shadow:none}
 .merchant-v4-login .small{margin-bottom:12px}.merchant-cod-card{background:#fffbea;border-color:rgba(250,204,21,.48)}
 .merchant-v4-cashflow{margin-top:10px;padding:12px;border-radius:16px;background:#111;color:#fff}.merchant-v4-cashflow div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px}.merchant-v4-cashflow b{color:#facc15}
+.merchant-fee-payer-box{margin-top:12px;padding:14px;border:1px solid rgba(17,24,39,.10);border-radius:18px;background:#fafafa}
+.merchant-fee-payer-title{font-size:14px;font-weight:1000;color:#111}.merchant-fee-payer-desc{margin-top:4px;font-size:11px;line-height:1.55;color:#777;font-weight:800}
+.merchant-fee-payer-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:11px}
+.merchant-fee-payer-option{display:flex;align-items:flex-start;gap:10px;margin:0;padding:12px;border:1px solid rgba(17,24,39,.12);border-radius:15px;background:#fff;cursor:pointer}
+.merchant-fee-payer-option:has(input:checked){border-color:#f4bd00;background:#fffbea;box-shadow:0 0 0 2px rgba(250,204,21,.12)}
+.merchant-fee-payer-option input{width:18px;height:18px;margin:2px 0 0;accent-color:#f4bd00;flex:0 0 auto}
+.merchant-fee-payer-option span{min-width:0}.merchant-fee-payer-option b{display:block;font-size:13px;color:#111}.merchant-fee-payer-option small{display:block;margin-top:3px;font-size:11px;line-height:1.5;color:#777;font-weight:800}
+
 </style>
 <script id="ubee-merchant-v4-runtime">
 /* UBee Merchant PWA V4｜2026-08-13 */
@@ -3840,11 +3876,14 @@ prepareMerchantOrderReview = async function(){
     const distanceKm = Math.round(estimateResult.totalKm * 100) / 100;
     const deliveryFee = calculateMerchantDeliveryFee(distanceKm, stops.length);
     const goodsAmount = Math.max(0, Math.round(Number(document.getElementById("newAdvanceAmount")?.value || 0)));
-    const customerTotal = goodsAmount + deliveryFee;
+    const deliveryFeePayer = getMerchantDeliveryFeePayer();
+    const customerTotal = goodsAmount + (deliveryFeePayer === "customer" ? deliveryFee : 0);
+    const merchantDeliveryPayable = deliveryFeePayer === "merchant" ? deliveryFee : 0;
 
     merchantPendingEstimate = {
       signature:getMerchantOrderInputSignature(), stops, stopCount:stops.length,
-      advanceAmount:goodsAmount, goodsAmount, distanceKm,
+      advanceAmount:goodsAmount, goodsAmount, distanceKm, deliveryFeePayer,
+      customerTotal, merchantDeliveryPayable,
       distanceText:estimateResult.distanceText, routeSegments:estimateResult.routeSegments, deliveryFee
     };
 
@@ -3860,11 +3899,14 @@ prepareMerchantOrderReview = async function(){
           <div class="merchant-review-row"><span>配送距離</span><strong>${escapeHtml(estimateResult.distanceText)}</strong></div>
           <div class="merchant-review-row"><span>商品金額</span><strong>NT$${goodsAmount.toLocaleString("zh-TW")}</strong></div>
           <div class="merchant-review-row"><span>配送費</span><strong>NT$${deliveryFee.toLocaleString("zh-TW")}</strong></div>
+          <div class="merchant-review-row"><span>配送費負擔</span><strong>${deliveryFeePayer === "merchant" ? "店家支付" : "客戶支付"}</strong></div>
           <div class="merchant-review-row total"><span>客戶應付</span><strong>NT$${customerTotal.toLocaleString("zh-TW")}</strong></div>
+          ${merchantDeliveryPayable > 0 ? `<div class="merchant-review-row"><span>店家配送帳款</span><strong>NT$${merchantDeliveryPayable.toLocaleString("zh-TW")}</strong></div>` : ""}
           <div class="merchant-v4-cashflow">
             <div><span>小U取貨時支付店家</span><b>NT$${goodsAmount.toLocaleString("zh-TW")}</b></div>
             <div><span>小U送達向客戶收取</span><b>NT$${customerTotal.toLocaleString("zh-TW")}</b></div>
             <div><span>小U本單配送收入</span><b>NT$${deliveryFee.toLocaleString("zh-TW")}</b></div>
+            ${deliveryFeePayer === "merchant" ? `<div><span>配送費結算來源</span><b>店家帳款</b></div>` : `<div><span>配送費結算來源</span><b>客戶現金</b></div>`}
           </div>
         </div>`;
     }
@@ -3890,6 +3932,7 @@ createMerchantOrder = async function(){
   const validateMsg = validateDeliveryStops(stops);
   if(validateMsg){ showCreateOrderMsg("err", validateMsg); return; }
   const goodsAmount = Math.max(0, Math.round(Number(document.getElementById("newAdvanceAmount")?.value || 0)));
+  const deliveryFeePayer = getMerchantDeliveryFeePayer();
 
   if(!merchantPendingEstimate || merchantPendingEstimate.signature !== getMerchantOrderInputSignature()){
     const ok = await prepareMerchantOrderReview();
@@ -3905,6 +3948,7 @@ createMerchantOrder = async function(){
       body:JSON.stringify({
         deliveryMode:"ubee",
         paymentMethod:"rider_advance_cod",
+        deliveryFeePayer,
         orderSource:"MERCHANT_DIRECT",
         advanceAmount:goodsAmount,
         goodsAmount,
@@ -3914,9 +3958,12 @@ createMerchantOrder = async function(){
     });
     const order = data.order || {};
     const fee = Number(order.deliveryFee || order.totalFee || 0);
-    const collect = Number(order.customerPayableTotal || order.cashCollectAmount || goodsAmount + fee);
+    const collect = Number(order.customerPayableTotal || order.cashCollectAmount || goodsAmount + (deliveryFeePayer === "customer" ? fee : 0));
     const orderId = data.orderId || order.id || "";
-    showCreateOrderMsg("ok", `配送已建立。小U到店支付 NT$${goodsAmount}，送達向客戶收 NT$${collect}，小U配送收入 NT$${fee}。訂單：${orderId}`);
+    const payerText = deliveryFeePayer === "merchant"
+      ? `配送費 NT$${fee} 由店家負擔並列入店家帳款`
+      : `配送費 NT$${fee} 由客戶負擔`;
+    showCreateOrderMsg("ok", `配送已建立。小U到店支付 NT$${goodsAmount}，送達向客戶收 NT$${collect}；${payerText}。小U配送收入 NT$${fee}。訂單：${orderId}`);
     resetCreateOrderForm();
     await refreshMerchantV3Orders({silent:true});
     setTab("todo");
@@ -3935,6 +3982,8 @@ resetCreateOrderForm = function(){
   merchantV4LegacyReset();
   const payment = document.getElementById("newPaymentMethod");
   if(payment) payment.value = "rider_advance_cod";
+  const customerPayer = document.querySelector('input[name="deliveryFeePayer"][value="customer"]');
+  if(customerPayer) customerPayer.checked = true;
 };
 
 window.addEventListener("load", () => {
