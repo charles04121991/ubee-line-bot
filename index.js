@@ -23214,7 +23214,13 @@ function recalculateOrderFinancials(order) {
     const weatherFee = Math.max(0, Math.round(Number(order.weatherFee || 0)));
     const riderServiceIncome = baseDeliveryFee + speedFee + upstairsFee + waitingFee + itemSizeFee + dynamicPricingFee + weatherFee;
     const advancePayment = getOrderAdvancePaymentAmount(order);
-    const customerPayableTotal = riderServiceIncome + advancePayment;
+    const deliveryFeePayer =
+      String(order.deliveryFeePayer || 'customer').trim().toLowerCase() === 'merchant'
+        ? 'merchant'
+        : 'customer';
+    const merchantPaysDeliveryFee = deliveryFeePayer === 'merchant';
+    const customerPayableTotal =
+      advancePayment + (merchantPaysDeliveryFee ? 0 : riderServiceIncome);
 
     order.itemSize = itemSizePricing.itemSize;
     order.itemSizeLabel = order.itemSizeLabel || itemSizePricing.itemSizeLabel;
@@ -23241,9 +23247,19 @@ function recalculateOrderFinancials(order) {
     order.customerTotalWithAdvance = customerPayableTotal;
     order.cashCollectAmount = customerPayableTotal;
     order.riderCollectAmount = customerPayableTotal;
-    order.cashServiceNet = riderServiceIncome;
+    order.deliveryFeePayer = deliveryFeePayer;
+    order.deliveryFeePayerLabel = merchantPaysDeliveryFee ? '店家支付' : '客戶支付';
+    order.deliveryFeeSettlementMode = merchantPaysDeliveryFee ? 'merchant_billing' : 'customer_cash';
+    order.riderPayoutSource = merchantPaysDeliveryFee ? 'merchant_billing' : 'customer_cash';
+    order.billedTo = merchantPaysDeliveryFee ? 'merchant' : 'customer';
+    order.merchantPayableAmount = merchantPaysDeliveryFee ? riderServiceIncome : 0;
+    order.storePayableAmount = merchantPaysDeliveryFee ? riderServiceIncome : 0;
+    order.merchantBillingStatus = merchantPaysDeliveryFee
+      ? (String(order.merchantBillingStatus || '').toLowerCase() === 'paid' ? 'paid' : 'unpaid')
+      : 'not_billable';
+    order.cashServiceNet = merchantPaysDeliveryFee ? 0 : riderServiceIncome;
     order.cashDueToPlatform = 0;
-    order.platformReceivable = 0;
+    order.platformReceivable = merchantPaysDeliveryFee ? riderServiceIncome : 0;
     order.riderDueToPlatform = 0;
     return order;
   }
@@ -26297,7 +26313,8 @@ app.post('/api/merchant/order', async (req, res) => {
 
     await saveOrder(order);
 
-    await pushToGroup(LINE_ADMIN_GROUP_ID, createAdminForceCancelFlex(order));
+    // 店家配送單只進入騎士派單流程，不推送到 LINE_ADMIN_GROUP_ID（審核／管理群組）。
+    // 審核群組僅保留小U、店家合作申請等真正需要人工審核的通知。
 
     return res.json({
       success: true,
@@ -26601,6 +26618,14 @@ async function createMerchantOrderV3({
   const isRiderAdvanceCod =
     deliveryMode === 'ubee' && paymentMethod === 'rider_advance_cod';
 
+  const deliveryFeePayer =
+    String(payload.deliveryFeePayer || 'customer').trim().toLowerCase() === 'merchant'
+      ? 'merchant'
+      : 'customer';
+
+  const merchantPaysDeliveryFee =
+    isRiderAdvanceCod && deliveryFeePayer === 'merchant';
+
   const goodsAmount = merchantV3Money(
     isRiderAdvanceCod
       ? (payload.goodsAmount ?? payload.advanceAmount)
@@ -26624,16 +26649,22 @@ async function createMerchantOrderV3({
     deliveryMode === 'ubee' &&
     (paymentMethod === 'cash' || isRiderAdvanceCod);
 
+  // 店家 COD 支援兩種配送費付款人：
+  // customer：客戶支付商品款＋配送費。
+  // merchant：客戶只支付商品款；配送費列入店家帳款。
   const merchantChargeAmount =
-    deliveryMode === 'ubee' && !isCashOrder
-      ? deliveryFee + advanceAmount
-      : 0;
+    merchantPaysDeliveryFee
+      ? deliveryFee
+      : deliveryMode === 'ubee' && !isCashOrder
+        ? deliveryFee + advanceAmount
+        : 0;
 
-  // rider_advance_cod：小U取貨時先付商品款給店家，送達後向客戶收商品款 + 配送費。
   const customerCashCollectAmount =
-    isCashOrder
-      ? deliveryFee + advanceAmount
-      : 0;
+    isRiderAdvanceCod
+      ? advanceAmount + (merchantPaysDeliveryFee ? 0 : deliveryFee)
+      : isCashOrder
+        ? deliveryFee + advanceAmount
+        : 0;
 
   const commission = calculateMerchantCommissionV3({
     merchant,
@@ -26670,11 +26701,15 @@ async function createMerchantOrderV3({
       : 'pending_dispatch';
 
   const merchantBillingStatus =
-    deliveryMode !== 'ubee' || isCashOrder
+    deliveryMode !== 'ubee'
       ? 'not_billable'
-      : paymentMethod === 'merchant_paid'
-        ? 'paid'
-        : 'unpaid';
+      : merchantPaysDeliveryFee
+        ? 'unpaid'
+        : isCashOrder
+          ? 'not_billable'
+          : paymentMethod === 'merchant_paid'
+            ? 'paid'
+            : 'unpaid';
 
   const marketplaceSettlementRequired =
     orderSource === 'UBEE_MARKETPLACE' &&
@@ -26785,6 +26820,24 @@ async function createMerchantOrderV3({
     riderAdvanceAmount: advanceAmount,
     deliveryFee,
     merchantServiceFee: deliveryFee,
+    deliveryFeePayer: isRiderAdvanceCod ? deliveryFeePayer : (
+      paymentMethod === 'merchant_settlement' || paymentMethod === 'merchant_paid'
+        ? 'merchant'
+        : 'customer'
+    ),
+    deliveryFeePayerLabel: isRiderAdvanceCod
+      ? (merchantPaysDeliveryFee ? '店家支付' : '客戶支付')
+      : '',
+    deliveryFeeSettlementMode: merchantPaysDeliveryFee
+      ? 'merchant_billing'
+      : isRiderAdvanceCod
+        ? 'customer_cash'
+        : paymentMethod,
+    riderPayoutSource: merchantPaysDeliveryFee
+      ? 'merchant_billing'
+      : isRiderAdvanceCod
+        ? 'customer_cash'
+        : '',
     riderCollectAmount: customerCashCollectAmount,
     merchantReceivableAtPickup: isRiderAdvanceCod ? advanceAmount : 0,
     settlementMode: isRiderAdvanceCod ? 'rider_advance_cod' : paymentMethod,
@@ -26820,9 +26873,11 @@ async function createMerchantOrderV3({
     billedTo:
       deliveryMode !== 'ubee'
         ? 'none'
-        : isCashOrder
-          ? 'customer'
-          : 'merchant',
+        : merchantPaysDeliveryFee
+          ? 'merchant'
+          : isCashOrder
+            ? 'customer'
+            : 'merchant',
 
     merchantBillingType: 'merchant_dispatch',
     merchantPayableAmount: merchantChargeAmount,
@@ -26919,18 +26974,9 @@ async function createMerchantOrderV3({
       dispatchPushCycleId
     );
 
-    try {
-      await pushToGroup(
-        LINE_ADMIN_GROUP_ID,
-        createAdminForceCancelFlex({
-          ...order,
-          status: 'pending_dispatch',
-          createdAt: nowMs,
-        })
-      );
-    } catch (pushError) {
-      console.error('⚠️ 店家 V3 新單通知失敗：', pushError);
-    }
+    // 店家 V3 新單不推送到 LINE_ADMIN_GROUP_ID（審核／管理群組）。
+    // 訂單仍會正常啟動 startDispatchPushSequence()，送到符合條件的小U。
+    // 審核群組因此不再被一般店家配送單洗版。
   }
 
   return {
