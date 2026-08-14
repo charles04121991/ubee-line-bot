@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 V2.12：2026-08-07｜沿用 V2.11，僅重整我的設定頁位置權限與裝置項目 -->
+<!-- UBee 用戶端 V2.12 + Password Reset V1.1：2026-08-14｜忘記密碼三步驟引導與手機格式檢查 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -8829,6 +8829,20 @@ body.ubee-app-starting{
     if(!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+
+    const forgotView = target.closest?.('[data-uca-view="forgot"]');
+    if(forgotView){
+      const phoneInput = document.getElementById('ucaForgotPhone');
+      const phone = String(phoneInput?.value || '').replace(/\D/g,'').slice(0,10);
+      if(!/^09\d{8}$/.test(phone)){
+        const error = document.getElementById('ucaForgotPhoneError');
+        if(error) error.textContent = '請先輸入完整的 09 開頭 10 碼註冊手機號碼。';
+        phoneInput?.focus();
+        return;
+      }
+      try{ sessionStorage.setItem('ubee_password_reset_phone', phone); }catch(_){ }
+    }
+
     window.openUBeeOfficialAccount();
   },true);
 })();
@@ -8845,6 +8859,47 @@ body.ubee-app-starting{
   body.ubee-customer-auth-open {
     overflow:hidden !important;
     background:#f4f5f6 !important;
+  }
+
+  .uca-reset-flow{
+    display:grid;
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .uca-reset-step{
+    display:grid;
+    grid-template-columns:36px minmax(0,1fr);
+    gap:11px;
+    align-items:start;
+    padding:13px;
+    border:1px solid #e6e7e9;
+    border-radius:15px;
+    background:#fafafa;
+  }
+  .uca-reset-step-no{
+    width:36px;
+    height:36px;
+    display:grid;
+    place-items:center;
+    border-radius:12px;
+    background:#facc15;
+    color:#111;
+    font-size:15px;
+    font-weight:1000;
+  }
+  .uca-reset-step strong{
+    display:block;
+    color:#171717;
+    font-size:14px;
+    line-height:1.45;
+  }
+  .uca-reset-step span{
+    display:block;
+    margin-top:4px;
+    color:#6f7378;
+    font-size:12px;
+    font-weight:750;
+    line-height:1.65;
   }
 
   /* 舊版 1～4 步驟僅保留為建單相容引擎，不再顯示給客人。
@@ -9528,15 +9583,21 @@ body.ubee-app-starting{
 <section class="uca-view" data-uca-view="forgot">
 <header class="uca-topbar"><button aria-label="返回" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="首頁" class="uca-icon-btn" data-uca-home="" type="button">⌂</button></header>
 <div class="uca-scroll">
-<div class="uca-heading"><div class="uca-kicker">PASSWORD HELP</div><h2>忘記密碼</h2><p class="uca-subtitle">V1 不收簡訊費。請先確認你的登入手機號碼，再聯繫 UBee 客服完成身分核對。</p></div>
+<div class="uca-heading"><div class="uca-kicker">PASSWORD HELP</div><h2>重設登入密碼</h2><p class="uca-subtitle">不需要簡訊驗證碼，也不會產生簡訊費。請依照下面 3 個步驟完成密碼重設。</p></div>
 <div class="uca-panel">
-<div class="uca-field">
-<div class="uca-label-row"><label class="uca-label" for="ucaForgotPhone">註冊手機號碼</label></div>
-<input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
-<div class="uca-help">客服核對完成後，會提供一組 15 分鐘內有效、只能使用一次的密碼重設連結。</div>
+<div class="uca-reset-flow" aria-label="密碼重設流程">
+<div class="uca-reset-step"><div class="uca-reset-step-no">1</div><div><strong>確認註冊手機號碼</strong><span>輸入你註冊 UBee 會員時使用的 09 開頭手機號碼。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">2</div><div><strong>聯繫 UBee 客服核對本人</strong><span>客服會核對會員姓名、近期任務或常用資料，不會詢問你的舊密碼。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">3</div><div><strong>取得一次性連結並設定新密碼</strong><span>核對完成後，客服會提供 15 分鐘內有效且只能使用一次的重設連結。</span></div></div>
 </div>
-<div class="uca-security">客服可能核對會員姓名、手機號碼、近期任務或常用資料；客服不會要求你說出原本的登入密碼。</div>
-<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" data-uca-support="" data-ubee-line-support type="button">聯繫 UBee 客服</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">返回登入</button></div>
+<div class="uca-field">
+<div class="uca-label-row"><label class="uca-label" for="ucaForgotPhone">註冊手機號碼</label><span class="uca-optional">必填</span></div>
+<input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
+<div class="uca-error" id="ucaForgotPhoneError"></div>
+<div class="uca-help">輸入完整手機號碼後，下方「聯繫 UBee 客服」按鈕才會開啟。</div>
+</div>
+<div class="uca-security">為保障帳號安全，UBee 客服只能協助「重設」密碼，無法查看或告訴你原本的登入密碼。</div>
+<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaForgotSupport" data-uca-support="" data-ubee-line-support type="button" disabled>聯繫 UBee 客服</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">返回登入</button></div>
 </div>
 </div>
 </section>
@@ -9945,7 +10006,9 @@ body.ubee-app-starting{
     if(go==='register')startRegister();
     else if(go==='forgot'){
       $('ucaForgotPhone').value=normalizePhone($('ucaLoginPhone').value);
+      updateForgotSupportState();
       showView('forgot');
+      setTimeout(()=>$('ucaForgotPhone').focus(),80);
     }else if(go)showView(go);
     if(event.target.closest('[data-uca-back]'))goBack();
     if(event.target.closest('[data-uca-home]'))goHome();
@@ -9969,10 +10032,23 @@ body.ubee-app-starting{
   $('ucaResetPassword').addEventListener('input',resetPasswordState);
   $('ucaResetSubmit').addEventListener('click',submitPasswordReset);
   ['ucaRegisterPhone','ucaRegisterName','ucaRegisterEmail','ucaRegisterReferral'].forEach(id=>$(id).addEventListener('input',event=>{if(id==='ucaRegisterPhone')event.target.value=normalizePhone(event.target.value);saveDraft()}));
-  $('ucaLoginPhone').addEventListener('input',event=>event.target.value=normalizePhone(event.target.value));
-  $('ucaForgotPhone').addEventListener('input',event=>event.target.value=normalizePhone(event.target.value));
+  function updateForgotSupportState(){
+    const phone=normalizePhone($('ucaForgotPhone').value);
+    $('ucaForgotPhone').value=phone;
+    const valid=validPhone(phone);
+    const button=$('ucaForgotSupport');
+    if(button) button.disabled=!valid;
+    if(valid) setError('ucaForgotPhoneError');
+    return valid;
+  }
 
-  populateCities(); restoreDraft(); passwordState(); resetPasswordState();
+  $('ucaLoginPhone').addEventListener('input',event=>event.target.value=normalizePhone(event.target.value));
+  $('ucaForgotPhone').addEventListener('input',event=>{
+    event.target.value=normalizePhone(event.target.value);
+    updateForgotSupportState();
+  });
+
+  populateCities(); restoreDraft(); passwordState(); resetPasswordState(); updateForgotSupportState();
   window.UBeeCustomerAuthHost=Object.freeze({show,hide,isOpen:()=>root.classList.contains('active')});
   if(state.resetToken) validatePasswordResetToken();
 })();
