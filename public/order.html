@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 V2.13 + Password Reset V2：2026-08-14｜LINE 全自動免簡訊密碼重設 -->
+<!-- UBee 用戶端 V2.12 + Password Reset V3：2026-08-14｜LINE Messaging API Bot 全自動核對；不使用 LIFF／不需客服 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -8829,22 +8829,6 @@ body.ubee-app-starting{
     if(!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-
-    const forgotView = target.closest?.('[data-uca-view="forgot"]');
-    if(forgotView){
-      const phoneInput = document.getElementById('ucaForgotPhone');
-      const phone = String(phoneInput?.value || '').replace(/\D/g,'').slice(0,10);
-      if(!/^09\d{8}$/.test(phone)){
-        const error = document.getElementById('ucaForgotPhoneError');
-        if(error) error.textContent = '請先輸入完整的 09 開頭 10 碼註冊手機號碼。';
-        phoneInput?.focus();
-        return;
-      }
-      try{ sessionStorage.setItem('ubee_password_reset_phone', phone); }catch(_){ }
-      window.location.assign(`/rider-app-login/password-reset?phone=${encodeURIComponent(phone)}`);
-      return;
-    }
-
     window.openUBeeOfficialAccount();
   },true);
 })();
@@ -8856,7 +8840,7 @@ body.ubee-app-starting{
      UBee 客戶會員入口｜直接整合在 order.html
      - 不使用 iframe
      - 不使用 Base64 會員頁
-     - 不使用 LINE / LIFF / SMS 驗證碼
+     - 會員登入不依賴 LINE；忘記密碼使用 LINE Messaging API Bot，不使用 LIFF / SMS 驗證碼
      ===================================================== */
   body.ubee-customer-auth-open {
     overflow:hidden !important;
@@ -9585,21 +9569,22 @@ body.ubee-app-starting{
 <section class="uca-view" data-uca-view="forgot">
 <header class="uca-topbar"><button aria-label="返回" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="首頁" class="uca-icon-btn" data-uca-home="" type="button">⌂</button></header>
 <div class="uca-scroll">
-<div class="uca-heading"><div class="uca-kicker">AUTO PASSWORD RESET</div><h2>自動重設登入密碼</h2><p class="uca-subtitle">不需要簡訊驗證碼，也不需要等客服人工處理。UBee 會透過 LINE 自動核對身分並自動發送一次性重設連結。</p></div>
+<div class="uca-heading"><div class="uca-kicker">PASSWORD RESET V3</div><h2>自動重設登入密碼</h2><p class="uca-subtitle">不使用簡訊、不使用 LIFF，也不需要客服人工產生或傳送連結。UBee LINE Bot 會直接完成核對。</p></div>
 <div class="uca-panel">
 <div class="uca-reset-flow" aria-label="密碼重設流程">
-<div class="uca-reset-step"><div class="uca-reset-step-no">1</div><div><strong>輸入註冊手機號碼</strong><span>輸入你註冊 UBee 會員時使用的 09 開頭 10 碼手機號碼。</span></div></div>
-<div class="uca-reset-step"><div class="uca-reset-step-no">2</div><div><strong>前往 LINE 自動核對</strong><span>點擊下方按鈕後，系統會啟動 LINE 安全登入，自動取得目前 LINE 身分，再比對可信綁定、歷史任務與會員資料。</span></div></div>
-<div class="uca-reset-step"><div class="uca-reset-step-no">3</div><div><strong>系統自動傳送重設連結</strong><span>核對通過後會直接進入「設定新密碼」畫面；不需要客服查帳號、產生連結、複製網址或回傳訊息。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">1</div><div><strong>輸入註冊手機號碼</strong><span>輸入 UBee 會員帳號使用的 09 開頭手機號碼。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">2</div><div><strong>前往 UBee LINE 官方帳號</strong><span>系統會先複製「忘記密碼＋手機號碼」指令；進入 LINE 後貼上並送出即可。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">3</div><div><strong>LINE Bot 自動核對並發連結</strong><span>已信任的 LINE 可直接重設；舊會員由 Bot 自動詢問必要資料，核對成功後直接收到 15 分鐘一次性連結。</span></div></div>
 </div>
 <div class="uca-field">
 <div class="uca-label-row"><label class="uca-label" for="ucaForgotPhone">註冊手機號碼</label><span class="uca-optional">必填</span></div>
 <input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
 <div class="uca-error" id="ucaForgotPhoneError"></div>
-<div class="uca-help">輸入完整手機號碼後，下方自動重設按鈕才會開啟；之後由系統自動完成 LINE 身分核對。</div>
+<div class="uca-help">輸入完整手機號碼後，系統會產生要傳給 LINE Bot 的重設指令。</div>
 </div>
-<div class="uca-security">UBee 不會查看或告訴你原本的登入密碼。系統只會在自動身分核對通過後發出一次性重設連結。</div>
-<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaForgotSupport" data-uca-support="" data-ubee-line-support type="button" disabled>使用 LINE 自動驗證並重設</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">返回登入</button></div>
+<div class="uca-security"><strong>LINE 指令</strong><br><span id="ucaForgotCommandPreview">忘記密碼 09xxxxxxxx</span><br><small>這不是密碼，也不會讓任何人只靠手機號碼直接改密碼；LINE Bot 還會做身分核對。</small></div>
+<div class="uca-status" id="ucaForgotStatus"></div>
+<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaForgotSupport" type="button" disabled>開啟 LINE 自動重設</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">返回登入</button></div>
 </div>
 </div>
 </section>
@@ -10039,9 +10024,59 @@ body.ubee-app-starting{
     $('ucaForgotPhone').value=phone;
     const valid=validPhone(phone);
     const button=$('ucaForgotSupport');
+    const preview=$('ucaForgotCommandPreview');
     if(button) button.disabled=!valid;
+    if(preview) preview.textContent=valid?`忘記密碼 ${phone}`:'忘記密碼 09xxxxxxxx';
     if(valid) setError('ucaForgotPhoneError');
     return valid;
+  }
+
+  async function startAutomatedLinePasswordReset(){
+    const phone=normalizePhone($('ucaForgotPhone').value);
+    $('ucaForgotPhone').value=phone;
+    if(!validPhone(phone)){
+      setError('ucaForgotPhoneError','請輸入完整的 09 開頭 10 碼註冊手機號碼。');
+      $('ucaForgotPhone').focus();
+      return;
+    }
+
+    const command=`忘記密碼 ${phone}`;
+    const status=$('ucaForgotStatus');
+    let copied=false;
+
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(command);
+        copied=true;
+      }
+    }catch(_){}
+
+    if(!copied){
+      try{
+        const temp=document.createElement('textarea');
+        temp.value=command;
+        temp.setAttribute('readonly','');
+        temp.style.position='fixed';
+        temp.style.opacity='0';
+        document.body.appendChild(temp);
+        temp.select();
+        copied=document.execCommand('copy');
+        temp.remove();
+      }catch(_){}
+    }
+
+    try{sessionStorage.setItem('ubee_password_reset_line_command',command)}catch(_){}
+
+    if(status){
+      status.textContent=copied
+        ? `已複製「${command}」。進入 LINE 後貼上並送出，Bot 會自動完成後續核對。`
+        : `進入 LINE 後請送出：「${command}」；Bot 會自動完成後續核對。`;
+      status.classList.add('show','success');
+    }
+
+    window.setTimeout(()=>{
+      window.openUBeeOfficialAccount?.();
+    },180);
   }
 
   $('ucaLoginPhone').addEventListener('input',event=>event.target.value=normalizePhone(event.target.value));
@@ -10049,6 +10084,7 @@ body.ubee-app-starting{
     event.target.value=normalizePhone(event.target.value);
     updateForgotSupportState();
   });
+  $('ucaForgotSupport').addEventListener('click',startAutomatedLinePasswordReset);
 
   populateCities(); restoreDraft(); passwordState(); resetPasswordState(); updateForgotSupportState();
   window.UBeeCustomerAuthHost=Object.freeze({show,hide,isOpen:()=>root.classList.contains('active')});
