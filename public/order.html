@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 V2.12 + Password Reset V1.1：2026-08-14｜忘記密碼三步驟引導與手機格式檢查 -->
+<!-- UBee 用戶端 V2.13 + Password Reset V2：2026-08-14｜LINE 全自動免簡訊密碼重設 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
     :root{
@@ -8841,6 +8841,8 @@ body.ubee-app-starting{
         return;
       }
       try{ sessionStorage.setItem('ubee_password_reset_phone', phone); }catch(_){ }
+      window.location.assign(`/customer-password-reset-line?phone=${encodeURIComponent(phone)}`);
+      return;
     }
 
     window.openUBeeOfficialAccount();
@@ -9583,21 +9585,21 @@ body.ubee-app-starting{
 <section class="uca-view" data-uca-view="forgot">
 <header class="uca-topbar"><button aria-label="返回" class="uca-icon-btn" data-uca-back="" type="button">‹</button><div class="uca-brand"><span>U</span>Bee 跑腿</div><button aria-label="首頁" class="uca-icon-btn" data-uca-home="" type="button">⌂</button></header>
 <div class="uca-scroll">
-<div class="uca-heading"><div class="uca-kicker">PASSWORD HELP</div><h2>重設登入密碼</h2><p class="uca-subtitle">不需要簡訊驗證碼，也不會產生簡訊費。請依照下面 3 個步驟完成密碼重設。</p></div>
+<div class="uca-heading"><div class="uca-kicker">AUTO PASSWORD RESET</div><h2>自動重設登入密碼</h2><p class="uca-subtitle">不需要簡訊驗證碼，也不需要等客服人工處理。UBee 會透過 LINE 自動核對身分並自動發送一次性重設連結。</p></div>
 <div class="uca-panel">
 <div class="uca-reset-flow" aria-label="密碼重設流程">
-<div class="uca-reset-step"><div class="uca-reset-step-no">1</div><div><strong>確認註冊手機號碼</strong><span>輸入你註冊 UBee 會員時使用的 09 開頭手機號碼。</span></div></div>
-<div class="uca-reset-step"><div class="uca-reset-step-no">2</div><div><strong>聯繫 UBee 客服核對本人</strong><span>客服會核對會員姓名、近期任務或常用資料，不會詢問你的舊密碼。</span></div></div>
-<div class="uca-reset-step"><div class="uca-reset-step-no">3</div><div><strong>取得一次性連結並設定新密碼</strong><span>核對完成後，客服會提供 15 分鐘內有效且只能使用一次的重設連結。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">1</div><div><strong>輸入註冊手機號碼</strong><span>輸入你註冊 UBee 會員時使用的 09 開頭 10 碼手機號碼。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">2</div><div><strong>前往 LINE 自動核對</strong><span>點擊下方按鈕後，系統會啟動 LINE 安全登入，自動取得目前 LINE 身分，再比對可信綁定、歷史任務與會員資料。</span></div></div>
+<div class="uca-reset-step"><div class="uca-reset-step-no">3</div><div><strong>系統自動傳送重設連結</strong><span>核對通過後會直接進入「設定新密碼」畫面；不需要客服查帳號、產生連結、複製網址或回傳訊息。</span></div></div>
 </div>
 <div class="uca-field">
 <div class="uca-label-row"><label class="uca-label" for="ucaForgotPhone">註冊手機號碼</label><span class="uca-optional">必填</span></div>
 <input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
 <div class="uca-error" id="ucaForgotPhoneError"></div>
-<div class="uca-help">輸入完整手機號碼後，下方「聯繫 UBee 客服」按鈕才會開啟。</div>
+<div class="uca-help">輸入完整手機號碼後，下方自動重設按鈕才會開啟；之後由系統自動完成 LINE 身分核對。</div>
 </div>
-<div class="uca-security">為保障帳號安全，UBee 客服只能協助「重設」密碼，無法查看或告訴你原本的登入密碼。</div>
-<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaForgotSupport" data-uca-support="" data-ubee-line-support type="button" disabled>聯繫 UBee 客服</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">返回登入</button></div>
+<div class="uca-security">UBee 不會查看或告訴你原本的登入密碼。系統只會在自動身分核對通過後發出一次性重設連結。</div>
+<div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaForgotSupport" data-uca-support="" data-ubee-line-support type="button" disabled>使用 LINE 自動驗證並重設</button><button class="uca-btn uca-btn-secondary" data-uca-go="login" type="button">返回登入</button></div>
 </div>
 </div>
 </section>
