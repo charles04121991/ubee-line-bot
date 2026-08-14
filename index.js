@@ -3255,22 +3255,32 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
   phoneIndex: 'customerPhoneIndex',
   sessions: 'customerSessions',
   passwordResetTokens: 'customerPasswordResetTokens',
+  passwordResetLineStates: 'customerPasswordResetLineStates',
+  passwordResetAudit: 'customerPasswordResetAudit',
   counters: 'systemCounters',
 });
 
 // =====================================================
-// UBee Customer Password Reset V1｜免簡訊客服核對版
-// - 客服完成身分核對後才可產生一次性連結
-// - 原始 Token 不寫入 Firestore，只保存 SHA-256
-// - 15 分鐘失效、一次性使用、每次新連結自動淘汰舊連結
-// - 同一會員 30 分鐘最多產生 3 次
-// - 重設完成後 passwordVersion + 1，既有 Session 全部失效
+// UBee Customer Password Reset V2｜LINE 全自動免簡訊版
+// - 客人於 LINE 官方帳號輸入註冊手機，系統自動辨識會員與 LINE 身分。
+// - 已有可信 LINE 綁定或歷史訂單可直接核對時，自動產生 15 分鐘一次性連結。
+// - 無既有可信綁定時，由系統自動要求姓名＋註冊 Email／本人歷史訂單做第二層核對。
+// - 原始 Token 不寫入 Firestore，只保存 SHA-256。
+// - 15 分鐘失效、一次性使用、每次新連結自動淘汰舊連結。
+// - 同一會員 30 分鐘最多產生 3 次；LINE 自動核對最多嘗試 5 次。
+// - 重設完成後 passwordVersion + 1，既有 Session 全部失效。
 // =====================================================
 const CUSTOMER_PASSWORD_RESET = Object.freeze({
   ttlMs: 15 * 60 * 1000,
   issueWindowMs: 30 * 60 * 1000,
   maxIssuesPerWindow: 3,
   tokenBytes: 32,
+});
+
+const CUSTOMER_PASSWORD_RESET_AUTO = Object.freeze({
+  stateTtlMs: 10 * 60 * 1000,
+  maxVerificationAttempts: 5,
+  maxLegacyOrdersToCheck: 50,
 });
 
 // =====================================================
@@ -3578,7 +3588,7 @@ async function loadCustomerPasswordResetRecord(rawToken) {
   const token = customerPasswordResetToken(rawToken);
   if (token.length < 32) {
     throw customerAuthError(
-      '這個密碼重設連結無效或已經失效，請重新聯繫 UBee 客服。',
+      '這個密碼重設連結無效或已經失效，請聯繫 UBee 客服。',
       410,
       'CUSTOMER_PASSWORD_RESET_INVALID'
     );
@@ -3592,7 +3602,7 @@ async function loadCustomerPasswordResetRecord(rawToken) {
 
   if (!tokenDoc.exists) {
     throw customerAuthError(
-      '這個密碼重設連結無效或已經失效，請重新聯繫 UBee 客服。',
+      '這個密碼重設連結無效或已經失效，請聯繫 UBee 客服。',
       410,
       'CUSTOMER_PASSWORD_RESET_INVALID'
     );
@@ -3606,7 +3616,7 @@ async function loadCustomerPasswordResetRecord(rawToken) {
     Number(reset.expiresAtMs || 0) <= nowMs
   ) {
     throw customerAuthError(
-      '這個密碼重設連結已使用或已過期，請重新聯繫 UBee 客服。',
+      '這個密碼重設連結已使用或已過期，請聯繫 UBee 客服。',
       410,
       'CUSTOMER_PASSWORD_RESET_EXPIRED'
     );
@@ -3615,7 +3625,7 @@ async function loadCustomerPasswordResetRecord(rawToken) {
   const customerId = String(reset.customerId || '').trim();
   if (!/^customer_[a-f0-9]{32}$/.test(customerId)) {
     throw customerAuthError(
-      '這個密碼重設連結無效，請重新聯繫 UBee 客服。',
+      '這個密碼重設連結無效，請聯繫 UBee 客服。',
       410,
       'CUSTOMER_PASSWORD_RESET_INVALID'
     );
@@ -3661,6 +3671,136 @@ async function loadCustomerPasswordResetRecord(rawToken) {
     customerId,
     accountRef,
     account,
+  };
+}
+
+
+async function issueCustomerPasswordResetToken({
+  record,
+  createdBy = 'system',
+  verificationNote = 'system_verified',
+  source = 'system',
+  lineUserId = '',
+  requestIp = '',
+} = {}) {
+  if (!record?.ref || !record?.customerId) {
+    throw customerAuthError(
+      '找不到 UBee 會員帳號。',
+      404,
+      'CUSTOMER_ACCOUNT_NOT_FOUND'
+    );
+  }
+
+  const rawToken = customerAuthRandomToken(CUSTOMER_PASSWORD_RESET.tokenBytes);
+  const tokenHash = customerAuthHash(rawToken);
+  const tokenRef = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.passwordResetTokens)
+    .doc(tokenHash);
+
+  const nowMs = Date.now();
+  let expiresAtMs = nowMs + CUSTOMER_PASSWORD_RESET.ttlMs;
+  let resetVersion = 0;
+
+  await db.runTransaction(async transaction => {
+    const accountDoc = await transaction.get(record.ref);
+    if (!accountDoc.exists) {
+      throw customerAuthError(
+        '找不到 UBee 會員帳號。',
+        404,
+        'CUSTOMER_ACCOUNT_NOT_FOUND'
+      );
+    }
+
+    const account = accountDoc.data() || {};
+    if (String(account.status || 'active') !== 'active') {
+      throw customerAuthError(
+        '此帳號目前無法重設密碼。',
+        403,
+        'CUSTOMER_ACCOUNT_UNAVAILABLE'
+      );
+    }
+
+    let windowStartedAtMs = Number(
+      account.passwordResetIssueWindowStartedAtMs || 0
+    );
+    let issueCount = Number(account.passwordResetIssueCount || 0);
+
+    if (
+      !windowStartedAtMs ||
+      nowMs - windowStartedAtMs >= CUSTOMER_PASSWORD_RESET.issueWindowMs
+    ) {
+      windowStartedAtMs = nowMs;
+      issueCount = 0;
+    }
+
+    if (issueCount >= CUSTOMER_PASSWORD_RESET.maxIssuesPerWindow) {
+      const remainingMs = Math.max(
+        1000,
+        CUSTOMER_PASSWORD_RESET.issueWindowMs - (nowMs - windowStartedAtMs)
+      );
+      const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+      throw customerAuthError(
+        `此會員 30 分鐘內已產生 3 次重設連結，請約 ${remainingMinutes} 分鐘後再試。`,
+        429,
+        'CUSTOMER_PASSWORD_RESET_RATE_LIMITED'
+      );
+    }
+
+    resetVersion = Number(account.passwordResetVersion || 0) + 1;
+    expiresAtMs = nowMs + CUSTOMER_PASSWORD_RESET.ttlMs;
+
+    const normalizedLineUserId = String(lineUserId || '').trim();
+    const accountUpdate = {
+      passwordResetVersion: resetVersion,
+      passwordResetIssueWindowStartedAtMs: windowStartedAtMs,
+      passwordResetIssueCount: issueCount + 1,
+      passwordResetLastIssuedAtMs: nowMs,
+      passwordResetLastIssuedBy: cleanText(createdBy, 100) || 'system',
+      passwordResetLastIssuedSource: cleanText(source, 80) || 'system',
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (normalizedLineUserId.startsWith('U')) {
+      accountUpdate.passwordResetLineUserId = normalizedLineUserId;
+      accountUpdate.passwordResetLineVerifiedAtMs = nowMs;
+      accountUpdate.passwordResetLineVerificationMethod = cleanText(
+        source,
+        80
+      );
+    }
+
+    transaction.set(record.ref, accountUpdate, { merge: true });
+
+    transaction.set(tokenRef, {
+      tokenHash,
+      customerId: record.customerId,
+      phone: normalizeCustomerPhone(record.account?.phone || ''),
+      resetVersion,
+      createdBy: cleanText(createdBy, 100) || 'system',
+      source: cleanText(source, 80) || 'system',
+      verificationNote: cleanText(verificationNote, 500),
+      lineUserIdHash: normalizedLineUserId.startsWith('U')
+        ? customerAuthHash(normalizedLineUserId).slice(0, 32)
+        : '',
+      createdAtMs: nowMs,
+      expiresAtMs,
+      used: false,
+      revoked: false,
+      adminIpHash: requestIp
+        ? customerAuthHash(requestIp).slice(0, 32)
+        : '',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  return {
+    rawToken,
+    tokenHash,
+    resetLink: customerPasswordResetLink(rawToken),
+    expiresAtMs,
+    resetVersion,
+    validForMinutes: Math.round(CUSTOMER_PASSWORD_RESET.ttlMs / 60000),
   };
 }
 
@@ -4236,7 +4376,7 @@ app.post('/api/customer-auth/password-reset/complete', async (req, res) => {
 
       if (!tokenDoc.exists || !accountDoc.exists) {
         throw customerAuthError(
-          '這個密碼重設連結無效，請重新聯繫 UBee 客服。',
+          '這個密碼重設連結無效，請聯繫 UBee 客服。',
           410,
           'CUSTOMER_PASSWORD_RESET_INVALID'
         );
@@ -4436,6 +4576,377 @@ app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => 
   } catch (error) {
     return sendCustomerAuthError(res, error);
   }
+});
+
+
+async function customerPasswordResetLineProfile(accessToken) {
+  const token = String(accessToken || '').trim();
+  if (token.length < 20 || token.length > 3000) {
+    throw customerAuthError(
+      'LINE 登入憑證無效，請重新開啟密碼重設。',
+      401,
+      'CUSTOMER_RESET_LINE_TOKEN_INVALID'
+    );
+  }
+
+  const response = await fetch('https://api.line.me/v2/profile', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+  const lineUserId = String(data?.userId || '').trim();
+
+  if (!response.ok || !lineUserId.startsWith('U')) {
+    throw customerAuthError(
+      'LINE 身分驗證失敗，請重新登入 LINE 後再試。',
+      401,
+      'CUSTOMER_RESET_LINE_IDENTITY_FAILED'
+    );
+  }
+
+  return {
+    lineUserId,
+    displayName: cleanText(data?.displayName || '', 100),
+  };
+}
+
+async function customerPasswordResetAutoStart(record, lineUserId) {
+  const boundLine = String(record.account?.passwordResetLineUserId || '').trim();
+  if (boundLine && boundLine !== lineUserId) {
+    return {
+      blocked: true,
+      code: 'CUSTOMER_RESET_BOUND_TO_OTHER_LINE',
+      message: '此會員已綁定其他可信 LINE 復原身分，系統不會自動改綁。',
+    };
+  }
+
+  const history = await customerResetFindMatchingLineHistory(record, lineUserId);
+  if (history.verified) {
+    const canBind = await customerResetEnsureLineNotBoundElsewhere(record, lineUserId);
+    if (!canBind) {
+      return {
+        blocked: true,
+        code: 'CUSTOMER_RESET_LINE_BIND_CONFLICT',
+        message: '這個 LINE 帳號已綁定其他 UBee 會員，系統已停止自動重設。',
+      };
+    }
+
+    const issued = await issueCustomerPasswordResetToken({
+      record,
+      createdBy: 'line_liff_auto_reset',
+      verificationNote: history.method,
+      source: 'line_liff_auto_reset',
+      lineUserId,
+    });
+
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_RESET_LINK_ISSUED',
+      status: 'success',
+      record,
+      lineUserId,
+      verificationMethod: history.method,
+      detail: 'LIFF 自動身分核對通過並直接建立重設連結。',
+    });
+
+    return {
+      success: true,
+      resetLink: issued.resetLink,
+      expiresAtMs: issued.expiresAtMs,
+      verificationMethod: history.method,
+    };
+  }
+
+  const hasOrder = await customerResetHasAccountOrder(record);
+  const hasEmail = Boolean(normalizeCustomerEmail(record.account?.email || ''));
+  let challengeMode = '';
+  if (hasOrder && hasEmail) challengeMode = 'name_email_order';
+  else if (hasOrder) challengeMode = 'name_order';
+  else if (hasEmail) challengeMode = 'name_email';
+
+  if (!challengeMode) {
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_IDENTITY_INSUFFICIENT_DATA',
+      status: 'blocked',
+      record,
+      lineUserId,
+      verificationMethod: 'no_trust_anchor',
+      detail: 'LIFF 已確認 LINE 本人，但會員沒有足夠的既有資料完成帳號歸屬核對。',
+    });
+    return {
+      blocked: true,
+      code: 'CUSTOMER_RESET_INSUFFICIENT_DATA',
+      message: '此帳號目前沒有足夠的既有資料可安全完成全自動核對。',
+    };
+  }
+
+  const nowMs = Date.now();
+  await customerPasswordResetLineStateRef(lineUserId).set({
+    stage: 'awaiting_identity',
+    phone: normalizeCustomerPhone(record.account?.phone || ''),
+    customerId: record.customerId,
+    challengeMode,
+    verificationAttempts: 0,
+    createdAtMs: nowMs,
+    expiresAtMs: nowMs + CUSTOMER_PASSWORD_RESET_AUTO.stateTtlMs,
+    updatedAtMs: nowMs,
+  });
+
+  await customerPasswordResetAudit({
+    eventType: 'AUTO_CHALLENGE_REQUIRED',
+    status: 'pending',
+    record,
+    lineUserId,
+    verificationMethod: challengeMode,
+    detail: 'LIFF 已驗證 LINE，等待第二層會員資料自動核對。',
+  });
+
+  return {
+    success: true,
+    challengeRequired: true,
+    challengeMode,
+    prompt: customerResetChallengePrompt(challengeMode),
+  };
+}
+
+app.post('/api/customer-auth/password-reset/line-auto', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    if (!isValidCustomerPhone(phone)) {
+      return res.status(400).json({
+        success: false,
+        code: 'CUSTOMER_PHONE_INVALID',
+        message: '請輸入 09 開頭的 10 碼 UBee 註冊手機號碼。',
+      });
+    }
+
+    const profile = await customerPasswordResetLineProfile(
+      req.body?.lineAccessToken
+    );
+    const lineUserId = profile.lineUserId;
+    const record = await findCustomerAccountByPhone(phone);
+
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        code: 'CUSTOMER_ACCOUNT_NOT_FOUND',
+        message: '目前無法用這支手機完成自動密碼重設，請確認註冊手機號碼。',
+      });
+    }
+
+    if (String(record.account?.status || 'active') !== 'active') {
+      return res.status(403).json({
+        success: false,
+        code: 'CUSTOMER_ACCOUNT_UNAVAILABLE',
+        message: '此 UBee 帳號目前無法進行密碼重設。',
+      });
+    }
+
+    const challenge = String(req.body?.challenge || '').trim();
+    if (!challenge) {
+      const result = await customerPasswordResetAutoStart(record, lineUserId);
+      if (result.blocked) {
+        return res.status(403).json({ success: false, ...result });
+      }
+      return res.json(result);
+    }
+
+    const stateRef = customerPasswordResetLineStateRef(lineUserId);
+    const stateDoc = await stateRef.get();
+    if (!stateDoc.exists) {
+      return res.status(410).json({
+        success: false,
+        code: 'CUSTOMER_RESET_CHALLENGE_EXPIRED',
+        message: '自動核對階段已逾時，請重新開始。',
+      });
+    }
+
+    const state = stateDoc.data() || {};
+    if (
+      Number(state.expiresAtMs || 0) <= Date.now() ||
+      state.customerId !== record.customerId ||
+      normalizeCustomerPhone(state.phone || '') !== phone
+    ) {
+      await stateRef.delete().catch(() => {});
+      return res.status(410).json({
+        success: false,
+        code: 'CUSTOMER_RESET_CHALLENGE_EXPIRED',
+        message: '自動核對階段已逾時或會員資料已變更，請重新開始。',
+      });
+    }
+
+    const mode = String(state.challengeMode || '');
+    const checked = await customerResetCheckChallenge(
+      record,
+      lineUserId,
+      mode,
+      challenge
+    );
+
+    if (!checked.passed) {
+      const attempts = Number(state.verificationAttempts || 0) + 1;
+      if (attempts >= CUSTOMER_PASSWORD_RESET_AUTO.maxVerificationAttempts) {
+        await stateRef.delete().catch(() => {});
+        await customerPasswordResetAudit({
+          eventType: 'AUTO_CHALLENGE_LOCKED',
+          status: 'blocked',
+          record,
+          lineUserId,
+          verificationMethod: mode,
+          detail: `LIFF 第二層核對連續失敗 ${attempts} 次。`,
+        });
+        return res.status(429).json({
+          success: false,
+          code: 'CUSTOMER_RESET_CHALLENGE_LOCKED',
+          message: '自動核對資料連續不一致，本次流程已停止。',
+        });
+      }
+
+      await stateRef.set({
+        verificationAttempts: attempts,
+        updatedAtMs: Date.now(),
+      }, { merge: true });
+
+      return res.status(403).json({
+        success: false,
+        challengeRequired: true,
+        challengeMode: mode,
+        remainingAttempts:
+          CUSTOMER_PASSWORD_RESET_AUTO.maxVerificationAttempts - attempts,
+        message: '資料核對不一致，請確認後重新輸入。',
+        prompt: customerResetChallengePrompt(mode),
+      });
+    }
+
+    const canBind = await customerResetEnsureLineNotBoundElsewhere(
+      record,
+      lineUserId
+    );
+    if (!canBind) {
+      await stateRef.delete().catch(() => {});
+      return res.status(403).json({
+        success: false,
+        code: 'CUSTOMER_RESET_LINE_BIND_CONFLICT',
+        message: '這個 LINE 帳號已綁定其他 UBee 會員，系統已停止自動重設。',
+      });
+    }
+
+    const issued = await issueCustomerPasswordResetToken({
+      record,
+      createdBy: 'line_liff_auto_reset',
+      verificationNote: checked.verificationMethod,
+      source: 'line_liff_auto_reset_challenge',
+      lineUserId,
+    });
+
+    await stateRef.delete().catch(() => {});
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_CHALLENGE_VERIFIED',
+      status: 'success',
+      record,
+      lineUserId,
+      verificationMethod: checked.verificationMethod,
+      detail: 'LIFF 第二層核對通過並建立一次性重設連結。',
+    });
+
+    return res.json({
+      success: true,
+      resetLink: issued.resetLink,
+      expiresAtMs: issued.expiresAtMs,
+      verificationMethod: checked.verificationMethod,
+    });
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 500);
+    console.error('❌ LINE 全自動密碼重設失敗：', error);
+    return res.status(statusCode).json({
+      success: false,
+      code: error?.code || 'CUSTOMER_RESET_LINE_AUTO_FAILED',
+      message: error?.message || '自動密碼重設失敗，請稍後再試。',
+    });
+  }
+});
+
+app.get('/customer-password-reset-line', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const phone = normalizeCustomerPhone(req.query?.phone || '');
+  const safePhone = isValidCustomerPhone(phone) ? phone : '';
+
+  return res.type('html').send(`<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>UBee｜LINE 自動密碼重設</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#f5f6f7;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;display:grid;place-items:center;padding:20px}.card{width:min(100%,460px);background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:24px;box-shadow:0 18px 48px rgba(17,24,39,.08)}.logo{width:52px;height:52px;border-radius:17px;background:#facc15;display:grid;place-items:center;font-weight:1000;font-size:25px}.kicker{margin-top:18px;color:#8a6700;font-size:11px;font-weight:1000}.title{margin:5px 0 8px;font-size:25px;font-weight:1000}.sub{color:#6f7378;font-size:13px;line-height:1.7}.status{margin-top:18px;padding:14px;border-radius:15px;background:#f7f8f9;font-size:13px;line-height:1.7;font-weight:800}.status.error{background:#fff1f2;color:#a61f26}.status.ok{background:#edf9f1;color:#166534}.field{margin-top:14px}.field label{display:block;margin-bottom:7px;font-size:12px;font-weight:1000}.field input{width:100%;border:1px solid #d5d8dc;border-radius:13px;padding:13px;font-size:16px;outline:none}.btn{width:100%;margin-top:14px;border:0;border-radius:15px;padding:14px;background:#171717;color:#fff;font-size:15px;font-weight:1000}.btn:disabled{opacity:.5}.security{margin-top:14px;padding:12px;border:1px solid #eee;border-radius:14px;color:#666;font-size:11px;line-height:1.65}</style>
+</head>
+<body>
+<div class="card">
+<div class="logo">U</div>
+<div class="kicker">LINE AUTO PASSWORD RESET</div>
+<div class="title">UBee 自動密碼重設</div>
+<div class="sub">系統會使用 LINE 登入身分與 UBee 既有會員資料自動核對。通過後會直接進入設定新密碼，不需要客服人工傳送連結。</div>
+<div id="status" class="status">正在啟動 LINE 安全驗證…</div>
+<div id="challenge" hidden></div>
+<div class="security">UBee 不會要求你輸入舊密碼。一次性重設連結有效 15 分鐘且只能使用一次；完成後其他舊登入 Session 會失效。</div>
+</div>
+<script>
+(()=>{
+  'use strict';
+  const LIFF_ID=${JSON.stringify(LIFF_ID)};
+  const PHONE=${JSON.stringify(safePhone)};
+  const status=document.getElementById('status');
+  const challenge=document.getElementById('challenge');
+  let accessToken='';
+  let challengeMode='';
+  const setStatus=(text,type='')=>{status.textContent=text;status.className='status'+(type?' '+type:'')};
+  async function post(body){
+    const res=await fetch('/api/customer-auth/password-reset/line-auto',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify(body)});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||data.success===false){const e=new Error(data.message||'自動密碼重設失敗');e.data=data;throw e}
+    return data;
+  }
+  function promptFor(mode){
+    if(mode==='name_email_order')return {label:'會員姓名＃註冊Email＃本人訂單編號',placeholder:'王小明#name@example.com#UB20260801093000001'};
+    if(mode==='name_order')return {label:'會員姓名＃本人訂單編號',placeholder:'王小明#UB20260801093000001'};
+    return {label:'會員姓名＃註冊Email',placeholder:'王小明#name@example.com'};
+  }
+  function showChallenge(mode,message){
+    challengeMode=mode;const p=promptFor(mode);challenge.hidden=false;
+    challenge.innerHTML='<div class="field"><label>'+p.label+'</label><input id="proof" autocomplete="off" placeholder="'+p.placeholder+'"></div><button id="verifyBtn" class="btn" type="button">自動核對並繼續</button>';
+    setStatus(message||'需要再核對一項既有會員資料。');
+    document.getElementById('verifyBtn').onclick=submitChallenge;
+  }
+  async function submitChallenge(){
+    const proof=String(document.getElementById('proof')?.value||'').trim();if(!proof){setStatus('請先輸入畫面要求的核對資料。','error');return}
+    const btn=document.getElementById('verifyBtn');btn.disabled=true;setStatus('正在自動核對會員資料…');
+    try{const data=await post({phone:PHONE,lineAccessToken:accessToken,challenge:proof});if(data.resetLink){setStatus('核對完成，正在前往設定新密碼…','ok');location.replace(data.resetLink);return}if(data.challengeRequired)showChallenge(data.challengeMode,data.prompt)}catch(e){setStatus(e.message,'error');btn.disabled=false}
+  }
+  async function start(){
+    if(!PHONE){setStatus('缺少正確的 UBee 註冊手機號碼，請返回用戶端重新操作。','error');return}
+    if(!LIFF_ID){setStatus('系統尚未設定 LINE LIFF_ID，無法啟動全自動 LINE 驗證。','error');return}
+    try{
+      await liff.init({liffId:LIFF_ID});
+      if(!liff.isLoggedIn()){liff.login({redirectUri:location.href});return}
+      accessToken=liff.getAccessToken()||'';
+      if(!accessToken)throw new Error('無法取得 LINE 登入憑證，請重新開啟此頁。');
+      setStatus('LINE 身分已確認，正在核對 UBee 會員資料…');
+      const data=await post({phone:PHONE,lineAccessToken:accessToken});
+      if(data.resetLink){setStatus('身分核對完成，正在前往設定新密碼…','ok');location.replace(data.resetLink);return}
+      if(data.challengeRequired){showChallenge(data.challengeMode,data.prompt);return}
+      throw new Error('系統沒有取得可用的密碼重設結果。');
+    }catch(e){setStatus(e.message||'LINE 自動驗證失敗，請重新操作。','error')}
+  }
+  start();
+})();
+</script>
+</body>
+</html>`);
 });
 
 console.log('🔐 UBee 客戶會員系統已載入｜註冊：手機＋密碼｜忘記密碼：客服核對＋15分鐘一次性連結（無簡訊）');
@@ -32121,6 +32632,594 @@ if (!riderSnap.empty) {
   return replyText(event.replyToken, '未識別的操作。');
 }
 
+
+// =====================================================
+// UBee Customer Password Reset V2｜LINE 全自動核對流程
+// =====================================================
+function customerPasswordResetLineStateRef(lineUserId) {
+  const safe = String(lineUserId || '').trim();
+  return db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.passwordResetLineStates)
+    .doc(customerAuthHash(safe).slice(0, 48));
+}
+
+function normalizeCustomerResetIdentityText(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
+function customerResetOrderPhones(order = {}) {
+  return new Set([
+    order.customerPhone,
+    order.contactPhone,
+    order.phone,
+    order.pickupPhone,
+    order.dropoffPhone,
+  ]
+    .map(normalizeCustomerPhone)
+    .filter(isValidCustomerPhone));
+}
+
+function customerResetOrderMatchesAccount(order = {}, record, lineUserId = '') {
+  const phone = normalizeCustomerPhone(record?.account?.phone || '');
+  const customerId = String(record?.customerId || '').trim();
+  const memberNumber = String(record?.account?.memberNumber || '').trim();
+  const safeLineUserId = String(lineUserId || '').trim();
+
+  const phoneMatch = customerResetOrderPhones(order).has(phone);
+  const idMatch = [order.userId, order.customerId]
+    .map(value => String(value || '').trim())
+    .includes(customerId);
+  const memberMatch = memberNumber &&
+    String(order.customerMemberNumber || '').trim() === memberNumber;
+  const lineMatch = safeLineUserId.startsWith('U') && [
+    order.userId,
+    order.lineUserId,
+    order.customerLineUserId,
+  ].some(value => String(value || '').trim() === safeLineUserId);
+
+  return phoneMatch && (idMatch || memberMatch || lineMatch);
+}
+
+async function customerPasswordResetAudit({
+  eventType,
+  status = 'info',
+  record = null,
+  lineUserId = '',
+  verificationMethod = '',
+  detail = '',
+} = {}) {
+  try {
+    const account = record?.account || {};
+    await db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.passwordResetAudit)
+      .add({
+        eventType: cleanText(eventType, 80),
+        status: cleanText(status, 40),
+        customerId: String(record?.customerId || ''),
+        memberNumber: String(account.memberNumber || ''),
+        customerName: cleanText(account.name || '', 80),
+        maskedPhone: maskCustomerPhone(account.phone || ''),
+        lineUserIdHash: String(lineUserId || '').startsWith('U')
+          ? customerAuthHash(lineUserId).slice(0, 32)
+          : '',
+        verificationMethod: cleanText(verificationMethod, 100),
+        detail: cleanText(detail, 500),
+        createdAtMs: Date.now(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+  } catch (error) {
+    console.warn('⚠️ 密碼重設稽核紀錄寫入失敗：', error?.message || error);
+  }
+}
+
+async function customerResetFindMatchingLineHistory(record, lineUserId) {
+  const safeLineUserId = String(lineUserId || '').trim();
+  const phone = normalizeCustomerPhone(record?.account?.phone || '');
+  const account = record?.account || {};
+
+  if (!safeLineUserId.startsWith('U')) {
+    return { verified: false, method: '' };
+  }
+
+  if (
+    String(account.passwordResetLineUserId || '').trim() === safeLineUserId ||
+    String(account.lineUserId || '').trim() === safeLineUserId
+  ) {
+    return { verified: true, method: 'trusted_line_binding' };
+  }
+
+  const fields = ['userId', 'lineUserId', 'customerLineUserId'];
+  for (const field of fields) {
+    try {
+      const snap = await db
+        .collection('orders')
+        .where(field, '==', safeLineUserId)
+        .limit(CUSTOMER_PASSWORD_RESET_AUTO.maxLegacyOrdersToCheck)
+        .get();
+
+      for (const doc of snap.docs) {
+        const order = { id: doc.id, ...(doc.data() || {}) };
+        if (customerResetOrderPhones(order).has(phone)) {
+          return {
+            verified: true,
+            method: `historical_order_${field}`,
+            orderId: doc.id,
+          };
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ LINE 歷史訂單核對 ${field} 失敗：`, error?.message || error);
+    }
+  }
+
+  try {
+    const supportSnap = await db
+      .collection('supportCases')
+      .where('sourceLineUserId', '==', safeLineUserId)
+      .limit(50)
+      .get();
+
+    for (const doc of supportSnap.docs) {
+      const supportCase = doc.data() || {};
+      if (normalizeCustomerPhone(supportCase.contactPhone || '') === phone) {
+        return {
+          verified: true,
+          method: 'historical_support_case',
+          caseId: doc.id,
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ LINE 歷史客服身分核對失敗：', error?.message || error);
+  }
+
+  return { verified: false, method: '' };
+}
+
+async function customerResetHasAccountOrder(record) {
+  const customerId = String(record?.customerId || '').trim();
+  if (!customerId) return false;
+
+  for (const field of ['userId', 'customerId']) {
+    try {
+      const snap = await db
+        .collection('orders')
+        .where(field, '==', customerId)
+        .limit(1)
+        .get();
+      if (!snap.empty) return true;
+    } catch (error) {
+      console.warn(`⚠️ 密碼重設會員訂單檢查 ${field} 失敗：`, error?.message || error);
+    }
+  }
+
+  return false;
+}
+
+async function customerResetEnsureLineNotBoundElsewhere(record, lineUserId) {
+  const safeLineUserId = String(lineUserId || '').trim();
+  if (!safeLineUserId.startsWith('U')) return false;
+
+  try {
+    const snap = await db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+      .where('passwordResetLineUserId', '==', safeLineUserId)
+      .limit(2)
+      .get();
+
+    return !snap.docs.some(doc => doc.id !== record.customerId);
+  } catch (error) {
+    console.warn('⚠️ 檢查 LINE 復原綁定失敗：', error?.message || error);
+    return false;
+  }
+}
+
+function customerResetLinkMessage(issued) {
+  return {
+    type: 'template',
+    altText: 'UBee 密碼重設連結已建立',
+    template: {
+      type: 'buttons',
+      title: 'UBee 密碼重設',
+      text: `身分已由系統自動核對完成。請在 ${issued.validForMinutes} 分鐘內設定新密碼；連結只能使用一次。`,
+      actions: [
+        {
+          type: 'uri',
+          label: '設定新密碼',
+          uri: issued.resetLink,
+        },
+      ],
+    },
+  };
+}
+
+async function customerResetIssueAndReply(event, record, lineUserId, verificationMethod) {
+  const canBind = await customerResetEnsureLineNotBoundElsewhere(
+    record,
+    lineUserId
+  );
+
+  if (!canBind) {
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_BIND_CONFLICT',
+      status: 'blocked',
+      record,
+      lineUserId,
+      verificationMethod,
+      detail: '同一 LINE 已綁定其他 UBee 會員，系統拒絕自動重設。',
+    });
+    return replyText(
+      event.replyToken,
+      '這個 LINE 帳號目前無法自動綁定此會員。為保護帳號，系統已停止本次密碼重設。'
+    );
+  }
+
+  const issued = await issueCustomerPasswordResetToken({
+    record,
+    createdBy: 'line_auto_reset',
+    verificationNote: verificationMethod,
+    source: 'line_auto_reset',
+    lineUserId,
+  });
+
+  await customerPasswordResetLineStateRef(lineUserId).delete().catch(() => {});
+
+  await customerPasswordResetAudit({
+    eventType: 'AUTO_RESET_LINK_ISSUED',
+    status: 'success',
+    record,
+    lineUserId,
+    verificationMethod,
+    detail: `已自動建立 ${issued.validForMinutes} 分鐘一次性重設連結。`,
+  });
+
+  return replyMessages(event.replyToken, [customerResetLinkMessage(issued)]);
+}
+
+function customerResetChallengePrompt(mode) {
+  if (mode === 'name_email_order') {
+    return (
+      '為保護帳號，系統需要再自動核對一次。\n\n' +
+      '請用以下格式回覆：\n會員姓名#註冊Email#任一本人 UBee 訂單編號\n\n' +
+      '例如：王小明#name@example.com#UB20260801093000001\n\n' +
+      '系統只會比對既有資料，不會詢問你的舊密碼。'
+    );
+  }
+  if (mode === 'name_order') {
+    return (
+      '為保護帳號，系統需要再自動核對一次。\n\n' +
+      '請用以下格式回覆：\n會員姓名#任一本人 UBee 訂單編號\n\n' +
+      '例如：王小明#UB20260801093000001\n\n' +
+      '系統只會比對既有資料，不會詢問你的舊密碼。'
+    );
+  }
+  return (
+    '為保護帳號，系統需要再自動核對一次。\n\n' +
+    '請用以下格式回覆：\n會員姓名#註冊Email\n\n' +
+    '例如：王小明#name@example.com\n\n' +
+    '系統只會比對既有資料，不會詢問你的舊密碼。'
+  );
+}
+
+async function customerResetStartFromPhone(event, lineUserId, phone) {
+  const normalizedPhone = normalizeCustomerPhone(phone);
+  const stateRef = customerPasswordResetLineStateRef(lineUserId);
+
+  if (!isValidCustomerPhone(normalizedPhone)) {
+    return replyText(event.replyToken, '請輸入 09 開頭的 10 碼 UBee 註冊手機號碼。');
+  }
+
+  const record = await findCustomerAccountByPhone(normalizedPhone);
+  if (!record) {
+    await stateRef.delete().catch(() => {});
+    return replyText(
+      event.replyToken,
+      '目前無法用這支手機完成自動密碼重設。請確認輸入的是 UBee 會員註冊手機號碼。'
+    );
+  }
+
+  if (String(record.account?.status || 'active') !== 'active') {
+    await stateRef.delete().catch(() => {});
+    return replyText(event.replyToken, '此 UBee 帳號目前無法進行密碼重設。');
+  }
+
+  const boundLine = String(record.account?.passwordResetLineUserId || '').trim();
+  if (boundLine && boundLine !== lineUserId) {
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_RESET_DIFFERENT_BOUND_LINE',
+      status: 'blocked',
+      record,
+      lineUserId,
+      verificationMethod: 'existing_binding_conflict',
+      detail: '會員已存在其他可信 LINE 復原綁定。',
+    });
+    await stateRef.delete().catch(() => {});
+    return replyText(
+      event.replyToken,
+      '此會員已綁定其他可信 LINE 復原身分。為保護帳號，本次自動重設已停止。'
+    );
+  }
+
+  const history = await customerResetFindMatchingLineHistory(record, lineUserId);
+  if (history.verified) {
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_IDENTITY_VERIFIED',
+      status: 'success',
+      record,
+      lineUserId,
+      verificationMethod: history.method,
+      detail: history.orderId || history.caseId || '既有可信 LINE 綁定',
+    });
+    return customerResetIssueAndReply(event, record, lineUserId, history.method);
+  }
+
+  const hasOrder = await customerResetHasAccountOrder(record);
+  const hasEmail = Boolean(normalizeCustomerEmail(record.account?.email || ''));
+  let challengeMode = '';
+
+  if (hasOrder && hasEmail) challengeMode = 'name_email_order';
+  else if (hasOrder) challengeMode = 'name_order';
+  else if (hasEmail) challengeMode = 'name_email';
+
+  if (!challengeMode) {
+    await stateRef.delete().catch(() => {});
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_IDENTITY_INSUFFICIENT_DATA',
+      status: 'blocked',
+      record,
+      lineUserId,
+      verificationMethod: 'no_trust_anchor',
+      detail: '沒有可信 LINE 歷史、會員訂單或註冊 Email 可供系統核對。',
+    });
+    return replyText(
+      event.replyToken,
+      '此帳號目前沒有足夠的既有資料可安全完成全自動核對，因此系統不會直接發出密碼重設連結。'
+    );
+  }
+
+  const nowMs = Date.now();
+  await stateRef.set({
+    stage: 'awaiting_identity',
+    phone: normalizedPhone,
+    customerId: record.customerId,
+    challengeMode,
+    verificationAttempts: 0,
+    createdAtMs: nowMs,
+    expiresAtMs: nowMs + CUSTOMER_PASSWORD_RESET_AUTO.stateTtlMs,
+    updatedAtMs: nowMs,
+  });
+
+  await customerPasswordResetAudit({
+    eventType: 'AUTO_CHALLENGE_REQUIRED',
+    status: 'pending',
+    record,
+    lineUserId,
+    verificationMethod: challengeMode,
+    detail: 'LINE 歷史不足，改由系統第二層資料核對。',
+  });
+
+  return replyText(event.replyToken, customerResetChallengePrompt(challengeMode));
+}
+
+
+async function customerResetCheckChallenge(record, lineUserId, mode, text) {
+  const parts = String(text || '')
+    .split(/[＃#｜|，,]/)
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  const accountName = normalizeCustomerResetIdentityText(
+    record?.account?.name || ''
+  );
+  const submittedName = normalizeCustomerResetIdentityText(parts[0] || '');
+  let passed = Boolean(submittedName && submittedName === accountName);
+  let verificationMethod = String(mode || '');
+
+  if (passed && mode === 'name_email') {
+    passed = parts.length >= 2 &&
+      normalizeCustomerEmail(parts[1]) ===
+        normalizeCustomerEmail(record?.account?.email || '');
+    verificationMethod = passed ? 'challenge_name_email' : mode;
+  }
+
+  if (passed && mode === 'name_order') {
+    const orderId = String(parts[1] || '').trim().toUpperCase();
+    const order = orderId ? await getOrder(orderId) : null;
+    passed = Boolean(
+      order && customerResetOrderMatchesAccount(order, record, lineUserId)
+    );
+    verificationMethod = passed ? 'challenge_name_order' : mode;
+  }
+
+  if (passed && mode === 'name_email_order') {
+    const emailOk = parts.length >= 3 &&
+      normalizeCustomerEmail(parts[1]) ===
+        normalizeCustomerEmail(record?.account?.email || '');
+    const orderId = String(parts[2] || '').trim().toUpperCase();
+    const order = orderId ? await getOrder(orderId) : null;
+    const orderOk = Boolean(
+      order && customerResetOrderMatchesAccount(order, record, lineUserId)
+    );
+    passed = Boolean(emailOk && orderOk);
+    verificationMethod = passed ? 'challenge_name_email_order' : mode;
+  }
+
+  return { passed, verificationMethod };
+}
+
+async function customerResetVerifyChallenge(event, lineUserId, state, text) {
+  const stateRef = customerPasswordResetLineStateRef(lineUserId);
+  const nowMs = Date.now();
+
+  if (Number(state.expiresAtMs || 0) <= nowMs) {
+    await stateRef.delete().catch(() => {});
+    return replyText(
+      event.replyToken,
+      '這次自動核對已逾時。請重新傳送「重設密碼」開始。'
+    );
+  }
+
+  const record = await findCustomerAccountByPhone(state.phone || '');
+  if (!record || record.customerId !== state.customerId) {
+    await stateRef.delete().catch(() => {});
+    return replyText(event.replyToken, '會員資料已變更，請重新開始密碼重設。');
+  }
+
+  const mode = String(state.challengeMode || '');
+  const challengeResult = await customerResetCheckChallenge(
+    record,
+    lineUserId,
+    mode,
+    text
+  );
+  const passed = challengeResult.passed;
+  const verificationMethod = challengeResult.verificationMethod;
+
+  if (passed) {
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_CHALLENGE_VERIFIED',
+      status: 'success',
+      record,
+      lineUserId,
+      verificationMethod,
+      detail: '第二層自動核對通過。',
+    });
+    return customerResetIssueAndReply(
+      event,
+      record,
+      lineUserId,
+      verificationMethod
+    );
+  }
+
+  const attempts = Number(state.verificationAttempts || 0) + 1;
+  if (attempts >= CUSTOMER_PASSWORD_RESET_AUTO.maxVerificationAttempts) {
+    await stateRef.delete().catch(() => {});
+    await customerPasswordResetAudit({
+      eventType: 'AUTO_CHALLENGE_LOCKED',
+      status: 'blocked',
+      record,
+      lineUserId,
+      verificationMethod: mode,
+      detail: `連續核對失敗 ${attempts} 次。`,
+    });
+    return replyText(
+      event.replyToken,
+      '自動核對資料連續不一致，本次流程已停止。請稍後重新開始，不要嘗試猜測其他會員資料。'
+    );
+  }
+
+  await stateRef.set({
+    verificationAttempts: attempts,
+    updatedAtMs: nowMs,
+  }, { merge: true });
+
+  return replyText(
+    event.replyToken,
+    `資料核對不一致（${attempts}/${CUSTOMER_PASSWORD_RESET_AUTO.maxVerificationAttempts}）。\n\n${customerResetChallengePrompt(mode)}`
+  );
+}
+
+async function tryHandleCustomerPasswordResetLineText(event, lineUserId, text) {
+  const safeLineUserId = String(lineUserId || '').trim();
+  const normalizedText = String(text || '').trim();
+
+  if (!safeLineUserId.startsWith('U')) {
+    return { handled: false, value: null };
+  }
+
+  const stateRef = customerPasswordResetLineStateRef(safeLineUserId);
+  let state = null;
+  try {
+    const stateDoc = await stateRef.get();
+    state = stateDoc.exists ? (stateDoc.data() || {}) : null;
+  } catch (error) {
+    console.warn('⚠️ 讀取 LINE 密碼重設狀態失敗：', error?.message || error);
+  }
+
+  const resetCommand = /^(忘記密碼|重設密碼|密碼重設)(?:\s+(.+))?$/i.exec(normalizedText);
+  const directPhone = /^09\d{8}$/.test(normalizedText)
+    ? normalizedText
+    : '';
+
+  if (resetCommand) {
+    const commandPhone = normalizeCustomerPhone(resetCommand[2] || '');
+    if (isValidCustomerPhone(commandPhone)) {
+      return {
+        handled: true,
+        value: await customerResetStartFromPhone(
+          event,
+          safeLineUserId,
+          commandPhone
+        ),
+      };
+    }
+
+    const nowMs = Date.now();
+    await stateRef.set({
+      stage: 'awaiting_phone',
+      createdAtMs: nowMs,
+      updatedAtMs: nowMs,
+      expiresAtMs: nowMs + CUSTOMER_PASSWORD_RESET_AUTO.stateTtlMs,
+      verificationAttempts: 0,
+    });
+
+    return {
+      handled: true,
+      value: await replyText(
+        event.replyToken,
+        'UBee 密碼重設已進入全自動流程。\n\n請直接輸入你註冊 UBee 會員時使用的 09 開頭 10 碼手機號碼。\n\n系統不會詢問你的舊密碼。'
+      ),
+    };
+  }
+
+  if (directPhone && state?.stage === 'awaiting_phone') {
+    return {
+      handled: true,
+      value: await customerResetStartFromPhone(
+        event,
+        safeLineUserId,
+        directPhone
+      ),
+    };
+  }
+
+  if (normalizedText === '取消重設' && state) {
+    await stateRef.delete().catch(() => {});
+    return {
+      handled: true,
+      value: await replyText(event.replyToken, '已取消本次 UBee 密碼重設流程。'),
+    };
+  }
+
+  if (state?.stage === 'awaiting_phone') {
+    return {
+      handled: true,
+      value: await replyText(
+        event.replyToken,
+        '請輸入 09 開頭的 10 碼 UBee 註冊手機號碼；若要取消，可傳送「取消重設」。'
+      ),
+    };
+  }
+
+  if (state?.stage === 'awaiting_identity') {
+    return {
+      handled: true,
+      value: await customerResetVerifyChallenge(
+        event,
+        safeLineUserId,
+        state,
+        normalizedText
+      ),
+    };
+  }
+
+  return { handled: false, value: null };
+}
+
 async function handleTextStep(event, userId, text) {
   const normalized = text.trim();
 
@@ -32201,6 +33300,15 @@ async function handleTextMessage(event) {
   }
 
   if (event.source.type === 'group') return null;
+
+  const passwordResetFlow = await tryHandleCustomerPasswordResetLineText(
+    event,
+    userId,
+    text
+  );
+  if (passwordResetFlow.handled) {
+    return passwordResetFlow.value;
+  }
 
   if (/^UB\d+/i.test(text)) {
     const orderId = text.toUpperCase();
@@ -34025,11 +35133,18 @@ app.post('/api/admin/customer-auth/password-reset/create', supportRequireAdmin, 
     const phone = normalizeCustomerPhone(req.body?.phone);
     const identityChecked = req.body?.identityChecked === true;
     const verificationNote = supportCleanText(req.body?.verificationNote || '', 500);
-    const operator = supportCleanText(req.supportAdmin?.operator || 'support_center', 100) || 'support_center';
+    const operator = supportCleanText(
+      req.supportAdmin?.operator || 'support_center',
+      100
+    ) || 'support_center';
 
     if (!isValidCustomerPhone(phone)) {
-      return res.status(400).json({ success: false, message: '請輸入正確的台灣手機號碼。' });
+      return res.status(400).json({
+        success: false,
+        message: '請輸入正確的台灣手機號碼。',
+      });
     }
+
     if (!identityChecked || verificationNote.length < 4) {
       return res.status(400).json({
         success: false,
@@ -34047,73 +35162,12 @@ app.post('/api/admin/customer-auth/password-reset/create', supportRequireAdmin, 
       });
     }
 
-    const rawToken = customerAuthRandomToken(CUSTOMER_PASSWORD_RESET.tokenBytes);
-    const tokenHash = customerAuthHash(rawToken);
-    const tokenRef = db
-      .collection(CUSTOMER_AUTH_COLLECTIONS.passwordResetTokens)
-      .doc(tokenHash);
-    const nowMs = Date.now();
-    let expiresAtMs = nowMs + CUSTOMER_PASSWORD_RESET.ttlMs;
-    let resetVersion = 0;
-
-    await db.runTransaction(async transaction => {
-      const accountDoc = await transaction.get(record.ref);
-      if (!accountDoc.exists) {
-        throw customerAuthError('找不到 UBee 會員帳號。', 404, 'CUSTOMER_ACCOUNT_NOT_FOUND');
-      }
-
-      const account = accountDoc.data() || {};
-      if (String(account.status || 'active') !== 'active') {
-        throw customerAuthError('此帳號目前無法重設密碼。', 403, 'CUSTOMER_ACCOUNT_UNAVAILABLE');
-      }
-
-      let windowStartedAtMs = Number(account.passwordResetIssueWindowStartedAtMs || 0);
-      let issueCount = Number(account.passwordResetIssueCount || 0);
-      if (!windowStartedAtMs || nowMs - windowStartedAtMs >= CUSTOMER_PASSWORD_RESET.issueWindowMs) {
-        windowStartedAtMs = nowMs;
-        issueCount = 0;
-      }
-
-      if (issueCount >= CUSTOMER_PASSWORD_RESET.maxIssuesPerWindow) {
-        const remainingMs = Math.max(
-          1000,
-          CUSTOMER_PASSWORD_RESET.issueWindowMs - (nowMs - windowStartedAtMs)
-        );
-        const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-        throw customerAuthError(
-          `此會員 30 分鐘內已產生 3 次重設連結，請約 ${remainingMinutes} 分鐘後再試。`,
-          429,
-          'CUSTOMER_PASSWORD_RESET_RATE_LIMITED'
-        );
-      }
-
-      resetVersion = Number(account.passwordResetVersion || 0) + 1;
-      expiresAtMs = nowMs + CUSTOMER_PASSWORD_RESET.ttlMs;
-
-      transaction.set(record.ref, {
-        passwordResetVersion: resetVersion,
-        passwordResetIssueWindowStartedAtMs: windowStartedAtMs,
-        passwordResetIssueCount: issueCount + 1,
-        passwordResetLastIssuedAtMs: nowMs,
-        passwordResetLastIssuedBy: operator,
-        updatedAtMs: nowMs,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-
-      transaction.set(tokenRef, {
-        tokenHash,
-        customerId: record.customerId,
-        phone,
-        resetVersion,
-        createdBy: operator,
-        verificationNote,
-        createdAtMs: nowMs,
-        expiresAtMs,
-        used: false,
-        revoked: false,
-        adminIpHash: customerAuthHash(customerAuthIp(req)).slice(0, 32),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    const issued = await issueCustomerPasswordResetToken({
+      record,
+      createdBy: operator,
+      verificationNote,
+      source: 'support_manual_emergency',
+      requestIp: customerAuthIp(req),
     });
 
     const latestAccountDoc = await record.ref.get();
@@ -34121,9 +35175,9 @@ app.post('/api/admin/customer-auth/password-reset/create', supportRequireAdmin, 
 
     return res.json({
       success: true,
-      resetLink: customerPasswordResetLink(rawToken),
-      expiresAtMs,
-      validForMinutes: Math.round(CUSTOMER_PASSWORD_RESET.ttlMs / 60000),
+      resetLink: issued.resetLink,
+      expiresAtMs: issued.expiresAtMs,
+      validForMinutes: issued.validForMinutes,
       customer: {
         memberNumber: String(latestAccount.memberNumber || ''),
         name: String(latestAccount.name || ''),
@@ -34138,6 +35192,41 @@ app.post('/api/admin/customer-auth/password-reset/create', supportRequireAdmin, 
       success: false,
       code: error?.code || 'CUSTOMER_PASSWORD_RESET_CREATE_FAILED',
       message: error?.message || '建立密碼重設連結失敗。',
+    });
+  }
+});
+
+app.get('/api/admin/customer-auth/password-reset/auto-events', supportRequireAdmin, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const snap = await db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.passwordResetAudit)
+      .orderBy('createdAtMs', 'desc')
+      .limit(100)
+      .get();
+
+    const events = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        eventType: String(data.eventType || ''),
+        status: String(data.status || ''),
+        customerId: String(data.customerId || ''),
+        memberNumber: String(data.memberNumber || ''),
+        customerName: String(data.customerName || ''),
+        maskedPhone: String(data.maskedPhone || ''),
+        verificationMethod: String(data.verificationMethod || ''),
+        detail: String(data.detail || ''),
+        createdAtMs: Number(data.createdAtMs || 0),
+      };
+    });
+
+    return res.json({ success: true, events });
+  } catch (error) {
+    console.error('❌ 讀取全自動密碼重設紀錄失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: '密碼重設紀錄讀取失敗。',
     });
   }
 });
