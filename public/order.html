@@ -8841,7 +8841,7 @@ body.ubee-app-starting{
         return;
       }
       try{ sessionStorage.setItem('ubee_password_reset_phone', phone); }catch(_){ }
-      window.location.assign(`/customer-password-reset-line?phone=${encodeURIComponent(phone)}`);
+      window.location.assign(`/rider-app-login/password-reset?phone=${encodeURIComponent(phone)}`);
       return;
     }
 
