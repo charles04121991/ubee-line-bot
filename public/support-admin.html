@@ -274,7 +274,7 @@ label{display:block;margin-bottom:7px;font-size:13px;font-weight:900}
         <div class="login-logo">U</div>
         <div>
           <h1>UBee 客服管理中心</h1>
-          <p>處理客服案件、客戶回覆、退款審核、結案與垃圾桶。</p>
+          <p>處理客服案件、客戶回覆、退款審核、結案與垃圾桶；客戶密碼重設已改為 LINE 全自動流程。</p>
         </div>
       </div>
       <div class="field">
@@ -304,7 +304,7 @@ label{display:block;margin-bottom:7px;font-size:13px;font-weight:900}
       <div class="actions">
         <span id="syncPill" class="sync-pill"><span class="sync-dot"></span><span id="syncText">尚未同步</span></span>
         <button class="btn" onclick="changeOperator()">更換人員</button>
-        <button class="btn blue" onclick="openPasswordReset()">密碼重設</button>
+        <button class="btn blue" onclick="openPasswordReset()">自動重設紀錄</button>
         <button class="btn" onclick="loadCases(true)">重新整理</button>
         <button class="btn red" onclick="logout()">登出</button>
       </div>
@@ -428,40 +428,34 @@ async function submitTrash(){const reason=$('deleteReason').value.trim();if(!rea
 async function restoreCase(){if(!confirm('確定要復原這筆客服案件嗎？'))return;try{await api(`/api/admin/support/cases/${encodeURIComponent(selectedId)}/restore`,{method:'POST',body:JSON.stringify({operator:operator(),message:'案件由客服營運工作台復原。'})});toast('案件已復原');filter='all';selectedId='';selectedDetail=null;showList();await loadCases()}catch(err){alert(err.message)}}
 function openPermanentDelete(){const c=selectedDetail?.case||{};if(c.refundRequestId||c.refundRequestStatus)return alert('此案件已有退款／財務紀錄，不能永久刪除，只能留在垃圾桶。');openModal('永久刪除案件','此動作無法復原。',`<div class="confirm-box"><b>警告：</b>永久刪除會移除案件、處理時間軸、證據資料與 Firebase Storage 檔案，無法復原。<br><br>請完整輸入案件編號：<br><span class="confirm-case-id">${esc(c.caseId||'')}</span></div><div class="field"><label>輸入案件編號確認</label><input id="confirmDeleteId" class="input" autocomplete="off" placeholder="${esc(c.caseId||'')}"></div><button class="btn red" style="width:100%;margin-top:12px;padding:13px" onclick="submitPermanentDelete()">永久刪除，無法復原</button>`)}
 async function submitPermanentDelete(){const confirmCaseId=$('confirmDeleteId').value.trim().toUpperCase();if(confirmCaseId!==selectedId.toUpperCase())return alert('案件編號不一致，已取消永久刪除。');if(!confirm('最後確認：永久刪除後完全無法復原，確定繼續嗎？'))return;try{const data=await api(`/api/admin/support/cases/${encodeURIComponent(selectedId)}`,{method:'DELETE',body:JSON.stringify({confirmCaseId,operator:operator()})});closeModal();toast(data.message||'案件已永久刪除');selectedId='';selectedDetail=null;showList();await loadCases()}catch(err){alert(err.message)}}
-function normalizeResetPhone(v){return String(v||'').replace(/\D/g,'').slice(0,10)}
-function openPasswordReset(){
-  const casePhone=normalizeResetPhone(selectedDetail?.case?.contactPhone||'');
-  openModal('客戶密碼重設','客服核對版 V1｜不發簡訊、不查看舊密碼',`<div class="note warning">先輸入會員手機號碼查詢。確認是本人後，才能產生 15 分鐘、一次性的重設連結；新連結會讓舊連結立即失效。</div><div class="field"><label for="resetLookupPhone">會員手機號碼</label><input id="resetLookupPhone" class="input" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" value="${esc(casePhone)}"><div class="hint">若從客戶案件開啟，系統會自動帶入案件聯絡電話。</div></div><button class="btn primary" style="width:100%;margin-top:12px" onclick="lookupPasswordResetCustomer()">查詢會員資料</button><div id="resetCustomerResult" style="margin-top:12px"></div>`);
-  $('resetLookupPhone')?.addEventListener('input',e=>e.target.value=normalizeResetPhone(e.target.value));
+function passwordResetEventLabel(type){
+  return {
+    AUTO_IDENTITY_VERIFIED:'自動身分核對通過',
+    AUTO_CHALLENGE_REQUIRED:'需要第二層自動核對',
+    AUTO_CHALLENGE_VERIFIED:'第二層核對通過',
+    AUTO_RESET_LINK_ISSUED:'已自動發送重設連結',
+    AUTO_BIND_CONFLICT:'LINE 綁定衝突',
+    AUTO_RESET_DIFFERENT_BOUND_LINE:'非原可信 LINE',
+    AUTO_IDENTITY_INSUFFICIENT_DATA:'自動核對資料不足',
+    AUTO_CHALLENGE_LOCKED:'核對失敗次數過多'
+  }[type]||type||'-';
 }
-async function lookupPasswordResetCustomer(){
-  const phone=normalizeResetPhone($('resetLookupPhone')?.value);
-  if(!/^09\d{8}$/.test(phone))return alert('請輸入正確的台灣手機號碼。');
-  const result=$('resetCustomerResult');
-  result.innerHTML='<div class="note">正在查詢會員資料…</div>';
-  try{
-    const data=await api('/api/admin/customer-auth/password-reset/lookup',{method:'POST',body:JSON.stringify({phone})});
-    const c=data.customer||{};
-    result.innerHTML=`<div class="order-grid"><div class="order-item"><span>會員編號</span><b>${esc(c.memberNumber||'-')}</b></div><div class="order-item"><span>會員姓名</span><b>${esc(c.name||'-')}</b></div><div class="order-item"><span>登入手機</span><b>${esc(c.maskedPhone||phone)}</b></div><div class="order-item"><span>常用地區</span><b>${esc(`${c.serviceCity||''}${c.serviceDistrict||''}`||'-')}</b></div><div class="order-item"><span>帳號狀態</span><b>${esc(c.status||'-')}</b></div><div class="order-item"><span>最後登入</span><b>${esc(fmtTime(c.lastLoginAtMs))}</b></div></div><div class="field"><label class="remember" style="margin-top:14px"><input id="resetIdentityChecked" type="checkbox">我已完成本人身分核對</label><div class="hint">至少核對會員姓名＋近期任務／常用資料之一；不要詢問客戶原密碼。</div></div><div class="field"><label for="resetVerificationNote">核對方式紀錄</label><textarea id="resetVerificationNote" class="textarea" placeholder="例如：姓名＋最近任務編號核對一致"></textarea></div><button class="btn yellow" style="width:100%;margin-top:12px" onclick="createPasswordResetLink('${esc(phone)}')">產生 15 分鐘重設連結</button><div id="resetLinkResult" style="margin-top:12px"></div>`;
-  }catch(err){result.innerHTML=`<div class="note warning">${esc(err.message)}</div>`}
+function passwordResetStatusClass(status){return status==='success'?'public':status==='blocked'?'warning':''}
+async function openPasswordReset(){
+  openModal('客戶密碼重設｜全自動','LINE 自動核對 V2｜客服不需要產生或複製連結',`<div class="note public"><b>目前正式流程已全自動化</b><br>客人從用戶端按「忘記密碼」後，到 LINE 官方帳號傳送註冊手機；系統會自動核對身分、自動產生 15 分鐘一次性連結，並直接由 LINE 回傳「設定新密碼」按鈕。客服不需要手動查會員、產生連結或貼網址。</div><div id="resetAutoEvents" style="margin-top:12px"><div class="note">正在讀取最近自動重設紀錄…</div></div><button class="btn" style="width:100%;margin-top:12px" onclick="loadPasswordResetAutoEvents()">重新整理紀錄</button>`);
+  await loadPasswordResetAutoEvents();
 }
-async function createPasswordResetLink(phone){
-  if(!$('resetIdentityChecked')?.checked)return alert('請先完成本人身分核對。');
-  const verificationNote=String($('resetVerificationNote')?.value||'').trim();
-  if(verificationNote.length<4)return alert('請留下核對方式，例如：姓名＋最近任務編號。');
-  const box=$('resetLinkResult');
-  box.innerHTML='<div class="note">正在建立一次性連結…</div>';
+async function loadPasswordResetAutoEvents(){
+  const box=$('resetAutoEvents');if(!box)return;
+  box.innerHTML='<div class="note">正在讀取最近自動重設紀錄…</div>';
   try{
-    const data=await api('/api/admin/customer-auth/password-reset/create',{method:'POST',body:JSON.stringify({phone,identityChecked:true,verificationNote,operator:operator()})});
-    const expires=fmtTime(data.expiresAtMs);
-    box.innerHTML=`<div class="note public"><b>一次性連結已建立</b><br>有效期限：${esc(expires)}<br>只能使用一次；重新產生時舊連結會立即失效。</div><div class="field"><label for="resetGeneratedLink">傳給客戶的連結</label><textarea id="resetGeneratedLink" class="textarea" readonly>${esc(data.resetLink||'')}</textarea></div><button class="btn green" style="width:100%" onclick="copyGeneratedResetLink()">複製重設連結</button>`;
+    const data=await api('/api/admin/customer-auth/password-reset/auto-events');
+    const events=data.events||[];
+    if(!events.length){box.innerHTML='<div class="note">目前尚無自動密碼重設紀錄。</div>';return}
+    box.innerHTML=`<div style="display:grid;gap:8px">${events.slice(0,50).map(e=>`<div class="note ${passwordResetStatusClass(e.status)}"><b>${esc(passwordResetEventLabel(e.eventType))}</b><br>${esc(e.customerName||'-')}｜${esc(e.memberNumber||'-')}｜${esc(e.maskedPhone||'-')}<br><span style="color:#777">${esc(fmtTime(e.createdAtMs))}｜${esc(e.verificationMethod||'-')}</span>${e.detail?`<br>${esc(e.detail)}`:''}</div>`).join('')}</div>`;
   }catch(err){box.innerHTML=`<div class="note warning">${esc(err.message)}</div>`}
 }
-async function copyGeneratedResetLink(){
-  const value=String($('resetGeneratedLink')?.value||'').trim();
-  if(!value)return;
-  try{await navigator.clipboard.writeText(value);toast('重設連結已複製')}catch(_){$('resetGeneratedLink')?.select();document.execCommand('copy');toast('重設連結已複製')}
-}
+
 function openModal(title,sub,body){$('modalTitle').textContent=title;$('modalSub').textContent=sub||'';$('modalBody').innerHTML=body;$('modalBackdrop').classList.add('show')}
 function closeModal(){$('modalBackdrop').classList.remove('show')}
 function setupAutoRefresh(){clearInterval(autoTimer);autoTimer=setInterval(()=>{if($('autoRefresh')?.checked&&document.visibilityState==='visible'&&!modalOpen()&&!userTyping())loadCases(false)},30000)}
