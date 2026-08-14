@@ -4870,7 +4870,31 @@ app.post('/api/customer-auth/password-reset/line-auto', async (req, res) => {
   }
 });
 
+// Password Reset V2.1 compatibility entry:
+// Old customer page links may still point here. Redirect into a child path of the
+// existing rider LIFF Endpoint URL so LINE accepts liff.login({ redirectUri }).
 app.get('/customer-password-reset-line', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const phone = normalizeCustomerPhone(req.query?.phone || '');
+
+  if (!isValidCustomerPhone(phone)) {
+    return res.status(400).type('html').send(
+      '<!doctype html><html lang="zh-TW"><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>UBee｜密碼重設</title>' +
+      '<body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Microsoft JhengHei,sans-serif;padding:28px">' +
+      '<h2>手機號碼格式不正確</h2><p>請返回 UBee 用戶端重新輸入 09 開頭的 10 碼手機號碼。</p>' +
+      '</body></html>'
+    );
+  }
+
+  return res.redirect(
+    302,
+    `/rider-app-login/password-reset?phone=${encodeURIComponent(phone)}`
+  );
+});
+
+app.get('/rider-app-login/password-reset', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const phone = normalizeCustomerPhone(req.query?.phone || '');
   const safePhone = isValidCustomerPhone(phone) ? phone : '';
@@ -4898,7 +4922,7 @@ app.get('/customer-password-reset-line', (req, res) => {
 <script>
 (()=>{
   'use strict';
-  const LIFF_ID=${JSON.stringify(LIFF_ID)};
+  const LIFF_ID=${JSON.stringify(RIDER_LIFF_ID)};
   const PHONE=${JSON.stringify(safePhone)};
   const status=document.getElementById('status');
   const challenge=document.getElementById('challenge');
@@ -4949,7 +4973,7 @@ app.get('/customer-password-reset-line', (req, res) => {
 </html>`);
 });
 
-console.log('🔐 UBee 客戶會員系統已載入｜註冊：手機＋密碼｜忘記密碼：客服核對＋15分鐘一次性連結（無簡訊）');
+console.log('🔐 UBee 客戶會員系統已載入｜註冊：手機＋密碼｜忘記密碼：LINE LIFF 全自動核對＋15分鐘一次性連結（無簡訊）');
 
 
 // ==============================
