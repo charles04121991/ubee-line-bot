@@ -3254,7 +3254,23 @@ const CUSTOMER_AUTH_COLLECTIONS = Object.freeze({
   accounts: 'customerAccounts',
   phoneIndex: 'customerPhoneIndex',
   sessions: 'customerSessions',
+  passwordResetTokens: 'customerPasswordResetTokens',
   counters: 'systemCounters',
+});
+
+// =====================================================
+// UBee Customer Password Reset V1｜免簡訊客服核對版
+// - 客服完成身分核對後才可產生一次性連結
+// - 原始 Token 不寫入 Firestore，只保存 SHA-256
+// - 15 分鐘失效、一次性使用、每次新連結自動淘汰舊連結
+// - 同一會員 30 分鐘最多產生 3 次
+// - 重設完成後 passwordVersion + 1，既有 Session 全部失效
+// =====================================================
+const CUSTOMER_PASSWORD_RESET = Object.freeze({
+  ttlMs: 15 * 60 * 1000,
+  issueWindowMs: 30 * 60 * 1000,
+  maxIssuesPerWindow: 3,
+  tokenBytes: 32,
 });
 
 // =====================================================
@@ -3538,6 +3554,113 @@ async function findCustomerAccountByPhone(phone) {
     customerId,
     ref: accountDoc.ref,
     account: accountDoc.data() || {},
+  };
+}
+
+
+function customerPasswordResetToken(value) {
+  return String(value || '').trim().slice(0, 300);
+}
+
+function customerPasswordResetPublicBaseUrl() {
+  const configured = String(
+    process.env.UBEE_CUSTOMER_PUBLIC_BASE_URL ||
+    'https://ubee-line-bot-2-zezw.onrender.com'
+  ).trim();
+  return configured.replace(/\/+$/, '');
+}
+
+function customerPasswordResetLink(rawToken) {
+  return `${customerPasswordResetPublicBaseUrl()}/order.html?passwordResetToken=${encodeURIComponent(rawToken)}`;
+}
+
+async function loadCustomerPasswordResetRecord(rawToken) {
+  const token = customerPasswordResetToken(rawToken);
+  if (token.length < 32) {
+    throw customerAuthError(
+      '這個密碼重設連結無效或已經失效，請重新聯繫 UBee 客服。',
+      410,
+      'CUSTOMER_PASSWORD_RESET_INVALID'
+    );
+  }
+
+  const tokenHash = customerAuthHash(token);
+  const tokenRef = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.passwordResetTokens)
+    .doc(tokenHash);
+  const tokenDoc = await tokenRef.get();
+
+  if (!tokenDoc.exists) {
+    throw customerAuthError(
+      '這個密碼重設連結無效或已經失效，請重新聯繫 UBee 客服。',
+      410,
+      'CUSTOMER_PASSWORD_RESET_INVALID'
+    );
+  }
+
+  const reset = tokenDoc.data() || {};
+  const nowMs = Date.now();
+  if (
+    reset.used === true ||
+    reset.revoked === true ||
+    Number(reset.expiresAtMs || 0) <= nowMs
+  ) {
+    throw customerAuthError(
+      '這個密碼重設連結已使用或已過期，請重新聯繫 UBee 客服。',
+      410,
+      'CUSTOMER_PASSWORD_RESET_EXPIRED'
+    );
+  }
+
+  const customerId = String(reset.customerId || '').trim();
+  if (!/^customer_[a-f0-9]{32}$/.test(customerId)) {
+    throw customerAuthError(
+      '這個密碼重設連結無效，請重新聯繫 UBee 客服。',
+      410,
+      'CUSTOMER_PASSWORD_RESET_INVALID'
+    );
+  }
+
+  const accountRef = db
+    .collection(CUSTOMER_AUTH_COLLECTIONS.accounts)
+    .doc(customerId);
+  const accountDoc = await accountRef.get();
+  if (!accountDoc.exists) {
+    throw customerAuthError(
+      '找不到這個 UBee 會員帳號，請聯繫客服。',
+      404,
+      'CUSTOMER_ACCOUNT_NOT_FOUND'
+    );
+  }
+
+  const account = accountDoc.data() || {};
+  if (String(account.status || 'active') !== 'active') {
+    throw customerAuthError(
+      '此帳號目前無法重設密碼，請聯繫 UBee 客服。',
+      403,
+      'CUSTOMER_ACCOUNT_UNAVAILABLE'
+    );
+  }
+
+  if (
+    Number(account.passwordResetVersion || 0) !==
+    Number(reset.resetVersion || -1)
+  ) {
+    throw customerAuthError(
+      '這個密碼重設連結已被較新的連結取代，請使用客服最新提供的連結。',
+      410,
+      'CUSTOMER_PASSWORD_RESET_SUPERSEDED'
+    );
+  }
+
+  return {
+    token,
+    tokenHash,
+    tokenRef,
+    reset,
+    customerId,
+    accountRef,
+    account,
   };
 }
 
@@ -4065,6 +4188,109 @@ app.post('/api/customer-auth/login', async (req, res) => {
   }
 });
 
+// =====================================================
+// UBee Customer Password Reset V1｜公開一次性連結 API
+// =====================================================
+app.post('/api/customer-auth/password-reset/validate', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const record = await loadCustomerPasswordResetRecord(req.body?.token);
+    return res.json({
+      success: true,
+      valid: true,
+      maskedPhone: maskCustomerPhone(record.account.phone || ''),
+      expiresAtMs: Number(record.reset.expiresAtMs || 0),
+    });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
+app.post('/api/customer-auth/password-reset/complete', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const first = await loadCustomerPasswordResetRecord(req.body?.token);
+    const newPasswordHash = await hashCustomerPassword(
+      req.body?.password,
+      first.account.phone || ''
+    );
+
+    const sameAsOld = await verifyCustomerPassword(
+      req.body?.password,
+      first.account.passwordHash
+    );
+    if (sameAsOld) {
+      throw customerAuthError(
+        '新密碼不可與目前密碼相同，請設定另一組密碼。',
+        400,
+        'CUSTOMER_PASSWORD_REUSE'
+      );
+    }
+
+    const nowMs = Date.now();
+    await db.runTransaction(async transaction => {
+      const [tokenDoc, accountDoc] = await Promise.all([
+        transaction.get(first.tokenRef),
+        transaction.get(first.accountRef),
+      ]);
+
+      if (!tokenDoc.exists || !accountDoc.exists) {
+        throw customerAuthError(
+          '這個密碼重設連結無效，請重新聯繫 UBee 客服。',
+          410,
+          'CUSTOMER_PASSWORD_RESET_INVALID'
+        );
+      }
+
+      const reset = tokenDoc.data() || {};
+      const account = accountDoc.data() || {};
+      if (
+        reset.used === true ||
+        reset.revoked === true ||
+        Number(reset.expiresAtMs || 0) <= nowMs ||
+        Number(account.passwordResetVersion || 0) !== Number(reset.resetVersion || -1)
+      ) {
+        throw customerAuthError(
+          '這個密碼重設連結已使用、已過期，或已被新連結取代。',
+          410,
+          'CUSTOMER_PASSWORD_RESET_EXPIRED'
+        );
+      }
+
+      const nextPasswordVersion = Number(account.passwordVersion || 1) + 1;
+      transaction.set(first.accountRef, {
+        passwordHash: newPasswordHash,
+        passwordVersion: nextPasswordVersion,
+        failedLoginCount: 0,
+        lockedUntilMs: 0,
+        lastFailedLoginAtMs: 0,
+        passwordResetCompletedAtMs: nowMs,
+        passwordResetCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(first.tokenRef, {
+        used: true,
+        usedAtMs: nowMs,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    // passwordVersion 已變更，其他裝置上的舊 Session 會全部失效；
+    // 同時清掉目前瀏覽器 Cookie，要求用新密碼重新登入。
+    clearCustomerSessionCookie(req, res);
+
+    return res.json({
+      success: true,
+      reset: true,
+      message: '密碼已重設完成，請使用新密碼重新登入 UBee。',
+    });
+  } catch (error) {
+    return sendCustomerAuthError(res, error);
+  }
+});
+
 app.get('/api/customer-auth/me', customerAuthOptional, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (!req.customerAuth) {
@@ -4212,7 +4438,7 @@ app.post('/api/customer-auth/logout', customerAuthOptional, async (req, res) => 
   }
 });
 
-console.log('🔐 UBee 客戶會員系統已載入｜註冊模式：手機號碼＋密碼（無簡訊驗證）');
+console.log('🔐 UBee 客戶會員系統已載入｜註冊：手機＋密碼｜忘記密碼：客服核對＋15分鐘一次性連結（無簡訊）');
 
 
 // ==============================
@@ -33742,6 +33968,179 @@ function supportRequireAdmin(req, res, next) {
 
   return next();
 }
+
+// =====================================================
+// UBee Customer Password Reset V1｜客服管理 API
+// =====================================================
+app.post('/api/admin/customer-auth/password-reset/lookup', supportRequireAdmin, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    if (!isValidCustomerPhone(phone)) {
+      return res.status(400).json({
+        success: false,
+        code: 'CUSTOMER_PHONE_INVALID',
+        message: '請輸入正確的台灣手機號碼。',
+      });
+    }
+
+    const record = await findCustomerAccountByPhone(phone);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        code: 'CUSTOMER_ACCOUNT_NOT_FOUND',
+        message: '查無此手機號碼的 UBee 會員帳號。',
+      });
+    }
+
+    const account = record.account || {};
+    return res.json({
+      success: true,
+      customer: {
+        customerId: record.customerId,
+        memberNumber: String(account.memberNumber || ''),
+        name: String(account.name || ''),
+        phone,
+        maskedPhone: maskCustomerPhone(phone),
+        email: String(account.email || ''),
+        serviceCity: String(account.serviceCity || ''),
+        serviceDistrict: String(account.serviceDistrict || ''),
+        status: String(account.status || 'active'),
+        createdAtMs: Number(account.createdAtMs || 0),
+        lastLoginAtMs: Number(account.lastLoginAtMs || 0),
+      },
+    });
+  } catch (error) {
+    console.error('❌ 客服查詢密碼重設會員失敗：', error);
+    return res.status(500).json({
+      success: false,
+      message: '會員資料查詢失敗，請稍後再試。',
+    });
+  }
+});
+
+app.post('/api/admin/customer-auth/password-reset/create', supportRequireAdmin, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const phone = normalizeCustomerPhone(req.body?.phone);
+    const identityChecked = req.body?.identityChecked === true;
+    const verificationNote = supportCleanText(req.body?.verificationNote || '', 500);
+    const operator = supportCleanText(req.supportAdmin?.operator || 'support_center', 100) || 'support_center';
+
+    if (!isValidCustomerPhone(phone)) {
+      return res.status(400).json({ success: false, message: '請輸入正確的台灣手機號碼。' });
+    }
+    if (!identityChecked || verificationNote.length < 4) {
+      return res.status(400).json({
+        success: false,
+        code: 'CUSTOMER_PASSWORD_RESET_IDENTITY_REQUIRED',
+        message: '產生連結前，請完成身分核對並留下核對方式。',
+      });
+    }
+
+    const record = await findCustomerAccountByPhone(phone);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        code: 'CUSTOMER_ACCOUNT_NOT_FOUND',
+        message: '查無此手機號碼的 UBee 會員帳號。',
+      });
+    }
+
+    const rawToken = customerAuthRandomToken(CUSTOMER_PASSWORD_RESET.tokenBytes);
+    const tokenHash = customerAuthHash(rawToken);
+    const tokenRef = db
+      .collection(CUSTOMER_AUTH_COLLECTIONS.passwordResetTokens)
+      .doc(tokenHash);
+    const nowMs = Date.now();
+    let expiresAtMs = nowMs + CUSTOMER_PASSWORD_RESET.ttlMs;
+    let resetVersion = 0;
+
+    await db.runTransaction(async transaction => {
+      const accountDoc = await transaction.get(record.ref);
+      if (!accountDoc.exists) {
+        throw customerAuthError('找不到 UBee 會員帳號。', 404, 'CUSTOMER_ACCOUNT_NOT_FOUND');
+      }
+
+      const account = accountDoc.data() || {};
+      if (String(account.status || 'active') !== 'active') {
+        throw customerAuthError('此帳號目前無法重設密碼。', 403, 'CUSTOMER_ACCOUNT_UNAVAILABLE');
+      }
+
+      let windowStartedAtMs = Number(account.passwordResetIssueWindowStartedAtMs || 0);
+      let issueCount = Number(account.passwordResetIssueCount || 0);
+      if (!windowStartedAtMs || nowMs - windowStartedAtMs >= CUSTOMER_PASSWORD_RESET.issueWindowMs) {
+        windowStartedAtMs = nowMs;
+        issueCount = 0;
+      }
+
+      if (issueCount >= CUSTOMER_PASSWORD_RESET.maxIssuesPerWindow) {
+        const remainingMs = Math.max(
+          1000,
+          CUSTOMER_PASSWORD_RESET.issueWindowMs - (nowMs - windowStartedAtMs)
+        );
+        const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+        throw customerAuthError(
+          `此會員 30 分鐘內已產生 3 次重設連結，請約 ${remainingMinutes} 分鐘後再試。`,
+          429,
+          'CUSTOMER_PASSWORD_RESET_RATE_LIMITED'
+        );
+      }
+
+      resetVersion = Number(account.passwordResetVersion || 0) + 1;
+      expiresAtMs = nowMs + CUSTOMER_PASSWORD_RESET.ttlMs;
+
+      transaction.set(record.ref, {
+        passwordResetVersion: resetVersion,
+        passwordResetIssueWindowStartedAtMs: windowStartedAtMs,
+        passwordResetIssueCount: issueCount + 1,
+        passwordResetLastIssuedAtMs: nowMs,
+        passwordResetLastIssuedBy: operator,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      transaction.set(tokenRef, {
+        tokenHash,
+        customerId: record.customerId,
+        phone,
+        resetVersion,
+        createdBy: operator,
+        verificationNote,
+        createdAtMs: nowMs,
+        expiresAtMs,
+        used: false,
+        revoked: false,
+        adminIpHash: customerAuthHash(customerAuthIp(req)).slice(0, 32),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    const latestAccountDoc = await record.ref.get();
+    const latestAccount = latestAccountDoc.data() || record.account || {};
+
+    return res.json({
+      success: true,
+      resetLink: customerPasswordResetLink(rawToken),
+      expiresAtMs,
+      validForMinutes: Math.round(CUSTOMER_PASSWORD_RESET.ttlMs / 60000),
+      customer: {
+        memberNumber: String(latestAccount.memberNumber || ''),
+        name: String(latestAccount.name || ''),
+        maskedPhone: maskCustomerPhone(phone),
+      },
+      message: '一次性密碼重設連結已建立。新連結會使舊連結立即失效。',
+    });
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 500);
+    console.error('❌ 客服建立客戶密碼重設連結失敗：', error);
+    return res.status(statusCode).json({
+      success: false,
+      code: error?.code || 'CUSTOMER_PASSWORD_RESET_CREATE_FAILED',
+      message: error?.message || '建立密碼重設連結失敗。',
+    });
+  }
+});
 
 function supportGetCaseToken(req) {
   return supportCleanText(
