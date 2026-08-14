@@ -17,6 +17,7 @@ const multer = require('multer');
 // 2026-08-06 Store V2｜Google Places API 僅由客戶主動點擊「搜尋更多附近店家」時呼叫；一般店家瀏覽改由 Vercel 靜態 JSON 提供。
 // 2026-08-06 Store V2.1｜代買任務改為商品、數量、規格、缺貨處理與其他需求的結構化欄位。
 // 2026-08-06 Rider Purchase V1｜騎士端待接預覽與接單後任務詳情支援結構化代買資料。
+// 2026-08-14 Nearby Tasks V1.1｜新任務 Web Push 改為回到騎士端首頁地圖，由附近任務池開啟指定任務；接單 Transaction 鎖維持既有安全模型。
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -1870,8 +1871,8 @@ async function sendNewOrderPushToRiders(
 送達：${dropoff}
 騎士收入：$${fee}`,
 
-          url: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=task&source=push`,
-          deepLink: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=task&source=push`,
+          url: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=home&source=push`,
+          deepLink: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=home&source=push`,
           orderId
         });
 
