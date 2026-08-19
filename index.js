@@ -18,7 +18,6 @@ const multer = require('multer');
 // 2026-08-06 Store V2.1｜代買任務改為商品、數量、規格、缺貨處理與其他需求的結構化欄位。
 // 2026-08-06 Rider Purchase V1｜騎士端待接預覽與接單後任務詳情支援結構化代買資料。
 // 2026-08-14 Nearby Tasks V1.1｜新任務 Web Push 改為回到騎士端首頁地圖，由附近任務池開啟指定任務；接單 Transaction 鎖維持既有安全模型。
-// 2026-08-19 Partner Operations V2｜合作團隊優先／專屬派單、15/5/80 自動拆帳、負責人管理分潤台帳。
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -78,338 +77,6 @@ const RIDER_DOCUMENT_LABELS = Object.freeze({
   vehicleLicense: '行照',
   compulsoryInsurance: '強制險證明',
 });
-
-// =====================================================
-// 2026-08-19｜UBee 合作團隊驗證 V1
-// - 一般小U維持原證件驗證流程
-// - 合作團隊負責人／成員改採必要資料＋人工本人核驗
-// - 人工核驗完成前不得正式通過申請或取得接單資格
-// =====================================================
-const RIDER_APPLICANT_TYPES = Object.freeze({
-  INDIVIDUAL: 'individual',
-  PARTNER_OWNER: 'partner_owner',
-  PARTNER_MEMBER: 'partner_member',
-});
-
-function normalizeRiderApplicantType(value) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (['partner_owner', 'partner-leader', 'team_owner', 'team_leader'].includes(raw)) {
-    return RIDER_APPLICANT_TYPES.PARTNER_OWNER;
-  }
-  if (['partner_member', 'team_member'].includes(raw)) {
-    return RIDER_APPLICANT_TYPES.PARTNER_MEMBER;
-  }
-  return RIDER_APPLICANT_TYPES.INDIVIDUAL;
-}
-
-function isPartnerRiderApplicant(value) {
-  const type = typeof value === 'object' && value
-    ? normalizeRiderApplicantType(value.applicantType || value.partnerRole || '')
-    : normalizeRiderApplicantType(value);
-  return [
-    RIDER_APPLICANT_TYPES.PARTNER_OWNER,
-    RIDER_APPLICANT_TYPES.PARTNER_MEMBER,
-  ].includes(type);
-}
-
-function buildPartnerTeamId(ownerPhone) {
-  const cleanOwnerPhone = normalizePhone(ownerPhone || '');
-  if (!/^09\d{8}$/.test(cleanOwnerPhone)) return '';
-  return `partner_${crypto.createHash('sha256').update(cleanOwnerPhone).digest('hex').slice(0, 16)}`;
-}
-
-function getRequiredRiderApplicationDocumentKeys(application = {}) {
-  if (isPartnerRiderApplicant(application)) return [];
-  return getRequiredRiderDocumentKeys(
-    application.vehicle,
-    application.requiredDocumentKeys
-  );
-}
-
-
-// =====================================================
-// 2026-08-19｜UBee 合作團隊營運 V2
-// - 指定合作團隊優先／專屬派單
-// - 純跑腿服務總額 15% / 5% / 80%
-// - 商品代墊／代收款不參與拆帳
-// - 一般小U與店家 COD 原財務規則維持不變
-// =====================================================
-const PARTNER_TEAM_REVENUE_MODEL_V1 = Object.freeze({
-  version: 'partner_standard_v1',
-  platformRate: 0.15,
-  managerRate: 0.05,
-  executorRate: 0.80,
-});
-
-const PARTNER_TEAM_LEDGER_COLLECTION = 'partnerTeamEarningsV1';
-
-const PARTNER_DISPATCH_MODES = Object.freeze({
-  NONE: '',
-  PRIORITY: 'partner_team_priority',
-  EXCLUSIVE: 'partner_team_exclusive',
-});
-
-function normalizePartnerDispatchMode(value) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (['priority','partner_team_priority','team_priority'].includes(raw)) {
-    return PARTNER_DISPATCH_MODES.PRIORITY;
-  }
-  if (['exclusive','partner_team_exclusive','team_exclusive'].includes(raw)) {
-    return PARTNER_DISPATCH_MODES.EXCLUSIVE;
-  }
-  return PARTNER_DISPATCH_MODES.NONE;
-}
-
-function partnerTimeMs(value) {
-  if (!value) return 0;
-  if (typeof value === 'number') return value;
-  if (typeof value.toDate === 'function') return value.toDate().getTime();
-  if (typeof value.seconds === 'number') return value.seconds * 1000;
-  if (typeof value._seconds === 'number') return value._seconds * 1000;
-  const parsed = new Date(value).getTime();
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function getPartnerTeamIdFromRider(rider = {}) {
-  return cleanText(rider.partnerTeamId || '', 80);
-}
-
-function getPartnerTargetTeamIdFromOrder(order = {}) {
-  return cleanText(
-    order.preferredPartnerTeamId ||
-    order.partnerDispatchTeamId ||
-    order.partnerTeamId ||
-    '',
-    80
-  );
-}
-
-function isPartnerPriorityWindowActive(order = {}, nowMs = Date.now()) {
-  if (normalizePartnerDispatchMode(order.partnerDispatchMode) !== PARTNER_DISPATCH_MODES.PRIORITY) {
-    return false;
-  }
-  if (!getPartnerTargetTeamIdFromOrder(order)) return false;
-  return Number(order.partnerPriorityUntilMs || 0) > Number(nowMs || Date.now());
-}
-
-function riderMatchesPartnerTargetTeam(rider = {}, order = {}) {
-  const riderTeamId = getPartnerTeamIdFromRider(rider);
-  const targetTeamId = getPartnerTargetTeamIdFromOrder(order);
-  return Boolean(riderTeamId && targetTeamId && riderTeamId === targetTeamId);
-}
-
-function canRiderAccessPartnerDispatchOrder(rider = {}, order = {}, nowMs = Date.now()) {
-  const mode = normalizePartnerDispatchMode(order.partnerDispatchMode);
-  const targetTeamId = getPartnerTargetTeamIdFromOrder(order);
-  if (!mode || !targetTeamId) return true;
-  if (mode === PARTNER_DISPATCH_MODES.EXCLUSIVE) {
-    return riderMatchesPartnerTargetTeam(rider, order);
-  }
-  if (mode === PARTNER_DISPATCH_MODES.PRIORITY) {
-    return isPartnerPriorityWindowActive(order, nowMs)
-      ? riderMatchesPartnerTargetTeam(rider, order)
-      : true;
-  }
-  return true;
-}
-
-function isPartnerRevenueExcludedOrder(order = {}) {
-  const settlementMode = String(order.settlementMode || '').trim().toLowerCase();
-  const paymentMethod = String(
-    order.paymentMethod || order.payMethod || order.paymentType || order.payType || ''
-  ).trim().toLowerCase();
-  return settlementMode === 'rider_advance_cod' || paymentMethod === 'rider_advance_cod';
-}
-
-function shouldApplyPartnerRevenueSplit(order = {}, rider = {}) {
-  if (order.partnerRevenueSplitEnabled !== true) return false;
-  if (!isPartnerRiderApplicant(rider)) return false;
-  if (isPartnerRevenueExcludedOrder(order)) return false;
-  const riderTeamId = getPartnerTeamIdFromRider(rider);
-  const targetTeamId = getPartnerTargetTeamIdFromOrder(order);
-  return Boolean(riderTeamId && targetTeamId && riderTeamId === targetTeamId);
-}
-
-function getPartnerRevenueServiceBase(order = {}) {
-  const direct = Number(order.serviceSubtotal ?? order.serviceTotal ?? order.partnerServiceBase);
-  if (Number.isFinite(direct) && direct >= 0) {
-    return Math.max(0, Math.round(direct));
-  }
-  return [
-    order.deliveryFee, order.serviceFee, order.speedFee, order.upstairsFee,
-    order.itemSizeFee, order.waitingFee, order.dynamicPricingFee,
-    order.dynamicFee, order.weatherFee, order.operationalWaitingFee,
-    order.taskHandlingFee,
-  ].reduce((sum, value) => sum + Math.max(0, Math.round(Number(value || 0))), 0);
-}
-
-function getPartnerRevenueActors(order = {}, rider = {}) {
-  const executorRiderId = normalizePhone(
-    rider.riderId || rider.phone || order.partnerExecutorRiderId || order.riderId || order.riderPhone || ''
-  );
-  const applicantType = normalizeRiderApplicantType(
-    rider.applicantType || order.partnerExecutorApplicantType || ''
-  );
-  const managerRiderId = normalizePhone(
-    order.partnerManagerRiderId ||
-    (applicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER
-      ? executorRiderId
-      : rider.partnerTeamLeaderPhone) ||
-    ''
-  );
-  return {
-    executorRiderId,
-    managerRiderId,
-    applicantType,
-    ownerSelfRun: Boolean(executorRiderId && managerRiderId && executorRiderId === managerRiderId),
-  };
-}
-
-function calculatePartnerTeamRevenueSplit(order = {}, rider = {}) {
-  if (order.partnerRevenueSplitApplied !== true && !shouldApplyPartnerRevenueSplit(order, rider)) {
-    return null;
-  }
-  const serviceBase = getPartnerRevenueServiceBase(order);
-  const actors = getPartnerRevenueActors(order, rider);
-  if (!serviceBase || !actors.executorRiderId || !actors.managerRiderId) return null;
-
-  const platformFee = Math.max(0, Math.round(serviceBase * PARTNER_TEAM_REVENUE_MODEL_V1.platformRate));
-  const managerFee = Math.max(0, Math.round(serviceBase * PARTNER_TEAM_REVENUE_MODEL_V1.managerRate));
-  const executorIncome = Math.max(0, serviceBase - platformFee - managerFee);
-  const executorPayout = executorIncome + (actors.ownerSelfRun ? managerFee : 0);
-
-  return {
-    version: PARTNER_TEAM_REVENUE_MODEL_V1.version,
-    serviceBase,
-    platformFee,
-    managerFee,
-    executorIncome,
-    executorPayout,
-    teamIncome: executorIncome + managerFee,
-    managerSeparatePayable: actors.ownerSelfRun ? 0 : managerFee,
-    managerIncludedInExecutorPayout: actors.ownerSelfRun ? managerFee : 0,
-    ...actors,
-  };
-}
-
-function applyPartnerTeamRevenueSplit(order = {}, rider = {}) {
-  const split = calculatePartnerTeamRevenueSplit(order, rider);
-  if (!split) return order;
-
-  const paymentMethod = String(getOrderPaymentMethod(order) || '').trim().toLowerCase();
-  const isCashOrder =
-    order.isCashOrder === true ||
-    paymentMethod === 'cash' ||
-    paymentMethod.includes('cash') ||
-    paymentMethod.includes('現金');
-
-  const advancePayment = Math.max(0, Math.round(Number(getOrderAdvancePaymentAmount(order) || 0)));
-  const customerPayableTotal = split.serviceBase + advancePayment;
-
-  Object.assign(order, {
-    partnerRevenueSplitEnabled: true,
-    partnerRevenueSplitApplied: true,
-    partnerRevenueModelVersion: split.version,
-    partnerExecutorRiderId: split.executorRiderId,
-    partnerManagerRiderId: split.managerRiderId,
-    partnerExecutorApplicantType: split.applicantType,
-    partnerServiceBase: split.serviceBase,
-    partnerPlatformFee: split.platformFee,
-    partnerManagerFee: split.managerFee,
-    partnerExecutorIncome: split.executorIncome,
-    partnerExecutorPayout: split.executorPayout,
-    partnerTeamIncome: split.teamIncome,
-    partnerManagerSeparatePayable: split.managerSeparatePayable,
-    partnerManagerIncludedInRiderIncome: split.managerIncludedInExecutorPayout,
-    partnerOwnerSelfRun: split.ownerSelfRun,
-
-    driverFee: split.executorPayout,
-    riderFee: split.executorPayout,
-    riderIncome: split.executorPayout,
-    estimatedRiderIncome: split.executorPayout,
-    platformFee: split.platformFee,
-    platformIncome: split.platformFee,
-
-    advancePayment,
-    advanceAmount: advancePayment,
-    riderAdvanceAmount: advancePayment,
-    customerPayableTotal,
-    payableTotal: customerPayableTotal,
-    riderDisplayTotal: customerPayableTotal,
-    total: customerPayableTotal,
-    finalTotal: customerPayableTotal,
-    customerTotalWithAdvance: customerPayableTotal,
-
-    platformPayableToPartnerManager: split.managerSeparatePayable,
-    partnerManagerSettlementSource: split.ownerSelfRun
-      ? 'included_in_executor_payout'
-      : 'ubee_platform',
-  });
-
-  if (isCashOrder) {
-    // 成員跑單：小U保留 80%，其餘 20% 回 UBee；UBee 再支付負責人 5%。
-    // 負責人本人跑：本人保留 85%，只回 UBee 15%。
-    const cashDueToPlatform = split.platformFee + split.managerSeparatePayable;
-    order.cashCollectAmount = customerPayableTotal;
-    order.riderCollectAmount = customerPayableTotal;
-    order.cashServiceNet = split.serviceBase;
-    order.cashDueToPlatform = cashDueToPlatform;
-    order.platformReceivable = cashDueToPlatform;
-    order.riderDueToPlatform = cashDueToPlatform;
-  }
-
-  return order;
-}
-
-function getPartnerLedgerLifecycleStatus(order = {}) {
-  const status = String(order.status || '').trim().toLowerCase();
-  if (status === 'completed') {
-    return Number(order.partnerManagerSeparatePayable || 0) > 0
-      ? 'earned'
-      : 'included_in_executor_payout';
-  }
-  if (['cancelled','canceled','rejected'].includes(status)) return 'cancelled';
-  return 'allocated';
-}
-
-function buildPartnerTeamLedgerPayload(order = {}) {
-  if (order.partnerRevenueSplitApplied !== true) return null;
-  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
-  if (!orderId) return null;
-  return {
-    ledgerId: orderId,
-    orderId,
-    partnerTeamId: getPartnerTargetTeamIdFromOrder(order),
-    partnerTeamName: cleanText(order.preferredPartnerTeamName || order.partnerTeamName || '', 80),
-    managerRiderId: normalizePhone(order.partnerManagerRiderId || ''),
-    executorRiderId: normalizePhone(order.partnerExecutorRiderId || order.riderId || ''),
-    executorName: cleanText(order.riderName || '', 40),
-    revenueModelVersion: order.partnerRevenueModelVersion || PARTNER_TEAM_REVENUE_MODEL_V1.version,
-    serviceBase: Math.max(0, Math.round(Number(order.partnerServiceBase || 0))),
-    platformFee: Math.max(0, Math.round(Number(order.partnerPlatformFee || 0))),
-    managerFee: Math.max(0, Math.round(Number(order.partnerManagerFee || 0))),
-    executorIncome: Math.max(0, Math.round(Number(order.partnerExecutorIncome || 0))),
-    executorPayout: Math.max(0, Math.round(Number(order.partnerExecutorPayout || order.riderIncome || 0))),
-    teamIncome: Math.max(0, Math.round(Number(order.partnerTeamIncome || 0))),
-    managerSeparatePayable: Math.max(0, Math.round(Number(order.partnerManagerSeparatePayable || 0))),
-    managerIncludedInExecutorPayout: Math.max(0, Math.round(Number(order.partnerManagerIncludedInRiderIncome || 0))),
-    ownerSelfRun: order.partnerOwnerSelfRun === true,
-    paymentMethod: String(getOrderPaymentMethod(order) || '').trim(),
-    managerSettlementSource: String(order.partnerManagerSettlementSource || '').trim(),
-    ledgerStatus: getPartnerLedgerLifecycleStatus(order),
-    orderStatus: String(order.status || '').trim(),
-    completedAtMs: Number(order.completedAtMs || 0) || partnerTimeMs(order.completedAt),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAtMs: Date.now(),
-  };
-}
-
-async function syncPartnerTeamLedger(order = {}) {
-  const payload = buildPartnerTeamLedgerPayload(order);
-  if (!payload) return null;
-  await db.collection(PARTNER_TEAM_LEDGER_COLLECTION).doc(payload.orderId).set(payload, { merge:true });
-  return payload;
-}
 
 
 // =====================================================
@@ -2067,11 +1734,6 @@ async function sendNewOrderPushToRiders(
       order.riderFee ||
       "未設定";
 
-    const pushIncomeLabel =
-      order.partnerRevenueSplitEnabled === true
-        ? '請開啟任務查看'
-        : `$${fee}`;
-
     const pickup =
       order.pickupAddress ||
       order.fromAddress ||
@@ -2207,7 +1869,7 @@ async function sendNewOrderPushToRiders(
 
 取件：${pickup}
 送達：${dropoff}
-騎士收入：${pushIncomeLabel}`,
+騎士收入：$${fee}`,
 
           url: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=home&source=push`,
           deepLink: `/rider.html?orderId=${encodeURIComponent(orderId)}&tab=home&source=push`,
@@ -2227,8 +1889,7 @@ async function sendNewOrderPushToRiders(
 
           const riderDispatchEligible =
             canRiderAcceptOrdersV4(rider) &&
-            riderMeetsOrderV4Requirements(rider, order) &&
-            canRiderAccessPartnerDispatchOrder(rider, order, Date.now());
+            riderMeetsOrderV4Requirements(rider, order);
 
           const riderOnline =
             rider.online === true;
@@ -6061,44 +5722,6 @@ function requireRiderV4AdminKey(req, res, next) {
   return next();
 }
 
-
-app.get('/api/admin/partner-team-ledger', requireRiderV4AdminKey, async (req,res)=>{
-  try{
-    const partnerTeamId=cleanText(req.query?.partnerTeamId||'',80);
-    const limit=Math.max(1,Math.min(500,Number(req.query?.limit||300)||300));
-    let query=db.collection(PARTNER_TEAM_LEDGER_COLLECTION);
-    if(partnerTeamId)query=query.where('partnerTeamId','==',partnerTeamId);
-    const snap=await query.limit(limit).get();
-    const items=snap.docs.map(d=>({id:d.id,...(d.data()||{})})).sort((a,b)=>Number(b.completedAtMs||b.updatedAtMs||0)-Number(a.completedAtMs||a.updatedAtMs||0));
-    const totals=items.reduce((a,x)=>{
-      a.serviceBase+=Number(x.serviceBase||0);a.platformFee+=Number(x.platformFee||0);a.managerFee+=Number(x.managerFee||0);a.executorIncome+=Number(x.executorIncome||0);a.teamIncome+=Number(x.teamIncome||0);
-      if(x.ledgerStatus==='earned')a.managerPending+=Number(x.managerSeparatePayable||0);
-      if(x.ledgerStatus==='settled')a.managerSettled+=Number(x.managerSeparatePayable||0);
-      return a;
-    },{serviceBase:0,platformFee:0,managerFee:0,executorIncome:0,teamIncome:0,managerPending:0,managerSettled:0});
-    return res.json({success:true,items,totals,count:items.length});
-  }catch(error){console.error('❌ 讀取合作團隊分潤台帳失敗：',error);return res.status(500).json({success:false,message:'讀取合作團隊分潤台帳失敗。'});}
-});
-
-app.post('/api/admin/partner-team-ledger/:orderId/settle', requireRiderV4AdminKey, async (req,res)=>{
-  try{
-    const orderId=String(req.params.orderId||'').trim().toUpperCase();
-    const operator=cleanText(req.body?.operator||'finance_admin',100);
-    const ref=db.collection(PARTNER_TEAM_LEDGER_COLLECTION).doc(orderId);
-    const doc=await ref.get();
-    if(!doc.exists)return res.status(404).json({success:false,message:'找不到此合作團隊分潤紀錄。'});
-    const item=doc.data()||{};
-    if(item.ledgerStatus==='included_in_executor_payout')return res.status(409).json({success:false,message:'此單為負責人本人執行，5% 已包含在本人 85% 收入，不需另外撥付。'});
-    if(item.ledgerStatus==='cancelled')return res.status(409).json({success:false,message:'此訂單已取消，不可結算管理分潤。'});
-    if(item.ledgerStatus==='settled')return res.json({success:true,duplicate:true,message:'此筆管理分潤已完成結算。',item:{id:doc.id,...item}});
-    if(item.ledgerStatus!=='earned')return res.status(409).json({success:false,message:'此訂單尚未完成，管理分潤目前不可結算。'});
-    const nowMs=Date.now();
-    await ref.set({ledgerStatus:'settled',settledAt:admin.firestore.FieldValue.serverTimestamp(),settledAtMs:nowMs,settledBy:operator,updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs},{merge:true});
-    const fresh=await ref.get();
-    return res.json({success:true,message:'合作團隊管理分潤已完成結算。',item:{id:fresh.id,...(fresh.data()||{})}});
-  }catch(error){console.error('❌ 合作團隊管理分潤結算失敗：',error);return res.status(500).json({success:false,message:'合作團隊管理分潤結算失敗。'});}
-});
-
 function isApprovedRiderData(riderData) {
   if (!riderData) return false;
 
@@ -7609,7 +7232,7 @@ function sanitizeRiderPendingPreviewText(value, maxLength = 160) {
   return clean.slice(0, Math.max(0, Number(maxLength) || 160));
 }
 
-function buildRiderPendingTaskPreview(order = {}, rider = {}) {
+function buildRiderPendingTaskPreview(order = {}) {
   const status = String(order.status || '').trim();
   const orderId = String(
     order.id || order.orderId || order.orderNo || ''
@@ -7786,14 +7409,6 @@ function buildRiderPendingTaskPreview(order = {}, rider = {}) {
     220
   );
 
-  const partnerPreviewSplit = calculatePartnerTeamRevenueSplit(order, rider);
-  const previewRiderIncome = partnerPreviewSplit
-    ? partnerPreviewSplit.executorPayout
-    : Number(
-        order.estimatedRiderIncome || order.riderIncome || order.riderFee ||
-        order.riderEarning || order.driverIncome || order.courierIncome || 0
-      );
-
   return {
     id: orderId,
     orderId,
@@ -7868,22 +7483,12 @@ function buildRiderPendingTaskPreview(order = {}, rider = {}) {
     source: String(order.source || '').trim(),
     createdFrom: String(order.createdFrom || '').trim(),
 
-    estimatedRiderIncome: previewRiderIncome,
-    riderIncome: previewRiderIncome,
-    riderFee: previewRiderIncome,
-    riderEarning: previewRiderIncome,
-    driverIncome: previewRiderIncome,
-    courierIncome: previewRiderIncome,
-    partnerDispatchMode: String(order.partnerDispatchMode || '').trim(),
-    preferredPartnerTeamId: getPartnerTargetTeamIdFromOrder(order),
-    preferredPartnerTeamName: String(order.preferredPartnerTeamName || '').trim(),
-    partnerPriorityUntilMs: Number(order.partnerPriorityUntilMs || 0),
-    partnerPriorityActive: isPartnerPriorityWindowActive(order),
-    partnerRevenueSplitEnabled: order.partnerRevenueSplitEnabled === true,
-    partnerPreviewPlatformFee: partnerPreviewSplit?.platformFee || 0,
-    partnerPreviewManagerFee: partnerPreviewSplit?.managerFee || 0,
-    partnerPreviewExecutorIncome: partnerPreviewSplit?.executorIncome || 0,
-    partnerPreviewOwnerSelfRun: partnerPreviewSplit?.ownerSelfRun === true,
+    estimatedRiderIncome: Number(order.estimatedRiderIncome || 0),
+    riderIncome: Number(order.riderIncome || 0),
+    riderFee: Number(order.riderFee || 0),
+    riderEarning: Number(order.riderEarning || 0),
+    driverIncome: Number(order.driverIncome || 0),
+    courierIncome: Number(order.courierIncome || 0),
 
     distanceText: sanitizeRiderPendingPreviewText(
       order.distanceText || '',
@@ -8015,7 +7620,6 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
         ...doc.data()
       }))
       .filter(order => isRiderVisibleDispatchOrder(order))
-      .filter(order => canRiderAccessPartnerDispatchOrder(rider, order, nowMs))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => {
         const status = String(order.status || '').trim();
@@ -8054,7 +7658,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
             String(order.status || '').trim() === 'pending_schedule'
               ? riderMatchesScheduledOrderAvailability(rider, order)
               : true,
-        }, rider)
+        })
       );
 
     return res.json({
@@ -13859,12 +13463,6 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           phone: r.phone || '',
           district: r.district || r.cityDistrict || '',
           serviceArea: r.serviceArea || r.area || '',
-          applicantType: normalizeRiderApplicantType(r.applicantType),
-          partnerApplicant: isPartnerRiderApplicant(r),
-          partnerTeamId: cleanText(r.partnerTeamId || '', 80),
-          partnerTeamName: cleanText(r.partnerTeamName || '', 80),
-          partnerRole: cleanText(r.partnerRole || '', 40),
-          partnerTeamLeaderPhone: normalizePhone(r.partnerTeamLeaderPhone || ''),
           approved: true,
           declaredOnline,
           online,
@@ -14201,23 +13799,6 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         driverFee: Number(o.driverFee || o.riderFee || 0),
         riderFee: Number(o.riderFee || o.driverFee || 0),
         platformFee: Number(o.platformFee || o.platformIncome || 0),
-        partnerDispatchMode: normalizePartnerDispatchMode(o.partnerDispatchMode),
-        preferredPartnerTeamId: getPartnerTargetTeamIdFromOrder(o),
-        preferredPartnerTeamName: cleanText(o.preferredPartnerTeamName || o.partnerTeamName || '', 80),
-        partnerManagerRiderId: normalizePhone(o.partnerManagerRiderId || ''),
-        partnerPriorityStartedAtMs: Number(o.partnerPriorityStartedAtMs || 0),
-        partnerPriorityUntilMs: Number(o.partnerPriorityUntilMs || 0),
-        partnerPriorityActive: isPartnerPriorityWindowActive(o, nowMs),
-        partnerRevenueSplitEnabled: o.partnerRevenueSplitEnabled === true,
-        partnerRevenueSplitApplied: o.partnerRevenueSplitApplied === true,
-        partnerRevenueModelVersion: o.partnerRevenueModelVersion || '',
-        partnerServiceBase: Number(o.partnerServiceBase || 0),
-        partnerPlatformFee: Number(o.partnerPlatformFee || 0),
-        partnerManagerFee: Number(o.partnerManagerFee || 0),
-        partnerExecutorIncome: Number(o.partnerExecutorIncome || 0),
-        partnerExecutorPayout: Number(o.partnerExecutorPayout || 0),
-        partnerTeamIncome: Number(o.partnerTeamIncome || 0),
-        partnerOwnerSelfRun: o.partnerOwnerSelfRun === true,
 
         deliveryFee: Number(o.deliveryFee || 0),
         serviceFee: Number(o.serviceFee || 0),
@@ -14784,101 +14365,6 @@ function verifyDynamicPricingAdmin(req, res, next) {
 
   return next();
 }
-
-
-app.get('/api/dispatch/partner-teams', verifyDynamicPricingAdmin, async (req, res) => {
-  try {
-    const snap = await db.collection(RIDER_V2_COLLECTIONS.riders)
-      .where('partnerApplicant', '==', true).limit(500).get();
-    const map = new Map();
-    snap.docs.forEach(doc => {
-      const rider = doc.data() || {};
-      const teamId = getPartnerTeamIdFromRider(rider);
-      if (!teamId) return;
-      const team = map.get(teamId) || {
-        partnerTeamId:teamId, partnerTeamName:cleanText(rider.partnerTeamName || '',80),
-        ownerRiderId:'', ownerPhone:'', ownerName:'', memberCount:0, activeMemberCount:0,
-      };
-      team.memberCount += 1;
-      if (canRiderAcceptOrdersV4(rider)) team.activeMemberCount += 1;
-      if (normalizeRiderApplicantType(rider.applicantType) === RIDER_APPLICANT_TYPES.PARTNER_OWNER) {
-        team.ownerRiderId = doc.id;
-        team.ownerPhone = normalizePhone(rider.phone || doc.id);
-        team.ownerName = cleanText(rider.name || '',40);
-        team.partnerTeamName = cleanText(rider.partnerTeamName || team.partnerTeamName || '',80);
-      }
-      map.set(teamId,team);
-    });
-    const teams=[...map.values()].filter(t=>t.ownerRiderId).sort((a,b)=>String(a.partnerTeamName).localeCompare(String(b.partnerTeamName),'zh-TW'));
-    return res.json({success:true,teams,count:teams.length});
-  } catch (error) {
-    console.error('❌ 讀取合作團隊清單失敗：',error);
-    return res.status(500).json({success:false,message:'讀取合作團隊清單失敗。'});
-  }
-});
-
-app.post('/api/dispatch/orders/:orderId/partner-dispatch', verifyDynamicPricingAdmin, async (req,res)=>{
-  try {
-    const orderId=String(req.params.orderId||'').trim().toUpperCase();
-    const mode=normalizePartnerDispatchMode(req.body?.mode);
-    const partnerTeamId=cleanText(req.body?.partnerTeamId||'',80);
-    const operator=cleanText(req.body?.operator||'dispatch_admin',100);
-    const ref=db.collection('orders').doc(orderId);
-    const doc=await ref.get();
-    if(!doc.exists)return res.status(404).json({success:false,message:'找不到此訂單。'});
-    const order={id:orderId,...(doc.data()||{})};
-    const status=String(order.status||'').trim();
-    if(!['pending_dispatch','pending_schedule','scheduled_reserved','scheduled_confirmed'].includes(status)){
-      return res.status(409).json({success:false,message:'此訂單目前不是可設定合作團隊派單的狀態。'});
-    }
-    if(isPartnerRevenueExcludedOrder(order)){
-      return res.status(409).json({success:false,message:'店家 COD 維持原配送費全額給小U規則，不套用合作團隊 15/5/80。'});
-    }
-    if(!mode){
-      const update={partnerDispatchMode:'',preferredPartnerTeamId:'',preferredPartnerTeamName:'',partnerManagerRiderId:'',partnerManagerPhone:'',partnerPriorityStartedAtMs:0,partnerPriorityUntilMs:0,partnerRevenueSplitEnabled:false,partnerDispatchAssignedBy:operator,partnerDispatchUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),partnerDispatchUpdatedAtMs:Date.now()};
-      await ref.set(update,{merge:true});
-      orders[orderId]={...order,...update};
-      clearDispatchPushTimers(orderId);
-      if(status==='pending_dispatch')startOrderDispatchInBackground(orders[orderId]);
-      return res.json({success:true,message:'已解除合作團隊派單，恢復一般小U派單。',order:orders[orderId]});
-    }
-    if(!partnerTeamId)return res.status(400).json({success:false,message:'請選擇合作團隊。'});
-    const teamSnap=await db.collection(RIDER_V2_COLLECTIONS.riders).where('partnerTeamId','==',partnerTeamId).limit(100).get();
-    const ownerDoc=teamSnap.docs.find(d=>normalizeRiderApplicantType((d.data()||{}).applicantType)===RIDER_APPLICANT_TYPES.PARTNER_OWNER);
-    if(!ownerDoc)return res.status(404).json({success:false,message:'找不到此合作團隊負責人。'});
-    const owner=ownerDoc.data()||{};
-    if(!canRiderAcceptOrdersV4(owner))return res.status(409).json({success:false,message:'此合作團隊負責人目前沒有正式接單資格。'});
-    const priorityMinutes=mode===PARTNER_DISPATCH_MODES.PRIORITY?Number(req.body?.priorityMinutes||0):0;
-    if(mode===PARTNER_DISPATCH_MODES.PRIORITY&&(!Number.isFinite(priorityMinutes)||priorityMinutes<1||priorityMinutes>120)){
-      return res.status(400).json({success:false,message:'優先派單時間請設定 1～120 分鐘。'});
-    }
-    const nowMs=Date.now();
-    const update={
-      partnerDispatchMode:mode,
-      preferredPartnerTeamId:partnerTeamId,
-      preferredPartnerTeamName:cleanText(owner.partnerTeamName||'',80),
-      partnerManagerRiderId:ownerDoc.id,
-      partnerManagerPhone:normalizePhone(owner.phone||ownerDoc.id),
-      partnerPriorityStartedAtMs:nowMs,
-      partnerPriorityUntilMs:mode===PARTNER_DISPATCH_MODES.PRIORITY?nowMs+Math.round(priorityMinutes*60000):0,
-      partnerRevenueSplitEnabled:true,
-      partnerRevenueModelVersion:PARTNER_TEAM_REVENUE_MODEL_V1.version,
-      partnerDispatchAssignedBy:operator,
-      partnerDispatchAssignedAt:admin.firestore.FieldValue.serverTimestamp(),
-      partnerDispatchAssignedAtMs:nowMs,
-      partnerDispatchUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
-      partnerDispatchUpdatedAtMs:nowMs,
-    };
-    await ref.set(update,{merge:true});
-    orders[orderId]={...order,...update};
-    clearDispatchPushTimers(orderId);
-    if(status==='pending_dispatch')startOrderDispatchInBackground(orders[orderId]);
-    return res.json({success:true,message:mode===PARTNER_DISPATCH_MODES.EXCLUSIVE?`已設定「${update.preferredPartnerTeamName||partnerTeamId}」專屬承接。`:`已設定「${update.preferredPartnerTeamName||partnerTeamId}」優先 ${priorityMinutes} 分鐘。`,order:orders[orderId]});
-  } catch(error){
-    console.error('❌ 設定合作團隊派單失敗：',error);
-    return res.status(500).json({success:false,message:'設定合作團隊派單失敗。',error:error.message});
-  }
-});
 
 app.get('/api/dispatch/dynamic-pricing', async (req, res) => {
   try {
@@ -15627,13 +15113,6 @@ app.post('/api/rider/register', async (req, res) => {
       emergencyContactPhone,
       documents,
 
-      applicantType,
-      partnerTeamName,
-      partnerTeamSize,
-      partnerTeamLeaderPhone,
-      partnerVerificationConsent,
-      partnerPrivacyMinimumConsent,
-
       driverLicenseConfirmed,
       vehicleLicenseConfirmed,
       policeRecordConfirmed,
@@ -15735,26 +15214,8 @@ app.post('/api/rider/register', async (req, res) => {
       value === 1 ||
       value === '1';
 
-    const normalizedApplicantType = normalizeRiderApplicantType(applicantType);
-    const partnerApplicant = isPartnerRiderApplicant(normalizedApplicantType);
-    const normalizedPartnerTeamName = cleanText(partnerTeamName || '', 80);
-    const normalizedPartnerTeamSize = Math.max(
-      0,
-      Math.min(500, Number(partnerTeamSize || 0) || 0)
-    );
-    const normalizedPartnerLeaderPhone = normalizePhone(
-      normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER
-        ? cleanPhone
-        : partnerTeamLeaderPhone || ''
-    );
-    const partnerTeamId = partnerApplicant
-      ? buildPartnerTeamId(normalizedPartnerLeaderPhone)
-      : '';
-
     const motorizedVehicle = isMotorizedRiderVehicle(vehicle);
-    const requiredDocumentKeys = partnerApplicant
-      ? []
-      : getRequiredRiderDocumentKeys(vehicle);
+    const requiredDocumentKeys = getRequiredRiderDocumentKeys(vehicle);
 
     // 良民證目前不列為申請必備文件，也不作為送出條件。
     // 駕照、行照與強制險相關同意，只在機車／汽車申請時要求。
@@ -15765,9 +15226,8 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm,
       liabilityConfirm,
       privacyConfirm,
-      ...(partnerApplicant
-        ? [partnerVerificationConsent, partnerPrivacyMinimumConsent]
-        : [identityDocumentConsent, documentAuthenticityConfirm]),
+      identityDocumentConsent,
+      documentAuthenticityConfirm,
       locationDataConsent,
       jkoRequirementAgree,
       communityRequirementAgree,
@@ -15783,74 +15243,10 @@ app.post('/api/rider/register', async (req, res) => {
     if (!requiredAgreements.every(toBool)) {
       return res.status(400).json({
         success: false,
-        message: partnerApplicant
-          ? '請先閱讀並同意合作團隊、個資、人工身分核驗與定位規範後再送出申請。'
-          : '請先閱讀並同意全部合作、個資與證件規範後再送出申請。',
+        message: '請先閱讀並同意全部合作、個資與證件規範後再送出申請。',
       });
     }
 
-    if (partnerApplicant) {
-      if (!normalizedPartnerTeamName || normalizedPartnerTeamName.length < 2) {
-        return res.status(400).json({
-          success: false,
-          message: '合作團隊名稱至少需要 2 個字。',
-        });
-      }
-
-      if (!/^09\d{8}$/.test(normalizedPartnerLeaderPhone)) {
-        return res.status(400).json({
-          success: false,
-          message: '請填寫正確的合作團隊負責人手機號碼。',
-        });
-      }
-
-      if (
-        normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER &&
-        normalizedPartnerTeamSize < 1
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: '合作團隊負責人請填寫目前可調度人數。',
-        });
-      }
-
-      if (normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_MEMBER) {
-        const [leaderApplicationDoc, leaderRiderDoc] = await Promise.all([
-          db.collection(RIDER_V2_COLLECTIONS.applications)
-            .doc(normalizedPartnerLeaderPhone)
-            .get(),
-          db.collection(RIDER_V2_COLLECTIONS.riders)
-            .doc(normalizedPartnerLeaderPhone)
-            .get(),
-        ]);
-        const leaderData = leaderRiderDoc.exists
-          ? leaderRiderDoc.data() || {}
-          : leaderApplicationDoc.exists
-            ? leaderApplicationDoc.data() || {}
-            : null;
-
-        if (
-          !leaderData ||
-          normalizeRiderApplicantType(leaderData.applicantType) !==
-            RIDER_APPLICANT_TYPES.PARTNER_OWNER
-        ) {
-          return res.status(400).json({
-            success: false,
-            message: '找不到此手機號碼對應的合作團隊負責人，請先由負責人完成合作團隊申請。',
-          });
-        }
-
-        if (
-          cleanText(leaderData.partnerTeamName || '', 80) !==
-          normalizedPartnerTeamName
-        ) {
-          return res.status(400).json({
-            success: false,
-            message: '合作團隊名稱與負責人資料不一致，請向團隊負責人確認。',
-          });
-        }
-      }
-    }
 
     if (
       !name ||
@@ -15988,14 +15384,13 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    const documentValidation = partnerApplicant
-      ? { ok: true, documents: {} }
-      : await validateRiderApplicationDocuments(
-          documents,
-          cleanPhone,
-          riderLineUserId,
-          requiredDocumentKeys
-        );
+    const documentValidation =
+      await validateRiderApplicationDocuments(
+        documents,
+        cleanPhone,
+        riderLineUserId,
+        requiredDocumentKeys
+      );
 
     if (!documentValidation.ok) {
       return res.status(400).json({
@@ -16031,34 +15426,6 @@ app.post('/api/rider/register', async (req, res) => {
       userId: riderLineUserId.startsWith('U') ? riderLineUserId : '',
       lineUserId: riderLineUserId.startsWith('U') ? riderLineUserId : '',
       birthDate: String(birthDate || '').trim(),
-
-      applicantType: normalizedApplicantType,
-      partnerApplicant,
-      partnerTeamId,
-      partnerTeamName: partnerApplicant ? normalizedPartnerTeamName : '',
-      partnerRole: partnerApplicant ? normalizedApplicantType : '',
-      partnerTeamSize:
-        normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER
-          ? normalizedPartnerTeamSize
-          : 0,
-      partnerTeamLeaderPhone: partnerApplicant
-        ? normalizedPartnerLeaderPhone
-        : '',
-      identityVerificationStatus: partnerApplicant ? 'pending' : 'document_pending',
-      identityVerificationMethod: partnerApplicant
-        ? 'manual_partner_review'
-        : 'document_upload',
-      identityVerifiedAtMs: 0,
-      identityVerifiedBy: '',
-      riderPermissionLevel: partnerApplicant ? 'trial' : 'document_review',
-      partnerRevenueModel: partnerApplicant
-        ? {
-            version: 'partner_standard_v1',
-            platformRate: 0.15,
-            managerRate: 0.05,
-            executorRate: 0.80,
-          }
-        : null,
 
       district: cleanText(finalDistrict || '', 80),
       city: cleanText(finalResidenceCity || '', 20),
@@ -16101,14 +15468,12 @@ app.post('/api/rider/register', async (req, res) => {
 
       documents: documentValidation.documents,
       requiredDocumentKeys,
-      documentsComplete: partnerApplicant
-        ? false
-        : requiredDocumentKeys.every(key =>
-            Boolean(documentValidation.documents?.[key]?.storagePath)
-          ),
-      verificationModelVersion: partnerApplicant ? 3 : 2,
-      documentReviewStatus: partnerApplicant ? 'manual_pending' : 'pending',
-      manualIdentityVerificationRequired: partnerApplicant,
+      documentsComplete:
+        requiredDocumentKeys.every(key =>
+          Boolean(documentValidation.documents?.[key]?.storagePath)
+        ),
+      verificationModelVersion: 2,
+      documentReviewStatus: 'pending',
 
       approved: false,
       status: 'submitted',
@@ -16126,16 +15491,7 @@ app.post('/api/rider/register', async (req, res) => {
         applicationSource || 'rider_apply_v3',
         60
       ),
-      applicationType: partnerApplicant
-        ? 'partner_team_verification_v1'
-        : 'rider_v3_verification',
-
-      partnerVerificationConsent: partnerApplicant
-        ? toBool(partnerVerificationConsent)
-        : false,
-      partnerPrivacyMinimumConsent: partnerApplicant
-        ? toBool(partnerPrivacyMinimumConsent)
-        : false,
+      applicationType: 'rider_v3_verification',
 
       driverLicenseConfirmed: toBool(driverLicenseConfirmed),
       vehicleLicenseConfirmed: toBool(vehicleLicenseConfirmed),
@@ -16147,12 +15503,10 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm: toBool(riderRuleConfirm),
       liabilityConfirm: toBool(liabilityConfirm),
       privacyConfirm: toBool(privacyConfirm),
-      identityDocumentConsent: partnerApplicant
-        ? false
-        : toBool(identityDocumentConsent),
-      documentAuthenticityConfirm: partnerApplicant
-        ? false
-        : toBool(documentAuthenticityConfirm),
+      identityDocumentConsent: toBool(identityDocumentConsent),
+      documentAuthenticityConfirm: toBool(
+        documentAuthenticityConfirm
+      ),
       locationDataConsent: toBool(locationDataConsent),
       jkoRequirementAgree: toBool(jkoRequirementAgree),
       communityRequirementAgree: toBool(
@@ -16227,9 +15581,7 @@ app.post('/api/rider/register', async (req, res) => {
       phone: application.phone,
       lineUserId: application.lineUserId,
       applicationCollection: RIDER_V2_COLLECTIONS.applications,
-      documentsComplete: application.documentsComplete === true,
-      applicantType: application.applicantType,
-      partnerTeamName: application.partnerTeamName,
+      documentsComplete: true,
     });
 
     let notifyOk = false;
@@ -16341,7 +15693,10 @@ function getRiderApplicationDocumentReviewItems(application = {}) {
       ? application.documents
       : {};
 
-  const requiredDocumentKeys = getRequiredRiderApplicationDocumentKeys(application);
+  const requiredDocumentKeys = getRequiredRiderDocumentKeys(
+    application.vehicle,
+    application.requiredDocumentKeys
+  );
 
   const hasStoredDocuments = Object.keys(documents).length > 0;
   if (
@@ -16408,7 +15763,10 @@ function buildRiderApplicationVerificationGroups(
   application = {},
   documents = getRiderApplicationDocumentReviewItems(application)
 ) {
-  const requiredDocumentKeys = getRequiredRiderApplicationDocumentKeys(application);
+  const requiredDocumentKeys = getRequiredRiderDocumentKeys(
+    application.vehicle,
+    application.requiredDocumentKeys
+  );
 
   return Object.values(RIDER_VERIFICATION_GROUPS).map(group => {
     const groupDocumentKeys = group.documentKeys.filter(key =>
@@ -16452,44 +15810,6 @@ function buildRiderApplicationVerificationGroups(
 }
 
 function summarizeRiderApplicationDocuments(application = {}) {
-  if (isPartnerRiderApplicant(application)) {
-    const identityStatus = String(
-      application.identityVerificationStatus || 'pending'
-    ).trim().toLowerCase();
-    const verified = identityStatus === 'verified';
-    const rejected = identityStatus === 'rejected';
-    const manualGroup = {
-      key: 'partnerIdentity',
-      label: '合作團隊人工身分核驗',
-      description: '以最小必要資料、本人聯繫與合作關係進行人工核驗，不要求在申請階段上傳完整身分證影像。',
-      required: true,
-      status: verified ? 'approved' : rejected ? 'needs_supplement' : 'pending',
-      documentKeys: [],
-      totalCount: 1,
-      approvedCount: verified ? 1 : 0,
-      supplementCount: rejected ? 1 : 0,
-      pendingCount: verified || rejected ? 0 : 1,
-      allApproved: verified,
-    };
-
-    return {
-      documents: [],
-      verificationGroups: [manualGroup],
-      totalCount: 1,
-      approvedCount: verified ? 1 : 0,
-      supplementCount: rejected ? 1 : 0,
-      pendingCount: verified || rejected ? 0 : 1,
-      requiredGroupCount: 1,
-      approvedGroupCount: verified ? 1 : 0,
-      supplementGroupCount: rejected ? 1 : 0,
-      allApproved: verified,
-      allGroupsApproved: verified,
-      hasSupplementRequest: rejected,
-      manualVerification: true,
-      identityVerificationStatus: identityStatus,
-    };
-  }
-
   const documents = getRiderApplicationDocumentReviewItems(application);
   const approvedCount = documents.filter(
     item => item.reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.APPROVED
@@ -16523,7 +15843,6 @@ function summarizeRiderApplicationDocuments(application = {}) {
       requiredGroups.length > 0 &&
       approvedGroupCount === requiredGroups.length,
     hasSupplementRequest: supplementCount > 0,
-    manualVerification: false,
   };
 }
 
@@ -16551,27 +15870,16 @@ function buildRiderApplicationRiskChecks(application = {}, summary = null) {
     }
   }
 
-  if (isPartnerRiderApplicant(application)) {
-    if (String(application.identityVerificationStatus || '').trim().toLowerCase() !== 'verified') {
-      add(
-        'critical',
-        'PARTNER_IDENTITY_PENDING',
-        '合作團隊身分待人工核驗',
-        '正式通過前需由 UBee 管理端完成本人與合作關係人工核驗。'
-      );
-    }
-  } else {
-    const missingDocuments = documentSummary.documents
-      .filter(item => !String(item.storagePath || '').trim())
-      .map(item => item.label);
-    if (missingDocuments.length) {
-      add(
-        'critical',
-        'MISSING_DOCUMENTS',
-        '必要文件不完整',
-        missingDocuments.join('、')
-      );
-    }
+  const missingDocuments = documentSummary.documents
+    .filter(item => !String(item.storagePath || '').trim())
+    .map(item => item.label);
+  if (missingDocuments.length) {
+    add(
+      'critical',
+      'MISSING_DOCUMENTS',
+      '必要文件不完整',
+      missingDocuments.join('、')
+    );
   }
 
   const applicantPhone = normalizePhone(application.phone || '');
@@ -16644,9 +15952,6 @@ function getRiderApplicationLifecyclePresentation(application = {}, officialRide
     ''
   ).trim().toUpperCase();
   const documentSummary = summarizeRiderApplicationDocuments(application);
-  const partnerApplicant = isPartnerRiderApplicant(application);
-  const partnerIdentityVerified =
-    String(application.identityVerificationStatus || '').trim().toLowerCase() === 'verified';
   const active = lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
   const training = lifecycle === RIDER_V4_LIFECYCLE.TRAINING || status === 'training';
   const rejected = lifecycle === RIDER_V4_LIFECYCLE.REJECTED || status === 'rejected';
@@ -16663,15 +15968,11 @@ function getRiderApplicationLifecyclePresentation(application = {}, officialRide
     },
     {
       key: 'documents',
-      label: partnerApplicant
-        ? partnerIdentityVerified
-          ? '合作團隊人工身分核驗已完成'
-          : '合作團隊人工身分核驗中'
-        : needsSupplement
-          ? '證件需要補件'
-          : documentSummary.allApproved
-            ? '必要驗證已通過'
-            : '驗證資料審核中',
+      label: needsSupplement
+        ? '證件需要補件'
+        : documentSummary.allApproved
+          ? '必要驗證已通過'
+          : '驗證資料審核中',
       status: needsSupplement
         ? 'action'
         : documentSummary.allApproved
@@ -16951,19 +16252,10 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
     riderId: application.riderId || applicationDoc.id,
     applicationId: application.applicationId || applicationDoc.id,
     verificationModelVersion: Number(application.verificationModelVersion || 1),
-    requiredDocumentKeys: getRequiredRiderApplicationDocumentKeys(application),
-    applicantType: normalizeRiderApplicantType(application.applicantType),
-    partnerApplicant: isPartnerRiderApplicant(application),
-    partnerTeamId: application.partnerTeamId || '',
-    partnerTeamName: application.partnerTeamName || '',
-    partnerRole: application.partnerRole || '',
-    partnerTeamSize: Number(application.partnerTeamSize || 0),
-    partnerTeamLeaderPhone: application.partnerTeamLeaderPhone || '',
-    identityVerificationStatus: application.identityVerificationStatus || '',
-    identityVerificationMethod: application.identityVerificationMethod || '',
-    identityVerifiedAtMs: Number(application.identityVerifiedAtMs || 0),
-    identityVerifiedBy: application.identityVerifiedBy || '',
-    riderPermissionLevel: application.riderPermissionLevel || '',
+    requiredDocumentKeys: getRequiredRiderDocumentKeys(
+      application.vehicle,
+      application.requiredDocumentKeys
+    ),
     name: application.name || '',
     phone: application.phone || applicationDoc.id,
     lineId: application.lineId || '',
@@ -17403,11 +16695,6 @@ app.get(
         return {
           id: doc.id,
           riderId: application.riderId || doc.id,
-          applicantType: normalizeRiderApplicantType(application.applicantType),
-          partnerApplicant: isPartnerRiderApplicant(application),
-          partnerTeamName: application.partnerTeamName || '',
-          partnerRole: application.partnerRole || '',
-          identityVerificationStatus: application.identityVerificationStatus || '',
           name: application.name || '',
           phone: application.phone || doc.id,
           district: application.district || '',
@@ -17485,7 +16772,6 @@ app.get(
             item.phone,
             item.district,
             item.plateNumber,
-            item.partnerTeamName,
           ]
             .join(' ')
             .toLowerCase()
@@ -17603,12 +16889,6 @@ app.post(
       const nowMs = Date.now();
 
       if (action === 'mark_document') {
-        if (isPartnerRiderApplicant(application)) {
-          return res.status(409).json({
-            success: false,
-            message: '合作團隊申請採人工身分與合作關係核驗，不使用一般小U證件逐項審核／補件流程。',
-          });
-        }
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
             success: false,
@@ -17777,12 +17057,6 @@ app.post(
       }
 
       if (action === 'approve_group') {
-        if (isPartnerRiderApplicant(application)) {
-          return res.status(409).json({
-            success: false,
-            message: '合作團隊申請採人工身分與合作關係核驗，不使用一般小U證件逐項審核／補件流程。',
-          });
-        }
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
             success: false,
@@ -17910,12 +17184,6 @@ app.post(
       }
 
       if (action === 'request_supplement') {
-        if (isPartnerRiderApplicant(application)) {
-          return res.status(409).json({
-            success: false,
-            message: '合作團隊申請採人工身分與合作關係核驗，不使用一般小U證件逐項審核／補件流程。',
-          });
-        }
         if (status === 'rejected') {
           return res.status(409).json({
             success: false,
@@ -18140,109 +17408,6 @@ app.post(
           });
         }
 
-        // 合作團隊 V1：此動作同時代表管理端已完成人工本人與合作關係核驗。
-        // 不要求先上傳完整身分證件影像，但仍需正確輸入申請者姓名作為人工確認。
-        if (isPartnerRiderApplicant(application)) {
-          await applicationDoc.ref.set(
-            {
-              identityVerificationStatus: 'verified',
-              identityVerificationMethod: 'manual_partner_review',
-              identityVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-              identityVerifiedAtMs: nowMs,
-              identityVerifiedBy: operator,
-              riderPermissionLevel: 'identity_verified',
-              documentReviewStatus: 'manual_verified',
-              manualIdentityVerificationRequired: false,
-              status: 'pending',
-              reviewStatus: 'pending',
-              lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
-              approved: false,
-              canAcceptOrders: false,
-              supplementReason: '',
-              reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-              reviewedAtMs: nowMs,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              updatedAtMs: nowMs,
-            },
-            { merge: true }
-          );
-
-          const verifiedApplicationDoc = await applicationDoc.ref.get();
-          const verifiedApplication = verifiedApplicationDoc.data() || {};
-          const summary = summarizeRiderApplicationDocuments(verifiedApplication);
-          const riskChecks = buildRiderApplicationRiskChecks(
-            verifiedApplication,
-            summary
-          );
-
-          if (!summary.allApproved || riskChecks.criticalCount > 0) {
-            return res.status(409).json({
-              success: false,
-              message:
-                '合作團隊人工核驗後仍有未完成項目：' +
-                riskChecks.items
-                  .filter(item => item.level === 'critical')
-                  .map(item => item.label)
-                  .join('、'),
-            });
-          }
-
-          const approvedRider = buildApprovedRiderV2(
-            verifiedApplication,
-            operator
-          );
-          await saveRiderV2(approvedRider, { mirrorLegacy: true });
-
-          await applicationDoc.ref.set(
-            {
-              status: 'training',
-              reviewStatus: 'approved',
-              lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
-              canAcceptOrders: false,
-              onboardingRequired: true,
-              approved: true,
-              documentReviewStatus: 'manual_verified',
-              officialRiderCollection: RIDER_V2_COLLECTIONS.riders,
-              officialRiderId: approvedRider.riderId,
-              approvedAt: approvedRider.approvedAt,
-              approvedBy: operator,
-              quickApproved: true,
-              quickApprovedAt: admin.firestore.FieldValue.serverTimestamp(),
-              quickApprovedAtMs: nowMs,
-              quickApprovedBy: operator,
-              reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-              reviewedAtMs: nowMs,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              updatedAtMs: nowMs,
-            },
-            { merge: true }
-          );
-
-          const freshDoc = await applicationDoc.ref.get();
-          const freshApplication = freshDoc.data() || {};
-          await writeRiderApplicationReviewEvent({
-            application: freshApplication,
-            type: 'partner_manual_identity_approved',
-            operator,
-            reason: reason || '合作團隊人工身分與合作關係核驗完成。',
-            metadata: {
-              partnerTeamId: freshApplication.partnerTeamId || '',
-              partnerTeamName: freshApplication.partnerTeamName || '',
-              partnerRole: freshApplication.partnerRole || '',
-            },
-          });
-          await notifyRiderApplicationReviewUpdate(
-            freshApplication,
-            'approved'
-          );
-
-          return res.json({
-            success: true,
-            message: '合作團隊人工核驗已完成，申請已通過並進入數位入職階段。',
-            application: await serializeRiderApplicationForAdmin(freshDoc),
-          });
-        }
-
         const storedDocuments =
           application.documents && typeof application.documents === 'object'
             ? application.documents
@@ -18401,12 +17566,6 @@ app.post(
 
         const summary = summarizeRiderApplicationDocuments(application);
         if (!summary.allApproved) {
-          if (isPartnerRiderApplicant(application)) {
-            return res.status(409).json({
-              success: false,
-              message: '合作團隊身分尚未完成人工核驗，請使用「全部確認並通過」完成本人與合作關係確認。',
-            });
-          }
           const unfinished = summary.documents
             .filter(
               item =>
@@ -19068,14 +18227,6 @@ app.get('/api/rider/application-status', async (req, res) => {
         found: true,
         source: RIDER_V2_COLLECTIONS.riders,
         riderId: rider.riderId || officialDoc.id,
-        applicantType: normalizeRiderApplicantType(
-          application.applicantType || rider.applicantType
-        ),
-        partnerApplicant: isPartnerRiderApplicant(application.applicantType || rider.applicantType),
-        partnerTeamName: application.partnerTeamName || rider.partnerTeamName || '',
-        partnerRole: application.partnerRole || rider.partnerRole || '',
-        identityVerificationStatus:
-          application.identityVerificationStatus || rider.identityVerificationStatus || '',
         name: rider.name || application.name || '',
         approved: rider.approved === true,
         reviewStatus:
@@ -19182,11 +18333,6 @@ app.get('/api/rider/application-status', async (req, res) => {
         found: true,
         source: RIDER_V2_COLLECTIONS.applications,
         riderId: application.riderId || applicationDoc.id,
-        applicantType: normalizeRiderApplicantType(application.applicantType),
-        partnerApplicant: isPartnerRiderApplicant(application),
-        partnerTeamName: application.partnerTeamName || '',
-        partnerRole: application.partnerRole || '',
-        identityVerificationStatus: application.identityVerificationStatus || '',
         name: application.name || '',
         approved: application.approved === true,
         reviewStatus:
@@ -19243,10 +18389,7 @@ app.get('/api/rider/application-status', async (req, res) => {
           : presentation.rejected
             ? 'CONTACT_SUPPORT'
             : 'WAIT_REVIEW',
-        message: isPartnerRiderApplicant(application) &&
-          String(application.identityVerificationStatus || '').trim().toLowerCase() !== 'verified'
-          ? '合作團隊申請已送出，UBee 將以必要資料與本人聯繫進行人工身分及合作關係核驗；完成前不會開通正式接單資格。'
-          : messageMap[status] || '已找到新版申請資料。',
+        message: messageMap[status] || '已找到新版申請資料。',
       });
     }
 
@@ -22633,12 +21776,6 @@ function copyOrderFinancialFields(target, financialOrder) {
     'cashDueToPlatform',
     'platformReceivable',
     'riderDueToPlatform',
-    'partnerRevenueSplitEnabled','partnerRevenueSplitApplied','partnerRevenueModelVersion',
-    'partnerExecutorRiderId','partnerManagerRiderId','partnerExecutorApplicantType',
-    'partnerServiceBase','partnerPlatformFee','partnerManagerFee','partnerExecutorIncome',
-    'partnerExecutorPayout','partnerTeamIncome','partnerManagerSeparatePayable',
-    'partnerManagerIncludedInRiderIncome','partnerOwnerSelfRun',
-    'platformPayableToPartnerManager','partnerManagerSettlementSource',
   ];
 
   fields.forEach(field => {
@@ -23581,11 +22718,6 @@ async function saveOrder(order) {
       }
     );
 
-  if (order.partnerRevenueSplitApplied === true) {
-    try { await syncPartnerTeamLedger(order); }
-    catch (e) { console.warn('⚠️ 合作團隊分潤台帳同步失敗：', e?.message || e); }
-  }
-
   if (
     order.status ===
       'pending_dispatch' &&
@@ -23669,35 +22801,6 @@ function buildApprovedRiderV2(application, approvedBy) {
       application.lineUserId || application.userId || ''
     ).trim(),
 
-    applicantType: normalizeRiderApplicantType(application.applicantType),
-    partnerApplicant: isPartnerRiderApplicant(application),
-    partnerTeamId: cleanText(application.partnerTeamId || '', 80),
-    partnerTeamName: cleanText(application.partnerTeamName || '', 80),
-    partnerRole: cleanText(application.partnerRole || '', 40),
-    partnerTeamSize: Number(application.partnerTeamSize || 0),
-    partnerTeamLeaderPhone: normalizePhone(application.partnerTeamLeaderPhone || ''),
-    identityVerificationStatus: isPartnerRiderApplicant(application)
-      ? 'verified'
-      : 'document_verified',
-    identityVerificationMethod: isPartnerRiderApplicant(application)
-      ? 'manual_partner_review'
-      : 'document_upload',
-    identityVerifiedAtMs: Number(application.identityVerifiedAtMs || nowMs),
-    identityVerifiedBy: cleanText(application.identityVerifiedBy || approvedBy, 100),
-    riderPermissionLevel: isPartnerRiderApplicant(application)
-      ? 'identity_verified'
-      : 'fully_verified',
-
-    // 合作團隊標準分潤 V1：僅記錄合作制度，不在此處直接改寫既有訂單財務公式。
-    partnerRevenueModel: isPartnerRiderApplicant(application)
-      ? {
-          version: 'partner_standard_v1',
-          platformRate: 0.15,
-          managerRate: 0.05,
-          executorRate: 0.80,
-        }
-      : null,
-
     district: cleanText(application.district || '', 80),
     city: cleanText(application.city || '', 20),
     residenceCity: cleanText(
@@ -23747,18 +22850,10 @@ function buildApprovedRiderV2(application, approvedBy) {
     },
 
     identityVerified: true,
-    driverLicenseVerified: isPartnerRiderApplicant(application)
-      ? false
-      : true,
-    vehicleLicenseVerified: isPartnerRiderApplicant(application)
-      ? false
-      : true,
-    compulsoryInsuranceVerified: isPartnerRiderApplicant(application)
-      ? false
-      : true,
-    documentVerificationStatus: isPartnerRiderApplicant(application)
-      ? 'manual_identity_verified'
-      : 'approved',
+    driverLicenseVerified: true,
+    vehicleLicenseVerified: true,
+    compulsoryInsuranceVerified: true,
+    documentVerificationStatus: 'approved',
 
     approved: true,
     reviewStatus: 'approved',
@@ -25789,10 +24884,6 @@ function recalculateOrderFinancials(order) {
       cashDueToPlatform;
   }
 
-  if (order.partnerRevenueSplitApplied === true) {
-    applyPartnerTeamRevenueSplit(order);
-  }
-
   return order;
 }
 
@@ -25809,26 +24900,10 @@ function createMainMenuFlex() {
 }
 
 function createRiderReviewFlex(rider) {
-  const partnerApplicant = isPartnerRiderApplicant(rider);
-  const applicantType = normalizeRiderApplicantType(rider.applicantType);
-  const applicantTypeLabel = partnerApplicant
-    ? applicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER
-      ? '合作團隊負責人'
-      : '合作團隊成員'
-    : '一般小U';
-
   return createFlexMessage('新騎士申請審核', createBubble(
-    partnerApplicant ? '🟠 合作團隊申請審核' : '🟡 新騎士申請審核',
+    '🟡 新騎士申請審核',
     [
       createInfoRow('申請編號', rider.riderId),
-      createInfoRow('申請類型', applicantTypeLabel),
-      ...(partnerApplicant
-        ? [
-            createInfoRow('合作團隊', rider.partnerTeamName || '-'),
-            createInfoRow('團隊負責人手機', rider.partnerTeamLeaderPhone || rider.phone || '-'),
-            createInfoRow('可調度人數', rider.partnerTeamSize ? `${rider.partnerTeamSize} 人` : '-'),
-          ]
-        : []),
       createInfoRow('姓名', rider.name),
       createInfoRow('手機', rider.phone),
       createInfoRow('LINE ID', rider.lineId || rider.userId || '-'),
@@ -25838,12 +24913,10 @@ function createRiderReviewFlex(rider) {
       createInfoRow('服務區域', rider.serviceArea || rider.area || '-'),
       createInfoRow('服務時段', rider.availableTime || '-'),
       createInfoRow(
-        partnerApplicant ? '身分驗證' : '證件資料',
-        partnerApplicant
-          ? '合作團隊人工核驗待確認'
-          : rider.documentsComplete === true
-            ? '必要文件已上傳，待管理端審核'
-            : '尚未完整'
+        '證件資料',
+        rider.documentsComplete === true
+          ? '5 項已上傳，待管理端審核'
+          : '尚未完整'
       ),
       createInfoRow(
         '強制險到期',
@@ -25853,9 +24926,7 @@ function createRiderReviewFlex(rider) {
       createInfoRow('申請時間', rider.createdAt),
       {
         type: 'text',
-        text: partnerApplicant
-          ? '合作團隊 V1 不要求申請階段上傳完整身分證影像。請至審核管理頁，以必要資料、本人聯繫與合作關係完成人工核驗；核驗完成前不得開通正式接單資格。'
-          : '請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再做最終決定。',
+        text: '請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再做最終決定。',
         size: 'sm',
         color: '#666666',
         wrap: true,
@@ -31706,10 +30777,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
       }
 
-      if (!canRiderAccessPartnerDispatchOrder(latestRider, order, Date.now())) {
-        throw new Error('PARTNER_TEAM_PRIORITY_ONLY');
-      }
-
       if (
         latestRider.busy === true &&
         latestRider.currentOrderId &&
@@ -31798,36 +30865,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       
       const acceptedEtaPayload = getEtaPayloadByStatus('accepted');
 
-      const partnerSplitCandidate = shouldApplyPartnerRevenueSplit(order, latestRider)
-        ? applyPartnerTeamRevenueSplit({
-            ...order,
-            partnerExecutorRiderId: identity.riderId,
-            partnerExecutorApplicantType: normalizeRiderApplicantType(latestRider.applicantType),
-            partnerManagerRiderId:
-              normalizeRiderApplicantType(latestRider.applicantType) === RIDER_APPLICANT_TYPES.PARTNER_OWNER
-                ? identity.riderDocId
-                : normalizePhone(order.partnerManagerRiderId || latestRider.partnerTeamLeaderPhone || ''),
-            partnerRevenueSplitApplied: true,
-          }, latestRider)
-        : null;
-
-      const partnerRevenueUpdate = {};
-      if (partnerSplitCandidate?.partnerRevenueSplitApplied === true) {
-        copyOrderFinancialFields(partnerRevenueUpdate, partnerSplitCandidate);
-        Object.assign(partnerRevenueUpdate, {
-          partnerRevenueSplitEnabled: true,
-          partnerRevenueSplitApplied: true,
-          partnerRevenueModelVersion: partnerSplitCandidate.partnerRevenueModelVersion,
-          partnerExecutorRiderId: partnerSplitCandidate.partnerExecutorRiderId,
-          partnerManagerRiderId: partnerSplitCandidate.partnerManagerRiderId,
-          partnerExecutorApplicantType: partnerSplitCandidate.partnerExecutorApplicantType,
-          partnerTeamId: getPartnerTargetTeamIdFromOrder(order),
-          partnerTeamName: cleanText(order.preferredPartnerTeamName || latestRider.partnerTeamName || '', 80),
-          partnerDispatchAcceptedAtMs: trackingStartedAtMs,
-          partnerDispatchAcceptedByTeamId: getPartnerTeamIdFromRider(latestRider),
-        });
-      }
-
       const acceptUpdateData = {
         status: 'accepted',
         riderStatus: 'accepted',
@@ -31865,7 +30902,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
             }
           : {}),
 
-        ...partnerRevenueUpdate,
         ...acceptedEtaPayload,
       };
 
@@ -31896,11 +30932,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
     });
 
     orders[safeOrderId] = acceptedOrder;
-
-    if (acceptedOrder?.partnerRevenueSplitApplied === true) {
-      try { await syncPartnerTeamLedger(acceptedOrder); }
-      catch (e) { console.warn('⚠️ 合作團隊分潤台帳建立失敗，但接單成功：', e?.message || e); }
-    }
 
     clearDispatchPushTimers(
       safeOrderId
@@ -31977,14 +31008,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       return res.status(409).json({
         success: false,
         message: '此訂單尚未符合可派送條件，請確認付款狀態或店家派單狀態。',
-      });
-    }
-
-    if (error.message === 'PARTNER_TEAM_PRIORITY_ONLY') {
-      return res.status(409).json({
-        success:false,
-        code:'PARTNER_TEAM_PRIORITY_ONLY',
-        message:'此任務目前由指定合作團隊優先承接，尚未開放一般小U接單。',
       });
     }
 
@@ -32858,11 +31881,6 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     ).trim();
 
     orders[safeOrderId] = updatedOrder;
-
-    if (updatedOrder?.partnerRevenueSplitApplied === true && effectiveStatus === 'completed') {
-      try { await syncPartnerTeamLedger(updatedOrder); }
-      catch (e) { console.warn('⚠️ 合作團隊完成分潤台帳同步失敗：', e?.message || e); }
-    }
 
     const statusEventType = effectiveStatus === 'completed'
       ? 'ORDER_COMPLETED'
@@ -33971,9 +32989,6 @@ function getDispatchApiErrorResponse(error) {
     RIDER_OFFLINE: [409, '這位小U目前已離線，請重新選擇其他小U。'],
     RIDER_ALREADY_BUSY: [409, '這位小U目前已有進行中的任務，請重新選擇。'],
     RIDER_ALREADY_ASSIGNED: [409, '此訂單已經被其他小U接走。'],
-    RIDER_V4_NOT_ACTIVE: [403, '這位小U目前沒有正式接單資格。'],
-    RIDER_V4_QUALIFICATION_REQUIRED: [403, '這位小U的等級或專業資格不符合此任務。'],
-    PARTNER_TEAM_PRIORITY_ONLY: [409, '此任務目前只開放指定合作團隊承接。'],
     ORDER_RECOVERY_NOT_ALLOWED: [409, '此任務目前不符合安全備援轉派條件，請重新整理後確認。'],
     ORDER_CUSTODY_RISK: [409, '此任務已到達取件或取件後階段，可能已發生貨物交接，禁止直接轉派。請先聯絡小U並人工處置。'],
   };
@@ -34110,18 +33125,6 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
         );
       }
 
-      if (!canRiderAcceptOrdersV4(latestRider)) {
-        throw new Error('RIDER_V4_NOT_ACTIVE');
-      }
-
-      if (!riderMeetsOrderV4Requirements(latestRider, order)) {
-        throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
-      }
-
-      if (!canRiderAccessPartnerDispatchOrder(latestRider, order, Date.now())) {
-        throw new Error('PARTNER_TEAM_PRIORITY_ONLY');
-      }
-
       // 人工指定仍要求小U在線。
       // 不用「候選畫面的舊資料」做最終判定，
       // Transaction 內再次讀取 riders 文件。
@@ -34171,36 +33174,6 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
 
       const acceptedEtaPayload =
         getEtaPayloadByStatus('accepted');
-
-      const partnerSplitCandidate = shouldApplyPartnerRevenueSplit(order, latestRider)
-        ? applyPartnerTeamRevenueSplit({
-            ...order,
-            partnerExecutorRiderId: identity.riderId,
-            partnerExecutorApplicantType: normalizeRiderApplicantType(latestRider.applicantType),
-            partnerManagerRiderId:
-              normalizeRiderApplicantType(latestRider.applicantType) === RIDER_APPLICANT_TYPES.PARTNER_OWNER
-                ? identity.riderDocId
-                : normalizePhone(order.partnerManagerRiderId || latestRider.partnerTeamLeaderPhone || ''),
-            partnerRevenueSplitApplied: true,
-          }, latestRider)
-        : null;
-
-      const partnerRevenueUpdate = {};
-      if (partnerSplitCandidate?.partnerRevenueSplitApplied === true) {
-        copyOrderFinancialFields(partnerRevenueUpdate, partnerSplitCandidate);
-        Object.assign(partnerRevenueUpdate, {
-          partnerRevenueSplitEnabled: true,
-          partnerRevenueSplitApplied: true,
-          partnerRevenueModelVersion: partnerSplitCandidate.partnerRevenueModelVersion,
-          partnerExecutorRiderId: partnerSplitCandidate.partnerExecutorRiderId,
-          partnerManagerRiderId: partnerSplitCandidate.partnerManagerRiderId,
-          partnerExecutorApplicantType: partnerSplitCandidate.partnerExecutorApplicantType,
-          partnerTeamId: getPartnerTargetTeamIdFromOrder(order),
-          partnerTeamName: cleanText(order.preferredPartnerTeamName || latestRider.partnerTeamName || '', 80),
-          partnerDispatchAcceptedAtMs: nowMs,
-          partnerDispatchAcceptedByTeamId: getPartnerTeamIdFromRider(latestRider),
-        });
-      }
 
       const assignUpdateData = {
         status: 'accepted',
@@ -34257,7 +33230,6 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
         trackingEndedAt: null,
         trackingStopReason: '',
 
-        ...partnerRevenueUpdate,
         ...acceptedEtaPayload,
       };
 
@@ -34307,11 +33279,6 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
     ) {
       orders[safeOrderId] =
         assignedOrder;
-    }
-
-    if (assignedOrder?.partnerRevenueSplitApplied === true) {
-      try { await syncPartnerTeamLedger(assignedOrder); }
-      catch (e) { console.warn('⚠️ 人工指定合作團隊分潤台帳建立失敗：', e?.message || e); }
     }
 
     try {
