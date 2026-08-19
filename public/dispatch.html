@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
+<!-- UBee 調度中心 V2 Final＋合作團隊營運 V2：合作團隊優先／專屬派單與 15/5/80。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>UBee 跑腿｜調度中心 V2 Final＋動態定價 V3</title>
+<title>UBee 跑腿｜調度中心 V2 Final＋合作團隊營運 V2</title>
 
 <!-- Google Maps JavaScript API：由 /api/config 取得現有 UBee Google Maps 設定後動態載入 -->
 
@@ -173,6 +173,9 @@ button{cursor:pointer}
   border:1px solid var(--line);border-radius:13px;padding:11px;background:#fff
 }
 .candidate.best{border-color:#f1c72e;background:#fffdf1}
+.partner-ops-box{border:1px solid #ddd6fe;border-radius:14px;padding:12px;background:#faf7ff;display:grid;gap:9px}
+.partner-ops-title{font-size:12px;font-weight:1000;color:#5b21b6}.partner-ops-grid{display:grid;grid-template-columns:1.3fr .9fr .8fr auto;gap:7px}.partner-ops-grid select,.partner-ops-grid input{border:1px solid var(--line);border-radius:10px;padding:8px 9px;background:#fff;font-size:11px;font-weight:850;min-width:0}.partner-ops-status{font-size:10px;line-height:1.55;color:#5f6570;font-weight:800}.partner-ops-status strong{color:#111}.badge.partner{background:#ede9fe;color:#6d28d9}
+@media(max-width:760px){.partner-ops-grid{grid-template-columns:1fr 1fr}.partner-ops-grid .btn{grid-column:1/-1}}
 .candidate-name{font-size:13px;font-weight:1000}
 .candidate-meta{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.45}
 .distance{font-size:15px;font-weight:1000;text-align:right}
@@ -339,6 +342,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
+      <input id="dispatchAdminKey" type="password" placeholder="調度管理金鑰" style="width:170px;border:1px solid var(--line);border-radius:11px;padding:9px 10px;font-weight:800;background:#fff">
       <button class="btn" id="fitMapBtn">定位全部</button>
       <button class="btn primary" id="refreshBtn">重新整理</button>
     </div>
@@ -449,6 +453,11 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
             </div>
 
             <div id="v3RiskActionPanel" class="v3-risk-panel"></div>
+
+            <div id="partnerDispatchPanel" class="partner-ops-box">
+              <div class="partner-ops-title">合作團隊派單</div>
+              <div class="partner-ops-status">選擇訂單後，可設定「優先」或「專屬」合作團隊。合作團隊訂單會套用 UBee 15%／負責人 5%／執行者 80%。</div>
+            </div>
 
             <div class="radius-row">
               <strong style="font-size:12px">派單半徑</strong>
@@ -685,6 +694,8 @@ const state = {
     global:{},
     weatherAdjustment:{}
   },
+  partnerTeams: [],
+  partnerTeamsLoaded: false,
   loading: false
 };
 
@@ -1411,6 +1422,9 @@ async function loadDashboard({silent=false}={}){
   $('systemStatusText').textContent = '資料更新中';
 
   try{
+    if(getDispatchAdminKey() && !state.partnerTeamsLoaded){
+      try{await loadPartnerTeams();}catch(e){console.warn('合作團隊清單暫時無法讀取:',e);}
+    }
     const response = await fetch('/api/dispatch/dashboard',{
       cache:'no-store',
       headers:{'Accept':'application/json'}
@@ -1539,6 +1553,53 @@ function getDispatchAdminKey(){
     localStorage.getItem('ubee_dispatch_admin_key') ||
     ''
   ).trim();
+}
+
+async function loadPartnerTeams(force=false){
+  if(state.partnerTeamsLoaded&&!force)return state.partnerTeams;
+  const key=getDispatchAdminKey();
+  if(!key){state.partnerTeams=[];state.partnerTeamsLoaded=false;return [];} 
+  const r=await fetch('/api/dispatch/partner-teams?t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/json','X-UBee-Dispatch-Admin-Key':key}});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok||data.success===false)throw new Error(data.message||'讀取合作團隊失敗');
+  state.partnerTeams=Array.isArray(data.teams)?data.teams:[];state.partnerTeamsLoaded=true;return state.partnerTeams;
+}
+function partnerModeLabel(mode){return mode==='partner_team_exclusive'?'專屬團隊':mode==='partner_team_priority'?'團隊優先':'一般派單';}
+function partnerPriorityRemaining(order){const until=Number(order?.partnerPriorityUntilMs||0);if(!until)return'';const sec=Math.ceil((until-Date.now())/1000);if(sec<=0)return'優先時間已到，已開放一般小U';return`剩餘 ${Math.ceil(sec/60)} 分鐘`;}
+function renderPartnerDispatchPanel(order){
+  const el=$('partnerDispatchPanel');if(!el)return;
+  if(!order){el.innerHTML='<div class="partner-ops-title">合作團隊派單</div><div class="partner-ops-status">請先選擇一筆待派訂單。</div>';return;}
+  const waiting=statusKind(order)==='waiting';
+  const teams=state.partnerTeams||[];
+  const mode=String(order.partnerDispatchMode||'');
+  const currentTeam=String(order.preferredPartnerTeamId||'');
+  const options=['<option value="">選擇合作團隊</option>',...teams.map(t=>`<option value="${esc(t.partnerTeamId)}" ${currentTeam===String(t.partnerTeamId)?'selected':''}>${esc(t.partnerTeamName||t.partnerTeamId)}（可接 ${esc(t.activeMemberCount||0)}／${esc(t.memberCount||0)}）</option>`)].join('');
+  el.innerHTML=`<div class="partner-ops-title">合作團隊派單 ${mode?`<span class="badge partner">${esc(partnerModeLabel(mode))}</span>`:''}</div>
+    <div class="partner-ops-status">目前：<strong>${esc(order.preferredPartnerTeamName||'未指定')}</strong>${mode==='partner_team_priority'?`｜${esc(partnerPriorityRemaining(order))}`:''}<br>標準分潤：UBee 15%／團隊負責人 5%／實際執行者 80%；負責人本人跑則本人 85%。</div>
+    <div class="partner-ops-grid">
+      <select id="partnerTeamSelect" ${!waiting?'disabled':''}>${options}</select>
+      <select id="partnerModeSelect" ${!waiting?'disabled':''}><option value="partner_team_priority" ${mode==='partner_team_priority'?'selected':''}>優先派單</option><option value="partner_team_exclusive" ${mode==='partner_team_exclusive'?'selected':''}>專屬派單</option></select>
+      <input id="partnerPriorityMinutes" type="number" min="1" max="120" value="15" placeholder="優先分鐘" ${!waiting?'disabled':''}>
+      <button class="btn small yellow" id="savePartnerDispatchBtn" ${!waiting?'disabled':''}>套用</button>
+    </div>
+    ${mode?`<button class="btn small" id="clearPartnerDispatchBtn" ${!waiting?'disabled':''}>解除合作團隊派單</button>`:''}`;
+  $('partnerModeSelect')?.addEventListener('change',e=>{const input=$('partnerPriorityMinutes');if(input)input.disabled=!waiting||e.target.value!=='partner_team_priority';});
+  $('savePartnerDispatchBtn')?.addEventListener('click',()=>savePartnerDispatch(order.id,false));
+  $('clearPartnerDispatchBtn')?.addEventListener('click',()=>savePartnerDispatch(order.id,true));
+  if($('partnerPriorityMinutes'))$('partnerPriorityMinutes').disabled=!waiting||String($('partnerModeSelect')?.value)!=='partner_team_priority';
+}
+async function savePartnerDispatch(orderId,clear=false){
+  const key=getDispatchAdminKey();if(!key){toast('請輸入調度管理金鑰');return;}
+  localStorage.setItem('ubee_dispatch_admin_key',key);
+  const teamId=clear?'':String($('partnerTeamSelect')?.value||'');
+  const mode=clear?'':String($('partnerModeSelect')?.value||'partner_team_priority');
+  const priorityMinutes=Math.max(1,Math.min(120,Math.round(Number($('partnerPriorityMinutes')?.value||15))));
+  if(!clear&&!teamId){toast('請先選擇合作團隊');return;}
+  try{
+    const r=await fetch(`/api/dispatch/orders/${encodeURIComponent(orderId)}/partner-dispatch`,{method:'POST',headers:{'Content-Type':'application/json','X-UBee-Dispatch-Admin-Key':key},body:JSON.stringify({partnerTeamId:teamId,mode,priorityMinutes,operator:'dispatch_center'})});
+    const data=await r.json().catch(()=>({}));if(!r.ok||data.success===false)throw new Error(data.message||'設定失敗');
+    toast(data.message||'合作團隊派單已更新');await loadDashboard({silent:true});
+  }catch(e){alert('合作團隊派單設定失敗：'+e.message);}
 }
 
 function weatherDefaultMeta(type){
@@ -2163,6 +2224,11 @@ function renderAlerts(){
    ========================= */
 function getCandidateRiders(order){
   if(!order) return [];
+  const mode=String(order.partnerDispatchMode||'');
+  const targetTeam=String(order.preferredPartnerTeamId||'');
+  const priorityActive=mode==='partner_team_priority'&&Number(order.partnerPriorityUntilMs||0)>Date.now();
+  const restrictTeam=targetTeam&&(mode==='partner_team_exclusive'||priorityActive);
+  const partnerFilter=r=>!restrictTeam||String(r.partnerTeamId||'')===targetTeam;
   const insight = getOrderInsight(order.id);
   if(insight && Array.isArray(insight.candidates) && insight.candidates.length){
     return insight.candidates
@@ -2172,11 +2238,12 @@ function getCandidateRiders(order){
         const base=(state.data.riders||[]).find(r=>String(r.riderId)===String(c.riderId)||String(r.riderDocId)===String(c.riderDocId))||{};
         return {...base,...c,distanceKm:Number(c.distanceKm),dispatchScore:Number(c.score||0)};
       })
-      .filter(r=>r.online === true && r.busy !== true);
+      .filter(r=>r.online === true && r.busy !== true)
+      .filter(partnerFilter);
   }
   if(!hasLatLng(order.pickupLat,order.pickupLng)) return [];
   const pLat=Number(order.pickupLat),pLng=Number(order.pickupLng);
-  return (state.data.riders||[]).filter(r=>r.online===true && !r.busy).filter(r=>hasLatLng(r.currentLat,r.currentLng)).map(r=>({
+  return (state.data.riders||[]).filter(r=>r.online===true && !r.busy).filter(partnerFilter).filter(r=>hasLatLng(r.currentLat,r.currentLng)).map(r=>({
     ...r,distanceKm:haversineKm(pLat,pLng,Number(r.currentLat),Number(r.currentLng)),dispatchScore:0
   })).filter(r=>r.distanceKm<=state.radiusKm).sort((a,b)=>a.distanceKm-b.distanceKm);
 }
@@ -2201,8 +2268,11 @@ function renderCandidates(){
     if($('createIncidentBtn')) $('createIncidentBtn').disabled=true;
     $('selectedOrderSummary').innerHTML = '<div class="empty">請先選擇一筆訂單</div>';
     $('candidateList').innerHTML = '<div class="empty">選擇訂單後顯示候選小U</div>';
+    renderPartnerDispatchPanel(null);
     return;
   }
+
+  renderPartnerDispatchPanel(order);
 
   const selectedItemSize=String(
     order.reportedItemSize||
@@ -2224,6 +2294,7 @@ function renderCandidates(){
     <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.55">
       取件：${esc(order.pickupAddress || '-')}<br>
       狀態：${esc(order.statusLabel || order.status || '-')}<br>
+      ${order.preferredPartnerTeamId?`合作團隊：<b>${esc(order.preferredPartnerTeamName||order.preferredPartnerTeamId)}</b>・${esc(partnerModeLabel(order.partnerDispatchMode))}${order.partnerDispatchMode==='partner_team_priority'?`・${esc(partnerPriorityRemaining(order))}`:''}<br>`:''}
       ${riskBadge(order.riskLevel,order.riskScore)}
       ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<br>原因：${esc(order.riskReasons.slice(0,4).join('；'))}`:''}
        ${Array.isArray(order.riderLocationTrail)&&order.riderLocationTrail.length?`<br><span style="color:var(--purple)">V5 最近軌跡：${esc(order.riderLocationTrail.length)} 個定位採樣點</span>`:''}
@@ -2321,6 +2392,7 @@ function renderCandidates(){
         </div>
         <div class="candidate-meta">
           ${esc(r.district || r.serviceArea || '未設定區域')}
+          ${r.partnerApplicant?` · <span class="badge partner">${esc(r.partnerTeamName||'合作團隊')}</span>`:''}
           · 定位更新 ${esc(fmtAge(r.locationUpdatedAtMs || (Date.now()-Number(r.locationAgeMs||0))))}
           · 預估取件 ${esc(r.estimatedPickupMinutes || '-')} 分
           · ${esc(r.riderId || '')}
@@ -2791,9 +2863,12 @@ $('refreshBtn').addEventListener('click',()=>loadDashboard());
 $('fitMapBtn').addEventListener('click',()=>fitMapToData());
 
 if($('dispatchAdminKey')){
-  $('dispatchAdminKey').value=
-    localStorage.getItem('ubee_dispatch_admin_key')||
-    '';
+  $('dispatchAdminKey').value=localStorage.getItem('ubee_dispatch_admin_key')||'';
+  $('dispatchAdminKey').addEventListener('change',async()=>{
+    localStorage.setItem('ubee_dispatch_admin_key',String($('dispatchAdminKey').value||'').trim());
+    state.partnerTeamsLoaded=false;
+    try{await loadPartnerTeams(true);renderPartnerDispatchPanel(getSelectedOrder());toast('合作團隊清單已更新');}catch(e){toast('管理金鑰或合作團隊清單讀取失敗');}
+  });
 }
 
 $('weatherTypeSelect')?.addEventListener('change',event=>{
