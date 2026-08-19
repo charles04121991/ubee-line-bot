@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<!-- UBee 財務 V4＋合作團隊營運 V2：加入 15/5/80 分潤與負責人管理費結算。 -->
+<!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>UBee 跑腿｜財務結算中心 V4＋合作團隊營運 V2</title>
+<title>UBee 跑腿｜財務結算中心 V4</title>
 <style>
 :root{
   --bg:#f4f5f7;
@@ -128,7 +128,6 @@ summary::-webkit-details-marker{display:none}
 .finance-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .finance-summary-card{border:1px solid var(--line);border-radius:15px;padding:12px;background:#f9fafb}.finance-summary-card span{display:block;font-size:10px;color:var(--muted);font-weight:900}.finance-summary-card strong{display:block;margin-top:5px;font-size:20px;font-weight:1000}
 .finance-ledger-list{display:grid;gap:10px}.finance-order-card{border:1px solid var(--line);border-radius:16px;padding:13px;background:#fff}.finance-order-card.review{border-left:5px solid var(--red)}.finance-order-card.unpaid{border-left:5px solid var(--orange)}.finance-order-card.reconciled{border-left:5px solid var(--green)}
-.partner-ledger-card{border:1px solid var(--line);border-left:5px solid #7c3aed;border-radius:16px;padding:13px;background:#fff}.partner-ledger-card.settled{border-left-color:var(--green)}.partner-ledger-card.included{border-left-color:var(--blue)}.partner-ledger-card.cancelled{opacity:.6;border-left-color:#9ca3af}.partner-key-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}.partner-key-row input{flex:1;border:1px solid var(--line);border-radius:11px;padding:10px 11px;font-weight:800}
 .finance-order-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.finance-order-id{font-size:14px;font-weight:1000;word-break:break-all}.finance-order-meta{font-size:11px;color:var(--muted);font-weight:800;line-height:1.55;margin-top:4px}.finance-amount{font-size:22px;font-weight:1000;text-align:right;white-space:nowrap}
 .finance-mini-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}.finance-mini{background:#f7f8fa;border-radius:11px;padding:9px}.finance-mini span{display:block;font-size:9px;color:var(--muted);font-weight:900}.finance-mini strong{display:block;font-size:13px;margin-top:4px;font-weight:1000}.finance-variance{color:var(--red)}
 .finance-status-select{border:1px solid var(--line);border-radius:11px;padding:9px 10px;background:#fff;font-size:12px;font-weight:900}.finance-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
@@ -164,7 +163,6 @@ summary::-webkit-details-marker{display:none}
     <button class="tab" data-view="alerts">異常提醒 <span id="alertTabCount"></span></button>
     <button class="tab" data-view="history">結算紀錄</button>
     <button class="tab" data-view="ledger">訂單財務</button>
-    <button class="tab" data-view="partners">合作團隊分潤</button>
     <button class="tab" data-view="riders">小U V4 資格</button>
   </nav>
 
@@ -270,26 +268,6 @@ summary::-webkit-details-marker{display:none}
       </div>
     </section>
 
-    <section class="view" id="view-partners">
-      <div class="panel">
-        <div class="panel-head">
-          <div><div class="panel-title">合作團隊分潤台帳</div><div class="panel-sub">標準制度：UBee 15%／團隊負責人 5%／實際執行者 80%。負責人本人跑則 5% 併入本人收入，合計 85%。</div></div>
-          <div class="toolbar"><input id="partnerLedgerSearch" class="search" placeholder="搜尋團隊／訂單／負責人／執行者" oninput="renderPartnerLedger()"><button class="btn small" onclick="loadPartnerLedger(true)">更新</button></div>
-        </div>
-        <div class="panel-body">
-          <div class="v4-admin-note">管理分潤由平台財務端確認。現金單由執行者回繳 UBee 應收後，UBee 再支付負責人 5%；非現金單同樣由 UBee 統一結算。商品代墊／代收款不參與 15/5/80。</div>
-          <div class="partner-key-row"><input id="partnerAdminKey" type="password" placeholder="輸入 V4 管理金鑰"><button class="btn primary" onclick="savePartnerAdminKey()">套用金鑰</button></div>
-          <div class="finance-summary-grid">
-            <div class="finance-summary-card"><span>純跑腿服務總額</span><strong id="partnerServiceBase">$0</strong></div>
-            <div class="finance-summary-card"><span>UBee 15%</span><strong id="partnerPlatformTotal">$0</strong></div>
-            <div class="finance-summary-card"><span>負責人 5%</span><strong id="partnerManagerTotal">$0</strong></div>
-            <div class="finance-summary-card"><span>待支付管理分潤</span><strong id="partnerManagerPending">$0</strong></div>
-          </div>
-          <div id="partnerLedgerList" class="finance-ledger-list"><div class="empty">輸入管理金鑰後即可讀取合作團隊分潤。</div></div>
-        </div>
-      </div>
-    </section>
-
     <section class="view" id="view-riders">
       <div class="panel">
         <div class="panel-head">
@@ -325,7 +303,6 @@ const state = {
   ridersV4:null,
   finance:null,
   financeDetail:null,
-  partnerLedger:null,
   loading:false,
 };
 
@@ -398,7 +375,6 @@ function switchView(view){
   if(view==='alerts') renderAlerts();
   if(view==='history') renderHistory();
   if(view==='ledger' && !state.finance) loadFinanceLedger();
-  if(view==='partners' && !state.partnerLedger) loadPartnerLedger();
   if(view==='riders' && !state.ridersV4) loadV4Riders();
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));
@@ -668,27 +644,8 @@ async function settleJko(orderIds,button){
 }
 
 
-function savePartnerAdminKey(){const input=document.getElementById('partnerAdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);const v4=document.getElementById('v4AdminKey');if(v4&&!v4.value)v4.value=key;loadPartnerLedger(true);}
-function partnerLedgerStatusLabel(s){return {allocated:'已配置',earned:'待支付',settled:'已支付',included_in_executor_payout:'已併入本人85%',cancelled:'已取消'}[s]||s||'-';}
-function renderPartnerLedger(){
-  const el=document.getElementById('partnerLedgerList');if(!el)return;
-  const q=normalizeSearch(document.getElementById('partnerLedgerSearch')?.value);
-  const data=state.partnerLedger||{};const t=data.totals||{};
-  const set=(id,v)=>{const x=document.getElementById(id);if(x)x.textContent=money(v);};set('partnerServiceBase',t.serviceBase);set('partnerPlatformTotal',t.platformFee);set('partnerManagerTotal',t.managerFee);set('partnerManagerPending',t.managerPending);
-  let items=Array.isArray(data.items)?data.items:[];
-  if(q)items=items.filter(x=>[x.partnerTeamName,x.partnerTeamId,x.orderId,x.managerRiderId,x.executorRiderId,x.executorName].map(normalizeSearch).some(v=>v.includes(q)));
-  if(!items.length){el.innerHTML='<div class="empty">目前沒有符合條件的合作團隊分潤紀錄。</div>';return;}
-  el.innerHTML=items.map(x=>`<article class="partner-ledger-card ${x.ledgerStatus==='settled'?'settled':x.ledgerStatus==='included_in_executor_payout'?'included':x.ledgerStatus==='cancelled'?'cancelled':''}"><div class="finance-order-head"><div><div class="finance-order-id">${esc(x.orderId||x.id)}</div><div class="finance-order-meta">${esc(x.partnerTeamName||x.partnerTeamId||'合作團隊')}・負責人 ${esc(x.managerRiderId||'-')}<br>執行者 ${esc(x.executorName||x.executorRiderId||'-')}・${esc(formatTime(x.completedAtMs||x.updatedAtMs))}</div></div><div><div class="finance-amount">${money(x.managerFee)}</div><span class="tag ${x.ledgerStatus==='settled'?'done':x.ledgerStatus==='earned'?'cash':'jko'}">${esc(partnerLedgerStatusLabel(x.ledgerStatus))}</span></div></div><div class="finance-mini-grid"><div class="finance-mini"><span>服務總額</span><strong>${money(x.serviceBase)}</strong></div><div class="finance-mini"><span>UBee 15%</span><strong>${money(x.platformFee)}</strong></div><div class="finance-mini"><span>負責人 5%</span><strong>${money(x.managerFee)}</strong></div><div class="finance-mini"><span>執行者收入</span><strong>${money(x.executorPayout)}</strong></div></div>${x.ledgerStatus==='earned'&&Number(x.managerSeparatePayable||0)>0?`<div class="finance-actions"><button class="btn small yellow" onclick="settlePartnerManager('${esc(x.orderId)}',${Number(x.managerSeparatePayable||0)},this)">確認已支付負責人 ${money(x.managerSeparatePayable)}</button></div>`:''}</article>`).join('');
-}
-async function loadPartnerLedger(showMessage=false){
-  const el=document.getElementById('partnerLedgerList');const key=getV4AdminKey();const input=document.getElementById('partnerAdminKey');if(key&&input&&!input.value)input.value=key;if(!key){if(el)el.innerHTML='<div class="empty">請先輸入 V4 管理金鑰。</div>';return;}
-  if(el&&!showMessage)el.innerHTML='<div class="empty">正在讀取合作團隊分潤...</div>';
-  try{state.partnerLedger=await v4AdminFetch('/api/admin/partner-team-ledger?limit=500&t='+Date.now());renderPartnerLedger();if(showMessage)showToast('合作團隊分潤已更新');}catch(err){if(el)el.innerHTML=`<div class="empty">讀取失敗：${esc(err.message)}</div>`;}
-}
-async function settlePartnerManager(orderId,amount,button){if(!confirm(`確認已支付合作團隊負責人管理分潤？\n\n訂單：${orderId}\n金額：${money(amount)}`))return;const old=button?.textContent;if(button){button.disabled=true;button.textContent='處理中...';}try{await v4AdminFetch(`/api/admin/partner-team-ledger/${encodeURIComponent(orderId)}/settle`,{method:'POST',body:JSON.stringify({operator:'finance_center'})});showToast('管理分潤已完成結算');await loadPartnerLedger(true);}catch(err){alert('管理分潤結算失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}}
-
 function getV4AdminKey(){return String(sessionStorage.getItem('ubee_v4_admin_key')||'').trim();}
-function saveV4AdminKey(){const input=document.getElementById('v4AdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);const p=document.getElementById('partnerAdminKey');if(p&&!p.value)p.value=key;loadV4Riders(true);}
+function saveV4AdminKey(){const input=document.getElementById('v4AdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);loadV4Riders(true);}
 async function v4AdminFetch(path,options={}){const key=getV4AdminKey();if(!key)throw new Error('請先輸入 V4 管理金鑰。');const headers={...(options.headers||{}),'x-ubee-admin-key':key};if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';const res=await fetch(`${API_BASE}${path}`,{...options,headers,cache:'no-store'});return readJson(res);}
 async function loadV4Riders(showMessage=false){
   const el=document.getElementById('v4RiderList'); if(!el)return;
@@ -728,7 +685,7 @@ async function refreshAll(showMessage=false){
   try{
     const ok=await healthCheck();
     if(!ok){if(showMessage)showToast('目前無法連上 UBee 後端，保留畫面最後資料。');return;}
-    await Promise.all([loadOverview(true),loadCashRemittances(true),loadSettlements(true),loadFinanceLedger(false),getV4AdminKey()?loadPartnerLedger(false):Promise.resolve()]);
+    await Promise.all([loadOverview(true),loadCashRemittances(true),loadSettlements(true),loadFinanceLedger(false)]);
     if(showMessage)showToast('財務資料已全部更新');
   }finally{state.loading=false;}
 }
