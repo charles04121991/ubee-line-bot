@@ -78,6 +78,53 @@ const RIDER_DOCUMENT_LABELS = Object.freeze({
   compulsoryInsurance: '強制險證明',
 });
 
+// =====================================================
+// 2026-08-19｜UBee 合作團隊驗證 V1
+// - 一般小U維持原證件驗證流程
+// - 合作團隊負責人／成員改採必要資料＋人工本人核驗
+// - 人工核驗完成前不得正式通過申請或取得接單資格
+// =====================================================
+const RIDER_APPLICANT_TYPES = Object.freeze({
+  INDIVIDUAL: 'individual',
+  PARTNER_OWNER: 'partner_owner',
+  PARTNER_MEMBER: 'partner_member',
+});
+
+function normalizeRiderApplicantType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (['partner_owner', 'partner-leader', 'team_owner', 'team_leader'].includes(raw)) {
+    return RIDER_APPLICANT_TYPES.PARTNER_OWNER;
+  }
+  if (['partner_member', 'team_member'].includes(raw)) {
+    return RIDER_APPLICANT_TYPES.PARTNER_MEMBER;
+  }
+  return RIDER_APPLICANT_TYPES.INDIVIDUAL;
+}
+
+function isPartnerRiderApplicant(value) {
+  const type = typeof value === 'object' && value
+    ? normalizeRiderApplicantType(value.applicantType || value.partnerRole || '')
+    : normalizeRiderApplicantType(value);
+  return [
+    RIDER_APPLICANT_TYPES.PARTNER_OWNER,
+    RIDER_APPLICANT_TYPES.PARTNER_MEMBER,
+  ].includes(type);
+}
+
+function buildPartnerTeamId(ownerPhone) {
+  const cleanOwnerPhone = normalizePhone(ownerPhone || '');
+  if (!/^09\d{8}$/.test(cleanOwnerPhone)) return '';
+  return `partner_${crypto.createHash('sha256').update(cleanOwnerPhone).digest('hex').slice(0, 16)}`;
+}
+
+function getRequiredRiderApplicationDocumentKeys(application = {}) {
+  if (isPartnerRiderApplicant(application)) return [];
+  return getRequiredRiderDocumentKeys(
+    application.vehicle,
+    application.requiredDocumentKeys
+  );
+}
+
 
 // =====================================================
 // UBee 小U申請審核 V2：三大驗證模型
@@ -15113,6 +15160,13 @@ app.post('/api/rider/register', async (req, res) => {
       emergencyContactPhone,
       documents,
 
+      applicantType,
+      partnerTeamName,
+      partnerTeamSize,
+      partnerTeamLeaderPhone,
+      partnerVerificationConsent,
+      partnerPrivacyMinimumConsent,
+
       driverLicenseConfirmed,
       vehicleLicenseConfirmed,
       policeRecordConfirmed,
@@ -15214,8 +15268,26 @@ app.post('/api/rider/register', async (req, res) => {
       value === 1 ||
       value === '1';
 
+    const normalizedApplicantType = normalizeRiderApplicantType(applicantType);
+    const partnerApplicant = isPartnerRiderApplicant(normalizedApplicantType);
+    const normalizedPartnerTeamName = cleanText(partnerTeamName || '', 80);
+    const normalizedPartnerTeamSize = Math.max(
+      0,
+      Math.min(500, Number(partnerTeamSize || 0) || 0)
+    );
+    const normalizedPartnerLeaderPhone = normalizePhone(
+      normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER
+        ? cleanPhone
+        : partnerTeamLeaderPhone || ''
+    );
+    const partnerTeamId = partnerApplicant
+      ? buildPartnerTeamId(normalizedPartnerLeaderPhone)
+      : '';
+
     const motorizedVehicle = isMotorizedRiderVehicle(vehicle);
-    const requiredDocumentKeys = getRequiredRiderDocumentKeys(vehicle);
+    const requiredDocumentKeys = partnerApplicant
+      ? []
+      : getRequiredRiderDocumentKeys(vehicle);
 
     // 良民證目前不列為申請必備文件，也不作為送出條件。
     // 駕照、行照與強制險相關同意，只在機車／汽車申請時要求。
@@ -15226,8 +15298,9 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm,
       liabilityConfirm,
       privacyConfirm,
-      identityDocumentConsent,
-      documentAuthenticityConfirm,
+      ...(partnerApplicant
+        ? [partnerVerificationConsent, partnerPrivacyMinimumConsent]
+        : [identityDocumentConsent, documentAuthenticityConfirm]),
       locationDataConsent,
       jkoRequirementAgree,
       communityRequirementAgree,
@@ -15243,10 +15316,74 @@ app.post('/api/rider/register', async (req, res) => {
     if (!requiredAgreements.every(toBool)) {
       return res.status(400).json({
         success: false,
-        message: '請先閱讀並同意全部合作、個資與證件規範後再送出申請。',
+        message: partnerApplicant
+          ? '請先閱讀並同意合作團隊、個資、人工身分核驗與定位規範後再送出申請。'
+          : '請先閱讀並同意全部合作、個資與證件規範後再送出申請。',
       });
     }
 
+    if (partnerApplicant) {
+      if (!normalizedPartnerTeamName || normalizedPartnerTeamName.length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: '合作團隊名稱至少需要 2 個字。',
+        });
+      }
+
+      if (!/^09\d{8}$/.test(normalizedPartnerLeaderPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: '請填寫正確的合作團隊負責人手機號碼。',
+        });
+      }
+
+      if (
+        normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER &&
+        normalizedPartnerTeamSize < 1
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: '合作團隊負責人請填寫目前可調度人數。',
+        });
+      }
+
+      if (normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_MEMBER) {
+        const [leaderApplicationDoc, leaderRiderDoc] = await Promise.all([
+          db.collection(RIDER_V2_COLLECTIONS.applications)
+            .doc(normalizedPartnerLeaderPhone)
+            .get(),
+          db.collection(RIDER_V2_COLLECTIONS.riders)
+            .doc(normalizedPartnerLeaderPhone)
+            .get(),
+        ]);
+        const leaderData = leaderRiderDoc.exists
+          ? leaderRiderDoc.data() || {}
+          : leaderApplicationDoc.exists
+            ? leaderApplicationDoc.data() || {}
+            : null;
+
+        if (
+          !leaderData ||
+          normalizeRiderApplicantType(leaderData.applicantType) !==
+            RIDER_APPLICANT_TYPES.PARTNER_OWNER
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: '找不到此手機號碼對應的合作團隊負責人，請先由負責人完成合作團隊申請。',
+          });
+        }
+
+        if (
+          cleanText(leaderData.partnerTeamName || '', 80) !==
+          normalizedPartnerTeamName
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: '合作團隊名稱與負責人資料不一致，請向團隊負責人確認。',
+          });
+        }
+      }
+    }
 
     if (
       !name ||
@@ -15384,13 +15521,14 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    const documentValidation =
-      await validateRiderApplicationDocuments(
-        documents,
-        cleanPhone,
-        riderLineUserId,
-        requiredDocumentKeys
-      );
+    const documentValidation = partnerApplicant
+      ? { ok: true, documents: {} }
+      : await validateRiderApplicationDocuments(
+          documents,
+          cleanPhone,
+          riderLineUserId,
+          requiredDocumentKeys
+        );
 
     if (!documentValidation.ok) {
       return res.status(400).json({
@@ -15426,6 +15564,34 @@ app.post('/api/rider/register', async (req, res) => {
       userId: riderLineUserId.startsWith('U') ? riderLineUserId : '',
       lineUserId: riderLineUserId.startsWith('U') ? riderLineUserId : '',
       birthDate: String(birthDate || '').trim(),
+
+      applicantType: normalizedApplicantType,
+      partnerApplicant,
+      partnerTeamId,
+      partnerTeamName: partnerApplicant ? normalizedPartnerTeamName : '',
+      partnerRole: partnerApplicant ? normalizedApplicantType : '',
+      partnerTeamSize:
+        normalizedApplicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER
+          ? normalizedPartnerTeamSize
+          : 0,
+      partnerTeamLeaderPhone: partnerApplicant
+        ? normalizedPartnerLeaderPhone
+        : '',
+      identityVerificationStatus: partnerApplicant ? 'pending' : 'document_pending',
+      identityVerificationMethod: partnerApplicant
+        ? 'manual_partner_review'
+        : 'document_upload',
+      identityVerifiedAtMs: 0,
+      identityVerifiedBy: '',
+      riderPermissionLevel: partnerApplicant ? 'trial' : 'document_review',
+      partnerRevenueModel: partnerApplicant
+        ? {
+            version: 'partner_standard_v1',
+            platformRate: 0.15,
+            managerRate: 0.05,
+            executorRate: 0.80,
+          }
+        : null,
 
       district: cleanText(finalDistrict || '', 80),
       city: cleanText(finalResidenceCity || '', 20),
@@ -15468,12 +15634,14 @@ app.post('/api/rider/register', async (req, res) => {
 
       documents: documentValidation.documents,
       requiredDocumentKeys,
-      documentsComplete:
-        requiredDocumentKeys.every(key =>
-          Boolean(documentValidation.documents?.[key]?.storagePath)
-        ),
-      verificationModelVersion: 2,
-      documentReviewStatus: 'pending',
+      documentsComplete: partnerApplicant
+        ? false
+        : requiredDocumentKeys.every(key =>
+            Boolean(documentValidation.documents?.[key]?.storagePath)
+          ),
+      verificationModelVersion: partnerApplicant ? 3 : 2,
+      documentReviewStatus: partnerApplicant ? 'manual_pending' : 'pending',
+      manualIdentityVerificationRequired: partnerApplicant,
 
       approved: false,
       status: 'submitted',
@@ -15491,7 +15659,16 @@ app.post('/api/rider/register', async (req, res) => {
         applicationSource || 'rider_apply_v3',
         60
       ),
-      applicationType: 'rider_v3_verification',
+      applicationType: partnerApplicant
+        ? 'partner_team_verification_v1'
+        : 'rider_v3_verification',
+
+      partnerVerificationConsent: partnerApplicant
+        ? toBool(partnerVerificationConsent)
+        : false,
+      partnerPrivacyMinimumConsent: partnerApplicant
+        ? toBool(partnerPrivacyMinimumConsent)
+        : false,
 
       driverLicenseConfirmed: toBool(driverLicenseConfirmed),
       vehicleLicenseConfirmed: toBool(vehicleLicenseConfirmed),
@@ -15503,10 +15680,12 @@ app.post('/api/rider/register', async (req, res) => {
       riderRuleConfirm: toBool(riderRuleConfirm),
       liabilityConfirm: toBool(liabilityConfirm),
       privacyConfirm: toBool(privacyConfirm),
-      identityDocumentConsent: toBool(identityDocumentConsent),
-      documentAuthenticityConfirm: toBool(
-        documentAuthenticityConfirm
-      ),
+      identityDocumentConsent: partnerApplicant
+        ? false
+        : toBool(identityDocumentConsent),
+      documentAuthenticityConfirm: partnerApplicant
+        ? false
+        : toBool(documentAuthenticityConfirm),
       locationDataConsent: toBool(locationDataConsent),
       jkoRequirementAgree: toBool(jkoRequirementAgree),
       communityRequirementAgree: toBool(
@@ -15581,7 +15760,9 @@ app.post('/api/rider/register', async (req, res) => {
       phone: application.phone,
       lineUserId: application.lineUserId,
       applicationCollection: RIDER_V2_COLLECTIONS.applications,
-      documentsComplete: true,
+      documentsComplete: application.documentsComplete === true,
+      applicantType: application.applicantType,
+      partnerTeamName: application.partnerTeamName,
     });
 
     let notifyOk = false;
@@ -15693,10 +15874,7 @@ function getRiderApplicationDocumentReviewItems(application = {}) {
       ? application.documents
       : {};
 
-  const requiredDocumentKeys = getRequiredRiderDocumentKeys(
-    application.vehicle,
-    application.requiredDocumentKeys
-  );
+  const requiredDocumentKeys = getRequiredRiderApplicationDocumentKeys(application);
 
   const hasStoredDocuments = Object.keys(documents).length > 0;
   if (
@@ -15763,10 +15941,7 @@ function buildRiderApplicationVerificationGroups(
   application = {},
   documents = getRiderApplicationDocumentReviewItems(application)
 ) {
-  const requiredDocumentKeys = getRequiredRiderDocumentKeys(
-    application.vehicle,
-    application.requiredDocumentKeys
-  );
+  const requiredDocumentKeys = getRequiredRiderApplicationDocumentKeys(application);
 
   return Object.values(RIDER_VERIFICATION_GROUPS).map(group => {
     const groupDocumentKeys = group.documentKeys.filter(key =>
@@ -15810,6 +15985,44 @@ function buildRiderApplicationVerificationGroups(
 }
 
 function summarizeRiderApplicationDocuments(application = {}) {
+  if (isPartnerRiderApplicant(application)) {
+    const identityStatus = String(
+      application.identityVerificationStatus || 'pending'
+    ).trim().toLowerCase();
+    const verified = identityStatus === 'verified';
+    const rejected = identityStatus === 'rejected';
+    const manualGroup = {
+      key: 'partnerIdentity',
+      label: '合作團隊人工身分核驗',
+      description: '以最小必要資料、本人聯繫與合作關係進行人工核驗，不要求在申請階段上傳完整身分證影像。',
+      required: true,
+      status: verified ? 'approved' : rejected ? 'needs_supplement' : 'pending',
+      documentKeys: [],
+      totalCount: 1,
+      approvedCount: verified ? 1 : 0,
+      supplementCount: rejected ? 1 : 0,
+      pendingCount: verified || rejected ? 0 : 1,
+      allApproved: verified,
+    };
+
+    return {
+      documents: [],
+      verificationGroups: [manualGroup],
+      totalCount: 1,
+      approvedCount: verified ? 1 : 0,
+      supplementCount: rejected ? 1 : 0,
+      pendingCount: verified || rejected ? 0 : 1,
+      requiredGroupCount: 1,
+      approvedGroupCount: verified ? 1 : 0,
+      supplementGroupCount: rejected ? 1 : 0,
+      allApproved: verified,
+      allGroupsApproved: verified,
+      hasSupplementRequest: rejected,
+      manualVerification: true,
+      identityVerificationStatus: identityStatus,
+    };
+  }
+
   const documents = getRiderApplicationDocumentReviewItems(application);
   const approvedCount = documents.filter(
     item => item.reviewStatus === RIDER_DOCUMENT_REVIEW_STATUS.APPROVED
@@ -15843,6 +16056,7 @@ function summarizeRiderApplicationDocuments(application = {}) {
       requiredGroups.length > 0 &&
       approvedGroupCount === requiredGroups.length,
     hasSupplementRequest: supplementCount > 0,
+    manualVerification: false,
   };
 }
 
@@ -15870,16 +16084,27 @@ function buildRiderApplicationRiskChecks(application = {}, summary = null) {
     }
   }
 
-  const missingDocuments = documentSummary.documents
-    .filter(item => !String(item.storagePath || '').trim())
-    .map(item => item.label);
-  if (missingDocuments.length) {
-    add(
-      'critical',
-      'MISSING_DOCUMENTS',
-      '必要文件不完整',
-      missingDocuments.join('、')
-    );
+  if (isPartnerRiderApplicant(application)) {
+    if (String(application.identityVerificationStatus || '').trim().toLowerCase() !== 'verified') {
+      add(
+        'critical',
+        'PARTNER_IDENTITY_PENDING',
+        '合作團隊身分待人工核驗',
+        '正式通過前需由 UBee 管理端完成本人與合作關係人工核驗。'
+      );
+    }
+  } else {
+    const missingDocuments = documentSummary.documents
+      .filter(item => !String(item.storagePath || '').trim())
+      .map(item => item.label);
+    if (missingDocuments.length) {
+      add(
+        'critical',
+        'MISSING_DOCUMENTS',
+        '必要文件不完整',
+        missingDocuments.join('、')
+      );
+    }
   }
 
   const applicantPhone = normalizePhone(application.phone || '');
@@ -15952,6 +16177,9 @@ function getRiderApplicationLifecyclePresentation(application = {}, officialRide
     ''
   ).trim().toUpperCase();
   const documentSummary = summarizeRiderApplicationDocuments(application);
+  const partnerApplicant = isPartnerRiderApplicant(application);
+  const partnerIdentityVerified =
+    String(application.identityVerificationStatus || '').trim().toLowerCase() === 'verified';
   const active = lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
   const training = lifecycle === RIDER_V4_LIFECYCLE.TRAINING || status === 'training';
   const rejected = lifecycle === RIDER_V4_LIFECYCLE.REJECTED || status === 'rejected';
@@ -15968,11 +16196,15 @@ function getRiderApplicationLifecyclePresentation(application = {}, officialRide
     },
     {
       key: 'documents',
-      label: needsSupplement
-        ? '證件需要補件'
-        : documentSummary.allApproved
-          ? '必要驗證已通過'
-          : '驗證資料審核中',
+      label: partnerApplicant
+        ? partnerIdentityVerified
+          ? '合作團隊人工身分核驗已完成'
+          : '合作團隊人工身分核驗中'
+        : needsSupplement
+          ? '證件需要補件'
+          : documentSummary.allApproved
+            ? '必要驗證已通過'
+            : '驗證資料審核中',
       status: needsSupplement
         ? 'action'
         : documentSummary.allApproved
@@ -16252,10 +16484,19 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
     riderId: application.riderId || applicationDoc.id,
     applicationId: application.applicationId || applicationDoc.id,
     verificationModelVersion: Number(application.verificationModelVersion || 1),
-    requiredDocumentKeys: getRequiredRiderDocumentKeys(
-      application.vehicle,
-      application.requiredDocumentKeys
-    ),
+    requiredDocumentKeys: getRequiredRiderApplicationDocumentKeys(application),
+    applicantType: normalizeRiderApplicantType(application.applicantType),
+    partnerApplicant: isPartnerRiderApplicant(application),
+    partnerTeamId: application.partnerTeamId || '',
+    partnerTeamName: application.partnerTeamName || '',
+    partnerRole: application.partnerRole || '',
+    partnerTeamSize: Number(application.partnerTeamSize || 0),
+    partnerTeamLeaderPhone: application.partnerTeamLeaderPhone || '',
+    identityVerificationStatus: application.identityVerificationStatus || '',
+    identityVerificationMethod: application.identityVerificationMethod || '',
+    identityVerifiedAtMs: Number(application.identityVerifiedAtMs || 0),
+    identityVerifiedBy: application.identityVerifiedBy || '',
+    riderPermissionLevel: application.riderPermissionLevel || '',
     name: application.name || '',
     phone: application.phone || applicationDoc.id,
     lineId: application.lineId || '',
@@ -16695,6 +16936,11 @@ app.get(
         return {
           id: doc.id,
           riderId: application.riderId || doc.id,
+          applicantType: normalizeRiderApplicantType(application.applicantType),
+          partnerApplicant: isPartnerRiderApplicant(application),
+          partnerTeamName: application.partnerTeamName || '',
+          partnerRole: application.partnerRole || '',
+          identityVerificationStatus: application.identityVerificationStatus || '',
           name: application.name || '',
           phone: application.phone || doc.id,
           district: application.district || '',
@@ -16772,6 +17018,7 @@ app.get(
             item.phone,
             item.district,
             item.plateNumber,
+            item.partnerTeamName,
           ]
             .join(' ')
             .toLowerCase()
@@ -16889,6 +17136,12 @@ app.post(
       const nowMs = Date.now();
 
       if (action === 'mark_document') {
+        if (isPartnerRiderApplicant(application)) {
+          return res.status(409).json({
+            success: false,
+            message: '合作團隊申請採人工身分與合作關係核驗，不使用一般小U證件逐項審核／補件流程。',
+          });
+        }
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
             success: false,
@@ -17057,6 +17310,12 @@ app.post(
       }
 
       if (action === 'approve_group') {
+        if (isPartnerRiderApplicant(application)) {
+          return res.status(409).json({
+            success: false,
+            message: '合作團隊申請採人工身分與合作關係核驗，不使用一般小U證件逐項審核／補件流程。',
+          });
+        }
         if (['training', 'approved', 'active'].includes(status)) {
           return res.status(409).json({
             success: false,
@@ -17184,6 +17443,12 @@ app.post(
       }
 
       if (action === 'request_supplement') {
+        if (isPartnerRiderApplicant(application)) {
+          return res.status(409).json({
+            success: false,
+            message: '合作團隊申請採人工身分與合作關係核驗，不使用一般小U證件逐項審核／補件流程。',
+          });
+        }
         if (status === 'rejected') {
           return res.status(409).json({
             success: false,
@@ -17408,6 +17673,109 @@ app.post(
           });
         }
 
+        // 合作團隊 V1：此動作同時代表管理端已完成人工本人與合作關係核驗。
+        // 不要求先上傳完整身分證件影像，但仍需正確輸入申請者姓名作為人工確認。
+        if (isPartnerRiderApplicant(application)) {
+          await applicationDoc.ref.set(
+            {
+              identityVerificationStatus: 'verified',
+              identityVerificationMethod: 'manual_partner_review',
+              identityVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+              identityVerifiedAtMs: nowMs,
+              identityVerifiedBy: operator,
+              riderPermissionLevel: 'identity_verified',
+              documentReviewStatus: 'manual_verified',
+              manualIdentityVerificationRequired: false,
+              status: 'pending',
+              reviewStatus: 'pending',
+              lifecycleStatus: RIDER_V4_LIFECYCLE.UNDER_REVIEW,
+              approved: false,
+              canAcceptOrders: false,
+              supplementReason: '',
+              reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+              reviewedAtMs: nowMs,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: nowMs,
+            },
+            { merge: true }
+          );
+
+          const verifiedApplicationDoc = await applicationDoc.ref.get();
+          const verifiedApplication = verifiedApplicationDoc.data() || {};
+          const summary = summarizeRiderApplicationDocuments(verifiedApplication);
+          const riskChecks = buildRiderApplicationRiskChecks(
+            verifiedApplication,
+            summary
+          );
+
+          if (!summary.allApproved || riskChecks.criticalCount > 0) {
+            return res.status(409).json({
+              success: false,
+              message:
+                '合作團隊人工核驗後仍有未完成項目：' +
+                riskChecks.items
+                  .filter(item => item.level === 'critical')
+                  .map(item => item.label)
+                  .join('、'),
+            });
+          }
+
+          const approvedRider = buildApprovedRiderV2(
+            verifiedApplication,
+            operator
+          );
+          await saveRiderV2(approvedRider, { mirrorLegacy: true });
+
+          await applicationDoc.ref.set(
+            {
+              status: 'training',
+              reviewStatus: 'approved',
+              lifecycleStatus: RIDER_V4_LIFECYCLE.TRAINING,
+              canAcceptOrders: false,
+              onboardingRequired: true,
+              approved: true,
+              documentReviewStatus: 'manual_verified',
+              officialRiderCollection: RIDER_V2_COLLECTIONS.riders,
+              officialRiderId: approvedRider.riderId,
+              approvedAt: approvedRider.approvedAt,
+              approvedBy: operator,
+              quickApproved: true,
+              quickApprovedAt: admin.firestore.FieldValue.serverTimestamp(),
+              quickApprovedAtMs: nowMs,
+              quickApprovedBy: operator,
+              reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+              reviewedAtMs: nowMs,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAtMs: nowMs,
+            },
+            { merge: true }
+          );
+
+          const freshDoc = await applicationDoc.ref.get();
+          const freshApplication = freshDoc.data() || {};
+          await writeRiderApplicationReviewEvent({
+            application: freshApplication,
+            type: 'partner_manual_identity_approved',
+            operator,
+            reason: reason || '合作團隊人工身分與合作關係核驗完成。',
+            metadata: {
+              partnerTeamId: freshApplication.partnerTeamId || '',
+              partnerTeamName: freshApplication.partnerTeamName || '',
+              partnerRole: freshApplication.partnerRole || '',
+            },
+          });
+          await notifyRiderApplicationReviewUpdate(
+            freshApplication,
+            'approved'
+          );
+
+          return res.json({
+            success: true,
+            message: '合作團隊人工核驗已完成，申請已通過並進入數位入職階段。',
+            application: await serializeRiderApplicationForAdmin(freshDoc),
+          });
+        }
+
         const storedDocuments =
           application.documents && typeof application.documents === 'object'
             ? application.documents
@@ -17566,6 +17934,12 @@ app.post(
 
         const summary = summarizeRiderApplicationDocuments(application);
         if (!summary.allApproved) {
+          if (isPartnerRiderApplicant(application)) {
+            return res.status(409).json({
+              success: false,
+              message: '合作團隊身分尚未完成人工核驗，請使用「全部確認並通過」完成本人與合作關係確認。',
+            });
+          }
           const unfinished = summary.documents
             .filter(
               item =>
@@ -18227,6 +18601,14 @@ app.get('/api/rider/application-status', async (req, res) => {
         found: true,
         source: RIDER_V2_COLLECTIONS.riders,
         riderId: rider.riderId || officialDoc.id,
+        applicantType: normalizeRiderApplicantType(
+          application.applicantType || rider.applicantType
+        ),
+        partnerApplicant: isPartnerRiderApplicant(application.applicantType || rider.applicantType),
+        partnerTeamName: application.partnerTeamName || rider.partnerTeamName || '',
+        partnerRole: application.partnerRole || rider.partnerRole || '',
+        identityVerificationStatus:
+          application.identityVerificationStatus || rider.identityVerificationStatus || '',
         name: rider.name || application.name || '',
         approved: rider.approved === true,
         reviewStatus:
@@ -18333,6 +18715,11 @@ app.get('/api/rider/application-status', async (req, res) => {
         found: true,
         source: RIDER_V2_COLLECTIONS.applications,
         riderId: application.riderId || applicationDoc.id,
+        applicantType: normalizeRiderApplicantType(application.applicantType),
+        partnerApplicant: isPartnerRiderApplicant(application),
+        partnerTeamName: application.partnerTeamName || '',
+        partnerRole: application.partnerRole || '',
+        identityVerificationStatus: application.identityVerificationStatus || '',
         name: application.name || '',
         approved: application.approved === true,
         reviewStatus:
@@ -18389,7 +18776,10 @@ app.get('/api/rider/application-status', async (req, res) => {
           : presentation.rejected
             ? 'CONTACT_SUPPORT'
             : 'WAIT_REVIEW',
-        message: messageMap[status] || '已找到新版申請資料。',
+        message: isPartnerRiderApplicant(application) &&
+          String(application.identityVerificationStatus || '').trim().toLowerCase() !== 'verified'
+          ? '合作團隊申請已送出，UBee 將以必要資料與本人聯繫進行人工身分及合作關係核驗；完成前不會開通正式接單資格。'
+          : messageMap[status] || '已找到新版申請資料。',
       });
     }
 
@@ -22801,6 +23191,35 @@ function buildApprovedRiderV2(application, approvedBy) {
       application.lineUserId || application.userId || ''
     ).trim(),
 
+    applicantType: normalizeRiderApplicantType(application.applicantType),
+    partnerApplicant: isPartnerRiderApplicant(application),
+    partnerTeamId: cleanText(application.partnerTeamId || '', 80),
+    partnerTeamName: cleanText(application.partnerTeamName || '', 80),
+    partnerRole: cleanText(application.partnerRole || '', 40),
+    partnerTeamSize: Number(application.partnerTeamSize || 0),
+    partnerTeamLeaderPhone: normalizePhone(application.partnerTeamLeaderPhone || ''),
+    identityVerificationStatus: isPartnerRiderApplicant(application)
+      ? 'verified'
+      : 'document_verified',
+    identityVerificationMethod: isPartnerRiderApplicant(application)
+      ? 'manual_partner_review'
+      : 'document_upload',
+    identityVerifiedAtMs: Number(application.identityVerifiedAtMs || nowMs),
+    identityVerifiedBy: cleanText(application.identityVerifiedBy || approvedBy, 100),
+    riderPermissionLevel: isPartnerRiderApplicant(application)
+      ? 'identity_verified'
+      : 'fully_verified',
+
+    // 合作團隊標準分潤 V1：僅記錄合作制度，不在此處直接改寫既有訂單財務公式。
+    partnerRevenueModel: isPartnerRiderApplicant(application)
+      ? {
+          version: 'partner_standard_v1',
+          platformRate: 0.15,
+          managerRate: 0.05,
+          executorRate: 0.80,
+        }
+      : null,
+
     district: cleanText(application.district || '', 80),
     city: cleanText(application.city || '', 20),
     residenceCity: cleanText(
@@ -22850,10 +23269,18 @@ function buildApprovedRiderV2(application, approvedBy) {
     },
 
     identityVerified: true,
-    driverLicenseVerified: true,
-    vehicleLicenseVerified: true,
-    compulsoryInsuranceVerified: true,
-    documentVerificationStatus: 'approved',
+    driverLicenseVerified: isPartnerRiderApplicant(application)
+      ? false
+      : true,
+    vehicleLicenseVerified: isPartnerRiderApplicant(application)
+      ? false
+      : true,
+    compulsoryInsuranceVerified: isPartnerRiderApplicant(application)
+      ? false
+      : true,
+    documentVerificationStatus: isPartnerRiderApplicant(application)
+      ? 'manual_identity_verified'
+      : 'approved',
 
     approved: true,
     reviewStatus: 'approved',
@@ -24900,10 +25327,26 @@ function createMainMenuFlex() {
 }
 
 function createRiderReviewFlex(rider) {
+  const partnerApplicant = isPartnerRiderApplicant(rider);
+  const applicantType = normalizeRiderApplicantType(rider.applicantType);
+  const applicantTypeLabel = partnerApplicant
+    ? applicantType === RIDER_APPLICANT_TYPES.PARTNER_OWNER
+      ? '合作團隊負責人'
+      : '合作團隊成員'
+    : '一般小U';
+
   return createFlexMessage('新騎士申請審核', createBubble(
-    '🟡 新騎士申請審核',
+    partnerApplicant ? '🟠 合作團隊申請審核' : '🟡 新騎士申請審核',
     [
       createInfoRow('申請編號', rider.riderId),
+      createInfoRow('申請類型', applicantTypeLabel),
+      ...(partnerApplicant
+        ? [
+            createInfoRow('合作團隊', rider.partnerTeamName || '-'),
+            createInfoRow('團隊負責人手機', rider.partnerTeamLeaderPhone || rider.phone || '-'),
+            createInfoRow('可調度人數', rider.partnerTeamSize ? `${rider.partnerTeamSize} 人` : '-'),
+          ]
+        : []),
       createInfoRow('姓名', rider.name),
       createInfoRow('手機', rider.phone),
       createInfoRow('LINE ID', rider.lineId || rider.userId || '-'),
@@ -24913,10 +25356,12 @@ function createRiderReviewFlex(rider) {
       createInfoRow('服務區域', rider.serviceArea || rider.area || '-'),
       createInfoRow('服務時段', rider.availableTime || '-'),
       createInfoRow(
-        '證件資料',
-        rider.documentsComplete === true
-          ? '5 項已上傳，待管理端審核'
-          : '尚未完整'
+        partnerApplicant ? '身分驗證' : '證件資料',
+        partnerApplicant
+          ? '合作團隊人工核驗待確認'
+          : rider.documentsComplete === true
+            ? '必要文件已上傳，待管理端審核'
+            : '尚未完整'
       ),
       createInfoRow(
         '強制險到期',
@@ -24926,7 +25371,9 @@ function createRiderReviewFlex(rider) {
       createInfoRow('申請時間', rider.createdAt),
       {
         type: 'text',
-        text: '請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再做最終決定。',
+        text: partnerApplicant
+          ? '合作團隊 V1 不要求申請階段上傳完整身分證影像。請至審核管理頁，以必要資料、本人聯繫與合作關係完成人工核驗；核驗完成前不得開通正式接單資格。'
+          : '請至審核管理頁查看三大驗證區塊，完成必要資料審核或補件後，再做最終決定。',
         size: 'sm',
         color: '#666666',
         wrap: true,
