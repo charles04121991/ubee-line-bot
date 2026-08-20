@@ -326,6 +326,11 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 @media(max-width:1000px){.control-tower{grid-template-columns:1fr}.health-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:680px){.health-grid{grid-template-columns:repeat(2,1fr)}}
 
+
+/* ===== Merchant Live Tracking V3 ===== */
+.live-tracking-strip{margin-top:9px;padding:9px 10px;border-radius:11px;background:#f7f8fa;border:1px solid var(--line);font-size:10px;line-height:1.55;color:#555b63}
+.live-tracking-strip strong{color:#111;font-size:11px}.live-tracking-strip.watch{background:#fffdf4;border-color:#f4df99}.live-tracking-strip.high,.live-tracking-strip.critical{background:#fff5f5;border-color:#ffc6c9;color:#9f2b32}
+.live-eta-badge{background:#eaf1ff;color:#245fc0}.live-gps-badge{background:#e9f8ef;color:#157a49}.live-gps-badge.delayed{background:#fff4dc;color:#aa6500}.live-gps-badge.stale,.live-gps-badge.critical{background:#ffe7e8;color:#bd2c33}.live-geo-badge{background:#fff5d8;color:#8a6500}
 </style>
 </head>
 
@@ -828,7 +833,63 @@ function trackingHealth(updatedAtMs){
   const ageMs = Math.max(0,Date.now()-n);
   if(ageMs <= 60*1000) return {key:'live',label:'GPS 即時',color:'#20a464',ageMs};
   if(ageMs <= 3*60*1000) return {key:'delayed',label:'GPS 延遲',color:'#f59e0b',ageMs};
-  return {key:'stale',label:'定位暫時中斷',color:'#e5484d',ageMs};
+  if(ageMs <= 10*60*1000) return {key:'stale',label:'定位暫時中斷',color:'#e5484d',ageMs};
+  return {key:'critical',label:'定位長時間中斷',color:'#bd2c33',ageMs};
+}
+
+function isMerchantLiveTrackingOrder(order){
+  if(!order) return false;
+  const source=String(order.source||order.createdFrom||'').toLowerCase();
+  const type=String(order.orderType||'').toLowerCase();
+  return !!(order.merchantId||order.merchantCode) || source.includes('merchant-dashboard') || type.includes('merchant');
+}
+
+function merchantLiveTrackingMeta(order){
+  const eta=Number(order?.merchantLiveEtaMinutes ?? order?.etaMinutes);
+  const distance=String(order?.merchantLiveDistanceText || order?.remainingDistanceText || '').trim();
+  const gps=trackingHealth(order?.riderLocationUpdatedAtMs);
+  const risk=String(order?.merchantTrackingRiskLevel || 'NORMAL').toUpperCase();
+  const delay=Number(order?.merchantTrackingDelayMinutes || 0);
+  const delayLevel=String(order?.merchantTrackingDelayLevel || 'NORMAL').toUpperCase();
+  const geofence=String(order?.merchantGeofenceState || '').toUpperCase();
+  const geoMeters=Number(order?.merchantGeofenceDistanceMeters);
+  const etaAtMs=Number(order?.merchantLiveEtaAtMs || 0);
+  const routeAtMs=Number(order?.merchantLiveRouteUpdatedAtMs || 0);
+  return {
+    eta:Number.isFinite(eta)?eta:null,
+    etaAtMs,
+    distance,
+    gps,
+    risk,
+    delay:Number.isFinite(delay)?delay:0,
+    delayLevel,
+    geofence,
+    geoMeters:Number.isFinite(geoMeters)?geoMeters:null,
+    routeAtMs,
+    stalled:order?.merchantTrackingStalled===true,
+    reasons:Array.isArray(order?.merchantTrackingRiskReasons)?order.merchantTrackingRiskReasons:[]
+  };
+}
+
+function merchantLiveTrackingBadges(order){
+  if(!isMerchantLiveTrackingOrder(order) || statusKind(order)!=='active') return '';
+  const m=merchantLiveTrackingMeta(order);
+  return `${m.eta!==null?`<span class="badge live-eta-badge">ETA ${esc(Math.max(0,m.eta))} 分</span>`:''}
+    <span class="badge live-gps-badge ${esc(m.gps.key)}">${esc(m.gps.label)}</span>
+    ${['NEAR','CLOSE'].includes(m.geofence)?`<span class="badge live-geo-badge">Geofence ${m.geoMeters!==null?esc(Math.round(m.geoMeters))+'m':'接近'}</span>`:''}`;
+}
+
+function merchantLiveTrackingStrip(order){
+  if(!isMerchantLiveTrackingOrder(order) || statusKind(order)!=='active') return '';
+  const m=merchantLiveTrackingMeta(order);
+  const cls=(m.risk||'NORMAL').toLowerCase();
+  const pieces=[];
+  if(m.eta!==null) pieces.push(`ETA 約 ${Math.max(0,m.eta)} 分鐘${m.etaAtMs?`（${fmtTime(m.etaAtMs)}）`:''}`);
+  if(m.distance) pieces.push(`距目前目的地 ${m.distance}`);
+  pieces.push(`${m.gps.label}${order.riderLocationUpdatedAtMs?`・${fmtAge(order.riderLocationUpdatedAtMs)}`:''}`);
+  if(m.delayLevel==='HIGH'||m.delayLevel==='WATCH') pieces.push(`延誤趨勢 +${Math.round(m.delay)} 分`);
+  if(m.stalled) pieces.push('近 5 分鐘位移偏低');
+  return `<div class="live-tracking-strip ${esc(cls)}"><strong>Merchant Live Tracking V3</strong><br>${pieces.map(esc).join('｜')}${m.reasons.length?`<br>追蹤判斷：${esc(m.reasons.slice(0,3).join('；'))}`:''}</div>`;
 }
 
 function sameDispatchRider(rider,order){
@@ -1996,6 +2057,7 @@ function renderOrders(){
               ${waitBadge(order)}
               ${riskBadge(order.riskLevel,order.riskScore)}
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
+              ${merchantLiveTrackingBadges(order)}
               ${Number(order.openIncidentCount||0)>0?`<span class="badge danger">異常案件 ${esc(order.openIncidentCount)}</span>`:''}
             </div>
           </div>
@@ -2014,6 +2076,7 @@ function renderOrders(){
         </div>
 
         ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<div class="candidate-meta" style="margin-top:8px;color:${order.riskLevel==='CRITICAL'?'var(--red)':order.riskLevel==='HIGH'?'#b05e00':'var(--muted)'}">系統判斷：${esc(order.riskReasons.slice(0,3).join('；'))}</div>`:''}
+        ${merchantLiveTrackingStrip(order)}
         <div class="meta">
           <span>${esc(order.riderName || (isWaiting?'尚未接單':'已指派小U'))}</span>
           <span class="wait">${isWaiting?'等待 '+fmtAge(order.createdAtMs):'建立 '+fmtAge(order.createdAtMs)}</span>
@@ -2226,6 +2289,7 @@ function renderCandidates(){
       狀態：${esc(order.statusLabel || order.status || '-')}<br>
       ${riskBadge(order.riskLevel,order.riskScore)}
       ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<br>原因：${esc(order.riskReasons.slice(0,4).join('；'))}`:''}
+      ${isMerchantLiveTrackingOrder(order)&&statusKind(order)==='active'?(()=>{const m=merchantLiveTrackingMeta(order);return `<br><span style="color:var(--blue);font-weight:1000">Live ETA：${m.eta!==null?esc(m.eta)+' 分鐘':'計算中'}${m.distance?`｜${esc(m.distance)}`:''}｜${esc(m.gps.label)}</span>${['NEAR','CLOSE'].includes(m.geofence)?`<br><span style="color:#8a6500;font-weight:1000">Geofence：已接近目前目的地${m.geoMeters!==null?`（約 ${esc(Math.round(m.geoMeters))}m）`:''}</span>`:''}${m.delayLevel!=='NORMAL'?`<br><span style="color:var(--red);font-weight:1000">ETA 延誤：+${esc(Math.round(m.delay))} 分鐘</span>`:''}`;})():''}
        ${Array.isArray(order.riderLocationTrail)&&order.riderLocationTrail.length?`<br><span style="color:var(--purple)">V5 最近軌跡：${esc(order.riderLocationTrail.length)} 個定位採樣點</span>`:''}
       ${Number(order.openIncidentCount||0)>0?`<br><span style="color:var(--red);font-weight:1000">目前有 ${esc(order.openIncidentCount)} 件未結案異常</span>`:''}
       ${!hasLatLng(order.pickupLat,order.pickupLng)?'<br><b style="color:var(--red)">此訂單缺少取件座標，無法計算附近小U。</b>':''}
@@ -2276,9 +2340,10 @@ function renderCandidates(){
     const phone=String(order.riderPhone||'').replace(/[^0-9+]/g,'');
     const lastGps=order.riderLocationUpdatedAtMs?fmtAge(order.riderLocationUpdatedAtMs):'尚未收到';
     const custodyLock=order.custodyLocked===true;
+    const liveMeta=merchantLiveTrackingMeta(order);
     riskPanel.innerHTML=`
       <div class="v3-risk-title">V3 任務處置建議 · ${riskBadge(order.riskLevel,order.riskScore)}</div>
-      <div class="v3-risk-text">小U：${esc(order.riderName||order.riderId||'-')} · 最後定位 ${esc(lastGps)}${order.pickupDistanceKm!=null?` · 距取件約 ${esc(order.pickupDistanceKm)} km`:''}${order.dropoffDistanceKm!=null?` · 距送達約 ${esc(order.dropoffDistanceKm)} km`:''}</div>
+      <div class="v3-risk-text">小U：${esc(order.riderName||order.riderId||'-')} · 最後定位 ${esc(lastGps)}${order.pickupDistanceKm!=null?` · 距取件約 ${esc(order.pickupDistanceKm)} km`:''}${order.dropoffDistanceKm!=null?` · 距送達約 ${esc(order.dropoffDistanceKm)} km`:''}${liveMeta.eta!==null?` · Live ETA ${esc(liveMeta.eta)} 分`:''}${liveMeta.distance?` · ${esc(liveMeta.distance)}`:''}${liveMeta.delayLevel!=='NORMAL'?` · 延誤 +${esc(Math.round(liveMeta.delay))} 分`:''}</div>
       <div class="v3-risk-actions">
         <button class="btn small" data-action="focus-last-location" data-id="${esc(order.id)}">查看最後位置</button>
         ${phone?`<button class="btn small" data-action="contact-rider" data-phone="${esc(phone)}">聯絡小U</button>`:''}
