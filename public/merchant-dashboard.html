@@ -1502,8 +1502,12 @@ const todoStatuses = [
 
 const deliveryStatuses = [
   "accepted",
+  "going_to_pickup",
+  "heading_to_pickup",
   "arrived_pickup",
   "picked_up",
+  "going_to_dropoff",
+  "heading_to_dropoff",
   "arrived_dropoff"
 ];
 
@@ -1514,8 +1518,12 @@ const progressVisibleStatuses = [
   "merchant_self_delivery",
   "pending_dispatch",
   "accepted",
+  "going_to_pickup",
+  "heading_to_pickup",
   "arrived_pickup",
   "picked_up",
+  "going_to_dropoff",
+  "heading_to_dropoff",
   "arrived_dropoff"
 ];
 
@@ -1534,8 +1542,12 @@ const statusTextMap = {
   merchant_self_delivery:"店家自送",
   pending_dispatch:"等待騎士接單",
   accepted:"騎士已接單",
+  going_to_pickup:"小U前往店家中",
+  heading_to_pickup:"小U前往店家中",
   arrived_pickup:"騎士已抵達取件地",
   picked_up:"騎士已取件，配送中",
+  going_to_dropoff:"小U配送中",
+  heading_to_dropoff:"小U配送中",
   arrived_dropoff:"騎士已抵達送達地",
   completed:"已完成",
   merchant_cancelled:"店家已取消"
@@ -2464,7 +2476,14 @@ function getProgressFlow(order){
 
 function getProgressIndex(order){
   const flow = getProgressFlow(order);
-  const status = order.status || "";
+  const rawStatus = order.status || "";
+  const statusAlias = {
+    going_to_pickup:"accepted",
+    heading_to_pickup:"accepted",
+    going_to_dropoff:"picked_up",
+    heading_to_dropoff:"picked_up"
+  };
+  const status = statusAlias[rawStatus] || rawStatus;
 
   const index = flow.findIndex(step => step.key === status);
   if(index >= 0) return index;
@@ -3437,7 +3456,7 @@ async function refreshMerchantV3Orders({silent=false} = {}){
 startListenOrders = function(){
   stopListenOrders();
   refreshMerchantV3Orders({silent:true});
-  merchantV3PollTimer = setInterval(() => refreshMerchantV3Orders({silent:true}), 8000);
+  merchantV3PollTimer = setInterval(() => refreshMerchantV3Orders({silent:true}), 15000);
 };
 
 createMerchantOrder = async function(){
@@ -3991,7 +4010,7 @@ window.addEventListener("load", () => {
   if(payment) payment.value = "rider_advance_cod";
   setTimeout(()=>forceEnableLoginButton(), 50);
   const action = new URLSearchParams(location.search).get("action");
-  if(["create","orders","overview"].includes(action)){
+  if(["create","orders","progress","overview"].includes(action)){
     setTimeout(()=>{ if(merchantAuthed) switchMerchantView(action); }, 700);
   }
   if("serviceWorker" in navigator){
@@ -3999,6 +4018,493 @@ window.addEventListener("load", () => {
       console.warn("UBee Merchant SW 註冊失敗:", err);
     });
   }
+});
+</script>
+
+<style id="ubee-merchant-live-tracking-v3-style">
+/* =========================================================
+   UBee Merchant Live Tracking V3｜2026-08-20
+   ========================================================= */
+.merchant-live-notify-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:10px 11px;border:1px solid var(--line);border-radius:14px;background:#fafafa}
+.merchant-live-notify-copy{min-width:0}.merchant-live-notify-copy strong{display:block;font-size:12px}.merchant-live-notify-copy span{display:block;margin-top:3px;color:#777;font-size:10px;line-height:1.4;font-weight:800}
+.merchant-live-notify-btn{width:auto!important;min-width:112px!important;margin:0!important;padding:8px 10px!important;border-radius:11px!important;background:#111!important;color:#fff!important;font-size:11px!important;box-shadow:none!important;white-space:nowrap}
+.merchant-live-notify-btn.enabled{background:#e9f8ef!important;color:#157a49!important;border:1px solid #c7ecd6!important}
+.merchant-live-hero{margin-top:14px;border:1px solid rgba(17,24,39,.10);border-radius:22px;background:#fff;overflow:hidden;box-shadow:0 8px 24px rgba(17,24,39,.06)}
+.merchant-live-hero.hidden{display:none!important}.merchant-live-head{padding:14px 14px 12px;background:linear-gradient(135deg,#111,#242424);color:#fff}.merchant-live-head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.merchant-live-kicker{color:#facc15;font-size:10px;font-weight:1000;letter-spacing:.4px}.merchant-live-title{margin-top:4px;font-size:18px;font-weight:1000;line-height:1.25}.merchant-live-status{padding:6px 9px;border-radius:999px;background:#facc15;color:#111;font-size:10px;font-weight:1000;white-space:nowrap}.merchant-live-status.warn{background:#fff0c2;color:#7a5500}.merchant-live-status.danger{background:#fee2e2;color:#b42318}.merchant-live-select{width:100%;margin-top:10px;padding:9px 11px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#fff;color:#111;font-size:12px;font-weight:900}
+.merchant-live-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px}.merchant-live-metric{min-width:0;padding:11px;border-radius:15px;background:#fafafa;border:1px solid var(--line)}.merchant-live-metric span{display:block;color:#777;font-size:10px;font-weight:900}.merchant-live-metric strong{display:block;margin-top:4px;color:#111;font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.merchant-live-metric small{display:block;margin-top:3px;color:#8b9096;font-size:9px;font-weight:800}
+.merchant-live-rider{padding:0 12px 12px}.merchant-live-rider-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:15px;background:#fffbea}.merchant-live-rider-card strong{display:block;font-size:13px}.merchant-live-rider-card span{display:block;margin-top:3px;color:#6f7378;font-size:10px;font-weight:800}.merchant-live-gps{padding:5px 8px;border-radius:999px;background:#e9f8ef;color:#157a49;font-size:10px;font-weight:1000;white-space:nowrap}.merchant-live-gps.delayed{background:#fff4dc;color:#9a6500}.merchant-live-gps.stale,.merchant-live-gps.critical{background:#fee8e8;color:#b42318}
+.merchant-live-alert{display:none;margin:0 12px 12px;padding:10px 11px;border-radius:13px;background:#fff7ed;border:1px solid #fed7aa;color:#9a4e00;font-size:11px;line-height:1.55;font-weight:900}.merchant-live-alert.show{display:block}.merchant-live-alert.high,.merchant-live-alert.critical{background:#fff1f2;border-color:#fecdd3;color:#b42318}
+.merchant-live-map-wrap{position:relative;height:260px;margin:0 12px 12px;border-radius:18px;overflow:hidden;background:#eef1f3;border:1px solid var(--line)}#merchantLiveMapV3{width:100%;height:100%}.merchant-live-map-empty{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;background:#f4f5f7;color:#777;font-size:12px;font-weight:900;line-height:1.6}.merchant-live-map-empty.hidden{display:none}
+.merchant-live-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:0 12px 12px;color:#7b8086;font-size:10px;font-weight:800}.merchant-live-foot button{width:auto;margin:0;padding:7px 9px;border-radius:10px;background:#fff;color:#111;border:1px solid var(--line);font-size:10px;box-shadow:none}
+.merchant-live-card-summary{margin:12px 0 0;padding:10px 11px;border-radius:14px;background:#f6f7f8;border:1px solid var(--line);font-size:11px;line-height:1.6;color:#4f545a;font-weight:850}.merchant-live-card-summary b{color:#111}.merchant-live-card-summary.warn{background:#fff8e6;border-color:#f7dfa0}.merchant-live-card-summary.danger{background:#fff1f2;border-color:#fecdd3;color:#9f2b32}
+.merchant-live-toast{position:fixed;left:50%;top:18px;transform:translateX(-50%) translateY(-14px);z-index:100000;width:min(440px,calc(100% - 28px));padding:12px 14px;border-radius:14px;background:#111;color:#fff;box-shadow:0 16px 42px rgba(0,0,0,.24);font-size:12px;font-weight:900;line-height:1.55;opacity:0;pointer-events:none;transition:.2s ease}.merchant-live-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:420px){.merchant-live-metrics{grid-template-columns:1fr 1fr}.merchant-live-metric:first-child{grid-column:1/-1}.merchant-live-map-wrap{height:230px}.merchant-live-notify-bar{align-items:flex-start;flex-direction:column}.merchant-live-notify-btn{width:100%!important}}
+</style>
+
+<script id="ubee-merchant-live-tracking-v3-runtime">
+'use strict';
+/* =========================================================
+   UBee Merchant Live Tracking V3｜2026-08-20
+   - 選中配送每 4 秒讀取輕量 tracking endpoint
+   - 全訂單維持 15 秒同步，不再以全量 200 筆作為即時追蹤主通道
+   - Push 權限採店家主動點擊，已授權裝置會自動修復訂閱
+   ========================================================= */
+const MERCHANT_LIVE_TRACKING_POLL_MS = 4000;
+const MERCHANT_LIVE_ACTIVE_STATUSES = new Set([
+  'accepted','going_to_pickup','heading_to_pickup','arrived_pickup',
+  'picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff'
+]);
+
+let merchantLiveTrackingTimerV3 = null;
+let merchantLiveTrackingBusyV3 = false;
+let merchantLiveSelectedOrderIdV3 = '';
+let merchantLiveTrackingByOrderV3 = new Map();
+let merchantLiveMapV3 = null;
+let merchantLiveRiderMarkerV3 = null;
+let merchantLivePickupMarkerV3 = null;
+let merchantLiveDestinationMarkerV3 = null;
+let merchantLiveLineV3 = null;
+let merchantLiveGooglePromiseV3 = null;
+let merchantLiveToastTimerV3 = null;
+
+function merchantLiveOrderIdV3(order){
+  return String(order?.id || order?.orderId || order?.orderNo || '').trim().toUpperCase();
+}
+
+function merchantLiveActiveOrdersV3(){
+  return Object.values(ordersMap || {})
+    .filter(order => MERCHANT_LIVE_ACTIVE_STATUSES.has(String(order?.status || '').trim()))
+    .sort((a,b) => getOrderTime(b) - getOrderTime(a));
+}
+
+function merchantLiveFormatClockV3(ms){
+  const n=Number(ms||0); if(!n) return '--';
+  return new Date(n).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+}
+function merchantLiveFormatClockSecondV3(ms){
+  const n=Number(ms||0); if(!n) return '--';
+  return new Date(n).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function merchantLiveFormatAgeV3(ms){
+  const n=Number(ms||0); if(!n) return '尚未收到';
+  const sec=Math.max(0,Math.floor((Date.now()-n)/1000));
+  if(sec<10) return '剛剛';
+  if(sec<60) return `${sec} 秒前`;
+  const min=Math.floor(sec/60); return min<60?`${min} 分鐘前`:`${Math.floor(min/60)} 小時前`;
+}
+function merchantLiveFormatDistanceV3(tracking){
+  const text=String(tracking?.route?.distanceText||'').trim();
+  if(text) return text;
+  const km=Number(tracking?.route?.distanceKm);
+  return Number.isFinite(km)?`${km.toFixed(km<10?1:0)} km`:'--';
+}
+
+function showMerchantLiveToastV3(title,body=''){
+  let el=document.getElementById('merchantLiveToastV3');
+  if(!el){el=document.createElement('div');el.id='merchantLiveToastV3';el.className='merchant-live-toast';document.body.appendChild(el);}
+  el.innerHTML=`<strong>${escapeHtml(title||'UBee 配送更新')}</strong>${body?`<div style="margin-top:3px;color:#d7d9dc">${escapeHtml(body)}</div>`:''}`;
+  el.classList.add('show');
+  clearTimeout(merchantLiveToastTimerV3);
+  merchantLiveToastTimerV3=setTimeout(()=>el.classList.remove('show'),3600);
+}
+
+function ensureMerchantNotificationBarV3(){
+  if(document.getElementById('merchantLiveNotifyBarV3')) return;
+  const info=document.getElementById('merchantInfoBox');
+  if(!info) return;
+  const bar=document.createElement('div');
+  bar.id='merchantLiveNotifyBarV3';
+  bar.className='merchant-live-notify-bar';
+  bar.innerHTML=`<div class="merchant-live-notify-copy"><strong id="merchantLiveNotifyTitleV3">配送背景通知</strong><span id="merchantLiveNotifyDescV3">小U接單、到店、取件、完成與異常會即時通知。</span></div><button type="button" id="merchantLiveNotifyBtnV3" class="merchant-live-notify-btn">開啟配送通知</button>`;
+  info.insertAdjacentElement('afterend',bar);
+  document.getElementById('merchantLiveNotifyBtnV3')?.addEventListener('click',()=>requestMerchantPushV3());
+  updateMerchantNotificationBarV3();
+}
+
+function updateMerchantNotificationBarV3(message=''){
+  const btn=document.getElementById('merchantLiveNotifyBtnV3');
+  const desc=document.getElementById('merchantLiveNotifyDescV3');
+  if(!btn||!desc) return;
+  if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)){
+    btn.disabled=true;btn.textContent='此裝置不支援';desc.textContent='目前瀏覽器不支援 Web Push。';return;
+  }
+  if(Notification.permission==='granted'){
+    btn.disabled=false;btn.classList.add('enabled');btn.textContent='✓ 配送通知已開啟';desc.textContent=message||'背景也可收到小U接單、抵達與完成通知。';
+  }else if(Notification.permission==='denied'){
+    btn.disabled=true;btn.classList.remove('enabled');btn.textContent='通知已被封鎖';desc.textContent='請到瀏覽器／系統設定允許 UBee 店家平台通知。';
+  }else{
+    btn.disabled=false;btn.classList.remove('enabled');btn.textContent='開啟配送通知';desc.textContent=message||'建議開啟，店家不用一直停留在頁面等待。';
+  }
+}
+
+function merchantUrlBase64ToUint8ArrayV3(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData=atob(base64);
+  return Uint8Array.from([...rawData].map(ch=>ch.charCodeAt(0)));
+}
+
+async function getMerchantServiceWorkerRegistrationV3(){
+  if(!('serviceWorker' in navigator)) throw new Error('此瀏覽器不支援 Service Worker');
+  const reg=await navigator.serviceWorker.register('/ubee-merchant-sw.js',{scope:'/merchant-dashboard.html'});
+  await navigator.serviceWorker.ready;
+  return reg;
+}
+
+async function ensureMerchantPushSubscriptionV3(){
+  if(!merchantAuthed || !getMerchantSessionToken()) return false;
+  if(!('Notification' in window) || Notification.permission!=='granted') return false;
+  if(!('PushManager' in window)) return false;
+
+  const reg=await getMerchantServiceWorkerRegistrationV3();
+  let subscription=await reg.pushManager.getSubscription();
+  if(!subscription){
+    const keyRes=await fetch('/api/web-push/public-key',{cache:'no-store'});
+    const keyData=await keyRes.json().catch(()=>({}));
+    if(!keyRes.ok || !keyData.publicKey) throw new Error(keyData.message||'找不到 Web Push Public Key');
+    subscription=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:merchantUrlBase64ToUint8ArrayV3(keyData.publicKey)
+    });
+  }
+
+  await merchantV3Fetch('/api/merchant/push-subscription',{
+    method:'POST',
+    body:JSON.stringify({
+      subscription:subscription.toJSON ? subscription.toJSON() : subscription,
+      app:'ubee-merchant-pwa-v3',
+      platform:navigator.platform||'',
+      userAgent:navigator.userAgent||''
+    })
+  });
+  updateMerchantNotificationBarV3('裝置已完成背景通知訂閱。');
+  return true;
+}
+
+async function requestMerchantPushV3(){
+  try{
+    if(!('Notification' in window)) throw new Error('此瀏覽器不支援通知');
+    let permission=Notification.permission;
+    if(permission==='default') permission=await Notification.requestPermission();
+    if(permission!=='granted'){
+      updateMerchantNotificationBarV3('尚未取得通知權限。');
+      return false;
+    }
+    await ensureMerchantPushSubscriptionV3();
+    showMerchantLiveToastV3('配送通知已開啟','之後小U接單、到店與完成都可在背景收到通知。');
+    return true;
+  }catch(err){
+    console.warn('UBee Merchant Push 啟用失敗:',err);
+    updateMerchantNotificationBarV3(err.message||'通知設定失敗');
+    showMerchantLiveToastV3('通知設定失敗',err.message||'請稍後再試。');
+    return false;
+  }
+}
+
+async function disableMerchantPushV3(){
+  try{
+    if(!('serviceWorker' in navigator)) return;
+    const reg=await getMerchantServiceWorkerRegistrationV3();
+    const subscription=await reg.pushManager.getSubscription();
+    if(!subscription) return;
+    const endpoint=subscription.endpoint;
+    if(getMerchantSessionToken()){
+      await merchantV3Fetch('/api/merchant/push-subscription',{
+        method:'DELETE',body:JSON.stringify({endpoint})
+      }).catch(()=>{});
+    }
+    await subscription.unsubscribe().catch(()=>{});
+  }catch(_){ }
+}
+
+function ensureMerchantLiveHeroV3(){
+  if(document.getElementById('merchantLiveTrackingHeroV3')) return;
+  const progressBox=document.getElementById('merchantProgressBox');
+  if(!progressBox) return;
+  const hero=document.createElement('div');
+  hero.id='merchantLiveTrackingHeroV3';
+  hero.className='merchant-live-hero hidden';
+  hero.innerHTML=`
+    <div class="merchant-live-head">
+      <div class="merchant-live-head-row"><div><div class="merchant-live-kicker">LIVE DELIVERY TRACKING V3</div><div id="merchantLiveTitleV3" class="merchant-live-title">即時配送追蹤</div></div><span id="merchantLiveStatusV3" class="merchant-live-status">同步中</span></div>
+      <select id="merchantLiveOrderSelectV3" class="merchant-live-select" aria-label="選擇配送訂單"></select>
+    </div>
+    <div class="merchant-live-metrics">
+      <div class="merchant-live-metric"><span>預計抵達</span><strong id="merchantLiveEtaV3">--</strong><small id="merchantLiveEtaClockV3">等待 ETA</small></div>
+      <div class="merchant-live-metric"><span>目前距離</span><strong id="merchantLiveDistanceV3">--</strong><small id="merchantLiveDestinationV3">等待目的地</small></div>
+      <div class="merchant-live-metric"><span>最後位置</span><strong id="merchantLiveGpsAgeV3">--</strong><small id="merchantLiveGpsClockV3">等待 GPS</small></div>
+    </div>
+    <div class="merchant-live-rider"><div class="merchant-live-rider-card"><div><strong id="merchantLiveRiderNameV3">等待小U</strong><span id="merchantLiveRiderMetaV3">小U接單後會開始即時追蹤</span></div><span id="merchantLiveGpsV3" class="merchant-live-gps">等待 GPS</span></div></div>
+    <div id="merchantLiveAlertV3" class="merchant-live-alert"></div>
+    <div class="merchant-live-map-wrap"><div id="merchantLiveMapV3"></div><div id="merchantLiveMapEmptyV3" class="merchant-live-map-empty">等待小U位置…</div></div>
+    <div class="merchant-live-foot"><span id="merchantLiveFootV3">資料由小U GPS 與 UBee 路線引擎更新</span><button type="button" id="merchantLiveRefreshBtnV3">立即更新</button></div>`;
+  progressBox.insertAdjacentElement('beforebegin',hero);
+  document.getElementById('merchantLiveOrderSelectV3')?.addEventListener('change',event=>{
+    merchantLiveSelectedOrderIdV3=String(event.target.value||'').toUpperCase();
+    pollMerchantLiveTrackingV3({force:true});
+  });
+  document.getElementById('merchantLiveRefreshBtnV3')?.addEventListener('click',()=>pollMerchantLiveTrackingV3({force:true}));
+}
+
+function merchantLiveSyncOrderSelectV3(){
+  ensureMerchantLiveHeroV3();
+  const select=document.getElementById('merchantLiveOrderSelectV3');
+  const hero=document.getElementById('merchantLiveTrackingHeroV3');
+  if(!select||!hero) return [];
+  const active=merchantLiveActiveOrdersV3();
+  if(!active.length){hero.classList.add('hidden');select.innerHTML='';merchantLiveSelectedOrderIdV3='';return active;}
+  hero.classList.remove('hidden');
+  const ids=active.map(merchantLiveOrderIdV3);
+  const deepLinkId=String(new URLSearchParams(location.search).get('orderId')||'').trim().toUpperCase();
+  if(!merchantLiveSelectedOrderIdV3 || !ids.includes(merchantLiveSelectedOrderIdV3)){
+    merchantLiveSelectedOrderIdV3=ids.includes(deepLinkId)?deepLinkId:ids[0];
+  }
+  const signature=active.map(o=>`${merchantLiveOrderIdV3(o)}:${o.status}`).join('|');
+  if(select.dataset.signature!==signature){
+    select.innerHTML=active.map(o=>`<option value="${escapeHtml(merchantLiveOrderIdV3(o))}">${escapeHtml(merchantLiveOrderIdV3(o))}｜${escapeHtml(statusTextMap[o.status]||o.status||'配送中')}</option>`).join('');
+    select.dataset.signature=signature;
+  }
+  select.value=merchantLiveSelectedOrderIdV3;
+  return active;
+}
+
+async function ensureMerchantGoogleMapsV3(){
+  if(window.google?.maps) return window.google.maps;
+  if(merchantLiveGooglePromiseV3) return merchantLiveGooglePromiseV3;
+  merchantLiveGooglePromiseV3=(async()=>{
+    const configRes=await fetch('/api/config',{cache:'no-store'});
+    const config=await configRes.json().catch(()=>({}));
+    const key=String(config.googleMapsApiKey||'').trim();
+    if(!key) throw new Error('Google Maps 尚未設定');
+    await new Promise((resolve,reject)=>{
+      const old=document.getElementById('merchantGoogleMapsV3Script');
+      if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',()=>reject(new Error('Google Maps 載入失敗')),{once:true});return;}
+      const script=document.createElement('script');
+      script.id='merchantGoogleMapsV3Script';script.async=true;script.defer=true;
+      script.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&language=zh-TW&region=TW`;
+      script.onload=resolve;script.onerror=()=>reject(new Error('Google Maps 載入失敗'));
+      document.head.appendChild(script);
+    });
+    return window.google.maps;
+  })();
+  try{return await merchantLiveGooglePromiseV3;}catch(err){merchantLiveGooglePromiseV3=null;throw err;}
+}
+
+function merchantLiveAnimateRiderMarkerV3(next){
+  if(!merchantLiveRiderMarkerV3 || !next) return;
+  const startPos=merchantLiveRiderMarkerV3.getPosition?.();
+  if(!startPos){merchantLiveRiderMarkerV3.setPosition(next);return;}
+  const from={lat:startPos.lat(),lng:startPos.lng()};
+  const d=Math.hypot(next.lat-from.lat,next.lng-from.lng);
+  if(d>0.05){merchantLiveRiderMarkerV3.setPosition(next);return;}
+  const started=performance.now(),duration=3200;
+  const tick=now=>{
+    const t=Math.min(1,(now-started)/duration);
+    const eased=1-Math.pow(1-t,3);
+    merchantLiveRiderMarkerV3.setPosition({lat:from.lat+(next.lat-from.lat)*eased,lng:from.lng+(next.lng-from.lng)*eased});
+    if(t<1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+async function renderMerchantLiveMapV3(tracking){
+  const mapEl=document.getElementById('merchantLiveMapV3');
+  const empty=document.getElementById('merchantLiveMapEmptyV3');
+  if(!mapEl||!empty) return;
+  const riderLat=Number(tracking?.rider?.lat),riderLng=Number(tracking?.rider?.lng);
+  const destLat=Number(tracking?.destination?.lat),destLng=Number(tracking?.destination?.lng);
+  const pickupLat=Number(tracking?.pickup?.lat),pickupLng=Number(tracking?.pickup?.lng);
+  if(!Number.isFinite(riderLat)||!Number.isFinite(riderLng)){
+    empty.classList.remove('hidden');empty.textContent='等待小U GPS 定位…';return;
+  }
+  try{
+    await ensureMerchantGoogleMapsV3();
+    empty.classList.add('hidden');
+    const center={lat:riderLat,lng:riderLng};
+    if(!merchantLiveMapV3){
+      merchantLiveMapV3=new google.maps.Map(mapEl,{center,zoom:15,gestureHandling:'cooperative',mapTypeControl:false,streetViewControl:false,fullscreenControl:false,clickableIcons:false});
+      merchantLiveRiderMarkerV3=new google.maps.Marker({map:merchantLiveMapV3,position:center,title:'小U目前位置',zIndex:30,label:{text:'U',color:'#111',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#facc15',fillOpacity:1,strokeColor:'#111',strokeWeight:2}});
+      merchantLivePickupMarkerV3=new google.maps.Marker({map:merchantLiveMapV3,title:'店家取件點',label:{text:'店',color:'#fff',fontWeight:'900'}});
+      merchantLiveDestinationMarkerV3=new google.maps.Marker({map:merchantLiveMapV3,title:'目前目的地',label:{text:'收',color:'#fff',fontWeight:'900'}});
+      merchantLiveLineV3=new google.maps.Polyline({map:merchantLiveMapV3,strokeOpacity:.55,strokeWeight:4});
+    }else merchantLiveAnimateRiderMarkerV3(center);
+    const destination=Number.isFinite(destLat)&&Number.isFinite(destLng)?{lat:destLat,lng:destLng}:null;
+    const pickup=Number.isFinite(pickupLat)&&Number.isFinite(pickupLng)?{lat:pickupLat,lng:pickupLng}:null;
+    merchantLivePickupMarkerV3.setVisible(Boolean(pickup));if(pickup) merchantLivePickupMarkerV3.setPosition(pickup);
+    merchantLiveDestinationMarkerV3.setVisible(Boolean(destination));if(destination) merchantLiveDestinationMarkerV3.setPosition(destination);
+    merchantLiveLineV3.setPath(destination?[center,destination]:[]);
+    const bounds=new google.maps.LatLngBounds();bounds.extend(center);if(destination) bounds.extend(destination);else if(pickup) bounds.extend(pickup);
+    merchantLiveMapV3.fitBounds(bounds,58);
+    google.maps.event.addListenerOnce(merchantLiveMapV3,'idle',()=>{if(merchantLiveMapV3.getZoom()>16) merchantLiveMapV3.setZoom(16);});
+  }catch(err){empty.classList.remove('hidden');empty.textContent=`地圖暫時無法載入：${err.message||'請稍後再試'}`;}
+}
+
+function renderMerchantLiveHeroDataV3(tracking){
+  ensureMerchantLiveHeroV3();
+  if(!tracking) return;
+  const statusEl=document.getElementById('merchantLiveStatusV3');
+  const gpsKey=String(tracking.rider?.gpsHealth||'WAITING').toLowerCase();
+  const riskLevel=String(tracking.risk?.level||'NORMAL').toUpperCase();
+  const phaseTitle={pickup:'小U正在前往店家',pickup_arrived:'小U已抵達店家',delivery:'小U正在配送',dropoff_arrived:'小U已抵達送達點'}[tracking.phase]||tracking.statusLabel||'配送進行中';
+  safeSetText('merchantLiveTitleV3',phaseTitle);
+  if(statusEl){statusEl.textContent=tracking.statusLabel||'配送中';statusEl.className=`merchant-live-status ${riskLevel==='CRITICAL'||riskLevel==='HIGH'?'danger':riskLevel==='WATCH'?'warn':''}`;}
+  const etaMin=Number(tracking.eta?.minutes);
+  safeSetText('merchantLiveEtaV3',Number.isFinite(etaMin)?(etaMin<=0?'即將抵達':`${etaMin} 分鐘`):'計算中');
+  safeSetText('merchantLiveEtaClockV3',tracking.eta?.arrivalAtMs?`預計 ${merchantLiveFormatClockV3(tracking.eta.arrivalAtMs)} 抵達`:'等待真實路線 ETA');
+  safeSetText('merchantLiveDistanceV3',merchantLiveFormatDistanceV3(tracking));
+  safeSetText('merchantLiveDestinationV3',tracking.destination?.label||'目前目的地');
+  safeSetText('merchantLiveGpsAgeV3',merchantLiveFormatAgeV3(tracking.rider?.locationUpdatedAtMs));
+  safeSetText('merchantLiveGpsClockV3',tracking.rider?.locationUpdatedAtMs?`更新 ${merchantLiveFormatClockSecondV3(tracking.rider.locationUpdatedAtMs)}`:'尚未收到位置');
+  safeSetText('merchantLiveRiderNameV3',tracking.rider?.name||'已接單小U');
+  const geo=String(tracking.geofence?.state||'').toUpperCase();
+  const geoText=['NEAR','CLOSE'].includes(geo)?`｜已接近${tracking.destination?.label||'目的地'}`:'';
+  safeSetText('merchantLiveRiderMetaV3',`${tracking.destination?.address||'目的地資料同步中'}${geoText}`);
+  const gpsEl=document.getElementById('merchantLiveGpsV3');
+  if(gpsEl){gpsEl.textContent=tracking.rider?.gpsHealthLabel||'等待 GPS';gpsEl.className=`merchant-live-gps ${gpsKey}`;}
+  const alert=document.getElementById('merchantLiveAlertV3');
+  const reasons=Array.isArray(tracking.risk?.reasons)?tracking.risk.reasons:[];
+  if(alert){
+    if(reasons.length){alert.className=`merchant-live-alert show ${riskLevel.toLowerCase()}`;alert.innerHTML=`<b>${riskLevel==='CRITICAL'?'緊急注意':riskLevel==='HIGH'?'配送異常':riskLevel==='WATCH'?'需要注意':'狀態提醒'}</b><br>${reasons.map(escapeHtml).join('；')}`;}
+    else{alert.className='merchant-live-alert';alert.textContent='';}
+  }
+  const footBits=[];
+  if(tracking.eta?.trafficAware) footBits.push('交通路況 ETA'); else footBits.push('道路 ETA');
+  if(tracking.eta?.routeUpdatedAtMs) footBits.push(`路線 ${merchantLiveFormatAgeV3(tracking.eta.routeUpdatedAtMs)}更新`);
+  if(['NEAR','CLOSE'].includes(geo)) footBits.push(`Geofence ${Math.round(Number(tracking.geofence?.distanceMeters||0))}m`);
+  safeSetText('merchantLiveFootV3',footBits.join('｜')||'UBee Live Tracking V3');
+  renderMerchantLiveMapV3(tracking);
+}
+
+async function pollMerchantLiveTrackingV3({force=false}={}){
+  if(merchantLiveTrackingBusyV3 || !merchantAuthed || !getMerchantSessionToken()) return;
+  if(document.visibilityState==='hidden' && !force) return;
+  const active=merchantLiveSyncOrderSelectV3();
+  if(!active.length) return;
+  const orderId=merchantLiveSelectedOrderIdV3 || merchantLiveOrderIdV3(active[0]);
+  if(!orderId) return;
+  merchantLiveTrackingBusyV3=true;
+  try{
+    const data=await merchantV3Fetch(`/api/merchant/v3/orders/${encodeURIComponent(orderId)}/tracking?t=${Date.now()}`,{cache:'no-store'});
+    const tracking=data.tracking||null;
+    if(tracking){
+      merchantLiveTrackingByOrderV3.set(orderId,tracking);
+      renderMerchantLiveHeroDataV3(tracking);
+      const order=ordersMap?.[orderId];
+      if(order){
+        order.merchantLiveEtaMinutes=tracking.eta?.minutes;
+        order.merchantLiveEtaAtMs=tracking.eta?.arrivalAtMs;
+        order.merchantLiveDistanceText=tracking.route?.distanceText;
+        order.merchantTrackingRiskLevel=tracking.risk?.level;
+        order.merchantTrackingRiskReasons=tracking.risk?.reasons;
+      }
+    }
+  }catch(err){
+    if(force) showMerchantLiveToastV3('即時追蹤更新失敗',err.message||'請稍後再試。');
+  }finally{merchantLiveTrackingBusyV3=false;}
+}
+
+function startMerchantLiveTrackingV3(){
+  ensureMerchantLiveHeroV3();
+  clearInterval(merchantLiveTrackingTimerV3);
+  pollMerchantLiveTrackingV3({force:true});
+  merchantLiveTrackingTimerV3=setInterval(()=>pollMerchantLiveTrackingV3(),MERCHANT_LIVE_TRACKING_POLL_MS);
+}
+
+function openMerchantTrackingOrderV3(orderId){
+  const id=String(orderId||'').trim().toUpperCase();
+  if(id) merchantLiveSelectedOrderIdV3=id;
+  switchMerchantView('progress');
+  merchantLiveSyncOrderSelectV3();
+  pollMerchantLiveTrackingV3({force:true});
+  setTimeout(()=>document.getElementById('merchantLiveTrackingHeroV3')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+}
+window.openMerchantTrackingOrderV3=openMerchantTrackingOrderV3;
+
+// 讓每張進度卡也直接顯示目前 ETA / GPS 摘要。
+const merchantLiveOriginalRenderProgressCardV3=renderProgressCard;
+renderProgressCard=function(order){
+  let html=merchantLiveOriginalRenderProgressCardV3.apply(this,arguments);
+  const id=merchantLiveOrderIdV3(order);
+  const tracking=merchantLiveTrackingByOrderV3.get(id);
+  const eta=tracking?.eta?.minutes ?? order?.merchantLiveEtaMinutes;
+  const distance=tracking?.route?.distanceText || order?.merchantLiveDistanceText || '';
+  const risk=String(tracking?.risk?.level || order?.merchantTrackingRiskLevel || 'NORMAL').toUpperCase();
+  const gps=tracking?.rider?.gpsHealthLabel || (order?.riderLocationUpdatedAtMs?'GPS 追蹤中':'等待 GPS');
+  if(MERCHANT_LIVE_ACTIVE_STATUSES.has(String(order?.status||''))){
+    const summary=`<div class="merchant-live-card-summary ${risk==='HIGH'||risk==='CRITICAL'?'danger':risk==='WATCH'?'warn':''}"><b>即時追蹤：</b>${Number.isFinite(Number(eta))?`ETA 約 ${Math.max(0,Number(eta))} 分鐘`:'ETA 計算中'}${distance?`｜距離 ${escapeHtml(distance)}`:''}｜${escapeHtml(gps)}<br><button type="button" class="merchant-mini-btn" style="margin-top:7px" onclick="openMerchantTrackingOrderV3('${escapeHtml(id)}')">查看即時地圖</button></div>`;
+    html=html.replace('<div class="progressInfoGrid">',summary+'<div class="progressInfoGrid">');
+  }
+  return html;
+};
+
+const merchantLiveOriginalRenderProgressV3=renderMerchantProgress;
+renderMerchantProgress=function(){
+  const result=merchantLiveOriginalRenderProgressV3.apply(this,arguments);
+  setTimeout(()=>{merchantLiveSyncOrderSelectV3();const t=merchantLiveTrackingByOrderV3.get(merchantLiveSelectedOrderIdV3);if(t) renderMerchantLiveHeroDataV3(t);},0);
+  return result;
+};
+
+// 前景狀態變更也顯示店家內通知，即使尚未允許 Web Push 仍看得到。
+const merchantLiveOriginalApplyOrdersV3=merchantV3ApplyOrders;
+merchantV3ApplyOrders=function(orders){
+  const previous=new Map(Object.values(ordersMap||{}).map(o=>[merchantLiveOrderIdV3(o),String(o?.status||'')]));
+  const hadPrevious=previous.size>0;
+  const result=merchantLiveOriginalApplyOrdersV3.apply(this,arguments);
+  if(hadPrevious){
+    for(const order of (Array.isArray(orders)?orders:[])){
+      const id=merchantLiveOrderIdV3(order),before=previous.get(id),after=String(order?.status||'');
+      if(!before||before===after) continue;
+      const copy={accepted:['🛵 小U已接單',`${id} 已有小U前往店家`],arrived_pickup:['📍 小U已抵達店家',`${id} 請準備交付品項`],picked_up:['📦 已完成取件',`${id} 正在配送中`],arrived_dropoff:['📍 已抵達送達點',`${id} 即將完成`],completed:['✅ 配送完成',`${id} 已完成送達`]}[after];
+      if(copy) showMerchantLiveToastV3(copy[0],copy[1]);
+    }
+  }
+  merchantLiveSyncOrderSelectV3();
+  return result;
+};
+
+// 既有 enter dashboard 完成後啟動 Live Tracking 與已授權 Push 自動修復。
+const merchantLiveOriginalEnterDashboardV3=enterMerchantDashboardV3;
+enterMerchantDashboardV3=function(){
+  const result=merchantLiveOriginalEnterDashboardV3.apply(this,arguments);
+  setTimeout(()=>{
+    ensureMerchantNotificationBarV3();
+    ensureMerchantLiveHeroV3();
+    startMerchantLiveTrackingV3();
+    if('Notification' in window && Notification.permission==='granted') ensureMerchantPushSubscriptionV3().catch(()=>{});
+    const params=new URLSearchParams(location.search);
+    const action=params.get('action'),orderId=params.get('orderId');
+    if(action==='progress' || orderId) openMerchantTrackingOrderV3(orderId||'');
+  },0);
+  return result;
+};
+
+// 登出前移除本裝置 Merchant Push，避免共用裝置登出後仍收到店家訂單。
+const merchantLiveOriginalLogoutV3=logoutMerchant;
+logoutMerchant=async function(){
+  await disableMerchantPushV3().catch(()=>{});
+  clearInterval(merchantLiveTrackingTimerV3);merchantLiveTrackingTimerV3=null;
+  merchantLiveTrackingByOrderV3.clear();
+  return merchantLiveOriginalLogoutV3.apply(this,arguments);
+};
+
+navigator.serviceWorker?.addEventListener('message',event=>{
+  const data=event.data||{};
+  if(data.type==='UBEE_MERCHANT_OPEN_ORDER') openMerchantTrackingOrderV3(data.orderId||'');
+  if(data.type==='UBEE_MERCHANT_SW_UPDATED') updateMerchantNotificationBarV3('店家通知服務已更新。');
+});
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && merchantAuthed){
+    refreshMerchantV3Orders({silent:true}).catch(()=>{});
+    pollMerchantLiveTrackingV3({force:true});
+    navigator.serviceWorker?.controller?.postMessage({type:'UBEE_MERCHANT_CLEAR_BADGE'});
+  }
+});
+
+window.addEventListener('load',()=>{
+  ensureMerchantNotificationBarV3();
+  const params=new URLSearchParams(location.search);
+  if(params.get('action')==='progress' && merchantAuthed) openMerchantTrackingOrderV3(params.get('orderId')||'');
 });
 </script>
 
