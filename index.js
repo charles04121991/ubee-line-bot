@@ -14007,6 +14007,17 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
     );
     const enrichedLiveOrders = liveOrders.map(order => {
       const insight = insightMap.get(String(order.id)) || null;
+      const trackingRiskLevel = String(order.merchantTrackingRiskLevel || 'NORMAL').toUpperCase();
+      const riskRank = { NORMAL:0, WATCH:1, HIGH:2, CRITICAL:3 };
+      const intelligenceRiskLevel = String(insight?.level || 'NORMAL').toUpperCase();
+      const mergedRiskLevel =
+        (riskRank[trackingRiskLevel] || 0) > (riskRank[intelligenceRiskLevel] || 0)
+          ? trackingRiskLevel
+          : intelligenceRiskLevel;
+      const mergedRiskReasons = Array.from(new Set([
+        ...(Array.isArray(insight?.reasons) ? insight.reasons : []),
+        ...(Array.isArray(order.merchantTrackingRiskReasons) ? order.merchantTrackingRiskReasons : []),
+      ])).slice(0, 8);
       const orderIncidents = incidentsByOrder.get(
         String(order.id || '').trim().toUpperCase()
       ) || [];
@@ -14026,11 +14037,18 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
               : activeOrderIncidents.length
                 ? 'WATCH'
                 : '',
-        riskScore: insight?.score ?? 0,
-        riskLevel: insight?.level ?? 'NORMAL',
-        riskKind: insight?.kind || '',
-        riskStage: insight?.stage || '',
-        riskReasons: insight?.reasons || [],
+        riskScore: Math.max(
+          Number(insight?.score || 0),
+          trackingRiskLevel === 'CRITICAL' ? 90 :
+          trackingRiskLevel === 'HIGH' ? 70 :
+          trackingRiskLevel === 'WATCH' ? 40 : 0
+        ),
+        riskLevel: mergedRiskLevel,
+        riskKind: trackingRiskLevel !== 'NORMAL'
+          ? 'MERCHANT_LIVE_TRACKING_RISK'
+          : (insight?.kind || ''),
+        riskStage: insight?.stage || order.merchantTrackingPhase || '',
+        riskReasons: mergedRiskReasons,
         recoveryEligible: insight?.recoveryEligible === true,
         custodyLocked: insight?.custodyLocked === true,
         stageElapsedMinutes: insight?.stageElapsedMinutes ?? null,
@@ -19790,6 +19808,20 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
           };
         }
       );
+
+    if (transactionResult.syncedOrder && transactionResult.orderId) {
+      // Merchant Live Tracking V3：路線與 ETA 於背景更新，
+      // 不讓 Google Routes / Distance Matrix 延遲小U的 GPS 上傳。
+      refreshMerchantLiveTrackingV3(
+        transactionResult.orderId,
+        { reason: 'rider_location', allowRoute: true }
+      ).catch(error => {
+        console.warn(
+          '⚠️ Merchant Live Tracking V3 背景更新失敗：',
+          error?.message || error
+        );
+      });
+    }
 
     return res.json({
       success: true,
@@ -27732,6 +27764,1031 @@ app.post('/api/merchant/order', async (req, res) => {
 });
 
 // =====================================================
+// UBee Merchant Live Tracking V3｜2026-08-20
+// - 店家 Web Push 訂閱與配送節點通知
+// - 小U GPS -> 真實道路 ETA -> Geofence -> 延誤 / GPS 健康度
+// - 不建立第二套定位資料；orders 仍是配送追蹤唯一真相來源
+// - Geofence 只做提示，不自動改變騎士任務狀態，避免誤判交接
+// =====================================================
+const UBEE_MERCHANT_TRACKING_V3 = Object.freeze({
+  version: 'merchant-live-tracking-v3-20260820',
+  routeRefreshMs: 25 * 1000,
+  routeRefreshMinMoveKm: 0.08,
+  gpsLiveMs: 60 * 1000,
+  gpsDelayedMs: 3 * 60 * 1000,
+  gpsCriticalMs: 10 * 60 * 1000,
+  geofenceNearMeters: 150,
+  geofenceCloseMeters: 80,
+  stallWindowMs: 5 * 60 * 1000,
+  stallMoveMeters: 80,
+  delayWatchMinutes: 5,
+  delayHighMinutes: 10,
+  monitorIntervalMs: 60 * 1000,
+});
+
+const MERCHANT_PUSH_SUBCOLLECTION = 'pushSubscriptions';
+const MERCHANT_NOTIFICATION_SUBCOLLECTION = 'notifications';
+const merchantTrackingRefreshLocksV3 = new Map();
+
+function merchantPushSubscriptionDocumentIdV3(endpoint = '') {
+  return crypto
+    .createHash('sha256')
+    .update(String(endpoint || ''))
+    .digest('hex')
+    .slice(0, 48);
+}
+
+function normalizeMerchantPushSubscriptionV3(subscription = {}) {
+  if (
+    !subscription ||
+    typeof subscription !== 'object' ||
+    !subscription.endpoint ||
+    !subscription.keys?.p256dh ||
+    !subscription.keys?.auth
+  ) {
+    return null;
+  }
+
+  return {
+    endpoint: String(subscription.endpoint).slice(0, 1600),
+    expirationTime:
+      subscription.expirationTime === null ||
+      subscription.expirationTime === undefined
+        ? null
+        : Number(subscription.expirationTime),
+    keys: {
+      p256dh: String(subscription.keys.p256dh).slice(0, 600),
+      auth: String(subscription.keys.auth).slice(0, 300),
+    },
+  };
+}
+
+function getMerchantIdFromOrderV3(order = {}) {
+  return String(order.merchantId || order.merchantCode || '').trim();
+}
+
+function isMerchantTrackingOrderV3(order = {}) {
+  return Boolean(getMerchantIdFromOrderV3(order)) && isMerchantOrderRecord(order);
+}
+
+function merchantTrackingTimeMsV3(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function merchantTrackingActiveStatusV3(status) {
+  return new Set([
+    'accepted',
+    'going_to_pickup',
+    'heading_to_pickup',
+    'arrived_pickup',
+    'picked_up',
+    'going_to_dropoff',
+    'heading_to_dropoff',
+    'arrived_dropoff',
+  ]).has(String(status || '').trim());
+}
+
+function getMerchantTrackingPhaseV3(order = {}) {
+  const status = String(order.status || '').trim();
+
+  if (['accepted', 'going_to_pickup', 'heading_to_pickup'].includes(status)) {
+    return 'pickup';
+  }
+  if (status === 'arrived_pickup') return 'pickup_arrived';
+  if (['picked_up', 'going_to_dropoff', 'heading_to_dropoff'].includes(status)) {
+    return 'delivery';
+  }
+  if (status === 'arrived_dropoff') return 'dropoff_arrived';
+  if (status === 'completed') return 'completed';
+  return 'waiting';
+}
+
+function getMerchantTrackingDestinationV3(order = {}) {
+  const phase = getMerchantTrackingPhaseV3(order);
+  const currentStopIndex = Math.max(0, Number(order.currentDeliveryStopIndex || 0));
+  const stops = Array.isArray(order.deliveryStops) ? order.deliveryStops : [];
+  const currentStop = stops[currentStopIndex] || {};
+
+  if (phase === 'pickup' || phase === 'pickup_arrived') {
+    return {
+      kind: 'pickup',
+      label: '店家取件點',
+      address: String(order.pickupAddress || order.pickup || order.fromAddress || '').trim(),
+      lat: Number.isFinite(Number(order.pickupLat ?? order.fromLat))
+        ? Number(order.pickupLat ?? order.fromLat)
+        : null,
+      lng: Number.isFinite(Number(order.pickupLng ?? order.fromLng))
+        ? Number(order.pickupLng ?? order.fromLng)
+        : null,
+    };
+  }
+
+  const isLaterMultiStop = stops.length > 1 && currentStopIndex > 0;
+  return {
+    kind: 'dropoff',
+    label: isLaterMultiStop ? `第 ${currentStopIndex + 1} 個送達點` : '送達點',
+    address: String(
+      currentStop.dropoffAddress ||
+      currentStop.dropoff ||
+      order.dropoffAddress ||
+      order.dropoff ||
+      order.toAddress ||
+      ''
+    ).trim(),
+    // 多點第二站之後 order.dropoffLat 仍可能是第一站座標，因此不冒用。
+    lat: !isLaterMultiStop && Number.isFinite(Number(order.dropoffLat ?? order.toLat))
+      ? Number(order.dropoffLat ?? order.toLat)
+      : null,
+    lng: !isLaterMultiStop && Number.isFinite(Number(order.dropoffLng ?? order.toLng))
+      ? Number(order.dropoffLng ?? order.toLng)
+      : null,
+  };
+}
+
+function getMerchantTrackingGpsHealthV3(order = {}, nowMs = Date.now()) {
+  const locationAtMs = Number(
+    order.riderLocationUpdatedAtMs ||
+    order.riderCurrentLocation?.updatedAtMs ||
+    0
+  );
+
+  if (!locationAtMs) {
+    return {
+      key: 'WAITING',
+      label: '等待小U定位',
+      ageMs: null,
+      locationAtMs: 0,
+    };
+  }
+
+  const ageMs = Math.max(0, nowMs - locationAtMs);
+  if (ageMs <= UBEE_MERCHANT_TRACKING_V3.gpsLiveMs) {
+    return { key: 'LIVE', label: 'GPS 即時', ageMs, locationAtMs };
+  }
+  if (ageMs <= UBEE_MERCHANT_TRACKING_V3.gpsDelayedMs) {
+    return { key: 'DELAYED', label: 'GPS 延遲', ageMs, locationAtMs };
+  }
+  if (ageMs <= UBEE_MERCHANT_TRACKING_V3.gpsCriticalMs) {
+    return { key: 'STALE', label: 'GPS 暫時中斷', ageMs, locationAtMs };
+  }
+  return { key: 'CRITICAL', label: 'GPS 長時間中斷', ageMs, locationAtMs };
+}
+
+function getMerchantTrackingTrailStateV3(order = {}, nowMs = Date.now()) {
+  const trail = Array.isArray(order.riderLocationTrail)
+    ? order.riderLocationTrail
+        .filter(point =>
+          point &&
+          Number.isFinite(Number(point.lat)) &&
+          Number.isFinite(Number(point.lng)) &&
+          Number(point.updatedAtMs || 0) > 0
+        )
+        .sort((a, b) => Number(a.updatedAtMs) - Number(b.updatedAtMs))
+    : [];
+
+  if (trail.length < 2) {
+    return { stalled: false, movedMeters: null, windowMs: 0 };
+  }
+
+  const newest = trail[trail.length - 1];
+  const targetStart = nowMs - UBEE_MERCHANT_TRACKING_V3.stallWindowMs;
+  let oldest = trail[0];
+  for (const point of trail) {
+    if (Number(point.updatedAtMs) >= targetStart) {
+      oldest = point;
+      break;
+    }
+  }
+
+  const windowMs = Math.max(0, Number(newest.updatedAtMs) - Number(oldest.updatedAtMs));
+  if (windowMs < 4 * 60 * 1000) {
+    return { stalled: false, movedMeters: null, windowMs };
+  }
+
+  const movedKm = dispatchHaversineKm(
+    Number(oldest.lat), Number(oldest.lng),
+    Number(newest.lat), Number(newest.lng)
+  );
+  const movedMeters = Number.isFinite(movedKm) ? Math.round(movedKm * 1000) : null;
+
+  return {
+    stalled:
+      movedMeters !== null &&
+      movedMeters < UBEE_MERCHANT_TRACKING_V3.stallMoveMeters,
+    movedMeters,
+    windowMs,
+  };
+}
+
+function getMerchantTrackingRiskV3(order = {}, nowMs = Date.now()) {
+  const gps = getMerchantTrackingGpsHealthV3(order, nowMs);
+  const phase = getMerchantTrackingPhaseV3(order);
+  const movingPhase = ['pickup', 'delivery'].includes(phase);
+  const trail = getMerchantTrackingTrailStateV3(order, nowMs);
+  const remainingDistanceMeters = Number(
+    order.merchantLiveDistanceMeters ??
+    (Number(order.remainingDistanceKm || 0) * 1000)
+  );
+  const delayMinutes = Math.max(0, Number(order.merchantTrackingDelayMinutes || 0));
+  const reasons = [];
+  let level = 'NORMAL';
+  const rank = { NORMAL: 0, WATCH: 1, HIGH: 2, CRITICAL: 3 };
+  const raise = next => {
+    if ((rank[next] || 0) > (rank[level] || 0)) level = next;
+  };
+
+  if (gps.key === 'DELAYED') {
+    raise('WATCH');
+    reasons.push(`小U定位已 ${Math.max(1, Math.floor(gps.ageMs / 60000))} 分鐘未更新`);
+  } else if (gps.key === 'STALE') {
+    raise('HIGH');
+    reasons.push(`小U GPS 已 ${Math.max(3, Math.floor(gps.ageMs / 60000))} 分鐘未更新`);
+  } else if (gps.key === 'CRITICAL') {
+    raise('CRITICAL');
+    reasons.push(`小U GPS 已 ${Math.floor(gps.ageMs / 60000)} 分鐘未更新`);
+  }
+
+  const storedDelayLevel = String(order.merchantTrackingDelayLevel || '').toUpperCase();
+  if (storedDelayLevel === 'HIGH' || delayMinutes >= UBEE_MERCHANT_TRACKING_V3.delayHighMinutes) {
+    raise('HIGH');
+    reasons.push(`預估抵達時間較原計畫延後約 ${Math.round(delayMinutes)} 分鐘`);
+  } else if (storedDelayLevel === 'WATCH' || delayMinutes >= UBEE_MERCHANT_TRACKING_V3.delayWatchMinutes) {
+    raise('WATCH');
+    reasons.push(`ETA 有延後趨勢（約 ${Math.round(delayMinutes)} 分鐘）`);
+  }
+
+  if (
+    movingPhase &&
+    trail.stalled &&
+    Number.isFinite(remainingDistanceMeters) &&
+    remainingDistanceMeters > 500
+  ) {
+    raise('HIGH');
+    reasons.push(`小U近 5 分鐘位移不足 ${UBEE_MERCHANT_TRACKING_V3.stallMoveMeters} 公尺`);
+  }
+
+  return {
+    level,
+    reasons: reasons.slice(0, 6),
+    gps,
+    trail,
+  };
+}
+
+async function getMerchantTrafficRouteV3(originLat, originLng, destinationAddress) {
+  if (
+    !GOOGLE_MAPS_SERVER_API_KEY ||
+    !Number.isFinite(Number(originLat)) ||
+    !Number.isFinite(Number(originLng)) ||
+    !String(destinationAddress || '').trim()
+  ) {
+    return null;
+  }
+
+  const origin = `${Number(originLat)},${Number(originLng)}`;
+  const destination = normalizeTaskAddressForMaps(String(destinationAddress || '').trim());
+  const url =
+    'https://maps.googleapis.com/maps/api/distancematrix/json' +
+    `?origins=${encodeURIComponent(origin)}` +
+    `&destinations=${encodeURIComponent(destination)}` +
+    '&mode=driving' +
+    '&departure_time=now' +
+    '&traffic_model=best_guess' +
+    '&region=tw&language=zh-TW&units=metric' +
+    `&key=${encodeURIComponent(GOOGLE_MAPS_SERVER_API_KEY)}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json().catch(() => ({}));
+    const element = data?.rows?.[0]?.elements?.[0];
+
+    if (!response.ok || data.status !== 'OK' || !element || element.status !== 'OK') {
+      throw new Error(
+        data?.error_message ||
+        element?.status ||
+        data?.status ||
+        `HTTP_${response.status}`
+      );
+    }
+
+    const durationSeconds = Number(
+      element.duration_in_traffic?.value ?? element.duration?.value ?? 0
+    );
+    const distanceMeters = Number(element.distance?.value || 0);
+
+    if (!Number.isFinite(durationSeconds) || !Number.isFinite(distanceMeters)) {
+      return null;
+    }
+
+    return {
+      distanceMeters,
+      durationSeconds,
+      distanceText: String(element.distance?.text || formatRouteDistanceText(distanceMeters)),
+      durationText: String(
+        element.duration_in_traffic?.text ||
+        element.duration?.text ||
+        formatRouteDurationText(durationSeconds)
+      ),
+      trafficAware: Boolean(element.duration_in_traffic?.value),
+    };
+  } catch (error) {
+    console.warn('⚠️ Merchant Live Tracking V3 真實 ETA 計算失敗：', error?.message || error);
+    return null;
+  }
+}
+
+function buildMerchantTrackingPayloadV3(order = {}, nowMs = Date.now()) {
+  const status = String(order.status || '').trim();
+  const phase = getMerchantTrackingPhaseV3(order);
+  const destination = getMerchantTrackingDestinationV3(order);
+  const gps = getMerchantTrackingGpsHealthV3(order, nowMs);
+  const risk = getMerchantTrackingRiskV3(order, nowMs);
+  const riderLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+  const riderLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+  const routeDistanceMeters = Number(order.merchantLiveDistanceMeters);
+  const routeEtaMinutes = Number(order.merchantLiveEtaMinutes);
+  const geofenceMeters = Number(order.merchantGeofenceDistanceMeters);
+  const routeUpdatedAtMs = Number(order.merchantLiveRouteUpdatedAtMs || 0);
+
+  let geofenceState = String(order.merchantGeofenceState || 'UNKNOWN').toUpperCase();
+  if (phase === 'pickup_arrived' || phase === 'dropoff_arrived') geofenceState = 'ARRIVED_REPORTED';
+
+  return {
+    version: UBEE_MERCHANT_TRACKING_V3.version,
+    serverTimeMs: nowMs,
+    orderId: String(order.id || order.orderId || order.orderNo || '').trim().toUpperCase(),
+    status,
+    statusLabel: getStatusLabel(status),
+    phase,
+    isActive: merchantTrackingActiveStatusV3(status),
+    isTerminal: ['completed', 'cancelled', 'merchant_cancelled'].includes(status),
+    rider: {
+      assigned: Boolean(order.riderDocId || order.riderId || order.riderName),
+      name: String(order.riderName || order.riderDisplayName || ''),
+      phone: String(order.riderPhone || ''),
+      lat: Number.isFinite(riderLat) ? riderLat : null,
+      lng: Number.isFinite(riderLng) ? riderLng : null,
+      heading: Number.isFinite(Number(order.riderHeading)) ? Number(order.riderHeading) : null,
+      speed: Number.isFinite(Number(order.riderSpeed)) ? Number(order.riderSpeed) : null,
+      accuracy: Number.isFinite(Number(order.riderLocationAccuracy)) ? Number(order.riderLocationAccuracy) : null,
+      locationUpdatedAtMs: gps.locationAtMs,
+      gpsHealth: gps.key,
+      gpsHealthLabel: gps.label,
+      locationAgeMs: gps.ageMs,
+    },
+    destination: {
+      ...destination,
+      geofenceState,
+      geofenceDistanceMeters: Number.isFinite(geofenceMeters) ? geofenceMeters : null,
+    },
+    eta: {
+      minutes: Number.isFinite(routeEtaMinutes) ? routeEtaMinutes : null,
+      text: String(order.merchantLiveEtaText || order.etaText || ''),
+      arrivalAtMs: Number(order.merchantLiveEtaAtMs || 0) || null,
+      routeUpdatedAtMs: routeUpdatedAtMs || null,
+      trafficAware: order.merchantLiveTrafficAware === true,
+      delayMinutes: Number(order.merchantTrackingDelayMinutes || 0) || 0,
+      delayLevel: String(order.merchantTrackingDelayLevel || 'NORMAL').toUpperCase(),
+    },
+    route: {
+      distanceMeters: Number.isFinite(routeDistanceMeters) ? routeDistanceMeters : null,
+      distanceKm: Number.isFinite(routeDistanceMeters)
+        ? Number((routeDistanceMeters / 1000).toFixed(2))
+        : (Number.isFinite(Number(order.remainingDistanceKm)) ? Number(order.remainingDistanceKm) : null),
+      distanceText: String(order.merchantLiveDistanceText || order.remainingDistanceText || ''),
+    },
+    geofence: {
+      state: geofenceState,
+      distanceMeters: Number.isFinite(geofenceMeters) ? geofenceMeters : null,
+      nearMeters: UBEE_MERCHANT_TRACKING_V3.geofenceNearMeters,
+      closeMeters: UBEE_MERCHANT_TRACKING_V3.geofenceCloseMeters,
+    },
+    risk: {
+      level: risk.level,
+      reasons: risk.reasons,
+      stalled: risk.trail.stalled === true,
+      movedMeters5m: risk.trail.movedMeters,
+    },
+    pickup: {
+      address: String(order.pickupAddress || order.pickup || ''),
+      lat: Number.isFinite(Number(order.pickupLat ?? order.fromLat))
+        ? Number(order.pickupLat ?? order.fromLat)
+        : null,
+      lng: Number.isFinite(Number(order.pickupLng ?? order.fromLng))
+        ? Number(order.pickupLng ?? order.fromLng)
+        : null,
+    },
+    dropoff: {
+      address: String(destination.kind === 'dropoff' ? destination.address : (order.dropoffAddress || order.dropoff || '')),
+      lat: destination.kind === 'dropoff' ? destination.lat : (
+        Number.isFinite(Number(order.dropoffLat ?? order.toLat)) ? Number(order.dropoffLat ?? order.toLat) : null
+      ),
+      lng: destination.kind === 'dropoff' ? destination.lng : (
+        Number.isFinite(Number(order.dropoffLng ?? order.toLng)) ? Number(order.dropoffLng ?? order.toLng) : null
+      ),
+    },
+    updatedAtMs: Math.max(
+      merchantTrackingTimeMsV3(order.updatedAtMs || order.updatedAt),
+      Number(order.trackingUpdatedAtMs || 0),
+      gps.locationAtMs || 0,
+      routeUpdatedAtMs || 0
+    ),
+  };
+}
+
+async function reserveMerchantPushEventV3(orderId, eventKey) {
+  const safeOrderId = String(orderId || '').trim().toUpperCase();
+  const safeEventKey = String(eventKey || '').trim().replace(/[^A-Z0-9_-]/gi, '_').slice(0, 120);
+  if (!safeOrderId || !safeEventKey) return { reserved: false, order: null };
+
+  const orderRef = db.collection('orders').doc(safeOrderId);
+  let order = null;
+  let reserved = false;
+
+  await db.runTransaction(async transaction => {
+    const snap = await transaction.get(orderRef);
+    if (!snap.exists) return;
+    order = { id: snap.id, ...(snap.data() || {}) };
+    if (!isMerchantTrackingOrderV3(order)) return;
+
+    const notified = order.merchantPushNotifiedEvents && typeof order.merchantPushNotifiedEvents === 'object'
+      ? order.merchantPushNotifiedEvents
+      : {};
+    if (notified[safeEventKey]) return;
+
+    // Firestore 的 dotted field path 必須使用 update()，
+    // 避免 set({ 'a.b': ... }, {merge:true}) 留下 literal dotted field。
+    transaction.update(orderRef, {
+      [`merchantPushNotifiedEvents.${safeEventKey}`]: Date.now(),
+      merchantPushLastEventKey: safeEventKey,
+      merchantPushLastReservedAtMs: Date.now(),
+    });
+    reserved = true;
+  });
+
+  return { reserved, order };
+}
+
+function getMerchantPushCopyV3(eventType, order = {}, meta = {}) {
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  const riderName = String(order.riderName || '').trim();
+  const etaMinutes = Number(order.merchantLiveEtaMinutes);
+  const etaSuffix = Number.isFinite(etaMinutes) && etaMinutes >= 0
+    ? `，目前預估約 ${Math.max(1, Math.ceil(etaMinutes))} 分鐘`
+    : '';
+  const event = String(eventType || '').trim().toUpperCase();
+
+  const map = {
+    RIDER_ACCEPTED: {
+      title: '🛵 小U已接單',
+      body: `${riderName || '已有小U'} 已接下配送 ${orderId}${etaSuffix}。`,
+    },
+    ARRIVED_PICKUP: {
+      title: '📍 小U已抵達店家',
+      body: `配送 ${orderId} 的小U已抵達取件點，請準備交付品項。`,
+    },
+    PICKED_UP: {
+      title: '📦 已完成取件',
+      body: `配送 ${orderId} 已取件，現在前往收件地。`,
+    },
+    ARRIVED_DROPOFF: {
+      title: '📍 小U已抵達送達點',
+      body: `配送 ${orderId} 已抵達收件地址，準備完成交付。`,
+    },
+    COMPLETED: {
+      title: '✅ 配送已完成',
+      body: `配送 ${orderId} 已完成送達。`,
+    },
+    MULTI_STOP_ADVANCED: {
+      title: '📦 多點配送更新',
+      body: `配送 ${orderId} 第 ${meta.completedStopNumber || '-'} 點已完成，準備前往第 ${meta.nextStopNumber || '-'} 點。`,
+    },
+    RIDER_TRANSFERRED: {
+      title: '🔄 配送重新媒合中',
+      body: `配送 ${orderId} 正在重新安排小U，店家端會持續更新最新狀態。`,
+    },
+    NEAR_PICKUP: {
+      title: '🛵 小U已接近店家',
+      body: `配送 ${orderId} 的小U已進入店家附近約 ${UBEE_MERCHANT_TRACKING_V3.geofenceNearMeters} 公尺範圍。`,
+    },
+    NEAR_DROPOFF: {
+      title: '🛵 小U接近送達點',
+      body: `配送 ${orderId} 即將抵達收件地。`,
+    },
+    GPS_STALE: {
+      title: '⚠️ 小U位置暫時中斷',
+      body: `配送 ${orderId} 的小U位置已超過 3 分鐘未更新，系統仍保留最後位置。`,
+    },
+    GPS_CRITICAL: {
+      title: '⚠️ 小U位置長時間未更新',
+      body: `配送 ${orderId} 的 GPS 已長時間中斷，建議由 UBee 調度確認狀況。`,
+    },
+    DELIVERY_DELAYED: {
+      title: '⚠️ 配送可能延誤',
+      body: `配送 ${orderId} 的預估抵達時間較原計畫延後，請查看最新 ETA。`,
+    },
+    RIDER_STALLED: {
+      title: '⚠️ 小U移動狀態異常',
+      body: `配送 ${orderId} 的小U近幾分鐘位移偏低，UBee 調度可同步查看。`,
+    },
+  };
+
+  return map[event] || {
+    title: 'UBee 店家配送更新',
+    body: `配送 ${orderId} 狀態已更新。`,
+  };
+}
+
+async function sendMerchantWebPushV3(order = {}, eventType = '', meta = {}) {
+  if (!WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) {
+    return { sent: 0, removed: 0, skipped: true };
+  }
+
+  const merchantId = getMerchantIdFromOrderV3(order);
+  if (!merchantId) return { sent: 0, removed: 0, skipped: true };
+
+  const subscriptionsSnap = await db
+    .collection('merchants')
+    .doc(merchantId)
+    .collection(MERCHANT_PUSH_SUBCOLLECTION)
+    .where('enabled', '==', true)
+    .limit(20)
+    .get();
+
+  if (subscriptionsSnap.empty) return { sent: 0, removed: 0 };
+
+  const copy = getMerchantPushCopyV3(eventType, order, meta);
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  const payload = JSON.stringify({
+    title: copy.title,
+    body: copy.body,
+    orderId,
+    type: `UBEE_MERCHANT_${String(eventType || 'UPDATE').toUpperCase()}`,
+    tag: `ubee-merchant-${orderId}-${String(eventType || 'update').toLowerCase()}`,
+    renotify: true,
+    requireInteraction: ['GPS_CRITICAL', 'DELIVERY_DELAYED'].includes(String(eventType || '').toUpperCase()),
+    url: `/merchant-dashboard.html?action=progress&orderId=${encodeURIComponent(orderId)}&source=push`,
+    deepLink: `/merchant-dashboard.html?action=progress&orderId=${encodeURIComponent(orderId)}&source=push`,
+  });
+
+  let sent = 0;
+  let removed = 0;
+
+  await Promise.allSettled(
+    subscriptionsSnap.docs.map(async doc => {
+      const saved = doc.data() || {};
+      const subscription = normalizeMerchantPushSubscriptionV3(saved.subscription || saved);
+      if (!subscription) return;
+
+      try {
+        await webpush.sendNotification(subscription, payload, { TTL: 120 });
+        sent += 1;
+        await doc.ref.set({
+          lastSentAtMs: Date.now(),
+          lastError: '',
+        }, { merge: true }).catch(() => {});
+      } catch (error) {
+        const statusCode = Number(error?.statusCode || error?.status || 0);
+        if (statusCode === 404 || statusCode === 410) {
+          removed += 1;
+          await doc.ref.delete().catch(() => {});
+          return;
+        }
+        await doc.ref.set({
+          lastError: cleanText(error?.message || 'push_failed', 300),
+          lastErrorAtMs: Date.now(),
+        }, { merge: true }).catch(() => {});
+        throw error;
+      }
+    })
+  );
+
+  return { sent, removed };
+}
+
+async function notifyMerchantOrderEventV3(order = {}, eventType = '', meta = {}) {
+  if (!isMerchantTrackingOrderV3(order)) return false;
+
+  const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
+  const eventKey = String(meta.eventKey || eventType || 'UPDATE').trim().toUpperCase();
+  const reservation = await reserveMerchantPushEventV3(orderId, eventKey);
+  if (!reservation.reserved) return false;
+
+  const latestOrder = reservation.order || order;
+  const copy = getMerchantPushCopyV3(eventType, latestOrder, meta);
+  const merchantId = getMerchantIdFromOrderV3(latestOrder);
+
+  if (merchantId) {
+    const ref = db
+      .collection('merchants')
+      .doc(merchantId)
+      .collection(MERCHANT_NOTIFICATION_SUBCOLLECTION)
+      .doc();
+
+    await ref.set({
+      id: ref.id,
+      orderId,
+      eventType: String(eventType || 'UPDATE').toUpperCase(),
+      title: copy.title,
+      message: copy.body,
+      read: false,
+      createdAtMs: Date.now(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => {});
+  }
+
+  await sendMerchantWebPushV3(latestOrder, eventType, meta).catch(error => {
+    console.warn('⚠️ UBee Merchant Web Push 發送失敗：', error?.message || error);
+  });
+
+  return true;
+}
+
+async function maybeNotifyMerchantTrackingAlertsV3(order = {}, payload = null) {
+  if (!isMerchantTrackingOrderV3(order)) return;
+  const tracking = payload || buildMerchantTrackingPayloadV3(order);
+  const phase = tracking.phase;
+  const geofenceState = String(tracking.geofence?.state || '').toUpperCase();
+  const gpsHealth = String(tracking.rider?.gpsHealth || '').toUpperCase();
+  const risk = tracking.risk || {};
+
+  const tasks = [];
+
+  if (['NEAR', 'CLOSE'].includes(geofenceState)) {
+    if (phase === 'pickup') {
+      tasks.push(notifyMerchantOrderEventV3(order, 'NEAR_PICKUP', { eventKey: 'NEAR_PICKUP' }));
+    } else if (phase === 'delivery') {
+      const stopIndex = Number(order.currentDeliveryStopIndex || 0);
+      tasks.push(notifyMerchantOrderEventV3(order, 'NEAR_DROPOFF', {
+        eventKey: `NEAR_DROPOFF_${stopIndex}`,
+      }));
+    }
+  }
+
+  if (gpsHealth === 'STALE') {
+    tasks.push(notifyMerchantOrderEventV3(order, 'GPS_STALE', { eventKey: 'GPS_STALE' }));
+  } else if (gpsHealth === 'CRITICAL') {
+    tasks.push(notifyMerchantOrderEventV3(order, 'GPS_CRITICAL', { eventKey: 'GPS_CRITICAL' }));
+  }
+
+  if (String(tracking.eta?.delayLevel || '').toUpperCase() === 'HIGH') {
+    tasks.push(notifyMerchantOrderEventV3(order, 'DELIVERY_DELAYED', { eventKey: `DELIVERY_DELAYED_${phase}` }));
+  }
+
+  if (risk.stalled === true) {
+    tasks.push(notifyMerchantOrderEventV3(order, 'RIDER_STALLED', { eventKey: `RIDER_STALLED_${phase}` }));
+  }
+
+  if (tasks.length) await Promise.allSettled(tasks);
+}
+
+async function refreshMerchantLiveTrackingV3(orderId, options = {}) {
+  const safeOrderId = String(orderId || '').trim().toUpperCase();
+  if (!safeOrderId) return null;
+
+  if (merchantTrackingRefreshLocksV3.has(safeOrderId)) {
+    return merchantTrackingRefreshLocksV3.get(safeOrderId);
+  }
+
+  const task = (async () => {
+    const orderRef = db.collection('orders').doc(safeOrderId);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) return null;
+
+    const order = { id: orderDoc.id, ...(orderDoc.data() || {}) };
+    if (!isMerchantTrackingOrderV3(order)) return buildMerchantTrackingPayloadV3(order);
+
+    const nowMs = Date.now();
+    const status = String(order.status || '').trim();
+    const phase = getMerchantTrackingPhaseV3(order);
+    const destination = getMerchantTrackingDestinationV3(order);
+    const riderLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+    const riderLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+    const gps = getMerchantTrackingGpsHealthV3(order, nowMs);
+    const previousRouteAtMs = Number(order.merchantLiveRouteUpdatedAtMs || 0);
+    const previousOriginLat = Number(order.merchantLiveRouteOriginLat);
+    const previousOriginLng = Number(order.merchantLiveRouteOriginLng);
+    const movedKm = (
+      Number.isFinite(riderLat) && Number.isFinite(riderLng) &&
+      Number.isFinite(previousOriginLat) && Number.isFinite(previousOriginLng)
+    )
+      ? dispatchHaversineKm(previousOriginLat, previousOriginLng, riderLat, riderLng)
+      : null;
+
+    const phaseChanged = String(order.merchantTrackingBaselinePhase || '') !== phase;
+    const routeDue =
+      options.forceRoute === true ||
+      phaseChanged ||
+      !previousRouteAtMs ||
+      (nowMs - previousRouteAtMs) >= UBEE_MERCHANT_TRACKING_V3.routeRefreshMs ||
+      (Number.isFinite(movedKm) && movedKm >= UBEE_MERCHANT_TRACKING_V3.routeRefreshMinMoveKm);
+
+    let route = null;
+    if (
+      options.allowRoute !== false &&
+      routeDue &&
+      merchantTrackingActiveStatusV3(status) &&
+      ['pickup', 'delivery'].includes(phase) &&
+      Number.isFinite(riderLat) &&
+      Number.isFinite(riderLng) &&
+      destination.address &&
+      ['LIVE', 'DELAYED'].includes(gps.key)
+    ) {
+      route = await getMerchantTrafficRouteV3(riderLat, riderLng, destination.address);
+    }
+
+    const update = {};
+    let effectiveOrder = { ...order };
+
+    if (route) {
+      const etaMinutes = Math.max(0, Math.ceil(Number(route.durationSeconds || 0) / 60));
+      const routeDistanceMeters = Math.max(0, Number(route.distanceMeters || 0));
+
+      let geofenceDistanceMeters = routeDistanceMeters;
+      if (
+        Number.isFinite(destination.lat) &&
+        Number.isFinite(destination.lng) &&
+        Number.isFinite(riderLat) &&
+        Number.isFinite(riderLng)
+      ) {
+        const directKm = dispatchHaversineKm(riderLat, riderLng, destination.lat, destination.lng);
+        if (Number.isFinite(directKm)) geofenceDistanceMeters = Math.round(directKm * 1000);
+      }
+
+      let geofenceState = 'OUTSIDE';
+      if (geofenceDistanceMeters <= UBEE_MERCHANT_TRACKING_V3.geofenceCloseMeters) {
+        geofenceState = 'CLOSE';
+      } else if (geofenceDistanceMeters <= UBEE_MERCHANT_TRACKING_V3.geofenceNearMeters) {
+        geofenceState = 'NEAR';
+      }
+
+      let baselineMinutes = Number(order.merchantTrackingBaselineMinutes);
+      let baselineAtMs = Number(order.merchantTrackingBaselineAtMs || 0);
+      if (phaseChanged || !Number.isFinite(baselineMinutes) || baselineMinutes < 0 || !baselineAtMs) {
+        baselineMinutes = etaMinutes;
+        baselineAtMs = nowMs;
+      }
+
+      const elapsedMinutes = Math.max(0, (nowMs - baselineAtMs) / 60000);
+      const expectedRemainingMinutes = Math.max(0, baselineMinutes - elapsedMinutes);
+      const delayMinutes = Math.max(0, etaMinutes - expectedRemainingMinutes);
+      const delayLevel = delayMinutes >= UBEE_MERCHANT_TRACKING_V3.delayHighMinutes
+        ? 'HIGH'
+        : delayMinutes >= UBEE_MERCHANT_TRACKING_V3.delayWatchMinutes
+          ? 'WATCH'
+          : 'NORMAL';
+
+      Object.assign(update, {
+        merchantTrackingVersion: UBEE_MERCHANT_TRACKING_V3.version,
+        merchantTrackingPhase: phase,
+        merchantTrackingDestinationType: destination.kind,
+        merchantTrackingDestinationAddress: destination.address,
+        merchantLiveDistanceMeters: routeDistanceMeters,
+        merchantLiveDistanceKm: Number((routeDistanceMeters / 1000).toFixed(2)),
+        merchantLiveDistanceText: route.distanceText,
+        merchantLiveEtaSeconds: Number(route.durationSeconds || 0),
+        merchantLiveEtaMinutes: etaMinutes,
+        merchantLiveEtaText: etaMinutes <= 0 ? '即將抵達' : `約 ${etaMinutes} 分鐘`,
+        merchantLiveEtaAtMs: nowMs + Number(route.durationSeconds || 0) * 1000,
+        merchantLiveTrafficAware: route.trafficAware === true,
+        merchantLiveRouteUpdatedAtMs: nowMs,
+        merchantLiveRouteUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        merchantLiveRouteOriginLat: riderLat,
+        merchantLiveRouteOriginLng: riderLng,
+        merchantGeofenceDistanceMeters: Math.max(0, Math.round(geofenceDistanceMeters)),
+        merchantGeofenceState: geofenceState,
+        merchantTrackingBaselinePhase: phase,
+        merchantTrackingBaselineMinutes: baselineMinutes,
+        merchantTrackingBaselineAtMs: baselineAtMs,
+        merchantTrackingExpectedRemainingMinutes: Number(expectedRemainingMinutes.toFixed(1)),
+        merchantTrackingDelayMinutes: Number(delayMinutes.toFixed(1)),
+        merchantTrackingDelayLevel: delayLevel,
+        merchantTrackingGpsHealth: gps.key,
+        merchantTrackingGpsAgeMs: gps.ageMs,
+        remainingDistanceKm: Number((routeDistanceMeters / 1000).toFixed(2)),
+        remainingDistanceText: route.distanceText,
+        etaText: etaMinutes <= 0 ? '即將抵達' : `約 ${etaMinutes} 分鐘`,
+        etaMinutes,
+        etaUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(phase === 'pickup'
+          ? {
+              estimatedPickupMinutes: etaMinutes,
+              riderToPickupDistanceText: route.distanceText,
+            }
+          : {}),
+        ...(phase === 'delivery'
+          ? {
+              estimatedCompletionMinutes: etaMinutes,
+              riderToDropoffDistanceText: route.distanceText,
+            }
+          : {}),
+      });
+
+      effectiveOrder = { ...effectiveOrder, ...update };
+    }
+
+    const dynamicRisk = getMerchantTrackingRiskV3(effectiveOrder, nowMs);
+    const healthChanged = String(order.merchantTrackingGpsHealth || '') !== dynamicRisk.gps.key;
+    const riskChanged = String(order.merchantTrackingRiskLevel || '') !== dynamicRisk.level;
+    const reasonsChanged = JSON.stringify(order.merchantTrackingRiskReasons || []) !== JSON.stringify(dynamicRisk.reasons || []);
+
+    if (route || healthChanged || riskChanged || reasonsChanged) {
+      Object.assign(update, {
+        merchantTrackingGpsHealth: dynamicRisk.gps.key,
+        merchantTrackingGpsAgeMs: dynamicRisk.gps.ageMs,
+        merchantTrackingRiskLevel: dynamicRisk.level,
+        merchantTrackingRiskReasons: dynamicRisk.reasons,
+        merchantTrackingStalled: dynamicRisk.trail.stalled === true,
+        merchantTrackingMovedMeters5m: dynamicRisk.trail.movedMeters,
+        merchantTrackingUpdatedAtMs: nowMs,
+        merchantTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await orderRef.set(update, { merge: true });
+      effectiveOrder = { ...effectiveOrder, ...update };
+    }
+
+    const payload = buildMerchantTrackingPayloadV3(effectiveOrder, nowMs);
+    await maybeNotifyMerchantTrackingAlertsV3(effectiveOrder, payload).catch(() => {});
+    return payload;
+  })();
+
+  merchantTrackingRefreshLocksV3.set(safeOrderId, task);
+  try {
+    return await task;
+  } finally {
+    merchantTrackingRefreshLocksV3.delete(safeOrderId);
+  }
+}
+
+app.post('/api/merchant/push-subscription', merchantAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const merchantId = String(req.merchantAuth?.merchantId || '').trim();
+    const subscription = normalizeMerchantPushSubscriptionV3(req.body?.subscription);
+    if (!merchantId || !subscription) {
+      return res.status(400).json({
+        success: false,
+        ok: false,
+        message: '缺少正確的店家 Web Push subscription。',
+      });
+    }
+
+    const subscriptionId = merchantPushSubscriptionDocumentIdV3(subscription.endpoint);
+    const nowMs = Date.now();
+    await db
+      .collection('merchants')
+      .doc(merchantId)
+      .collection(MERCHANT_PUSH_SUBCOLLECTION)
+      .doc(subscriptionId)
+      .set({
+        id: subscriptionId,
+        subscription,
+        endpoint: subscription.endpoint,
+        enabled: true,
+        app: cleanText(req.body?.app || 'ubee-merchant-pwa', 80),
+        platform: cleanText(req.body?.platform || '', 120),
+        userAgent: cleanText(req.body?.userAgent || '', 500),
+        createdAtMs: nowMs,
+        updatedAtMs: nowMs,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+    return res.json({
+      success: true,
+      ok: true,
+      enabled: true,
+      subscriptionId,
+      message: '店家配送通知已開啟。',
+    });
+  } catch (error) {
+    console.error('❌ 店家 Web Push subscription 儲存失敗：', error);
+    return res.status(500).json({
+      success: false,
+      ok: false,
+      message: '店家通知設定儲存失敗。',
+    });
+  }
+});
+
+app.delete('/api/merchant/push-subscription', merchantAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const merchantId = String(req.merchantAuth?.merchantId || '').trim();
+    const endpoint = String(req.body?.endpoint || '').trim();
+    if (!merchantId || !endpoint) {
+      return res.status(400).json({ success: false, ok: false, message: '缺少通知 endpoint。' });
+    }
+
+    const subscriptionId = merchantPushSubscriptionDocumentIdV3(endpoint);
+    await db
+      .collection('merchants')
+      .doc(merchantId)
+      .collection(MERCHANT_PUSH_SUBCOLLECTION)
+      .doc(subscriptionId)
+      .delete()
+      .catch(() => {});
+
+    return res.json({ success: true, ok: true, enabled: false });
+  } catch (error) {
+    console.error('❌ 店家 Web Push subscription 刪除失敗：', error);
+    return res.status(500).json({ success: false, ok: false, message: '關閉通知失敗。' });
+  }
+});
+
+app.get('/api/merchant/v3/orders/:orderId/tracking', merchantAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const context = await resolveApprovedMerchantV3(req);
+    const orderId = String(req.params.orderId || '').trim().toUpperCase();
+    if (!orderId) {
+      return res.status(400).json({ success: false, ok: false, message: '缺少訂單編號。' });
+    }
+
+    const orderDoc = await db.collection('orders').doc(orderId).get();
+    if (!orderDoc.exists) {
+      return res.status(404).json({ success: false, ok: false, message: '找不到此訂單。' });
+    }
+
+    const order = { id: orderDoc.id, ...(orderDoc.data() || {}) };
+    if (getMerchantIdFromOrderV3(order) !== context.merchantId) {
+      return res.status(403).json({ success: false, ok: false, message: '這筆訂單不屬於目前登入店家。' });
+    }
+
+    // 前端高頻輪詢只讀取最新 tracking，不主動打 Google API。
+    // 真實 ETA 主要由小U GPS 上傳事件每 25 秒節流刷新。
+    const tracking = await refreshMerchantLiveTrackingV3(orderId, {
+      reason: 'merchant_tracking_poll',
+      allowRoute: false,
+    });
+
+    return res.json({
+      success: true,
+      ok: true,
+      tracking: tracking || buildMerchantTrackingPayloadV3(order),
+    });
+  } catch (error) {
+    console.error('❌ 店家 Live Tracking 讀取失敗：', error);
+    return sendMerchantV3Error(res, error);
+  }
+});
+
+async function runMerchantTrackingMonitorV3() {
+  try {
+    const activeStatuses = [
+      'accepted',
+      'going_to_pickup',
+      'heading_to_pickup',
+      'arrived_pickup',
+      'picked_up',
+      'going_to_dropoff',
+      'heading_to_dropoff',
+      'arrived_dropoff',
+    ];
+
+    const snap = await db
+      .collection('orders')
+      .where('status', 'in', activeStatuses)
+      .limit(300)
+      .get();
+
+    const merchantOrders = snap.docs
+      .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+      .filter(isMerchantTrackingOrderV3);
+
+    // Monitor 只做 GPS stale / risk 狀態檢查，不重算路線，避免背景 Google API 成本。
+    for (let i = 0; i < merchantOrders.length; i += 20) {
+      const batch = merchantOrders.slice(i, i + 20);
+      await Promise.allSettled(
+        batch.map(order =>
+          refreshMerchantLiveTrackingV3(order.id, {
+            reason: 'merchant_tracking_monitor',
+            allowRoute: false,
+          })
+        )
+      );
+    }
+  } catch (error) {
+    console.warn('⚠️ Merchant Live Tracking V3 monitor 失敗：', error?.message || error);
+  }
+}
+
+setTimeout(() => {
+  runMerchantTrackingMonitorV3().catch(() => {});
+  setInterval(
+    () => runMerchantTrackingMonitorV3().catch(() => {}),
+    UBEE_MERCHANT_TRACKING_V3.monitorIntervalMs
+  );
+}, 20 * 1000);
+
+// =====================================================
 // UBee 店家平台 V3 API
 // 下一版 merchant-dashboard.html 將改由這組 API 建單、更新與讀取。
 // 舊 /api/merchant/order 暫時保留相容，不影響既有前端。
@@ -30892,6 +31949,47 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         trackingEndedAt: null,
         trackingStopReason: '',
 
+        // 新 tracking session 一律重設 ETA baseline / geofence / 延誤判斷，
+        // 避免轉派後沿用上一位小U的路線基準。
+        merchantTrackingBaselinePhase: '',
+        merchantTrackingBaselineMinutes: null,
+        merchantTrackingBaselineAtMs: null,
+        merchantTrackingDelayMinutes: 0,
+        merchantTrackingDelayLevel: 'NORMAL',
+        merchantTrackingRiskLevel: 'NORMAL',
+        merchantTrackingRiskReasons: [],
+        merchantTrackingStalled: false,
+        merchantGeofenceState: 'UNKNOWN',
+        merchantGeofenceDistanceMeters: null,
+        merchantLiveRouteUpdatedAtMs: 0,
+        riderLocationTrail: [],
+
+        // Merchant Live Tracking V3：接單當下沿用小U最近一次有效定位，
+        // 讓店家不必等下一次 10 秒 GPS 回報才看到小U與初始 ETA。
+        ...(
+          Number.isFinite(Number(latestRider.currentLat)) &&
+          Number.isFinite(Number(latestRider.currentLng))
+            ? {
+                riderCurrentLat: Number(latestRider.currentLat),
+                riderCurrentLng: Number(latestRider.currentLng),
+                riderCurrentLocation: latestRider.currentLocation || {
+                  lat: Number(latestRider.currentLat),
+                  lng: Number(latestRider.currentLng),
+                  updatedAtMs: Number(latestRider.locationUpdatedAtMs || latestRider.lastLocationSuccessAtMs || 0),
+                },
+                riderLocationUpdatedAtMs: Number(
+                  latestRider.locationUpdatedAtMs ||
+                  latestRider.lastLocationSuccessAtMs ||
+                  latestRider.currentLocation?.updatedAtMs ||
+                  0
+                ),
+                riderHeading: latestRider.currentLocation?.heading ?? latestRider.heading ?? null,
+                riderSpeed: latestRider.currentLocation?.speed ?? latestRider.speed ?? null,
+                riderLocationAccuracy: latestRider.currentLocation?.accuracy ?? latestRider.locationAccuracy ?? null,
+              }
+            : {}
+        ),
+
         ...(isScheduledReservedForThisRider
           ? {
               scheduleStatus: 'in_progress',
@@ -30962,6 +32060,18 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
     } catch (notifyErr) {
       console.error('⚠️ 任務已接單，但通知客人失敗：', notifyErr);
     }
+
+    // Merchant Live Tracking V3：店家接單通知 + 初始真實 ETA。
+    Promise.allSettled([
+      notifyMerchantOrderEventV3(acceptedOrder, 'RIDER_ACCEPTED', {
+        eventKey: `RIDER_ACCEPTED_${trackingSessionId}`,
+      }),
+      refreshMerchantLiveTrackingV3(safeOrderId, {
+        reason: 'rider_accepted',
+        allowRoute: true,
+        forceRoute: true,
+      }),
+    ]).catch(() => {});
 
     return res.json({
       success: true,
@@ -31218,6 +32328,28 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
         trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         trackingStopReason: 'transferred',
 
+        // 轉派回待接狀態時清除上一位小U的 Live Tracking 即時判斷。
+        merchantTrackingPhase: 'waiting',
+        merchantTrackingGpsHealth: 'WAITING',
+        merchantTrackingRiskLevel: 'NORMAL',
+        merchantTrackingRiskReasons: [],
+        merchantTrackingStalled: false,
+        merchantTrackingDelayMinutes: 0,
+        merchantTrackingDelayLevel: 'NORMAL',
+        merchantTrackingBaselinePhase: '',
+        merchantTrackingBaselineMinutes: null,
+        merchantTrackingBaselineAtMs: null,
+        merchantGeofenceState: 'UNKNOWN',
+        merchantGeofenceDistanceMeters: null,
+        merchantLiveDistanceMeters: null,
+        merchantLiveDistanceKm: null,
+        merchantLiveDistanceText: '',
+        merchantLiveEtaSeconds: null,
+        merchantLiveEtaMinutes: null,
+        merchantLiveEtaText: '',
+        merchantLiveEtaAtMs: null,
+        merchantLiveRouteUpdatedAtMs: 0,
+
         updatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
 
@@ -31365,6 +32497,10 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
         createdAtMs:Date.now(),
       }),
       updateRiderDispatchStats(identity.riderId, { transferredOrders:1 }),
+      notifyMerchantOrderEventV3(transferredOrder, 'RIDER_TRANSFERRED', {
+        eventKey: `RIDER_TRANSFERRED_${Number(transferredOrder?.transferCount || 0) + 1}`,
+        reason: safeReason,
+      }),
     ]).catch(()=>{});
 
     return res.json({
@@ -31914,6 +33050,29 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     } catch (notifyErr) {
       console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
     }
+
+    // Merchant Live Tracking V3：每個重要配送節點同步通知店家。
+    // 多點配送以 stop index 加入事件鍵，避免下一站被前一站的去重紀錄吃掉。
+    const merchantStatusEventKey = multiStopAdvanced
+      ? `MULTI_STOP_ADVANCED_${nextStopNumber}`
+      : `${String(effectiveStatus || '').toUpperCase()}_${Number(updatedOrder?.currentDeliveryStopIndex || 0)}`;
+
+    Promise.allSettled([
+      notifyMerchantOrderEventV3(
+        updatedOrder,
+        multiStopAdvanced ? 'MULTI_STOP_ADVANCED' : String(effectiveStatus || '').toUpperCase(),
+        {
+          eventKey: merchantStatusEventKey,
+          completedStopNumber,
+          nextStopNumber,
+        }
+      ),
+      refreshMerchantLiveTrackingV3(safeOrderId, {
+        reason: `status_${effectiveStatus}`,
+        allowRoute: effectiveStatus !== 'completed',
+        forceRoute: ['picked_up', 'accepted'].includes(effectiveStatus) || multiStopAdvanced,
+      }),
+    ]).catch(() => {});
 
     if (effectiveStatus === 'completed') {
       try {
@@ -33230,6 +34389,43 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
         trackingEndedAt: null,
         trackingStopReason: '',
 
+        merchantTrackingBaselinePhase: '',
+        merchantTrackingBaselineMinutes: null,
+        merchantTrackingBaselineAtMs: null,
+        merchantTrackingDelayMinutes: 0,
+        merchantTrackingDelayLevel: 'NORMAL',
+        merchantTrackingRiskLevel: 'NORMAL',
+        merchantTrackingRiskReasons: [],
+        merchantTrackingStalled: false,
+        merchantGeofenceState: 'UNKNOWN',
+        merchantGeofenceDistanceMeters: null,
+        merchantLiveRouteUpdatedAtMs: 0,
+        riderLocationTrail: [],
+
+        // Merchant Live Tracking V3：人工指定時也沿用小U最近定位。
+        ...(
+          Number.isFinite(Number(latestRider.currentLat)) &&
+          Number.isFinite(Number(latestRider.currentLng))
+            ? {
+                riderCurrentLat: Number(latestRider.currentLat),
+                riderCurrentLng: Number(latestRider.currentLng),
+                riderCurrentLocation: latestRider.currentLocation || {
+                  lat: Number(latestRider.currentLat),
+                  lng: Number(latestRider.currentLng),
+                  updatedAtMs: Number(latestRider.locationUpdatedAtMs || 0),
+                },
+                riderLocationUpdatedAtMs: Number(
+                  latestRider.locationUpdatedAtMs ||
+                  latestRider.currentLocation?.updatedAtMs ||
+                  0
+                ),
+                riderHeading: latestRider.currentLocation?.heading ?? latestRider.heading ?? null,
+                riderSpeed: latestRider.currentLocation?.speed ?? latestRider.speed ?? null,
+                riderLocationAccuracy: latestRider.currentLocation?.accuracy ?? latestRider.locationAccuracy ?? null,
+              }
+            : {}
+        ),
+
         ...acceptedEtaPayload,
       };
 
@@ -33296,6 +34492,18 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
         notifyErr
       );
     }
+
+    Promise.allSettled([
+      notifyMerchantOrderEventV3(assignedOrder, 'RIDER_ACCEPTED', {
+        eventKey: `RIDER_ACCEPTED_${trackingSessionId}`,
+        source: 'dispatch_assign',
+      }),
+      refreshMerchantLiveTrackingV3(safeOrderId, {
+        reason: 'dispatch_assign',
+        allowRoute: true,
+        forceRoute: true,
+      }),
+    ]).catch(() => {});
 
     Promise.allSettled([
       logDispatchEvent({
@@ -33446,6 +34654,26 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
         trackingUpdatedAtMs: nowMs,
         trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         trackingStopReason: 'dispatch_v3_emergency_recovery',
+        merchantTrackingPhase: 'waiting',
+        merchantTrackingGpsHealth: 'WAITING',
+        merchantTrackingRiskLevel: 'NORMAL',
+        merchantTrackingRiskReasons: [],
+        merchantTrackingStalled: false,
+        merchantTrackingDelayMinutes: 0,
+        merchantTrackingDelayLevel: 'NORMAL',
+        merchantTrackingBaselinePhase: '',
+        merchantTrackingBaselineMinutes: null,
+        merchantTrackingBaselineAtMs: null,
+        merchantGeofenceState: 'UNKNOWN',
+        merchantGeofenceDistanceMeters: null,
+        merchantLiveDistanceMeters: null,
+        merchantLiveDistanceKm: null,
+        merchantLiveDistanceText: '',
+        merchantLiveEtaSeconds: null,
+        merchantLiveEtaMinutes: null,
+        merchantLiveEtaText: '',
+        merchantLiveEtaAtMs: null,
+        merchantLiveRouteUpdatedAtMs: 0,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         dispatchUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         'statusTimes.emergency_redispatch': admin.firestore.FieldValue.serverTimestamp(),
