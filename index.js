@@ -8,6 +8,7 @@ const admin = require('firebase-admin');
 const webpush = require('web-push');
 const multer = require('multer');
 
+// 2026-08-21 Store Purchase V2｜店家商品、動態規格、收藏、常買、最近購買、歷史規格、熱門商品與再次代買。
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
 // UBee Merchant PWA V4 + 小U資料庫 V2 Final｜2026-08-13：店家獨立密碼登入、COD 墊付配送、店家近距離費率。
 // 2026-08-04 R9｜全能跑腿 serviceMode 前後端一致：估價、建單與鎖價驗證統一為 custom。
@@ -30768,6 +30769,27 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       verifiedStoreResult.storeDiscovery
     );
 
+    // Store Purchase V2：若客人從店家商品清單建立代買需求，
+    // 這裡以 Firestore catalog 重新驗證商品、價格、規格與售完狀態。
+    // 前端傳來的價格僅供畫面顯示，正式建單不採信前端價格。
+    const purchaseCartValidation = await validatePurchaseCartV2ForOrder(
+      req.body.purchaseCartV2,
+      data.storeDiscovery
+    );
+
+    if (!purchaseCartValidation.ok) {
+      return res.status(purchaseCartValidation.statusCode || 400).json({
+        success: false,
+        code: purchaseCartValidation.code || 'STORE_V2_CART_INVALID',
+        error: purchaseCartValidation.message || '代買清單已變更，請重新確認。',
+      });
+    }
+
+    applyPurchaseCartV2ValidationToOrderData(
+      data,
+      purchaseCartValidation
+    );
+
     const quoteValidation = await loadValidDynamicPricingQuote(
       req.body.quoteId || data.quoteId
     );
@@ -31077,6 +31099,17 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     data.purchaseDetails && typeof data.purchaseDetails === 'object'
       ? data.purchaseDetails
       : null,
+
+  // Store Purchase V2：正式商品快照。
+  // 訂單成立後永遠保存當下商品名稱、版本、規格與參考價格，
+  // 後續店家修改 catalog 不會改動舊訂單。
+  purchaseSnapshot:
+    data.purchaseSnapshot && typeof data.purchaseSnapshot === 'object'
+      ? data.purchaseSnapshot
+      : null,
+
+  purchaseSnapshotVersion:
+    data.purchaseSnapshotVersion || '',
 
   taskDetails:
     data.taskDetails && typeof data.taskDetails === 'object'
@@ -31450,7 +31483,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
       customerPayableTotal: order.customerPayableTotal,
       advancePayment: order.advancePayment,
       message: '訂單已建立，請確認使用現金單。',
-      apiVersion: 'customer-order-v4',
+      apiVersion: 'customer-order-v4-store-v2',
       addressCenterVersion: order.addressCenterVersion || '',
     });
   } catch (error) {
@@ -31564,6 +31597,10 @@ app.post('/api/orders/:orderId/payment-method', requireCustomerAuth, async (req,
       order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
       await saveOrder(order);
+
+      // 熱門商品以「客人已正式確認付款方式、訂單進入派單／預約池」為統計點，
+      // 避免只建立 pending_payment 卻未確認的草稿影響熱門排名。
+      storeV2RecordPopularity(order).catch(() => {});
 
       if (scheduledOrder) {
         setImmediate(() => {
@@ -37568,6 +37605,25 @@ function sanitizeCustomerOrderForApi(order = {}) {
     itemSize: String(order.itemSize || ''),
     itemSizeLabel: String(order.itemSizeLabel || ''),
     shoppingItems: Array.isArray(order.shoppingItems) ? order.shoppingItems.slice(0, 50) : [],
+    purchaseDetails:
+      order.purchaseDetails && typeof order.purchaseDetails === 'object'
+        ? order.purchaseDetails
+        : null,
+    purchaseSnapshot:
+      order.purchaseSnapshot && typeof order.purchaseSnapshot === 'object'
+        ? order.purchaseSnapshot
+        : null,
+    purchaseSnapshotVersion: String(order.purchaseSnapshotVersion || ''),
+    storeDiscovery:
+      order.storeDiscovery && typeof order.storeDiscovery === 'object'
+        ? order.storeDiscovery
+        : null,
+    storePlaceId: String(order.storePlaceId || ''),
+    storeName: String(order.storeName || ''),
+    storeCategory: String(order.storeCategory || ''),
+    storeAddress: String(order.storeAddress || ''),
+    storePhone: String(order.storePhone || ''),
+    storeSource: String(order.storeSource || ''),
     paymentMethod: String(order.paymentMethod || ''),
     paymentStatus: String(order.paymentStatus || ''),
     total: Number(order.total || 0),
@@ -37879,6 +37935,1063 @@ app.get('/api/customer/recent-addresses', requireCustomerAuth, async (req, res) 
       success: false,
       error: error.message || '最近地址讀取失敗',
     });
+  }
+});
+
+
+
+// =====================================================
+// UBee Store Purchase V2｜個人化與回購正式版｜2026-08-21
+// - 店家商品目錄與動態規格
+// - 收藏店家（跨裝置）
+// - 最近購買／常買／歷史規格（由完成訂單即時計算）
+// - 熱門商品統計
+// - 再次代買前重新驗證商品、價格與規格
+// - 建單時由後端重新驗證 catalog，不信任前端價格
+// =====================================================
+const UBEE_STORE_PRODUCT_V2 = Object.freeze({
+  schemaVersion: 'store-purchase-v2',
+  productsSubcollection: 'products',
+  popularityCollection: 'productPopularityV2',
+  favoriteSubcollection: 'favoriteStores',
+  maxProductsPerStore: 120,
+  maxCartItems: 20,
+  maxItemQuantity: 20,
+  maxTotalQuantity: 50,
+  customerHistoryLimit: 160,
+  frequentWindowMs: 90 * 24 * 60 * 60 * 1000,
+});
+
+function storeV2SafeId(value, maxLength = 160) {
+  return cleanText(value || '', maxLength).replace(/[\/\\?#\[\]]/g, '_');
+}
+
+function storeV2FavoriteDocumentId(placeId) {
+  return crypto
+    .createHash('sha256')
+    .update(String(placeId || '').trim())
+    .digest('hex')
+    .slice(0, 40);
+}
+
+function storeV2PopularityDocumentId(placeId, productId) {
+  return crypto
+    .createHash('sha256')
+    .update(`${String(placeId || '').trim()}|${String(productId || '').trim()}`)
+    .digest('hex')
+    .slice(0, 48);
+}
+
+function customerStoreFavoritesV2Collection(customerId) {
+  return db
+    .collection('customerProfiles')
+    .doc(String(customerId || '').trim())
+    .collection(UBEE_STORE_PRODUCT_V2.favoriteSubcollection);
+}
+
+function storeProductsV2Collection(placeId) {
+  return db
+    .collection(UBEE_STORE_DIRECTORY_COLLECTION)
+    .doc(String(placeId || '').trim())
+    .collection(UBEE_STORE_PRODUCT_V2.productsSubcollection);
+}
+
+function storeV2NormalizeOptionGroups(value, { strict = false } = {}) {
+  const groups = Array.isArray(value) ? value.slice(0, 20) : [];
+  const usedGroupIds = new Set();
+
+  return groups.map((rawGroup, groupIndex) => {
+    const source = rawGroup && typeof rawGroup === 'object' ? rawGroup : {};
+    let groupId = storeV2SafeId(source.id || source.key || `group_${groupIndex + 1}`, 80);
+    if (!groupId) groupId = `group_${groupIndex + 1}`;
+    if (usedGroupIds.has(groupId)) groupId = `${groupId}_${groupIndex + 1}`;
+    usedGroupIds.add(groupId);
+
+    const type = String(source.type || 'single').trim().toLowerCase() === 'multi'
+      ? 'multi'
+      : 'single';
+    const options = Array.isArray(source.options) ? source.options.slice(0, 40) : [];
+    const usedOptionIds = new Set();
+    const normalizedOptions = options.map((rawOption, optionIndex) => {
+      const optionSource = rawOption && typeof rawOption === 'object'
+        ? rawOption
+        : { name: rawOption };
+      let optionId = storeV2SafeId(
+        optionSource.id || optionSource.key || `option_${optionIndex + 1}`,
+        80
+      );
+      if (!optionId) optionId = `option_${optionIndex + 1}`;
+      if (usedOptionIds.has(optionId)) optionId = `${optionId}_${optionIndex + 1}`;
+      usedOptionIds.add(optionId);
+
+      const optionName = cleanText(optionSource.name || optionSource.label || '', 80);
+      if (strict && !optionName) {
+        const error = new Error(`第 ${groupIndex + 1} 組規格的第 ${optionIndex + 1} 個選項缺少名稱。`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      return {
+        id: optionId,
+        name: optionName,
+        priceDelta: Math.round(Number(optionSource.priceDelta || 0)),
+        enabled: optionSource.enabled !== false,
+        sortWeight: Number.isFinite(Number(optionSource.sortWeight))
+          ? Number(optionSource.sortWeight)
+          : optionIndex,
+      };
+    }).filter(option => option.name);
+
+    const required = source.required === true;
+    const defaultMin = required ? 1 : 0;
+    let minSelections = Math.max(0, Math.round(Number(source.minSelections ?? defaultMin)));
+    let maxSelections = Math.max(
+      type === 'single' ? 1 : minSelections,
+      Math.round(Number(source.maxSelections ?? (type === 'single' ? 1 : normalizedOptions.length || 1)))
+    );
+
+    if (type === 'single') {
+      maxSelections = 1;
+      minSelections = required ? 1 : Math.min(1, minSelections);
+    } else {
+      maxSelections = Math.min(Math.max(1, maxSelections), Math.max(1, normalizedOptions.length));
+      minSelections = Math.min(minSelections, maxSelections);
+    }
+
+    const groupName = cleanText(source.name || source.label || '', 80);
+    if (strict && !groupName) {
+      const error = new Error(`第 ${groupIndex + 1} 組規格缺少名稱。`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      id: groupId,
+      name: groupName,
+      type,
+      required,
+      minSelections,
+      maxSelections,
+      sortWeight: Number.isFinite(Number(source.sortWeight))
+        ? Number(source.sortWeight)
+        : groupIndex,
+      options: normalizedOptions.sort((a, b) => a.sortWeight - b.sortWeight),
+    };
+  }).filter(group => group.name && group.options.length);
+}
+
+function storeV2NormalizeProduct(data = {}, productId = '') {
+  const source = data && typeof data === 'object' ? data : {};
+  const rawPrice = source.basePrice ?? source.price;
+  const numericPrice = Number(rawPrice);
+  const hasPrice = rawPrice !== '' && rawPrice !== null && rawPrice !== undefined && Number.isFinite(numericPrice);
+
+  return {
+    productId: storeV2SafeId(productId || source.productId || source.id || '', 120),
+    name: cleanText(source.name || source.productName || '', 120),
+    description: cleanLongText(source.description || '', 400),
+    category: cleanText(source.category || '熱門', 60),
+    basePrice: hasPrice ? Math.max(0, Math.round(numericPrice)) : null,
+    imageUrl: cleanText(source.imageUrl || '', 500),
+    enabled: source.enabled !== false,
+    soldOut: source.soldOut === true,
+    sortWeight: Number.isFinite(Number(source.sortWeight)) ? Number(source.sortWeight) : 0,
+    version: Math.max(1, Math.round(Number(source.version || 1))),
+    optionGroups: storeV2NormalizeOptionGroups(source.optionGroups || source.options || []),
+    updatedAtMs: Number(source.updatedAtMs || 0),
+  };
+}
+
+function storeV2PublicProduct(product) {
+  return {
+    productId: product.productId,
+    name: product.name,
+    description: product.description,
+    category: product.category,
+    basePrice: product.basePrice,
+    imageUrl: product.imageUrl,
+    enabled: product.enabled === true,
+    soldOut: product.soldOut === true,
+    sortWeight: product.sortWeight,
+    version: product.version,
+    optionGroups: (product.optionGroups || []).map(group => ({
+      id: group.id,
+      name: group.name,
+      type: group.type,
+      required: group.required === true,
+      minSelections: Number(group.minSelections || 0),
+      maxSelections: Number(group.maxSelections || 1),
+      options: (group.options || []).filter(option => option.enabled !== false).map(option => ({
+        id: option.id,
+        name: option.name,
+        priceDelta: Number(option.priceDelta || 0),
+        enabled: true,
+      })),
+    })),
+  };
+}
+
+async function storeV2LoadCatalog(placeId, { includeDisabled = false } = {}) {
+  const safePlaceId = cleanText(placeId || '', 200);
+  if (!safePlaceId) return [];
+
+  const snapshot = await storeProductsV2Collection(safePlaceId)
+    .limit(UBEE_STORE_PRODUCT_V2.maxProductsPerStore)
+    .get();
+
+  return snapshot.docs
+    .map(doc => storeV2NormalizeProduct(doc.data() || {}, doc.id))
+    .filter(product => product.name)
+    .filter(product => includeDisabled || product.enabled === true)
+    .sort((a, b) =>
+      Number(a.sortWeight || 0) - Number(b.sortWeight || 0) ||
+      String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant')
+    );
+}
+
+function storeV2SanitizeStoreSnapshot(source = {}) {
+  const raw = source && typeof source === 'object' ? source : {};
+  const placeId = cleanText(raw.placeId || raw.id || raw.storePlaceId || '', 200);
+  const isLocal =
+    String(raw.source || '').trim().toLowerCase() === 'ubee_local_catalog' ||
+    String(raw.source || '').trim().toLowerCase() === 'local' ||
+    placeId.startsWith('local:');
+
+  return {
+    placeId,
+    name: cleanText(raw.name || raw.storeName || '指定店家', 120),
+    category: cleanText(raw.category || raw.storeCategory || '', 60),
+    typeLabel: cleanText(raw.typeLabel || '', 80),
+    address: cleanText(raw.address || raw.storeAddress || '', 180),
+    phone: normalizePhone(cleanText(raw.phone || raw.storePhone || '', 40)),
+    photoUrl: cleanText(raw.photoUrl || '', 500),
+    source: isLocal ? 'ubee_local_catalog' : 'google_places',
+    sourceLabel: isLocal ? 'UBee 本地店家目錄' : 'Google Maps 公開店家資訊',
+  };
+}
+
+function storeV2PurchaseSnapshotFromOrder(order = {}) {
+  const existing = order.purchaseSnapshot && typeof order.purchaseSnapshot === 'object'
+    ? order.purchaseSnapshot
+    : null;
+
+  if (existing && Array.isArray(existing.items) && existing.items.length) {
+    return {
+      schemaVersion: String(existing.schemaVersion || UBEE_STORE_PRODUCT_V2.schemaVersion),
+      store: storeV2SanitizeStoreSnapshot(existing.store || order.storeDiscovery || order),
+      items: existing.items.slice(0, UBEE_STORE_PRODUCT_V2.maxCartItems).map(item => ({
+        productId: storeV2SafeId(item?.productId || '', 120),
+        productName: cleanText(item?.productName || item?.name || '', 120),
+        productVersion: Math.max(1, Math.round(Number(item?.productVersion || 1))),
+        unitPrice: Number.isFinite(Number(item?.unitPrice)) ? Number(item.unitPrice) : null,
+        quantity: Math.max(1, Math.round(Number(item?.quantity || 1))),
+        selections: Array.isArray(item?.selections)
+          ? item.selections.slice(0, 40).map(selection => ({
+              groupId: storeV2SafeId(selection?.groupId || '', 80),
+              groupName: cleanText(selection?.groupName || '', 80),
+              optionId: storeV2SafeId(selection?.optionId || '', 80),
+              optionName: cleanText(selection?.optionName || '', 80),
+              priceDelta: Math.round(Number(selection?.priceDelta || 0)),
+            }))
+          : [],
+        specification: cleanLongText(item?.specification || item?.spec || '', 300),
+        note: cleanLongText(item?.note || '', 180),
+        outOfStockAction: normalizePurchaseOutOfStockAction(
+          item?.outOfStockAction || item?.replacementPolicy
+        ),
+        unitEstimatedTotal: Number.isFinite(Number(item?.unitEstimatedTotal))
+          ? Number(item.unitEstimatedTotal)
+          : null,
+        lineEstimatedTotal: Number.isFinite(Number(item?.lineEstimatedTotal))
+          ? Number(item.lineEstimatedTotal)
+          : null,
+      })).filter(item => item.productName),
+      estimatedGoodsAmount: Math.max(
+        0,
+        Math.round(Number(existing.estimatedGoodsAmount || order.estimatedGoodsAmount || order.advancePayment || 0))
+      ),
+      createdAtMs: Number(existing.createdAtMs || customerOrderApiTimeMs(order.createdAtMs || order.createdAt) || 0),
+    };
+  }
+
+  const legacyItems = Array.isArray(order.shoppingItems) ? order.shoppingItems : [];
+  if (!legacyItems.length) return null;
+  const store = storeV2SanitizeStoreSnapshot(order.storeDiscovery || order);
+  if (!store.placeId && !store.name) return null;
+
+  return {
+    schemaVersion: 'legacy-shopping-items',
+    store,
+    items: legacyItems.slice(0, UBEE_STORE_PRODUCT_V2.maxCartItems).map(item => ({
+      productId: '',
+      productName: cleanText(item?.name || '', 120),
+      productVersion: 0,
+      unitPrice: null,
+      quantity: Math.max(1, Math.round(Number(item?.quantity || 1))),
+      selections: [],
+      specification: cleanLongText(item?.specification || item?.spec || '', 300),
+      note: '',
+      outOfStockAction: normalizePurchaseOutOfStockAction(item?.replacementPolicy),
+      unitEstimatedTotal: null,
+      lineEstimatedTotal: Number.isFinite(Number(item?.budget)) ? Number(item.budget) : null,
+    })).filter(item => item.productName),
+    estimatedGoodsAmount: Math.max(0, Math.round(Number(order.estimatedGoodsAmount || order.advancePayment || 0))),
+    createdAtMs: customerOrderApiTimeMs(order.createdAtMs || order.createdAt),
+  };
+}
+
+function storeV2SelectionSignature(item = {}) {
+  const selections = Array.isArray(item.selections) ? item.selections : [];
+  return selections
+    .map(selection => `${selection.groupId || selection.groupName}:${selection.optionId || selection.optionName}`)
+    .sort()
+    .join('|');
+}
+
+function storeV2OrderPurchaseSignature(snapshot = {}) {
+  const storeId = String(snapshot?.store?.placeId || snapshot?.store?.name || '').trim().toLowerCase();
+  const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
+  const itemSignature = items.map(item => [
+    item.productId || String(item.productName || '').trim().toLowerCase(),
+    Math.max(1, Number(item.quantity || 1)),
+    storeV2SelectionSignature(item),
+    String(item.specification || '').trim().toLowerCase(),
+  ].join('~')).sort().join('||');
+  return `${storeId}::${itemSignature}`;
+}
+
+function storeV2CompactPurchaseSummary(order = {}) {
+  const snapshot = storeV2PurchaseSnapshotFromOrder(order);
+  if (!snapshot || !snapshot.items.length) return null;
+  const orderId = String(order.id || '').trim().toUpperCase();
+  const usedAtMs = Math.max(
+    customerOrderApiTimeMs(order.completedAtMs || order.completedAt),
+    customerOrderApiTimeMs(order.updatedAtMs || order.updatedAt),
+    customerOrderApiTimeMs(order.createdAtMs || order.createdAt)
+  );
+
+  return {
+    orderId,
+    store: snapshot.store,
+    items: snapshot.items.map(item => ({
+      productId: item.productId,
+      productName: item.productName,
+      productVersion: item.productVersion,
+      quantity: item.quantity,
+      selections: item.selections,
+      specification: item.specification,
+      outOfStockAction: item.outOfStockAction,
+      unitPrice: item.unitPrice,
+      lineEstimatedTotal: item.lineEstimatedTotal,
+    })),
+    estimatedGoodsAmount: snapshot.estimatedGoodsAmount,
+    usedAtMs,
+    signature: storeV2OrderPurchaseSignature(snapshot),
+  };
+}
+
+async function storeV2LoadCustomerCompletedPurchases(customerId, limit = UBEE_STORE_PRODUCT_V2.customerHistoryLimit) {
+  const snapshot = await db
+    .collection('orders')
+    .where('userId', '==', String(customerId || '').trim())
+    .limit(Math.max(20, Math.min(200, Number(limit || UBEE_STORE_PRODUCT_V2.customerHistoryLimit))))
+    .get();
+
+  const completed = new Set(['completed', 'done']);
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(order => completed.has(String(order.status || '').trim().toLowerCase()))
+    .sort((a, b) => {
+      const aTime = Math.max(
+        customerOrderApiTimeMs(a.completedAtMs || a.completedAt),
+        customerOrderApiTimeMs(a.createdAtMs || a.createdAt)
+      );
+      const bTime = Math.max(
+        customerOrderApiTimeMs(b.completedAtMs || b.completedAt),
+        customerOrderApiTimeMs(b.createdAtMs || b.createdAt)
+      );
+      return bTime - aTime;
+    });
+}
+
+function storeV2BuildFrequentPurchases(orders = []) {
+  const cutoff = Date.now() - UBEE_STORE_PRODUCT_V2.frequentWindowMs;
+  const aggregates = new Map();
+
+  for (const order of orders) {
+    const summary = storeV2CompactPurchaseSummary(order);
+    if (!summary || !summary.signature || summary.usedAtMs < cutoff) continue;
+    const current = aggregates.get(summary.signature) || {
+      ...summary,
+      count: 0,
+      firstUsedAtMs: summary.usedAtMs,
+      lastUsedAtMs: summary.usedAtMs,
+    };
+    current.count += 1;
+    current.firstUsedAtMs = Math.min(current.firstUsedAtMs, summary.usedAtMs);
+    if (summary.usedAtMs >= current.lastUsedAtMs) {
+      current.lastUsedAtMs = summary.usedAtMs;
+      current.orderId = summary.orderId;
+      current.store = summary.store;
+      current.items = summary.items;
+      current.estimatedGoodsAmount = summary.estimatedGoodsAmount;
+    }
+    aggregates.set(summary.signature, current);
+  }
+
+  return [...aggregates.values()]
+    .sort((a, b) => b.count - a.count || b.lastUsedAtMs - a.lastUsedAtMs)
+    .slice(0, 12);
+}
+
+function storeV2BuildProductPreferences(orders = [], placeId = '') {
+  const targetPlaceId = String(placeId || '').trim();
+  const buckets = new Map();
+
+  for (const order of orders) {
+    const summary = storeV2CompactPurchaseSummary(order);
+    if (!summary || String(summary.store?.placeId || '') !== targetPlaceId) continue;
+    for (const item of summary.items) {
+      if (!item.productId) continue;
+      const signature = `${item.productId}::${storeV2SelectionSignature(item)}`;
+      const bucketKey = item.productId;
+      const existing = buckets.get(bucketKey) || {
+        productId: item.productId,
+        last: null,
+        combinations: new Map(),
+      };
+      if (!existing.last || summary.usedAtMs > existing.last.usedAtMs) {
+        existing.last = {
+          usedAtMs: summary.usedAtMs,
+          quantity: item.quantity,
+          selections: item.selections,
+          specification: item.specification,
+          outOfStockAction: item.outOfStockAction,
+        };
+      }
+      const combo = existing.combinations.get(signature) || {
+        count: 0,
+        usedAtMs: summary.usedAtMs,
+        quantity: item.quantity,
+        selections: item.selections,
+        specification: item.specification,
+        outOfStockAction: item.outOfStockAction,
+      };
+      combo.count += 1;
+      combo.usedAtMs = Math.max(combo.usedAtMs, summary.usedAtMs);
+      existing.combinations.set(signature, combo);
+      buckets.set(bucketKey, existing);
+    }
+  }
+
+  const result = {};
+  for (const [productId, bucket] of buckets.entries()) {
+    const mostUsed = [...bucket.combinations.values()]
+      .sort((a, b) => b.count - a.count || b.usedAtMs - a.usedAtMs)[0] || null;
+    result[productId] = {
+      productId,
+      last: bucket.last,
+      mostUsed,
+    };
+  }
+  return result;
+}
+
+async function storeV2LoadFavorites(customerId) {
+  const snapshot = await customerStoreFavoritesV2Collection(customerId).limit(50).get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .map(row => ({
+      id: row.id,
+      store: storeV2SanitizeStoreSnapshot(row.store || row),
+      createdAtMs: Number(row.createdAtMs || 0),
+      updatedAtMs: Number(row.updatedAtMs || 0),
+    }))
+    .filter(row => row.store.placeId || row.store.name)
+    .sort((a, b) => Number(b.updatedAtMs || b.createdAtMs || 0) - Number(a.updatedAtMs || a.createdAtMs || 0));
+}
+
+async function storeV2LoadPopularProducts({ placeId = '', limit = 12 } = {}) {
+  let query = db.collection(UBEE_STORE_PRODUCT_V2.popularityCollection);
+  if (placeId) query = query.where('storePlaceId', '==', String(placeId));
+  const snapshot = await query.limit(120).get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...(doc.data() || {}) }))
+    .filter(row => row.productId && row.productName && row.storePlaceId)
+    .sort((a, b) =>
+      Number(b.orderCount || 0) - Number(a.orderCount || 0) ||
+      Number(b.quantityOrdered || 0) - Number(a.quantityOrdered || 0) ||
+      Number(b.lastOrderedAtMs || 0) - Number(a.lastOrderedAtMs || 0)
+    )
+    .slice(0, Math.max(1, Math.min(30, Number(limit || 12))))
+    .map(row => ({
+      storePlaceId: String(row.storePlaceId || ''),
+      storeName: String(row.storeName || ''),
+      storeAddress: String(row.storeAddress || ''),
+      storeCategory: String(row.storeCategory || ''),
+      productId: String(row.productId || ''),
+      productName: String(row.productName || ''),
+      productVersion: Number(row.productVersion || 1),
+      basePrice: Number.isFinite(Number(row.basePrice)) ? Number(row.basePrice) : null,
+      orderCount: Number(row.orderCount || 0),
+      quantityOrdered: Number(row.quantityOrdered || 0),
+      lastOrderedAtMs: Number(row.lastOrderedAtMs || 0),
+    }));
+}
+
+async function storeV2RecordPopularity(order = {}) {
+  try {
+    const snapshot = storeV2PurchaseSnapshotFromOrder(order);
+    if (!snapshot || !snapshot.store?.placeId || !snapshot.items?.length) return;
+    const batch = db.batch();
+    const nowMs = Date.now();
+    for (const item of snapshot.items) {
+      if (!item.productId) continue;
+      const docId = storeV2PopularityDocumentId(snapshot.store.placeId, item.productId);
+      const ref = db.collection(UBEE_STORE_PRODUCT_V2.popularityCollection).doc(docId);
+      batch.set(ref, {
+        storePlaceId: snapshot.store.placeId,
+        storeName: snapshot.store.name,
+        storeAddress: snapshot.store.address,
+        storeCategory: snapshot.store.category,
+        productId: item.productId,
+        productName: item.productName,
+        productVersion: item.productVersion,
+        basePrice: item.unitPrice,
+        orderCount: admin.firestore.FieldValue.increment(1),
+        quantityOrdered: admin.firestore.FieldValue.increment(Math.max(1, Number(item.quantity || 1))),
+        lastOrderedAtMs: nowMs,
+        lastOrderedAt: admin.firestore.FieldValue.serverTimestamp(),
+        dataVersion: 2,
+      }, { merge: true });
+    }
+    await batch.commit();
+  } catch (error) {
+    console.warn('⚠️ Store V2 熱門商品統計失敗，不影響建單：', error.message || error);
+  }
+}
+
+function storeV2NormalizeCartSelections(rawSelections) {
+  if (!Array.isArray(rawSelections)) return [];
+  return rawSelections.slice(0, 30).map(raw => ({
+    groupId: storeV2SafeId(raw?.groupId || raw?.id || '', 80),
+    optionIds: Array.isArray(raw?.optionIds)
+      ? raw.optionIds.map(id => storeV2SafeId(id, 80)).filter(Boolean).slice(0, 30)
+      : raw?.optionId
+        ? [storeV2SafeId(raw.optionId, 80)].filter(Boolean)
+        : [],
+  })).filter(row => row.groupId);
+}
+
+async function validatePurchaseCartV2ForOrder(rawCart, verifiedStoreDiscovery) {
+  if (!rawCart || typeof rawCart !== 'object') {
+    return { ok: true, snapshot: null, shoppingItems: null, purchaseDetails: null };
+  }
+
+  const cartItems = Array.isArray(rawCart.items) ? rawCart.items.slice(0, UBEE_STORE_PRODUCT_V2.maxCartItems) : [];
+  if (!cartItems.length) {
+    return { ok: false, statusCode: 400, code: 'STORE_V2_CART_EMPTY', message: '代買清單沒有商品，請重新選擇。' };
+  }
+
+  const store = storeV2SanitizeStoreSnapshot(verifiedStoreDiscovery || {});
+  if (!store.placeId) {
+    return { ok: false, statusCode: 400, code: 'STORE_V2_STORE_REQUIRED', message: '找不到代買店家識別資料，請重新選擇店家。' };
+  }
+
+  const clientStorePlaceId = cleanText(rawCart.storePlaceId || rawCart.store?.placeId || '', 200);
+  if (clientStorePlaceId && clientStorePlaceId !== store.placeId) {
+    return { ok: false, statusCode: 409, code: 'STORE_V2_STORE_CHANGED', message: '店家資料已變更，請重新開啟店家商品頁。' };
+  }
+
+  const requestedProductIds = [...new Set(cartItems
+    .map(item => storeV2SafeId(item?.productId || '', 120))
+    .filter(Boolean))];
+  if (!requestedProductIds.length) {
+    return { ok: false, statusCode: 400, code: 'STORE_V2_PRODUCT_REQUIRED', message: '代買商品資料不完整，請重新選擇商品。' };
+  }
+
+  const refs = requestedProductIds.map(productId => storeProductsV2Collection(store.placeId).doc(productId));
+  const snapshots = await db.getAll(...refs);
+  const products = new Map();
+  snapshots.forEach(snapshot => {
+    if (snapshot.exists) {
+      const product = storeV2NormalizeProduct(snapshot.data() || {}, snapshot.id);
+      products.set(product.productId, product);
+    }
+  });
+
+  const snapshotItems = [];
+  let estimatedGoodsAmount = 0;
+  let totalQuantity = 0;
+
+  for (let index = 0; index < cartItems.length; index += 1) {
+    const rawItem = cartItems[index] && typeof cartItems[index] === 'object' ? cartItems[index] : {};
+    const productId = storeV2SafeId(rawItem.productId || '', 120);
+    const product = products.get(productId);
+    if (!product || product.enabled !== true) {
+      return { ok: false, statusCode: 409, code: 'STORE_V2_PRODUCT_UNAVAILABLE', message: `第 ${index + 1} 項商品已停售或不存在，請重新確認代買清單。` };
+    }
+    if (product.soldOut === true) {
+      return { ok: false, statusCode: 409, code: 'STORE_V2_PRODUCT_SOLD_OUT', message: `${product.name} 目前標示為售完，請重新選擇。` };
+    }
+    if (!Number.isFinite(Number(product.basePrice))) {
+      return { ok: false, statusCode: 409, code: 'STORE_V2_PRICE_UNAVAILABLE', message: `${product.name} 目前沒有可用的參考價格，請改用自行填寫代買內容。` };
+    }
+
+    const quantity = Math.max(1, Math.min(
+      UBEE_STORE_PRODUCT_V2.maxItemQuantity,
+      Math.round(Number(rawItem.quantity || 1))
+    ));
+    totalQuantity += quantity;
+    if (totalQuantity > UBEE_STORE_PRODUCT_V2.maxTotalQuantity) {
+      return { ok: false, statusCode: 400, code: 'STORE_V2_QUANTITY_LIMIT', message: `單筆代買清單最多 ${UBEE_STORE_PRODUCT_V2.maxTotalQuantity} 件商品。` };
+    }
+
+    const rawSelectionRows = storeV2NormalizeCartSelections(rawItem.selections);
+    const selectionMap = new Map(rawSelectionRows.map(row => [row.groupId, row.optionIds]));
+    const selectedDetails = [];
+    let optionPriceDelta = 0;
+
+    for (const group of product.optionGroups || []) {
+      const optionIds = [...new Set(selectionMap.get(group.id) || [])];
+      const min = Math.max(0, Number(group.minSelections || (group.required ? 1 : 0)));
+      const max = Math.max(min, Number(group.maxSelections || (group.type === 'single' ? 1 : group.options.length)));
+      if (optionIds.length < min) {
+        return { ok: false, statusCode: 409, code: 'STORE_V2_REQUIRED_OPTION_MISSING', message: `${product.name} 的「${group.name}」尚未完成選擇。` };
+      }
+      if (optionIds.length > max || (group.type === 'single' && optionIds.length > 1)) {
+        return { ok: false, statusCode: 409, code: 'STORE_V2_OPTION_LIMIT', message: `${product.name} 的「${group.name}」選項數量不正確。` };
+      }
+      for (const optionId of optionIds) {
+        const option = (group.options || []).find(candidate => candidate.id === optionId && candidate.enabled !== false);
+        if (!option) {
+          return { ok: false, statusCode: 409, code: 'STORE_V2_OPTION_CHANGED', message: `${product.name} 的「${group.name}」規格已變更，請重新確認。` };
+        }
+        const priceDelta = Math.round(Number(option.priceDelta || 0));
+        optionPriceDelta += priceDelta;
+        selectedDetails.push({
+          groupId: group.id,
+          groupName: group.name,
+          optionId: option.id,
+          optionName: option.name,
+          priceDelta,
+        });
+      }
+    }
+
+    const unitEstimatedTotal = Math.max(0, Math.round(Number(product.basePrice) + optionPriceDelta));
+    const lineEstimatedTotal = unitEstimatedTotal * quantity;
+    estimatedGoodsAmount += lineEstimatedTotal;
+    const groupedSpec = [];
+    for (const group of product.optionGroups || []) {
+      const names = selectedDetails.filter(row => row.groupId === group.id).map(row => row.optionName);
+      if (names.length) groupedSpec.push(`${group.name}：${names.join('、')}`);
+    }
+    const freeSpecification = cleanLongText(rawItem.specification || '', 160);
+    if (freeSpecification) groupedSpec.push(freeSpecification);
+
+    snapshotItems.push({
+      productId: product.productId,
+      productName: product.name,
+      productVersion: product.version,
+      unitPrice: Number(product.basePrice),
+      quantity,
+      selections: selectedDetails,
+      specification: groupedSpec.join('；'),
+      note: cleanLongText(rawItem.note || '', 180),
+      outOfStockAction: normalizePurchaseOutOfStockAction(
+        rawItem.outOfStockAction || rawItem.replacementPolicy
+      ),
+      unitEstimatedTotal,
+      lineEstimatedTotal,
+    });
+  }
+
+  const snapshot = {
+    schemaVersion: UBEE_STORE_PRODUCT_V2.schemaVersion,
+    store,
+    items: snapshotItems,
+    estimatedGoodsAmount: Math.max(0, Math.round(estimatedGoodsAmount)),
+    createdAtMs: Date.now(),
+  };
+
+  const shoppingItems = snapshotItems.map(item => ({
+    name: item.productName,
+    quantity: String(item.quantity),
+    specification: item.specification,
+    budget: String(item.lineEstimatedTotal),
+    replacementPolicy:
+      item.outOfStockAction === 'similar_item'
+        ? 'replace'
+        : item.outOfStockAction === 'skip_item'
+          ? 'skip'
+          : 'contact',
+  }));
+
+  const first = snapshotItems[0] || {};
+  const purchaseDetails = normalizePurchaseDetailsInput({
+    productName: first.productName || '',
+    quantity: first.quantity ? String(first.quantity) : '',
+    specification: first.specification || '',
+    outOfStockAction: first.outOfStockAction || 'contact_customer',
+    additionalNote: snapshotItems.length > 1 ? `本次共 ${snapshotItems.length} 項商品，請依代買清單逐項購買。` : (first.note || ''),
+  });
+
+  return { ok: true, snapshot, shoppingItems, purchaseDetails };
+}
+
+function applyPurchaseCartV2ValidationToOrderData(data, validation) {
+  if (!validation?.snapshot) return data;
+  const snapshot = validation.snapshot;
+  data.purchaseSnapshot = snapshot;
+  data.purchaseSnapshotVersion = UBEE_STORE_PRODUCT_V2.schemaVersion;
+  data.shoppingItems = validation.shoppingItems || [];
+  data.purchaseDetails = validation.purchaseDetails || data.purchaseDetails;
+  data.advancePayment = snapshot.estimatedGoodsAmount;
+  data.advanceAmount = snapshot.estimatedGoodsAmount;
+  data.estimatedGoodsAmount = snapshot.estimatedGoodsAmount;
+  data.riderAdvanceAmount = snapshot.estimatedGoodsAmount;
+  data.item = snapshot.items.length === 1
+    ? snapshot.items[0].productName
+    : `${snapshot.store.name} 代買 ${snapshot.items.length} 項`;
+  data.note = cleanLongText([
+    `【店家代買】${snapshot.store.name}`,
+    ...snapshot.items.map((item, index) => {
+      const lines = [
+        `${index + 1}. ${item.productName} ×${item.quantity}`,
+        item.specification ? `規格：${item.specification}` : '',
+        `缺貨處理：${getPurchaseOutOfStockLabel(item.outOfStockAction)}`,
+        item.note ? `備註：${item.note}` : '',
+      ].filter(Boolean);
+      return lines.join('\n');
+    }),
+    `商品預估金額：NT$${snapshot.estimatedGoodsAmount}`,
+    '※ 商品實際價格、供應與庫存以店家現場為準。',
+  ].join('\n'), ORDER_INPUT_LIMITS.note);
+  data.taskDetails = {
+    ...(data.taskDetails || {}),
+    itemName: data.item,
+    quantity: `${snapshot.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} 件`,
+    replacementPolicy: validation.purchaseDetails?.outOfStockAction === 'similar_item'
+      ? 'similar'
+      : validation.purchaseDetails?.outOfStockAction === 'skip_item'
+        ? 'skip'
+        : 'contact',
+  };
+  data.clientSchemaVersion = 'customer-store-v2-20260821';
+  return data;
+}
+
+async function storeV2BuildReorderPreview(order, customerId) {
+  if (!order || !isSameCustomerUserId(order, customerId)) {
+    return { ok: false, statusCode: 403, code: 'ORDER_NOT_OWNED', message: '此訂單無法再次代買。' };
+  }
+  const snapshot = storeV2PurchaseSnapshotFromOrder(order);
+  if (!snapshot || !snapshot.items?.length) {
+    return { ok: false, statusCode: 409, code: 'REORDER_NOT_PURCHASE', message: '此訂單沒有可再次代買的商品資料。' };
+  }
+
+  if (snapshot.schemaVersion !== UBEE_STORE_PRODUCT_V2.schemaVersion || snapshot.items.some(item => !item.productId)) {
+    return {
+      ok: true,
+      mode: 'legacy',
+      store: snapshot.store,
+      manualItems: snapshot.items,
+      warnings: ['這是舊版代買紀錄，沒有商品版本資料。系統會帶入舊內容，送出前請重新確認店家現況與價格。'],
+    };
+  }
+
+  const catalog = await storeV2LoadCatalog(snapshot.store.placeId, { includeDisabled: true });
+  const productMap = new Map(catalog.map(product => [product.productId, product]));
+  const cartItems = [];
+  const warnings = [];
+  const unavailableItems = [];
+  let estimatedGoodsAmount = 0;
+
+  for (const oldItem of snapshot.items) {
+    const product = productMap.get(oldItem.productId);
+    if (!product || product.enabled !== true || product.soldOut === true) {
+      unavailableItems.push({
+        productId: oldItem.productId,
+        productName: oldItem.productName,
+        reason: !product ? '商品已不存在' : product.soldOut ? '目前售完' : '目前停售',
+      });
+      continue;
+    }
+
+    const grouped = new Map();
+    let itemNeedsReview = false;
+    for (const oldSelection of oldItem.selections || []) {
+      const group = (product.optionGroups || []).find(candidate => candidate.id === oldSelection.groupId);
+      const option = group?.options?.find(candidate => candidate.id === oldSelection.optionId && candidate.enabled !== false);
+      if (!group || !option) {
+        itemNeedsReview = true;
+        warnings.push(`${oldItem.productName} 的「${oldSelection.groupName || '部分規格'}」已變更，請重新確認。`);
+        continue;
+      }
+      const row = grouped.get(group.id) || { groupId: group.id, optionIds: [] };
+      row.optionIds.push(option.id);
+      grouped.set(group.id, row);
+    }
+
+    for (const group of product.optionGroups || []) {
+      const selectedCount = grouped.get(group.id)?.optionIds?.length || 0;
+      const min = Math.max(0, Number(group.minSelections || (group.required ? 1 : 0)));
+      if (selectedCount < min) {
+        itemNeedsReview = true;
+        warnings.push(`${oldItem.productName} 的「${group.name}」需要重新選擇。`);
+      }
+    }
+
+    let currentUnit = Number(product.basePrice || 0);
+    for (const row of grouped.values()) {
+      const group = (product.optionGroups || []).find(candidate => candidate.id === row.groupId);
+      for (const optionId of row.optionIds) {
+        const option = group?.options?.find(candidate => candidate.id === optionId);
+        currentUnit += Number(option?.priceDelta || 0);
+      }
+    }
+    const quantity = Math.max(1, Math.min(UBEE_STORE_PRODUCT_V2.maxItemQuantity, Number(oldItem.quantity || 1)));
+    const currentLine = Math.max(0, Math.round(currentUnit)) * quantity;
+    estimatedGoodsAmount += currentLine;
+    const oldLine = Number(oldItem.lineEstimatedTotal);
+    if (Number.isFinite(oldLine) && Math.round(oldLine) !== currentLine) {
+      warnings.push(`${oldItem.productName} 的參考價格已由 NT$${Math.round(oldLine)} 更新為 NT$${currentLine}。`);
+    }
+
+    cartItems.push({
+      productId: product.productId,
+      quantity,
+      selections: [...grouped.values()],
+      note: oldItem.note || '',
+      outOfStockAction: oldItem.outOfStockAction || 'contact_customer',
+      needsReview: itemNeedsReview,
+    });
+  }
+
+  return {
+    ok: true,
+    mode: 'catalog',
+    store: snapshot.store,
+    purchaseCartV2: {
+      schemaVersion: UBEE_STORE_PRODUCT_V2.schemaVersion,
+      storePlaceId: snapshot.store.placeId,
+      items: cartItems,
+    },
+    unavailableItems,
+    warnings: [...new Set(warnings)].slice(0, 20),
+    estimatedGoodsAmount,
+    requiresReview: unavailableItems.length > 0 || warnings.some(text => text.includes('需要重新選擇') || text.includes('已變更')),
+  };
+}
+
+app.get('/api/customer/store-home', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const [favorites, orders, popular] = await Promise.all([
+      storeV2LoadFavorites(customerId),
+      storeV2LoadCustomerCompletedPurchases(customerId),
+      storeV2LoadPopularProducts({ limit: 12 }),
+    ]);
+    const recent = orders
+      .map(order => storeV2CompactPurchaseSummary(order))
+      .filter(Boolean)
+      .slice(0, 12);
+    const frequent = storeV2BuildFrequentPurchases(orders);
+    return res.json({
+      success: true,
+      version: UBEE_STORE_PRODUCT_V2.schemaVersion,
+      favorites,
+      recent,
+      frequent,
+      popular,
+    });
+  } catch (error) {
+    console.error('❌ Store V2 個人化首頁讀取失敗：', error);
+    return res.status(500).json({ success: false, error: '店家個人化資料暫時無法讀取。' });
+  }
+});
+
+app.get('/api/customer/stores/:placeId/catalog', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  try {
+    const placeId = cleanText(req.params.placeId || '', 200);
+    if (!placeId) return res.status(400).json({ success: false, error: '缺少店家識別資料。' });
+    const customerId = req.customerAuth.customerId;
+    const [products, favorites, orders, popular] = await Promise.all([
+      storeV2LoadCatalog(placeId),
+      storeV2LoadFavorites(customerId),
+      storeV2LoadCustomerCompletedPurchases(customerId, 100),
+      storeV2LoadPopularProducts({ placeId, limit: 12 }),
+    ]);
+    const favorite = favorites.some(row => row.store.placeId === placeId);
+    const preferences = storeV2BuildProductPreferences(orders, placeId);
+    return res.json({
+      success: true,
+      version: UBEE_STORE_PRODUCT_V2.schemaVersion,
+      placeId,
+      products: products.map(storeV2PublicProduct),
+      favorite,
+      preferences,
+      popular,
+      disclosure: '商品與價格為參考資訊，實際價格、供應與庫存以店家現場為準。',
+    });
+  } catch (error) {
+    console.error('❌ Store V2 商品目錄讀取失敗：', error);
+    return res.status(500).json({ success: false, error: '商品資料暫時無法讀取。' });
+  }
+});
+
+app.post('/api/customer/store-favorites/toggle', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const store = storeV2SanitizeStoreSnapshot(req.body?.store || {});
+    const favorite = req.body?.favorite !== false;
+    if (!store.placeId || !store.name) {
+      return res.status(400).json({ success: false, error: '店家資料不完整，無法收藏。' });
+    }
+    const ref = customerStoreFavoritesV2Collection(customerId)
+      .doc(storeV2FavoriteDocumentId(store.placeId));
+    if (!favorite) {
+      await ref.delete();
+      return res.json({ success: true, favorite: false, placeId: store.placeId });
+    }
+    const nowMs = Date.now();
+    const current = await ref.get();
+    await ref.set({
+      store,
+      createdAtMs: current.exists ? Number(current.data()?.createdAtMs || nowMs) : nowMs,
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      dataVersion: 2,
+    }, { merge: true });
+    return res.json({ success: true, favorite: true, placeId: store.placeId });
+  } catch (error) {
+    console.error('❌ Store V2 收藏店家失敗：', error);
+    return res.status(500).json({ success: false, error: '收藏狀態更新失敗。' });
+  }
+});
+
+app.get('/api/customer/purchases/:orderId/reorder-preview', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const orderId = String(req.params.orderId || '').trim().toUpperCase();
+    const order = await getOrder(orderId);
+    if (!order) return res.status(404).json({ success: false, error: '找不到原訂單。' });
+    const result = await storeV2BuildReorderPreview(order, req.customerAuth.customerId);
+    if (!result.ok) {
+      return res.status(result.statusCode || 400).json({
+        success: false,
+        code: result.code || 'REORDER_FAILED',
+        error: result.message || '無法再次代買。',
+      });
+    }
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('❌ Store V2 再次代買預檢失敗：', error);
+    return res.status(500).json({ success: false, error: '再次代買資料暫時無法準備。' });
+  }
+});
+
+app.get('/api/admin/store-v2/catalog', requireRiderV4AdminKey, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const placeId = cleanText(req.query.placeId || '', 200);
+    if (!placeId) return res.status(400).json({ success: false, error: '請輸入店家 Place ID。' });
+    const [storeDoc, products] = await Promise.all([
+      db.collection(UBEE_STORE_DIRECTORY_COLLECTION).doc(placeId).get(),
+      storeV2LoadCatalog(placeId, { includeDisabled: true }),
+    ]);
+    return res.json({
+      success: true,
+      store: storeDoc.exists ? { placeId: storeDoc.id, ...(storeDoc.data() || {}) } : { placeId },
+      products: products.map(storeV2PublicProduct),
+    });
+  } catch (error) {
+    console.error('❌ Store V2 管理目錄讀取失敗：', error);
+    return res.status(500).json({ success: false, error: '商品目錄讀取失敗。' });
+  }
+});
+
+app.post('/api/admin/store-v2/product', requireRiderV4AdminKey, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const storeInput = req.body?.store && typeof req.body.store === 'object' ? req.body.store : {};
+    const placeId = cleanText(req.body?.placeId || storeInput.placeId || '', 200);
+    const source = req.body?.product && typeof req.body.product === 'object' ? req.body.product : {};
+    if (!placeId) return res.status(400).json({ success: false, error: '請輸入店家 Place ID。' });
+    const name = cleanText(source.name || '', 120);
+    if (!name) return res.status(400).json({ success: false, error: '請輸入商品名稱。' });
+    if (!Number.isFinite(Number(source.basePrice)) || Number(source.basePrice) < 0) {
+      return res.status(400).json({ success: false, error: '請輸入有效的商品參考價格。' });
+    }
+    const optionGroups = storeV2NormalizeOptionGroups(source.optionGroups || [], { strict: true });
+    let productId = storeV2SafeId(source.productId || '', 120);
+    if (!productId) {
+      productId = `p_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
+    }
+    const productRef = storeProductsV2Collection(placeId).doc(productId);
+    const previous = await productRef.get();
+    const previousVersion = previous.exists ? Number(previous.data()?.version || 1) : 0;
+    const nowMs = Date.now();
+    const product = {
+      name,
+      description: cleanLongText(source.description || '', 400),
+      category: cleanText(source.category || '熱門', 60),
+      basePrice: Math.max(0, Math.round(Number(source.basePrice))),
+      imageUrl: cleanText(source.imageUrl || '', 500),
+      enabled: source.enabled !== false,
+      soldOut: source.soldOut === true,
+      sortWeight: Number.isFinite(Number(source.sortWeight)) ? Number(source.sortWeight) : 0,
+      optionGroups,
+      version: previousVersion + 1,
+      updatedAtMs: nowMs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      dataVersion: 2,
+    };
+    await productRef.set(product, { merge: true });
+
+    const directoryUpdate = {
+      purchaseEnabled: true,
+      catalogEnabled: true,
+      catalogUpdatedAtMs: nowMs,
+      catalogUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    const adminStoreName = cleanText(storeInput.name || '', 120);
+    const adminStoreCategory = cleanText(storeInput.category || '', 60);
+    if (adminStoreName) directoryUpdate.customName = adminStoreName;
+    if (adminStoreCategory) directoryUpdate.customCategory = adminStoreCategory;
+    await db.collection(UBEE_STORE_DIRECTORY_COLLECTION).doc(placeId).set(
+      directoryUpdate,
+      { merge: true }
+    );
+
+    return res.json({ success: true, product: storeV2PublicProduct(storeV2NormalizeProduct(product, productId)) });
+  } catch (error) {
+    console.error('❌ Store V2 商品儲存失敗：', error);
+    return res.status(error.statusCode || 500).json({ success: false, error: error.message || '商品儲存失敗。' });
+  }
+});
+
+app.post('/api/admin/store-v2/product/:productId/status', requireRiderV4AdminKey, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const placeId = cleanText(req.body?.placeId || '', 200);
+    const productId = storeV2SafeId(req.params.productId || '', 120);
+    if (!placeId || !productId) return res.status(400).json({ success: false, error: '缺少店家或商品識別資料。' });
+    const update = {
+      updatedAtMs: Date.now(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (typeof req.body?.enabled === 'boolean') update.enabled = req.body.enabled;
+    if (typeof req.body?.soldOut === 'boolean') update.soldOut = req.body.soldOut;
+    await storeProductsV2Collection(placeId).doc(productId).set(update, { merge: true });
+    return res.json({ success: true, productId, ...update });
+  } catch (error) {
+    console.error('❌ Store V2 商品狀態更新失敗：', error);
+    return res.status(500).json({ success: false, error: '商品狀態更新失敗。' });
   }
 });
 
