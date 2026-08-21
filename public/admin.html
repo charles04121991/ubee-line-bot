@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-08-21 Store Purchase V2：新增店家商品／動態規格管理，沿用既有高權限 V4 管理金鑰。 -->
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -164,6 +165,7 @@ summary::-webkit-details-marker{display:none}
     <button class="tab" data-view="history">結算紀錄</button>
     <button class="tab" data-view="ledger">訂單財務</button>
     <button class="tab" data-view="riders">小U V4 資格</button>
+    <button class="tab" data-view="stores">店家商品 V2</button>
   </nav>
 
   <section class="kpis">
@@ -278,6 +280,42 @@ summary::-webkit-details-marker{display:none}
           <div class="v4-admin-note">此頁為高權限管理功能。請在 Render 設定 <b>UBEE_RIDER_V4_ADMIN_KEY</b>；瀏覽器只會把管理金鑰保存在目前分頁的 sessionStorage。</div>
           <div class="v4-key-row"><input id="v4AdminKey" type="password" placeholder="輸入 V4 管理金鑰"><button class="btn primary" onclick="saveV4AdminKey()">套用金鑰</button></div>
           <div id="v4RiderList" class="v4-rider-grid"><div class="empty">輸入管理金鑰後即可讀取小U資格。</div></div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="view" id="view-stores">
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">店家商品 V2</div><div class="panel-sub">建立客人端可直接選擇的商品、價格與動態規格。所有修改使用既有 V4 管理金鑰保護。</div></div>
+          <button class="btn small" type="button" onclick="storeV2LoadCatalog()">重新讀取</button>
+        </div>
+        <div class="panel-body">
+          <div class="v4-admin-note"><strong>正式規則：</strong>Place ID 必須與客人端店家一致；商品參考價格必填。甜度、冰量、尺寸、辣度、加料等一律放在「規格群組」，不要寫死欄位。</div>
+          <div class="v4-key-row"><input id="storeV2AdminKey" type="password" placeholder="輸入 V4 管理金鑰"><button class="btn primary" type="button" onclick="storeV2UseAdminKey()">套用金鑰</button></div>
+          <div class="flow-grid" style="margin-top:12px">
+            <div class="flow-card">
+              <div class="flow-title">店家</div>
+              <label>Place ID</label><input id="storeV2PlaceId" placeholder="Google Place ID 或 local:...">
+              <label>店家名稱</label><input id="storeV2StoreName" placeholder="例如：50嵐 豐原店">
+              <label>店家地址</label><input id="storeV2StoreAddress" placeholder="完整地址">
+              <label>分類</label><input id="storeV2StoreCategory" placeholder="drink / food / dessert / pharmacy...">
+              <button class="btn yellow" type="button" style="margin-top:12px" onclick="storeV2LoadCatalog()">讀取此店商品</button>
+            </div>
+            <div class="flow-card">
+              <div class="flow-title">商品</div>
+              <input id="storeV2ProductId" type="hidden">
+              <label>商品名稱</label><input id="storeV2ProductName" placeholder="例如：珍珠奶茶">
+              <label>參考價格</label><input id="storeV2BasePrice" type="number" min="0" step="1" placeholder="65">
+              <label>商品分類</label><input id="storeV2ProductCategory" placeholder="熱門 / 奶茶 / 茶類">
+              <label>商品說明</label><input id="storeV2ProductDescription" placeholder="簡短說明，可留空">
+              <label>規格群組 JSON</label><textarea id="storeV2OptionGroups" style="width:100%;min-height:210px;padding:12px;border:1px solid var(--line);border-radius:12px;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace" spellcheck="false"></textarea>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px"><label style="display:flex;align-items:center;gap:6px"><input id="storeV2Enabled" type="checkbox" checked style="width:auto">上架</label><label style="display:flex;align-items:center;gap:6px"><input id="storeV2SoldOut" type="checkbox" style="width:auto">售完</label></div>
+              <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" type="button" onclick="storeV2SaveProduct()">儲存商品</button><button class="btn" type="button" onclick="storeV2ResetProductForm()">清空</button></div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:14px;box-shadow:none"><div class="panel-head"><div><div class="panel-title">目前商品</div><div class="panel-sub" id="storeV2CatalogMeta">尚未讀取</div></div></div><div class="panel-body"><div id="storeV2ProductList" class="rider-list"><div class="empty">輸入店家 Place ID 後讀取商品。</div></div></div></div>
         </div>
       </div>
     </section>
@@ -695,5 +733,28 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 refreshAll(false);
 </script>
+<script id="ubee-admin-store-v2-script">
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const sample=[
+    {id:'size',name:'尺寸',type:'single',required:true,options:[{id:'medium',name:'中杯',priceDelta:0},{id:'large',name:'大杯',priceDelta:10}]},
+    {id:'sweetness',name:'甜度',type:'single',required:true,options:[{id:'normal',name:'正常糖',priceDelta:0},{id:'half',name:'半糖',priceDelta:0},{id:'light',name:'微糖',priceDelta:0},{id:'none',name:'無糖',priceDelta:0}]},
+    {id:'ice',name:'冰量',type:'single',required:true,options:[{id:'normal',name:'正常冰',priceDelta:0},{id:'less',name:'少冰',priceDelta:0},{id:'light',name:'微冰',priceDelta:0},{id:'none',name:'去冰',priceDelta:0}]}
+  ];
+  const catalogState={products:[]};
+  function storeV2UseAdminKey(){const value=String($('storeV2AdminKey')?.value||'').trim();if(!value){alert('請輸入管理金鑰。');return}sessionStorage.setItem('ubee_rider_v4_admin_key',value);if($('v4AdminKey'))$('v4AdminKey').value=value;showToast('店家商品管理金鑰已套用');}
+  function storeV2ResetProductForm(){if($('storeV2ProductId'))$('storeV2ProductId').value='';if($('storeV2ProductName'))$('storeV2ProductName').value='';if($('storeV2BasePrice'))$('storeV2BasePrice').value='';if($('storeV2ProductCategory'))$('storeV2ProductCategory').value='熱門';if($('storeV2ProductDescription'))$('storeV2ProductDescription').value='';if($('storeV2Enabled'))$('storeV2Enabled').checked=true;if($('storeV2SoldOut'))$('storeV2SoldOut').checked=false;if($('storeV2OptionGroups'))$('storeV2OptionGroups').value=JSON.stringify(sample,null,2);}
+  function storeV2ReadGroups(){const raw=String($('storeV2OptionGroups')?.value||'[]').trim()||'[]';let value;try{value=JSON.parse(raw)}catch(error){throw new Error('規格群組 JSON 格式錯誤：'+error.message)}if(!Array.isArray(value))throw new Error('規格群組必須是 JSON 陣列。');return value;}
+  async function storeV2LoadCatalog(){try{const placeId=String($('storeV2PlaceId')?.value||'').trim();if(!placeId){alert('請輸入 Place ID。');return}const data=await v4AdminFetch(`/api/admin/store-v2/catalog?placeId=${encodeURIComponent(placeId)}`);catalogState.products=Array.isArray(data.products)?data.products:[];const store=data.store||{};if(!$('storeV2StoreName').value)$('storeV2StoreName').value=store.customName||store.name||'';if(!$('storeV2StoreCategory').value)$('storeV2StoreCategory').value=store.customCategory||store.category||'';renderStoreV2Products();$('storeV2CatalogMeta').textContent=`${catalogState.products.length} 項商品・${placeId}`;showToast('商品目錄已更新')}catch(error){alert(error.message||'商品目錄讀取失敗。')}}
+  function renderStoreV2Products(){const list=$('storeV2ProductList');if(!list)return;list.innerHTML=catalogState.products.length?catalogState.products.map((p,index)=>`<div class="rider-card"><div class="rider-head"><div><div class="rider-name">${esc(p.name)}</div><div class="rider-meta">${esc(p.category||'未分類')}・${money(p.basePrice)}・版本 ${esc(p.version||1)}<br>${esc((p.optionGroups||[]).map(g=>g.name).join(' / ')||'無規格')}</div></div><div class="rider-total"><strong class="${p.soldOut?'red':'green'}">${p.soldOut?'售完':p.enabled?'上架':'下架'}</strong></div></div><div class="rider-actions"><button class="btn small" onclick="storeV2EditProduct(${index})">編輯</button><button class="btn small ${p.soldOut?'yellow':'red'}" onclick="storeV2SetStatus('${esc(p.productId)}',{soldOut:${!p.soldOut}})">${p.soldOut?'恢復供應':'設為售完'}</button><button class="btn small" onclick="storeV2SetStatus('${esc(p.productId)}',{enabled:${!p.enabled}})">${p.enabled?'下架':'重新上架'}</button></div></div>`).join(''):'<div class="empty">此店目前尚未建立商品。</div>';}
+  function storeV2EditProduct(index){const p=catalogState.products[Number(index)];if(!p)return;$('storeV2ProductId').value=p.productId||'';$('storeV2ProductName').value=p.name||'';$('storeV2BasePrice').value=Number(p.basePrice||0);$('storeV2ProductCategory').value=p.category||'熱門';$('storeV2ProductDescription').value=p.description||'';$('storeV2Enabled').checked=p.enabled!==false;$('storeV2SoldOut').checked=p.soldOut===true;$('storeV2OptionGroups').value=JSON.stringify(p.optionGroups||[],null,2);$('storeV2ProductName').scrollIntoView({behavior:'smooth',block:'center'});}
+  async function storeV2SaveProduct(){try{const placeId=String($('storeV2PlaceId')?.value||'').trim(),name=String($('storeV2ProductName')?.value||'').trim(),basePrice=Number($('storeV2BasePrice')?.value);if(!placeId)throw new Error('請輸入 Place ID。');if(!name)throw new Error('請輸入商品名稱。');if(!Number.isFinite(basePrice)||basePrice<0)throw new Error('請輸入有效參考價格。');await v4AdminFetch('/api/admin/store-v2/product',{method:'POST',body:JSON.stringify({placeId,store:{placeId,name:String($('storeV2StoreName')?.value||'').trim(),address:String($('storeV2StoreAddress')?.value||'').trim(),category:String($('storeV2StoreCategory')?.value||'').trim()},product:{productId:String($('storeV2ProductId')?.value||'').trim(),name,basePrice,category:String($('storeV2ProductCategory')?.value||'熱門').trim(),description:String($('storeV2ProductDescription')?.value||'').trim(),enabled:$('storeV2Enabled')?.checked!==false,soldOut:$('storeV2SoldOut')?.checked===true,optionGroups:storeV2ReadGroups()}})});showToast('商品已儲存');storeV2ResetProductForm();await storeV2LoadCatalog()}catch(error){alert(error.message||'商品儲存失敗。')}}
+  async function storeV2SetStatus(productId,update){try{const placeId=String($('storeV2PlaceId')?.value||'').trim();await v4AdminFetch(`/api/admin/store-v2/product/${encodeURIComponent(productId)}/status`,{method:'POST',body:JSON.stringify({placeId,...update})});await storeV2LoadCatalog()}catch(error){alert(error.message||'商品狀態更新失敗。')}}
+  window.storeV2UseAdminKey=storeV2UseAdminKey;window.storeV2LoadCatalog=storeV2LoadCatalog;window.storeV2ResetProductForm=storeV2ResetProductForm;window.storeV2SaveProduct=storeV2SaveProduct;window.storeV2EditProduct=storeV2EditProduct;window.storeV2SetStatus=storeV2SetStatus;
+  window.addEventListener('DOMContentLoaded',()=>{const saved=sessionStorage.getItem('ubee_rider_v4_admin_key')||'';if($('storeV2AdminKey'))$('storeV2AdminKey').value=saved;storeV2ResetProductForm()});
+})();
+</script>
+
 </body>
 </html>
