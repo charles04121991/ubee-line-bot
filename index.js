@@ -31484,7 +31484,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
       customerPayableTotal: order.customerPayableTotal,
       advancePayment: order.advancePayment,
       message: '訂單已建立，請確認使用現金單。',
-      apiVersion: 'customer-order-v4-store-v2',
+      apiVersion: 'customer-order-v4-store-v3',
       addressCenterVersion: order.addressCenterVersion || '',
     });
   } catch (error) {
@@ -38185,6 +38185,7 @@ function storeV2PurchaseSnapshotFromOrder(order = {}) {
       schemaVersion: String(existing.schemaVersion || UBEE_STORE_PRODUCT_V2.schemaVersion),
       store: storeV2SanitizeStoreSnapshot(existing.store || order.storeDiscovery || order),
       items: existing.items.slice(0, UBEE_STORE_PRODUCT_V2.maxCartItems).map(item => ({
+        manual: item?.manual === true || String(item?.catalogSource || '').trim().toLowerCase() === 'manual',
         productId: storeV2SafeId(item?.productId || '', 120),
         productName: cleanText(item?.productName || item?.name || '', 120),
         productVersion: Math.max(1, Math.round(Number(item?.productVersion || 1))),
@@ -38513,10 +38514,12 @@ async function validatePurchaseCartV2ForOrder(rawCart, verifiedStoreDiscovery) {
   }
 
   const requestedProductIds = [...new Set(cartItems
+    .filter(item => item?.manual !== true)
     .map(item => storeV2SafeId(item?.productId || '', 120))
     .filter(Boolean))];
-  if (!requestedProductIds.length) {
-    return { ok: false, statusCode: 400, code: 'STORE_V2_PRODUCT_REQUIRED', message: '代買商品資料不完整，請重新選擇商品。' };
+  const hasManualItems = cartItems.some(item => item?.manual === true);
+  if (!requestedProductIds.length && !hasManualItems) {
+    return { ok: false, statusCode: 400, code: 'STORE_V3_PRODUCT_REQUIRED', message: '代買商品資料不完整，請重新選擇商品。' };
   }
 
   // Store V3：品牌共用 Catalog、分店覆寫與單店商品全部先解析成有效商品表。
@@ -38533,6 +38536,49 @@ async function validatePurchaseCartV2ForOrder(rawCart, verifiedStoreDiscovery) {
 
   for (let index = 0; index < cartItems.length; index += 1) {
     const rawItem = cartItems[index] && typeof cartItems[index] === 'object' ? cartItems[index] : {};
+    const isManualItem = rawItem.manual === true;
+    if (isManualItem) {
+      const productName = cleanText(rawItem.productName || rawItem.name || '', 120);
+      if (!productName) {
+        return { ok: false, statusCode: 400, code: 'STORE_V3_MANUAL_NAME_REQUIRED', message: `第 ${index + 1} 項商品請填寫商品名稱。` };
+      }
+      const quantity = Math.max(1, Math.min(
+        UBEE_STORE_PRODUCT_V2.maxItemQuantity,
+        Math.round(Number(rawItem.quantity || 1))
+      ));
+      totalQuantity += quantity;
+      if (totalQuantity > UBEE_STORE_PRODUCT_V2.maxTotalQuantity) {
+        return { ok: false, statusCode: 400, code: 'STORE_V3_QUANTITY_LIMIT', message: `單筆代買清單最多 ${UBEE_STORE_PRODUCT_V2.maxTotalQuantity} 件商品。` };
+      }
+      const specification = cleanLongText(rawItem.specificationText || rawItem.specification || rawItem.spec || '', 300);
+      const note = cleanLongText(rawItem.note || '', 180);
+      const budgetTotalRaw = Number(rawItem.lineEstimatedTotal ?? rawItem.budget ?? 0);
+      if (!Number.isFinite(budgetTotalRaw) || budgetTotalRaw <= 0) {
+        return { ok: false, statusCode: 400, code: 'STORE_V3_MANUAL_BUDGET_REQUIRED', message: `${productName} 請填寫商品預算／預估總金額。` };
+      }
+      const lineEstimatedTotal = Math.round(budgetTotalRaw);
+      estimatedGoodsAmount += lineEstimatedTotal;
+      snapshotItems.push({
+        manual: true,
+        productId: '',
+        productName,
+        productVersion: 1,
+        catalogSource: 'manual',
+        brandId: '',
+        brandProductId: '',
+        storeOverride: false,
+        unitPrice: lineEstimatedTotal > 0 ? Math.round(lineEstimatedTotal / quantity) : null,
+        quantity,
+        selections: [],
+        specification,
+        note,
+        outOfStockAction: normalizePurchaseOutOfStockAction(rawItem.outOfStockAction || rawItem.replacementPolicy),
+        unitEstimatedTotal: lineEstimatedTotal > 0 ? Math.round(lineEstimatedTotal / quantity) : null,
+        lineEstimatedTotal,
+      });
+      continue;
+    }
+
     const productId = storeV2SafeId(rawItem.productId || '', 120);
     const product = products.get(productId);
     if (!product || product.enabled !== true) {
@@ -38598,6 +38644,7 @@ async function validatePurchaseCartV2ForOrder(rawCart, verifiedStoreDiscovery) {
     if (freeSpecification) groupedSpec.push(freeSpecification);
 
     snapshotItems.push({
+      manual: false,
       productId: product.productId,
       productName: product.name,
       productVersion: product.version,
@@ -38710,7 +38757,7 @@ async function storeV2BuildReorderPreview(order, customerId) {
     return { ok: false, statusCode: 409, code: 'REORDER_NOT_PURCHASE', message: '此訂單沒有可再次代買的商品資料。' };
   }
 
-  if (![UBEE_STORE_PRODUCT_V2.schemaVersion, UBEE_STORE_PRODUCT_V3.schemaVersion].includes(snapshot.schemaVersion) || snapshot.items.some(item => !item.productId)) {
+  if (![UBEE_STORE_PRODUCT_V2.schemaVersion, UBEE_STORE_PRODUCT_V3.schemaVersion].includes(snapshot.schemaVersion) || snapshot.items.some(item => !item.productId && item.manual !== true)) {
     return {
       ok: true,
       mode: 'legacy',
@@ -38729,6 +38776,22 @@ async function storeV2BuildReorderPreview(order, customerId) {
   let estimatedGoodsAmount = 0;
 
   for (const oldItem of snapshot.items) {
+    if (oldItem.manual === true) {
+      const quantity = Math.max(1, Math.min(UBEE_STORE_PRODUCT_V2.maxItemQuantity, Number(oldItem.quantity || 1)));
+      const lineEstimatedTotal = Number.isFinite(Number(oldItem.lineEstimatedTotal)) ? Math.max(0, Math.round(Number(oldItem.lineEstimatedTotal))) : 0;
+      estimatedGoodsAmount += lineEstimatedTotal;
+      cartItems.push({
+        manual: true,
+        productName: oldItem.productName || '自訂商品',
+        quantity,
+        specificationText: oldItem.specification || '',
+        note: oldItem.note || '',
+        outOfStockAction: oldItem.outOfStockAction || 'contact_customer',
+        lineEstimatedTotal,
+        needsReview: false,
+      });
+      continue;
+    }
     const product = productMap.get(oldItem.productId);
     if (!product || product.enabled !== true || product.soldOut === true) {
       unavailableItems.push({
@@ -38794,7 +38857,7 @@ async function storeV2BuildReorderPreview(order, customerId) {
     mode: 'catalog',
     store: snapshot.store,
     purchaseCartV2: {
-      schemaVersion: UBEE_STORE_PRODUCT_V2.schemaVersion,
+      schemaVersion: UBEE_STORE_PRODUCT_V3.schemaVersion,
       storePlaceId: snapshot.store.placeId,
       items: cartItems,
     },
@@ -39471,20 +39534,79 @@ app.delete('/api/admin/store-v3/store/:placeId/override/:productId', requireRide
   } catch(error){return res.status(500).json({success:false,error:'清除分店覆寫失敗。'});}
 });
 
+async function storeV3LoadDiscoveryStores({ limit = 60 } = {}) {
+  const safeLimit = Math.max(12, Math.min(100, Number(limit || 60)));
+  try {
+    const snapshot = await db.collection(UBEE_STORE_DIRECTORY_COLLECTION).limit(safeLimit).get();
+    return snapshot.docs
+      .map(doc => {
+        const data = doc.data() || {};
+        if (data.hidden === true || data.purchaseEnabled === false) return null;
+        const name = cleanText(data.customName || data.name || data.storeName || '', 120);
+        const address = cleanText(data.address || data.formattedAddress || data.storeAddress || '', 180);
+        if (!name) return null;
+        return storeV2SanitizeStoreSnapshot({
+          placeId: doc.id,
+          name,
+          address,
+          category: data.customCategory || data.category || data.storeCategory || 'other',
+          typeLabel: data.typeLabel || '',
+          phone: data.phone || data.storePhone || '',
+          photoUrl: data.customCoverUrl || data.photoUrl || data.coverImage || '',
+          source: String(doc.id || '').startsWith('local:') ? 'local' : 'google_places',
+          brandId: data.brandIdV3 || data.brandId || '',
+          brandName: data.brandName || '',
+          catalogMode: data.catalogModeV3 || data.catalogMode || '',
+          catalogSource: data.catalogSource || '',
+        });
+      })
+      .filter(Boolean)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant'));
+  } catch (error) {
+    console.warn('⚠️ Store V3 探索店家讀取失敗：', error.message || error);
+    return [];
+  }
+}
+
+function storeV3MergeDiscoveryStores(...groups) {
+  const map = new Map();
+  for (const group of groups) {
+    for (const candidate of Array.isArray(group) ? group : []) {
+      const store = storeV2SanitizeStoreSnapshot(candidate?.store || candidate || {});
+      const key = store.placeId || `${store.name}|${store.address}`;
+      if (!key || !store.name) continue;
+      if (!map.has(key)) map.set(key, store);
+    }
+  }
+  return [...map.values()].slice(0, 80);
+}
+
 app.get('/api/customer/store-home', requireCustomerAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   try {
     const customerId = req.customerAuth.customerId;
-    const [favorites, orders, popular] = await Promise.all([
+    const [favorites, orders, popular, directoryStores] = await Promise.all([
       storeV2LoadFavorites(customerId),
       storeV2LoadCustomerCompletedPurchases(customerId),
       storeV2LoadPopularProducts({ limit: 12 }),
+      storeV3LoadDiscoveryStores({ limit: 80 }),
     ]);
     const recent = orders
       .map(order => storeV2CompactPurchaseSummary(order))
       .filter(Boolean)
       .slice(0, 12);
     const frequent = storeV2BuildFrequentPurchases(orders);
+    const popularStores = popular.map(row => ({
+      placeId: row.storePlaceId, name: row.storeName, address: row.storeAddress, category: row.storeCategory, source: 'google_places'
+    }));
+    const discovery = storeV3MergeDiscoveryStores(
+      directoryStores,
+      favorites.map(row => row.store),
+      recent.map(row => row.store),
+      frequent.map(row => row.store),
+      popularStores
+    );
+    const categories = [...new Set(discovery.map(store => store.category).filter(Boolean))].slice(0, 20);
     return res.json({
       success: true,
       version: UBEE_STORE_PRODUCT_V3.schemaVersion,
@@ -39492,10 +39614,13 @@ app.get('/api/customer/store-home', requireCustomerAuth, async (req, res) => {
       recent,
       frequent,
       popular,
+      discovery,
+      categories,
+      discoveryAlwaysAvailable: true,
     });
   } catch (error) {
-    console.error('❌ Store V2 個人化首頁讀取失敗：', error);
-    return res.status(500).json({ success: false, error: '店家個人化資料暫時無法讀取。' });
+    console.error('❌ Store V3 商城首頁讀取失敗：', error);
+    return res.status(500).json({ success: false, error: '店家商城首頁資料暫時無法讀取。' });
   }
 });
 
