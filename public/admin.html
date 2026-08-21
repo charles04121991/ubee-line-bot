@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<!-- 2026-08-21 Store Purchase V2：新增店家商品／動態規格管理，沿用既有高權限 V4 管理金鑰。 -->
+<!-- 2026-08-21 Store V3｜商城管理：品牌 Catalog、分店繼承／覆寫、單店商品與動態規格，沿用既有高權限 V4 管理金鑰。 -->
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -142,6 +142,40 @@ summary::-webkit-details-marker{display:none}
 @media(max-width:1050px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.content-grid{grid-template-columns:1fr}}
 @media(max-width:700px){.app{padding:14px 12px 70px}.topbar{flex-direction:column}.top-actions{width:100%;justify-content:flex-start}.kpis{grid-template-columns:1fr 1fr}.flow-grid{grid-template-columns:1fr}.summary-row{grid-template-columns:1fr}.rider-head{flex-direction:column}.rider-total{text-align:left}.toolbar{align-items:stretch}.search{min-width:0;width:100%}}
 @media(max-width:430px){.kpis{grid-template-columns:1fr}.brand{font-size:25px}.kpi-value{font-size:25px}.history-item{grid-template-columns:auto 1fr}.history-amount{grid-column:2;text-align:left}}
+.store-v3-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+.store-v3-box{border:1px solid var(--line);border-radius:17px;background:#fff;padding:14px;min-width:0}
+.store-v3-box-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.store-v3-box-head strong{display:block;font-size:15px;font-weight:1000}
+.store-v3-box-head span{display:block;margin-top:4px;color:var(--muted);font-size:11px;font-weight:800;line-height:1.5}
+.store-v3-box label{display:block;margin:10px 0 5px;color:#555d66;font-size:11px;font-weight:950}
+.store-v3-box input,.store-v3-box select,.store-v3-box textarea{width:100%;border:1px solid var(--line);border-radius:11px;background:#fff;padding:9px 10px;outline:none;font-size:13px;font-weight:800;color:#111}
+.store-v3-search-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+.store-v3-results{display:grid;gap:8px;margin-top:11px;max-height:320px;overflow:auto}
+.store-v3-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:13px;padding:11px;background:#fafbfc}
+.store-v3-result strong{display:block;font-size:13px;font-weight:1000}
+.store-v3-result span{display:block;margin-top:4px;color:var(--muted);font-size:10px;font-weight:800;line-height:1.5}
+.store-v3-selected{margin-top:12px;padding:12px;border:1px solid #efd66b;border-radius:14px;background:#fffbea}
+.store-v3-selected strong{font-size:14px;font-weight:1000}
+.store-v3-selected span{display:block;margin-top:4px;font-size:10px;color:#6f6650;font-weight:800;line-height:1.5;word-break:break-all}
+.store-v3-brand-form{margin-top:10px;padding:10px;border-radius:13px;background:#f8f9fa;border:1px solid var(--line)}
+.store-v3-sep{border:0;border-top:1px solid var(--line);margin:14px 0}
+.store-v3-status{margin-top:8px;padding:9px 10px;border-radius:11px;background:#f6f7f8;color:#686f78;font-size:10px;font-weight:850;line-height:1.55}
+.store-v3-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.store-v3-json{min-height:230px!important;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace!important;font-weight:500!important}
+.store-v3-checks{display:flex;gap:13px;flex-wrap:wrap;margin-top:10px}
+.store-v3-checks label{display:flex;align-items:center;gap:6px;margin:0;font-size:11px}
+.store-v3-checks input{width:auto}
+.store-v3-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.store-v3-products{display:grid;gap:9px;max-height:740px;overflow:auto}
+.store-v3-product-card{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fff}
+.store-v3-product-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.store-v3-product-card strong{display:block;font-size:14px;font-weight:1000}
+.store-v3-product-card span{display:block;margin-top:4px;font-size:10px;color:var(--muted);font-weight:800;line-height:1.5}
+.store-v3-source{display:inline-flex!important;padding:4px 7px;border-radius:999px;background:#f2f3f5;color:#5b6068!important;font-size:9px!important;font-weight:1000!important;margin:0!important;white-space:nowrap}
+.store-v3-source.brand{background:#fff7cf;color:#765d00!important}.store-v3-source.store{background:#eaf2ff;color:#245ebd!important}.store-v3-source.override{background:#ecf8f1;color:#197a4d!important}
+.store-v3-product-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+@media(max-width:900px){.store-v3-layout{grid-template-columns:1fr}.store-v3-search-row{grid-template-columns:1fr}.store-v3-products{max-height:none}}
+
 </style>
 </head>
 <body>
@@ -165,7 +199,7 @@ summary::-webkit-details-marker{display:none}
     <button class="tab" data-view="history">結算紀錄</button>
     <button class="tab" data-view="ledger">訂單財務</button>
     <button class="tab" data-view="riders">小U V4 資格</button>
-    <button class="tab" data-view="stores">店家商品 V2</button>
+    <button class="tab" data-view="stores">Store V3 商城</button>
   </nav>
 
   <section class="kpis">
@@ -283,42 +317,70 @@ summary::-webkit-details-marker{display:none}
         </div>
       </div>
     </section>
-
-
     <section class="view" id="view-stores">
       <div class="panel">
         <div class="panel-head">
-          <div><div class="panel-title">店家商品 V2</div><div class="panel-sub">建立客人端可直接選擇的商品、價格與動態規格。所有修改使用既有 V4 管理金鑰保護。</div></div>
-          <button class="btn small" type="button" onclick="storeV2LoadCatalog()">重新讀取</button>
+          <div><div class="panel-title">Store V3｜商城管理</div><div class="panel-sub">搜尋分店、綁定品牌共用菜單、建立單店商品與分店覆寫。客人端所有店家共用同一套商城流程。</div></div>
+          <button class="btn small" type="button" onclick="storeV3RefreshSelectedStore()">重新讀取</button>
         </div>
         <div class="panel-body">
-          <div class="v4-admin-note"><strong>正式規則：</strong>Place ID 必須與客人端店家一致；商品參考價格必填。甜度、冰量、尺寸、辣度、加料等一律放在「規格群組」，不要寫死欄位。</div>
-          <div class="v4-key-row"><input id="storeV2AdminKey" type="password" placeholder="輸入 V4 管理金鑰"><button class="btn primary" type="button" onclick="storeV2UseAdminKey()">套用金鑰</button></div>
-          <div class="flow-grid" style="margin-top:12px">
-            <div class="flow-card">
-              <div class="flow-title">店家</div>
-              <label>Place ID</label><input id="storeV2PlaceId" placeholder="Google Place ID 或 local:...">
-              <label>店家名稱</label><input id="storeV2StoreName" placeholder="例如：50嵐 豐原店">
-              <label>店家地址</label><input id="storeV2StoreAddress" placeholder="完整地址">
-              <label>分類</label><input id="storeV2StoreCategory" placeholder="drink / food / dessert / pharmacy...">
-              <button class="btn yellow" type="button" style="margin-top:12px" onclick="storeV2LoadCatalog()">讀取此店商品</button>
-            </div>
-            <div class="flow-card">
-              <div class="flow-title">商品</div>
-              <input id="storeV2ProductId" type="hidden">
-              <label>商品名稱</label><input id="storeV2ProductName" placeholder="例如：珍珠奶茶">
-              <label>參考價格</label><input id="storeV2BasePrice" type="number" min="0" step="1" placeholder="65">
-              <label>商品分類</label><input id="storeV2ProductCategory" placeholder="熱門 / 奶茶 / 茶類">
-              <label>商品說明</label><input id="storeV2ProductDescription" placeholder="簡短說明，可留空">
-              <label>規格群組 JSON</label><textarea id="storeV2OptionGroups" style="width:100%;min-height:210px;padding:12px;border:1px solid var(--line);border-radius:12px;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace" spellcheck="false"></textarea>
-              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px"><label style="display:flex;align-items:center;gap:6px"><input id="storeV2Enabled" type="checkbox" checked style="width:auto">上架</label><label style="display:flex;align-items:center;gap:6px"><input id="storeV2SoldOut" type="checkbox" style="width:auto">售完</label></div>
-              <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" type="button" onclick="storeV2SaveProduct()">儲存商品</button><button class="btn" type="button" onclick="storeV2ResetProductForm()">清空</button></div>
-            </div>
+          <div class="v4-admin-note"><strong>V3 原則：</strong>品牌菜單只建一次，多個分店可共用；分店可另外調整價格、售完、上下架與規格。獨立店家則直接使用單店 Catalog。Place ID 由搜尋結果自動帶入，不再要求日常人工查找。</div>
+          <div class="v4-key-row"><input id="storeV3AdminKey" type="password" placeholder="輸入 V4 管理金鑰"><button class="btn primary" type="button" onclick="storeV3UseAdminKey()">套用金鑰</button></div>
+
+          <div class="store-v3-layout" style="margin-top:14px">
+            <section class="store-v3-box">
+              <div class="store-v3-box-head"><div><strong>1. 搜尋並選擇店家</strong><span>直接搜尋店名與地區，系統自動取得正確 Place ID。</span></div></div>
+              <div class="store-v3-search-row"><input id="storeV3SearchQuery" placeholder="例如：十二韻"><input id="storeV3SearchArea" placeholder="例如：台中市豐原區"><button class="btn yellow" type="button" onclick="storeV3SearchStores()">搜尋店家</button></div>
+              <div id="storeV3SearchResults" class="store-v3-results"><div class="empty">先搜尋要管理的店家。</div></div>
+              <div id="storeV3SelectedStore" class="store-v3-selected" hidden></div>
+            </section>
+
+            <section class="store-v3-box">
+              <div class="store-v3-box-head"><div><strong>2. 品牌與分店綁定</strong><span>連鎖品牌用品牌 Catalog；獨立店家可維持單店 Catalog。</span></div><button class="btn small" type="button" onclick="storeV3NewBrand()">新增品牌</button></div>
+              <label>品牌</label><select id="storeV3BrandSelect" onchange="storeV3SelectBrand()"><option value="">不綁品牌／獨立店家</option></select>
+              <div class="store-v3-brand-form">
+                <input id="storeV3BrandId" type="hidden">
+                <label>品牌名稱</label><input id="storeV3BrandName" placeholder="例如：十二韻">
+                <label>品牌別名</label><input id="storeV3BrandAliases" placeholder="例如：十二韻, 十二韻茶飲">
+                <label>商品分類順序</label><input id="storeV3BrandCategories" placeholder="例如：熱門, 原茶, 奶茶, 鮮奶, 果茶">
+                <label>品牌說明</label><input id="storeV3BrandDescription" placeholder="可留空">
+                <label>品牌 Logo URL</label><input id="storeV3BrandLogo" placeholder="https://...">
+                <label>品牌封面 URL</label><input id="storeV3BrandCover" placeholder="https://...">
+                <button class="btn primary" type="button" style="margin-top:10px" onclick="storeV3SaveBrand()">儲存品牌</button>
+              </div>
+              <hr class="store-v3-sep">
+              <label>此分店 Catalog 模式</label>
+              <select id="storeV3CatalogMode"><option value="hybrid">品牌菜單＋分店自有商品</option><option value="brand">只使用品牌菜單</option><option value="store">只使用分店自己的商品</option></select>
+              <button class="btn blue" type="button" style="margin-top:10px" onclick="storeV3BindStore()">儲存分店綁定</button>
+              <div id="storeV3BindingStatus" class="store-v3-status">尚未選擇店家。</div>
+            </section>
           </div>
-          <div class="panel" style="margin-top:14px;box-shadow:none"><div class="panel-head"><div><div class="panel-title">目前商品</div><div class="panel-sub" id="storeV2CatalogMeta">尚未讀取</div></div></div><div class="panel-body"><div id="storeV2ProductList" class="rider-list"><div class="empty">輸入店家 Place ID 後讀取商品。</div></div></div></div>
+
+          <div class="store-v3-layout" style="margin-top:14px">
+            <section class="store-v3-box">
+              <div class="store-v3-box-head"><div><strong>3. 商品編輯器</strong><span>品牌商品會套用到所有綁定分店；分店商品只影響目前店家；覆寫只調整目前分店。</span></div></div>
+              <input id="storeV3ProductId" type="hidden">
+              <label>編輯層級</label><select id="storeV3ProductTarget" onchange="storeV3SyncProductTargetHint()"><option value="brand">品牌 Catalog</option><option value="store">此分店自有商品</option><option value="override">此分店覆寫品牌商品</option></select>
+              <div id="storeV3ProductTargetHint" class="store-v3-status"></div>
+              <label>商品名稱</label><input id="storeV3ProductName" placeholder="例如：珍珠奶茶">
+              <div class="store-v3-two"><div><label>參考價格</label><input id="storeV3BasePrice" type="number" min="0" step="1" placeholder="65"></div><div><label>排序</label><input id="storeV3SortWeight" type="number" step="1" value="0"></div></div>
+              <label>商品分類</label><input id="storeV3ProductCategory" placeholder="熱門 / 奶茶 / 茶類">
+              <label>商品說明</label><input id="storeV3ProductDescription" placeholder="簡短說明，可留空">
+              <label>商品圖片 URL</label><input id="storeV3ProductImage" placeholder="https://...">
+              <label>規格群組 JSON</label><textarea id="storeV3OptionGroups" class="store-v3-json" spellcheck="false"></textarea>
+              <div class="store-v3-checks"><label><input id="storeV3Enabled" type="checkbox" checked> 上架</label><label><input id="storeV3SoldOut" type="checkbox"> 售完</label><label id="storeV3HiddenWrap"><input id="storeV3Hidden" type="checkbox"> 此分店隱藏</label></div>
+              <div class="store-v3-actions"><button class="btn primary" type="button" onclick="storeV3SaveProduct()">儲存商品</button><button class="btn" type="button" onclick="storeV3ResetProductForm()">清空</button><button class="btn red" id="storeV3ClearOverrideBtn" type="button" onclick="storeV3ClearOverride()" hidden>清除分店覆寫</button></div>
+            </section>
+
+            <section class="store-v3-box">
+              <div class="store-v3-box-head"><div><strong>4. 目前有效商城</strong><span id="storeV3CatalogMeta">選擇店家後顯示。</span></div></div>
+              <div id="storeV3ProductList" class="store-v3-products"><div class="empty">尚未選擇店家。</div></div>
+            </section>
+          </div>
         </div>
       </div>
     </section>
+
   </main>
 </div>
 
@@ -733,26 +795,51 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 refreshAll(false);
 </script>
-<script id="ubee-admin-store-v2-script">
+<script id="ubee-admin-store-v3-script">
 (() => {
   'use strict';
+  if(window.__UBEE_ADMIN_STORE_V3__)return;
+  window.__UBEE_ADMIN_STORE_V3__=true;
   const $=id=>document.getElementById(id);
   const sample=[
     {id:'size',name:'尺寸',type:'single',required:true,options:[{id:'medium',name:'中杯',priceDelta:0},{id:'large',name:'大杯',priceDelta:10}]},
     {id:'sweetness',name:'甜度',type:'single',required:true,options:[{id:'normal',name:'正常糖',priceDelta:0},{id:'half',name:'半糖',priceDelta:0},{id:'light',name:'微糖',priceDelta:0},{id:'none',name:'無糖',priceDelta:0}]},
     {id:'ice',name:'冰量',type:'single',required:true,options:[{id:'normal',name:'正常冰',priceDelta:0},{id:'less',name:'少冰',priceDelta:0},{id:'light',name:'微冰',priceDelta:0},{id:'none',name:'去冰',priceDelta:0}]}
   ];
-  const catalogState={products:[]};
-  function storeV2UseAdminKey(){const value=String($('storeV2AdminKey')?.value||'').trim();if(!value){alert('請輸入管理金鑰。');return}sessionStorage.setItem('ubee_rider_v4_admin_key',value);if($('v4AdminKey'))$('v4AdminKey').value=value;showToast('店家商品管理金鑰已套用');}
-  function storeV2ResetProductForm(){if($('storeV2ProductId'))$('storeV2ProductId').value='';if($('storeV2ProductName'))$('storeV2ProductName').value='';if($('storeV2BasePrice'))$('storeV2BasePrice').value='';if($('storeV2ProductCategory'))$('storeV2ProductCategory').value='熱門';if($('storeV2ProductDescription'))$('storeV2ProductDescription').value='';if($('storeV2Enabled'))$('storeV2Enabled').checked=true;if($('storeV2SoldOut'))$('storeV2SoldOut').checked=false;if($('storeV2OptionGroups'))$('storeV2OptionGroups').value=JSON.stringify(sample,null,2);}
-  function storeV2ReadGroups(){const raw=String($('storeV2OptionGroups')?.value||'[]').trim()||'[]';let value;try{value=JSON.parse(raw)}catch(error){throw new Error('規格群組 JSON 格式錯誤：'+error.message)}if(!Array.isArray(value))throw new Error('規格群組必須是 JSON 陣列。');return value;}
-  async function storeV2LoadCatalog(){try{const placeId=String($('storeV2PlaceId')?.value||'').trim();if(!placeId){alert('請輸入 Place ID。');return}const data=await v4AdminFetch(`/api/admin/store-v2/catalog?placeId=${encodeURIComponent(placeId)}`);catalogState.products=Array.isArray(data.products)?data.products:[];const store=data.store||{};if(!$('storeV2StoreName').value)$('storeV2StoreName').value=store.customName||store.name||'';if(!$('storeV2StoreCategory').value)$('storeV2StoreCategory').value=store.customCategory||store.category||'';renderStoreV2Products();$('storeV2CatalogMeta').textContent=`${catalogState.products.length} 項商品・${placeId}`;showToast('商品目錄已更新')}catch(error){alert(error.message||'商品目錄讀取失敗。')}}
-  function renderStoreV2Products(){const list=$('storeV2ProductList');if(!list)return;list.innerHTML=catalogState.products.length?catalogState.products.map((p,index)=>`<div class="rider-card"><div class="rider-head"><div><div class="rider-name">${esc(p.name)}</div><div class="rider-meta">${esc(p.category||'未分類')}・${money(p.basePrice)}・版本 ${esc(p.version||1)}<br>${esc((p.optionGroups||[]).map(g=>g.name).join(' / ')||'無規格')}</div></div><div class="rider-total"><strong class="${p.soldOut?'red':'green'}">${p.soldOut?'售完':p.enabled?'上架':'下架'}</strong></div></div><div class="rider-actions"><button class="btn small" onclick="storeV2EditProduct(${index})">編輯</button><button class="btn small ${p.soldOut?'yellow':'red'}" onclick="storeV2SetStatus('${esc(p.productId)}',{soldOut:${!p.soldOut}})">${p.soldOut?'恢復供應':'設為售完'}</button><button class="btn small" onclick="storeV2SetStatus('${esc(p.productId)}',{enabled:${!p.enabled}})">${p.enabled?'下架':'重新上架'}</button></div></div>`).join(''):'<div class="empty">此店目前尚未建立商品。</div>';}
-  function storeV2EditProduct(index){const p=catalogState.products[Number(index)];if(!p)return;$('storeV2ProductId').value=p.productId||'';$('storeV2ProductName').value=p.name||'';$('storeV2BasePrice').value=Number(p.basePrice||0);$('storeV2ProductCategory').value=p.category||'熱門';$('storeV2ProductDescription').value=p.description||'';$('storeV2Enabled').checked=p.enabled!==false;$('storeV2SoldOut').checked=p.soldOut===true;$('storeV2OptionGroups').value=JSON.stringify(p.optionGroups||[],null,2);$('storeV2ProductName').scrollIntoView({behavior:'smooth',block:'center'});}
-  async function storeV2SaveProduct(){try{const placeId=String($('storeV2PlaceId')?.value||'').trim(),name=String($('storeV2ProductName')?.value||'').trim(),basePrice=Number($('storeV2BasePrice')?.value);if(!placeId)throw new Error('請輸入 Place ID。');if(!name)throw new Error('請輸入商品名稱。');if(!Number.isFinite(basePrice)||basePrice<0)throw new Error('請輸入有效參考價格。');await v4AdminFetch('/api/admin/store-v2/product',{method:'POST',body:JSON.stringify({placeId,store:{placeId,name:String($('storeV2StoreName')?.value||'').trim(),address:String($('storeV2StoreAddress')?.value||'').trim(),category:String($('storeV2StoreCategory')?.value||'').trim()},product:{productId:String($('storeV2ProductId')?.value||'').trim(),name,basePrice,category:String($('storeV2ProductCategory')?.value||'熱門').trim(),description:String($('storeV2ProductDescription')?.value||'').trim(),enabled:$('storeV2Enabled')?.checked!==false,soldOut:$('storeV2SoldOut')?.checked===true,optionGroups:storeV2ReadGroups()}})});showToast('商品已儲存');storeV2ResetProductForm();await storeV2LoadCatalog()}catch(error){alert(error.message||'商品儲存失敗。')}}
-  async function storeV2SetStatus(productId,update){try{const placeId=String($('storeV2PlaceId')?.value||'').trim();await v4AdminFetch(`/api/admin/store-v2/product/${encodeURIComponent(productId)}/status`,{method:'POST',body:JSON.stringify({placeId,...update})});await storeV2LoadCatalog()}catch(error){alert(error.message||'商品狀態更新失敗。')}}
-  window.storeV2UseAdminKey=storeV2UseAdminKey;window.storeV2LoadCatalog=storeV2LoadCatalog;window.storeV2ResetProductForm=storeV2ResetProductForm;window.storeV2SaveProduct=storeV2SaveProduct;window.storeV2EditProduct=storeV2EditProduct;window.storeV2SetStatus=storeV2SetStatus;
-  window.addEventListener('DOMContentLoaded',()=>{const saved=sessionStorage.getItem('ubee_rider_v4_admin_key')||'';if($('storeV2AdminKey'))$('storeV2AdminKey').value=saved;storeV2ResetProductForm()});
+  const sv3={stores:[],selectedStore:null,brands:[],selectedBrand:null,resolved:null,products:[]};
+  const clean=value=>String(value??'').trim();
+
+  function storeV3UseAdminKey(){const value=clean($('storeV3AdminKey')?.value);if(!value){alert('請輸入管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',value);if($('v4AdminKey'))$('v4AdminKey').value=value;showToast('Store V3 管理金鑰已套用');storeV3LoadBrands();}
+  function brandById(id){return sv3.brands.find(brand=>brand.brandId===id)||null;}
+  function renderBrandSelect(){const select=$('storeV3BrandSelect');if(!select)return;const current=select.value;select.innerHTML='<option value="">不綁品牌／獨立店家</option>'+sv3.brands.map(brand=>`<option value="${esc(brand.brandId)}">${esc(brand.name)}</option>`).join('');if(sv3.selectedBrand?.brandId)select.value=sv3.selectedBrand.brandId;else if(current&&brandById(current))select.value=current;}
+  async function storeV3LoadBrands(){try{const data=await v4AdminFetch('/api/admin/store-v3/brands');sv3.brands=Array.isArray(data.brands)?data.brands:[];renderBrandSelect();return sv3.brands;}catch(error){console.warn('品牌清單讀取失敗',error);return sv3.brands;}}
+  function storeV3NewBrand(){sv3.selectedBrand=null;$('storeV3BrandSelect').value='';['storeV3BrandId','storeV3BrandName','storeV3BrandAliases','storeV3BrandCategories','storeV3BrandDescription','storeV3BrandLogo','storeV3BrandCover'].forEach(id=>{if($(id))$(id).value='';});storeV3SyncProductTargetHint();}
+  function storeV3SelectBrand(){const brand=brandById($('storeV3BrandSelect')?.value||'');sv3.selectedBrand=brand;if(!brand){storeV3NewBrand();return;}$('storeV3BrandId').value=brand.brandId||'';$('storeV3BrandName').value=brand.name||'';$('storeV3BrandAliases').value=(brand.aliases||[]).join(', ');$('storeV3BrandCategories').value=(brand.categoryOrder||[]).join(', ');$('storeV3BrandDescription').value=brand.description||'';$('storeV3BrandLogo').value=brand.logoUrl||'';$('storeV3BrandCover').value=brand.coverUrl||'';storeV3SyncProductTargetHint();}
+  async function storeV3SaveBrand(){try{const name=clean($('storeV3BrandName')?.value);if(!name)throw new Error('請輸入品牌名稱。');const payload={brand:{brandId:clean($('storeV3BrandId')?.value),name,aliases:clean($('storeV3BrandAliases')?.value).split(/[，,]/).map(clean).filter(Boolean),categoryOrder:clean($('storeV3BrandCategories')?.value).split(/[，,]/).map(clean).filter(Boolean),description:clean($('storeV3BrandDescription')?.value),logoUrl:clean($('storeV3BrandLogo')?.value),coverUrl:clean($('storeV3BrandCover')?.value),enabled:true}};const data=await v4AdminFetch('/api/admin/store-v3/brand',{method:'POST',body:JSON.stringify(payload)});await storeV3LoadBrands();sv3.selectedBrand=data.brand||brandById(data.brand?.brandId);renderBrandSelect();if(data.brand?.brandId)$('storeV3BrandSelect').value=data.brand.brandId;storeV3SelectBrand();showToast('品牌已儲存');}catch(error){alert(error.message||'品牌儲存失敗。');}}
+
+  async function storeV3SearchStores(){try{const q=clean($('storeV3SearchQuery')?.value),area=clean($('storeV3SearchArea')?.value);if(!q)throw new Error('請輸入店家名稱。');$('storeV3SearchResults').innerHTML='<div class="empty">正在搜尋店家…</div>';const data=await v4AdminFetch(`/api/admin/store-v3/search-stores?q=${encodeURIComponent(q)}&area=${encodeURIComponent(area)}`);sv3.stores=Array.isArray(data.stores)?data.stores:[];renderStoreV3SearchResults();}catch(error){$('storeV3SearchResults').innerHTML=`<div class="empty">${esc(error.message||'店家搜尋失敗。')}</div>`;}}
+  function renderStoreV3SearchResults(){const host=$('storeV3SearchResults');if(!host)return;if(!sv3.stores.length){host.innerHTML='<div class="empty">找不到符合的店家，請調整店名或地區。</div>';return;}host.innerHTML=sv3.stores.map((store,index)=>`<div class="store-v3-result"><div><strong>${esc(store.name||'店家')}</strong><span>${esc(store.address||store.shortAddress||'')}<br>${esc(store.typeLabel||store.category||'')}</span></div><button class="btn small yellow" type="button" data-store-v3-select="${index}">管理</button></div>`).join('');host.querySelectorAll('[data-store-v3-select]').forEach(btn=>btn.addEventListener('click',()=>storeV3ChooseStore(Number(btn.dataset.storeV3Select))));}
+  async function storeV3ChooseStore(index){const store=sv3.stores[index];if(!store)return;sv3.selectedStore=store;renderSelectedStore();await storeV3LoadBrands();await storeV3RefreshSelectedStore();if(!sv3.resolved?.brand){const normalized=clean(store.name).toLowerCase().replace(/[\s\-＿_·・．.（）()]/g,'');const matched=sv3.brands.find(brand=>(brand.aliases||[brand.name]).some(alias=>{const token=clean(alias).toLowerCase().replace(/[\s\-＿_·・．.（）()]/g,'');return token.length>=2&&normalized.includes(token);}));if(matched){sv3.selectedBrand=matched;$('storeV3BrandSelect').value=matched.brandId;storeV3SelectBrand();$('storeV3CatalogMode').value='hybrid';$('storeV3BindingStatus').textContent=`偵測到品牌「${matched.name}」，確認後按「儲存分店綁定」。`;}}}
+  function renderSelectedStore(){const host=$('storeV3SelectedStore'),store=sv3.selectedStore;if(!host)return;if(!store){host.hidden=true;return;}host.hidden=false;host.innerHTML=`<strong>${esc(store.name||'店家')}</strong><span>${esc(store.address||'')}<br>Place ID：${esc(store.placeId||'')}</span>`;}
+
+  async function storeV3RefreshSelectedStore(){try{const store=sv3.selectedStore;if(!store?.placeId){$('storeV3CatalogMeta').textContent='尚未選擇店家。';return;}const params=new URLSearchParams({name:store.name||'',address:store.address||'',category:store.category||'',source:store.source||'google'});const data=await v4AdminFetch(`/api/admin/store-v3/store/${encodeURIComponent(store.placeId)}?${params.toString()}`);sv3.resolved=data;sv3.products=Array.isArray(data.products)?data.products:[];const brand=data.brand||null;sv3.selectedBrand=brand;if(brand){await storeV3LoadBrands();$('storeV3BrandSelect').value=brand.brandId||'';storeV3SelectBrand();}else{$('storeV3BrandSelect').value='';sv3.selectedBrand=null;}$('storeV3CatalogMode').value=data.catalogMode||((brand)?'hybrid':'store');$('storeV3BindingStatus').textContent=`目前模式：${data.catalogMode||'store'}｜來源：${data.catalogSource||'empty'}｜${sv3.products.length} 項有效商品`;renderStoreV3Products();storeV3SyncProductTargetHint();}catch(error){alert(error.message||'分店商城資料讀取失敗。');}}
+
+  async function storeV3BindStore(){try{const store=sv3.selectedStore;if(!store?.placeId)throw new Error('請先搜尋並選擇店家。');const brandId=clean($('storeV3BrandSelect')?.value);const catalogMode=clean($('storeV3CatalogMode')?.value)|| (brandId?'hybrid':'store');await v4AdminFetch(`/api/admin/store-v3/store/${encodeURIComponent(store.placeId)}/binding`,{method:'POST',body:JSON.stringify({brandId,catalogMode,store:{name:store.name,address:store.address,category:store.category}})});showToast('分店綁定已儲存');await storeV3RefreshSelectedStore();}catch(error){alert(error.message||'分店綁定失敗。');}}
+
+  function storeV3ReadGroups(){const raw=clean($('storeV3OptionGroups')?.value)||'[]';let value;try{value=JSON.parse(raw);}catch(error){throw new Error('規格群組 JSON 格式錯誤：'+error.message);}if(!Array.isArray(value))throw new Error('規格群組必須是 JSON 陣列。');return value;}
+  function storeV3ResetProductForm(){if($('storeV3ProductId'))$('storeV3ProductId').value='';if($('storeV3ProductName'))$('storeV3ProductName').value='';if($('storeV3BasePrice'))$('storeV3BasePrice').value='';if($('storeV3SortWeight'))$('storeV3SortWeight').value='0';if($('storeV3ProductCategory'))$('storeV3ProductCategory').value='熱門';if($('storeV3ProductDescription'))$('storeV3ProductDescription').value='';if($('storeV3ProductImage'))$('storeV3ProductImage').value='';if($('storeV3Enabled'))$('storeV3Enabled').checked=true;if($('storeV3SoldOut'))$('storeV3SoldOut').checked=false;if($('storeV3Hidden'))$('storeV3Hidden').checked=false;if($('storeV3OptionGroups'))$('storeV3OptionGroups').value=JSON.stringify(sample,null,2);$('storeV3ProductTarget').value=sv3.selectedBrand?'brand':'store';storeV3SyncProductTargetHint();}
+  function storeV3SyncProductTargetHint(){const target=$('storeV3ProductTarget')?.value||'brand',brand=brandById($('storeV3BrandSelect')?.value||'')||sv3.selectedBrand,store=sv3.selectedStore;let text='';if(target==='brand')text=brand?`品牌 Catalog：修改會套用到所有綁定「${brand.name}」的分店。`:'請先選擇或建立品牌。';if(target==='store')text=store?`單店 Catalog：只影響 ${store.name||'目前分店'}。`:'請先選擇店家。';if(target==='override')text=store?`分店覆寫：只調整 ${store.name||'目前分店'} 的品牌商品，不影響其他分店。`:'請先選擇店家。';$('storeV3ProductTargetHint').textContent=text;$('storeV3HiddenWrap').style.display=target==='override'?'flex':'none';$('storeV3ClearOverrideBtn').hidden=!(target==='override'&&clean($('storeV3ProductId')?.value));}
+  function storeV3FillProduct(product,target){$('storeV3ProductId').value=product.productId||'';$('storeV3ProductName').value=product.name||'';$('storeV3BasePrice').value=Number.isFinite(Number(product.basePrice))?Number(product.basePrice):'';$('storeV3SortWeight').value=Number(product.sortWeight||0);$('storeV3ProductCategory').value=product.category||'熱門';$('storeV3ProductDescription').value=product.description||'';$('storeV3ProductImage').value=product.imageUrl||'';$('storeV3Enabled').checked=product.enabled!==false;$('storeV3SoldOut').checked=product.soldOut===true;$('storeV3Hidden').checked=false;$('storeV3OptionGroups').value=JSON.stringify(product.optionGroups||[],null,2);$('storeV3ProductTarget').value=target;storeV3SyncProductTargetHint();$('storeV3ProductName').scrollIntoView({behavior:'smooth',block:'center'});}
+
+  async function storeV3SaveProduct(){try{const target=$('storeV3ProductTarget')?.value||'brand',store=sv3.selectedStore,brandId=clean($('storeV3BrandSelect')?.value),productId=clean($('storeV3ProductId')?.value),name=clean($('storeV3ProductName')?.value),basePrice=Number($('storeV3BasePrice')?.value);if(!name)throw new Error('請輸入商品名稱。');if(!Number.isFinite(basePrice)||basePrice<0)throw new Error('請輸入有效參考價格。');const product={productId,name,basePrice,sortWeight:Number($('storeV3SortWeight')?.value||0),category:clean($('storeV3ProductCategory')?.value)||'熱門',description:clean($('storeV3ProductDescription')?.value),imageUrl:clean($('storeV3ProductImage')?.value),enabled:$('storeV3Enabled')?.checked!==false,soldOut:$('storeV3SoldOut')?.checked===true,optionGroups:storeV3ReadGroups()};if(target==='brand'){if(!brandId)throw new Error('請先選擇品牌。');await v4AdminFetch(`/api/admin/store-v3/brand/${encodeURIComponent(brandId)}/product`,{method:'POST',body:JSON.stringify({product})});}else if(target==='store'){if(!store?.placeId)throw new Error('請先選擇店家。');await v4AdminFetch(`/api/admin/store-v3/store/${encodeURIComponent(store.placeId)}/product`,{method:'POST',body:JSON.stringify({product})});}else{if(!store?.placeId||!productId)throw new Error('請先從品牌商品按「分店覆寫」。');await v4AdminFetch(`/api/admin/store-v3/store/${encodeURIComponent(store.placeId)}/override/${encodeURIComponent(productId)}`,{method:'POST',body:JSON.stringify({override:{name,basePrice,sortWeight:Number($('storeV3SortWeight')?.value||0),category:product.category,description:product.description,imageUrl:product.imageUrl,enabled:product.enabled,soldOut:product.soldOut,hidden:$('storeV3Hidden')?.checked===true,optionGroups:product.optionGroups}})});}showToast('商品已儲存');storeV3ResetProductForm();await storeV3RefreshSelectedStore();}catch(error){alert(error.message||'商品儲存失敗。');}}
+  async function storeV3ClearOverride(){try{const store=sv3.selectedStore,productId=clean($('storeV3ProductId')?.value);if(!store?.placeId||!productId)throw new Error('目前沒有可清除的分店覆寫。');await v4AdminFetch(`/api/admin/store-v3/store/${encodeURIComponent(store.placeId)}/override/${encodeURIComponent(productId)}`,{method:'DELETE'});showToast('分店覆寫已清除');storeV3ResetProductForm();await storeV3RefreshSelectedStore();}catch(error){alert(error.message||'清除覆寫失敗。');}}
+  async function storeV3SetStoreStatus(productId,update){try{const store=sv3.selectedStore;if(!store?.placeId)return;await v4AdminFetch(`/api/admin/store-v3/store/${encodeURIComponent(store.placeId)}/product/${encodeURIComponent(productId)}/status`,{method:'POST',body:JSON.stringify(update)});await storeV3RefreshSelectedStore();}catch(error){alert(error.message||'商品狀態更新失敗。');}}
+  async function storeV3SetBranchOverride(product,update){try{const store=sv3.selectedStore;if(!store?.placeId)return;await v4AdminFetch(`/api/admin/store-v3/store/${encodeURIComponent(store.placeId)}/override/${encodeURIComponent(product.productId)}`,{method:'POST',body:JSON.stringify({override:update})});await storeV3RefreshSelectedStore();}catch(error){alert(error.message||'分店覆寫失敗。');}}
+
+  function renderStoreV3Products(){const list=$('storeV3ProductList');if(!list)return;$('storeV3CatalogMeta').textContent=`${sv3.products.length} 項有效商品・${sv3.resolved?.catalogSource||'empty'}`;if(!sv3.products.length){list.innerHTML='<div class="empty">這間店目前沒有有效商品。可建立品牌菜單或單店商品。</div>';return;}list.innerHTML=sv3.products.map((p,index)=>{const source=p.catalogSource==='brand'?(p.storeOverride?'override':'brand'):'store';const sourceLabel=source==='override'?'品牌＋分店覆寫':source==='brand'?'品牌 Catalog':'單店 Catalog';return `<article class="store-v3-product-card"><div class="store-v3-product-top"><div><strong>${esc(p.name)}</strong><span>${esc(p.category||'未分類')}・${money(p.basePrice)}・版本 ${esc(p.version||1)}<br>${esc((p.optionGroups||[]).map(g=>g.name).join(' / ')||'無規格')}</span></div><span class="store-v3-source ${source}">${sourceLabel}</span></div><div class="store-v3-product-actions"><button class="btn small" data-v3-edit="${index}">${source==='store'?'編輯單店商品':'編輯品牌商品'}</button>${source!=='store'?`<button class="btn small yellow" data-v3-override="${index}">分店覆寫</button><button class="btn small ${p.soldOut?'blue':'red'}" data-v3-branch-soldout="${index}">${p.soldOut?'此分店恢復供應':'此分店售完'}</button>`:`<button class="btn small ${p.soldOut?'blue':'red'}" data-v3-store-soldout="${index}">${p.soldOut?'恢復供應':'設為售完'}</button><button class="btn small" data-v3-store-enabled="${index}">${p.enabled?'下架':'重新上架'}</button>`}${p.storeOverride?`<button class="btn small" data-v3-clear-override="${index}">清除覆寫</button>`:''}</div></article>`;}).join('');list.querySelectorAll('[data-v3-edit]').forEach(btn=>btn.addEventListener('click',()=>{const p=sv3.products[Number(btn.dataset.v3Edit)];if(!p)return;storeV3FillProduct(p,p.catalogSource==='brand'?'brand':'store');}));list.querySelectorAll('[data-v3-override]').forEach(btn=>btn.addEventListener('click',()=>{const p=sv3.products[Number(btn.dataset.v3Override)];if(p)storeV3FillProduct(p,'override');}));list.querySelectorAll('[data-v3-branch-soldout]').forEach(btn=>btn.addEventListener('click',()=>{const p=sv3.products[Number(btn.dataset.v3BranchSoldout)];if(p)storeV3SetBranchOverride(p,{soldOut:!p.soldOut});}));list.querySelectorAll('[data-v3-store-soldout]').forEach(btn=>btn.addEventListener('click',()=>{const p=sv3.products[Number(btn.dataset.v3StoreSoldout)];if(p)storeV3SetStoreStatus(p.productId,{soldOut:!p.soldOut});}));list.querySelectorAll('[data-v3-store-enabled]').forEach(btn=>btn.addEventListener('click',()=>{const p=sv3.products[Number(btn.dataset.v3StoreEnabled)];if(p)storeV3SetStoreStatus(p.productId,{enabled:!p.enabled});}));list.querySelectorAll('[data-v3-clear-override]').forEach(btn=>btn.addEventListener('click',async()=>{const p=sv3.products[Number(btn.dataset.v3ClearOverride)];if(!p)return;storeV3FillProduct(p,'override');await storeV3ClearOverride();}));}
+
+  window.storeV3UseAdminKey=storeV3UseAdminKey;window.storeV3SearchStores=storeV3SearchStores;window.storeV3RefreshSelectedStore=storeV3RefreshSelectedStore;window.storeV3LoadBrands=storeV3LoadBrands;window.storeV3NewBrand=storeV3NewBrand;window.storeV3SelectBrand=storeV3SelectBrand;window.storeV3SaveBrand=storeV3SaveBrand;window.storeV3BindStore=storeV3BindStore;window.storeV3ResetProductForm=storeV3ResetProductForm;window.storeV3SyncProductTargetHint=storeV3SyncProductTargetHint;window.storeV3SaveProduct=storeV3SaveProduct;window.storeV3ClearOverride=storeV3ClearOverride;
+  window.addEventListener('DOMContentLoaded',()=>{const saved=sessionStorage.getItem('ubee_v4_admin_key')||'';if($('storeV3AdminKey'))$('storeV3AdminKey').value=saved;storeV3ResetProductForm();if(saved)storeV3LoadBrands();});
 })();
 </script>
 
