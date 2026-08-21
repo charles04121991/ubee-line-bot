@@ -1,7 +1,7 @@
 {
   "name": "ubee-oms-h5-pro-flow",
-  "version": "4.2.0",
-  "description": "UBee integrated OMS with customer accounts, store discovery, personalized reorder, secure sessions, order dispatch, rider operations, merchant operations, LINE Messaging API and web push",
+  "version": "4.3.0",
+  "description": "UBee integrated OMS with Store V3 marketplace-style shopping, brand catalogs, store inheritance/overrides, structured manual purchase, customer accounts, dispatch, rider operations, merchant operations, LINE Messaging API and web push",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
