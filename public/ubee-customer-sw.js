@@ -1,12 +1,12 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.08.21.1
+ * Version: 2026.08.21.3 Store V3 Production Final
  * File: ubee-customer-sw.js
  *
- * 2026-08-21 Store Purchase V2 更新：
+ * 2026-08-21 Store V3 Production Final 更新：
  * 1. 店家商品／收藏／回購 API 持續維持 Network Only，避免個人化資料被舊 Cache 汙染。
- * 2. order.html 更新採 Network First，確保正式上線後取得 Store V2 最新介面。
+ * 2. order.html 更新採 Network First，確保正式上線後取得 Store V3 Production Final 最新介面。
  *
  * 2026-08-11 Identity V1 更新：
  * 1. 實名制 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
@@ -19,7 +19,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.08.21.1';
+const UBEE_CUSTOMER_SW_VERSION = '2026.08.21.3-store-v3-final';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
