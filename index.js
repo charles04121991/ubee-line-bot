@@ -1849,6 +1849,7 @@ async function sendNewOrderPushToRiders(
         let webPushSuccess = 0;
         let webPushFail = 0;
         let skippedRiderCount = 0;
+        let cityFilteredRiderCount = 0;
         let distanceFilteredRiderCount = 0;
         let staleLocationRiderCount = 0;
         
@@ -1950,6 +1951,13 @@ async function sendNewOrderPushToRiders(
             !subscription ||
             !subscription.endpoint
           ) {
+            return;
+          }
+
+          // 縣市硬隔離：台南單只進台南服務小U、台中單只進台中服務小U。
+          // 必須先通過縣市 Gate，才進原本的預約時段與距離擴圈。
+          if (!isRiderAllowedForOrderCity(rider, order)) {
+            cityFilteredRiderCount += 1;
             return;
           }
 
@@ -2086,7 +2094,7 @@ async function sendNewOrderPushToRiders(
             isRedispatch
               ? "轉派"
               : "新任務"
-          }通知完成：${orderId}，範圍 ${pushRadiusLabel}，成功 ${webPushSuccess}，失敗 ${webPushFail}，略過已取消騎士 ${skippedRiderCount}，距離外 ${distanceFilteredRiderCount}，位置過期或缺失 ${staleLocationRiderCount}`
+          }通知完成：${orderId}，範圍 ${pushRadiusLabel}，成功 ${webPushSuccess}，失敗 ${webPushFail}，跨縣市排除 ${cityFilteredRiderCount}，略過已取消騎士 ${skippedRiderCount}，距離外 ${distanceFilteredRiderCount}，位置過期或缺失 ${staleLocationRiderCount}`
         );
       }
 
@@ -6403,6 +6411,7 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
       phone,
       riderId,
       subscription,
+      enabled,
       userAgent,
       platform,
       app: riderApp
@@ -6411,19 +6420,7 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
     const safeLineUserId = String(lineUserId || '').trim();
     const cleanPhone = normalizePhone(phone || '');
     const safeRiderId = String(riderId || '').trim();
-
-    if (
-      !subscription ||
-      !subscription.endpoint ||
-      !subscription.keys ||
-      !subscription.keys.p256dh ||
-      !subscription.keys.auth
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的 Web Push subscription。',
-      });
-    }
+    const requestedEnabled = enabled !== false;
 
     const found = await findRiderDocumentV2First({
       phone: cleanPhone,
@@ -6435,7 +6432,7 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
     if (!riderDoc) {
       return res.status(404).json({
         success: false,
-        message: '找不到騎士資料，無法儲存派單通知。',
+        message: '找不到騎士資料，無法更新派單通知設定。',
       });
     }
 
@@ -6443,12 +6440,44 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
 
     const riderApproved =
       riderData.approved === true ||
-      String(riderData.status || '').trim().toLowerCase() === 'approved';
+      String(riderData.status || '').trim().toLowerCase() === 'approved' ||
+      String(riderData.status || '').trim().toLowerCase() === 'active';
 
     if (!riderApproved) {
       return res.status(403).json({
         success: false,
-        message: '騎士尚未審核通過，無法啟用派單通知。',
+        message: '騎士尚未審核通過，無法調整派單通知。',
+      });
+    }
+
+    // 關閉時只關閉 webPushEnabled，保留有效 subscription。
+    // 下次重新開啟可直接沿用，不需要無謂 unsubscribe / subscribe。
+    if (!requestedEnabled) {
+      await writeRiderMigrationCompatible(riderDoc, {
+        webPushEnabled: false,
+        webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        webPushUpdatedAtMs: Date.now(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return res.json({
+        success: true,
+        enabled: false,
+        message: 'UBee 背景派單通知已關閉。',
+        riderId: riderDoc.id,
+      });
+    }
+
+    if (
+      !subscription ||
+      !subscription.endpoint ||
+      !subscription.keys ||
+      !subscription.keys.p256dh ||
+      !subscription.keys.auth
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的 Web Push subscription。',
       });
     }
 
@@ -6472,16 +6501,17 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
 
     return res.json({
       success: true,
-      message: 'UBee 派單通知訂閱已儲存。',
+      enabled: true,
+      message: 'UBee 背景派單通知已開啟。',
       riderId: riderDoc.id,
     });
 
   } catch (err) {
-    console.error('❌ 儲存騎士 Web Push subscription 失敗：', err);
+    console.error('❌ 更新騎士 Web Push 設定失敗：', err);
 
     return res.status(500).json({
       success: false,
-      message: '儲存派單通知失敗，請稍後再試。',
+      message: '更新派單通知設定失敗，請稍後再試。',
       error: err.message,
     });
   }
@@ -7620,6 +7650,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
         ...doc.data()
       }))
       .filter(order => isRiderVisibleDispatchOrder(order))
+      .filter(order => isRiderAllowedForOrderCity(rider, order))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => {
         const status = String(order.status || '').trim();
@@ -8435,6 +8466,17 @@ app.post(
           }
 
           if (
+            !isRiderAllowedForOrderCity(
+              riderResult.rider || {},
+              order
+            )
+          ) {
+            throw new Error(
+              'RIDER_ORDER_CITY_MISMATCH'
+            );
+          }
+
+          if (
             !riderMatchesScheduledOrderAvailability(
               riderResult.rider || {},
               order
@@ -8553,6 +8595,8 @@ app.post(
           [403, '你的帳號目前無法承接任務，請先確認接單資格。'],
         RIDER_V4_QUALIFICATION_REQUIRED:
           [403, '你的資格目前不符合這筆任務。'],
+        RIDER_ORDER_CITY_MISMATCH:
+          [403, '這筆預約不在你目前設定的服務縣市，無法承接。'],
         RIDER_SCHEDULE_NOT_MATCHED:
           [409, '這筆預約時間不在你設定的可接時段內。'],
         ORDER_SCHEDULE_EXPIRED:
@@ -12436,6 +12480,70 @@ function getDispatchRiderZone(rider = {}) {
     district: district || '未分區',
     zoneId: buildNationwideDispatchZoneId(city, district),
   };
+}
+
+// =====================================================
+// UBee 縣市隔離派單 V1｜2026-08-21
+// - 訂單以「取件縣市」作為派單縣市。
+// - 小U 優先以 serviceCities / serviceCity / serviceArea 判定可服務縣市。
+// - 若沒有明確服務縣市，才回退到既有 rider zone（含 residenceCity）。
+// - 無法判定訂單縣市或小U服務縣市時採 fail-closed，不跨縣市曝光／推播／承接。
+// =====================================================
+function getDispatchRiderServiceCities(rider = {}) {
+  const explicitValues = [];
+
+  if (Array.isArray(rider.serviceCities)) {
+    explicitValues.push(...rider.serviceCities);
+  }
+
+  if (rider.serviceCity) {
+    explicitValues.push(rider.serviceCity);
+  }
+
+  if (Array.isArray(rider.serviceAreas)) {
+    explicitValues.push(...rider.serviceAreas);
+  }
+
+  if (rider.serviceArea) {
+    explicitValues.push(rider.serviceArea);
+  }
+
+  if (Array.isArray(rider.serviceDistricts)) {
+    explicitValues.push(...rider.serviceDistricts);
+  }
+
+  const explicitCities = explicitValues
+    .map(value => {
+      const direct = normalizeTaiwanCityName(value);
+      if (direct) return direct;
+      return inferDispatchRegion(value).city || '';
+    })
+    .filter(Boolean);
+
+  if (explicitCities.length) {
+    return [...new Set(explicitCities)];
+  }
+
+  const fallbackZone = getDispatchRiderZone(rider);
+  const fallbackCity = normalizeTaiwanCityName(fallbackZone.city || '');
+
+  return fallbackCity ? [fallbackCity] : [];
+}
+
+function isRiderAllowedForOrderCity(rider = {}, order = {}) {
+  const orderZone = getDispatchOrderZone(order);
+  const orderCity = normalizeTaiwanCityName(orderZone.city || '');
+
+  if (!orderCity) {
+    return false;
+  }
+
+  const riderCities = getDispatchRiderServiceCities(rider);
+  if (!riderCities.length) {
+    return false;
+  }
+
+  return riderCities.includes(orderCity);
 }
 
 function dispatchHaversineKm(lat1, lng1, lat2, lng2) {
@@ -31834,6 +31942,10 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
       }
 
+      if (!isRiderAllowedForOrderCity(latestRider, order)) {
+        throw new Error('RIDER_ORDER_CITY_MISMATCH');
+      }
+
       if (
         latestRider.busy === true &&
         latestRider.currentOrderId &&
@@ -32097,6 +32209,14 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         success: false,
         code: 'RIDER_V4_QUALIFICATION_REQUIRED',
         message: '此任務需要更高等級或指定專業資格，目前無法承接。',
+      });
+    }
+
+    if (error.message === 'RIDER_ORDER_CITY_MISMATCH') {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_ORDER_CITY_MISMATCH',
+        message: '這筆任務不在你目前設定的服務縣市，無法承接。',
       });
     }
 
