@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260821-store-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260821-store-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17,7 +17,7 @@
 <meta content="UBee 跑腿" name="application-name"/>
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
-<!-- UBee 用戶端 Store Purchase V2｜2026-08-21：店家商品、動態規格、收藏、常買、再次代買、歷史規格、熱門商品、最近購買。 -->
+<!-- UBee Store V3｜商城式代買｜2026-08-21：品牌 Catalog、分店繼承／覆寫、商品分類、動態規格、購物清單、收藏、常買與再次代買。 -->
 <!-- UBee 用戶端 V2.12 + Password Reset V3：2026-08-14｜LINE Messaging API Bot 全自動核對；不使用 LIFF／不需客服 -->
 <!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
 <style>
@@ -19286,7 +19286,7 @@ const UBeeEnhancements = (() => {
   function renderSystemCheck(){const el=qs('orderSystemCheck');if(!el)return;const checks=[['pickup','取件位置已填寫',!!value('pickup')],['dropoff','送達位置已填寫',!!value('dropoff')],['phone','至少一組聯絡電話已填寫',!!(value('pickupPhone')||value('dropoffPhone'))],['route','路線已成功計算',!!lastRouteData],['quote','正式估價資料可用',!!lastQuoteData&&Number(lastEstimatedTotal)>0],['note','任務內容已完成',!!value('note')]];el.innerHTML=checks.map(([,label,ok])=>`<div class="system-check-row ${ok?'ok':'warn'}"><span class="system-check-icon">${ok?'✓':'!'}</span><span>${label}</span></div>`).join('')}
 
   function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,order.serviceType||serviceType);speedType=order.speedType||order.speed||'standard';orderTimingType=order.orderTimingType||'immediate';scheduleGoal=order.scheduleGoal||'pickup_at';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
-  function reorder(id){const order=state.lastOrders.get(id);if(!order)return;if((order.purchaseSnapshot||order.storePlaceId||order.storeDiscovery)&&window.UBeeStorePurchaseV2?.reorderOrder){window.UBeeStorePurchaseV2.reorderOrder(id);return;}applyOrder(order)}
+  function reorder(id){const order=state.lastOrders.get(id);if(!order)return;if((order.purchaseSnapshot||order.storePlaceId||order.storeDiscovery)&&window.UBeeStorePurchaseV3?.reorderOrder){window.UBeeStorePurchaseV3.reorderOrder(id);return;}applyOrder(order)}
   function openOrder(id){const order=state.lastOrders.get(id);if(!order)return;currentOrderId=id;currentOrderData=order;localStorage.setItem('ubee_current_order_id',id);setOrderNo(id);showOnlyStep(5);renderTimeline(order.status||'pending_payment',order);startOrderListener(id)}
   function renderOrderCards(el,orders,emptyText){if(!el)return;if(!orders.length){el.textContent=emptyText;return}state.lastOrders.clear();orders.forEach(o=>state.lastOrders.set(o.id,o));el.innerHTML=orders.map(o=>{const pickup=o.pickup||o.pickupAddress||'-',dropoff=o.dropoff||o.dropoffAddress||'-',total=getCustomerPayableTotal(o),status=getStatusLabel(o.status),done=['completed','done'].includes(String(o.status));return `<div class="order-history-card"><div style="font-size:15px;font-weight:1000">${escapeAttr(o.serviceType||'UBee 跑腿任務')}</div><div class="field-help">${escapeAttr(status)}・${escapeAttr(formatOrderTime(o.createdAt||o.updatedAt))}<br>${escapeAttr(pickup)} → ${escapeAttr(dropoff)}<br>金額：${total>0?`NT$${Math.round(total)}`:'-'}</div><div class="order-card-actions"><button type="button" onclick="UBeeEnhancements.openOrder('${o.id}')">查看明細</button>${done?`<button type="button" onclick="UBeeEnhancements.reorder('${o.id}')">再叫一次</button>`:''}</div></div>`}).join('')}
 
@@ -20560,8 +20560,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const items=state.purchaseCartV2.items||[];
     summary.innerHTML=`<div class="flow-purchase-v2-head"><div><strong>已從店家商品帶入 ${items.length} 項</strong><small>規格已保存到代買清單；送出前系統會再次驗證。</small></div><button type="button" id="flowPurchaseCartV2Edit">返回店家修改</button></div><div class="flow-purchase-v2-items">${items.map(item=>`<div class="flow-purchase-v2-item"><div><strong>${escapeHtml(item.productName||item.name||'商品')} ×${Math.max(1,Number(item.quantity||1))}</strong><span>${escapeHtml(item.specificationText||item.specification||'依選擇規格')}</span></div><b>${Number.isFinite(Number(item.lineEstimatedTotal))?`NT$${Math.round(Number(item.lineEstimatedTotal))}`:'價格現場確認'}</b></div>`).join('')}</div><div class="flow-purchase-v2-total"><span>商品預估</span><strong>NT$${Math.max(0,Math.round(Number(state.purchaseCartV2.estimatedGoodsAmount||state.advancePayment||0)))}</strong></div>`;
     summary.querySelector('#flowPurchaseCartV2Edit')?.addEventListener('click',()=>{
-      if(state.storeContext&&window.UBeeStorePurchaseV2?.open){
-        window.UBeeStorePurchaseV2.open(state.storeContext,{restoreCart:state.purchaseCartV2});
+      if(state.storeContext&&window.UBeeStorePurchaseV3?.open){
+        window.UBeeStorePurchaseV3.open(state.storeContext,{restoreCart:state.purchaseCartV2});
       }else{
         window.openUBeeStorePage?.();
       }
@@ -21359,7 +21359,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260821-store-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260821-store-v3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -24883,7 +24883,7 @@ body.ubee-store-active #productionOrderFlow{
       const sourceLabel=store.source==='google'?'<span class="ubee-store-source-chip google">Google 即時</span>':'<span class="ubee-store-source-chip">UBee 目錄</span>';
       return `<article class="ubee-store-card" data-store-id="${escape(store.placeId)}">${mediaMarkup}<div class="ubee-store-card-body">${inlineBadges}<div class="ubee-store-card-title-row"><div class="ubee-store-card-title"><strong>${escape(store.name)}</strong><span>${escape(store.typeLabel||store.categoryLabel||'店家')}${distance}</span></div><span class="ubee-store-open-state ${store.openNow===true?'':'closed'}">${escape(store.openStatusLabel||'營業狀態請確認')}</span></div><div style="margin:6px 0">${sourceLabel}</div><div class="ubee-store-address">${escape(store.address||'地址請確認')}</div><div class="ubee-store-purchase-note">商品依店內實際售價・${escape(store.purchaseLabel||'可委託小U前往代買')}</div><div class="ubee-store-card-actions"><button class="ubee-store-view-btn" type="button" data-store-view="${escape(store.placeId)}">查看店家</button><button class="ubee-store-buy-btn" type="button" data-store-buy="${escape(store.placeId)}" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button></div></div></article>`;
     }).join('');
-    window.UBeeStorePurchaseV2?.decorateStoreCards?.(stores);
+    window.UBeeStorePurchaseV3?.decorateStoreCards?.(stores);
   }
 
   function setLocationDisplay(title,text,showManual=false){
@@ -24988,7 +24988,7 @@ body.ubee-store-active #productionOrderFlow{
     renderCategories();
     loadLocalCatalog();
     initializeLocation();
-    window.UBeeStorePurchaseV2?.refreshHome?.();
+    window.UBeeStorePurchaseV3?.refreshHome?.();
   }
 
   async function openStoreDetail(placeId){
@@ -25054,13 +25054,13 @@ body.ubee-store-active #productionOrderFlow{
       <div class="ubee-store-detail-actions"><button class="ubee-store-detail-buy" id="ubeeStoreDetailBuy" type="button" ${store.canRequestPurchase===false?'disabled':''}>請小U幫我買</button></div>
       ${store.source==='google'?googleAttributionMarkup('提供本頁店家與照片資料',store.attributions):'<div class="ubee-store-google-attribution"><span>資料來源：UBee 本地店家目錄</span></div>'}`;
     $('ubeeStoreDetailBuy')?.addEventListener('click',()=>startPurchase(store));
-    window.UBeeStorePurchaseV2?.decorateStoreDetail?.(store);
+    window.UBeeStorePurchaseV3?.decorateStoreDetail?.(store);
   }
 
   function startPurchase(store){
     if(!store||!store.address){alert('店家地址不存在，請改用地址搜尋建立代買任務。');return;}
-    if(window.UBeeStorePurchaseV2?.open){
-      try{window.UBeeStorePurchaseV2.open(store);clearStoreNavigation();return;}catch(error){alert(error.message||'店家商品載入失敗，請稍後再試。');return;}
+    if(window.UBeeStorePurchaseV3?.open){
+      try{window.UBeeStorePurchaseV3.open(store);clearStoreNavigation();return;}catch(error){alert(error.message||'店家商品載入失敗，請稍後再試。');return;}
     }
     if(typeof window.openUBeeStorePurchase==='function'){
       try{window.openUBeeStorePurchase(store);clearStoreNavigation();return;}catch(error){alert(error.message||'店家資料帶入失敗，請稍後再試。');return;}
@@ -25232,38 +25232,36 @@ body.ubee-store-active #productionOrderFlow{
 })();
 </script>
 
-<style id="ubee-store-purchase-v2-style">
+<style id="ubee-store-purchase-v3-style">
 /* =========================================================
-   UBee Store Purchase V2｜2026-08-21
-   個人化首頁、商品規格、代買清單、收藏與再次代買
+   UBee Store V3｜商城式代買｜2026-08-21
+   商城店家頁、品牌 Catalog、分類、商品規格、購物清單、收藏與回購
    ========================================================= */
-#productionOrderFlow .ubee-store-v2-personalized{display:grid;gap:14px;margin:0 0 16px}
-#productionOrderFlow .ubee-store-v2-section{display:grid;gap:9px}
-#productionOrderFlow .ubee-store-v2-section-head{display:flex;align-items:end;justify-content:space-between;gap:10px;padding:0 2px}
-#productionOrderFlow .ubee-store-v2-section-head strong{font-size:16px;font-weight:1000;color:#111}
-#productionOrderFlow .ubee-store-v2-section-head span{font-size:10px;font-weight:850;color:#878b90}
-#productionOrderFlow .ubee-store-v2-row{display:flex;gap:9px;overflow:auto;padding:1px 1px 4px;scrollbar-width:none;scroll-snap-type:x proximity}
-#productionOrderFlow .ubee-store-v2-row::-webkit-scrollbar{display:none}
-#productionOrderFlow .ubee-store-v2-card{flex:0 0 198px;scroll-snap-align:start;border:1px solid #e5e7e9;border-radius:17px;background:#fff;padding:12px;text-align:left;color:#111;box-shadow:0 6px 18px rgba(17,24,39,.04)}
-#productionOrderFlow .ubee-store-v2-card:active{transform:scale(.985)}
-#productionOrderFlow .ubee-store-v2-card-kicker{font-size:10px;font-weight:1000;color:#9a7900;margin-bottom:5px}
-#productionOrderFlow .ubee-store-v2-card strong{display:block;font-size:14px;font-weight:1000;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#productionOrderFlow .ubee-store-v2-card span{display:block;margin-top:4px;font-size:11px;font-weight:800;color:#71767c;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-#productionOrderFlow .ubee-store-v2-card small{display:block;margin-top:7px;font-size:10px;font-weight:900;color:#b07c00}
-#productionOrderFlow .ubee-store-v2-favorite-btn{width:40px;height:40px;border:1px solid #e4e6e8;border-radius:13px;background:#fff;color:#777;font-size:22px;line-height:1;display:grid;place-items:center;flex:0 0 auto;padding:0}
-#productionOrderFlow .ubee-store-v2-favorite-btn.active{background:#fff8cf;border-color:#f0cf35;color:#d29b00}
-#productionOrderFlow .ubee-store-v2-catalog{margin:12px 0;padding:15px;border:1px solid #e5e7e9;border-radius:18px;background:#fff}
-#productionOrderFlow .ubee-store-v2-catalog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
-#productionOrderFlow .ubee-store-v2-catalog-head strong{font-size:16px;font-weight:1000}
-#productionOrderFlow .ubee-store-v2-catalog-head span{display:block;margin-top:3px;font-size:10px;font-weight:800;color:#85898e}
-#productionOrderFlow .ubee-store-v2-product-list{display:grid;gap:9px}
-#productionOrderFlow .ubee-store-v2-product{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #eceef0;border-radius:15px;background:#fafbfb}
-#productionOrderFlow .ubee-store-v2-product.soldout{opacity:.55}
-#productionOrderFlow .ubee-store-v2-product strong{display:block;font-size:14px;font-weight:1000;color:#111}
-#productionOrderFlow .ubee-store-v2-product span{display:block;margin-top:4px;font-size:11px;font-weight:800;color:#72777d;line-height:1.45}
-#productionOrderFlow .ubee-store-v2-product button{min-height:39px;border:0;border-radius:12px;background:#facc15;color:#111;padding:8px 11px;font-size:12px!important;font-weight:1000}
-#productionOrderFlow .ubee-store-v2-product button:disabled{background:#eee;color:#888}
-#productionOrderFlow .ubee-store-v2-empty{padding:16px;border:1px dashed #d8dbde;border-radius:14px;color:#74797f;font-size:12px;font-weight:850;line-height:1.65;text-align:center;background:#fafafa}
+#productionOrderFlow .ubee-store-v3-personalized{display:grid;gap:16px;margin:0 0 16px}
+#productionOrderFlow .ubee-store-v3-section{display:grid;gap:10px}
+#productionOrderFlow .ubee-store-v3-section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:0 2px}
+#productionOrderFlow .ubee-store-v3-section-head strong{font-size:17px;font-weight:1000;color:#111}
+#productionOrderFlow .ubee-store-v3-section-head span{font-size:10px;font-weight:850;color:#878b90}
+#productionOrderFlow .ubee-store-v3-row{display:flex;gap:10px;overflow:auto;padding:1px 1px 5px;scrollbar-width:none;scroll-snap-type:x proximity}
+#productionOrderFlow .ubee-store-v3-row::-webkit-scrollbar{display:none}
+#productionOrderFlow .ubee-store-v3-personal-card{flex:0 0 205px;scroll-snap-align:start;border:1px solid #e5e7e9;border-radius:18px;background:#fff;padding:13px;text-align:left;color:#111;box-shadow:0 6px 18px rgba(17,24,39,.04)}
+#productionOrderFlow .ubee-store-v3-personal-card:active{transform:scale(.985)}
+#productionOrderFlow .ubee-store-v3-personal-card em{display:block;font-style:normal;font-size:10px;font-weight:1000;color:#997600;margin-bottom:5px}
+#productionOrderFlow .ubee-store-v3-personal-card strong{display:block;font-size:14px;font-weight:1000;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#productionOrderFlow .ubee-store-v3-personal-card span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px;font-size:11px;font-weight:800;color:#71767c;line-height:1.5}
+#productionOrderFlow .ubee-store-v3-personal-card small{display:block;margin-top:8px;font-size:10px;font-weight:900;color:#b07c00}
+#productionOrderFlow .ubee-store-v3-favorite-btn{width:40px;height:40px;border:1px solid #e4e6e8;border-radius:13px;background:#fff;color:#777;font-size:22px;line-height:1;display:grid;place-items:center;flex:0 0 auto;padding:0}
+#productionOrderFlow .ubee-store-v3-favorite-btn.active{background:#fff8cf;border-color:#f0cf35;color:#d29b00}
+#productionOrderFlow .ubee-store-v3-preview{margin:12px 0;padding:15px;border:1px solid #e5e7e9;border-radius:18px;background:#fff}
+#productionOrderFlow .ubee-store-v3-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:11px}
+#productionOrderFlow .ubee-store-v3-preview-head strong{font-size:16px;font-weight:1000}
+#productionOrderFlow .ubee-store-v3-preview-head span{display:block;margin-top:3px;font-size:10px;font-weight:800;color:#85898e}
+#productionOrderFlow .ubee-store-v3-preview-btn{border:0;border-radius:12px;background:#facc15;color:#111;padding:9px 12px;font-size:12px!important;font-weight:1000;white-space:nowrap}
+#productionOrderFlow .ubee-store-v3-preview-list{display:grid;gap:8px}
+#productionOrderFlow .ubee-store-v3-preview-product{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #f0f1f2}
+#productionOrderFlow .ubee-store-v3-preview-product:first-child{border-top:0}
+#productionOrderFlow .ubee-store-v3-preview-product strong{font-size:13px;font-weight:1000}
+#productionOrderFlow .ubee-store-v3-preview-product span{font-size:11px;font-weight:850;color:#777}
 #productionOrderFlow .flow-purchase-cart-v2-summary{padding:14px;border:1px solid rgba(244,189,0,.32);border-radius:17px;background:#fffdf1;margin-bottom:12px}
 #productionOrderFlow .flow-purchase-v2-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 #productionOrderFlow .flow-purchase-v2-head strong{display:block;font-size:14px;font-weight:1000}
@@ -25275,78 +25273,120 @@ body.ubee-store-active #productionOrderFlow{
 #productionOrderFlow .flow-purchase-v2-item span{display:block;margin-top:3px;font-size:10px;font-weight:800;color:#74787d;line-height:1.45}
 #productionOrderFlow .flow-purchase-v2-item b{font-size:11px;white-space:nowrap}
 #productionOrderFlow .flow-purchase-v2-total{display:flex;justify-content:space-between;gap:10px;margin-top:9px;padding-top:10px;border-top:1px solid rgba(17,24,39,.09);font-size:13px;font-weight:1000}
-.ubee-store-v2-overlay{position:fixed;inset:0;z-index:2147483200;background:#f5f6f7;color:#111;display:none;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",sans-serif}
-.ubee-store-v2-overlay.show{display:block}
-.ubee-store-v2-shell{width:min(100%,520px);height:100%;margin:0 auto;display:flex;flex-direction:column;background:#f5f6f7}
-.ubee-store-v2-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;background:#fff;border-bottom:1px solid #e6e7e9}
-.ubee-store-v2-top button{width:42px;height:42px;border:1px solid #e3e5e7;border-radius:14px;background:#fff;font-size:20px;font-weight:1000}
-.ubee-store-v2-top-title{min-width:0;flex:1;text-align:center}
-.ubee-store-v2-top-title strong{display:block;font-size:17px;font-weight:1000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ubee-store-v2-top-title span{display:block;margin-top:2px;font-size:10px;color:#80858b;font-weight:850}
-.ubee-store-v2-scroll{flex:1;overflow:auto;padding:14px 14px calc(130px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
-.ubee-store-v2-disclosure{padding:11px 12px;border-radius:13px;background:#fff9d9;color:#6a5600;font-size:11px;font-weight:850;line-height:1.6;margin-bottom:12px}
-.ubee-store-v2-category{margin:16px 0 8px;font-size:16px;font-weight:1000}
-.ubee-store-v2-grid{display:grid;gap:9px}
-.ubee-store-v2-overlay-product{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid #e3e5e7;border-radius:18px;padding:14px;background:#fff}
-.ubee-store-v2-overlay-product strong{display:block;font-size:15px;font-weight:1000}
-.ubee-store-v2-overlay-product p{margin:5px 0 0;color:#777c82;font-size:11px;font-weight:800;line-height:1.5}
-.ubee-store-v2-overlay-product b{display:block;margin-top:7px;font-size:13px;color:#9a7000}
-.ubee-store-v2-overlay-product button{border:0;background:#facc15;border-radius:13px;padding:10px 12px;font-size:12px;font-weight:1000;white-space:nowrap}
-.ubee-store-v2-overlay-product button:disabled{background:#ececec;color:#888}
-.ubee-store-v2-cartbar{position:absolute;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));display:none;align-items:center;justify-content:space-between;gap:12px;border:1px solid rgba(17,24,39,.10);border-radius:18px;background:#111;color:#fff;padding:12px 13px;box-shadow:0 15px 35px rgba(17,24,39,.22)}
-.ubee-store-v2-cartbar.show{display:flex}
-.ubee-store-v2-cartbar span{display:block;font-size:10px;color:#d5d5d5;font-weight:800}
-.ubee-store-v2-cartbar strong{display:block;margin-top:2px;font-size:15px;font-weight:1000}
-.ubee-store-v2-cartbar button{border:0;background:#facc15;color:#111;border-radius:13px;padding:11px 14px;font-size:13px;font-weight:1000}
-.ubee-store-v2-sheet{position:fixed;inset:0;z-index:2147483300;background:rgba(17,24,39,.34);display:none;align-items:flex-end;justify-content:center;padding:0}
-.ubee-store-v2-sheet.show{display:flex}
-.ubee-store-v2-sheet-card{width:min(100%,520px);max-height:88vh;overflow:auto;background:#fff;border-radius:24px 24px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -20px 50px rgba(17,24,39,.18)}
-.ubee-store-v2-sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}
-.ubee-store-v2-sheet-head strong{font-size:19px;font-weight:1000}
-.ubee-store-v2-sheet-head span{display:block;margin-top:3px;font-size:11px;color:#7c8187;font-weight:800}
-.ubee-store-v2-sheet-close{width:38px;height:38px;border:1px solid #e5e7e9;border-radius:12px;background:#fff;font-size:20px}
-.ubee-store-v2-field{margin-top:12px}
-.ubee-store-v2-field>label{display:block;margin-bottom:7px;font-size:12px;font-weight:1000}
-.ubee-store-v2-field input,.ubee-store-v2-field textarea{width:100%;min-height:48px;border:1px solid #dde0e3;border-radius:14px;background:#fafafa;padding:11px 12px;font-size:16px;outline:none}
-.ubee-store-v2-option-grid{display:flex;flex-wrap:wrap;gap:7px}
-.ubee-store-v2-option{position:relative}
-.ubee-store-v2-option input{position:absolute;opacity:0;pointer-events:none}
-.ubee-store-v2-option span{display:inline-flex;align-items:center;min-height:40px;padding:8px 11px;border:1px solid #dde0e3;border-radius:12px;background:#fff;font-size:12px;font-weight:900}
-.ubee-store-v2-option input:checked+span{border-color:#e3b900;background:#fff8c9;color:#5e4a00}
-.ubee-store-v2-pref-actions{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 3px}
-.ubee-store-v2-pref-actions button{border:1px solid #ecd463;background:#fffce8;border-radius:10px;padding:7px 9px;font-size:10px;font-weight:1000;color:#745e00}
-.ubee-store-v2-policy{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.ubee-store-v2-policy button{border:1px solid #e1e3e5;background:#fff;border-radius:11px;padding:9px 6px;font-size:10px;font-weight:900}
-.ubee-store-v2-policy button.active{border-color:#e2bb00;background:#fff7bd;color:#654f00}
-.ubee-store-v2-primary{width:100%;min-height:50px;margin-top:15px;border:0;border-radius:15px;background:#facc15;color:#111;font-size:15px;font-weight:1000}
-.ubee-store-v2-secondary{width:100%;min-height:46px;margin-top:8px;border:1px solid #e1e3e5;border-radius:15px;background:#fff;color:#111;font-size:13px;font-weight:950}
-.ubee-store-v2-cart-list{display:grid;gap:9px}
-.ubee-store-v2-cart-item{border:1px solid #e5e7e9;border-radius:15px;padding:12px;background:#fafafa}
-.ubee-store-v2-cart-item-head{display:flex;justify-content:space-between;gap:10px}
-.ubee-store-v2-cart-item strong{font-size:13px;font-weight:1000}
-.ubee-store-v2-cart-item span{display:block;margin-top:4px;font-size:10px;color:#74797f;font-weight:800;line-height:1.5}
-.ubee-store-v2-cart-item button{border:0;background:transparent;color:#bd2e35;font-size:11px;font-weight:1000}
-.ubee-store-v2-cart-total{display:flex;justify-content:space-between;gap:10px;margin-top:12px;padding:12px 2px;border-top:1px solid #e4e6e8;font-size:15px;font-weight:1000}
-.ubee-store-v2-warning{margin-top:10px;padding:10px 11px;border-radius:12px;background:#fff5e6;color:#8a5200;font-size:11px;font-weight:850;line-height:1.6}
-.ubee-store-v2-toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));z-index:2147483500;transform:translateX(-50%);max-width:calc(100% - 36px);padding:10px 13px;border-radius:13px;background:rgba(17,17,17,.94);color:#fff;font-size:12px;font-weight:900;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:.18s ease}
-.ubee-store-v2-toast.show{opacity:1}
-@media(max-width:390px){.ubee-store-v2-card{flex-basis:180px}.ubee-store-v2-policy{grid-template-columns:1fr}.ubee-store-v2-overlay-product{padding:12px}.ubee-store-v2-top{padding-left:10px;padding-right:10px}}
+.ubee-store-v3-overlay{position:fixed;inset:0;z-index:2147483200;background:#f5f6f7;color:#111;display:none;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",sans-serif}
+.ubee-store-v3-overlay.show{display:block}
+.ubee-store-v3-shell{width:min(100%,520px);height:100%;margin:0 auto;display:flex;flex-direction:column;background:#f5f6f7;position:relative}
+.ubee-store-v3-top{display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;background:#fff;border-bottom:1px solid #e6e7e9;z-index:4}
+.ubee-store-v3-top>button{width:42px;height:42px;border:1px solid #e3e5e7;border-radius:14px;background:#fff;font-size:20px;font-weight:1000;padding:0}
+.ubee-store-v3-top-title{min-width:0;text-align:center}
+.ubee-store-v3-top-title strong{display:block;font-size:16px;font-weight:1000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ubee-store-v3-top-title span{display:block;margin-top:2px;font-size:10px;color:#80858b;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ubee-store-v3-scroll{flex:1;overflow:auto;padding:0 14px calc(132px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.ubee-store-v3-hero{margin:0 -14px 14px;background:#fff;border-bottom:1px solid #e8e9eb}
+.ubee-store-v3-cover{height:136px;background:#eceef0;overflow:hidden;position:relative}
+.ubee-store-v3-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.ubee-store-v3-cover-placeholder{width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,#f9e98e,#f8f1c9);font-size:44px;font-weight:1000;color:#7a6400}
+.ubee-store-v3-hero-copy{padding:14px}
+.ubee-store-v3-hero-brand{display:inline-flex;align-items:center;min-height:24px;padding:4px 8px;border-radius:999px;background:#fff8cf;color:#7d6200;font-size:10px;font-weight:1000;margin-bottom:7px}
+.ubee-store-v3-hero-copy h2{font-size:22px;line-height:1.25;font-weight:1000;margin:0;color:#111}
+.ubee-store-v3-hero-copy p{margin:6px 0 0;color:#71767c;font-size:11px;font-weight:800;line-height:1.55}
+.ubee-store-v3-search-wrap{position:sticky;top:0;z-index:3;background:#f5f6f7;padding:9px 0 8px}
+.ubee-store-v3-search{display:flex;align-items:center;gap:8px;border:1px solid #dde0e3;border-radius:15px;background:#fff;padding:0 11px;min-height:46px}
+.ubee-store-v3-search span{font-size:17px;color:#777}
+.ubee-store-v3-search input{flex:1;min-width:0;border:0!important;background:transparent!important;padding:0!important;outline:0;font-size:16px!important}
+.ubee-store-v3-category-rail{display:flex;gap:8px;overflow:auto;scrollbar-width:none;padding:2px 0 10px}
+.ubee-store-v3-category-rail::-webkit-scrollbar{display:none}
+.ubee-store-v3-category-rail button{flex:0 0 auto;border:1px solid #e0e2e5;border-radius:999px;background:#fff;color:#555;padding:8px 12px;font-size:11px;font-weight:1000}
+.ubee-store-v3-category-rail button.active{background:#111;color:#fff;border-color:#111}
+.ubee-store-v3-disclosure{padding:10px 12px;border-radius:13px;background:#fff9d9;color:#6a5600;font-size:10px;font-weight:850;line-height:1.6;margin-bottom:13px}
+.ubee-store-v3-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 1px 9px}
+.ubee-store-v3-section-title strong{font-size:17px;font-weight:1000}
+.ubee-store-v3-section-title span{font-size:10px;font-weight:850;color:#85898e}
+.ubee-store-v3-popular-row{display:flex;gap:9px;overflow:auto;scrollbar-width:none;padding-bottom:3px}
+.ubee-store-v3-popular-row::-webkit-scrollbar{display:none}
+.ubee-store-v3-popular-card{flex:0 0 165px;border:1px solid #e4e6e8;border-radius:17px;background:#fff;overflow:hidden;padding:0;text-align:left}
+.ubee-store-v3-popular-card .media{height:92px;background:#f0f1f2;overflow:hidden}
+.ubee-store-v3-popular-card .media img{width:100%;height:100%;object-fit:cover}
+.ubee-store-v3-popular-card .copy{padding:10px}
+.ubee-store-v3-popular-card strong{display:block;font-size:13px;font-weight:1000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ubee-store-v3-popular-card span{display:block;margin-top:5px;font-size:11px;font-weight:950;color:#977000}
+.ubee-store-v3-product-list{display:grid;gap:9px}
+.ubee-store-v3-product{display:grid;grid-template-columns:92px minmax(0,1fr) 40px;gap:11px;align-items:center;border:1px solid #e3e5e7;border-radius:18px;padding:10px;background:#fff;min-height:112px}
+.ubee-store-v3-product.soldout{opacity:.58}
+.ubee-store-v3-product-media{width:92px;height:92px;border-radius:14px;background:#f1f2f3;overflow:hidden;display:grid;place-items:center;color:#aaa;font-size:12px;font-weight:900}
+.ubee-store-v3-product-media img{width:100%;height:100%;object-fit:cover;display:block}
+.ubee-store-v3-product-copy{min-width:0}
+.ubee-store-v3-product-copy strong{display:block;font-size:15px;font-weight:1000;line-height:1.35;color:#111}
+.ubee-store-v3-product-copy p{margin:5px 0 0;color:#777c82;font-size:11px;font-weight:800;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ubee-store-v3-product-copy b{display:block;margin-top:7px;font-size:13px;color:#997100}
+.ubee-store-v3-add{width:38px;height:38px;border:0;border-radius:50%;background:#facc15;color:#111;font-size:22px;font-weight:1000;line-height:1;padding:0;display:grid;place-items:center}
+.ubee-store-v3-add:disabled{background:#ececec;color:#888}
+.ubee-store-v3-empty{padding:28px 17px;border:1px solid #e2e4e7;border-radius:18px;background:#fff;text-align:center;color:#666b71;font-size:12px;font-weight:850;line-height:1.7}
+.ubee-store-v3-empty strong{display:block;color:#111;font-size:17px;font-weight:1000;margin-bottom:5px}
+.ubee-store-v3-empty-action{width:100%;margin-top:12px;border:0;border-radius:14px;background:#facc15;color:#111;min-height:48px;font-size:13px;font-weight:1000}
+.ubee-store-v3-secondary{width:100%;margin-top:12px;border:1px solid #dfe1e4;border-radius:14px;background:#fff;color:#333;min-height:46px;font-size:12px;font-weight:1000}
+.ubee-store-v3-cartbar{position:absolute;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));display:none;align-items:center;justify-content:space-between;gap:12px;border:1px solid rgba(17,24,39,.10);border-radius:18px;background:#111;color:#fff;padding:12px 13px;box-shadow:0 15px 35px rgba(17,24,39,.22);z-index:6}
+.ubee-store-v3-cartbar.show{display:flex}
+.ubee-store-v3-cartbar span{display:block;font-size:10px;color:#d5d5d5;font-weight:800}
+.ubee-store-v3-cartbar strong{display:block;margin-top:2px;font-size:15px;font-weight:1000}
+.ubee-store-v3-cartbar button{border:0;background:#facc15;color:#111;border-radius:13px;padding:11px 14px;font-size:13px;font-weight:1000}
+.ubee-store-v3-sheet{position:fixed;inset:0;z-index:2147483300;background:rgba(17,24,39,.36);display:none;align-items:flex-end;justify-content:center;padding:0}
+.ubee-store-v3-sheet.show{display:flex}
+.ubee-store-v3-sheet-card{width:min(100%,520px);max-height:90vh;overflow:auto;background:#fff;border-radius:24px 24px 0 0;padding:16px 14px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -20px 50px rgba(17,24,39,.18)}
+.ubee-store-v3-sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}
+.ubee-store-v3-sheet-head strong{font-size:20px;font-weight:1000;line-height:1.3}
+.ubee-store-v3-sheet-head span{display:block;margin-top:4px;font-size:11px;color:#7c8187;font-weight:800}
+.ubee-store-v3-sheet-close{width:38px;height:38px;border:1px solid #e5e7e9;border-radius:12px;background:#fff;font-size:20px;padding:0;flex:0 0 auto}
+.ubee-store-v3-product-hero{width:100%;height:200px;border-radius:18px;background:#f1f2f3;overflow:hidden;margin-bottom:14px;display:grid;place-items:center;color:#aaa;font-size:13px;font-weight:900}
+.ubee-store-v3-product-hero img{width:100%;height:100%;object-fit:cover}
+.ubee-store-v3-field{margin-top:14px}
+.ubee-store-v3-field>label{display:block;margin-bottom:8px;font-size:13px;font-weight:1000}
+.ubee-store-v3-option-grid{display:grid;gap:7px}
+.ubee-store-v3-option{position:relative}
+.ubee-store-v3-option input{position:absolute;opacity:0;pointer-events:none}
+.ubee-store-v3-option span{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;padding:10px 12px;border:1px solid #dde0e3;border-radius:13px;background:#fff;font-size:12px;font-weight:900}
+.ubee-store-v3-option input:checked+span{border-color:#e8b900;background:#fff9d6;box-shadow:inset 0 0 0 1px #e8b900}
+.ubee-store-v3-pref-actions{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 4px}
+.ubee-store-v3-pref-actions button{border:1px solid #efd65a;border-radius:999px;background:#fff9d6;color:#705800;padding:7px 10px;font-size:10px;font-weight:1000}
+.ubee-store-v3-qty{display:grid;grid-template-columns:44px minmax(52px,72px) 44px;align-items:center;gap:8px}
+.ubee-store-v3-qty button{height:42px;border:1px solid #dde0e3;border-radius:12px;background:#fff;font-size:21px;font-weight:1000}
+.ubee-store-v3-qty input{height:42px;border:1px solid #dde0e3!important;border-radius:12px!important;background:#fafafa!important;padding:0 6px!important;text-align:center;font-size:16px!important;font-weight:1000}
+.ubee-store-v3-policy{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.ubee-store-v3-policy button{border:1px solid #dde0e3;border-radius:12px;background:#fff;min-height:44px;padding:7px;font-size:10px;font-weight:1000}
+.ubee-store-v3-policy button.active{border-color:#e8b900;background:#fff9d6;color:#6f5700}
+.ubee-store-v3-field textarea{width:100%;min-height:84px;border:1px solid #dde0e3;border-radius:14px;background:#fafafa;padding:11px 12px;font-size:16px;outline:none;resize:vertical}
+.ubee-store-v3-primary{width:100%;min-height:52px;margin-top:15px;border:0;border-radius:15px;background:#facc15;color:#111;font-size:14px;font-weight:1000}
+.ubee-store-v3-primary:disabled{background:#e6e6e6;color:#929292}
+.ubee-store-v3-warning{margin-top:10px;padding:10px 11px;border-radius:12px;background:#fff6df;color:#8b5b00;font-size:11px;font-weight:850;line-height:1.6}
+.ubee-store-v3-cart-list{display:grid;gap:9px}
+.ubee-store-v3-cart-item{border:1px solid #e3e5e7;border-radius:16px;background:#fff;padding:12px}
+.ubee-store-v3-cart-item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.ubee-store-v3-cart-item strong{font-size:13px;font-weight:1000}
+.ubee-store-v3-cart-item span{display:block;margin-top:4px;color:#777;font-size:10px;font-weight:800;line-height:1.5}
+.ubee-store-v3-cart-item b{display:block;font-size:12px;font-weight:1000;white-space:nowrap;text-align:right}
+.ubee-store-v3-cart-item button{border:0;background:transparent;color:#7b6200;font-size:10px;font-weight:1000;padding:5px 0 0 8px}
+.ubee-store-v3-cart-total{display:flex;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid #e8e9eb;font-size:15px;font-weight:1000}
+.ubee-store-v3-toast{position:fixed;left:50%;bottom:calc(112px + env(safe-area-inset-bottom));z-index:2147483400;transform:translate(-50%,16px);opacity:0;pointer-events:none;background:#111;color:#fff;border-radius:999px;padding:10px 14px;font-size:11px;font-weight:900;transition:.18s ease;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+.ubee-store-v3-toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:390px){.ubee-store-v3-policy{grid-template-columns:1fr}.ubee-store-v3-product{grid-template-columns:82px minmax(0,1fr) 38px}.ubee-store-v3-product-media{width:82px;height:82px}.ubee-store-v3-personal-card{flex-basis:185px}}
 </style>
-<script id="ubee-store-purchase-v2-script">
+
+<script id="ubee-store-purchase-v3-script">
 (() => {
   'use strict';
-  if(window.__UBEE_STORE_PURCHASE_V2__) return;
-  window.__UBEE_STORE_PURCHASE_V2__=true;
+  if(window.__UBEE_STORE_PURCHASE_V3__) return;
+  window.__UBEE_STORE_PURCHASE_V3__=true;
 
-  const VERSION='store-purchase-v2';
+  const VERSION='store-purchase-v3';
   const state={
     home:null,
     homeLoading:false,
     currentStore:null,
     catalog:null,
     catalogCache:new Map(),
-    cart:{storePlaceId:'',items:[]},
-    editingProduct:null,
+    cart:{storePlaceId:'',items:[],estimatedGoodsAmount:0},
+    activeCategory:'all',
+    searchQuery:'',
     toastTimer:null
   };
 
@@ -25380,89 +25420,88 @@ body.ubee-store-active #productionOrderFlow{
   }
 
   function toast(text){
-    let el=document.getElementById('ubeeStoreV2Toast');
-    if(!el){el=document.createElement('div');el.id='ubeeStoreV2Toast';el.className='ubee-store-v2-toast';document.body.appendChild(el);}
+    let el=document.getElementById('ubeeStoreV3Toast');
+    if(!el){el=document.createElement('div');el.id='ubeeStoreV3Toast';el.className='ubee-store-v3-toast';document.body.appendChild(el);}
     el.textContent=String(text||'');el.classList.add('show');clearTimeout(state.toastTimer);state.toastTimer=setTimeout(()=>el.classList.remove('show'),1900);
   }
 
+  function imageMarkup(url,alt,placeholder='UBee'){
+    const src=String(url||'').trim();
+    return src?`<img src="${esc(src)}" alt="${esc(alt||'商品圖片')}" loading="lazy" referrerpolicy="no-referrer">`:`<span>${esc(placeholder)}</span>`;
+  }
+
   function ensureOverlay(){
-    let overlay=document.getElementById('ubeeStoreV2Overlay');
+    let overlay=document.getElementById('ubeeStoreV3Overlay');
     if(overlay)return overlay;
-    overlay=document.createElement('div');overlay.id='ubeeStoreV2Overlay';overlay.className='ubee-store-v2-overlay';
-    overlay.innerHTML=`<div class="ubee-store-v2-shell"><header class="ubee-store-v2-top"><button type="button" id="ubeeStoreV2Close" aria-label="返回">‹</button><div class="ubee-store-v2-top-title"><strong id="ubeeStoreV2Title">店家商品</strong><span id="ubeeStoreV2Meta">選好規格後加入代買清單</span></div><button type="button" id="ubeeStoreV2Favorite" aria-label="收藏店家">☆</button></header><main class="ubee-store-v2-scroll" id="ubeeStoreV2Content"></main><div class="ubee-store-v2-cartbar" id="ubeeStoreV2Cartbar"><div><span id="ubeeStoreV2CartCount">代買清單</span><strong id="ubeeStoreV2CartTotal">NT$0</strong></div><button type="button" id="ubeeStoreV2OpenCart">查看清單</button></div></div>`;
+    overlay=document.createElement('div');
+    overlay.id='ubeeStoreV3Overlay';overlay.className='ubee-store-v3-overlay';
+    overlay.innerHTML=`<div class="ubee-store-v3-shell">
+      <header class="ubee-store-v3-top">
+        <button type="button" id="ubeeStoreV3Close" aria-label="返回">‹</button>
+        <div class="ubee-store-v3-top-title"><strong id="ubeeStoreV3Title">店家</strong><span id="ubeeStoreV3Meta">商城式代買</span></div>
+        <button type="button" id="ubeeStoreV3Favorite" aria-label="收藏店家">☆</button>
+      </header>
+      <main class="ubee-store-v3-scroll" id="ubeeStoreV3Content"></main>
+      <div class="ubee-store-v3-cartbar" id="ubeeStoreV3Cartbar">
+        <div><span id="ubeeStoreV3CartCount">代買清單</span><strong id="ubeeStoreV3CartTotal">NT$0</strong></div>
+        <button type="button" id="ubeeStoreV3OpenCart">查看清單</button>
+      </div>
+    </div>`;
     document.body.appendChild(overlay);
-    overlay.querySelector('#ubeeStoreV2Close')?.addEventListener('click',closeOverlay);
-    overlay.querySelector('#ubeeStoreV2Favorite')?.addEventListener('click',toggleCurrentFavorite);
-    overlay.querySelector('#ubeeStoreV2OpenCart')?.addEventListener('click',openCartSheet);
+    overlay.querySelector('#ubeeStoreV3Close')?.addEventListener('click',closeOverlay);
+    overlay.querySelector('#ubeeStoreV3Favorite')?.addEventListener('click',toggleCurrentFavorite);
+    overlay.querySelector('#ubeeStoreV3OpenCart')?.addEventListener('click',openCartSheet);
     return overlay;
   }
 
   function ensureSheet(){
-    let sheet=document.getElementById('ubeeStoreV2Sheet');
+    let sheet=document.getElementById('ubeeStoreV3Sheet');
     if(sheet)return sheet;
-    sheet=document.createElement('div');sheet.id='ubeeStoreV2Sheet';sheet.className='ubee-store-v2-sheet';sheet.innerHTML='<div class="ubee-store-v2-sheet-card" id="ubeeStoreV2SheetCard"></div>';
+    sheet=document.createElement('div');sheet.id='ubeeStoreV3Sheet';sheet.className='ubee-store-v3-sheet';sheet.innerHTML='<div class="ubee-store-v3-sheet-card" id="ubeeStoreV3SheetCard"></div>';
     document.body.appendChild(sheet);
     sheet.addEventListener('click',event=>{if(event.target===sheet)closeSheet();});
     return sheet;
   }
-  function closeSheet(){document.getElementById('ubeeStoreV2Sheet')?.classList.remove('show')}
-  function showSheet(html){const sheet=ensureSheet();const card=sheet.querySelector('#ubeeStoreV2SheetCard');card.innerHTML=html;sheet.classList.add('show');card.scrollTop=0;return card}
-  function closeOverlay(){document.getElementById('ubeeStoreV2Overlay')?.classList.remove('show');document.body.style.overflow=''}
+  function closeSheet(){document.getElementById('ubeeStoreV3Sheet')?.classList.remove('show');}
+  function showSheet(html){const sheet=ensureSheet();const card=sheet.querySelector('#ubeeStoreV3SheetCard');card.innerHTML=html;sheet.classList.add('show');card.scrollTop=0;return card;}
+  function closeOverlay(){document.getElementById('ubeeStoreV3Overlay')?.classList.remove('show');document.body.style.overflow='';}
 
   function currentFavorite(){
     const id=storeId(state.currentStore);if(!id)return false;
     return Boolean(state.home?.favorites?.some(row=>storeId(row.store)===id)||state.catalog?.favorite===true);
   }
   function renderFavoriteButton(){
-    const btn=document.getElementById('ubeeStoreV2Favorite');if(!btn)return;
-    const active=currentFavorite();btn.textContent=active?'★':'☆';btn.setAttribute('aria-label',active?'取消收藏店家':'收藏店家');
+    const btn=document.getElementById('ubeeStoreV3Favorite');if(!btn)return;
+    const active=currentFavorite();btn.textContent=active?'★':'☆';btn.classList.toggle('active',active);btn.setAttribute('aria-label',active?'取消收藏店家':'收藏店家');
   }
-
   async function setFavorite(store,favorite){
-    const normalized=cleanStore(store);
-    if(!normalized.placeId)throw new Error('店家識別資料不完整。');
+    const normalized=cleanStore(store);if(!normalized.placeId)throw new Error('店家識別資料不完整。');
     const data=await api('/api/customer/store-favorites/toggle',{method:'POST',body:JSON.stringify({store:normalized,favorite})});
     state.catalog={...(state.catalog||{}),favorite:data.favorite===true};
-    await refreshHome(true);
-    renderFavoriteButton();
-    toast(data.favorite?'已收藏店家':'已取消收藏');
-    return data.favorite===true;
+    await refreshHome(true);renderFavoriteButton();toast(data.favorite?'已收藏店家':'已取消收藏');return data.favorite===true;
   }
-  async function toggleCurrentFavorite(){try{await setFavorite(state.currentStore,!currentFavorite())}catch(error){alert(error.message||'收藏更新失敗。')}}
+  async function toggleCurrentFavorite(){try{await setFavorite(state.currentStore,!currentFavorite());}catch(error){alert(error.message||'收藏更新失敗。');}}
 
-  function purchaseLabel(items=[]){
-    return items.slice(0,2).map(item=>`${item.productName||'商品'} ×${item.quantity||1}`).join('、')+(items.length>2?` 等 ${items.length} 項`:'');
-  }
-  function personalCard(kicker,title,desc,action,actionValue,extra=''){
-    return `<button class="ubee-store-v2-card" type="button" data-v2-action="${esc(action)}" data-v2-value="${esc(actionValue)}"><span class="ubee-store-v2-card-kicker">${esc(kicker)}</span><strong>${esc(title)}</strong><span>${esc(desc)}</span>${extra?`<small>${esc(extra)}</small>`:''}</button>`;
-  }
+  function purchaseLabel(items=[]){return items.slice(0,2).map(item=>`${item.productName||'商品'} ×${item.quantity||1}`).join('、')+(items.length>2?` 等 ${items.length} 項`:'');}
+  function personalCard(kicker,title,desc,action,value,extra=''){return `<button class="ubee-store-v3-personal-card" type="button" data-v3-action="${esc(action)}" data-v3-value="${esc(value)}"><em>${esc(kicker)}</em><strong>${esc(title)}</strong><span>${esc(desc)}</span>${extra?`<small>${esc(extra)}</small>`:''}</button>`;}
 
   function renderPersonalizedHome(){
-    const scroll=document.querySelector('#productionOrderFlow .flow-page[data-page="stores"] .ubee-store-scroll');
-    if(!scroll)return;
-    let host=document.getElementById('ubeeStorePersonalizedV2');
-    if(!host){host=document.createElement('div');host.id='ubeeStorePersonalizedV2';host.className='ubee-store-v2-personalized';const before=scroll.querySelector('.ubee-store-search-shell');if(before)scroll.insertBefore(host,before);else scroll.prepend(host);}
-    const home=state.home||{};
+    const scroll=document.querySelector('#productionOrderFlow .flow-page[data-page="stores"] .ubee-store-scroll');if(!scroll)return;
+    let host=document.getElementById('ubeeStorePersonalizedV3');
+    if(!host){host=document.createElement('div');host.id='ubeeStorePersonalizedV3';host.className='ubee-store-v3-personalized';const before=scroll.querySelector('.ubee-store-search-shell');if(before)scroll.insertBefore(host,before);else scroll.prepend(host);}
+    const home=state.home||{},recent=Array.isArray(home.recent)?home.recent:[],frequent=Array.isArray(home.frequent)?home.frequent:[],favorites=Array.isArray(home.favorites)?home.favorites:[],popular=Array.isArray(home.popular)?home.popular:[];
     const sections=[];
-    const recent=Array.isArray(home.recent)?home.recent:[];
-    const frequent=Array.isArray(home.frequent)?home.frequent:[];
-    const favorites=Array.isArray(home.favorites)?home.favorites:[];
-    const popular=Array.isArray(home.popular)?home.popular:[];
-    if(recent.length)sections.push(`<section class="ubee-store-v2-section"><div class="ubee-store-v2-section-head"><strong>最近購買</strong><span>快速再買一次</span></div><div class="ubee-store-v2-row">${recent.slice(0,8).map(row=>personalCard('最近買過',row.store?.name||'店家',purchaseLabel(row.items),'reorder',row.orderId,row.usedAtMs?new Date(row.usedAtMs).toLocaleDateString('zh-TW'):'' )).join('')}</div></section>`);
-    if(frequent.length)sections.push(`<section class="ubee-store-v2-section"><div class="ubee-store-v2-section-head"><strong>常買</strong><span>依近 90 天完成紀錄</span></div><div class="ubee-store-v2-row">${frequent.slice(0,8).map(row=>personalCard(`已買 ${row.count||1} 次`,row.store?.name||'店家',purchaseLabel(row.items),'reorder',row.orderId,'再次代買')).join('')}</div></section>`);
-    if(favorites.length)sections.push(`<section class="ubee-store-v2-section"><div class="ubee-store-v2-section-head"><strong>收藏店家</strong><span>你的常用店家</span></div><div class="ubee-store-v2-row">${favorites.slice(0,10).map((row,index)=>personalCard('★ 已收藏',row.store?.name||'店家',row.store?.address||'','favorite',String(index),'查看商品')).join('')}</div></section>`);
-    if(popular.length)sections.push(`<section class="ubee-store-v2-section"><div class="ubee-store-v2-section-head"><strong>熱門商品</strong><span>近期多人委託代買</span></div><div class="ubee-store-v2-row">${popular.slice(0,10).map((row,index)=>personalCard('🔥 熱門',row.productName,row.storeName||'店家','popular',String(index),row.basePrice!=null?money(row.basePrice):'')).join('')}</div></section>`);
-    host.innerHTML=sections.join('');
-    host.hidden=!sections.length;
+    if(recent.length)sections.push(`<section class="ubee-store-v3-section"><div class="ubee-store-v3-section-head"><strong>最近購買</strong><span>快速再買一次</span></div><div class="ubee-store-v3-row">${recent.slice(0,8).map(row=>personalCard('最近買過',row.store?.name||'店家',purchaseLabel(row.items),'reorder',row.orderId,row.usedAtMs?new Date(row.usedAtMs).toLocaleDateString('zh-TW'):'' )).join('')}</div></section>`);
+    if(frequent.length)sections.push(`<section class="ubee-store-v3-section"><div class="ubee-store-v3-section-head"><strong>常買</strong><span>依近 90 天完成紀錄</span></div><div class="ubee-store-v3-row">${frequent.slice(0,8).map(row=>personalCard(`已買 ${row.count||1} 次`,row.store?.name||'店家',purchaseLabel(row.items),'reorder',row.orderId,'再次代買')).join('')}</div></section>`);
+    if(favorites.length)sections.push(`<section class="ubee-store-v3-section"><div class="ubee-store-v3-section-head"><strong>收藏店家</strong><span>你的常用店家</span></div><div class="ubee-store-v3-row">${favorites.slice(0,10).map((row,index)=>personalCard('★ 已收藏',row.store?.name||'店家',row.store?.address||'','favorite',String(index),'逛店家')).join('')}</div></section>`);
+    if(popular.length)sections.push(`<section class="ubee-store-v3-section"><div class="ubee-store-v3-section-head"><strong>熱門商品</strong><span>近期多人委託代買</span></div><div class="ubee-store-v3-row">${popular.slice(0,10).map((row,index)=>personalCard('🔥 熱門',row.productName,row.storeName||'店家','popular',String(index),row.basePrice!=null?money(row.basePrice):'')).join('')}</div></section>`);
+    host.innerHTML=sections.join('');host.hidden=!sections.length;
     host.onclick=event=>{
-      const button=event.target.closest('[data-v2-action]');if(!button)return;
-      const action=button.dataset.v2Action,value=button.dataset.v2Value;
+      const button=event.target.closest('[data-v3-action]');if(!button)return;
+      const action=button.dataset.v3Action,value=button.dataset.v3Value;
       if(action==='reorder')return reorderOrder(value);
       if(action==='favorite')return open(favorites[Number(value)]?.store||{});
-      if(action==='popular'){
-        const row=popular[Number(value)]||{};
-        return open({placeId:row.storePlaceId,name:row.storeName,address:row.storeAddress,category:row.storeCategory,source:'google'} ,{focusProductId:row.productId});
-      }
+      if(action==='popular'){const row=popular[Number(value)]||{};return open({placeId:row.storePlaceId,name:row.storeName,address:row.storeAddress,category:row.storeCategory,source:'google'},{focusProductId:row.productId});}
     };
   }
 
@@ -25470,231 +25509,189 @@ body.ubee-store-active #productionOrderFlow{
     if(state.homeLoading)return state.home;
     if(state.home&&!force){renderPersonalizedHome();return state.home;}
     state.homeLoading=true;
-    try{state.home=await api('/api/customer/store-home');renderPersonalizedHome();decorateStoreCards();return state.home}
-    catch(error){console.warn('Store V2 個人化首頁讀取失敗：',error);return state.home}
-    finally{state.homeLoading=false}
+    try{state.home=await api('/api/customer/store-home');renderPersonalizedHome();decorateStoreCards();syncMyFavoritesPanel();return state.home;}
+    catch(error){console.warn('Store V3 個人化首頁讀取失敗：',error);return state.home;}
+    finally{state.homeLoading=false;}
   }
 
   function decorateStoreCards(){
     const favoriteIds=new Set((state.home?.favorites||[]).map(row=>storeId(row.store)));
     document.querySelectorAll('#ubeeStoreList .ubee-store-card[data-store-id]').forEach(card=>{
-      const id=card.dataset.storeId||'';
-      card.classList.toggle('ubee-store-v2-favorite-store',favoriteIds.has(id));
-      const titleRow=card.querySelector('.ubee-store-card-title-row');
-      if(titleRow&&!titleRow.querySelector('[data-v2-card-favorite]')){
-        const star=document.createElement('span');star.dataset.v2CardFavorite='1';star.style.cssText='font-size:15px;color:#d3a300;margin-left:auto';star.textContent=favoriteIds.has(id)?'★':'';titleRow.appendChild(star);
-      }else if(titleRow?.querySelector('[data-v2-card-favorite]')){
-        titleRow.querySelector('[data-v2-card-favorite]').textContent=favoriteIds.has(id)?'★':'';
-      }
+      const id=card.dataset.storeId||'';const titleRow=card.querySelector('.ubee-store-card-title-row');
+      if(titleRow&&!titleRow.querySelector('[data-v3-card-favorite]')){const star=document.createElement('span');star.dataset.v3CardFavorite='1';star.style.cssText='font-size:15px;color:#d3a300;margin-left:auto';titleRow.appendChild(star);}
+      const star=titleRow?.querySelector('[data-v3-card-favorite]');if(star)star.textContent=favoriteIds.has(id)?'★':'';
     });
   }
 
   async function loadCatalog(store,{force=false}={}){
-    const id=storeId(store);if(!id)throw new Error('店家識別資料不完整。');
-    if(!force&&state.catalogCache.has(id))return state.catalogCache.get(id);
-    const data=await api(`/api/customer/stores/${encodeURIComponent(id)}/catalog`);
-    state.catalogCache.set(id,data);
-    return data;
+    const normalized=cleanStore(store),id=normalized.placeId;if(!id)throw new Error('店家識別資料不完整。');
+    const cacheKey=[id,normalized.name,normalized.address].join('|');
+    if(!force&&state.catalogCache.has(cacheKey))return state.catalogCache.get(cacheKey);
+    const params=new URLSearchParams();
+    if(normalized.name)params.set('name',normalized.name);if(normalized.address)params.set('address',normalized.address);if(normalized.category)params.set('category',normalized.category);if(normalized.source)params.set('source',normalized.source);
+    const data=await api(`/api/customer/stores/${encodeURIComponent(id)}/catalog?${params.toString()}`);
+    state.catalogCache.set(cacheKey,data);return data;
   }
 
   function optionSpec(product,selections){
-    const rows=[];
-    for(const selected of selections||[]){
-      const group=product.optionGroups?.find(row=>row.id===selected.groupId);
-      const names=(selected.optionIds||[]).map(optionId=>group?.options?.find(option=>option.id===optionId)?.name).filter(Boolean);
-      if(group&&names.length)rows.push(`${group.name}：${names.join('、')}`);
-    }
-    return rows.join('；');
+    const rows=[];for(const selected of selections||[]){const group=product.optionGroups?.find(row=>row.id===selected.groupId);const names=(selected.optionIds||[]).map(optionId=>group?.options?.find(option=>option.id===optionId)?.name).filter(Boolean);if(group&&names.length)rows.push(`${group.name}：${names.join('、')}`);}return rows.join('；');
   }
   function calculateCartLine(product,quantity,selections){
-    let unit=Number(product.basePrice||0);
-    for(const selected of selections||[]){
-      const group=product.optionGroups?.find(row=>row.id===selected.groupId);
-      for(const optionId of selected.optionIds||[]){unit+=Number(group?.options?.find(option=>option.id===optionId)?.priceDelta||0)}
-    }
-    return Math.max(0,Math.round(unit))*Math.max(1,Number(quantity||1));
+    let unit=Number(product.basePrice||0);for(const selected of selections||[]){const group=product.optionGroups?.find(row=>row.id===selected.groupId);for(const optionId of selected.optionIds||[])unit+=Number(group?.options?.find(option=>option.id===optionId)?.priceDelta||0);}return Math.max(0,Math.round(unit))*Math.max(1,Number(quantity||1));
   }
-  function recalcCart(){
-    let total=0;
-    for(const item of state.cart.items){if(Number.isFinite(Number(item.lineEstimatedTotal)))total+=Number(item.lineEstimatedTotal)}
-    state.cart.estimatedGoodsAmount=Math.max(0,Math.round(total));
-    renderCartbar();
-  }
-  function resetCartForStore(store){
-    const id=storeId(store);
-    if(state.cart.storePlaceId!==id)state.cart={storePlaceId:id,items:[],estimatedGoodsAmount:0};
-  }
+  function resetCartForStore(store){const id=storeId(store);if(state.cart.storePlaceId!==id)state.cart={storePlaceId:id,items:[],estimatedGoodsAmount:0};}
+  function recalcCart(){state.cart.estimatedGoodsAmount=Math.max(0,Math.round(state.cart.items.reduce((sum,item)=>sum+(Number.isFinite(Number(item.lineEstimatedTotal))?Number(item.lineEstimatedTotal):0),0)));renderCartbar();}
   function renderCartbar(){
-    const bar=document.getElementById('ubeeStoreV2Cartbar');if(!bar)return;
-    const count=state.cart.items.reduce((sum,item)=>sum+Math.max(1,Number(item.quantity||1)),0);
-    bar.classList.toggle('show',count>0);
-    const countEl=document.getElementById('ubeeStoreV2CartCount'),totalEl=document.getElementById('ubeeStoreV2CartTotal');
-    if(countEl)countEl.textContent=`代買清單・${count} 件`;
-    if(totalEl)totalEl.textContent=money(state.cart.estimatedGoodsAmount||0);
+    const bar=document.getElementById('ubeeStoreV3Cartbar');if(!bar)return;const count=state.cart.items.reduce((sum,item)=>sum+Math.max(1,Number(item.quantity||1)),0);bar.classList.toggle('show',count>0);
+    const c=document.getElementById('ubeeStoreV3CartCount'),t=document.getElementById('ubeeStoreV3CartTotal');if(c)c.textContent=`代買清單・${count} 件`;if(t)t.textContent=money(state.cart.estimatedGoodsAmount||0);
+  }
+
+  function storeHeroMarkup(){
+    const store=state.currentStore||{},brand=state.catalog?.brand||{},photo=brand.coverUrl||store.photoUrl||state.catalog?.store?.photoUrl||'';
+    const brandName=brand.name||'';const address=store.address||state.catalog?.store?.address||'';
+    return `<section class="ubee-store-v3-hero"><div class="ubee-store-v3-cover">${photo?`<img src="${esc(photo)}" alt="${esc(store.name||'店家')}" referrerpolicy="no-referrer">`:'<div class="ubee-store-v3-cover-placeholder">UBee</div>'}</div><div class="ubee-store-v3-hero-copy">${brandName?`<span class="ubee-store-v3-hero-brand">${esc(brandName)} 品牌菜單</span>`:''}<h2>${esc(store.name||'指定店家')}</h2><p>${esc(address||'店家地址以目前選擇資料為準')}<br>商品由小U依你的代買清單前往購買。</p></div></section>`;
   }
 
   function productCard(product){
-    const unavailable=product.soldOut===true||product.enabled===false;
-    const optionText=(product.optionGroups||[]).map(group=>group.name).slice(0,3).join('・');
-    return `<article class="ubee-store-v2-overlay-product ${unavailable?'soldout':''}"><div><strong>${esc(product.name)}</strong><p>${esc(product.description||optionText||'選擇商品規格與數量')}</p><b>${money(product.basePrice)}${product.optionGroups?.some(group=>group.options?.some(option=>Number(option.priceDelta)>0))?' 起':''}</b></div><button type="button" data-v2-product="${esc(product.productId)}" ${unavailable?'disabled':''}>${unavailable?'已售完':'選擇規格'}</button></article>`;
+    const unavailable=product.soldOut===true||product.enabled===false;const optionText=(product.optionGroups||[]).map(group=>group.name).slice(0,3).join('・');
+    return `<article class="ubee-store-v3-product ${unavailable?'soldout':''}" data-v3-product-card="${esc(product.productId)}"><div class="ubee-store-v3-product-media">${imageMarkup(product.imageUrl,product.name,'商品')}</div><div class="ubee-store-v3-product-copy"><strong>${esc(product.name)}</strong><p>${esc(product.description||optionText||'選擇商品規格與數量')}</p><b>${money(product.basePrice)}${product.optionGroups?.some(group=>group.options?.some(option=>Number(option.priceDelta)>0))?' 起':''}</b></div><button class="ubee-store-v3-add" type="button" data-v3-product="${esc(product.productId)}" ${unavailable?'disabled':''} aria-label="${unavailable?'目前售完':'加入 '+esc(product.name)}">${unavailable?'×':'+'}</button></article>`;
   }
+
   function renderOverlayCatalog(){
-    const content=document.getElementById('ubeeStoreV2Content');if(!content)return;
-    const products=Array.isArray(state.catalog?.products)?state.catalog.products:[];
-    if(!products.length){content.innerHTML='<div class="ubee-store-v2-empty">這間店目前尚未建立 UBee 商品清單。<br>仍可使用「自行填寫代買內容」建立跑腿需求。</div><button class="ubee-store-v2-secondary" id="ubeeStoreV2ManualPurchase" type="button">自行填寫代買內容</button>';content.querySelector('#ubeeStoreV2ManualPurchase')?.addEventListener('click',manualPurchase);return;}
-    const categories=[...new Set(products.map(product=>product.category||'其他'))];
-    content.innerHTML=`<div class="ubee-store-v2-disclosure">${esc(state.catalog?.disclosure||'商品與價格為參考資訊，實際價格、供應與庫存以店家現場為準。')}</div>${categories.map(category=>`<div class="ubee-store-v2-category">${esc(category)}</div><div class="ubee-store-v2-grid">${products.filter(product=>(product.category||'其他')===category).map(productCard).join('')}</div>`).join('')}<button class="ubee-store-v2-secondary" id="ubeeStoreV2ManualPurchase" type="button">找不到商品？自行填寫代買內容</button>`;
-    content.querySelectorAll('[data-v2-product]').forEach(button=>button.addEventListener('click',()=>openProduct(button.dataset.v2Product)));
-    content.querySelector('#ubeeStoreV2ManualPurchase')?.addEventListener('click',manualPurchase);
+    const content=document.getElementById('ubeeStoreV3Content');if(!content)return;
+    const all=Array.isArray(state.catalog?.products)?state.catalog.products:[];
+    const categories=Array.isArray(state.catalog?.categories)&&state.catalog.categories.length?state.catalog.categories:[...new Set(all.map(p=>p.category||'其他'))];
+    if(state.activeCategory!=='all'&&!categories.includes(state.activeCategory))state.activeCategory='all';
+    const query=String(state.searchQuery||'').trim().toLowerCase();
+    const filtered=all.filter(product=>{
+      const categoryOk=state.activeCategory==='all'||(product.category||'其他')===state.activeCategory;
+      const hay=[product.name,product.description,product.category].join(' ').toLowerCase();return categoryOk&&(!query||hay.includes(query));
+    });
+    const popularIds=new Set((state.catalog?.popular||[]).map(row=>row.productId));
+    const popularProducts=all.filter(product=>popularIds.has(product.productId)&&product.enabled!==false&&!product.soldOut).slice(0,8);
+    const categoryRail=`<div class="ubee-store-v3-category-rail"><button type="button" data-v3-category="all" class="${state.activeCategory==='all'?'active':''}">全部</button>${categories.map(c=>`<button type="button" data-v3-category="${esc(c)}" class="${state.activeCategory===c?'active':''}">${esc(c)}</button>`).join('')}</div>`;
+    let body='';
+    if(!all.length){
+      body=`<div class="ubee-store-v3-empty"><strong>店內商品資訊同步中</strong>這家店目前尚未有可直接選擇的 UBee 商城商品。你仍可從同一間店建立代買需求，不需要離開店家流程。<button class="ubee-store-v3-empty-action" id="ubeeStoreV3ManualPurchase" type="button">描述想買的商品</button></div>`;
+    }else if(!filtered.length){
+      body=`<div class="ubee-store-v3-empty"><strong>找不到符合的商品</strong>可以清除搜尋、切換分類，或直接描述想買的商品。<button class="ubee-store-v3-empty-action" id="ubeeStoreV3ManualPurchase" type="button">描述想買的商品</button></div>`;
+    }else{
+      const popularMarkup=!query&&state.activeCategory==='all'&&popularProducts.length?`<div class="ubee-store-v3-section-title"><strong>熱門商品</strong><span>近期多人代買</span></div><div class="ubee-store-v3-popular-row">${popularProducts.map(product=>`<button class="ubee-store-v3-popular-card" type="button" data-v3-popular-product="${esc(product.productId)}"><div class="media">${imageMarkup(product.imageUrl,product.name,'熱門')}</div><div class="copy"><strong>${esc(product.name)}</strong><span>${money(product.basePrice)}</span></div></button>`).join('')}</div>`:'';
+      if(state.activeCategory==='all'&&!query){
+        body=popularMarkup+categories.map(category=>{const rows=filtered.filter(product=>(product.category||'其他')===category);return rows.length?`<div class="ubee-store-v3-section-title"><strong>${esc(category)}</strong><span>${rows.length} 項</span></div><div class="ubee-store-v3-product-list">${rows.map(productCard).join('')}</div>`:'';}).join('');
+      }else{
+        body=`<div class="ubee-store-v3-section-title"><strong>${state.activeCategory==='all'?'搜尋結果':esc(state.activeCategory)}</strong><span>${filtered.length} 項</span></div><div class="ubee-store-v3-product-list">${filtered.map(productCard).join('')}</div>`;
+      }
+      body+=`<button class="ubee-store-v3-secondary" id="ubeeStoreV3ManualPurchase" type="button">找不到商品？描述想買的商品</button>`;
+    }
+    content.innerHTML=`${storeHeroMarkup()}<div class="ubee-store-v3-search-wrap"><label class="ubee-store-v3-search"><span>⌕</span><input id="ubeeStoreV3SearchInput" type="search" maxlength="80" value="${esc(state.searchQuery)}" placeholder="搜尋店內商品"></label>${categoryRail}</div><div class="ubee-store-v3-disclosure">${esc(state.catalog?.disclosure||'商品與價格為參考資訊，實際價格、供應與庫存以店家現場為準。')}</div>${body}`;
+    content.querySelector('#ubeeStoreV3SearchInput')?.addEventListener('input',event=>{state.searchQuery=event.target.value||'';const y=content.scrollTop;renderOverlayCatalog();content.scrollTop=Math.min(y,content.scrollHeight);document.getElementById('ubeeStoreV3SearchInput')?.focus();});
+    content.querySelectorAll('[data-v3-category]').forEach(button=>button.addEventListener('click',()=>{state.activeCategory=button.dataset.v3Category||'all';state.searchQuery='';renderOverlayCatalog();content.scrollTop=130;}));
+    content.querySelectorAll('[data-v3-product]').forEach(button=>button.addEventListener('click',()=>openProduct(button.dataset.v3Product)));
+    content.querySelectorAll('[data-v3-product-card]').forEach(card=>card.addEventListener('click',event=>{if(event.target.closest('button'))return;openProduct(card.dataset.v3ProductCard);}));
+    content.querySelectorAll('[data-v3-popular-product]').forEach(button=>button.addEventListener('click',()=>openProduct(button.dataset.v3PopularProduct)));
+    content.querySelector('#ubeeStoreV3ManualPurchase')?.addEventListener('click',manualPurchase);
   }
 
   function hydrateCartFromPayload(payload){
-    const products=state.catalog?.products||[];
-    const result=[];
-    for(const raw of payload?.items||[]){
-      const product=products.find(row=>row.productId===raw.productId);if(!product)continue;
-      const selections=Array.isArray(raw.selections)?raw.selections.map(row=>({groupId:String(row.groupId||''),optionIds:Array.isArray(row.optionIds)?row.optionIds.map(String):[]})):[];
-      const quantity=Math.max(1,Number(raw.quantity||1));
-      result.push({
-        productId:product.productId,productName:product.name,productVersion:product.version,quantity,selections,
-        specificationText:optionSpec(product,selections),note:String(raw.note||''),outOfStockAction:String(raw.outOfStockAction||'contact_customer'),
-        lineEstimatedTotal:calculateCartLine(product,quantity,selections),needsReview:raw.needsReview===true
-      });
-    }
-    state.cart={storePlaceId:storeId(state.currentStore),items:result};recalcCart();
+    const products=state.catalog?.products||[],result=[];
+    for(const raw of payload?.items||[]){const product=products.find(row=>row.productId===raw.productId);if(!product)continue;const selections=Array.isArray(raw.selections)?raw.selections.map(row=>({groupId:String(row.groupId||''),optionIds:Array.isArray(row.optionIds)?row.optionIds.map(String):[]})):[];const quantity=Math.max(1,Number(raw.quantity||1));result.push({productId:product.productId,productName:product.name,productVersion:product.version,catalogSource:product.catalogSource||'',brandId:product.brandId||'',brandProductId:product.brandProductId||'',quantity,selections,specificationText:optionSpec(product,selections),note:String(raw.note||''),outOfStockAction:String(raw.outOfStockAction||'contact_customer'),lineEstimatedTotal:calculateCartLine(product,quantity,selections),needsReview:raw.needsReview===true});}
+    state.cart={storePlaceId:storeId(state.currentStore),items:result,estimatedGoodsAmount:0};recalcCart();
   }
 
   async function open(store,options={}){
     const normalized=cleanStore(store);if(!normalized.placeId)throw new Error('店家識別資料不完整。');
-    state.currentStore={...store,...normalized};resetCartForStore(state.currentStore);
+    state.currentStore={...store,...normalized};resetCartForStore(state.currentStore);state.activeCategory='all';state.searchQuery='';
     const overlay=ensureOverlay();overlay.classList.add('show');document.body.style.overflow='hidden';
-    document.getElementById('ubeeStoreV2Title').textContent=normalized.name;
-    document.getElementById('ubeeStoreV2Meta').textContent='選商品・規格・數量後加入代買清單';
-    document.getElementById('ubeeStoreV2Content').innerHTML='<div class="ubee-store-v2-empty">商品資料載入中…</div>';
+    document.getElementById('ubeeStoreV3Title').textContent=normalized.name;document.getElementById('ubeeStoreV3Meta').textContent='商城式代買・選商品加入清單';
+    document.getElementById('ubeeStoreV3Content').innerHTML='<div class="ubee-store-v3-empty" style="margin-top:14px"><strong>正在開啟店家</strong>商品、分類與個人化規格載入中…</div>';
     try{
       state.catalog=await loadCatalog(normalized,{force:options.force===true});
+      if(state.catalog?.store)state.currentStore={...state.currentStore,...cleanStore({...state.currentStore,...state.catalog.store})};
       if(options.restoreCart)hydrateCartFromPayload(options.restoreCart);
-      renderFavoriteButton();renderOverlayCatalog();renderCartbar();
-      if(options.focusProductId){setTimeout(()=>openProduct(options.focusProductId),80)}
-    }catch(error){document.getElementById('ubeeStoreV2Content').innerHTML=`<div class="ubee-store-v2-empty">${esc(error.message||'商品資料暫時無法讀取。')}</div><button class="ubee-store-v2-secondary" id="ubeeStoreV2Retry" type="button">重新載入</button><button class="ubee-store-v2-secondary" id="ubeeStoreV2ManualPurchase" type="button">改用自行填寫代買</button>`;document.getElementById('ubeeStoreV2Retry')?.addEventListener('click',()=>open(state.currentStore,{force:true}));document.getElementById('ubeeStoreV2ManualPurchase')?.addEventListener('click',manualPurchase)}
+      const brandName=state.catalog?.brand?.name||'';document.getElementById('ubeeStoreV3Meta').textContent=brandName?`${brandName}・商城式代買`:'商城式代買・選商品加入清單';
+      renderFavoriteButton();renderOverlayCatalog();renderCartbar();if(options.focusProductId)setTimeout(()=>openProduct(options.focusProductId),80);
+    }catch(error){
+      document.getElementById('ubeeStoreV3Content').innerHTML=`${storeHeroMarkup()}<div class="ubee-store-v3-empty"><strong>店家商品暫時無法載入</strong>${esc(error.message||'請稍後再試。')}<button class="ubee-store-v3-empty-action" id="ubeeStoreV3Retry" type="button">重新載入</button><button class="ubee-store-v3-secondary" id="ubeeStoreV3ManualPurchase" type="button">描述想買的商品</button></div>`;
+      document.getElementById('ubeeStoreV3Retry')?.addEventListener('click',()=>open(state.currentStore,{force:true}));document.getElementById('ubeeStoreV3ManualPurchase')?.addEventListener('click',manualPurchase);
+    }
   }
 
-  function manualPurchase(){const store=state.currentStore;closeSheet();closeOverlay();if(typeof window.openUBeeStorePurchase==='function')window.openUBeeStorePurchase(store)}
-
-  function selectionFromPreference(pref){
-    if(!pref?.selections)return[];
-    const grouped=new Map();
-    for(const row of pref.selections){const current=grouped.get(row.groupId)||{groupId:row.groupId,optionIds:[]};if(row.optionId)current.optionIds.push(row.optionId);grouped.set(row.groupId,current)}
-    return [...grouped.values()];
-  }
+  function manualPurchase(){const store=state.currentStore;closeSheet();closeOverlay();if(typeof window.openUBeeStorePurchase==='function')window.openUBeeStorePurchase(store);}
+  function selectionFromPreference(pref){if(!pref?.selections)return[];const grouped=new Map();for(const row of pref.selections){const current=grouped.get(row.groupId)||{groupId:row.groupId,optionIds:[]};if(row.optionId)current.optionIds.push(row.optionId);grouped.set(row.groupId,current);}return [...grouped.values()];}
 
   function openProduct(productId,preset=null,editIndex=null){
-    const product=state.catalog?.products?.find(row=>row.productId===productId);if(!product||product.soldOut)return;
-    const preference=state.catalog?.preferences?.[product.productId]||{};
-    const initialSelections=preset?.selections||[];
-    const selectedMap=new Map(initialSelections.map(row=>[row.groupId,new Set(row.optionIds||[])]));
-    const groupHtml=(product.optionGroups||[]).map(group=>{
-      const type=group.type==='multi'?'checkbox':'radio';
-      const options=(group.options||[]).map(option=>`<label class="ubee-store-v2-option"><input type="${type}" name="v2_${esc(group.id)}" data-v2-group="${esc(group.id)}" value="${esc(option.id)}" ${selectedMap.get(group.id)?.has(option.id)?'checked':''}><span>${esc(option.name)}${Number(option.priceDelta)?` ${Number(option.priceDelta)>0?'+':''}${money(option.priceDelta).replace('NT$','NT$')}`:''}</span></label>`).join('');
-      return `<div class="ubee-store-v2-field" data-v2-option-group="${esc(group.id)}"><label>${esc(group.name)}${group.required?' ＊':''}${group.type==='multi'&&group.maxSelections?`（最多 ${group.maxSelections} 個）`:''}</label><div class="ubee-store-v2-option-grid">${options}</div></div>`;
-    }).join('');
-    const card=showSheet(`<div class="ubee-store-v2-sheet-head"><div><strong>${esc(product.name)}</strong><span>${money(product.basePrice)} 起・請確認所有必選規格</span></div><button class="ubee-store-v2-sheet-close" type="button">×</button></div>${preference.last||preference.mostUsed?`<div class="ubee-store-v2-pref-actions">${preference.last?'<button type="button" data-v2-pref="last">套用上次規格</button>':''}${preference.mostUsed?'<button type="button" data-v2-pref="most">套用最常用規格</button>':''}</div>`:''}${groupHtml}<div class="ubee-store-v2-field"><label>數量</label><input id="ubeeStoreV2Quantity" type="number" inputmode="numeric" min="1" max="20" value="${Math.max(1,Number(preset?.quantity||preference.last?.quantity||1))}"></div><div class="ubee-store-v2-field"><label>缺貨時怎麼處理？</label><div class="ubee-store-v2-policy" id="ubeeStoreV2Policy"><button type="button" data-policy="contact_customer">先聯絡我</button><button type="button" data-policy="similar_item">可接受相近商品</button><button type="button" data-policy="skip_item">缺貨就不買</button></div></div><div class="ubee-store-v2-field"><label>其他需求（選填）</label><textarea id="ubeeStoreV2Note" maxlength="180" placeholder="例如：不要吸管、需要發票">${esc(preset?.note||'')}</textarea></div><div id="ubeeStoreV2ProductStatus"></div><button class="ubee-store-v2-primary" id="ubeeStoreV2AddProduct" type="button">加入代買清單</button>`);
-    card.querySelector('.ubee-store-v2-sheet-close')?.addEventListener('click',closeSheet);
+    const product=state.catalog?.products?.find(row=>row.productId===productId);if(!product||product.soldOut||product.enabled===false)return;
+    const preference=state.catalog?.preferences?.[product.productId]||{},initialSelections=preset?.selections||[],selectedMap=new Map(initialSelections.map(row=>[row.groupId,new Set(row.optionIds||[])]));
+    const groupHtml=(product.optionGroups||[]).map(group=>{const type=group.type==='multi'?'checkbox':'radio';const options=(group.options||[]).map(option=>`<label class="ubee-store-v3-option"><input type="${type}" name="v3_${esc(group.id)}" data-v3-group="${esc(group.id)}" value="${esc(option.id)}" ${selectedMap.get(group.id)?.has(option.id)?'checked':''}><span><b>${esc(option.name)}</b><em>${Number(option.priceDelta)?`${Number(option.priceDelta)>0?'+':''}${money(option.priceDelta)}`:''}</em></span></label>`).join('');return `<div class="ubee-store-v3-field" data-v3-option-group="${esc(group.id)}"><label>${esc(group.name)}${group.required?' ＊':''}${group.type==='multi'&&group.maxSelections?`（最多 ${group.maxSelections} 個）`:''}</label><div class="ubee-store-v3-option-grid">${options}</div></div>`;}).join('');
+    const image=product.imageUrl?`<div class="ubee-store-v3-product-hero"><img src="${esc(product.imageUrl)}" alt="${esc(product.name)}" referrerpolicy="no-referrer"></div>`:'';
+    const card=showSheet(`${image}<div class="ubee-store-v3-sheet-head"><div><strong>${esc(product.name)}</strong><span>${esc(product.description||'選擇規格與數量')}・${money(product.basePrice)} 起</span></div><button class="ubee-store-v3-sheet-close" type="button">×</button></div>${preference.last||preference.mostUsed?`<div class="ubee-store-v3-pref-actions">${preference.last?'<button type="button" data-v3-pref="last">套用上次規格</button>':''}${preference.mostUsed?'<button type="button" data-v3-pref="most">套用最常用規格</button>':''}</div>`:''}${groupHtml}<div class="ubee-store-v3-field"><label>數量</label><div class="ubee-store-v3-qty"><button type="button" data-v3-qty="minus">−</button><input id="ubeeStoreV3Quantity" type="number" inputmode="numeric" min="1" max="20" value="${Math.max(1,Number(preset?.quantity||preference.last?.quantity||1))}"><button type="button" data-v3-qty="plus">＋</button></div></div><div class="ubee-store-v3-field"><label>缺貨時怎麼處理？</label><div class="ubee-store-v3-policy" id="ubeeStoreV3Policy"><button type="button" data-policy="contact_customer">先聯絡我</button><button type="button" data-policy="similar_item">可接受相近商品</button><button type="button" data-policy="skip_item">缺貨就不買</button></div></div><div class="ubee-store-v3-field"><label>其他需求（選填）</label><textarea id="ubeeStoreV3Note" maxlength="180" placeholder="例如：不要吸管、需要發票">${esc(preset?.note||'')}</textarea></div><div id="ubeeStoreV3ProductStatus"></div><button class="ubee-store-v3-primary" id="ubeeStoreV3AddProduct" type="button">加入代買清單</button>`);
+    card.querySelector('.ubee-store-v3-sheet-close')?.addEventListener('click',closeSheet);
     let policy=String(preset?.outOfStockAction||preference.last?.outOfStockAction||'contact_customer');
-    const syncPolicy=()=>card.querySelectorAll('[data-policy]').forEach(button=>button.classList.toggle('active',button.dataset.policy===policy));syncPolicy();
-    card.querySelector('#ubeeStoreV2Policy')?.addEventListener('click',event=>{const btn=event.target.closest('[data-policy]');if(!btn)return;policy=btn.dataset.policy;syncPolicy()});
-    function applyPref(which){const source=which==='most'?preference.mostUsed:preference.last;if(!source)return;card.querySelectorAll('[data-v2-group]').forEach(input=>input.checked=false);for(const row of selectionFromPreference(source)){for(const optionId of row.optionIds){const input=[...card.querySelectorAll(`[data-v2-group="${CSS.escape(row.groupId)}"]`)].find(el=>el.value===optionId);if(input)input.checked=true}}if(source.quantity)card.querySelector('#ubeeStoreV2Quantity').value=String(source.quantity);policy=source.outOfStockAction||policy;syncPolicy();toast(which==='most'?'已套用最常用規格':'已套用上次規格')}
-    card.querySelectorAll('[data-v2-pref]').forEach(btn=>btn.addEventListener('click',()=>applyPref(btn.dataset.v2Pref)));
-    card.querySelector('#ubeeStoreV2AddProduct')?.addEventListener('click',()=>{
+    const syncPolicy=()=>card.querySelectorAll('[data-policy]').forEach(button=>button.classList.toggle('active',button.dataset.policy===policy));
+    const currentSelections=()=>{const selections=[];for(const group of product.optionGroups||[]){const ids=[...card.querySelectorAll(`[data-v3-group="${CSS.escape(group.id)}"]`)].filter(input=>input.checked).map(input=>input.value);selections.push({groupId:group.id,optionIds:ids});}return selections;};
+    const updatePrice=()=>{const qty=Math.max(1,Math.min(20,Math.round(Number(card.querySelector('#ubeeStoreV3Quantity')?.value||1))));const total=calculateCartLine(product,qty,currentSelections());const btn=card.querySelector('#ubeeStoreV3AddProduct');if(btn)btn.textContent=`${Number.isInteger(editIndex)?'更新':'加入'}代買清單・${money(total)}`;};
+    syncPolicy();updatePrice();
+    card.querySelector('#ubeeStoreV3Policy')?.addEventListener('click',event=>{const btn=event.target.closest('[data-policy]');if(!btn)return;policy=btn.dataset.policy;syncPolicy();});
+    card.querySelectorAll('[data-v3-group]').forEach(input=>input.addEventListener('change',updatePrice));
+    card.querySelectorAll('[data-v3-qty]').forEach(button=>button.addEventListener('click',()=>{const input=card.querySelector('#ubeeStoreV3Quantity');const delta=button.dataset.v3Qty==='plus'?1:-1;input.value=String(Math.max(1,Math.min(20,Number(input.value||1)+delta)));updatePrice();}));
+    card.querySelector('#ubeeStoreV3Quantity')?.addEventListener('input',updatePrice);
+    function applyPref(which){const source=which==='most'?preference.mostUsed:preference.last;if(!source)return;card.querySelectorAll('[data-v3-group]').forEach(input=>input.checked=false);for(const row of selectionFromPreference(source)){for(const optionId of row.optionIds){const input=[...card.querySelectorAll(`[data-v3-group="${CSS.escape(row.groupId)}"]`)].find(el=>el.value===optionId);if(input)input.checked=true;}}if(source.quantity)card.querySelector('#ubeeStoreV3Quantity').value=String(source.quantity);policy=source.outOfStockAction||policy;syncPolicy();updatePrice();toast(which==='most'?'已套用最常用規格':'已套用上次規格');}
+    card.querySelectorAll('[data-v3-pref]').forEach(btn=>btn.addEventListener('click',()=>applyPref(btn.dataset.v3Pref)));
+    card.querySelector('#ubeeStoreV3AddProduct')?.addEventListener('click',()=>{
       const selections=[];let invalid='';
-      for(const group of product.optionGroups||[]){const ids=[...card.querySelectorAll(`[data-v2-group="${CSS.escape(group.id)}"]`)].filter(input=>input.checked).map(input=>input.value);const min=Math.max(0,Number(group.minSelections ?? (group.required?1:0)));const max=Math.max(min,Number(group.maxSelections||1));if(ids.length<min){invalid=`請選擇「${group.name}」。`;break}if(ids.length>max){invalid=`「${group.name}」最多選 ${max} 個。`;break}selections.push({groupId:group.id,optionIds:ids})}
-      const status=card.querySelector('#ubeeStoreV2ProductStatus');if(invalid){status.innerHTML=`<div class="ubee-store-v2-warning">${esc(invalid)}</div>`;return}
-      const quantity=Math.max(1,Math.min(20,Math.round(Number(card.querySelector('#ubeeStoreV2Quantity')?.value||1))));
-      const spec=optionSpec(product,selections);const line=calculateCartLine(product,quantity,selections);
-      const nextItem={productId:product.productId,productName:product.name,productVersion:product.version,quantity,selections,specificationText:spec,note:String(card.querySelector('#ubeeStoreV2Note')?.value||'').trim(),outOfStockAction:policy,lineEstimatedTotal:line,needsReview:false};
-      if(Number.isInteger(editIndex)&&editIndex>=0&&editIndex<state.cart.items.length)state.cart.items[editIndex]=nextItem;
-      else state.cart.items.push(nextItem);
-      recalcCart();closeSheet();toast(Number.isInteger(editIndex)?`${product.name} 規格已更新`:`${product.name} 已加入代買清單`);
+      for(const group of product.optionGroups||[]){const ids=[...card.querySelectorAll(`[data-v3-group="${CSS.escape(group.id)}"]`)].filter(input=>input.checked).map(input=>input.value);const min=Math.max(0,Number(group.minSelections ?? (group.required?1:0)));const max=Math.max(min,Number(group.maxSelections||1));if(ids.length<min){invalid=`請選擇「${group.name}」。`;break;}if(ids.length>max){invalid=`「${group.name}」最多選 ${max} 個。`;break;}selections.push({groupId:group.id,optionIds:ids});}
+      const status=card.querySelector('#ubeeStoreV3ProductStatus');if(invalid){status.innerHTML=`<div class="ubee-store-v3-warning">${esc(invalid)}</div>`;return;}
+      const quantity=Math.max(1,Math.min(20,Math.round(Number(card.querySelector('#ubeeStoreV3Quantity')?.value||1)))),spec=optionSpec(product,selections),line=calculateCartLine(product,quantity,selections);
+      const nextItem={productId:product.productId,productName:product.name,productVersion:product.version,catalogSource:product.catalogSource||'',brandId:product.brandId||'',brandProductId:product.brandProductId||'',quantity,selections,specificationText:spec,note:String(card.querySelector('#ubeeStoreV3Note')?.value||'').trim(),outOfStockAction:policy,lineEstimatedTotal:line,needsReview:false};
+      if(Number.isInteger(editIndex)&&editIndex>=0&&editIndex<state.cart.items.length)state.cart.items[editIndex]=nextItem;else state.cart.items.push(nextItem);recalcCart();closeSheet();toast(Number.isInteger(editIndex)?`${product.name} 規格已更新`:`${product.name} 已加入代買清單`);
     });
   }
 
   function openCartSheet(){
-    if(!state.cart.items.length)return;
-    const needsReview=state.cart.items.some(item=>item.needsReview===true);
-    const card=showSheet(`<div class="ubee-store-v2-sheet-head"><div><strong>我的代買清單</strong><span>${esc(state.currentStore?.name||'指定店家')}・送出前會再次驗證商品與規格</span></div><button class="ubee-store-v2-sheet-close" type="button">×</button></div>${needsReview?'<div class="ubee-store-v2-warning">再次代買的部分規格已變更。請先按「重新選規格」完成確認，才能建立新訂單。</div>':''}<div class="ubee-store-v2-cart-list">${state.cart.items.map((item,index)=>`<article class="ubee-store-v2-cart-item"><div class="ubee-store-v2-cart-item-head"><div><strong>${esc(item.productName)} ×${item.quantity}${item.needsReview?' ⚠':''}</strong><span>${esc(item.specificationText||'依選擇規格')}<br>${esc(item.note||'')}</span></div><div><b>${money(item.lineEstimatedTotal)}</b><button type="button" data-v2-edit="${index}">${item.needsReview?'重新選規格':'修改'}</button><button type="button" data-v2-remove="${index}">移除</button></div></div></article>`).join('')}</div><div class="ubee-store-v2-cart-total"><span>商品預估金額</span><strong>${money(state.cart.estimatedGoodsAmount||0)}</strong></div><div class="ubee-store-v2-warning">商品價格為參考資訊，實際金額依店家現場為準。UBee 跑腿費會在填寫送達地址後另外估算。</div><button class="ubee-store-v2-primary" id="ubeeStoreV2Checkout" type="button" ${needsReview?'disabled':''}>${needsReview?'請先完成規格確認':'建立跑腿訂單'}</button><button class="ubee-store-v2-secondary" id="ubeeStoreV2Continue" type="button">繼續加入商品</button>`);
-    card.querySelector('.ubee-store-v2-sheet-close')?.addEventListener('click',closeSheet);
-    card.querySelectorAll('[data-v2-remove]').forEach(btn=>btn.addEventListener('click',()=>{state.cart.items.splice(Number(btn.dataset.v2Remove),1);recalcCart();closeSheet();state.cart.items.length?openCartSheet():toast('代買清單已清空')}));
-    card.querySelectorAll('[data-v2-edit]').forEach(btn=>btn.addEventListener('click',()=>{const index=Number(btn.dataset.v2Edit),item=state.cart.items[index];if(!item)return;closeSheet();openProduct(item.productId,item,index)}));
-    card.querySelector('#ubeeStoreV2Continue')?.addEventListener('click',closeSheet);
-    card.querySelector('#ubeeStoreV2Checkout')?.addEventListener('click',checkout);
+    if(!state.cart.items.length)return;const needsReview=state.cart.items.some(item=>item.needsReview===true);
+    const card=showSheet(`<div class="ubee-store-v3-sheet-head"><div><strong>我的代買清單</strong><span>${esc(state.currentStore?.name||'指定店家')}・送出前系統會再次驗證</span></div><button class="ubee-store-v3-sheet-close" type="button">×</button></div>${needsReview?'<div class="ubee-store-v3-warning">部分規格已變更，請先重新確認，才能建立新訂單。</div>':''}<div class="ubee-store-v3-cart-list">${state.cart.items.map((item,index)=>`<article class="ubee-store-v3-cart-item"><div class="ubee-store-v3-cart-item-head"><div><strong>${esc(item.productName)} ×${item.quantity}${item.needsReview?' ⚠':''}</strong><span>${esc(item.specificationText||'依選擇規格')}${item.note?`<br>${esc(item.note)}`:''}</span></div><div><b>${money(item.lineEstimatedTotal)}</b><button type="button" data-v3-edit="${index}">${item.needsReview?'重新選規格':'修改'}</button><button type="button" data-v3-remove="${index}">移除</button></div></div></article>`).join('')}</div><div class="ubee-store-v3-cart-total"><span>商品預估金額</span><strong>${money(state.cart.estimatedGoodsAmount||0)}</strong></div><div class="ubee-store-v3-warning">商品價格為參考資訊，實際金額依店家現場為準。UBee 跑腿費會在填寫送達地址後另外估算。</div><button class="ubee-store-v3-primary" id="ubeeStoreV3Checkout" type="button" ${needsReview?'disabled':''}>${needsReview?'請先完成規格確認':'下一步・建立跑腿訂單'}</button><button class="ubee-store-v3-secondary" id="ubeeStoreV3Continue" type="button">繼續加入商品</button>`);
+    card.querySelector('.ubee-store-v3-sheet-close')?.addEventListener('click',closeSheet);
+    card.querySelectorAll('[data-v3-remove]').forEach(btn=>btn.addEventListener('click',()=>{state.cart.items.splice(Number(btn.dataset.v3Remove),1);recalcCart();closeSheet();state.cart.items.length?openCartSheet():toast('代買清單已清空');}));
+    card.querySelectorAll('[data-v3-edit]').forEach(btn=>btn.addEventListener('click',()=>{const index=Number(btn.dataset.v3Edit),item=state.cart.items[index];if(!item)return;closeSheet();openProduct(item.productId,item,index);}));
+    card.querySelector('#ubeeStoreV3Continue')?.addEventListener('click',closeSheet);card.querySelector('#ubeeStoreV3Checkout')?.addEventListener('click',checkout);
   }
 
   function checkout(){
-    if(!state.currentStore||!state.cart.items.length)return;
-    if(state.cart.items.some(item=>item.needsReview===true)){alert('部分商品規格已變更，請先完成重新選擇。');return}
-    if(Number(state.cart.estimatedGoodsAmount||0)>=1000){alert('目前 UBee 正式規則：代墊商品金額達 NT$1,000（含）以上，請先聯繫客服人工確認。');return}
+    if(!state.currentStore||!state.cart.items.length)return;if(state.cart.items.some(item=>item.needsReview===true)){alert('部分商品規格已變更，請先完成重新選擇。');return;}if(Number(state.cart.estimatedGoodsAmount||0)>=1000){alert('目前 UBee 正式規則：代墊商品金額達 NT$1,000（含）以上，請先聯繫客服人工確認。');return;}
     const cart={schemaVersion:VERSION,storePlaceId:storeId(state.currentStore),estimatedGoodsAmount:Number(state.cart.estimatedGoodsAmount||0),items:state.cart.items.map(item=>({...item,selections:(item.selections||[]).map(row=>({groupId:row.groupId,optionIds:[...(row.optionIds||[])]}))}))};
-    closeSheet();closeOverlay();
-    if(typeof window.openUBeeStorePurchase!=='function'){alert('正式下單流程尚未載入，請重新整理後再試。');return}
-    window.openUBeeStorePurchase(state.currentStore,{purchaseCartV2:cart});
+    closeSheet();closeOverlay();if(typeof window.openUBeeStorePurchase!=='function'){alert('正式下單流程尚未載入，請重新整理後再試。');return;}window.openUBeeStorePurchase(state.currentStore,{purchaseCartV2:cart});
   }
 
   async function reorderOrder(orderId){
-    if(!orderId)return;
-    try{
-      toast('正在確認目前商品與規格…');
-      const data=await api(`/api/customer/purchases/${encodeURIComponent(orderId)}/reorder-preview`);
-      if(data.mode==='legacy'){
-        alert((data.warnings||[]).join('\n')||'這是舊版代買紀錄，請重新確認內容。');
-        if(window.UBeeEnhancements?.reorder)window.UBeeEnhancements.reorder(orderId);
-        return;
-      }
-      const warnings=[...(data.warnings||[]),...(data.unavailableItems||[]).map(item=>`${item.productName}：${item.reason}`)];
-      await open(data.store||{}, {restoreCart:data.purchaseCartV2});
-      if(warnings.length)alert(`再次代買前請確認：\n\n${warnings.join('\n')}`);
-      else toast('已套用上次代買內容');
-    }catch(error){alert(error.message||'再次代買資料讀取失敗。')}
+    if(!orderId)return;try{toast('正在確認目前商品與規格…');const data=await api(`/api/customer/purchases/${encodeURIComponent(orderId)}/reorder-preview`);if(data.mode==='legacy'){alert((data.warnings||[]).join('\n')||'這是舊版代買紀錄，請重新確認內容。');if(window.UBeeEnhancements?.reorder)window.UBeeEnhancements.reorder(orderId);return;}const warnings=[...(data.warnings||[]),...(data.unavailableItems||[]).map(item=>`${item.productName}：${item.reason}`)];await open(data.store||{}, {restoreCart:data.purchaseCartV2});if(warnings.length)alert(`再次代買前請確認：\n\n${warnings.join('\n')}`);else toast('已套用上次代買內容');}catch(error){alert(error.message||'再次代買資料讀取失敗。');}
   }
 
   async function decorateStoreDetail(store){
-    const host=document.getElementById('ubeeStoreDetailContent');if(!host||!storeId(store))return;
-    const titleRow=host.querySelector('.ubee-store-detail-title-row');
-    if(titleRow&&!titleRow.querySelector('.ubee-store-v2-favorite-btn')){
-      const btn=document.createElement('button');btn.type='button';btn.className='ubee-store-v2-favorite-btn';btn.textContent='☆';btn.setAttribute('aria-label','收藏店家');titleRow.appendChild(btn);
-      btn.addEventListener('click',async()=>{try{const active=btn.classList.contains('active');const next=await setFavorite(store,!active);btn.classList.toggle('active',next);btn.textContent=next?'★':'☆'}catch(error){alert(error.message||'收藏更新失敗。')}});
-    }
-    let catalogHost=host.querySelector('#ubeeStoreDetailCatalogV2');
-    if(!catalogHost){catalogHost=document.createElement('section');catalogHost.id='ubeeStoreDetailCatalogV2';catalogHost.className='ubee-store-v2-catalog';const actions=host.querySelector('.ubee-store-detail-actions');if(actions)host.insertBefore(catalogHost,actions);else host.appendChild(catalogHost)}
-    catalogHost.innerHTML='<div class="ubee-store-v2-empty">商品清單載入中…</div>';
-    try{
-      const data=await loadCatalog(store);state.catalogCache.set(storeId(store),data);
-      const fav=Boolean(data.favorite||state.home?.favorites?.some(row=>storeId(row.store)===storeId(store)));const btn=titleRow?.querySelector('.ubee-store-v2-favorite-btn');if(btn){btn.classList.toggle('active',fav);btn.textContent=fav?'★':'☆'}
-      const products=(data.products||[]).slice(0,12);
-      catalogHost.innerHTML=`<div class="ubee-store-v2-catalog-head"><div><strong>商品代買</strong><span>${products.length?'選好規格後直接帶入 UBee 訂單':'尚未建立商品清單'}</span></div>${products.length?'<span>價格以現場為準</span>':''}</div>${products.length?`<div class="ubee-store-v2-product-list">${products.map(product=>`<div class="ubee-store-v2-product ${product.soldOut?'soldout':''}"><div><strong>${esc(product.name)}</strong><span>${money(product.basePrice)}${product.optionGroups?.length?`・${product.optionGroups.map(group=>group.name).slice(0,3).join('・')}`:''}</span></div><button type="button" data-v2-detail-product="${esc(product.productId)}" ${product.soldOut?'disabled':''}>${product.soldOut?'售完':'選擇規格'}</button></div>`).join('')}</div>`:'<div class="ubee-store-v2-empty">目前沒有 UBee 商品資料，仍可使用下方「請小U幫我買」自行填寫。</div>'}`;
-      catalogHost.querySelectorAll('[data-v2-detail-product]').forEach(button=>button.addEventListener('click',async()=>{await open(store,{focusProductId:button.dataset.v2DetailProduct})}));
-    }catch(error){catalogHost.innerHTML=`<div class="ubee-store-v2-empty">${esc(error.message||'商品清單暫時無法讀取。')}<br>仍可使用自行填寫代買。</div>`}
+    const host=document.getElementById('ubeeStoreDetailContent');if(!host||!storeId(store))return;const titleRow=host.querySelector('.ubee-store-detail-title-row');
+    if(titleRow&&!titleRow.querySelector('.ubee-store-v3-favorite-btn')){const btn=document.createElement('button');btn.type='button';btn.className='ubee-store-v3-favorite-btn';btn.textContent='☆';btn.setAttribute('aria-label','收藏店家');titleRow.appendChild(btn);btn.addEventListener('click',async()=>{try{const active=btn.classList.contains('active');const next=await setFavorite(store,!active);btn.classList.toggle('active',next);btn.textContent=next?'★':'☆';}catch(error){alert(error.message||'收藏更新失敗。');}});}
+    host.querySelector('#ubeeStoreDetailCatalogV2')?.remove();let preview=host.querySelector('#ubeeStoreDetailCatalogV3');if(!preview){preview=document.createElement('section');preview.id='ubeeStoreDetailCatalogV3';preview.className='ubee-store-v3-preview';const actions=host.querySelector('.ubee-store-detail-actions');if(actions)host.insertBefore(preview,actions);else host.appendChild(preview);}
+    preview.innerHTML='<div class="ubee-store-v3-empty"><strong>正在準備店家商城</strong>讀取商品與分類中…</div>';
+    try{const data=await loadCatalog(store);const products=(data.products||[]).slice(0,4),fav=Boolean(data.favorite||state.home?.favorites?.some(row=>storeId(row.store)===storeId(store)));const favBtn=titleRow?.querySelector('.ubee-store-v3-favorite-btn');if(favBtn){favBtn.classList.toggle('active',fav);favBtn.textContent=fav?'★':'☆';}preview.innerHTML=`<div class="ubee-store-v3-preview-head"><div><strong>${esc(data.brand?.name||store.name||'店家')} 商城</strong><span>${products.length?'直接選商品、規格與數量':'進入店家後可建立代買需求'}</span></div><button class="ubee-store-v3-preview-btn" type="button" id="ubeeStoreV3Browse">逛店家</button></div>${products.length?`<div class="ubee-store-v3-preview-list">${products.map(product=>`<div class="ubee-store-v3-preview-product"><strong>${esc(product.name)}</strong><span>${money(product.basePrice)}</span></div>`).join('')}</div>`:'<div style="font-size:11px;color:#777;font-weight:800;line-height:1.6">店家介面已採商城式流程；若完整商品尚在同步，可在店內直接描述想買的商品。</div>'}`;preview.querySelector('#ubeeStoreV3Browse')?.addEventListener('click',()=>open(store));}catch(error){preview.innerHTML=`<div class="ubee-store-v3-preview-head"><div><strong>店家商城</strong><span>商品資料暫時無法讀取</span></div><button class="ubee-store-v3-preview-btn" type="button" id="ubeeStoreV3Browse">進入店家</button></div>`;preview.querySelector('#ubeeStoreV3Browse')?.addEventListener('click',()=>open(store,{force:true}));}
   }
 
-  // 「我的 > 常用任務」由原本預告空殼升級為真實回購內容。
   function syncMyFavoritesPanel(){
-    const panel=document.getElementById('ubeeMyFavoritesPanel');if(!panel||!state.home)return;
-    const frequent=state.home.frequent||[],favorites=state.home.favorites||[];
-    const body=panel.querySelector('.ubee-flat-section');if(!body)return;
-    if(!frequent.length&&!favorites.length){body.innerHTML='<strong>目前還沒有常買或收藏</strong><p>完成店家代買後，常買組合會自動出現在這裡；店家可從店家頁加入收藏。</p>';return}
-    body.innerHTML=`<strong>常買與收藏</strong><p>這些資料會跟著 UBee 會員帳號保存。</p><div style="display:grid;gap:8px;margin-top:10px">${frequent.slice(0,5).map(row=>`<button type="button" data-v2-my-reorder="${esc(row.orderId)}" style="width:100%;text-align:left;border:1px solid #e5e7e9;border-radius:13px;background:#fff;padding:11px;font-weight:900">${esc(row.store?.name||'店家')}｜${esc(purchaseLabel(row.items))}<br><small style="color:#777">已買 ${row.count||1} 次・再次代買</small></button>`).join('')}${favorites.slice(0,5).map((row,index)=>`<button type="button" data-v2-my-favorite="${index}" style="width:100%;text-align:left;border:1px solid #e5e7e9;border-radius:13px;background:#fff;padding:11px;font-weight:900">★ ${esc(row.store?.name||'店家')}<br><small style="color:#777">${esc(row.store?.address||'查看商品')}</small></button>`).join('')}</div>`;
-    body.querySelectorAll('[data-v2-my-reorder]').forEach(btn=>btn.addEventListener('click',()=>reorderOrder(btn.dataset.v2MyReorder)));
-    body.querySelectorAll('[data-v2-my-favorite]').forEach(btn=>btn.addEventListener('click',()=>open(favorites[Number(btn.dataset.v2MyFavorite)]?.store||{})));
+    const panel=document.getElementById('ubeeMyFavoritesPanel');if(!panel||!state.home)return;const frequent=state.home.frequent||[],favorites=state.home.favorites||[],body=panel.querySelector('.ubee-flat-section');if(!body)return;
+    if(!frequent.length&&!favorites.length){body.innerHTML='<strong>目前還沒有常買或收藏</strong><p>完成店家代買後，常買組合會自動出現在這裡；店家可從商城頁加入收藏。</p>';return;}
+    body.innerHTML=`<strong>常買與收藏</strong><p>這些資料會跟著 UBee 會員帳號保存。</p><div style="display:grid;gap:8px;margin-top:10px">${frequent.slice(0,5).map(row=>`<button type="button" data-v3-my-reorder="${esc(row.orderId)}" style="width:100%;text-align:left;border:1px solid #e5e7e9;border-radius:13px;background:#fff;padding:11px;font-weight:900">${esc(row.store?.name||'店家')}｜${esc(purchaseLabel(row.items))}<br><small style="color:#777">已買 ${row.count||1} 次・再次代買</small></button>`).join('')}${favorites.slice(0,5).map((row,index)=>`<button type="button" data-v3-my-favorite="${index}" style="width:100%;text-align:left;border:1px solid #e5e7e9;border-radius:13px;background:#fff;padding:11px;font-weight:900">★ ${esc(row.store?.name||'店家')}<br><small style="color:#777">${esc(row.store?.address||'逛店家')}</small></button>`).join('')}</div>`;
+    body.querySelectorAll('[data-v3-my-reorder]').forEach(btn=>btn.addEventListener('click',()=>reorderOrder(btn.dataset.v3MyReorder)));body.querySelectorAll('[data-v3-my-favorite]').forEach(btn=>btn.addEventListener('click',()=>open(favorites[Number(btn.dataset.v3MyFavorite)]?.store||{})));
   }
 
-  const myObserver=new MutationObserver(()=>syncMyFavoritesPanel());
-  const myPanel=document.getElementById('ubeeMyFavoritesPanel');if(myPanel)myObserver.observe(myPanel,{attributes:true,attributeFilter:['hidden']});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshHome(true)});
-  window.addEventListener('pageshow',()=>refreshHome(false));
+  const myObserver=new MutationObserver(()=>syncMyFavoritesPanel());const myPanel=document.getElementById('ubeeMyFavoritesPanel');if(myPanel)myObserver.observe(myPanel,{attributes:true,attributeFilter:['hidden']});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshHome(true);});window.addEventListener('pageshow',()=>refreshHome(false));
 
-  window.UBeeStorePurchaseV2={open,refreshHome,decorateStoreCards,decorateStoreDetail,reorderOrder,getState:()=>state};
+  const apiObject={open,refreshHome,decorateStoreCards,decorateStoreDetail,reorderOrder,getState:()=>state};
+  window.UBeeStorePurchaseV3=apiObject;
+  window.UBeeStorePurchaseV2=apiObject; // 單一 V3 實作的向下相容別名，不建立第二套系統。
   refreshHome(false);
 })();
 </script>
 
+
 </body>
-</html>(
+</html>
