@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-08-21 Store Purchase V2：調度中心顯示店家、商品、完整規格、缺貨規則與商品預估代墊。 -->
 <!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -935,6 +936,30 @@ function toast(message, duration=3200){
 
 function getSelectedOrder(){
   return (state.data.orders || []).find(o => String(o.id) === String(state.selectedOrderId)) || null;
+}
+
+
+function dispatchPurchaseV2Html(order={}){
+  const store=order.purchaseSnapshot?.store||order.storeDiscovery||{};
+  const snapshotItems=Array.isArray(order.purchaseSnapshot?.items)?order.purchaseSnapshot.items:[];
+  const legacyItems=Array.isArray(order.shoppingItems)?order.shoppingItems:[];
+  const items=snapshotItems.length?snapshotItems.map(item=>({
+    name:item.productName||item.name||'',
+    quantity:item.quantity||1,
+    specification:item.specification||'',
+    replacementPolicy:item.outOfStockAction||''
+  })):legacyItems.map(item=>({
+    name:item.name||'',quantity:item.quantity||1,specification:item.specification||item.spec||'',replacementPolicy:item.replacementPolicy||''
+  }));
+  if(!items.length)return'';
+  const policyLabel=value=>({contact_customer:'先聯絡客人',contact:'先聯絡客人',similar_item:'可接受相近商品',replace:'可接受相近商品',skip_item:'缺貨就不買',skip:'缺貨就不買'}[String(value||'')]||'依訂單處理');
+  const storeName=store.name||order.storeName||'指定店家';
+  const estimate=Number(order.purchaseSnapshot?.estimatedGoodsAmount||order.estimatedGoodsAmount||order.advancePayment||0);
+  return `<div style="margin-top:10px;padding:11px;border:1px solid #ead47a;border-radius:13px;background:#fffbed">
+    <div style="font-size:12px;font-weight:1000;color:#6e5600">🛍 店家代買｜${esc(storeName)}</div>
+    <div style="margin-top:7px;display:grid;gap:6px">${items.slice(0,20).map((item,index)=>`<div style="font-size:11px;line-height:1.5;color:#3f444a"><b>${index+1}. ${esc(item.name||'商品')} ×${esc(item.quantity||1)}</b>${item.specification?`<br>規格：${esc(item.specification)}`:''}<br>缺貨：${esc(policyLabel(item.replacementPolicy))}</div>`).join('')}</div>
+    ${estimate>0?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(110,86,0,.12);font-size:11px;font-weight:1000">商品預估代墊：NT$${esc(Math.round(estimate))}</div>`:''}
+  </div>`;
 }
 
 
@@ -2299,6 +2324,7 @@ function renderCandidates(){
       ${waitingLiveSummary?`<br><span style="color:var(--orange);font-weight:1000">${esc(waitingLiveSummary)}</span>`:''}
       ${String(order.itemSizeReviewStatus||'')==='pending'?`<br><span style="color:var(--red);font-weight:1000">小U已回報體積不符，等待調度確認</span>`:''}
     </div>
+    ${dispatchPurchaseV2Html(order)}
 
     <div class="order-surcharge-box">
       <strong style="font-size:12px">商品體積審核／人工調整</strong>
