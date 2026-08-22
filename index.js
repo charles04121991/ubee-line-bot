@@ -5780,29 +5780,57 @@ async function findRiderDocumentV2First(source = {}) {
   ];
 
   for (const collectionName of collections) {
-    if (/^09\d{8}$/.test(cleanPhone)) {
-      let doc = await db.collection(collectionName).doc(cleanPhone).get();
-      if (doc.exists) return { riderDoc: doc, sourceCollection: collectionName };
+    const phoneIsValid = /^09\d{8}$/.test(cleanPhone);
+    const riderIdIsSameAsPhone =
+      phoneIsValid &&
+      cleanRiderId &&
+      cleanRiderId === cleanPhone;
+
+    if (phoneIsValid) {
+      const doc = await db.collection(collectionName).doc(cleanPhone).get();
+      if (doc.exists) {
+        return {
+          riderDoc: doc,
+          sourceCollection: collectionName,
+        };
+      }
 
       const phoneSnap = await db.collection(collectionName)
         .where('phone', '==', cleanPhone)
         .limit(1)
         .get();
+
       if (!phoneSnap.empty) {
-        return { riderDoc: phoneSnap.docs[0], sourceCollection: collectionName };
+        return {
+          riderDoc: phoneSnap.docs[0],
+          sourceCollection: collectionName,
+        };
       }
     }
 
-    if (cleanRiderId) {
-      let doc = await db.collection(collectionName).doc(cleanRiderId).get();
-      if (doc.exists) return { riderDoc: doc, sourceCollection: collectionName };
+    // Firestore Read Cost Optimization V2
+    // 正式 ridersV2 資料以手機號碼作為 document id。
+    // 若 riderId 與已查過的 cleanPhone 完全相同，就不再重複執行
+    // doc(cleanRiderId).get() 與 riderId query；只有不同識別值才走 fallback。
+    if (cleanRiderId && !riderIdIsSameAsPhone) {
+      const doc = await db.collection(collectionName).doc(cleanRiderId).get();
+      if (doc.exists) {
+        return {
+          riderDoc: doc,
+          sourceCollection: collectionName,
+        };
+      }
 
       const riderIdSnap = await db.collection(collectionName)
         .where('riderId', '==', cleanRiderId)
         .limit(1)
         .get();
+
       if (!riderIdSnap.empty) {
-        return { riderDoc: riderIdSnap.docs[0], sourceCollection: collectionName };
+        return {
+          riderDoc: riderIdSnap.docs[0],
+          sourceCollection: collectionName,
+        };
       }
     }
 
@@ -5811,13 +5839,20 @@ async function findRiderDocumentV2First(source = {}) {
         .where('lineUserId', '==', cleanLineUserId)
         .limit(1)
         .get();
+
       if (!lineSnap.empty) {
-        return { riderDoc: lineSnap.docs[0], sourceCollection: collectionName };
+        return {
+          riderDoc: lineSnap.docs[0],
+          sourceCollection: collectionName,
+        };
       }
     }
   }
 
-  return { riderDoc: null, sourceCollection: '' };
+  return {
+    riderDoc: null,
+    sourceCollection: '',
+  };
 }
 
 async function writeRiderMigrationCompatible(riderDoc, updateData = {}) {
