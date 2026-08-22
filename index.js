@@ -1841,8 +1841,14 @@ async function sendNewOrderPushToRiders(
         );
 
       } else {
+        // Firestore Read Cost Optimization V1
+        // 原本每次派單都先讀取最多 300 位小U，再於記憶體檢查 webPushEnabled。
+        // 現在把「webPushEnabled === true」這個既有必要條件提前到 Firestore 查詢，
+        // 只讀真正可能收到 Web Push 的小U；其餘核准、在線、資格、距離、
+        // 預約可用時段與略過名單等既有判斷全部保留，不改派單業務規則。
         const ridersSnap = await db
           .collection(RIDER_V2_COLLECTIONS.riders)
+          .where('webPushEnabled', '==', true)
           .limit(300)
           .get();
 
