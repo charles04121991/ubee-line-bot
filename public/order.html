@@ -8693,7 +8693,7 @@ body.ubee-app-starting{
     "設定登入手機號碼":"ログイン用電話番号を設定",
     "這組號碼會成為 UBee 登入帳號及訂單聯絡方式，請確認輸入正確。":"この電話番号は UBee のログインIDと依頼時の連絡先になります。正しく入力してください。",
     "必填":"必須",
-    "台灣行動電話格式，共 10 碼。":"台湾の携帯電話番号（10桁）を入力してください。",
+    "支援台灣 09 手機號碼與日本 070／080／090 手機號碼。":"台湾の携帯電話番号（10桁）を入力してください。",
     "下一步：建立密碼":"次へ：パスワード設定",
     "建立登入密碼":"ログインパスワードを設定",
     "設定一組只供你本人使用的安全密碼。":"ご本人だけが使用する安全なパスワードを設定してください。",
@@ -10256,7 +10256,7 @@ body.ubee-app-starting{
 <div class="uca-field">
 <div class="uca-label-row"><label class="uca-label" for="ucaRegisterPhone">手機號碼</label><span class="uca-optional">必填</span></div>
 <input autocomplete="tel" class="uca-input" id="ucaRegisterPhone" inputmode="tel" maxlength="18" placeholder="0912345678 / 09012345678" type="tel"/>
-<div class="uca-help">支援台灣 09 與日本 070／080／090 手機號碼。</div>
+<div class="uca-help">支援台灣 09 手機號碼與日本 070／080／090 手機號碼。</div>
 <div class="uca-error" id="ucaRegisterPhoneError"></div>
 </div>
 <div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaToPassword" type="button">下一步：建立密碼</button></div>
@@ -10449,12 +10449,7 @@ body.ubee-app-starting{
   }
   function validEmail(value){ const text=String(value||'').trim(); return !text || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text); }
   function escapeHtml(value){ return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-  function maskPhone(value){
-    const p=normalizePhone(value);
-    if(/^09\d{8}$/.test(p)) return `${p.slice(0,4)}-***-${p.slice(-3)}`;
-    if(/^\+81(?:70|80|90)\d{8}$/.test(p)) return `${p.slice(0,5)}-****-${p.slice(-4)}`;
-    return p;
-  }
+  function maskPhone(value){ const p=normalizePhone(value); return p.length===10?`${p.slice(0,4)}-***-${p.slice(-3)}`:p; }
   function setError(id,message=''){ const el=$(id); if(!el)return; el.textContent=message; el.classList.toggle('show',Boolean(message)); }
   function setStatus(id,message='',type='info'){ const el=$(id); if(!el)return; el.textContent=message; el.className=`uca-status${message?` show ${type}`:''}`; }
   function loading(show,text='處理中'){ $('ucaLoadingText').textContent=text; $('ucaLoading').classList.toggle('active',show); $('ucaLoading').setAttribute('aria-hidden',show?'false':'true'); }
@@ -10710,7 +10705,7 @@ body.ubee-app-starting{
     $('ucaLoginPhone').value=phone;
     setError('ucaLoginPhoneError'); setError('ucaLoginPasswordError'); setStatus('ucaLoginStatus');
     let ok=true;
-    if(!validPhone(phone)){setError('ucaLoginPhoneError','請輸入正確的台灣手機號碼。');ok=false}
+    if(!validPhone(phone)){setError('ucaLoginPhoneError','請輸入正確的台灣或日本手機號碼。');ok=false}
     if(!password){setError('ucaLoginPasswordError','請輸入登入密碼。');ok=false}
     if(!ok)return;
     loading(true,'正在登入 UBee');
@@ -10721,7 +10716,7 @@ body.ubee-app-starting{
 
   function step1(){
     const phone=normalizePhone($('ucaRegisterPhone').value); $('ucaRegisterPhone').value=phone; setError('ucaRegisterPhoneError');
-    if(!validPhone(phone)){setError('ucaRegisterPhoneError','請輸入正確的台灣手機號碼。');return}
+    if(!validPhone(phone)){setError('ucaRegisterPhoneError','請輸入正確的台灣或日本手機號碼。');return}
     state.phone=phone; renderStep(2); setTimeout(()=>$('ucaRegisterPassword').focus(),80);
   }
   function step2(){
@@ -12023,14 +12018,27 @@ function loadGoogleMapsApi(){
 
     script.dataset.ubeeGoogleMaps = 'true';
 
+    const uiCountry =
+      String(
+        window.getUBeeCustomerCountryCode?.() ||
+        'TW'
+      ).toUpperCase() === 'JP'
+        ? 'JP'
+        : 'TW';
+
+    const mapsLanguage =
+      uiCountry === 'JP'
+        ? 'ja'
+        : 'zh-TW';
+
     script.src =
       'https://maps.googleapis.com/maps/api/js' +
       `?key=${encodeURIComponent(googleMapsApiKey)}` +
       '&v=weekly' +
       '&loading=async' +
       `&callback=${encodeURIComponent(callbackName)}` +
-      '&language=zh-TW' +
-      '&region=TW';
+      `&language=${encodeURIComponent(mapsLanguage)}` +
+      `&region=${encodeURIComponent(uiCountry)}`;
 
     script.async = true;
 
@@ -14566,15 +14574,7 @@ function escapeHtml(str){
 }
 
 function cleanPhone(value){
-  let phone=String(value||'').trim().replace(/[^\d+]/g,'');
-  if(phone.startsWith('00')) phone=`+${phone.slice(2)}`;
-  if(/^\+8869\d{8}$/.test(phone)) return `0${phone.slice(4)}`;
-  if(/^8869\d{8}$/.test(phone)) return `0${phone.slice(3)}`;
-  if(/^09\d{8}$/.test(phone)) return phone;
-  if(/^0(?:70|80|90)\d{8}$/.test(phone)) return `+81${phone.slice(1)}`;
-  if(/^81(?:70|80|90)\d{8}$/.test(phone)) return `+${phone}`;
-  if(/^\+81(?:70|80|90)\d{8}$/.test(phone)) return phone;
-  return phone.slice(0,24);
+  return String(value || '').replace(/[^\d]/g,'').trim();
 }
 
 function normalizeAdvancePaymentText(text){
@@ -15329,21 +15329,104 @@ function syncQueueLocation(){
 }
 
 
-function getTaipeiNowParts(){
+function getOrderMarketCountryCode(){
+  const pickupAddress =
+    String(qs('pickup')?.value || '').trim();
+
+  const lat = Number(pickupLat);
+  const lng = Number(pickupLng);
+
+  if(
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  ){
+    if(
+      lat >= 21.5 &&
+      lat <= 26.6 &&
+      lng >= 118.0 &&
+      lng <= 122.4
+    ){
+      return 'TW';
+    }
+
+    if(
+      lat >= 24.0 &&
+      lat <= 46.7 &&
+      lng >= 122.5 &&
+      lng <= 146.7
+    ){
+      return 'JP';
+    }
+  }
+
+  try{
+    if(
+      pickupAddress &&
+      typeof inferUBeeOrderRegion === 'function'
+    ){
+      const region =
+        inferUBeeOrderRegion(
+          pickupAddress,
+          pickupLat,
+          pickupLng
+        );
+
+      if(
+        region?.countryCode === 'JP' ||
+        region?.countryCode === 'TW'
+      ){
+        return region.countryCode;
+      }
+    }
+  }catch(_){}
+
+  return String(
+    window.getUBeeCustomerCountryCode?.() ||
+    'TW'
+  ).toUpperCase() === 'JP'
+    ? 'JP'
+    : 'TW';
+}
+
+function getOrderMarketTimeZone(countryCode = getOrderMarketCountryCode()){
+  return countryCode === 'JP'
+    ? 'Asia/Tokyo'
+    : 'Asia/Taipei';
+}
+
+function getOrderMarketLocale(countryCode = getOrderMarketCountryCode()){
+  return countryCode === 'JP'
+    ? 'ja-JP'
+    : 'zh-TW';
+}
+
+function getOrderMarketUtcOffset(countryCode = getOrderMarketCountryCode()){
+  return countryCode === 'JP'
+    ? '+09:00'
+    : '+08:00';
+}
+
+function getOrderMarketNowParts(){
   const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-CA',{
-    timeZone:'Asia/Taipei',
-    year:'numeric',
-    month:'2-digit',
-    day:'2-digit',
-    hour:'2-digit',
-    minute:'2-digit',
-    hour12:false
-  }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat(
+    'en-CA',
+    {
+      timeZone:getOrderMarketTimeZone(),
+      year:'numeric',
+      month:'2-digit',
+      day:'2-digit',
+      hour:'2-digit',
+      minute:'2-digit',
+      hour12:false
+    }
+  ).formatToParts(now);
 
   const map = {};
+
   parts.forEach(part=>{
-    if(part.type !== 'literal') map[part.type] = part.value;
+    if(part.type !== 'literal'){
+      map[part.type] = part.value;
+    }
   });
 
   return {
@@ -15352,40 +15435,63 @@ function getTaipeiNowParts(){
   };
 }
 
-function combineTaipeiDateTime(dateText,timeText){
-  const date = String(dateText||'').trim();
-  const time = String(timeText||'').trim();
+function combineOrderMarketDateTime(
+  dateText,
+  timeText
+){
+  const date =
+    String(dateText || '').trim();
 
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)){
+  const time =
+    String(timeText || '').trim();
+
+  if(
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !/^\d{2}:\d{2}$/.test(time)
+  ){
     return 0;
   }
 
-  // 台灣全年 UTC+8，直接轉成 ISO offset，避免瀏覽器本地時區造成偏移。
-  const parsed = Date.parse(`${date}T${time}:00+08:00`);
-  return Number.isFinite(parsed) ? parsed : 0;
+  const parsed =
+    Date.parse(
+      `${date}T${time}:00${getOrderMarketUtcOffset()}`
+    );
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : 0;
 }
 
 function formatOrderTimingDateTime(ms){
-  const value = Number(ms||0);
-  if(!Number.isFinite(value) || value<=0) return '';
+  const value = Number(ms || 0);
 
-  return new Date(value).toLocaleString('zh-TW',{
-    timeZone:'Asia/Taipei',
-    month:'2-digit',
-    day:'2-digit',
-    hour:'2-digit',
-    minute:'2-digit',
-    hour12:false
-  });
+  if(
+    !Number.isFinite(value) ||
+    value <= 0
+  ){
+    return '';
+  }
+
+  return new Date(value).toLocaleString(
+    getOrderMarketLocale(),
+    {
+      timeZone:getOrderMarketTimeZone(),
+      month:'2-digit',
+      day:'2-digit',
+      hour:'2-digit',
+      minute:'2-digit',
+      hour12:false
+    }
+  );
 }
 
 function ensureScheduleInputDefaults(){
-  const nowParts=getTaipeiNowParts();
+  const nowParts=getOrderMarketNowParts();
 
-  const toTaipeiParts=value=>{
+  const toOrderMarketParts=value=>{
     const parts={};
     new Intl.DateTimeFormat('en-CA',{
-      timeZone:'Asia/Taipei',
+      timeZone:getOrderMarketTimeZone(),
       year:'numeric',
       month:'2-digit',
       day:'2-digit',
@@ -15407,11 +15513,11 @@ function ensureScheduleInputDefaults(){
     return Math.ceil(Number(value||Date.now())/step)*step;
   };
 
-  const startDefault=toTaipeiParts(
+  const startDefault=toOrderMarketParts(
     roundToFiveMinutes(Date.now()+2*60*60*1000)
   );
 
-  const endDefault=toTaipeiParts(
+  const endDefault=toOrderMarketParts(
     roundToFiveMinutes(Date.now()+4*60*60*1000)
   );
 
@@ -15489,7 +15595,7 @@ function getOrderTimingPayload(){
 
   if(timingType==='scheduled'){
     const goal=String(qs('scheduleGoal')?.value||scheduleGoal||'pickup_at');
-    const requestedScheduleAtMs=combineTaipeiDateTime(
+    const requestedScheduleAtMs=combineOrderMarketDateTime(
       qs('scheduledDate')?.value,
       qs('scheduledTime')?.value
     );
@@ -15504,11 +15610,11 @@ function getOrderTimingPayload(){
 
   if(timingType==='flexible'){
     const date=qs('flexibleDate')?.value||'';
-    const flexibleStartAtMs=combineTaipeiDateTime(
+    const flexibleStartAtMs=combineOrderMarketDateTime(
       date,
       qs('flexibleStartTime')?.value
     );
-    const flexibleEndAtMs=combineTaipeiDateTime(
+    const flexibleEndAtMs=combineOrderMarketDateTime(
       date,
       qs('flexibleEndTime')?.value
     );
@@ -15543,7 +15649,7 @@ function getOrderTimingLabel(payload=getOrderTimingPayload()){
   }
 
   if(type==='flexible'){
-    return `彈性時段：${formatOrderTimingDateTime(payload.flexibleStartAtMs)}～${new Date(Number(payload.flexibleEndAtMs||0)).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false})}`;
+    return `彈性時段：${formatOrderTimingDateTime(payload.flexibleStartAtMs)}～${new Date(Number(payload.flexibleEndAtMs||0)).toLocaleTimeString(getOrderMarketLocale(),{timeZone:getOrderMarketTimeZone(),hour:'2-digit',minute:'2-digit',hour12:false})}`;
   }
 
   return `立即任務・${getSpeedLabel(speedType)}`;
@@ -16112,9 +16218,43 @@ function goPrev(){
   showHomeTab();
 }
 
+
+const UBEE_ORDER_JP_PREFECTURES=[
+  '北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'
+];
+
+function inferUBeeOrderRegion(address,lat,lng){
+  const text=String(address||'').replace(/\s+/g,'').trim();
+  const y=Number(lat),x=Number(lng);
+  let country='';
+  if(Number.isFinite(y)&&Number.isFinite(x)){
+    if(y>=21.5&&y<=26.6&&x>=118.0&&x<=122.4)country='TW';
+    else if(y>=24.0&&y<=46.7&&x>=122.5&&x<=146.7)country='JP';
+  }
+  if(!country){
+    if(/日本|Japan/i.test(text)||UBEE_ORDER_JP_PREFECTURES.some(p=>text.includes(p)))country='JP';
+    else country=String(window.getUBeeCustomerCountryCode?.()||'TW').toUpperCase()==='JP'?'JP':'TW';
+  }
+  if(country==='JP'){
+    const prefecture=UBEE_ORDER_JP_PREFECTURES.find(p=>text.includes(p))||'';
+    const city=text.includes('札幌市')?'札幌市':(text.match(/((?:[^都道府県市区町村]{1,12})市)/)?.[1]||'');
+    const district=city==='札幌市'
+      ?(['中央区','北区','東区','白石区','豊平区','南区','西区','厚別区','手稲区','清田区'].find(d=>text.includes(d))||'')
+      :(text.match(/((?:[^市区町村]{1,12})区)/)?.[1]||'');
+    return{countryCode:'JP',prefecture,city,district};
+  }
+  const normalized=text.replace(/臺/g,'台');
+  const city=['台北市','新北市','桃園市','台中市','台南市','高雄市','基隆市','新竹市','嘉義市','新竹縣','苗栗縣','彰化縣','南投縣','雲林縣','嘉義縣','屏東縣','宜蘭縣','花蓮縣','台東縣','澎湖縣','金門縣','連江縣'].find(c=>normalized.includes(c))||String(selectedServiceCity||'').replace(/臺/g,'台');
+  const after=city&&normalized.includes(city)?normalized.slice(normalized.indexOf(city)+city.length):'';
+  const district=after.match(/^(.{1,8}?(?:區|鄉|鎮|市))/)?.[1]||'';
+  return{countryCode:'TW',prefecture:'',city,district};
+}
+
 function getPayload(){
   const pickup = qs('pickup').value.trim();
   const dropoff = qs('dropoff').value.trim();
+  const pickupRegion=inferUBeeOrderRegion(pickup,pickupLat,pickupLng);
+  const dropoffRegion=inferUBeeOrderRegion(dropoff,dropoffLat,dropoffLng);
   const upstairsOption = getUpstairsOption();
   const rawAdvancePayment = getAdvancePaymentAmount();
   const advancePayment = Number.isFinite(rawAdvancePayment) ? rawAdvancePayment : 0;
@@ -16142,6 +16282,10 @@ function getPayload(){
     pickupLat,
     pickupLng,
     pickupPlaceId,
+    pickupCountryCode:pickupRegion.countryCode,
+    pickupPrefecture:pickupRegion.prefecture,
+    pickupCity:pickupRegion.city,
+    pickupDistrict:pickupRegion.district,
 
     dropoff,
     dropoffAddress:dropoff,
@@ -16150,6 +16294,10 @@ function getPayload(){
     dropoffLat,
     dropoffLng,
     dropoffPlaceId,
+    dropoffCountryCode:dropoffRegion.countryCode,
+    dropoffPrefecture:dropoffRegion.prefecture,
+    dropoffCity:dropoffRegion.city,
+    dropoffDistrict:dropoffRegion.district,
 
     item:itemText,
     note,
@@ -20062,7 +20210,7 @@ const UBeeEnhancements = (() => {
   function saveDraft(){const d=collectDraft();if(!d.pickup&&!d.dropoff&&!d.note&&!d.pickupPhone&&!d.dropoffPhone)return;localStorage.setItem(KEYS.draft,JSON.stringify(d));}
   function scheduleDraft(){clearTimeout(state.draftTimer);state.draftTimer=setTimeout(saveDraft,500)}
   function clearDraft(){localStorage.removeItem(KEYS.draft)}
-  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,d.serviceType||serviceType);speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
+  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,d.serviceType||serviceType);speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
   function offerDraft(){const d=safeParse(localStorage.getItem(KEYS.draft)||'',null);if(!d||!d.savedAt||Date.now()-new Date(d.savedAt).getTime()>7*86400000)return;const el=document.createElement('div');el.className='draft-banner';el.id='draftBanner';el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}<br>${new Date(d.savedAt).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;(document.querySelector('#productionOrderFlow #flowPageHome .flow-home-scroll')||document.querySelector('#productionOrderFlow #flowPageHome .flow-scroll')||document.querySelector('.app')||document.body).prepend(el);el.querySelector('.draft-discard').onclick=()=>{clearDraft();el.remove()};el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};}
 
   function renderQuickAddresses(){const bar=qs('savedAddressQuickBar'),list=getAddresses();if(!bar)return;bar.classList.toggle('hidden',!list.length);bar.innerHTML=list.map(a=>`<button class="quick-address-chip" type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">${escapeAttr(a.label||'常用地址')}</button>`).join('')}
@@ -20929,7 +21077,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-form-group"><label class="flow-label" for="flowDetailAddress">完整地址</label><input class="flow-input" id="flowDetailAddress" maxlength="240" readonly=""/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailNote">門牌、樓層及補充說明</label><input class="flow-input" id="flowDetailNote" maxlength="160" placeholder="例如：12號3樓、店名、管理室或入口說明"/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailName">聯絡人姓名 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailName" maxlength="60" placeholder="取件聯絡人或收件人"/></div>
-<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="09xxxxxxxx"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button></div></div>
+<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="0912345678 / 09012345678"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button></div></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailLabel">常用地址名稱</label><input class="flow-input" id="flowDetailLabel" maxlength="40" placeholder="例如：家、公司、店家"/></div>
 <label class="flow-check" style="margin:0"><input id="flowSaveAddress" type="checkbox"/><span>儲存為常用地址，下次可直接選擇。</span></label>
 <div class="flow-status" id="flowDetailStatus"></div>
@@ -21533,26 +21681,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     try{await ensureMaps();const point=validPoint(item)?{lat:Number(item.lat),lng:Number(item.lng)}:await geocodeAddress(item.address||item.formattedAddress);const center=point||{lat:24.1477,lng:120.6736};if(!state.detailMap)state.detailMap=new google.maps.Map($('flowDetailMap'),{center,zoom:point?17:12,disableDefaultUI:true,gestureHandling:'greedy'});else{state.detailMap.setCenter(center);state.detailMap.setZoom(point?17:12);google.maps.event.trigger(state.detailMap,'resize')}if(state.detailMarker)state.detailMarker.setMap(null);if(point)state.detailMarker=new google.maps.Marker({map:state.detailMap,position:point,title:'選擇的地點'})}catch(error){console.warn('地點預覽失敗：',error)}
   }
 
-  const UBEE_JP_PREFECTURES_CLIENT=['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
-  function inferCustomerOrderRegion(address,base={}){
-    const text=String(address||'').replace(/\s+/g,'').trim();
-    const lat=Number(base.lat),lng=Number(base.lng);
-    let coordinateCountry='';
-    if(Number.isFinite(lat)&&Number.isFinite(lng)){
-      if(lat>=21.5&&lat<=26.6&&lng>=118.0&&lng<=122.4)coordinateCountry='TW';
-      else if(lat>=24.0&&lat<=46.7&&lng>=122.5&&lng<=146.7)coordinateCountry='JP';
-    }
-    const addressCountry=UBEE_JP_PREFECTURES_CLIENT.some(x=>text.includes(x))||/(?:日本|Japan)/i.test(text)?'JP':/(?:台灣|台湾|Taiwan|台北市|新北市|桃園市|台中市|臺中市|台南市|臺南市|高雄市|基隆市|新竹市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|屏東縣|宜蘭縣|花蓮縣|台東縣|臺東縣|澎湖縣|金門縣|連江縣)/.test(text)?'TW':'';
-    const countryCode=coordinateCountry||addressCountry||String(base.countryCode||window.getUBeeCustomerCountryCode?.()||'TW').toUpperCase();
-    if(countryCode==='JP'){
-      const prefecture=String(base.prefecture||'').trim()||UBEE_JP_PREFECTURES_CLIENT.find(x=>text.includes(x))||'';
-      const city=String(base.city||'').trim()||(text.includes('札幌市')?'札幌市':(text.match(/([^都道府県市区町村]{1,16}市)/)?.[1]||''));
-      const district=String(base.district||'').trim()||(city==='札幌市'?(['中央区','北区','東区','白石区','豊平区','南区','西区','厚別区','手稲区','清田区'].find(x=>text.includes(x))||''):(text.match(/([^市区町村]{1,16}区)/)?.[1]||''));
-      return {countryCode:'JP',prefecture,city,district};
-    }
-    return {countryCode:'TW',prefecture:'',city:String(base.city||selectedServiceCity||'').replace(/臺/g,'台').trim(),district:String(base.district||'').replace(/臺/g,'台').trim()};
-  }
-
   async function saveDetail(){
     const base=state.selectedAddress||{};
     const address=String($('flowDetailAddress').value||'').trim();const contactName=String($('flowDetailName').value||'').trim();const phone=cleanPhone($('flowDetailPhone').value);
@@ -21560,8 +21688,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     if(!contactName){status('flowDetailStatus','請填寫聯絡人姓名。',true);return}
     if(!validUBeeCustomerPhone(phone)){status('flowDetailStatus','請填寫正確的台灣或日本手機號碼。',true);return}
     let lat=Number(base.lat),lng=Number(base.lng);if(!validPoint({lat,lng})){try{const point=await geocodeAddress(address);lat=point?.lat??null;lng=point?.lng??null}catch(_){lat=null;lng=null}}
-    const region=inferCustomerOrderRegion(address,{...base,lat,lng});
-    const item={label:String($('flowDetailLabel').value||'').trim()||(state.addressTarget==='pickup'?'取件地址':'收件地址'),address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),countryCode:region.countryCode,prefecture:region.prefecture,city:region.city,district:region.district,lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
+    const item={label:String($('flowDetailLabel').value||'').trim()||(state.addressTarget==='pickup'?'取件地址':'收件地址'),address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
     if(state.addressTarget==='pickup'){state.pickup=item;if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};}else{state.dropoff={...item,_autoQueue:false};}
     if($('flowSaveAddress').checked)await persistAddress(item);
     updateHome();syncLegacy();showPage('home');
@@ -21620,18 +21747,17 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function ensureTimeDefaults(){
     const round=ms=>Math.ceil(ms/(5*60*1000))*(5*60*1000);const start=new Date(round(Date.now()+2*60*60*1000));const end=new Date(round(Date.now()+4*60*60*1000));
-    const localParts=date=>{const p={};new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});return{date:`${p.year}-${p.month}-${p.day}`,time:`${p.hour}:${p.minute}`}};
+    const localParts=date=>{const p={};new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});return{date:`${p.year}-${p.month}-${p.day}`,time:`${p.hour}:${p.minute}`}};
     const a=localParts(start),b=localParts(end),today=localParts(new Date()).date;['flowScheduledDate','flowFlexibleDate'].forEach(id=>{const el=$(id);el.min=today;if(!el.value)el.value=a.date});if(!$('flowScheduledTime').value)$('flowScheduledTime').value=a.time;if(!$('flowFlexibleStart').value)$('flowFlexibleStart').value=a.time;if(!$('flowFlexibleEnd').value)$('flowFlexibleEnd').value=b.time;
   }
 
   function setTiming(type){state.timing=['immediate','scheduled','flexible'].includes(type)?type:'immediate';root.querySelectorAll('[data-timing]').forEach(btn=>btn.classList.toggle('active',btn.dataset.timing===state.timing));$('flowScheduledPanel').classList.toggle('show',state.timing==='scheduled');$('flowFlexiblePanel').classList.toggle('show',state.timing==='flexible');$('flowSpeedCard').style.display=state.timing==='immediate'?'block':'none';if(state.timing!=='immediate')state.speed='standard';ensureTimeDefaults()}
   function setSpeed(type){state.speed=['standard','priority','express'].includes(type)?type:'standard';root.querySelectorAll('[data-speed]').forEach(btn=>btn.classList.toggle('active',btn.dataset.speed===state.speed))}
-  function combineTaipei(date,time){return Date.parse(`${date}T${time}:00+08:00`)}
   function validateOptions(){
     state.scheduleGoal=$('flowScheduleGoal').value;state.scheduledDate=$('flowScheduledDate').value;state.scheduledTime=$('flowScheduledTime').value;state.flexibleDate=$('flowFlexibleDate').value;state.flexibleStart=$('flowFlexibleStart').value;state.flexibleEnd=$('flowFlexibleEnd').value;
     const min=Date.now()+30*60*1000;
-    if(state.timing==='scheduled'){const ms=combineTaipei(state.scheduledDate,state.scheduledTime);if(!Number.isFinite(ms)||ms<min){status('flowOptionsStatus','指定時間至少需要晚於現在 30 分鐘。',true);return false}}
-    if(state.timing==='flexible'){const a=combineTaipei(state.flexibleDate,state.flexibleStart),b=combineTaipei(state.flexibleDate,state.flexibleEnd);if(!Number.isFinite(a)||!Number.isFinite(b)||a<min||b<=a){status('flowOptionsStatus','請選擇正確的彈性時段，開始時間至少晚於現在 30 分鐘。',true);return false}}
+    if(state.timing==='scheduled'){const ms=combineOrderMarketDateTime(state.scheduledDate,state.scheduledTime);if(!Number.isFinite(ms)||ms<min){status('flowOptionsStatus','指定時間至少需要晚於現在 30 分鐘。',true);return false}}
+    if(state.timing==='flexible'){const a=combineOrderMarketDateTime(state.flexibleDate,state.flexibleStart),b=combineOrderMarketDateTime(state.flexibleDate,state.flexibleEnd);if(!Number.isFinite(a)||!Number.isFinite(b)||a<min||b<=a){status('flowOptionsStatus','請選擇正確的彈性時段，開始時間至少晚於現在 30 分鐘。',true);return false}}
     status('flowOptionsStatus','');return true;
   }
 
@@ -21697,14 +21823,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
           serviceMode:resolveClientServiceMode(state.service,payload.serviceType||serviceLabels[state.service]),
           pickupAddressObject:state.pickup||null,
           dropoffAddressObject:state.dropoff||null,
-          pickupCountryCode:String(state.pickup?.countryCode||'').toUpperCase(),
-          pickupPrefecture:String(state.pickup?.prefecture||''),
-          pickupCity:String(state.pickup?.city||''),
-          pickupDistrict:String(state.pickup?.district||''),
-          dropoffCountryCode:String(state.dropoff?.countryCode||'').toUpperCase(),
-          dropoffPrefecture:String(state.dropoff?.prefecture||''),
-          dropoffCity:String(state.dropoff?.city||''),
-          dropoffDistrict:String(state.dropoff?.district||''),
           nearbyPlace:storeDiscovery?{
             name:storeDiscovery.name,
             address:storeDiscovery.address,
@@ -21796,7 +21914,53 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function orderTimeText(order){
     const value=order?.createdAt||order?.updatedAt;
-    try{const date=value?.toDate?value.toDate():new Date(value);if(!date||Number.isNaN(date.getTime()))return'';return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(date)}catch(_){return''}
+
+    try{
+      const date=value?.toDate
+        ? value.toDate()
+        : new Date(value);
+
+      if(
+        !date ||
+        Number.isNaN(date.getTime())
+      ){
+        return '';
+      }
+
+      const country=
+        String(
+          order?.pickupCountryCode ||
+          ''
+        ).toUpperCase() === 'JP'
+          ? 'JP'
+          : (
+              String(
+                order?.pickupCountryCode ||
+                ''
+              ).toUpperCase() === 'TW'
+                ? 'TW'
+                : getOrderMarketCountryCode()
+            );
+
+      return new Intl.DateTimeFormat(
+        country==='JP'
+          ? 'ja-JP'
+          : 'zh-TW',
+        {
+          timeZone:
+            country==='JP'
+              ? 'Asia/Tokyo'
+              : 'Asia/Taipei',
+          month:'numeric',
+          day:'numeric',
+          hour:'2-digit',
+          minute:'2-digit'
+        }
+      ).format(date);
+
+    }catch(_){
+      return '';
+    }
   }
 
   function orderStatusText(statusValue){
