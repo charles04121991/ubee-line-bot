@@ -8657,773 +8657,6 @@ body.ubee-app-starting{
   height:24px;
 }
 </style>
-
-<script id="ubee-customer-country-auto-locale-runtime">
-(() => {
-  const EXACT_JA = Object.freeze({
-    "UBee 跑腿｜正式營運用戶端":"UBee｜生活サポート",
-    "即時跑腿・快速抵達":"すぐ頼める・すぐ届く",
-    "Bee 跑腿":"Bee 生活サポート",
-    "UBee 生活跑腿平台":"UBee 生活サポートプラットフォーム",
-    "生活中的大小事":"日常のちょっとした用事を",
-    "交給 UBee":"UBee におまかせ",
-    "代買、代送、取件、排隊與生活任務，都能在同一個平台完成估價、下單與進度追蹤。":"買い物代行、配達、受け取り、行列代行などを、見積もりから依頼・進捗確認まで一つのアプリで完結できます。",
-    "快速估價":"かんたん見積もり",
-    "任務追蹤":"依頼を追跡",
-    "常用地址":"よく使う住所",
-    "建立新帳號":"新規アカウント作成",
-    "登入 UBee":"UBee にログイン",
-    "使用手機號碼與密碼建立 UBee 獨立帳號，不需要 LINE，也不需要簡訊驗證碼。":"電話番号とパスワードで UBee アカウントを作成できます。LINE やSMS認証は不要です。",
-    "歡迎回來":"おかえりなさい",
-    "使用註冊時設定的手機號碼與密碼登入。":"登録した電話番号とパスワードでログインしてください。",
-    "手機號碼":"電話番号",
-    "登入密碼":"ログインパスワード",
-    "忘記密碼":"パスワードを忘れた場合",
-    "顯示":"表示",
-    "還沒有帳號":"アカウントをお持ちでない方",
-    "立即建立帳號":"今すぐアカウントを作成",
-    "UBee 客服不會向你索取登入密碼。請勿將帳號資訊提供給小U、店家或任何第三人。":"UBee サポートがログインパスワードをお尋ねすることはありません。アカウント情報を配達パートナー、店舗、第三者に共有しないでください。",
-    "設定帳號":"アカウント設定",
-    "第 1 步，共 5 步":"ステップ 1 / 5",
-    "帳號":"アカウント",
-    "密碼":"パスワード",
-    "資料":"情報",
-    "偏好":"設定",
-    "確認":"確認",
-    "設定登入手機號碼":"ログイン用電話番号を設定",
-    "這組號碼會成為 UBee 登入帳號及訂單聯絡方式，請確認輸入正確。":"この電話番号は UBee のログインIDと依頼時の連絡先になります。正しく入力してください。",
-    "必填":"必須",
-    "支援台灣 09 手機號碼與日本 070／080／090 手機號碼。":"台湾の携帯電話番号（10桁）を入力してください。",
-    "下一步：建立密碼":"次へ：パスワード設定",
-    "建立登入密碼":"ログインパスワードを設定",
-    "設定一組只供你本人使用的安全密碼。":"ご本人だけが使用する安全なパスワードを設定してください。",
-    "登入帳號":"ログインID",
-    "至少 8 個字元":"8文字以上",
-    "包含英文字母":"英字を含む",
-    "包含數字":"数字を含む",
-    "再次輸入密碼":"パスワードを再入力",
-    "下一步：會員資料":"次へ：会員情報",
-    "建立會員資料":"会員情報を登録",
-    "讓訂單、客服與服務地區資料可以正確對應。":"依頼、サポート、サービスエリア情報を正しく紐づけるために使用します。",
-    "真實姓名":"氏名",
-    "電子信箱":"メールアドレス",
-    "選填":"任意",
-    "常用縣市":"よく使う地域",
-    "選擇縣市":"地域を選択",
-    "常用行政區":"よく使う市区町村",
-    "先選擇縣市":"先に地域を選択",
-    "推薦碼":"紹介コード",
-    "下一步：使用偏好":"次へ：通知設定",
-    "設定使用偏好":"通知・利用設定",
-    "必要的任務通知會維持開啟，其他訊息由你自行決定。":"依頼に必要な通知は常に有効です。その他の通知は自由に設定できます。",
-    "任務狀態通知":"依頼状況の通知",
-    "接單、取件、配送、完成及任務異常等必要通知。":"受付、受け取り、配達、完了、トラブルなど必要な通知です。",
-    "付款與安全通知":"支払い・安全通知",
-    "付款狀態、帳號安全及重要客服處理資訊。":"支払い状況、アカウント安全、重要なサポート情報です。",
-    "平台重要公告":"重要なお知らせ",
-    "服務區域、營運時間或系統重要調整。":"サービスエリア、営業時間、システムに関する重要な変更です。",
-    "優惠與活動訊息":"キャンペーン情報",
-    "不是註冊必要條件，之後可再調整。":"登録必須ではありません。後から変更できます。",
-    "註冊完成後再設定常用地址":"登録後に住所を設定",
-    "不影響帳號建立與登入。":"アカウント作成・ログインには影響しません。",
-    "下一步：確認規範":"次へ：規約確認",
-    "確認服務規範":"サービス規約を確認",
-    "完成最後確認後，系統會建立帳號並自動登入。":"最後の確認後、アカウントを作成して自動ログインします。",
-    "我同意 UBee 跑腿服務條款":"UBee 利用規約に同意します",
-    "查看服務條款":"利用規約を見る",
-    "我同意 UBee 隱私權政策":"UBee プライバシーポリシーに同意します",
-    "查看隱私權政策":"プライバシーポリシーを見る",
-    "我了解商品費用與跑腿服務費分開計算":"商品代金とサービス料金が別計算であることを確認しました",
-    "查看任務與費用規範":"依頼・料金ルールを見る",
-    "我了解平台禁止違法、危險或高風險任務":"違法・危険・高リスクな依頼は禁止されていることを確認しました",
-    "平台可基於法規、安全或服務風險拒絕任務。":"法令、安全性、サービスリスクにより依頼をお断りする場合があります。",
-    "完成註冊":"登録を完了",
-    "歡迎加入 UBee":"UBee へようこそ",
-    "會員帳號已建立完成，現在可以開始使用完整跑腿服務。":"アカウントの作成が完了しました。UBee のサービスをご利用いただけます。",
-    "開始使用 UBee":"UBee を使い始める",
-    "自動重設登入密碼":"ログインパスワードを再設定",
-    "輸入註冊手機號碼":"登録した電話番号を入力",
-    "註冊手機號碼":"登録電話番号",
-    "LINE 指令":"LINE コマンド",
-    "開啟 LINE 自動重設":"LINE で再設定",
-    "返回登入":"ログインに戻る",
-    "設定新密碼":"新しいパスワードを設定",
-    "正在驗證一次性重設連結。":"再設定リンクを確認しています。",
-    "新密碼":"新しいパスワード",
-    "再次輸入新密碼":"新しいパスワードを再入力",
-    "確認重設密碼":"パスワードを再設定",
-    "連結有問題，聯繫客服":"リンクに問題がある場合はサポートへ",
-    "服務規範":"サービスルール",
-    "我已閱讀":"確認しました",
-    "處理中":"処理中",
-    "選擇服務城市":"サービスエリアを選択",
-    "選擇任務主要所在地；實際服務仍以地址、估價及媒合結果為準。":"依頼の主なエリアを選択してください。実際の対応可否は住所、見積もり、マッチング結果によります。",
-    "UBee 即時任務服務":"UBee 即時サービス",
-    "今天需要":"今日は",
-    "幫你完成什麼？":"何をお手伝いしましょうか？",
-    "選擇服務、填入路線，系統會立即估價並開始媒合附近小U。":"サービスと住所を入力すると、すぐに見積もりを計算し、近くの配達パートナーを探します。",
-    "快速媒合":"スピードマッチング",
-    "平均約 35 分鐘完成":"平均約35分で完了",
-    "UBee 跑腿服務":"UBee 生活サポート",
-    "今天需要幫什麼？":"今日は何をお手伝いしましょうか？",
-    "先選擇服務，再填寫地址與任務內容。":"まずサービスを選び、住所と依頼内容を入力してください。",
-    "即時服務狀態":"現在のサービス状況",
-    "位小U可即時媒合":"名の配達パートナーが対応可能",
-    "資料更新時間":"更新時刻",
-    "系統正在更新在線小U數量。":"対応可能な配達パートナー数を更新しています。",
-    "選擇服務":"サービスを選択",
-    "幫我送":"届けてほしい",
-    "文件、包裹、物品配送":"書類・荷物・商品の配達",
-    "幫我取":"受け取ってほしい",
-    "到店取貨、代領取件":"店舗受け取り・代理受け取り",
-    "幫我買":"買ってきてほしい",
-    "商品、餐點、生活用品":"商品・食事・日用品",
-    "幫排隊":"並んでほしい",
-    "現場排隊、代候位":"行列・順番待ち代行",
-    "全能跑腿":"その他のお手伝い",
-    "其他生活任務與代辦":"その他の日常サポート",
-    "任務分類":"依頼カテゴリ",
-    "請選擇分類":"カテゴリを選択してください",
-    "附近店家":"近くのお店",
-    "搜尋附近":"近くを検索",
-    "選擇代買分類後，\n    按「搜尋附近」即可搜尋店家。":"購入代行カテゴリを選んで「近くを検索」を押すと店舗を検索できます。",
-    "取件資訊":"受け取り情報",
-    "送達資訊":"お届け情報",
-    "取件補充":"受け取り補足",
-    "送達補充":"お届け補足",
-    "附近媒合狀態":"近くのマッチング状況",
-    "填寫取件地址後顯示媒合狀況":"受け取り住所を入力すると表示されます",
-    "等待定位":"位置情報待ち",
-    "預估費用":"見積もり料金",
-    "填寫地址後自動估價":"住所入力後に自動見積もり",
-    "預計完成時間待計算":"完了予定時刻を計算中",
-    "待估價":"見積もり待ち",
-    "填寫任務資訊":"依頼内容を入力",
-    "服務路線":"ルート",
-    "任務資訊":"依頼情報",
-    "任務時效":"依頼時間",
-    "確認訂單":"依頼内容を確認",
-    "任務進度":"依頼状況",
-    "請完成這筆任務的聯絡方式、需求內容與其他必要資訊。":"連絡先、依頼内容、その他必要な情報を入力してください。",
-    "代買提醒":"購入代行について",
-    "排隊提醒":"行列代行について",
-    "全能跑腿提醒":"その他依頼について",
-    "急件專送提醒":"お急ぎ配送について",
-    "聯絡資訊":"連絡先",
-    "商品體積":"荷物サイズ",
-    "請選擇商品體積":"荷物サイズを選択",
-    "小型｜可放機車置物箱（不加價）":"小型｜バイクの収納に入るサイズ（追加料金なし）",
-    "中型｜占用部分腳踏空間（+50）":"中型｜やや大きめ（+50）",
-    "大型｜超過一般機車腳踏空間（+100）":"大型｜通常のバイク積載を超えるサイズ（+100）",
-    "超大型｜特殊承載／汽車配送（預估 +300，需確認）":"特大型｜特別積載／自動車配送（目安 +300、要確認）",
-    "交付需求":"受け渡し条件",
-    "不用上樓，門口交付":"建物入口で受け渡し",
-    "需要上樓，有電梯（+20）":"上階まで・エレベーターあり（+20）",
-    "需要上樓，無電梯（+30）":"上階まで・エレベーターなし（+30）",
-    "重物／大量物品，需人工確認":"重量物／大量荷物（要確認）",
-    "備註":"メモ",
-    "任務細節":"依頼詳細",
-    "付款狀態不確定":"支払い状況不明",
-    "已付款":"支払い済み",
-    "尚未付款":"未払い",
-    "缺貨時先聯絡我":"欠品時は連絡してほしい",
-    "缺貨就不買":"欠品なら購入しない",
-    "可改買相近商品":"類似商品で代替可",
-    "需要發票":"レシートが必要",
-    "不需要發票":"レシート不要",
-    "皆可":"どちらでも可",
-    "不需要完成證明":"完了証明不要",
-    "需要完成照片":"完了写真が必要",
-    "需要簽收":"受取サインが必要",
-    "需要照片與簽收":"写真と受取サインが必要",
-    "商品清單":"商品リスト",
-    "＋ 新增商品":"＋ 商品を追加",
-    "代墊費用":"立替金額",
-    "上一步":"戻る",
-    "選擇任務時效":"依頼時間を選択",
-    "立即任務":"今すぐ依頼",
-    "現在開始媒合附近可接單的小U":"今すぐ近くの配達パートナーを探します",
-    "指定時間預約":"日時指定予約",
-    "指定取件時間，或指定希望完成時間":"受け取り時刻または完了希望時刻を指定",
-    "彈性時段預約":"時間帯予約",
-    "提供一段可執行時段，讓有正職的小U更容易安排":"対応可能な時間帯を指定して依頼します",
-    "立即任務處理速度":"即時依頼の優先度",
-    "一般件":"通常",
-    "60-90 分鐘":"60～90分",
-    "標準件":"標準",
-    "30-60 分鐘":"30～60分",
-    "優先件":"優先",
-    "20-30 分鐘":"20～30分",
-    "預約方式":"予約方法",
-    "希望在指定時間取件":"指定時刻に受け取り希望",
-    "希望在指定時間前完成":"指定時刻までに完了希望",
-    "日期":"日付",
-    "時間":"時刻",
-    "開始時間":"開始時刻",
-    "結束時間":"終了時刻",
-    "配送偏好":"配達希望",
-    "抵達前聯絡":"到着前に連絡",
-    "不按門鈴":"インターホン不要",
-    "可放管理室":"管理室への預け入れ可",
-    "需要保溫":"保温が必要",
-    "不可淋雨":"雨濡れ厳禁",
-    "交通工具偏好":"車両希望",
-    "不限":"指定なし",
-    "機車":"バイク",
-    "汽車":"自動車",
-    "前往確認訂單":"依頼内容を確認",
-    "確認路線、任務與費用後即可送出":"ルート、依頼内容、料金を確認して送信できます",
-    "正在準備路線地圖":"ルート地図を準備中",
-    "路線距離":"ルート距離",
-    "預估時間":"所要時間",
-    "路線與任務":"ルートと依頼",
-    "點選內容可返回修改":"タップして内容を修正できます",
-    "明細可展開查看":"詳細を開いて確認できます",
-    "我已確認訂單資訊並同意 UBee 跑腿服務規則。":"依頼内容を確認し、UBee のサービスルールに同意します。",
-    "查看服務規則":"サービスルールを見る",
-    "預估應付":"お支払い見込み",
-    "確認並建立任務":"確認して依頼を作成",
-    "訂單":"依頼",
-    "前往 LINE 官方客服":"LINE公式サポートへ",
-    "取消訂單":"依頼をキャンセル",
-    "預計抵達時間":"到着予定時刻",
-    "任務狀態更新中":"依頼状況を更新中",
-    "系統正在讀取最新任務資訊":"最新の依頼情報を読み込んでいます",
-    "即時連線正常":"リアルタイム接続中",
-    "訂單狀態與小U位置會自動同步":"依頼状況と配達パートナーの位置は自動更新されます",
-    "剛剛更新":"更新したばかり",
-    "UBee 正在協助處理異常":"UBee が問題対応中です",
-    "調度中心已介入，訂單與進度資料不會消失。":"運営側が対応しています。依頼・進捗データは保持されます。",
-    "即時位置":"現在地",
-    "小U 接單後顯示即時位置與路線":"配達パートナー決定後、現在地とルートを表示します",
-    "等待小U接單":"配達パートナーを探しています",
-    "費用明細":"料金明細",
-    "查看":"見る",
-    "跑腿詳細資訊載入中...":"依頼詳細を読み込み中...",
-    "付款":"支払い",
-    "現金・任務完成時交付給小U":"現金・依頼完了時に配達パートナーへ支払い",
-    "現金":"現金",
-    "現金單":"現金払い",
-    "確認現金單，開始尋找小U":"現金払いを確認して配達パートナーを探す",
-    "訂單資訊":"依頼情報",
-    "地址、聯絡人與完整任務內容":"住所、連絡先、依頼内容",
-    "查看完整資訊":"詳細を見る",
-    "任務明細載入中...":"依頼詳細を読み込み中...",
-    "系統處理中…":"処理中…",
-    "正在取得位置…":"位置情報を取得中…",
-    "正在確認目前服務地區":"現在のサービスエリアを確認中",
-    "取件地點":"受け取り場所",
-    "請選擇取件地址":"受け取り住所を選択",
-    "填寫取件聯絡人與電話":"受け取り先の連絡先を入力",
-    "送達地點":"お届け先",
-    "請選擇送達地址":"お届け先住所を選択",
-    "填寫收件人與電話":"受取人と電話番号を入力",
-    "修改":"変更",
-    "下一步：填寫任務內容":"次へ：依頼内容",
-    "生活大小事，一叫就出發":"日常の用事をすぐにサポート",
-    "代買・代送・取件・排隊・全能跑腿":"買い物代行・配達・受け取り・行列代行・その他",
-    "任務內容":"依頼内容",
-    "請讓小U清楚知道要做什麼":"配達パートナーに依頼内容が分かるように入力してください",
-    "目前選擇":"現在の選択",
-    "任務細項":"依頼詳細",
-    "選擇最接近的服務":"最も近いサービスを選択",
-    "品項分類":"品目カテゴリ",
-    "可快速辨識任務內容":"依頼内容を分かりやすく分類できます",
-    "購買店家":"購入店舗",
-    "尚未選擇店家":"店舗未選択",
-    "已自動帶入":"自動入力済み",
-    "要請小U完成什麼？":"何をお願いしたいですか？",
-    "請告訴小U要買什麼":"購入してほしいものを入力してください",
-    "商品名稱":"商品名",
-    "數量":"数量",
-    "規格":"仕様",
-    "缺貨時怎麼處理？":"欠品時の対応",
-    "先聯絡我":"先に連絡してほしい",
-    "可接受相近商品":"類似商品でも可",
-    "其他需求":"その他の要望",
-    "任務標題（選填）":"依頼タイトル（任意）",
-    "預估代墊金額":"立替見込み額",
-    "預估排隊時間":"待ち時間の目安",
-    "其他配送需求（選填）":"その他の配達希望（任意）",
-    "物品大小":"荷物サイズ",
-    "小型｜機車可載":"小型｜バイクで運べるサイズ",
-    "中型｜需較大空間":"中型｜やや大きめ",
-    "大型｜請先與客服確認":"大型｜事前にサポートへ確認",
-    "搬上樓需求":"上階への運搬",
-    "不需要":"不要",
-    "有電梯":"エレベーターあり",
-    "需要走樓梯":"階段利用",
-    "下一步：配送設定":"次へ：配達設定",
-    "配送設定":"配達設定",
-    "選擇執行時間與處理速度":"実行時間と優先度を選択",
-    "任務時間":"依頼時間",
-    "現在開始媒合":"今すぐマッチング",
-    "指定時間":"日時指定",
-    "預約日期時間":"予約日時",
-    "彈性時段":"時間帯",
-    "提供執行區間":"対応可能な時間帯を指定",
-    "預約目標":"予約条件",
-    "希望此時間取件":"この時刻に受け取り希望",
-    "希望此時間前完成":"この時刻までに完了希望",
-    "處理速度":"優先度",
-    "經濟配送":"エコノミー",
-    "較快媒合":"優先マッチング",
-    "優先處理":"最優先",
-    "下一步：確認任務":"次へ：依頼確認",
-    "確認任務":"依頼を確認",
-    "確認地點、內容、路線與費用":"場所、内容、ルート、料金を確認",
-    "正式估價":"正式見積もり",
-    "正在計算路線與費用":"ルートと料金を計算中",
-    "搜尋地址":"住所を検索",
-    "先選擇地點，再填寫聯絡資訊":"場所を選んでから連絡先を入力",
-    "使用目前位置":"現在地を使用",
-    "搜尋結果":"検索結果",
-    "最近使用":"最近使用した住所",
-    "讀取中…":"読み込み中…",
-    "尚無最近使用地址":"最近使用した住所はありません",
-    "填寫地點資訊":"場所の詳細を入力",
-    "完整地址":"住所",
-    "門牌、樓層及補充說明":"番地、階数、補足情報",
-    "聯絡人姓名":"連絡先氏名",
-    "聯絡電話":"電話番号",
-    "帶入本人姓名":"自分の名前を入力",
-    "使用另一端電話":"もう一方の電話番号を使用",
-    "常用地址名稱":"住所の名前",
-    "儲存為常用地址，下次可直接選擇。":"よく使う住所として保存すると次回すぐ選べます。",
-    "儲存地點資訊":"住所情報を保存",
-    "任務":"依頼",
-    "查看進行中與歷史跑腿任務":"進行中・過去の依頼を確認",
-    "UBee 跑腿":"UBee",
-    "我的任務":"マイ依頼",
-    "點選任務可查看完整內容與目前狀態。":"依頼をタップすると詳細と現在の状況を確認できます。",
-    "查看進行中任務":"進行中の依頼を見る",
-    "正在讀取任務…":"依頼を読み込み中…",
-    "我的":"マイページ",
-    "立即登入":"ログイン",
-    "登入後可查看訂單與常用資料":"ログインすると依頼履歴や保存情報を確認できます",
-    "訂單與常用服務":"依頼とよく使う機能",
-    "我的訂單":"依頼履歴",
-    "常用任務":"よく使う依頼",
-    "優惠券":"クーポン",
-    "消息與活動":"お知らせ・キャンペーン",
-    "通知中心":"通知",
-    "服務地區":"サービスエリア",
-    "推薦獎勵":"紹介特典",
-    "支援與其他":"サポート・その他",
-    "聯繫客服":"サポートに連絡",
-    "意見回饋":"フィードバック",
-    "成為小U":"配達パートナーになる",
-    "設定":"設定",
-    "關閉":"閉じる",
-    "正在讀取常用地址…":"保存住所を読み込み中…",
-    "會員帳號":"会員アカウント",
-    "上一頁":"戻る",
-    "UBee 會員":"UBee 会員",
-    "帳號狀態：正常使用中":"アカウント状態：利用可能",
-    "尚未提供":"未登録",
-    "常用地區":"よく使う地域",
-    "尚未設定":"未設定",
-    "加入日期":"登録日",
-    "編輯會員資料":"会員情報を編集",
-    "修改密碼":"パスワード変更",
-    "通知偏好":"通知設定",
-    "帳號與安全":"アカウントと安全",
-    "規範與隱私":"規約・プライバシー",
-    "登出帳號":"ログアウト",
-    "刪除帳號":"アカウント削除",
-    "目前沒有可使用的優惠券。":"現在利用できるクーポンはありません。",
-    "目前沒有新的通知。":"新しい通知はありません。",
-    "功能即將推出":"近日公開",
-    "尚未建立常用任務":"よく使う依頼はまだありません",
-    "前往建立新任務":"新しい依頼を作成",
-    "正式服務":"正式サービス",
-    "測試服務":"テストサービス",
-    "籌備中":"準備中",
-    "加入UBee小U":"UBee 配達パートナーに参加",
-    "前往小U申請":"配達パートナー申請へ",
-    "姓名":"氏名",
-    "儲存資料":"情報を保存",
-    "目前密碼":"現在のパスワード",
-    "確認新密碼":"新しいパスワードを確認",
-    "確認修改":"変更を確認",
-    "儲存偏好":"設定を保存",
-    "修改登入密碼":"ログインパスワード変更",
-    "變更手機號碼":"電話番号変更",
-    "服務條款":"利用規約",
-    "隱私權政策":"プライバシーポリシー",
-    "任務與費用規範":"依頼・料金ルール",
-    "禁止委託項目":"禁止依頼",
-    "規範說明":"ルール説明",
-    "確認申請刪除帳號":"アカウント削除を申請",
-    "回饋類型":"フィードバック種別",
-    "使用問題":"利用上の問題",
-    "訂單問題":"依頼の問題",
-    "功能建議":"機能の提案",
-    "介面建議":"画面の提案",
-    "其他意見":"その他",
-    "回饋內容":"内容",
-    "聯絡方式（選填）":"連絡先（任意）",
-    "送出意見回饋":"フィードバックを送信",
-    "登出 UBee 帳號":"UBee からログアウト",
-    "一般":"一般",
-    "任務詳細資訊":"依頼詳細",
-    "查看任務內容與金額":"依頼内容と料金を確認",
-    "UBee 任務":"UBee 依頼",
-    "任務處理中":"依頼対応中",
-    "任務金額":"依頼料金",
-    "返回我的訂單":"依頼履歴に戻る",
-    "首頁":"ホーム",
-    "店家":"お店"
-  });
-
-  const PARTIAL_JA = Object.freeze({
-    "請先":"まず",
-    "請":" ",
-    "目前":"現在",
-    "尚未":"未",
-    "已":"済み",
-    "正在":" ",
-    "任務":"依頼",
-    "訂單":"依頼",
-    "小U":"配達パートナー",
-    "跑腿":"生活サポート",
-    "會員":"会員",
-    "帳號":"アカウント",
-    "密碼":"パスワード",
-    "手機號碼":"電話番号",
-    "手機":"電話",
-    "電話":"電話",
-    "地址":"住所",
-    "取件":"受け取り",
-    "送達":"お届け",
-    "配送":"配達",
-    "服務":"サービス",
-    "地區":"地域",
-    "城市":"地域",
-    "縣市":"地域",
-    "行政區":"市区町村",
-    "選擇":"選択",
-    "填寫":"入力",
-    "輸入":"入力",
-    "確認":"確認",
-    "建立":"作成",
-    "登入":"ログイン",
-    "登出":"ログアウト",
-    "註冊":"登録",
-    "修改":"変更",
-    "設定":"設定",
-    "資料":"情報",
-    "資訊":"情報",
-    "狀態":"状況",
-    "通知":"通知",
-    "付款":"支払い",
-    "費用":"料金",
-    "估價":"見積もり",
-    "預估":"見込み",
-    "金額":"金額",
-    "商品":"商品",
-    "店家":"店舗",
-    "附近":"近く",
-    "搜尋":"検索",
-    "聯絡":"連絡",
-    "客服":"サポート",
-    "立即":"今すぐ",
-    "返回":"戻る",
-    "下一步":"次へ",
-    "上一步":"戻る",
-    "完成":"完了",
-    "取消":"キャンセル",
-    "處理":"対応",
-    "更新":"更新",
-    "載入":"読み込み",
-    "讀取":"読み込み",
-    "系統":"システム",
-    "路線":"ルート",
-    "地圖":"地図",
-    "距離":"距離",
-    "時間":"時間",
-    "分鐘":"分",
-    "公里":"km",
-    "今日":"本日",
-    "今天":"今日",
-    "最近":"最近",
-    "常用":"よく使う",
-    "明細":"詳細",
-    "詳細":"詳細",
-    "內容":"内容",
-    "備註":"メモ",
-    "規範":"ルール",
-    "規則":"ルール",
-    "條款":"規約",
-    "隱私權":"プライバシー",
-    "優惠":"キャンペーン",
-    "活動":"キャンペーン",
-    "推薦":"紹介",
-    "獎勵":"特典",
-    "回饋":"フィードバック",
-    "意見":"意見",
-    "支援":"サポート",
-    "安全":"安全",
-    "現金":"現金",
-    "排隊":"行列",
-    "代買":"購入代行",
-    "代送":"配達代行",
-    "代墊":"立替",
-    "缺貨":"欠品",
-    "發票":"レシート",
-    "數量":"数量",
-    "規格":"仕様",
-    "品項":"品目",
-    "分類":"カテゴリ",
-    "偏好":"希望",
-    "交通工具":"車両",
-    "機車":"バイク",
-    "汽車":"自動車",
-    "樓":"階",
-    "門口":"入口",
-    "樓層":"階数",
-    "姓名":"氏名",
-    "電子信箱":"メールアドレス",
-    "選填":"任意",
-    "必填":"必須",
-    "錯誤":"エラー",
-    "失敗":"失敗",
-    "正常":"正常",
-    "同意":"同意",
-    "查看":"見る",
-    "開啟":"開く",
-    "關閉":"閉じる",
-    "等待":"待機",
-    "媒合":"マッチング",
-    "進度":"進捗",
-    "即時":"リアルタイム",
-    "預約":"予約",
-    "指定":"指定",
-    "彈性":"柔軟",
-    "開始":"開始",
-    "結束":"終了",
-    "日期":"日付",
-    "使用":"利用",
-    "需要":"必要",
-    "不需要":"不要",
-    "提供":"提供",
-    "儲存":"保存",
-    "刪除":"削除",
-    "新增":"追加",
-    "其他":"その他",
-    "一般":"一般",
-    "標準":"標準",
-    "優先":"優先"
-  });
-
-  const partialEntries=Object.entries(PARTIAL_JA).sort((a,b)=>b[0].length-a[0].length);
-  let activeCountry="";
-  let applying=false;
-  const originalText=new WeakMap();
-  const originalAttrs=new WeakMap();
-
-  function countryFromTimeZone(){
-    try{
-      const tz=Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-      if(tz==="Asia/Tokyo") return "JP";
-      if(tz==="Asia/Taipei") return "TW";
-    }catch(_){}
-    return /^ja(?:-|$)/i.test(String(navigator.language||"")) ? "JP" : "TW";
-  }
-
-  function inferCountryFromCoords(lat,lng){
-    const y=Number(lat), x=Number(lng);
-    if(!Number.isFinite(y)||!Number.isFinite(x)) return "";
-    if(y>=21.5 && y<=26.5 && x>=118.0 && x<=122.5) return "TW";
-    const mainJapan=y>=30.0 && y<=46.5 && x>=129.0 && x<=146.5;
-    const okinawa=y>=24.0 && y<31.0 && x>=122.0 && x<132.0;
-    if(mainJapan || okinawa) return "JP";
-    return "";
-  }
-
-  function locale(){
-    return activeCountry==="JP" ? "ja-JP" : "zh-TW";
-  }
-
-  function translate(value){
-    const source=String(value??"");
-    if(locale()!=="ja-JP") return source;
-    const trimmed=source.trim();
-    if(!trimmed) return source;
-    const exact=EXACT_JA[trimmed];
-    if(exact){
-      const i=source.indexOf(trimmed);
-      return source.slice(0,i)+exact+source.slice(i+trimmed.length);
-    }
-    let out=source;
-    for(const [from,to] of partialEntries){
-      if(out.includes(from)) out=out.split(from).join(to);
-    }
-    return out;
-  }
-
-  function renderElement(el){
-    if(!el || el.nodeType!==1) return;
-    if(["SCRIPT","STYLE","NOSCRIPT","TEXTAREA"].includes(el.tagName)) return;
-
-    for(const attr of ["placeholder","aria-label","title"]){
-      if(!el.hasAttribute?.(attr)) continue;
-      let bag=originalAttrs.get(el);
-      if(!bag){ bag={}; originalAttrs.set(el,bag); }
-      if(!(attr in bag)) bag[attr]=String(el.getAttribute(attr)??"");
-      const rendered=translate(bag[attr]);
-      if(el.getAttribute(attr)!==rendered) el.setAttribute(attr,rendered);
-    }
-
-    for(const node of el.childNodes||[]){
-      if(node.nodeType!==Node.TEXT_NODE) continue;
-      if(!originalText.has(node)) originalText.set(node,String(node.nodeValue??""));
-      const rendered=translate(originalText.get(node));
-      if(node.nodeValue!==rendered) node.nodeValue=rendered;
-    }
-  }
-
-  function applyLocale(root=document){
-    applying=true;
-    try{
-      document.documentElement.lang=locale();
-      document.documentElement.dataset.ubeeCountry=activeCountry;
-      document.documentElement.dataset.ubeeLocale=locale();
-      document.title=locale()==="ja-JP" ? "UBee｜生活サポート" : "UBee 跑腿";
-      const scope=root?.nodeType===1 ? root : document.documentElement;
-      renderElement(scope);
-      scope.querySelectorAll?.("*").forEach(renderElement);
-    }finally{
-      applying=false;
-    }
-  }
-
-  function setCountry(country,source=""){
-    const safe=String(country||"").toUpperCase();
-    if(!["TW","JP"].includes(safe)) return false;
-    if(activeCountry===safe) return true;
-    activeCountry=safe;
-    window.__UBEE_CUSTOMER_INTERFACE_COUNTRY__=safe;
-    window.__UBEE_CUSTOMER_INTERFACE_COUNTRY_SOURCE__=source;
-    applyLocale(document);
-    return true;
-  }
-
-  function syncFromPosition(lat,lng){
-    const c=inferCountryFromCoords(lat,lng);
-    if(c) setCountry(c,"gps-ui-only");
-    return c;
-  }
-
-  activeCountry=countryFromTimeZone();
-  window.__UBEE_CUSTOMER_INTERFACE_COUNTRY__=activeCountry;
-  window.__UBEE_CUSTOMER_INTERFACE_COUNTRY_SOURCE__="timezone-fallback";
-  window.getUBeeCustomerCountryCode=()=>activeCountry;
-  window.getUBeeCustomerLocale=()=>locale();
-  window.ubeeCustomerTranslate=translate;
-  window.setUBeeCustomerInterfaceCountry=setCountry;
-  window.syncUBeeCustomerLocaleFromPosition=syncFromPosition;
-  window.applyUBeeCustomerLocale=applyLocale;
-
-  const nativeAlert=window.alert?.bind(window);
-  const nativeConfirm=window.confirm?.bind(window);
-  const nativePrompt=window.prompt?.bind(window);
-  if(nativeAlert) window.alert=msg=>nativeAlert(translate(msg));
-  if(nativeConfirm) window.confirm=msg=>nativeConfirm(translate(msg));
-  if(nativePrompt) window.prompt=(msg,def)=>nativePrompt(translate(msg),def);
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",()=>applyLocale(document),{once:true});
-  }else{
-    applyLocale(document);
-  }
-
-  const observer=new MutationObserver(records=>{
-    if(applying) return;
-    const currentLocale=locale();
-
-    for(const record of records){
-      if(record.type==="characterData"){
-        const node=record.target;
-        const current=String(node.nodeValue??"");
-        const known=originalText.get(node);
-        const knownRendered=known===undefined ? "" : (currentLocale==="ja-JP" ? translate(known) : known);
-        if(known!==undefined && current===knownRendered) continue;
-        originalText.set(node,current);
-        const rendered=translate(current);
-        if(rendered!==current){
-          applying=true;
-          try{ node.nodeValue=rendered; }finally{ applying=false; }
-        }
-        continue;
-      }
-
-      if(record.type==="attributes" && record.target?.nodeType===1){
-        const el=record.target, attr=record.attributeName;
-        if(!["placeholder","aria-label","title"].includes(attr)) continue;
-        let bag=originalAttrs.get(el);
-        if(!bag){ bag={}; originalAttrs.set(el,bag); }
-        const current=String(el.getAttribute(attr)??"");
-        const known=bag[attr];
-        const knownRendered=known===undefined ? "" : (currentLocale==="ja-JP" ? translate(known) : known);
-        if(known!==undefined && current===knownRendered) continue;
-        bag[attr]=current;
-        const rendered=translate(current);
-        if(rendered!==current){
-          applying=true;
-          try{ el.setAttribute(attr,rendered); }finally{ applying=false; }
-        }
-        continue;
-      }
-
-      for(const node of record.addedNodes){
-        if(node.nodeType===Node.TEXT_NODE){
-          const source=String(node.nodeValue??"");
-          originalText.set(node,source);
-          const rendered=translate(source);
-          if(rendered!==source){
-            applying=true;
-            try{ node.nodeValue=rendered; }finally{ applying=false; }
-          }
-        }else if(node.nodeType===Node.ELEMENT_NODE){
-          applying=true;
-          try{
-            renderElement(node);
-            node.querySelectorAll?.("*").forEach(renderElement);
-          }finally{ applying=false; }
-        }
-      }
-    }
-  });
-
-  const startObserver=()=>{
-    if(document.body){
-      observer.observe(document.body,{
-        subtree:true,
-        childList:true,
-        characterData:true,
-        attributes:true,
-        attributeFilter:["placeholder","aria-label","title"]
-      });
-    }
-  };
-  if(document.body) startObserver();
-  else document.addEventListener("DOMContentLoaded",startObserver,{once:true});
-
-  // 若瀏覽器已授權定位，啟動後直接用 GPS 校正介面國家；不會主動彈出新的定位授權視窗。
-  try{
-    navigator.permissions?.query?.({name:"geolocation"}).then(status=>{
-      if(status?.state!=="granted" || !navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        p=>syncFromPosition(p.coords.latitude,p.coords.longitude),
-        ()=>{},
-        {enableHighAccuracy:false,timeout:5000,maximumAge:300000}
-      );
-    }).catch(()=>{});
-  }catch(_){}
-})();
-</script>
-
 </head>
 <body class="ubee-app-starting" style="background:#ffffff;">
 
@@ -10212,7 +9445,7 @@ body.ubee-app-starting{
 <form class="uca-panel" id="ucaLoginForm" novalidate="">
 <div class="uca-field">
 <div class="uca-label-row"><label class="uca-label" for="ucaLoginPhone">手機號碼</label></div>
-<input autocomplete="username" class="uca-input" id="ucaLoginPhone" inputmode="tel" maxlength="18" placeholder="0912345678 / 09012345678" type="tel"/>
+<input autocomplete="username" class="uca-input" id="ucaLoginPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
 <div class="uca-error" id="ucaLoginPhoneError"></div>
 </div>
 <div class="uca-field">
@@ -10255,8 +9488,8 @@ body.ubee-app-starting{
 <div class="uca-panel">
 <div class="uca-field">
 <div class="uca-label-row"><label class="uca-label" for="ucaRegisterPhone">手機號碼</label><span class="uca-optional">必填</span></div>
-<input autocomplete="tel" class="uca-input" id="ucaRegisterPhone" inputmode="tel" maxlength="18" placeholder="0912345678 / 09012345678" type="tel"/>
-<div class="uca-help">支援台灣 09 手機號碼與日本 070／080／090 手機號碼。</div>
+<input autocomplete="tel" class="uca-input" id="ucaRegisterPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
+<div class="uca-help">台灣行動電話格式，共 10 碼。</div>
 <div class="uca-error" id="ucaRegisterPhoneError"></div>
 </div>
 <div class="uca-button-stack"><button class="uca-btn uca-btn-primary" id="ucaToPassword" type="button">下一步：建立密碼</button></div>
@@ -10345,7 +9578,7 @@ body.ubee-app-starting{
 </div>
 <div class="uca-field">
 <div class="uca-label-row"><label class="uca-label" for="ucaForgotPhone">註冊手機號碼</label><span class="uca-optional">必填</span></div>
-<input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="tel" maxlength="18" placeholder="0912345678 / 09012345678" type="tel"/>
+<input autocomplete="username" class="uca-input" id="ucaForgotPhone" inputmode="numeric" maxlength="10" placeholder="09xxxxxxxx" type="tel"/>
 <div class="uca-error" id="ucaForgotPhoneError"></div>
 <div class="uca-help">輸入完整手機號碼後，系統會產生要傳給 LINE Bot 的重設指令。</div>
 </div>
@@ -10432,21 +9665,8 @@ body.ubee-app-starting{
     pricing:{title:'UBee 任務與費用規範',html:`<h4>費用組成</h4><p>訂單可能包含跑腿服務費、商品或代墊金額、等候費、樓層費、特殊物品費、優先服務費或其他送出前已揭露費用。</p><h4>商品與服務費分開</h4><p>商品店內價格、代墊金額與跑腿服務費為不同項目，系統依任務內容、距離與時間估價。</p><h4>任務變更</h4><p>地址、物品、代墊金額或等候時間變更時，平台可能重新估價或由客服協助確認。</p><h4>禁止任務</h4><p>違法、危險、管制、詐騙相關、侵害第三人權益或平台認定風險過高的任務，UBee 得拒絕承接。</p>`}
   });
 
-  function normalizePhone(value){
-    let phone=String(value||'').trim().replace(/[^\d+]/g,'');
-    if(phone.startsWith('00')) phone=`+${phone.slice(2)}`;
-    if(/^\+8869\d{8}$/.test(phone)) return `0${phone.slice(4)}`;
-    if(/^8869\d{8}$/.test(phone)) return `0${phone.slice(3)}`;
-    if(/^09\d{8}$/.test(phone)) return phone;
-    if(/^0(?:70|80|90)\d{8}$/.test(phone)) return `+81${phone.slice(1)}`;
-    if(/^81(?:70|80|90)\d{8}$/.test(phone)) return `+${phone}`;
-    if(/^\+81(?:70|80|90)\d{8}$/.test(phone)) return phone;
-    return phone.slice(0,24);
-  }
-  function validPhone(value){
-    const phone=normalizePhone(value);
-    return /^09\d{8}$/.test(phone)||/^\+81(?:70|80|90)\d{8}$/.test(phone);
-  }
+  function normalizePhone(value){ return String(value || '').replace(/\D/g,'').slice(0,10); }
+  function validPhone(value){ return /^09\d{8}$/.test(normalizePhone(value)); }
   function validEmail(value){ const text=String(value||'').trim(); return !text || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text); }
   function escapeHtml(value){ return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
   function maskPhone(value){ const p=normalizePhone(value); return p.length===10?`${p.slice(0,4)}-***-${p.slice(-3)}`:p; }
@@ -10705,7 +9925,7 @@ body.ubee-app-starting{
     $('ucaLoginPhone').value=phone;
     setError('ucaLoginPhoneError'); setError('ucaLoginPasswordError'); setStatus('ucaLoginStatus');
     let ok=true;
-    if(!validPhone(phone)){setError('ucaLoginPhoneError','請輸入正確的台灣或日本手機號碼。');ok=false}
+    if(!validPhone(phone)){setError('ucaLoginPhoneError','請輸入正確的台灣手機號碼。');ok=false}
     if(!password){setError('ucaLoginPasswordError','請輸入登入密碼。');ok=false}
     if(!ok)return;
     loading(true,'正在登入 UBee');
@@ -10716,7 +9936,7 @@ body.ubee-app-starting{
 
   function step1(){
     const phone=normalizePhone($('ucaRegisterPhone').value); $('ucaRegisterPhone').value=phone; setError('ucaRegisterPhoneError');
-    if(!validPhone(phone)){setError('ucaRegisterPhoneError','請輸入正確的台灣或日本手機號碼。');return}
+    if(!validPhone(phone)){setError('ucaRegisterPhoneError','請輸入正確的台灣手機號碼。');return}
     state.phone=phone; renderStep(2); setTimeout(()=>$('ucaRegisterPassword').focus(),80);
   }
   function step2(){
@@ -10738,7 +9958,7 @@ body.ubee-app-starting{
   }
 
   function payload(){
-    return {phone:state.phone,password:$('ucaRegisterPassword').value,profile:{name:String($('ucaRegisterName').value||'').trim(),email:String($('ucaRegisterEmail').value||'').trim().toLowerCase(),serviceCountryCode:(window.getUBeeCustomerCountryCode?.()||'TW'),serviceCity:$('ucaRegisterCity').value,serviceDistrict:$('ucaRegisterDistrict').value,referralCode:String($('ucaRegisterReferral').value||'').trim()},preferences:{orderStatusNotifications:true,paymentAndSafetyNotifications:true,importantAnnouncements:$('ucaPrefImportant').checked,marketingNotifications:$('ucaPrefMarketing').checked,setupAddressLater:$('ucaPrefAddressLater').checked},agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()},client:{source:'customer-pwa',schemaVersion:'customer-account-v2'}};
+    return {phone:state.phone,password:$('ucaRegisterPassword').value,profile:{name:String($('ucaRegisterName').value||'').trim(),email:String($('ucaRegisterEmail').value||'').trim().toLowerCase(),serviceCity:$('ucaRegisterCity').value,serviceDistrict:$('ucaRegisterDistrict').value,referralCode:String($('ucaRegisterReferral').value||'').trim()},preferences:{orderStatusNotifications:true,paymentAndSafetyNotifications:true,importantAnnouncements:$('ucaPrefImportant').checked,marketingNotifications:$('ucaPrefMarketing').checked,setupAddressLater:$('ucaPrefAddressLater').checked},agreements:{terms:true,privacy:true,pricing:true,prohibitedTasks:true,agreedAtClient:new Date().toISOString()},client:{source:'customer-pwa',schemaVersion:'customer-account-v2'}};
   }
 
   async function completeRegistration(){
@@ -12018,27 +11238,14 @@ function loadGoogleMapsApi(){
 
     script.dataset.ubeeGoogleMaps = 'true';
 
-    const uiCountry =
-      String(
-        window.getUBeeCustomerCountryCode?.() ||
-        'TW'
-      ).toUpperCase() === 'JP'
-        ? 'JP'
-        : 'TW';
-
-    const mapsLanguage =
-      uiCountry === 'JP'
-        ? 'ja'
-        : 'zh-TW';
-
     script.src =
       'https://maps.googleapis.com/maps/api/js' +
       `?key=${encodeURIComponent(googleMapsApiKey)}` +
       '&v=weekly' +
       '&loading=async' +
       `&callback=${encodeURIComponent(callbackName)}` +
-      `&language=${encodeURIComponent(mapsLanguage)}` +
-      `&region=${encodeURIComponent(uiCountry)}`;
+      '&language=zh-TW' +
+      '&region=TW';
 
     script.async = true;
 
@@ -15074,15 +14281,7 @@ function getCurrentPosition(){
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(position => {
-      try{
-        window.syncUBeeCustomerLocaleFromPosition?.(
-          position.coords.latitude,
-          position.coords.longitude
-        );
-      }catch(_){}
-      resolve(position);
-    }, reject, {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy:false,
       timeout:6000,
       maximumAge:300000
@@ -15329,104 +14528,21 @@ function syncQueueLocation(){
 }
 
 
-function getOrderMarketCountryCode(){
-  const pickupAddress =
-    String(qs('pickup')?.value || '').trim();
-
-  const lat = Number(pickupLat);
-  const lng = Number(pickupLng);
-
-  if(
-    Number.isFinite(lat) &&
-    Number.isFinite(lng)
-  ){
-    if(
-      lat >= 21.5 &&
-      lat <= 26.6 &&
-      lng >= 118.0 &&
-      lng <= 122.4
-    ){
-      return 'TW';
-    }
-
-    if(
-      lat >= 24.0 &&
-      lat <= 46.7 &&
-      lng >= 122.5 &&
-      lng <= 146.7
-    ){
-      return 'JP';
-    }
-  }
-
-  try{
-    if(
-      pickupAddress &&
-      typeof inferUBeeOrderRegion === 'function'
-    ){
-      const region =
-        inferUBeeOrderRegion(
-          pickupAddress,
-          pickupLat,
-          pickupLng
-        );
-
-      if(
-        region?.countryCode === 'JP' ||
-        region?.countryCode === 'TW'
-      ){
-        return region.countryCode;
-      }
-    }
-  }catch(_){}
-
-  return String(
-    window.getUBeeCustomerCountryCode?.() ||
-    'TW'
-  ).toUpperCase() === 'JP'
-    ? 'JP'
-    : 'TW';
-}
-
-function getOrderMarketTimeZone(countryCode = getOrderMarketCountryCode()){
-  return countryCode === 'JP'
-    ? 'Asia/Tokyo'
-    : 'Asia/Taipei';
-}
-
-function getOrderMarketLocale(countryCode = getOrderMarketCountryCode()){
-  return countryCode === 'JP'
-    ? 'ja-JP'
-    : 'zh-TW';
-}
-
-function getOrderMarketUtcOffset(countryCode = getOrderMarketCountryCode()){
-  return countryCode === 'JP'
-    ? '+09:00'
-    : '+08:00';
-}
-
-function getOrderMarketNowParts(){
+function getTaipeiNowParts(){
   const now = new Date();
-  const parts = new Intl.DateTimeFormat(
-    'en-CA',
-    {
-      timeZone:getOrderMarketTimeZone(),
-      year:'numeric',
-      month:'2-digit',
-      day:'2-digit',
-      hour:'2-digit',
-      minute:'2-digit',
-      hour12:false
-    }
-  ).formatToParts(now);
+  const parts = new Intl.DateTimeFormat('en-CA',{
+    timeZone:'Asia/Taipei',
+    year:'numeric',
+    month:'2-digit',
+    day:'2-digit',
+    hour:'2-digit',
+    minute:'2-digit',
+    hour12:false
+  }).formatToParts(now);
 
   const map = {};
-
   parts.forEach(part=>{
-    if(part.type !== 'literal'){
-      map[part.type] = part.value;
-    }
+    if(part.type !== 'literal') map[part.type] = part.value;
   });
 
   return {
@@ -15435,63 +14551,40 @@ function getOrderMarketNowParts(){
   };
 }
 
-function combineOrderMarketDateTime(
-  dateText,
-  timeText
-){
-  const date =
-    String(dateText || '').trim();
+function combineTaipeiDateTime(dateText,timeText){
+  const date = String(dateText||'').trim();
+  const time = String(timeText||'').trim();
 
-  const time =
-    String(timeText || '').trim();
-
-  if(
-    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-    !/^\d{2}:\d{2}$/.test(time)
-  ){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)){
     return 0;
   }
 
-  const parsed =
-    Date.parse(
-      `${date}T${time}:00${getOrderMarketUtcOffset()}`
-    );
-
-  return Number.isFinite(parsed)
-    ? parsed
-    : 0;
+  // 台灣全年 UTC+8，直接轉成 ISO offset，避免瀏覽器本地時區造成偏移。
+  const parsed = Date.parse(`${date}T${time}:00+08:00`);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatOrderTimingDateTime(ms){
-  const value = Number(ms || 0);
+  const value = Number(ms||0);
+  if(!Number.isFinite(value) || value<=0) return '';
 
-  if(
-    !Number.isFinite(value) ||
-    value <= 0
-  ){
-    return '';
-  }
-
-  return new Date(value).toLocaleString(
-    getOrderMarketLocale(),
-    {
-      timeZone:getOrderMarketTimeZone(),
-      month:'2-digit',
-      day:'2-digit',
-      hour:'2-digit',
-      minute:'2-digit',
-      hour12:false
-    }
-  );
+  return new Date(value).toLocaleString('zh-TW',{
+    timeZone:'Asia/Taipei',
+    month:'2-digit',
+    day:'2-digit',
+    hour:'2-digit',
+    minute:'2-digit',
+    hour12:false
+  });
 }
 
 function ensureScheduleInputDefaults(){
-  const nowParts=getOrderMarketNowParts();
+  const nowParts=getTaipeiNowParts();
 
-  const toOrderMarketParts=value=>{
+  const toTaipeiParts=value=>{
     const parts={};
     new Intl.DateTimeFormat('en-CA',{
-      timeZone:getOrderMarketTimeZone(),
+      timeZone:'Asia/Taipei',
       year:'numeric',
       month:'2-digit',
       day:'2-digit',
@@ -15513,11 +14606,11 @@ function ensureScheduleInputDefaults(){
     return Math.ceil(Number(value||Date.now())/step)*step;
   };
 
-  const startDefault=toOrderMarketParts(
+  const startDefault=toTaipeiParts(
     roundToFiveMinutes(Date.now()+2*60*60*1000)
   );
 
-  const endDefault=toOrderMarketParts(
+  const endDefault=toTaipeiParts(
     roundToFiveMinutes(Date.now()+4*60*60*1000)
   );
 
@@ -15595,7 +14688,7 @@ function getOrderTimingPayload(){
 
   if(timingType==='scheduled'){
     const goal=String(qs('scheduleGoal')?.value||scheduleGoal||'pickup_at');
-    const requestedScheduleAtMs=combineOrderMarketDateTime(
+    const requestedScheduleAtMs=combineTaipeiDateTime(
       qs('scheduledDate')?.value,
       qs('scheduledTime')?.value
     );
@@ -15610,11 +14703,11 @@ function getOrderTimingPayload(){
 
   if(timingType==='flexible'){
     const date=qs('flexibleDate')?.value||'';
-    const flexibleStartAtMs=combineOrderMarketDateTime(
+    const flexibleStartAtMs=combineTaipeiDateTime(
       date,
       qs('flexibleStartTime')?.value
     );
-    const flexibleEndAtMs=combineOrderMarketDateTime(
+    const flexibleEndAtMs=combineTaipeiDateTime(
       date,
       qs('flexibleEndTime')?.value
     );
@@ -15649,7 +14742,7 @@ function getOrderTimingLabel(payload=getOrderTimingPayload()){
   }
 
   if(type==='flexible'){
-    return `彈性時段：${formatOrderTimingDateTime(payload.flexibleStartAtMs)}～${new Date(Number(payload.flexibleEndAtMs||0)).toLocaleTimeString(getOrderMarketLocale(),{timeZone:getOrderMarketTimeZone(),hour:'2-digit',minute:'2-digit',hour12:false})}`;
+    return `彈性時段：${formatOrderTimingDateTime(payload.flexibleStartAtMs)}～${new Date(Number(payload.flexibleEndAtMs||0)).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false})}`;
   }
 
   return `立即任務・${getSpeedLabel(speedType)}`;
@@ -16218,43 +15311,9 @@ function goPrev(){
   showHomeTab();
 }
 
-
-const UBEE_ORDER_JP_PREFECTURES=[
-  '北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'
-];
-
-function inferUBeeOrderRegion(address,lat,lng){
-  const text=String(address||'').replace(/\s+/g,'').trim();
-  const y=Number(lat),x=Number(lng);
-  let country='';
-  if(Number.isFinite(y)&&Number.isFinite(x)){
-    if(y>=21.5&&y<=26.6&&x>=118.0&&x<=122.4)country='TW';
-    else if(y>=24.0&&y<=46.7&&x>=122.5&&x<=146.7)country='JP';
-  }
-  if(!country){
-    if(/日本|Japan/i.test(text)||UBEE_ORDER_JP_PREFECTURES.some(p=>text.includes(p)))country='JP';
-    else country=String(window.getUBeeCustomerCountryCode?.()||'TW').toUpperCase()==='JP'?'JP':'TW';
-  }
-  if(country==='JP'){
-    const prefecture=UBEE_ORDER_JP_PREFECTURES.find(p=>text.includes(p))||'';
-    const city=text.includes('札幌市')?'札幌市':(text.match(/((?:[^都道府県市区町村]{1,12})市)/)?.[1]||'');
-    const district=city==='札幌市'
-      ?(['中央区','北区','東区','白石区','豊平区','南区','西区','厚別区','手稲区','清田区'].find(d=>text.includes(d))||'')
-      :(text.match(/((?:[^市区町村]{1,12})区)/)?.[1]||'');
-    return{countryCode:'JP',prefecture,city,district};
-  }
-  const normalized=text.replace(/臺/g,'台');
-  const city=['台北市','新北市','桃園市','台中市','台南市','高雄市','基隆市','新竹市','嘉義市','新竹縣','苗栗縣','彰化縣','南投縣','雲林縣','嘉義縣','屏東縣','宜蘭縣','花蓮縣','台東縣','澎湖縣','金門縣','連江縣'].find(c=>normalized.includes(c))||String(selectedServiceCity||'').replace(/臺/g,'台');
-  const after=city&&normalized.includes(city)?normalized.slice(normalized.indexOf(city)+city.length):'';
-  const district=after.match(/^(.{1,8}?(?:區|鄉|鎮|市))/)?.[1]||'';
-  return{countryCode:'TW',prefecture:'',city,district};
-}
-
 function getPayload(){
   const pickup = qs('pickup').value.trim();
   const dropoff = qs('dropoff').value.trim();
-  const pickupRegion=inferUBeeOrderRegion(pickup,pickupLat,pickupLng);
-  const dropoffRegion=inferUBeeOrderRegion(dropoff,dropoffLat,dropoffLng);
   const upstairsOption = getUpstairsOption();
   const rawAdvancePayment = getAdvancePaymentAmount();
   const advancePayment = Number.isFinite(rawAdvancePayment) ? rawAdvancePayment : 0;
@@ -16282,10 +15341,6 @@ function getPayload(){
     pickupLat,
     pickupLng,
     pickupPlaceId,
-    pickupCountryCode:pickupRegion.countryCode,
-    pickupPrefecture:pickupRegion.prefecture,
-    pickupCity:pickupRegion.city,
-    pickupDistrict:pickupRegion.district,
 
     dropoff,
     dropoffAddress:dropoff,
@@ -16294,10 +15349,6 @@ function getPayload(){
     dropoffLat,
     dropoffLng,
     dropoffPlaceId,
-    dropoffCountryCode:dropoffRegion.countryCode,
-    dropoffPrefecture:dropoffRegion.prefecture,
-    dropoffCity:dropoffRegion.city,
-    dropoffDistrict:dropoffRegion.district,
 
     item:itemText,
     note,
@@ -16361,9 +15412,7 @@ function getPayload(){
     // Level 4 診斷標記：真正的區域／時段特徵仍由 index.js 後端重新計算。
     dispatchClientVersion:'level4-v1',
     clientSubmittedAtMs:Date.now(),
-    clientTimeZone:(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Taipei'),
-    clientInterfaceCountryCode:(window.getUBeeCustomerCountryCode?.() || 'TW'),
-    clientLocale:(window.getUBeeCustomerLocale?.() || 'zh-TW')
+    clientTimeZone:(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Taipei')
   };
 }
 
@@ -20210,7 +19259,7 @@ const UBeeEnhancements = (() => {
   function saveDraft(){const d=collectDraft();if(!d.pickup&&!d.dropoff&&!d.note&&!d.pickupPhone&&!d.dropoffPhone)return;localStorage.setItem(KEYS.draft,JSON.stringify(d));}
   function scheduleDraft(){clearTimeout(state.draftTimer);state.draftTimer=setTimeout(saveDraft,500)}
   function clearDraft(){localStorage.removeItem(KEYS.draft)}
-  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,d.serviceType||serviceType);speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
+  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,d.serviceType||serviceType);speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
   function offerDraft(){const d=safeParse(localStorage.getItem(KEYS.draft)||'',null);if(!d||!d.savedAt||Date.now()-new Date(d.savedAt).getTime()>7*86400000)return;const el=document.createElement('div');el.className='draft-banner';el.id='draftBanner';el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}<br>${new Date(d.savedAt).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;(document.querySelector('#productionOrderFlow #flowPageHome .flow-home-scroll')||document.querySelector('#productionOrderFlow #flowPageHome .flow-scroll')||document.querySelector('.app')||document.body).prepend(el);el.querySelector('.draft-discard').onclick=()=>{clearDraft();el.remove()};el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};}
 
   function renderQuickAddresses(){const bar=qs('savedAddressQuickBar'),list=getAddresses();if(!bar)return;bar.classList.toggle('hidden',!list.length);bar.innerHTML=list.map(a=>`<button class="quick-address-chip" type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">${escapeAttr(a.label||'常用地址')}</button>`).join('')}
@@ -21077,7 +20126,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-form-group"><label class="flow-label" for="flowDetailAddress">完整地址</label><input class="flow-input" id="flowDetailAddress" maxlength="240" readonly=""/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailNote">門牌、樓層及補充說明</label><input class="flow-input" id="flowDetailNote" maxlength="160" placeholder="例如：12號3樓、店名、管理室或入口說明"/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailName">聯絡人姓名 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailName" maxlength="60" placeholder="取件聯絡人或收件人"/></div>
-<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="0912345678 / 09012345678"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button></div></div>
+<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="09xxxxxxxx"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button></div></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailLabel">常用地址名稱</label><input class="flow-input" id="flowDetailLabel" maxlength="40" placeholder="例如：家、公司、店家"/></div>
 <label class="flow-check" style="margin:0"><input id="flowSaveAddress" type="checkbox"/><span>儲存為常用地址，下次可直接選擇。</span></label>
 <div class="flow-status" id="flowDetailStatus"></div>
@@ -21343,21 +20392,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   function setLoading(show,text='系統處理中…'){$('flowLoadingText').textContent=text;$('flowLoading').classList.toggle('show',!!show)}
   function status(id,text='',error=false){const el=$(id);if(!el)return;el.textContent=text;el.classList.toggle('error',!!error)}
   function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]))}
-  function cleanPhone(value){
-    let phone=String(value||'').trim().replace(/[^\d+]/g,'');
-    if(phone.startsWith('00')) phone=`+${phone.slice(2)}`;
-    if(/^\+8869\d{8}$/.test(phone)) return `0${phone.slice(4)}`;
-    if(/^8869\d{8}$/.test(phone)) return `0${phone.slice(3)}`;
-    if(/^09\d{8}$/.test(phone)) return phone;
-    if(/^0(?:70|80|90)\d{8}$/.test(phone)) return `+81${phone.slice(1)}`;
-    if(/^81(?:70|80|90)\d{8}$/.test(phone)) return `+${phone}`;
-    if(/^\+81(?:70|80|90)\d{8}$/.test(phone)) return phone;
-    return phone.slice(0,24);
-  }
-  function validUBeeCustomerPhone(value){
-    const phone=cleanPhone(value);
-    return /^09\d{8}$/.test(phone)||/^\+81(?:70|80|90)\d{8}$/.test(phone);
-  }
+  function cleanPhone(value){return String(value||'').replace(/\D/g,'').slice(0,10)}
   function validPoint(point){return point&&Number.isFinite(Number(point.lat))&&Number.isFinite(Number(point.lng))&&Number(point.lat)>=-90&&Number(point.lat)<=90&&Number(point.lng)>=-180&&Number(point.lng)<=180}
   function getUserId(){
     return String(userId || currentCustomer?.customerId || '').trim();
@@ -21643,7 +20678,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     if(!navigator.geolocation){status('flowSearchStatus','此裝置無法使用定位功能，請改用地址搜尋。',true);return}
     setLoading(true,'正在取得目前位置…');
     navigator.geolocation.getCurrentPosition(async position=>{
-      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);window.syncUBeeCustomerLocaleFromPosition?.(lat,lng);const response=await fetch('/api/address/reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'目前位置轉換失敗');status('flowSearchStatus','');openDetail({...data.address,lat,lng})}catch(error){status('flowSearchStatus',error.message||'無法讀取目前位置，請改用地址搜尋。',true)}finally{setLoading(false)}
+      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);const response=await fetch('/api/address/reverse-geocode',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.message||data.error||'目前位置轉換失敗');status('flowSearchStatus','');openDetail({...data.address,lat,lng})}catch(error){status('flowSearchStatus',error.message||'無法讀取目前位置，請改用地址搜尋。',true)}finally{setLoading(false)}
     },()=>{setLoading(false);status('flowSearchStatus','無法取得目前位置，請改用地址搜尋。',true)},{enableHighAccuracy:true,timeout:12000,maximumAge:30000});
   }
 
@@ -21669,10 +20704,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   async function geocodeAddress(address){
     await ensureMaps();
     const geocoder=new google.maps.Geocoder();
-    const result=await geocoder.geocode({
-      address:String(address||''),
-      region:window.getUBeeCustomerCountryCode?.() || 'TW'
-    });
+    const result=await geocoder.geocode({address:String(address||''),region:'TW'});
     const loc=result?.results?.[0]?.geometry?.location;
     return loc?{lat:loc.lat(),lng:loc.lng()}:null;
   }
@@ -21686,7 +20718,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const address=String($('flowDetailAddress').value||'').trim();const contactName=String($('flowDetailName').value||'').trim();const phone=cleanPhone($('flowDetailPhone').value);
     if(!address){status('flowDetailStatus','請先選擇完整地址。',true);return}
     if(!contactName){status('flowDetailStatus','請填寫聯絡人姓名。',true);return}
-    if(!validUBeeCustomerPhone(phone)){status('flowDetailStatus','請填寫正確的台灣或日本手機號碼。',true);return}
+    if(!/^09\d{8}$/.test(phone)){status('flowDetailStatus','請填寫正確的台灣手機號碼。',true);return}
     let lat=Number(base.lat),lng=Number(base.lng);if(!validPoint({lat,lng})){try{const point=await geocodeAddress(address);lat=point?.lat??null;lng=point?.lng??null}catch(_){lat=null;lng=null}}
     const item={label:String($('flowDetailLabel').value||'').trim()||(state.addressTarget==='pickup'?'取件地址':'收件地址'),address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
     if(state.addressTarget==='pickup'){state.pickup=item;if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};}else{state.dropoff={...item,_autoQueue:false};}
@@ -21747,17 +20779,18 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function ensureTimeDefaults(){
     const round=ms=>Math.ceil(ms/(5*60*1000))*(5*60*1000);const start=new Date(round(Date.now()+2*60*60*1000));const end=new Date(round(Date.now()+4*60*60*1000));
-    const localParts=date=>{const p={};new Intl.DateTimeFormat('en-CA',{timeZone:getOrderMarketTimeZone(),year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});return{date:`${p.year}-${p.month}-${p.day}`,time:`${p.hour}:${p.minute}`}};
+    const localParts=date=>{const p={};new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});return{date:`${p.year}-${p.month}-${p.day}`,time:`${p.hour}:${p.minute}`}};
     const a=localParts(start),b=localParts(end),today=localParts(new Date()).date;['flowScheduledDate','flowFlexibleDate'].forEach(id=>{const el=$(id);el.min=today;if(!el.value)el.value=a.date});if(!$('flowScheduledTime').value)$('flowScheduledTime').value=a.time;if(!$('flowFlexibleStart').value)$('flowFlexibleStart').value=a.time;if(!$('flowFlexibleEnd').value)$('flowFlexibleEnd').value=b.time;
   }
 
   function setTiming(type){state.timing=['immediate','scheduled','flexible'].includes(type)?type:'immediate';root.querySelectorAll('[data-timing]').forEach(btn=>btn.classList.toggle('active',btn.dataset.timing===state.timing));$('flowScheduledPanel').classList.toggle('show',state.timing==='scheduled');$('flowFlexiblePanel').classList.toggle('show',state.timing==='flexible');$('flowSpeedCard').style.display=state.timing==='immediate'?'block':'none';if(state.timing!=='immediate')state.speed='standard';ensureTimeDefaults()}
   function setSpeed(type){state.speed=['standard','priority','express'].includes(type)?type:'standard';root.querySelectorAll('[data-speed]').forEach(btn=>btn.classList.toggle('active',btn.dataset.speed===state.speed))}
+  function combineTaipei(date,time){return Date.parse(`${date}T${time}:00+08:00`)}
   function validateOptions(){
     state.scheduleGoal=$('flowScheduleGoal').value;state.scheduledDate=$('flowScheduledDate').value;state.scheduledTime=$('flowScheduledTime').value;state.flexibleDate=$('flowFlexibleDate').value;state.flexibleStart=$('flowFlexibleStart').value;state.flexibleEnd=$('flowFlexibleEnd').value;
     const min=Date.now()+30*60*1000;
-    if(state.timing==='scheduled'){const ms=combineOrderMarketDateTime(state.scheduledDate,state.scheduledTime);if(!Number.isFinite(ms)||ms<min){status('flowOptionsStatus','指定時間至少需要晚於現在 30 分鐘。',true);return false}}
-    if(state.timing==='flexible'){const a=combineOrderMarketDateTime(state.flexibleDate,state.flexibleStart),b=combineOrderMarketDateTime(state.flexibleDate,state.flexibleEnd);if(!Number.isFinite(a)||!Number.isFinite(b)||a<min||b<=a){status('flowOptionsStatus','請選擇正確的彈性時段，開始時間至少晚於現在 30 分鐘。',true);return false}}
+    if(state.timing==='scheduled'){const ms=combineTaipei(state.scheduledDate,state.scheduledTime);if(!Number.isFinite(ms)||ms<min){status('flowOptionsStatus','指定時間至少需要晚於現在 30 分鐘。',true);return false}}
+    if(state.timing==='flexible'){const a=combineTaipei(state.flexibleDate,state.flexibleStart),b=combineTaipei(state.flexibleDate,state.flexibleEnd);if(!Number.isFinite(a)||!Number.isFinite(b)||a<min||b<=a){status('flowOptionsStatus','請選擇正確的彈性時段，開始時間至少晚於現在 30 分鐘。',true);return false}}
     status('flowOptionsStatus','');return true;
   }
 
@@ -21914,53 +20947,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function orderTimeText(order){
     const value=order?.createdAt||order?.updatedAt;
-
-    try{
-      const date=value?.toDate
-        ? value.toDate()
-        : new Date(value);
-
-      if(
-        !date ||
-        Number.isNaN(date.getTime())
-      ){
-        return '';
-      }
-
-      const country=
-        String(
-          order?.pickupCountryCode ||
-          ''
-        ).toUpperCase() === 'JP'
-          ? 'JP'
-          : (
-              String(
-                order?.pickupCountryCode ||
-                ''
-              ).toUpperCase() === 'TW'
-                ? 'TW'
-                : getOrderMarketCountryCode()
-            );
-
-      return new Intl.DateTimeFormat(
-        country==='JP'
-          ? 'ja-JP'
-          : 'zh-TW',
-        {
-          timeZone:
-            country==='JP'
-              ? 'Asia/Tokyo'
-              : 'Asia/Taipei',
-          month:'numeric',
-          day:'numeric',
-          hour:'2-digit',
-          minute:'2-digit'
-        }
-      ).format(date);
-
-    }catch(_){
-      return '';
-    }
+    try{const date=value?.toDate?value.toDate():new Date(value);if(!date||Number.isNaN(date.getTime()))return'';return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(date)}catch(_){return''}
   }
 
   function orderStatusText(statusValue){
@@ -22111,7 +21098,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const cityButton=$('flowCityButton'),text=$('flowLocationText');cityButton.textContent='正在取得位置…';text.textContent='正在確認目前服務地區';
     if(!navigator.geolocation){cityButton.textContent='選擇服務地區';text.textContent='請手動選擇服務地區';return}
     navigator.geolocation.getCurrentPosition(async position=>{
-      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);window.syncUBeeCustomerLocaleFromPosition?.(lat,lng);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';text.textContent=loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`;if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'}
+      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';text.textContent=loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`;if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'}
     },()=>{cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
   }
 
