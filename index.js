@@ -1948,7 +1948,9 @@ async function sendNewOrderPushToRiders(
           const allowOffline =
             safeOptions.allowOffline === true;
 
-          if (!isOrderInsideRiderAuthorizedServiceRegionServer(order, rider)) {
+          if (
+            !isOrderInsideRiderAuthorizedServiceRegionServer(order, rider)
+          ) {
             return;
           }
 
@@ -3535,7 +3537,6 @@ function customerAccountResponse(account, customerId) {
     phone: String(source.phone || ''),
     phoneVerified: source.phoneVerified === true,
     email: String(source.email || ''),
-    serviceCountryCode: normalizeUBeeCountryCode(source.serviceCountryCode || ''),
     serviceCity: String(source.serviceCity || ''),
     serviceDistrict: String(source.serviceDistrict || ''),
     status: String(source.status || 'active'),
@@ -4561,9 +4562,6 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
 
     const name = cleanText(profile.name || '', 40);
     const email = normalizeCustomerEmail(profile.email);
-    const serviceCountryCode = normalizeUBeeCountryCode(
-      profile.serviceCountryCode || getUBeePhoneCountryCode(phone) || ''
-    );
     const serviceCity = cleanText(profile.serviceCity || '', 30);
     const serviceDistrict = cleanText(profile.serviceDistrict || '', 30);
     const referralCode = cleanText(profile.referralCode || '', 24);
@@ -4707,7 +4705,6 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
         name,
         email,
         emailVerified: false,
-        serviceCountryCode,
         serviceCity,
         serviceDistrict,
         referralCode,
@@ -5792,31 +5789,71 @@ async function findRiderDocumentV2First(source = {}) {
   ];
 
   for (const collectionName of collections) {
-    const phoneIsValid = isValidUBeeMobilePhone(cleanPhone);
+    const phoneIsValid =
+      isValidUBeeMobilePhone(cleanPhone);
+
     const riderIdIsSameAsPhone =
       phoneIsValid &&
       cleanRiderId &&
       cleanRiderId === cleanPhone;
 
     if (phoneIsValid) {
-      const doc = await db.collection(collectionName).doc(cleanPhone).get();
-      if (doc.exists) {
-        return {
-          riderDoc: doc,
-          sourceCollection: collectionName,
-        };
+      const phoneCandidates = [cleanPhone];
+
+      // 相容歷史資料：
+      // 台灣帳號可能曾以 +8869xxxxxxxx 保存；
+      // 日本帳號可能曾以 090/080/070 本地格式保存。
+      if (/^09\d{8}$/.test(cleanPhone)) {
+        phoneCandidates.push(
+          `+886${cleanPhone.slice(1)}`
+        );
       }
 
-      const phoneSnap = await db.collection(collectionName)
-        .where('phone', '==', cleanPhone)
-        .limit(1)
-        .get();
+      if (/^\+81(?:70|80|90)\d{8}$/.test(cleanPhone)) {
+        phoneCandidates.push(
+          `0${cleanPhone.slice(3)}`
+        );
+      }
 
-      if (!phoneSnap.empty) {
-        return {
-          riderDoc: phoneSnap.docs[0],
-          sourceCollection: collectionName,
-        };
+      const uniquePhoneCandidates = [
+        ...new Set(
+          phoneCandidates.filter(Boolean)
+        ),
+      ];
+
+      for (const phoneCandidate of uniquePhoneCandidates) {
+        const doc =
+          await db
+            .collection(collectionName)
+            .doc(phoneCandidate)
+            .get();
+
+        if (doc.exists) {
+          return {
+            riderDoc: doc,
+            sourceCollection: collectionName,
+          };
+        }
+      }
+
+      for (const phoneCandidate of uniquePhoneCandidates) {
+        const phoneSnap =
+          await db
+            .collection(collectionName)
+            .where(
+              'phone',
+              '==',
+              phoneCandidate
+            )
+            .limit(1)
+            .get();
+
+        if (!phoneSnap.empty) {
+          return {
+            riderDoc: phoneSnap.docs[0],
+            sourceCollection: collectionName,
+          };
+        }
       }
     }
 
@@ -5945,7 +5982,7 @@ async function findRiderByPhoneForLogin(phone) {
     return {
       ok: false,
       statusCode: 400,
-      message: '手機號碼格式錯誤，請輸入台灣 09 或日本 070／080／090 手機號碼。',
+      message: '手機號碼格式錯誤，請輸入台灣 09 手機號碼或日本 070／080／090 手機號碼。',
     };
   }
 
@@ -6010,6 +6047,12 @@ app.post('/api/rider/login', async (req, res) => {
     if (!result.ok) {
       return res.status(result.statusCode).json({
         success: false,
+        code:
+          result.statusCode === 404
+            ? 'RIDER_PHONE_NOT_FOUND'
+            : result.statusCode === 403
+              ? 'RIDER_LOGIN_NOT_ALLOWED'
+              : 'RIDER_PHONE_INVALID',
         message: result.message,
       });
     }
@@ -6776,7 +6819,7 @@ app.get('/api/rider/profile', riderAuthMiddleware, async (req, res) => {
       if (!isValidUBeeMobilePhone(cleanPhone)) {
         return res.status(400).json({
           success: false,
-          message: '手機號碼格式錯誤，請輸入台灣 09 或日本 070／080／090 手機號碼。',
+          message: '手機號碼格式錯誤，請輸入台灣 09 手機號碼或日本 070／080／090 手機號碼。',
         });
       }
 
@@ -7246,31 +7289,18 @@ function getRiderPendingAreaLabel(value, fallback = '區域待確認') {
     .replace(/^\d{3,5}/, '')
     .replace(/臺/g, '台');
 
-  if (!text) {
-    return fallback;
+  if (!text) return fallback;
+
+  const jp = inferJapanRegion(text);
+  if (jp.prefecture || jp.city || jp.district) {
+    return [jp.prefecture, jp.city, jp.district].filter(Boolean).join('') || fallback;
   }
 
-  const countyMatch = text.match(
-    /(台北市|新北市|桃園市|台中市|台南市|高雄市|基隆市|新竹市|嘉義市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義縣|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/
-  );
+  const tw = inferTaiwanRegion(text);
+  if (tw.city && tw.district) return `${tw.city}${tw.district}`;
+  if (tw.city) return tw.city;
 
-  if (!countyMatch) {
-    return fallback;
-  }
-
-  const county = countyMatch[1];
-  const afterCounty = text.slice(
-    Number(countyMatch.index || 0) + county.length
-  );
-  const districtMatch = afterCounty.match(
-    /^(.{1,8}?(?:區|鄉|鎮|市))/
-  );
-
-  if (!districtMatch) {
-    return county;
-  }
-
-  return `${county}${districtMatch[1]}`;
+  return fallback;
 }
 
 function sanitizeRiderPendingPreviewText(value, maxLength = 160) {
@@ -7485,10 +7515,6 @@ function buildRiderPendingTaskPreview(order = {}) {
       : null,
     pickupLat: pickupPoint?.lat ?? null,
     pickupLng: pickupPoint?.lng ?? null,
-    pickupCountryCode: normalizeUBeeCountryCode(order.pickupCountryCode || ''),
-    pickupPrefecture: sanitizeRiderPendingPreviewText(order.pickupPrefecture || '', 40),
-    pickupCity: sanitizeRiderPendingPreviewText(order.pickupCity || '', 40),
-    pickupDistrict: sanitizeRiderPendingPreviewText(order.pickupDistrict || '', 40),
 
     createdAtMs:
       order.createdAtMs ||
@@ -7676,7 +7702,9 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
         id: doc.id,
         ...doc.data()
       }))
-      .filter(order => isOrderInsideRiderAuthorizedServiceRegionServer(order, rider))
+      .filter(order =>
+        isOrderInsideRiderAuthorizedServiceRegionServer(order, rider)
+      )
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => {
@@ -8461,7 +8489,12 @@ app.post(
             );
           }
 
-          if (!isOrderInsideRiderAuthorizedServiceRegionServer(order, riderResult.rider || {})) {
+          if (
+            !isOrderInsideRiderAuthorizedServiceRegionServer(
+              order,
+              riderResult.rider || {}
+            )
+          ) {
             throw new Error('ORDER_OUTSIDE_RIDER_SERVICE_REGION');
           }
 
@@ -8611,8 +8644,6 @@ app.post(
           [409, '這筆預約任務已被其他小U承接或狀態已更新。'],
         ORDER_PAYMENT_NOT_CONFIRMED:
           [409, '此預約任務尚未符合承接條件。'],
-        ORDER_OUTSIDE_RIDER_SERVICE_REGION:
-          [403, '此任務不在你的正式服務區域內。'],
         RIDER_NOT_ELIGIBLE:
           [403, '你的帳號目前無法承接任務，請先確認接單資格。'],
         RIDER_V4_QUALIFICATION_REQUIRED:
@@ -12528,185 +12559,60 @@ function getTaipeiTimeParts(ms = Date.now()) {
   };
 }
 
-const UBEE_JAPAN_PREFECTURES = Object.freeze([
-  '北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県',
-  '茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県',
-  '新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県',
-  '静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県',
-  '奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県',
-  '徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県',
-  '熊本県','大分県','宮崎県','鹿児島県','沖縄県'
-]);
-const UBEE_SAPPORO_WARDS = Object.freeze([
-  '中央区','北区','東区','白石区','豊平区','南区','西区','厚別区','手稲区','清田区'
-]);
-
-function normalizeUBeeCountryCode(value) {
-  const raw = String(value || '').trim();
-  const upper = raw.toUpperCase();
-  if (['TW','TWN','TAIWAN'].includes(upper) || ['台灣','台湾'].includes(raw)) return 'TW';
-  if (['JP','JPN','JAPAN'].includes(upper) || raw === '日本') return 'JP';
-  return '';
-}
-function inferUBeeCountryFromCoordinates(lat, lng) {
-  const y = Number(lat), x = Number(lng);
-  if (!Number.isFinite(y) || !Number.isFinite(x)) return '';
-  if (y >= 21.5 && y <= 26.6 && x >= 118.0 && x <= 122.4) return 'TW';
-  if (y >= 24.0 && y <= 46.7 && x >= 122.5 && x <= 146.7) return 'JP';
-  return '';
-}
-function inferUBeeCountryFromAddressText(value) {
-  const text = String(value || '').replace(/\s+/g, '').trim();
-  if (!text) return '';
-  if (/(?:日本|Japan)/i.test(text) || UBEE_JAPAN_PREFECTURES.some(p => text.includes(p))) return 'JP';
-  if (/(?:台灣|台湾|Taiwan|台北市|新北市|桃園市|台中市|臺中市|台南市|臺南市|高雄市|基隆市|新竹市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|屏東縣|宜蘭縣|花蓮縣|台東縣|臺東縣|澎湖縣|金門縣|連江縣)/.test(text)) return 'TW';
-  return '';
-}
-function inferJapanRegion(value) {
-  const text = String(value || '').replace(/\s+/g, '').trim();
-  if (!text) return { prefecture:'', city:'', district:'' };
-  const prefecture = UBEE_JAPAN_PREFECTURES.find(p => text.includes(p)) || '';
-  const city = text.includes('札幌市') ? '札幌市' : (text.match(/([^都道府県市区町村]{1,16}市)/)?.[1] || '');
-  const district = city === '札幌市'
-    ? (UBEE_SAPPORO_WARDS.find(w => text.includes(w)) || '')
-    : (text.match(/([^市区町村]{1,16}区)/)?.[1] || '');
-  return { prefecture, city, district };
-}
-function normalizeJapanServiceDistricts(value, serviceCity = '') {
-  const source = Array.isArray(value) ? value : String(value || '').split(/[、,，\n]/);
-  const output = [], seen = new Set();
-  for (const item of source) {
-    const text = String(item || '').replace(/\s+/g, '').trim();
-    if (!text) continue;
-    let normalized = text;
-    if (String(serviceCity || '').trim() === '札幌市') {
-      const ward = UBEE_SAPPORO_WARDS.find(w => text.includes(w));
-      if (ward) normalized = `札幌市${ward}`;
-    }
-    if (!seen.has(normalized)) { seen.add(normalized); output.push(normalized); }
-  }
-  return output.slice(0, 8);
-}
-function buildInternationalDispatchZoneId({countryCode='',prefecture='',city='',district=''}={}) {
-  const country = normalizeUBeeCountryCode(countryCode);
-  if (country === 'TW') {
-    const safeCity = normalizeTaiwanCityName(city);
-    const safeDistrict = normalizeTaiwanRegionText(district);
-    if (safeCity && safeDistrict) return `taiwan_${safeCity}_${safeDistrict}`;
-    if (safeCity) return `taiwan_${safeCity}_unknown`;
-    return 'taiwan_unknown';
-  }
-  if (country === 'JP') {
-    return `japan_${String(prefecture||'unknown').trim()}_${String(city||'unknown').trim()}_${String(district||'unknown').trim()}`;
-  }
-  return 'unknown_region';
-}
-function resolveOrderPickupRegion(order = {}) {
-  const pickupAddress = String(order.pickupAddress || order.fromAddress || order.pickup || order.pickupAddressObject?.address || '').trim();
-  const countryCode =
-    inferUBeeCountryFromCoordinates(
-      order.pickupLat ?? order.fromLat ?? order.pickupAddressObject?.lat,
-      order.pickupLng ?? order.fromLng ?? order.pickupAddressObject?.lng
-    ) ||
-    inferUBeeCountryFromAddressText(pickupAddress) ||
-    normalizeUBeeCountryCode(order.pickupCountryCode || order.pickupAddressObject?.countryCode || order.clientInterfaceCountryCode || '');
-
-  if (countryCode === 'TW') {
-    const inferred = inferTaiwanRegion(`${order.pickupCity||''}${order.pickupDistrict||''}${pickupAddress}`);
-    const city = normalizeTaiwanCityName(order.pickupCity || inferred.city || '');
-    const district = normalizeTaiwanRegionText(order.pickupDistrict || inferred.district || '');
-    return {countryCode:'TW',prefecture:'',city,district,zoneId:buildInternationalDispatchZoneId({countryCode:'TW',city,district})};
-  }
-  if (countryCode === 'JP') {
-    const inferred = inferJapanRegion(`${order.pickupPrefecture||''}${order.pickupCity||''}${order.pickupDistrict||''}${pickupAddress}`);
-    const prefecture = String(order.pickupPrefecture || order.pickupAddressObject?.prefecture || inferred.prefecture || '').trim();
-    const city = String(order.pickupCity || order.pickupAddressObject?.city || inferred.city || '').trim();
-    let district = String(order.pickupDistrict || order.pickupAddressObject?.district || inferred.district || '').trim();
-    if (city === '札幌市' && district) {
-      const ward = UBEE_SAPPORO_WARDS.find(w => district.includes(w));
-      if (ward) district = ward;
-    }
-    return {countryCode:'JP',prefecture,city,district,zoneId:buildInternationalDispatchZoneId({countryCode:'JP',prefecture,city,district})};
-  }
-  return {countryCode:'',prefecture:'',city:'',district:'',zoneId:'unknown_region'};
-}
-function getRiderAuthorizedServiceRegionServer(rider = {}) {
-  const explicitCountry = normalizeUBeeCountryCode(rider.serviceCountryCode || rider.serviceCountry || '');
-  const legacyText = [
-    rider.serviceCity,
-    ...(Array.isArray(rider.serviceCities)?rider.serviceCities:[]),
-    rider.serviceArea,rider.area,
-    ...(Array.isArray(rider.serviceDistricts)?rider.serviceDistricts:[])
-  ].filter(Boolean).join(' ');
-  const countryCode = explicitCountry || (!explicitCountry && inferTaiwanRegion(legacyText).city ? 'TW' : '');
-
-  if (countryCode === 'TW') {
-    const cities = [rider.serviceCity,...(Array.isArray(rider.serviceCities)?rider.serviceCities:[])]
-      .map(normalizeTaiwanCityName).filter(Boolean);
-    const districts = normalizeTaiwanServiceDistricts(rider.serviceDistricts || rider.serviceArea || rider.area || []);
-    districts.forEach(x=>{const c=inferTaiwanRegion(x).city;if(c)cities.push(c);});
-    return {countryCode:'TW',prefectures:[],cities:[...new Set(cities)],districts:[...new Set(districts)]};
-  }
-  if (countryCode === 'JP') {
-    const prefectures=[rider.servicePrefecture,...(Array.isArray(rider.servicePrefectures)?rider.servicePrefectures:[])]
-      .map(v=>String(v||'').trim()).filter(Boolean);
-    const cities=[rider.serviceCity,...(Array.isArray(rider.serviceCities)?rider.serviceCities:[])]
-      .map(v=>String(v||'').trim()).filter(Boolean);
-    const districts=normalizeJapanServiceDistricts(rider.serviceDistricts || rider.serviceArea || rider.area || [], cities[0] || rider.serviceCity || '');
-    return {countryCode:'JP',prefectures:[...new Set(prefectures)],cities:[...new Set(cities)],districts:[...new Set(districts)]};
-  }
-  return {countryCode:'',prefectures:[],cities:[],districts:[]};
-}
-function isOrderInsideRiderAuthorizedServiceRegionServer(order = {}, rider = {}) {
-  const pickup=resolveOrderPickupRegion(order), allowed=getRiderAuthorizedServiceRegionServer(rider);
-  if (!pickup.countryCode || !allowed.countryCode || pickup.countryCode !== allowed.countryCode) return false;
-  if (allowed.countryCode === 'TW') {
-    if (!pickup.city || !allowed.cities.length || !allowed.cities.includes(pickup.city)) return false;
-    if (allowed.districts.length) return !!pickup.district && allowed.districts.includes(`${pickup.city}${pickup.district}`);
-    return true;
-  }
-  if (allowed.countryCode === 'JP') {
-    if (allowed.prefectures.length && (!pickup.prefecture || !allowed.prefectures.includes(pickup.prefecture))) return false;
-    if (!pickup.city || !allowed.cities.length || !allowed.cities.includes(pickup.city)) return false;
-    if (allowed.districts.length) {
-      if (!pickup.district) return false;
-      const full=`${pickup.city}${pickup.district}`;
-      return allowed.districts.some(x=>x===pickup.district || x===full);
-    }
-    return true;
-  }
-  return false;
-}
-
 function buildDispatchOrderMetadata(order = {}, nowMs = Date.now()) {
-  const pickup = resolveOrderPickupRegion(order);
-  const dropoffAddress = String(order.dropoffAddress || order.toAddress || order.dropoff || order.dropoffAddressObject?.address || '').trim();
+  const pickupRegion = resolveOrderPickupRegion(order);
+  const dropoffAddress = String(order.dropoffAddress || order.toAddress || order.dropoff || '').trim();
   const dropoffCountryCode =
-    inferUBeeCountryFromCoordinates(
-      order.dropoffLat ?? order.toLat ?? order.dropoffAddressObject?.lat,
-      order.dropoffLng ?? order.toLng ?? order.dropoffAddressObject?.lng
-    ) ||
+    inferUBeeCountryFromCoordinates(order.dropoffLat ?? order.toLat, order.dropoffLng ?? order.toLng) ||
     inferUBeeCountryFromAddressText(dropoffAddress) ||
-    normalizeUBeeCountryCode(order.dropoffCountryCode || order.dropoffAddressObject?.countryCode || '');
-  let dropoffPrefecture='',dropoffCity='',dropoffDistrict='';
+    normalizeUBeeCountryCode(order.dropoffCountryCode || '') ||
+    '';
+
+  let dropoffPrefecture = String(order.dropoffPrefecture || '').trim();
+  let dropoffCity = String(order.dropoffCity || '').trim();
+  let dropoffDistrict = String(order.dropoffDistrict || '').trim();
+
   if (dropoffCountryCode === 'TW') {
-    const r=inferTaiwanRegion(`${order.dropoffCity||''}${order.dropoffDistrict||''}${dropoffAddress}`);
-    dropoffCity=normalizeTaiwanCityName(order.dropoffCity||r.city||'');
-    dropoffDistrict=normalizeTaiwanRegionText(order.dropoffDistrict||r.district||'');
+    const inferred = inferTaiwanRegion(`${dropoffCity}${dropoffDistrict}${dropoffAddress}`);
+    dropoffCity = normalizeTaiwanCityName(dropoffCity || inferred.city || '');
+    dropoffDistrict = normalizeTaiwanRegionText(dropoffDistrict || inferred.district || '');
+    dropoffPrefecture = '';
   } else if (dropoffCountryCode === 'JP') {
-    const r=inferJapanRegion(`${order.dropoffPrefecture||''}${order.dropoffCity||''}${order.dropoffDistrict||''}${dropoffAddress}`);
-    dropoffPrefecture=String(order.dropoffPrefecture||order.dropoffAddressObject?.prefecture||r.prefecture||'').trim();
-    dropoffCity=String(order.dropoffCity||order.dropoffAddressObject?.city||r.city||'').trim();
-    dropoffDistrict=String(order.dropoffDistrict||order.dropoffAddressObject?.district||r.district||'').trim();
+    const inferred = inferJapanRegion(`${dropoffPrefecture}${dropoffCity}${dropoffDistrict}${dropoffAddress}`);
+    dropoffPrefecture = dropoffPrefecture || inferred.prefecture || '';
+    dropoffCity = dropoffCity || inferred.city || '';
+    dropoffDistrict = dropoffDistrict || inferred.district || '';
   }
-  const t=getTaipeiTimeParts(nowMs);
+
+  const t = getTaipeiTimeParts(nowMs);
+
   return {
-    pickupCountryCode:pickup.countryCode,pickupPrefecture:pickup.prefecture,pickupCity:pickup.city,pickupDistrict:pickup.district,pickupZoneId:pickup.zoneId,
-    dropoffCountryCode,dropoffPrefecture,dropoffCity,dropoffDistrict,
-    dropoffZoneId:buildInternationalDispatchZoneId({countryCode:dropoffCountryCode,prefecture:dropoffPrefecture,city:dropoffCity,district:dropoffDistrict}),
-    createdHour:t.hour,createdWeekday:t.weekday,
-    createdTimeSlot:`${String(t.hour).padStart(2,'0')}:${String(t.slot15*15).padStart(2,'0')}`,
-    dispatchIntelligenceVersion:UBEE_DISPATCH_INTELLIGENCE_VERSION,
+    pickupCountryCode: pickupRegion.countryCode,
+    pickupPrefecture: pickupRegion.prefecture,
+    pickupCity: pickupRegion.city,
+    pickupDistrict: pickupRegion.district,
+    pickupZoneId:
+      pickupRegion.countryCode === 'TW'
+        ? buildNationwideDispatchZoneId(pickupRegion.city, pickupRegion.district)
+        : pickupRegion.countryCode === 'JP'
+          ? `japan_${pickupRegion.prefecture || 'unknown'}_${pickupRegion.city || 'unknown'}_${pickupRegion.district || 'unknown'}`
+          : 'unknown_region',
+
+    dropoffCountryCode,
+    dropoffPrefecture,
+    dropoffCity,
+    dropoffDistrict,
+    dropoffZoneId:
+      dropoffCountryCode === 'TW'
+        ? buildNationwideDispatchZoneId(dropoffCity, dropoffDistrict)
+        : dropoffCountryCode === 'JP'
+          ? `japan_${dropoffPrefecture || 'unknown'}_${dropoffCity || 'unknown'}_${dropoffDistrict || 'unknown'}`
+          : 'unknown_region',
+
+    createdHour: t.hour,
+    createdWeekday: t.weekday,
+    createdTimeSlot: `${String(t.hour).padStart(2,'0')}:${String(t.slot15*15).padStart(2,'0')}`,
+    dispatchIntelligenceVersion: UBEE_DISPATCH_INTELLIGENCE_VERSION,
   };
 }
 
@@ -15395,40 +15301,113 @@ app.post('/api/rider/register', async (req, res) => {
       emergencyContactPhone || ''
     );
 
-    const phoneCountryCode = getUBeePhoneCountryCode(cleanPhone);
-    const applicationCountryCode = normalizeUBeeCountryCode(
-      serviceCountryCode || residenceCountryCode || clientInterfaceCountryCode || phoneCountryCode || ''
-    ) || 'TW';
+    const applicationCountry =
+      normalizeUBeeCountryCode(
+        serviceCountryCode ||
+        clientInterfaceCountryCode ||
+        residenceCountryCode ||
+        getUBeePhoneCountryCode(cleanPhone) ||
+        'TW'
+      ) || 'TW';
 
-    let finalResidencePrefecture='', finalResidenceCity='', finalResidenceDistrict='', finalDistrict='';
-    let finalServicePrefecture='', normalizedServicePrefectures=[], normalizedServiceCities=[], normalizedServiceDistricts=[];
-    let finalServiceArea='', finalServiceCity='';
+    let finalResidencePrefecture = '';
+    let finalResidenceCity = '';
+    let finalResidenceDistrict = '';
+    let finalDistrict = '';
+    let finalServicePrefecture = '';
+    let normalizedServicePrefectures = [];
+    let normalizedServiceCities = [];
+    let normalizedServiceDistricts = [];
+    let finalServiceArea = '';
+    let finalServiceCity = '';
 
-    if (applicationCountryCode === 'JP') {
-      const inferred=inferJapanRegion(`${residencePrefecture||''}${residenceCity||city||''}${residenceDistrict||''}${district||''}`);
-      finalResidencePrefecture=String(residencePrefecture||inferred.prefecture||'').trim();
-      finalResidenceCity=String(residenceCity||city||inferred.city||'').trim();
-      finalResidenceDistrict=String(residenceDistrict||inferred.district||'').trim();
-      finalDistrict=[finalResidencePrefecture,finalResidenceCity,finalResidenceDistrict].filter(Boolean).join('');
+    if (applicationCountry === 'JP') {
+      const inferredResidence = inferJapanRegion(
+        `${residencePrefecture || ''}${residenceCity || city || ''}${residenceDistrict || ''}${district || ''}`
+      );
 
-      normalizedServiceCities=[...new Set((Array.isArray(serviceCities)?serviceCities:[serviceCity]).map(v=>String(v||'').trim()).filter(Boolean))];
-      finalServiceCity=String(serviceCity||normalizedServiceCities[0]||finalResidenceCity||'').trim();
+      finalResidencePrefecture = String(
+        residencePrefecture || inferredResidence.prefecture || '北海道'
+      ).trim();
 
-      normalizedServicePrefectures=[...new Set((Array.isArray(servicePrefectures)?servicePrefectures:[servicePrefecture]).map(v=>String(v||'').trim()).filter(Boolean))];
-      finalServicePrefecture=String(servicePrefecture||normalizedServicePrefectures[0]||finalResidencePrefecture||'').trim();
-      if (finalServicePrefecture && !normalizedServicePrefectures.includes(finalServicePrefecture)) normalizedServicePrefectures.unshift(finalServicePrefecture);
+      finalResidenceCity = String(
+        residenceCity || city || inferredResidence.city || ''
+      ).trim();
 
-      normalizedServiceDistricts=normalizeJapanServiceDistricts(serviceDistricts||serviceArea||area||[], finalServiceCity);
-      finalServiceArea=normalizedServiceDistricts.join('、')||String(serviceArea||area||'').trim();
+      finalResidenceDistrict = String(
+        residenceDistrict || inferredResidence.district || ''
+      ).trim();
+
+      finalDistrict = [
+        finalResidencePrefecture,
+        finalResidenceCity,
+        finalResidenceDistrict
+      ].filter(Boolean).join('');
+
+      normalizedServiceCities = [...new Set(
+        (Array.isArray(serviceCities) ? serviceCities : [serviceCity])
+          .map(v => String(v || '').trim())
+          .filter(Boolean)
+      )];
+
+      finalServiceCity = String(
+        serviceCity || normalizedServiceCities[0] || finalResidenceCity || ''
+      ).trim();
+
+      normalizedServicePrefectures = [...new Set(
+        (Array.isArray(servicePrefectures) ? servicePrefectures : [servicePrefecture])
+          .map(v => String(v || '').trim())
+          .filter(Boolean)
+          .concat(finalResidencePrefecture ? [finalResidencePrefecture] : [])
+      )];
+
+      finalServicePrefecture = String(
+        servicePrefecture || normalizedServicePrefectures[0] || finalResidencePrefecture || ''
+      ).trim();
+
+      normalizedServiceDistricts = normalizeJapanServiceDistricts(
+        serviceDistricts || serviceArea || area || [],
+        finalServiceCity
+      );
+
+      finalServiceArea = normalizedServiceDistricts.join('、') || String(serviceArea || area || '').trim();
     } else {
-      const inferredResidence=inferTaiwanRegion(district||`${residenceCity||city||''}${residenceDistrict||''}`);
-      finalResidenceCity=normalizeTaiwanCityName(residenceCity||city||inferredResidence.city||'');
-      finalResidenceDistrict=normalizeTaiwanRegionText(residenceDistrict||inferredResidence.district||'');
-      finalDistrict=buildTaiwanFullDistrict(finalResidenceCity,finalResidenceDistrict,district||'')||normalizeTaiwanRegionText(district);
-      normalizedServiceDistricts=normalizeTaiwanServiceDistricts(serviceDistricts||serviceArea||area||[]);
-      finalServiceArea=normalizedServiceDistricts.join('、')||String(serviceArea||area||'').trim();
-      normalizedServiceCities=[...new Set((Array.isArray(serviceCities)?serviceCities:[serviceCity]).map(normalizeTaiwanCityName).filter(Boolean).concat(normalizedServiceDistricts.map(x=>inferTaiwanRegion(x).city).filter(Boolean)))];
-      finalServiceCity=normalizeTaiwanCityName(serviceCity)||normalizedServiceCities[0]||finalResidenceCity||'';
+      const inferredResidence = inferTaiwanRegion(
+        district || `${residenceCity || city || ''}${residenceDistrict || ''}`
+      );
+
+      finalResidenceCity = normalizeTaiwanCityName(
+        residenceCity || city || inferredResidence.city || ''
+      );
+
+      finalResidenceDistrict = normalizeTaiwanRegionText(
+        residenceDistrict || inferredResidence.district || ''
+      );
+
+      finalDistrict = buildTaiwanFullDistrict(
+        finalResidenceCity,
+        finalResidenceDistrict,
+        district || ''
+      ) || normalizeTaiwanRegionText(district);
+
+      normalizedServiceDistricts = normalizeTaiwanServiceDistricts(
+        serviceDistricts || serviceArea || area || []
+      );
+
+      finalServiceArea = normalizedServiceDistricts.join('、') || String(serviceArea || area || '').trim();
+
+      normalizedServiceCities = [...new Set(
+        (Array.isArray(serviceCities) ? serviceCities : [serviceCity])
+          .map(normalizeTaiwanCityName)
+          .filter(Boolean)
+          .concat(
+            normalizedServiceDistricts
+              .map(item => inferTaiwanRegion(item).city)
+              .filter(Boolean)
+          )
+      )];
+
+      finalServiceCity = normalizeTaiwanCityName(serviceCity) || normalizedServiceCities[0] || finalResidenceCity || '';
     }
 
     const nowMs = Date.now();
@@ -15485,7 +15464,14 @@ app.post('/api/rider/register', async (req, res) => {
       !finalDistrict ||
       !vehicle ||
       !finalServiceArea ||
-      (applicationCountryCode === 'JP' && (!finalResidencePrefecture || !finalServicePrefecture || !finalServiceCity || normalizedServiceDistricts.length < 1)) ||
+      (
+        applicationCountry === 'JP' &&
+        (
+          !finalServicePrefecture ||
+          !finalServiceCity ||
+          normalizedServiceDistricts.length < 1
+        )
+      ) ||
       !availableTime ||
       !emergencyContactName ||
       !emergencyContactRelationship ||
@@ -15660,7 +15646,7 @@ app.post('/api/rider/register', async (req, res) => {
 
       district: cleanText(finalDistrict || '', 100),
       city: cleanText(finalResidenceCity || '', 40),
-      residenceCountryCode: applicationCountryCode,
+      residenceCountryCode: applicationCountry,
       residencePrefecture: cleanText(finalResidencePrefecture || '', 40),
       residenceCity: cleanText(finalResidenceCity || '', 40),
       residenceDistrict: cleanText(finalResidenceDistrict || '', 40),
@@ -15685,7 +15671,7 @@ app.post('/api/rider/register', async (req, res) => {
 
       area: cleanText(finalServiceArea || '', 100),
       serviceArea: cleanText(finalServiceArea || '', 100),
-      serviceCountryCode: applicationCountryCode,
+      serviceCountryCode: applicationCountry,
       servicePrefecture: cleanText(finalServicePrefecture || '', 40),
       servicePrefectures: normalizedServicePrefectures,
       serviceCity: cleanText(finalServiceCity || '', 40),
@@ -18167,7 +18153,7 @@ app.post('/api/rider/application-supplement', async (req, res) => {
     if (!isValidUBeeMobilePhone(phone)) {
       return res.status(400).json({
         success: false,
-        message: '請輸入申請時使用的正確台灣或日本手機號碼。',
+        message: '請輸入申請時使用的正確手機號碼。',
       });
     }
 
@@ -18428,7 +18414,7 @@ app.get('/api/rider/application-status', async (req, res) => {
     if (!isValidUBeeMobilePhone(cleanPhone)) {
       return res.status(400).json({
         success: false,
-        message: '請輸入台灣 09 或日本 070／080／090 手機號碼。',
+        message: '請輸入台灣 09 手機號碼或日本 070／080／090 手機號碼。',
       });
     }
 
@@ -20522,10 +20508,10 @@ app.post('/api/business/register', async (req, res) => {
       });
     }
 
-    if (!/^09\d{8}$/.test(phone)) {
+    if (!isValidUBeeMobilePhone(phone)) {
       return res.status(400).json({
         success: false,
-        message: '手機號碼格式錯誤，請輸入 09 開頭的 10 碼手機號碼。',
+        message: '手機號碼格式錯誤，請輸入台灣 09 手機號碼或日本 070／080／090 手機號碼。',
       });
     }
 
@@ -21339,7 +21325,7 @@ app.post('/api/merchant/register', async (req, res) => {
       });
     }
 
-    if (!/^09\d{8}$/.test(cleanPhone)) {
+    if (!isValidUBeeMobilePhone(cleanPhone)) {
       return res.status(400).json({
         ok: false,
         message: '請輸入正確的手機格式，例如：0912345678',
@@ -21482,7 +21468,7 @@ app.post('/api/merchant/bind', async (req, res) => {
       });
     }
 
-    if (!/^09\d{8}$/.test(cleanPhone)) {
+    if (!isValidUBeeMobilePhone(cleanPhone)) {
       return res.status(400).json({
         ok: false,
         message: '請輸入申請合作時填寫的手機號碼，例如：0912345678',
@@ -23051,12 +23037,16 @@ function buildApprovedRiderV2(application, approvedBy) {
       application.lineUserId || application.userId || ''
     ).trim(),
 
-    district: cleanText(application.district || '', 100),
-    city: cleanText(application.city || '', 40),
-    residenceCountryCode: normalizeUBeeCountryCode(application.residenceCountryCode || application.serviceCountryCode || ''),
-    residencePrefecture: cleanText(application.residencePrefecture || '', 40),
-    residenceCity: cleanText(application.residenceCity || application.city || '', 40),
-    residenceDistrict: cleanText(application.residenceDistrict || '', 40),
+    district: cleanText(application.district || '', 80),
+    city: cleanText(application.city || '', 20),
+    residenceCity: cleanText(
+      application.residenceCity || application.city || '',
+      20
+    ),
+    residenceDistrict: cleanText(
+      application.residenceDistrict || '',
+      20
+    ),
 
     vehicle: cleanText(application.vehicle || '', 40),
     plateNumber: cleanText(application.plateNumber || '', 20),
@@ -23071,13 +23061,24 @@ function buildApprovedRiderV2(application, approvedBy) {
       application.serviceArea || application.area || '',
       80
     ),
-    serviceArea: cleanText(application.serviceArea || application.area || '', 100),
-    serviceCountryCode: normalizeUBeeCountryCode(application.serviceCountryCode || application.residenceCountryCode || ''),
+    serviceArea: cleanText(
+      application.serviceArea || application.area || '',
+      100
+    ),
+    serviceCountryCode: normalizeUBeeCountryCode(
+      application.serviceCountryCode || application.residenceCountryCode || ''
+    ),
     servicePrefecture: cleanText(application.servicePrefecture || '', 40),
-    servicePrefectures: Array.isArray(application.servicePrefectures) ? application.servicePrefectures : [],
+    servicePrefectures: Array.isArray(application.servicePrefectures)
+      ? application.servicePrefectures
+      : [],
     serviceCity: cleanText(application.serviceCity || '', 40),
-    serviceCities: Array.isArray(application.serviceCities) ? application.serviceCities : [],
-    serviceDistricts: Array.isArray(application.serviceDistricts) ? application.serviceDistricts : [],
+    serviceCities: Array.isArray(application.serviceCities)
+      ? application.serviceCities
+      : [],
+    serviceDistricts: Array.isArray(application.serviceDistricts)
+      ? application.serviceDistricts
+      : [],
     availableTime: cleanText(application.availableTime || '', 80),
 
     emergencyContact: {
@@ -23233,13 +23234,17 @@ function formatCurrency(value) {
 }
 
 function normalizePhone(phone) {
-  let value = String(phone || '').trim().replace(/[^\d+]/g, '');
-  if (value.startsWith('00')) value = `+${value.slice(2)}`;
+  let value = String(phone || '')
+    .trim()
+    .replace(/[^\d+]/g, '');
+
+  if (value.startsWith('00')) {
+    value = `+${value.slice(2)}`;
+  }
 
   if (/^\+8869\d{8}$/.test(value)) return `0${value.slice(4)}`;
   if (/^8869\d{8}$/.test(value)) return `0${value.slice(3)}`;
   if (/^09\d{8}$/.test(value)) return value;
-
   if (/^0(?:70|80|90)\d{8}$/.test(value)) return `+81${value.slice(1)}`;
   if (/^81(?:70|80|90)\d{8}$/.test(value)) return `+${value}`;
   if (/^\+81(?:70|80|90)\d{8}$/.test(value)) return value;
@@ -23370,6 +23375,183 @@ function normalizeTaiwanServiceDistricts(value) {
   });
 
   return output.slice(0, 8);
+}
+
+
+// =====================================================
+// UBee TW / JP 正式國別與服務區域模型
+// - 訂單國別由取件地判斷。
+// - 小U接單授權只讀正式服務區域資料。
+// - 小U GPS 僅供距離計算，不授予跨國服務權限。
+// =====================================================
+const UBEE_JAPAN_PREFECTURES = Object.freeze([
+  '北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県',
+  '茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県',
+  '新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県',
+  '静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県',
+  '奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県',
+  '徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県',
+  '熊本県','大分県','宮崎県','鹿児島県','沖縄県'
+]);
+
+const UBEE_SAPPORO_WARDS = Object.freeze([
+  '中央区','北区','東区','白石区','豊平区',
+  '南区','西区','厚別区','手稲区','清田区'
+]);
+
+function normalizeUBeeCountryCode(value) {
+  const text = String(value || '').trim().toUpperCase();
+  if (['TW','TWN','TAIWAN','台灣','台湾'].includes(text)) return 'TW';
+  if (['JP','JPN','JAPAN','日本'].includes(text)) return 'JP';
+  return '';
+}
+
+function inferUBeeCountryFromCoordinates(lat, lng) {
+  const y = Number(lat);
+  const x = Number(lng);
+  if (!Number.isFinite(y) || !Number.isFinite(x)) return '';
+  if (y >= 21.5 && y <= 26.6 && x >= 118.0 && x <= 122.4) return 'TW';
+  if (y >= 24.0 && y <= 46.7 && x >= 122.5 && x <= 146.7) return 'JP';
+  return '';
+}
+
+function inferUBeeCountryFromAddressText(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (/日本|Japan/i.test(text) || UBEE_JAPAN_PREFECTURES.some(p => text.includes(p))) return 'JP';
+  const tw = text.replace(/臺/g, '台');
+  if (/台灣|台湾|Taiwan/i.test(text) || TAIWAN_CITY_COUNTY_NAMES.some(city => tw.includes(city))) return 'TW';
+  return '';
+}
+
+function inferJapanRegion(value) {
+  const text = String(value || '').replace(/\s+/g, '').trim();
+  if (!text) return { prefecture:'', city:'', district:'' };
+  const prefecture = UBEE_JAPAN_PREFECTURES.find(p => text.includes(p)) || '';
+  const city = text.includes('札幌市')
+    ? '札幌市'
+    : (text.match(/((?:[^都道府県市区町村]{1,12})市)/)?.[1] || '');
+  const district = city === '札幌市'
+    ? (UBEE_SAPPORO_WARDS.find(w => text.includes(w)) || '')
+    : (text.match(/((?:[^市区町村]{1,12})区)/)?.[1] || '');
+  return { prefecture, city, district };
+}
+
+function normalizeJapanServiceDistricts(value, serviceCity = '') {
+  const source = Array.isArray(value) ? value : String(value || '').split(/[、,，\n]/);
+  const out = [];
+  const seen = new Set();
+  for (const item of source) {
+    const text = String(item || '').replace(/\s+/g, '').trim();
+    if (!text) continue;
+    let normalized = text;
+    if (String(serviceCity || '').trim() === '札幌市') {
+      const ward = UBEE_SAPPORO_WARDS.find(w => text.includes(w));
+      if (ward) normalized = `札幌市${ward}`;
+    }
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      out.push(normalized);
+    }
+  }
+  return out.slice(0, 8);
+}
+
+function resolveOrderPickupRegion(order = {}) {
+  const pickupAddress = String(
+    order.pickupAddress || order.fromAddress || order.pickup || order.pickupAddressObject?.address || ''
+  ).trim();
+  const countryCode =
+    inferUBeeCountryFromCoordinates(
+      order.pickupLat ?? order.fromLat ?? order.pickupAddressObject?.lat,
+      order.pickupLng ?? order.fromLng ?? order.pickupAddressObject?.lng
+    ) ||
+    inferUBeeCountryFromAddressText(pickupAddress) ||
+    normalizeUBeeCountryCode(order.pickupCountryCode || order.clientInterfaceCountryCode || '') ||
+    '';
+
+  if (countryCode === 'TW') {
+    const inferred = inferTaiwanRegion(`${order.pickupCity || ''}${order.pickupDistrict || ''}${pickupAddress}`);
+    return {
+      countryCode:'TW',
+      prefecture:'',
+      city:normalizeTaiwanCityName(order.pickupCity || inferred.city || ''),
+      district:normalizeTaiwanRegionText(order.pickupDistrict || inferred.district || '')
+    };
+  }
+
+  if (countryCode === 'JP') {
+    const inferred = inferJapanRegion(`${order.pickupPrefecture || ''}${order.pickupCity || ''}${order.pickupDistrict || ''}${pickupAddress}`);
+    return {
+      countryCode:'JP',
+      prefecture:String(order.pickupPrefecture || inferred.prefecture || '').trim(),
+      city:String(order.pickupCity || inferred.city || '').trim(),
+      district:String(order.pickupDistrict || inferred.district || '').trim()
+    };
+  }
+
+  return { countryCode:'', prefecture:'', city:'', district:'' };
+}
+
+function getRiderAuthorizedServiceRegionServer(rider = {}) {
+  const explicitCountry = normalizeUBeeCountryCode(rider.serviceCountryCode || rider.serviceCountry || '');
+  const legacyText = [
+    rider.serviceCity,
+    ...(Array.isArray(rider.serviceCities) ? rider.serviceCities : []),
+    rider.serviceArea,
+    rider.area,
+    ...(Array.isArray(rider.serviceDistricts) ? rider.serviceDistricts : [])
+  ].filter(Boolean).join(' ');
+  const countryCode = explicitCountry || (inferTaiwanRegion(legacyText).city ? 'TW' : '');
+
+  if (countryCode === 'TW') {
+    const cities = [rider.serviceCity, ...(Array.isArray(rider.serviceCities) ? rider.serviceCities : [])]
+      .map(normalizeTaiwanCityName).filter(Boolean);
+    const districts = normalizeTaiwanServiceDistricts(rider.serviceDistricts || rider.serviceArea || rider.area || []);
+    districts.forEach(item => {
+      const city = inferTaiwanRegion(item).city;
+      if (city) cities.push(city);
+    });
+    return { countryCode:'TW', prefectures:[], cities:[...new Set(cities)], districts:[...new Set(districts)] };
+  }
+
+  if (countryCode === 'JP') {
+    const prefectures = [rider.servicePrefecture, ...(Array.isArray(rider.servicePrefectures) ? rider.servicePrefectures : [])]
+      .map(v => String(v || '').trim()).filter(Boolean);
+    const cities = [rider.serviceCity, ...(Array.isArray(rider.serviceCities) ? rider.serviceCities : [])]
+      .map(v => String(v || '').trim()).filter(Boolean);
+    const districts = normalizeJapanServiceDistricts(
+      rider.serviceDistricts || rider.serviceArea || rider.area || [],
+      cities[0] || rider.serviceCity || ''
+    );
+    return { countryCode:'JP', prefectures:[...new Set(prefectures)], cities:[...new Set(cities)], districts:[...new Set(districts)] };
+  }
+
+  return { countryCode:'', prefectures:[], cities:[], districts:[] };
+}
+
+function isOrderInsideRiderAuthorizedServiceRegionServer(order = {}, rider = {}) {
+  const pickup = resolveOrderPickupRegion(order);
+  const auth = getRiderAuthorizedServiceRegionServer(rider);
+  if (!pickup.countryCode || !auth.countryCode || pickup.countryCode !== auth.countryCode) return false;
+
+  if (auth.countryCode === 'TW') {
+    if (!pickup.city || !auth.cities.length || !auth.cities.includes(pickup.city)) return false;
+    if (!auth.districts.length) return true;
+    if (!pickup.district) return false;
+    return auth.districts.includes(`${pickup.city}${pickup.district}`);
+  }
+
+  if (auth.countryCode === 'JP') {
+    if (auth.prefectures.length && (!pickup.prefecture || !auth.prefectures.includes(pickup.prefecture))) return false;
+    if (!pickup.city || !auth.cities.length || !auth.cities.includes(pickup.city)) return false;
+    if (!auth.districts.length) return true;
+    if (!pickup.district) return false;
+    const full = `${pickup.city}${pickup.district}`;
+    return auth.districts.some(d => d === pickup.district || d === full);
+  }
+
+  return false;
 }
 
 function buildNationwideDispatchZoneId(city, district) {
@@ -26019,7 +26201,10 @@ function createOrderFromApi(data) {
       data.pickupPlaceId || '',
       200
     ),
-    pickupCountryCode: normalizeUBeeCountryCode(data.pickupCountryCode || data.pickupAddressObject?.countryCode || data.clientInterfaceCountryCode || ''),
+
+    pickupCountryCode: normalizeUBeeCountryCode(
+      data.pickupCountryCode || data.pickupAddressObject?.countryCode || data.clientInterfaceCountryCode || ''
+    ),
     pickupPrefecture: cleanText(data.pickupPrefecture || data.pickupAddressObject?.prefecture || '', 40),
     pickupCity: cleanText(data.pickupCity || data.pickupAddressObject?.city || '', 40),
     pickupDistrict: cleanText(data.pickupDistrict || data.pickupAddressObject?.district || '', 40),
@@ -26052,7 +26237,10 @@ function createOrderFromApi(data) {
       data.dropoffPlaceId || '',
       200
     ),
-    dropoffCountryCode: normalizeUBeeCountryCode(data.dropoffCountryCode || data.dropoffAddressObject?.countryCode || ''),
+
+    dropoffCountryCode: normalizeUBeeCountryCode(
+      data.dropoffCountryCode || data.dropoffAddressObject?.countryCode || ''
+    ),
     dropoffPrefecture: cleanText(data.dropoffPrefecture || data.dropoffAddressObject?.prefecture || '', 40),
     dropoffCity: cleanText(data.dropoffCity || data.dropoffAddressObject?.city || '', 40),
     dropoffDistrict: cleanText(data.dropoffDistrict || data.dropoffAddressObject?.district || '', 40),
@@ -32199,14 +32387,6 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         success: false,
         code: 'RIDER_V4_NOT_ACTIVE',
         message: '你的 V4 入職／接單資格尚未啟用，請先完成教學、測驗或聯繫 UBee。',
-      });
-    }
-
-    if (error.message === 'ORDER_OUTSIDE_RIDER_SERVICE_REGION') {
-      return res.status(403).json({
-        success: false,
-        code: 'ORDER_OUTSIDE_RIDER_SERVICE_REGION',
-        message: '此任務不在你的正式服務區域內。',
       });
     }
 
