@@ -1955,6 +1955,12 @@ async function sendNewOrderPushToRiders(
           }
 
           if (
+            !isOrderInsideRiderDispatchPreferenceServer(order, rider)
+          ) {
+            return;
+          }
+
+          if (
             !riderApproved ||
             !riderDispatchEligible ||
             (!riderOnline && !allowOffline) ||
@@ -5789,71 +5795,31 @@ async function findRiderDocumentV2First(source = {}) {
   ];
 
   for (const collectionName of collections) {
-    const phoneIsValid =
-      isValidUBeeMobilePhone(cleanPhone);
-
+    const phoneIsValid = /^09\d{8}$/.test(cleanPhone);
     const riderIdIsSameAsPhone =
       phoneIsValid &&
       cleanRiderId &&
       cleanRiderId === cleanPhone;
 
     if (phoneIsValid) {
-      const phoneCandidates = [cleanPhone];
-
-      // 相容歷史資料：
-      // 台灣帳號可能曾以 +8869xxxxxxxx 保存；
-      // 日本帳號可能曾以 090/080/070 本地格式保存。
-      if (/^09\d{8}$/.test(cleanPhone)) {
-        phoneCandidates.push(
-          `+886${cleanPhone.slice(1)}`
-        );
+      const doc = await db.collection(collectionName).doc(cleanPhone).get();
+      if (doc.exists) {
+        return {
+          riderDoc: doc,
+          sourceCollection: collectionName,
+        };
       }
 
-      if (/^\+81(?:70|80|90)\d{8}$/.test(cleanPhone)) {
-        phoneCandidates.push(
-          `0${cleanPhone.slice(3)}`
-        );
-      }
+      const phoneSnap = await db.collection(collectionName)
+        .where('phone', '==', cleanPhone)
+        .limit(1)
+        .get();
 
-      const uniquePhoneCandidates = [
-        ...new Set(
-          phoneCandidates.filter(Boolean)
-        ),
-      ];
-
-      for (const phoneCandidate of uniquePhoneCandidates) {
-        const doc =
-          await db
-            .collection(collectionName)
-            .doc(phoneCandidate)
-            .get();
-
-        if (doc.exists) {
-          return {
-            riderDoc: doc,
-            sourceCollection: collectionName,
-          };
-        }
-      }
-
-      for (const phoneCandidate of uniquePhoneCandidates) {
-        const phoneSnap =
-          await db
-            .collection(collectionName)
-            .where(
-              'phone',
-              '==',
-              phoneCandidate
-            )
-            .limit(1)
-            .get();
-
-        if (!phoneSnap.empty) {
-          return {
-            riderDoc: phoneSnap.docs[0],
-            sourceCollection: collectionName,
-          };
-        }
+      if (!phoneSnap.empty) {
+        return {
+          riderDoc: phoneSnap.docs[0],
+          sourceCollection: collectionName,
+        };
       }
     }
 
@@ -6047,12 +6013,6 @@ app.post('/api/rider/login', async (req, res) => {
     if (!result.ok) {
       return res.status(result.statusCode).json({
         success: false,
-        code:
-          result.statusCode === 404
-            ? 'RIDER_PHONE_NOT_FOUND'
-            : result.statusCode === 403
-              ? 'RIDER_LOGIN_NOT_ALLOWED'
-              : 'RIDER_PHONE_INVALID',
         message: result.message,
       });
     }
@@ -7705,6 +7665,9 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       .filter(order =>
         isOrderInsideRiderAuthorizedServiceRegionServer(order, rider)
       )
+      .filter(order =>
+        isOrderInsideRiderDispatchPreferenceServer(order, rider)
+      )
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => {
@@ -8182,6 +8145,169 @@ async function maintainScheduledOrders() {
 setInterval(() => {
   maintainScheduledOrders().catch(() => {});
 }, 5 * 60 * 1000).unref?.();
+
+// =====================================================
+// UBee 接單偏好 V2
+// - 正式服務資格由 ridersV2 控制。
+// - 小U只能在正式授權區域內縮小接單偏好。
+// =====================================================
+app.get(
+  '/api/rider/dispatch-preferences',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const riderResult =
+        await findApprovedRiderForApi(req.query || {});
+
+      if (!riderResult.ok) {
+        return res.status(riderResult.statusCode).json({
+          success: false,
+          message: riderResult.message,
+        });
+      }
+
+      const rider = riderResult.rider || {};
+      const preferences =
+        rider.dispatchPreferences &&
+        typeof rider.dispatchPreferences === 'object'
+          ? rider.dispatchPreferences
+          : {};
+
+      return res.json({
+        success: true,
+        preferences,
+      });
+    } catch (error) {
+      console.error('讀取小U接單偏好失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '讀取接單偏好失敗。',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/rider/dispatch-preferences',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const riderResult =
+        await findApprovedRiderForApi(req.body || {});
+
+      if (!riderResult.ok) {
+        return res.status(riderResult.statusCode).json({
+          success: false,
+          message: riderResult.message,
+        });
+      }
+
+      const rider = riderResult.rider || {};
+      const official =
+        getRiderAuthorizedServiceRegionServer(rider);
+
+      if (!official.countryCode) {
+        return res.status(403).json({
+          success: false,
+          message: '正式服務國家尚未設定，不能修改接單偏好。',
+        });
+      }
+
+      const requestedDistricts =
+        Array.isArray(req.body?.serviceDistricts)
+          ? req.body.serviceDistricts
+              .map(value => String(value || '').trim())
+              .filter(Boolean)
+          : [];
+
+      const requestedCities =
+        Array.isArray(req.body?.serviceCities)
+          ? req.body.serviceCities
+              .map(value => String(value || '').trim())
+              .filter(Boolean)
+          : [];
+
+      const officialDistricts =
+        Array.isArray(official.districts)
+          ? official.districts
+          : [];
+
+      const officialCities =
+        Array.isArray(official.cities)
+          ? official.cities
+          : [];
+
+      const districtsAllowed =
+        requestedDistricts.every(item =>
+          officialDistricts.includes(item)
+        );
+
+      const citiesAllowed =
+        requestedCities.every(item =>
+          officialCities.includes(item)
+        );
+
+      if (!districtsAllowed || !citiesAllowed) {
+        return res.status(403).json({
+          success: false,
+          message: '接單偏好包含未核准的服務區域。',
+        });
+      }
+
+      const preferences = {
+        serviceCountryCode: official.countryCode,
+        servicePrefecture:
+          official.countryCode === 'JP'
+            ? String(
+                official.prefectures?.[0] ||
+                rider.servicePrefecture ||
+                ''
+              ).trim()
+            : '',
+        servicePrefectures:
+          official.countryCode === 'JP'
+            ? [...new Set(official.prefectures || [])]
+            : [],
+        serviceCity: requestedCities[0] || '',
+        serviceCities: requestedCities,
+        serviceDistricts: requestedDistricts,
+        serviceArea: requestedDistricts.join('、'),
+        maxAdvance: String(req.body?.maxAdvance || '1000'),
+        maxDistance: String(req.body?.maxDistance || '5'),
+        acceptCash: req.body?.acceptCash !== false,
+        acceptJko: req.body?.acceptJko !== false,
+        acceptMerchant: req.body?.acceptMerchant !== false,
+        acceptAdvance: req.body?.acceptAdvance !== false,
+        acceptUrgent: req.body?.acceptUrgent !== false,
+        acceptQueue: req.body?.acceptQueue !== false,
+        acceptLongDistance: req.body?.acceptLongDistance === true,
+        updatedAtMs: Date.now(),
+      };
+
+      await riderResult.riderDoc.ref.set(
+        {
+          dispatchPreferences: preferences,
+          dispatchPreferencesUpdatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return res.json({
+        success: true,
+        preferences,
+      });
+    } catch (error) {
+      console.error('儲存小U接單偏好失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '儲存接單偏好失敗。',
+      });
+    }
+  }
+);
 
 app.get(
   '/api/rider/schedule-preferences',
@@ -23528,6 +23654,36 @@ function getRiderAuthorizedServiceRegionServer(rider = {}) {
   }
 
   return { countryCode:'', prefectures:[], cities:[], districts:[] };
+}
+
+function isOrderInsideRiderDispatchPreferenceServer(order = {}, rider = {}) {
+  const prefs =
+    rider.dispatchPreferences &&
+    typeof rider.dispatchPreferences === 'object'
+      ? rider.dispatchPreferences
+      : {};
+
+  const selectedDistricts =
+    Array.isArray(prefs.serviceDistricts)
+      ? prefs.serviceDistricts
+          .map(value => String(value || '').trim())
+          .filter(Boolean)
+      : [];
+
+  if (!selectedDistricts.length) {
+    return true;
+  }
+
+  const pickup =
+    resolveOrderPickupRegion(order);
+
+  if (!pickup.countryCode || !pickup.city || !pickup.district) {
+    return false;
+  }
+
+  return selectedDistricts.includes(
+    `${pickup.city}${pickup.district}`
+  );
 }
 
 function isOrderInsideRiderAuthorizedServiceRegionServer(order = {}, rider = {}) {
