@@ -6443,6 +6443,7 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
       lineUserId,
       phone,
       riderId,
+      enabled,
       subscription,
       userAgent,
       platform,
@@ -6452,31 +6453,20 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
     const safeLineUserId = String(lineUserId || '').trim();
     const cleanPhone = normalizePhone(phone || '');
     const safeRiderId = String(riderId || '').trim();
-
-    if (
-      !subscription ||
-      !subscription.endpoint ||
-      !subscription.keys ||
-      !subscription.keys.p256dh ||
-      !subscription.keys.auth
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: '缺少正確的 Web Push subscription。',
-      });
-    }
+    const nextEnabled = enabled !== false;
 
     const found = await findRiderDocumentV2First({
       phone: cleanPhone,
       riderId: safeRiderId,
       lineUserId: safeLineUserId,
     });
+
     const riderDoc = found.riderDoc;
 
     if (!riderDoc) {
       return res.status(404).json({
         success: false,
-        message: '找不到騎士資料，無法儲存派單通知。',
+        message: '找不到騎士資料，無法更新派單通知設定。',
       });
     }
 
@@ -6489,7 +6479,39 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
     if (!riderApproved) {
       return res.status(403).json({
         success: false,
-        message: '騎士尚未審核通過，無法啟用派單通知。',
+        message: '騎士尚未審核通過，無法更新派單通知設定。',
+      });
+    }
+
+    // 關閉通知時不需要 subscription。
+    // 這是正式開關語意：先保存 webPushEnabled=false，
+    // 已有 subscription 保留，之後重新開啟時可重新同步或更新。
+    if (!nextEnabled) {
+      await writeRiderMigrationCompatible(riderDoc, {
+        webPushEnabled: false,
+        webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        webPushUpdatedAtMs: Date.now(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return res.json({
+        success: true,
+        enabled: false,
+        riderId: riderDoc.id,
+        message: '背景派單通知已關閉。',
+      });
+    }
+
+    if (
+      !subscription ||
+      !subscription.endpoint ||
+      !subscription.keys ||
+      !subscription.keys.p256dh ||
+      !subscription.keys.auth
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少正確的 Web Push subscription。',
       });
     }
 
@@ -6513,20 +6535,21 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
 
     return res.json({
       success: true,
+      enabled: true,
       message: 'UBee 派單通知訂閱已儲存。',
       riderId: riderDoc.id,
     });
 
   } catch (err) {
-    console.error('❌ 儲存騎士 Web Push subscription 失敗：', err);
+    console.error('❌ 更新騎士 Web Push subscription 失敗：', err);
 
     return res.status(500).json({
       success: false,
-      message: '儲存派單通知失敗，請稍後再試。',
+      message: '更新派單通知設定失敗，請稍後再試。',
       error: err.message,
     });
   }
-});
+})
 
 
 // ============================================================
@@ -8137,6 +8160,143 @@ async function maintainScheduledOrders() {
 setInterval(() => {
   maintainScheduledOrders().catch(() => {});
 }, 5 * 60 * 1000).unref?.();
+
+function normalizeRiderDispatchPreferences(input = {}, rider = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+
+  const allowedAdvance = new Set(['0','500','1000','2000','3000']);
+  const allowedDistance = new Set(['3','5','10','999']);
+
+  const serviceDistricts = normalizeTaiwanServiceDistricts(
+    source.serviceDistricts || source.serviceArea || []
+  ).slice(0, 8);
+
+  const serviceCities = [
+    ...new Set(
+      serviceDistricts
+        .map(item => inferTaiwanRegion(item).city)
+        .filter(Boolean)
+    ),
+  ];
+
+  const fallbackCity = normalizeTaiwanCityName(
+    rider.serviceCity || rider.city || rider.residenceCity || ''
+  );
+
+  const requestedCity = normalizeTaiwanCityName(source.serviceCity || '');
+  const serviceCity =
+    serviceCities[0] || requestedCity || fallbackCity || '';
+
+  return {
+    serviceCity,
+    serviceCities: serviceCities.length
+      ? serviceCities
+      : (serviceCity ? [serviceCity] : []),
+    serviceDistricts,
+    serviceArea: serviceDistricts.join('、'),
+    maxAdvance: allowedAdvance.has(String(source.maxAdvance || ''))
+      ? String(source.maxAdvance)
+      : '1000',
+    maxDistance: allowedDistance.has(String(source.maxDistance || ''))
+      ? String(source.maxDistance)
+      : '5',
+    acceptCash: source.acceptCash !== false,
+    acceptJko: source.acceptJko !== false,
+    acceptMerchant: source.acceptMerchant !== false,
+    acceptAdvance: source.acceptAdvance !== false,
+    acceptUrgent: source.acceptUrgent !== false,
+    acceptQueue: source.acceptQueue !== false,
+    acceptLongDistance: source.acceptLongDistance === true,
+  };
+}
+
+app.get(
+  '/api/rider/dispatch-preferences',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const riderResult = await findApprovedRiderForApi(req.query || {});
+
+      if (!riderResult.ok) {
+        return res.status(riderResult.statusCode).json({
+          success: false,
+          message: riderResult.message,
+        });
+      }
+
+      const rider = riderResult.rider || {};
+      const preferences = normalizeRiderDispatchPreferences(
+        rider.dispatchPreferences || {},
+        rider
+      );
+
+      return res.json({
+        success: true,
+        preferences,
+      });
+    } catch (error) {
+      console.error('讀取小U接單設定失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '讀取接單設定失敗。',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/rider/dispatch-preferences',
+  riderAuthMiddleware,
+  async (req, res) => {
+    try {
+      const riderResult = await findApprovedRiderForApi(req.body || {});
+
+      if (!riderResult.ok) {
+        return res.status(riderResult.statusCode).json({
+          success: false,
+          message: riderResult.message,
+        });
+      }
+
+      const rider = riderResult.rider || {};
+      const preferences = normalizeRiderDispatchPreferences(
+        req.body?.preferences || {},
+        rider
+      );
+
+      if (!preferences.serviceDistricts.length) {
+        return res.status(400).json({
+          success: false,
+          message: '請至少選擇一個主要服務行政區。',
+        });
+      }
+
+      await writeRiderMigrationCompatible(
+        riderResult.riderDoc,
+        {
+          dispatchPreferences: preferences,
+          dispatchPreferencesUpdatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          dispatchPreferencesUpdatedAtMs: Date.now(),
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+        }
+      );
+
+      return res.json({
+        success: true,
+        preferences,
+        message: '接單設定已儲存。',
+      });
+    } catch (error) {
+      console.error('儲存小U接單設定失敗：', error);
+      return res.status(500).json({
+        success: false,
+        message: '儲存接單設定失敗。',
+      });
+    }
+  }
+);
 
 app.get(
   '/api/rider/schedule-preferences',
