@@ -6453,20 +6453,18 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
     const safeLineUserId = String(lineUserId || '').trim();
     const cleanPhone = normalizePhone(phone || '');
     const safeRiderId = String(riderId || '').trim();
-    const nextEnabled = enabled !== false;
 
     const found = await findRiderDocumentV2First({
       phone: cleanPhone,
       riderId: safeRiderId,
       lineUserId: safeLineUserId,
     });
-
     const riderDoc = found.riderDoc;
 
     if (!riderDoc) {
       return res.status(404).json({
         success: false,
-        message: '找不到騎士資料，無法更新派單通知設定。',
+        message: '找不到騎士資料，無法更新派單通知。',
       });
     }
 
@@ -6479,16 +6477,17 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
     if (!riderApproved) {
       return res.status(403).json({
         success: false,
-        message: '騎士尚未審核通過，無法更新派單通知設定。',
+        message: '騎士尚未審核通過，無法更新派單通知。',
       });
     }
 
-    // 關閉通知時不需要 subscription。
-    // 這是正式開關語意：先保存 webPushEnabled=false，
-    // 已有 subscription 保留，之後重新開啟時可重新同步或更新。
-    if (!nextEnabled) {
+    // 關閉通知不需要瀏覽器再提供 subscription。
+    // 舊版先驗證 subscription，會導致「關閉」永遠回 400。
+    if (enabled === false) {
       await writeRiderMigrationCompatible(riderDoc, {
         webPushEnabled: false,
+        webPushSubscription: admin.firestore.FieldValue.delete(),
+        webPushDisabledAt: admin.firestore.FieldValue.serverTimestamp(),
         webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         webPushUpdatedAtMs: Date.now(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -6497,7 +6496,6 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
       return res.json({
         success: true,
         enabled: false,
-        riderId: riderDoc.id,
         message: '背景派單通知已關閉。',
       });
     }
@@ -6535,21 +6533,20 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
 
     return res.json({
       success: true,
-      enabled: true,
       message: 'UBee 派單通知訂閱已儲存。',
       riderId: riderDoc.id,
     });
 
   } catch (err) {
-    console.error('❌ 更新騎士 Web Push subscription 失敗：', err);
+    console.error('❌ 儲存騎士 Web Push subscription 失敗：', err);
 
     return res.status(500).json({
       success: false,
-      message: '更新派單通知設定失敗，請稍後再試。',
+      message: '儲存派單通知失敗，請稍後再試。',
       error: err.message,
     });
   }
-})
+});
 
 
 // ============================================================
@@ -8161,52 +8158,64 @@ setInterval(() => {
   maintainScheduledOrders().catch(() => {});
 }, 5 * 60 * 1000).unref?.();
 
+
 function normalizeRiderDispatchPreferences(input = {}, rider = {}) {
-  const source = input && typeof input === 'object' ? input : {};
+  const saved =
+    rider.dispatchPreferences && typeof rider.dispatchPreferences === 'object'
+      ? rider.dispatchPreferences
+      : {};
 
-  const allowedAdvance = new Set(['0','500','1000','2000','3000']);
-  const allowedDistance = new Set(['3','5','10','999']);
+  const allowedAdvance = new Set(['0', '500', '1000', '2000', '3000']);
+  const allowedDistance = new Set(['3', '5', '10', '999']);
 
-  const serviceDistricts = normalizeTaiwanServiceDistricts(
-    source.serviceDistricts || source.serviceArea || []
-  ).slice(0, 8);
+  const boolValue = (key, fallback = true) => {
+    if (Object.prototype.hasOwnProperty.call(input, key)) {
+      return input[key] === true;
+    }
+    if (Object.prototype.hasOwnProperty.call(saved, key)) {
+      return saved[key] === true;
+    }
+    return fallback;
+  };
 
-  const serviceCities = [
-    ...new Set(
-      serviceDistricts
-        .map(item => inferTaiwanRegion(item).city)
-        .filter(Boolean)
-    ),
-  ];
+  const requestedDistricts = Array.isArray(input.serviceDistricts)
+    ? input.serviceDistricts.map(v => String(v || '').trim()).filter(Boolean)
+    : Array.isArray(saved.serviceDistricts)
+      ? saved.serviceDistricts.map(v => String(v || '').trim()).filter(Boolean)
+      : [];
 
-  const fallbackCity = normalizeTaiwanCityName(
-    rider.serviceCity || rider.city || rider.residenceCity || ''
-  );
+  // 接單偏好只能縮小正式服務區，不能透過設定頁自行擴張官方授權。
+  const officialDistricts = Array.isArray(rider.serviceDistricts)
+    ? rider.serviceDistricts.map(v => String(v || '').trim()).filter(Boolean)
+    : [];
 
-  const requestedCity = normalizeTaiwanCityName(source.serviceCity || '');
-  const serviceCity =
-    serviceCities[0] || requestedCity || fallbackCity || '';
+  const safeDistricts = officialDistricts.length
+    ? requestedDistricts.filter(v => officialDistricts.includes(v))
+    : requestedDistricts;
+
+  const maxAdvanceRaw = String(input.maxAdvance ?? saved.maxAdvance ?? '1000');
+  const maxDistanceRaw = String(input.maxDistance ?? saved.maxDistance ?? '5');
 
   return {
-    serviceCity,
-    serviceCities: serviceCities.length
-      ? serviceCities
-      : (serviceCity ? [serviceCity] : []),
-    serviceDistricts,
-    serviceArea: serviceDistricts.join('、'),
-    maxAdvance: allowedAdvance.has(String(source.maxAdvance || ''))
-      ? String(source.maxAdvance)
-      : '1000',
-    maxDistance: allowedDistance.has(String(source.maxDistance || ''))
-      ? String(source.maxDistance)
-      : '5',
-    acceptCash: source.acceptCash !== false,
-    acceptJko: source.acceptJko !== false,
-    acceptMerchant: source.acceptMerchant !== false,
-    acceptAdvance: source.acceptAdvance !== false,
-    acceptUrgent: source.acceptUrgent !== false,
-    acceptQueue: source.acceptQueue !== false,
-    acceptLongDistance: source.acceptLongDistance === true,
+    serviceCity: String(
+      input.serviceCity ?? saved.serviceCity ?? rider.serviceCity ?? ''
+    ).trim(),
+    serviceCities: Array.isArray(input.serviceCities)
+      ? [...new Set(input.serviceCities.map(v => String(v || '').trim()).filter(Boolean))]
+      : Array.isArray(saved.serviceCities)
+        ? saved.serviceCities
+        : [],
+    serviceDistricts: [...new Set(safeDistricts)].slice(0, 8),
+    serviceArea: [...new Set(safeDistricts)].slice(0, 8).join('、'),
+    maxAdvance: allowedAdvance.has(maxAdvanceRaw) ? maxAdvanceRaw : '1000',
+    maxDistance: allowedDistance.has(maxDistanceRaw) ? maxDistanceRaw : '5',
+    acceptCash: boolValue('acceptCash', true),
+    acceptJko: boolValue('acceptJko', true),
+    acceptMerchant: boolValue('acceptMerchant', true),
+    acceptAdvance: boolValue('acceptAdvance', true),
+    acceptUrgent: boolValue('acceptUrgent', true),
+    acceptQueue: boolValue('acceptQueue', true),
+    acceptLongDistance: boolValue('acceptLongDistance', false),
   };
 }
 
@@ -8216,7 +8225,6 @@ app.get(
   async (req, res) => {
     try {
       const riderResult = await findApprovedRiderForApi(req.query || {});
-
       if (!riderResult.ok) {
         return res.status(riderResult.statusCode).json({
           success: false,
@@ -8224,21 +8232,17 @@ app.get(
         });
       }
 
-      const rider = riderResult.rider || {};
       const preferences = normalizeRiderDispatchPreferences(
-        rider.dispatchPreferences || {},
-        rider
+        {},
+        riderResult.rider || {}
       );
 
-      return res.json({
-        success: true,
-        preferences,
-      });
+      return res.json({ success: true, preferences });
     } catch (error) {
-      console.error('讀取小U接單設定失敗：', error);
+      console.error('讀取小U接單偏好失敗：', error);
       return res.status(500).json({
         success: false,
-        message: '讀取接單設定失敗。',
+        message: '讀取接單偏好失敗。',
       });
     }
   }
@@ -8250,7 +8254,6 @@ app.post(
   async (req, res) => {
     try {
       const riderResult = await findApprovedRiderForApi(req.body || {});
-
       if (!riderResult.ok) {
         return res.status(riderResult.statusCode).json({
           success: false,
@@ -8260,39 +8263,31 @@ app.post(
 
       const rider = riderResult.rider || {};
       const preferences = normalizeRiderDispatchPreferences(
-        req.body?.preferences || {},
+        req.body?.preferences || req.body || {},
         rider
       );
 
-      if (!preferences.serviceDistricts.length) {
-        return res.status(400).json({
-          success: false,
-          message: '請至少選擇一個主要服務行政區。',
-        });
-      }
-
-      await writeRiderMigrationCompatible(
-        riderResult.riderDoc,
-        {
+      await db
+        .collection(RIDER_V2_COLLECTIONS.riders)
+        .doc(riderResult.riderDoc.id)
+        .set({
           dispatchPreferences: preferences,
           dispatchPreferencesUpdatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
-          dispatchPreferencesUpdatedAtMs: Date.now(),
           updatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
-        }
-      );
+        }, { merge: true });
 
       return res.json({
         success: true,
         preferences,
-        message: '接單設定已儲存。',
+        message: '接單偏好已儲存。',
       });
     } catch (error) {
-      console.error('儲存小U接單設定失敗：', error);
+      console.error('儲存小U接單偏好失敗：', error);
       return res.status(500).json({
         success: false,
-        message: '儲存接單設定失敗。',
+        message: '儲存接單偏好失敗。',
       });
     }
   }
