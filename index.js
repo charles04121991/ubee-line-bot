@@ -8,7 +8,7 @@ const admin = require('firebase-admin');
 const webpush = require('web-push');
 const multer = require('multer');
 
-// UBee Customer V2.14 Full Integration｜2026-08-31：報價鎖定契約、全能跑腿單點任務、任務歷史與再次下單 API 完整整合。
+// UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
 // UBee Merchant PWA V4 + 小U資料庫 V2 Final｜2026-08-13：店家獨立密碼登入、COD 墊付配送、店家近距離費率。
 // 2026-08-04 R9｜全能跑腿 serviceMode 前後端一致：估價、建單與鎖價驗證統一為 custom。
 // 2026-08-04｜小U申請審核 V2：三大驗證、條件式證件、批次補件、多通道通知與審核紀錄。
@@ -22730,14 +22730,10 @@ async function createDynamicPricingQuoteSnapshot({
     serviceType: String(requestData.serviceType || ''),
     serviceMode: String(requestData.serviceMode || ''),
     serviceKey: String(requestData.serviceKey || ''),
-    serviceGroup: String(requestData.serviceGroup || ''),
     speedType: String(requestData.speedType || requestData.speed || 'standard'),
     itemSize: normalizeItemSize(requestData.itemSize),
     pickupAddress: String(requestData.pickupAddress || requestData.pickup || requestData.from || ''),
     dropoffAddress: String(requestData.dropoffAddress || requestData.dropoff || requestData.to || ''),
-    queueMinutes: Math.max(0, Math.round(dynamicSafeNumber(requestData.queueMinutes))),
-    taskMinutes: Math.max(0, Math.round(dynamicSafeNumber(requestData.taskMinutes))),
-    upstairsFee: Math.max(0, Math.round(dynamicSafeNumber(requestData.upstairsFee))),
     advancePayment: Math.max(0, Math.round(dynamicSafeNumber(requestData.advancePayment))),
     weatherType: String(price?.weatherType || 'none'),
     price: JSON.parse(JSON.stringify(price || {})),
@@ -22810,10 +22806,8 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
   const orderPickup = normalizeQuoteComparisonText(orderData.pickupAddress || orderData.pickup);
   const quoteDropoff = normalizeQuoteComparisonText(lockedQuote.dropoffAddress);
   const orderDropoff = normalizeQuoteComparisonText(orderData.dropoffAddress || orderData.dropoff);
-
-  const quoteSpeed = String(lockedQuote.speedType || 'standard').trim().toLowerCase();
-  const orderSpeed = String(orderData.speedType || orderData.speed || 'standard').trim().toLowerCase();
-
+  const quoteSpeed = String(lockedQuote.speedType || 'standard').trim();
+  const orderSpeed = String(orderData.speedType || orderData.speed || 'standard').trim();
   const quoteMode = resolveCustomerServiceMode({
     serviceMode: lockedQuote.serviceMode,
     serviceType: lockedQuote.serviceType,
@@ -22826,58 +22820,23 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
     serviceKey: orderData.serviceKey,
     serviceGroup: orderData.serviceGroup,
   });
-
-  const quoteServiceKey = String(lockedQuote.serviceKey || '').trim().toLowerCase();
-  const orderServiceKey = String(orderData.serviceKey || '').trim().toLowerCase();
   const quoteItemSize = normalizeItemSize(lockedQuote.itemSize);
   const orderItemSize = normalizeItemSize(orderData.itemSize);
-  const quoteQueueMinutes = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.queueMinutes)));
-  const orderQueueMinutes = Math.max(0, Math.round(dynamicSafeNumber(orderData.queueMinutes)));
-  const quoteTaskMinutes = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.taskMinutes)));
-  const orderTaskMinutes = Math.max(0, Math.round(dynamicSafeNumber(orderData.taskMinutes)));
-  const quoteUpstairsFee = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.upstairsFee)));
-  const orderUpstairsFee = Math.max(0, Math.round(dynamicSafeNumber(orderData.upstairsFee)));
-  const quoteAdvancePayment = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.advancePayment)));
-  const orderAdvancePayment = Math.max(
-    0,
-    Math.round(dynamicSafeNumber(getDetectedAdvancePaymentAmountFromOrderInput(orderData)))
-  );
 
   if (!quotePickup || !orderPickup || quotePickup !== orderPickup) {
     return { ok: false, message: '取件地址已變更，請重新估價。' };
   }
-
-  const requiresDropoff = quoteMode === 'normal' || (quoteMode === 'custom' && !!quoteDropoff);
-  if (requiresDropoff && (!quoteDropoff || !orderDropoff || quoteDropoff !== orderDropoff)) {
+  if (quoteMode !== 'queue' && (!quoteDropoff || !orderDropoff || quoteDropoff !== orderDropoff)) {
     return { ok: false, message: '送達地址已變更，請重新估價。' };
-  }
-  if (!requiresDropoff && orderDropoff && quoteDropoff !== orderDropoff) {
-    return { ok: false, message: '任務地點設定已變更，請重新估價。' };
-  }
-
-  if (quoteMode !== orderMode) {
-    return { ok: false, message: '任務型態已變更，請重新估價。' };
-  }
-  if (quoteServiceKey && orderServiceKey && quoteServiceKey !== orderServiceKey) {
-    return { ok: false, message: '服務項目已變更，請重新估價。' };
   }
   if (quoteSpeed !== orderSpeed) {
     return { ok: false, message: '配送速度已變更，請重新估價。' };
   }
+  if (quoteMode !== orderMode) {
+    return { ok: false, message: '任務型態已變更，請重新估價。' };
+  }
   if (quoteItemSize !== orderItemSize) {
     return { ok: false, message: '物品體積選項已變更，請重新估價。' };
-  }
-  if (quoteMode === 'queue' && quoteQueueMinutes !== orderQueueMinutes) {
-    return { ok: false, message: '排隊時間已變更，請重新估價。' };
-  }
-  if (quoteMode === 'custom' && quoteTaskMinutes !== orderTaskMinutes) {
-    return { ok: false, message: '任務處理時間已變更，請重新估價。' };
-  }
-  if (quoteUpstairsFee !== orderUpstairsFee) {
-    return { ok: false, message: '上樓服務設定已變更，請重新估價。' };
-  }
-  if (quoteAdvancePayment !== orderAdvancePayment) {
-    return { ok: false, message: '代墊金額已變更，請重新估價。' };
   }
 
   return { ok: true };
@@ -23768,47 +23727,15 @@ function validateOrderInput(data) {
     errors.push('會員登入狀態失效，請重新登入 UBee 帳號。');
   }
 
-  const mode = resolveCustomerServiceMode({
-    serviceMode: data.serviceMode,
-    serviceType: data.serviceType,
-    serviceKey: data.serviceKey,
-    serviceGroup: data.serviceGroup,
-  });
-
   const hasRemark = !!String(data.note || data.item || '').trim();
-  const hasPickup = !!String(data.pickupAddress || '').trim();
-  const hasDropoff = !!String(data.dropoffAddress || '').trim();
-  const hasPickupPhone = !!String(data.pickupPhone || '').trim();
-  const hasDropoffPhone = !!String(data.dropoffPhone || '').trim();
 
-  if (!hasPickup || !hasPickupPhone || !hasRemark) {
-    errors.push('請完整填寫任務地點、聯絡電話與任務內容。');
-  }
-
-  if (mode === 'normal' && (!hasDropoff || !hasDropoffPhone)) {
-    errors.push('此服務需要完整填寫送達地址與收件電話。');
-  }
-
-  if (mode === 'custom' && hasDropoff && !hasDropoffPhone) {
-    errors.push('已填寫送達地址時，也請填寫送達聯絡電話。');
-  }
-
-  if (mode === 'queue') {
-    const queueMinutes = Math.max(0, Math.round(Number(data.queueMinutes || 0)));
-    if (queueMinutes <= 0 || queueMinutes > PRICING.maxQuoteTimeMinutes) {
-      errors.push(`排隊時間需介於 1～${PRICING.maxQuoteTimeMinutes} 分鐘內。`);
-    }
-  }
-
-  if (mode === 'custom') {
-    const taskMinutes = Math.max(0, Math.round(Number(data.taskMinutes || 0)));
-    if (taskMinutes <= 0 || taskMinutes > PRICING.maxQuoteTimeMinutes) {
-      errors.push(`任務處理時間需介於 1～${PRICING.maxQuoteTimeMinutes} 分鐘內。`);
-    }
+  if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !hasRemark) {
+    errors.push('請完整填寫取件地址、送達地址、電話與備註。');
   }
 
   const isPurchaseOrder =
     String(data.serviceKey || '').trim() === 'buy' ||
+    String(data.serviceMode || '').trim() === 'buy' ||
     String(data.serviceGroup || '').includes('幫我買') ||
     String(data.serviceType || '').includes('代買');
 
@@ -23836,11 +23763,22 @@ function validateOrderInput(data) {
     errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額，請先聯繫 UBee 跑腿客服人工確認。');
   }
 
-  const timingType = normalizeOrderTimingType(data.orderTimingType);
-  const minimumFutureMs = Date.now() + 30 * 60 * 1000;
+  const timingType =
+    normalizeOrderTimingType(
+      data.orderTimingType
+    );
 
-  if (timingType === UBEE_ORDER_TIMING_TYPES.SCHEDULED) {
-    const requestedMs = getScheduleTimestampMs(data.requestedScheduleAtMs);
+  const minimumFutureMs =
+    Date.now() + 30 * 60 * 1000;
+
+  if (
+    timingType ===
+    UBEE_ORDER_TIMING_TYPES.SCHEDULED
+  ) {
+    const requestedMs =
+      getScheduleTimestampMs(
+        data.requestedScheduleAtMs
+      );
 
     if (!requestedMs) {
       errors.push('請選擇正確的預約日期與時間。');
@@ -23849,9 +23787,19 @@ function validateOrderInput(data) {
     }
   }
 
-  if (timingType === UBEE_ORDER_TIMING_TYPES.FLEXIBLE) {
-    const startMs = getScheduleTimestampMs(data.flexibleStartAtMs);
-    const endMs = getScheduleTimestampMs(data.flexibleEndAtMs);
+  if (
+    timingType ===
+    UBEE_ORDER_TIMING_TYPES.FLEXIBLE
+  ) {
+    const startMs =
+      getScheduleTimestampMs(
+        data.flexibleStartAtMs
+      );
+
+    const endMs =
+      getScheduleTimestampMs(
+        data.flexibleEndAtMs
+      );
 
     if (!startMs || !endMs) {
       errors.push('請完整選擇彈性預約的開始與結束時間。');
@@ -23871,13 +23819,7 @@ function getDuplicateFingerprint(data) {
   return [
     String(data.userId || '').trim(),
     String(data.serviceGroup || '').trim(),
-    String(data.serviceKey || '').trim(),
     String(data.serviceType || '').trim(),
-    String(data.serviceMode || '').trim(),
-    String(data.queueMinutes || ''),
-    String(data.taskMinutes || ''),
-    String(data.upstairsFee || ''),
-    String(getDetectedAdvancePaymentAmountFromOrderInput(data) || ''),
     normalizeAddress(data.pickupAddress),
     normalizeAddress(data.dropoffAddress),
     String(data.pickupPhone || '').trim(),
@@ -26127,13 +26069,6 @@ function createOrderFromApi(data) {
       )
     ),
 
-    taskMinutes: Math.max(
-      0,
-      Math.round(
-        Number(data.taskMinutes || 0)
-      )
-    ),
-
     item: rawItem,
     purchaseDetails,
     taskDetails,
@@ -27172,15 +27107,20 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       req.query.itemSize || 'unspecified'
     );
 
-    const resolvedServiceMode = resolveCustomerServiceMode({
-      serviceMode: rawServiceMode,
-      serviceType,
-      serviceKey,
-      serviceGroup,
-    });
+    const isQueueTask =
+      rawServiceMode === 'queue' ||
+      serviceType === '幫排隊';
 
-    const isQueueTask = resolvedServiceMode === 'queue';
-    const isCustomTask = resolvedServiceMode === 'custom';
+    const isCustomTask =
+      rawServiceMode === 'custom' ||
+      serviceType === '全能跑腿';
+
+    const resolvedServiceMode =
+      isQueueTask
+        ? 'queue'
+        : isCustomTask
+          ? 'custom'
+          : 'normal';
 
     let distance = null;
     let price = null;
@@ -27392,12 +27332,10 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         serviceType,
         serviceMode: resolvedServiceMode,
         serviceKey,
-        serviceGroup,
         speedType,
         pickupAddress: from,
         dropoffAddress: to,
         advancePayment,
-        upstairsFee,
         itemSize,
         queueMinutes,
         taskMinutes,
@@ -31076,49 +31014,174 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     let distance = null;
     let price = null;
 
-    const resolvedOrderMode = resolveCustomerServiceMode({
-      serviceMode: data.serviceMode,
-      serviceType: data.serviceType,
+    if (data.serviceMode === 'queue') {
+  const queueMinutes = Math.max(
+    0,
+    Math.round(Number(data.queueMinutes || 0))
+  );
+
+  if (queueMinutes <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: '請輸入正確的預估排隊時間',
+    });
+  }
+
+  if (queueMinutes > PRICING.maxQuoteTimeMinutes) {
+    return res.status(400).json({
+      success: false,
+      error: `排隊時間超過 ${PRICING.maxQuoteTimeMinutes} 分鐘，建議改由 UBee 跑腿客服協助確認費用。`,
+    });
+  }
+
+  const deliveryFee = Math.max(
+    0,
+    Math.round(Number(PRICING.queueBaseFee || 0))
+  );
+
+  const serviceFee = Math.max(
+    0,
+    Math.round(Number(PRICING.serviceFee || 0))
+  );
+
+  const upstairsFee = Math.max(
+    0,
+    Math.round(Number(data.upstairsFee || 0))
+  );
+
+  const queueTimeFee = Math.max(
+    0,
+    queueMinutes * PRICING.queuePerMinute
+  );
+
+  const longTaskExtraFee =
+    queueMinutes > PRICING.queueLongTaskThresholdMinutes
+      ? PRICING.queueLongTaskExtraFee
+      : 0;
+
+  const waitingFee =
+    queueTimeFee +
+    longTaskExtraFee;
+
+  const speed = getSpeedOption(
+    data.speedType || 'standard'
+  );
+
+  const speedFee = Math.max(
+    0,
+    Math.round(Number(speed.fee || 0))
+  );
+
+  const financials = calculateFinancialSplit({
+    deliveryFee,
+    serviceFee,
+    speedFee,
+    upstairsFee,
+    waitingFee,
+  });
+
+  price = {
+    fareMode: 'queue',
+
+    deliveryFee:
+      financials.deliveryFee,
+
+    serviceFee:
+      financials.serviceFee,
+
+    platformServiceFee:
+      financials.platformServiceFee,
+
+    speedFee:
+      financials.speedFee,
+
+    upstairsFee:
+      financials.upstairsFee,
+
+    waitingFee:
+      financials.waitingFee,
+
+    queueTimeFee,
+    longTaskExtraFee,
+
+    taskSubtotal:
+      financials.taskSubtotal,
+
+    serviceSubtotal:
+      financials.serviceSubtotal,
+
+    total:
+      financials.serviceSubtotal,
+
+    driverFee:
+      financials.driverFee,
+
+    riderFee:
+      financials.riderFee,
+
+    riderIncome:
+      financials.riderIncome,
+
+    estimatedRiderIncome:
+      financials.estimatedRiderIncome,
+
+    riderIncomeBeforeGuarantee:
+      financials.riderIncomeBeforeGuarantee,
+
+    riderGuaranteeSubsidy:
+      financials.riderGuaranteeSubsidy,
+
+    riderMinimumApplied:
+      financials.riderMinimumApplied,
+
+    riderMinimumTaskIncome:
+      financials.riderMinimumTaskIncome,
+
+    riderIncomePolicyVersion:
+      financials.riderIncomePolicyVersion,
+
+    platformFee:
+      financials.platformFee,
+
+    platformIncome:
+      financials.platformIncome,
+  };
+}else {
+  distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
+
+  if(!distance || !distance.distanceMeters){
+    return res.status(400).json({
+      success: false,
+      error: '地址無法計算距離，請確認取件與送達地址是否完整'
+    });
+  }
+
+  const quickServiceType =
+    getQuickServicePricingType({
       serviceKey: data.serviceKey,
       serviceGroup: data.serviceGroup,
+      serviceType: data.serviceType,
     });
 
-    if (resolvedOrderMode === 'queue') {
-      const queueMinutes = Math.max(0, Math.round(Number(data.queueMinutes || 0)));
-      if (queueMinutes <= 0 || queueMinutes > PRICING.maxQuoteTimeMinutes) {
-        return res.status(400).json({
-          success: false,
-          error: `排隊時間需介於 1～${PRICING.maxQuoteTimeMinutes} 分鐘內。`,
-        });
-      }
-    } else if (resolvedOrderMode === 'custom') {
-      const taskMinutes = Math.max(0, Math.round(Number(data.taskMinutes || 0)));
-      if (taskMinutes <= 0 || taskMinutes > PRICING.maxQuoteTimeMinutes) {
-        return res.status(400).json({
-          success: false,
-          error: `任務處理時間需介於 1～${PRICING.maxQuoteTimeMinutes} 分鐘內。`,
-        });
-      }
+  if (quickServiceType) {
+    // 只有「幫我取 / 幫代買」走專用即時配送計價。
+    price = calculateQuickServicePrice({
+      distanceMeters: distance.distanceMeters,
+      speedType: data.speedType,
+      upstairsFee: data.upstairsFee,
+      serviceType: quickServiceType,
+    });
 
-      if (String(data.dropoffAddress || '').trim()) {
-        distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
-        if (!distance || !distance.distanceMeters) {
-          return res.status(400).json({
-            success: false,
-            error: '地址無法計算距離，請確認任務地點是否完整。',
-          });
-        }
-      }
-    } else {
-      distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
-      if (!distance || !distance.distanceMeters) {
-        return res.status(400).json({
-          success: false,
-          error: '地址無法計算距離，請確認取件與送達地址是否完整。',
-        });
-      }
-    }
-
+  } else {
+    // 幫我送、全能跑腿、急件專送與其他一般任務完全沿用原本公式。
+    price = calculatePrice({
+      distanceMeters: distance.distanceMeters,
+      durationSeconds: distance.durationSeconds,
+      speedType: data.speedType,
+      upstairsFee: data.upstairsFee,
+    });
+  }
+}    
     const id = generateOrderId();
 
     const detectedAdvancePayment = getDetectedAdvancePaymentAmountFromOrderInput(data);
@@ -31199,9 +31262,6 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   queueMinutes:
     data.queueMinutes,
-
-  taskMinutes:
-    data.taskMinutes,
 
   // ==============================
   // 任務內容
@@ -31446,24 +31506,24 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   // 路線資料
   // ==============================
   distanceMeters:
-    Number(distance?.distanceMeters || 0),
+    data.serviceMode === 'queue'
+      ? 0
+      : distance.distanceMeters,
 
   durationSeconds:
-    Number(distance?.durationSeconds || 0),
+    data.serviceMode === 'queue'
+      ? 0
+      : distance.durationSeconds,
 
   distanceText:
     data.serviceMode === 'queue'
       ? '排隊任務'
-      : data.serviceMode === 'custom' && !distance
-        ? '單點任務'
-        : String(distance?.distanceText || ''),
+      : distance.distanceText,
 
   durationText:
     data.serviceMode === 'queue'
       ? `${data.queueMinutes} 分鐘內`
-      : data.serviceMode === 'custom' && !distance
-        ? `${data.taskMinutes} 分鐘內`
-        : String(distance?.durationText || ''),
+      : distance.durationText,
 
   // 正式價格計算結果。
   // 這裡仍然完全使用你現在的 calculatePrice /
@@ -37723,12 +37783,9 @@ function sanitizeCustomerOrderForApi(order = {}) {
     id: String(order.id || ''),
     status: String(order.status || ''),
     serviceGroup: String(order.serviceGroup || ''),
-    serviceKey: String(order.serviceKey || ''),
     serviceType: String(order.serviceType || 'UBee 跑腿任務'),
     serviceCategory: String(order.serviceCategory || ''),
     serviceMode: String(order.serviceMode || ''),
-    queueMinutes: Number(order.queueMinutes || 0),
-    taskMinutes: Number(order.taskMinutes || 0),
     speedType: String(order.speedType || order.speed || 'standard'),
     orderTimingType: String(order.orderTimingType || 'immediate'),
     scheduleGoal: String(order.scheduleGoal || ''),
@@ -37766,13 +37823,8 @@ function sanitizeCustomerOrderForApi(order = {}) {
     deliveryFee: Number(order.deliveryFee || 0),
     serviceFee: Number(order.serviceFee || 0),
     speedFee: Number(order.speedFee || 0),
-    upstairsOption: String(order.upstairsOption || 'none'),
-    upstairsLabel: String(order.upstairsLabel || ''),
     upstairsFee: Number(order.upstairsFee || 0),
     itemSizeFee: Number(order.itemSizeFee || 0),
-    longDistanceFee: Number(order.longDistanceFee || 0),
-    quoteRoundingFee: Number(order.quoteRoundingFee || 0),
-    taskHandlingFee: Number(order.taskHandlingFee || 0),
     dynamicPricingFee: Number(order.dynamicPricingFee || 0),
     waitingFee: Number(order.waitingFee || 0),
     advancePayment: Number(
@@ -37830,118 +37882,6 @@ app.get('/api/customer/orders', requireCustomerAuth, async (req, res) => {
     return res.status(500).json({
       success: false,
       error: '訂單清單讀取失敗，請稍後再試。',
-    });
-  }
-});
-
-
-
-function buildCustomerReorderTemplate(order = {}) {
-  const store = order.storeDiscovery && typeof order.storeDiscovery === 'object'
-    ? order.storeDiscovery
-    : null;
-
-  return {
-    sourceOrderId: String(order.id || ''),
-    serviceKey: String(order.serviceKey || '').trim(),
-    serviceGroup: String(order.serviceGroup || '').trim(),
-    serviceType: String(order.serviceType || '').trim(),
-    serviceCategory: String(order.serviceCategory || '').trim(),
-    serviceMode: String(order.serviceMode || '').trim(),
-    item: String(order.item || ''),
-    note: String(order.note || ''),
-    itemSize: String(order.itemSize || 'small'),
-    purchaseDetails:
-      order.purchaseDetails && typeof order.purchaseDetails === 'object'
-        ? order.purchaseDetails
-        : null,
-    taskDetails:
-      order.taskDetails && typeof order.taskDetails === 'object'
-        ? order.taskDetails
-        : {},
-    shoppingItems: Array.isArray(order.shoppingItems)
-      ? order.shoppingItems.slice(0, 20)
-      : [],
-    pickup: normalizeCustomerSavedAddress(
-      order.pickupAddressObject || {
-        label: order.pickupContact || '取件地點',
-        address: order.pickupAddress || order.pickup || '',
-        addressDetail: order.pickupAddressNote || '',
-        contactName: order.pickupContact || '',
-        phone: order.pickupPhone || '',
-        placeId: order.pickupPlaceId || '',
-        lat: order.pickupLat,
-        lng: order.pickupLng,
-      }
-    ),
-    dropoff: String(order.dropoffAddress || order.dropoff || '').trim()
-      ? normalizeCustomerSavedAddress(
-          order.dropoffAddressObject || {
-            label: order.dropoffContact || '送達地點',
-            address: order.dropoffAddress || order.dropoff || '',
-            addressDetail: order.dropoffAddressNote || '',
-            contactName: order.dropoffContact || '',
-            phone: order.dropoffPhone || '',
-            placeId: order.dropoffPlaceId || '',
-            lat: order.dropoffLat,
-            lng: order.dropoffLng,
-          }
-        )
-      : null,
-    upstairsOption: String(order.upstairsOption || 'none'),
-    advancePayment: Math.max(
-      0,
-      Math.round(
-        Number(
-          order.advancePayment ||
-          order.riderAdvanceAmount ||
-          order.estimatedGoodsAmount ||
-          0
-        )
-      )
-    ),
-    queueMinutes: Math.max(0, Math.round(Number(order.queueMinutes || 0))),
-    taskMinutes: Math.max(0, Math.round(Number(order.taskMinutes || 0))),
-    storeDiscovery: store
-      ? {
-          placeId: String(store.placeId || ''),
-          name: String(store.name || ''),
-          category: String(store.category || ''),
-          typeLabel: String(store.typeLabel || ''),
-          address: String(store.address || ''),
-          phone: String(store.phone || ''),
-          source: String(store.source || ''),
-        }
-      : null,
-  };
-}
-
-app.get('/api/customer/orders/:orderId/reorder-template', requireCustomerAuth, async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  try {
-    const orderId = String(req.params.orderId || '').trim().toUpperCase();
-    if (!orderId) {
-      return res.status(400).json({ success: false, error: '缺少訂單編號' });
-    }
-
-    const order = await getOrder(orderId);
-    if (!order) {
-      return res.status(404).json({ success: false, error: '查無此訂單' });
-    }
-
-    if (!isSameCustomerUserId(order, req.customerAuth.customerId)) {
-      return res.status(403).json({ success: false, error: '你沒有權限讀取此任務' });
-    }
-
-    return res.json({
-      success: true,
-      template: buildCustomerReorderTemplate({ id: orderId, ...order }),
-    });
-  } catch (error) {
-    console.error('❌ 讀取再次下單範本失敗：', error);
-    return res.status(500).json({
-      success: false,
-      error: '再次下單資料讀取失敗，請稍後再試。',
     });
   }
 });
