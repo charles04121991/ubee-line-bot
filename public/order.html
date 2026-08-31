@@ -8364,74 +8364,7 @@ body.ubee-my-subpage-open #productionOrderFlow #flowPageProfile .ubee-my-scroll{
 }
 </style>
 
-<style id="ubee-static-flow-actions-style">
-/* UBee 流程內容與靜態操作列規則。 */
-#productionOrderFlow .ubee-hidden-duplicate-field{
-  display:none!important;
-}
-
-#productionOrderFlow .flow-actionbar{
-  position:static!important;
-  inset:auto!important;
-  left:auto!important;
-  right:auto!important;
-  top:auto!important;
-  bottom:auto!important;
-  z-index:auto!important;
-  width:auto!important;
-  min-width:0!important;
-  max-width:none!important;
-  display:grid!important;
-  grid-template-columns:106px minmax(0,1fr)!important;
-  gap:9px!important;
-  margin:12px -14px 0!important;
-  padding:12px 14px 4px!important;
-  border:0!important;
-  border-top:1px solid #eceeef!important;
-  border-radius:0!important;
-  background:#fff!important;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  transform:none!important;
-  translate:none!important;
-}
-
-#productionOrderFlow .flow-actionbar.single{
-  grid-template-columns:1fr!important;
-}
-
-.home-action-footer,
-.step2-action-footer,
-.step3-action-footer,
-.step4-action-footer,
-.step5-action-footer,
-.flow-action-footer,
-.flow-sticky-action,
-.tracking-action-footer{
-  position:static!important;
-  inset:auto!important;
-  left:auto!important;
-  right:auto!important;
-  top:auto!important;
-  bottom:auto!important;
-  z-index:auto!important;
-  width:100%!important;
-  max-width:none!important;
-  margin:12px 0 0!important;
-  padding:10px 0 0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  filter:none!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  transform:none!important;
-  translate:none!important;
-}
-</style>
+<!-- V2.14.1：已移除舊版 static flow actionbar 規則；流程主操作固定於頁面底部。 -->
 
 <style id="ubee-startup-screen-style">
 /* UBee 白色啟動畫面｜第一幀可見正式修復版
@@ -19538,7 +19471,7 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 .flow-summary-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff;}.flow-summary-row{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:9px;align-items:start;padding:12px 13px;border-bottom:1px solid #eef0f1;}.flow-summary-row:last-child{border-bottom:none;}.flow-summary-label{color:#858a90;font-size:11px;font-weight:900;}.flow-summary-value{color:#111;font-size:13px;font-weight:900;line-height:1.55;word-break:break-word;}.flow-summary-edit{border:none;background:transparent;color:#876c00;font-size:11px!important;font-weight:1000;}
 .flow-price-card{display:flex;align-items:center;justify-content:space-between;gap:12px;}.flow-price-card small{display:block;color:#858a90;font-size:11px;font-weight:900;}.flow-route-meta{margin-top:4px;color:#676c72;font-size:12px;font-weight:850;}.flow-price{font-size:29px;font-weight:1000;white-space:nowrap;}
 .flow-check{display:flex;align-items:flex-start;gap:10px;margin:12px 2px;padding:12px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#333;font-size:12px;font-weight:850;line-height:1.55;}.flow-check input{width:20px;height:20px;flex:0 0 20px;margin:0;accent-color:#111;}
-.flow-actionbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px;border-top:1px solid rgba(17,24,39,.08);background:#ffffff;}
+.flow-actionbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;margin:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid rgba(17,24,39,.08);background:#ffffff;}
 .flow-actionbar.single{grid-template-columns:1fr;}.flow-actionbar .flow-secondary,.flow-actionbar .flow-primary{min-height:54px;}
 
 .flow-search-box{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:7px;margin-bottom:10px;}.flow-search-box .flow-input{min-width:0;}.flow-clear-btn{border:1px solid var(--flow-line);border-radius:14px;background:#fff;color:#555;font-size:21px;}
@@ -19880,7 +19813,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-form-group"><label class="flow-label" for="flowDetailLabel">常用地址名稱</label><input class="flow-input" id="flowDetailLabel" maxlength="40" placeholder="例如：家、公司、店家"/></div>
 <label class="flow-check" style="margin:0"><input id="flowSaveAddress" type="checkbox"/><span>儲存為常用地址，下次可直接選擇。</span></label>
 <div class="flow-status" id="flowDetailStatus"></div>
-<button class="flow-primary" id="flowSaveDetail" type="button">儲存地點資訊</button>
+<div class="flow-actionbar single"><button class="flow-primary" id="flowSaveDetail" type="button">儲存地點資訊</button></div>
 </div>
 </div>
 </section>
@@ -20121,6 +20054,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <script id="ubee-production-flow-v4-script">
 (() => {
   'use strict';
+  // UBee Customer V2.14.1 Layout Fix｜主操作列固定、子流程全螢幕、移除舊 static action 規則。
   if(window.__UBEE_CUSTOMER_V214__) return;
   window.__UBEE_CUSTOMER_V214__=true;
 
@@ -20168,6 +20102,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   function showPage(name){
     state.page=name;
     if(!['stores','storeDetail'].includes(name)) document.body.classList.remove('ubee-store-active');
+    const isSubpage=['task','options','confirm','search','detail','profileDetail','storeDetail'].includes(name);
+    document.body.classList.toggle('ubee-flow-subpage',isSubpage);
     root.querySelectorAll('.flow-page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
     const scroller=root.querySelector(`.flow-page[data-page="${name}"] .flow-scroll`);
     if(scroller)scroller.scrollTop=0;
@@ -23484,6 +23420,19 @@ body.ubee-active-order #step5{
   padding:0!important;
   overflow:hidden!important;
 }
+body.ubee-flow-subpage #productionOrderFlow .flow-page{
+  inset:0!important;
+}
+body.ubee-flow-subpage > #ubeePersistentBottomNav{
+  display:none!important;
+}
+#productionOrderFlow .flow-page[data-page="task"] .flow-scroll,
+#productionOrderFlow .flow-page[data-page="options"] .flow-scroll,
+#productionOrderFlow .flow-page[data-page="confirm"] .flow-scroll,
+#productionOrderFlow .flow-page[data-page="detail"] .flow-scroll{
+  padding-bottom:calc(88px + env(safe-area-inset-bottom))!important;
+  scroll-padding-bottom:calc(88px + env(safe-area-inset-bottom))!important;
+}
 #productionOrderFlow .flow-scroll,
 #productionOrderFlow .flow-home-scroll,
 #productionOrderFlow .ubee-my-scroll{
@@ -24525,6 +24474,7 @@ body.ubee-store-active #productionOrderFlow{
     root.classList.add('active');
     document.body.classList.remove('ubee-active-order','ubee-customer-auth-open');
     document.body.classList.add('flow-active','ubee-store-active');
+    document.body.classList.toggle('ubee-flow-subpage',page==='storeDetail');
     root.querySelectorAll('.flow-page').forEach(item=>item.classList.toggle('active',item.dataset.page===page));
     const scroller=root.querySelector(`.flow-page[data-page="${page}"] .flow-scroll`);
     if(scroller)scroller.scrollTop=0;
@@ -24878,6 +24828,7 @@ body.ubee-store-active #productionOrderFlow{
   }
 
   async function openTarget(target){
+    document.body?.classList.remove('ubee-flow-subpage');
     if(target==='home'){
       return window.openUBeeHomePage?.() ?? window.openUBeeSystemOrderFlow?.({fresh:false,source:'primary-navigation'});
     }
