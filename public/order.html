@@ -19375,9 +19375,10 @@ document.addEventListener('keydown', (event) => {
 </script>
 <!-- 2026-08-03 正式清理：登入後只顯示新版下單流程；舊 1～4 步驟畫面已退出介面，僅保留隱藏建單相容節點；進行中任務只顯示正式 Step 5。 -->
 <!-- =========================================================
-     UBee 客人端｜長期正式營運穩定流程 2026-07-31
-     流程：選擇地點 → 任務內容 → 配送設定 → 確認送出
-     保留既有正式估價、建單、付款、派單與追蹤核心
+     UBee Customer V2.14.2｜Home Reset｜2026-08-31
+     首頁只保留：選服務 → 填地址 → 看價格 → 下一步；有進行中任務時才顯示任務摘要。
+     已移除 V2.14 首頁舊進度列、定位資訊列、常用地址列、最近任務、任務預覽與品牌浮水印。
+     保留既有正式估價、建單、付款、派單與追蹤核心。
      ========================================================= -->
 <style id="ubee-production-flow-v4-style">
 :root{
@@ -19411,7 +19412,10 @@ body.flow-active>.app{display:none!important;}
 .flow-page{position:absolute;inset:0;display:none;flex-direction:column;min-height:0;background:var(--flow-bg);}
 .flow-page.active{display:flex;}
 .flow-header{flex:0 0 auto;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;min-height:64px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:#fff;border-bottom:1px solid var(--flow-line);z-index:5;}
-.flow-header.home{grid-template-columns:minmax(0,1fr) auto;}
+.flow-header.home{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);}
+.flow-header.home .flow-city-btn{grid-column:1;grid-row:1;justify-self:start;}
+.flow-header.home .flow-brand{grid-column:2;grid-row:1;justify-self:center;}
+.flow-header.home .flow-header-spacer{grid-column:3;grid-row:1;display:block;width:1px;height:1px;justify-self:end;}
 .flow-brand{font-size:24px;font-weight:1000;letter-spacing:-1px;white-space:nowrap;}.flow-brand span{color:var(--flow-accent-strong);}
 .flow-title-wrap{min-width:0;text-align:center;}.flow-title{font-size:18px;font-weight:1000;line-height:1.25;}.flow-subtitle{margin-top:2px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.35;}
 .flow-icon-btn,.flow-back-btn,.flow-city-btn{border:none;background:transparent;color:#111;font-weight:1000;}
@@ -19422,14 +19426,9 @@ body.flow-active>.app{display:none!important;}
 .flow-progress-item::before{content:attr(data-number);display:grid;place-items:center;width:19px;height:19px;flex:0 0 19px;border-radius:50%;background:#eef0f2;color:#7e8388;font-size:10px;}
 .flow-progress-item.active{color:#111;}.flow-progress-item.active::before{background:var(--flow-accent);color:#111;}.flow-progress-item.done::before{content:"✓";background:#111;color:#fff;}
 .flow-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 14px 94px;}
-.flow-home-scroll{display:flex;flex-direction:column;min-height:100%;padding-top:12px;}
-.flow-home-scroll>*{width:100%;flex:0 0 auto;}
-.flow-home-watermark{margin-top:auto;min-height:210px;display:flex;align-items:center;justify-content:center;padding:26px 12px calc(30px + env(safe-area-inset-bottom));}
-.flow-home-watermark-inner{text-align:center;opacity:.38;user-select:none;pointer-events:none;}
-.flow-home-watermark-brand{display:inline-flex;align-items:flex-end;gap:0;font-size:46px;font-weight:1000;letter-spacing:-2px;line-height:1;white-space:nowrap;color:#111;}
-.flow-home-watermark-brand .u{color:var(--flow-accent-strong);}
-.flow-home-watermark-slogan{margin-top:10px;color:#6f747a;font-size:14px;font-weight:900;letter-spacing:.08em;}
-.flow-home-watermark-meta{margin-top:8px;color:#9aa0a6;font-size:11px;font-weight:800;letter-spacing:.06em;}
+.flow-home-scroll{display:block;min-height:0;padding:14px 14px 104px;}
+.flow-home-main{width:100%;max-width:100%;}
+.flow-home-main .flow-service-tabs{margin-bottom:12px;}
 .flow-card{margin-bottom:12px;padding:15px;border:1px solid var(--flow-line);border-radius:20px;background:#fff;}
 .flow-section-title{margin:0 0 9px;font-size:15px;font-weight:1000;}.flow-help{color:var(--flow-muted);font-size:12px;font-weight:800;line-height:1.6;}
 .flow-service-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:0 0 16px;padding:3px 0 2px;border:none;overflow:visible;}
@@ -19440,16 +19439,13 @@ body.flow-active>.app{display:none!important;}
 .flow-service-label{display:block;max-width:100%;overflow:hidden;color:inherit;font-size:11px;font-weight:1000;line-height:1.2;letter-spacing:-.15px;white-space:nowrap;}
 .flow-service-tab.active{background:transparent;color:#111;}
 .flow-service-tab.active .flow-service-icon{border-color:#e6b900;background:var(--flow-accent);color:#111;transform:translateY(-1px);}
-.flow-location-line{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px 12px;border-radius:14px;background:#f7f8f9;color:#555b61;font-size:12px;font-weight:850;}.flow-location-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;}
 .flow-route-card{position:relative;overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff;}
 .flow-route-card::before{content:"";position:absolute;left:27px;top:39px;bottom:39px;width:2px;background:#d9dcdf;}
 .flow-address-button{position:relative;z-index:1;width:100%;display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:76px;padding:13px 14px;border:none;background:#fff;text-align:left;}.flow-address-button+.flow-address-button{border-top:1px solid #eef0f1;}
 .flow-address-dot{width:11px;height:11px;margin-left:5px;border-radius:50%;background:#111;}.flow-address-dot.drop{background:var(--flow-accent-strong);}
 .flow-address-text{min-width:0;}.flow-address-text small{display:block;margin-bottom:4px;color:#8c9197;font-size:11px;font-weight:900;}.flow-address-text strong{display:block;overflow:hidden;color:#111;font-size:15px;font-weight:1000;line-height:1.45;text-overflow:ellipsis;white-space:nowrap;}.flow-address-text em{display:block;overflow:hidden;margin-top:3px;color:#8a8f95;font-size:11px;font-style:normal;font-weight:800;text-overflow:ellipsis;white-space:nowrap;}
 .flow-address-arrow{color:#a4a8ad;font-size:22px;}
-.flow-task-preview{display:none;margin-top:11px;padding:11px 12px;border:1px solid #ead77a;border-radius:15px;background:#fffbed;}.flow-task-preview.show{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}.flow-task-preview-text{min-width:0;color:#514400;font-size:12px;font-weight:850;line-height:1.55;}.flow-text-link{flex:0 0 auto;border:none;background:transparent;color:#7c6200;font-size:12px!important;font-weight:1000;}
 .flow-primary,.flow-secondary{width:100%;min-height:54px;border-radius:16px;font-weight:1000;}.flow-primary{border:none;background:var(--flow-accent);color:#111;}.flow-secondary{border:1px solid #dfe2e5;background:#fff;color:#333;}.flow-primary:active,.flow-secondary:active{transform:scale(.985);}.flow-primary:disabled{opacity:.45;}
-.flow-home-next{margin-top:13px;}
 .flow-form-group{margin-bottom:14px;}.flow-label{display:block;margin:0 0 7px;color:#25282b;font-size:13px;font-weight:1000;}.flow-required{color:var(--flow-danger);}
 /* UBee V1.2｜代買任務內容精簡版 */
 .flow-store-summary{display:none;margin:0 0 16px;padding:14px 15px;border:1px solid #e4e6e9;border-radius:16px;background:#fafafa;}
@@ -19555,18 +19551,21 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 }
 
 
-/* UBee Customer V2.14 Full Integration */
-.flow-home-dashboard{display:grid;gap:10px;margin:0 0 12px;}
+/* UBee Customer V2.14.2｜Home Reset */
+.flow-home-dashboard{display:block;margin:12px 0 0;}
 .flow-home-dashboard[hidden]{display:none!important;}
-.flow-home-task-card,.flow-home-estimate-card{padding:13px 14px;border:1px solid var(--flow-line);border-radius:17px;background:#fff;}
-.flow-home-task-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;}
-.flow-home-task-card strong{display:block;font-size:14px;font-weight:1000;line-height:1.4;}
+.flow-home-task-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 13px;border:1px solid var(--flow-line);border-radius:16px;background:#fff;}
+.flow-home-task-kicker{display:block;margin:0 0 3px;color:#8b8f94;font-size:10px;font-weight:1000;}
+.flow-home-task-card strong{display:block;color:#111;font-size:14px;font-weight:1000;line-height:1.4;}
 .flow-home-task-card small{display:block;margin-top:4px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.45;}
-.flow-home-task-action{min-height:38px;padding:0 12px;border:1px solid #dedfe1;border-radius:999px;background:#fff;color:#111;font-size:11px!important;font-weight:1000;}
-.flow-home-estimate-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fffbed;border-color:#ead77a;}
-.flow-home-estimate-copy{min-width:0;}.flow-home-estimate-copy small{display:block;color:#8b750b;font-size:10px;font-weight:900;}.flow-home-estimate-copy strong{display:block;margin-top:2px;font-size:22px;font-weight:1000;}.flow-home-estimate-copy span{display:block;margin-top:3px;overflow:hidden;color:#766a48;font-size:10px;font-weight:800;text-overflow:ellipsis;white-space:nowrap;}
-.flow-home-quick{display:flex;gap:8px;overflow-x:auto;margin:10px 0 0;padding:1px 0 2px;scrollbar-width:none;}.flow-home-quick::-webkit-scrollbar{display:none;}
-.flow-home-quick button{flex:0 0 auto;max-width:180px;min-height:38px;padding:0 12px;border:1px solid #e3e5e7;border-radius:999px;background:#f7f8f9;color:#303439;font-size:11px!important;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.flow-home-task-amount{display:block;margin-top:4px;color:#111;font-size:11px;font-style:normal;font-weight:1000;}
+.flow-home-task-action{min-height:38px;padding:0 12px;border:1px solid #dedfe1;border-radius:999px;background:#fff;color:#111;font-size:11px!important;font-weight:1000;white-space:nowrap;}
+.flow-home-actionbar{position:absolute;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:minmax(0,1fr) minmax(132px,42%);gap:12px;align-items:center;min-height:82px;padding:9px 14px calc(9px + env(safe-area-inset-bottom));border-top:1px solid rgba(17,24,39,.08);background:#fff;}
+.flow-home-estimate-copy{min-width:0;padding-left:2px;}
+.flow-home-estimate-copy small{display:block;color:#8b8f94;font-size:10px;font-weight:900;line-height:1.2;}
+.flow-home-estimate-copy strong{display:block;margin-top:2px;color:#111;font-size:23px;font-weight:1000;line-height:1.2;letter-spacing:-.5px;}
+.flow-home-estimate-copy span{display:block;max-width:100%;margin-top:3px;overflow:hidden;color:#8b8f94;font-size:10px;font-weight:800;line-height:1.35;text-overflow:ellipsis;white-space:nowrap;}
+.flow-home-actionbar .flow-home-next{width:100%;min-height:54px;margin:0;border-radius:16px;}
 .flow-task-groups{display:grid;gap:18px;}.flow-task-group[hidden]{display:none!important;}.flow-task-group-title{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;padding:0 2px;}.flow-task-group-title strong{font-size:14px;font-weight:1000;}.flow-task-group-title span{color:var(--flow-muted);font-size:10px;font-weight:900;}.flow-task-group-list{display:grid;gap:9px;}
 .flow-profile-task-actions{display:flex;align-items:center;gap:7px;}.flow-reorder-btn{min-height:38px;padding:0 12px;border:none;border-radius:999px;background:#facc15;color:#111;font-size:11px!important;font-weight:1000;}
 .flow-helper-time-options{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}.flow-helper-time-option{min-height:44px;border:1px solid var(--flow-line);border-radius:13px;background:#fff;color:#656a70;font-size:12px!important;font-weight:900;}.flow-helper-time-option.active{border-color:#d5aa00;background:#fff7d0;color:#111;}
@@ -19579,12 +19578,12 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-loading" id="flowLoading"><div class="flow-spinner"></div><div id="flowLoadingText">系統處理中…</div></div>
 <section class="flow-page active" data-page="home" id="flowPageHome">
 <header class="flow-header home">
-<div class="flow-brand"><span>U</span>Bee 跑腿</div>
 <button class="flow-city-btn" id="flowCityButton" type="button">正在取得位置…</button>
+<div class="flow-brand"><span>U</span>Bee</div>
+<span class="flow-header-spacer" aria-hidden="true"></span>
 </header>
-<div class="flow-progress" data-progress="0"></div>
 <div class="flow-scroll flow-home-scroll">
-<div class="flow-card">
+<div class="flow-home-main">
 <div aria-label="選擇跑腿服務" class="flow-service-tabs" id="flowServiceTabs" role="tablist">
 <button aria-selected="true" class="flow-service-tab active" data-service="send" role="tab" type="button">
 <span aria-hidden="true" class="flow-service-icon">
@@ -19631,8 +19630,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <span class="flow-service-label">全能跑腿</span>
 </button>
 </div>
-<div class="flow-location-line"><span class="flow-location-dot"></span><span id="flowLocationText">正在確認目前服務地區</span></div>
-<div class="flow-home-quick" id="flowHomeQuickAddresses" aria-label="常用地址"></div>
 <div class="flow-route-card">
 <button class="flow-address-button" id="flowPickupButton" type="button">
 <span class="flow-address-dot"></span>
@@ -19645,19 +19642,17 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <span class="flow-address-arrow">›</span>
 </button>
 </div>
-<div class="flow-home-estimate-card" hidden id="flowHomeEstimateCard"><div class="flow-home-estimate-copy"><small>目前預估</small><strong id="flowHomeEstimateAmount">待估價</strong><span id="flowHomeEstimateMeta">完成地址後顯示</span></div><button class="flow-home-task-action" id="flowHomeEstimateRefresh" type="button">重新估價</button></div>
-<div class="flow-home-dashboard" id="flowHomeDashboard" hidden><div id="flowHomeActiveTask"></div><div id="flowHomeRecentTask"></div></div>
-<div class="flow-task-preview" id="flowTaskPreview"><div class="flow-task-preview-text" id="flowTaskPreviewText"></div><button class="flow-text-link" id="flowEditTaskButton" type="button">修改</button></div>
+<div class="flow-home-dashboard" id="flowHomeDashboard" hidden><div id="flowHomeActiveTask"></div></div>
 <div class="flow-status" id="flowHomeStatus"></div>
-<button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步：填寫任務內容</button>
-</div>
-<div class="flow-home-watermark" aria-hidden="true">
-<div class="flow-home-watermark-inner">
-<div class="flow-home-watermark-brand"><span class="u">U</span><span>Bee 跑腿</span></div>
-<div class="flow-home-watermark-slogan">生活大小事，一叫就出發</div>
-<div class="flow-home-watermark-meta">代買・代送・取件・排隊・全能跑腿</div>
 </div>
 </div>
+<div class="flow-home-actionbar" id="flowHomeActionbar">
+<div class="flow-home-estimate-copy" aria-live="polite">
+<small>預估費用</small>
+<strong id="flowHomeEstimateAmount">待估價</strong>
+<span id="flowHomeEstimateMeta">填寫地址後顯示</span>
+</div>
+<button class="flow-primary flow-home-next" id="flowHomeNext" type="button" disabled>下一步</button>
 </div>
 </section>
 <section class="flow-page" data-page="task" id="flowPageTask">
@@ -20022,7 +20017,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMySettingsPanel">
 <div class="ubee-my-panel-head"><strong>設定</strong><button data-my-close="" type="button">關閉</button></div>
-<button class="ubee-my-setting-button" id="flowProfileLogout" type="button">登出 UBee 帳號</button>
+<button class="ubee-my-setting-button" type="button">登出 UBee 帳號</button>
 </section>
 <span hidden="" id="flowProfileTaskCount">0</span><span hidden="" id="flowProfileLevel">一般</span>
 </div>
@@ -20315,15 +20310,10 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     $('flowDropoffText').textContent=d?.address||(state.service==='helper'?'不需要送達可留空':'請選擇送達地址');
     $('flowDropoffMeta').textContent=d?`${d.contactName||''} ${d.phone||''}`.trim()||'收件資訊已填寫':state.service==='helper'?'單點任務可直接在現場完成':'填寫收件人與電話';
 
-    const preview=$('flowTaskPreview');
-    if(state.taskNote){
-      preview.classList.add('show');
-      $('flowTaskPreviewText').textContent=`${serviceLabels[state.service]}｜${state.taskName||selectedServiceDefinition().title}｜${state.taskNote}`;
-    }else{
-      preview.classList.remove('show');
-    }
-
-    renderHomeQuickAddresses();
+    const canContinue=!!p&&(!requiresDropoff()||!!d);
+    const nextButton=$('flowHomeNext');
+    if(nextButton)nextButton.disabled=!canContinue;
+    updateHomeEstimateCard();
   }
 
   function openAddress(target){state.addressTarget=target;state.searchItems=[];state.quickAddressTab='saved';status('flowSearchStatus','');$('flowSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';$('flowAddressSearch').value='';$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;setQuickAddressTab('saved');showPage('search');loadAddresses();setTimeout(()=>$('flowAddressSearch').focus(),80)}
@@ -20340,7 +20330,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }catch(error){console.warn('讀取常用地址失敗：',error)}
     if(!saved.length){try{const local=JSON.parse(localStorage.getItem('ubee_uu_local_addresses_v1')||'[]');saved=Array.isArray(local)?local:[]}catch(_){}}
     state.savedAddresses=saved;state.recentAddresses=recent;
-    renderHomeQuickAddresses();
     renderAddressList('flowSavedAddresses',saved,'saved','尚未儲存常用地址',4);
     renderAddressList('flowRecentAddresses',recent,'recent','尚無最近使用地址',4);
   }
@@ -20922,13 +20911,6 @@ ${state.taskNote||'—'}`,'task'],
     }catch(error){console.warn('讀取會員統計失敗：',error)}
   }
 
-  function renderHomeQuickAddresses(){
-    const target=$('flowHomeQuickAddresses');if(!target)return;
-    const items=state.savedAddresses.slice(0,4);
-    target.innerHTML=items.map((item,index)=>`<button type="button" data-home-address-index="${index}">⌖ ${escapeHtml(item.label||item.name||item.address||'常用地址')}</button>`).join('');
-    target.hidden=!items.length;
-  }
-
   function openOrderTracking(order){
     const id=String(order?.id||order?.orderNo||'').trim().toUpperCase();if(!id)return;
     try{
@@ -20939,32 +20921,42 @@ ${state.taskNote||'—'}`,'task'],
   }
 
   async function refreshHomeDashboard(){
-    const dashboard=$('flowHomeDashboard'),activeTarget=$('flowHomeActiveTask'),recentTarget=$('flowHomeRecentTask');
-    if(!dashboard||!activeTarget||!recentTarget)return;
+    const dashboard=$('flowHomeDashboard'),activeTarget=$('flowHomeActiveTask');
+    if(!dashboard||!activeTarget)return;
     try{
       if(typeof loadCustomerOrders!=='function'){dashboard.hidden=true;return}
       const orders=await loadCustomerOrders();
       const list=Array.isArray(orders)?orders:[];
       const terminal=new Set(['completed','done','cancelled','canceled']);
       const active=list.find(order=>!terminal.has(String(order?.status||'').toLowerCase()))||null;
-      const recent=list.find(order=>['completed','done'].includes(String(order?.status||'').toLowerCase()))||null;
-      activeTarget.innerHTML=active?`<div class="flow-home-task-card"><div><strong>${escapeHtml(orderStatusText(active.status))}</strong><small>${escapeHtml(profileOrderTitle(active))}・${escapeHtml(profileOrderAddress(active,'pickup'))}${profileOrderAddress(active,'dropoff')!=='—'?` → ${escapeHtml(profileOrderAddress(active,'dropoff'))}`:''}</small></div><button class="flow-home-task-action" type="button" data-home-active-order="${escapeHtml(active.id||'')}">查看進度</button></div>`:'';
-      recentTarget.innerHTML=recent?`<div class="flow-home-task-card"><div><strong>最近完成・${escapeHtml(profileOrderTitle(recent))}</strong><small>${escapeHtml(orderTimeText(recent)||'')}・${escapeHtml(orderAmountInfo(recent).amount===null?'金額確認中':`NT$${orderAmountInfo(recent).amount}`)}</small></div><button class="flow-home-task-action" type="button" data-home-reorder="${escapeHtml(recent.id||'')}">再叫一次</button></div>`:'';
+      if(active){
+        const pickup=profileOrderAddress(active,'pickup');
+        const dropoff=profileOrderAddress(active,'dropoff');
+        const amountInfo=orderAmountInfo(active);
+        const amountText=amountInfo.amount===null?'':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
+        activeTarget.innerHTML=`<div class="flow-home-task-card"><div><span class="flow-home-task-kicker">進行中</span><strong>${escapeHtml(orderStatusText(active.status))}</strong><small>${escapeHtml(profileOrderTitle(active))}${pickup!=='—'?`・${escapeHtml(pickup)}`:''}${dropoff!=='—'?` → ${escapeHtml(dropoff)}`:''}</small>${amountText?`<em class="flow-home-task-amount">${escapeHtml(amountText)}</em>`:''}</div><button class="flow-home-task-action" type="button" data-home-active-order="${escapeHtml(active.id||'')}">查看進度</button></div>`;
+      }else{
+        activeTarget.innerHTML='';
+      }
       state.homeOrders=list;
-      dashboard.hidden=!(active||recent);
-    }catch(error){console.warn('首頁任務摘要讀取失敗：',error);dashboard.hidden=true}
+      dashboard.hidden=!active;
+    }catch(error){console.warn('首頁進行中任務讀取失敗：',error);dashboard.hidden=true}
   }
 
   function updateHomeEstimateCard(){
-    const card=$('flowHomeEstimateCard'),amount=$('flowHomeEstimateAmount'),meta=$('flowHomeEstimateMeta');if(!card||!amount||!meta)return;
+    const amount=$('flowHomeEstimateAmount'),meta=$('flowHomeEstimateMeta');
+    if(!amount||!meta)return;
     const canEstimate=!!state.pickup&&(!requiresDropoff()||!!state.dropoff);
-    card.hidden=!canEstimate;
-    if(!canEstimate)return;
+    if(!canEstimate){
+      amount.textContent='待估價';
+      meta.textContent=requiresDropoff()?'填寫取件與送達地址後顯示':'填寫任務地點後顯示';
+      return;
+    }
     const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);
-    amount.textContent=total>0?`NT$${Math.round(total)}`:'待估價';
+    amount.textContent=total>0?`NT$${Math.round(total)}`:'估價中…';
     const d=String(lastQuoteData?.distanceText||lastRouteData?.distanceText||'').trim();
     const t=String(lastQuoteData?.durationText||lastRouteData?.durationText||'').trim();
-    meta.textContent=[d,t].filter(Boolean).join('・')||(state.service==='queue'?`預估排隊 ${state.queueMinutes} 分鐘`:state.service==='helper'&&!state.dropoff?`預估處理 ${state.taskMinutes} 分鐘`:'完成設定後顯示正式費用');
+    meta.textContent=[d,t].filter(Boolean).join('・')||(state.service==='queue'?`預估排隊 ${state.queueMinutes} 分鐘`:state.service==='helper'&&!state.dropoff?`預估處理 ${state.taskMinutes} 分鐘`:'正在取得正式估價');
   }
 
   function scheduleHomeEstimate(delay=500){
@@ -20992,11 +20984,13 @@ ${state.taskNote||'—'}`,'task'],
   }
 
   async function detectLocation(){
-    const cityButton=$('flowCityButton'),text=$('flowLocationText');cityButton.textContent='正在取得位置…';text.textContent='正在確認目前服務地區';
-    if(!navigator.geolocation){cityButton.textContent='選擇服務地區';text.textContent='請手動選擇服務地區';return}
+    const cityButton=$('flowCityButton');
+    if(!cityButton)return;
+    cityButton.textContent='正在取得位置…';
+    if(!navigator.geolocation){cityButton.textContent='選擇服務地區';return}
     navigator.geolocation.getCurrentPosition(async position=>{
-      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';text.textContent=loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`;if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'}
-    },()=>{cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區'}
+    },()=>{cityButton.textContent='選擇服務地區'},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
   }
 
   function showFlow(options={}){
@@ -21015,7 +21009,7 @@ ${state.taskNote||'—'}`,'task'],
   function bind(){
     $('flowServiceTabs').addEventListener('click',event=>{const btn=event.target.closest('[data-service]');if(btn)setService(btn.dataset.service)});
     $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));
-    $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||(requiresDropoff()&&!state.dropoff)){status('flowHomeStatus',requiresDropoff()?'請先完成取件地點與送達地點。':'請先完成任務地點。',true);return}status('flowHomeStatus','');syncServiceSelectors();showPage('task')});$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
+    $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||(requiresDropoff()&&!state.dropoff)){status('flowHomeStatus',requiresDropoff()?'請先完成取件地點與送達地點。':'請先完成任務地點。',true);return}status('flowHomeStatus','');syncServiceSelectors();showPage('task')});
     root.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.go)));
     $('flowServiceTypeChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-type-index]');if(!btn)return;captureCurrentTaskDraft();state.serviceTypeIndex=Number(btn.dataset.serviceTypeIndex)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];syncServiceSelectors()});
     $('flowServiceCategoryChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-category]');if(!btn)return;captureCurrentTaskDraft();state.serviceCategory=btn.dataset.serviceCategory||'';$('flowServiceCategory').value=state.serviceCategory;syncServiceSelectors()});
@@ -21030,9 +21024,7 @@ ${state.taskNote||'—'}`,'task'],
     $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
     $('flowProfileTasksList').addEventListener('click',event=>{const action=event.target.closest('[data-task-action]');if(action?.dataset.taskAction==='reorder'){event.stopPropagation();reorderOrder(action.dataset.orderId);return}const target=event.target.closest('[data-profile-order-index]');if(target)openProfileOrderDetail(target.dataset.profileOrderIndex)});
     $('flowProfileDetailReorder').addEventListener('click',event=>reorderOrder(event.currentTarget.dataset.orderId));
-    $('flowHomeQuickAddresses').addEventListener('click',event=>{const button=event.target.closest('[data-home-address-index]');if(!button)return;const item=state.savedAddresses[Number(button.dataset.homeAddressIndex)];if(!item)return;state.addressTarget=!state.pickup?'pickup':(!state.dropoff&&state.service!=='queue'?'dropoff':'pickup');openDetail(item)});
-    $('flowHomeDashboard').addEventListener('click',event=>{const active=event.target.closest('[data-home-active-order]');if(active){const order=(state.homeOrders||[]).find(item=>String(item.id||'')===active.dataset.homeActiveOrder);if(order)openOrderTracking(order);return}const reorder=event.target.closest('[data-home-reorder]');if(reorder)reorderOrder(reorder.dataset.homeReorder)});
-    $('flowHomeEstimateRefresh').addEventListener('click',()=>scheduleHomeEstimate(0));
+    $('flowHomeDashboard').addEventListener('click',event=>{const active=event.target.closest('[data-home-active-order]');if(!active)return;const order=(state.homeOrders||[]).find(item=>String(item.id||'')===active.dataset.homeActiveOrder);if(order)openOrderTracking(order)});
     $('ubeeMyFeedbackForm')?.addEventListener('submit',event=>{
       event.preventDefault();
       const type=String($('ubeeMyFeedbackType')?.value||'其他意見').trim();
@@ -21725,11 +21717,6 @@ ${state.taskNote||'—'}`,'task'],
     background:#f4f5f6 !important;
   }
 
-  /* 首頁不再顯示舊式步驟列；進入填單後才顯示流程進度。 */
-  #productionOrderFlow #flowPageHome > .flow-progress{
-    display:none !important;
-  }
-
   /* 通知權限改由「我的 → 設定」管理，不阻擋客人開始下單。 */
   #productionOrderFlow #ubeeCustomerPushCardHome,
   #productionOrderFlow #ubeeCustomerPushCardTracking{
@@ -21772,23 +21759,12 @@ ${state.taskNote||'—'}`,'task'],
   }
 
   #productionOrderFlow .flow-home-scroll{
-    padding:14px 14px 28px !important;
+    padding:14px 14px 104px !important;
   }
 
-  #productionOrderFlow #flowPageHome .flow-card{
-    margin:0 !important;
-    padding:16px !important;
-    border:1px solid #e5e7e9 !important;
-    border-radius:23px !important;
-    background:#fff !important;
-
-  }
-
-  #productionOrderFlow .flow-location-line{
-    min-height:42px !important;
-    margin-bottom:12px !important;
-    border:1px solid #eceef0 !important;
-    background:#f7f8f9 !important;
+  #productionOrderFlow .flow-home-main{
+    width:100% !important;
+    max-width:100% !important;
   }
 
   #productionOrderFlow .flow-route-card{
@@ -21805,11 +21781,10 @@ ${state.taskNote||'—'}`,'task'],
     background:#f8f9fa !important;
   }
 
-  #productionOrderFlow .flow-home-next{
-    min-height:55px !important;
-    margin-top:14px !important;
-    border-radius:17px !important;
-
+  #productionOrderFlow .flow-home-actionbar .flow-home-next{
+    min-height:54px !important;
+    margin:0 !important;
+    border-radius:16px !important;
   }
 
   /* =========================================================
@@ -21832,9 +21807,25 @@ ${state.taskNote||'—'}`,'task'],
       padding-left:11px !important;
       padding-right:11px !important;
     }
-    #productionOrderFlow #flowPageHome .flow-card{
-      padding:14px !important;
-      border-radius:21px !important;
+    #productionOrderFlow .flow-service-tab{
+      min-height:70px !important;
+      gap:5px !important;
+    }
+    #productionOrderFlow .flow-service-icon{
+      width:38px !important;
+      height:38px !important;
+      flex-basis:38px !important;
+    }
+    #productionOrderFlow .flow-address-button{
+      min-height:72px !important;
+      padding-top:11px !important;
+      padding-bottom:11px !important;
+    }
+    #productionOrderFlow .flow-home-actionbar{
+      grid-template-columns:minmax(0,1fr) 128px !important;
+      gap:9px !important;
+      padding-left:11px !important;
+      padding-right:11px !important;
     }
     #productionOrderFlow .flow-city-btn{
       max-width:132px !important;
@@ -22339,13 +22330,7 @@ ${state.taskNote||'—'}`,'task'],
     ).replace(/^臺/,'台');
 
     const cityButton = document.getElementById('flowCityButton');
-    const locationText = document.getElementById('flowLocationText');
     if(cityButton) cityButton.textContent = display || '目前位置';
-    if(locationText){
-      locationText.textContent = location.formattedAddress
-        ? `目前位置：${location.formattedAddress}`
-        : `目前服務地區：${display}`;
-    }
 
     if(city && typeof selectServiceCity === 'function'){
       try{
@@ -23434,12 +23419,17 @@ body.ubee-flow-subpage > #ubeePersistentBottomNav{
   scroll-padding-bottom:calc(88px + env(safe-area-inset-bottom))!important;
 }
 #productionOrderFlow .flow-scroll,
-#productionOrderFlow .flow-home-scroll,
 #productionOrderFlow .ubee-my-scroll{
   min-height:0!important;
   overscroll-behavior-y:contain!important;
   padding-bottom:16px!important;
   scroll-padding-bottom:16px!important;
+}
+#productionOrderFlow .flow-home-scroll{
+  min-height:0!important;
+  overscroll-behavior-y:contain!important;
+  padding-bottom:104px!important;
+  scroll-padding-bottom:104px!important;
 }
 #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
   position:absolute!important;
