@@ -125,7 +125,7 @@ summary::-webkit-details-marker{display:none}
 .v4-rider-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.v4-rider-card{border:1px solid var(--line);border-radius:17px;padding:14px;background:#fff}.v4-rider-top{display:flex;justify-content:space-between;gap:12px}.v4-life{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:1000}.v4-life.ACTIVE{background:#dcfce7;color:#166534}.v4-life.TRAINING,.v4-life.RETRAINING{background:#fef3c7;color:#92400e}.v4-life.RESTRICTED,.v4-life.SUSPENDED,.v4-life.BANNED{background:#fee2e2;color:#991b1b}.v4-cert-list{margin-top:10px}.v4-cert{display:inline-flex;margin:3px 3px 0 0;padding:5px 7px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:900}.v4-cert.on{background:#dcfce7;color:#166534}.v4-action-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}.v4-action-grid .btn{padding:7px 9px;font-size:11px}.v4-key-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}.v4-key-row input{flex:1;border:1px solid var(--line);border-radius:11px;padding:10px 11px;font-weight:800}
 @media(max-width:850px){.v4-rider-grid{grid-template-columns:1fr}}
 
-.finance-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.finance-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .finance-summary-card{border:1px solid var(--line);border-radius:15px;padding:12px;background:#f9fafb}.finance-summary-card span{display:block;font-size:10px;color:var(--muted);font-weight:900}.finance-summary-card strong{display:block;margin-top:5px;font-size:20px;font-weight:1000}
 .finance-ledger-list{display:grid;gap:10px}.finance-order-card{border:1px solid var(--line);border-radius:16px;padding:13px;background:#fff}.finance-order-card.review{border-left:5px solid var(--red)}.finance-order-card.unpaid{border-left:5px solid var(--orange)}.finance-order-card.reconciled{border-left:5px solid var(--green)}
 .finance-order-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.finance-order-id{font-size:14px;font-weight:1000;word-break:break-all}.finance-order-meta{font-size:11px;color:var(--muted);font-weight:800;line-height:1.55;margin-top:4px}.finance-amount{font-size:22px;font-weight:1000;text-align:right;white-space:nowrap}
@@ -261,6 +261,7 @@ summary::-webkit-details-marker{display:none}
             <div class="finance-summary-card"><span>今日客戶實收</span><strong id="financeTodayRevenue">$0</strong></div>
             <div class="finance-summary-card"><span>今日平台收入</span><strong id="financeTodayPlatform">$0</strong></div>
             <div class="finance-summary-card"><span>今日小U收入</span><strong id="financeTodayRider">$0</strong></div>
+            <div class="finance-summary-card"><span>今日保底補貼</span><strong id="financeTodayGuarantee">$0</strong></div>
             <div class="finance-summary-card"><span>財務差異總額</span><strong id="financeVarianceTotal">$0</strong></div>
           </div>
           <div id="financeLedgerList" class="finance-ledger-list"><div class="empty">正在讀取訂單財務總帳...</div></div>
@@ -441,6 +442,7 @@ function renderFinanceKpis(){
   set('financeTodayRevenue',money(s.todayCustomerRevenue));
   set('financeTodayPlatform',money(s.todayPlatformIncome));
   set('financeTodayRider',money(s.todayRiderIncome));
+  set('financeTodayGuarantee',money(s.todayRiderGuaranteeSubsidy));
   set('financeVarianceTotal',money(s.totalVarianceAmount));
 }
 function renderFinanceLedger(){
@@ -476,8 +478,8 @@ async function openFinanceOrder(orderId){
     document.getElementById('financeModalBody').innerHTML=`
       <div class="finance-detail-grid">
         ${financeDetailItem('初始估價',money(o.initialEstimatedTotal))}${financeDetailItem('最終應收',money(o.finalCustomerTotal))}${financeDetailItem('客戶實收',money(o.actualPaidAmount))}
-        ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('平台收入',money(o.expectedPlatformIncome))}
-        ${financeDetailItem('等待費',money(fees.waitingFee))}${financeDetailItem('上樓費',money(fees.upstairsFee))}${financeDetailItem('追加費用',money(fees.additionalFee))}
+        ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('保底補貼',money(o.riderGuaranteeSubsidy))}
+        ${financeDetailItem('平台收入',money(o.expectedPlatformIncome))}${financeDetailItem('等待費',money(fees.waitingFee))}${financeDetailItem('上樓費',money(fees.upstairsFee))}${financeDetailItem('追加費用',money(fees.additionalFee))}
         ${financeDetailItem('取消費',money(fees.cancellationFee))}${financeDetailItem('退款',money(fees.refundAmount))}${financeDetailItem('結算狀態',o.settlementStatus||'-')}
       </div>
       ${reasons.length?`<div class="finance-discrepancy"><b>尚有差異：</b>${esc(reasons.join('、'))}</div>`:''}
