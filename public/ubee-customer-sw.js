@@ -1,60 +1,53 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.08.14.5
+ * Version: 2026.08.31.1
  * File: ubee-customer-sw.js
  *
- * 2026-08-11 Identity V1 更新：
- * 1. 實名制 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
- * 2. HTML / navigation 採 Network First，避免 PWA 長期停在舊版 order.html。
- * 3. 靜態資源採 Stale While Revalidate。
- * 4. 啟用新版 SW 時清除舊版 UBee Customer Cache。
- * 5. 保留 Web Push、通知點擊與 App Badge 基本能力。
+ * Customer V2.14 Full Integration：
+ * 1. 客戶 API 與所有非 GET 請求一律 Network Only。
+ * 2. 僅攔截 UBee Customer 頁面導覽，避免影響同網域其他後台／頁面。
+ * 3. order.html 採 Network First，且只保留一份 canonical 離線頁快取。
+ * 4. Manifest／Customer Icons 採 Stale While Revalidate。
+ * 5. 啟用新版 SW 時移除舊版 UBee Customer Cache。
+ * 6. Web Push 只允許導向同網域的 Customer 頁面。
+ * 7. 保留通知點擊、App Badge、skipWaiting 基本能力。
  * ============================================================
  */
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.08.14.5';
+const UBEE_CUSTOMER_SW_VERSION = '2026.08.31.1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}page-${UBEE_CUSTOMER_SW_VERSION}`;
 
-const APP_SHELL = [
-  '/order.html',
+const CUSTOMER_PAGE_PATH = '/order.html';
+const CUSTOMER_HOME_PATHS = new Set(['/', CUSTOMER_PAGE_PATH]);
+
+const STATIC_SHELL = [
   '/manifest-order.json',
   '/ubee-customer-icon-192.png',
   '/ubee-customer-icon-512.png'
-];
-
-/*
- * 這些路徑包含登入 Session、會員資料、實名狀態、訂單與即時資訊。
- * 永遠不得由 Service Worker Cache 回傳。
- */
-const NETWORK_ONLY_PATH_PREFIXES = [
-  '/api/',
-  '/api/customer-auth/',
-  '/api/customer-identity/',
-  '/api/customer/',
-  '/api/orders',
-  '/api/order',
-  '/api/quote'
 ];
 
 function isSameOrigin(url) {
   return url.origin === self.location.origin;
 }
 
+function isCustomerPageUrl(url) {
+  return isSameOrigin(url) && CUSTOMER_HOME_PATHS.has(url.pathname);
+}
+
 function isNetworkOnlyRequest(request, url) {
   if (!isSameOrigin(url)) return false;
 
+  // 所有寫入行為永遠不進 Cache。
   if (request.method !== 'GET') return true;
 
-  return NETWORK_ONLY_PATH_PREFIXES.some(prefix =>
-    url.pathname === prefix ||
-    url.pathname.startsWith(prefix)
-  );
+  // 所有 UBee API GET 也永遠走最新後端資料。
+  return url.pathname === '/api' || url.pathname.startsWith('/api/');
 }
 
 function isNavigationRequest(request) {
@@ -64,22 +57,18 @@ function isNavigationRequest(request) {
   );
 }
 
-function isStaticAssetRequest(request, url) {
+function isCustomerStaticAsset(url) {
   if (!isSameOrigin(url)) return false;
 
-  if (
-    ['style', 'script', 'image', 'font'].includes(request.destination)
-  ) {
-    return true;
-  }
-
-  return /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf)$/i
-    .test(url.pathname);
+  return (
+    url.pathname === '/manifest-order.json' ||
+    url.pathname === '/ubee-customer-icon-192.png' ||
+    url.pathname === '/ubee-customer-icon-512.png'
+  );
 }
 
 async function putResponse(cacheName, request, response) {
   if (!response || !response.ok) return;
-
   if (response.type !== 'basic' && response.type !== 'default') return;
 
   try {
@@ -91,50 +80,43 @@ async function putResponse(cacheName, request, response) {
 }
 
 async function networkOnly(request) {
-  /*
-   * API 不經 Service Worker Cache。
-   * 後端實名 API 同時已使用 Cache-Control: no-store。
-   */
   return fetch(request);
 }
 
-async function networkFirstPage(request) {
+async function networkFirstCustomerPage(request) {
   try {
     const response = await fetch(request, {
       cache: 'no-store'
     });
 
     if (response && response.ok) {
-      await putResponse(PAGE_CACHE, request, response);
+      // 不依 query string 重複儲存 order.html，避免 PWA 版本參數造成 Cache 膨脹。
+      await putResponse(PAGE_CACHE, CUSTOMER_PAGE_PATH, response);
     }
 
     return response;
   } catch (error) {
-    const cached = await caches.match(request, {
-      ignoreSearch: true
-    });
+    const cache = await caches.open(PAGE_CACHE);
+    const cached = await cache.match(CUSTOMER_PAGE_PATH);
 
     if (cached) return cached;
-
-    const fallback = await caches.match('/order.html', {
-      ignoreSearch: true
-    });
-
-    if (fallback) return fallback;
 
     throw error;
   }
 }
 
 async function staleWhileRevalidate(request) {
-  const cached = await caches.match(request, {
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(request, {
     ignoreSearch: false
   });
 
-  const networkPromise = fetch(request)
+  const networkPromise = fetch(request, {
+    cache: 'no-cache'
+  })
     .then(async response => {
       if (response && response.ok) {
-        await putResponse(STATIC_CACHE, request, response);
+        await cache.put(request, response.clone());
       }
       return response;
     })
@@ -156,6 +138,37 @@ async function staleWhileRevalidate(request) {
   });
 }
 
+function buildFallbackOrderUrl(orderId = '') {
+  const id = String(orderId || '').trim().toUpperCase();
+
+  return id
+    ? `${CUSTOMER_PAGE_PATH}?orderId=${encodeURIComponent(id)}&source=push`
+    : `${CUSTOMER_PAGE_PATH}?source=push`;
+}
+
+function resolveSafeCustomerTargetUrl(rawUrl, orderId = '') {
+  const fallback = buildFallbackOrderUrl(orderId);
+
+  try {
+    const target = new URL(
+      String(rawUrl || fallback),
+      self.location.origin
+    );
+
+    if (!isSameOrigin(target)) {
+      return new URL(fallback, self.location.origin).href;
+    }
+
+    if (!CUSTOMER_HOME_PATHS.has(target.pathname)) {
+      return new URL(fallback, self.location.origin).href;
+    }
+
+    return target.href;
+  } catch (_) {
+    return new URL(fallback, self.location.origin).href;
+  }
+}
+
 /* ============================================================
  * INSTALL
  * ============================================================
@@ -163,24 +176,34 @@ async function staleWhileRevalidate(request) {
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     try {
-      const cache = await caches.open(STATIC_CACHE);
+      const pageCache = await caches.open(PAGE_CACHE);
 
-      /*
-       * addAll 任何一項失敗會讓整批失敗，因此逐項加入，
-       * 避免單一 icon 或 manifest 暫時不可用造成 SW 安裝失敗。
-       */
+      try {
+        const response = await fetch(CUSTOMER_PAGE_PATH, {
+          cache: 'reload'
+        });
+
+        if (response && response.ok) {
+          await pageCache.put(CUSTOMER_PAGE_PATH, response.clone());
+        }
+      } catch (_) {
+        // 首頁預快取失敗不阻擋新版 Service Worker 安裝。
+      }
+
+      const staticCache = await caches.open(STATIC_CACHE);
+
       await Promise.all(
-        APP_SHELL.map(async url => {
+        STATIC_SHELL.map(async url => {
           try {
             const response = await fetch(url, {
               cache: 'reload'
             });
 
             if (response && response.ok) {
-              await cache.put(url, response.clone());
+              await staticCache.put(url, response.clone());
             }
           } catch (_) {
-            // 安裝時單項預快取失敗不阻擋新版 Service Worker。
+            // 單一靜態資源預快取失敗不阻擋新版 Service Worker。
           }
         })
       );
@@ -213,18 +236,6 @@ self.addEventListener('activate', event => {
     );
 
     await self.clients.claim();
-
-    const clientList = await self.clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    });
-
-    for (const client of clientList) {
-      client.postMessage({
-        type: 'UBEE_CUSTOMER_SW_UPDATED',
-        version: UBEE_CUSTOMER_SW_VERSION
-      });
-    }
   })());
 });
 
@@ -239,45 +250,31 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
 
-  /*
-   * 非 HTTP(S) scheme 不處理。
-   */
   if (!/^https?:$/.test(url.protocol)) {
     return;
   }
 
-  /*
-   * POST / PUT / PATCH / DELETE，以及 UBee API：
-   * 全部直接走網路，不進 Cache。
-   */
+  // API 與所有寫入行為永遠不進 Cache。
   if (isNetworkOnlyRequest(request, url)) {
     event.respondWith(networkOnly(request));
     return;
   }
 
-  /*
-   * 跨網域資源不由 UBee Customer SW 管理，
-   * 例如 Google Maps、第三方服務。
-   */
   if (!isSameOrigin(url)) {
     return;
   }
 
-  /*
-   * order.html / navigation：
-   * 一律優先取得伺服器最新版。
-   * 只有離線時才使用本機快取。
-   */
+  // Root scope 保留相容性，但只接管 UBee Customer 本身的頁面導覽。
+  // 同網域 dispatch/admin/support 等頁面不由 Customer SW 攔截。
   if (isNavigationRequest(request)) {
-    event.respondWith(networkFirstPage(request));
+    if (isCustomerPageUrl(url)) {
+      event.respondWith(networkFirstCustomerPage(request));
+    }
     return;
   }
 
-  /*
-   * 靜態檔案：
-   * 先快速回傳快取，同時背景更新。
-   */
-  if (request.method === 'GET' && isStaticAssetRequest(request, url)) {
+  // 只快取 Customer PWA 真正需要的靜態資源，避免同網域其他系統被放入 Customer Cache。
+  if (request.method === 'GET' && isCustomerStaticAsset(url)) {
     event.respondWith(staleWhileRevalidate(request));
   }
 });
@@ -305,14 +302,9 @@ self.addEventListener('push', event => {
     ''
   ).trim().toUpperCase();
 
-  const fallbackUrl = orderId
-    ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
-    : '/order.html?source=push';
-
-  const targetUrl = String(
-    data.url ||
-    data.deepLink ||
-    fallbackUrl
+  const targetUrl = resolveSafeCustomerTargetUrl(
+    data.url || data.deepLink,
+    orderId
   );
 
   const options = {
@@ -356,15 +348,10 @@ self.addEventListener('notificationclick', event => {
     .trim()
     .toUpperCase();
 
-  const targetUrl = new URL(
-    data.url ||
-      (
-        orderId
-          ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
-          : '/order.html?source=push'
-      ),
-    self.location.origin
-  ).href;
+  const targetUrl = resolveSafeCustomerTargetUrl(
+    data.url,
+    orderId
+  );
 
   event.waitUntil((async () => {
     const clientList = await clients.matchAll({
@@ -372,22 +359,20 @@ self.addEventListener('notificationclick', event => {
       includeUncontrolled: true
     });
 
+    // 只重用既有 Customer 視窗，不把同網域的後台／客服視窗強制導向用戶端。
     for (const client of clientList) {
       try {
         const clientUrl = new URL(client.url);
 
-        if (clientUrl.origin === self.location.origin) {
+        if (
+          clientUrl.origin === self.location.origin &&
+          CUSTOMER_HOME_PATHS.has(clientUrl.pathname)
+        ) {
           if ('navigate' in client) {
             await client.navigate(targetUrl);
           }
 
           await client.focus();
-
-          client.postMessage({
-            type: 'UBEE_CUSTOMER_OPEN_ORDER',
-            orderId,
-            url: targetUrl
-          });
 
           if (self.registration.clearAppBadge) {
             await self.registration.clearAppBadge().catch(() => {});
@@ -396,7 +381,7 @@ self.addEventListener('notificationclick', event => {
           return;
         }
       } catch (_) {
-        // 繼續尋找下一個可用 client。
+        // 繼續尋找下一個可用 Customer client。
       }
     }
 
