@@ -1730,9 +1730,15 @@ async function sendNewOrderPushToRiders(
     }
 
     const fee =
-      order.driverFee ||
-      order.riderFee ||
-      "未設定";
+      getOrderMoneyValue(
+        order,
+        [
+          'riderIncome',
+          'estimatedRiderIncome',
+          'riderFee',
+          'driverFee',
+        ]
+      ) ?? "未設定";
 
     const pickup =
       order.pickupAddress ||
@@ -7547,7 +7553,13 @@ function buildRiderPendingTaskPreview(order = {}) {
     estimatedRiderIncome: Number(order.estimatedRiderIncome || 0),
     riderIncome: Number(order.riderIncome || 0),
     riderFee: Number(order.riderFee || 0),
+    driverFee: Number(order.driverFee || 0),
     riderEarning: Number(order.riderEarning || 0),
+    riderIncomeBeforeGuarantee: Number(order.riderIncomeBeforeGuarantee || 0),
+    riderGuaranteeSubsidy: Number(order.riderGuaranteeSubsidy || 0),
+    riderMinimumApplied: order.riderMinimumApplied === true,
+    riderMinimumTaskIncome: Number(order.riderMinimumTaskIncome || 0),
+    riderIncomePolicyVersion: String(order.riderIncomePolicyVersion || ''),
     driverIncome: Number(order.driverIncome || 0),
     courierIncome: Number(order.courierIncome || 0),
 
@@ -13994,6 +14006,12 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         serviceSubtotal: Number(o.serviceSubtotal || o.serviceTotal || 0),
         driverFee: Number(o.driverFee || o.riderFee || 0),
         riderFee: Number(o.riderFee || o.driverFee || 0),
+        riderIncome: Number(o.riderIncome || o.riderFee || o.driverFee || 0),
+        riderIncomeBeforeGuarantee: Number(o.riderIncomeBeforeGuarantee || 0),
+        riderGuaranteeSubsidy: Number(o.riderGuaranteeSubsidy || 0),
+        riderMinimumApplied: o.riderMinimumApplied === true,
+        riderMinimumTaskIncome: Number(o.riderMinimumTaskIncome || 0),
+        riderIncomePolicyVersion: String(o.riderIncomePolicyVersion || ''),
         platformFee: Number(o.platformFee || o.platformIncome || 0),
 
         deliveryFee: Number(o.deliveryFee || 0),
@@ -21524,6 +21542,11 @@ const PRICING = {
   // 騎士分潤比例
   driverRatio: 0.7,
 
+  // 2026-08-31｜小U每筆有效任務最低收入。
+  // 僅補足小U收入，不直接提高客戶報價；差額由原平台收入吸收。
+  riderMinimumTaskIncome: 50,
+  riderMinimumIncomeVersion: 'RIDER_MIN_50_V1_20260831',
+
   // 一般配送基本價格
   baseFee: 60,
   perKm: 12,
@@ -21582,6 +21605,53 @@ const PRICING = {
   // 舊版 LINE 等候費流程相容欄位；新版騎士端採自動計時。
   waitingFee: 50,
 };
+
+// =====================================================
+// UBee 小U最低收入 V1｜2026-08-31
+// - 任務費本體仍依原本 70 / 30 計算
+// - 小U原始分潤低於 NT$50 時，由 UBee 補足至 NT$50
+// - taskSubtotal <= 0 時不憑空產生保底收入
+// - 天候／動態調度等 100% 給小U的加價，於保底後再加上
+// =====================================================
+function calculateRiderTaskIncomeWithMinimum(taskSubtotal = 0) {
+  const safeTaskSubtotal = Math.max(
+    0,
+    Math.round(Number(taskSubtotal || 0))
+  );
+
+  const riderIncomeBeforeGuarantee = Math.max(
+    0,
+    Math.round(
+      safeTaskSubtotal * Number(PRICING.driverRatio || 0.7)
+    )
+  );
+
+  const riderMinimumTaskIncome = Math.max(
+    0,
+    Math.round(Number(PRICING.riderMinimumTaskIncome || 50))
+  );
+
+  const riderIncome =
+    safeTaskSubtotal > 0
+      ? Math.max(riderMinimumTaskIncome, riderIncomeBeforeGuarantee)
+      : 0;
+
+  const riderGuaranteeSubsidy = Math.max(
+    0,
+    riderIncome - riderIncomeBeforeGuarantee
+  );
+
+  return {
+    riderIncome,
+    riderIncomeBeforeGuarantee,
+    riderGuaranteeSubsidy,
+    riderMinimumApplied: riderGuaranteeSubsidy > 0,
+    riderMinimumTaskIncome,
+    riderIncomePolicyVersion: String(
+      PRICING.riderMinimumIncomeVersion || 'RIDER_MIN_50_V1_20260831'
+    ),
+  };
+}
 
 // =====================================================
 // UBee「幫我取 / 幫代買」專用即時配送計價
@@ -21987,6 +22057,11 @@ function copyOrderFinancialFields(target, financialOrder) {
     'riderFee',
     'riderIncome',
     'estimatedRiderIncome',
+    'riderIncomeBeforeGuarantee',
+    'riderGuaranteeSubsidy',
+    'riderMinimumApplied',
+    'riderMinimumTaskIncome',
+    'riderIncomePolicyVersion',
     'riderAdvanceAmount',
     'riderCollectAmount',
     'platformFee',
@@ -22520,6 +22595,8 @@ function applyDynamicPricingToPrice(price, dynamicPricing) {
   // 動態調度費 100% 給小U，平台收入不因動態費增加。
   result.driverFee = Math.max(0, Math.round(dynamicSafeNumber(result.driverFee))) + dynamicPricingFee;
   result.riderFee = result.driverFee;
+  result.riderIncome = result.driverFee;
+  result.estimatedRiderIncome = result.driverFee;
   result.platformFee = Math.max(0, Math.round(dynamicSafeNumber(result.platformFee)));
   result.platformIncome = result.platformFee;
 
@@ -22623,6 +22700,8 @@ function applyWeatherSurchargeToPrice(
       Math.round(dynamicSafeNumber(result.driverFee))
     ) + weatherFee;
   result.riderFee = result.driverFee;
+  result.riderIncome = result.driverFee;
+  result.estimatedRiderIncome = result.driverFee;
 
   result.platformFee = Math.max(
     0,
@@ -24392,13 +24471,16 @@ function calculateFinancialSplit({
     taskSubtotal +
     platformServiceFee;
 
-  // 騎士只從任務費本體取得 70%
-  const driverFee = Math.round(
-    taskSubtotal * Number(PRICING.driverRatio || 0.7)
-  );
+  // 小U原始分潤仍為任務費本體 × 70%，
+  // 若低於 NT$50，UBee 以保底補貼補足至 NT$50。
+  const riderIncomeInfo =
+    calculateRiderTaskIncomeWithMinimum(taskSubtotal);
+
+  const driverFee = riderIncomeInfo.riderIncome;
 
   // 平台收入：
-  // 任務費剩餘部分 + 完整平台服務費
+  // 客戶服務總額 - 小U實得。
+  // 保底差額會自然由原平台收入吸收，不提高本次客戶報價。
   const platformFee = Math.max(
     0,
     serviceSubtotal - driverFee
@@ -24419,6 +24501,19 @@ function calculateFinancialSplit({
 
     driverFee,
     riderFee: driverFee,
+    riderIncome: driverFee,
+    estimatedRiderIncome: driverFee,
+
+    riderIncomeBeforeGuarantee:
+      riderIncomeInfo.riderIncomeBeforeGuarantee,
+    riderGuaranteeSubsidy:
+      riderIncomeInfo.riderGuaranteeSubsidy,
+    riderMinimumApplied:
+      riderIncomeInfo.riderMinimumApplied,
+    riderMinimumTaskIncome:
+      riderIncomeInfo.riderMinimumTaskIncome,
+    riderIncomePolicyVersion:
+      riderIncomeInfo.riderIncomePolicyVersion,
 
     platformFee,
     platformIncome: platformFee,
@@ -24808,18 +24903,6 @@ function applyCustomTaskHandlingFee(
     return result;
   }
 
-  const riderShare = Math.max(
-    0,
-    Math.round(
-      taskHandlingFee * Number(PRICING.driverRatio || 0.7)
-    )
-  );
-
-  const platformShare = Math.max(
-    0,
-    taskHandlingFee - riderShare
-  );
-
   result.taskSubtotal =
     Math.max(0, Math.round(Number(result.taskSubtotal || 0))) +
     taskHandlingFee;
@@ -24834,15 +24917,32 @@ function applyCustomTaskHandlingFee(
 
   result.total = result.serviceSubtotal;
 
-  result.driverFee =
-    Math.max(0, Math.round(Number(result.driverFee || 0))) +
-    riderShare;
+  // 任務處理時間費同樣屬於 70 / 30 任務費本體。
+  // 必須以「加完處理時間費後的完整 taskSubtotal」重新判斷保底，
+  // 避免先補到 $50 再額外加 70% 而重複補貼。
+  const riderIncomeInfo =
+    calculateRiderTaskIncomeWithMinimum(result.taskSubtotal);
 
+  result.driverFee = riderIncomeInfo.riderIncome;
   result.riderFee = result.driverFee;
+  result.riderIncome = result.driverFee;
+  result.estimatedRiderIncome = result.driverFee;
 
-  result.platformFee =
-    Math.max(0, Math.round(Number(result.platformFee || 0))) +
-    platformShare;
+  result.riderIncomeBeforeGuarantee =
+    riderIncomeInfo.riderIncomeBeforeGuarantee;
+  result.riderGuaranteeSubsidy =
+    riderIncomeInfo.riderGuaranteeSubsidy;
+  result.riderMinimumApplied =
+    riderIncomeInfo.riderMinimumApplied;
+  result.riderMinimumTaskIncome =
+    riderIncomeInfo.riderMinimumTaskIncome;
+  result.riderIncomePolicyVersion =
+    riderIncomeInfo.riderIncomePolicyVersion;
+
+  result.platformFee = Math.max(
+    0,
+    result.serviceSubtotal - result.driverFee
+  );
 
   result.platformIncome = result.platformFee;
 
@@ -25043,6 +25143,27 @@ function recalculateOrderFinancials(order) {
 
   order.riderFee =
     financials.riderFee;
+
+  order.riderIncome =
+    financials.riderIncome;
+
+  order.estimatedRiderIncome =
+    financials.estimatedRiderIncome;
+
+  order.riderIncomeBeforeGuarantee =
+    financials.riderIncomeBeforeGuarantee;
+
+  order.riderGuaranteeSubsidy =
+    financials.riderGuaranteeSubsidy;
+
+  order.riderMinimumApplied =
+    financials.riderMinimumApplied;
+
+  order.riderMinimumTaskIncome =
+    financials.riderMinimumTaskIncome;
+
+  order.riderIncomePolicyVersion =
+    financials.riderIncomePolicyVersion;
 
   // 平台收入
   order.platformFee =
@@ -27085,6 +27206,13 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         total: financials.serviceSubtotal,
         driverFee: financials.driverFee,
         riderFee: financials.riderFee,
+        riderIncome: financials.riderIncome,
+        estimatedRiderIncome: financials.estimatedRiderIncome,
+        riderIncomeBeforeGuarantee: financials.riderIncomeBeforeGuarantee,
+        riderGuaranteeSubsidy: financials.riderGuaranteeSubsidy,
+        riderMinimumApplied: financials.riderMinimumApplied,
+        riderMinimumTaskIncome: financials.riderMinimumTaskIncome,
+        riderIncomePolicyVersion: financials.riderIncomePolicyVersion,
         platformFee: financials.platformFee,
         platformIncome: financials.platformIncome,
       };
@@ -27876,8 +28004,10 @@ app.post('/api/merchant/order', async (req, res) => {
     );
 
     const total = deliveryFee + speedFee;
-    const driverFee = Math.round(total * PRICING.driverRatio);
-    const platformFee = total - driverFee;
+    const riderIncomeInfo =
+      calculateRiderTaskIncomeWithMinimum(total);
+    const driverFee = riderIncomeInfo.riderIncome;
+    const platformFee = Math.max(0, total - driverFee);
     const order = {
       
       id,
@@ -27919,6 +28049,13 @@ app.post('/api/merchant/order', async (req, res) => {
 
       driverFee,
       riderFee: driverFee,
+      riderIncome: driverFee,
+      estimatedRiderIncome: driverFee,
+      riderIncomeBeforeGuarantee: riderIncomeInfo.riderIncomeBeforeGuarantee,
+      riderGuaranteeSubsidy: riderIncomeInfo.riderGuaranteeSubsidy,
+      riderMinimumApplied: riderIncomeInfo.riderMinimumApplied,
+      riderMinimumTaskIncome: riderIncomeInfo.riderMinimumTaskIncome,
+      riderIncomePolicyVersion: riderIncomeInfo.riderIncomePolicyVersion,
       platformFee,
       deliveryFee,
       serviceFee: 0,
@@ -30981,6 +31118,27 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
 
     riderFee:
       financials.riderFee,
+
+    riderIncome:
+      financials.riderIncome,
+
+    estimatedRiderIncome:
+      financials.estimatedRiderIncome,
+
+    riderIncomeBeforeGuarantee:
+      financials.riderIncomeBeforeGuarantee,
+
+    riderGuaranteeSubsidy:
+      financials.riderGuaranteeSubsidy,
+
+    riderMinimumApplied:
+      financials.riderMinimumApplied,
+
+    riderMinimumTaskIncome:
+      financials.riderMinimumTaskIncome,
+
+    riderIncomePolicyVersion:
+      financials.riderIncomePolicyVersion,
 
     platformFee:
       financials.platformFee,
@@ -35358,6 +35516,27 @@ function buildFinanceClosureSnapshot(order = {}) {
   const riderIncome = firstFinanceMoney(order, [
     'riderIncome', 'riderFee', 'driverFee', 'riderEarning', 'riderPayout', 'riderShare', 'fee'
   ], 0);
+  const riderIncomeBeforeGuarantee = firstFinanceMoney(
+    order,
+    ['riderIncomeBeforeGuarantee'],
+    riderIncome
+  );
+  const riderGuaranteeSubsidy = firstFinanceMoney(
+    order,
+    ['riderGuaranteeSubsidy'],
+    Math.max(0, riderIncome - riderIncomeBeforeGuarantee)
+  );
+  const riderMinimumApplied =
+    order.riderMinimumApplied === true ||
+    riderGuaranteeSubsidy > 0;
+  const riderMinimumTaskIncome = firstFinanceMoney(
+    order,
+    ['riderMinimumTaskIncome'],
+    0
+  );
+  const riderIncomePolicyVersion = String(
+    order.riderIncomePolicyVersion || ''
+  );
   const expectedPlatformIncome = Math.max(0, Math.round(finalCustomerTotal - riderAdvance - riderIncome));
   const recordedPlatformIncome = firstFinanceMoney(order, [
     'platformIncome', 'platformFee', 'cashDueToPlatform', 'platformReceivable'
@@ -35436,6 +35615,11 @@ function buildFinanceClosureSnapshot(order = {}) {
     actualPaidAmount,
     riderAdvance,
     riderIncome,
+    riderIncomeBeforeGuarantee,
+    riderGuaranteeSubsidy,
+    riderMinimumApplied,
+    riderMinimumTaskIncome,
+    riderIncomePolicyVersion,
     expectedPlatformIncome,
     recordedPlatformIncome,
     feeBreakdown,
@@ -35528,6 +35712,7 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
       todayCustomerRevenue: 0,
       todayPlatformIncome: 0,
       todayRiderIncome: 0,
+      todayRiderGuaranteeSubsidy: 0,
       todayRiderAdvance: 0,
       totalVarianceAmount: 0,
     };
@@ -35547,6 +35732,7 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
         summary.todayCustomerRevenue += item.actualPaidAmount;
         summary.todayPlatformIncome += item.expectedPlatformIncome;
         summary.todayRiderIncome += item.riderIncome;
+        summary.todayRiderGuaranteeSubsidy += item.riderGuaranteeSubsidy;
         summary.todayRiderAdvance += item.riderAdvance;
       }
     });
