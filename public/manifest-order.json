@@ -2,8 +2,8 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee 跑腿用戶端：估價、下單、追蹤與管理跑腿任務。",
-  "start_url": "/order.html?source=pwa&v=20260807-2",
+  "description": "UBee 跑腿用戶端：估價、下單、即時追蹤、店家探索與任務管理。",
+  "start_url": "/order.html?source=pwa&v=20260901-v3",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -36,7 +36,18 @@
     {
       "name": "立即下單",
       "short_name": "下單",
-      "url": "/order.html?action=new",
+      "url": "/order.html?action=new&v=20260901-v3",
+      "icons": [
+        {
+          "src": "/ubee-customer-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "店家代買",
+      "short_name": "店家",
+      "url": "/order.html?action=store&v=20260901-v3",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -47,7 +58,7 @@
     {
       "name": "我的任務",
       "short_name": "任務",
-      "url": "/order.html?action=tasks",
+      "url": "/order.html?action=tasks&v=20260901-v3",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
