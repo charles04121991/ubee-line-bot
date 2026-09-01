@@ -14004,6 +14004,12 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         dropoffLng: asNumberOrNull(o.dropoffLng ?? o.toLng),
         total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
         serviceSubtotal: Number(o.serviceSubtotal || o.serviceTotal || 0),
+        shareableTaskSubtotal: Number(o.shareableTaskSubtotal || 0),
+        riderOnlySurchargeSubtotal: Number(o.riderOnlySurchargeSubtotal || 0),
+        taskSubtotal: Number(o.taskSubtotal || 0),
+
+        riderBaseIncome: Number(o.riderBaseIncome || 0),
+        riderBaseIncomeBeforeGuarantee: Number(o.riderBaseIncomeBeforeGuarantee || 0),
         driverFee: Number(o.driverFee || o.riderFee || 0),
         riderFee: Number(o.riderFee || o.driverFee || 0),
         riderIncome: Number(o.riderIncome || o.riderFee || o.driverFee || 0),
@@ -14012,12 +14018,21 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         riderMinimumApplied: o.riderMinimumApplied === true,
         riderMinimumTaskIncome: Number(o.riderMinimumTaskIncome || 0),
         riderIncomePolicyVersion: String(o.riderIncomePolicyVersion || ''),
+        riderMinimumIncomePolicyVersion: String(o.riderMinimumIncomePolicyVersion || ''),
         platformFee: Number(o.platformFee || o.platformIncome || 0),
 
         deliveryFee: Number(o.deliveryFee || 0),
+        crossZoneFee: Number(o.crossZoneFee || 0),
+        multiStopFee: Number(o.multiStopFee || 0),
+        returnTripFee: Number(o.returnTripFee || 0),
+        specialTaskFee: Number(o.specialTaskFee || 0),
+        taskHandlingFee: Number(o.taskHandlingFee || 0),
         serviceFee: Number(o.serviceFee || 0),
         speedFee: Number(o.speedFee || 0),
         upstairsFee: Number(o.upstairsFee || 0),
+        overweightFee: Number(o.overweightFee || 0),
+        nightFee: Number(o.nightFee || 0),
+        cancellationCompensation: Number(o.cancellationCompensation || 0),
 
         itemSize: normalizeItemSize(o.itemSize),
         itemSizeLabel:
@@ -21547,6 +21562,10 @@ const PRICING = {
   riderMinimumTaskIncome: 50,
   riderMinimumIncomeVersion: 'RIDER_MIN_50_V1_20260831',
 
+  // 2026-09-01｜小U收入制度 V2：
+  // 70/30 僅作用於任務服務費；額外時間／勞力／風險加價 100% 歸小U。
+  riderIncomePolicyVersion: 'UBEE_RIDER_INCOME_V2_20260901',
+
   // 一般配送基本價格
   baseFee: 60,
   perKm: 12,
@@ -22577,27 +22596,81 @@ function applyDynamicPricingToPrice(price, dynamicPricing) {
   const result = { ...(price || {}) };
   const dynamicPricingFee = Math.max(
     0,
-    Math.round(dynamicSafeNumber(dynamicPricing?.dynamicPricingFee ?? dynamicPricing?.fee))
+    Math.round(dynamicSafeNumber(
+      dynamicPricing?.dynamicPricingFee ??
+      dynamicPricing?.fee
+    ))
   );
 
   result.dynamicPricingFee = dynamicPricingFee;
   result.dynamicFee = dynamicPricingFee;
   result.dynamicPricing = dynamicPricing || null;
-  result.dynamicPricingComponents = Array.isArray(dynamicPricing?.components)
-    ? dynamicPricing.components
-    : [];
-  result.dynamicPricingRegion = dynamicPricing?.region || null;
+  result.dynamicPricingComponents =
+    Array.isArray(dynamicPricing?.components)
+      ? dynamicPricing.components
+      : [];
+  result.dynamicPricingRegion =
+    dynamicPricing?.region || null;
 
-  result.taskSubtotal = Math.max(0, Math.round(dynamicSafeNumber(result.taskSubtotal))) + dynamicPricingFee;
-  result.serviceSubtotal = Math.max(0, Math.round(dynamicSafeNumber(result.serviceSubtotal ?? result.total))) + dynamicPricingFee;
+  if (dynamicPricingFee <= 0) {
+    return result;
+  }
+
+  result.riderOnlySurchargeSubtotal =
+    Math.max(
+      0,
+      Math.round(
+        dynamicSafeNumber(
+          result.riderOnlySurchargeSubtotal
+        )
+      )
+    ) + dynamicPricingFee;
+
+  result.taskSubtotal =
+    Math.max(
+      0,
+      Math.round(dynamicSafeNumber(result.taskSubtotal))
+    ) + dynamicPricingFee;
+
+  result.serviceSubtotal =
+    Math.max(
+      0,
+      Math.round(
+        dynamicSafeNumber(
+          result.serviceSubtotal ?? result.total
+        )
+      )
+    ) + dynamicPricingFee;
+
   result.total = result.serviceSubtotal;
 
-  // 動態調度費 100% 給小U，平台收入不因動態費增加。
-  result.driverFee = Math.max(0, Math.round(dynamicSafeNumber(result.driverFee))) + dynamicPricingFee;
+  // 動態調度費 100% 給小U。
+  result.driverFee =
+    Math.max(
+      0,
+      Math.round(dynamicSafeNumber(result.driverFee))
+    ) + dynamicPricingFee;
+
   result.riderFee = result.driverFee;
   result.riderIncome = result.driverFee;
   result.estimatedRiderIncome = result.driverFee;
-  result.platformFee = Math.max(0, Math.round(dynamicSafeNumber(result.platformFee)));
+
+  // 保底前收入也同步加上這筆 100% 小U費用；
+  // 保底補貼本身不受影響。
+  result.riderIncomeBeforeGuarantee =
+    Math.max(
+      0,
+      Math.round(
+        dynamicSafeNumber(
+          result.riderIncomeBeforeGuarantee
+        )
+      )
+    ) + dynamicPricingFee;
+
+  result.platformFee = Math.max(
+    0,
+    Math.round(dynamicSafeNumber(result.platformFee))
+  );
   result.platformIncome = result.platformFee;
 
   return result;
@@ -22649,18 +22722,24 @@ function applyWeatherSurchargeToPrice(
 
   const weatherFee =
     normalized.active === true
-      ? Math.max(0, Math.round(Number(normalized.fee || 0)))
+      ? Math.max(
+          0,
+          Math.round(Number(normalized.fee || 0))
+        )
       : 0;
 
   result.weatherType =
     weatherFee > 0
       ? normalized.weatherType
       : 'none';
+
   result.weatherLabel =
     weatherFee > 0
       ? normalized.label
       : '';
+
   result.weatherFee = weatherFee;
+
   result.weatherAdjustment =
     weatherFee > 0
       ? normalized
@@ -22674,6 +22753,16 @@ function applyWeatherSurchargeToPrice(
   if (weatherFee <= 0) {
     return result;
   }
+
+  result.riderOnlySurchargeSubtotal =
+    Math.max(
+      0,
+      Math.round(
+        dynamicSafeNumber(
+          result.riderOnlySurchargeSubtotal
+        )
+      )
+    ) + weatherFee;
 
   result.taskSubtotal =
     Math.max(
@@ -22699,9 +22788,20 @@ function applyWeatherSurchargeToPrice(
       0,
       Math.round(dynamicSafeNumber(result.driverFee))
     ) + weatherFee;
+
   result.riderFee = result.driverFee;
   result.riderIncome = result.driverFee;
   result.estimatedRiderIncome = result.driverFee;
+
+  result.riderIncomeBeforeGuarantee =
+    Math.max(
+      0,
+      Math.round(
+        dynamicSafeNumber(
+          result.riderIncomeBeforeGuarantee
+        )
+      )
+    ) + weatherFee;
 
   result.platformFee = Math.max(
     0,
@@ -24401,93 +24501,117 @@ function calculateDistanceTierFee(distanceKm) {
 }
 
 // ==============================
-// UBee 唯一財務計算核心
+// UBee 唯一財務計算核心 V2｜2026-09-01
 // ==============================
-// 正式規則：
-// 1. 任務費本體參與 70 / 30 分潤
-// 2. 平台服務費 100% 歸 UBee
-// 3. 代墊款不屬於平台收入，也不屬於騎士收入
-//
-// 任務費本體：
-// 配送費 + 急件費 + 樓層費 + 等候費
-//
-// 騎士收入：
-// 任務費本體 × 70%
-//
-// 平台收入：
-// 任務費本體剩餘 30% + 完整平台服務費
+// A｜70 / 30 任務服務費：配送／距離／跨區／多點／返程／特殊任務／任務處理時間
+// B｜100% 小U：急件／樓層／等待／大型物品／超重／夜間／天候／動態調度／取消補償
+// C｜100% UBee：平台服務費
+// D｜實支實付：代墊、停車、通行與行政規費不進本函式分潤
 function calculateFinancialSplit({
+  // A｜70 / 30
   deliveryFee = 0,
-  serviceFee = 0,
+  crossZoneFee = 0,
+  multiStopFee = 0,
+  returnTripFee = 0,
+  specialTaskFee = 0,
+  taskHandlingFee = 0,
+
+  // B｜100% 小U
   speedFee = 0,
   upstairsFee = 0,
   waitingFee = 0,
   itemSizeFee = 0,
+  overweightFee = 0,
+  nightFee = 0,
+  weatherFee = 0,
+  dynamicPricingFee = 0,
+  cancellationCompensation = 0,
+
+  // C｜100% UBee
+  serviceFee = 0,
 } = {}) {
-  const safeDeliveryFee = Math.max(
-    0,
-    Math.round(Number(deliveryFee || 0))
-  );
+  const safeMoney = value =>
+    Math.max(0, Math.round(Number(value || 0)));
 
-  const safeServiceFee = Math.max(
-    0,
-    Math.round(Number(serviceFee || 0))
-  );
+  const safeDeliveryFee = safeMoney(deliveryFee);
+  const safeCrossZoneFee = safeMoney(crossZoneFee);
+  const safeMultiStopFee = safeMoney(multiStopFee);
+  const safeReturnTripFee = safeMoney(returnTripFee);
+  const safeSpecialTaskFee = safeMoney(specialTaskFee);
+  const safeTaskHandlingFee = safeMoney(taskHandlingFee);
 
-  const safeSpeedFee = Math.max(
-    0,
-    Math.round(Number(speedFee || 0))
-  );
+  const safeSpeedFee = safeMoney(speedFee);
+  const safeUpstairsFee = safeMoney(upstairsFee);
+  const safeWaitingFee = safeMoney(waitingFee);
+  const safeItemSizeFee = safeMoney(itemSizeFee);
+  const safeOverweightFee = safeMoney(overweightFee);
+  const safeNightFee = safeMoney(nightFee);
+  const safeWeatherFee = safeMoney(weatherFee);
+  const safeDynamicPricingFee = safeMoney(dynamicPricingFee);
+  const safeCancellationCompensation =
+    safeMoney(cancellationCompensation);
 
-  const safeUpstairsFee = Math.max(
-    0,
-    Math.round(Number(upstairsFee || 0))
-  );
+  const safeServiceFee = safeMoney(serviceFee);
 
-  const safeWaitingFee = Math.max(
-    0,
-    Math.round(Number(waitingFee || 0))
-  );
-
-  const safeItemSizeFee = Math.max(
-    0,
-    Math.round(Number(itemSizeFee || 0))
-  );
-
-  // 任務費本體：
-  // 這部分才參與騎士 70% / 平台 30%
-  const taskSubtotal =
+  // A｜只有這一桶參與 70 / 30，並套用每單最低 NT$50。
+  const shareableTaskSubtotal =
     safeDeliveryFee +
+    safeCrossZoneFee +
+    safeMultiStopFee +
+    safeReturnTripFee +
+    safeSpecialTaskFee +
+    safeTaskHandlingFee;
+
+  const riderIncomeInfo =
+    calculateRiderTaskIncomeWithMinimum(
+      shareableTaskSubtotal
+    );
+
+  const riderBaseIncome =
+    riderIncomeInfo.riderIncome;
+
+  // B｜這一桶全部直接給小U，不再乘 70%。
+  const riderOnlySurchargeSubtotal =
     safeSpeedFee +
     safeUpstairsFee +
     safeWaitingFee +
-    safeItemSizeFee;
+    safeItemSizeFee +
+    safeOverweightFee +
+    safeNightFee +
+    safeWeatherFee +
+    safeDynamicPricingFee +
+    safeCancellationCompensation;
 
-  // 平台服務費 100% 歸 UBee
+  const riderIncome =
+    riderBaseIncome +
+    riderOnlySurchargeSubtotal;
+
+  // 舊欄位 taskSubtotal 保留「所有服務型費用、不含平台服務費」語意，
+  // 避免客戶端與既有訂單總額欄位失去相容性。
+  const taskSubtotal =
+    shareableTaskSubtotal +
+    riderOnlySurchargeSubtotal;
+
   const platformServiceFee = safeServiceFee;
 
-  // 服務總額，不含代墊款
   const serviceSubtotal =
     taskSubtotal +
     platformServiceFee;
 
-  // 小U原始分潤仍為任務費本體 × 70%，
-  // 若低於 NT$50，UBee 以保底補貼補足至 NT$50。
-  const riderIncomeInfo =
-    calculateRiderTaskIncomeWithMinimum(taskSubtotal);
-
-  const driverFee = riderIncomeInfo.riderIncome;
-
-  // 平台收入：
-  // 客戶服務總額 - 小U實得。
-  // 保底差額會自然由原平台收入吸收，不提高本次客戶報價。
+  // 保底差額仍由原平台收入吸收；100% 小U加價不增加平台收入。
   const platformFee = Math.max(
     0,
-    serviceSubtotal - driverFee
+    serviceSubtotal - riderIncome
   );
 
   return {
     deliveryFee: safeDeliveryFee,
+    crossZoneFee: safeCrossZoneFee,
+    multiStopFee: safeMultiStopFee,
+    returnTripFee: safeReturnTripFee,
+    specialTaskFee: safeSpecialTaskFee,
+    taskHandlingFee: safeTaskHandlingFee,
+
     serviceFee: safeServiceFee,
     platformServiceFee,
 
@@ -24495,25 +24619,44 @@ function calculateFinancialSplit({
     upstairsFee: safeUpstairsFee,
     waitingFee: safeWaitingFee,
     itemSizeFee: safeItemSizeFee,
+    overweightFee: safeOverweightFee,
+    nightFee: safeNightFee,
+    weatherFee: safeWeatherFee,
+    dynamicPricingFee: safeDynamicPricingFee,
+    cancellationCompensation:
+      safeCancellationCompensation,
 
+    shareableTaskSubtotal,
+    riderOnlySurchargeSubtotal,
     taskSubtotal,
     serviceSubtotal,
 
-    driverFee,
-    riderFee: driverFee,
-    riderIncome: driverFee,
-    estimatedRiderIncome: driverFee,
+    riderBaseIncome,
+    driverFee: riderIncome,
+    riderFee: riderIncome,
+    riderIncome,
+    estimatedRiderIncome: riderIncome,
 
-    riderIncomeBeforeGuarantee:
+    // 這裡的「保底前收入」包含 100% 小U加價，
+    // 因此 riderIncome - riderIncomeBeforeGuarantee 仍只會等於真正的保底補貼。
+    riderBaseIncomeBeforeGuarantee:
       riderIncomeInfo.riderIncomeBeforeGuarantee,
+    riderIncomeBeforeGuarantee:
+      riderIncomeInfo.riderIncomeBeforeGuarantee +
+      riderOnlySurchargeSubtotal,
     riderGuaranteeSubsidy:
       riderIncomeInfo.riderGuaranteeSubsidy,
     riderMinimumApplied:
       riderIncomeInfo.riderMinimumApplied,
     riderMinimumTaskIncome:
       riderIncomeInfo.riderMinimumTaskIncome,
-    riderIncomePolicyVersion:
+    riderMinimumIncomePolicyVersion:
       riderIncomeInfo.riderIncomePolicyVersion,
+    riderIncomePolicyVersion:
+      String(
+        PRICING.riderIncomePolicyVersion ||
+        'UBEE_RIDER_INCOME_V2_20260901'
+      ),
 
     platformFee,
     platformIncome: platformFee,
@@ -24892,7 +25035,8 @@ function applyCustomTaskHandlingFee(
   const taskHandlingFee = Math.max(
     0,
     Math.round(
-      safeTaskMinutes * Number(PRICING.perMinute || 0)
+      safeTaskMinutes *
+      Number(PRICING.perMinute || 0)
     )
   );
 
@@ -24903,48 +25047,100 @@ function applyCustomTaskHandlingFee(
     return result;
   }
 
+  // 全能跑腿的「任務處理時間費」仍屬 A 類任務服務費，
+  // 參與 70 / 30，並與配送費一起判斷小U最低 NT$50。
+  result.shareableTaskSubtotal =
+    Math.max(
+      0,
+      Math.round(
+        Number(
+          result.shareableTaskSubtotal ??
+          result.deliveryFee ??
+          0
+        )
+      )
+    ) + taskHandlingFee;
+
   result.taskSubtotal =
-    Math.max(0, Math.round(Number(result.taskSubtotal || 0))) +
-    taskHandlingFee;
+    Math.max(
+      0,
+      Math.round(Number(result.taskSubtotal || 0))
+    ) + taskHandlingFee;
 
   result.serviceSubtotal =
     Math.max(
       0,
       Math.round(
-        Number(result.serviceSubtotal ?? result.total ?? 0)
+        Number(
+          result.serviceSubtotal ??
+          result.total ??
+          0
+        )
       )
     ) + taskHandlingFee;
 
   result.total = result.serviceSubtotal;
 
-  // 任務處理時間費同樣屬於 70 / 30 任務費本體。
-  // 必須以「加完處理時間費後的完整 taskSubtotal」重新判斷保底，
-  // 避免先補到 $50 再額外加 70% 而重複補貼。
-  const riderIncomeInfo =
-    calculateRiderTaskIncomeWithMinimum(result.taskSubtotal);
+  const riderOnlySurchargeSubtotal =
+    Math.max(
+      0,
+      Math.round(
+        Number(
+          result.riderOnlySurchargeSubtotal ||
+          0
+        )
+      )
+    );
 
-  result.driverFee = riderIncomeInfo.riderIncome;
+  const riderIncomeInfo =
+    calculateRiderTaskIncomeWithMinimum(
+      result.shareableTaskSubtotal
+    );
+
+  result.riderBaseIncome =
+    riderIncomeInfo.riderIncome;
+
+  result.driverFee =
+    riderIncomeInfo.riderIncome +
+    riderOnlySurchargeSubtotal;
+
   result.riderFee = result.driverFee;
   result.riderIncome = result.driverFee;
   result.estimatedRiderIncome = result.driverFee;
 
-  result.riderIncomeBeforeGuarantee =
+  result.riderBaseIncomeBeforeGuarantee =
     riderIncomeInfo.riderIncomeBeforeGuarantee;
+
+  result.riderIncomeBeforeGuarantee =
+    riderIncomeInfo.riderIncomeBeforeGuarantee +
+    riderOnlySurchargeSubtotal;
+
   result.riderGuaranteeSubsidy =
     riderIncomeInfo.riderGuaranteeSubsidy;
+
   result.riderMinimumApplied =
     riderIncomeInfo.riderMinimumApplied;
+
   result.riderMinimumTaskIncome =
     riderIncomeInfo.riderMinimumTaskIncome;
-  result.riderIncomePolicyVersion =
+
+  result.riderMinimumIncomePolicyVersion =
     riderIncomeInfo.riderIncomePolicyVersion;
+
+  result.riderIncomePolicyVersion =
+    String(
+      PRICING.riderIncomePolicyVersion ||
+      'UBEE_RIDER_INCOME_V2_20260901'
+    );
 
   result.platformFee = Math.max(
     0,
-    result.serviceSubtotal - result.driverFee
+    result.serviceSubtotal -
+    result.driverFee
   );
 
-  result.platformIncome = result.platformFee;
+  result.platformIncome =
+    result.platformFee;
 
   return result;
 }
@@ -25026,66 +25222,41 @@ function recalculateOrderFinancials(order) {
   );
 
   const itemSizeFee =
-    Object.prototype.hasOwnProperty.call(order, 'itemSizeFee')
+    Object.prototype.hasOwnProperty.call(
+      order,
+      'itemSizeFee'
+    )
       ? Math.max(
           0,
           Math.round(Number(order.itemSizeFee || 0))
         )
       : itemSizePricing.itemSizeFee;
 
+  // 所有一般訂單統一回到 V2 財務核心計算。
+  // 重要：任務處理時間費屬 70/30；急件／樓層／等待／體積／天候／動態費 100% 給小U。
   const financials = calculateFinancialSplit({
     deliveryFee: order.deliveryFee,
+    crossZoneFee: order.crossZoneFee,
+    multiStopFee: order.multiStopFee,
+    returnTripFee: order.returnTripFee,
+    specialTaskFee: order.specialTaskFee,
+    taskHandlingFee: order.taskHandlingFee,
+
     serviceFee: order.serviceFee,
+
     speedFee: order.speedFee,
     upstairsFee: order.upstairsFee,
     waitingFee: order.waitingFee,
     itemSizeFee,
+    overweightFee: order.overweightFee,
+    nightFee: order.nightFee,
+    weatherFee: order.weatherFee,
+    dynamicPricingFee:
+      order.dynamicPricingFee ||
+      order.dynamicFee,
+    cancellationCompensation:
+      order.cancellationCompensation,
   });
-
-  const dynamicPricingFee = Math.max(
-    0,
-    Math.round(
-      Number(
-        order.dynamicPricingFee ||
-        order.dynamicFee ||
-        0
-      )
-    )
-  );
-
-  const weatherFee = Math.max(
-    0,
-    Math.round(Number(order.weatherFee || 0))
-  );
-
-  // 動態調度費與天候保障費皆 100% 給小U。
-  const riderOnlySurcharges =
-    dynamicPricingFee +
-    weatherFee;
-
-  if (riderOnlySurcharges > 0) {
-    financials.taskSubtotal +=
-      riderOnlySurcharges;
-
-    financials.serviceSubtotal +=
-      riderOnlySurcharges;
-
-    financials.driverFee +=
-      riderOnlySurcharges;
-
-    financials.riderFee =
-      financials.driverFee;
-
-    // 這兩項不增加平台收入。
-    financials.platformFee = Math.max(
-      0,
-      financials.serviceSubtotal -
-      financials.driverFee
-    );
-
-    financials.platformIncome =
-      financials.platformFee;
-  }
 
   const advancePayment =
     getOrderAdvancePaymentAmount(order);
@@ -25120,11 +25291,50 @@ function recalculateOrderFinancials(order) {
   order.itemSizeFee =
     financials.itemSizeFee;
 
+  order.crossZoneFee =
+    financials.crossZoneFee;
+
+  order.multiStopFee =
+    financials.multiStopFee;
+
+  order.returnTripFee =
+    financials.returnTripFee;
+
+  order.specialTaskFee =
+    financials.specialTaskFee;
+
+  order.taskHandlingFee =
+    financials.taskHandlingFee;
+
+  order.overweightFee =
+    financials.overweightFee;
+
+  order.nightFee =
+    financials.nightFee;
+
+  order.weatherFee =
+    financials.weatherFee;
+
+  order.dynamicPricingFee =
+    financials.dynamicPricingFee;
+
+  order.dynamicFee =
+    financials.dynamicPricingFee;
+
+  order.cancellationCompensation =
+    financials.cancellationCompensation;
+
   order.itemSizeReviewRequired =
     order.itemSizeReviewRequired === true ||
     itemSizePricing.itemSizeReviewRequired;
 
   // 財務拆解
+  order.shareableTaskSubtotal =
+    financials.shareableTaskSubtotal;
+
+  order.riderOnlySurchargeSubtotal =
+    financials.riderOnlySurchargeSubtotal;
+
   order.taskSubtotal =
     financials.taskSubtotal;
 
@@ -25138,6 +25348,12 @@ function recalculateOrderFinancials(order) {
     financials.serviceSubtotal;
 
   // 騎士收入
+  order.riderBaseIncome =
+    financials.riderBaseIncome;
+
+  order.riderBaseIncomeBeforeGuarantee =
+    financials.riderBaseIncomeBeforeGuarantee;
+
   order.driverFee =
     financials.driverFee;
 
@@ -25164,6 +25380,9 @@ function recalculateOrderFinancials(order) {
 
   order.riderIncomePolicyVersion =
     financials.riderIncomePolicyVersion;
+
+  order.riderMinimumIncomePolicyVersion =
+    financials.riderMinimumIncomePolicyVersion;
 
   // 平台收入
   order.platformFee =
@@ -27201,9 +27420,13 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         waitingFee: financials.waitingFee,
         queueTimeFee,
         longTaskExtraFee,
+        shareableTaskSubtotal: financials.shareableTaskSubtotal,
+        riderOnlySurchargeSubtotal: financials.riderOnlySurchargeSubtotal,
         taskSubtotal: financials.taskSubtotal,
         serviceSubtotal: financials.serviceSubtotal,
         total: financials.serviceSubtotal,
+        riderBaseIncome: financials.riderBaseIncome,
+        riderBaseIncomeBeforeGuarantee: financials.riderBaseIncomeBeforeGuarantee,
         driverFee: financials.driverFee,
         riderFee: financials.riderFee,
         riderIncome: financials.riderIncome,
@@ -27213,6 +27436,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         riderMinimumApplied: financials.riderMinimumApplied,
         riderMinimumTaskIncome: financials.riderMinimumTaskIncome,
         riderIncomePolicyVersion: financials.riderIncomePolicyVersion,
+        riderMinimumIncomePolicyVersion: financials.riderMinimumIncomePolicyVersion,
         platformFee: financials.platformFee,
         platformIncome: financials.platformIncome,
       };
@@ -28004,10 +28228,25 @@ app.post('/api/merchant/order', async (req, res) => {
     );
 
     const total = deliveryFee + speedFee;
+
+    // 店家一般配送同樣套用小U收入制度 V2：
+    // 配送費 70/30 + 每單最低 $50；急件速度費 100% 給小U。
     const riderIncomeInfo =
-      calculateRiderTaskIncomeWithMinimum(total);
-    const driverFee = riderIncomeInfo.riderIncome;
-    const platformFee = Math.max(0, total - driverFee);
+      calculateRiderTaskIncomeWithMinimum(deliveryFee);
+
+    const riderBaseIncome =
+      riderIncomeInfo.riderIncome;
+
+    const driverFee =
+      riderBaseIncome +
+      speedFee;
+
+    const platformFee =
+      Math.max(0, total - driverFee);
+
+    const riderIncomeBeforeGuarantee =
+      riderIncomeInfo.riderIncomeBeforeGuarantee +
+      speedFee;
     const order = {
       
       id,
@@ -28047,15 +28286,29 @@ app.post('/api/merchant/order', async (req, res) => {
       storePayableAmount: total,
       totalFee: total,
 
+      shareableTaskSubtotal: deliveryFee,
+      riderOnlySurchargeSubtotal: speedFee,
+      taskSubtotal: total,
+
+      riderBaseIncome,
+      riderBaseIncomeBeforeGuarantee:
+        riderIncomeInfo.riderIncomeBeforeGuarantee,
+
       driverFee,
       riderFee: driverFee,
       riderIncome: driverFee,
       estimatedRiderIncome: driverFee,
-      riderIncomeBeforeGuarantee: riderIncomeInfo.riderIncomeBeforeGuarantee,
+      riderIncomeBeforeGuarantee,
       riderGuaranteeSubsidy: riderIncomeInfo.riderGuaranteeSubsidy,
       riderMinimumApplied: riderIncomeInfo.riderMinimumApplied,
       riderMinimumTaskIncome: riderIncomeInfo.riderMinimumTaskIncome,
-      riderIncomePolicyVersion: riderIncomeInfo.riderIncomePolicyVersion,
+      riderMinimumIncomePolicyVersion:
+        riderIncomeInfo.riderIncomePolicyVersion,
+      riderIncomePolicyVersion:
+        String(
+          PRICING.riderIncomePolicyVersion ||
+          'UBEE_RIDER_INCOME_V2_20260901'
+        ),
       platformFee,
       deliveryFee,
       serviceFee: 0,
@@ -31104,6 +31357,12 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     queueTimeFee,
     longTaskExtraFee,
 
+    shareableTaskSubtotal:
+      financials.shareableTaskSubtotal,
+
+    riderOnlySurchargeSubtotal:
+      financials.riderOnlySurchargeSubtotal,
+
     taskSubtotal:
       financials.taskSubtotal,
 
@@ -31112,6 +31371,12 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
 
     total:
       financials.serviceSubtotal,
+
+    riderBaseIncome:
+      financials.riderBaseIncome,
+
+    riderBaseIncomeBeforeGuarantee:
+      financials.riderBaseIncomeBeforeGuarantee,
 
     driverFee:
       financials.driverFee,
@@ -31139,6 +31404,9 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
 
     riderIncomePolicyVersion:
       financials.riderIncomePolicyVersion,
+
+    riderMinimumIncomePolicyVersion:
+      financials.riderMinimumIncomePolicyVersion,
 
     platformFee:
       financials.platformFee,
@@ -35492,10 +35760,25 @@ function getFinanceFeeBreakdown(order = {}) {
     baseFee: firstFinanceMoney(order, ['baseFee', 'startFee', 'startingFee'], 0),
     distanceFee: firstFinanceMoney(order, ['distanceFee'], 0),
     timeFee: firstFinanceMoney(order, ['timeFee'], 0),
+
+    crossZoneFee: firstFinanceMoney(order, ['crossZoneFee'], 0),
+    multiStopFee: firstFinanceMoney(order, ['multiStopFee'], 0),
+    returnTripFee: firstFinanceMoney(order, ['returnTripFee'], 0),
+    specialTaskFee: firstFinanceMoney(order, ['specialTaskFee'], 0),
+    taskHandlingFee: firstFinanceMoney(order, ['taskHandlingFee'], 0),
+
     platformServiceFee: firstFinanceMoney(order, ['platformServiceFee', 'serviceFee'], 0),
+
+    speedFee: firstFinanceMoney(order, ['speedFee', 'priorityFee'], 0),
     waitingFee: firstFinanceMoney(order, ['waitingFee'], 0),
     upstairsFee: firstFinanceMoney(order, ['upstairsFee'], 0),
-    speedFee: firstFinanceMoney(order, ['speedFee', 'priorityFee'], 0),
+    itemSizeFee: firstFinanceMoney(order, ['itemSizeFee'], 0),
+    overweightFee: firstFinanceMoney(order, ['overweightFee'], 0),
+    nightFee: firstFinanceMoney(order, ['nightFee'], 0),
+    weatherFee: firstFinanceMoney(order, ['weatherFee'], 0),
+    dynamicPricingFee: firstFinanceMoney(order, ['dynamicPricingFee', 'dynamicFee'], 0),
+    cancellationCompensation: firstFinanceMoney(order, ['cancellationCompensation'], 0),
+
     additionalFee: firstFinanceMoney(order, ['additionalFee', 'extraFee', 'surcharge'], 0),
     cancellationFee: firstFinanceMoney(order, ['cancellationFee'], 0),
     discountAmount: firstFinanceMoney(order, ['discountAmount', 'discount'], 0),
@@ -35513,6 +35796,25 @@ function buildFinanceClosureSnapshot(order = {}) {
   const finalCustomerTotal = getFinanceFinalCustomerTotal(order);
   const actualPaidAmount = getFinanceActualPaidAmount(order, finalCustomerTotal);
   const riderAdvance = getOrderAdvancePaymentAmount(order);
+
+  const shareableTaskSubtotal = firstFinanceMoney(
+    order,
+    ['shareableTaskSubtotal'],
+    0
+  );
+
+  const riderOnlySurchargeSubtotal = firstFinanceMoney(
+    order,
+    ['riderOnlySurchargeSubtotal'],
+    0
+  );
+
+  const riderBaseIncome = firstFinanceMoney(
+    order,
+    ['riderBaseIncome'],
+    0
+  );
+
   const riderIncome = firstFinanceMoney(order, [
     'riderIncome', 'riderFee', 'driverFee', 'riderEarning', 'riderPayout', 'riderShare', 'fee'
   ], 0);
@@ -35614,6 +35916,9 @@ function buildFinanceClosureSnapshot(order = {}) {
     finalCustomerTotal,
     actualPaidAmount,
     riderAdvance,
+    shareableTaskSubtotal,
+    riderOnlySurchargeSubtotal,
+    riderBaseIncome,
     riderIncome,
     riderIncomeBeforeGuarantee,
     riderGuaranteeSubsidy,
