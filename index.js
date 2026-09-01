@@ -8,6 +8,7 @@ const admin = require('firebase-admin');
 const webpush = require('web-push');
 const multer = require('multer');
 
+// 2026-09-01｜Rider Safety Backend V12.1：安全回報支援 payment/item、money→payment 相容正規化，並驗證 orderId 存在與騎士歸屬後才允許關聯／回寫訂單。
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
 // UBee Merchant PWA V4 + 小U資料庫 V2 Final｜2026-08-13：店家獨立密碼登入、COD 墊付配送、店家近距離費率。
 // 2026-08-04 R9｜全能跑腿 serviceMode 前後端一致：估價、建單與鎖價驗證統一為 custom。
@@ -20221,18 +20222,29 @@ app.post('/api/rider/safety-report', riderAuthMiddleware, async (req, res) => {
     // ==============================
     // 1. 安全回報分類
     // ==============================
+    // V12.1：安全中心正式分類統一使用 payment / item。
+    // 保留舊版 money 相容，但寫入資料庫時一律正規化為 payment。
+    const typeAliases = {
+      money: 'payment',
+    };
+
     const typeMap = {
-      customer: '客人失聯 / 無法交付',
-      store: '店家異常',
-      money: '金額 / 代墊異常',
-      accident: '事故 / 緊急狀況',
+      customer: '客人失聯／無法交付',
+      store: '店家／取件異常',
+      payment: '金額／代墊問題',
+      item: '商品損壞／遺失',
+      accident: '事故／緊急狀況',
       account_system: '帳號與系統',
     };
 
-    const safeReportType = cleanText(
+    const rawReportType = cleanText(
       reportType || '',
       30
     );
+
+    const safeReportType =
+      typeAliases[rawReportType] ||
+      rawReportType;
 
     const safeReportTitle = cleanText(
       reportTitle ||
@@ -20344,18 +20356,37 @@ app.post('/api/rider/safety-report', riderAuthMiddleware, async (req, res) => {
             .doc(safeOrderId)
             .get();
 
-        if (orderDoc.exists) {
-          orderData = {
-            id: orderDoc.id,
-            ...orderDoc.data(),
-          };
+        if (!orderDoc.exists) {
+          return res.status(404).json({
+            success: false,
+            message: '找不到此任務，請重新整理騎士端後再試。',
+          });
         }
+
+        const candidateOrder = {
+          id: orderDoc.id,
+          ...orderDoc.data(),
+        };
+
+        if (!isOrderBelongsToRider(candidateOrder, identity)) {
+          return res.status(403).json({
+            success: false,
+            message: '此任務不屬於目前登入的小U，無法建立安全回報。',
+          });
+        }
+
+        orderData = candidateOrder;
 
       } catch (orderErr) {
         console.warn(
           '安全中心回報讀取訂單失敗：',
           orderErr.message
         );
+
+        return res.status(503).json({
+          success: false,
+          message: '目前無法驗證任務資料，請稍後再試。',
+        });
       }
     }
 
@@ -20446,7 +20477,6 @@ app.post('/api/rider/safety-report', riderAuthMiddleware, async (req, res) => {
       // ==============================
       orderId:
         orderData?.id ||
-        safeOrderId ||
         '',
 
       orderNo:
@@ -20500,10 +20530,10 @@ app.post('/api/rider/safety-report', riderAuthMiddleware, async (req, res) => {
     // ==============================
     // 6. 回寫訂單最後安全回報
     // ==============================
-    if (report.orderId) {
+    if (orderData?.id) {
       await db
         .collection('orders')
-        .doc(report.orderId)
+        .doc(orderData.id)
         .set({
           lastSafetyReportId:
             reportId,
