@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-01｜Order ↔ Backend Pricing Contract V1：統一估價/建單服務欄位，加入全能跑腿 taskMinutes，排隊明細去重，樓層費改由後端正式判定。 -->
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
@@ -10360,6 +10361,16 @@ body.ubee-app-starting{
 </div>
 </div>
 </div>
+<div class="form-section hidden" id="helperTimeSection">
+<div class="form-title">任務處理時間</div>
+<div class="input-card">
+<div class="input-wrap">
+<div class="input-icon">分</div>
+<input id="taskMinutes" inputmode="numeric" max="480" min="10" placeholder="預估處理時間，例如：30" step="5" type="number" value="30"/>
+</div>
+</div>
+<div class="field-help">全能跑腿會依預估處理時間計算任務處理時間費；請依實際需要填寫。</div>
+</div>
 <div class="form-section">
 <div class="form-title">商品體積</div>
 <div class="input-card">
@@ -13523,6 +13534,7 @@ function bindOrderInputEvents(){
   qs('itemSize')?.addEventListener('change', handleEstimateAffectingChange);
   qs('advancePayment')?.addEventListener('input', handleEstimateAffectingChange);
   qs('queueMinutes')?.addEventListener('input', handleEstimateAffectingChange);
+  qs('taskMinutes')?.addEventListener('input', handleEstimateAffectingChange);
 
   updateSwapAddressButtonState();
 }
@@ -14442,6 +14454,7 @@ function applyDynamicFields(){
   qs('helperGuide')?.classList.toggle('hidden', !isHelper);
   qs('urgentGuide')?.classList.toggle('hidden', !isUrgent);
   qs('queueSection')?.classList.toggle('hidden', !isQueue);
+  qs('helperTimeSection')?.classList.toggle('hidden', !isHelper);
 
   qs('advancePaymentBox')?.classList.remove('hidden');
   qs('advanceRuleBox')?.classList.remove('hidden');
@@ -15180,6 +15193,25 @@ function validateStep2(){
     if(queueMinutesEl) queueMinutesEl.value = String(queueMinutes);
   }
 
+  if(serviceGroup === 'helper'){
+    const taskMinutesEl = qs('taskMinutes');
+    const taskMinutes = Math.max(0, Math.round(Number(taskMinutesEl ? taskMinutesEl.value : 0)));
+
+    if(taskMinutes <= 0){
+      alert('請填寫預估任務處理時間。');
+      taskMinutesEl?.focus();
+      return false;
+    }
+
+    if(taskMinutes > 480){
+      alert('任務處理時間超過 480 分鐘，建議改由 UBee 跑腿客服協助確認費用。');
+      taskMinutesEl?.focus();
+      return false;
+    }
+
+    if(taskMinutesEl) taskMinutesEl.value = String(taskMinutes);
+  }
+
   if(!pickup){
     alert('請填寫取件地點 / 購買地點 / 任務地點。');
     return false;
@@ -15333,6 +15365,7 @@ function getPayload(){
     selectedServiceCity,
     serviceMode:resolveClientServiceMode(serviceGroup,serviceType),
     queueMinutes:Math.max(0, Math.round(Number(qs('queueMinutes')?.value || 0))),
+    taskMinutes:Math.max(0, Math.round(Number(qs('taskMinutes')?.value || 0))),
 
     pickup,
     pickupAddress:pickup,
@@ -15570,7 +15603,10 @@ async function renderEstimate(){
   const pickup = qs('pickup')?.value.trim() || '';
   const dropoff = qs('dropoff')?.value.trim() || '';
   const queueMinutes = Math.max(0, Math.round(Number(qs('queueMinutes')?.value || 0)));
-  const isQueueTask = serviceGroup === 'queue';
+  const taskMinutes = Math.max(0, Math.round(Number(qs('taskMinutes')?.value || 0)));
+  const resolvedServiceMode = resolveClientServiceMode(serviceGroup, serviceType);
+  const isQueueTask = resolvedServiceMode === 'queue';
+  const isCustomTask = resolvedServiceMode === 'custom';
 
   if(isQueueTask && queueMinutes <= 0){
     lastQuoteData = null;
@@ -15580,6 +15616,30 @@ async function renderEstimate(){
     box.innerHTML = `
       <div class="price-row price-total"><span>費用</span><strong>請先填寫排隊時間</strong></div>
       <div class="price-note">排隊任務需要先填寫預估排隊時間，系統才能依後端費率計算。</div>
+    `;
+    return null;
+  }
+
+  if(isCustomTask && taskMinutes <= 0){
+    lastQuoteData = null;
+    lastEstimatedTotal = 0;
+    updateStickyEstimate('待填時間');
+
+    box.innerHTML = `
+      <div class="price-row price-total"><span>費用</span><strong>請先填寫處理時間</strong></div>
+      <div class="price-note">全能跑腿需要填寫預估任務處理時間，系統才能依後端費率計算。</div>
+    `;
+    return null;
+  }
+
+  if(isCustomTask && taskMinutes > 480){
+    lastQuoteData = null;
+    lastEstimatedTotal = 0;
+    updateStickyEstimate('人工確認');
+
+    box.innerHTML = `
+      <div class="price-row price-total"><span>費用</span><strong>人工確認</strong></div>
+      <div class="price-note">任務處理時間超過 480 分鐘，請先聯繫 UBee 跑腿客服人工確認。</div>
     `;
     return null;
   }
@@ -15605,10 +15665,14 @@ async function renderEstimate(){
     params.set('dropoff', dropoff);
     params.set('speedType', speedType);
     params.set('speed', speedType);
-    params.set('serviceMode', isQueueTask ? 'queue' : 'normal');
-    params.set('serviceType', getServiceGroupLabel());
+    params.set('serviceGroup', getServiceGroupForApi());
+    params.set('serviceMode', resolvedServiceMode);
+    params.set('serviceType', serviceType);
     params.set('serviceKey', getServiceKeyForApi());
     params.set('queueMinutes', String(queueMinutes));
+    params.set('taskMinutes', String(taskMinutes));
+    params.set('upstairsOption', upstairsOption);
+    // 僅保留舊後端相容欄位；正式費用由後端依 upstairsOption 決定。
     params.set('upstairsFee', String(upstairsFee));
     params.set('itemSize', getItemSizeOption());
     params.set('advancePayment', String(advancePayment));
@@ -15671,6 +15735,8 @@ async function renderEstimate(){
     const waitingFee = money(data.waitingFee);
     const queueTimeFee = money(data.queueTimeFee);
     const longTaskExtraFee = money(data.longTaskExtraFee);
+    const taskHandlingFee = money(data.taskHandlingFee);
+    const quotedTaskMinutes = Math.max(0, Math.round(Number(data.taskMinutes ?? taskMinutes)));
     const itemSizeFee = money(data.itemSizeFee);
     const itemSizeLabel = String(
       data.itemSizeLabel ||
@@ -15754,12 +15820,6 @@ if(isQueueTask){
     });
   }
 
-  if(waitingFee > 0){
-    detailRows.push({
-      label:'等候費',
-      value:waitingFee
-    });
-  }
 
 }else{
 
@@ -15788,6 +15848,13 @@ if(isQueueTask){
     detailRows.push({
       label:'配送服務費',
       value:deliveryFee
+    });
+  }
+
+  if(isCustomTask && taskHandlingFee > 0){
+    detailRows.push({
+      label:`任務處理時間費（${quotedTaskMinutes} 分鐘）`,
+      value:taskHandlingFee
     });
   }
 
@@ -15889,9 +15956,13 @@ const detailRowsHtml =
 const routeSummaryText =
   isQueueTask
     ? `預估排隊 ${queueMinutes} 分鐘`
-    : [distanceText, durationText]
-        .filter(Boolean)
-        .join('・');
+    : isCustomTask
+      ? [distanceText, `預估處理 ${quotedTaskMinutes} 分鐘`]
+          .filter(Boolean)
+          .join('・')
+      : [distanceText, durationText]
+          .filter(Boolean)
+          .join('・');
 
 
 /* ==============================
@@ -19255,11 +19326,11 @@ const UBeeEnhancements = (() => {
   const uid=()=>`${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`;
   const escapeAttr=x=>escapeHtml(String(x??''));
 
-  function collectDraft(){const timing=getOrderTimingPayload();return {version:3,savedAt:new Date().toISOString(),currentStep,serviceGroup,serviceType,serviceCategory,serviceMode,speedType,orderTimingType,scheduleGoal:timing.scheduleGoal,requestedScheduleAtMs:timing.requestedScheduleAtMs,flexibleStartAtMs:timing.flexibleStartAtMs,flexibleEndAtMs:timing.flexibleEndAtMs,pickup:value('pickup'),dropoff:value('dropoff'),pickupPhone:value('pickupPhone'),dropoffPhone:value('dropoffPhone'),pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),note:value('note'),advancePayment:value('advancePayment'),queueMinutes:value('queueMinutes'),upstairsOption:value('upstairsOption'),itemSize:value('itemSize'),shoppingItems:state.shoppingItems};}
+  function collectDraft(){const timing=getOrderTimingPayload();return {version:3,savedAt:new Date().toISOString(),currentStep,serviceGroup,serviceType,serviceCategory,serviceMode,speedType,orderTimingType,scheduleGoal:timing.scheduleGoal,requestedScheduleAtMs:timing.requestedScheduleAtMs,flexibleStartAtMs:timing.flexibleStartAtMs,flexibleEndAtMs:timing.flexibleEndAtMs,pickup:value('pickup'),dropoff:value('dropoff'),pickupPhone:value('pickupPhone'),dropoffPhone:value('dropoffPhone'),pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),note:value('note'),advancePayment:value('advancePayment'),queueMinutes:value('queueMinutes'),taskMinutes:value('taskMinutes'),upstairsOption:value('upstairsOption'),itemSize:value('itemSize'),shoppingItems:state.shoppingItems};}
   function saveDraft(){const d=collectDraft();if(!d.pickup&&!d.dropoff&&!d.note&&!d.pickupPhone&&!d.dropoffPhone)return;localStorage.setItem(KEYS.draft,JSON.stringify(d));}
   function scheduleDraft(){clearTimeout(state.draftTimer);state.draftTimer=setTimeout(saveDraft,500)}
   function clearDraft(){localStorage.removeItem(KEYS.draft)}
-  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,d.serviceType||serviceType);speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
+  function restoreDraft(d){if(!d||![2,3].includes(d.version))return;serviceGroup=d.serviceGroup||serviceGroup;renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===d.serviceType)||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=d.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,d.serviceType||serviceType);speedType=d.speedType||speedType;orderTimingType=d.orderTimingType||'immediate';scheduleGoal=d.scheduleGoal||'pickup_at';setValue('pickup',d.pickup);setValue('dropoff',d.dropoff);setValue('pickupPhone',d.pickupPhone);setValue('dropoffPhone',d.dropoffPhone);setValue('pickupAddressNote',d.pickupAddressNote);setValue('dropoffAddressNote',d.dropoffAddressNote);setValue('note',d.note);setValue('advancePayment',d.advancePayment||'0');setValue('queueMinutes',d.queueMinutes);setValue('taskMinutes',d.taskMinutes||'30');setValue('upstairsOption',d.upstairsOption||'none');setValue('itemSize',d.itemSize||'');state.shoppingItems=Array.isArray(d.shoppingItems)?d.shoppingItems:[];renderShoppingItems();updateTaskPathText();applyDynamicFields();ensureScheduleInputDefaults();if(d.requestedScheduleAtMs){const dt=new Date(Number(d.requestedScheduleAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('scheduledDate',`${p.year}-${p.month}-${p.day}`);setValue('scheduledTime',`${p.hour}:${p.minute}`)}if(d.flexibleStartAtMs){const dt=new Date(Number(d.flexibleStartAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleDate',`${p.year}-${p.month}-${p.day}`);setValue('flexibleStartTime',`${p.hour}:${p.minute}`)}if(d.flexibleEndAtMs){const dt=new Date(Number(d.flexibleEndAtMs));const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(dt);const p={};parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});setValue('flexibleEndTime',`${p.hour}:${p.minute}`)}setValue('scheduleGoal',scheduleGoal);selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();scheduleRouteRefresh();scheduleQuoteRefresh();}
   function offerDraft(){const d=safeParse(localStorage.getItem(KEYS.draft)||'',null);if(!d||!d.savedAt||Date.now()-new Date(d.savedAt).getTime()>7*86400000)return;const el=document.createElement('div');el.className='draft-banner';el.id='draftBanner';el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}<br>${new Date(d.savedAt).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;(document.querySelector('#productionOrderFlow #flowPageHome .flow-home-scroll')||document.querySelector('#productionOrderFlow #flowPageHome .flow-scroll')||document.querySelector('.app')||document.body).prepend(el);el.querySelector('.draft-discard').onclick=()=>{clearDraft();el.remove()};el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};}
 
   function renderQuickAddresses(){const bar=qs('savedAddressQuickBar'),list=getAddresses();if(!bar)return;bar.classList.toggle('hidden',!list.length);bar.innerHTML=list.map(a=>`<button class="quick-address-chip" type="button" onclick="UBeeEnhancements.applyAddress('${a.id}','dropoff')">${escapeAttr(a.label||'常用地址')}</button>`).join('')}
@@ -20020,6 +20091,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-form-group ubee-hidden-duplicate-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="999" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowQueueWrap"><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/></div>
+<div class="flow-form-group flow-dynamic-field" hidden="" id="flowTaskMinutesWrap"><label class="flow-label" for="flowTaskMinutes">預估任務處理時間</label><input class="flow-input" id="flowTaskMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/><div class="flow-inline-note">全能跑腿會依預估處理時間計算任務處理時間費。</div></div>
 <details class="flow-task-extra ubee-hidden-duplicate-field" id="flowExtraTaskDetails">
 <summary>其他配送需求（選填）</summary>
 <div class="flow-task-extra-body">
@@ -20381,7 +20453,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
     pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
-    taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,
+    taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
@@ -20571,7 +20643,9 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     $('flowUpstairs').value=state.upstairs;
     $('flowAdvancePayment').value=String(state.advancePayment||0);
     $('flowQueueMinutes').value=String(state.queueMinutes||30);
+    $('flowTaskMinutes').value=String(state.taskMinutes||30);
     $('flowQueueWrap').hidden=state.service!=='queue';
+    $('flowTaskMinutesWrap').hidden=state.service!=='helper';
     $('flowAdvanceWrap').hidden=!['buy','pickup','helper'].includes(state.service);
     $('flowExtraTaskDetails').hidden=state.service==='queue';
     $('flowItemSizeGroup').hidden=state.service==='queue';
@@ -20748,6 +20822,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     state.upstairs=$('flowUpstairs')?.value||'none';
     state.advancePayment=$('flowAdvanceWrap')?.hidden?0:Math.max(0,Math.round(Number($('flowAdvancePayment')?.value)||0));
     state.queueMinutes=Math.max(10,Math.min(480,Math.round(Number($('flowQueueMinutes')?.value)||30)));
+    state.taskMinutes=Math.round(Number($('flowTaskMinutes')?.value)||30);
   }
 
   function validateTask(){
@@ -20767,6 +20842,11 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     }else if(!state.taskNote){
       status('flowTaskStatus','請完整填寫任務內容，才能進入下一步。',true);
       $('flowTaskNote')?.focus();
+      return false;
+    }
+    if(state.service==='helper' && (!Number.isFinite(state.taskMinutes) || state.taskMinutes < 10 || state.taskMinutes > 480)){
+      status('flowTaskStatus','請填寫 10～480 分鐘內的預估任務處理時間。',true);
+      $('flowTaskMinutes')?.focus();
       return false;
     }
     if(state.advancePayment>=1000){
@@ -20802,7 +20882,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     set('taskItemName',purchase?.productName||state.taskName||selectedServiceDefinition().title||serviceLabels[state.service]);
     set('taskQuantity',purchase?.quantity||'');
     set('taskReplacementPolicy',purchaseLegacyPolicy(purchase?.outOfStockAction));
-    set('note',state.taskNote);set('item',state.taskNote);set('itemSize',state.itemSize);set('upstairsOption',state.upstairs);set('advancePayment',String(state.advancePayment||0));set('queueMinutes',state.service==='queue'?String(state.queueMinutes||30):'0');if(state.service==='queue')set('queueLocation',p.address||'');
+    set('note',state.taskNote);set('item',state.taskNote);set('itemSize',state.itemSize);set('upstairsOption',state.upstairs);set('advancePayment',String(state.advancePayment||0));set('queueMinutes',state.service==='queue'?String(state.queueMinutes||30):'0');set('taskMinutes',state.service==='helper'?String(state.taskMinutes||30):'0');if(state.service==='queue')set('queueLocation',p.address||'');
     set('scheduledDate',state.scheduledDate);set('scheduledTime',state.scheduledTime);set('scheduleGoal',state.scheduleGoal);set('flexibleDate',state.flexibleDate);set('flexibleStartTime',state.flexibleStart);set('flexibleEndTime',state.flexibleEnd);
     try{
       serviceGroup=state.service;serviceMode=resolveClientServiceMode(state.service,serviceLabels[state.service]);const def=selectedServiceDefinition();serviceType=def.title||serviceLabels[state.service];serviceCategory=state.serviceCategory||def.categories?.[0]||'其他';speedType=state.timing==='immediate'?state.speed:'standard';orderTimingType=state.timing;scheduleGoal=state.scheduleGoal;
@@ -20916,7 +20996,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home'],
       ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}\n${d.contactName||''} ${d.phone||''}`,'home'],
       ['任務內容',`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}\n${state.taskNote||'—'}`,'task'],
-      ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:''}`,'options']
+      ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:state.service==='helper'?`\n預估處理：${state.taskMinutes} 分鐘`:''}`,'options']
     ];
     $('flowSummaryList').innerHTML=rows.map(([label,value,target])=>`<div class="flow-summary-row"><span class="flow-summary-label">${escapeHtml(label)}</span><span class="flow-summary-value" style="white-space:pre-line">${escapeHtml(value)}</span><button class="flow-summary-edit" type="button" data-summary-go="${target}">修改</button></div>`).join('');
   }
@@ -20939,8 +21019,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   }
 
   function resetNewTask(clearLegacy=true){
-    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
-    if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=null;pickupPlaceId=dropoffPlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;localStorage.removeItem('ubee_order_draft_v2')}catch(_){ }}
+    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
+    if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=null;pickupPlaceId=dropoffPlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;localStorage.removeItem('ubee_order_draft_v2')}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
   }
 
