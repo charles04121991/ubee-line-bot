@@ -12367,6 +12367,104 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
           fee:
             riderIncome,
 
+          // 2026-09-01｜完成任務收入明細 V1
+          // 將正式收入制度 V2 的拆解欄位一併回傳給騎士端「完成任務」。
+          riderIncome:
+            riderIncome,
+
+          estimatedRiderIncome:
+            riderIncome,
+
+          shareableTaskSubtotal:
+            Math.max(0, Math.round(Number(order.shareableTaskSubtotal || 0))),
+
+          riderOnlySurchargeSubtotal:
+            Math.max(0, Math.round(Number(order.riderOnlySurchargeSubtotal || 0))),
+
+          riderBaseIncome:
+            Math.max(0, Math.round(Number(order.riderBaseIncome || 0))),
+
+          riderBaseIncomeBeforeGuarantee:
+            Math.max(0, Math.round(Number(order.riderBaseIncomeBeforeGuarantee || order.riderIncomeBeforeGuarantee || 0))),
+
+          riderIncomeBeforeGuarantee:
+            Math.max(0, Math.round(Number(order.riderIncomeBeforeGuarantee || order.riderBaseIncomeBeforeGuarantee || 0))),
+
+          riderGuaranteeSubsidy:
+            Math.max(0, Math.round(Number(order.riderGuaranteeSubsidy || 0))),
+
+          riderMinimumApplied:
+            order.riderMinimumApplied === true,
+
+          riderMinimumTaskIncome:
+            Math.max(0, Math.round(Number(order.riderMinimumTaskIncome || 0))),
+
+          riderIncomePolicyVersion:
+            String(order.riderIncomePolicyVersion || ''),
+
+          deliveryFee:
+            Math.max(0, Math.round(Number(order.deliveryFee || 0))),
+
+          serviceFee:
+            Math.max(0, Math.round(Number(order.serviceFee || 0))),
+
+          platformServiceFee:
+            Math.max(0, Math.round(Number(order.platformServiceFee || order.serviceFee || 0))),
+
+          speedFee:
+            Math.max(0, Math.round(Number(order.speedFee || 0))),
+
+          upstairsFee:
+            Math.max(0, Math.round(Number(order.upstairsFee || 0))),
+
+          waitingFee:
+            Math.max(0, Math.round(Number(order.waitingFee || 0))),
+
+          operationalWaitingFee:
+            Math.max(0, Math.round(Number(order.operationalWaitingFee || 0))),
+
+          itemSize:
+            order.itemSize || '',
+
+          itemSizeLabel:
+            order.itemSizeLabel || '',
+
+          itemSizeFee:
+            Math.max(0, Math.round(Number(order.itemSizeFee || 0))),
+
+          weatherType:
+            order.weatherType || 'none',
+
+          weatherLabel:
+            order.weatherLabel || '',
+
+          weatherFee:
+            Math.max(0, Math.round(Number(order.weatherFee || 0))),
+
+          dynamicPricingFee:
+            Math.max(0, Math.round(Number(order.dynamicPricingFee || order.dynamicFee || 0))),
+
+          crossZoneFee:
+            Math.max(0, Math.round(Number(order.crossZoneFee || 0))),
+
+          multiStopFee:
+            Math.max(0, Math.round(Number(order.multiStopFee || 0))),
+
+          returnTripFee:
+            Math.max(0, Math.round(Number(order.returnTripFee || 0))),
+
+          specialTaskFee:
+            Math.max(0, Math.round(Number(order.specialTaskFee || 0))),
+
+          overweightFee:
+            Math.max(0, Math.round(Number(order.overweightFee || 0))),
+
+          nightFee:
+            Math.max(0, Math.round(Number(order.nightFee || 0))),
+
+          cancellationCompensation:
+            Math.max(0, Math.round(Number(order.cancellationCompensation || 0))),
+
           // 舊版 rider.html 相容
           // price 保留騎士收入
           price:
