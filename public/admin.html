@@ -478,8 +478,11 @@ async function openFinanceOrder(orderId){
     document.getElementById('financeModalBody').innerHTML=`
       <div class="finance-detail-grid">
         ${financeDetailItem('初始估價',money(o.initialEstimatedTotal))}${financeDetailItem('最終應收',money(o.finalCustomerTotal))}${financeDetailItem('客戶實收',money(o.actualPaidAmount))}
-        ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('保底補貼',money(o.riderGuaranteeSubsidy))}
-        ${financeDetailItem('平台收入',money(o.expectedPlatformIncome))}${financeDetailItem('等待費',money(fees.waitingFee))}${financeDetailItem('上樓費',money(fees.upstairsFee))}${financeDetailItem('追加費用',money(fees.additionalFee))}
+        ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('小U基本收入',money(o.riderBaseIncome))}
+        ${financeDetailItem('70/30 任務費池',money(o.shareableTaskSubtotal))}${financeDetailItem('100% 小U加價池',money(o.riderOnlySurchargeSubtotal))}${financeDetailItem('保底補貼',money(o.riderGuaranteeSubsidy))}
+        ${financeDetailItem('平台收入',money(o.expectedPlatformIncome))}${financeDetailItem('急件／速度費',money(fees.speedFee))}${financeDetailItem('等待費',money(fees.waitingFee))}
+        ${financeDetailItem('上樓費',money(fees.upstairsFee))}${financeDetailItem('商品體積費',money(fees.itemSizeFee))}${financeDetailItem('天候保障費',money(fees.weatherFee))}
+        ${financeDetailItem('動態調度費',money(fees.dynamicPricingFee))}${financeDetailItem('任務處理時間費',money(fees.taskHandlingFee))}${financeDetailItem('追加費用',money(fees.additionalFee))}
         ${financeDetailItem('取消費',money(fees.cancellationFee))}${financeDetailItem('退款',money(fees.refundAmount))}${financeDetailItem('結算狀態',o.settlementStatus||'-')}
       </div>
       ${reasons.length?`<div class="finance-discrepancy"><b>尚有差異：</b>${esc(reasons.join('、'))}</div>`:''}
