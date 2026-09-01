@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260807-2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260901-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18,7 +18,7 @@
 <meta content="#ffffff" name="theme-color"/>
 <title>UBee 跑腿｜正式營運用戶端</title>
 <!-- UBee 用戶端 V2.12 + Password Reset V3：2026-08-14｜LINE Messaging API Bot 全自動核對；不使用 LIFF／不需客服 -->
-<!-- UBee 用戶端 V2 清理整合版：五步驟下單；客戶端地圖、取送點、道路路線與即時追蹤皆為不可移除核心。 -->
+<!-- UBee 用戶端 V3 第一階段｜2026-09-01：productionOrderFlow 移除獨立配送設定頁，合併至費用確認；底部導航改為固定尺寸淡黃選中卡。 -->
 <style>
     :root{
   --bg:#f5f6f7;
@@ -19895,6 +19895,40 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   .flow-stock-option{flex:1 1 calc(50% - 8px);}
 }
 </style>
+
+<style id="ubee-customer-v3-integrated-style">
+body.ubee-v3-focus-mode > #ubeePersistentBottomNav{display:none!important;}
+body.ubee-v3-focus-mode #productionOrderFlow .flow-page.active{inset:0!important;}
+#productionOrderFlow .ubee-v3-focus-page .flow-scroll{padding:14px 14px calc(28px + env(safe-area-inset-bottom))!important;}
+#productionOrderFlow .ubee-v3-tracking-hero,#productionOrderFlow .ubee-v3-complete-card{text-align:center;padding:24px 18px!important;}
+.ubee-v3-tracking-orbit{width:78px;height:78px;margin:0 auto 15px;border-radius:50%;border:7px solid #fff1a8;border-top-color:#f5c400;animation:ubeeV3Spin 1.05s linear infinite;display:grid;place-items:center}
+.ubee-v3-tracking-orbit span{width:42px;height:42px;border-radius:50%;background:#fff8d6;display:block}
+@keyframes ubeeV3Spin{to{transform:rotate(360deg)}}
+.ubee-v3-tracking-kicker{font-size:12px;font-weight:1000;color:#8a6a00;margin-bottom:5px}
+.ubee-v3-tracking-title{font-size:24px;font-weight:1000;letter-spacing:-.5px;line-height:1.3}
+.ubee-v3-tracking-desc{margin-top:7px;color:#6f7378;font-size:13px;font-weight:800;line-height:1.65}
+.ubee-v3-tracking-meta{display:inline-flex;margin-top:12px;padding:7px 11px;border-radius:999px;background:#fff8d6;color:#6a5200;font-size:11px;font-weight:1000}
+.ubee-v3-rider-card{display:flex;align-items:center;gap:12px}
+.ubee-v3-rider-avatar{width:46px;height:46px;border-radius:15px;background:#facc15;display:grid;place-items:center;font-weight:1000;font-size:20px}
+.ubee-v3-rider-main{display:flex;flex-direction:column;gap:2px}.ubee-v3-rider-main small{color:#8b9096;font-weight:900}.ubee-v3-rider-main strong{font-size:17px}.ubee-v3-rider-main span{font-size:12px;color:#6f7378;font-weight:800}
+.ubee-v3-stage-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ubee-v3-stage-head strong{font-size:17px}.ubee-v3-stage-head span{font-size:12px;color:#8a8f95;font-weight:900}
+.ubee-v3-stage-list{display:flex;flex-direction:column}
+.ubee-v3-stage-item{display:grid;grid-template-columns:24px 1fr;gap:10px;min-height:48px;position:relative}
+.ubee-v3-stage-item:not(:last-child)::after{content:"";position:absolute;left:11px;top:24px;bottom:-2px;width:2px;background:#e5e7eb}
+.ubee-v3-stage-dot{width:24px;height:24px;border-radius:50%;border:2px solid #d7d9dc;background:#fff;display:grid;place-items:center;font-size:11px;font-weight:1000;z-index:1}
+.ubee-v3-stage-item.done .ubee-v3-stage-dot,.ubee-v3-stage-item.current .ubee-v3-stage-dot{border-color:#f3bd00;background:#facc15;color:#111}
+.ubee-v3-stage-item.done:not(:last-child)::after{background:#f0c940}
+.ubee-v3-stage-copy strong{display:block;font-size:14px;line-height:1.45}.ubee-v3-stage-copy small{display:block;margin-top:3px;color:#8a8f95;font-size:11px;font-weight:800}
+.ubee-v3-route-summary>div{display:flex;flex-direction:column;gap:3px}.ubee-v3-route-summary small{color:#8a8f95;font-weight:900}.ubee-v3-route-summary strong{font-size:14px;line-height:1.55}.ubee-v3-route-line{height:1px;background:#eceef0;margin:12px 0}
+.ubee-v3-tracking-total{display:flex;align-items:center;justify-content:space-between}.ubee-v3-tracking-total span{color:#6f7378;font-weight:900}.ubee-v3-tracking-total strong{font-size:25px}
+.ubee-v3-complete-icon{width:78px;height:78px;margin:0 auto 16px;border-radius:50%;background:#facc15;display:grid;place-items:center;font-size:39px;font-weight:1000}
+.ubee-v3-complete-title{font-size:27px;font-weight:1000;letter-spacing:-.6px}.ubee-v3-complete-desc{margin-top:7px;color:#6f7378;font-size:13px;font-weight:800}
+.ubee-v3-complete-price-label{margin-top:22px;color:#8a8f95;font-size:12px;font-weight:900}.ubee-v3-complete-price{margin-top:3px;font-size:38px;font-weight:1000}.ubee-v3-complete-order{margin-top:6px;font-size:11px;color:#9a9fa5;font-weight:850}
+.ubee-v3-complete-route>div{display:flex;flex-direction:column;gap:3px;padding:7px 0}.ubee-v3-complete-route small{color:#8a8f95;font-weight:900}.ubee-v3-complete-route strong{font-size:14px;line-height:1.55}
+body > #ubeePersistentBottomNav > button.active{background:#fff4b8!important;color:#111!important;border-radius:14px!important;margin:5px 6px!important;width:calc(100% - 12px)!important;height:calc(var(--ubee-nav-content-height) - 10px)!important;min-height:calc(var(--ubee-nav-content-height) - 10px)!important;}
+body > #ubeePersistentBottomNav > button.active::before{display:none!important}
+</style>
+
 <div aria-label="UBee 客人端正式下單流程" id="productionOrderFlow">
 <div class="flow-shell">
 <div class="flow-loading" id="flowLoading"><div class="flow-spinner"></div><div id="flowLoadingText">系統處理中…</div></div>
@@ -20031,19 +20065,19 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </details>
 <div class="flow-status" id="flowTaskStatus"></div>
 </div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="home" type="button">上一步</button><button class="flow-primary" id="flowTaskNext" type="button">下一步：配送設定</button></div></div>
+<div class="flow-actionbar"><button class="flow-secondary" data-go="home" type="button">上一步</button><button class="flow-primary" id="flowTaskNext" type="button">下一步：確認費用</button></div></div>
 
 </section>
-<section class="flow-page" data-page="options" id="flowPageOptions">
+<section class="flow-page" data-page="confirm" id="flowPageConfirm">
 <header class="flow-header">
 <button aria-label="返回" class="flow-back-btn" data-go="task" type="button">‹</button>
-<div class="flow-title-wrap"><div class="flow-title">配送設定</div><div class="flow-subtitle">選擇執行時間與處理速度</div></div>
+<div class="flow-title-wrap"><div class="flow-title">費用確認</div><div class="flow-subtitle">確認執行時間、路線與正式費用</div></div>
 <span></span>
 </header>
 <div class="flow-progress" data-progress="2"></div>
 <div class="flow-scroll">
-<div class="flow-card">
-<div class="flow-section-title">任務時間</div>
+<div class="flow-card flow-confirm-options-card">
+<div class="flow-section-title">執行時間</div>
 <div class="flow-timing-list" id="flowTimingList">
 <button class="flow-choice active" data-timing="immediate" type="button"><strong>立即任務</strong><small>現在開始媒合</small></button>
 <button class="flow-choice" data-timing="scheduled" type="button"><strong>指定時間</strong><small>預約日期時間</small></button>
@@ -20057,27 +20091,15 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-form-group"><label class="flow-label" for="flowFlexibleDate">日期</label><input class="flow-input" id="flowFlexibleDate" type="date"/></div>
 <div class="flow-grid-2"><div class="flow-form-group"><label class="flow-label" for="flowFlexibleStart">開始時間</label><input class="flow-input" id="flowFlexibleStart" step="300" type="time"/></div><div class="flow-form-group"><label class="flow-label" for="flowFlexibleEnd">結束時間</label><input class="flow-input" id="flowFlexibleEnd" step="300" type="time"/></div></div>
 </div>
-</div>
-<div class="flow-card" id="flowSpeedCard">
-<div class="flow-section-title">處理速度</div>
+<div class="flow-section-title flow-confirm-speed-title">處理速度</div>
 <div class="flow-speed-list" id="flowSpeedList">
 <button class="flow-choice active" data-speed="standard" type="button"><strong>一般件</strong><small>經濟配送</small></button>
 <button class="flow-choice" data-speed="priority" type="button"><strong>標準件</strong><small>較快媒合</small></button>
 <button class="flow-choice" data-speed="express" type="button"><strong>優先件</strong><small>優先處理</small></button>
 </div>
-</div>
+<div id="flowSpeedCard" hidden></div>
 <div class="flow-status" id="flowOptionsStatus"></div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="task" type="button">上一步</button><button class="flow-primary" id="flowOptionsNext" type="button">下一步：確認任務</button></div></div>
-
-</section>
-<section class="flow-page" data-page="confirm" id="flowPageConfirm">
-<header class="flow-header">
-<button aria-label="返回" class="flow-back-btn" data-go="options" type="button">‹</button>
-<div class="flow-title-wrap"><div class="flow-title">確認任務</div><div class="flow-subtitle">確認地點、內容、路線與費用</div></div>
-<span></span>
-</header>
-<div class="flow-progress" data-progress="3"></div>
-<div class="flow-scroll">
+</div>
 <div class="flow-card" style="padding:0;border:none;box-shadow:none;background:transparent">
 <div class="flow-map"><div class="flow-map-canvas" id="flowConfirmMapCanvas"></div><div class="flow-map-status" id="flowMapStatus">正在載入取件位置、送達位置與道路路線…</div></div>
 </div>
@@ -20085,7 +20107,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-card flow-price-card"><div><small>正式估價</small><div class="flow-route-meta" id="flowRouteMeta">正在計算路線與費用</div></div><div class="flow-price" id="flowConfirmPrice">—</div></div>
 <label class="flow-check"><input id="flowAgree" type="checkbox"/><span>我已確認取件地點、送達地點、聯絡資訊、任務內容、執行時間與費用。</span></label>
 <div class="flow-status" id="flowConfirmStatus"></div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="options" type="button">上一步</button><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div></div>
+<div class="flow-actionbar"><button class="flow-secondary" data-go="task" type="button">上一步</button><button class="flow-primary" id="flowSubmitOrder" type="button">確認叫小U</button></div></div>
 
 </section>
 <section class="flow-page" data-page="search" id="flowPageSearch">
@@ -20134,6 +20156,65 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 </div>
 </section>
+
+<section class="flow-page ubee-v3-focus-page" data-page="tracking" id="flowPageTracking">
+<header class="flow-header">
+<button aria-label="返回任務" class="flow-back-btn" id="flowTrackingBack" type="button">‹</button>
+<div class="flow-title-wrap"><div class="flow-title">任務進行中</div><div class="flow-subtitle" id="flowTrackingOrderNo">UBee 正在同步最新進度</div></div>
+<span></span>
+</header>
+<div class="flow-scroll">
+<div class="flow-card ubee-v3-tracking-hero">
+<div class="ubee-v3-tracking-orbit" aria-hidden="true"><span></span></div>
+<div class="ubee-v3-tracking-kicker">即時任務狀態</div>
+<div class="ubee-v3-tracking-title" id="flowTrackingTitle">正在尋找附近的小U</div>
+<div class="ubee-v3-tracking-desc" id="flowTrackingDescription">小U接單後會顯示最新進度。</div>
+<div class="ubee-v3-tracking-meta" id="flowTrackingMeta">系統同步中</div>
+</div>
+<div class="flow-card ubee-v3-rider-card" id="flowTrackingRiderCard" hidden>
+<div class="ubee-v3-rider-avatar">U</div>
+<div class="ubee-v3-rider-main"><small>承接小U</small><strong id="flowTrackingRiderName">小U</strong><span id="flowTrackingRiderMeta">已接單</span></div>
+</div>
+<div class="flow-card">
+<div class="ubee-v3-stage-head"><strong>任務進度</strong><span id="flowTrackingStageText">1 / 8</span></div>
+<div class="ubee-v3-stage-list" id="flowTrackingStages"></div>
+</div>
+<div class="flow-card ubee-v3-route-summary">
+<div><small>取件</small><strong id="flowTrackingPickup">—</strong></div>
+<div class="ubee-v3-route-line"></div>
+<div><small>送達</small><strong id="flowTrackingDropoff">—</strong></div>
+</div>
+<div class="flow-card ubee-v3-tracking-total"><span>任務金額</span><strong id="flowTrackingTotal">—</strong></div>
+<div class="flow-status" id="flowTrackingStatus"></div>
+<button class="flow-primary" id="flowTrackingCashConfirm" type="button" hidden>確認現金單，開始尋找小U</button>
+<button class="flow-secondary" id="flowTrackingRefresh" type="button">重新整理進度</button>
+</div>
+</section>
+
+<section class="flow-page ubee-v3-focus-page" data-page="complete" id="flowPageComplete">
+<header class="flow-header">
+<span></span>
+<div class="flow-title-wrap"><div class="flow-title">任務完成</div><div class="flow-subtitle">感謝使用 UBee 跑腿</div></div>
+<span></span>
+</header>
+<div class="flow-scroll">
+<div class="flow-card ubee-v3-complete-card">
+<div class="ubee-v3-complete-icon">✓</div>
+<div class="ubee-v3-complete-title">任務已完成！</div>
+<div class="ubee-v3-complete-desc">這次任務已順利完成。</div>
+<div class="ubee-v3-complete-price-label">本次任務金額</div>
+<div class="ubee-v3-complete-price" id="flowCompleteTotal">—</div>
+<div class="ubee-v3-complete-order" id="flowCompleteOrderNo">—</div>
+</div>
+<div class="flow-card ubee-v3-complete-route">
+<div><small>取件</small><strong id="flowCompletePickup">—</strong></div>
+<div><small>送達</small><strong id="flowCompleteDropoff">—</strong></div>
+</div>
+<button class="flow-primary" id="flowCompleteReorder" type="button">再叫一次</button>
+<button class="flow-secondary" id="flowCompleteHome" type="button">返回首頁</button>
+</div>
+</section>
+
 <section class="flow-page ubee-primary-task-page" data-page="tasksRoot" id="flowPageTasksRoot">
 <header class="flow-header home ubee-primary-page-header">
 <div class="flow-title-wrap"><div class="flow-title">任務</div><div class="flow-subtitle">查看進行中與歷史跑腿任務</div></div>
@@ -20377,7 +20458,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   const $=id=>document.getElementById(id);
   const root=$('productionOrderFlow');
   const serviceLabels={send:'幫我送',pickup:'幫我取',buy:'幫我買',queue:'幫排隊',helper:'全能跑腿'};
-  const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,profile:0,profileDetail:0};
+  const pageStep={home:0,search:0,detail:0,task:1,confirm:2,tracking:3,complete:4,tasksRoot:0,profile:0,profileDetail:0,stores:0,storeDetail:0};
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
     pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
@@ -20386,7 +20467,8 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
     mapRenderId:0,submitting:false,profileOrders:[],selectedProfileOrder:null,
-    storeContext:null
+    storeContext:null,
+    trackingTimer:null,trackingPayload:null,lastCompletedOrder:null
   };
 
   function setLoading(show,text='系統處理中…'){$('flowLoadingText').textContent=text;$('flowLoading').classList.toggle('show',!!show)}
@@ -20411,16 +20493,19 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   function buildProgress(){
     document.querySelectorAll('#productionOrderFlow .flow-progress').forEach(bar=>{
       const active=Number(bar.dataset.progress||0);
-      bar.innerHTML=['地點','任務內容','配送設定','確認送出'].map((label,index)=>`<div class="flow-progress-item ${index===active?'active':index<active?'done':''}" data-number="${index+1}">${label}</div>`).join('');
+      bar.innerHTML=['地點','任務內容','費用確認'].map((label,index)=>`<div class="flow-progress-item ${index===active?'active':index<active?'done':''}" data-number="${index+1}">${label}</div>`).join('');
     });
   }
 
   function showPage(name){
     state.page=name;
     if(!['stores','storeDetail'].includes(name)) document.body.classList.remove('ubee-store-active');
+    const focusPages=new Set(['task','confirm','search','detail','tracking','complete','profileDetail','storeDetail']);
+    document.body.classList.toggle('ubee-v3-focus-mode',focusPages.has(name));
     root.querySelectorAll('.flow-page').forEach(page=>page.classList.toggle('active',page.dataset.page===name));
     const scroller=root.querySelector(`.flow-page[data-page="${name}"] .flow-scroll`);
     if(scroller)scroller.scrollTop=0;
+    if(name!=='tracking') stopTrackingPolling();
   }
 
   function selectedServiceDefinition(){
@@ -20723,7 +20808,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     const item={label:String($('flowDetailLabel').value||'').trim()||(state.addressTarget==='pickup'?'取件地址':'收件地址'),address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
     if(state.addressTarget==='pickup'){state.pickup=item;if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};}else{state.dropoff={...item,_autoQueue:false};}
     if($('flowSaveAddress').checked)await persistAddress(item);
-    updateHome();syncLegacy();showPage('home');
+    updateHome();syncSharedCoreState();showPage('home');
   }
 
   async function persistAddress(item){
@@ -20785,6 +20870,23 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function setTiming(type){state.timing=['immediate','scheduled','flexible'].includes(type)?type:'immediate';root.querySelectorAll('[data-timing]').forEach(btn=>btn.classList.toggle('active',btn.dataset.timing===state.timing));$('flowScheduledPanel').classList.toggle('show',state.timing==='scheduled');$('flowFlexiblePanel').classList.toggle('show',state.timing==='flexible');$('flowSpeedCard').style.display=state.timing==='immediate'?'block':'none';if(state.timing!=='immediate')state.speed='standard';ensureTimeDefaults()}
   function setSpeed(type){state.speed=['standard','priority','express'].includes(type)?type:'standard';root.querySelectorAll('[data-speed]').forEach(btn=>btn.classList.toggle('active',btn.dataset.speed===state.speed))}
+  let confirmEstimateRefreshTimer=null;
+  function refreshConfirmEstimateDebounced(){
+    clearTimeout(confirmEstimateRefreshTimer);
+    confirmEstimateRefreshTimer=setTimeout(async()=>{
+      if(state.page!=='confirm')return;
+      try{
+        if(!validateOptions())return;
+        syncSharedCoreState();
+        await refreshProductionQuote();
+        const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);
+        if($('flowConfirmPrice'))$('flowConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';
+      }catch(error){
+        console.warn('費用確認頁重新估價失敗：',error);
+        status('flowConfirmStatus','費用更新暫時失敗，請稍後再試。',true);
+      }
+    },220);
+  }
   function combineTaipei(date,time){return Date.parse(`${date}T${time}:00+08:00`)}
   function validateOptions(){
     state.scheduleGoal=$('flowScheduleGoal').value;state.scheduledDate=$('flowScheduledDate').value;state.scheduledTime=$('flowScheduledTime').value;state.flexibleDate=$('flowFlexibleDate').value;state.flexibleStart=$('flowFlexibleStart').value;state.flexibleEnd=$('flowFlexibleEnd').value;
@@ -20794,89 +20896,83 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     status('flowOptionsStatus','');return true;
   }
 
-  function syncLegacy(){
-    const p=state.pickup||{},d=state.dropoff||{};const set=(id,value)=>{const el=$(id);if(el)el.value=value??''};
-    set('pickup',p.address||'');set('pickupAddressNote',p.addressDetail||'');set('pickupContact',p.contactName||'');set('pickupPhone',p.phone||'');
-    set('dropoff',d.address||'');set('dropoffAddressNote',d.addressDetail||'');set('dropoffContact',d.contactName||'');set('dropoffPhone',d.phone||'');
-    const purchase=state.service==='buy'?normalizePurchaseDetails(state.purchaseDetails):null;
-    set('taskItemName',purchase?.productName||state.taskName||selectedServiceDefinition().title||serviceLabels[state.service]);
-    set('taskQuantity',purchase?.quantity||'');
-    set('taskReplacementPolicy',purchaseLegacyPolicy(purchase?.outOfStockAction));
-    set('note',state.taskNote);set('item',state.taskNote);set('itemSize',state.itemSize);set('upstairsOption',state.upstairs);set('advancePayment',String(state.advancePayment||0));set('queueMinutes',state.service==='queue'?String(state.queueMinutes||30):'0');if(state.service==='queue')set('queueLocation',p.address||'');
-    set('scheduledDate',state.scheduledDate);set('scheduledTime',state.scheduledTime);set('scheduleGoal',state.scheduleGoal);set('flexibleDate',state.flexibleDate);set('flexibleStartTime',state.flexibleStart);set('flexibleEndTime',state.flexibleEnd);
-    try{
-      serviceGroup=state.service;serviceMode=resolveClientServiceMode(state.service,serviceLabels[state.service]);const def=selectedServiceDefinition();serviceType=def.title||serviceLabels[state.service];serviceCategory=state.serviceCategory||def.categories?.[0]||'其他';speedType=state.timing==='immediate'?state.speed:'standard';orderTimingType=state.timing;scheduleGoal=state.scheduleGoal;
-      pickupLat=validPoint(p)?Number(p.lat):null;pickupLng=validPoint(p)?Number(p.lng):null;pickupPlaceId=p.placeId||'';dropoffLat=validPoint(d)?Number(d.lat):null;dropoffLng=validPoint(d)?Number(d.lng):null;dropoffPlaceId=d.placeId||'';
-      if(typeof selectOrderTimingType==='function')selectOrderTimingType(state.timing);if(typeof selectSpeed==='function')selectSpeed(speedType);if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();
-    }catch(error){console.warn('同步正式訂單欄位失敗：',error)}
+
+  function effectiveSpeed(){return state.timing==='immediate'?state.speed:'standard'}
+  function serviceGroupForApi(){return state.service==='helper'?'life':state.service}
+
+  function buildTimingPayload(){
+    if(state.timing==='scheduled')return{orderTimingType:'scheduled',timingType:'scheduled',scheduleGoal:state.scheduleGoal==='complete_by'?'complete_by':'pickup_at',requestedScheduleAtMs:combineTaipei(state.scheduledDate,state.scheduledTime),flexibleStartAtMs:0,flexibleEndAtMs:0};
+    if(state.timing==='flexible')return{orderTimingType:'flexible',timingType:'flexible',scheduleGoal:'time_window',requestedScheduleAtMs:0,flexibleStartAtMs:combineTaipei(state.flexibleDate,state.flexibleStart),flexibleEndAtMs:combineTaipei(state.flexibleDate,state.flexibleEnd)};
+    return{orderTimingType:'immediate',timingType:'immediate',scheduleGoal:'immediate',requestedScheduleAtMs:0,flexibleStartAtMs:0,flexibleEndAtMs:0};
   }
 
-  function wrapPayload(){
+  function buildStoreDiscovery(){
+    const store=state.storeContext&&typeof state.storeContext==='object'?state.storeContext:null;
+    if(!store)return null;
+    return{placeId:String(store.placeId||store.id||'').trim(),name:String(store.name||'').trim(),category:String(store.category||'other').trim(),typeLabel:String(store.typeLabel||'').trim(),address:String(store.address||'').trim(),phone:String(store.phone||'').trim(),source:String(store.source||'').toLowerCase()==='local'?'ubee_local_catalog':'google_places',sourceLabel:String(store.source||'').toLowerCase()==='local'?'UBee 本地店家目錄':'Google Maps 公開店家資訊'};
+  }
+
+  function buildProductionOrderPayload(){
+    const p=state.pickup||{},d=state.dropoff||{},def=selectedServiceDefinition();
+    const purchase=state.service==='buy'?normalizePurchaseDetails(state.purchaseDetails):null;
+    const note=purchase?buildPurchaseTaskNote(purchase):String(state.taskNote||'').trim();
+    const storeDiscovery=buildStoreDiscovery();
+    const upstairsFee=typeof calculateUpstairsFee==='function'?calculateUpstairsFee(state.upstairs):0;
+    const upstairsLabel=typeof getUpstairsLabel==='function'?getUpstairsLabel(state.upstairs):String(state.upstairs||'none');
+    const itemMeta=typeof getItemSizeMeta==='function'?getItemSizeMeta(state.itemSize):{label:state.itemSize};
+    const advance=Math.max(0,Math.round(Number(state.advancePayment||0)));
+    return{
+      serviceGroup:serviceGroupForApi(),serviceKey:state.service,serviceType:def.title||serviceLabels[state.service],serviceCategory:state.serviceCategory||def.categories?.[0]||'其他',
+      serviceCity:typeof selectedServiceCity!=='undefined'?selectedServiceCity:'臺中市',selectedServiceCity:typeof selectedServiceCity!=='undefined'?selectedServiceCity:'臺中市',
+      serviceMode:resolveClientServiceMode(state.service,def.title||serviceLabels[state.service]),queueMinutes:state.service==='queue'?Math.max(0,Math.round(Number(state.queueMinutes||30))):0,
+      pickup:p.address||'',pickupAddress:p.address||'',pickupAddressNote:p.addressDetail||'',pickupPhone:cleanPhone(p.phone),pickupContact:String(p.contactName||'').trim(),pickupLat:validPoint(p)?Number(p.lat):null,pickupLng:validPoint(p)?Number(p.lng):null,pickupPlaceId:p.placeId||'',
+      dropoff:d.address||'',dropoffAddress:d.address||'',dropoffAddressNote:d.addressDetail||'',dropoffPhone:cleanPhone(d.phone),dropoffContact:String(d.contactName||'').trim(),dropoffLat:validPoint(d)?Number(d.lat):null,dropoffLng:validPoint(d)?Number(d.lng):null,dropoffPlaceId:d.placeId||'',
+      item:note||state.taskName||def.title||serviceLabels[state.service],note,itemQuantity:purchase?.quantity||'',proofRequired:'none',proofRequiredLabel:'',
+      taskDetails:{itemName:purchase?.productName||state.taskName||def.title||'',quantity:purchase?.quantity||'',weight:'',pickupCode:'',pickupPaid:'unknown',replacementPolicy:purchaseLegacyPolicy(purchase?.outOfStockAction),invoice:'need',queuePurpose:'',queueHandoff:'',deadline:''},
+      purchaseDetails:purchase,shoppingItems:purchase?[{name:purchase.productName,quantity:purchase.quantity,specification:purchase.specification,budget:String(advance),replacementPolicy:purchaseLegacyPolicy(purchase.outOfStockAction)}]:undefined,
+      deliveryPreferences:[],vehiclePreference:'any',itemSize:state.itemSize,itemSizeLabel:itemMeta?.label||state.itemSize,speedType:effectiveSpeed(),speed:effectiveSpeed(),...buildTimingPayload(),
+      locationConfirmed:true,advancePayment:advance,estimatedGoodsAmount:advance,purchaseAdvanceAllowed:advance>0,riderAdvanceAmount:advance,purchasePaymentRule:advance>0?'rider_advance_then_customer_pay':'no_advance',
+      paymentMethod:'unselected',paymentLabel:'尚未選擇',paymentStatus:'unselected',isCashOrder:false,
+      upstairsOption:state.upstairs,upstairsLabel,upstairsFee,fareMode:'base_km_minute',
+      quoteId:String(lastQuoteData?.quoteId||''),quotedAtMs:Number(lastQuoteData?.quotedAtMs||0),quoteExpiresAtMs:Number(lastQuoteData?.expiresAtMs||0),dynamicPricingFee:Math.max(0,Math.round(Number(lastQuoteData?.dynamicPricingFee||0))),
+      pickupAddressObject:state.pickup||null,dropoffAddressObject:state.dropoff||null,
+      nearbyPlace:storeDiscovery?{name:storeDiscovery.name,address:storeDiscovery.address,placeId:storeDiscovery.placeId,phone:storeDiscovery.phone,lat:Number.isFinite(Number(state.storeContext?.lat))?Number(state.storeContext.lat):null,lng:Number.isFinite(Number(state.storeContext?.lng))?Number(state.storeContext.lng):null}:null,
+      storeDiscovery,dispatchClientVersion:'customer-v3-20260901',clientSchemaVersion:'customer-v3-five-step-2026-09-01',clientSubmittedAtMs:Date.now(),clientTimeZone:(Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Taipei')
+    };
+  }
+
+  function syncSharedCoreState(){
+    const p=state.pickup||{},d=state.dropoff||{},def=selectedServiceDefinition();
     try{
-      if(typeof getPayload!=='function'||getPayload.__productionFlowWrapped)return;
-      const original=getPayload;
-      const wrapped=function(){
-        const payload=original.apply(this,arguments);
-        const store=state.storeContext&&typeof state.storeContext==='object'
-          ? state.storeContext
-          : null;
-        const storeDiscovery=store?{
-          placeId:String(store.placeId||store.id||'').trim(),
-          name:String(store.name||'').trim(),
-          category:String(store.category||'other').trim(),
-          typeLabel:String(store.typeLabel||'').trim(),
-          address:String(store.address||'').trim(),
-          phone:String(store.phone||'').trim(),
-          source:String(store.source||'').toLowerCase()==='local'?'ubee_local_catalog':'google_places',
-          sourceLabel:String(store.source||'').toLowerCase()==='local'?'UBee 本地店家目錄':'Google Maps 公開店家資訊'
-        }:null;
-        const purchase=state.service==='buy'
-          ? normalizePurchaseDetails(state.purchaseDetails)
-          : null;
-        const compiledNote=purchase?buildPurchaseTaskNote(purchase):state.taskNote;
-        return{
-          ...payload,
-          item:compiledNote||payload.item,
-          note:compiledNote||payload.note,
-          itemQuantity:purchase?.quantity||payload.itemQuantity||'',
-          purchaseDetails:purchase,
-          shoppingItems:purchase?[{
-            name:purchase.productName,
-            quantity:purchase.quantity,
-            specification:purchase.specification,
-            budget:String(state.advancePayment||''),
-            replacementPolicy:purchaseLegacyPolicy(purchase.outOfStockAction)
-          }]:payload.shoppingItems,
-          taskDetails:{
-            ...(payload.taskDetails&&typeof payload.taskDetails==='object'?payload.taskDetails:{}),
-            itemName:purchase?.productName||payload.taskDetails?.itemName||'',
-            quantity:purchase?.quantity||payload.taskDetails?.quantity||'',
-            replacementPolicy:purchaseLegacyPolicy(purchase?.outOfStockAction)
-          },
-          serviceMode:resolveClientServiceMode(state.service,payload.serviceType||serviceLabels[state.service]),
-          pickupAddressObject:state.pickup||null,
-          dropoffAddressObject:state.dropoff||null,
-          nearbyPlace:storeDiscovery?{
-            name:storeDiscovery.name,
-            address:storeDiscovery.address,
-            placeId:storeDiscovery.placeId,
-            phone:storeDiscovery.phone,
-            lat:Number.isFinite(Number(store?.lat))?Number(store.lat):null,
-            lng:Number.isFinite(Number(store?.lng))?Number(store.lng):null
-          }:payload.nearbyPlace,
-          storeDiscovery,
-          clientSchemaVersion:'customer-production-flow-v4-store-v21-purchase-details-2026-08-06'
-        };
-      };
-      wrapped.__productionFlowWrapped=true;
-      getPayload=wrapped;
-    }catch(error){
-      console.warn('擴充正式建單資料失敗：',error);
-    }
+      serviceGroup=state.service;serviceMode=resolveClientServiceMode(state.service,def.title||serviceLabels[state.service]);serviceType=def.title||serviceLabels[state.service];serviceCategory=state.serviceCategory||def.categories?.[0]||'其他';speedType=effectiveSpeed();orderTimingType=state.timing;scheduleGoal=state.scheduleGoal;
+      pickupLat=validPoint(p)?Number(p.lat):null;pickupLng=validPoint(p)?Number(p.lng):null;pickupPlaceId=p.placeId||'';dropoffLat=validPoint(d)?Number(d.lat):null;dropoffLng=validPoint(d)?Number(d.lng):null;dropoffPlaceId=d.placeId||'';
+      if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();
+    }catch(error){console.warn('同步共享核心狀態失敗：',error)}
+  }
+
+  function productionQuoteParams(){
+    const p=state.pickup||{},d=state.dropoff||{},def=selectedServiceDefinition();
+    const params=new URLSearchParams();
+    params.set('from',p.address||'');params.set('to',d.address||'');params.set('pickup',p.address||'');params.set('dropoff',d.address||'');
+    params.set('speedType',effectiveSpeed());params.set('speed',effectiveSpeed());params.set('serviceMode',resolveClientServiceMode(state.service,def.title||serviceLabels[state.service]));
+    params.set('serviceType',serviceLabels[state.service]);params.set('serviceKey',state.service);params.set('serviceGroup',serviceGroupForApi());
+    params.set('queueMinutes',String(state.service==='queue'?Math.max(0,Math.round(Number(state.queueMinutes||30))):0));params.set('upstairsFee',String(typeof calculateUpstairsFee==='function'?calculateUpstairsFee(state.upstairs):0));params.set('itemSize',String(state.itemSize||'small'));params.set('advancePayment',String(Math.max(0,Math.round(Number(state.advancePayment||0)))));
+    if(p.placeId)params.set('pickupPlaceId',p.placeId);if(d.placeId)params.set('dropoffPlaceId',d.placeId);if(validPoint(p)){params.set('pickupLat',String(p.lat));params.set('pickupLng',String(p.lng))}if(validPoint(d)){params.set('dropoffLat',String(d.lat));params.set('dropoffLng',String(d.lng))}
+    return params;
+  }
+
+  async function refreshProductionQuote(){
+    if(!state.pickup||!state.dropoff)throw new Error('請先完成取件與送達地址。');
+    const response=await fetch(`/api/quote?${productionQuoteParams().toString()}`,{cache:'no-store'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.success===false)throw new Error(data.error||data.message||'正式估價失敗');
+    lastQuoteData=data;const total=Number(data.customerPayableTotal??data.payableTotal??data.total??0);lastEstimatedTotal=Number.isFinite(total)?Math.round(total):0;
+    if($('flowConfirmPrice'))$('flowConfirmPrice').textContent=lastEstimatedTotal>0?`NT$${lastEstimatedTotal}`:'待估價';
+    return data;
   }
 
   async function requestRoute(){
-    syncLegacy();const p=state.pickup||{},d=state.dropoff||{};
+    const p=state.pickup||{},d=state.dropoff||{};
     const response=await fetch('/api/map-route',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({pickup:p.address,pickupAddress:p.address,pickupPlaceId:p.placeId||'',pickupLat:p.lat,pickupLng:p.lng,dropoff:d.address,dropoffAddress:d.address,dropoffPlaceId:d.placeId||'',dropoffLat:d.lat,dropoffLng:d.lng})});
     const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false)throw new Error(data.message||data.error||'道路路線載入失敗');
     const start=data.originLocation||{lat:data.routeStartLat??data.pickupLat,lng:data.routeStartLng??data.pickupLng};const end=data.destinationLocation||{lat:data.routeEndLat??data.dropoffLat,lng:data.routeEndLng??data.dropoffLng};if(validPoint(start)){state.pickup.lat=Number(start.lat);state.pickup.lng=Number(start.lng)}if(validPoint(end)){state.dropoff.lat=Number(end.lat);state.dropoff.lng=Number(end.lng)}
@@ -20916,7 +21012,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home'],
       ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}\n${d.contactName||''} ${d.phone||''}`,'home'],
       ['任務內容',`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}\n${state.taskNote||'—'}`,'task'],
-      ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:''}`,'options']
+      ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:''}`,'confirm']
     ];
     $('flowSummaryList').innerHTML=rows.map(([label,value,target])=>`<div class="flow-summary-row"><span class="flow-summary-label">${escapeHtml(label)}</span><span class="flow-summary-value" style="white-space:pre-line">${escapeHtml(value)}</span><button class="flow-summary-edit" type="button" data-summary-go="${target}">修改</button></div>`).join('');
   }
@@ -20924,18 +21020,41 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   async function openConfirm(){
     if(!state.pickup||!state.dropoff){showPage('home');status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}
     if(!validateTask()){showPage('task');return}
-    if(!validateOptions()){showPage('options');return}
-    syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在載入路線與正式估價…');
-    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);$('flowConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'路線已顯示，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
+    if(!validateOptions()){showPage('confirm');return}
+    syncSharedCoreState();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在載入路線與正式估價…');
+    try{const route=await renderConfirmMap(null);await refreshProductionQuote();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);$('flowConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'路線已顯示，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
+  }
+
+  async function confirmCashForCurrentOrder(){
+    if(!currentOrderId)throw new Error('找不到訂單編號。');
+    const data=await customerApiFetch(`/api/orders/${encodeURIComponent(currentOrderId)}/payment-method`,{method:'POST',body:JSON.stringify({paymentMethod:'cash',paymentLabel:'現金付款',isCashOrder:true})});
+    currentOrderData={...(currentOrderData||{}),status:data.status||'pending_dispatch',paymentMethod:'cash',paymentLabel:'現金付款',paymentStatus:data.paymentStatus||'cash_on_delivery',isCashOrder:true,customerPayableTotal:data.customerPayableTotal??data.total??currentOrderData?.customerPayableTotal??lastEstimatedTotal};
+    return data;
   }
 
   async function submitOrder(){
-    if(state.submitting)return;if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
-    syncLegacy();wrapPayload();const legacyAgree=$('agreeCheck');if(legacyAgree)legacyAgree.checked=true;try{currentStep=4}catch(_){ }
-    try{if(typeof validateAdvancePaymentLimit==='function'&&!validateAdvancePaymentLimit())return;if(typeof validateOrderTimingSelection==='function'&&!validateOrderTimingSelection())return}catch(_){ }
-    const uid=await resolveCustomerIdForSubmit();if(!/^customer_[a-f0-9]{32}$/.test(uid)){status('flowConfirmStatus','會員登入狀態失效，請重新登入後再試。',true);return}
-    state.submitting=true;setLoading(true,'正在建立 UBee 任務…');
-    try{if(typeof createOrder!=='function')throw new Error('正式建單功能尚未載入');await createOrder();if(typeof currentOrderId!=='undefined'&&currentOrderId){root.classList.remove('active');document.body.classList.remove('flow-active');document.body.classList.add('ubee-active-order');try{showOnlyStep(5)}catch(_){ }resetNewTask(false)}else throw new Error('訂單尚未成功建立，請重新確認後再試')}catch(error){console.error('建立訂單失敗：',error);status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true)}finally{state.submitting=false;setLoading(false)}
+    if(state.submitting)return;
+    if(!$('flowAgree').checked){status('flowConfirmStatus','請先勾選確認資料與費用。',true);return}
+    if(!validateTask()||!validateOptions())return;
+    const uid=await resolveCustomerIdForSubmit();
+    if(!/^customer_[a-f0-9]{32}$/.test(uid)){status('flowConfirmStatus','會員登入狀態失效，請重新登入後再試。',true);return}
+    state.submitting=true;setLoading(true,'正在建立 UBee 任務…');status('flowConfirmStatus','');
+    try{
+      syncSharedCoreState();
+      const quote=await refreshProductionQuote();
+      if(!quote||!lastQuoteData?.quoteId||Number(lastEstimatedTotal)<=0)throw new Error('目前無法取得有效正式報價，請稍後重試。');
+      const payload=buildProductionOrderPayload();
+      const data=await customerApiFetch('/api/orders',{method:'POST',body:JSON.stringify(payload)});
+      currentOrderId=String(data.orderId||data.id||data.order?.id||'').trim().toUpperCase();
+      if(!currentOrderId)throw new Error('後端未回傳訂單編號。');
+      currentOrderData=data.order||{id:currentOrderId,...payload,status:'pending_payment',customerPayableTotal:data.total||lastEstimatedTotal};
+      localStorage.setItem('ubee_current_order_id',currentOrderId);
+      try{await confirmCashForCurrentOrder()}catch(paymentError){console.warn('自動確認現金單失敗，保留訂單供客人重試：',paymentError)}
+      resetNewTask(false);
+      await openTracking(currentOrderId,true);
+    }catch(error){
+      console.error('建立訂單失敗：',error);status('flowConfirmStatus',error.message||'建立訂單失敗，請稍後再試。',true);
+    }finally{state.submitting=false;setLoading(false)}
   }
 
   function resetNewTask(clearLegacy=true){
@@ -20944,6 +21063,49 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
   }
 
+
+
+  const TRACKING_STAGES=[['created','任務已成立'],['matching','等待小U接單'],['accepted','小U已接單'],['to_pickup','前往取件'],['at_pickup','抵達取件'],['delivery','配送中'],['at_dropoff','抵達送達'],['completed','任務完成']];
+
+  function stopTrackingPolling(){if(state.trackingTimer){clearInterval(state.trackingTimer);state.trackingTimer=null}}
+
+  function renderTracking(payload){
+    if(!payload)return;state.trackingPayload=payload;
+    $('flowTrackingOrderNo').textContent=payload.orderId?`訂單 ${payload.orderId}`:'UBee 任務';
+    $('flowTrackingTitle').textContent=payload.title||payload.statusLabel||'任務狀態更新中';
+    $('flowTrackingDescription').textContent=payload.description||'系統正在同步最新進度。';
+    $('flowTrackingMeta').textContent=[payload.eta?.text,payload.rider?.locationHealth?.label].filter(Boolean).join('・')||'最新狀態已同步';
+    $('flowTrackingPickup').textContent=payload.pickupAddress||'—';$('flowTrackingDropoff').textContent=payload.dropoffAddress||'—';
+    $('flowTrackingTotal').textContent=Number.isFinite(Number(payload.total))?`NT$${Math.round(Number(payload.total))}`:'—';
+    const riderAssigned=!!payload.rider?.assigned;$('flowTrackingRiderCard').hidden=!riderAssigned;
+    if(riderAssigned){$('flowTrackingRiderName').textContent=payload.rider?.name||'UBee 小U';$('flowTrackingRiderMeta').textContent=[payload.rider?.vehicleType,payload.eta?.text].filter(Boolean).join('・')||'已承接任務'}
+    const index=Math.max(0,Math.min(TRACKING_STAGES.length-1,Number(payload.stage?.index||0)));$('flowTrackingStageText').textContent=`${index+1} / ${TRACKING_STAGES.length}`;
+    $('flowTrackingStages').innerHTML=TRACKING_STAGES.map((item,i)=>`<div class="ubee-v3-stage-item ${i<index?'done':i===index?'current':''}"><span class="ubee-v3-stage-dot">${i<index?'✓':i+1}</span><span class="ubee-v3-stage-copy"><strong>${escapeHtml(item[1])}</strong><small>${i===index?'目前進度':i<index?'已完成':'尚未開始'}</small></span></div>`).join('');
+    $('flowTrackingCashConfirm').hidden=String(payload.status||'').toLowerCase()!=='pending_payment';
+    if(payload.activeIncident)status('flowTrackingStatus',payload.activeIncident.title||payload.activeIncident.typeLabel||'UBee 正在協助處理異常',true);else status('flowTrackingStatus','');
+    if(String(payload.status||'').toLowerCase()==='completed'){renderComplete(payload);showPage('complete')}
+  }
+
+  async function fetchTracking(orderId=currentOrderId){
+    const id=String(orderId||'').trim().toUpperCase();if(!id)return null;
+    try{const data=await customerApiFetch(`/api/customer/orders/${encodeURIComponent(id)}/tracking?t=${Date.now()}`);if(data?.tracking)renderTracking(data.tracking);return data?.tracking||null}
+    catch(error){console.warn('讀取新版任務追蹤失敗：',error);status('flowTrackingStatus','暫時無法更新進度，請稍後再試。',true);return null}
+  }
+
+  async function openTracking(orderId=currentOrderId,immediate=false){
+    const id=String(orderId||localStorage.getItem('ubee_current_order_id')||'').trim().toUpperCase();
+    if(!id){showTasksRoot();return}
+    currentOrderId=id;localStorage.setItem('ubee_current_order_id',id);showPage('tracking');stopTrackingPolling();
+    if(immediate)setLoading(true,'正在開啟任務進度…');
+    try{await fetchTracking(id)}finally{if(immediate)setLoading(false)}
+    state.trackingTimer=setInterval(()=>{if(state.page==='tracking')fetchTracking(id)},5000);
+  }
+
+  function renderComplete(payload){
+    state.lastCompletedOrder=payload;$('flowCompleteTotal').textContent=Number.isFinite(Number(payload?.total))?`NT$${Math.round(Number(payload.total))}`:'—';
+    $('flowCompleteOrderNo').textContent=payload?.orderId?`訂單 ${payload.orderId}`:'';$('flowCompletePickup').textContent=payload?.pickupAddress||'—';$('flowCompleteDropoff').textContent=payload?.dropoffAddress||'—';
+    try{localStorage.removeItem('ubee_current_order_id')}catch(_){}
+  }
 
   function orderTimeText(order){
     const value=order?.createdAt||order?.updatedAt;
@@ -21122,9 +21284,15 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     $('flowServiceType').addEventListener('change',()=>{captureCurrentTaskDraft();state.serviceTypeIndex=Number($('flowServiceType').value)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||state.taskName;syncServiceSelectors()});
     $('flowServiceCategory').addEventListener('change',()=>{captureCurrentTaskDraft();state.serviceCategory=$('flowServiceCategory').value;syncServiceSelectors()});
     $('flowPurchaseStockOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-purchase-stock-policy]');if(!button)return;root.querySelectorAll('[data-purchase-stock-policy]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active?'true':'false')});state.purchaseDetails=readPurchaseDetailsFromForm();});
-    $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
-    $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn)setTiming(btn.dataset.timing)});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn)setSpeed(btn.dataset.speed)});$('flowOptionsNext').addEventListener('click',()=>{if(validateOptions())openConfirm()});
-    $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
+    $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncSharedCoreState();updateHome();setTiming(state.timing);setSpeed(state.speed);openConfirm()});
+    $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn){setTiming(btn.dataset.timing);refreshConfirmEstimateDebounced()}});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn){setSpeed(btn.dataset.speed);refreshConfirmEstimateDebounced()}});
+    $('flowSubmitOrder').addEventListener('click',submitOrder);
+    $('flowTrackingRefresh').addEventListener('click',()=>fetchTracking(currentOrderId));
+    $('flowTrackingBack').addEventListener('click',()=>showTasksRoot());
+    $('flowTrackingCashConfirm').addEventListener('click',async()=>{try{setLoading(true,'正在確認現金單…');await confirmCashForCurrentOrder();await fetchTracking(currentOrderId)}catch(error){status('flowTrackingStatus',error.message||'現金單確認失敗，請稍後重試。',true)}finally{setLoading(false)}});
+    $('flowCompleteHome').addEventListener('click',()=>{resetNewTask(true);showPage('home')});
+    $('flowCompleteReorder').addEventListener('click',()=>{resetNewTask(true);showPage('home')});$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
+    ;['flowScheduleGoal','flowScheduledDate','flowScheduledTime','flowFlexibleDate','flowFlexibleStart','flowFlexibleEnd'].forEach(id=>$(id)?.addEventListener('change',refreshConfirmEstimateDebounced));
     $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];status('flowSearchStatus','');$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;$('flowSearchResults').innerHTML='';setQuickAddressTab(state.quickAddressTab)});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);root.querySelectorAll('[data-address-tab]').forEach(btn=>btn.addEventListener('click',()=>setQuickAddressTab(btn.dataset.addressTab)));
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
     $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
@@ -21141,11 +21309,12 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       if(statusEl){statusEl.textContent='即將開啟郵件 App，請確認內容後寄出。';statusEl.style.color='#73787e'}
       window.location.href=`mailto:service@ubee.tw?subject=${subject}&body=${body}`;
     });
-    $('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;root.classList.remove('active');document.body.classList.remove('flow-active');try{showOnlyStep(5)}catch(_){ }});
+    $('flowOpenActiveOrder').addEventListener('click',()=>{if(!activeOrder())return;openTracking(currentOrderId,true)});
     $('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
-  buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();
+  window.UBeeCustomerV3={openTracking,fetchTracking,showPage,buildProductionOrderPayload};
+  buildProgress();bind();resetNewTask(true);ensureTimeDefaults();
   if(localStorage.getItem('ubee_setting_auto_location')!=='false'){
     const runAutoLocationAfterHome = () => window.setTimeout(()=>detectLocation(),520);
     if(window.__ubeeCustomerHomeReady){
@@ -21231,7 +21400,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     state.itemSize='small';
     syncServiceSelectors();
     updateHome();
-    syncLegacy();
+    syncSharedCoreState();
     showPage('home');
     status('flowHomeStatus',`已帶入「${name}」，接下來請選擇送達地址。`);
     window.setTimeout(()=>openAddress('dropoff'),160);
@@ -21246,7 +21415,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260807-2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260901-v3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21278,6 +21447,14 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       }
     });
   })();
+</script>
+<script id="ubee-customer-v3-deeplink-bridge">
+(() => {
+  'use strict';
+  function openFromUrl(){try{const params=new URLSearchParams(location.search);const orderId=String(params.get('orderId')||'').trim().toUpperCase();if(orderId&&window.UBeeCustomerV3?.openTracking)window.UBeeCustomerV3.openTracking(orderId,true)}catch(_){}}
+  window.addEventListener('message',event=>{const data=event.data||{};if(data.type==='UBEE_CUSTOMER_OPEN_ORDER'&&data.orderId&&window.UBeeCustomerV3?.openTracking)window.UBeeCustomerV3.openTracking(String(data.orderId).trim().toUpperCase(),true)});
+  setTimeout(openFromUrl,0);
+})();
 </script>
 <style id="ubee-fixed-bottom-nav-yellow-service-tabs">
   /* 2026-08-04 正式清理：舊固定導航覆蓋已移除，底部導覽由唯一正式 App 導覽層管理。 */
@@ -23678,8 +23855,11 @@ body > #ubeePersistentBottomNav > button{
   align-items:center!important;
   justify-content:center!important;
   gap:3px!important;
-  margin:0!important;
-  padding:4px 2px 3px!important;
+  margin:5px 8px!important;
+  padding:2px 2px 3px!important;
+  width:calc(100% - 16px)!important;
+  height:calc(var(--ubee-nav-content-height) - 10px)!important;
+  min-height:calc(var(--ubee-nav-content-height) - 10px)!important;
   overflow:hidden!important;
   border:0!important;
   border-radius:0!important;
@@ -23700,26 +23880,15 @@ body > #ubeePersistentBottomNav > button{
   box-sizing:border-box!important;
 }
 body > #ubeePersistentBottomNav > button::before{
-  content:""!important;
-  position:absolute!important;
-  top:0!important;
-  left:50%!important;
-  width:28px!important;
-  height:3px!important;
-  border-radius:0 0 999px 999px!important;
-  background:transparent!important;
-  transform:translateX(-50%)!important;
-  pointer-events:none!important;
+  display:none!important;
 }
 body > #ubeePersistentBottomNav > button.active{
-  background:#fff!important;
+  background:#fff3bf!important;
   color:#111!important;
-}
-body > #ubeePersistentBottomNav > button.active::before{
-  background:#f4bd00!important;
+  border-radius:15px!important;
 }
 body > #ubeePersistentBottomNav > button.ubee-nav-pressed{
-  background:#fff9dd!important;
+  background:#ffef9a!important;
 }
 body > #ubeePersistentBottomNav > button > *,
 body > #ubeePersistentBottomNav > button svg,
