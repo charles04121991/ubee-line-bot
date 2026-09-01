@@ -6,7 +6,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260901-v3" rel="manifest"/>
+<link href="/manifest-order.json?v=20260901-v3-5step" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19763,7 +19763,7 @@ body.flow-active>.app{display:none!important;}
 .flow-icon-btn,.flow-back-btn,.flow-city-btn{border:none;background:transparent;color:#111;font-weight:1000;}
 .flow-back-btn,.flow-icon-btn{width:42px;height:42px;border-radius:50%;}.flow-back-btn{font-size:30px;line-height:1;}.flow-icon-btn{font-size:20px;}
 .flow-city-btn{max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:9px 10px;border-radius:999px;background:#f5f6f7;font-size:13px;text-align:center;}
-.flow-progress{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:9px 10px;background:#fff;border-bottom:1px solid var(--flow-line);}
+.flow-progress{flex:0 0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;padding:9px 10px;background:#fff;border-bottom:1px solid var(--flow-line);}
 .flow-progress-item{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;color:#989ca1;font-size:10px;font-weight:900;white-space:nowrap;}
 .flow-progress-item::before{content:attr(data-number);display:grid;place-items:center;width:19px;height:19px;flex:0 0 19px;border-radius:50%;background:#eef0f2;color:#7e8388;font-size:10px;}
 .flow-progress-item.active{color:#111;}.flow-progress-item.active::before{background:var(--flow-accent);color:#111;}.flow-progress-item.done::before{content:"✓";background:#111;color:#fff;}
@@ -20163,6 +20163,7 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
 <div class="flow-title-wrap"><div class="flow-title">任務進行中</div><div class="flow-subtitle" id="flowTrackingOrderNo">UBee 正在同步最新進度</div></div>
 <span></span>
 </header>
+<div class="flow-progress" data-progress="3"></div>
 <div class="flow-scroll">
 <div class="flow-card ubee-v3-tracking-hero">
 <div class="ubee-v3-tracking-orbit" aria-hidden="true"><span></span></div>
@@ -20187,6 +20188,7 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
 <div class="flow-card ubee-v3-tracking-total"><span>任務金額</span><strong id="flowTrackingTotal">—</strong></div>
 <div class="flow-status" id="flowTrackingStatus"></div>
 <button class="flow-primary" id="flowTrackingCashConfirm" type="button" hidden>確認現金單，開始尋找小U</button>
+<button class="flow-secondary ubee-v3-cancel-order" id="flowTrackingCancel" type="button">取消訂單</button>
 <button class="flow-secondary" id="flowTrackingRefresh" type="button">重新整理進度</button>
 </div>
 </section>
@@ -20197,6 +20199,7 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
 <div class="flow-title-wrap"><div class="flow-title">任務完成</div><div class="flow-subtitle">感謝使用 UBee 跑腿</div></div>
 <span></span>
 </header>
+<div class="flow-progress" data-progress="4"></div>
 <div class="flow-scroll">
 <div class="flow-card ubee-v3-complete-card">
 <div class="ubee-v3-complete-icon">✓</div>
@@ -20209,6 +20212,17 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
 <div class="flow-card ubee-v3-complete-route">
 <div><small>取件</small><strong id="flowCompletePickup">—</strong></div>
 <div><small>送達</small><strong id="flowCompleteDropoff">—</strong></div>
+</div>
+<div class="flow-card ubee-v3-rating-card">
+<div class="ubee-v3-rating-title">給小U一個評價吧！</div>
+<div class="ubee-v3-rating-stars" id="flowCompleteRating" aria-label="任務評價">
+<button type="button" data-rating="1" aria-label="1 星">★</button>
+<button type="button" data-rating="2" aria-label="2 星">★</button>
+<button type="button" data-rating="3" aria-label="3 星">★</button>
+<button type="button" data-rating="4" aria-label="4 星">★</button>
+<button type="button" data-rating="5" aria-label="5 星">★</button>
+</div>
+<div class="ubee-v3-rating-hint" id="flowCompleteRatingHint">點選星星即可記錄這次評價</div>
 </div>
 <button class="flow-primary" id="flowCompleteReorder" type="button">再叫一次</button>
 <button class="flow-secondary" id="flowCompleteHome" type="button">返回首頁</button>
@@ -20493,7 +20507,7 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
   function buildProgress(){
     document.querySelectorAll('#productionOrderFlow .flow-progress').forEach(bar=>{
       const active=Number(bar.dataset.progress||0);
-      bar.innerHTML=['地點','任務內容','費用確認'].map((label,index)=>`<div class="flow-progress-item ${index===active?'active':index<active?'done':''}" data-number="${index+1}">${label}</div>`).join('');
+      bar.innerHTML=['首頁','任務內容','費用確認','任務進行中','完成'].map((label,index)=>`<div class="flow-progress-item ${index===active?'active':index<active?'done':''}" data-number="${index+1}">${label}</div>`).join('');
     });
   }
 
@@ -21082,8 +21096,55 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
     const index=Math.max(0,Math.min(TRACKING_STAGES.length-1,Number(payload.stage?.index||0)));$('flowTrackingStageText').textContent=`${index+1} / ${TRACKING_STAGES.length}`;
     $('flowTrackingStages').innerHTML=TRACKING_STAGES.map((item,i)=>`<div class="ubee-v3-stage-item ${i<index?'done':i===index?'current':''}"><span class="ubee-v3-stage-dot">${i<index?'✓':i+1}</span><span class="ubee-v3-stage-copy"><strong>${escapeHtml(item[1])}</strong><small>${i===index?'目前進度':i<index?'已完成':'尚未開始'}</small></span></div>`).join('');
     $('flowTrackingCashConfirm').hidden=String(payload.status||'').toLowerCase()!=='pending_payment';
+    const trackingStatus=String(payload.status||'').toLowerCase();
+    const cancelForbidden=new Set(['picked_up','arrived_dropoff','completed','done','cancelled','canceled']);
+    const cancelBtn=$('flowTrackingCancel');
+    if(cancelBtn){
+      cancelBtn.disabled=cancelForbidden.has(trackingStatus);
+      cancelBtn.hidden=['completed','done','cancelled','canceled'].includes(trackingStatus);
+      cancelBtn.textContent=cancelForbidden.has(trackingStatus)?'此階段不可取消':'取消訂單';
+    }
     if(payload.activeIncident)status('flowTrackingStatus',payload.activeIncident.title||payload.activeIncident.typeLabel||'UBee 正在協助處理異常',true);else status('flowTrackingStatus','');
-    if(String(payload.status||'').toLowerCase()==='completed'){renderComplete(payload);showPage('complete')}
+    if(['completed','done'].includes(trackingStatus)){renderComplete(payload);showPage('complete');return}
+    if(['cancelled','canceled'].includes(trackingStatus)){
+      stopTrackingPolling();
+      $('flowTrackingTitle').textContent='訂單已取消';
+      $('flowTrackingDescription').textContent='這筆任務已取消，不會再進行媒合或配送。';
+      $('flowTrackingMeta').textContent='已取消';
+      status('flowTrackingStatus','訂單已成功取消。');
+    }
+  }
+
+
+  async function cancelCurrentOrder(){
+    const id=String(currentOrderId||'').trim().toUpperCase();
+    if(!id){status('flowTrackingStatus','找不到目前訂單編號。',true);return}
+    const payload=state.trackingPayload||{};
+    const currentStatus=String(payload.status||currentOrderData?.status||'').toLowerCase();
+    const forbidden=new Set(['picked_up','arrived_dropoff','completed','done','cancelled','canceled']);
+    if(forbidden.has(currentStatus)){
+      status('flowTrackingStatus','此階段不可取消訂單。',true);
+      return;
+    }
+    const confirmed=window.confirm('確定要取消這筆 UBee 任務嗎？');
+    if(!confirmed)return;
+    const btn=$('flowTrackingCancel');
+    if(btn)btn.disabled=true;
+    try{
+      setLoading(true,'正在取消訂單…');
+      await customerApiFetch('/cancel-order',{
+        method:'POST',
+        body:JSON.stringify({orderId:id})
+      });
+      stopTrackingPolling();
+      await fetchTracking(id);
+      status('flowTrackingStatus','訂單已成功取消。');
+    }catch(error){
+      status('flowTrackingStatus',error.message||'取消訂單失敗，請稍後再試。',true);
+      if(btn)btn.disabled=false;
+    }finally{
+      setLoading(false);
+    }
   }
 
   async function fetchTracking(orderId=currentOrderId){
@@ -21287,9 +21348,18 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
     $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncSharedCoreState();updateHome();setTiming(state.timing);setSpeed(state.speed);openConfirm()});
     $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn){setTiming(btn.dataset.timing);refreshConfirmEstimateDebounced()}});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn){setSpeed(btn.dataset.speed);refreshConfirmEstimateDebounced()}});
     $('flowSubmitOrder').addEventListener('click',submitOrder);
+    $('flowTrackingCancel').addEventListener('click',cancelCurrentOrder);
     $('flowTrackingRefresh').addEventListener('click',()=>fetchTracking(currentOrderId));
     $('flowTrackingBack').addEventListener('click',()=>showTasksRoot());
     $('flowTrackingCashConfirm').addEventListener('click',async()=>{try{setLoading(true,'正在確認現金單…');await confirmCashForCurrentOrder();await fetchTracking(currentOrderId)}catch(error){status('flowTrackingStatus',error.message||'現金單確認失敗，請稍後重試。',true)}finally{setLoading(false)}});
+    $('flowCompleteRating')?.addEventListener('click',event=>{
+      const button=event.target.closest('[data-rating]');
+      if(!button)return;
+      const rating=Math.max(1,Math.min(5,Number(button.dataset.rating||0)));
+      root.querySelectorAll('#flowCompleteRating [data-rating]').forEach(star=>star.classList.toggle('active',Number(star.dataset.rating)<=rating));
+      const hint=$('flowCompleteRatingHint');
+      if(hint)hint.textContent=`已選擇 ${rating} 星`;
+    });
     $('flowCompleteHome').addEventListener('click',()=>{resetNewTask(true);showPage('home')});
     $('flowCompleteReorder').addEventListener('click',()=>{resetNewTask(true);showPage('home')});$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
     ;['flowScheduleGoal','flowScheduledDate','flowScheduledTime','flowFlexibleDate','flowFlexibleStart','flowFlexibleEnd'].forEach(id=>$(id)?.addEventListener('change',refreshConfirmEstimateDebounced));
@@ -21313,7 +21383,7 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
     $('flowCityButton').addEventListener('click',()=>{try{openServiceCitySelector()}catch(_){ }});
   }
 
-  window.UBeeCustomerV3={openTracking,fetchTracking,showPage,buildProductionOrderPayload};
+  window.UBeeCustomerV3={openTracking,fetchTracking,showPage,buildProductionOrderPayload,cancelCurrentOrder};
   buildProgress();bind();resetNewTask(true);ensureTimeDefaults();
   if(localStorage.getItem('ubee_setting_auto_location')!=='false'){
     const runAutoLocationAfterHome = () => window.setTimeout(()=>detectLocation(),520);
@@ -21415,7 +21485,7 @@ body > #ubeePersistentBottomNav > button.active::before{display:none!important}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260901-v3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260901-v3-5step-5step';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
