@@ -8,6 +8,7 @@ const admin = require('firebase-admin');
 const webpush = require('web-push');
 const multer = require('multer');
 
+// 2026-09-01｜Order ↔ Backend Pricing Contract V1：Quote Lock 加入 serviceKey/queueMinutes/taskMinutes/upstairsOption/advancePayment 驗證；樓層費改由後端 canonical 規則決定。
 // 2026-09-01｜Rider Safety Backend V12.1：安全回報支援 payment/item、money→payment 相容正規化，並驗證 orderId 存在與騎士歸屬後才允許關聯／回寫訂單。
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
 // UBee Merchant PWA V4 + 小U資料庫 V2 Final｜2026-08-13：店家獨立密碼登入、COD 墊付配送、店家近距離費率。
@@ -21754,6 +21755,24 @@ const PRICING = {
 };
 
 // =====================================================
+// Order ↔ Backend Pricing Contract V1｜樓層費 canonical 規則
+// 前端只負責送 upstairsOption；正式金額由後端決定。
+// =====================================================
+function normalizeCustomerUpstairsOption(value) {
+  const normalized = String(value || 'none').trim().toLowerCase();
+  return ['none', 'elevator', 'no_elevator', 'heavy'].includes(normalized)
+    ? normalized
+    : 'none';
+}
+
+function getCanonicalUpstairsFee(option) {
+  const normalized = normalizeCustomerUpstairsOption(option);
+  if (normalized === 'elevator') return 20;
+  if (normalized === 'no_elevator') return 30;
+  return 0;
+}
+
+// =====================================================
 // UBee 小U最低收入 V1｜2026-08-31
 // - 任務費本體仍依原本 70 / 30 計算
 // - 小U原始分潤低於 NT$50 時，由 UBee 補足至 NT$50
@@ -22958,8 +22977,13 @@ async function createDynamicPricingQuoteSnapshot({
     serviceType: String(requestData.serviceType || ''),
     serviceMode: String(requestData.serviceMode || ''),
     serviceKey: String(requestData.serviceKey || ''),
+    serviceGroup: String(requestData.serviceGroup || ''),
     speedType: String(requestData.speedType || requestData.speed || 'standard'),
     itemSize: normalizeItemSize(requestData.itemSize),
+    queueMinutes: Math.max(0, Math.round(dynamicSafeNumber(requestData.queueMinutes))),
+    taskMinutes: Math.max(0, Math.round(dynamicSafeNumber(requestData.taskMinutes))),
+    upstairsOption: normalizeCustomerUpstairsOption(requestData.upstairsOption),
+    upstairsFee: getCanonicalUpstairsFee(requestData.upstairsOption),
     pickupAddress: String(requestData.pickupAddress || requestData.pickup || requestData.from || ''),
     dropoffAddress: String(requestData.dropoffAddress || requestData.dropoff || requestData.to || ''),
     advancePayment: Math.max(0, Math.round(dynamicSafeNumber(requestData.advancePayment))),
@@ -23065,6 +23089,40 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
   }
   if (quoteItemSize !== orderItemSize) {
     return { ok: false, message: '物品體積選項已變更，請重新估價。' };
+  }
+
+  const quoteServiceKey = String(lockedQuote.serviceKey || '').trim().toLowerCase();
+  const orderServiceKey = String(orderData.serviceKey || '').trim().toLowerCase();
+  if (!quoteServiceKey || !orderServiceKey || quoteServiceKey !== orderServiceKey) {
+    return { ok: false, message: '服務項目已變更，請重新估價。' };
+  }
+
+  if (quoteMode === 'queue') {
+    const quoteQueueMinutes = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.queueMinutes)));
+    const orderQueueMinutes = Math.max(0, Math.round(dynamicSafeNumber(orderData.queueMinutes)));
+    if (quoteQueueMinutes !== orderQueueMinutes) {
+      return { ok: false, message: '排隊時間已變更，請重新估價。' };
+    }
+  }
+
+  if (quoteMode === 'custom') {
+    const quoteTaskMinutes = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.taskMinutes)));
+    const orderTaskMinutes = Math.max(0, Math.round(dynamicSafeNumber(orderData.taskMinutes)));
+    if (quoteTaskMinutes !== orderTaskMinutes) {
+      return { ok: false, message: '任務處理時間已變更，請重新估價。' };
+    }
+  }
+
+  const quoteUpstairsOption = normalizeCustomerUpstairsOption(lockedQuote.upstairsOption);
+  const orderUpstairsOption = normalizeCustomerUpstairsOption(orderData.upstairsOption);
+  if (quoteUpstairsOption !== orderUpstairsOption) {
+    return { ok: false, message: '上樓需求已變更，請重新估價。' };
+  }
+
+  const quoteAdvancePayment = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.advancePayment)));
+  const orderAdvancePayment = Math.max(0, Math.round(dynamicSafeNumber(orderData.advancePayment)));
+  if (quoteAdvancePayment !== orderAdvancePayment) {
+    return { ok: false, message: '代墊金額已變更，請重新估價。' };
   }
 
   return { ok: true };
@@ -26416,6 +26474,13 @@ function createOrderFromApi(data) {
       )
     ),
 
+    taskMinutes: Math.max(
+      0,
+      Math.round(
+        Number(data.taskMinutes || 0)
+      )
+    ),
+
     item: rawItem,
     purchaseDetails,
     taskDetails,
@@ -26601,9 +26666,8 @@ function createOrderFromApi(data) {
         data.advancePayment
       ),
 
-    upstairsOption: cleanText(
-      data.upstairsOption || 'none',
-      30
+    upstairsOption: normalizeCustomerUpstairsOption(
+      data.upstairsOption
     ),
 
     upstairsLabel: cleanText(
@@ -26611,11 +26675,9 @@ function createOrderFromApi(data) {
       80
     ),
 
-    upstairsFee: Math.max(
-      0,
-      Math.round(
-        Number(data.upstairsFee || 0)
-      )
+    // 正式金額不可相信前端傳入的 upstairsFee。
+    upstairsFee: getCanonicalUpstairsFee(
+      data.upstairsOption
     ),
 
     fareMode: cleanText(
@@ -27445,29 +27507,35 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       });
     }
 
-    const upstairsFee = Math.max(
-      0,
-      Math.round(Number(req.query.upstairsFee || 0))
+    const upstairsOption = normalizeCustomerUpstairsOption(
+      req.query.upstairsOption
+    );
+
+    if (upstairsOption === 'heavy') {
+      return res.status(409).json({
+        success: false,
+        code: 'UPSTAIRS_MANUAL_REVIEW_REQUIRED',
+        error: '重物／大量物品需由 UBee 跑腿客服人工確認後再報價。',
+      });
+    }
+
+    const upstairsFee = getCanonicalUpstairsFee(
+      upstairsOption
     );
 
     const itemSize = normalizeItemSize(
       req.query.itemSize || 'unspecified'
     );
 
-    const isQueueTask =
-      rawServiceMode === 'queue' ||
-      serviceType === '幫排隊';
+    const resolvedServiceMode = resolveCustomerServiceMode({
+      serviceMode: rawServiceMode,
+      serviceType,
+      serviceKey,
+      serviceGroup,
+    });
 
-    const isCustomTask =
-      rawServiceMode === 'custom' ||
-      serviceType === '全能跑腿';
-
-    const resolvedServiceMode =
-      isQueueTask
-        ? 'queue'
-        : isCustomTask
-          ? 'custom'
-          : 'normal';
+    const isQueueTask = resolvedServiceMode === 'queue';
+    const isCustomTask = resolvedServiceMode === 'custom';
 
     let distance = null;
     let price = null;
@@ -27684,6 +27752,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         serviceType,
         serviceMode: resolvedServiceMode,
         serviceKey,
+        serviceGroup,
         speedType,
         pickupAddress: from,
         dropoffAddress: to,
@@ -27691,6 +27760,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         itemSize,
         queueMinutes,
         taskMinutes,
+        upstairsOption,
       },
       dynamicPricing,
       source: req.customerAuth
@@ -27727,6 +27797,10 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
 
       serviceType,
       serviceMode: resolvedServiceMode,
+      serviceKey,
+      serviceGroup,
+      upstairsOption,
+      upstairsFee,
 
       distanceText: responseDistanceText,
       durationText: responseDurationText,
@@ -31425,9 +31499,8 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     Math.round(Number(PRICING.serviceFee || 0))
   );
 
-  const upstairsFee = Math.max(
-    0,
-    Math.round(Number(data.upstairsFee || 0))
+  const upstairsFee = getCanonicalUpstairsFee(
+    data.upstairsOption
   );
 
   const queueTimeFee = Math.max(
@@ -31658,6 +31731,9 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   queueMinutes:
     data.queueMinutes,
+
+  taskMinutes:
+    data.taskMinutes,
 
   // ==============================
   // 任務內容
