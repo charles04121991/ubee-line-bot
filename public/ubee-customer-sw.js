@@ -1,7 +1,7 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.01.1
+ * Version: 2026.09.01.2
  * File: ubee-customer-sw.js
  *
  * UBee Customer V3：
@@ -14,7 +14,7 @@
  */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.01.1';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.01.2';
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
 const PAGE_CACHE = `${CACHE_PREFIX}page-${UBEE_CUSTOMER_SW_VERSION}`;
@@ -94,7 +94,7 @@ self.addEventListener('push',event=>{
   let data={};
   try{data=event.data?event.data.json():{}}catch(_){data={body:event.data?event.data.text():'UBee 跑腿有新的通知。'}}
   const orderId=String(data.orderId||data.id||'').trim().toUpperCase();
-  const fallbackUrl=orderId?`/order.html?orderId=${encodeURIComponent(orderId)}&source=push&v=20260901-v3`:'/order.html?source=push&v=20260901-v3';
+  const fallbackUrl=orderId?`/order.html?orderId=${encodeURIComponent(orderId)}&source=push&v=20260901-v3-5step`:'/order.html?source=push&v=20260901-v3-5step';
   const targetUrl=String(data.url||data.deepLink||fallbackUrl);
   const options={
     body:data.body||'UBee 跑腿有新的任務進度通知。',
@@ -111,7 +111,7 @@ self.addEventListener('notificationclick',event=>{
   event.notification.close();
   const data=event.notification.data||{};
   const orderId=String(data.orderId||'').trim().toUpperCase();
-  const targetUrl=new URL(data.url||(orderId?`/order.html?orderId=${encodeURIComponent(orderId)}&source=push&v=20260901-v3`:'/order.html?source=push&v=20260901-v3'),self.location.origin).href;
+  const targetUrl=new URL(data.url||(orderId?`/order.html?orderId=${encodeURIComponent(orderId)}&source=push&v=20260901-v3-5step`:'/order.html?source=push&v=20260901-v3-5step'),self.location.origin).href;
   event.waitUntil((async()=>{
     const clientList=await clients.matchAll({type:'window',includeUncontrolled:true});
     for(const client of clientList){
