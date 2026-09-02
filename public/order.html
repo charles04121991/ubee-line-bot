@@ -4,12 +4,13 @@
 <head>
 <!-- 2026-09-02｜Home Live Supply V2：首頁即時運力狀態重新顯眼呈現；優先依取件點／裝置定位顯示附近 5 公里可即時媒合小U數量，無定位時保留全區可媒合數量 fallback。 -->
 <!-- 2026-09-02｜Home Live Supply V2.1：即時運力卡正式接入 productionOrderFlow 首頁；附近 5 公里 / 全區 fallback 共用既有 service-status API。 -->
+<!-- 2026-09-02｜Home Live Supply V2.2 Compact：正式首頁即時運力改為中等尺寸狀態列；保留 5 公里媒合數，降低卡片高度與視覺搶佔。 -->
 <!-- 2026-09-01｜Order ↔ Backend Pricing Contract V1：統一估價/建單服務欄位，加入全能跑腿 taskMinutes，排隊明細去重，樓層費改由後端正式判定。 -->
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260902-live-supply-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260902-live-supply-v2-1-production-flow-fix" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -20243,28 +20244,29 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   .flow-stock-option{flex:1 1 calc(50% - 8px);}
 }
 </style>
-<style id="ubee-production-live-supply-v21-style">
+<style id="ubee-production-live-supply-v22-compact-style">
 /* =====================================================
-   2026-09-02｜Production Flow 首頁即時運力 V2.1
-   正式可見首頁：附近 5 公里優先；無定位顯示全區 fallback。
+   2026-09-02｜Production Flow 首頁即時運力 V2.2 Compact
+   中等尺寸原生狀態列：保留 5 公里即時運力，但不搶過服務入口。
    ===================================================== */
 #productionOrderFlow .flow-live-supply-status{
-  margin:0 0 16px;
-  padding:14px 14px 13px;
+  margin:0 0 11px;
+  padding:10px 12px;
   border:1px solid #eadb91;
-  border-radius:18px;
+  border-radius:15px;
   background:#fffbea;
-  box-shadow:0 6px 18px rgba(17,24,39,.045);
+  box-shadow:0 3px 12px rgba(17,24,39,.035);
 }
 #productionOrderFlow .flow-live-supply-status.is-fallback{
   border-color:#e5e7ea;
   background:#f8f9fa;
 }
 #productionOrderFlow .flow-live-supply-head{
+  min-height:52px;
   display:flex;
-  align-items:flex-start;
+  align-items:center;
   justify-content:space-between;
-  gap:12px;
+  gap:10px;
 }
 #productionOrderFlow .flow-live-supply-main{
   min-width:0;
@@ -20273,36 +20275,36 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 #productionOrderFlow .flow-live-supply-kicker{
   display:flex;
   align-items:center;
-  gap:7px;
-  color:#666b70;
-  font-size:11px;
-  line-height:1.3;
-  font-weight:900;
+  gap:6px;
+  color:#72767b;
+  font-size:10px;
+  line-height:1.2;
+  font-weight:850;
 }
 #productionOrderFlow .flow-live-supply-dot{
-  width:8px;
-  height:8px;
-  flex:0 0 8px;
+  width:7px;
+  height:7px;
+  flex:0 0 7px;
   border-radius:50%;
   background:#22c55e;
-  box-shadow:0 0 0 4px rgba(34,197,94,.10);
+  box-shadow:0 0 0 3px rgba(34,197,94,.09);
 }
 #productionOrderFlow .flow-live-supply-status.is-fallback .flow-live-supply-dot{
   background:#f4bd00;
-  box-shadow:0 0 0 4px rgba(244,189,0,.10);
+  box-shadow:0 0 0 3px rgba(244,189,0,.09);
 }
 #productionOrderFlow .flow-live-supply-count{
-  margin-top:7px;
+  margin-top:5px;
   color:#111;
-  font-size:19px;
-  line-height:1.35;
+  font-size:15px;
+  line-height:1.22;
   font-weight:850;
-  letter-spacing:-.25px;
+  letter-spacing:-.15px;
 }
 #productionOrderFlow .flow-live-supply-count span{
   display:inline-block;
-  margin:0 2px;
-  font-size:27px;
+  margin:0 1px;
+  font-size:21px;
   line-height:1;
   font-weight:1000;
 }
@@ -20312,40 +20314,37 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 }
 #productionOrderFlow .flow-live-supply-side{
   flex:0 0 auto;
+  min-width:58px;
   text-align:right;
 }
 #productionOrderFlow .flow-live-supply-scope{
   display:inline-flex;
   align-items:center;
-  min-height:26px;
-  padding:0 9px;
+  min-height:22px;
+  padding:0 8px;
   border:1px solid #e6d37a;
   border-radius:999px;
   background:#fff;
   color:#675300;
-  font-size:10px;
+  font-size:9.5px;
   font-weight:950;
   white-space:nowrap;
 }
 #productionOrderFlow .flow-live-supply-time{
-  margin-top:5px;
-  color:#90959b;
-  font-size:10px;
+  margin-top:4px;
+  color:#9a9ea3;
+  font-size:9px;
   font-weight:800;
 }
 #productionOrderFlow .flow-live-supply-note{
-  margin-top:10px;
-  padding-top:9px;
-  border-top:1px solid rgba(130,115,45,.14);
-  color:#6a6f74;
-  font-size:11px;
-  line-height:1.55;
-  font-weight:750;
+  display:none!important;
 }
 @media(max-width:390px){
-  #productionOrderFlow .flow-live-supply-status{padding:13px 12px 12px;}
-  #productionOrderFlow .flow-live-supply-count{font-size:17px;}
-  #productionOrderFlow .flow-live-supply-count span{font-size:24px;}
+  #productionOrderFlow .flow-live-supply-status{padding:9px 10px;margin-bottom:10px;}
+  #productionOrderFlow .flow-live-supply-head{min-height:50px;gap:8px;}
+  #productionOrderFlow .flow-live-supply-count{font-size:14px;}
+  #productionOrderFlow .flow-live-supply-count span{font-size:20px;}
+  #productionOrderFlow .flow-live-supply-side{min-width:54px;}
 }
 </style>
 <div aria-label="UBee 客人端正式下單流程" id="productionOrderFlow">
@@ -21729,7 +21728,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-live-supply-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-live-supply-v2-1-production-flow-fix';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
