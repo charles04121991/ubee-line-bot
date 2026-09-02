@@ -1,10 +1,10 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.02.4 Customer Match ETA V1
+ * Version: 2026.09.02.3 Customer Home Platform V3
  * File: ubee-customer-sw.js
  *
- * 2026-09-02 Customer Match ETA V1：同步首頁即時運力媒合時間估算，保留 Home Platform V3 地圖與需求情境；升版後清除舊 Customer Cache。
+ * 2026-09-02 Customer Home Platform V3：同步正式首頁地圖、匿名小U運力、需求情境入口與訂單導覽文案；升版後清除舊 Customer Cache。
  *
  * 2026-08-11 Identity V1 更新：
  * 1. 實名制 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
@@ -17,7 +17,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.02.4-customer-match-eta-v1';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.02.3-home-platform-v3';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
