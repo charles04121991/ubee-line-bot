@@ -1,3 +1,4 @@
+// 2026-09-02｜Rider Task Visibility V1：統一調度中心/騎士端待派狀態、補齊安全預覽區域欄位，避免調度有單但騎士任務池被舊狀態或二次解析誤擋。
 require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
@@ -7302,8 +7303,80 @@ function sanitizeRiderPendingPreviewText(value, maxLength = 160) {
   return clean.slice(0, Math.max(0, Number(maxLength) || 160));
 }
 
+
+// ============================================================
+// 2026-09-02｜Rider Task Visibility V1
+// 調度中心與騎士端共用的「待派單」狀態正規化。
+// 舊狀態 pending / waiting / searching / dispatching / redispatching
+// 在騎士任務池一律視為 pending_dispatch，避免調度中心看得到、騎士端拿不到。
+// ============================================================
+const UBEE_RIDER_PENDING_DISPATCH_STATUSES = Object.freeze([
+  'pending_dispatch',
+  'pending',
+  'waiting',
+  'searching',
+  'dispatching',
+  'redispatching',
+]);
+
+function normalizeRiderPendingTaskStatus(value) {
+  const safe = String(value || '').trim().toLowerCase();
+
+  if (safe === 'pending_schedule') {
+    return 'pending_schedule';
+  }
+
+  if (UBEE_RIDER_PENDING_DISPATCH_STATUSES.includes(safe)) {
+    return 'pending_dispatch';
+  }
+
+  return safe;
+}
+
+function getRiderPendingPreviewRegion(order = {}) {
+  const pickupAddress =
+    order.pickupAddress ||
+    order.fromAddress ||
+    order.pickup ||
+    '';
+
+  const inferred =
+    typeof inferTaiwanRegion === 'function'
+      ? inferTaiwanRegion(pickupAddress)
+      : { city:'', district:'', fullDistrict:'' };
+
+  const pickupCity = normalizeTaiwanCityName(
+    order.pickupCity ||
+    inferred.city ||
+    ''
+  );
+
+  const pickupDistrict = normalizeTaiwanRegionText(
+    order.pickupDistrict ||
+    inferred.district ||
+    ''
+  );
+
+  const pickupFullDistrict =
+    buildTaiwanFullDistrict(
+      pickupCity,
+      pickupDistrict,
+      inferred.fullDistrict || ''
+    ) ||
+    String(inferred.fullDistrict || '').trim();
+
+  return {
+    pickupCountryCode: pickupCity ? 'TW' : '',
+    pickupCity,
+    pickupDistrict,
+    pickupFullDistrict,
+  };
+}
+
 function buildRiderPendingTaskPreview(order = {}) {
-  const status = String(order.status || '').trim();
+  const sourceDispatchStatus = String(order.status || '').trim().toLowerCase();
+  const status = normalizeRiderPendingTaskStatus(sourceDispatchStatus);
+  const previewRegion = getRiderPendingPreviewRegion(order);
   const orderId = String(
     order.id || order.orderId || order.orderNo || ''
   ).trim().toUpperCase();
@@ -7485,6 +7558,15 @@ function buildRiderPendingTaskPreview(order = {}) {
     orderNo: String(order.orderNo || orderId).trim(),
     status,
     riderStatus: status,
+    sourceDispatchStatus,
+    serverDispatchEligible: true,
+    riderTaskPreviewVersion: 3,
+
+    // 後端直接提供正規化區域，避免前端只靠地址字串再次解析而誤擋任務。
+    pickupCountryCode: previewRegion.pickupCountryCode,
+    pickupCity: previewRegion.pickupCity,
+    pickupDistrict: previewRegion.pickupDistrict,
+    pickupRegion: previewRegion.pickupFullDistrict,
 
     // 接單前畫面只顯示行政區，不回傳門牌與聯絡資料。
     pickupArea,
@@ -7507,6 +7589,8 @@ function buildRiderPendingTaskPreview(order = {}) {
       order.createdAtMs ||
       getDispatchPushTimeMs(order.createdAt || order.updatedAtMs || order.updatedAt) ||
       Date.now(),
+    dispatchStartedAtMs: Number(order.dispatchStartedAtMs || 0),
+    redispatchStartedAtMs: Number(order.redispatchStartedAtMs || 0),
     dispatchRadiusKm: Number(order.dispatchRadiusKm || 0),
     skippedRiderIds: Array.isArray(order.skippedRiderIds)
       ? order.skippedRiderIds
@@ -7684,17 +7768,44 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
     
     const snap = await db
       .collection('orders')
-      .where('status', 'in', ['pending_dispatch', 'pending_schedule'])
-      .limit(80)
+      .where(
+        'status',
+        'in',
+        [
+          'pending_dispatch',
+          'pending_schedule',
+          'pending',
+          'waiting',
+          'searching',
+          'dispatching',
+          'redispatching',
+        ]
+      )
+      .limit(100)
       .get();
 
     const nowMs = Date.now();
 
     const orders = snap.docs
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
+      .map(doc => {
+        const rawOrder = {
+          id: doc.id,
+          ...doc.data()
+        };
+
+        const sourceDispatchStatus =
+          String(rawOrder.status || '').trim().toLowerCase();
+
+        const canonicalStatus =
+          normalizeRiderPendingTaskStatus(sourceDispatchStatus);
+
+        return {
+          ...rawOrder,
+          status: canonicalStatus,
+          riderStatus: canonicalStatus,
+          sourceDispatchStatus,
+        };
+      })
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => !isOrderSkippedForRider(order, identity))
       .filter(order => {
@@ -7743,6 +7854,11 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       tasks: orders,
       availableTaskCount: orders.length,
       mapPickupEnabled: true,
+      apiVersion: 'rider-task-visibility-v1',
+      supportedWaitingStatuses: [
+        ...UBEE_RIDER_PENDING_DISPATCH_STATUSES,
+        'pending_schedule',
+      ],
     });
 
   } catch (err) {
