@@ -1,10 +1,10 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.02.2 Home Live Supply V2.1 Production Flow Fix
+ * Version: 2026.09.02.4 Customer Match ETA V1
  * File: ubee-customer-sw.js
  *
- * 2026-09-02 Home Live Supply V2.1 Production Flow Fix：同步正式 productionOrderFlow 首頁即時運力卡版本，並清除舊 Customer Cache。
+ * 2026-09-02 Customer Match ETA V1：同步首頁即時運力媒合時間估算，保留 Home Platform V3 地圖與需求情境；升版後清除舊 Customer Cache。
  *
  * 2026-08-11 Identity V1 更新：
  * 1. 實名制 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
@@ -17,7 +17,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.02.2-live-supply-v2-1-production-flow-fix';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.02.4-customer-match-eta-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
