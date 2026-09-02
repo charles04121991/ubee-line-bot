@@ -2,12 +2,13 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-02｜Home Live Supply V2：首頁即時運力狀態重新顯眼呈現；優先依取件點／裝置定位顯示附近 5 公里可即時媒合小U數量，無定位時保留全區可媒合數量 fallback。 -->
 <!-- 2026-09-01｜Order ↔ Backend Pricing Contract V1：統一估價/建單服務欄位，加入全能跑腿 taskMinutes，排隊明細去重，樓層費改由後端正式判定。 -->
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260807-2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260902-live-supply-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -8658,6 +8659,139 @@ body.ubee-app-starting{
   height:24px;
 }
 </style>
+
+<style id="ubee-home-live-supply-v2-style">
+/* =====================================================
+   2026-09-02｜UBee 首頁即時運力狀態 V2
+   - 重新提高首頁可見度，不回到笨重的大卡片
+   - 有定位：主顯示附近 5 公里可即時媒合小U
+   - 無定位：顯示全區可即時媒合小U，並提示開啟定位
+   ===================================================== */
+.home-service-status{
+  display:block!important;
+  margin:2px 0 18px!important;
+  padding:14px 15px 13px!important;
+  border:1px solid #e3e5e8!important;
+  border-radius:18px!important;
+  background:#ffffff!important;
+  box-shadow:0 7px 22px rgba(17,24,39,.055)!important;
+}
+.home-service-status-head{
+  width:100%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:14px!important;
+}
+.home-service-status-head > div:first-child{
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+.home-service-status-kicker{
+  display:flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  color:#70757b!important;
+  font-size:11px!important;
+  line-height:1.3!important;
+  font-weight:850!important;
+  letter-spacing:.15px!important;
+}
+.home-service-status-dot{
+  width:8px!important;
+  height:8px!important;
+  flex:0 0 8px!important;
+  border-radius:50%!important;
+  background:#16a34a!important;
+  box-shadow:0 0 0 4px rgba(22,163,74,.10)!important;
+}
+.home-service-status.is-limited .home-service-status-dot{
+  background:#d99a00!important;
+  box-shadow:0 0 0 4px rgba(217,154,0,.10)!important;
+}
+.home-service-status.is-empty .home-service-status-dot,
+.home-service-status.is-fallback .home-service-status-dot{
+  background:#9ca3af!important;
+  box-shadow:0 0 0 4px rgba(156,163,175,.10)!important;
+}
+.home-service-status-count{
+  margin-top:5px!important;
+  color:#111111!important;
+  font-size:19px!important;
+  line-height:1.28!important;
+  font-weight:850!important;
+  letter-spacing:-.25px!important;
+  white-space:normal!important;
+}
+.home-service-status-count span{
+  color:#d49b00!important;
+  font-size:24px!important;
+  line-height:1!important;
+  font-weight:1000!important;
+  letter-spacing:-.6px!important;
+}
+.home-service-status-count strong{
+  color:#111111!important;
+  font-size:19px!important;
+  line-height:1.28!important;
+  font-weight:850!important;
+}
+.home-service-status-side{
+  flex:0 0 auto!important;
+  min-width:62px!important;
+  text-align:right!important;
+}
+.home-service-status-scope{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:24px!important;
+  padding:0 8px!important;
+  border-radius:999px!important;
+  background:#f4f5f6!important;
+  color:#5f646a!important;
+  font-size:10px!important;
+  line-height:1!important;
+  font-weight:900!important;
+  white-space:nowrap!important;
+}
+.home-service-status.is-nearby .home-service-status-scope{
+  background:#fff6c9!important;
+  color:#755900!important;
+}
+.home-service-status-label{display:none!important;}
+.home-service-status-time{
+  margin-top:6px!important;
+  color:#9a9da2!important;
+  font-size:10px!important;
+  line-height:1.2!important;
+  font-weight:750!important;
+}
+.home-service-status-note{
+  display:block!important;
+  margin-top:10px!important;
+  padding-top:9px!important;
+  border-top:1px solid #f0f1f2!important;
+  color:#6f747a!important;
+  font-size:11px!important;
+  line-height:1.5!important;
+  font-weight:700!important;
+}
+@media(max-width:390px){
+  .home-service-status{
+    padding:13px 13px 12px!important;
+    border-radius:17px!important;
+  }
+  .home-service-status-count,
+  .home-service-status-count strong{
+    font-size:18px!important;
+  }
+  .home-service-status-count span{
+    font-size:23px!important;
+  }
+}
+</style>
+
 </head>
 <body class="ubee-app-starting" style="background:#ffffff;">
 
@@ -10165,19 +10299,19 @@ body.ubee-app-starting{
 <div>
 <div class="home-service-status-kicker">
 <span aria-hidden="true" class="home-service-status-dot"></span>
-              即時服務狀態
-            </div>
-<div class="home-service-status-count" id="homeOnlineRiderCount">
-<span>0</span> <strong>位小U可即時媒合</strong>
+<span id="homeServiceStatusKickerText">即時小U運力</span>
+</div>
+<div class="home-service-status-count" data-rider-count="0" data-scope="loading" id="homeOnlineRiderCount">
+<strong>正在確認附近小U</strong>
 </div>
 </div>
 <div class="home-service-status-side">
-<div class="home-service-status-label">資料更新時間</div>
+<div class="home-service-status-scope" id="homeServiceStatusScope">定位中</div>
 <div class="home-service-status-time" id="homeServiceUpdatedAt">--:--</div>
 </div>
 </div>
 <div class="home-service-status-note" id="homeServiceStatusNote">
-          系統正在更新在線小U數量。
+          取得定位後，會優先顯示附近 5 公里可即時媒合的小U。
         </div>
 </div>
 <div class="ubee-v4-service-title">選擇服務</div>
@@ -10989,6 +11123,9 @@ const HOME_SERVICE_STATUS_REFRESH_MS = 10000;
 let homeServiceStatusRequestInFlight = false;
 let homeLastSuccessfulOnlineRiderCount = 0;
 let homeHasSuccessfulServiceStatus = false;
+let homeLastSuccessfulServiceScope = 'global';
+let homeServiceLocationAttempted = false;
+let homeServiceLocationError = '';
 let homeNearbyRiderMarkers = [];
 let homeNearbyRiderInfoWindow = null;
 
@@ -11551,6 +11688,10 @@ async function requestCurrentLocationForMap(){
     const position = await getCurrentPosition();
     currentLocationLat = position.coords.latitude;
     currentLocationLng = position.coords.longitude;
+
+    if(typeof refreshHomeServiceStatus === 'function'){
+      setTimeout(() => refreshHomeServiceStatus(), 0);
+    }
 
     if(customerMap){
       renderCurrentLocationMarker();
@@ -18961,11 +19102,82 @@ function formatHomeServiceUpdatedAt(value){
   });
 }
 
-function renderHomeServiceStatus(data, fallback = false){
+function getKnownHomeServiceStatusPoint(){
+  if(hasValidLatLng(pickupLat, pickupLng)){
+    return {
+      lat:Number(pickupLat),
+      lng:Number(pickupLng),
+      source:'pickup'
+    };
+  }
+
+  if(hasValidLatLng(currentLocationLat, currentLocationLng)){
+    return {
+      lat:Number(currentLocationLat),
+      lng:Number(currentLocationLng),
+      source:'device'
+    };
+  }
+
+  return null;
+}
+
+async function resolveHomeServiceStatusPoint(){
+  const knownPoint = getKnownHomeServiceStatusPoint();
+  if(knownPoint){
+    return knownPoint;
+  }
+
+  // 同一個頁面生命週期只主動嘗試一次定位；之後每 10 秒刷新沿用既有座標。
+  // 若使用者之後在地址流程或地圖流程取得座標，下一輪會自動改用該座標。
+  if(homeServiceLocationAttempted){
+    return null;
+  }
+
+  homeServiceLocationAttempted = true;
+
+  try{
+    const position = await getCurrentPosition();
+    const lat = Number(position?.coords?.latitude);
+    const lng = Number(position?.coords?.longitude);
+
+    if(!hasValidLatLng(lat, lng)){
+      return null;
+    }
+
+    currentLocationLat = lat;
+    currentLocationLng = lng;
+    homeServiceLocationError = '';
+
+    return {
+      lat,
+      lng,
+      source:'device'
+    };
+  }catch(err){
+    homeServiceLocationError = String(err?.message || '定位不可用');
+    console.warn('首頁即時運力定位取得失敗，改用全區數量：', err);
+    return null;
+  }
+}
+
+function buildHomeServiceStatusEndpoint(endpoint, point){
+  if(!point || !hasValidLatLng(point.lat, point.lng)){
+    return endpoint;
+  }
+
+  const separator = endpoint.includes('?') ? '&' : '?';
+
+  return `${endpoint}${separator}pickupLat=${encodeURIComponent(point.lat)}&pickupLng=${encodeURIComponent(point.lng)}`;
+}
+
+function renderHomeServiceStatus(data, fallback = false, context = {}){
   const card = qs('homeServiceStatus');
   const countEl = qs('homeOnlineRiderCount');
   const timeEl = qs('homeServiceUpdatedAt');
   const noteEl = qs('homeServiceStatusNote');
+  const scopeEl = qs('homeServiceStatusScope');
+  const kickerEl = qs('homeServiceStatusKickerText');
 
   if(
     !card ||
@@ -18976,89 +19188,105 @@ function renderHomeServiceStatus(data, fallback = false){
     return;
   }
 
-  /*
-   * API 某一次更新失敗時：
-   * - 保留最後一次成功取得的人數
-   * - 不顯示任何媒合備援文字
-   * - 不清除地圖上的小U標記
-   */
   if(fallback){
-    const retainedCount =
-      Math.max(
-        0,
-        Number(
-          homeLastSuccessfulOnlineRiderCount || 0
-        )
-      );
-
-    countEl.innerHTML =
-      `<span>${retainedCount}</span> <strong>位小U可即時媒合</strong>`;
+    card.classList.add('is-fallback');
 
     if(!homeHasSuccessfulServiceStatus){
-      noteEl.innerText =
-        '系統正在更新在線小U數量。';
-
-      timeEl.innerText =
-        '更新中';
+      countEl.dataset.riderCount = '0';
+      countEl.dataset.scope = 'loading';
+      countEl.innerHTML = '<strong>正在更新小U運力</strong>';
+      noteEl.innerText = homeServiceLocationError
+        ? '目前無法取得定位，系統仍會嘗試更新全區可媒合小U。'
+        : '系統正在更新可即時媒合的小U數量。';
+      if(scopeEl) scopeEl.innerText = '更新中';
+      timeEl.innerText = '稍後重試';
     }
 
     return;
   }
 
-  const onlineCount =
-    Math.max(
-      0,
-      Number(
-        data?.onlineRiderCount || 0
-      )
-    );
-
-  const mapRiderCount =
-    Math.max(
-      0,
-      Number(
-        data?.mapRiderCount ??
-        data?.nearbyRiders?.length ??
-        data?.onlineRiderCount ??
-        0
-      )
-    );
-
-  // 客人端主數字只顯示 5 分鐘內有近期定位、可即時媒合的小U。
-  const displayCount = mapRiderCount;
-
-  homeLastSuccessfulOnlineRiderCount =
-    displayCount;
-
-  homeHasSuccessfulServiceStatus =
-    true;
-
-  card.classList.remove(
-    'is-fallback'
+  const onlineCount = Math.max(
+    0,
+    Number(data?.onlineRiderCount || 0)
   );
 
-  countEl.innerHTML =
-    `<span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
-
-  renderHomeNearbyRiders(
-    data?.nearbyRiders || []
+  const mapRiderCount = Math.max(
+    0,
+    Number(
+      data?.mapRiderCount ??
+      data?.nearbyRiders?.length ??
+      data?.onlineRiderCount ??
+      0
+    )
   );
 
-  timeEl.innerText =
-    formatHomeServiceUpdatedAt(
-      data?.updatedAt
-    );
+  const pickupMatch =
+    data?.pickupMatch && typeof data.pickupMatch === 'object'
+      ? data.pickupMatch
+      : null;
 
-  if(displayCount > 0){
-    noteEl.innerText =
-      `目前有 ${displayCount} 位小U可即時媒合，地圖顯示匿名約略位置。`;
-  }else if(onlineCount > 0){
-    noteEl.innerText =
-      `目前有 ${onlineCount} 位小U維持公開上線狀態，定位正在更新。`;
-  }else{
-    noteEl.innerText =
-      '目前尚無可即時媒合的小U，系統會持續更新。';
+  const nearby5kmRaw = pickupMatch?.nearbyRiderCount5km;
+  const hasNearby5km =
+    pickupMatch !== null &&
+    Number.isFinite(Number(nearby5kmRaw));
+
+  const displayCount = hasNearby5km
+    ? Math.max(0, Number(nearby5kmRaw))
+    : mapRiderCount;
+
+  homeLastSuccessfulOnlineRiderCount = displayCount;
+  homeLastSuccessfulServiceScope = hasNearby5km ? 'nearby5km' : 'global';
+  homeHasSuccessfulServiceStatus = true;
+
+  card.classList.remove('is-fallback','is-nearby','is-global','is-limited','is-empty');
+  card.classList.add(hasNearby5km ? 'is-nearby' : 'is-global');
+
+  if(displayCount <= 0){
+    card.classList.add(mapRiderCount > 0 ? 'is-limited' : 'is-empty');
   }
+
+  countEl.dataset.riderCount = String(displayCount);
+  countEl.dataset.scope = homeLastSuccessfulServiceScope;
+
+  if(hasNearby5km){
+    countEl.innerHTML =
+      `<strong>附近 5 公里有</strong> <span>${displayCount}</span> <strong>位小U</strong>`;
+
+    if(scopeEl) scopeEl.innerText = '附近 5 km';
+    if(kickerEl) kickerEl.innerText = context?.point?.source === 'pickup'
+      ? '取件地即時運力'
+      : '附近即時運力';
+
+    if(displayCount > 0){
+      noteEl.innerText = '目前可即時媒合，建立任務後系統會依取件位置安排小U。';
+    }else if(mapRiderCount > 0){
+      noteEl.innerText = '附近 5 公里暫無小U，系統仍可依任務位置擴大媒合範圍。';
+    }else if(onlineCount > 0){
+      noteEl.innerText = '目前有小U在線，但近期定位仍在更新。';
+    }else{
+      noteEl.innerText = '目前附近尚無可即時媒合的小U，系統會持續更新。';
+    }
+  }else{
+    countEl.innerHTML =
+      `<strong>目前有</strong> <span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
+
+    if(scopeEl) scopeEl.innerText = '全區';
+    if(kickerEl) kickerEl.innerText = '即時小U運力';
+
+    if(displayCount > 0){
+      noteEl.innerText = homeServiceLocationError
+        ? '目前顯示全區可媒合小U；定位開啟後會改顯示附近 5 公里。'
+        : '目前顯示全區可媒合小U；取得定位後會改顯示附近 5 公里。';
+    }else if(onlineCount > 0){
+      noteEl.innerText = '目前有小U在線，近期定位正在更新。';
+    }else{
+      noteEl.innerText = '目前尚無可即時媒合的小U，系統會持續更新。';
+    }
+  }
+
+  renderHomeNearbyRiders(data?.nearbyRiders || []);
+
+  timeEl.innerText = formatHomeServiceUpdatedAt(data?.updatedAt);
 }
 
 async function fetchHomeServiceStatusFrom(url){
@@ -19127,18 +19355,25 @@ async function refreshHomeServiceStatus(){
   ];
 
   let lastError = null;
+  let point = null;
 
   try{
+    point = getKnownHomeServiceStatusPoint();
+
+    if(!point){
+      point = await resolveHomeServiceStatusPoint();
+    }
+
     for(const endpoint of endpointCandidates){
       try{
-        const data =
-          await fetchHomeServiceStatusFrom(
-            endpoint
-          );
+        const data = await fetchHomeServiceStatusFrom(
+          buildHomeServiceStatusEndpoint(endpoint, point)
+        );
 
         renderHomeServiceStatus(
           data,
-          false
+          false,
+          { point }
         );
 
         return;
@@ -19167,14 +19402,14 @@ async function refreshHomeServiceStatus(){
 
     renderHomeServiceStatus(
       null,
-      true
+      true,
+      { point }
     );
 
   }finally{
     homeServiceStatusRequestInFlight = false;
   }
 }
-
 
 function startHomeServiceStatusRefresh(){
   if(homeServiceStatusTimer){
@@ -19352,7 +19587,7 @@ const UBeeEnhancements = (() => {
 
   function etaMinutes(){const route=Math.max(1,Math.ceil(Number(lastRouteData?.durationMinutes||lastRouteData?.durationMin||0)));const handling=serviceGroup==='buy'?15:serviceGroup==='queue'?Math.max(10,Number(value('queueMinutes')||30)):8;const matching=speedType==='express'?3:speedType==='economy'?10:6;return matching+route+handling}
   function updateEta(){const el=qs('homeEstimateEta');if(!el)return;if(!lastRouteData){el.textContent='預計完成時間待計算';return}const mins=etaMinutes(),d=new Date(Date.now()+mins*60000);el.textContent=`預計約 ${d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} 前完成（${mins}-${mins+15} 分鐘）`}
-  function updateMatchStatus(){const text=qs('matchStatusText'),badge=qs('matchStatusBadge');if(!text||!badge)return;const count=Number(qs('homeOnlineRiderCount')?.innerText.match(/\d+/)?.[0]||0);if(!value('pickup')){text.textContent='填寫取件地址後顯示媒合狀況';badge.textContent='等待定位';badge.className='status-badge neutral'}else if(count>=5){text.textContent=`目前共有 ${count} 位小U可即時媒合，系統將從取件點附近開始媒合`;badge.textContent='媒合良好';badge.className='status-badge good'}else if(count>0){text.textContent=`目前 ${count} 位小U可即時媒合，系統會逐步擴大媒合範圍`;badge.textContent='小U較少';badge.className='status-badge warn'}else{text.textContent='目前尚無近期定位的小U，仍可正常建立任務';badge.textContent='持續搜尋';badge.className='status-badge neutral'}}
+  function updateMatchStatus(){const text=qs('matchStatusText'),badge=qs('matchStatusBadge');if(!text||!badge)return;const count=Number(qs('homeOnlineRiderCount')?.dataset?.riderCount ?? qs('homeOnlineRiderCount')?.innerText.match(/\d+/)?.[0] ?? 0);if(!value('pickup')){text.textContent='填寫取件地址後顯示媒合狀況';badge.textContent='等待定位';badge.className='status-badge neutral'}else if(count>=5){text.textContent=`目前共有 ${count} 位小U可即時媒合，系統將從取件點附近開始媒合`;badge.textContent='媒合良好';badge.className='status-badge good'}else if(count>0){text.textContent=`目前 ${count} 位小U可即時媒合，系統會逐步擴大媒合範圍`;badge.textContent='小U較少';badge.className='status-badge warn'}else{text.textContent='目前尚無近期定位的小U，仍可正常建立任務';badge.textContent='持續搜尋';badge.className='status-badge neutral'}}
   function renderSystemCheck(){const el=qs('orderSystemCheck');if(!el)return;const checks=[['pickup','取件位置已填寫',!!value('pickup')],['dropoff','送達位置已填寫',!!value('dropoff')],['phone','至少一組聯絡電話已填寫',!!(value('pickupPhone')||value('dropoffPhone'))],['route','路線已成功計算',!!lastRouteData],['quote','正式估價資料可用',!!lastQuoteData&&Number(lastEstimatedTotal)>0],['note','任務內容已完成',!!value('note')]];el.innerHTML=checks.map(([,label,ok])=>`<div class="system-check-row ${ok?'ok':'warn'}"><span class="system-check-icon">${ok?'✓':'!'}</span><span>${label}</span></div>`).join('')}
 
   function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,order.serviceType||serviceType);speedType=order.speedType||order.speed||'standard';orderTimingType=order.orderTimingType||'immediate';scheduleGoal=order.scheduleGoal||'pickup_at';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
@@ -21326,7 +21561,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260807-2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-live-supply-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
