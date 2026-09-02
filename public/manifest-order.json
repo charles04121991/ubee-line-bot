@@ -4,7 +4,7 @@
   "short_name": "UBee 跑腿",
   "description": "UBee 跑腿用戶端：即時媒合、估價、下單、訂單追蹤與店家服務。",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20260902-home-layout-v3-6",
+  "start_url": "/order.html?source=pwa&v=20260902-home-layout-v3-7",
   "scope": "/",
   "display": "standalone",
   "display_override": [
