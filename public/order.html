@@ -2,7 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
-<!-- 2026-09-02｜Customer Home Layout V3.7：首頁底部浮水印維持「UBee跑腿」原始三行品牌樣式，並把 UBee跑腿 第一行再放大。 -->
+<!-- 2026-09-02｜Customer Home Layout V3.8：首頁底部浮水印維持原始三行品牌樣式，並進一步放大「UBee跑腿」品牌字，強化品牌感。 -->
 <!-- 2026-09-02｜Customer Home Layout V3.5：修正首頁底部 UBee 跑腿浮水印，改為接近原始品牌視覺的三行淡化樣式；其餘首頁結構與地圖互動維持 V3.4。 -->
 <!-- 2026-09-02｜Customer Match ETA V1：首頁即時運力加入後端媒合時間估算；顯示「最快約 X 分鐘媒合」，並保留 Home Platform V3 地圖、匿名小U與需求情境入口。 -->
 <!-- 2026-09-02｜Customer Home Platform V3：正式首頁加入即時服務地圖、匿名小U分布、低運力友善顯示、動態任務地址文案與需求情境入口；productionOrderFlow 為唯一正式首頁。 -->
@@ -14,7 +14,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260902-home-layout-v3-7" rel="manifest"/>
+<link href="/manifest-order.json?v=20260902-home-layout-v3-8" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -22309,7 +22309,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-7';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-8';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26626,7 +26626,7 @@ body.ubee-store-active #productionOrderFlow{
 /* ---------- UBee 底部品牌浮水印 ---------- */
 
 #productionOrderFlow #flowPageHome .flow-home-footer-brand{
-  min-height:218px!important;
+  min-height:228px!important;
   margin:14px 0 0!important;
   padding:48px 12px 26px!important;
   display:flex!important;
@@ -26646,7 +26646,7 @@ body.ubee-store-active #productionOrderFlow{
   gap:0!important;
   white-space:nowrap!important;
   line-height:1!important;
-  font-size:52px!important;
+  font-size:60px!important;
   font-weight:1000!important;
   letter-spacing:-1.3px!important;
 }
@@ -26705,12 +26705,12 @@ body.ubee-store-active #productionOrderFlow{
   }
 
   #productionOrderFlow #flowPageHome .flow-home-footer-brand{
-    min-height:198px!important;
+    min-height:205px!important;
     padding-top:42px!important;
   }
 
   #productionOrderFlow #flowPageHome .flow-home-footer-logo{
-    font-size:44px!important;
+    font-size:49px!important;
   }
 
   #productionOrderFlow #flowPageHome .flow-home-footer-slogan{
