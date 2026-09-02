@@ -2,8 +2,9 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee 跑腿用戶端：估價、下單、追蹤與管理跑腿任務。",
-  "start_url": "/order.html?source=pwa&v=20260902-live-supply-v2-1-production-flow-fix",
+  "description": "UBee 跑腿用戶端：即時小U運力、媒合時間估算、估價、下單、訂單追蹤與店家服務。",
+  "lang": "zh-TW",
+  "start_url": "/order.html?source=pwa&v=20260902-match-eta-v1",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -36,22 +37,39 @@
     {
       "name": "立即下單",
       "short_name": "下單",
-      "url": "/order.html?action=new",
+      "description": "開啟 UBee 首頁建立新的跑腿需求。",
+      "url": "/order.html?action=new&source=shortcut",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
-          "sizes": "192x192"
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     },
     {
-      "name": "我的任務",
-      "short_name": "任務",
-      "url": "/order.html?action=tasks",
+      "name": "我的訂單",
+      "short_name": "訂單",
+      "description": "查看進行中與歷史 UBee 訂單。",
+      "url": "/order.html?action=tasks&source=shortcut",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
-          "sizes": "192x192"
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "店家服務",
+      "short_name": "店家",
+      "description": "開啟 UBee 店家服務入口。",
+      "url": "/order.html?action=store&source=shortcut",
+      "icons": [
+        {
+          "src": "/ubee-customer-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     }
