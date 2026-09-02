@@ -8,6 +8,7 @@ const admin = require('firebase-admin');
 const webpush = require('web-push');
 const multer = require('multer');
 
+// 2026-09-02｜Customer Match ETA V1：客戶端 service-status 加入附近運力／距離推估的媒合時間、供給等級與信心度；僅作即時估算，不作接單保證。
 // 2026-09-01｜Order ↔ Backend Pricing Contract V1：Quote Lock 加入 serviceKey/queueMinutes/taskMinutes/upstairsOption/advancePayment 驗證；樓層費改由後端 canonical 規則決定。
 // 2026-09-01｜Rider Safety Backend V12.1：安全回報支援 payment/item、money→payment 相容正規化，並驗證 orderId 存在與騎士歸屬後才允許關聯／回寫訂單。
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
@@ -26729,6 +26730,122 @@ const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
 const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
 const CUSTOMER_RIDER_MAX_MARKERS = 80;
 
+// Customer Match ETA V1：
+// 以「目前可即時媒合的小U數量 + 距離」估算媒合等待時間。
+// 這不是 SLA，也不代表特定小U已接受任務；實際時間仍受任務內容、接單意願與即時狀態影響。
+const CUSTOMER_MATCH_ESTIMATE_VERSION = 'supply-distance-v1';
+
+function buildCustomerMatchEstimate({
+  hasPickupPoint,
+  nearbyRiderCount3km = 0,
+  nearbyRiderCount5km = 0,
+  nearbyRiderCount10km = 0,
+  nearestRiderDistanceKm = null,
+  mapRiderCount = 0,
+  onlineRiderCount = 0,
+} = {}) {
+  const counts = {
+    nearby3km: Math.max(0, Number(nearbyRiderCount3km || 0)),
+    nearby5km: Math.max(0, Number(nearbyRiderCount5km || 0)),
+    nearby10km: Math.max(0, Number(nearbyRiderCount10km || 0)),
+    realtime: Math.max(0, Number(mapRiderCount || 0)),
+    publicOnline: Math.max(0, Number(onlineRiderCount || 0)),
+  };
+
+  const nearestKm = Number.isFinite(Number(nearestRiderDistanceKm))
+    ? Math.max(0, Number(nearestRiderDistanceKm))
+    : null;
+
+  const makeEstimate = (
+    fastestMinutes,
+    minMinutes,
+    maxMinutes,
+    supplyLevel,
+    confidence,
+    basis
+  ) => ({
+    available: true,
+    fastestMatchMinutes: fastestMinutes,
+    estimatedMatchMinutes: Math.round((minMinutes + maxMinutes) / 2),
+    estimatedMatchMinMinutes: minMinutes,
+    estimatedMatchMaxMinutes: maxMinutes,
+    supplyLevel,
+    confidence,
+    basis,
+    estimateVersion: CUSTOMER_MATCH_ESTIMATE_VERSION,
+    disclaimer: '依目前附近小U與定位狀態估算，實際媒合時間可能因任務內容、接單意願與即時運力變動。',
+  });
+
+  if (hasPickupPoint) {
+    if (counts.nearby3km >= 4) {
+      return makeEstimate(3, 3, 5, 'high', 'high', 'pickup_3km_dense');
+    }
+
+    if (counts.nearby3km >= 2) {
+      return makeEstimate(3, 3, 6, 'high', 'high', 'pickup_3km');
+    }
+
+    if (counts.nearby3km === 1) {
+      const fastest = nearestKm !== null && nearestKm <= 1.5 ? 3 : 4;
+      return makeEstimate(fastest, fastest, fastest + 4, 'normal', 'medium', 'pickup_3km_single');
+    }
+
+    if (counts.nearby5km >= 2) {
+      return makeEstimate(5, 5, 8, 'normal', 'medium', 'pickup_5km');
+    }
+
+    if (counts.nearby5km === 1) {
+      return makeEstimate(6, 6, 10, 'limited', 'medium', 'pickup_5km_single');
+    }
+
+    if (counts.nearby10km >= 2) {
+      return makeEstimate(8, 8, 12, 'limited', 'low', 'pickup_10km');
+    }
+
+    if (counts.nearby10km === 1) {
+      return makeEstimate(10, 10, 15, 'expanded', 'low', 'pickup_10km_single');
+    }
+
+    if (counts.realtime > 0) {
+      return makeEstimate(12, 12, 18, 'expanded', 'low', 'realtime_outside_10km');
+    }
+
+    if (counts.publicOnline > 0) {
+      return makeEstimate(15, 15, 22, 'limited', 'low', 'public_online_location_refreshing');
+    }
+  } else {
+    // 尚未取得客人位置時，只以全區即時運力做低信心度估算。
+    if (counts.realtime >= 6) {
+      return makeEstimate(4, 4, 7, 'high', 'low', 'global_realtime_dense');
+    }
+
+    if (counts.realtime >= 3) {
+      return makeEstimate(5, 5, 9, 'normal', 'low', 'global_realtime');
+    }
+
+    if (counts.realtime >= 1) {
+      return makeEstimate(8, 8, 13, 'limited', 'low', 'global_realtime_limited');
+    }
+
+    if (counts.publicOnline > 0) {
+      return makeEstimate(15, 15, 22, 'limited', 'low', 'global_public_online');
+    }
+  }
+
+  return {
+    available: false,
+    fastestMatchMinutes: null,
+    estimatedMatchMinutes: null,
+    estimatedMatchMinMinutes: null,
+    estimatedMatchMaxMinutes: null,
+    supplyLevel: 'none',
+    confidence: 'none',
+    basis: 'no_realtime_supply',
+    estimateVersion: CUSTOMER_MATCH_ESTIMATE_VERSION,
+    disclaimer: '目前沒有足夠即時運力資料可估算媒合時間。',
+  };
+}
+
 function getCustomerRiderMapSecret() {
   return String(
     process.env.CUSTOMER_RIDER_MAP_SECRET ||
@@ -26917,6 +27034,16 @@ app.get('/api/customer/service-status', async (req, res) => {
       }
     });
 
+    const matchEstimate = buildCustomerMatchEstimate({
+      hasPickupPoint,
+      nearbyRiderCount3km,
+      nearbyRiderCount5km,
+      nearbyRiderCount10km,
+      nearestRiderDistanceKm,
+      mapRiderCount,
+      onlineRiderCount,
+    });
+
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -26926,6 +27053,7 @@ app.get('/api/customer/service-status', async (req, res) => {
       onlineRiderCount,
       mapRiderCount,
       nearbyRiders,
+      matchEstimate,
 
       pickupMatch:
         hasPickupPoint
@@ -26950,6 +27078,12 @@ app.get('/api/customer/service-status', async (req, res) => {
                     : mapRiderCount > 0
                       ? 'expand_required'
                       : 'none',
+              fastestMatchMinutes: matchEstimate.fastestMatchMinutes,
+              estimatedMatchMinutes: matchEstimate.estimatedMatchMinutes,
+              estimatedMatchMinMinutes: matchEstimate.estimatedMatchMinMinutes,
+              estimatedMatchMaxMinutes: matchEstimate.estimatedMatchMaxMinutes,
+              supplyLevel: matchEstimate.supplyLevel,
+              estimateConfidence: matchEstimate.confidence,
             }
           : null,
 
