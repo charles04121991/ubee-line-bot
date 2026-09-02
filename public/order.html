@@ -2,7 +2,8 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
-<!-- 2026-09-02｜Customer Home Layout V3.4：首頁 Google Maps 改為單指可拖曳／直接縮放；地圖再放大；底部恢復 UBee 跑腿品牌浮水印。 -->
+<!-- 2026-09-02｜Customer Home Layout V3.6：首頁底部浮水印改回「UBee跑腿」原始三行品牌樣式；不再出現錯誤間距。 -->
+<!-- 2026-09-02｜Customer Home Layout V3.5：修正首頁底部 UBee 跑腿浮水印，改為接近原始品牌視覺的三行淡化樣式；其餘首頁結構與地圖互動維持 V3.4。 -->
 <!-- 2026-09-02｜Customer Match ETA V1：首頁即時運力加入後端媒合時間估算；顯示「最快約 X 分鐘媒合」，並保留 Home Platform V3 地圖、匿名小U與需求情境入口。 -->
 <!-- 2026-09-02｜Customer Home Platform V3：正式首頁加入即時服務地圖、匿名小U分布、低運力友善顯示、動態任務地址文案與需求情境入口；productionOrderFlow 為唯一正式首頁。 -->
 <!-- 2026-09-02｜Home Live Supply V2：首頁即時運力狀態重新顯眼呈現；優先依取件點／裝置定位顯示附近 5 公里可即時媒合小U數量，無定位時保留全區可媒合數量 fallback。 -->
@@ -13,7 +14,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260902-home-layout-v3-4" rel="manifest"/>
+<link href="/manifest-order.json?v=20260902-home-layout-v3-6" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -20929,8 +20930,11 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </section>
 
 <div aria-hidden="true" class="flow-home-footer-brand">
-<strong><span class="u">U</span>Bee 跑腿</strong>
-<span>生活大小事，一叫就出發</span>
+  <div class="flow-home-footer-logo">
+    <span class="u">U</span><span class="bee">Bee</span><span class="rt">跑腿</span>
+  </div>
+  <div class="flow-home-footer-slogan">生活大小事，一叫就出發</div>
+  <div class="flow-home-footer-meta">代買・代送・取件・排隊・全能跑腿</div>
 </div>
 </div>
 </section>
@@ -22305,7 +22309,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-4';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-6';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26167,14 +26171,13 @@ body.ubee-store-active #productionOrderFlow{
 </script>
 
 
-<style id="ubee-customer-home-layout-v3-4-style">
+<style id="ubee-customer-home-layout-v3-6-style">
 /* =========================================================
    2026-09-02｜Customer Home Layout V3.3
-   - 首頁地圖改為 greedy：單指可拖曳，直接手勢縮放
-   - 地圖高度再放大
+   - 維持首頁地圖 greedy 單指互動與放大高度
    - 即時運力 / Match ETA 維持地圖下方
    - 教育區維持六種常見情境
-   - 底部恢復 UBee 跑腿淡化品牌浮水印
+   - 底部 UBee 跑腿浮水印調整為更接近品牌原稿的三行淡化樣式
    ========================================================= */
 
 #productionOrderFlow #flowPageHome{
@@ -26623,42 +26626,60 @@ body.ubee-store-active #productionOrderFlow{
 /* ---------- UBee 底部品牌浮水印 ---------- */
 
 #productionOrderFlow #flowPageHome .flow-home-footer-brand{
-  min-height:190px!important;
-  margin:10px 0 0!important;
-  padding:42px 12px 26px!important;
+  min-height:205px!important;
+  margin:14px 0 0!important;
+  padding:48px 12px 26px!important;
   display:flex!important;
   flex-direction:column!important;
   align-items:center!important;
-  justify-content:center!important;
+  justify-content:flex-start!important;
   text-align:center!important;
-  opacity:.20!important;
   pointer-events:none!important;
   user-select:none!important;
   -webkit-user-select:none!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-footer-brand strong{
-  display:block!important;
-  color:#111!important;
-  font-size:43px!important;
-  font-weight:1000!important;
-  letter-spacing:-2px!important;
-  line-height:1!important;
+#productionOrderFlow #flowPageHome .flow-home-footer-logo{
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:center!important;
+  gap:0!important;
   white-space:nowrap!important;
+  line-height:1!important;
+  font-size:44px!important;
+  font-weight:1000!important;
+  letter-spacing:-1.3px!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-footer-brand strong .u{
-  color:#f4bd00!important;
+#productionOrderFlow #flowPageHome .flow-home-footer-logo .u{
+  color:#e6d486!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-footer-brand > span{
-  display:block!important;
-  margin-top:11px!important;
-  color:#6f747a!important;
+#productionOrderFlow #flowPageHome .flow-home-footer-logo .bee,
+#productionOrderFlow #flowPageHome .flow-home-footer-logo .rt{
+  color:#a9adb2!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-footer-logo .rt{
+  margin-left:1px!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-footer-slogan{
+  margin-top:10px!important;
+  color:#b5b9be!important;
   font-size:13px!important;
   font-weight:900!important;
-  letter-spacing:.08em!important;
-  line-height:1.4!important;
+  letter-spacing:.02em!important;
+  line-height:1.45!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-footer-meta{
+  margin-top:7px!important;
+  color:#c7cacf!important;
+  font-size:9px!important;
+  font-weight:850!important;
+  letter-spacing:.01em!important;
+  line-height:1.5!important;
 }
 
 @media(max-width:390px){
@@ -26684,12 +26705,20 @@ body.ubee-store-active #productionOrderFlow{
   }
 
   #productionOrderFlow #flowPageHome .flow-home-footer-brand{
-    min-height:170px!important;
-    padding-top:36px!important;
+    min-height:188px!important;
+    padding-top:42px!important;
   }
 
-  #productionOrderFlow #flowPageHome .flow-home-footer-brand strong{
-    font-size:38px!important;
+  #productionOrderFlow #flowPageHome .flow-home-footer-logo{
+    font-size:39px!important;
+  }
+
+  #productionOrderFlow #flowPageHome .flow-home-footer-slogan{
+    font-size:12px!important;
+  }
+
+  #productionOrderFlow #flowPageHome .flow-home-footer-meta{
+    font-size:8.5px!important;
   }
 }
 </style>
