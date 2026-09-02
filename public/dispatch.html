@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-02｜Dispatch Rider Visibility V1：以這份調度中心程式為基準，加入待派單「騎士可見性診斷」；對齊騎士端 3km→5km→全區波次，顯示在線、GPS、後端候選與距離阻擋原因。 -->
 <!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>UBee 跑腿｜調度中心 V2 Final＋動態定價 V3</title>
+<title>UBee 跑腿｜調度中心 V2 Final＋動態定價 V3＋Rider Visibility V1</title>
 
 <!-- Google Maps JavaScript API：由 /api/config 取得現有 UBee Google Maps 設定後動態載入 -->
 
@@ -232,6 +233,105 @@ button{cursor:pointer}
 }
 
 
+/* ===== Dispatch Rider Visibility V1 ===== */
+.rider-visibility-strip{
+  margin-top:9px;
+  padding:10px 11px;
+  border:1px solid var(--line);
+  border-left:4px solid #8b9098;
+  border-radius:12px;
+  background:#f8f9fa;
+  font-size:10px;
+  line-height:1.55;
+  color:#5f646c;
+}
+.rider-visibility-strip.ready{
+  border-left-color:var(--green);
+  background:#f4fcf7;
+}
+.rider-visibility-strip.radius{
+  border-left-color:var(--yellow);
+  background:#fffdf4;
+}
+.rider-visibility-strip.gps,
+.rider-visibility-strip.eligibility{
+  border-left-color:var(--orange);
+  background:#fff9f1;
+}
+.rider-visibility-strip.offline,
+.rider-visibility-strip.blocked{
+  border-left-color:var(--red);
+  background:#fff6f6;
+}
+.rider-visibility-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.rider-visibility-head strong{
+  color:#111;
+  font-size:11px;
+  font-weight:1000;
+}
+.rider-visibility-label{
+  display:inline-flex;
+  align-items:center;
+  min-height:22px;
+  padding:0 8px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.07);
+  font-size:9px;
+  font-weight:1000;
+  white-space:nowrap;
+}
+.rider-visibility-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:6px;
+  margin-top:8px;
+}
+.rider-visibility-mini{
+  min-width:0;
+  padding:7px 8px;
+  border-radius:9px;
+  background:rgba(255,255,255,.78);
+}
+.rider-visibility-mini b{
+  display:block;
+  color:#111;
+  font-size:14px;
+  line-height:1;
+}
+.rider-visibility-mini span{
+  display:block;
+  margin-top:4px;
+  color:#777c84;
+  font-size:9px;
+  font-weight:900;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.rider-visibility-reason{
+  margin-top:7px;
+  color:#666b72;
+  font-weight:800;
+}
+.rider-visibility-note{
+  margin-top:5px;
+  color:#8a8f96;
+  font-size:9px;
+}
+@media(max-width:680px){
+  .rider-visibility-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+
 /* ===== Level 4 智慧調度 ===== */
 .level4-banner{
   margin-bottom:14px;padding:14px 16px;border-radius:18px;background:#111;color:#fff;
@@ -340,7 +440,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">V4 + V5 · INCIDENT OPS</div>
+      <div class="version">V4 + V5 · RIDER VISIBILITY</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -924,6 +1024,360 @@ function waitBadge(order){
   if(age >= 2*60*1000) return '<span class="badge warn">超過 2 分鐘</span>';
   return '<span class="badge">等待媒合</span>';
 }
+
+/* ============================================================
+   Dispatch Rider Visibility V1
+   目的：
+   1. 調度中心直接看出「為什麼有待派單但小U可能看不到」
+   2. 波次邏輯與 rider.html 對齊：0-30秒 3km、31-60秒 5km、60秒後全區
+   3. 若智慧調度已有 candidates，優先用後端候選；否則以即時在線＋GPS＋距離估算
+   4. 此區是營運診斷；服務區域、付款、略過名單等最終資格仍由後端 /api/rider/tasks 判定
+   ============================================================ */
+
+function getRiderVisibilityOrderStartedAtMs(order){
+  const values=[
+    order?.redispatchStartedAtMs,
+    order?.dispatchStartedAtMs,
+    order?.redispatchStartedAt,
+    order?.dispatchStartedAt,
+    order?.createdAtMs,
+    order?.createdAt
+  ];
+
+  for(const value of values){
+    if(!value) continue;
+    if(typeof value==='number' && Number.isFinite(value)) return value;
+    if(typeof value==='string'){
+      const parsed=Date.parse(value);
+      if(Number.isFinite(parsed)) return parsed;
+    }
+    if(value && typeof value.toDate==='function'){
+      try{return value.toDate().getTime();}catch(_){}
+    }
+  }
+
+  return 0;
+}
+
+function getRiderVisibilityWave(order){
+  const startedAtMs=getRiderVisibilityOrderStartedAtMs(order);
+
+  if(!startedAtMs){
+    const fallback=Number(order?.dispatchRadiusKm);
+    if(Number.isFinite(fallback) && fallback>0 && fallback<999){
+      return {radiusKm:fallback,label:`${fallback} km`,stage:'manual'};
+    }
+    return {radiusKm:999,label:'全區',stage:'global'};
+  }
+
+  const elapsedSeconds=Math.max(
+    0,
+    Math.floor((Date.now()-startedAtMs)/1000)
+  );
+
+  if(elapsedSeconds<=30){
+    return {radiusKm:3,label:'3 km',stage:'3km'};
+  }
+
+  if(elapsedSeconds<=60){
+    return {radiusKm:5,label:'5 km',stage:'5km'};
+  }
+
+  return {radiusKm:999,label:'全區',stage:'global'};
+}
+
+function getRiderVisibilityCandidateRows(order,wave){
+  const riders=Array.isArray(state.data.riders)
+    ? state.data.riders
+    : [];
+
+  const insight=getOrderInsight(order?.id);
+  const backendCandidates=
+    insight && Array.isArray(insight.candidates)
+      ? insight.candidates
+      : [];
+
+  const byRiderId=new Map();
+
+  riders.forEach(rider=>{
+    [
+      rider?.riderId,
+      rider?.riderDocId,
+      rider?.id
+    ]
+      .map(value=>String(value||'').trim())
+      .filter(Boolean)
+      .forEach(key=>byRiderId.set(key,rider));
+  });
+
+  if(backendCandidates.length){
+    return backendCandidates.map(candidate=>{
+      const keyCandidates=[
+        candidate?.riderId,
+        candidate?.riderDocId,
+        candidate?.id
+      ]
+        .map(value=>String(value||'').trim())
+        .filter(Boolean);
+
+      let base={};
+      for(const key of keyCandidates){
+        if(byRiderId.has(key)){
+          base=byRiderId.get(key)||{};
+          break;
+        }
+      }
+
+      const merged={...base,...candidate};
+
+      let distanceKm=Number(merged.distanceKm);
+      if(
+        !Number.isFinite(distanceKm) &&
+        hasLatLng(order?.pickupLat,order?.pickupLng) &&
+        hasLatLng(merged?.currentLat,merged?.currentLng)
+      ){
+        distanceKm=haversineKm(
+          Number(order.pickupLat),
+          Number(order.pickupLng),
+          Number(merged.currentLat),
+          Number(merged.currentLng)
+        );
+      }
+
+      return {
+        ...merged,
+        distanceKm:Number.isFinite(distanceKm)?distanceKm:null,
+        fromBackendCandidate:true
+      };
+    });
+  }
+
+  if(!hasLatLng(order?.pickupLat,order?.pickupLng)){
+    return [];
+  }
+
+  return riders.map(rider=>{
+    let distanceKm=null;
+
+    if(hasLatLng(rider?.currentLat,rider?.currentLng)){
+      distanceKm=haversineKm(
+        Number(order.pickupLat),
+        Number(order.pickupLng),
+        Number(rider.currentLat),
+        Number(rider.currentLng)
+      );
+    }
+
+    return {
+      ...rider,
+      distanceKm,
+      fromBackendCandidate:false
+    };
+  });
+}
+
+function getRiderVisibilityDiagnostics(order){
+  if(!order || statusKind(order)!=='waiting'){
+    return {
+      applicable:false,
+      state:'active',
+      label:'已離開待派階段',
+      wave:{radiusKm:0,label:'-'},
+      visibleCount:0,
+      onlineAvailableCount:0,
+      gpsAvailableCount:0,
+      backendCandidateCount:0,
+      skippedCount:0,
+      outsideRadiusCount:0,
+      minDistanceKm:null,
+      reason:'此訂單目前不是待派單。'
+    };
+  }
+
+  const wave=getRiderVisibilityWave(order);
+  const riders=Array.isArray(state.data.riders)
+    ? state.data.riders
+    : [];
+
+  const onlineAvailable=riders.filter(
+    rider=>rider?.online===true && rider?.busy!==true
+  );
+
+  const gpsAvailable=onlineAvailable.filter(
+    rider=>hasLatLng(rider?.currentLat,rider?.currentLng)
+  );
+
+  const insight=getOrderInsight(order.id);
+  const backendCandidates=
+    insight && Array.isArray(insight.candidates)
+      ? insight.candidates
+      : [];
+
+  const rows=getRiderVisibilityCandidateRows(order,wave);
+
+  const candidateRows=backendCandidates.length
+    ? rows.filter(row=>row?.skippedThisOrder!==true)
+    : rows.filter(row=>row?.online===true && row?.busy!==true);
+
+  const skippedCount=backendCandidates.filter(
+    row=>row?.skippedThisOrder===true
+  ).length;
+
+  const eligibleOnlineRows=candidateRows.filter(
+    row=>row?.online===true && row?.busy!==true
+  );
+
+  const eligibleGpsRows=eligibleOnlineRows.filter(
+    row=>Number.isFinite(Number(row?.distanceKm))
+  );
+
+  const isGlobal=
+    !Number.isFinite(Number(wave.radiusKm)) ||
+    Number(wave.radiusKm)>=999;
+
+  const visibleRows=eligibleGpsRows.filter(row=>
+    isGlobal ||
+    Number(row.distanceKm)<=Number(wave.radiusKm)
+  );
+
+  const outsideRadiusRows=eligibleGpsRows.filter(row=>
+    !isGlobal &&
+    Number(row.distanceKm)>Number(wave.radiusKm)
+  );
+
+  const minDistanceKm=eligibleGpsRows.length
+    ? Math.min(
+        ...eligibleGpsRows.map(row=>Number(row.distanceKm))
+      )
+    : null;
+
+  let stateKey='blocked';
+  let label='目前無小U可見';
+  let reason='目前沒有符合本波次條件的小U。';
+
+  if(visibleRows.length>0){
+    stateKey='ready';
+    label=`預估 ${visibleRows.length} 位可進入本波次`;
+    reason=backendCandidates.length
+      ? '智慧候選、在線狀態與派單距離均符合目前波次。'
+      : '依在線狀態、GPS 與距離估算，可進入目前派單波次。';
+  }else if(onlineAvailable.length===0){
+    stateKey='offline';
+    label='目前沒有可接單小U在線';
+    reason='調度中心目前沒有偵測到在線且非任務中的小U。';
+  }else if(gpsAvailable.length===0){
+    stateKey='gps';
+    label='在線小U尚無可用定位';
+    reason='小U雖在線，但目前沒有可用 GPS，前 3 km／5 km 波次無法完成距離判斷。';
+  }else if(
+    backendCandidates.length &&
+    candidateRows.length===0
+  ){
+    stateKey='eligibility';
+    label='後端候選目前為 0';
+    reason='有在線運力，但智慧候選沒有可派人員；請檢查服務區域、略過名單、付款或其他後端資格。';
+  }else if(outsideRadiusRows.length>0){
+    stateKey='radius';
+    label=`${outsideRadiusRows.length} 位在本波次外`;
+    reason=`目前是 ${wave.label} 波次；最近候選約 ${Number(minDistanceKm).toFixed(2)} km，等待擴圈後可能進入。`;
+  }else if(backendCandidates.length && skippedCount>0){
+    stateKey='eligibility';
+    label='候選已被略過或資格受限';
+    reason=`智慧候選中有 ${skippedCount} 位被標記為本單略過；其餘候選目前未進入本波次。`;
+  }
+
+  return {
+    applicable:true,
+    state:stateKey,
+    label,
+    reason,
+    wave,
+    visibleCount:visibleRows.length,
+    onlineAvailableCount:onlineAvailable.length,
+    gpsAvailableCount:gpsAvailable.length,
+    backendCandidateCount:backendCandidates.filter(
+      row=>row?.skippedThisOrder!==true
+    ).length,
+    skippedCount,
+    outsideRadiusCount:outsideRadiusRows.length,
+    minDistanceKm:Number.isFinite(minDistanceKm)
+      ? minDistanceKm
+      : null,
+    source:backendCandidates.length
+      ? 'backend_candidates'
+      : 'local_estimate'
+  };
+}
+
+function riderVisibilityBadge(order){
+  const d=getRiderVisibilityDiagnostics(order);
+
+  if(!d.applicable) return '';
+
+  const cls=
+    d.state==='ready'
+      ? 'green'
+      : ['offline','blocked'].includes(d.state)
+        ? 'danger'
+        : 'warn';
+
+  return `<span class="badge ${cls}">小U可見 ${esc(d.visibleCount)}</span>`;
+}
+
+function riderVisibilityStrip(order,{compact=false}={}){
+  const d=getRiderVisibilityDiagnostics(order);
+
+  if(!d.applicable) return '';
+
+  const sourceLabel=
+    d.source==='backend_candidates'
+      ? '後端智慧候選'
+      : '運力／距離估算';
+
+  if(compact){
+    return `
+      <div class="rider-visibility-strip ${esc(d.state)}">
+        <div class="rider-visibility-head">
+          <strong>騎士可見性｜${esc(d.label)}</strong>
+          <span class="rider-visibility-label">${esc(d.wave.label)} 波次</span>
+        </div>
+        <div class="rider-visibility-reason">${esc(d.reason)}</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="rider-visibility-strip ${esc(d.state)}">
+      <div class="rider-visibility-head">
+        <strong>Rider Visibility｜${esc(d.label)}</strong>
+        <span class="rider-visibility-label">${esc(d.wave.label)} 波次 · ${esc(sourceLabel)}</span>
+      </div>
+      <div class="rider-visibility-grid">
+        <div class="rider-visibility-mini">
+          <b>${esc(d.visibleCount)}</b>
+          <span>本波次可見</span>
+        </div>
+        <div class="rider-visibility-mini">
+          <b>${esc(d.onlineAvailableCount)}</b>
+          <span>在線可接單</span>
+        </div>
+        <div class="rider-visibility-mini">
+          <b>${esc(d.gpsAvailableCount)}</b>
+          <span>有可用 GPS</span>
+        </div>
+        <div class="rider-visibility-mini">
+          <b>${esc(d.backendCandidateCount)}</b>
+          <span>後端候選</span>
+        </div>
+      </div>
+      <div class="rider-visibility-reason">${esc(d.reason)}</div>
+      <div class="rider-visibility-note">
+        最終是否出現在 rider.html，仍以後端 /api/rider/tasks 的服務區域、付款、略過名單與任務資格判斷為準。
+      </div>
+    </div>
+  `;
+}
+
 
 function toast(message, duration=3200){
   const el = $('toast');
@@ -2056,6 +2510,7 @@ function renderOrders(){
             <div class="badges">
               ${waitBadge(order)}
               ${riskBadge(order.riskLevel,order.riskScore)}
+              ${riderVisibilityBadge(order)}
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
               ${merchantLiveTrackingBadges(order)}
               ${Number(order.openIncidentCount||0)>0?`<span class="badge danger">異常案件 ${esc(order.openIncidentCount)}</span>`:''}
@@ -2077,6 +2532,7 @@ function renderOrders(){
 
         ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<div class="candidate-meta" style="margin-top:8px;color:${order.riskLevel==='CRITICAL'?'var(--red)':order.riskLevel==='HIGH'?'#b05e00':'var(--muted)'}">系統判斷：${esc(order.riskReasons.slice(0,3).join('；'))}</div>`:''}
         ${merchantLiveTrackingStrip(order)}
+        ${isWaiting?riderVisibilityStrip(order,{compact:true}):''}
         <div class="meta">
           <span>${esc(order.riderName || (isWaiting?'尚未接單':'已指派小U'))}</span>
           <span class="wait">${isWaiting?'等待 '+fmtAge(order.createdAtMs):'建立 '+fmtAge(order.createdAtMs)}</span>
@@ -2300,6 +2756,8 @@ function renderCandidates(){
       ${String(order.itemSizeReviewStatus||'')==='pending'?`<br><span style="color:var(--red);font-weight:1000">小U已回報體積不符，等待調度確認</span>`:''}
     </div>
 
+    ${isWaiting?riderVisibilityStrip(order):''}
+
     <div class="order-surcharge-box">
       <strong style="font-size:12px">商品體積審核／人工調整</strong>
       <div class="order-surcharge-grid">
@@ -2367,10 +2825,15 @@ function renderCandidates(){
   const candidates = getCandidateRiders(order);
 
   if(!candidates.length){
+    const visibility=isWaiting
+      ? getRiderVisibilityDiagnostics(order)
+      : null;
+
     $('candidateList').innerHTML = `
       <div class="empty">
         ${state.radiusKm} km 內沒有符合條件的${isActive?'備援':'可接單'}小U<br>
         ${isWaiting?'可使用「擴大派單半徑」':'可調整上方半徑查看更遠的備援候選'}
+        ${visibility?.reason?`<br><span style="display:inline-block;margin-top:7px;color:var(--orange);font-weight:900">${esc(visibility.reason)}</span>`:''}
       </div>
     `;
     return;
