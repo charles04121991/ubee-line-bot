@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-02｜Customer Home Layout V3.9：刪除舊版 flow-home-footer-brand CSS，修正舊 span 10px 規則覆蓋新版 60px 品牌字；UBee跑腿 改為真正單一樣式來源。 -->
 <!-- 2026-09-02｜Customer Home Layout V3.8：首頁底部浮水印維持原始三行品牌樣式，並進一步放大「UBee跑腿」品牌字，強化品牌感。 -->
 <!-- 2026-09-02｜Customer Home Layout V3.5：修正首頁底部 UBee 跑腿浮水印，改為接近原始品牌視覺的三行淡化樣式；其餘首頁結構與地圖互動維持 V3.4。 -->
 <!-- 2026-09-02｜Customer Match ETA V1：首頁即時運力加入後端媒合時間估算；顯示「最快約 X 分鐘媒合」，並保留 Home Platform V3 地圖、匿名小U與需求情境入口。 -->
@@ -14,7 +15,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260902-home-layout-v3-8" rel="manifest"/>
+<link href="/manifest-order.json?v=20260902-home-layout-v3-9" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -20710,32 +20711,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   line-height:1.35;
 }
 
-#productionOrderFlow .flow-home-footer-brand{
-  padding:28px 12px 14px;
-  text-align:center;
-  user-select:none;
-}
-
-#productionOrderFlow .flow-home-footer-brand strong{
-  display:block;
-  color:#c3c6ca;
-  font-size:28px;
-  font-weight:1000;
-  letter-spacing:-1px;
-}
-
-#productionOrderFlow .flow-home-footer-brand strong .u{
-  color:#e8d77d;
-}
-
-#productionOrderFlow .flow-home-footer-brand span{
-  display:block;
-  margin-top:6px;
-  color:#c9ccd0;
-  font-size:10px;
-  font-weight:850;
-}
-
 @media(max-width:390px){
   #productionOrderFlow .flow-home-map-shell{height:185px;}
   #productionOrderFlow .flow-home-map-shell .flow-live-supply-status{top:8px!important;left:8px!important;right:8px!important;}
@@ -22309,7 +22284,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-8';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-9';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26649,6 +26624,15 @@ body.ubee-store-active #productionOrderFlow{
   font-size:60px!important;
   font-weight:1000!important;
   letter-spacing:-1.3px!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-footer-logo > span{
+  display:inline!important;
+  margin-top:0!important;
+  font-size:inherit!important;
+  font-weight:inherit!important;
+  line-height:inherit!important;
+  letter-spacing:inherit!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-home-footer-logo .u{
