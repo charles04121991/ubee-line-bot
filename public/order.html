@@ -2,7 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
-<!-- 2026-09-02｜Customer Home Layout V3.2：放大首頁地圖；「你可能需要」改為靜態 2x2 情境卡，不再觸發服務切換或頁面跳轉；移除首頁底部多餘信任表格。 -->
+<!-- 2026-09-02｜Customer Home Layout V3.4：首頁 Google Maps 改為單指可拖曳／直接縮放；地圖再放大；底部恢復 UBee 跑腿品牌浮水印。 -->
 <!-- 2026-09-02｜Customer Match ETA V1：首頁即時運力加入後端媒合時間估算；顯示「最快約 X 分鐘媒合」，並保留 Home Platform V3 地圖、匿名小U與需求情境入口。 -->
 <!-- 2026-09-02｜Customer Home Platform V3：正式首頁加入即時服務地圖、匿名小U分布、低運力友善顯示、動態任務地址文案與需求情境入口；productionOrderFlow 為唯一正式首頁。 -->
 <!-- 2026-09-02｜Home Live Supply V2：首頁即時運力狀態重新顯眼呈現；優先依取件點／裝置定位顯示附近 5 公里可即時媒合小U數量，無定位時保留全區可媒合數量 fallback。 -->
@@ -13,7 +13,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260902-home-layout-v3-2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260902-home-layout-v3-4" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -10307,7 +10307,7 @@ body.ubee-app-starting{
 <span id="homeServiceStatusKickerText">即時小U運力</span>
 </div>
 <div class="home-service-status-count" data-rider-count="0" data-scope="loading" id="homeOnlineRiderCount">
-<strong>正在確認附近小U</strong>
+<strong>即時運力更新中</strong>
 </div>
 </div>
 <div class="home-service-status-side">
@@ -11438,7 +11438,7 @@ async function ensureCustomerMapReady(){
       zoom:13,
       disableDefaultUI:true,
       clickableIcons:false,
-      gestureHandling:mapEl.id === 'flowHomeMap' ? 'cooperative' : 'greedy',
+      gestureHandling:'greedy',
       backgroundColor:'#e8eaed'
     };
 
@@ -19348,7 +19348,7 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
     // 首頁公開文案不在低密度時強調「只有 1 位 / 2 位」，
     // 但 dataset 仍保留真實數量供內部 UI 與診斷使用。
     if(displayCount <= 0){
-      countEl.innerHTML = '<strong>正在尋找附近小U</strong>';
+      countEl.innerHTML = '<strong>附近即時運力更新中</strong>';
     }else if(displayCount <= 2){
       countEl.innerHTML = '<strong>附近已有小U在線</strong>';
     }else{
@@ -19372,7 +19372,7 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
     }
   }else{
     if(displayCount <= 0){
-      countEl.innerHTML = '<strong>正在更新可媒合小U</strong>';
+      countEl.innerHTML = '<strong>即時運力更新中</strong>';
     }else if(displayCount <= 2){
       countEl.innerHTML = '<strong>目前已有小U在線</strong>';
     }else{
@@ -20763,6 +20763,15 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <strong>正在準備附近服務地圖</strong>
 <small>取得定位後，顯示目前位置與匿名小U概略分布。</small>
 </div>
+<div class="flow-home-map-privacy">小U位置為匿名概略顯示</div>
+<button aria-label="回到目前位置" class="flow-home-map-current" onclick="focusCurrentLocation()" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="5"></circle>
+<path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+</svg>
+</button>
+</div>
+<div class="flow-home-supply-strip-wrap">
 <div aria-live="polite" class="flow-live-supply-status" data-rider-count="0" data-scope="loading" id="flowLiveSupplyStatus">
   <div class="flow-live-supply-head">
     <div class="flow-live-supply-main">
@@ -20771,7 +20780,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
         <span id="flowLiveSupplyKicker">即時小U運力</span>
       </div>
       <div class="flow-live-supply-count" data-rider-count="0" data-scope="loading" id="flowLiveSupplyCount">
-        <strong>正在確認附近小U</strong>
+        <strong>即時運力更新中</strong>
       </div>
       <div aria-live="polite" class="flow-live-supply-eta is-unavailable" data-confidence="none" data-supply-level="none" id="flowLiveSupplyEta">媒合時間持續更新</div>
     </div>
@@ -20782,13 +20791,6 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   </div>
   <div class="flow-live-supply-note" id="flowLiveSupplyNote">取得定位後，會優先顯示附近 5 公里可即時媒合的小U。</div>
 </div>
-<div class="flow-home-map-privacy">小U位置為匿名概略顯示</div>
-<button aria-label="回到目前位置" class="flow-home-map-current" onclick="focusCurrentLocation()" type="button">
-<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
-<circle cx="12" cy="12" r="5"></circle>
-<path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
-</svg>
-</button>
 </div>
 <div class="flow-home-action-head"><strong>需要小U幫什麼？</strong><span>選擇服務後再填地點</span></div>
 <div aria-label="選擇跑腿服務" class="flow-service-tabs" id="flowServiceTabs" role="tablist">
@@ -20857,62 +20859,72 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <section aria-labelledby="flowHomeDiscoveryTitle" class="flow-home-discovery">
 <div class="flow-home-section-head">
 <div>
-<strong id="flowHomeDiscoveryTitle">你可能需要</strong>
-<span>常見生活情境，看看小U可以幫你做什麼</span>
+<strong id="flowHomeDiscoveryTitle">原來這些也能交給小U</strong>
+<span>UBee 不只幫你送東西，生活裡需要有人跑一趟的事，都可以先看看能不能交給小U。</span>
 </div>
 </div>
 
-<div class="flow-home-scenario-grid" aria-label="UBee 常見服務情境">
-<div class="flow-home-scenario" aria-label="忘記東西沒帶">
-  <span aria-hidden="true" class="flow-home-scenario-icon">
-    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-      <path d="M6 8h12l1 13H5L6 8Z"></path>
-      <path d="M9 8V6a3 3 0 0 1 6 0v2"></path>
-      <path d="M12 12v5"></path>
-      <path d="m9.8 14.8 2.2 2.2 2.2-2.2"></path>
-    </svg>
-  </span>
-  <strong>忘記東西沒帶？</strong>
-  <span>小U可以到指定地點幫你取回</span>
+<div class="flow-home-education-grid" aria-label="UBee 跑腿服務情境說明">
+
+<div class="flow-home-education-card">
+  <div class="flow-home-education-top">
+    <span class="flow-home-education-icon" aria-hidden="true">取</span>
+    <span class="flow-home-education-tag">幫我取</span>
+  </div>
+  <strong>東西忘在公司、家裡或飯店？</strong>
+  <p>把取件地點和送達地點告訴我們，小U可以幫你取回再送到指定位置。</p>
 </div>
 
-<div class="flow-home-scenario" aria-label="臨時需要買東西">
-  <span aria-hidden="true" class="flow-home-scenario-icon">
-    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-      <circle cx="9" cy="20" r="1"></circle>
-      <circle cx="18" cy="20" r="1"></circle>
-      <path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.9a2 2 0 0 0 2-1.6L21 8H7"></path>
-    </svg>
-  </span>
-  <strong>臨時需要買東西？</strong>
-  <span>告訴小U要買什麼，再送到你手上</span>
+<div class="flow-home-education-card">
+  <div class="flow-home-education-top">
+    <span class="flow-home-education-icon" aria-hidden="true">買</span>
+    <span class="flow-home-education-tag">幫我買</span>
+  </div>
+  <strong>臨時缺東西，但現在沒空去買？</strong>
+  <p>日用品、餐點或臨時用品都可以填寫需求，讓小U代買後送到你手上。</p>
 </div>
 
-<div class="flow-home-scenario" aria-label="不想浪費時間排隊">
-  <span aria-hidden="true" class="flow-home-scenario-icon">
-    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="9"></circle>
-      <path d="M12 7v5l3 2"></path>
-    </svg>
-  </span>
-  <strong>不想浪費時間排隊？</strong>
-  <span>小U可以先到現場排隊或候位</span>
+<div class="flow-home-education-card">
+  <div class="flow-home-education-top">
+    <span class="flow-home-education-icon" aria-hidden="true">排</span>
+    <span class="flow-home-education-tag">幫排隊</span>
+  </div>
+  <strong>不想把時間花在排隊或候位？</strong>
+  <p>餐廳、活動、門市或其他需要現場等待的情境，可以請小U先到場協助。</p>
 </div>
 
-<div class="flow-home-scenario" aria-label="文件或物品急著送">
-  <span aria-hidden="true" class="flow-home-scenario-icon">
-    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-      <path d="m3.3 7 8.7 5 8.7-5M12 22V12"></path>
-    </svg>
-  </span>
-  <strong>文件或物品急著送？</strong>
-  <span>建立取件與送達地點，交給附近小U</span>
-</div>
+<div class="flow-home-education-card">
+  <div class="flow-home-education-top">
+    <span class="flow-home-education-icon" aria-hidden="true">送</span>
+    <span class="flow-home-education-tag">幫我送</span>
+  </div>
+  <strong>文件、鑰匙、蛋糕或物品急著送？</strong>
+  <p>建立取件與送達地點，附近小U就能依任務位置進行媒合。</p>
 </div>
 
-<div class="flow-home-scenario-note">
-更多生活大小事，也可以直接使用上方「全能跑腿」。
+<div class="flow-home-education-card">
+  <div class="flow-home-education-top">
+    <span class="flow-home-education-icon" aria-hidden="true">辦</span>
+    <span class="flow-home-education-tag">代辦協助</span>
+  </div>
+  <strong>取貨、領件或臨時跑一趟的事情？</strong>
+  <p>只要能清楚說明地點、時間與交付方式，都可以先把需求交給 UBee 評估。</p>
+</div>
+
+<div class="flow-home-education-card flow-home-education-card-helper">
+  <div class="flow-home-education-top">
+    <span class="flow-home-education-icon" aria-hidden="true">U</span>
+    <span class="flow-home-education-tag">全能跑腿</span>
+  </div>
+  <strong>不知道自己的需求算哪一種？</strong>
+  <p>不用硬分類。選「全能跑腿」描述要完成的事情，系統會依任務內容處理。</p>
+</div>
+
+</div>
+
+<div class="flow-home-education-foot">
+<strong>UBee 的重點不是只有「送」。</strong>
+<span>送、取、買、排、辦，都是把生活裡需要有人跑一趟的事情標準化。</span>
 </div>
 </section>
 
@@ -22293,7 +22305,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-home-layout-v3-4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26155,13 +26167,14 @@ body.ubee-store-active #productionOrderFlow{
 </script>
 
 
-<style id="ubee-customer-home-layout-v3-2-style">
+<style id="ubee-customer-home-layout-v3-4-style">
 /* =========================================================
-   2026-09-02｜Customer Home Layout V3.2
-   1. 放大即時地圖
-   2. 「你可能需要」改為靜態 2x2 情境卡
-   3. 情境卡完全不觸發服務切換 / 導覽
-   4. 移除首頁底部多餘的 2x2 信任表格
+   2026-09-02｜Customer Home Layout V3.3
+   - 首頁地圖改為 greedy：單指可拖曳，直接手勢縮放
+   - 地圖高度再放大
+   - 即時運力 / Match ETA 維持地圖下方
+   - 教育區維持六種常見情境
+   - 底部恢復 UBee 跑腿淡化品牌浮水印
    ========================================================= */
 
 #productionOrderFlow #flowPageHome{
@@ -26206,11 +26219,11 @@ body.ubee-store-active #productionOrderFlow{
   box-shadow:none!important;
 }
 
-/* ---------- 地圖：放大，讓首頁先有真正的平台感 ---------- */
+/* ---------- 地圖 ---------- */
 
 #productionOrderFlow #flowPageHome .flow-home-map-shell{
-  height:232px!important;
-  margin:0 0 15px!important;
+  height:310px!important;
+  margin:0 0 8px!important;
   border:1px solid #dfe3e6!important;
   border-radius:22px!important;
   background:#e7eaed!important;
@@ -26219,7 +26232,7 @@ body.ubee-store-active #productionOrderFlow{
 }
 
 #productionOrderFlow #flowPageHome .flow-home-map-placeholder{
-  padding:68px 48px 46px!important;
+  padding:100px 48px 70px!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-home-map-placeholder strong{
@@ -26228,69 +26241,6 @@ body.ubee-store-active #productionOrderFlow{
 
 #productionOrderFlow #flowPageHome .flow-home-map-placeholder small{
   font-size:9.5px!important;
-}
-
-/* 即時運力維持小型浮動卡，不遮掉太多地圖 */
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-status{
-  top:10px!important;
-  left:10px!important;
-  right:auto!important;
-  width:auto!important;
-  max-width:285px!important;
-  min-width:0!important;
-  margin:0!important;
-  padding:8px 10px!important;
-  border:1px solid rgba(17,24,39,.07)!important;
-  border-radius:13px!important;
-  background:rgba(255,255,255,.96)!important;
-  box-shadow:0 5px 16px rgba(17,24,39,.08)!important;
-  -webkit-backdrop-filter:blur(10px)!important;
-  backdrop-filter:blur(10px)!important;
-}
-
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-head{
-  display:block!important;
-  min-height:0!important;
-}
-
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-main{
-  display:flex!important;
-  align-items:center!important;
-  flex-wrap:wrap!important;
-  gap:5px 7px!important;
-  min-width:0!important;
-}
-
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-kicker,
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-side,
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-note{
-  display:none!important;
-}
-
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-count{
-  margin:0!important;
-  color:#111!important;
-  font-size:11.5px!important;
-  font-weight:1000!important;
-  line-height:1.2!important;
-  white-space:normal!important;
-}
-
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-count strong{
-  font-size:11.5px!important;
-}
-
-#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-count span{
-  font-size:14px!important;
-  line-height:1!important;
-}
-
-#productionOrderFlow #flowPageHome .flow-live-supply-eta{
-  min-height:20px!important;
-  margin:0!important;
-  padding:0 7px!important;
-  border-radius:999px!important;
-  font-size:9px!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-home-map-current{
@@ -26306,9 +26256,88 @@ body.ubee-store-active #productionOrderFlow{
   height:20px!important;
 }
 
-/* 地圖上不再放細小隱私文字，避免和 Google 地圖標示互相打架 */
 #productionOrderFlow #flowPageHome .flow-home-map-privacy{
   display:none!important;
+}
+
+/* 地圖內不允許再出現即時運力文字卡 */
+#productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-status{
+  display:none!important;
+}
+
+/* ---------- 地圖下方：即時運力 + Match ETA ---------- */
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap{
+  margin:0 0 14px!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-status{
+  position:static!important;
+  inset:auto!important;
+  width:100%!important;
+  max-width:none!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:10px 12px!important;
+  border:1px solid #e3e5e7!important;
+  border-radius:16px!important;
+  background:#fff!important;
+  box-shadow:0 3px 12px rgba(17,24,39,.035)!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-head{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  min-height:0!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-main{
+  display:flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  flex-wrap:wrap!important;
+  min-width:0!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-kicker{
+  display:none!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-count{
+  margin:0!important;
+  font-size:11px!important;
+  font-weight:1000!important;
+  line-height:1.25!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-count strong{
+  font-size:11px!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-count span{
+  font-size:14px!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-eta{
+  min-height:22px!important;
+  margin:0!important;
+  padding:0 8px!important;
+  border-radius:999px!important;
+  font-size:9.5px!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-side{
+  display:none!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-supply-strip-wrap .flow-live-supply-note{
+  margin-top:5px!important;
+  color:#858a90!important;
+  font-size:9.5px!important;
+  font-weight:800!important;
+  line-height:1.45!important;
 }
 
 /* ---------- 服務入口 ---------- */
@@ -26325,14 +26354,12 @@ body.ubee-store-active #productionOrderFlow{
   color:#111!important;
   font-size:15px!important;
   font-weight:1000!important;
-  line-height:1.25!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-home-action-head span{
   color:#8a8f95!important;
   font-size:9.5px!important;
   font-weight:850!important;
-  line-height:1.25!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-service-tabs{
@@ -26396,10 +26423,9 @@ body.ubee-store-active #productionOrderFlow{
 #productionOrderFlow #flowPageHome .flow-service-label{
   font-size:10.5px!important;
   font-weight:950!important;
-  line-height:1.2!important;
 }
 
-/* ---------- 地址主操作區 ---------- */
+/* ---------- 地址 ---------- */
 
 #productionOrderFlow #flowPageHome .flow-location-line{
   margin:0 4px 7px!important;
@@ -26464,139 +26490,206 @@ body.ubee-store-active #productionOrderFlow{
   box-shadow:0 4px 12px rgba(169,132,0,.10)!important;
 }
 
-/* ---------- 你可能需要：靜態 2x2 情境資訊 ---------- */
+/* ---------- 教育區 ---------- */
 
 #productionOrderFlow #flowPageHome .flow-home-discovery{
-  margin:20px 0 0!important;
+  margin:22px 0 0!important;
   padding:0!important;
   border:0!important;
-  border-radius:0!important;
   background:transparent!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-home-section-head{
-  margin:0 3px 10px!important;
+  margin:0 3px 12px!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-home-section-head strong{
-  font-size:17px!important;
+  display:block!important;
+  font-size:18px!important;
+  font-weight:1000!important;
   line-height:1.25!important;
 }
 
 #productionOrderFlow #flowPageHome .flow-home-section-head span{
-  margin-top:3px!important;
-  color:#8a8f95!important;
-  font-size:10px!important;
-  line-height:1.35!important;
+  display:block!important;
+  max-width:430px!important;
+  margin-top:5px!important;
+  color:#747a80!important;
+  font-size:10.5px!important;
+  font-weight:800!important;
+  line-height:1.55!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario-grid{
+#productionOrderFlow #flowPageHome .flow-home-education-grid{
   display:grid!important;
   grid-template-columns:repeat(2,minmax(0,1fr))!important;
   gap:10px!important;
-  overflow:visible!important;
-  margin:0!important;
-  padding:0!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario{
+#productionOrderFlow #flowPageHome .flow-home-education-card{
   min-width:0!important;
-  min-height:112px!important;
-  padding:13px!important;
-  display:block!important;
+  min-height:150px!important;
+  padding:14px!important;
   border:1px solid #e5e7e9!important;
-  border-radius:18px!important;
+  border-radius:19px!important;
   background:#fff!important;
   box-shadow:0 4px 14px rgba(17,24,39,.035)!important;
-  color:#111!important;
-  text-align:left!important;
-  cursor:default!important;
+  pointer-events:none!important;
   user-select:none!important;
   -webkit-user-select:none!important;
-  pointer-events:none!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario:nth-child(2n){
-  background:#fff!important;
+#productionOrderFlow #flowPageHome .flow-home-education-top{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:8px!important;
+  margin-bottom:10px!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario-icon{
-  width:36px!important;
-  height:36px!important;
+#productionOrderFlow #flowPageHome .flow-home-education-icon{
+  width:34px!important;
+  height:34px!important;
   display:grid!important;
   place-items:center!important;
-  margin:0 0 10px!important;
-  border-radius:12px!important;
-  background:#fff7cf!important;
+  border-radius:11px!important;
+  background:#facc15!important;
   color:#111!important;
-  font-size:0!important;
+  font-size:11px!important;
+  font-weight:1000!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario-icon svg{
-  width:19px!important;
-  height:19px!important;
+#productionOrderFlow #flowPageHome .flow-home-education-tag{
+  display:inline-flex!important;
+  align-items:center!important;
+  min-height:22px!important;
+  padding:0 8px!important;
+  border-radius:999px!important;
+  background:#f5f6f7!important;
+  color:#6f747a!important;
+  font-size:9px!important;
+  font-weight:950!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario strong{
+#productionOrderFlow #flowPageHome .flow-home-education-card strong{
   display:block!important;
   margin:0!important;
   color:#111!important;
   font-size:13px!important;
   font-weight:1000!important;
-  line-height:1.35!important;
+  line-height:1.4!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario > span:last-child{
-  display:block!important;
-  margin-top:4px!important;
+#productionOrderFlow #flowPageHome .flow-home-education-card p{
+  margin:6px 0 0!important;
   color:#747a80!important;
   font-size:10px!important;
   font-weight:800!important;
-  line-height:1.45!important;
+  line-height:1.55!important;
 }
 
-#productionOrderFlow #flowPageHome .flow-home-scenario-note{
-  margin:10px 3px 0!important;
-  color:#8a8f95!important;
-  font-size:10px!important;
+#productionOrderFlow #flowPageHome .flow-home-education-card-helper{
+  background:#fffdf3!important;
+  border-color:#eee2a4!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-education-foot{
+  margin-top:11px!important;
+  padding:13px 14px!important;
+  border-radius:17px!important;
+  background:#111!important;
+  color:#fff!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-education-foot strong{
+  display:block!important;
+  font-size:12px!important;
+  font-weight:1000!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-education-foot span{
+  display:block!important;
+  margin-top:4px!important;
+  color:rgba(255,255,255,.72)!important;
+  font-size:9.5px!important;
   font-weight:800!important;
   line-height:1.5!important;
 }
 
-/* 舊的服務特色表格不再出現在首頁 */
 #productionOrderFlow #flowPageHome .flow-home-trust{
   display:none!important;
 }
 
+/* ---------- UBee 底部品牌浮水印 ---------- */
+
 #productionOrderFlow #flowPageHome .flow-home-footer-brand{
-  display:none!important;
+  min-height:190px!important;
+  margin:10px 0 0!important;
+  padding:42px 12px 26px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  opacity:.20!important;
+  pointer-events:none!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-footer-brand strong{
+  display:block!important;
+  color:#111!important;
+  font-size:43px!important;
+  font-weight:1000!important;
+  letter-spacing:-2px!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-footer-brand strong .u{
+  color:#f4bd00!important;
+}
+
+#productionOrderFlow #flowPageHome .flow-home-footer-brand > span{
+  display:block!important;
+  margin-top:11px!important;
+  color:#6f747a!important;
+  font-size:13px!important;
+  font-weight:900!important;
+  letter-spacing:.08em!important;
+  line-height:1.4!important;
 }
 
 @media(max-width:390px){
   #productionOrderFlow #flowPageHome .flow-home-map-shell{
-    height:210px!important;
-  }
-
-  #productionOrderFlow #flowPageHome .flow-home-map-shell .flow-live-supply-status{
-    max-width:calc(100% - 62px)!important;
-  }
-
-  #productionOrderFlow #flowPageHome .flow-service-tabs{
-    padding-left:4px!important;
-    padding-right:4px!important;
+    height:275px!important;
   }
 
   #productionOrderFlow #flowPageHome .flow-service-label{
     font-size:10px!important;
   }
 
-  #productionOrderFlow #flowPageHome .flow-home-scenario{
-    min-height:106px!important;
-    padding:11px!important;
+  #productionOrderFlow #flowPageHome .flow-home-education-card{
+    min-height:142px!important;
+    padding:12px!important;
   }
 
-  #productionOrderFlow #flowPageHome .flow-home-scenario strong{
+  #productionOrderFlow #flowPageHome .flow-home-education-card strong{
     font-size:12px!important;
+  }
+
+  #productionOrderFlow #flowPageHome .flow-home-education-card p{
+    font-size:9.5px!important;
+  }
+
+  #productionOrderFlow #flowPageHome .flow-home-footer-brand{
+    min-height:170px!important;
+    padding-top:36px!important;
+  }
+
+  #productionOrderFlow #flowPageHome .flow-home-footer-brand strong{
+    font-size:38px!important;
   }
 }
 </style>
