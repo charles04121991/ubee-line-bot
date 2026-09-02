@@ -2,9 +2,9 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee 跑腿用戶端：即時小U運力、媒合時間估算、估價、下單、訂單追蹤與店家服務。",
+  "description": "UBee 跑腿用戶端：即時小U運力、媒合時間估算、快速下單、訂單追蹤與店家服務。",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20260902-match-eta-v1",
+  "start_url": "/order.html?source=pwa&v=20260902-home-layout-v3-1",
   "scope": "/",
   "display": "standalone",
   "display_override": [
