@@ -2,6 +2,8 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-02｜Customer Match ETA V1：首頁即時運力加入後端媒合時間估算；顯示「最快約 X 分鐘媒合」，並保留 Home Platform V3 地圖、匿名小U與需求情境入口。 -->
+<!-- 2026-09-02｜Customer Home Platform V3：正式首頁加入即時服務地圖、匿名小U分布、低運力友善顯示、動態任務地址文案與需求情境入口；productionOrderFlow 為唯一正式首頁。 -->
 <!-- 2026-09-02｜Home Live Supply V2：首頁即時運力狀態重新顯眼呈現；優先依取件點／裝置定位顯示附近 5 公里可即時媒合小U數量，無定位時保留全區可媒合數量 fallback。 -->
 <!-- 2026-09-02｜Home Live Supply V2.1：即時運力卡正式接入 productionOrderFlow 首頁；附近 5 公里 / 全區 fallback 共用既有 service-status API。 -->
 <!-- 2026-09-02｜Home Live Supply V2.2 Compact：正式首頁即時運力改為中等尺寸狀態列；保留 5 公里媒合數，降低卡片高度與視覺搶佔。 -->
@@ -10,7 +12,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260902-live-supply-v2-1-production-flow-fix" rel="manifest"/>
+<link href="/manifest-order.json?v=20260902-match-eta-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -11126,6 +11128,7 @@ let homeServiceStatusRequestInFlight = false;
 let homeLastSuccessfulOnlineRiderCount = 0;
 let homeHasSuccessfulServiceStatus = false;
 let homeLastSuccessfulServiceScope = 'global';
+let homeLastMatchEstimate = null;
 let homeServiceLocationAttempted = false;
 let homeServiceLocationError = '';
 let homeNearbyRiderMarkers = [];
@@ -11418,7 +11421,10 @@ function loadGoogleMapsApi(){
 }
 
 async function ensureCustomerMapReady(){
-  const mapEl = qs('customerMap');
+  // Customer Home Platform V3：
+  // productionOrderFlow 為正式首頁，因此優先把既有 customerMap 實例掛在 flowHomeMap。
+  // 這樣沿用既有匿名小U標記、目前位置與路線邏輯，不另外建立第二個首頁 Map 實例。
+  const mapEl = qs('flowHomeMap') || qs('customerMap');
   if(!mapEl) return null;
 
   await loadGoogleMapsApi();
@@ -11431,7 +11437,7 @@ async function ensureCustomerMapReady(){
       zoom:13,
       disableDefaultUI:true,
       clickableIcons:false,
-      gestureHandling:'greedy',
+      gestureHandling:mapEl.id === 'flowHomeMap' ? 'cooperative' : 'greedy',
       backgroundColor:'#e8eaed'
     };
 
@@ -11443,6 +11449,8 @@ async function ensureCustomerMapReady(){
   }
 
   qs('homeMapPlaceholder')?.classList.add('is-ready');
+  qs('flowHomeMapPlaceholder')?.classList.add('is-ready');
+
   renderCurrentLocationMarker();
 
   if(lastRouteData){
@@ -19187,6 +19195,7 @@ function mirrorHomeServiceStatusToProductionFlow(){
   const targetNote = qs('flowLiveSupplyNote');
   const targetScope = qs('flowLiveSupplyScope');
   const targetKicker = qs('flowLiveSupplyKicker');
+  const targetEta = qs('flowLiveSupplyEta');
 
   if(!targetCard || !targetCount || !targetTime || !targetNote){
     return;
@@ -19210,6 +19219,21 @@ function mirrorHomeServiceStatusToProductionFlow(){
   targetNote.innerText = sourceNote?.innerText || '系統正在更新可即時媒合的小U數量。';
   if(targetScope) targetScope.innerText = sourceScope?.innerText || '更新中';
   if(targetKicker) targetKicker.innerText = sourceKicker?.innerText || '即時小U運力';
+
+  if(targetEta){
+    const fastestMinutes = Number(homeLastMatchEstimate?.fastestMatchMinutes);
+    const estimateAvailable =
+      homeLastMatchEstimate?.available === true &&
+      Number.isFinite(fastestMinutes) &&
+      fastestMinutes > 0;
+
+    targetEta.classList.toggle('is-unavailable', !estimateAvailable);
+    targetEta.dataset.supplyLevel = String(homeLastMatchEstimate?.supplyLevel || 'none');
+    targetEta.dataset.confidence = String(homeLastMatchEstimate?.confidence || 'none');
+    targetEta.innerText = estimateAvailable
+      ? `最快約 ${Math.round(fastestMinutes)} 分鐘媒合`
+      : '媒合時間持續更新';
+  }
 }
 
 function renderHomeServiceStatus(data, fallback = false, context = {}){
@@ -19233,6 +19257,7 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
     card.classList.add('is-fallback');
 
     if(!homeHasSuccessfulServiceStatus){
+      homeLastMatchEstimate = null;
       countEl.dataset.riderCount = '0';
       countEl.dataset.scope = 'loading';
       countEl.innerHTML = '<strong>正在更新小U運力</strong>';
@@ -19267,6 +19292,34 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
       ? data.pickupMatch
       : null;
 
+  const rawMatchEstimate =
+    data?.matchEstimate && typeof data.matchEstimate === 'object'
+      ? data.matchEstimate
+      : null;
+
+  const fastestMatchMinutes = Number(
+    rawMatchEstimate?.fastestMatchMinutes ??
+    pickupMatch?.fastestMatchMinutes
+  );
+
+  homeLastMatchEstimate = rawMatchEstimate
+    ? {
+        ...rawMatchEstimate,
+        fastestMatchMinutes:
+          Number.isFinite(fastestMatchMinutes) && fastestMatchMinutes > 0
+            ? fastestMatchMinutes
+            : null
+      }
+    : {
+        available: Number.isFinite(fastestMatchMinutes) && fastestMatchMinutes > 0,
+        fastestMatchMinutes:
+          Number.isFinite(fastestMatchMinutes) && fastestMatchMinutes > 0
+            ? fastestMatchMinutes
+            : null,
+        supplyLevel: pickupMatch?.supplyLevel || 'none',
+        confidence: pickupMatch?.estimateConfidence || 'none'
+      };
+
   const nearby5kmRaw = pickupMatch?.nearbyRiderCount5km;
   const hasNearby5km =
     pickupMatch !== null &&
@@ -19291,8 +19344,16 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
   countEl.dataset.scope = homeLastSuccessfulServiceScope;
 
   if(hasNearby5km){
-    countEl.innerHTML =
-      `<strong>附近 5 公里有</strong> <span>${displayCount}</span> <strong>位小U</strong>`;
+    // 首頁公開文案不在低密度時強調「只有 1 位 / 2 位」，
+    // 但 dataset 仍保留真實數量供內部 UI 與診斷使用。
+    if(displayCount <= 0){
+      countEl.innerHTML = '<strong>正在尋找附近小U</strong>';
+    }else if(displayCount <= 2){
+      countEl.innerHTML = '<strong>附近已有小U在線</strong>';
+    }else{
+      countEl.innerHTML =
+        `<strong>附近 5 公里有</strong> <span>${displayCount}</span> <strong>位小U</strong>`;
+    }
 
     if(scopeEl) scopeEl.innerText = '附近 5 km';
     if(kickerEl) kickerEl.innerText = context?.point?.source === 'pickup'
@@ -19300,17 +19361,23 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
       : '附近即時運力';
 
     if(displayCount > 0){
-      noteEl.innerText = '目前可即時媒合，建立任務後系統會依取件位置安排小U。';
+      noteEl.innerText = '目前可開始媒合，建立任務後系統會依取件位置安排小U。';
     }else if(mapRiderCount > 0){
-      noteEl.innerText = '附近 5 公里暫無小U，系統仍可依任務位置擴大媒合範圍。';
+      noteEl.innerText = '附近 5 公里暫無即時小U，系統仍可依任務位置擴大媒合範圍。';
     }else if(onlineCount > 0){
-      noteEl.innerText = '目前有小U在線，但近期定位仍在更新。';
+      noteEl.innerText = '目前已有小U在線，近期定位仍在更新。';
     }else{
-      noteEl.innerText = '目前附近尚無可即時媒合的小U，系統會持續更新。';
+      noteEl.innerText = '目前正在尋找可媒合小U，系統會持續更新。';
     }
   }else{
-    countEl.innerHTML =
-      `<strong>目前有</strong> <span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
+    if(displayCount <= 0){
+      countEl.innerHTML = '<strong>正在更新可媒合小U</strong>';
+    }else if(displayCount <= 2){
+      countEl.innerHTML = '<strong>目前已有小U在線</strong>';
+    }else{
+      countEl.innerHTML =
+        `<strong>目前有</strong> <span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
+    }
 
     if(scopeEl) scopeEl.innerText = '全區';
     if(kickerEl) kickerEl.innerText = '即時小U運力';
@@ -19320,9 +19387,9 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
         ? '目前顯示全區可媒合小U；定位開啟後會改顯示附近 5 公里。'
         : '目前顯示全區可媒合小U；取得定位後會改顯示附近 5 公里。';
     }else if(onlineCount > 0){
-      noteEl.innerText = '目前有小U在線，近期定位正在更新。';
+      noteEl.innerText = '目前已有小U在線，近期定位正在更新。';
     }else{
-      noteEl.innerText = '目前尚無可即時媒合的小U，系統會持續更新。';
+      noteEl.innerText = '目前正在更新可媒合小U，系統會持續確認服務狀態。';
     }
   }
 
@@ -20347,6 +20414,337 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   #productionOrderFlow .flow-live-supply-side{min-width:54px;}
 }
 </style>
+<style id="ubee-customer-home-platform-v3-style">
+/* =========================================================
+   2026-09-02｜Customer Home Platform V3
+   正式首頁：即時地圖 + 運力 + 任務入口 + 情境教育
+   ========================================================= */
+#productionOrderFlow #flowPageHome .flow-card{
+  overflow:visible!important;
+}
+
+#productionOrderFlow .flow-home-map-shell{
+  position:relative;
+  width:100%;
+  height:205px;
+  margin:0 0 14px;
+  overflow:hidden;
+  border:1px solid #e5e7e9;
+  border-radius:19px;
+  background:#e8eaed;
+}
+
+#productionOrderFlow .flow-home-map-canvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  background:#e8eaed;
+}
+
+#productionOrderFlow .flow-home-map-placeholder{
+  z-index:2;
+  padding:76px 52px 46px;
+  background:linear-gradient(180deg,#eef1f3 0%,#e6e9ec 100%);
+}
+
+#productionOrderFlow .flow-home-map-placeholder strong{
+  display:block;
+  color:#555b61;
+  font-size:13px;
+  font-weight:1000;
+}
+
+#productionOrderFlow .flow-home-map-placeholder small{
+  display:block;
+  max-width:230px;
+  margin-top:5px;
+  color:#888e95;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.5;
+}
+
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-status{
+  position:absolute!important;
+  z-index:5!important;
+  top:10px!important;
+  left:10px!important;
+  right:10px!important;
+  width:auto!important;
+  margin:0!important;
+  padding:9px 11px!important;
+  border:1px solid rgba(219,197,90,.78)!important;
+  border-radius:15px!important;
+  background:rgba(255,253,238,.95)!important;
+  box-shadow:0 7px 20px rgba(17,24,39,.09)!important;
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+}
+
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-status.is-fallback,
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-status.is-empty{
+  border-color:rgba(222,225,228,.92)!important;
+  background:rgba(255,255,255,.95)!important;
+}
+
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-head{
+  min-height:45px!important;
+}
+
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-count{
+  margin-top:4px!important;
+  font-size:14px!important;
+}
+
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-count span{
+  font-size:20px!important;
+}
+
+#productionOrderFlow .flow-live-supply-eta{
+  display:inline-flex;
+  align-items:center;
+  min-height:21px;
+  margin-top:6px;
+  padding:0 8px;
+  border-radius:999px;
+  background:#111;
+  color:#fff;
+  font-size:9.5px;
+  font-weight:1000;
+  line-height:1;
+  white-space:nowrap;
+}
+
+#productionOrderFlow .flow-live-supply-eta[data-supply-level="high"]{
+  background:#176b3a;
+}
+
+#productionOrderFlow .flow-live-supply-eta[data-supply-level="normal"]{
+  background:#111;
+}
+
+#productionOrderFlow .flow-live-supply-eta[data-supply-level="limited"],
+#productionOrderFlow .flow-live-supply-eta[data-supply-level="expanded"]{
+  background:#6a5712;
+}
+
+#productionOrderFlow .flow-live-supply-eta.is-unavailable{
+  background:#f0f1f2;
+  color:#7e8389;
+}
+
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-head{
+  min-height:62px!important;
+  align-items:flex-start!important;
+}
+
+#productionOrderFlow .flow-home-map-shell .flow-live-supply-side{
+  padding-top:2px;
+}
+
+#productionOrderFlow .flow-home-map-current{
+  position:absolute;
+  z-index:6;
+  right:11px;
+  bottom:11px;
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid rgba(17,24,39,.09);
+  border-radius:14px;
+  background:rgba(255,255,255,.96);
+  color:#111;
+  box-shadow:0 5px 15px rgba(17,24,39,.10);
+}
+
+#productionOrderFlow .flow-home-map-current svg{
+  width:21px;
+  height:21px;
+  display:block;
+}
+
+#productionOrderFlow .flow-home-map-privacy{
+  position:absolute;
+  z-index:5;
+  left:11px;
+  bottom:11px;
+  max-width:calc(100% - 68px);
+  padding:7px 10px;
+  border:1px solid rgba(17,24,39,.07);
+  border-radius:999px;
+  background:rgba(255,255,255,.92);
+  color:#6f747a;
+  font-size:9px;
+  font-weight:850;
+  line-height:1.2;
+  white-space:nowrap;
+  box-shadow:0 4px 12px rgba(17,24,39,.06);
+}
+
+#productionOrderFlow .flow-home-discovery,
+#productionOrderFlow .flow-home-trust{
+  margin-top:14px;
+  padding:16px;
+  border:1px solid #e5e7e9;
+  border-radius:22px;
+  background:#fff;
+}
+
+#productionOrderFlow .flow-home-section-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+#productionOrderFlow .flow-home-section-head strong{
+  display:block;
+  color:#111;
+  font-size:17px;
+  font-weight:1000;
+  line-height:1.35;
+}
+
+#productionOrderFlow .flow-home-section-head span{
+  display:block;
+  margin-top:4px;
+  color:#7d8288;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.45;
+}
+
+#productionOrderFlow .flow-home-scenario-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+
+#productionOrderFlow .flow-home-scenario{
+  position:relative;
+  min-height:112px;
+  overflow:hidden;
+  padding:13px;
+  border:1px solid #eceef0;
+  border-radius:18px;
+  background:linear-gradient(145deg,#fffdf0 0%,#ffffff 78%);
+  color:#111;
+  text-align:left;
+}
+
+#productionOrderFlow .flow-home-scenario:nth-child(2n){
+  background:linear-gradient(145deg,#f7f8f9 0%,#ffffff 78%);
+}
+
+#productionOrderFlow .flow-home-scenario:active{
+  transform:scale(.985);
+}
+
+#productionOrderFlow .flow-home-scenario-icon{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  margin-bottom:9px;
+  border-radius:12px;
+  background:#facc15;
+  color:#111;
+  font-size:13px;
+  font-weight:1000;
+}
+
+#productionOrderFlow .flow-home-scenario strong{
+  display:block;
+  color:#111;
+  font-size:13px;
+  font-weight:1000;
+  line-height:1.4;
+}
+
+#productionOrderFlow .flow-home-scenario span{
+  display:block;
+  margin-top:4px;
+  color:#777d83;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.5;
+}
+
+#productionOrderFlow .flow-home-trust{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:0;
+  padding:12px 8px;
+}
+
+#productionOrderFlow .flow-home-trust-item{
+  min-width:0;
+  padding:4px 7px;
+  text-align:center;
+}
+
+#productionOrderFlow .flow-home-trust-item + .flow-home-trust-item{
+  border-left:1px solid #eef0f1;
+}
+
+#productionOrderFlow .flow-home-trust-item strong{
+  display:block;
+  color:#111;
+  font-size:10px;
+  font-weight:1000;
+  line-height:1.35;
+}
+
+#productionOrderFlow .flow-home-trust-item span{
+  display:block;
+  margin-top:3px;
+  color:#959aa0;
+  font-size:8.5px;
+  font-weight:800;
+  line-height:1.35;
+}
+
+#productionOrderFlow .flow-home-footer-brand{
+  padding:28px 12px 14px;
+  text-align:center;
+  user-select:none;
+}
+
+#productionOrderFlow .flow-home-footer-brand strong{
+  display:block;
+  color:#c3c6ca;
+  font-size:28px;
+  font-weight:1000;
+  letter-spacing:-1px;
+}
+
+#productionOrderFlow .flow-home-footer-brand strong .u{
+  color:#e8d77d;
+}
+
+#productionOrderFlow .flow-home-footer-brand span{
+  display:block;
+  margin-top:6px;
+  color:#c9ccd0;
+  font-size:10px;
+  font-weight:850;
+}
+
+@media(max-width:390px){
+  #productionOrderFlow .flow-home-map-shell{height:185px;}
+  #productionOrderFlow .flow-home-map-shell .flow-live-supply-status{top:8px!important;left:8px!important;right:8px!important;}
+  #productionOrderFlow .flow-home-map-privacy{left:9px;bottom:9px;font-size:8.5px;}
+  #productionOrderFlow .flow-home-map-current{right:9px;bottom:9px;width:40px;height:40px;}
+  #productionOrderFlow .flow-home-discovery{padding:14px;}
+  #productionOrderFlow .flow-home-scenario{min-height:106px;padding:12px;}
+  #productionOrderFlow .flow-home-trust{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:10px;}
+  #productionOrderFlow .flow-home-trust-item:nth-child(3){border-left:0;}
+}
+</style>
 <div aria-label="UBee 客人端正式下單流程" id="productionOrderFlow">
 <div class="flow-shell">
 <div class="flow-loading" id="flowLoading"><div class="flow-spinner"></div><div id="flowLoadingText">系統處理中…</div></div>
@@ -20358,6 +20756,12 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-progress" data-progress="0"></div>
 <div class="flow-scroll flow-home-scroll">
 <div class="flow-card">
+<div aria-label="UBee 即時服務地圖" class="flow-home-map-shell">
+<div class="flow-home-map-canvas" id="flowHomeMap"></div>
+<div class="map-placeholder flow-home-map-placeholder" id="flowHomeMapPlaceholder">
+<strong>正在準備附近服務地圖</strong>
+<small>取得定位後，顯示目前位置與匿名小U概略分布。</small>
+</div>
 <div aria-live="polite" class="flow-live-supply-status" data-rider-count="0" data-scope="loading" id="flowLiveSupplyStatus">
   <div class="flow-live-supply-head">
     <div class="flow-live-supply-main">
@@ -20368,6 +20772,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
       <div class="flow-live-supply-count" data-rider-count="0" data-scope="loading" id="flowLiveSupplyCount">
         <strong>正在確認附近小U</strong>
       </div>
+      <div aria-live="polite" class="flow-live-supply-eta is-unavailable" data-confidence="none" data-supply-level="none" id="flowLiveSupplyEta">媒合時間持續更新</div>
     </div>
     <div class="flow-live-supply-side">
       <div class="flow-live-supply-scope" id="flowLiveSupplyScope">定位中</div>
@@ -20375,6 +20780,14 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     </div>
   </div>
   <div class="flow-live-supply-note" id="flowLiveSupplyNote">取得定位後，會優先顯示附近 5 公里可即時媒合的小U。</div>
+</div>
+<div class="flow-home-map-privacy">小U位置為匿名概略顯示・媒合時間依即時運力估算</div>
+<button aria-label="回到目前位置" class="flow-home-map-current" onclick="focusCurrentLocation()" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="5"></circle>
+<path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+</svg>
+</button>
 </div>
 <div aria-label="選擇跑腿服務" class="flow-service-tabs" id="flowServiceTabs" role="tablist">
 <button aria-selected="true" class="flow-service-tab active" data-service="send" role="tab" type="button">
@@ -20426,12 +20839,12 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-route-card">
 <button class="flow-address-button" id="flowPickupButton" type="button">
 <span class="flow-address-dot"></span>
-<span class="flow-address-text"><small>取件地點</small><strong id="flowPickupText">請選擇取件地址</strong><em id="flowPickupMeta">填寫取件聯絡人與電話</em></span>
+<span class="flow-address-text"><small id="flowPickupLabel">取件地點</small><strong id="flowPickupText">請選擇取件地址</strong><em id="flowPickupMeta">填寫取件聯絡人與電話</em></span>
 <span class="flow-address-arrow">›</span>
 </button>
 <button class="flow-address-button" id="flowDropoffButton" type="button">
 <span class="flow-address-dot drop"></span>
-<span class="flow-address-text"><small>送達地點</small><strong id="flowDropoffText">請選擇送達地址</strong><em id="flowDropoffMeta">填寫收件人與電話</em></span>
+<span class="flow-address-text"><small id="flowDropoffLabel">送達地點</small><strong id="flowDropoffText">請選擇送達地址</strong><em id="flowDropoffMeta">填寫收件人與電話</em></span>
 <span class="flow-address-arrow">›</span>
 </button>
 </div>
@@ -20439,12 +20852,31 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 <div class="flow-status" id="flowHomeStatus"></div>
 <button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步：填寫任務內容</button>
 </div>
-<div class="flow-home-watermark" aria-hidden="true">
-<div class="flow-home-watermark-inner">
-<div class="flow-home-watermark-brand"><span class="u">U</span><span>Bee 跑腿</span></div>
-<div class="flow-home-watermark-slogan">生活大小事，一叫就出發</div>
-<div class="flow-home-watermark-meta">代買・代送・取件・排隊・全能跑腿</div>
+<section aria-labelledby="flowHomeDiscoveryTitle" class="flow-home-discovery">
+<div class="flow-home-section-head">
+<div>
+<strong id="flowHomeDiscoveryTitle">今天想讓小U幫你做什麼？</strong>
+<span>常見需求一點就開始，不必先研究任務分類。</span>
 </div>
+</div>
+<div class="flow-home-scenario-grid">
+<button class="flow-home-scenario" data-home-service="pickup" type="button"><span class="flow-home-scenario-icon">取</span><strong>忘記東西沒帶？</strong><span>小U幫你到指定地點取回來</span></button>
+<button class="flow-home-scenario" data-home-service="buy" type="button"><span class="flow-home-scenario-icon">買</span><strong>臨時需要買東西？</strong><span>告訴小U要買什麼、送到哪裡</span></button>
+<button class="flow-home-scenario" data-home-service="queue" type="button"><span class="flow-home-scenario-icon">排</span><strong>不想浪費時間排隊？</strong><span>小U先幫你到現場排隊或候位</span></button>
+<button class="flow-home-scenario" data-home-service="send" type="button"><span class="flow-home-scenario-icon">送</span><strong>文件或物品急著送？</strong><span>直接建立取件與送達路線</span></button>
+<button class="flow-home-scenario" data-home-nav="store" type="button"><span class="flow-home-scenario-icon">店</span><strong>店家臨時缺配送？</strong><span>前往店家入口查看可用服務</span></button>
+<button class="flow-home-scenario" data-home-service="helper" type="button"><span class="flow-home-scenario-icon">U</span><strong>不知道怎麼分類？</strong><span>交給全能跑腿，直接描述需求</span></button>
+</div>
+</section>
+<section aria-label="UBee 服務特色" class="flow-home-trust">
+<div class="flow-home-trust-item"><strong>即時媒合</strong><span>依任務位置找小U</span></div>
+<div class="flow-home-trust-item"><strong>費用透明</strong><span>確認價格再送出</span></div>
+<div class="flow-home-trust-item"><strong>多種任務</strong><span>送・取・買・排・辦</span></div>
+<div class="flow-home-trust-item"><strong>進度追蹤</strong><span>訂單狀態持續同步</span></div>
+</section>
+<div aria-hidden="true" class="flow-home-footer-brand">
+<strong><span class="u">U</span>Bee 跑腿</strong>
+<span>生活大小事，一叫就出發</span>
 </div>
 </div>
 </section>
@@ -20607,11 +21039,11 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </section>
 <section class="flow-page ubee-primary-task-page" data-page="tasksRoot" id="flowPageTasksRoot">
 <header class="flow-header home ubee-primary-page-header">
-<div class="flow-title-wrap"><div class="flow-title">任務</div><div class="flow-subtitle">查看進行中與歷史跑腿任務</div></div>
+<div class="flow-title-wrap"><div class="flow-title">訂單</div><div class="flow-subtitle">查看進行中與歷史跑腿訂單</div></div>
 </header>
 <div class="flow-scroll ubee-primary-task-scroll">
 <section class="ubee-primary-task-shell">
-<div class="ubee-primary-task-heading"><div><small>UBee 跑腿</small><strong>我的任務</strong><span>點選任務可查看完整內容與目前狀態。</span></div><button class="flow-text-link" hidden="" id="flowOpenActiveOrder" type="button">查看進行中任務</button></div>
+<div class="ubee-primary-task-heading"><div><small>UBee 跑腿</small><strong>我的訂單</strong><span>點選訂單可查看完整內容與目前狀態。</span></div><button class="flow-text-link" hidden="" id="flowOpenActiveOrder" type="button">查看進行中訂單</button></div>
 <div class="flow-profile-list" id="flowProfileTasksList"><div class="flow-empty">正在讀取任務…</div></div>
 </section>
 </div>
@@ -20835,7 +21267,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 </div>
 <nav aria-label="主要導覽" class="ubee-primary-bottom-nav" id="ubeePersistentBottomNav">
 <button aria-label="首頁" aria-current="page" class="active" data-nav-target="home" id="flowNavHome" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.8l8.5 6.7"/><path d="M5.5 9.8V20h13V9.8M9.3 20v-6.2h5.4V20"/></svg></span><span class="flow-nav-label">首頁</span></button>
-<button aria-label="任務" data-nav-target="task" id="flowNavTasks" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 1.8 1.8 3.2-3.2M8.5 16h7"/></svg></span><span class="flow-nav-label">任務</span></button>
+<button aria-label="訂單" data-nav-target="task" id="flowNavTasks" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="m8.5 11 1.8 1.8 3.2-3.2M8.5 16h7"/></svg></span><span class="flow-nav-label">訂單</span></button>
 <button aria-label="店家" data-nav-target="store" id="flowNavStores" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><path d="M4 9h16l-1-5H5L4 9Z"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6M4 9c0 1.7 1.1 3 2.5 3S9 10.7 9 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.1 3 2.5 3S20 10.7 20 9"/></svg></span><span class="flow-nav-label">店家</span></button>
 <button aria-label="我的" data-nav-target="my" id="flowNavMy" type="button"><span class="flow-nav-icon"><svg aria-hidden="true" class="ubee-nav-line" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20.5c.8-4.1 3.2-6.2 7-6.2s6.2 2.1 7 6.2"/></svg></span><span class="flow-nav-label">我的</span></button>
 </nav>
@@ -20848,6 +21280,33 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   const $=id=>document.getElementById(id);
   const root=$('productionOrderFlow');
   const serviceLabels={send:'幫我送',pickup:'幫我取',buy:'幫我買',queue:'幫排隊',helper:'全能跑腿'};
+  const homeServiceCopy={
+    send:{
+      pickupLabel:'取件地點',pickupEmpty:'請選擇取件地址',pickupMeta:'填寫取件聯絡人與電話',
+      dropoffLabel:'送達地點',dropoffEmpty:'請選擇送達地址',dropoffMeta:'填寫收件人與電話',
+      next:'下一步：填寫物品資訊'
+    },
+    pickup:{
+      pickupLabel:'取件地點',pickupEmpty:'請選擇要前往的取件地址',pickupMeta:'填寫取件聯絡人與電話',
+      dropoffLabel:'送達地點',dropoffEmpty:'取回後要送到哪裡？',dropoffMeta:'填寫收件人與電話',
+      next:'下一步：告訴小U要取什麼'
+    },
+    buy:{
+      pickupLabel:'購買地點',pickupEmpty:'請選擇店家或購買地址',pickupMeta:'可指定店家、商場或其他購買地點',
+      dropoffLabel:'送達地點',dropoffEmpty:'買好後要送到哪裡？',dropoffMeta:'填寫收件人與電話',
+      next:'下一步：填寫購買內容'
+    },
+    queue:{
+      pickupLabel:'排隊地點',pickupEmpty:'請選擇要排隊的店家或地點',pickupMeta:'填寫現場聯絡人與電話',
+      dropoffLabel:'任務完成地點',dropoffEmpty:'會與排隊地點自動同步',dropoffMeta:'排隊任務通常在同一地點完成',
+      next:'下一步：填寫排隊需求'
+    },
+    helper:{
+      pickupLabel:'任務起點',pickupEmpty:'小U需要先去哪裡？',pickupMeta:'填寫現場聯絡人與電話',
+      dropoffLabel:'任務完成地點',dropoffEmpty:'需要完成在哪裡？',dropoffMeta:'若同地點也可選擇相同地址',
+      next:'下一步：描述任務需求'
+    }
+  };
   const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,profile:0,profileDetail:0};
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
@@ -21087,16 +21546,54 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
 
   function updateHome(){
     const p=state.pickup,d=state.dropoff;
-    $('flowPickupText').textContent=p?.address||'請選擇取件地址';
-    $('flowPickupMeta').textContent=p?`${p.contactName||''} ${p.phone||''}`.trim()||'取件資訊已填寫':'填寫取件聯絡人與電話';
-    $('flowDropoffText').textContent=d?.address||'請選擇送達地址';
-    $('flowDropoffMeta').textContent=d?`${d.contactName||''} ${d.phone||''}`.trim()||'收件資訊已填寫':'填寫收件人與電話';
+    const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+
+    if($('flowPickupLabel')) $('flowPickupLabel').textContent=copy.pickupLabel;
+    if($('flowDropoffLabel')) $('flowDropoffLabel').textContent=copy.dropoffLabel;
+
+    $('flowPickupText').textContent=p?.address||copy.pickupEmpty;
+    $('flowPickupMeta').textContent=p
+      ? `${p.contactName||''} ${p.phone||''}`.trim()||`${copy.pickupLabel}資訊已填寫`
+      : copy.pickupMeta;
+
+    const queueAuto=state.service==='queue'&&d?._autoQueue;
+    $('flowDropoffText').textContent=queueAuto
+      ? '與排隊地點相同'
+      : d?.address||copy.dropoffEmpty;
+    $('flowDropoffMeta').textContent=queueAuto
+      ? '排隊任務將在同一地點完成'
+      : d
+        ? `${d.contactName||''} ${d.phone||''}`.trim()||`${copy.dropoffLabel}資訊已填寫`
+        : copy.dropoffMeta;
+
+    if($('flowHomeNext')) $('flowHomeNext').textContent=copy.next;
+
     const preview=$('flowTaskPreview');
-    if(state.taskNote){preview.classList.add('show');$('flowTaskPreviewText').textContent=`${serviceLabels[state.service]}｜${state.taskName||selectedServiceDefinition().title}｜${state.taskNote}`}
-    else preview.classList.remove('show');
+    if(state.taskNote){
+      preview.classList.add('show');
+      $('flowTaskPreviewText').textContent=`${serviceLabels[state.service]}｜${state.taskName||selectedServiceDefinition().title}｜${state.taskNote}`;
+    }else{
+      preview.classList.remove('show');
+    }
   }
 
-  function openAddress(target){state.addressTarget=target;state.searchItems=[];state.quickAddressTab='saved';status('flowSearchStatus','');$('flowSearchTitle').textContent=target==='pickup'?'選擇取件地點':'選擇送達地點';$('flowAddressSearch').value='';$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;setQuickAddressTab('saved');showPage('search');loadAddresses();setTimeout(()=>$('flowAddressSearch').focus(),80)}
+  function openAddress(target){
+    state.addressTarget=target;
+    state.searchItems=[];
+    state.quickAddressTab='saved';
+    status('flowSearchStatus','');
+    const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+    $('flowSearchTitle').textContent=target==='pickup'
+      ? `選擇${copy.pickupLabel}`
+      : `選擇${copy.dropoffLabel}`;
+    $('flowAddressSearch').value='';
+    $('flowSearchResultsSection').hidden=true;
+    $('flowQuickAddresses').hidden=false;
+    setQuickAddressTab('saved');
+    showPage('search');
+    loadAddresses();
+    setTimeout(()=>$('flowAddressSearch').focus(),80);
+  }
 
   async function loadAddresses(){
     let saved=[],recent=[];
@@ -21159,7 +21656,10 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     state.selectedAddress={...base};
     const existing=state.addressTarget==='pickup'?state.pickup:state.dropoff;
     const merged=existing&&existing.address===(base.address||base.formattedAddress)?{...base,...existing}:base;
-    $('flowDetailTitle').textContent=state.addressTarget==='pickup'?'填寫取件資訊':'填寫收件資訊';
+    const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+    $('flowDetailTitle').textContent=state.addressTarget==='pickup'
+      ? `填寫${copy.pickupLabel}資訊`
+      : `填寫${copy.dropoffLabel}資訊`;
     $('flowDetailAddress').value=merged.address||merged.formattedAddress||'';
     $('flowDetailNote').value=merged.addressDetail||merged.note||'';
     $('flowDetailName').value=merged.contactName||merged.name||'';
@@ -21193,7 +21693,9 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
     if(!contactName){status('flowDetailStatus','請填寫聯絡人姓名。',true);return}
     if(!/^09\d{8}$/.test(phone)){status('flowDetailStatus','請填寫正確的台灣手機號碼。',true);return}
     let lat=Number(base.lat),lng=Number(base.lng);if(!validPoint({lat,lng})){try{const point=await geocodeAddress(address);lat=point?.lat??null;lng=point?.lng??null}catch(_){lat=null;lng=null}}
-    const item={label:String($('flowDetailLabel').value||'').trim()||(state.addressTarget==='pickup'?'取件地址':'收件地址'),address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
+    const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+    const defaultLabel=state.addressTarget==='pickup'?copy.pickupLabel:copy.dropoffLabel;
+    const item={label:String($('flowDetailLabel').value||'').trim()||defaultLabel,address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
     if(state.addressTarget==='pickup'){state.pickup=item;if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};}else{state.dropoff={...item,_autoQueue:false};}
     if($('flowSaveAddress').checked)await persistAddress(item);
     updateHome();syncLegacy();
@@ -21594,9 +22096,30 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   }
 
   function bind(){
-    $('flowServiceTabs').addEventListener('click',event=>{const btn=event.target.closest('[data-service]');if(btn)setService(btn.dataset.service)});
+    $('flowServiceTabs').addEventListener('click',event=>{const btn=event.target.closest('[data-service]');if(btn){setService(btn.dataset.service);updateHome()}});
+    root.querySelectorAll('[data-home-service]').forEach(button=>button.addEventListener('click',()=>{
+      const service=button.dataset.homeService;
+      setService(service);
+      updateHome();
+      status('flowHomeStatus','');
+      root.querySelector('#flowPageHome .flow-card')?.scrollIntoView({block:'start',behavior:'smooth'});
+    }));
+    root.querySelectorAll('[data-home-nav]').forEach(button=>button.addEventListener('click',()=>{
+      const target=button.dataset.homeNav;
+      if(window.UBeePrimaryNavigation?.open) window.UBeePrimaryNavigation.open(target,{source:'home-scenario'});
+      else if(target==='store') window.openUBeeStorePage?.();
+    }));
     $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));
-    $('flowHomeNext').addEventListener('click',()=>{if(!state.pickup||!state.dropoff){status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}status('flowHomeStatus','');syncServiceSelectors();showPage('task')});$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
+    $('flowHomeNext').addEventListener('click',()=>{
+      if(!state.pickup||!state.dropoff){
+        const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
+        status('flowHomeStatus',`請先完成${copy.pickupLabel}與${copy.dropoffLabel}。`,true);
+        return;
+      }
+      status('flowHomeStatus','');
+      syncServiceSelectors();
+      showPage('task');
+    });$('flowEditTaskButton').addEventListener('click',()=>{syncServiceSelectors();showPage('task')});
     root.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>showPage(btn.dataset.go)));
     $('flowServiceTypeChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-type-index]');if(!btn)return;captureCurrentTaskDraft();state.serviceTypeIndex=Number(btn.dataset.serviceTypeIndex)||0;state.serviceCategory='';state.taskName=selectedServiceDefinition().title||serviceLabels[state.service];syncServiceSelectors()});
     $('flowServiceCategoryChoices').addEventListener('click',event=>{const btn=event.target.closest('[data-service-category]');if(!btn)return;captureCurrentTaskDraft();state.serviceCategory=btn.dataset.serviceCategory||'';$('flowServiceCategory').value=state.serviceCategory;syncServiceSelectors()});
@@ -21728,7 +22251,7 @@ body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-live-supply-v2-1-production-flow-fix';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260902-match-eta-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
