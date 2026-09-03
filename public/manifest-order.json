@@ -4,7 +4,7 @@
   "short_name": "UBee 跑腿",
   "description": "UBee 跑腿用戶端：即時媒合、估價、下單、訂單追蹤與店家服務。",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20260903-task-contract-v2",
+  "start_url": "/order.html?source=pwa&v=20260903-task-contract-v3-3-location-bootstrap-universal-photo",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -38,7 +38,7 @@
       "name": "立即下單",
       "short_name": "下單",
       "description": "開啟 UBee 首頁建立新的跑腿需求。",
-      "url": "/order.html?action=new&source=shortcut&v=20260903-task-contract-v2",
+      "url": "/order.html?action=new&source=shortcut&v=20260903-task-contract-v3-3-location-bootstrap-universal-photo",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -51,7 +51,7 @@
       "name": "我的訂單",
       "short_name": "訂單",
       "description": "查看進行中與歷史 UBee 訂單。",
-      "url": "/order.html?action=tasks&source=shortcut&v=20260903-task-contract-v2",
+      "url": "/order.html?action=tasks&source=shortcut&v=20260903-task-contract-v3-3-location-bootstrap-universal-photo",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -64,7 +64,7 @@
       "name": "店家服務",
       "short_name": "店家",
       "description": "開啟 UBee 店家服務入口。",
-      "url": "/order.html?action=store&source=shortcut&v=20260903-task-contract-v2",
+      "url": "/order.html?action=store&source=shortcut&v=20260903-task-contract-v3-3-location-bootstrap-universal-photo",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
