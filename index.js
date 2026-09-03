@@ -1,3 +1,4 @@
+// 2026-09-03｜Task Contract Backend V3 Full Flow：在 V2 結構化 taskDetails 基礎上，打通單點全能任務、騎士文字／照片／交接完成回報、完成前後端強制驗證、客戶完成結果與調度回報狀態；保留舊訂單相容。
 // 2026-09-03｜Task Contract Backend V2：正式正規化 taskDetails.reportMode / handoffMode，產生 canonical label 與需求旗標，並同步到騎士安全預覽、調度 Dashboard、客戶訂單 API。
 // 2026-09-02｜Rider Task Visibility V1：統一調度中心/騎士端待派狀態、補齊安全預覽區域欄位，避免調度有單但騎士任務池被舊狀態或二次解析誤擋。
 require('dotenv').config();
@@ -173,6 +174,43 @@ const riderDocumentUpload = multer({
       return callback(new Error('RIDER_DOCUMENT_UNSUPPORTED_TYPE'));
     }
 
+    return callback(null, true);
+  },
+});
+
+
+// =====================================================
+// Task Contract V3：任務完成回報照片
+// - 僅接受圖片，單檔上限 8MB。
+// - 檔案保存在 Firebase Storage，不將公開 URL 寫入 Firestore。
+// - 客戶查看時才產生短效 signed URL。
+// =====================================================
+const TASK_EXECUTION_REPORT_MAX_BYTES = 8 * 1024 * 1024;
+const TASK_EXECUTION_STORAGE_BUCKET = String(
+  process.env.TASK_EXECUTION_STORAGE_BUCKET ||
+  process.env.FIREBASE_STORAGE_BUCKET ||
+  RIDER_DOCUMENT_STORAGE_BUCKET ||
+  `${process.env.FIREBASE_PROJECT_ID || ''}.appspot.com`
+).trim();
+
+const taskExecutionPhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 1,
+    fileSize: TASK_EXECUTION_REPORT_MAX_BYTES,
+  },
+  fileFilter: (req, file, callback) => {
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
+    const mimeType = String(file?.mimetype || '').toLowerCase();
+    if (!allowedMimeTypes.has(mimeType)) {
+      return callback(new Error('TASK_EXECUTION_UNSUPPORTED_PHOTO_TYPE'));
+    }
     return callback(null, true);
   },
 });
@@ -7623,6 +7661,7 @@ function buildRiderPendingTaskPreview(order = {}) {
     serviceGroup: String(order.serviceGroup || '').trim(),
     serviceType: String(order.serviceType || '').trim(),
     serviceCategory: sanitizeRiderPendingPreviewText(order.serviceCategory || '', 80),
+    singlePointTask: order.singlePointTask === true,
     serviceName: sanitizeRiderPendingPreviewText(
       order.serviceName || '',
       80
@@ -14357,9 +14396,16 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         serviceCategory: o.serviceCategory || '',
         queueMinutes: Number(o.queueMinutes || 0),
         taskMinutes: Number(o.taskMinutes || 0),
+        singlePointTask: o.singlePointTask === true,
         item: o.item || '',
         note: o.note || '',
         taskDetails: o.taskDetails && typeof o.taskDetails === 'object' ? o.taskDetails : {},
+        taskExecutionReport:
+          o.taskExecutionReport && typeof o.taskExecutionReport === 'object'
+            ? normalizeTaskExecutionReport(o.taskExecutionReport)
+            : normalizeTaskExecutionReport({}),
+        taskExecutionReady: o.taskExecutionReady === true,
+        taskExecutionMissing: Array.isArray(o.taskExecutionMissing) ? o.taskExecutionMissing : [],
         purchaseDetails: o.purchaseDetails && typeof o.purchaseDetails === 'object' ? o.purchaseDetails : null,
         orderSource: o.orderSource || o.source || '',
         merchantOrder: o.merchantOrder === true || String(o.orderSource || o.source || '').toLowerCase().includes('merchant'),
@@ -23123,6 +23169,10 @@ async function createDynamicPricingQuoteSnapshot({
     itemSize: normalizeItemSize(requestData.itemSize),
     queueMinutes: Math.max(0, Math.round(dynamicSafeNumber(requestData.queueMinutes))),
     taskMinutes: Math.max(0, Math.round(dynamicSafeNumber(requestData.taskMinutes))),
+    singlePointTask:
+      requestData.singlePointTask === true ||
+      String(requestData.singlePointTask || '').trim() === '1' ||
+      String(requestData.singlePointTask || '').trim().toLowerCase() === 'true',
     upstairsOption: normalizeCustomerUpstairsOption(requestData.upstairsOption),
     upstairsFee: getCanonicalUpstairsFee(requestData.upstairsOption),
     pickupAddress: String(requestData.pickupAddress || requestData.pickup || requestData.from || ''),
@@ -23215,11 +23265,26 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
   });
   const quoteItemSize = normalizeItemSize(lockedQuote.itemSize);
   const orderItemSize = normalizeItemSize(orderData.itemSize);
+  const quoteSinglePointTask =
+    lockedQuote.singlePointTask === true ||
+    String(lockedQuote.singlePointTask || '').trim() === '1' ||
+    String(lockedQuote.singlePointTask || '').trim().toLowerCase() === 'true';
+  const orderSinglePointTask =
+    orderData.singlePointTask === true ||
+    String(orderData.singlePointTask || '').trim() === '1' ||
+    String(orderData.singlePointTask || '').trim().toLowerCase() === 'true';
 
   if (!quotePickup || !orderPickup || quotePickup !== orderPickup) {
     return { ok: false, message: '取件地址已變更，請重新估價。' };
   }
-  if (quoteMode !== 'queue' && (!quoteDropoff || !orderDropoff || quoteDropoff !== orderDropoff)) {
+  if (quoteSinglePointTask !== orderSinglePointTask) {
+    return { ok: false, message: '任務完成地點設定已變更，請重新估價。' };
+  }
+  if (
+    quoteMode !== 'queue' &&
+    !(quoteMode === 'custom' && quoteSinglePointTask) &&
+    (!quoteDropoff || !orderDropoff || quoteDropoff !== orderDropoff)
+  ) {
     return { ok: false, message: '送達地址已變更，請重新估價。' };
   }
   if (quoteSpeed !== orderSpeed) {
@@ -24155,9 +24220,19 @@ function validateOrderInput(data) {
   }
 
   const hasRemark = !!String(data.note || data.item || '').trim();
+  const isQueueTask = String(data.serviceMode || '').trim() === 'queue';
+  const isCustomSinglePointTask =
+    String(data.serviceMode || '').trim() === 'custom' &&
+    data.singlePointTask === true;
 
-  if (!data.pickupAddress || !data.dropoffAddress || !data.pickupPhone || !data.dropoffPhone || !hasRemark) {
-    errors.push('請完整填寫取件地址、送達地址、電話與備註。');
+  if (!data.pickupAddress || !data.pickupPhone || !hasRemark) {
+    errors.push('請完整填寫任務地點、聯絡電話與任務內容。');
+  }
+
+  if (!isQueueTask && !isCustomSinglePointTask) {
+    if (!data.dropoffAddress || !data.dropoffPhone) {
+      errors.push('請完整填寫送達地址與收件聯絡電話。');
+    }
   }
 
   const isPurchaseOrder =
@@ -24247,11 +24322,19 @@ function getDuplicateFingerprint(data) {
     String(data.userId || '').trim(),
     String(data.serviceGroup || '').trim(),
     String(data.serviceType || '').trim(),
+    String(data.serviceCategory || '').trim(),
+    String(data.serviceMode || '').trim(),
+    data.singlePointTask === true ? 'single_point' : 'route_task',
     normalizeAddress(data.pickupAddress),
     normalizeAddress(data.dropoffAddress),
     String(data.pickupPhone || '').trim(),
     String(data.dropoffPhone || '').trim(),
     cleanText(data.item, ORDER_INPUT_LIMITS.item),
+    cleanText(data.note, ORDER_INPUT_LIMITS.note),
+    String(data.queueMinutes || ''),
+    String(data.taskMinutes || ''),
+    String(data.taskDetails?.reportMode || ''),
+    String(data.taskDetails?.handoffMode || ''),
     String(data.speedType || 'standard'),
     String(data.orderTimingType || 'immediate'),
     String(data.requestedScheduleAtMs || ''),
@@ -26406,6 +26489,108 @@ function buildCanonicalTaskRequirementDetails(raw = {}) {
   };
 }
 
+
+function normalizeTaskExecutionReport(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const photo = source.photo && typeof source.photo === 'object'
+    ? {
+        storageBucket: cleanText(source.photo.storageBucket || '', 180),
+        storagePath: cleanText(source.photo.storagePath || '', 500),
+        mimeType: cleanText(source.photo.mimeType || '', 80),
+        sizeBytes: Math.max(0, Math.round(Number(source.photo.sizeBytes || 0))),
+        sha256: cleanText(source.photo.sha256 || '', 128),
+        originalName: cleanText(source.photo.originalName || '', 180),
+        uploadedAtMs: Math.max(0, Math.round(Number(source.photo.uploadedAtMs || 0))),
+      }
+    : null;
+
+  return {
+    text: cleanLongText(source.text || '', 1200),
+    handoffConfirmed: source.handoffConfirmed === true,
+    photo,
+    submittedAtMs: Math.max(0, Math.round(Number(source.submittedAtMs || 0))),
+    submittedByRiderId: cleanText(source.submittedByRiderId || '', 100),
+    schemaVersion: 'task-execution-report-v1',
+  };
+}
+
+function getTaskExecutionCompletionState(order = {}, rawReport = null) {
+  const requirements = buildCanonicalTaskRequirementDetails(order.taskDetails || {});
+  const report = normalizeTaskExecutionReport(rawReport || order.taskExecutionReport || {});
+  const missing = [];
+
+  if (requirements.requiresTextReport && !report.text) {
+    missing.push('文字回報');
+  }
+  if (requirements.requiresPhotoReport && !report.photo?.storagePath) {
+    missing.push('照片回報');
+  }
+  if (
+    (requirements.requiresInquiry || requirements.requiresPickup || requirements.requiresDelivery) &&
+    report.handoffConfirmed !== true
+  ) {
+    missing.push(requirements.handoffModeLabel || '現場交接確認');
+  }
+
+  return {
+    requirements,
+    report,
+    missing,
+    ready: missing.length === 0,
+  };
+}
+
+function taskExecutionPhotoExtension(mimeType, originalName = '') {
+  const extFromName = String(originalName || '').toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1];
+  if (['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(extFromName || '')) {
+    return extFromName;
+  }
+  return {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+  }[String(mimeType || '').toLowerCase()] || 'jpg';
+}
+
+async function createTaskExecutionPhotoSignedUrl(report = {}) {
+  const normalized = normalizeTaskExecutionReport(report);
+  const photo = normalized.photo;
+  if (!photo?.storagePath) return '';
+  const bucketName = String(photo.storageBucket || TASK_EXECUTION_STORAGE_BUCKET || '').trim();
+  if (!bucketName) return '';
+  try {
+    const bucket = admin.storage().bucket(bucketName);
+    const file = bucket.file(photo.storagePath);
+    const [exists] = await file.exists();
+    if (!exists) return '';
+    const [url] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 15 * 60 * 1000,
+      responseDisposition: 'inline',
+    });
+    return url;
+  } catch (error) {
+    console.warn('⚠️ 產生任務完成回報照片網址失敗：', error?.message || error);
+    return '';
+  }
+}
+
+async function buildCustomerTaskExecutionReportForApi(order = {}) {
+  const report = normalizeTaskExecutionReport(order.taskExecutionReport || {});
+  return {
+    text: report.text,
+    handoffConfirmed: report.handoffConfirmed,
+    hasPhoto: Boolean(report.photo?.storagePath),
+    photoUrl: report.photo?.storagePath
+      ? await createTaskExecutionPhotoSignedUrl(report)
+      : '',
+    submittedAtMs: report.submittedAtMs,
+    schemaVersion: report.schemaVersion,
+  };
+}
+
 function createOrderFromApi(data) {
   const userId = cleanText(
     data.userId || data.customerId || '',
@@ -26605,6 +26790,21 @@ function createOrderFromApi(data) {
   const canonicalTaskRequirements =
     buildCanonicalTaskRequirementDetails(rawTaskDetails);
 
+  const isPurchaseTask =
+    serviceKey === 'buy' ||
+    normalizedServiceType.includes('代買');
+  const isPickupTask =
+    serviceKey === 'pickup' ||
+    normalizedServiceType.includes('代取') ||
+    normalizedServiceType.includes('取件');
+  const singlePointTask =
+    normalizedServiceMode === 'custom' &&
+    (
+      data.singlePointTask === true ||
+      String(data.singlePointTask || '').trim() === '1' ||
+      String(data.singlePointTask || '').trim().toLowerCase() === 'true'
+    );
+
   const taskDetails = {
     itemName: cleanText(
       rawTaskDetails.itemName || purchaseDetails.productName || '',
@@ -26616,19 +26816,31 @@ function createOrderFromApi(data) {
     ),
     weight: cleanText(rawTaskDetails.weight || '', 40),
     pickupCode: cleanText(rawTaskDetails.pickupCode || '', 80),
-    pickupPaid: ['paid', 'unpaid', 'unknown'].includes(String(rawTaskDetails.pickupPaid || ''))
-      ? String(rawTaskDetails.pickupPaid)
-      : 'unknown',
-    replacementPolicy: ['contact', 'skip', 'similar'].includes(String(rawTaskDetails.replacementPolicy || ''))
-      ? String(rawTaskDetails.replacementPolicy)
-      : purchaseDetails.outOfStockAction === 'similar_item'
-        ? 'similar'
-        : purchaseDetails.outOfStockAction === 'skip_item'
-          ? 'skip'
-          : 'contact',
-    invoice: ['need', 'no_need', 'either'].includes(String(rawTaskDetails.invoice || ''))
-      ? String(rawTaskDetails.invoice)
-      : 'need',
+    pickupPaid: isPickupTask
+      ? (
+          ['paid', 'unpaid', 'unknown'].includes(String(rawTaskDetails.pickupPaid || ''))
+            ? String(rawTaskDetails.pickupPaid)
+            : 'unknown'
+        )
+      : '',
+    replacementPolicy: isPurchaseTask
+      ? (
+          ['contact', 'skip', 'similar'].includes(String(rawTaskDetails.replacementPolicy || ''))
+            ? String(rawTaskDetails.replacementPolicy)
+            : purchaseDetails.outOfStockAction === 'similar_item'
+              ? 'similar'
+              : purchaseDetails.outOfStockAction === 'skip_item'
+                ? 'skip'
+                : 'contact'
+        )
+      : '',
+    invoice: isPurchaseTask
+      ? (
+          ['need', 'no_need', 'either'].includes(String(rawTaskDetails.invoice || ''))
+            ? String(rawTaskDetails.invoice)
+            : 'either'
+        )
+      : '',
     queuePurpose: cleanText(rawTaskDetails.queuePurpose || '', 120),
     queueHandoff: cleanLongText(rawTaskDetails.queueHandoff || '', 200),
     deadline: cleanText(rawTaskDetails.deadline || '', 80),
@@ -26676,6 +26888,8 @@ function createOrderFromApi(data) {
         Number(data.taskMinutes || 0)
       )
     ),
+
+    singlePointTask,
 
     item: rawItem,
     purchaseDetails,
@@ -27865,6 +28079,13 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
 
     const isQueueTask = resolvedServiceMode === 'queue';
     const isCustomTask = resolvedServiceMode === 'custom';
+    const singlePointTask =
+      isCustomTask &&
+      (
+        req.query.singlePointTask === true ||
+        String(req.query.singlePointTask || '').trim() === '1' ||
+        String(req.query.singlePointTask || '').trim().toLowerCase() === 'true'
+      );
 
     let distance = null;
     let price = null;
@@ -27993,7 +28214,14 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         });
       }
 
-      if (to) {
+      if (!singlePointTask && !to) {
+        return res.status(400).json({
+          success: false,
+          error: '請輸入任務完成地點，或選擇「同地點完成」。',
+        });
+      }
+
+      if (!singlePointTask) {
         distance = await getDistanceMatrixCached(from, to);
 
         price = calculatePrice({
@@ -28089,6 +28317,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         itemSize,
         queueMinutes,
         taskMinutes,
+        singlePointTask,
         upstairsOption,
       },
       dynamicPricing,
@@ -28109,7 +28338,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
     const responseDistanceText =
       isQueueTask
         ? '排隊任務'
-        : isCustomTask && !to
+        : isCustomTask && singlePointTask
           ? '單點任務'
           : distance?.distanceText || '';
 
@@ -31798,6 +32027,9 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     let distance = null;
     let price = null;
 
+    const isCustomSinglePointTask =
+      data.serviceMode === 'custom' && data.singlePointTask === true;
+
     if (data.serviceMode === 'queue') {
   const queueMinutes = Math.max(
     0,
@@ -31944,10 +32176,22 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     platformIncome:
       financials.platformIncome,
   };
+}else if (isCustomSinglePointTask) {
+  distance = {
+    distanceMeters: 0,
+    durationSeconds: 0,
+    distanceKm: 0,
+    durationMinutes: 0,
+  };
+
+  price = calculateSinglePointCustomTaskPrice({
+    speedType: data.speedType,
+    upstairsFee: data.upstairsFee,
+  });
 }else {
   distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
 
-  if(!distance || !distance.distanceMeters){
+  if(!distance || !Number.isFinite(Number(distance.distanceMeters)) || Number(distance.distanceMeters) < 0){
     return res.status(400).json({
       success: false,
       error: '地址無法計算距離，請確認取件與送達地址是否完整'
@@ -32063,6 +32307,9 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   taskMinutes:
     data.taskMinutes,
+
+  singlePointTask:
+    data.singlePointTask === true,
 
   // ==============================
   // 任務內容
@@ -33580,6 +33827,159 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
 // 前端已統一為底部單一 Task Dock；本後端維持既有正式狀態機與導航階段欄位。
 // 狀態主流程：accepted -> arrived_pickup -> picked_up -> arrived_dropoff -> completed
 // 前端各階段維持單一主 CTA；後端持續以狀態機驗證，不允許跳階。
+// ===== Task Contract V3：騎士任務完成回報 =====
+app.post(
+  '/api/rider/orders/:orderId/task-execution-report',
+  riderAuthMiddleware,
+  (req, res, next) => {
+    taskExecutionPhotoUpload.single('photo')(req, res, error => {
+      if (!error) return next();
+      const message =
+        error.code === 'LIMIT_FILE_SIZE'
+          ? '回報照片不可超過 8MB。'
+          : error.message === 'TASK_EXECUTION_UNSUPPORTED_PHOTO_TYPE'
+            ? '回報照片僅支援 JPG、PNG、WebP、HEIC。'
+            : '回報照片上傳失敗，請重新選擇照片。';
+      return res.status(400).json({ success: false, code: 'TASK_EXECUTION_PHOTO_INVALID', message });
+    });
+  },
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    let newPhoto = null;
+    let previousPhotoToDelete = null;
+    try {
+      const safeOrderId = String(req.params.orderId || '').trim().toUpperCase();
+      if (!safeOrderId) {
+        return res.status(400).json({ success: false, message: '缺少訂單編號。' });
+      }
+
+      const trustedRiderDocId = String(req.riderAuth?.riderDocId || '').trim();
+      const trustedRiderId = String(req.riderAuth?.riderId || '').trim();
+      const trustedPhone = /^09\d{8}$/.test(trustedRiderDocId)
+        ? trustedRiderDocId
+        : '';
+
+      const riderResult = await findApprovedRiderForApi({
+        lineUserId: req.riderAuth ? '' : req.body?.lineUserId,
+        phone: trustedPhone || req.body?.phone,
+        riderId: trustedRiderId || req.body?.riderId,
+      });
+      if (!riderResult.ok) {
+        return res.status(riderResult.statusCode).json({ success: false, message: riderResult.message || '找不到小U身分。' });
+      }
+
+      const identity = buildRiderApiIdentity(
+        riderResult.riderDoc,
+        riderResult.rider || {},
+        req.body || {}
+      );
+      const orderRef = db.collection('orders').doc(safeOrderId);
+      const orderDoc = await orderRef.get();
+      if (!orderDoc.exists) {
+        return res.status(404).json({ success: false, message: '找不到此訂單。' });
+      }
+      const order = orderDoc.data() || {};
+      if (!isOrderBelongsToRider(order, identity)) {
+        return res.status(403).json({ success: false, message: '你不是此任務的接單小U。' });
+      }
+      if (['completed', 'cancelled', 'canceled'].includes(String(order.status || '').trim().toLowerCase())) {
+        return res.status(409).json({ success: false, message: '此任務已結束，無法再修改完成回報。' });
+      }
+
+      const currentReport = normalizeTaskExecutionReport(order.taskExecutionReport || {});
+      const reportText = cleanLongText(req.body?.text || currentReport.text || '', 1200);
+      const handoffConfirmed =
+        req.body?.handoffConfirmed === true ||
+        String(req.body?.handoffConfirmed || '').trim() === '1' ||
+        String(req.body?.handoffConfirmed || '').trim().toLowerCase() === 'true';
+
+      if (req.file) {
+        if (!TASK_EXECUTION_STORAGE_BUCKET) {
+          return res.status(500).json({ success: false, message: '任務回報照片儲存空間尚未設定。' });
+        }
+        const bucket = admin.storage().bucket(TASK_EXECUTION_STORAGE_BUCKET);
+        const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+        const extension = taskExecutionPhotoExtension(req.file.mimetype, req.file.originalname);
+        const storagePath = `task-execution-reports/${safeOrderId}/${identity.riderId || identity.riderDocId}/${Date.now()}-${sha256.slice(0, 16)}.${extension}`;
+        const file = bucket.file(storagePath);
+        await file.save(req.file.buffer, {
+          resumable: false,
+          contentType: req.file.mimetype,
+          metadata: {
+            cacheControl: 'private, max-age=0, no-store',
+            metadata: {
+              orderId: safeOrderId,
+              riderId: identity.riderId || '',
+              riderDocId: identity.riderDocId || '',
+              sha256,
+              purpose: 'task_execution_report',
+            },
+          },
+        });
+        newPhoto = {
+          storageBucket: bucket.name,
+          storagePath,
+          mimeType: req.file.mimetype,
+          sizeBytes: Number(req.file.size || 0),
+          sha256,
+          originalName: cleanText(req.file.originalname || '', 180),
+          uploadedAtMs: Date.now(),
+        };
+        if (currentReport.photo?.storagePath) previousPhotoToDelete = currentReport.photo;
+      }
+
+      const nextReport = normalizeTaskExecutionReport({
+        ...currentReport,
+        text: reportText,
+        handoffConfirmed,
+        photo: newPhoto || currentReport.photo,
+        submittedAtMs: Date.now(),
+        submittedByRiderId: identity.riderId || identity.riderDocId || '',
+      });
+      const completionState = getTaskExecutionCompletionState(order, nextReport);
+
+      await orderRef.set({
+        taskExecutionReport: nextReport,
+        taskExecutionReady: completionState.ready,
+        taskExecutionMissing: completionState.missing,
+        taskExecutionUpdatedAtMs: Date.now(),
+        taskExecutionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      if (previousPhotoToDelete?.storagePath && newPhoto?.storagePath) {
+        try {
+          const oldBucket = admin.storage().bucket(previousPhotoToDelete.storageBucket || TASK_EXECUTION_STORAGE_BUCKET);
+          await oldBucket.file(previousPhotoToDelete.storagePath).delete({ ignoreNotFound: true });
+        } catch (deleteError) {
+          console.warn('⚠️ 舊任務回報照片刪除失敗：', deleteError?.message || deleteError);
+        }
+      }
+
+      return res.json({
+        success: true,
+        orderId: safeOrderId,
+        readyForCompletion: completionState.ready,
+        missing: completionState.missing,
+        report: {
+          text: nextReport.text,
+          handoffConfirmed: nextReport.handoffConfirmed,
+          hasPhoto: Boolean(nextReport.photo?.storagePath),
+          submittedAtMs: nextReport.submittedAtMs,
+        },
+      });
+    } catch (error) {
+      if (newPhoto?.storagePath) {
+        try {
+          await admin.storage().bucket(newPhoto.storageBucket || TASK_EXECUTION_STORAGE_BUCKET).file(newPhoto.storagePath).delete({ ignoreNotFound: true });
+        } catch (_) {}
+      }
+      console.error('❌ 任務完成回報儲存失敗：', error);
+      return res.status(500).json({ success: false, message: '任務完成回報儲存失敗，請稍後再試。' });
+    }
+  }
+);
+
 // ===== 騎士更新任務狀態 API =====
 // 4. 更新任務狀態：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
@@ -33680,7 +34080,18 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         return;
       }
 
-      const nextStatuses = allowedFlow[currentStatus] || [];
+      const isSinglePointCustomTask =
+        order.singlePointTask === true &&
+        resolveCustomerServiceMode({
+          serviceMode: order.serviceMode,
+          serviceType: order.serviceType,
+          serviceKey: order.serviceKey,
+          serviceGroup: order.serviceGroup,
+        }) === 'custom';
+
+      const nextStatuses = isSinglePointCustomTask && currentStatus === 'picked_up'
+        ? ['completed']
+        : (allowedFlow[currentStatus] || []);
 
       if (!nextStatuses.includes(status)) {
         throw new Error('INVALID_TRANSITION');
@@ -33703,6 +34114,15 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         currentStatus === 'arrived_dropoff' &&
         deliveryStops.length > 1 &&
         currentDeliveryStopIndex < deliveryStops.length - 1;
+
+      if (status === 'completed' && !shouldAdvanceMultiStop) {
+        const completionState = getTaskExecutionCompletionState(order);
+        if (!completionState.ready) {
+          const requirementError = new Error('TASK_EXECUTION_REQUIREMENTS_MISSING');
+          requirementError.missing = completionState.missing;
+          throw requirementError;
+        }
+      }
 
       if (shouldAdvanceMultiStop) {
         const nowMs = Date.now();
@@ -34152,6 +34572,18 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       });
     }
 
+    if (error.message === 'TASK_EXECUTION_REQUIREMENTS_MISSING') {
+      const missing = Array.isArray(error.missing) ? error.missing : [];
+      return res.status(409).json({
+        success: false,
+        code: 'TASK_EXECUTION_REQUIREMENTS_MISSING',
+        missing,
+        message: missing.length
+          ? `完成任務前，請先完成：${missing.join('、')}。`
+          : '完成任務前，請先完成必要的現場回報與交接確認。',
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: '任務狀態更新失敗，請稍後再試。',
@@ -34161,6 +34593,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
 });
 
 app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   try {
     const orderId =
       String(
@@ -34212,6 +34645,8 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
       );
 
     const customerOrderSummary = sanitizeCustomerOrderForApi(order);
+    const customerTaskExecutionReport =
+      await buildCustomerTaskExecutionReportForApi(order);
 
     return res.json({
       success: true,
@@ -34240,6 +34675,22 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
           getSpeedOption(
             order.speedType
           ).label,
+
+        serviceKey: order.serviceKey || '',
+        serviceMode: order.serviceMode || '',
+        serviceGroup: order.serviceGroup || '',
+        serviceType: order.serviceType || '',
+        serviceCategory: order.serviceCategory || '',
+        singlePointTask: order.singlePointTask === true,
+        taskMinutes: Number(order.taskMinutes || 0),
+        queueMinutes: Number(order.queueMinutes || 0),
+        note: order.note || order.item || '',
+        item: order.item || '',
+        taskDetails:
+          order.taskDetails && typeof order.taskDetails === 'object'
+            ? order.taskDetails
+            : {},
+        taskExecutionReport: customerTaskExecutionReport,
 
         pickupAddress:
           order.pickupAddress,
@@ -38650,6 +39101,7 @@ function sanitizeCustomerOrderForApi(order = {}) {
     note: String(order.note || ''),
     taskDetails: order.taskDetails && typeof order.taskDetails === 'object' ? order.taskDetails : {},
     purchaseDetails: order.purchaseDetails && typeof order.purchaseDetails === 'object' ? order.purchaseDetails : null,
+    singlePointTask: order.singlePointTask === true,
     queueMinutes: Number(order.queueMinutes || 0),
     taskMinutes: Number(order.taskMinutes || 0),
     itemSize: String(order.itemSize || ''),
