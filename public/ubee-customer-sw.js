@@ -1,9 +1,10 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.02.3 Customer Home Platform V3
+ * Version: 2026.09.03.2 Customer Task Contract V2
  * File: ubee-customer-sw.js
  *
+ * 2026-09-03 Customer Task Content V1：同步任務內容／細項／品項分類優化與全能跑腿結構化欄位；升版後清除舊 Customer Cache。
  * 2026-09-02 Customer Home Platform V3：同步正式首頁地圖、匿名小U運力、需求情境入口與訂單導覽文案；升版後清除舊 Customer Cache。
  *
  * 2026-08-11 Identity V1 更新：
@@ -17,7 +18,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.02.3-home-platform-v3';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.03.2-task-contract-v2';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
