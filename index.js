@@ -1,4 +1,6 @@
+// 2026-09-03｜Universal Arrival Photo Backend V1.1：所有服務共用到場照片；排隊任務視為單一現場任務，抵達拍照後可直接進入處理並完成，不再要求不存在的送達點。
 // 2026-09-03｜Task Contract Backend V3 Full Flow：在 V2 結構化 taskDetails 基礎上，打通單點全能任務、騎士文字／照片／交接完成回報、完成前後端強制驗證、客戶完成結果與調度回報狀態；保留舊訂單相容。
+// 2026-09-03｜Arrival Photo Proof Backend V1：所有服務在抵達任務地點與各送達點後皆須拍照；後端儲存 Firebase Storage、驗證狀態流轉，並以短效 signed URL 回傳原下單客戶。
 // 2026-09-03｜Task Contract Backend V2：正式正規化 taskDetails.reportMode / handoffMode，產生 canonical label 與需求旗標，並同步到騎士安全預覽、調度 Dashboard、客戶訂單 API。
 // 2026-09-02｜Rider Task Visibility V1：統一調度中心/騎士端待派狀態、補齊安全預覽區域欄位，避免調度有單但騎士任務池被舊狀態或二次解析誤擋。
 require('dotenv').config();
@@ -204,8 +206,6 @@ const taskExecutionPhotoUpload = multer({
       'image/jpeg',
       'image/png',
       'image/webp',
-      'image/heic',
-      'image/heif',
     ]);
     const mimeType = String(file?.mimetype || '').toLowerCase();
     if (!allowedMimeTypes.has(mimeType)) {
@@ -14404,6 +14404,7 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           o.taskExecutionReport && typeof o.taskExecutionReport === 'object'
             ? normalizeTaskExecutionReport(o.taskExecutionReport)
             : normalizeTaskExecutionReport({}),
+        arrivalProofs: normalizeArrivalProofMap(o.arrivalProofs || {}),
         taskExecutionReady: o.taskExecutionReady === true,
         taskExecutionMissing: Array.isArray(o.taskExecutionMissing) ? o.taskExecutionMissing : [],
         purchaseDetails: o.purchaseDetails && typeof o.purchaseDetails === 'object' ? o.purchaseDetails : null,
@@ -26591,6 +26592,108 @@ async function buildCustomerTaskExecutionReportForApi(order = {}) {
   };
 }
 
+// ============================================================
+// Arrival Photo Proof V1：所有服務共用的到場照片證明
+// pickup：抵達第一個任務／取件／購買／排隊地點後必須拍照
+// dropoff_N：抵達每一個送達點後必須拍照（多點配送依 stop index 分開保存）
+// ============================================================
+function normalizeArrivalProofStage(value) {
+  const stage = String(value || '').trim().toLowerCase();
+  return stage === 'dropoff' ? 'dropoff' : stage === 'pickup' ? 'pickup' : '';
+}
+
+function getArrivalProofKey(stage, stopIndex = 0) {
+  const normalizedStage = normalizeArrivalProofStage(stage);
+  if (normalizedStage === 'pickup') return 'pickup';
+  if (normalizedStage === 'dropoff') {
+    return `dropoff_${Math.max(0, Math.round(Number(stopIndex || 0)))}`;
+  }
+  return '';
+}
+
+function getArrivalProofStageLabel(stage, stopIndex = 0, order = {}) {
+  const normalizedStage = normalizeArrivalProofStage(stage);
+  if (normalizedStage === 'pickup') {
+    const key = String(order.serviceKey || '').trim().toLowerCase();
+    if (key === 'buy') return '購買地點到場照片';
+    if (key === 'queue') return '排隊／任務地點到場照片';
+    if (key === 'helper') return '任務地點到場照片';
+    return '取件地點到場照片';
+  }
+  if (normalizedStage === 'dropoff') {
+    const stops = Array.isArray(order.deliveryStops) ? order.deliveryStops : [];
+    if (stops.length > 1) return `第 ${Math.max(0, Math.round(Number(stopIndex || 0))) + 1} 個送達點照片`;
+    return '送達地點到場照片';
+  }
+  return '到場照片';
+}
+
+function normalizeArrivalPhotoProof(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const stage = normalizeArrivalProofStage(source.stage);
+  const stopIndex = Math.max(0, Math.round(Number(source.stopIndex || 0)));
+  const photo = source.photo && typeof source.photo === 'object'
+    ? {
+        storageBucket: cleanText(source.photo.storageBucket || '', 180),
+        storagePath: cleanText(source.photo.storagePath || '', 500),
+        mimeType: cleanText(source.photo.mimeType || '', 80),
+        sizeBytes: Math.max(0, Math.round(Number(source.photo.sizeBytes || 0))),
+        sha256: cleanText(source.photo.sha256 || '', 128),
+        originalName: cleanText(source.photo.originalName || '', 180),
+        uploadedAtMs: Math.max(0, Math.round(Number(source.photo.uploadedAtMs || 0))),
+      }
+    : null;
+  return {
+    stage,
+    stopIndex,
+    photo,
+    submittedAtMs: Math.max(0, Math.round(Number(source.submittedAtMs || 0))),
+    submittedByRiderId: cleanText(source.submittedByRiderId || '', 100),
+    schemaVersion: 'arrival-photo-proof-v1',
+  };
+}
+
+function normalizeArrivalProofMap(raw = {}) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const result = {};
+  Object.values(source).forEach(value => {
+    const normalized = normalizeArrivalPhotoProof(value);
+    if (!normalized.stage || !normalized.photo?.storagePath) return;
+    const canonicalKey = getArrivalProofKey(normalized.stage, normalized.stopIndex);
+    if (canonicalKey) result[canonicalKey] = normalized;
+  });
+  return result;
+}
+
+function hasArrivalPhotoProof(order = {}, stage, stopIndex = 0) {
+  const key = getArrivalProofKey(stage, stopIndex);
+  if (!key) return false;
+  const proofs = normalizeArrivalProofMap(order.arrivalProofs || {});
+  return Boolean(proofs[key]?.photo?.storagePath);
+}
+
+async function buildCustomerArrivalProofsForApi(order = {}) {
+  const proofs = normalizeArrivalProofMap(order.arrivalProofs || {});
+  const rows = Object.entries(proofs).map(([key, proof]) => ({ key, proof }));
+  rows.sort((a, b) => {
+    if (a.proof.stage !== b.proof.stage) return a.proof.stage === 'pickup' ? -1 : 1;
+    return Number(a.proof.stopIndex || 0) - Number(b.proof.stopIndex || 0);
+  });
+
+  return await Promise.all(rows.map(async ({ key, proof }) => ({
+    key,
+    stage: proof.stage,
+    stopIndex: proof.stopIndex,
+    stageLabel: getArrivalProofStageLabel(proof.stage, proof.stopIndex, order),
+    hasPhoto: Boolean(proof.photo?.storagePath),
+    photoUrl: proof.photo?.storagePath
+      ? await createTaskExecutionPhotoSignedUrl({ photo: proof.photo })
+      : '',
+    submittedAtMs: proof.submittedAtMs,
+    schemaVersion: proof.schemaVersion,
+  })));
+}
+
 function createOrderFromApi(data) {
   const userId = cleanText(
     data.userId || data.customerId || '',
@@ -33827,6 +33930,170 @@ app.post('/api/rider/transfer-order', riderAuthMiddleware, async (req, res) => {
 // 前端已統一為底部單一 Task Dock；本後端維持既有正式狀態機與導航階段欄位。
 // 狀態主流程：accepted -> arrived_pickup -> picked_up -> arrived_dropoff -> completed
 // 前端各階段維持單一主 CTA；後端持續以狀態機驗證，不允許跳階。
+// ===== Arrival Photo Proof V1：騎士抵達後強制拍照回傳 =====
+app.post(
+  '/api/rider/orders/:orderId/arrival-proof',
+  riderAuthMiddleware,
+  (req, res, next) => {
+    taskExecutionPhotoUpload.single('photo')(req, res, error => {
+      if (!error) return next();
+      const message =
+        error.code === 'LIMIT_FILE_SIZE'
+          ? '到場照片不可超過 8MB。'
+          : error.message === 'TASK_EXECUTION_UNSUPPORTED_PHOTO_TYPE'
+            ? '到場照片僅支援 JPG、PNG、WebP，以確保客戶各裝置都能直接查看。'
+            : '到場照片上傳失敗，請重新拍攝。';
+      return res.status(400).json({ success: false, code: 'ARRIVAL_PHOTO_INVALID', message });
+    });
+  },
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    let newPhoto = null;
+    let previousPhotoToDelete = null;
+    try {
+      const safeOrderId = String(req.params.orderId || '').trim().toUpperCase();
+      const stage = normalizeArrivalProofStage(req.body?.stage);
+      if (!safeOrderId || !stage || !req.file) {
+        return res.status(400).json({ success: false, message: '缺少訂單、到場階段或照片。' });
+      }
+
+      const trustedRiderDocId = String(req.riderAuth?.riderDocId || '').trim();
+      const trustedRiderId = String(req.riderAuth?.riderId || '').trim();
+      const trustedPhone = /^09\d{8}$/.test(trustedRiderDocId) ? trustedRiderDocId : '';
+      const riderResult = await findApprovedRiderForApi({
+        lineUserId: req.riderAuth ? '' : req.body?.lineUserId,
+        phone: trustedPhone || req.body?.phone,
+        riderId: trustedRiderId || req.body?.riderId,
+      });
+      if (!riderResult.ok) {
+        return res.status(riderResult.statusCode).json({ success: false, message: riderResult.message || '找不到小U身分。' });
+      }
+
+      const identity = buildRiderApiIdentity(riderResult.riderDoc, riderResult.rider || {}, req.body || {});
+      const orderRef = db.collection('orders').doc(safeOrderId);
+      const orderDoc = await orderRef.get();
+      if (!orderDoc.exists) return res.status(404).json({ success: false, message: '找不到此訂單。' });
+      const order = orderDoc.data() || {};
+      if (!isOrderBelongsToRider(order, identity)) {
+        return res.status(403).json({ success: false, message: '你不是此任務的接單小U。' });
+      }
+      const status = String(order.status || '').trim().toLowerCase();
+      if (['completed', 'cancelled', 'canceled'].includes(status)) {
+        return res.status(409).json({ success: false, message: '此任務已結束，無法再上傳到場照片。' });
+      }
+
+      let stopIndex = 0;
+      if (stage === 'pickup') {
+        const allowed = new Set(['arrived_pickup', 'picked_up', 'going_to_dropoff', 'arrived_dropoff']);
+        if (!allowed.has(status)) {
+          return res.status(409).json({ success: false, code: 'PICKUP_NOT_ARRIVED', message: '請先在騎士端確認已抵達任務／取件地點，再拍照回傳。' });
+        }
+      } else {
+        if (status !== 'arrived_dropoff') {
+          return res.status(409).json({ success: false, code: 'DROPOFF_NOT_ARRIVED', message: '請先確認已抵達送達地點，再拍照回傳。' });
+        }
+        stopIndex = Math.max(0, Math.round(Number(order.currentDeliveryStopIndex || 0)));
+      }
+
+      if (!TASK_EXECUTION_STORAGE_BUCKET) {
+        return res.status(500).json({ success: false, message: '到場照片儲存空間尚未設定。' });
+      }
+      const bucket = admin.storage().bucket(TASK_EXECUTION_STORAGE_BUCKET);
+      const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      const extension = taskExecutionPhotoExtension(req.file.mimetype, req.file.originalname);
+      const key = getArrivalProofKey(stage, stopIndex);
+      const storagePath = `arrival-photo-proofs/${safeOrderId}/${key}/${identity.riderId || identity.riderDocId}/${Date.now()}-${sha256.slice(0, 16)}.${extension}`;
+      const file = bucket.file(storagePath);
+      await file.save(req.file.buffer, {
+        resumable: false,
+        contentType: req.file.mimetype,
+        metadata: {
+          cacheControl: 'private, max-age=0, no-store',
+          metadata: {
+            orderId: safeOrderId,
+            riderId: identity.riderId || '',
+            riderDocId: identity.riderDocId || '',
+            stage,
+            stopIndex: String(stopIndex),
+            sha256,
+            purpose: 'arrival_photo_proof',
+          },
+        },
+      });
+      newPhoto = {
+        storageBucket: bucket.name,
+        storagePath,
+        mimeType: req.file.mimetype,
+        sizeBytes: Number(req.file.size || 0),
+        sha256,
+        originalName: cleanText(req.file.originalname || '', 180),
+        uploadedAtMs: Date.now(),
+      };
+
+      const currentProofs = normalizeArrivalProofMap(order.arrivalProofs || {});
+      if (currentProofs[key]?.photo?.storagePath) previousPhotoToDelete = currentProofs[key].photo;
+      const nextProof = normalizeArrivalPhotoProof({
+        stage,
+        stopIndex,
+        photo: newPhoto,
+        submittedAtMs: Date.now(),
+        submittedByRiderId: identity.riderId || identity.riderDocId || '',
+      });
+      const nextProofs = { ...currentProofs, [key]: nextProof };
+
+      await orderRef.set({
+        arrivalProofs: nextProofs,
+        arrivalPhotoProofVersion: 'v1',
+        arrivalPhotoProofUpdatedAtMs: Date.now(),
+        arrivalPhotoProofUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      // 照片一上傳就主動通知原下單客戶；客戶端同時會在 4 秒輪詢內顯示照片。
+      try {
+        await notifyCustomer(
+          { ...order, id: safeOrderId },
+          createTextMessage(`UBee 到場照片已回傳
+
+訂單編號：${safeOrderId}
+${getArrivalProofStageLabel(stage, stopIndex, order)}已由小U拍照回傳，請開啟 UBee 任務進度查看。`)
+        );
+      } catch (notifyError) {
+        console.warn('⚠️ 到場照片已儲存，但通知客戶失敗：', notifyError?.message || notifyError);
+      }
+
+      if (previousPhotoToDelete?.storagePath) {
+        try {
+          await admin.storage().bucket(previousPhotoToDelete.storageBucket || TASK_EXECUTION_STORAGE_BUCKET)
+            .file(previousPhotoToDelete.storagePath).delete({ ignoreNotFound: true });
+        } catch (deleteError) {
+          console.warn('⚠️ 舊到場照片刪除失敗：', deleteError?.message || deleteError);
+        }
+      }
+
+      return res.json({
+        success: true,
+        orderId: safeOrderId,
+        proofKey: key,
+        stage,
+        stopIndex,
+        stageLabel: getArrivalProofStageLabel(stage, stopIndex, order),
+        hasPhoto: true,
+        submittedAtMs: nextProof.submittedAtMs,
+      });
+    } catch (error) {
+      if (newPhoto?.storagePath) {
+        try {
+          await admin.storage().bucket(newPhoto.storageBucket || TASK_EXECUTION_STORAGE_BUCKET)
+            .file(newPhoto.storagePath).delete({ ignoreNotFound: true });
+        } catch (_) {}
+      }
+      console.error('❌ 到場照片儲存失敗：', error);
+      return res.status(500).json({ success: false, message: '到場照片儲存失敗，請稍後再試。' });
+    }
+  }
+);
+
 // ===== Task Contract V3：騎士任務完成回報 =====
 app.post(
   '/api/rider/orders/:orderId/task-execution-report',
@@ -33838,7 +34105,7 @@ app.post(
         error.code === 'LIMIT_FILE_SIZE'
           ? '回報照片不可超過 8MB。'
           : error.message === 'TASK_EXECUTION_UNSUPPORTED_PHOTO_TYPE'
-            ? '回報照片僅支援 JPG、PNG、WebP、HEIC。'
+            ? '回報照片僅支援 JPG、PNG、WebP，以確保客戶各裝置都能直接查看。'
             : '回報照片上傳失敗，請重新選擇照片。';
       return res.status(400).json({ success: false, code: 'TASK_EXECUTION_PHOTO_INVALID', message });
     });
@@ -34080,21 +34347,50 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         return;
       }
 
-      const isSinglePointCustomTask =
-        order.singlePointTask === true &&
-        resolveCustomerServiceMode({
-          serviceMode: order.serviceMode,
-          serviceType: order.serviceType,
-          serviceKey: order.serviceKey,
-          serviceGroup: order.serviceGroup,
-        }) === 'custom';
+      const resolvedOrderMode = resolveCustomerServiceMode({
+        serviceMode: order.serviceMode,
+        serviceType: order.serviceType,
+        serviceKey: order.serviceKey,
+        serviceGroup: order.serviceGroup,
+      });
 
-      const nextStatuses = isSinglePointCustomTask && currentStatus === 'picked_up'
+      // Universal Arrival Photo V1.1：
+      // - 全能「同地點完成」是單一現場任務
+      // - 排隊任務本來就只有任務地點，不應強迫產生假的送達點
+      const isSingleSiteTask =
+        (order.singlePointTask === true && resolvedOrderMode === 'custom') ||
+        resolvedOrderMode === 'queue';
+
+      const nextStatuses = isSingleSiteTask && currentStatus === 'picked_up'
         ? ['completed']
         : (allowedFlow[currentStatus] || []);
 
       if (!nextStatuses.includes(status)) {
         throw new Error('INVALID_TRANSITION');
+      }
+
+      // Arrival Photo Proof V1：所有服務都必須在抵達後拍照。
+      // 抵達取件／任務地點後，未有 pickup photo 不可進入 picked_up；
+      // 抵達每個送達點後，未有該 stop 的 dropoff photo 不可完成該站。
+      if (status === 'picked_up' && currentStatus === 'arrived_pickup') {
+        if (!hasArrivalPhotoProof(order, 'pickup', 0)) {
+          throw new Error('ARRIVAL_PHOTO_REQUIRED_PICKUP');
+        }
+      }
+
+      if (status === 'completed' && currentStatus === 'picked_up' && isSingleSiteTask) {
+        if (!hasArrivalPhotoProof(order, 'pickup', 0)) {
+          throw new Error('ARRIVAL_PHOTO_REQUIRED_PICKUP');
+        }
+      }
+
+      if (status === 'completed' && currentStatus === 'arrived_dropoff') {
+        const proofStopIndex = Math.max(0, Math.round(Number(order.currentDeliveryStopIndex || 0)));
+        if (!hasArrivalPhotoProof(order, 'dropoff', proofStopIndex)) {
+          const err = new Error('ARRIVAL_PHOTO_REQUIRED_DROPOFF');
+          err.stopIndex = proofStopIndex;
+          throw err;
+        }
       }
 
       // 多點配送：完成目前送達點時，如果後面還有站點，
@@ -34565,6 +34861,22 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       });
     }
 
+    if (error.message === 'ARRIVAL_PHOTO_REQUIRED_PICKUP') {
+      return res.status(409).json({
+        success: false,
+        code: 'ARRIVAL_PHOTO_REQUIRED_PICKUP',
+        message: '請先拍攝並回傳抵達任務／取件地點的照片，客人確認看得到後才能繼續。',
+      });
+    }
+
+    if (error.message === 'ARRIVAL_PHOTO_REQUIRED_DROPOFF') {
+      return res.status(409).json({
+        success: false,
+        code: 'ARRIVAL_PHOTO_REQUIRED_DROPOFF',
+        message: `請先拍攝並回傳第 ${Number(error.stopIndex || 0) + 1} 個送達點的到場照片，才能完成此站。`,
+      });
+    }
+
     if (error.message === 'INVALID_TRANSITION') {
       return res.status(409).json({
         success: false,
@@ -34647,6 +34959,8 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
     const customerOrderSummary = sanitizeCustomerOrderForApi(order);
     const customerTaskExecutionReport =
       await buildCustomerTaskExecutionReportForApi(order);
+    const customerArrivalProofs =
+      await buildCustomerArrivalProofsForApi(order);
 
     return res.json({
       success: true,
@@ -34691,6 +35005,7 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
             ? order.taskDetails
             : {},
         taskExecutionReport: customerTaskExecutionReport,
+        arrivalProofs: customerArrivalProofs,
 
         pickupAddress:
           order.pickupAddress,
