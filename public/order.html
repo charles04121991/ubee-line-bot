@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-03｜Customer Task Contract V3 Full Flow：補上全能任務「同地點完成」單點模式，估價／鎖價／建單一致；完成後顯示小U文字／照片／交接回報結果。 -->
 <!-- 2026-09-03｜Customer Task Contract V2：全能任務的現場回報／交接由畫面選項正式寫入 taskDetails.reportMode / handoffMode，後端、調度中心與騎士端可直接辨識，不再只依賴 note 文字；保留 human-readable note 作舊版相容。 -->
 <!-- 2026-09-03｜Customer Task Content V1：重整送／取／買／排隊／全能跑腿任務細項與品項分類；新增忘帶急送、維修品取件、五金急買、現場代辦、退換歸還、臨時救援；Production Flow 加入依任務細項變化的提示文案與全能任務現場回報／交接結構化欄位；底層 serviceKey/serviceMode 與既有估價建單契約維持不變。 -->
 <!-- 2026-09-02｜Customer Home Layout V3.9：刪除舊版 flow-home-footer-brand CSS，修正舊 span 10px 規則覆蓋新版 60px 品牌字；UBee跑腿 改為真正單一樣式來源。 -->
@@ -17,7 +18,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260903-task-contract-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260903-task-contract-v3-full-flow" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -15824,6 +15825,8 @@ async function renderEstimate(){
   const resolvedServiceMode = resolveClientServiceMode(serviceGroup, serviceType);
   const isQueueTask = resolvedServiceMode === 'queue';
   const isCustomTask = resolvedServiceMode === 'custom';
+  const isSinglePointCustomTask =
+    isCustomTask && window.__UBEE_PRODUCTION_SINGLE_POINT_TASK__ === true;
 
   if(isQueueTask && queueMinutes <= 0){
     lastQuoteData = null;
@@ -15861,7 +15864,19 @@ async function renderEstimate(){
     return null;
   }
 
-  if(!isQueueTask && (!pickup || !dropoff)){
+  if(isSinglePointCustomTask && !pickup){
+    lastQuoteData = null;
+    lastEstimatedTotal = 0;
+    updateStickyEstimate('待估價');
+
+    box.innerHTML = `
+      <div class="price-row price-total"><span>費用</span><strong>請先填寫任務地點</strong></div>
+      <div class="price-note">單點全能任務需要先填寫任務地點，系統才能計算正式費用。</div>
+    `;
+    return null;
+  }
+
+  if(!isQueueTask && !isSinglePointCustomTask && (!pickup || !dropoff)){
     lastQuoteData = null;
     lastEstimatedTotal = 0;
     updateStickyEstimate('待估價');
@@ -15877,9 +15892,10 @@ async function renderEstimate(){
     const params = new URLSearchParams();
 
     params.set('from', pickup);
-    params.set('to', dropoff);
+    params.set('to', isSinglePointCustomTask ? '' : dropoff);
     params.set('pickup', pickup);
-    params.set('dropoff', dropoff);
+    params.set('dropoff', isSinglePointCustomTask ? '' : dropoff);
+    params.set('singlePointTask', isSinglePointCustomTask ? '1' : '0');
     params.set('speedType', speedType);
     params.set('speed', speedType);
     params.set('serviceGroup', getServiceGroupForApi());
@@ -15925,11 +15941,13 @@ async function renderEstimate(){
 
     const distanceText = isQueueTask
       ? '排隊任務'
-      : (
-          distanceKm > 0
-            ? `${distanceKm.toFixed(1)} 公里`
-            : (data.distanceText || '-')
-        );
+      : isSinglePointCustomTask
+        ? '現場單點任務'
+        : (
+            distanceKm > 0
+              ? `${distanceKm.toFixed(1)} 公里`
+              : (data.distanceText || '-')
+          );
 
     const durationText = isQueueTask
       ? `${queueMinutes} 分鐘`
@@ -16983,10 +17001,25 @@ function renderStep5TaskDetail(order){
 
 
   const serviceCategoryText =
+
     String(
       data.serviceCategory ||
       ''
     ).trim();
+
+  const taskDetails =
+    data.taskDetails && typeof data.taskDetails === 'object'
+      ? data.taskDetails
+      : {};
+  const executionReport =
+    data.taskExecutionReport && typeof data.taskExecutionReport === 'object'
+      ? data.taskExecutionReport
+      : {};
+  const reportMode = String(taskDetails.reportMode || 'none').trim().toLowerCase();
+  const handoffMode = String(taskDetails.handoffMode || 'none').trim().toLowerCase();
+  const reportModeLabel = String(taskDetails.reportModeLabel || ({none:'不用另外回報',text:'文字回報',photo:'拍照回報',photo_text:'拍照＋文字'}[reportMode] || ''));
+  const handoffModeLabel = String(taskDetails.handoffModeLabel || ({none:'不需要',inquire:'需要詢問',pickup:'需要領取',deliver:'需要交付'}[handoffMode] || ''));
+  const singlePointTask = data.singlePointTask === true;
 
 
   const serviceMetaText =
@@ -17015,7 +17048,11 @@ function renderStep5TaskDetail(order){
 
       ''
 
-    ).trim() ||
+    )
+      .split(/\r?\n/)
+      .filter(line => !/^現場(?:回報|交接)：/.test(String(line || '').trim()))
+      .join('\n')
+      .trim() ||
 
     '未提供任務內容';
 
@@ -17139,6 +17176,11 @@ function renderStep5TaskDetail(order){
 
   }
 
+  if(singlePointTask){
+    pickupTitle = '任務地點';
+    dropoffTitle = '現場完成';
+  }
+
   /* ==============================
      正式產生任務明細
      ============================== */
@@ -17176,6 +17218,20 @@ function renderStep5TaskDetail(order){
       <div class="task-receipt-text">
         ${escapeHtml(taskContent)}
       </div>
+
+      ${reportMode!=='none'||handoffMode!=='none'?`
+        <div class="task-receipt-row"><span class="task-receipt-label">現場回報</span><strong class="task-receipt-value">${escapeHtml(reportModeLabel)}</strong></div>
+        <div class="task-receipt-row"><span class="task-receipt-label">現場交接</span><strong class="task-receipt-value">${escapeHtml(handoffModeLabel)}</strong></div>
+      `:''}
+
+      ${['completed','done'].includes(String(data.status||'').toLowerCase())&&(executionReport.text||executionReport.hasPhoto||executionReport.handoffConfirmed)?`
+        <div class="task-receipt-separator"></div>
+        <div class="task-receipt-section-title">小U 完成回報</div>
+        ${executionReport.text?`<div class="task-receipt-text">${escapeHtml(executionReport.text)}</div>`:''}
+        ${executionReport.handoffConfirmed?`<div class="task-receipt-row"><span class="task-receipt-label">現場交接</span><strong class="task-receipt-value">已確認完成</strong></div>`:''}
+        ${executionReport.hasPhoto?`<div class="task-receipt-row"><span class="task-receipt-label">照片回報</span><strong class="task-receipt-value">${executionReport.photoUrl?'已上傳':'已回報・暫時無法顯示'}</strong></div>`:''}
+        ${executionReport.photoUrl?`<div style="margin-top:10px"><img src="${escapeHtml(executionReport.photoUrl)}" alt="小U 任務完成回報照片" style="display:block;width:100%;max-height:360px;object-fit:cover;border-radius:14px;border:1px solid rgba(15,23,42,.10)" referrerpolicy="no-referrer"/></div>`:''}
+      `:''}
 
     </div>
 
@@ -18376,6 +18432,7 @@ function startOrderListener(orderId){
       const order = {
         ...(currentOrderData || {}),
         ...(data.summary || {}),
+        ...(data.order || {}),
         id:safeOrderId
       };
 
@@ -21031,6 +21088,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       <button aria-pressed="false" class="flow-helper-option" data-helper-handoff="pickup" type="button">需要領取</button>
       <button aria-pressed="false" class="flow-helper-option" data-helper-handoff="deliver" type="button">需要交付</button>
     </div></div>
+    <div class="flow-helper-field"><label>任務地點</label><div class="flow-helper-options" id="flowHelperLocationOptions" role="radiogroup" aria-label="全能任務地點模式">
+      <button aria-pressed="true" class="flow-helper-option active" data-helper-location="route" type="button">需要前往另一地點</button>
+      <button aria-pressed="false" class="flow-helper-option" data-helper-location="single" type="button">同地點完成</button>
+    </div><div class="flow-inline-note">「同地點完成」適合現場確認、代辦、排查、等待後回報等，不會另外計算一段送達路線。</div></div>
     <div class="flow-helper-safety">僅限合法且可由第三人協助的事項；涉及本人身分驗證、金融交易、授權簽署、醫療決策或其他依法不得代辦的事項，請勿委託。</div>
   </div>
 </div>
@@ -21443,7 +21504,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
     pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
-    taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},helperDetails:{reportMode:'none',handoffMode:'none'},itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,
+    taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
@@ -21581,6 +21642,21 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
   }
 
+  function syncSinglePointTask(){
+    const single=state.service==='helper'&&state.singlePointTask===true;
+    root.querySelectorAll('[data-helper-location]').forEach(button=>{
+      const active=(button.dataset.helperLocation==='single')===single;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',active?'true':'false');
+    });
+    window.__UBEE_PRODUCTION_SINGLE_POINT_TASK__=single;
+    if(single&&state.pickup){
+      state.dropoff={...state.pickup,label:'現場完成',_autoSinglePoint:true};
+    }else if(state.dropoff?._autoSinglePoint){
+      state.dropoff=null;
+    }
+  }
+
   function syncHelperForm(){
     const details=normalizeHelperDetails(state.helperDetails);
     state.helperDetails=details;
@@ -21594,6 +21670,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       button.classList.toggle('active',active);
       button.setAttribute('aria-pressed',active?'true':'false');
     });
+    syncSinglePointTask();
   }
 
   function buildHelperTaskNote(note,detailsValue){
@@ -21717,6 +21794,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       console.warn('清除舊估價狀態失敗：',error);
     }
 
+    if(service!=='helper'){
+      state.singlePointTask=false;
+      if(state.dropoff?._autoSinglePoint)state.dropoff=null;
+      window.__UBEE_PRODUCTION_SINGLE_POINT_TASK__=false;
+    }
     state.service=service;state.serviceTypeIndex=0;state.serviceCategory='';
     root.querySelectorAll('.flow-service-tab').forEach(btn=>{
       const selected=btn.dataset.service===service;
@@ -21741,14 +21823,19 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       : copy.pickupMeta;
 
     const queueAuto=state.service==='queue'&&d?._autoQueue;
+    const helperSingle=state.service==='helper'&&state.singlePointTask===true&&d?._autoSinglePoint;
     $('flowDropoffText').textContent=queueAuto
       ? '與排隊地點相同'
-      : d?.address||copy.dropoffEmpty;
+      : helperSingle
+        ? '與任務起點相同・現場完成'
+        : d?.address||copy.dropoffEmpty;
     $('flowDropoffMeta').textContent=queueAuto
       ? '排隊任務將在同一地點完成'
-      : d
-        ? `${d.contactName||''} ${d.phone||''}`.trim()||`${copy.dropoffLabel}資訊已填寫`
-        : copy.dropoffMeta;
+      : helperSingle
+        ? '此任務不需要另外前往送達地點'
+        : d
+          ? `${d.contactName||''} ${d.phone||''}`.trim()||`${copy.dropoffLabel}資訊已填寫`
+          : copy.dropoffMeta;
 
     if($('flowHomeNext')) $('flowHomeNext').textContent=copy.next;
 
@@ -21881,7 +21968,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
     const defaultLabel=state.addressTarget==='pickup'?copy.pickupLabel:copy.dropoffLabel;
     const item={label:String($('flowDetailLabel').value||'').trim()||defaultLabel,address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
-    if(state.addressTarget==='pickup'){state.pickup=item;if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};}else{state.dropoff={...item,_autoQueue:false};}
+    if(state.addressTarget==='pickup'){
+      state.pickup=item;
+      if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};
+      if(state.service==='helper'&&state.singlePointTask)state.dropoff={...item,label:'現場完成',_autoSinglePoint:true};
+    }else{
+      state.dropoff={...item,_autoQueue:false,_autoSinglePoint:false};
+      if(state.service==='helper')state.singlePointTask=false;
+    }
+    syncSinglePointTask();
     if($('flowSaveAddress').checked)await persistAddress(item);
     updateHome();syncLegacy();
     if(typeof refreshHomeServiceStatus === 'function') refreshHomeServiceStatus();
@@ -21964,6 +22059,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function syncLegacy(){
+    syncSinglePointTask();
     const p=state.pickup||{},d=state.dropoff||{};const set=(id,value)=>{const el=$(id);if(el)el.value=value??''};
     set('pickup',p.address||'');set('pickupAddressNote',p.addressDetail||'');set('pickupContact',p.contactName||'');set('pickupPhone',p.phone||'');
     set('dropoff',d.address||'');set('dropoffAddressNote',d.addressDetail||'');set('dropoffContact',d.contactName||'');set('dropoffPhone',d.phone||'');
@@ -22038,6 +22134,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
             schemaVersion:'task-details-v2'
           },
           serviceMode:resolveClientServiceMode(state.service,payload.serviceType||serviceLabels[state.service]),
+          singlePointTask:state.service==='helper'&&state.singlePointTask===true,
           pickupAddressObject:state.pickup||null,
           dropoffAddressObject:state.dropoff||null,
           nearbyPlace:storeDiscovery?{
@@ -22049,7 +22146,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
             lng:Number.isFinite(Number(store?.lng))?Number(store.lng):null
           }:payload.nearbyPlace,
           storeDiscovery,
-          clientSchemaVersion:'customer-production-flow-v4-task-contract-v2-2026-09-03'
+          clientSchemaVersion:'customer-production-flow-v4-task-contract-v3-full-flow-2026-09-03'
         };
       };
       wrapped.__productionFlowWrapped=true;
@@ -22061,6 +22158,12 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   async function requestRoute(){
     syncLegacy();const p=state.pickup||{},d=state.dropoff||{};
+    if(state.service==='helper'&&state.singlePointTask===true){
+      const point=validPoint(p)?{lat:Number(p.lat),lng:Number(p.lng)}:null;
+      const synthetic={success:true,singlePointTask:true,distanceMeters:0,durationSeconds:0,distanceKm:0,durationMinutes:0,distanceText:'現場任務',durationText:`處理 ${Math.max(0,Number(state.taskMinutes||0))} 分鐘`,originLocation:point,destinationLocation:point};
+      try{lastRouteData=synthetic}catch(_){ }
+      return synthetic;
+    }
     const response=await fetch('/api/map-route',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({pickup:p.address,pickupAddress:p.address,pickupPlaceId:p.placeId||'',pickupLat:p.lat,pickupLng:p.lng,dropoff:d.address,dropoffAddress:d.address,dropoffPlaceId:d.placeId||'',dropoffLat:d.lat,dropoffLng:d.lng})});
     const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false)throw new Error(data.message||data.error||'道路路線載入失敗');
     const start=data.originLocation||{lat:data.routeStartLat??data.pickupLat,lng:data.routeStartLng??data.pickupLng};const end=data.destinationLocation||{lat:data.routeEndLat??data.dropoffLat,lng:data.routeEndLng??data.dropoffLng};if(validPoint(start)){state.pickup.lat=Number(start.lat);state.pickup.lng=Number(start.lng)}if(validPoint(end)){state.dropoff.lat=Number(end.lat);state.dropoff.lng=Number(end.lng)}
@@ -22097,9 +22200,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   function renderSummary(){
     const p=state.pickup||{},d=state.dropoff||{},def=selectedServiceDefinition();
     const summaryTaskNote=state.service==='helper'?buildHelperTaskNote(state.taskNote,state.helperDetails):state.taskNote;
+    const locationRows=state.service==='helper'&&state.singlePointTask
+      ? [['任務地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home']]
+      : [
+          ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home'],
+          ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}\n${d.contactName||''} ${d.phone||''}`,'home']
+        ];
     const rows=[
-      ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home'],
-      ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}\n${d.contactName||''} ${d.phone||''}`,'home'],
+      ...locationRows,
       ['任務內容',`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}\n${summaryTaskNote||'—'}`,'task'],
       ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:state.service==='helper'?`\n預估處理：${state.taskMinutes} 分鐘`:''}`,'options']
     ];
@@ -22124,7 +22232,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function resetNewTask(clearLegacy=true){
-    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
+    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
     if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=null;pickupPlaceId=dropoffPlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;localStorage.removeItem('ubee_order_draft_v2')}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
   }
@@ -22330,6 +22438,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowPurchaseStockOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-purchase-stock-policy]');if(!button)return;root.querySelectorAll('[data-purchase-stock-policy]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active?'true':'false')});state.purchaseDetails=readPurchaseDetailsFromForm();});
     $('flowHelperReportOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-helper-report]');if(!button)return;root.querySelectorAll('[data-helper-report]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active?'true':'false')});state.helperDetails=readHelperDetailsFromForm();});
     $('flowHelperHandoffOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-helper-handoff]');if(!button)return;root.querySelectorAll('[data-helper-handoff]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active?'true':'false')});state.helperDetails=readHelperDetailsFromForm();});
+    $('flowHelperLocationOptions')?.addEventListener('click',event=>{
+      const button=event.target.closest('[data-helper-location]');if(!button)return;
+      state.singlePointTask=button.dataset.helperLocation==='single';
+      syncSinglePointTask();
+      updateHome();
+      try{if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();}catch(_){ }
+    });
     $('flowTaskNext').addEventListener('click',()=>{if(!validateTask())return;syncLegacy();updateHome();setTiming(state.timing);setSpeed(state.speed);showPage('options')});
     $('flowTimingList').addEventListener('click',event=>{const btn=event.target.closest('[data-timing]');if(btn)setTiming(btn.dataset.timing)});$('flowSpeedList').addEventListener('click',event=>{const btn=event.target.closest('[data-speed]');if(btn)setSpeed(btn.dataset.speed)});$('flowOptionsNext').addEventListener('click',()=>{if(validateOptions())openConfirm()});
     $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
@@ -22455,7 +22570,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260903-task-contract-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260903-task-contract-v3-full-flow';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
