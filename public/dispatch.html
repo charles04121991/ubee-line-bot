@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-03｜Dispatch Universal Arrival Photo V1.1：所有服務共用到場照片狀態；排隊任務只要求任務地點照片，路線任務依取件＋每個送達點計算。 -->
+<!-- 2026-09-03｜Dispatch Arrival Photo Proof V1：訂單卡與摘要顯示小U已回傳的到場照片數量，讓調度中心確認每個到場節點都有照片證明。 -->
 <!-- 2026-09-03｜Dispatch Task Contract V3 Full Flow：除任務要求外，顯示小U完成回報是否已齊備、文字／照片／交接確認狀態與單點任務標記。 -->
 <!-- 2026-09-03｜Dispatch Task Contract V2：調度訂單卡與選定訂單摘要正式顯示 serviceType / serviceCategory 與 taskDetails 現場回報、交接要求。 -->
 <!-- 2026-09-02｜Dispatch Rider Visibility V1：以這份調度中心程式為基準，加入待派單「騎士可見性診斷」；對齊騎士端 3km→5km→全區波次，顯示在線、GPS、後端候選與距離阻擋原因。 -->
@@ -836,8 +838,11 @@ function renderTaskContractStrip(order={},options={}){
   const taskMinutes=Math.max(0,Math.round(Number(order.taskMinutes||0)));
   const compact=options.compact===true;
   const execution=order?.taskExecutionReport&&typeof order.taskExecutionReport==='object'?order.taskExecutionReport:{};
+  const arrivalProofMap=order?.arrivalProofs&&typeof order.arrivalProofs==='object'?order.arrivalProofs:{};
+  const arrivalProofCount=Object.values(arrivalProofMap).filter(item=>Boolean(item?.photo?.storagePath||item?.hasPhoto)).length;
   const pills=[];
   if(order.singlePointTask===true)pills.push(`<span class="task-contract-pill">單點現場任務</span>`);
+  pills.push(`<span class="task-contract-pill ${arrivalProofCount>0?'':'required'}">到場照片：${arrivalProofCount>0?`${arrivalProofCount} 張已回傳`:'等待回傳'}</span>`);
   if(meta.reportMode!=='none')pills.push(`<span class="task-contract-pill required">回報：${esc(meta.reportLabel)}</span>`);
   if(meta.handoffMode!=='none')pills.push(`<span class="task-contract-pill required">交接：${esc(meta.handoffLabel)}</span>`);
   if(taskMinutes>0&&!compact)pills.push(`<span class="task-contract-pill">處理 ${esc(taskMinutes)} 分鐘</span>`);
