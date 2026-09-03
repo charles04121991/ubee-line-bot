@@ -1,3 +1,4 @@
+// 2026-09-03｜Task Contract Backend V2：正式正規化 taskDetails.reportMode / handoffMode，產生 canonical label 與需求旗標，並同步到騎士安全預覽、調度 Dashboard、客戶訂單 API。
 // 2026-09-02｜Rider Task Visibility V1：統一調度中心/騎士端待派狀態、補齊安全預覽區域欄位，避免調度有單但騎士任務池被舊狀態或二次解析誤擋。
 require('dotenv').config();
 const express = require('express');
@@ -7447,6 +7448,16 @@ function buildRiderPendingTaskPreview(order = {}) {
       taskDetails.deadline || '',
       60
     ),
+    reportMode: normalizeTaskReportMode(taskDetails.reportMode),
+    reportModeLabel: getTaskReportModeLabel(taskDetails.reportMode),
+    handoffMode: normalizeTaskHandoffMode(taskDetails.handoffMode),
+    handoffModeLabel: getTaskHandoffModeLabel(taskDetails.handoffMode),
+    requiresPhotoReport: ['photo', 'photo_text'].includes(normalizeTaskReportMode(taskDetails.reportMode)),
+    requiresTextReport: ['text', 'photo_text'].includes(normalizeTaskReportMode(taskDetails.reportMode)),
+    requiresInquiry: normalizeTaskHandoffMode(taskDetails.handoffMode) === 'inquire',
+    requiresPickup: normalizeTaskHandoffMode(taskDetails.handoffMode) === 'pickup',
+    requiresDelivery: normalizeTaskHandoffMode(taskDetails.handoffMode) === 'deliver',
+    schemaVersion: 'task-details-v2',
   };
 
   const shoppingItems = Array.isArray(order.shoppingItems)
@@ -7608,7 +7619,10 @@ function buildRiderPendingTaskPreview(order = {}) {
     desiredCompletionAtMs: order.desiredCompletionAtMs || 0,
 
     serviceMode: String(order.serviceMode || '').trim(),
+    serviceKey: String(order.serviceKey || '').trim(),
+    serviceGroup: String(order.serviceGroup || '').trim(),
     serviceType: String(order.serviceType || '').trim(),
+    serviceCategory: sanitizeRiderPendingPreviewText(order.serviceCategory || '', 80),
     serviceName: sanitizeRiderPendingPreviewText(
       order.serviceName || '',
       80
@@ -14336,7 +14350,17 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
 
         dispatchRadiusKm: Number(o.dispatchManualRadiusKm || o.dispatchManualRedispatchRadiusKm || 0) || null,
         speedType: o.speedType || '',
+        serviceKey: o.serviceKey || '',
+        serviceGroup: o.serviceGroup || '',
+        serviceMode: o.serviceMode || '',
         serviceType: o.serviceType || '',
+        serviceCategory: o.serviceCategory || '',
+        queueMinutes: Number(o.queueMinutes || 0),
+        taskMinutes: Number(o.taskMinutes || 0),
+        item: o.item || '',
+        note: o.note || '',
+        taskDetails: o.taskDetails && typeof o.taskDetails === 'object' ? o.taskDetails : {},
+        purchaseDetails: o.purchaseDetails && typeof o.purchaseDetails === 'object' ? o.purchaseDetails : null,
         orderSource: o.orderSource || o.source || '',
         merchantOrder: o.merchantOrder === true || String(o.orderSource || o.source || '').toLowerCase().includes('merchant'),
         customerName: o.customerName || o.contactName || '',
@@ -26331,6 +26355,57 @@ function buildPurchaseDetailsTaskNote(value) {
     .join('\n');
 }
 
+// ============================================================
+// UBee Task Contract V2：全能任務完成要求 canonical contract
+// 前端只傳 mode；後端統一正規化 label / boolean flags，避免信任 client label。
+// ============================================================
+function normalizeTaskReportMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return ['none', 'text', 'photo', 'photo_text'].includes(mode) ? mode : 'none';
+}
+
+function getTaskReportModeLabel(value) {
+  return {
+    none: '不用另外回報',
+    text: '文字回報',
+    photo: '拍照回報',
+    photo_text: '拍照＋文字',
+  }[normalizeTaskReportMode(value)];
+}
+
+function normalizeTaskHandoffMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return ['none', 'inquire', 'pickup', 'deliver'].includes(mode) ? mode : 'none';
+}
+
+function getTaskHandoffModeLabel(value) {
+  return {
+    none: '不需要',
+    inquire: '需要詢問',
+    pickup: '需要領取',
+    deliver: '需要交付',
+  }[normalizeTaskHandoffMode(value)];
+}
+
+function buildCanonicalTaskRequirementDetails(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const reportMode = normalizeTaskReportMode(source.reportMode);
+  const handoffMode = normalizeTaskHandoffMode(source.handoffMode);
+
+  return {
+    reportMode,
+    reportModeLabel: getTaskReportModeLabel(reportMode),
+    handoffMode,
+    handoffModeLabel: getTaskHandoffModeLabel(handoffMode),
+    requiresPhotoReport: ['photo', 'photo_text'].includes(reportMode),
+    requiresTextReport: ['text', 'photo_text'].includes(reportMode),
+    requiresInquiry: handoffMode === 'inquire',
+    requiresPickup: handoffMode === 'pickup',
+    requiresDelivery: handoffMode === 'deliver',
+    schemaVersion: 'task-details-v2',
+  };
+}
+
 function createOrderFromApi(data) {
   const userId = cleanText(
     data.userId || data.customerId || '',
@@ -26527,6 +26602,9 @@ function createOrderFromApi(data) {
       ? data.taskDetails
       : {};
 
+  const canonicalTaskRequirements =
+    buildCanonicalTaskRequirementDetails(rawTaskDetails);
+
   const taskDetails = {
     itemName: cleanText(
       rawTaskDetails.itemName || purchaseDetails.productName || '',
@@ -26554,6 +26632,7 @@ function createOrderFromApi(data) {
     queuePurpose: cleanText(rawTaskDetails.queuePurpose || '', 120),
     queueHandoff: cleanLongText(rawTaskDetails.queueHandoff || '', 200),
     deadline: cleanText(rawTaskDetails.deadline || '', 80),
+    ...canonicalTaskRequirements,
   };
 
   const deliveryPreferences = Array.isArray(data.deliveryPreferences)
@@ -38569,6 +38648,10 @@ function sanitizeCustomerOrderForApi(order = {}) {
     dropoffPlaceId: String(order.dropoffPlaceId || ''),
     item: String(order.item || ''),
     note: String(order.note || ''),
+    taskDetails: order.taskDetails && typeof order.taskDetails === 'object' ? order.taskDetails : {},
+    purchaseDetails: order.purchaseDetails && typeof order.purchaseDetails === 'object' ? order.purchaseDetails : null,
+    queueMinutes: Number(order.queueMinutes || 0),
+    taskMinutes: Number(order.taskMinutes || 0),
     itemSize: String(order.itemSize || ''),
     itemSizeLabel: String(order.itemSizeLabel || ''),
     shoppingItems: Array.isArray(order.shoppingItems) ? order.shoppingItems.slice(0, 50) : [],
