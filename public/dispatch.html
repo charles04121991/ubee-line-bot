@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-03｜Dispatch Task Contract V3 Full Flow：除任務要求外，顯示小U完成回報是否已齊備、文字／照片／交接確認狀態與單點任務標記。 -->
 <!-- 2026-09-03｜Dispatch Task Contract V2：調度訂單卡與選定訂單摘要正式顯示 serviceType / serviceCategory 與 taskDetails 現場回報、交接要求。 -->
 <!-- 2026-09-02｜Dispatch Rider Visibility V1：以這份調度中心程式為基準，加入待派單「騎士可見性診斷」；對齊騎士端 3km→5km→全區波次，顯示在線、GPS、後端候選與距離阻擋原因。 -->
 <!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
@@ -834,12 +835,25 @@ function renderTaskContractStrip(order={},options={}){
   const category=String(order.serviceCategory||'').trim();
   const taskMinutes=Math.max(0,Math.round(Number(order.taskMinutes||0)));
   const compact=options.compact===true;
+  const execution=order?.taskExecutionReport&&typeof order.taskExecutionReport==='object'?order.taskExecutionReport:{};
   const pills=[];
+  if(order.singlePointTask===true)pills.push(`<span class="task-contract-pill">單點現場任務</span>`);
   if(meta.reportMode!=='none')pills.push(`<span class="task-contract-pill required">回報：${esc(meta.reportLabel)}</span>`);
   if(meta.handoffMode!=='none')pills.push(`<span class="task-contract-pill required">交接：${esc(meta.handoffLabel)}</span>`);
   if(taskMinutes>0&&!compact)pills.push(`<span class="task-contract-pill">處理 ${esc(taskMinutes)} 分鐘</span>`);
+  if(meta.hasRequirement){
+    const ready=order.taskExecutionReady===true;
+    const reportText=String(execution.text||'').trim();
+    const hasPhoto=Boolean(execution.photo?.storagePath||execution.hasPhoto);
+    const handoffConfirmed=execution.handoffConfirmed===true;
+    pills.push(`<span class="task-contract-pill ${ready?'':'required'}">完成回報：${ready?'已齊備':'尚未齊備'}</span>`);
+    if(!compact&&reportText)pills.push(`<span class="task-contract-pill">文字已回報</span>`);
+    if(!compact&&hasPhoto)pills.push(`<span class="task-contract-pill">照片已回報</span>`);
+    if(!compact&&handoffConfirmed)pills.push(`<span class="task-contract-pill">交接已確認</span>`);
+  }
   if(!category&&!pills.length&&compact)return '';
-  return `<div class="task-contract-strip"><strong>${esc(type)}${category?`｜${esc(category)}`:''}</strong>${pills.length?`<div class="task-contract-pills">${pills.join('')}</div>`:''}${!compact&&order.note?`<div style="margin-top:6px;white-space:pre-wrap">${esc(order.note)}</div>`:''}</div>`;
+  const cleanNote=String(order.note||'').split(/\r?\n/).filter(line=>!/^現場(?:回報|交接)：/.test(String(line||'').trim())).join('\n').trim();
+  return `<div class="task-contract-strip"><strong>${esc(type)}${category?`｜${esc(category)}`:''}</strong>${pills.length?`<div class="task-contract-pills">${pills.join('')}</div>`:''}${!compact&&cleanNote?`<div style="margin-top:6px;white-space:pre-wrap">${esc(cleanNote)}</div>`:''}</div>`;
 }
 
 function fmtAge(ms){
