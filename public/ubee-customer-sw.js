@@ -1,9 +1,12 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.03.3 Customer Task Contract V3 Full Flow
+ * Version: 2026.09.03.6 Customer Location Bootstrap V3.3 + Universal Arrival Photo V1.1
  * File: ubee-customer-sw.js
  *
+ * 2026-09-03 Customer Location Bootstrap V3.3：DOM 完成即啟動定位；Map 建立仍受定位閘門保護，第一個正式地圖畫面不得先顯示城市預設中心。
+ * 2026-09-03 Customer Location Lock V3.2：首頁 Map 建立前必須先完成定位嘗試；定位未完成前保持 placeholder，不再先顯示其他服務城市中心。
+ * 2026-09-03 Arrival Photo Proof V1：客戶任務進度顯示小U到場照片；照片由後端以短效 signed URL 回傳。
  * 2026-09-03 Customer Task Contract V3 Full Flow：同步單點全能任務與完成回報結果；升版後清除舊 Customer Cache。
  * 2026-09-03 Customer Task Content V1：同步任務內容／細項／品項分類優化與全能跑腿結構化欄位；升版後清除舊 Customer Cache。
  * 2026-09-02 Customer Home Platform V3：同步正式首頁地圖、匿名小U運力、需求情境入口與訂單導覽文案；升版後清除舊 Customer Cache。
@@ -19,7 +22,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.03.3-task-contract-v3-full-flow';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.03.6-location-bootstrap-universal-photo-v3-3';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
