@@ -2,6 +2,9 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-03｜Customer Location Bootstrap V3.3：DOM 完成後立即啟動首次定位；首頁地圖建立前必須等待定位成功／失敗，未取得結果前維持定位占位，禁止先建立城市預設中心地圖。 -->
+<!-- 2026-09-03｜Customer Location Lock V3.2：首頁地圖建立前強制等待首次定位嘗試完成；未取得座標前只顯示定位中的地圖占位，不建立城市預設中心地圖，徹底避免首頁先跳到其他地區。 -->
+<!-- 2026-09-03｜Customer Arrival Photo Proof V1：所有服務均顯示小U到場照片；取件／任務地點與各送達點照片由後端短效簽名網址安全回傳，任務進行中即可查看。 -->
 <!-- 2026-09-03｜Customer Task Contract V3 Full Flow：補上全能任務「同地點完成」單點模式，估價／鎖價／建單一致；完成後顯示小U文字／照片／交接回報結果。 -->
 <!-- 2026-09-03｜Customer Task Contract V2：全能任務的現場回報／交接由畫面選項正式寫入 taskDetails.reportMode / handoffMode，後端、調度中心與騎士端可直接辨識，不再只依賴 note 文字；保留 human-readable note 作舊版相容。 -->
 <!-- 2026-09-03｜Customer Task Content V1：重整送／取／買／排隊／全能跑腿任務細項與品項分類；新增忘帶急送、維修品取件、五金急買、現場代辦、退換歸還、臨時救援；Production Flow 加入依任務細項變化的提示文案與全能任務現場回報／交接結構化欄位；底層 serviceKey/serviceMode 與既有估價建單契約維持不變。 -->
@@ -18,7 +21,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260903-task-contract-v3-full-flow" rel="manifest"/>
+<link href="/manifest-order.json?v=20260903-task-contract-v3-3-location-bootstrap-universal-photo" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -11181,6 +11184,12 @@ let dropoffPlaceId = '';
 let currentLocationLat = null;
 let currentLocationLng = null;
 let currentLocationPromise = null;
+let currentLocationUiSyncPromise = null;
+let currentLocationUiSyncKey = '';
+let currentLocationResolvedAt = 0;
+let customerInitialLocationGatePromise = null;
+let customerInitialLocationGateSettled = false;
+let customerInitialLocationGateStartedAt = 0;
 
 let lastRouteData = null;
 let lastQuoteData = null;
@@ -11435,7 +11444,15 @@ async function ensureCustomerMapReady(){
 
   await loadGoogleMapsApi();
 
+  // Location Lock V3.2：首頁第一個 Map 實例建立前，必須先完成一次定位嘗試。
+  // 定位尚未完成時維持 placeholder，不允許先用服務城市中心建立地圖。
   if(!customerMap){
+    try{
+      await ensureCustomerInitialLocationGate();
+    }catch(error){
+      console.warn('首頁首次定位閘門失敗，改用手動服務地區：', error);
+    }
+
     const options = {
       center:hasValidLatLng(currentLocationLat, currentLocationLng)
         ? { lat:currentLocationLat, lng:currentLocationLng }
@@ -11701,9 +11718,26 @@ function renderCurrentLocationMarker(){
 
 async function requestCurrentLocationForMap(){
   try{
+    setHomeLocationUiState('定位中…','正在確認目前位置與服務地區');
+
     const position = await getCurrentPosition();
-    currentLocationLat = position.coords.latitude;
-    currentLocationLng = position.coords.longitude;
+    const lat = Number(position?.coords?.latitude);
+    const lng = Number(position?.coords?.longitude);
+
+    if(!hasValidLatLng(lat, lng)){
+      throw new Error('目前位置座標無效');
+    }
+
+    currentLocationLat = lat;
+    currentLocationLng = lng;
+    currentLocationResolvedAt = Date.now();
+
+    // 座標一拿到就先解除「定位中」狀態，地圖可立即使用這組座標建立；
+    // 縣市／行政區名稱在背景同步，避免反向地理編碼延遲拖住首頁地圖。
+    setHomeLocationUiState('目前位置','已取得目前位置，正在辨識服務地區');
+    syncCurrentLocationHomeUi(lat, lng).catch(error => {
+      console.warn('首頁服務地區背景同步失敗：', error);
+    });
 
     if(typeof refreshHomeServiceStatus === 'function'){
       setTimeout(() => refreshHomeServiceStatus(), 0);
@@ -11711,27 +11745,37 @@ async function requestCurrentLocationForMap(){
 
     if(customerMap){
       renderCurrentLocationMarker();
-      customerMap.setCenter({ lat:currentLocationLat, lng:currentLocationLng });
-      customerMap.setZoom(15);
+      customerMap.setCenter({ lat, lng });
+      customerMap.setZoom(16);
     }
 
     return position;
   }catch(err){
     console.warn('目前位置取得失敗:', err);
+
+    const denied = Number(err?.code) === 1;
+    setHomeLocationUiState(
+      '選擇服務地區',
+      denied
+        ? '定位權限未允許，請在瀏覽器或手機設定開啟定位'
+        : '目前無法自動取得位置，仍可手動選擇服務地區'
+    );
+
     return null;
   }
 }
 
 async function focusCurrentLocation(){
   try{
-    await ensureCustomerMapReady();
-
+    // 先取得座標，再建立／移動地圖；避免先跳到城市預設中心。
     if(!hasValidLatLng(currentLocationLat, currentLocationLng)){
       await requestCurrentLocationForMap();
     }
 
+    await ensureCustomerMapReady();
+
     if(hasValidLatLng(currentLocationLat, currentLocationLng) && customerMap){
-      customerMap.panTo({ lat:currentLocationLat, lng:currentLocationLng });
+      customerMap.panTo({ lat:Number(currentLocationLat), lng:Number(currentLocationLng) });
       customerMap.setZoom(16);
       renderCurrentLocationMarker();
     }
@@ -14501,6 +14545,51 @@ function handleServiceSelectionChanged(){
   setNearbyStatus('已選擇代買分類，按「搜尋附近」即可定位並搜尋店家。');
 }
 
+function setHomeLocationUiState(buttonText, detailText){
+  const cityButton = qs('flowCityButton');
+  const locationText = qs('flowLocationText');
+
+  if(cityButton && buttonText){
+    cityButton.textContent = buttonText;
+  }
+
+  if(locationText && detailText){
+    locationText.textContent = detailText;
+  }
+}
+
+async function shouldAutoLocateCustomer(){
+  if(!navigator.geolocation){
+    return false;
+  }
+
+  const preferenceKey = 'ubee_setting_auto_location';
+  const storedPreference = localStorage.getItem(preferenceKey);
+
+  try{
+    if(navigator.permissions?.query){
+      const permission = await navigator.permissions.query({name:'geolocation'});
+
+      if(permission.state === 'granted'){
+        // 若過去因權限被拒而自動寫成 false，但瀏覽器目前已重新允許，
+        // 直接恢復首頁自動定位，避免永遠停在手動模式。
+        if(storedPreference === 'false'){
+          localStorage.setItem(preferenceKey,'true');
+        }
+        return true;
+      }
+
+      if(permission.state === 'denied'){
+        return false;
+      }
+    }
+  }catch(_){
+    // Safari / 部分 PWA 不支援 Permissions API，沿用應用程式偏好。
+  }
+
+  return storedPreference !== 'false';
+}
+
 function getCurrentPosition(){
   if(currentLocationPromise){
     return currentLocationPromise;
@@ -14513,15 +14602,108 @@ function getCurrentPosition(){
     }
 
     navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy:false,
-      timeout:6000,
-      maximumAge:300000
+      enableHighAccuracy:true,
+      timeout:15000,
+      maximumAge:0
     });
   }).finally(() => {
     currentLocationPromise = null;
   });
 
   return currentLocationPromise;
+}
+
+async function ensureCustomerInitialLocationGate(){
+  if(customerInitialLocationGatePromise){
+    return customerInitialLocationGatePromise;
+  }
+
+  customerInitialLocationGateStartedAt = Date.now();
+  customerInitialLocationGateSettled = false;
+
+  customerInitialLocationGatePromise = (async () => {
+    const enabled = await shouldAutoLocateCustomer();
+
+    if(!enabled){
+      setHomeLocationUiState(
+        '選擇服務地區',
+        '目前位置功能未開啟，可手動選擇服務地區或在設定中開啟定位'
+      );
+      return null;
+    }
+
+    return await requestCurrentLocationForMap();
+  })().finally(() => {
+    customerInitialLocationGateSettled = true;
+  });
+
+  return customerInitialLocationGatePromise;
+}
+
+async function syncCurrentLocationHomeUi(lat, lng){
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+
+  if(!hasValidLatLng(latitude, longitude)){
+    return false;
+  }
+
+  const syncKey = `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+  if(currentLocationUiSyncPromise && currentLocationUiSyncKey === syncKey){
+    return currentLocationUiSyncPromise;
+  }
+
+  currentLocationUiSyncKey = syncKey;
+  currentLocationUiSyncPromise = (async () => {
+    try{
+      const response = await fetch('/api/customer/current-location',{
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        cache:'no-store',
+        body:JSON.stringify({lat:latitude,lng:longitude})
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if(!response.ok || !data.success){
+        throw new Error(data.message || '位置辨識失敗');
+      }
+
+      const loc = data.location || {};
+      const city = String(loc.city || '').replace(/^臺/,'台');
+      const district = String(loc.district || '');
+      const display = String(
+        loc.displayLocation || `${city}${district}` || '目前位置'
+      ).replace(/^臺/,'台');
+
+      setHomeLocationUiState(
+        display || '目前位置',
+        loc.formattedAddress
+          ? `目前位置：${loc.formattedAddress}`
+          : `目前服務地區：${display || '目前位置'}`
+      );
+
+      if(city && typeof selectServiceCity === 'function'){
+        try{
+          selectServiceCity(city.replace(/^台/,'臺'));
+        }catch(_){ }
+      }
+
+      return true;
+    }catch(error){
+      console.warn('目前位置服務地區同步失敗：', error);
+      // 座標已取得時不要把 UI 留在「正在取得位置」。
+      setHomeLocationUiState(
+        '目前位置',
+        '目前座標已取得，服務地區名稱暫時無法辨識'
+      );
+      return false;
+    }finally{
+      currentLocationUiSyncPromise = null;
+    }
+  })();
+
+  return currentLocationUiSyncPromise;
 }
 
 function setNearbyStatus(text){
@@ -17015,11 +17197,15 @@ function renderStep5TaskDetail(order){
     data.taskExecutionReport && typeof data.taskExecutionReport === 'object'
       ? data.taskExecutionReport
       : {};
+  const arrivalProofs = Array.isArray(data.arrivalProofs)
+    ? data.arrivalProofs.filter(item => item && typeof item === 'object')
+    : [];
   const reportMode = String(taskDetails.reportMode || 'none').trim().toLowerCase();
   const handoffMode = String(taskDetails.handoffMode || 'none').trim().toLowerCase();
   const reportModeLabel = String(taskDetails.reportModeLabel || ({none:'不用另外回報',text:'文字回報',photo:'拍照回報',photo_text:'拍照＋文字'}[reportMode] || ''));
   const handoffModeLabel = String(taskDetails.handoffModeLabel || ({none:'不需要',inquire:'需要詢問',pickup:'需要領取',deliver:'需要交付'}[handoffMode] || ''));
   const singlePointTask = data.singlePointTask === true;
+  const singleSiteTask = singlePointTask || serviceKey === 'queue';
 
 
   const serviceMetaText =
@@ -17176,8 +17362,8 @@ function renderStep5TaskDetail(order){
 
   }
 
-  if(singlePointTask){
-    pickupTitle = '任務地點';
+  if(singleSiteTask){
+    pickupTitle = serviceKey === 'queue' ? '排隊／任務地點' : '任務地點';
     dropoffTitle = '現場完成';
   }
 
@@ -17223,6 +17409,17 @@ function renderStep5TaskDetail(order){
         <div class="task-receipt-row"><span class="task-receipt-label">現場回報</span><strong class="task-receipt-value">${escapeHtml(reportModeLabel)}</strong></div>
         <div class="task-receipt-row"><span class="task-receipt-label">現場交接</span><strong class="task-receipt-value">${escapeHtml(handoffModeLabel)}</strong></div>
       `:''}
+
+      <div class="task-receipt-separator"></div>
+      <div class="task-receipt-section-title">小U 到場照片</div>
+      ${arrivalProofs.length
+        ? arrivalProofs.map(proof => `
+            <div style="margin-top:10px;padding:10px;border:1px solid rgba(15,23,42,.10);border-radius:14px;background:#f8fafc">
+              <div class="task-receipt-row"><span class="task-receipt-label">${escapeHtml(proof.stageLabel||'到場照片')}</span><strong class="task-receipt-value">已回傳</strong></div>
+              ${proof.photoUrl?`<img src="${escapeHtml(proof.photoUrl)}" alt="${escapeHtml(proof.stageLabel||'小U 到場照片')}" style="display:block;width:100%;max-height:360px;object-fit:cover;border-radius:12px;margin-top:8px;border:1px solid rgba(15,23,42,.10)" referrerpolicy="no-referrer"/>`:''}
+              ${proof.submittedAtMs?`<div style="margin-top:7px;color:#73787e;font-size:11px;font-weight:800">${escapeHtml(new Date(Number(proof.submittedAtMs)).toLocaleString('zh-TW'))}</div>`:''}
+            </div>`).join('')
+        : `<div class="task-receipt-text" style="color:#73787e">小U 抵達任務地點／送達地點後，系統會要求拍照並自動回傳到這裡。</div>`}
 
       ${['completed','done'].includes(String(data.status||'').toLowerCase())&&(executionReport.text||executionReport.hasPhoto||executionReport.handoffConfirmed)?`
         <div class="task-receipt-separator"></div>
@@ -17297,39 +17494,41 @@ function renderStep5TaskDetail(order){
 
     </div>
 
-    <div class="task-receipt-separator"></div>
+    ${singleSiteTask ? '' : `
+      <div class="task-receipt-separator"></div>
 
-    <div class="task-receipt-section">
+      <div class="task-receipt-section">
 
-      <div class="task-receipt-section-title">
-        送達資訊
+        <div class="task-receipt-section-title">
+          送達資訊
+        </div>
+
+        <div class="task-receipt-row">
+
+          <span class="task-receipt-label">
+            ${escapeHtml(dropoffTitle)}
+          </span>
+
+          <strong class="task-receipt-value">
+            ${escapeHtml(dropoffAddress)}
+          </strong>
+
+        </div>
+
+        <div class="task-receipt-row">
+
+          <span class="task-receipt-label">
+            聯絡電話
+          </span>
+
+          <strong class="task-receipt-value">
+            ${escapeHtml(dropoffPhone)}
+          </strong>
+
+        </div>
+
       </div>
-
-      <div class="task-receipt-row">
-
-        <span class="task-receipt-label">
-          ${escapeHtml(dropoffTitle)}
-        </span>
-
-        <strong class="task-receipt-value">
-          ${escapeHtml(dropoffAddress)}
-        </strong>
-
-      </div>
-
-      <div class="task-receipt-row">
-
-        <span class="task-receipt-label">
-          聯絡電話
-        </span>
-
-        <strong class="task-receipt-value">
-          ${escapeHtml(dropoffPhone)}
-        </strong>
-
-      </div>
-
-    </div>
+    `}
 
   `;
 
@@ -19722,6 +19921,15 @@ async function initPage(options = {}){
     setSubmitButton('確認並建立任務', false);
     renderCustomerMemberInfo();
     handleInitialOpenAction();
+
+    // Location First V3.1：
+    // 先取得目前位置，再建立首頁地圖。定位成功時，首頁第一個可見地圖畫面就是客戶所在地，
+    // 不再先顯示服務城市預設中心後才跳回目前位置。
+    // Location Lock V3.2：initPage 與任何提早觸發的首頁地圖共用同一個首次定位閘門。
+    // 即使 showOnlyStep(1) 比會員初始化更早執行，也不會先建立城市預設中心地圖。
+    const initialLocationPromise = ensureCustomerInitialLocationGate();
+
+    // 即時運力與首頁定位共用同一個 getCurrentPosition Promise，避免重複跳定位請求。
     startHomeServiceStatusRefresh();
 
     if(googleMapsApiKey && !customerPageInitialized){
@@ -19731,10 +19939,20 @@ async function initPage(options = {}){
             if(typeof window.ubeeWaitForCustomerHomeReady === 'function'){
               await window.ubeeWaitForCustomerHomeReady();
             }
-            await new Promise(resolve=>setTimeout(resolve,220));
+
+            // 關鍵：定位成功／失敗都先有明確結果，再把地圖放出來。
+            await initialLocationPromise;
+            await new Promise(resolve=>setTimeout(resolve,80));
             await ensureCustomerMapReady();
-            await requestCurrentLocationForMap();
-            await detectServiceCityFromCurrentLocation();
+
+            if(hasValidLatLng(currentLocationLat, currentLocationLng) && customerMap){
+              customerMap.setCenter({
+                lat:Number(currentLocationLat),
+                lng:Number(currentLocationLng)
+              });
+              customerMap.setZoom(16);
+              renderCurrentLocationMarker();
+            }
           }catch(error){
             console.warn('UBee 首頁地圖初始化失敗：', error);
           }
@@ -19868,6 +20086,26 @@ updateNearbyPlacesVisibility();
 bindOrderInputEvents();
 
 updateStickyEstimate();
+
+// Location Bootstrap V3.3：不等會員／Google Maps 初始化，DOM 一完成就先向裝置取得位置。
+// 地圖本身仍由 ensureCustomerMapReady() 建立，而且會等待同一個 location gate，
+// 因此第一個真正顯示的地圖中心只能是目前位置，或定位明確失敗後的手動服務區。
+function bootstrapCustomerLocationImmediately(){
+  try{
+    setHomeLocationUiState('定位中…','正在確認目前位置與服務地區');
+    ensureCustomerInitialLocationGate().catch(error => {
+      console.warn('首頁預先定位失敗：', error);
+    });
+  }catch(error){
+    console.warn('首頁預先定位啟動失敗：', error);
+  }
+}
+
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', bootstrapCustomerLocationImmediately, { once:true });
+}else{
+  bootstrapCustomerLocationImmediately();
+}
 
 showOnlyStep(1);
 
@@ -20866,7 +21104,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="flow-page active" data-page="home" id="flowPageHome">
 <header class="flow-header home">
 <div class="flow-brand"><span>U</span>Bee 跑腿</div>
-<button class="flow-city-btn" id="flowCityButton" type="button">正在取得位置…</button>
+<button class="flow-city-btn" id="flowCityButton" type="button">定位中…</button>
 </header>
 <div class="flow-progress" data-progress="0"></div>
 <div class="flow-scroll flow-home-scroll">
@@ -21075,9 +21313,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-form-group" id="flowTaskNoteGroup"><label class="flow-label" for="flowTaskNote" id="flowTaskNoteLabel">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="請說明任務內容與注意事項"></textarea><div class="flow-inline-note" id="flowTaskNoteHelp">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
 <div class="flow-helper-structured" id="flowHelperDetailsForm">
   <div class="flow-helper-form">
-    <div class="flow-helper-form-head"><div><strong>任務完成方式</strong><small>補充小U到現場後要怎麼回報或交接，任務會自動整理給小U。</small></div></div>
-    <div class="flow-helper-field"><label>現場回報</label><div aria-label="現場回報方式" class="flow-helper-options" id="flowHelperReportOptions" role="radiogroup">
-      <button aria-pressed="true" class="flow-helper-option active" data-helper-report="none" type="button">不用另外回報</button>
+    <div class="flow-helper-form-head"><div><strong>任務完成方式</strong><small>所有服務抵達後都會強制拍照回傳給你；這裡設定的是全能任務額外需要的文字／完成照片或現場交接。</small></div></div>
+    <div class="flow-helper-field"><label>額外完成回報</label><div aria-label="額外完成回報方式" class="flow-helper-options" id="flowHelperReportOptions" role="radiogroup">
+      <button aria-pressed="true" class="flow-helper-option active" data-helper-report="none" type="button">只要到場照片</button>
       <button aria-pressed="false" class="flow-helper-option" data-helper-report="text" type="button">文字回報</button>
       <button aria-pressed="false" class="flow-helper-option" data-helper-report="photo" type="button">拍照回報</button>
       <button aria-pressed="false" class="flow-helper-option" data-helper-report="photo_text" type="button">拍照＋文字</button>
@@ -21452,6 +21690,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-profile-detail-amount"><span id="flowProfileDetailAmountLabel">任務金額</span><strong id="flowProfileDetailAmount">—</strong></div>
 </div>
 <div class="flow-detail-list" id="flowProfileDetailList"></div>
+<div id="flowProfileDetailPhotos" style="margin-top:12px"></div>
 <button class="flow-secondary" data-go="profile" style="margin-top:12px" type="button">返回我的訂單</button>
 </div>
 </section>
@@ -22146,7 +22385,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
             lng:Number.isFinite(Number(store?.lng))?Number(store.lng):null
           }:payload.nearbyPlace,
           storeDiscovery,
-          clientSchemaVersion:'customer-production-flow-v4-task-contract-v3-full-flow-2026-09-03'
+          clientSchemaVersion:'customer-production-flow-v4-location-bootstrap-universal-photo-v3-3-2026-09-03'
         };
       };
       wrapped.__productionFlowWrapped=true;
@@ -22304,7 +22543,21 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     return '依任務設定';
   }
 
-  function openProfileOrderDetail(index){
+  function renderProfileOrderArrivalPhotos(order){
+    const target=$('flowProfileDetailPhotos');
+    if(!target)return;
+    const proofs=Array.isArray(order?.arrivalProofs)?order.arrivalProofs.filter(item=>item&&typeof item==='object'):[];
+    const execution=order?.taskExecutionReport&&typeof order.taskExecutionReport==='object'?order.taskExecutionReport:{};
+    if(!proofs.length&&!execution.photoUrl){
+      target.innerHTML='<div class="flow-empty" style="padding:14px">尚無小U到場照片。小U抵達後拍攝的照片會保留在這筆任務明細。</div>';
+      return;
+    }
+    const arrivalHtml=proofs.map(proof=>`<div style="margin-top:10px;padding:11px;border:1px solid var(--flow-line);border-radius:16px;background:#fff"><div style="font-size:13px;font-weight:1000">${escapeHtml(proof.stageLabel||'小U 到場照片')}</div>${proof.photoUrl?`<img src="${escapeHtml(proof.photoUrl)}" alt="${escapeHtml(proof.stageLabel||'小U 到場照片')}" style="display:block;width:100%;max-height:380px;object-fit:cover;border-radius:13px;margin-top:9px;border:1px solid #e7e9ec" referrerpolicy="no-referrer">`:''}${proof.submittedAtMs?`<div style="margin-top:7px;color:#73787e;font-size:11px;font-weight:800">${escapeHtml(new Date(Number(proof.submittedAtMs)).toLocaleString('zh-TW'))}</div>`:''}</div>`).join('');
+    const completionHtml=execution.photoUrl?`<div style="margin-top:10px;padding:11px;border:1px solid var(--flow-line);border-radius:16px;background:#fff"><div style="font-size:13px;font-weight:1000">小U 完成回報照片</div><img src="${escapeHtml(execution.photoUrl)}" alt="小U 完成回報照片" style="display:block;width:100%;max-height:380px;object-fit:cover;border-radius:13px;margin-top:9px;border:1px solid #e7e9ec" referrerpolicy="no-referrer"></div>`:'';
+    target.innerHTML=`<div style="padding:13px;border:1px solid var(--flow-line);border-radius:18px;background:#fafafa"><div style="font-size:15px;font-weight:1000">小U 現場照片</div><div style="margin-top:4px;color:var(--flow-muted);font-size:11px;font-weight:850;line-height:1.55">取件／任務地點與每個送達點的到場照片都會保留在這裡。</div>${arrivalHtml}${completionHtml}</div>`;
+  }
+
+  async function openProfileOrderDetail(index){
     const order=state.profileOrders[Number(index)];
     if(!order)return;
     const returnPage=state.page==='tasksRoot'?'tasksRoot':'profile';
@@ -22341,7 +22594,27 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       ['付款方式',profileOrderPayment(order)]
     ];
     $('flowProfileDetailList').innerHTML=rows.map(([label,value])=>`<div class="flow-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+    const photoTarget=$('flowProfileDetailPhotos');
+    if(photoTarget)photoTarget.innerHTML='<div class="flow-empty" style="padding:14px">正在讀取小U到場照片…</div>';
     showPage('profileDetail');
+
+    // 任務清單只帶摘要；照片採私有 Storage + 短效 signed URL，
+    // 因此開啟歷史明細時一定重新向原下單客戶專屬 API 取得完整資料。
+    const orderId=String(order?.id||order?.orderNo||'').trim().toUpperCase();
+    if(!orderId){
+      renderProfileOrderArrivalPhotos(order);
+      return;
+    }
+    try{
+      const fullData=await customerApiFetch(`/api/orders/${encodeURIComponent(orderId)}?t=${Date.now()}`);
+      const merged={...order,...(fullData?.summary||{}),...(fullData?.order||{}),id:orderId};
+      state.profileOrders[Number(index)]=merged;
+      state.selectedProfileOrder=merged;
+      renderProfileOrderArrivalPhotos(merged);
+    }catch(error){
+      console.warn('讀取歷史任務到場照片失敗：',error);
+      if(photoTarget)photoTarget.innerHTML='<div class="flow-empty" style="padding:14px">照片暫時無法載入，請稍後再開啟此任務。</div>';
+    }
   }
 
   async function renderTaskList(){
@@ -22388,11 +22661,35 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   async function detectLocation(){
-    const cityButton=$('flowCityButton'),text=$('flowLocationText');cityButton.textContent='正在取得位置…';text.textContent='正在確認目前服務地區';
-    if(!navigator.geolocation){cityButton.textContent='選擇服務地區';text.textContent='請手動選擇服務地區';return}
-    navigator.geolocation.getCurrentPosition(async position=>{
-      try{const lat=Number(position.coords.latitude),lng=Number(position.coords.longitude);try{currentLocationLat=lat;currentLocationLng=lng}catch(_){ }const response=await fetch('/api/customer/current-location',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({lat,lng})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error('位置辨識失敗');const loc=data.location||{};const city=String(loc.city||'').replace(/^臺/,'台');const district=String(loc.district||'');const display=String(loc.displayLocation||`${city}${district}`||'目前位置').replace(/^臺/,'台');cityButton.textContent=display||'目前位置';text.textContent=loc.formattedAddress?`目前位置：${loc.formattedAddress}`:`目前服務地區：${display}`;if(city&&typeof selectServiceCity==='function'){try{selectServiceCity(city.replace(/^台/,'臺'))}catch(_){ }}}catch(error){cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'}
-    },()=>{cityButton.textContent='選擇服務地區';text.textContent='無法自動取得位置，仍可手動輸入地址'},{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+    const cityButton=$('flowCityButton'),text=$('flowLocationText');
+
+    if(!navigator.geolocation){
+      cityButton.textContent='選擇服務地區';
+      text.textContent='目前裝置不支援定位，請手動選擇服務地區';
+      return false;
+    }
+
+    // 已經拿到座標就先顯示，不把右上角重新改回「定位中」。
+    if(hasValidLatLng(currentLocationLat,currentLocationLng)){
+      setHomeLocationUiState('目前位置','已取得目前位置，正在辨識服務地區');
+      await syncCurrentLocationHomeUi(currentLocationLat,currentLocationLng);
+      if(customerMap){
+        customerMap.setCenter({lat:Number(currentLocationLat),lng:Number(currentLocationLng)});
+        customerMap.setZoom(16);
+        renderCurrentLocationMarker();
+      }
+      return true;
+    }
+
+    cityButton.textContent='定位中…';
+    text.textContent='正在確認目前位置與服務地區';
+
+    const position = await ensureCustomerInitialLocationGate();
+    if(!position){
+      return false;
+    }
+
+    return true;
   }
 
   function showFlow(options={}){
@@ -22469,13 +22766,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   buildProgress();bind();wrapPayload();resetNewTask(true);ensureTimeDefaults();
-  if(localStorage.getItem('ubee_setting_auto_location')!=='false'){
-    const runAutoLocationAfterHome = () => window.setTimeout(()=>detectLocation(),520);
-    if(window.__ubeeCustomerHomeReady){
-      runAutoLocationAfterHome();
-    }else{
-      window.addEventListener('ubee:customer-home-ready',runAutoLocationAfterHome,{once:true});
-    }
+  const runAutoLocationAfterHome = async () => {
+    // 與 initPage / 地圖建立共用同一個定位閘門；不再啟動第二條競態定位流程。
+    window.setTimeout(()=>detectLocation(),60);
+  };
+
+  if(window.__ubeeCustomerHomeReady){
+    runAutoLocationAfterHome();
+  }else{
+    window.addEventListener('ubee:customer-home-ready',runAutoLocationAfterHome,{once:true});
   }
   window.openUBeeHomePage=function(){
     window.UBeePrimaryNavigation?.activate('home');
@@ -22570,7 +22869,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260903-task-contract-v3-full-flow';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260903-task-contract-v3-3-location-bootstrap-universal-photo';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
