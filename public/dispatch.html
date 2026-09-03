@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-03｜Dispatch Task Contract V2：調度訂單卡與選定訂單摘要正式顯示 serviceType / serviceCategory 與 taskDetails 現場回報、交接要求。 -->
 <!-- 2026-09-02｜Dispatch Rider Visibility V1：以這份調度中心程式為基準，加入待派單「騎士可見性診斷」；對齊騎士端 3km→5km→全區波次，顯示在線、GPS、後端候選與距離阻擋原因。 -->
 <!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
 <meta charset="UTF-8">
@@ -231,6 +232,11 @@ button{cursor:pointer}
   background:#fff8dc;border:1px solid #f7dfa0;border-radius:12px;padding:10px 12px;
   color:#765500;font-size:11px;line-height:1.55
 }
+
+/* ===== Task Contract V2 ===== */
+.task-contract-strip{margin-top:9px;padding:9px 10px;border-radius:11px;background:#f7f8fa;border:1px solid var(--line);font-size:10px;line-height:1.6;color:#555b63}
+.task-contract-strip strong{color:#111;font-size:11px}.task-contract-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.task-contract-pill{display:inline-flex;align-items:center;min-height:22px;padding:4px 7px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:9px;font-weight:1000;color:#444b55}
+.task-contract-pill.required{background:#fff8dc;border-color:#f4d76b;color:#765500}
 
 
 /* ===== Dispatch Rider Visibility V1 ===== */
@@ -797,6 +803,44 @@ const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
 }[ch]));
+
+function taskReportModeLabel(value){
+  const mode=String(value||'none').trim().toLowerCase();
+  return {none:'不用另外回報',text:'文字回報',photo:'拍照回報',photo_text:'拍照＋文字'}[mode]||'不用另外回報';
+}
+
+function taskHandoffModeLabel(value){
+  const mode=String(value||'none').trim().toLowerCase();
+  return {none:'不需要',inquire:'需要詢問',pickup:'需要領取',deliver:'需要交付'}[mode]||'不需要';
+}
+
+function getStructuredTaskRequirements(order={}){
+  const details=order?.taskDetails&&typeof order.taskDetails==='object'?order.taskDetails:{};
+  const reportMode=String(details.reportMode||'none').trim().toLowerCase();
+  const handoffMode=String(details.handoffMode||'none').trim().toLowerCase();
+  return {
+    details,
+    reportMode,
+    handoffMode,
+    reportLabel:String(details.reportModeLabel||taskReportModeLabel(reportMode)),
+    handoffLabel:String(details.handoffModeLabel||taskHandoffModeLabel(handoffMode)),
+    hasRequirement:reportMode!=='none'||handoffMode!=='none'
+  };
+}
+
+function renderTaskContractStrip(order={},options={}){
+  const meta=getStructuredTaskRequirements(order);
+  const type=String(order.serviceType||'UBee 任務').trim();
+  const category=String(order.serviceCategory||'').trim();
+  const taskMinutes=Math.max(0,Math.round(Number(order.taskMinutes||0)));
+  const compact=options.compact===true;
+  const pills=[];
+  if(meta.reportMode!=='none')pills.push(`<span class="task-contract-pill required">回報：${esc(meta.reportLabel)}</span>`);
+  if(meta.handoffMode!=='none')pills.push(`<span class="task-contract-pill required">交接：${esc(meta.handoffLabel)}</span>`);
+  if(taskMinutes>0&&!compact)pills.push(`<span class="task-contract-pill">處理 ${esc(taskMinutes)} 分鐘</span>`);
+  if(!category&&!pills.length&&compact)return '';
+  return `<div class="task-contract-strip"><strong>${esc(type)}${category?`｜${esc(category)}`:''}</strong>${pills.length?`<div class="task-contract-pills">${pills.join('')}</div>`:''}${!compact&&order.note?`<div style="margin-top:6px;white-space:pre-wrap">${esc(order.note)}</div>`:''}</div>`;
+}
 
 function fmtAge(ms){
   const n = Number(ms || 0);
@@ -2512,6 +2556,8 @@ function renderOrders(){
               ${riskBadge(order.riskLevel,order.riskScore)}
               ${riderVisibilityBadge(order)}
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
+              ${order.serviceType?`<span class="badge blue">${esc(order.serviceType)}</span>`:''}
+              ${order.serviceCategory?`<span class="badge">${esc(order.serviceCategory)}</span>`:''}
               ${merchantLiveTrackingBadges(order)}
               ${Number(order.openIncidentCount||0)>0?`<span class="badge danger">異常案件 ${esc(order.openIncidentCount)}</span>`:''}
             </div>
@@ -2530,6 +2576,7 @@ function renderOrders(){
           </div>
         </div>
 
+        ${renderTaskContractStrip(order,{compact:true})}
         ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<div class="candidate-meta" style="margin-top:8px;color:${order.riskLevel==='CRITICAL'?'var(--red)':order.riskLevel==='HIGH'?'#b05e00':'var(--muted)'}">系統判斷：${esc(order.riskReasons.slice(0,3).join('；'))}</div>`:''}
         ${merchantLiveTrackingStrip(order)}
         ${isWaiting?riderVisibilityStrip(order,{compact:true}):''}
@@ -2742,6 +2789,7 @@ function renderCandidates(){
     <strong>${esc(order.id)}</strong>
     <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.55">
       取件：${esc(order.pickupAddress || '-')}<br>
+      任務：${esc(order.serviceType || 'UBee 任務')}${order.serviceCategory?`｜${esc(order.serviceCategory)}`:''}<br>
       狀態：${esc(order.statusLabel || order.status || '-')}<br>
       ${riskBadge(order.riskLevel,order.riskScore)}
       ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<br>原因：${esc(order.riskReasons.slice(0,4).join('；'))}`:''}
@@ -2756,6 +2804,7 @@ function renderCandidates(){
       ${String(order.itemSizeReviewStatus||'')==='pending'?`<br><span style="color:var(--red);font-weight:1000">小U已回報體積不符，等待調度確認</span>`:''}
     </div>
 
+    ${renderTaskContractStrip(order)}
     ${isWaiting?riderVisibilityStrip(order):''}
 
     <div class="order-surcharge-box">
