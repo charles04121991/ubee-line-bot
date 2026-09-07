@@ -1,3 +1,4 @@
+// 2026-09-07｜Dispatch Manual Unassign V1：調度中心新增「取消派單」；僅允許取件前解除目前小U，訂單退回 pending_dispatch 並重新媒合；抵達取件後啟用貨物安全鎖禁止直接解除。
 // 2026-09-03｜Universal Arrival Photo Backend V1.1：所有服務共用到場照片；排隊任務視為單一現場任務，抵達拍照後可直接進入處理並完成，不再要求不存在的送達點。
 // 2026-09-03｜Task Contract Backend V3 Full Flow：在 V2 結構化 taskDetails 基礎上，打通單點全能任務、騎士文字／照片／交接完成回報、完成前後端強制驗證、客戶完成結果與調度回報狀態；保留舊訂單相容。
 // 2026-09-03｜Arrival Photo Proof Backend V1：所有服務在抵達任務地點與各送達點後皆須拍照；後端儲存 Firebase Storage、驗證狀態流轉，並以短效 signed URL 回傳原下單客戶。
@@ -35932,8 +35933,11 @@ function getDispatchApiErrorResponse(error) {
     RIDER_OFFLINE: [409, '這位小U目前已離線，請重新選擇其他小U。'],
     RIDER_ALREADY_BUSY: [409, '這位小U目前已有進行中的任務，請重新選擇。'],
     RIDER_ALREADY_ASSIGNED: [409, '此訂單已經被其他小U接走。'],
+    ORDER_UNASSIGN_NOT_ALLOWED: [409, '此任務目前不符合取消派單條件；只有小U接單後、抵達取件點前可以由調度中心解除派單。'],
+    ORDER_NO_RIDER_ASSIGNED: [409, '此訂單目前沒有可解除的承接小U。'],
+    ORDER_ASSIGNMENT_CHANGED: [409, '此訂單的承接小U已發生變更，請重新整理調度中心後再操作。'],
     ORDER_RECOVERY_NOT_ALLOWED: [409, '此任務目前不符合安全備援轉派條件，請重新整理後確認。'],
-    ORDER_CUSTODY_RISK: [409, '此任務已到達取件或取件後階段，可能已發生貨物交接，禁止直接轉派。請先聯絡小U並人工處置。'],
+    ORDER_CUSTODY_RISK: [409, '此任務已到達取件或取件後階段，可能已發生貨物交接，禁止直接取消派單／轉派。請先聯絡小U並人工處置。'],
   };
 
   if (map[code]) {
@@ -36330,6 +36334,751 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
   }
 });
 
+
+
+
+// ------------------------------------------------------------
+// Dispatch Manual Unassign V1｜調度中心取消目前派單
+// POST /api/dispatch/orders/:orderId/unassign
+//
+// 這不是取消客戶訂單：
+// - 只解除目前承接小U。
+// - accepted / going_to_pickup / heading_to_pickup 可操作。
+// - arrived_pickup 起視為可能已發生貨物交接，啟用安全鎖，禁止直接解除。
+// - 成功後訂單回到 pending_dispatch，原小U恢復可接單，並重新啟動正式派單。
+// - 原小U加入 skippedRiderIds，避免同一輪立即再次收到同一張任務。
+// ------------------------------------------------------------
+app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
+  try {
+    const safeOrderId = String(req.params.orderId || '')
+      .trim()
+      .toUpperCase();
+
+    if (!safeOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少訂單編號。',
+      });
+    }
+
+    const safeReason = String(
+      req.body?.reason ||
+      '調度中心人工取消派單'
+    )
+      .trim()
+      .slice(0, 160);
+
+    if (!safeReason) {
+      return res.status(400).json({
+        success: false,
+        message: '請填寫取消派單原因。',
+      });
+    }
+
+    const requestedRadiusKm =
+      normalizeDispatchRadiusKm(
+        req.body?.radiusKm,
+        3
+      );
+
+    const source = String(
+      req.body?.source ||
+      'dispatch_center'
+    )
+      .trim()
+      .slice(0, 80);
+
+    const nowMs = Date.now();
+    const newCycleId =
+      buildDispatchPushCycleId(
+        safeOrderId
+      );
+
+    const orderRef =
+      db.collection('orders')
+        .doc(safeOrderId);
+
+    let unassignedOrder = null;
+    let previousRiderId = '';
+    let previousRiderDocId = '';
+    let previousRiderName = '';
+    let previousRiderPhone = '';
+    let previousRiderLineUserId = '';
+    let fallbackRiderIdentity = null;
+
+    await db.runTransaction(
+      async transaction => {
+        const orderDoc =
+          await transaction.get(orderRef);
+
+        if (!orderDoc.exists) {
+          throw new Error(
+            'ORDER_NOT_FOUND'
+          );
+        }
+
+        const order =
+          orderDoc.data() || {};
+
+        const currentStatus =
+          String(
+            order.status || ''
+          ).trim();
+
+        const unassignable = [
+          'accepted',
+          'going_to_pickup',
+          'heading_to_pickup',
+        ];
+
+        const custodyRisk = [
+          'arrived_pickup',
+          'picked_up',
+          'going_to_dropoff',
+          'heading_to_dropoff',
+          'arrived_dropoff',
+          'completed',
+        ];
+
+        if (
+          custodyRisk.includes(
+            currentStatus
+          )
+        ) {
+          throw new Error(
+            'ORDER_CUSTODY_RISK'
+          );
+        }
+
+        if (
+          !unassignable.includes(
+            currentStatus
+          )
+        ) {
+          throw new Error(
+            'ORDER_UNASSIGN_NOT_ALLOWED'
+          );
+        }
+
+        previousRiderId =
+          String(
+            order.riderId || ''
+          ).trim();
+
+        previousRiderDocId =
+          String(
+            order.riderDocId || ''
+          ).trim();
+
+        previousRiderName =
+          String(
+            order.riderName ||
+            order.driverName ||
+            ''
+          ).trim();
+
+        previousRiderPhone =
+          normalizePhone(
+            order.riderPhone ||
+            order.driverPhone ||
+            ''
+          );
+
+        previousRiderLineUserId =
+          String(
+            order.riderLineUserId ||
+            ''
+          ).trim();
+
+        if (
+          !previousRiderId &&
+          !previousRiderDocId &&
+          !previousRiderPhone &&
+          !previousRiderLineUserId
+        ) {
+          throw new Error(
+            'ORDER_NO_RIDER_ASSIGNED'
+          );
+        }
+
+        const previousIdentity = {
+          riderId: previousRiderId,
+          riderDocId:
+            previousRiderDocId,
+          phone:
+            previousRiderPhone,
+          lineUserId:
+            previousRiderLineUserId,
+        };
+
+        fallbackRiderIdentity =
+          previousIdentity;
+
+        const riderSkipKeys =
+          getRiderIdentityKeys(
+            previousIdentity
+          );
+
+        let previousRiderRef = null;
+        let previousRiderDoc = null;
+
+        if (previousRiderDocId) {
+          previousRiderRef =
+            db.collection(
+              RIDER_V2_COLLECTIONS.riders
+            ).doc(
+              previousRiderDocId
+            );
+
+          previousRiderDoc =
+            await transaction.get(
+              previousRiderRef
+            );
+        }
+
+        const previousTrail =
+          Array.isArray(
+            order.riderLocationTrail
+          )
+            ? order.riderLocationTrail
+                .slice(-40)
+            : [];
+
+        const updateData = {
+          status:
+            'pending_dispatch',
+
+          riderStatus:
+            'pending_dispatch',
+
+          previousRiderId,
+          previousRiderDocId,
+          previousRiderName,
+          previousRiderPhone,
+          previousRiderLineUserId,
+
+          previousRiderLastLat:
+            order.riderCurrentLat ??
+            order.riderCurrentLocation?.lat ??
+            null,
+
+          previousRiderLastLng:
+            order.riderCurrentLng ??
+            order.riderCurrentLocation?.lng ??
+            null,
+
+          previousRiderLastLocationAtMs:
+            getDispatchOrderTrackingAtMs(
+              order
+            ) || null,
+
+          previousRiderLocationTrail:
+            previousTrail,
+
+          riderId: '',
+          riderDocId: '',
+          riderPhone: '',
+          riderLineUserId: '',
+          riderName: '',
+
+          riderCurrentLat: null,
+          riderCurrentLng: null,
+          riderCurrentLocation: null,
+          riderLocationUpdatedAtMs: null,
+          riderLocationUpdatedAt: null,
+          riderHeading: null,
+          riderSpeed: null,
+          riderLocationAccuracy: null,
+          riderLocationTrail: [],
+
+          acceptedAt: null,
+
+          previousDispatchAssignedAtMs:
+            Number(order.dispatchAssignedAtMs || 0) || null,
+          previousDispatchAssignedSource:
+            String(order.dispatchAssignedSource || '').trim(),
+
+          assignedByDispatch: false,
+          dispatchAssignedRiderId: '',
+          dispatchAssignedRiderDocId: '',
+          dispatchAssignedAtMs: null,
+          dispatchAssignedAt: null,
+          dispatchAssignedSource: '',
+
+          dispatchUnassignReason:
+            safeReason,
+
+          dispatchUnassignCount:
+            admin.firestore.FieldValue
+              .increment(1),
+
+          dispatchUnassignedAtMs:
+            nowMs,
+
+          dispatchUnassignedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          dispatchUnassignedSource:
+            source,
+
+          dispatchStartedAtMs:
+            nowMs,
+
+          redispatchStartedAtMs:
+            nowMs,
+
+          dispatchPushCycleId:
+            newCycleId,
+
+          dispatchPushNotifiedRiderDocIds:
+            [],
+
+          dispatchPushStage:
+            'manual_unassign_redispatch_scheduled',
+
+          dispatchManualRedispatchRadiusKm:
+            requestedRadiusKm,
+
+          trackingSessionId: '',
+          riderTrackingStatus:
+            'stopped',
+
+          trackingEndedAtMs:
+            nowMs,
+
+          trackingEndedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          trackingUpdatedAtMs:
+            nowMs,
+
+          trackingUpdatedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          trackingStopReason:
+            'dispatch_manual_unassign',
+
+          merchantTrackingPhase:
+            'waiting',
+
+          merchantTrackingGpsHealth:
+            'WAITING',
+
+          merchantTrackingRiskLevel:
+            'NORMAL',
+
+          merchantTrackingRiskReasons:
+            [],
+
+          merchantTrackingStalled:
+            false,
+
+          merchantTrackingDelayMinutes:
+            0,
+
+          merchantTrackingDelayLevel:
+            'NORMAL',
+
+          merchantTrackingBaselinePhase:
+            '',
+
+          merchantTrackingBaselineMinutes:
+            null,
+
+          merchantTrackingBaselineAtMs:
+            null,
+
+          merchantGeofenceState:
+            'UNKNOWN',
+
+          merchantGeofenceDistanceMeters:
+            null,
+
+          merchantLiveDistanceMeters:
+            null,
+
+          merchantLiveDistanceKm:
+            null,
+
+          merchantLiveDistanceText:
+            '',
+
+          merchantLiveEtaSeconds:
+            null,
+
+          merchantLiveEtaMinutes:
+            null,
+
+          merchantLiveEtaText:
+            '',
+
+          merchantLiveEtaAtMs:
+            null,
+
+          merchantLiveRouteUpdatedAtMs:
+            0,
+
+          dispatchUpdatedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          updatedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          'statusTimes.dispatch_unassigned':
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+
+          ...getEtaPayloadByStatus(
+            'pending_dispatch'
+          ),
+        };
+
+        if (riderSkipKeys.length) {
+          updateData.skippedRiderIds =
+            admin.firestore.FieldValue
+              .arrayUnion(
+                ...riderSkipKeys
+              );
+        }
+
+        transaction.update(
+          orderRef,
+          updateData
+        );
+
+        if (
+          previousRiderRef &&
+          previousRiderDoc?.exists
+        ) {
+          const previousRider =
+            previousRiderDoc.data() || {};
+
+          const currentOrderId =
+            String(
+              previousRider
+                .currentOrderId || ''
+            )
+              .trim()
+              .toUpperCase();
+
+          if (
+            !currentOrderId ||
+            currentOrderId ===
+              safeOrderId
+          ) {
+            transaction.set(
+              previousRiderRef,
+              {
+                busy: false,
+                currentOrderId: '',
+                activeTrackingOrderId:
+                  '',
+                activeTrackingSessionId:
+                  '',
+                taskTrackingStatus:
+                  'stopped',
+                taskTrackingUpdatedAtMs:
+                  nowMs,
+                taskTrackingUpdatedAt:
+                  admin.firestore.FieldValue
+                    .serverTimestamp(),
+                taskTrackingStopReason:
+                  'dispatch_manual_unassign',
+                updatedAt:
+                  admin.firestore.FieldValue
+                    .serverTimestamp(),
+              },
+              {
+                merge: true,
+              }
+            );
+          }
+        }
+
+        unassignedOrder = {
+          ...order,
+          id: safeOrderId,
+
+          status:
+            'pending_dispatch',
+
+          riderStatus:
+            'pending_dispatch',
+
+          riderId: '',
+          riderDocId: '',
+          riderPhone: '',
+          riderLineUserId: '',
+          riderName: '',
+
+          riderCurrentLat: null,
+          riderCurrentLng: null,
+          riderCurrentLocation: null,
+          riderLocationUpdatedAtMs: null,
+          riderLocationTrail: [],
+
+          acceptedAt: null,
+
+          previousRiderId,
+          previousRiderDocId,
+          previousRiderName,
+          previousRiderPhone,
+          previousRiderLineUserId,
+
+          previousRiderLastLat:
+            order.riderCurrentLat ??
+            order.riderCurrentLocation?.lat ??
+            null,
+
+          previousRiderLastLng:
+            order.riderCurrentLng ??
+            order.riderCurrentLocation?.lng ??
+            null,
+
+          previousRiderLastLocationAtMs:
+            getDispatchOrderTrackingAtMs(
+              order
+            ) || null,
+
+          previousRiderLocationTrail:
+            previousTrail,
+
+          dispatchPushCycleId:
+            newCycleId,
+
+          dispatchManualRedispatchRadiusKm:
+            requestedRadiusKm,
+
+          dispatchUnassignReason:
+            safeReason,
+
+          dispatchUnassignedAtMs:
+            nowMs,
+
+          skippedRiderIds:
+            Array.from(
+              new Set([
+                ...(
+                  Array.isArray(
+                    order.skippedRiderIds
+                  )
+                    ? order.skippedRiderIds
+                    : []
+                ),
+                ...riderSkipKeys,
+              ])
+            ),
+        };
+      }
+    );
+
+    // 舊資料若缺 riderDocId，交易內無法安全定位 ridersV2 文件；
+    // 交易完成後再用既有身分查找，且只有 currentOrderId 仍是本單時才釋放 busy。
+    if (
+      !previousRiderDocId &&
+      fallbackRiderIdentity &&
+      (
+        fallbackRiderIdentity.riderId ||
+        fallbackRiderIdentity.phone ||
+        fallbackRiderIdentity.lineUserId
+      )
+    ) {
+      try {
+        const riderResult =
+          await findApprovedRiderForApi(
+            fallbackRiderIdentity
+          );
+
+        if (riderResult.ok) {
+          const legacyRiderRef =
+            db.collection(
+              RIDER_V2_COLLECTIONS.riders
+            ).doc(
+              riderResult.riderDoc.id
+            );
+
+          const legacyRiderDoc =
+            await legacyRiderRef.get();
+
+          if (legacyRiderDoc.exists) {
+            const legacyRider =
+              legacyRiderDoc.data() || {};
+
+            const currentOrderId =
+              String(
+                legacyRider
+                  .currentOrderId || ''
+              )
+                .trim()
+                .toUpperCase();
+
+            if (
+              !currentOrderId ||
+              currentOrderId ===
+                safeOrderId
+            ) {
+              await legacyRiderRef.set(
+                {
+                  busy: false,
+                  currentOrderId: '',
+                  activeTrackingOrderId:
+                    '',
+                  activeTrackingSessionId:
+                    '',
+                  taskTrackingStatus:
+                    'stopped',
+                  taskTrackingUpdatedAtMs:
+                    nowMs,
+                  taskTrackingUpdatedAt:
+                    admin.firestore.FieldValue
+                      .serverTimestamp(),
+                  taskTrackingStopReason:
+                    'dispatch_manual_unassign',
+                  updatedAt:
+                    admin.firestore.FieldValue
+                      .serverTimestamp(),
+                },
+                {
+                  merge: true,
+                }
+              );
+            }
+          }
+        }
+      } catch (fallbackError) {
+        console.warn(
+          '⚠️ 取消派單已完成，但舊版小U busy fallback 釋放失敗：',
+          fallbackError?.message ||
+          fallbackError
+        );
+      }
+    }
+
+    clearDispatchPushTimers(
+      safeOrderId
+    );
+
+    if (
+      typeof orders === 'object' &&
+      orders
+    ) {
+      orders[safeOrderId] =
+        unassignedOrder;
+    }
+
+    try {
+      await startDispatchPushSequence(
+        unassignedOrder,
+        newCycleId
+      );
+    } catch (pushError) {
+      console.error(
+        '⚠️ 取消派單成功，但重新派單通知啟動失敗：',
+        pushError
+      );
+    }
+
+    try {
+      await notifyCustomer(
+        unassignedOrder,
+        createTextMessage(
+          `🟠 UBee 調度中心正在重新安排小U\n\n` +
+          `訂單編號：${safeOrderId}\n` +
+          `目前派單已由調度中心解除，系統正在重新媒合新的小U。`
+        )
+      );
+    } catch (notifyError) {
+      console.error(
+        '⚠️ 取消派單成功，但通知客人失敗：',
+        notifyError
+      );
+    }
+
+    Promise.allSettled([
+      logDispatchEvent({
+        type:
+          'DISPATCH_UNASSIGN',
+        orderId:
+          safeOrderId,
+        riderId:
+          previousRiderId,
+        riderDocId:
+          previousRiderDocId,
+        riderName:
+          previousRiderName,
+        reason:
+          safeReason,
+        radiusKm:
+          requestedRadiusKm,
+        source,
+        createdAtMs:
+          nowMs,
+      }),
+
+      notifyMerchantOrderEventV3(
+        unassignedOrder,
+        'RIDER_TRANSFERRED',
+        {
+          eventKey:
+            `DISPATCH_UNASSIGN_${nowMs}`,
+          reason:
+            safeReason,
+          source:
+            'dispatch_unassign',
+        }
+      ),
+
+      refreshMerchantLiveTrackingV3(
+        safeOrderId,
+        {
+          reason:
+            'dispatch_unassign',
+          allowRoute:
+            false,
+          forceRoute:
+            false,
+        }
+      ),
+    ]).catch(() => {});
+
+    return res.json({
+      success: true,
+      orderId:
+        safeOrderId,
+      status:
+        'pending_dispatch',
+      previousRiderId,
+      previousRiderDocId,
+      dispatchPushCycleId:
+        newCycleId,
+      radiusKm:
+        requestedRadiusKm,
+      order:
+        unassignedOrder,
+      message:
+        '已取消目前派單，訂單已回到待派單並重新開始媒合。',
+    });
+  } catch (error) {
+    console.error(
+      '❌ UBee 調度中心取消派單失敗：',
+      error
+    );
+
+    const result =
+      getDispatchApiErrorResponse(
+        error
+      );
+
+    return res
+      .status(result.status)
+      .json(result.body);
+  }
+});
 
 
 // ------------------------------------------------------------
