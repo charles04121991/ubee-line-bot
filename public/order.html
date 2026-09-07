@@ -10460,7 +10460,7 @@ body.ubee-app-starting{
 </div>
 <div class="quick-guide hidden" id="buyGuide">
 <div class="quick-guide-title">代買提醒</div>
-<div class="quick-guide-text">請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與購買注意事項。若需要 小U 先代墊，請填寫正確金額；沒有代墊請填 0。代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。</div>
+<div class="quick-guide-text">請填寫商品名稱、品牌、數量、規格、冰塊甜度、替代品與購買注意事項。若需要 小U 先代墊，請填寫正確金額；沒有代墊請填 0。最高代墊上限為 NT$1,500；超過 NT$1,500 請先聯繫 UBee 跑腿客服人工確認。</div>
 </div>
 <div class="quick-guide hidden" id="queueGuide">
 <div class="quick-guide-title">排隊提醒</div>
@@ -10590,7 +10590,7 @@ body.ubee-app-starting{
 </div>
 <div class="quick-guide" id="advanceRuleBox">
 <div class="quick-guide-title">代墊費用提醒</div>
-<div class="quick-guide-text">若任務需要 小U 先代墊商品費、餐點費或其他必要費用，請填寫正確金額；沒有代墊請填 0。代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。</div>
+<div class="quick-guide-text">若任務需要 小U 先代墊商品費、餐點費或其他必要費用，請填寫正確金額；沒有代墊請填 0。最高代墊上限為 NT$1,500；超過 NT$1,500 請先聯繫 UBee 跑腿客服人工確認。</div>
 </div>
 <div class="step2-action-footer">
 <button class="step2-back-btn" onclick="goPrev()" type="button">
@@ -10816,7 +10816,7 @@ body.ubee-app-starting{
 </summary>
 <div class="review-rules-content">
 <div class="review-rule-item"><div class="review-rule-text">・不得委託違法、危險或不適合配送的任務</div></div>
-<div class="review-rule-item"><div class="review-rule-text">・代墊金額達 NT$1,000（含）以上需人工確認</div></div>
+<div class="review-rule-item"><div class="review-rule-text">・代墊金額超過 NT$1,500 需人工確認</div></div>
 <div class="review-rule-item"><div class="review-rule-text">・目前以現金付款為主</div></div>
 <div class="review-rule-item"><div class="review-rule-text">・最終費用可能依等候或實際執行情況調整</div></div>
 </div>
@@ -11202,7 +11202,7 @@ let quoteRequestSequence = 0;
 
 const INITIAL_PAYMENT_METHOD = '';
 const INITIAL_PAYMENT_LABEL = '尚未選擇';
-const MAX_ADVANCE_PAYMENT = 1000;
+const MAX_ADVANCE_PAYMENT = 1500;
 
 function qs(id){
   return document.getElementById(id);
@@ -14143,8 +14143,8 @@ function validateAdvancePaymentLimit(){
     qs('advancePayment').value = String(amount);
   }
 
-  if(amount >= MAX_ADVANCE_PAYMENT){
-    alert('UBee 跑腿目前不協助 小U 代墊 NT$1,000（含）以上金額。為保障客人與 小U 安全，系統暫不開放繼續下單，請先聯繫 UBee 跑腿客服人工確認。');
+  if(amount > MAX_ADVANCE_PAYMENT){
+    alert('UBee 跑腿目前最高代墊上限為 NT$1,500。為保障客人與 小U 安全，超過 NT$1,500 系統暫不開放繼續下單，請先聯繫 UBee 跑腿客服人工確認。');
     return false;
   }
 
@@ -21351,7 +21351,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   </div>
 </div>
 <div class="flow-form-group ubee-hidden-duplicate-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
-<div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="999" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。</div></div>
+<div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="1500" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">最高代墊上限為 NT$1,500；超過 NT$1,500 請先聯繫客服確認。</div></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowQueueWrap"><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/></div>
 <div class="flow-form-group flow-dynamic-field" hidden="" id="flowTaskMinutesWrap"><label class="flow-label" for="flowTaskMinutes">預估任務處理時間</label><input class="flow-input" id="flowTaskMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/><div class="flow-inline-note">全能跑腿會依預估處理時間計算任務處理時間費；請依實際需要填寫。</div></div>
 <details class="flow-task-extra ubee-hidden-duplicate-field" id="flowExtraTaskDetails">
@@ -22272,8 +22272,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       $('flowTaskMinutes')?.focus();
       return false;
     }
-    if(state.advancePayment>=1000){
-      status('flowTaskStatus','代墊金額達 NT$1,000（含）以上，請先聯繫客服確認。',true);
+    if(state.advancePayment>MAX_ADVANCE_PAYMENT){
+      status('flowTaskStatus','最高代墊上限為 NT$1,500；超過 NT$1,500 請先聯繫客服確認。',true);
       return false;
     }
     status('flowTaskStatus','');
