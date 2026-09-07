@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-07｜Customer Advance Payment V1：最高自動代墊上限調整為 NT$1,500；超過 NT$1,500 才需客服人工確認；同步升級 Manifest 與 Customer Service Worker 快取版本。 -->
 <!-- 2026-09-03｜Customer Location Bootstrap V3.3：DOM 完成後立即啟動首次定位；首頁地圖建立前必須等待定位成功／失敗，未取得結果前維持定位占位，禁止先建立城市預設中心地圖。 -->
 <!-- 2026-09-03｜Customer Location Lock V3.2：首頁地圖建立前強制等待首次定位嘗試完成；未取得座標前只顯示定位中的地圖占位，不建立城市預設中心地圖，徹底避免首頁先跳到其他地區。 -->
 <!-- 2026-09-03｜Customer Arrival Photo Proof V1：所有服務均顯示小U到場照片；取件／任務地點與各送達點照片由後端短效簽名網址安全回傳，任務進行中即可查看。 -->
@@ -21,7 +22,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260903-task-contract-v3-3-location-bootstrap-universal-photo" rel="manifest"/>
+<link href="/manifest-order.json?v=20260907-advance-payment-1500" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -22869,7 +22870,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260903-task-contract-v3-3-location-bootstrap-universal-photo';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260907-advance-payment-1500';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
