@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-07｜Dispatch Manual Unassign V1：新增「取消派單」；只解除目前小U，不取消客戶訂單；取件前可退回待派單並重新媒合，抵達取件後受貨物安全鎖保護。 -->
 <!-- 2026-09-03｜Dispatch Universal Arrival Photo V1.1：所有服務共用到場照片狀態；排隊任務只要求任務地點照片，路線任務依取件＋每個送達點計算。 -->
 <!-- 2026-09-03｜Dispatch Arrival Photo Proof V1：訂單卡與摘要顯示小U已回傳的到場照片數量，讓調度中心確認每個到場節點都有照片證明。 -->
 <!-- 2026-09-03｜Dispatch Task Contract V3 Full Flow：除任務要求外，顯示小U完成回報是否已齊備、文字／照片／交接確認狀態與單點任務標記。 -->
@@ -576,6 +577,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
               </select>
               <button class="btn small yellow" id="expandRadiusBtn" disabled>擴大派單半徑</button>
               <button class="btn small" id="redispatchBtn" disabled>重新派單</button>
+              <button class="btn small danger" id="unassignBtn" disabled>取消派單</button>
               <button class="btn small danger" id="emergencyRecoverBtn" disabled>啟動備援轉派</button>
             </div>
 
@@ -683,6 +685,56 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   </div>
 </div>
 
+<!-- Dispatch Manual Unassign V1｜取消目前派單確認視窗 -->
+<div class="modal-backdrop" id="unassignModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">取消目前派單</div>
+        <div class="panel-sub">只解除目前小U，不會取消客戶訂單</div>
+      </div>
+      <button class="close-btn" data-close-unassign-modal>×</button>
+    </div>
+    <div class="modal-body">
+      <div class="dispatch-order-summary" id="unassignOrderSummary"></div>
+
+      <div class="api-note" style="margin-top:12px">
+        取消後，這張訂單會退回「待派單」，目前小U恢復可接單，系統重新媒合其他小U。<br>
+        若小U已抵達取件點或已取件，系統會啟用貨物安全鎖並禁止直接取消派單。
+      </div>
+
+      <div class="form-grid" style="margin-top:14px">
+        <div class="form-field full">
+          <label class="form-label" for="unassignReasonSelect">取消派單原因</label>
+          <select class="form-control" id="unassignReasonSelect">
+            <option value="小U無法繼續執行">小U無法繼續執行</option>
+            <option value="聯絡不上小U">聯絡不上小U</option>
+            <option value="客戶要求更換小U">客戶要求更換小U</option>
+            <option value="小U位置或狀態異常">小U位置或狀態異常</option>
+            <option value="誤派，需要重新安排">誤派，需要重新安排</option>
+            <option value="調度中心人工重新安排">調度中心人工重新安排</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+
+        <div class="form-field full">
+          <label class="form-label" for="unassignReasonNote">補充說明</label>
+          <textarea
+            class="form-control"
+            id="unassignReasonNote"
+            maxlength="500"
+            placeholder="可補充聯絡狀況、取消原因或後續安排"
+          ></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close-unassign-modal>返回</button>
+      <button class="btn danger" id="confirmUnassignBtn">確認取消派單</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- 第二階段：異常案件建立／處理視窗 -->
 <div class="modal-backdrop" id="incidentModal">
@@ -763,6 +815,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
 
    後端已對應的寫入 API：
    POST /api/dispatch/orders/:orderId/assign
+   POST /api/dispatch/orders/:orderId/unassign
    POST /api/dispatch/orders/:orderId/redispatch
    POST /api/dispatch/orders/:orderId/expand-radius
    POST /api/dispatch/orders/:orderId/recover
@@ -774,6 +827,7 @@ const state = {
   riderFilter: 'all',
   selectedOrderId: '',
   selectedCandidateRiderId: '',
+  unassignOrderId: '',
   selectedOrderEvents: [],
   incidentFilter: 'active',
   incidentModalMode: 'create',
@@ -2565,6 +2619,10 @@ function renderOrders(){
   $('orders').innerHTML = list.map(order=>{
     const selected = String(order.id) === String(state.selectedOrderId);
     const isWaiting = statusKind(order) === 'waiting';
+    const currentStatus = String(order.status||'').trim();
+    const canUnassign = ['accepted','going_to_pickup','heading_to_pickup'].includes(currentStatus) &&
+      Boolean(order.riderId||order.riderDocId||order.riderPhone||order.riderLineUserId) &&
+      order.custodyLocked !== true;
     return `
       <article class="order-card ${selected?'selected':''}" data-order-id="${esc(order.id)}">
         <div class="order-top">
@@ -2612,9 +2670,10 @@ function renderOrders(){
           ${isWaiting ? `
             <button class="btn small" data-action="redispatch" data-id="${esc(order.id)}">重新派單</button>
             <button class="btn small primary" data-action="candidates" data-id="${esc(order.id)}">指定小U</button>
-          ` : ['WATCH','HIGH','CRITICAL'].includes(String(order.riskLevel||'').toUpperCase()) ? `
-            <button class="btn small danger" data-action="handle-risk" data-id="${esc(order.id)}">處理異常</button>
-          ` : ''}
+          ` : `
+            ${canUnassign?`<button class="btn small danger" data-action="unassign" data-id="${esc(order.id)}">取消派單</button>`:''}
+            ${['WATCH','HIGH','CRITICAL'].includes(String(order.riskLevel||'').toUpperCase())?`<button class="btn small danger" data-action="handle-risk" data-id="${esc(order.id)}">處理異常</button>`:''}
+          `}
         </div>
       </article>
     `;
@@ -2772,10 +2831,16 @@ function renderCandidates(){
   const isActive = order && statusKind(order)==='active';
   const riskLevel=String(order?.riskLevel||'NORMAL').toUpperCase();
   const highRisk=['HIGH','CRITICAL'].includes(riskLevel);
+  const currentStatus=String(order?.status||'').trim();
+  const canUnassign=Boolean(order) &&
+    ['accepted','going_to_pickup','heading_to_pickup'].includes(currentStatus) &&
+    Boolean(order?.riderId||order?.riderDocId||order?.riderPhone||order?.riderLineUserId) &&
+    order?.custodyLocked!==true;
   const canRecover=isActive && order?.recoveryEligible===true && highRisk;
 
   $('redispatchBtn').disabled = !isWaiting;
   $('expandRadiusBtn').disabled = !isWaiting;
+  $('unassignBtn').disabled = !canUnassign;
   $('emergencyRecoverBtn').disabled = !canRecover;
   $('radiusSelect').value = String(state.radiusKm);
 
@@ -2810,6 +2875,7 @@ function renderCandidates(){
       取件：${esc(order.pickupAddress || '-')}<br>
       任務：${esc(order.serviceType || 'UBee 任務')}${order.serviceCategory?`｜${esc(order.serviceCategory)}`:''}<br>
       狀態：${esc(order.statusLabel || order.status || '-')}<br>
+      ${!isWaiting?`目前小U：<b style="color:#111">${esc(order.riderName||order.riderId||order.riderDocId||'-')}</b><br>`:''}
       ${riskBadge(order.riskLevel,order.riskScore)}
       ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<br>原因：${esc(order.riskReasons.slice(0,4).join('；'))}`:''}
       ${isMerchantLiveTrackingOrder(order)&&statusKind(order)==='active'?(()=>{const m=merchantLiveTrackingMeta(order);return `<br><span style="color:var(--blue);font-weight:1000">Live ETA：${m.eta!==null?esc(m.eta)+' 分鐘':'計算中'}${m.distance?`｜${esc(m.distance)}`:''}｜${esc(m.gps.label)}</span>${['NEAR','CLOSE'].includes(m.geofence)?`<br><span style="color:#8a6500;font-weight:1000">Geofence：已接近目前目的地${m.geoMeters!==null?`（約 ${esc(Math.round(m.geoMeters))}m）`:''}</span>`:''}${m.delayLevel!=='NORMAL'?`<br><span style="color:var(--red);font-weight:1000">ETA 延誤：+${esc(Math.round(m.delay))} 分鐘</span>`:''}`;})():''}
@@ -2935,7 +3001,7 @@ function renderCandidates(){
 function eventLabel(type){
   const map={
     ORDER_CREATED:'訂單建立',RIDER_NOTIFIED:'已通知小U',RIDER_ACCEPTED:'小U接單',RIDER_SKIPPED:'小U略過',
-    RIDER_TRANSFERRED:'騎士取消／轉派',MANUAL_ASSIGN:'人工指定小U',REDISPATCH:'重新派單',EMERGENCY_REDISPATCH:'V3 備援轉派',RADIUS_EXPANDED:'擴大派單半徑',
+    RIDER_TRANSFERRED:'騎士取消／轉派',DISPATCH_UNASSIGN:'調度取消派單',MANUAL_ASSIGN:'人工指定小U',REDISPATCH:'重新派單',EMERGENCY_REDISPATCH:'V3 備援轉派',RADIUS_EXPANDED:'擴大派單半徑',
     ORDER_STATUS_ARRIVED_PICKUP:'抵達取件點',ORDER_STATUS_PICKED_UP:'已取件',ORDER_STATUS_ARRIVED_DROPOFF:'抵達送達點',ORDER_COMPLETED:'任務完成',
     INCIDENT_CREATED:'建立異常案件',INCIDENT_STARTED:'開始處理異常',INCIDENT_ASSIGNED:'指派異常負責人',INCIDENT_NOTE:'新增異常紀錄',INCIDENT_RESOLVED:'異常案件結案',INCIDENT_REOPENED:'重新開啟異常'
   };
@@ -3038,6 +3104,124 @@ async function redispatchOrder(orderId){
     }else{
       toast('重新派單失敗：'+error.message,5000);
     }
+  }
+}
+
+
+
+function canDispatchUnassignOrder(order){
+  if(!order) return false;
+  const status=String(order.status||'').trim();
+  return (
+    ['accepted','going_to_pickup','heading_to_pickup'].includes(status) &&
+    Boolean(order.riderId||order.riderDocId||order.riderPhone||order.riderLineUserId) &&
+    order.custodyLocked!==true
+  );
+}
+
+function openUnassignModal(orderId){
+  const order=(state.data.orders||[]).find(
+    o=>String(o.id)===String(orderId)
+  );
+
+  if(!order) return toast('找不到此訂單');
+
+  if(order.custodyLocked===true){
+    toast('此任務已到達取件或取件後階段，可能已發生貨物交接，禁止直接取消派單。',6000);
+    return;
+  }
+
+  if(!canDispatchUnassignOrder(order)){
+    toast('此訂單目前不符合取消派單條件。只有小U接單後、抵達取件點前可以解除派單。',5200);
+    return;
+  }
+
+  state.unassignOrderId=String(order.id);
+
+  $('unassignOrderSummary').innerHTML=`
+    <strong>訂單 ${esc(order.id)}</strong>
+    <div style="font-size:12px;line-height:1.7;margin-top:7px;color:var(--muted)">
+      目前狀態：<b style="color:#111">${esc(order.statusLabel||order.status||'-')}</b><br>
+      目前小U：<b style="color:#111">${esc(order.riderName||order.riderId||order.riderDocId||'-')}</b><br>
+      取件：${esc(order.pickupAddress||'-')}<br>
+      送達：${esc(order.dropoffAddress||'-')}
+    </div>
+  `;
+
+  $('unassignReasonSelect').value='調度中心人工重新安排';
+  $('unassignReasonNote').value='';
+  $('unassignModal').classList.add('show');
+}
+
+function closeUnassignModal(){
+  $('unassignModal').classList.remove('show');
+  state.unassignOrderId='';
+  $('unassignReasonNote').value='';
+}
+
+async function confirmUnassignOrder(){
+  const orderId=state.unassignOrderId;
+  if(!orderId) return toast('找不到要取消派單的訂單');
+
+  const order=(state.data.orders||[]).find(
+    o=>String(o.id)===String(orderId)
+  );
+
+  if(!canDispatchUnassignOrder(order)){
+    closeUnassignModal();
+    return toast('訂單狀態已改變，請重新整理後再操作。',5200);
+  }
+
+  const reasonType=String(
+    $('unassignReasonSelect').value||
+    '調度中心人工重新安排'
+  ).trim();
+
+  const note=String(
+    $('unassignReasonNote').value||
+    ''
+  ).trim();
+
+  const reason=note
+    ? `${reasonType}｜${note}`
+    : reasonType;
+
+  const btn=$('confirmUnassignBtn');
+  btn.disabled=true;
+
+  try{
+    const result=await postJson(
+      `/api/dispatch/orders/${encodeURIComponent(orderId)}/unassign`,
+      {
+        reason,
+        radiusKm:state.radiusKm,
+        source:'dispatch_center'
+      }
+    );
+
+    closeUnassignModal();
+    toast(
+      result.message||
+      '已取消目前派單，正在重新媒合小U',
+      5200
+    );
+
+    await loadDashboard();
+    selectOrder(orderId,{pan:false});
+  }catch(error){
+    if(error.status===404||error.status===405){
+      toast(
+        backendNotReadyMessage('取消派單'),
+        6000
+      );
+    }else{
+      toast(
+        '取消派單失敗：'+error.message,
+        6000
+      );
+    }
+  }finally{
+    btn.disabled=false;
   }
 }
 
@@ -3339,6 +3523,10 @@ document.addEventListener('click',event=>{
       selectOrder(id);
       redispatchOrder(id);
     }
+    if(action==='unassign'){
+      selectOrder(id);
+      openUnassignModal(id);
+    }
     if(action==='emergency-recover'){
       selectOrder(id);
       emergencyRecoverOrder(id);
@@ -3380,6 +3568,7 @@ document.addEventListener('click',event=>{
   }
 
   if(event.target.closest('[data-close-modal]')) closeAssignModal();
+  if(event.target.closest('[data-close-unassign-modal]')) closeUnassignModal();
   if(event.target.closest('[data-close-incident-modal]')) closeIncidentModal();
 });
 
@@ -3412,6 +3601,11 @@ $('radiusSelect').addEventListener('change',event=>{
 $('redispatchBtn').addEventListener('click',()=>{
   const order = getSelectedOrder();
   if(order) redispatchOrder(order.id);
+});
+
+$('unassignBtn').addEventListener('click',()=>{
+  const order = getSelectedOrder();
+  if(order) openUnassignModal(order.id);
 });
 
 $('emergencyRecoverBtn').addEventListener('click',()=>{
@@ -3450,6 +3644,12 @@ $('incidentModal').addEventListener('click',event=>{
 
 $('assignModal').addEventListener('click',event=>{
   if(event.target === $('assignModal')) closeAssignModal();
+});
+
+$('confirmUnassignBtn').addEventListener('click',confirmUnassignOrder);
+
+$('unassignModal').addEventListener('click',event=>{
+  if(event.target === $('unassignModal')) closeUnassignModal();
 });
 
 // V4 全局風險篩選
