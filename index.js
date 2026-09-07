@@ -24086,7 +24086,7 @@ const ORDER_INPUT_LIMITS = {
   note: 700,
 };
 
-const MAX_ADVANCE_PAYMENT = 1000;
+const MAX_ADVANCE_PAYMENT = 1500;
 
 const DUPLICATE_ORDER_WINDOW_MS = 90 * 1000;
 
@@ -24262,8 +24262,8 @@ function validateOrderInput(data) {
 
   const detectedAdvancePayment = getDetectedAdvancePaymentAmountFromOrderInput(data);
 
-  if (detectedAdvancePayment >= MAX_ADVANCE_PAYMENT) {
-    errors.push('UBee 跑腿目前不協助騎士代墊 NT$1,000（含）以上金額，請先聯繫 UBee 跑腿客服人工確認。');
+  if (detectedAdvancePayment > MAX_ADVANCE_PAYMENT) {
+    errors.push('UBee 跑腿目前最高自動代墊上限為 NT$1,500；超過 NT$1,500 請先聯繫 UBee 跑腿客服人工確認。');
   }
 
   const timingType =
@@ -28146,10 +28146,10 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       Math.round(Number(req.query.advancePayment || 0))
     );
 
-    if (advancePayment >= MAX_ADVANCE_PAYMENT) {
+    if (advancePayment > MAX_ADVANCE_PAYMENT) {
       return res.status(400).json({
         success: false,
-        error: '代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。',
+        error: '代墊款項超過 NT$1,500，請先聯繫 UBee 跑腿客服人工確認。',
       });
     }
 
@@ -32335,10 +32335,10 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       ? Math.max(0, Math.round(detectedAdvancePayment))
       : 0;
 
-    if (advancePayment >= MAX_ADVANCE_PAYMENT) {
+    if (advancePayment > MAX_ADVANCE_PAYMENT) {
       return res.status(400).json({
         success: false,
-        error: '代墊款項達 NT$1,000（含）以上，請先聯繫 UBee 跑腿客服人工確認。',
+        error: '代墊款項超過 NT$1,500，請先聯繫 UBee 跑腿客服人工確認。',
       });
     }
 
