@@ -1,3 +1,4 @@
+// 2026-09-07｜Rider Background Presence V2：移除舊『Heartbeat 超過 5 分鐘即視為離線』邏輯；改為前景即時 / 背景 Push 可達 / 任務中真相三層 Presence，PWA 被 OS 暫停時不再誤判為主動下線。
 // 2026-09-07｜Dispatch Manual Unassign V1：調度中心新增「取消派單」；僅允許取件前解除目前小U，訂單退回 pending_dispatch 並重新媒合；抵達取件後啟用貨物安全鎖禁止直接解除。
 // 2026-09-03｜Universal Arrival Photo Backend V1.1：所有服務共用到場照片；排隊任務視為單一現場任務，抵達拍照後可直接進入處理並完成，不再要求不存在的送達點。
 // 2026-09-03｜Task Contract Backend V3 Full Flow：在 V2 結構化 taskDetails 基礎上，打通單點全能任務、騎士文字／照片／交接完成回報、完成前後端強制驗證、客戶完成結果與調度回報狀態；保留舊訂單相容。
@@ -1050,9 +1051,154 @@ function getDispatchPushTimeMs(value) {
 }
 
 
+const RIDER_PRESENCE_LIVE_FRESH_MS = 5 * 60 * 1000;
+const RIDER_BACKGROUND_LOCATION_GRACE_MS = 20 * 60 * 1000;
+
+// =====================================================
+// Rider Background Presence V2
+// - declaredOnline：只代表小U本人最後一次是否選擇「上線接單」。
+// - liveForeground：Heartbeat 仍在 5 分鐘內，代表頁面目前仍可即時互動。
+// - backgroundReachable：即使 PWA 被 OS 暫停，只要 Web Push 訂閱仍有效，仍視為可背景派單。
+// - reachableForDispatch：不得再把「Heartbeat 變舊」等同於「小U主動下線」。
+// =====================================================
+function getRiderPresenceV2(rider = {}, nowMs = Date.now()) {
+  const declaredOnline =
+    rider.online === true ||
+    rider.acceptingOrders === true;
+
+  const heartbeatAtMs =
+    getDispatchPushTimeMs(rider.lastHeartbeatAtMs) ||
+    getDispatchPushTimeMs(rider.lastHeartbeatAt) ||
+    getDispatchPushTimeMs(rider.lastSeenAtMs) ||
+    getDispatchPushTimeMs(rider.lastSeenAt) ||
+    getDispatchPushTimeMs(rider.lastActiveMs) ||
+    getDispatchPushTimeMs(rider.onlineUpdatedAtMs) ||
+    getDispatchPushTimeMs(rider.updatedAtMs) ||
+    getDispatchPushTimeMs(rider.updatedAt);
+
+  const heartbeatAgeMs = heartbeatAtMs
+    ? Math.max(0, Number(nowMs || Date.now()) - heartbeatAtMs)
+    : null;
+
+  const liveForeground =
+    declaredOnline &&
+    heartbeatAgeMs !== null &&
+    heartbeatAgeMs <= RIDER_PRESENCE_LIVE_FRESH_MS;
+
+  const subscription =
+    rider.webPushSubscription &&
+    typeof rider.webPushSubscription === 'object'
+      ? rider.webPushSubscription
+      : null;
+
+  const backgroundPushReady =
+    rider.webPushEnabled === true &&
+    !!String(subscription?.endpoint || '').trim();
+
+  const backgroundReachable =
+    declaredOnline &&
+    backgroundPushReady;
+
+  const reachableForDispatch =
+    declaredOnline &&
+    (liveForeground || backgroundReachable);
+
+  const busy =
+    rider.busy === true ||
+    !!String(rider.currentOrderId || '').trim();
+
+  const visibilityState = String(
+    rider.clientVisibilityState ||
+    rider.visibilityState ||
+    ''
+  ).trim().toLowerCase();
+
+  const clientPresenceMode = String(
+    rider.clientPresenceMode ||
+    ''
+  ).trim().toLowerCase();
+
+  const backgroundModeClaimed =
+    visibilityState === 'hidden' ||
+    visibilityState === 'background' ||
+    clientPresenceMode.includes('background') ||
+    !liveForeground;
+
+  let presenceState = 'OFFLINE';
+  if (busy) {
+    presenceState = 'BUSY';
+  } else if (!declaredOnline) {
+    presenceState = 'PAUSED';
+  } else if (liveForeground) {
+    presenceState = 'LIVE';
+  } else if (backgroundReachable) {
+    presenceState = 'BACKGROUND_PUSH';
+  } else {
+    presenceState = 'UNREACHABLE';
+  }
+
+  return {
+    declaredOnline,
+    heartbeatAtMs,
+    heartbeatAgeMs,
+    liveForeground,
+    backgroundPushReady,
+    backgroundReachable,
+    backgroundModeClaimed,
+    reachableForDispatch,
+    acceptingOrders: reachableForDispatch && !busy,
+    busy,
+    presenceState,
+  };
+}
+
+function riderMatchesBackgroundDispatchZone(rider = {}, order = {}) {
+  try {
+    const orderZone = getDispatchOrderZone(order);
+    const riderZone = getDispatchRiderZone(rider);
+
+    const pickupDistrict = String(orderZone?.district || '').trim();
+    const pickupCity = String(orderZone?.city || '').trim();
+
+    const serviceDistricts = normalizeTaiwanServiceDistricts(
+      rider.serviceDistricts ||
+      rider.serviceArea ||
+      rider.area ||
+      []
+    );
+
+    if (
+      pickupDistrict &&
+      pickupDistrict !== '未分區' &&
+      serviceDistricts.some(value =>
+        inferTaiwanRegion(value).district === pickupDistrict
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      pickupDistrict &&
+      pickupDistrict !== '未分區' &&
+      String(riderZone?.district || '').trim() === pickupDistrict
+    ) {
+      return true;
+    }
+
+    return (
+      pickupCity &&
+      pickupCity !== '未分縣市' &&
+      String(riderZone?.city || '').trim() === pickupCity &&
+      (!pickupDistrict || pickupDistrict === '未分區')
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 function isRiderLocationFreshForPush(
   rider = {},
-  maxAgeMs = 120000
+  maxAgeMs = null
 ) {
   const updatedAtMs =
     getDispatchPushTimeMs(
@@ -1072,9 +1218,22 @@ function isRiderLocationFreshForPush(
   const ageMs =
     Date.now() - updatedAtMs;
 
+  const presence =
+    getRiderPresenceV2(rider);
+
+  const effectiveMaxAgeMs =
+    Number.isFinite(Number(maxAgeMs)) && Number(maxAgeMs) > 0
+      ? Number(maxAgeMs)
+      : (
+          presence.backgroundReachable &&
+          presence.backgroundModeClaimed
+            ? RIDER_BACKGROUND_LOCATION_GRACE_MS
+            : 120000
+        );
+
   return (
     ageMs >= 0 &&
-    ageMs <= maxAgeMs
+    ageMs <= effectiveMaxAgeMs
   );
 }
 
@@ -1907,6 +2066,7 @@ async function sendNewOrderPushToRiders(
         let skippedRiderCount = 0;
         let distanceFilteredRiderCount = 0;
         let staleLocationRiderCount = 0;
+        let backgroundZoneFallbackRiderCount = 0;
         
         const pushPayload = JSON.stringify({
           title:
@@ -1947,8 +2107,12 @@ async function sendNewOrderPushToRiders(
             canRiderAcceptOrdersV4(rider) &&
             riderMeetsOrderV4Requirements(rider, order);
 
+          const riderPresence =
+            getRiderPresenceV2(rider);
+
           const riderOnline =
-            rider.online === true;
+            riderPresence.reachableForDispatch &&
+            rider.busy !== true;
 
           const webPushEnabled =
             rider.webPushEnabled === true;
@@ -2031,28 +2195,41 @@ async function sendNewOrderPushToRiders(
             const riderLocationFresh =
               isRiderLocationFreshForPush(rider);
 
+            const allowBackgroundZoneFallback =
+              riderPresence.backgroundReachable &&
+              riderMatchesBackgroundDispatchZone(
+                rider,
+                order
+              );
+
             if (
               !riderPoint ||
               !riderLocationFresh
             ) {
-              staleLocationRiderCount += 1;
-              return;
-            }
+              // PWA 進入背景後，OS 可能停止 Web GPS；此時不能把「定位暫停」誤判成「小U離線」。
+              // 只有背景 Push 仍有效，且服務區與取件區相符時才放行通知；不拿過期座標硬算半徑。
+              if (!allowBackgroundZoneFallback) {
+                staleLocationRiderCount += 1;
+                return;
+              }
 
-            const distanceKm =
-              calcDispatchPushDistanceKm(
-                riderPoint.lat,
-                riderPoint.lng,
-                pickupPoint.lat,
-                pickupPoint.lng
-              );
+              backgroundZoneFallbackRiderCount += 1;
+            } else {
+              const distanceKm =
+                calcDispatchPushDistanceKm(
+                  riderPoint.lat,
+                  riderPoint.lng,
+                  pickupPoint.lat,
+                  pickupPoint.lng
+                );
 
-            if (
-              !Number.isFinite(distanceKm) ||
-              distanceKm > normalizedMaxRadiusKm
-            ) {
-              distanceFilteredRiderCount += 1;
-              return;
+              if (
+                !Number.isFinite(distanceKm) ||
+                distanceKm > normalizedMaxRadiusKm
+              ) {
+                distanceFilteredRiderCount += 1;
+                return;
+              }
             }
           }
           
@@ -2142,7 +2319,7 @@ async function sendNewOrderPushToRiders(
             isRedispatch
               ? "轉派"
               : "新任務"
-          }通知完成：${orderId}，範圍 ${pushRadiusLabel}，成功 ${webPushSuccess}，失敗 ${webPushFail}，略過已取消騎士 ${skippedRiderCount}，距離外 ${distanceFilteredRiderCount}，位置過期或缺失 ${staleLocationRiderCount}`
+          }通知完成：${orderId}，範圍 ${pushRadiusLabel}，成功 ${webPushSuccess}，失敗 ${webPushFail}，略過已取消騎士 ${skippedRiderCount}，距離外 ${distanceFilteredRiderCount}，位置過期或缺失 ${staleLocationRiderCount}，背景區域備援 ${backgroundZoneFallbackRiderCount}`
         );
       }
 
@@ -6237,6 +6414,9 @@ app.post('/api/rider/heartbeat', riderAuthMiddleware, async (req, res) => {
       locationState,
       lastLocationSuccessAtMs,
       userAgent,
+      presenceMode,
+      backgroundPushReady,
+      standaloneMode,
     } = req.body || {};
 
     const riderResult = await findApprovedRiderForApi({
@@ -6271,6 +6451,24 @@ app.post('/api/rider/heartbeat', riderAuthMiddleware, async (req, res) => {
       ? normalizedLocationState
       : 'unknown';
 
+    const safePresenceModes = new Set([
+      'foreground',
+      'background',
+      'task_foreground',
+      'task_background',
+      'unknown',
+    ]);
+
+    const normalizedPresenceMode = String(
+      presenceMode || ''
+    ).trim().toLowerCase();
+
+    const safePresenceMode = safePresenceModes.has(
+      normalizedPresenceMode
+    )
+      ? normalizedPresenceMode
+      : 'unknown';
+
     const updateData = {
       lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
       lastSeenAtMs: nowMs,
@@ -6279,6 +6477,9 @@ app.post('/api/rider/heartbeat', riderAuthMiddleware, async (req, res) => {
       lastHeartbeatReason: cleanText(reason || 'interval', 40),
       clientVisibilityState: cleanText(visibilityState || 'unknown', 20),
       clientNetworkOnline: clientOnline !== false,
+      clientPresenceMode: safePresenceMode,
+      backgroundPushReady: backgroundPushReady === true,
+      standaloneMode: standaloneMode === true,
       connectionState: clientOnline === false ? 'client_offline' : 'connected',
       locationHealthState: safeLocationState,
       locationHealthUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -13903,21 +14104,24 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           toMs(r.updatedAt) ||
           locationUpdatedAtMs;
 
-        // declaredOnline：小U自己最後一次選擇仍保持「上線」。
-        // online：再加上 5 分鐘活動新鮮度，只供即時派單／候選判斷使用。
-        // 兩者刻意分開，避免調度地圖因 heartbeat 逾時就看不到仍保持上線的小U。
+        // Rider Background Presence V2：
+        // 「是否願意接單」與「前景 Heartbeat 是否新鮮」完全分離。
+        // PWA 被 OS 暫停後，只要背景 Web Push 仍有效，就保持可派單，不再 5 分鐘後誤判為主動離線。
+        const presenceV2 =
+          getRiderPresenceV2(r, nowMs);
+
         const declaredOnline =
-          r.online === true ||
-          r.acceptingOrders === true;
+          presenceV2.declaredOnline;
 
         const isFresh =
-          !!lastActiveAtMs &&
-          (nowMs - lastActiveAtMs) >= 0 &&
-          (nowMs - lastActiveAtMs) <= 5 * 60 * 1000;
+          presenceV2.liveForeground;
 
-        // online 是「此刻可視為在線」；declaredOnline 是騎士最後一次選擇是否願意接單。
-        const online = declaredOnline && isFresh;
-        const busy = r.busy === true || !!String(r.currentOrderId || '').trim();
+        const online =
+          presenceV2.reachableForDispatch;
+
+        const busy =
+          r.busy === true ||
+          !!String(r.currentOrderId || '').trim();
 
         let dispatchState = 'OFFLINE';
         if (busy) {
@@ -13929,8 +14133,10 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         }
 
         let connectionState = 'UNKNOWN';
-        if (isFresh) {
+        if (presenceV2.liveForeground) {
           connectionState = 'LIVE';
+        } else if (presenceV2.backgroundReachable) {
+          connectionState = 'BACKGROUND_PUSH';
         } else if (lastActiveAtMs) {
           connectionState = 'STALE';
         }
@@ -13945,6 +14151,10 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           approved: true,
           declaredOnline,
           online,
+          liveForeground: presenceV2.liveForeground,
+          backgroundReachable: presenceV2.backgroundReachable,
+          backgroundPushReady: presenceV2.backgroundPushReady,
+          presenceState: presenceV2.presenceState,
           acceptingOrders: online && !busy,
           busy,
           currentOrderId: r.currentOrderId || '',
@@ -14181,10 +14391,10 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       // - 綠色 U：只顯示目前真正開啟騎士端、近期 heartbeat 仍有效的小U。
       // - 真正進行中任務：藍色 U，永遠優先保留。
       //
-      // rider.online 仍是即時在線與派單資格的主要判定。
+      // rider.online 代表「可派單可達」；mapOnline 僅代表前景 Heartbeat 仍新鮮。
       // ============================================================
       rider.mapOnline =
-        rider.online === true &&
+        rider.liveForeground === true &&
         !verifiedBusy;
       rider.mapVisible =
         verifiedBusy ||
@@ -14228,8 +14438,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
       }
     }
 
-    // 智慧候選只使用真正在線者；BUSY 已由 orders 真實狀態校正。
-    activeRiders = allApprovedRiders.filter(r => r.online);
+    // 智慧候選使用「可派單可達」小U；包含前景即時與背景 Push 可達者，BUSY 仍由 orders 真實狀態校正。
+    activeRiders = allApprovedRiders.filter(r => r.online && r.acceptingOrders);
 
     const orderTimeMs = o =>
       Number(o.createdAtMs || o.orderCreatedAtMs || o.submittedAtMs || 0) ||
@@ -14718,20 +14928,24 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
           healthLabel = '任務執行中';
           healthReason = `訂單 ${activeOrder.id}｜${activeOrder.statusLabel || activeOrder.status || '進行中'}`;
         }
-      } else if (rider.online === true) {
+      } else if (rider.liveForeground === true) {
         if (!rider.locationUpdatedAtMs || locationAgeMs > 3 * 60 * 1000) {
           healthState = 'UNSTABLE';
-          healthLabel = '連線不穩';
-          healthReason = rider.locationUpdatedAtMs ? `定位已 ${Math.floor(locationAgeMs/60000)} 分鐘未更新` : '尚無有效定位';
+          healthLabel = '定位待恢復';
+          healthReason = rider.locationUpdatedAtMs ? `前景在線，但定位已 ${Math.floor(locationAgeMs/60000)} 分鐘未更新` : '前景在線，但尚無有效定位';
         } else {
           healthState = 'HEALTHY';
           healthLabel = '狀態良好';
-          healthReason = '在線且定位正常';
+          healthReason = '前景在線且定位正常';
         }
+      } else if (rider.backgroundReachable === true) {
+        healthState = 'HEALTHY';
+        healthLabel = '背景可接單';
+        healthReason = 'PWA 目前未在前景，但 Web Push 仍可派送新任務';
       } else if (rider.declaredOnline === true) {
         healthState = 'UNSTABLE';
-        healthLabel = '等待重新連線';
-        healthReason = '仍保持上線意願，但 heartbeat 已逾時';
+        healthLabel = '背景不可達';
+        healthReason = '仍保持上線意願，但目前沒有新鮮 Heartbeat，也沒有可用背景 Push';
       }
 
       riderHealthSummary[healthState] = (riderHealthSummary[healthState] || 0) + 1;
@@ -19804,6 +20018,12 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
       lastHeartbeatAt: admin.firestore.FieldValue.serverTimestamp(),
       lastHeartbeatAtMs: nowMs,
       connectionState: 'connected',
+      clientVisibilityState: 'visible',
+      clientPresenceMode: 'foreground',
+      backgroundPushReady:
+        online === true &&
+        rider.webPushEnabled === true &&
+        !!String(rider.webPushSubscription?.endpoint || '').trim(),
       dispatchPresenceState: online ? 'ACCEPTING' : 'PAUSED',
       dataVersion: RIDER_V2_DATA_VERSION,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -22462,7 +22682,6 @@ const DYNAMIC_PRICING_V3 = Object.freeze({
   enabled: true,
   quoteTtlMs: 10 * 60 * 1000,
   operationalCacheMs: 15 * 1000,
-  riderHeartbeatFreshMs: 5 * 60 * 1000,
   riderLocationFreshMs: 10 * 60 * 1000,
   defaultSupplyRadiusKm: 5,
   standardMaxFee: 60,
@@ -22758,12 +22977,23 @@ async function loadDynamicPricingOperationalState() {
       master.approved === true ||
       String(master.status || '').trim().toLowerCase() === 'approved';
 
+    const presenceV2 = getRiderPresenceV2(
+      { ...master, ...presence },
+      nowMs
+    );
+
+    const busy =
+      presence.busy === true ||
+      !!String(presence.currentOrderId || '').trim();
+
     return {
       riderDocId: doc.id,
       approved,
-      online: presence.online === true || presence.acceptingOrders === true,
-      acceptingOrders: presence.acceptingOrders === true,
-      busy: presence.busy === true || !!String(presence.currentOrderId || '').trim(),
+      online: presenceV2.reachableForDispatch,
+      acceptingOrders: presenceV2.reachableForDispatch && !busy,
+      liveForeground: presenceV2.liveForeground,
+      backgroundReachable: presenceV2.backgroundReachable,
+      busy,
       heartbeatMs,
       locationMs,
       lat: dynamicSafeNumber(location.currentLat ?? location.lat ?? location.latitude, NaN),
@@ -22798,7 +23028,8 @@ function countRegionWaitingOrders(waitingOrders, region) {
 function countRegionAvailableRiders(riders, region, nowMs) {
   return riders.filter(rider => {
     if (!rider.approved || !rider.online || !rider.acceptingOrders || rider.busy) return false;
-    if (!rider.heartbeatMs || nowMs - rider.heartbeatMs > DYNAMIC_PRICING_V3.riderHeartbeatFreshMs) return false;
+    // Background Presence V2：供需不能再因 PWA Heartbeat 被 OS 暫停 5 分鐘就把背景可推播小U扣掉。
+    // 但區域供給仍要求最近 10 分鐘內有可用定位，避免用過舊位置灌高運力。
     if (!rider.locationMs || nowMs - rider.locationMs > DYNAMIC_PRICING_V3.riderLocationFreshMs) return false;
     if (region.district && rider.district) {
       return rider.district.includes(region.district) || region.district.includes(rider.district);
