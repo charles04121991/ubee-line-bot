@@ -1,8 +1,10 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.03.6 Customer Location Bootstrap V3.3 + Universal Arrival Photo V1.1
+ * Version: 2026.09.07.1 Customer Advance Payment V1
  * File: ubee-customer-sw.js
+ *
+ * 2026-09-07 Customer Advance Payment V1：客戶端最高自動代墊上限調整為 NT$1,500；升版後清除舊 Customer Cache，確保已安裝 PWA 取得最新版 order.html。
  *
  * 2026-09-03 Customer Location Bootstrap V3.3：DOM 完成即啟動定位；Map 建立仍受定位閘門保護，第一個正式地圖畫面不得先顯示城市預設中心。
  * 2026-09-03 Customer Location Lock V3.2：首頁 Map 建立前必須先完成定位嘗試；定位未完成前保持 placeholder，不再先顯示其他服務城市中心。
@@ -22,7 +24,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.03.6-location-bootstrap-universal-photo-v3-3';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.07.1-advance-payment-1500';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
