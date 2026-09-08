@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-08｜Finance Center Guard V4.1：財務中心加入管理金鑰、所有財務 API 統一帶 x-ubee-admin-key，避免高權限財務資料裸露。 -->
+<!-- 2026-09-08｜Finance Ledger KPI Fix V1：今日收入類 KPI 改由後端只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。 -->
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -152,6 +154,8 @@ summary::-webkit-details-marker{display:none}
     </div>
     <div class="top-actions">
       <div class="status-pill" id="systemStatus"><span class="status-dot"></span><span id="systemStatusText">連線檢查中</span></div>
+      <input id="financeAdminKey" class="search" type="password" inputmode="text" autocomplete="off" placeholder="財務管理金鑰" style="max-width:220px">
+      <button class="btn primary" type="button" onclick="saveFinanceAdminKey()">套用金鑰</button>
       <button class="btn" type="button" onclick="refreshAll(true)">重新整理</button>
     </div>
   </header>
@@ -347,6 +351,43 @@ function showToast(message){
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(()=>el.style.display='none',3200);
 }
+function getFinanceAdminKey(){
+  return String(
+    sessionStorage.getItem('ubee_finance_admin_key') ||
+    sessionStorage.getItem('ubee_v4_admin_key') ||
+    ''
+  ).trim();
+}
+
+function saveFinanceAdminKey(){
+  const input = document.getElementById('financeAdminKey');
+  const key = String(input?.value || '').trim();
+
+  if(!key){
+    alert('請輸入財務管理金鑰。');
+    return;
+  }
+
+  sessionStorage.setItem('ubee_finance_admin_key', key);
+  sessionStorage.setItem('ubee_v4_admin_key', key);
+  showToast('財務管理金鑰已套用');
+  refreshAll(true);
+}
+
+function hydrateFinanceAdminKeyInput(){
+  const input = document.getElementById('financeAdminKey');
+  if(input && !input.value){
+    input.value = getFinanceAdminKey();
+  }
+}
+
+function financeAdminHeaders(extra = {}){
+  const key = getFinanceAdminKey();
+  return key
+    ? { ...extra, 'x-ubee-admin-key': key }
+    : { ...extra };
+}
+
 async function readJson(res){
   const data = await res.json().catch(()=>({}));
   if(!res.ok || data.success === false){
@@ -356,13 +397,16 @@ async function readJson(res){
 }
 async function getJson(path){
   const sep = path.includes('?') ? '&' : '?';
-  const res = await fetch(`${API_BASE}${path}${sep}t=${Date.now()}`,{cache:'no-store'});
+  const res = await fetch(`${API_BASE}${path}${sep}t=${Date.now()}`,{
+    cache:'no-store',
+    headers:financeAdminHeaders()
+  });
   return readJson(res);
 }
 async function postJson(path,body){
   const res = await fetch(`${API_BASE}${path}`,{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:financeAdminHeaders({'Content-Type':'application/json'}),
     body:JSON.stringify(body || {})
   });
   return readJson(res);
@@ -522,7 +566,7 @@ async function loadOverview(silent=false){
     if(!silent) showToast('財務總覽已更新');
   }catch(err){
     console.error(err);
-    if(!silent) showToast('讀取財務總覽失敗：'+err.message);
+    if(!silent) showToast('讀取財務總覽失敗：'+err.message+'；請確認財務管理金鑰。');
   }
 }
 
@@ -686,6 +730,12 @@ async function healthCheck(){
 
 async function refreshAll(showMessage=false){
   if(state.loading)return;
+  hydrateFinanceAdminKeyInput();
+
+  if(!getFinanceAdminKey()){
+    showToast('請先輸入財務管理金鑰。');
+  }
+
   state.loading=true;
   try{
     const ok=await healthCheck();
@@ -698,6 +748,7 @@ window.addEventListener('online',()=>refreshAll(true));
 window.addEventListener('offline',()=>healthCheck());
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')healthCheck();});
 
+hydrateFinanceAdminKeyInput();
 refreshAll(false);
 </script>
 </body>
