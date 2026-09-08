@@ -1,3 +1,4 @@
+// 2026-09-08｜Rider Activity V1：騎士 summary 正式回傳本月完成單數、活躍度、活躍等級與下月優先派單資格資料；第一階段只顯示，不改派單核心。
 // 2026-09-07｜Rider Background Presence V2：移除舊『Heartbeat 超過 5 分鐘即視為離線』邏輯；改為前景即時 / 背景 Push 可達 / 任務中真相三層 Presence，PWA 被 OS 暫停時不再誤判為主動下線。
 // 2026-09-07｜Dispatch Manual Unassign V1：調度中心新增「取消派單」；僅允許取件前解除目前小U，訂單退回 pending_dispatch 並重新媒合；抵達取件後啟用貨物安全鎖禁止直接解除。
 // 2026-09-03｜Universal Arrival Photo Backend V1.1：所有服務共用到場照片；排隊任務視為單一現場任務，抵達拍照後可直接進入處理並完成，不再要求不存在的送達點。
@@ -57,6 +58,100 @@ const RIDER_V2_COLLECTIONS = Object.freeze({
   locations: 'riderLocationsV2',
   stats: 'riderStatsV2',
 });
+
+
+// =====================================================
+// UBee Rider Activity V1：小U本月活躍度與優先派單資格
+// - 第一階段只回傳 summary 給 rider.html 顯示
+// - 不在前端用 localStorage 自行判斷資格，避免資料被竄改
+// - 後續要接派單時，可直接使用 level / dispatchDelaySeconds
+// =====================================================
+const UBEE_RIDER_ACTIVITY_TARGET = Math.max(
+  1,
+  Math.round(Number(process.env.UBEE_RIDER_ACTIVITY_TARGET || 5) || 5)
+);
+
+function clampRiderActivityPercent(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function buildUBeeRiderActivitySummary({
+  rider = {},
+  monthCompleted = 0,
+  nowMs = Date.now(),
+} = {}) {
+  const target = UBEE_RIDER_ACTIVITY_TARGET;
+  const completed = Math.max(0, Math.round(Number(monthCompleted || 0)));
+  const remainingTasks = Math.max(0, target - completed);
+  const percent = clampRiderActivityPercent((completed / target) * 100);
+
+  const approvedAtMs =
+    getDispatchPushTimeMs(rider.approvedAtMs) ||
+    getDispatchPushTimeMs(rider.approvedAt) ||
+    getDispatchPushTimeMs(rider.reviewedAtMs) ||
+    getDispatchPushTimeMs(rider.reviewedAt) ||
+    getDispatchPushTimeMs(rider.createdAtMs) ||
+    getDispatchPushTimeMs(rider.createdAt);
+
+  const daysSinceApproved = approvedAtMs
+    ? Math.floor((Number(nowMs || Date.now()) - approvedAtMs) / 86400000)
+    : null;
+
+  // 新加入但還沒開始跑的人，避免一開始就被標成低活躍。
+  const newbieGrace =
+    completed === 0 &&
+    Number.isFinite(daysSinceApproved) &&
+    daysSinceApproved >= 0 &&
+    daysSinceApproved < 30;
+
+  let level = 'inactive';
+  let levelText = '待活躍小U';
+  let dispatchDelaySeconds = 30;
+  let priorityQualified = false;
+
+  if (completed >= target) {
+    level = 'active';
+    levelText = '活躍小U';
+    dispatchDelaySeconds = 0;
+    priorityQualified = true;
+  } else if (completed >= 3) {
+    level = 'normal';
+    levelText = '一般小U';
+    dispatchDelaySeconds = 5;
+  } else if (completed >= 1) {
+    level = 'low';
+    levelText = '低活躍小U';
+    dispatchDelaySeconds = 15;
+  } else if (newbieGrace) {
+    level = 'newbie_grace';
+    levelText = '新手保護期';
+    dispatchDelaySeconds = 5;
+  }
+
+  const priorityStatusText = priorityQualified
+    ? '已取得下月優先派單資格。'
+    : newbieGrace
+      ? `新手保護期內，請先完成第一單建立活躍紀錄。本月目標 ${target} 單。`
+      : `再完成 ${remainingTasks} 單，可維持下月優先派單資格。`;
+
+  return {
+    version: 'rider-activity-v1',
+    target,
+    completed,
+    percent,
+    level,
+    levelText,
+    remainingTasks,
+    priorityQualified,
+    priorityStatusText,
+    dispatchDelaySeconds,
+    newbieGrace,
+    daysSinceApproved,
+    calculatedAtMs: Number(nowMs || Date.now()),
+  };
+}
 
 const RIDER_V2_APPLICATION_ROUND = '2026_RIDER_RESET';
 const RIDER_V2_DATA_VERSION = 2;
@@ -9825,6 +9920,7 @@ app.get('/api/rider/summary', riderAuthMiddleware, async (req, res) => {
 
     let weekIncome = 0;
     let monthIncome = 0;
+    let monthCompleted = 0;
 
     let pendingIncome = 0;
     let settledIncome = 0;
@@ -10097,8 +10193,15 @@ const riderIncome =
         completedAtMs <
           tomorrowStartMs
       ) {
+        monthCompleted += 1;
         monthIncome += riderIncome;
       }
+    });
+
+    const activity = buildUBeeRiderActivitySummary({
+      rider,
+      monthCompleted,
+      nowMs,
     });
 
     // ==============================
@@ -10177,6 +10280,17 @@ const riderIncome =
         // 期間統計
         weekIncome,
         monthIncome,
+        monthCompleted,
+
+        // 小U活躍度 / 下月優先派單資格
+        activity,
+        activityTarget: activity.target,
+        activityPercent: activity.percent,
+        activityLevel: activity.level,
+        activityLevelText: activity.levelText,
+        activityRemainingTasks: activity.remainingTasks,
+        activityPriorityQualified: activity.priorityQualified,
+        activityPriorityStatusText: activity.priorityStatusText,
 
         // 非現金單結算
         pendingIncome,
