@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-08｜Customer Global Supply V1：用戶端首頁即時運力改為全區可媒合小U；刪除附近公里數優先顯示與擴大媒合文案，避免與騎士端全區待接任務池衝突。 -->
 <!-- 2026-09-07｜Customer Advance Payment V1：最高自動代墊上限調整為 NT$1,500；超過 NT$1,500 才需客服人工確認；同步升級 Manifest 與 Customer Service Worker 快取版本。 -->
 <!-- 2026-09-03｜Customer Location Bootstrap V3.3：DOM 完成後立即啟動首次定位；首頁地圖建立前必須等待定位成功／失敗，未取得結果前維持定位占位，禁止先建立城市預設中心地圖。 -->
 <!-- 2026-09-03｜Customer Location Lock V3.2：首頁地圖建立前強制等待首次定位嘗試完成；未取得座標前只顯示定位中的地圖占位，不建立城市預設中心地圖，徹底避免首頁先跳到其他地區。 -->
@@ -12,11 +13,11 @@
 <!-- 2026-09-02｜Customer Home Layout V3.9：刪除舊版 flow-home-footer-brand CSS，修正舊 span 10px 規則覆蓋新版 60px 品牌字；UBee跑腿 改為真正單一樣式來源。 -->
 <!-- 2026-09-02｜Customer Home Layout V3.8：首頁底部浮水印維持原始三行品牌樣式，並進一步放大「UBee跑腿」品牌字，強化品牌感。 -->
 <!-- 2026-09-02｜Customer Home Layout V3.5：修正首頁底部 UBee 跑腿浮水印，改為接近原始品牌視覺的三行淡化樣式；其餘首頁結構與地圖互動維持 V3.4。 -->
-<!-- 2026-09-02｜Customer Match ETA V1：首頁即時運力加入後端媒合時間估算；顯示「最快約 X 分鐘媒合」，並保留 Home Platform V3 地圖、匿名小U與需求情境入口。 -->
+<!-- 2026-09-08｜Customer Global Match ETA V1：首頁媒合時間改以全區可媒合小U估算，不再依附近 3/5/10 公里數量呈現。 -->
 <!-- 2026-09-02｜Customer Home Platform V3：正式首頁加入即時服務地圖、匿名小U分布、低運力友善顯示、動態任務地址文案與需求情境入口；productionOrderFlow 為唯一正式首頁。 -->
-<!-- 2026-09-02｜Home Live Supply V2：首頁即時運力狀態重新顯眼呈現；優先依取件點／裝置定位顯示附近 5 公里可即時媒合小U數量，無定位時保留全區可媒合數量 fallback。 -->
-<!-- 2026-09-02｜Home Live Supply V2.1：即時運力卡正式接入 productionOrderFlow 首頁；附近 5 公里 / 全區 fallback 共用既有 service-status API。 -->
-<!-- 2026-09-02｜Home Live Supply V2.2 Compact：正式首頁即時運力改為中等尺寸狀態列；保留 5 公里媒合數，降低卡片高度與視覺搶佔。 -->
+<!-- 2026-09-08｜Home Live Supply Global V1：首頁即時運力固定顯示全區可媒合小U，不再切換全區 / 全區 fallback。 -->
+<!-- 2026-09-08｜Home Live Supply Global V1.1：productionOrderFlow 首頁共用全區 service-status，不再讀取全區欄位。 -->
+<!-- 2026-09-08｜Home Live Supply Global V1.2 Compact：正式首頁即時運力保留中等尺寸，但展示口徑改為全區任務池。 -->
 <!-- 2026-09-01｜Order ↔ Backend Pricing Contract V1：統一估價/建單服務欄位，加入全能跑腿 taskMinutes，排隊明細去重，樓層費改由後端正式判定。 -->
 <!-- UBee 長期正式營運穩定版：最近任務顯示金額與詳細資訊；任務細項、品項分類改為 App 式選擇。 -->
 <meta charset="utf-8"/>
@@ -8678,7 +8679,7 @@ body.ubee-app-starting{
 /* =====================================================
    2026-09-02｜UBee 首頁即時運力狀態 V2
    - 重新提高首頁可見度，不回到笨重的大卡片
-   - 有定位：主顯示附近 5 公里可即時媒合小U
+   - 有定位：主顯示全區可即時媒合小U
    - 無定位：顯示全區可即時媒合小U，並提示開啟定位
    ===================================================== */
 .home-service-status{
@@ -10325,7 +10326,7 @@ body.ubee-app-starting{
 </div>
 </div>
 <div class="home-service-status-note" id="homeServiceStatusNote">
-          取得定位後，會優先顯示附近 5 公里可即時媒合的小U。
+          目前顯示全區可媒合小U；建立任務後會進入全區待接任務池。
         </div>
 </div>
 <div class="ubee-v4-service-title">選擇服務</div>
@@ -19495,13 +19496,10 @@ async function resolveHomeServiceStatusPoint(){
 }
 
 function buildHomeServiceStatusEndpoint(endpoint, point){
-  if(!point || !hasValidLatLng(point.lat, point.lng)){
-    return endpoint;
-  }
-
-  const separator = endpoint.includes('?') ? '&' : '?';
-
-  return `${endpoint}${separator}pickupLat=${encodeURIComponent(point.lat)}&pickupLng=${encodeURIComponent(point.lng)}`;
+  // Customer Global Supply V1：
+  // 首頁服務狀態固定使用全區任務池口徑；定位仍可用於地圖，但不再把 pickupLat/pickupLng 傳給 service-status 做全區判斷。
+  void point;
+  return endpoint;
 }
 
 function mirrorHomeServiceStatusToProductionFlow(){
@@ -19582,12 +19580,10 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
     if(!homeHasSuccessfulServiceStatus){
       homeLastMatchEstimate = null;
       countEl.dataset.riderCount = '0';
-      countEl.dataset.scope = 'loading';
-      countEl.innerHTML = '<strong>正在更新小U運力</strong>';
-      noteEl.innerText = homeServiceLocationError
-        ? '目前無法取得定位，系統仍會嘗試更新全區可媒合小U。'
-        : '系統正在更新可即時媒合的小U數量。';
-      if(scopeEl) scopeEl.innerText = '更新中';
+      countEl.dataset.scope = 'global';
+      countEl.innerHTML = '<strong>正在更新全區小U運力</strong>';
+      noteEl.innerText = '系統正在更新全區可媒合小U，建立任務後會進入全區待接任務池。';
+      if(scopeEl) scopeEl.innerText = '全區任務池';
       timeEl.innerText = '稍後重試';
     }
 
@@ -19610,10 +19606,9 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
     )
   );
 
-  const pickupMatch =
-    data?.pickupMatch && typeof data.pickupMatch === 'object'
-      ? data.pickupMatch
-      : null;
+  const displayCount = mapRiderCount > 0
+    ? mapRiderCount
+    : onlineCount;
 
   const rawMatchEstimate =
     data?.matchEstimate && typeof data.matchEstimate === 'object'
@@ -19621,8 +19616,7 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
       : null;
 
   const fastestMatchMinutes = Number(
-    rawMatchEstimate?.fastestMatchMinutes ??
-    pickupMatch?.fastestMatchMinutes
+    rawMatchEstimate?.fastestMatchMinutes
   );
 
   homeLastMatchEstimate = rawMatchEstimate
@@ -19634,86 +19628,46 @@ function renderHomeServiceStatus(data, fallback = false, context = {}){
             : null
       }
     : {
-        available: Number.isFinite(fastestMatchMinutes) && fastestMatchMinutes > 0,
-        fastestMatchMinutes:
-          Number.isFinite(fastestMatchMinutes) && fastestMatchMinutes > 0
-            ? fastestMatchMinutes
-            : null,
-        supplyLevel: pickupMatch?.supplyLevel || 'none',
-        confidence: pickupMatch?.estimateConfidence || 'none'
+        available: false,
+        fastestMatchMinutes: null,
+        supplyLevel: displayCount > 0 ? 'global' : 'none',
+        confidence: displayCount > 0 ? 'low' : 'none'
       };
 
-  const nearby5kmRaw = pickupMatch?.nearbyRiderCount5km;
-  const hasNearby5km =
-    pickupMatch !== null &&
-    Number.isFinite(Number(nearby5kmRaw));
-
-  const displayCount = hasNearby5km
-    ? Math.max(0, Number(nearby5kmRaw))
-    : mapRiderCount;
-
   homeLastSuccessfulOnlineRiderCount = displayCount;
-  homeLastSuccessfulServiceScope = hasNearby5km ? 'nearby5km' : 'global';
+  homeLastSuccessfulServiceScope = 'global';
   homeHasSuccessfulServiceStatus = true;
 
   card.classList.remove('is-fallback','is-nearby','is-global','is-limited','is-empty');
-  card.classList.add(hasNearby5km ? 'is-nearby' : 'is-global');
+  card.classList.add('is-global');
 
   if(displayCount <= 0){
-    card.classList.add(mapRiderCount > 0 ? 'is-limited' : 'is-empty');
+    card.classList.add('is-empty');
+  }else if(mapRiderCount <= 0 && onlineCount > 0){
+    card.classList.add('is-limited');
   }
 
   countEl.dataset.riderCount = String(displayCount);
-  countEl.dataset.scope = homeLastSuccessfulServiceScope;
+  countEl.dataset.scope = 'global';
 
-  if(hasNearby5km){
-    // 首頁公開文案不在低密度時強調「只有 1 位 / 2 位」，
-    // 但 dataset 仍保留真實數量供內部 UI 與診斷使用。
-    if(displayCount <= 0){
-      countEl.innerHTML = '<strong>附近即時運力更新中</strong>';
-    }else if(displayCount <= 2){
-      countEl.innerHTML = '<strong>附近已有小U在線</strong>';
-    }else{
-      countEl.innerHTML =
-        `<strong>附近 5 公里有</strong> <span>${displayCount}</span> <strong>位小U</strong>`;
-    }
-
-    if(scopeEl) scopeEl.innerText = '附近 5 km';
-    if(kickerEl) kickerEl.innerText = context?.point?.source === 'pickup'
-      ? '取件地即時運力'
-      : '附近即時運力';
-
-    if(displayCount > 0){
-      noteEl.innerText = '目前可開始媒合，建立任務後系統會依取件位置安排小U。';
-    }else if(mapRiderCount > 0){
-      noteEl.innerText = '附近 5 公里暫無即時小U，系統仍可依任務位置擴大媒合範圍。';
-    }else if(onlineCount > 0){
-      noteEl.innerText = '目前已有小U在線，近期定位仍在更新。';
-    }else{
-      noteEl.innerText = '目前正在尋找可媒合小U，系統會持續更新。';
-    }
+  if(displayCount <= 0){
+    countEl.innerHTML = '<strong>全區即時運力更新中</strong>';
+  }else if(displayCount <= 2){
+    countEl.innerHTML = '<strong>全區已有小U在線</strong>';
   }else{
-    if(displayCount <= 0){
-      countEl.innerHTML = '<strong>即時運力更新中</strong>';
-    }else if(displayCount <= 2){
-      countEl.innerHTML = '<strong>目前已有小U在線</strong>';
-    }else{
-      countEl.innerHTML =
-        `<strong>目前有</strong> <span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
-    }
+    countEl.innerHTML =
+      `<strong>全區目前有</strong> <span>${displayCount}</span> <strong>位小U可即時媒合</strong>`;
+  }
 
-    if(scopeEl) scopeEl.innerText = '全區';
-    if(kickerEl) kickerEl.innerText = '即時小U運力';
+  if(scopeEl) scopeEl.innerText = '全區任務池';
+  if(kickerEl) kickerEl.innerText = '全區即時運力';
 
-    if(displayCount > 0){
-      noteEl.innerText = homeServiceLocationError
-        ? '目前顯示全區可媒合小U；定位開啟後會改顯示附近 5 公里。'
-        : '目前顯示全區可媒合小U；取得定位後會改顯示附近 5 公里。';
-    }else if(onlineCount > 0){
-      noteEl.innerText = '目前已有小U在線，近期定位正在更新。';
-    }else{
-      noteEl.innerText = '目前正在更新可媒合小U，系統會持續確認服務狀態。';
-    }
+  if(mapRiderCount > 0){
+    noteEl.innerText = '建立任務後會同步進入全區待接任務池，符合資格的小U都能看到。';
+  }else if(onlineCount > 0){
+    noteEl.innerText = '目前已有小U在線，定位與可媒合狀態仍在更新。';
+  }else{
+    noteEl.innerText = '目前正在更新全區可媒合小U，系統會持續確認服務狀態。';
   }
 
   renderHomeNearbyRiders(data?.nearbyRiders || []);
@@ -20693,8 +20647,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </style>
 <style id="ubee-production-live-supply-v22-compact-style">
 /* =====================================================
-   2026-09-02｜Production Flow 首頁即時運力 V2.2 Compact
-   中等尺寸原生狀態列：保留 5 公里即時運力，但不搶過服務入口。
+   2026-09-08｜Production Flow 首頁全區即時運力 V1 Compact
+   中等尺寸原生狀態列：顯示全區可媒合小U，不再使用全區口徑。
    ===================================================== */
 #productionOrderFlow .flow-live-supply-status{
   margin:0 0 11px;
@@ -21142,7 +21096,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       <div class="flow-live-supply-time" id="flowLiveSupplyTime">--:--</div>
     </div>
   </div>
-  <div class="flow-live-supply-note" id="flowLiveSupplyNote">取得定位後，會優先顯示附近 5 公里可即時媒合的小U。</div>
+  <div class="flow-live-supply-note" id="flowLiveSupplyNote">目前顯示全區可媒合小U；建立任務後會進入全區待接任務池。</div>
 </div>
 </div>
 <div class="flow-home-action-head"><strong>需要小U幫什麼？</strong><span>選擇服務後再填地點</span></div>
