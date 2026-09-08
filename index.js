@@ -1,4 +1,6 @@
 // 2026-09-08｜Rider Global Task Pool Backend V1：待接任務改為全員可見任務池；/api/rider/tasks 不做距離擴圈限制，Web Push 第一波直接全區通知。
+// 2026-09-08｜Finance Center Guard V4.1：財務中心 API 加入 x-ubee-admin-key 驗證，避免財務總覽、回繳、撥款與對帳 API 裸露。
+// 2026-09-08｜Finance Ledger KPI Fix V1：訂單財務總帳今日收入類 KPI 只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。
 // 2026-09-08｜Rider Activity V1：騎士 summary 正式回傳本月完成單數、活躍度、活躍等級與下月優先派單資格資料；第一階段只顯示，不改派單核心。
 // 2026-09-07｜Rider Background Presence V2：移除舊『Heartbeat 超過 5 分鐘即視為離線』邏輯；改為前景即時 / 背景 Push 可達 / 任務中真相三層 Presence，PWA 被 OS 暫停時不再誤判為主動下線。
 // 2026-09-07｜Dispatch Manual Unassign V1：調度中心新增「取消派單」；僅允許取件前解除目前小U，訂單退回 pending_dispatch 並重新媒合；抵達取件後啟用貨物安全鎖禁止直接解除。
@@ -956,6 +958,14 @@ const UBEE_RIDER_COMMUNITIES = Object.freeze({
 
 const UBEE_RIDER_V4_ADMIN_KEY =
   String(process.env.UBEE_RIDER_V4_ADMIN_KEY || '').trim();
+
+const UBEE_FINANCE_ADMIN_KEY =
+  String(
+    process.env.UBEE_FINANCE_ADMIN_KEY ||
+    process.env.UBEE_ADMIN_KEY ||
+    process.env.UBEE_RIDER_V4_ADMIN_KEY ||
+    ''
+  ).trim();
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_SERVER_API_KEY =
   process.env.GOOGLE_MAPS_SERVER_API_KEY || GOOGLE_MAPS_API_KEY;
@@ -6033,6 +6043,32 @@ function requireRiderV4AdminKey(req, res, next) {
   return next();
 }
 
+function requireFinanceAdminKey(req, res, next) {
+  if (!UBEE_FINANCE_ADMIN_KEY) {
+    return res.status(503).json({
+      success: false,
+      message: '尚未設定 UBEE_FINANCE_ADMIN_KEY 或 UBEE_RIDER_V4_ADMIN_KEY，財務中心暫不開放。',
+    });
+  }
+
+  const key = String(
+    req.headers['x-ubee-admin-key'] ||
+    req.headers['x-ubee-finance-key'] ||
+    req.body?.adminKey ||
+    req.query?.adminKey ||
+    ''
+  ).trim();
+
+  if (!key || key !== UBEE_FINANCE_ADMIN_KEY) {
+    return res.status(401).json({
+      success: false,
+      message: '財務中心授權失敗，請重新輸入管理金鑰。',
+    });
+  }
+
+  return next();
+}
+
 function isApprovedRiderData(riderData) {
   if (!riderData) return false;
 
@@ -10557,7 +10593,7 @@ function getFinanceCashAmounts(order = {}) {
 // ============================================================
 // UBee 財務結算中心 V2：總覽／異常／結算紀錄
 // ============================================================
-app.get('/api/admin/finance-overview', async (req, res) => {
+app.get('/api/admin/finance-overview', requireFinanceAdminKey, async (req, res) => {
   try {
     const snap = await db
       .collection('orders')
@@ -10867,7 +10903,7 @@ app.get('/api/admin/finance-overview', async (req, res) => {
 // UBee 財務結算中心 V2：街口待撥款
 // 回傳「騎士收入 + 騎士代墊款」作為平台實際應撥總額
 // ============================================================
-app.get('/api/admin/pending-settlements', async (req, res) => {
+app.get('/api/admin/pending-settlements', requireFinanceAdminKey, async (req, res) => {
   try {
     // 不要求 settlementStatus 欄位一定已存在，
     // 讓舊的已完成街口訂單也能由後端統一判斷是否待撥。
@@ -11179,7 +11215,7 @@ async function settleFinanceJkoOrders({
 }
 
 // 單筆街口撥款：保留舊 API，相容既有財務中心／外部流程
-app.post('/api/admin/settle-order', async (req, res) => {
+app.post('/api/admin/settle-order', requireFinanceAdminKey, async (req, res) => {
   try {
     const orderId = String(
       req.body?.orderId || ''
@@ -11231,7 +11267,7 @@ app.post('/api/admin/settle-order', async (req, res) => {
 });
 
 // 批次街口撥款：財務中心可一次確認同一小U全部待撥訂單
-app.post('/api/admin/settle-orders', async (req, res) => {
+app.post('/api/admin/settle-orders', requireFinanceAdminKey, async (req, res) => {
   try {
     const rawOrderIds = Array.isArray(req.body?.orderIds)
       ? req.body.orderIds
@@ -11357,6 +11393,7 @@ function isMerchantReceivableOrder(order) {
 
 app.get(
   '/api/admin/cash-remittances',
+  requireFinanceAdminKey,
   async (req, res) => {
     try {
       // 不使用複合索引：
@@ -11708,6 +11745,7 @@ app.get(
 
 app.post(
   '/api/admin/cash-remittances/settle',
+  requireFinanceAdminKey,
   async (req, res) => {
     try {
       const body =
@@ -38356,7 +38394,7 @@ async function writeFinanceAuditLog({ orderId, type, operator, reason, before = 
   return nowMs;
 }
 
-app.get('/api/admin/finance-ledger', async (req, res) => {
+app.get('/api/admin/finance-ledger', requireFinanceAdminKey, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const query = String(req.query.q || req.query.query || '').trim().toLowerCase();
@@ -38412,8 +38450,17 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
       if (item.reconciliationStatus === 'reconciled') summary.reconciledCount += 1;
       summary.totalVarianceAmount += Math.abs(item.customerVariance) + Math.abs(item.platformVariance) + Math.abs(item.settlementVariance);
 
-      const when = Number(item.completedAtMs || item.createdAtMs || 0);
-      if (when >= todayStartMs && when < tomorrowStartMs) {
+      const isCompletedFinanceOrder =
+        ['completed', 'done'].includes(
+          String(item.orderStatus || '').trim().toLowerCase()
+        );
+
+      const when = Number(item.completedAtMs || 0);
+      if (
+        isCompletedFinanceOrder &&
+        when >= todayStartMs &&
+        when < tomorrowStartMs
+      ) {
         summary.todayCustomerRevenue += item.actualPaidAmount;
         summary.todayPlatformIncome += item.expectedPlatformIncome;
         summary.todayRiderIncome += item.riderIncome;
@@ -38433,7 +38480,7 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
   }
 });
 
-app.get('/api/admin/finance-orders/:orderId', async (req, res) => {
+app.get('/api/admin/finance-orders/:orderId', requireFinanceAdminKey, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const doc = await getFinanceOrderDoc(req.params.orderId);
@@ -38459,7 +38506,7 @@ app.get('/api/admin/finance-orders/:orderId', async (req, res) => {
   }
 });
 
-app.post('/api/admin/finance-orders/:orderId/adjust', async (req, res) => {
+app.post('/api/admin/finance-orders/:orderId/adjust', requireFinanceAdminKey, async (req, res) => {
   try {
     const field = String(req.body?.field || '').trim();
     const reason = String(req.body?.reason || '').trim();
@@ -38506,7 +38553,7 @@ app.post('/api/admin/finance-orders/:orderId/adjust', async (req, res) => {
   }
 });
 
-app.post('/api/admin/finance-orders/:orderId/payment-status', async (req, res) => {
+app.post('/api/admin/finance-orders/:orderId/payment-status', requireFinanceAdminKey, async (req, res) => {
   try {
     const allowed = new Set(['unpaid', 'partial', 'paid', 'cash_pending', 'cash_collected', 'refunded', 'cancelled']);
     const status = String(req.body?.status || '').trim().toLowerCase();
@@ -38551,7 +38598,7 @@ app.post('/api/admin/finance-orders/:orderId/payment-status', async (req, res) =
   }
 });
 
-app.post('/api/admin/finance-orders/:orderId/reconcile', async (req, res) => {
+app.post('/api/admin/finance-orders/:orderId/reconcile', requireFinanceAdminKey, async (req, res) => {
   try {
     const operator = String(req.body?.operator || 'finance_center').trim().slice(0, 100);
     const note = String(req.body?.note || '').trim();
