@@ -1,6 +1,7 @@
-// 2026-09-08｜Rider Global Task Pool Backend V1.2 No Radius Clean：清除可重新啟動距離半徑派單的殘留路徑；舊 expand-radius API 改為全區重新通知相容入口。
+// 2026-09-08｜Customer Global Supply Backend V1：客戶端 service-status 改為全區可媒合小U，不再回傳附近公里數作為媒合依據。
+// 2026-09-08｜Rider Global Task Pool Backend V1.2 No Radius Clean：清除可重新啟動距離圈派單的殘留路徑；舊 expand-radius API 改為全區重新通知相容入口。
 // 2026-09-08｜Finance Center No Key V4.4：依營運需求徹底移除財務中心 API 金鑰驗證；admin 財務頁不再要求輸入金鑰。
-// 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean：待接任務改為全員可見任務池；/api/rider/tasks 不做距離擴圈限制，Web Push 第一波直接全區通知。
+// 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean：待接任務改為全員可見任務池；/api/rider/tasks 不做距離限制，Web Push 第一波直接全區通知。
 // 2026-09-08｜Finance Ledger KPI Fix V1：訂單財務總帳今日收入類 KPI 只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。
 // 2026-09-08｜Rider Activity V1：騎士 summary 正式回傳本月完成單數、活躍度、活躍等級與下月優先派單資格資料；第一階段只顯示，不改派單核心。
 // 2026-09-07｜Rider Background Presence V2：移除舊『Heartbeat 超過 5 分鐘即視為離線』邏輯；改為前景即時 / 背景 Push 可達 / 任務中真相三層 Presence，PWA 被 OS 暫停時不再誤判為主動下線。
@@ -20,7 +21,7 @@ const admin = require('firebase-admin');
 const webpush = require('web-push');
 const multer = require('multer');
 
-// 2026-09-02｜Customer Match ETA V1：客戶端 service-status 加入附近運力／距離推估的媒合時間、供給等級與信心度；僅作即時估算，不作接單保證。
+// 2026-09-08｜Customer Global Match ETA V1：客戶端 service-status 以全區可媒合小U估算媒合時間，不再依附近公里數判斷。
 // 2026-09-01｜Order ↔ Backend Pricing Contract V1：Quote Lock 加入 serviceKey/queueMinutes/taskMinutes/upstairsOption/advancePayment 驗證；樓層費改由後端 canonical 規則決定。
 // 2026-09-01｜Rider Safety Backend V12.1：安全回報支援 payment/item、money→payment 相容正規化，並驗證 orderId 存在與騎士歸屬後才允許關聯／回寫訂單。
 // UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
@@ -2087,7 +2088,7 @@ async function sendNewOrderPushToRiders(
         .filter(Boolean)
     );
 
-    // 2026-09-08｜Global Task Pool V1.2：後端不再接受距離半徑作為派單可見條件。
+    // 2026-09-08｜Global Task Pool V1.2：後端不再接受距離距離圈作為派單可見條件。
     // maxRadiusKm 只保留在函式簽名中，避免舊呼叫點因參數數量改變而噴錯。
     void maxRadiusKm;
 
@@ -2136,7 +2137,7 @@ async function sendNewOrderPushToRiders(
         // 原本每次派單都先讀取最多 300 位小U，再於記憶體檢查 webPushEnabled。
         // 現在把「webPushEnabled === true」這個既有必要條件提前到 Firestore 查詢，
         // 只讀真正可能收到 Web Push 的小U；核准、在線、資格、
-        // 預約可用時段與略過名單等既有判斷保留；距離擴圈改為全區第一波通知。
+        // 預約可用時段與略過名單等既有判斷保留；距離條件改為全區第一波通知。
         const ridersSnap = await db
           .collection(RIDER_V2_COLLECTIONS.riders)
           .where('webPushEnabled', '==', true)
@@ -2407,7 +2408,7 @@ async function sendNewOrderPushToRiders(
 //
 // 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean
 // - 「我的任務 → 待接任務」由 /api/rider/tasks 作為全員可見任務池。
-// - Web Push 第一波直接全區通知，不再用 3km / 5km / 8km 擴圈擋住小U。
+// - Web Push 第一波直接全區通知，不再用距離圈擋住小U。
 // - 距離仍可保留作為前端排序與參考資訊，但不再是能不能看見待接任務的條件。
 // - 已通知過的小U不重複通知；訂單被接走、取消或完成後，停止後續流程。
 // =====================================================
@@ -2476,20 +2477,9 @@ function getDispatchWaveTimestampField(stage) {
       .trim()
       .toLowerCase();
 
-  if (safeStage === "all") {
-    return "dispatchPushAllAt";
-  }
-
-  const radiusMatch =
-    safeStage.match(/^(\d+)km$/);
-
-  if (!radiusMatch) {
-    return "";
-  }
-
-  return (
-    `dispatchPush${radiusMatch[1]}kmAt`
-  );
+  return safeStage === "all"
+    ? "dispatchPushAllAt"
+    : "";
 }
 
 
@@ -2541,7 +2531,7 @@ async function runDispatchPushWave(
     ...orderDoc.data(),
   };
 
-  // 訂單已被接單、取消或完成，停止所有後續擴圈。
+  // 訂單已被接單、取消或完成，停止後續全區通知。
   if (
     String(order.status || "")
       .trim() !== "pending_dispatch"
@@ -2639,7 +2629,7 @@ async function runDispatchPushWave(
       safeStage === 'all' ? 'all' : 'all',
 
     dispatchPushLastRadiusKm:
-      999,
+      null,
 
     dispatchPushVisibilityMode:
       'global_pending_task_pool',
@@ -2677,7 +2667,7 @@ async function runDispatchPushWave(
   );
 
   console.log(
-    `UBee 分段派單完成：` +
+    `UBee 全區任務池通知完成：` +
     `${safeOrderId}，` +
     `階段 ${safeStage}，` +
     `本次新通知 ${newlyNotified.length} 位小U`
@@ -3062,30 +3052,8 @@ async function startDispatchPushSequence(
 
       dispatchStartedAtMs:
         startedAtMs,
-
-      dispatchPush3kmAt:
-        null,
-
-      dispatchPush5kmAt:
-        null,
-
-      dispatchPush8kmAt:
-        null,
-
-      dispatchPush10kmAt:
-        null,
-
-      dispatchPush12kmAt:
-        null,
-
-      dispatchPush15kmAt:
-        null,
-
-      dispatchPush17kmAt:
-        null,
-
-      dispatchPush20kmAt:
-        null,
+      dispatchPushVisibilityMode:
+        'global_pending_task_pool',
 
       dispatchPushAllAt:
         null,
@@ -7857,7 +7825,8 @@ function buildRiderPendingTaskPreview(order = {}) {
       Date.now(),
     dispatchStartedAtMs: Number(order.dispatchStartedAtMs || 0),
     redispatchStartedAtMs: Number(order.redispatchStartedAtMs || 0),
-    dispatchRadiusKm: Number(order.dispatchRadiusKm || 0),
+    dispatchRadiusKm: null,
+    dispatchVisibilityMode: 'global_pending_task_pool',
     skippedRiderIds: Array.isArray(order.skippedRiderIds)
       ? order.skippedRiderIds
       : [],
@@ -13331,24 +13300,19 @@ function buildOrderRiskInsight(order, riders, zoneSummary, statsMap, nowMs = Dat
     .filter(Boolean)
     .sort((a,b) => b.score - a.score || a.distanceKm - b.distanceKm);
 
-  const within3 = candidates.filter(c => c.distanceKm <= 3 && !c.skippedThisOrder).length;
-  const within5 = candidates.filter(c => c.distanceKm <= 5 && !c.skippedThisOrder).length;
-  const within8 = candidates.filter(c => c.distanceKm <= 8 && !c.skippedThisOrder).length;
+  const nearbyCandidateCount = candidates.filter(c => c.distanceKm <= 8 && !c.skippedThisOrder).length;
   const nearestKm = candidates.length ? Math.min(...candidates.filter(c=>!c.skippedThisOrder).map(c=>c.distanceKm).concat([999])) : null;
   const skippedCount = Array.isArray(order.skippedRiderIds) ? order.skippedRiderIds.length : 0;
-  const radiusKm = Number(order.dispatchManualRadiusKm || order.dispatchManualRedispatchRadiusKm || order.dispatchRadiusKm || 3) || 3;
   const speed = String(order.speedType || '').toLowerCase();
 
   let score = Math.min(38, waitMinutes * 4.6);
   const reasons = [];
   if (waitMinutes >= 2) reasons.push(`已等待 ${Math.floor(waitMinutes)} 分鐘`);
-  if (within3 === 0) { score += 18; reasons.push('3 km 內無可接小U'); }
-  else if (within3 <= 1) { score += 8; reasons.push('3 km 內運力偏少'); }
-  if (within5 === 0) { score += 10; reasons.push('5 km 內仍無可接小U'); }
+  if (nearbyCandidateCount === 0) { score += 18; reasons.push('取件點附近即時候選偏少'); }
+  else if (nearbyCandidateCount <= 1) { score += 8; reasons.push('取件點附近候選較少，但任務仍為全區可見'); }
   if (nearestKm !== null && nearestKm > 8 && nearestKm < 999) { score += 10; reasons.push(`最近可接小U約 ${nearestKm.toFixed(1)} km`); }
   if (nearestKm === 999 || nearestKm === null) { score += 14; reasons.push('目前找不到可用候選小U'); }
   if (skippedCount >= 2) { score += Math.min(12, skippedCount * 2); reasons.push(`已有 ${skippedCount} 次略過紀錄`); }
-  if (radiusKm >= 8) { score += 5; reasons.push(`已擴圈至 ${radiusKm} km`); }
   if (['priority','express','instant','urgent'].includes(speed)) { score += 6; reasons.push('此任務時效要求較高'); }
   if (zoneSummary && Number(zoneSummary.expectedGap15m) < 0) {
     score += Math.min(12, Math.abs(Number(zoneSummary.expectedGap15m)) * 2);
@@ -13362,9 +13326,6 @@ function buildOrderRiskInsight(order, riders, zoneSummary, statsMap, nowMs = Dat
   else if (score >= 35) level = 'WATCH';
 
   const recommendations = [];
-  if (within3 === 0 && radiusKm < 5) recommendations.push({ type:'EXPAND_RADIUS', targetRadiusKm:5, label:'擴大派單至 5 km' });
-  else if (within5 === 0 && radiusKm < 8) recommendations.push({ type:'EXPAND_RADIUS', targetRadiusKm:8, label:'擴大派單至 8 km' });
-  else if (within8 === 0 && radiusKm < 12) recommendations.push({ type:'EXPAND_RADIUS', targetRadiusKm:12, label:'擴大派單至 12 km' });
   if (candidates[0] && candidates[0].score >= 55) recommendations.push({ type:'REVIEW_CANDIDATE', riderId:candidates[0].riderId, label:`優先檢視 ${candidates[0].name || candidates[0].riderId}` });
   if (score >= 60) recommendations.push({ type:'MANUAL_REVIEW', label:'進入人工調度確認' });
 
@@ -13373,18 +13334,15 @@ function buildOrderRiskInsight(order, riders, zoneSummary, statsMap, nowMs = Dat
     score,
     level,
     waitMinutes: Number(waitMinutes.toFixed(1)),
-    within3,
-    within5,
-    within8,
+    nearbyCandidateCount,
     nearestKm: nearestKm === null || nearestKm === 999 ? null : Number(nearestKm.toFixed(2)),
     skippedCount,
-    radiusKm,
+    visibilityMode: 'global_pending_task_pool',
     reasons: reasons.slice(0, 6),
     recommendations,
     candidates: candidates.slice(0, 8),
   };
 }
-
 
 // ============================================================
 // UBee V3：進行中任務異常監控 / 備援建議
@@ -14636,7 +14594,8 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         riderSpeed: o.riderSpeed ?? null,
         riderLocationAccuracy: o.riderLocationAccuracy ?? null,
 
-        dispatchRadiusKm: Number(o.dispatchManualRadiusKm || o.dispatchManualRedispatchRadiusKm || 0) || null,
+        dispatchRadiusKm: null,
+        dispatchVisibilityMode: o.dispatchPushVisibilityMode || 'global_pending_task_pool',
         speedType: o.speedType || '',
         serviceKey: o.serviceKey || '',
         serviceGroup: o.serviceGroup || '',
@@ -27512,31 +27471,21 @@ const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
 const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
 const CUSTOMER_RIDER_MAX_MARKERS = 80;
 
-// Customer Match ETA V1：
-// 以「目前可即時媒合的小U數量 + 距離」估算媒合等待時間。
+// 2026-09-08｜Customer Global Match ETA V1：
+// 以全區可媒合小U數量估算媒合等待時間。
 // 這不是 SLA，也不代表特定小U已接受任務；實際時間仍受任務內容、接單意願與即時狀態影響。
-const CUSTOMER_MATCH_ESTIMATE_VERSION = 'supply-distance-v1';
+const CUSTOMER_MATCH_ESTIMATE_VERSION = 'global-task-pool-v1';
 
 function buildCustomerMatchEstimate({
-  hasPickupPoint,
-  nearbyRiderCount3km = 0,
-  nearbyRiderCount5km = 0,
-  nearbyRiderCount10km = 0,
-  nearestRiderDistanceKm = null,
   mapRiderCount = 0,
   onlineRiderCount = 0,
+  declaredOnlineRiderCount = 0,
 } = {}) {
   const counts = {
-    nearby3km: Math.max(0, Number(nearbyRiderCount3km || 0)),
-    nearby5km: Math.max(0, Number(nearbyRiderCount5km || 0)),
-    nearby10km: Math.max(0, Number(nearbyRiderCount10km || 0)),
     realtime: Math.max(0, Number(mapRiderCount || 0)),
     publicOnline: Math.max(0, Number(onlineRiderCount || 0)),
+    declaredOnline: Math.max(0, Number(declaredOnlineRiderCount || 0)),
   };
-
-  const nearestKm = Number.isFinite(Number(nearestRiderDistanceKm))
-    ? Math.max(0, Number(nearestRiderDistanceKm))
-    : null;
 
   const makeEstimate = (
     fastestMinutes,
@@ -27555,63 +27504,24 @@ function buildCustomerMatchEstimate({
     confidence,
     basis,
     estimateVersion: CUSTOMER_MATCH_ESTIMATE_VERSION,
-    disclaimer: '依目前附近小U與定位狀態估算，實際媒合時間可能因任務內容、接單意願與即時運力變動。',
+    visibilityMode: 'global_pending_task_pool',
+    disclaimer: '依目前全區可媒合小U與任務池狀態估算，實際媒合時間可能因任務內容、接單意願與即時運力變動。',
   });
 
-  if (hasPickupPoint) {
-    if (counts.nearby3km >= 4) {
-      return makeEstimate(3, 3, 5, 'high', 'high', 'pickup_3km_dense');
-    }
+  if (counts.realtime >= 6) {
+    return makeEstimate(4, 4, 7, 'high', 'medium', 'global_realtime_dense');
+  }
 
-    if (counts.nearby3km >= 2) {
-      return makeEstimate(3, 3, 6, 'high', 'high', 'pickup_3km');
-    }
+  if (counts.realtime >= 3) {
+    return makeEstimate(5, 5, 9, 'normal', 'medium', 'global_realtime');
+  }
 
-    if (counts.nearby3km === 1) {
-      const fastest = nearestKm !== null && nearestKm <= 1.5 ? 3 : 4;
-      return makeEstimate(fastest, fastest, fastest + 4, 'normal', 'medium', 'pickup_3km_single');
-    }
+  if (counts.realtime >= 1) {
+    return makeEstimate(8, 8, 13, 'limited', 'low', 'global_realtime_limited');
+  }
 
-    if (counts.nearby5km >= 2) {
-      return makeEstimate(5, 5, 8, 'normal', 'medium', 'pickup_5km');
-    }
-
-    if (counts.nearby5km === 1) {
-      return makeEstimate(6, 6, 10, 'limited', 'medium', 'pickup_5km_single');
-    }
-
-    if (counts.nearby10km >= 2) {
-      return makeEstimate(8, 8, 12, 'limited', 'low', 'pickup_10km');
-    }
-
-    if (counts.nearby10km === 1) {
-      return makeEstimate(10, 10, 15, 'expanded', 'low', 'pickup_10km_single');
-    }
-
-    if (counts.realtime > 0) {
-      return makeEstimate(12, 12, 18, 'expanded', 'low', 'realtime_outside_10km');
-    }
-
-    if (counts.publicOnline > 0) {
-      return makeEstimate(15, 15, 22, 'limited', 'low', 'public_online_location_refreshing');
-    }
-  } else {
-    // 尚未取得客人位置時，只以全區即時運力做低信心度估算。
-    if (counts.realtime >= 6) {
-      return makeEstimate(4, 4, 7, 'high', 'low', 'global_realtime_dense');
-    }
-
-    if (counts.realtime >= 3) {
-      return makeEstimate(5, 5, 9, 'normal', 'low', 'global_realtime');
-    }
-
-    if (counts.realtime >= 1) {
-      return makeEstimate(8, 8, 13, 'limited', 'low', 'global_realtime_limited');
-    }
-
-    if (counts.publicOnline > 0) {
-      return makeEstimate(15, 15, 22, 'limited', 'low', 'global_public_online');
-    }
+  if (counts.publicOnline > 0 || counts.declaredOnline > 0) {
+    return makeEstimate(12, 12, 18, 'updating', 'low', 'global_online_location_refreshing');
   }
 
   return {
@@ -27622,9 +27532,10 @@ function buildCustomerMatchEstimate({
     estimatedMatchMaxMinutes: null,
     supplyLevel: 'none',
     confidence: 'none',
-    basis: 'no_realtime_supply',
+    basis: 'no_global_realtime_supply',
     estimateVersion: CUSTOMER_MATCH_ESTIMATE_VERSION,
-    disclaimer: '目前沒有足夠即時運力資料可估算媒合時間。',
+    visibilityMode: 'global_pending_task_pool',
+    disclaimer: '目前沒有足夠全區即時運力資料可估算媒合時間。',
   };
 }
 
@@ -27690,22 +27601,9 @@ app.get('/api/customer/service-status', async (req, res) => {
   try {
     const nowMs = Date.now();
 
-    const pickupLat =
-      getNullableCoordinate(
-        req.query.pickupLat ||
-        req.query.lat
-      );
-
-    const pickupLng =
-      getNullableCoordinate(
-        req.query.pickupLng ||
-        req.query.lng
-      );
-
-    const hasPickupPoint =
-      isValidLatitude(pickupLat) &&
-      isValidLongitude(pickupLng);
-
+    // Customer Global Supply Backend V1：
+    // pickupLat / pickupLng 查詢參數保留相容，但不再依取件點切附近公里數。
+    // 客戶端首頁只顯示全區可媒合小U與全區任務池估算。
     const ridersSnap = await db
       .collection(RIDER_V2_COLLECTIONS.riders)
       .limit(500)
@@ -27714,10 +27612,6 @@ app.get('/api/customer/service-status', async (req, res) => {
     let declaredOnlineRiderCount = 0;
     let onlineRiderCount = 0;
     let mapRiderCount = 0;
-    let nearbyRiderCount3km = 0;
-    let nearbyRiderCount5km = 0;
-    let nearbyRiderCount10km = 0;
-    let nearestRiderDistanceKm = null;
     const nearbyRiders = [];
 
     ridersSnap.forEach((riderDoc) => {
@@ -27728,7 +27622,7 @@ app.get('/api/customer/service-status', async (req, res) => {
       const online = rider.online === true;
 
       // Firestore 裡 online=true 只代表小U曾主動按下上線。
-      // 先保留這個原始數字供內部診斷，但不直接公開給客人端。
+      // 先保留這個原始數字供內部診斷，但不直接公開成「保證可接」。
       if (!approved || !online) {
         return;
       }
@@ -27751,7 +27645,7 @@ app.get('/api/customer/service-status', async (req, res) => {
         locationAgeMs >= 0 &&
         locationAgeMs <= CUSTOMER_RIDER_PUBLIC_ONLINE_MS;
 
-      // 超過 30 分鐘沒有定位更新，客人端公開狀態視為離線。
+      // 超過 30 分鐘沒有定位更新，客人端公開狀態視為需要重新更新。
       if (!publicOnline) {
         return;
       }
@@ -27767,39 +27661,6 @@ app.get('/api/customer/service-status', async (req, res) => {
       }
 
       mapRiderCount += 1;
-
-      if (hasPickupPoint) {
-        const distanceKm =
-          calcDispatchPushDistanceKm(
-            pickupLat,
-            pickupLng,
-            point.lat,
-            point.lng
-          );
-
-        if (Number.isFinite(distanceKm)) {
-          if (
-            nearestRiderDistanceKm === null ||
-            distanceKm <
-              nearestRiderDistanceKm
-          ) {
-            nearestRiderDistanceKm =
-              distanceKm;
-          }
-
-          if (distanceKm <= 3) {
-            nearbyRiderCount3km += 1;
-          }
-
-          if (distanceKm <= 5) {
-            nearbyRiderCount5km += 1;
-          }
-
-          if (distanceKm <= 10) {
-            nearbyRiderCount10km += 1;
-          }
-        }
-      }
 
       if (nearbyRiders.length >= CUSTOMER_RIDER_MAX_MARKERS) {
         return;
@@ -27817,18 +27678,15 @@ app.get('/api/customer/service-status', async (req, res) => {
     });
 
     const matchEstimate = buildCustomerMatchEstimate({
-      hasPickupPoint,
-      nearbyRiderCount3km,
-      nearbyRiderCount5km,
-      nearbyRiderCount10km,
-      nearestRiderDistanceKm,
       mapRiderCount,
       onlineRiderCount,
+      declaredOnlineRiderCount,
     });
 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+
     return res.json({
       success: true,
       declaredOnlineRiderCount,
@@ -27836,39 +27694,9 @@ app.get('/api/customer/service-status', async (req, res) => {
       mapRiderCount,
       nearbyRiders,
       matchEstimate,
-
-      pickupMatch:
-        hasPickupPoint
-          ? {
-              pickupLat,
-              pickupLng,
-              nearbyRiderCount3km,
-              nearbyRiderCount5km,
-              nearbyRiderCount10km,
-              nearestRiderDistanceKm:
-                nearestRiderDistanceKm === null
-                  ? null
-                  : Number(
-                      nearestRiderDistanceKm
-                        .toFixed(2)
-                    ),
-              matchLevel:
-                nearbyRiderCount3km >= 3
-                  ? 'good'
-                  : nearbyRiderCount5km > 0
-                    ? 'limited'
-                    : mapRiderCount > 0
-                      ? 'expand_required'
-                      : 'none',
-              fastestMatchMinutes: matchEstimate.fastestMatchMinutes,
-              estimatedMatchMinutes: matchEstimate.estimatedMatchMinutes,
-              estimatedMatchMinMinutes: matchEstimate.estimatedMatchMinMinutes,
-              estimatedMatchMaxMinutes: matchEstimate.estimatedMatchMaxMinutes,
-              supplyLevel: matchEstimate.supplyLevel,
-              estimateConfidence: matchEstimate.confidence,
-            }
-          : null,
-
+      taskPoolVisibilityMode: 'global_pending_task_pool',
+      serviceStatusMode: 'global_supply',
+      pickupMatch: null,
       updatedAt: new Date(nowMs).toISOString(),
       locationFreshSeconds: Math.floor(
         CUSTOMER_RIDER_LOCATION_FRESH_MS / 1000
@@ -27884,7 +27712,7 @@ app.get('/api/customer/service-status', async (req, res) => {
           CUSTOMER_RIDER_OFFSET_BUCKET_MS / 60000
         ),
       },
-      scope: 'public_online_riders_and_realtime_matchable_locations',
+      scope: 'global_public_online_riders_and_realtime_matchable_locations',
     });
   } catch (error) {
     console.error('❌ 客戶端服務狀態 API 讀取失敗：', error);
@@ -30981,8 +30809,9 @@ async function createMerchantOrderV3({
     completedDeliveryStopCount: 0,
     extraStopFee: Math.max(0, stops.length - 1) * 20,
 
-    // 新店家單立即從 3 公里開始分段派單；後續仍由原本派單核心擴圈。
-    dispatchRadiusKm: deliveryMode === 'ubee' ? 3 : 0,
+    // 新店家單直接進入全區待接任務池；不再寫入舊起始距離欄位。
+    dispatchRadiusKm: null,
+    dispatchVisibilityMode: deliveryMode === 'ubee' ? 'global_pending_task_pool' : 'merchant_only',
 
     distanceMeters: route.distanceMeters,
     durationSeconds: route.durationSeconds,
@@ -36169,27 +35998,10 @@ async function handleEvent(event) {
 // 重要原則：
 // 1. 不建立第二套派單核心。
 // 2. 指定小U沿用騎士接單的 Transaction 安全模型。
-// 3. 重新派單沿用既有多層級 dispatch cycle。
-// 4. 擴大半徑沿用既有 runDispatchPushWave()，避免重複通知。
+// 3. 重新派單沿用同一個 dispatch cycle。
+// 4. 待接任務一律回到全區任務池，不再使用距離圈。
 // ============================================================
 
-function normalizeDispatchRadiusKm(value, fallback = 3) {
-  const n = Number(value);
-
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-
-  const allowed = [2, 3, 5, 8, 10, 12, 15, 17, 20];
-
-  if (allowed.includes(n)) {
-    return n;
-  }
-
-  // 前端目前有 2 / 3 / 5 / 8 / 12 / 20，
-  // 後端只允許固定安全級距，避免任意超大範圍。
-  return fallback;
-}
 
 function getDispatchApiErrorResponse(error) {
   const code = String(error?.message || '').trim();
@@ -36643,12 +36455,7 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
         message: '請填寫取消派單原因。',
       });
     }
-
-    const requestedRadiusKm =
-      normalizeDispatchRadiusKm(
-        req.body?.radiusKm,
-        3
-      );
+    const dispatchVisibilityMode = 'global_pending_task_pool';
 
     const source = String(
       req.body?.source ||
@@ -36907,7 +36714,10 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
             'manual_unassign_redispatch_scheduled',
 
           dispatchManualRedispatchRadiusKm:
-            requestedRadiusKm,
+            null,
+
+          dispatchManualRedispatchMode:
+            dispatchVisibilityMode,
 
           trackingSessionId: '',
           riderTrackingStatus:
@@ -37121,7 +36931,10 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
             newCycleId,
 
           dispatchManualRedispatchRadiusKm:
-            requestedRadiusKm,
+            null,
+
+          dispatchManualRedispatchMode:
+            dispatchVisibilityMode,
 
           dispatchUnassignReason:
             safeReason,
@@ -37283,7 +37096,7 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
         reason:
           safeReason,
         radiusKm:
-          requestedRadiusKm,
+          null,
         source,
         createdAtMs:
           nowMs,
@@ -37326,7 +37139,7 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
       dispatchPushCycleId:
         newCycleId,
       radiusKm:
-        requestedRadiusKm,
+        null,
       order:
         unassignedOrder,
       message:
@@ -37365,8 +37178,7 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
     if (!safeOrderId) {
       return res.status(400).json({ success: false, message: '缺少訂單編號。' });
     }
-
-    const requestedRadiusKm = normalizeDispatchRadiusKm(req.body?.radiusKm, 3);
+    const dispatchVisibilityMode = 'global_pending_task_pool';
     const safeReason = String(req.body?.reason || '調度中心 V3 異常備援轉派')
       .trim()
       .slice(0, 160);
@@ -37448,8 +37260,9 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
         redispatchStartedAtMs: nowMs,
         dispatchPushCycleId: newCycleId,
         dispatchPushNotifiedRiderDocIds: [],
-        dispatchPushStage: 'v3_emergency_redispatch_scheduled',
-        dispatchManualRedispatchRadiusKm: requestedRadiusKm,
+        dispatchPushStage: 'v3_emergency_global_redispatch_scheduled',
+        dispatchManualRedispatchRadiusKm: null,
+        dispatchManualRedispatchMode: dispatchVisibilityMode,
         riderTrackingStatus: 'stopped',
         trackingEndedAtMs: nowMs,
         trackingEndedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -37528,7 +37341,8 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
           ...riderSkipKeys,
         ])),
         dispatchPushCycleId: newCycleId,
-        dispatchManualRedispatchRadiusKm: requestedRadiusKm,
+        dispatchManualRedispatchRadiusKm: null,
+        dispatchManualRedispatchMode: dispatchVisibilityMode,
         emergencyRecoveryReason: safeReason,
       };
     });
@@ -37562,7 +37376,7 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
         riderId: previousRiderId,
         riderDocId: previousRiderDocId,
         reason: safeReason,
-        radiusKm: requestedRadiusKm,
+        radiusKm: null,
         source,
         createdAtMs: nowMs,
       }),
@@ -37576,8 +37390,8 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
       orderId: safeOrderId,
       status: 'pending_dispatch',
       dispatchPushCycleId: newCycleId,
-      radiusKm: requestedRadiusKm,
-      message: '已啟動 V3 備援轉派，訂單重新進入智慧派單。',
+      radiusKm: null,
+      message: '已啟動 V3 備援轉派，訂單重新進入全區待接任務池。',
     });
   } catch (error) {
     console.error('❌ UBee V3 備援轉派失敗：', error);
@@ -37592,7 +37406,6 @@ app.post('/api/dispatch/orders/:orderId/recover', async (req, res) => {
 //
 // body:
 // {
-//   radiusKm: 3,
 //   source: "dispatch_center"
 // }
 // ------------------------------------------------------------
@@ -37610,12 +37423,7 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
         message: '缺少訂單編號。',
       });
     }
-
-    const requestedRadiusKm =
-      normalizeDispatchRadiusKm(
-        req.body?.radiusKm,
-        3
-      );
+    const dispatchVisibilityMode = 'global_pending_task_pool';
 
     const orderRef = db
       .collection('orders')
@@ -37674,7 +37482,7 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
               [],
 
             dispatchPushStage:
-              'manual_redispatch_scheduled',
+              'manual_global_redispatch_scheduled',
 
             dispatchManualRedispatchCount:
               admin.firestore.FieldValue
@@ -37688,7 +37496,10 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
                 .serverTimestamp(),
 
             dispatchManualRedispatchRadiusKm:
-              requestedRadiusKm,
+            null,
+
+          dispatchManualRedispatchMode:
+            dispatchVisibilityMode,
 
             dispatchManualRedispatchSource:
               String(
@@ -37728,7 +37539,7 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
     logDispatchEvent({
       type:'REDISPATCH',
       orderId:safeOrderId,
-      radiusKm:requestedRadiusKm,
+      radiusKm:null,
       source:String(req.body?.source || 'dispatch_center'),
       createdAtMs:Date.now(),
     }).catch(()=>{});
@@ -37740,9 +37551,9 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
       dispatchPushCycleId:
         newCycleId,
       radiusKm:
-        requestedRadiusKm,
+        null,
       message:
-        '已重新啟動派單。',
+        '已重新啟動全區待接任務池通知。',
     });
 
   } catch (error) {
@@ -37782,7 +37593,7 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
       });
     }
 
-    // 2026-09-08｜Global Task Pool V1.2：舊 expand-radius 路由保留相容，但不再使用半徑。
+    // 2026-09-08｜Global Task Pool V1.2：舊 expand-radius 路由保留相容，但不再使用距離圈。
     const radiusKm = null;
     const previousRadiusKm = null;
 
