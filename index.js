@@ -1,3 +1,4 @@
+// 2026-09-08｜Rider Global Task Pool Backend V1：待接任務改為全員可見任務池；/api/rider/tasks 不做距離擴圈限制，Web Push 第一波直接全區通知。
 // 2026-09-08｜Rider Activity V1：騎士 summary 正式回傳本月完成單數、活躍度、活躍等級與下月優先派單資格資料；第一階段只顯示，不改派單核心。
 // 2026-09-07｜Rider Background Presence V2：移除舊『Heartbeat 超過 5 分鐘即視為離線』邏輯；改為前景即時 / 背景 Push 可達 / 任務中真相三層 Presence，PWA 被 OS 暫停時不再誤判為主動下線。
 // 2026-09-07｜Dispatch Manual Unassign V1：調度中心新增「取消派單」；僅允許取件前解除目前小U，訂單退回 pending_dispatch 並重新媒合；抵達取件後啟用貨物安全鎖禁止直接解除。
@@ -2148,8 +2149,8 @@ async function sendNewOrderPushToRiders(
         // Firestore Read Cost Optimization V1
         // 原本每次派單都先讀取最多 300 位小U，再於記憶體檢查 webPushEnabled。
         // 現在把「webPushEnabled === true」這個既有必要條件提前到 Firestore 查詢，
-        // 只讀真正可能收到 Web Push 的小U；其餘核准、在線、資格、距離、
-        // 預約可用時段與略過名單等既有判斷全部保留，不改派單業務規則。
+        // 只讀真正可能收到 Web Push 的小U；核准、在線、資格、
+        // 預約可用時段與略過名單等既有判斷保留；距離擴圈改為全區第一波通知。
         const ridersSnap = await db
           .collection(RIDER_V2_COLLECTIONS.riders)
           .where('webPushEnabled', '==', true)
@@ -2466,42 +2467,24 @@ async function sendNewOrderPushToRiders(
 }
 
 // =====================================================
-// UBee 多層級距離擴圈派單
+// UBee 全區待接任務派單
 //
-// 第 0 秒：3 公里
-// 第 5 秒：5 公里
-// 第 10 秒：8 公里
-// 第 15 秒：10 公里
-// 第 20 秒：12 公里
-// 第 25 秒：15 公里
-// 第 30 秒：17 公里
-// 第 35 秒：20 公里
-// 第 40 秒：全區
-//
-// 同一輪派單中：
-// 1. 已通知過的小U不重複通知。
-// 2. 訂單被接走、取消或完成後，停止後續擴圈。
-// 3. 使用 dispatchPushCycleId 避免舊計時器干擾新週期。
-// 4. 任務通知永遠只走小U端／Web Push，不送進審核群組。
+// 2026-09-08｜Rider Global Task Pool Backend V1
+// - 「我的任務 → 待接任務」由 /api/rider/tasks 作為全員可見任務池。
+// - Web Push 第一波直接全區通知，不再用 3km / 5km / 8km 擴圈擋住小U。
+// - 距離仍可保留作為前端排序與參考資訊，但不再是能不能看見待接任務的條件。
+// - 已通知過的小U不重複通知；訂單被接走、取消或完成後，停止後續流程。
 // =====================================================
 
 const DISPATCH_PUSH_WAVES = [
-  { delayMs: 0, radiusKm: 3, stage: "3km" },
-  { delayMs: 5000, radiusKm: 5, stage: "5km" },
-  { delayMs: 10000, radiusKm: 8, stage: "8km" },
-  { delayMs: 15000, radiusKm: 10, stage: "10km" },
-  { delayMs: 20000, radiusKm: 12, stage: "12km" },
-  { delayMs: 25000, radiusKm: 15, stage: "15km" },
-  { delayMs: 30000, radiusKm: 17, stage: "17km" },
-  { delayMs: 35000, radiusKm: 20, stage: "20km" },
-  { delayMs: 40000, radiusKm: null, stage: "all" },
+  { delayMs: 0, radiusKm: null, stage: "all" },
 ];
 
 // 一輪派單跑完全區後，等待 60 秒再重新跑下一輪
 const DISPATCH_PUSH_RESTART_DELAY_MS =
   60000;
 
-// 第一輪完成後，後續重新派單是否直接通知全區
+// 全區通知完成後，後續重新派單仍直接通知全區
 const DISPATCH_PUSH_REPEAT_ALL_ONLY =
   true;
 
@@ -8204,7 +8187,11 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       tasks: orders,
       availableTaskCount: orders.length,
       mapPickupEnabled: true,
-      apiVersion: 'rider-task-visibility-v1',
+      visibilityMode: 'global_pending_task_pool',
+      radiusLimited: false,
+      dispatchRadiusKm: null,
+      taskPoolLabel: '全區待接任務',
+      apiVersion: 'rider-global-task-pool-v1',
       supportedWaitingStatuses: [
         ...UBEE_RIDER_PENDING_DISPATCH_STATUSES,
         'pending_schedule',
