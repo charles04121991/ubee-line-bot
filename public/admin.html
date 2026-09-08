@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-08｜Finance Center Guard V4.2：財務金鑰與 V4 小U管理金鑰分離；未輸入財務金鑰時不再送出財務 API 請求。 -->
 <!-- 2026-09-08｜Finance Center Guard V4.1：財務中心加入管理金鑰、所有財務 API 統一帶 x-ubee-admin-key，避免高權限財務資料裸露。 -->
 <!-- 2026-09-08｜Finance Ledger KPI Fix V1：今日收入類 KPI 改由後端只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。 -->
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
@@ -369,7 +370,6 @@ function saveFinanceAdminKey(){
   }
 
   sessionStorage.setItem('ubee_finance_admin_key', key);
-  sessionStorage.setItem('ubee_v4_admin_key', key);
   showToast('財務管理金鑰已套用');
   refreshAll(true);
 }
@@ -381,11 +381,17 @@ function hydrateFinanceAdminKeyInput(){
   }
 }
 
-function financeAdminHeaders(extra = {}){
+function requireFinanceAdminKeyForRequest(){
   const key = getFinanceAdminKey();
-  return key
-    ? { ...extra, 'x-ubee-admin-key': key }
-    : { ...extra };
+  if(!key){
+    throw new Error('請先輸入財務管理金鑰。');
+  }
+  return key;
+}
+
+function financeAdminHeaders(extra = {}){
+  const key = requireFinanceAdminKeyForRequest();
+  return { ...extra, 'x-ubee-admin-key': key };
 }
 
 async function readJson(res){
@@ -733,7 +739,12 @@ async function refreshAll(showMessage=false){
   hydrateFinanceAdminKeyInput();
 
   if(!getFinanceAdminKey()){
+    const box=document.getElementById('systemStatus');
+    const text=document.getElementById('systemStatusText');
+    box?.classList.add('offline');
+    if(text) text.textContent='等待財務金鑰';
     showToast('請先輸入財務管理金鑰。');
+    return;
   }
 
   state.loading=true;
