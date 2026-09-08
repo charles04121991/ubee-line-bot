@@ -1,3 +1,4 @@
+// 2026-09-08｜Rider Global Task Pool Backend V1.2 No Radius Clean：清除可重新啟動距離半徑派單的殘留路徑；舊 expand-radius API 改為全區重新通知相容入口。
 // 2026-09-08｜Finance Center No Key V4.4：依營運需求徹底移除財務中心 API 金鑰驗證；admin 財務頁不再要求輸入金鑰。
 // 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean：待接任務改為全員可見任務池；/api/rider/tasks 不做距離擴圈限制，Web Push 第一波直接全區通知。
 // 2026-09-08｜Finance Ledger KPI Fix V1：訂單財務總帳今日收入類 KPI 只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。
@@ -2086,21 +2087,12 @@ async function sendNewOrderPushToRiders(
         .filter(Boolean)
     );
 
-        const normalizedMaxRadiusKm =
-      Number(maxRadiusKm);
-
-    const hasRadiusLimit =
-      Number.isFinite(normalizedMaxRadiusKm) &&
-      normalizedMaxRadiusKm > 0 &&
-      normalizedMaxRadiusKm < 999;
-
-    const pickupPoint =
-      getOrderPickupPointForPush(order);
+    // 2026-09-08｜Global Task Pool V1.2：後端不再接受距離半徑作為派單可見條件。
+    // maxRadiusKm 只保留在函式簽名中，避免舊呼叫點因參數數量改變而噴錯。
+    void maxRadiusKm;
 
     const pushRadiusLabel =
-      hasRadiusLimit
-        ? `${normalizedMaxRadiusKm}km`
-        : "全區";
+      "全區";
 
         const safeOptions =
       options &&
@@ -2127,15 +2119,6 @@ async function sendNewOrderPushToRiders(
     const notifiedRiderDocIds = [];
     
 
-    if (
-      hasRadiusLimit &&
-      !pickupPoint
-    ) {
-      console.warn(
-        `⚠️ UBee 距離派單無法取得取件座標，orderId=${orderId}，radius=${normalizedMaxRadiusKm}km`
-      );
-    }
-    
     // ==============================
     // 1. iPhone / PWA Web Push 派單通知
     // ==============================
@@ -2163,9 +2146,6 @@ async function sendNewOrderPushToRiders(
         let webPushSuccess = 0;
         let webPushFail = 0;
         let skippedRiderCount = 0;
-        let distanceFilteredRiderCount = 0;
-        let staleLocationRiderCount = 0;
-        let backgroundZoneFallbackRiderCount = 0;
         
         const pushPayload = JSON.stringify({
           title:
@@ -2282,55 +2262,8 @@ async function sendNewOrderPushToRiders(
             return;
           }
 
-                    if (hasRadiusLimit) {
-            if (!pickupPoint) {
-              distanceFilteredRiderCount += 1;
-              return;
-            }
-
-            const riderPoint =
-              getRiderCurrentPointForPush(rider);
-
-            const riderLocationFresh =
-              isRiderLocationFreshForPush(rider);
-
-            const allowBackgroundZoneFallback =
-              riderPresence.backgroundReachable &&
-              riderMatchesBackgroundDispatchZone(
-                rider,
-                order
-              );
-
-            if (
-              !riderPoint ||
-              !riderLocationFresh
-            ) {
-              // PWA 進入背景後，OS 可能停止 Web GPS；此時不能把「定位暫停」誤判成「小U離線」。
-              // 只有背景 Push 仍有效，且服務區與取件區相符時才放行通知；不拿過期座標硬算半徑。
-              if (!allowBackgroundZoneFallback) {
-                staleLocationRiderCount += 1;
-                return;
-              }
-
-              backgroundZoneFallbackRiderCount += 1;
-            } else {
-              const distanceKm =
-                calcDispatchPushDistanceKm(
-                  riderPoint.lat,
-                  riderPoint.lng,
-                  pickupPoint.lat,
-                  pickupPoint.lng
-                );
-
-              if (
-                !Number.isFinite(distanceKm) ||
-                distanceKm > normalizedMaxRadiusKm
-              ) {
-                distanceFilteredRiderCount += 1;
-                return;
-              }
-            }
-          }
+                    // Global Task Pool：不再用取件距離、服務區或定位新鮮度擋掉待接任務通知。
+          // 上線、審核通過、非忙碌、Web Push 可用與預約時段仍保留。
           
           pushTasks.push(
             webpush
@@ -2356,7 +2289,7 @@ async function sendNewOrderPushToRiders(
                     orderId,
                     riderId:dispatchRiderId,
                     riderDocId:riderDocId || riderDoc.id || '',
-                    radiusKm:normalizedMaxRadiusKm,
+                    radiusKm:null,
                     dispatchStage:pushRadiusLabel,
                     createdAtMs:Date.now(),
                   }),
@@ -2418,7 +2351,7 @@ async function sendNewOrderPushToRiders(
             isRedispatch
               ? "轉派"
               : "新任務"
-          }通知完成：${orderId}，範圍 ${pushRadiusLabel}，成功 ${webPushSuccess}，失敗 ${webPushFail}，略過已取消騎士 ${skippedRiderCount}，距離外 ${distanceFilteredRiderCount}，位置過期或缺失 ${staleLocationRiderCount}，背景區域備援 ${backgroundZoneFallbackRiderCount}`
+          }通知完成：${orderId}，範圍 ${pushRadiusLabel}，成功 ${webPushSuccess}，失敗 ${webPushFail}，略過已取消騎士 ${skippedRiderCount}`
         );
       }
 
@@ -2430,7 +2363,7 @@ async function sendNewOrderPushToRiders(
     }
 
     // UBee 規則：派單／重新轉派只通知小U端，不推送「任務重新轉派」到審核／管理群。
-    // 保留重新開放接單、擴圈派單、Web Push 與調度邏輯。
+    // 保留重新開放接單、全區任務池、Web Push 與調度邏輯。
     return {
       success: true,
       orderId,
@@ -2703,12 +2636,13 @@ async function runDispatchPushWave(
 
   const updateData = {
     dispatchPushStage:
-      safeStage,
+      safeStage === 'all' ? 'all' : 'all',
 
     dispatchPushLastRadiusKm:
-      maxRadiusKm === null
-        ? 999
-        : Number(maxRadiusKm),
+      999,
+
+    dispatchPushVisibilityMode:
+      'global_pending_task_pool',
 
     dispatchPushLastRunAtMs:
       nowMs,
@@ -2920,8 +2854,8 @@ function scheduleDispatchPushWave(
     startedAtMs
   );
 } else {
-  // 全部距離波次已完成。
-  // 如果訂單仍無人接，等待設定時間後重新跑下一輪。
+  // 全區通知輪次已完成。
+  // 如果訂單仍無人接，等待設定時間後重新通知全區任務池。
   scheduleNextDispatchPushRound(
     safeOrderId
   );
@@ -37781,7 +37715,7 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
       }
     );
 
-    // 關閉舊週期，重新啟動正式既有多層級派單。
+    // 關閉舊週期，重新啟動全區待接任務池通知。
     clearDispatchPushTimers(
       safeOrderId
     );
@@ -37828,15 +37762,10 @@ app.post('/api/dispatch/orders/:orderId/redispatch', async (req, res) => {
 
 
 // ------------------------------------------------------------
-// 3. 人工擴大派單半徑
+// 3. 人工重新通知全區待接任務池（相容舊 expand-radius 路由）
 // POST /api/dispatch/orders/:orderId/expand-radius
 //
-// body:
-// {
-//   radiusKm: 8,
-//   previousRadiusKm: 5,
-//   source: "dispatch_center"
-// }
+// body：舊版調度中心若仍送 radiusKm / previousRadiusKm，後端會忽略，統一改成全區通知。
 // ------------------------------------------------------------
 app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
   try {
@@ -37853,17 +37782,9 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
       });
     }
 
-    const radiusKm =
-      normalizeDispatchRadiusKm(
-        req.body?.radiusKm,
-        3
-      );
-
-    const previousRadiusKm =
-      normalizeDispatchRadiusKm(
-        req.body?.previousRadiusKm,
-        3
-      );
+    // 2026-09-08｜Global Task Pool V1.2：舊 expand-radius 路由保留相容，但不再使用半徑。
+    const radiusKm = null;
+    const previousRadiusKm = null;
 
     const orderRef = db
       .collection('orders')
@@ -37921,10 +37842,13 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
               cycleId,
 
             dispatchManualRadiusKm:
-              radiusKm,
+              null,
 
             dispatchManualPreviousRadiusKm:
-              previousRadiusKm,
+              null,
+
+            dispatchManualRadiusMode:
+              'global_pending_task_pool',
 
             dispatchManualRadiusExpandedAtMs:
               nowMs,
@@ -37959,9 +37883,8 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
       await runDispatchPushWave(
         safeOrderId,
         cycleId,
-        radiusKm,
-        `${radiusKm}km`,
-        false
+        null,
+        'all'
       );
 
     if (!completed) {
@@ -37991,10 +37914,10 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
     }
 
     logDispatchEvent({
-      type:'RADIUS_EXPANDED',
+      type:'GLOBAL_POOL_RENOTICE',
       orderId:safeOrderId,
-      radiusKm,
-      previousRadiusKm,
+      radiusKm:null,
+      previousRadiusKm:null,
       source:String(req.body?.source || 'dispatch_center'),
       createdAtMs:Date.now(),
     }).catch(()=>{});
@@ -38003,17 +37926,17 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
       success: true,
       orderId: safeOrderId,
       status: 'pending_dispatch',
-      radiusKm,
-      previousRadiusKm,
+      radiusKm:null,
+      previousRadiusKm:null,
       dispatchPushCycleId:
         cycleId,
       message:
-        `派單半徑已擴大至 ${radiusKm} km。`,
+        '已重新通知全區待接任務池。',
     });
 
   } catch (error) {
     console.error(
-      '❌ UBee 調度中心擴大派單半徑失敗：',
+      '❌ UBee 調度中心重新通知全區任務池失敗：',
       error
     );
 
