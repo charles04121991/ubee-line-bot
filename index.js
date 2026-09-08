@@ -1,5 +1,5 @@
 // 2026-09-08｜Finance Center No Key V4.4：依營運需求徹底移除財務中心 API 金鑰驗證；admin 財務頁不再要求輸入金鑰。
-// 2026-09-08｜Rider Global Task Pool Backend V1：待接任務改為全員可見任務池；/api/rider/tasks 不做距離擴圈限制，Web Push 第一波直接全區通知。
+// 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean：待接任務改為全員可見任務池；/api/rider/tasks 不做距離擴圈限制，Web Push 第一波直接全區通知。
 // 2026-09-08｜Finance Ledger KPI Fix V1：訂單財務總帳今日收入類 KPI 只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。
 // 2026-09-08｜Rider Activity V1：騎士 summary 正式回傳本月完成單數、活躍度、活躍等級與下月優先派單資格資料；第一階段只顯示，不改派單核心。
 // 2026-09-07｜Rider Background Presence V2：移除舊『Heartbeat 超過 5 分鐘即視為離線』邏輯；改為前景即時 / 背景 Push 可達 / 任務中真相三層 Presence，PWA 被 OS 暫停時不再誤判為主動下線。
@@ -2472,7 +2472,7 @@ async function sendNewOrderPushToRiders(
 // =====================================================
 // UBee 全區待接任務派單
 //
-// 2026-09-08｜Rider Global Task Pool Backend V1
+// 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean
 // - 「我的任務 → 待接任務」由 /api/rider/tasks 作為全員可見任務池。
 // - Web Push 第一波直接全區通知，不再用 3km / 5km / 8km 擴圈擋住小U。
 // - 距離仍可保留作為前端排序與參考資訊，但不再是能不能看見待接任務的條件。
