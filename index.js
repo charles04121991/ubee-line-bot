@@ -1,3 +1,4 @@
+// 2026-09-08｜Finance Center Guard V4.2：補上店家應收 admin API 權限保護，與財務中心金鑰驗證保持一致。
 // 2026-09-08｜Rider Global Task Pool Backend V1：待接任務改為全員可見任務池；/api/rider/tasks 不做距離擴圈限制，Web Push 第一波直接全區通知。
 // 2026-09-08｜Finance Center Guard V4.1：財務中心 API 加入 x-ubee-admin-key 驗證，避免財務總覽、回繳、撥款與對帳 API 裸露。
 // 2026-09-08｜Finance Ledger KPI Fix V1：訂單財務總帳今日收入類 KPI 只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。
@@ -6047,7 +6048,7 @@ function requireFinanceAdminKey(req, res, next) {
   if (!UBEE_FINANCE_ADMIN_KEY) {
     return res.status(503).json({
       success: false,
-      message: '尚未設定 UBEE_FINANCE_ADMIN_KEY 或 UBEE_RIDER_V4_ADMIN_KEY，財務中心暫不開放。',
+      message: '尚未設定 UBEE_FINANCE_ADMIN_KEY / UBEE_ADMIN_KEY / UBEE_RIDER_V4_ADMIN_KEY，財務中心暫不開放。',
     });
   }
 
@@ -12084,7 +12085,7 @@ app.post(
 );
 
 // 讀取所有店家應收帳款
-app.get('/api/admin/merchant-receivables', async (req, res) => {
+app.get('/api/admin/merchant-receivables', requireFinanceAdminKey, async (req, res) => {
   try {
     const snap = await db.collection('orders')
       .where('orderType', 'in', ['merchant_dispatch', 'merchant_delivery'])
@@ -12223,7 +12224,7 @@ app.get('/api/admin/merchant-receivables', async (req, res) => {
 });
 
 // 將單筆店家應收帳款標記為已結清
-app.post('/api/admin/merchant-receivables/settle-order', async (req, res) => {
+app.post('/api/admin/merchant-receivables/settle-order', requireFinanceAdminKey, async (req, res) => {
   try {
     const { orderId } = req.body || {};
 
