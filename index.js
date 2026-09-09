@@ -1,3 +1,4 @@
+// 2026-09-09｜Rider Qualification Hard Lock Backend V1：刪除舊 approved→ACTIVE／無 onboarding 即放行相容邏輯；正式接單改為「審核→入職→測驗→ACTIVE→上線」五段式硬鎖，tasks/status/accept-order 全部後端 fail-closed 驗證。
 // 2026-09-08｜Customer Global Supply Backend V1：客戶端 service-status 改為全區可媒合小U，不再回傳附近公里數作為媒合依據。
 // 2026-09-08｜Rider Global Task Pool Backend V1.2 No Radius Clean：清除可重新啟動距離圈派單的殘留路徑；舊 expand-radius API 改為全區重新通知相容入口。
 // 2026-09-08｜Finance Center No Key V4.4：依營運需求徹底移除財務中心 API 金鑰驗證；admin 財務頁不再要求輸入金鑰。
@@ -5616,22 +5617,100 @@ function getRiderV4LifecycleStatus(rider = {}) {
   if (status === 'training') return RIDER_V4_LIFECYCLE.TRAINING;
   if (status === 'retraining') return RIDER_V4_LIFECYCLE.RETRAINING;
   if (status === 'restricted') return RIDER_V4_LIFECYCLE.RESTRICTED;
-  if (rider.approved === true || status === 'approved' || status === 'active') return RIDER_V4_LIFECYCLE.ACTIVE;
+
+  // Qualification Hard Lock V1：
+  // 舊版「approved 直接視為 ACTIVE」已刪除。
+  // 沒有明確 lifecycleStatus 的已審核帳號，一律回到 TRAINING，
+  // 必須完成正式入職與測驗後，由後端寫入 ACTIVE 才能接單。
+  if (status === 'active') return RIDER_V4_LIFECYCLE.ACTIVE;
+  if (rider.approved === true || status === 'approved') return RIDER_V4_LIFECYCLE.TRAINING;
+
   return RIDER_V4_LIFECYCLE.UNDER_REVIEW;
 }
 
+function getRiderV4HardLockState(rider = {}) {
+  const checklist = getRiderUnifiedLearningChecklist(rider);
+  const modules = getRiderUnifiedLearningModules(rider);
+  const quiz = getRiderUnifiedLearningQuiz(rider);
+  const status = String(rider.status || '').trim().toLowerCase();
+  const lifecycle = getRiderV4LifecycleStatus(rider);
+
+  const reviewApproved =
+    rider.approved === true ||
+    status === 'approved' ||
+    status === 'active';
+
+  const checklistComplete =
+    checklist.jkopayInstalled === true &&
+    checklist.announcementGroupJoined === true &&
+    checklist.chatGroupJoined === true &&
+    checklist.reportGroupJoined === true;
+
+  const modulesComplete =
+    RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
+
+  const quizPassed =
+    quiz.passed === true &&
+    Number(quiz.score || 0) >= 80;
+
+  const onboardingCompleted =
+    rider.onboarding?.completed === true;
+
+  const trainingCompleted =
+    rider.trainingCompleted === true;
+
+  const onboardingRequiredCleared =
+    rider.onboardingRequired === false;
+
+  const basicCertified =
+    rider.certifications?.basic === true;
+
+  const explicitCanAcceptOrders =
+    rider.canAcceptOrders === true;
+
+  const activeLifecycle =
+    lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
+
+  const onboardingComplete =
+    checklistComplete &&
+    modulesComplete &&
+    quizPassed &&
+    onboardingCompleted &&
+    trainingCompleted;
+
+  const canAcceptOrders =
+    reviewApproved &&
+    activeLifecycle &&
+    explicitCanAcceptOrders &&
+    onboardingRequiredCleared &&
+    onboardingComplete &&
+    basicCertified;
+
+  return {
+    version: 'rider-qualification-hard-lock-v1',
+    reviewApproved,
+    lifecycle,
+    checklistComplete,
+    modulesComplete,
+    quizScore: Number(quiz.score || 0),
+    quizPassed,
+    onboardingCompleted,
+    trainingCompleted,
+    onboardingRequiredCleared,
+    basicCertified,
+    explicitCanAcceptOrders,
+    activeLifecycle,
+    onboardingComplete,
+    canAcceptOrders,
+  };
+}
+
 function isRiderV4OnboardingComplete(rider = {}) {
-  // 舊版已審核小U沒有 onboarding 欄位時，視為既有有效帳號，避免升級造成全面停單。
-  if (rider.approved === true && !rider.onboarding && !rider.lifecycleStatus) return true;
-  return rider.onboarding?.completed === true || rider.trainingCompleted === true;
+  return getRiderV4HardLockState(rider).onboardingComplete === true;
 }
 
 function canRiderAcceptOrdersV4(rider = {}) {
-  const lifecycle = getRiderV4LifecycleStatus(rider);
-  if (lifecycle !== RIDER_V4_LIFECYCLE.ACTIVE) return false;
-  if (rider.canAcceptOrders === false) return false;
-  if (!isRiderV4OnboardingComplete(rider) && (rider.onboarding || rider.lifecycleStatus)) return false;
-  return true;
+  return getRiderV4HardLockState(rider).canAcceptOrders === true;
 }
 
 function getRiderV4LevelNumber(rider = {}) {
@@ -5896,6 +5975,7 @@ function getRiderV4Progress(rider = {}) {
   return {
     lifecycleStatus: getRiderV4LifecycleStatus(rider),
     canAcceptOrders: canRiderAcceptOrdersV4(rider),
+    qualificationHardLock: getRiderV4HardLockState(rider),
     riderLevel: String(rider.riderLevel || (isRiderV4OnboardingComplete(rider) ? 'L1' : 'L0')),
     checklist,
     modules,
@@ -7996,8 +8076,19 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
       });
     }
 
-        const riderDoc = riderResult.riderDoc;
+    const riderDoc = riderResult.riderDoc;
     const rider = riderResult.rider || {};
+
+    // Qualification Hard Lock V1：未完成完整五段式資格，不回傳待接任務池。
+    if (!canRiderAcceptOrdersV4(rider)) {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_DISPATCH_NOT_ELIGIBLE',
+        message: '尚未完成完整入職與測驗，或正式接單資格目前受限，無法讀取待接任務。',
+        lifecycleStatus: getRiderV4LifecycleStatus(rider),
+        qualificationHardLock: getRiderV4HardLockState(rider),
+      });
+    }
 
     const identity = buildRiderApiIdentity(riderDoc, rider, {
       lineUserId,
@@ -17997,7 +18088,7 @@ app.post(
 
         if (officialRider && !wasMaintenanceActive) {
           update.credentialMaintenancePreviousLifecycleStatus =
-            officialLifecycle || RIDER_V4_LIFECYCLE.ACTIVE;
+            officialLifecycle || RIDER_V4_LIFECYCLE.TRAINING;
           update.credentialMaintenancePreviousStatus = String(
             officialRider.status ||
             getRiderStatusFromLifecycle(officialLifecycle, 'approved')
@@ -18374,20 +18465,34 @@ app.post(
 
           const previousLifecycleRaw = String(
             application.credentialMaintenancePreviousLifecycleStatus ||
-            RIDER_V4_LIFECYCLE.ACTIVE
+            RIDER_V4_LIFECYCLE.TRAINING
           ).trim().toUpperCase();
-          const restoredLifecycle = Object.values(RIDER_V4_LIFECYCLE).includes(
+          const requestedRestoreLifecycle = Object.values(RIDER_V4_LIFECYCLE).includes(
             previousLifecycleRaw
           )
             ? previousLifecycleRaw
-            : RIDER_V4_LIFECYCLE.ACTIVE;
+            : RIDER_V4_LIFECYCLE.TRAINING;
+
+          // Qualification Hard Lock V1：證件複審不可用舊預設值把帳號直接恢復 ACTIVE。
+          // 只有補件前原本就是 ACTIVE，且完整入職／測驗證據仍成立，才允許恢復 ACTIVE。
+          const canRestoreActive =
+            requestedRestoreLifecycle === RIDER_V4_LIFECYCLE.ACTIVE &&
+            application.credentialMaintenancePreviousCanAcceptOrders === true &&
+            isRiderV4OnboardingComplete(officialRider) &&
+            officialRider.certifications?.basic === true;
+
+          const restoredLifecycle =
+            requestedRestoreLifecycle === RIDER_V4_LIFECYCLE.ACTIVE && !canRestoreActive
+              ? RIDER_V4_LIFECYCLE.TRAINING
+              : requestedRestoreLifecycle;
+
           const restoredStatus = getRiderStatusFromLifecycle(
             restoredLifecycle,
             application.credentialMaintenancePreviousStatus || 'approved'
           );
           const restoredCanAcceptOrders =
             restoredLifecycle === RIDER_V4_LIFECYCLE.ACTIVE &&
-            application.credentialMaintenancePreviousCanAcceptOrders === true;
+            canRestoreActive;
 
           const officialUpdate = {
             status: restoredStatus,
@@ -19312,7 +19417,7 @@ app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, r
         RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
 
       const quiz = getRiderUnifiedLearningQuiz(updatedRider);
-      if (checklistComplete && quiz.passed === true && !canRiderAcceptOrdersV4(updatedRider)) {
+      if (checklistComplete && quiz.passed === true && Number(quiz.score || 0) >= 80 && !canRiderAcceptOrdersV4(updatedRider)) {
         const finalLevel = isRiderL4LearningQualified(updatedRider)
           ? 'L4'
           : getNonDowngradeRiderLevel(updatedRider, 'L1');
@@ -19446,7 +19551,7 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
     };
 
     // 新申請者：仍必須街口 + 三社群 + 12課 + 測驗才可正式 ACTIVE。
-    const activated = effectivePassed && checklistComplete;
+    const activated = effectivePassed && effectiveBestScore >= 80 && checklistComplete;
     if (activated) {
       const projectedRider = {
         ...rider,
@@ -19796,7 +19901,7 @@ app.post('/api/admin/rider-v4/action', requireRiderV4AdminKey, async (req, res) 
       update['governance.banReason'] = reason;
       update['governance.bannedAtMs'] = nowMs;
     } else if (action === 'restore') {
-      if (!isRiderV4OnboardingComplete(rider)) return res.status(409).json({ success:false, message:'此小U尚未完成入職，不能直接恢復 ACTIVE。' });
+      if (!isRiderV4OnboardingComplete(rider) || rider.certifications?.basic !== true) return res.status(409).json({ success:false, message:'此小U尚未完成完整入職／測驗與基礎資格，不能直接恢復 ACTIVE。' });
       update.lifecycleStatus = RIDER_V4_LIFECYCLE.ACTIVE;
       update.status = 'approved';
       update.suspended = false;
@@ -19965,9 +20070,10 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
     if (online === true && !canRiderAcceptOrdersV4(rider)) {
       return res.status(403).json({
         success: false,
-        code: 'RIDER_V4_NOT_ACTIVE',
-        message: '尚未完成 V4 入職／資格目前受限，暫時不能開啟接單。',
+        code: 'RIDER_DISPATCH_NOT_ELIGIBLE',
+        message: '尚未完成「審核 → 入職 → 測驗 → ACTIVE」完整資格，或資格目前受限，不能上線接單。',
         lifecycleStatus: getRiderV4LifecycleStatus(rider),
+        qualificationHardLock: getRiderV4HardLockState(rider),
       });
     }
 
@@ -33267,6 +33373,18 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       riderId,
     });
 
+    // Qualification Hard Lock V1：先做一次快速資格拒絕；
+    // Transaction 內仍會再讀最新 ridersV2 並二次驗證，避免資格在接單瞬間被撤銷的競態。
+    if (!canRiderAcceptOrdersV4(rider)) {
+      return res.status(403).json({
+        success: false,
+        code: 'RIDER_DISPATCH_NOT_ELIGIBLE',
+        message: '目前尚未取得正式接單資格，請先完成入職與測驗並確認帳號為 ACTIVE。',
+        lifecycleStatus: getRiderV4LifecycleStatus(rider),
+        qualificationHardLock: getRiderV4HardLockState(rider),
+      });
+    }
+
     const safeOrderId = String(orderId).toUpperCase();
     const orderRef = db.collection('orders').doc(safeOrderId);
     const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
@@ -33294,7 +33412,7 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() : {};
 
       if (!canRiderAcceptOrdersV4(latestRider)) {
-        throw new Error('RIDER_V4_NOT_ACTIVE');
+        throw new Error('RIDER_DISPATCH_NOT_ELIGIBLE');
       }
 
       if (!riderMeetsOrderV4Requirements(latestRider, order)) {
@@ -33551,11 +33669,11 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
   } catch (error) {
     console.error('❌ 騎士網頁接單失敗：', error);
 
-    if (error.message === 'RIDER_V4_NOT_ACTIVE') {
+    if (error.message === 'RIDER_DISPATCH_NOT_ELIGIBLE') {
       return res.status(403).json({
         success: false,
-        code: 'RIDER_V4_NOT_ACTIVE',
-        message: '你的 V4 入職／接單資格尚未啟用，請先完成教學、測驗或聯繫 UBee。',
+        code: 'RIDER_DISPATCH_NOT_ELIGIBLE',
+        message: '目前尚未取得正式接單資格；必須完成審核、必要入職、20 題測驗 80 分以上並由系統切為 ACTIVE 後才能接單。',
       });
     }
 
