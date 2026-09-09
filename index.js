@@ -1,3 +1,4 @@
+// 2026-09-09｜Customer Dispatch Recovery Backend V1：客戶現金立即單由 pending_payment 確認為 pending_dispatch 後，正式建立 dispatchPushCycle 並啟動全區 startDispatchPushSequence，避免只靠騎士端輪詢才看見任務。
 // 2026-09-09｜Rider Qualification Hard Lock Backend V1：刪除舊 approved→ACTIVE／無 onboarding 即放行相容邏輯；正式接單改為「審核→入職→測驗→ACTIVE→上線」五段式硬鎖，tasks/status/accept-order 全部後端 fail-closed 驗證。
 // 2026-09-08｜Customer Global Supply Backend V1：客戶端 service-status 改為全區可媒合小U，不再回傳附近公里數作為媒合依據。
 // 2026-09-08｜Rider Global Task Pool Backend V1.2 No Radius Clean：清除可重新啟動距離圈派單的殘留路徑；舊 expand-radius API 改為全區重新通知相容入口。
@@ -33137,6 +33138,56 @@ app.post('/api/orders/:orderId/payment-method', requireCustomerAuth, async (req,
       order.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
       await saveOrder(order);
+
+      // Customer Dispatch Recovery Backend V1：
+      // 立即現金單確認後必須正式啟動全區派單，不再只把 status 改成 pending_dispatch 後等待騎士端輪詢。
+      if (!scheduledOrder) {
+        const dispatchNowMs = Date.now();
+        const dispatchPushCycleId = buildDispatchPushCycleId(orderId);
+
+        order.dispatchPushCycleId = dispatchPushCycleId;
+        order.dispatchPushNotifiedRiderDocIds = [];
+        order.dispatchPushStage = 'scheduled';
+        order.dispatchStartedAtMs = dispatchNowMs;
+        order.updatedAtMs = dispatchNowMs;
+
+        await db.collection('orders').doc(orderId).set(
+          {
+            status: 'pending_dispatch',
+            riderStatus: 'pending_dispatch',
+            dispatchPushCycleId,
+            dispatchPushNotifiedRiderDocIds: [],
+            dispatchPushStage: 'scheduled',
+            dispatchStartedAtMs: dispatchNowMs,
+            dispatchStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+            dispatchedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: dispatchNowMs,
+          },
+          { merge: true }
+        );
+
+        clearDispatchPushTimers(orderId);
+
+        setImmediate(() => {
+          startDispatchPushSequence(
+            {
+              ...order,
+              status: 'pending_dispatch',
+              riderStatus: 'pending_dispatch',
+              dispatchPushCycleId,
+              createdAtMs: getDispatchOrderCreatedAtMs(order) || dispatchNowMs,
+              updatedAtMs: dispatchNowMs,
+            },
+            dispatchPushCycleId
+          ).catch((pushError) => {
+            console.error(
+              '⚠️ 現金立即單已進待接池，但啟動全區派單 Push 失敗：',
+              pushError
+            );
+          });
+        });
+      }
 
       if (scheduledOrder) {
         setImmediate(() => {
