@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-09｜Customer Dispatch Recovery V1：建立訂單後立即以 Native Confirm 完成現金單確認，避免任務停在 pending_payment；確認成功後等待後端正式啟動全區派單。 -->
 <!-- 2026-09-09｜Customer Native System V1：刪除舊 Step 5 可見頁、訂單 Card／Detail Hero／照片 Card；進行中任務正式併入 productionOrderFlow，訂單列表改 Native Flat List、詳情改 Grouped Detail、照片改 Timeline；首頁與正式下單 API contract 保留。 -->
 <!-- 2026-09-08｜Customer Global Supply V1：用戶端首頁即時運力改為全區可媒合小U；刪除附近公里數優先顯示與擴大媒合文案，避免與騎士端全區待接任務池衝突。 -->
 <!-- 2026-09-07｜Customer Advance Payment V1：最高自動代墊上限調整為 NT$1,500；超過 NT$1,500 才需客服人工確認；同步升級 Manifest 與 Customer Service Worker 快取版本。 -->
@@ -24,7 +25,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260909-customer-native-system-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260909-customer-native-system-v1-1-dispatch-recovery" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -13955,6 +13956,17 @@ async function createOrder(){
 
     selectPaymentMethod('cash');
 
+    // Customer Dispatch Recovery V1：訂單建立後立刻要求完成現金單確認，
+    // 不讓新任務因為確認按鈕位於頁面下方而停留在 pending_payment。
+    window.setTimeout(() => {
+      const latestStatus = String(currentOrderData?.status || 'pending_payment').trim().toLowerCase();
+      if(latestStatus === 'pending_payment' && !isConfirmingPaid){
+        confirmPaid().catch(error => {
+          console.warn('UBee 建單後現金確認未完成：', error);
+        });
+      }
+    }, 220);
+
   }catch(err){
 
     console.error(
@@ -20221,7 +20233,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260909-customer-native-system-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260909-customer-native-system-v1-1-dispatch-recovery';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
