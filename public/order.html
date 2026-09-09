@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-09｜Customer Native System V1.3 / Live ETA V1：修復 Native Active Task 漏失 step5LiveStatusPanel ID；ETA 改為「剩餘分鐘＋預計抵達時間＋GPS 新鮮度」，定位超過 5 分鐘停止顯示精準 ETA，並讀取後端 traffic-aware ETA。 -->
 <!-- 2026-09-09｜Customer Native System V1.2：先刪除任務內容大 Card、配送方案 Card、確認訂單 Summary/Price Card 視覺，再建立 Native Form Sections／Selection Rows／Checkout Summary；估價、建單、派單、付款與地圖 API contract 保留。 -->
 <!-- 2026-09-09｜Customer Dispatch Recovery V1：建立訂單後立即以 Native Confirm 完成現金單確認，避免任務停在 pending_payment；確認成功後等待後端正式啟動全區派單。 -->
 <!-- 2026-09-09｜Customer Native System V1：刪除舊 Step 5 可見頁、訂單 Card／Detail Hero／照片 Card；進行中任務正式併入 productionOrderFlow，訂單列表改 Native Flat List、詳情改 Grouped Detail、照片改 Timeline；首頁與正式下單 API contract 保留。 -->
@@ -26,7 +27,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260909-customer-native-system-v1-2-order-flow" rel="manifest"/>
+<link href="/manifest-order.json?v=20260909-customer-native-system-v1-3-live-eta-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -4861,9 +4862,10 @@ body{background:#eef0f2;}
 #step5 .customer-tracking-health-card{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 #step5 .customer-tracking-health-main{display:flex;align-items:center;gap:10px;min-width:0;}
 #step5 .customer-tracking-health-dot{width:11px;height:11px;border-radius:50%;background:#16a34a;flex:0 0 auto;}
-#step5 .customer-tracking-health-card.is-delayed .customer-tracking-health-dot{background:#f59e0b;}
+#step5 .customer-tracking-health-card.is-delayed .customer-tracking-health-dot{background:#9ca3af;}
+#step5 .customer-tracking-health-card.is-stale .customer-tracking-health-dot{background:#f59e0b;}
 #step5 .customer-tracking-health-card.is-offline .customer-tracking-health-dot,
-#step5 .customer-tracking-health-card.is-stale .customer-tracking-health-dot{background:#dc2626;}
+#step5 .customer-tracking-health-card.is-critical .customer-tracking-health-dot{background:#dc2626;}
 #step5 .customer-tracking-health-title{font-size:13px;font-weight:1000;color:#111;}
 #step5 .customer-tracking-health-desc{font-size:11px;font-weight:800;color:var(--muted);margin-top:3px;line-height:1.5;}
 #step5 .customer-tracking-health-time{font-size:11px;font-weight:1000;color:#6b7280;white-space:nowrap;}
@@ -9651,415 +9653,283 @@ function getTrackingEtaTime(data){
 }
 
 
+
+function formatTrackingClockTime(value){
+  const ms = Number(value || 0);
+  if(!ms) return '';
+  const date = new Date(ms);
+  if(Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+
+function getTrackingLocationHealth(order = {}){
+  const summaryHealth = order?._trackingSummary?.rider?.locationHealth;
+  if(summaryHealth && summaryHealth.key){
+    return {
+      key:String(summaryHealth.key || '').toLowerCase(),
+      updatedAtMs:Number(summaryHealth.updatedAtMs || 0),
+      ageMs:summaryHealth.ageMs === null || summaryHealth.ageMs === undefined
+        ? null
+        : Math.max(0,Number(summaryHealth.ageMs || 0))
+    };
+  }
+
+  const updatedAtMs = Number(
+    order?.riderLocationUpdatedAtMs ||
+    order?.trackingUpdatedAtMs ||
+    0
+  );
+
+  if(!updatedAtMs){
+    return {key:'waiting',updatedAtMs:0,ageMs:null};
+  }
+
+  const ageMs = Math.max(0,Date.now()-updatedAtMs);
+  if(ageMs <= 2*60*1000) return {key:'live',updatedAtMs,ageMs};
+  if(ageMs <= 5*60*1000) return {key:'delayed',updatedAtMs,ageMs};
+  if(ageMs <= 10*60*1000) return {key:'stale',updatedAtMs,ageMs};
+  return {key:'critical',updatedAtMs,ageMs};
+}
+
+function formatTrackingLocationAge(ageMs){
+  if(ageMs === null || ageMs === undefined || !Number.isFinite(Number(ageMs))) return '等待定位';
+  const seconds = Math.max(0,Math.floor(Number(ageMs)/1000));
+  if(seconds < 15) return '剛剛更新';
+  if(seconds < 60) return `${seconds} 秒前更新`;
+  const minutes = Math.floor(seconds/60);
+  if(minutes < 60) return `${minutes} 分鐘前更新`;
+  return `${Math.floor(minutes/60)} 小時前更新`;
+}
+
+function getTrackingEtaPresentation(order = {}, routeData = null){
+  const health = getTrackingLocationHealth(order);
+  const summaryEta = order?._trackingSummary?.eta || {};
+  const serverAvailable = summaryEta.available === true && Number.isFinite(Number(summaryEta.minutes));
+
+  let minutes = serverAvailable ? Math.max(1,Math.ceil(Number(summaryEta.minutes))) : null;
+  let arrivalAtMs = serverAvailable ? Number(summaryEta.arrivalAtMs || 0) : 0;
+  let distanceText = serverAvailable ? String(summaryEta.distanceText || '').trim() : '';
+  let confidence = serverAvailable ? String(summaryEta.confidence || 'high').toLowerCase() : '';
+
+  // 後端 ETA 尚未完成第一輪時，只有在 GPS 仍新鮮時才使用前端即時道路路線作 fallback。
+  if(!serverAvailable && ['live','delayed'].includes(health.key) && routeData){
+    const clientMinutes = getTrackingRouteDurationMinutes(routeData);
+    if(clientMinutes){
+      minutes = clientMinutes;
+      arrivalAtMs = Date.now() + clientMinutes*60*1000;
+      distanceText = getTrackingRouteDistanceText(routeData);
+      confidence = health.key === 'live' ? 'high' : 'medium';
+    }
+  }
+
+  // 超過 5 分鐘未取得新 GPS 時，不允許沿用舊 ETA。
+  if(['stale','critical'].includes(health.key)){
+    return {
+      available:false,
+      reason:'location_stale',
+      health,
+      primary:'暫時無法估算',
+      label:`小U定位 ${formatTrackingLocationAge(health.ageMs)}`,
+      distanceText:''
+    };
+  }
+
+  if(!minutes){
+    return {
+      available:false,
+      reason:health.key === 'waiting' ? 'waiting_location' : 'eta_loading',
+      health,
+      primary:health.key === 'waiting' ? '等待定位' : '計算中',
+      label:health.key === 'waiting' ? '小U開始回傳位置後自動估算' : '正在計算最新道路時間',
+      distanceText:''
+    };
+  }
+
+  if(confidence === 'medium' || health.key === 'delayed'){
+    const low = Math.max(1,minutes-2);
+    const high = Math.max(low+1,minutes+3);
+    return {
+      available:true,
+      health,
+      confidence:'medium',
+      minutes,
+      primary:`約 ${low}–${high} 分鐘`,
+      label:'定位更新稍慢・時間僅供參考',
+      distanceText
+    };
+  }
+
+  const clock = formatTrackingClockTime(arrivalAtMs || (Date.now()+minutes*60*1000));
+  return {
+    available:true,
+    health,
+    confidence:'high',
+    minutes,
+    primary:`約 ${minutes} 分鐘`,
+    label:clock ? `預計 ${clock} 抵達` : '依目前路況估算',
+    distanceText
+  };
+}
+
 function renderStep5LiveStatus(
   order,
   routeData = null
 ){
+  const panel = qs('step5LiveStatusPanel');
+  const primaryEl = qs('step5LiveStatusPrimary');
+  const labelEl = qs('step5LiveStatusLabel');
+  const titleEl = qs('step5LiveStatusTitle');
+  const metaEl = qs('step5LiveStatusMeta');
 
-  const panel =
-    qs('step5LiveStatusPanel');
-
-  const primaryEl =
-    qs('step5LiveStatusPrimary');
-
-  const labelEl =
-    qs('step5LiveStatusLabel');
-
-  const titleEl =
-    qs('step5LiveStatusTitle');
-
-  const metaEl =
-    qs('step5LiveStatusMeta');
-
-  if(
-    !panel ||
-    !primaryEl ||
-    !labelEl ||
-    !titleEl ||
-    !metaEl
-  ){
+  if(!panel || !primaryEl || !labelEl || !titleEl || !metaEl){
     return;
   }
 
-  const data =
-    order ||
-    currentOrderData ||
-    {};
+  const data = order || currentOrderData || {};
+  const status = String(data.status || 'pending_payment').trim().toLowerCase();
 
-  const status =
-    String(
-      data.status ||
-      'pending_payment'
-    )
-      .trim()
-      .toLowerCase();
-
-  const distanceText =
-    getTrackingRouteDistanceText(
-      routeData
-    );
-
-  const durationMinutes =
-    getTrackingRouteDurationMinutes(
-      routeData
-    );
-
-  const durationText =
-    String(
-      routeData?.durationText || ''
-    ).trim()
-    ||
-    (
-      durationMinutes
-        ? `${durationMinutes} 分鐘`
-        : ''
-    );
-
-  const etaTime =
-    getTrackingEtaTime(
-      routeData
-    );
-
-  let primaryText =
-    '--:--';
-
-  let labelText =
-    '預計抵達時間';
-
-  let titleText =
-    '任務狀態更新中';
-
-  let metaText =
-    '系統正在讀取最新任務資訊';
-
+  let primaryText = '同步中';
+  let labelText = '正在讀取最新任務資訊';
+  let titleText = '任務狀態更新中';
+  let metaText = '系統正在取得最新資訊';
+  let etaState = 'status';
 
   switch(status){
-
     case 'pending_payment':
-
-      primaryText =
-        '待確認';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '確認現金單後開始派單';
-
-      metaText =
-        '確認後系統會開始媒合附近的小U';
-
+      primaryText='待確認';
+      labelText='目前狀態';
+      titleText='確認現金單後開始派單';
+      metaText='確認後系統會開始媒合可執行的小U';
       break;
-
 
     case 'merchant_pending':
-
-      primaryText =
-        '等待中';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '正在等待合作店家確認';
-
-      metaText =
-        '店家確認後系統會開始媒合小U';
-
+      primaryText='等待中';
+      labelText='目前狀態';
+      titleText='正在等待合作店家確認';
+      metaText='店家確認後系統會開始媒合小U';
       break;
-
 
     case 'pending_schedule':
-
-      primaryText =
-        '預約媒合中';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '正在媒合可於指定時間執行的小U';
-
-      metaText =
-        data.scheduleLabel
-          ? `預約時間 ${data.scheduleLabel}`
-          : '有人承接後，系統才會顯示預約已成立';
-
+      primaryText='預約媒合中';
+      labelText='目前狀態';
+      titleText='正在媒合可於指定時間執行的小U';
+      metaText=data.scheduleLabel ? `預約時間 ${data.scheduleLabel}` : '有人承接後，系統會顯示預約已成立';
       break;
-
 
     case 'scheduled_reserved':
-
-      primaryText =
-        '預約已成立';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '已有小U提前承接這筆預約';
-
-      metaText =
-        data.scheduleLabel
-          ? `${data.scheduleLabel}・任務前會再次確認`
-          : '任務前系統會再次確認小U是否可以準時執行';
-
+      primaryText='預約已成立';
+      labelText='目前狀態';
+      titleText='已有小U提前承接這筆預約';
+      metaText=data.scheduleLabel ? `${data.scheduleLabel}・任務前會再次確認` : '任務前系統會再次確認小U是否可以準時執行';
       break;
-
 
     case 'scheduled_confirmed':
-
-      primaryText =
-        '已確認';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '小U已確認可以執行預約任務';
-
-      metaText =
-        data.scheduleLabel
-          ? `預約時間 ${data.scheduleLabel}`
-          : '請留意後續出發與取件進度';
-
+      primaryText='已確認';
+      labelText='目前狀態';
+      titleText='小U已確認可以執行預約任務';
+      metaText=data.scheduleLabel ? `預約時間 ${data.scheduleLabel}` : '請留意後續出發與取件進度';
       break;
-
 
     case 'pending_dispatch':
-
-      primaryText =
-        data.isScheduleEmergency === true
-          ? '候補媒合'
-          : '媒合中';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        data.isScheduleEmergency === true
-          ? '正在緊急媒合候補小U'
-          : '正在為你尋找附近的小U';
-
-      metaText =
-        data.isScheduleEmergency === true && data.scheduleLabel
-          ? `原預約時間 ${data.scheduleLabel}`
-          : '小U接單後會顯示距離與預計抵達時間';
-
+      primaryText=data.isScheduleEmergency === true ? '候補媒合' : '媒合中';
+      labelText='目前狀態';
+      titleText=data.isScheduleEmergency === true ? '正在緊急媒合候補小U' : '正在為你尋找小U';
+      metaText=data.isScheduleEmergency === true && data.scheduleLabel ? `原預約時間 ${data.scheduleLabel}` : '小U接單後會自動顯示預計抵達時間';
       break;
-
 
     case 'accepted':
-
     case 'going_to_pickup': {
-
-      primaryText =
-        etaTime ||
-        '定位中';
-
-      labelText =
-        '預計抵達時間';
-
-      titleText =
-        '小U正在前往取件地點';
-
-      const metaParts = [];
-
-      if(distanceText){
-
-        metaParts.push(
-          `距離取件點 ${distanceText}`
-        );
-
-      }
-
-      if(durationText){
-
-        metaParts.push(
-          `約 ${durationText}`
-        );
-
-      }
-
-      metaText =
-        metaParts.join('・')
-        ||
-        '正在取得小U即時位置';
-
+      const eta = getTrackingEtaPresentation(data,routeData);
+      etaState = eta.available ? eta.confidence : eta.reason;
+      primaryText=eta.primary;
+      labelText=eta.label;
+      titleText='前往取件中';
+      const metaParts=[];
+      if(eta.distanceText) metaParts.push(`距離取件點 ${eta.distanceText}`);
+      if(eta.health?.key === 'live') metaParts.push('定位即時');
+      if(eta.health?.key === 'delayed') metaParts.push(formatTrackingLocationAge(eta.health.ageMs));
+      if(['stale','critical'].includes(eta.health?.key)) metaParts.push('定位恢復後會自動重新計算');
+      metaText=metaParts.join('・') || '正在取得小U位置與道路時間';
       break;
-
     }
-
 
     case 'arrived_pickup':
-
-      primaryText =
-        '已抵達';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '小U已抵達取件地點';
-
-      metaText =
-        '正在處理取件任務';
-
+      primaryText='已抵達';
+      labelText='取件地點';
+      titleText='小U已抵達取件地點';
+      metaText='正在處理取件任務';
       break;
-
 
     case 'picked_up':
-
     case 'going_to_dropoff': {
-
-      primaryText =
-        etaTime ||
-        '定位中';
-
-      labelText =
-        '預計抵達時間';
-
-      titleText =
-        '小U正在前往送達地點';
-
-      const metaParts = [];
-
-      if(distanceText){
-
-        metaParts.push(
-          `距離送達點 ${distanceText}`
-        );
-
+      // 單點任務 picked_up 代表現場處理，不存在送達 ETA。
+      if(data.singlePointTask === true){
+        primaryText='處理中';
+        labelText='現場任務';
+        titleText='小U正在處理任務';
+        metaText='完成後會立即更新任務結果';
+        break;
       }
-
-      if(durationText){
-
-        metaParts.push(
-          `約 ${durationText}`
-        );
-
-      }
-
-      metaText =
-        metaParts.join('・')
-        ||
-        '正在更新剩餘送達路程';
-
+      const eta = getTrackingEtaPresentation(data,routeData);
+      etaState = eta.available ? eta.confidence : eta.reason;
+      primaryText=eta.primary;
+      labelText=eta.label;
+      titleText='配送中';
+      const metaParts=[];
+      if(eta.distanceText) metaParts.push(`距離送達點 ${eta.distanceText}`);
+      if(eta.health?.key === 'live') metaParts.push('定位即時');
+      if(eta.health?.key === 'delayed') metaParts.push(formatTrackingLocationAge(eta.health.ageMs));
+      if(['stale','critical'].includes(eta.health?.key)) metaParts.push('定位恢復後會自動重新計算');
+      metaText=metaParts.join('・') || '正在更新剩餘送達路程';
       break;
-
     }
 
-
     case 'arrived_dropoff':
-
-      primaryText =
-        '已抵達';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '小U已抵達送達地點';
-
-      metaText =
-        '請準備完成交付';
-
+      primaryText='已抵達';
+      labelText='送達地點';
+      titleText='小U已抵達送達地點';
+      metaText='請準備完成交付';
       break;
-
 
     case 'completed':
-
     case 'done':
-
-      primaryText =
-        '已完成';
-
-      labelText =
-        '任務狀態';
-
-      titleText =
-        '本次任務已完成';
-
-      metaText =
-        '感謝使用 UBee 跑腿';
-
+      primaryText='已完成';
+      labelText='任務狀態';
+      titleText='本次任務已完成';
+      metaText='感謝使用 UBee 跑腿';
       break;
-
 
     case 'cancelled':
-
-      primaryText =
-        '已取消';
-
-      labelText =
-        '任務狀態';
-
-      titleText =
-        '此筆任務已取消';
-
-      metaText =
-        '如需協助，請聯繫 UBee 跑腿客服';
-
+      primaryText='已取消';
+      labelText='任務狀態';
+      titleText='此筆任務已取消';
+      metaText='如需協助，請聯繫 UBee 跑腿客服';
       break;
-
 
     default:
-
-      primaryText =
-        '更新中';
-
-      labelText =
-        '目前狀態';
-
-      titleText =
-        '任務狀態更新中';
-
-      metaText =
-        '系統正在取得最新資訊';
-
+      primaryText='更新中';
+      labelText='目前狀態';
+      titleText='任務狀態更新中';
+      metaText='系統正在取得最新資訊';
       break;
-
   }
 
-  const waitingPreview =
-    getActiveWaitingPreview(data);
-
-  if(
-    waitingPreview &&
-    ['arrived_pickup', 'arrived_dropoff'].includes(status)
-  ){
-    primaryText =
-      waitingPreview.charge > 0
-        ? `NT$${waitingPreview.charge}`
-        : '免費等候';
-
-    labelText =
-      `${waitingPreview.stageLabel}等候`;
-
-    titleText =
-      waitingPreview.charge > 0
-        ? '現場等候已開始計費'
-        : '目前仍在免費等候時間';
-
-    metaText =
-      waitingPreview.text;
+  const waitingPreview = getActiveWaitingPreview(data);
+  if(waitingPreview && ['arrived_pickup','arrived_dropoff'].includes(status)){
+    primaryText=waitingPreview.charge > 0 ? `NT$${waitingPreview.charge}` : '免費等候';
+    labelText=`${waitingPreview.stageLabel}等候`;
+    titleText=waitingPreview.charge > 0 ? '現場等候已開始計費' : '目前仍在免費等候時間';
+    metaText=waitingPreview.text;
+    etaState='waiting_charge';
   }
 
-  panel.dataset.status =
-    status;
-
-  primaryEl.innerText =
-    primaryText;
-
-  labelEl.innerText =
-    labelText;
-
-  titleEl.innerText =
-    titleText;
-
-  metaEl.innerText =
-    metaText;
-
+  panel.dataset.status=status;
+  panel.dataset.etaState=etaState;
+  primaryEl.classList.toggle('is-long',String(primaryText).length >= 6);
+  primaryEl.innerText=primaryText;
+  labelEl.innerText=labelText;
+  titleEl.innerText=titleText;
+  metaEl.innerText=metaText;
 }
 
 function getTrackingRouteMoveDistanceMeters(
@@ -17570,7 +17440,7 @@ activateUBeeCustomerRuntime();
     const title = el('customerTrackingHealthTitle');
     const desc = el('customerTrackingHealthDesc');
     const time = el('customerTrackingHealthTime');
-    card.classList.remove('is-delayed','is-offline','is-stale');
+    card.classList.remove('is-delayed','is-offline','is-stale','is-critical');
 
     const offline = !navigator.onLine || options.offline === true;
     const locationAt = Number(
@@ -17586,14 +17456,18 @@ activateUBeeCustomerRuntime();
       card.classList.add('is-offline');
       title.textContent = '目前網路連線受阻';
       desc.textContent = '已保留最後訂單資料，連線恢復後會自動同步。';
+    }else if(activeStatus && hasRider && locationAt && Date.now()-locationAt > 10*60*1000){
+      card.classList.add('is-critical');
+      title.textContent = '小U定位暫時中斷';
+      desc.textContent = '訂單仍在進行；定位恢復後 ETA 會自動重新計算。';
     }else if(activeStatus && hasRider && locationAt && Date.now()-locationAt > 5*60*1000){
       card.classList.add('is-stale');
-      title.textContent = '小U定位暫時中斷';
-      desc.textContent = '訂單仍在進行，UBee 調度中心可查看最後位置。';
-    }else if(activeStatus && hasRider && locationAt && Date.now()-locationAt > 90*1000){
+      title.textContent = '小U定位暫時未更新';
+      desc.textContent = '目前不顯示精準 ETA，避免使用過期位置造成誤導。';
+    }else if(activeStatus && hasRider && locationAt && Date.now()-locationAt > 2*60*1000){
       card.classList.add('is-delayed');
-      title.textContent = '小U定位更新稍有延遲';
-      desc.textContent = '系統仍會持續重新取得最新位置。';
+      title.textContent = '小U定位更新稍慢';
+      desc.textContent = 'ETA 會改以較保守的時間範圍顯示。';
     }else{
       title.textContent = options.source === 'api' ? '已完成重新同步' : '即時連線正常';
       desc.textContent = hasRider ? '訂單狀態與小U位置會自動同步。' : '訂單狀態會自動同步，小U接單後顯示即時位置。';
@@ -17626,6 +17500,7 @@ activateUBeeCustomerRuntime();
       status:summary.status,
       serviceType:summary.serviceType,
       serviceGroup:summary.serviceGroup,
+      singlePointTask:summary.singlePointTask === true,
       pickupAddress:summary.pickupAddress,
       dropoffAddress:summary.dropoffAddress,
       pickupLat:summary.pickupLat,
@@ -17635,8 +17510,14 @@ activateUBeeCustomerRuntime();
       total:summary.total,
       etaText:summary.eta?.text || '',
       etaMinutes:summary.eta?.minutes,
+      etaArrivalAtMs:summary.eta?.arrivalAtMs || 0,
+      etaConfidence:summary.eta?.confidence || '',
+      etaTarget:summary.eta?.target || '',
+      etaTargetLabel:summary.eta?.targetLabel || '',
+      etaDistanceText:summary.eta?.distanceText || '',
       estimatedPickupMinutes:summary.eta?.estimatedPickupMinutes,
       estimatedCompletionMinutes:summary.eta?.estimatedCompletionMinutes,
+      trackingServerTimeMs:summary.serverTimeMs || 0,
       riderName:rider.name || '',
       riderId:rider.assigned ? (currentOrderData?.riderId || 'assigned') : '',
       riderCurrentLat:rider.currentLat,
@@ -17956,6 +17837,7 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 #productionOrderFlow .ubee-native-task-menu-sheet button:last-child{border-bottom:0}#productionOrderFlow .ubee-native-task-menu-sheet .ubee-native-danger{color:#c62828}
 #productionOrderFlow .ubee-native-active-summary{padding:14px 2px 16px}#productionOrderFlow .ubee-native-active-summary-top{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:end}
 #productionOrderFlow .ubee-native-active-kicker{color:#7b8086;font-size:11px;font-weight:700;line-height:1.35}#productionOrderFlow .ubee-native-active-primary{margin-top:7px;color:#111;font-size:32px;font-weight:850;letter-spacing:-1px;line-height:1}
+#productionOrderFlow .ubee-native-active-primary.is-long{font-size:22px;letter-spacing:-.4px;line-height:1.18}
 #productionOrderFlow .ubee-native-active-primary-label{margin-top:5px;color:#7b8086;font-size:11px;font-weight:650}#productionOrderFlow .ubee-native-active-status{min-width:0;padding-bottom:1px}
 #productionOrderFlow .ubee-native-active-status strong{display:block;color:#111;font-size:16px;font-weight:850;line-height:1.4}#productionOrderFlow .ubee-native-active-status span{display:block;margin-top:5px;color:#73787e;font-size:12px;font-weight:650;line-height:1.55}
 #productionOrderFlow .ubee-native-health-row{margin:0 0 14px;border:1px solid var(--flow-line);border-radius:16px;background:#fff;box-shadow:none}
@@ -19039,12 +18921,12 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </details>
 </header>
 <div class="flow-scroll ubee-customer-active-scroll">
-<section class="ubee-native-active-summary" aria-live="polite">
+<section class="ubee-native-active-summary" id="step5LiveStatusPanel" aria-live="polite">
 <div class="ubee-native-active-summary-top">
 <div>
 <div class="ubee-native-active-kicker">訂單 <strong id="orderNo">-</strong></div>
-<div class="ubee-native-active-primary" id="step5LiveStatusPrimary">--:--</div>
-<div class="ubee-native-active-primary-label" id="step5LiveStatusLabel">預計抵達時間</div>
+<div class="ubee-native-active-primary" id="step5LiveStatusPrimary">同步中</div>
+<div class="ubee-native-active-primary-label" id="step5LiveStatusLabel">正在讀取最新任務資訊</div>
 </div>
 <div class="ubee-native-active-status">
 <strong id="step5LiveStatusTitle">任務狀態更新中</strong>
@@ -20309,7 +20191,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260909-customer-native-system-v1-2-order-flow';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260909-customer-native-system-v1-3-live-eta-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
