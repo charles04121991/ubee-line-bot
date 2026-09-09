@@ -1,7 +1,8 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.09.3 Customer Native System V1.2 Order Flow
+ * 2026-09-09 Customer Native System V1.3 / Live ETA V1：修復 Active Task ETA 狀態面板並切換至後端 traffic-aware ETA；升版後清除舊 Customer Cache。
+ * Version: 2026.09.09.4 Customer Native System V1.3 / Live ETA V1
  * File: ubee-customer-sw.js
  *
  * 2026-09-09 Customer Native System V1.2：任務內容／配送設定／確認訂單改為 Native Form Sections、Selection Rows、Checkout Summary；升版清除舊 Customer Cache。
@@ -30,7 +31,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.09.3-customer-native-v1-2-order-flow';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.09.4-customer-native-v1-3-live-eta-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
