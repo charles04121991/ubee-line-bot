@@ -1,3 +1,4 @@
+// 2026-09-09｜Customer Live ETA Backend V1：一般客戶進行中任務使用小U最新 GPS＋即時道路路況計算 ETA；30 秒／80 公尺節流更新，定位超過 5 分鐘即停止提供精準 ETA，避免客戶看到過期預估。
 // 2026-09-09｜Customer Dispatch Recovery Backend V1：客戶現金立即單由 pending_payment 確認為 pending_dispatch 後，正式建立 dispatchPushCycle 並啟動全區 startDispatchPushSequence，避免只靠騎士端輪詢才看見任務。
 // 2026-09-09｜Rider Qualification Hard Lock Backend V1：刪除舊 approved→ACTIVE／無 onboarding 即放行相容邏輯；正式接單改為「審核→入職→測驗→ACTIVE→上線」五段式硬鎖，tasks/status/accept-order 全部後端 fail-closed 驗證。
 // 2026-09-08｜Customer Global Supply Backend V1：客戶端 service-status 改為全區可媒合小U，不再回傳附近公里數作為媒合依據。
@@ -20652,8 +20653,18 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
       );
 
     if (transactionResult.syncedOrder && transactionResult.orderId) {
-      // Merchant Live Tracking V3：路線與 ETA 於背景更新，
-      // 不讓 Google Routes / Distance Matrix 延遲小U的 GPS 上傳。
+      // Customer Live ETA V1 / Merchant Live Tracking V3：
+      // GPS 先完成寫入後，再於背景做 traffic-aware ETA；不阻塞小U定位上傳。
+      refreshCustomerLiveEtaV1(
+        transactionResult.orderId,
+        { reason:'rider_location', allowRoute:true }
+      ).catch(error => {
+        console.warn(
+          '⚠️ Customer Live ETA V1 背景更新失敗：',
+          error?.message || error
+        );
+      });
+
       refreshMerchantLiveTrackingV3(
         transactionResult.orderId,
         { reason: 'rider_location', allowRoute: true }
@@ -40251,19 +40262,309 @@ function getCustomerTrackingMoney(order = {}) {
   return null;
 }
 
-function getCustomerLocationHealth(order = {}, nowMs = Date.now()) {
-  const updatedAtMs =
+
+const UBEE_CUSTOMER_LIVE_ETA_V1 = Object.freeze({
+  version:'customer-live-eta-v1-20260909',
+  routeRefreshMs:30 * 1000,
+  routeRefreshMinMoveKm:0.08,
+  gpsLiveMs:2 * 60 * 1000,
+  gpsDelayedMs:5 * 60 * 1000,
+  gpsStaleMs:10 * 60 * 1000,
+  routeMaxAgeMs:5 * 60 * 1000,
+});
+
+const customerLiveEtaRefreshLocksV1 = new Map();
+
+function getCustomerLiveEtaPhaseV1(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  if (['accepted','going_to_pickup','heading_to_pickup'].includes(status)) return 'pickup';
+  if (status === 'arrived_pickup') return 'pickup_arrived';
+  if (order.singlePointTask === true && ['picked_up','going_to_dropoff'].includes(status)) return 'processing';
+  if (['picked_up','going_to_dropoff','heading_to_dropoff'].includes(status)) return 'delivery';
+  if (status === 'arrived_dropoff') return 'dropoff_arrived';
+  if (['completed','done'].includes(status)) return 'completed';
+  return 'waiting';
+}
+
+function getCustomerLiveEtaDestinationV1(order = {}) {
+  const phase = getCustomerLiveEtaPhaseV1(order);
+  if (phase === 'pickup' || phase === 'pickup_arrived') {
+    const lat = Number(order.pickupLat ?? order.pickupLocation?.lat);
+    const lng = Number(order.pickupLng ?? order.pickupLocation?.lng);
+    return {
+      key:'pickup',
+      label:'取件地點',
+      address:String(order.pickupAddress || order.pickup || order.fromAddress || '').trim(),
+      lat:Number.isFinite(lat) ? lat : null,
+      lng:Number.isFinite(lng) ? lng : null,
+    };
+  }
+
+  if (phase !== 'delivery') return null;
+
+  const stops = Array.isArray(order.deliveryStops) ? order.deliveryStops : [];
+  const currentStopIndex = Math.max(0, Number(order.currentDeliveryStopIndex || 0));
+  const currentStop = stops[currentStopIndex] || {};
+  const laterMultiStop = stops.length > 1 && currentStopIndex > 0;
+  const lat = Number(
+    currentStop.dropoffLat ??
+    currentStop.lat ??
+    (!laterMultiStop ? (order.dropoffLat ?? order.dropoffLocation?.lat) : null)
+  );
+  const lng = Number(
+    currentStop.dropoffLng ??
+    currentStop.lng ??
+    (!laterMultiStop ? (order.dropoffLng ?? order.dropoffLocation?.lng) : null)
+  );
+
+  return {
+    key:'dropoff',
+    label:stops.length > 1 ? `第 ${currentStopIndex + 1} 個送達點` : '送達地點',
+    address:String(
+      currentStop.dropoffAddress ||
+      currentStop.address ||
+      currentStop.dropoff ||
+      order.dropoffAddress ||
+      order.dropoff ||
+      order.toAddress ||
+      ''
+    ).trim(),
+    lat:Number.isFinite(lat) ? lat : null,
+    lng:Number.isFinite(lng) ? lng : null,
+  };
+}
+
+function getCustomerLiveEtaLocationAtMsV1(order = {}) {
+  return (
     Number(order.riderLocationUpdatedAtMs || 0) ||
-    Number(order.trackingUpdatedAtMs || 0) ||
+    Number(order.riderCurrentLocation?.updatedAtMs || 0) ||
     dispatchIncidentTimeMs(order.riderLocationUpdatedAt) ||
-    dispatchIncidentTimeMs(order.trackingUpdatedAt);
+    0
+  );
+}
+
+function getCustomerLiveEtaHealthV1(order = {}, nowMs = Date.now()) {
+  const updatedAtMs = getCustomerLiveEtaLocationAtMsV1(order);
   if (!updatedAtMs) {
     return { key:'waiting', label:'等待小U定位', updatedAtMs:0, ageMs:null };
   }
   const ageMs = Math.max(0, nowMs - updatedAtMs);
-  if (ageMs <= 90 * 1000) return { key:'live', label:'即時定位正常', updatedAtMs, ageMs };
-  if (ageMs <= 5 * 60 * 1000) return { key:'delayed', label:'定位更新稍有延遲', updatedAtMs, ageMs };
-  return { key:'stale', label:'定位暫時中斷', updatedAtMs, ageMs };
+  if (ageMs <= UBEE_CUSTOMER_LIVE_ETA_V1.gpsLiveMs) {
+    return { key:'live', label:'即時定位正常', updatedAtMs, ageMs };
+  }
+  if (ageMs <= UBEE_CUSTOMER_LIVE_ETA_V1.gpsDelayedMs) {
+    return { key:'delayed', label:'定位更新稍慢', updatedAtMs, ageMs };
+  }
+  if (ageMs <= UBEE_CUSTOMER_LIVE_ETA_V1.gpsStaleMs) {
+    return { key:'stale', label:'定位暫時未更新', updatedAtMs, ageMs };
+  }
+  return { key:'critical', label:'定位暫時中斷', updatedAtMs, ageMs };
+}
+
+async function refreshCustomerLiveEtaV1(orderId, options = {}) {
+  const safeOrderId = String(orderId || '').trim().toUpperCase();
+  if (!safeOrderId) return null;
+
+  if (customerLiveEtaRefreshLocksV1.has(safeOrderId)) {
+    return customerLiveEtaRefreshLocksV1.get(safeOrderId);
+  }
+
+  const task = (async () => {
+    const orderRef = db.collection('orders').doc(safeOrderId);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) return null;
+
+    const order = { id:orderDoc.id, ...(orderDoc.data() || {}) };
+
+    // 店家配送已由 Merchant Live Tracking V3 計算同一組 traffic-aware ETA，
+    // 避免同一筆訂單重複呼叫 Google 路線 API。
+    if (typeof isMerchantTrackingOrderV3 === 'function' && isMerchantTrackingOrderV3(order)) {
+      return null;
+    }
+
+    const phase = getCustomerLiveEtaPhaseV1(order);
+    if (!['pickup','delivery'].includes(phase)) return null;
+
+    const destination = getCustomerLiveEtaDestinationV1(order);
+    if (!destination) return null;
+
+    const riderLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+    const riderLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+    if (!Number.isFinite(riderLat) || !Number.isFinite(riderLng)) return null;
+
+    const nowMs = Date.now();
+    const gps = getCustomerLiveEtaHealthV1(order, nowMs);
+    if (!['live','delayed'].includes(gps.key)) return null;
+
+    const previousRouteAtMs = Number(order.customerLiveEtaUpdatedAtMs || 0);
+    const previousOriginLat = Number(order.customerLiveEtaOriginLat);
+    const previousOriginLng = Number(order.customerLiveEtaOriginLng);
+    const movedKm = (
+      Number.isFinite(previousOriginLat) &&
+      Number.isFinite(previousOriginLng)
+    )
+      ? dispatchHaversineKm(previousOriginLat, previousOriginLng, riderLat, riderLng)
+      : null;
+
+    const targetChanged = String(order.customerLiveEtaTarget || '') !== destination.key;
+    const routeDue =
+      options.forceRoute === true ||
+      targetChanged ||
+      !previousRouteAtMs ||
+      (nowMs - previousRouteAtMs) >= UBEE_CUSTOMER_LIVE_ETA_V1.routeRefreshMs ||
+      (Number.isFinite(movedKm) && movedKm >= UBEE_CUSTOMER_LIVE_ETA_V1.routeRefreshMinMoveKm);
+
+    if (!routeDue || options.allowRoute === false) return null;
+
+    const destinationInput = destination.address || (
+      Number.isFinite(destination.lat) && Number.isFinite(destination.lng)
+        ? `${destination.lat},${destination.lng}`
+        : ''
+    );
+    if (!destinationInput) return null;
+
+    const route = await getMerchantTrafficRouteV3(riderLat, riderLng, destinationInput);
+    if (!route) return null;
+
+    const durationSeconds = Math.max(0, Number(route.durationSeconds || 0));
+    const etaMinutes = Math.max(1, Math.ceil(durationSeconds / 60));
+    const etaAtMs = nowMs + durationSeconds * 1000;
+    const update = {
+      customerLiveEtaVersion:UBEE_CUSTOMER_LIVE_ETA_V1.version,
+      customerLiveEtaTarget:destination.key,
+      customerLiveEtaTargetLabel:destination.label,
+      customerLiveEtaMinutes:etaMinutes,
+      customerLiveEtaText:`約 ${etaMinutes} 分鐘`,
+      customerLiveEtaAtMs:etaAtMs,
+      customerLiveEtaDistanceText:String(route.distanceText || ''),
+      customerLiveEtaDurationText:String(route.durationText || ''),
+      customerLiveEtaTrafficAware:route.trafficAware === true,
+      customerLiveEtaUpdatedAtMs:nowMs,
+      customerLiveEtaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      customerLiveEtaLocationAtMs:gps.updatedAtMs,
+      customerLiveEtaOriginLat:riderLat,
+      customerLiveEtaOriginLng:riderLng,
+
+      // 同步既有欄位，讓舊前端與其他營運頁仍可讀到最新 ETA。
+      etaText:`約 ${etaMinutes} 分鐘`,
+      etaMinutes,
+      etaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      remainingDistanceText:String(route.distanceText || ''),
+      remainingDistanceKm:Number((Math.max(0, Number(route.distanceMeters || 0)) / 1000).toFixed(2)),
+      ...(phase === 'pickup'
+        ? {
+            estimatedPickupMinutes:etaMinutes,
+            riderToPickupDistanceText:String(route.distanceText || ''),
+          }
+        : {
+            estimatedCompletionMinutes:etaMinutes,
+            riderToDropoffDistanceText:String(route.distanceText || ''),
+          }),
+    };
+
+    await orderRef.set(update, { merge:true });
+    return { ...update, orderId:safeOrderId };
+  })();
+
+  customerLiveEtaRefreshLocksV1.set(safeOrderId, task);
+  try {
+    return await task;
+  } finally {
+    customerLiveEtaRefreshLocksV1.delete(safeOrderId);
+  }
+}
+
+function buildCustomerLiveEtaPayloadV1(order = {}, locationHealth = null, nowMs = Date.now()) {
+  const phase = getCustomerLiveEtaPhaseV1(order);
+  const destination = getCustomerLiveEtaDestinationV1(order);
+  const health = locationHealth || getCustomerLiveEtaHealthV1(order, nowMs);
+  const moving = ['pickup','delivery'].includes(phase);
+
+  const routeUpdatedAtMs =
+    Number(order.customerLiveEtaUpdatedAtMs || 0) ||
+    Number(order.merchantLiveRouteUpdatedAtMs || 0) ||
+    dispatchIncidentTimeMs(order.etaUpdatedAt) ||
+    0;
+
+  const storedMinutes = Number(
+    order.customerLiveEtaMinutes ??
+    order.merchantLiveEtaMinutes ??
+    order.etaMinutes ??
+    (phase === 'pickup' ? order.estimatedPickupMinutes : order.estimatedCompletionMinutes)
+  );
+
+  let arrivalAtMs = Number(
+    order.customerLiveEtaAtMs ||
+    order.merchantLiveEtaAtMs ||
+    0
+  );
+
+  if (!arrivalAtMs && routeUpdatedAtMs && Number.isFinite(storedMinutes) && storedMinutes > 0) {
+    arrivalAtMs = routeUpdatedAtMs + storedMinutes * 60 * 1000;
+  }
+
+  let minutes = Number.isFinite(storedMinutes) && storedMinutes > 0
+    ? Math.ceil(storedMinutes)
+    : null;
+
+  if (arrivalAtMs > 0) {
+    minutes = Math.max(1, Math.ceil((arrivalAtMs - nowMs) / 60000));
+  }
+
+  const routeAgeMs = routeUpdatedAtMs > 0 ? Math.max(0, nowMs - routeUpdatedAtMs) : null;
+  const healthKey = String(health?.key || 'waiting');
+  const confidence = healthKey === 'live'
+    ? 'high'
+    : healthKey === 'delayed'
+      ? 'medium'
+      : 'unavailable';
+
+  const routeFreshEnough = routeAgeMs !== null && routeAgeMs <= UBEE_CUSTOMER_LIVE_ETA_V1.routeMaxAgeMs;
+  const available =
+    moving &&
+    ['live','delayed'].includes(healthKey) &&
+    routeFreshEnough &&
+    Number.isFinite(minutes) &&
+    minutes > 0;
+
+  let reason = '';
+  if (!moving) reason = 'stage_not_moving';
+  else if (healthKey === 'waiting') reason = 'waiting_location';
+  else if (healthKey === 'stale' || healthKey === 'critical') reason = 'location_stale';
+  else if (!routeFreshEnough) reason = 'route_stale';
+  else if (!Number.isFinite(minutes)) reason = 'eta_unavailable';
+
+  const distanceText = String(
+    order.customerLiveEtaDistanceText ||
+    order.merchantLiveDistanceText ||
+    (phase === 'pickup' ? order.riderToPickupDistanceText : order.riderToDropoffDistanceText) ||
+    order.remainingDistanceText ||
+    ''
+  ).trim();
+
+  return {
+    version:UBEE_CUSTOMER_LIVE_ETA_V1.version,
+    available,
+    reason,
+    confidence,
+    target:destination?.key || '',
+    targetLabel:destination?.label || '',
+    text:available ? `約 ${minutes} 分鐘` : '',
+    minutes:available ? minutes : null,
+    arrivalAtMs:available && confidence === 'high' ? arrivalAtMs : null,
+    distanceText:available ? distanceText : '',
+    routeUpdatedAtMs,
+    routeAgeMs,
+    locationUpdatedAtMs:Number(health?.updatedAtMs || 0),
+    locationAgeMs:health?.ageMs ?? null,
+    trafficAware:order.customerLiveEtaTrafficAware === true || order.merchantLiveTrafficAware === true,
+    estimatedPickupMinutes:phase === 'pickup' && available ? minutes : null,
+    estimatedCompletionMinutes:phase === 'delivery' && available ? minutes : null,
+  };
+}
+
+function getCustomerLocationHealth(order = {}, nowMs = Date.now()) {
+  return getCustomerLiveEtaHealthV1(order, nowMs);
 }
 
 async function getCustomerActiveIncident(orderId) {
@@ -40287,6 +40588,7 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
   const stage = getCustomerTrackingStage(status);
   const copy = getCustomerTrackingCopy(order, incident);
   const locationHealth = getCustomerLocationHealth(order, nowMs);
+  const liveEta = buildCustomerLiveEtaPayloadV1(order, locationHealth, nowMs);
   const riderCurrentLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
   const riderCurrentLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
   const pickupLat = Number(order.pickupLat ?? order.pickupLocation?.lat);
@@ -40309,6 +40611,7 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
     isTerminal:['completed','cancelled'].includes(status),
     serviceType:String(order.serviceType || order.serviceName || 'UBee 跑腿任務'),
     serviceGroup:String(order.serviceGroup || order.serviceKey || ''),
+    singlePointTask:order.singlePointTask === true,
     pickupAddress:String(order.pickupAddress || order.pickup || order.fromAddress || ''),
     dropoffAddress:String(order.dropoffAddress || order.dropoff || order.toAddress || ''),
     pickupLat:Number.isFinite(pickupLat) ? pickupLat : null,
@@ -40326,12 +40629,7 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
       accuracy:Number.isFinite(Number(order.riderLocationAccuracy)) ? Number(order.riderLocationAccuracy) : null,
       locationHealth,
     },
-    eta:{
-      text:String(order.etaText || order.estimatedTime || order.estimatedCompletionText || ''),
-      minutes:Number.isFinite(Number(order.etaMinutes)) ? Number(order.etaMinutes) : null,
-      estimatedPickupMinutes:Number.isFinite(Number(order.estimatedPickupMinutes)) ? Number(order.estimatedPickupMinutes) : null,
-      estimatedCompletionMinutes:Number.isFinite(Number(order.estimatedCompletionMinutes)) ? Number(order.estimatedCompletionMinutes) : null,
-    },
+    eta:liveEta,
     route:{
       riderToPickupDistanceText:String(order.riderToPickupDistanceText || order.distanceToPickupText || ''),
       riderToDropoffDistanceText:String(order.riderToDropoffDistanceText || order.distanceToDropoffText || order.remainingDistanceText || ''),
@@ -40442,6 +40740,14 @@ function sanitizeCustomerOrderForApi(order = {}) {
     riderHeading: order.riderHeading ?? null,
     riderSpeed: order.riderSpeed ?? null,
     riderLocationAccuracy: order.riderLocationAccuracy ?? null,
+    customerLiveEtaTarget: String(order.customerLiveEtaTarget || ''),
+    customerLiveEtaTargetLabel: String(order.customerLiveEtaTargetLabel || ''),
+    customerLiveEtaMinutes: Number.isFinite(Number(order.customerLiveEtaMinutes)) ? Number(order.customerLiveEtaMinutes) : null,
+    customerLiveEtaAtMs: Number(order.customerLiveEtaAtMs || 0),
+    customerLiveEtaDistanceText: String(order.customerLiveEtaDistanceText || ''),
+    customerLiveEtaUpdatedAtMs: Number(order.customerLiveEtaUpdatedAtMs || 0),
+    etaText: String(order.etaText || ''),
+    etaMinutes: Number.isFinite(Number(order.etaMinutes)) ? Number(order.etaMinutes) : null,
     createdAtMs: customerOrderApiTimeMs(order.createdAtMs || order.createdAt),
     updatedAtMs: customerOrderApiTimeMs(order.updatedAtMs || order.updatedAt),
   };
