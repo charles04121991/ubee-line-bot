@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-09｜Customer Native System V1.2：先刪除任務內容大 Card、配送方案 Card、確認訂單 Summary/Price Card 視覺，再建立 Native Form Sections／Selection Rows／Checkout Summary；估價、建單、派單、付款與地圖 API contract 保留。 -->
 <!-- 2026-09-09｜Customer Dispatch Recovery V1：建立訂單後立即以 Native Confirm 完成現金單確認，避免任務停在 pending_payment；確認成功後等待後端正式啟動全區派單。 -->
 <!-- 2026-09-09｜Customer Native System V1：刪除舊 Step 5 可見頁、訂單 Card／Detail Hero／照片 Card；進行中任務正式併入 productionOrderFlow，訂單列表改 Native Flat List、詳情改 Grouped Detail、照片改 Timeline；首頁與正式下單 API contract 保留。 -->
 <!-- 2026-09-08｜Customer Global Supply V1：用戶端首頁即時運力改為全區可媒合小U；刪除附近公里數優先顯示與擴大媒合文案，避免與騎士端全區待接任務池衝突。 -->
@@ -25,7 +26,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260909-customer-native-system-v1-1-dispatch-recovery" rel="manifest"/>
+<link href="/manifest-order.json?v=20260909-customer-native-system-v1-2-order-flow" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -17812,24 +17813,13 @@ body.flow-active>.app{display:none!important;}
 .flow-home-next{margin-top:13px;}
 .flow-form-group{margin-bottom:14px;}.flow-label{display:block;margin:0 0 7px;color:#25282b;font-size:13px;font-weight:1000;}.flow-required{color:var(--flow-danger);}
 /* UBee V1.2｜代買任務內容精簡版 */
-.flow-store-summary{display:none;margin:0 0 16px;padding:14px 15px;border:1px solid #e4e6e9;border-radius:16px;background:#fafafa;}
-.flow-store-summary.active{display:block;}
-.flow-store-summary-kicker{margin-bottom:5px;color:#7a7f85;font-size:11px;font-weight:1000;}
-.flow-store-summary-main{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.flow-store-summary-name{min-width:0;color:#111;font-size:15px;font-weight:1000;line-height:1.45;overflow-wrap:anywhere;}
-.flow-store-summary-badge{flex:0 0 auto;padding:5px 8px;border-radius:999px;background:#fff3b0;color:#6f5700;font-size:10px;font-weight:1000;}
-#flowTaskNote{min-height:138px;max-height:280px;resize:none;overflow-y:auto;}
 .flow-buy-note-example{display:none;margin-top:8px;color:#858a90;font-size:11px;font-weight:800;line-height:1.65;}
 body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 
 .flow-input,.flow-select,.flow-textarea{width:100%;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#111;outline:none;}.flow-input,.flow-select{min-height:52px;padding:0 13px;}.flow-textarea{min-height:126px;padding:12px 13px;line-height:1.65;resize:vertical;}.flow-input:focus,.flow-select:focus,.flow-textarea:focus{border-color:#c79d00;}
 .flow-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.flow-dynamic-field[hidden]{display:none!important;}
 .flow-inline-note{margin-top:7px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.55;}
-.flow-timing-list,.flow-speed-list{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}.flow-choice{min-height:78px;padding:9px 7px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#73787e;font-size:12px!important;font-weight:900;line-height:1.35;}.flow-choice strong{display:block;color:inherit;font-size:13px;}.flow-choice small{display:block;margin-top:4px;color:inherit;font-size:10px;font-weight:800;}.flow-choice.active{border-color:#d5aa00;background:#fff7d0;color:#111;}
-.flow-schedule-panel{display:none;margin-top:11px;padding:12px;border:1px solid var(--flow-line);border-radius:16px;background:#fafafa;}.flow-schedule-panel.show{display:block;}
 .flow-map{position:relative;width:100%;height:310px;overflow:hidden;border-radius:19px;background:#e8eaed;}.flow-map-canvas{position:absolute;inset:0;}.flow-map-status{position:absolute;left:12px;right:12px;bottom:12px;z-index:5;padding:10px 12px;border:1px solid rgba(17,24,39,.08);border-radius:14px;background:rgba(255,255,255,.95);color:#555b61;font-size:11px;font-weight:900;line-height:1.5;text-align:center;}.flow-map-status.success{display:none;}.flow-map-retry{display:inline-block;margin-top:7px;border:1px solid #dbdde0;border-radius:999px;background:#fff;padding:7px 10px;color:#111;font-size:11px!important;font-weight:1000;}
-.flow-summary-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:18px;background:#fff;}.flow-summary-row{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:9px;align-items:start;padding:12px 13px;border-bottom:1px solid #eef0f1;}.flow-summary-row:last-child{border-bottom:none;}.flow-summary-label{color:#858a90;font-size:11px;font-weight:900;}.flow-summary-value{color:#111;font-size:13px;font-weight:900;line-height:1.55;word-break:break-word;}.flow-summary-edit{border:none;background:transparent;color:#876c00;font-size:11px!important;font-weight:1000;}
-.flow-price-card{display:flex;align-items:center;justify-content:space-between;gap:12px;}.flow-price-card small{display:block;color:#858a90;font-size:11px;font-weight:900;}.flow-route-meta{margin-top:4px;color:#676c72;font-size:12px;font-weight:850;}.flow-price{font-size:29px;font-weight:1000;white-space:nowrap;}
 .flow-check{display:flex;align-items:flex-start;gap:10px;margin:12px 2px;padding:12px;border:1px solid var(--flow-line);border-radius:15px;background:#fff;color:#333;font-size:12px;font-weight:850;line-height:1.55;}.flow-check input{width:20px;height:20px;flex:0 0 20px;margin:0;accent-color:#111;}
 .flow-actionbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px;border-top:1px solid rgba(17,24,39,.08);background:#ffffff;}
 .flow-actionbar.single{grid-template-columns:1fr;}.flow-actionbar .flow-secondary,.flow-actionbar .flow-primary{min-height:54px;}
@@ -17841,25 +17831,110 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 .flow-status{min-height:20px;margin:7px 2px;color:#667078;font-size:12px;font-weight:850;line-height:1.5;}.flow-status:empty{display:none;}.flow-status.error{color:var(--flow-danger);}
 .flow-loading{position:absolute;inset:0;z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(255,255,255,.82);font-size:13px;font-weight:1000;}.flow-loading.show{display:flex;}.flow-spinner{width:34px;height:34px;border:4px solid #e5e7ea;border-top-color:#111;border-radius:50%;animation:flowSpin .75s linear infinite;}@keyframes flowSpin{to{transform:rotate(360deg);}}
 
-.flow-selected-service-card{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:11px 12px;border:1px solid #ead77a;border-radius:15px;background:#fffbed;}.flow-selected-service-card span{color:#8a7200;font-size:11px;font-weight:900;}.flow-selected-service-card strong{color:#111;font-size:15px;font-weight:1000;text-align:right;}
 .flow-task-extra{margin-top:4px;border:1px solid var(--flow-line);border-radius:15px;background:#fafafa;overflow:hidden;}.flow-task-extra summary{cursor:pointer;list-style:none;padding:13px 14px;color:#555b61;font-size:12px;font-weight:1000;}.flow-task-extra summary::-webkit-details-marker{display:none;}.flow-task-extra summary::after{content:"＋";float:right;color:#8a8f95;}.flow-task-extra[open] summary::after{content:"－";}.flow-task-extra-body{padding:0 12px 12px;}.flow-task-extra-body .flow-form-group{margin-bottom:0;}
 .flow-search-results-section[hidden],.flow-quick-addresses[hidden]{display:none!important;}.flow-address-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:13px 0 9px;padding:4px;border:1px solid var(--flow-line);border-radius:14px;background:#eef0f2;}.flow-address-tab{min-height:42px;border:none;border-radius:11px;background:transparent;color:#777c82;font-size:13px!important;font-weight:1000;}.flow-address-tab.active{background:#fff;color:#111;}
 .flow-profile-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-bottom:12px;padding:18px;border:1px solid #eadf9d;border-radius:20px;background:#fffbed;}.flow-profile-hero small,.flow-profile-hero span{display:block;color:#817552;font-size:11px;font-weight:850;}.flow-profile-hero strong{display:block;margin:4px 0;color:#111;font-size:21px;font-weight:1000;}.flow-profile-stats{display:grid;grid-template-columns:repeat(2,64px);gap:7px;}.flow-profile-stats div{padding:9px 5px;border:1px solid #eee4b5;border-radius:13px;background:#fff;text-align:center;}.flow-profile-stats strong{margin:0;font-size:17px;}.flow-profile-stats span{margin-top:2px;font-size:9px;}.flow-profile-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;}.flow-profile-section-head strong{display:block;font-size:15px;font-weight:1000;}.flow-profile-section-head small{display:block;margin-top:3px;color:var(--flow-muted);font-size:10px;font-weight:800;}.flow-profile-list{display:flex;flex-direction:column;gap:8px;}.flow-profile-item{padding:11px 12px;border:1px solid var(--flow-line);border-radius:14px;background:#fafafa;}.flow-profile-item strong{display:block;color:#111;font-size:13px;font-weight:1000;line-height:1.45;}.flow-profile-item span{display:block;margin-top:4px;color:#73787e;font-size:10px;font-weight:800;line-height:1.5;}.flow-profile-item-address{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 /* 任務內容：App 式任務細項與品項分類 */
 .flow-compat-select{display:none!important;}
-.flow-task-choice-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
-.flow-task-choice-title .flow-label{margin:0;}.flow-task-choice-title small{color:var(--flow-muted);font-size:10px;font-weight:800;}
-.flow-task-type-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
-.flow-task-type-card{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:9px;min-height:68px;padding:10px;border:1px solid var(--flow-line);border-radius:16px;background:#fff;color:#111;text-align:left;}
-.flow-task-type-card .flow-task-type-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:#f4f5f6;font-size:20px;}
-.flow-task-type-card strong{display:block;overflow:hidden;font-size:13px;font-weight:1000;line-height:1.35;text-overflow:ellipsis;white-space:nowrap;}
-.flow-task-type-card small{display:block;margin-top:3px;color:var(--flow-muted);font-size:9px;font-weight:800;}
-.flow-task-type-card.active{border-color:#d3aa00;background:#fff9d9;}
-.flow-task-type-card.active .flow-task-type-icon{background:var(--flow-accent);}
-.flow-category-chips{display:flex;flex-wrap:wrap;gap:8px;}
-.flow-category-chip{min-height:40px;padding:8px 13px;border:1px solid var(--flow-line);border-radius:999px;background:#fff;color:#555b61;font-size:12px!important;font-weight:900;}
-.flow-category-chip.active{border-color:#111;background:#111;color:#fff;}
+
+/* =========================================================
+   Customer Native System V1.2｜Order Creation Native Flow
+   唯一正式樣式來源：Task Form / Delivery Selection / Checkout
+   被取代的舊 flow-choice / flow-summary / purchase-helper card CSS 已先刪除。
+   ========================================================= */
+#productionOrderFlow .ubee-native-create-scroll{padding:12px 14px 20px!important;background:var(--flow-bg)}
+#productionOrderFlow .ubee-native-form-section{margin:0 0 20px}
+#productionOrderFlow .ubee-native-form-section[hidden]{display:none!important}
+#productionOrderFlow .ubee-native-form-section-title{margin:0 4px 7px;color:#111;font-size:15px;font-weight:850;line-height:1.35}
+#productionOrderFlow .ubee-native-form-section-caption{margin:-2px 4px 9px;color:var(--flow-muted);font-size:11px;font-weight:650;line-height:1.55}
+#productionOrderFlow .ubee-native-form-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:17px;background:#fff}
+#productionOrderFlow .ubee-native-form-block{padding:13px;border-bottom:1px solid #eef0f1}
+#productionOrderFlow .ubee-native-form-block:last-child{border-bottom:0}
+#productionOrderFlow .ubee-native-field-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:9px}
+#productionOrderFlow .ubee-native-field-head .flow-label{margin:0!important;font-size:13px!important;font-weight:800!important}
+#productionOrderFlow .ubee-native-field-head small{color:var(--flow-muted);font-size:10px;font-weight:650}
+#productionOrderFlow .ubee-native-form-row{min-height:54px;display:grid;grid-template-columns:112px minmax(0,1fr);align-items:center;gap:14px;padding:10px 13px;border-bottom:1px solid #eef0f1;color:#111}
+#productionOrderFlow .ubee-native-form-row:last-child{border-bottom:0}
+#productionOrderFlow .ubee-native-form-row>span:first-child,#productionOrderFlow .ubee-native-form-row>.flow-label{margin:0!important;color:#44494f;font-size:12px!important;font-weight:750!important;line-height:1.4}
+#productionOrderFlow .ubee-native-form-row.stack{display:block;padding:12px 13px}
+#productionOrderFlow .ubee-native-form-row.stack>span:first-child{display:block;margin-bottom:7px!important}
+#productionOrderFlow .ubee-native-form-row .flow-input,#productionOrderFlow .ubee-native-form-row .flow-select,#productionOrderFlow .ubee-native-form-row .flow-textarea{min-height:34px!important;width:100%;border:0!important;border-radius:0!important;background:transparent!important;padding:4px 0!important;color:#111;font-size:15px!important;font-weight:700!important;text-align:right;box-shadow:none!important}
+#productionOrderFlow .ubee-native-form-row.stack .flow-textarea{text-align:left;min-height:118px!important;padding:2px 0!important;line-height:1.65!important}
+#productionOrderFlow .ubee-native-form-row.stack .flow-textarea.compact{min-height:82px!important}
+#productionOrderFlow .ubee-native-form-row .flow-input:focus,#productionOrderFlow .ubee-native-form-row .flow-select:focus,#productionOrderFlow .ubee-native-form-row .flow-textarea:focus{outline:none!important}
+#productionOrderFlow .ubee-native-form-help{display:block;margin-top:7px;color:var(--flow-muted);font-size:10px;font-weight:650;line-height:1.55}
+#productionOrderFlow .ubee-native-form-note{margin:8px 4px 0;color:#777d83;font-size:10px;font-weight:650;line-height:1.6}
+#productionOrderFlow .ubee-native-inline-control{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;color:#6f747a;font-size:12px;font-weight:700}
+#productionOrderFlow .ubee-native-inline-control .flow-input{width:min(128px,55vw)!important;text-align:right!important}
+
+#productionOrderFlow .ubee-native-task-type-list{overflow:hidden;border:1px solid #eceeef;border-radius:14px;background:#fff}
+#productionOrderFlow .ubee-native-task-type-row{width:100%;min-height:60px;display:grid;grid-template-columns:36px minmax(0,1fr) 22px;align-items:center;gap:10px;padding:10px 12px;border:0;border-bottom:1px solid #eef0f1;background:#fff;color:#111;text-align:left}
+#productionOrderFlow .ubee-native-task-type-row:last-child{border-bottom:0}
+#productionOrderFlow .ubee-native-task-type-row:active{background:#f7f8f9}
+#productionOrderFlow .ubee-native-task-type-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#f3f4f5;font-size:19px}
+#productionOrderFlow .ubee-native-task-type-copy{min-width:0}
+#productionOrderFlow .ubee-native-task-type-copy strong{display:block;color:#111;font-size:13px;font-weight:800;line-height:1.4}
+#productionOrderFlow .ubee-native-task-type-copy small{display:block;margin-top:3px;color:var(--flow-muted);font-size:10px;font-weight:650}
+#productionOrderFlow .ubee-native-selection-mark{width:20px;height:20px;border:1.5px solid #c7cbd0;border-radius:50%;background:#fff;position:relative}
+#productionOrderFlow .ubee-native-task-type-row.active .ubee-native-selection-mark,#productionOrderFlow .ubee-native-selection-row.active .ubee-native-selection-mark{border-color:#111;background:#111}
+#productionOrderFlow .ubee-native-task-type-row.active .ubee-native-selection-mark::after,#productionOrderFlow .ubee-native-selection-row.active .ubee-native-selection-mark::after{content:"";position:absolute;left:6px;top:3px;width:5px;height:9px;border-right:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(45deg)}
+#productionOrderFlow .ubee-native-category-list,#productionOrderFlow .ubee-native-chip-list{display:flex;flex-wrap:wrap;gap:7px}
+#productionOrderFlow .ubee-native-chip{min-height:38px;padding:8px 11px;border:1px solid #e1e3e6;border-radius:999px;background:#f7f8f9;color:#5f656b;font-size:11px!important;font-weight:750;line-height:1.25}
+#productionOrderFlow .ubee-native-chip.active{border-color:#111;background:#111;color:#fff}
+#productionOrderFlow .ubee-native-choice-field{padding:12px 13px;border-bottom:1px solid #eef0f1}
+#productionOrderFlow .ubee-native-choice-field:last-child{border-bottom:0}
+#productionOrderFlow .ubee-native-choice-field-title{margin-bottom:8px;color:#44494f;font-size:12px;font-weight:750}
+#productionOrderFlow .flow-store-summary{display:none;margin:0;border:0;border-radius:0;border-bottom:1px solid #eef0f1;background:#fff;padding:12px 13px}
+#productionOrderFlow .flow-store-summary.active{display:block}
+#productionOrderFlow .flow-store-summary-kicker{margin-bottom:5px;color:#7a7f85;font-size:10px;font-weight:700}
+#productionOrderFlow .flow-store-summary-main{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#productionOrderFlow .flow-store-summary-name{min-width:0;color:#111;font-size:14px;font-weight:800;line-height:1.45;overflow-wrap:anywhere}
+#productionOrderFlow .flow-store-summary-badge{flex:0 0 auto;padding:5px 8px;border-radius:999px;background:#fff3b0;color:#6f5700;font-size:10px;font-weight:750}
+
+#productionOrderFlow .ubee-native-selection-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:17px;background:#fff}
+#productionOrderFlow .ubee-native-selection-row{width:100%;min-height:68px;display:grid;grid-template-columns:minmax(0,1fr) 22px;align-items:center;gap:12px;padding:11px 13px;border:0;border-bottom:1px solid #eef0f1;background:#fff;text-align:left;color:#111}
+#productionOrderFlow .ubee-native-selection-row:last-child{border-bottom:0}
+#productionOrderFlow .ubee-native-selection-row:active{background:#f7f8f9}
+#productionOrderFlow .ubee-native-selection-copy strong{display:block;color:#111;font-size:14px;font-weight:800;line-height:1.4}
+#productionOrderFlow .ubee-native-selection-copy small{display:block;margin-top:4px;color:var(--flow-muted);font-size:11px;font-weight:650;line-height:1.45}
+#productionOrderFlow .ubee-native-inline-panel{display:none;margin-top:9px}
+#productionOrderFlow .ubee-native-inline-panel.show{display:block}
+#productionOrderFlow .ubee-native-inline-panel .ubee-native-form-list{background:#fafafa}
+#productionOrderFlow .ubee-native-flow-actionbar{flex:0 0 auto;display:grid;grid-template-columns:106px minmax(0,1fr);gap:9px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #e9ebed;background:#fff}
+#productionOrderFlow .ubee-native-flow-actionbar .flow-primary,#productionOrderFlow .ubee-native-flow-actionbar .flow-secondary{min-height:50px!important;margin:0!important;border-radius:14px!important;font-size:14px!important}
+
+#productionOrderFlow .ubee-native-checkout-scroll{padding-bottom:20px!important}
+#productionOrderFlow .ubee-native-checkout-map-section{margin:0 0 18px}
+#productionOrderFlow .ubee-native-checkout-map{height:286px;border-radius:18px}
+#productionOrderFlow .ubee-native-checkout-group{margin:0 0 18px}
+#productionOrderFlow .ubee-native-checkout-group-title{margin:0 4px 7px;color:#777c82;font-size:11px;font-weight:750}
+#productionOrderFlow .ubee-native-checkout-list{overflow:hidden;border:1px solid var(--flow-line);border-radius:17px;background:#fff}
+#productionOrderFlow .ubee-native-checkout-row{width:100%;min-height:58px;display:grid;grid-template-columns:84px minmax(0,1fr) 18px;align-items:center;gap:10px;padding:11px 13px;border:0;border-bottom:1px solid #eef0f1;background:#fff;color:#111;text-align:left}
+#productionOrderFlow .ubee-native-checkout-row:last-child{border-bottom:0}
+#productionOrderFlow .ubee-native-checkout-row:active{background:#f7f8f9}
+#productionOrderFlow .ubee-native-checkout-row>span:first-child{color:var(--flow-muted);font-size:11px;font-weight:700}
+#productionOrderFlow .ubee-native-checkout-row>strong{color:#111;font-size:13px;font-weight:750;line-height:1.55;white-space:pre-line;word-break:break-word}
+#productionOrderFlow .ubee-native-checkout-chevron{color:#b6babf;font-size:20px;font-weight:400;text-align:right}
+#productionOrderFlow .ubee-native-checkout-price{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:0 0 14px;padding:2px 4px}
+#productionOrderFlow .ubee-native-checkout-price span{display:block;color:#777d83;font-size:11px;font-weight:700}
+#productionOrderFlow .ubee-native-checkout-price small{display:block;margin-top:4px;color:#777d83;font-size:11px;font-weight:650}
+#productionOrderFlow .ubee-native-checkout-price>strong{color:#111;font-size:28px;font-weight:850;letter-spacing:-.6px;white-space:nowrap}
+#productionOrderFlow .ubee-native-consent-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:11px;align-items:start;padding:12px 13px;border:1px solid var(--flow-line);border-radius:16px;background:#fff}
+#productionOrderFlow .ubee-native-consent-row input{width:20px;height:20px;margin:0;accent-color:#111}
+#productionOrderFlow .ubee-native-consent-row strong{display:block;color:#111;font-size:13px;font-weight:800}
+#productionOrderFlow .ubee-native-consent-row small{display:block;margin-top:3px;color:var(--flow-muted);font-size:10px;font-weight:650;line-height:1.55}
+#productionOrderFlow .ubee-native-checkout-actionbar{flex:0 0 auto;display:grid;grid-template-columns:minmax(94px,.7fr) minmax(0,1.3fr);align-items:center;gap:10px;padding:9px 12px calc(9px + env(safe-area-inset-bottom));border-top:1px solid #e9ebed;background:#fff}
+#productionOrderFlow .ubee-native-checkout-action-price{min-width:0;padding-left:2px}
+#productionOrderFlow .ubee-native-checkout-action-price span{display:block;color:#777d83;font-size:10px;font-weight:700}
+#productionOrderFlow .ubee-native-checkout-action-price strong{display:block;margin-top:2px;color:#111;font-size:20px;font-weight:850;white-space:nowrap}
+#productionOrderFlow .ubee-native-checkout-actionbar .flow-primary{min-height:50px!important;margin:0!important;border-radius:14px!important;font-size:14px!important}
+@media(max-width:380px){
+  #productionOrderFlow .ubee-native-form-row{grid-template-columns:96px minmax(0,1fr);gap:10px;padding-left:11px;padding-right:11px}
+  #productionOrderFlow .ubee-native-checkout-row{grid-template-columns:72px minmax(0,1fr) 16px;padding-left:11px;padding-right:11px}
+  #productionOrderFlow .ubee-native-checkout-map{height:250px}
+  #productionOrderFlow .ubee-native-flow-actionbar{grid-template-columns:94px minmax(0,1fr)}
+}
 
 /* Customer Native Dialog V1 */
 .ubee-customer-dialog{position:fixed;inset:0;z-index:2147483200;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -17918,7 +17993,7 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 
 @media(max-width:390px){
   .flow-progress-item{font-size:9px;}.flow-progress-item::before{width:17px;height:17px;flex-basis:17px;}
-  .flow-grid-2{grid-template-columns:1fr;}.flow-timing-list,.flow-speed-list{grid-template-columns:1fr 1fr;}.flow-map{height:270px;}
+  .flow-grid-2{grid-template-columns:1fr;}.flow-map{height:270px;}
 }
 
 /* ===== UBee 用戶端｜我的頁面（台灣用語、所有入口可點擊） ===== */
@@ -17926,50 +18001,14 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 @media(max-width:380px){}
 
 /* =====================================================
-   UBee 店家探索 V2.1｜代買內容結構化表單
+   UBee 任務結構化欄位｜Native System V1.2 visibility only
+   舊 Purchase / Helper Card CSS 已刪除；視覺由唯一 Native Form stylesheet 管理。
    ===================================================== */
 .flow-buy-structured{display:none;}
 body.ubee-buy-task-active .flow-buy-structured{display:block;}
 body.ubee-buy-task-active #flowTaskNoteGroup{display:none;}
-.flow-purchase-form{margin:0 0 18px;padding:0;}
-.flow-purchase-form-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
-.flow-purchase-form-head strong{display:block;color:#111;font-size:16px;font-weight:1000;line-height:1.4;}
-.flow-purchase-form-head small{display:block;margin-top:3px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.5;}
-.flow-purchase-required{color:#dc2626;}
-.flow-purchase-grid{display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:10px;}
-.flow-purchase-field{margin-bottom:12px;}
-.flow-purchase-field:last-child{margin-bottom:0;}
-.flow-purchase-field label{display:block;margin:0 0 7px;color:#303236;font-size:13px;font-weight:1000;}
-.flow-purchase-field .flow-input,
-.flow-purchase-field .flow-textarea{background:#fff;}
-.flow-purchase-note{min-height:92px!important;max-height:180px!important;resize:none!important;}
-.flow-stock-options{display:flex;flex-wrap:wrap;gap:8px;}
-.flow-stock-option{min-height:42px;padding:9px 13px;border:1px solid var(--flow-line);border-radius:999px;background:#fff;color:#565b61;font-size:12px!important;font-weight:900;line-height:1.3;}
-.flow-stock-option.active{border-color:#111;background:#111;color:#fff;}
-.flow-purchase-help{margin-top:8px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.65;}
-.flow-purchase-preview{margin-top:12px;padding:11px 12px;border:1px solid #efe2a2;border-radius:14px;background:#fffbea;color:#6a5b23;font-size:11px;font-weight:850;line-height:1.65;}
-@media(max-width:360px){
-  .flow-purchase-grid{grid-template-columns:1fr;}
-  .flow-stock-option{flex:1 1 calc(50% - 8px);}
-}
-
-/* =====================================================
-   2026-09-03｜全能跑腿任務完成方式 V1
-   ===================================================== */
 .flow-helper-structured{display:none;}
 body.ubee-helper-task-active .flow-helper-structured{display:block;}
-.flow-helper-form{margin:0 0 18px;padding:13px;border:1px solid #e7e9ec;border-radius:17px;background:#fafbfc;}
-.flow-helper-form-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
-.flow-helper-form-head strong{display:block;color:#111;font-size:15px;font-weight:1000;line-height:1.4;}
-.flow-helper-form-head small{display:block;margin-top:3px;color:var(--flow-muted);font-size:11px;font-weight:800;line-height:1.55;}
-.flow-helper-field{margin-top:12px;}
-.flow-helper-field:first-of-type{margin-top:0;}
-.flow-helper-field label{display:block;margin:0 0 7px;color:#303236;font-size:12px;font-weight:1000;}
-.flow-helper-options{display:flex;flex-wrap:wrap;gap:8px;}
-.flow-helper-option{min-height:40px;padding:8px 12px;border:1px solid var(--flow-line);border-radius:999px;background:#fff;color:#565b61;font-size:11px!important;font-weight:900;line-height:1.3;}
-.flow-helper-option.active{border-color:#111;background:#111;color:#fff;}
-.flow-helper-safety{margin-top:12px;padding:10px 11px;border:1px solid #f0dfa3;border-radius:13px;background:#fffbea;color:#6a5b23;font-size:10px;font-weight:850;line-height:1.65;}
-@media(max-width:360px){.flow-helper-option{flex:1 1 calc(50% - 8px);}}
 </style>
 <style id="ubee-production-live-supply-v22-compact-style">
 /* =====================================================
@@ -18573,82 +18612,100 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="flow-page" data-page="task" id="flowPageTask">
 <header class="flow-header">
 <button aria-label="返回" class="flow-back-btn" data-go="home" type="button">‹</button>
-<div class="flow-title-wrap"><div class="flow-title">任務內容</div><div class="flow-subtitle">請讓小U清楚知道要做什麼</div></div>
+<div class="flow-title-wrap"><div class="flow-title">任務內容</div><div class="flow-subtitle">設定這筆任務需要小U完成的內容</div></div>
 <span></span>
 </header>
 <div class="flow-progress" data-progress="1"></div>
-<div class="flow-scroll">
-<div class="flow-card">
-<div class="flow-selected-service-card ubee-hidden-duplicate-field"><span>目前選擇</span><strong id="flowSelectedServiceLabel">幫我送</strong></div>
-<div class="flow-form-group" hidden="" id="flowServiceTypeGroup">
-<div class="flow-task-choice-title"><label class="flow-label">任務細項</label><small>選擇最接近的服務</small></div>
-<div aria-label="任務細項" class="flow-task-type-grid" id="flowServiceTypeChoices" role="listbox"></div>
+<div class="flow-scroll ubee-native-create-scroll">
+
+<section class="ubee-native-form-section">
+<div class="ubee-native-form-section-title">任務類型</div>
+<div class="ubee-native-form-section-caption">選擇最接近的任務內容，系統會依類型帶入對應欄位。</div>
+<div class="ubee-native-form-list">
+<div class="ubee-native-form-block ubee-hidden-duplicate-field"><span>目前選擇</span><strong id="flowSelectedServiceLabel">幫我送</strong></div>
+<div class="ubee-native-form-block" hidden id="flowServiceTypeGroup">
+<div class="ubee-native-field-head"><label class="flow-label">任務細項</label><small>選擇最接近的服務</small></div>
+<div aria-label="任務細項" class="ubee-native-task-type-list" id="flowServiceTypeChoices" role="listbox"></div>
 <select aria-hidden="true" class="flow-compat-select" id="flowServiceType" tabindex="-1"></select>
 </div>
-<div class="flow-form-group" hidden="" id="flowServiceCategoryGroup">
-<div class="flow-task-choice-title"><label class="flow-label">品項分類</label><small>可快速辨識任務內容</small></div>
-<div aria-label="品項分類" class="flow-category-chips" id="flowServiceCategoryChoices" role="listbox"></div>
+<div class="ubee-native-form-block" hidden id="flowServiceCategoryGroup">
+<div class="ubee-native-field-head"><label class="flow-label">品項分類</label><small>協助小U快速辨識任務</small></div>
+<div aria-label="品項分類" class="ubee-native-category-list" id="flowServiceCategoryChoices" role="listbox"></div>
 <select aria-hidden="true" class="flow-compat-select" id="flowServiceCategory" tabindex="-1"></select>
 </div>
 <div class="flow-store-summary" id="flowStorePurchaseSummary"><div class="flow-store-summary-kicker">購買店家</div><div class="flow-store-summary-main"><div class="flow-store-summary-name" id="flowStorePurchaseName">尚未選擇店家</div><span class="flow-store-summary-badge">已自動帶入</span></div></div>
-<div class="flow-form-group" id="flowTaskNoteGroup"><label class="flow-label" for="flowTaskNote" id="flowTaskNoteLabel">要請小U完成什麼？ <span class="flow-required">＊</span></label><textarea class="flow-textarea" id="flowTaskNote" maxlength="500" placeholder="請說明任務內容與注意事項"></textarea><div class="flow-inline-note" id="flowTaskNoteHelp">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</div></div>
+</div>
+</section>
+
+<section class="ubee-native-form-section" id="flowTaskNoteGroup">
+<div class="ubee-native-form-section-title" id="flowTaskNoteLabel">要請小U完成什麼？ <span class="flow-required">＊</span></div>
+<div class="ubee-native-form-list">
+<label class="ubee-native-form-row stack" for="flowTaskNote"><textarea class="flow-textarea ubee-native-textarea" id="flowTaskNote" maxlength="500" placeholder="請說明任務內容與注意事項"></textarea><span class="ubee-native-form-help" id="flowTaskNoteHelp">寫清楚品項、數量、取件方式、交付方式與注意事項即可。</span></label>
+</div>
+</section>
+
 <div class="flow-helper-structured" id="flowHelperDetailsForm">
-  <div class="flow-helper-form">
-    <div class="flow-helper-form-head"><div><strong>任務完成方式</strong><small>所有服務抵達後都會強制拍照回傳給你；這裡設定的是全能任務額外需要的文字／完成照片或現場交接。</small></div></div>
-    <div class="flow-helper-field"><label>額外完成回報</label><div aria-label="額外完成回報方式" class="flow-helper-options" id="flowHelperReportOptions" role="radiogroup">
-      <button aria-pressed="true" class="flow-helper-option active" data-helper-report="none" type="button">只要到場照片</button>
-      <button aria-pressed="false" class="flow-helper-option" data-helper-report="text" type="button">文字回報</button>
-      <button aria-pressed="false" class="flow-helper-option" data-helper-report="photo" type="button">拍照回報</button>
-      <button aria-pressed="false" class="flow-helper-option" data-helper-report="photo_text" type="button">拍照＋文字</button>
-    </div></div>
-    <div class="flow-helper-field"><label>現場交接</label><div aria-label="現場交接方式" class="flow-helper-options" id="flowHelperHandoffOptions" role="radiogroup">
-      <button aria-pressed="true" class="flow-helper-option active" data-helper-handoff="none" type="button">不需要</button>
-      <button aria-pressed="false" class="flow-helper-option" data-helper-handoff="inquire" type="button">需要詢問</button>
-      <button aria-pressed="false" class="flow-helper-option" data-helper-handoff="pickup" type="button">需要領取</button>
-      <button aria-pressed="false" class="flow-helper-option" data-helper-handoff="deliver" type="button">需要交付</button>
-    </div></div>
-    <div class="flow-helper-field"><label>任務地點</label><div class="flow-helper-options" id="flowHelperLocationOptions" role="radiogroup" aria-label="全能任務地點模式">
-      <button aria-pressed="true" class="flow-helper-option active" data-helper-location="route" type="button">需要前往另一地點</button>
-      <button aria-pressed="false" class="flow-helper-option" data-helper-location="single" type="button">同地點完成</button>
-    </div><div class="flow-inline-note">「同地點完成」適合現場確認、代辦、排查、等待後回報等，不會另外計算一段送達路線。</div></div>
-    <div class="flow-helper-safety">僅限合法且可由第三人協助的事項；涉及本人身分驗證、金融交易、授權簽署、醫療決策或其他依法不得代辦的事項，請勿委託。</div>
-  </div>
+<section class="ubee-native-form-section">
+<div class="ubee-native-form-section-title">任務完成方式</div>
+<div class="ubee-native-form-section-caption">所有服務抵達後都會強制拍照；以下是全能任務額外需要的完成回報與現場交接。</div>
+<div class="ubee-native-form-list">
+<div class="ubee-native-choice-field"><div class="ubee-native-choice-field-title">額外完成回報</div><div aria-label="額外完成回報方式" class="ubee-native-chip-list" id="flowHelperReportOptions" role="radiogroup">
+<button aria-pressed="true" class="ubee-native-chip active" data-helper-report="none" type="button">只要到場照片</button>
+<button aria-pressed="false" class="ubee-native-chip" data-helper-report="text" type="button">文字回報</button>
+<button aria-pressed="false" class="ubee-native-chip" data-helper-report="photo" type="button">拍照回報</button>
+<button aria-pressed="false" class="ubee-native-chip" data-helper-report="photo_text" type="button">拍照＋文字</button>
+</div></div>
+<div class="ubee-native-choice-field"><div class="ubee-native-choice-field-title">現場交接</div><div aria-label="現場交接方式" class="ubee-native-chip-list" id="flowHelperHandoffOptions" role="radiogroup">
+<button aria-pressed="true" class="ubee-native-chip active" data-helper-handoff="none" type="button">不需要</button>
+<button aria-pressed="false" class="ubee-native-chip" data-helper-handoff="inquire" type="button">需要詢問</button>
+<button aria-pressed="false" class="ubee-native-chip" data-helper-handoff="pickup" type="button">需要領取</button>
+<button aria-pressed="false" class="ubee-native-chip" data-helper-handoff="deliver" type="button">需要交付</button>
+</div></div>
+<div class="ubee-native-choice-field"><div class="ubee-native-choice-field-title">任務地點</div><div aria-label="全能任務地點模式" class="ubee-native-chip-list" id="flowHelperLocationOptions" role="radiogroup">
+<button aria-pressed="true" class="ubee-native-chip active" data-helper-location="route" type="button">需要前往另一地點</button>
+<button aria-pressed="false" class="ubee-native-chip" data-helper-location="single" type="button">同地點完成</button>
+</div><div class="ubee-native-form-help">同地點完成適合現場確認、代辦、排查或等待後回報，不會另外計算送達路線。</div></div>
 </div>
+<div class="ubee-native-form-note">僅限合法且可由第三人協助的事項；涉及本人身分驗證、金融交易、授權簽署、醫療決策或依法不得代辦的事項，請勿委託。</div>
+</section>
+</div>
+
 <div class="flow-buy-structured" id="flowPurchaseDetailsForm">
-  <div class="flow-purchase-form">
-    <div class="flow-purchase-form-head"><div><strong>請告訴小U要買什麼 <span class="flow-purchase-required">＊</span></strong><small>分開填寫後，系統會自動整理成清楚的代買任務。</small></div></div>
-    <div class="flow-purchase-field"><label for="flowPurchaseProductName">商品名稱 <span class="flow-purchase-required">＊</span></label><input class="flow-input" id="flowPurchaseProductName" maxlength="100" placeholder="例如：生日蛋糕"/></div>
-    <div class="flow-purchase-grid">
-      <div class="flow-purchase-field"><label for="flowPurchaseQuantity">數量 <span class="flow-purchase-required">＊</span></label><input class="flow-input" id="flowPurchaseQuantity" maxlength="40" placeholder="例如：1 個"/></div>
-      <div class="flow-purchase-field"><label for="flowPurchaseSpecification">規格</label><input class="flow-input" id="flowPurchaseSpecification" maxlength="140" placeholder="例如：8 吋、巧克力口味"/></div>
-    </div>
-    <div class="flow-purchase-field"><label>缺貨時怎麼處理？</label><div aria-label="缺貨處理方式" class="flow-stock-options" id="flowPurchaseStockOptions" role="radiogroup">
-      <button aria-pressed="true" class="flow-stock-option active" data-purchase-stock-policy="contact_customer" type="button">先聯絡我</button>
-      <button aria-pressed="false" class="flow-stock-option" data-purchase-stock-policy="similar_item" type="button">可接受相近商品</button>
-      <button aria-pressed="false" class="flow-stock-option" data-purchase-stock-policy="skip_item" type="button">缺貨就不買</button>
-    </div></div>
-    <div class="flow-purchase-field"><label for="flowPurchaseAdditionalNote">其他需求</label><textarea class="flow-textarea flow-purchase-note" id="flowPurchaseAdditionalNote" maxlength="220" placeholder="例如：需要蠟燭、生日牌、發票"></textarea><div class="flow-purchase-help">可補充品牌、保存期限、發票、包裝或交付注意事項。</div></div>
-    <div class="flow-purchase-preview">小U會看到：商品、數量、規格、缺貨處理方式與其他需求。</div>
-  </div>
+<section class="ubee-native-form-section">
+<div class="ubee-native-form-section-title">購買內容 <span class="flow-required">＊</span></div>
+<div class="ubee-native-form-section-caption">分開填寫商品資訊後，系統會自動整理成小U可直接執行的代買任務。</div>
+<div class="ubee-native-form-list">
+<label class="ubee-native-form-row" for="flowPurchaseProductName"><span>商品名稱</span><input class="flow-input" id="flowPurchaseProductName" maxlength="100" placeholder="例如：生日蛋糕"/></label>
+<label class="ubee-native-form-row" for="flowPurchaseQuantity"><span>數量</span><input class="flow-input" id="flowPurchaseQuantity" maxlength="40" placeholder="例如：1 個"/></label>
+<label class="ubee-native-form-row" for="flowPurchaseSpecification"><span>規格</span><input class="flow-input" id="flowPurchaseSpecification" maxlength="140" placeholder="例如：8 吋、巧克力口味"/></label>
+<div class="ubee-native-choice-field"><div class="ubee-native-choice-field-title">缺貨時怎麼處理？</div><div aria-label="缺貨處理方式" class="ubee-native-chip-list" id="flowPurchaseStockOptions" role="radiogroup">
+<button aria-pressed="true" class="ubee-native-chip active" data-purchase-stock-policy="contact_customer" type="button">先聯絡我</button>
+<button aria-pressed="false" class="ubee-native-chip" data-purchase-stock-policy="similar_item" type="button">可接受相近商品</button>
+<button aria-pressed="false" class="ubee-native-chip" data-purchase-stock-policy="skip_item" type="button">缺貨就不買</button>
+</div></div>
+<label class="ubee-native-form-row stack" for="flowPurchaseAdditionalNote"><span>其他需求</span><textarea class="flow-textarea ubee-native-textarea compact" id="flowPurchaseAdditionalNote" maxlength="220" placeholder="例如：需要蠟燭、生日牌、發票"></textarea><span class="ubee-native-form-help">可補充品牌、保存期限、發票、包裝或交付注意事項。</span></label>
 </div>
-<div class="flow-form-group ubee-hidden-duplicate-field"><label class="flow-label" for="flowTaskName">任務標題（選填）</label><input class="flow-input" id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
-<div class="flow-form-group flow-dynamic-field" hidden="" id="flowAdvanceWrap"><label class="flow-label" for="flowAdvancePayment">預估代墊金額</label><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="1500" min="0" step="1" type="number" value="0"/><div class="flow-inline-note">最高代墊上限為 NT$1,500；超過 NT$1,500 請先聯繫客服確認。</div></div>
-<div class="flow-form-group flow-dynamic-field" hidden="" id="flowQueueWrap"><label class="flow-label" for="flowQueueMinutes">預估排隊時間</label><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/></div>
-<div class="flow-form-group flow-dynamic-field" hidden="" id="flowTaskMinutesWrap"><label class="flow-label" for="flowTaskMinutes">預估任務處理時間</label><input class="flow-input" id="flowTaskMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/><div class="flow-inline-note">全能跑腿會依預估處理時間計算任務處理時間費；請依實際需要填寫。</div></div>
-<details class="flow-task-extra ubee-hidden-duplicate-field" id="flowExtraTaskDetails">
-<summary>其他配送需求（選填）</summary>
-<div class="flow-task-extra-body">
-<div class="flow-grid-2">
-<div class="flow-form-group" id="flowItemSizeGroup"><label class="flow-label" for="flowItemSize">物品大小</label><select class="flow-select" id="flowItemSize"><option value="small">小型｜機車可載</option><option value="medium">中型｜需較大空間</option><option value="large">大型｜請先與客服確認</option></select></div>
-<div class="flow-form-group" id="flowUpstairsGroup"><label class="flow-label" for="flowUpstairs">搬上樓需求</label><select class="flow-select" id="flowUpstairs"><option value="none">不需要</option><option value="elevator">有電梯</option><option value="no_elevator">需要走樓梯</option></select></div>
+</section>
 </div>
+
+<div class="ubee-hidden-duplicate-field"><label for="flowTaskName">任務標題（選填）</label><input id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
+
+<section class="ubee-native-form-section" id="flowTaskRuntimeSection">
+<div class="ubee-native-form-section-title">費用與執行條件</div>
+<div class="ubee-native-form-list">
+<label class="ubee-native-form-row flow-dynamic-field" hidden id="flowAdvanceWrap" for="flowAdvancePayment"><span class="flow-label">預估代墊金額</span><div class="ubee-native-inline-control"><span>NT$</span><input class="flow-input" id="flowAdvancePayment" inputmode="numeric" max="1500" min="0" step="1" type="number" value="0"/></div></label>
+<label class="ubee-native-form-row flow-dynamic-field" hidden id="flowQueueWrap" for="flowQueueMinutes"><span class="flow-label">預估排隊時間</span><div class="ubee-native-inline-control"><input class="flow-input" id="flowQueueMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/><span>分鐘</span></div></label>
+<label class="ubee-native-form-row flow-dynamic-field" hidden id="flowTaskMinutesWrap" for="flowTaskMinutes"><span class="flow-label">預估任務處理時間</span><div class="ubee-native-inline-control"><input class="flow-input" id="flowTaskMinutes" inputmode="numeric" max="480" min="10" step="5" type="number" value="30"/><span>分鐘</span></div></label>
 </div>
-</details>
+<div class="ubee-native-form-note">代墊最高 NT$1,500；排隊／全能任務請依實際需要填寫預估時間，正式費用仍以系統估價為準。</div>
+</section>
+
+<details class="flow-task-extra ubee-hidden-duplicate-field" id="flowExtraTaskDetails"><summary>其他配送需求（選填）</summary><div class="flow-task-extra-body"><div class="flow-grid-2"><div id="flowItemSizeGroup"><label for="flowItemSize">物品大小</label><select id="flowItemSize"><option value="small">小型｜機車可載</option><option value="medium">中型｜需較大空間</option><option value="large">大型｜請先與客服確認</option></select></div><div id="flowUpstairsGroup"><label for="flowUpstairs">搬上樓需求</label><select id="flowUpstairs"><option value="none">不需要</option><option value="elevator">有電梯</option><option value="no_elevator">需要走樓梯</option></select></div></div></div></details>
 <div class="flow-status" id="flowTaskStatus"></div>
 </div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="home" type="button">上一步</button><button class="flow-primary" id="flowTaskNext" type="button">下一步：配送設定</button></div></div>
-
+<div class="ubee-native-flow-actionbar"><button class="flow-secondary" data-go="home" type="button">上一步</button><button class="flow-primary" id="flowTaskNext" type="button">下一步：配送設定</button></div>
 </section>
+
 <section class="flow-page" data-page="options" id="flowPageOptions">
 <header class="flow-header">
 <button aria-label="返回" class="flow-back-btn" data-go="task" type="button">‹</button>
@@ -18656,53 +18713,61 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <span></span>
 </header>
 <div class="flow-progress" data-progress="2"></div>
-<div class="flow-scroll">
-<div class="flow-card">
-<div class="flow-section-title">任務時間</div>
-<div class="flow-timing-list" id="flowTimingList">
-<button class="flow-choice active" data-timing="immediate" type="button"><strong>立即任務</strong><small>現在開始媒合</small></button>
-<button class="flow-choice" data-timing="scheduled" type="button"><strong>指定時間</strong><small>預約日期時間</small></button>
-<button class="flow-choice" data-timing="flexible" type="button"><strong>彈性時段</strong><small>提供執行區間</small></button>
+<div class="flow-scroll ubee-native-create-scroll">
+<section class="ubee-native-form-section">
+<div class="ubee-native-form-section-title">任務時間</div>
+<div class="ubee-native-selection-list" id="flowTimingList">
+<button class="ubee-native-selection-row active" data-timing="immediate" type="button"><span class="ubee-native-selection-copy"><strong>立即任務</strong><small>現在開始媒合小U</small></span><span class="ubee-native-selection-mark" aria-hidden="true"></span></button>
+<button class="ubee-native-selection-row" data-timing="scheduled" type="button"><span class="ubee-native-selection-copy"><strong>指定時間</strong><small>指定取件或完成時間</small></span><span class="ubee-native-selection-mark" aria-hidden="true"></span></button>
+<button class="ubee-native-selection-row" data-timing="flexible" type="button"><span class="ubee-native-selection-copy"><strong>彈性時段</strong><small>提供可執行的時間區間</small></span><span class="ubee-native-selection-mark" aria-hidden="true"></span></button>
 </div>
-<div class="flow-schedule-panel" id="flowScheduledPanel">
-<div class="flow-form-group"><label class="flow-label" for="flowScheduleGoal">預約目標</label><select class="flow-select" id="flowScheduleGoal"><option value="pickup_at">希望此時間取件</option><option value="complete_by">希望此時間前完成</option></select></div>
-<div class="flow-grid-2"><div class="flow-form-group"><label class="flow-label" for="flowScheduledDate">日期</label><input class="flow-input" id="flowScheduledDate" type="date"/></div><div class="flow-form-group"><label class="flow-label" for="flowScheduledTime">時間</label><input class="flow-input" id="flowScheduledTime" step="300" type="time"/></div></div>
-</div>
-<div class="flow-schedule-panel" id="flowFlexiblePanel">
-<div class="flow-form-group"><label class="flow-label" for="flowFlexibleDate">日期</label><input class="flow-input" id="flowFlexibleDate" type="date"/></div>
-<div class="flow-grid-2"><div class="flow-form-group"><label class="flow-label" for="flowFlexibleStart">開始時間</label><input class="flow-input" id="flowFlexibleStart" step="300" type="time"/></div><div class="flow-form-group"><label class="flow-label" for="flowFlexibleEnd">結束時間</label><input class="flow-input" id="flowFlexibleEnd" step="300" type="time"/></div></div>
+<div class="ubee-native-inline-panel" id="flowScheduledPanel">
+<div class="ubee-native-form-list">
+<label class="ubee-native-form-row" for="flowScheduleGoal"><span>預約目標</span><select class="flow-select" id="flowScheduleGoal"><option value="pickup_at">希望此時間取件</option><option value="complete_by">希望此時間前完成</option></select></label>
+<label class="ubee-native-form-row" for="flowScheduledDate"><span>日期</span><input class="flow-input" id="flowScheduledDate" type="date"/></label>
+<label class="ubee-native-form-row" for="flowScheduledTime"><span>時間</span><input class="flow-input" id="flowScheduledTime" step="300" type="time"/></label>
 </div>
 </div>
-<div class="flow-card" id="flowSpeedCard">
-<div class="flow-section-title">處理速度</div>
-<div class="flow-speed-list" id="flowSpeedList">
-<button class="flow-choice active" data-speed="standard" type="button"><strong>一般件</strong><small>經濟配送</small></button>
-<button class="flow-choice" data-speed="priority" type="button"><strong>標準件</strong><small>較快媒合</small></button>
-<button class="flow-choice" data-speed="express" type="button"><strong>優先件</strong><small>優先處理</small></button>
+<div class="ubee-native-inline-panel" id="flowFlexiblePanel">
+<div class="ubee-native-form-list">
+<label class="ubee-native-form-row" for="flowFlexibleDate"><span>日期</span><input class="flow-input" id="flowFlexibleDate" type="date"/></label>
+<label class="ubee-native-form-row" for="flowFlexibleStart"><span>開始時間</span><input class="flow-input" id="flowFlexibleStart" step="300" type="time"/></label>
+<label class="ubee-native-form-row" for="flowFlexibleEnd"><span>結束時間</span><input class="flow-input" id="flowFlexibleEnd" step="300" type="time"/></label>
 </div>
 </div>
-<div class="flow-status" id="flowOptionsStatus"></div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="task" type="button">上一步</button><button class="flow-primary" id="flowOptionsNext" type="button">下一步：確認任務</button></div></div>
-
 </section>
+
+<section class="ubee-native-form-section" id="flowSpeedCard">
+<div class="ubee-native-form-section-title">處理速度</div>
+<div class="ubee-native-selection-list" id="flowSpeedList">
+<button class="ubee-native-selection-row active" data-speed="standard" type="button"><span class="ubee-native-selection-copy"><strong>一般件</strong><small>經濟配送</small></span><span class="ubee-native-selection-mark" aria-hidden="true"></span></button>
+<button class="ubee-native-selection-row" data-speed="priority" type="button"><span class="ubee-native-selection-copy"><strong>標準件</strong><small>較快媒合</small></span><span class="ubee-native-selection-mark" aria-hidden="true"></span></button>
+<button class="ubee-native-selection-row" data-speed="express" type="button"><span class="ubee-native-selection-copy"><strong>優先件</strong><small>優先處理</small></span><span class="ubee-native-selection-mark" aria-hidden="true"></span></button>
+</div>
+</section>
+<div class="flow-status" id="flowOptionsStatus"></div>
+</div>
+<div class="ubee-native-flow-actionbar"><button class="flow-secondary" data-go="task" type="button">上一步</button><button class="flow-primary" id="flowOptionsNext" type="button">下一步：確認任務</button></div>
+</section>
+
 <section class="flow-page" data-page="confirm" id="flowPageConfirm">
 <header class="flow-header">
 <button aria-label="返回" class="flow-back-btn" data-go="options" type="button">‹</button>
-<div class="flow-title-wrap"><div class="flow-title">確認任務</div><div class="flow-subtitle">確認地點、內容、路線與費用</div></div>
+<div class="flow-title-wrap"><div class="flow-title">確認任務</div><div class="flow-subtitle">送出前再確認一次路線、內容與費用</div></div>
 <span></span>
 </header>
 <div class="flow-progress" data-progress="3"></div>
-<div class="flow-scroll">
-<div class="flow-card" style="padding:0;border:none;box-shadow:none;background:transparent">
-<div class="flow-map"><div class="flow-map-canvas" id="flowConfirmMapCanvas"></div><div class="flow-map-status" id="flowMapStatus">正在載入取件位置、送達位置與道路路線…</div></div>
-</div>
-<div class="flow-card"><div class="flow-summary-list" id="flowSummaryList"></div></div>
-<div class="flow-card flow-price-card"><div><small>正式估價</small><div class="flow-route-meta" id="flowRouteMeta">正在計算路線與費用</div></div><div class="flow-price" id="flowConfirmPrice">—</div></div>
-<label class="flow-check"><input id="flowAgree" type="checkbox"/><span>我已確認取件地點、送達地點、聯絡資訊、任務內容、執行時間與費用。</span></label>
+<div class="flow-scroll ubee-native-create-scroll ubee-native-checkout-scroll">
+<section class="ubee-native-checkout-map-section"><div class="flow-map ubee-native-checkout-map"><div class="flow-map-canvas" id="flowConfirmMapCanvas"></div><div class="flow-map-status" id="flowMapStatus">正在載入取件位置、送達位置與道路路線…</div></div></section>
+<div id="flowSummaryList"></div>
+<section class="ubee-native-checkout-price"><div><span>正式估價</span><small id="flowRouteMeta">正在計算路線與費用</small></div><strong id="flowConfirmPrice">—</strong></section>
+<label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務資料</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間與費用。</small></span></label>
+<div class="ubee-native-form-note">建立任務後，系統會依目前付款流程要求你確認付款方式，再正式進入派單。</div>
 <div class="flow-status" id="flowConfirmStatus"></div>
-<div class="flow-actionbar"><button class="flow-secondary" data-go="options" type="button">上一步</button><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div></div>
-
+</div>
+<div class="ubee-native-checkout-actionbar"><div class="ubee-native-checkout-action-price"><span>預估費用</span><strong id="flowConfirmActionPrice">—</strong></div><button class="flow-primary" id="flowSubmitOrder" type="button">確認並建立任務</button></div>
 </section>
+
 <section class="flow-page" data-page="search" id="flowPageSearch">
 <header class="flow-header">
 <button aria-label="返回" class="flow-back-btn" data-go="home" type="button">‹</button>
@@ -19305,7 +19370,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowServiceTypeGroup').hidden=list.length<=1;
 
     const typeChoices=$('flowServiceTypeChoices');
-    typeChoices.innerHTML=list.map((item,index)=>`<button class="flow-task-type-card ${index===state.serviceTypeIndex?'active':''}" type="button" role="option" aria-selected="${index===state.serviceTypeIndex?'true':'false'}" data-service-type-index="${index}"><span class="flow-task-type-icon">${escapeHtml(item.icon||'🐝')}</span><span><strong>${escapeHtml(item.title||serviceLabels[state.service])}</strong><small>${index===state.serviceTypeIndex?'已選擇':'點一下選擇'}</small></span></button>`).join('');
+    typeChoices.innerHTML=list.map((item,index)=>`<button class="ubee-native-task-type-row ${index===state.serviceTypeIndex?'active':''}" type="button" role="option" aria-selected="${index===state.serviceTypeIndex?'true':'false'}" data-service-type-index="${index}"><span class="ubee-native-task-type-icon">${escapeHtml(item.icon||'🐝')}</span><span class="ubee-native-task-type-copy"><strong>${escapeHtml(item.title||serviceLabels[state.service])}</strong><small>${index===state.serviceTypeIndex?'已選擇':'點一下選擇'}</small></span><span class="ubee-native-selection-mark" aria-hidden="true"></span></button>`).join('');
 
     const selected=list[state.serviceTypeIndex]||list[0];
     const categories=Array.isArray(selected.categories)&&selected.categories.length?selected.categories:['其他'];
@@ -19317,7 +19382,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowServiceCategoryGroup').hidden=categories.length<=1;
 
     const categoryChoices=$('flowServiceCategoryChoices');
-    categoryChoices.innerHTML=categories.map(item=>`<button class="flow-category-chip ${item===state.serviceCategory?'active':''}" type="button" role="option" aria-selected="${item===state.serviceCategory?'true':'false'}" data-service-category="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('');
+    categoryChoices.innerHTML=categories.map(item=>`<button class="ubee-native-chip ${item===state.serviceCategory?'active':''}" type="button" role="option" aria-selected="${item===state.serviceCategory?'true':'false'}" data-service-category="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join('');
 
     $('flowSelectedServiceLabel').textContent=`${serviceLabels[state.service]}${selected.title&&selected.title!==serviceLabels[state.service]?`・${selected.title}`:''}`;
     if(!state.taskName)state.taskName=selected.title||serviceLabels[state.service];
@@ -19353,6 +19418,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowQueueWrap').hidden=state.service!=='queue';
     $('flowTaskMinutesWrap').hidden=state.service!=='helper';
     $('flowAdvanceWrap').hidden=!['buy','pickup','helper'].includes(state.service);
+    const runtimeSection=$('flowTaskRuntimeSection');
+    if(runtimeSection) runtimeSection.hidden=$('flowQueueWrap').hidden&&$('flowTaskMinutesWrap').hidden&&$('flowAdvanceWrap').hidden;
     $('flowExtraTaskDetails').hidden=state.service==='queue';
     $('flowItemSizeGroup').hidden=state.service==='queue';
     $('flowUpstairsGroup').hidden=state.service==='queue';
@@ -19634,8 +19701,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const a=localParts(start),b=localParts(end),today=localParts(new Date()).date;['flowScheduledDate','flowFlexibleDate'].forEach(id=>{const el=$(id);el.min=today;if(!el.value)el.value=a.date});if(!$('flowScheduledTime').value)$('flowScheduledTime').value=a.time;if(!$('flowFlexibleStart').value)$('flowFlexibleStart').value=a.time;if(!$('flowFlexibleEnd').value)$('flowFlexibleEnd').value=b.time;
   }
 
-  function setTiming(type){state.timing=['immediate','scheduled','flexible'].includes(type)?type:'immediate';root.querySelectorAll('[data-timing]').forEach(btn=>btn.classList.toggle('active',btn.dataset.timing===state.timing));$('flowScheduledPanel').classList.toggle('show',state.timing==='scheduled');$('flowFlexiblePanel').classList.toggle('show',state.timing==='flexible');$('flowSpeedCard').style.display=state.timing==='immediate'?'block':'none';if(state.timing!=='immediate')state.speed='standard';ensureTimeDefaults()}
-  function setSpeed(type){state.speed=['standard','priority','express'].includes(type)?type:'standard';root.querySelectorAll('[data-speed]').forEach(btn=>btn.classList.toggle('active',btn.dataset.speed===state.speed))}
+  function setTiming(type){state.timing=['immediate','scheduled','flexible'].includes(type)?type:'immediate';root.querySelectorAll('[data-timing]').forEach(btn=>{const active=btn.dataset.timing===state.timing;btn.classList.toggle('active',active);btn.setAttribute('aria-pressed',active?'true':'false')});$('flowScheduledPanel').classList.toggle('show',state.timing==='scheduled');$('flowFlexiblePanel').classList.toggle('show',state.timing==='flexible');$('flowSpeedCard').hidden=state.timing!=='immediate';if(state.timing!=='immediate')state.speed='standard';ensureTimeDefaults()}
+  function setSpeed(type){state.speed=['standard','priority','express'].includes(type)?type:'standard';root.querySelectorAll('[data-speed]').forEach(btn=>{const active=btn.dataset.speed===state.speed;btn.classList.toggle('active',active);btn.setAttribute('aria-pressed',active?'true':'false')})}
   function combineTaipei(date,time){return Date.parse(`${date}T${time}:00+08:00`)}
   function validateOptions(){
     state.scheduleGoal=$('flowScheduleGoal').value;state.scheduledDate=$('flowScheduledDate').value;state.scheduledTime=$('flowScheduledTime').value;state.flexibleDate=$('flowFlexibleDate').value;state.flexibleStart=$('flowFlexibleStart').value;state.flexibleEnd=$('flowFlexibleEnd').value;
@@ -19787,26 +19854,35 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   function renderSummary(){
     const p=state.pickup||{},d=state.dropoff||{},def=selectedServiceDefinition();
     const summaryTaskNote=state.service==='helper'?buildHelperTaskNote(state.taskNote,state.helperDetails):state.taskNote;
-    const locationRows=state.service==='helper'&&state.singlePointTask
-      ? [['任務地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home']]
+    const routeRows=state.service==='helper'&&state.singlePointTask
+      ? [['任務地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home']]
       : [
-          ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}\n${p.contactName||''} ${p.phone||''}`,'home'],
-          ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}\n${d.contactName||''} ${d.phone||''}`,'home']
+          ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home'],
+          ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}`,'home']
         ];
-    const rows=[
-      ...locationRows,
-      ['任務內容',`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}\n${summaryTaskNote||'—'}`,'task'],
-      ['配送設定',`${timingLabel()}${state.service==='queue'?`\n預估排隊：${state.queueMinutes} 分鐘`:state.service==='helper'?`\n預估處理：${state.taskMinutes} 分鐘`:''}`,'options']
-    ];
-    $('flowSummaryList').innerHTML=rows.map(([label,value,target])=>`<div class="flow-summary-row"><span class="flow-summary-label">${escapeHtml(label)}</span><span class="flow-summary-value" style="white-space:pre-line">${escapeHtml(value)}</span><button class="flow-summary-edit" type="button" data-summary-go="${target}">修改</button></div>`).join('');
+    const contactRows=state.service==='helper'&&state.singlePointTask
+      ? [['聯絡人',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home']]
+      : [
+          ['取件聯絡',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home'],
+          ['送達聯絡',[d.contactName,d.phone].filter(Boolean).join('・')||'—','home']
+        ];
+    const taskValue=`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}${summaryTaskNote?`\n${summaryTaskNote}`:''}`;
+    const optionValue=`${timingLabel()}${state.service==='queue'?`\n預估排隊 ${state.queueMinutes} 分鐘`:state.service==='helper'?`\n預估處理 ${state.taskMinutes} 分鐘`:''}`;
+    const group=(title,rows)=>`<section class="ubee-native-checkout-group"><div class="ubee-native-checkout-group-title">${escapeHtml(title)}</div><div class="ubee-native-checkout-list">${rows.map(([label,value,target])=>`<button class="ubee-native-checkout-row" type="button" data-summary-go="${escapeHtml(target)}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><span class="ubee-native-checkout-chevron" aria-hidden="true">›</span></button>`).join('')}</div></section>`;
+    $('flowSummaryList').innerHTML=[
+      group('路線',routeRows),
+      group('聯絡資訊',contactRows),
+      group('任務', [['任務內容',taskValue,'task']]),
+      group('配送', [['執行設定',optionValue,'options']])
+    ].join('');
   }
 
   async function openConfirm(){
     if(!state.pickup||!state.dropoff){showPage('home');status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}
     if(!validateTask()){showPage('task');return}
     if(!validateOptions()){showPage('options');return}
-    syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在載入路線與正式估價…');
-    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);$('flowConfirmPrice').textContent=total>0?`NT$${Math.round(total)}`:'待估價';const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'路線已顯示，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
+    syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowConfirmActionPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在載入路線與正式估價…');
+    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);const priceText=total>0?`NT$${Math.round(total)}`:'待估價';$('flowConfirmPrice').textContent=priceText;$('flowConfirmActionPrice').textContent=priceText;const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'路線已顯示，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
   }
 
   async function submitOrder(){
@@ -20233,7 +20309,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260909-customer-native-system-v1-1-dispatch-recovery';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260909-customer-native-system-v1-2-order-flow';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
