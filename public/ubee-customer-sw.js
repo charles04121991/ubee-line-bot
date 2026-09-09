@@ -1,8 +1,10 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.07.1 Customer Advance Payment V1
+ * Version: 2026.09.09.1 Customer Native System V1
  * File: ubee-customer-sw.js
+ *
+ * 2026-09-09 Customer Native System V1：Step 5 進行中任務併入 productionOrderFlow；訂單列表／詳情／現場照片改為 Native Flat List、Grouped Detail、Timeline；升版清除舊 Customer Cache。
  *
  * 2026-09-07 Customer Advance Payment V1：客戶端最高自動代墊上限調整為 NT$1,500；升版後清除舊 Customer Cache，確保已安裝 PWA 取得最新版 order.html。
  *
@@ -24,7 +26,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.07.1-advance-payment-1500';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.09.1-customer-native-system-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
