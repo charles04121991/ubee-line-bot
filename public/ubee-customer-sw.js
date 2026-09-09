@@ -1,8 +1,10 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
- * Version: 2026.09.09.1 Customer Native System V1
+ * Version: 2026.09.09.2 Customer Native System V1.1 Dispatch Recovery
  * File: ubee-customer-sw.js
+ *
+ * 2026-09-09 Customer Dispatch Recovery V1：建單後現金確認改為立即 Native Confirm；配合後端確認後立即啟動全區派單，升版清除舊 Customer Cache。
  *
  * 2026-09-09 Customer Native System V1：Step 5 進行中任務併入 productionOrderFlow；訂單列表／詳情／現場照片改為 Native Flat List、Grouped Detail、Timeline；升版清除舊 Customer Cache。
  *
@@ -26,7 +28,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.09.1-customer-native-system-v1';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.09.2-customer-native-v1-1-dispatch-recovery';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
