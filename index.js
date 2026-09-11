@@ -1,3 +1,4 @@
+// 2026-09-11｜Route Pricing V3 / Rider Income Canonical V3：刪除一般配送舊 base+全里程+導航時間+8km長距離加價公式；改為 NT$80 含3km、超出每km NT$12，並加入 8km=NT$98、14km=NT$250 小U路線收入保障。新訂單收入只信任後端 canonical riderIncome。
 // 2026-09-09｜Customer Live ETA Backend V1：一般客戶進行中任務使用小U最新 GPS＋即時道路路況計算 ETA；30 秒／80 公尺節流更新，定位超過 5 分鐘即停止提供精準 ETA，避免客戶看到過期預估。
 // 2026-09-09｜Customer Dispatch Recovery Backend V1：客戶現金立即單由 pending_payment 確認為 pending_dispatch 後，正式建立 dispatchPushCycle 並啟動全區 startDispatchPushSequence，避免只靠騎士端輪詢才看見任務。
 // 2026-09-09｜Rider Qualification Hard Lock Backend V1：刪除舊 approved→ACTIVE／無 onboarding 即放行相容邏輯；正式接單改為「審核→入職→測驗→ACTIVE→上線」五段式硬鎖，tasks/status/accept-order 全部後端 fail-closed 驗證。
@@ -9966,85 +9967,12 @@ const serviceSubtotal =
       );
 
 // ------------------------------
-// 騎士收入
-//
-// 第一優先：使用訂單已儲存的正式騎士收入
-//
-// 第二優先：如果是舊訂單沒有 driverFee / riderFee，
-// 就從 taskSubtotal 或費用明細重新計算
+// 騎士收入｜Canonical V3
+// 只讀後端正式收入；欄位缺失時僅依明確 V2/V3 分桶重建。
+// 不再使用 taskSubtotal / customerTotal × 70% 的舊推算。
 // ------------------------------
-const directRiderIncome =
-  getOrderMoneyValue(
-    order,
-    [
-      'driverFee',
-      'riderFee',
-      'riderIncome',
-      'riderEarning',
-      'riderPayout',
-      'riderShare',
-      'fee',
-    ]
-  );
-
-const directTaskSubtotal =
-  getOrderMoneyValue(
-    order,
-    [
-      'taskSubtotal',
-    ]
-  );
-
-const fallbackTaskSubtotal =
-  Math.max(
-    0,
-    Math.round(Number(order.deliveryFee || 0))
-  ) +
-  Math.max(
-    0,
-    Math.round(Number(order.speedFee || 0))
-  ) +
-  Math.max(
-    0,
-    Math.round(Number(order.upstairsFee || 0))
-  ) +
-  Math.max(
-    0,
-    Math.round(Number(order.waitingFee || 0))
-  );
-
-const platformServiceFee =
-  getOrderMoneyValue(
-    order,
-    [
-      'platformServiceFee',
-      'serviceFee',
-    ]
-  ) || 0;
-
-const calculatedTaskSubtotal =
-  directTaskSubtotal !== null
-    ? directTaskSubtotal
-    : (
-        fallbackTaskSubtotal > 0
-          ? fallbackTaskSubtotal
-          : Math.max(
-              0,
-              serviceSubtotal -
-              platformServiceFee
-            )
-      );
-
-const fallbackRiderIncome =
-  Math.round(
-    calculatedTaskSubtotal *
-    Number(PRICING.driverRatio || 0.7)
-  );
-
 const riderIncome =
-  directRiderIncome !== null
-    ? directRiderIncome
-    : fallbackRiderIncome;
+  getCanonicalOrderRiderIncome(order);
 
       // ------------------------------
       // 平台收入
@@ -12641,101 +12569,10 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
               );
 
         // ============================
-        // 騎士收入
+        // 騎士收入｜Canonical V3
         // ============================
-        const directRiderIncome =
-          getOrderMoneyValue(
-            order,
-            [
-              'driverFee',
-              'riderFee',
-              'riderIncome',
-              'riderEarning',
-              'riderPayout',
-              'riderShare',
-            ]
-          );
-
-        // 新正式規則：
-        // 配送費 + 急件費 + 樓層費 + 等候費
-        // 才參與 70 / 30 分潤
-        const fallbackTaskSubtotal =
-          Math.max(
-            0,
-            Math.round(
-              Number(
-                order.deliveryFee || 0
-              )
-            )
-          ) +
-
-          Math.max(
-            0,
-            Math.round(
-              Number(
-                order.speedFee || 0
-              )
-            )
-          ) +
-
-          Math.max(
-            0,
-            Math.round(
-              Number(
-                order.upstairsFee || 0
-              )
-            )
-          ) +
-
-          Math.max(
-            0,
-            Math.round(
-              Number(
-                order.waitingFee || 0
-              )
-            )
-          );
-
-        const fallbackServiceFee =
-          Math.max(
-            0,
-            Math.round(
-              Number(
-                order.serviceFee || 0
-              )
-            )
-          );
-
-        const fallbackRiderIncome =
-          fallbackTaskSubtotal > 0
-
-            ? Math.round(
-                fallbackTaskSubtotal *
-                Number(
-                  PRICING.driverRatio ||
-                  0.7
-                )
-              )
-
-            : Math.round(
-                Math.max(
-                  0,
-                  serviceNet -
-                  fallbackServiceFee
-                ) *
-                Number(
-                  PRICING.driverRatio ||
-                  0.7
-                )
-              );
-
         const riderIncome =
-          directRiderIncome !== null &&
-          directRiderIncome > 0
-
-            ? directRiderIncome
-
-            : fallbackRiderIncome;
+          getCanonicalOrderRiderIncome(order);
 
         // ============================
         // 現金單應回繳平台
@@ -22219,17 +22056,27 @@ const PRICING = {
   // 70/30 僅作用於任務服務費；額外時間／勞力／風險加價 100% 歸小U。
   riderIncomePolicyVersion: 'UBEE_RIDER_INCOME_V2_20260901',
 
-  // 一般配送基本價格
-  baseFee: 60,
+  // =====================================================
+  // 2026-09-11｜UBee Route Pricing V3
+  // 一般路線配送：NT$80 含前 3 km；超過 3 km 每公里 +NT$12。
+  // 一般路線不再把導航時間列入客戶計價；perMinute 僅保留給全能跑腿處理時間。
+  // =====================================================
+  routePricingVersion: 'UBEE_ROUTE_V3_20260911',
+  baseFee: 80,
+  includedKm: 3,
   perKm: 12,
   perMinute: 2,
 
   // 平台服務費
   serviceFee: 20,
 
-  // 長距離保障費：只套用一般配送，不影響「幫我取 / 幫代買」專用計價
-  longDistanceThresholdKm: 8, // 超過 8 公里開始加價
-  longDistanceExtraPerKm: 10, // 超過門檻的距離，每公里加 $10
+  // 小U一般路線收入保障：8 km 至少 NT$98；14 km 至少 NT$250。
+  // 8 km～14 km 線性增加；14 km 以上沿相同斜率延伸。
+  routeGuaranteeStartKm: 8,
+  routeGuaranteeAnchorKm: 14,
+  routeRiderIncomeAt8Km: 98,
+  routeRiderIncomeAt14Km: 250,
+
   quoteRoundUnit: 10,         // 一般配送報價無條件進位至 $10
 
   // 排隊服務設定
@@ -22350,7 +22197,7 @@ function calculateRiderTaskIncomeWithMinimum(taskSubtotal = 0) {
 // - pickup / 幫我取
 // - buy / 幫代買 / 幫我買
 //
-// 其他服務全部維持原本 PRICING + calculatePrice() 邏輯不變。
+// 其他服務走 Route Pricing V3 的 calculatePrice() 唯一正式路線核心。
 // 這兩種服務取消導航時間費（每分鐘 $2），避免短程因塞車被放大價格。
 // =====================================================
 const QUICK_SERVICE_PRICING = {
@@ -25421,6 +25268,88 @@ function calculateFinancialSplit({
   };
 }
 
+
+// =====================================================
+// UBee Canonical Rider Income V3｜2026-09-11
+// - 新訂單與新版歷史訂單：優先使用後端已儲存 riderIncome / driverFee / riderFee。
+// - 若正式收入欄位遺失，只允許用 V2/V3 明確分桶欄位重建。
+// - 不再用 taskSubtotal、customerTotal 或「全部費用 × 70%」猜測小U收入。
+// =====================================================
+function getCanonicalOrderRiderIncome(order = {}) {
+  const directRiderIncome = getOrderMoneyValue(order, [
+    'riderIncome',
+    'estimatedRiderIncome',
+    'driverFee',
+    'riderFee',
+    'riderEarning',
+    'riderPayout',
+    'riderShare',
+    'driverIncome',
+    'courierIncome',
+  ]);
+
+  if (directRiderIncome !== null) {
+    return Math.max(0, Math.round(directRiderIncome));
+  }
+
+  const directShareableTaskSubtotal =
+    getOrderMoneyValue(order, ['shareableTaskSubtotal']);
+
+  const shareableTaskSubtotal =
+    directShareableTaskSubtotal !== null
+      ? directShareableTaskSubtotal
+      : [
+          'deliveryFee',
+          'crossZoneFee',
+          'multiStopFee',
+          'returnTripFee',
+          'specialTaskFee',
+          'taskHandlingFee',
+        ].reduce((sum, field) => {
+          const value = getOrderMoneyValue(order, [field]);
+          return sum + (value === null ? 0 : value);
+        }, 0);
+
+  const directRiderOnlySurchargeSubtotal =
+    getOrderMoneyValue(order, ['riderOnlySurchargeSubtotal']);
+
+  const riderOnlySurchargeSubtotal =
+    directRiderOnlySurchargeSubtotal !== null
+      ? directRiderOnlySurchargeSubtotal
+      : [
+          'speedFee',
+          'upstairsFee',
+          'waitingFee',
+          'itemSizeFee',
+          'overweightFee',
+          'nightFee',
+          'weatherFee',
+          'dynamicPricingFee',
+          'cancellationCompensation',
+        ].reduce((sum, field) => {
+          const value = getOrderMoneyValue(order, [field]);
+          return sum + (value === null ? 0 : value);
+        }, 0);
+
+  if (shareableTaskSubtotal <= 0 && riderOnlySurchargeSubtotal <= 0) {
+    return 0;
+  }
+
+  const riderBaseIncome =
+    shareableTaskSubtotal > 0
+      ? calculateRiderTaskIncomeWithMinimum(
+          shareableTaskSubtotal
+        ).riderIncome
+      : 0;
+
+  return Math.max(
+    0,
+    Math.round(
+      riderBaseIncome + riderOnlySurchargeSubtotal
+    )
+  );
+}
+
 // =====================================================
 // 僅辨識「幫我取 / 幫代買」兩種專用計價服務
 // 其他任何服務一律回傳空字串，繼續走原本 calculatePrice()。
@@ -25586,16 +25515,160 @@ function calculateQuickServicePrice({
   };
 }
 
+// =====================================================
+// UBee Route Pricing V3｜2026-09-11
+// 一般路線唯一正式核心：
+// - NT$80 含前 3 km
+// - 超過 3 km 每公里 +NT$12
+// - 導航時間只作 ETA，不再列入一般配送價格
+// - 8 km 小U路線收入至少 NT$98
+// - 14 km 小U路線收入至少 NT$250
+// - 8～14 km 線性增加，14 km 以上沿同斜率延伸
+// =====================================================
+function getRouteRiderIncomeFloor(distanceKm = 0) {
+  const km = Math.max(0, Number(distanceKm || 0));
+
+  const startKm = Math.max(
+    0,
+    Number(PRICING.routeGuaranteeStartKm || 8)
+  );
+
+  const anchorKm = Math.max(
+    startKm,
+    Number(PRICING.routeGuaranteeAnchorKm || 14)
+  );
+
+  const incomeAtStart = Math.max(
+    0,
+    Number(PRICING.routeRiderIncomeAt8Km || 98)
+  );
+
+  const incomeAtAnchor = Math.max(
+    incomeAtStart,
+    Number(PRICING.routeRiderIncomeAt14Km || 250)
+  );
+
+  if (km < startKm) {
+    return 0;
+  }
+
+  const slope =
+    (incomeAtAnchor - incomeAtStart) /
+    Math.max(1, anchorKm - startKm);
+
+  return Math.max(
+    0,
+    Math.ceil(
+      incomeAtStart +
+      (km - startKm) * slope
+    )
+  );
+}
+
+function getMinimumShareableFeeForRiderIncome(
+  targetRiderIncome = 0
+) {
+  const target = Math.max(
+    0,
+    Math.round(Number(targetRiderIncome || 0))
+  );
+
+  if (target <= 0) {
+    return 0;
+  }
+
+  const ratio = Math.max(
+    0.01,
+    Number(PRICING.driverRatio || 0.7)
+  );
+
+  // calculateRiderTaskIncomeWithMinimum 內部使用 Math.round(fee × ratio)。
+  // 反推能讓小U至少取得 target 的最低 shareable 任務費。
+  return Math.max(
+    0,
+    Math.ceil((target - 0.5) / ratio)
+  );
+}
+
+function calculateRouteDeliveryCore({
+  distanceMeters = 0,
+} = {}) {
+  const km = Math.max(
+    0,
+    Number(distanceMeters || 0)
+  ) / 1000;
+
+  const baseFee = Math.max(
+    0,
+    Math.round(Number(PRICING.baseFee || 80))
+  );
+
+  const includedKm = Math.max(
+    0,
+    Number(PRICING.includedKm || 3)
+  );
+
+  const billableDistanceKm = Math.max(
+    0,
+    km - includedKm
+  );
+
+  const distanceFee = Math.max(
+    0,
+    Math.round(
+      billableDistanceKm *
+      Number(PRICING.perKm || 12)
+    )
+  );
+
+  const normalDeliveryFee =
+    baseFee + distanceFee;
+
+  const routeRiderIncomeFloor =
+    getRouteRiderIncomeFloor(km);
+
+  const routeGuaranteeDeliveryFee =
+    getMinimumShareableFeeForRiderIncome(
+      routeRiderIncomeFloor
+    );
+
+  const guaranteedDeliveryFee = Math.max(
+    normalDeliveryFee,
+    routeGuaranteeDeliveryFee
+  );
+
+  return {
+    routePricingVersion:
+      String(
+        PRICING.routePricingVersion ||
+        'UBEE_ROUTE_V3_20260911'
+      ),
+    distanceKm:
+      Math.round(km * 100) / 100,
+    baseFee,
+    includedKm,
+    billableDistanceKm:
+      Math.round(billableDistanceKm * 100) / 100,
+    distanceFee,
+    timeFee: 0,
+    normalDeliveryFee,
+    routeRiderIncomeFloor,
+    routeGuaranteeDeliveryFee,
+    routeGuaranteeApplied:
+      guaranteedDeliveryFee > normalDeliveryFee,
+    guaranteedDeliveryFee,
+  };
+}
+
 function calculatePrice({
   distanceMeters,
   durationSeconds,
   speedType,
   upstairsFee = 0
 }) {
-  const km = Math.max(
-    0,
-    Number(distanceMeters || 0)
-  ) / 1000;
+  const route = calculateRouteDeliveryCore({
+    distanceMeters,
+  });
 
   const minutes = Math.max(
     0,
@@ -25603,45 +25676,6 @@ function calculatePrice({
   ) / 60;
 
   const speed = getSpeedOption(speedType);
-
-  const baseFee = Math.max(
-    0,
-    Math.round(Number(PRICING.baseFee || 0))
-  );
-
-  const distanceFee = Math.max(
-    0,
-    Math.round(
-      km * Number(PRICING.perKm || 0)
-    )
-  );
-
-  const timeFee = Math.max(
-    0,
-    Math.round(
-      minutes * Number(PRICING.perMinute || 0)
-    )
-  );
-
-  // 超過門檻的距離才收長距離保障費。
-  // 例如 13 km：超過 8 km 的 5 km × $10 = $50。
-  const longDistanceThresholdKm = Math.max(
-    0,
-    Number(PRICING.longDistanceThresholdKm || 0)
-  );
-
-  const longDistanceKm = Math.max(
-    0,
-    km - longDistanceThresholdKm
-  );
-
-  const longDistanceFee = Math.max(
-    0,
-    Math.round(
-      longDistanceKm *
-      Number(PRICING.longDistanceExtraPerKm || 0)
-    )
-  );
 
   const serviceFee = Math.max(
     0,
@@ -25658,21 +25692,13 @@ function calculatePrice({
     Math.round(Number(upstairsFee || 0))
   );
 
-  const unroundedDeliveryFee =
-    baseFee +
-    distanceFee +
-    timeFee +
-    longDistanceFee;
-
-  // 將一般配送的最終服務總額無條件進位到指定單位。
-  // 進位差額歸入配送費，並依既有 70 / 30 財務核心分配。
   const quoteRoundUnit = Math.max(
     1,
-    Math.round(Number(PRICING.quoteRoundUnit || 1))
+    Math.round(Number(PRICING.quoteRoundUnit || 10))
   );
 
   const unroundedServiceSubtotal =
-    unroundedDeliveryFee +
+    route.guaranteedDeliveryFee +
     serviceFee +
     speedFee +
     safeUpstairsFee;
@@ -25687,8 +25713,9 @@ function calculatePrice({
     roundedServiceSubtotal - unroundedServiceSubtotal
   );
 
+  // 報價進位差額歸入 shareable 配送費，仍由唯一財務核心做 70/30。
   const deliveryFee =
-    unroundedDeliveryFee +
+    route.guaranteedDeliveryFee +
     quoteRoundingFee;
 
   const financials = calculateFinancialSplit({
@@ -25700,19 +25727,25 @@ function calculatePrice({
   });
 
   return {
-    fareMode: 'base_km_minute_long_distance',
+    fareMode: 'route_distance_guarantee_v3',
+    routePricingVersion: route.routePricingVersion,
 
-    distanceKm: Math.round(km * 100) / 100,
+    distanceKm: route.distanceKm,
     durationMinutes: Math.round(minutes),
 
-    baseFee,
-    distanceFee,
-    timeFee,
+    baseFee: route.baseFee,
+    includedKm: route.includedKm,
+    billableDistanceKm: route.billableDistanceKm,
+    distanceFee: route.distanceFee,
+    timeFee: 0,
 
-    longDistanceThresholdKm,
-    longDistanceKm:
-      Math.round(longDistanceKm * 100) / 100,
-    longDistanceFee,
+    normalDeliveryFee: route.normalDeliveryFee,
+    routeRiderIncomeFloor: route.routeRiderIncomeFloor,
+    routeGuaranteeDeliveryFee:
+      route.routeGuaranteeDeliveryFee,
+    routeGuaranteeApplied:
+      route.routeGuaranteeApplied,
+
     quoteRoundUnit,
     quoteRoundingFee,
 
@@ -25773,7 +25806,6 @@ function calculateSinglePointCustomTaskPrice({
     baseFee,
     distanceFee: 0,
     timeFee: 0,
-    longDistanceFee: 0,
     ...financials,
     total: financials.serviceSubtotal,
   };
@@ -29296,36 +29328,29 @@ app.post('/api/merchant/order', async (req, res) => {
       urgent: 75,
     };
 
-    const km = Number(distance.distanceMeters || 0) / 1000;
-    const minutes = Number(distance.durationSeconds || 0) / 60;
     const speedFee = merchantSpeedFeeMap[deliveryType] || 0;
 
-    const deliveryFee = Math.round(
-      PRICING.baseFee +
-      km * PRICING.perKm +
-      minutes * PRICING.perMinute
-    );
+    // 2026-09-11｜舊店家派單入口也改用唯一 Route Pricing V3 路線核心。
+    // 店家入口維持 serviceFee = 0，但距離規則與小U路線收入保障不得另算一套。
+    const routePricing = calculateRouteDeliveryCore({
+      distanceMeters: distance.distanceMeters,
+    });
 
-    const total = deliveryFee + speedFee;
+    const financials = calculateFinancialSplit({
+      deliveryFee: routePricing.guaranteedDeliveryFee,
+      serviceFee: 0,
+      speedFee,
+      upstairsFee: 0,
+      waitingFee: 0,
+    });
 
-    // 店家一般配送同樣套用小U收入制度 V2：
-    // 配送費 70/30 + 每單最低 $50；急件速度費 100% 給小U。
-    const riderIncomeInfo =
-      calculateRiderTaskIncomeWithMinimum(deliveryFee);
-
-    const riderBaseIncome =
-      riderIncomeInfo.riderIncome;
-
-    const driverFee =
-      riderBaseIncome +
-      speedFee;
-
-    const platformFee =
-      Math.max(0, total - driverFee);
-
+    const deliveryFee = financials.deliveryFee;
+    const total = financials.serviceSubtotal;
+    const riderBaseIncome = financials.riderBaseIncome;
+    const driverFee = financials.riderIncome;
+    const platformFee = financials.platformFee;
     const riderIncomeBeforeGuarantee =
-      riderIncomeInfo.riderIncomeBeforeGuarantee +
-      speedFee;
+      financials.riderIncomeBeforeGuarantee;
     const order = {
       
       id,
@@ -29365,32 +29390,37 @@ app.post('/api/merchant/order', async (req, res) => {
       storePayableAmount: total,
       totalFee: total,
 
-      shareableTaskSubtotal: deliveryFee,
-      riderOnlySurchargeSubtotal: speedFee,
-      taskSubtotal: total,
+      routePricingVersion: routePricing.routePricingVersion,
+      routeRiderIncomeFloor: routePricing.routeRiderIncomeFloor,
+      routeGuaranteeDeliveryFee: routePricing.routeGuaranteeDeliveryFee,
+      routeGuaranteeApplied: routePricing.routeGuaranteeApplied,
+
+      shareableTaskSubtotal: financials.shareableTaskSubtotal,
+      riderOnlySurchargeSubtotal: financials.riderOnlySurchargeSubtotal,
+      taskSubtotal: financials.taskSubtotal,
+      serviceSubtotal: financials.serviceSubtotal,
 
       riderBaseIncome,
       riderBaseIncomeBeforeGuarantee:
-        riderIncomeInfo.riderIncomeBeforeGuarantee,
+        financials.riderBaseIncomeBeforeGuarantee,
 
       driverFee,
-      riderFee: driverFee,
-      riderIncome: driverFee,
-      estimatedRiderIncome: driverFee,
+      riderFee: financials.riderFee,
+      riderIncome: financials.riderIncome,
+      estimatedRiderIncome: financials.estimatedRiderIncome,
       riderIncomeBeforeGuarantee,
-      riderGuaranteeSubsidy: riderIncomeInfo.riderGuaranteeSubsidy,
-      riderMinimumApplied: riderIncomeInfo.riderMinimumApplied,
-      riderMinimumTaskIncome: riderIncomeInfo.riderMinimumTaskIncome,
+      riderGuaranteeSubsidy: financials.riderGuaranteeSubsidy,
+      riderMinimumApplied: financials.riderMinimumApplied,
+      riderMinimumTaskIncome: financials.riderMinimumTaskIncome,
       riderMinimumIncomePolicyVersion:
-        riderIncomeInfo.riderIncomePolicyVersion,
+        financials.riderMinimumIncomePolicyVersion,
       riderIncomePolicyVersion:
-        String(
-          PRICING.riderIncomePolicyVersion ||
-          'UBEE_RIDER_INCOME_V2_20260901'
-        ),
+        financials.riderIncomePolicyVersion,
       platformFee,
+      platformIncome: financials.platformIncome,
       deliveryFee,
       serviceFee: 0,
+      platformServiceFee: 0,
       speedFee,
       waitingFee: 0,
 
@@ -32535,7 +32565,7 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     });
 
   } else {
-    // 幫我送、全能跑腿、急件專送與其他一般任務完全沿用原本公式。
+    // 幫我送、全能跑腿、急件專送與其他一般路線任務統一走 Route Pricing V3。
     price = calculatePrice({
       distanceMeters: distance.distanceMeters,
       durationSeconds: distance.durationSeconds,
