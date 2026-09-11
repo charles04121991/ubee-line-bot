@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-11｜Customer Native System V1.4 / Route Pricing V3：刪除舊 base_km_minute 與一般配送時間費顯示；fareMode 以後端正式報價為唯一來源；一般路線費用明細改為單一「路線配送費」，避免起步價／距離費／配送費重複呈現。 -->
 <!-- 2026-09-09｜Customer Native System V1.3 / Live ETA V1：修復 Native Active Task 漏失 step5LiveStatusPanel ID；ETA 改為「剩餘分鐘＋預計抵達時間＋GPS 新鮮度」，定位超過 5 分鐘停止顯示精準 ETA，並讀取後端 traffic-aware ETA。 -->
 <!-- 2026-09-09｜Customer Native System V1.2：先刪除任務內容大 Card、配送方案 Card、確認訂單 Summary/Price Card 視覺，再建立 Native Form Sections／Selection Rows／Checkout Summary；估價、建單、派單、付款與地圖 API contract 保留。 -->
 <!-- 2026-09-09｜Customer Dispatch Recovery V1：建立訂單後立即以 Native Confirm 完成現金單確認，避免任務停在 pending_payment；確認成功後等待後端正式啟動全區派單。 -->
@@ -27,7 +28,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260909-customer-native-system-v1-3-live-eta-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260911-customer-native-system-v1-4-route-pricing-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -12971,7 +12972,10 @@ function getPayload(){
     upstairsLabel:getUpstairsLabel(upstairsOption),
     upstairsFee:calculateUpstairsFee(upstairsOption),
 
-    fareMode:'base_km_minute',
+    fareMode:String(
+      lastQuoteData?.fareMode ||
+      'route_distance_guarantee_v3'
+    ),
 
     quoteId:String(lastQuoteData?.quoteId || ''),
     quotedAtMs:Number(lastQuoteData?.quotedAtMs || 0),
@@ -13287,9 +13291,6 @@ async function renderEstimate(){
           )
         );
 
-    const baseFee = money(data.baseFee);
-    const distanceFee = money(data.distanceFee);
-    const timeFee = money(data.timeFee);
     const deliveryFee = money(data.deliveryFee);
     const serviceFee = money(data.serviceFee);
     const speedFee = money(data.speedFee);
@@ -13385,30 +13386,15 @@ if(isQueueTask){
 
 }else{
 
-  if(baseFee > 0){
-    detailRows.push({
-      label:'起步價',
-      value:baseFee
-    });
-  }
-
-  if(distanceFee > 0){
-    detailRows.push({
-      label:'距離費',
-      value:distanceFee
-    });
-  }
-
-  if(timeFee > 0){
-    detailRows.push({
-      label:'時間費',
-      value:timeFee
-    });
-  }
+  const quoteFareMode = String(data.fareMode || '').trim();
 
   if(deliveryFee > 0){
     detailRows.push({
-      label:'配送服務費',
+      label:isCustomTask
+        ? '任務基本費'
+        : quoteFareMode.startsWith('quick_')
+          ? '跑腿配送費'
+          : '路線配送費',
       value:deliveryFee
     });
   }
@@ -20191,7 +20177,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260909-customer-native-system-v1-3-live-eta-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260911-customer-native-system-v1-4-route-pricing-v3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
