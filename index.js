@@ -27574,7 +27574,7 @@ function createOrderFromApi(data) {
 
     fareMode: cleanText(
       data.fareMode ||
-      'base_km_minute',
+      'route_distance_guarantee_v3',
       40
     ),
 
