@@ -1,9 +1,10 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
+ * 2026-09-14 Customer Native System V1.5 / Live Tracking Accept Sync V1：同步新版 order.html 主輪詢 tracking 摘要與接單即時 UI；升版後清除舊 Customer Cache。
  * 2026-09-11 Customer Native System V1.4 / Route Pricing V3：同步新版 order.html，移除舊一般配送時間費／重複費用明細並切換正式 fareMode；升版後清除舊 Customer Cache。
  * 2026-09-09 Customer Native System V1.3 / Live ETA V1：修復 Active Task ETA 狀態面板並切換至後端 traffic-aware ETA；升版後清除舊 Customer Cache。
- * Version: 2026.09.11.5 Customer Native System V1.4 / Route Pricing V3
+ * Version: 2026.09.14.6 Customer Native System V1.5 / Live Tracking Accept Sync V1
  * File: ubee-customer-sw.js
  *
  * 2026-09-09 Customer Native System V1.2：任務內容／配送設定／確認訂單改為 Native Form Sections、Selection Rows、Checkout Summary；升版清除舊 Customer Cache。
@@ -32,7 +33,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.11.5-customer-native-v1-4-route-pricing-v3';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.14.6-customer-native-v1-5-live-tracking-accept-sync-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
