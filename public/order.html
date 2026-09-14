@@ -2,6 +2,7 @@
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
+<!-- 2026-09-14｜Customer Native System V1.5 / Live Tracking Accept Sync V1：主訂單輪詢直接接收後端安全 tracking 摘要；已接單與 ETA 不再依賴 5 秒備援追蹤才更新；客戶端不需要 riderDocId / riderPhone。 -->
 <!-- 2026-09-11｜Customer Native System V1.4 / Route Pricing V3：刪除舊 base_km_minute 與一般配送時間費顯示；fareMode 以後端正式報價為唯一來源；一般路線費用明細改為單一「路線配送費」，避免起步價／距離費／配送費重複呈現。 -->
 <!-- 2026-09-09｜Customer Native System V1.3 / Live ETA V1：修復 Native Active Task 漏失 step5LiveStatusPanel ID；ETA 改為「剩餘分鐘＋預計抵達時間＋GPS 新鮮度」，定位超過 5 分鐘停止顯示精準 ETA，並讀取後端 traffic-aware ETA。 -->
 <!-- 2026-09-09｜Customer Native System V1.2：先刪除任務內容大 Card、配送方案 Card、確認訂單 Summary/Price Card 視覺，再建立 Native Form Sections／Selection Rows／Checkout Summary；估價、建單、派單、付款與地圖 API contract 保留。 -->
@@ -28,7 +29,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260911-customer-native-system-v1-4-route-pricing-v3" rel="manifest"/>
+<link href="/manifest-order.json?v=20260914-customer-native-system-v1-5-live-tracking-accept-sync-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -15084,31 +15085,33 @@ function renderTimeline(status, order){
 // 第一刀
 // ==============================
 
-function getOrderRiderDocId(order){
+function hasAssignedRiderForCustomer(order){
 
   if(!order){
-    return '';
+    return false;
   }
 
-  const candidates = [
-    order.riderDocId,
-    order.riderId,
-    order.riderPhone
-  ];
+  const status =
+    String(order.status || '')
+      .trim()
+      .toLowerCase();
 
-  for(const value of candidates){
+  const summaryRider =
+    order?._trackingSummary?.rider || {};
 
-    const safeValue =
-      String(
-        value || ''
-      ).trim();
-
-    if(safeValue){
-      return safeValue;
-    }
-  }
-
-  return '';
+  return (
+    order.riderAssigned === true ||
+    summaryRider.assigned === true ||
+    !!String(order.riderName || '').trim() ||
+    [
+      'accepted',
+      'going_to_pickup',
+      'arrived_pickup',
+      'picked_up',
+      'going_to_dropoff',
+      'arrived_dropoff'
+    ].includes(status)
+  );
 }
 
 
@@ -15534,7 +15537,7 @@ function startTrackedRiderListener(order){
   const position = { lat, lng };
   trackedRiderPosition = position;
   trackedRiderData = {
-    id:String(order.riderDocId || order.riderId || ''),
+    id:'assigned',
     currentLat:lat,
     currentLng:lng,
     locationUpdatedAtMs:Number(order.riderLocationUpdatedAtMs || 0)
@@ -15578,8 +15581,8 @@ function syncCustomerLiveTracking(order){
       .toLowerCase();
 
 
-const riderDocId =
-  getOrderRiderDocId(order);
+const riderAssigned =
+  hasAssignedRiderForCustomer(order);
 
 
 const liveDestination =
@@ -15640,7 +15643,7 @@ const activeTrackingStatuses = [
 
   const shouldTrackRider =
 
-    !!riderDocId &&
+    riderAssigned &&
 
     activeTrackingStatuses
       .includes(status);
@@ -15781,12 +15784,38 @@ function startOrderListener(orderId){
         id:safeOrderId
       };
 
+      // Customer Live Tracking V1.1：
+      // /api/orders/:id 已直接帶安全 tracking 摘要。
+      // 主輪詢立即更新「已接單／小U／GPS／ETA」，不再等待 5 秒備援 API。
+      if(
+        data.tracking &&
+        typeof data.tracking === 'object'
+      ){
+        order._trackingSummary = data.tracking;
+        order.riderAssigned =
+          data.tracking?.rider?.assigned === true;
+
+        if(data.tracking?.rider?.name){
+          order.riderName =
+            String(data.tracking.rider.name);
+        }
+
+        if(data.tracking?.rider?.vehicleType){
+          order.riderVehicleType =
+            String(data.tracking.rider.vehicleType);
+        }
+      }
+
       currentOrderData = order;
       currentOrderId = safeOrderId;
       localStorage.setItem('ubee_current_order_id', safeOrderId);
       setOrderNo(safeOrderId);
       renderTimeline(order.status || 'pending_payment', order);
       syncCustomerLiveTracking(order);
+
+      // 不等 MutationObserver / 5 秒 UI fallback，主輪詢完成後立即刷新 Rider Card 與進度。
+      window.UBeeCustomerRenderAppTracking?.(order);
+
       if(typeof cacheCustomerTrackingOrder === 'function'){
         cacheCustomerTrackingOrder(order);
       }
@@ -17504,6 +17533,7 @@ activateUBeeCustomerRuntime();
       estimatedPickupMinutes:summary.eta?.estimatedPickupMinutes,
       estimatedCompletionMinutes:summary.eta?.estimatedCompletionMinutes,
       trackingServerTimeMs:summary.serverTimeMs || 0,
+      riderAssigned:rider.assigned === true,
       riderName:rider.name || '',
       riderId:rider.assigned ? (currentOrderData?.riderId || 'assigned') : '',
       riderCurrentLat:rider.currentLat,
@@ -20177,7 +20207,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260911-customer-native-system-v1-4-route-pricing-v3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260914-customer-native-system-v1-5-live-tracking-accept-sync-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -20389,7 +20419,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const card = byId('ubeeCustomerRiderCard');
     if(!card) return;
     const summaryRider = order?._trackingSummary?.rider || {};
-    const assigned = !!(order?.riderId || order?.riderDocId || order?.riderName || summaryRider.assigned);
+    const assigned = !!(
+      order?.riderAssigned === true ||
+      order?.riderName ||
+      summaryRider.assigned
+    );
     card.classList.toggle('show',assigned);
     if(!assigned) return;
     const name = safe(order?.riderName || summaryRider.name) || 'UBee 小U';
@@ -20461,6 +20495,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     renderStage(order || (typeof currentOrderData !== 'undefined' ? currentOrderData : null));
     activateTaskNavigation();
   }
+
+  // 讓主訂單 4 秒輪詢可以在拿到 tracking 摘要後立即刷新 Native Tracking UI。
+  window.UBeeCustomerRenderAppTracking = renderAppTracking;
 
   function openActiveTask(){
     if(!hasActiveOrder()){
