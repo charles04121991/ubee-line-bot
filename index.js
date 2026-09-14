@@ -1,3 +1,4 @@
+// 2026-09-14｜Customer Live Tracking V1.1 / Accept Sync Fix：客戶主訂單 API 直接回傳安全 tracking 摘要；小U接單後立即背景計算 Customer Live ETA，不再依賴下一次 GPS 才建立第一輪 ETA。
 // 2026-09-11｜Route Pricing V3 / Rider Income Canonical V3：刪除一般配送舊 base+全里程+導航時間+8km長距離加價公式；改為 NT$80 含3km、超出每km NT$12，並加入 8km=NT$98、14km=NT$250 小U路線收入保障。新訂單收入只信任後端 canonical riderIncome。
 // 2026-09-09｜Customer Live ETA Backend V1：一般客戶進行中任務使用小U最新 GPS＋即時道路路況計算 ETA；30 秒／80 公尺節流更新，定位超過 5 分鐘即停止提供精準 ETA，避免客戶看到過期預估。
 // 2026-09-09｜Customer Dispatch Recovery Backend V1：客戶現金立即單由 pending_payment 確認為 pending_dispatch 後，正式建立 dispatchPushCycle 並啟動全區 startDispatchPushSequence，避免只靠騎士端輪詢才看見任務。
@@ -33738,8 +33739,15 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       console.error('⚠️ 任務已接單，但通知客人失敗：', notifyErr);
     }
 
-    // Merchant Live Tracking V3：店家接單通知 + 初始真實 ETA。
+    // Customer Live Tracking V1.1 / Merchant Live Tracking V3：
+    // 接單當下立即利用小U最近一次有效定位建立第一輪 ETA。
+    // 若該定位已過期，Customer ETA 會安全略過，等 Rider 下一筆 fresh GPS 自動重算。
     Promise.allSettled([
+      refreshCustomerLiveEtaV1(safeOrderId, {
+        reason: 'rider_accepted',
+        allowRoute: true,
+        forceRoute: true,
+      }),
       notifyMerchantOrderEventV3(acceptedOrder, 'RIDER_ACCEPTED', {
         eventKey: `RIDER_ACCEPTED_${trackingSessionId}`,
       }),
@@ -35271,9 +35279,20 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
     const customerArrivalProofs =
       await buildCustomerArrivalProofsForApi(order);
 
+    // Customer Live Tracking V1.1：
+    // 主訂單輪詢直接回傳安全 tracking 摘要，讓客戶不必等備援 tracking API
+    // 才知道「已接單／小U名稱／GPS／ETA」。不暴露 riderDocId 或 riderPhone。
+    const customerTrackingSummary =
+      buildCustomerTrackingPayload(
+        order,
+        null,
+        Date.now()
+      );
+
     return res.json({
       success: true,
       summary: customerOrderSummary,
+      tracking: customerTrackingSummary,
 
       order: {
         id:
@@ -35285,6 +35304,27 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
         riderStatus:
           order.riderStatus ||
           order.status,
+
+        riderAssigned:
+          Boolean(
+            order.riderDocId ||
+            order.riderId ||
+            order.riderName
+          ),
+
+        riderName:
+          String(
+            order.riderName ||
+            order.riderDisplayName ||
+            ''
+          ),
+
+        riderVehicleType:
+          String(
+            order.riderVehicleType ||
+            order.vehicleType ||
+            ''
+          ),
 
         statusLabel:
           getStatusLabel(
@@ -40710,6 +40750,9 @@ function sanitizeCustomerOrderForApi(order = {}) {
   return {
     id: String(order.id || ''),
     status: String(order.status || ''),
+    riderAssigned: Boolean(order.riderDocId || order.riderId || order.riderName),
+    riderName: String(order.riderName || order.riderDisplayName || ''),
+    riderVehicleType: String(order.riderVehicleType || order.vehicleType || ''),
     serviceGroup: String(order.serviceGroup || ''),
     serviceType: String(order.serviceType || 'UBee 跑腿任務'),
     serviceCategory: String(order.serviceCategory || ''),
