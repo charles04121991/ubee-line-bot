@@ -1,3 +1,4 @@
+// 2026-09-16｜UBee Native Experience V2：同步前端 App Shell Release；本版不修改計價、派單、Growth Engine、Rider Income、資格、ETA、付款與任務核心規則。
 // 2026-09-16｜UBee Growth Engine V1.8：雙端「我的」二級頁 UX 統一；後端規則沿用 V1.6，Release 版本同步升級。
 // 2026-09-16｜UBee Growth Engine V1：刪除 Rider Activity V1 優先派單資格／延遲概念；建立雙體系階級、推薦碼、有效推薦、成長歷程、活躍度／品質／成長貢獻分離模型。
 // 2026-09-14｜Customer Live Tracking V1.1 / Accept Sync Fix：客戶主訂單 API 直接回傳安全 tracking 摘要；小U接單後立即背景計算 Customer Live ETA，不再依賴下一次 GPS 才建立第一輪 ETA。
