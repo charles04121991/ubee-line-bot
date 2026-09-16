@@ -1,3 +1,4 @@
+// 2026-09-16｜UBee Growth Engine V1.6：修正終身履約計數、品質樣本、資格分離與雙端易用性。
 // 2026-09-16｜UBee Growth Engine V1：刪除 Rider Activity V1 優先派單資格／延遲概念；建立雙體系階級、推薦碼、有效推薦、成長歷程、活躍度／品質／成長貢獻分離模型。
 // 2026-09-14｜Customer Live Tracking V1.1 / Accept Sync Fix：客戶主訂單 API 直接回傳安全 tracking 摘要；小U接單後立即背景計算 Customer Live ETA，不再依賴下一次 GPS 才建立第一輪 ETA。
 // 2026-09-11｜Route Pricing V3 / Rider Income Canonical V3：刪除一般配送舊 base+全里程+導航時間+8km長距離加價公式；改為 NT$80 含3km、超出每km NT$12，並加入 8km=NT$98、14km=NT$250 小U路線收入保障。新訂單收入只信任後端 canonical riderIncome。
@@ -77,7 +78,9 @@ const RIDER_V2_COLLECTIONS = Object.freeze({
 // - 牌級（長期成就）、活躍度（近期）、服務品質、成長貢獻四維分離。
 // - 所有階級由後端判定，前端只顯示結果。
 // =====================================================
-const UBEE_GROWTH_VERSION = 'growth-engine-v1.3';
+const UBEE_GROWTH_VERSION = 'growth-engine-v1.6';
+const UBEE_GROWTH_COUNTER_VERSION = 1;
+const UBEE_RIDER_QUALITY_RULE = Object.freeze({ minimumSampleOrders:20, highTierMinimumScore:90 });
 const UBEE_GROWTH_RULES_VERSION = 'tier-rules-v1-20260916';
 
 const UBEE_GROWTH_COLLECTIONS = Object.freeze({
@@ -106,10 +109,10 @@ const UBEE_RIDER_TIER_RULES = Object.freeze([
   Object.freeze({ key:'GOLD', label:'黃金', minOrders:30, minQuality:0 }),
   Object.freeze({ key:'BRONZE', label:'銅牌', minOrders:100, minQuality:0 }),
   Object.freeze({ key:'SILVER', label:'銀牌', minOrders:300, minQuality:90 }),
-  Object.freeze({ key:'WHITE_SILVER', label:'白銀', minOrders:700, minQuality:92 }),
-  Object.freeze({ key:'GOLD_HIGH', label:'金牌', minOrders:1500, minQuality:94 }),
-  Object.freeze({ key:'PLATINUM', label:'白金', minOrders:3000, minQuality:96 }),
-  Object.freeze({ key:'DIAMOND', label:'鑽石', minOrders:5000, minQuality:97 }),
+  Object.freeze({ key:'WHITE_SILVER', label:'白銀', minOrders:700, minQuality:90 }),
+  Object.freeze({ key:'GOLD_HIGH', label:'金牌', minOrders:1500, minQuality:90 }),
+  Object.freeze({ key:'PLATINUM', label:'白金', minOrders:3000, minQuality:90 }),
+  Object.freeze({ key:'DIAMOND', label:'鑽石', minOrders:5000, minQuality:90 }),
 ]);
 
 function growthClamp(value, min = 0, max = 100) {
@@ -264,16 +267,20 @@ function getRiderGrowthQuality(rider = {}, riderOrders = []) {
   const taskReporting = growthClamp(100 - incompleteReportCount * 8);
   const serviceRecord = growthClamp(100 - warningCount * 5 - complaintCount * 10);
   const complianceRecord = growthClamp(100 - violationCount * 20 - (majorViolation ? 60 : 0));
-  const score = growthClamp(
+  const sampleReady = handledCount >= UBEE_RIDER_QUALITY_RULE.minimumSampleOrders;
+  const score = sampleReady ? growthClamp(
     fulfillmentStability * 0.30 +
     cancellationControl * 0.20 +
     taskReporting * 0.15 +
     serviceRecord * 0.15 +
     complianceRecord * 0.20
-  );
+  ) : null;
 
   return {
     score,
+    sampleReady,
+    minimumSampleOrders:UBEE_RIDER_QUALITY_RULE.minimumSampleOrders,
+    sampleRemaining:Math.max(0, UBEE_RIDER_QUALITY_RULE.minimumSampleOrders - handledCount),
     warningCount,
     violationCount,
     complaintCount,
@@ -298,10 +305,10 @@ function getRiderGrowthQuality(rider = {}, riderOrders = []) {
 
 function getRiderGrowthTier(completedOrders, quality) {
   const orders = Math.max(0, Number(completedOrders || 0));
-  const q = quality || { score:100, majorViolation:false, lifecycle:'' };
+  const q = quality || { score:null, sampleReady:false, majorViolation:false, lifecycle:'' };
   let current = UBEE_RIDER_TIER_RULES[0];
   for (const rule of UBEE_RIDER_TIER_RULES) {
-    const qualityOk = rule.minQuality <= 0 || (q.score >= rule.minQuality && q.majorViolation !== true && q.accountEligible === true);
+    const qualityOk = rule.minQuality <= 0 || (q.sampleReady === true && Number(q.score) >= rule.minQuality && q.majorViolation !== true && q.accountEligible === true);
     if (orders >= rule.minOrders && qualityOk) current = rule;
   }
   const index = UBEE_RIDER_TIER_RULES.findIndex(rule => rule.key === current.key);
@@ -377,18 +384,27 @@ function getCustomerTierBenefits(tierKey = 'GENERAL') {
   return benefits[String(tierKey || 'GENERAL')] || benefits.GENERAL;
 }
 
-function buildRiderGrowthTasks({ completedOrders = 0, monthCompleted = 0, qualityScore = 0, nextTier = null } = {}) {
+function buildRiderGrowthTasks({ completedOrders = 0, monthCompleted = 0, quality = {}, nextTier = null } = {}) {
   const nextTarget = Number(nextTier?.minOrders || completedOrders || 1);
   const nextQuality = Number(nextTier?.minQuality || 0);
+  const sampleReady = quality?.sampleReady === true;
+  const qualityScore = Number.isFinite(Number(quality?.score)) ? Number(quality.score) : 0;
+  const sampleTarget = Math.max(1, Number(quality?.minimumSampleOrders || UBEE_RIDER_QUALITY_RULE.minimumSampleOrders));
+  const sampleProgress = Math.min(sampleTarget, Math.max(0, Number(quality?.handledCount || 0)));
+  const qualityTask = nextQuality > 0 && !sampleReady
+    ? { key:'QUALITY_SAMPLE', title:`完成 ${sampleTarget} 筆品質樣本`, progress:sampleProgress, target:sampleTarget, completed:false, rewardText:'完成後才會形成正式服務品質分數' }
+    : { key:'QUALITY', title:nextQuality>0?`服務品質維持 ${nextQuality} 分以上`:'維持良好服務品質', progress:Math.min(qualityScore,nextQuality||100), target:nextQuality||100, completed:sampleReady && qualityScore>=(nextQuality||UBEE_RIDER_QUALITY_RULE.highTierMinimumScore), rewardText:'高階品質資格' };
   return [
     { key:'MONTH_10', title:'本月完成 10 筆任務', progress:Math.min(monthCompleted,10), target:10, completed:monthCompleted>=10, rewardText:'月度活躍里程碑' },
     { key:'MONTH_30', title:'本月完成 30 筆任務', progress:Math.min(monthCompleted,30), target:30, completed:monthCompleted>=30, rewardText:'穩定履約里程碑' },
     { key:'NEXT_TIER', title:nextTier?`朝 ${nextTier.label} 前進`:'維持最高牌級紀錄', progress:nextTier?Math.min(completedOrders,nextTarget):1, target:nextTier?nextTarget:1, completed:!nextTier || completedOrders>=nextTarget, rewardText:nextTier?'牌級晉升條件':'最高牌級' },
-    { key:'QUALITY', title:nextQuality>0?`服務品質維持 ${nextQuality} 分以上`:'維持良好服務品質', progress:Math.min(qualityScore,nextQuality||100), target:nextQuality||100, completed:qualityScore>=(nextQuality||90), rewardText:'高階品質資格' },
+    qualityTask,
   ];
 }
 
-function buildRiderGrowthAchievements(completedOrders = 0, qualityScore = 0, contribution = {}) {
+function buildRiderGrowthAchievements(completedOrders = 0, quality = {}, contribution = {}) {
+  const qualityScore = Number.isFinite(Number(quality?.score)) ? Number(quality.score) : 0;
+  const qualityReady = quality?.sampleReady === true;
   const totalReferrals = Number(contribution.validCustomerReferrals || 0) + Number(contribution.validRiderReferrals || 0);
   const definitions = [
     ['PARTNER','正式夥伴','完成 3 筆有效履約',completedOrders>=3],
@@ -396,7 +412,7 @@ function buildRiderGrowthAchievements(completedOrders = 0, qualityScore = 0, con
     ['HUNDRED','百單小U','累積完成 100 筆有效履約',completedOrders>=100],
     ['THREE_HUNDRED','銀牌里程碑','累積完成 300 筆有效履約',completedOrders>=300],
     ['THOUSAND','千單紀錄','累積完成 1,000 筆有效履約',completedOrders>=1000],
-    ['QUALITY_95','品質守護','服務品質達 95 分以上',qualityScore>=95],
+    ['QUALITY_95','品質守護','服務品質達 95 分以上',qualityReady && qualityScore>=95],
     ['GROWTH_10','城市成長夥伴','累積帶來 10 位有效新客或新小U',totalReferrals>=10],
     ['FIVE_THOUSAND','鑽石里程碑','累積完成 5,000 筆有效履約',completedOrders>=5000],
   ];
@@ -418,8 +434,12 @@ function getRiderTierBenefits(tierKey = 'NEW') {
   return benefits[String(tierKey || 'NEW')] || benefits.NEW;
 }
 
-function buildRiderGrowthSummary({ rider = {}, riderOrders = [], completedOrders = [], growthProfile = {}, nowMs = Date.now() } = {}) {
-  const completed = completedOrders.length;
+function buildRiderGrowthSummary({ rider = {}, riderOrders = [], completedOrders = [], lifetimeCompletedOrders = null, growthProfile = {}, nowMs = Date.now() } = {}) {
+  const completed = Math.max(
+    completedOrders.length,
+    Math.max(0, Number(growthProfile.completedOrders || 0)),
+    Number.isFinite(Number(lifetimeCompletedOrders)) ? Math.max(0, Number(lifetimeCompletedOrders)) : 0
+  );
   const quality = getRiderGrowthQuality(rider, riderOrders);
   const candidateTier = getRiderGrowthTier(completed, quality);
   const historicalKey = String(growthProfile.highestTier || '');
@@ -437,8 +457,8 @@ function buildRiderGrowthSummary({ rider = {}, riderOrders = [], completedOrders
   const progressSpan = next ? Math.max(1, next.minOrders - tier.minOrders) : 1;
   const monthCompleted = growthCurrentMonthCount(completedOrders, nowMs);
   const contribution = { score:growthScore, validCustomerReferrals, validRiderReferrals };
-  const tasks = buildRiderGrowthTasks({ completedOrders:completed, monthCompleted, qualityScore:quality.score, nextTier:next });
-  const achievements = buildRiderGrowthAchievements(completed, quality.score, contribution);
+  const tasks = buildRiderGrowthTasks({ completedOrders:completed, monthCompleted, quality, nextTier:next });
+  const achievements = buildRiderGrowthAchievements(completed, quality, contribution);
   const benefits = getRiderTierBenefits(tier.key);
   return {
     version:UBEE_GROWTH_VERSION,
@@ -447,7 +467,8 @@ function buildRiderGrowthSummary({ rider = {}, riderOrders = [], completedOrders
     nextTier:next ? { key:next.key, label:next.label, minOrders:next.minOrders, minQuality:next.minQuality, remainingOrders:Math.max(0,next.minOrders-completed), progressPercent:growthClamp((progressBase/progressSpan)*100) } : null,
     completedOrders:completed,
     activity,
-    quality:{ ...quality, statusText:quality.majorViolation?'資格受限制':quality.accountEligible?'正常':'尚未 ACTIVE', highTierEligible:quality.score>=90 && quality.majorViolation!==true && quality.accountEligible===true },
+    quality:{ ...quality, statusText:quality.majorViolation?'資格受限制':!quality.accountEligible?'尚未 ACTIVE':!quality.sampleReady?'資料累積中':'正常', highTierEligible:quality.sampleReady===true && Number(quality.score)>=UBEE_RIDER_QUALITY_RULE.highTierMinimumScore && quality.majorViolation!==true && quality.accountEligible===true },
+    eligibility:{ currentlyEligible:quality.accountEligible===true && quality.majorViolation!==true, specialProgramsEligible:quality.accountEligible===true && quality.majorViolation!==true && quality.sampleReady===true && Number(quality.score)>=UBEE_RIDER_QUALITY_RULE.highTierMinimumScore, accountEligible:quality.accountEligible===true, qualityEligible:quality.sampleReady===true && Number(quality.score)>=UBEE_RIDER_QUALITY_RULE.highTierMinimumScore, majorViolation:quality.majorViolation===true, statusText:quality.majorViolation?'資格受限制':!quality.accountEligible?'尚未 ACTIVE':!quality.sampleReady?'品質資料累積中':Number(quality.score)>=UBEE_RIDER_QUALITY_RULE.highTierMinimumScore?'目前正常':'品質資格待達標' },
     contribution,
     monthCompleted,
     tasks,
@@ -471,7 +492,7 @@ function buildGrowthTierHistoryReason(ownerType, growthSummary = {}) {
   }
   const minQuality = Math.max(0, Number(growthSummary?.tier?.minQuality || 0));
   return minQuality > 0
-    ? `累積 ${completedOrders} 筆有效履約，品質 ${Math.max(0,Number(growthSummary?.quality?.score || 0))} 分`
+    ? `累積 ${completedOrders} 筆有效履約，品質 ${growthSummary?.quality?.sampleReady===true ? Math.max(0,Number(growthSummary?.quality?.score || 0))+' 分' : '已完成樣本'}`
     : `累積完成 ${completedOrders} 筆有效履約`;
 }
 
@@ -565,13 +586,135 @@ async function qualifyGrowthReferral(refereeType, refereeId, reason = {}) {
   });
 }
 
+async function recordGrowthCompletedOrderForOwner(ownerType, ownerId, orderId) {
+  const safeType = String(ownerType || '').trim();
+  const safeOwnerId = String(ownerId || '').trim();
+  const safeOrderId = String(orderId || '').trim();
+  if (!['customer','rider'].includes(safeType) || !safeOwnerId || !safeOrderId) return { recorded:false };
+  const eventKey = crypto.createHash('sha256').update(`${safeType}:${safeOwnerId}:${safeOrderId}`).digest('hex');
+  const eventRef = db.collection(UBEE_GROWTH_COLLECTIONS.events).doc(`completed_${eventKey}`);
+  const profileRef = db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId(safeType, safeOwnerId));
+  const nowMs = Date.now();
+  return db.runTransaction(async tx => {
+    const eventDoc = await tx.get(eventRef);
+    if (eventDoc.exists) return { recorded:false, duplicate:true };
+    tx.set(eventRef, {
+      type:'VALID_ORDER_COMPLETED', ownerType:safeType, ownerId:safeOwnerId, orderId:safeOrderId,
+      rulesVersion:UBEE_GROWTH_RULES_VERSION, createdAtMs:nowMs,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.set(profileRef, {
+      ownerType:safeType, ownerId:safeOwnerId,
+      completedOrders:admin.firestore.FieldValue.increment(1),
+      updatedAtMs:nowMs, updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    return { recorded:true };
+  });
+}
+
+async function resolveGrowthRiderOwnerIdFromOrder(order = {}) {
+  const riderDocId = String(order.riderDocId || '').trim();
+  if (riderDocId) {
+    const doc = await db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDocId).get().catch(()=>null);
+    if (doc?.exists) return String(doc.data()?.riderId || doc.id || '').trim();
+  }
+  const phone = normalizePhone(order.riderPhone || '');
+  if (phone) {
+    const snap = await db.collection(RIDER_V2_COLLECTIONS.riders).where('phone','==',phone).limit(1).get().catch(()=>null);
+    if (snap && !snap.empty) return String(snap.docs[0].data()?.riderId || snap.docs[0].id || '').trim();
+  }
+  return String(order.riderId || order.driverId || '').trim();
+}
+
 async function processUBeeGrowthCompletedOrder(order = {}) {
   if (!isGrowthValidCompletedOrder(order)) return;
   const orderId = String(order.id || order.orderId || '').trim();
+  if (!orderId) return;
   const customerId = String(order.userId || order.customerId || '').trim();
   if (customerId) {
+    await recordGrowthCompletedOrderForOwner('customer', customerId, orderId).catch(err => console.warn('Growth customer counter:', err.message));
     await qualifyGrowthReferral('customer', customerId, { type:'first_valid_order', orderId }).catch(err => console.warn('Growth customer referral reconcile:', err.message));
   }
+  const riderOwnerId = await resolveGrowthRiderOwnerIdFromOrder(order).catch(()=>String(order.riderId || '').trim());
+  if (riderOwnerId) {
+    const result = await recordGrowthCompletedOrderForOwner('rider', riderOwnerId, orderId).catch(err => ({ recorded:false, error:err }));
+    if (result?.recorded) {
+      const { data:profile } = await loadGrowthProfile('rider', riderOwnerId).catch(()=>({data:{}}));
+      if (Number(profile?.completedOrders || 0) >= 3) {
+        await qualifyGrowthReferral('rider', riderOwnerId, { type:'three_valid_orders', orderId }).catch(err => console.warn('Growth rider referral reconcile:', err.message));
+      }
+    }
+  }
+}
+
+function buildGrowthRiderQueryPairs(identity = {}) {
+  const pairs = [];
+  const add = (field, value) => {
+    const safe = String(value || '').trim();
+    if (!safe || pairs.some(([f,v]) => f === field && v === safe)) return;
+    pairs.push([field, safe]);
+  };
+  add('riderDocId', identity.riderDocId);
+  add('riderId', identity.riderId);
+  add('riderPhone', identity.phone);
+  add('riderLineUserId', identity.lineUserId);
+  if (identity.lineUserId) { add('riderId', identity.lineUserId); add('driverId', identity.lineUserId); }
+  if (identity.riderId) add('driverId', identity.riderId);
+  return pairs;
+}
+
+async function scanAllGrowthOrdersByQueryPairs(queryPairs, validator) {
+  const map = new Map();
+  for (const [field, value] of queryPairs) {
+    let lastDoc = null;
+    let pages = 0;
+    while (pages < 40) {
+      let query = db.collection('orders').where(field, '==', value).limit(500);
+      if (lastDoc) query = query.startAfter(lastDoc);
+      const snap = await query.get();
+      for (const doc of snap.docs) {
+        const order = { id:doc.id, ...(doc.data() || {}) };
+        if (!validator || validator(order)) map.set(doc.id, order);
+      }
+      pages += 1;
+      if (snap.size < 500) break;
+      lastDoc = snap.docs[snap.docs.length - 1];
+      if (!lastDoc) break;
+    }
+  }
+  return Array.from(map.values());
+}
+
+async function reconcileRiderLifetimeGrowthCounter(identity, ownerId, profile = {}) {
+  if (Number(profile.lifetimeCounterVersion || 0) >= UBEE_GROWTH_COUNTER_VERSION) {
+    return Math.max(0, Number(profile.completedOrders || 0));
+  }
+  const allCompleted = await scanAllGrowthOrdersByQueryPairs(
+    buildGrowthRiderQueryPairs(identity),
+    order => isGrowthValidCompletedOrder(order) && isOrderBelongsToRider(order, identity)
+  );
+  const count = allCompleted.length;
+  await db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('rider', ownerId)).set({
+    completedOrders:count, lifetimeCounterVersion:UBEE_GROWTH_COUNTER_VERSION,
+    lifetimeCounterReconciledAtMs:Date.now(), updatedAtMs:Date.now(),
+    updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge:true });
+  return count;
+}
+
+async function reconcileCustomerLifetimeGrowthCounter(customerId, profile = {}) {
+  if (Number(profile.lifetimeCounterVersion || 0) >= UBEE_GROWTH_COUNTER_VERSION) {
+    return Math.max(0, Number(profile.completedOrders || 0));
+  }
+  const pairs = [['userId', customerId], ['customerId', customerId]];
+  const allCompleted = await scanAllGrowthOrdersByQueryPairs(pairs, order => isGrowthValidCompletedOrder(order));
+  const count = allCompleted.length;
+  await db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('customer', customerId)).set({
+    completedOrders:count, lifetimeCounterVersion:UBEE_GROWTH_COUNTER_VERSION,
+    lifetimeCounterReconciledAtMs:Date.now(), updatedAtMs:Date.now(),
+    updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge:true });
+  return count;
 }
 
 const RIDER_V2_APPLICATION_ROUND = '2026_RIDER_RESET';
@@ -5416,7 +5559,7 @@ app.post('/api/customer-auth/register/complete', async (req, res) => {
 
       transaction.set(growthProfileRef, {
         ownerType:'customer', ownerId:customerId, referralCode:growthReferralCode,
-        currentTier:'GENERAL', highestTier:'GENERAL', completedOrders:0,
+        currentTier:'GENERAL', highestTier:'GENERAL', completedOrders:0, lifetimeCounterVersion:UBEE_GROWTH_COUNTER_VERSION,
         validCustomerReferrals:0, validRiderReferrals:0, growthScore:0,
         city:serviceCity, district:serviceDistrict, rulesVersion:UBEE_GROWTH_RULES_VERSION,
         createdAtMs:nowMs, updatedAtMs:nowMs,
@@ -5724,20 +5867,19 @@ app.get('/api/customer/growth', requireCustomerAuth, async (req, res) => {
   try {
     const customerId = req.customerAuth.customerId;
     const account = req.customerAuth.account || {};
-    const snapshot = await db.collection('orders').where('userId', '==', customerId).limit(2000).get();
-    const completedOrders = snapshot.docs.filter(doc => isGrowthValidCompletedOrder(doc.data() || {}));
-    const completedCount = completedOrders.length;
-    const completedOrderData = completedOrders.map(doc => ({ id:doc.id, ...(doc.data() || {}) }));
+    const snapshot = await db.collection('orders').where('userId', '==', customerId).limit(500).get();
+    const recentCompletedOrders = snapshot.docs.filter(doc => isGrowthValidCompletedOrder(doc.data() || {}));
+    const completedOrderData = recentCompletedOrders.map(doc => ({ id:doc.id, ...(doc.data() || {}) }));
     const monthCompleted = growthCurrentMonthCount(completedOrderData);
-
-    if (completedCount >= 1) {
-      await qualifyGrowthReferral('customer', customerId, { type:'first_valid_order', orderId:completedOrders[0]?.id || '' });
-    }
 
     const referralCode = await ensureGrowthReferralCode('customer', customerId, {
       city:account.serviceCity || '', district:account.serviceDistrict || '',
     });
     const { data:profile } = await loadGrowthProfile('customer', customerId);
+    const completedCount = await reconcileCustomerLifetimeGrowthCounter(customerId, profile);
+    if (completedCount >= 1) {
+      await qualifyGrowthReferral('customer', customerId, { type:'first_valid_order', orderId:recentCompletedOrders[0]?.id || '' });
+    }
     const validReferrals = Math.max(0, Number(profile.validCustomerReferrals || 0));
     const tier = getCustomerGrowthTier(completedCount, validReferrals);
     const next = tier.next;
@@ -10725,17 +10867,18 @@ const riderIncome =
       }
     });
 
-    if (totalCompleted >= 3) {
-      await qualifyGrowthReferral('rider', identity.riderId || riderDoc.id, { type:'three_valid_orders' }).catch(err => console.warn('Growth rider referral qualify:', err.message));
-    }
-
     const riderGrowthId = identity.riderId || riderDoc.id;
     const riderReferralCode = await ensureGrowthReferralCode('rider', riderGrowthId, {
       city:rider.serviceCity || rider.city || '',
       district:rider.residenceDistrict || rider.district || '',
     });
     const { data:riderGrowthProfile } = await loadGrowthProfile('rider', riderGrowthId);
-    const growth = buildRiderGrowthSummary({ rider, riderOrders, completedOrders, growthProfile:riderGrowthProfile, nowMs });
+    const lifetimeCompletedOrders = await reconcileRiderLifetimeGrowthCounter(identity, riderGrowthId, riderGrowthProfile);
+    totalCompleted = Math.max(totalCompleted, lifetimeCompletedOrders);
+    if (lifetimeCompletedOrders >= 3) {
+      await qualifyGrowthReferral('rider', riderGrowthId, { type:'three_valid_orders' }).catch(err => console.warn('Growth rider referral qualify:', err.message));
+    }
+    const growth = buildRiderGrowthSummary({ rider, riderOrders, completedOrders, lifetimeCompletedOrders, growthProfile:riderGrowthProfile, nowMs });
     growth.referralCode = riderReferralCode;
     growth.customerInviteUrl = `${String(process.env.UBEE_CUSTOMER_PUBLIC_BASE_URL || 'https://ubee-line-bot-2-zezw.onrender.com').replace(/\/$/,'')}/order.html?ref=${encodeURIComponent(riderReferralCode)}&source=rider-invite`;
     growth.riderInviteUrl = `${String(process.env.UBEE_RIDER_PUBLIC_BASE_URL || 'https://ubee-rider-web.vercel.app').replace(/\/$/,'')}/rider.html?ref=${encodeURIComponent(riderReferralCode)}&source=rider-invite`;
