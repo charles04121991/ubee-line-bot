@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 2026-09-16｜UBee Growth Engine V1.1 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
+<!-- 2026-09-16｜UBee Growth Engine V1.2 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
 <head>
@@ -21122,6 +21122,20 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 #productionOrderFlow .ubee-native-growth-action span:last-child{color:#a1a6ac;font-size:20px;font-weight:400}
 #productionOrderFlow .ubee-native-growth-note{margin:0;padding:12px 13px;border-radius:13px;background:#eceef1;color:#666d74;font-size:11px;font-weight:700;line-height:1.6}
 #productionOrderFlow .ubee-native-growth-status{min-height:20px;margin:8px 2px 0;color:#747a81;font-size:11px;font-weight:750;text-align:center}
+#productionOrderFlow .ubee-native-growth-hub{margin:0 0 16px;border:1px solid var(--ubee-my-line);border-radius:16px;background:#fff;overflow:hidden}
+#productionOrderFlow .ubee-native-growth-hub-row{width:100%;min-height:60px;padding:10px 13px;border:0;border-bottom:1px solid #eceef0;background:#fff;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:11px;align-items:center;text-align:left;color:#111}
+#productionOrderFlow .ubee-native-growth-hub-row:last-child{border-bottom:0}#productionOrderFlow .ubee-native-growth-hub-row:active{background:#f3f4f5}
+#productionOrderFlow .ubee-native-growth-hub-icon{width:32px;height:32px;border-radius:10px;background:#f1f2f4;display:grid;place-items:center;color:#555d65;font-size:12px;font-weight:1000}
+#productionOrderFlow .ubee-native-growth-hub-main strong{display:block;color:#111;font-size:14px;font-weight:900}.ubee-native-growth-hub-main small{display:block;margin-top:2px;color:#7b8188;font-size:10.5px;font-weight:700;line-height:1.4}
+#productionOrderFlow .ubee-native-growth-hub-side{color:#a1a6ac;font-size:20px;font-weight:400}
+#productionOrderFlow .ubee-native-growth-detail-head{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+#productionOrderFlow .ubee-native-growth-back{min-height:38px;padding:0 12px;border:0;border-radius:11px;background:#eceef1;color:#111;font-size:13px;font-weight:850}
+#productionOrderFlow .ubee-native-growth-detail-head strong{font-size:18px;font-weight:1000;color:#111}
+#productionOrderFlow .ubee-native-task-row{padding:13px 14px;border-bottom:1px solid #eceef0}.ubee-native-task-row:last-child{border-bottom:0}
+#productionOrderFlow .ubee-native-task-top{display:flex;justify-content:space-between;gap:12px;align-items:center}.ubee-native-task-top strong{font-size:14px;font-weight:900;color:#111}.ubee-native-task-top span{font-size:11px;font-weight:850;color:#747a81;white-space:nowrap}
+#productionOrderFlow .ubee-native-task-bar{height:5px;margin-top:9px;border-radius:999px;background:#eceef1;overflow:hidden}.ubee-native-task-bar span{display:block;height:100%;border-radius:inherit;background:#facc15}
+#productionOrderFlow .ubee-native-task-row small{display:block;margin-top:6px;color:#7b8188;font-size:10.5px;font-weight:700}
+#productionOrderFlow .ubee-native-achievement-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px}.ubee-native-achievement{padding:14px 12px;border:1px solid var(--ubee-my-line);border-radius:14px;background:#fff;min-height:108px}.ubee-native-achievement.locked{opacity:.46}.ubee-native-achievement-mark{width:30px;height:30px;border-radius:10px;background:#facc15;display:grid;place-items:center;font-size:12px;font-weight:1000;color:#111}.ubee-native-achievement.locked .ubee-native-achievement-mark{background:#eceef1;color:#7b8188}.ubee-native-achievement strong{display:block;margin-top:9px;font-size:13px;font-weight:900;color:#111}.ubee-native-achievement small{display:block;margin-top:3px;font-size:10px;line-height:1.4;font-weight:650;color:#7b8188}
 @media(max-width:380px){#productionOrderFlow .ubee-native-growth-summary{padding:15px 13px}#productionOrderFlow .ubee-native-growth-tier{font-size:20px}#productionOrderFlow .ubee-native-invite-code strong{font-size:24px}}
 </style>
 <script id="ubee-app-settings-controller">
@@ -21454,31 +21468,52 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     return `${Number(value).toLocaleString('zh-TW')} 筆有效訂單`;
   }
 
+  function renderCustomerTaskRows(tasks=[]){
+    return (Array.isArray(tasks)?tasks:[]).map(item=>{const progress=Math.max(0,Number(item.progress||0));const target=Math.max(1,Number(item.target||1));const percent=Math.min(100,Math.round(progress/target*100));return `<div class="ubee-native-task-row"><div class="ubee-native-task-top"><strong>${growthEsc(item.title||'成長任務')}</strong><span>${item.completed?'已完成':`${progress.toLocaleString('zh-TW')} / ${target.toLocaleString('zh-TW')}`}</span></div><div class="ubee-native-task-bar"><span style="width:${percent}%"></span></div><small>${growthEsc(item.rewardText||'成長里程碑')}</small></div>`}).join('')||'<div class="ubee-my-empty-state">目前沒有新的成長任務。</div>';
+  }
+
+  function renderCustomerAchievementGrid(items=[]){
+    return (Array.isArray(items)?items:[]).map(item=>`<div class="ubee-native-achievement ${item.unlocked?'':'locked'}"><span class="ubee-native-achievement-mark">${item.unlocked?'✓':'—'}</span><strong>${growthEsc(item.title||'成就')}</strong><small>${growthEsc(item.description||'')}</small></div>`).join('')||'<div class="ubee-my-empty-state">目前沒有成就資料。</div>';
+  }
+
+  function renderCustomerGrowthDetail(type,growth,history=[]){
+    const target=document.getElementById('ubeeMyGrowthContent');if(!target)return;
+    const back=`<div class="ubee-native-growth-detail-head"><button class="ubee-native-growth-back" type="button" data-growth-detail-back>‹ 返回</button><strong>${growthEsc(type==='benefits'?'會員權益':type==='tasks'?'成長任務':type==='achievements'?'我的成就':'成長歷程')}</strong></div>`;
+    if(type==='benefits'){
+      const rows=(Array.isArray(growth?.benefits)?growth.benefits:[]).map((text,index)=>`<div class="ubee-native-growth-row is-done"><span class="ubee-native-growth-state">✓</span><span class="ubee-native-growth-row-main"><strong>${growthEsc(text)}</strong><small>${index===0?'目前牌級身份':'符合目前牌級可取得的資格'}</small></span><span class="ubee-native-growth-row-side">已解鎖</span></div>`).join('');
+      target.innerHTML=back+`<section class="ubee-native-growth-summary"><div class="ubee-native-growth-summary-top"><span class="ubee-native-growth-mark">U</span><span class="ubee-native-growth-copy"><small class="ubee-native-growth-label">目前會員牌級</small><strong class="ubee-native-growth-tier">${growthEsc(growth?.tier?.label||'一般')}會員</strong></span></div></section><section class="ubee-native-growth-list">${rows||'<div class="ubee-my-empty-state">目前沒有額外權益。</div>'}</section><div class="ubee-native-growth-note">會員權益以資格與平台活動為主，不代表固定現金折抵或永久折扣。</div>`;
+    }else if(type==='tasks'){
+      target.innerHTML=back+`<section class="ubee-native-growth-list">${renderCustomerTaskRows(growth?.tasks||[])}</section>`;
+    }else if(type==='achievements'){
+      target.innerHTML=back+`<section class="ubee-native-growth-metrics"><div class="ubee-native-growth-metric"><small>已解鎖成就</small><strong>${Number(growth?.unlockedAchievementCount||0)}</strong></div><div class="ubee-native-growth-metric"><small>全部成就</small><strong>${Number(growth?.achievements?.length||0)}</strong></div></section><div class="ubee-native-achievement-grid">${renderCustomerAchievementGrid(growth?.achievements||[])}</div>`;
+    }else{
+      const historyHtml=history.length?history.map((item,index)=>`<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>${growthEsc(item.toTierLabel||item.toTier||'階級更新')}</strong><small>${index===0?'最近一次成長紀錄':'歷史成長紀錄'}</small></span><span class="ubee-native-growth-row-side">${Number(item.completedOrders||0).toLocaleString('zh-TW')} 單</span></div>`).join(''):'<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>加入 UBee</strong><small>成長歷程從這裡開始</small></span><span class="ubee-native-growth-row-side">已建立</span></div>';
+      target.innerHTML=back+`<section class="ubee-native-growth-list">${historyHtml}</section>`;
+    }
+    target.querySelector('[data-growth-detail-back]')?.addEventListener('click',()=>renderCustomerGrowthPanel(growth,history));
+  }
+
   function renderCustomerGrowthPanel(growth,history=[]){
     const target=document.getElementById('ubeeMyGrowthContent');if(!target)return;
-    const tierLabel=String(growth?.tier?.label||'一般');
-    const next=growth?.nextTier||null;
-    const completed=Number(growth?.completedOrders||0);
-    const referrals=Number(growth?.validReferrals||0);
+    const tierLabel=String(growth?.tier?.label||'一般');const next=growth?.nextTier||null;const completed=Number(growth?.completedOrders||0);const referrals=Number(growth?.validReferrals||0);const monthCompleted=Number(growth?.monthCompleted||0);const achievementCount=Number(growth?.unlockedAchievementCount||0);
     const progress=next?(Number(next.minReferrals||0)>referrals?Math.min(100,Math.round(referrals/Math.max(1,Number(next.minReferrals||0))*100)):Math.min(100,Math.round(completed/Math.max(1,Number(next.minOrders||0))*100))):100;
     const nextCopy=next?(Number(next.remainingReferrals||0)>0?`還差 ${Number(next.remainingReferrals||0).toLocaleString('zh-TW')} 位有效好友`:`還差 ${Number(next.remainingOrders||0).toLocaleString('zh-TW')} 筆有效訂單`):'已達目前最高會員牌級';
-    const rules=customerGrowthRules();
-    const currentIndex=Math.max(0,rules.findIndex(([label])=>label===tierLabel));
-    const tierRows=rules.map(([label,value],index)=>{
-      const state=index<currentIndex?'is-done':index===currentIndex?'is-current':'';
-      const mark=index<currentIndex?'✓':index===currentIndex?'U':String(index+1);
-      return `<div class="ubee-native-growth-row ${state}"><span class="ubee-native-growth-state">${growthEsc(mark)}</span><span class="ubee-native-growth-row-main"><strong>${growthEsc(label)}</strong><small>${growthEsc(customerGrowthTierRequirement(label,value))}</small></span><span class="ubee-native-growth-row-side">${index<currentIndex?'已達成':index===currentIndex?'目前':'未解鎖'}</span></div>`;
-    }).join('');
-    const historyHtml=history.length?history.map((item,index)=>`<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>${growthEsc(item.toTierLabel||item.toTier||'階級更新')}</strong><small>${index===0?'最近一次成長紀錄':'歷史成長紀錄'}</small></span><span class="ubee-native-growth-row-side">${Number(item.completedOrders||0).toLocaleString('zh-TW')} 單</span></div>`).join(''):'<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>加入 UBee</strong><small>成長歷程從這裡開始</small></span><span class="ubee-native-growth-row-side">已建立</span></div>';
+    const rules=customerGrowthRules();const currentIndex=Math.max(0,rules.findIndex(([label])=>label===tierLabel));
+    const tierRows=rules.map(([label,value],index)=>{const state=index<currentIndex?'is-done':index===currentIndex?'is-current':'';const mark=index<currentIndex?'✓':index===currentIndex?'U':String(index+1);return `<div class="ubee-native-growth-row ${state}"><span class="ubee-native-growth-state">${growthEsc(mark)}</span><span class="ubee-native-growth-row-main"><strong>${growthEsc(label)}</strong><small>${growthEsc(customerGrowthTierRequirement(label,value))}</small></span><span class="ubee-native-growth-row-side">${index<currentIndex?'已達成':index===currentIndex?'目前':'未解鎖'}</span></div>`}).join('');
+    const taskDone=(growth?.tasks||[]).filter(item=>item.completed).length;const taskTotal=(growth?.tasks||[]).length;
     target.innerHTML=`
-      <section class="ubee-native-growth-summary">
-        <div class="ubee-native-growth-summary-top"><span class="ubee-native-growth-mark">U</span><span class="ubee-native-growth-copy"><small class="ubee-native-growth-label">UBee 會員牌級</small><strong class="ubee-native-growth-tier">${growthEsc(tierLabel)}會員</strong></span><span class="ubee-native-growth-count">${completed.toLocaleString('zh-TW')} 單</span></div>
-        <div class="ubee-native-growth-progress" aria-label="下一階級進度 ${progress}%"><span style="width:${progress}%"></span></div>
-        <div class="ubee-native-growth-next"><span>${next?`下一階級・${growthEsc(next.label)}`:'會員成長'}</span><strong>${growthEsc(nextCopy)}</strong></div>
+      <section class="ubee-native-growth-summary"><div class="ubee-native-growth-summary-top"><span class="ubee-native-growth-mark">U</span><span class="ubee-native-growth-copy"><small class="ubee-native-growth-label">UBee 會員牌級</small><strong class="ubee-native-growth-tier">${growthEsc(tierLabel)}會員</strong></span><span class="ubee-native-growth-count">${completed.toLocaleString('zh-TW')} 單</span></div><div class="ubee-native-growth-progress" aria-label="下一階級進度 ${progress}%"><span style="width:${progress}%"></span></div><div class="ubee-native-growth-next"><span>${next?`下一階級・${growthEsc(next.label)}`:'會員成長'}</span><strong>${growthEsc(nextCopy)}</strong></div></section>
+      <section class="ubee-native-growth-metrics"><div class="ubee-native-growth-metric"><small>本月完成</small><strong>${monthCompleted.toLocaleString('zh-TW')}</strong></div><div class="ubee-native-growth-metric"><small>累積有效訂單</small><strong>${completed.toLocaleString('zh-TW')}</strong></div><div class="ubee-native-growth-metric"><small>有效推薦好友</small><strong>${referrals.toLocaleString('zh-TW')}</strong></div><div class="ubee-native-growth-metric"><small>已解鎖成就</small><strong>${achievementCount.toLocaleString('zh-TW')}</strong></div></section>
+      <div class="ubee-native-growth-section-title">成長中心</div><section class="ubee-native-growth-hub">
+        <button class="ubee-native-growth-hub-row" type="button" data-growth-detail="benefits"><span class="ubee-native-growth-hub-icon">U</span><span class="ubee-native-growth-hub-main"><strong>會員權益</strong><small>查看 ${growthEsc(tierLabel)}會員目前解鎖的資格</small></span><span class="ubee-native-growth-hub-side">›</span></button>
+        <button class="ubee-native-growth-hub-row" type="button" data-growth-detail="tasks"><span class="ubee-native-growth-hub-icon">✓</span><span class="ubee-native-growth-hub-main"><strong>成長任務</strong><small>${taskDone} / ${taskTotal} 個目前里程碑已完成</small></span><span class="ubee-native-growth-hub-side">›</span></button>
+        <button class="ubee-native-growth-hub-row" type="button" data-growth-detail="achievements"><span class="ubee-native-growth-hub-icon">★</span><span class="ubee-native-growth-hub-main"><strong>我的成就</strong><small>已解鎖 ${achievementCount} 枚成就</small></span><span class="ubee-native-growth-hub-side">›</span></button>
+        <button class="ubee-native-growth-hub-row" type="button" data-growth-open-invite><span class="ubee-native-growth-hub-icon">+</span><span class="ubee-native-growth-hub-main"><strong>邀請好友</strong><small>查看推薦碼、有效推薦與好友進度</small></span><span class="ubee-native-growth-hub-side">›</span></button>
+        <button class="ubee-native-growth-hub-row" type="button" data-growth-detail="history"><span class="ubee-native-growth-hub-icon">↗</span><span class="ubee-native-growth-hub-main"><strong>成長歷程</strong><small>查看每一次會員牌級晉升</small></span><span class="ubee-native-growth-hub-side">›</span></button>
       </section>
-      <section class="ubee-native-growth-metrics"><div class="ubee-native-growth-metric"><small>累積有效訂單</small><strong>${completed.toLocaleString('zh-TW')}</strong></div><div class="ubee-native-growth-metric"><small>有效推薦好友</small><strong>${referrals.toLocaleString('zh-TW')}</strong></div></section>
-      <div class="ubee-native-growth-section-title">會員階級</div><section class="ubee-native-growth-list">${tierRows}</section>
-      <div class="ubee-native-growth-section-title">我的成長歷程</div><section class="ubee-native-growth-list">${historyHtml}</section>`;
+      <div class="ubee-native-growth-section-title">會員階級</div><section class="ubee-native-growth-list">${tierRows}</section>`;
+    target.querySelectorAll('[data-growth-detail]').forEach(btn=>btn.addEventListener('click',()=>renderCustomerGrowthDetail(btn.dataset.growthDetail,growth,history)));
+    target.querySelector('[data-growth-open-invite]')?.addEventListener('click',()=>openMySection('rewards'));
   }
 
   function setCustomerGrowthStatus(message=''){
@@ -21490,14 +21525,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     catch(_){setCustomerGrowthStatus('無法自動複製，請長按推薦碼複製。');}
   }
 
-  function renderCustomerInvitePanel(growth){
+  function renderCustomerInvitePanel(growth,referrals=[]){
     const target=document.getElementById('ubeeMyInviteContent');if(!target)return;
-    const code=String(growth?.referralCode||'');const url=String(growth?.shareUrl||'');const referrals=Number(growth?.validReferrals||0);
+    const code=String(growth?.referralCode||'');const url=String(growth?.shareUrl||'');const referralCount=Number(growth?.validReferrals||0);
     target.innerHTML=`
       <section class="ubee-native-invite-code"><small>我的 UBee 推薦碼</small><strong>${growthEsc(code||'載入中')}</strong><p>好友完成註冊並完成第一筆有效訂單後，才會計入有效推薦。</p></section>
       <button class="ubee-native-growth-primary" type="button" data-growth-share>邀請好友</button>
       <section class="ubee-native-growth-action-list"><button class="ubee-native-growth-action" type="button" data-growth-copy-link><span>複製邀請連結</span><span>›</span></button><button class="ubee-native-growth-action" type="button" data-growth-copy-code><span>複製推薦碼</span><span>›</span></button></section>
-      <section class="ubee-native-growth-metrics"><div class="ubee-native-growth-metric"><small>目前有效推薦</small><strong>${referrals.toLocaleString('zh-TW')}</strong></div><div class="ubee-native-growth-metric"><small>認定方式</small><strong>完成首單</strong></div></section>
+      <section class="ubee-native-growth-metrics"><div class="ubee-native-growth-metric"><small>目前有效推薦</small><strong>${referralCount.toLocaleString('zh-TW')}</strong></div><div class="ubee-native-growth-metric"><small>認定方式</small><strong>完成首單</strong></div></section>
+      <div class="ubee-native-growth-section-title">好友推薦進度</div><section class="ubee-native-growth-list">${(Array.isArray(referrals)?referrals:[]).slice(0,10).map(item=>`<div class="ubee-native-growth-row ${item.status==='qualified'?'is-done':''}"><span class="ubee-native-growth-state">${item.status==='qualified'?'✓':'…'}</span><span class="ubee-native-growth-row-main"><strong>${item.status==='qualified'?'已完成首單':'等待完成首單'}</strong><small>${growthEsc([item.city,item.district].filter(Boolean).join('')||'UBee 新會員')}</small></span><span class="ubee-native-growth-row-side">${item.status==='qualified'?'有效推薦':'進行中'}</span></div>`).join('')||'<div class="ubee-my-empty-state">目前還沒有推薦進度。</div>'}</section>
       <div class="ubee-native-growth-note">單純註冊、取消訂單、異常帳號或自我推薦都不計入。Growth Engine 只計算真正完成首筆有效訂單的新會員。</div><div class="ubee-native-growth-status" id="ubeeCustomerGrowthStatus" role="status" aria-live="polite"></div>`;
     target.querySelector('[data-growth-share]')?.addEventListener('click',async()=>{const text=`加入 UBee 跑腿，推薦碼：${code}`;if(navigator.share){try{await navigator.share({title:'UBee 跑腿',text,url});setCustomerGrowthStatus('分享完成');}catch(_){} }else await copyCustomerGrowthText(url,'邀請連結已複製');});
     target.querySelector('[data-growth-copy-link]')?.addEventListener('click',()=>copyCustomerGrowthText(url,'邀請連結已複製'));
@@ -21507,7 +21543,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   async function fillGrowthPanel(mode='growth'){
     const target=document.getElementById(mode==='rewards'?'ubeeMyInviteContent':'ubeeMyGrowthContent');
     if(target)target.innerHTML='<div class="ubee-my-empty-state">正在讀取成長資料…</div>';
-    try{const data=await loadCustomerGrowth();if(mode==='rewards')renderCustomerInvitePanel(data?.growth||{});else renderCustomerGrowthPanel(data?.growth||{},data?.history||[])}catch(error){if(target)target.innerHTML='<div class="ubee-my-empty-state">成長資料暫時無法讀取，請稍後再試。</div>'}
+    try{const data=await loadCustomerGrowth();if(mode==='rewards'){let referralData={referrals:[]};try{referralData=await customerApiFetch('/api/customer/growth/referrals')}catch(_){}renderCustomerInvitePanel(data?.growth||{},referralData?.referrals||[])}else renderCustomerGrowthPanel(data?.growth||{},data?.history||[])}catch(error){if(target)target.innerHTML='<div class="ubee-my-empty-state">成長資料暫時無法讀取，請稍後再試。</div>'}
   }
 
   function openMySection(action){
