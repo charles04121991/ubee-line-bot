@@ -34,7 +34,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.16.1-growth-engine-v1';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.16.5-growth-engine-v1-5-my-native-profile';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
