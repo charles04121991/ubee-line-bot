@@ -6,7 +6,7 @@
  * 2026-09-14 Customer Native System V1.5 / Live Tracking Accept Sync V1：同步新版 order.html 主輪詢 tracking 摘要與接單即時 UI；升版後清除舊 Customer Cache。
  * 2026-09-11 Customer Native System V1.4 / Route Pricing V3：同步新版 order.html，移除舊一般配送時間費／重複費用明細並切換正式 fareMode；升版後清除舊 Customer Cache。
  * 2026-09-09 Customer Native System V1.3 / Live ETA V1：修復 Active Task ETA 狀態面板並切換至後端 traffic-aware ETA；升版後清除舊 Customer Cache。
- * Version: 2026.09.14.6 Customer Native System V1.5 / Live Tracking Accept Sync V1
+ * Version: 2026-09-16 Native Experience V2 / Customer Isolation
  * File: ubee-customer-sw.js
  *
  * 2026-09-09 Customer Native System V1.2：任務內容／配送設定／確認訂單改為 Native Form Sections、Selection Rows、Checkout Summary；升版清除舊 Customer Cache。
@@ -35,7 +35,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.16.7-growth-engine-v1-8-my-ux';
+const UBEE_CUSTOMER_SW_VERSION = '20260916-native-experience-v2';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
@@ -47,6 +47,24 @@ const APP_SHELL = [
   '/ubee-customer-icon-192.png',
   '/ubee-customer-icon-512.png'
 ];
+
+const UBEE_CUSTOMER_STATIC_PATHS = new Set([
+  '/manifest-order.json',
+  '/ubee-customer-icon-192.png',
+  '/ubee-customer-icon-512.png'
+]);
+
+function isUBeeCustomerClientUrl(clientUrl) {
+  try {
+    const url = new URL(clientUrl);
+    return (
+      url.origin === self.location.origin &&
+      (url.pathname === '/order.html' || url.pathname.endsWith('/order.html'))
+    );
+  } catch (_) {
+    return false;
+  }
+}
 
 /*
  * 這些路徑包含登入 Session、會員資料、實名狀態、訂單與即時資訊。
@@ -84,17 +102,17 @@ function isNavigationRequest(request) {
   );
 }
 
+function isCustomerNavigationRequest(request, url) {
+  return (
+    isSameOrigin(url) &&
+    isNavigationRequest(request) &&
+    (url.pathname === '/order.html' || url.pathname.endsWith('/order.html'))
+  );
+}
+
 function isStaticAssetRequest(request, url) {
-  if (!isSameOrigin(url)) return false;
-
-  if (
-    ['style', 'script', 'image', 'font'].includes(request.destination)
-  ) {
-    return true;
-  }
-
-  return /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf)$/i
-    .test(url.pathname);
+  if (!isSameOrigin(url) || request.method !== 'GET') return false;
+  return UBEE_CUSTOMER_STATIC_PATHS.has(url.pathname);
 }
 
 async function putResponse(cacheName, request, response) {
@@ -255,49 +273,21 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
 
-  if (!request || !request.url) return;
+  if (!request || !request.url || request.method !== 'GET') return;
 
   const url = new URL(request.url);
 
-  /*
-   * 非 HTTP(S) scheme 不處理。
-   */
-  if (!/^https?:$/.test(url.protocol)) {
-    return;
-  }
+  if (!/^https?:$/.test(url.protocol) || !isSameOrigin(url)) return;
 
-  /*
-   * POST / PUT / PATCH / DELETE，以及 UBee API：
-   * 全部直接走網路，不進 Cache。
-   */
-  if (isNetworkOnlyRequest(request, url)) {
-    event.respondWith(networkOnly(request));
-    return;
-  }
-
-  /*
-   * 跨網域資源不由 UBee Customer SW 管理，
-   * 例如 Google Maps、第三方服務。
-   */
-  if (!isSameOrigin(url)) {
-    return;
-  }
-
-  /*
-   * order.html / navigation：
-   * 一律優先取得伺服器最新版。
-   * 只有離線時才使用本機快取。
-   */
-  if (isNavigationRequest(request)) {
+  // Native Experience V2：Customer SW 只攔截 Customer App 自己的 navigation。
+  // /api/*、admin、merchant、support 與其他同源 UBee 系統全部交回瀏覽器原生網路流程。
+  if (isCustomerNavigationRequest(request, url)) {
     event.respondWith(networkFirstPage(request));
     return;
   }
 
-  /*
-   * 靜態檔案：
-   * 先快速回傳快取，同時背景更新。
-   */
-  if (request.method === 'GET' && isStaticAssetRequest(request, url)) {
+  // 只快取 Customer 明確白名單資源，不接管同源其他系統的 CSS / JS / image。
+  if (isStaticAssetRequest(request, url)) {
     event.respondWith(staleWhileRevalidate(request));
   }
 });
@@ -376,15 +366,20 @@ self.addEventListener('notificationclick', event => {
     .trim()
     .toUpperCase();
 
-  const targetUrl = new URL(
-    data.url ||
-      (
-        orderId
-          ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
-          : '/order.html?source=push'
-      ),
-    self.location.origin
-  ).href;
+  const fallbackPath = orderId
+    ? `/order.html?orderId=${encodeURIComponent(orderId)}&source=push`
+    : '/order.html?source=push';
+
+  let targetUrl = new URL(fallbackPath, self.location.origin).href;
+  try {
+    const requested = new URL(data.url || data.deepLink || fallbackPath, self.location.origin);
+    if (
+      requested.origin === self.location.origin &&
+      (requested.pathname === '/order.html' || requested.pathname.endsWith('/order.html'))
+    ) {
+      targetUrl = requested.href;
+    }
+  } catch (_) {}
 
   event.waitUntil((async () => {
     const clientList = await clients.matchAll({
@@ -396,7 +391,7 @@ self.addEventListener('notificationclick', event => {
       try {
         const clientUrl = new URL(client.url);
 
-        if (clientUrl.origin === self.location.origin) {
+        if (isUBeeCustomerClientUrl(client.url)) {
           if ('navigate' in client) {
             await client.navigate(targetUrl);
           }
