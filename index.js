@@ -72,12 +72,12 @@ const RIDER_V2_COLLECTIONS = Object.freeze({
 
 // =====================================================
 // UBee Growth Engine V1｜唯一正式成長制度
-// - 已刪除 Rider Activity V1 的「優先派單資格 / dispatchDelaySeconds」。
+// - 舊 Rider Activity V1 已完整移除；近期活躍僅保留為統計狀態。
 // - 一般訂單對所有具接單資格的小U維持公平，不因牌級或活躍度提前顯示。
 // - 牌級（長期成就）、活躍度（近期）、服務品質、成長貢獻四維分離。
 // - 所有階級由後端判定，前端只顯示結果。
 // =====================================================
-const UBEE_GROWTH_VERSION = 'growth-engine-v1.2';
+const UBEE_GROWTH_VERSION = 'growth-engine-v1.3';
 const UBEE_GROWTH_RULES_VERSION = 'tier-rules-v1-20260916';
 
 const UBEE_GROWTH_COLLECTIONS = Object.freeze({
@@ -145,6 +145,19 @@ function growthOrderCompletedAtMs(order = {}) {
   return 0;
 }
 
+function isGrowthValidCompletedOrder(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  if (!['completed','done'].includes(status)) return false;
+  const paymentStatus = String(order.paymentStatus || order.financePaymentStatus || '').trim().toLowerCase();
+  const riskStatus = String(order.riskStatus || order.fraudStatus || '').trim().toLowerCase();
+  const source = String(order.source || order.orderSource || '').trim().toLowerCase();
+  if (['refunded','refund','void','cancelled','canceled'].includes(paymentStatus)) return false;
+  if (order.growthExcluded === true || order.isAnomalous === true || order.fraudFlag === true || order.deleted === true) return false;
+  if (['fraud','blocked','rejected'].includes(riskStatus)) return false;
+  if (order.isTestOrder === true || order.testOrder === true || source === 'test' || source === 'sandbox') return false;
+  return true;
+}
+
 function normalizeGrowthReferralCode(value) {
   return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
 }
@@ -210,15 +223,77 @@ function getCustomerGrowthTier(completedOrders, validReferrals) {
   return { ...current, next };
 }
 
-function getRiderGrowthQuality(rider = {}) {
+function getRiderGrowthQuality(rider = {}, riderOrders = []) {
   const governance = rider.governance && typeof rider.governance === 'object' ? rider.governance : {};
   const warningCount = Math.max(0, Number(governance.warningCount || 0));
   const violationCount = Math.max(0, Number(governance.violationCount || 0));
+  const complaintCount = Math.max(0, Number(governance.complaintCount || 0));
+  const incompleteReportCount = Math.max(0, Number(governance.incompleteReportCount || 0));
   const lifecycle = String(rider.lifecycleStatus || rider.status || '').trim().toUpperCase();
   const majorViolation = rider.blocked === true || rider.suspended === true || ['RESTRICTED','SUSPENDED','BANNED'].includes(lifecycle);
   const accountEligible = lifecycle === 'ACTIVE';
-  const score = growthClamp(100 - warningCount * 3 - violationCount * 12 - (majorViolation ? 40 : 0));
-  return { score, warningCount, violationCount, majorViolation, accountEligible, lifecycle };
+
+  let completedCount = 0;
+  let cancelledCount = 0;
+  const riderIdentityValues = new Set([
+    String(rider.riderId || '').trim().toLowerCase(),
+    String(rider.id || '').trim().toLowerCase(),
+    String(rider.phone || '').trim().toLowerCase(),
+    String(rider.lineUserId || '').trim().toLowerCase(),
+    'rider','driver','小u','小U'.toLowerCase(),
+  ].filter(Boolean));
+  for (const order of Array.isArray(riderOrders) ? riderOrders : []) {
+    const status = String(order?.status || '').trim().toLowerCase();
+    if (status === 'completed' || status === 'done') completedCount += 1;
+    if (['cancelled','canceled'].includes(status)) {
+      const cancelledBy = String(order?.cancelledBy || order?.canceledBy || '').trim().toLowerCase();
+      const cancelType = String(order?.cancelType || order?.cancelReasonType || '').trim().toLowerCase();
+      if (riderIdentityValues.has(cancelledBy) || cancelType.includes('rider') || cancelType.includes('driver')) {
+        cancelledCount += 1;
+      }
+    }
+  }
+  const handledCount = completedCount + cancelledCount;
+  const completionRate = handledCount > 0 ? (completedCount / handledCount) * 100 : 100;
+  const cancellationRate = handledCount > 0 ? (cancelledCount / handledCount) * 100 : 0;
+
+  // V1.3：品質分數改為五維模型。只使用目前系統已有或明確記錄的資料；
+  // 沒有紀錄的欄位不憑空推測客訴或回報缺失。
+  const fulfillmentStability = growthClamp(completionRate);
+  const cancellationControl = growthClamp(100 - cancellationRate * 2);
+  const taskReporting = growthClamp(100 - incompleteReportCount * 8);
+  const serviceRecord = growthClamp(100 - warningCount * 5 - complaintCount * 10);
+  const complianceRecord = growthClamp(100 - violationCount * 20 - (majorViolation ? 60 : 0));
+  const score = growthClamp(
+    fulfillmentStability * 0.30 +
+    cancellationControl * 0.20 +
+    taskReporting * 0.15 +
+    serviceRecord * 0.15 +
+    complianceRecord * 0.20
+  );
+
+  return {
+    score,
+    warningCount,
+    violationCount,
+    complaintCount,
+    incompleteReportCount,
+    majorViolation,
+    accountEligible,
+    lifecycle,
+    completedCount,
+    cancelledCount,
+    handledCount,
+    completionRate:growthClamp(completionRate),
+    cancellationRate:growthClamp(cancellationRate),
+    dimensions:{
+      fulfillmentStability,
+      cancellationControl,
+      taskReporting,
+      serviceRecord,
+      complianceRecord,
+    },
+  };
 }
 
 function getRiderGrowthTier(completedOrders, quality) {
@@ -235,10 +310,11 @@ function getRiderGrowthTier(completedOrders, quality) {
 }
 
 function buildRiderGrowthActivity(completedOrders = [], nowMs = Date.now()) {
+  const cutoff7 = nowMs - 7 * 86400000;
   const cutoff30 = nowMs - 30 * 86400000;
   const cutoff60 = nowMs - 60 * 86400000;
   const cutoff90 = nowMs - 90 * 86400000;
-  let d30 = 0, d60 = 0, d90 = 0, lastCompletedAtMs = 0;
+  let d7 = 0, d30 = 0, d60 = 0, d90 = 0, lastCompletedAtMs = 0;
   for (const order of completedOrders) {
     const ms = growthOrderCompletedAtMs(order);
     if (!ms) continue;
@@ -246,10 +322,11 @@ function buildRiderGrowthActivity(completedOrders = [], nowMs = Date.now()) {
     if (ms >= cutoff90) d90 += 1;
     if (ms >= cutoff60) d60 += 1;
     if (ms >= cutoff30) d30 += 1;
+    if (ms >= cutoff7) d7 += 1;
   }
-  const score = growthClamp((d30 / 10) * 100);
-  const label = d30 >= 10 ? '高度活躍' : d30 >= 5 ? '穩定活躍' : d30 >= 1 ? '近期活躍' : '近期較少接單';
-  return { score, label, completed30d:d30, completed60d:d60, completed90d:d90, lastCompletedAtMs };
+  const statusKey = d30 >= 30 ? 'HIGH' : d30 >= 10 ? 'STABLE' : d30 >= 1 ? 'RECENT' : 'LOW';
+  const label = statusKey === 'HIGH' ? '高度活躍' : statusKey === 'STABLE' ? '穩定活躍' : statusKey === 'RECENT' ? '近期活躍' : '近期較少接單';
+  return { statusKey, label, completed7d:d7, completed30d:d30, completed60d:d60, completed90d:d90, lastCompletedAtMs };
 }
 
 
@@ -341,9 +418,9 @@ function getRiderTierBenefits(tierKey = 'NEW') {
   return benefits[String(tierKey || 'NEW')] || benefits.NEW;
 }
 
-function buildRiderGrowthSummary({ rider = {}, completedOrders = [], growthProfile = {}, nowMs = Date.now() } = {}) {
+function buildRiderGrowthSummary({ rider = {}, riderOrders = [], completedOrders = [], growthProfile = {}, nowMs = Date.now() } = {}) {
   const completed = completedOrders.length;
-  const quality = getRiderGrowthQuality(rider);
+  const quality = getRiderGrowthQuality(rider, riderOrders);
   const candidateTier = getRiderGrowthTier(completed, quality);
   const historicalKey = String(growthProfile.highestTier || '');
   const historicalIndex = UBEE_RIDER_TIER_RULES.findIndex(rule => rule.key === historicalKey);
@@ -366,7 +443,7 @@ function buildRiderGrowthSummary({ rider = {}, completedOrders = [], growthProfi
   return {
     version:UBEE_GROWTH_VERSION,
     rulesVersion:UBEE_GROWTH_RULES_VERSION,
-    tier:{ key:tier.key, label:tier.label, minOrders:tier.minOrders, highestTier:String(growthProfile.highestTier || tier.key) },
+    tier:{ key:tier.key, label:tier.label, minOrders:tier.minOrders, minQuality:tier.minQuality, highestTier:String(growthProfile.highestTier || tier.key) },
     nextTier:next ? { key:next.key, label:next.label, minOrders:next.minOrders, minQuality:next.minQuality, remainingOrders:Math.max(0,next.minOrders-completed), progressPercent:growthClamp((progressBase/progressSpan)*100) } : null,
     completedOrders:completed,
     activity,
@@ -381,6 +458,21 @@ function buildRiderGrowthSummary({ rider = {}, completedOrders = [], growthProfi
     ordinaryOrderFairnessText:'一般訂單維持公平，不因牌級或活躍度提前顯示。',
     calculatedAtMs:nowMs,
   };
+}
+
+function buildGrowthTierHistoryReason(ownerType, growthSummary = {}) {
+  const tierKey = String(growthSummary?.tier?.key || '');
+  const completedOrders = Math.max(0, Number(growthSummary?.completedOrders || 0));
+  if (ownerType === 'customer') {
+    const validReferrals = Math.max(0, Number(growthSummary?.validReferrals || 0));
+    if (tierKey === 'GOLD') return '完成第一筆有效訂單';
+    if (tierKey === 'BRONZE') return `達成 ${validReferrals} 位有效推薦好友`;
+    return `累積完成 ${completedOrders} 筆有效訂單`;
+  }
+  const minQuality = Math.max(0, Number(growthSummary?.tier?.minQuality || 0));
+  return minQuality > 0
+    ? `累積 ${completedOrders} 筆有效履約，品質 ${Math.max(0,Number(growthSummary?.quality?.score || 0))} 分`
+    : `累積完成 ${completedOrders} 筆有效履約`;
 }
 
 async function syncGrowthTierHistory(ownerType, ownerId, growthSummary) {
@@ -408,10 +500,38 @@ async function syncGrowthTierHistory(ownerType, ownerId, growthSummary) {
         ownerType, ownerId:String(ownerId || ''), fromTier:oldTier || '', toTier:newTier,
         toTierLabel:String(growthSummary?.tier?.label || newTier),
         completedOrders:Number(growthSummary.completedOrders || 0),
+        validReferrals:Number(growthSummary?.validReferrals || 0),
+        qualityScore:Number(growthSummary?.quality?.score || 0),
+        reasonText:buildGrowthTierHistoryReason(ownerType, growthSummary),
         rulesVersion:UBEE_GROWTH_RULES_VERSION, createdAtMs:nowMs,
         createdAt:admin.firestore.FieldValue.serverTimestamp(),
       });
     }
+  });
+}
+
+async function markGrowthReferralProgress(refereeType, refereeId, status, extra = {}) {
+  const safeType = String(refereeType || '').trim();
+  const safeId = String(refereeId || '').trim();
+  const safeStatus = String(status || '').trim().toLowerCase();
+  if (!['customer','rider'].includes(safeType) || !safeId || !safeStatus) return { updated:false };
+  const ranks = { registered:0, application_review:1, approved:2, active:3, order_created:1, order_progress:4, qualified:9 };
+  const ref = db.collection(UBEE_GROWTH_COLLECTIONS.referrals).doc(`${safeType}_${safeId}`);
+  return db.runTransaction(async tx => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) return { updated:false, reason:'no_referral' };
+    const current = doc.data() || {};
+    if (String(current.status || '') === 'qualified') return { updated:false, reason:'already_qualified' };
+    const oldRank = ranks[String(current.status || 'registered')] ?? 0;
+    const newRank = ranks[safeStatus] ?? 0;
+    if (newRank < oldRank) return { updated:false, reason:'older_stage' };
+    tx.set(ref, {
+      status:safeStatus,
+      ...extra,
+      updatedAtMs:Date.now(),
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    return { updated:true };
   });
 }
 
@@ -446,8 +566,7 @@ async function qualifyGrowthReferral(refereeType, refereeId, reason = {}) {
 }
 
 async function processUBeeGrowthCompletedOrder(order = {}) {
-  const status = String(order.status || '').trim().toLowerCase();
-  if (!['completed','done'].includes(status)) return;
+  if (!isGrowthValidCompletedOrder(order)) return;
   const orderId = String(order.id || order.orderId || '').trim();
   const customerId = String(order.userId || order.customerId || '').trim();
   if (customerId) {
@@ -5606,7 +5725,7 @@ app.get('/api/customer/growth', requireCustomerAuth, async (req, res) => {
     const customerId = req.customerAuth.customerId;
     const account = req.customerAuth.account || {};
     const snapshot = await db.collection('orders').where('userId', '==', customerId).limit(2000).get();
-    const completedOrders = snapshot.docs.filter(doc => ['completed','done'].includes(String(doc.data()?.status || '').trim().toLowerCase()));
+    const completedOrders = snapshot.docs.filter(doc => isGrowthValidCompletedOrder(doc.data() || {}));
     const completedCount = completedOrders.length;
     const completedOrderData = completedOrders.map(doc => ({ id:doc.id, ...(doc.data() || {}) }));
     const monthCompleted = growthCurrentMonthCount(completedOrderData);
@@ -5664,11 +5783,69 @@ app.get('/api/customer/growth/referrals', requireCustomerAuth, async (req, res) 
     const snap = await db.collection(UBEE_GROWTH_COLLECTIONS.referrals).where('referrerId','==',customerId).limit(100).get();
     const referrals = snap.docs.map(doc => {
       const r = doc.data() || {};
-      return { id:doc.id, refereeType:r.refereeType || '', status:r.status || 'registered', city:r.city || '', district:r.district || '', createdAtMs:Number(r.createdAtMs || 0), qualifiedAtMs:Number(r.qualifiedAtMs || 0) };
+      return { id:doc.id, refereeType:r.refereeType || '', status:r.status || 'registered', progressStage:r.status || 'registered', city:r.city || '', district:r.district || '', createdAtMs:Number(r.createdAtMs || 0), qualifiedAtMs:Number(r.qualifiedAtMs || 0), firstOrderCreatedAtMs:Number(r.firstOrderCreatedAtMs || 0) };
     }).sort((a,b)=>b.createdAtMs-a.createdAtMs);
     return res.json({ success:true, referrals });
   } catch (error) {
     return res.status(500).json({ success:false, message:'推薦紀錄讀取失敗。' });
+  }
+});
+
+// UBee Growth Engine V1.3｜小U邀請進度（不回傳被邀請者姓名／電話）
+app.get('/api/rider/growth/referrals', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const { lineUserId, phone, riderId } = req.query || {};
+    const riderResult = await findApprovedRiderForApi({ lineUserId, phone, riderId });
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({ success:false, message:riderResult.message });
+    }
+    const identity = buildRiderApiIdentity(riderResult.riderDoc, riderResult.rider || {}, { lineUserId, phone, riderId });
+    const ownerId = String(identity.riderId || riderResult.riderDoc.id || '').trim();
+    const snap = await db.collection(UBEE_GROWTH_COLLECTIONS.referrals).where('referrerId','==',ownerId).limit(60).get();
+    const rows = await Promise.all(snap.docs.map(async doc => {
+      const r = doc.data() || {};
+      const refereeType = String(r.refereeType || 'customer');
+      const refereeId = String(r.refereeId || '').trim();
+      let status = String(r.status || 'registered');
+      let completedOrders = 0;
+      if (refereeType === 'rider' && refereeId) {
+        const [profileDoc, applicationDoc, officialDoc] = await Promise.all([
+          db.collection(UBEE_GROWTH_COLLECTIONS.profiles).doc(getGrowthProfileId('rider', refereeId)).get().catch(()=>null),
+          db.collection(RIDER_V2_COLLECTIONS.applications).doc(refereeId).get().catch(()=>null),
+          db.collection(RIDER_V2_COLLECTIONS.riders).doc(refereeId).get().catch(()=>null),
+        ]);
+        const profile = profileDoc?.exists ? (profileDoc.data() || {}) : {};
+        const application = applicationDoc?.exists ? (applicationDoc.data() || {}) : {};
+        const official = officialDoc?.exists ? (officialDoc.data() || {}) : {};
+        completedOrders = Math.max(0, Number(profile.completedOrders || official.completedOrders || official.totalCompletedOrders || 0));
+        const lifecycle = String(official.lifecycleStatus || official.status || '').trim().toUpperCase();
+        const applicationStatus = String(application.status || '').trim().toLowerCase();
+        if (status !== 'qualified') {
+          if (completedOrders > 0) status = 'order_progress';
+          else if (lifecycle === 'ACTIVE' || official.canAcceptOrders === true) status = 'active';
+          else if (['approved','training'].includes(applicationStatus)) status = 'approved';
+          else if (applicationStatus) status = 'application_review';
+        }
+      }
+      const token = crypto.createHash('sha256').update(`${refereeType}:${refereeId}`).digest('hex').slice(-4).toUpperCase();
+      return {
+        id:doc.id,
+        refereeType,
+        status,
+        completedOrders:Math.min(3, completedOrders),
+        displayId:`#${token}`,
+        city:String(r.city || ''),
+        district:String(r.district || ''),
+        createdAtMs:Number(r.createdAtMs || 0),
+        qualifiedAtMs:Number(r.qualifiedAtMs || 0),
+      };
+    }));
+    rows.sort((a,b)=>b.createdAtMs-a.createdAtMs);
+    return res.json({ success:true, referrals:rows });
+  } catch (error) {
+    console.error('❌ Rider Growth referral progress failed:', error);
+    return res.status(500).json({ success:false, message:'邀請進度讀取失敗。' });
   }
 });
 
@@ -10255,6 +10432,8 @@ app.get('/api/rider/summary', riderAuthMiddleware, async (req, res) => {
     // ==============================
     // 5. 查詢所有屬於這名騎士的訂單
     // ==============================
+    const riderOrderMap =
+      new Map();
     const completedOrderMap =
       new Map();
 
@@ -10280,12 +10459,7 @@ app.get('/api/rider/summary', riderAuthMiddleware, async (req, res) => {
               .toLowerCase();
 
           const isCompleted =
-            status === 'completed' ||
-            status === 'done';
-
-          if (!isCompleted) {
-            return;
-          }
+            isGrowthValidCompletedOrder(order);
 
           // 再次確認訂單真的屬於這名騎士
           if (
@@ -10311,10 +10485,10 @@ app.get('/api/rider/summary', riderAuthMiddleware, async (req, res) => {
             }
           }
 
-          completedOrderMap.set(
-            doc.id,
-            order
-          );
+          riderOrderMap.set(doc.id, order);
+          if (isCompleted) {
+            completedOrderMap.set(doc.id, order);
+          }
         });
 
       } catch (queryErr) {
@@ -10324,6 +10498,11 @@ app.get('/api/rider/summary', riderAuthMiddleware, async (req, res) => {
         );
       }
     }
+
+    const riderOrders =
+      Array.from(
+        riderOrderMap.values()
+      );
 
     const completedOrders =
       Array.from(
@@ -10556,11 +10735,16 @@ const riderIncome =
       district:rider.residenceDistrict || rider.district || '',
     });
     const { data:riderGrowthProfile } = await loadGrowthProfile('rider', riderGrowthId);
-    const growth = buildRiderGrowthSummary({ rider, completedOrders, growthProfile:riderGrowthProfile, nowMs });
+    const growth = buildRiderGrowthSummary({ rider, riderOrders, completedOrders, growthProfile:riderGrowthProfile, nowMs });
     growth.referralCode = riderReferralCode;
     growth.customerInviteUrl = `${String(process.env.UBEE_CUSTOMER_PUBLIC_BASE_URL || 'https://ubee-line-bot-2-zezw.onrender.com').replace(/\/$/,'')}/order.html?ref=${encodeURIComponent(riderReferralCode)}&source=rider-invite`;
     growth.riderInviteUrl = `${String(process.env.UBEE_RIDER_PUBLIC_BASE_URL || 'https://ubee-rider-web.vercel.app').replace(/\/$/,'')}/rider.html?ref=${encodeURIComponent(riderReferralCode)}&source=rider-invite`;
     await syncGrowthTierHistory('rider', riderGrowthId, growth);
+    const riderGrowthHistorySnap = await db.collection(UBEE_GROWTH_COLLECTIONS.tierHistory).where('ownerId','==',riderGrowthId).limit(30).get();
+    growth.history = riderGrowthHistorySnap.docs
+      .map(doc => ({ id:doc.id, ...(doc.data() || {}) }))
+      .sort((a,b)=>Number(b.createdAtMs||0)-Number(a.createdAtMs||0))
+      .slice(0,20);
 
     // ==============================
     // 8. 回傳正式統計資料
@@ -33546,6 +33730,11 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     Object.assign(order, buildDispatchOrderMetadata(order, Date.now()));
 
     await saveOrder(order);
+
+    await markGrowthReferralProgress('customer', req.customerAuth.customerId, 'order_created', {
+      firstOrderCreatedId:String(order.id || id || ''),
+      firstOrderCreatedAtMs:Date.now(),
+    }).catch(err => console.warn('Growth customer referral progress:', err.message));
 
     logDispatchEvent({
       type:'ORDER_CREATED',
