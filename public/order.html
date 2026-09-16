@@ -3,6 +3,7 @@
 <!-- 2026-09-16｜UBee Growth Engine V1.3 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
+<!-- 2026-09-16｜Customer Account UX V2：會員帳號主頁移除登出／刪除入口；通知偏好改為通知設定；登出與刪除申請下沉至帳號與安全。 -->
 <head>
 <!-- 2026-09-14｜Customer Native System V1.5 / Live Tracking Accept Sync V1：主訂單輪詢直接接收後端安全 tracking 摘要；已接單與 ETA 不再依賴 5 秒備援追蹤才更新；客戶端不需要 riderDocId / riderPhone。 -->
 <!-- 2026-09-11｜Customer Native System V1.4 / Route Pricing V3：刪除舊 base_km_minute 與一般配送時間費顯示；fareMode 以後端正式報價為唯一來源；一般路線費用明細改為單一「路線配送費」，避免起步價／距離費／配送費重複呈現。 -->
@@ -31,7 +32,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260916-native-experience-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260916-customer-account-ux-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18867,11 +18868,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="ubee-account-actions">
 <button data-my-action="editProfile" type="button">編輯會員資料 <span>›</span></button>
 <button data-my-action="changePassword" type="button">修改密碼 <span>›</span></button>
-<button data-my-action="preferences" type="button">通知偏好 <span>›</span></button>
+<button data-my-action="preferences" type="button">通知設定 <span>›</span></button>
 <button data-my-action="security" type="button">帳號與安全 <span>›</span></button>
 <button data-my-action="privacy" type="button">規範與隱私 <span>›</span></button>
-<button data-my-action="logout" type="button">登出帳號 <span>›</span></button>
-<button class="danger-text" data-my-action="deleteAccount" type="button">刪除帳號 <span>›</span></button>
 </div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyCouponsPanel">
@@ -18935,7 +18934,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </form>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyPreferencesPanel">
-<div class="ubee-my-panel-head"><strong>通知偏好</strong><button data-my-close-account="" type="button">上一頁</button></div>
+<div class="ubee-my-panel-head"><strong>通知設定</strong><button data-my-close-account="" type="button">上一頁</button></div>
 <div class="ubee-flat-switches">
 <label><span>任務狀態通知</span><input checked="" disabled="" type="checkbox"/></label>
 <label><span>付款與安全通知</span><input checked="" disabled="" type="checkbox"/></label>
@@ -18950,6 +18949,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <button class="ubee-flat-row" data-my-action="changePassword" type="button">修改登入密碼 <span>›</span></button>
 <button class="ubee-flat-row" data-flat-action="phone-help" type="button">變更手機號碼 <span>›</span></button>
 </div>
+<div class="ubee-account-security-note">登入資訊與重要帳號操作集中在這裡管理。</div>
+<button class="ubee-account-secondary-action" data-settings-action="logout" type="button">登出目前帳號</button>
+<button class="ubee-account-destructive-link" data-my-action="deleteAccount" type="button">申請刪除帳號</button>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyPrivacyPanel">
 <div class="ubee-my-panel-head"><strong>規範與隱私</strong><button data-my-close-account="" type="button">上一頁</button></div>
@@ -18965,9 +18967,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyDeleteAccountPanel">
-<div class="ubee-my-panel-head"><strong>刪除帳號</strong><button data-my-close-account="" type="button">上一頁</button></div>
-<div class="ubee-my-feature-note">刪除帳號會影響訂單與會員資料存取。正式刪除前必須再次確認，並依平台資料保存規範處理。</div>
-<button class="ubee-flat-danger" data-flat-action="confirm-delete" type="button">確認申請刪除帳號</button><div aria-live="polite" class="ubee-flat-status" id="ubeeDeleteAccountStatus"></div>
+<div class="ubee-my-panel-head"><strong>帳號刪除申請</strong><button data-my-close-security="" type="button">上一頁</button></div>
+<div class="ubee-my-feature-note">如不再使用 UBee，可在此提出帳號刪除申請。提交前會再次確認；訂單、付款、爭議或依法需保存的必要紀錄，仍依平台規範處理。</div>
+<button class="ubee-flat-danger" data-flat-action="confirm-delete" type="button">提出帳號刪除申請</button><div aria-live="polite" class="ubee-flat-status" id="ubeeDeleteAccountStatus"></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyFeedbackPanel">
 <div class="ubee-my-panel-head"><strong>意見回饋</strong><button data-my-close="" type="button">關閉</button></div>
@@ -20289,7 +20291,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260916-native-experience-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260916-customer-account-ux-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21221,6 +21223,41 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 #productionOrderFlow .ubee-my-growth-detail-panel .ubee-native-growth-back{min-height:44px;padding:0 4px;font-size:15px}
 #productionOrderFlow .ubee-my-menu-item{min-height:60px}
 #productionOrderFlow .ubee-my-menu-item:active{background:var(--ubee-surface-2)}
+#productionOrderFlow .ubee-account-security-note{
+  margin:4px 2px 18px;
+  color:#8a9097;
+  font-size:12px;
+  font-weight:650;
+  line-height:1.55;
+}
+#productionOrderFlow .ubee-account-secondary-action{
+  width:100%;
+  min-height:48px;
+  margin:0 0 14px;
+  border:1px solid #e4e6e8;
+  border-radius:12px;
+  background:#fff;
+  color:#25282c;
+  font:inherit;
+  font-size:14px;
+  font-weight:800;
+}
+#productionOrderFlow .ubee-account-destructive-link{
+  display:block;
+  min-height:44px;
+  margin:26px auto 6px;
+  padding:8px 14px;
+  border:0;
+  background:transparent;
+  color:#8a9097;
+  font:inherit;
+  font-size:12px;
+  font-weight:750;
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
+#productionOrderFlow .ubee-account-secondary-action:active{background:#f5f6f7;}
+#productionOrderFlow .ubee-account-destructive-link:active{color:#c62828;}
 @media(max-width:380px){#productionOrderFlow .ubee-my-member-card{padding-left:14px;padding-right:14px}#productionOrderFlow .ubee-my-menu-copy small{font-size:11px}}
 </style>
 <script id="ubee-app-settings-controller">
@@ -22110,6 +22147,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       hapticPulse();
     }
 
+    const closeSecurityButton = event.target.closest('#productionOrderFlow [data-my-close-security]');
+    if(closeSecurityButton){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openMySection('security');
+      return;
+    }
+
     const closeAccountButton = event.target.closest('#productionOrderFlow [data-my-close-account]');
     if(closeAccountButton){
       event.preventDefault();
@@ -22141,7 +22186,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           marketing:Boolean(document.getElementById('ubeePrefMarketing')?.checked)
         }));
         const status = document.getElementById('ubeePreferencesStatus');
-        if(status) status.textContent = '通知偏好已儲存。';
+        if(status) status.textContent = '通知設定已儲存。';
         return;
       }
 
