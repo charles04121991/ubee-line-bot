@@ -1,4 +1,4 @@
-/* 2026-09-16｜Growth Engine V1.6 Usability：雙端易用性、成長導航與快取升版。 */
+/* 2026-09-16｜Growth Engine V1.7 Native Usability：雙端版面整理、返回層級修正與快取升版。 */
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
@@ -35,7 +35,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.16.5-growth-engine-v1-6-usability';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.16.6-growth-engine-v1-7-native-usability';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
