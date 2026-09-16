@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-16｜UBee Native Experience V2：Release Sync／Cold Launch Only Splash／Navigation Stack／VisualViewport Keyboard／Customer SW Isolation。 -->
 <!-- 2026-09-16｜UBee Growth Engine V1.3 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
@@ -30,7 +31,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260914-customer-native-system-v1-5-live-tracking-accept-sync-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260916-native-experience-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6316,15 +6317,12 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
   if(!startup) return;
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  const INITIAL_VISIBLE_MS = 1900;
-  const RESUME_VISIBLE_MS = 1350;
-  const INITIAL_PAINT_DELAY_MS = 260;
-  const RESUME_PAINT_DELAY_MS = 90;
-  const LEAVE_MS = 250;
-  const RESUME_THRESHOLD_MS = 2500;
+  // Native Experience V2：只在真正冷啟動播放 HTML Splash；回前景直接恢復原畫面。
+  const INITIAL_VISIBLE_MS = 650;
+  const INITIAL_PAINT_DELAY_MS = 100;
+  const LEAVE_MS = 180;
 
   let playToken = 0;
-  let hiddenAt = 0;
   let initialStarted = false;
   let homeReadySent = false;
 
@@ -6378,7 +6376,7 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
     },LEAVE_MS);
   };
 
-  const playAfterRealPaint = ({resume = false} = {}) => {
+  const playAfterRealPaint = () => {
     const token = ++playToken;
     showStartupImmediately();
 
@@ -6395,10 +6393,9 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
           void startup.offsetWidth;
           startup.classList.add('is-playing');
 
-          const visibleMs = resume ? RESUME_VISIBLE_MS : INITIAL_VISIBLE_MS;
-          window.setTimeout(()=>hideStartup(token),visibleMs);
-          window.setTimeout(()=>hideStartup(token),visibleMs + 1200);
-        },resume ? RESUME_PAINT_DELAY_MS : INITIAL_PAINT_DELAY_MS);
+          window.setTimeout(()=>hideStartup(token),INITIAL_VISIBLE_MS);
+          window.setTimeout(()=>hideStartup(token),INITIAL_VISIBLE_MS + 900);
+        },INITIAL_PAINT_DELAY_MS);
       });
     });
   };
@@ -6406,7 +6403,7 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
   const startInitialAnimation = () => {
     if(initialStarted) return;
     initialStarted = true;
-    playAfterRealPaint({resume:false});
+    playAfterRealPaint();
   };
 
   /* Logo 先靜態可見；DOM 完成後才正式播放與開始計時。 */
@@ -6421,27 +6418,8 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
   /* 極端情況保護：DOMContentLoaded 若未被接收到，仍會啟動。 */
   window.setTimeout(startInitialAnimation,4500);
 
-  window.ubeePlayStartupAnimation = () => playAfterRealPaint({resume:true});
-
-  document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState === 'hidden'){
-      hiddenAt = Date.now();
-      return;
-    }
-
-    if(
-      document.visibilityState === 'visible' &&
-      hiddenAt &&
-      Date.now() - hiddenAt >= RESUME_THRESHOLD_MS
-    ){
-      hiddenAt = 0;
-      playAfterRealPaint({resume:true});
-    }
-  });
-
-  window.addEventListener('pageshow',event=>{
-    if(event.persisted) playAfterRealPaint({resume:true});
-  });
+  // 保留相容 API，但 Resume 不再播放 Splash。
+  window.ubeePlayStartupAnimation = () => false;
 })();
 </script>
 <script id="ubee-line-official-support-controller">
@@ -20311,7 +20289,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260914-customer-native-system-v1-5-live-tracking-accept-sync-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260916-native-experience-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21621,7 +21599,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       const historyHtml=history.length?history.map(item=>`<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>晉升${growthEsc(item.toTierLabel||item.toTier||'會員階級')}</strong><small>${growthEsc(item.reasonText||`累積 ${Number(item.completedOrders||0).toLocaleString('zh-TW')} 筆有效訂單`)}</small><small class="ubee-native-growth-history-date">${growthEsc(formatCustomerGrowthDate(item.createdAtMs)||'歷史紀錄')}</small></span><span class="ubee-native-growth-row-side">已達成</span></div>`).join(''):'<div class="ubee-native-growth-row ubee-native-growth-history-row"><span class="ubee-native-growth-history-dot"></span><span class="ubee-native-growth-row-main"><strong>加入 UBee</strong><small>成長歷程從這裡開始</small></span><span class="ubee-native-growth-row-side">已建立</span></div>';
       target.innerHTML=back+`<section class="ubee-native-growth-list">${historyHtml}</section>`;
     }
-    target.querySelector('[data-growth-detail-back]')?.addEventListener('click',()=>closeMySubPages());
+    target.querySelector('[data-growth-detail-back]')?.addEventListener('click',()=>{
+      if(window.UBeeCustomerNavigation?.backOrFallback){
+        window.UBeeCustomerNavigation.backOrFallback(()=>closeMySubPages());
+      }else{
+        closeMySubPages();
+      }
+    });
   }
 
 
@@ -21703,7 +21687,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }
   }
 
-  async function openMyGrowthDetail(type){
+  async function openMyGrowthDetail(type,options={}){
     const detail=safeText(type).toLowerCase();
     if(!['benefits','tasks','achievements','history'].includes(detail))return false;
     if(!getCurrentCustomerSafe()){
@@ -21725,6 +21709,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const target=document.getElementById('ubeeMyGrowthContent');
     if(target)target.innerHTML='<div class="ubee-my-empty-state">正在讀取會員資料…</div>';
     requestAnimationFrame(()=>panel.classList.add('is-open'));
+    if(!options.fromHistory){
+      window.UBeeCustomerNavigation?.pushGrowthDetail?.(detail);
+    }
     try{
       const data=await loadCustomerGrowth();
       renderMyMemberCard(data?.growth||{});
@@ -21735,7 +21722,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     return true;
   }
 
-  function openMySection(action){
+  function openMySection(action,options={}){
     const normalized = safeText(action).toLowerCase();
     if(normalized === 'orders'){
       if(window.UBeePrimaryNavigation?.open){
@@ -21780,6 +21767,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
     if(normalized === 'settings'){
       refreshEnvironmentStatus();
+    }
+
+    if(!options.fromHistory){
+      window.UBeeCustomerNavigation?.pushMySection?.(normalized);
     }
 
     return true;
@@ -22088,9 +22079,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function closeWithHistory(){
+    if(window.UBeeCustomerNavigation?.backOrFallback){
+      return window.UBeeCustomerNavigation.backOrFallback(()=>returnToMyRoot());
+    }
     returnToMyRoot();
+    return true;
   }
 
+  window.closeUBeeMySubPages = closeMySubPages;
+  window.openUBeeMyGrowthDetail = openMyGrowthDetail;
   window.openUBeeMySection = openMySection;
   window.openUBeeTaskPage = openTaskPage;
   window.showTasksTab = openTaskPage;
@@ -24329,6 +24326,177 @@ body.ubee-store-active #productionOrderFlow{
 
 
 
+<style id="ubee-native-experience-v2-keyboard-style">
+:root{
+  --ubee-visual-viewport-height:100dvh;
+  --ubee-visual-viewport-offset-top:0px;
+  --ubee-keyboard-height:0px;
+}
+body.ubee-keyboard-open > #ubeePersistentBottomNav{
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+  transform:translateY(100%)!important;
+}
+body.ubee-keyboard-open #productionOrderFlow .flow-page,
+body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
+  inset-bottom:0!important;
+}
+body.ubee-keyboard-open #productionOrderFlow .flow-shell,
+body.ubee-keyboard-open #ubeeCustomerAuthRoot .uca-shell{
+  height:var(--ubee-visual-viewport-height)!important;
+  max-height:var(--ubee-visual-viewport-height)!important;
+}
+body.ubee-keyboard-open #productionOrderFlow .flow-scroll,
+body.ubee-keyboard-open #productionOrderFlow .flow-home-scroll,
+body.ubee-keyboard-open #productionOrderFlow .ubee-my-scroll,
+body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
+  scroll-padding-bottom:calc(var(--ubee-keyboard-height) + 24px)!important;
+}
+</style>
+<script id="ubee-customer-navigation-stack-v2">
+(()=>{
+  'use strict';
+  if(window.__UBEE_CUSTOMER_NAVIGATION_STACK_V2__) return;
+  window.__UBEE_CUSTOMER_NAVIGATION_STACK_V2__=true;
+
+  const STATE_KEY='ubeeCustomerNavigationV2';
+  const PRIMARY=new Set(['home','task','store','my']);
+  const MY_SECTIONS=new Set(['account','rewards','settings','feedback','privacy']);
+  const GROWTH_DETAILS=new Set(['benefits','tasks','achievements','history']);
+  let applying=false;
+
+  const normalizePrimary=value=>PRIMARY.has(String(value||'').toLowerCase())?String(value).toLowerCase():'home';
+  const currentPrimary=()=>normalizePrimary(window.UBeePrimaryNavigation?.getCurrent?.()||document.body?.dataset.ubeePrimaryNav||'home');
+  const getState=()=>history.state?.[STATE_KEY]||null;
+  const wrap=route=>({...(history.state||{}),[STATE_KEY]:{primary:normalizePrimary(route.primary),sub:route.sub||'',detail:route.detail||'',ts:Date.now()}});
+  const same=(a,b)=>Boolean(a&&b&&a.primary===b.primary&&(a.sub||'')===(b.sub||'')&&(a.detail||'')===(b.detail||''));
+
+  function pushRoute(route,{replace=false}={}){
+    if(applying) return false;
+    const normalized={primary:normalizePrimary(route.primary),sub:String(route.sub||''),detail:String(route.detail||'')};
+    const current=getState();
+    if(same(current,normalized)) return false;
+    const method=replace?'replaceState':'pushState';
+    history[method](wrap(normalized),'',location.href);
+    return true;
+  }
+
+  async function applyRoute(route){
+    if(!route) return false;
+    applying=true;
+    try{
+      const primary=normalizePrimary(route.primary);
+      if(window.UBeePrimaryNavigation?.open){
+        await window.UBeePrimaryNavigation.open(primary,{source:'history',skipHistory:true});
+      }
+      if(primary!=='my') return true;
+
+      if(route.detail&&GROWTH_DETAILS.has(route.detail)){
+        await window.openUBeeMyGrowthDetail?.(route.detail,{fromHistory:true});
+        return true;
+      }
+      if(route.sub&&MY_SECTIONS.has(route.sub)){
+        window.openUBeeMySection?.(route.sub,{fromHistory:true});
+        return true;
+      }
+      window.closeUBeeMySubPages?.();
+      return true;
+    }finally{
+      applying=false;
+    }
+  }
+
+  function backOrFallback(fallback){
+    const state=getState();
+    if(state&&(state.sub||state.detail)){
+      history.back();
+      return true;
+    }
+    if(typeof fallback==='function') fallback();
+    return false;
+  }
+
+  window.UBeeCustomerNavigation=Object.freeze({
+    pushPrimary(primary){return pushRoute({primary});},
+    pushMySection(sub){return pushRoute({primary:'my',sub});},
+    pushGrowthDetail(detail){return pushRoute({primary:'my',sub:'growth',detail});},
+    backOrFallback,
+    isApplying:()=>applying,
+    getState
+  });
+
+  window.addEventListener('popstate',event=>{
+    const route=event.state?.[STATE_KEY];
+    if(route) applyRoute(route);
+  });
+
+  const establishInitialState=()=>{
+    const existing=getState();
+    if(existing) return;
+    history.replaceState(wrap({primary:currentPrimary()}),'',location.href);
+  };
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>setTimeout(establishInitialState,80),{once:true});
+  }else{
+    setTimeout(establishInitialState,80);
+  }
+})();
+</script>
+<script id="ubee-customer-visual-viewport-v2">
+(()=>{
+  'use strict';
+  if(window.__UBEE_CUSTOMER_VISUAL_VIEWPORT_V2__) return;
+  window.__UBEE_CUSTOMER_VISUAL_VIEWPORT_V2__=true;
+
+  const root=document.documentElement;
+  const vv=window.visualViewport;
+  let lastKeyboardOpen=false;
+  let focusTimer=0;
+
+  function syncViewport(){
+    const height=vv?.height||window.innerHeight||0;
+    const offsetTop=vv?.offsetTop||0;
+    const layoutHeight=window.innerHeight||height;
+    const keyboardHeight=Math.max(0,Math.round(layoutHeight-height-offsetTop));
+    const keyboardOpen=keyboardHeight>120;
+
+    root.style.setProperty('--ubee-visual-viewport-height',`${Math.round(height)}px`);
+    root.style.setProperty('--ubee-visual-viewport-offset-top',`${Math.round(offsetTop)}px`);
+    root.style.setProperty('--ubee-keyboard-height',`${keyboardHeight}px`);
+    document.body?.classList.toggle('ubee-keyboard-open',keyboardOpen);
+
+    if(keyboardOpen&&!lastKeyboardOpen){
+      const active=document.activeElement;
+      if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)){
+        clearTimeout(focusTimer);
+        focusTimer=setTimeout(()=>{
+          try{active.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'});}catch(_){}
+        },90);
+      }
+    }
+    lastKeyboardOpen=keyboardOpen;
+  }
+
+  vv?.addEventListener('resize',syncViewport,{passive:true});
+  vv?.addEventListener('scroll',syncViewport,{passive:true});
+  window.addEventListener('resize',syncViewport,{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(syncViewport,120),{passive:true});
+  window.addEventListener('pageshow',syncViewport,{passive:true});
+  document.addEventListener('focusin',event=>{
+    if(!/^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName||'')) return;
+    clearTimeout(focusTimer);
+    focusTimer=setTimeout(()=>{
+      syncViewport();
+      try{event.target.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'});}catch(_){}
+    },120);
+  });
+  document.addEventListener('focusout',()=>setTimeout(syncViewport,120));
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',syncViewport,{once:true});
+  else syncViewport();
+})();
+</script>
 <script id="ubee-bottom-navigation-controller-v29">
 (() => {
   'use strict';
@@ -24373,7 +24541,10 @@ body.ubee-store-active #productionOrderFlow{
 
   async function navigate(target,options={}){
     target=normalizeTarget(target);
-    if(options.source!=='initial-url') userHasNavigated=true;
+    if(options.source!=='initial-url'&&options.source!=='history') userHasNavigated=true;
+    if(!options.skipHistory&&options.source!=='initial-url'&&options.source!=='history'){
+      window.UBeeCustomerNavigation?.pushPrimary?.(target);
+    }
     const token=++navigationToken;
     cancelPendingNavigation(target);
     setActive(target);
