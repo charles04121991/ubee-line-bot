@@ -1,4 +1,4 @@
-// 2026-09-16｜UBee Growth Engine V1.6：修正終身履約計數、品質樣本、資格分離與雙端易用性。
+// 2026-09-16｜UBee Growth Engine V1.7：雙端 Native Usability 整理；後端規則沿用 V1.6，Release 版本同步升級。
 // 2026-09-16｜UBee Growth Engine V1：刪除 Rider Activity V1 優先派單資格／延遲概念；建立雙體系階級、推薦碼、有效推薦、成長歷程、活躍度／品質／成長貢獻分離模型。
 // 2026-09-14｜Customer Live Tracking V1.1 / Accept Sync Fix：客戶主訂單 API 直接回傳安全 tracking 摘要；小U接單後立即背景計算 Customer Live ETA，不再依賴下一次 GPS 才建立第一輪 ETA。
 // 2026-09-11｜Route Pricing V3 / Rider Income Canonical V3：刪除一般配送舊 base+全里程+導航時間+8km長距離加價公式；改為 NT$80 含3km、超出每km NT$12，並加入 8km=NT$98、14km=NT$250 小U路線收入保障。新訂單收入只信任後端 canonical riderIncome。
@@ -78,7 +78,7 @@ const RIDER_V2_COLLECTIONS = Object.freeze({
 // - 牌級（長期成就）、活躍度（近期）、服務品質、成長貢獻四維分離。
 // - 所有階級由後端判定，前端只顯示結果。
 // =====================================================
-const UBEE_GROWTH_VERSION = 'growth-engine-v1.6';
+const UBEE_GROWTH_VERSION = 'growth-engine-v1.7';
 const UBEE_GROWTH_COUNTER_VERSION = 1;
 const UBEE_RIDER_QUALITY_RULE = Object.freeze({ minimumSampleOrders:20, highTierMinimumScore:90 });
 const UBEE_GROWTH_RULES_VERSION = 'tier-rules-v1-20260916';
