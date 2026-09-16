@@ -1,6 +1,7 @@
 /*
  * ============================================================
  * UBee 跑腿｜用戶端 Service Worker
+ * 2026-09-16 Growth Engine V1：同步我的 UBee／會員階級／邀請好友，並清除舊 Customer Cache。
  * 2026-09-14 Customer Native System V1.5 / Live Tracking Accept Sync V1：同步新版 order.html 主輪詢 tracking 摘要與接單即時 UI；升版後清除舊 Customer Cache。
  * 2026-09-11 Customer Native System V1.4 / Route Pricing V3：同步新版 order.html，移除舊一般配送時間費／重複費用明細並切換正式 fareMode；升版後清除舊 Customer Cache。
  * 2026-09-09 Customer Native System V1.3 / Live ETA V1：修復 Active Task ETA 狀態面板並切換至後端 traffic-aware ETA；升版後清除舊 Customer Cache。
@@ -33,7 +34,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '2026.09.14.6-customer-native-v1-5-live-tracking-accept-sync-v1';
+const UBEE_CUSTOMER_SW_VERSION = '2026.09.16.1-growth-engine-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
