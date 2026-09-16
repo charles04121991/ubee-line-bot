@@ -77,7 +77,7 @@ const RIDER_V2_COLLECTIONS = Object.freeze({
 // - 牌級（長期成就）、活躍度（近期）、服務品質、成長貢獻四維分離。
 // - 所有階級由後端判定，前端只顯示結果。
 // =====================================================
-const UBEE_GROWTH_VERSION = 'growth-engine-v1';
+const UBEE_GROWTH_VERSION = 'growth-engine-v1.2';
 const UBEE_GROWTH_RULES_VERSION = 'tier-rules-v1-20260916';
 
 const UBEE_GROWTH_COLLECTIONS = Object.freeze({
@@ -252,6 +252,95 @@ function buildRiderGrowthActivity(completedOrders = [], nowMs = Date.now()) {
   return { score, label, completed30d:d30, completed60d:d60, completed90d:d90, lastCompletedAtMs };
 }
 
+
+function growthCurrentMonthCount(completedOrders = [], nowMs = Date.now()) {
+  const now = new Date(nowMs);
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+  return completedOrders.reduce((count, order) => {
+    const ms = growthOrderCompletedAtMs(order);
+    return count + (ms >= start && ms < end ? 1 : 0);
+  }, 0);
+}
+
+function buildCustomerGrowthTasks({ completedOrders = 0, monthCompleted = 0, validReferrals = 0 } = {}) {
+  const nextOrderMilestone = [10,25,50,75,100,150,300,600].find(value => completedOrders < value) || 600;
+  const nextReferralMilestone = [1,3,5,10,20,30].find(value => validReferrals < value) || 30;
+  return [
+    { key:'MONTH_3', title:'本月完成 3 筆任務', progress:Math.min(monthCompleted,3), target:3, completed:monthCompleted>=3, rewardText:'月度成長紀錄' },
+    { key:'MONTH_5', title:'本月完成 5 筆任務', progress:Math.min(monthCompleted,5), target:5, completed:monthCompleted>=5, rewardText:'活躍里程碑' },
+    { key:'ORDER_MILESTONE', title:`累積完成 ${nextOrderMilestone} 筆任務`, progress:Math.min(completedOrders,nextOrderMilestone), target:nextOrderMilestone, completed:completedOrders>=nextOrderMilestone, rewardText:'訂單里程碑' },
+    { key:'REFERRAL_MILESTONE', title:`累積 ${nextReferralMilestone} 位有效推薦`, progress:Math.min(validReferrals,nextReferralMilestone), target:nextReferralMilestone, completed:validReferrals>=nextReferralMilestone, rewardText:'推薦里程碑' },
+  ];
+}
+
+function buildCustomerGrowthAchievements(completedOrders = 0, validReferrals = 0) {
+  const definitions = [
+    ['FIRST_ORDER','初次相遇','完成第一筆 UBee 任務',completedOrders>=1],
+    ['TEN_ORDERS','熟客報到','累積完成 10 筆有效訂單',completedOrders>=10],
+    ['THIRTY_REFERRALS','銅牌推手','30 位有效推薦好友',validReferrals>=30],
+    ['FIFTY_ORDERS','五十次同行','累積完成 50 筆有效訂單',completedOrders>=50],
+    ['HUNDRED_ORDERS','百單會員','累積完成 100 筆有效訂單',completedOrders>=100],
+    ['THREE_HUNDRED','長期夥伴','累積完成 300 筆有效訂單',completedOrders>=300],
+    ['SIX_HUNDRED','白金里程碑','累積完成 600 筆有效訂單',completedOrders>=600],
+  ];
+  return definitions.map(([key,title,description,unlocked]) => ({ key,title,description,unlocked:Boolean(unlocked) }));
+}
+
+function getCustomerTierBenefits(tierKey = 'GENERAL') {
+  const benefits = {
+    GENERAL:['UBee 會員身份','使用邀請好友功能'],
+    GOLD:['黃金會員身份','會員成長紀錄','成長任務資格'],
+    BRONZE:['銅牌會員身份','成就徽章與會員活動資格','城市成長紀錄'],
+    SILVER:['銀牌會員身份','銀牌以上限定活動資格','新功能優先體驗資格'],
+    WHITE_SILVER:['白銀會員身份','進階會員活動資格','限定任務與活動資格'],
+    GOLD_HIGH:['金牌會員身份','高階會員活動資格','部分新服務預覽資格'],
+    PLATINUM:['白金會員身份','白金限定活動與權益資格','核心用戶測試與意見計畫資格'],
+  };
+  return benefits[String(tierKey || 'GENERAL')] || benefits.GENERAL;
+}
+
+function buildRiderGrowthTasks({ completedOrders = 0, monthCompleted = 0, qualityScore = 0, nextTier = null } = {}) {
+  const nextTarget = Number(nextTier?.minOrders || completedOrders || 1);
+  const nextQuality = Number(nextTier?.minQuality || 0);
+  return [
+    { key:'MONTH_10', title:'本月完成 10 筆任務', progress:Math.min(monthCompleted,10), target:10, completed:monthCompleted>=10, rewardText:'月度活躍里程碑' },
+    { key:'MONTH_30', title:'本月完成 30 筆任務', progress:Math.min(monthCompleted,30), target:30, completed:monthCompleted>=30, rewardText:'穩定履約里程碑' },
+    { key:'NEXT_TIER', title:nextTier?`朝 ${nextTier.label} 前進`:'維持最高牌級紀錄', progress:nextTier?Math.min(completedOrders,nextTarget):1, target:nextTier?nextTarget:1, completed:!nextTier || completedOrders>=nextTarget, rewardText:nextTier?'牌級晉升條件':'最高牌級' },
+    { key:'QUALITY', title:nextQuality>0?`服務品質維持 ${nextQuality} 分以上`:'維持良好服務品質', progress:Math.min(qualityScore,nextQuality||100), target:nextQuality||100, completed:qualityScore>=(nextQuality||90), rewardText:'高階品質資格' },
+  ];
+}
+
+function buildRiderGrowthAchievements(completedOrders = 0, qualityScore = 0, contribution = {}) {
+  const totalReferrals = Number(contribution.validCustomerReferrals || 0) + Number(contribution.validRiderReferrals || 0);
+  const definitions = [
+    ['PARTNER','正式夥伴','完成 3 筆有效履約',completedOrders>=3],
+    ['THIRTY','三十單里程碑','累積完成 30 筆有效履約',completedOrders>=30],
+    ['HUNDRED','百單小U','累積完成 100 筆有效履約',completedOrders>=100],
+    ['THREE_HUNDRED','銀牌里程碑','累積完成 300 筆有效履約',completedOrders>=300],
+    ['THOUSAND','千單紀錄','累積完成 1,000 筆有效履約',completedOrders>=1000],
+    ['QUALITY_95','品質守護','服務品質達 95 分以上',qualityScore>=95],
+    ['GROWTH_10','城市成長夥伴','累積帶來 10 位有效新客或新小U',totalReferrals>=10],
+    ['FIVE_THOUSAND','鑽石里程碑','累積完成 5,000 筆有效履約',completedOrders>=5000],
+  ];
+  return definitions.map(([key,title,description,unlocked]) => ({ key,title,description,unlocked:Boolean(unlocked) }));
+}
+
+function getRiderTierBenefits(tierKey = 'NEW') {
+  const benefits = {
+    NEW:['完成資格流程後開始累積小U成長紀錄'],
+    PARTNER:['正式小U夥伴身份','基本接單資格依既有資格鏈判定'],
+    GOLD:['黃金小U身份','個人成長與履約紀錄'],
+    BRONZE:['銅牌小U認證','成長任務與區域成長紀錄資格'],
+    SILVER:['銀牌小U認證','進階任務候選資格','特殊案件候選資格'],
+    WHITE_SILVER:['白銀小U身份','特殊任務資格','經驗分享與帶領候選資格'],
+    GOLD_HIGH:['金牌核心小U候選','城市活動與特殊案件資格'],
+    PLATINUM:['白金核心小U身份','帶隊候選資格','城市營運計畫參與資格'],
+    DIAMOND:['鑽石小U最高榮譽','城市種子小U候選','帶隊與區域人才培育資格'],
+  };
+  return benefits[String(tierKey || 'NEW')] || benefits.NEW;
+}
+
 function buildRiderGrowthSummary({ rider = {}, completedOrders = [], growthProfile = {}, nowMs = Date.now() } = {}) {
   const completed = completedOrders.length;
   const quality = getRiderGrowthQuality(rider);
@@ -269,6 +358,11 @@ function buildRiderGrowthSummary({ rider = {}, completedOrders = [], growthProfi
   const next = tier.next;
   const progressBase = next ? Math.max(0, completed - tier.minOrders) : 1;
   const progressSpan = next ? Math.max(1, next.minOrders - tier.minOrders) : 1;
+  const monthCompleted = growthCurrentMonthCount(completedOrders, nowMs);
+  const contribution = { score:growthScore, validCustomerReferrals, validRiderReferrals };
+  const tasks = buildRiderGrowthTasks({ completedOrders:completed, monthCompleted, qualityScore:quality.score, nextTier:next });
+  const achievements = buildRiderGrowthAchievements(completed, quality.score, contribution);
+  const benefits = getRiderTierBenefits(tier.key);
   return {
     version:UBEE_GROWTH_VERSION,
     rulesVersion:UBEE_GROWTH_RULES_VERSION,
@@ -276,8 +370,13 @@ function buildRiderGrowthSummary({ rider = {}, completedOrders = [], growthProfi
     nextTier:next ? { key:next.key, label:next.label, minOrders:next.minOrders, minQuality:next.minQuality, remainingOrders:Math.max(0,next.minOrders-completed), progressPercent:growthClamp((progressBase/progressSpan)*100) } : null,
     completedOrders:completed,
     activity,
-    quality,
-    contribution:{ score:growthScore, validCustomerReferrals, validRiderReferrals },
+    quality:{ ...quality, statusText:quality.majorViolation?'資格受限制':quality.accountEligible?'正常':'尚未 ACTIVE', highTierEligible:quality.score>=90 && quality.majorViolation!==true && quality.accountEligible===true },
+    contribution,
+    monthCompleted,
+    tasks,
+    achievements,
+    benefits,
+    unlockedAchievementCount:achievements.filter(item=>item.unlocked).length,
     ordinaryOrderPriority:false,
     ordinaryOrderFairnessText:'一般訂單維持公平，不因牌級或活躍度提前顯示。',
     calculatedAtMs:nowMs,
@@ -5509,6 +5608,8 @@ app.get('/api/customer/growth', requireCustomerAuth, async (req, res) => {
     const snapshot = await db.collection('orders').where('userId', '==', customerId).limit(2000).get();
     const completedOrders = snapshot.docs.filter(doc => ['completed','done'].includes(String(doc.data()?.status || '').trim().toLowerCase()));
     const completedCount = completedOrders.length;
+    const completedOrderData = completedOrders.map(doc => ({ id:doc.id, ...(doc.data() || {}) }));
+    const monthCompleted = growthCurrentMonthCount(completedOrderData);
 
     if (completedCount >= 1) {
       await qualifyGrowthReferral('customer', customerId, { type:'first_valid_order', orderId:completedOrders[0]?.id || '' });
@@ -5521,11 +5622,19 @@ app.get('/api/customer/growth', requireCustomerAuth, async (req, res) => {
     const validReferrals = Math.max(0, Number(profile.validCustomerReferrals || 0));
     const tier = getCustomerGrowthTier(completedCount, validReferrals);
     const next = tier.next;
+    const tasks = buildCustomerGrowthTasks({ completedOrders:completedCount, monthCompleted, validReferrals });
+    const achievements = buildCustomerGrowthAchievements(completedCount, validReferrals);
+    const benefits = getCustomerTierBenefits(tier.key);
     const growth = {
       version:UBEE_GROWTH_VERSION,
       rulesVersion:UBEE_GROWTH_RULES_VERSION,
       completedOrders:completedCount,
+      monthCompleted,
       validReferrals,
+      tasks,
+      achievements,
+      benefits,
+      unlockedAchievementCount:achievements.filter(item=>item.unlocked).length,
       referralCode,
       shareUrl:`${String(process.env.UBEE_CUSTOMER_PUBLIC_BASE_URL || 'https://ubee-line-bot-2-zezw.onrender.com').replace(/\/$/,'')}/order.html?ref=${encodeURIComponent(referralCode)}&source=invite`,
       tier:{ key:tier.key, label:tier.label, minOrders:tier.minOrders, minReferrals:tier.minReferrals },
