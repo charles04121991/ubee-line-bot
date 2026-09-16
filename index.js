@@ -1,3 +1,4 @@
+// 2026-09-16｜Rider Motor Vehicle Hard Lock V1：新版小U申請只接受機車／汽車；/api/rider/register 後端硬鎖，非允許車種直接 400 拒絕。
 // 2026-09-16｜UBee Native Experience V2：同步前端 App Shell Release；本版不修改計價、派單、Growth Engine、Rider Income、資格、ETA、付款與任務核心規則。
 // 2026-09-16｜UBee Growth Engine V1.8：雙端「我的」二級頁 UX 統一；後端規則沿用 V1.6，Release 版本同步升級。
 // 2026-09-16｜UBee Growth Engine V1：刪除 Rider Activity V1 優先派單資格／延遲概念；建立雙體系階級、推薦碼、有效推薦、成長歷程、活躍度／品質／成長貢獻分離模型。
@@ -753,7 +754,7 @@ const RIDER_DOCUMENT_LABELS = Object.freeze({
 // UBee 小U申請審核 V2：三大驗證模型
 // - 對申請者與審核人員顯示三大驗證區塊
 // - Firestore 仍保留既有五個文件欄位，完整相容舊申請
-// - 機車／汽車需五份文件；自行車／步行只需身分驗證
+// - 新申請只接受機車／汽車且固定五份文件；舊自行車／步行資料僅保留歷史審核相容
 // =====================================================
 const RIDER_VERIFICATION_GROUPS = Object.freeze({
   identity: Object.freeze({
@@ -783,6 +784,19 @@ function normalizeRiderVehicleMode(value) {
   if (/自行車|腳踏車|單車|bicycle|bike/.test(text)) return 'bicycle';
   if (/步行|徒步|walk|walking/.test(text)) return 'walking';
   return text ? 'other' : '';
+}
+
+// 新版申請的嚴格車種白名單。歷史資料仍由 normalizeRiderVehicleMode() 相容讀取；
+// /api/rider/register 只接受下列精確值，避免修改前端 HTML 或自行組 request 繞過。
+function normalizeNewRiderApplicationVehicle(value) {
+  const text = String(value || '').trim().toLowerCase();
+  if (['機車', 'motorcycle', 'scooter', 'motorbike'].includes(text)) {
+    return { mode: 'motorcycle', label: '機車' };
+  }
+  if (['汽車', 'car', 'auto', 'automobile'].includes(text)) {
+    return { mode: 'car', label: '汽車' };
+  }
+  return null;
 }
 
 function isMotorizedRiderVehicle(value) {
@@ -16528,7 +16542,7 @@ const riders = {};
 // 1. 申請送出時，只建立 riderApplicationsV2/{手機號碼}
 // 2. 不提前建立 ridersV2
 // 3. 審核通過後，才由審核流程建立正式 ridersV2
-// 4. 身分證、駕照、行照、強制險檔案只存 Firebase Storage 路徑
+// 4. 新申請只接受機車／汽車，且身分證、駕照、行照、強制險檔案只存 Firebase Storage 路徑
 // ============================================================
 app.post('/api/rider/register', async (req, res) => {
   try {
@@ -16661,11 +16675,22 @@ app.post('/api/rider/register', async (req, res) => {
       value === 1 ||
       value === '1';
 
-    const motorizedVehicle = isMotorizedRiderVehicle(vehicle);
-    const requiredDocumentKeys = getRequiredRiderDocumentKeys(vehicle);
+    const allowedApplicationVehicle = normalizeNewRiderApplicationVehicle(vehicle);
 
-    // 良民證目前不列為申請必備文件，也不作為送出條件。
-    // 駕照、行照與強制險相關同意，只在機車／汽車申請時要求。
+    if (!allowedApplicationVehicle) {
+      return res.status(400).json({
+        success: false,
+        code: 'RIDER_APPLICATION_VEHICLE_NOT_ALLOWED',
+        message: 'UBee 小U目前只接受機車或汽車申請。',
+      });
+    }
+
+    const canonicalVehicle = allowedApplicationVehicle.label;
+    const canonicalVehicleMode = allowedApplicationVehicle.mode;
+    const motorizedVehicle = true;
+    const requiredDocumentKeys = Object.keys(RIDER_REQUIRED_DOCUMENTS);
+
+    // 新版申請只接受機車／汽車，因此駕照、行照與強制險同意一律為必要條件。
     const requiredAgreements = [
       businessConditionAgree,
       violationConfirm,
@@ -16678,13 +16703,9 @@ app.post('/api/rider/register', async (req, res) => {
       locationDataConsent,
       jkoRequirementAgree,
       communityRequirementAgree,
-      ...(motorizedVehicle
-        ? [
-            driverLicenseConfirmed,
-            vehicleLicenseConfirmed,
-            insuranceConfirm,
-          ]
-        : []),
+      driverLicenseConfirmed,
+      vehicleLicenseConfirmed,
+      insuranceConfirm,
     ];
 
     if (!requiredAgreements.every(toBool)) {
@@ -16706,20 +16727,13 @@ app.post('/api/rider/register', async (req, res) => {
       !emergencyContactName ||
       !emergencyContactRelationship ||
       !emergencyContactPhone ||
-      (
-        motorizedVehicle &&
-        (
-          !plateNumber ||
-          !vehicleOwnerType ||
-          !compulsoryInsuranceExpiryDate
-        )
-      )
+      !plateNumber ||
+      !vehicleOwnerType ||
+      !compulsoryInsuranceExpiryDate
     ) {
       return res.status(400).json({
         success: false,
-        message: motorizedVehicle
-          ? '資料不完整，請確認基本資料、車輛資料、保險資料、服務區域與緊急聯絡人都已填寫。'
-          : '資料不完整，請確認基本資料、配送工具、服務區域與緊急聯絡人都已填寫。',
+        message: '資料不完整，請確認基本資料、機車或汽車資料、保險資料、服務區域與緊急聯絡人都已填寫。',
       });
     }
 
@@ -16745,7 +16759,6 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
     if (
-      motorizedVehicle &&
       !/^\d{4}-\d{2}-\d{2}$/.test(
         String(compulsoryInsuranceExpiryDate || '').trim()
       )
@@ -16806,14 +16819,10 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
-    const normalizedVehicleOwnerType = motorizedVehicle
-      ? String(vehicleOwnerType || '').trim().toLowerCase()
-      : 'not_applicable';
+    const normalizedVehicleOwnerType =
+      String(vehicleOwnerType || '').trim().toLowerCase();
 
-    if (
-      motorizedVehicle &&
-      !['self', 'other'].includes(normalizedVehicleOwnerType)
-    ) {
+    if (!['self', 'other'].includes(normalizedVehicleOwnerType)) {
       return res.status(400).json({
         success: false,
         message: '請確認車輛是本人所有或經車主同意使用。',
@@ -16821,7 +16830,6 @@ app.post('/api/rider/register', async (req, res) => {
     }
 
     if (
-      motorizedVehicle &&
       normalizedVehicleOwnerType === 'other' &&
       !toBool(vehicleOwnerConsent)
     ) {
@@ -16886,23 +16894,17 @@ app.post('/api/rider/register', async (req, res) => {
       residenceCity: cleanText(finalResidenceCity || '', 20),
       residenceDistrict: cleanText(finalResidenceDistrict || '', 20),
 
-      vehicle: cleanText(vehicle || '', 40),
-      vehicleMode: normalizeRiderVehicleMode(vehicle),
-      motorizedVehicle,
-      plateNumber: motorizedVehicle
-        ? cleanText(plateNumber || '', 20)
-        : '',
+      vehicle: canonicalVehicle,
+      vehicleMode: canonicalVehicleMode,
+      motorizedVehicle: true,
+      plateNumber: cleanText(plateNumber || '', 20),
       vehicleOwnerType: normalizedVehicleOwnerType,
-      vehicleOwnerConsent: motorizedVehicle
-        ? (
-            normalizedVehicleOwnerType === 'self'
-              ? true
-              : toBool(vehicleOwnerConsent)
-          )
-        : true,
-      compulsoryInsuranceExpiryDate: motorizedVehicle
-        ? String(compulsoryInsuranceExpiryDate || '').trim()
-        : '',
+      vehicleOwnerConsent:
+        normalizedVehicleOwnerType === 'self'
+          ? true
+          : toBool(vehicleOwnerConsent),
+      compulsoryInsuranceExpiryDate:
+        String(compulsoryInsuranceExpiryDate || '').trim(),
 
       area: cleanText(finalServiceArea || '', 80),
       serviceArea: cleanText(finalServiceArea || '', 80),
