@@ -3,6 +3,7 @@
 <!-- 2026-09-16｜UBee Growth Engine V1.3 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
+<!-- 2026-09-17｜Customer Notification Settings V3：通知頁改為獨立 ubee-notify 元件，切斷舊 settings row 樣式，修正窄欄斷字、超長狀態膠囊與 Switch 位置。 -->
 <!-- 2026-09-16｜Customer Notification Settings V2：通知設定改為原生 Switch；必要通知固定啟用、可選通知即時儲存、加入系統通知權限狀態。 -->
 <!-- 2026-09-16｜Customer Account UX V2：會員帳號主頁移除登出／刪除入口；通知偏好改為通知設定；登出與刪除申請下沉至帳號與安全。 -->
 <head>
@@ -33,7 +34,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260916-customer-notification-settings-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260917-customer-notification-settings-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18937,49 +18938,67 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="ubee-my-panel" hidden="" id="ubeeMyPreferencesPanel">
 <div class="ubee-my-panel-head"><strong>通知設定</strong><button data-my-close-account="" type="button">上一頁</button></div>
 
-<div class="ubee-notification-section-copy">必要通知</div>
-<div class="ubee-settings-list ubee-notification-settings-list">
-  <div class="ubee-settings-row ubee-notification-row">
-    <span class="ubee-settings-copy"><strong>任務狀態通知</strong><small>接單、抵達、任務進度與完成狀態</small></span>
-    <span class="ubee-notification-fixed-status">已啟用</span>
+<div class="ubee-notify-section-title">必要通知</div>
+<div class="ubee-notify-group">
+  <div class="ubee-notify-row">
+    <div class="ubee-notify-copy">
+      <strong>任務狀態通知</strong>
+      <small>接單、抵達、任務進度與完成狀態</small>
+    </div>
+    <span class="ubee-notify-badge ubee-notify-badge-required">已啟用</span>
   </div>
-  <div class="ubee-settings-row ubee-notification-row">
-    <span class="ubee-settings-copy"><strong>付款與安全通知</strong><small>付款異常、帳號安全與重要風險提醒</small></span>
-    <span class="ubee-notification-fixed-status">已啟用</span>
+  <div class="ubee-notify-row">
+    <div class="ubee-notify-copy">
+      <strong>付款與安全通知</strong>
+      <small>付款異常、帳號安全與重要風險提醒</small>
+    </div>
+    <span class="ubee-notify-badge ubee-notify-badge-required">已啟用</span>
   </div>
-  <div class="ubee-settings-row ubee-notification-row">
-    <span class="ubee-settings-copy"><strong>平台重要公告</strong><small>服務、營運或系統的重要變更通知</small></span>
-    <span class="ubee-notification-fixed-status">已啟用</span>
-  </div>
-</div>
-<div class="ubee-notification-helper">必要通知用於訂單、安全及重要服務資訊，無法個別關閉。</div>
-
-<div class="ubee-notification-section-copy">可選通知</div>
-<div class="ubee-settings-list ubee-notification-settings-list">
-  <div class="ubee-settings-row ubee-notification-row" data-notification-row="marketing">
-    <span class="ubee-settings-copy"><strong>優惠與活動訊息</strong><small>優惠、活動與期間限定資訊</small></span>
-    <button class="ubee-setting-switch" id="ubeePrefMarketingSwitch" type="button" role="switch" data-notification-toggle="marketing" aria-label="優惠與活動訊息" aria-checked="false"></button>
-  </div>
-  <div class="ubee-settings-row ubee-notification-row" data-notification-row="updates">
-    <span class="ubee-settings-copy"><strong>新功能與服務推薦</strong><small>UBee 新功能、服務與使用建議</small></span>
-    <button class="ubee-setting-switch" id="ubeePrefUpdatesSwitch" type="button" role="switch" data-notification-toggle="updates" aria-label="新功能與服務推薦" aria-checked="false"></button>
+  <div class="ubee-notify-row">
+    <div class="ubee-notify-copy">
+      <strong>平台重要公告</strong>
+      <small>服務、營運與系統的重要變更通知</small>
+    </div>
+    <span class="ubee-notify-badge ubee-notify-badge-required">已啟用</span>
   </div>
 </div>
-<div class="ubee-notification-helper">可選通知可隨時開關，切換後會立即儲存。</div>
+<div class="ubee-notify-footnote">必要通知用於訂單、安全及重要服務資訊，無法個別關閉。</div>
 
-<div class="ubee-notification-section-copy">系統通知權限</div>
-<div class="ubee-settings-list ubee-notification-settings-list">
-  <div class="ubee-settings-row ubee-notification-row ubee-notification-permission-row">
-    <span class="ubee-settings-copy"><strong>這台裝置的推播通知</strong><small id="ubeeNotificationPermissionCopy">正在確認系統通知權限</small></span>
-    <div class="ubee-notification-permission-side">
-      <span class="ubee-notification-permission-status" id="ubeeNotificationPermissionStatus">確認中</span>
-      <button class="ubee-notification-permission-action" id="ubeeNotificationPermissionAction" type="button" hidden>開啟通知</button>
+<div class="ubee-notify-section-title">可選通知</div>
+<div class="ubee-notify-group">
+  <div class="ubee-notify-row" data-notification-row="marketing">
+    <div class="ubee-notify-copy">
+      <strong>優惠與活動訊息</strong>
+      <small>優惠、活動與期間限定資訊</small>
+    </div>
+    <button class="ubee-notify-switch" id="ubeePrefMarketingSwitch" type="button" role="switch" data-notification-toggle="marketing" aria-label="優惠與活動訊息" aria-checked="false"></button>
+  </div>
+  <div class="ubee-notify-row" data-notification-row="updates">
+    <div class="ubee-notify-copy">
+      <strong>新功能與服務推薦</strong>
+      <small>UBee 新功能、服務與使用建議</small>
+    </div>
+    <button class="ubee-notify-switch" id="ubeePrefUpdatesSwitch" type="button" role="switch" data-notification-toggle="updates" aria-label="新功能與服務推薦" aria-checked="false"></button>
+  </div>
+</div>
+<div class="ubee-notify-footnote">可選通知可隨時開關，切換後立即儲存。</div>
+
+<div class="ubee-notify-section-title">系統通知權限</div>
+<div class="ubee-notify-group">
+  <div class="ubee-notify-row ubee-notify-permission-row">
+    <div class="ubee-notify-copy">
+      <strong>這台裝置的推播通知</strong>
+      <small id="ubeeNotificationPermissionCopy">正在確認系統通知權限</small>
+    </div>
+    <div class="ubee-notify-permission-side">
+      <span class="ubee-notify-badge" id="ubeeNotificationPermissionStatus">確認中</span>
+      <button class="ubee-notify-permission-action" id="ubeeNotificationPermissionAction" type="button" hidden>開啟通知</button>
     </div>
   </div>
 </div>
-<div class="ubee-notification-helper" id="ubeeNotificationPermissionHelp">手機系統若關閉 UBee 通知，即使 App 內設定為開啟，也可能無法收到推播。</div>
+<div class="ubee-notify-footnote" id="ubeeNotificationPermissionHelp">手機系統若關閉 UBee 通知，即使 App 內設定為開啟，也可能無法收到推播。</div>
 
-<div aria-live="polite" class="ubee-notification-autosave-status" id="ubeePreferencesStatus"></div>
+<div aria-live="polite" class="ubee-notify-autosave-status" id="ubeePreferencesStatus"></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMySecurityPanel">
 <div class="ubee-my-panel-head"><strong>帳號與安全</strong><button data-my-close-account="" type="button">上一頁</button></div>
@@ -20329,7 +20348,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260916-customer-notification-settings-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260917-customer-notification-settings-v3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21262,111 +21281,222 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 #productionOrderFlow .ubee-my-menu-item{min-height:60px}
 #productionOrderFlow .ubee-my-menu-item:active{background:var(--ubee-surface-2)}
 
-#productionOrderFlow .ubee-notification-section-copy{
-  margin:22px 2px 8px;
-  color:#8a9097;
-  font-size:12px;
-  font-weight:800;
-  letter-spacing:.02em;
+/* Customer Notification Settings V3｜獨立元件，禁止繼承舊 settings row 版型 */
+#productionOrderFlow #ubeeMyPreferencesPanel{
+  width:100% !important;
+  min-width:0 !important;
 }
-#productionOrderFlow #ubeeMyPreferencesPanel .ubee-notification-section-copy:first-of-type{
-  margin-top:4px;
+#productionOrderFlow .ubee-notify-section-title{
+  margin:22px 4px 9px !important;
+  color:#8b9096 !important;
+  font-size:13px !important;
+  font-weight:850 !important;
+  line-height:1.25 !important;
+  letter-spacing:.01em !important;
 }
-#productionOrderFlow .ubee-notification-settings-list{
-  margin:0;
-  overflow:hidden;
-  border:1px solid #e7e8ea;
-  border-radius:14px;
-  background:#fff;
+#productionOrderFlow #ubeeMyPreferencesPanel .ubee-notify-section-title:first-of-type{
+  margin-top:4px !important;
 }
-#productionOrderFlow .ubee-notification-row{
-  min-height:66px;
-  padding:12px 14px;
-  gap:14px;
+#productionOrderFlow .ubee-notify-group{
+  width:100% !important;
+  min-width:0 !important;
+  margin:0 !important;
+  overflow:hidden !important;
+  border:1px solid #e6e7e9 !important;
+  border-radius:15px !important;
+  background:#fff !important;
 }
-#productionOrderFlow .ubee-notification-row .ubee-settings-copy{
-  min-width:0;
+#productionOrderFlow .ubee-notify-row{
+  width:100% !important;
+  min-width:0 !important;
+  min-height:72px !important;
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:16px !important;
+  padding:14px 16px !important;
+  border:0 !important;
+  border-bottom:1px solid #eceef0 !important;
+  background:#fff !important;
 }
-#productionOrderFlow .ubee-notification-row .ubee-settings-copy strong{
-  font-size:15px;
-  font-weight:850;
-  color:#15171a;
+#productionOrderFlow .ubee-notify-row:last-child{
+  border-bottom:0 !important;
 }
-#productionOrderFlow .ubee-notification-row .ubee-settings-copy small{
-  display:block;
-  margin-top:3px;
-  color:#8a9097;
-  font-size:12px;
-  font-weight:600;
-  line-height:1.4;
+#productionOrderFlow .ubee-notify-copy{
+  display:block !important;
+  flex:1 1 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:none !important;
+  padding:0 !important;
+  margin:0 !important;
+  text-align:left !important;
+  writing-mode:horizontal-tb !important;
+  word-break:normal !important;
+  overflow-wrap:normal !important;
+  white-space:normal !important;
 }
-#productionOrderFlow .ubee-notification-fixed-status,
-#productionOrderFlow .ubee-notification-permission-status{
-  flex:0 0 auto;
-  min-width:58px;
-  padding:6px 9px;
-  border-radius:999px;
-  background:#fff5bf;
-  color:#765d00;
-  font-size:11px;
-  font-weight:850;
-  text-align:center;
-  white-space:nowrap;
+#productionOrderFlow .ubee-notify-copy strong{
+  display:block !important;
+  width:auto !important;
+  margin:0 !important;
+  color:#111317 !important;
+  font-size:16px !important;
+  font-weight:900 !important;
+  line-height:1.35 !important;
+  letter-spacing:-.01em !important;
+  white-space:normal !important;
+  word-break:keep-all !important;
 }
-#productionOrderFlow .ubee-notification-helper{
-  margin:7px 4px 0;
-  color:#9a9fa5;
-  font-size:11px;
-  font-weight:600;
-  line-height:1.5;
+#productionOrderFlow .ubee-notify-copy small{
+  display:block !important;
+  width:auto !important;
+  margin:4px 0 0 !important;
+  color:#8d9298 !important;
+  font-size:12px !important;
+  font-weight:650 !important;
+  line-height:1.45 !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:anywhere !important;
 }
-#productionOrderFlow .ubee-notification-permission-side{
-  flex:0 0 auto;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:7px;
+#productionOrderFlow .ubee-notify-badge{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:54px !important;
+  max-width:86px !important;
+  margin:0 !important;
+  padding:6px 10px !important;
+  border-radius:999px !important;
+  background:#f1f2f4 !important;
+  color:#747980 !important;
+  font-size:12px !important;
+  font-weight:850 !important;
+  line-height:1.2 !important;
+  text-align:center !important;
+  white-space:nowrap !important;
 }
-#productionOrderFlow .ubee-notification-permission-status[data-state="granted"]{
-  background:#e8f7ed;
-  color:#15723a;
+#productionOrderFlow .ubee-notify-badge-required{
+  background:#fff4bc !important;
+  color:#6e5700 !important;
 }
-#productionOrderFlow .ubee-notification-permission-status[data-state="default"]{
-  background:#fff5bf;
-  color:#765d00;
+#productionOrderFlow .ubee-notify-footnote{
+  margin:8px 5px 0 !important;
+  color:#9a9fa5 !important;
+  font-size:11px !important;
+  font-weight:650 !important;
+  line-height:1.5 !important;
 }
-#productionOrderFlow .ubee-notification-permission-status[data-state="denied"],
-#productionOrderFlow .ubee-notification-permission-status[data-state="unsupported"]{
-  background:#f1f2f4;
-  color:#72777e;
+#productionOrderFlow .ubee-notify-switch{
+  position:relative !important;
+  display:block !important;
+  flex:0 0 51px !important;
+  width:51px !important;
+  min-width:51px !important;
+  max-width:51px !important;
+  height:31px !important;
+  min-height:31px !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:999px !important;
+  background:#d7d9dc !important;
+  box-shadow:inset 0 0 0 1px rgba(17,17,17,.04) !important;
+  appearance:none !important;
+  -webkit-appearance:none !important;
+  cursor:pointer !important;
+  overflow:visible !important;
+  transition:background-color .2s ease !important;
 }
-#productionOrderFlow .ubee-notification-permission-action{
-  min-height:34px;
-  padding:7px 10px;
-  border:0;
-  border-radius:9px;
-  background:#facc15;
-  color:#111;
-  font:inherit;
-  font-size:12px;
-  font-weight:850;
+#productionOrderFlow .ubee-notify-switch::after{
+  content:"" !important;
+  position:absolute !important;
+  top:3px !important;
+  left:3px !important;
+  width:25px !important;
+  height:25px !important;
+  border-radius:50% !important;
+  background:#fff !important;
+  box-shadow:0 2px 6px rgba(0,0,0,.22) !important;
+  transform:translateX(0) !important;
+  transition:transform .2s cubic-bezier(.22,.61,.36,1) !important;
 }
-#productionOrderFlow .ubee-notification-permission-action:disabled{
-  background:#f1f2f4;
-  color:#8f949a;
+#productionOrderFlow .ubee-notify-switch[aria-checked="true"]{
+  background:#f4bd00 !important;
 }
-#productionOrderFlow .ubee-notification-autosave-status{
-  min-height:24px;
-  margin:10px 2px 0;
-  color:#7a8087;
-  font-size:12px;
-  font-weight:650;
+#productionOrderFlow .ubee-notify-switch[aria-checked="true"]::after{
+  transform:translateX(20px) !important;
 }
-#productionOrderFlow .ubee-notification-autosave-status.is-saved{
-  color:#27864c;
+#productionOrderFlow .ubee-notify-permission-side{
+  display:flex !important;
+  flex:0 0 auto !important;
+  flex-direction:column !important;
+  align-items:flex-end !important;
+  justify-content:center !important;
+  gap:7px !important;
+  min-width:70px !important;
 }
-#productionOrderFlow #ubeeMyPreferencesPanel .ubee-setting-switch{
-  flex:0 0 auto;
+#productionOrderFlow .ubee-notify-badge[data-state="granted"]{
+  background:#e6f6eb !important;
+  color:#18733d !important;
+}
+#productionOrderFlow .ubee-notify-badge[data-state="default"]{
+  background:#fff4bc !important;
+  color:#6e5700 !important;
+}
+#productionOrderFlow .ubee-notify-badge[data-state="denied"],
+#productionOrderFlow .ubee-notify-badge[data-state="unsupported"]{
+  background:#f1f2f4 !important;
+  color:#747980 !important;
+}
+#productionOrderFlow .ubee-notify-permission-action{
+  width:auto !important;
+  min-width:0 !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:7px 10px !important;
+  border:0 !important;
+  border-radius:9px !important;
+  background:#facc15 !important;
+  color:#111 !important;
+  font:inherit !important;
+  font-size:12px !important;
+  font-weight:850 !important;
+  line-height:1.2 !important;
+  white-space:nowrap !important;
+}
+#productionOrderFlow .ubee-notify-permission-action:disabled{
+  background:#f1f2f4 !important;
+  color:#8f949a !important;
+}
+#productionOrderFlow .ubee-notify-autosave-status{
+  min-height:22px !important;
+  margin:9px 4px 0 !important;
+  color:#7a8087 !important;
+  font-size:12px !important;
+  font-weight:650 !important;
+  line-height:1.4 !important;
+}
+#productionOrderFlow .ubee-notify-autosave-status.is-saved{
+  color:#27864c !important;
+}
+@media(max-width:380px){
+  #productionOrderFlow .ubee-notify-row{
+    padding:13px 14px !important;
+    gap:12px !important;
+  }
+  #productionOrderFlow .ubee-notify-copy strong{
+    font-size:15px !important;
+  }
+  #productionOrderFlow .ubee-notify-copy small{
+    font-size:11px !important;
+  }
+  #productionOrderFlow .ubee-notify-badge{
+    min-width:50px !important;
+    padding:6px 8px !important;
+    font-size:11px !important;
+  }
 }
 
 #productionOrderFlow .ubee-account-security-note{
