@@ -1,3 +1,4 @@
+/* 2026-09-17｜Profit Pricing V1 / Route Pricing V4：同步新計價核心與平台應收／已收辨識版本。 */
 /* 2026-09-16｜Growth Engine V1.8 My UX：雙端「我的」二級頁統一與快取升版。 */
 /*
  * ============================================================
@@ -35,7 +36,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260917-customer-member-level-progress-v1';
+const UBEE_CUSTOMER_SW_VERSION = '20260917-profit-pricing-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
