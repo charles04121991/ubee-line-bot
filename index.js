@@ -15212,6 +15212,25 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         riderMinimumIncomePolicyVersion: String(o.riderMinimumIncomePolicyVersion || ''),
         platformFee: Number(o.platformFee || o.platformIncome || 0),
 
+        // Profit Pricing V1：調度中心需要辨識正式定價版本與平台費組成。
+        fareMode: String(o.fareMode || ''),
+        routePricingVersion: String(o.routePricingVersion || ''),
+        platformServiceFee: Number(o.platformServiceFee || o.serviceFee || 0),
+        basePlatformServiceFee: Number(o.basePlatformServiceFee || 0),
+        speedPlatformFee: Number(o.speedPlatformFee || 0),
+        queuePlatformFee: Number(o.queuePlatformFee || 0),
+        merchantOrderPlatformFee: Number(o.merchantOrderPlatformFee || 0),
+        financialDataAvailable: [
+          o.riderIncome,
+          o.riderFee,
+          o.driverFee,
+          o.platformIncome,
+          o.platformFee,
+        ].some(value => value !== undefined && value !== null && value !== ''),
+
+        // 財務閉環快照只供調度判讀，不在此 API 改寫任何財務資料。
+        finance: buildFinanceClosureSnapshot(o),
+
         deliveryFee: Number(o.deliveryFee || 0),
         crossZoneFee: Number(o.crossZoneFee || 0),
         multiStopFee: Number(o.multiStopFee || 0),
