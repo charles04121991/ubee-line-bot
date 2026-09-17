@@ -35,7 +35,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260917-customer-legal-privacy-ux-v1';
+const UBEE_CUSTOMER_SW_VERSION = '20260917-customer-member-level-progress-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
