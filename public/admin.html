@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-17｜Profit Finance V1：平台收入拆分應得、已收與待收，避免把未回繳現金誤認為已入帳收入。 -->
 <!-- 2026-09-08｜Finance Center No Key V4.4：徹底移除財務中心金鑰輸入與財務 API Header 包裝；財務中心開啟後直接讀取資料。 -->
 <!-- 2026-09-08｜Finance Ledger KPI Fix V1：今日收入類 KPI 改由後端只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。 -->
 <!-- UBee 店家平台 V3 相容：沿用既有店家應收、月結與結清 API。 -->
@@ -174,7 +175,7 @@ summary::-webkit-details-marker{display:none}
     <div class="kpi"><div class="kpi-label">街口待撥款</div><div class="kpi-value blue" id="kpiJkoPending">$0</div><div class="kpi-sub" id="kpiJkoSub">0 位小U待處理</div></div>
     <div class="kpi"><div class="kpi-label">待處理小U</div><div class="kpi-value yellow" id="kpiPendingRiders">0</div><div class="kpi-sub">現金／街口未結清聯集</div></div>
     <div class="kpi"><div class="kpi-label">今日已處理金額</div><div class="kpi-value green" id="kpiProcessed">$0</div><div class="kpi-sub" id="kpiProcessedSub">回繳 $0・撥款 $0</div></div>
-    <div class="kpi"><div class="kpi-label">今日平台收入</div><div class="kpi-value green" id="kpiPlatformIncome">$0</div><div class="kpi-sub">依完成訂單財務公式</div></div>
+    <div class="kpi"><div class="kpi-label">今日平台應得</div><div class="kpi-value green" id="kpiPlatformIncome">$0</div><div class="kpi-sub">完成訂單依正式公式計算</div></div>
     <div class="kpi"><div class="kpi-label">待對帳訂單</div><div class="kpi-value red" id="kpiNeedsReview">0</div><div class="kpi-sub">金額差異或資料缺漏</div></div>
     <div class="kpi"><div class="kpi-label">未收款金額</div><div class="kpi-value yellow" id="kpiUnpaidAmount">$0</div><div class="kpi-sub">已完成但尚未收齊</div></div>
   </section>
@@ -243,7 +244,7 @@ summary::-webkit-details-marker{display:none}
     <section class="view" id="view-ledger">
       <div class="panel">
         <div class="panel-head">
-          <div><div class="panel-title">訂單財務總帳</div><div class="panel-sub">初始估價、最終應收、實收、小U代墊、小U收入、平台收入、追加費用與對帳差異完整閉環。</div></div>
+          <div><div class="panel-title">訂單財務總帳</div><div class="panel-sub">初始估價、最終應收、平台應得／已收／待收、小U收入、追加費用與對帳差異完整閉環。</div></div>
           <div class="toolbar">
             <select id="financeStatusFilter" class="finance-status-select" onchange="loadFinanceLedger(true)">
               <option value="all">全部狀態</option>
@@ -261,10 +262,13 @@ summary::-webkit-details-marker{display:none}
           <div class="v4-admin-note">所有金額修改都必須填寫原因，後端會保留修改人、修改前後數值、時間與對帳紀錄。完成對帳不會改動派單、騎士審核或通知流程。</div>
           <div class="finance-summary-grid">
             <div class="finance-summary-card"><span>今日客戶實收</span><strong id="financeTodayRevenue">$0</strong></div>
-            <div class="finance-summary-card"><span>今日平台收入</span><strong id="financeTodayPlatform">$0</strong></div>
+            <div class="finance-summary-card"><span>今日平台應得</span><strong id="financeTodayPlatform">$0</strong></div>
             <div class="finance-summary-card"><span>今日小U收入</span><strong id="financeTodayRider">$0</strong></div>
             <div class="finance-summary-card"><span>今日保底補貼</span><strong id="financeTodayGuarantee">$0</strong></div>
             <div class="finance-summary-card"><span>財務差異總額</span><strong id="financeVarianceTotal">$0</strong></div>
+            <div class="finance-summary-card"><span>平台累計應得</span><strong id="financePlatformAccrued">$0</strong></div>
+            <div class="finance-summary-card"><span>平台累計已收</span><strong id="financePlatformCollected">$0</strong></div>
+            <div class="finance-summary-card"><span>平台累計待收</span><strong id="financePlatformOutstanding">$0</strong></div>
           </div>
           <div id="financeLedgerList" class="finance-ledger-list"><div class="empty">正在讀取訂單財務總帳...</div></div>
         </div>
@@ -448,6 +452,9 @@ function renderFinanceKpis(){
   set('financeTodayRider',money(s.todayRiderIncome));
   set('financeTodayGuarantee',money(s.todayRiderGuaranteeSubsidy));
   set('financeVarianceTotal',money(s.totalVarianceAmount));
+  set('financePlatformAccrued',money(s.totalPlatformAccruedIncome));
+  set('financePlatformCollected',money(s.totalPlatformCollectedIncome));
+  set('financePlatformOutstanding',money(s.totalPlatformOutstandingIncome));
 }
 function renderFinanceLedger(){
   const el=document.getElementById('financeLedgerList');if(!el)return;
@@ -460,7 +467,7 @@ function renderFinanceLedger(){
     const who=o.merchantName||o.customerName||'一般客戶';
     return `<article class="finance-order-card ${financeStatusClass(o.reconciliationStatus)}">
       <div class="finance-order-head"><div><div class="finance-order-id">${esc(o.orderNo||o.orderId)}</div><div class="finance-order-meta">${esc(who)}・${esc(o.serviceType||'-')}<br>${esc(o.rider?.riderName||'尚未指派小U')}・${esc(formatTime(o.completedAtMs||o.createdAtMs))}</div></div><div><div class="finance-amount">${money(o.finalCustomerTotal)}</div><span class="tag ${o.reconciliationStatus==='reconciled'?'done':o.reconciliationStatus==='needs_review'?'cash':'jko'}">${esc(financeStatusLabel(o.reconciliationStatus))}</span></div></div>
-      <div class="finance-mini-grid"><div class="finance-mini"><span>初始估價</span><strong>${money(o.initialEstimatedTotal)}</strong></div><div class="finance-mini"><span>客戶實收</span><strong>${money(o.actualPaidAmount)}</strong></div><div class="finance-mini"><span>小U應得</span><strong>${money(Number(o.riderIncome||0)+Number(o.riderAdvance||0))}</strong></div><div class="finance-mini"><span>平台收入</span><strong>${money(o.expectedPlatformIncome)}</strong></div></div>
+      <div class="finance-mini-grid"><div class="finance-mini"><span>初始估價</span><strong>${money(o.initialEstimatedTotal)}</strong></div><div class="finance-mini"><span>客戶實收</span><strong>${money(o.actualPaidAmount)}</strong></div><div class="finance-mini"><span>小U應得</span><strong>${money(Number(o.riderIncome||0)+Number(o.riderAdvance||0))}</strong></div><div class="finance-mini"><span>平台應得</span><strong>${money(o.expectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台已收</span><strong>${money(o.collectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台待收</span><strong>${money(o.outstandingPlatformIncome)}</strong></div></div>
       ${variance?`<div class="finance-discrepancy">差異總額 ${money(variance)}${o.discrepancyReasons?.length?`：${esc(o.discrepancyReasons.join('、'))}`:''}</div>`:''}
       <div class="finance-actions"><button class="btn small primary" onclick="openFinanceOrder('${esc(o.orderId)}')">查看／調整</button>${o.reconciliationStatus!=='reconciled'?`<button class="btn small yellow" onclick="quickReconcile('${esc(o.orderId)}')">完成對帳</button>`:''}</div>
     </article>`;
@@ -484,7 +491,8 @@ async function openFinanceOrder(orderId){
         ${financeDetailItem('初始估價',money(o.initialEstimatedTotal))}${financeDetailItem('最終應收',money(o.finalCustomerTotal))}${financeDetailItem('客戶實收',money(o.actualPaidAmount))}
         ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('小U基本收入',money(o.riderBaseIncome))}
         ${financeDetailItem('70/30 任務費池',money(o.shareableTaskSubtotal))}${financeDetailItem('100% 小U加價池',money(o.riderOnlySurchargeSubtotal))}${financeDetailItem('保底補貼',money(o.riderGuaranteeSubsidy))}
-        ${financeDetailItem('平台收入',money(o.expectedPlatformIncome))}${financeDetailItem('急件／速度費',money(fees.speedFee))}${financeDetailItem('等待費',money(fees.waitingFee))}
+        ${financeDetailItem('平台應得',money(o.expectedPlatformIncome))}${financeDetailItem('平台已收',money(o.collectedPlatformIncome))}${financeDetailItem('平台待收',money(o.outstandingPlatformIncome))}
+        ${financeDetailItem('急件／速度費',money(fees.speedFee))}${financeDetailItem('等待費',money(fees.waitingFee))}
         ${financeDetailItem('上樓費',money(fees.upstairsFee))}${financeDetailItem('商品體積費',money(fees.itemSizeFee))}${financeDetailItem('天候保障費',money(fees.weatherFee))}
         ${financeDetailItem('動態調度費',money(fees.dynamicPricingFee))}${financeDetailItem('任務處理時間費',money(fees.taskHandlingFee))}${financeDetailItem('追加費用',money(fees.additionalFee))}
         ${financeDetailItem('取消費',money(fees.cancellationFee))}${financeDetailItem('退款',money(fees.refundAmount))}${financeDetailItem('結算狀態',o.settlementStatus||'-')}
