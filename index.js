@@ -1,3 +1,4 @@
+// 2026-09-17｜Profit Pricing V1 / Route Pricing V4：維持任務費 70/30 與小U NT$50 保底；一般路線改為 3km 內 NT$80、3～8km 每公里 NT$12、8km 以上每公里 NT$11，移除長途收入保障的失控外推；急件與長時間排隊另收平台管理費，小U原有加價不減少；店家 COD 加入固定系統服務費；財務總帳拆分平台應收、已收與待收。
 // 2026-09-16｜Rider Motor Vehicle Hard Lock V1：新版小U申請只接受機車／汽車；/api/rider/register 後端硬鎖，非允許車種直接 400 拒絕。
 // 2026-09-16｜UBee Native Experience V2：同步前端 App Shell Release；本版不修改計價、派單、Growth Engine、Rider Income、資格、ETA、付款與任務核心規則。
 // 2026-09-16｜UBee Growth Engine V1.8：雙端「我的」二級頁 UX 統一；後端規則沿用 V1.6，Release 版本同步升級。
@@ -22901,25 +22902,26 @@ const PRICING = {
   riderIncomePolicyVersion: 'UBEE_RIDER_INCOME_V2_20260901',
 
   // =====================================================
-  // 2026-09-11｜UBee Route Pricing V3
-  // 一般路線配送：NT$80 含前 3 km；超過 3 km 每公里 +NT$12。
+  // 2026-09-17｜UBee Route Pricing V4
+  // 一般路線配送：NT$80 含前 3 km；3～8 km 每公里 +NT$12；8 km 以上每公里 +NT$11。
   // 一般路線不再把導航時間列入客戶計價；perMinute 僅保留給全能跑腿處理時間。
   // =====================================================
-  routePricingVersion: 'UBEE_ROUTE_V3_20260911',
+  routePricingVersion: 'UBEE_ROUTE_V4_PROFIT_20260917',
   baseFee: 80,
   includedKm: 3,
+  routeLongDistanceStartKm: 8,
   perKm: 12,
+  longDistancePerKm: 11,
   perMinute: 2,
 
   // 平台服務費
   serviceFee: 20,
 
-  // 小U一般路線收入保障：8 km 至少 NT$98；14 km 至少 NT$250。
-  // 8 km～14 km 線性增加；14 km 以上沿相同斜率延伸。
-  routeGuaranteeStartKm: 8,
-  routeGuaranteeAnchorKm: 14,
-  routeRiderIncomeAt8Km: 98,
-  routeRiderIncomeAt14Km: 250,
+  // 平台管理費不從小U既有收入扣除，而是加入客人端總價。
+  priorityPlatformFee: 10,
+  expressPlatformFee: 20,
+  queuePlatformFeePer30Minutes: 5,
+  merchantOrderPlatformFee: 10,
 
   quoteRoundUnit: 10,         // 一般配送報價無條件進位至 $10
 
@@ -23051,7 +23053,7 @@ const QUICK_SERVICE_PRICING = {
     upTo5KmExtra: 10,     // 3～5 km：總行程費 $75
     upTo8KmExtra: 30,     // 5～8 km：總行程費 $95
     extraPerKm: 12,       // 超過 8 km：每公里 +$12
-    serviceFee: 10,       // 專用平台服務費
+    serviceFee: 15,       // 專用平台服務費
   },
 
   buy: {
@@ -23060,7 +23062,7 @@ const QUICK_SERVICE_PRICING = {
     upTo5KmExtra: 15,     // 3～5 km：總行程費 $85
     upTo8KmExtra: 35,     // 5～8 km：總行程費 $105
     extraPerKm: 12,       // 超過 8 km：每公里 +$12
-    serviceFee: 10,       // 專用平台服務費
+    serviceFee: 15,       // 專用平台服務費
   },
 };
 
@@ -25029,6 +25031,29 @@ function getSpeedOption(speedType) {
   return SPEED_OPTIONS[speedType] || SPEED_OPTIONS.standard;
 }
 
+// Profit Pricing V1：急件平台管理費由客人額外支付，不減少小U既有急件收入。
+function getPlatformSpeedManagementFee(speedType) {
+  const normalized = String(speedType || 'standard').trim().toLowerCase();
+  if (normalized === 'priority') {
+    return Math.max(0, Math.round(Number(PRICING.priorityPlatformFee || 10)));
+  }
+  if (normalized === 'express') {
+    return Math.max(0, Math.round(Number(PRICING.expressPlatformFee || 20)));
+  }
+  return 0;
+}
+
+// Profit Pricing V1：長時間任務每開始 30 分鐘增加一次平台管理費。
+function getQueuePlatformManagementFee(queueMinutes = 0) {
+  const minutes = Math.max(0, Math.round(Number(queueMinutes || 0)));
+  if (minutes <= 0) return 0;
+  const unitFee = Math.max(
+    0,
+    Math.round(Number(PRICING.queuePlatformFeePer30Minutes || 5))
+  );
+  return Math.ceil(minutes / 30) * unitFee;
+}
+
 function getPaymentMethodLabel(method) {
   return ({
     cash: '現金付款',
@@ -26321,10 +26346,16 @@ function calculateQuickServicePrice({
     baseFee +
     distanceFee;
 
-  const serviceFee = Math.max(
+  const basePlatformServiceFee = Math.max(
     0,
     Math.round(Number(pricing.serviceFee || 0))
   );
+
+  const speedPlatformFee =
+    getPlatformSpeedManagementFee(speedType);
+
+  const serviceFee =
+    basePlatformServiceFee + speedPlatformFee;
 
   // 急件速度費維持原本 SPEED_OPTIONS。
   const speedFee = Math.max(
@@ -26356,6 +26387,8 @@ function calculateQuickServicePrice({
     baseFee,
     distanceFee,
     timeFee,
+    basePlatformServiceFee,
+    speedPlatformFee,
 
     ...financials,
 
@@ -26365,80 +26398,15 @@ function calculateQuickServicePrice({
 }
 
 // =====================================================
-// UBee Route Pricing V3｜2026-09-11
+// UBee Route Pricing V4｜2026-09-17
 // 一般路線唯一正式核心：
 // - NT$80 含前 3 km
-// - 超過 3 km 每公里 +NT$12
+// - 3～8 km 每公里 +NT$12
+// - 8 km 以上每公里 +NT$11
 // - 導航時間只作 ETA，不再列入一般配送價格
-// - 8 km 小U路線收入至少 NT$98
-// - 14 km 小U路線收入至少 NT$250
-// - 8～14 km 線性增加，14 km 以上沿同斜率延伸
+// - 維持任務費 70/30 與小U最低 NT$50
+// - 約 25.2 km 標準件目標總價 NT$350
 // =====================================================
-function getRouteRiderIncomeFloor(distanceKm = 0) {
-  const km = Math.max(0, Number(distanceKm || 0));
-
-  const startKm = Math.max(
-    0,
-    Number(PRICING.routeGuaranteeStartKm || 8)
-  );
-
-  const anchorKm = Math.max(
-    startKm,
-    Number(PRICING.routeGuaranteeAnchorKm || 14)
-  );
-
-  const incomeAtStart = Math.max(
-    0,
-    Number(PRICING.routeRiderIncomeAt8Km || 98)
-  );
-
-  const incomeAtAnchor = Math.max(
-    incomeAtStart,
-    Number(PRICING.routeRiderIncomeAt14Km || 250)
-  );
-
-  if (km < startKm) {
-    return 0;
-  }
-
-  const slope =
-    (incomeAtAnchor - incomeAtStart) /
-    Math.max(1, anchorKm - startKm);
-
-  return Math.max(
-    0,
-    Math.ceil(
-      incomeAtStart +
-      (km - startKm) * slope
-    )
-  );
-}
-
-function getMinimumShareableFeeForRiderIncome(
-  targetRiderIncome = 0
-) {
-  const target = Math.max(
-    0,
-    Math.round(Number(targetRiderIncome || 0))
-  );
-
-  if (target <= 0) {
-    return 0;
-  }
-
-  const ratio = Math.max(
-    0.01,
-    Number(PRICING.driverRatio || 0.7)
-  );
-
-  // calculateRiderTaskIncomeWithMinimum 內部使用 Math.round(fee × ratio)。
-  // 反推能讓小U至少取得 target 的最低 shareable 任務費。
-  return Math.max(
-    0,
-    Math.ceil((target - 0.5) / ratio)
-  );
-}
-
 function calculateRouteDeliveryCore({
   distanceMeters = 0,
 } = {}) {
@@ -26457,55 +26425,67 @@ function calculateRouteDeliveryCore({
     Number(PRICING.includedKm || 3)
   );
 
-  const billableDistanceKm = Math.max(
-    0,
-    km - includedKm
+  const shortDistanceEndKm = Math.max(
+    includedKm,
+    Number(PRICING.routeLongDistanceStartKm || 8)
   );
 
-  const distanceFee = Math.max(
+  const shortBillableDistanceKm = Math.max(
+    0,
+    Math.min(km, shortDistanceEndKm) - includedKm
+  );
+
+  const longBillableDistanceKm = Math.max(
+    0,
+    km - shortDistanceEndKm
+  );
+
+  const shortDistanceFee = Math.max(
     0,
     Math.round(
-      billableDistanceKm *
+      shortBillableDistanceKm *
       Number(PRICING.perKm || 12)
     )
   );
 
+  const longDistanceFee = Math.max(
+    0,
+    Math.round(
+      longBillableDistanceKm *
+      Number(PRICING.longDistancePerKm || 11)
+    )
+  );
+
+  const distanceFee = shortDistanceFee + longDistanceFee;
+
   const normalDeliveryFee =
     baseFee + distanceFee;
-
-  const routeRiderIncomeFloor =
-    getRouteRiderIncomeFloor(km);
-
-  const routeGuaranteeDeliveryFee =
-    getMinimumShareableFeeForRiderIncome(
-      routeRiderIncomeFloor
-    );
-
-  const guaranteedDeliveryFee = Math.max(
-    normalDeliveryFee,
-    routeGuaranteeDeliveryFee
-  );
 
   return {
     routePricingVersion:
       String(
         PRICING.routePricingVersion ||
-        'UBEE_ROUTE_V3_20260911'
+        'UBEE_ROUTE_V4_PROFIT_20260917'
       ),
     distanceKm:
       Math.round(km * 100) / 100,
     baseFee,
     includedKm,
     billableDistanceKm:
-      Math.round(billableDistanceKm * 100) / 100,
+      Math.round((shortBillableDistanceKm + longBillableDistanceKm) * 100) / 100,
+    shortBillableDistanceKm:
+      Math.round(shortBillableDistanceKm * 100) / 100,
+    longBillableDistanceKm:
+      Math.round(longBillableDistanceKm * 100) / 100,
+    shortDistanceFee,
+    longDistanceFee,
     distanceFee,
     timeFee: 0,
     normalDeliveryFee,
-    routeRiderIncomeFloor,
-    routeGuaranteeDeliveryFee,
-    routeGuaranteeApplied:
-      guaranteedDeliveryFee > normalDeliveryFee,
-    guaranteedDeliveryFee,
+    routeRiderIncomeFloor: 0,
+    routeGuaranteeDeliveryFee: normalDeliveryFee,
+    routeGuaranteeApplied: false,
+    guaranteedDeliveryFee: normalDeliveryFee,
   };
 }
 
@@ -26526,10 +26506,16 @@ function calculatePrice({
 
   const speed = getSpeedOption(speedType);
 
-  const serviceFee = Math.max(
+  const basePlatformServiceFee = Math.max(
     0,
     Math.round(Number(PRICING.serviceFee || 0))
   );
+
+  const speedPlatformFee =
+    getPlatformSpeedManagementFee(speedType);
+
+  const serviceFee =
+    basePlatformServiceFee + speedPlatformFee;
 
   const speedFee = Math.max(
     0,
@@ -26576,7 +26562,7 @@ function calculatePrice({
   });
 
   return {
-    fareMode: 'route_distance_guarantee_v3',
+    fareMode: 'route_tiered_profit_v4',
     routePricingVersion: route.routePricingVersion,
 
     distanceKm: route.distanceKm,
@@ -26585,8 +26571,14 @@ function calculatePrice({
     baseFee: route.baseFee,
     includedKm: route.includedKm,
     billableDistanceKm: route.billableDistanceKm,
+    shortBillableDistanceKm: route.shortBillableDistanceKm,
+    longBillableDistanceKm: route.longBillableDistanceKm,
+    shortDistanceFee: route.shortDistanceFee,
+    longDistanceFee: route.longDistanceFee,
     distanceFee: route.distanceFee,
     timeFee: 0,
+    basePlatformServiceFee,
+    speedPlatformFee,
 
     normalDeliveryFee: route.normalDeliveryFee,
     routeRiderIncomeFloor: route.routeRiderIncomeFloor,
@@ -26625,10 +26617,16 @@ function calculateSinglePointCustomTaskPrice({
     Math.round(Number(PRICING.baseFee || 0))
   );
 
-  const serviceFee = Math.max(
+  const basePlatformServiceFee = Math.max(
     0,
     Math.round(Number(PRICING.serviceFee || 0))
   );
+
+  const speedPlatformFee =
+    getPlatformSpeedManagementFee(speedType);
+
+  const serviceFee =
+    basePlatformServiceFee + speedPlatformFee;
 
   const speedFee = Math.max(
     0,
@@ -26655,6 +26653,8 @@ function calculateSinglePointCustomTaskPrice({
     baseFee,
     distanceFee: 0,
     timeFee: 0,
+    basePlatformServiceFee,
+    speedPlatformFee,
     ...financials,
     total: financials.serviceSubtotal,
   };
@@ -26789,8 +26789,8 @@ function recalculateOrderFinancials(order) {
     return order;
   }
 
-  // 店家 COD 單維持「配送費全額給小U、平台不抽配送費」的財務模型。
-  // 等候費 / 體積費 / 天候與動態調度加價仍直接加到客戶應付，並全額給小U。
+  // 店家 COD 單維持「配送費全額給小U、平台不抽配送費」的財務模型，
+  // 但每筆加入固定系統服務費，支付方與配送費支付方一致。
   const merchantSettlementMode = String(order.settlementMode || '').trim().toLowerCase();
   const merchantPaymentMethod = getOrderPaymentMethod(order);
   if (merchantSettlementMode === 'rider_advance_cod' || merchantPaymentMethod === 'rider_advance_cod') {
@@ -26805,6 +26805,10 @@ function recalculateOrderFinancials(order) {
     const dynamicPricingFee = Math.max(0, Math.round(Number(order.dynamicPricingFee || order.dynamicFee || 0)));
     const weatherFee = Math.max(0, Math.round(Number(order.weatherFee || 0)));
     const riderServiceIncome = baseDeliveryFee + speedFee + upstairsFee + waitingFee + itemSizeFee + dynamicPricingFee + weatherFee;
+    const merchantOrderPlatformFee = Math.max(
+      0,
+      Math.round(Number(PRICING.merchantOrderPlatformFee || 10))
+    );
     const advancePayment = getOrderAdvancePaymentAmount(order);
     const deliveryFeePayer =
       String(order.deliveryFeePayer || 'customer').trim().toLowerCase() === 'merchant'
@@ -26812,22 +26816,29 @@ function recalculateOrderFinancials(order) {
         : 'customer';
     const merchantPaysDeliveryFee = deliveryFeePayer === 'merchant';
     const customerPayableTotal =
-      advancePayment + (merchantPaysDeliveryFee ? 0 : riderServiceIncome);
+      advancePayment +
+      (merchantPaysDeliveryFee
+        ? 0
+        : riderServiceIncome + merchantOrderPlatformFee);
+    const merchantPayableAmount = merchantPaysDeliveryFee
+      ? riderServiceIncome + merchantOrderPlatformFee
+      : 0;
 
     order.itemSize = itemSizePricing.itemSize;
     order.itemSizeLabel = order.itemSizeLabel || itemSizePricing.itemSizeLabel;
     order.itemSizeFee = itemSizeFee;
-    order.serviceFee = 0;
-    order.platformServiceFee = 0;
+    order.serviceFee = merchantOrderPlatformFee;
+    order.platformServiceFee = merchantOrderPlatformFee;
+    order.merchantOrderPlatformFee = merchantOrderPlatformFee;
     order.taskSubtotal = riderServiceIncome;
-    order.serviceSubtotal = riderServiceIncome;
-    order.serviceTotal = riderServiceIncome;
+    order.serviceSubtotal = riderServiceIncome + merchantOrderPlatformFee;
+    order.serviceTotal = riderServiceIncome + merchantOrderPlatformFee;
     order.driverFee = riderServiceIncome;
     order.riderFee = riderServiceIncome;
     order.riderIncome = riderServiceIncome;
     order.estimatedRiderIncome = riderServiceIncome;
-    order.platformFee = 0;
-    order.platformIncome = 0;
+    order.platformFee = merchantOrderPlatformFee;
+    order.platformIncome = merchantOrderPlatformFee;
     order.advancePayment = advancePayment;
     order.advanceAmount = advancePayment;
     order.riderAdvanceAmount = advancePayment;
@@ -26844,15 +26855,23 @@ function recalculateOrderFinancials(order) {
     order.deliveryFeeSettlementMode = merchantPaysDeliveryFee ? 'merchant_billing' : 'customer_cash';
     order.riderPayoutSource = merchantPaysDeliveryFee ? 'merchant_billing' : 'customer_cash';
     order.billedTo = merchantPaysDeliveryFee ? 'merchant' : 'customer';
-    order.merchantPayableAmount = merchantPaysDeliveryFee ? riderServiceIncome : 0;
-    order.storePayableAmount = merchantPaysDeliveryFee ? riderServiceIncome : 0;
+    order.merchantPayableAmount = merchantPayableAmount;
+    order.storePayableAmount = merchantPayableAmount;
     order.merchantBillingStatus = merchantPaysDeliveryFee
       ? (String(order.merchantBillingStatus || '').toLowerCase() === 'paid' ? 'paid' : 'unpaid')
       : 'not_billable';
-    order.cashServiceNet = merchantPaysDeliveryFee ? 0 : riderServiceIncome;
-    order.cashDueToPlatform = 0;
-    order.platformReceivable = merchantPaysDeliveryFee ? riderServiceIncome : 0;
-    order.riderDueToPlatform = 0;
+    order.cashServiceNet = merchantPaysDeliveryFee
+      ? 0
+      : riderServiceIncome + merchantOrderPlatformFee;
+    order.cashDueToPlatform = merchantPaysDeliveryFee
+      ? 0
+      : merchantOrderPlatformFee;
+    order.platformReceivable = merchantPaysDeliveryFee
+      ? merchantPayableAmount
+      : merchantOrderPlatformFee;
+    order.riderDueToPlatform = merchantPaysDeliveryFee
+      ? 0
+      : merchantOrderPlatformFee;
     return order;
   }
 
@@ -29333,10 +29352,21 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         queueTimeFee +
         longTaskExtraFee;
 
-      const serviceFee = Math.max(
+      const basePlatformServiceFee = Math.max(
         0,
         Math.round(Number(PRICING.serviceFee || 0))
       );
+
+      const speedPlatformFee =
+        getPlatformSpeedManagementFee(speedType);
+
+      const queuePlatformFee =
+        getQueuePlatformManagementFee(queueMinutes);
+
+      const serviceFee =
+        basePlatformServiceFee +
+        speedPlatformFee +
+        queuePlatformFee;
 
       const deliveryFee = Math.max(
         0,
@@ -29361,6 +29391,9 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         deliveryFee: financials.deliveryFee,
         serviceFee: financials.serviceFee,
         platformServiceFee: financials.platformServiceFee,
+        basePlatformServiceFee,
+        speedPlatformFee,
+        queuePlatformFee,
         speedFee: financials.speedFee,
         upstairsFee: financials.upstairsFee,
         waitingFee: financials.waitingFee,
@@ -31615,6 +31648,10 @@ async function createMerchantOrderV3({
     ? calculateMerchantDeliveryFeeV3(route.distanceKm, stops.length)
     : 0;
 
+  const merchantOrderPlatformFee = deliveryMode === 'ubee'
+    ? Math.max(0, Math.round(Number(PRICING.merchantOrderPlatformFee || 10)))
+    : 0;
+
   const isRiderAdvanceCod =
     deliveryMode === 'ubee' && paymentMethod === 'rider_advance_cod';
 
@@ -31654,16 +31691,16 @@ async function createMerchantOrderV3({
   // merchant：客戶只支付商品款；配送費列入店家帳款。
   const merchantChargeAmount =
     merchantPaysDeliveryFee
-      ? deliveryFee
+      ? deliveryFee + merchantOrderPlatformFee
       : deliveryMode === 'ubee' && !isCashOrder
-        ? deliveryFee + advanceAmount
+        ? deliveryFee + merchantOrderPlatformFee + advanceAmount
         : 0;
 
   const customerCashCollectAmount =
     isRiderAdvanceCod
-      ? advanceAmount + (merchantPaysDeliveryFee ? 0 : deliveryFee)
+      ? advanceAmount + (merchantPaysDeliveryFee ? 0 : deliveryFee + merchantOrderPlatformFee)
       : isCashOrder
-        ? deliveryFee + advanceAmount
+        ? deliveryFee + merchantOrderPlatformFee + advanceAmount
         : 0;
 
   const commission = calculateMerchantCommissionV3({
@@ -31843,11 +31880,15 @@ async function createMerchantOrderV3({
     merchantReceivableAtPickup: isRiderAdvanceCod ? advanceAmount : 0,
     settlementMode: isRiderAdvanceCod ? 'rider_advance_cod' : paymentMethod,
 
-    totalFee: deliveryFee,
-    total: deliveryFee,
-    finalTotal: deliveryFee,
-    price: deliveryFee,
-    fee: deliveryFee,
+    serviceFee: merchantOrderPlatformFee,
+    platformServiceFee: merchantOrderPlatformFee,
+    merchantOrderPlatformFee,
+    serviceSubtotal: deliveryFee + merchantOrderPlatformFee,
+    totalFee: deliveryFee + merchantOrderPlatformFee,
+    total: deliveryFee + merchantOrderPlatformFee,
+    finalTotal: deliveryFee + merchantOrderPlatformFee,
+    price: deliveryFee + merchantOrderPlatformFee,
+    fee: deliveryFee + merchantOrderPlatformFee,
     customerPayableTotal: customerCashCollectAmount,
     cashCollectAmount: customerCashCollectAmount,
     amountToCollect: customerCashCollectAmount,
@@ -31858,7 +31899,16 @@ async function createMerchantOrderV3({
     driverFee: deliveryMode === 'ubee' ? deliveryFee : 0,
     riderIncome: deliveryMode === 'ubee' ? deliveryFee : 0,
     estimatedRiderIncome: deliveryMode === 'ubee' ? deliveryFee : 0,
-    platformFee: 0,
+    platformFee: merchantOrderPlatformFee,
+    platformIncome: merchantOrderPlatformFee,
+    cashDueToPlatform:
+      isCashOrder && !merchantPaysDeliveryFee
+        ? merchantOrderPlatformFee
+        : 0,
+    riderDueToPlatform:
+      isCashOrder && !merchantPaysDeliveryFee
+        ? merchantOrderPlatformFee
+        : 0,
 
     paymentMethod,
     paymentMethodLabel: paymentMethodLabelMap[paymentMethod],
@@ -31884,6 +31934,12 @@ async function createMerchantOrderV3({
     merchantPayableAmount: merchantChargeAmount,
 
     storePayableAmount: merchantChargeAmount,
+    platformReceivable:
+      merchantPaysDeliveryFee
+        ? merchantChargeAmount
+        : isCashOrder
+          ? merchantOrderPlatformFee
+          : merchantChargeAmount,
 
     merchantBillingStatus,
     merchantPaidAmount:
@@ -33254,7 +33310,7 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     Math.round(Number(PRICING.queueBaseFee || 0))
   );
 
-  const serviceFee = Math.max(
+  const basePlatformServiceFee = Math.max(
     0,
     Math.round(Number(PRICING.serviceFee || 0))
   );
@@ -33286,6 +33342,17 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     Math.round(Number(speed.fee || 0))
   );
 
+  const speedPlatformFee =
+    getPlatformSpeedManagementFee(data.speedType || 'standard');
+
+  const queuePlatformFee =
+    getQueuePlatformManagementFee(queueMinutes);
+
+  const serviceFee =
+    basePlatformServiceFee +
+    speedPlatformFee +
+    queuePlatformFee;
+
   const financials = calculateFinancialSplit({
     deliveryFee,
     serviceFee,
@@ -33305,6 +33372,10 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
 
     platformServiceFee:
       financials.platformServiceFee,
+
+    basePlatformServiceFee,
+    speedPlatformFee,
+    queuePlatformFee,
 
     speedFee:
       financials.speedFee,
@@ -39095,6 +39166,31 @@ function buildFinanceClosureSnapshot(order = {}) {
   }
 
   const settlementVariance = Math.round(settlementActual - settlementExpected);
+  let collectedPlatformIncome = 0;
+  if (isCompleted && !isCancelled) {
+    if (isCashPaymentOrder(order)) {
+      collectedPlatformIncome = Math.min(
+        expectedPlatformIncome,
+        Math.max(0, settlementActual)
+      );
+    } else if (isFinancePlatformPayoutOrder(order)) {
+      collectedPlatformIncome = actualPaidAmount > 0
+        ? expectedPlatformIncome
+        : 0;
+    } else if (String(order.merchantBillingStatus || '').trim()) {
+      collectedPlatformIncome =
+        String(order.merchantBillingStatus || '').trim().toLowerCase() === 'paid'
+          ? expectedPlatformIncome
+          : 0;
+    } else if (actualPaidAmount > 0) {
+      collectedPlatformIncome = expectedPlatformIncome;
+    }
+  }
+  collectedPlatformIncome = Math.max(0, Math.round(collectedPlatformIncome));
+  const outstandingPlatformIncome = Math.max(
+    0,
+    Math.round(expectedPlatformIncome - collectedPlatformIncome)
+  );
   const discrepancyReasons = [];
   if (Math.abs(customerVariance) > 1 && !['unpaid', 'cash_pending'].includes(paymentStatus)) {
     discrepancyReasons.push('客戶實收與最終應收不一致');
@@ -39147,6 +39243,8 @@ function buildFinanceClosureSnapshot(order = {}) {
     riderMinimumTaskIncome,
     riderIncomePolicyVersion,
     expectedPlatformIncome,
+    collectedPlatformIncome,
+    outstandingPlatformIncome,
     recordedPlatformIncome,
     feeBreakdown,
     customerVariance,
@@ -39237,6 +39335,9 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
       unpaidAmount: 0,
       todayCustomerRevenue: 0,
       todayPlatformIncome: 0,
+      totalPlatformAccruedIncome: 0,
+      totalPlatformCollectedIncome: 0,
+      totalPlatformOutstandingIncome: 0,
       todayRiderIncome: 0,
       todayRiderGuaranteeSubsidy: 0,
       todayRiderAdvance: 0,
@@ -39257,6 +39358,12 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
         ['completed', 'done'].includes(
           String(item.orderStatus || '').trim().toLowerCase()
         );
+
+      if (isCompletedFinanceOrder) {
+        summary.totalPlatformAccruedIncome += item.expectedPlatformIncome;
+        summary.totalPlatformCollectedIncome += item.collectedPlatformIncome;
+        summary.totalPlatformOutstandingIncome += item.outstandingPlatformIncome;
+      }
 
       const when = Number(item.completedAtMs || 0);
       if (
