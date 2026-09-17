@@ -3,6 +3,7 @@
 <!-- 2026-09-16｜UBee Growth Engine V1.3 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
+<!-- 2026-09-16｜Customer Notification Settings V2：通知設定改為原生 Switch；必要通知固定啟用、可選通知即時儲存、加入系統通知權限狀態。 -->
 <!-- 2026-09-16｜Customer Account UX V2：會員帳號主頁移除登出／刪除入口；通知偏好改為通知設定；登出與刪除申請下沉至帳號與安全。 -->
 <head>
 <!-- 2026-09-14｜Customer Native System V1.5 / Live Tracking Accept Sync V1：主訂單輪詢直接接收後端安全 tracking 摘要；已接單與 ETA 不再依賴 5 秒備援追蹤才更新；客戶端不需要 riderDocId / riderPhone。 -->
@@ -32,7 +33,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260916-customer-account-ux-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260916-customer-notification-settings-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -7144,7 +7145,7 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
 <div class="uca-choice-list">
 <label class="uca-choice"><input checked="" disabled="" type="checkbox"/><span><strong>任務狀態通知</strong><small>接單、取件、配送、完成及任務異常等必要通知。</small></span></label>
 <label class="uca-choice"><input checked="" disabled="" type="checkbox"/><span><strong>付款與安全通知</strong><small>付款狀態、帳號安全及重要客服處理資訊。</small></span></label>
-<label class="uca-choice"><input checked="" id="ucaPrefImportant" type="checkbox"/><span><strong>平台重要公告</strong><small>服務區域、營運時間或系統重要調整。</small></span></label>
+<label class="uca-choice"><input checked="" disabled="" id="ucaPrefImportant" type="checkbox"/><span><strong>平台重要公告（必要）</strong><small>服務區域、營運時間或系統重要調整，為確保服務資訊完整將固定啟用。</small></span></label>
 <label class="uca-choice"><input id="ucaPrefMarketing" type="checkbox"/><span><strong>優惠與活動訊息</strong><small>不是註冊必要條件，之後可再調整。</small></span></label>
 <label class="uca-choice"><input checked="" id="ucaPrefAddressLater" type="checkbox"/><span><strong>註冊完成後再設定常用地址</strong><small>不影響帳號建立與登入。</small></span></label>
 </div>
@@ -18935,13 +18936,50 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyPreferencesPanel">
 <div class="ubee-my-panel-head"><strong>通知設定</strong><button data-my-close-account="" type="button">上一頁</button></div>
-<div class="ubee-flat-switches">
-<label><span>任務狀態通知</span><input checked="" disabled="" type="checkbox"/></label>
-<label><span>付款與安全通知</span><input checked="" disabled="" type="checkbox"/></label>
-<label><span>平台重要公告</span><input checked="" id="ubeePrefImportant" type="checkbox"/></label>
-<label><span>優惠與活動訊息</span><input id="ubeePrefMarketing" type="checkbox"/></label>
+
+<div class="ubee-notification-section-copy">必要通知</div>
+<div class="ubee-settings-list ubee-notification-settings-list">
+  <div class="ubee-settings-row ubee-notification-row">
+    <span class="ubee-settings-copy"><strong>任務狀態通知</strong><small>接單、抵達、任務進度與完成狀態</small></span>
+    <span class="ubee-notification-fixed-status">已啟用</span>
+  </div>
+  <div class="ubee-settings-row ubee-notification-row">
+    <span class="ubee-settings-copy"><strong>付款與安全通知</strong><small>付款異常、帳號安全與重要風險提醒</small></span>
+    <span class="ubee-notification-fixed-status">已啟用</span>
+  </div>
+  <div class="ubee-settings-row ubee-notification-row">
+    <span class="ubee-settings-copy"><strong>平台重要公告</strong><small>服務、營運或系統的重要變更通知</small></span>
+    <span class="ubee-notification-fixed-status">已啟用</span>
+  </div>
 </div>
-<button class="ubee-flat-primary" data-flat-action="save-preferences" type="button">儲存偏好</button><div aria-live="polite" class="ubee-flat-status" id="ubeePreferencesStatus"></div>
+<div class="ubee-notification-helper">必要通知用於訂單、安全及重要服務資訊，無法個別關閉。</div>
+
+<div class="ubee-notification-section-copy">可選通知</div>
+<div class="ubee-settings-list ubee-notification-settings-list">
+  <div class="ubee-settings-row ubee-notification-row" data-notification-row="marketing">
+    <span class="ubee-settings-copy"><strong>優惠與活動訊息</strong><small>優惠、活動與期間限定資訊</small></span>
+    <button class="ubee-setting-switch" id="ubeePrefMarketingSwitch" type="button" role="switch" data-notification-toggle="marketing" aria-label="優惠與活動訊息" aria-checked="false"></button>
+  </div>
+  <div class="ubee-settings-row ubee-notification-row" data-notification-row="updates">
+    <span class="ubee-settings-copy"><strong>新功能與服務推薦</strong><small>UBee 新功能、服務與使用建議</small></span>
+    <button class="ubee-setting-switch" id="ubeePrefUpdatesSwitch" type="button" role="switch" data-notification-toggle="updates" aria-label="新功能與服務推薦" aria-checked="false"></button>
+  </div>
+</div>
+<div class="ubee-notification-helper">可選通知可隨時開關，切換後會立即儲存。</div>
+
+<div class="ubee-notification-section-copy">系統通知權限</div>
+<div class="ubee-settings-list ubee-notification-settings-list">
+  <div class="ubee-settings-row ubee-notification-row ubee-notification-permission-row">
+    <span class="ubee-settings-copy"><strong>這台裝置的推播通知</strong><small id="ubeeNotificationPermissionCopy">正在確認系統通知權限</small></span>
+    <div class="ubee-notification-permission-side">
+      <span class="ubee-notification-permission-status" id="ubeeNotificationPermissionStatus">確認中</span>
+      <button class="ubee-notification-permission-action" id="ubeeNotificationPermissionAction" type="button" hidden>開啟通知</button>
+    </div>
+  </div>
+</div>
+<div class="ubee-notification-helper" id="ubeeNotificationPermissionHelp">手機系統若關閉 UBee 通知，即使 App 內設定為開啟，也可能無法收到推播。</div>
+
+<div aria-live="polite" class="ubee-notification-autosave-status" id="ubeePreferencesStatus"></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMySecurityPanel">
 <div class="ubee-my-panel-head"><strong>帳號與安全</strong><button data-my-close-account="" type="button">上一頁</button></div>
@@ -20291,7 +20329,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260916-customer-account-ux-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260916-customer-notification-settings-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -21223,6 +21261,114 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 #productionOrderFlow .ubee-my-growth-detail-panel .ubee-native-growth-back{min-height:44px;padding:0 4px;font-size:15px}
 #productionOrderFlow .ubee-my-menu-item{min-height:60px}
 #productionOrderFlow .ubee-my-menu-item:active{background:var(--ubee-surface-2)}
+
+#productionOrderFlow .ubee-notification-section-copy{
+  margin:22px 2px 8px;
+  color:#8a9097;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+#productionOrderFlow #ubeeMyPreferencesPanel .ubee-notification-section-copy:first-of-type{
+  margin-top:4px;
+}
+#productionOrderFlow .ubee-notification-settings-list{
+  margin:0;
+  overflow:hidden;
+  border:1px solid #e7e8ea;
+  border-radius:14px;
+  background:#fff;
+}
+#productionOrderFlow .ubee-notification-row{
+  min-height:66px;
+  padding:12px 14px;
+  gap:14px;
+}
+#productionOrderFlow .ubee-notification-row .ubee-settings-copy{
+  min-width:0;
+}
+#productionOrderFlow .ubee-notification-row .ubee-settings-copy strong{
+  font-size:15px;
+  font-weight:850;
+  color:#15171a;
+}
+#productionOrderFlow .ubee-notification-row .ubee-settings-copy small{
+  display:block;
+  margin-top:3px;
+  color:#8a9097;
+  font-size:12px;
+  font-weight:600;
+  line-height:1.4;
+}
+#productionOrderFlow .ubee-notification-fixed-status,
+#productionOrderFlow .ubee-notification-permission-status{
+  flex:0 0 auto;
+  min-width:58px;
+  padding:6px 9px;
+  border-radius:999px;
+  background:#fff5bf;
+  color:#765d00;
+  font-size:11px;
+  font-weight:850;
+  text-align:center;
+  white-space:nowrap;
+}
+#productionOrderFlow .ubee-notification-helper{
+  margin:7px 4px 0;
+  color:#9a9fa5;
+  font-size:11px;
+  font-weight:600;
+  line-height:1.5;
+}
+#productionOrderFlow .ubee-notification-permission-side{
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:7px;
+}
+#productionOrderFlow .ubee-notification-permission-status[data-state="granted"]{
+  background:#e8f7ed;
+  color:#15723a;
+}
+#productionOrderFlow .ubee-notification-permission-status[data-state="default"]{
+  background:#fff5bf;
+  color:#765d00;
+}
+#productionOrderFlow .ubee-notification-permission-status[data-state="denied"],
+#productionOrderFlow .ubee-notification-permission-status[data-state="unsupported"]{
+  background:#f1f2f4;
+  color:#72777e;
+}
+#productionOrderFlow .ubee-notification-permission-action{
+  min-height:34px;
+  padding:7px 10px;
+  border:0;
+  border-radius:9px;
+  background:#facc15;
+  color:#111;
+  font:inherit;
+  font-size:12px;
+  font-weight:850;
+}
+#productionOrderFlow .ubee-notification-permission-action:disabled{
+  background:#f1f2f4;
+  color:#8f949a;
+}
+#productionOrderFlow .ubee-notification-autosave-status{
+  min-height:24px;
+  margin:10px 2px 0;
+  color:#7a8087;
+  font-size:12px;
+  font-weight:650;
+}
+#productionOrderFlow .ubee-notification-autosave-status.is-saved{
+  color:#27864c;
+}
+#productionOrderFlow #ubeeMyPreferencesPanel .ubee-setting-switch{
+  flex:0 0 auto;
+}
+
 #productionOrderFlow .ubee-account-security-note{
   margin:4px 2px 18px;
   color:#8a9097;
@@ -22177,16 +22323,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
       if(flatAction === 'rider-apply'){
         location.href = 'https://ubee-rider-web.vercel.app/rider.html';
-        return;
-      }
-
-      if(flatAction === 'save-preferences'){
-        localStorage.setItem('ubeeCustomerPreferences',JSON.stringify({
-          important:document.getElementById('ubeePrefImportant')?.checked !== false,
-          marketing:Boolean(document.getElementById('ubeePrefMarketing')?.checked)
-        }));
-        const status = document.getElementById('ubeePreferencesStatus');
-        if(status) status.textContent = '通知設定已儲存。';
         return;
       }
 
@@ -25240,6 +25376,184 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   }
 }
 </style>
+
+
+<script id="ubee-customer-notification-settings-v2-controller">
+(()=>{
+  'use strict';
+
+  if(window.__UBEE_CUSTOMER_NOTIFICATION_SETTINGS_V2__) return;
+  window.__UBEE_CUSTOMER_NOTIFICATION_SETTINGS_V2__ = true;
+
+  const STORAGE_KEY = 'ubeeCustomerPreferences';
+  let saveStatusTimer = 0;
+
+  function readPreferences(){
+    let saved = {};
+    try{
+      saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};
+    }catch(_){
+      saved = {};
+    }
+    return {
+      important:true,
+      marketing:Boolean(saved.marketing),
+      updates:Boolean(saved.updates)
+    };
+  }
+
+  function writePreferences(next){
+    const current = readPreferences();
+    const merged = {
+      important:true,
+      marketing:Boolean(next?.marketing ?? current.marketing),
+      updates:Boolean(next?.updates ?? current.updates)
+    };
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(merged));
+    return merged;
+  }
+
+  function setSwitch(button,on){
+    if(!button) return;
+    button.setAttribute('aria-checked',on ? 'true' : 'false');
+  }
+
+  function showSaved(message='已自動儲存'){
+    const status = document.getElementById('ubeePreferencesStatus');
+    if(!status) return;
+    window.clearTimeout(saveStatusTimer);
+    status.textContent = message;
+    status.classList.add('is-saved');
+    saveStatusTimer = window.setTimeout(()=>{
+      status.textContent = '';
+      status.classList.remove('is-saved');
+    },1600);
+  }
+
+  function renderPreferenceSwitches(){
+    const pref = readPreferences();
+    setSwitch(document.getElementById('ubeePrefMarketingSwitch'),pref.marketing);
+    setSwitch(document.getElementById('ubeePrefUpdatesSwitch'),pref.updates);
+  }
+
+  async function refreshPermissionState(){
+    const status = document.getElementById('ubeeNotificationPermissionStatus');
+    const copy = document.getElementById('ubeeNotificationPermissionCopy');
+    const action = document.getElementById('ubeeNotificationPermissionAction');
+    const help = document.getElementById('ubeeNotificationPermissionHelp');
+    if(!status || !copy || !action) return;
+
+    action.hidden = true;
+    action.disabled = false;
+
+    if(!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)){
+      status.textContent = '不支援';
+      status.dataset.state = 'unsupported';
+      copy.textContent = '目前瀏覽器或裝置不支援 Web Push 通知';
+      if(help) help.textContent = '此裝置目前無法使用 UBee 推播通知。';
+      return;
+    }
+
+    const permission = Notification.permission;
+
+    if(permission === 'granted'){
+      status.textContent = '已允許';
+      status.dataset.state = 'granted';
+      copy.textContent = '系統已允許 UBee 在這台裝置傳送推播';
+      if(help) help.textContent = '必要通知會依訂單、付款、安全與平台重要事件傳送。';
+      return;
+    }
+
+    if(permission === 'denied'){
+      status.textContent = '已關閉';
+      status.dataset.state = 'denied';
+      copy.textContent = '手機系統目前封鎖 UBee 通知';
+      action.hidden = false;
+      action.disabled = true;
+      action.textContent = '請至系統設定';
+      if(help) help.textContent = '請到 iPhone／Android 的系統設定中允許 UBee 通知，再回到此頁重新確認。';
+      return;
+    }
+
+    status.textContent = '尚未開啟';
+    status.dataset.state = 'default';
+    copy.textContent = '尚未取得這台裝置的通知權限';
+    action.hidden = false;
+    action.textContent = '開啟通知';
+    if(help) help.textContent = '點「開啟通知」後，系統會詢問是否允許 UBee 傳送推播。';
+  }
+
+  async function enableSystemNotification(){
+    const action = document.getElementById('ubeeNotificationPermissionAction');
+    if(action) action.disabled = true;
+
+    try{
+      if(window.UBeeCustomerPush?.enable){
+        await window.UBeeCustomerPush.enable();
+      }else if('Notification' in window){
+        await Notification.requestPermission();
+      }
+    }catch(error){
+      const status = document.getElementById('ubeePreferencesStatus');
+      if(status){
+        status.textContent = error?.message || '通知權限開啟失敗，請稍後再試。';
+        status.classList.remove('is-saved');
+      }
+    }finally{
+      if(action) action.disabled = false;
+      await refreshPermissionState();
+    }
+  }
+
+  document.addEventListener('click',event=>{
+    const toggle = event.target.closest?.('#ubeeMyPreferencesPanel [data-notification-toggle]');
+    if(toggle){
+      event.preventDefault();
+      event.stopPropagation();
+      const name = String(toggle.dataset.notificationToggle || '').trim();
+      if(!['marketing','updates'].includes(name)) return;
+
+      const next = toggle.getAttribute('aria-checked') !== 'true';
+      setSwitch(toggle,next);
+      writePreferences({[name]:next});
+      try{
+        if(typeof navigator.vibrate === 'function') navigator.vibrate(8);
+      }catch(_){}
+      showSaved(next ? '已開啟並自動儲存' : '已關閉並自動儲存');
+      return;
+    }
+
+    if(event.target.closest?.('#ubeeNotificationPermissionAction')){
+      event.preventDefault();
+      event.stopPropagation();
+      enableSystemNotification();
+    }
+  },true);
+
+  window.addEventListener('focus',refreshPermissionState);
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden) refreshPermissionState();
+  });
+
+  const init = ()=>{
+    renderPreferenceSwitches();
+    refreshPermissionState();
+  };
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded',init,{once:true});
+  }else{
+    init();
+  }
+
+  window.UBeeCustomerNotificationSettingsV2 = Object.freeze({
+    refresh(){
+      renderPreferenceSwitches();
+      return refreshPermissionState();
+    }
+  });
+})();
+</script>
 
 </body>
 </html>
