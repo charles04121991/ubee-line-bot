@@ -3,6 +3,7 @@
 <!-- 2026-09-16｜UBee Growth Engine V1.3 Native：刪除舊 taskCount→一般/銀卡/金卡/鑽石會員判斷；會員牌級改由後端 Growth Engine 唯一判定，新增我的 UBee／邀請好友／成長歷程。 -->
 
 <html lang="zh-TW" class="ubee-app-starting" style="background:#ffffff;">
+<!-- 2026-09-17｜Customer Legal & Privacy UX V1：移除規範與隱私頁預設「規範說明」區塊；只保留四個正式入口，條款內容改為點選後才顯示。 -->
 <!-- 2026-09-17｜Customer Notification Settings V3：通知頁改為獨立 ubee-notify 元件，切斷舊 settings row 樣式，修正窄欄斷字、超長狀態膠囊與 Switch 位置。 -->
 <!-- 2026-09-16｜Customer Notification Settings V2：通知設定改為原生 Switch；必要通知固定啟用、可選通知即時儲存、加入系統通知權限狀態。 -->
 <!-- 2026-09-16｜Customer Account UX V2：會員帳號主頁移除登出／刪除入口；通知偏好改為通知設定；登出與刪除申請下沉至帳號與安全。 -->
@@ -34,7 +35,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260917-customer-notification-settings-v3" rel="manifest"/>
+<link href="/manifest-order.json?v=20260917-customer-legal-privacy-ux-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19018,10 +19019,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <button class="ubee-flat-row" data-flat-action="pricing" type="button">任務與費用規範 <span>›</span></button>
 <button class="ubee-flat-row" data-flat-action="prohibited" type="button">禁止委託項目 <span>›</span></button>
 </div>
-<div class="ubee-flat-section" id="ubeeMyDocumentContent" tabindex="-1">
-<strong>規範說明</strong>
-<p>點選上方項目即可在這裡查看重點說明。</p>
-</div>
+<div class="ubee-flat-section" hidden id="ubeeMyDocumentContent" tabindex="-1"></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyDeleteAccountPanel">
 <div class="ubee-my-panel-head"><strong>帳號刪除申請</strong><button data-my-close-security="" type="button">上一頁</button></div>
@@ -20348,7 +20346,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260917-customer-notification-settings-v3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260917-customer-legal-privacy-ux-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22066,6 +22064,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(normalized === 'account') fillAccountPanel();
     if(normalized === 'feedback') fillFeedbackContact();
     if(normalized === 'rewards') fillGrowthPanel(normalized);
+    if(normalized === 'privacy' && !options.keepLegalDocument){
+      const legalContent = document.getElementById('ubeeMyDocumentContent');
+      if(legalContent){
+        legalContent.hidden = true;
+        legalContent.innerHTML = '';
+      }
+    }
 
     const panel = document.getElementById(panelId);
     if(!panel) return false;
@@ -22926,12 +22931,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
       const selectedLegalDocument = legalDocuments[flatAction];
       if(selectedLegalDocument){
+        if(currentMySection !== 'privacy'){
+          openMySection('privacy',{keepLegalDocument:true});
+        }
         const content = document.getElementById('ubeeMyDocumentContent');
         if(content){
           content.innerHTML = `<strong>${selectedLegalDocument.title}</strong>${selectedLegalDocument.html}`;
+          content.hidden = false;
+          requestAnimationFrame(()=>content.scrollIntoView({block:'start',behavior:'smooth'}));
         }
-        openMySection('privacy');
-        document.getElementById('ubeeMyDocumentContent')?.scrollIntoView({block:'start'});
         return;
       }
     }
