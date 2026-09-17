@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-17｜Dispatch Profit Control V1：顯示客戶支付、小U收入、平台應得、實收／待收、定價版本與獲利警示。 -->
 <!-- 2026-09-07｜Dispatch Manual Unassign V1：新增「取消派單」；只解除目前小U，不取消客戶訂單；取件前可退回待派單並重新媒合，抵達取件後受貨物安全鎖保護。 -->
 <!-- 2026-09-03｜Dispatch Universal Arrival Photo V1.1：所有服務共用到場照片狀態；排隊任務只要求任務地點照片，路線任務依取件＋每個送達點計算。 -->
 <!-- 2026-09-03｜Dispatch Arrival Photo Proof V1：訂單卡與摘要顯示小U已回傳的到場照片數量，讓調度中心確認每個到場節點都有照片證明。 -->
@@ -10,7 +11,7 @@
 <!-- UBee 調度中心 V2 Final：dashboard 由 ridersV2＋riderPresenceV2＋riderLocationsV2＋riderStatsV2 聚合。 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>UBee 跑腿｜調度中心 V2 Final＋動態定價 V3＋Rider Visibility V1</title>
+<title>UBee 跑腿｜智慧調度控制塔＋Profit Pricing V1</title>
 
 <!-- Google Maps JavaScript API：由 /api/config 取得現有 UBee Google Maps 設定後動態載入 -->
 
@@ -116,6 +117,25 @@ button{cursor:pointer}
 .badge.blue{background:#eaf1ff;color:#2463cf}
 .badge.green{background:#e9f8ef;color:#157a49}
 .price{font-size:19px;font-weight:1000;white-space:nowrap}
+.profit-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}
+.profit-cell{border:1px solid var(--line);border-radius:10px;background:#f8f9fb;padding:7px 8px;min-width:0}
+.profit-cell span{display:block;color:var(--muted);font-size:9px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profit-cell b{display:block;margin-top:3px;font-size:13px;line-height:1.15}
+.profit-cell.rider b{color:var(--blue)}
+.profit-cell.platform b{color:var(--green)}
+.profit-status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:1000}
+.profit-status.normal{background:#e9f8ef;color:#157a49}
+.profit-status.low{background:#fff4dc;color:#9a5b00}
+.profit-status.missing{background:#ffe7e8;color:#bd2c33}
+.order-finance-box{margin-top:11px;border:1px solid #dfe8e3;border-radius:13px;background:#f7fcf9;padding:11px}
+.order-finance-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.order-finance-title{font-size:12px;font-weight:1000}
+.order-finance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:9px}
+.order-finance-item{border-radius:9px;background:#fff;border:1px solid #e5ece8;padding:8px;min-width:0}
+.order-finance-item span{display:block;font-size:9px;color:var(--muted);font-weight:900}
+.order-finance-item b{display:block;margin-top:3px;font-size:14px}
+.order-finance-detail{margin-top:9px;font-size:10px;line-height:1.65;color:#59615c}
+.order-finance-detail strong{color:#111}
 .route{margin-top:10px;display:grid;gap:6px}
 .route-line{display:grid;grid-template-columns:17px 1fr;gap:7px;font-size:12px;line-height:1.45}
 .pin{width:9px;height:9px;border-radius:50%;margin-top:4px;margin-left:3px}
@@ -450,7 +470,7 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   <header class="topbar">
     <div class="brand-wrap">
       <div class="brand">U<span class="bee">Bee</span> 調度中心</div>
-      <div class="version">V4 + V5 · RIDER VISIBILITY</div>
+      <div class="version">V4 + V5 · PROFIT PRICING V1</div>
       <div class="status-live"><span class="live-dot"></span><span id="systemStatusText">即時監控啟動中</span></div>
     </div>
     <div class="actions">
@@ -460,8 +480,8 @@ textarea.form-control{min-height:110px;resize:vertical;line-height:1.6}
   </header>
 
   <div class="level4-banner">
-    <div><strong>UBee 智慧調度控制塔 V4 + V5</strong><br><small>V4 全局任務控制塔 × V5 智慧城市供需地圖；整合任務階段、小U健康、15分鐘預測、最近移動軌跡與 V3 異常處置。</small></div>
-    <div class="level4-badge">CITY OPS：LIVE · V3 SAFETY：ON</div>
+    <div><strong>UBee 智慧調度控制塔 V4 + V5｜Profit Pricing V1</strong><br><small>整合任務階段、小U健康、即時獲利、平台回款、15分鐘預測、移動軌跡與異常處置。</small></div>
+    <div class="level4-badge">CITY OPS：LIVE · PROFIT CONTROL：ON</div>
   </div>
 
   <section class="kpis">
@@ -2591,6 +2611,111 @@ function renderIntelligence(){
     <div class="api-note" style="margin-top:10px">第一版預測採即時趨勢＋同星期同時段歷史樣本加權；資料不足時信心會顯示 LOW。</div>`;
 }
 
+function dispatchMoney(value){
+  const amount=Math.max(0,Math.round(Number(value||0)));
+  return `NT$ ${amount.toLocaleString('zh-TW')}`;
+}
+
+function getOrderProfitMeta(order){
+  const finance=order?.finance&&typeof order.finance==='object'
+    ? order.finance
+    : {};
+
+  const customerTotal=Math.max(
+    0,
+    Number(finance.finalCustomerTotal??order?.total??0)||0
+  );
+  const riderIncome=Math.max(
+    0,
+    Number(
+      finance.riderIncome??
+      order?.riderIncome??
+      order?.riderFee??
+      order?.driverFee??
+      0
+    )||0
+  );
+  const platformIncome=Math.max(
+    0,
+    Number(
+      finance.expectedPlatformIncome??
+      order?.platformFee??
+      0
+    )||0
+  );
+  const platformCollected=Math.max(
+    0,
+    Number(finance.collectedPlatformIncome??0)||0
+  );
+  const platformOutstanding=Math.max(
+    0,
+    Number(
+      finance.outstandingPlatformIncome??
+      Math.max(0,platformIncome-platformCollected)
+    )||0
+  );
+  const platformServiceFee=Math.max(
+    0,
+    Number(order?.platformServiceFee??order?.serviceFee??0)||0
+  );
+  const available=
+    order?.financialDataAvailable!==false&&
+    (customerTotal<=0||riderIncome>0||platformIncome>0);
+  const marginPercent=customerTotal>0
+    ? Math.round(platformIncome/customerTotal*1000)/10
+    : 0;
+
+  let stateKey='normal';
+  let stateLabel='獲利正常';
+  if(!available){
+    stateKey='missing';
+    stateLabel='舊版／財務待確認';
+  }else if(platformIncome<=0){
+    stateKey='missing';
+    stateLabel='平台收入異常';
+  }else if(platformIncome<Math.max(10,platformServiceFee)){
+    stateKey='low';
+    stateLabel='平台收入偏低';
+  }
+
+  return {
+    finance,
+    customerTotal,
+    riderIncome,
+    platformIncome,
+    platformCollected,
+    platformOutstanding,
+    platformServiceFee,
+    marginPercent,
+    stateKey,
+    stateLabel
+  };
+}
+
+function profitStatusBadge(profit){
+  return `<span class="profit-status ${esc(profit.stateKey)}">${esc(profit.stateLabel)}</span>`;
+}
+
+function financeStatusLabel(value){
+  const status=String(value||'').trim().toLowerCase();
+  const labels={
+    paid:'已付款',paid_confirmed:'已付款',cash_collected:'現金已收',
+    cash_pending:'現金待收',unpaid:'未付款',partial:'部分付款',
+    settled:'已結清',pending:'待結算',pending_settlement:'待結算',
+    ready:'可對帳',reconciled:'已對帳',in_progress:'任務進行中',
+    not_applicable:'不適用',needs_review:'需要檢查'
+  };
+  return labels[status]||status||'待確認';
+}
+
+function pricingVersionLabel(order){
+  return String(
+    order?.routePricingVersion||
+    order?.fareMode||
+    '舊版／未標記'
+  );
+}
+
 function renderOrders(){
   let list = [...(state.data.orders || [])];
 
@@ -2619,6 +2744,7 @@ function renderOrders(){
   $('orders').innerHTML = list.map(order=>{
     const selected = String(order.id) === String(state.selectedOrderId);
     const isWaiting = statusKind(order) === 'waiting';
+    const profit=getOrderProfitMeta(order);
     const currentStatus = String(order.status||'').trim();
     const canUnassign = ['accepted','going_to_pickup','heading_to_pickup'].includes(currentStatus) &&
       Boolean(order.riderId||order.riderDocId||order.riderPhone||order.riderLineUserId) &&
@@ -2635,11 +2761,18 @@ function renderOrders(){
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
               ${order.serviceType?`<span class="badge blue">${esc(order.serviceType)}</span>`:''}
               ${order.serviceCategory?`<span class="badge">${esc(order.serviceCategory)}</span>`:''}
+              ${profitStatusBadge(profit)}
               ${merchantLiveTrackingBadges(order)}
               ${Number(order.openIncidentCount||0)>0?`<span class="badge danger">異常案件 ${esc(order.openIncidentCount)}</span>`:''}
             </div>
           </div>
           <div class="price">NT$ ${esc(order.total || 0)}</div>
+        </div>
+
+        <div class="profit-strip">
+          <div class="profit-cell"><span>客戶支付</span><b>${esc(dispatchMoney(profit.customerTotal))}</b></div>
+          <div class="profit-cell rider"><span>小U收入</span><b>${esc(dispatchMoney(profit.riderIncome))}</b></div>
+          <div class="profit-cell platform"><span>平台應得</span><b>${esc(dispatchMoney(profit.platformIncome))}</b></div>
         </div>
 
         <div class="route">
@@ -2868,6 +3001,22 @@ function renderCandidates(){
     )||0
   );
   const waitingLiveSummary=getWaitingLiveSummary(order);
+  const profit=getOrderProfitMeta(order);
+  const finance=profit.finance||{};
+  const pricingComponents=[
+    Number(order.basePlatformServiceFee||0)>0
+      ? `基本平台費 ${dispatchMoney(order.basePlatformServiceFee)}`
+      : '',
+    Number(order.speedPlatformFee||0)>0
+      ? `時效管理費 ${dispatchMoney(order.speedPlatformFee)}`
+      : '',
+    Number(order.queuePlatformFee||0)>0
+      ? `排隊管理費 ${dispatchMoney(order.queuePlatformFee)}`
+      : '',
+    Number(order.merchantOrderPlatformFee||0)>0
+      ? `店家系統費 ${dispatchMoney(order.merchantOrderPlatformFee)}`
+      : ''
+  ].filter(Boolean);
 
   $('selectedOrderSummary').innerHTML = `
     <strong>${esc(order.id)}</strong>
@@ -2887,6 +3036,34 @@ function renderCandidates(){
       ${Number(order.operationalWaitingFee||0)>0?`<br>已結算現場等候費：NT$${esc(Number(order.operationalWaitingFee||0))}`:''}
       ${waitingLiveSummary?`<br><span style="color:var(--orange);font-weight:1000">${esc(waitingLiveSummary)}</span>`:''}
       ${String(order.itemSizeReviewStatus||'')==='pending'?`<br><span style="color:var(--red);font-weight:1000">小U已回報體積不符，等待調度確認</span>`:''}
+    </div>
+
+    <div class="order-finance-box">
+      <div class="order-finance-head">
+        <div class="order-finance-title">Profit Pricing｜即時獲利與回款</div>
+        ${profitStatusBadge(profit)}
+      </div>
+      <div class="order-finance-grid">
+        <div class="order-finance-item"><span>客戶支付</span><b>${esc(dispatchMoney(profit.customerTotal))}</b></div>
+        <div class="order-finance-item"><span>小U收入</span><b style="color:var(--blue)">${esc(dispatchMoney(profit.riderIncome))}</b></div>
+        <div class="order-finance-item"><span>平台應得</span><b style="color:var(--green)">${esc(dispatchMoney(profit.platformIncome))}</b></div>
+        <div class="order-finance-item"><span>平台已入帳</span><b>${esc(dispatchMoney(profit.platformCollected))}</b></div>
+        <div class="order-finance-item"><span>平台待收／待回繳</span><b style="color:${profit.platformOutstanding>0?'var(--orange)':'var(--green)'}">${esc(dispatchMoney(profit.platformOutstanding))}</b></div>
+        <div class="order-finance-item"><span>平台收入占比</span><b>${esc(profit.marginPercent)}%</b></div>
+      </div>
+      <div class="order-finance-detail">
+        <strong>定價版本：</strong>${esc(pricingVersionLabel(order))}<br>
+        <strong>平台服務費：</strong>${esc(dispatchMoney(profit.platformServiceFee))}
+        ${pricingComponents.length?`｜${esc(pricingComponents.join('、'))}`:''}<br>
+        <strong>任務費分潤桶：</strong>${esc(dispatchMoney(order.shareableTaskSubtotal||0))}
+        ｜<strong>小U專屬加價：</strong>${esc(dispatchMoney(order.riderOnlySurchargeSubtotal||0))}<br>
+        <strong>付款：</strong>${esc(financeStatusLabel(finance.paymentStatus))}
+        ｜<strong>結算：</strong>${esc(financeStatusLabel(finance.settlementStatus))}
+        ｜<strong>對帳：</strong>${esc(financeStatusLabel(finance.reconciliationStatus))}
+        ${Array.isArray(finance.discrepancyReasons)&&finance.discrepancyReasons.length
+          ? `<br><span style="color:var(--red);font-weight:1000">需檢查：${esc(finance.discrepancyReasons.join('；'))}</span>`
+          : ''}
+      </div>
     </div>
 
     ${renderTaskContractStrip(order)}
