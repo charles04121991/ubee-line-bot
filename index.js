@@ -1,3 +1,4 @@
+// 2026-09-18｜UBee Smart Stack V1.1：Recovery Hard Lock＋Google Routes 真實道路疊單判斷＋QUEUED Live ETA；V1 CURRENT/QUEUED 架構保留。
 // 2026-09-18｜UBee Smart Stack V1：順序疊單；最多 2 單，CURRENT + QUEUED，完成第一單後自動升級第二單；不改 Profit Pricing V1。
 // 2026-09-17｜Profit Pricing V1 / Route Pricing V4：維持任務費 70/30 與小U NT$50 保底；一般路線改為 3km 內 NT$80、3～8km 每公里 NT$12、8km 以上每公里 NT$11，移除長途收入保障的失控外推；急件與長時間排隊另收平台管理費，小U原有加價不減少；店家 COD 加入固定系統服務費；財務總帳拆分平台應收、已收與待收。
 // 2026-09-16｜Rider Motor Vehicle Hard Lock V1：新版小U申請只接受機車／汽車；/api/rider/register 後端硬鎖，非允許車種直接 400 拒絕。
@@ -8841,7 +8842,6 @@ const UBEE_SMART_STACK_V1 = Object.freeze({
   maxActiveOrders: 2,
   maxTransferKm: 3,
   maxTransferMinutes: 15,
-  roadFactor: 1.25,
 });
 
 function smartStackSafeOrderId(value) {
@@ -8889,29 +8889,149 @@ function isSmartStackStandardDelivery(order = {}) {
   );
 }
 
-function getSmartStackRemainingMinutes(order = {}) {
-  const status = String(order.status || '').trim().toLowerCase();
-  const defaults = {
-    accepted: 30,
-    going_to_pickup: 26,
-    heading_to_pickup: 26,
-    arrived_pickup: 20,
-    picked_up: 14,
-    going_to_dropoff: 12,
-    heading_to_dropoff: 12,
-    arrived_dropoff: 5,
-  };
-  return Math.max(3, Number(defaults[status] || 20));
+
+const UBEE_SMART_STACK_V11 = Object.freeze({
+  version:'smart-stack-v1.1',
+  queuedEtaRefreshMs:30 * 1000,
+  queuedEtaMinMoveKm:0.08,
+  transferRouteRefreshMs:3 * 60 * 1000,
+  routeCheckCandidateLimit:12,
+});
+
+const smartStackQueuedEtaLocksV11 = new Map();
+
+function smartStackRouteWaypoint(order = {}, type = 'pickup') {
+  const pickup = type === 'pickup';
+  return buildRoutesWaypoint({
+    address: pickup
+      ? (order.pickupAddress || order.pickup || order.fromAddress || '')
+      : (order.dropoffAddress || order.dropoff || order.toAddress || ''),
+    placeId: pickup
+      ? (order.pickupPlaceId || order.fromPlaceId || '')
+      : (order.dropoffPlaceId || order.toPlaceId || ''),
+    lat: pickup
+      ? (order.pickupLat ?? order.fromLat ?? order.pickupLocation?.lat)
+      : (order.dropoffLat ?? order.toLat ?? order.dropoffLocation?.lat),
+    lng: pickup
+      ? (order.pickupLng ?? order.fromLng ?? order.pickupLocation?.lng)
+      : (order.dropoffLng ?? order.toLng ?? order.dropoffLocation?.lng),
+  });
 }
 
-function buildSmartStackEligibility(currentOrder = {}, candidateOrder = {}) {
+function smartStackRouteFingerprint(currentOrder = {}, candidateOrder = {}) {
+  const currentDropoff = smartStackRouteWaypoint(currentOrder,'dropoff');
+  const candidatePickup = smartStackRouteWaypoint(candidateOrder,'pickup');
+  return JSON.stringify({
+    currentId:smartStackSafeOrderId(currentOrder.id || currentOrder.orderId),
+    candidateId:smartStackSafeOrderId(candidateOrder.id || candidateOrder.orderId),
+    currentDropoff,
+    candidatePickup,
+  });
+}
+
+async function computeGoogleRoutesTrafficV11({
+  origin,
+  destination,
+  intermediates = [],
+} = {}) {
+  if (!GOOGLE_MAPS_SERVER_API_KEY || !origin || !destination) return null;
+
+  const body = {
+    origin,
+    destination,
+    travelMode:'DRIVE',
+    routingPreference:'TRAFFIC_AWARE',
+    computeAlternativeRoutes:false,
+    routeModifiers:{
+      avoidTolls:false,
+      avoidHighways:false,
+      avoidFerries:false,
+    },
+    languageCode:'zh-TW',
+    regionCode:'tw',
+    units:'METRIC',
+    departureTime:new Date().toISOString(),
+  };
+
+  const safeIntermediates = Array.isArray(intermediates)
+    ? intermediates.filter(Boolean).slice(0, 3)
+    : [];
+  if (safeIntermediates.length) {
+    body.intermediates = safeIntermediates;
+  }
+
+  try {
+    const response = await fetch(
+      'https://routes.googleapis.com/directions/v2:computeRoutes',
+      {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'X-Goog-Api-Key':GOOGLE_MAPS_SERVER_API_KEY,
+          'X-Goog-FieldMask':[
+            'routes.distanceMeters',
+            'routes.duration',
+            'routes.staticDuration',
+          ].join(','),
+        },
+        body:JSON.stringify(body),
+      }
+    );
+
+    const data = await response.json().catch(()=>({}));
+    const route = data?.routes?.[0];
+
+    if (!response.ok || !route) {
+      throw new Error(
+        data?.error?.message ||
+        `HTTP_${response.status}`
+      );
+    }
+
+    const distanceMeters = Math.max(0, Number(route.distanceMeters || 0));
+    const durationSeconds = parseGoogleDurationSeconds(route.duration);
+    const staticDurationSeconds = parseGoogleDurationSeconds(route.staticDuration);
+
+    if (!Number.isFinite(distanceMeters) || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+      return null;
+    }
+
+    return {
+      distanceMeters,
+      distanceKm:Number((distanceMeters / 1000).toFixed(2)),
+      durationSeconds,
+      durationMinutes:Math.max(1, Math.ceil(durationSeconds / 60)),
+      staticDurationSeconds,
+      distanceText:formatRouteDistanceText(distanceMeters),
+      durationText:formatRouteDurationText(durationSeconds),
+      trafficAware:true,
+      provider:'google_routes',
+      version:UBEE_SMART_STACK_V11.version,
+    };
+  } catch (error) {
+    console.warn('⚠️ Smart Stack V1.1 Google Routes 計算失敗：', error?.message || error);
+    return null;
+  }
+}
+
+async function getSmartStackTransferRouteV11(currentOrder = {}, candidateOrder = {}) {
+  const origin = smartStackRouteWaypoint(currentOrder,'dropoff');
+  const destination = smartStackRouteWaypoint(candidateOrder,'pickup');
+  if (!origin || !destination) return null;
+
+  return computeGoogleRoutesTrafficV11({
+    origin,
+    destination,
+  });
+}
+
+async function buildSmartStackEligibilityV11(currentOrder = {}, candidateOrder = {}) {
   const currentId = smartStackSafeOrderId(currentOrder.id || currentOrder.orderId);
   const candidateId = smartStackSafeOrderId(candidateOrder.id || candidateOrder.orderId);
 
   if (!currentId || !candidateId || currentId === candidateId) {
     return { eligible:false, code:'INVALID_ORDER_PAIR' };
   }
-
   if (!isSmartStackStandardDelivery(currentOrder)) {
     return { eligible:false, code:'CURRENT_ORDER_NOT_SUPPORTED' };
   }
@@ -8931,42 +9051,208 @@ function buildSmartStackEligibility(currentOrder = {}, candidateOrder = {}) {
     return { eligible:false, code:'CANDIDATE_NOT_PENDING' };
   }
 
-  const currentDropoff = smartStackOrderPoint(currentOrder, 'dropoff');
-  const candidatePickup = smartStackOrderPoint(candidateOrder, 'pickup');
-  if (!currentDropoff || !candidatePickup) {
-    return { eligible:false, code:'STACK_ROUTE_COORDINATES_MISSING' };
+  const route = await getSmartStackTransferRouteV11(currentOrder,candidateOrder);
+  if (!route) {
+    return {
+      eligible:false,
+      code:'STACK_REAL_ROUTE_UNAVAILABLE',
+      routeProvider:'google_routes',
+    };
   }
 
-  const straightKm = dispatchHaversineKm(
-    currentDropoff.lat,
-    currentDropoff.lng,
-    candidatePickup.lat,
-    candidatePickup.lng
-  );
-  const transferKm = Math.max(0, Number((straightKm * UBEE_SMART_STACK_V1.roadFactor).toFixed(2)));
-  const transferMinutes = Math.max(3, Math.ceil(transferKm * 3.2 + 2));
-  const remainingCurrentMinutes = getSmartStackRemainingMinutes(currentOrder);
-  const queuedWaitMinutes = remainingCurrentMinutes + transferMinutes;
-
   const eligible =
-    transferKm <= UBEE_SMART_STACK_V1.maxTransferKm &&
-    transferMinutes <= UBEE_SMART_STACK_V1.maxTransferMinutes;
+    route.distanceKm <= UBEE_SMART_STACK_V1.maxTransferKm &&
+    route.durationMinutes <= UBEE_SMART_STACK_V1.maxTransferMinutes;
 
   return {
     eligible,
-    code: eligible ? 'STACK_ELIGIBLE' : 'STACK_TOO_FAR',
-    mode: 'sequential_queue',
-    currentOrderId: currentId,
-    candidateOrderId: candidateId,
-    transferKm,
-    transferMinutes,
-    remainingCurrentMinutes,
-    queuedWaitMinutes,
-    maxTransferKm: UBEE_SMART_STACK_V1.maxTransferKm,
-    maxTransferMinutes: UBEE_SMART_STACK_V1.maxTransferMinutes,
-    version: UBEE_SMART_STACK_V1.version,
+    code:eligible ? 'STACK_ELIGIBLE' : 'STACK_TOO_FAR',
+    mode:'sequential_queue',
+    currentOrderId:currentId,
+    candidateOrderId:candidateId,
+    transferKm:route.distanceKm,
+    transferDistanceMeters:route.distanceMeters,
+    transferMinutes:route.durationMinutes,
+    transferDurationSeconds:route.durationSeconds,
+    transferDistanceText:route.distanceText,
+    transferDurationText:route.durationText,
+    transferTrafficAware:true,
+    routeProvider:'google_routes',
+    routeVersion:UBEE_SMART_STACK_V11.version,
+    routeCheckedAtMs:Date.now(),
+    routeFingerprint:smartStackRouteFingerprint(currentOrder,candidateOrder),
+    maxTransferKm:UBEE_SMART_STACK_V1.maxTransferKm,
+    maxTransferMinutes:UBEE_SMART_STACK_V1.maxTransferMinutes,
+    version:UBEE_SMART_STACK_V11.version,
   };
 }
+
+function getSmartStackCurrentCompletionRouteInputV11(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  const riderLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+  const riderLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+
+  if (!Number.isFinite(riderLat) || !Number.isFinite(riderLng)) return null;
+
+  const origin = buildRoutesWaypoint({lat:riderLat,lng:riderLng});
+  const destination = smartStackRouteWaypoint(order,'dropoff');
+  if (!origin || !destination) return null;
+
+  const beforePickup = [
+    'accepted','going_to_pickup','heading_to_pickup'
+  ].includes(status);
+
+  const pickup = beforePickup
+    ? smartStackRouteWaypoint(order,'pickup')
+    : null;
+
+  return {
+    origin,
+    destination,
+    intermediates:pickup ? [pickup] : [],
+  };
+}
+
+async function getSmartStackCurrentCompletionRouteV11(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  if (status === 'arrived_dropoff') {
+    return {
+      distanceMeters:0,
+      distanceKm:0,
+      durationSeconds:0,
+      durationMinutes:0,
+      distanceText:'已抵達',
+      durationText:'已抵達',
+      trafficAware:true,
+      provider:'google_routes',
+      version:UBEE_SMART_STACK_V11.version,
+    };
+  }
+
+  const input = getSmartStackCurrentCompletionRouteInputV11(order);
+  if (!input) return null;
+  return computeGoogleRoutesTrafficV11(input);
+}
+
+async function refreshSmartStackQueuedEtaV11(currentOrderId, options = {}) {
+  const safeCurrentId = smartStackSafeOrderId(currentOrderId);
+  if (!safeCurrentId) return null;
+
+  if (smartStackQueuedEtaLocksV11.has(safeCurrentId)) {
+    return smartStackQueuedEtaLocksV11.get(safeCurrentId);
+  }
+
+  const task = (async()=>{
+    const currentRef = db.collection('orders').doc(safeCurrentId);
+    const currentDoc = await currentRef.get();
+    if (!currentDoc.exists) return null;
+
+    const currentOrder = { id:currentDoc.id, ...currentDoc.data() };
+    const queuedId = smartStackSafeOrderId(currentOrder.stackQueuedOrderId);
+    if (!queuedId || String(currentOrder.stackRole || '').toUpperCase() !== 'CURRENT') return null;
+
+    const queuedRef = db.collection('orders').doc(queuedId);
+    const queuedDoc = await queuedRef.get();
+    if (!queuedDoc.exists) return null;
+
+    const queuedOrder = { id:queuedDoc.id, ...queuedDoc.data() };
+    if (String(queuedOrder.stackRole || '').toUpperCase() !== 'QUEUED') return null;
+    if (String(queuedOrder.stackPrimaryOrderId || '').trim().toUpperCase() !== safeCurrentId) return null;
+
+    const nowMs = Date.now();
+    const riderLat = Number(currentOrder.riderCurrentLat ?? currentOrder.riderCurrentLocation?.lat);
+    const riderLng = Number(currentOrder.riderCurrentLng ?? currentOrder.riderCurrentLocation?.lng);
+    if (!Number.isFinite(riderLat) || !Number.isFinite(riderLng)) return null;
+
+    const previousAtMs = Number(queuedOrder.stackQueuedEtaUpdatedAtMs || 0);
+    const prevLat = Number(queuedOrder.stackQueuedEtaOriginLat);
+    const prevLng = Number(queuedOrder.stackQueuedEtaOriginLng);
+    const movedKm = Number.isFinite(prevLat) && Number.isFinite(prevLng)
+      ? dispatchHaversineKm(prevLat,prevLng,riderLat,riderLng)
+      : null;
+
+    const due =
+      options.force === true ||
+      !previousAtMs ||
+      (nowMs - previousAtMs) >= UBEE_SMART_STACK_V11.queuedEtaRefreshMs ||
+      (Number.isFinite(movedKm) && movedKm >= UBEE_SMART_STACK_V11.queuedEtaMinMoveKm);
+
+    if (!due) return null;
+
+    const currentCompletionRoute = await getSmartStackCurrentCompletionRouteV11(currentOrder);
+    if (!currentCompletionRoute) return null;
+
+    let transferRoute = null;
+    const storedTransferUpdatedAtMs = Number(queuedOrder.stackTransferRouteUpdatedAtMs || 0);
+    const transferFresh =
+      storedTransferUpdatedAtMs > 0 &&
+      (nowMs - storedTransferUpdatedAtMs) < UBEE_SMART_STACK_V11.transferRouteRefreshMs &&
+      Number(queuedOrder.stackTransferDurationSeconds || 0) > 0;
+
+    if (transferFresh) {
+      transferRoute = {
+        distanceMeters:Number(queuedOrder.stackTransferDistanceMeters || 0),
+        distanceKm:Number(queuedOrder.stackTransferKm || 0),
+        durationSeconds:Number(queuedOrder.stackTransferDurationSeconds || 0),
+        durationMinutes:Math.max(1,Math.ceil(Number(queuedOrder.stackTransferDurationSeconds || 0)/60)),
+        distanceText:String(queuedOrder.stackTransferDistanceText || ''),
+        durationText:String(queuedOrder.stackTransferDurationText || ''),
+        trafficAware:queuedOrder.stackTransferTrafficAware === true,
+      };
+    } else {
+      transferRoute = await getSmartStackTransferRouteV11(currentOrder,queuedOrder);
+    }
+
+    if (!transferRoute) return null;
+
+    const currentRemainingSeconds = Math.max(0,Number(currentCompletionRoute.durationSeconds || 0));
+    const transferSeconds = Math.max(0,Number(transferRoute.durationSeconds || 0));
+    const totalSeconds = currentRemainingSeconds + transferSeconds;
+    const totalMinutes = Math.max(1,Math.ceil(totalSeconds/60));
+    const etaAtMs = nowMs + totalSeconds*1000;
+
+    const update = {
+      stackEstimatedWaitMinutes:totalMinutes,
+      stackQueuedEtaMinutes:totalMinutes,
+      stackQueuedEtaAtMs:etaAtMs,
+      stackQueuedEtaUpdatedAtMs:nowMs,
+      stackQueuedEtaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      stackQueuedEtaOriginLat:riderLat,
+      stackQueuedEtaOriginLng:riderLng,
+      stackQueuedEtaCurrentOrderRemainingMinutes:Math.max(0,Math.ceil(currentRemainingSeconds/60)),
+      stackQueuedEtaTransferMinutes:Math.max(0,Math.ceil(transferSeconds/60)),
+      stackQueuedEtaTrafficAware:true,
+      stackQueuedEtaProvider:'google_routes',
+      stackQueuedEtaVersion:UBEE_SMART_STACK_V11.version,
+
+      stackTransferDistanceMeters:Number(transferRoute.distanceMeters || 0),
+      stackTransferKm:Number((Number(transferRoute.distanceMeters || 0)/1000).toFixed(2)),
+      stackTransferMinutes:Math.max(1,Math.ceil(transferSeconds/60)),
+      stackTransferDurationSeconds:transferSeconds,
+      stackTransferDistanceText:String(transferRoute.distanceText || formatRouteDistanceText(transferRoute.distanceMeters)),
+      stackTransferDurationText:String(transferRoute.durationText || formatRouteDurationText(transferSeconds)),
+      stackTransferTrafficAware:true,
+      stackTransferRouteUpdatedAtMs:nowMs,
+      stackTransferRouteUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+
+      etaText:`約 ${totalMinutes} 分鐘抵達取件地點`,
+      etaMinutes:totalMinutes,
+      estimatedPickupMinutes:totalMinutes,
+      etaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await queuedRef.set(update,{merge:true});
+    return {orderId:queuedId,...update};
+  })();
+
+  smartStackQueuedEtaLocksV11.set(safeCurrentId,task);
+  try {
+    return await task;
+  } finally {
+    smartStackQueuedEtaLocksV11.delete(safeCurrentId);
+  }
+}
+
 
 function buildSmartStackGroupId(currentOrderId, candidateOrderId) {
   const a = smartStackSafeOrderId(currentOrderId);
@@ -9227,23 +9513,44 @@ app.get('/api/rider/stack-candidates', riderAuthMiddleware, async (req, res) => 
       .limit(80)
       .get();
 
-    const candidates = snap.docs
+    const routeCheckPool = snap.docs
       .map(doc => ({ id:doc.id, ...doc.data() }))
       .filter(order => isRiderVisibleDispatchOrder(order))
       .filter(order => !isOrderSkippedForRider(order, identity))
+      .filter(order => isSmartStackStandardDelivery(order))
       .map(order => {
-        const eligibility = buildSmartStackEligibility(currentOrder, order);
+        // 只作 API 成本保護：直線距離是道路距離的理論下限，
+        // 不再乘係數、不再作正式 eligibility 判斷。
+        const a = smartStackOrderPoint(currentOrder,'dropoff');
+        const b = smartStackOrderPoint(order,'pickup');
+        const straightKm = a && b
+          ? dispatchHaversineKm(a.lat,a.lng,b.lat,b.lng)
+          : 0;
+        return { order, straightKm:Number.isFinite(straightKm) ? straightKm : 0 };
+      })
+      .filter(item =>
+        item.straightKm <= UBEE_SMART_STACK_V1.maxTransferKm + 0.25
+      )
+      .sort((a,b)=>a.straightKm-b.straightKm)
+      .slice(0,UBEE_SMART_STACK_V11.routeCheckCandidateLimit);
+
+    const checked = await Promise.all(
+      routeCheckPool.map(async ({order}) => {
+        const eligibility = await buildSmartStackEligibilityV11(currentOrder,order);
         if (!eligibility.eligible) return null;
         return {
           ...buildRiderPendingTaskPreview(order),
-          smartStack: eligibility,
+          smartStack:eligibility,
         };
       })
+    );
+
+    const candidates = checked
       .filter(Boolean)
       .sort((a,b) =>
         Number(a.smartStack?.transferMinutes || 999) - Number(b.smartStack?.transferMinutes || 999)
       )
-      .slice(0, 8);
+      .slice(0,8);
 
     return res.json({
       success:true,
@@ -10512,7 +10819,7 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
       'arrived_dropoff',
     ];
 
-    async function returnOrderIfActive(orderId) {
+    async function returnOrderIfActive(orderId,{allowQueued=false}={}) {
       const safeOrderId = String(orderId || '').trim().toUpperCase();
       if (!safeOrderId) return null;
 
@@ -10529,6 +10836,12 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
       }
 
       if (!isOrderBelongsToRider(order, identity)) {
+        return null;
+      }
+
+      // Smart Stack V1.1 Recovery Hard Lock：
+      // QUEUED 永遠不能因 currentOrderId 殘留／修復查詢而成為 CURRENT。
+      if (!allowQueued && String(order.stackRole || '').trim().toUpperCase() === 'QUEUED') {
         return null;
       }
 
@@ -10558,7 +10871,8 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
       });
     }
 
-    // 第二優先：從 orders 反查，不使用複合索引，避免 Firestore index 問題
+    // 第二優先：從所有可識別欄位反查後先合併，再做「全域」Recovery 決策。
+    // 優先順序固定：CURRENT → 一般 active 單 → 絕不選 QUEUED。
     const queryFields = [
       ['riderDocId', identity.riderDocId],
       ['riderId', identity.riderId],
@@ -10566,51 +10880,155 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
       ['riderLineUserId', identity.lineUserId],
     ].filter(([, value]) => !!value);
 
+    const recoveryOrdersById = new Map();
+
     for (const [field, value] of queryFields) {
       const snap = await db.collection('orders')
         .where(field, '==', value)
         .limit(80)
         .get();
 
-      const found = snap.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        .find(order => {
+      snap.docs
+        .map(doc => ({id:doc.id,...doc.data()}))
+        .filter(order => {
           const status = String(order.status || '').trim();
-          return activeStatuses.includes(status) && isOrderBelongsToRider(order, identity);
+          return activeStatuses.includes(status) && isOrderBelongsToRider(order,identity);
+        })
+        .forEach(order => {
+          recoveryOrdersById.set(
+            smartStackSafeOrderId(order.id || order.orderId),
+            order
+          );
         });
+    }
 
-      if (found) {
-        // riders.currentOrderId 遺失或不同步時，自動修復，讓重新開啟騎士端仍能找回任務。
+    const recoveryOrders = Array.from(recoveryOrdersById.values());
+
+    const found =
+      recoveryOrders.find(order =>
+        String(order.stackRole || '').trim().toUpperCase() === 'CURRENT'
+      ) ||
+      recoveryOrders.find(order =>
+        !String(order.stackRole || '').trim()
+      ) ||
+      null;
+
+    if (found) {
+      // QUEUED 永遠不會出現在 found；如果未來資料異常，這裡仍再 fail-closed 一次。
+      if (String(found.stackRole || '').trim().toUpperCase() === 'QUEUED') {
+        throw new Error('STACK_RECOVERY_QUEUED_BLOCKED');
+      }
+
+      await riderDoc.ref.set({
+        busy:true,
+        currentOrderId:found.id,
+        activeTrackingOrderId:found.id,
+        taskTrackingStatus:'live',
+        lastSeenAt:admin.firestore.FieldValue.serverTimestamp(),
+        lastSeenAtMs:Date.now(),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      },{merge:true});
+
+      const repairedRider = {
+        ...rider,
+        busy:true,
+        currentOrderId:found.id,
+      };
+      const stackPayload = await buildSmartStackCurrentPayload(repairedRider,found,identity);
+
+      return res.json({
+        success:true,
+        hasOrder:true,
+        order:found,
+        recoverySource:
+          String(found.stackRole || '').trim().toUpperCase() === 'CURRENT'
+            ? 'orders_global_current'
+            : 'orders_global_unstacked',
+        ...stackPayload,
+      });
+    }
+
+    // 如果所有 active 訂單裡只剩 QUEUED，沿 stackPrimaryOrderId 嘗試找回真正 CURRENT。
+    const queuedFromOrders = recoveryOrders.find(order =>
+      String(order.stackRole || '').trim().toUpperCase() === 'QUEUED'
+    ) || null;
+
+    const queuedIdsFromRider = Array.isArray(rider.queuedOrderIds)
+      ? rider.queuedOrderIds.map(smartStackSafeOrderId).filter(Boolean)
+      : [];
+
+    let queuedForRecovery = queuedFromOrders;
+
+    if (!queuedForRecovery && queuedIdsFromRider.length) {
+      const queuedDoc = await db.collection('orders').doc(queuedIdsFromRider[0]).get();
+      if (queuedDoc.exists) {
+        const candidate = {id:queuedDoc.id,...queuedDoc.data()};
+        if (
+          String(candidate.stackRole || '').trim().toUpperCase() === 'QUEUED' &&
+          isOrderBelongsToRider(candidate,identity)
+        ) {
+          queuedForRecovery = candidate;
+        }
+      }
+    }
+
+    if (queuedForRecovery) {
+      const primaryId = smartStackSafeOrderId(queuedForRecovery.stackPrimaryOrderId);
+      const primary = await returnOrderIfActive(primaryId);
+
+      if (primary) {
         await riderDoc.ref.set({
-          busy: true,
-          currentOrderId: found.id,
-          activeTrackingOrderId: found.id,
-          taskTrackingStatus: 'live',
-          lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastSeenAtMs: Date.now(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+          busy:true,
+          currentOrderId:primary.id,
+          queuedOrderIds:[queuedForRecovery.id],
+          activeOrderIds:[primary.id,queuedForRecovery.id],
+          activeTrackingOrderId:primary.id,
+          taskTrackingStatus:'live',
+          smartStackActive:true,
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        },{merge:true});
 
         const repairedRider = {
           ...rider,
           busy:true,
-          currentOrderId:found.id,
+          currentOrderId:primary.id,
+          queuedOrderIds:[queuedForRecovery.id],
         };
-        const stackPayload = await buildSmartStackCurrentPayload(repairedRider, found, identity);
+        const stackPayload = await buildSmartStackCurrentPayload(repairedRider,primary,identity);
+
         return res.json({
-          success: true,
-          hasOrder: true,
-          order: found,
-          recoverySource: `orders_${field}`,
+          success:true,
+          hasOrder:true,
+          order:primary,
+          recoverySource:'stack_primary_pointer',
           ...stackPayload,
         });
       }
+
+      // 找不到 PRIMARY 時絕不自動升 QUEUED，也不清除 QUEUED。
+      await riderDoc.ref.set({
+        busy:true,
+        currentOrderId:'',
+        queuedOrderIds:[queuedForRecovery.id],
+        activeOrderIds:[queuedForRecovery.id],
+        smartStackActive:true,
+        taskTrackingStatus:'recovery_blocked',
+        taskTrackingStopReason:'queued_without_primary',
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      },{merge:true});
+
+      return res.json({
+        success:true,
+        hasOrder:false,
+        order:null,
+        recoverySource:'stack_queued_orphan_blocked',
+        smartStackRecoveryBlocked:true,
+        queuedOrder:queuedForRecovery,
+        message:'偵測到疊單恢復異常，系統已阻止 QUEUED 誤升為目前任務。',
+      });
     }
 
-    // 已確認所有歸屬欄位都沒有進行中任務，才清理 riders 上的殘留 busy/currentOrderId。
+    // 已確認所有歸屬欄位都沒有進行中任務，且不存在 QUEUED，才清理 busy/currentOrderId。
     if (rider.busy === true || rider.currentOrderId) {
       await riderDoc.ref.set({
         busy: false,
@@ -21668,6 +22086,16 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
       ).catch(error => {
         console.warn(
           '⚠️ Customer Live ETA V1 背景更新失敗：',
+          error?.message || error
+        );
+      });
+
+      refreshSmartStackQueuedEtaV11(
+        transactionResult.orderId,
+        { reason:'rider_location' }
+      ).catch(error => {
+        console.warn(
+          '⚠️ Smart Stack V1.1 QUEUED ETA 背景更新失敗：',
           error?.message || error
         );
       });
@@ -34712,6 +35140,49 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
 
     const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
     const candidateRef = db.collection('orders').doc(safeOrderId);
+
+    // Smart Stack V1.1：外部 Google Routes 呼叫不可放進 Firestore Transaction。
+    // 先以最新快照取得正式道路判斷，再在 Transaction 內用 endpoint fingerprint 防止資料被換掉。
+    const preCurrentOrderId = smartStackSafeOrderId(rider.currentOrderId);
+    if (!preCurrentOrderId) {
+      return res.status(409).json({
+        success:false,
+        code:'STACK_CURRENT_ORDER_REQUIRED',
+        message:'目前沒有可建立疊單的進行中任務。',
+      });
+    }
+
+    const [preCurrentDoc,preCandidateDoc] = await Promise.all([
+      db.collection('orders').doc(preCurrentOrderId).get(),
+      candidateRef.get(),
+    ]);
+
+    if (!preCurrentDoc.exists || !preCandidateDoc.exists) {
+      return res.status(409).json({
+        success:false,
+        code:'STACK_ORDER_REFRESH_REQUIRED',
+        message:'任務資料已更新，請重新整理後再試。',
+      });
+    }
+
+    const preCurrent = {id:preCurrentDoc.id,...preCurrentDoc.data()};
+    const preCandidate = {id:preCandidateDoc.id,...preCandidateDoc.data()};
+    const preEligibility = await buildSmartStackEligibilityV11(preCurrent,preCandidate);
+
+    if (!preEligibility.eligible) {
+      const code = preEligibility.code || 'STACK_NOT_ELIGIBLE';
+      const message = code === 'STACK_REAL_ROUTE_UNAVAILABLE'
+        ? '目前無法取得 Google 真實道路路線，為避免錯誤疊單，本次不開放承接。'
+        : '這張任務目前不符合疊單條件。';
+      return res.status(code === 'STACK_REAL_ROUTE_UNAVAILABLE' ? 503 : 409).json({
+        success:false,
+        code,
+        message,
+      });
+    }
+
+    const preRouteFingerprint = preEligibility.routeFingerprint;
+
     let acceptedQueuedOrder = null;
     let primaryOrder = null;
     let eligibilityResult = null;
@@ -34753,16 +35224,18 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
         throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
       }
 
-      const eligibility = buildSmartStackEligibility(current, candidate);
+      if (smartStackRouteFingerprint(current,candidate) !== preRouteFingerprint) {
+        throw new Error('STACK_ROUTE_CHANGED_RETRY');
+      }
+
+      const eligibility = preEligibility;
       eligibilityResult = eligibility;
-      if (!eligibility.eligible) throw new Error(eligibility.code || 'STACK_NOT_ELIGIBLE');
 
       const nowMs = Date.now();
       const stackGroupId =
         String(current.stackGroupId || '').trim() ||
         buildSmartStackGroupId(current.id, candidate.id);
 
-      const queuedEtaMinutes = Math.max(5, Number(eligibility.queuedWaitMinutes || 20));
       const queuedUpdate = {
         status:'accepted',
         riderStatus:'accepted',
@@ -34784,9 +35257,16 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
         stackAcceptedAtMs:nowMs,
         stackAcceptedAt:admin.firestore.FieldValue.serverTimestamp(),
         stackTransferKm:Number(eligibility.transferKm || 0),
+        stackTransferDistanceMeters:Number(eligibility.transferDistanceMeters || 0),
         stackTransferMinutes:Number(eligibility.transferMinutes || 0),
-        stackEstimatedWaitMinutes:queuedEtaMinutes,
-        stackVersion:UBEE_SMART_STACK_V1.version,
+        stackTransferDurationSeconds:Number(eligibility.transferDurationSeconds || 0),
+        stackTransferDistanceText:String(eligibility.transferDistanceText || ''),
+        stackTransferDurationText:String(eligibility.transferDurationText || ''),
+        stackTransferTrafficAware:eligibility.transferTrafficAware === true,
+        stackTransferRouteUpdatedAtMs:nowMs,
+        stackTransferRouteUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        stackEstimatedWaitMinutes:null,
+        stackVersion:UBEE_SMART_STACK_V11.version,
 
         riderTrackingStatus:'queued',
         trackingSessionId:'',
@@ -34794,8 +35274,8 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
         trackingEndedAtMs:null,
         trackingStopReason:'',
         etaText:'小U正在完成前序任務',
-        estimatedTime:`約 ${queuedEtaMinutes} 分鐘後開始前往取件`,
-        etaMinutes:queuedEtaMinutes,
+        estimatedTime:'完成前序任務後將依序前往取件',
+        etaMinutes:null,
         etaStatus:'accepted',
         etaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
       };
@@ -34807,7 +35287,7 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
         stackState:'active',
         stackPosition:1,
         stackQueuedOrderId:candidate.id,
-        stackVersion:UBEE_SMART_STACK_V1.version,
+        stackVersion:UBEE_SMART_STACK_V11.version,
         updatedAt:admin.firestore.FieldValue.serverTimestamp(),
       });
       transaction.set(riderRef, {
@@ -34825,6 +35305,21 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
     });
 
     clearDispatchPushTimers(safeOrderId);
+
+    // Smart Stack V1.1：接下第二單後立即建立第一輪「A 剩餘道路 ETA + A→B 道路 ETA」。
+    try {
+      await refreshSmartStackQueuedEtaV11(primaryOrder?.id || preCurrentOrderId,{force:true});
+      const refreshedQueuedDoc = await candidateRef.get();
+      if (refreshedQueuedDoc.exists) {
+        acceptedQueuedOrder = {
+          id:refreshedQueuedDoc.id,
+          ...refreshedQueuedDoc.data(),
+        };
+      }
+    } catch (etaError) {
+      console.warn('⚠️ Smart Stack V1.1 初始 QUEUED ETA 建立失敗：',etaError?.message || etaError);
+    }
+
     if (typeof orders === 'object' && orders) orders[safeOrderId] = acceptedQueuedOrder;
 
     Promise.allSettled([
@@ -34874,6 +35369,8 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       CANDIDATE_ORDER_NOT_SUPPORTED:[409,'這張任務目前不支援疊單。'],
       STACK_TOO_FAR:[409,'這張任務與目前路線銜接距離過遠，不建議疊單。'],
       STACK_ROUTE_COORDINATES_MISSING:[409,'任務路線資料不足，暫時不能建立疊單。'],
+      STACK_ROUTE_CHANGED_RETRY:[409,'任務地點剛剛發生更新，請重新整理後再試。'],
+      STACK_REAL_ROUTE_UNAVAILABLE:[503,'目前無法取得 Google 真實道路路線，為避免錯誤疊單，本次不開放承接。'],
       ORDER_ALREADY_ACCEPTED:[409,'這張任務已被其他小U接走。'],
       ORDER_PAYMENT_NOT_CONFIRMED:[409,'這張任務尚未符合可接單條件。'],
       NOT_THIS_RIDER:[403,'目前任務不屬於此小U。'],
@@ -36644,6 +37141,15 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       ]).catch(()=>{});
     }
 
+    if (effectiveStatus !== 'completed') {
+      refreshSmartStackQueuedEtaV11(
+        safeOrderId,
+        { reason:`status_${effectiveStatus}`, force:true }
+      ).catch(error => {
+        console.warn('⚠️ Smart Stack V1.1 狀態切換後 QUEUED ETA 更新失敗：',error?.message || error);
+      });
+    }
+
     const statusEventType = effectiveStatus === 'completed'
       ? 'ORDER_COMPLETED'
       : multiStopAdvanced
@@ -36910,6 +37416,20 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
 
         stackEstimatedWaitMinutes:
           Math.max(0, Number(order.stackEstimatedWaitMinutes || 0)),
+
+        stackQueuedEtaMinutes:
+          Number.isFinite(Number(order.stackQueuedEtaMinutes))
+            ? Number(order.stackQueuedEtaMinutes)
+            : null,
+
+        stackQueuedEtaAtMs:
+          Math.max(0, Number(order.stackQueuedEtaAtMs || 0)),
+
+        stackQueuedEtaUpdatedAtMs:
+          Math.max(0, Number(order.stackQueuedEtaUpdatedAtMs || 0)),
+
+        stackQueuedEtaTrafficAware:
+          order.stackQueuedEtaTrafficAware === true,
 
         riderVehicleType:
           String(
@@ -42143,6 +42663,12 @@ async function refreshCustomerLiveEtaV1(orderId, options = {}) {
 
     const order = { id:orderDoc.id, ...(orderDoc.data() || {}) };
 
+    // Smart Stack V1.1：QUEUED 不得用「目前小U位置 → B 取件點」直接算 ETA；
+    // 它的 ETA 必須是 A 剩餘真實道路時間 + A→B 真實道路時間。
+    if (String(order.stackRole || '').trim().toUpperCase() === 'QUEUED') {
+      return null;
+    }
+
     // 店家配送已由 Merchant Live Tracking V3 計算同一組 traffic-aware ETA，
     // 避免同一筆訂單重複呼叫 Google 路線 API。
     if (typeof isMerchantTrackingOrderV3 === 'function' && isMerchantTrackingOrderV3(order)) {
@@ -42242,6 +42768,49 @@ async function refreshCustomerLiveEtaV1(orderId, options = {}) {
 }
 
 function buildCustomerLiveEtaPayloadV1(order = {}, locationHealth = null, nowMs = Date.now()) {
+  if (String(order.stackRole || '').trim().toUpperCase() === 'QUEUED') {
+    const updatedAtMs = Number(order.stackQueuedEtaUpdatedAtMs || 0);
+    const etaAtMs = Number(order.stackQueuedEtaAtMs || 0);
+    const storedMinutes = Number(order.stackQueuedEtaMinutes ?? order.stackEstimatedWaitMinutes);
+    const routeAgeMs = updatedAtMs > 0 ? Math.max(0,nowMs-updatedAtMs) : null;
+
+    let minutes = Number.isFinite(storedMinutes) && storedMinutes > 0
+      ? Math.ceil(storedMinutes)
+      : null;
+    if (etaAtMs > 0) {
+      minutes = Math.max(1,Math.ceil((etaAtMs-nowMs)/60000));
+    }
+
+    const available =
+      routeAgeMs !== null &&
+      routeAgeMs <= UBEE_CUSTOMER_LIVE_ETA_V1.routeMaxAgeMs &&
+      Number.isFinite(minutes) &&
+      minutes > 0;
+
+    return {
+      version:UBEE_SMART_STACK_V11.version,
+      available,
+      reason:available ? '' : 'stack_queued_eta_waiting',
+      confidence:available ? 'high' : 'unavailable',
+      target:'pickup',
+      targetLabel:'取件地點',
+      text:available ? `約 ${minutes} 分鐘` : '',
+      minutes:available ? minutes : null,
+      arrivalAtMs:available ? etaAtMs : null,
+      distanceText:available ? String(order.stackTransferDistanceText || '') : '',
+      routeUpdatedAtMs:updatedAtMs,
+      routeAgeMs,
+      locationUpdatedAtMs:Number(order.stackQueuedEtaUpdatedAtMs || 0),
+      locationAgeMs:routeAgeMs,
+      trafficAware:order.stackQueuedEtaTrafficAware === true,
+      estimatedPickupMinutes:available ? minutes : null,
+      estimatedCompletionMinutes:null,
+      queued:true,
+      currentOrderRemainingMinutes:Number(order.stackQueuedEtaCurrentOrderRemainingMinutes || 0),
+      transferMinutes:Number(order.stackQueuedEtaTransferMinutes || 0),
+    };
+  }
+
   const phase = getCustomerLiveEtaPhaseV1(order);
   const destination = getCustomerLiveEtaDestinationV1(order);
   const health = locationHealth || getCustomerLiveEtaHealthV1(order, nowMs);
