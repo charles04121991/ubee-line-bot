@@ -1,3 +1,4 @@
+// 2026-09-18｜UBee Smart Stack V1：順序疊單；最多 2 單，CURRENT + QUEUED，完成第一單後自動升級第二單；不改 Profit Pricing V1。
 // 2026-09-17｜Profit Pricing V1 / Route Pricing V4：維持任務費 70/30 與小U NT$50 保底；一般路線改為 3km 內 NT$80、3～8km 每公里 NT$12、8km 以上每公里 NT$11，移除長途收入保障的失控外推；急件與長時間排隊另收平台管理費，小U原有加價不減少；店家 COD 加入固定系統服務費；財務總帳拆分平台應收、已收與待收。
 // 2026-09-16｜Rider Motor Vehicle Hard Lock V1：新版小U申請只接受機車／汽車；/api/rider/register 後端硬鎖，非允許車種直接 400 拒絕。
 // 2026-09-16｜UBee Native Experience V2：同步前端 App Shell Release；本版不修改計價、派單、Growth Engine、Rider Income、資格、ETA、付款與任務核心規則。
@@ -8827,6 +8828,190 @@ function buildRiderPendingTaskPreview(order = {}) {
   };
 }
 
+
+// ============================================================
+// UBee Smart Stack V1｜順序疊單核心
+// - 同時最多 2 單：CURRENT + QUEUED。
+// - 第二張任務只預先承接，不插入目前任務路線。
+// - 完成 CURRENT 後，QUEUED 自動升級為 CURRENT。
+// - 第一版只允許一般取送，排除代買／排隊／全能／急件／多點／代墊。
+// ============================================================
+const UBEE_SMART_STACK_V1 = Object.freeze({
+  version: 'smart-stack-v1',
+  maxActiveOrders: 2,
+  maxTransferKm: 3,
+  maxTransferMinutes: 15,
+  roadFactor: 1.25,
+});
+
+function smartStackSafeOrderId(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function smartStackOrderPoint(order = {}, type = 'pickup') {
+  const pickup = type === 'pickup';
+  const lat = Number(
+    pickup
+      ? (order.pickupLat ?? order.fromLat ?? order.pickupLocation?.lat)
+      : (order.dropoffLat ?? order.toLat ?? order.dropoffLocation?.lat)
+  );
+  const lng = Number(
+    pickup
+      ? (order.pickupLng ?? order.fromLng ?? order.pickupLocation?.lng)
+      : (order.dropoffLng ?? order.toLng ?? order.dropoffLocation?.lng)
+  );
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function isSmartStackStandardDelivery(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  const serviceKey = String(order.serviceKey || '').trim().toLowerCase();
+  const serviceMode = String(order.serviceMode || '').trim().toLowerCase();
+  const serviceText = [
+    order.serviceType,
+    order.serviceGroup,
+    order.serviceCategory,
+  ].map(v => String(v || '').trim().toLowerCase()).join(' ');
+
+  if (['completed','done','cancelled','canceled'].includes(status)) return false;
+  if (['buy','queue','helper','urgent'].includes(serviceKey)) return false;
+  if (['queue','custom','buy'].includes(serviceMode)) return false;
+  if (/代買|排隊|全能|急件/.test(serviceText)) return false;
+  if (Array.isArray(order.deliveryStops) && order.deliveryStops.length > 1) return false;
+  if (order.singlePointTask === true) return false;
+  if (Math.max(0, Number(order.advancePayment || order.advanceAmount || 0)) > 0) return false;
+  if (String(order.orderTimingType || '').trim().toLowerCase() === 'scheduled') return false;
+
+  // 正式 V1 只接受可清楚辨識為取送路線的任務。
+  return (
+    ['send','pickup'].includes(serviceKey) ||
+    /配送|取件|代取|幫我送|幫我取|送件/.test(serviceText)
+  );
+}
+
+function getSmartStackRemainingMinutes(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  const defaults = {
+    accepted: 30,
+    going_to_pickup: 26,
+    heading_to_pickup: 26,
+    arrived_pickup: 20,
+    picked_up: 14,
+    going_to_dropoff: 12,
+    heading_to_dropoff: 12,
+    arrived_dropoff: 5,
+  };
+  return Math.max(3, Number(defaults[status] || 20));
+}
+
+function buildSmartStackEligibility(currentOrder = {}, candidateOrder = {}) {
+  const currentId = smartStackSafeOrderId(currentOrder.id || currentOrder.orderId);
+  const candidateId = smartStackSafeOrderId(candidateOrder.id || candidateOrder.orderId);
+
+  if (!currentId || !candidateId || currentId === candidateId) {
+    return { eligible:false, code:'INVALID_ORDER_PAIR' };
+  }
+
+  if (!isSmartStackStandardDelivery(currentOrder)) {
+    return { eligible:false, code:'CURRENT_ORDER_NOT_SUPPORTED' };
+  }
+  if (!isSmartStackStandardDelivery(candidateOrder)) {
+    return { eligible:false, code:'CANDIDATE_ORDER_NOT_SUPPORTED' };
+  }
+
+  const currentStatus = String(currentOrder.status || '').trim().toLowerCase();
+  if (![
+    'accepted','going_to_pickup','heading_to_pickup','arrived_pickup',
+    'picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff'
+  ].includes(currentStatus)) {
+    return { eligible:false, code:'CURRENT_ORDER_NOT_ACTIVE' };
+  }
+
+  if (String(candidateOrder.status || '').trim() !== 'pending_dispatch') {
+    return { eligible:false, code:'CANDIDATE_NOT_PENDING' };
+  }
+
+  const currentDropoff = smartStackOrderPoint(currentOrder, 'dropoff');
+  const candidatePickup = smartStackOrderPoint(candidateOrder, 'pickup');
+  if (!currentDropoff || !candidatePickup) {
+    return { eligible:false, code:'STACK_ROUTE_COORDINATES_MISSING' };
+  }
+
+  const straightKm = dispatchHaversineKm(
+    currentDropoff.lat,
+    currentDropoff.lng,
+    candidatePickup.lat,
+    candidatePickup.lng
+  );
+  const transferKm = Math.max(0, Number((straightKm * UBEE_SMART_STACK_V1.roadFactor).toFixed(2)));
+  const transferMinutes = Math.max(3, Math.ceil(transferKm * 3.2 + 2));
+  const remainingCurrentMinutes = getSmartStackRemainingMinutes(currentOrder);
+  const queuedWaitMinutes = remainingCurrentMinutes + transferMinutes;
+
+  const eligible =
+    transferKm <= UBEE_SMART_STACK_V1.maxTransferKm &&
+    transferMinutes <= UBEE_SMART_STACK_V1.maxTransferMinutes;
+
+  return {
+    eligible,
+    code: eligible ? 'STACK_ELIGIBLE' : 'STACK_TOO_FAR',
+    mode: 'sequential_queue',
+    currentOrderId: currentId,
+    candidateOrderId: candidateId,
+    transferKm,
+    transferMinutes,
+    remainingCurrentMinutes,
+    queuedWaitMinutes,
+    maxTransferKm: UBEE_SMART_STACK_V1.maxTransferKm,
+    maxTransferMinutes: UBEE_SMART_STACK_V1.maxTransferMinutes,
+    version: UBEE_SMART_STACK_V1.version,
+  };
+}
+
+function buildSmartStackGroupId(currentOrderId, candidateOrderId) {
+  const a = smartStackSafeOrderId(currentOrderId);
+  const b = smartStackSafeOrderId(candidateOrderId);
+  return `STK_${a}_${b}_${Date.now()}`;
+}
+
+async function getSmartStackQueuedOrdersForRider(rider = {}, identity = {}) {
+  const ids = Array.isArray(rider.queuedOrderIds)
+    ? rider.queuedOrderIds
+    : (rider.queuedOrderId ? [rider.queuedOrderId] : []);
+
+  const safeIds = Array.from(new Set(ids.map(smartStackSafeOrderId).filter(Boolean))).slice(0, 1);
+  const result = [];
+
+  for (const orderId of safeIds) {
+    const doc = await db.collection('orders').doc(orderId).get();
+    if (!doc.exists) continue;
+    const order = { id:doc.id, ...doc.data() };
+    if (!isOrderBelongsToRider(order, identity)) continue;
+    if (String(order.stackRole || '').toUpperCase() !== 'QUEUED') continue;
+    if (['completed','done','cancelled','canceled'].includes(String(order.status || '').toLowerCase())) continue;
+    result.push(order);
+  }
+
+  return result;
+}
+
+async function buildSmartStackCurrentPayload(rider = {}, currentOrder = null, identity = {}) {
+  const queuedOrders = await getSmartStackQueuedOrdersForRider(rider, identity);
+  return {
+    queuedOrders,
+    queuedOrder: queuedOrders[0] || null,
+    activeOrders: [currentOrder, ...queuedOrders].filter(Boolean),
+    smartStack: {
+      enabled: true,
+      version: UBEE_SMART_STACK_V1.version,
+      maxActiveOrders: UBEE_SMART_STACK_V1.maxActiveOrders,
+      hasQueuedOrder: queuedOrders.length > 0,
+      count: (currentOrder ? 1 : 0) + queuedOrders.length,
+    },
+  };
+}
+
+
 // 2. 取得可接任務：手機登入正式版（V2 待接任務＋地圖取件點）
 // 支援 phone / riderId，並保留 lineUserId 相容；待接單狀態也回傳 riderMapPickup。
 app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
@@ -8978,6 +9163,106 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
   }
 });
 
+
+
+// ============================================================
+// Smart Stack V1｜取得目前任務可預先承接的下一張任務
+// ============================================================
+app.get('/api/rider/stack-candidates', riderAuthMiddleware, async (req, res) => {
+  try {
+    const { lineUserId, phone, riderId } = req.query || {};
+    const riderResult = await findApprovedRiderForApi({ lineUserId, phone, riderId });
+
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({ success:false, message:riderResult.message });
+    }
+
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+    const identity = buildRiderApiIdentity(riderDoc, rider, { lineUserId, phone, riderId });
+
+    if (!canRiderAcceptOrdersV4(rider)) {
+      return res.status(403).json({
+        success:false,
+        code:'RIDER_DISPATCH_NOT_ELIGIBLE',
+        message:'目前不具備正式接單資格。',
+      });
+    }
+
+    const currentOrderId = smartStackSafeOrderId(rider.currentOrderId);
+    if (!currentOrderId) {
+      return res.json({
+        success:true,
+        enabled:true,
+        candidates:[],
+        reason:'NO_CURRENT_ORDER',
+        smartStack:{ version:UBEE_SMART_STACK_V1.version, maxActiveOrders:2 }
+      });
+    }
+
+    const currentDoc = await db.collection('orders').doc(currentOrderId).get();
+    if (!currentDoc.exists) {
+      return res.json({ success:true, enabled:true, candidates:[], reason:'CURRENT_ORDER_NOT_FOUND' });
+    }
+
+    const currentOrder = { id:currentDoc.id, ...currentDoc.data() };
+    if (!isOrderBelongsToRider(currentOrder, identity)) {
+      return res.status(403).json({ success:false, message:'目前任務歸屬驗證失敗。' });
+    }
+
+    const queuedOrders = await getSmartStackQueuedOrdersForRider(rider, identity);
+    if (queuedOrders.length) {
+      return res.json({
+        success:true,
+        enabled:true,
+        candidates:[],
+        queuedOrder:queuedOrders[0],
+        reason:'QUEUE_FULL',
+        smartStack:{ version:UBEE_SMART_STACK_V1.version, maxActiveOrders:2, count:2 }
+      });
+    }
+
+    const snap = await db.collection('orders')
+      .where('status', '==', 'pending_dispatch')
+      .limit(80)
+      .get();
+
+    const candidates = snap.docs
+      .map(doc => ({ id:doc.id, ...doc.data() }))
+      .filter(order => isRiderVisibleDispatchOrder(order))
+      .filter(order => !isOrderSkippedForRider(order, identity))
+      .map(order => {
+        const eligibility = buildSmartStackEligibility(currentOrder, order);
+        if (!eligibility.eligible) return null;
+        return {
+          ...buildRiderPendingTaskPreview(order),
+          smartStack: eligibility,
+        };
+      })
+      .filter(Boolean)
+      .sort((a,b) =>
+        Number(a.smartStack?.transferMinutes || 999) - Number(b.smartStack?.transferMinutes || 999)
+      )
+      .slice(0, 8);
+
+    return res.json({
+      success:true,
+      enabled:true,
+      currentOrderId,
+      candidates,
+      smartStack:{
+        version:UBEE_SMART_STACK_V1.version,
+        mode:'sequential_queue',
+        maxActiveOrders:2,
+        maxTransferKm:UBEE_SMART_STACK_V1.maxTransferKm,
+        maxTransferMinutes:UBEE_SMART_STACK_V1.maxTransferMinutes,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Smart Stack 候選任務讀取失敗：', error);
+    return res.status(500).json({ success:false, message:'疊單候選任務讀取失敗。' });
+  }
+});
 
 // =====================================================
 // UBee 預約任務：騎士身分解析
@@ -10263,11 +10548,13 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
+      const stackPayload = await buildSmartStackCurrentPayload(rider, directOrder, identity);
       return res.json({
         success: true,
         hasOrder: true,
         order: directOrder,
         recoverySource: 'rider_current_order_id',
+        ...stackPayload,
       });
     }
 
@@ -10307,11 +10594,18 @@ app.get('/api/rider/current-order', riderAuthMiddleware, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
 
+        const repairedRider = {
+          ...rider,
+          busy:true,
+          currentOrderId:found.id,
+        };
+        const stackPayload = await buildSmartStackCurrentPayload(repairedRider, found, identity);
         return res.json({
           success: true,
           hasOrder: true,
           order: found,
           recoverySource: `orders_${field}`,
+          ...stackPayload,
         });
       }
     }
@@ -15308,6 +15602,18 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         riderId: o.riderId || o.riderDocId || '',
         riderDocId: o.riderDocId || '',
         riderPhone: o.riderPhone || o.driverPhone || '',
+
+        // Smart Stack V1
+        stackGroupId: String(o.stackGroupId || ''),
+        stackRole: String(o.stackRole || ''),
+        stackState: String(o.stackState || ''),
+        stackPosition: Number(o.stackPosition || 0),
+        stackPrimaryOrderId: String(o.stackPrimaryOrderId || ''),
+        stackQueuedOrderId: String(o.stackQueuedOrderId || ''),
+        stackTransferKm: Number(o.stackTransferKm || 0),
+        stackTransferMinutes: Number(o.stackTransferMinutes || 0),
+        stackEstimatedWaitMinutes: Number(o.stackEstimatedWaitMinutes || 0),
+        stackVersion: String(o.stackVersion || ''),
 
         // 任務中小U最後位置：即使 Web/PWA 暫時失去背景 GPS，也保留最後已知位置。
         riderCurrentLat: asNumberOrNull(o.riderCurrentLat ?? o.riderCurrentLocation?.lat),
@@ -34375,6 +34681,212 @@ app.post('/api/rider/dispatch-event', riderAuthMiddleware, async (req, res) => {
   }
 });
 
+
+// ============================================================
+// Smart Stack V1｜承接第二張 QUEUED 任務
+// ============================================================
+app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) => {
+  try {
+    const { orderId, lineUserId, phone, riderId } = req.body || {};
+    const safeOrderId = smartStackSafeOrderId(orderId);
+    if (!safeOrderId) {
+      return res.status(400).json({ success:false, message:'缺少疊單訂單編號。' });
+    }
+
+    const riderResult = await findApprovedRiderForApi({ lineUserId, phone, riderId });
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({ success:false, message:riderResult.message });
+    }
+
+    const riderDoc = riderResult.riderDoc;
+    const rider = riderResult.rider || {};
+    const identity = buildRiderApiIdentity(riderDoc, rider, { lineUserId, phone, riderId });
+
+    if (!canRiderAcceptOrdersV4(rider)) {
+      return res.status(403).json({
+        success:false,
+        code:'RIDER_DISPATCH_NOT_ELIGIBLE',
+        message:'目前不具備正式接單資格。',
+      });
+    }
+
+    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDoc.id);
+    const candidateRef = db.collection('orders').doc(safeOrderId);
+    let acceptedQueuedOrder = null;
+    let primaryOrder = null;
+    let eligibilityResult = null;
+
+    await db.runTransaction(async transaction => {
+      const latestRiderDoc = await transaction.get(riderRef);
+      if (!latestRiderDoc.exists) throw new Error('RIDER_NOT_FOUND');
+
+      const latestRider = latestRiderDoc.data() || {};
+      if (!canRiderAcceptOrdersV4(latestRider)) throw new Error('RIDER_DISPATCH_NOT_ELIGIBLE');
+
+      const currentOrderId = smartStackSafeOrderId(latestRider.currentOrderId);
+      if (!currentOrderId) throw new Error('STACK_CURRENT_ORDER_REQUIRED');
+
+      const existingQueued = Array.isArray(latestRider.queuedOrderIds)
+        ? latestRider.queuedOrderIds.map(smartStackSafeOrderId).filter(Boolean)
+        : [];
+      if (existingQueued.length) throw new Error('STACK_QUEUE_FULL');
+
+      const currentRef = db.collection('orders').doc(currentOrderId);
+      const currentDoc = await transaction.get(currentRef);
+      const candidateDoc = await transaction.get(candidateRef);
+
+      if (!currentDoc.exists) throw new Error('STACK_CURRENT_ORDER_NOT_FOUND');
+      if (!candidateDoc.exists) throw new Error('ORDER_NOT_FOUND');
+
+      const current = { id:currentDoc.id, ...currentDoc.data() };
+      const candidate = { id:candidateDoc.id, ...candidateDoc.data() };
+
+      if (!isOrderBelongsToRider(current, identity)) throw new Error('NOT_THIS_RIDER');
+      if (!riderMeetsOrderV4Requirements(latestRider, candidate)) {
+        throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
+      }
+      if (isOrderSkippedForRider(candidate, identity)) throw new Error('RIDER_ALREADY_SKIPPED_ORDER');
+      if (String(candidate.status || '').trim() !== 'pending_dispatch') {
+        throw new Error('ORDER_ALREADY_ACCEPTED');
+      }
+      if (!isRiderVisibleDispatchOrder(candidate)) {
+        throw new Error('ORDER_PAYMENT_NOT_CONFIRMED');
+      }
+
+      const eligibility = buildSmartStackEligibility(current, candidate);
+      eligibilityResult = eligibility;
+      if (!eligibility.eligible) throw new Error(eligibility.code || 'STACK_NOT_ELIGIBLE');
+
+      const nowMs = Date.now();
+      const stackGroupId =
+        String(current.stackGroupId || '').trim() ||
+        buildSmartStackGroupId(current.id, candidate.id);
+
+      const queuedEtaMinutes = Math.max(5, Number(eligibility.queuedWaitMinutes || 20));
+      const queuedUpdate = {
+        status:'accepted',
+        riderStatus:'accepted',
+        riderId:identity.riderId,
+        riderDocId:identity.riderDocId,
+        riderPhone:identity.phone,
+        riderLineUserId:identity.lineUserId || '',
+        riderName:latestRider.name || latestRider.riderName || '',
+        acceptedAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        'statusTimes.accepted':admin.firestore.FieldValue.serverTimestamp(),
+
+        stackGroupId,
+        stackRole:'QUEUED',
+        stackState:'queued',
+        stackPosition:2,
+        stackPrimaryOrderId:current.id,
+        stackQueuedBehindOrderId:current.id,
+        stackAcceptedAtMs:nowMs,
+        stackAcceptedAt:admin.firestore.FieldValue.serverTimestamp(),
+        stackTransferKm:Number(eligibility.transferKm || 0),
+        stackTransferMinutes:Number(eligibility.transferMinutes || 0),
+        stackEstimatedWaitMinutes:queuedEtaMinutes,
+        stackVersion:UBEE_SMART_STACK_V1.version,
+
+        riderTrackingStatus:'queued',
+        trackingSessionId:'',
+        trackingStartedAtMs:null,
+        trackingEndedAtMs:null,
+        trackingStopReason:'',
+        etaText:'小U正在完成前序任務',
+        estimatedTime:`約 ${queuedEtaMinutes} 分鐘後開始前往取件`,
+        etaMinutes:queuedEtaMinutes,
+        etaStatus:'accepted',
+        etaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      transaction.update(candidateRef, queuedUpdate);
+      transaction.update(currentRef, {
+        stackGroupId,
+        stackRole:'CURRENT',
+        stackState:'active',
+        stackPosition:1,
+        stackQueuedOrderId:candidate.id,
+        stackVersion:UBEE_SMART_STACK_V1.version,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(riderRef, {
+        busy:true,
+        currentOrderId:current.id,
+        queuedOrderIds:[candidate.id],
+        activeOrderIds:[current.id,candidate.id],
+        stackGroupId,
+        smartStackActive:true,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+
+      primaryOrder = { ...current, stackGroupId, stackRole:'CURRENT', stackState:'active', stackQueuedOrderId:candidate.id };
+      acceptedQueuedOrder = { ...candidate, ...queuedUpdate, id:candidate.id };
+    });
+
+    clearDispatchPushTimers(safeOrderId);
+    if (typeof orders === 'object' && orders) orders[safeOrderId] = acceptedQueuedOrder;
+
+    Promise.allSettled([
+      logDispatchEvent({
+        type:'RIDER_STACK_ACCEPTED',
+        orderId:safeOrderId,
+        riderId:identity.riderId,
+        riderDocId:identity.riderDocId,
+        reason:`queued behind ${primaryOrder?.id || ''}`,
+        createdAtMs:Date.now(),
+      }),
+      updateRiderDispatchStats(identity.riderId, {
+        acceptedOrders:1,
+        lastAcceptedAtMs:Date.now(),
+      }),
+      notifyCustomer(
+        acceptedQueuedOrder,
+        createTextMessage(
+          `🟡 UBee 小U已承接你的任務\n\n訂單編號：${safeOrderId}\n小U目前正在完成前序任務，完成後會依序前往取件。`
+        )
+      )
+    ]).catch(()=>{});
+
+    return res.json({
+      success:true,
+      order:acceptedQueuedOrder,
+      queuedOrder:acceptedQueuedOrder,
+      currentOrder:primaryOrder,
+      eligibility:eligibilityResult,
+      smartStack:{
+        version:UBEE_SMART_STACK_V1.version,
+        role:'QUEUED',
+        count:2,
+        maxActiveOrders:2,
+      },
+      message:'已加入下一筆任務；完成目前任務後會自動切換。',
+    });
+  } catch (error) {
+    const code = String(error?.message || '').trim();
+    const map = {
+      RIDER_NOT_FOUND:[404,'找不到小U資料。'],
+      RIDER_DISPATCH_NOT_ELIGIBLE:[403,'目前不具備正式接單資格。'],
+      STACK_CURRENT_ORDER_REQUIRED:[409,'目前沒有可建立疊單的進行中任務。'],
+      STACK_CURRENT_ORDER_NOT_FOUND:[409,'目前任務已更新，請重新整理。'],
+      STACK_QUEUE_FULL:[409,'目前已經有一筆下一任務，完成後才能再疊單。'],
+      CURRENT_ORDER_NOT_SUPPORTED:[409,'目前任務類型不支援疊單。'],
+      CANDIDATE_ORDER_NOT_SUPPORTED:[409,'這張任務目前不支援疊單。'],
+      STACK_TOO_FAR:[409,'這張任務與目前路線銜接距離過遠，不建議疊單。'],
+      STACK_ROUTE_COORDINATES_MISSING:[409,'任務路線資料不足，暫時不能建立疊單。'],
+      ORDER_ALREADY_ACCEPTED:[409,'這張任務已被其他小U接走。'],
+      ORDER_PAYMENT_NOT_CONFIRMED:[409,'這張任務尚未符合可接單條件。'],
+      NOT_THIS_RIDER:[403,'目前任務不屬於此小U。'],
+      RIDER_V4_QUALIFICATION_REQUIRED:[403,'目前資格不符合此任務需求。'],
+      RIDER_ALREADY_SKIPPED_ORDER:[409,'你已略過這張任務。'],
+      ORDER_NOT_FOUND:[404,'找不到此任務。'],
+    };
+    const result = map[code] || [500,'疊單失敗，請稍後再試。'];
+    console.error('❌ Smart Stack 接單失敗：', code || error);
+    return res.status(result[0]).json({ success:false, code:code || 'STACK_FAILED', message:result[1] });
+  }
+});
+
 // 3. 接受任務：手機登入正式版
 // 支援 phone / riderId，並保留 lineUserId 相容
 app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
@@ -35574,6 +36086,8 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     let multiStopAdvanced = false;
     let completedStopNumber = 0;
     let nextStopNumber = 0;
+    let promotedOrder = null;
+    let promotedOrderId = '';
 
     await db.runTransaction(async (transaction) => {
       const orderDoc = await transaction.get(orderRef);
@@ -35584,6 +36098,25 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
 
       const order = orderDoc.data() || {};
       const currentStatus = String(order.status || '').trim();
+
+      // Smart Stack V1：Transaction 一開始先讀取 Rider 與 QUEUED，
+      // 確保完成 CURRENT 時可以原子化提升下一張任務。
+      const latestRiderDoc = await transaction.get(riderRef);
+      const latestRider = latestRiderDoc.exists ? latestRiderDoc.data() || {} : {};
+      const queuedIdsForPromotion = Array.isArray(latestRider.queuedOrderIds)
+        ? latestRider.queuedOrderIds.map(smartStackSafeOrderId).filter(Boolean)
+        : [];
+      const queuedPromotionId = queuedIdsForPromotion[0] || '';
+      let queuedPromotionRef = null;
+      let queuedPromotionDoc = null;
+      let queuedPromotionOrder = null;
+      if (status === 'completed' && queuedPromotionId) {
+        queuedPromotionRef = db.collection('orders').doc(queuedPromotionId);
+        queuedPromotionDoc = await transaction.get(queuedPromotionRef);
+        if (queuedPromotionDoc.exists) {
+          queuedPromotionOrder = { id:queuedPromotionDoc.id, ...queuedPromotionDoc.data() };
+        }
+      }
 
       if (!isOrderBelongsToRider(order, identity)) {
         throw new Error('NOT_THIS_RIDER');
@@ -35969,21 +36502,101 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
   }
 }
     
+      // Smart Stack V1：如果有 QUEUED，先在目前訂單上留下銜接資訊。
+      if (
+        status === 'completed' &&
+        queuedPromotionOrder &&
+        String(queuedPromotionOrder.stackRole || '').trim().toUpperCase() === 'QUEUED' &&
+        String(queuedPromotionOrder.status || '').trim() === 'accepted' &&
+        isOrderBelongsToRider(queuedPromotionOrder, identity)
+      ) {
+        updateData.stackRole = 'COMPLETED';
+        updateData.stackState = 'completed';
+        updateData.stackNextOrderId = queuedPromotionId;
+      }
+
       transaction.update(orderRef, updateData);
 
       if (status === 'completed') {
-        transaction.set(riderRef, {
-          busy: false,
-          currentOrderId: '',
-          lastActive: Date.now(),
-          activeTrackingOrderId: '',
-          activeTrackingSessionId: '',
-          taskTrackingStatus: 'stopped',
-          taskTrackingUpdatedAtMs: Date.now(),
-          taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          taskTrackingStopReason: 'completed',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true });
+        const canPromoteQueued =
+          queuedPromotionOrder &&
+          String(queuedPromotionOrder.stackRole || '').trim().toUpperCase() === 'QUEUED' &&
+          String(queuedPromotionOrder.status || '').trim() === 'accepted' &&
+          isOrderBelongsToRider(queuedPromotionOrder, identity);
+
+        if (canPromoteQueued) {
+          const promotedAtMs = Date.now();
+          const promotedTrackingSessionId =
+            typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : crypto.randomBytes(16).toString('hex');
+
+          const promotedUpdate = {
+            stackRole:'CURRENT',
+            stackState:'active',
+            stackPromotedAtMs:promotedAtMs,
+            stackPromotedAt:admin.firestore.FieldValue.serverTimestamp(),
+            stackPreviousOrderId:safeOrderId,
+            riderTrackingStatus:'starting',
+            trackingSessionId:promotedTrackingSessionId,
+            trackingStartedAtMs:promotedAtMs,
+            trackingStartedAt:admin.firestore.FieldValue.serverTimestamp(),
+            trackingUpdatedAtMs:promotedAtMs,
+            trackingUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            trackingEndedAtMs:null,
+            trackingEndedAt:null,
+            trackingStopReason:'',
+            ...getEtaPayloadByStatus('accepted'),
+            updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+          };
+
+          transaction.update(queuedPromotionRef, promotedUpdate);
+
+          updateData.stackRole = 'COMPLETED';
+          updateData.stackState = 'completed';
+          updateData.stackNextOrderId = queuedPromotionId;
+
+          transaction.set(riderRef, {
+            busy:true,
+            currentOrderId:queuedPromotionId,
+            queuedOrderIds:[],
+            activeOrderIds:[queuedPromotionId],
+            smartStackActive:false,
+            lastActive:promotedAtMs,
+            activeTrackingOrderId:queuedPromotionId,
+            activeTrackingSessionId:promotedTrackingSessionId,
+            taskTrackingStatus:'starting',
+            taskTrackingUpdatedAtMs:promotedAtMs,
+            taskTrackingUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            taskTrackingStopReason:'',
+            updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge:true });
+
+          promotedOrderId = queuedPromotionId;
+          promotedOrder = {
+            ...queuedPromotionOrder,
+            ...promotedUpdate,
+            id:queuedPromotionId,
+            status:'accepted',
+            riderStatus:'accepted',
+          };
+        } else {
+          transaction.set(riderRef, {
+            busy: false,
+            currentOrderId: '',
+            queuedOrderIds:[],
+            activeOrderIds:[],
+            smartStackActive:false,
+            lastActive: Date.now(),
+            activeTrackingOrderId: '',
+            activeTrackingSessionId: '',
+            taskTrackingStatus: 'stopped',
+            taskTrackingUpdatedAtMs: Date.now(),
+            taskTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            taskTrackingStopReason: 'completed',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
       } else {
         transaction.set(riderRef, {
           busy: true,
@@ -36011,6 +36624,25 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     ).trim();
 
     orders[safeOrderId] = updatedOrder;
+    if (promotedOrderId && promotedOrder) {
+      orders[promotedOrderId] = promotedOrder;
+      Promise.allSettled([
+        logDispatchEvent({
+          type:'STACK_QUEUED_PROMOTED',
+          orderId:promotedOrderId,
+          riderId:identity.riderId,
+          riderDocId:identity.riderDocId,
+          reason:`previous ${safeOrderId} completed`,
+          createdAtMs:Date.now(),
+        }),
+        notifyCustomer(
+          promotedOrder,
+          createTextMessage(
+            `🟢 UBee 小U已完成前序任務\n\n訂單編號：${promotedOrderId}\n小U現在開始前往你的取件地點。`
+          )
+        )
+      ]).catch(()=>{});
+    }
 
     const statusEventType = effectiveStatus === 'completed'
       ? 'ORDER_COMPLETED'
@@ -36100,6 +36732,9 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       multiStopAdvanced,
       completedStopNumber,
       nextStopNumber,
+      promotedOrderId,
+      promotedOrder,
+      smartStackPromoted: Boolean(promotedOrderId),
       message: multiStopAdvanced
         ? `第 ${completedStopNumber} 個送達點已完成，請前往第 ${nextStopNumber} 點。`
         : '任務狀態已更新',
@@ -36262,6 +36897,19 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
             order.riderDisplayName ||
             ''
           ),
+
+        // Smart Stack V1：只暴露客戶需要知道的安全狀態，不暴露另一張訂單資訊。
+        stackRole:
+          String(order.stackRole || '').trim().toUpperCase(),
+
+        stackState:
+          String(order.stackState || '').trim().toLowerCase(),
+
+        stackWaitingAhead:
+          String(order.stackRole || '').trim().toUpperCase() === 'QUEUED',
+
+        stackEstimatedWaitMinutes:
+          Math.max(0, Number(order.stackEstimatedWaitMinutes || 0)),
 
         riderVehicleType:
           String(
@@ -37213,6 +37861,7 @@ function getDispatchApiErrorResponse(error) {
     ORDER_ASSIGNMENT_CHANGED: [409, '此訂單的承接小U已發生變更，請重新整理調度中心後再操作。'],
     ORDER_RECOVERY_NOT_ALLOWED: [409, '此任務目前不符合安全備援轉派條件，請重新整理後確認。'],
     ORDER_CUSTODY_RISK: [409, '此任務已到達取件或取件後階段，可能已發生貨物交接，禁止直接取消派單／轉派。請先聯絡小U並人工處置。'],
+    STACK_PRIMARY_HAS_QUEUED_ORDER: [409, '此小U目前還有下一筆疊單任務；請先解除下一筆任務，再處理目前任務。'],
   };
 
   if (map[code]) {
@@ -37806,6 +38455,32 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
             );
         }
 
+        const isQueuedStackOrder =
+          String(order.stackRole || '').trim().toUpperCase() === 'QUEUED';
+        const isCurrentStackOrder =
+          String(order.stackRole || '').trim().toUpperCase() === 'CURRENT';
+        let stackPrimaryRef = null;
+        let stackPrimaryDoc = null;
+
+        if (
+          isCurrentStackOrder &&
+          String(order.stackQueuedOrderId || '').trim()
+        ) {
+          throw new Error('STACK_PRIMARY_HAS_QUEUED_ORDER');
+        }
+
+        if (isQueuedStackOrder && previousRiderDoc?.exists) {
+          const previousRider = previousRiderDoc.data() || {};
+          const stackPrimaryId = smartStackSafeOrderId(
+            order.stackPrimaryOrderId ||
+            previousRider.currentOrderId
+          );
+          if (stackPrimaryId && stackPrimaryId !== safeOrderId) {
+            stackPrimaryRef = db.collection('orders').doc(stackPrimaryId);
+            stackPrimaryDoc = await transaction.get(stackPrimaryRef);
+          }
+        }
+
         const previousTrail =
           Array.isArray(
             order.riderLocationTrail
@@ -38009,6 +38684,18 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
           ...getEtaPayloadByStatus(
             'pending_dispatch'
           ),
+
+          // Smart Stack V1：解除派單後清除疊單歸屬。
+          stackGroupId:'',
+          stackRole:'',
+          stackState:'',
+          stackPosition:0,
+          stackPrimaryOrderId:'',
+          stackQueuedBehindOrderId:'',
+          stackQueuedOrderId:'',
+          stackTransferKm:0,
+          stackTransferMinutes:0,
+          stackEstimatedWaitMinutes:0,
         };
 
         if (riderSkipKeys.length) {
@@ -38023,6 +38710,36 @@ app.post('/api/dispatch/orders/:orderId/unassign', async (req, res) => {
           orderRef,
           updateData
         );
+
+        if (isQueuedStackOrder) {
+          if (stackPrimaryRef && stackPrimaryDoc?.exists) {
+            transaction.set(
+              stackPrimaryRef,
+              {
+                stackQueuedOrderId:'',
+                stackState:'solo',
+                updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge:true }
+            );
+          }
+          if (previousRiderRef && previousRiderDoc?.exists) {
+            const previousRider = previousRiderDoc.data() || {};
+            const currentId = smartStackSafeOrderId(previousRider.currentOrderId);
+            transaction.set(
+              previousRiderRef,
+              {
+                busy:Boolean(currentId),
+                queuedOrderIds:admin.firestore.FieldValue.arrayRemove(safeOrderId),
+                activeOrderIds:currentId ? [currentId] : [],
+                smartStackActive:false,
+                stackGroupId:'',
+                updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge:true }
+            );
+          }
+        }
 
         if (
           previousRiderRef &&
