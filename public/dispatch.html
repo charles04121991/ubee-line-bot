@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-18｜UBee Smart Stack V1：調度中心顯示 CURRENT／QUEUED、疊單群組與下一筆任務。 -->
 <!-- 2026-09-17｜Dispatch Profit Control V1：顯示客戶支付、小U收入、平台應得、實收／待收、定價版本與獲利警示。 -->
 <!-- 2026-09-07｜Dispatch Manual Unassign V1：新增「取消派單」；只解除目前小U，不取消客戶訂單；取件前可退回待派單並重新媒合，抵達取件後受貨物安全鎖保護。 -->
 <!-- 2026-09-03｜Dispatch Universal Arrival Photo V1.1：所有服務共用到場照片狀態；排隊任務只要求任務地點照片，路線任務依取件＋每個送達點計算。 -->
@@ -2716,6 +2717,28 @@ function pricingVersionLabel(order){
   );
 }
 
+
+function smartStackBadge(order){
+  const role=String(order?.stackRole||'').trim().toUpperCase();
+  if(role==='CURRENT') return '<span class="badge blue">疊單 CURRENT</span>';
+  if(role==='QUEUED') return '<span class="badge warn">疊單 QUEUED</span>';
+  if(role==='COMPLETED') return '<span class="badge green">疊單已完成</span>';
+  return '';
+}
+function smartStackMeta(order){
+  const role=String(order?.stackRole||'').trim().toUpperCase();
+  if(!role)return '';
+  if(role==='QUEUED'){
+    const km=Number(order?.stackTransferKm||0);
+    const min=Number(order?.stackTransferMinutes||0);
+    return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：下一筆任務 · 銜接 ${esc(km.toFixed(1))} km / ${esc(Math.round(min))} 分鐘 · 前序 ${esc(order.stackPrimaryOrderId||'-')}</div>`;
+  }
+  if(role==='CURRENT' && order?.stackQueuedOrderId){
+    return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：目前任務 · 下一筆 ${esc(order.stackQueuedOrderId)}</div>`;
+  }
+  return '';
+}
+
 function renderOrders(){
   let list = [...(state.data.orders || [])];
 
@@ -2761,6 +2784,7 @@ function renderOrders(){
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
               ${order.serviceType?`<span class="badge blue">${esc(order.serviceType)}</span>`:''}
               ${order.serviceCategory?`<span class="badge">${esc(order.serviceCategory)}</span>`:''}
+              ${smartStackBadge(order)}
               ${profitStatusBadge(profit)}
               ${merchantLiveTrackingBadges(order)}
               ${Number(order.openIncidentCount||0)>0?`<span class="badge danger">異常案件 ${esc(order.openIncidentCount)}</span>`:''}
@@ -2789,6 +2813,7 @@ function renderOrders(){
         ${renderTaskContractStrip(order,{compact:true})}
         ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<div class="candidate-meta" style="margin-top:8px;color:${order.riskLevel==='CRITICAL'?'var(--red)':order.riskLevel==='HIGH'?'#b05e00':'var(--muted)'}">系統判斷：${esc(order.riskReasons.slice(0,3).join('；'))}</div>`:''}
         ${merchantLiveTrackingStrip(order)}
+        ${smartStackMeta(order)}
         ${isWaiting?riderVisibilityStrip(order,{compact:true}):''}
         <div class="meta">
           <span>${esc(order.riderName || (isWaiting?'尚未接單':'已指派小U'))}</span>
