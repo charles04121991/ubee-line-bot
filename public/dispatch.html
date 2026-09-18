@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-18｜UBee Smart Stack V1.1：顯示 Google Routes 真實銜接與 QUEUED Live ETA。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1：調度中心顯示 CURRENT／QUEUED、疊單群組與下一筆任務。 -->
 <!-- 2026-09-17｜Dispatch Profit Control V1：顯示客戶支付、小U收入、平台應得、實收／待收、定價版本與獲利警示。 -->
 <!-- 2026-09-07｜Dispatch Manual Unassign V1：新增「取消派單」；只解除目前小U，不取消客戶訂單；取件前可退回待派單並重新媒合，抵達取件後受貨物安全鎖保護。 -->
@@ -2731,7 +2732,8 @@ function smartStackMeta(order){
   if(role==='QUEUED'){
     const km=Number(order?.stackTransferKm||0);
     const min=Number(order?.stackTransferMinutes||0);
-    return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：下一筆任務 · 銜接 ${esc(km.toFixed(1))} km / ${esc(Math.round(min))} 分鐘 · 前序 ${esc(order.stackPrimaryOrderId||'-')}</div>`;
+    const liveEta=Math.max(0,Number(order?.stackQueuedEtaMinutes||order?.stackEstimatedWaitMinutes||0));
+    return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：下一筆任務 · Google Routes 銜接 ${esc(km.toFixed(1))} km / ${esc(Math.round(min))} 分鐘${liveEta>0?` · 預計 ${esc(Math.round(liveEta))} 分鐘抵達取件點`:''} · 前序 ${esc(order.stackPrimaryOrderId||'-')}</div>`;
   }
   if(role==='CURRENT' && order?.stackQueuedOrderId){
     return `<div class="candidate-meta" style="margin-top:8px">Smart Stack：目前任務 · 下一筆 ${esc(order.stackQueuedOrderId)}</div>`;
