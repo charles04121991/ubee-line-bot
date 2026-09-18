@@ -1,3 +1,4 @@
+// 2026-09-18｜Rider Task Control V1.1：補齊已承接／已確認預約的「取消預約承接」；安全釋放、避免回派同一小U、接近任務時間自動緊急媒合。
 // 2026-09-18｜Rider Task Control V1：待接任務加入正式拒絕；已接任務在抵達取件前可由小U取消接單並重新媒合；Smart Stack 安全釋放。
 // 2026-09-18｜UBee Smart Stack V1.1：Recovery Hard Lock＋Google Routes 真實道路疊單判斷＋QUEUED Live ETA；V1 CURRENT/QUEUED 架構保留。
 // 2026-09-18｜UBee Smart Stack V1：順序疊單；最多 2 單，CURRENT + QUEUED，完成第一單後自動升級第二單；不改 Profit Pricing V1。
@@ -10596,6 +10597,252 @@ app.post(
           code,
           message: response[1],
         });
+    }
+  }
+);
+
+
+// ============================================================
+// Rider Task Control V1.1｜小U取消預約承接
+// - scheduled_reserved / scheduled_confirmed 均可取消。
+// - 尚未進入正式 accepted 執行階段前使用。
+// - 取消後排除原小U，避免再次回派。
+// - 距離預約時間 <= 15 分鐘時直接轉 emergency pending_dispatch。
+// ============================================================
+app.post(
+  '/api/rider/cancel-scheduled-reservation',
+  riderAuthMiddleware,
+  async (req,res)=>{
+    try{
+      const {
+        orderId,
+        lineUserId,
+        phone,
+        riderId,
+      }=req.body||{};
+
+      const safeOrderId=String(orderId||'').trim().toUpperCase();
+      if(!safeOrderId){
+        return res.status(400).json({
+          success:false,
+          message:'缺少訂單編號。',
+        });
+      }
+
+      const riderResult=
+        await resolveScheduleRiderForRequest(
+          req,
+          {lineUserId,phone,riderId}
+        );
+
+      if(!riderResult.ok){
+        return res.status(riderResult.statusCode).json({
+          success:false,
+          message:riderResult.message,
+        });
+      }
+
+      const identity=
+        buildRiderApiIdentity(
+          riderResult.riderDoc,
+          riderResult.rider||{},
+          {lineUserId,phone,riderId}
+        );
+
+      const orderRef=db.collection('orders').doc(safeOrderId);
+      let releasedOrder=null;
+      let emergency=false;
+
+      await db.runTransaction(async transaction=>{
+        const orderDoc=await transaction.get(orderRef);
+        if(!orderDoc.exists){
+          throw new Error('ORDER_NOT_FOUND');
+        }
+
+        const order={
+          id:orderDoc.id,
+          ...orderDoc.data(),
+        };
+
+        const status=String(order.status||'').trim();
+        if(!['scheduled_reserved','scheduled_confirmed'].includes(status)){
+          throw new Error('SCHEDULE_NOT_CANCELLABLE');
+        }
+
+        const reservedDocId=String(order.reservedRiderDocId||'').trim();
+        const reservedRiderId=String(order.reservedRiderId||'').trim();
+        const reservedPhone=String(order.reservedRiderPhone||'').trim();
+
+        const belongs=
+          (reservedDocId && reservedDocId===identity.riderDocId) ||
+          (reservedRiderId && reservedRiderId===identity.riderId) ||
+          (reservedPhone && reservedPhone===identity.phone);
+
+        if(!belongs){
+          throw new Error('NOT_RESERVED_RIDER');
+        }
+
+        const startMs=getScheduleTimestampMs(
+          order.scheduledStartAtMs||
+          order.requestedScheduleAtMs
+        );
+
+        const nowMs=Date.now();
+        emergency=
+          startMs>0 &&
+          nowMs>=startMs-UBEE_SCHEDULE_EMERGENCY_BEFORE_MS;
+
+        const nextStatus=emergency
+          ? 'pending_dispatch'
+          : 'pending_schedule';
+
+        const skipKeys=Array.from(new Set([
+          identity.riderId,
+          identity.riderDocId,
+          identity.phone,
+          identity.lineUserId,
+        ].map(v=>String(v||'').trim()).filter(Boolean)));
+
+        const updateData={
+          status:nextStatus,
+          riderStatus:nextStatus,
+          scheduleStatus:emergency
+            ? 'emergency_dispatch'
+            : 'awaiting_rider',
+
+          scheduleReleaseReason:'rider_cancelled_reservation',
+          scheduleReleasedAtMs:nowMs,
+          scheduleReleasedAt:admin.firestore.FieldValue.serverTimestamp(),
+
+          scheduleConfirmationRequired:false,
+          scheduleConfirmationRequestedAtMs:0,
+          scheduleConfirmationRequestedAt:null,
+
+          reservedRiderId:'',
+          reservedRiderDocId:'',
+          reservedRiderPhone:'',
+          reservedRiderName:'',
+
+          scheduleReservedAtMs:0,
+          scheduleReservedAt:null,
+          riderConfirmedAtMs:0,
+          riderConfirmedAt:null,
+
+          isScheduleEmergency:emergency===true,
+
+          lastRiderCancelledScheduleAtMs:nowMs,
+          lastRiderCancelledScheduleAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+
+          updatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        if(skipKeys.length){
+          updateData.skippedRiderIds=
+            admin.firestore.FieldValue.arrayUnion(...skipKeys);
+        }
+
+        transaction.set(
+          orderRef,
+          updateData,
+          {merge:true}
+        );
+
+        releasedOrder={
+          ...order,
+          ...updateData,
+          id:safeOrderId,
+          status:nextStatus,
+          riderStatus:nextStatus,
+        };
+      });
+
+      orders[safeOrderId]=releasedOrder;
+
+      // 重新媒合。
+      if(emergency){
+        startOrderDispatchInBackground(releasedOrder);
+      }else{
+        setImmediate(()=>{
+          sendNewOrderPushToRiders(
+            releasedOrder,
+            null,
+            {
+              allowOffline:true,
+              scheduled:true,
+            }
+          ).catch(error=>{
+            console.warn(
+              '⚠️ 預約取消後重新通知小U失敗：',
+              error?.message||error
+            );
+          });
+        });
+      }
+
+      const nowMs=Date.now();
+
+      await Promise.allSettled([
+        logDispatchEvent({
+          type:'RIDER_CANCELLED_SCHEDULE_RESERVATION',
+          orderId:safeOrderId,
+          riderId:identity.riderId,
+          riderDocId:identity.riderDocId,
+          status:releasedOrder.status,
+          emergency,
+          createdAtMs:nowMs,
+        }),
+        updateRiderDispatchStats(identity.riderId,{
+          cancelledOrders:1,
+          lastCancelledAtMs:nowMs,
+        }),
+        notifyCustomer(
+          releasedOrder,
+          createTextMessage(
+            `📅 UBee 預約任務重新媒合中\n\n`+
+            `訂單編號：${safeOrderId}\n`+
+            `原承接小U已取消預約承接，系統正在重新媒合其他小U。`
+          )
+        ),
+      ]);
+
+      return res.json({
+        success:true,
+        orderId:safeOrderId,
+        order:releasedOrder,
+        emergency,
+        status:releasedOrder.status,
+        message:emergency
+          ? '已取消預約承接；因接近任務時間，系統已轉為緊急即時媒合。'
+          : '已取消預約承接，任務已重新開放給其他小U。',
+      });
+
+    }catch(error){
+      const code=String(error?.message||'');
+      const map={
+        ORDER_NOT_FOUND:
+          [404,'找不到此預約任務。'],
+        SCHEDULE_NOT_CANCELLABLE:
+          [409,'這筆預約已進入其他任務階段，無法使用取消預約承接。'],
+        NOT_RESERVED_RIDER:
+          [403,'這筆預約不是由目前的小U承接。'],
+      };
+
+      const result=
+        map[code]||
+        [500,'取消預約承接失敗，請稍後再試。'];
+
+      console.error(
+        '❌ Rider cancel-scheduled-reservation:',
+        code||error
+      );
+
+      return res.status(result[0]).json({
+        success:false,
+        code:code||'CANCEL_SCHEDULE_RESERVATION_FAILED',
+        message:result[1],
+      });
     }
   }
 );
