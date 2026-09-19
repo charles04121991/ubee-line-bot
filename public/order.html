@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-19｜Customer Cancel UX V1：我的訂單列表、訂單詳情、進行中任務皆直接提供取消入口。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1.1：QUEUED 顯示 A 真實剩餘道路 ETA + A→B 真實道路 ETA；不暴露前序訂單資料。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1：客戶追蹤支援 QUEUED 前序任務狀態，不暴露其他客戶訂單資訊。 -->
 <!-- 2026-09-17｜Profit Pricing V1 / Route Pricing V4：用戶端只呈現後端鎖價；一般長途採平滑分段費率，急件與排隊平台管理費納入「平台服務費」，不減少小U既有收入。 -->
@@ -39,7 +40,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260918-smart-stack-v1-1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260919-customer-cancel-ux-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6300,6 +6301,73 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
 }
 </style>
 
+
+<style id="ubee-customer-cancel-ux-v1-style">
+#productionOrderFlow .ubee-customer-order-card-actions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:11px;
+  padding-top:10px;
+  border-top:1px solid #eceef0;
+}
+#productionOrderFlow .ubee-customer-cancel-inline,
+#productionOrderFlow .ubee-native-order-cancel{
+  min-height:38px;
+  border:1px solid #f0c4c4;
+  border-radius:12px;
+  background:#fff5f5;
+  color:#c52929;
+  padding:8px 12px;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.01em;
+}
+#productionOrderFlow .ubee-native-order-item{
+  border-bottom:1px solid #eceef0;
+}
+#productionOrderFlow .ubee-native-order-item:last-child{
+  border-bottom:0;
+}
+#productionOrderFlow .ubee-native-order-item .ubee-native-order-row{
+  border-bottom:0!important;
+}
+#productionOrderFlow .ubee-native-order-item .ubee-native-order-cancel{
+  margin:0 14px 12px;
+  min-width:92px;
+}
+#productionOrderFlow .ubee-native-cancel-section{
+  margin-top:14px;
+}
+#productionOrderFlow .ubee-customer-cancel-primary{
+  width:100%;
+  min-height:52px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  border:1px solid #efc6c6;
+  border-radius:15px;
+  background:#fff4f4;
+  color:#bd2929;
+  font:inherit;
+  font-size:14px;
+  font-weight:950;
+}
+#productionOrderFlow .ubee-customer-cancel-primary small{
+  display:block;
+  color:#a95d5d;
+  font-size:10px;
+  font-weight:750;
+}
+#productionOrderFlow .ubee-customer-cancel-primary.hidden{
+  display:none!important;
+}
+#productionOrderFlow .ubee-native-detail-cancel-group{
+  margin:14px 0;
+}
+</style>
+
 </head>
 <body class="ubee-app-starting" style="background:#ffffff;">
 
@@ -12477,6 +12545,10 @@ function hideFooterButtons(){
   qs('cancelOrderBtn')
     ?.classList
     .add('hidden');
+
+  qs('cancelOrderInlineBtn')
+    ?.classList
+    .add('hidden');
 }
 
 function showOnlyStep(step){
@@ -12518,13 +12590,15 @@ function showOnlyStep(step){
     );
 
 
-  qs('cancelOrderBtn')
-    ?.classList
-    .toggle(
-      'hidden',
-      !currentOrderId ||
-      step !== 5
-    );
+  ['cancelOrderBtn','cancelOrderInlineBtn'].forEach(id=>{
+    qs(id)
+      ?.classList
+      .toggle(
+        'hidden',
+        !currentOrderId ||
+        step !== 5
+      );
+  });
 
 
   window.UBeePrimaryNavigation?.activate(step === 5 ? 'task' : 'home');
@@ -14172,8 +14246,15 @@ async function confirmPaid(){
   }
 }
 
-async function cancelOrder(){
-  if(!currentOrderId){
+async function cancelOrder(orderIdOverride=''){
+  const targetOrderId=
+    String(
+      orderIdOverride ||
+      currentOrderId ||
+      ''
+    ).trim().toUpperCase();
+
+  if(!targetOrderId){
     await showUBeeCustomerNativeAlert('目前沒有可取消的訂單。');
     return;
   }
@@ -14206,7 +14287,7 @@ async function cancelOrder(){
 
         credentials:'include',
         body:JSON.stringify({
-          orderId:currentOrderId
+          orderId:targetOrderId
         })
       }
     );
@@ -14227,14 +14308,41 @@ async function cancelOrder(){
 
     await showUBeeCustomerNativeAlert('訂單已取消。','任務已取消');
 
-    renderTimeline(
-      'cancelled',
-      currentOrderData
-    );
+    if(
+      String(currentOrderId||'').trim().toUpperCase()===
+      targetOrderId
+    ){
+      if(currentOrderData){
+        currentOrderData={
+          ...currentOrderData,
+          status:'cancelled'
+        };
+      }
 
-    qs('cancelOrderBtn')
-      .classList
-      .add('hidden');
+      renderTimeline(
+        'cancelled',
+        currentOrderData
+      );
+
+      qs('cancelOrderBtn')
+        ?.classList
+        .add('hidden');
+
+      qs('cancelOrderInlineBtn')
+        ?.classList
+        .add('hidden');
+    }
+
+    window.dispatchEvent(
+      new CustomEvent(
+        'ubee:customer-order-cancelled',
+        {
+          detail:{
+            orderId:targetOrderId
+          }
+        }
+      )
+    );
 
   }catch(err){
 
@@ -15168,14 +15276,15 @@ function renderTimeline(status, order){
       'cancelled'
     ].includes(currentStatus);
 
-  qs('cancelOrderBtn')
-    ?.classList
-    .toggle(
-      'hidden',
-
-      !canCancel ||
-      currentStep !== 5
-    );
+  ['cancelOrderBtn','cancelOrderInlineBtn'].forEach(id=>{
+    qs(id)
+      ?.classList
+      .toggle(
+        'hidden',
+        !canCancel ||
+        currentStep !== 5
+      );
+  });
 
 }
 
@@ -16008,6 +16117,39 @@ function getOrderStatusColor(status){
     '#8b9096';
 }
 
+
+function isCustomerOrderCancellableV1(orderOrStatus){
+  const status=
+    typeof orderOrStatus==='string'
+      ? orderOrStatus
+      : orderOrStatus?.status;
+
+  const normalized=
+    String(status||'')
+      .trim()
+      .toLowerCase();
+
+  return ![
+    'picked_up',
+    'going_to_dropoff',
+    'heading_to_dropoff',
+    'arrived_dropoff',
+    'completed',
+    'done',
+    'cancelled',
+    'canceled'
+  ].includes(normalized);
+}
+
+function getCustomerOrderIdV1(order){
+  return String(
+    order?.id ||
+    order?.orderId ||
+    order?.orderNo ||
+    ''
+  ).trim().toUpperCase();
+}
+
 function renderOrderList(el, orders, emptyText){
   if(!el){
     return;
@@ -16109,6 +16251,16 @@ function renderOrderList(el, orders, emptyText){
             送達：${escapeHtml(dropoff)}<br>
             金額：NT$${escapeHtml(total)}
           </div>
+
+          ${isCustomerOrderCancellableV1(order) && getCustomerOrderIdV1(order) ? `
+            <div class="ubee-customer-order-card-actions">
+              <button
+                type="button"
+                class="ubee-customer-cancel-inline"
+                onclick="cancelOrder('${escapeHtml(getCustomerOrderIdV1(order))}')"
+              >取消訂單</button>
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -19124,6 +19276,12 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="ubee-native-group-title">任務資訊</div>
 <details class="ubee-native-detail-disclosure" id="step5TaskDetailSection"><summary><span>地址、聯絡人與任務內容</span><span>查看完整資訊</span></summary><div class="ubee-native-task-detail-content" id="step5TaskDetailContent">任務明細載入中...</div></details>
 </section>
+<section class="ubee-native-cancel-section" id="step5CancelActionSection">
+<button class="ubee-customer-cancel-primary hidden" id="cancelOrderInlineBtn" onclick="cancelOrder()" type="button">
+<span>取消任務</span>
+<small>尚未完成取件前可取消</small>
+</button>
+</section>
 </div>
 </section>
 <section class="flow-page" data-page="profileDetail" id="flowPageProfileDetail">
@@ -19139,6 +19297,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </section>
 <div id="flowProfileDetailList"></div>
 <div id="flowProfileDetailPhotos"></div>
+<div id="flowProfileDetailActions"></div>
 <button class="flow-secondary ubee-native-detail-back" data-go="profile" type="button">返回我的訂單</button>
 </div>
 </section>
@@ -20026,6 +20185,30 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     target.innerHTML=`<section class="ubee-native-detail-group"><div class="ubee-native-detail-group-title">執行紀錄</div><div class="ubee-native-photo-timeline">${events.map(item=>`<div class="ubee-native-photo-event"><div class="ubee-native-photo-event-head"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.time||'')}</span></div><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.label)}" loading="lazy" referrerpolicy="no-referrer"></div>`).join('')}</div></section>`;
   }
 
+
+  function renderProfileOrderCancelAction(order){
+    const target=$('flowProfileDetailActions');
+    if(!target)return;
+
+    const orderId=getCustomerOrderIdV1(order);
+    const canCancel=
+      Boolean(orderId) &&
+      isCustomerOrderCancellableV1(order);
+
+    target.innerHTML=canCancel
+      ? `<section class="ubee-native-detail-cancel-group">
+          <button
+            class="ubee-customer-cancel-primary"
+            type="button"
+            data-detail-cancel-order="${escapeHtml(orderId)}"
+          >
+            <span>取消訂單</span>
+            <small>尚未完成取件前可取消</small>
+          </button>
+        </section>`
+      : '';
+  }
+
   async function openProfileOrderDetail(index){
     const order=state.profileOrders[Number(index)];
     if(!order)return;
@@ -20045,6 +20228,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowProfileDetailStatus').textContent=orderStatusText(order.status);
     $('flowProfileDetailAmountLabel').textContent=amountInfo.label;
     $('flowProfileDetailAmount').textContent=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;
+    renderProfileOrderCancelAction(order);
 
     const note=String(order?.note||order?.customerNote||order?.taskNote||order?.item||'').trim()||'—';
     const category=String(order?.serviceCategory||order?.category||'').trim()||'—';
@@ -20074,6 +20258,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       const merged={...order,...(fullData?.summary||{}),...(fullData?.order||{}),id:orderId};
       state.profileOrders[Number(index)]=merged;
       state.selectedProfileOrder=merged;
+      renderProfileOrderCancelAction(merged);
       renderProfileOrderArrivalPhotos(merged);
     }catch(error){
       console.warn('讀取歷史任務到場照片失敗：',error);
@@ -20090,7 +20275,22 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       list.classList.toggle('ubee-native-order-list',recent.length>0);
       list.innerHTML=recent.length?recent.map((order,index)=>{
         const amountInfo=orderAmountInfo(order);const amountText=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;const route=`${profileOrderAddress(order,'pickup')} → ${profileOrderAddress(order,'dropoff')}`;
-        return `<button class="ubee-native-order-row" type="button" data-profile-order-index="${index}"><span class="ubee-native-order-main"><strong class="ubee-native-order-title">${escapeHtml(profileOrderTitle(order))}</strong><span class="ubee-native-order-sub">${escapeHtml(route)}・${escapeHtml(orderTimeText(order)||'時間確認中')}</span></span><span class="ubee-native-order-side"><span class="ubee-native-order-status">${escapeHtml(orderStatusText(order.status))}</span><strong class="ubee-native-order-amount">${escapeHtml(amountText)}</strong></span><span class="ubee-native-order-chevron" aria-hidden="true">›</span></button>`;
+        const orderId=getCustomerOrderIdV1(order);
+        const canCancel=isCustomerOrderCancellableV1(order)&&Boolean(orderId);
+        return `<div class="ubee-native-order-item">
+          <button class="ubee-native-order-row" type="button" data-profile-order-index="${index}">
+            <span class="ubee-native-order-main">
+              <strong class="ubee-native-order-title">${escapeHtml(profileOrderTitle(order))}</strong>
+              <span class="ubee-native-order-sub">${escapeHtml(route)}・${escapeHtml(orderTimeText(order)||'時間確認中')}</span>
+            </span>
+            <span class="ubee-native-order-side">
+              <span class="ubee-native-order-status">${escapeHtml(orderStatusText(order.status))}</span>
+              <strong class="ubee-native-order-amount">${escapeHtml(amountText)}</strong>
+            </span>
+            <span class="ubee-native-order-chevron" aria-hidden="true">›</span>
+          </button>
+          ${canCancel?`<button class="ubee-native-order-cancel" type="button" data-cancel-profile-order="${escapeHtml(orderId)}">取消訂單</button>`:''}
+        </div>`;
       }).join(''):'<div class="flow-empty">目前還沒有任務</div>';
     }catch(error){console.warn('UBee 任務清單讀取失敗：',error);list.classList.remove('ubee-native-order-list');list.innerHTML='<div class="flow-empty">任務暫時無法讀取，請稍後再試。</div>'}
   }
@@ -20212,7 +20412,45 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];status('flowSearchStatus','');$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;$('flowSearchResults').innerHTML='';setQuickAddressTab(state.quickAddressTab)});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);root.querySelectorAll('[data-address-tab]').forEach(btn=>btn.addEventListener('click',()=>setQuickAddressTab(btn.dataset.addressTab)));
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
     $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
-    $('flowProfileTasksList').addEventListener('click',event=>{const btn=event.target.closest('[data-profile-order-index]');if(btn)openProfileOrderDetail(btn.dataset.profileOrderIndex)});
+    $('flowProfileTasksList').addEventListener('click',async event=>{
+      const cancelButton=event.target.closest('[data-cancel-profile-order]');
+      if(cancelButton){
+        event.preventDefault();
+        event.stopPropagation();
+        await cancelOrder(cancelButton.dataset.cancelProfileOrder||'');
+        await renderTaskList();
+        return;
+      }
+
+      const btn=event.target.closest('[data-profile-order-index]');
+      if(btn)openProfileOrderDetail(btn.dataset.profileOrderIndex);
+    });
+
+    $('flowProfileDetailActions')?.addEventListener('click',async event=>{
+      const cancelButton=event.target.closest('[data-detail-cancel-order]');
+      if(!cancelButton)return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const orderId=String(cancelButton.dataset.detailCancelOrder||'').trim().toUpperCase();
+      await cancelOrder(orderId);
+
+      if(state.selectedProfileOrder && getCustomerOrderIdV1(state.selectedProfileOrder)===orderId){
+        state.selectedProfileOrder={
+          ...state.selectedProfileOrder,
+          status:'cancelled'
+        };
+        $('flowProfileDetailStatus').textContent=orderStatusText('cancelled');
+        renderProfileOrderCancelAction(state.selectedProfileOrder);
+      }
+
+      state.profileOrders=state.profileOrders.map(item=>
+        getCustomerOrderIdV1(item)===orderId
+          ? {...item,status:'cancelled'}
+          : item
+      );
+    });
     $('ubeeMyFeedbackForm')?.addEventListener('submit',event=>{
       event.preventDefault();
       const type=String($('ubeeMyFeedbackType')?.value||'其他意見').trim();
@@ -20249,6 +20487,44 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     return true;
   };
   window.showHomeTab=window.openUBeeHomePage;
+
+  window.refreshUBeeCustomerOrderViews=async function(cancelledOrderId=''){
+    const safeId=String(cancelledOrderId||'').trim().toUpperCase();
+
+    if(safeId){
+      state.profileOrders=state.profileOrders.map(item=>
+        getCustomerOrderIdV1(item)===safeId
+          ? {...item,status:'cancelled'}
+          : item
+      );
+
+      if(
+        state.selectedProfileOrder &&
+        getCustomerOrderIdV1(state.selectedProfileOrder)===safeId
+      ){
+        state.selectedProfileOrder={
+          ...state.selectedProfileOrder,
+          status:'cancelled'
+        };
+        $('flowProfileDetailStatus').textContent=orderStatusText('cancelled');
+        renderProfileOrderCancelAction(state.selectedProfileOrder);
+      }
+    }
+
+    if(state.page==='tasksRoot'){
+      await renderTaskList().catch(()=>{});
+    }
+  };
+
+  window.addEventListener(
+    'ubee:customer-order-cancelled',
+    event=>{
+      window.refreshUBeeCustomerOrderViews?.(
+        event?.detail?.orderId||''
+      );
+    }
+  );
+
   window.openUBeeTaskRoot=async function(){
     window.UBeePrimaryNavigation?.activate('task');
     document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
@@ -20350,7 +20626,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260918-smart-stack-v1-1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260919-customer-cancel-ux-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
