@@ -1,4 +1,4 @@
-// 2026-09-19｜Rider Membership Fee + Partner Benefits V2：完整取代 V1；10/5 後新申請者後端鎖定 NT$499，絕不回退顯示 NT$299；既有小U NT$299；正式小U夥伴優惠與開通核對資格綁定。
+// 2026-09-19｜Rider Native Membership + Partner Benefits V5.1 Audit：完整按鈕／返回／付款回報流程檢查；修正生效日前誤可送出付款、原生返回根頁一致性、QR 儲存與外部導航 fallback；不改 299/499 cohort 與既有任務核心。
 // 2026-09-19｜Customer Cancel UX V1：客戶端取消入口全面可見；後端取消同步處理 Rider/Smart Stack 狀態，避免小U殘留忙碌。
 // 2026-09-18｜Rider Task Control V1.1：補齊已承接／已確認預約的「取消預約承接」；安全釋放、避免回派同一小U、接近任務時間自動緊急媒合。
 // 2026-09-18｜Rider Task Control V1：待接任務加入正式拒絕；已接任務在抵達取件前可由小U取消接單並重新媒合；Smart Stack 安全釋放。
@@ -1526,6 +1526,7 @@ const RIDER_REVIEW_ADMIN_URL =
 
 const UBEE_JKOPAY_ACCOUNT =
   String(process.env.UBEE_JKOPAY_ACCOUNT || '901871793').trim();
+
 
 const UBEE_RIDER_COMMUNITY_PASSWORD =
   String(process.env.UBEE_RIDER_COMMUNITY_PASSWORD || '1234').trim();
