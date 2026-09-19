@@ -1,3 +1,4 @@
+/* 2026-09-19｜Customer Cancel UX V1：同步訂單列表／詳情／進行中任務取消入口。 */
 /* 2026-09-18｜Smart Stack V1.1：同步 QUEUED Live ETA 與 Recovery Hard Lock 客戶端。 */
 /* 2026-09-17｜Profit Pricing V1 / Route Pricing V4：同步新計價核心與平台應收／已收辨識版本。 */
 /* 2026-09-16｜Growth Engine V1.8 My UX：雙端「我的」二級頁統一與快取升版。 */
@@ -37,7 +38,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260918-smart-stack-v1-1';
+const UBEE_CUSTOMER_SW_VERSION = '20260919-customer-cancel-ux-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
