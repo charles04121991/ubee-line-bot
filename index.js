@@ -1,4 +1,4 @@
-// 2026-09-19｜Rider Membership Fee V1：10/5 正式導入小U系統資格開通費；既有小U NT$299、10/5 起新加入 NT$499；既有小U 7 天緩衝至 10/11，10/12 起未完成核對者暫停派單；付款採街口支付＋人工核對。
+// 2026-09-19｜Rider Membership Fee + Partner Benefits V2：完整取代 V1；10/5 後新申請者後端鎖定 NT$499，絕不回退顯示 NT$299；既有小U NT$299；正式小U夥伴優惠與開通核對資格綁定。
 // 2026-09-19｜Customer Cancel UX V1：客戶端取消入口全面可見；後端取消同步處理 Rider/Smart Stack 狀態，避免小U殘留忙碌。
 // 2026-09-18｜Rider Task Control V1.1：補齊已承接／已確認預約的「取消預約承接」；安全釋放、避免回派同一小U、接近任務時間自動緊急媒合。
 // 2026-09-18｜Rider Task Control V1：待接任務加入正式拒絕；已接任務在抵達取件前可由小U取消接單並重新媒合；Smart Stack 安全釋放。
@@ -6407,17 +6407,19 @@ function getRiderV4LifecycleStatus(rider = {}) {
 }
 
 // =====================================================
-// UBee 小U系統資格開通費 V1｜2026-10-05 生效
-// - 2026/10/5 前已加入：NT$299，一次性，10/5～10/11 為 7 天緩衝期。
-// - 2026/10/5 起新加入：NT$499，一次性，完成付款且經 UBee 核對後才可開通接單。
-// - 付款方式：街口支付；前端僅回報「已付款待核對」，正式 verified 只能由管理端確認。
-// - 10/12 起既有小U若仍未 verified / waived，只暫停派單，不刪除帳號與歷史資料。
+// UBee 小U系統資格開通費 V2｜2026-10-05 生效
+// 此區塊完整取代 V1，禁止保留第二套 299/499 判斷。
+// - 2026/10/5 前已送出申請／已存在的小U：NT$299，一次性。
+// - 2026/10/5 00:00（台灣時間）起送出申請：NT$499，一次性。
+// - 新加入者的 cohort 與金額由後端以「申請建立時間」鎖定，前端不得自行猜測。
+// - 10/5～10/11 為既有小U 7 天緩衝；10/12 00:00 起未完成核對者暫停派單。
+// - 付款方式：街口支付；小U只能回報已付款，verified 僅能由管理端核對。
 // =====================================================
 const UBEE_RIDER_MEMBERSHIP_FEE_POLICY = Object.freeze({
-  version: '2026-10-05-v1',
+  version: '2026-10-05-v2',
   method: 'jkopay',
   effectiveAtMs: Date.UTC(2026, 9, 4, 16, 0, 0), // 2026-10-05 00:00 Asia/Taipei
-  existingGraceEndsAtMs: Date.UTC(2026, 9, 11, 16, 0, 0), // 2026-10-12 00:00 起暫停派單
+  existingGraceEndsAtMs: Date.UTC(2026, 9, 11, 16, 0, 0), // 2026-10-12 00:00 Asia/Taipei
   existingAmount: 299,
   newAmount: 499,
 });
@@ -6429,17 +6431,88 @@ function normalizeRiderMembershipFeeStatus(value = '') {
     : 'pending';
 }
 
+function getRiderMembershipFeeJoinMs(rider = {}) {
+  const directCandidates = [
+    rider.submittedAtMs,
+    rider.createdAtMs,
+    rider.applicationSubmittedAtMs,
+    rider.registeredAtMs,
+    rider.appliedAtMs,
+  ];
+
+  for (const value of directCandidates) {
+    const ms = Number(value || 0);
+    if (Number.isFinite(ms) && ms > 0) return ms;
+  }
+
+  const timestampCandidates = [
+    rider.submittedAt,
+    rider.createdAt,
+    rider.applicationSubmittedAt,
+    rider.registeredAt,
+  ];
+
+  for (const value of timestampCandidates) {
+    if (value && typeof value.toMillis === 'function') {
+      const ms = Number(value.toMillis() || 0);
+      if (Number.isFinite(ms) && ms > 0) return ms;
+    }
+    if (value && value._seconds) {
+      const ms = Number(value._seconds) * 1000;
+      if (Number.isFinite(ms) && ms > 0) return ms;
+    }
+  }
+
+  return 0;
+}
+
+function resolveRiderMembershipFeeCohort(rider = {}) {
+  const policy = UBEE_RIDER_MEMBERSHIP_FEE_POLICY;
+  const fee = rider.membershipFee && typeof rider.membershipFee === 'object'
+    ? rider.membershipFee
+    : {};
+
+  const explicit = String(
+    fee.cohort || rider.membershipFeeCohort || ''
+  ).trim().toLowerCase();
+
+  if (explicit === 'new' || explicit === 'existing') {
+    return explicit;
+  }
+
+  const joinMs = getRiderMembershipFeeJoinMs(rider);
+
+  // 有正式申請時間時，以 10/5 切線唯一判定。
+  if (joinMs > 0) {
+    return joinMs >= policy.effectiveAtMs ? 'new' : 'existing';
+  }
+
+  // 舊正式 ACTIVE／已審核帳號若歷史時間戳缺失，視為既有小U，
+  // 避免資料遷移造成舊人被誤收 499。
+  const status = String(rider.status || '').trim().toLowerCase();
+  const lifecycle = String(rider.lifecycleStatus || '').trim().toUpperCase();
+  const clearlyLegacyApproved =
+    rider.approved === true ||
+    status === 'approved' ||
+    status === 'active' ||
+    lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
+
+  if (clearlyLegacyApproved) {
+    return 'existing';
+  }
+
+  // 無時間戳、也不是既有已審核帳號時採 fail-closed：
+  // 一律視為新加入，避免 10/5 後新申請者因缺欄位看到 299。
+  return 'new';
+}
+
 function getRiderMembershipFeeState(rider = {}, nowMs = Date.now()) {
   const policy = UBEE_RIDER_MEMBERSHIP_FEE_POLICY;
   const fee = rider.membershipFee && typeof rider.membershipFee === 'object'
     ? rider.membershipFee
     : {};
-  const explicitCohort = String(
-    fee.cohort || rider.membershipFeeCohort || ''
-  ).trim().toLowerCase();
 
-  // 舊資料沒有 cohort 時一律視為既有小U，避免歷史資料缺時間戳造成誤收 NT$499。
-  const cohort = explicitCohort === 'new' ? 'new' : 'existing';
+  const cohort = resolveRiderMembershipFeeCohort(rider);
   const amount = cohort === 'new' ? policy.newAmount : policy.existingAmount;
   const status = normalizeRiderMembershipFeeStatus(
     fee.status || rider.membershipFeeStatus || ''
@@ -6464,7 +6537,6 @@ function getRiderMembershipFeeState(rider = {}, nowMs = Date.now()) {
     dispatchAllowed = false;
     displayStatus = status === 'submitted' ? 'submitted' : 'pending';
   } else if (Number(nowMs) < policy.existingGraceEndsAtMs) {
-    // 既有小U在 10/5～10/11 緩衝期內仍可正常派單。
     dispatchAllowed = true;
     displayStatus = status === 'submitted' ? 'submitted' : 'grace';
   } else {
@@ -6486,9 +6558,55 @@ function getRiderMembershipFeeState(rider = {}, nowMs = Date.now()) {
     effectiveAtMs: policy.effectiveAtMs,
     graceEndsAtMs: cohort === 'existing' ? policy.existingGraceEndsAtMs : 0,
     dueAtMs,
+    joinedAtMs: getRiderMembershipFeeJoinMs(rider),
     submittedAtMs: Number(fee.submittedAtMs || 0),
     verifiedAtMs: Number(fee.verifiedAtMs || 0),
     rejectedAtMs: Number(fee.rejectedAtMs || 0),
+  };
+}
+
+// =====================================================
+// UBee 小U夥伴優惠資格 V1
+// - 10/5 前沿用「正式審核通過小U」資格。
+// - 10/5 起必須同時完成資格開通費核對，才可使用夥伴優惠身分。
+// - 不使用 QR Code；騎士端顯示即時動態小U身分證明。
+// =====================================================
+function getRiderPartnerBenefitState(rider = {}, nowMs = Date.now()) {
+  const fee = getRiderMembershipFeeState(rider, nowMs);
+  const status = String(rider.status || '').trim().toLowerCase();
+  const lifecycle = getRiderV4LifecycleStatus(rider);
+  const reviewApproved =
+    rider.approved === true ||
+    status === 'approved' ||
+    status === 'active';
+
+  const policyActive =
+    Number(nowMs) >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.effectiveAtMs;
+
+  const eligible =
+    reviewApproved &&
+    (
+      !policyActive ||
+      fee.verified === true
+    );
+
+  let displayStatus = '尚未取得正式小U資格';
+  if (eligible) {
+    displayStatus = '優惠資格有效';
+  } else if (reviewApproved && policyActive && fee.verified !== true) {
+    displayStatus = '完成資格開通核對後啟用';
+  }
+
+  return {
+    eligible,
+    displayStatus,
+    reviewApproved,
+    membershipFeeVerified: fee.verified === true,
+    membershipFeeCohort: fee.cohort,
+    membershipFeeAmount: fee.amount,
+    lifecycleStatus: lifecycle,
+    checkedAtMs: Number(nowMs),
+    verificationMode: 'live_rider_identity',
   };
 }
 
@@ -6846,6 +6964,7 @@ function getRiderV4Progress(rider = {}) {
     canAcceptOrders: canRiderAcceptOrdersV4(rider),
     qualificationHardLock: getRiderV4HardLockState(rider),
     membershipFee: getRiderMembershipFeeState(rider),
+    partnerBenefits: getRiderPartnerBenefitState(rider),
     riderLevel: String(rider.riderLevel || (isRiderV4OnboardingComplete(rider) ? 'L1' : 'L0')),
     checklist,
     modules,
@@ -18026,7 +18145,7 @@ app.post('/api/rider/register', async (req, res) => {
       riderLevel: 'L0',
       onboardingRequired: true,
 
-      // 小U系統資格開通費：以送出申請時間鎖定 cohort，避免日後價格漂移。
+      // 小U系統資格開通費 V2：以送出申請時間鎖定 cohort；10/5 起新申請固定 NT$499，前端不得降級為 NT$299。
       membershipFeeCohort:
         nowMs >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.effectiveAtMs
           ? 'new'
