@@ -1,3 +1,4 @@
+// 2026-09-19｜Customer Cancel UX V1：客戶端取消入口全面可見；後端取消同步處理 Rider/Smart Stack 狀態，避免小U殘留忙碌。
 // 2026-09-18｜Rider Task Control V1.1：補齊已承接／已確認預約的「取消預約承接」；安全釋放、避免回派同一小U、接近任務時間自動緊急媒合。
 // 2026-09-18｜Rider Task Control V1：待接任務加入正式拒絕；已接任務在抵達取件前可由小U取消接單並重新媒合；Smart Stack 安全釋放。
 // 2026-09-18｜UBee Smart Stack V1.1：Recovery Hard Lock＋Google Routes 真實道路疊單判斷＋QUEUED Live ETA；V1 CURRENT/QUEUED 架構保留。
@@ -38351,34 +38352,388 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
   }
 });
 
-app.post('/cancel-order', requireCustomerAuth, async (req, res) => {
-  try {
-    const { orderId } = req.body;
-    const requestUserId = req.customerAuth.customerId;
-    const order = await getOrder(orderId);
+// ============================================================
+// Customer Cancel UX V1｜客戶取消正式任務
+// - 客戶可取消「尚未取件」任務。
+// - picked_up 之後全面鎖定。
+// - Smart Stack QUEUED：只取消自己的 QUEUED。
+// - Smart Stack CURRENT：若後面有 QUEUED，取消 CURRENT 後直接把 QUEUED 提升成 CURRENT。
+// - 普通已接單：同步解除小U busy/currentOrderId。
+// - 預約任務：同步清除 reserved rider 欄位。
+// ============================================================
+function isCustomerOrderCancellableStatusV1(status){
+  const normalized=String(status||'').trim().toLowerCase();
+  return ![
+    'picked_up',
+    'going_to_dropoff',
+    'heading_to_dropoff',
+    'arrived_dropoff',
+    'completed',
+    'done',
+    'cancelled',
+    'canceled',
+  ].includes(normalized);
+}
 
-    if (!order) {
-      return res.json({ success: false, message: '訂單不存在' });
+function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Date.now()){
+  return {
+    status:'cancelled',
+    riderStatus:'cancelled',
+    cancelType:'customer_cancel',
+    cancelledBy:String(requestUserId||''),
+    cancelledAt:nowMs,
+    cancelledAtMs:nowMs,
+    cancelledAtServer:admin.firestore.FieldValue.serverTimestamp(),
+
+    riderTrackingStatus:'stopped',
+    trackingEndedAtMs:nowMs,
+    trackingEndedAt:admin.firestore.FieldValue.serverTimestamp(),
+    trackingStopReason:'customer_cancel',
+    trackingUpdatedAtMs:nowMs,
+    trackingUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+
+    scheduleStatus:'cancelled',
+    scheduleConfirmationRequired:false,
+    scheduleConfirmationRequestedAtMs:0,
+    reservedRiderId:'',
+    reservedRiderDocId:'',
+    reservedRiderPhone:'',
+    reservedRiderName:'',
+
+    updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    'statusTimes.cancelled':admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
+app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
+  try{
+    const safeOrderId=smartStackSafeOrderId(req.body?.orderId);
+    const requestUserId=req.customerAuth.customerId;
+
+    if(!safeOrderId){
+      return res.status(400).json({
+        success:false,
+        message:'缺少訂單編號。'
+      });
     }
 
-    if (!isSameCustomerUserId(order, requestUserId)) {
-      return res.status(403).json({ success: false, message: '此訂單只能由原本下單的客人取消' });
+    const orderRef=db.collection('orders').doc(safeOrderId);
+
+    let cancelledOrder=null;
+    let promotedOrder=null;
+    let promotedOrderId='';
+    let affectedRiderDocId='';
+
+    await db.runTransaction(async transaction=>{
+      const orderDoc=await transaction.get(orderRef);
+
+      if(!orderDoc.exists){
+        throw new Error('ORDER_NOT_FOUND');
+      }
+
+      const order={
+        id:orderDoc.id,
+        ...orderDoc.data(),
+      };
+
+      if(!isSameCustomerUserId(order,requestUserId)){
+        throw new Error('NOT_ORDER_OWNER');
+      }
+
+      if(!isCustomerOrderCancellableStatusV1(order.status)){
+        throw new Error('CUSTOMER_CANCEL_CUSTODY_LOCK');
+      }
+
+      const role=String(order.stackRole||'').trim().toUpperCase();
+      const riderDocId=String(order.riderDocId||'').trim();
+      const riderRef=riderDocId
+        ? db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDocId)
+        : null;
+
+      let riderDoc=null;
+      let rider={};
+
+      if(riderRef){
+        riderDoc=await transaction.get(riderRef);
+        rider=riderDoc.exists ? riderDoc.data()||{} : {};
+        affectedRiderDocId=riderDoc.exists ? riderDocId : '';
+      }
+
+      // Smart Stack references are read before writes.
+      let primaryRef=null;
+      let primaryDoc=null;
+      let primaryOrder=null;
+
+      let queuedRef=null;
+      let queuedDoc=null;
+      let queuedOrder=null;
+
+      if(role==='QUEUED'){
+        const primaryId=smartStackSafeOrderId(
+          order.stackPrimaryOrderId ||
+          rider.currentOrderId
+        );
+        if(primaryId && primaryId!==safeOrderId){
+          primaryRef=db.collection('orders').doc(primaryId);
+          primaryDoc=await transaction.get(primaryRef);
+          if(primaryDoc.exists){
+            primaryOrder={id:primaryDoc.id,...primaryDoc.data()};
+          }
+        }
+      }else{
+        const queuedId=smartStackSafeOrderId(
+          order.stackQueuedOrderId ||
+          (Array.isArray(rider.queuedOrderIds)?rider.queuedOrderIds[0]:'')
+        );
+        if(queuedId && queuedId!==safeOrderId){
+          queuedRef=db.collection('orders').doc(queuedId);
+          queuedDoc=await transaction.get(queuedRef);
+          if(queuedDoc.exists){
+            queuedOrder={id:queuedDoc.id,...queuedDoc.data()};
+          }
+        }
+      }
+
+      const nowMs=Date.now();
+      const cancelUpdate=buildCustomerCancelledOrderUpdateV1(
+        order,
+        requestUserId,
+        nowMs
+      );
+
+      // 取消訂單本體。
+      transaction.set(
+        orderRef,
+        {
+          ...cancelUpdate,
+          stackState:'cancelled',
+        },
+        {merge:true}
+      );
+
+      cancelledOrder={
+        ...order,
+        ...cancelUpdate,
+        id:safeOrderId,
+        status:'cancelled',
+        riderStatus:'cancelled',
+        stackState:'cancelled',
+      };
+
+      // QUEUED 被客戶取消：CURRENT 完全不受影響。
+      if(role==='QUEUED'){
+        if(primaryRef && primaryOrder){
+          transaction.set(
+            primaryRef,
+            {
+              stackQueuedOrderId:'',
+              stackState:'solo',
+              stackGroupId:'',
+              updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            },
+            {merge:true}
+          );
+        }
+
+        if(riderRef && riderDoc?.exists){
+          const currentId=smartStackSafeOrderId(rider.currentOrderId);
+          transaction.set(
+            riderRef,
+            {
+              busy:Boolean(currentId),
+              currentOrderId:currentId,
+              queuedOrderIds:[],
+              activeOrderIds:currentId?[currentId]:[],
+              smartStackActive:false,
+              stackGroupId:'',
+              updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            },
+            {merge:true}
+          );
+        }
+
+        return;
+      }
+
+      // CURRENT 被取消，但後面仍有有效 QUEUED：
+      // 直接將 QUEUED 提升成新的 CURRENT，避免小U被清成空閒。
+      const canPromoteQueued=
+        queuedOrder &&
+        String(queuedOrder.stackRole||'').trim().toUpperCase()==='QUEUED' &&
+        String(queuedOrder.status||'').trim()==='accepted' &&
+        (
+          !riderDoc?.exists ||
+          isOrderBelongsToRider(
+            queuedOrder,
+            buildRiderApiIdentity(
+              riderDoc,
+              rider,
+              {
+                riderId:rider.riderId,
+                phone:rider.phone,
+                lineUserId:rider.lineUserId,
+              }
+            )
+          )
+        );
+
+      if(canPromoteQueued && riderRef && riderDoc?.exists){
+        const trackingSessionId=
+          typeof crypto.randomUUID==='function'
+            ? crypto.randomUUID()
+            : crypto.randomBytes(16).toString('hex');
+
+        const promotedAtMs=Date.now();
+        const promotedUpdate={
+          stackRole:'CURRENT',
+          stackState:'active',
+          stackPosition:1,
+          stackPrimaryOrderId:'',
+          stackQueuedBehindOrderId:'',
+          stackPreviousOrderId:safeOrderId,
+          stackPromotedAtMs:promotedAtMs,
+          stackPromotedAt:admin.firestore.FieldValue.serverTimestamp(),
+
+          riderTrackingStatus:'starting',
+          trackingSessionId,
+          trackingStartedAtMs:promotedAtMs,
+          trackingStartedAt:admin.firestore.FieldValue.serverTimestamp(),
+          trackingUpdatedAtMs:promotedAtMs,
+          trackingUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+          trackingEndedAtMs:null,
+          trackingEndedAt:null,
+          trackingStopReason:'',
+
+          ...getEtaPayloadByStatus('accepted'),
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        transaction.set(
+          queuedRef,
+          promotedUpdate,
+          {merge:true}
+        );
+
+        transaction.set(
+          riderRef,
+          {
+            busy:true,
+            currentOrderId:queuedOrder.id,
+            queuedOrderIds:[],
+            activeOrderIds:[queuedOrder.id],
+            smartStackActive:false,
+            stackGroupId:'',
+            activeTrackingOrderId:queuedOrder.id,
+            activeTrackingSessionId:trackingSessionId,
+            taskTrackingStatus:'starting',
+            taskTrackingUpdatedAtMs:promotedAtMs,
+            taskTrackingUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            taskTrackingStopReason:'',
+            updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+          },
+          {merge:true}
+        );
+
+        promotedOrderId=queuedOrder.id;
+        promotedOrder={
+          ...queuedOrder,
+          ...promotedUpdate,
+          id:queuedOrder.id,
+          status:'accepted',
+          riderStatus:'accepted',
+        };
+
+        return;
+      }
+
+      // 普通已接單／沒有可提升的下一單：解除小U目前任務。
+      if(riderRef && riderDoc?.exists){
+        const currentId=smartStackSafeOrderId(rider.currentOrderId);
+
+        if(
+          !currentId ||
+          currentId===safeOrderId
+        ){
+          transaction.set(
+            riderRef,
+            {
+              busy:false,
+              currentOrderId:'',
+              queuedOrderIds:[],
+              activeOrderIds:[],
+              smartStackActive:false,
+              stackGroupId:'',
+              activeTrackingOrderId:'',
+              activeTrackingSessionId:'',
+              taskTrackingStatus:'stopped',
+              taskTrackingUpdatedAtMs:nowMs,
+              taskTrackingUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+              taskTrackingStopReason:'customer_cancel',
+              updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+            },
+            {merge:true}
+          );
+        }
+      }
+    });
+
+    if(typeof orders==='object' && orders){
+      orders[safeOrderId]=cancelledOrder;
+      if(promotedOrderId && promotedOrder){
+        orders[promotedOrderId]=promotedOrder;
+      }
     }
 
-    if (['picked_up', 'arrived_dropoff', 'completed', 'cancelled'].includes(order.status)) {
-      return res.json({ success: false, message: '此階段不可取消' });
-    }
+    clearDispatchPushTimers(safeOrderId);
 
-    order.status = 'cancelled';
-    order.cancelType = 'customer_cancel';
-    order.cancelledBy = requestUserId;
-    order.cancelledAt = Date.now();
-    await saveOrder(order);
+    Promise.allSettled([
+      logDispatchEvent({
+        type:'CUSTOMER_CANCELLED_ORDER',
+        orderId:safeOrderId,
+        riderDocId:affectedRiderDocId,
+        promotedOrderId,
+        createdAtMs:Date.now(),
+      }),
+      promotedOrder
+        ? notifyCustomer(
+            promotedOrder,
+            createTextMessage(
+              `🟢 UBee 任務已提前開始\n\n`+
+              `前序任務已由客戶取消，小U現在會直接前往你的取件地點。`
+            )
+          )
+        : Promise.resolve(),
+    ]).catch(()=>{});
 
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('cancel-order error:', err);
-    return res.status(500).json({ success: false, message: '取消失敗，請稍後再試' });
+    return res.json({
+      success:true,
+      orderId:safeOrderId,
+      status:'cancelled',
+      promotedOrderId,
+      smartStackPromoted:Boolean(promotedOrderId),
+      message:'訂單已取消。',
+    });
+
+  }catch(error){
+    const code=String(error?.message||'');
+    const map={
+      ORDER_NOT_FOUND:[404,'訂單不存在。'],
+      NOT_ORDER_OWNER:[403,'此訂單只能由原本下單的客人取消。'],
+      CUSTOMER_CANCEL_CUSTODY_LOCK:[409,'小U已完成取件或任務已進入後續配送階段，目前無法自行取消。請聯繫 UBee 客服。'],
+    };
+
+    const result=map[code]||[500,'取消失敗，請稍後再試。'];
+
+    console.error(
+      'cancel-order error:',
+      code||error
+    );
+
+    return res.status(result[0]).json({
+      success:false,
+      code:code||'CUSTOMER_CANCEL_FAILED',
+      message:result[1],
+    });
   }
 });
 
