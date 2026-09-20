@@ -6566,51 +6566,6 @@ function getRiderMembershipFeeState(rider = {}, nowMs = Date.now()) {
   };
 }
 
-// =====================================================
-// UBee 小U夥伴優惠資格 V1
-// - 10/5 前沿用「正式審核通過小U」資格。
-// - 10/5 起必須同時完成資格開通費核對，才可使用夥伴優惠身分。
-// - 不使用 QR Code；騎士端顯示即時動態小U身分證明。
-// =====================================================
-function getRiderPartnerBenefitState(rider = {}, nowMs = Date.now()) {
-  const fee = getRiderMembershipFeeState(rider, nowMs);
-  const status = String(rider.status || '').trim().toLowerCase();
-  const lifecycle = getRiderV4LifecycleStatus(rider);
-  const reviewApproved =
-    rider.approved === true ||
-    status === 'approved' ||
-    status === 'active';
-
-  const policyActive =
-    Number(nowMs) >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.effectiveAtMs;
-
-  const eligible =
-    reviewApproved &&
-    (
-      !policyActive ||
-      fee.verified === true
-    );
-
-  let displayStatus = '尚未取得正式小U資格';
-  if (eligible) {
-    displayStatus = '優惠資格有效';
-  } else if (reviewApproved && policyActive && fee.verified !== true) {
-    displayStatus = '完成資格開通核對後啟用';
-  }
-
-  return {
-    eligible,
-    displayStatus,
-    reviewApproved,
-    membershipFeeVerified: fee.verified === true,
-    membershipFeeCohort: fee.cohort,
-    membershipFeeAmount: fee.amount,
-    lifecycleStatus: lifecycle,
-    checkedAtMs: Number(nowMs),
-    verificationMode: 'live_rider_identity',
-  };
-}
-
 function getRiderV4HardLockState(rider = {}) {
   const checklist = getRiderUnifiedLearningChecklist(rider);
   const modules = getRiderUnifiedLearningModules(rider);
@@ -6965,7 +6920,6 @@ function getRiderV4Progress(rider = {}) {
     canAcceptOrders: canRiderAcceptOrdersV4(rider),
     qualificationHardLock: getRiderV4HardLockState(rider),
     membershipFee: getRiderMembershipFeeState(rider),
-    partnerBenefits: getRiderPartnerBenefitState(rider),
     riderLevel: String(rider.riderLevel || (isRiderV4OnboardingComplete(rider) ? 'L1' : 'L0')),
     checklist,
     modules,
