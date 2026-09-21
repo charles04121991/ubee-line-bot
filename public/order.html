@@ -41,7 +41,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260921-customer-rider-rating-fullscreen-v1-5" rel="manifest"/>
+<link href="/manifest-order.json?v=20260921-customer-rider-rating-fullscreen-v1-6" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6546,19 +6546,20 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
   font-weight:850;
 }
 .ubee-rider-rating-star-buttons{
+  width:min(100%,360px);
   display:flex;
-  justify-content:center;
-  gap:10px;
+  justify-content:space-between;
+  gap:0;
   margin:26px auto 8px;
 }
 .ubee-rider-rating-star{
-  width:60px;
-  height:60px;
+  width:clamp(56px,16vw,68px);
+  height:clamp(56px,16vw,68px);
   padding:0;
   border:0;
   background:transparent;
   color:#d1d5db;
-  font-size:48px;
+  font-size:clamp(50px,14vw,58px);
   line-height:1;
 }
 .ubee-rider-rating-star.active{color:#f5a623}
@@ -21017,7 +21018,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-fullscreen-v1-5';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-fullscreen-v1-6';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
