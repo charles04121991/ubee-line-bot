@@ -41,7 +41,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260921-customer-rider-rating-popup-v1-1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260921-customer-rider-rating-popup-v1-2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6494,17 +6494,20 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
 .ubee-rider-rating-comment:focus{border-color:#9ca3af}
 
 .ubee-rider-rating-later{
-  width:100%;
-  min-height:44px;
-  margin-top:8px;
   border:0;
-  border-radius:13px;
   background:transparent;
   color:#73787e;
   font-size:13px;
-  font-weight:800;
+  font-weight:850;
 }
-.ubee-rider-rating-later:active{background:#f5f6f8}
+.ubee-rider-rating-later-top{
+  min-height:36px;
+  margin-left:12px;
+  padding:0 2px 0 10px;
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+.ubee-rider-rating-later:active{opacity:.55}
 .ubee-rider-rating-submit{
   width:100%;min-height:50px;margin-top:14px;border:0;border-radius:14px;
   background:#111827;color:#fff;font-size:15px;font-weight:900;
@@ -20833,7 +20836,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-popup-v1-1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-popup-v1-2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26581,7 +26584,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
             <strong id="ubeeRiderRatingTitleV1">這次服務還滿意嗎？</strong>
             <span id="ubeeRiderRatingRiderV1">評價這位小U</span>
           </div>
-          <button class="ubee-rider-rating-close" type="button" aria-label="關閉評價">×</button>
+          <button class="ubee-rider-rating-later ubee-rider-rating-later-top" id="ubeeRiderRatingLaterV1" type="button">稍後再說</button>
         </div>
 
         <div class="ubee-rider-rating-star-buttons" aria-label="選擇星等">
@@ -26596,13 +26599,12 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
         <textarea class="ubee-rider-rating-comment" id="ubeeRiderRatingCommentV1" maxlength="300" placeholder="其他想說的話（選填）"></textarea>
         <button class="ubee-rider-rating-submit" id="ubeeRiderRatingSubmitV1" type="button" disabled>送出評價</button>
-        <button class="ubee-rider-rating-later" id="ubeeRiderRatingLaterV1" type="button">稍後再說</button>
         <div class="ubee-rider-rating-status" id="ubeeRiderRatingStatusV1"></div>
       </div>`;
     document.body.appendChild(modal);
 
     modal.addEventListener('click',event=>{
-      if(event.target===modal || event.target.closest('.ubee-rider-rating-close')){
+      if(event.target===modal){
         close();
         return;
       }
