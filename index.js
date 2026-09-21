@@ -1,3 +1,4 @@
+// 2026-09-21｜Membership Fee Finance No-Key V3.1：資格開通費財務清單／核對沿用 Finance Center No Key V4.4，不再要求 x-ubee-admin-key；其他 Rider V4 治理 API 仍保留 requireRiderV4AdminKey。
 // 2026-09-19｜Rider Native Membership + Partner Benefits V5.1 Audit：完整按鈕／返回／付款回報流程檢查；修正生效日前誤可送出付款、原生返回根頁一致性、QR 儲存與外部導航 fallback；不改 299/499 cohort 與既有任務核心。
 // 2026-09-19｜Customer Cancel UX V1：客戶端取消入口全面可見；後端取消同步處理 Rider/Smart Stack 狀態，避免小U殘留忙碌。
 // 2026-09-18｜Rider Task Control V1.1：補齊已承接／已確認預約的「取消預約承接」；安全釋放、避免回派同一小U、接近任務時間自動緊急媒合。
@@ -21305,11 +21306,11 @@ app.post('/api/rider/membership-fee/submit', riderAuthMiddleware, async (req, re
 
 // ============================================================
 // UBee 小U資格開通費 V3｜財務中心管理清單
-// - 僅管理端可讀取。
+// - 沿用 Finance Center No Key V4.4：財務中心直接讀取，不要求 V4 管理金鑰。
 // - 回傳原始付款回報、後端 canonical state 與派單資格。
 // - 財務中心以此清單核對街口實收，再呼叫既有 verify API。
 // ============================================================
-app.get('/api/admin/rider-membership-fees', requireRiderV4AdminKey, async (req, res) => {
+app.get('/api/admin/rider-membership-fees', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const snap = await db.collection(RIDER_V2_COLLECTIONS.riders).limit(5000).get();
@@ -21416,7 +21417,7 @@ app.get('/api/admin/rider-membership-fees', requireRiderV4AdminKey, async (req, 
   }
 });
 
-app.post('/api/rider/v4/membership-fee/admin/verify', requireRiderV4AdminKey, async (req, res) => {
+app.post('/api/rider/v4/membership-fee/admin/verify', async (req, res) => {
   try {
     const riderId = normalizePhone(req.body?.riderId || req.body?.phone || '');
     const action = String(req.body?.action || 'verified').trim().toLowerCase();
