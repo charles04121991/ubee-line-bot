@@ -39,7 +39,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260921-customer-rider-rating-fullscreen-v1-5';
+const UBEE_CUSTOMER_SW_VERSION = '20260921-customer-rider-rating-fullscreen-v1-6';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
