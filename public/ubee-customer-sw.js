@@ -1,3 +1,4 @@
+/* 2026-09-20｜Customer Rider Rating V1：同步完成任務小U評價功能。 */
 /* 2026-09-19｜Customer Cancel UX V1：同步訂單列表／詳情／進行中任務取消入口。 */
 /* 2026-09-18｜Smart Stack V1.1：同步 QUEUED Live ETA 與 Recovery Hard Lock 客戶端。 */
 /* 2026-09-17｜Profit Pricing V1 / Route Pricing V4：同步新計價核心與平台應收／已收辨識版本。 */
@@ -38,7 +39,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260919-customer-cancel-ux-v1';
+const UBEE_CUSTOMER_SW_VERSION = '20260920-customer-rider-rating-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
