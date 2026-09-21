@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-20｜Customer Rider Rating V1：完成任務後可對實際承接小U評價；每單一次、1～5 星、標籤與選填留言；已完成訂單明細可補評。 -->
 <!-- 2026-09-19｜Customer Cancel UX V1：我的訂單列表、訂單詳情、進行中任務皆直接提供取消入口。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1.1：QUEUED 顯示 A 真實剩餘道路 ETA + A→B 真實道路 ETA；不暴露前序訂單資料。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1：客戶追蹤支援 QUEUED 前序任務狀態，不暴露其他客戶訂單資訊。 -->
@@ -40,7 +41,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260919-customer-cancel-ux-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260920-customer-rider-rating-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6368,6 +6369,139 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
 }
 </style>
 
+
+<style id="ubee-customer-rider-rating-v1-style">
+/* UBee Customer → Rider Rating V1 */
+.ubee-rider-rating-card{
+  margin:0;
+  padding:16px;
+  border:1px solid #e7e9ee;
+  border-radius:18px;
+  background:#fff;
+}
+.ubee-rider-rating-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.ubee-rider-rating-card-copy strong{
+  display:block;
+  color:#111827;
+  font-size:16px;
+  line-height:1.3;
+  font-weight:900;
+}
+.ubee-rider-rating-card-copy span{
+  display:block;
+  margin-top:4px;
+  color:#73787e;
+  font-size:12px;
+  line-height:1.5;
+  font-weight:650;
+}
+.ubee-rider-rating-stars-display{
+  margin-top:10px;
+  color:#f5a623;
+  font-size:20px;
+  letter-spacing:2px;
+  line-height:1;
+}
+.ubee-rider-rating-open{
+  min-height:44px;
+  margin-top:13px;
+  padding:0 16px;
+  border:0;
+  border-radius:13px;
+  background:#111827;
+  color:#fff;
+  font-size:14px;
+  font-weight:900;
+}
+.ubee-rider-rating-done{
+  display:inline-flex;
+  align-items:center;
+  min-height:30px;
+  padding:0 10px;
+  border-radius:999px;
+  background:#ecfdf3;
+  color:#15803d;
+  font-size:12px;
+  font-weight:850;
+  white-space:nowrap;
+}
+
+.ubee-rider-rating-modal{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  display:flex;
+  align-items:flex-end;
+  background:rgba(17,24,39,.38);
+}
+.ubee-rider-rating-modal[hidden]{display:none!important}
+.ubee-rider-rating-sheet{
+  width:100%;
+  max-width:620px;
+  max-height:min(82vh,720px);
+  margin:0 auto;
+  padding:10px 18px calc(18px + env(safe-area-inset-bottom));
+  overflow:auto;
+  border-radius:24px 24px 0 0;
+  background:#fff;
+  box-shadow:0 -18px 50px rgba(15,23,42,.16);
+}
+.ubee-rider-rating-handle{
+  width:38px;height:5px;margin:0 auto 14px;border-radius:999px;background:#d8dbe1;
+}
+.ubee-rider-rating-sheet-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+}
+.ubee-rider-rating-sheet-head strong{
+  display:block;color:#111827;font-size:21px;line-height:1.2;font-weight:950;
+}
+.ubee-rider-rating-sheet-head span{
+  display:block;margin-top:5px;color:#73787e;font-size:13px;font-weight:650;
+}
+.ubee-rider-rating-close{
+  width:38px;height:38px;border:0;border-radius:50%;background:#f3f4f6;color:#111827;
+  font-size:22px;line-height:1;font-weight:700;
+}
+.ubee-rider-rating-star-buttons{
+  display:flex;justify-content:center;gap:7px;margin:22px 0 8px;
+}
+.ubee-rider-rating-star{
+  width:48px;height:48px;border:0;background:transparent;
+  color:#d1d5db;font-size:38px;line-height:1;
+}
+.ubee-rider-rating-star.active{color:#f5a623}
+.ubee-rider-rating-caption{
+  min-height:22px;text-align:center;color:#555b65;font-size:13px;font-weight:800;
+}
+.ubee-rider-rating-tags{
+  display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;
+}
+.ubee-rider-rating-tag{
+  min-height:38px;padding:0 13px;border:1px solid #e1e4e8;border-radius:999px;
+  background:#fff;color:#374151;font-size:13px;font-weight:800;
+}
+.ubee-rider-rating-tag.active{border-color:#111827;background:#111827;color:#fff}
+.ubee-rider-rating-comment{
+  width:100%;min-height:92px;margin-top:16px;padding:12px 13px;
+  resize:vertical;border:1px solid #e1e4e8;border-radius:14px;background:#fff;
+  color:#111827;font:inherit;font-size:14px;line-height:1.5;outline:none;
+}
+.ubee-rider-rating-comment:focus{border-color:#9ca3af}
+.ubee-rider-rating-submit{
+  width:100%;min-height:50px;margin-top:14px;border:0;border-radius:14px;
+  background:#111827;color:#fff;font-size:15px;font-weight:900;
+}
+.ubee-rider-rating-submit:disabled{opacity:.45}
+.ubee-rider-rating-status{
+  min-height:18px;margin-top:9px;text-align:center;color:#73787e;font-size:12px;font-weight:700;
+}
+</style>
+
 </head>
 <body class="ubee-app-starting" style="background:#ffffff;">
 
@@ -10099,6 +10233,12 @@ function renderStep5LiveStatus(
   labelEl.innerText=labelText;
   titleEl.innerText=titleText;
   metaEl.innerText=metaText;
+
+  try{
+    window.UBeeCustomerRiderRatingV1?.renderActive?.(data);
+  }catch(error){
+    console.warn('UBee 小U評價卡更新失敗：',error);
+  }
 }
 
 function getTrackingRouteMoveDistanceMeters(
@@ -19239,6 +19379,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 </div>
 </section>
+<section class="ubee-native-group" id="step5RiderRatingSection" hidden>
+  <div class="ubee-native-group-title">本次服務</div>
+  <div id="step5RiderRatingContent"></div>
+</section>
 <div class="customer-tracking-health-card ubee-native-health-row" id="customerTrackingHealthCard">
 <div class="customer-tracking-health-main">
 <span class="customer-tracking-health-dot"></span>
@@ -20191,11 +20335,30 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(!target)return;
 
     const orderId=getCustomerOrderIdV1(order);
-    const canCancel=
-      Boolean(orderId) &&
-      isCustomerOrderCancellableV1(order);
+    const canCancel=Boolean(orderId)&&isCustomerOrderCancellableV1(order);
+    const statusKey=String(order?.status||'').trim().toLowerCase();
+    const completed=['completed','done'].includes(statusKey);
+    const rated=order?.riderRatingSubmitted===true;
+    const ratingValue=Math.max(0,Math.min(5,Number(order?.riderRating||order?.riderRatingValue||0)));
+    const riderName=String(order?.riderName||'這位小U').trim()||'這位小U';
 
-    target.innerHTML=canCancel
+    const ratingHtml=completed&&orderId
+      ? `<section class="ubee-native-detail-group">
+          <div class="ubee-native-detail-group-title">服務評價</div>
+          <div class="ubee-rider-rating-card">
+            <div class="ubee-rider-rating-card-head">
+              <div class="ubee-rider-rating-card-copy">
+                <strong>${rated?'已完成小U評價':`評價 ${escapeHtml(riderName)}`}</strong>
+                <span>${rated?'感謝你的回饋，這筆任務已完成評價。':'星等必填，服務標籤與文字留言可選填。'}</span>
+              </div>
+              ${rated?'<span class="ubee-rider-rating-done">已評價</span>':''}
+            </div>
+            ${rated?`<div class="ubee-rider-rating-stars-display">${'★'.repeat(Math.round(ratingValue))}${'☆'.repeat(5-Math.round(ratingValue))}</div>`:`<button class="ubee-rider-rating-open" type="button" data-detail-rate-order="${escapeHtml(orderId)}" data-detail-rate-rider="${escapeHtml(riderName)}">給小U評價</button>`}
+          </div>
+        </section>`
+      : '';
+
+    const cancelHtml=canCancel
       ? `<section class="ubee-native-detail-cancel-group">
           <button
             class="ubee-customer-cancel-primary"
@@ -20207,6 +20370,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           </button>
         </section>`
       : '';
+
+    target.innerHTML=ratingHtml+cancelHtml;
   }
 
   async function openProfileOrderDetail(index){
@@ -20427,6 +20592,17 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
 
     $('flowProfileDetailActions')?.addEventListener('click',async event=>{
+      const ratingButton=event.target.closest('[data-detail-rate-order]');
+      if(ratingButton){
+        event.preventDefault();
+        event.stopPropagation();
+        window.UBeeCustomerRiderRatingV1?.open?.(
+          String(ratingButton.dataset.detailRateOrder||'').trim().toUpperCase(),
+          String(ratingButton.dataset.detailRateRider||'這位小U')
+        );
+        return;
+      }
+
       const cancelButton=event.target.closest('[data-detail-cancel-order]');
       if(!cancelButton)return;
 
@@ -20524,6 +20700,28 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       );
     }
   );
+
+  window.addEventListener('ubee:rider-rating-submitted',event=>{
+    const detail=event?.detail||{};
+    const orderId=String(detail.orderId||'').trim().toUpperCase();
+    if(!orderId)return;
+
+    state.profileOrders=state.profileOrders.map(item=>
+      getCustomerOrderIdV1(item)===orderId
+        ? {...item,riderRatingSubmitted:true,riderRating:Number(detail.rating||0),riderRatingTags:Array.isArray(detail.tags)?detail.tags:[]}
+        : item
+    );
+
+    if(state.selectedProfileOrder&&getCustomerOrderIdV1(state.selectedProfileOrder)===orderId){
+      state.selectedProfileOrder={
+        ...state.selectedProfileOrder,
+        riderRatingSubmitted:true,
+        riderRating:Number(detail.rating||0),
+        riderRatingTags:Array.isArray(detail.tags)?detail.tags:[]
+      };
+      renderProfileOrderCancelAction(state.selectedProfileOrder);
+    }
+  });
 
   window.openUBeeTaskRoot=async function(){
     window.UBeePrimaryNavigation?.activate('task');
@@ -20626,7 +20824,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260919-customer-cancel-ux-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260920-customer-rider-rating-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26304,6 +26502,231 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
       renderPreferenceSwitches();
       return refreshPermissionState();
     }
+  });
+})();
+</script>
+
+
+<script id="ubee-customer-rider-rating-v1-script">
+(() => {
+  'use strict';
+  if(window.UBeeCustomerRiderRatingV1) return;
+
+  const TAGS=['準時','態度好','溝通清楚','細心','速度快','值得推薦'];
+  const CAPTIONS={1:'需要改善',2:'普通',3:'不錯',4:'很好',5:'非常滿意'};
+  const state={orderId:'',riderName:'這位小U',rating:0,tags:new Set(),submitting:false};
+
+  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+
+  function normalizeOrderId(value){
+    return String(value||'').trim().toUpperCase();
+  }
+
+  function ensureModal(){
+    let modal=document.getElementById('ubeeRiderRatingModalV1');
+    if(modal) return modal;
+
+    modal=document.createElement('div');
+    modal.id='ubeeRiderRatingModalV1';
+    modal.className='ubee-rider-rating-modal';
+    modal.hidden=true;
+    modal.innerHTML=`
+      <div class="ubee-rider-rating-sheet" role="dialog" aria-modal="true" aria-labelledby="ubeeRiderRatingTitleV1">
+        <div class="ubee-rider-rating-handle"></div>
+        <div class="ubee-rider-rating-sheet-head">
+          <div>
+            <strong id="ubeeRiderRatingTitleV1">這次服務還滿意嗎？</strong>
+            <span id="ubeeRiderRatingRiderV1">評價這位小U</span>
+          </div>
+          <button class="ubee-rider-rating-close" type="button" aria-label="關閉評價">×</button>
+        </div>
+        <div class="ubee-rider-rating-star-buttons" aria-label="選擇星等">
+          ${[1,2,3,4,5].map(value=>`<button class="ubee-rider-rating-star" type="button" data-rating-star="${value}" aria-label="${value} 顆星">★</button>`).join('')}
+        </div>
+        <div class="ubee-rider-rating-caption" id="ubeeRiderRatingCaptionV1">請選擇 1～5 顆星</div>
+        <div class="ubee-rider-rating-tags">
+          ${TAGS.map(tag=>`<button class="ubee-rider-rating-tag" type="button" data-rating-tag="${esc(tag)}">${esc(tag)}</button>`).join('')}
+        </div>
+        <textarea class="ubee-rider-rating-comment" id="ubeeRiderRatingCommentV1" maxlength="300" placeholder="其他想說的話（選填）"></textarea>
+        <button class="ubee-rider-rating-submit" id="ubeeRiderRatingSubmitV1" type="button" disabled>送出評價</button>
+        <div class="ubee-rider-rating-status" id="ubeeRiderRatingStatusV1"></div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click',event=>{
+      if(event.target===modal || event.target.closest('.ubee-rider-rating-close')){
+        close();
+        return;
+      }
+      const star=event.target.closest('[data-rating-star]');
+      if(star){
+        state.rating=Math.max(1,Math.min(5,Number(star.dataset.ratingStar||0)));
+        sync();
+        return;
+      }
+      const tag=event.target.closest('[data-rating-tag]');
+      if(tag){
+        const value=String(tag.dataset.ratingTag||'').trim();
+        if(state.tags.has(value)) state.tags.delete(value);
+        else state.tags.add(value);
+        sync();
+      }
+    });
+
+    modal.querySelector('#ubeeRiderRatingSubmitV1')?.addEventListener('click',submit);
+    return modal;
+  }
+
+  function sync(){
+    const modal=ensureModal();
+    modal.querySelectorAll('[data-rating-star]').forEach(button=>{
+      button.classList.toggle('active',Number(button.dataset.ratingStar)<=state.rating);
+      button.setAttribute('aria-pressed',Number(button.dataset.ratingStar)<=state.rating?'true':'false');
+    });
+    modal.querySelectorAll('[data-rating-tag]').forEach(button=>{
+      button.classList.toggle('active',state.tags.has(String(button.dataset.ratingTag||'')));
+      button.setAttribute('aria-pressed',state.tags.has(String(button.dataset.ratingTag||''))?'true':'false');
+    });
+    const caption=modal.querySelector('#ubeeRiderRatingCaptionV1');
+    if(caption) caption.textContent=state.rating?CAPTIONS[state.rating]:'請選擇 1～5 顆星';
+    const submitButton=modal.querySelector('#ubeeRiderRatingSubmitV1');
+    if(submitButton){
+      submitButton.disabled=state.rating<1||state.submitting;
+      submitButton.textContent=state.submitting?'送出中…':'送出評價';
+    }
+  }
+
+  function open(orderId,riderName='這位小U'){
+    const safeId=normalizeOrderId(orderId);
+    if(!safeId)return;
+    const modal=ensureModal();
+    state.orderId=safeId;
+    state.riderName=String(riderName||'這位小U').trim()||'這位小U';
+    state.rating=0;
+    state.tags=new Set();
+    state.submitting=false;
+    const rider=modal.querySelector('#ubeeRiderRatingRiderV1');
+    if(rider) rider.textContent=`評價 ${state.riderName}`;
+    const comment=modal.querySelector('#ubeeRiderRatingCommentV1');
+    if(comment) comment.value='';
+    const status=modal.querySelector('#ubeeRiderRatingStatusV1');
+    if(status) status.textContent='';
+    modal.hidden=false;
+    document.body.style.overflow='hidden';
+    sync();
+  }
+
+  function close(){
+    const modal=ensureModal();
+    if(state.submitting)return;
+    modal.hidden=true;
+    document.body.style.overflow='';
+  }
+
+  async function submit(){
+    if(state.submitting||state.rating<1||!state.orderId)return;
+    const modal=ensureModal();
+    const status=modal.querySelector('#ubeeRiderRatingStatusV1');
+    const comment=String(modal.querySelector('#ubeeRiderRatingCommentV1')?.value||'').trim().slice(0,300);
+
+    state.submitting=true;
+    if(status) status.textContent='正在送出評價…';
+    sync();
+
+    try{
+      const data=await customerApiFetch(
+        `/api/customer/orders/${encodeURIComponent(state.orderId)}/rider-rating`,
+        {
+          method:'POST',
+          body:JSON.stringify({
+            rating:state.rating,
+            tags:Array.from(state.tags),
+            comment
+          })
+        }
+      );
+
+      const detail={
+        orderId:state.orderId,
+        rating:state.rating,
+        tags:Array.from(state.tags),
+        comment,
+        riderRatingSummary:data?.riderRatingSummary||null
+      };
+
+      if(typeof currentOrderData!=='undefined' && currentOrderData && normalizeOrderId(currentOrderData.id||currentOrderData.orderId)===state.orderId){
+        currentOrderData={
+          ...currentOrderData,
+          riderRatingSubmitted:true,
+          riderRating:state.rating,
+          riderRatingTags:Array.from(state.tags),
+          riderRatingComment:comment
+        };
+        renderActive(currentOrderData);
+      }
+
+      window.dispatchEvent(new CustomEvent('ubee:rider-rating-submitted',{detail}));
+      if(status) status.textContent='評價已送出，謝謝你的回饋。';
+      setTimeout(()=>{
+        state.submitting=false;
+        modal.hidden=true;
+        document.body.style.overflow='';
+        sync();
+      },650);
+    }catch(error){
+      state.submitting=false;
+      if(status) status.textContent=error?.message||'評價送出失敗，請稍後再試。';
+      sync();
+    }
+  }
+
+  function renderActive(order){
+    const section=document.getElementById('step5RiderRatingSection');
+    const content=document.getElementById('step5RiderRatingContent');
+    if(!section||!content)return;
+
+    const data=order||{};
+    const status=String(data.status||'').trim().toLowerCase();
+    const completed=['completed','done'].includes(status);
+    if(!completed){
+      section.hidden=true;
+      content.innerHTML='';
+      return;
+    }
+
+    const orderId=normalizeOrderId(data.id||data.orderId||((typeof currentOrderId!=='undefined')?currentOrderId:''));
+    const riderName=String(data.riderName||data.rider?.name||'這位小U').trim()||'這位小U';
+    const rated=data.riderRatingSubmitted===true;
+    const ratingValue=Math.max(0,Math.min(5,Number(data.riderRating?.rating||data.riderRating||data.riderRatingValue||0)));
+    const stars=ratingValue>0?'★'.repeat(Math.round(ratingValue))+'☆'.repeat(5-Math.round(ratingValue)):'';
+
+    section.hidden=false;
+    content.innerHTML=`
+      <div class="ubee-rider-rating-card">
+        <div class="ubee-rider-rating-card-head">
+          <div class="ubee-rider-rating-card-copy">
+            <strong>${rated?'已完成小U評價':`這次服務還滿意嗎？`}</strong>
+            <span>${rated?`你已對 ${esc(riderName)} 完成本次評價。`:`給 ${esc(riderName)} 一個服務評價，幫助 UBee 持續改善服務品質。`}</span>
+          </div>
+          ${rated?'<span class="ubee-rider-rating-done">已評價</span>':''}
+        </div>
+        ${rated?`<div class="ubee-rider-rating-stars-display">${stars}</div>`:`<button class="ubee-rider-rating-open" type="button" data-active-rider-rating>給小U評價</button>`}
+      </div>`;
+
+    content.querySelector('[data-active-rider-rating]')?.addEventListener('click',()=>open(orderId,riderName));
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    ensureModal();
+    try{
+      if(typeof currentOrderData!=='undefined'&&currentOrderData)renderActive(currentOrderData);
+    }catch(_){}
+  },{once:true});
+
+  window.UBeeCustomerRiderRatingV1=Object.freeze({
+    open,
+    close,
+    renderActive
   });
 })();
 </script>
