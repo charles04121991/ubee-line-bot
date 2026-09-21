@@ -276,6 +276,37 @@ function getRiderGrowthQuality(rider = {}, riderOrders = []) {
   const taskReporting = growthClamp(100 - incompleteReportCount * 8);
   const serviceRecord = growthClamp(100 - warningCount * 5 - complaintCount * 10);
   const complianceRecord = growthClamp(100 - violationCount * 20 - (majorViolation ? 60 : 0));
+  const customerRatingSource =
+    rider.customerRatings && typeof rider.customerRatings === 'object'
+      ? rider.customerRatings
+      : {};
+  const customerRatingCount = Math.max(0, Number(customerRatingSource.count || 0));
+  const customerRatingSum = Math.max(0, Number(customerRatingSource.sum || 0));
+  const customerRatingAverage =
+    customerRatingCount > 0
+      ? Math.max(1, Math.min(5, Number(customerRatingSource.average || (customerRatingSum / customerRatingCount))))
+      : null;
+  const customerRatingStars =
+    customerRatingSource.stars && typeof customerRatingSource.stars === 'object'
+      ? {
+          '1':Math.max(0, Number(customerRatingSource.stars['1'] || 0)),
+          '2':Math.max(0, Number(customerRatingSource.stars['2'] || 0)),
+          '3':Math.max(0, Number(customerRatingSource.stars['3'] || 0)),
+          '4':Math.max(0, Number(customerRatingSource.stars['4'] || 0)),
+          '5':Math.max(0, Number(customerRatingSource.stars['5'] || 0)),
+        }
+      : {'1':0,'2':0,'3':0,'4':0,'5':0};
+  const customerRatingTags =
+    customerRatingSource.tags && typeof customerRatingSource.tags === 'object'
+      ? Object.fromEntries(
+          Object.entries(customerRatingSource.tags)
+            .map(([key,value]) => [String(key), Math.max(0, Number(value || 0))])
+            .filter(([,value]) => value > 0)
+            .sort((a,b) => b[1] - a[1])
+            .slice(0, 12)
+        )
+      : {};
+
   const sampleReady = handledCount >= UBEE_RIDER_QUALITY_RULE.minimumSampleOrders;
   const score = sampleReady ? growthClamp(
     fulfillmentStability * 0.30 +
@@ -302,6 +333,13 @@ function getRiderGrowthQuality(rider = {}, riderOrders = []) {
     handledCount,
     completionRate:growthClamp(completionRate),
     cancellationRate:growthClamp(cancellationRate),
+    customerRating:{
+      count:customerRatingCount,
+      average:customerRatingAverage,
+      stars:customerRatingStars,
+      tags:customerRatingTags,
+      lastRatingAtMs:Number(customerRatingSource.lastRatingAtMs || 0),
+    },
     dimensions:{
       fulfillmentStability,
       cancellationControl,
@@ -44386,6 +44424,9 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
     total:getCustomerTrackingMoney(order),
     paymentMethod:String(order.paymentMethod || ''),
     paymentStatus:String(order.paymentStatus || ''),
+    riderRatingSubmitted:order.riderRatingSubmitted === true,
+    riderRating:Number(order.riderRating?.rating || order.riderRatingValue || 0) || 0,
+    riderRatingTags:Array.isArray(order.riderRating?.tags) ? order.riderRating.tags.slice(0, 6) : [],
     statusTimes,
     activeIncident:incident ? {
       incidentId:incident.incidentId,
@@ -44431,6 +44472,11 @@ function sanitizeCustomerOrderForApi(order = {}) {
     riderAssigned: Boolean(order.riderDocId || order.riderId || order.riderName),
     riderName: String(order.riderName || order.riderDisplayName || ''),
     riderVehicleType: String(order.riderVehicleType || order.vehicleType || ''),
+    riderRatingSubmitted: order.riderRatingSubmitted === true,
+    riderRating: Number(order.riderRating?.rating || order.riderRatingValue || 0) || 0,
+    riderRatingTags: Array.isArray(order.riderRating?.tags) ? order.riderRating.tags.slice(0, 6) : [],
+    riderRatingComment: String(order.riderRating?.comment || '').slice(0, 300),
+    riderRatedAtMs: customerOrderApiTimeMs(order.riderRating?.createdAtMs || order.riderRatedAtMs || order.riderRating?.createdAt),
     serviceGroup: String(order.serviceGroup || ''),
     serviceType: String(order.serviceType || 'UBee 跑腿任務'),
     serviceCategory: String(order.serviceCategory || ''),
@@ -44571,6 +44617,232 @@ app.get('/api/customer/orders/:orderId/tracking', requireCustomerAuth, async (re
   } catch (error) {
     console.error('❌ 讀取客戶即時追蹤摘要失敗：', error);
     return res.status(500).json({ success:false, error:'即時追蹤讀取失敗' });
+  }
+});
+
+
+// =====================================================
+// UBee Customer → Rider Rating V1｜2026-09-20
+// - 僅 completed / done 訂單可評價
+// - 僅原下單會員可評價
+// - 一張訂單只允許一筆正式評價
+// - riderId 不採信前端輸入，固定由訂單實際承接小U解析
+// - 評價不影響訂單完成；V1 先作為服務品質與營運資料，不直接改變派單排序
+// =====================================================
+const UBEE_RIDER_RATING_COLLECTION = 'orderRiderRatings';
+const UBEE_RIDER_RATING_TAGS = Object.freeze([
+  '準時',
+  '態度好',
+  '溝通清楚',
+  '細心',
+  '速度快',
+  '值得推薦',
+]);
+
+function normalizeCustomerRiderRatingPayload(body = {}) {
+  const rawRating = Number(body.rating);
+  const rating = Number.isInteger(rawRating) ? rawRating : 0;
+  const allowedTags = new Set(UBEE_RIDER_RATING_TAGS);
+  const tags = Array.from(new Set(
+    (Array.isArray(body.tags) ? body.tags : [])
+      .map(value => cleanText(value, 20))
+      .filter(value => allowedTags.has(value))
+  )).slice(0, 6);
+  const comment = cleanLongText(body.comment || '', 300);
+  return { rating, tags, comment };
+}
+
+function serializeOrderRiderRatingSummary(order = {}) {
+  const source = order.riderRating && typeof order.riderRating === 'object'
+    ? order.riderRating
+    : {};
+  return {
+    submitted:order.riderRatingSubmitted === true,
+    rating:Number(source.rating || order.riderRatingValue || 0) || 0,
+    tags:Array.isArray(source.tags) ? source.tags.slice(0, 6) : [],
+    comment:String(source.comment || '').slice(0, 300),
+    createdAtMs:customerOrderApiTimeMs(source.createdAtMs || order.riderRatedAtMs || source.createdAt),
+  };
+}
+
+app.post('/api/customer/orders/:orderId/rider-rating', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const orderId = String(req.params.orderId || '').trim().toUpperCase();
+    const customerId = String(req.customerAuth?.customerId || '').trim();
+    const payload = normalizeCustomerRiderRatingPayload(req.body || {});
+
+    if (!orderId) {
+      return res.status(400).json({ success:false, error:'缺少訂單編號' });
+    }
+    if (!Number.isInteger(payload.rating) || payload.rating < 1 || payload.rating > 5) {
+      return res.status(400).json({ success:false, error:'請選擇 1～5 顆星' });
+    }
+
+    const orderRef = db.collection('orders').doc(orderId);
+    const firstOrderDoc = await orderRef.get();
+
+    if (!firstOrderDoc.exists) {
+      return res.status(404).json({ success:false, error:'查無此訂單' });
+    }
+
+    const firstOrder = { id:firstOrderDoc.id, ...(firstOrderDoc.data() || {}) };
+    if (!isSameCustomerUserId(firstOrder, customerId)) {
+      return res.status(403).json({ success:false, error:'此訂單只能由原本下單的客人評價' });
+    }
+
+    const firstStatus = String(firstOrder.status || '').trim().toLowerCase();
+    if (!['completed','done'].includes(firstStatus)) {
+      return res.status(409).json({ success:false, error:'任務完成後才能評價小U' });
+    }
+
+    const riderLookup = await findRiderDocumentV2First({
+      phone:firstOrder.riderPhone || firstOrder.driverPhone || '',
+      riderId:firstOrder.riderDocId || firstOrder.riderId || firstOrder.driverId || '',
+      lineUserId:firstOrder.riderLineUserId || firstOrder.driverLineUserId || '',
+    });
+
+    if (!riderLookup?.riderDoc?.exists) {
+      return res.status(409).json({
+        success:false,
+        error:'目前無法確認此筆任務的小U資料，請稍後再試。',
+      });
+    }
+
+    const riderDocId = riderLookup.riderDoc.id;
+    const riderRef = riderLookup.riderDoc.ref;
+    const ratingRef = db.collection(UBEE_RIDER_RATING_COLLECTION).doc(orderId);
+
+    let savedRating = null;
+    let riderAggregate = null;
+
+    await db.runTransaction(async transaction => {
+      const [orderDoc, ratingDoc, riderDoc] = await Promise.all([
+        transaction.get(orderRef),
+        transaction.get(ratingRef),
+        transaction.get(riderRef),
+      ]);
+
+      if (!orderDoc.exists) throw new Error('ORDER_NOT_FOUND');
+      if (!riderDoc.exists) throw new Error('RIDER_NOT_FOUND');
+
+      const order = { id:orderDoc.id, ...(orderDoc.data() || {}) };
+      if (!isSameCustomerUserId(order, customerId)) {
+        throw new Error('CUSTOMER_NOT_OWNER');
+      }
+
+      const status = String(order.status || '').trim().toLowerCase();
+      if (!['completed','done'].includes(status)) {
+        throw new Error('ORDER_NOT_COMPLETED');
+      }
+
+      if (ratingDoc.exists || order.riderRatingSubmitted === true) {
+        throw new Error('RATING_ALREADY_SUBMITTED');
+      }
+
+      const currentRider = riderDoc.data() || {};
+      const current = currentRider.customerRatings && typeof currentRider.customerRatings === 'object'
+        ? currentRider.customerRatings
+        : {};
+
+      const previousCount = Math.max(0, Number(current.count || 0));
+      const previousSum = Math.max(0, Number(current.sum || 0));
+      const nextCount = previousCount + 1;
+      const nextSum = previousSum + payload.rating;
+      const nextAverage = Math.round((nextSum / nextCount) * 100) / 100;
+
+      const nextStars = {
+        '1':Math.max(0, Number(current.stars?.['1'] || 0)),
+        '2':Math.max(0, Number(current.stars?.['2'] || 0)),
+        '3':Math.max(0, Number(current.stars?.['3'] || 0)),
+        '4':Math.max(0, Number(current.stars?.['4'] || 0)),
+        '5':Math.max(0, Number(current.stars?.['5'] || 0)),
+      };
+      nextStars[String(payload.rating)] += 1;
+
+      const nextTags = {};
+      if (current.tags && typeof current.tags === 'object') {
+        for (const [key, value] of Object.entries(current.tags)) {
+          const safeKey = cleanText(key, 20);
+          const count = Math.max(0, Number(value || 0));
+          if (safeKey && count > 0) nextTags[safeKey] = count;
+        }
+      }
+      for (const tag of payload.tags) {
+        nextTags[tag] = Math.max(0, Number(nextTags[tag] || 0)) + 1;
+      }
+
+      const nowMs = Date.now();
+      savedRating = {
+        orderId,
+        customerId,
+        riderDocId,
+        riderId:String(currentRider.riderId || riderDocId),
+        rating:payload.rating,
+        tags:payload.tags,
+        comment:payload.comment,
+        createdAtMs:nowMs,
+      };
+
+      riderAggregate = {
+        count:nextCount,
+        sum:nextSum,
+        average:nextAverage,
+        stars:nextStars,
+        tags:nextTags,
+        lastRatingAtMs:nowMs,
+      };
+
+      transaction.set(ratingRef, {
+        ...savedRating,
+        createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(orderRef, {
+        riderRatingSubmitted:true,
+        riderRating:{
+          rating:payload.rating,
+          tags:payload.tags,
+          comment:payload.comment,
+          createdAtMs:nowMs,
+        },
+        riderRatingValue:payload.rating,
+        riderRatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+
+      transaction.set(riderRef, {
+        customerRatings:riderAggregate,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+    });
+
+    return res.json({
+      success:true,
+      message:'評價已送出，謝謝你的回饋。',
+      rating:savedRating,
+      riderRatingSummary:{
+        count:Number(riderAggregate?.count || 0),
+        average:Number(riderAggregate?.average || 0),
+      },
+    });
+  } catch (error) {
+    const code = String(error?.message || error || '');
+    if (code === 'RATING_ALREADY_SUBMITTED') {
+      return res.status(409).json({ success:false, code, error:'這筆任務已經評價過了。' });
+    }
+    if (code === 'ORDER_NOT_COMPLETED') {
+      return res.status(409).json({ success:false, code, error:'任務完成後才能評價小U。' });
+    }
+    if (code === 'CUSTOMER_NOT_OWNER') {
+      return res.status(403).json({ success:false, code, error:'此訂單只能由原本下單的客人評價。' });
+    }
+    if (code === 'ORDER_NOT_FOUND') {
+      return res.status(404).json({ success:false, code, error:'查無此訂單。' });
+    }
+    console.error('❌ 客戶評價小U失敗：', error);
+    return res.status(500).json({ success:false, error:'評價送出失敗，請稍後再試。' });
   }
 });
 
