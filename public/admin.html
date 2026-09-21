@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-21｜Membership Fee Finance No-Key V3.1：資格開通費管理改為沿用 Finance Center No Key；移除資格開通費頁的管理金鑰輸入、sessionStorage 依賴與 V4 Admin Header；小U V4 資格與治理頁仍維持原高權限金鑰。 -->
 <!-- 2026-09-21｜Rider Membership Fee Finance V3：新增小U資格開通費核對中心；10/1 開放付款、10/12 未核對暫停派單。 -->
 <!-- 2026-09-17｜Profit Finance V1：平台收入拆分應得、已收與待收，避免把未回繳現金誤認為已入帳收入。 -->
 <!-- 2026-09-08｜Finance Center No Key V4.4：徹底移除財務中心金鑰輸入與財務 API Header 包裝；財務中心開啟後直接讀取資料。 -->
@@ -341,10 +342,6 @@ summary::-webkit-details-marker{display:none}
             既有小U於 10/1～10/11 未完成核對仍可正常派單；2026/10/12 00:00 起未 verified / waived 者自動停止新任務派送。
             核對完成後系統自動恢復資格判定。
           </div>
-          <div class="v4-key-row">
-            <input id="membershipAdminKey" type="password" placeholder="輸入 V4 管理金鑰">
-            <button class="btn primary" onclick="saveMembershipAdminKey()">套用金鑰</button>
-          </div>
           <div class="membership-summary-grid">
             <div class="membership-summary-card"><span>全部小U</span><strong id="membershipTotal">0</strong></div>
             <div class="membership-summary-card pending"><span>待核對</span><strong id="membershipSubmitted">0</strong></div>
@@ -353,7 +350,7 @@ summary::-webkit-details-marker{display:none}
             <div class="membership-summary-card overdue"><span>逾期／已暫停</span><strong id="membershipOverdue">0</strong></div>
             <div class="membership-summary-card"><span>已核對金額</span><strong id="membershipVerifiedAmount">$0</strong></div>
           </div>
-          <div id="membershipList" class="membership-list"><div class="empty">輸入管理金鑰後即可讀取資格開通費資料。</div></div>
+          <div id="membershipList" class="membership-list"><div class="empty">正在讀取資格開通費資料...</div></div>
         </div>
       </div>
     </section>
@@ -769,21 +766,6 @@ function membershipStatusClass(r){
   if(status==='not_started') return 'not-started';
   return '';
 }
-function syncMembershipAdminKeyInput(){
-  const key=getV4AdminKey();
-  const input=document.getElementById('membershipAdminKey');
-  const v4Input=document.getElementById('v4AdminKey');
-  if(input && key && !input.value) input.value=key;
-  if(v4Input && key && !v4Input.value) v4Input.value=key;
-}
-function saveMembershipAdminKey(){
-  const input=document.getElementById('membershipAdminKey');
-  const key=String(input?.value||'').trim();
-  if(!key){alert('請輸入 V4 管理金鑰。');return;}
-  sessionStorage.setItem('ubee_v4_admin_key',key);
-  syncMembershipAdminKeyInput();
-  Promise.all([loadMembershipFees(true),loadV4Riders(false)]).catch(()=>{});
-}
 function membershipMatches(r,query){
   if(!query) return true;
   return [r.name,r.phone,r.riderId,r.id,r.payerName]
@@ -811,17 +793,18 @@ function renderMembershipSummary(){
   const tab=document.getElementById('membershipTabCount');
   if(tab) tab.textContent=Number(s.submitted||0)>0?`(${Number(s.submitted||0)})`:'';
 }
+async function membershipFinanceFetch(path,options={}){
+  const headers={...(options.headers||{})};
+  if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';
+  const res=await fetch(`${API_BASE}${path}`,{...options,headers,cache:'no-store'});
+  return readJson(res);
+}
 async function loadMembershipFees(showMessage=false){
   const el=document.getElementById('membershipList');
   if(!el)return;
-  syncMembershipAdminKeyInput();
-  if(!getV4AdminKey()){
-    el.innerHTML='<div class="empty">請先輸入 V4 管理金鑰。</div>';
-    return;
-  }
   if(!showMessage) el.innerHTML='<div class="empty">正在讀取資格開通費資料...</div>';
   try{
-    state.membershipFees=await v4AdminFetch('/api/admin/rider-membership-fees?t='+Date.now());
+    state.membershipFees=await membershipFinanceFetch('/api/admin/rider-membership-fees?t='+Date.now());
     renderMembershipSummary();
     renderMembershipFees();
     if(showMessage)showToast('小U資格開通費資料已更新');
@@ -884,7 +867,7 @@ async function verifyMembershipPayment(riderId,action,button){
   const old=button?.textContent;
   if(button){button.disabled=true;button.textContent=isVerified?'確認中...':'處理中...';}
   try{
-    await v4AdminFetch('/api/rider/v4/membership-fee/admin/verify',{
+    await membershipFinanceFetch('/api/rider/v4/membership-fee/admin/verify',{
       method:'POST',
       body:JSON.stringify({
         riderId,
@@ -894,7 +877,7 @@ async function verifyMembershipPayment(riderId,action,button){
       })
     });
     showToast(isVerified?'資格開通費已確認':'已標記查無付款');
-    await Promise.all([loadMembershipFees(false),loadV4Riders(false)]);
+    await loadMembershipFees(false);
   }catch(err){
     alert('資格開通費核對失敗：'+err.message);
     if(button){button.disabled=false;button.textContent=old;}
@@ -903,7 +886,7 @@ async function verifyMembershipPayment(riderId,action,button){
 
 
 function getV4AdminKey(){return String(sessionStorage.getItem('ubee_v4_admin_key')||'').trim();}
-function saveV4AdminKey(){const input=document.getElementById('v4AdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);syncMembershipAdminKeyInput();Promise.all([loadV4Riders(true),loadMembershipFees(false)]).catch(()=>{});}
+function saveV4AdminKey(){const input=document.getElementById('v4AdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);loadV4Riders(true).catch(()=>{});}
 async function v4AdminFetch(path,options={}){const key=getV4AdminKey();if(!key)throw new Error('請先輸入 V4 管理金鑰。');const headers={...(options.headers||{}),'x-ubee-admin-key':key};if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';const res=await fetch(`${API_BASE}${path}`,{...options,headers,cache:'no-store'});return readJson(res);}
 async function loadV4Riders(showMessage=false){
   const el=document.getElementById('v4RiderList'); if(!el)return;
@@ -943,8 +926,7 @@ async function refreshAll(showMessage=false){
   try{
     const ok=await healthCheck();
     if(!ok){if(showMessage)showToast('目前無法連上 UBee 後端，保留畫面最後資料。');return;}
-    const jobs=[loadOverview(true),loadCashRemittances(true),loadSettlements(true),loadFinanceLedger(false)];
-    if(getV4AdminKey()) jobs.push(loadMembershipFees(false));
+    const jobs=[loadOverview(true),loadCashRemittances(true),loadSettlements(true),loadFinanceLedger(false),loadMembershipFees(false)];
     await Promise.all(jobs);
     if(showMessage)showToast('財務資料已全部更新');
   }finally{state.loading=false;}
