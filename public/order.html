@@ -41,7 +41,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260921-customer-rider-rating-fullscreen-v1-6" rel="manifest"/>
+<link href="/manifest-order.json?v=20260921-customer-rider-rating-fullscreen-v1-7" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6546,23 +6546,45 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
   font-weight:850;
 }
 .ubee-rider-rating-star-buttons{
-  width:min(100%,360px);
-  display:flex;
-  justify-content:space-between;
-  gap:0;
-  margin:26px auto 8px;
+  width:min(100%,370px);
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:2px;
+  margin:24px auto 8px;
 }
 .ubee-rider-rating-star{
-  width:clamp(56px,16vw,68px);
-  height:clamp(56px,16vw,68px);
+  width:100%;
+  max-width:70px;
+  aspect-ratio:1;
+  justify-self:center;
   padding:0;
   border:0;
   background:transparent;
   color:#d1d5db;
-  font-size:clamp(50px,14vw,58px);
-  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  -webkit-tap-highlight-color:transparent;
 }
-.ubee-rider-rating-star.active{color:#f5a623}
+.ubee-rider-rating-star-svg{
+  width:100%;
+  height:100%;
+  display:block;
+  fill:currentColor;
+  transform:scale(1);
+  transform-origin:center;
+  transition:transform .14s ease,color .14s ease;
+  pointer-events:none;
+}
+.ubee-rider-rating-star.active{
+  color:#f5a623;
+}
+.ubee-rider-rating-star.active .ubee-rider-rating-star-svg{
+  transform:scale(1.04);
+}
+.ubee-rider-rating-star:active .ubee-rider-rating-star-svg{
+  transform:scale(.93);
+}
 .ubee-rider-rating-caption{
   min-height:22px;
   text-align:center;
@@ -21018,7 +21040,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-fullscreen-v1-6';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-fullscreen-v1-7';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26763,7 +26785,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
           <div class="ubee-rider-rating-rider-name" id="ubeeRiderRatingRiderV1">評價這位小U</div>
 
           <div class="ubee-rider-rating-star-buttons" aria-label="選擇星等">
-            ${[1,2,3,4,5].map(value=>`<button class="ubee-rider-rating-star" type="button" data-rating-star="${value}" aria-label="${value} 顆星">★</button>`).join('')}
+            ${[1,2,3,4,5].map(value=>`<button class="ubee-rider-rating-star" type="button" data-rating-star="${value}" aria-label="${value} 顆星"><svg class="ubee-rider-rating-star-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 1.75l3.18 6.44 7.11 1.03-5.15 5.02 1.22 7.08L12 18l-6.36 3.32 1.22-7.08-5.15-5.02 7.11-1.03L12 1.75z"/></svg></button>`).join('')}
           </div>
 
           <div class="ubee-rider-rating-caption" id="ubeeRiderRatingCaptionV1">請選擇 1～5 顆星</div>
