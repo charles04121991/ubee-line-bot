@@ -41,7 +41,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260921-customer-rider-rating-fullscreen-v1-3" rel="manifest"/>
+<link href="/manifest-order.json?v=20260921-customer-rider-rating-fullscreen-v1-5" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6439,10 +6439,19 @@ body.ubee-rider-rating-gate-open{
   overscroll-behavior:none;
   touch-action:pan-x pan-y;
 }
+/* 評價 Gate 開啟時，原本的 App 底部導覽必須完全隱藏，
+   否則它會蓋住 Full Screen 的「送出評價」固定操作列。 */
+body.ubee-rider-rating-gate-open #ubeePersistentBottomNav,
+body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
 .ubee-rider-rating-screen{
   position:fixed;
   inset:0;
-  z-index:99999;
+  z-index:2147483647!important;
   display:flex;
   flex-direction:column;
   background:#fff;
@@ -6491,6 +6500,7 @@ body.ubee-rider-rating-gate-open{
   overflow:auto;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
+  padding-bottom:112px;
 }
 .ubee-rider-rating-screen-main{
   width:min(100%,620px);
@@ -6538,17 +6548,17 @@ body.ubee-rider-rating-gate-open{
 .ubee-rider-rating-star-buttons{
   display:flex;
   justify-content:center;
-  gap:6px;
+  gap:10px;
   margin:26px auto 8px;
 }
 .ubee-rider-rating-star{
-  width:48px;
-  height:48px;
+  width:60px;
+  height:60px;
   padding:0;
   border:0;
   background:transparent;
   color:#d1d5db;
-  font-size:38px;
+  font-size:48px;
   line-height:1;
 }
 .ubee-rider-rating-star.active{color:#f5a623}
@@ -6611,10 +6621,15 @@ body.ubee-rider-rating-gate-open{
   font-weight:750;
 }
 .ubee-rider-rating-screen-footer{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:2147483647;
   flex:0 0 auto;
   padding:10px 18px calc(10px + env(safe-area-inset-bottom));
   border-top:1px solid #eef0f3;
-  background:rgba(255,255,255,.97);
+  background:rgba(255,255,255,.98);
   backdrop-filter:blur(14px);
   -webkit-backdrop-filter:blur(14px);
 }
@@ -6633,6 +6648,13 @@ body.ubee-rider-rating-gate-open{
   font-weight:950;
 }
 .ubee-rider-rating-submit:disabled{opacity:.42}
+.ubee-rider-rating-footer-tip{
+  margin-top:7px;
+  text-align:center;
+  color:#6b7280;
+  font-size:11px;
+  font-weight:750;
+}
 .ubee-rider-rating-success{
   position:absolute;
   inset:0;
@@ -20995,7 +21017,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-fullscreen-v1-3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260921-customer-rider-rating-fullscreen-v1-5';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26764,6 +26786,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
       <footer class="ubee-rider-rating-screen-footer">
         <div class="ubee-rider-rating-screen-footer-inner">
           <button class="ubee-rider-rating-submit" id="ubeeRiderRatingSubmitV1" type="button" disabled>送出評價</button>
+          <div class="ubee-rider-rating-footer-tip">請先選擇星等後送出</div>
         </div>
       </footer>
 
