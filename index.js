@@ -1,32 +1,7 @@
-// 2026-09-21｜Membership Fee Finance No-Key V3.1：資格開通費財務清單／核對沿用 Finance Center No Key V4.4，不再要求 x-ubee-admin-key；其他 Rider V4 治理 API 仍保留 requireRiderV4AdminKey。
-// 2026-09-19｜Rider Native Membership + Partner Benefits V5.1 Audit：完整按鈕／返回／付款回報流程檢查；修正生效日前誤可送出付款、原生返回根頁一致性、QR 儲存與外部導航 fallback；不改 299/499 cohort 與既有任務核心。
-// 2026-09-19｜Customer Cancel UX V1：客戶端取消入口全面可見；後端取消同步處理 Rider/Smart Stack 狀態，避免小U殘留忙碌。
-// 2026-09-18｜Rider Task Control V1.1：補齊已承接／已確認預約的「取消預約承接」；安全釋放、避免回派同一小U、接近任務時間自動緊急媒合。
-// 2026-09-18｜Rider Task Control V1：待接任務加入正式拒絕；已接任務在抵達取件前可由小U取消接單並重新媒合；Smart Stack 安全釋放。
-// 2026-09-18｜UBee Smart Stack V1.1：Recovery Hard Lock＋Google Routes 真實道路疊單判斷＋QUEUED Live ETA；V1 CURRENT/QUEUED 架構保留。
-// 2026-09-18｜UBee Smart Stack V1：順序疊單；最多 2 單，CURRENT + QUEUED，完成第一單後自動升級第二單；不改 Profit Pricing V1。
-// 2026-09-17｜Profit Pricing V1 / Route Pricing V4：維持任務費 70/30 與小U NT$50 保底；一般路線改為 3km 內 NT$80、3～8km 每公里 NT$12、8km 以上每公里 NT$11，移除長途收入保障的失控外推；急件與長時間排隊另收平台管理費，小U原有加價不減少；店家 COD 加入固定系統服務費；財務總帳拆分平台應收、已收與待收。
-// 2026-09-16｜Rider Motor Vehicle Hard Lock V1：新版小U申請只接受機車／汽車；/api/rider/register 後端硬鎖，非允許車種直接 400 拒絕。
-// 2026-09-16｜UBee Native Experience V2：同步前端 App Shell Release；本版不修改計價、派單、Growth Engine、Rider Income、資格、ETA、付款與任務核心規則。
-// 2026-09-16｜UBee Growth Engine V1.8：雙端「我的」二級頁 UX 統一；後端規則沿用 V1.6，Release 版本同步升級。
-// 2026-09-16｜UBee Growth Engine V1：刪除 Rider Activity V1 優先派單資格／延遲概念；建立雙體系階級、推薦碼、有效推薦、成長歷程、活躍度／品質／成長貢獻分離模型。
-// 2026-09-14｜Customer Live Tracking V1.1 / Accept Sync Fix：客戶主訂單 API 直接回傳安全 tracking 摘要；小U接單後立即背景計算 Customer Live ETA，不再依賴下一次 GPS 才建立第一輪 ETA。
-// 2026-09-11｜Route Pricing V3 / Rider Income Canonical V3：刪除一般配送舊 base+全里程+導航時間+8km長距離加價公式；改為 NT$80 含3km、超出每km NT$12，並加入 8km=NT$98、14km=NT$250 小U路線收入保障。新訂單收入只信任後端 canonical riderIncome。
-// 2026-09-09｜Customer Live ETA Backend V1：一般客戶進行中任務使用小U最新 GPS＋即時道路路況計算 ETA；30 秒／80 公尺節流更新，定位超過 5 分鐘即停止提供精準 ETA，避免客戶看到過期預估。
-// 2026-09-09｜Customer Dispatch Recovery Backend V1：客戶現金立即單由 pending_payment 確認為 pending_dispatch 後，正式建立 dispatchPushCycle 並啟動全區 startDispatchPushSequence，避免只靠騎士端輪詢才看見任務。
-// 2026-09-09｜Rider Qualification Hard Lock Backend V1：刪除舊 approved→ACTIVE／無 onboarding 即放行相容邏輯；正式接單改為「審核→入職→測驗→ACTIVE→上線」五段式硬鎖，tasks/status/accept-order 全部後端 fail-closed 驗證。
-// 2026-09-08｜Customer Global Supply Backend V1：客戶端 service-status 改為全區可媒合小U，不再回傳附近公里數作為媒合依據。
-// 2026-09-08｜Rider Global Task Pool Backend V1.2 No Radius Clean：清除可重新啟動距離圈派單的殘留路徑；舊 expand-radius API 改為全區重新通知相容入口。
-// 2026-09-08｜Finance Center No Key V4.4：依營運需求徹底移除財務中心 API 金鑰驗證；admin 財務頁不再要求輸入金鑰。
-// 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean：待接任務改為全員可見任務池；/api/rider/tasks 不做距離限制，Web Push 第一波直接全區通知。
-// 2026-09-08｜Finance Ledger KPI Fix V1：訂單財務總帳今日收入類 KPI 只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。
-// 2026-09-07｜Rider Background Presence V2：移除舊『Heartbeat 超過 5 分鐘即視為離線』邏輯；改為前景即時 / 背景 Push 可達 / 任務中真相三層 Presence，PWA 被 OS 暫停時不再誤判為主動下線。
-// 2026-09-07｜Dispatch Manual Unassign V1：調度中心新增「取消派單」；僅允許取件前解除目前小U，訂單退回 pending_dispatch 並重新媒合；抵達取件後啟用貨物安全鎖禁止直接解除。
-// 2026-09-03｜Universal Arrival Photo Backend V1.1：所有服務共用到場照片；排隊任務視為單一現場任務，抵達拍照後可直接進入處理並完成，不再要求不存在的送達點。
-// 2026-09-03｜Task Contract Backend V3 Full Flow：在 V2 結構化 taskDetails 基礎上，打通單點全能任務、騎士文字／照片／交接完成回報、完成前後端強制驗證、客戶完成結果與調度回報狀態；保留舊訂單相容。
-// 2026-09-03｜Arrival Photo Proof Backend V1：所有服務在抵達任務地點與各送達點後皆須拍照；後端儲存 Firebase Storage、驗證狀態流轉，並以短效 signed URL 回傳原下單客戶。
-// 2026-09-03｜Task Contract Backend V2：正式正規化 taskDetails.reportMode / handoffMode，產生 canonical label 與需求旗標，並同步到騎士安全預覽、調度 Dashboard、客戶訂單 API。
-// 2026-09-02｜Rider Task Visibility V1：統一調度中心/騎士端待派狀態、補齊安全預覽區域欄位，避免調度有單但騎士任務池被舊狀態或二次解析誤擋。
+// =====================================================
+// UBee Backend｜Release 2026-09-22
+// Core：Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking
+// =====================================================
 require('dotenv').config();
 const express = require('express');
 const line = require('@line/bot-sdk');
@@ -36,20 +11,6 @@ const crypto = require('crypto');
 const admin = require('firebase-admin');
 const webpush = require('web-push');
 const multer = require('multer');
-
-// 2026-09-08｜Customer Global Match ETA V1：客戶端 service-status 以全區可媒合小U估算媒合時間，不再依附近公里數判斷。
-// 2026-09-01｜Order ↔ Backend Pricing Contract V1：Quote Lock 加入 serviceKey/queueMinutes/taskMinutes/upstairsOption/advancePayment 驗證；樓層費改由後端 canonical 規則決定。
-// 2026-09-01｜Rider Safety Backend V12.1：安全回報支援 payment/item、money→payment 相容正規化，並驗證 orderId 存在與騎士歸屬後才允許關聯／回寫訂單。
-// UBee 正式清理整合版：已移除被 Google Maps 外部導航取代的舊 Navigation V2.4 後端流程。
-// UBee Merchant PWA V4 + 小U資料庫 V2 Final｜2026-08-13：店家獨立密碼登入、COD 墊付配送、店家近距離費率。
-// 2026-08-04 R9｜全能跑腿 serviceMode 前後端一致：估價、建單與鎖價驗證統一為 custom。
-// 2026-08-04｜小U申請審核 V2：三大驗證、條件式證件、批次補件、多通道通知與審核紀錄。
-// V2 Final：騎士身分、在線、定位、統計、派單與調度全面以 V2 集合為唯一資料來源。
-// 2026-08-05｜待接任務隱私預覽：接單前僅回傳行政區、路線、收入與必要摘要。
-// 2026-08-06 Store V2｜Google Places API 僅由客戶主動點擊「搜尋更多附近店家」時呼叫；一般店家瀏覽改由 Vercel 靜態 JSON 提供。
-// 2026-08-06 Store V2.1｜代買任務改為商品、數量、規格、缺貨處理與其他需求的結構化欄位。
-// 2026-08-06 Rider Purchase V1｜騎士端待接預覽與接單後任務詳情支援結構化代買資料。
-// 2026-08-14 Nearby Tasks V1.1｜新任務 Web Push 改為回到騎士端首頁地圖，由附近任務池開啟指定任務；接單 Transaction 鎖維持既有安全模型。
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -1544,9 +1505,6 @@ const BASE_URL = (process.env.BASE_URL || '').replace(/\/$/, '');
 const LINE_FINISH_GROUP_ID = process.env.LINE_FINISH_GROUP_ID || '';
 const LINE_ADMIN_GROUP_ID = process.env.LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
 const LINE_SAFETY_GROUP_ID = process.env.LINE_SAFETY_GROUP_ID || LINE_ADMIN_GROUP_ID || LINE_FINISH_GROUP_ID || '';
-const RIDER_SOP_GROUP_LINK = process.env.RIDER_SOP_GROUP_LINK || '';
-
-
 // =====================================================
 // UBee 小U營運管理系統 V4：固定營運設定
 // - 街口支付：平台款項回繳入口
@@ -1567,17 +1525,42 @@ const UBEE_JKOPAY_ACCOUNT =
   String(process.env.UBEE_JKOPAY_ACCOUNT || '901871793').trim();
 
 
+// Rider Community Server Config：公告／聊天／回報社群僅由後端提供給 bootstrap；騎士端不保存網址或密碼。
 const UBEE_RIDER_COMMUNITY_PASSWORD =
   String(process.env.UBEE_RIDER_COMMUNITY_PASSWORD || '1234').trim();
 
 const UBEE_RIDER_COMMUNITIES = Object.freeze({
-  announcement: process.env.UBEE_RIDER_ANNOUNCEMENT_GROUP ||
-    'https://line.me/ti/g2/B1CTRdDllLZN95W3NhMOcVLk4UK9BbwrZTOn-Q?utm_source=invitation&utm_medium=link_copy&utm_campaign=default',
-  chat: process.env.UBEE_RIDER_CHAT_GROUP ||
-    'https://line.me/ti/g2/18w2eLfCmxmZH21DkhcOGqTygoE4-C9F3J_SlA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default',
-  report: process.env.UBEE_RIDER_REPORT_GROUP ||
-    'https://line.me/ti/g2/tCKMgQyxBfiYgaq2mlI9J3iH9vv-swc7OjcjGA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default',
+  announcement: String(
+    process.env.UBEE_RIDER_ANNOUNCEMENT_GROUP ||
+    'https://line.me/ti/g2/B1CTRdDllLZN95W3NhMOcVLk4UK9BbwrZTOn-Q?utm_source=invitation&utm_medium=link_copy&utm_campaign=default'
+  ).trim(),
+  chat: String(
+    process.env.UBEE_RIDER_CHAT_GROUP ||
+    'https://line.me/ti/g2/18w2eLfCmxmZH21DkhcOGqTygoE4-C9F3J_SlA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default'
+  ).trim(),
+  report: String(
+    process.env.UBEE_RIDER_REPORT_GROUP ||
+    'https://line.me/ti/g2/tCKMgQyxBfiYgaq2mlI9J3iH9vv-swc7OjcjGA?utm_source=invitation&utm_medium=link_copy&utm_campaign=default'
+  ).trim(),
 });
+
+function buildRiderCommunityPublicConfig() {
+  const password = String(UBEE_RIDER_COMMUNITY_PASSWORD || '').trim();
+  const announcement = String(UBEE_RIDER_COMMUNITIES.announcement || '').trim();
+  const chat = String(UBEE_RIDER_COMMUNITIES.chat || '').trim();
+  const report = String(UBEE_RIDER_COMMUNITIES.report || '').trim();
+
+  return {
+    source: 'server',
+    version: 'rider-community-server-v1',
+    required: true,
+    ready: Boolean(password && announcement && chat && report),
+    password,
+    announcement,
+    chat,
+    report,
+  };
+}
 
 const UBEE_RIDER_V4_ADMIN_KEY =
   String(process.env.UBEE_RIDER_V4_ADMIN_KEY || '').trim();
@@ -2709,7 +2692,7 @@ async function sendNewOrderPushToRiders(
         .filter(Boolean)
     );
 
-    // 2026-09-08｜Global Task Pool V1.2：後端不再接受距離距離圈作為派單可見條件。
+    // Global Task Pool V1.2：後端不再接受距離距離圈作為派單可見條件。
     // maxRadiusKm 只保留在函式簽名中，避免舊呼叫點因參數數量改變而噴錯。
     void maxRadiusKm;
 
@@ -3027,7 +3010,7 @@ async function sendNewOrderPushToRiders(
 // =====================================================
 // UBee 全區待接任務派單
 //
-// 2026-09-08｜Rider Global Task Pool Backend V1.1 Clean
+// Rider Global Task Pool Backend V1.1 Clean
 // - 「我的任務 → 待接任務」由 /api/rider/tasks 作為全員可見任務池。
 // - Web Push 第一波直接全區通知，不再用距離圈擋住小U。
 // - 距離仍可保留作為前端排序與參考資訊，但不再是能不能看見待接任務的條件。
@@ -6802,13 +6785,7 @@ function buildRiderV4PublicConfig() {
       account: UBEE_JKOPAY_ACCOUNT,
       required: true,
     },
-    communities: {
-      required: true,
-      password: UBEE_RIDER_COMMUNITY_PASSWORD,
-      announcement: UBEE_RIDER_COMMUNITIES.announcement,
-      chat: UBEE_RIDER_COMMUNITIES.chat,
-      report: UBEE_RIDER_COMMUNITIES.report,
-    },
+    communities: buildRiderCommunityPublicConfig(),
     requiredModules: RIDER_V4_REQUIRED_MODULES,
     passingScore: 80,
     quiz: RIDER_V4_QUIZ.map(({ answer, ...publicQuestion }) => publicQuestion),
@@ -7671,7 +7648,7 @@ app.get('/api/web-push/public-key', (req, res) => {
 
 
 // =====================================================
-// UBee 客戶端 Web Push 訂閱 API｜2026-08-04
+// UBee 客戶端 Web Push 訂閱 API
 // - 每位會員可保存多台裝置；以 endpoint 雜湊作為文件 ID。
 // - 訂閱資料只接受已登入會員，不接受前端自行指定 customerId。
 // =====================================================
@@ -8664,7 +8641,7 @@ function sanitizeRiderPendingPreviewText(value, maxLength = 160) {
 
 
 // ============================================================
-// 2026-09-02｜Rider Task Visibility V1
+// Rider Task Visibility V1
 // 調度中心與騎士端共用的「待派單」狀態正規化。
 // 舊狀態 pending / waiting / searching / dispatching / redispatching
 // 在騎士任務池一律視為 pending_dispatch，避免調度中心看得到、騎士端拿不到。
@@ -14701,7 +14678,7 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
           fee:
             riderIncome,
 
-          // 2026-09-01｜完成任務收入明細 V1
+          // 完成任務收入明細 V1
           // 將正式收入制度 V2 的拆解欄位一併回傳給騎士端「完成任務」。
           riderIncome:
             riderIncome,
@@ -18424,7 +18401,7 @@ app.post('/api/rider/register', async (req, res) => {
 
 
 // ============================================================
-// UBee 小U申請審核與補件系統 V2｜2026-08-04
+// UBee 小U申請審核與補件系統 V2
 // - 三大驗證區塊，底層相容既有五份文件欄位
 // - 機動車與非機動配送採條件式文件要求
 // - 管理端短效簽名預覽網址、批次補件與審核紀錄
@@ -18830,7 +18807,7 @@ async function getRiderApplicationDocumentById(riderId) {
 }
 
 // ============================================================
-// 正式小U證件續期 / 補件維護工具｜2026-08-13
+// 正式小U證件續期 / 補件維護工具
 // - 已建立 ridersV2 的小U仍可被要求補件
 // - 補件期間保留登入，但以 RESTRICTED 暫停新任務資格
 // - 最終複審通過後恢復補件前生命週期，不重建或重置原有入職資料
@@ -21239,7 +21216,7 @@ async function findApprovedRiderForApi(source = {}) {
 }
 
 // ============================================================
-// UBee 小U營運管理系統 V4 API｜學習進度永久同步修正版 2026-07-22
+// UBee 小U營運管理系統 V4 API｜學習進度永久同步修正版
 // ============================================================
 async function getRiderV4ApiContext(req) {
   if (req.riderAuth?.riderDocId) {
@@ -24497,17 +24474,17 @@ const PRICING = {
   // 騎士分潤比例
   driverRatio: 0.7,
 
-  // 2026-08-31｜小U每筆有效任務最低收入。
+  // 小U每筆有效任務最低收入。
   // 僅補足小U收入，不直接提高客戶報價；差額由原平台收入吸收。
   riderMinimumTaskIncome: 50,
   riderMinimumIncomeVersion: 'RIDER_MIN_50_V1_20260831',
 
-  // 2026-09-01｜小U收入制度 V2：
+  // 小U收入制度 V2：
   // 70/30 僅作用於任務服務費；額外時間／勞力／風險加價 100% 歸小U。
   riderIncomePolicyVersion: 'UBEE_RIDER_INCOME_V2_20260901',
 
   // =====================================================
-  // 2026-09-17｜UBee Route Pricing V4
+  // UBee Route Pricing V4
   // 一般路線配送：NT$80 含前 3 km；3～8 km 每公里 +NT$12；8 km 以上每公里 +NT$11。
   // 一般路線不再把導航時間列入客戶計價；perMinute 僅保留給全能跑腿處理時間。
   // =====================================================
@@ -24595,7 +24572,7 @@ function getCanonicalUpstairsFee(option) {
 }
 
 // =====================================================
-// UBee 小U最低收入 V1｜2026-08-31
+// UBee 小U最低收入 V1
 // - 任務費本體仍依原本 70 / 30 計算
 // - 小U原始分潤低於 NT$50 時，由 UBee 補足至 NT$50
 // - taskSubtotal <= 0 時不憑空產生保底收入
@@ -27609,7 +27586,7 @@ function calculateDistanceTierFee(distanceKm) {
 }
 
 // ==============================
-// UBee 唯一財務計算核心 V2｜2026-09-01
+// UBee 唯一財務計算核心 V2
 // ==============================
 // A｜70 / 30 任務服務費：配送／距離／跨區／多點／返程／特殊任務／任務處理時間
 // B｜100% 小U：急件／樓層／等待／大型物品／超重／夜間／天候／動態調度／取消補償
@@ -27773,7 +27750,7 @@ function calculateFinancialSplit({
 
 
 // =====================================================
-// UBee Canonical Rider Income V3｜2026-09-11
+// UBee Canonical Rider Income V3
 // - 新訂單與新版歷史訂單：優先使用後端已儲存 riderIncome / driverFee / riderFee。
 // - 若正式收入欄位遺失，只允許用 V2/V3 明確分桶欄位重建。
 // - 不再用 taskSubtotal、customerTotal 或「全部費用 × 70%」猜測小U收入。
@@ -28027,7 +28004,7 @@ function calculateQuickServicePrice({
 }
 
 // =====================================================
-// UBee Route Pricing V4｜2026-09-17
+// UBee Route Pricing V4
 // 一般路線唯一正式核心：
 // - NT$80 含前 3 km
 // - 3～8 km 每公里 +NT$12
@@ -30118,7 +30095,7 @@ const CUSTOMER_RIDER_OFFSET_MAX_METERS = 80;
 const CUSTOMER_RIDER_OFFSET_BUCKET_MS = 15 * 60 * 1000;
 const CUSTOMER_RIDER_MAX_MARKERS = 80;
 
-// 2026-09-08｜Customer Global Match ETA V1：
+// Customer Global Match ETA V1：
 // 以全區可媒合小U數量估算媒合等待時間。
 // 這不是 SLA，也不代表特定小U已接受任務；實際時間仍受任務內容、接單意願與即時狀態影響。
 const CUSTOMER_MATCH_ESTIMATE_VERSION = 'global-task-pool-v1';
@@ -31451,7 +31428,7 @@ app.post('/api/places/detail', async (req, res) => {
 
 
 // ============================================================
-// UBee 客人端 V4 地址中心 API｜2026-07-30
+// UBee 客人端 V4 地址中心 API
 // - 地址／店家／地標搜尋
 // - Place 詳細地址與座標
 // - 目前位置反向地理編碼
@@ -31841,7 +31818,7 @@ app.post('/api/merchant/order', async (req, res) => {
 
     const speedFee = merchantSpeedFeeMap[deliveryType] || 0;
 
-    // 2026-09-11｜舊店家派單入口也改用唯一 Route Pricing V3 路線核心。
+    // 舊店家派單入口也改用唯一 Route Pricing V3 路線核心。
     // 店家入口維持 serviceFee = 0，但距離規則與小U路線收入保障不得另算一套。
     const routePricing = calculateRouteDeliveryCore({
       distanceMeters: distance.distanceMeters,
@@ -31970,7 +31947,7 @@ app.post('/api/merchant/order', async (req, res) => {
 });
 
 // =====================================================
-// UBee Merchant Live Tracking V3｜2026-08-20
+// UBee Merchant Live Tracking V3
 // - 店家 Web Push 訂閱與配送節點通知
 // - 小U GPS -> 真實道路 ETA -> Geofence -> 延誤 / GPS 健康度
 // - 不建立第二套定位資料；orders 仍是配送追蹤唯一真相來源
@@ -41673,7 +41650,7 @@ app.post('/api/dispatch/orders/:orderId/expand-radius', async (req, res) => {
       });
     }
 
-    // 2026-09-08｜Global Task Pool V1.2：舊 expand-radius 路由保留相容，但不再使用距離圈。
+    // Global Task Pool V1.2：舊 expand-radius 路由保留相容，但不再使用距離圈。
     const radiusKm = null;
     const previousRadiusKm = null;
 
@@ -44821,7 +44798,7 @@ app.get('/api/customer/orders/:orderId/tracking', requireCustomerAuth, async (re
 
 
 // =====================================================
-// UBee Customer → Rider Rating V1｜2026-09-20
+// UBee Customer → Rider Rating V1
 // - 僅 completed / done 訂單可評價
 // - 僅原下單會員可評價
 // - 一張訂單只允許一筆正式評價
@@ -45047,7 +45024,7 @@ app.post('/api/customer/orders/:orderId/rider-rating', requireCustomerAuth, asyn
 
 
 // =====================================================
-// UBee 客戶端「類 UU 跑腿」地址中心正式相容層｜2026-07-31
+// UBee 客戶端「類 UU 跑腿」地址中心正式相容層
 // - 不建立第二套訂單核心
 // - 常用地址跨裝置保存於 Firestore
 // - 最近使用地址從既有 orders 彙整
