@@ -6430,23 +6430,26 @@ function getRiderV4LifecycleStatus(rider = {}) {
 }
 
 // =====================================================
-// UBee 小U系統資格開通費 V4｜2026-10-01 開放付款＋早期價期限鎖定
-// 此區塊為唯一 299/499 與派單資格判斷來源。
+// UBee 小U系統資格開通費 V5｜2026-10-01 開放付款＋299 期限價／499 正式價
+// 此區塊為唯一資格開通費金額、期限與派單資格判斷來源。
 // - 2026/10/1 00:00（台灣時間）起開放資格開通費付款。
-// - 2026/10/1 前已送出申請／已存在的小U：10/1～10/11 享 NT$299 早期價。
-// - 2026/10/1 00:00（台灣時間）起送出申請的新加入小U：NT$499，一次性。
-// - 既有小U須於 2026/10/12 00:00 前完成付款並送出付款回報，才鎖定 NT$299。
-// - 2026/10/12 00:00 起，未在期限內完成付款回報／核對為 rejected 者改按 NT$499。
+// - 2026/10/1 00:00～2026/10/11 23:59:59：只要在期限內完成付款回報，一律 NT$299。
+// - 2026/10/12 00:00 起：尚未在期限內完成付款回報者，資格開通費改為 NT$499。
+// - 期限內已 submitted 者，即使管理端 10/12 後才核對，仍鎖定 NT$299；若核對 rejected，期限價失效並依當下正式價重新處理。
 // - 2026/10/12 00:00 起，既有小U若仍未 verified / waived，暫停新任務派送。
-// - 期限內已 submitted 者即使管理端 10/12 後才核對，仍保留 NT$299；若核對 rejected，早期價失效。
+// - 10/1 起新加入小U仍須完成資格開通並經核對後，才可正式接單；價格則同樣遵守 10/12 00:00 的 299→499 切線。
 // - 小U只能回報已付款（submitted）；verified / rejected / waived 僅能由管理端核對。
 // =====================================================
 const UBEE_RIDER_MEMBERSHIP_FEE_POLICY = Object.freeze({
-  version: '2026-10-01-v4',
+  version: '2026-10-01-v5-299-window',
   method: 'jkopay',
   paymentOpensAtMs: Date.UTC(2026, 8, 30, 16, 0, 0), // 2026-10-01 00:00 Asia/Taipei
-  newCohortStartsAtMs: Date.UTC(2026, 8, 30, 16, 0, 0), // 2026-10-01 00:00 Asia/Taipei
-  existingGraceEndsAtMs: Date.UTC(2026, 9, 11, 16, 0, 0), // 2026-10-12 00:00 Asia/Taipei
+  newCohortStartsAtMs: Date.UTC(2026, 8, 30, 16, 0, 0), // 只用於新加入小U接單資格流程，不再決定價格
+  earlyPriceEndsAtMs: Date.UTC(2026, 9, 11, 16, 0, 0), // 2026-10-12 00:00 Asia/Taipei
+  existingGraceEndsAtMs: Date.UTC(2026, 9, 11, 16, 0, 0), // 既有小U派單緩衝截止
+  earlyAmount: 299,
+  standardAmount: 499,
+  // 舊欄位保留 API / 財務中心相容；正式價格請以 earlyAmount / standardAmount 為準。
   existingAmount: 299,
   newAmount: 499,
 });
@@ -6509,7 +6512,7 @@ function resolveRiderMembershipFeeCohort(rider = {}) {
 
   const joinMs = getRiderMembershipFeeJoinMs(rider);
 
-  // 有正式申請時間時，以 10/1 的新加入切線唯一判定；10/1 前為既有小U，10/1 起為新加入小U。
+  // cohort 僅保留給接單資格流程：10/1 前為既有小U，10/1 起為新加入小U；價格不再由 cohort 決定。
   if (joinMs > 0) {
     return joinMs >= policy.newCohortStartsAtMs ? 'new' : 'existing';
   }
@@ -6549,42 +6552,48 @@ function getRiderMembershipFeeState(rider = {}, nowMs = Date.now()) {
   const submittedAtMs = Number(fee.submittedAtMs || 0);
   const storedAmount = Number(fee.amount || 0);
 
-  // 既有小U的 NT$299 是「期限價」而不是永久舊會員價：
-  // 1) 10/12 前尚未到期，一律顯示 299。
-  // 2) 10/12 前已 submitted，且尚未被 rejected，鎖定 299 等待人工核對。
-  // 3) verified / waived 後保留當次正式核對金額，避免核對日在 10/12 後被改價。
-  // 4) 其餘既有小U自 10/12 起改為 499。
-  const existingEarlySubmission =
-    cohort === 'existing' &&
-    submittedAtMs >= policy.paymentOpensAtMs &&
-    submittedAtMs < policy.existingGraceEndsAtMs;
+  // V5：299 / 499 完全改由付款回報期限決定，不再由 existing / new cohort 決定。
+  // 1) 10/12 00:00 前，所有尚未完成者顯示 NT$299。
+  // 2) 期限內 submitted 且尚未 rejected，鎖定 NT$299 等待人工核對。
+  // 3) verified / waived 後保留實際核對金額，避免核對日在 10/12 後被改價。
+  // 4) 10/12 00:00 起，未在期限內 submitted 者改為 NT$499。
+  const earlyPriceEndsAtMs = Number(
+    policy.earlyPriceEndsAtMs || policy.existingGraceEndsAtMs
+  );
+  const earlyAmount = Number(policy.earlyAmount || policy.existingAmount || 299);
+  const standardAmount = Number(policy.standardAmount || policy.newAmount || 499);
 
-  const existingEarlyPriceLocked =
-    cohort === 'existing' &&
+  const earlySubmission =
+    submittedAtMs >= policy.paymentOpensAtMs &&
+    submittedAtMs < earlyPriceEndsAtMs;
+
+  const earlyPriceLocked =
+    (status === 'submitted' && earlySubmission) ||
     (
-      (status === 'submitted' && existingEarlySubmission) ||
-      (
-        verified &&
-        storedAmount === policy.existingAmount
-      )
+      verified &&
+      storedAmount === earlyAmount
     );
 
-  const existingEarlyPriceActive =
-    cohort === 'existing' &&
-    Number(nowMs) < policy.existingGraceEndsAtMs;
+  const verifiedStoredAmount =
+    verified && [earlyAmount, standardAmount].includes(storedAmount)
+      ? storedAmount
+      : 0;
+
+  const earlyPriceActive =
+    Number(nowMs) < earlyPriceEndsAtMs;
 
   const amount =
-    cohort === 'new'
-      ? policy.newAmount
-      : (
-          existingEarlyPriceActive || existingEarlyPriceLocked
-            ? policy.existingAmount
-            : policy.newAmount
-        );
+    verifiedStoredAmount ||
+    (
+      earlyPriceActive || earlyPriceLocked
+        ? earlyAmount
+        : standardAmount
+    );
 
-  const dueAtMs = cohort === 'new'
-    ? Math.max(joinedAtMs || policy.newCohortStartsAtMs, policy.newCohortStartsAtMs)
-    : policy.existingGraceEndsAtMs;
+  const dueAtMs =
+    joinedAtMs > 0 && joinedAtMs >= earlyPriceEndsAtMs
+      ? joinedAtMs
+      : earlyPriceEndsAtMs;
 
   let required = paymentOpen;
   let dispatchAllowed = true;
@@ -6638,14 +6647,16 @@ function getRiderMembershipFeeState(rider = {}, nowMs = Date.now()) {
     effectiveAtMs: policy.paymentOpensAtMs,
     paymentOpensAtMs: policy.paymentOpensAtMs,
     newCohortStartsAtMs: policy.newCohortStartsAtMs,
+    earlyPriceEndsAtMs,
+    earlyAmount,
+    standardAmount,
     graceEndsAtMs: cohort === 'existing' ? policy.existingGraceEndsAtMs : 0,
     dueAtMs,
     joinedAtMs,
-    earlyPriceLocked: existingEarlyPriceLocked,
+    earlyPriceLocked,
     earlyPriceExpired:
-      cohort === 'existing' &&
-      Number(nowMs) >= policy.existingGraceEndsAtMs &&
-      !existingEarlyPriceLocked &&
+      Number(nowMs) >= earlyPriceEndsAtMs &&
+      !earlyPriceLocked &&
       !verified,
 
     payerName: cleanText(fee.payerName || '', 40),
@@ -18319,7 +18330,7 @@ app.post('/api/rider/register', async (req, res) => {
       riderLevel: 'L0',
       onboardingRequired: true,
 
-      // 小U系統資格開通費 V4：10/1 開放付款；以送出申請時間鎖定 cohort，10/1 起新申請固定 NT$499。
+      // 小U系統資格開通費 V5：cohort 只管理新舊小U接單流程；價格統一依 10/12 00:00 期限切換。
       membershipFeeCohort:
         nowMs >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs
           ? 'new'
@@ -18331,12 +18342,14 @@ app.post('/api/rider/register', async (req, res) => {
             ? 'new'
             : 'existing',
         amount:
-          nowMs >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs
-            ? UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newAmount
-            : UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingAmount,
+          nowMs < UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyPriceEndsAtMs
+            ? UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyAmount
+            : UBEE_RIDER_MEMBERSHIP_FEE_POLICY.standardAmount,
         method: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.method,
         status: 'pending',
         policyEffectiveAtMs: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.paymentOpensAtMs,
+        paymentOpensAtMs: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.paymentOpensAtMs,
+        earlyPriceEndsAtMs: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyPriceEndsAtMs,
         graceEndsAtMs:
           nowMs >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs
             ? 0
@@ -21446,6 +21459,7 @@ app.post('/api/rider/membership-fee/submit', riderAuthMiddleware, async (req, re
         policyEffectiveAtMs: current.paymentOpensAtMs || current.effectiveAtMs,
         paymentOpensAtMs: current.paymentOpensAtMs || current.effectiveAtMs,
         newCohortStartsAtMs: current.newCohortStartsAtMs || 0,
+        earlyPriceEndsAtMs: current.earlyPriceEndsAtMs || 0,
         graceEndsAtMs: current.graceEndsAtMs,
       },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -21523,6 +21537,7 @@ app.get('/api/admin/rider-membership-fees', async (req, res) => {
         dueAtMs:fee.dueAtMs,
         paymentOpensAtMs:fee.paymentOpensAtMs,
         newCohortStartsAtMs:fee.newCohortStartsAtMs,
+        earlyPriceEndsAtMs:fee.earlyPriceEndsAtMs,
         graceEndsAtMs:fee.graceEndsAtMs,
       };
     }).sort((a,b) => {
@@ -21569,7 +21584,10 @@ app.get('/api/admin/rider-membership-fees', async (req, res) => {
         version:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.version,
         paymentOpensAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.paymentOpensAtMs,
         newCohortStartsAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs,
+        earlyPriceEndsAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyPriceEndsAtMs,
         existingGraceEndsAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingGraceEndsAtMs,
+        earlyAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyAmount,
+        standardAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.standardAmount,
         existingAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingAmount,
         newAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newAmount,
       },
@@ -21889,7 +21907,7 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
       updatedAt:admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    // 新申請者：仍必須街口 + 三社群 + 12課 + 測驗；10/1 起的新加入者還必須完成 NT$499 並經核對。
+    // 新申請者：仍必須街口 + 三社群 + 12課 + 測驗；10/1 起的新加入者還必須完成當期資格開通費並經核對（10/1～10/11 NT$299，10/12 00:00 起 NT$499）。
     const projectedRider = {
       ...rider,
       onboarding:{
