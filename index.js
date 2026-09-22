@@ -1,6 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-22
-// Core：Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking
+// Core：App Access Hard Lock／Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking
 // =====================================================
 require('dotenv').config();
 const express = require('express');
@@ -6750,6 +6750,130 @@ function canRiderAcceptOrdersV4(rider = {}) {
   return getRiderV4HardLockState(rider).canAcceptOrders === true;
 }
 
+// =====================================================
+// UBee Rider App Access V1
+// 後端為唯一權限來源：只有 ACTIVE + 完整 Hard Lock 通過的小U
+// 才能進工作地圖、切換上線、讀取即時／預約任務池。
+// 前端只負責依此結果顯示對應畫面，不自行放寬資格。
+// =====================================================
+function buildRiderAppAccessState(rider = {}) {
+  const hardLock = getRiderV4HardLockState(rider);
+  const lifecycleStatus = String(
+    hardLock.lifecycle || getRiderV4LifecycleStatus(rider) || ''
+  ).trim().toUpperCase();
+
+  const reviewApproved = hardLock.reviewApproved === true;
+  const blocked = isBlockedRiderData(rider);
+  const workAccess =
+    blocked !== true &&
+    reviewApproved === true &&
+    lifecycleStatus === RIDER_V4_LIFECYCLE.ACTIVE &&
+    hardLock.canAcceptOrders === true;
+
+  let startupRoute = 'QUALIFICATION';
+  let accessState = 'QUALIFICATION';
+
+  if (blocked) {
+    startupRoute = 'BLOCKED';
+    accessState = 'BLOCKED';
+  } else if (workAccess) {
+    startupRoute = 'WORK_MAP';
+    accessState = 'ACTIVE';
+  } else if (
+    lifecycleStatus === RIDER_V4_LIFECYCLE.UNDER_REVIEW ||
+    lifecycleStatus === RIDER_V4_LIFECYCLE.APPLICANT ||
+    !reviewApproved
+  ) {
+    startupRoute = 'APPLICATION';
+    accessState = 'UNDER_REVIEW';
+  }
+
+  return {
+    version: 'rider-app-access-v2-map-first',
+    reviewApproved,
+    lifecycleStatus,
+    startupRoute,
+    accessState,
+
+    // Map First：所有狀態都可看工作地圖；真正工作權限仍由後端 Hard Lock。
+    canViewWorkMap: true,
+
+    // 舊欄位保留既有語意：只有正式 ACTIVE 小U可進入受保護工作能力。
+    canEnterWorkMap: workAccess,
+    canGoOnline: workAccess,
+    canViewTaskPool: workAccess,
+    canViewImmediateOrders: workAccess,
+    canViewScheduledOrders: workAccess,
+  };
+}
+
+function buildRiderApplicationAccessState(application = null, rider = null) {
+  if (rider && typeof rider === 'object') {
+    return buildRiderAppAccessState(rider);
+  }
+
+  const app = application && typeof application === 'object'
+    ? application
+    : null;
+
+  if (!app) {
+    return {
+      version: 'rider-app-access-v2-map-first',
+      reviewApproved: false,
+      lifecycleStatus: 'NOT_APPLIED',
+      startupRoute: 'APPLICATION',
+      accessState: 'NOT_REGISTERED',
+      canViewWorkMap: true,
+      canEnterWorkMap: false,
+      canGoOnline: false,
+      canViewTaskPool: false,
+      canViewImmediateOrders: false,
+      canViewScheduledOrders: false,
+    };
+  }
+
+  const lifecycleStatus = String(
+    app.lifecycleStatus ||
+    getRiderV4LifecycleStatus(app) ||
+    RIDER_V4_LIFECYCLE.UNDER_REVIEW
+  ).trim().toUpperCase();
+
+  const status = String(app.status || app.reviewStatus || '').trim().toLowerCase();
+  const approved =
+    app.approved === true ||
+    ['approved','training','active'].includes(status);
+
+  const blocked =
+    isBlockedRiderData(app) ||
+    ['RESTRICTED','SUSPENDED','BANNED','REJECTED'].includes(lifecycleStatus) ||
+    status === 'rejected';
+
+  let accessState = 'UNDER_REVIEW';
+  let startupRoute = 'APPLICATION';
+
+  if (blocked) {
+    accessState = 'BLOCKED';
+    startupRoute = 'BLOCKED';
+  } else if (approved || lifecycleStatus === RIDER_V4_LIFECYCLE.TRAINING) {
+    accessState = 'QUALIFICATION';
+    startupRoute = 'QUALIFICATION';
+  }
+
+  return {
+    version: 'rider-app-access-v2-map-first',
+    reviewApproved: approved,
+    lifecycleStatus,
+    startupRoute,
+    accessState,
+    canViewWorkMap: true,
+    canEnterWorkMap: false,
+    canGoOnline: false,
+    canViewTaskPool: false,
+    canViewImmediateOrders: false,
+    canViewScheduledOrders: false,
+  };
+}
+
 function getRiderV4LevelNumber(rider = {}) {
   const level = String(rider.riderLevel || 'L1').trim().toUpperCase();
   const match = level.match(/^L(\d+)$/);
@@ -7473,10 +7597,16 @@ app.get('/api/rider/session', riderAuthMiddleware, async (req, res) => {
       );
     }
 
+    const refreshedRiderData = {
+      id: refreshedRiderDoc.id,
+      ...(refreshedRiderDoc.data() || {}),
+    };
+
     return res.json({
       success: true,
       restored: true,
       rider: buildRiderLoginPayload(refreshedRiderDoc),
+      appAccess: buildRiderAppAccessState(refreshedRiderData),
       firebaseUid,
       firebaseCustomToken,
       serverTimeMs: nowMs,
@@ -9588,6 +9718,7 @@ app.get('/api/rider/tasks', riderAuthMiddleware, async (req, res) => {
         message: '尚未完成完整入職與測驗，或正式接單資格目前受限，無法讀取待接任務。',
         lifecycleStatus: getRiderV4LifecycleStatus(rider),
         qualificationHardLock: getRiderV4HardLockState(rider),
+        appAccess: buildRiderAppAccessState(rider),
       });
     }
 
@@ -19246,7 +19377,7 @@ function buildRiderApplicationNotificationContent(type, reason = '') {
     },
     approved: {
       title: '你的小U申請已通過',
-      body: '身分驗證、必要駕駛資格與車輛安全資料均已完成確認。下一步請完成數位入職。',
+      body: '身分驗證、必要駕駛資格與車輛安全資料均已完成確認。請開啟 UBee Driver 完成數位入職與必要資格；系統顯示 ACTIVE／可接單後，才可上線並查看即時與預約任務。',
     },
     credential_approved: {
       title: '小U證件複審已完成',
@@ -20995,6 +21126,7 @@ app.get('/api/rider/application-status', async (req, res) => {
           : rider.status || application.status || '',
         lifecycleStatus,
         canAcceptOrders: canRiderAcceptOrdersV4(rider),
+        appAccess: buildRiderApplicationAccessState(application, rider),
         riderLevel: rider.riderLevel || '',
         documentsComplete: application.documentsComplete === true,
         documentReviewStatus:
@@ -21101,6 +21233,7 @@ app.get('/api/rider/application-status', async (req, res) => {
           application.lifecycleStatus ||
           RIDER_V4_LIFECYCLE.UNDER_REVIEW,
         canAcceptOrders: false,
+        appAccess: buildRiderApplicationAccessState(application, null),
         riderLevel: application.riderLevel || 'L0',
         documentsComplete: application.documentsComplete === true,
         documentReviewStatus:
@@ -21157,6 +21290,7 @@ app.get('/api/rider/application-status', async (req, res) => {
       found: false,
       status: 'not_found',
       lifecycleStatus: 'NOT_APPLIED',
+      appAccess: buildRiderApplicationAccessState(null, null),
       documents: [],
       timeline: [],
       canSupplement: false,
@@ -21249,6 +21383,7 @@ app.get('/api/rider/v4/bootstrap', riderAuthMiddleware, async (req, res) => {
       config:buildRiderV4PublicConfig(),
       rider,
       progress:getRiderV4Progress(rider),
+      appAccess:buildRiderAppAccessState(rider),
     });
   } catch (err) {
     console.error('❌ V4 bootstrap 失敗：', err);
@@ -22330,6 +22465,7 @@ app.post('/api/rider/status', riderAuthMiddleware, async (req, res) => {
         message: '尚未完成「審核 → 入職 → 測驗 → ACTIVE」完整資格，或資格目前受限，不能上線接單。',
         lifecycleStatus: getRiderV4LifecycleStatus(rider),
         qualificationHardLock: getRiderV4HardLockState(rider),
+        appAccess: buildRiderAppAccessState(rider),
       });
     }
 
