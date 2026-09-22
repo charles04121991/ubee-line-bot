@@ -6430,7 +6430,246 @@ function getRiderV4LifecycleStatus(rider = {}) {
 }
 
 // =====================================================
-// 已停用的騎士資格費制度已完整移除。
+// UBee 小U系統資格開通費 V5｜2026-10-01 開放付款＋299 期限價／499 正式價
+// 此區塊為唯一資格開通費金額、期限與派單資格判斷來源。
+// - 2026/10/1 00:00（台灣時間）起開放資格開通費付款。
+// - 2026/10/1 00:00～2026/10/11 23:59:59：只要在期限內完成付款回報，一律 NT$299。
+// - 2026/10/12 00:00 起：尚未在期限內完成付款回報者，資格開通費改為 NT$499。
+// - 期限內已 submitted 者，即使管理端 10/12 後才核對，仍鎖定 NT$299；若核對 rejected，期限價失效並依當下正式價重新處理。
+// - 2026/10/12 00:00 起，既有小U若仍未 verified / waived，暫停新任務派送。
+// - 10/1 起新加入小U仍須完成資格開通並經核對後，才可正式接單；價格則同樣遵守 10/12 00:00 的 299→499 切線。
+// - 小U只能回報已付款（submitted）；verified / rejected / waived 僅能由管理端核對。
+// =====================================================
+const UBEE_RIDER_MEMBERSHIP_FEE_POLICY = Object.freeze({
+  version: '2026-10-01-v5-299-window',
+  method: 'jkopay',
+  paymentOpensAtMs: Date.UTC(2026, 8, 30, 16, 0, 0), // 2026-10-01 00:00 Asia/Taipei
+  newCohortStartsAtMs: Date.UTC(2026, 8, 30, 16, 0, 0), // 只用於新加入小U接單資格流程，不再決定價格
+  earlyPriceEndsAtMs: Date.UTC(2026, 9, 11, 16, 0, 0), // 2026-10-12 00:00 Asia/Taipei
+  existingGraceEndsAtMs: Date.UTC(2026, 9, 11, 16, 0, 0), // 既有小U派單緩衝截止
+  earlyAmount: 299,
+  standardAmount: 499,
+  // 舊欄位保留 API / 財務中心相容；正式價格請以 earlyAmount / standardAmount 為準。
+  existingAmount: 299,
+  newAmount: 499,
+});
+
+function normalizeRiderMembershipFeeStatus(value = '') {
+  const status = String(value || '').trim().toLowerCase();
+  return ['pending','submitted','verified','waived','rejected'].includes(status)
+    ? status
+    : 'pending';
+}
+
+function getRiderMembershipFeeJoinMs(rider = {}) {
+  const directCandidates = [
+    rider.submittedAtMs,
+    rider.createdAtMs,
+    rider.applicationSubmittedAtMs,
+    rider.registeredAtMs,
+    rider.appliedAtMs,
+  ];
+
+  for (const value of directCandidates) {
+    const ms = Number(value || 0);
+    if (Number.isFinite(ms) && ms > 0) return ms;
+  }
+
+  const timestampCandidates = [
+    rider.submittedAt,
+    rider.createdAt,
+    rider.applicationSubmittedAt,
+    rider.registeredAt,
+  ];
+
+  for (const value of timestampCandidates) {
+    if (value && typeof value.toMillis === 'function') {
+      const ms = Number(value.toMillis() || 0);
+      if (Number.isFinite(ms) && ms > 0) return ms;
+    }
+    if (value && value._seconds) {
+      const ms = Number(value._seconds) * 1000;
+      if (Number.isFinite(ms) && ms > 0) return ms;
+    }
+  }
+
+  return 0;
+}
+
+function resolveRiderMembershipFeeCohort(rider = {}) {
+  const policy = UBEE_RIDER_MEMBERSHIP_FEE_POLICY;
+  const fee = rider.membershipFee && typeof rider.membershipFee === 'object'
+    ? rider.membershipFee
+    : {};
+
+  const explicit = String(
+    fee.cohort || rider.membershipFeeCohort || ''
+  ).trim().toLowerCase();
+
+  if (explicit === 'new' || explicit === 'existing') {
+    return explicit;
+  }
+
+  const joinMs = getRiderMembershipFeeJoinMs(rider);
+
+  // cohort 僅保留給接單資格流程：10/1 前為既有小U，10/1 起為新加入小U；價格不再由 cohort 決定。
+  if (joinMs > 0) {
+    return joinMs >= policy.newCohortStartsAtMs ? 'new' : 'existing';
+  }
+
+  // 舊正式 ACTIVE／已審核帳號若歷史時間戳缺失，視為既有小U，
+  // 避免資料遷移造成舊人被誤收 499。
+  const status = String(rider.status || '').trim().toLowerCase();
+  const lifecycle = String(rider.lifecycleStatus || '').trim().toUpperCase();
+  const clearlyLegacyApproved =
+    rider.approved === true ||
+    status === 'approved' ||
+    status === 'active' ||
+    lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
+
+  if (clearlyLegacyApproved) {
+    return 'existing';
+  }
+
+  // 無時間戳、也不是既有已審核帳號時採 fail-closed：
+  // 一律視為新加入，避免 10/1 後新申請者因缺欄位看到 299。
+  return 'new';
+}
+
+function getRiderMembershipFeeState(rider = {}, nowMs = Date.now()) {
+  const policy = UBEE_RIDER_MEMBERSHIP_FEE_POLICY;
+  const fee = rider.membershipFee && typeof rider.membershipFee === 'object'
+    ? rider.membershipFee
+    : {};
+
+  const cohort = resolveRiderMembershipFeeCohort(rider);
+  const status = normalizeRiderMembershipFeeStatus(
+    fee.status || rider.membershipFeeStatus || ''
+  );
+  const verified = status === 'verified' || status === 'waived';
+  const joinedAtMs = getRiderMembershipFeeJoinMs(rider);
+  const paymentOpen = Number(nowMs) >= policy.paymentOpensAtMs;
+  const submittedAtMs = Number(fee.submittedAtMs || 0);
+  const storedAmount = Number(fee.amount || 0);
+
+  // V5：299 / 499 完全改由付款回報期限決定，不再由 existing / new cohort 決定。
+  // 1) 10/12 00:00 前，所有尚未完成者顯示 NT$299。
+  // 2) 期限內 submitted 且尚未 rejected，鎖定 NT$299 等待人工核對。
+  // 3) verified / waived 後保留實際核對金額，避免核對日在 10/12 後被改價。
+  // 4) 10/12 00:00 起，未在期限內 submitted 者改為 NT$499。
+  const earlyPriceEndsAtMs = Number(
+    policy.earlyPriceEndsAtMs || policy.existingGraceEndsAtMs
+  );
+  const earlyAmount = Number(policy.earlyAmount || policy.existingAmount || 299);
+  const standardAmount = Number(policy.standardAmount || policy.newAmount || 499);
+
+  const earlySubmission =
+    submittedAtMs >= policy.paymentOpensAtMs &&
+    submittedAtMs < earlyPriceEndsAtMs;
+
+  const earlyPriceLocked =
+    (status === 'submitted' && earlySubmission) ||
+    (
+      verified &&
+      storedAmount === earlyAmount
+    );
+
+  const verifiedStoredAmount =
+    verified && [earlyAmount, standardAmount].includes(storedAmount)
+      ? storedAmount
+      : 0;
+
+  const earlyPriceActive =
+    Number(nowMs) < earlyPriceEndsAtMs;
+
+  const amount =
+    verifiedStoredAmount ||
+    (
+      earlyPriceActive || earlyPriceLocked
+        ? earlyAmount
+        : standardAmount
+    );
+
+  const dueAtMs =
+    joinedAtMs > 0 && joinedAtMs >= earlyPriceEndsAtMs
+      ? joinedAtMs
+      : earlyPriceEndsAtMs;
+
+  let required = paymentOpen;
+  let dispatchAllowed = true;
+  let displayStatus = status;
+
+  if (!paymentOpen) {
+    required = false;
+    dispatchAllowed = true;
+    displayStatus = verified ? status : 'not_started';
+  } else if (verified) {
+    dispatchAllowed = true;
+  } else if (cohort === 'new') {
+    // 10/1 起的新加入者：付款核對完成前不得正式接單。
+    dispatchAllowed = false;
+    displayStatus = status === 'submitted'
+      ? 'submitted'
+      : status === 'rejected'
+        ? 'rejected'
+        : 'pending';
+  } else if (Number(nowMs) < policy.existingGraceEndsAtMs) {
+    // 10/1～10/11：既有小U可付款，未完成核對仍維持派單。
+    dispatchAllowed = true;
+    displayStatus = status === 'submitted'
+      ? 'submitted'
+      : status === 'rejected'
+        ? 'rejected'
+        : 'grace';
+  } else {
+    // 10/12 起：既有小U未 verified / waived 即停止新任務派送。
+    dispatchAllowed = false;
+    displayStatus = status === 'submitted'
+      ? 'submitted_overdue'
+      : status === 'rejected'
+        ? 'rejected_overdue'
+        : 'overdue';
+  }
+
+  return {
+    version: policy.version,
+    method: policy.method,
+    cohort,
+    amount,
+    currency: 'TWD',
+    required,
+    status,
+    displayStatus,
+    verified,
+    dispatchAllowed,
+
+    // effectiveAtMs 保留作舊版前端相容；正式語意為「付款開放日」。
+    effectiveAtMs: policy.paymentOpensAtMs,
+    paymentOpensAtMs: policy.paymentOpensAtMs,
+    newCohortStartsAtMs: policy.newCohortStartsAtMs,
+    earlyPriceEndsAtMs,
+    earlyAmount,
+    standardAmount,
+    graceEndsAtMs: cohort === 'existing' ? policy.existingGraceEndsAtMs : 0,
+    dueAtMs,
+    joinedAtMs,
+    earlyPriceLocked,
+    earlyPriceExpired:
+      Number(nowMs) >= earlyPriceEndsAtMs &&
+      !earlyPriceLocked &&
+      !verified,
+
+    payerName: cleanText(fee.payerName || '', 40),
+    paymentNote: cleanText(fee.paymentNote || '', 120),
+    submittedAtMs,
+    verifiedAtMs: Number(fee.verifiedAtMs || 0),
+    rejectedAtMs: Number(fee.rejectedAtMs || 0),
+    waivedAtMs: Number(fee.waivedAtMs || 0),
+    reviewedAtMs: Number(fee.reviewedAtMs || 0),
+    reviewedBy: cleanText(fee.reviewedBy || '', 60),
+    reviewNote: cleanText(fee.reviewNote || '', 200),
+  };
+}
 
 function getRiderV4HardLockState(rider = {}) {
   const checklist = getRiderUnifiedLearningChecklist(rider);
@@ -6475,6 +6714,9 @@ function getRiderV4HardLockState(rider = {}) {
   const activeLifecycle =
     lifecycle === RIDER_V4_LIFECYCLE.ACTIVE;
 
+  const membershipFee =
+    getRiderMembershipFeeState(rider);
+
   const onboardingComplete =
     checklistComplete &&
     modulesComplete &&
@@ -6488,7 +6730,8 @@ function getRiderV4HardLockState(rider = {}) {
     explicitCanAcceptOrders &&
     onboardingRequiredCleared &&
     onboardingComplete &&
-    basicCertified;
+    basicCertified &&
+    membershipFee.dispatchAllowed === true;
 
   return {
     version: 'rider-qualification-hard-lock-v1',
@@ -6505,6 +6748,7 @@ function getRiderV4HardLockState(rider = {}) {
     explicitCanAcceptOrders,
     activeLifecycle,
     onboardingComplete,
+    membershipFee,
     canAcceptOrders,
   };
 }
@@ -6898,6 +7142,7 @@ function getRiderV4Progress(rider = {}) {
     lifecycleStatus: getRiderV4LifecycleStatus(rider),
     canAcceptOrders: canRiderAcceptOrdersV4(rider),
     qualificationHardLock: getRiderV4HardLockState(rider),
+    membershipFee: getRiderMembershipFeeState(rider),
     riderLevel: String(rider.riderLevel || (isRiderV4OnboardingComplete(rider) ? 'L1' : 'L0')),
     checklist,
     modules,
@@ -18085,6 +18330,32 @@ app.post('/api/rider/register', async (req, res) => {
       riderLevel: 'L0',
       onboardingRequired: true,
 
+      // 小U系統資格開通費 V5：cohort 只管理新舊小U接單流程；價格統一依 10/12 00:00 期限切換。
+      membershipFeeCohort:
+        nowMs >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs
+          ? 'new'
+          : 'existing',
+      membershipFee: {
+        version: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.version,
+        cohort:
+          nowMs >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs
+            ? 'new'
+            : 'existing',
+        amount:
+          nowMs < UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyPriceEndsAtMs
+            ? UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyAmount
+            : UBEE_RIDER_MEMBERSHIP_FEE_POLICY.standardAmount,
+        method: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.method,
+        status: 'pending',
+        policyEffectiveAtMs: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.paymentOpensAtMs,
+        paymentOpensAtMs: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.paymentOpensAtMs,
+        earlyPriceEndsAtMs: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyPriceEndsAtMs,
+        graceEndsAtMs:
+          nowMs >= UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs
+            ? 0
+            : UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingGraceEndsAtMs,
+      },
+
       source: cleanText(
         applicationSource || 'rider_web_apply_v3',
         60
@@ -21134,7 +21405,306 @@ app.get('/api/rider/v4/bootstrap', riderAuthMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// Rider V4 onboarding progress
+// UBee 小U系統資格開通費 API
+// ============================================================
+app.get('/api/rider/membership-fee', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+    return res.json({
+      success:true,
+      membershipFee:getRiderMembershipFeeState(ctx.rider),
+    });
+  } catch (err) {
+    console.error('❌ 讀取小U資格開通費狀態失敗：', err);
+    return res.status(500).json({ success:false, message:'讀取資格開通費狀態失敗。' });
+  }
+});
+
+app.post('/api/rider/membership-fee/submit', riderAuthMiddleware, async (req, res) => {
+  try {
+    const ctx = await getRiderV4ApiContext(req);
+    if (!ctx.ok) return res.status(ctx.statusCode || 403).json({ success:false, message:ctx.message });
+
+    const nowMs = Date.now();
+    const current = getRiderMembershipFeeState(ctx.rider, nowMs);
+    if (!current.required) {
+      return res.status(409).json({ success:false, message:'資格開通費尚未進入正式實施期間。', membershipFee:current });
+    }
+    if (current.verified) {
+      return res.json({ success:true, alreadyVerified:true, message:'此小U資格開通費已完成核對。', membershipFee:current });
+    }
+    if (current.status === 'submitted') {
+      return res.json({
+        success:true,
+        alreadySubmitted:true,
+        message:'付款已回報，正在等待 UBee 核對，請勿重複送出。',
+        membershipFee:current,
+      });
+    }
+
+    const payerName = cleanText(req.body?.payerName || ctx.rider?.name || '', 40);
+    const paymentNote = cleanText(req.body?.paymentNote || '', 120);
+    const patch = {
+      membershipFeeCohort: current.cohort,
+      membershipFee: {
+        version: current.version,
+        cohort: current.cohort,
+        amount: current.amount,
+        method: current.method,
+        status: 'submitted',
+        payerName,
+        paymentNote,
+        submittedAtMs: nowMs,
+        policyEffectiveAtMs: current.paymentOpensAtMs || current.effectiveAtMs,
+        paymentOpensAtMs: current.paymentOpensAtMs || current.effectiveAtMs,
+        newCohortStartsAtMs: current.newCohortStartsAtMs || 0,
+        earlyPriceEndsAtMs: current.earlyPriceEndsAtMs || 0,
+        graceEndsAtMs: current.graceEndsAtMs,
+      },
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    };
+    await ctx.riderDoc.ref.set(patch, { merge:true });
+    const updated = await ctx.riderDoc.ref.get();
+    const rider = { id:updated.id, ...updated.data() };
+
+    return res.json({
+      success:true,
+      message:'已登記付款完成，UBee 將核對現有人員資料與街口支付紀錄。核對完成前請勿重複付款。',
+      membershipFee:getRiderMembershipFeeState(rider, nowMs),
+    });
+  } catch (err) {
+    console.error('❌ 登記小U資格開通費失敗：', err);
+    return res.status(500).json({ success:false, message:'登記付款狀態失敗，請稍後再試。' });
+  }
+});
+
+
+// ============================================================
+// UBee 小U資格開通費 V4｜財務中心管理清單
+// - 沿用 Finance Center No Key V4.4：財務中心直接讀取，不要求 V4 管理金鑰。
+// - 回傳原始付款回報、後端 canonical state 與派單資格。
+// - 財務中心以此清單核對街口實收，再呼叫既有 verify API。
+// ============================================================
+app.get('/api/admin/rider-membership-fees', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const snap = await db.collection(RIDER_V2_COLLECTIONS.riders).limit(5000).get();
+    const nowMs = Date.now();
+
+    const riders = snap.docs.map(doc => {
+      const raw = { id:doc.id, ...(doc.data() || {}) };
+      const feeRaw = raw.membershipFee && typeof raw.membershipFee === 'object'
+        ? raw.membershipFee
+        : {};
+      const fee = getRiderMembershipFeeState(raw, nowMs);
+      const lifecycleStatus = getRiderV4LifecycleStatus(raw);
+      const phone = normalizePhone(raw.phone || raw.riderId || doc.id || '');
+
+      return {
+        id:doc.id,
+        riderId:String(raw.riderId || doc.id || ''),
+        name:cleanText(raw.name || raw.riderName || '', 80),
+        phone,
+        lineUserId:String(raw.lineUserId || ''),
+        lifecycleStatus,
+        canAcceptOrders:canRiderAcceptOrdersV4(raw),
+
+        cohort:fee.cohort,
+        amount:fee.amount,
+        currency:fee.currency,
+        method:fee.method,
+        required:fee.required,
+        status:fee.status,
+        displayStatus:fee.displayStatus,
+        verified:fee.verified,
+        dispatchAllowed:fee.dispatchAllowed,
+        earlyPriceLocked:fee.earlyPriceLocked === true,
+        earlyPriceExpired:fee.earlyPriceExpired === true,
+
+        payerName:cleanText(feeRaw.payerName || raw.name || raw.riderName || '', 40),
+        paymentNote:cleanText(feeRaw.paymentNote || '', 120),
+        submittedAtMs:Number(feeRaw.submittedAtMs || 0),
+        verifiedAtMs:Number(feeRaw.verifiedAtMs || 0),
+        rejectedAtMs:Number(feeRaw.rejectedAtMs || 0),
+        waivedAtMs:Number(feeRaw.waivedAtMs || 0),
+        reviewedAtMs:Number(feeRaw.reviewedAtMs || 0),
+        reviewedBy:cleanText(feeRaw.reviewedBy || '', 60),
+        reviewNote:cleanText(feeRaw.reviewNote || '', 200),
+
+        joinedAtMs:fee.joinedAtMs,
+        dueAtMs:fee.dueAtMs,
+        paymentOpensAtMs:fee.paymentOpensAtMs,
+        newCohortStartsAtMs:fee.newCohortStartsAtMs,
+        earlyPriceEndsAtMs:fee.earlyPriceEndsAtMs,
+        graceEndsAtMs:fee.graceEndsAtMs,
+      };
+    }).sort((a,b) => {
+      const priority = status => ({
+        submitted_overdue:0,
+        submitted:1,
+        overdue:2,
+        rejected_overdue:3,
+        rejected:4,
+        grace:5,
+        pending:6,
+        verified:7,
+        waived:8,
+        not_started:9,
+      }[status] ?? 10);
+      return priority(a.displayStatus) - priority(b.displayStatus)
+        || Number(b.submittedAtMs || 0) - Number(a.submittedAtMs || 0)
+        || String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant');
+    });
+
+    const isCompleted = rider => rider.verified === true;
+    const isSubmitted = rider => ['submitted','submitted_overdue'].includes(String(rider.displayStatus || ''));
+    const isRejected = rider => ['rejected','rejected_overdue'].includes(String(rider.displayStatus || ''));
+    const isOverdue = rider => ['overdue','submitted_overdue','rejected_overdue'].includes(String(rider.displayStatus || ''));
+
+    const summary = {
+      total:riders.length,
+      submitted:riders.filter(isSubmitted).length,
+      verified:riders.filter(isCompleted).length,
+      incomplete:riders.filter(r => !isCompleted(r)).length,
+      rejected:riders.filter(isRejected).length,
+      overdue:riders.filter(isOverdue).length,
+      expectedAmount:riders
+        .filter(r => r.required === true && !isCompleted(r))
+        .reduce((sum,r) => sum + Number(r.amount || 0), 0),
+      verifiedAmount:riders
+        .filter(isCompleted)
+        .reduce((sum,r) => sum + Number(r.amount || 0), 0),
+    };
+
+    return res.json({
+      success:true,
+      policy:{
+        version:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.version,
+        paymentOpensAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.paymentOpensAtMs,
+        newCohortStartsAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newCohortStartsAtMs,
+        earlyPriceEndsAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyPriceEndsAtMs,
+        existingGraceEndsAtMs:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingGraceEndsAtMs,
+        earlyAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.earlyAmount,
+        standardAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.standardAmount,
+        existingAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingAmount,
+        newAmount:UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newAmount,
+      },
+      summary,
+      riders,
+    });
+  } catch (err) {
+    console.error('❌ 讀取小U資格開通費管理清單失敗：', err);
+    return res.status(500).json({ success:false, message:'讀取小U資格開通費清單失敗。' });
+  }
+});
+
+app.post('/api/rider/v4/membership-fee/admin/verify', async (req, res) => {
+  try {
+    const riderId = normalizePhone(req.body?.riderId || req.body?.phone || '');
+    const action = String(req.body?.action || 'verified').trim().toLowerCase();
+    if (!/^09\d{8}$/.test(riderId)) {
+      return res.status(400).json({ success:false, message:'請提供正確的小U手機號碼。' });
+    }
+    if (!['verified','rejected','waived'].includes(action)) {
+      return res.status(400).json({ success:false, message:'action 僅支援 verified / rejected / waived。' });
+    }
+
+    const found = await findRiderDocumentV2First({ riderId });
+    const riderDoc = found.riderDoc;
+    if (!riderDoc || !riderDoc.exists) {
+      return res.status(404).json({ success:false, message:'找不到小U資料。' });
+    }
+    const rider = { id:riderDoc.id, ...riderDoc.data() };
+    const state = getRiderMembershipFeeState(rider);
+    const nowMs = Date.now();
+    const operator = cleanText(req.body?.operator || 'admin', 60);
+    const note = cleanText(req.body?.note || '', 200);
+
+    const membershipFee = {
+      ...(rider.membershipFee || {}),
+      version: state.version,
+      cohort: state.cohort,
+      amount: state.amount,
+      method: state.method,
+      status: action,
+      reviewedBy: operator,
+      reviewNote: note,
+      reviewedAtMs: nowMs,
+      ...(action === 'verified' ? { verifiedAtMs:nowMs } : {}),
+      ...(action === 'rejected' ? { rejectedAtMs:nowMs } : {}),
+      ...(action === 'waived' ? { waivedAtMs:nowMs } : {}),
+    };
+
+    await riderDoc.ref.set({
+      membershipFeeCohort: state.cohort,
+      membershipFee,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs: nowMs,
+    }, { merge:true });
+
+    let updated = await riderDoc.ref.get();
+    let updatedRider = { id:updated.id, ...updated.data() };
+
+    // 新加入小U若其他入職條件早已完成，管理端核對付款後立即正式開通，
+    // 不要求再重做課程或測驗。
+    if (['verified','waived'].includes(action)) {
+      const lifecycle = getRiderV4LifecycleStatus(updatedRider);
+      const checklist = getRiderUnifiedLearningChecklist(updatedRider);
+      const modules = getRiderUnifiedLearningModules(updatedRider);
+      const quiz = getRiderUnifiedLearningQuiz(updatedRider);
+      const learningReady =
+        checklist.jkopayInstalled === true &&
+        checklist.announcementGroupJoined === true &&
+        checklist.chatGroupJoined === true &&
+        checklist.reportGroupJoined === true &&
+        RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true) &&
+        quiz.passed === true &&
+        Number(quiz.score || 0) >= 80;
+
+      if (lifecycle === RIDER_V4_LIFECYCLE.TRAINING && learningReady) {
+        const finalLevel = isRiderL4LearningQualified(updatedRider)
+          ? 'L4'
+          : getNonDowngradeRiderLevel(updatedRider, 'L1');
+        await riderDoc.ref.set({
+          status:'approved',
+          reviewStatus:'approved',
+          approved:true,
+          lifecycleStatus:RIDER_V4_LIFECYCLE.ACTIVE,
+          canAcceptOrders:true,
+          riderLevel:finalLevel,
+          onboardingRequired:false,
+          trainingCompleted:true,
+          trainingCompletedAtMs:nowMs,
+          'onboarding.completed':true,
+          'onboarding.completedAtMs':nowMs,
+          'certifications.basic':true,
+          ...(finalLevel === 'L4' ? {
+            'learning.l4Qualified':true,
+            'learning.l4QualifiedAtMs':
+              Number(updatedRider.learning?.l4QualifiedAtMs || 0) || nowMs,
+          } : {}),
+          updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+          updatedAtMs:nowMs,
+        }, { merge:true });
+        updated = await riderDoc.ref.get();
+        updatedRider = { id:updated.id, ...updated.data() };
+      }
+    }
+
+    return res.json({
+      success:true,
+      message: action === 'verified' ? '資格開通費已核對完成。' : action === 'waived' ? '此小U已設為免繳。' : '付款核對未通過，已退回待處理。',
+      membershipFee:getRiderMembershipFeeState(updatedRider, nowMs),
+      progress:getRiderV4Progress(updatedRider),
+    });
+  } catch (err) {
+    console.error('❌ 管理端核對小U資格開通費失敗：', err);
+    return res.status(500).json({ success:false, message:'核對資格開通費失敗。' });
+  }
+});
+
 app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, res) => {
   try {
     const ctx = await getRiderV4ApiContext(req);
@@ -21203,7 +21773,8 @@ app.post('/api/rider/v4/onboarding/progress', riderAuthMiddleware, async (req, r
         RIDER_V4_REQUIRED_MODULES.every(id => modules[id] === true);
 
       const quiz = getRiderUnifiedLearningQuiz(updatedRider);
-      if (checklistComplete && quiz.passed === true && Number(quiz.score || 0) >= 80 && !canRiderAcceptOrdersV4(updatedRider)) {
+      const feeReady = getRiderMembershipFeeState(updatedRider, nowMs).dispatchAllowed === true;
+      if (checklistComplete && quiz.passed === true && Number(quiz.score || 0) >= 80 && feeReady && !canRiderAcceptOrdersV4(updatedRider)) {
         const finalLevel = isRiderL4LearningQualified(updatedRider)
           ? 'L4'
           : getNonDowngradeRiderLevel(updatedRider, 'L1');
@@ -21336,7 +21907,7 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
       updatedAt:admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    // 新申請者：完成街口設定、三社群、12 課與測驗後即可依既有資格流程啟用接單。
+    // 新申請者：仍必須街口 + 三社群 + 12課 + 測驗；10/1 起的新加入者還必須完成當期資格開通費並經核對（10/1～10/11 NT$299，10/12 00:00 起 NT$499）。
     const projectedRider = {
       ...rider,
       onboarding:{
@@ -21353,7 +21924,8 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
         quizPassed:true,
       },
     };
-    const activated = effectivePassed && effectiveBestScore >= 80 && checklistComplete;
+    const feeReady = getRiderMembershipFeeState(projectedRider, nowMs).dispatchAllowed === true;
+    const activated = effectivePassed && effectiveBestScore >= 80 && checklistComplete && feeReady;
     if (activated) {
       const finalLevel = isRiderL4LearningQualified(projectedRider)
         ? 'L4'
@@ -21397,6 +21969,8 @@ app.post('/api/rider/v4/quiz/submit', riderAuthMiddleware, async (req, res) => {
         ? (l4Qualified
             ? '恭喜完成 V4 小U入職與全部學習要求，正式接單資格已開通並取得 L4。'
             : '恭喜完成 V4 小U入職，正式接單資格已開通。')
+        : passed && checklistComplete && !feeReady
+          ? `測驗已通過；請先完成小U系統資格開通費 NT$${getRiderMembershipFeeState(updatedRider, nowMs).amount}，並等待 UBee 核對後即可開通接單。`
         : passed
           ? '測驗已通過，請先完成所有必修入職項目。'
           : '測驗未達 80 分，請複習後重新作答。',
@@ -25864,6 +26438,30 @@ function buildApprovedRiderV2(application, approvedBy) {
     canAcceptOrders: false,
     riderLevel: 'L0',
     onboardingRequired: true,
+    membershipFeeCohort:
+      String(application.membershipFeeCohort || application.membershipFee?.cohort || '').trim().toLowerCase() === 'new'
+        ? 'new'
+        : 'existing',
+    membershipFee: {
+      version: String(application.membershipFee?.version || UBEE_RIDER_MEMBERSHIP_FEE_POLICY.version),
+      cohort:
+        String(application.membershipFeeCohort || application.membershipFee?.cohort || '').trim().toLowerCase() === 'new'
+          ? 'new'
+          : 'existing',
+      amount:
+        String(application.membershipFeeCohort || application.membershipFee?.cohort || '').trim().toLowerCase() === 'new'
+          ? UBEE_RIDER_MEMBERSHIP_FEE_POLICY.newAmount
+          : UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingAmount,
+      method: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.method,
+      status: normalizeRiderMembershipFeeStatus(application.membershipFee?.status || 'pending'),
+      submittedAtMs: Number(application.membershipFee?.submittedAtMs || 0),
+      verifiedAtMs: Number(application.membershipFee?.verifiedAtMs || 0),
+      policyEffectiveAtMs: UBEE_RIDER_MEMBERSHIP_FEE_POLICY.paymentOpensAtMs,
+      graceEndsAtMs:
+        String(application.membershipFeeCohort || application.membershipFee?.cohort || '').trim().toLowerCase() === 'new'
+          ? 0
+          : UBEE_RIDER_MEMBERSHIP_FEE_POLICY.existingGraceEndsAtMs,
+    },
     onboarding: {
       jkopayInstalled: false,
       announcementGroupJoined: false,
