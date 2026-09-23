@@ -1,6 +1,6 @@
 // =====================================================
-// UBee Backend｜Release 2026-09-22
-// Core：App Access Hard Lock／Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking
+// UBee Backend｜Release 2026-09-23
+// Core：App Access Hard Lock／Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking／Customer Cloud Draft
 // =====================================================
 require('dotenv').config();
 const express = require('express');
@@ -25380,6 +25380,9 @@ async function createDynamicPricingQuoteSnapshot({
     upstairsFee: getCanonicalUpstairsFee(requestData.upstairsOption),
     pickupAddress: String(requestData.pickupAddress || requestData.pickup || requestData.from || ''),
     dropoffAddress: String(requestData.dropoffAddress || requestData.dropoff || requestData.to || ''),
+    deliveryStops: getCustomerRouteStopAddresses(requestData),
+    stopCount: getCustomerRouteStopAddresses(requestData).length,
+    multiDropoff: getCustomerRouteStopAddresses(requestData).length > 1,
     advancePayment: Math.max(0, Math.round(dynamicSafeNumber(requestData.advancePayment))),
     weatherType: String(price?.weatherType || 'none'),
     price: JSON.parse(JSON.stringify(price || {})),
@@ -25477,6 +25480,13 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
     String(orderData.singlePointTask || '').trim() === '1' ||
     String(orderData.singlePointTask || '').trim().toLowerCase() === 'true';
 
+  const quoteDeliveryStops = getCustomerRouteStopAddresses({
+    deliveryStops: lockedQuote.deliveryStops,
+    dropoffAddress: lockedQuote.dropoffAddress,
+  }).map(normalizeQuoteComparisonText);
+  const orderDeliveryStops = getCustomerRouteStopAddresses(orderData)
+    .map(normalizeQuoteComparisonText);
+
   if (!quotePickup || !orderPickup || quotePickup !== orderPickup) {
     return { ok: false, message: '取件地址已變更，請重新估價。' };
   }
@@ -25489,6 +25499,16 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
     (!quoteDropoff || !orderDropoff || quoteDropoff !== orderDropoff)
   ) {
     return { ok: false, message: '送達地址已變更，請重新估價。' };
+  }
+  if (
+    quoteMode !== 'queue' &&
+    !(quoteMode === 'custom' && quoteSinglePointTask) &&
+    (
+      quoteDeliveryStops.length !== orderDeliveryStops.length ||
+      quoteDeliveryStops.some((address, index) => address !== orderDeliveryStops[index])
+    )
+  ) {
+    return { ok: false, message: '多點送達路線已變更，請重新估價。' };
   }
   if (quoteSpeed !== orderSpeed) {
     return { ok: false, message: '配送速度已變更，請重新估價。' };
@@ -26461,6 +26481,17 @@ function validateOrderInput(data) {
     }
   }
 
+  const deliveryStops = Array.isArray(data.deliveryStops) ? data.deliveryStops : [];
+  if (deliveryStops.length > 1) {
+    const firstAddress = normalizeAddress(deliveryStops[0]?.dropoffAddress || data.dropoffAddress || '');
+    const secondAddress = normalizeAddress(deliveryStops[1]?.dropoffAddress || '');
+    if (!secondAddress) {
+      errors.push('第二送達點地址不完整，請重新輸入或留空。');
+    } else if (secondAddress === firstAddress || secondAddress === normalizeAddress(data.pickupAddress)) {
+      errors.push('第二送達點不可與取件點或第一送達點相同。');
+    }
+  }
+
   const isPurchaseOrder =
     String(data.serviceKey || '').trim() === 'buy' ||
     String(data.serviceMode || '').trim() === 'buy' ||
@@ -26553,6 +26584,10 @@ function getDuplicateFingerprint(data) {
     data.singlePointTask === true ? 'single_point' : 'route_task',
     normalizeAddress(data.pickupAddress),
     normalizeAddress(data.dropoffAddress),
+    (Array.isArray(data.deliveryStops) ? data.deliveryStops : [])
+      .map(stop => normalizeAddress(stop?.dropoffAddress || ''))
+      .filter(Boolean)
+      .join('>'),
     String(data.pickupPhone || '').trim(),
     String(data.dropoffPhone || '').trim(),
     cleanText(data.item, ORDER_INPUT_LIMITS.item),
@@ -27127,6 +27162,131 @@ async function getDistanceMatrixCached(origin, destination) {
   const distance = await getDistanceMatrix(origin, destination);
   distanceCache.set(key, distance);
   return distance;
+}
+
+
+// =====================================================
+// UBee Customer Multi-stop Delivery V1
+// 一般客戶第一版最多 2 個送達點：第 1 點必填、第 2 點選填。
+// 多點報價以實際道路「取件 → 第1點 → 第2點」總距離／總時間計算；
+// 多點配送正式規則：第 1 個送達點不加價；每新增 1 個有效送達點固定 +NT$50。
+// 第一版最多 2 個送達點，因此目前最多加收 NT$50；公式保留未來擴點能力。
+// =====================================================
+const CUSTOMER_MAX_DELIVERY_STOPS = 2;
+const CUSTOMER_EXTRA_STOP_FEE = 50;
+
+function normalizeCustomerDeliveryStopAddress(value) {
+  return cleanText(value || '', ORDER_INPUT_LIMITS?.dropoffAddress || 160);
+}
+
+function getCustomerRouteStopAddresses(input = {}) {
+  const rawStops = Array.isArray(input.deliveryStops) ? input.deliveryStops : [];
+  const primary = normalizeCustomerDeliveryStopAddress(
+    input.to || input.dropoff || input.dropoffAddress || rawStops[0]?.dropoffAddress || rawStops[0]?.address || ''
+  );
+  const secondary = normalizeCustomerDeliveryStopAddress(
+    input.to2 || input.dropoff2 || input.dropoff2Address || rawStops[1]?.dropoffAddress || rawStops[1]?.address || ''
+  );
+  return [primary, secondary].filter(Boolean).slice(0, CUSTOMER_MAX_DELIVERY_STOPS);
+}
+
+async function calculateCustomerRouteThroughStops(originAddress, stops = []) {
+  const cleanOrigin = cleanText(originAddress || '', ORDER_INPUT_LIMITS?.pickupAddress || 160);
+  const addresses = (Array.isArray(stops) ? stops : [])
+    .map(stop => normalizeCustomerDeliveryStopAddress(
+      typeof stop === 'string' ? stop : (stop?.dropoffAddress || stop?.address || stop?.dropoff || '')
+    ))
+    .filter(Boolean)
+    .slice(0, CUSTOMER_MAX_DELIVERY_STOPS);
+
+  if (!cleanOrigin || !addresses.length) {
+    throw new Error('請輸入取件地址與至少一個送達地址');
+  }
+
+  let origin = cleanOrigin;
+  let distanceMeters = 0;
+  let durationSeconds = 0;
+  const routeSegments = [];
+
+  for (let index = 0; index < addresses.length; index += 1) {
+    const destination = addresses[index];
+    const leg = await getDistanceMatrixCached(origin, destination);
+    const legDistance = Math.max(0, Number(leg?.distanceMeters || 0));
+    const legDuration = Math.max(0, Number(leg?.durationSeconds || 0));
+    distanceMeters += legDistance;
+    durationSeconds += legDuration;
+    routeSegments.push({
+      index: index + 1,
+      origin,
+      destination,
+      distanceMeters: legDistance,
+      durationSeconds: legDuration,
+      distanceText: leg?.distanceText || formatRouteDistanceText(legDistance),
+      durationText: leg?.durationText || formatRouteDurationText(legDuration),
+    });
+    origin = destination;
+  }
+
+  return {
+    distanceMeters,
+    durationSeconds,
+    distanceKm: Math.round((distanceMeters / 1000) * 100) / 100,
+    distanceText: formatRouteDistanceText(distanceMeters),
+    durationText: formatRouteDurationText(durationSeconds),
+    routeSegments,
+    stopCount: addresses.length,
+    multiDropoff: addresses.length > 1,
+  };
+}
+
+// =====================================================
+// UBee Customer Multi-stop Fee V1
+// 第 1 個送達點不加價；每新增 1 個有效送達點固定 +NT$50。
+// multiStopFee 屬既有 A 類任務服務費，沿用平台既有 70 / 30 財務核心。
+// =====================================================
+function applyCustomerMultiStopFee(price = {}, stopCount = 1) {
+  const result = { ...(price || {}) };
+  const safeStopCount = Math.max(
+    1,
+    Math.min(
+      CUSTOMER_MAX_DELIVERY_STOPS,
+      Math.round(Number(stopCount || 1))
+    )
+  );
+  const extraStopCount = Math.max(0, safeStopCount - 1);
+  const multiStopFee = extraStopCount * CUSTOMER_EXTRA_STOP_FEE;
+
+  const financials = calculateFinancialSplit({
+    deliveryFee: result.deliveryFee,
+    crossZoneFee: result.crossZoneFee,
+    multiStopFee,
+    returnTripFee: result.returnTripFee,
+    specialTaskFee: result.specialTaskFee,
+    taskHandlingFee: result.taskHandlingFee,
+
+    serviceFee: result.serviceFee,
+
+    speedFee: result.speedFee,
+    upstairsFee: result.upstairsFee,
+    waitingFee: result.waitingFee,
+    itemSizeFee: result.itemSizeFee,
+    overweightFee: result.overweightFee,
+    nightFee: result.nightFee,
+    weatherFee: result.weatherFee,
+    dynamicPricingFee: result.dynamicPricingFee || result.dynamicFee,
+    cancellationCompensation: result.cancellationCompensation,
+  });
+
+  return {
+    ...result,
+    ...financials,
+    stopCount: safeStopCount,
+    extraStopCount,
+    extraStopUnitFee: CUSTOMER_EXTRA_STOP_FEE,
+    extraStopFee: multiStopFee,
+    multiStopFee,
+    total: financials.serviceSubtotal,
+  };
 }
 
 function calculateDistanceTierFee(distanceKm) {
@@ -29103,6 +29263,73 @@ async function buildCustomerArrivalProofsForApi(order = {}) {
   })));
 }
 
+function normalizeCustomerOrderDeliveryStops(data = {}) {
+  const rawStops = Array.isArray(data.deliveryStops) ? data.deliveryStops : [];
+  const primaryRaw = rawStops[0] || {};
+  const secondaryRaw = rawStops[1] || {};
+
+  const normalizeStop = (raw = {}, fallback = {}, index = 0) => {
+    const address = cleanText(
+      fallback.address || raw.dropoffAddress || raw.address || raw.dropoff || '',
+      ORDER_INPUT_LIMITS.dropoffAddress
+    );
+    if (!address) return null;
+
+    const phone = normalizePhone(cleanText(
+      fallback.phone || raw.customerPhone || raw.dropoffPhone || raw.phone || '',
+      ORDER_INPUT_LIMITS.dropoffPhone
+    ));
+    const lat = getNullableCoordinate(fallback.lat ?? raw.dropoffLat ?? raw.lat);
+    const lng = getNullableCoordinate(fallback.lng ?? raw.dropoffLng ?? raw.lng);
+
+    return {
+      index: index + 1,
+      customerName: cleanText(
+        fallback.contact || raw.customerName || raw.receiverName || raw.dropoffContact || raw.contact || '',
+        60
+      ),
+      customerPhone: phone,
+      dropoffPhone: phone,
+      dropoffAddress: address,
+      address,
+      addressNote: cleanLongText(
+        fallback.note || raw.addressNote || raw.dropoffAddressNote || raw.note || '',
+        200
+      ),
+      dropoffAddressNote: cleanLongText(
+        fallback.note || raw.addressNote || raw.dropoffAddressNote || raw.note || '',
+        200
+      ),
+      placeId: cleanText(fallback.placeId || raw.placeId || raw.dropoffPlaceId || '', 200),
+      dropoffPlaceId: cleanText(fallback.placeId || raw.placeId || raw.dropoffPlaceId || '', 200),
+      dropoffLat: isValidLatitude(lat) ? lat : null,
+      dropoffLng: isValidLongitude(lng) ? lng : null,
+    };
+  };
+
+  const primary = normalizeStop(primaryRaw, {
+    address: data.dropoff || data.dropoffAddress,
+    phone: data.dropoffPhone,
+    contact: data.dropoffContact,
+    note: data.dropoffAddressNote,
+    placeId: data.dropoffPlaceId,
+    lat: data.dropoffLat,
+    lng: data.dropoffLng,
+  }, 0);
+
+  const secondary = normalizeStop(secondaryRaw, {
+    address: data.dropoff2 || data.dropoff2Address,
+    phone: data.dropoff2Phone || data.dropoffPhone,
+    contact: data.dropoff2Contact,
+    note: data.dropoff2AddressNote,
+    placeId: data.dropoff2PlaceId,
+    lat: data.dropoff2Lat,
+    lng: data.dropoff2Lng,
+  }, 1);
+
+  return [primary, secondary].filter(Boolean).slice(0, CUSTOMER_MAX_DELIVERY_STOPS);
+}
+
 function createOrderFromApi(data) {
   const userId = cleanText(
     data.userId || data.customerId || '',
@@ -29370,6 +29597,10 @@ function createOrderFromApi(data) {
     ? String(data.vehiclePreference)
     : 'any';
 
+  const deliveryStops = normalizeCustomerOrderDeliveryStops(data);
+  const primaryDeliveryStop = deliveryStops[0] || null;
+  const secondaryDeliveryStop = deliveryStops[1] || null;
+
   return {
     userId,
     customerId: userId,
@@ -29438,34 +29669,33 @@ function createOrderFromApi(data) {
       200
     ),
 
-    dropoffAddress: cleanText(
-      data.dropoff ||
-      data.dropoffAddress ||
-      '',
-      ORDER_INPUT_LIMITS.dropoffAddress
-    ),
+    dropoffAddress: primaryDeliveryStop?.dropoffAddress || '',
 
-    dropoffPhone: normalizePhone(
-      cleanText(
-        data.dropoffPhone || '',
-        ORDER_INPUT_LIMITS.dropoffPhone
-      )
-    ),
+    dropoffPhone: primaryDeliveryStop?.dropoffPhone || '',
 
     dropoffLat:
-      isValidLatitude(dropoffLat)
-        ? dropoffLat
-        : null,
+      primaryDeliveryStop?.dropoffLat ??
+      (isValidLatitude(dropoffLat) ? dropoffLat : null),
 
     dropoffLng:
-      isValidLongitude(dropoffLng)
-        ? dropoffLng
-        : null,
+      primaryDeliveryStop?.dropoffLng ??
+      (isValidLongitude(dropoffLng) ? dropoffLng : null),
 
-    dropoffPlaceId: cleanText(
+    dropoffPlaceId: primaryDeliveryStop?.dropoffPlaceId || cleanText(
       data.dropoffPlaceId || '',
       200
     ),
+
+    dropoff2Address: secondaryDeliveryStop?.dropoffAddress || '',
+    dropoff2Phone: secondaryDeliveryStop?.dropoffPhone || '',
+    dropoff2Contact: secondaryDeliveryStop?.customerName || '',
+    dropoff2AddressNote: secondaryDeliveryStop?.dropoffAddressNote || '',
+    dropoff2Lat: secondaryDeliveryStop?.dropoffLat ?? null,
+    dropoff2Lng: secondaryDeliveryStop?.dropoffLng ?? null,
+    dropoff2PlaceId: secondaryDeliveryStop?.dropoffPlaceId || '',
+    deliveryStops: deliveryStops.length > 1 ? deliveryStops : [],
+    multiDropoff: deliveryStops.length > 1,
+    stopCount: Math.max(1, deliveryStops.length || 1),
 
     speedType: [
       'standard',
@@ -29520,9 +29750,9 @@ function createOrderFromApi(data) {
     note: rawNote,
 
     pickupContact: cleanText(data.pickupContact || '', 60),
-    dropoffContact: cleanText(data.dropoffContact || '', 60),
+    dropoffContact: primaryDeliveryStop?.customerName || cleanText(data.dropoffContact || '', 60),
     pickupAddressNote: cleanLongText(data.pickupAddressNote || '', 200),
-    dropoffAddressNote: cleanLongText(data.dropoffAddressNote || '', 200),
+    dropoffAddressNote: primaryDeliveryStop?.dropoffAddressNote || cleanLongText(data.dropoffAddressNote || '', 200),
     itemQuantity: cleanText(data.itemQuantity || '', 40),
     itemSize: getItemSizePricing(data.itemSize).itemSize,
     itemSizeLabel: getItemSizePricing(data.itemSize).itemSizeLabel,
@@ -30087,6 +30317,22 @@ app.post('/api/map-route', async (req, res) => {
           body.dropoffLng,
       });
 
+    const secondaryDestinationWaypoint =
+      buildRoutesWaypoint({
+        address: body.dropoff2Address || body.dropoff2 || body.destination2Address || '',
+        placeId: body.dropoff2PlaceId || body.destination2PlaceId || '',
+        lat: body.dropoff2Lat ?? body.destination2Lat,
+        lng: body.dropoff2Lng ?? body.destination2Lng,
+      });
+
+    const isMultiDropoffRoute = Boolean(secondaryDestinationWaypoint);
+    const routeDestinationWaypoint = isMultiDropoffRoute
+      ? secondaryDestinationWaypoint
+      : destinationWaypoint;
+    const routeIntermediates = isMultiDropoffRoute
+      ? [destinationWaypoint]
+      : [];
+
     if (
       !originWaypoint ||
       !destinationWaypoint
@@ -30136,7 +30382,9 @@ app.post('/api/map-route', async (req, res) => {
           origin: originWaypoint,
 
           destination:
-            destinationWaypoint,
+            routeDestinationWaypoint,
+
+          ...(routeIntermediates.length ? { intermediates: routeIntermediates } : {}),
 
           travelMode: 'DRIVE',
 
@@ -30233,36 +30481,19 @@ app.post('/api/map-route', async (req, res) => {
       });
     }
 
-    const firstLeg =
-      route?.legs?.[0] || {};
+    const firstLeg = route?.legs?.[0] || {};
+    const lastLeg = route?.legs?.[route?.legs?.length - 1] || firstLeg;
 
-    const startLatLng =
-      firstLeg?.startLocation
-        ?.latLng || {};
+    const startLatLng = firstLeg?.startLocation?.latLng || {};
+    const primaryDropoffLatLng = firstLeg?.endLocation?.latLng || {};
+    const finalDropoffLatLng = lastLeg?.endLocation?.latLng || primaryDropoffLatLng;
 
-    const endLatLng =
-      firstLeg?.endLocation
-        ?.latLng || {};
-
-    const originLat =
-      getNullableCoordinate(
-        startLatLng.latitude
-      );
-
-    const originLng =
-      getNullableCoordinate(
-        startLatLng.longitude
-      );
-
-    const destinationLat =
-      getNullableCoordinate(
-        endLatLng.latitude
-      );
-
-    const destinationLng =
-      getNullableCoordinate(
-        endLatLng.longitude
-      );
+    const originLat = getNullableCoordinate(startLatLng.latitude);
+    const originLng = getNullableCoordinate(startLatLng.longitude);
+    const primaryDropoffLat = getNullableCoordinate(primaryDropoffLatLng.latitude);
+    const primaryDropoffLng = getNullableCoordinate(primaryDropoffLatLng.longitude);
+    const finalDropoffLat = getNullableCoordinate(finalDropoffLatLng.latitude);
+    const finalDropoffLng = getNullableCoordinate(finalDropoffLatLng.longitude);
 
     // 路線端點座標優先採用 Google Routes 實際結果；
     // 若個別回應未帶端點，則退回客人端已確認的座標，
@@ -30281,18 +30512,24 @@ app.post('/api/map-route', async (req, res) => {
         body.pickupLng
       );
 
+    const safePrimaryDropoffLat =
+      primaryDropoffLat ??
+      getNullableCoordinate(body.destinationLat ?? body.dropoffLat);
+
+    const safePrimaryDropoffLng =
+      primaryDropoffLng ??
+      getNullableCoordinate(body.destinationLng ?? body.dropoffLng);
+
     const safeDestinationLat =
-      destinationLat ??
+      finalDropoffLat ??
       getNullableCoordinate(
-        body.destinationLat ??
-        body.dropoffLat
+        isMultiDropoffRoute ? (body.dropoff2Lat ?? body.destination2Lat) : (body.destinationLat ?? body.dropoffLat)
       );
 
     const safeDestinationLng =
-      destinationLng ??
+      finalDropoffLng ??
       getNullableCoordinate(
-        body.destinationLng ??
-        body.dropoffLng
+        isMultiDropoffRoute ? (body.dropoff2Lng ?? body.destination2Lng) : (body.destinationLng ?? body.dropoffLng)
       );
 
     const originPlaceId =
@@ -30306,16 +30543,13 @@ app.post('/api/map-route', async (req, res) => {
         ''
       );
 
-    const destinationPlaceId =
-      String(
-        routesData
-          ?.geocodingResults
-          ?.destination
-          ?.placeId ||
-        body.destinationPlaceId ||
-        body.dropoffPlaceId ||
-        ''
-      );
+    const destinationPlaceId = String(
+      body.destinationPlaceId || body.dropoffPlaceId || ''
+    );
+    const secondaryDestinationPlaceId = String(
+      routesData?.geocodingResults?.destination?.placeId ||
+      body.dropoff2PlaceId || body.destination2PlaceId || ''
+    );
 
     return res.json({
       success: true,
@@ -30360,6 +30594,11 @@ app.post('/api/map-route', async (req, res) => {
         lng: safeOriginLng,
       },
 
+      primaryDropoffLocation: {
+        lat: safePrimaryDropoffLat,
+        lng: safePrimaryDropoffLng,
+      },
+
       destinationLocation: {
         lat: safeDestinationLat,
         lng: safeDestinationLng,
@@ -30373,17 +30612,20 @@ app.post('/api/map-route', async (req, res) => {
       // 客人端正式確認頁使用的明確別名。
       pickupLat: safeOriginLat,
       pickupLng: safeOriginLng,
-      dropoffLat: safeDestinationLat,
-      dropoffLng: safeDestinationLng,
+      dropoffLat: safePrimaryDropoffLat,
+      dropoffLng: safePrimaryDropoffLng,
+      dropoff2Lat: isMultiDropoffRoute ? safeDestinationLat : null,
+      dropoff2Lng: isMultiDropoffRoute ? safeDestinationLng : null,
 
       originPlaceId,
       destinationPlaceId,
+      secondaryDestinationPlaceId,
 
-      pickupPlaceId:
-        originPlaceId,
-
-      dropoffPlaceId:
-        destinationPlaceId,
+      pickupPlaceId: originPlaceId,
+      dropoffPlaceId: destinationPlaceId,
+      dropoff2PlaceId: isMultiDropoffRoute ? secondaryDestinationPlaceId : '',
+      multiDropoff: isMultiDropoffRoute,
+      stopCount: isMultiDropoffRoute ? 2 : 1,
     });
 
   } catch (err) {
@@ -30413,6 +30655,18 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
 
     const from = String(req.query.from || req.query.pickup || '').trim();
     const to = String(req.query.to || req.query.dropoff || '').trim();
+    const to2 = String(req.query.to2 || req.query.dropoff2 || req.query.dropoff2Address || '').trim();
+    const quoteStopAddresses = [to, to2].filter(Boolean).slice(0, CUSTOMER_MAX_DELIVERY_STOPS);
+
+    if (to2 && !to) {
+      return res.status(400).json({ success:false, error:'請先填寫第一個送達地點；第二送達點可以留空。' });
+    }
+    if (to2 && normalizeAddress(to2) === normalizeAddress(to)) {
+      return res.status(400).json({ success:false, error:'第二送達點不可與第一送達點相同。' });
+    }
+    if (to2 && normalizeAddress(to2) === normalizeAddress(from)) {
+      return res.status(400).json({ success:false, error:'第二送達點不可與取件地點相同。' });
+    }
 
     const speedType = String(
       req.query.speed || req.query.speedType || 'standard'
@@ -30617,7 +30871,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       }
 
       if (!singlePointTask) {
-        distance = await getDistanceMatrixCached(from, to);
+        distance = await calculateCustomerRouteThroughStops(from, quoteStopAddresses);
 
         price = calculatePrice({
           distanceMeters: distance.distanceMeters,
@@ -30640,7 +30894,7 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         });
       }
 
-      distance = await getDistanceMatrixCached(from, to);
+      distance = await calculateCustomerRouteThroughStops(from, quoteStopAddresses);
 
       const quickServiceType =
         getQuickServicePricingType({
@@ -30698,6 +30952,18 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       weatherAdjustment
     );
 
+    // 多點配送費由後端正式計價：第 1 點不加價，每新增 1 點固定 +NT$50。
+    // queue 與全能跑腿「同地點完成」不套用多點費。
+    const pricedStopCount =
+      isQueueTask || (isCustomTask && singlePointTask)
+        ? 1
+        : Math.max(1, quoteStopAddresses.length || 1);
+
+    price = applyCustomerMultiStopFee(
+      price,
+      pricedStopCount
+    );
+
     const quoteSnapshot = await createDynamicPricingQuoteSnapshot({
       price,
       requestData: {
@@ -30708,6 +30974,8 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         speedType,
         pickupAddress: from,
         dropoffAddress: to,
+        dropoff2Address: to2,
+        deliveryStops: quoteStopAddresses.map(dropoffAddress => ({ dropoffAddress })),
         advancePayment,
         itemSize,
         queueMinutes,
@@ -30762,6 +31030,10 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
 
       queueMinutes,
       taskMinutes,
+      deliveryStops: quoteStopAddresses.map((dropoffAddress, index) => ({ index:index + 1, dropoffAddress })),
+      stopCount: quoteStopAddresses.length || (isQueueTask ? 0 : 1),
+      multiDropoff: quoteStopAddresses.length > 1,
+      routeSegments: Array.isArray(distance?.routeSegments) ? distance.routeSegments : [],
 
       speedType,
       speedLabel: speed.label,
@@ -34621,7 +34893,10 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     upstairsFee: data.upstairsFee,
   });
 }else {
-  distance = await getDistanceMatrixCached(data.pickupAddress, data.dropoffAddress);
+  const orderRouteStops = Array.isArray(data.deliveryStops) && data.deliveryStops.length > 1
+    ? data.deliveryStops
+    : [{ dropoffAddress:data.dropoffAddress }];
+  distance = await calculateCustomerRouteThroughStops(data.pickupAddress, orderRouteStops);
 
   if(!distance || !Number.isFinite(Number(distance.distanceMeters)) || Number(distance.distanceMeters) < 0){
     return res.status(400).json({
@@ -34847,6 +35122,38 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   dropoffPlaceId:
     data.dropoffPlaceId || '',
+
+  // 一般客戶多點配送：第 1 點仍維持既有 dropoff 欄位，第 2 點存於 deliveryStops。
+  deliveryStops:
+    Array.isArray(data.deliveryStops) && data.deliveryStops.length > 1
+      ? data.deliveryStops.map((stop, index) => ({
+          ...stop,
+          index:index + 1,
+          status:index === 0 ? 'current' : 'pending',
+          completedAtMs:0,
+          arrivedAtMs:0,
+        }))
+      : [],
+
+  multiDropoff:
+    Array.isArray(data.deliveryStops) && data.deliveryStops.length > 1,
+
+  stopCount:
+    Array.isArray(data.deliveryStops) && data.deliveryStops.length > 1
+      ? data.deliveryStops.length
+      : 1,
+
+  currentDeliveryStopIndex:0,
+  completedDeliveryStopCount:0,
+  finalDropoffAddress:
+    Array.isArray(data.deliveryStops) && data.deliveryStops.length > 1
+      ? String(data.deliveryStops[data.deliveryStops.length - 1]?.dropoffAddress || data.dropoffAddress || '')
+      : data.dropoffAddress,
+  routeSegments:
+    Array.isArray(distance?.routeSegments) ? distance.routeSegments : [],
+  extraStopFee: Math.max(0, Math.round(Number(price.extraStopFee || price.multiStopFee || 0))),
+  extraStopCount: Math.max(0, Math.round(Number(price.extraStopCount || 0))),
+  extraStopUnitFee: Math.max(0, Math.round(Number(price.extraStopUnitFee || CUSTOMER_EXTRA_STOP_FEE))),
 
   // ==============================
   // 任務設定
@@ -35152,7 +35459,7 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
       customerPayableTotal: order.customerPayableTotal,
       advancePayment: order.advancePayment,
       message: '訂單已建立，請確認使用現金單。',
-      apiVersion: 'customer-order-v4',
+      apiVersion: 'customer-order-v5-multi-stop',
       addressCenterVersion: order.addressCenterVersion || '',
     });
   } catch (error) {
@@ -44793,6 +45100,240 @@ app.get('/api/customer/recent-addresses', requireCustomerAuth, async (req, res) 
   }
 });
 
+
+
+// =====================================================
+// UBee Customer Cloud Draft V1｜跨裝置未完成任務草稿
+// - 同一會員只保留一份目前未完成的下單草稿
+// - 會員身分一律由 HttpOnly Session 決定，前端不可指定 customerId
+// - Firestore：customerProfiles/{customerId}/drafts/order
+// - 草稿 7 日後視為失效；正式建單／使用者捨棄時由前端呼叫 DELETE
+// - 只保存下單表單必要欄位，不保存正式報價、付款狀態或其他會員敏感資料
+// =====================================================
+const CUSTOMER_ORDER_DRAFT_VERSION = 5;
+const CUSTOMER_ORDER_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CUSTOMER_ORDER_DRAFT_GROUPS = new Set(['send','pickup','buy','queue','helper','urgent']);
+const CUSTOMER_ORDER_DRAFT_TIMING_TYPES = new Set(['immediate','scheduled','flexible']);
+const CUSTOMER_ORDER_DRAFT_SCHEDULE_GOALS = new Set(['pickup_at','deliver_by']);
+const CUSTOMER_ORDER_DRAFT_SPEED_TYPES = new Set(['standard','express','economy']);
+const CUSTOMER_ORDER_DRAFT_SERVICE_MODES = new Set(['normal','queue','custom']);
+const CUSTOMER_ORDER_DRAFT_REPLACEMENT_POLICIES = new Set(['contact','replace','skip']);
+
+function customerOrderDraftDocument(customerId) {
+  return db
+    .collection('customerProfiles')
+    .doc(customerId)
+    .collection('drafts')
+    .doc('order');
+}
+
+function normalizeCustomerDraftTime(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n);
+}
+
+function normalizeCustomerDraftCoordinate(value, axis) {
+  const n = getNullableCoordinate(value);
+  if (axis === 'lat') return isValidLatitude(n) ? n : null;
+  return isValidLongitude(n) ? n : null;
+}
+
+function normalizeCustomerOrderDraft(input = {}) {
+  const nowMs = Date.now();
+  const parsedSavedAtMs = normalizeCustomerDraftTime(
+    input.savedAtMs || getCustomerAddressTimeMs(input.savedAt)
+  );
+  const savedAtMs = parsedSavedAtMs && parsedSavedAtMs <= nowMs + (5 * 60 * 1000)
+    ? parsedSavedAtMs
+    : nowMs;
+
+  const groupRaw = cleanText(input.serviceGroup || 'send', 24).toLowerCase();
+  const timingRaw = cleanText(input.orderTimingType || 'immediate', 24).toLowerCase();
+  const scheduleGoalRaw = cleanText(input.scheduleGoal || 'pickup_at', 24).toLowerCase();
+  const speedRaw = cleanText(input.speedType || 'standard', 24).toLowerCase();
+  const serviceModeRaw = cleanText(input.serviceMode || 'normal', 24).toLowerCase();
+
+  const shoppingItems = Array.isArray(input.shoppingItems)
+    ? input.shoppingItems.slice(0, 20).map(item => ({
+        name: cleanText(item?.name || '', 80),
+        quantity: cleanText(item?.quantity || '1', 12),
+        budget: cleanText(item?.budget || '', 20),
+        replacementPolicy: CUSTOMER_ORDER_DRAFT_REPLACEMENT_POLICIES.has(String(item?.replacementPolicy || '').toLowerCase())
+          ? String(item.replacementPolicy).toLowerCase()
+          : 'contact',
+      })).filter(item => item.name || item.quantity || item.budget)
+    : [];
+
+  return {
+    version: CUSTOMER_ORDER_DRAFT_VERSION,
+    savedAt: new Date(savedAtMs).toISOString(),
+    savedAtMs,
+    currentStep: Math.max(1, Math.min(4, Math.round(Number(input.currentStep || 1) || 1))),
+    serviceCity: cleanText(input.serviceCity || '', 60),
+    serviceGroup: CUSTOMER_ORDER_DRAFT_GROUPS.has(groupRaw) ? groupRaw : 'send',
+    serviceType: cleanText(input.serviceType || '', 60),
+    serviceCategory: cleanText(input.serviceCategory || '', 80),
+    serviceMode: CUSTOMER_ORDER_DRAFT_SERVICE_MODES.has(serviceModeRaw) ? serviceModeRaw : 'normal',
+    speedType: CUSTOMER_ORDER_DRAFT_SPEED_TYPES.has(speedRaw) ? speedRaw : 'standard',
+    orderTimingType: CUSTOMER_ORDER_DRAFT_TIMING_TYPES.has(timingRaw) ? timingRaw : 'immediate',
+    scheduleGoal: CUSTOMER_ORDER_DRAFT_SCHEDULE_GOALS.has(scheduleGoalRaw) ? scheduleGoalRaw : 'pickup_at',
+    requestedScheduleAtMs: normalizeCustomerDraftTime(input.requestedScheduleAtMs),
+    flexibleStartAtMs: normalizeCustomerDraftTime(input.flexibleStartAtMs),
+    flexibleEndAtMs: normalizeCustomerDraftTime(input.flexibleEndAtMs),
+    pickup: cleanText(input.pickup || '', 240),
+    dropoff: cleanText(input.dropoff || '', 240),
+    dropoff2: cleanText(input.dropoff2 || '', 240),
+    pickupContact: cleanText(input.pickupContact || '', 60),
+    dropoffContact: cleanText(input.dropoffContact || '', 60),
+    dropoff2Contact: cleanText(input.dropoff2Contact || '', 60),
+    pickupPhone: cleanText(input.pickupPhone || '', 30),
+    dropoffPhone: cleanText(input.dropoffPhone || '', 30),
+    dropoff2Phone: cleanText(input.dropoff2Phone || '', 30),
+    pickupAddressNote: cleanLongText(input.pickupAddressNote || '', 160),
+    dropoffAddressNote: cleanLongText(input.dropoffAddressNote || '', 160),
+    dropoff2AddressNote: cleanLongText(input.dropoff2AddressNote || '', 160),
+    pickupLat: normalizeCustomerDraftCoordinate(input.pickupLat, 'lat'),
+    pickupLng: normalizeCustomerDraftCoordinate(input.pickupLng, 'lng'),
+    dropoffLat: normalizeCustomerDraftCoordinate(input.dropoffLat, 'lat'),
+    dropoffLng: normalizeCustomerDraftCoordinate(input.dropoffLng, 'lng'),
+    dropoff2Lat: normalizeCustomerDraftCoordinate(input.dropoff2Lat, 'lat'),
+    dropoff2Lng: normalizeCustomerDraftCoordinate(input.dropoff2Lng, 'lng'),
+    pickupPlaceId: cleanText(input.pickupPlaceId || '', 240),
+    dropoffPlaceId: cleanText(input.dropoffPlaceId || '', 240),
+    dropoff2PlaceId: cleanText(input.dropoff2PlaceId || '', 240),
+    note: cleanLongText(input.note || '', 1200),
+    advancePayment: cleanText(input.advancePayment || '0', 20),
+    queueMinutes: cleanText(input.queueMinutes || '', 12),
+    taskMinutes: cleanText(input.taskMinutes || '30', 12),
+    upstairsOption: cleanText(input.upstairsOption || 'none', 30),
+    itemSize: cleanText(input.itemSize || '', 40),
+    shoppingItems,
+  };
+}
+
+function hasCustomerOrderDraftContent(draft = {}) {
+  return Boolean(
+    cleanText(draft.pickup || '', 240) ||
+    cleanText(draft.dropoff || '', 240) ||
+    cleanText(draft.dropoff2 || '', 240) ||
+    cleanLongText(draft.note || '', 1200) ||
+    cleanText(draft.pickupPhone || '', 30) ||
+    cleanText(draft.dropoffPhone || '', 30) ||
+    cleanText(draft.pickupContact || '', 60) ||
+    cleanText(draft.dropoffContact || '', 60) ||
+    (Array.isArray(draft.shoppingItems) && draft.shoppingItems.some(item => cleanText(item?.name || '', 80)))
+  );
+}
+
+app.get('/api/customer/draft', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const ref = customerOrderDraftDocument(customerId);
+    const doc = await ref.get();
+
+    if (!doc.exists) {
+      return res.json({ success:true, draft:null, revision:0, updatedAtMs:0 });
+    }
+
+    const data = doc.data() || {};
+    const expiresAtMs = Math.max(0, Number(data.expiresAtMs || 0));
+    const updatedAtMs = Math.max(0, Number(data.updatedAtMs || 0));
+    if ((expiresAtMs && expiresAtMs <= Date.now()) || (!expiresAtMs && updatedAtMs && Date.now() - updatedAtMs > CUSTOMER_ORDER_DRAFT_TTL_MS)) {
+      await ref.delete().catch(() => {});
+      return res.json({ success:true, draft:null, revision:0, updatedAtMs:0, expired:true });
+    }
+
+    const draft = normalizeCustomerOrderDraft(data.draft || {});
+    if (!hasCustomerOrderDraftContent(draft)) {
+      await ref.delete().catch(() => {});
+      return res.json({ success:true, draft:null, revision:0, updatedAtMs:0 });
+    }
+
+    return res.json({
+      success:true,
+      draft,
+      revision:Math.max(0, Number(data.revision || 0)),
+      updatedAtMs,
+      expiresAtMs,
+    });
+  } catch (error) {
+    console.error('❌ 讀取客戶雲端草稿失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success:false,
+      error:error.message || '未完成任務草稿讀取失敗',
+    });
+  }
+});
+
+app.put('/api/customer/draft', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    const draft = normalizeCustomerOrderDraft(req.body?.draft || {});
+    if (!hasCustomerOrderDraftContent(draft)) {
+      return res.status(400).json({
+        success:false,
+        error:'草稿尚未包含可保存的任務內容。',
+      });
+    }
+
+    const deviceId = cleanText(req.body?.deviceId || '', 120);
+    const ref = customerOrderDraftDocument(customerId);
+    const nowMs = Date.now();
+    const expiresAtMs = nowMs + CUSTOMER_ORDER_DRAFT_TTL_MS;
+    let revision = 1;
+
+    await db.runTransaction(async transaction => {
+      const currentDoc = await transaction.get(ref);
+      const current = currentDoc.exists ? (currentDoc.data() || {}) : {};
+      revision = Math.max(0, Number(current.revision || 0)) + 1;
+      transaction.set(ref, {
+        customerId,
+        draft,
+        revision,
+        clientUpdatedAtMs:draft.savedAtMs,
+        updatedAtMs:nowMs,
+        expiresAtMs,
+        lastDeviceId:deviceId,
+        dataVersion:CUSTOMER_ORDER_DRAFT_VERSION,
+        source:'customer-order-cloud-draft-v1',
+        createdAt:current.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    return res.json({
+      success:true,
+      draft,
+      revision,
+      updatedAtMs:nowMs,
+      expiresAtMs,
+    });
+  } catch (error) {
+    console.error('❌ 儲存客戶雲端草稿失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success:false,
+      error:error.message || '未完成任務草稿儲存失敗',
+    });
+  }
+});
+
+app.delete('/api/customer/draft', requireCustomerAuth, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const customerId = req.customerAuth.customerId;
+    await customerOrderDraftDocument(customerId).delete();
+    return res.json({ success:true, cleared:true });
+  } catch (error) {
+    console.error('❌ 清除客戶雲端草稿失敗：', error);
+    return res.status(error.statusCode || 500).json({
+      success:false,
+      error:error.message || '未完成任務草稿清除失敗',
+    });
+  }
+});
 
 // =====================================================
 // UBee 網路韌性健康檢查
