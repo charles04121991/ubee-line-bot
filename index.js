@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-23
+// 2026-09-23｜Dispatch & Finance Contract Sync V1：調度 Dashboard 補完整多點配送／代墊欄位；財務契約維持後端唯一來源。
 // Core：App Access Hard Lock／Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking／Customer Cloud Draft
 // =====================================================
 require('dotenv').config();
@@ -16307,6 +16308,51 @@ app.get('/api/dispatch/dashboard', async (req, res) => {
         pickupLng: asNumberOrNull(o.pickupLng ?? o.fromLng),
         dropoffLat: asNumberOrNull(o.dropoffLat ?? o.toLat),
         dropoffLng: asNumberOrNull(o.dropoffLng ?? o.toLng),
+
+        // Dispatch Multi-stop Contract V1：把完整送達節點交給調度中心。
+        deliveryStops: Array.isArray(o.deliveryStops)
+          ? o.deliveryStops.slice(0, 20).map((stop, index) => ({
+              index: Math.max(1, Number(stop?.index || index + 1)),
+              customerName: String(stop?.customerName || stop?.receiverName || ''),
+              customerPhone: String(stop?.customerPhone || stop?.dropoffPhone || ''),
+              dropoffAddress: String(stop?.dropoffAddress || stop?.address || ''),
+              dropoffLat: asNumberOrNull(stop?.dropoffLat ?? stop?.lat),
+              dropoffLng: asNumberOrNull(stop?.dropoffLng ?? stop?.lng),
+              addressNote: String(stop?.dropoffAddressNote || stop?.addressNote || stop?.note || ''),
+              status: String(stop?.status || ''),
+              arrivedAtMs: Number(stop?.arrivedAtMs || 0),
+              completedAtMs: Number(stop?.completedAtMs || 0),
+            }))
+          : [],
+        multiDropoff:
+          o.multiDropoff === true ||
+          (Array.isArray(o.deliveryStops) && o.deliveryStops.length > 1),
+        stopCount: Math.max(
+          1,
+          Number(
+            o.stopCount ||
+            (Array.isArray(o.deliveryStops) && o.deliveryStops.length
+              ? o.deliveryStops.length
+              : 1)
+          ) || 1
+        ),
+        currentDeliveryStopIndex: Math.max(0, Number(o.currentDeliveryStopIndex || 0)),
+        completedDeliveryStopCount: Math.max(0, Number(o.completedDeliveryStopCount || 0)),
+        finalDropoffAddress: String(
+          o.finalDropoffAddress ||
+          (Array.isArray(o.deliveryStops) && o.deliveryStops.length
+            ? (o.deliveryStops[o.deliveryStops.length - 1]?.dropoffAddress || '')
+            : '') ||
+          o.dropoffAddress ||
+          o.toAddress ||
+          ''
+        ),
+        routeSegments: Array.isArray(o.routeSegments) ? o.routeSegments.slice(0, 20) : [],
+        extraStopFee: Math.max(0, Number(o.extraStopFee || o.multiStopFee || 0)),
+        extraStopCount: Math.max(0, Number(o.extraStopCount || 0)),
+        extraStopUnitFee: Math.max(0, Number(o.extraStopUnitFee || CUSTOMER_EXTRA_STOP_FEE || 50)),
+        advancePayment: Math.max(0, Number(getOrderAdvancePaymentAmount(o) || 0)),
+
         total: Number(o.total || o.customerPayableTotal || o.finalTotal || 0),
         serviceSubtotal: Number(o.serviceSubtotal || o.serviceTotal || 0),
         shareableTaskSubtotal: Number(o.shareableTaskSubtotal || 0),
