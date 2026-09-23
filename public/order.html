@@ -47,7 +47,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260923-customer-draft-resume-fix-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260923-customer-draft-resume-fix-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18144,11 +18144,13 @@ const UBeeEnhancements = (() => {
       if(button?.disabled)return;
       if(button)button.disabled=true;
       try{
-        // 先恢復舊相容層欄位，確保正式 getPayload / quote contract 一致。
-        restoreDraft(d);
-        // 正式畫面已是 productionOrderFlow；不能再只切換隱藏的 legacy step。
-        const restored=await window.restoreUBeeProductionDraft?.(d);
-        if(restored===false)throw new Error('正式編輯流程尚未完成載入');
+        // 正式畫面只走 productionOrderFlow 草稿恢復。
+        // restoreUBeeProductionDraft() 末端本身會 syncLegacy()，不再先操作已退居相容層的 legacy UI。
+        if(typeof window.restoreUBeeProductionDraft!=='function'){
+          throw new Error('正式草稿恢復模組尚未完成載入');
+        }
+        const restored=await window.restoreUBeeProductionDraft(d);
+        if(restored!==true)throw new Error('正式編輯流程尚未完成載入');
         el.remove();
       }catch(error){
         console.error('恢復未完成任務失敗：',error);
@@ -20800,7 +20802,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   function productionDraftAddress(address,contactName,phone,addressDetail,lat,lng,placeId,label){
     const text=String(address||'').trim();
     if(!text)return null;
-    const safeLat=Number(lat),safeLng=Number(lng);
+    const rawLat=lat,rawLng=lng;
+    const safeLat=(rawLat===null||rawLat===undefined||String(rawLat).trim()==='')?null:Number(rawLat);
+    const safeLng=(rawLng===null||rawLng===undefined||String(rawLng).trim()==='')?null:Number(rawLng);
     const point=Number.isFinite(safeLat)&&Number.isFinite(safeLng)&&safeLat>=-90&&safeLat<=90&&safeLng>=-180&&safeLng<=180;
     return{
       label:String(label||'').trim(),
@@ -21711,7 +21715,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260923-customer-draft-resume-fix-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260923-customer-draft-resume-fix-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23134,7 +23138,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.09.23.5';
+  const APP_VERSION = '2026.09.23.6';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
