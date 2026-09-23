@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<!-- 2026-09-21｜Membership Fee Finance No-Key V3.1：資格開通費管理改為沿用 Finance Center No Key；移除資格開通費頁的管理金鑰輸入、sessionStorage 依賴與 V4 Admin Header；小U V4 資格與治理頁仍維持原高權限金鑰。 -->
-<!-- 2026-09-22｜Rider Membership Fee Finance V4：10/1 起新加入 NT$499；既有小U 10/1～10/11 為 NT$299 期限價，逾期改 NT$499；期限內付款回報可鎖定 299 等待核對。 -->
+<!-- 2026-09-23｜Finance Contract Sync V1：移除已停用資格開通費；補完整費用明細與 V4 L4 管理。 -->
 <!-- 2026-09-17｜Profit Finance V1：平台收入拆分應得、已收與待收，避免把未回繳現金誤認為已入帳收入。 -->
 <!-- 2026-09-08｜Finance Center No Key V4.4：徹底移除財務中心金鑰輸入與財務 API Header 包裝；財務中心開啟後直接讀取資料。 -->
 <!-- 2026-09-08｜Finance Ledger KPI Fix V1：今日收入類 KPI 改由後端只計入已完成訂單，避免進行中訂單以 createdAt 誤算收入。 -->
@@ -129,42 +128,6 @@ summary::-webkit-details-marker{display:none}
 .v4-admin-note{padding:12px 13px;border-radius:14px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;line-height:1.65;color:#6b5b00;font-weight:850;margin-bottom:12px}
 .v4-rider-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.v4-rider-card{border:1px solid var(--line);border-radius:17px;padding:14px;background:#fff}.v4-rider-top{display:flex;justify-content:space-between;gap:12px}.v4-life{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:1000}.v4-life.ACTIVE{background:#dcfce7;color:#166534}.v4-life.TRAINING,.v4-life.RETRAINING{background:#fef3c7;color:#92400e}.v4-life.RESTRICTED,.v4-life.SUSPENDED,.v4-life.BANNED{background:#fee2e2;color:#991b1b}.v4-cert-list{margin-top:10px}.v4-cert{display:inline-flex;margin:3px 3px 0 0;padding:5px 7px;border-radius:999px;background:#f3f4f6;font-size:10px;font-weight:900}.v4-cert.on{background:#dcfce7;color:#166534}.v4-action-grid{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}.v4-action-grid .btn{padding:7px 9px;font-size:11px}.v4-key-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}.v4-key-row input{flex:1;border:1px solid var(--line);border-radius:11px;padding:10px 11px;font-weight:800}
 
-.membership-summary-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin-bottom:12px}
-.membership-summary-card{border:1px solid var(--line);border-radius:15px;padding:12px;background:#f9fafb}
-.membership-summary-card span{display:block;font-size:10px;color:var(--muted);font-weight:900}
-.membership-summary-card strong{display:block;margin-top:5px;font-size:21px;font-weight:1000}
-.membership-summary-card.pending strong{color:var(--orange)}
-.membership-summary-card.done strong{color:var(--green)}
-.membership-summary-card.overdue strong{color:var(--red)}
-.membership-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.membership-filter{border:1px solid var(--line);border-radius:11px;padding:9px 10px;background:#fff;font-size:12px;font-weight:900}
-.membership-list{display:grid;gap:10px}
-.membership-card{border:1px solid var(--line);border-radius:17px;padding:14px;background:#fff}
-.membership-card.submitted{border-left:5px solid var(--orange)}
-.membership-card.verified{border-left:5px solid var(--green)}
-.membership-card.overdue{border-left:5px solid var(--red)}
-.membership-card.rejected{border-left:5px solid #8b5cf6}
-.membership-card.not-started{opacity:.82}
-.membership-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.membership-name{font-size:18px;font-weight:1000;line-height:1.3}
-.membership-meta{margin-top:4px;color:var(--muted);font-size:11px;font-weight:800;line-height:1.6}
-.membership-amount{text-align:right;white-space:nowrap}
-.membership-amount strong{display:block;font-size:24px;font-weight:1000}
-.membership-amount span{display:block;margin-top:4px;font-size:10px;color:var(--muted);font-weight:900}
-.membership-status{display:inline-flex;align-items:center;min-height:26px;padding:5px 8px;border-radius:999px;background:#f3f4f6;color:#4b5563;font-size:10px;font-weight:1000}
-.membership-status.submitted{background:#fff7e6;color:#a55d00}
-.membership-status.verified{background:#ecf8f1;color:#197a4d}
-.membership-status.overdue{background:#fff0f1;color:#bc2931}
-.membership-status.rejected{background:#f3e8ff;color:#7e22ce}
-.membership-info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:11px}
-.membership-info{background:#f7f8fa;border-radius:11px;padding:9px}
-.membership-info span{display:block;font-size:9px;color:var(--muted);font-weight:900}
-.membership-info strong{display:block;margin-top:4px;font-size:12px;font-weight:1000;word-break:break-word}
-.membership-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
-.membership-policy-note{padding:12px 13px;border-radius:14px;background:#fffbeb;border:1px solid #fde68a;font-size:12px;line-height:1.7;color:#6b5b00;font-weight:850;margin-bottom:12px}
-.membership-policy-note b{color:#111}
-@media(max-width:1050px){.membership-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.membership-info-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:620px){.membership-summary-grid{grid-template-columns:1fr 1fr}.membership-info-grid{grid-template-columns:1fr}.membership-head{flex-direction:column}.membership-amount{text-align:left}.membership-toolbar{align-items:stretch}.membership-toolbar .search{width:100%}}
 
 @media(max-width:850px){.v4-rider-grid{grid-template-columns:1fr}}
 
@@ -206,7 +169,6 @@ summary::-webkit-details-marker{display:none}
     <button class="tab" data-view="alerts">異常提醒 <span id="alertTabCount"></span></button>
     <button class="tab" data-view="history">結算紀錄</button>
     <button class="tab" data-view="ledger">訂單財務</button>
-    <button class="tab" data-view="membership">資格開通費 <span id="membershipTabCount"></span></button>
     <button class="tab" data-view="riders">小U V4 資格</button>
   </nav>
 
@@ -316,49 +278,10 @@ summary::-webkit-details-marker{display:none}
       </div>
     </section>
 
-    <section class="view" id="view-membership">
-      <div class="panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">小U資格開通費</div>
-            <div class="panel-sub">核對小U街口付款回報。小U只能回報付款；只有財務端確認收到款後才會正式 verified。</div>
-          </div>
-          <div class="membership-toolbar">
-            <select id="membershipStatusFilter" class="membership-filter" onchange="renderMembershipFees()">
-              <option value="all">全部</option>
-              <option value="submitted">待核對</option>
-              <option value="verified">已完成</option>
-              <option value="incomplete">未完成</option>
-              <option value="rejected">查無付款</option>
-              <option value="overdue">逾期／已暫停</option>
-            </select>
-            <input id="membershipSearch" class="search" placeholder="搜尋小U姓名／手機／Rider ID／付款人" oninput="renderMembershipFees()">
-            <button class="btn small" onclick="loadMembershipFees(true)">更新</button>
-          </div>
-        </div>
-        <div class="panel-body">
-          <div class="membership-policy-note">
-            <b>制度：</b>2026/10/1 起開放付款；10/1 前已加入的既有小U於 10/1～10/11 享 NT$299 早期價，10/1 起新加入者為 NT$499。
-            既有小U須在 10/11 23:59 前完成付款並送出回報，才保留 NT$299；2026/10/12 00:00 起未在期限內回報或核對為查無付款者，改按 NT$499。
-            10/12 起未 verified / waived 者暫停新任務派送；期限內已回報者即使 10/12 後才核對，仍保留 NT$299。
-          </div>
-          <div class="membership-summary-grid">
-            <div class="membership-summary-card"><span>全部小U</span><strong id="membershipTotal">0</strong></div>
-            <div class="membership-summary-card pending"><span>待核對</span><strong id="membershipSubmitted">0</strong></div>
-            <div class="membership-summary-card done"><span>已完成</span><strong id="membershipVerified">0</strong></div>
-            <div class="membership-summary-card"><span>未完成</span><strong id="membershipIncomplete">0</strong></div>
-            <div class="membership-summary-card overdue"><span>逾期／已暫停</span><strong id="membershipOverdue">0</strong></div>
-            <div class="membership-summary-card"><span>已核對金額</span><strong id="membershipVerifiedAmount">$0</strong></div>
-          </div>
-          <div id="membershipList" class="membership-list"><div class="empty">正在讀取資格開通費資料...</div></div>
-        </div>
-      </div>
-    </section>
-
     <section class="view" id="view-riders">
       <div class="panel">
         <div class="panel-head">
-          <div><div class="panel-title">小U V4 資格與治理</div><div class="panel-sub">V2 個人資格、V3 違規／重新教育、V4 等級與專業認證管理。</div></div>
+          <div><div class="panel-title">小U V4 資格與治理</div><div class="panel-sub">小U接單資格、違規／重新教育、L1～L4 等級與專業認證管理。</div></div>
           <div class="toolbar"><input id="v4RiderSearch" class="search" placeholder="搜尋姓名／電話／Rider ID" oninput="renderV4Riders()"><button class="btn small" onclick="loadV4Riders(true)">更新</button></div>
         </div>
         <div class="panel-body">
@@ -388,7 +311,6 @@ const state = {
   cash:null,
   jko:null,
   ridersV4:null,
-  membershipFees:null,
   finance:null,
   financeDetail:null,
   loading:false,
@@ -465,7 +387,6 @@ function switchView(view){
   if(view==='alerts') renderAlerts();
   if(view==='history') renderHistory();
   if(view==='ledger' && !state.finance) loadFinanceLedger();
-  if(view==='membership' && !state.membershipFees) loadMembershipFees();
   if(view==='riders' && !state.ridersV4) loadV4Riders();
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));
@@ -550,6 +471,7 @@ function renderFinanceLedger(){
     return `<article class="finance-order-card ${financeStatusClass(o.reconciliationStatus)}">
       <div class="finance-order-head"><div><div class="finance-order-id">${esc(o.orderNo||o.orderId)}</div><div class="finance-order-meta">${esc(who)}・${esc(o.serviceType||'-')}<br>${esc(o.rider?.riderName||'尚未指派小U')}・${esc(formatTime(o.completedAtMs||o.createdAtMs))}</div></div><div><div class="finance-amount">${money(o.finalCustomerTotal)}</div><span class="tag ${o.reconciliationStatus==='reconciled'?'done':o.reconciliationStatus==='needs_review'?'cash':'jko'}">${esc(financeStatusLabel(o.reconciliationStatus))}</span></div></div>
       <div class="finance-mini-grid"><div class="finance-mini"><span>初始估價</span><strong>${money(o.initialEstimatedTotal)}</strong></div><div class="finance-mini"><span>客戶實收</span><strong>${money(o.actualPaidAmount)}</strong></div><div class="finance-mini"><span>小U應得</span><strong>${money(Number(o.riderIncome||0)+Number(o.riderAdvance||0))}</strong></div><div class="finance-mini"><span>平台應得</span><strong>${money(o.expectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台已收</span><strong>${money(o.collectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台待收</span><strong>${money(o.outstandingPlatformIncome)}</strong></div></div>
+      ${Number(o.feeBreakdown?.multiStopFee||0)>0||Number(o.riderAdvance||0)>0?`<div class="section-note" style="margin-top:10px;margin-bottom:0">${Number(o.feeBreakdown?.multiStopFee||0)>0?`<strong>多點配送費：</strong>${money(o.feeBreakdown.multiStopFee)}`:''}${Number(o.feeBreakdown?.multiStopFee||0)>0&&Number(o.riderAdvance||0)>0?'　｜　':''}${Number(o.riderAdvance||0)>0?`<strong>小U代墊：</strong>${money(o.riderAdvance)}`:''}</div>`:''}
       ${variance?`<div class="finance-discrepancy">差異總額 ${money(variance)}${o.discrepancyReasons?.length?`：${esc(o.discrepancyReasons.join('、'))}`:''}</div>`:''}
       <div class="finance-actions"><button class="btn small primary" onclick="openFinanceOrder('${esc(o.orderId)}')">查看／調整</button>${o.reconciliationStatus!=='reconciled'?`<button class="btn small yellow" onclick="quickReconcile('${esc(o.orderId)}')">完成對帳</button>`:''}</div>
     </article>`;
@@ -574,10 +496,14 @@ async function openFinanceOrder(orderId){
         ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('小U基本收入',money(o.riderBaseIncome))}
         ${financeDetailItem('70/30 任務費池',money(o.shareableTaskSubtotal))}${financeDetailItem('100% 小U加價池',money(o.riderOnlySurchargeSubtotal))}${financeDetailItem('保底補貼',money(o.riderGuaranteeSubsidy))}
         ${financeDetailItem('平台應得',money(o.expectedPlatformIncome))}${financeDetailItem('平台已收',money(o.collectedPlatformIncome))}${financeDetailItem('平台待收',money(o.outstandingPlatformIncome))}
-        ${financeDetailItem('急件／速度費',money(fees.speedFee))}${financeDetailItem('等待費',money(fees.waitingFee))}
-        ${financeDetailItem('上樓費',money(fees.upstairsFee))}${financeDetailItem('商品體積費',money(fees.itemSizeFee))}${financeDetailItem('天候保障費',money(fees.weatherFee))}
-        ${financeDetailItem('動態調度費',money(fees.dynamicPricingFee))}${financeDetailItem('任務處理時間費',money(fees.taskHandlingFee))}${financeDetailItem('追加費用',money(fees.additionalFee))}
-        ${financeDetailItem('取消費',money(fees.cancellationFee))}${financeDetailItem('退款',money(fees.refundAmount))}${financeDetailItem('結算狀態',o.settlementStatus||'-')}
+        ${financeDetailItem('基本／起步費',money(fees.baseFee))}${financeDetailItem('距離費',money(fees.distanceFee))}${financeDetailItem('時間費',money(fees.timeFee))}
+        ${financeDetailItem('跨區費',money(fees.crossZoneFee))}${financeDetailItem('多點配送費',money(fees.multiStopFee))}${financeDetailItem('回程費',money(fees.returnTripFee))}
+        ${financeDetailItem('特殊任務費',money(fees.specialTaskFee))}${financeDetailItem('任務處理時間費',money(fees.taskHandlingFee))}${financeDetailItem('平台服務費',money(fees.platformServiceFee))}
+        ${financeDetailItem('急件／速度費',money(fees.speedFee))}${financeDetailItem('等待費',money(fees.waitingFee))}${financeDetailItem('上樓費',money(fees.upstairsFee))}
+        ${financeDetailItem('商品體積費',money(fees.itemSizeFee))}${financeDetailItem('超重費',money(fees.overweightFee))}${financeDetailItem('夜間費',money(fees.nightFee))}
+        ${financeDetailItem('天候保障費',money(fees.weatherFee))}${financeDetailItem('動態調度費',money(fees.dynamicPricingFee))}${financeDetailItem('取消補償',money(fees.cancellationCompensation))}
+        ${financeDetailItem('追加費用',money(fees.additionalFee))}${financeDetailItem('取消費',money(fees.cancellationFee))}${financeDetailItem('折扣',money(fees.discountAmount))}
+        ${financeDetailItem('退款',money(fees.refundAmount))}${financeDetailItem('結算狀態',o.settlementStatus||'-')}
       </div>
       ${reasons.length?`<div class="finance-discrepancy"><b>尚有差異：</b>${esc(reasons.join('、'))}</div>`:''}
       <div class="finance-form"><div class="panel-title">調整金額</div><div class="finance-form-row"><select id="financeAdjustField" class="finance-input"><option value="finalCustomerTotal">最終應收</option><option value="actualPaidAmount">客戶實收</option><option value="riderAdvance">小U代墊</option><option value="riderIncome">小U任務收入</option><option value="platformIncome">平台收入</option><option value="waitingFee">等待費</option><option value="upstairsFee">上樓費</option><option value="additionalFee">追加費用</option><option value="cancellationFee">取消費</option><option value="discountAmount">折扣</option><option value="refundAmount">退款</option></select><input id="financeAdjustValue" class="finance-input" type="number" min="0" step="1" placeholder="新金額"></div><input id="financeOperator" class="finance-input" value="finance_center" placeholder="處理人員"><textarea id="financeAdjustReason" class="finance-textarea" placeholder="必填：金額調整原因"></textarea><button class="btn primary" onclick="submitFinanceAdjustment('${esc(o.orderId)}')">儲存金額調整</button></div>
@@ -744,148 +670,6 @@ async function settleJko(orderIds,button){
 
 
 
-function membershipStatusLabel(r){
-  const status=String(r?.displayStatus||r?.status||'').toLowerCase();
-  if(r?.verified===true||['verified','waived'].includes(status)) return '已完成開通';
-  if(status==='submitted') return '等待核對';
-  if(status==='submitted_overdue') return '逾期・等待核對';
-  if(status==='overdue') return '逾期・已暫停派單';
-  if(status==='rejected_overdue') return '查無付款・已暫停';
-  if(status==='rejected') return '查無付款';
-  if(status==='grace') return '繳費期間';
-  if(status==='pending') return '待完成';
-  if(status==='not_started') return '尚未開放';
-  return status||'待完成';
-}
-function membershipStatusClass(r){
-  const status=String(r?.displayStatus||r?.status||'').toLowerCase();
-  if(r?.verified===true||['verified','waived'].includes(status)) return 'verified';
-  if(status.includes('submitted')) return status.includes('overdue')?'overdue':'submitted';
-  if(status.includes('rejected')) return 'rejected';
-  if(status==='overdue') return 'overdue';
-  if(status==='not_started') return 'not-started';
-  return '';
-}
-function membershipMatches(r,query){
-  if(!query) return true;
-  return [r.name,r.phone,r.riderId,r.id,r.payerName]
-    .map(normalizeSearch)
-    .some(v=>v.includes(query));
-}
-function membershipFilterMatches(r,filter){
-  if(filter==='all') return true;
-  if(filter==='verified') return r.verified===true;
-  if(filter==='submitted') return ['submitted','submitted_overdue'].includes(String(r.displayStatus||''));
-  if(filter==='rejected') return ['rejected','rejected_overdue'].includes(String(r.displayStatus||''));
-  if(filter==='overdue') return ['overdue','submitted_overdue','rejected_overdue'].includes(String(r.displayStatus||''));
-  if(filter==='incomplete') return r.verified!==true;
-  return true;
-}
-function renderMembershipSummary(){
-  const s=state.membershipFees?.summary||{};
-  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
-  set('membershipTotal',Number(s.total||0).toLocaleString('zh-TW'));
-  set('membershipSubmitted',Number(s.submitted||0).toLocaleString('zh-TW'));
-  set('membershipVerified',Number(s.verified||0).toLocaleString('zh-TW'));
-  set('membershipIncomplete',Number(s.incomplete||0).toLocaleString('zh-TW'));
-  set('membershipOverdue',Number(s.overdue||0).toLocaleString('zh-TW'));
-  set('membershipVerifiedAmount',money(s.verifiedAmount||0));
-  const tab=document.getElementById('membershipTabCount');
-  if(tab) tab.textContent=Number(s.submitted||0)>0?`(${Number(s.submitted||0)})`:'';
-}
-async function membershipFinanceFetch(path,options={}){
-  const headers={...(options.headers||{})};
-  if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';
-  const res=await fetch(`${API_BASE}${path}`,{...options,headers,cache:'no-store'});
-  return readJson(res);
-}
-async function loadMembershipFees(showMessage=false){
-  const el=document.getElementById('membershipList');
-  if(!el)return;
-  if(!showMessage) el.innerHTML='<div class="empty">正在讀取資格開通費資料...</div>';
-  try{
-    state.membershipFees=await membershipFinanceFetch('/api/admin/rider-membership-fees?t='+Date.now());
-    renderMembershipSummary();
-    renderMembershipFees();
-    if(showMessage)showToast('小U資格開通費資料已更新');
-  }catch(err){
-    el.innerHTML=`<div class="empty">讀取資格開通費失敗：${esc(err.message)}</div>`;
-  }
-}
-function renderMembershipFees(){
-  const el=document.getElementById('membershipList');if(!el)return;
-  const query=normalizeSearch(document.getElementById('membershipSearch')?.value);
-  const filter=String(document.getElementById('membershipStatusFilter')?.value||'all');
-  let riders=Array.isArray(state.membershipFees?.riders)?state.membershipFees.riders:[];
-  riders=riders.filter(r=>membershipMatches(r,query)&&membershipFilterMatches(r,filter));
-  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的小U資格開通費資料。</div>';return;}
-
-  el.innerHTML=riders.map(r=>{
-    const cls=membershipStatusClass(r);
-    const cohort=r.cohort==='new'?'新加入小U':'既有小U';
-    const paymentName=r.payerName||r.name||'-';
-    const canVerify=r.verified!==true;
-    const submitted=['submitted','submitted_overdue'].includes(String(r.displayStatus||''));
-    const dispatchText=r.dispatchAllowed===false?'資格費鎖定':'資格費未鎖定';
-    const actualAccept=r.canAcceptOrders===true?'目前可接單':'目前不可接單';
-    const actionHtml=canVerify?`
-      <div class="membership-actions">
-        <button class="btn primary" ${submitted?'':'disabled title="小U尚未回報付款"'} onclick="verifyMembershipPayment('${esc(r.phone||r.riderId||r.id)}','verified',this)">確認已付款</button>
-        <button class="btn red" ${submitted?'':'disabled title="小U尚未回報付款"'} onclick="verifyMembershipPayment('${esc(r.phone||r.riderId||r.id)}','rejected',this)">查無付款</button>
-      </div>`:'';
-    return `<article class="membership-card ${cls}">
-      <div class="membership-head">
-        <div>
-          <div class="membership-name">${esc(r.name||'未設定小U姓名')}</div>
-          <div class="membership-meta">手機：${esc(r.phone||'-')}<br>Rider ID：${esc(r.riderId||r.id||'-')}</div>
-        </div>
-        <div class="membership-amount">
-          <strong>${money(r.amount)}</strong>
-          <span>${esc(cohort)}</span>
-          <span class="membership-status ${cls}">${esc(membershipStatusLabel(r))}</span>
-        </div>
-      </div>
-      <div class="membership-info-grid">
-        <div class="membership-info"><span>付款人</span><strong>${esc(paymentName)}</strong></div>
-        <div class="membership-info"><span>付款回報時間</span><strong>${esc(formatTime(r.submittedAtMs))}</strong></div>
-        <div class="membership-info"><span>核對時間</span><strong>${esc(formatTime(r.verifiedAtMs||r.reviewedAtMs))}</strong></div>
-        <div class="membership-info"><span>價格狀態</span><strong>${esc(r.earlyPriceLocked?'NT$299 已鎖定':r.earlyPriceExpired?'早期價已失效':'依目前制度')}</strong></div>
-        <div class="membership-info"><span>派單狀態</span><strong>${esc(dispatchText)}・${esc(actualAccept)}</strong></div>
-      </div>
-      ${r.reviewNote?`<div class="section-note" style="margin-top:10px;margin-bottom:0"><strong>核對備註：</strong>${esc(r.reviewNote)}</div>`:''}
-      ${actionHtml}
-    </article>`;
-  }).join('');
-}
-async function verifyMembershipPayment(riderId,action,button){
-  if(!riderId)return;
-  const isVerified=action==='verified';
-  const promptText=isVerified
-    ? '請再次確認：你已在街口收款紀錄中找到這筆付款。\\n\\n確認後，小U將標記為已完成資格開通；若因資格費被暫停派單，系統會自動恢復資格判定。'
-    : '確認在街口收款紀錄中查無此筆付款？\\n\\n此操作會將回報標記為「查無付款」。若已超過 10/11，原 NT$299 早期價將失效，重新付款改按 NT$499。';
-  if(!confirm(promptText))return;
-  const note=prompt(isVerified?'核對備註（可留空）：':'請輸入查無付款的簡短備註：',isVerified?'街口收款紀錄已確認':'街口紀錄查無對應款項')||'';
-  const old=button?.textContent;
-  if(button){button.disabled=true;button.textContent=isVerified?'確認中...':'處理中...';}
-  try{
-    await membershipFinanceFetch('/api/rider/v4/membership-fee/admin/verify',{
-      method:'POST',
-      body:JSON.stringify({
-        riderId,
-        action,
-        operator:'finance_center',
-        note
-      })
-    });
-    showToast(isVerified?'資格開通費已確認':'已標記查無付款');
-    await loadMembershipFees(false);
-  }catch(err){
-    alert('資格開通費核對失敗：'+err.message);
-    if(button){button.disabled=false;button.textContent=old;}
-  }
-}
-
-
 function getV4AdminKey(){return String(sessionStorage.getItem('ubee_v4_admin_key')||'').trim();}
 function saveV4AdminKey(){const input=document.getElementById('v4AdminKey');const key=String(input?.value||'').trim();if(!key){alert('請輸入 V4 管理金鑰。');return;}sessionStorage.setItem('ubee_v4_admin_key',key);loadV4Riders(true).catch(()=>{});}
 async function v4AdminFetch(path,options={}){const key=getV4AdminKey();if(!key)throw new Error('請先輸入 V4 管理金鑰。');const headers={...(options.headers||{}),'x-ubee-admin-key':key};if(options.body&&!headers['Content-Type'])headers['Content-Type']='application/json';const res=await fetch(`${API_BASE}${path}`,{...options,headers,cache:'no-store'});return readJson(res);}
@@ -906,7 +690,7 @@ async function v4Action(riderId,action){
   let reason='';let value='';if(['warn','retraining','restrict','suspend'].includes(action)){reason=prompt('請輸入原因／說明：','')||'';if(!reason.trim())return;}if(action==='retraining'){value=prompt('指定重新教育課程代碼：','general_rules')||'general_rules';}if(action==='restore'&&!confirm('確認恢復此小U接單資格？'))return;
   try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action,reason,value})});showToast('V4 資格已更新');await loadV4Riders();}catch(err){alert('操作失敗：'+err.message);}
 }
-async function setV4Level(riderId){const value=(prompt('設定等級：L1 / L2 / L3','L1')||'').toUpperCase();if(!['L1','L2','L3'].includes(value))return;try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action:'set_level',value})});await loadV4Riders();showToast('等級已更新');}catch(err){alert(err.message);}}
+async function setV4Level(riderId){const value=(prompt('設定等級：L1 / L2 / L3 / L4\nL4 需後端驗證已完成 12 堂核心教學與 80 分以上測驗。','L1')||'').toUpperCase();if(!['L1','L2','L3','L4'].includes(value))return;try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action:'set_level',value})});await loadV4Riders();showToast('等級已更新');}catch(err){alert(err.message);}}
 async function setV4Cert(riderId){const cert=prompt('認證代碼：\nhigh_value_advance\ncake_flower\ncar_delivery\nbusiness_documents\nmulti_stop','high_value_advance');if(!cert)return;const grant=confirm('按「確定」＝授予認證；按「取消」＝撤銷認證。');try{await v4AdminFetch('/api/admin/rider-v4/action',{method:'POST',body:JSON.stringify({riderId,action:grant?'grant_cert':'revoke_cert',value:cert})});await loadV4Riders();showToast('認證已更新');}catch(err){alert(err.message);}}
 
 async function healthCheck(){
@@ -927,7 +711,7 @@ async function refreshAll(showMessage=false){
   try{
     const ok=await healthCheck();
     if(!ok){if(showMessage)showToast('目前無法連上 UBee 後端，保留畫面最後資料。');return;}
-    const jobs=[loadOverview(true),loadCashRemittances(true),loadSettlements(true),loadFinanceLedger(false),loadMembershipFees(false)];
+    const jobs=[loadOverview(true),loadCashRemittances(true),loadSettlements(true),loadFinanceLedger(false)];
     await Promise.all(jobs);
     if(showMessage)showToast('財務資料已全部更新');
   }finally{state.loading=false;}
