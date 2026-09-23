@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-23
+// 2026-09-23｜Customer Production Multi-stop UI V1：確認一般客戶多點配送契約；送達點 2 選填，僅有有效第二點時納入路線與多點配送費。
 // 2026-09-23｜Dispatch & Finance Contract Sync V1：調度 Dashboard 補完整多點配送／代墊欄位；財務契約維持後端唯一來源。
 // Core：App Access Hard Lock／Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking／Customer Cloud Draft
 // =====================================================
