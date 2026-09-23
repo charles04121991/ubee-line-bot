@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-23
+// 2026-09-23｜Customer Multi-stop Quote Lock Fix V1：修正多點報價快照 deliveryStops 字串/物件格式不一致，避免建立任務時誤判「多點送達路線已變更」。
 // 2026-09-23｜Rider Multi-stop Visibility V1：待接任務 Preview 補多點配送安全摘要；接單前只回行政區、站點數與多點費，不洩露完整地址。
 // 2026-09-23｜Customer Production Multi-stop UI V1：確認一般客戶多點配送契約；送達點 2 選填，僅有有效第二點時納入路線與多點配送費。
 // 2026-09-23｜Dispatch & Finance Contract Sync V1：調度 Dashboard 補完整多點配送／代墊欄位；財務契約維持後端唯一來源。
@@ -25466,7 +25467,10 @@ async function createDynamicPricingQuoteSnapshot({
     upstairsFee: getCanonicalUpstairsFee(requestData.upstairsOption),
     pickupAddress: String(requestData.pickupAddress || requestData.pickup || requestData.from || ''),
     dropoffAddress: String(requestData.dropoffAddress || requestData.dropoff || requestData.to || ''),
-    deliveryStops: getCustomerRouteStopAddresses(requestData),
+    deliveryStops: getCustomerRouteStopAddresses(requestData).map((dropoffAddress, index) => ({
+      index:index + 1,
+      dropoffAddress,
+    })),
     stopCount: getCustomerRouteStopAddresses(requestData).length,
     multiDropoff: getCustomerRouteStopAddresses(requestData).length > 1,
     advancePayment: Math.max(0, Math.round(dynamicSafeNumber(requestData.advancePayment))),
@@ -27267,11 +27271,21 @@ function normalizeCustomerDeliveryStopAddress(value) {
 
 function getCustomerRouteStopAddresses(input = {}) {
   const rawStops = Array.isArray(input.deliveryStops) ? input.deliveryStops : [];
+
+  // Quote Snapshot 舊版曾把 deliveryStops 存成字串陣列，
+  // 正式訂單則是物件陣列。這裡統一同時相容兩種格式，
+  // 避免多點報價完成後在建單驗證時誤判「路線已變更」。
+  const readStopAddress = stop => normalizeCustomerDeliveryStopAddress(
+    typeof stop === 'string'
+      ? stop
+      : (stop?.dropoffAddress || stop?.address || stop?.dropoff || '')
+  );
+
   const primary = normalizeCustomerDeliveryStopAddress(
-    input.to || input.dropoff || input.dropoffAddress || rawStops[0]?.dropoffAddress || rawStops[0]?.address || ''
+    input.to || input.dropoff || input.dropoffAddress || readStopAddress(rawStops[0]) || ''
   );
   const secondary = normalizeCustomerDeliveryStopAddress(
-    input.to2 || input.dropoff2 || input.dropoff2Address || rawStops[1]?.dropoffAddress || rawStops[1]?.address || ''
+    input.to2 || input.dropoff2 || input.dropoff2Address || readStopAddress(rawStops[1]) || ''
   );
   return [primary, secondary].filter(Boolean).slice(0, CUSTOMER_MAX_DELIVERY_STOPS);
 }
