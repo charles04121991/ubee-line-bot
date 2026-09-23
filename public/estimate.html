@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+<!-- 2026-09-23｜Quick Estimate Multi-stop Fee V1：第 1 送達點不加價，第二送達點選填；有填則固定 +NT$50。 -->
 <head>
+<!-- 2026-09-23｜Quick Estimate Multi-stop V1：送達點 1 必填、送達點 2 選填；第二點留空不影響估價。 -->
 <!-- 2026-09-17｜Quick Estimate Profit Pricing V1：正式使用後端統一定價，補齊平台管理費、版本與報價鎖定資訊。 -->
 <!-- UBee 店家平台 V3 相容：店家正式價格由後端 V3 建單 API 重新計算，本頁維持一般客戶估價。 -->
   <meta charset="UTF-8" />
@@ -405,9 +407,15 @@
       </div>
 
       <div class="field" id="toField">
-        <label id="toLabel" for="toInput">3. 送達地點</label>
+        <label id="toLabel" for="toInput">3. 送達點 1</label>
         <input id="toInput" type="text" placeholder="例如：潭子車站" autocomplete="street-address" />
-        <div id="toHint" class="hint">請輸入完整送達地址或明確地標。</div>
+        <div id="toHint" class="hint">第一個送達點為主要送達地址。</div>
+      </div>
+
+      <div class="field" id="to2Field">
+        <label for="to2Input">送達點 2（選填）</label>
+        <input id="to2Input" type="text" placeholder="第二個送達點可留空" autocomplete="street-address" />
+        <div class="hint">沒有第二個送達點請直接留空；有填第二個送達點時固定加收 NT$50，多點道路里程仍會納入配送距離。</div>
       </div>
 
       <div class="field hidden" id="advanceField">
@@ -477,6 +485,11 @@
           <strong id="speedText">一般件</strong>
         </div>
 
+        <div class="row hidden" id="stopCountRow">
+          <span>送達點數</span>
+          <strong id="stopCountText">1 個</strong>
+        </div>
+
         <div class="row">
           <span id="distanceRowLabel">預估距離</span>
           <strong id="distanceText">-</strong>
@@ -495,6 +508,11 @@
         <div class="row">
           <span>配送費</span>
           <strong id="deliveryFeeText">$0</strong>
+        </div>
+
+        <div class="row hidden" id="multiStopFeeRow">
+          <span>多點配送費</span>
+          <strong id="multiStopFeeText">$0</strong>
         </div>
 
         <div class="row">
@@ -732,6 +750,8 @@
     const toLabel = document.getElementById('toLabel');
     const toInput = document.getElementById('toInput');
     const toHint = document.getElementById('toHint');
+    const to2Field = document.getElementById('to2Field');
+    const to2Input = document.getElementById('to2Input');
 
     const advanceField = document.getElementById('advanceField');
     const advanceLabel = document.getElementById('advanceLabel');
@@ -754,6 +774,8 @@
     const totalPrice = document.getElementById('totalPrice');
     const serviceText = document.getElementById('serviceText');
     const speedText = document.getElementById('speedText');
+    const stopCountRow = document.getElementById('stopCountRow');
+    const stopCountText = document.getElementById('stopCountText');
 
     const distanceRowLabel = document.getElementById('distanceRowLabel');
     const distanceText = document.getElementById('distanceText');
@@ -763,6 +785,8 @@
 
     const serviceSubtotalText = document.getElementById('serviceSubtotalText');
     const deliveryFeeText = document.getElementById('deliveryFeeText');
+    const multiStopFeeRow = document.getElementById('multiStopFeeRow');
+    const multiStopFeeText = document.getElementById('multiStopFeeText');
     const serviceFeeText = document.getElementById('serviceFeeText');
     const basePlatformServiceFeeRow = document.getElementById('basePlatformServiceFeeRow');
     const basePlatformServiceFeeText = document.getElementById('basePlatformServiceFeeText');
@@ -846,6 +870,8 @@
       toHint.textContent = config.toHint || '';
 
       toggleField(toField, !config.hideTo);
+      toggleField(to2Field, !config.hideTo);
+      if(config.hideTo) to2Input.value = '';
       toggleField(advanceField, config.showAdvance);
       toggleField(queueField, config.showQueue);
       toggleField(taskMinutesField, config.showTaskMinutes);
@@ -878,6 +904,7 @@
 
       const from = fromInput.value.trim();
       const to = toInput.value.trim();
+      const to2 = to2Input.value.trim();
 
       if (!from) {
         if (config.mode === 'queue') {
@@ -899,8 +926,18 @@
       }
 
       if (!config.hideTo && to && from === to) {
-        showError('取件地點／任務地點與送達地點不能相同。');
+        showError('取件地點／任務地點與送達點 1 不能相同。');
         toInput.focus();
+        return false;
+      }
+      if (!config.hideTo && to2 && !to) {
+        showError('請先填寫送達點 1；送達點 2 可以留空。');
+        toInput.focus();
+        return false;
+      }
+      if (!config.hideTo && to2 && (to2 === to || to2 === from)) {
+        showError('送達點 2 不可與取件地點或送達點 1 相同。');
+        to2Input.focus();
         return false;
       }
 
@@ -952,6 +989,7 @@
 
       const from = fromInput.value.trim();
       const to = toInput.value.trim();
+      const to2 = to2Input.value.trim();
       const advancePayment = config.showAdvance ? numberValue(advanceInput) : 0;
 
       const params = new URLSearchParams({
@@ -964,6 +1002,9 @@
 
       if (!config.hideTo && to) {
         params.set('to', to);
+      }
+      if (!config.hideTo && to2) {
+        params.set('to2', to2);
       }
 
       if (config.showQueue) {
@@ -992,6 +1033,9 @@
 
       serviceText.textContent = selectedService;
       speedText.textContent = data.speedLabel || getSpeedLabel(selectedSpeed);
+      const stopCount = Math.max(0, Number(data.stopCount || 0));
+      stopCountText.textContent = `${stopCount || 1} 個`;
+      setRowVisible(stopCountRow, Boolean(data.multiDropoff));
 
       if (data.serviceMode === 'queue') {
         distanceRowLabel.textContent = '任務型態';
@@ -1015,6 +1059,9 @@
 
       serviceSubtotalText.textContent = money(serviceSubtotal);
       deliveryFeeText.textContent = money(data.deliveryFee);
+      const multiStopFee = Number(data.multiStopFee || data.extraStopFee || 0);
+      multiStopFeeText.textContent = money(multiStopFee);
+      setRowVisible(multiStopFeeRow, multiStopFee > 0);
       serviceFeeText.textContent = money(data.serviceFee);
       speedFeeText.textContent = money(data.speedFee);
 
@@ -1110,6 +1157,10 @@
         notice += ' 本次區域供需正常，未收取動態調度費；後端報價鎖定 10 分鐘。';
       }
 
+      if(Number(data.multiStopFee || data.extraStopFee || 0)>0){
+        notice+=` 本次使用第 2 個送達點，已加收多點配送費 ${money(data.multiStopFee || data.extraStopFee)}；道路總里程以「取件 → 送達點 1 → 送達點 2」計算。`;
+      }
+
       if(speedPlatformFee>0){
         notice+=` 本次${data.speedLabel||getSpeedLabel(selectedSpeed)}總加價為 ${money(Number(data.speedFee||0)+speedPlatformFee)}，包含小U時效加價與平台時效管理費。`;
       }
@@ -1159,7 +1210,7 @@
       });
     });
 
-    [fromInput, toInput, advanceInput, queueMinutesInput, taskMinutesInput].forEach((input) => {
+    [fromInput, toInput, to2Input, advanceInput, queueMinutesInput, taskMinutesInput].forEach((input) => {
       input.addEventListener('input', () => {
         clearError();
         hideResult();
