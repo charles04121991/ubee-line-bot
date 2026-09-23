@@ -45,7 +45,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260923-customer-production-multistop-ui-v1';
+const UBEE_CUSTOMER_SW_VERSION = '20260923-customer-draft-resume-fix-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
