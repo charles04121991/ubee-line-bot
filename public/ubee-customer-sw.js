@@ -1,3 +1,6 @@
+/* 2026-09-23｜Customer Multi-stop Delivery V1：同步一般客戶雙送達點、多點報價／建單與新版快取。 */
+/* 2026-09-23｜Customer Cloud Draft V1：同步跨裝置會員雲端草稿 API；草稿 API 維持 Network Only。 */
+/* 2026-09-23｜Customer Local State Fix V1：同步用戶端定位偏好、帳號本機資料隔離與草稿恢復修正。 */
 /* 2026-09-20｜Customer Rider Rating V1：同步完成任務小U評價功能。 */
 /* 2026-09-19｜Customer Cancel UX V1：同步訂單列表／詳情／進行中任務取消入口。 */
 /* 2026-09-18｜Smart Stack V1.1：同步 QUEUED Live ETA 與 Recovery Hard Lock 客戶端。 */
@@ -37,9 +40,11 @@
  * ============================================================
  */
 
+/* 2026-09-23｜Customer Multi-stop Fee V1：同步第二送達點選填與每新增一點固定 +NT$50 的正式報價版本。 */
+
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260921-customer-rider-rating-fullscreen-v1-7';
+const UBEE_CUSTOMER_SW_VERSION = '20260923-customer-multi-stop-fee-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
