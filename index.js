@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-23
+// 2026-09-23｜Rider Multi-stop Route Refresh V1：完成目前送達點後同步切換下一站座標/Place ID，騎士端可立即重算並重畫下一段路線。
 // 2026-09-23｜Customer Multi-stop Quote Lock Fix V1：修正多點報價快照 deliveryStops 字串/物件格式不一致，避免建立任務時誤判「多點送達路線已變更」。
 // 2026-09-23｜Rider Multi-stop Visibility V1：待接任務 Preview 補多點配送安全摘要；接單前只回行政區、站點數與多點費，不洩露完整地址。
 // 2026-09-23｜Customer Production Multi-stop UI V1：確認一般客戶多點配送契約；送達點 2 選填，僅有有效第二點時納入路線與多點配送費。
@@ -25657,6 +25658,57 @@ async function consumeDynamicPricingQuote(quoteRef, orderId) {
   }, { merge: true });
 }
 
+// Production Order Atomicity V1：正式客戶建單與 Quote 消耗必須在同一 Firestore transaction。
+// 避免雙擊／網路重送時兩個請求同時看到 active quote 而建立兩張訂單。
+async function saveCustomerOrderWithQuoteLock(order, quoteRef) {
+  if (!order?.id || !quoteRef) {
+    const error = new Error('正式報價或訂單資料不存在，請重新估價。');
+    error.code = 'QUOTE_REQUIRED';
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const orderId = String(order.id).trim().toUpperCase();
+  const orderRef = db.collection('orders').doc(orderId);
+  const nowMs = Date.now();
+
+  await db.runTransaction(async transaction => {
+    const quoteSnap = await transaction.get(quoteRef);
+    if (!quoteSnap.exists) {
+      const error = new Error('找不到正式報價，請重新估價。');
+      error.code = 'QUOTE_NOT_FOUND';
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const quoteData = quoteSnap.data() || {};
+    if (String(quoteData.status || 'active') !== 'active') {
+      const error = new Error('此報價已使用或失效，請重新估價。');
+      error.code = 'QUOTE_USED';
+      error.statusCode = 409;
+      throw error;
+    }
+    if (nowMs > dynamicSafeNumber(quoteData.expiresAtMs)) {
+      const error = new Error('即時運力狀況已變化，請確認更新後的價格。');
+      error.code = 'QUOTE_EXPIRED';
+      error.statusCode = 409;
+      throw error;
+    }
+
+    transaction.set(orderRef, { ...order, id: orderId }, { merge: true });
+    transaction.set(quoteRef, {
+      status: 'used',
+      usedAtMs: nowMs,
+      usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      orderId,
+    }, { merge: true });
+  });
+
+  order.id = orderId;
+  orders[orderId] = order;
+  return order;
+}
+
 function summarizeDynamicPricingForDashboard(zones = [], globalSettings = {}) {
   return {
     version: DYNAMIC_PRICING_V3.version,
@@ -26401,7 +26453,7 @@ function isAdminGroup(event) {
 }
 
 function isTerminalOrderStatus(order) {
-  return ['completed', 'cancelled'].includes(order?.status);
+  return ['completed', 'done', 'cancelled', 'canceled'].includes(String(order?.status || '').trim().toLowerCase());
 }
 
 function isOrderCustomer(event, order) {
@@ -26665,6 +26717,16 @@ function validateOrderInput(data) {
 }
 
 function getDuplicateFingerprint(data) {
+  const stopFingerprint = (Array.isArray(data.deliveryStops) ? data.deliveryStops : [])
+    .map(stop => [
+      normalizeAddress(stop?.dropoffAddress || stop?.address || ''),
+      String(stop?.customerName || stop?.receiverName || '').trim(),
+      String(stop?.customerPhone || stop?.dropoffPhone || '').trim(),
+      cleanText(stop?.dropoffAddressNote || stop?.addressNote || stop?.note || '', 160),
+    ].join('~'))
+    .filter(Boolean)
+    .join('>');
+
   return [
     String(data.userId || '').trim(),
     String(data.serviceGroup || '').trim(),
@@ -26674,14 +26736,16 @@ function getDuplicateFingerprint(data) {
     data.singlePointTask === true ? 'single_point' : 'route_task',
     normalizeAddress(data.pickupAddress),
     normalizeAddress(data.dropoffAddress),
-    (Array.isArray(data.deliveryStops) ? data.deliveryStops : [])
-      .map(stop => normalizeAddress(stop?.dropoffAddress || ''))
-      .filter(Boolean)
-      .join('>'),
+    stopFingerprint,
+    String(data.pickupContact || '').trim(),
     String(data.pickupPhone || '').trim(),
+    String(data.dropoffContact || '').trim(),
     String(data.dropoffPhone || '').trim(),
     cleanText(data.item, ORDER_INPUT_LIMITS.item),
     cleanText(data.note, ORDER_INPUT_LIMITS.note),
+    String(Math.max(0, Math.round(Number(data.advancePayment || 0)))),
+    String(normalizeCustomerUpstairsOption(data.upstairsOption)),
+    String(normalizeItemSize(data.itemSize)),
     String(data.queueMinutes || ''),
     String(data.taskMinutes || ''),
     String(data.taskDetails?.reportMode || ''),
@@ -26701,7 +26765,7 @@ async function findRecentDuplicateOrder(data) {
   for (const order of Object.values(orders)) {
     if (!order || !order.createdAt) continue;
     if (now - Number(order.createdAt) > DUPLICATE_ORDER_WINDOW_MS) continue;
-    if (['cancelled', 'completed'].includes(order.status)) continue;
+    if (['cancelled', 'canceled', 'completed', 'done'].includes(String(order.status || '').toLowerCase())) continue;
     if (order.duplicateFingerprint === fingerprint) return order;
   }
 
@@ -26714,7 +26778,7 @@ async function findRecentDuplicateOrder(data) {
       .limit(1)
       .get();
 
-    if (!snap.empty) return snap.docs[0].data();
+    if (!snap.empty) return { id: snap.docs[0].id, ...(snap.docs[0].data() || {}) };
   } catch (err) {
     console.error('❌ 查詢重複訂單失敗：', err);
   }
@@ -26915,7 +26979,7 @@ async function handleAdminForceCancel(event, orderId, reason, groupDenyText) {
   const order = await getOrderOrReply(event.replyToken, orderId);
   if (!order) return null;
 
-  if (['completed', 'cancelled'].includes(order.status)) {
+  if (['completed', 'done', 'cancelled', 'canceled'].includes(String(order.status || '').trim().toLowerCase())) {
     return replyText(
       event.replyToken,
       `此訂單目前狀態為「${getStatusLabel(order.status)}」，不可重複取消。`
@@ -34766,6 +34830,37 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       verifiedStoreResult.storeDiscovery
     );
 
+    // Production Idempotency V1：先找回短時間內已成功建立的相同訂單。
+    // 這一步必須早於 Quote 驗證，才能處理「訂單已建立、但手機沒收到成功回應」後的重送。
+    const duplicateOrder = await findRecentDuplicateOrder(data);
+    if (duplicateOrder?.id) {
+      const duplicateTotal = Math.max(0, Math.round(Number(
+        duplicateOrder.customerPayableTotal ||
+        duplicateOrder.payableTotal ||
+        duplicateOrder.finalTotal ||
+        duplicateOrder.total ||
+        0
+      )));
+      return res.json({
+        success: true,
+        duplicateRecovered: true,
+        orderId: String(duplicateOrder.id).toUpperCase(),
+        order: duplicateOrder,
+        paymentMethod: String(duplicateOrder.paymentMethod || ''),
+        paymentMethodLabel: String(duplicateOrder.paymentMethodLabel || '尚未選擇'),
+        paymentLabel: String(duplicateOrder.paymentLabel || '尚未選擇'),
+        paymentInfo: '',
+        paymentOptions: { cash: getPaymentInfo('cash', duplicateTotal) },
+        total: duplicateTotal,
+        serviceSubtotal: Math.max(0, Math.round(Number(duplicateOrder.serviceSubtotal || duplicateOrder.serviceTotal || 0))),
+        customerPayableTotal: duplicateTotal,
+        advancePayment: Math.max(0, Math.round(Number(duplicateOrder.advancePayment || 0))),
+        message: '已找回剛剛建立成功的訂單。',
+        apiVersion: 'customer-order-v5-multi-stop-idempotent',
+        addressCenterVersion: duplicateOrder.addressCenterVersion || '',
+      });
+    }
+
     const quoteValidation = await loadValidDynamicPricingQuote(
       req.body.quoteId || data.quoteId
     );
@@ -34801,15 +34896,6 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
       return res.status(400).json({
         success: false,
         error: inputErrors[0],
-      });
-    }
-
-    const duplicateOrder = await findRecentDuplicateOrder(data);
-    if (duplicateOrder) {
-      return res.status(409).json({
-        success: false,
-        error: `系統偵測到你剛剛已送出相同訂單，請勿重複下單。原訂單編號：${duplicateOrder.id}`,
-        orderId: duplicateOrder.id,
       });
     }
 
@@ -35515,7 +35601,8 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     // Level 4：由後端統一產生可信任的區域與時間特徵，不依賴前端判斷。
     Object.assign(order, buildDispatchOrderMetadata(order, Date.now()));
 
-    await saveOrder(order);
+    // 訂單與 Quote 在同一 transaction 內提交：成功就兩者一起成功，失敗就兩者都不寫入。
+    await saveCustomerOrderWithQuoteLock(order, quoteValidation.ref);
 
     await markGrowthReferralProgress('customer', req.customerAuth.customerId, 'order_created', {
       firstOrderCreatedId:String(order.id || id || ''),
@@ -35532,16 +35619,14 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
       createdAtMs:getDispatchOrderCreatedAtMs(order) || Date.now(),
     }).catch(()=>{});
 
-    await notifyCustomer(order, createTextMessage(
+    // 通知屬於非關鍵副作用：即使 LINE / Push 暫時失敗，已成功建立的訂單仍應回 200。
+    notifyCustomer(order, createTextMessage(
       `✅ 訂單已建立：${order.id}\n\n` +
       `目前 UBee 跑腿先開放現金單。\n` +
       `請回到網頁確認使用現金單，確認後系統才會開始媒合騎士。`
-    ));
-
-    await consumeDynamicPricingQuote(
-      quoteValidation.ref,
-      id
-    );
+    )).catch(error => {
+      console.warn(`⚠️ 訂單 ${order.id} 已建立，但客戶通知失敗：`, error?.message || error);
+    });
 
     res.json({
       success: true,
@@ -35564,8 +35649,10 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
     });
   } catch (error) {
   console.error('❌ API 建立訂單失敗：', error.message || error);
-  res.status(500).json({
+  const statusCode = Number(error?.statusCode || 500);
+  res.status(Number.isFinite(statusCode) ? statusCode : 500).json({
     success: false,
+    code: error?.code || 'ORDER_CREATE_FAILED',
     error: error.message || '建立訂單失敗，請稍後再試'
   });
 }
@@ -35602,6 +35689,40 @@ app.post('/api/orders/:orderId/payment-method', requireCustomerAuth, async (req,
     }
 
     const currentStatus = String(order.status || '').trim();
+
+    // Payment Idempotency V1：如果現金付款其實已確認成功，只是客戶端沒有收到上一個回應，
+    // 再送一次相同請求時直接回傳目前訂單，不得把成功狀態誤報成失敗。
+    if (
+      String(order.paymentMethod || '').trim().toLowerCase() === 'cash' &&
+      order.isCashOrder === true &&
+      order.paymentStatus === 'cash_on_delivery' &&
+      !['pending_payment', 'merchant_pending'].includes(currentStatus)
+    ) {
+      const existingTotal = Math.max(0, Math.round(Number(
+        order.customerPayableTotal ||
+        order.payableTotal ||
+        order.riderDisplayTotal ||
+        order.total ||
+        0
+      )));
+      return res.json({
+        success: true,
+        idempotent: true,
+        orderId,
+        status: currentStatus,
+        paymentMethod: 'cash',
+        paymentMethodLabel: '現金付款',
+        paymentLabel: '現金付款',
+        paymentStatus: 'cash_on_delivery',
+        isCashOrder: true,
+        cashCollectAmount: Math.max(0, Math.round(Number(order.cashCollectAmount || existingTotal))),
+        total: existingTotal,
+        customerPayableTotal: existingTotal,
+        advancePayment: parseNonNegativeMoney(order.advancePayment),
+        paymentInfo: getPaymentInfo('cash', existingTotal),
+        message: '現金單已確認，沿用目前任務狀態。',
+      });
+    }
 
     // 正式版保護：
     // 正常情況只允許 pending_payment。
@@ -35674,55 +35795,9 @@ app.post('/api/orders/:orderId/payment-method', requireCustomerAuth, async (req,
 
       await saveOrder(order);
 
-      // Customer Dispatch Recovery Backend V1：
-      // 立即現金單確認後必須正式啟動全區派單，不再只把 status 改成 pending_dispatch 後等待騎士端輪詢。
-      if (!scheduledOrder) {
-        const dispatchNowMs = Date.now();
-        const dispatchPushCycleId = buildDispatchPushCycleId(orderId);
-
-        order.dispatchPushCycleId = dispatchPushCycleId;
-        order.dispatchPushNotifiedRiderDocIds = [];
-        order.dispatchPushStage = 'scheduled';
-        order.dispatchStartedAtMs = dispatchNowMs;
-        order.updatedAtMs = dispatchNowMs;
-
-        await db.collection('orders').doc(orderId).set(
-          {
-            status: 'pending_dispatch',
-            riderStatus: 'pending_dispatch',
-            dispatchPushCycleId,
-            dispatchPushNotifiedRiderDocIds: [],
-            dispatchPushStage: 'scheduled',
-            dispatchStartedAtMs: dispatchNowMs,
-            dispatchStartedAt: admin.firestore.FieldValue.serverTimestamp(),
-            dispatchedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAtMs: dispatchNowMs,
-          },
-          { merge: true }
-        );
-
-        clearDispatchPushTimers(orderId);
-
-        setImmediate(() => {
-          startDispatchPushSequence(
-            {
-              ...order,
-              status: 'pending_dispatch',
-              riderStatus: 'pending_dispatch',
-              dispatchPushCycleId,
-              createdAtMs: getDispatchOrderCreatedAtMs(order) || dispatchNowMs,
-              updatedAtMs: dispatchNowMs,
-            },
-            dispatchPushCycleId
-          ).catch((pushError) => {
-            console.error(
-              '⚠️ 現金立即單已進待接池，但啟動全區派單 Push 失敗：',
-              pushError
-            );
-          });
-        });
-      }
+      // Dispatch Single-Owner V1：立即單的派單啟動統一交給 saveOrder()。
+      // saveOrder() 在 pending_dispatch 且尚未 pushSentAt 時會呼叫 startOrderDispatchInBackground()，
+      // 此處不得再建立第二個 dispatch cycle，避免重複 Push／重複排程。
 
       if (scheduledOrder) {
         setImmediate(() => {
@@ -36710,7 +36785,7 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
         if (oldOrderDoc.exists) {
           const oldOrder = oldOrderDoc.data() || {};
 
-          if (!['completed', 'cancelled'].includes(oldOrder.status)) {
+          if (!['completed', 'done', 'cancelled', 'canceled'].includes(String(oldOrder.status || '').trim().toLowerCase())) {
             throw new Error('RIDER_ALREADY_BUSY');
           }
         }
@@ -38003,6 +38078,39 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
             nextStop.dropoffAddress || nextStop.dropoff || '',
           dropoff:
             nextStop.dropoffAddress || nextStop.dropoff || '',
+          // Multi-stop Route Refresh V1：切站時必須連同導航座標／Place ID 一起切換。
+          // 騎士端路線引擎座標優先於文字地址；若殘留上一站座標，
+          // 即使 dropoffAddress 已換成下一站，仍會錯畫回上一站。
+          dropoffLat: (() => {
+            const raw = nextStop.dropoffLat ?? nextStop.lat;
+            if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+            const value = Number(raw);
+            return Number.isFinite(value) && value >= -90 && value <= 90 ? value : null;
+          })(),
+          dropoffLng: (() => {
+            const raw = nextStop.dropoffLng ?? nextStop.lng;
+            if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+            const value = Number(raw);
+            return Number.isFinite(value) && value >= -180 && value <= 180 ? value : null;
+          })(),
+          toLat: (() => {
+            const raw = nextStop.dropoffLat ?? nextStop.lat;
+            if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+            const value = Number(raw);
+            return Number.isFinite(value) && value >= -90 && value <= 90 ? value : null;
+          })(),
+          toLng: (() => {
+            const raw = nextStop.dropoffLng ?? nextStop.lng;
+            if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+            const value = Number(raw);
+            return Number.isFinite(value) && value >= -180 && value <= 180 ? value : null;
+          })(),
+          dropoffPlaceId:
+            String(nextStop.dropoffPlaceId || nextStop.placeId || ''),
+          toPlaceId:
+            String(nextStop.dropoffPlaceId || nextStop.placeId || ''),
+          dropoffAddressNote:
+            String(nextStop.dropoffAddressNote || nextStop.addressNote || nextStop.note || ''),
           itemName:
             nextStop.itemName || nextStop.item || order.itemName || '',
           item:
@@ -38077,6 +38185,31 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         trackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         ...etaPayload,
       };
+
+      // Multi-stop Final Stop Integrity V1：最後一個送達點完成時，
+      // 除了整張 order=completed，也必須把目前 deliveryStop 本身標成 completed。
+      // 否則會出現「訂單已完成，但最後一站仍是 current、完成站數少 1」的不一致資料。
+      if (
+        status === 'completed' &&
+        currentStatus === 'arrived_dropoff' &&
+        deliveryStops.length > 0
+      ) {
+        const finalStop = deliveryStops[currentDeliveryStopIndex] || {};
+        deliveryStops[currentDeliveryStopIndex] = {
+          ...finalStop,
+          status: 'completed',
+          completedAtMs: transitionNowMs,
+        };
+        updateData.deliveryStops = deliveryStops;
+        updateData.completedDeliveryStopCount = Math.max(
+          Number(order.completedDeliveryStopCount || 0),
+          currentDeliveryStopIndex + 1
+        );
+        updateData.lastCompletedDeliveryStopIndex = currentDeliveryStopIndex;
+        updateData.lastCompletedDeliveryStopAtMs = transitionNowMs;
+        updateData.lastCompletedDeliveryStopAt =
+          admin.firestore.FieldValue.serverTimestamp();
+      }
 
       // 小U抵達取件／送達地時，後端立即開始可信任的等候計時。
       if (status === 'arrived_pickup') {
@@ -40139,10 +40272,11 @@ app.post('/api/dispatch/orders/:orderId/assign', async (req, res) => {
             oldOrderDoc.data() || {};
 
           if (
-            !['completed', 'cancelled']
+            !['completed', 'done', 'cancelled', 'canceled']
               .includes(
                 String(oldOrder.status || '')
                   .trim()
+                  .toLowerCase()
               )
           ) {
             throw new Error(
@@ -44533,7 +44667,7 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
     stage,
     title:copy.title,
     description:copy.description,
-    isTerminal:['completed','cancelled'].includes(status),
+    isTerminal:['completed','done','cancelled','canceled'].includes(String(status || '').toLowerCase()),
     serviceType:String(order.serviceType || order.serviceName || 'UBee 跑腿任務'),
     serviceGroup:String(order.serviceGroup || order.serviceKey || ''),
     singlePointTask:order.singlePointTask === true,
@@ -45215,7 +45349,7 @@ const CUSTOMER_ORDER_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CUSTOMER_ORDER_DRAFT_GROUPS = new Set(['send','pickup','buy','queue','helper','urgent']);
 const CUSTOMER_ORDER_DRAFT_TIMING_TYPES = new Set(['immediate','scheduled','flexible']);
 const CUSTOMER_ORDER_DRAFT_SCHEDULE_GOALS = new Set(['pickup_at','deliver_by']);
-const CUSTOMER_ORDER_DRAFT_SPEED_TYPES = new Set(['standard','express','economy']);
+const CUSTOMER_ORDER_DRAFT_SPEED_TYPES = new Set(['standard','priority','express','economy']);
 const CUSTOMER_ORDER_DRAFT_SERVICE_MODES = new Set(['normal','queue','custom']);
 const CUSTOMER_ORDER_DRAFT_REPLACEMENT_POLICIES = new Set(['contact','replace','skip']);
 
