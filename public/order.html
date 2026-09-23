@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-23 Production Audit：已核對 index / order / rider API 與多點配送契約；本檔無需功能修正。 -->
 <!-- 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；留空不阻擋流程，有填才納入多點路線並加收 NT$50。 -->
 <!-- 2026-09-23｜Customer Multi-stop Fee V1：送達點 1 必填、送達點 2 選填；每新增 1 個有效送達點固定加 NT$50，正式報價與建單一致。 -->
 <!-- 2026-09-23｜Customer Cloud Draft V1：會員未完成任務同步至 Firestore；支援跨手機恢復、本機離線備援、7 日有效期與成功建單／捨棄後雲端清除。 -->
@@ -46,7 +47,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260923-customer-production-multistop-ui-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260923-customer-draft-resume-fix-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -18135,10 +18136,26 @@ const UBeeEnhancements = (() => {
     const el=document.createElement('div');
     el.className='draft-banner';
     el.id='draftBanner';
-    el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}${d.dropoff2?` → ${escapeAttr(d.dropoff2)}`:''}<br>${new Date(draftTimeMs(d)).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">繼續填寫</button></div>`;
+    el.innerHTML=`<strong>找到尚未完成的任務</strong><div class="field-help">${escapeAttr(d.pickup||'尚未填取件點')} → ${escapeAttr(d.dropoff||'尚未填送達點')}${d.dropoff2?` → ${escapeAttr(d.dropoff2)}`:''}<br>${new Date(draftTimeMs(d)).toLocaleString('zh-TW')}</div><div class="draft-banner-actions"><button class="draft-discard" type="button">捨棄</button><button class="draft-continue" type="button">重新編輯</button></div>`;
     (document.querySelector('#productionOrderFlow #flowPageHome .flow-home-scroll')||document.querySelector('#productionOrderFlow #flowPageHome .flow-scroll')||document.querySelector('.app')||document.body).prepend(el);
     el.querySelector('.draft-discard').onclick=()=>{el.remove();clearDraft()};
-    el.querySelector('.draft-continue').onclick=()=>{restoreDraft(d);el.remove();showOnlyStep(Math.min(4,Math.max(1,Number(d.currentStep)||1)))};
+    el.querySelector('.draft-continue').onclick=async()=>{
+      const button=el.querySelector('.draft-continue');
+      if(button?.disabled)return;
+      if(button)button.disabled=true;
+      try{
+        // 先恢復舊相容層欄位，確保正式 getPayload / quote contract 一致。
+        restoreDraft(d);
+        // 正式畫面已是 productionOrderFlow；不能再只切換隱藏的 legacy step。
+        const restored=await window.restoreUBeeProductionDraft?.(d);
+        if(restored===false)throw new Error('正式編輯流程尚未完成載入');
+        el.remove();
+      }catch(error){
+        console.error('恢復未完成任務失敗：',error);
+        if(button)button.disabled=false;
+        try{window.showUBeeCustomerNativeAlert?.('草稿暫時無法恢復，請重新整理後再試。','草稿恢復失敗');}catch(_){ }
+      }
+    };
   }
 
   async function syncDraftFromCloud(){
@@ -20780,6 +20797,151 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }catch(error){console.warn('同步正式訂單欄位失敗：',error)}
   }
 
+  function productionDraftAddress(address,contactName,phone,addressDetail,lat,lng,placeId,label){
+    const text=String(address||'').trim();
+    if(!text)return null;
+    const safeLat=Number(lat),safeLng=Number(lng);
+    const point=Number.isFinite(safeLat)&&Number.isFinite(safeLng)&&safeLat>=-90&&safeLat<=90&&safeLng>=-180&&safeLng<=180;
+    return{
+      label:String(label||'').trim(),
+      address:text,
+      formattedAddress:text,
+      addressDetail:String(addressDetail||'').trim(),
+      contactName:String(contactName||'').trim(),
+      phone:cleanPhone(phone||''),
+      placeId:String(placeId||'').trim(),
+      lat:point?safeLat:null,
+      lng:point?safeLng:null,
+      source:'draft_resume'
+    };
+  }
+
+  function parseDraftPurchaseDetails(d={}){
+    const items=Array.isArray(d.shoppingItems)?d.shoppingItems:[];
+    const first=items[0]&&typeof items[0]==='object'?items[0]:{};
+    const note=String(d.note||'');
+    const lineValue=label=>{
+      const line=note.split(/\r?\n/).find(row=>String(row||'').trim().startsWith(`${label}：`));
+      return line?String(line).split('：').slice(1).join('：').trim():'';
+    };
+    const policyText=lineValue('缺貨處理');
+    const replacementPolicy=String(first.replacementPolicy||'').toLowerCase();
+    let outOfStockAction='contact_customer';
+    if(replacementPolicy==='similar'||replacementPolicy==='replace'||/相近商品/.test(policyText))outOfStockAction='similar_item';
+    else if(replacementPolicy==='skip'||/不購買/.test(policyText))outOfStockAction='skip_item';
+    return normalizePurchaseDetails({
+      productName:first.name||lineValue('商品'),
+      quantity:first.quantity||lineValue('數量'),
+      specification:first.specification||lineValue('規格'),
+      outOfStockAction,
+      additionalNote:first.additionalNote||lineValue('其他需求')
+    });
+  }
+
+  function draftTaipeiParts(ms,withDate=true){
+    const value=Number(ms||0);
+    if(!Number.isFinite(value)||value<=0)return null;
+    const p={};
+    new Intl.DateTimeFormat('en-CA',{
+      timeZone:'Asia/Taipei',
+      ...(withDate?{year:'numeric',month:'2-digit',day:'2-digit'}:{}),
+      hour:'2-digit',minute:'2-digit',hour12:false
+    }).formatToParts(new Date(value)).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});
+    return{date:withDate?`${p.year}-${p.month}-${p.day}`:'',time:`${p.hour}:${p.minute}`};
+  }
+
+  window.restoreUBeeProductionDraft=async function restoreUBeeProductionDraft(d={}){
+    try{
+      const group=serviceLabels?.[d.serviceGroup]?String(d.serviceGroup):'send';
+      state.service=group;
+      root.querySelectorAll('.flow-service-tab').forEach(btn=>{
+        const active=btn.dataset.service===group;
+        btn.classList.toggle('active',active);
+        btn.setAttribute('aria-selected',active?'true':'false');
+      });
+
+      let list=[];try{list=serviceGroups?.[group]||[]}catch(_){list=[]}
+      const typeIndex=list.findIndex(item=>String(item?.title||'')===String(d.serviceType||''));
+      state.serviceTypeIndex=typeIndex>=0?typeIndex:0;
+      state.serviceCategory=String(d.serviceCategory||'').trim();
+
+      const copy=homeServiceCopy[group]||homeServiceCopy.send;
+      state.pickup=productionDraftAddress(d.pickup,d.pickupContact,d.pickupPhone,d.pickupAddressNote,d.pickupLat,d.pickupLng,d.pickupPlaceId,copy.pickupLabel);
+      state.dropoff=productionDraftAddress(d.dropoff,d.dropoffContact,d.dropoffPhone,d.dropoffAddressNote,d.dropoffLat,d.dropoffLng,d.dropoffPlaceId,copy.dropoffLabel);
+      state.dropoff2=productionDraftAddress(d.dropoff2,d.dropoff2Contact,d.dropoff2Phone||d.dropoffPhone,d.dropoff2AddressNote,d.dropoff2Lat,d.dropoff2Lng,d.dropoff2PlaceId,'送達點 2');
+
+      state.singlePointTask=group==='helper' && !!state.pickup && !!state.dropoff &&
+        String(state.pickup.address||'').trim()===String(state.dropoff.address||'').trim() && !state.dropoff2;
+      if(state.singlePointTask&&state.dropoff)state.dropoff={...state.dropoff,_autoSinglePoint:true};
+      if(group==='queue'&&state.pickup){
+        state.dropoff={...state.pickup,label:'現場完成',_autoQueue:true};
+        state.dropoff2=null;
+      }
+
+      state.taskName=String(d.serviceType||'').trim()||(list[state.serviceTypeIndex]?.title||serviceLabels[group]);
+      state.taskNote=String(d.note||'').trim();
+      if(group==='buy'){
+        state.purchaseDetails=parseDraftPurchaseDetails(d);
+      }else if(group==='helper'){
+        const noteLines=String(d.note||'').split(/\r?\n/).map(line=>String(line||'').trim()).filter(Boolean);
+        const reportLine=noteLines.find(line=>line.startsWith('現場回報：'))||'';
+        const handoffLine=noteLines.find(line=>line.startsWith('現場交接：'))||'';
+        state.helperDetails=normalizeHelperDetails({
+          reportMode:/拍照＋文字/.test(reportLine)?'photo_text':/拍照/.test(reportLine)?'photo':/文字/.test(reportLine)?'text':'none',
+          handoffMode:/詢問/.test(handoffLine)?'inquire':/領取/.test(handoffLine)?'pickup':/交付/.test(handoffLine)?'deliver':'none'
+        });
+        state.taskNote=noteLines.filter(line=>!line.startsWith('現場回報：')&&!line.startsWith('現場交接：')).join('\n');
+      }
+      state.itemSize=String(d.itemSize||'small').trim()||'small';
+      state.upstairs=String(d.upstairsOption||'none').trim()||'none';
+      state.advancePayment=Math.max(0,Math.round(Number(d.advancePayment)||0));
+      state.queueMinutes=Math.max(10,Math.min(480,Math.round(Number(d.queueMinutes)||30)));
+      state.taskMinutes=Math.max(10,Math.min(480,Math.round(Number(d.taskMinutes)||30)));
+      state.timing=['immediate','scheduled','flexible'].includes(String(d.orderTimingType||''))?String(d.orderTimingType):'immediate';
+      state.scheduleGoal=['pickup_at','deliver_by'].includes(String(d.scheduleGoal||''))?String(d.scheduleGoal):'pickup_at';
+      state.speed=['standard','priority','express'].includes(String(d.speedType||''))?String(d.speedType):'standard';
+
+      const scheduled=draftTaipeiParts(d.requestedScheduleAtMs,true);
+      const flexibleStart=draftTaipeiParts(d.flexibleStartAtMs,true);
+      const flexibleEnd=draftTaipeiParts(d.flexibleEndAtMs,false);
+      state.scheduledDate=scheduled?.date||'';
+      state.scheduledTime=scheduled?.time||'';
+      state.flexibleDate=flexibleStart?.date||'';
+      state.flexibleStart=flexibleStart?.time||'';
+      state.flexibleEnd=flexibleEnd?.time||'';
+
+      document.body.classList.remove('ubee-active-order','ubee-store-active','ubee-my-subpage-open');
+      root.classList.add('active');
+      document.body.classList.add('flow-active');
+      syncServiceSelectors();
+      setTiming(state.timing);
+      setSpeed(state.speed);
+      if($('flowScheduleGoal'))$('flowScheduleGoal').value=state.scheduleGoal;
+      if($('flowScheduledDate')&&state.scheduledDate)$('flowScheduledDate').value=state.scheduledDate;
+      if($('flowScheduledTime')&&state.scheduledTime)$('flowScheduledTime').value=state.scheduledTime;
+      if($('flowFlexibleDate')&&state.flexibleDate)$('flowFlexibleDate').value=state.flexibleDate;
+      if($('flowFlexibleStart')&&state.flexibleStart)$('flowFlexibleStart').value=state.flexibleStart;
+      if($('flowFlexibleEnd')&&state.flexibleEnd)$('flowFlexibleEnd').value=state.flexibleEnd;
+      updateHome();
+      syncLegacy();
+
+      const step=Math.min(4,Math.max(1,Number(d.currentStep)||1));
+      if(step>=4 && state.pickup && state.dropoff){
+        await openConfirm();
+      }else if(step===3){
+        showPage('options');
+      }else if(step===2){
+        showPage('task');
+      }else{
+        showPage('home');
+      }
+      return true;
+    }catch(error){
+      console.error('正式 production 草稿恢復失敗：',error);
+      return false;
+    }
+  };
+
   function wrapPayload(){
     try{
       if(typeof getPayload!=='function'||getPayload.__productionFlowWrapped)return;
@@ -21549,7 +21711,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260923-customer-production-multistop-ui-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260923-customer-draft-resume-fix-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22972,7 +23134,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.09.23.4';
+  const APP_VERSION = '2026.09.23.5';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
