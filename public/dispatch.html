@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-23｜Dispatch Multi-stop & Finance Sync V1：完整顯示多點配送、+NT$50 多點費與代墊資訊；對齊最新版 index Dashboard contract。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1.1：顯示 Google Routes 真實銜接與 QUEUED Live ETA。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1：調度中心顯示 CURRENT／QUEUED、疊單群組與下一筆任務。 -->
 <!-- 2026-09-17｜Dispatch Profit Control V1：顯示客戶支付、小U收入、平台應得、實收／待收、定價版本與獲利警示。 -->
@@ -1771,11 +1772,21 @@ async function drawSelectedOrderRoute(order,pickup,dropoff){
 
   if(!state.directionsService || !state.directionsRenderer) return;
 
+  const geoStops=getDispatchDeliveryStops(order)
+    .filter(stop=>hasTaiwanMapLatLng(stop.dropoffLat,stop.dropoffLng));
+  const routePoints=geoStops.length
+    ? geoStops.map(stop=>({lat:Number(stop.dropoffLat),lng:Number(stop.dropoffLng)}))
+    : [dropoff];
+  const destination=routePoints[routePoints.length-1]||dropoff;
+  const waypoints=routePoints.slice(0,-1).map(location=>({location,stopover:true}));
+
   try{
     const result = await new Promise((resolve,reject)=>{
       state.directionsService.route({
         origin:pickup,
-        destination:dropoff,
+        destination,
+        waypoints,
+        optimizeWaypoints:false,
         travelMode:google.maps.TravelMode.DRIVING,
         provideRouteAlternatives:false
       },(response,status)=>{
@@ -1792,7 +1803,7 @@ async function drawSelectedOrderRoute(order,pickup,dropoff){
 
     const line = new google.maps.Polyline({
       map:state.map,
-      path:[pickup,dropoff],
+      path:[pickup,...routePoints],
       strokeColor:'#171717',
       strokeWeight:6,
       strokeOpacity:.88,
@@ -1946,25 +1957,32 @@ async function renderMap(){
           <small>${esc(order.statusLabel || order.status || '')}</small><hr style="border:0;border-top:1px solid #eee">
           <small><b>取件：</b>${esc(order.pickupAddress || '-')}</small><br>
           <small><b>送達：</b>${esc(order.dropoffAddress || '-')}</small><br>
+          ${dispatchStopCount(order)>1?`<small><b>多點：</b>${esc(dispatchStopCount(order))} 點・${esc(dispatchMoney(order.multiStopFee||0))}</small><br>`:''}
           <small>NT$ ${esc(order.total || 0)}</small>
         </div>`
     });
 
     if(selected){
-      if(hasTaiwanMapLatLng(order.dropoffLat,order.dropoffLng)){
-        const dropoff = {lat:Number(order.dropoffLat),lng:Number(order.dropoffLng)};
-        bounds.extend(dropoff); hasBounds = true;
-
+      const selectedStops=getDispatchDeliveryStops(order);
+      let geoStops=selectedStops.filter(stop=>hasTaiwanMapLatLng(stop.dropoffLat,stop.dropoffLng));
+      if(!geoStops.length && hasTaiwanMapLatLng(order.dropoffLat,order.dropoffLng)){
+        geoStops=[{index:1,dropoffAddress:order.dropoffAddress||'',dropoffLat:Number(order.dropoffLat),dropoffLng:Number(order.dropoffLng)}];
+      }
+      geoStops.forEach((stop,index)=>{
+        const position={lat:Number(stop.dropoffLat),lng:Number(stop.dropoffLng)};
+        bounds.extend(position); hasBounds=true;
         createOpsMarker({
-          position:dropoff,
-          label:'送',
+          position,
+          label:String(index+1),
           fillColor:'#f5b800',
-          title:`送達：${order.id}`,
-          zIndex:500,
-          infoHtml:`<div style="min-width:180px"><b>送達點</b><br><small>${esc(order.dropoffAddress || '-')}</small></div>`
+          title:`送達點 ${index+1}：${order.id}`,
+          zIndex:500-index,
+          infoHtml:`<div style="min-width:180px"><b>送達點 ${index+1}</b><br><small>${esc(stop.dropoffAddress||'-')}</small></div>`
         });
-
-        drawSelectedOrderRoute(order,pickup,dropoff);
+      });
+      if(geoStops.length){
+        const finalStop=geoStops[geoStops.length-1];
+        drawSelectedOrderRoute(order,pickup,{lat:Number(finalStop.dropoffLat),lng:Number(finalStop.dropoffLng)});
       }
 
       if(kind === 'waiting'){
@@ -2741,6 +2759,63 @@ function smartStackMeta(order){
   return '';
 }
 
+function getDispatchDeliveryStops(order={}){
+  const raw=Array.isArray(order.deliveryStops)?order.deliveryStops:[];
+  const stops=raw.map((stop,index)=>({
+    index:Math.max(1,Number(stop?.index||index+1)),
+    customerName:String(stop?.customerName||''),
+    customerPhone:String(stop?.customerPhone||''),
+    dropoffAddress:String(stop?.dropoffAddress||stop?.address||''),
+    dropoffLat:Number.isFinite(Number(stop?.dropoffLat))?Number(stop.dropoffLat):null,
+    dropoffLng:Number.isFinite(Number(stop?.dropoffLng))?Number(stop.dropoffLng):null,
+    addressNote:String(stop?.addressNote||stop?.dropoffAddressNote||''),
+    status:String(stop?.status||''),
+  })).filter(stop=>stop.dropoffAddress);
+
+  if(!stops.length && order.dropoffAddress){
+    stops.push({
+      index:1,
+      customerName:'',
+      customerPhone:'',
+      dropoffAddress:String(order.dropoffAddress||''),
+      dropoffLat:Number.isFinite(Number(order.dropoffLat))?Number(order.dropoffLat):null,
+      dropoffLng:Number.isFinite(Number(order.dropoffLng))?Number(order.dropoffLng):null,
+      addressNote:'',
+      status:'',
+    });
+  }
+  return stops;
+}
+
+function dispatchStopCount(order={}){
+  return Math.max(1,Number(order.stopCount||getDispatchDeliveryStops(order).length||1));
+}
+
+function dispatchAdvancePayment(order={}){
+  return Math.max(0,Number(order.advancePayment??order.finance?.riderAdvance??0)||0);
+}
+
+function renderDispatchRouteLines(order={}){
+  const stops=getDispatchDeliveryStops(order);
+  const stopLines=stops.map((stop,index)=>`
+    <div class="route-line">
+      <span class="pin dropoff"></span>
+      <div><b>${stops.length>1?`送達點 ${index+1}`:'送達'}</b>　${esc(stop.dropoffAddress||'-')}</div>
+    </div>`).join('');
+  return `
+    <div class="route-line">
+      <span class="pin pickup"></span>
+      <div><b>取件</b>　${esc(order.pickupAddress||'-')}</div>
+    </div>
+    ${stopLines||`<div class="route-line"><span class="pin dropoff"></span><div><b>送達</b>　${esc(order.dropoffAddress||'-')}</div></div>`}`;
+}
+
+function renderDispatchStopSummary(order={}){
+  const stops=getDispatchDeliveryStops(order);
+  if(!stops.length) return '送達：-';
+  return stops.map((stop,index)=>`${stops.length>1?`送達點 ${index+1}`:'送達'}：${esc(stop.dropoffAddress||'-')}`).join('<br>');
+}
+
 function renderOrders(){
   let list = [...(state.data.orders || [])];
 
@@ -2786,6 +2861,7 @@ function renderOrders(){
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
               ${order.serviceType?`<span class="badge blue">${esc(order.serviceType)}</span>`:''}
               ${order.serviceCategory?`<span class="badge">${esc(order.serviceCategory)}</span>`:''}
+              ${dispatchStopCount(order)>1?`<span class="badge blue">多點 ${esc(dispatchStopCount(order))} 點</span>`:''}
               ${smartStackBadge(order)}
               ${profitStatusBadge(profit)}
               ${merchantLiveTrackingBadges(order)}
@@ -2802,15 +2878,9 @@ function renderOrders(){
         </div>
 
         <div class="route">
-          <div class="route-line">
-            <span class="pin pickup"></span>
-            <div><b>取件</b>　${esc(order.pickupAddress || '-')}</div>
-          </div>
-          <div class="route-line">
-            <span class="pin dropoff"></span>
-            <div><b>送達</b>　${esc(order.dropoffAddress || '-')}</div>
-          </div>
+          ${renderDispatchRouteLines(order)}
         </div>
+        ${Number(order.multiStopFee||0)>0||dispatchAdvancePayment(order)>0?`<div class="candidate-meta" style="margin-top:8px">${Number(order.multiStopFee||0)>0?`多點配送費 ${esc(dispatchMoney(order.multiStopFee))}`:''}${Number(order.multiStopFee||0)>0&&dispatchAdvancePayment(order)>0?' · ':''}${dispatchAdvancePayment(order)>0?`預估代墊 ${esc(dispatchMoney(dispatchAdvancePayment(order)))}`:''}</div>`:''}
 
         ${renderTaskContractStrip(order,{compact:true})}
         ${Array.isArray(order.riskReasons)&&order.riskReasons.length?`<div class="candidate-meta" style="margin-top:8px;color:${order.riskLevel==='CRITICAL'?'var(--red)':order.riskLevel==='HIGH'?'#b05e00':'var(--muted)'}">系統判斷：${esc(order.riskReasons.slice(0,3).join('；'))}</div>`:''}
@@ -3049,6 +3119,9 @@ function renderCandidates(){
     <strong>${esc(order.id)}</strong>
     <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.55">
       取件：${esc(order.pickupAddress || '-')}<br>
+      ${renderDispatchStopSummary(order)}<br>
+      ${dispatchStopCount(order)>1?`<span style="color:var(--blue);font-weight:1000">多點配送：${esc(dispatchStopCount(order))} 點｜多點配送費 ${esc(dispatchMoney(order.multiStopFee||0))}</span><br>`:''}
+      ${dispatchAdvancePayment(order)>0?`預估代墊：<b style="color:#111">${esc(dispatchMoney(dispatchAdvancePayment(order)))}</b><br>`:''}
       任務：${esc(order.serviceType || 'UBee 任務')}${order.serviceCategory?`｜${esc(order.serviceCategory)}`:''}<br>
       狀態：${esc(order.statusLabel || order.status || '-')}<br>
       ${!isWaiting?`目前小U：<b style="color:#111">${esc(order.riderName||order.riderId||order.riderDocId||'-')}</b><br>`:''}
@@ -3084,6 +3157,8 @@ function renderCandidates(){
         ${pricingComponents.length?`｜${esc(pricingComponents.join('、'))}`:''}<br>
         <strong>任務費分潤桶：</strong>${esc(dispatchMoney(order.shareableTaskSubtotal||0))}
         ｜<strong>小U專屬加價：</strong>${esc(dispatchMoney(order.riderOnlySurchargeSubtotal||0))}<br>
+        <strong>多點配送費：</strong>${esc(dispatchMoney(order.multiStopFee||0))}
+        ｜<strong>預估代墊：</strong>${esc(dispatchMoney(dispatchAdvancePayment(order)))}<br>
         <strong>付款：</strong>${esc(financeStatusLabel(finance.paymentStatus))}
         ｜<strong>結算：</strong>${esc(financeStatusLabel(finance.settlementStatus))}
         ｜<strong>對帳：</strong>${esc(financeStatusLabel(finance.reconciliationStatus))}
