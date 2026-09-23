@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；留空不阻擋流程，有填才納入多點路線並加收 NT$50。 -->
 <!-- 2026-09-23｜Customer Multi-stop Fee V1：送達點 1 必填、送達點 2 選填；每新增 1 個有效送達點固定加 NT$50，正式報價與建單一致。 -->
 <!-- 2026-09-23｜Customer Cloud Draft V1：會員未完成任務同步至 Firestore；支援跨手機恢復、本機離線備援、7 日有效期與成功建單／捨棄後雲端清除。 -->
 <!-- 2026-09-23｜Customer Local State Fix V1：修正定位偏好尊重使用者設定、恢復未完成任務草稿、草稿／常用地址依會員隔離、統一 App/PWA Release。 -->
@@ -45,7 +46,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260923-customer-multi-stop-fee-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260923-customer-production-multistop-ui-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19480,10 +19481,17 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </button>
 <button class="flow-address-button" id="flowDropoffButton" type="button">
 <span class="flow-address-dot drop"></span>
-<span class="flow-address-text"><small id="flowDropoffLabel">送達地點</small><strong id="flowDropoffText">請選擇送達地址</strong><em id="flowDropoffMeta">填寫收件人與電話</em></span>
+<span class="flow-address-text"><small id="flowDropoffLabel">送達點 1</small><strong id="flowDropoffText">請選擇第一個送達地址</strong><em id="flowDropoffMeta">第一個送達點為必填</em></span>
+<span class="flow-address-arrow">›</span>
+</button>
+<button class="flow-address-button" id="flowDropoff2Button" type="button">
+<span class="flow-address-dot drop"></span>
+<span class="flow-address-text"><small id="flowDropoff2Label">送達點 2（選填）</small><strong id="flowDropoff2Text">可不填，直接下一步</strong><em id="flowDropoff2Meta">有填才加入多點路線並加收 NT$50</em></span>
 <span class="flow-address-arrow">›</span>
 </button>
 </div>
+<div id="flowMultiStopHint" style="margin:8px 2px 0;color:#737780;font-size:12px;font-weight:800;line-height:1.55">送達點 2 為選填；留空不影響估價、下一步或正式送單。有填寫時固定加收多點配送費 NT$50。</div>
+<button class="flow-text-link" id="flowClearDropoff2" type="button" hidden style="margin-top:8px">移除送達點 2</button>
 <div class="flow-task-preview" id="flowTaskPreview"><div class="flow-task-preview-text" id="flowTaskPreviewText"></div><button class="flow-text-link" id="flowEditTaskButton" type="button">修改</button></div>
 <div class="flow-status" id="flowHomeStatus"></div>
 <button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步：填寫任務內容</button>
@@ -19765,8 +19773,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-card">
 <div class="flow-form-group"><label class="flow-label" for="flowDetailAddress">完整地址</label><input class="flow-input" id="flowDetailAddress" maxlength="240" readonly=""/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailNote">門牌、樓層及補充說明</label><input class="flow-input" id="flowDetailNote" maxlength="160" placeholder="例如：12號3樓、店名、管理室或入口說明"/></div>
-<div class="flow-form-group"><label class="flow-label" for="flowDetailName">聯絡人姓名 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailName" maxlength="60" placeholder="取件聯絡人或收件人"/></div>
-<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="09xxxxxxxx"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button></div></div>
+<div class="flow-form-group"><label class="flow-label" for="flowDetailName" id="flowDetailNameLabel">聯絡人姓名 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailName" maxlength="60" placeholder="取件聯絡人或收件人"/></div>
+<div class="flow-form-group"><label class="flow-label" for="flowDetailPhone" id="flowDetailPhoneLabel">聯絡電話 <span class="flow-required">＊</span></label><input class="flow-input" id="flowDetailPhone" inputmode="tel" maxlength="20" placeholder="09xxxxxxxx"/><div class="flow-detail-actions"><button class="flow-small-btn" id="flowUseProfileName" type="button">帶入本人姓名</button><button class="flow-small-btn" id="flowUseOtherPhone" type="button">使用另一端電話</button></div></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailLabel">常用地址名稱</label><input class="flow-input" id="flowDetailLabel" maxlength="40" placeholder="例如：家、公司、店家"/></div>
 <label class="flow-check" style="margin:0"><input id="flowSaveAddress" type="checkbox"/><span>儲存為常用地址，下次可直接選擇。</span></label>
 <div class="flow-status" id="flowDetailStatus"></div>
@@ -20160,11 +20168,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,activeTask:0,tasksRoot:0,profile:0,profileDetail:0};
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
-    pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,
+    pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,
     taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
-    detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,directionsRenderer:null,
+    detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,confirmDropoff2Marker:null,directionsRenderer:null,
     mapRenderId:0,submitting:false,profileOrders:[],selectedProfileOrder:null,
     storeContext:null
   };
@@ -20309,6 +20317,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     window.__UBEE_PRODUCTION_SINGLE_POINT_TASK__=single;
     if(single&&state.pickup){
       state.dropoff={...state.pickup,label:'現場完成',_autoSinglePoint:true};
+      state.dropoff2=null;
     }else if(state.dropoff?._autoSinglePoint){
       state.dropoff=null;
     }
@@ -20465,12 +20474,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       btn.setAttribute('aria-selected',selected?'true':'false');
     });
     const def=selectedServiceDefinition();state.taskName=def.title||serviceLabels[service];
-    if(service==='queue'&&state.pickup&&!state.dropoff)state.dropoff={...state.pickup,label:'現場完成',_autoQueue:true};if(service!=='queue'&&state.dropoff?._autoQueue)state.dropoff=null;
+    if(service==='queue'&&state.pickup&&!state.dropoff)state.dropoff={...state.pickup,label:'現場完成',_autoQueue:true};
+    if(service==='queue')state.dropoff2=null;
+    if(service!=='queue'&&state.dropoff?._autoQueue)state.dropoff=null;
     syncServiceSelectors();updateHome();
   }
 
   function updateHome(){
-    const p=state.pickup,d=state.dropoff;
+    const p=state.pickup,d=state.dropoff,d2=state.dropoff2;
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
 
     if($('flowPickupLabel')) $('flowPickupLabel').textContent=copy.pickupLabel;
@@ -20496,6 +20507,16 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           ? `${d.contactName||''} ${d.phone||''}`.trim()||`${copy.dropoffLabel}資訊已填寫`
           : copy.dropoffMeta;
 
+    const multiStopAvailable=state.service!=='queue'&&!(state.service==='helper'&&state.singlePointTask===true);
+    const dropoff2Button=$('flowDropoff2Button');
+    if(dropoff2Button)dropoff2Button.hidden=!multiStopAvailable;
+    if($('flowMultiStopHint'))$('flowMultiStopHint').hidden=!multiStopAvailable;
+    if($('flowDropoff2Text'))$('flowDropoff2Text').textContent=d2?.address||'可不填，直接下一步';
+    if($('flowDropoff2Meta'))$('flowDropoff2Meta').textContent=d2
+      ? `${d2.contactName||''} ${d2.phone||''}`.trim()||'已加入第二送達點・多點 +NT$50'
+      : '有填才加入多點路線並加收 NT$50';
+    if($('flowClearDropoff2'))$('flowClearDropoff2').hidden=!multiStopAvailable||!d2;
+
     if($('flowHomeNext')) $('flowHomeNext').textContent=copy.next;
 
     const preview=$('flowTaskPreview');
@@ -20516,7 +20537,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
     $('flowSearchTitle').textContent=target==='pickup'
       ? `選擇${copy.pickupLabel}`
-      : `選擇${copy.dropoffLabel}`;
+      : target==='dropoff2'
+        ? '選擇送達點 2（選填）'
+        : `選擇${copy.dropoffLabel}`;
     $('flowAddressSearch').value='';
     $('flowSearchResultsSection').hidden=true;
     $('flowQuickAddresses').hidden=false;
@@ -20585,17 +20608,24 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   function openDetail(base){
     state.selectedAddress={...base};
-    const existing=state.addressTarget==='pickup'?state.pickup:state.dropoff;
+    const existing=state.addressTarget==='pickup'?state.pickup:state.addressTarget==='dropoff2'?state.dropoff2:state.dropoff;
     const merged=existing&&existing.address===(base.address||base.formattedAddress)?{...base,...existing}:base;
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
     $('flowDetailTitle').textContent=state.addressTarget==='pickup'
       ? `填寫${copy.pickupLabel}資訊`
-      : `填寫${copy.dropoffLabel}資訊`;
+      : state.addressTarget==='dropoff2'
+        ? '填寫送達點 2 資訊（選填）'
+        : `填寫${copy.dropoffLabel}資訊`;
     $('flowDetailAddress').value=merged.address||merged.formattedAddress||'';
     $('flowDetailNote').value=merged.addressDetail||merged.note||'';
     $('flowDetailName').value=merged.contactName||merged.name||'';
     $('flowDetailPhone').value=merged.phone||'';
     $('flowDetailLabel').value=merged.label||'';
+    const optionalSecond=state.addressTarget==='dropoff2';
+    if($('flowDetailNameLabel'))$('flowDetailNameLabel').innerHTML=optionalSecond?'聯絡人姓名（選填）':'聯絡人姓名 <span class="flow-required">＊</span>';
+    if($('flowDetailPhoneLabel'))$('flowDetailPhoneLabel').innerHTML=optionalSecond?'聯絡電話（選填）':'聯絡電話 <span class="flow-required">＊</span>';
+    $('flowDetailName').placeholder=optionalSecond?'第二點收件人，可留空':'取件聯絡人或收件人';
+    $('flowDetailPhone').placeholder=optionalSecond?'可留空，未填則沿用送達點 1':'09xxxxxxxx';
     $('flowSaveAddress').checked=false;status('flowDetailStatus','');showPage('detail');setTimeout(()=>renderDetailMap(merged),80);
   }
 
@@ -20621,16 +20651,24 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const base=state.selectedAddress||{};
     const address=String($('flowDetailAddress').value||'').trim();const contactName=String($('flowDetailName').value||'').trim();const phone=cleanPhone($('flowDetailPhone').value);
     if(!address){status('flowDetailStatus','請先選擇完整地址。',true);return}
-    if(!contactName){status('flowDetailStatus','請填寫聯絡人姓名。',true);return}
-    if(!/^09\d{8}$/.test(phone)){status('flowDetailStatus','請填寫正確的台灣手機號碼。',true);return}
+    const optionalSecond=state.addressTarget==='dropoff2';
+    if(!optionalSecond&&!contactName){status('flowDetailStatus','請填寫聯絡人姓名。',true);return}
+    if(!optionalSecond&&!/^09\d{8}$/.test(phone)){status('flowDetailStatus','請填寫正確的台灣手機號碼。',true);return}
+    if(optionalSecond&&phone&&!/^09\d{8}$/.test(phone)){status('flowDetailStatus','第二送達點電話若有填寫，請使用正確的台灣手機號碼。',true);return}
+    if(optionalSecond){
+      const norm=value=>String(value||'').trim().replace(/\s+/g,'').toLowerCase();
+      if(norm(address)===norm(state.pickup?.address)||norm(address)===norm(state.dropoff?.address)){status('flowDetailStatus','送達點 2 不可與取件地點或送達點 1 相同。',true);return}
+    }
     let lat=Number(base.lat),lng=Number(base.lng);if(!validPoint({lat,lng})){try{const point=await geocodeAddress(address);lat=point?.lat??null;lng=point?.lng??null}catch(_){lat=null;lng=null}}
     const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
-    const defaultLabel=state.addressTarget==='pickup'?copy.pickupLabel:copy.dropoffLabel;
+    const defaultLabel=state.addressTarget==='pickup'?copy.pickupLabel:state.addressTarget==='dropoff2'?'送達點 2':copy.dropoffLabel;
     const item={label:String($('flowDetailLabel').value||'').trim()||defaultLabel,address,formattedAddress:address,addressDetail:String($('flowDetailNote').value||'').trim(),contactName,phone,placeId:String(base.placeId||''),city:String(base.city||''),district:String(base.district||''),lat:validPoint({lat,lng})?Number(lat):null,lng:validPoint({lat,lng})?Number(lng):null};
     if(state.addressTarget==='pickup'){
       state.pickup=item;
-      if(state.service==='queue')state.dropoff={...item,label:'現場完成',_autoQueue:true};
-      if(state.service==='helper'&&state.singlePointTask)state.dropoff={...item,label:'現場完成',_autoSinglePoint:true};
+      if(state.service==='queue'){state.dropoff={...item,label:'現場完成',_autoQueue:true};state.dropoff2=null;}
+      if(state.service==='helper'&&state.singlePointTask){state.dropoff={...item,label:'現場完成',_autoSinglePoint:true};state.dropoff2=null;}
+    }else if(state.addressTarget==='dropoff2'){
+      state.dropoff2={...item,contactName:contactName||'',phone:phone||state.dropoff?.phone||''};
     }else{
       state.dropoff={...item,_autoQueue:false,_autoSinglePoint:false};
       if(state.service==='helper')state.singlePointTask=false;
@@ -20638,6 +20676,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     syncSinglePointTask();
     if($('flowSaveAddress').checked)await persistAddress(item);
     updateHome();syncLegacy();
+    try{UBeeEnhancements?.saveDraft?.()}catch(_){ }
     if(typeof refreshHomeServiceStatus === 'function') refreshHomeServiceStatus();
     showPage('home');
   }
@@ -20719,9 +20758,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   function syncLegacy(){
     syncSinglePointTask();
-    const p=state.pickup||{},d=state.dropoff||{};const set=(id,value)=>{const el=$(id);if(el)el.value=value??''};
+    const p=state.pickup||{},d=state.dropoff||{},d2=state.dropoff2||{};const set=(id,value)=>{const el=$(id);if(el)el.value=value??''};
     set('pickup',p.address||'');set('pickupAddressNote',p.addressDetail||'');set('pickupContact',p.contactName||'');set('pickupPhone',p.phone||'');
     set('dropoff',d.address||'');set('dropoffAddressNote',d.addressDetail||'');set('dropoffContact',d.contactName||'');set('dropoffPhone',d.phone||'');
+    set('dropoff2',d2.address||'');set('dropoff2AddressNote',d2.addressDetail||'');set('dropoff2Contact',d2.contactName||'');set('dropoff2Phone',d2.phone||d.phone||'');
     const purchase=state.service==='buy'?normalizePurchaseDetails(state.purchaseDetails):null;
     const compiledTaskNote=purchase
       ? buildPurchaseTaskNote(purchase)
@@ -20735,7 +20775,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     set('scheduledDate',state.scheduledDate);set('scheduledTime',state.scheduledTime);set('scheduleGoal',state.scheduleGoal);set('flexibleDate',state.flexibleDate);set('flexibleStartTime',state.flexibleStart);set('flexibleEndTime',state.flexibleEnd);
     try{
       serviceGroup=state.service;serviceMode=resolveClientServiceMode(state.service,serviceLabels[state.service]);const def=selectedServiceDefinition();serviceType=def.title||serviceLabels[state.service];serviceCategory=state.serviceCategory||def.categories?.[0]||'其他';speedType=state.timing==='immediate'?state.speed:'standard';orderTimingType=state.timing;scheduleGoal=state.scheduleGoal;
-      pickupLat=validPoint(p)?Number(p.lat):null;pickupLng=validPoint(p)?Number(p.lng):null;pickupPlaceId=p.placeId||'';dropoffLat=validPoint(d)?Number(d.lat):null;dropoffLng=validPoint(d)?Number(d.lng):null;dropoffPlaceId=d.placeId||'';
+      pickupLat=validPoint(p)?Number(p.lat):null;pickupLng=validPoint(p)?Number(p.lng):null;pickupPlaceId=p.placeId||'';dropoffLat=validPoint(d)?Number(d.lat):null;dropoffLng=validPoint(d)?Number(d.lng):null;dropoffPlaceId=d.placeId||'';dropoff2Lat=validPoint(d2)?Number(d2.lat):null;dropoff2Lng=validPoint(d2)?Number(d2.lng):null;dropoff2PlaceId=d2.placeId||'';
       if(typeof selectOrderTimingType==='function')selectOrderTimingType(state.timing);if(typeof selectSpeed==='function')selectSpeed(speedType);if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();
     }catch(error){console.warn('同步正式訂單欄位失敗：',error)}
   }
@@ -20796,6 +20836,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           singlePointTask:state.service==='helper'&&state.singlePointTask===true,
           pickupAddressObject:state.pickup||null,
           dropoffAddressObject:state.dropoff||null,
+          dropoff2AddressObject:state.dropoff2||null,
           nearbyPlace:storeDiscovery?{
             name:storeDiscovery.name,
             address:storeDiscovery.address,
@@ -20816,38 +20857,53 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   async function requestRoute(){
-    syncLegacy();const p=state.pickup||{},d=state.dropoff||{};
+    syncLegacy();const p=state.pickup||{},d=state.dropoff||{},d2=state.dropoff2||{};
     if(state.service==='helper'&&state.singlePointTask===true){
       const point=validPoint(p)?{lat:Number(p.lat),lng:Number(p.lng)}:null;
       const synthetic={success:true,singlePointTask:true,distanceMeters:0,durationSeconds:0,distanceKm:0,durationMinutes:0,distanceText:'現場任務',durationText:`處理 ${Math.max(0,Number(state.taskMinutes||0))} 分鐘`,originLocation:point,destinationLocation:point};
       try{lastRouteData=synthetic}catch(_){ }
       return synthetic;
     }
-    const response=await fetch('/api/map-route',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({pickup:p.address,pickupAddress:p.address,pickupPlaceId:p.placeId||'',pickupLat:p.lat,pickupLng:p.lng,dropoff:d.address,dropoffAddress:d.address,dropoffPlaceId:d.placeId||'',dropoffLat:d.lat,dropoffLng:d.lng})});
+    const response=await fetch('/api/map-route',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({
+      pickup:p.address,pickupAddress:p.address,pickupPlaceId:p.placeId||'',pickupLat:p.lat,pickupLng:p.lng,
+      dropoff:d.address,dropoffAddress:d.address,dropoffPlaceId:d.placeId||'',dropoffLat:d.lat,dropoffLng:d.lng,
+      dropoff2:d2.address||'',dropoff2Address:d2.address||'',dropoff2PlaceId:d2.placeId||'',dropoff2Lat:d2.lat??null,dropoff2Lng:d2.lng??null
+    })});
     const data=await response.json().catch(()=>({}));if(!response.ok||data.success===false)throw new Error(data.message||data.error||'道路路線載入失敗');
-    const start=data.originLocation||{lat:data.routeStartLat??data.pickupLat,lng:data.routeStartLng??data.pickupLng};const end=data.destinationLocation||{lat:data.routeEndLat??data.dropoffLat,lng:data.routeEndLng??data.dropoffLng};if(validPoint(start)){state.pickup.lat=Number(start.lat);state.pickup.lng=Number(start.lng)}if(validPoint(end)){state.dropoff.lat=Number(end.lat);state.dropoff.lng=Number(end.lng)}
+    const start=data.originLocation||{lat:data.routeStartLat??data.pickupLat,lng:data.routeStartLng??data.pickupLng};
+    const primary=data.primaryDropoffLocation||{lat:data.dropoffLat,lng:data.dropoffLng};
+    const end=data.destinationLocation||{lat:data.routeEndLat??data.dropoff2Lat??data.dropoffLat,lng:data.routeEndLng??data.dropoff2Lng??data.dropoffLng};
+    if(validPoint(start)){state.pickup.lat=Number(start.lat);state.pickup.lng=Number(start.lng)}
+    if(validPoint(primary)){state.dropoff.lat=Number(primary.lat);state.dropoff.lng=Number(primary.lng)}
+    if(state.dropoff2&&validPoint(end)){state.dropoff2.lat=Number(end.lat);state.dropoff2.lng=Number(end.lng)}
     try{lastRouteData=data}catch(_){ }
     return data;
   }
 
-  function clearConfirmMap(){[state.confirmPolyline,state.confirmPickupMarker,state.confirmDropoffMarker].forEach(item=>{try{item?.setMap(null)}catch(_){}});state.confirmPolyline=state.confirmPickupMarker=state.confirmDropoffMarker=null;if(state.directionsRenderer){try{state.directionsRenderer.setMap(null)}catch(_){ }state.directionsRenderer=null}}
+  function clearConfirmMap(){[state.confirmPolyline,state.confirmPickupMarker,state.confirmDropoffMarker,state.confirmDropoff2Marker].forEach(item=>{try{item?.setMap(null)}catch(_){}});state.confirmPolyline=state.confirmPickupMarker=state.confirmDropoffMarker=state.confirmDropoff2Marker=null;if(state.directionsRenderer){try{state.directionsRenderer.setMap(null)}catch(_){ }state.directionsRenderer=null}}
   function routePolyline(route){return String(route?.encodedPolyline||route?.routePolyline||route?.overviewPolyline||route?.polyline||'').trim()}
   async function pointForAddress(item){if(validPoint(item))return{lat:Number(item.lat),lng:Number(item.lng)};const point=await geocodeAddress(item?.address||'');if(point){item.lat=point.lat;item.lng=point.lng}return point}
 
   async function renderConfirmMap(route=null){
-    const renderId=++state.mapRenderId;const statusEl=$('flowMapStatus');statusEl.className='flow-map-status';statusEl.innerHTML='正在載入取件位置、送達位置與道路路線…';
+    const renderId=++state.mapRenderId;const statusEl=$('flowMapStatus');statusEl.className='flow-map-status';statusEl.innerHTML='正在載入取件位置、各送達點與道路路線…';
     try{
       await ensureMaps();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));if(renderId!==state.mapRenderId)return;
-      let p=await pointForAddress(state.pickup),d=await pointForAddress(state.dropoff);if(!route){try{route=await requestRoute()}catch(error){console.warn('後端道路路線失敗，改用地圖備援：',error)}}
-      const routeStart=route?.originLocation||{lat:route?.routeStartLat??route?.pickupLat,lng:route?.routeStartLng??route?.pickupLng};const routeEnd=route?.destinationLocation||{lat:route?.routeEndLat??route?.dropoffLat,lng:route?.routeEndLng??route?.dropoffLng};if(validPoint(routeStart))p={lat:Number(routeStart.lat),lng:Number(routeStart.lng)};if(validPoint(routeEnd))d={lat:Number(routeEnd.lat),lng:Number(routeEnd.lng)};
-      if(!p&&!d)throw new Error('無法取得取件與送達座標');const center=p||d;
+      let p=await pointForAddress(state.pickup),d=await pointForAddress(state.dropoff),d2=state.dropoff2?await pointForAddress(state.dropoff2):null;if(!route){try{route=await requestRoute()}catch(error){console.warn('後端道路路線失敗，改用地圖備援：',error)}}
+      const routeStart=route?.originLocation||{lat:route?.routeStartLat??route?.pickupLat,lng:route?.routeStartLng??route?.pickupLng};
+      const routePrimary=route?.primaryDropoffLocation||{lat:route?.dropoffLat,lng:route?.dropoffLng};
+      const routeEnd=route?.destinationLocation||{lat:route?.routeEndLat??route?.dropoff2Lat??route?.dropoffLat,lng:route?.routeEndLng??route?.dropoff2Lng??route?.dropoffLng};
+      if(validPoint(routeStart))p={lat:Number(routeStart.lat),lng:Number(routeStart.lng)};
+      if(validPoint(routePrimary))d={lat:Number(routePrimary.lat),lng:Number(routePrimary.lng)};
+      if(state.dropoff2&&validPoint(routeEnd))d2={lat:Number(routeEnd.lat),lng:Number(routeEnd.lng)};
+      if(!p&&!d&&!d2)throw new Error('無法取得取件與送達座標');const center=p||d||d2;
       if(!state.confirmMap)state.confirmMap=new google.maps.Map($('flowConfirmMapCanvas'),{center,zoom:p&&d?12:16,disableDefaultUI:true,gestureHandling:'greedy',clickableIcons:false});else{state.confirmMap.setCenter(center);google.maps.event.trigger(state.confirmMap,'resize')}
       clearConfirmMap();const bounds=new google.maps.LatLngBounds();
       if(p){state.confirmPickupMarker=new google.maps.Marker({map:state.confirmMap,position:p,title:'取件地點',label:{text:'取',color:'#fff',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#111111',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(p)}
-      if(d){state.confirmDropoffMarker=new google.maps.Marker({map:state.confirmMap,position:d,title:'送達地點',label:{text:'送',color:'#111',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#f4bd00',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(d)}
+      if(d){state.confirmDropoffMarker=new google.maps.Marker({map:state.confirmMap,position:d,title:d2?'送達點 1':'送達地點',label:{text:d2?'1':'送',color:'#111',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#f4bd00',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(d)}
+      if(d2){state.confirmDropoff2Marker=new google.maps.Marker({map:state.confirmMap,position:d2,title:'送達點 2',label:{text:'2',color:'#111',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#f4bd00',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(d2)}
       let routeDrawn=false;const encoded=routePolyline(route);
       if(encoded){try{const libs=typeof loadGoogleMapsLibraries==='function'?await loadGoogleMapsLibraries():null;const path=libs?.geometry?.encoding?.decodePath?libs.geometry.encoding.decodePath(encoded):google.maps.geometry?.encoding?.decodePath(encoded);if(path?.length){state.confirmPolyline=new google.maps.Polyline({map:state.confirmMap,path,geodesic:true,strokeColor:'#111111',strokeOpacity:.9,strokeWeight:6});path.forEach(point=>bounds.extend(point));routeDrawn=true}}catch(error){console.warn('Polyline 繪製失敗：',error)}}
-      if(!routeDrawn&&p&&d&&google.maps.DirectionsService){try{const service=new google.maps.DirectionsService();const result=await service.route({origin:p,destination:d,travelMode:google.maps.TravelMode.DRIVING});state.directionsRenderer=new google.maps.DirectionsRenderer({map:state.confirmMap,directions:result,suppressMarkers:true,preserveViewport:true,polylineOptions:{strokeColor:'#111111',strokeOpacity:.9,strokeWeight:6}});const overview=result?.routes?.[0]?.overview_path||[];overview.forEach(point=>bounds.extend(point));routeDrawn=true}catch(error){console.warn('DirectionsService 備援失敗：',error)}}
+      if(!routeDrawn&&p&&d&&google.maps.DirectionsService){try{const service=new google.maps.DirectionsService();const result=await service.route({origin:p,destination:d2||d,waypoints:d2?[{location:d,stopover:true}]:[],travelMode:google.maps.TravelMode.DRIVING});state.directionsRenderer=new google.maps.DirectionsRenderer({map:state.confirmMap,directions:result,suppressMarkers:true,preserveViewport:true,polylineOptions:{strokeColor:'#111111',strokeOpacity:.9,strokeWeight:6}});const overview=result?.routes?.[0]?.overview_path||[];overview.forEach(point=>bounds.extend(point));routeDrawn=true}catch(error){console.warn('DirectionsService 備援失敗：',error)}}
       if(!bounds.isEmpty())state.confirmMap.fitBounds(bounds,48);
       setTimeout(()=>{try{google.maps.event.trigger(state.confirmMap,'resize');if(!bounds.isEmpty())state.confirmMap.fitBounds(bounds,48)}catch(_){ }},120);
       if(routeDrawn){statusEl.className='flow-map-status success';statusEl.textContent=''}else{statusEl.className='flow-map-status';statusEl.textContent='已顯示取件與送達位置，道路路線暫時無法載入。'}
@@ -20857,19 +20913,21 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   function timingLabel(){if(state.timing==='scheduled')return`${state.scheduleGoal==='complete_by'?'希望完成':'希望取件'}：${state.scheduledDate} ${state.scheduledTime}`;if(state.timing==='flexible')return`彈性時段：${state.flexibleDate} ${state.flexibleStart}～${state.flexibleEnd}`;return`立即任務・${{standard:'一般件',priority:'標準件',express:'優先件'}[state.speed]||'一般件'}`}
   function renderSummary(){
-    const p=state.pickup||{},d=state.dropoff||{},def=selectedServiceDefinition();
+    const p=state.pickup||{},d=state.dropoff||{},d2=state.dropoff2||null,def=selectedServiceDefinition();
     const summaryTaskNote=state.service==='helper'?buildHelperTaskNote(state.taskNote,state.helperDetails):state.taskNote;
     const routeRows=state.service==='helper'&&state.singlePointTask
       ? [['任務地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home']]
       : [
           ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home'],
-          ['送達地點',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}`,'home']
+          ['送達點 1',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}`,'home'],
+          ...(d2?[['送達點 2（選填）',`${d2.address||'—'}${d2.addressDetail?`\n${d2.addressDetail}`:''}`,'home']]:[])
         ];
     const contactRows=state.service==='helper'&&state.singlePointTask
       ? [['聯絡人',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home']]
       : [
           ['取件聯絡',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home'],
-          ['送達聯絡',[d.contactName,d.phone].filter(Boolean).join('・')||'—','home']
+          ['送達點 1 聯絡',[d.contactName,d.phone].filter(Boolean).join('・')||'—','home'],
+          ...(d2?[['送達點 2 聯絡',[d2.contactName,d2.phone||d.phone].filter(Boolean).join('・')||'沿用送達點 1','home']]:[])
         ];
     const taskValue=`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}${summaryTaskNote?`\n${summaryTaskNote}`:''}`;
     const optionValue=`${timingLabel()}${state.service==='queue'?`\n預估排隊 ${state.queueMinutes} 分鐘`:state.service==='helper'?`\n預估處理 ${state.taskMinutes} 分鐘`:''}`;
@@ -20900,7 +20958,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function resetNewTask(clearLegacy=true){
-    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
+    Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
     if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','dropoff2','dropoff2AddressNote','dropoff2Contact','dropoff2Phone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=dropoff2Lat=dropoff2Lng=null;pickupPlaceId=dropoffPlaceId=dropoff2PlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;try{UBeeEnhancements.clearDraft()}catch(_){localStorage.removeItem('ubee_order_draft_v2')}}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
   }
@@ -21212,7 +21270,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       if(window.UBeePrimaryNavigation?.open) window.UBeePrimaryNavigation.open(target,{source:'home-scenario'});
       else if(target==='store') window.openUBeeStorePage?.();
     }));
-    $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));
+    $('flowPickupButton').addEventListener('click',()=>openAddress('pickup'));$('flowDropoffButton').addEventListener('click',()=>openAddress('dropoff'));$('flowDropoff2Button')?.addEventListener('click',()=>openAddress('dropoff2'));$('flowClearDropoff2')?.addEventListener('click',()=>{state.dropoff2=null;syncLegacy();updateHome();try{if(typeof invalidateRoute==='function')invalidateRoute();if(typeof invalidateQuote==='function')invalidateQuote();}catch(_){ }});
     $('flowHomeNext').addEventListener('click',()=>{
       if(!state.pickup||!state.dropoff){
         const copy=homeServiceCopy[state.service]||homeServiceCopy.send;
@@ -21243,7 +21301,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowSubmitOrder').addEventListener('click',submitOrder);$('flowSummaryList').addEventListener('click',event=>{const btn=event.target.closest('[data-summary-go]');if(btn)showPage(btn.dataset.summaryGo)});
     $('flowAddressSearch').addEventListener('input',event=>{clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>searchAddress(event.target.value),350)});$('flowAddressSearch').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();clearTimeout(state.searchTimer);searchAddress(event.currentTarget.value)}});$('flowSearchClear').addEventListener('click',()=>{$('flowAddressSearch').value='';state.searchItems=[];status('flowSearchStatus','');$('flowSearchResultsSection').hidden=true;$('flowQuickAddresses').hidden=false;$('flowSearchResults').innerHTML='';setQuickAddressTab(state.quickAddressTab)});$('flowUseCurrentLocation').addEventListener('click',useCurrentLocation);root.querySelectorAll('[data-address-tab]').forEach(btn=>btn.addEventListener('click',()=>setQuickAddressTab(btn.dataset.addressTab)));
     $('flowSearchResults').addEventListener('click',event=>{const btn=event.target.closest('[data-prediction]');if(btn)choosePrediction(btn.dataset.prediction)});['flowSavedAddresses','flowRecentAddresses'].forEach(id=>$(id).addEventListener('click',event=>{const btn=event.target.closest('[data-address-list]');if(!btn)return;const list=btn.dataset.addressList==='saved'?state.savedAddresses:state.recentAddresses;openDetail(list[Number(btn.dataset.index)]||{})}));
-    $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
+    $('flowUseProfileName').addEventListener('click',()=>{$('flowDetailName').value=String(currentCustomer?.name || '')});$('flowUseOtherPhone').addEventListener('click',()=>{const other=state.addressTarget==='pickup'?state.dropoff:state.addressTarget==='dropoff2'?(state.dropoff||state.pickup):state.pickup;if(other?.phone)$('flowDetailPhone').value=other.phone});$('flowSaveDetail').addEventListener('click',saveDetail);
     $('flowProfileTasksList').addEventListener('click',async event=>{
       const cancelButton=event.target.closest('[data-cancel-profile-order]');
       if(cancelButton){
@@ -21491,7 +21549,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260923-customer-multi-stop-fee-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260923-customer-production-multistop-ui-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22914,7 +22972,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.09.23.3';
+  const APP_VERSION = '2026.09.23.4';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
