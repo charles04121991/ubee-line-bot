@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+<!-- 2026-09-23｜Quick Estimate Advance Limit Sync V1：最高自動代墊 NT$1,500；NT$1,500 可直接估價，超過才轉客服人工確認。 -->
 <!-- 2026-09-23｜Quick Estimate Multi-stop Fee V1：第 1 送達點不加價，第二送達點選填；有填則固定 +NT$50。 -->
 <head>
 <!-- 2026-09-23｜Quick Estimate Multi-stop V1：送達點 1 必填、送達點 2 選填；第二點留空不影響估價。 -->
@@ -420,7 +421,7 @@
 
       <div class="field hidden" id="advanceField">
         <label id="advanceLabel" for="advanceInput">預估代墊費用</label>
-        <input id="advanceInput" type="number" inputmode="numeric" min="0" step="1" placeholder="例如：250" />
+        <input id="advanceInput" type="number" inputmode="numeric" min="0" max="1500" step="1" placeholder="例如：250" />
         <div id="advanceHint" class="hint">
           代墊費用會加到客人預估應付總額，但不列入跑腿服務費。
         </div>
@@ -633,7 +634,7 @@
         showAdvance: true,
         advanceLabel: '預估代墊費用',
         advancePlaceholder: '例如：250',
-        advanceHint: '請輸入預估商品金額。系統會把代墊費用加到客人預估應付總額。',
+        advanceHint: '請輸入預估商品金額。最高自動代墊 NT$1,500；代墊費用會加到客人預估應付總額。',
         showQueue: false,
         showTaskMinutes: false,
         showTaskNote: false,
@@ -653,7 +654,7 @@
         showAdvance: true,
         advanceLabel: '預估代墊費用',
         advancePlaceholder: '例如：100',
-        advanceHint: '若取件時可能需要代付費用，請先填入預估金額；沒有代墊可留空。',
+        advanceHint: '若取件時可能需要代付費用，請先填入預估金額；最高自動代墊 NT$1,500，沒有代墊可留空。',
         showQueue: false,
         showTaskMinutes: false,
         showTaskNote: false,
@@ -690,7 +691,7 @@
         showAdvance: true,
         advanceLabel: '預估代墊費用（選填）',
         advancePlaceholder: '例如：300',
-        advanceHint: '若全能跑腿需要購買、代付或現場付款，請填入預估代墊金額。',
+        advanceHint: '若全能跑腿需要購買、代付或現場付款，請填入預估代墊金額；最高自動代墊 NT$1,500。',
         showQueue: false,
         showTaskMinutes: true,
         showTaskNote: true,
@@ -975,8 +976,8 @@
 
       const advancePayment = numberValue(advanceInput);
 
-      if (advancePayment >= 1000) {
-        showError('UBee 跑腿目前代墊金額達 NT$1,000（含）以上需由客服人工確認，快速估價暫不開放直接試算。');
+      if (advancePayment > 1500) {
+        showError('UBee 跑腿目前最高自動代墊上限為 NT$1,500；NT$1,500 可直接試算，超過 NT$1,500 請先聯繫客服人工確認。');
         advanceInput.focus();
         return false;
       }
