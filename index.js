@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-23
+// 2026-09-23｜Rider Multi-stop Visibility V1：待接任務 Preview 補多點配送安全摘要；接單前只回行政區、站點數與多點費，不洩露完整地址。
 // 2026-09-23｜Customer Production Multi-stop UI V1：確認一般客戶多點配送契約；送達點 2 選填，僅有有效第二點時納入路線與多點配送費。
 // 2026-09-23｜Dispatch & Finance Contract Sync V1：調度 Dashboard 補完整多點配送／代墊欄位；財務契約維持後端唯一來源。
 // Core：App Access Hard Lock／Community Server Config／Membership & Qualification／Task & Smart Stack／Pricing & Finance／Growth & Quality／Safety & Tracking／Customer Cloud Draft
@@ -8637,6 +8638,38 @@ function buildRiderPendingTaskPreview(order = {}) {
     '送達區域待確認'
   );
 
+  // Rider Multi-stop Visibility V1：待接任務只提供行政區層級摘要。
+  // 完整門牌、電話與備註仍必須等接單成功後由 current-order 取得。
+  const rawPreviewDeliveryStops = Array.isArray(order.deliveryStops)
+    ? order.deliveryStops.slice(0, 20)
+    : [];
+  const previewDropoffAreas = (rawPreviewDeliveryStops.length
+    ? rawPreviewDeliveryStops
+        .map(stop => getRiderPendingAreaLabel(
+          stop?.dropoffAddress || stop?.address || stop?.dropoff || '',
+          ''
+        ))
+        .filter(Boolean)
+    : [dropoffArea]
+  ).filter(Boolean);
+  const previewStopCount = Math.max(
+    1,
+    Math.round(Number(
+      order.stopCount ||
+      order.deliveryStopCount ||
+      previewDropoffAreas.length ||
+      1
+    ))
+  );
+  const previewMultiDropoff =
+    order.multiDropoff === true ||
+    previewStopCount > 1 ||
+    rawPreviewDeliveryStops.length > 1;
+  const previewMultiStopFee = Math.max(
+    0,
+    Math.round(Number(order.multiStopFee || order.extraStopFee || 0))
+  );
+
   const pickupPoint = getOrderPickupPointForPush(order);
   const taskDetails =
     order.taskDetails && typeof order.taskDetails === 'object'
@@ -8804,7 +8837,7 @@ function buildRiderPendingTaskPreview(order = {}) {
     riderStatus: status,
     sourceDispatchStatus,
     serverDispatchEligible: true,
-    riderTaskPreviewVersion: 3,
+    riderTaskPreviewVersion: 4,
 
     // 後端直接提供正規化區域，避免前端只靠地址字串再次解析而誤擋任務。
     pickupCountryCode: previewRegion.pickupCountryCode,
@@ -8821,6 +8854,12 @@ function buildRiderPendingTaskPreview(order = {}) {
     dropoffAddress: dropoffArea,
     toAddress: dropoffArea,
     dropoff: dropoffArea,
+    dropoffAreas: previewDropoffAreas.slice(0, previewStopCount),
+    stopCount: previewStopCount,
+    deliveryStopCount: previewStopCount,
+    multiDropoff: previewMultiDropoff,
+    multiStopFee: previewMultiStopFee,
+    extraStopFee: previewMultiStopFee,
 
     // 待接任務地圖只保留取件座標；送達座標接單後才回傳。
     riderMapPickup: pickupPoint
