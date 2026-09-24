@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-24｜Finance Contract Sync V2：同步 Smart Stack 平台轉場補貼；街口／店家已付款統一為平台待撥款；補平台補貼稽核。 -->
 <!-- 2026-09-23｜Finance Contract Sync V1：移除已停用資格開通費；補完整費用明細與 V4 L4 管理。 -->
 <!-- 2026-09-17｜Profit Finance V1：平台收入拆分應得、已收與待收，避免把未回繳現金誤認為已入帳收入。 -->
 <!-- 2026-09-08｜Finance Center No Key V4.4：徹底移除財務中心金鑰輸入與財務 API Header 包裝；財務中心開啟後直接讀取資料。 -->
@@ -154,7 +155,7 @@ summary::-webkit-details-marker{display:none}
   <header class="topbar">
     <div>
       <div class="brand">UBee <span class="bee">財務結算中心</span></div>
-      <div class="sub">訂單財務閉環、現金回繳與街口待撥款分流管理。回繳狀態與撥款狀態只由平台財務端確認，不由小U自行歸零。</div>
+      <div class="sub">訂單財務閉環、現金回繳與平台待撥款分流管理。回繳狀態與撥款狀態只由平台財務端確認，不由小U自行歸零。</div>
     </div>
     <div class="top-actions">
       <div class="status-pill" id="systemStatus"><span class="status-dot"></span><span id="systemStatusText">連線檢查中</span></div>
@@ -165,7 +166,7 @@ summary::-webkit-details-marker{display:none}
   <nav class="tabs" id="tabs">
     <button class="tab active" data-view="overview">財務總覽</button>
     <button class="tab" data-view="cash">現金回繳</button>
-    <button class="tab" data-view="jko">街口待撥款</button>
+    <button class="tab" data-view="jko">平台待撥款</button>
     <button class="tab" data-view="alerts">異常提醒 <span id="alertTabCount"></span></button>
     <button class="tab" data-view="history">結算紀錄</button>
     <button class="tab" data-view="ledger">訂單財務</button>
@@ -175,8 +176,8 @@ summary::-webkit-details-marker{display:none}
   <section class="kpis">
     <div class="kpi"><div class="kpi-label">今日完成訂單</div><div class="kpi-value" id="kpiTodayCompleted">0</div><div class="kpi-sub">今日已完成的任務數</div></div>
     <div class="kpi"><div class="kpi-label">現金待回繳</div><div class="kpi-value red" id="kpiCashPending">$0</div><div class="kpi-sub" id="kpiCashSub">0 位小U待處理</div></div>
-    <div class="kpi"><div class="kpi-label">街口待撥款</div><div class="kpi-value blue" id="kpiJkoPending">$0</div><div class="kpi-sub" id="kpiJkoSub">0 位小U待處理</div></div>
-    <div class="kpi"><div class="kpi-label">待處理小U</div><div class="kpi-value yellow" id="kpiPendingRiders">0</div><div class="kpi-sub">現金／街口未結清聯集</div></div>
+    <div class="kpi"><div class="kpi-label">平台待撥款</div><div class="kpi-value blue" id="kpiJkoPending">$0</div><div class="kpi-sub" id="kpiJkoSub">0 位小U待處理</div></div>
+    <div class="kpi"><div class="kpi-label">待處理小U</div><div class="kpi-value yellow" id="kpiPendingRiders">0</div><div class="kpi-sub">現金／平台待撥未結清聯集</div></div>
     <div class="kpi"><div class="kpi-label">今日已處理金額</div><div class="kpi-value green" id="kpiProcessed">$0</div><div class="kpi-sub" id="kpiProcessedSub">回繳 $0・撥款 $0</div></div>
     <div class="kpi"><div class="kpi-label">今日平台應得</div><div class="kpi-value green" id="kpiPlatformIncome">$0</div><div class="kpi-sub">完成訂單依正式公式計算</div></div>
     <div class="kpi"><div class="kpi-label">待對帳訂單</div><div class="kpi-value red" id="kpiNeedsReview">0</div><div class="kpi-sub">金額差異或資料缺漏</div></div>
@@ -191,7 +192,7 @@ summary::-webkit-details-marker{display:none}
           <div class="panel-body">
             <div class="flow-grid">
               <div class="flow-card"><div class="flow-title">現金單</div><div class="flow-dir in">小U → UBee</div><div class="flow-desc">客人把現金交給小U。小U保留自己的任務收入與代墊回收，其餘平台應收款需回繳 UBee。</div><button class="btn red small" style="margin-top:12px" onclick="switchView('cash')">處理現金回繳</button></div>
-              <div class="flow-card"><div class="flow-title">街口支付</div><div class="flow-dir out">UBee → 小U</div><div class="flow-desc">平台已收客人款項。正式應撥給小U＝騎士任務收入＋騎士代墊款。</div><button class="btn blue small" style="margin-top:12px" onclick="switchView('jko')">處理街口待撥</button></div>
+              <div class="flow-card"><div class="flow-title">平台代收／店家已付款</div><div class="flow-dir out">UBee → 小U</div><div class="flow-desc">平台已收到街口款項，或店家月結／付款已入帳。正式應撥給小U＝小U任務收入＋小U代墊款。</div><button class="btn blue small" style="margin-top:12px" onclick="switchView('jko')">處理平台待撥</button></div>
             </div>
           </div>
         </div>
@@ -218,12 +219,12 @@ summary::-webkit-details-marker{display:none}
     <section class="view" id="view-jko">
       <div class="panel">
         <div class="panel-head">
-          <div><div class="panel-title">小U待撥款（街口）</div><div class="panel-sub">按小U彙總顯示平台實際應撥款，可單筆或整批確認。</div></div>
+          <div><div class="panel-title">小U平台待撥款</div><div class="panel-sub">按小U彙總顯示平台實際應撥款，可單筆或整批確認。</div></div>
           <div class="toolbar"><input id="jkoSearch" class="search" placeholder="搜尋小U姓名／電話／識別碼" oninput="renderJko()"><button class="btn small" onclick="loadSettlements(true)">更新</button></div>
         </div>
         <div class="panel-body">
-          <div class="section-note"><strong>街口公式：</strong>平台應撥＝小U任務收入＋小U代墊款。這兩項會分開顯示，避免只撥任務收入而漏掉代墊。</div>
-          <div id="jkoList" class="rider-list"><div class="empty">正在讀取街口待撥款資料...</div></div>
+          <div class="section-note"><strong>平台待撥公式：</strong>平台應撥＝小U任務收入＋小U代墊款。來源可能是街口付款或已入帳的店家付款／月結；這兩項會分開顯示，避免漏撥代墊。</div>
+          <div id="jkoList" class="rider-list"><div class="empty">正在讀取平台待撥款資料...</div></div>
         </div>
       </div>
     </section>
@@ -268,6 +269,8 @@ summary::-webkit-details-marker{display:none}
             <div class="finance-summary-card"><span>今日平台應得</span><strong id="financeTodayPlatform">$0</strong></div>
             <div class="finance-summary-card"><span>今日小U收入</span><strong id="financeTodayRider">$0</strong></div>
             <div class="finance-summary-card"><span>今日保底補貼</span><strong id="financeTodayGuarantee">$0</strong></div>
+            <div class="finance-summary-card"><span>今日轉場補貼</span><strong id="financeTodayTransferSubsidy">$0</strong></div>
+            <div class="finance-summary-card"><span>累計轉場補貼</span><strong id="financeTotalTransferSubsidy">$0</strong></div>
             <div class="finance-summary-card"><span>財務差異總額</span><strong id="financeVarianceTotal">$0</strong></div>
             <div class="finance-summary-card"><span>平台累計應得</span><strong id="financePlatformAccrued">$0</strong></div>
             <div class="finance-summary-card"><span>平台累計已收</span><strong id="financePlatformCollected">$0</strong></div>
@@ -395,11 +398,13 @@ function updateKpis(){
   const s = state.overview?.summary || {};
   document.getElementById('kpiTodayCompleted').textContent = Number(s.todayCompletedOrders || 0).toLocaleString('zh-TW');
   document.getElementById('kpiCashPending').textContent = money(s.cashPendingTotal);
-  document.getElementById('kpiJkoPending').textContent = money(s.jkoPendingTotal);
+  document.getElementById('kpiJkoPending').textContent =
+    money(s.platformPayoutPendingTotal ?? s.jkoPendingTotal);
   document.getElementById('kpiPendingRiders').textContent = Number(s.pendingRiderCount || 0).toLocaleString('zh-TW');
   document.getElementById('kpiProcessed').textContent = money(s.todayProcessedTotal);
   document.getElementById('kpiCashSub').textContent = `${Number(s.cashPendingRiderCount || 0)} 位小U待回繳`;
-  document.getElementById('kpiJkoSub').textContent = `${Number(s.jkoPendingRiderCount || 0)} 位小U待撥款`;
+  document.getElementById('kpiJkoSub').textContent =
+    `${Number(s.platformPayoutPendingRiderCount ?? s.jkoPendingRiderCount ?? 0)} 位小U待撥款`;
   document.getElementById('kpiProcessedSub').textContent = `回繳 ${money(s.todayCashRemitted)}・撥款 ${money(s.todayRiderPaid)}`;
   const count = Number(s.alertCount || 0);
   document.getElementById('alertTabCount').textContent = count ? `(${count})` : '';
@@ -454,6 +459,8 @@ function renderFinanceKpis(){
   set('financeTodayPlatform',money(s.todayPlatformIncome));
   set('financeTodayRider',money(s.todayRiderIncome));
   set('financeTodayGuarantee',money(s.todayRiderGuaranteeSubsidy));
+  set('financeTodayTransferSubsidy',money(s.todayStackTransferSubsidy));
+  set('financeTotalTransferSubsidy',money(s.totalStackTransferSubsidy));
   set('financeVarianceTotal',money(s.totalVarianceAmount));
   set('financePlatformAccrued',money(s.totalPlatformAccruedIncome));
   set('financePlatformCollected',money(s.totalPlatformCollectedIncome));
@@ -471,7 +478,7 @@ function renderFinanceLedger(){
     return `<article class="finance-order-card ${financeStatusClass(o.reconciliationStatus)}">
       <div class="finance-order-head"><div><div class="finance-order-id">${esc(o.orderNo||o.orderId)}</div><div class="finance-order-meta">${esc(who)}・${esc(o.serviceType||'-')}<br>${esc(o.rider?.riderName||'尚未指派小U')}・${esc(formatTime(o.completedAtMs||o.createdAtMs))}</div></div><div><div class="finance-amount">${money(o.finalCustomerTotal)}</div><span class="tag ${o.reconciliationStatus==='reconciled'?'done':o.reconciliationStatus==='needs_review'?'cash':'jko'}">${esc(financeStatusLabel(o.reconciliationStatus))}</span></div></div>
       <div class="finance-mini-grid"><div class="finance-mini"><span>初始估價</span><strong>${money(o.initialEstimatedTotal)}</strong></div><div class="finance-mini"><span>客戶實收</span><strong>${money(o.actualPaidAmount)}</strong></div><div class="finance-mini"><span>小U應得</span><strong>${money(Number(o.riderIncome||0)+Number(o.riderAdvance||0))}</strong></div><div class="finance-mini"><span>平台應得</span><strong>${money(o.expectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台已收</span><strong>${money(o.collectedPlatformIncome)}</strong></div><div class="finance-mini"><span>平台待收</span><strong>${money(o.outstandingPlatformIncome)}</strong></div></div>
-      ${Number(o.feeBreakdown?.multiStopFee||0)>0||Number(o.riderAdvance||0)>0?`<div class="section-note" style="margin-top:10px;margin-bottom:0">${Number(o.feeBreakdown?.multiStopFee||0)>0?`<strong>多點配送費：</strong>${money(o.feeBreakdown.multiStopFee)}`:''}${Number(o.feeBreakdown?.multiStopFee||0)>0&&Number(o.riderAdvance||0)>0?'　｜　':''}${Number(o.riderAdvance||0)>0?`<strong>小U代墊：</strong>${money(o.riderAdvance)}`:''}</div>`:''}
+      ${Number(o.feeBreakdown?.multiStopFee||0)>0||Number(o.riderAdvance||0)>0||Number(o.stackTransferSubsidy||0)>0?`<div class="section-note" style="margin-top:10px;margin-bottom:0">${Number(o.feeBreakdown?.multiStopFee||0)>0?`<strong>多點配送費：</strong>${money(o.feeBreakdown.multiStopFee)}`:''}${Number(o.feeBreakdown?.multiStopFee||0)>0&&(Number(o.riderAdvance||0)>0||Number(o.stackTransferSubsidy||0)>0)?'　｜　':''}${Number(o.riderAdvance||0)>0?`<strong>小U代墊：</strong>${money(o.riderAdvance)}`:''}${Number(o.riderAdvance||0)>0&&Number(o.stackTransferSubsidy||0)>0?'　｜　':''}${Number(o.stackTransferSubsidy||0)>0?`<strong>平台轉場補貼：</strong>${money(o.stackTransferSubsidy)}`:''}</div>`:''}
       ${variance?`<div class="finance-discrepancy">差異總額 ${money(variance)}${o.discrepancyReasons?.length?`：${esc(o.discrepancyReasons.join('、'))}`:''}</div>`:''}
       <div class="finance-actions"><button class="btn small primary" onclick="openFinanceOrder('${esc(o.orderId)}')">查看／調整</button>${o.reconciliationStatus!=='reconciled'?`<button class="btn small yellow" onclick="quickReconcile('${esc(o.orderId)}')">完成對帳</button>`:''}</div>
     </article>`;
@@ -495,6 +502,9 @@ async function openFinanceOrder(orderId){
         ${financeDetailItem('初始估價',money(o.initialEstimatedTotal))}${financeDetailItem('最終應收',money(o.finalCustomerTotal))}${financeDetailItem('客戶實收',money(o.actualPaidAmount))}
         ${financeDetailItem('小U代墊',money(o.riderAdvance))}${financeDetailItem('小U任務收入',money(o.riderIncome))}${financeDetailItem('小U基本收入',money(o.riderBaseIncome))}
         ${financeDetailItem('70/30 任務費池',money(o.shareableTaskSubtotal))}${financeDetailItem('100% 小U加價池',money(o.riderOnlySurchargeSubtotal))}${financeDetailItem('保底補貼',money(o.riderGuaranteeSubsidy))}
+        ${financeDetailItem('平台轉場補貼',money(o.stackTransferSubsidy))}${financeDetailItem('疊單客戶加價',money(o.stackCustomerSurcharge))}${financeDetailItem('轉場距離／時間',Number(o.stackTransferSubsidy||0)>0||Number(o.stackTransferKm||0)>0?`${Number(o.stackTransferKm||0).toFixed(2)} km・${Math.round(Number(o.stackTransferMinutes||0))} 分鐘`:'-')}
+        ${financeDetailItem('補貼前小U收入',money(o.stackRiderIncomeBeforeSubsidy))}${financeDetailItem('補貼後小U收入',money(o.stackRiderIncomeAfterSubsidy))}${financeDetailItem('補貼負擔方',o.stackTransferSubsidyPayer==='platform'?'UBee 平台':(o.stackTransferSubsidyPayer||'-'))}
+        ${financeDetailItem('補貼前平台收入',money(o.stackPlatformIncomeBeforeSubsidy))}${financeDetailItem('補貼後平台收入',money(o.stackPlatformIncomeAfterSubsidy))}${financeDetailItem('補貼版本',o.stackTransferSubsidyVersion||'-')}
         ${financeDetailItem('平台應得',money(o.expectedPlatformIncome))}${financeDetailItem('平台已收',money(o.collectedPlatformIncome))}${financeDetailItem('平台待收',money(o.outstandingPlatformIncome))}
         ${financeDetailItem('基本／起步費',money(fees.baseFee))}${financeDetailItem('距離費',money(fees.distanceFee))}${financeDetailItem('時間費',money(fees.timeFee))}
         ${financeDetailItem('跨區費',money(fees.crossZoneFee))}${financeDetailItem('多點配送費',money(fees.multiStopFee))}${financeDetailItem('回程費',money(fees.returnTripFee))}
@@ -591,6 +601,7 @@ function renderCash(){
           <div class="row"><span class="label">客人支付現金</span><span class="value">${money(order.customerTotal)}</span></div>
           <div class="row"><span class="label">小U代墊款</span><span class="value">${money(order.advancePayment)}</span></div>
           <div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome)}</span></div>
+          ${Number(order.stackTransferSubsidy||0)>0?`<div class="row"><span class="label">平台轉場補貼</span><span class="value">${money(order.stackTransferSubsidy)}</span></div>`:''}
           <div class="row"><span class="label">應回繳平台</span><span class="value amount-red">${money(order.cashDueToPlatform)}</span></div>
         </div><button class="btn red small" onclick="settleCashSingle('${esc(order.id||'')}',${Number(order.cashDueToPlatform||0)},this)">確認此筆已回繳</button></div>`).join('')}
       </div></details>
@@ -620,35 +631,38 @@ async function settleCash(orderIds,button){
 
 async function loadSettlements(silent=false){
   const el=document.getElementById('jkoList');
-  if(!silent) el.innerHTML='<div class="empty">正在讀取街口待撥款資料...</div>';
+  if(!silent) el.innerHTML='<div class="empty">正在讀取平台待撥款資料...</div>';
   try{
     state.jko=await getJson('/api/admin/pending-settlements');
     renderJko();
-  }catch(err){console.error(err);el.innerHTML=`<div class="empty">讀取街口待撥款失敗：${esc(err.message)}</div>`;}
+  }catch(err){console.error(err);el.innerHTML=`<div class="empty">讀取平台待撥款失敗：${esc(err.message)}</div>`;}
 }
 function renderJko(){
   const query=normalizeSearch(document.getElementById('jkoSearch')?.value);
   let riders=Array.isArray(state.jko?.riders)?state.jko.riders:[];
   if(!riders.length && Array.isArray(state.jko?.orders)){
     const map=new Map();
-    state.jko.orders.forEach(o=>{const key=o.riderKey||o.riderId||o.riderDocId||o.riderName||`unknown_${o.id}`;if(!map.has(key))map.set(key,{riderKey:key,riderName:o.riderName,riderId:o.riderId,riderPhone:o.riderPhone,orders:[],riderIncomeTotal:0,advancePaymentTotal:0,payoutTotal:0});const g=map.get(key);g.orders.push(o);g.riderIncomeTotal+=Number(o.riderIncome||o.riderFee||0);g.advancePaymentTotal+=Number(o.advancePayment||0);g.payoutTotal+=Number(o.payoutTotal||o.riderFee||0);});riders=[...map.values()];
+    state.jko.orders.forEach(o=>{const key=o.riderKey||o.riderId||o.riderDocId||o.riderName||`unknown_${o.id}`;if(!map.has(key))map.set(key,{riderKey:key,riderName:o.riderName,riderId:o.riderId,riderPhone:o.riderPhone,orders:[],riderIncomeTotal:0,advancePaymentTotal:0,payoutTotal:0});const g=map.get(key);g.orders.push(o);g.riderIncomeTotal+=Number(o.riderIncome||o.riderFee||0);g.advancePaymentTotal+=Number(o.advancePayment||0);g.payoutTotal+=Number(
+      o.payoutTotal ??
+      (Number(o.riderIncome||o.riderFee||0)+Number(o.advancePayment||0))
+    );});riders=[...map.values()];
   }
   riders=riders.filter(r=>riderMatches(r,query));
   const el=document.getElementById('jkoList');
-  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的街口待撥款。</div>';return;}
+  if(!riders.length){el.innerHTML='<div class="empty">目前沒有符合條件的平台待撥款。</div>';return;}
   el.innerHTML=riders.map(rider=>{
     const orders=Array.isArray(rider.orders)?rider.orders:[];
     const ids=orders.map(o=>String(o.id||'')).filter(Boolean);
     return `<article class="rider-card jko"><div class="rider-head"><div><div class="rider-name">${esc(rider.riderName||'未設定小U姓名')}</div><div class="rider-meta">電話：${esc(rider.riderPhone||'-')}<br>識別：${esc(rider.riderId||rider.riderDocId||rider.riderLineUserId||rider.riderKey||'-')}</div></div><div class="rider-total jko"><strong>${money(rider.payoutTotal)}</strong><span>${Number(rider.orderCount||orders.length)} 筆待撥款</span></div></div>
       <div class="summary-row"><div class="summary-mini"><span>小U任務收入</span><strong>${money(rider.riderIncomeTotal)}</strong></div><div class="summary-mini"><span>小U代墊款</span><strong>${money(rider.advancePaymentTotal)}</strong></div><div class="summary-mini"><span>平台實際應撥</span><strong style="color:var(--blue)">${money(rider.payoutTotal)}</strong></div></div>
       <div class="rider-actions"><button class="btn blue" onclick='settleJkoBatch(${JSON.stringify(JSON.stringify(ids))},${JSON.stringify(rider.riderName||'此小U')},${Number(rider.payoutTotal||0)},this)'>確認已撥給此小U全部款項</button></div>
-      <details><summary>查看 ${orders.length} 筆待撥款明細</summary><div class="order-list">${orders.map(order=>`<div class="order-card"><div class="order-top"><div class="order-no">${esc(order.orderNo||order.id||'-')}</div><span class="tag jko">街口待撥</span></div><div class="rows"><div class="row"><span class="label">完成時間</span><span class="value">${esc(formatTime(order.completedAt||order.updatedAt))}</span></div><div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome||order.riderFee)}</span></div><div class="row"><span class="label">小U代墊款</span><span class="value">${money(order.advancePayment)}</span></div><div class="row"><span class="label">平台應撥</span><span class="value amount-blue">${money(order.payoutTotal)}</span></div></div><button class="btn blue small" onclick="settleJkoSingle('${esc(order.id||'')}',${Number(order.payoutTotal||0)},this)">確認此筆已撥款</button></div>`).join('')}</div></details>
+      <details><summary>查看 ${orders.length} 筆待撥款明細</summary><div class="order-list">${orders.map(order=>`<div class="order-card"><div class="order-top"><div class="order-no">${esc(order.orderNo||order.id||'-')}</div><span class="tag jko">${esc(order.paymentMethodLabel||'平台待撥')}</span></div><div class="rows"><div class="row"><span class="label">完成時間</span><span class="value">${esc(formatTime(order.completedAt||order.updatedAt))}</span></div><div class="row"><span class="label">款項來源</span><span class="value">${esc(order.paymentMethodLabel||order.paymentMethod||'-')}</span></div><div class="row"><span class="label">小U任務收入</span><span class="value">${money(order.riderIncome||order.riderFee)}</span></div>${Number(order.stackTransferSubsidy||0)>0?`<div class="row"><span class="label">平台轉場補貼</span><span class="value">${money(order.stackTransferSubsidy)}</span></div>`:''}<div class="row"><span class="label">小U代墊款</span><span class="value">${money(order.advancePayment)}</span></div><div class="row"><span class="label">平台應撥</span><span class="value amount-blue">${money(order.payoutTotal)}</span></div></div><button class="btn blue small" onclick="settleJkoSingle('${esc(order.id||'')}',${Number(order.payoutTotal||0)},this)">確認此筆已撥款</button></div>`).join('')}</div></details>
     </article>`;
   }).join('');
 }
 async function settleJkoSingle(orderId,amount,button){
   if(!orderId)return;
-  if(!confirm(`確認已經撥款給小U？\n\n訂單：${orderId}\n應撥總額：${money(amount)}\n\n此金額包含小U任務收入與代墊款。`))return;
+  if(!confirm(`確認已經撥款給小U？\n\n訂單：${orderId}\n應撥總額：${money(amount)}\n\n此金額包含小U任務收入（含符合條件的平台轉場補貼）與代墊款。`))return;
   await settleJko([orderId],button);
 }
 async function settleJkoBatch(orderIdsJson,riderName,amount,button){
@@ -663,9 +677,9 @@ async function settleJko(orderIds,button){
     const path=orderIds.length===1?'/api/admin/settle-order':'/api/admin/settle-orders';
     const body=orderIds.length===1?{orderId:orderIds[0],settledBy:'finance_center'}:{orderIds,settledBy:'finance_center'};
     const data=await postJson(path,body);
-    showToast(`街口撥款已確認：${data.settledOrderCount||1} 筆・${money(data.totalSettledAmount||data.settledAmount)}`);
+    showToast(`平台撥款已確認：${data.settledOrderCount||1} 筆・${money(data.totalSettledAmount||data.settledAmount)}`);
     await Promise.all([loadSettlements(true),loadOverview(true)]);
-  }catch(err){alert('確認街口撥款失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
+  }catch(err){alert('確認平台撥款失敗：'+err.message);if(button){button.disabled=false;button.textContent=old;}}
 }
 
 
