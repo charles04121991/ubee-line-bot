@@ -1,5 +1,7 @@
 // =====================================================
-// UBee Backend｜Release 2026-09-23
+// UBee Backend｜Release 2026-09-24
+// 2026-09-24｜Queue ETA Engine V1：客戶最終送達 ETA 以每張訂單獨立計算；Smart Stack B 單包含 A 剩餘路程＋A→B 轉場＋B 取件處理＋B 配送，A ETA 不受 B 影響。
+// 2026-09-24｜Smart Stack Transfer Subsidy V1：疊單轉場不向 A/B 客戶加價；短轉場不補貼，合理轉場由平台分潤固定補貼小U，超過既有 3km/15min 仍禁止疊單。
 // 2026-09-23｜Rider Multi-stop Route Refresh V1：完成目前送達點後同步切換下一站座標/Place ID，騎士端可立即重算並重畫下一段路線。
 // 2026-09-23｜Customer Multi-stop Quote Lock Fix V1：修正多點報價快照 deliveryStops 字串/物件格式不一致，避免建立任務時誤判「多點送達路線已變更」。
 // 2026-09-23｜Rider Multi-stop Visibility V1：待接任務 Preview 補多點配送安全摘要；接單前只回行政區、站點數與多點費，不洩露完整地址。
@@ -9095,6 +9097,72 @@ const UBEE_SMART_STACK_V11 = Object.freeze({
   routeCheckCandidateLimit:12,
 });
 
+const UBEE_SMART_STACK_TRANSFER_SUBSIDY_V1 = Object.freeze({
+  version:'smart-stack-transfer-subsidy-v1-20260924',
+  // A→B 為平台調度產生的轉場，不加到客戶價格。
+  customerSurcharge:0,
+  // 很短的順路轉場視為疊單效率，不另加補貼。
+  freeTransferKm:1.0,
+  freeTransferMinutes:5,
+  // 超過免費轉場但仍在 Smart Stack 3km / 15min 合格範圍內，
+  // 由平台分潤固定補貼小U；實際補貼不得超過該單可用平台收入。
+  fixedPlatformSubsidy:10,
+});
+
+function calculateSmartStackTransferSubsidyV1(candidateOrder = {}, route = {}) {
+  const transferKm = Math.max(0, Number(route.distanceKm ?? route.transferKm ?? 0));
+  const transferMinutes = Math.max(0, Number(route.durationMinutes ?? route.transferMinutes ?? 0));
+
+  const riderIncome = Math.max(
+    0,
+    Math.round(Number(
+      candidateOrder.riderIncome ??
+      candidateOrder.driverFee ??
+      candidateOrder.riderFee ??
+      0
+    ))
+  );
+  const serviceSubtotal = Math.max(
+    0,
+    Math.round(Number(
+      candidateOrder.serviceSubtotal ??
+      candidateOrder.serviceTotal ??
+      candidateOrder.total ??
+      0
+    ))
+  );
+  const platformAvailable = Math.max(
+    0,
+    Math.round(Number(
+      candidateOrder.platformIncome ??
+      candidateOrder.platformFee ??
+      Math.max(0, serviceSubtotal - riderIncome)
+    ))
+  );
+
+  const needsSubsidy =
+    transferKm > UBEE_SMART_STACK_TRANSFER_SUBSIDY_V1.freeTransferKm ||
+    transferMinutes > UBEE_SMART_STACK_TRANSFER_SUBSIDY_V1.freeTransferMinutes;
+
+  const requested = needsSubsidy
+    ? UBEE_SMART_STACK_TRANSFER_SUBSIDY_V1.fixedPlatformSubsidy
+    : 0;
+
+  const amount = Math.max(0, Math.min(requested, platformAvailable));
+
+  return {
+    version:UBEE_SMART_STACK_TRANSFER_SUBSIDY_V1.version,
+    payer:'platform',
+    customerSurcharge:0,
+    transferKm:Number(transferKm.toFixed(2)),
+    transferMinutes:Math.ceil(transferMinutes),
+    requestedAmount:requested,
+    amount,
+    platformAvailableBeforeSubsidy:platformAvailable,
+    fullyFunded:requested === amount,
+  };
+}
+
 const smartStackQueuedEtaLocksV11 = new Map();
 
 function smartStackRouteWaypoint(order = {}, type = 'pickup') {
@@ -9261,6 +9329,9 @@ async function buildSmartStackEligibilityV11(currentOrder = {}, candidateOrder =
     route.distanceKm <= UBEE_SMART_STACK_V1.maxTransferKm &&
     route.durationMinutes <= UBEE_SMART_STACK_V1.maxTransferMinutes;
 
+  const transferSubsidy =
+    calculateSmartStackTransferSubsidyV1(candidateOrder, route);
+
   return {
     eligible,
     code:eligible ? 'STACK_ELIGIBLE' : 'STACK_TOO_FAR',
@@ -9274,6 +9345,11 @@ async function buildSmartStackEligibilityV11(currentOrder = {}, candidateOrder =
     transferDistanceText:route.distanceText,
     transferDurationText:route.durationText,
     transferTrafficAware:true,
+    transferSubsidy:Number(transferSubsidy.amount || 0),
+    transferSubsidyPayer:'platform',
+    transferSubsidyVersion:String(transferSubsidy.version || ''),
+    customerTransferSurcharge:0,
+    transferSubsidyFullyFunded:transferSubsidy.fullyFunded === true,
     routeProvider:'google_routes',
     routeVersion:UBEE_SMART_STACK_V11.version,
     routeCheckedAtMs:Date.now(),
@@ -9403,10 +9479,61 @@ async function refreshSmartStackQueuedEtaV11(currentOrderId, options = {}) {
     if (!transferRoute) return null;
 
     const currentRemainingSeconds = Math.max(0,Number(currentCompletionRoute.durationSeconds || 0));
+    const currentHandlingMinutes = getCustomerFinalEtaHandlingMinutesV1(currentOrder);
+    const currentHandlingSeconds = Math.max(0,currentHandlingMinutes * 60);
     const transferSeconds = Math.max(0,Number(transferRoute.durationSeconds || 0));
-    const totalSeconds = currentRemainingSeconds + transferSeconds;
-    const totalMinutes = Math.max(1,Math.ceil(totalSeconds/60));
-    const etaAtMs = nowMs + totalSeconds*1000;
+
+    // QUEUED 的「抵達 B 取件點」必須包含 A 尚未完成的處理時間。
+    const pickupTotalSeconds =
+      currentRemainingSeconds +
+      currentHandlingSeconds +
+      transferSeconds;
+    const totalMinutes = Math.max(1,Math.ceil(pickupTotalSeconds/60));
+    const etaAtMs = nowMs + pickupTotalSeconds*1000;
+
+    // B 最終送達 ETA：A 剩餘 + A→B + B 取件處理 + B 自己的完整配送路線。
+    let ownRoute = null;
+    const ownRouteFresh =
+      Number(queuedOrder.stackOwnRouteUpdatedAtMs || 0) > 0 &&
+      (nowMs - Number(queuedOrder.stackOwnRouteUpdatedAtMs || 0)) <
+        UBEE_SMART_STACK_V11.transferRouteRefreshMs &&
+      Number(queuedOrder.stackOwnRouteDurationSeconds || 0) > 0;
+
+    if (ownRouteFresh) {
+      ownRoute = {
+        distanceMeters:Number(queuedOrder.stackOwnRouteDistanceMeters || 0),
+        durationSeconds:Number(queuedOrder.stackOwnRouteDurationSeconds || 0),
+        distanceText:String(queuedOrder.stackOwnRouteDistanceText || ''),
+        durationText:String(queuedOrder.stackOwnRouteDurationText || ''),
+        trafficAware:queuedOrder.stackOwnRouteTrafficAware === true,
+      };
+    } else {
+      const ownOrigin = smartStackRouteWaypoint(queuedOrder,'pickup');
+      const ownDestination = smartStackRouteWaypoint(queuedOrder,'dropoff');
+      if (ownOrigin && ownDestination) {
+        ownRoute = await computeGoogleRoutesTrafficV11({
+          origin:ownOrigin,
+          destination:ownDestination,
+        });
+      }
+    }
+
+    const queuedHandlingMinutes = getCustomerFinalEtaHandlingMinutesV1({
+      ...queuedOrder,
+      status:'going_to_pickup',
+    });
+    const queuedHandlingSeconds = Math.max(0, queuedHandlingMinutes * 60);
+    const ownRouteSeconds = Math.max(0, Number(ownRoute?.durationSeconds || 0));
+    const finalTotalSeconds =
+      pickupTotalSeconds +
+      queuedHandlingSeconds +
+      ownRouteSeconds;
+    const finalBaseMinutes = ownRoute
+      ? Math.max(1,Math.ceil(finalTotalSeconds/60))
+      : null;
+    const finalWindow = Number.isFinite(finalBaseMinutes)
+      ? buildCustomerFinalEtaWindowV1(finalBaseMinutes, nowMs, 'high')
+      : null;
 
     const update = {
       stackEstimatedWaitMinutes:totalMinutes,
@@ -9417,6 +9544,7 @@ async function refreshSmartStackQueuedEtaV11(currentOrderId, options = {}) {
       stackQueuedEtaOriginLat:riderLat,
       stackQueuedEtaOriginLng:riderLng,
       stackQueuedEtaCurrentOrderRemainingMinutes:Math.max(0,Math.ceil(currentRemainingSeconds/60)),
+      stackQueuedEtaCurrentOrderHandlingMinutes:currentHandlingMinutes,
       stackQueuedEtaTransferMinutes:Math.max(0,Math.ceil(transferSeconds/60)),
       stackQueuedEtaTrafficAware:true,
       stackQueuedEtaProvider:'google_routes',
@@ -9431,6 +9559,33 @@ async function refreshSmartStackQueuedEtaV11(currentOrderId, options = {}) {
       stackTransferTrafficAware:true,
       stackTransferRouteUpdatedAtMs:nowMs,
       stackTransferRouteUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+
+      ...(ownRoute ? {
+        stackOwnRouteDistanceMeters:Number(ownRoute.distanceMeters || 0),
+        stackOwnRouteDurationSeconds:ownRouteSeconds,
+        stackOwnRouteDistanceText:String(ownRoute.distanceText || ''),
+        stackOwnRouteDurationText:String(ownRoute.durationText || ''),
+        stackOwnRouteTrafficAware:ownRoute.trafficAware === true,
+        stackOwnRouteUpdatedAtMs:nowMs,
+        stackOwnRouteUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      } : {}),
+
+      ...(finalWindow ? {
+        customerFinalEtaVersion:UBEE_CUSTOMER_FINAL_ETA_V1.version,
+        customerFinalEtaAvailable:true,
+        customerFinalEtaPhase:'queued',
+        customerFinalEtaMinMinutes:finalWindow.minMinutes,
+        customerFinalEtaMaxMinutes:finalWindow.maxMinutes,
+        customerFinalEtaStartAtMs:finalWindow.startAtMs,
+        customerFinalEtaEndAtMs:finalWindow.endAtMs,
+        customerFinalEtaUpdatedAtMs:nowMs,
+        customerFinalEtaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+        customerFinalEtaTrafficAware:true,
+        customerFinalEtaConfidence:'high',
+        customerFinalEtaRouteMinutes:Math.max(1,Math.ceil((currentRemainingSeconds + transferSeconds + ownRouteSeconds)/60)),
+        customerFinalEtaHandlingMinutes:currentHandlingMinutes + queuedHandlingMinutes,
+        customerFinalEtaHandoffMinutes:0,
+      } : {}),
 
       etaText:`約 ${totalMinutes} 分鐘抵達取件地點`,
       etaMinutes:totalMinutes,
@@ -22583,6 +22738,16 @@ app.post('/api/rider/location', riderAuthMiddleware, async (req, res) => {
       ).catch(error => {
         console.warn(
           '⚠️ Customer Live ETA V1 背景更新失敗：',
+          error?.message || error
+        );
+      });
+
+      refreshCustomerFinalDeliveryEtaV1(
+        transactionResult.orderId,
+        { reason:'rider_location' }
+      ).catch(error => {
+        console.warn(
+          '⚠️ Customer Final Delivery ETA V1 背景更新失敗：',
           error?.message || error
         );
       });
@@ -36546,6 +36711,51 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
         String(current.stackGroupId || '').trim() ||
         buildSmartStackGroupId(current.id, candidate.id);
 
+      // Transfer Subsidy V1：
+      // 客戶價格完全不變；平台從 B 單既有平台收入中支付合理轉場補貼。
+      const stackTransferSubsidy = Math.max(
+        0,
+        Math.round(Number(eligibility.transferSubsidy || 0))
+      );
+      const baseRiderIncome = Math.max(
+        0,
+        Math.round(Number(
+          candidate.riderIncome ??
+          candidate.driverFee ??
+          candidate.riderFee ??
+          0
+        ))
+      );
+      const baseRiderIncomeBeforeGuarantee = Math.max(
+        0,
+        Math.round(Number(
+          candidate.riderIncomeBeforeGuarantee ??
+          candidate.riderBaseIncomeBeforeGuarantee ??
+          baseRiderIncome
+        ))
+      );
+      const basePlatformIncome = Math.max(
+        0,
+        Math.round(Number(
+          candidate.platformIncome ??
+          candidate.platformFee ??
+          Math.max(
+            0,
+            Number(candidate.serviceSubtotal || candidate.serviceTotal || 0) -
+            baseRiderIncome
+          )
+        ))
+      );
+      const appliedTransferSubsidy = Math.min(
+        stackTransferSubsidy,
+        basePlatformIncome
+      );
+      const stackedRiderIncome = baseRiderIncome + appliedTransferSubsidy;
+      const stackedRiderIncomeBeforeGuarantee =
+        baseRiderIncomeBeforeGuarantee + appliedTransferSubsidy;
+      const stackedPlatformIncome =
+        Math.max(0, basePlatformIncome - appliedTransferSubsidy);
+
       const queuedUpdate = {
         status:'accepted',
         riderStatus:'accepted',
@@ -36577,6 +36787,42 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
         stackTransferRouteUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
         stackEstimatedWaitMinutes:null,
         stackVersion:UBEE_SMART_STACK_V11.version,
+        stackTransferSubsidy:appliedTransferSubsidy,
+        stackTransferSubsidyPayer:'platform',
+        stackTransferSubsidyVersion:UBEE_SMART_STACK_TRANSFER_SUBSIDY_V1.version,
+        stackCustomerSurcharge:0,
+
+        // 補貼只在平台／小U之間重分配，不改 customerPayableTotal / serviceSubtotal。
+        ...(appliedTransferSubsidy > 0 ? {
+          riderIncome:stackedRiderIncome,
+          driverFee:stackedRiderIncome,
+          riderFee:stackedRiderIncome,
+          estimatedRiderIncome:stackedRiderIncome,
+          riderIncomeBeforeGuarantee:stackedRiderIncomeBeforeGuarantee,
+          platformFee:stackedPlatformIncome,
+          platformIncome:stackedPlatformIncome,
+          ...((
+            Object.prototype.hasOwnProperty.call(candidate,'cashDueToPlatform') ||
+            Object.prototype.hasOwnProperty.call(candidate,'platformReceivable') ||
+            Object.prototype.hasOwnProperty.call(candidate,'riderDueToPlatform')
+          ) ? {
+            cashDueToPlatform:Math.max(
+              0,
+              Math.round(Number(candidate.cashDueToPlatform ?? candidate.platformReceivable ?? basePlatformIncome)) -
+              appliedTransferSubsidy
+            ),
+            platformReceivable:Math.max(
+              0,
+              Math.round(Number(candidate.platformReceivable ?? candidate.cashDueToPlatform ?? basePlatformIncome)) -
+              appliedTransferSubsidy
+            ),
+            riderDueToPlatform:Math.max(
+              0,
+              Math.round(Number(candidate.riderDueToPlatform ?? candidate.cashDueToPlatform ?? basePlatformIncome)) -
+              appliedTransferSubsidy
+            ),
+          } : {}),
+        } : {}),
 
         riderTrackingStatus:'queued',
         trackingSessionId:'',
@@ -44285,6 +44531,284 @@ const UBEE_CUSTOMER_LIVE_ETA_V1 = Object.freeze({
 
 const customerLiveEtaRefreshLocksV1 = new Map();
 
+const UBEE_CUSTOMER_FINAL_ETA_V1 = Object.freeze({
+  version:'customer-final-delivery-eta-v1-20260924',
+  routeRefreshMs:30 * 1000,
+  routeRefreshMinMoveKm:0.08,
+  routeMaxAgeMs:5 * 60 * 1000,
+  standardPickupHandlingMinutes:8,
+  intermediateStopHandoffMinutes:3,
+  highConfidenceWindowMinutes:8,
+  delayedExtraWindowMinutes:4,
+});
+
+const customerFinalEtaRefreshLocksV1 = new Map();
+
+function buildCustomerFinalEtaWindowV1(baseMinutes, nowMs = Date.now(), confidence = 'high') {
+  const minMinutes = Math.max(1, Math.ceil(Number(baseMinutes || 0)));
+  const extra =
+    UBEE_CUSTOMER_FINAL_ETA_V1.highConfidenceWindowMinutes +
+    (String(confidence || '').toLowerCase() === 'medium'
+      ? UBEE_CUSTOMER_FINAL_ETA_V1.delayedExtraWindowMinutes
+      : 0);
+  const maxMinutes = Math.max(minMinutes + 1, minMinutes + extra);
+  return {
+    minMinutes,
+    maxMinutes,
+    startAtMs:nowMs + minMinutes * 60 * 1000,
+    endAtMs:nowMs + maxMinutes * 60 * 1000,
+  };
+}
+
+function getCustomerFinalEtaHandlingMinutesV1(order = {}) {
+  const status = String(order.status || '').trim().toLowerCase();
+  if (['accepted','going_to_pickup','heading_to_pickup','arrived_pickup'].includes(status)) {
+    return UBEE_CUSTOMER_FINAL_ETA_V1.standardPickupHandlingMinutes;
+  }
+  return 0;
+}
+
+function getCustomerFinalEtaStopWaypointV1(stop = {}, fallbackOrder = {}) {
+  return buildRoutesWaypoint({
+    address:
+      stop.dropoffAddress ||
+      stop.address ||
+      stop.dropoff ||
+      fallbackOrder.dropoffAddress ||
+      fallbackOrder.dropoff ||
+      fallbackOrder.toAddress ||
+      '',
+    placeId:
+      stop.dropoffPlaceId ||
+      stop.placeId ||
+      fallbackOrder.dropoffPlaceId ||
+      fallbackOrder.toPlaceId ||
+      '',
+    lat:
+      stop.dropoffLat ??
+      stop.lat ??
+      fallbackOrder.dropoffLat ??
+      fallbackOrder.toLat ??
+      fallbackOrder.dropoffLocation?.lat,
+    lng:
+      stop.dropoffLng ??
+      stop.lng ??
+      fallbackOrder.dropoffLng ??
+      fallbackOrder.toLng ??
+      fallbackOrder.dropoffLocation?.lng,
+  });
+}
+
+function getCustomerFinalEtaRemainingStopsV1(order = {}) {
+  const rawStops = Array.isArray(order.deliveryStops)
+    ? order.deliveryStops.filter(stop => stop && typeof stop === 'object')
+    : [];
+  if (!rawStops.length) {
+    const single = getCustomerFinalEtaStopWaypointV1({}, order);
+    return single ? [single] : [];
+  }
+
+  const index = Math.max(
+    0,
+    Math.min(
+      rawStops.length - 1,
+      Number(order.currentDeliveryStopIndex || 0)
+    )
+  );
+
+  return rawStops
+    .slice(index)
+    .map(stop => getCustomerFinalEtaStopWaypointV1(stop, order))
+    .filter(Boolean);
+}
+
+function getCustomerFinalEtaRouteInputV1(order = {}) {
+  if (order.singlePointTask === true) return null;
+
+  const status = String(order.status || '').trim().toLowerCase();
+  const phase = getCustomerLiveEtaPhaseV1(order);
+  if (!['pickup','pickup_arrived','delivery'].includes(phase)) return null;
+
+  const riderLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+  const riderLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+  if (!Number.isFinite(riderLat) || !Number.isFinite(riderLng)) return null;
+
+  const origin = buildRoutesWaypoint({ lat:riderLat, lng:riderLng });
+  const remainingStops = getCustomerFinalEtaRemainingStopsV1(order);
+  if (!origin || !remainingStops.length) return null;
+
+  const chain = [];
+  if (phase === 'pickup') {
+    const pickup = smartStackRouteWaypoint(order,'pickup');
+    if (pickup) chain.push(pickup);
+  }
+  chain.push(...remainingStops);
+
+  if (!chain.length) return null;
+
+  const destination = chain[chain.length - 1];
+  const intermediates = chain.slice(0, -1);
+
+  return {
+    status,
+    phase,
+    origin,
+    destination,
+    intermediates,
+    remainingStopCount:remainingStops.length,
+    handlingMinutes:getCustomerFinalEtaHandlingMinutesV1(order),
+    handoffMinutes:Math.max(
+      0,
+      (remainingStops.length - 1) *
+      UBEE_CUSTOMER_FINAL_ETA_V1.intermediateStopHandoffMinutes
+    ),
+  };
+}
+
+async function refreshCustomerFinalDeliveryEtaV1(orderId, options = {}) {
+  const safeOrderId = String(orderId || '').trim().toUpperCase();
+  if (!safeOrderId) return null;
+
+  if (customerFinalEtaRefreshLocksV1.has(safeOrderId)) {
+    return customerFinalEtaRefreshLocksV1.get(safeOrderId);
+  }
+
+  const task = (async()=>{
+    const orderRef = db.collection('orders').doc(safeOrderId);
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) return null;
+    const order = { id:orderDoc.id, ...(orderDoc.data() || {}) };
+
+    // QUEUED 的最終 ETA 由 Queue ETA Engine 計算，避免誤用目前位置直達 B。
+    if (String(order.stackRole || '').trim().toUpperCase() === 'QUEUED') {
+      return null;
+    }
+
+    const input = getCustomerFinalEtaRouteInputV1(order);
+    if (!input) return null;
+
+    const nowMs = Date.now();
+    const gps = getCustomerLiveEtaHealthV1(order, nowMs);
+    if (!['live','delayed'].includes(gps.key)) return null;
+
+    const previousAtMs = Number(order.customerFinalEtaUpdatedAtMs || 0);
+    const previousOriginLat = Number(order.customerFinalEtaOriginLat);
+    const previousOriginLng = Number(order.customerFinalEtaOriginLng);
+    const riderLat = Number(order.riderCurrentLat ?? order.riderCurrentLocation?.lat);
+    const riderLng = Number(order.riderCurrentLng ?? order.riderCurrentLocation?.lng);
+    const movedKm =
+      Number.isFinite(previousOriginLat) &&
+      Number.isFinite(previousOriginLng)
+        ? dispatchHaversineKm(previousOriginLat, previousOriginLng, riderLat, riderLng)
+        : null;
+
+    const due =
+      options.force === true ||
+      !previousAtMs ||
+      (nowMs - previousAtMs) >= UBEE_CUSTOMER_FINAL_ETA_V1.routeRefreshMs ||
+      (Number.isFinite(movedKm) && movedKm >= UBEE_CUSTOMER_FINAL_ETA_V1.routeRefreshMinMoveKm);
+
+    if (!due) return null;
+
+    const route = await computeGoogleRoutesTrafficV11({
+      origin:input.origin,
+      destination:input.destination,
+      intermediates:input.intermediates,
+    });
+    if (!route) return null;
+
+    const routeMinutes = Math.max(1, Math.ceil(Number(route.durationSeconds || 0) / 60));
+    const baseMinutes =
+      routeMinutes +
+      input.handlingMinutes +
+      input.handoffMinutes;
+    const confidence = gps.key === 'live' ? 'high' : 'medium';
+    const window = buildCustomerFinalEtaWindowV1(baseMinutes, nowMs, confidence);
+
+    const update = {
+      customerFinalEtaVersion:UBEE_CUSTOMER_FINAL_ETA_V1.version,
+      customerFinalEtaAvailable:true,
+      customerFinalEtaPhase:input.phase,
+      customerFinalEtaMinMinutes:window.minMinutes,
+      customerFinalEtaMaxMinutes:window.maxMinutes,
+      customerFinalEtaStartAtMs:window.startAtMs,
+      customerFinalEtaEndAtMs:window.endAtMs,
+      customerFinalEtaUpdatedAtMs:nowMs,
+      customerFinalEtaUpdatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      customerFinalEtaLocationAtMs:gps.updatedAtMs,
+      customerFinalEtaOriginLat:riderLat,
+      customerFinalEtaOriginLng:riderLng,
+      customerFinalEtaTrafficAware:route.trafficAware === true,
+      customerFinalEtaConfidence:confidence,
+      customerFinalEtaRouteMinutes:routeMinutes,
+      customerFinalEtaHandlingMinutes:input.handlingMinutes,
+      customerFinalEtaHandoffMinutes:input.handoffMinutes,
+      customerFinalEtaRemainingStopCount:input.remainingStopCount,
+    };
+
+    await orderRef.set(update,{merge:true});
+    return { orderId:safeOrderId, ...update };
+  })();
+
+  customerFinalEtaRefreshLocksV1.set(safeOrderId, task);
+  try {
+    return await task;
+  } finally {
+    customerFinalEtaRefreshLocksV1.delete(safeOrderId);
+  }
+}
+
+function buildCustomerFinalEtaPayloadV1(order = {}, nowMs = Date.now()) {
+  const status = String(order.status || '').trim().toLowerCase();
+  if (['completed','done','cancelled','canceled'].includes(status)) {
+    return {
+      version:UBEE_CUSTOMER_FINAL_ETA_V1.version,
+      available:false,
+      reason:'terminal',
+    };
+  }
+
+  const updatedAtMs = Number(order.customerFinalEtaUpdatedAtMs || 0);
+  const routeAgeMs = updatedAtMs > 0 ? Math.max(0, nowMs - updatedAtMs) : null;
+  const startAtMs = Number(order.customerFinalEtaStartAtMs || 0);
+  const endAtMs = Number(order.customerFinalEtaEndAtMs || 0);
+
+  let minMinutes = Number(order.customerFinalEtaMinMinutes || 0);
+  let maxMinutes = Number(order.customerFinalEtaMaxMinutes || 0);
+
+  if (startAtMs > 0) {
+    minMinutes = Math.max(1, Math.ceil((startAtMs - nowMs) / 60000));
+  }
+  if (endAtMs > 0) {
+    maxMinutes = Math.max(minMinutes + 1, Math.ceil((endAtMs - nowMs) / 60000));
+  }
+
+  const available =
+    order.customerFinalEtaAvailable === true &&
+    routeAgeMs !== null &&
+    routeAgeMs <= UBEE_CUSTOMER_FINAL_ETA_V1.routeMaxAgeMs &&
+    Number.isFinite(minMinutes) &&
+    Number.isFinite(maxMinutes) &&
+    minMinutes > 0 &&
+    maxMinutes >= minMinutes;
+
+  return {
+    version:String(order.customerFinalEtaVersion || UBEE_CUSTOMER_FINAL_ETA_V1.version),
+    available,
+    reason:available ? '' : (routeAgeMs === null ? 'final_eta_waiting' : 'final_eta_stale'),
+    confidence:String(order.customerFinalEtaConfidence || 'high'),
+    phase:String(order.customerFinalEtaPhase || ''),
+    minMinutes:available ? Math.ceil(minMinutes) : null,
+    maxMinutes:available ? Math.ceil(maxMinutes) : null,
+    startAtMs:available ? startAtMs : null,
+    endAtMs:available ? endAtMs : null,
+    updatedAtMs,
+    routeAgeMs,
+    trafficAware:order.customerFinalEtaTrafficAware === true,
+    queued:String(order.stackRole || '').trim().toUpperCase() === 'QUEUED',
+  };
+}
+
 function getCustomerLiveEtaPhaseV1(order = {}) {
   const status = String(order.status || '').trim().toLowerCase();
   if (['accepted','going_to_pickup','heading_to_pickup'].includes(status)) return 'pickup';
@@ -44689,6 +45213,7 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
       locationHealth,
     },
     eta:liveEta,
+    finalEta:buildCustomerFinalEtaPayloadV1(order, nowMs),
     route:{
       riderToPickupDistanceText:String(order.riderToPickupDistanceText || order.distanceToPickupText || ''),
       riderToDropoffDistanceText:String(order.riderToDropoffDistanceText || order.distanceToDropoffText || order.remainingDistanceText || ''),
@@ -44818,6 +45343,27 @@ function sanitizeCustomerOrderForApi(order = {}) {
     customerLiveEtaUpdatedAtMs: Number(order.customerLiveEtaUpdatedAtMs || 0),
     etaText: String(order.etaText || ''),
     etaMinutes: Number.isFinite(Number(order.etaMinutes)) ? Number(order.etaMinutes) : null,
+
+    // Final Delivery ETA：列表、明細、進行中任務共用同一份後端時間窗。
+    customerFinalEtaVersion: String(order.customerFinalEtaVersion || ''),
+    customerFinalEtaAvailable: order.customerFinalEtaAvailable === true,
+    customerFinalEtaPhase: String(order.customerFinalEtaPhase || ''),
+    customerFinalEtaMinMinutes: Number.isFinite(Number(order.customerFinalEtaMinMinutes)) ? Number(order.customerFinalEtaMinMinutes) : null,
+    customerFinalEtaMaxMinutes: Number.isFinite(Number(order.customerFinalEtaMaxMinutes)) ? Number(order.customerFinalEtaMaxMinutes) : null,
+    customerFinalEtaStartAtMs: Number(order.customerFinalEtaStartAtMs || 0),
+    customerFinalEtaEndAtMs: Number(order.customerFinalEtaEndAtMs || 0),
+    customerFinalEtaUpdatedAtMs: Number(order.customerFinalEtaUpdatedAtMs || 0),
+    customerFinalEtaTrafficAware: order.customerFinalEtaTrafficAware === true,
+    customerFinalEtaConfidence: String(order.customerFinalEtaConfidence || ''),
+
+    // Smart Stack 只回傳本客戶需要知道的安全狀態，不暴露前序客戶內容。
+    stackRole: String(order.stackRole || '').trim().toUpperCase(),
+    stackState: String(order.stackState || '').trim().toLowerCase(),
+    stackWaitingAhead: String(order.stackRole || '').trim().toUpperCase() === 'QUEUED',
+    stackQueuedEtaMinutes: Number.isFinite(Number(order.stackQueuedEtaMinutes)) ? Number(order.stackQueuedEtaMinutes) : null,
+    stackQueuedEtaAtMs: Number(order.stackQueuedEtaAtMs || 0),
+    stackQueuedEtaUpdatedAtMs: Number(order.stackQueuedEtaUpdatedAtMs || 0),
+
     createdAtMs: customerOrderApiTimeMs(order.createdAtMs || order.createdAt),
     updatedAtMs: customerOrderApiTimeMs(order.updatedAtMs || order.updatedAt),
   };
