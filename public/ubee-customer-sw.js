@@ -1,3 +1,5 @@
+/* 2026-09-24｜Customer Home Dynamic Hero V2：首頁只移除 Google Map，恢復既有五大服務與內容結構；原地圖位置改城市節點 Hero／進行中任務摘要。 */
+/* 2026-09-24｜Customer Service Home + Linear Progress V1：同步首頁移除大地圖、服務導向首頁與 4 節點線性進度條。 */
 /* 2026-09-24｜Customer Final Delivery ETA V1：同步訂單總覽／明細／進行中任務的最終送達 ETA 與 Queue ETA 顯示。 */
 /* 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；同步 PWA Release，留空不影響估價與送單。 */
 /* 2026-09-23｜Customer Multi-stop Delivery V1：同步一般客戶雙送達點、多點報價／建單與新版快取。 */
@@ -46,7 +48,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260924-customer-final-delivery-eta-v2';
+const UBEE_CUSTOMER_SW_VERSION = '20260924-customer-home-dynamic-hero-v2';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
