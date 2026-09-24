@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-24｜Customer Final Delivery ETA V1：進行中主畫面、底部「訂單」清單與訂單明細統一顯示後端最終送達 ETA；Smart Stack B 單以 Queue ETA 顯示，不暴露 A 客戶資料。 -->
 <!-- 2026-09-23 Production Audit：已核對 index / order / rider API 與多點配送契約；本檔無需功能修正。 -->
 <!-- 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；留空不阻擋流程，有填才納入多點路線並加收 NT$50。 -->
 <!-- 2026-09-23｜Customer Multi-stop Fee V1：送達點 1 必填、送達點 2 選填；每新增 1 個有效送達點固定加 NT$50，正式報價與建單一致。 -->
@@ -47,7 +48,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260923-customer-draft-resume-fix-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260924-customer-final-delivery-eta-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6310,6 +6311,31 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
 
 
 <style id="ubee-customer-cancel-ux-v1-style">
+#productionOrderFlow .ubee-native-order-eta{
+  display:block;
+  margin-top:6px;
+  font-size:12px;
+  line-height:1.45;
+  font-weight:850;
+  color:#111;
+}
+#productionOrderFlow .ubee-native-order-eta strong{
+  display:block;
+  color:#111;
+  font-size:12px;
+  font-weight:950;
+}
+#productionOrderFlow .ubee-native-order-eta small{
+  display:block;
+  margin-top:1px;
+  color:#6f7378;
+  font-size:10.5px;
+  font-weight:750;
+}
+#productionOrderFlow .ubee-native-order-eta.waiting strong{
+  color:#8a6200;
+}
+
 #productionOrderFlow .ubee-customer-order-card-actions{
   display:flex;
   justify-content:flex-end;
@@ -10332,6 +10358,97 @@ function getTrackingEtaPresentation(order = {}, routeData = null){
   };
 }
 
+function getCustomerFinalDeliveryEtaPresentation(order = {}){
+  const status=String(order?.status||'').trim().toLowerCase();
+  const terminal=['completed','done','cancelled','canceled'].includes(status);
+  if(terminal){
+    return {available:false,reason:'terminal',windowText:'',remainingText:''};
+  }
+
+  const server=order?._trackingSummary?.finalEta || {};
+  const now=Date.now();
+
+  let available=server.available===true;
+  let minMinutes=Number(server.minMinutes);
+  let maxMinutes=Number(server.maxMinutes);
+  let startAtMs=Number(server.startAtMs||0);
+  let endAtMs=Number(server.endAtMs||0);
+  let confidence=String(server.confidence||order?.customerFinalEtaConfidence||'').toLowerCase();
+  let queued=server.queued===true || String(order?.stackRole||'').toUpperCase()==='QUEUED' || order?.stackWaitingAhead===true;
+
+  if(!available){
+    const updatedAtMs=Number(order?.customerFinalEtaUpdatedAtMs||0);
+    const routeAgeMs=updatedAtMs>0?Math.max(0,now-updatedAtMs):null;
+    startAtMs=Number(order?.customerFinalEtaStartAtMs||0);
+    endAtMs=Number(order?.customerFinalEtaEndAtMs||0);
+    minMinutes=Number(order?.customerFinalEtaMinMinutes);
+    maxMinutes=Number(order?.customerFinalEtaMaxMinutes);
+    if(startAtMs>0)minMinutes=Math.max(1,Math.ceil((startAtMs-now)/60000));
+    if(endAtMs>0)maxMinutes=Math.max(Math.max(1,Math.ceil(minMinutes||1))+1,Math.ceil((endAtMs-now)/60000));
+    available=
+      order?.customerFinalEtaAvailable===true &&
+      routeAgeMs!==null &&
+      routeAgeMs<=5*60*1000 &&
+      Number.isFinite(minMinutes) &&
+      Number.isFinite(maxMinutes) &&
+      minMinutes>0 &&
+      maxMinutes>=minMinutes;
+  }
+
+  if(!available){
+    if(['pending_payment','merchant_pending','pending_schedule','pending_dispatch'].includes(status)){
+      return {
+        available:false,
+        reason:'waiting_match',
+        queued:false,
+        windowText:'正在為你尋找小U',
+        remainingText:'小U接單後顯示預計送達時間'
+      };
+    }
+    return {
+      available:false,
+      reason:'loading',
+      queued,
+      windowText:'預計送達時間計算中',
+      remainingText:queued?'小U正在完成前序任務':'取得最新路況後自動更新'
+    };
+  }
+
+  minMinutes=Math.max(1,Math.ceil(Number(minMinutes||1)));
+  maxMinutes=Math.max(minMinutes+1,Math.ceil(Number(maxMinutes||minMinutes+1)));
+
+  if(!startAtMs)startAtMs=now+minMinutes*60000;
+  if(!endAtMs)endAtMs=now+maxMinutes*60000;
+
+  const startClock=formatTrackingClockTime(startAtMs);
+  const endClock=formatTrackingClockTime(endAtMs);
+  return {
+    available:true,
+    reason:'',
+    confidence:confidence||'high',
+    queued,
+    minMinutes,
+    maxMinutes,
+    startAtMs,
+    endAtMs,
+    windowText:startClock&&endClock
+      ? `預計 ${startClock}–${endClock} 送達`
+      : '預計送達時間更新中',
+    remainingText:`還有約 ${minMinutes}–${maxMinutes} 分鐘`
+  };
+}
+
+function renderCustomerOrderListEtaHtml(order = {}){
+  const status=String(order?.status||'').trim().toLowerCase();
+  if(['completed','done','cancelled','canceled'].includes(status))return'';
+
+  const eta=getCustomerFinalDeliveryEtaPresentation(order);
+  if(!eta.windowText&&!eta.remainingText)return'';
+
+  const waiting=eta.available?'':' waiting';
+  return `<span class="ubee-native-order-eta${waiting}"><strong>${escapeHtml(eta.windowText)}</strong><small>${escapeHtml(eta.remainingText)}</small></span>`;
+}
+
 function renderStep5LiveStatus(
   order,
   routeData = null
@@ -10401,16 +10518,19 @@ function renderStep5LiveStatus(
     case 'accepted':
     case 'going_to_pickup': {
       const eta = getTrackingEtaPresentation(data,routeData);
-      etaState = eta.available ? eta.confidence : eta.reason;
-      primaryText=eta.primary;
-      labelText=eta.label;
-      titleText='前往取件中';
+      const finalEta = getCustomerFinalDeliveryEtaPresentation(data);
+      const stackQueued = String(data?.stackRole||'').toUpperCase()==='QUEUED' || data?.stackWaitingAhead===true;
+      etaState = finalEta.available ? (finalEta.confidence||'high') : (eta.available ? eta.confidence : eta.reason);
+      primaryText=finalEta.windowText || eta.primary;
+      labelText=finalEta.remainingText || eta.label;
+      titleText=stackQueued?'小U正在完成前序任務':'小U正在前往取件';
       const metaParts=[];
-      if(eta.distanceText) metaParts.push(`距離取件點 ${eta.distanceText}`);
+      if(eta.distanceText) metaParts.push(stackQueued?`距離下一單取件點 ${eta.distanceText}`:`距離取件點 ${eta.distanceText}`);
+      if(eta.available) metaParts.push(`目前階段 ${eta.primary}`);
       if(eta.health?.key === 'live') metaParts.push('定位即時');
       if(eta.health?.key === 'delayed') metaParts.push(formatTrackingLocationAge(eta.health.ageMs));
       if(['stale','critical'].includes(eta.health?.key)) metaParts.push('定位恢復後會自動重新計算');
-      metaText=metaParts.join('・') || '正在取得小U位置與道路時間';
+      metaText=metaParts.join('・') || (stackQueued?'完成前序任務後會依序前往取件':'正在取得小U位置與道路時間');
       break;
     }
 
@@ -10432,12 +10552,14 @@ function renderStep5LiveStatus(
         break;
       }
       const eta = getTrackingEtaPresentation(data,routeData);
-      etaState = eta.available ? eta.confidence : eta.reason;
-      primaryText=eta.primary;
-      labelText=eta.label;
+      const finalEta = getCustomerFinalDeliveryEtaPresentation(data);
+      etaState = finalEta.available ? (finalEta.confidence||'high') : (eta.available ? eta.confidence : eta.reason);
+      primaryText=finalEta.windowText || eta.primary;
+      labelText=finalEta.remainingText || eta.label;
       titleText='配送中';
       const metaParts=[];
-      if(eta.distanceText) metaParts.push(`距離送達點 ${eta.distanceText}`);
+      if(eta.distanceText) metaParts.push(`距離目前送達點 ${eta.distanceText}`);
+      if(eta.available) metaParts.push(`目前階段 ${eta.primary}`);
       if(eta.health?.key === 'live') metaParts.push('定位即時');
       if(eta.health?.key === 'delayed') metaParts.push(formatTrackingLocationAge(eta.health.ageMs));
       if(['stale','critical'].includes(eta.health?.key)) metaParts.push('定位恢復後會自動重新計算');
@@ -18250,7 +18372,7 @@ const UBeeEnhancements = (() => {
   function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,order.serviceType||serviceType);speedType=order.speedType||order.speed||'standard';orderTimingType=order.orderTimingType||'immediate';scheduleGoal=order.scheduleGoal||'pickup_at';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
   function reorder(id){const order=state.lastOrders.get(id);if(order)applyOrder(order)}
   function openOrder(id){const order=state.lastOrders.get(id);if(!order)return;currentOrderId=id;currentOrderData=order;localStorage.setItem('ubee_current_order_id',id);setOrderNo(id);showOnlyStep(5);renderTimeline(order.status||'pending_payment',order);startOrderListener(id)}
-  function renderOrderCards(el,orders,emptyText){if(!el)return;if(!orders.length){el.textContent=emptyText;return}state.lastOrders.clear();orders.forEach(o=>state.lastOrders.set(o.id,o));el.innerHTML=orders.map(o=>{const pickup=o.pickup||o.pickupAddress||'-',dropoff=o.dropoff||o.dropoffAddress||'-',total=getCustomerPayableTotal(o),status=getStatusLabel(o.status),done=['completed','done'].includes(String(o.status));return `<div class="order-history-card"><div style="font-size:15px;font-weight:1000">${escapeAttr(o.serviceType||'UBee 跑腿任務')}</div><div class="field-help">${escapeAttr(status)}・${escapeAttr(formatOrderTime(o.createdAt||o.updatedAt))}<br>${escapeAttr(pickup)} → ${escapeAttr(dropoff)}<br>金額：${total>0?`NT$${Math.round(total)}`:'-'}</div><div class="order-card-actions"><button type="button" onclick="UBeeEnhancements.openOrder('${o.id}')">查看明細</button>${done?`<button type="button" onclick="UBeeEnhancements.reorder('${o.id}')">再叫一次</button>`:''}</div></div>`}).join('')}
+  function renderOrderCards(el,orders,emptyText){if(!el)return;if(!orders.length){el.textContent=emptyText;return}state.lastOrders.clear();orders.forEach(o=>state.lastOrders.set(o.id,o));el.innerHTML=orders.map(o=>{const pickup=o.pickup||o.pickupAddress||'-',dropoff=o.dropoff||o.dropoffAddress||'-',total=getCustomerPayableTotal(o),status=getStatusLabel(o.status),done=['completed','done'].includes(String(o.status));return `<div class="order-history-card"><div style="font-size:15px;font-weight:1000">${escapeAttr(o.serviceType||'UBee 跑腿任務')}</div><div class="field-help">${escapeAttr(status)}・${escapeAttr(formatOrderTime(o.createdAt||o.updatedAt))}<br>${escapeAttr(pickup)} → ${escapeAttr(dropoff)}<br>${renderCustomerOrderListEtaHtml(o)}金額：${total>0?`NT$${Math.round(total)}`:'-'}</div><div class="order-card-actions"><button type="button" onclick="UBeeEnhancements.openOrder('${o.id}')">查看明細</button>${done?`<button type="button" onclick="UBeeEnhancements.reorder('${o.id}')">再叫一次</button>`:''}</div></div>`}).join('')}
 
   async function beforeCreate(){if(!validateInline())throw new Error('請先完成標示的必要欄位。');renderSystemCheck()}
   function extendPayload(payload){return {...payload,pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),shoppingItems:state.shoppingItems.filter(x=>String(x.name||'').trim()).map(({id,...x})=>x),estimatedCompletionMinutes:lastRouteData?etaMinutes():null,clientSchemaVersion:'customer-v4-2026-07-16'} }
@@ -21290,8 +21412,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const category=String(order?.serviceCategory||order?.category||'').trim()||'—';
     const pickupContact=profileOrderContact(order,'pickup');
     const dropoffContact=profileOrderContact(order,'dropoff');
+    const detailEta=getCustomerFinalDeliveryEtaPresentation(order);
     const groups=[
       ['基本資料',[['訂單編號',String(order?.orderNo||order?.id||'—')],['建立時間',orderTimeText(order)||'—'],['任務狀態',orderStatusText(order.status)],['任務時間',profileOrderTiming(order)]]],
+      ...(!['completed','done','cancelled','canceled'].includes(String(order?.status||'').toLowerCase())
+        ? [['預計送達',[
+            ['送達時間',detailEta.windowText||'預計送達時間計算中'],
+            ['剩餘時間',detailEta.remainingText||'取得最新路況後自動更新']
+          ]]]
+        : []),
       ['路線',[['取件地點',profileOrderAddress(order,'pickup')],['送達地點',profileOrderAddress(order,'dropoff')]]],
       ['聯絡資訊',[['取件聯絡',pickupContact||'—'],['送達聯絡',dropoffContact||'—']]],
       ['任務內容',[['任務項目',profileOrderTitle(order)],['品項分類',category],['需求內容',note]]],
@@ -21338,6 +21467,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
             <span class="ubee-native-order-main">
               <strong class="ubee-native-order-title">${escapeHtml(profileOrderTitle(order))}</strong>
               <span class="ubee-native-order-sub">${escapeHtml(route)}・${escapeHtml(orderTimeText(order)||'時間確認中')}</span>
+              ${renderCustomerOrderListEtaHtml(order)}
             </span>
             <span class="ubee-native-order-side">
               <span class="ubee-native-order-status">${escapeHtml(orderStatusText(order.status))}</span>
@@ -21356,6 +21486,17 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const activeButton=$('flowOpenActiveOrder');
     if(activeButton) activeButton.hidden=!activeOrder();
     await renderTaskList();
+
+    // 訂單總覽維持輕量更新；只在使用者停留「訂單」頁時重新讀取。
+    if(!window.__ubeeCustomerOrderEtaRefreshTimer){
+      window.__ubeeCustomerOrderEtaRefreshTimer=setInterval(()=>{
+        try{
+          if(state.page==='tasksRoot' && document.visibilityState==='visible'){
+            renderTaskList();
+          }
+        }catch(_){}
+      },15000);
+    }
   }
 
   async function renderProfile(){
@@ -21715,7 +21856,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260923-customer-draft-resume-fix-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260924-customer-final-delivery-eta-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23138,7 +23279,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.09.23.6';
+  const APP_VERSION = '2026.09.24.1';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
