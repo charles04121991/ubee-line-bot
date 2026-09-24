@@ -36687,6 +36687,26 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       const current = { id:currentDoc.id, ...currentDoc.data() };
       const candidate = { id:candidateDoc.id, ...candidateDoc.data() };
 
+      // Smart Stack Transaction Recheck V2：
+      // Google Routes 在 Transaction 外計算，但正式鎖單前必須再次確認
+      // A 仍是同一張進行中任務，且 A / B 任務型態仍符合疊單規則。
+      if (currentOrderId !== preCurrentOrderId) {
+        throw new Error('STACK_STATE_CHANGED');
+      }
+      const latestCurrentStatus = String(current.status || '').trim().toLowerCase();
+      if (![
+        'accepted','going_to_pickup','heading_to_pickup','arrived_pickup',
+        'picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff'
+      ].includes(latestCurrentStatus)) {
+        throw new Error('STACK_STATE_CHANGED');
+      }
+      if (!isSmartStackStandardDelivery(current)) {
+        throw new Error('CURRENT_ORDER_NOT_SUPPORTED');
+      }
+      if (!isSmartStackStandardDelivery(candidate)) {
+        throw new Error('CANDIDATE_ORDER_NOT_SUPPORTED');
+      }
+
       if (!isOrderBelongsToRider(current, identity)) throw new Error('NOT_THIS_RIDER');
       if (!riderMeetsOrderV4Requirements(latestRider, candidate)) {
         throw new Error('RIDER_V4_QUALIFICATION_REQUIRED');
@@ -36920,6 +36940,7 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
       RIDER_DISPATCH_NOT_ELIGIBLE:[403,'目前不具備正式接單資格。'],
       STACK_CURRENT_ORDER_REQUIRED:[409,'目前沒有可建立疊單的進行中任務。'],
       STACK_CURRENT_ORDER_NOT_FOUND:[409,'目前任務已更新，請重新整理。'],
+      STACK_STATE_CHANGED:[409,'目前任務狀態已更新，請重新整理後再試。'],
       STACK_QUEUE_FULL:[409,'目前已經有一筆下一任務，完成後才能再疊單。'],
       CURRENT_ORDER_NOT_SUPPORTED:[409,'目前任務類型不支援疊單。'],
       CANDIDATE_ORDER_NOT_SUPPORTED:[409,'這張任務目前不支援疊單。'],
@@ -38642,10 +38663,36 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
               ? crypto.randomUUID()
               : crypto.randomBytes(16).toString('hex');
 
+          const inheritedRiderLat = Number(
+            order.riderCurrentLat ?? order.riderCurrentLocation?.lat
+          );
+          const inheritedRiderLng = Number(
+            order.riderCurrentLng ?? order.riderCurrentLocation?.lng
+          );
+          const inheritedRiderLocationUpdatedAtMs = Number(
+            order.riderLocationUpdatedAtMs || order.riderCurrentLocation?.updatedAtMs || 0
+          );
+
           const promotedUpdate = {
             stackRole:'CURRENT',
             stackState:'active',
             stackPromotedAtMs:promotedAtMs,
+
+            // Queue ETA Promotion Hardening V2：
+            // B 升成 CURRENT 後，不得繼續沿用「前序任務中的排隊 ETA」。
+            customerFinalEtaAvailable:false,
+            customerFinalEtaPhase:'pickup',
+            customerFinalEtaMinMinutes:null,
+            customerFinalEtaMaxMinutes:null,
+            customerFinalEtaStartAtMs:0,
+            customerFinalEtaEndAtMs:0,
+            customerFinalEtaUpdatedAtMs:0,
+            customerFinalEtaConfidence:'',
+            ...(Number.isFinite(inheritedRiderLat) && Number.isFinite(inheritedRiderLng) ? {
+              riderCurrentLat:inheritedRiderLat,
+              riderCurrentLng:inheritedRiderLng,
+              riderLocationUpdatedAtMs:inheritedRiderLocationUpdatedAtMs,
+            } : {}),
             stackPromotedAt:admin.firestore.FieldValue.serverTimestamp(),
             stackPreviousOrderId:safeOrderId,
             riderTrackingStatus:'starting',
@@ -38738,6 +38785,14 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     if (promotedOrderId && promotedOrder) {
       orders[promotedOrderId] = promotedOrder;
       Promise.allSettled([
+        refreshCustomerLiveEtaV1(
+          promotedOrderId,
+          { reason:'stack_promoted_after_completion', allowRoute:true, force:true }
+        ),
+        refreshCustomerFinalDeliveryEtaV1(
+          promotedOrderId,
+          { reason:'stack_promoted_after_completion', force:true }
+        ),
         logDispatchEvent({
           type:'STACK_QUEUED_PROMOTED',
           orderId:promotedOrderId,
@@ -38756,12 +38811,30 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     }
 
     if (effectiveStatus !== 'completed') {
-      refreshSmartStackQueuedEtaV11(
-        safeOrderId,
-        { reason:`status_${effectiveStatus}`, force:true }
-      ).catch(error => {
-        console.warn('⚠️ Smart Stack V1.1 狀態切換後 QUEUED ETA 更新失敗：',error?.message || error);
-      });
+      Promise.allSettled([
+        refreshCustomerLiveEtaV1(
+          safeOrderId,
+          { reason:`status_${effectiveStatus}`, allowRoute:true, force:true }
+        ),
+        refreshCustomerFinalDeliveryEtaV1(
+          safeOrderId,
+          { reason:`status_${effectiveStatus}`, force:true }
+        ),
+        refreshSmartStackQueuedEtaV11(
+          safeOrderId,
+          { reason:`status_${effectiveStatus}`, force:true }
+        ),
+      ]).then(results => {
+        const labels = ['Live ETA','Final ETA','QUEUED ETA'];
+        results.forEach((result,index) => {
+          if (result.status === 'rejected') {
+            console.warn(
+              `⚠️ ${labels[index]} 狀態切換後更新失敗：`,
+              result.reason?.message || result.reason
+            );
+          }
+        });
+      }).catch(()=>{});
     }
 
     const statusEventType = effectiveStatus === 'completed'
@@ -39529,9 +39602,35 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
             : crypto.randomBytes(16).toString('hex');
 
         const promotedAtMs=Date.now();
+        const inheritedRiderLat=Number(
+          order.riderCurrentLat ?? order.riderCurrentLocation?.lat
+        );
+        const inheritedRiderLng=Number(
+          order.riderCurrentLng ?? order.riderCurrentLocation?.lng
+        );
+        const inheritedRiderLocationUpdatedAtMs=Number(
+          order.riderLocationUpdatedAtMs || order.riderCurrentLocation?.updatedAtMs || 0
+        );
+
         const promotedUpdate={
           stackRole:'CURRENT',
           stackState:'active',
+
+          // Queue ETA Promotion Hardening V2：
+          // 前序任務取消後，B 直接成為 CURRENT，舊的排隊 ETA 必須作廢。
+          customerFinalEtaAvailable:false,
+          customerFinalEtaPhase:'pickup',
+          customerFinalEtaMinMinutes:null,
+          customerFinalEtaMaxMinutes:null,
+          customerFinalEtaStartAtMs:0,
+          customerFinalEtaEndAtMs:0,
+          customerFinalEtaUpdatedAtMs:0,
+          customerFinalEtaConfidence:'',
+          ...(Number.isFinite(inheritedRiderLat) && Number.isFinite(inheritedRiderLng) ? {
+            riderCurrentLat:inheritedRiderLat,
+            riderCurrentLng:inheritedRiderLng,
+            riderLocationUpdatedAtMs:inheritedRiderLocationUpdatedAtMs,
+          } : {}),
           stackPosition:1,
           stackPrimaryOrderId:'',
           stackQueuedBehindOrderId:'',
@@ -39632,6 +39731,16 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
     clearDispatchPushTimers(safeOrderId);
 
     Promise.allSettled([
+      ...(promotedOrderId ? [
+        refreshCustomerLiveEtaV1(
+          promotedOrderId,
+          { reason:'stack_promoted_after_cancel', allowRoute:true, force:true }
+        ),
+        refreshCustomerFinalDeliveryEtaV1(
+          promotedOrderId,
+          { reason:'stack_promoted_after_cancel', force:true }
+        ),
+      ] : []),
       logDispatchEvent({
         type:'CUSTOMER_CANCELLED_ORDER',
         orderId:safeOrderId,
