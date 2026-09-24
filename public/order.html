@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-24｜Customer Platform Home V3：首頁改為外送平台式資訊架構；移除城市節點動畫／大 Hero，五大正式服務（幫我送／幫我取／幫我買／幫排隊／全能跑腿）完全保留；進行中任務有單才顯示，運力資訊移至下單區下方。 -->
 <!-- 2026-09-24｜Customer Home Dynamic Hero V2：恢復既有正式首頁與五大服務（幫我送／幫我取／幫我買／幫排隊／全能跑腿）；只移除首頁 Google Map，原位置改為城市任務動態 Hero；有進行中訂單時同區塊切換為 ETA＋4 節點進度。 -->
 <!-- 2026-09-24｜Customer Service Home + Linear Progress V1：進行中任務固定 4 節點線性進度（媒合→取件→配送→完成），沿用 Final Delivery ETA；V2 已撤回 V1 的首頁服務重新編排，恢復既有正式首頁服務結構。 -->
 <!-- 2026-09-24｜Customer Final Delivery ETA V2：訂單頁背景靜默刷新、防重複請求；Smart Stack B 升為 CURRENT 後不顯示舊排隊 ETA。 -->
@@ -51,7 +52,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260924-customer-home-dynamic-hero-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20260924-customer-platform-home-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19507,48 +19508,15 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-progress" data-progress="0"></div>
 <div class="flow-scroll flow-home-scroll">
 <div class="flow-card">
-<section class="flow-home-dynamic-hero" id="flowHomeDynamicHero" aria-label="UBee 首頁動態服務狀態">
-  <div class="flow-home-idle-hero" id="flowHomeIdleHero">
-    <div class="flow-home-city-network" aria-hidden="true">
-      <span class="node n1"></span><i class="link l1"></i><span class="node n2"></span><i class="link l2"></i><span class="node n3"></span><i class="link l3"></i><span class="node n4"></span>
-    </div>
-    <div class="flow-home-idle-copy">
-      <small>UBee 城市任務網路</small>
-      <strong>城市任務正在流動</strong>
-      <span>需求出現・系統媒合・小U移動・任務完成</span>
-    </div>
-    <div class="flow-home-supply-strip-wrap">
-      <div aria-live="polite" class="flow-live-supply-status" data-rider-count="0" data-scope="loading" id="flowLiveSupplyStatus">
-        <div class="flow-live-supply-head">
-          <div class="flow-live-supply-main">
-            <div class="flow-live-supply-kicker">
-              <span aria-hidden="true" class="flow-live-supply-dot"></span>
-              <span id="flowLiveSupplyKicker">即時小U運力</span>
-            </div>
-            <div class="flow-live-supply-count" data-rider-count="0" data-scope="loading" id="flowLiveSupplyCount">
-              <strong>即時運力更新中</strong>
-            </div>
-            <div aria-live="polite" class="flow-live-supply-eta is-unavailable" data-confidence="none" data-supply-level="none" id="flowLiveSupplyEta">媒合時間持續更新</div>
-          </div>
-          <div class="flow-live-supply-side">
-            <div class="flow-live-supply-scope" id="flowLiveSupplyScope">定位中</div>
-            <div class="flow-live-supply-time" id="flowLiveSupplyTime">--:--</div>
-          </div>
-        </div>
-        <div class="flow-live-supply-note" id="flowLiveSupplyNote">目前顯示全區可媒合小U；建立任務後會進入全區待接任務池。</div>
-      </div>
-    </div>
+<section class="flow-home-active-task-card" id="flowHomeActiveTaskCard" hidden aria-live="polite">
+  <div class="flow-home-active-task-head">
+    <div><small>目前有進行中的任務</small><strong id="flowHomeActiveTaskTitle">任務進行中</strong></div>
+    <button type="button" id="flowHomeActiveTaskOpen">查看進度 ›</button>
   </div>
-  <section class="flow-home-active-task-card" id="flowHomeActiveTaskCard" hidden aria-live="polite">
-    <div class="flow-home-active-task-head">
-      <div><small>目前有進行中的任務</small><strong id="flowHomeActiveTaskTitle">任務進行中</strong></div>
-      <button type="button" id="flowHomeActiveTaskOpen">查看進度 ›</button>
-    </div>
-    <div class="flow-home-active-task-eta"><strong id="flowHomeActiveTaskEta">預計送達時間計算中</strong><span id="flowHomeActiveTaskRemaining">取得最新路況後自動更新</span></div>
-    <div class="flow-home-mini-progress" id="flowHomeMiniProgress" data-stage="0" style="--ubee-mini-fill:0%;--ubee-mini-left:12.5%"><i></i><b></b><span class="p1">媒合</span><span class="p2">取件</span><span class="p3">配送</span><span class="p4">完成</span></div>
-  </section>
+  <div class="flow-home-active-task-eta"><strong id="flowHomeActiveTaskEta">預計送達時間計算中</strong><span id="flowHomeActiveTaskRemaining">取得最新路況後自動更新</span></div>
+  <div class="flow-home-mini-progress" id="flowHomeMiniProgress" data-stage="0" style="--ubee-mini-fill:0%;--ubee-mini-left:12.5%"><i></i><b></b><span class="p1">媒合</span><span class="p2">取件</span><span class="p3">配送</span><span class="p4">完成</span></div>
 </section>
-<div class="flow-home-action-head"><strong>需要小U幫什麼？</strong><span>選擇服務後再填地點</span></div>
+<div class="flow-home-action-head"><strong>今天需要小U幫什麼？</strong><span>選擇服務後再填地點</span></div>
 <div aria-label="選擇跑腿服務" class="flow-service-tabs" id="flowServiceTabs" role="tablist">
 <button aria-selected="true" class="flow-service-tab active" data-service="send" role="tab" type="button">
 <span aria-hidden="true" class="flow-service-icon">
@@ -19618,6 +19586,27 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-task-preview" id="flowTaskPreview"><div class="flow-task-preview-text" id="flowTaskPreviewText"></div><button class="flow-text-link" id="flowEditTaskButton" type="button">修改</button></div>
 <div class="flow-status" id="flowHomeStatus"></div>
 <button class="flow-primary flow-home-next" id="flowHomeNext" type="button">下一步：填寫任務內容</button>
+<section class="flow-home-supply-strip" aria-label="即時小U運力">
+  <div aria-live="polite" class="flow-live-supply-status" data-rider-count="0" data-scope="loading" id="flowLiveSupplyStatus">
+    <div class="flow-live-supply-head">
+      <div class="flow-live-supply-main">
+        <div class="flow-live-supply-kicker">
+          <span aria-hidden="true" class="flow-live-supply-dot"></span>
+          <span id="flowLiveSupplyKicker">即時小U運力</span>
+        </div>
+        <div class="flow-live-supply-count" data-rider-count="0" data-scope="loading" id="flowLiveSupplyCount">
+          <strong>即時運力更新中</strong>
+        </div>
+        <div aria-live="polite" class="flow-live-supply-eta is-unavailable" data-confidence="none" data-supply-level="none" id="flowLiveSupplyEta">媒合時間持續更新</div>
+      </div>
+      <div class="flow-live-supply-side">
+        <div class="flow-live-supply-scope" id="flowLiveSupplyScope">定位中</div>
+        <div class="flow-live-supply-time" id="flowLiveSupplyTime">--:--</div>
+      </div>
+    </div>
+    <div class="flow-live-supply-note" id="flowLiveSupplyNote">目前顯示全區可媒合小U；建立任務後會進入全區待接任務池。</div>
+  </div>
+</section>
 </div>
 <section aria-labelledby="flowHomeDiscoveryTitle" class="flow-home-discovery">
 <div class="flow-home-section-head">
@@ -21873,7 +21862,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260924-customer-home-dynamic-hero-v2';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260924-customer-platform-home-v3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22005,76 +21994,35 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 </style>
 
-<style id="ubee-customer-home-dynamic-hero-v2-style">
+<style id="ubee-customer-platform-home-v3-style">
 /* =====================================================
-   Customer Home Dynamic Hero V2
-   - 保留既有正式五大服務與首頁內容順序
-   - 只以動態 Hero 取代首頁 Google Map
-   - 無進行中任務：城市節點動畫 + 既有即時運力
-   - 有進行中任務：同一位置切換 ETA + 4 節點精簡進度
+   Customer Platform Home V3
+   - 外送平台式首頁：服務優先、地址其次、建立任務 CTA
+   - 五大正式服務不改名、不合併、不改 serviceKey
+   - 無訂單時不顯示大 Hero／節點動畫
+   - 有進行中訂單時才顯示任務摘要
+   - 即時運力保留既有資料來源，移到建立任務 CTA 後方
    ===================================================== */
 #productionOrderFlow #flowPageHome .flow-card{padding-top:12px!important}
-#productionOrderFlow .flow-home-dynamic-hero{
-  position:relative;overflow:hidden;min-height:214px;margin:0 0 14px;padding:18px;
-  border:1px solid #e3e5e7;border-radius:22px;
-  background:linear-gradient(145deg,#fff 0%,#fffdf3 58%,#f8f9fa 100%);
-  box-shadow:0 5px 18px rgba(17,24,39,.04)
-}
-#productionOrderFlow .flow-home-idle-hero{position:relative;z-index:1;display:grid;gap:12px;min-height:176px}
-#productionOrderFlow .flow-home-idle-hero[hidden]{display:none!important}
-#productionOrderFlow .flow-home-idle-copy{position:relative;z-index:2;display:grid;gap:4px;padding-right:4px}
-#productionOrderFlow .flow-home-idle-copy small{color:#8c9298;font-size:10px;font-weight:900;letter-spacing:.35px}
-#productionOrderFlow .flow-home-idle-copy strong{color:#111;font-size:22px;font-weight:1000;letter-spacing:-.55px;line-height:1.2}
-#productionOrderFlow .flow-home-idle-copy>span{color:#777d84;font-size:11px;font-weight:800;line-height:1.45}
+#productionOrderFlow #flowPageHome .flow-home-action-head{margin-top:2px!important}
+#productionOrderFlow #flowPageHome .flow-home-action-head strong{font-size:18px!important;letter-spacing:-.35px}
+#productionOrderFlow #flowPageHome .flow-home-action-head span{font-size:10px!important}
 
-#productionOrderFlow .flow-home-city-network{
-  position:relative;z-index:1;display:flex;align-items:center;width:100%;height:58px;padding:0 10px;margin:0 auto
+/* 只有真的有進行中訂單才出現；沒有訂單時首頁不保留空白 Hero 高度。 */
+#productionOrderFlow .flow-home-active-task-card{
+  margin:0 0 14px!important;padding:15px 16px 14px!important;
+  border:1px solid #e5e7e9!important;border-radius:20px!important;
+  background:#fff!important;box-shadow:0 4px 14px rgba(17,24,39,.035)!important
 }
-#productionOrderFlow .flow-home-city-network .node{
-  position:relative;z-index:2;flex:0 0 13px;width:13px;height:13px;border:3px solid #fff;border-radius:50%;
-  background:#111;box-shadow:0 0 0 1px #d7dade,0 3px 10px rgba(17,24,39,.08)
-}
-#productionOrderFlow .flow-home-city-network .n2,
-#productionOrderFlow .flow-home-city-network .n4{background:#facc15}
-#productionOrderFlow .flow-home-city-network .n1{transform:translateY(7px)}
-#productionOrderFlow .flow-home-city-network .n2{transform:translateY(-6px)}
-#productionOrderFlow .flow-home-city-network .n3{transform:translateY(5px)}
-#productionOrderFlow .flow-home-city-network .n4{transform:translateY(-3px)}
-#productionOrderFlow .flow-home-city-network .link{
-  position:relative;flex:1;height:2px;margin:0 5px;overflow:hidden;border-radius:999px;
-  background:repeating-linear-gradient(90deg,#d5d9dd 0 7px,transparent 7px 12px)
-}
-#productionOrderFlow .flow-home-city-network .link::after{
-  content:"";position:absolute;top:-1px;bottom:-1px;width:34%;
-  background:linear-gradient(90deg,transparent,rgba(250,204,21,.95),transparent);
-  animation:ubeeHomeNetworkFlowV2 2.35s linear infinite;transform:translateX(-140%)
-}
-#productionOrderFlow .flow-home-city-network .l2::after{animation-delay:.45s}
-#productionOrderFlow .flow-home-city-network .l3::after{animation-delay:.9s}
-@keyframes ubeeHomeNetworkFlowV2{to{transform:translateX(390%)}}
-@media (prefers-reduced-motion:reduce){
-  #productionOrderFlow .flow-home-city-network .link::after{animation:none;opacity:.45;transform:none}
-}
-
-/* 將既有即時運力原封不動放進 Hero，不建立第二套運力資料。 */
-#productionOrderFlow #flowPageHome .flow-home-dynamic-hero .flow-home-supply-strip-wrap{position:relative;z-index:2;margin:0!important}
-#productionOrderFlow #flowPageHome .flow-home-dynamic-hero .flow-home-supply-strip-wrap .flow-live-supply-status{
-  margin:0!important;padding:10px 12px!important;border:1px solid rgba(223,226,229,.95)!important;
-  border-radius:15px!important;background:rgba(255,255,255,.92)!important;box-shadow:none!important
-}
-#productionOrderFlow #flowPageHome .flow-home-dynamic-hero .flow-home-supply-strip-wrap .flow-live-supply-note{margin-top:4px!important}
-
-/* 有進行中任務時，同一個 Hero 區域切成任務摘要；不改正式「現在訂單」頁。 */
-#productionOrderFlow .flow-home-active-task-card{min-height:176px;margin:0!important;padding:2px 1px!important;border:0!important;border-radius:0!important;background:transparent!important}
 #productionOrderFlow .flow-home-active-task-card[hidden]{display:none!important}
 #productionOrderFlow .flow-home-active-task-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 #productionOrderFlow .flow-home-active-task-head small{display:block;color:#8a9097;font-size:10px;font-weight:850}
-#productionOrderFlow .flow-home-active-task-head strong{display:block;margin-top:5px;color:#111;font-size:15px;font-weight:1000;line-height:1.45}
+#productionOrderFlow .flow-home-active-task-head strong{display:block;margin-top:4px;color:#111;font-size:15px;font-weight:1000;line-height:1.42}
 #productionOrderFlow .flow-home-active-task-head button{flex:0 0 auto;padding:3px 0;border:0;background:transparent;color:#111;font-size:11px;font-weight:1000}
-#productionOrderFlow .flow-home-active-task-eta{display:grid;gap:3px;margin-top:16px;padding:12px 13px;border:1px solid #eceef0;border-radius:14px;background:rgba(255,255,255,.82)}
+#productionOrderFlow .flow-home-active-task-eta{display:grid;gap:3px;margin-top:12px}
 #productionOrderFlow .flow-home-active-task-eta strong{color:#111;font-size:16px;font-weight:1000;line-height:1.35}
 #productionOrderFlow .flow-home-active-task-eta span{color:#777d84;font-size:11px;font-weight:750}
-#productionOrderFlow .flow-home-mini-progress{position:relative;display:grid;grid-template-columns:repeat(4,1fr);margin-top:18px;padding-top:12px;color:#989da3;font-size:9.5px;font-weight:850;text-align:center}
+#productionOrderFlow .flow-home-mini-progress{position:relative;display:grid;grid-template-columns:repeat(4,1fr);margin-top:17px;padding-top:12px;color:#989da3;font-size:9.5px;font-weight:850;text-align:center}
 #productionOrderFlow .flow-home-mini-progress::before,
 #productionOrderFlow .flow-home-mini-progress i{content:"";position:absolute;left:12.5%;right:12.5%;top:3px;height:4px;border-radius:999px;background:#e3e6e9}
 #productionOrderFlow .flow-home-mini-progress i{right:auto;width:var(--ubee-mini-fill);background:#facc15;transition:width .55s cubic-bezier(.22,.61,.36,1)}
@@ -22084,28 +22032,43 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 #productionOrderFlow .flow-home-mini-progress[data-stage="2"] .p3,
 #productionOrderFlow .flow-home-mini-progress[data-stage="3"] .p4{color:#111;font-weight:1000}
 
+/* 即時運力改成下單流程後方的緊湊資訊列，不再做成首頁主視覺。 */
+#productionOrderFlow .flow-home-supply-strip{
+  margin:12px 0 0;padding:0;border:0;background:transparent
+}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-status{
+  margin:0!important;padding:11px 13px!important;
+  border:1px solid #e6e8ea!important;border-radius:16px!important;
+  background:#fff!important;box-shadow:none!important
+}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-head{min-height:auto!important;align-items:center!important}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-count{margin-top:2px!important;font-size:13px!important}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-count span{font-size:17px!important}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-kicker{display:none!important}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-side{display:none!important}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-note{display:none!important}
+#productionOrderFlow .flow-home-supply-strip .flow-live-supply-eta{margin-top:5px!important}
+
 /* Customer 4-stage Linear Progress V1：現在訂單頁固定 DOM，維持 0–100% 平滑移動。 */
 #productionOrderFlow .ubee-customer-progress-card{padding:14px 14px 13px!important}
 #productionOrderFlow .ubee-customer-progress-head{margin-bottom:9px!important}
 #productionOrderFlow .ubee-customer-progress-eta{display:grid;gap:3px;margin-bottom:16px}
 #productionOrderFlow .ubee-customer-progress-eta strong{color:#111;font-size:17px;font-weight:1000;line-height:1.35}
-#productionOrderFlow .ubee-customer-progress-eta span{color:#777d84;font-size:11px;font-weight:750}
-#productionOrderFlow .ubee-customer-progress-track{position:relative;display:block!important;padding:7px 0 0!important}
-#productionOrderFlow .ubee-customer-progress-rail{position:absolute;left:12.5%;right:12.5%;top:12px;height:4px;border-radius:999px;background:#e4e7ea;overflow:visible}
-#productionOrderFlow .ubee-customer-progress-rail i{position:absolute;left:0;top:0;height:100%;width:var(--ubee-progress);max-width:100%;border-radius:inherit;background:#facc15;transition:width .6s cubic-bezier(.22,.61,.36,1)}
-#productionOrderFlow .ubee-customer-progress-rail b{position:absolute;top:50%;left:var(--ubee-progress);width:16px;height:16px;border:4px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #d5d9dd;transform:translate(-50%,-50%);transition:left .6s cubic-bezier(.22,.61,.36,1)}
-#productionOrderFlow .ubee-customer-progress-nodes{position:relative;z-index:2;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
-#productionOrderFlow .ubee-customer-progress-item{display:grid;justify-items:center;gap:8px;color:#989da3;font-size:10px;font-weight:850;line-height:1.2}
-#productionOrderFlow .ubee-customer-progress-dot{width:14px!important;height:14px!important;margin:0!important;border:3px solid #fff!important;background:#e4e7ea!important;box-shadow:0 0 0 1px #d8dce0;color:transparent!important}
+#productionOrderFlow .ubee-customer-progress-eta span{color:#777d84;font-size:11px;font-weight:760}
+#productionOrderFlow .ubee-customer-progress-track{position:relative;display:grid;grid-template-columns:repeat(4,1fr);padding-top:18px}
+#productionOrderFlow .ubee-customer-progress-track::before{content:"";position:absolute;left:12.5%;right:12.5%;top:6px;height:5px;border-radius:999px;background:#e2e5e8}
+#productionOrderFlow .ubee-customer-progress-fill{position:absolute;left:12.5%;top:6px;width:calc(var(--ubee-progress,0%) * .75);height:5px;border-radius:999px;background:#facc15;transition:width .65s cubic-bezier(.22,.61,.36,1)}
+#productionOrderFlow .ubee-customer-progress-marker{position:absolute;top:0;left:calc(12.5% + (var(--ubee-progress,0%) * .75));width:17px;height:17px;border:3px solid #fff;border-radius:50%;background:#111;box-shadow:0 0 0 1px #d8dbde,0 2px 7px rgba(17,24,39,.15);transform:translateX(-50%);transition:left .65s cubic-bezier(.22,.61,.36,1);z-index:3}
+#productionOrderFlow .ubee-customer-progress-item{position:relative;display:grid;justify-items:center;gap:6px;color:#9a9fa4;font-size:10px;font-weight:850;text-align:center}
+#productionOrderFlow .ubee-customer-progress-dot{position:absolute;top:-18px;left:50%;z-index:2;width:11px;height:11px;border:2px solid #fff;border-radius:50%;background:#dfe2e5;box-shadow:0 0 0 1px #d5d8db;transform:translateX(-50%)}
 #productionOrderFlow .ubee-customer-progress-item.done{color:#111}
-#productionOrderFlow .ubee-customer-progress-item.done .ubee-customer-progress-dot{background:#facc15!important}
+#productionOrderFlow .ubee-customer-progress-item.done .ubee-customer-progress-dot{background:#facc15;box-shadow:0 0 0 1px #e0b500}
 #productionOrderFlow .ubee-customer-progress-item.active{color:#111;font-weight:1000}
-#productionOrderFlow .ubee-customer-progress-item.active .ubee-customer-progress-dot{background:#111!important;box-shadow:0 0 0 4px rgba(250,204,21,.22)}
-#productionOrderFlow .ubee-customer-progress-stage-meta{margin-top:13px;padding-top:11px;border-top:1px solid #eef0f2;color:#555c64;font-size:12px;font-weight:850;line-height:1.5}
+#productionOrderFlow .ubee-customer-progress-stage-meta{margin-top:11px;padding-top:11px;border-top:1px solid #f0f1f2;color:#686e75;font-size:11px;font-weight:780;line-height:1.5}
+
 @media(max-width:390px){
-  #productionOrderFlow .flow-home-dynamic-hero{min-height:202px;padding:15px}
-  #productionOrderFlow .flow-home-idle-copy strong{font-size:20px}
-  #productionOrderFlow .flow-home-city-network{height:52px;padding:0 5px}
+  #productionOrderFlow .flow-home-active-task-card{padding:14px!important;border-radius:18px!important}
+  #productionOrderFlow .flow-home-supply-strip .flow-live-supply-status{padding:10px 12px!important}
 }
 </style>
 <script id="ubee-customer-app-tracking-v2-clean-script">
@@ -22230,11 +22193,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function renderHomeActiveTask(order,status,percent,stageIndex,eta){
-    const idle=byId('flowHomeIdleHero');
     const card=byId('flowHomeActiveTaskCard');
     if(!card)return;
     const active=hasActiveOrder() && !TERMINAL.has(status);
-    if(idle) idle.hidden=active;
     card.hidden=!active;
     if(!active)return;
     const title=byId('flowHomeActiveTaskTitle');
@@ -23451,7 +23412,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.09.24.4';
+  const APP_VERSION = '2026.09.24.5';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
