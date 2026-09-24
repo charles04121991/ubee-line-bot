@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-24
+// 2026-09-24｜Rider Completed Task Detail V1：完成任務新增騎士本人專屬詳情 API；補完整路線、聯絡、費用、Smart Stack 轉場補貼、時間軸與短效照片網址，不影響進行中任務。
 // 2026-09-24｜Finance Contract Sync V2：同步 Smart Stack 平台轉場補貼、平台待撥款語意與店家已付款財務閉環；補強財務稽核欄位。
 // 2026-09-24｜Queue ETA Engine V1：客戶最終送達 ETA 以每張訂單獨立計算；Smart Stack B 單包含 A 剩餘路程＋A→B 轉場＋B 取件處理＋B 配送，A ETA 不受 B 影響。
 // 2026-09-24｜Smart Stack Transfer Subsidy V1：疊單轉場不向 A/B 客戶加價；短轉場不補貼，合理轉場由平台分潤固定補貼小U，超過既有 3km/15min 仍禁止疊單。
@@ -14832,6 +14833,18 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
           riderIncomePolicyVersion:
             String(order.riderIncomePolicyVersion || ''),
 
+          stackTransferSubsidy:
+            Math.max(0, Math.round(Number(order.stackTransferSubsidy || 0))),
+
+          stackTransferKm:
+            Math.max(0, Number(order.stackTransferKm || 0)),
+
+          stackTransferMinutes:
+            Math.max(0, Number(order.stackTransferMinutes || 0)),
+
+          stackTransferSubsidyPayer:
+            String(order.stackTransferSubsidyPayer || ''),
+
           deliveryFee:
             Math.max(0, Math.round(Number(order.deliveryFee || 0))),
 
@@ -15025,6 +15038,172 @@ app.get('/api/rider/completed-orders', riderAuthMiddleware, async (req, res) => 
         '取得騎士完成訂單失敗，請稍後再試。',
       error: err.message,
     });
+  }
+});
+
+
+// ============================================================
+// Rider Completed Task Detail V1
+// 已完成任務只允許原承接小U本人讀取；列表維持輕量，點入明細才取得完整資料與短效照片。
+// ============================================================
+app.get('/api/rider/completed-orders/:orderId', riderAuthMiddleware, async (req, res) => {
+  try {
+    const safeOrderId = String(req.params?.orderId || '').trim().toUpperCase();
+    if (!safeOrderId) {
+      return res.status(400).json({ success:false, message:'缺少訂單編號' });
+    }
+
+    const { lineUserId, phone, riderId } = req.query || {};
+    const riderResult = await findApprovedRiderForApi({ lineUserId, phone, riderId });
+    if (!riderResult.ok) {
+      return res.status(riderResult.statusCode).json({ success:false, message:riderResult.message });
+    }
+
+    const identity = buildRiderApiIdentity(
+      riderResult.riderDoc,
+      riderResult.rider || {},
+      { lineUserId, phone, riderId }
+    );
+
+    let orderDoc = await db.collection('orders').doc(safeOrderId).get();
+    if (!orderDoc.exists) {
+      const byOrderNo = await db.collection('orders').where('orderNo','==',safeOrderId).limit(1).get();
+      orderDoc = byOrderNo.empty ? null : byOrderNo.docs[0];
+    }
+    if (!orderDoc || !orderDoc.exists) {
+      return res.status(404).json({ success:false, message:'找不到這筆完成任務' });
+    }
+
+    const order = { id:orderDoc.id, ...(orderDoc.data() || {}) };
+    const status = String(order.status || '').trim().toLowerCase();
+    if (!['completed','done'].includes(status)) {
+      return res.status(409).json({ success:false, message:'此任務尚未完成' });
+    }
+
+    const directBelongs = isOrderBelongsToRider(order, identity);
+    const legacyBelongs = !!identity.lineUserId && [order.riderId, order.driverId]
+      .map(value => String(value || '').trim())
+      .includes(identity.lineUserId);
+    if (!directBelongs && !legacyBelongs) {
+      return res.status(403).json({ success:false, message:'你沒有權限查看這筆任務' });
+    }
+
+    const arrivalProofs = await buildCustomerArrivalProofsForApi(order);
+    const taskExecutionReport = await buildCustomerTaskExecutionReportForApi(order);
+    const riderIncome = getCanonicalOrderRiderIncome(order);
+    const customerTotal = Math.max(0, Math.round(Number(getOrderCustomerPayableTotal(order) || 0)));
+    const advancePayment = Math.max(0, Math.round(Number(getOrderAdvancePaymentAmount(order) || 0)));
+
+    const deliveryStops = Array.isArray(order.deliveryStops)
+      ? order.deliveryStops.slice(0, 8).map((stop, index) => ({
+          index:index + 1,
+          dropoffAddress:String(stop?.dropoffAddress || stop?.address || '').trim(),
+          address:String(stop?.address || stop?.dropoffAddress || '').trim(),
+          customerName:String(stop?.customerName || stop?.receiverName || stop?.dropoffContact || '').trim(),
+          customerPhone:String(stop?.customerPhone || stop?.dropoffPhone || stop?.phone || '').trim(),
+          addressNote:String(stop?.addressNote || stop?.dropoffAddressNote || stop?.note || '').trim(),
+          dropoffAddressNote:String(stop?.dropoffAddressNote || stop?.addressNote || stop?.note || '').trim(),
+        })).filter(stop => stop.dropoffAddress || stop.address)
+      : [];
+
+    return res.json({
+      success:true,
+      order:{
+        id:order.id,
+        orderId:order.id,
+        orderNo:order.orderNo || order.id,
+        status:order.status,
+        serviceKey:order.serviceKey || '',
+        serviceType:order.serviceType || '',
+        serviceMode:order.serviceMode || '',
+        taskName:order.taskName || '',
+        taskContent:order.taskContent || '',
+        item:order.item || '',
+        itemName:order.itemName || '',
+        itemType:order.itemType || '',
+        note:order.note || order.remark || order.memo || order.customerNote || '',
+        remark:order.remark || '',
+        customerNote:order.customerNote || '',
+
+        pickupAddress:order.pickupAddress || order.fromAddress || order.pickup || '',
+        dropoffAddress:order.dropoffAddress || order.toAddress || order.dropoff || '',
+        pickupAddressNote:order.pickupAddressNote || order.fromAddressNote || '',
+        dropoffAddressNote:order.dropoffAddressNote || order.toAddressNote || '',
+        pickupName:order.pickupName || order.pickupContact || order.fromName || order.shopName || order.merchantName || '',
+        pickupPhone:order.pickupPhone || order.fromPhone || order.shopPhone || order.merchantPhone || '',
+        dropoffName:order.dropoffName || order.dropoffContact || order.toName || order.recipientName || order.customerName || '',
+        dropoffPhone:order.dropoffPhone || order.toPhone || order.recipientPhone || order.customerPhone || order.phone || '',
+        customerName:order.customerName || '',
+        customerPhone:order.customerPhone || '',
+        merchantName:order.merchantName || '',
+        merchantPhone:order.merchantPhone || '',
+        deliveryStops,
+
+        taskDetails:order.taskDetails && typeof order.taskDetails === 'object' ? order.taskDetails : {},
+        purchaseDetails:order.purchaseDetails && typeof order.purchaseDetails === 'object' ? order.purchaseDetails : {},
+        shoppingItems:Array.isArray(order.shoppingItems) ? order.shoppingItems.slice(0, 30) : [],
+        deliveryPreferences:Array.isArray(order.deliveryPreferences) ? order.deliveryPreferences.slice(0, 20) : [],
+        vehiclePreference:order.vehiclePreference || '',
+        itemSize:order.itemSize || '',
+        itemSizeLabel:order.itemSizeLabel || '',
+        itemSizeReviewStatus:order.itemSizeReviewStatus || '',
+        speedType:order.speedType || order.serviceSpeed || '',
+        speedName:order.speedName || order.speedLabel || '',
+        orderTimingType:order.orderTimingType || '',
+        scheduleLabel:order.scheduleLabel || '',
+        scheduledAt:order.scheduledAt || null,
+
+        riderIncome,
+        estimatedRiderIncome:riderIncome,
+        riderBaseIncome:Math.max(0, Math.round(Number(order.riderBaseIncome || 0))),
+        riderBaseIncomeBeforeGuarantee:Math.max(0, Math.round(Number(order.riderBaseIncomeBeforeGuarantee || order.riderIncomeBeforeGuarantee || 0))),
+        riderIncomeBeforeGuarantee:Math.max(0, Math.round(Number(order.riderIncomeBeforeGuarantee || order.riderBaseIncomeBeforeGuarantee || 0))),
+        riderGuaranteeSubsidy:Math.max(0, Math.round(Number(order.riderGuaranteeSubsidy || 0))),
+        riderMinimumApplied:order.riderMinimumApplied === true,
+        riderMinimumTaskIncome:Math.max(0, Math.round(Number(order.riderMinimumTaskIncome || 0))),
+        riderIncomePolicyVersion:String(order.riderIncomePolicyVersion || ''),
+        shareableTaskSubtotal:Math.max(0, Math.round(Number(order.shareableTaskSubtotal || 0))),
+        riderOnlySurchargeSubtotal:Math.max(0, Math.round(Number(order.riderOnlySurchargeSubtotal || 0))),
+
+        speedFee:Math.max(0, Math.round(Number(order.speedFee || 0))),
+        upstairsFee:Math.max(0, Math.round(Number(order.upstairsFee || 0))),
+        waitingFee:Math.max(0, Math.round(Number(order.waitingFee || 0))),
+        operationalWaitingFee:Math.max(0, Math.round(Number(order.operationalWaitingFee || 0))),
+        itemSizeFee:Math.max(0, Math.round(Number(order.itemSizeFee || 0))),
+        weatherFee:Math.max(0, Math.round(Number(order.weatherFee || 0))),
+        weatherLabel:String(order.weatherLabel || ''),
+        dynamicPricingFee:Math.max(0, Math.round(Number(order.dynamicPricingFee || order.dynamicFee || 0))),
+        multiStopFee:Math.max(0, Math.round(Number(order.multiStopFee || order.extraStopFee || 0))),
+        overweightFee:Math.max(0, Math.round(Number(order.overweightFee || 0))),
+        nightFee:Math.max(0, Math.round(Number(order.nightFee || 0))),
+        cancellationCompensation:Math.max(0, Math.round(Number(order.cancellationCompensation || order.cancellationFee || 0))),
+        stackTransferSubsidy:Math.max(0, Math.round(Number(order.stackTransferSubsidy || 0))),
+        stackTransferKm:Math.max(0, Number(order.stackTransferKm || 0)),
+        stackTransferMinutes:Math.max(0, Number(order.stackTransferMinutes || 0)),
+        stackTransferSubsidyPayer:String(order.stackTransferSubsidyPayer || ''),
+        stackTransferSubsidyVersion:String(order.stackTransferSubsidyVersion || ''),
+
+        paymentMethod:getOrderPaymentMethod(order) || order.paymentMethod || '',
+        paymentStatus:getOrderPaymentStatus(order) || order.paymentStatus || '',
+        customerPayableTotal:customerTotal,
+        payableTotal:customerTotal,
+        total:customerTotal,
+        advancePayment,
+        advanceAmount:advancePayment,
+        cashDueToPlatform:Math.max(0, Math.round(Number(order.cashDueToPlatform || order.platformReceivable || order.riderDueToPlatform || 0))),
+
+        createdAtMs:dispatchToMs(order.createdAt) || Number(order.createdAtMs || 0),
+        createdAt:order.createdAt || null,
+        completedAtMs:getDispatchOrderCompletedAtMs(order),
+        completedAt:order.completedAt || order.statusTimes?.completed || null,
+        statusTimes:order.statusTimes && typeof order.statusTimes === 'object' ? order.statusTimes : {},
+        arrivalProofs,
+        taskExecutionReport,
+      }
+    });
+  } catch (error) {
+    console.error('❌ 讀取騎士完成任務詳情失敗：', error);
+    return res.status(500).json({ success:false, message:'完成任務詳情暫時無法讀取', error:error.message });
   }
 });
 
