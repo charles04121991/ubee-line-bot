@@ -1,3 +1,4 @@
+/* 2026-09-24｜Customer Platform Home V3：移除首頁城市節點 Hero；五大正式服務維持不變，首頁改為服務→地址→建立任務的外送平台式結構。 */
 /* 2026-09-24｜Customer Home Dynamic Hero V2：首頁只移除 Google Map，恢復既有五大服務與內容結構；原地圖位置改城市節點 Hero／進行中任務摘要。 */
 /* 2026-09-24｜Customer Service Home + Linear Progress V1：同步首頁移除大地圖、服務導向首頁與 4 節點線性進度條。 */
 /* 2026-09-24｜Customer Final Delivery ETA V1：同步訂單總覽／明細／進行中任務的最終送達 ETA 與 Queue ETA 顯示。 */
@@ -48,7 +49,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260924-customer-home-dynamic-hero-v2';
+const UBEE_CUSTOMER_SW_VERSION = '20260924-customer-platform-home-v3';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
