@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-24
+// 2026-09-24｜Rider Application Native Onboarding V1：新申請改為 9 頁式流程；新增小U大頭照獨立資產、管理端預覽與審核 fail-closed；既有五份證件與資格硬鎖保持不變。
 // 2026-09-24｜Rider Completed Task Detail V1：完成任務新增騎士本人專屬詳情 API；補完整路線、聯絡、費用、Smart Stack 轉場補貼、時間軸與短效照片網址，不影響進行中任務。
 // 2026-09-24｜Finance Contract Sync V2：同步 Smart Stack 平台轉場補貼、平台待撥款語意與店家已付款財務閉環；補強財務稽核欄位。
 // 2026-09-24｜Queue ETA Engine V1：客戶最終送達 ETA 以每張訂單獨立計算；Smart Stack B 單包含 A 剩餘路程＋A→B 轉場＋B 取件處理＋B 配送，A ETA 不受 B 影響。
@@ -765,6 +766,17 @@ const RIDER_DOCUMENT_LABELS = Object.freeze({
   compulsoryInsurance: '強制險證明',
 });
 
+// 大頭照是申請資產，不列入三大驗證／五份證件計數。
+const RIDER_PROFILE_PHOTO_KEY = 'profilePhoto';
+const RIDER_UPLOAD_TYPES = Object.freeze({
+  ...RIDER_REQUIRED_DOCUMENTS,
+  [RIDER_PROFILE_PHOTO_KEY]: 'profile_photo',
+});
+const RIDER_UPLOAD_LABELS = Object.freeze({
+  ...RIDER_DOCUMENT_LABELS,
+  [RIDER_PROFILE_PHOTO_KEY]: '小U大頭照',
+});
+
 
 // =====================================================
 // UBee 小U申請審核 V2：三大驗證模型
@@ -927,6 +939,10 @@ function normalizeRiderDocumentKey(value) {
     compulsoryinsurance: 'compulsoryInsurance',
     compulsory_insurance: 'compulsoryInsurance',
     insurance: 'compulsoryInsurance',
+    profilephoto: 'profilePhoto',
+    profile_photo: 'profilePhoto',
+    avatar: 'profilePhoto',
+    headshot: 'profilePhoto',
   };
 
   return aliases[normalized] || '';
@@ -993,7 +1009,7 @@ async function handleRiderDocumentUpload(req, res) {
     }
 
 
-    if (!documentKey || !RIDER_REQUIRED_DOCUMENTS[documentKey]) {
+    if (!documentKey || !RIDER_UPLOAD_TYPES[documentKey]) {
       return res.status(400).json({
         success: false,
         message: '證件類型不正確。',
@@ -1084,7 +1100,7 @@ async function handleRiderDocumentUpload(req, res) {
         metadata: {
           riderApplicantKey: applicantKey,
           riderDocumentKey: documentKey,
-          riderDocumentType: RIDER_REQUIRED_DOCUMENTS[documentKey],
+          riderDocumentType: RIDER_UPLOAD_TYPES[documentKey],
           sha256,
           dataVersion: String(RIDER_V2_DATA_VERSION),
         },
@@ -1095,8 +1111,8 @@ async function handleRiderDocumentUpload(req, res) {
       success: true,
       document: {
         documentKey,
-        documentType: RIDER_REQUIRED_DOCUMENTS[documentKey],
-        label: RIDER_DOCUMENT_LABELS[documentKey],
+        documentType: RIDER_UPLOAD_TYPES[documentKey],
+        label: RIDER_UPLOAD_LABELS[documentKey],
         originalName,
         mimeType: contentType,
         sizeBytes: fileBuffer.length,
@@ -1221,6 +1237,45 @@ async function validateRiderApplicationDocuments(
     ok: true,
     documents: normalized,
   };
+}
+
+async function validateRiderProfilePhoto(profilePhoto, phone) {
+  const item = profilePhoto && typeof profilePhoto === 'object' ? profilePhoto : null;
+  if (!item) return { ok:false, message:'請完成小U大頭照拍攝。' };
+  const cleanPhone = normalizePhone(phone || '');
+  const applicantKey = buildRiderApplicantStorageKey(cleanPhone);
+  const bucket = admin.storage().bucket(RIDER_DOCUMENT_STORAGE_BUCKET);
+  const storagePath = String(item.storagePath || '').trim();
+  const storageBucket = String(item.storageBucket || RIDER_DOCUMENT_STORAGE_BUCKET).trim();
+  const expectedPrefix = `rider-documents-v2/pending/${applicantKey}/profilePhoto/`;
+  if (storageBucket !== bucket.name || !storagePath.startsWith(expectedPrefix)) {
+    return { ok:false, message:'小U大頭照上傳資料不正確，請重新拍攝。' };
+  }
+  const file = bucket.file(storagePath);
+  const [exists] = await file.exists();
+  if (!exists) return { ok:false, message:'找不到小U大頭照檔案，請重新拍攝。' };
+  const [metadata] = await file.getMetadata();
+  const customMetadata = metadata.metadata || {};
+  if (
+    String(customMetadata.riderApplicantKey || '') !== applicantKey ||
+    String(customMetadata.riderDocumentKey || '') !== RIDER_PROFILE_PHOTO_KEY ||
+    String(customMetadata.riderDocumentType || '') !== RIDER_UPLOAD_TYPES[RIDER_PROFILE_PHOTO_KEY]
+  ) {
+    return { ok:false, message:'小U大頭照檔案驗證失敗，請重新拍攝。' };
+  }
+  return { ok:true, profilePhoto:{
+    documentKey:RIDER_PROFILE_PHOTO_KEY,
+    documentType:RIDER_UPLOAD_TYPES[RIDER_PROFILE_PHOTO_KEY],
+    label:RIDER_UPLOAD_LABELS[RIDER_PROFILE_PHOTO_KEY],
+    originalName:cleanText(item.originalName || '',180),
+    mimeType:String(metadata.contentType || item.mimeType || '').trim(),
+    sizeBytes:Number(metadata.size || item.sizeBytes || 0),
+    sha256:String(customMetadata.sha256 || item.sha256 || '').trim(),
+    storageBucket:bucket.name,
+    storagePath,
+    source:'application',
+    uploadedAtMs:Number(item.uploadedAtMs || Date.now()),
+  }};
 }
 
 
@@ -18129,6 +18184,36 @@ app.get("/", (req, res) => {
 const riders = {};
 
 // ============================================================
+// 現有正式小U大頭照補件：上傳仍走 /api/rider/documents/upload，
+// commit 必須使用已登入 Firebase Rider Token，且不會因此改變接單資格。
+// ============================================================
+app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res) => {
+  try {
+    if (!req.riderAuth?.riderDocId) {
+      return res.status(401).json({ success:false, code:'RIDER_TOKEN_REQUIRED', message:'請先登入騎士端再補拍大頭照。' });
+    }
+    const phone = normalizePhone(req.riderAuth.riderDocId || req.body?.phone || '');
+    if (!/^09\d{8}$/.test(phone)) return res.status(400).json({ success:false, message:'找不到正式小U手機資料。' });
+    const validated = await validateRiderProfilePhoto(req.body?.profilePhoto, phone);
+    if (!validated.ok) return res.status(400).json({ success:false, message:validated.message });
+    const nowMs=Date.now();
+    const profilePhoto={...validated.profilePhoto,source:'existing_rider_supplement',updatedAtMs:nowMs};
+    const riderRef=db.collection(RIDER_V2_COLLECTIONS.riders).doc(phone);
+    const riderDoc=await riderRef.get();
+    if(!riderDoc.exists) return res.status(404).json({success:false,message:'找不到正式小U資料，無法更新大頭照。'});
+    await riderRef.set({profilePhoto,profilePhotoUpdatedAtMs:nowMs,updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs},{merge:true});
+    if(RIDER_V2_MIRROR_TO_LEGACY_RIDERS){
+      await db.collection('riders').doc(phone).set({profilePhoto,profilePhotoUpdatedAtMs:nowMs,updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs},{merge:true});
+    }
+    return res.json({success:true,message:'小U大頭照已完成。',profilePhoto});
+  } catch(error){
+    console.error('❌ 現有小U大頭照補件失敗：',error);
+    return res.status(500).json({success:false,message:'大頭照更新失敗，請稍後再試。'});
+  }
+});
+
+
+// ============================================================
 // UBee 小U註冊 API V2
 // 正式分層規則：
 // 1. 申請送出時，只建立 riderApplicationsV2/{手機號碼}
@@ -18164,6 +18249,7 @@ app.post('/api/rider/register', async (req, res) => {
       emergencyContactRelationship,
       emergencyContactPhone,
       documents,
+      profilePhoto,
 
       driverLicenseConfirmed,
       vehicleLicenseConfirmed,
@@ -18446,6 +18532,11 @@ app.post('/api/rider/register', async (req, res) => {
       });
     }
 
+    const profilePhotoValidation = await validateRiderProfilePhoto(profilePhoto, cleanPhone);
+    if (!profilePhotoValidation.ok) {
+      return res.status(400).json({ success:false, code:'RIDER_PROFILE_PHOTO_REQUIRED', message:profilePhotoValidation.message });
+    }
+
     const riderId = cleanPhone;
     const incomingGrowthReferral = referralCode
       ? await resolveGrowthReferralCode(referralCode)
@@ -18513,6 +18604,12 @@ app.post('/api/rider/register', async (req, res) => {
         ),
         phone: cleanEmergencyPhone,
       },
+
+      profilePhoto: profilePhotoValidation.profilePhoto,
+      profilePhotoRequired: true,
+      profilePhotoUploadedAtMs: Number(profilePhotoValidation.profilePhoto?.uploadedAtMs || nowMs),
+      applicationStage: 'SUBMITTED',
+      applicationFlowVersion: 'native-onboarding-v1-9-step',
 
       documents: documentValidation.documents,
       requiredDocumentKeys,
@@ -19311,6 +19408,13 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
     listRiderApplicationNotifications(application, 15),
   ]);
 
+  const profilePhoto = application.profilePhoto && typeof application.profilePhoto === 'object'
+    ? {
+        ...application.profilePhoto,
+        previewUrl: await createRiderDocumentReviewSignedUrl(application.profilePhoto),
+      }
+    : null;
+
   return {
     id: applicationDoc.id,
     riderId: application.riderId || applicationDoc.id,
@@ -19350,6 +19454,10 @@ async function serializeRiderApplicationForAdmin(applicationDoc) {
       : [],
     availableTime: application.availableTime || '',
     emergencyContact: application.emergencyContact || {},
+    profilePhoto,
+    profilePhotoRequired: application.profilePhotoRequired === true,
+    applicationStage: application.applicationStage || '',
+    applicationFlowVersion: application.applicationFlowVersion || '',
     status: application.status || 'submitted',
     reviewStatus:
       application.reviewStatus || application.status || 'under_review',
@@ -20472,6 +20580,10 @@ app.post(
           });
         }
 
+        if (application.profilePhotoRequired === true && !String(application.profilePhoto?.storagePath || '').trim()) {
+          return res.status(409).json({ success:false, message:'缺少小U大頭照，不能正式通過。' });
+        }
+
         const storedDocuments =
           application.documents && typeof application.documents === 'object'
             ? application.documents
@@ -20626,6 +20738,10 @@ app.post(
             success: false,
             message: '此申請已拒絕，請先重新開啟後再審核。',
           });
+        }
+
+        if (application.profilePhotoRequired === true && !String(application.profilePhoto?.storagePath || '').trim()) {
+          return res.status(409).json({ success:false, message:'缺少小U大頭照，不能正式通過。' });
         }
 
         const summary = summarizeRiderApplicationDocuments(application);
@@ -26380,6 +26496,11 @@ function buildApprovedRiderV2(application, approvedBy) {
         application.emergencyContact?.phone || ''
       ),
     },
+
+    profilePhoto: application.profilePhoto && typeof application.profilePhoto === 'object'
+      ? { ...application.profilePhoto, source:'application' }
+      : null,
+    profilePhotoUpdatedAtMs: Number(application.profilePhoto?.uploadedAtMs || nowMs),
 
     identityVerified: true,
     driverLicenseVerified: true,
