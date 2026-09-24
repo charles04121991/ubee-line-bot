@@ -4,7 +4,7 @@
   "short_name": "UBee 跑腿",
   "description": "UBee 跑腿用戶端：即時媒合、估價、下單、訂單追蹤、會員成長與店家服務。",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20260923-customer-draft-resume-fix-v2",
+  "start_url": "/order.html?source=pwa&v=20260924-customer-final-delivery-eta-v1",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -38,7 +38,7 @@
       "name": "立即下單",
       "short_name": "下單",
       "description": "開啟 UBee 首頁建立新的跑腿需求。",
-      "url": "/order.html?action=new&source=shortcut&v=20260923-customer-draft-resume-fix-v2",
+      "url": "/order.html?action=new&source=shortcut&v=20260924-customer-final-delivery-eta-v1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -51,7 +51,7 @@
       "name": "我的訂單",
       "short_name": "訂單",
       "description": "查看進行中與歷史 UBee 訂單。",
-      "url": "/order.html?action=tasks&source=shortcut&v=20260923-customer-draft-resume-fix-v2",
+      "url": "/order.html?action=tasks&source=shortcut&v=20260924-customer-final-delivery-eta-v1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -64,7 +64,7 @@
       "name": "我的",
       "short_name": "我的",
       "description": "開啟 UBee 個人中心、會員成長與邀請功能。",
-      "url": "/order.html?action=my&source=shortcut&v=20260923-customer-draft-resume-fix-v2",
+      "url": "/order.html?action=my&source=shortcut&v=20260924-customer-final-delivery-eta-v1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
