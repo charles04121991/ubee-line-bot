@@ -1,5 +1,6 @@
 // =====================================================
 // UBee Backend｜Release 2026-09-24
+// 2026-09-24｜Finance Contract Sync V2：同步 Smart Stack 平台轉場補貼、平台待撥款語意與店家已付款財務閉環；補強財務稽核欄位。
 // 2026-09-24｜Queue ETA Engine V1：客戶最終送達 ETA 以每張訂單獨立計算；Smart Stack B 單包含 A 剩餘路程＋A→B 轉場＋B 取件處理＋B 配送，A ETA 不受 B 影響。
 // 2026-09-24｜Smart Stack Transfer Subsidy V1：疊單轉場不向 A/B 客戶加價；短轉場不補貼，合理轉場由平台分潤固定補貼小U，超過既有 3km/15min 仍禁止疊單。
 // 2026-09-23｜Rider Multi-stop Route Refresh V1：完成目前送達點後同步切換下一站座標/Place ID，騎士端可立即重算並重畫下一段路線。
@@ -12862,11 +12863,15 @@ app.get('/api/admin/finance-overview', async (req, res) => {
         todayCompletedOrders,
         cashPendingTotal: Math.round(cashPendingTotal),
         jkoPendingTotal: Math.round(jkoPendingTotal),
+        // V2 相容別名：此集合包含街口與已入帳店家付款，不再只代表 JKO。
+        platformPayoutPendingTotal: Math.round(jkoPendingTotal),
         pendingRiderCount: pendingRiderKeys.size,
         cashPendingRiderCount: cashRiderKeys.size,
         jkoPendingRiderCount: jkoRiderKeys.size,
+        platformPayoutPendingRiderCount: jkoRiderKeys.size,
         todayCashRemitted: Math.round(todayCashRemitted),
         todayRiderPaid: Math.round(todayRiderPaid),
+        todayPlatformRiderPaid: Math.round(todayRiderPaid),
         todayProcessedTotal: Math.round(
           todayCashRemitted + todayRiderPaid
         ),
@@ -12886,7 +12891,7 @@ app.get('/api/admin/finance-overview', async (req, res) => {
 });
 
 // ============================================================
-// UBee 財務結算中心 V2：街口待撥款
+// UBee 財務結算中心 V2：平台待撥款（街口＋已入帳店家付款）
 // 回傳「騎士收入 + 騎士代墊款」作為平台實際應撥總額
 // ============================================================
 app.get('/api/admin/pending-settlements', async (req, res) => {
@@ -12962,6 +12967,10 @@ app.get('/api/admin/pending-settlements', async (req, res) => {
         riderIncome: amounts.riderIncome,
         advancePayment: amounts.advancePayment,
         payoutTotal: amounts.payoutTotal,
+        stackTransferSubsidy: Math.max(0, Math.round(Number(order.stackTransferSubsidy || 0))),
+        stackTransferKm: Math.max(0, Number(order.stackTransferKm || 0)),
+        stackTransferMinutes: Math.max(0, Number(order.stackTransferMinutes || 0)),
+        stackTransferSubsidyPayer: String(order.stackTransferSubsidyPayer || ''),
         total: customerTotal,
         completedAt: order.completedAt || order.finishedAt || null,
         updatedAt: order.updatedAt || null,
@@ -13592,6 +13601,21 @@ app.get(
           riderIncome,
           advancePayment,
           cashDueToPlatform,
+          stackTransferSubsidy: Math.max(
+            0,
+            Math.round(Number(order.stackTransferSubsidy || 0))
+          ),
+          stackTransferKm: Math.max(
+            0,
+            Number(order.stackTransferKm || 0)
+          ),
+          stackTransferMinutes: Math.max(
+            0,
+            Number(order.stackTransferMinutes || 0)
+          ),
+          stackTransferSubsidyPayer: String(
+            order.stackTransferSubsidyPayer || ''
+          ),
 
           cashRemittanceStatus:
             getOrderCashRemittanceStatus(
@@ -36811,6 +36835,11 @@ app.post('/api/rider/accept-stack-order', riderAuthMiddleware, async (req, res) 
         stackTransferSubsidyPayer:'platform',
         stackTransferSubsidyVersion:UBEE_SMART_STACK_TRANSFER_SUBSIDY_V1.version,
         stackCustomerSurcharge:0,
+        // Finance Contract Sync V2：保存補貼前後快照，避免財務只能從差額反推。
+        stackRiderIncomeBeforeSubsidy:baseRiderIncome,
+        stackRiderIncomeAfterSubsidy:stackedRiderIncome,
+        stackPlatformIncomeBeforeSubsidy:basePlatformIncome,
+        stackPlatformIncomeAfterSubsidy:stackedPlatformIncome,
 
         // 補貼只在平台／小U之間重分配，不改 customerPayableTotal / serviceSubtotal。
         ...(appliedTransferSubsidy > 0 ? {
@@ -42317,7 +42346,11 @@ function normalizeFinancePaymentStatus(order = {}) {
     ''
   ).trim().toLowerCase();
 
-  if (['paid', 'paid_confirmed', 'settled', 'completed'].includes(raw) || order.isPaid === true) {
+  if (
+    ['paid', 'paid_confirmed', 'settled', 'completed'].includes(raw) ||
+    order.isPaid === true ||
+    isFinancePaidMerchantOrder(order)
+  ) {
     return 'paid';
   }
   if (['partial', 'partially_paid'].includes(raw)) return 'partial';
@@ -42465,7 +42498,56 @@ function buildFinanceClosureSnapshot(order = {}) {
   const riderIncomePolicyVersion = String(
     order.riderIncomePolicyVersion || ''
   );
+
+  // Finance Contract Sync V2：
+  // Smart Stack 轉場補貼是平台→小U的收入重分配，不屬於客戶加價。
+  const stackTransferSubsidy = firstFinanceMoney(
+    order,
+    ['stackTransferSubsidy'],
+    0
+  );
+  const stackCustomerSurcharge = firstFinanceMoney(
+    order,
+    ['stackCustomerSurcharge'],
+    0
+  );
+  const stackTransferKm = Math.max(
+    0,
+    Number(order.stackTransferKm || 0)
+  );
+  const stackTransferMinutes = Math.max(
+    0,
+    Number(order.stackTransferMinutes || 0)
+  );
+  const stackTransferSubsidyPayer = String(
+    order.stackTransferSubsidyPayer || ''
+  ).trim();
+  const stackTransferSubsidyVersion = String(
+    order.stackTransferSubsidyVersion || ''
+  ).trim();
+
+  const riderIncomeBeforeStackSubsidy = firstFinanceMoney(
+    order,
+    ['stackRiderIncomeBeforeSubsidy'],
+    Math.max(0, riderIncome - stackTransferSubsidy)
+  );
+  const riderIncomeAfterStackSubsidy = firstFinanceMoney(
+    order,
+    ['stackRiderIncomeAfterSubsidy'],
+    riderIncome
+  );
+
   const expectedPlatformIncome = Math.max(0, Math.round(finalCustomerTotal - riderAdvance - riderIncome));
+  const platformIncomeBeforeStackSubsidy = firstFinanceMoney(
+    order,
+    ['stackPlatformIncomeBeforeSubsidy'],
+    expectedPlatformIncome + stackTransferSubsidy
+  );
+  const platformIncomeAfterStackSubsidy = firstFinanceMoney(
+    order,
+    ['stackPlatformIncomeAfterSubsidy'],
+    expectedPlatformIncome
+  );
   const recordedPlatformIncome = firstFinanceMoney(order, [
     'platformIncome', 'platformFee', 'cashDueToPlatform', 'platformReceivable'
   ], expectedPlatformIncome);
@@ -42508,9 +42590,11 @@ function buildFinanceClosureSnapshot(order = {}) {
         Math.max(0, settlementActual)
       );
     } else if (isFinancePlatformPayoutOrder(order)) {
-      collectedPlatformIncome = actualPaidAmount > 0
+      // 店家已付款／月結已入帳本身就代表平台已收款；
+      // 街口等一般平台代收仍以 actualPaidAmount / paymentStatus 為準。
+      collectedPlatformIncome = isFinancePaidMerchantOrder(order)
         ? expectedPlatformIncome
-        : 0;
+        : (actualPaidAmount > 0 ? expectedPlatformIncome : 0);
     } else if (String(order.merchantBillingStatus || '').trim()) {
       collectedPlatformIncome =
         String(order.merchantBillingStatus || '').trim().toLowerCase() === 'paid'
@@ -42531,6 +42615,16 @@ function buildFinanceClosureSnapshot(order = {}) {
   }
   if (Math.abs(platformVariance) > 1) {
     discrepancyReasons.push('平台收入欄位與公式不一致');
+  }
+  if (stackCustomerSurcharge > 0) {
+    discrepancyReasons.push('疊單不應向客戶加收轉場費');
+  }
+  if (
+    stackTransferSubsidy > 0 &&
+    stackTransferSubsidyPayer &&
+    stackTransferSubsidyPayer !== 'platform'
+  ) {
+    discrepancyReasons.push('轉場補貼負擔方不是平台');
   }
   if (settlementStatus === 'settled' && Math.abs(settlementVariance) > 1) {
     discrepancyReasons.push('結算金額與應結算金額不一致');
@@ -42576,6 +42670,18 @@ function buildFinanceClosureSnapshot(order = {}) {
     riderMinimumApplied,
     riderMinimumTaskIncome,
     riderIncomePolicyVersion,
+
+    stackTransferSubsidy,
+    stackTransferSubsidyPayer,
+    stackTransferSubsidyVersion,
+    stackCustomerSurcharge,
+    stackTransferKm,
+    stackTransferMinutes,
+    stackRiderIncomeBeforeSubsidy: riderIncomeBeforeStackSubsidy,
+    stackRiderIncomeAfterSubsidy: riderIncomeAfterStackSubsidy,
+    stackPlatformIncomeBeforeSubsidy: platformIncomeBeforeStackSubsidy,
+    stackPlatformIncomeAfterSubsidy: platformIncomeAfterStackSubsidy,
+
     expectedPlatformIncome,
     collectedPlatformIncome,
     outstandingPlatformIncome,
@@ -42674,6 +42780,8 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
       totalPlatformOutstandingIncome: 0,
       todayRiderIncome: 0,
       todayRiderGuaranteeSubsidy: 0,
+      todayStackTransferSubsidy: 0,
+      totalStackTransferSubsidy: 0,
       todayRiderAdvance: 0,
       totalVarianceAmount: 0,
     };
@@ -42697,6 +42805,7 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
         summary.totalPlatformAccruedIncome += item.expectedPlatformIncome;
         summary.totalPlatformCollectedIncome += item.collectedPlatformIncome;
         summary.totalPlatformOutstandingIncome += item.outstandingPlatformIncome;
+        summary.totalStackTransferSubsidy += item.stackTransferSubsidy;
       }
 
       const when = Number(item.completedAtMs || 0);
@@ -42709,6 +42818,7 @@ app.get('/api/admin/finance-ledger', async (req, res) => {
         summary.todayPlatformIncome += item.expectedPlatformIncome;
         summary.todayRiderIncome += item.riderIncome;
         summary.todayRiderGuaranteeSubsidy += item.riderGuaranteeSubsidy;
+        summary.todayStackTransferSubsidy += item.stackTransferSubsidy;
         summary.todayRiderAdvance += item.riderAdvance;
       }
     });
