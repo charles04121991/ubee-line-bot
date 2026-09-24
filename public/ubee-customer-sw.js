@@ -1,3 +1,4 @@
+/* 2026-09-24｜Customer Final Delivery ETA V1：同步訂單總覽／明細／進行中任務的最終送達 ETA 與 Queue ETA 顯示。 */
 /* 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；同步 PWA Release，留空不影響估價與送單。 */
 /* 2026-09-23｜Customer Multi-stop Delivery V1：同步一般客戶雙送達點、多點報價／建單與新版快取。 */
 /* 2026-09-23｜Customer Cloud Draft V1：同步跨裝置會員雲端草稿 API；草稿 API 維持 Network Only。 */
@@ -45,7 +46,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260923-customer-draft-resume-fix-v2';
+const UBEE_CUSTOMER_SW_VERSION = '20260924-customer-final-delivery-eta-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
