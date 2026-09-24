@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-24｜Customer Final Delivery ETA V2：訂單頁背景靜默刷新、防重複請求；Smart Stack B 升為 CURRENT 後不顯示舊排隊 ETA。 -->
 <!-- 2026-09-24｜Customer Final Delivery ETA V1：進行中主畫面、底部「訂單」清單與訂單明細統一顯示後端最終送達 ETA；Smart Stack B 單以 Queue ETA 顯示，不暴露 A 客戶資料。 -->
 <!-- 2026-09-23 Production Audit：已核對 index / order / rider API 與多點配送契約；本檔無需功能修正。 -->
 <!-- 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；留空不阻擋流程，有填才納入多點路線並加收 NT$50。 -->
@@ -48,7 +49,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260924-customer-final-delivery-eta-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260924-customer-final-delivery-eta-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -21451,14 +21452,21 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }
   }
 
-  async function renderTaskList(){
+  let taskListRefreshPromise=null;
+
+  async function renderTaskList({silent=false}={}){
     const list=$('flowProfileTasksList');if(!list)return;
-    list.innerHTML='<div class="flow-empty">正在讀取任務…</div>';
-    try{
-      if(typeof loadCustomerOrders!=='function')throw new Error('任務資料尚未載入');
-      const orders=await loadCustomerOrders();const recent=Array.isArray(orders)?orders.slice(0,100):[];state.profileOrders=recent;
-      list.classList.toggle('ubee-native-order-list',recent.length>0);
-      list.innerHTML=recent.length?recent.map((order,index)=>{
+    if(taskListRefreshPromise)return taskListRefreshPromise;
+
+    const run=async()=>{
+      if(!silent || !list.children.length){
+        list.innerHTML='<div class="flow-empty">正在讀取任務…</div>';
+      }
+      try{
+        if(typeof loadCustomerOrders!=='function')throw new Error('任務資料尚未載入');
+        const orders=await loadCustomerOrders();const recent=Array.isArray(orders)?orders.slice(0,100):[];state.profileOrders=recent;
+        list.classList.toggle('ubee-native-order-list',recent.length>0);
+        list.innerHTML=recent.length?recent.map((order,index)=>{
         const amountInfo=orderAmountInfo(order);const amountText=amountInfo.amount===null?'金額確認中':`NT$${amountInfo.amount.toLocaleString('zh-TW')}`;const route=`${profileOrderAddress(order,'pickup')} → ${profileOrderAddress(order,'dropoff')}`;
         const orderId=getCustomerOrderIdV1(order);
         const canCancel=isCustomerOrderCancellableV1(order)&&Boolean(orderId);
@@ -21477,8 +21485,22 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           </button>
           ${canCancel?`<button class="ubee-native-order-cancel" type="button" data-cancel-profile-order="${escapeHtml(orderId)}">取消訂單</button>`:''}
         </div>`;
-      }).join(''):'<div class="flow-empty">目前還沒有任務</div>';
-    }catch(error){console.warn('UBee 任務清單讀取失敗：',error);list.classList.remove('ubee-native-order-list');list.innerHTML='<div class="flow-empty">任務暫時無法讀取，請稍後再試。</div>'}
+        }).join(''):'<div class="flow-empty">目前還沒有任務</div>';
+      }catch(error){
+        console.warn('UBee 任務清單讀取失敗：',error);
+        if(!silent || !list.children.length){
+          list.classList.remove('ubee-native-order-list');
+          list.innerHTML='<div class="flow-empty">任務暫時無法讀取，請稍後再試。</div>';
+        }
+      }
+    };
+
+    taskListRefreshPromise=run();
+    try{
+      return await taskListRefreshPromise;
+    }finally{
+      taskListRefreshPromise=null;
+    }
   }
 
   async function renderTaskRoot(){
@@ -21492,7 +21514,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       window.__ubeeCustomerOrderEtaRefreshTimer=setInterval(()=>{
         try{
           if(state.page==='tasksRoot' && document.visibilityState==='visible'){
-            renderTaskList();
+            renderTaskList({silent:true});
           }
         }catch(_){}
       },15000);
@@ -21856,7 +21878,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260924-customer-final-delivery-eta-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260924-customer-final-delivery-eta-v2';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -23279,7 +23301,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.09.24.1';
+  const APP_VERSION = '2026.09.24.2';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
