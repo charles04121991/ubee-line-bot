@@ -1,3 +1,4 @@
+// 2026-09-25｜Rider Profile Photo UI V4.3.4：正式小U大頭照以短效 Signed URL 提供騎士本人顯示；我的首頁／帳號資料可安全載入，不公開 Storage。
 // 2026-09-25｜Rider Profile Supplement Auth Compatibility Fix：正式小U大頭照補件在 Token 過渡期允許既有手機登入身分 fallback；有 Bearer Token 時仍以 Token riderDocId 為唯一可信來源，RIDER_AUTH_ENFORCE=true 時仍強制 Token。
 // =====================================================
 // UBee Backend｜Release 2026-09-24
@@ -18231,10 +18232,69 @@ app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res
     if(RIDER_V2_MIRROR_TO_LEGACY_RIDERS){
       await db.collection('riders').doc(phone).set({profilePhoto,profilePhotoUpdatedAtMs:nowMs,updatedAt:admin.firestore.FieldValue.serverTimestamp(),updatedAtMs:nowMs},{merge:true});
     }
-    return res.json({success:true,message:'小U大頭照已完成。',profilePhoto});
+    const previewUrl=await createRiderDocumentReviewSignedUrl(profilePhoto);
+    return res.json({
+      success:true,
+      message:'小U大頭照已完成。',
+      profilePhoto:{...profilePhoto,previewUrl},
+      profilePhotoPreviewExpiresAtMs:previewUrl?Date.now()+9*60*1000:0
+    });
   } catch(error){
     console.error('❌ 現有小U大頭照補件失敗：',error);
     return res.status(500).json({success:false,message:'大頭照更新失敗，請稍後再試。'});
+  }
+});
+
+// ============================================================
+// 2026-09-25｜Rider Profile Photo UI V4.3.4
+// 正式小U本人查看大頭照：回傳短效 Signed URL，不將 Storage 改成公開讀取。
+// - 有 Firebase Bearer Token 時，只信任 Token riderDocId。
+// - RIDER_AUTH_ENFORCE=false 過渡期才允許以目前手機登入 phone 讀取本人照片。
+// ============================================================
+app.get('/api/rider/profile-photo/view', riderAuthMiddleware, async (req, res) => {
+  try {
+    const tokenPhone=normalizePhone(req.riderAuth?.riderDocId||'');
+    const queryPhone=normalizePhone(req.query?.phone||'');
+
+    if(tokenPhone&&queryPhone&&tokenPhone!==queryPhone){
+      return res.status(403).json({success:false,code:'RIDER_IDENTITY_MISMATCH',message:'登入身分與大頭照資料不一致。'});
+    }
+
+    const phone=tokenPhone||(!RIDER_AUTH_ENFORCE?queryPhone:'');
+    if(!/^09\d{8}$/.test(phone)){
+      return res.status(401).json({success:false,code:'RIDER_IDENTITY_REQUIRED',message:'目前無法確認小U登入身分，請重新登入後再試。'});
+    }
+
+    const found=await findRiderDocumentV2First({phone});
+    const riderDoc=found?.riderDoc||null;
+    if(!riderDoc||!riderDoc.exists){
+      return res.status(404).json({success:false,message:'找不到正式小U資料。'});
+    }
+
+    const riderData=riderDoc.data()||{};
+    const profilePhoto=riderData.profilePhoto&&typeof riderData.profilePhoto==='object'
+      ? riderData.profilePhoto
+      : null;
+
+    if(!profilePhoto||!String(profilePhoto.storagePath||'').trim()){
+      return res.json({success:true,hasPhoto:false,profilePhoto:null,previewUrl:'',profilePhotoPreviewExpiresAtMs:0});
+    }
+
+    const previewUrl=await createRiderDocumentReviewSignedUrl(profilePhoto);
+    if(!previewUrl){
+      return res.status(404).json({success:false,code:'RIDER_PROFILE_PHOTO_NOT_FOUND',message:'目前無法讀取小U大頭照，請稍後再試。'});
+    }
+
+    return res.json({
+      success:true,
+      hasPhoto:true,
+      profilePhoto:{...profilePhoto,previewUrl},
+      previewUrl,
+      profilePhotoPreviewExpiresAtMs:Date.now()+9*60*1000
+    });
+  }catch(error){
+    console.error('❌ 讀取正式小U大頭照失敗：',error);
+    return res.status(500).json({success:false,message:'大頭照讀取失敗，請稍後再試。'});
   }
 });
 
