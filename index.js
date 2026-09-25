@@ -1,3 +1,4 @@
+// 2026-09-25｜Rider Profile Supplement Auth Compatibility Fix：正式小U大頭照補件在 Token 過渡期允許既有手機登入身分 fallback；有 Bearer Token 時仍以 Token riderDocId 為唯一可信來源，RIDER_AUTH_ENFORCE=true 時仍強制 Token。
 // =====================================================
 // UBee Backend｜Release 2026-09-24
 // 2026-09-24｜Rider Application Native Onboarding V1：新申請改為 9 頁式流程；新增小U大頭照獨立資產、管理端預覽與審核 fail-closed；既有五份證件與資格硬鎖保持不變。
@@ -18189,15 +18190,40 @@ const riders = {};
 // ============================================================
 app.post('/api/rider/profile-photo/commit', riderAuthMiddleware, async (req, res) => {
   try {
-    if (!req.riderAuth?.riderDocId) {
-      return res.status(401).json({ success:false, code:'RIDER_TOKEN_REQUIRED', message:'請先登入騎士端再補拍大頭照。' });
+    // Token 過渡期相容：
+    // 1. 有 Bearer Token 時，只信任 Token 內 riderDocId。
+    // 2. RIDER_AUTH_ENFORCE=false 且目前沒有 Token 時，才允許沿用既有手機登入 phone。
+    // 3. RIDER_AUTH_ENFORCE=true 時，riderAuthMiddleware 會在抵達此處前直接擋下無 Token 請求。
+    const tokenPhone = normalizePhone(req.riderAuth?.riderDocId || '');
+    const bodyPhone = normalizePhone(req.body?.phone || '');
+
+    if (tokenPhone && bodyPhone && tokenPhone !== bodyPhone) {
+      return res.status(403).json({
+        success:false,
+        code:'RIDER_IDENTITY_MISMATCH',
+        message:'登入身分與補件資料不一致，請重新登入後再試。'
+      });
     }
-    const phone = normalizePhone(req.riderAuth.riderDocId || req.body?.phone || '');
-    if (!/^09\d{8}$/.test(phone)) return res.status(400).json({ success:false, message:'找不到正式小U手機資料。' });
+
+    const phone = tokenPhone || (!RIDER_AUTH_ENFORCE ? bodyPhone : '');
+
+    if (!/^09\d{8}$/.test(phone)) {
+      return res.status(401).json({
+        success:false,
+        code:'RIDER_IDENTITY_REQUIRED',
+        message:'目前無法確認小U登入身分，請重新登入後再補拍大頭照。'
+      });
+    }
+
     const validated = await validateRiderProfilePhoto(req.body?.profilePhoto, phone);
     if (!validated.ok) return res.status(400).json({ success:false, message:validated.message });
     const nowMs=Date.now();
-    const profilePhoto={...validated.profilePhoto,source:'existing_rider_supplement',updatedAtMs:nowMs};
+    const profilePhoto={
+      ...validated.profilePhoto,
+      source:'existing_rider_supplement',
+      authSource:tokenPhone?'firebase_bearer':'compat_phone_session',
+      updatedAtMs:nowMs
+    };
     const riderRef=db.collection(RIDER_V2_COLLECTIONS.riders).doc(phone);
     const riderDoc=await riderRef.get();
     if(!riderDoc.exists) return res.status(404).json({success:false,message:'找不到正式小U資料，無法更新大頭照。'});
