@@ -1,5 +1,5 @@
-/* 2026-09-29｜Customer Native Form Fix V1.1：同步必要欄位驗證修正與 Native Keyboard UX V3；強制 Customer PWA 取得新版 order.html。 */
-/* 2026-09-29｜Drive Service + Order Chat V1：同步六服務首頁、代駕與聊天室；清除舊 Customer Cache。 */
+/* 2026-09-29｜Customer Map Restore + Native Form Fix V1.2：以地圖正常基線重發，只同步新版 order.html 與 Cache；Google Maps / Push / Network Only 策略不變。 */
+/* 2026-09-29｜Customer Contact Removal V1.3：同步移除 Order Chat／聯絡小U即時對話功能；保留代駕、地圖、通知與既有 Customer PWA 核心。 */
 /* 2026-09-24｜Customer Order Lifecycle V1：同步訂單總覽進行中 5 段進度、完成評價與已評價狀態卡；既有通知、ETA 與 API 快取策略不變。 */
 /* 2026-09-24｜Customer Segmented Live Progress V2：進度條精簡為 5 段短線；保留即時狀態、ETA 與 PWA 快取更新。 */
 /* 2026-09-24｜Customer Segmented Live Progress V1：同步外送平台式八段動態進度條與首頁進行中任務精簡進度；舊四節點 UI 已移除。 */
@@ -54,7 +54,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-drive-order-chat-v1-1-native-form-fix';
+const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-drive-v1-3-contact-removed';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
