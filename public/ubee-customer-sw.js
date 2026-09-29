@@ -1,3 +1,5 @@
+/* 2026-09-29｜Customer Rating Lock V1.4.3：同步評價完成後永久鎖定再次評價入口。 */
+/* 2026-09-29｜Customer State Sync V1.4.2：主訂單狀態優先、備援防回退、2 秒前景同步。 */
 /* 2026-09-29｜Customer Active Meta Fix V1.4.1：同步建立時間與固定 ETA 資訊列。 */
 /* 2026-09-29｜Customer No-Map + Universal ETA + Drive Semantic V1.4：同步無可視地圖用戶端、六服務階段 ETA 與代駕專用語意；API 仍維持 Network Only。 */
 /* 2026-09-29｜Customer Map Restore + Native Form Fix V1.2：歷史版本。 */
@@ -56,7 +58,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-nomap-eta-drive-v1-4-1';
+const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-rating-lock-v1-4-3';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
