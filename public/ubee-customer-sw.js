@@ -1,3 +1,4 @@
+/* 2026-09-29｜Customer Active Meta Fix V1.4.1：同步建立時間與固定 ETA 資訊列。 */
 /* 2026-09-29｜Customer No-Map + Universal ETA + Drive Semantic V1.4：同步無可視地圖用戶端、六服務階段 ETA 與代駕專用語意；API 仍維持 Network Only。 */
 /* 2026-09-29｜Customer Map Restore + Native Form Fix V1.2：歷史版本。 */
 /* 2026-09-29｜Customer Contact Removal V1.3：同步移除 Order Chat／聯絡小U即時對話功能；保留代駕、地圖、通知與既有 Customer PWA 核心。 */
@@ -55,7 +56,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-nomap-eta-drive-v1-4';
+const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-nomap-eta-drive-v1-4-1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
