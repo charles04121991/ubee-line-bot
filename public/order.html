@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-29｜Customer Native Form Fix V1.1：移除已被 Production Flow 取代的舊 generic required-field 驗證；代駕不再被舊備註／物品體積規則誤擋。輸入體驗改為 Native Keyboard UX V3：文字欄位左對齊、聚焦可視、鍵盤工具列、上一欄／下一欄／完成、textarea 自動增高與 iOS PWA viewport 修正。 -->
 <!-- 2026-09-29｜Drive Service + Order Chat V1：六服務 3×2 Native Grid、代駕專用表單與全服務訂單聊天室。 -->
 <!-- 2026-09-24｜Customer Order Lifecycle V1：訂單總覽改為進行中 5 段動態進度／完成待評價／已評價三種原生狀態卡；沿用既有 Rider Rating API 與 Final Delivery ETA。 -->
 <!-- 2026-09-24｜Customer Segmented Live Progress V2：動態進度由 8 段精簡為 5 段短線；保留細部訂單狀態與目前段流動動畫。 -->
@@ -56,7 +57,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260929-customer-drive-order-chat-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260929-customer-drive-order-chat-v1-1-native-form-fix" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -13545,12 +13546,14 @@ function validateStep2(){
     dropoffPhone = pickupPhone;
   }
 
-  if(!note){
-    showUBeeCustomerNativeAlert('請填寫備註，讓 UBee 跑腿 小U 知道這筆任務要處理什麼。');
+  // 代駕沒有「物品體積」需求，車況／交車備註也是選填；
+  // 不再用一般跑腿的 legacy note / itemSize 規則阻擋代駕正式送單。
+  if(serviceGroup !== 'drive' && !note){
+    showUBeeCustomerNativeAlert('請填寫任務內容，讓小U知道這筆任務要處理什麼。');
     return false;
   }
 
-  if(!getItemSizeOption()){
+  if(serviceGroup !== 'drive' && !getItemSizeOption()){
     showUBeeCustomerNativeAlert('請選擇商品體積，系統才能正確計算體積費與安排安全承載方式。');
     itemSizeEl?.focus();
     return false;
@@ -18353,20 +18356,35 @@ const UBeeEnhancements = (() => {
 
 
   function clearFieldErrors(){document.querySelectorAll('.field-invalid').forEach(x=>x.classList.remove('field-invalid'));document.querySelectorAll('.field-error-text').forEach(x=>x.remove())}
-  function fieldError(id,msg){const el=qs(id);if(!el)return;const wrap=el.closest('.input-wrap,.compact-field')||el;wrap.classList.add('field-invalid');const m=document.createElement('div');m.className='field-error-text';m.textContent=msg;(wrap.parentElement||wrap).appendChild(m)}
-  function validateInline(){clearFieldErrors();const errs=[];if(!value('pickup'))errs.push(['pickup','請填寫取件地點']);if(!value('dropoff'))errs.push(['dropoff','請填寫送達地點']);if(!value('pickupPhone')&&!value('dropoffPhone'))errs.push(['pickupPhone','請至少填寫一組聯絡電話']);if(!value('note'))errs.push(['note','請清楚說明任務內容']);errs.forEach(x=>fieldError(...x));if(errs.length){qs(errs[0][0])?.scrollIntoView({behavior:'smooth',block:'center'});return false}return true}
+  // Customer Native Form Fix V1.1：舊 generic required-field 驗證已移除。
+  // 正式 Production Flow 由地址頁／任務頁／配送設定頁各自驗證，避免隱藏 legacy 欄位誤擋正式送單。
 
   function etaMinutes(){const route=Math.max(1,Math.ceil(Number(lastRouteData?.durationMinutes||lastRouteData?.durationMin||0)));const handling=serviceGroup==='buy'?15:serviceGroup==='queue'?Math.max(10,Number(value('queueMinutes')||30)):8;const matching=speedType==='express'?3:speedType==='economy'?10:6;return matching+route+handling}
   function updateEta(){const el=qs('homeEstimateEta');if(!el)return;if(!lastRouteData){el.textContent='預計完成時間待計算';return}const mins=etaMinutes(),d=new Date(Date.now()+mins*60000);el.textContent=`預計約 ${d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} 前完成（${mins}-${mins+15} 分鐘）`}
   function updateMatchStatus(){const text=qs('matchStatusText'),badge=qs('matchStatusBadge');if(!text||!badge)return;const count=Number(qs('homeOnlineRiderCount')?.dataset?.riderCount ?? qs('homeOnlineRiderCount')?.innerText.match(/\d+/)?.[0] ?? 0);if(!value('pickup')){text.textContent='填寫取件地址後顯示媒合狀況';badge.textContent='等待定位';badge.className='status-badge neutral'}else if(count>=5){text.textContent=`目前共有 ${count} 位小U可即時媒合，系統將從取件點附近開始媒合`;badge.textContent='媒合良好';badge.className='status-badge good'}else if(count>0){text.textContent=`目前 ${count} 位小U可即時媒合，系統會逐步擴大媒合範圍`;badge.textContent='小U較少';badge.className='status-badge warn'}else{text.textContent='目前尚無近期定位的小U，仍可正常建立任務';badge.textContent='持續搜尋';badge.className='status-badge neutral'}}
-  function renderSystemCheck(){const el=qs('orderSystemCheck');if(!el)return;const checks=[['pickup','取件位置已填寫',!!value('pickup')],['dropoff','送達位置已填寫',!!value('dropoff')],['phone','至少一組聯絡電話已填寫',!!(value('pickupPhone')||value('dropoffPhone'))],['route','路線已成功計算',!!lastRouteData],['quote','正式估價資料可用',!!lastQuoteData&&Number(lastEstimatedTotal)>0],['note','任務內容已完成',!!value('note')]];el.innerHTML=checks.map(([,label,ok])=>`<div class="system-check-row ${ok?'ok':'warn'}"><span class="system-check-icon">${ok?'✓':'!'}</span><span>${label}</span></div>`).join('')}
+  function renderSystemCheck(){
+    const el=qs('orderSystemCheck');if(!el)return;
+    const drive=String(serviceGroup||'').toLowerCase()==='drive';
+    const checks=[
+      ['pickup',drive?'車輛所在地已填寫':'取件位置已填寫',!!value('pickup')],
+      ['dropoff',drive?'代駕目的地已填寫':'送達位置已填寫',!!value('dropoff')],
+      ['phone','至少一組聯絡電話已填寫',!!(value('pickupPhone')||value('dropoffPhone'))],
+      ['route','路線已成功計算',!!lastRouteData],
+      ['quote','正式估價資料可用',!!lastQuoteData&&Number(lastEstimatedTotal)>0],
+      ...(drive?[
+        ['plate','車牌已填寫',!!String(document.getElementById('flowDrivePlate')?.value||'').trim()],
+        ['model','品牌／車型已填寫',!!String(document.getElementById('flowDriveMakeModel')?.value||'').trim()]
+      ]:[['note','任務內容已完成',!!value('note')]])
+    ];
+    el.innerHTML=checks.map(([,label,ok])=>`<div class="system-check-row ${ok?'ok':'warn'}"><span class="system-check-icon">${ok?'✓':'!'}</span><span>${label}</span></div>`).join('');
+  }
 
   function applyOrder(order){serviceGroup=order.serviceGroup||'send';renderServiceGrid(serviceGroup);const candidate=(serviceGroups[serviceGroup]||[]).find(x=>x.title===(order.serviceType||''))||(serviceGroups[serviceGroup]||[])[0];if(candidate){serviceType=candidate.title;renderCategoryBox(candidate)}serviceCategory=order.serviceCategory||serviceCategory;serviceMode=resolveClientServiceMode(serviceGroup,order.serviceType||serviceType);speedType=order.speedType||order.speed||'standard';orderTimingType=order.orderTimingType||'immediate';scheduleGoal=order.scheduleGoal||'pickup_at';setValue('pickup',order.pickup||order.pickupAddress);setValue('dropoff',order.dropoff||order.dropoffAddress);setValue('pickupPhone','');setValue('dropoffPhone','');setValue('pickupAddressNote',order.pickupAddressNote||'');setValue('dropoffAddressNote',order.dropoffAddressNote||'');setValue('note',order.note||order.item||'');setValue('advancePayment','0');state.shoppingItems=Array.isArray(order.shoppingItems)?order.shoppingItems.map(x=>({...x,id:uid()})):[];renderShoppingItems();updateTaskPathText();applyDynamicFields();selectOrderTimingType(orderTimingType);invalidateRoute();invalidateQuote();showHomeTab();scheduleRouteRefresh();scheduleQuoteRefresh();scheduleDraft()}
   function reorder(id){const order=state.lastOrders.get(id);if(order)applyOrder(order)}
   function openOrder(id){const order=state.lastOrders.get(id);if(!order)return;currentOrderId=id;currentOrderData=order;localStorage.setItem('ubee_current_order_id',id);setOrderNo(id);showOnlyStep(5);renderTimeline(order.status||'pending_payment',order);startOrderListener(id)}
   function renderOrderCards(el,orders,emptyText){if(!el)return;if(!orders.length){el.textContent=emptyText;return}state.lastOrders.clear();orders.forEach(o=>state.lastOrders.set(o.id,o));el.innerHTML=orders.map(o=>{const pickup=o.pickup||o.pickupAddress||'-',dropoff=o.dropoff||o.dropoffAddress||'-',total=getCustomerPayableTotal(o),status=getStatusLabel(o.status),done=['completed','done'].includes(String(o.status));return `<div class="order-history-card"><div style="font-size:15px;font-weight:1000">${escapeAttr(o.serviceType||'UBee 跑腿任務')}</div><div class="field-help">${escapeAttr(status)}・${escapeAttr(formatOrderTime(o.createdAt||o.updatedAt))}<br>${escapeAttr(pickup)} → ${escapeAttr(dropoff)}<br>${renderCustomerOrderListEtaHtml(o)}金額：${total>0?`NT$${Math.round(total)}`:'-'}</div><div class="order-card-actions"><button type="button" onclick="UBeeEnhancements.openOrder('${o.id}')">查看明細</button>${done?`<button type="button" onclick="UBeeEnhancements.reorder('${o.id}')">再叫一次</button>`:''}</div></div>`}).join('')}
 
-  async function beforeCreate(){if(!validateInline())throw new Error('請先完成標示的必要欄位。');renderSystemCheck()}
+  async function beforeCreate(){clearFieldErrors();renderSystemCheck();return true}
   function extendPayload(payload){return {...payload,pickupAddressNote:value('pickupAddressNote'),dropoffAddressNote:value('dropoffAddressNote'),shoppingItems:state.shoppingItems.filter(x=>String(x.name||'').trim()).map(({id,...x})=>x),estimatedCompletionMinutes:lastRouteData?etaMinutes():null,clientSchemaVersion:'customer-v4-2026-07-16'} }
   async function refreshCustomerContext(){migrateLegacyLocalData();renderAddressManager();renderQuickAddresses();await syncDraftFromCloud()}
   async function init(){await refreshCustomerContext();renderShoppingItems();document.querySelectorAll('#step1 input,#step2 input,#step2 textarea,#step2 select').forEach(el=>el.addEventListener('input',()=>{scheduleDraft();clearFieldErrors();updateMatchStatus()}));const observer=new MutationObserver(()=>{updateEta();updateMatchStatus();if(currentStep===4)renderSystemCheck()});['homeEstimateMeta','homeOnlineRiderCount','homeEstimateAmount'].forEach(id=>qs(id)&&observer.observe(qs(id),{childList:true,subtree:true,characterData:true}));window.addEventListener('pagehide',()=>{try{saveDraft();flushDraftToCloud()}catch(_){ }},{capture:true});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{saveDraft();flushDraftToCloud()}catch(_){ }}});updateEta();updateMatchStatus()}
@@ -18952,7 +18970,9 @@ body.ubee-buy-task-active .flow-buy-note-example{display:block;}
 #productionOrderFlow .ubee-native-form-row>span:first-child,#productionOrderFlow .ubee-native-form-row>.flow-label{margin:0!important;color:#44494f;font-size:12px!important;font-weight:750!important;line-height:1.4}
 #productionOrderFlow .ubee-native-form-row.stack{display:block;padding:12px 13px}
 #productionOrderFlow .ubee-native-form-row.stack>span:first-child{display:block;margin-bottom:7px!important}
-#productionOrderFlow .ubee-native-form-row .flow-input,#productionOrderFlow .ubee-native-form-row .flow-select,#productionOrderFlow .ubee-native-form-row .flow-textarea{min-height:34px!important;width:100%;border:0!important;border-radius:0!important;background:transparent!important;padding:4px 0!important;color:#111;font-size:15px!important;font-weight:700!important;text-align:right;box-shadow:none!important}
+#productionOrderFlow .ubee-native-form-row .flow-input,#productionOrderFlow .ubee-native-form-row .flow-select,#productionOrderFlow .ubee-native-form-row .flow-textarea{min-height:34px!important;width:100%;border:0!important;border-radius:0!important;background:transparent!important;padding:4px 0!important;color:#111;font-size:16px!important;font-weight:700!important;box-shadow:none!important}
+#productionOrderFlow .ubee-native-form-row .flow-input,#productionOrderFlow .ubee-native-form-row .flow-textarea{text-align:left!important}
+#productionOrderFlow .ubee-native-form-row .flow-select{text-align:right!important}
 #productionOrderFlow .ubee-native-form-row.stack .flow-textarea{text-align:left;min-height:118px!important;padding:2px 0!important;line-height:1.65!important}
 #productionOrderFlow .ubee-native-form-row.stack .flow-textarea.compact{min-height:82px!important}
 #productionOrderFlow .ubee-native-form-row .flow-input:focus,#productionOrderFlow .ubee-native-form-row .flow-select:focus,#productionOrderFlow .ubee-native-form-row .flow-textarea:focus{outline:none!important}
@@ -22121,7 +22141,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-drive-order-chat-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-drive-order-chat-v1-1-native-form-fix';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -26877,7 +26897,7 @@ body.ubee-store-active #productionOrderFlow{
 
 
 
-<style id="ubee-native-experience-v2-keyboard-style">
+<style id="ubee-native-experience-v3-keyboard-style">
 :root{
   --ubee-visual-viewport-height:100dvh;
   --ubee-visual-viewport-offset-top:0px;
@@ -26888,6 +26908,9 @@ body.ubee-keyboard-open > #ubeePersistentBottomNav{
   visibility:hidden!important;
   pointer-events:none!important;
   transform:translateY(100%)!important;
+}
+body.ubee-keyboard-open #productionOrderFlow .ubee-native-flow-actionbar{
+  display:none!important;
 }
 body.ubee-keyboard-open #productionOrderFlow .flow-page,
 body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel.ubee-my-app-page{
@@ -26902,7 +26925,89 @@ body.ubee-keyboard-open #productionOrderFlow .flow-scroll,
 body.ubee-keyboard-open #productionOrderFlow .flow-home-scroll,
 body.ubee-keyboard-open #productionOrderFlow .ubee-my-scroll,
 body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
-  scroll-padding-bottom:calc(var(--ubee-keyboard-height) + 24px)!important;
+  scroll-padding-top:74px!important;
+  scroll-padding-bottom:calc(var(--ubee-keyboard-height) + 76px)!important;
+}
+#productionOrderFlow .ubee-native-edit-row{
+  grid-template-columns:1fr!important;
+  align-items:start!important;
+  gap:3px!important;
+  padding-top:10px!important;
+  padding-bottom:10px!important;
+  scroll-margin-top:82px!important;
+  scroll-margin-bottom:96px!important;
+}
+#productionOrderFlow .ubee-native-edit-row>span:first-child,
+#productionOrderFlow .ubee-native-edit-row>.flow-label{
+  display:block!important;
+  margin-bottom:2px!important;
+  color:#60656b!important;
+  font-size:11px!important;
+}
+#productionOrderFlow .ubee-native-edit-row .flow-input,
+#productionOrderFlow .ubee-native-edit-row .flow-textarea{
+  width:100%!important;
+  min-height:42px!important;
+  padding:6px 0!important;
+  text-align:left!important;
+  font-size:16px!important;
+  line-height:1.45!important;
+  caret-color:#111!important;
+}
+#productionOrderFlow .ubee-native-edit-row .flow-textarea{
+  min-height:88px!important;
+  max-height:220px!important;
+  overflow-y:auto!important;
+  resize:none!important;
+}
+#productionOrderFlow .ubee-native-edit-row:focus-within{
+  background:#fffdf3!important;
+  box-shadow:inset 3px 0 0 #f4bd00!important;
+}
+#ubeeNativeKeyboardToolbar{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:22000;
+  height:48px;
+  display:none;
+  grid-template-columns:48px 48px minmax(0,1fr) 68px;
+  align-items:center;
+  gap:2px;
+  padding:0 8px calc(env(safe-area-inset-bottom) * .15);
+  background:rgba(250,250,251,.97);
+  border-top:1px solid #dfe2e5;
+  box-shadow:0 -8px 24px rgba(0,0,0,.06);
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+body.ubee-keyboard-open #ubeeNativeKeyboardToolbar{display:grid}
+#ubeeNativeKeyboardToolbar button{
+  height:36px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:#111;
+  font-size:18px;
+  font-weight:850;
+}
+#ubeeNativeKeyboardToolbar button:disabled{opacity:.28}
+#ubeeNativeKeyboardToolbar .ubee-kb-title{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  padding:0 6px;
+  color:#6f747a;
+  font-size:12px;
+  font-weight:750;
+  text-align:center;
+}
+#ubeeNativeKeyboardToolbar .ubee-kb-done{
+  background:#111;
+  color:#fff;
+  font-size:14px;
 }
 </style>
 <script id="ubee-customer-navigation-stack-v2">
@@ -26994,58 +27099,167 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
   }
 })();
 </script>
-<script id="ubee-customer-visual-viewport-v2">
+<script id="ubee-customer-native-keyboard-v3">
 (()=>{
   'use strict';
-  if(window.__UBEE_CUSTOMER_VISUAL_VIEWPORT_V2__) return;
-  window.__UBEE_CUSTOMER_VISUAL_VIEWPORT_V2__=true;
+  if(window.__UBEE_CUSTOMER_NATIVE_KEYBOARD_V3__) return;
+  window.__UBEE_CUSTOMER_NATIVE_KEYBOARD_V3__=true;
 
   const root=document.documentElement;
   const vv=window.visualViewport;
   let lastKeyboardOpen=false;
   let focusTimer=0;
+  let activeControl=null;
+  let baselineViewportHeight=Math.max(window.innerHeight||0,vv?.height||0);
+
+  const isEditable=el=>Boolean(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)&&!el.disabled&&!el.readOnly&&el.type!=='hidden');
+  const isVisible=el=>{
+    if(!isEditable(el))return false;
+    if(el.closest('[hidden]'))return false;
+    const style=getComputedStyle(el);
+    if(style.display==='none'||style.visibility==='hidden')return false;
+    return el.getClientRects().length>0;
+  };
+  const controlLabel=el=>{
+    const row=el?.closest('.ubee-native-form-row,.flow-form-group,.compact-field');
+    const text=row?.querySelector('span:first-child,.flow-label,label')?.textContent||el?.getAttribute('aria-label')||el?.placeholder||'輸入資料';
+    return String(text).replace(/＊/g,'').trim().slice(0,28)||'輸入資料';
+  };
+
+  function ensureToolbar(){
+    let bar=document.getElementById('ubeeNativeKeyboardToolbar');
+    if(bar)return bar;
+    bar=document.createElement('div');
+    bar.id='ubeeNativeKeyboardToolbar';
+    bar.setAttribute('role','toolbar');
+    bar.setAttribute('aria-label','表單輸入工具列');
+    bar.innerHTML='<button type="button" data-kb-prev aria-label="上一欄">↑</button><button type="button" data-kb-next aria-label="下一欄">↓</button><div class="ubee-kb-title" id="ubeeNativeKeyboardTitle">輸入資料</div><button type="button" class="ubee-kb-done" data-kb-done>完成</button>';
+    document.body.appendChild(bar);
+    bar.querySelector('[data-kb-prev]')?.addEventListener('click',()=>focusSibling(-1));
+    bar.querySelector('[data-kb-next]')?.addEventListener('click',()=>focusSibling(1));
+    bar.querySelector('[data-kb-done]')?.addEventListener('click',()=>{try{activeControl?.blur()}catch(_){}});
+    return bar;
+  }
+
+  function editableControls(){
+    return Array.from(document.querySelectorAll('#productionOrderFlow input,#productionOrderFlow textarea,#productionOrderFlow select,#ubeeCustomerAuthRoot input,#ubeeCustomerAuthRoot textarea,#ubeeCustomerAuthRoot select'))
+      .filter(isVisible);
+  }
+
+  function updateToolbar(){
+    const bar=ensureToolbar();
+    const controls=editableControls();
+    const index=controls.indexOf(activeControl);
+    const prev=bar.querySelector('[data-kb-prev]');
+    const next=bar.querySelector('[data-kb-next]');
+    if(prev)prev.disabled=index<=0;
+    if(next)next.disabled=index<0||index>=controls.length-1;
+    const title=bar.querySelector('#ubeeNativeKeyboardTitle');
+    if(title)title.textContent=controlLabel(activeControl);
+  }
+
+  function reveal(el,delay=70){
+    clearTimeout(focusTimer);
+    focusTimer=setTimeout(()=>{
+      try{(el.closest('.ubee-native-edit-row,.ubee-native-form-row,.flow-form-group')||el).scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});}catch(_){ }
+    },delay);
+  }
+
+  function focusSibling(delta){
+    const controls=editableControls();
+    const index=controls.indexOf(activeControl);
+    const next=controls[index+delta];
+    if(!next)return;
+    try{next.focus({preventScroll:true})}catch(_){next.focus()}
+    reveal(next,40);
+  }
+
+  function autoGrow(el){
+    if(!(el instanceof HTMLTextAreaElement))return;
+    if(el.id==='ubeeOrderChatInput')return;
+    el.style.height='auto';
+    el.style.height=`${Math.min(Math.max(el.scrollHeight,88),220)}px`;
+  }
+
+  function prepareControl(el){
+    if(!isEditable(el)||el.dataset.ubeeNativeInputReady==='1')return;
+    el.dataset.ubeeNativeInputReady='1';
+    const row=el.closest('#productionOrderFlow .ubee-native-form-row');
+    const type=String(el.getAttribute('type')||'text').toLowerCase();
+    if(row&&(el.tagName==='TEXTAREA'||['text','tel','email','number','search','url','password'].includes(type))){
+      row.classList.add('ubee-native-edit-row');
+    }
+    if(el.tagName==='TEXTAREA'){
+      autoGrow(el);
+      el.addEventListener('input',()=>autoGrow(el),{passive:true});
+    }
+    if(el.tagName==='INPUT'&&['text','tel','email','number','search','url'].includes(type)&&el.id!=='flowAddressSearch'){
+      el.setAttribute('enterkeyhint','next');
+    }
+    if(type==='tel')el.setAttribute('autocomplete','tel');
+    if(el.id==='flowDetailName')el.setAttribute('autocomplete','name');
+    if(el.id==='flowDrivePlate'){
+      el.setAttribute('autocapitalize','characters');
+      el.setAttribute('spellcheck','false');
+    }
+    if(['flowDriveMakeModel','flowDriveColor'].includes(el.id))el.setAttribute('autocapitalize','words');
+  }
+
+  function prepareAll(){
+    document.querySelectorAll('#productionOrderFlow input,#productionOrderFlow textarea,#productionOrderFlow select,#ubeeCustomerAuthRoot input,#ubeeCustomerAuthRoot textarea,#ubeeCustomerAuthRoot select').forEach(prepareControl);
+    ensureToolbar();
+  }
 
   function syncViewport(){
     const height=vv?.height||window.innerHeight||0;
     const offsetTop=vv?.offsetTop||0;
     const layoutHeight=window.innerHeight||height;
-    const keyboardHeight=Math.max(0,Math.round(layoutHeight-height-offsetTop));
-    const keyboardOpen=keyboardHeight>120;
-
+    if(!activeControl&&height>0)baselineViewportHeight=Math.max(baselineViewportHeight,layoutHeight,height);
+    const referenceHeight=Math.max(baselineViewportHeight,layoutHeight,height);
+    const keyboardHeight=Math.max(0,Math.round(referenceHeight-height-offsetTop));
+    const keyboardOpen=Boolean(activeControl)&&keyboardHeight>120;
     root.style.setProperty('--ubee-visual-viewport-height',`${Math.round(height)}px`);
     root.style.setProperty('--ubee-visual-viewport-offset-top',`${Math.round(offsetTop)}px`);
     root.style.setProperty('--ubee-keyboard-height',`${keyboardHeight}px`);
     document.body?.classList.toggle('ubee-keyboard-open',keyboardOpen);
-
-    if(keyboardOpen&&!lastKeyboardOpen){
-      const active=document.activeElement;
-      if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)){
-        clearTimeout(focusTimer);
-        focusTimer=setTimeout(()=>{
-          try{active.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'});}catch(_){}
-        },90);
-      }
-    }
+    if(keyboardOpen&&activeControl&&(keyboardOpen!==lastKeyboardOpen))reveal(activeControl,100);
     lastKeyboardOpen=keyboardOpen;
+    updateToolbar();
   }
 
   vv?.addEventListener('resize',syncViewport,{passive:true});
   vv?.addEventListener('scroll',syncViewport,{passive:true});
   window.addEventListener('resize',syncViewport,{passive:true});
   window.addEventListener('orientationchange',()=>setTimeout(syncViewport,120),{passive:true});
-  window.addEventListener('pageshow',syncViewport,{passive:true});
-  document.addEventListener('focusin',event=>{
-    if(!/^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName||'')) return;
-    clearTimeout(focusTimer);
-    focusTimer=setTimeout(()=>{
-      syncViewport();
-      try{event.target.scrollIntoView({block:'center',inline:'nearest',behavior:'auto'});}catch(_){}
-    },120);
-  });
-  document.addEventListener('focusout',()=>setTimeout(syncViewport,120));
+  window.addEventListener('pageshow',()=>{prepareAll();syncViewport()},{passive:true});
 
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',syncViewport,{once:true});
-  else syncViewport();
+  document.addEventListener('focusin',event=>{
+    if(!isEditable(event.target))return;
+    activeControl=event.target;
+    prepareControl(activeControl);
+    syncViewport();
+    reveal(activeControl,130);
+  });
+  document.addEventListener('focusout',event=>{
+    if(event.target===activeControl)setTimeout(()=>{if(document.activeElement!==activeControl)activeControl=isEditable(document.activeElement)?document.activeElement:null;syncViewport()},120);
+  });
+  document.addEventListener('keydown',event=>{
+    const el=event.target;
+    if(!isEditable(el)||el.tagName!=='INPUT'||event.key!=='Enter'||el.id==='flowAddressSearch')return;
+    event.preventDefault();
+    activeControl=el;
+    focusSibling(1);
+  });
+
+  const observer=new MutationObserver(()=>prepareAll());
+  const start=()=>{
+    prepareAll();
+    const flow=document.getElementById('productionOrderFlow');
+    if(flow)observer.observe(flow,{childList:true,subtree:true});
+    syncViewport();
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
 })();
 </script>
 <script id="ubee-bottom-navigation-controller-v29">
