@@ -1,3 +1,4 @@
+// 2026-09-29｜Customer/Rider State Atomic Sync V1：騎士狀態更新同一 transaction 同步寫入 status / riderStatus / customerTrackingStatus 與毫秒版本；客戶 API 明確回傳狀態版本。 
 // 2026-09-29｜Rider Area MultiSelect V1：接單設定與小U申請的 serviceDistricts 移除 8 區硬上限；接單設定不再被初始申請服務區鎖住，可儲存多行政區偏好；代駕與客戶端既有 API 契約不變。
 // 2026-09-29｜Customer Active Meta Fix V1.4.1：單筆訂單 API 明確回傳 createdAtMs / updatedAtMs，供用戶端固定顯示建立時間；ETA canonical 欄位維持不變。
 // 2026-09-29｜Drive Semantic + Universal ETA V1.4：保留既有狀態碼與 API 契約；代駕對外狀態改用車輛所在地／車輛交接／代駕目的地語意；六大服務 Live ETA 繼續由後端 traffic-aware Routes 為唯一依據。
@@ -27582,6 +27583,8 @@ async function updateOrderStatus(order, status, extra = {}) {
     customerTrackingStatusLabel: getStatusLabel(status),
     customerTrackingUpdatedAtMs: Date.now(),
     customerTrackingUpdatedAt: now,
+    statusUpdatedAtMs: Date.now(),
+    updatedAtMs: Date.now(),
     updatedAt: now,
     statusTimes: {
       ...currentStatusTimes,
@@ -39068,6 +39071,12 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
           trackingUpdatedAtMs: nowMs,
           trackingUpdatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
+          customerTrackingStatus:'picked_up',
+          customerTrackingStatusLabel:getStatusLabel('picked_up'),
+          customerTrackingUpdatedAtMs:nowMs,
+          customerTrackingUpdatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          statusUpdatedAtMs:nowMs,
           updatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
           updatedAtMs: nowMs,
@@ -39116,6 +39125,11 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       const updateData = {
         status,
         riderStatus: status,
+        customerTrackingStatus: status,
+        customerTrackingStatusLabel: getStatusLabel(status),
+        customerTrackingUpdatedAtMs: transitionNowMs,
+        customerTrackingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        statusUpdatedAtMs: transitionNowMs,
 
         // 保留目前任務歸屬資訊，避免後續查詢不到
         riderId: identity.riderId,
@@ -39123,6 +39137,7 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
         riderPhone: identity.phone,
         riderLineUserId: identity.lineUserId || '',
 
+        updatedAtMs: transitionNowMs,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         [`statusTimes.${status}`]: admin.firestore.FieldValue.serverTimestamp(),
 
@@ -39764,6 +39779,25 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
         riderStatus:
           order.riderStatus ||
           order.status,
+
+        customerTrackingStatus:
+          order.customerTrackingStatus ||
+          order.status,
+
+        statusUpdatedAtMs:
+          Number(
+            order.statusUpdatedAtMs ||
+            order.customerTrackingUpdatedAtMs ||
+            order.trackingUpdatedAtMs ||
+            customerOrderApiTimeMs(order.statusTimes?.[String(order.status || '').trim()]) ||
+            customerOrderApiTimeMs(order.updatedAt)
+          ) || 0,
+
+        customerTrackingUpdatedAtMs:
+          Number(order.customerTrackingUpdatedAtMs || 0),
+
+        trackingUpdatedAtMs:
+          Number(order.trackingUpdatedAtMs || 0),
 
         riderAssigned:
           Boolean(
@@ -46185,8 +46219,10 @@ function buildCustomerTrackingPayload(order = {}, incident = null, nowMs = Date.
       updatedAtMs:incident.updatedAtMs,
     } : null,
     updatedAtMs:
+      Number(order.statusUpdatedAtMs || 0) ||
       Number(order.customerTrackingUpdatedAtMs || 0) ||
       Number(order.trackingUpdatedAtMs || 0) ||
+      dispatchIncidentTimeMs(order.statusTimes?.[status]) ||
       dispatchIncidentTimeMs(order.updatedAt) ||
       nowMs,
   };
@@ -46214,6 +46250,17 @@ function sanitizeCustomerOrderForApi(order = {}) {
   return {
     id: String(order.id || ''),
     status: String(order.status || ''),
+    riderStatus: String(order.riderStatus || order.status || ''),
+    customerTrackingStatus: String(order.customerTrackingStatus || order.status || ''),
+    statusUpdatedAtMs: Number(
+      order.statusUpdatedAtMs ||
+      order.customerTrackingUpdatedAtMs ||
+      order.trackingUpdatedAtMs ||
+      customerOrderApiTimeMs(order.statusTimes?.[String(order.status || '').trim()]) ||
+      customerOrderApiTimeMs(order.updatedAt)
+    ) || 0,
+    customerTrackingUpdatedAtMs: Number(order.customerTrackingUpdatedAtMs || 0),
+    trackingUpdatedAtMs: Number(order.trackingUpdatedAtMs || 0),
     riderAssigned: Boolean(order.riderDocId || order.riderId || order.riderName),
     riderName: String(order.riderName || order.riderDisplayName || ''),
     riderVehicleType: String(order.riderVehicleType || order.vehicleType || ''),
