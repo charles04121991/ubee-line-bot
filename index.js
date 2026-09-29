@@ -1,3 +1,4 @@
+// 2026-09-29｜Drive Service + Order Chat V1：新增正式代駕服務、專用計價／結算資料契約與全服務訂單聊天室；代駕排除 Smart Stack，多媒體聊天延後。
 // 2026-09-25｜Rider Profile Photo UI V4.3.4：正式小U大頭照以短效 Signed URL 提供騎士本人顯示；我的首頁／帳號資料可安全載入，不公開 Storage。
 // 2026-09-25｜Rider Profile Supplement Auth Compatibility Fix：正式小U大頭照補件在 Token 過渡期允許既有手機登入身分 fallback；有 Bearer Token 時仍以 Token riderDocId 為唯一可信來源，RIDER_AUTH_ENFORCE=true 時仍強制 Token。
 // =====================================================
@@ -9132,8 +9133,8 @@ function isSmartStackStandardDelivery(order = {}) {
   ].map(v => String(v || '').trim().toLowerCase()).join(' ');
 
   if (['completed','done','cancelled','canceled'].includes(status)) return false;
-  if (['buy','queue','helper','urgent'].includes(serviceKey)) return false;
-  if (['queue','custom','buy'].includes(serviceMode)) return false;
+  if (['buy','queue','helper','urgent','drive'].includes(serviceKey)) return false;
+  if (['queue','custom','buy','drive'].includes(serviceMode)) return false;
   if (/代買|排隊|全能|急件/.test(serviceText)) return false;
   if (Array.isArray(order.deliveryStops) && order.deliveryStops.length > 1) return false;
   if (order.singlePointTask === true) return false;
@@ -14081,6 +14082,12 @@ app.post(
 
             cashRemittedAmount:
               item.cashDueToPlatform,
+
+            platformPaymentMethod: 'jkopay',
+            platformFeeStatus: 'paid',
+            platformFeePaidAt:
+              admin.firestore.FieldValue.serverTimestamp(),
+            platformFeePaidAtMs: nowMs,
 
             // 現金單不屬於平台撥款流程
             settlementStatus:
@@ -25095,6 +25102,17 @@ function calculateStopWaitingCharge({
   };
 }
 
+function calculateDriveWaitingCharge({ startedAtMs = 0, endedAtMs = Date.now() } = {}) {
+  const start=Number(startedAtMs||0), end=Number(endedAtMs||Date.now());
+  const freeMinutes=UBEE_DRIVE_PRICING_V1.waitingFreeMinutes;
+  if(!Number.isFinite(start)||!Number.isFinite(end)||start<=0||end<=start)return {elapsedMs:0,elapsedMinutes:0,chargeableMinutes:0,fee:0,freeMinutes,policyVersion:UBEE_DRIVE_PRICING_V1.version};
+  const elapsedMs=Math.max(0,end-start), freeMs=freeMinutes*60000;
+  if(elapsedMs<=freeMs)return {elapsedMs,elapsedMinutes:Math.ceil(elapsedMs/60000),chargeableMinutes:0,fee:0,freeMinutes,policyVersion:UBEE_DRIVE_PRICING_V1.version};
+  const chargeableMs=elapsedMs-freeMs;
+  const units=Math.ceil(chargeableMs/(UBEE_DRIVE_PRICING_V1.waitingUnitMinutes*60000));
+  return {elapsedMs,elapsedMinutes:Math.ceil(elapsedMs/60000),chargeableMinutes:units*UBEE_DRIVE_PRICING_V1.waitingUnitMinutes,fee:units*UBEE_DRIVE_PRICING_V1.waitingUnitFee,freeMinutes,policyVersion:UBEE_DRIVE_PRICING_V1.version};
+}
+
 function getOrderBaseWaitingFee(order = {}) {
   const explicit = Number(order.baseWaitingFee);
 
@@ -25160,22 +25178,16 @@ function buildWaitingStageStartUpdate(order = {}, stage, nowMs = Date.now()) {
     waitingActiveStageLabel: fields.label,
     waitingFreeUntilMs:
       (existingStart > 0 ? existingStart : safeNowMs) +
-      Math.max(0, Number(PRICING.waitingFreeMinutes || 10)) *
-        60 *
-        1000,
-    waitingPolicyVersion: UBEE_WAITING_POLICY_VERSION,
+      Math.max(0, Number(String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive' ? UBEE_DRIVE_PRICING_V1.waitingFreeMinutes : (PRICING.waitingFreeMinutes || 10))) * 60 * 1000,
+    waitingPolicyVersion: String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive' ? UBEE_DRIVE_PRICING_V1.version : UBEE_WAITING_POLICY_VERSION,
     waitingFreeMinutes: Math.max(
       0,
-      Math.round(Number(PRICING.waitingFreeMinutes || 10))
+      Math.round(Number(String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive' ? UBEE_DRIVE_PRICING_V1.waitingFreeMinutes : (PRICING.waitingFreeMinutes || 10)))
     ),
-    waitingBaseCharge: Math.max(
-      0,
-      Math.round(Number(PRICING.waitingBaseFee || 50))
-    ),
-    waitingPerMinuteCharge: Math.max(
-      0,
-      Math.round(Number(PRICING.waitingPerMinute || 5))
-    ),
+    waitingBaseCharge: String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive' ? 0 : Math.max(0, Math.round(Number(PRICING.waitingBaseFee || 50))),
+    waitingPerMinuteCharge: String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive' ? 0 : Math.max(0, Math.round(Number(PRICING.waitingPerMinute || 5))),
+    driveWaitingUnitMinutes: String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive' ? UBEE_DRIVE_PRICING_V1.waitingUnitMinutes : 0,
+    driveWaitingUnitFee: String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive' ? UBEE_DRIVE_PRICING_V1.waitingUnitFee : 0,
   };
 }
 
@@ -25187,10 +25199,10 @@ function buildWaitingStageFinalization(order = {}, stage, nowMs = Date.now()) {
   );
   const startedAtMs = Number(order[fields.startedAtMs] || 0);
 
-  const calculation = calculateStopWaitingCharge({
-    startedAtMs,
-    endedAtMs,
-  });
+  const isDriveOrder = String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive';
+  const calculation = isDriveOrder
+    ? calculateDriveWaitingCharge({ startedAtMs, endedAtMs })
+    : calculateStopWaitingCharge({ startedAtMs, endedAtMs });
 
   const pickupFee =
     fields.stage === 'pickup'
@@ -25231,16 +25243,12 @@ function buildWaitingStageFinalization(order = {}, stage, nowMs = Date.now()) {
     waitingActiveStage: '',
     waitingActiveStageLabel: '',
     waitingFreeUntilMs: 0,
-    waitingPolicyVersion: UBEE_WAITING_POLICY_VERSION,
+    waitingPolicyVersion: isDriveOrder ? UBEE_DRIVE_PRICING_V1.version : UBEE_WAITING_POLICY_VERSION,
     waitingFreeMinutes: calculation.freeMinutes,
-    waitingBaseCharge: Math.max(
-      0,
-      Math.round(Number(PRICING.waitingBaseFee || 50))
-    ),
-    waitingPerMinuteCharge: Math.max(
-      0,
-      Math.round(Number(PRICING.waitingPerMinute || 5))
-    ),
+    waitingBaseCharge: isDriveOrder ? 0 : Math.max(0, Math.round(Number(PRICING.waitingBaseFee || 50))),
+    waitingPerMinuteCharge: isDriveOrder ? 0 : Math.max(0, Math.round(Number(PRICING.waitingPerMinute || 5))),
+    driveWaitingUnitMinutes: isDriveOrder ? UBEE_DRIVE_PRICING_V1.waitingUnitMinutes : 0,
+    driveWaitingUnitFee: isDriveOrder ? UBEE_DRIVE_PRICING_V1.waitingUnitFee : 0,
   };
 }
 
@@ -26045,6 +26053,10 @@ async function createDynamicPricingQuoteSnapshot({
     stopCount: getCustomerRouteStopAddresses(requestData).length,
     multiDropoff: getCustomerRouteStopAddresses(requestData).length > 1,
     advancePayment: Math.max(0, Math.round(dynamicSafeNumber(requestData.advancePayment))),
+    orderTimingType: normalizeOrderTimingType(requestData.orderTimingType || requestData.timingType || 'immediate'),
+    requestedScheduleAtMs: getScheduleTimestampMs(requestData.requestedScheduleAtMs || requestData.scheduledAtMs || requestData.scheduledAt),
+    flexibleStartAtMs: getScheduleTimestampMs(requestData.flexibleStartAtMs || requestData.scheduleWindowStartAtMs),
+    flexibleEndAtMs: getScheduleTimestampMs(requestData.flexibleEndAtMs || requestData.scheduleWindowEndAtMs),
     weatherType: String(price?.weatherType || 'none'),
     price: JSON.parse(JSON.stringify(price || {})),
     dynamicPricing: JSON.parse(JSON.stringify(dynamicPricing || {})),
@@ -26082,6 +26094,15 @@ function resolveCustomerServiceMode({
   const normalizedType = String(serviceType || '').trim();
   const normalizedKey = String(serviceKey || '').trim().toLowerCase();
   const normalizedGroup = String(serviceGroup || '').trim().toLowerCase();
+
+  if (
+    rawMode === 'drive' ||
+    normalizedType === '代駕' ||
+    normalizedKey === 'drive' ||
+    normalizedGroup === 'drive'
+  ) {
+    return 'drive';
+  }
 
   if (
     rawMode === 'queue' ||
@@ -26171,13 +26192,13 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
   ) {
     return { ok: false, message: '多點送達路線已變更，請重新估價。' };
   }
-  if (quoteSpeed !== orderSpeed) {
+  if (quoteMode !== 'drive' && quoteSpeed !== orderSpeed) {
     return { ok: false, message: '配送速度已變更，請重新估價。' };
   }
   if (quoteMode !== orderMode) {
     return { ok: false, message: '任務型態已變更，請重新估價。' };
   }
-  if (quoteItemSize !== orderItemSize) {
+  if (quoteMode !== 'drive' && quoteItemSize !== orderItemSize) {
     return { ok: false, message: '物品體積選項已變更，請重新估價。' };
   }
 
@@ -26203,15 +26224,40 @@ function validateLockedQuoteAgainstOrder(lockedQuote, orderData) {
     }
   }
 
+  // 代駕深夜費會依預約執行時間決定；Quote 必須鎖定相同的時間模式與時間點。
+  if (quoteMode === 'drive') {
+    const quoteTimingType = normalizeOrderTimingType(lockedQuote.orderTimingType || 'immediate');
+    const orderTimingType = normalizeOrderTimingType(orderData.orderTimingType || orderData.timingType || 'immediate');
+    if (quoteTimingType !== orderTimingType) {
+      return { ok: false, message: '代駕時間設定已變更，請重新估價。' };
+    }
+    if (quoteTimingType === UBEE_ORDER_TIMING_TYPES.SCHEDULED) {
+      const quoteAt = getScheduleTimestampMs(lockedQuote.requestedScheduleAtMs);
+      const orderAt = getScheduleTimestampMs(orderData.requestedScheduleAtMs || orderData.scheduledAtMs || orderData.scheduledAt);
+      if (!quoteAt || !orderAt || quoteAt !== orderAt) {
+        return { ok: false, message: '代駕預約時間已變更，請重新估價。' };
+      }
+    }
+    if (quoteTimingType === UBEE_ORDER_TIMING_TYPES.FLEXIBLE) {
+      const quoteStart = getScheduleTimestampMs(lockedQuote.flexibleStartAtMs);
+      const orderStart = getScheduleTimestampMs(orderData.flexibleStartAtMs || orderData.scheduleWindowStartAtMs);
+      const quoteEnd = getScheduleTimestampMs(lockedQuote.flexibleEndAtMs);
+      const orderEnd = getScheduleTimestampMs(orderData.flexibleEndAtMs || orderData.scheduleWindowEndAtMs);
+      if (!quoteStart || !orderStart || quoteStart !== orderStart || quoteEnd !== orderEnd) {
+        return { ok: false, message: '代駕彈性時段已變更，請重新估價。' };
+      }
+    }
+  }
+
   const quoteUpstairsOption = normalizeCustomerUpstairsOption(lockedQuote.upstairsOption);
   const orderUpstairsOption = normalizeCustomerUpstairsOption(orderData.upstairsOption);
-  if (quoteUpstairsOption !== orderUpstairsOption) {
+  if (quoteMode !== 'drive' && quoteUpstairsOption !== orderUpstairsOption) {
     return { ok: false, message: '上樓需求已變更，請重新估價。' };
   }
 
   const quoteAdvancePayment = Math.max(0, Math.round(dynamicSafeNumber(lockedQuote.advancePayment)));
   const orderAdvancePayment = Math.max(0, Math.round(dynamicSafeNumber(orderData.advancePayment)));
-  if (quoteAdvancePayment !== orderAdvancePayment) {
+  if (quoteMode !== 'drive' && quoteAdvancePayment !== orderAdvancePayment) {
     return { ok: false, message: '代墊金額已變更，請重新估價。' };
   }
 
@@ -27184,17 +27230,18 @@ function validateOrderInput(data) {
 
   const hasRemark = !!String(data.note || data.item || '').trim();
   const isQueueTask = String(data.serviceMode || '').trim() === 'queue';
+  const isDriveOrder = String(data.serviceMode || '').trim() === 'drive' || String(data.serviceKey || '').trim() === 'drive';
   const isCustomSinglePointTask =
     String(data.serviceMode || '').trim() === 'custom' &&
     data.singlePointTask === true;
 
-  if (!data.pickupAddress || !data.pickupPhone || !hasRemark) {
-    errors.push('請完整填寫任務地點、聯絡電話與任務內容。');
+  if (!data.pickupAddress || !data.pickupPhone || (!hasRemark && !isDriveOrder)) {
+    errors.push(isDriveOrder ? '請完整填寫車輛所在地與現場聯絡電話。' : '請完整填寫任務地點、聯絡電話與任務內容。');
   }
 
   if (!isQueueTask && !isCustomSinglePointTask) {
     if (!data.dropoffAddress || !data.dropoffPhone) {
-      errors.push('請完整填寫送達地址與收件聯絡電話。');
+      errors.push(isDriveOrder ? '請完整填寫代駕目的地與抵達地聯絡電話。' : '請完整填寫送達地址與收件聯絡電話。');
     }
   }
 
@@ -27207,6 +27254,14 @@ function validateOrderInput(data) {
     } else if (secondAddress === firstAddress || secondAddress === normalizeAddress(data.pickupAddress)) {
       errors.push('第二送達點不可與取件點或第一送達點相同。');
     }
+  }
+
+  if (isDriveOrder) {
+    const vehicle = normalizeDriveVehicleInput(data.driveVehicle || {});
+    if (!vehicle.plate) errors.push('請填寫代駕車輛車牌。');
+    if (!vehicle.makeModel) errors.push('請填寫代駕車輛品牌／車型。');
+    if (!vehicle.transmission) errors.push('請選擇代駕車輛為自排或手排。');
+    if (deliveryStops.length > 1) errors.push('代駕 V1 目前僅支援單一目的地。');
   }
 
   const isPurchaseOrder =
@@ -27302,6 +27357,9 @@ function getDuplicateFingerprint(data) {
     .filter(Boolean)
     .join('>');
 
+  const driveVehicle = normalizeDriveVehicleInput(data.driveVehicle || {});
+  const driveVehicleFingerprint = [driveVehicle.plate, driveVehicle.makeModel, driveVehicle.color, driveVehicle.transmission, driveVehicle.conditionNote].join('~');
+
   return [
     String(data.userId || '').trim(),
     String(data.serviceGroup || '').trim(),
@@ -27312,6 +27370,7 @@ function getDuplicateFingerprint(data) {
     normalizeAddress(data.pickupAddress),
     normalizeAddress(data.dropoffAddress),
     stopFingerprint,
+    driveVehicleFingerprint,
     String(data.pickupContact || '').trim(),
     String(data.pickupPhone || '').trim(),
     String(data.dropoffContact || '').trim(),
@@ -28286,6 +28345,132 @@ function getCanonicalOrderRiderIncome(order = {}) {
 }
 
 // =====================================================
+// UBee Drive Pricing V1｜代駕唯一正式計價核心
+// - 0～3 km：NT$350
+// - 3.1～5 km：NT$400
+// - 5.1～10 km：NT$450
+// - 10～30 km：每開始 1 km +NT$50
+// - 30 km 後：每開始 2 km +NT$50
+// - Asia/Taipei 00:00～06:59：3km 內 +50，其餘 +100
+// - 代駕不套一般配送動態運力／天候／物品體積／多點費。
+// =====================================================
+const UBEE_DRIVE_PRICING_V1 = Object.freeze({
+  version:'drive-pricing-v1-20260929',
+  base3Km:350,
+  upTo5Km:400,
+  upTo10Km:450,
+  perKm10To30:50,
+  after30Per2Km:50,
+  nightShort:50,
+  nightLong:100,
+  waitingFreeMinutes:10,
+  waitingUnitMinutes:5,
+  waitingUnitFee:50,
+});
+
+function getTaipeiHour(nowMs = Date.now()) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone:'Asia/Taipei', hour:'2-digit', hourCycle:'h23'
+    }).formatToParts(new Date(nowMs));
+    const h = Number(parts.find(p=>p.type==='hour')?.value);
+    return Number.isFinite(h) ? h : new Date(nowMs).getUTCHours();
+  } catch (_) {
+    return new Date(nowMs).getUTCHours();
+  }
+}
+
+function getDrivePricingReferenceMs(input = {}) {
+  const timingType = normalizeOrderTimingType(input.orderTimingType || input.timingType || 'immediate');
+  if (timingType === UBEE_ORDER_TIMING_TYPES.SCHEDULED) {
+    return getScheduleTimestampMs(input.requestedScheduleAtMs) || Date.now();
+  }
+  if (timingType === UBEE_ORDER_TIMING_TYPES.FLEXIBLE) {
+    return getScheduleTimestampMs(input.flexibleStartAtMs) || Date.now();
+  }
+  return Date.now();
+}
+
+function calculateDrivePrice({ distanceMeters = 0, nowMs = Date.now() } = {}) {
+  const km = Math.max(0, Number(distanceMeters || 0)) / 1000;
+  let baseFare = UBEE_DRIVE_PRICING_V1.base3Km;
+  if (km > 3 && km <= 5) baseFare = UBEE_DRIVE_PRICING_V1.upTo5Km;
+  else if (km > 5 && km <= 10) baseFare = UBEE_DRIVE_PRICING_V1.upTo10Km;
+  else if (km > 10 && km <= 30) {
+    baseFare = UBEE_DRIVE_PRICING_V1.upTo10Km + Math.ceil(km - 10) * UBEE_DRIVE_PRICING_V1.perKm10To30;
+  } else if (km > 30) {
+    baseFare = UBEE_DRIVE_PRICING_V1.upTo10Km + (20 * UBEE_DRIVE_PRICING_V1.perKm10To30) + Math.ceil((km - 30) / 2) * UBEE_DRIVE_PRICING_V1.after30Per2Km;
+  }
+
+  let riderBaseIncome = 300;
+  let platformBaseFee = 50;
+  if (baseFare === 400) { riderBaseIncome = 335; platformBaseFee = 65; }
+  else if (baseFare >= 450) {
+    const increments = Math.max(0, Math.round((baseFare - 450) / 50));
+    riderBaseIncome = 375 + increments * 40;
+    platformBaseFee = 75 + increments * 10;
+  }
+
+  const hour = getTaipeiHour(nowMs);
+  const isNight = hour >= 0 && hour <= 6;
+  const nightFee = isNight ? (km <= 3 ? UBEE_DRIVE_PRICING_V1.nightShort : UBEE_DRIVE_PRICING_V1.nightLong) : 0;
+  const nightRiderIncome = Math.round(nightFee * 0.8);
+  const nightPlatformFee = nightFee - nightRiderIncome;
+  const serviceSubtotal = baseFare + nightFee;
+  const riderIncome = riderBaseIncome + nightRiderIncome;
+  const platformFee = platformBaseFee + nightPlatformFee;
+
+  return {
+    fareMode:'drive_v1',
+    drivePricingVersion:UBEE_DRIVE_PRICING_V1.version,
+    distanceKm:Math.round(km * 100) / 100,
+    distanceFee:Math.max(0, baseFare - UBEE_DRIVE_PRICING_V1.base3Km),
+    baseFee:UBEE_DRIVE_PRICING_V1.base3Km,
+    driveBaseFare:baseFare,
+    nightFee,
+    driveNightApplied:isNight,
+    waitingFee:0,
+    waitingFreeMinutes:UBEE_DRIVE_PRICING_V1.waitingFreeMinutes,
+    waitingUnitMinutes:UBEE_DRIVE_PRICING_V1.waitingUnitMinutes,
+    waitingUnitFee:UBEE_DRIVE_PRICING_V1.waitingUnitFee,
+    shareableTaskSubtotal:baseFare,
+    riderOnlySurchargeSubtotal:nightFee,
+    taskSubtotal:serviceSubtotal,
+    serviceSubtotal,
+    total:serviceSubtotal,
+    riderBaseIncome,
+    driverFee:riderIncome,
+    riderFee:riderIncome,
+    riderIncome,
+    estimatedRiderIncome:riderIncome,
+    platformFee,
+    platformIncome:platformFee,
+    platformServiceFee:platformFee,
+    serviceFee:platformFee,
+    speedFee:0,
+    upstairsFee:0,
+    itemSizeFee:0,
+    dynamicPricingFee:0,
+    weatherFee:0,
+    extraStopFee:0,
+    extraStopCount:0,
+  };
+}
+
+function normalizeDriveVehicleInput(value = {}) {
+  const v = value && typeof value === 'object' ? value : {};
+  const transmission = ['automatic','manual'].includes(String(v.transmission||'').trim().toLowerCase())
+    ? String(v.transmission).trim().toLowerCase() : '';
+  return {
+    plate:cleanText(v.plate || '', 20).toUpperCase(),
+    makeModel:cleanText(v.makeModel || v.model || '', 100),
+    color:cleanText(v.color || '', 40),
+    transmission,
+    conditionNote:cleanLongText(v.conditionNote || '', 300),
+  };
+}
+
+// =====================================================
 // 僅辨識「幫我取 / 幫代買」兩種專用計價服務
 // 其他任何服務一律回傳空字串，繼續走原本 calculatePrice()。
 // =====================================================
@@ -28847,6 +29032,31 @@ function applyCustomTaskHandlingFee(
 
 function recalculateOrderFinancials(order) {
   if (!order) {
+    return order;
+  }
+
+  // 代駕使用獨立階梯分潤；等待費與深夜費固定 80/20，不進一般 70/30 核心。
+  if (String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive') {
+    const baseFare = Math.max(0, Math.round(Number(order.driveBaseFare || order.deliveryFee || order.shareableTaskSubtotal || 0)));
+    const nightFee = Math.max(0, Math.round(Number(order.nightFee || 0)));
+    const waitingFee = Math.max(0, Math.round(Number(order.waitingFee || 0)));
+    let riderBaseIncome = Math.max(0, Math.round(Number(order.riderBaseIncome || 0)));
+    if (!riderBaseIncome) {
+      if (baseFare <= 350) riderBaseIncome = 300;
+      else if (baseFare <= 400) riderBaseIncome = 335;
+      else riderBaseIncome = 375 + Math.max(0, Math.round((baseFare - 450) / 50)) * 40;
+    }
+    const riderIncome = riderBaseIncome + Math.round(nightFee * 0.8) + Math.round(waitingFee * 0.8);
+    const serviceSubtotal = baseFare + nightFee + waitingFee;
+    const platformFee = Math.max(0, serviceSubtotal - riderIncome);
+    order.deliveryFee = baseFare;
+    order.driveBaseFare = baseFare;
+    order.riderBaseIncome = riderBaseIncome;
+    order.riderIncome = riderIncome; order.estimatedRiderIncome = riderIncome; order.riderFee = riderIncome; order.driverFee = riderIncome;
+    order.platformFee = platformFee; order.platformIncome = platformFee; order.serviceFee = platformFee; order.platformServiceFee = platformFee;
+    order.taskSubtotal = serviceSubtotal; order.serviceSubtotal = serviceSubtotal; order.serviceTotal = serviceSubtotal;
+    order.customerPayableTotal = serviceSubtotal; order.payableTotal = serviceSubtotal; order.riderDisplayTotal = serviceSubtotal; order.total = serviceSubtotal; order.finalTotal = serviceSubtotal; order.customerTotalWithAdvance = serviceSubtotal;
+    order.cashCollectAmount = serviceSubtotal; order.riderCollectAmount = serviceSubtotal; order.cashDueToPlatform = platformFee; order.riderDueToPlatform = platformFee; order.platformReceivable = platformFee;
     return order;
   }
 
@@ -30091,6 +30301,7 @@ function createOrderFromApi(data) {
     buy: '幫我買',
     queue: '幫排隊',
     helper: '全能跑腿',
+    drive: '代駕',
     urgent: '急件專送',
 
     life:
@@ -30332,9 +30543,15 @@ function createOrderFromApi(data) {
         .slice(0, 5)
     : [];
 
-  const vehiclePreference = ['any', 'motorcycle', 'car'].includes(String(data.vehiclePreference || ''))
-    ? String(data.vehiclePreference)
-    : 'any';
+  const isDriveService = normalizedServiceMode === 'drive';
+
+  const vehiclePreference = isDriveService
+    ? 'any'
+    : (['any', 'motorcycle', 'car'].includes(String(data.vehiclePreference || ''))
+        ? String(data.vehiclePreference)
+        : 'any');
+
+  const driveVehicle = normalizeDriveVehicleInput(data.driveVehicle || {});
 
   const deliveryStops = normalizeCustomerOrderDeliveryStops(data);
   const primaryDeliveryStop = deliveryStops[0] || null;
@@ -30378,6 +30595,7 @@ function createOrderFromApi(data) {
     taskDetails,
     deliveryPreferences,
     vehiclePreference,
+    driveVehicle,
 
     pickupAddress: cleanText(
       data.pickup ||
@@ -30436,18 +30654,15 @@ function createOrderFromApi(data) {
     multiDropoff: deliveryStops.length > 1,
     stopCount: Math.max(1, deliveryStops.length || 1),
 
-    speedType: [
-      'standard',
-      'priority',
-      'express'
-    ].includes(
-      data.speedType || data.speed
-    )
-      ? (
-          data.speedType ||
-          data.speed
-        )
-      : 'standard',
+    speedType: isDriveService
+      ? 'standard'
+      : ([
+          'standard',
+          'priority',
+          'express'
+        ].includes(data.speedType || data.speed)
+          ? (data.speedType || data.speed)
+          : 'standard'),
 
     // UBee 任務時間模式：立即／指定時間／彈性時段
     orderTimingType:
@@ -30492,9 +30707,9 @@ function createOrderFromApi(data) {
     dropoffContact: primaryDeliveryStop?.customerName || cleanText(data.dropoffContact || '', 60),
     pickupAddressNote: cleanLongText(data.pickupAddressNote || '', 200),
     dropoffAddressNote: primaryDeliveryStop?.dropoffAddressNote || cleanLongText(data.dropoffAddressNote || '', 200),
-    itemQuantity: cleanText(data.itemQuantity || '', 40),
-    itemSize: getItemSizePricing(data.itemSize).itemSize,
-    itemSizeLabel: getItemSizePricing(data.itemSize).itemSizeLabel,
+    itemQuantity: isDriveService ? '' : cleanText(data.itemQuantity || '', 40),
+    itemSize: isDriveService ? 'unspecified' : getItemSizePricing(data.itemSize).itemSize,
+    itemSizeLabel: isDriveService ? getItemSizePricing('unspecified').itemSizeLabel : getItemSizePricing(data.itemSize).itemSizeLabel,
     proofRequired: ['none', 'photo', 'signature', 'photo_and_signature'].includes(String(data.proofRequired || ''))
       ? String(data.proofRequired)
       : 'none',
@@ -30552,24 +30767,23 @@ function createOrderFromApi(data) {
       }
     ),
 
-    advancePayment:
-      parseNonNegativeMoney(
-        data.advancePayment
-      ),
+    // 代駕不適用代墊／上樓／物品體積等配送欄位；後端強制正規化，不能只信任前端隱藏欄位。
+    advancePayment: isDriveService
+      ? 0
+      : parseNonNegativeMoney(data.advancePayment),
 
-    upstairsOption: normalizeCustomerUpstairsOption(
-      data.upstairsOption
-    ),
+    upstairsOption: isDriveService
+      ? 'none'
+      : normalizeCustomerUpstairsOption(data.upstairsOption),
 
-    upstairsLabel: cleanText(
-      data.upstairsLabel || '',
-      80
-    ),
+    upstairsLabel: isDriveService
+      ? ''
+      : cleanText(data.upstairsLabel || '', 80),
 
     // 正式金額不可相信前端傳入的 upstairsFee。
-    upstairsFee: getCanonicalUpstairsFee(
-      data.upstairsOption
-    ),
+    upstairsFee: isDriveService
+      ? 0
+      : getCanonicalUpstairsFee(data.upstairsOption),
 
     fareMode: cleanText(
       data.fareMode ||
@@ -31407,43 +31621,6 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       return res.status(400).json({ success:false, error:'第二送達點不可與取件地點相同。' });
     }
 
-    const speedType = String(
-      req.query.speed || req.query.speedType || 'standard'
-    ).trim();
-    const speed = getSpeedOption(speedType);
-
-    const advancePayment = Math.max(
-      0,
-      Math.round(Number(req.query.advancePayment || 0))
-    );
-
-    if (advancePayment > MAX_ADVANCE_PAYMENT) {
-      return res.status(400).json({
-        success: false,
-        error: '代墊款項超過 NT$1,500，請先聯繫 UBee 跑腿客服人工確認。',
-      });
-    }
-
-    const upstairsOption = normalizeCustomerUpstairsOption(
-      req.query.upstairsOption
-    );
-
-    if (upstairsOption === 'heavy') {
-      return res.status(409).json({
-        success: false,
-        code: 'UPSTAIRS_MANUAL_REVIEW_REQUIRED',
-        error: '重物／大量物品需由 UBee 跑腿客服人工確認後再報價。',
-      });
-    }
-
-    const upstairsFee = getCanonicalUpstairsFee(
-      upstairsOption
-    );
-
-    const itemSize = normalizeItemSize(
-      req.query.itemSize || 'unspecified'
-    );
-
     const resolvedServiceMode = resolveCustomerServiceMode({
       serviceMode: rawServiceMode,
       serviceType,
@@ -31451,6 +31628,46 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       serviceGroup,
     });
 
+    const isDriveTask = resolvedServiceMode === 'drive';
+
+    const requestedSpeedType = String(
+      req.query.speed || req.query.speedType || 'standard'
+    ).trim();
+    const speedType = isDriveTask ? 'standard' : requestedSpeedType;
+    const speed = getSpeedOption(speedType);
+
+    const requestedAdvancePayment = Math.max(
+      0,
+      Math.round(Number(req.query.advancePayment || 0))
+    );
+    const advancePayment = isDriveTask ? 0 : requestedAdvancePayment;
+
+    if (!isDriveTask && advancePayment > MAX_ADVANCE_PAYMENT) {
+      return res.status(400).json({
+        success: false,
+        error: '代墊款項超過 NT$1,500，請先聯繫 UBee 跑腿客服人工確認。',
+      });
+    }
+
+    const upstairsOption = isDriveTask
+      ? 'none'
+      : normalizeCustomerUpstairsOption(req.query.upstairsOption);
+
+    if (!isDriveTask && upstairsOption === 'heavy') {
+      return res.status(409).json({
+        success: false,
+        code: 'UPSTAIRS_MANUAL_REVIEW_REQUIRED',
+        error: '重物／大量物品需由 UBee 跑腿客服人工確認後再報價。',
+      });
+    }
+
+    const upstairsFee = isDriveTask
+      ? 0
+      : getCanonicalUpstairsFee(upstairsOption);
+
+    const itemSize = isDriveTask
+      ? 'unspecified'
+      : normalizeItemSize(req.query.itemSize || 'unspecified');
     const isQueueTask = resolvedServiceMode === 'queue';
     const isCustomTask = resolvedServiceMode === 'custom';
     const singlePointTask =
@@ -31466,7 +31683,16 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
     let queueMinutes = 0;
     let taskMinutes = 0;
 
-    if (isQueueTask) {
+    if (isDriveTask) {
+      if (!from || !to) {
+        return res.status(400).json({ success:false, error:'請完整填寫車輛所在地與代駕目的地。' });
+      }
+      if (to2) {
+        return res.status(400).json({ success:false, error:'代駕 V1 僅支援單一目的地。' });
+      }
+      distance = await calculateCustomerRouteThroughStops(from, [to]);
+      price = calculateDrivePrice({ distanceMeters:distance.distanceMeters, nowMs:getDrivePricingReferenceMs(req.query) });
+    } else if (isQueueTask) {
       if (!from) {
         return res.status(400).json({
           success: false,
@@ -31659,11 +31885,10 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       }
     }
 
-    // 商品體積費套用於所有服務。
-    price = applyItemSizeSurchargeToPrice(
-      price,
-      itemSize
-    );
+    // 代駕使用獨立費率，不套用物品體積費。
+    if (!isDriveTask) {
+      price = applyItemSizeSurchargeToPrice(price, itemSize);
+    }
 
     // 全能跑腿再加上任務處理時間費；沿用既有每分鐘費率與 70 / 30 分潤。
     if (isCustomTask) {
@@ -31673,35 +31898,26 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
       );
     }
 
-    const dynamicPricing = await calculateRegionalDynamicPricing({
-      pickupAddress: from,
-      nowMs: Date.now(),
-    });
+    const dynamicPricing = isDriveTask
+      ? { enabled:false, fee:0, multiplier:1, reason:'drive_independent_pricing' }
+      : await calculateRegionalDynamicPricing({ pickupAddress:from, nowMs:Date.now() });
 
-    price = applyDynamicPricingToPrice(
-      price,
-      dynamicPricing
-    );
-
-    const weatherAdjustment =
-      await getCurrentWeatherAdjustment(Date.now());
-
-    price = applyWeatherSurchargeToPrice(
-      price,
-      weatherAdjustment
-    );
+    if (!isDriveTask) {
+      price = applyDynamicPricingToPrice(price, dynamicPricing);
+      const weatherAdjustment = await getCurrentWeatherAdjustment(Date.now());
+      price = applyWeatherSurchargeToPrice(price, weatherAdjustment);
+    }
 
     // 多點配送費由後端正式計價：第 1 點不加價，每新增 1 點固定 +NT$50。
     // queue 與全能跑腿「同地點完成」不套用多點費。
     const pricedStopCount =
-      isQueueTask || (isCustomTask && singlePointTask)
+      isDriveTask || isQueueTask || (isCustomTask && singlePointTask)
         ? 1
         : Math.max(1, quoteStopAddresses.length || 1);
 
-    price = applyCustomerMultiStopFee(
-      price,
-      pricedStopCount
-    );
+    if (!isDriveTask) {
+      price = applyCustomerMultiStopFee(price, pricedStopCount);
+    }
 
     const quoteSnapshot = await createDynamicPricingQuoteSnapshot({
       price,
@@ -31721,6 +31937,10 @@ app.get('/api/quote', customerAuthOptional, async (req, res) => {
         taskMinutes,
         singlePointTask,
         upstairsOption,
+        orderTimingType: req.query.orderTimingType || req.query.timingType || 'immediate',
+        requestedScheduleAtMs: req.query.requestedScheduleAtMs || req.query.scheduledAtMs || req.query.scheduledAt,
+        flexibleStartAtMs: req.query.flexibleStartAtMs || req.query.scheduleWindowStartAtMs,
+        flexibleEndAtMs: req.query.flexibleEndAtMs || req.query.scheduleWindowEndAtMs,
       },
       dynamicPricing,
       source: req.customerAuth
@@ -35480,7 +35700,10 @@ app.post('/api/orders', requireCustomerAuth, requireCustomerIdentity, async (req
     const isCustomSinglePointTask =
       data.serviceMode === 'custom' && data.singlePointTask === true;
 
-    if (data.serviceMode === 'queue') {
+    if (data.serviceMode === 'drive') {
+      distance = await calculateCustomerRouteThroughStops(data.pickupAddress, [data.dropoffAddress]);
+      price = calculateDrivePrice({ distanceMeters:distance.distanceMeters, nowMs:getDrivePricingReferenceMs(data) });
+    } else     if (data.serviceMode === 'queue') {
   const queueMinutes = Math.max(
     0,
     Math.round(Number(data.queueMinutes || 0))
@@ -35769,6 +35992,12 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
 
   serviceKey:
     data.serviceKey,
+
+  driveVehicle:
+    data.driveVehicle && typeof data.driveVehicle === 'object' ? data.driveVehicle : null,
+
+  drivePricingVersion:
+    data.serviceMode === 'drive' ? String(price.drivePricingVersion || UBEE_DRIVE_PRICING_V1.version) : '',
 
   queueMinutes:
     data.queueMinutes,
@@ -36108,6 +36337,14 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   paymentStatus:
     'unselected',
 
+  // Production Settlement Alias V1：保留既有 canonical 欄位，補上客戶收款／平台費回繳語意供代駕與財務稽核共用。
+  customerPaymentMethod: '',
+  customerPaymentStatus: 'unselected',
+  platformPaymentMethod: 'jkopay',
+  platformFeeStatus: 'not_due',
+  platformFeePaidAt: null,
+  platformFeePaidAtMs: 0,
+
   isCashOrder: false,
 
   cashCollectAmount: 0,
@@ -36145,10 +36382,12 @@ const customerPayableTotal = serviceSubtotal + advancePayment;
   waitingActiveStage: '',
   waitingActiveStageLabel: '',
   waitingFreeUntilMs: 0,
-  waitingPolicyVersion: UBEE_WAITING_POLICY_VERSION,
-  waitingFreeMinutes: PRICING.waitingFreeMinutes,
-  waitingBaseCharge: PRICING.waitingBaseFee,
-  waitingPerMinuteCharge: PRICING.waitingPerMinute,
+  waitingPolicyVersion: data.serviceMode === 'drive' ? UBEE_DRIVE_PRICING_V1.version : UBEE_WAITING_POLICY_VERSION,
+  waitingFreeMinutes: data.serviceMode === 'drive' ? UBEE_DRIVE_PRICING_V1.waitingFreeMinutes : PRICING.waitingFreeMinutes,
+  waitingBaseCharge: data.serviceMode === 'drive' ? 0 : PRICING.waitingBaseFee,
+  waitingPerMinuteCharge: data.serviceMode === 'drive' ? 0 : PRICING.waitingPerMinute,
+  driveWaitingUnitMinutes: data.serviceMode === 'drive' ? UBEE_DRIVE_PRICING_V1.waitingUnitMinutes : 0,
+  driveWaitingUnitFee: data.serviceMode === 'drive' ? UBEE_DRIVE_PRICING_V1.waitingUnitFee : 0,
 
   // 舊版 LINE 等候費欄位保留，但新版不再要求客人逐次同意。
   waitingFeeRequested: false,
@@ -36337,6 +36576,12 @@ app.post('/api/orders/:orderId/payment-method', requireCustomerAuth, async (req,
       order.paymentMethodLabel = '現金付款';
       order.paymentLabel = '現金付款';
       order.paymentStatus = 'cash_on_delivery';
+      order.customerPaymentMethod = 'cash';
+      order.customerPaymentStatus = 'pending_collection';
+      order.platformPaymentMethod = 'jkopay';
+      order.platformFeeStatus = 'not_due';
+      order.platformFeePaidAt = null;
+      order.platformFeePaidAtMs = 0;
 
       order.isCashOrder = true;
       order.cashCollectAmount = customerPayableTotal;
@@ -39020,6 +39265,14 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
     updateData.cashRemittedBy = '';
 
     updateData.cashRemittedAmount = 0;
+
+    updateData.customerPaymentMethod = 'cash';
+    updateData.customerPaymentStatus = 'collected';
+    updateData.cashCollected = true;
+    updateData.platformPaymentMethod = 'jkopay';
+    updateData.platformFeeStatus = 'pending';
+    updateData.platformFeePaidAt = null;
+    updateData.platformFeePaidAtMs = 0;
   }
 
   // ==============================
@@ -39808,8 +40061,56 @@ function isCustomerOrderCancellableStatusV1(status){
   ].includes(normalized);
 }
 
+function getDriveCustomerCancellationCharge(order = {}) {
+  const isDrive = String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive';
+  if (!isDrive) return { cancellationFee:0, riderCompensation:0, platformCancellationFee:0 };
+  const status = String(order.status || '').trim().toLowerCase();
+  if (['accepted','going_to_pickup','heading_to_pickup'].includes(status)) return { cancellationFee:80, riderCompensation:60, platformCancellationFee:20 };
+  if (status === 'arrived_pickup') return { cancellationFee:150, riderCompensation:120, platformCancellationFee:30 };
+  return { cancellationFee:0, riderCompensation:0, platformCancellationFee:0 };
+}
+
 function buildCustomerCancelledOrderUpdateV1(order={},requestUserId='',nowMs=Date.now()){
+  const driveCancel = getDriveCustomerCancellationCharge(order);
+  const isDriveOrder = String(order.serviceMode || order.serviceKey || '').trim().toLowerCase() === 'drive';
+  const driveCancellationFinancials = isDriveOrder
+    ? {
+        cancellationFee:driveCancel.cancellationFee,
+        cancellationCompensation:driveCancel.riderCompensation,
+        platformCancellationFee:driveCancel.platformCancellationFee,
+        cancellationPaymentStatus:driveCancel.cancellationFee > 0 ? 'pending' : 'waived',
+        cancellationSettlementStatus:driveCancel.cancellationFee > 0 ? 'pending_collection' : 'not_applicable',
+
+        // 取消後正式應收只剩取消費；尚未接單取消為 NT$0，不保留原代駕全程報價作為應收總額。
+        finalCustomerTotal:driveCancel.cancellationFee,
+        customerPayableTotal:driveCancel.cancellationFee,
+        payableTotal:driveCancel.cancellationFee,
+        finalTotal:driveCancel.cancellationFee,
+        total:driveCancel.cancellationFee,
+        serviceTotal:driveCancel.cancellationFee,
+        serviceSubtotal:driveCancel.cancellationFee,
+        taskSubtotal:driveCancel.cancellationFee,
+
+        riderIncome:driveCancel.riderCompensation,
+        estimatedRiderIncome:driveCancel.riderCompensation,
+        riderFee:driveCancel.riderCompensation,
+        driverFee:driveCancel.riderCompensation,
+        platformFee:driveCancel.platformCancellationFee,
+        platformIncome:driveCancel.platformCancellationFee,
+        platformServiceFee:driveCancel.platformCancellationFee,
+
+        customerPaymentMethod:'cash',
+        customerPaymentStatus:driveCancel.cancellationFee > 0 ? 'unpaid' : 'not_due',
+        platformPaymentMethod:'jkopay',
+        platformFeeStatus:driveCancel.cancellationFee > 0 ? 'pending_collection' : 'not_due',
+        cashCollected:false,
+        cashCollectAmount:0,
+        cashRemittanceStatus:'not_applicable',
+        cashRemittedAmount:0,
+      }
+    : {};
   return {
+    ...driveCancellationFinancials,
     status:'cancelled',
     riderStatus:'cancelled',
     cancelType:'customer_cancel',
@@ -40180,7 +40481,9 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
       status:'cancelled',
       promotedOrderId,
       smartStackPromoted:Boolean(promotedOrderId),
-      message:'訂單已取消。',
+      cancellationFee:Math.max(0, Number(cancelledOrder?.cancellationFee || 0)),
+      cancellationPaymentStatus:String(cancelledOrder?.cancellationPaymentStatus || ''),
+      message:cancelledOrder?.cancellationFee > 0 ? `訂單已取消，系統已記錄取消費 NT$${Number(cancelledOrder.cancellationFee)}（待收款）。` : '訂單已取消。',
     });
 
   }catch(error){
@@ -46718,6 +47021,130 @@ app.delete('/api/customer/draft', requireCustomerAuth, async (req, res) => {
       error:error.message || '未完成任務草稿清除失敗',
     });
   }
+});
+
+// =====================================================
+// UBee Order Chat V1｜全服務共用，一張訂單 = 一個聊天室
+// - 客戶與目前承接小U才可讀寫
+// - 任務 completed/cancelled 後唯讀
+// - V1：文字／快捷訊息／未讀／已讀／Web Push
+// =====================================================
+const UBEE_ORDER_CHAT_COLLECTION = 'orderChats';
+const UBEE_ORDER_CHAT_MESSAGE_LIMIT = 80;
+const UBEE_ORDER_CHAT_MAX_TEXT = 600;
+
+function isOrderChatReadOnly(order = {}) {
+  return ['completed','done','cancelled','canceled'].includes(String(order.status||'').trim().toLowerCase());
+}
+function isOrderChatAvailable(order = {}) {
+  if (!getOrderChatRiderId(order) && !String(order.riderDocId || '').trim()) return false;
+  const status = String(order.status || '').trim().toLowerCase();
+  return ['accepted','going_to_pickup','heading_to_pickup','arrived_pickup','picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff','completed','done','cancelled','canceled'].includes(status);
+}
+function getOrderChatRiderId(order = {}) {
+  return String(order.riderDocId || order.riderId || order.assignedRiderId || order.riderPhone || '').trim();
+}
+async function getOrderForChat(orderId='') {
+  const safeId=String(orderId||'').trim().toUpperCase();
+  if(!safeId) return null;
+  const doc=await db.collection('orders').doc(safeId).get();
+  if(!doc.exists) return null;
+  return {id:doc.id,...(doc.data()||{})};
+}
+function sanitizeOrderChatText(value='') {
+  return cleanLongText(String(value||'').replace(/[\u0000-\u001F\u007F]/g,' ').trim(), UBEE_ORDER_CHAT_MAX_TEXT);
+}
+async function listOrderChatMessages(orderId, participantType) {
+  const roomRef=db.collection(UBEE_ORDER_CHAT_COLLECTION).doc(orderId);
+  const snap=await roomRef.collection('messages').orderBy('createdAtMs','desc').limit(UBEE_ORDER_CHAT_MESSAGE_LIMIT).get();
+  const messages=snap.docs.map(doc=>({id:doc.id,...(doc.data()||{})})).reverse();
+  const roomDoc=await roomRef.get();
+  const room=roomDoc.exists?(roomDoc.data()||{}):{};
+  return {room,messages,unreadCount:Math.max(0,Number(participantType==='customer'?room.customerUnreadCount:room.riderUnreadCount)||0)};
+}
+async function markOrderChatRead(orderId, participantType) {
+  const roomRef=db.collection(UBEE_ORDER_CHAT_COLLECTION).doc(orderId);
+  await roomRef.set({
+    [participantType==='customer'?'customerUnreadCount':'riderUnreadCount']:0,
+    [participantType==='customer'?'customerLastReadAtMs':'riderLastReadAtMs']:Date.now(),
+    updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+  },{merge:true});
+}
+async function sendRiderOrderChatPush(order={}, text='') {
+  try {
+    const riderId=getOrderChatRiderId(order);
+    if(!riderId || !WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) return;
+    const found=await findRiderDocumentV2First({riderId,phone:riderId});
+    const rider=found?.riderDoc?.data?.()||{};
+    if(rider.webPushEnabled===false || !rider.webPushSubscription?.endpoint) return;
+    await webpush.sendNotification(rider.webPushSubscription,JSON.stringify({
+      title:'UBee｜客人傳來新訊息',body:'客人傳來一則新訊息，點一下回到 UBee 查看。',
+      url:`/rider.html?chatOrderId=${encodeURIComponent(order.id||'')}`,deepLink:`/rider.html?chatOrderId=${encodeURIComponent(order.id||'')}`,
+      type:'order_chat',orderId:String(order.id||'')
+    }),{TTL:3600,urgency:'high'});
+  } catch(error){ console.warn('⚠️ Rider Chat Push 失敗：',error?.message||error); }
+}
+async function sendCustomerOrderChatPush(order={}, text='') {
+  try {
+    // 沿用既有客戶 Web Push 訂閱；不改訂單狀態。
+    const customerId=String(order.userId||order.customerId||'').trim();
+    if(!isValidCustomerUserId(customerId)||!WEB_PUSH_PUBLIC_KEY||!WEB_PUSH_PRIVATE_KEY)return;
+    const snap=await db.collection(CUSTOMER_AUTH_COLLECTIONS.accounts).doc(customerId).collection(CUSTOMER_PUSH_SUBCOLLECTION).limit(20).get();
+    const payload=JSON.stringify({title:'UBee｜小U傳來新訊息',body:'小U傳來一則新訊息，點一下回到 UBee 查看。',url:`/order.html?chatOrderId=${encodeURIComponent(order.id||'')}`,deepLink:`/order.html?chatOrderId=${encodeURIComponent(order.id||'')}`,type:'order_chat',orderId:String(order.id||'')});
+    await Promise.allSettled(snap.docs.map(async d=>{const x=d.data()||{};const sub=normalizeCustomerPushSubscription(x.subscription||x);if(sub)await webpush.sendNotification(sub,payload,{TTL:3600,urgency:'high'});}));
+  } catch(error){ console.warn('⚠️ Customer Chat Push 失敗：',error?.message||error); }
+}
+async function writeOrderChatMessage({order,senderType,senderId,text}) {
+  const safeText=sanitizeOrderChatText(text);
+  if(!safeText) throw Object.assign(new Error('訊息不可為空白。'),{statusCode:400});
+  if(isOrderChatReadOnly(order)) throw Object.assign(new Error('此任務已結束，聊天室目前為唯讀。'),{statusCode:409});
+  const roomRef=db.collection(UBEE_ORDER_CHAT_COLLECTION).doc(order.id);
+  const msgRef=roomRef.collection('messages').doc();
+  const nowMs=Date.now();
+  const otherUnreadField=senderType==='customer'?'riderUnreadCount':'customerUnreadCount';
+  const batch=db.batch();
+  batch.set(msgRef,{id:msgRef.id,orderId:order.id,senderType,senderId:String(senderId||''),messageType:'text',text:safeText,createdAtMs:nowMs,createdAt:admin.firestore.FieldValue.serverTimestamp()});
+  batch.set(roomRef,{orderId:order.id,customerId:String(order.userId||order.customerId||''),riderId:getOrderChatRiderId(order),status:'active',lastMessage:safeText,lastMessageAtMs:nowMs,lastSenderType:senderType,[otherUnreadField]:admin.firestore.FieldValue.increment(1),updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+  await batch.commit();
+  if(senderType==='customer') sendRiderOrderChatPush(order,safeText); else sendCustomerOrderChatPush(order,safeText);
+  return {id:msgRef.id,text:safeText,createdAtMs:nowMs,senderType};
+}
+
+app.get('/api/orders/:orderId/chat/messages', requireCustomerAuth, async (req,res)=>{
+  try{const order=await getOrderForChat(req.params.orderId);if(!order)return res.status(404).json({success:false,error:'找不到訂單。'});if(!isSameCustomerUserId(order,req.customerAuth.customerId))return res.status(403).json({success:false,error:'你沒有這張訂單的聊天室權限。'});if(!isOrderChatAvailable(order))return res.json({success:true,available:false,readOnly:false,messages:[],unreadCount:0});const data=await listOrderChatMessages(order.id,'customer');return res.json({success:true,available:true,readOnly:isOrderChatReadOnly(order),orderId:order.id,...data});}catch(error){return res.status(500).json({success:false,error:error.message||'聊天室讀取失敗'});}
+});
+app.post('/api/orders/:orderId/chat/messages', requireCustomerAuth, async (req,res)=>{
+  try{const order=await getOrderForChat(req.params.orderId);if(!order)return res.status(404).json({success:false,error:'找不到訂單。'});if(!isSameCustomerUserId(order,req.customerAuth.customerId))return res.status(403).json({success:false,error:'你沒有這張訂單的聊天室權限。'});if(!isOrderChatAvailable(order))return res.status(409).json({success:false,error:'小U接單後才能使用聊天室。'});const message=await writeOrderChatMessage({order,senderType:'customer',senderId:req.customerAuth.customerId,text:req.body?.text});return res.json({success:true,message});}catch(error){return res.status(error.statusCode||500).json({success:false,error:error.message||'訊息送出失敗'});}
+});
+app.post('/api/orders/:orderId/chat/read', requireCustomerAuth, async (req,res)=>{
+  try{const order=await getOrderForChat(req.params.orderId);if(!order)return res.status(404).json({success:false,error:'找不到訂單。'});if(!isSameCustomerUserId(order,req.customerAuth.customerId))return res.status(403).json({success:false,error:'沒有權限。'});await markOrderChatRead(order.id,'customer');return res.json({success:true});}catch(error){return res.status(500).json({success:false,error:'已讀狀態更新失敗'});}
+});
+
+app.get('/api/rider/orders/:orderId/chat/messages', riderAuthMiddleware, async (req,res)=>{
+  try{
+    const order=await getOrderForChat(req.params.orderId); if(!order)return res.status(404).json({success:false,error:'找不到訂單。'});
+    const ctx=await getRiderV4ApiContext(req); if(!ctx.ok)return res.status(ctx.statusCode||403).json({success:false,error:ctx.message||'小U身分驗證失敗。'});
+    const identity=buildRiderApiIdentity(ctx.riderDoc,ctx.rider,req.query||{}); if(!isOrderBelongsToRider(order,identity))return res.status(403).json({success:false,error:'你不是目前承接這張任務的小U。'});
+    if(!isOrderChatAvailable(order))return res.json({success:true,available:false,readOnly:false,messages:[],unreadCount:0});
+    const data=await listOrderChatMessages(order.id,'rider'); return res.json({success:true,available:true,readOnly:isOrderChatReadOnly(order),orderId:order.id,...data});
+  }catch(error){return res.status(500).json({success:false,error:error.message||'聊天室讀取失敗'});}
+});
+app.post('/api/rider/orders/:orderId/chat/messages', riderAuthMiddleware, async (req,res)=>{
+  try{
+    const order=await getOrderForChat(req.params.orderId); if(!order)return res.status(404).json({success:false,error:'找不到訂單。'});
+    const ctx=await getRiderV4ApiContext(req); if(!ctx.ok)return res.status(ctx.statusCode||403).json({success:false,error:ctx.message||'小U身分驗證失敗。'});
+    const identity=buildRiderApiIdentity(ctx.riderDoc,ctx.rider,req.body||{}); if(!isOrderBelongsToRider(order,identity))return res.status(403).json({success:false,error:'你不是目前承接這張任務的小U。'});
+    if(!isOrderChatAvailable(order))return res.status(409).json({success:false,error:'接單後才能使用聊天室。'});
+    const message=await writeOrderChatMessage({order,senderType:'rider',senderId:identity.riderDocId||identity.riderId,text:req.body?.text}); return res.json({success:true,message});
+  }catch(error){return res.status(error.statusCode||500).json({success:false,error:error.message||'訊息送出失敗'});}
+});
+app.post('/api/rider/orders/:orderId/chat/read', riderAuthMiddleware, async (req,res)=>{
+  try{
+    const order=await getOrderForChat(req.params.orderId); if(!order)return res.status(404).json({success:false,error:'找不到訂單。'});
+    const ctx=await getRiderV4ApiContext(req); if(!ctx.ok)return res.status(ctx.statusCode||403).json({success:false,error:ctx.message||'小U身分驗證失敗。'});
+    const identity=buildRiderApiIdentity(ctx.riderDoc,ctx.rider,req.body||{}); if(!isOrderBelongsToRider(order,identity))return res.status(403).json({success:false,error:'沒有權限。'});
+    await markOrderChatRead(order.id,'rider'); return res.json({success:true});
+  }catch(error){return res.status(500).json({success:false,error:'已讀狀態更新失敗'});}
 });
 
 // =====================================================
