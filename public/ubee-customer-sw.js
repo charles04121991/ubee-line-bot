@@ -1,3 +1,4 @@
+/* 2026-09-29｜Customer Critical Sync V1.4.4：修復完成訂單誤生草稿與 Rider/Customer 狀態同步。 */
 /* 2026-09-29｜Customer Rating Lock V1.4.3：同步評價完成後永久鎖定再次評價入口。 */
 /* 2026-09-29｜Customer State Sync V1.4.2：主訂單狀態優先、備援防回退、2 秒前景同步。 */
 /* 2026-09-29｜Customer Active Meta Fix V1.4.1：同步建立時間與固定 ETA 資訊列。 */
@@ -58,7 +59,7 @@
 
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-rating-lock-v1-4-3';
+const UBEE_CUSTOMER_SW_VERSION = '20260929-customer-critical-sync-v1-4-4';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
