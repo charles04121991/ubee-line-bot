@@ -1,3 +1,4 @@
+// 2026-09-29｜Customer Active Meta Fix V1.4.1：單筆訂單 API 明確回傳 createdAtMs / updatedAtMs，供用戶端固定顯示建立時間；ETA canonical 欄位維持不變。
 // 2026-09-29｜Drive Semantic + Universal ETA V1.4：保留既有狀態碼與 API 契約；代駕對外狀態改用車輛所在地／車輛交接／代駕目的地語意；六大服務 Live ETA 繼續由後端 traffic-aware Routes 為唯一依據。
 // 2026-09-29｜Drive Service + Contact Removal V1.3：保留正式代駕服務與專用計價／結算契約；完整移除 Order Chat API、訊息儲存與 Chat Push。
 // 2026-09-25｜Rider Profile Photo UI V4.3.4：正式小U大頭照以短效 Signed URL 提供騎士本人顯示；我的首頁／帳號資料可安全載入，不公開 Storage。
@@ -40017,6 +40018,18 @@ app.get('/api/orders/:orderId', requireCustomerAuth, async (req, res) => {
         riderLocationAccuracy:
           order.riderLocationAccuracy ??
           null,
+
+        createdAtMs:
+          customerOrderApiTimeMs(
+            order.createdAtMs ||
+            order.createdAt
+          ),
+
+        updatedAtMs:
+          customerOrderApiTimeMs(
+            order.updatedAtMs ||
+            order.updatedAt
+          ),
       },
     });
 
