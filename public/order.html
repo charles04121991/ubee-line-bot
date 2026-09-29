@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-29｜Drive Service + Order Chat V1：六服務 3×2 Native Grid、代駕專用表單與全服務訂單聊天室。 -->
 <!-- 2026-09-24｜Customer Order Lifecycle V1：訂單總覽改為進行中 5 段動態進度／完成待評價／已評價三種原生狀態卡；沿用既有 Rider Rating API 與 Final Delivery ETA。 -->
 <!-- 2026-09-24｜Customer Segmented Live Progress V2：動態進度由 8 段精簡為 5 段短線；保留細部訂單狀態與目前段流動動畫。 -->
 <!-- 2026-09-24｜Customer Segmented Live Progress V1：現在訂單與首頁進行中任務改為外送平台式多段動態進度條；移除四節點文字／圓點與重複 ETA 卡內顯示。 -->
@@ -55,7 +56,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260924-customer-order-lifecycle-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260929-customer-drive-order-chat-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -8916,6 +8917,7 @@ let serviceMode = 'normal';
 function resolveClientServiceMode(group = serviceGroup, type = serviceType){
   const normalizedGroup=String(group||'').trim().toLowerCase();
   const normalizedType=String(type||'').trim();
+  if(normalizedGroup==='drive'||normalizedType==='代駕')return 'drive';
   if(normalizedGroup==='queue'||normalizedType==='幫排隊')return 'queue';
   if(normalizedGroup==='helper'||normalizedType==='全能跑腿'||normalizedType==='全能協助')return 'custom';
   return 'normal';
@@ -10463,6 +10465,7 @@ function renderStep5LiveStatus(
 
   const data = order || currentOrderData || {};
   const status = String(data.status || 'pending_payment').trim().toLowerCase();
+  const isDriveTask = String(data.serviceKey || data.serviceMode || '').trim().toLowerCase()==='drive' || String(data.serviceType||'').includes('代駕');
 
   let primaryText = '同步中';
   let labelText = '正在讀取最新任務資訊';
@@ -10521,7 +10524,7 @@ function renderStep5LiveStatus(
       etaState = finalEta.available ? (finalEta.confidence||'high') : (eta.available ? eta.confidence : eta.reason);
       primaryText=finalEta.windowText || eta.primary;
       labelText=finalEta.remainingText || eta.label;
-      titleText=stackQueued?'小U正在完成前序任務':'小U正在前往取件';
+      titleText=isDriveTask?'小U正在前往車輛位置':(stackQueued?'小U正在完成前序任務':'小U正在前往取件');
       const metaParts=[];
       if(eta.distanceText) metaParts.push(stackQueued?`距離下一單取件點 ${eta.distanceText}`:`距離取件點 ${eta.distanceText}`);
       if(eta.available) metaParts.push(`目前階段 ${eta.primary}`);
@@ -10535,8 +10538,8 @@ function renderStep5LiveStatus(
     case 'arrived_pickup':
       primaryText='已抵達';
       labelText='取件地點';
-      titleText='小U已抵達取件地點';
-      metaText='正在處理取件任務';
+      titleText=isDriveTask?'小U已抵達車輛位置':'小U已抵達取件地點';
+      metaText=isDriveTask?'請準備進行車輛交接與車況確認':'正在處理取件任務';
       break;
 
     case 'picked_up':
@@ -10554,7 +10557,7 @@ function renderStep5LiveStatus(
       etaState = finalEta.available ? (finalEta.confidence||'high') : (eta.available ? eta.confidence : eta.reason);
       primaryText=finalEta.windowText || eta.primary;
       labelText=finalEta.remainingText || eta.label;
-      titleText='配送中';
+      titleText=isDriveTask?'代駕進行中':'配送中';
       const metaParts=[];
       if(eta.distanceText) metaParts.push(`距離目前送達點 ${eta.distanceText}`);
       if(eta.available) metaParts.push(`目前階段 ${eta.primary}`);
@@ -10567,9 +10570,9 @@ function renderStep5LiveStatus(
 
     case 'arrived_dropoff':
       primaryText='已抵達';
-      labelText='送達地點';
-      titleText='小U已抵達送達地點';
-      metaText='請準備完成交付';
+      labelText=isDriveTask?'代駕目的地':'送達地點';
+      titleText=isDriveTask?'小U已抵達代駕目的地':'小U已抵達送達地點';
+      metaText=isDriveTask?'請準備完成交車與現金結算':'請準備完成交付';
       break;
 
     case 'completed':
@@ -11841,6 +11844,9 @@ const serviceGroups = {
     { icon:'🔄', title:'退換歸還', categories:['商品退貨','商品換貨','維修送件','租借歸還','鑰匙歸還','物品歸還','其他歸還'] },
     { icon:'🚨', title:'臨時救援', categories:['店家缺料','活動補件','現場急需','生活救急','臨時跑一趟','其他緊急協助'] }
   ],
+  drive:[
+    { icon:'◉', title:'代駕', categories:['一般代駕'] }
+  ],
   urgent:[
     { icon:'⚡', title:'急件專送', categories:['急送小包裹','急送餐點','急送生活用品','急送店家商品','限時取送','其他急件'] }
   ]
@@ -11889,6 +11895,7 @@ function getTaskContentCopy(group = serviceGroup, type = serviceType, category =
     return {label:'這次希望小U幫你完成什麼？',placeholder:'例如：到指定地點協助處理一件生活雜事，完成後拍照回報',help:'把地點、任務內容、完成標準與注意事項寫清楚；不確定分類時可使用全能協助。'};
   }
 
+  if(g === 'drive') return {label:'有什麼需要先告訴代駕小U？',placeholder:'例如：車停在地下二樓 B12、抵達後請先電話聯絡',help:'可補充停車位置、車況與交車注意事項；請勿填寫不必要的敏感資料。'};
   if(g === 'buy') return {label:'請告訴小U要買什麼',placeholder:'請填寫商品名稱、數量、規格與其他需求',help:'商品、數量、規格與缺貨處理會以結構化欄位整理。'};
   return base;
 }
@@ -12066,6 +12073,7 @@ function getServiceGroupLabel(){
     buy:'幫代買',
     queue:'幫排隊',
     helper:'全能跑腿',
+    drive:'代駕',
     urgent:'急件專送'
   };
   return map[serviceGroup] || 'UBee 跑腿任務';
@@ -13734,6 +13742,13 @@ function getPayload(){
     },
     deliveryPreferences:Array.from(document.querySelectorAll('[data-ubee-delivery-pref]:checked')).map(el=>el.value),
     vehiclePreference:String(document.querySelector('[name="ubeeVehiclePreference"]:checked')?.value || 'any'),
+    driveVehicle: serviceGroup==='drive' ? {
+      plate:String(document.getElementById('flowDrivePlate')?.value||'').trim().toUpperCase(),
+      makeModel:String(document.getElementById('flowDriveMakeModel')?.value||'').trim(),
+      color:String(document.getElementById('flowDriveColor')?.value||'').trim(),
+      transmission:String(document.getElementById('flowDriveTransmission')?.value||'automatic'),
+      conditionNote:String(document.getElementById('flowDriveConditionNote')?.value||'').trim()
+    } : null,
     itemSize:getItemSizeOption(),
     itemSizeLabel:getItemSizeMeta().label,
     speedType,
@@ -14028,6 +14043,11 @@ async function renderEstimate(){
     params.set('upstairsFee', String(upstairsFee));
     params.set('itemSize', getItemSizeOption());
     params.set('advancePayment', String(advancePayment));
+    const quoteTiming = getOrderTimingPayload();
+    params.set('orderTimingType', String(quoteTiming.orderTimingType || 'immediate'));
+    params.set('requestedScheduleAtMs', String(quoteTiming.requestedScheduleAtMs || 0));
+    params.set('flexibleStartAtMs', String(quoteTiming.flexibleStartAtMs || 0));
+    params.set('flexibleEndAtMs', String(quoteTiming.flexibleEndAtMs || 0));
 
     if(pickupPlaceId) params.set('pickupPlaceId', pickupPlaceId);
     if(dropoffPlaceId) params.set('dropoffPlaceId', dropoffPlaceId);
@@ -14934,7 +14954,7 @@ async function cancelOrder(orderIdOverride=''){
       );
     }
 
-    await showUBeeCustomerNativeAlert('訂單已取消。','任務已取消');
+    await showUBeeCustomerNativeAlert(data.message || (Number(data.cancellationFee||0)>0 ? `訂單已取消；取消費 NT$${Number(data.cancellationFee)} 已記錄為待收款。` : '訂單已取消。'),'任務已取消');
 
     if(
       String(currentOrderId||'').trim().toUpperCase()===
@@ -15144,6 +15164,7 @@ function renderStep5TaskDetail(order){
     queue:'幫排隊',
 
     helper:'全能跑腿',
+    drive:'代駕',
 
     urgent:'急件專送',
 
@@ -18870,7 +18891,7 @@ body.flow-active>.app{display:none!important;}
 .flow-home-watermark-meta{margin-top:8px;color:#9aa0a6;font-size:11px;font-weight:800;letter-spacing:.06em;}
 .flow-card{margin-bottom:12px;padding:15px;border:1px solid var(--flow-line);border-radius:20px;background:#fff;}
 .flow-section-title{margin:0 0 9px;font-size:15px;font-weight:1000;}.flow-help{color:var(--flow-muted);font-size:12px;font-weight:800;line-height:1.6;}
-.flow-service-tabs{display:flex;gap:0;overflow-x:auto;margin:0 -15px 13px;padding:0 9px 9px;border-bottom:1px solid var(--flow-line);scrollbar-width:none;}.flow-service-tabs::-webkit-scrollbar{display:none;}
+.flow-service-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;overflow:visible;margin:0 0 13px;padding:0 0 9px;border-bottom:1px solid var(--flow-line);}.flow-service-tabs::-webkit-scrollbar{display:none;}
 .flow-service-tab{position:relative;flex:0 0 auto;min-width:76px;min-height:42px;border:none;background:transparent;color:#85898e;font-size:14px!important;font-weight:900;white-space:nowrap;}
 .flow-service-tab.active{color:#111;}.flow-service-tab.active::after{content:"";position:absolute;left:50%;bottom:-9px;width:28px;height:4px;transform:translateX(-50%);border-radius:999px;background:var(--flow-accent-strong);}
 .flow-location-line{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px 12px;border-radius:14px;background:#f7f8f9;color:#555b61;font-size:12px;font-weight:850;}.flow-location-dot{width:9px;height:9px;border-radius:50%;background:#16a34a;}
@@ -19589,6 +19610,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </span>
 <span class="flow-service-label">全能跑腿</span>
 </button>
+<button aria-selected="false" class="flow-service-tab" data-service="drive" role="tab" type="button">
+<span aria-hidden="true" class="flow-service-icon">
+<svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="2.2"></circle><path d="M4.8 10.5h14.4M12 14.2V20M7.5 10.5c.8 2.6 2.2 3.7 4.5 3.7s3.7-1.1 4.5-3.7"></path>
+</svg>
+</span>
+<span class="flow-service-label">代駕</span>
+</button>
 </div>
 <div class="flow-location-line"><span class="flow-location-dot"></span><span id="flowLocationText">正在確認目前服務地區</span></div>
 <div class="flow-route-card">
@@ -19712,7 +19741,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     <span class="u">U</span><span class="bee">Bee</span><span class="rt">跑腿</span>
   </div>
   <div class="flow-home-footer-slogan">生活大小事，一叫就出發</div>
-  <div class="flow-home-footer-meta">代買・代送・取件・排隊・全能跑腿</div>
+  <div class="flow-home-footer-meta">代買・代送・取件・排隊・全能跑腿・代駕</div>
 </div>
 </div>
 </section>
@@ -19794,6 +19823,19 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </div>
 </section>
 </div>
+
+<section class="ubee-native-form-section" id="flowDriveVehicleSection" hidden>
+<div class="ubee-native-form-section-title">代駕車輛資料</div>
+<div class="ubee-native-form-section-caption">請填寫小U到場辨識與安全交接所需資料。</div>
+<div class="ubee-native-form-list">
+<label class="ubee-native-form-row" for="flowDrivePlate"><span>車牌 <b class="flow-required">＊</b></span><input class="flow-input" id="flowDrivePlate" maxlength="20" autocomplete="off" placeholder="例如 ABC-1234"/></label>
+<label class="ubee-native-form-row" for="flowDriveMakeModel"><span>品牌／車型 <b class="flow-required">＊</b></span><input class="flow-input" id="flowDriveMakeModel" maxlength="100" placeholder="例如 Toyota Corolla Cross"/></label>
+<label class="ubee-native-form-row" for="flowDriveColor"><span>車色</span><input class="flow-input" id="flowDriveColor" maxlength="40" placeholder="例如 白色"/></label>
+<label class="ubee-native-form-row" for="flowDriveTransmission"><span>排檔 <b class="flow-required">＊</b></span><select class="flow-select" id="flowDriveTransmission"><option value="automatic">自排</option><option value="manual">手排</option></select></label>
+<label class="ubee-native-form-row stack" for="flowDriveConditionNote"><span>車況／交車備註</span><textarea class="flow-textarea ubee-native-textarea compact" id="flowDriveConditionNote" maxlength="300" placeholder="例如：地下二樓 B12；右後方有既有刮痕"></textarea></label>
+</div>
+<div class="ubee-native-form-note">代駕為駕駛客戶自有車輛，不是叫車服務。請於交車前自行確認車況與必要文件。</div>
+</section>
 
 <div class="ubee-hidden-duplicate-field"><label for="flowTaskName">任務標題（選填）</label><input id="flowTaskName" maxlength="120" placeholder="系統會依服務自動帶入，也可以自行修改"/></div>
 
@@ -20283,7 +20325,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   const $=id=>document.getElementById(id);
   const root=$('productionOrderFlow');
-  const serviceLabels={send:'幫我送',pickup:'幫我取',buy:'幫我買',queue:'幫排隊',helper:'全能跑腿'};
+  const serviceLabels={send:'幫我送',pickup:'幫我取',buy:'幫我買',queue:'幫排隊',helper:'全能跑腿',drive:'代駕'};
   const homeServiceCopy={
     send:{
       pickupLabel:'取件地點',pickupEmpty:'請選擇取件地址',pickupMeta:'填寫取件聯絡人與電話',
@@ -20309,13 +20351,18 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       pickupLabel:'任務起點',pickupEmpty:'小U需要先去哪裡？',pickupMeta:'填寫現場聯絡人與電話',
       dropoffLabel:'任務完成地點',dropoffEmpty:'需要完成在哪裡？',dropoffMeta:'若同地點也可選擇相同地址',
       next:'下一步：描述任務需求'
+    },
+    drive:{
+      pickupLabel:'車輛所在地',pickupEmpty:'請選擇車輛所在位置',pickupMeta:'填寫現場聯絡人與電話',
+      dropoffLabel:'代駕目的地',dropoffEmpty:'請選擇代駕目的地',dropoffMeta:'填寫抵達地聯絡資訊',
+      next:'下一步：填寫車輛資料'
     }
   };
   const pageStep={home:0,search:0,detail:0,task:1,options:2,confirm:3,activeTask:0,tasksRoot:0,profile:0,profileDetail:0};
   const state={
     page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',
     pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,
-    taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,
+    taskName:'',taskNote:'',purchaseDetails:{productName:'',quantity:'',specification:'',outOfStockAction:'contact_customer',additionalNote:''},helperDetails:{reportMode:'none',handoffMode:'none'},driveVehicle:{plate:'',makeModel:'',color:'',transmission:'automatic',conditionNote:''},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,
     timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',
     savedAddresses:[],recentAddresses:[],searchItems:[],searchTimer:null,searchSession:'',quickAddressTab:'saved',
     detailMap:null,detailMarker:null,confirmMap:null,confirmPolyline:null,confirmPickupMarker:null,confirmDropoffMarker:null,confirmDropoff2Marker:null,directionsRenderer:null,
@@ -20516,6 +20563,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }else{
       state.taskNote=String($('flowTaskNote')?.value||state.taskNote).trim();
       if(state.service==='helper') state.helperDetails=readHelperDetailsFromForm();
+      if(state.service==='drive') state.driveVehicle={plate:String($('flowDrivePlate')?.value||state.driveVehicle.plate||'').trim().toUpperCase(),makeModel:String($('flowDriveMakeModel')?.value||state.driveVehicle.makeModel||'').trim(),color:String($('flowDriveColor')?.value||state.driveVehicle.color||'').trim(),transmission:String($('flowDriveTransmission')?.value||state.driveVehicle.transmission||'automatic'),conditionNote:String($('flowDriveConditionNote')?.value||state.driveVehicle.conditionNote||'').trim()};
     }
   }
 
@@ -20550,8 +20598,24 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowTaskNote').value=state.taskNote;
     const isBuyTask=state.service==='buy';
     const isHelperTask=state.service==='helper';
+    const isDriveTask=state.service==='drive';
     document.body.classList.toggle('ubee-buy-task-active',isBuyTask);
     document.body.classList.toggle('ubee-helper-task-active',isHelperTask);
+    document.body.classList.toggle('ubee-drive-task-active',isDriveTask);
+    if($('flowDriveVehicleSection')) $('flowDriveVehicleSection').hidden=!isDriveTask;
+    if(isDriveTask){
+      $('flowDrivePlate').value=state.driveVehicle.plate||'';
+      $('flowDriveMakeModel').value=state.driveVehicle.makeModel||'';
+      $('flowDriveColor').value=state.driveVehicle.color||'';
+      $('flowDriveTransmission').value=state.driveVehicle.transmission||'automatic';
+      $('flowDriveConditionNote').value=state.driveVehicle.conditionNote||'';
+      // 代駕不適用一般配送的體積／上樓／代墊／速度／多點欄位；切入或恢復草稿時一律清除舊值。
+      state.itemSize='unspecified';
+      state.upstairs='none';
+      state.advancePayment=0;
+      state.speed='standard';
+      state.dropoff2=null;
+    }
     const taskNoteLabel=$('flowTaskNoteLabel');
     const taskNoteHelp=$('flowTaskNoteHelp');
     const taskNoteInput=$('flowTaskNote');
@@ -20561,7 +20625,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const taskCopy=typeof getTaskContentCopy==='function'
       ? getTaskContentCopy(state.service,selected.title||serviceLabels[state.service],state.serviceCategory)
       : {label:'要請小U完成什麼？',placeholder:'請說明任務內容與注意事項',help:'請把任務內容與注意事項寫清楚。'};
-    if(taskNoteLabel)taskNoteLabel.innerHTML=`${escapeHtml(taskCopy.label)} <span class="flow-required">＊</span>`;
+    if(taskNoteLabel)taskNoteLabel.innerHTML=isDriveTask?`${escapeHtml(taskCopy.label)} <span style="color:var(--ubee-muted);font-weight:600">（選填）</span>`:`${escapeHtml(taskCopy.label)} <span class="flow-required">＊</span>`;
     if(taskNoteHelp)taskNoteHelp.textContent=taskCopy.help;
     if(taskNoteInput)taskNoteInput.placeholder=taskCopy.placeholder;
     if(advanceLabel)advanceLabel.textContent=isBuyTask?'預計商品金額':'預估代墊金額';
@@ -20580,9 +20644,9 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     $('flowAdvanceWrap').hidden=!['buy','pickup','helper'].includes(state.service);
     const runtimeSection=$('flowTaskRuntimeSection');
     if(runtimeSection) runtimeSection.hidden=$('flowQueueWrap').hidden&&$('flowTaskMinutesWrap').hidden&&$('flowAdvanceWrap').hidden;
-    $('flowExtraTaskDetails').hidden=state.service==='queue';
-    $('flowItemSizeGroup').hidden=state.service==='queue';
-    $('flowUpstairsGroup').hidden=state.service==='queue';
+    $('flowExtraTaskDetails').hidden=['queue','drive'].includes(state.service);
+    $('flowItemSizeGroup').hidden=['queue','drive'].includes(state.service);
+    $('flowUpstairsGroup').hidden=['queue','drive'].includes(state.service);
   }
 
   function setService(service){
@@ -20621,7 +20685,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
     const def=selectedServiceDefinition();state.taskName=def.title||serviceLabels[service];
     if(service==='queue'&&state.pickup&&!state.dropoff)state.dropoff={...state.pickup,label:'現場完成',_autoQueue:true};
-    if(service==='queue')state.dropoff2=null;
+    if(service==='queue'||service==='drive')state.dropoff2=null;
+    if(service==='drive'){
+      state.itemSize='unspecified';state.upstairs='none';state.advancePayment=0;state.speed='standard';
+    }else if(previousService==='drive'){
+      // 離開代駕後恢復一般跑腿安全預設，避免代駕的「不適用」值殘留到配送報價。
+      state.itemSize='small';state.upstairs='none';state.advancePayment=0;state.speed='standard';
+    }
     if(service!=='queue'&&state.dropoff?._autoQueue)state.dropoff=null;
     syncServiceSelectors();updateHome();
   }
@@ -20653,7 +20723,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
           ? `${d.contactName||''} ${d.phone||''}`.trim()||`${copy.dropoffLabel}資訊已填寫`
           : copy.dropoffMeta;
 
-    const multiStopAvailable=state.service!=='queue'&&!(state.service==='helper'&&state.singlePointTask===true);
+    const multiStopAvailable=!['queue','drive'].includes(state.service)&&!(state.service==='helper'&&state.singlePointTask===true);
     const dropoff2Button=$('flowDropoff2Button');
     if(dropoff2Button)dropoff2Button.hidden=!multiStopAvailable;
     if($('flowMultiStopHint'))$('flowMultiStopHint').hidden=!multiStopAvailable;
@@ -20845,10 +20915,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     }else{
       state.taskNote=String($('flowTaskNote')?.value||'').trim();
       if(state.service==='helper') state.helperDetails=readHelperDetailsFromForm();
+      if(state.service==='drive') state.driveVehicle={plate:String($('flowDrivePlate')?.value||'').trim().toUpperCase(),makeModel:String($('flowDriveMakeModel')?.value||'').trim(),color:String($('flowDriveColor')?.value||'').trim(),transmission:String($('flowDriveTransmission')?.value||'automatic'),conditionNote:String($('flowDriveConditionNote')?.value||'').trim()};
     }
-    state.itemSize=$('flowItemSize')?.value||'small';
-    state.upstairs=$('flowUpstairs')?.value||'none';
-    state.advancePayment=$('flowAdvanceWrap')?.hidden?0:Math.max(0,Math.round(Number($('flowAdvancePayment')?.value)||0));
+    state.itemSize=state.service==='drive'?'unspecified':($('flowItemSize')?.value||'small');
+    state.upstairs=state.service==='drive'?'none':($('flowUpstairs')?.value||'none');
+    state.advancePayment=state.service==='drive'?0:($('flowAdvanceWrap')?.hidden?0:Math.max(0,Math.round(Number($('flowAdvancePayment')?.value)||0)));
     state.queueMinutes=Math.max(10,Math.min(480,Math.round(Number($('flowQueueMinutes')?.value)||30)));
     state.taskMinutes=Math.round(Number($('flowTaskMinutes')?.value)||30);
   }
@@ -20867,6 +20938,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
         $('flowPurchaseQuantity')?.focus();
         return false;
       }
+    }else if(state.service==='drive'){
+      if(!state.driveVehicle.plate){status('flowTaskStatus','請填寫車牌。',true);$('flowDrivePlate')?.focus();return false}
+      if(!state.driveVehicle.makeModel){status('flowTaskStatus','請填寫車輛品牌／車型。',true);$('flowDriveMakeModel')?.focus();return false}
+      if(!['automatic','manual'].includes(state.driveVehicle.transmission)){status('flowTaskStatus','請選擇自排或手排。',true);$('flowDriveTransmission')?.focus();return false}
     }else if(!state.taskNote){
       status('flowTaskStatus','請完整填寫任務內容，才能進入下一步。',true);
       $('flowTaskNote')?.focus();
@@ -21023,6 +21098,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
         });
         state.taskNote=noteLines.filter(line=>!line.startsWith('現場回報：')&&!line.startsWith('現場交接：')).join('\n');
       }
+      const restoredDrive=d.driveVehicle&&typeof d.driveVehicle==='object'?d.driveVehicle:{};
+      state.driveVehicle={plate:String(restoredDrive.plate||d.vehiclePlate||'').trim().toUpperCase(),makeModel:String(restoredDrive.makeModel||restoredDrive.model||d.vehicleBrandModel||'').trim(),color:String(restoredDrive.color||d.vehicleColor||'').trim(),transmission:['automatic','manual'].includes(String(restoredDrive.transmission||d.vehicleTransmission||''))?String(restoredDrive.transmission||d.vehicleTransmission):'automatic',conditionNote:String(restoredDrive.conditionNote||d.vehicleConditionNote||'').trim()};
       state.itemSize=String(d.itemSize||'small').trim()||'small';
       state.upstairs=String(d.upstairsOption||'none').trim()||'none';
       state.advancePayment=Math.max(0,Math.round(Number(d.advancePayment)||0));
@@ -21126,6 +21203,18 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
             schemaVersion:'task-details-v2'
           },
           serviceMode:resolveClientServiceMode(state.service,payload.serviceType||serviceLabels[state.service]),
+          ...(state.service==='drive'?{
+            speedType:'standard',speed:'standard',itemSize:'unspecified',itemSizeLabel:'未申報物品體積',
+            upstairsOption:'none',upstairsLabel:'',upstairsFee:0,
+            advancePayment:0,estimatedGoodsAmount:0,purchaseAdvanceAllowed:false,riderAdvanceAmount:0,purchasePaymentRule:'no_advance',
+            vehiclePreference:'any',dropoff2:'',dropoff2Address:'',dropoff2Phone:'',dropoff2Contact:'',dropoff2AddressNote:'',dropoff2Lat:null,dropoff2Lng:null,dropoff2PlaceId:'',deliveryStops:[]
+          }:{}),
+          driveVehicle:state.service==='drive'?{...state.driveVehicle}:null,
+          vehiclePlate:state.service==='drive'?state.driveVehicle.plate:'',
+          vehicleBrandModel:state.service==='drive'?state.driveVehicle.makeModel:'',
+          vehicleColor:state.service==='drive'?state.driveVehicle.color:'',
+          vehicleTransmission:state.service==='drive'?state.driveVehicle.transmission:'',
+          vehicleConditionNote:state.service==='drive'?state.driveVehicle.conditionNote:'',
           singlePointTask:state.service==='helper'&&state.singlePointTask===true,
           pickupAddressObject:state.pickup||null,
           dropoffAddressObject:state.dropoff||null,
@@ -21494,7 +21583,17 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
         </section>`
       : '';
 
-    target.innerHTML=ratingHtml+cancelHtml;
+    const hasAssignedRider=Boolean(
+      order?.riderDocId || order?.riderId || order?.assignedRiderId || order?.riderPhone
+    );
+    const chatHtml=orderId&&hasAssignedRider
+      ? `<section class="ubee-native-detail-group">
+          <div class="ubee-native-detail-group-title">訂單對話</div>
+          <button class="ubee-rider-rating-open" type="button" data-detail-chat-order="${escapeHtml(orderId)}">${['completed','done','cancelled','canceled'].includes(statusKey)?'查看對話紀錄':'聯絡小U'}</button>
+        </section>`
+      : '';
+
+    target.innerHTML=ratingHtml+chatHtml+cancelHtml;
   }
 
   async function openProfileOrderDetail(index){
@@ -21778,6 +21877,14 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     });
 
     $('flowProfileDetailActions')?.addEventListener('click',async event=>{
+      const chatButton=event.target.closest('[data-detail-chat-order]');
+      if(chatButton){
+        event.preventDefault();
+        event.stopPropagation();
+        window.UBeeOrderChatV1?.open?.(String(chatButton.dataset.detailChatOrder||'').trim().toUpperCase());
+        return;
+      }
+
       const ratingButton=event.target.closest('[data-detail-rate-order]');
       if(ratingButton){
         event.preventDefault();
@@ -22014,7 +22121,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260924-customer-order-lifecycle-v1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-drive-order-chat-v1';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22050,10 +22157,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <style id="ubee-fixed-bottom-nav-yellow-service-tabs">
   /* 2026-08-04 正式清理：舊固定導航覆蓋已移除，底部導覽由唯一正式 App 導覽層管理。 */
 
-  /* 五大服務入口：App 圖示式設計，取代整條黃色分類列。 */
+  /* 六大服務入口：3×2 Native App 圖示式設計。 */
   #productionOrderFlow .flow-service-tabs{
     display:grid !important;
-    grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
     overflow:visible !important;
     margin:0 0 16px !important;
     padding:3px 0 2px !important;
@@ -22150,7 +22257,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 /* =====================================================
    Customer Platform Home V3
    - 外送平台式首頁：服務優先、地址其次、建立任務 CTA
-   - 五大正式服務不改名、不合併、不改 serviceKey
+   - 六大正式服務維持獨立 serviceKey；代駕使用 drive
    - 無訂單時不顯示大 Hero／節點動畫
    - 有進行中訂單時才顯示任務摘要
    - 即時運力保留既有資料來源，移到建立任務 CTA 後方
@@ -23553,7 +23660,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 (() => {
   'use strict';
 
-  const APP_VERSION = '2026.09.24.8';
+  const APP_VERSION = '2026.09.29.1';
   const root = document.getElementById('productionOrderFlow');
   if(!root || root.dataset.ubeeAppNavigationSettings === APP_VERSION) return;
   root.dataset.ubeeAppNavigationSettings = APP_VERSION;
@@ -27275,7 +27382,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
 #productionOrderFlow #flowPageHome .flow-service-tabs{
   display:grid!important;
-  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
   gap:4px!important;
   overflow:visible!important;
   margin:0 0 10px!important;
@@ -27288,7 +27395,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
 
 #productionOrderFlow #flowPageHome .flow-service-tab{
   min-width:0!important;
-  min-height:64px!important;
+  min-height:70px!important;
   padding:5px 1px!important;
   display:flex!important;
   flex-direction:column!important;
@@ -28255,6 +28362,23 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     renderActive
   });
 })();
+</script>
+
+
+<style id="ubee-order-chat-v1-style">
+#ubeeOrderChatFab{position:fixed;right:18px;bottom:92px;z-index:12020;border:0;border-radius:999px;background:#111;color:#fff;padding:12px 15px;font-weight:950;box-shadow:0 10px 28px rgba(0,0,0,.18);display:none;align-items:center;gap:8px}#ubeeOrderChatFab.show{display:flex}#ubeeOrderChatBadge{min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:#facc15;color:#111;display:none;place-items:center;font-size:11px}#ubeeOrderChatBadge.show{display:grid}
+#ubeeOrderChatPage{position:fixed;inset:0;z-index:13000;background:#f5f6f7;display:none;flex-direction:column;padding-top:env(safe-area-inset-top)}#ubeeOrderChatPage.show{display:flex}.ubee-chat-head{height:58px;background:#fff;border-bottom:1px solid #e5e7eb;display:grid;grid-template-columns:52px 1fr 52px;align-items:center;padding:0 8px}.ubee-chat-head button{border:0;background:transparent;font-size:30px}.ubee-chat-head strong{text-align:center;font-size:17px}.ubee-chat-list{flex:1;overflow:auto;padding:16px 14px 22px;display:flex;flex-direction:column;gap:8px}.ubee-chat-msg{max-width:80%;padding:10px 12px;border-radius:17px;background:#fff;color:#111;align-self:flex-start;box-shadow:0 1px 2px rgba(0,0,0,.05);font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}.ubee-chat-msg.me{align-self:flex-end;background:#facc15}.ubee-chat-msg small{display:block;margin-top:4px;font-size:10px;opacity:.62}.ubee-chat-quick{display:flex;gap:7px;overflow:auto;padding:8px 12px;background:#fff;border-top:1px solid #eee}.ubee-chat-quick button{flex:0 0 auto;border:1px solid #ddd;background:#fff;border-radius:999px;padding:8px 11px;font-size:12px;font-weight:800}.ubee-chat-compose{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #eee}.ubee-chat-compose textarea{resize:none;min-height:44px;max-height:100px;border:1px solid #d9dde2;border-radius:16px;padding:11px 12px;font:inherit}.ubee-chat-compose button{border:0;border-radius:15px;background:#111;color:#fff;padding:0 16px;font-weight:900}.ubee-chat-readonly{padding:10px 14px;background:#fff8d5;color:#6b5700;text-align:center;font-size:12px;font-weight:800;display:none}.ubee-chat-readonly.show{display:block}
+</style>
+<button id="ubeeOrderChatFab" type="button">聯絡小U <span id="ubeeOrderChatBadge">0</span></button>
+<section id="ubeeOrderChatPage" aria-label="UBee 訂單聊天室">
+ <div class="ubee-chat-head"><button id="ubeeOrderChatBack" type="button" aria-label="返回">‹</button><strong>聯絡小U</strong><span></span></div>
+ <div id="ubeeOrderChatReadonly" class="ubee-chat-readonly">此任務已結束，聊天室為唯讀。</div>
+ <div id="ubeeOrderChatList" class="ubee-chat-list"></div>
+ <div class="ubee-chat-quick" id="ubeeOrderChatQuick"><button type="button">請問目前到哪裡了？</button><button type="button">到達後請聯絡我</button><button type="button">謝謝你</button></div>
+ <div class="ubee-chat-compose" id="ubeeOrderChatCompose"><textarea id="ubeeOrderChatInput" maxlength="600" placeholder="輸入訊息"></textarea><button id="ubeeOrderChatSend" type="button">送出</button></div>
+</section>
+<script id="ubee-order-chat-v1-script">
+(()=>{'use strict';if(window.__UBEE_ORDER_CHAT_V1__)return;window.__UBEE_ORDER_CHAT_V1__=true;const $=id=>document.getElementById(id);let activeId='',timer=0,open=false,sending=false;const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));const statusDone=s=>['completed','done','cancelled','canceled'].includes(String(s||'').toLowerCase());function currentCustomerOrder(){try{if(typeof currentOrderData!=='undefined'&&currentOrderData)return currentOrderData}catch(_){}return window.currentOrderData||null}function orderId(){try{if(typeof currentOrderId!=='undefined'&&currentOrderId)return String(currentOrderId).trim().toUpperCase()}catch(_){}const d=currentCustomerOrder();return String(d?.id||d?.orderId||'').trim().toUpperCase()}function assigned(){const d=currentCustomerOrder()||{};const st=String(d.status||'').trim().toLowerCase();return Boolean(d.riderId||d.assignedRiderId||d.riderPhone||['accepted','going_to_pickup','arrived_pickup','picked_up','going_to_dropoff','arrived_dropoff','completed','done'].includes(st))}function refreshFab(){const id=orderId();const show=Boolean(id&&assigned());$('ubeeOrderChatFab')?.classList.toggle('show',show);if(!show&&open)closeChat()}function time(ms){try{return new Date(Number(ms||0)).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}catch(_){return''}}function render(data){const list=$('ubeeOrderChatList');if(!list)return;list.innerHTML=(data.messages||[]).map(m=>`<div class="ubee-chat-msg ${m.senderType==='customer'?'me':''}">${esc(m.text)}<small>${time(m.createdAtMs)}</small></div>`).join('')||'<div style="margin:auto;color:#8a8f95;font-size:13px">小U接單後，可以在這裡即時溝通。</div>';list.scrollTop=list.scrollHeight;const ro=!!data.readOnly;$('ubeeOrderChatReadonly').classList.toggle('show',ro);$('ubeeOrderChatCompose').style.display=ro?'none':'grid';$('ubeeOrderChatQuick').style.display=ro?'none':'flex';const n=Math.max(0,Number(data.unreadCount||0));$('ubeeOrderChatBadge').textContent=String(n);$('ubeeOrderChatBadge').classList.toggle('show',n>0)}async function load(){const id=activeId||orderId();if(!id)return;try{const data=await customerApiFetch(`/api/orders/${encodeURIComponent(id)}/chat/messages?t=${Date.now()}`);if(data?.success!==false){render(data);if(open&&data.available)customerApiFetch(`/api/orders/${encodeURIComponent(id)}/chat/read`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).catch(()=>{})}}catch(_){}}async function send(text){text=String(text||'').trim();if(!text||sending||!activeId)return;sending=true;const b=$('ubeeOrderChatSend');if(b)b.disabled=true;try{await customerApiFetch(`/api/orders/${encodeURIComponent(activeId)}/chat/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});$('ubeeOrderChatInput').value='';await load()}catch(e){window.showUBeeCustomerNativeAlert?.(e?.message||'訊息送出失敗，請稍後再試。')}finally{sending=false;if(b)b.disabled=false}}function openChat(id=orderId()){if(!id)return;activeId=String(id).trim().toUpperCase();open=true;$('ubeeOrderChatPage').classList.add('show');document.body.style.overflow='hidden';load();clearInterval(timer);timer=setInterval(load,2500)}function closeChat(){open=false;$('ubeeOrderChatPage')?.classList.remove('show');document.body.style.overflow='';clearInterval(timer);timer=0;activeId=''}$('ubeeOrderChatFab')?.addEventListener('click',()=>openChat());$('ubeeOrderChatBack')?.addEventListener('click',closeChat);$('ubeeOrderChatSend')?.addEventListener('click',()=>send($('ubeeOrderChatInput')?.value));$('ubeeOrderChatInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e.currentTarget.value)}});$('ubeeOrderChatQuick')?.addEventListener('click',e=>{const b=e.target.closest('button');if(b)send(b.textContent)});setInterval(()=>{refreshFab();if(!open&&orderId()&&assigned())load()},5000);refreshFab();const deep=new URLSearchParams(location.search).get('chatOrderId');if(deep)setTimeout(()=>openChat(deep),1400);window.UBeeOrderChatV1={open:openChat,close:closeChat,refresh:load};})();
 </script>
 
 </body>
