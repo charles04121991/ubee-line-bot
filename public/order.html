@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- 2026-09-29｜Customer Contact Removal V1.3：完整移除 Order Chat 即時對話 UI、事件與 API 呼叫；保留 V1.2 已恢復的 Google Maps、Address Picker、Route Map、VisualViewport 與表單修正。 -->
+<!-- 2026-09-29｜Customer No-Map + Universal ETA + Drive Semantic V1.4：用戶端移除所有可視地圖；保留定位、地址搜尋、Geocode、Routes、距離、ETA、正式估價。六大服務共用階段 ETA，代駕使用獨立車輛／交接語意。 -->
+<!-- 2026-09-29｜Customer Contact Removal V1.3：完整移除 Order Chat 即時對話 UI、事件與 API 呼叫；保留既有 PWA、通知、地址、估價與訂單核心。 -->
 <!-- 2026-09-29｜Drive Service V1：六服務 3×2 Native Grid 與代駕專用表單；訂單聊天室功能已於 Contact Removal V1.3 移除。 -->
 <!-- 2026-09-24｜Customer Order Lifecycle V1：訂單總覽改為進行中 5 段動態進度／完成待評價／已評價三種原生狀態卡；沿用既有 Rider Rating API 與 Final Delivery ETA。 -->
 <!-- 2026-09-24｜Customer Segmented Live Progress V2：動態進度由 8 段精簡為 5 段短線；保留細部訂單狀態與目前段流動動畫。 -->
@@ -57,7 +58,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260929-customer-drive-v1-3-contact-removed" rel="manifest"/>
+<link href="/manifest-order.json?v=20260929-customer-nomap-eta-drive-v1-4" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -8224,16 +8225,6 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 <h1>今天需要幫什麼？</h1>
 <p>先選擇服務，再填寫地址與任務內容。</p>
 </div>
-<!-- 保留原本地圖節點供既有 JavaScript 初始化，但首頁不呈現 -->
-<div aria-hidden="true" class="home-map-shell ubee-v4-home-map-hidden">
-<div class="map-canvas" id="customerMap"></div>
-<div class="map-placeholder" id="homeMapPlaceholder"></div>
-<div class="route-badge hidden" id="homeRouteBadge">
-<strong id="homeRouteDistance">-</strong>
-<span id="homeRouteDuration">-</span>
-</div>
-<button aria-label="回到目前位置" class="map-current-btn" onclick="focusCurrentLocation()" type="button"></button>
-</div>
 <div class="task-sheet ubee-v4-task-sheet">
 <div class="task-sheet-handle"></div>
 <div aria-live="polite" class="home-service-status" id="homeServiceStatus">
@@ -8714,13 +8705,6 @@ body.ubee-rider-rating-gate-open .ubee-primary-bottom-nav{
 <div class="step4-page-heading step4-page-heading-compact">
 <div class="step4-page-title">確認訂單</div>
 <div class="step4-page-sub">確認路線、任務與費用後即可送出</div>
-</div>
-<div class="review-map-shell review-map-shell-compact">
-<div class="map-canvas" id="reviewMap"></div>
-<div class="map-placeholder" id="reviewMapPlaceholder">
-<strong>正在準備路線地圖</strong>
-<small>地圖暫時無法顯示時，正式估價仍以後端結果為準。</small>
-</div>
 </div>
 <div class="review-route-badge hidden review-route-badge-compact" id="reviewRouteBadge">
 <div class="review-route-item">
@@ -9291,200 +9275,22 @@ function loadGoogleMapsApi(){
 }
 
 async function ensureCustomerMapReady(){
-  // Customer Home Dynamic Hero V2：正式首頁不再顯示 flowHomeMap。
-  // 保留既有隱藏 customerMap 節點作舊流程／路線相容層；只有真正被路線流程呼叫時才 lazy-load Google Maps。
-  // 確認頁 reviewMap 與進行中 trackingMap 仍由各自正式 Map Ready 流程管理。
-  const mapEl = qs('customerMap');
-  if(!mapEl) return null;
-
-  await loadGoogleMapsApi();
-
-  // Location Lock V3.2：首頁第一個 Map 實例建立前，必須先完成一次定位嘗試。
-  // 定位尚未完成時維持 placeholder，不允許先用服務城市中心建立地圖。
-  if(!customerMap){
-    try{
-      await ensureCustomerInitialLocationGate();
-    }catch(error){
-      console.warn('首頁首次定位閘門失敗，改用手動服務地區：', error);
-    }
-
-    const options = {
-      center:hasValidLatLng(currentLocationLat, currentLocationLng)
-        ? { lat:currentLocationLat, lng:currentLocationLng }
-        : getSelectedServiceCityCenter(),
-      zoom:13,
-      disableDefaultUI:true,
-      clickableIcons:false,
-      gestureHandling:'greedy',
-      backgroundColor:'#e8eaed'
-    };
-
-    if(googleMapsMapId){
-      options.mapId = googleMapsMapId;
-    }
-
-    customerMap = new googleMapsLibraries.maps.Map(mapEl, options);
-  }
-
-  qs('homeMapPlaceholder')?.classList.add('is-ready');
-  qs('flowHomeMapPlaceholder')?.classList.add('is-ready');
-
-  renderCurrentLocationMarker();
-
-  if(lastRouteData){
-    renderRouteOnCustomerMap(lastRouteData);
-  }
-
-  return customerMap;
+  // Customer No-Map V1.4：用戶端不建立可視地圖。
+  // Google Maps JS 僅保留 Places / Geocode 等地址能力。
+  return null;
 }
 
 // ==============================
 // Step 4 確認訂單頁地圖初始化
 // ==============================
 async function ensureReviewMapReady(){
-  const mapEl = qs('reviewMap');
-
-  if(!mapEl){
-    return null;
-  }
-
-  await loadGoogleMapsApi();
-
-  if(!reviewMap){
-    const options = {
-      center:
-        hasValidLatLng(
-          pickupLat,
-          pickupLng
-        )
-          ? {
-              lat:Number(pickupLat),
-              lng:Number(pickupLng)
-            }
-          : {
-              lat:24.2521,
-              lng:120.7214
-            },
-
-      zoom:13,
-
-      disableDefaultUI:true,
-
-      clickableIcons:false,
-
-      gestureHandling:'greedy',
-
-      backgroundColor:'#e8eaed'
-    };
-
-    if(googleMapsMapId){
-      options.mapId =
-        googleMapsMapId;
-    }
-
-    reviewMap =
-      new googleMapsLibraries.maps.Map(
-        mapEl,
-        options
-      );
-  }
-
-  qs('reviewMapPlaceholder')
-    ?.classList
-    .add('is-ready');
-
-  if(lastRouteData){
-    renderRouteOnReviewMap(
-      lastRouteData
-    );
-  }
-
-  return reviewMap;
+  // Customer No-Map V1.4：確認訂單只顯示距離／時間／費用，不建立地圖。
+  return null;
 }
 
 async function ensureTrackingMapReady(){
-
-  const mapEl =
-    qs('step5TrackingMap');
-
-
-  if(!mapEl){
-    return null;
-  }
-
-
-  await loadGoogleMapsApi();
-
-
-  if(!trackingMap){
-
-    const hasTrackedRiderPosition =
-      hasValidLatLng(
-        trackedRiderPosition?.lat,
-        trackedRiderPosition?.lng
-      );
-
-
-    const options = {
-
-      center:
-        hasTrackedRiderPosition
-
-          ? {
-              lat:Number(
-                trackedRiderPosition.lat
-              ),
-
-              lng:Number(
-                trackedRiderPosition.lng
-              )
-            }
-
-          : {
-              lat:24.2521,
-              lng:120.7214
-            },
-
-      zoom:
-        hasTrackedRiderPosition
-          ? 16
-          : 13,
-
-      disableDefaultUI:true,
-
-      clickableIcons:false,
-
-      gestureHandling:'greedy',
-
-      backgroundColor:'#e8eaed'
-    };
-
-
-    if(googleMapsMapId){
-
-      options.mapId =
-        googleMapsMapId;
-
-    }
-
-
-    trackingMap =
-      new googleMapsLibraries.maps.Map(
-        mapEl,
-        options
-      );
-
-  }
-
-
-  qs(
-    'step5TrackingMapPlaceholder'
-  )
-    ?.classList
-    .add('is-ready');
-
-
-  return trackingMap;
+  // Customer No-Map V1.4：進行中任務改以 ETA + 狀態進度呈現，不建立地圖。
+  return null;
 }
 
 function renderCurrentLocationMarker(){
@@ -10359,9 +10165,36 @@ function getTrackingEtaPresentation(order = {}, routeData = null){
   };
 }
 
+function isCustomerDriveOrder(order = {}){
+  return String(order?.serviceKey||order?.serviceMode||'').trim().toLowerCase()==='drive' ||
+    String(order?.serviceType||'').includes('代駕');
+}
+
+function getCustomerServiceEtaTargetLabel(order = {}, statusValue = ''){
+  const status=String(statusValue||order?.status||'').trim().toLowerCase();
+  const service=String(order?.serviceKey||order?.serviceMode||'').trim().toLowerCase();
+  const drive=isCustomerDriveOrder(order);
+
+  if(['accepted','going_to_pickup','heading_to_pickup'].includes(status)){
+    if(drive) return '車輛所在地';
+    if(service==='buy') return '購買店家';
+    if(service==='queue') return '排隊地點';
+    if(service==='helper' || order?.singlePointTask===true) return '任務地點';
+    return '取件地點';
+  }
+
+  if(['picked_up','going_to_dropoff','heading_to_dropoff'].includes(status)){
+    if(drive) return '代駕目的地';
+    return '送達地點';
+  }
+
+  return drive ? '代駕目的地' : '目的地';
+}
+
 function getCustomerFinalDeliveryEtaPresentation(order = {}){
   const status=String(order?.status||'').trim().toLowerCase();
   const terminal=['completed','done','cancelled','canceled'].includes(status);
+  const isDrive=isCustomerDriveOrder(order);
   if(terminal){
     return {available:false,reason:'terminal',windowText:'',remainingText:''};
   }
@@ -10403,14 +10236,14 @@ function getCustomerFinalDeliveryEtaPresentation(order = {}){
         reason:'waiting_match',
         queued:false,
         windowText:'正在為你尋找小U',
-        remainingText:'小U接單後顯示預計送達時間'
+        remainingText:isDrive?'小U接單後顯示預計抵達代駕目的地時間':'小U接單後顯示預計送達時間'
       };
     }
     return {
       available:false,
       reason:'loading',
       queued,
-      windowText:'預計送達時間計算中',
+      windowText:isDrive?'預計抵達代駕目的地時間計算中':'預計送達時間計算中',
       remainingText:queued?'小U正在完成前序任務':'取得最新路況後自動更新'
     };
   }
@@ -10433,8 +10266,8 @@ function getCustomerFinalDeliveryEtaPresentation(order = {}){
     startAtMs,
     endAtMs,
     windowText:startClock&&endClock
-      ? `預計 ${startClock}–${endClock} 送達`
-      : '預計送達時間更新中',
+      ? `預計 ${startClock}–${endClock} ${isDrive?'抵達代駕目的地':'送達'}`
+      : (isDrive?'預計抵達代駕目的地時間更新中':'預計送達時間更新中'),
     remainingText:`還有約 ${minMinutes}–${maxMinutes} 分鐘`
   };
 }
@@ -10450,35 +10283,47 @@ function renderCustomerOrderListEtaHtml(order = {}){
   return `<span class="ubee-native-order-eta${waiting}"><strong>${escapeHtml(eta.windowText)}</strong><small>${escapeHtml(eta.remainingText)}</small></span>`;
 }
 
-function renderStep5LiveStatus(
-  order,
-  routeData = null
-){
+function renderStep5LiveStatus(order,routeData = null){
   const panel = qs('step5LiveStatusPanel');
   const primaryEl = qs('step5LiveStatusPrimary');
   const labelEl = qs('step5LiveStatusLabel');
   const titleEl = qs('step5LiveStatusTitle');
   const metaEl = qs('step5LiveStatusMeta');
 
-  if(!panel || !primaryEl || !labelEl || !titleEl || !metaEl){
-    return;
-  }
+  if(!panel || !primaryEl || !labelEl || !titleEl || !metaEl) return;
 
   const data = order || currentOrderData || {};
   const status = String(data.status || 'pending_payment').trim().toLowerCase();
-  const isDriveTask = String(data.serviceKey || data.serviceMode || '').trim().toLowerCase()==='drive' || String(data.serviceType||'').includes('代駕');
+  const service = String(data.serviceKey || data.serviceMode || '').trim().toLowerCase();
+  const isDriveTask = isCustomerDriveOrder(data);
 
-  let primaryText = '同步中';
-  let labelText = '正在讀取最新任務資訊';
-  let titleText = '任務狀態更新中';
-  let metaText = '系統正在取得最新資訊';
-  let etaState = 'status';
+  let primaryText='同步中';
+  let labelText='正在讀取最新任務資訊';
+  let titleText='任務狀態更新中';
+  let metaText='系統正在取得最新資訊';
+  let etaState='status';
+
+  const phaseEta=()=>{
+    const eta=getTrackingEtaPresentation(data,routeData);
+    const target=getCustomerServiceEtaTargetLabel(data,status);
+    etaState=eta.available ? (eta.confidence||'high') : eta.reason;
+    primaryText=eta.primary;
+    labelText=eta.available ? `預計抵達${target}` : eta.label;
+    const parts=[];
+    if(eta.distanceText) parts.push(`距離${target} ${eta.distanceText}`);
+    if(eta.label && eta.available) parts.push(eta.label);
+    if(eta.health?.key==='live') parts.push('定位即時');
+    if(eta.health?.key==='delayed') parts.push(formatTrackingLocationAge(eta.health.ageMs));
+    if(['stale','critical'].includes(eta.health?.key)) parts.push('定位恢復後自動重算');
+    metaText=parts.join('・') || `正在計算前往${target}的道路時間`;
+    return eta;
+  };
 
   switch(status){
     case 'pending_payment':
       primaryText='待確認';
       labelText='目前狀態';
-      titleText='確認現金單後開始派單';
+      titleText='確認現金單後開始媒合';
       metaText='確認後系統會開始媒合可執行的小U';
       break;
 
@@ -10490,82 +10335,88 @@ function renderStep5LiveStatus(
       break;
 
     case 'pending_schedule':
-      primaryText='預約媒合中';
+      primaryText=isDriveTask?'代駕預約媒合中':'預約媒合中';
       labelText='目前狀態';
-      titleText='正在媒合可於指定時間執行的小U';
-      metaText=data.scheduleLabel ? `預約時間 ${data.scheduleLabel}` : '有人承接後，系統會顯示預約已成立';
+      titleText=isDriveTask?'正在媒合可於指定時間執行代駕的小U':'正在媒合可於指定時間執行的小U';
+      metaText=data.scheduleLabel ? `預約時間 ${data.scheduleLabel}` : '有人承接後系統會更新狀態';
       break;
 
     case 'scheduled_reserved':
       primaryText='預約已成立';
       labelText='目前狀態';
-      titleText='已有小U提前承接這筆預約';
-      metaText=data.scheduleLabel ? `${data.scheduleLabel}・任務前會再次確認` : '任務前系統會再次確認小U是否可以準時執行';
+      titleText=isDriveTask?'已有小U承接這筆代駕預約':'已有小U提前承接這筆預約';
+      metaText=data.scheduleLabel ? `${data.scheduleLabel}・任務前會再次確認` : '任務前系統會再次確認';
       break;
 
     case 'scheduled_confirmed':
       primaryText='已確認';
       labelText='目前狀態';
-      titleText='小U已確認可以執行預約任務';
-      metaText=data.scheduleLabel ? `預約時間 ${data.scheduleLabel}` : '請留意後續出發與取件進度';
+      titleText=isDriveTask?'小U已確認可以執行代駕':'小U已確認可以執行預約任務';
+      metaText=data.scheduleLabel ? `預約時間 ${data.scheduleLabel}` : (isDriveTask?'請留意前往車輛所在地的進度':'請留意後續出發進度');
       break;
 
     case 'pending_dispatch':
-      primaryText=data.isScheduleEmergency === true ? '候補媒合' : '媒合中';
+      primaryText=data.isScheduleEmergency===true?'候補媒合':'媒合中';
       labelText='目前狀態';
-      titleText=data.isScheduleEmergency === true ? '正在緊急媒合候補小U' : '正在為你尋找小U';
-      metaText=data.isScheduleEmergency === true && data.scheduleLabel ? `原預約時間 ${data.scheduleLabel}` : '小U接單後會自動顯示預計抵達時間';
+      titleText=isDriveTask?'正在為你媒合代駕小U':(data.isScheduleEmergency===true?'正在緊急媒合候補小U':'正在為你尋找小U');
+      metaText='小U接單後會顯示預計幾分鐘抵達';
       break;
 
     case 'accepted':
-    case 'going_to_pickup': {
-      const eta = getTrackingEtaPresentation(data,routeData);
-      const finalEta = getCustomerFinalDeliveryEtaPresentation(data);
-      const stackQueued = String(data?.stackRole||'').toUpperCase()==='QUEUED' || data?.stackWaitingAhead===true;
-      etaState = finalEta.available ? (finalEta.confidence||'high') : (eta.available ? eta.confidence : eta.reason);
-      primaryText=finalEta.windowText || eta.primary;
-      labelText=finalEta.remainingText || eta.label;
-      titleText=isDriveTask?'小U正在前往車輛位置':(stackQueued?'小U正在完成前序任務':'小U正在前往取件');
-      const metaParts=[];
-      if(eta.distanceText) metaParts.push(stackQueued?`距離下一單取件點 ${eta.distanceText}`:`距離取件點 ${eta.distanceText}`);
-      if(eta.available) metaParts.push(`目前階段 ${eta.primary}`);
-      if(eta.health?.key === 'live') metaParts.push('定位即時');
-      if(eta.health?.key === 'delayed') metaParts.push(formatTrackingLocationAge(eta.health.ageMs));
-      if(['stale','critical'].includes(eta.health?.key)) metaParts.push('定位恢復後會自動重新計算');
-      metaText=metaParts.join('・') || (stackQueued?'完成前序任務後會依序前往取件':'正在取得小U位置與道路時間');
+    case 'going_to_pickup':
+    case 'heading_to_pickup': {
+      const eta=phaseEta();
+      const stackQueued=!isDriveTask && (String(data?.stackRole||'').toUpperCase()==='QUEUED' || data?.stackWaitingAhead===true);
+      if(stackQueued){
+        titleText='小U正在完成前序任務';
+      }else if(isDriveTask){
+        titleText='小U正在前往車輛所在地';
+      }else if(service==='buy'){
+        titleText='小U正在前往購買店家';
+      }else if(service==='queue'){
+        titleText='小U正在前往排隊地點';
+      }else if(service==='helper' || data.singlePointTask===true){
+        titleText='小U正在前往任務地點';
+      }else{
+        titleText='小U正在前往取件地點';
+      }
+      if(stackQueued && !eta.available) metaText='完成前序任務後會依序前往';
       break;
     }
 
     case 'arrived_pickup':
       primaryText='已抵達';
-      labelText='取件地點';
-      titleText=isDriveTask?'小U已抵達車輛位置':'小U已抵達取件地點';
-      metaText=isDriveTask?'請準備進行車輛交接與車況確認':'正在處理取件任務';
+      labelText=getCustomerServiceEtaTargetLabel(data,'accepted');
+      if(isDriveTask){
+        titleText='小U已抵達車輛所在地';
+        metaText='請準備進行車輛交接與車況確認';
+      }else if(service==='buy'){
+        titleText='小U已抵達購買店家';
+        metaText='正在處理購買任務';
+      }else if(service==='queue'){
+        titleText='小U已抵達排隊地點';
+        metaText='準備開始排隊任務';
+      }else if(service==='helper' || data.singlePointTask===true){
+        titleText='小U已抵達任務地點';
+        metaText='正在處理現場任務';
+      }else{
+        titleText='小U已抵達取件地點';
+        metaText='正在處理取件任務';
+      }
       break;
 
     case 'picked_up':
-    case 'going_to_dropoff': {
-      // 單點任務 picked_up 代表現場處理，不存在送達 ETA。
-      if(data.singlePointTask === true){
+    case 'going_to_dropoff':
+    case 'heading_to_dropoff': {
+      if(data.singlePointTask===true && !isDriveTask){
         primaryText='處理中';
         labelText='現場任務';
-        titleText='小U正在處理任務';
+        titleText=service==='queue'?'排隊任務進行中':'小U正在處理任務';
         metaText='完成後會立即更新任務結果';
         break;
       }
-      const eta = getTrackingEtaPresentation(data,routeData);
-      const finalEta = getCustomerFinalDeliveryEtaPresentation(data);
-      etaState = finalEta.available ? (finalEta.confidence||'high') : (eta.available ? eta.confidence : eta.reason);
-      primaryText=finalEta.windowText || eta.primary;
-      labelText=finalEta.remainingText || eta.label;
-      titleText=isDriveTask?'代駕進行中':'配送中';
-      const metaParts=[];
-      if(eta.distanceText) metaParts.push(`距離目前送達點 ${eta.distanceText}`);
-      if(eta.available) metaParts.push(`目前階段 ${eta.primary}`);
-      if(eta.health?.key === 'live') metaParts.push('定位即時');
-      if(eta.health?.key === 'delayed') metaParts.push(formatTrackingLocationAge(eta.health.ageMs));
-      if(['stale','critical'].includes(eta.health?.key)) metaParts.push('定位恢復後會自動重新計算');
-      metaText=metaParts.join('・') || '正在更新剩餘送達路程';
+      phaseEta();
+      titleText=isDriveTask?'代駕進行中':'正在前往送達地點';
       break;
     }
 
@@ -10580,21 +10431,22 @@ function renderStep5LiveStatus(
     case 'done':
       primaryText='已完成';
       labelText='任務狀態';
-      titleText='本次任務已完成';
-      metaText='感謝使用 UBee 跑腿';
+      titleText=isDriveTask?'本次代駕已完成':'本次任務已完成';
+      metaText=isDriveTask?'感謝使用 UBee 代駕':'感謝使用 UBee 跑腿';
       break;
 
     case 'cancelled':
+    case 'canceled':
       primaryText='已取消';
       labelText='任務狀態';
-      titleText='此筆任務已取消';
+      titleText=isDriveTask?'此筆代駕已取消':'此筆任務已取消';
       metaText='如需協助，請聯繫 UBee 跑腿客服';
       break;
 
     default:
       primaryText='更新中';
       labelText='目前狀態';
-      titleText='任務狀態更新中';
+      titleText=isDriveTask?'代駕狀態更新中':'任務狀態更新中';
       metaText='系統正在取得最新資訊';
       break;
   }
@@ -10610,17 +10462,14 @@ function renderStep5LiveStatus(
 
   panel.dataset.status=status;
   panel.dataset.etaState=etaState;
-  primaryEl.classList.toggle('is-long',String(primaryText).length >= 6);
+  primaryEl.classList.toggle('is-long',String(primaryText).length>=6);
   primaryEl.innerText=primaryText;
   labelEl.innerText=labelText;
   titleEl.innerText=titleText;
   metaEl.innerText=metaText;
 
-  try{
-    window.UBeeCustomerRiderRatingV1?.renderActive?.(data);
-  }catch(error){
-    console.warn('UBee 小U評價卡更新失敗：',error);
-  }
+  try{ window.UBeeCustomerRiderRatingV1?.renderActive?.(data); }
+  catch(error){ console.warn('UBee 小U評價卡更新失敗：',error); }
 }
 
 function getTrackingRouteMoveDistanceMeters(
@@ -11439,21 +11288,7 @@ async function refreshRoutePreview(){
     applyRouteDataToLocationState(data);
     updateRouteBadges(data);
 
-    try{
-      await ensureCustomerMapReady();
-      renderRouteOnCustomerMap(data);
-    }catch(err){
-      console.warn('首頁地圖路線顯示失敗:', err);
-    }
-
-    if(currentStep === 4){
-      try{
-        await ensureReviewMapReady();
-        renderRouteOnReviewMap(data);
-      }catch(err){
-        console.warn('確認頁地圖路線顯示失敗:', err);
-      }
-    }
+    // Customer No-Map V1.4：路線資料保留供距離／時間／估價使用，不再繪製可視地圖。
 
     return data;
   }catch(err){
@@ -19911,7 +19746,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </header>
 <div class="flow-progress" data-progress="3"></div>
 <div class="flow-scroll ubee-native-create-scroll ubee-native-checkout-scroll">
-<section class="ubee-native-checkout-map-section"><div class="flow-map ubee-native-checkout-map"><div class="flow-map-canvas" id="flowConfirmMapCanvas"></div><div class="flow-map-status" id="flowMapStatus">正在載入取件位置、送達位置與道路路線…</div></div></section>
 <div id="flowSummaryList"></div>
 <section class="ubee-native-checkout-price"><div><span>正式估價</span><small id="flowRouteMeta">正在計算路線與費用</small></div><strong id="flowConfirmPrice">—</strong></section>
 <label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務資料</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間與費用。</small></span></label>
@@ -19954,7 +19788,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </header>
 <div class="flow-progress" data-progress="0"></div>
 <div class="flow-scroll">
-<div class="flow-detail-map" id="flowDetailMap"></div>
 <div class="flow-card">
 <div class="flow-form-group"><label class="flow-label" for="flowDetailAddress">完整地址</label><input class="flow-input" id="flowDetailAddress" maxlength="240" readonly=""/></div>
 <div class="flow-form-group"><label class="flow-label" for="flowDetailNote">門牌、樓層及補充說明</label><input class="flow-input" id="flowDetailNote" maxlength="160" placeholder="例如：12號3樓、店名、管理室或入口說明"/></div>
@@ -20262,13 +20095,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="customer-tracking-incident-text" id="customerTrackingIncidentText">調度中心已介入，訂單與進度資料不會消失。</div>
 <div class="customer-tracking-incident-meta" id="customerTrackingIncidentMeta"></div>
 </div>
-<section class="ubee-native-active-map-section" id="step5TrackingMapSection">
-<div class="ubee-native-section-head"><strong>即時位置</strong><span>小U 接單後顯示即時位置與道路路線</span></div>
-<div class="ubee-native-active-map-shell">
-<div class="map-canvas" id="step5TrackingMap"></div>
-<div class="map-placeholder" id="step5TrackingMapPlaceholder"><strong>等待小U接單</strong><small>小U 接單並開始回傳定位後，系統會顯示即時位置。</small></div>
-</div>
-</section>
 <section class="ubee-native-group" hidden id="step5PhotoTimelineSection">
 <div class="ubee-native-group-title">現場紀錄</div>
 <div id="step5PhotoTimeline"></div>
@@ -20864,8 +20690,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   async function renderDetailMap(item){
-    try{await ensureMaps();const point=validPoint(item)?{lat:Number(item.lat),lng:Number(item.lng)}:await geocodeAddress(item.address||item.formattedAddress);const center=point||{lat:24.1477,lng:120.6736};if(!state.detailMap)state.detailMap=new google.maps.Map($('flowDetailMap'),{center,zoom:point?17:12,disableDefaultUI:true,gestureHandling:'greedy'});else{state.detailMap.setCenter(center);state.detailMap.setZoom(point?17:12);google.maps.event.trigger(state.detailMap,'resize')}if(state.detailMarker)state.detailMarker.setMap(null);if(point)state.detailMarker=new google.maps.Marker({map:state.detailMap,position:point,title:'選擇的地點'})}catch(error){console.warn('地點預覽失敗：',error)}
-  }
+  // Customer No-Map V1.4：地址明細不再建立地圖預覽。
+  // 座標缺失時仍由既有 Geocode / Places 流程補齊。
+  return item || null;
+}
 
   async function saveDetail(){
     const base=state.selectedAddress||{};
@@ -21271,50 +21099,53 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   async function pointForAddress(item){if(validPoint(item))return{lat:Number(item.lat),lng:Number(item.lng)};const point=await geocodeAddress(item?.address||'');if(point){item.lat=point.lat;item.lng=point.lng}return point}
 
   async function renderConfirmMap(route=null){
-    const renderId=++state.mapRenderId;const statusEl=$('flowMapStatus');statusEl.className='flow-map-status';statusEl.innerHTML='正在載入取件位置、各送達點與道路路線…';
-    try{
-      await ensureMaps();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));if(renderId!==state.mapRenderId)return;
-      let p=await pointForAddress(state.pickup),d=await pointForAddress(state.dropoff),d2=state.dropoff2?await pointForAddress(state.dropoff2):null;if(!route){try{route=await requestRoute()}catch(error){console.warn('後端道路路線失敗，改用地圖備援：',error)}}
-      const routeStart=route?.originLocation||{lat:route?.routeStartLat??route?.pickupLat,lng:route?.routeStartLng??route?.pickupLng};
-      const routePrimary=route?.primaryDropoffLocation||{lat:route?.dropoffLat,lng:route?.dropoffLng};
-      const routeEnd=route?.destinationLocation||{lat:route?.routeEndLat??route?.dropoff2Lat??route?.dropoffLat,lng:route?.routeEndLng??route?.dropoff2Lng??route?.dropoffLng};
-      if(validPoint(routeStart))p={lat:Number(routeStart.lat),lng:Number(routeStart.lng)};
-      if(validPoint(routePrimary))d={lat:Number(routePrimary.lat),lng:Number(routePrimary.lng)};
-      if(state.dropoff2&&validPoint(routeEnd))d2={lat:Number(routeEnd.lat),lng:Number(routeEnd.lng)};
-      if(!p&&!d&&!d2)throw new Error('無法取得取件與送達座標');const center=p||d||d2;
-      if(!state.confirmMap)state.confirmMap=new google.maps.Map($('flowConfirmMapCanvas'),{center,zoom:p&&d?12:16,disableDefaultUI:true,gestureHandling:'greedy',clickableIcons:false});else{state.confirmMap.setCenter(center);google.maps.event.trigger(state.confirmMap,'resize')}
-      clearConfirmMap();const bounds=new google.maps.LatLngBounds();
-      if(p){state.confirmPickupMarker=new google.maps.Marker({map:state.confirmMap,position:p,title:'取件地點',label:{text:'取',color:'#fff',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#111111',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(p)}
-      if(d){state.confirmDropoffMarker=new google.maps.Marker({map:state.confirmMap,position:d,title:d2?'送達點 1':'送達地點',label:{text:d2?'1':'送',color:'#111',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#f4bd00',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(d)}
-      if(d2){state.confirmDropoff2Marker=new google.maps.Marker({map:state.confirmMap,position:d2,title:'送達點 2',label:{text:'2',color:'#111',fontWeight:'900'},icon:{path:google.maps.SymbolPath.CIRCLE,scale:17,fillColor:'#f4bd00',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3}});bounds.extend(d2)}
-      let routeDrawn=false;const encoded=routePolyline(route);
-      if(encoded){try{const libs=typeof loadGoogleMapsLibraries==='function'?await loadGoogleMapsLibraries():null;const path=libs?.geometry?.encoding?.decodePath?libs.geometry.encoding.decodePath(encoded):google.maps.geometry?.encoding?.decodePath(encoded);if(path?.length){state.confirmPolyline=new google.maps.Polyline({map:state.confirmMap,path,geodesic:true,strokeColor:'#111111',strokeOpacity:.9,strokeWeight:6});path.forEach(point=>bounds.extend(point));routeDrawn=true}}catch(error){console.warn('Polyline 繪製失敗：',error)}}
-      if(!routeDrawn&&p&&d&&google.maps.DirectionsService){try{const service=new google.maps.DirectionsService();const result=await service.route({origin:p,destination:d2||d,waypoints:d2?[{location:d,stopover:true}]:[],travelMode:google.maps.TravelMode.DRIVING});state.directionsRenderer=new google.maps.DirectionsRenderer({map:state.confirmMap,directions:result,suppressMarkers:true,preserveViewport:true,polylineOptions:{strokeColor:'#111111',strokeOpacity:.9,strokeWeight:6}});const overview=result?.routes?.[0]?.overview_path||[];overview.forEach(point=>bounds.extend(point));routeDrawn=true}catch(error){console.warn('DirectionsService 備援失敗：',error)}}
-      if(!bounds.isEmpty())state.confirmMap.fitBounds(bounds,48);
-      setTimeout(()=>{try{google.maps.event.trigger(state.confirmMap,'resize');if(!bounds.isEmpty())state.confirmMap.fitBounds(bounds,48)}catch(_){ }},120);
-      if(routeDrawn){statusEl.className='flow-map-status success';statusEl.textContent=''}else{statusEl.className='flow-map-status';statusEl.textContent='已顯示取件與送達位置，道路路線暫時無法載入。'}
-      return route;
-    }catch(error){console.error('確認頁地圖載入失敗：',error);statusEl.className='flow-map-status';statusEl.innerHTML=`${escapeHtml(error.message||'地圖載入失敗')}<br><button id="flowRetryMap" class="flow-map-retry" type="button">重新載入地圖</button>`;$('flowRetryMap')?.addEventListener('click',()=>renderConfirmMap(null));return route}
+  // Customer No-Map V1.4：確認頁不畫地圖，只保留後端道路路線資料。
+  try{
+    if(route) return route;
+    return await requestRoute();
+  }catch(error){
+    console.error('確認頁道路路線載入失敗：',error);
+    throw error;
   }
+}
 
-  function timingLabel(){if(state.timing==='scheduled')return`${state.scheduleGoal==='complete_by'?'希望完成':'希望取件'}：${state.scheduledDate} ${state.scheduledTime}`;if(state.timing==='flexible')return`彈性時段：${state.flexibleDate} ${state.flexibleStart}～${state.flexibleEnd}`;return`立即任務・${{standard:'一般件',priority:'標準件',express:'優先件'}[state.speed]||'一般件'}`}
+  function timingLabel(){
+    if(state.timing==='scheduled'){
+      const label=state.service==='drive'
+        ? (state.scheduleGoal==='complete_by'?'希望抵達目的地':'希望開始代駕')
+        : (state.scheduleGoal==='complete_by'?'希望完成':'希望取件');
+      return `${label}：${state.scheduledDate} ${state.scheduledTime}`;
+    }
+    if(state.timing==='flexible')return`彈性時段：${state.flexibleDate} ${state.flexibleStart}～${state.flexibleEnd}`;
+    return state.service==='drive'?'立即代駕':`立即任務・${{standard:'一般件',priority:'標準件',express:'優先件'}[state.speed]||'一般件'}`;
+  }
   function renderSummary(){
     const p=state.pickup||{},d=state.dropoff||{},d2=state.dropoff2||null,def=selectedServiceDefinition();
     const summaryTaskNote=state.service==='helper'?buildHelperTaskNote(state.taskNote,state.helperDetails):state.taskNote;
     const routeRows=state.service==='helper'&&state.singlePointTask
       ? [['任務地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home']]
-      : [
-          ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home'],
-          ['送達點 1',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}`,'home'],
-          ...(d2?[['送達點 2（選填）',`${d2.address||'—'}${d2.addressDetail?`\n${d2.addressDetail}`:''}`,'home']]:[])
-        ];
+      : state.service==='drive'
+        ? [
+            ['車輛所在地',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home'],
+            ['代駕目的地',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}`,'home']
+          ]
+        : [
+            ['取件地點',`${p.address||'—'}${p.addressDetail?`\n${p.addressDetail}`:''}`,'home'],
+            ['送達點 1',`${d.address||'—'}${d.addressDetail?`\n${d.addressDetail}`:''}`,'home'],
+            ...(d2?[['送達點 2（選填）',`${d2.address||'—'}${d2.addressDetail?`\n${d2.addressDetail}`:''}`,'home']]:[])
+          ];
     const contactRows=state.service==='helper'&&state.singlePointTask
       ? [['聯絡人',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home']]
-      : [
-          ['取件聯絡',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home'],
-          ['送達點 1 聯絡',[d.contactName,d.phone].filter(Boolean).join('・')||'—','home'],
-          ...(d2?[['送達點 2 聯絡',[d2.contactName,d2.phone||d.phone].filter(Boolean).join('・')||'沿用送達點 1','home']]:[])
-        ];
+      : state.service==='drive'
+        ? [
+            ['車輛所在地聯絡',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home'],
+            ['目的地聯絡',[d.contactName,d.phone].filter(Boolean).join('・')||'—','home']
+          ]
+        : [
+            ['取件聯絡',[p.contactName,p.phone].filter(Boolean).join('・')||'—','home'],
+            ['送達點 1 聯絡',[d.contactName,d.phone].filter(Boolean).join('・')||'—','home'],
+            ...(d2?[['送達點 2 聯絡',[d2.contactName,d2.phone||d.phone].filter(Boolean).join('・')||'沿用送達點 1','home']]:[])
+          ];
     const taskValue=`${state.taskName||def.title||serviceLabels[state.service]}${state.serviceCategory&&state.serviceCategory!=='其他'?`｜${state.serviceCategory}`:''}${summaryTaskNote?`\n${summaryTaskNote}`:''}`;
     const optionValue=`${timingLabel()}${state.service==='queue'?`\n預估排隊 ${state.queueMinutes} 分鐘`:state.service==='helper'?`\n預估處理 ${state.taskMinutes} 分鐘`:''}`;
     const group=(title,rows)=>`<section class="ubee-native-checkout-group"><div class="ubee-native-checkout-group-title">${escapeHtml(title)}</div><div class="ubee-native-checkout-list">${rows.map(([label,value,target])=>`<button class="ubee-native-checkout-row" type="button" data-summary-go="${escapeHtml(target)}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><span class="ubee-native-checkout-chevron" aria-hidden="true">›</span></button>`).join('')}</div></section>`;
@@ -21322,7 +21153,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       group('路線',routeRows),
       group('聯絡資訊',contactRows),
       group('任務', [['任務內容',taskValue,'task']]),
-      group('配送', [['執行設定',optionValue,'options']])
+      group(state.service==='drive'?'代駕設定':'配送', [['執行設定',optionValue,'options']])
     ].join('');
   }
 
@@ -21330,8 +21161,8 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(!state.pickup||!state.dropoff){showPage('home');status('flowHomeStatus','請先完成取件地點與送達地點。',true);return}
     if(!validateTask()){showPage('task');return}
     if(!validateOptions()){showPage('options');return}
-    syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowConfirmActionPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在載入路線與正式估價…');
-    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);const priceText=total>0?`NT$${Math.round(total)}`:'待估價';$('flowConfirmPrice').textContent=priceText;$('flowConfirmActionPrice').textContent=priceText;const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'路線已顯示，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
+    syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowConfirmActionPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在計算道路時間與正式估價…');
+    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);const priceText=total>0?`NT$${Math.round(total)}`:'待估價';$('flowConfirmPrice').textContent=priceText;$('flowConfirmActionPrice').textContent=priceText;const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'道路時間已計算，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
   }
 
   async function submitOrder(){
@@ -21355,8 +21186,20 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     try{const date=value?.toDate?value.toDate():new Date(value);if(!date||Number.isNaN(date.getTime()))return'';return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(date)}catch(_){return''}
   }
 
-  function orderStatusText(statusValue){
+  function orderStatusText(statusValue,order=null){
     const key=String(statusValue||'').toLowerCase();
+    if(isCustomerDriveOrder(order||{})){
+      const driveMap={
+        pending_payment:'等待付款',pending_dispatch:'等待小U接單',pending_schedule:'等待代駕媒合',
+        scheduled_reserved:'代駕預約已成立',scheduled_confirmed:'代駕預約已確認',merchant_pending:'等待處理',
+        accepted:'小U已接單',going_to_pickup:'小U正在前往車輛所在地',heading_to_pickup:'小U正在前往車輛所在地',
+        arrived_pickup:'小U已抵達車輛所在地',picked_up:'代駕已開始',
+        going_to_dropoff:'代駕進行中',heading_to_dropoff:'代駕進行中',
+        arrived_dropoff:'小U已抵達代駕目的地',completed:'代駕已完成',done:'代駕已完成',
+        cancelled:'已取消',canceled:'已取消'
+      };
+      return driveMap[key]||'代駕處理中';
+    }
     const map={
       pending_payment:'等待付款',pending_dispatch:'等待小U接單',pending_schedule:'等待預約媒合',
       scheduled_reserved:'預約已保留',scheduled_confirmed:'預約已確認',merchant_pending:'等待處理',
@@ -21422,8 +21265,23 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   function profileOrderStageText(order){
     const status=profileOrderStatusKey(order);
-    if(String(order?.stackRole||'').toUpperCase()==='QUEUED'||order?.stackWaitingAhead===true){
+    const drive=isCustomerDriveOrder(order);
+    if(!drive&&(String(order?.stackRole||'').toUpperCase()==='QUEUED'||order?.stackWaitingAhead===true)){
       return '小U正在完成前序任務';
+    }
+    if(drive){
+      if(status==='pending_payment')return '確認付款後開始媒合代駕小U';
+      if(['pending_schedule','pending_dispatch'].includes(status))return '正在為你媒合代駕小U';
+      if(['scheduled_reserved','scheduled_confirmed'].includes(status))return '代駕預約已承接';
+      if(status==='accepted')return '小U已接單，準備前往車輛所在地';
+      if(['going_to_pickup','heading_to_pickup'].includes(status))return '小U正在前往車輛所在地';
+      if(status==='arrived_pickup')return '小U已抵達車輛所在地，準備車輛交接';
+      if(status==='picked_up')return '車輛交接完成，代駕已開始';
+      if(['going_to_dropoff','heading_to_dropoff'].includes(status))return '代駕進行中';
+      if(status==='arrived_dropoff')return '小U已抵達代駕目的地，準備交車';
+      if(profileOrderIsCompleted(order))return '代駕已完成';
+      if(profileOrderIsCancelled(order))return '代駕已取消';
+      return orderStatusText(status,order);
     }
     if(status==='pending_payment')return '確認付款後開始媒合小U';
     if(status==='merchant_pending')return '正在等待合作店家確認';
@@ -21437,7 +21295,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(status==='arrived_dropoff')return '小U已抵達送達地點';
     if(profileOrderIsCompleted(order))return '任務已完成';
     if(profileOrderIsCancelled(order))return '任務已取消';
-    return orderStatusText(status);
+    return orderStatusText(status,order);
   }
 
   function profileOrderProgressHtml(order){
@@ -21769,11 +21627,6 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(hasValidLatLng(currentLocationLat,currentLocationLng)){
       setHomeLocationUiState('目前位置','已取得目前位置，正在辨識服務地區');
       await syncCurrentLocationHomeUi(currentLocationLat,currentLocationLng);
-      if(customerMap){
-        customerMap.setCenter({lat:Number(currentLocationLat),lng:Number(currentLocationLng)});
-        customerMap.setZoom(16);
-        renderCurrentLocationMarker();
-      }
       return true;
     }
 
@@ -22108,7 +21961,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-drive-v1-3-contact-removed';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-nomap-eta-drive-v1-4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22377,15 +22230,40 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function progressStageMeta(order,status){
-    const stackQueued=String(order?.stackRole||'').toUpperCase()==='QUEUED'||order?.stackWaitingAhead===true;
-    if(stackQueued) return '小U正在完成前序任務，完成後會依序前往取件';
+    const drive=isCustomerDriveOrder(order);
+    const service=String(order?.serviceKey||order?.serviceMode||'').trim().toLowerCase();
+    const stackQueued=!drive&&(String(order?.stackRole||'').toUpperCase()==='QUEUED'||order?.stackWaitingAhead===true);
+    if(stackQueued) return '小U正在完成前序任務，完成後會依序前往';
+    if(drive){
+      if(['pending_payment'].includes(status)) return '確認訂單後開始媒合代駕小U';
+      if(['pending_schedule','pending_dispatch'].includes(status)) return '正在為你媒合代駕小U';
+      if(['scheduled_reserved','scheduled_confirmed'].includes(status)) return '小U已承接代駕預約';
+      if(['accepted','going_to_pickup','heading_to_pickup'].includes(status)) return '小U正在前往車輛所在地';
+      if(status==='arrived_pickup') return '小U已抵達車輛所在地，準備車輛交接';
+      if(status==='picked_up') return '車輛交接完成，代駕已開始';
+      if(['going_to_dropoff','heading_to_dropoff'].includes(status)) return '代駕進行中';
+      if(status==='arrived_dropoff') return '小U已抵達代駕目的地，準備完成交車';
+      if(['completed','done'].includes(status)) return '代駕已完成';
+      if(['cancelled','canceled'].includes(status)) return '代駕已取消';
+      return '代駕狀態同步中';
+    }
     if(['pending_payment'].includes(status)) return '確認訂單後開始媒合小U';
     if(['merchant_pending'].includes(status)) return '正在等待合作店家確認';
     if(['pending_schedule','pending_dispatch'].includes(status)) return '正在為你尋找小U';
     if(['scheduled_reserved','scheduled_confirmed'].includes(status)) return '小U已承接預約任務';
-    if(['accepted','going_to_pickup','heading_to_pickup'].includes(status)) return '小U正在前往取件';
-    if(status==='arrived_pickup') return '小U已抵達取件地點';
-    if(status==='picked_up') return '小U已完成取件，準備開始配送';
+    if(['accepted','going_to_pickup','heading_to_pickup'].includes(status)){
+      if(service==='buy')return '小U正在前往購買店家';
+      if(service==='queue')return '小U正在前往排隊地點';
+      if(service==='helper'||order?.singlePointTask===true)return '小U正在前往任務地點';
+      return '小U正在前往取件';
+    }
+    if(status==='arrived_pickup'){
+      if(service==='buy')return '小U已抵達購買店家';
+      if(service==='queue')return '小U已抵達排隊地點';
+      if(service==='helper'||order?.singlePointTask===true)return '小U已抵達任務地點';
+      return '小U已抵達取件地點';
+    }
+    if(status==='picked_up') return order?.singlePointTask===true?'現場任務處理中':'小U已完成取件，準備開始配送';
     if(['going_to_dropoff','heading_to_dropoff'].includes(status)) return '小U正在配送途中';
     if(status==='arrived_dropoff') return '小U已抵達送達地點';
     if(['completed','done'].includes(status)) return '任務已完成';
@@ -22429,7 +22307,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     card.classList.toggle('show',assigned);
     if(!assigned) return;
     const name = safe(order?.riderName || summaryRider.name) || 'UBee 小U';
-    const vehicle = safe(order?.riderVehicleType || order?.vehicleType || summaryRider.vehicleType) || '配送夥伴';
+    const vehicle = safe(order?.riderVehicleType || order?.vehicleType || summaryRider.vehicleType) || (isCustomerDriveOrder(order)?'代駕小U':'任務小U');
     const locationAt = Number(order?.riderLocationUpdatedAtMs || summaryRider.locationHealth?.updatedAtMs || 0);
     const stackQueued = String(order?.stackRole || '').toUpperCase() === 'QUEUED' || order?.stackWaitingAhead === true;
     byId('ubeeCustomerRiderName').textContent = name;
@@ -22454,8 +22332,18 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(title)title.textContent=progressStageMeta(order,status);
     const etaEl=byId('flowHomeActiveTaskEta');
     const remaining=byId('flowHomeActiveTaskRemaining');
-    if(etaEl)etaEl.textContent=eta?.windowText||'預計送達時間計算中';
-    if(remaining)remaining.textContent=eta?.remainingText||'取得最新路況後自動更新';
+    const phaseEta=typeof getTrackingEtaPresentation==='function'?getTrackingEtaPresentation(order):null;
+    const moving=['accepted','going_to_pickup','heading_to_pickup','picked_up','going_to_dropoff','heading_to_dropoff'].includes(String(status||''));
+    if(etaEl){
+      etaEl.textContent=moving && phaseEta?.available
+        ? `${phaseEta.primary}抵達`
+        : (eta?.windowText||(isCustomerDriveOrder(order)?'預計抵達時間計算中':'預計完成時間計算中'));
+    }
+    if(remaining){
+      remaining.textContent=moving && phaseEta?.available
+        ? `${getCustomerServiceEtaTargetLabel(order,status)}・${phaseEta.label}`
+        : (eta?.remainingText||'取得最新路況後自動更新');
+    }
     renderSegmentedProgress(byId('flowHomeMiniProgress'),status);
   }
 
