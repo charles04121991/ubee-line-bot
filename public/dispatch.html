@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<!-- 2026-09-29｜Drive Service V1：調度中心識別代駕任務並顯示車輛交接摘要。 -->
 <!-- 2026-09-23｜Dispatch Multi-stop & Finance Sync V1：完整顯示多點配送、+NT$50 多點費與代墊資訊；對齊最新版 index Dashboard contract。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1.1：顯示 Google Routes 真實銜接與 QUEUED Live ETA。 -->
 <!-- 2026-09-18｜UBee Smart Stack V1：調度中心顯示 CURRENT／QUEUED、疊單群組與下一筆任務。 -->
@@ -2860,6 +2861,7 @@ function renderOrders(){
               ${riderVisibilityBadge(order)}
               <span class="badge">${esc(order.statusLabel || order.status || '-')}</span>
               ${order.serviceType?`<span class="badge blue">${esc(order.serviceType)}</span>`:''}
+              ${String(order.serviceKey||order.serviceMode||'').toLowerCase()==='drive'?`<span class="badge warn">代駕</span>`:''}
               ${order.serviceCategory?`<span class="badge">${esc(order.serviceCategory)}</span>`:''}
               ${dispatchStopCount(order)>1?`<span class="badge blue">多點 ${esc(dispatchStopCount(order))} 點</span>`:''}
               ${smartStackBadge(order)}
@@ -3123,6 +3125,7 @@ function renderCandidates(){
       ${dispatchStopCount(order)>1?`<span style="color:var(--blue);font-weight:1000">多點配送：${esc(dispatchStopCount(order))} 點｜多點配送費 ${esc(dispatchMoney(order.multiStopFee||0))}</span><br>`:''}
       ${dispatchAdvancePayment(order)>0?`預估代墊：<b style="color:#111">${esc(dispatchMoney(dispatchAdvancePayment(order)))}</b><br>`:''}
       任務：${esc(order.serviceType || 'UBee 任務')}${order.serviceCategory?`｜${esc(order.serviceCategory)}`:''}<br>
+      ${String(order.serviceKey||order.serviceMode||'').toLowerCase()==='drive'&&order.driveVehicle?`代駕車輛：${esc(order.driveVehicle.plate||'-')}｜${esc(order.driveVehicle.makeModel||'-')}｜${esc(order.driveVehicle.transmission==='manual'?'手排':'自排')}<br>`:''}
       狀態：${esc(order.statusLabel || order.status || '-')}<br>
       ${!isWaiting?`目前小U：<b style="color:#111">${esc(order.riderName||order.riderId||order.riderDocId||'-')}</b><br>`:''}
       ${riskBadge(order.riskLevel,order.riskScore)}
