@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- 2026-09-29｜Customer Rating Lock V1.4.3：評價成功後立即永久鎖定該訂單的再次評價入口；Server riderRatingSubmitted + 本機即時鎖雙重判斷，列表／詳情／完成任務 Gate 共用同一狀態。 -->
+<!-- 2026-09-29｜Customer State Sync V1.4.2：以主訂單 API 為唯一優先狀態來源，追蹤摘要只在主同步失聯時備援；加入版本時間防回退、統一 canonical status，並將可見頁輪詢縮短為 2 秒。 -->
 <!-- 2026-09-29｜Customer Active Meta Fix V1.4.1：修復建立時間使用 createdAtMs；進行中任務新增固定可見「建立時間／預計幾分鐘抵達」資訊列；ETA 同時支援 tracking summary 與 customerLiveEta canonical fallback。 -->
 <!-- 2026-09-29｜Customer No-Map + Universal ETA + Drive Semantic V1.4：用戶端移除所有可視地圖；保留定位、地址搜尋、Geocode、Routes、距離、ETA、正式估價。六大服務共用階段 ETA，代駕使用獨立車輛／交接語意。 -->
 <!-- 2026-09-29｜Customer Contact Removal V1.3：完整移除 Order Chat 即時對話 UI、事件與 API 呼叫；保留既有 PWA、通知、地址、估價與訂單核心。 -->
@@ -59,7 +61,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260929-customer-nomap-eta-drive-v1-4-1" rel="manifest"/>
+<link href="/manifest-order.json?v=20260929-customer-rating-lock-v1-4-3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -6403,6 +6405,109 @@ body.ubee-my-subpage-open #productionOrderFlow[data-my-section="rewards"] .ubee-
 }
 </style>
 
+
+
+<script id="ubee-customer-rating-lock-v1-4-3-script">
+(() => {
+  'use strict';
+
+  if(window.UBeeCustomerRatingLockV1) return;
+
+  const STORAGE_KEY='ubee_customer_rated_orders_v1';
+  const MAX_ENTRIES=500;
+  const MAX_AGE_MS=365*24*60*60*1000;
+
+  const normalize=value=>String(value||'').trim().toUpperCase();
+
+  function read(){
+    try{
+      const raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+      return raw && typeof raw==='object' && !Array.isArray(raw) ? raw : {};
+    }catch(_){
+      return {};
+    }
+  }
+
+  function write(registry){
+    try{
+      const now=Date.now();
+      const entries=Object.entries(registry||{})
+        .filter(([id,meta])=>{
+          const at=Number(meta?.ratedAtMs||0);
+          return normalize(id) && (!at || now-at<=MAX_AGE_MS);
+        })
+        .sort((a,b)=>Number(b[1]?.ratedAtMs||0)-Number(a[1]?.ratedAtMs||0))
+        .slice(0,MAX_ENTRIES);
+
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(Object.fromEntries(entries)));
+    }catch(_){}
+  }
+
+  function mark(orderId,meta={}){
+    const id=normalize(orderId);
+    if(!id) return false;
+    const registry=read();
+    registry[id]={
+      ratedAtMs:Number(meta?.ratedAtMs||Date.now()),
+      rating:Number(meta?.rating||0)||0
+    };
+    write(registry);
+    return true;
+  }
+
+  function has(orderOrId){
+    if(orderOrId && typeof orderOrId==='object'){
+      const order=orderOrId;
+      const id=normalize(order.id||order.orderId);
+      if(order.riderRatingSubmitted===true){
+        if(id) mark(id,{
+          ratedAtMs:Number(order.riderRatedAtMs||Date.now()),
+          rating:Number(order.riderRating?.rating||order.riderRating||order.riderRatingValue||0)
+        });
+        return true;
+      }
+      if(!id) return false;
+      return Boolean(read()[id]);
+    }
+
+    const id=normalize(orderOrId);
+    return Boolean(id && read()[id]);
+  }
+
+  function apply(order){
+    if(!order || typeof order!=='object') return order;
+    const id=normalize(order.id||order.orderId);
+    if(!id) return order;
+    const registry=read();
+    const local=registry[id];
+
+    if(order.riderRatingSubmitted===true){
+      mark(id,{
+        ratedAtMs:Number(order.riderRatedAtMs||local?.ratedAtMs||Date.now()),
+        rating:Number(order.riderRating?.rating||order.riderRating||order.riderRatingValue||local?.rating||0)
+      });
+      return order;
+    }
+
+    if(local){
+      return {
+        ...order,
+        riderRatingSubmitted:true,
+        riderRating:Number(order.riderRating||order.riderRatingValue||local.rating||0),
+        riderRatedAtMs:Number(order.riderRatedAtMs||local.ratedAtMs||0)
+      };
+    }
+
+    return order;
+  }
+
+  window.UBeeCustomerRatingLockV1=Object.freeze({
+    has,
+    mark,
+    apply
+  });
+})();
+</script>
 
 <style id="ubee-customer-rider-rating-v1-style">
 /* UBee Customer → Rider Rating Full Screen V1.3 */
@@ -15460,11 +15565,10 @@ function renderTimeline(status, order){
   };
 
   const currentStatus =
-    String(
-      status ||
-      data.status ||
-      'pending_payment'
-    ).trim();
+    getCustomerCanonicalStatus(
+      data,
+      status || 'pending_payment'
+    );
 
   /* ==============================
      外送詳細資訊金額
@@ -16317,11 +16421,7 @@ function syncCustomerLiveTracking(order){
 
 
   const status =
-    String(
-      order.status || ''
-    )
-      .trim()
-      .toLowerCase();
+    getCustomerCanonicalStatus(order,'');
 
 
 const riderAssigned =
@@ -16502,6 +16602,127 @@ if(trackedRiderPosition){
 
 }
 
+
+function getCustomerOrderStateVersionMs(order = {}){
+  const status = String(
+    order?.status ||
+    order?.riderStatus ||
+    order?._trackingSummary?.status ||
+    ''
+  ).trim().toLowerCase();
+
+  const statusTimeRaw = order?.statusTimes?.[status];
+  const statusTime =
+    Number(statusTimeRaw?.toMillis?.() || 0) ||
+    Number(statusTimeRaw?.seconds ? statusTimeRaw.seconds * 1000 : 0) ||
+    Number(statusTimeRaw || 0);
+
+  return Math.max(
+    0,
+    Number(order?.updatedAtMs || 0),
+    Number(order?.trackingUpdatedAtMs || 0),
+    Number(order?._trackingSummary?.updatedAtMs || 0),
+    Number(statusTime || 0)
+  );
+}
+
+function getCustomerCanonicalStatus(order = {}, fallbackStatus = ''){
+  const baseStatus = String(
+    order?.status ||
+    order?.riderStatus ||
+    fallbackStatus ||
+    ''
+  ).trim().toLowerCase();
+
+  const trackingStatus = String(
+    order?._trackingSummary?.status || ''
+  ).trim().toLowerCase();
+
+  if(!trackingStatus) return baseStatus || 'pending_payment';
+  if(!baseStatus) return trackingStatus;
+
+  const orderVersion = Math.max(
+    Number(order?.updatedAtMs || 0),
+    Number(order?.trackingUpdatedAtMs || 0)
+  );
+  const trackingVersion = Number(
+    order?._trackingSummary?.updatedAtMs || 0
+  );
+
+  return trackingVersion > orderVersion
+    ? trackingStatus
+    : baseStatus;
+}
+
+function mergeCustomerOrderState(baseOrder = {}, incomingOrder = {}, source = 'unknown'){
+  const base = baseOrder && typeof baseOrder === 'object' ? baseOrder : {};
+  const incoming = incomingOrder && typeof incomingOrder === 'object' ? incomingOrder : {};
+
+  const baseVersion = getCustomerOrderStateVersionMs(base);
+  const incomingVersion = getCustomerOrderStateVersionMs(incoming);
+
+  // 若備援／較慢請求比目前畫面資料舊，禁止把任務狀態倒退。
+  if(
+    baseVersion > 0 &&
+    incomingVersion > 0 &&
+    incomingVersion < baseVersion
+  ){
+    const merged = {...base};
+
+    // 位置資料可獨立採用較新的 GPS，不因狀態較舊而整包丟棄。
+    const baseLocationAt = Number(
+      base?.riderLocationUpdatedAtMs ||
+      base?._trackingSummary?.rider?.locationHealth?.updatedAtMs ||
+      0
+    );
+    const incomingLocationAt = Number(
+      incoming?.riderLocationUpdatedAtMs ||
+      incoming?._trackingSummary?.rider?.locationHealth?.updatedAtMs ||
+      0
+    );
+
+    if(incomingLocationAt > baseLocationAt){
+      [
+        'riderCurrentLat',
+        'riderCurrentLng',
+        'riderLocationUpdatedAtMs',
+        'riderHeading',
+        'riderSpeed',
+        'riderLocationAccuracy'
+      ].forEach(key => {
+        if(incoming[key] !== undefined) merged[key] = incoming[key];
+      });
+
+      if(incoming._trackingSummary){
+        merged._trackingSummary = {
+          ...(base._trackingSummary || {}),
+          ...(incoming._trackingSummary || {}),
+          status:base._trackingSummary?.status || base.status || incoming._trackingSummary?.status
+        };
+      }
+    }
+
+    merged._stateSyncSource = `${source}:stale-rejected`;
+    merged._stateSyncVersionMs = baseVersion;
+    return merged;
+  }
+
+  const merged = {
+    ...base,
+    ...incoming
+  };
+
+  const canonicalStatus = getCustomerCanonicalStatus(merged, incoming.status || base.status);
+  if(canonicalStatus){
+    merged.status = canonicalStatus;
+    merged.riderStatus = canonicalStatus;
+  }
+
+  merged._stateSyncSource = source;
+  merged._stateSyncVersionMs = Math.max(baseVersion, incomingVersion);
+  return merged;
+}
+
 function startOrderListener(orderId){
   if(orderUnsubscribe){
     try{ orderUnsubscribe(); }catch(_){ }
@@ -16520,40 +16741,62 @@ function startOrderListener(orderId){
     inFlight = true;
     try{
       const data = await customerApiFetch(`/api/orders/${encodeURIComponent(safeOrderId)}?t=${Date.now()}`);
-      const order = {
-        ...(currentOrderData || {}),
+
+      const incomingOrder = {
         ...(data.summary || {}),
         ...(data.order || {}),
         id:safeOrderId
       };
 
-      // Customer Live Tracking V1.1：
-      // /api/orders/:id 已直接帶安全 tracking 摘要。
-      // 主輪詢立即更新「已接單／小U／GPS／ETA」，不再等待 5 秒備援 API。
+      // 主訂單 API 是正常連線時唯一優先狀態來源。
       if(
         data.tracking &&
         typeof data.tracking === 'object'
       ){
-        order._trackingSummary = data.tracking;
-        order.riderAssigned =
+        incomingOrder._trackingSummary = data.tracking;
+        incomingOrder.riderAssigned =
           data.tracking?.rider?.assigned === true;
 
+        // tracking.updatedAtMs 是後端狀態／追蹤資料版本。
+        incomingOrder.trackingUpdatedAtMs = Math.max(
+          Number(incomingOrder.trackingUpdatedAtMs || 0),
+          Number(data.tracking?.updatedAtMs || 0)
+        );
+
+        if(data.tracking?.status){
+          const trackingVersion = Number(data.tracking?.updatedAtMs || 0);
+          const orderVersion = Number(incomingOrder.updatedAtMs || 0);
+          if(trackingVersion > orderVersion){
+            incomingOrder.status = String(data.tracking.status);
+            incomingOrder.riderStatus = String(data.tracking.status);
+          }
+        }
+
         if(data.tracking?.rider?.name){
-          order.riderName =
+          incomingOrder.riderName =
             String(data.tracking.rider.name);
         }
 
         if(data.tracking?.rider?.vehicleType){
-          order.riderVehicleType =
+          incomingOrder.riderVehicleType =
             String(data.tracking.rider.vehicleType);
         }
       }
 
-      currentOrderData = order;
+      const order = mergeCustomerOrderState(
+        currentOrderData || {},
+        incomingOrder,
+        'main-order-api'
+      );
+
+      currentOrderData =
+        window.UBeeCustomerRatingLockV1?.apply?.(order) ||
+        order;
+      window.__ubeeCustomerMainOrderSyncAtMs = Date.now();
       currentOrderId = safeOrderId;
       localStorage.setItem('ubee_current_order_id', safeOrderId);
       setOrderNo(safeOrderId);
-      renderTimeline(order.status || 'pending_payment', order);
+      renderTimeline(getCustomerCanonicalStatus(order,'pending_payment'), order);
       syncCustomerLiveTracking(order);
 
       // 不等 MutationObserver / 5 秒 UI fallback，主輪詢完成後立即刷新 Rider Card 與進度。
@@ -16563,7 +16806,7 @@ function startOrderListener(orderId){
         cacheCustomerTrackingOrder(order);
       }
 
-      if(['completed','done','cancelled','canceled'].includes(String(order.status || '').toLowerCase())){
+      if(['completed','done','cancelled','canceled'].includes(getCustomerCanonicalStatus(order,''))){
         if(currentCustomerPage === 'customerProfilePage') renderCustomerMemberInfo();
         if(currentCustomerPage === 'customerTasksPage') renderRecentTasks();
         clearCurrentOrderCache();
@@ -16582,7 +16825,7 @@ function startOrderListener(orderId){
   };
 
   poll();
-  timer = setInterval(poll, 4000);
+  timer = setInterval(poll, 2000);
   const visibilityHandler = () => {
     if(document.visibilityState === 'visible') poll();
   };
@@ -18494,7 +18737,7 @@ activateUBeeCustomerRuntime();
    ========================================================= */
 (function initUBeeCustomerTrackingPhase3(){
   const CACHE_PREFIX = 'ubee_customer_tracking_v3_';
-  const FALLBACK_INTERVAL_MS = 5000;
+  const FALLBACK_INTERVAL_MS = 6000;
   let fallbackTimer = null;
   let fallbackRequestSeq = 0;
   let lastTrackingUpdateAtMs = 0;
@@ -18616,6 +18859,8 @@ activateUBeeCustomerRuntime();
       estimatedPickupMinutes:summary.eta?.estimatedPickupMinutes,
       estimatedCompletionMinutes:summary.eta?.estimatedCompletionMinutes,
       trackingServerTimeMs:summary.serverTimeMs || 0,
+      trackingUpdatedAtMs:summary.updatedAtMs || 0,
+      updatedAtMs:summary.updatedAtMs || 0,
       riderAssigned:rider.assigned === true,
       riderName:rider.name || '',
       riderId:rider.assigned ? (currentOrderData?.riderId || 'assigned') : '',
@@ -18649,11 +18894,24 @@ activateUBeeCustomerRuntime();
       if(seq !== fallbackRequestSeq) return null;
       if(!response.ok || data.success === false || !data.tracking) throw new Error(data.error || '追蹤資料讀取失敗');
       const apiOrder = trackingToOrder(data.tracking);
-      const merged = {...(currentOrderData || {}),...apiOrder};
+      apiOrder.updatedAtMs = Math.max(
+        Number(apiOrder.updatedAtMs || 0),
+        Number(data.tracking?.updatedAtMs || 0)
+      );
+      apiOrder.trackingUpdatedAtMs = Math.max(
+        Number(apiOrder.trackingUpdatedAtMs || 0),
+        Number(data.tracking?.updatedAtMs || 0)
+      );
+
+      const merged = mergeCustomerOrderState(
+        currentOrderData || {},
+        apiOrder,
+        'tracking-fallback'
+      );
       currentOrderData = merged;
       currentOrderId = id;
       if(typeof setOrderNo === 'function') setOrderNo(id);
-      if(typeof renderTimeline === 'function') renderTimeline(merged.status,merged);
+      if(typeof renderTimeline === 'function') renderTimeline(getCustomerCanonicalStatus(merged,''),merged);
       if(typeof syncCustomerLiveTracking === 'function') syncCustomerLiveTracking(merged);
       handleOrder(merged,'api');
       if(!silent && typeof window.showStatus === 'function') window.showStatus('已同步最新任務進度',true);
@@ -18672,9 +18930,13 @@ activateUBeeCustomerRuntime();
   function scheduleFallback(){
     clearInterval(fallbackTimer);
     fallbackTimer = setInterval(()=>{
-      if(!document.hidden && navigator.onLine && currentOrderId){
-        fetchTrackingSummary(currentOrderId,{silent:true});
-      }
+      if(document.hidden || !navigator.onLine || !currentOrderId) return;
+
+      // 主訂單 API 正常時，不讓備援追蹤 API 與主狀態競爭。
+      const mainSyncAt = Number(window.__ubeeCustomerMainOrderSyncAtMs || 0);
+      if(mainSyncAt && Date.now() - mainSyncAt < 5000) return;
+
+      fetchTrackingSummary(currentOrderId,{silent:true});
     },FALLBACK_INTERVAL_MS);
   }
 
@@ -21436,9 +21698,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function profileOrderRatingHtml(order){
+    order=window.UBeeCustomerRatingLockV1?.apply?.(order)||order;
     const orderId=getCustomerOrderIdV1(order);
     if(!orderId||!profileOrderIsCompleted(order))return'';
-    const rated=order?.riderRatingSubmitted===true;
+    const rated=window.UBeeCustomerRatingLockV1?.has?.(order)===true;
     const rating=Math.max(0,Math.min(5,Math.round(Number(order?.riderRating||order?.riderRatingValue||0))));
     const riderName=String(order?.riderName||order?.rider?.name||'這位小U').trim()||'這位小U';
     if(rated){
@@ -21512,6 +21775,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
 
   function renderProfileOrderCancelAction(order){
+    order=window.UBeeCustomerRatingLockV1?.apply?.(order)||order;
     const target=$('flowProfileDetailActions');
     if(!target)return;
 
@@ -21519,7 +21783,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const canCancel=Boolean(orderId)&&isCustomerOrderCancellableV1(order);
     const statusKey=String(order?.status||'').trim().toLowerCase();
     const completed=['completed','done'].includes(statusKey);
-    const rated=order?.riderRatingSubmitted===true;
+    const rated=window.UBeeCustomerRatingLockV1?.has?.(order)===true;
     const ratingValue=Math.max(0,Math.min(5,Number(order?.riderRating||order?.riderRatingValue||0)));
     const riderName=String(order?.riderName||'這位小U').trim()||'這位小U';
 
@@ -21809,8 +22073,13 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       if(ratingStar){
         event.preventDefault();
         event.stopPropagation();
+        const ratingOrderId=String(ratingStar.dataset.listRatingOrder||'').trim().toUpperCase();
+        if(window.UBeeCustomerRatingLockV1?.has?.(ratingOrderId)){
+          renderTaskList({silent:true}).catch(()=>{});
+          return;
+        }
         window.UBeeCustomerRiderRatingV1?.open?.(
-          String(ratingStar.dataset.listRatingOrder||'').trim().toUpperCase(),
+          ratingOrderId,
           String(ratingStar.dataset.listRatingRider||'這位小U'),
           Math.max(1,Math.min(5,Number(ratingStar.dataset.listRatingValue||0)))
         );
@@ -21836,8 +22105,16 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
       if(ratingButton){
         event.preventDefault();
         event.stopPropagation();
+        const ratingOrderId=String(ratingButton.dataset.detailRateOrder||'').trim().toUpperCase();
+        if(window.UBeeCustomerRatingLockV1?.has?.(ratingOrderId)){
+          if(state.selectedProfileOrder){
+            state.selectedProfileOrder=window.UBeeCustomerRatingLockV1.apply(state.selectedProfileOrder);
+            renderProfileOrderCancelAction(state.selectedProfileOrder);
+          }
+          return;
+        }
         window.UBeeCustomerRiderRatingV1?.open?.(
-          String(ratingButton.dataset.detailRateOrder||'').trim().toUpperCase(),
+          ratingOrderId,
           String(ratingButton.dataset.detailRateRider||'這位小U')
         );
         return;
@@ -21945,6 +22222,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     const detail=event?.detail||{};
     const orderId=String(detail.orderId||'').trim().toUpperCase();
     if(!orderId)return;
+
+    window.UBeeCustomerRatingLockV1?.mark?.(orderId,{
+      rating:Number(detail.rating||0),
+      ratedAtMs:Date.now()
+    });
 
     state.profileOrders=state.profileOrders.map(item=>
       getCustomerOrderIdV1(item)===orderId
@@ -22068,7 +22350,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-nomap-eta-drive-v1-4-1';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-rating-lock-v1-4-3';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
@@ -22286,7 +22568,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 
   const byId = id => document.getElementById(id);
   const safe = value => String(value ?? '').trim();
-  const statusOf = order => safe(order?.status || currentOrderData?.status).toLowerCase();
+  const statusOf = order => safe(getCustomerCanonicalStatus(order || currentOrderData || {},'')).toLowerCase();
   const hasActiveOrder = () => {
     const id = safe((typeof currentOrderId !== 'undefined' ? currentOrderId : '') || localStorage.getItem('ubee_current_order_id'));
     const status = statusOf(typeof currentOrderData !== 'undefined' ? currentOrderData : null);
@@ -28187,6 +28469,16 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     const safeId=normalizeOrderId(orderId);
     if(!safeId) return;
 
+    // Rating Lock V1.4.3：已評價訂單不得再次開啟評價畫面。
+    if(window.UBeeCustomerRatingLockV1?.has?.(safeId)){
+      clearOpenTimer();
+      state.scheduledOrderId='';
+      if(state.active&&state.orderId===safeId){
+        releaseGate({alreadyRated:true});
+      }
+      return;
+    }
+
     clearOpenTimer();
     state.scheduledOrderId='';
     state.orderId=safeId;
@@ -28299,6 +28591,12 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
         riderRatingSummary:data?.riderRatingSummary||null
       };
 
+      // API 成功後先寫本機評價鎖，再更新任何畫面，避免成功動畫結束後又被舊快取重新打開。
+      window.UBeeCustomerRatingLockV1?.mark?.(state.orderId,{
+        rating:state.rating,
+        ratedAtMs:Date.now()
+      });
+
       if(
         typeof currentOrderData!=='undefined' &&
         currentOrderData &&
@@ -28319,6 +28617,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     }catch(error){
       // 若另一裝置／先前流程已經成功評價，不能把客人永久卡在全螢幕。
       if(error?.code==='RATING_ALREADY_SUBMITTED' || /已經評價過/.test(String(error?.message||''))){
+        window.UBeeCustomerRatingLockV1?.mark?.(state.orderId,{ratedAtMs:Date.now()});
         if(
           typeof currentOrderData!=='undefined' &&
           currentOrderData &&
@@ -28356,7 +28655,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
     );
     if(!orderId) return;
 
-    if(data.riderRatingSubmitted===true){
+    if(window.UBeeCustomerRatingLockV1?.has?.(data)===true || window.UBeeCustomerRatingLockV1?.has?.(orderId)===true){
       if(state.active&&state.orderId===orderId){
         releaseGate({alreadyRated:true});
       }
@@ -28375,7 +28674,7 @@ body.ubee-keyboard-open #productionOrderFlow .ubee-my-panel{
         typeof currentOrderData!=='undefined' &&
         currentOrderData &&
         ['completed','done'].includes(String(currentOrderData.status||'').trim().toLowerCase()) &&
-        currentOrderData.riderRatingSubmitted!==true
+        window.UBeeCustomerRatingLockV1?.has?.(currentOrderData)!==true
       ){
         renderActive(currentOrderData);
       }
