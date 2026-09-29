@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 2026-09-29｜Customer Critical Sync V1.4.4：修復正式訂單完成後舊表單被 autosave 成「未完成任務」草稿；主訂單與 tracking 狀態改為同請求 canonical 狀態，補強狀態版本與前景立即同步。 -->
 <!-- 2026-09-29｜Customer Rating Lock V1.4.3：評價成功後立即永久鎖定該訂單的再次評價入口；Server riderRatingSubmitted + 本機即時鎖雙重判斷，列表／詳情／完成任務 Gate 共用同一狀態。 -->
 <!-- 2026-09-29｜Customer State Sync V1.4.2：以主訂單 API 為唯一優先狀態來源，追蹤摘要只在主同步失聯時備援；加入版本時間防回退、統一 canonical status，並將可見頁輪詢縮短為 2 秒。 -->
 <!-- 2026-09-29｜Customer Active Meta Fix V1.4.1：修復建立時間使用 createdAtMs；進行中任務新增固定可見「建立時間／預計幾分鐘抵達」資訊列；ETA 同時支援 tracking summary 與 customerLiveEta canonical fallback。 -->
@@ -61,7 +62,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20260929-customer-rating-lock-v1-4-3" rel="manifest"/>
+<link href="/manifest-order.json?v=20260929-customer-critical-sync-v1-4-4" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -16619,6 +16620,8 @@ function getCustomerOrderStateVersionMs(order = {}){
 
   return Math.max(
     0,
+    Number(order?.statusUpdatedAtMs || 0),
+    Number(order?.customerTrackingUpdatedAtMs || 0),
     Number(order?.updatedAtMs || 0),
     Number(order?.trackingUpdatedAtMs || 0),
     Number(order?._trackingSummary?.updatedAtMs || 0),
@@ -16642,14 +16645,16 @@ function getCustomerCanonicalStatus(order = {}, fallbackStatus = ''){
   if(!baseStatus) return trackingStatus;
 
   const orderVersion = Math.max(
-    Number(order?.updatedAtMs || 0),
+    Number(order?.statusUpdatedAtMs || 0),
+    Number(order?.customerTrackingUpdatedAtMs || 0),
+    Number(order?.updatedAtMs || 0)
+  );
+  const trackingVersion = Math.max(
+    Number(order?._trackingSummary?.updatedAtMs || 0),
     Number(order?.trackingUpdatedAtMs || 0)
   );
-  const trackingVersion = Number(
-    order?._trackingSummary?.updatedAtMs || 0
-  );
 
-  return trackingVersion > orderVersion
+  return trackingVersion >= orderVersion
     ? trackingStatus
     : baseStatus;
 }
@@ -16762,14 +16767,18 @@ function startOrderListener(orderId){
           Number(incomingOrder.trackingUpdatedAtMs || 0),
           Number(data.tracking?.updatedAtMs || 0)
         );
+        incomingOrder.customerTrackingUpdatedAtMs = Math.max(
+          Number(incomingOrder.customerTrackingUpdatedAtMs || 0),
+          Number(data.tracking?.updatedAtMs || 0)
+        );
+        incomingOrder.statusUpdatedAtMs = Math.max(
+          Number(incomingOrder.statusUpdatedAtMs || 0),
+          Number(data.tracking?.updatedAtMs || 0)
+        );
 
         if(data.tracking?.status){
-          const trackingVersion = Number(data.tracking?.updatedAtMs || 0);
-          const orderVersion = Number(incomingOrder.updatedAtMs || 0);
-          if(trackingVersion > orderVersion){
-            incomingOrder.status = String(data.tracking.status);
-            incomingOrder.riderStatus = String(data.tracking.status);
-          }
+          incomingOrder.status = String(data.tracking.status).trim().toLowerCase();
+          incomingOrder.riderStatus = incomingOrder.status;
         }
 
         if(data.tracking?.rider?.name){
@@ -16809,6 +16818,15 @@ function startOrderListener(orderId){
       if(['completed','done','cancelled','canceled'].includes(getCustomerCanonicalStatus(order,''))){
         if(currentCustomerPage === 'customerProfilePage') renderCustomerMemberInfo();
         if(currentCustomerPage === 'customerTasksPage') renderRecentTasks();
+
+        document.getElementById('draftBanner')?.remove();
+        try{
+          const draftClearResult=window.UBeeEnhancements?.clearDraft?.();
+          draftClearResult?.catch?.(error=>console.warn('完成訂單後清理草稿失敗：',error));
+        }catch(error){
+          console.warn('完成訂單後清理草稿失敗：',error);
+        }
+
         clearCurrentOrderCache();
         stopped = true;
         if(timer) clearInterval(timer);
@@ -16825,16 +16843,20 @@ function startOrderListener(orderId){
   };
 
   poll();
-  timer = setInterval(poll, 2000);
+  timer = setInterval(poll, 1500);
   const visibilityHandler = () => {
     if(document.visibilityState === 'visible') poll();
   };
   document.addEventListener('visibilitychange', visibilityHandler);
+  window.addEventListener('focus', visibilityHandler);
+  window.addEventListener('pageshow', visibilityHandler);
 
   orderUnsubscribe = () => {
     stopped = true;
     if(timer) clearInterval(timer);
     document.removeEventListener('visibilitychange', visibilityHandler);
+    window.removeEventListener('focus', visibilityHandler);
+    window.removeEventListener('pageshow', visibilityHandler);
   };
 }
 
@@ -18284,7 +18306,44 @@ const UBeeEnhancements = (() => {
     }
   }
 
+  function shouldSuppressFormalOrderDraftAutosave(){
+    try{
+      const liveOrderId=String(
+        (typeof currentOrderId!=='undefined' ? currentOrderId : '') ||
+        localStorage.getItem('ubee_current_order_id') ||
+        ''
+      ).trim();
+
+      const liveStatus=String(
+        (typeof currentOrderData!=='undefined' ? currentOrderData?.status : '') ||
+        ''
+      ).trim().toLowerCase();
+
+      const inFormalOrderUi=
+        Number(typeof currentStep!=='undefined' ? currentStep : 0)===5 ||
+        document.body.classList.contains('ubee-active-order');
+
+      return Boolean(
+        liveOrderId ||
+        inFormalOrderUi ||
+        ['pending_payment','pending_schedule','scheduled_reserved','scheduled_confirmed',
+         'pending_dispatch','accepted','going_to_pickup','heading_to_pickup','arrived_pickup',
+         'picked_up','going_to_dropoff','heading_to_dropoff','arrived_dropoff',
+         'completed','done','cancelled','canceled'].includes(liveStatus)
+      );
+    }catch(_){
+      return false;
+    }
+  }
+
   function saveDraft(){
+    if(shouldSuppressFormalOrderDraftAutosave()){
+      clearTimeout(state.draftTimer);
+      clearTimeout(state.cloudDraftTimer);
+      document.getElementById('draftBanner')?.remove();
+      return;
+    }
+
     const d=collectDraft();
     if(!isMeaningfulDraft(d))return;
     state.editSeq+=1;
@@ -18376,6 +18435,7 @@ const UBeeEnhancements = (() => {
 
   function offerDraft(d=readLocalDraft()){
     document.getElementById('draftBanner')?.remove();
+    if(shouldSuppressFormalOrderDraftAutosave())return;
     if(!d||!draftTimeMs(d))return;
     if(Date.now()-draftTimeMs(d)>CLOUD_DRAFT_TTL_MS){clearDraft();return;}
     const el=document.createElement('div');
@@ -18502,6 +18562,7 @@ const UBeeEnhancements = (() => {
   async function init(){await refreshCustomerContext();renderShoppingItems();document.querySelectorAll('#step1 input,#step2 input,#step2 textarea,#step2 select').forEach(el=>el.addEventListener('input',()=>{scheduleDraft();clearFieldErrors();updateMatchStatus()}));const observer=new MutationObserver(()=>{updateEta();updateMatchStatus();if(currentStep===4)renderSystemCheck()});['homeEstimateMeta','homeOnlineRiderCount','homeEstimateAmount'].forEach(id=>qs(id)&&observer.observe(qs(id),{childList:true,subtree:true,characterData:true}));window.addEventListener('pagehide',()=>{try{saveDraft();flushDraftToCloud()}catch(_){ }},{capture:true});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{saveDraft();flushDraftToCloud()}catch(_){ }}});updateEta();updateMatchStatus()}
   return {init,refreshCustomerContext,saveDraft,clearDraft,syncDraftFromCloud,saveAddressFromManager,saveCurrentRouteAddress,applyAddress,deleteAddress,renderAddressManager,addShoppingItem,updateShoppingItem,removeShoppingItem,reorder,openOrder,renderOrderCards,beforeCreate,extendPayload,renderSystemCheck};
 })();
+window.UBeeEnhancements=UBeeEnhancements;
 
 // 將新增資料安全併入既有正式 API payload。
 const __ubeeOriginalGetPayload=getPayload;
@@ -22350,7 +22411,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   (() => {
     'use strict';
 
-    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-rating-lock-v1-4-3';
+    const CUSTOMER_SW_URL = '/ubee-customer-sw.js?v=20260929-customer-critical-sync-v1-4-4';
     const CUSTOMER_SW_SCOPE = '/';
 
     if (!('serviceWorker' in navigator)) {
