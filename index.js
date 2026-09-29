@@ -1,3 +1,4 @@
+// 2026-09-29｜Rider Area MultiSelect V1：接單設定與小U申請的 serviceDistricts 移除 8 區硬上限；接單設定不再被初始申請服務區鎖住，可儲存多行政區偏好；代駕與客戶端既有 API 契約不變。
 // 2026-09-29｜Customer Active Meta Fix V1.4.1：單筆訂單 API 明確回傳 createdAtMs / updatedAtMs，供用戶端固定顯示建立時間；ETA canonical 欄位維持不變。
 // 2026-09-29｜Drive Semantic + Universal ETA V1.4：保留既有狀態碼與 API 契約；代駕對外狀態改用車輛所在地／車輛交接／代駕目的地語意；六大服務 Live ETA 繼續由後端 traffic-aware Routes 為唯一依據。
 // 2026-09-29｜Drive Service + Contact Removal V1.3：保留正式代駕服務與專用計價／結算契約；完整移除 Order Chat API、訊息儲存與 Chat Push。
@@ -10420,35 +10421,55 @@ function normalizeRiderDispatchPreferences(input = {}, rider = {}) {
     return fallback;
   };
 
-  const requestedDistricts = Array.isArray(input.serviceDistricts)
-    ? input.serviceDistricts.map(v => String(v || '').trim()).filter(Boolean)
+  const requestedDistrictsRaw = Array.isArray(input.serviceDistricts)
+    ? input.serviceDistricts
     : Array.isArray(saved.serviceDistricts)
-      ? saved.serviceDistricts.map(v => String(v || '').trim()).filter(Boolean)
+      ? saved.serviceDistricts
       : [];
 
-  // 接單偏好只能縮小正式服務區，不能透過設定頁自行擴張官方授權。
-  const officialDistricts = Array.isArray(rider.serviceDistricts)
-    ? rider.serviceDistricts.map(v => String(v || '').trim()).filter(Boolean)
-    : [];
+  // 接單設定是小U的工作偏好，不再被「申請當下選的行政區」鎖住。
+  // 仍統一走台灣行政區正規化，避免重複值與格式不一致。
+  const safeDistricts = [
+    ...new Set(
+      normalizeTaiwanServiceDistricts(requestedDistrictsRaw)
+    ),
+  ];
 
-  const safeDistricts = officialDistricts.length
-    ? requestedDistricts.filter(v => officialDistricts.includes(v))
-    : requestedDistricts;
+  const requestedCities = Array.isArray(input.serviceCities)
+    ? input.serviceCities
+    : Array.isArray(saved.serviceCities)
+      ? saved.serviceCities
+      : [];
+
+  const safeServiceCities = [
+    ...new Set(
+      requestedCities
+        .map(normalizeTaiwanCityName)
+        .filter(Boolean)
+        .concat(
+          safeDistricts
+            .map(item => inferTaiwanRegion(item).city)
+            .filter(Boolean)
+        )
+    ),
+  ];
 
   const maxAdvanceRaw = String(input.maxAdvance ?? saved.maxAdvance ?? '1000');
   const maxDistanceRaw = String(input.maxDistance ?? saved.maxDistance ?? '5');
 
   return {
-    serviceCity: String(
-      input.serviceCity ?? saved.serviceCity ?? rider.serviceCity ?? ''
-    ).trim(),
-    serviceCities: Array.isArray(input.serviceCities)
-      ? [...new Set(input.serviceCities.map(v => String(v || '').trim()).filter(Boolean))]
-      : Array.isArray(saved.serviceCities)
-        ? saved.serviceCities
-        : [],
-    serviceDistricts: [...new Set(safeDistricts)].slice(0, 8),
-    serviceArea: [...new Set(safeDistricts)].slice(0, 8).join('、'),
+    serviceCity:
+      normalizeTaiwanCityName(
+        input.serviceCity ??
+        saved.serviceCity ??
+        rider.serviceCity ??
+        ''
+      ) ||
+      safeServiceCities[0] ||
+      '',
+    serviceCities: safeServiceCities,
+    serviceDistricts: safeDistricts,
+    serviceArea: safeDistricts.join('、'),
     maxAdvance: allowedAdvance.has(maxAdvanceRaw) ? maxAdvanceRaw : '1000',
     maxDistance: allowedDistance.has(maxDistanceRaw) ? maxDistanceRaw : '5',
     acceptCash: boolValue('acceptCash', true),
@@ -18682,8 +18703,8 @@ app.post('/api/rider/register', async (req, res) => {
       compulsoryInsuranceExpiryDate:
         String(compulsoryInsuranceExpiryDate || '').trim(),
 
-      area: cleanText(finalServiceArea || '', 80),
-      serviceArea: cleanText(finalServiceArea || '', 80),
+      area: cleanText(finalServiceArea || '', 4000),
+      serviceArea: cleanText(finalServiceArea || '', 4000),
       serviceCity: cleanText(finalServiceCity || '', 20),
       serviceCities: normalizedServiceCities,
       serviceDistricts: normalizedServiceDistricts,
@@ -26603,11 +26624,11 @@ function buildApprovedRiderV2(application, approvedBy) {
 
     area: cleanText(
       application.serviceArea || application.area || '',
-      80
+      4000
     ),
     serviceArea: cleanText(
       application.serviceArea || application.area || '',
-      80
+      4000
     ),
     serviceCity: cleanText(application.serviceCity || '', 20),
     serviceCities: Array.isArray(application.serviceCities)
@@ -26889,7 +26910,7 @@ function normalizeTaiwanServiceDistricts(value) {
     }
   });
 
-  return output.slice(0, 8);
+  return output;
 }
 
 function buildNationwideDispatchZoneId(city, district) {
