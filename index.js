@@ -1,3 +1,4 @@
+// 2026-09-29｜Drive Semantic + Universal ETA V1.4：保留既有狀態碼與 API 契約；代駕對外狀態改用車輛所在地／車輛交接／代駕目的地語意；六大服務 Live ETA 繼續由後端 traffic-aware Routes 為唯一依據。
 // 2026-09-29｜Drive Service + Contact Removal V1.3：保留正式代駕服務與專用計價／結算契約；完整移除 Order Chat API、訊息儲存與 Chat Push。
 // 2026-09-25｜Rider Profile Photo UI V4.3.4：正式小U大頭照以短效 Signed URL 提供騎士本人顯示；我的首頁／帳號資料可安全載入，不公開 Storage。
 // 2026-09-25｜Rider Profile Supplement Auth Compatibility Fix：正式小U大頭照補件在 Token 過渡期允許既有手機登入身分 fallback；有 Bearer Token 時仍以 Token riderDocId 為唯一可信來源，RIDER_AUTH_ENFORCE=true 時仍強制 Token。
@@ -7876,19 +7877,17 @@ function buildRiderV5NativeTaskPayload(order = {}) {
 
   const status = String(order.status || order.riderStatus || '').trim();
 
-  const stageMap = {
-    accepted: ['前往取件', 'pickup'],
-    going_to_pickup: ['前往取件', 'pickup'],
-    heading_to_pickup: ['前往取件', 'pickup'],
-    arrived_pickup: ['已抵達取件點', 'pickup'],
-    picked_up: ['配送中', 'delivery'],
-    going_to_dropoff: ['配送中', 'delivery'],
-    heading_to_dropoff: ['配送中', 'delivery'],
-    arrived_dropoff: ['已抵達送達點', 'delivery'],
-    completed: ['任務完成', 'completed'],
+  const isDrive = String(order?.serviceKey||order?.serviceMode||'').trim().toLowerCase()==='drive' || String(order?.serviceType||'').includes('代駕');
+  const stageMap = isDrive ? {
+    accepted:['前往車輛所在地','pickup'], going_to_pickup:['前往車輛所在地','pickup'], heading_to_pickup:['前往車輛所在地','pickup'],
+    arrived_pickup:['車輛交接','pickup'], picked_up:['代駕進行中','delivery'], going_to_dropoff:['代駕進行中','delivery'], heading_to_dropoff:['代駕進行中','delivery'],
+    arrived_dropoff:['完成交車','delivery'], completed:['代駕完成','completed'],
+  } : {
+    accepted: ['前往取件', 'pickup'], going_to_pickup: ['前往取件', 'pickup'], heading_to_pickup: ['前往取件', 'pickup'], arrived_pickup: ['已抵達取件點', 'pickup'],
+    picked_up: ['配送中', 'delivery'], going_to_dropoff: ['配送中', 'delivery'], heading_to_dropoff: ['配送中', 'delivery'], arrived_dropoff: ['已抵達送達點', 'delivery'], completed: ['任務完成', 'completed'],
   };
 
-  const [stage, phase] = stageMap[status] || ['任務進行中', 'task'];
+  const [stage, phase] = stageMap[status] || [isDrive?'代駕進行中':'任務進行中', 'task'];
 
   return {
     orderId,
@@ -27730,17 +27729,14 @@ function getCustomerWebPushCopy(order = {}, messages = []) {
   const status = String(order.status || '').trim().toLowerCase();
   const orderId = String(order.id || order.orderId || '').trim().toUpperCase();
 
-  const titleMap = {
-    accepted: '小U已接下你的任務',
-    going_to_pickup: '小U正在前往取件',
-    arrived_pickup: '小U已抵達取件地點',
-    picked_up: '小U已完成取件',
-    going_to_dropoff: '小U正在配送',
-    arrived_dropoff: '小U已抵達送達地點',
-    completed: 'UBee 任務已完成',
-    cancelled: 'UBee 任務已取消',
-    canceled: 'UBee 任務已取消',
-    pending_dispatch: 'UBee 正在媒合附近小U',
+  const isDrive = String(order?.serviceKey||order?.serviceMode||'').trim().toLowerCase()==='drive' || String(order?.serviceType||'').includes('代駕');
+  const titleMap = isDrive ? {
+    accepted:'小U已接下代駕任務', going_to_pickup:'小U正在前往車輛所在地', heading_to_pickup:'小U正在前往車輛所在地',
+    arrived_pickup:'小U已抵達車輛所在地', picked_up:'代駕已開始', going_to_dropoff:'代駕進行中', heading_to_dropoff:'代駕進行中',
+    arrived_dropoff:'小U已抵達代駕目的地', completed:'UBee 代駕已完成', cancelled:'UBee 代駕已取消', canceled:'UBee 代駕已取消', pending_dispatch:'UBee 正在媒合代駕小U',
+  } : {
+    accepted: '小U已接下你的任務', going_to_pickup: '小U正在前往取件', arrived_pickup: '小U已抵達取件地點', picked_up: '小U已完成取件',
+    going_to_dropoff: '小U正在配送', arrived_dropoff: '小U已抵達送達地點', completed: 'UBee 任務已完成', cancelled: 'UBee 任務已取消', canceled: 'UBee 任務已取消', pending_dispatch: 'UBee 正在媒合附近小U',
   };
 
   const rawMessage = getCustomerNotificationText(messages)
@@ -37921,7 +37917,9 @@ app.post('/api/rider/accept-order', riderAuthMiddleware, async (req, res) => {
       await notifyCustomer(
         acceptedOrder,
         createTextMessage(
-          `🟢 UBee 跑腿騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快前往取件。`
+          ((String(acceptedOrder.serviceKey||acceptedOrder.serviceMode||'').trim().toLowerCase()==='drive'||String(acceptedOrder.serviceType||'').includes('代駕'))
+            ? `🟢 UBee 代駕小U已接單\n\n訂單編號：${acceptedOrder.id}\n小U將盡快前往車輛所在地。`
+            : `🟢 UBee 跑腿騎士已接單\n\n訂單編號：${acceptedOrder.id}\n騎士將盡快前往取件。`)
         )
       );
     } catch (notifyErr) {
@@ -45379,13 +45377,26 @@ function getCustomerTrackingStage(status) {
 
 function getCustomerTrackingCopy(order = {}, incident = null) {
   const status = normalizeCustomerTrackingStatus(order.status);
+  const isDrive = String(order.serviceKey || order.serviceMode || '').trim().toLowerCase()==='drive' || String(order.serviceType || '').includes('代駕');
   if (incident) {
-    return {
-      title:'UBee 正在協助處理異常',
-      description:incident.typeLabel || incident.title || '調度中心已介入處理，訂單資料會持續保留。',
-    };
+    return { title:'UBee 正在協助處理異常', description:incident.typeLabel || incident.title || '調度中心已介入處理，訂單資料會持續保留。' };
   }
-  const copy = {
+  const copy = isDrive ? {
+    draft_confirm:['代駕資料確認中','系統正在確認本次代駕資料。'],
+    pending_payment:['等待確認現金單','確認後系統會開始媒合代駕小U。'],
+    pending_schedule:['代駕預約已建立','正在媒合可於指定時間執行的小U。'],
+    scheduled_reserved:['代駕預約已成立','已有小U承接本次代駕預約。'],
+    scheduled_confirmed:['代駕預約已確認','小U已確認可以依預約時間執行。'],
+    pending_dispatch:['正在媒合代駕小U','小U接單後會顯示距離與預計幾分鐘抵達。'],
+    accepted:['小U已接下代駕任務','小U正在準備前往車輛所在地。'],
+    going_to_pickup:['小U正在前往車輛所在地','系統會持續更新預計抵達時間。'],
+    arrived_pickup:['小U已抵達車輛所在地','請準備進行車輛交接與車況確認。'],
+    picked_up:['代駕已開始','車輛交接完成，代駕正式開始。'],
+    going_to_dropoff:['代駕進行中','系統會持續更新抵達代駕目的地的時間。'],
+    arrived_dropoff:['小U已抵達代駕目的地','請準備完成交車。'],
+    completed:['代駕已完成','感謝使用 UBee 代駕。'],
+    cancelled:['代駕已取消','如需協助，請聯繫 UBee 跑腿客服。'],
+  } : {
     draft_confirm:['任務資料確認中','系統正在確認本次任務資料。'],
     pending_payment:['等待確認現金單','確認後系統會開始媒合附近的小U。'],
     merchant_pending:['等待合作店家確認','店家確認後系統會開始媒合小U。'],
@@ -45394,7 +45405,7 @@ function getCustomerTrackingCopy(order = {}, incident = null) {
     pending_schedule:['預約需求已建立','正在媒合可於指定時間執行的小U。'],
     scheduled_reserved:['預約已成立','已有小U提前承接本次預約。'],
     scheduled_confirmed:['預約已確認','小U已確認可以依預約時間執行。'],
-    pending_dispatch:['正在尋找附近的小U','小U接單後會顯示距離與預計抵達時間。'],
+    pending_dispatch:['正在尋找附近的小U','小U接單後會顯示距離與預計幾分鐘抵達。'],
     accepted:['小U已接下任務','小U正在準備前往取件地點。'],
     going_to_pickup:['小U正在前往取件地點','請保持聯絡方式暢通。'],
     arrived_pickup:['小U已抵達取件地點','正在處理取件。'],
@@ -45403,8 +45414,9 @@ function getCustomerTrackingCopy(order = {}, incident = null) {
     arrived_dropoff:['小U已抵達送達地點','請準備完成交付。'],
     completed:['任務已完成','感謝使用 UBee 跑腿。'],
     cancelled:['任務已取消','如需協助，請聯繫 UBee 跑腿客服。'],
-  }[status] || ['任務狀態更新中','系統正在同步最新進度。'];
-  return { title:copy[0], description:copy[1] };
+  };
+  const selected=copy[status] || (isDrive?['代駕狀態更新中','系統正在同步最新進度。']:['任務狀態更新中','系統正在同步最新進度。']);
+  return { title:selected[0], description:selected[1] };
 }
 
 function getCustomerTrackingMoney(order = {}) {
@@ -45730,12 +45742,23 @@ function getCustomerLiveEtaPhaseV1(order = {}) {
 
 function getCustomerLiveEtaDestinationV1(order = {}) {
   const phase = getCustomerLiveEtaPhaseV1(order);
+  const service = String(order.serviceKey || order.serviceMode || '').trim().toLowerCase();
+  const isDrive = service === 'drive' || String(order.serviceType || '').includes('代駕');
+
   if (phase === 'pickup' || phase === 'pickup_arrived') {
     const lat = Number(order.pickupLat ?? order.pickupLocation?.lat);
     const lng = Number(order.pickupLng ?? order.pickupLocation?.lng);
+    const label = isDrive
+      ? '車輛所在地'
+      : service === 'buy'
+        ? '購買店家'
+        : service === 'queue'
+          ? '排隊地點'
+          : (service === 'helper' || order.singlePointTask === true)
+            ? '任務地點'
+            : '取件地點';
     return {
-      key:'pickup',
-      label:'取件地點',
+      key:'pickup', label,
       address:String(order.pickupAddress || order.pickup || order.fromAddress || '').trim(),
       lat:Number.isFinite(lat) ? lat : null,
       lng:Number.isFinite(lng) ? lng : null,
@@ -45743,34 +45766,16 @@ function getCustomerLiveEtaDestinationV1(order = {}) {
   }
 
   if (phase !== 'delivery') return null;
-
   const stops = Array.isArray(order.deliveryStops) ? order.deliveryStops : [];
   const currentStopIndex = Math.max(0, Number(order.currentDeliveryStopIndex || 0));
   const currentStop = stops[currentStopIndex] || {};
   const laterMultiStop = stops.length > 1 && currentStopIndex > 0;
-  const lat = Number(
-    currentStop.dropoffLat ??
-    currentStop.lat ??
-    (!laterMultiStop ? (order.dropoffLat ?? order.dropoffLocation?.lat) : null)
-  );
-  const lng = Number(
-    currentStop.dropoffLng ??
-    currentStop.lng ??
-    (!laterMultiStop ? (order.dropoffLng ?? order.dropoffLocation?.lng) : null)
-  );
-
+  const lat = Number(currentStop.dropoffLat ?? currentStop.lat ?? (!laterMultiStop ? (order.dropoffLat ?? order.dropoffLocation?.lat) : null));
+  const lng = Number(currentStop.dropoffLng ?? currentStop.lng ?? (!laterMultiStop ? (order.dropoffLng ?? order.dropoffLocation?.lng) : null));
   return {
     key:'dropoff',
-    label:stops.length > 1 ? `第 ${currentStopIndex + 1} 個送達點` : '送達地點',
-    address:String(
-      currentStop.dropoffAddress ||
-      currentStop.address ||
-      currentStop.dropoff ||
-      order.dropoffAddress ||
-      order.dropoff ||
-      order.toAddress ||
-      ''
-    ).trim(),
+    label:isDrive ? '代駕目的地' : (stops.length > 1 ? `第 ${currentStopIndex + 1} 個送達點` : '送達地點'),
+    address:String(currentStop.dropoffAddress || currentStop.address || currentStop.dropoff || order.dropoffAddress || order.dropoff || order.toAddress || '').trim(),
     lat:Number.isFinite(lat) ? lat : null,
     lng:Number.isFinite(lng) ? lng : null,
   };
