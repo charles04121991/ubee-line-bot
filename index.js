@@ -1,4 +1,4 @@
-// 2026-09-30｜Rider Notification Admin No-Key V1：小U通知管理端取消管理金鑰與 Session；僅通知公告 GET/POST API 改為直接存取，其他 V4 管理 API 權限機制不變。
+// 2026-09-30｜Rider Notification Admin No-Key V1.2：修復其他 V4 管理路由 middleware 定義；通知管理 GET/POST 維持直接存取；發布加入冪等防重送。
 // 2026-09-30｜Rider V5.3 Native Notification Center：新增小U後端 Notification Inbox、已讀同步與 Badge count；整合任務完成收入、客戶取消、預約承接／確認／任務前提醒與資格狀態事件；Web Push 與 App Inbox 分工，不改派單／計價／Smart Stack 核心。
 // 2026-09-29｜Customer/Rider State Atomic Sync V1：騎士狀態更新同一 transaction 同步寫入 status / riderStatus / customerTrackingStatus 與毫秒版本；客戶 API 明確回傳狀態版本。 
 // 2026-09-29｜Rider Area MultiSelect V1：接單設定與小U申請的 serviceDistricts 移除 8 區硬上限；接單設定不再被初始申請服務區鎖住，可儲存多行政區偏好；代駕與客戶端既有 API 契約不變。
@@ -1637,6 +1637,33 @@ function buildRiderCommunityPublicConfig() {
 
 const UBEE_RIDER_V4_ADMIN_KEY =
   String(process.env.UBEE_RIDER_V4_ADMIN_KEY || '').trim();
+
+// ===== Rider V4 Admin middleware =====
+// 小U通知 announcements GET / announcement POST 不使用此 middleware。
+// 此函式只保留給其他既有 V4 管理 API，避免啟動時 ReferenceError。
+function requireRiderV4AdminKey(req, res, next) {
+  if (!UBEE_RIDER_V4_ADMIN_KEY) {
+    return res.status(503).json({
+      success: false,
+      message: '尚未設定 UBEE_RIDER_V4_ADMIN_KEY，V4 管理功能暫不開放。',
+    });
+  }
+
+  const key = String(
+    req.headers['x-ubee-admin-key'] ||
+    req.body?.adminKey ||
+    ''
+  ).trim();
+
+  if (!key || key !== UBEE_RIDER_V4_ADMIN_KEY) {
+    return res.status(401).json({
+      success: false,
+      message: 'V4 管理授權失敗。',
+    });
+  }
+
+  return next();
+}
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_SERVER_API_KEY =
@@ -8171,6 +8198,40 @@ app.post('/api/admin/rider-notifications/announcement', async (req, res) => {
     const category = cleanText(req.body?.category || '系統公告', 80) || '系統公告';
     const webPush = req.body?.webPush !== false;
     const active = req.body?.active !== false;
+
+    // 同一筆管理端發布若因網路問題重送：
+    // 已完整發布且內容相同 -> 直接回傳既有結果，不重複 fan-out。
+    // 前次中途失敗 -> 允許補送；deterministic notificationId 會跳過已成功的小U。
+    const existingDoc = requestedId ? await ref.get() : null;
+    const existing = existingDoc?.exists ? (existingDoc.data() || {}) : null;
+
+    if (existing) {
+      const samePayload =
+        String(existing.revision || '') === revision &&
+        cleanText(existing.title || '', 160) === title &&
+        cleanText(existing.message || existing.body || '', 2000) === message &&
+        cleanText(existing.category || '系統公告', 80) === category &&
+        (existing.webPush !== false) === webPush &&
+        (existing.active !== false) === active;
+
+      if (!samePayload) {
+        return res.status(409).json({
+          success:false,
+          message:'這筆發布識別碼已存在，但內容不同。請重新建立一則通知。',
+        });
+      }
+
+      if (active && Number(existing.publishedAtMs || 0) > 0 && existing.delivery) {
+        return res.json({
+          success:true,
+          idempotent:true,
+          announcementId:ref.id,
+          revision,
+          delivery:existing.delivery,
+          message:'此通知已發布完成，本次未重複發送。',
+        });
+      }
+    }
     const announcement = {
       announcementId:ref.id,
       title,
