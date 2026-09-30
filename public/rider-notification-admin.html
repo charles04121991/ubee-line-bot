@@ -1,3 +1,4 @@
+<!-- 2026-09-30｜Rider Notification Admin Light UI V1：通知管理端改為淺色介面；功能、Session、發布 API 與 Web Push 流程不變。 -->
 <!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -6,18 +7,86 @@
 <meta name="theme-color" content="#0b0b0c">
 <title>UBee｜小U通知管理</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0b0c;--panel:#151517;--panel2:#1c1c1f;--line:#2b2b2f;--text:#f5f5f7;--muted:#9b9ba1;--accent:#facc15;--danger:#ff5c5c;--ok:#45d483}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}.app{max-width:920px;margin:auto;padding:28px 18px 80px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px}.brand{font-size:13px;color:var(--accent);font-weight:800;letter-spacing:.08em}.title{font-size:30px;font-weight:850;margin:5px 0}.sub{color:var(--muted);font-size:14px}.btn{border:0;border-radius:14px;padding:12px 16px;font-weight:800;cursor:pointer;background:var(--panel2);color:var(--text)}.btn.primary{background:var(--accent);color:#111}.btn.ghost{border:1px solid var(--line)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:16px}.card h2{font-size:17px;margin:0 0 16px}.field{margin-bottom:15px}.label{display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:750;margin-bottom:8px}.hint,.count{color:var(--muted);font-weight:500}.input,.select,.textarea{width:100%;border:1px solid var(--line);border-radius:14px;background:#101012;color:var(--text);padding:13px 14px;font:inherit;outline:none}.input:focus,.select:focus,.textarea:focus{border-color:#666}.textarea{min-height:170px;resize:vertical;line-height:1.6}.switchrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line)}.switchrow:first-child{border-top:0}.switch{width:48px;height:28px;border-radius:999px;background:#39393e;position:relative;cursor:pointer;border:0}.switch:after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:white;top:3px;left:3px;transition:.18s}.switch.on{background:var(--accent)}.switch.on:after{left:23px}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.notice{padding:12px 14px;border-radius:14px;background:#101012;color:var(--muted);font-size:13px;line-height:1.55}.preview{white-space:pre-wrap;line-height:1.65}.preview-title{font-size:18px;font-weight:850;margin-bottom:8px}.tag{display:inline-flex;padding:5px 9px;border-radius:999px;background:#29291f;color:var(--accent);font-size:12px;font-weight:800;margin-bottom:12px}.history-item{padding:15px 0;border-top:1px solid var(--line)}.history-item:first-child{border-top:0}.history-head{display:flex;justify-content:space-between;gap:12px}.history-title{font-weight:800}.history-meta{font-size:12px;color:var(--muted);margin-top:5px}.history-body{font-size:13px;color:#c8c8cc;margin-top:9px;white-space:pre-wrap;line-height:1.55;max-height:82px;overflow:hidden}.status{font-size:12px;font-weight:800}.status.ok{color:var(--ok)}.empty{color:var(--muted);text-align:center;padding:24px}.auth{display:flex;gap:10px}.auth .input{flex:1}.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#f5f5f7;color:#111;padding:11px 16px;border-radius:999px;font-weight:750;opacity:0;pointer-events:none;transition:.2s;z-index:20}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}dialog{border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--text);padding:0;max-width:480px;width:calc(100% - 32px)}dialog::backdrop{background:rgba(0,0,0,.68)}.dialog-inner{padding:20px}.dialog-inner h3{margin:0 0 10px}.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}@media(max-width:720px){.grid{grid-template-columns:1fr}.top{display:block}.top .btn{margin-top:14px}.title{font-size:26px}.auth{flex-direction:column}}
+
+:root{
+  color-scheme:light;
+  --bg:#f5f6f8;
+  --panel:#ffffff;
+  --panel2:#f3f4f6;
+  --line:#e3e5e8;
+  --text:#17181a;
+  --muted:#777b82;
+  --accent:#facc15;
+  --accent-soft:#fff8d8;
+  --danger:#d92d20;
+  --ok:#168a4a;
+  --shadow:0 10px 30px rgba(17,24,39,.06);
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;-webkit-font-smoothing:antialiased}
+.app{max-width:920px;margin:auto;padding:28px 18px 80px}
+.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:22px}
+.brand{font-size:13px;color:#9a7800;font-weight:850;letter-spacing:.08em}
+.title{font-size:30px;font-weight:850;margin:5px 0;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:14px;line-height:1.55}
+.btn{border:0;border-radius:14px;padding:12px 16px;font-weight:800;cursor:pointer;background:var(--panel2);color:var(--text);transition:transform .14s ease,background .14s ease,border-color .14s ease}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent);color:#17181a}
+.btn.ghost{background:#fff;border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h2{font-size:17px;margin:0 0 16px}
+.field{margin-bottom:15px}
+.label{display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:750;margin-bottom:8px}
+.hint,.count{color:var(--muted);font-weight:500}
+.input,.select,.textarea{width:100%;border:1px solid #d9dce1;border-radius:14px;background:#fff;color:var(--text);padding:13px 14px;font:inherit;outline:none;box-shadow:0 1px 2px rgba(17,24,39,.02)}
+.input::placeholder,.textarea::placeholder{color:#a3a7ad}
+.input:focus,.select:focus,.textarea:focus{border-color:#c3a400;box-shadow:0 0 0 3px rgba(250,204,21,.16)}
+.textarea{min-height:170px;resize:vertical;line-height:1.6}
+.switchrow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.switchrow:first-child{border-top:0}
+.switch{width:48px;height:28px;border-radius:999px;background:#d9dce1;position:relative;cursor:pointer;border:0}
+.switch:after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:white;top:3px;left:3px;transition:.18s;box-shadow:0 1px 4px rgba(17,24,39,.18)}
+.switch.on{background:var(--accent)}
+.switch.on:after{left:23px}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap}
+.notice{padding:12px 14px;border-radius:14px;background:#f7f8fa;color:var(--muted);font-size:13px;line-height:1.55;border:1px solid #eceef1}
+.preview{white-space:pre-wrap;line-height:1.65}
+.preview-title{font-size:18px;font-weight:850;margin-bottom:8px}
+.tag{display:inline-flex;padding:5px 9px;border-radius:999px;background:var(--accent-soft);color:#7b6200;font-size:12px;font-weight:800;margin-bottom:12px;border:1px solid #f5df78}
+.history-item{padding:15px 0;border-top:1px solid var(--line)}
+.history-item:first-child{border-top:0}
+.history-head{display:flex;justify-content:space-between;gap:12px}
+.history-title{font-weight:800}
+.history-meta{font-size:12px;color:var(--muted);margin-top:5px}
+.history-body{font-size:13px;color:#555a61;margin-top:9px;white-space:pre-wrap;line-height:1.55;max-height:82px;overflow:hidden}
+.status{font-size:12px;font-weight:800}
+.status.ok{color:var(--ok)}
+.empty{color:var(--muted);text-align:center;padding:24px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#17181a;color:#fff;padding:11px 16px;border-radius:999px;font-weight:750;opacity:0;pointer-events:none;transition:.2s;z-index:20;box-shadow:0 12px 30px rgba(17,24,39,.18)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+dialog{border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--text);padding:0;max-width:480px;width:calc(100% - 32px);box-shadow:0 24px 70px rgba(17,24,39,.18)}
+dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(2px)}
+.dialog-inner,.dialog-card{padding:20px}
+.dialog-inner h3,.dialog-title{margin:0 0 10px}
+.dialog-title{font-size:18px;font-weight:850}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+@media(max-width:720px){
+  .app{padding:22px 16px 70px}
+  .grid{grid-template-columns:1fr}
+  .top{display:block}
+  .top>.actions{justify-content:flex-start;margin-top:14px}
+  .top .btn{margin-top:0}
+  .title{font-size:26px}
+  .card{border-radius:18px;padding:16px}
+}
+
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="top"><div><div class="brand">UBEE DRIVER ADMIN</div><div class="title">小U通知管理</div><div class="sub">發布系統公告到小U Notification Center，並可同步發送 Web Push。</div></div><button class="btn ghost" onclick="loadAnnouncements()">重新整理</button></div>
-
-  <div class="card">
-    <h2>管理授權</h2>
-    <div class="auth"><input id="adminKey" class="input" type="password" autocomplete="current-password" placeholder="輸入 UBEE_RIDER_V4_ADMIN_KEY"><button class="btn" onclick="saveKey()">儲存授權</button></div>
-    <div class="hint" style="margin-top:9px">管理金鑰只保存在此瀏覽器的 sessionStorage，關閉工作階段後需重新輸入。</div>
-  </div>
+  <div class="top"><div><div class="brand">UBEE DRIVER ADMIN</div><div class="title">小U通知管理</div><div class="sub">發布系統公告到小U Notification Center，並可同步發送 Web Push。</div></div><div class="actions"><button class="btn ghost" onclick="loadAnnouncements()">重新整理</button><button id="logoutBtn" class="btn ghost" onclick="logoutAdmin()" hidden>登出</button></div></div>
 
   <div class="grid">
     <div class="card">
@@ -43,25 +112,86 @@
 
 <dialog id="confirmDialog"><div class="dialog-inner"><h3>確定發布這則通知？</h3><div id="confirmText" class="notice"></div><div class="dialog-actions"><button class="btn ghost" onclick="confirmDialog.close()">取消</button><button class="btn primary" onclick="publishNotice()">確認發布</button></div></div></dialog>
 <div id="toast" class="toast"></div>
+  <dialog id="loginDialog">
+    <div class="dialog-card">
+      <div class="dialog-title">管理員登入</div>
+      <div class="hint" style="margin-top:8px">首次使用或 Session 到期時驗證一次；驗證成功後管理金鑰不會保存在前端。</div>
+      <div class="field" style="margin-top:18px">
+        <div class="label">管理金鑰</div>
+        <input id="loginAdminKey" class="input" type="password" autocomplete="current-password" placeholder="輸入管理金鑰">
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button id="loginBtn" class="btn primary" type="button" onclick="loginAdmin()">登入管理端</button>
+      </div>
+    </div>
+  </dialog>
+
 <script>
 const API_BASE = location.origin;
+$('loginDialog')?.addEventListener('cancel',e=>e.preventDefault());
 let pushEnabled = true;
 const $ = id => document.getElementById(id);
 function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function key(){return $('adminKey').value.trim() || sessionStorage.getItem('ubee_rider_admin_key') || '';}
-function saveKey(){const v=$('adminKey').value.trim();if(!v)return toast('請輸入管理金鑰');sessionStorage.setItem('ubee_rider_admin_key',v);toast('管理授權已暫存');loadAnnouncements();}
 function togglePush(){pushEnabled=!pushEnabled;$('pushSwitch').classList.toggle('on',pushEnabled);}
 function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(window.__tt);window.__tt=setTimeout(()=>el.classList.remove('show'),2400);}
 function values(){return {category:$('category').value,title:$('noticeTitle').value.trim(),message:$('noticeBody').value.trim(),webPush:pushEnabled};}
 function previewNotice(){const v=values();if(!v.title&&!v.message)return toast('先輸入通知標題與內容');$('previewEmpty').hidden=true;$('previewBox').hidden=false;$('previewCategory').textContent=v.category;$('previewTitle').textContent=v.title||'（尚未輸入標題）';$('previewBody').textContent=v.message||'（尚未輸入內容）';}
 function confirmPublish(){const v=values();if(!v.title||!v.message)return toast('通知標題與內容都要填寫');previewNotice();$('confirmText').innerHTML=`<b>${esc(v.category)}｜${esc(v.title)}</b><br><br>發送對象：全體正式且未停權的小U<br>Web Push：${v.webPush?'同步發送':'不發送'}<br><br>發布後會立即建立到小U通知中心。`;$('confirmDialog').showModal();}
-async function api(path,opt={}){const k=key();if(!k)throw new Error('請先輸入管理金鑰');const headers={'Content-Type':'application/json','x-ubee-admin-key':k,...(opt.headers||{})};const res=await fetch(API_BASE+path,{...opt,headers});let data={};try{data=await res.json()}catch{}if(!res.ok||data.success===false)throw new Error(data.message||`HTTP ${res.status}`);return data;}
+async function api(path,opt={}){const headers={'Content-Type':'application/json',...(opt.headers||{})};const res=await fetch(API_BASE+path,{...opt,headers,credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(res.status===401){showLogin();throw new Error('管理員 Session 已失效，請重新登入。');}if(!res.ok||data.success===false)throw new Error(data.message||`HTTP ${res.status}`);return data;}
 async function publishNotice(){const v=values();$('confirmDialog').close();const btn=$('publishBtn');btn.disabled=true;btn.textContent='發布中…';try{const data=await api('/api/admin/rider-notifications/announcement',{method:'POST',body:JSON.stringify({...v,active:true})});const d=data.delivery||{};toast(`發布完成：${Number(d.created||0)} 位小U已建立通知`);$('noticeTitle').value='';$('noticeBody').value='';updateCounts();$('previewBox').hidden=true;$('previewEmpty').hidden=false;await loadAnnouncements();}catch(e){toast(e.message||'發布失敗');}finally{btn.disabled=false;btn.textContent='發布通知';}}
 async function loadAnnouncements(){try{const data=await api('/api/admin/rider-notifications/announcements?limit=50');renderHistory(data.announcements||[]);}catch(e){$('history').innerHTML=`<div class="empty">${esc(e.message)}</div>`;}}
 function renderHistory(items){if(!items.length){$('history').innerHTML='<div class="empty">目前沒有已發布通知</div>';return;}$('history').innerHTML=items.map(n=>{const d=n.delivery||{};const dt=n.createdAtMs?new Date(n.createdAtMs).toLocaleString('zh-TW',{hour12:false}):'—';return `<div class="history-item"><div class="history-head"><div><div class="history-title">${esc(n.title)}</div><div class="history-meta">${esc(n.category)} ・ ${esc(dt)}</div></div><div class="status ok">${n.active?'已發布':'停用'}</div></div><div class="history-body">${esc(n.message)}</div><div class="history-meta">Inbox ${Number(d.created||0)} / 符合資格 ${Number(d.eligible||0)}${n.webPush!==false?' ・ Push 已啟用':''}</div></div>`}).join('');}
 function updateCounts(){$('titleCount').textContent=`${$('noticeTitle').value.length} / 160`;$('bodyCount').textContent=`${$('noticeBody').value.length} / 2000`;}
 $('noticeTitle').addEventListener('input',()=>{updateCounts();previewNotice();});$('noticeBody').addEventListener('input',()=>{updateCounts();previewNotice();});$('category').addEventListener('change',previewNotice);
-const saved=sessionStorage.getItem('ubee_rider_admin_key');if(saved){$('adminKey').value=saved;loadAnnouncements();}updateCounts();
+function showLogin(){
+  const d=$('loginDialog');
+  if(d && !d.open) d.showModal();
+  setTimeout(()=>$('loginAdminKey')?.focus(),50);
+}
+async function checkAdminSession(){
+  try{
+    const res=await fetch(API_BASE+'/api/admin/rider-notifications/session',{cache:'no-store',credentials:'same-origin'});
+    const data=await res.json().catch(()=>({}));
+    if(res.ok&&data.authenticated===true){
+      $('logoutBtn').hidden=false;
+      if($('loginDialog')?.open) $('loginDialog').close();
+      await loadAnnouncements();
+      return true;
+    }
+  }catch(_){}
+  $('logoutBtn').hidden=true;
+  showLogin();
+  return false;
+}
+async function loginAdmin(){
+  const key=$('loginAdminKey').value.trim();
+  if(!key)return toast('請輸入管理金鑰');
+  const btn=$('loginBtn');btn.disabled=true;btn.textContent='驗證中…';
+  try{
+    const res=await fetch(API_BASE+'/api/admin/rider-notifications/session/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify({adminKey:key})
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||data.success===false)throw new Error(data.message||'登入失敗');
+    $('loginAdminKey').value='';
+    $('loginDialog').close();
+    $('logoutBtn').hidden=false;
+    toast('管理員登入成功');
+    await loadAnnouncements();
+  }catch(err){toast(err.message||'登入失敗');}
+  finally{btn.disabled=false;btn.textContent='登入管理端';}
+}
+async function logoutAdmin(){
+  try{await fetch(API_BASE+'/api/admin/rider-notifications/session/logout',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'});}catch(_){}
+  $('logoutBtn').hidden=true;
+  showLogin();
+}
+$('loginAdminKey').addEventListener('keydown',e=>{if(e.key==='Enter')loginAdmin();});
+updateCounts();
+checkAdminSession();
 </script>
 </body>
 </html>
