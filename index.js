@@ -8074,33 +8074,154 @@ async function syncGlobalRiderAnnouncementsToInbox(riderDocId) {
   }
 }
 
+// ============================================================
+// Rider Notification Admin V1
+// - 管理端建立全體正式小U公告。
+// - 發布時立即 fan-out 到每位正式小U Inbox；可選擇同步 Web Push。
+// - syncGlobalRiderAnnouncementsToInbox() 繼續保留為補漏機制，deterministic notificationId 可避免重複。
+// ============================================================
+async function publishRiderAnnouncementToApprovedRiders(announcementId, announcement = {}, options = {}) {
+  const safeAnnouncementId = cleanText(announcementId || '', 80);
+  if (!safeAnnouncementId) return { eligible:0, created:0, pushed:0, failed:0 };
+
+  const ridersSnapshot = await db.collection(RIDER_V2_COLLECTIONS.riders).get();
+  const eligibleDocs = ridersSnapshot.docs.filter(doc => {
+    const rider = doc.data() || {};
+    return isApprovedRiderData(rider) && !isBlockedRiderData(rider);
+  });
+
+  const webPush = options.webPush !== false;
+  const concurrency = 20;
+  let created = 0;
+  let pushed = 0;
+  let failed = 0;
+
+  for (let i = 0; i < eligibleDocs.length; i += concurrency) {
+    const chunk = eligibleDocs.slice(i, i + concurrency);
+    const results = await Promise.allSettled(chunk.map(async riderDoc => {
+      const rider = riderDoc.data() || {};
+      const pushConfigured = rider.webPushEnabled === true && !!rider.webPushSubscription?.endpoint;
+      const result = await createRiderInboxNotification(riderDoc.id, {
+        eventKey:`system_announcement:${safeAnnouncementId}`,
+        revision:cleanText(announcement.revision || '1', 80) || '1',
+        type:'system_announcement',
+        category:cleanText(announcement.category || '系統公告', 80) || '系統公告',
+        title:cleanText(announcement.title || 'UBee 系統公告', 160),
+        message:cleanText(announcement.message || announcement.body || '', 2000),
+        actionType:cleanText(announcement.actionType || '', 80),
+        actionTarget:cleanText(announcement.actionTarget || '', 160),
+        metadata:{ announcementId:safeAnnouncementId },
+        createdAtMs:Math.max(1, Number(announcement.createdAtMs || Date.now())),
+        webPush,
+      });
+      return { ...result, pushConfigured };
+    }));
+
+    results.forEach(result => {
+      if (result.status !== 'fulfilled') {
+        failed += 1;
+        return;
+      }
+      if (result.value?.created === true) {
+        created += 1;
+        if (webPush && result.value?.pushConfigured) pushed += 1;
+      }
+    });
+  }
+
+  return { eligible:eligibleDocs.length, created, pushed, failed };
+}
+
+function riderAnnouncementAdminPayload(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    announcementId: cleanText(data.announcementId || doc?.id || '', 80),
+    title: cleanText(data.title || '', 160),
+    message: cleanText(data.message || data.body || '', 2000),
+    category: cleanText(data.category || '系統公告', 80) || '系統公告',
+    revision: cleanText(data.revision || '1', 80) || '1',
+    active: data.active !== false,
+    webPush: data.webPush !== false,
+    actionType: cleanText(data.actionType || '', 80),
+    actionTarget: cleanText(data.actionTarget || '', 160),
+    createdAtMs: Math.max(0, Number(data.createdAtMs || 0)),
+    updatedAtMs: Math.max(0, Number(data.updatedAtMs || 0)),
+    delivery: data.delivery && typeof data.delivery === 'object' ? data.delivery : null,
+  };
+}
+
+app.get('/api/admin/rider-notifications/announcements', requireRiderV4AdminKey, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const requestedLimit = Number(req.query?.limit || 50);
+    const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(100, Math.round(requestedLimit))) : 50;
+    const snapshot = await db.collection(RIDER_NOTIFICATION_ANNOUNCEMENT_COLLECTION)
+      .orderBy('createdAtMs', 'desc')
+      .limit(limit)
+      .get();
+    const announcements = snapshot.docs.map(riderAnnouncementAdminPayload);
+    return res.json({ success:true, announcements, count:announcements.length });
+  } catch (error) {
+    console.error('❌ 讀取 Rider 系統公告管理清單失敗：', error);
+    return res.status(500).json({ success:false, message:'讀取系統公告失敗。' });
+  }
+});
+
 app.post('/api/admin/rider-notifications/announcement', requireRiderV4AdminKey, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const title = cleanText(req.body?.title || '', 160);
     const message = cleanText(req.body?.message || req.body?.body || '', 2000);
     if (!title || !message) return res.status(400).json({ success:false, message:'系統公告需要標題與內容。' });
+
     const requestedId = cleanText(req.body?.announcementId || '', 80).replace(/[^a-zA-Z0-9_-]/g, '');
     const ref = requestedId
       ? db.collection(RIDER_NOTIFICATION_ANNOUNCEMENT_COLLECTION).doc(requestedId)
       : db.collection(RIDER_NOTIFICATION_ANNOUNCEMENT_COLLECTION).doc();
     const nowMs = Date.now();
     const revision = cleanText(req.body?.revision || String(nowMs), 80) || String(nowMs);
-    await ref.set({
+    const category = cleanText(req.body?.category || '系統公告', 80) || '系統公告';
+    const webPush = req.body?.webPush !== false;
+    const active = req.body?.active !== false;
+    const announcement = {
       announcementId:ref.id,
       title,
       message,
-      category:cleanText(req.body?.category || '系統', 80) || '系統',
+      category,
       revision,
-      active:req.body?.active !== false,
+      active,
+      webPush,
       actionType:cleanText(req.body?.actionType || '', 80),
       actionTarget:cleanText(req.body?.actionTarget || '', 160),
       createdAtMs:nowMs,
       createdAt:admin.firestore.FieldValue.serverTimestamp(),
       updatedAtMs:nowMs,
       updatedAt:admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge:true });
-    return res.json({ success:true, announcementId:ref.id, revision, message:'Rider 系統公告已建立；小U下次同步 Notification Center 時會收到。' });
+    };
+
+    await ref.set(announcement, { merge:true });
+
+    let delivery = { eligible:0, created:0, pushed:0, failed:0 };
+    if (active) {
+      delivery = await publishRiderAnnouncementToApprovedRiders(ref.id, announcement, { webPush });
+      await ref.set({
+        delivery,
+        publishedAtMs:Date.now(),
+        publishedAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:Date.now(),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+    }
+
+    return res.json({
+      success:true,
+      announcementId:ref.id,
+      revision,
+      delivery,
+      message: active
+        ? `Rider 系統公告已發布；已建立 ${delivery.created} 位小U Inbox 通知。`
+        : 'Rider 系統公告已儲存為停用狀態。',
+    });
   } catch (error) {
     console.error('❌ 建立 Rider 系統公告失敗：', error);
     return res.status(500).json({ success:false, message:'建立系統公告失敗。' });
