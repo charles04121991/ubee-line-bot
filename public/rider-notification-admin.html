@@ -1,4 +1,4 @@
-<!-- 2026-09-30｜Rider Notification Admin No-Key Light V1：完全移除管理金鑰、登入與 Session；開啟頁面即可預覽、發布與查看歷史通知。 -->
+<!-- 2026-09-30｜Rider Notification Admin No-Key Light V1.2：預覽與發布操作鏈重做；發布前預檢、二次確認、發送中鎖定、失敗保留草稿、防重送。 -->
 <!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -31,7 +31,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,B
 .title{font-size:30px;font-weight:850;margin:5px 0;letter-spacing:-.02em}
 .sub{color:var(--muted);font-size:14px;line-height:1.55}
 .btn{border:0;border-radius:14px;padding:12px 16px;font-weight:800;cursor:pointer;background:var(--panel2);color:var(--text);transition:transform .14s ease,background .14s ease,border-color .14s ease}
-.btn:active{transform:scale(.98)}
+.btn:active{transform:scale(.98)}.btn:disabled{opacity:.48;cursor:not-allowed;transform:none}
 .btn.primary{background:var(--accent);color:#17181a}
 .btn.ghost{background:#fff;border:1px solid var(--line)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -98,38 +98,352 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(2px)}
       <div style="margin-top:14px">
         <div class="switchrow"><div><b>同步 Web Push</b><div class="hint">已開啟背景通知的小U會收到手機通知。</div></div><button id="pushSwitch" class="switch on" aria-label="同步 Web Push" onclick="togglePush()"></button></div>
       </div>
-      <div class="actions"><button class="btn ghost" onclick="previewNotice()">預覽</button><button id="publishBtn" class="btn primary" onclick="confirmPublish()">發布通知</button></div>
+      <div class="actions"><button id="previewBtn" class="btn ghost" type="button">預覽</button><button id="publishBtn" class="btn primary" type="button" disabled>發布通知</button></div>
     </div>
 
     <div>
       <div class="card"><h2>通知預覽</h2><div id="previewEmpty" class="empty">輸入通知內容後，可先預覽小U看到的資訊。</div><div id="previewBox" hidden><div id="previewCategory" class="tag">系統公告</div><div id="previewTitle" class="preview-title"></div><div id="previewBody" class="preview"></div></div></div>
-      <div class="card"><h2>發布說明</h2><div class="notice">發布後，後端會立即把通知建立到符合資格的小U Inbox。已開啟 Web Push 的小U會同步收到 Push；App 之後的公告同步機制仍會負責補漏，而且同一 announcement revision 不會重複建立。</div></div>
+      <div class="card"><h2>發布說明</h2><div id="backendStatus" class="notice">正在檢查通知服務…</div><div class="notice" style="margin-top:10px">發布前會再次檢查通知服務並顯示最後確認內容。發布期間會鎖定欄位；若網路中斷，草稿會保留，可安全重試。</div></div>
     </div>
   </div>
 
   <div class="card"><h2>已發布通知</h2><div id="history"><div class="empty">尚未載入</div></div></div>
 </div>
 
-<dialog id="confirmDialog"><div class="dialog-inner"><h3>確定發布這則通知？</h3><div id="confirmText" class="notice"></div><div class="dialog-actions"><button class="btn ghost" onclick="confirmDialog.close()">取消</button><button class="btn primary" onclick="publishNotice()">確認發布</button></div></div></dialog>
+<dialog id="confirmDialog"><div class="dialog-inner">
+      <h3>發布前最後確認</h3>
+      <div id="confirmText" class="notice"></div>
+      <div class="dialog-actions">
+        <button id="cancelPublishBtn" class="btn ghost" type="button">取消</button>
+        <button id="confirmPublishBtn" class="btn primary" type="button">確認發布</button>
+      </div>
+    </div></dialog>
 <div id="toast" class="toast"></div>
 <script>
 const API_BASE = location.origin;
-let pushEnabled = true;
 const $ = id => document.getElementById(id);
-function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function togglePush(){pushEnabled=!pushEnabled;$('pushSwitch').classList.toggle('on',pushEnabled);}
-function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(window.__tt);window.__tt=setTimeout(()=>el.classList.remove('show'),2400);}
-function values(){return {category:$('category').value,title:$('noticeTitle').value.trim(),message:$('noticeBody').value.trim(),webPush:pushEnabled};}
-function previewNotice(){const v=values();if(!v.title&&!v.message)return toast('先輸入通知標題與內容');$('previewEmpty').hidden=true;$('previewBox').hidden=false;$('previewCategory').textContent=v.category;$('previewTitle').textContent=v.title||'（尚未輸入標題）';$('previewBody').textContent=v.message||'（尚未輸入內容）';}
-function confirmPublish(){const v=values();if(!v.title||!v.message)return toast('通知標題與內容都要填寫');previewNotice();$('confirmText').innerHTML=`<b>${esc(v.category)}｜${esc(v.title)}</b><br><br>發送對象：全體正式且未停權的小U<br>Web Push：${v.webPush?'同步發送':'不發送'}<br><br>發布後會立即建立到小U通知中心。`;$('confirmDialog').showModal();}
-async function api(path,opt={}){const headers={'Content-Type':'application/json',...(opt.headers||{})};const res=await fetch(API_BASE+path,{...opt,headers,credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(!res.ok||data.success===false)throw new Error(data.message||`HTTP ${res.status}`);return data;}
-async function publishNotice(){const v=values();$('confirmDialog').close();const btn=$('publishBtn');btn.disabled=true;btn.textContent='發布中…';try{const data=await api('/api/admin/rider-notifications/announcement',{method:'POST',body:JSON.stringify({...v,active:true})});const d=data.delivery||{};toast(`發布完成：${Number(d.created||0)} 位小U已建立通知`);$('noticeTitle').value='';$('noticeBody').value='';updateCounts();$('previewBox').hidden=true;$('previewEmpty').hidden=false;await loadAnnouncements();}catch(e){toast(e.message||'發布失敗');}finally{btn.disabled=false;btn.textContent='發布通知';}}
-async function loadAnnouncements(){try{const data=await api('/api/admin/rider-notifications/announcements?limit=50');renderHistory(data.announcements||[]);}catch(e){$('history').innerHTML=`<div class="empty">${esc(e.message)}</div>`;}}
-function renderHistory(items){if(!items.length){$('history').innerHTML='<div class="empty">目前沒有已發布通知</div>';return;}$('history').innerHTML=items.map(n=>{const d=n.delivery||{};const dt=n.createdAtMs?new Date(n.createdAtMs).toLocaleString('zh-TW',{hour12:false}):'—';return `<div class="history-item"><div class="history-head"><div><div class="history-title">${esc(n.title)}</div><div class="history-meta">${esc(n.category)} ・ ${esc(dt)}</div></div><div class="status ok">${n.active?'已發布':'停用'}</div></div><div class="history-body">${esc(n.message)}</div><div class="history-meta">Inbox ${Number(d.created||0)} / 符合資格 ${Number(d.eligible||0)}${n.webPush!==false?' ・ Push 已啟用':''}</div></div>`}).join('');}
-function updateCounts(){$('titleCount').textContent=`${$('noticeTitle').value.length} / 160`;$('bodyCount').textContent=`${$('noticeBody').value.length} / 2000`;}
-$('noticeTitle').addEventListener('input',()=>{updateCounts();previewNotice();});$('noticeBody').addEventListener('input',()=>{updateCounts();previewNotice();});$('category').addEventListener('change',previewNotice);
+
+let pushEnabled = true;
+let backendReady = false;
+let publishInFlight = false;
+let draftIdentity = null;
+let draftAttempted = false;
+
+function esc(v=''){
+  return String(v).replace(/[&<>"']/g, m => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[m]));
+}
+
+function toast(msg, duration=2800){
+  const el = $('toast');
+  el.textContent = String(msg || '');
+  el.classList.add('show');
+  clearTimeout(window.__tt);
+  window.__tt = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function values(){
+  return {
+    category: $('category').value,
+    title: $('noticeTitle').value.trim(),
+    message: $('noticeBody').value.trim(),
+    webPush: pushEnabled,
+  };
+}
+
+function resetDraftIdentity(){
+  draftIdentity = null;
+  draftAttempted = false;
+}
+
+function ensureDraftIdentity(){
+  if (draftIdentity) return draftIdentity;
+  const rand = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+    ? globalThis.crypto.randomUUID().replace(/-/g,'').slice(0,20)
+    : Math.random().toString(36).slice(2,14);
+  const stamp = Date.now().toString(36);
+  const token = `admin_${stamp}_${rand}`.slice(0,78);
+  draftIdentity = { announcementId:token, revision:token };
+  return draftIdentity;
+}
+
+function updateCounts(){
+  $('titleCount').textContent = `${$('noticeTitle').value.length} / 160`;
+  $('bodyCount').textContent = `${$('noticeBody').value.length} / 2000`;
+}
+
+function updateActionState(){
+  const v = values();
+  $('previewBtn').disabled = !(v.title || v.message) || publishInFlight;
+  $('publishBtn').disabled = !(v.title && v.message) || !backendReady || publishInFlight;
+}
+
+function setBackendStatus(ok, text){
+  backendReady = ok === true;
+  const el = $('backendStatus');
+  el.textContent = text;
+  el.style.borderColor = ok ? '#b7e3c8' : '#f1c0bd';
+  el.style.background = ok ? '#f0fbf4' : '#fff4f3';
+  el.style.color = ok ? '#176b3a' : '#a52a21';
+  updateActionState();
+}
+
+function renderPreview(){
+  const v = values();
+  if (!v.title && !v.message) {
+    $('previewBox').hidden = true;
+    $('previewEmpty').hidden = false;
+    return false;
+  }
+  $('previewEmpty').hidden = true;
+  $('previewBox').hidden = false;
+  $('previewCategory').textContent = v.category;
+  $('previewTitle').textContent = v.title || '（尚未輸入標題）';
+  $('previewBody').textContent = v.message || '（尚未輸入內容）';
+  return true;
+}
+
+function previewNotice(){
+  if (!renderPreview()) {
+    toast('請先輸入通知標題或內容');
+    return;
+  }
+  toast('預覽已更新');
+}
+
+function togglePush(){
+  if (publishInFlight) return;
+  pushEnabled = !pushEnabled;
+  $('pushSwitch').classList.toggle('on', pushEnabled);
+  $('pushSwitch').setAttribute('aria-pressed', pushEnabled ? 'true' : 'false');
+}
+
+async function api(path, opt={}, timeoutMs=20000){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const headers = {'Content-Type':'application/json', ...(opt.headers || {})};
+    const res = await fetch(API_BASE + path, {
+      ...opt,
+      headers,
+      credentials:'same-origin',
+      cache:'no-store',
+      signal:controller.signal,
+    });
+
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+
+    if (!res.ok || data.success === false) {
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    return data;
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('連線逾時，請確認後端狀態後再試。');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function checkBackendReady(showToast=false){
+  setBackendStatus(false, '正在檢查通知服務…');
+  try {
+    const data = await api('/api/admin/rider-notifications/announcements?limit=1', {}, 15000);
+    if (!Array.isArray(data.announcements)) {
+      throw new Error('後端回傳格式不正確');
+    }
+    setBackendStatus(true, '通知服務正常，可以預覽與發布。');
+    if (showToast) toast('通知服務正常');
+    return true;
+  } catch (err) {
+    setBackendStatus(false, `通知服務目前不可用：${err.message || '未知錯誤'}`);
+    if (showToast) toast('通知服務目前不可用，已禁止發布', 3600);
+    return false;
+  }
+}
+
+async function confirmPublish(){
+  if (publishInFlight) return;
+
+  const v = values();
+  if (!v.title || !v.message) {
+    toast('通知標題與內容都必須填寫');
+    updateActionState();
+    return;
+  }
+
+  renderPreview();
+
+  const ready = await checkBackendReady(false);
+  if (!ready) {
+    toast('後端檢查未通過，已取消發布', 3600);
+    return;
+  }
+
+  ensureDraftIdentity();
+
+  $('confirmText').innerHTML =
+    `<b>${esc(v.category)}｜${esc(v.title)}</b>` +
+    `<br><br>${esc(v.message).replace(/\n/g,'<br>')}` +
+    `<br><br><b>發送對象：</b>全體正式且未停權的小U` +
+    `<br><b>Web Push：</b>${v.webPush ? '同步發送' : '不發送'}`;
+
+  $('confirmDialog').showModal();
+  $('confirmPublishBtn').focus();
+}
+
+async function publishNotice(){
+  if (publishInFlight) return;
+
+  const v = values();
+  if (!v.title || !v.message) {
+    $('confirmDialog').close();
+    toast('通知標題或內容不完整，請重新確認');
+    return;
+  }
+
+  const identity = ensureDraftIdentity();
+  draftAttempted = true;
+  publishInFlight = true;
+
+  $('confirmDialog').close();
+  $('publishBtn').textContent = '發布中…';
+  $('publishBtn').disabled = true;
+  $('previewBtn').disabled = true;
+  $('confirmPublishBtn').disabled = true;
+
+  $('category').disabled = true;
+  $('noticeTitle').disabled = true;
+  $('noticeBody').disabled = true;
+  $('pushSwitch').disabled = true;
+
+  try {
+    const data = await api('/api/admin/rider-notifications/announcement', {
+      method:'POST',
+      body:JSON.stringify({
+        ...v,
+        ...identity,
+        active:true,
+      }),
+    }, 120000);
+
+    if (data.success !== true || !data.announcementId) {
+      throw new Error('後端沒有回傳完整發布結果');
+    }
+
+    const d = data.delivery || {};
+    const eligible = Number(d.eligible || 0);
+    const created = Number(d.created || 0);
+    const failed = Number(d.failed || 0);
+
+    await loadAnnouncements(false);
+
+    if (failed > 0) {
+      toast(`部分發布未完成：成功 ${created}、失敗 ${failed}。內容已保留，可直接重試。`, 5200);
+      return;
+    }
+
+    toast(
+      data.idempotent === true
+        ? '此通知先前已發布完成，本次沒有重複發送。'
+        : `發布完成：${created} / ${eligible} 位符合資格小U已建立通知`,
+      4200
+    );
+
+    $('noticeTitle').value = '';
+    $('noticeBody').value = '';
+    $('previewBox').hidden = true;
+    $('previewEmpty').hidden = false;
+    resetDraftIdentity();
+    updateCounts();
+  } catch (err) {
+    toast(`發布失敗：${err.message || '未知錯誤'}。內容已保留，可直接重試。`, 5200);
+  } finally {
+    publishInFlight = false;
+    $('publishBtn').textContent = '發布通知';
+    $('confirmPublishBtn').disabled = false;
+    $('category').disabled = false;
+    $('noticeTitle').disabled = false;
+    $('noticeBody').disabled = false;
+    $('pushSwitch').disabled = false;
+    updateActionState();
+  }
+}
+
+async function loadAnnouncements(updateStatus=true){
+  try {
+    const data = await api('/api/admin/rider-notifications/announcements?limit=50', {}, 20000);
+    renderHistory(Array.isArray(data.announcements) ? data.announcements : []);
+    if (updateStatus) {
+      setBackendStatus(true, '通知服務正常，可以預覽與發布。');
+    }
+    return true;
+  } catch (err) {
+    $('history').innerHTML = `<div class="empty">${esc(err.message || '讀取失敗')}</div>`;
+    if (updateStatus) {
+      setBackendStatus(false, `通知服務目前不可用：${err.message || '未知錯誤'}`);
+    }
+    return false;
+  }
+}
+
+function renderHistory(items){
+  if (!items.length) {
+    $('history').innerHTML = '<div class="empty">目前沒有已發布通知</div>';
+    return;
+  }
+
+  $('history').innerHTML = items.map(n => {
+    const d = n.delivery || {};
+    const dt = n.createdAtMs
+      ? new Date(n.createdAtMs).toLocaleString('zh-TW', {hour12:false})
+      : '—';
+
+    return `<div class="history-item">
+      <div class="history-head">
+        <div>
+          <div class="history-title">${esc(n.title)}</div>
+          <div class="history-meta">${esc(n.category)} ・ ${esc(dt)}</div>
+        </div>
+        <div class="status ok">${n.active ? '已發布' : '停用'}</div>
+      </div>
+      <div class="history-body">${esc(n.message)}</div>
+      <div class="history-meta">
+        Inbox ${Number(d.created || 0)} / 符合資格 ${Number(d.eligible || 0)}
+        ${Number(d.failed || 0) > 0 ? ` ・ 失敗 ${Number(d.failed || 0)}` : ''}
+        ${n.webPush !== false ? ' ・ Push 已啟用' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function onDraftEdited(){
+  updateCounts();
+  renderPreview();
+
+  if (draftAttempted && !publishInFlight) {
+    resetDraftIdentity();
+  }
+  updateActionState();
+}
+
+$('previewBtn').addEventListener('click', previewNotice);
+$('publishBtn').addEventListener('click', confirmPublish);
+$('cancelPublishBtn').addEventListener('click', () => $('confirmDialog').close());
+$('confirmPublishBtn').addEventListener('click', publishNotice);
+$('noticeTitle').addEventListener('input', onDraftEdited);
+$('noticeBody').addEventListener('input', onDraftEdited);
+$('category').addEventListener('change', onDraftEdited);
+$('pushSwitch').setAttribute('aria-pressed','true');
+
 updateCounts();
-loadAnnouncements();
+updateActionState();
+loadAnnouncements(true);
 </script>
 </body>
 </html>
