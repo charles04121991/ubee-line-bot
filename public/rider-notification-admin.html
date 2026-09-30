@@ -1,3 +1,4 @@
+<!-- 2026-09-30｜Light UI Hotfix V1.1：修正 $ helper 初始化順序，恢復預覽、發布、登入與所有互動按鈕。 -->
 <!-- 2026-09-30｜Rider Notification Admin Light UI V1：通知管理端改為淺色介面；功能、Session、發布 API 與 Web Push 流程不變。 -->
 <!doctype html>
 <html lang="zh-Hant">
@@ -128,9 +129,9 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(2px)}
 
 <script>
 const API_BASE = location.origin;
-$('loginDialog')?.addEventListener('cancel',e=>e.preventDefault());
 let pushEnabled = true;
 const $ = id => document.getElementById(id);
+$('loginDialog')?.addEventListener('cancel',e=>e.preventDefault());
 function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function togglePush(){pushEnabled=!pushEnabled;$('pushSwitch').classList.toggle('on',pushEnabled);}
 function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(window.__tt);window.__tt=setTimeout(()=>el.classList.remove('show'),2400);}
