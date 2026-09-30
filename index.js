@@ -1,4 +1,4 @@
-// 2026-09-30｜Rider Notification Admin Session V1：通知管理端移除前端常駐管理授權欄位，改用後端簽發 HttpOnly Session；既有 V4 Admin Key API 相容保留。
+// 2026-09-30｜Rider Notification Admin No-Key V1：小U通知管理端取消管理金鑰與 Session；僅通知公告 GET/POST API 改為直接存取，其他 V4 管理 API 權限機制不變。
 // 2026-09-30｜Rider V5.3 Native Notification Center：新增小U後端 Notification Inbox、已讀同步與 Badge count；整合任務完成收入、客戶取消、預約承接／確認／任務前提醒與資格狀態事件；Web Push 與 App Inbox 分工，不改派單／計價／Smart Stack 核心。
 // 2026-09-29｜Customer/Rider State Atomic Sync V1：騎士狀態更新同一 transaction 同步寫入 status / riderStatus / customerTrackingStatus 與毫秒版本；客戶 API 明確回傳狀態版本。 
 // 2026-09-29｜Rider Area MultiSelect V1：接單設定與小U申請的 serviceDistricts 移除 8 區硬上限；接單設定不再被初始申請服務區鎖住，可儲存多行政區偏好；代駕與客戶端既有 API 契約不變。
@@ -6999,121 +6999,6 @@ function getRiderV4Progress(rider = {}) {
   };
 }
 
-// ===== Rider Admin Session V1 =====
-// 通知管理端不再把管理金鑰保存在前端 sessionStorage。
-// 首次驗證成功後，由後端簽發 HttpOnly / SameSite=Strict Cookie。
-// 既有 x-ubee-admin-key 驗證仍保留，避免破壞其他 V4 管理工具。
-const RIDER_ADMIN_SESSION_COOKIE = 'ubee_rider_admin_session';
-const RIDER_ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-
-function riderAdminSessionSecret() {
-  return String(process.env.UBEE_RIDER_ADMIN_SESSION_SECRET || UBEE_RIDER_V4_ADMIN_KEY || '').trim();
-}
-
-function parseRequestCookies(req) {
-  const source = String(req.headers.cookie || '');
-  const result = {};
-  source.split(';').forEach((part) => {
-    const i = part.indexOf('=');
-    if (i <= 0) return;
-    const key = part.slice(0, i).trim();
-    const value = part.slice(i + 1).trim();
-    if (!key) return;
-    try { result[key] = decodeURIComponent(value); }
-    catch (_) { result[key] = value; }
-  });
-  return result;
-}
-
-function riderAdminSessionSignature(payload) {
-  const secret = riderAdminSessionSecret();
-  if (!secret) return '';
-  return crypto.createHmac('sha256', secret).update(String(payload)).digest('base64url');
-}
-
-function createRiderAdminSessionToken() {
-  const expiresAtMs = Date.now() + RIDER_ADMIN_SESSION_TTL_MS;
-  const nonce = crypto.randomBytes(18).toString('base64url');
-  const payload = `${expiresAtMs}.${nonce}`;
-  return `${payload}.${riderAdminSessionSignature(payload)}`;
-}
-
-function verifyRiderAdminSessionToken(token) {
-  const raw = String(token || '').trim();
-  const parts = raw.split('.');
-  if (parts.length !== 3) return false;
-  const [expiresRaw, nonce, signature] = parts;
-  const expiresAtMs = Number(expiresRaw || 0);
-  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now() || !nonce || !signature) return false;
-  const expected = riderAdminSessionSignature(`${expiresRaw}.${nonce}`);
-  if (!expected) return false;
-  try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch (_) {
-    return false;
-  }
-}
-
-function riderAdminSessionCookie(req, token, maxAgeMs = RIDER_ADMIN_SESSION_TTL_MS) {
-  const secure = String(req.headers['x-forwarded-proto'] || req.protocol || '').toLowerCase() === 'https';
-  return [
-    `${RIDER_ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Strict',
-    secure ? 'Secure' : '',
-    `Max-Age=${Math.max(0, Math.floor(Number(maxAgeMs || 0) / 1000))}`,
-  ].filter(Boolean).join('; ');
-}
-
-function hasValidRiderAdminSession(req) {
-  const cookies = parseRequestCookies(req);
-  return verifyRiderAdminSessionToken(cookies[RIDER_ADMIN_SESSION_COOKIE]);
-}
-
-function requireRiderV4AdminKey(req, res, next) {
-  if (!UBEE_RIDER_V4_ADMIN_KEY) {
-    return res.status(503).json({
-      success: false,
-      message: '尚未設定 UBEE_RIDER_V4_ADMIN_KEY，V4 管理功能暫不開放。',
-    });
-  }
-
-  // 新版管理端：HttpOnly Session。
-  if (hasValidRiderAdminSession(req)) return next();
-
-  // 相容既有管理工具：原本的 Header / Body Admin Key 繼續可用。
-  const key = String(req.headers['x-ubee-admin-key'] || req.body?.adminKey || '').trim();
-  if (!key || key !== UBEE_RIDER_V4_ADMIN_KEY) {
-    return res.status(401).json({ success:false, message:'V4 管理授權失敗。' });
-  }
-  return next();
-}
-
-app.get('/api/admin/rider-notifications/session', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  return res.json({ success:true, authenticated:hasValidRiderAdminSession(req) });
-});
-
-app.post('/api/admin/rider-notifications/session/login', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  if (!UBEE_RIDER_V4_ADMIN_KEY || !riderAdminSessionSecret()) {
-    return res.status(503).json({ success:false, message:'管理端 Session 尚未完成後端設定。' });
-  }
-  const key = String(req.body?.adminKey || '').trim();
-  if (!key || key !== UBEE_RIDER_V4_ADMIN_KEY) {
-    return res.status(401).json({ success:false, message:'管理員驗證失敗。' });
-  }
-  const token = createRiderAdminSessionToken();
-  res.setHeader('Set-Cookie', riderAdminSessionCookie(req, token));
-  return res.json({ success:true, authenticated:true, expiresInMs:RIDER_ADMIN_SESSION_TTL_MS });
-});
-
-app.post('/api/admin/rider-notifications/session/logout', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Set-Cookie', riderAdminSessionCookie(req, '', 0));
-  return res.json({ success:true, authenticated:false });
-});
 
 function isApprovedRiderData(riderData) {
   if (!riderData) return false;
@@ -8253,7 +8138,7 @@ function riderAnnouncementAdminPayload(doc) {
   };
 }
 
-app.get('/api/admin/rider-notifications/announcements', requireRiderV4AdminKey, async (req, res) => {
+app.get('/api/admin/rider-notifications/announcements', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const requestedLimit = Number(req.query?.limit || 50);
@@ -8270,7 +8155,7 @@ app.get('/api/admin/rider-notifications/announcements', requireRiderV4AdminKey, 
   }
 });
 
-app.post('/api/admin/rider-notifications/announcement', requireRiderV4AdminKey, async (req, res) => {
+app.post('/api/admin/rider-notifications/announcement', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
     const title = cleanText(req.body?.title || '', 160);
