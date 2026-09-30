@@ -1,3 +1,4 @@
+// 2026-09-30｜Rider V5.3 Native Notification Center：新增小U後端 Notification Inbox、已讀同步與 Badge count；整合任務完成收入、客戶取消、預約承接／確認／任務前提醒與資格狀態事件；Web Push 與 App Inbox 分工，不改派單／計價／Smart Stack 核心。
 // 2026-09-29｜Customer/Rider State Atomic Sync V1：騎士狀態更新同一 transaction 同步寫入 status / riderStatus / customerTrackingStatus 與毫秒版本；客戶 API 明確回傳狀態版本。 
 // 2026-09-29｜Rider Area MultiSelect V1：接單設定與小U申請的 serviceDistricts 移除 8 區硬上限；接單設定不再被初始申請服務區鎖住，可儲存多行政區偏好；代駕與客戶端既有 API 契約不變。
 // 2026-09-29｜Customer Active Meta Fix V1.4.1：單筆訂單 API 明確回傳 createdAtMs / updatedAtMs，供用戶端固定顯示建立時間；ETA canonical 欄位維持不變。
@@ -7862,6 +7863,372 @@ app.post('/api/rider/push-subscription', riderAuthMiddleware, async (req, res) =
 });
 
 
+
+// ============================================================
+// Rider V5.3 Native Notification Center
+// - ridersV2/{riderDocId}/notifications：小U真正的 App Inbox。
+// - Web Push 只負責背景喚回；Inbox 保存可追溯事件，兩者不互相取代。
+// - notificationId 由 rider + eventKey + revision 決定，重試不重複寫入；revision 改變會成為新未讀事件。
+// ============================================================
+const RIDER_NOTIFICATION_SUBCOLLECTION = 'notifications';
+const RIDER_NOTIFICATION_ANNOUNCEMENT_COLLECTION = 'riderNotificationAnnouncements';
+const RIDER_NOTIFICATION_LIST_LIMIT = 80;
+
+function normalizeRiderNotificationMetadata(value, depth = 0) {
+  if (depth > 3 || value === undefined) return null;
+  if (value === null) return null;
+  if (typeof value === 'string') return cleanText(value, 600);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map(item => normalizeRiderNotificationMetadata(item, depth + 1));
+  }
+  if (typeof value === 'object') {
+    const out = {};
+    Object.entries(value).slice(0, 30).forEach(([key, item]) => {
+      const normalized = normalizeRiderNotificationMetadata(item, depth + 1);
+      if (normalized !== undefined) out[cleanText(key, 80)] = normalized;
+    });
+    return out;
+  }
+  return cleanText(String(value), 300);
+}
+
+function buildRiderNotificationId(riderDocId, eventKey, revision = '1') {
+  return crypto
+    .createHash('sha256')
+    .update(`${String(riderDocId || '').trim()}:${String(eventKey || '').trim()}:${String(revision || '1').trim()}`)
+    .digest('hex')
+    .slice(0, 40);
+}
+
+function riderNotificationApiPayload(doc) {
+  const data = doc?.data ? (doc.data() || {}) : (doc || {});
+  return {
+    notificationId: cleanText(data.notificationId || data.id || doc?.id || '', 80),
+    type: cleanText(data.type || 'system', 80),
+    category: cleanText(data.category || '系統', 80),
+    title: cleanText(data.title || 'UBee 通知', 160),
+    message: cleanText(data.message || data.body || '', 2000),
+    createdAtMs: Math.max(0, Number(data.createdAtMs || 0)),
+    read: data.read === true,
+    readAtMs: Math.max(0, Number(data.readAtMs || 0)),
+    actionType: cleanText(data.actionType || '', 80),
+    actionTarget: cleanText(data.actionTarget || '', 160),
+    revision: cleanText(data.revision || '1', 80),
+    metadata: data.metadata && typeof data.metadata === 'object' ? data.metadata : {},
+  };
+}
+
+async function resolveRiderNotificationRequest(req, source = {}) {
+  if (req?.riderAuth?.riderDocId) {
+    const riderDocId = String(req.riderAuth.riderDocId || '').trim();
+    const riderDoc = await db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDocId).get();
+    if (!riderDoc.exists) return { ok:false, statusCode:404, message:'找不到小U資料。' };
+    const rider = riderDoc.data() || {};
+    if (isBlockedRiderData(rider)) return { ok:false, statusCode:403, message:'此小U帳號目前無法使用。' };
+    if (!isApprovedRiderData(rider)) return { ok:false, statusCode:403, message:'小U尚未審核通過。' };
+    return { ok:true, riderDoc, rider:{ id:riderDoc.id, ...rider } };
+  }
+  return findApprovedRiderForApi(source || {});
+}
+
+async function sendRiderInboxWebPush(riderDocId, notification = {}) {
+  try {
+    const safeRiderDocId = String(riderDocId || '').trim();
+    const notificationId = String(notification.notificationId || '').trim();
+    if (!safeRiderDocId || !notificationId || !WEB_PUSH_PUBLIC_KEY || !WEB_PUSH_PRIVATE_KEY) return false;
+
+    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(safeRiderDocId);
+    const riderDoc = await riderRef.get();
+    if (!riderDoc.exists) return false;
+    const rider = riderDoc.data() || {};
+    if (rider.webPushEnabled !== true || !rider.webPushSubscription?.endpoint) return false;
+
+    const orderId = cleanText(notification.metadata?.orderId || '', 80).toUpperCase();
+    const deepLink = `/rider.html?tab=notify&notificationId=${encodeURIComponent(notificationId)}&source=push`;
+    try {
+      await webpush.sendNotification(
+        rider.webPushSubscription,
+        JSON.stringify({
+          title: notification.title || 'UBee 跑腿',
+          body: notification.message || '你有一則新的 UBee 通知。',
+          type: 'UBEE_RIDER_INBOX',
+          category: notification.category || '系統',
+          notificationId,
+          orderId,
+          tag: `ubee-rider-inbox-${notificationId}`,
+          url: deepLink,
+          deepLink,
+        }),
+        { TTL: 60 * 60 * 6, urgency: 'high' }
+      );
+      return true;
+    } catch (error) {
+      const statusCode = Number(error?.statusCode || error?.status || 0);
+      if ([404, 410].includes(statusCode)) {
+        await riderRef.set({
+          webPushSubscription: admin.firestore.FieldValue.delete(),
+          webPushEnabled: false,
+          webPushUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          webPushUpdatedAtMs: Date.now(),
+        }, { merge:true }).catch(() => {});
+      }
+      console.warn('⚠️ Rider Inbox Web Push 發送失敗：', error?.message || error);
+      return false;
+    }
+  } catch (error) {
+    console.warn('⚠️ Rider Inbox Web Push 準備失敗：', error?.message || error);
+    return false;
+  }
+}
+
+async function createRiderInboxNotification(riderDocId, payload = {}) {
+  const safeRiderDocId = String(riderDocId || '').trim();
+  const eventKey = cleanText(payload.eventKey || '', 220);
+  const revision = cleanText(payload.revision || '1', 80) || '1';
+  if (!safeRiderDocId || !eventKey) return { created:false, notificationId:'' };
+
+  const notificationId = buildRiderNotificationId(safeRiderDocId, eventKey, revision);
+  const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(safeRiderDocId);
+  const notificationRef = riderRef.collection(RIDER_NOTIFICATION_SUBCOLLECTION).doc(notificationId);
+  const nowMs = Math.max(1, Number(payload.createdAtMs || Date.now()));
+  const notification = {
+    notificationId,
+    riderDocId: safeRiderDocId,
+    eventKey,
+    revision,
+    type: cleanText(payload.type || 'system', 80) || 'system',
+    category: cleanText(payload.category || '系統', 80) || '系統',
+    title: cleanText(payload.title || 'UBee 通知', 160) || 'UBee 通知',
+    message: cleanText(payload.message || payload.body || '', 2000),
+    actionType: cleanText(payload.actionType || '', 80),
+    actionTarget: cleanText(payload.actionTarget || '', 160),
+    metadata: normalizeRiderNotificationMetadata(payload.metadata || {}) || {},
+    read: false,
+    readAt: null,
+    readAtMs: 0,
+    createdAtMs: nowMs,
+    updatedAtMs: nowMs,
+  };
+
+  let created = false;
+  await db.runTransaction(async transaction => {
+    const [riderDoc, notificationDoc] = await Promise.all([
+      transaction.get(riderRef),
+      transaction.get(notificationRef),
+    ]);
+    if (!riderDoc.exists || notificationDoc.exists) return;
+    transaction.set(notificationRef, {
+      ...notification,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    transaction.set(riderRef, {
+      notificationUnreadCount: admin.firestore.FieldValue.increment(1),
+      lastNotificationId: notificationId,
+      lastNotificationAtMs: nowMs,
+      lastNotificationAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    created = true;
+  });
+
+  if (created && payload.webPush === true) {
+    await sendRiderInboxWebPush(safeRiderDocId, notification).catch(() => {});
+  }
+
+  return { created, notificationId, notification };
+}
+
+async function syncGlobalRiderAnnouncementsToInbox(riderDocId) {
+  const safeRiderDocId = String(riderDocId || '').trim();
+  if (!safeRiderDocId) return 0;
+  try {
+    const snapshot = await db
+      .collection(RIDER_NOTIFICATION_ANNOUNCEMENT_COLLECTION)
+      .where('active', '==', true)
+      .limit(20)
+      .get();
+    if (snapshot.empty) return 0;
+    const results = await Promise.allSettled(snapshot.docs.map(doc => {
+      const announcement = doc.data() || {};
+      return createRiderInboxNotification(safeRiderDocId, {
+        eventKey:`system_announcement:${doc.id}`,
+        revision:cleanText(announcement.revision || '1', 80) || '1',
+        type:'system_announcement',
+        category:cleanText(announcement.category || '系統', 80) || '系統',
+        title:cleanText(announcement.title || 'UBee 系統公告', 160),
+        message:cleanText(announcement.message || announcement.body || '', 2000),
+        actionType:cleanText(announcement.actionType || '', 80),
+        actionTarget:cleanText(announcement.actionTarget || '', 160),
+        metadata:{ announcementId:doc.id },
+        createdAtMs:Math.max(1, Number(announcement.createdAtMs || Date.now())),
+        webPush:false,
+      });
+    }));
+    return results.filter(item => item.status === 'fulfilled' && item.value?.created === true).length;
+  } catch (error) {
+    console.warn('⚠️ 同步 Rider 系統公告失敗：', error?.message || error);
+    return 0;
+  }
+}
+
+app.post('/api/admin/rider-notifications/announcement', requireRiderV4AdminKey, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const title = cleanText(req.body?.title || '', 160);
+    const message = cleanText(req.body?.message || req.body?.body || '', 2000);
+    if (!title || !message) return res.status(400).json({ success:false, message:'系統公告需要標題與內容。' });
+    const requestedId = cleanText(req.body?.announcementId || '', 80).replace(/[^a-zA-Z0-9_-]/g, '');
+    const ref = requestedId
+      ? db.collection(RIDER_NOTIFICATION_ANNOUNCEMENT_COLLECTION).doc(requestedId)
+      : db.collection(RIDER_NOTIFICATION_ANNOUNCEMENT_COLLECTION).doc();
+    const nowMs = Date.now();
+    const revision = cleanText(req.body?.revision || String(nowMs), 80) || String(nowMs);
+    await ref.set({
+      announcementId:ref.id,
+      title,
+      message,
+      category:cleanText(req.body?.category || '系統', 80) || '系統',
+      revision,
+      active:req.body?.active !== false,
+      actionType:cleanText(req.body?.actionType || '', 80),
+      actionTarget:cleanText(req.body?.actionTarget || '', 160),
+      createdAtMs:nowMs,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtMs:nowMs,
+      updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge:true });
+    return res.json({ success:true, announcementId:ref.id, revision, message:'Rider 系統公告已建立；小U下次同步 Notification Center 時會收到。' });
+  } catch (error) {
+    console.error('❌ 建立 Rider 系統公告失敗：', error);
+    return res.status(500).json({ success:false, message:'建立系統公告失敗。' });
+  }
+});
+
+app.get('/api/rider/notifications', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const resolved = await resolveRiderNotificationRequest(req, req.query || {});
+    if (!resolved.ok) return res.status(resolved.statusCode || 403).json({ success:false, message:resolved.message || '小U身分驗證失敗。' });
+
+    const riderDocId = resolved.riderDoc.id;
+    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderDocId);
+    await syncGlobalRiderAnnouncementsToInbox(riderDocId);
+    const freshRiderDoc = await riderRef.get();
+    const rider = freshRiderDoc.exists ? (freshRiderDoc.data() || {}) : (resolved.rider || {});
+    const unreadCount = Math.max(0, Number(rider.notificationUnreadCount || 0));
+    const summaryOnly = ['1','true','yes'].includes(String(req.query?.summary || '').trim().toLowerCase());
+    if (summaryOnly) {
+      return res.json({ success:true, unreadCount, notifications:[] });
+    }
+
+    const requestedLimit = Number(req.query?.limit || 60);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(RIDER_NOTIFICATION_LIST_LIMIT, Math.round(requestedLimit)))
+      : 60;
+    const snapshot = await riderRef
+      .collection(RIDER_NOTIFICATION_SUBCOLLECTION)
+      .orderBy('createdAtMs', 'desc')
+      .limit(limit)
+      .get();
+    const notifications = snapshot.docs.map(doc => riderNotificationApiPayload(doc));
+    const derivedUnread = notifications.filter(item => item.read !== true).length;
+
+    return res.json({
+      success:true,
+      unreadCount: Number.isFinite(Number(rider.notificationUnreadCount)) ? unreadCount : derivedUnread,
+      notifications,
+      count: notifications.length,
+    });
+  } catch (error) {
+    console.error('❌ 讀取 Rider Notification Inbox 失敗：', error);
+    return res.status(500).json({ success:false, message:'通知中心暫時無法讀取，請稍後再試。' });
+  }
+});
+
+app.post('/api/rider/notifications/read', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const resolved = await resolveRiderNotificationRequest(req, req.body || {});
+    if (!resolved.ok) return res.status(resolved.statusCode || 403).json({ success:false, message:resolved.message || '小U身分驗證失敗。' });
+    const notificationId = cleanText(req.body?.notificationId || '', 80);
+    if (!notificationId) return res.status(400).json({ success:false, message:'缺少通知編號。' });
+
+    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(resolved.riderDoc.id);
+    const notificationRef = riderRef.collection(RIDER_NOTIFICATION_SUBCOLLECTION).doc(notificationId);
+    let unreadCount = Math.max(0, Number((resolved.rider || {}).notificationUnreadCount || 0));
+
+    await db.runTransaction(async transaction => {
+      const [riderDoc, notificationDoc] = await Promise.all([
+        transaction.get(riderRef),
+        transaction.get(notificationRef),
+      ]);
+      if (!notificationDoc.exists) throw new Error('NOTIFICATION_NOT_FOUND');
+      const current = notificationDoc.data() || {};
+      const rider = riderDoc.exists ? (riderDoc.data() || {}) : {};
+      unreadCount = Math.max(0, Number(rider.notificationUnreadCount || 0));
+      if (current.read === true) return;
+      unreadCount = Math.max(0, unreadCount - 1);
+      const nowMs = Date.now();
+      transaction.set(notificationRef, {
+        read:true,
+        readAtMs:nowMs,
+        readAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+      transaction.set(riderRef, {
+        notificationUnreadCount:unreadCount,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+    });
+
+    return res.json({ success:true, notificationId, unreadCount });
+  } catch (error) {
+    if (String(error?.message || '') === 'NOTIFICATION_NOT_FOUND') return res.status(404).json({ success:false, message:'找不到這則通知。' });
+    console.error('❌ Rider Notification 標記已讀失敗：', error);
+    return res.status(500).json({ success:false, message:'通知已讀狀態暫時無法更新。' });
+  }
+});
+
+app.post('/api/rider/notifications/read-all', riderAuthMiddleware, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const resolved = await resolveRiderNotificationRequest(req, req.body || {});
+    if (!resolved.ok) return res.status(resolved.statusCode || 403).json({ success:false, message:resolved.message || '小U身分驗證失敗。' });
+
+    const riderRef = db.collection(RIDER_V2_COLLECTIONS.riders).doc(resolved.riderDoc.id);
+    const snapshot = await riderRef.collection(RIDER_NOTIFICATION_SUBCOLLECTION).where('read', '==', false).limit(400).get();
+    const nowMs = Date.now();
+    if (!snapshot.empty) {
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => batch.set(doc.ref, {
+        read:true,
+        readAtMs:nowMs,
+        readAt:admin.firestore.FieldValue.serverTimestamp(),
+        updatedAtMs:nowMs,
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true }));
+      batch.set(riderRef, {
+        notificationUnreadCount:Math.max(0, Number((resolved.rider || {}).notificationUnreadCount || 0) - snapshot.size),
+        updatedAt:admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge:true });
+      await batch.commit();
+    } else {
+      await riderRef.set({ notificationUnreadCount:0, updatedAt:admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
+    }
+
+    const latestRider = await riderRef.get();
+    const unreadCount = Math.max(0, Number(latestRider.data()?.notificationUnreadCount || 0));
+    return res.json({ success:true, updated:snapshot.size, unreadCount });
+  } catch (error) {
+    console.error('❌ Rider Notification 全部已讀失敗：', error);
+    return res.status(500).json({ success:false, message:'通知已讀狀態暫時無法更新。' });
+  }
+});
+
 // ============================================================
 // UBee 騎士端 V5 Native Bridge API
 // - 原生 iOS / Android 裝置資訊與推播 Token 保存
@@ -10053,6 +10420,22 @@ async function sendScheduledRiderReminder(
 
     const rider = riderDoc.data() || {};
 
+    const inboxResult = await createRiderInboxNotification(
+      safeRiderDocId,
+      {
+        eventKey: `schedule_reminder:${String(orderId || '').trim().toUpperCase() || title}`,
+        revision: '1',
+        type: 'schedule_reminder',
+        category: '預約',
+        title,
+        message: body,
+        actionType: 'task_running',
+        actionTarget: String(orderId || '').trim().toUpperCase(),
+        metadata: { orderId: String(orderId || '').trim().toUpperCase() },
+        webPush: false,
+      }
+    ).catch(() => ({ notificationId:'' }));
+
     const tasks = [];
 
     if (
@@ -10067,6 +10450,9 @@ async function sendScheduledRiderReminder(
           JSON.stringify({
             title,
             body,
+            type: 'UBEE_RIDER_INBOX',
+            category: '預約',
+            notificationId: String(inboxResult?.notificationId || ''),
             url: `/rider.html?tab=task&source=schedule_reminder${orderId ? `&orderId=${encodeURIComponent(orderId)}` : ''}`,
             deepLink: `/rider.html?tab=task&source=schedule_reminder${orderId ? `&orderId=${encodeURIComponent(orderId)}` : ''}`,
             orderId,
@@ -10979,6 +11365,19 @@ app.post(
       orders[safeOrderId] =
         reservedOrder;
 
+      await createRiderInboxNotification(identity.riderDocId, {
+        eventKey:`schedule_reserved:${safeOrderId}`,
+        revision:'1',
+        type:'schedule_reserved',
+        category:'預約',
+        title:'預約任務已承接',
+        message:`${reservedOrder.scheduleLabel || '預約時間待確認'}・任務 ${safeOrderId}`,
+        actionType:'task_running',
+        actionTarget:safeOrderId,
+        metadata:{ orderId:safeOrderId, scheduleLabel:reservedOrder.scheduleLabel || '' },
+        webPush:false,
+      }).catch(() => {});
+
       try {
         await notifyCustomer(
           reservedOrder,
@@ -11431,6 +11830,19 @@ app.post(
 
       orders[safeOrderId] =
         updatedOrder;
+
+      await createRiderInboxNotification(identity.riderDocId, {
+        eventKey:`schedule_confirmed:${safeOrderId}`,
+        revision:'1',
+        type:'schedule_confirmed',
+        category:'預約',
+        title:'預約任務已確認',
+        message:`${updatedOrder.scheduleLabel || '預約時間待確認'}・任務 ${safeOrderId}`,
+        actionType:'task_running',
+        actionTarget:safeOrderId,
+        metadata:{ orderId:safeOrderId, scheduleLabel:updatedOrder.scheduleLabel || '' },
+        webPush:false,
+      }).catch(() => {});
 
       try {
         await notifyCustomer(
@@ -19875,6 +20287,26 @@ async function notifyRiderApplicationReviewUpdate(
   } catch (error) {
     console.warn('⚠️ 寫入小U申請通知中心失敗：', error?.message || error);
     channels.inApp = false;
+  }
+
+  try {
+    const riderDoc = await db.collection(RIDER_V2_COLLECTIONS.riders).doc(riderId).get();
+    if (riderDoc.exists) {
+      await createRiderInboxNotification(riderDoc.id, {
+        eventKey:`qualification:${cleanText(type || 'updated',80)}:${notificationId}`,
+        revision:'1',
+        type:`qualification_${cleanText(type || 'updated',80)}`,
+        category:'資格',
+        title:content.title,
+        message:content.body,
+        actionType:'my',
+        actionTarget:'qualification',
+        metadata:{ applicationType:cleanText(type || '',80) },
+        webPush:false,
+      });
+    }
+  } catch (error) {
+    console.warn('⚠️ 同步小U資格事件到 Rider Inbox 失敗：', error?.message || error);
   }
 
   const pushSubscription =
@@ -39574,6 +40006,30 @@ app.post('/api/rider/update-order-status', riderAuthMiddleware, async (req, res)
       console.error('⚠️ 任務狀態已更新，但通知客人失敗：', notifyErr);
     }
 
+    if (effectiveStatus === 'completed') {
+      const riderIncome = Math.max(0, Math.round(Number(
+        updatedOrder?.riderIncome ??
+        updatedOrder?.estimatedRiderIncome ??
+        updatedOrder?.riderFee ??
+        updatedOrder?.driverFee ??
+        0
+      )));
+      await createRiderInboxNotification(identity.riderDocId, {
+        eventKey:`order_completed:${safeOrderId}`,
+        revision:'1',
+        type:'income_completed',
+        category:'收入',
+        title:'任務已完成',
+        message:riderIncome > 0
+          ? `任務 ${safeOrderId} 已完成，本單小U收入 NT$ ${riderIncome.toLocaleString('zh-TW')} 已記錄。`
+          : `任務 ${safeOrderId} 已完成，收入資料已同步至收入明細。`,
+        actionType:'income_history',
+        actionTarget:safeOrderId,
+        metadata:{ orderId:safeOrderId, riderIncome, orderStatus:'completed' },
+        webPush:false,
+      }).catch(() => {});
+    }
+
     // Merchant Live Tracking V3：每個重要配送節點同步通知店家。
     // 多點配送以 stop index 加入事件鍵，避免下一站被前一站的去重紀錄吃掉。
     const merchantStatusEventKey = multiStopAdvanced
@@ -40530,6 +40986,28 @@ app.post('/cancel-order', requireCustomerAuth, async (req,res)=>{
         promotedOrderId,
         createdAtMs:Date.now(),
       }),
+      affectedRiderDocId
+        ? createRiderInboxNotification(affectedRiderDocId, {
+            eventKey:`customer_cancelled:${safeOrderId}`,
+            revision:'1',
+            type:'task_cancelled',
+            category:'任務',
+            title:'任務已由客戶取消',
+            message:Math.max(0, Number(cancelledOrder?.cancellationCompensation || 0)) > 0
+              ? `任務 ${safeOrderId} 已取消，系統已記錄小U取消補償 NT$ ${Math.max(0, Number(cancelledOrder.cancellationCompensation || 0))}。`
+              : (promotedOrderId
+                  ? `任務 ${safeOrderId} 已取消，下一筆任務 ${promotedOrderId} 已自動切為目前任務。`
+                  : `任務 ${safeOrderId} 已由客戶取消。`),
+            actionType:promotedOrderId ? 'task_running' : '',
+            actionTarget:promotedOrderId || safeOrderId,
+            metadata:{
+              orderId:safeOrderId,
+              promotedOrderId,
+              cancellationCompensation:Math.max(0, Number(cancelledOrder?.cancellationCompensation || 0)),
+            },
+            webPush:true,
+          })
+        : Promise.resolve(),
       promotedOrder
         ? notifyCustomer(
             promotedOrder,
