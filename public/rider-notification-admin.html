@@ -1,11 +1,10 @@
-<!-- 2026-09-30｜Light UI Hotfix V1.1：修正 $ helper 初始化順序，恢復預覽、發布、登入與所有互動按鈕。 -->
-<!-- 2026-09-30｜Rider Notification Admin Light UI V1：通知管理端改為淺色介面；功能、Session、發布 API 與 Web Push 流程不變。 -->
+<!-- 2026-09-30｜Rider Notification Admin No-Key Light V1：完全移除管理金鑰、登入與 Session；開啟頁面即可預覽、發布與查看歷史通知。 -->
 <!doctype html>
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0b0c">
+<meta name="theme-color" content="#f5f6f8">
 <title>UBee｜小U通知管理</title>
 <style>
 
@@ -87,7 +86,7 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(2px)}
 </head>
 <body>
 <div class="app">
-  <div class="top"><div><div class="brand">UBEE DRIVER ADMIN</div><div class="title">小U通知管理</div><div class="sub">發布系統公告到小U Notification Center，並可同步發送 Web Push。</div></div><div class="actions"><button class="btn ghost" onclick="loadAnnouncements()">重新整理</button><button id="logoutBtn" class="btn ghost" onclick="logoutAdmin()" hidden>登出</button></div></div>
+  <div class="top"><div><div class="brand">UBEE DRIVER ADMIN</div><div class="title">小U通知管理</div><div class="sub">發布系統公告到小U Notification Center，並可同步發送 Web Push。</div></div><div class="actions"><button class="btn ghost" onclick="loadAnnouncements()">重新整理</button></div></div>
 
   <div class="grid">
     <div class="card">
@@ -113,86 +112,24 @@ dialog::backdrop{background:rgba(17,24,39,.32);backdrop-filter:blur(2px)}
 
 <dialog id="confirmDialog"><div class="dialog-inner"><h3>確定發布這則通知？</h3><div id="confirmText" class="notice"></div><div class="dialog-actions"><button class="btn ghost" onclick="confirmDialog.close()">取消</button><button class="btn primary" onclick="publishNotice()">確認發布</button></div></div></dialog>
 <div id="toast" class="toast"></div>
-  <dialog id="loginDialog">
-    <div class="dialog-card">
-      <div class="dialog-title">管理員登入</div>
-      <div class="hint" style="margin-top:8px">首次使用或 Session 到期時驗證一次；驗證成功後管理金鑰不會保存在前端。</div>
-      <div class="field" style="margin-top:18px">
-        <div class="label">管理金鑰</div>
-        <input id="loginAdminKey" class="input" type="password" autocomplete="current-password" placeholder="輸入管理金鑰">
-      </div>
-      <div class="actions" style="justify-content:flex-end">
-        <button id="loginBtn" class="btn primary" type="button" onclick="loginAdmin()">登入管理端</button>
-      </div>
-    </div>
-  </dialog>
-
 <script>
 const API_BASE = location.origin;
 let pushEnabled = true;
 const $ = id => document.getElementById(id);
-$('loginDialog')?.addEventListener('cancel',e=>e.preventDefault());
 function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function togglePush(){pushEnabled=!pushEnabled;$('pushSwitch').classList.toggle('on',pushEnabled);}
 function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(window.__tt);window.__tt=setTimeout(()=>el.classList.remove('show'),2400);}
 function values(){return {category:$('category').value,title:$('noticeTitle').value.trim(),message:$('noticeBody').value.trim(),webPush:pushEnabled};}
 function previewNotice(){const v=values();if(!v.title&&!v.message)return toast('先輸入通知標題與內容');$('previewEmpty').hidden=true;$('previewBox').hidden=false;$('previewCategory').textContent=v.category;$('previewTitle').textContent=v.title||'（尚未輸入標題）';$('previewBody').textContent=v.message||'（尚未輸入內容）';}
 function confirmPublish(){const v=values();if(!v.title||!v.message)return toast('通知標題與內容都要填寫');previewNotice();$('confirmText').innerHTML=`<b>${esc(v.category)}｜${esc(v.title)}</b><br><br>發送對象：全體正式且未停權的小U<br>Web Push：${v.webPush?'同步發送':'不發送'}<br><br>發布後會立即建立到小U通知中心。`;$('confirmDialog').showModal();}
-async function api(path,opt={}){const headers={'Content-Type':'application/json',...(opt.headers||{})};const res=await fetch(API_BASE+path,{...opt,headers,credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(res.status===401){showLogin();throw new Error('管理員 Session 已失效，請重新登入。');}if(!res.ok||data.success===false)throw new Error(data.message||`HTTP ${res.status}`);return data;}
+async function api(path,opt={}){const headers={'Content-Type':'application/json',...(opt.headers||{})};const res=await fetch(API_BASE+path,{...opt,headers,credentials:'same-origin'});let data={};try{data=await res.json()}catch{}if(!res.ok||data.success===false)throw new Error(data.message||`HTTP ${res.status}`);return data;}
 async function publishNotice(){const v=values();$('confirmDialog').close();const btn=$('publishBtn');btn.disabled=true;btn.textContent='發布中…';try{const data=await api('/api/admin/rider-notifications/announcement',{method:'POST',body:JSON.stringify({...v,active:true})});const d=data.delivery||{};toast(`發布完成：${Number(d.created||0)} 位小U已建立通知`);$('noticeTitle').value='';$('noticeBody').value='';updateCounts();$('previewBox').hidden=true;$('previewEmpty').hidden=false;await loadAnnouncements();}catch(e){toast(e.message||'發布失敗');}finally{btn.disabled=false;btn.textContent='發布通知';}}
 async function loadAnnouncements(){try{const data=await api('/api/admin/rider-notifications/announcements?limit=50');renderHistory(data.announcements||[]);}catch(e){$('history').innerHTML=`<div class="empty">${esc(e.message)}</div>`;}}
 function renderHistory(items){if(!items.length){$('history').innerHTML='<div class="empty">目前沒有已發布通知</div>';return;}$('history').innerHTML=items.map(n=>{const d=n.delivery||{};const dt=n.createdAtMs?new Date(n.createdAtMs).toLocaleString('zh-TW',{hour12:false}):'—';return `<div class="history-item"><div class="history-head"><div><div class="history-title">${esc(n.title)}</div><div class="history-meta">${esc(n.category)} ・ ${esc(dt)}</div></div><div class="status ok">${n.active?'已發布':'停用'}</div></div><div class="history-body">${esc(n.message)}</div><div class="history-meta">Inbox ${Number(d.created||0)} / 符合資格 ${Number(d.eligible||0)}${n.webPush!==false?' ・ Push 已啟用':''}</div></div>`}).join('');}
 function updateCounts(){$('titleCount').textContent=`${$('noticeTitle').value.length} / 160`;$('bodyCount').textContent=`${$('noticeBody').value.length} / 2000`;}
 $('noticeTitle').addEventListener('input',()=>{updateCounts();previewNotice();});$('noticeBody').addEventListener('input',()=>{updateCounts();previewNotice();});$('category').addEventListener('change',previewNotice);
-function showLogin(){
-  const d=$('loginDialog');
-  if(d && !d.open) d.showModal();
-  setTimeout(()=>$('loginAdminKey')?.focus(),50);
-}
-async function checkAdminSession(){
-  try{
-    const res=await fetch(API_BASE+'/api/admin/rider-notifications/session',{cache:'no-store',credentials:'same-origin'});
-    const data=await res.json().catch(()=>({}));
-    if(res.ok&&data.authenticated===true){
-      $('logoutBtn').hidden=false;
-      if($('loginDialog')?.open) $('loginDialog').close();
-      await loadAnnouncements();
-      return true;
-    }
-  }catch(_){}
-  $('logoutBtn').hidden=true;
-  showLogin();
-  return false;
-}
-async function loginAdmin(){
-  const key=$('loginAdminKey').value.trim();
-  if(!key)return toast('請輸入管理金鑰');
-  const btn=$('loginBtn');btn.disabled=true;btn.textContent='驗證中…';
-  try{
-    const res=await fetch(API_BASE+'/api/admin/rider-notifications/session/login',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      credentials:'same-origin',
-      body:JSON.stringify({adminKey:key})
-    });
-    const data=await res.json().catch(()=>({}));
-    if(!res.ok||data.success===false)throw new Error(data.message||'登入失敗');
-    $('loginAdminKey').value='';
-    $('loginDialog').close();
-    $('logoutBtn').hidden=false;
-    toast('管理員登入成功');
-    await loadAnnouncements();
-  }catch(err){toast(err.message||'登入失敗');}
-  finally{btn.disabled=false;btn.textContent='登入管理端';}
-}
-async function logoutAdmin(){
-  try{await fetch(API_BASE+'/api/admin/rider-notifications/session/logout',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'});}catch(_){}
-  $('logoutBtn').hidden=true;
-  showLogin();
-}
-$('loginAdminKey').addEventListener('keydown',e=>{if(e.key==='Enter')loginAdmin();});
 updateCounts();
-checkAdminSession();
+loadAnnouncements();
 </script>
 </body>
 </html>
