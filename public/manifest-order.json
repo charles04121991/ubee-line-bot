@@ -2,9 +2,9 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee 跑腿用戶端：六大服務即時媒合、Native 下單、估價、ETA 任務追蹤、通知中心、會員成長與店家服務。",
+  "description": "UBee 跑腿用戶端：六大服務即時媒合、Native 發任務、估價、ETA 任務追蹤、通知中心、會員成長與店家服務。",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20261001-customer-native-controls-v2",
+  "start_url": "/order.html?source=pwa&v=20261001-customer-native-primary-action-v3",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -35,10 +35,10 @@
   ],
   "shortcuts": [
     {
-      "name": "立即下單",
-      "short_name": "下單",
-      "description": "開啟 UBee 首頁建立新的服務需求。",
-      "url": "/order.html?action=new&source=shortcut&v=20261001-customer-native-controls-v2",
+      "name": "發任務",
+      "short_name": "發任務",
+      "description": "直接建立新的 UBee 跑腿任務。",
+      "url": "/order.html?action=new&source=shortcut&v=20261001-customer-native-primary-action-v3",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -51,7 +51,7 @@
       "name": "我的訂單",
       "short_name": "訂單",
       "description": "查看進行中與歷史 UBee 訂單。",
-      "url": "/order.html?action=tasks&source=shortcut&v=20261001-customer-native-controls-v2",
+      "url": "/order.html?action=tasks&source=shortcut&v=20261001-customer-native-primary-action-v3",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -64,7 +64,7 @@
       "name": "我的",
       "short_name": "我的",
       "description": "開啟 UBee 個人中心、會員成長與邀請功能。",
-      "url": "/order.html?action=my&source=shortcut&v=20261001-customer-native-controls-v2",
+      "url": "/order.html?action=my&source=shortcut&v=20261001-customer-native-primary-action-v3",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
