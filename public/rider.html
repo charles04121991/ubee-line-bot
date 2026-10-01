@@ -3446,6 +3446,7 @@ input,select,textarea{background:var(--ubee-surface-2);color:var(--ubee-text);bo
 .ubee-setting-switch.is-on{background:var(--ubee-switch-on)}
 .info-note-card{background:var(--ubee-surface-2);border-color:var(--ubee-border);color:var(--ubee-text)}
 
+/* 2026-10-01 Rider Notification Card UX Fix：列表摘要採穩定固定高度，完整內容僅在通知詳情展開。 */
 /* 通知中心｜Rider V5.3 Native Notification Center */
 #notifyPage .page-title{margin:4px 2px 2px;font-size:30px;line-height:1.1;font-weight:820;letter-spacing:-.55px;color:var(--ubee-text)}
 .ubee-notify-head{align-items:flex-end;margin:0 2px 14px}
@@ -3467,7 +3468,7 @@ input,select,textarea{background:var(--ubee-surface-2);color:var(--ubee-text);bo
 .ubee-notify-main strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.35;font-weight:720}
 .ubee-notify-row.is-unread .ubee-notify-main strong{font-weight:820}
 .ubee-notify-category{flex:0 0 auto;padding:3px 6px;border-radius:999px;background:var(--ubee-surface-2);color:var(--ubee-muted);font-size:9.5px;line-height:1;font-weight:700}
-.ubee-notify-main small{display:-webkit-box;margin-top:4px;color:var(--ubee-muted);font-size:11px;line-height:1.42;font-weight:500;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ubee-notify-main small{display:block;max-height:2.84em;margin-top:4px;color:var(--ubee-muted);font-size:11px;line-height:1.42;font-weight:500;overflow:hidden;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
 .ubee-notify-meta{display:flex;align-items:center;gap:7px;color:var(--ubee-muted);font-size:10px;font-weight:600;white-space:nowrap}
 .ubee-notify-meta i{width:7px;height:7px;border-radius:50%;background:var(--ubee-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--ubee-accent) 15%,transparent)}
 .ubee-notify-meta .ubee-svg-icon{width:15px;height:15px;color:var(--ubee-muted-2)}
@@ -8110,7 +8111,7 @@ function renderRiderNotificationList(force=false){
     const read=item.read===true;
     return `<button type="button" class="ubee-notify-row ${read?'is-read':'is-unread'}" data-notification-id="${escapeHtml(item.notificationId)}" onclick="openNotificationDetail('${escapeForJs(item.notificationId)}')">
       <span class="ubee-notify-icon">${ubeeIcon(getRiderNotificationIcon(item))}</span>
-      <span class="ubee-notify-main"><span class="ubee-notify-main-top"><strong>${escapeHtml(item.title)}</strong><span class="ubee-notify-category">${escapeHtml(item.category)}</span></span><small>${escapeHtml(item.message||'點一下查看完整內容')}</small></span>
+      <span class="ubee-notify-main"><span class="ubee-notify-main-top"><strong>${escapeHtml(item.title)}</strong><span class="ubee-notify-category">${escapeHtml(item.category)}</span></span><small>${escapeHtml(item.message||'查看完整內容')}</small></span>
       <span class="ubee-notify-meta">${read?'':`<i aria-hidden="true"></i>`}<span>${escapeHtml(formatRiderNotificationTime(item.createdAtMs))}</span>${ubeeIcon('chevron')}</span>
     </button>`;
   }).join('')}</div>`;
