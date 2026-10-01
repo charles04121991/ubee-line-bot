@@ -3,15 +3,14 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-01
-  Release: Customer Native Notification Tab V4
-  PWA: 20261001-customer-native-notification-tab-v4
+  Release: Customer U Coin V1
+  PWA: 20261001-customer-ucoin-v1
 
   本次整理：
-  1. 底部主導航正式改為「首頁／訂單／通知／我的」，四個入口各自負責不同功能。
-  2. 完整移除舊「發任務」主 Tab、Primary Action 樣式與主導航路由；action=new 僅保留為 PWA 快捷下單入口，不再佔用主導航。
-  3. 「我的」內通知中心入口、My Panel 對應與 My History 子路由全部移除；通知中心改為獨立 Native 主頁。
-  4. 首頁右上通知鈴鐺保留為通知 Tab 快捷入口；首頁與底部通知 Tab 共用同一未讀數量來源。
-  5. 延續 Native Picker / Bottom Sheet、Safe Area、鍵盤避讓、訂單、ETA、店家、會員與既有後端 API 契約。
+  1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
+  2. 訂單確認頁新增 U幣折抵；1 U = NT$1，只使用整數 U。
+  3. 折抵上限為跑腿服務費 20% 且不超過平台收入，不影響小U收入；代墊費不折抵。
+  4. 延續 Native Notification Tab V4、訂單、ETA、店家、會員與既有後端 API 契約。
 
   Canonical recent milestones:
   - 2026-10-01 Customer Native Notification Tab V4 / Native Controls V2 / Notification Center
@@ -22,7 +21,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-native-notification-tab-v4" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-ucoin-v1" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -14307,6 +14306,7 @@ async function createOrder(){
     btn.innerText = '建立訂單中...';
 
     const payload = getPayload();
+    payload.uCoinRedeemWhole = Math.max(0, Math.floor(Number(window.__ubeeUCoinRedeemWhole || 0)));
 
     if(!payload.quoteId){
       throw new Error('正式報價識別碼不存在，請重新估價後再送出。');
@@ -19685,6 +19685,11 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="flow-scroll ubee-native-create-scroll ubee-native-checkout-scroll">
 <div id="flowSummaryList"></div>
 <section class="ubee-native-checkout-price"><div><span>正式估價</span><small id="flowRouteMeta">正在計算路線與費用</small></div><strong id="flowConfirmPrice">—</strong></section>
+<section class="ubee-ucoin-checkout" id="ubeeUCoinCheckout" hidden>
+<div><span class="ubee-ucoin-checkout-mark">U</span><span><strong>使用 U幣折抵</strong><small id="ubeeUCoinCheckoutHint">正在確認可折抵額度…</small></span></div>
+<label class="ubee-ucoin-switch"><input id="ubeeUCoinUseToggle" type="checkbox"><span></span></label>
+</section>
+<div class="ubee-ucoin-checkout-saving" id="ubeeUCoinCheckoutSaving" hidden></div>
 <label class="ubee-native-consent-row"><input id="flowAgree" type="checkbox"/><span><strong>確認任務資料</strong><small>我已確認地點、聯絡資訊、任務內容、執行時間與費用。</small></span></label>
 <div class="ubee-native-form-note">建立任務後，系統會依目前付款流程要求你確認付款方式，再正式進入派單。</div>
 <div class="flow-status" id="flowConfirmStatus"></div>
@@ -19777,6 +19782,12 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <div class="ubee-my-member-progress"><span id="ubeeMyMemberProgressBar" style="width:0%"></span></div>
 <div class="ubee-my-member-meta"><span id="ubeeMyMemberNext">完成第一筆有效訂單即可晉升</span><strong id="ubeeMyMemberOrders">0 單</strong></div>
 </button>
+<button class="ubee-my-ucoin-card" id="ubeeMyUCoinCard" type="button" aria-label="查看我的U幣">
+<span class="ubee-my-ucoin-mark" aria-hidden="true">U</span>
+<span class="ubee-my-ucoin-copy"><small>簽到、任務與推薦獎勵</small><strong>我的U幣</strong></span>
+<span class="ubee-my-ucoin-balance"><small>可用餘額</small><strong id="ubeeMyUCoinBalance">—</strong></span>
+<span class="ubee-my-member-chevron" aria-hidden="true">›</span>
+</button>
 <div class="ubee-my-groups" role="list">
 <section class="ubee-my-group"><h3>我的服務</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-action="orders"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span class="ubee-my-menu-copy"><strong>我的訂單</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="favorites"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></span><span class="ubee-my-menu-copy"><strong>常用任務</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="addresses"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="ubee-my-menu-copy"><strong>常用地址</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="serviceAreas"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></span><span class="ubee-my-menu-copy"><strong>服務地區</strong></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button></div></section>
 <section class="ubee-my-group"><h3>成長與邀請</h3><div class="ubee-my-menu"><button class="ubee-my-menu-item" data-my-growth-detail="tasks"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3"/></svg></span><span class="ubee-my-menu-copy"><strong>成長任務</strong><small>目前的成長里程碑</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-growth-detail="achievements"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="m8.5 13-1 8 4.5-2 4.5 2-1-8"/></svg></span><span class="ubee-my-menu-copy"><strong>我的成就</strong><small>已解鎖的會員成就</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-action="rewards"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c.6-4 2.5-6 5.5-6 1.5 0 2.7.4 3.6 1.2M17 10v6M14 13h6"/></svg></span><span class="ubee-my-menu-copy"><strong>邀請好友</strong><small>推薦碼與好友進度</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button><button class="ubee-my-menu-item" data-my-growth-detail="history"  type="button"><span class="ubee-my-menu-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span><span class="ubee-my-menu-copy"><strong>成長歷程</strong><small>會員晉升紀錄</small></span><span class="ubee-my-menu-chevron" aria-hidden="true">›</span></button></div></section>
@@ -19817,6 +19828,10 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 <section class="ubee-my-panel" hidden="" id="ubeeMyRewardsPanel">
 <div class="ubee-my-panel-head"><strong>邀請好友</strong><button data-my-close="" type="button">上一頁</button></div>
 <div id="ubeeMyInviteContent"><div class="ubee-my-empty-state">正在讀取推薦資料…</div></div>
+</section>
+<section class="ubee-my-panel ubee-ucoin-panel" hidden="" id="ubeeMyUCoinPanel">
+<div class="ubee-my-panel-head"><strong>我的U幣</strong><button data-my-close="" type="button">上一頁</button></div>
+<div class="ubee-ucoin-content" id="ubeeMyUCoinContent"><div class="ubee-my-empty-state">正在讀取 U幣資料…</div></div>
 </section>
 <section class="ubee-my-panel" hidden="" id="ubeeMyFavoritesPanel">
 <div class="ubee-my-panel-head"><strong>常用任務</strong><button data-my-close="" type="button">上一頁</button></div>
@@ -21118,7 +21133,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
     if(!validateTask()){showPage('task');return}
     if(!validateOptions()){showPage('options');return}
     syncLegacy();wrapPayload();renderSummary();$('flowAgree').checked=false;status('flowConfirmStatus','');$('flowConfirmPrice').textContent='—';$('flowConfirmActionPrice').textContent='—';$('flowRouteMeta').textContent='正在計算路線與費用';showPage('confirm');setLoading(true,'正在計算道路時間與正式估價…');
-    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);const priceText=total>0?`NT$${Math.round(total)}`:'待估價';$('flowConfirmPrice').textContent=priceText;$('flowConfirmActionPrice').textContent=priceText;const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'道路時間已計算，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
+    try{const route=await renderConfirmMap(null);if(typeof renderEstimate==='function')await renderEstimate();const total=Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0);const priceText=total>0?`NT$${Math.round(total)}`:'待估價';$('flowConfirmPrice').textContent=priceText;$('flowConfirmActionPrice').textContent=priceText;await window.UBeeUCoinV1?.refreshCheckout?.();const distance=route?.distanceText||lastRouteData?.distanceText||'';const duration=route?.durationText||lastRouteData?.durationText||'';$('flowRouteMeta').textContent=[distance,duration].filter(Boolean).join('・')||'道路時間已計算，費用待確認'}catch(error){console.error('確認頁估價失敗：',error);status('flowConfirmStatus','正式估價暫時無法完成，請稍後重試。',true)}finally{setLoading(false)}
   }
 
   async function submitOrder(){
@@ -21131,6 +21146,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
   }
 
   function resetNewTask(clearLegacy=true){
+    window.__ubeeUCoinRedeemWhole=0;
     Object.assign(state,{page:'home',service:'send',serviceTypeIndex:0,serviceCategory:'',pickup:null,dropoff:null,dropoff2:null,addressTarget:'pickup',selectedAddress:null,quickAddressTab:'saved',taskName:'',taskNote:'',purchaseDetails:emptyPurchaseDetails(),helperDetails:{reportMode:'none',handoffMode:'none'},singlePointTask:false,itemSize:'small',upstairs:'none',advancePayment:0,queueMinutes:30,taskMinutes:30,timing:'immediate',scheduleGoal:'pickup_at',scheduledDate:'',scheduledTime:'',flexibleDate:'',flexibleStart:'',flexibleEnd:'',speed:'standard',storeContext:null});
     if(clearLegacy){['pickup','pickupAddressNote','pickupContact','pickupPhone','dropoff','dropoffAddressNote','dropoffContact','dropoffPhone','dropoff2','dropoff2AddressNote','dropoff2Contact','dropoff2Phone','taskItemName','note','item'].forEach(id=>{const el=$(id);if(el)el.value=''});['advancePayment','queueMinutes','taskMinutes'].forEach(id=>{const el=$(id);if(el)el.value=id==='advancePayment'?'0':id==='taskMinutes'?'30':''});try{pickupLat=pickupLng=dropoffLat=dropoffLng=dropoff2Lat=dropoff2Lng=null;pickupPlaceId=dropoffPlaceId=dropoff2PlaceId='';lastRouteData=null;lastQuoteData=null;lastEstimatedTotal=0;try{UBeeEnhancements.clearDraft()}catch(_){localStorage.removeItem('ubee_order_draft_v2')}}catch(_){ }}
     setService('send');setTiming('immediate');setSpeed('standard');syncServiceSelectors();updateHome();showPage('home');
@@ -21584,6 +21600,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
         }
       }
     }catch(error){console.warn('讀取會員統計失敗：',error)}
+    window.UBeeUCoinV1?.load?.().catch(()=>{});
   }
 
   async function detectLocation(){
@@ -29208,6 +29225,93 @@ body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>scan(),{once:true});else scan();
   new MutationObserver(records=>{for(const record of records){for(const node of record.addedNodes){if(node.nodeType===1){scan(node);Object.keys(configs).forEach(id=>{const el=node.querySelector?.(`#${CSS.escape(id)}`);if(el instanceof HTMLSelectElement)enhance(el)})}}}}).observe(document.documentElement,{childList:true,subtree:true});
   window.UBeeCustomerNativePicker=Object.freeze({scan,open:id=>{const select=document.getElementById(id);if(select instanceof HTMLSelectElement)openPicker(select,triggerFor(select))},close:closePicker});
+})();
+</script>
+
+<style id="ubee-ucoin-v1-style">
+.ubee-my-ucoin-card{width:calc(100% - 64px);margin:18px 32px 8px;padding:18px 20px;border:1px solid #f0d36c;border-radius:22px;background:linear-gradient(135deg,#fffdf2,#fff8d2);display:grid;grid-template-columns:52px minmax(0,1fr) auto 18px;gap:14px;align-items:center;text-align:left;color:#111;box-shadow:0 8px 24px rgba(174,126,0,.08)}
+.ubee-my-ucoin-mark,.ubee-ucoin-checkout-mark{display:grid;place-items:center;background:#ffca0a;color:#111;font-weight:1000;border-radius:16px}.ubee-my-ucoin-mark{width:52px;height:52px;font-size:24px}.ubee-my-ucoin-copy{display:flex;flex-direction:column;gap:4px}.ubee-my-ucoin-copy small,.ubee-my-ucoin-balance small{color:#8b8d92;font-size:12px;font-weight:800}.ubee-my-ucoin-copy strong{font-size:20px}.ubee-my-ucoin-balance{text-align:right;display:flex;flex-direction:column;gap:3px}.ubee-my-ucoin-balance strong{font-size:20px}.ubee-my-subpage-open .ubee-my-ucoin-card{display:none}
+.ubee-ucoin-content{padding:18px 22px 110px;background:#f6f7f8;min-height:100%}.ubee-ucoin-hero{padding:24px;border-radius:24px;background:#111;color:#fff}.ubee-ucoin-hero small{color:#c8cbd0;font-weight:800}.ubee-ucoin-hero strong{display:block;font-size:40px;margin:8px 0 4px}.ubee-ucoin-hero p{margin:0;color:#c8cbd0;font-size:13px}.ubee-ucoin-checkin{margin-top:14px;padding:18px;background:#fff;border-radius:22px;border:1px solid #e7e8eb}.ubee-ucoin-checkin-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.ubee-ucoin-checkin-head strong{font-size:18px}.ubee-ucoin-checkin-head button{border:0;border-radius:14px;padding:11px 17px;background:#ffca0a;font-weight:900}.ubee-ucoin-checkin-head button:disabled{background:#eceef1;color:#90949a}.ubee-ucoin-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:16px}.ubee-ucoin-day{padding:9px 2px;border-radius:12px;background:#f3f4f6;text-align:center;font-size:11px;color:#777;font-weight:800}.ubee-ucoin-day b{display:block;color:#222;margin-top:4px}.ubee-ucoin-day.is-current{background:#fff3ba;outline:2px solid #ffca0a}.ubee-ucoin-section{margin-top:14px;padding:18px;background:#fff;border-radius:22px;border:1px solid #e7e8eb}.ubee-ucoin-section h3{margin:0 0 12px;font-size:18px}.ubee-ucoin-task,.ubee-ucoin-history-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #eceef1}.ubee-ucoin-task:last-child,.ubee-ucoin-history-row:last-child{border-bottom:0}.ubee-ucoin-task span,.ubee-ucoin-history-copy{display:flex;flex-direction:column;gap:3px}.ubee-ucoin-task small,.ubee-ucoin-history-copy small{color:#92959a;font-size:12px}.ubee-ucoin-task b{color:#a46f00}.ubee-ucoin-history-row>strong.is-plus{color:#14934a}.ubee-ucoin-history-row>strong.is-minus{color:#e44b3b}.ubee-ucoin-rule{font-size:13px;line-height:1.65;color:#666;margin:0}.ubee-ucoin-empty{padding:18px 0;color:#93969b;text-align:center;font-size:13px}
+.ubee-ucoin-checkout{margin-top:12px;padding:15px 16px;border:1px solid #efd361;border-radius:18px;background:#fffdf1;display:flex;align-items:center;justify-content:space-between;gap:14px}.ubee-ucoin-checkout[hidden],.ubee-ucoin-checkout-saving[hidden]{display:none!important}.ubee-ucoin-checkout>div{display:flex;align-items:center;gap:11px}.ubee-ucoin-checkout-mark{width:38px;height:38px;border-radius:12px}.ubee-ucoin-checkout span span{display:flex;flex-direction:column;gap:3px}.ubee-ucoin-checkout small{color:#85878c;font-size:12px}.ubee-ucoin-switch input{position:absolute;opacity:0}.ubee-ucoin-switch>span{width:48px;height:28px;background:#d9dce1;border-radius:20px;display:block;position:relative}.ubee-ucoin-switch>span:after{content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 4px #999;transition:.2s}.ubee-ucoin-switch input:checked+span{background:#ffca0a}.ubee-ucoin-switch input:checked+span:after{transform:translateX(20px)}.ubee-ucoin-checkout-saving{padding:8px 4px 0;text-align:right;color:#138a45;font-size:13px;font-weight:900}
+@media(max-width:390px){.ubee-my-ucoin-card{width:calc(100% - 40px);margin-left:20px;margin-right:20px;padding:15px;grid-template-columns:46px minmax(0,1fr) auto 12px}.ubee-my-ucoin-mark{width:46px;height:46px}.ubee-my-ucoin-balance small{display:none}}
+</style>
+<script id="ubee-ucoin-v1-script">
+(()=>{
+  'use strict';
+  const state={data:null,maxWhole:0,checkoutTotal:0,loading:false};
+  const $=id=>document.getElementById(id);
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const coins=units=>{
+    const value=Math.max(0,Number(units||0))/10;
+    return Number.isInteger(value)?String(value):value.toFixed(1);
+  };
+  const timeText=ms=>{
+    if(!Number(ms))return'';
+    try{return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(Number(ms)))}catch(_){return''}
+  };
+  function setEntry(wallet={}){const el=$('ubeeMyUCoinBalance');if(el)el.textContent=`${coins(wallet.availableUnits)} U`}
+  function render(data){
+    state.data=data;setEntry(data?.wallet||{});
+    const root=$('ubeeMyUCoinContent');if(!root)return;
+    const wallet=data?.wallet||{},checkin=data?.checkin||{},rules=data?.rules||{},history=Array.isArray(data?.history)?data.history:[];
+    const current=checkin.checkedInToday?Number(checkin.cycleDay||1):Math.min(7,Number(checkin.cycleDay||0)+1)||1;
+    root.innerHTML=`
+      <section class="ubee-ucoin-hero"><small>可用餘額</small><strong>${esc(coins(wallet.availableUnits))} U</strong><p>整數 U幣可在訂單確認時折抵；小數餘額會保留。</p></section>
+      <section class="ubee-ucoin-checkin"><div class="ubee-ucoin-checkin-head"><span><strong>每日簽到</strong><small>連續第 ${esc(checkin.streak||0)} 天</small></span><button id="ubeeUCoinCheckinButton" type="button" ${checkin.checkedInToday?'disabled':''}>${checkin.checkedInToday?'今日已簽到':'立即簽到'}</button></div><div class="ubee-ucoin-days">${[1,2,3,4,5,6,7].map(day=>`<div class="ubee-ucoin-day ${day===current?'is-current':''}">Day ${day}<b>+${day<=4?'0.1':'0.2'}</b></div>`).join('')}</div></section>
+      <section class="ubee-ucoin-section"><h3>U幣取得方式</h3>${(rules.earn||[]).map(item=>`<div class="ubee-ucoin-task"><span><strong>${esc(item.title)}</strong><small>${item.key==='referral'?'好友完成第一趟後發放':'完成條件後自動入帳'}</small></span><b>${esc(item.amountText)}</b></div>`).join('')}</section>
+      <section class="ubee-ucoin-section"><h3>U幣明細</h3>${history.length?history.map(item=>`<div class="ubee-ucoin-history-row"><span class="ubee-ucoin-history-copy"><strong>${esc(item.title)}</strong><small>${esc(timeText(item.createdAtMs))}${item.orderId?`・${esc(item.orderId)}`:''}</small></span><strong class="${Number(item.deltaUnits)>=0?'is-plus':'is-minus'}">${Number(item.deltaUnits)>=0?'+':'−'}${esc(coins(Math.abs(Number(item.deltaUnits||0))))} U</strong></div>`).join(''):'<div class="ubee-ucoin-empty">目前還沒有 U幣紀錄</div>'}</section>
+      <section class="ubee-ucoin-section"><h3>使用規則</h3><p class="ubee-ucoin-rule">${esc(rules.redemptionText||'1 U幣折抵 NT$1。')} U幣自取得日起 ${esc(rules.expiryDays||180)} 天有效；退款或取消訂單時，尚未使用的保留 U幣會退回。</p></section>`;
+    $('ubeeUCoinCheckinButton')?.addEventListener('click',checkinNow);
+  }
+  async function load(){
+    const data=await customerApiFetch('/api/customer/u-coins');render(data);return data;
+  }
+  async function checkinNow(){
+    const button=$('ubeeUCoinCheckinButton');if(button){button.disabled=true;button.textContent='簽到中…'}
+    try{const result=await customerApiFetch('/api/customer/u-coins/check-in',{method:'POST',body:'{}'});if(typeof showUBeeCustomerNativeAlert==='function')showUBeeCustomerNativeAlert(result.message||'簽到成功');await load()}catch(error){if(button){button.disabled=false;button.textContent='立即簽到'};if(typeof showUBeeCustomerNativeAlert==='function')showUBeeCustomerNativeAlert(error.message||'簽到失敗')}
+  }
+  async function openPanel(){
+    const signedIn=(typeof currentCustomer!=='undefined'&&currentCustomer)||window.__ubeeCurrentCustomer;
+    if(!signedIn){try{window.UBeeCustomerAuthHost?.show('login')}catch(_){}return}
+    const profile=$('flowPageProfile'),panel=$('ubeeMyUCoinPanel');if(!profile||!panel)return;
+    profile.querySelectorAll('.ubee-my-panel').forEach(item=>{item.hidden=true;item.classList.remove('is-open')});
+    panel.hidden=false;panel.scrollTop=0;profile.setAttribute('data-my-section','ucoin');document.body.classList.add('ubee-my-subpage-open');requestAnimationFrame(()=>panel.classList.add('is-open'));
+    $('ubeeMyUCoinContent').innerHTML='<div class="ubee-my-empty-state">正在讀取 U幣資料…</div>';
+    try{await load()}catch(error){$('ubeeMyUCoinContent').innerHTML=`<div class="ubee-my-empty-state">${esc(error.message||'U幣資料暫時無法讀取')}</div>`}
+  }
+  function syncCheckout(){
+    const toggle=$('ubeeUCoinUseToggle'),saving=$('ubeeUCoinCheckoutSaving');
+    const use=Boolean(toggle?.checked&&state.maxWhole>0);window.__ubeeUCoinRedeemWhole=use?state.maxWhole:0;
+    const finalTotal=Math.max(0,Math.round(state.checkoutTotal-(use?state.maxWhole:0)));
+    if($('flowConfirmPrice'))$('flowConfirmPrice').textContent=state.checkoutTotal>0?`NT$${finalTotal}`:'待估價';
+    if($('flowConfirmActionPrice'))$('flowConfirmActionPrice').textContent=state.checkoutTotal>0?`NT$${finalTotal}`:'待估價';
+    if(saving){saving.hidden=!use;saving.textContent=use?`已折抵 NT$${state.maxWhole}，代墊費用不列入折抵。`:''}
+  }
+  async function refreshCheckout(){
+    const box=$('ubeeUCoinCheckout'),toggle=$('ubeeUCoinUseToggle'),hint=$('ubeeUCoinCheckoutHint');if(!box||!toggle)return;
+    window.__ubeeUCoinRedeemWhole=0;toggle.checked=false;toggle.disabled=true;state.maxWhole=0;
+    state.checkoutTotal=Math.max(0,Math.round(Number(typeof lastEstimatedTotal!=='undefined'?lastEstimatedTotal:0)));
+    const quote=typeof lastQuoteData!=='undefined'?(lastQuoteData||{}):{},price=quote.price||quote;
+    const serviceSubtotal=Math.max(0,Math.round(Number(price.serviceSubtotal||price.total||state.checkoutTotal||0)));
+    const platformIncome=Math.max(0,Math.floor(Number(price.platformIncome??price.platformFee??price.serviceFee??0)));
+    box.hidden=false;if(hint)hint.textContent='正在確認可折抵額度…';
+    try{
+      const data=await customerApiFetch('/api/customer/u-coins/redemption-preview',{method:'POST',body:JSON.stringify({serviceSubtotal,platformIncome})});
+      state.maxWhole=Math.max(0,Math.floor(Number(data.maxWhole||0)));setEntry(data.wallet||{});
+      toggle.disabled=state.maxWhole<=0;
+      if(hint)hint.textContent=state.maxWhole>0?`本單最多可折抵 ${state.maxWhole} U幣（NT$${state.maxWhole}）`:`目前沒有可用的整數 U幣額度`;
+    }catch(_){box.hidden=true}
+    syncCheckout();
+  }
+  function init(){
+    $('ubeeMyUCoinCard')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openPanel()});
+    $('ubeeUCoinUseToggle')?.addEventListener('change',syncCheckout);
+    $('ubeeMyUCoinPanel')?.querySelector('[data-my-close]')?.addEventListener('click',()=>{document.body.classList.remove('ubee-my-subpage-open');$('flowPageProfile')?.removeAttribute('data-my-section')});
+    if(typeof currentCustomer!=='undefined'&&currentCustomer)load().catch(()=>{});
+    window.addEventListener('ubee:rider-rating-submitted',()=>load().catch(()=>{}));
+  }
+  window.UBeeUCoinV1=Object.freeze({open:openPanel,load,refreshCheckout});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
 </script>
 
