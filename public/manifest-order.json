@@ -2,9 +2,9 @@
   "id": "/order.html",
   "name": "UBee 跑腿",
   "short_name": "UBee 跑腿",
-  "description": "UBee 跑腿用戶端：六大服務即時媒合、Native 下單、估價、ETA 任務追蹤、通知中心、會員成長與店家服務。",
+  "description": "UBee 跑腿用戶端：六大服務即時媒合、Native 下單、估價、ETA 任務追蹤、通知中心、會員成長與我的U幣。",
   "lang": "zh-TW",
-  "start_url": "/order.html?source=pwa&v=20261001-customer-native-notification-tab-v4",
+  "start_url": "/order.html?source=pwa&v=20261001-customer-ucoin-v1",
   "scope": "/",
   "display": "standalone",
   "display_override": [
@@ -38,7 +38,7 @@
       "name": "立即下單",
       "short_name": "下單",
       "description": "直接建立新的 UBee 跑腿任務。",
-      "url": "/order.html?action=new&source=shortcut&v=20261001-customer-native-notification-tab-v4",
+      "url": "/order.html?action=new&source=shortcut&v=20261001-customer-ucoin-v1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -51,7 +51,7 @@
       "name": "我的訂單",
       "short_name": "訂單",
       "description": "查看進行中與歷史 UBee 訂單。",
-      "url": "/order.html?action=tasks&source=shortcut&v=20261001-customer-native-notification-tab-v4",
+      "url": "/order.html?action=tasks&source=shortcut&v=20261001-customer-ucoin-v1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -64,7 +64,7 @@
       "name": "通知中心",
       "short_name": "通知",
       "description": "查看 UBee 訂單進度、重要提醒與系統通知。",
-      "url": "/order.html?action=notifications&source=shortcut&v=20261001-customer-native-notification-tab-v4",
+      "url": "/order.html?action=notifications&source=shortcut&v=20261001-customer-ucoin-v1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
@@ -76,8 +76,8 @@
     {
       "name": "我的",
       "short_name": "我的",
-      "description": "開啟 UBee 個人中心、會員成長與邀請功能。",
-      "url": "/order.html?action=my&source=shortcut&v=20261001-customer-native-notification-tab-v4",
+      "description": "開啟 UBee 個人中心、我的U幣、會員成長與邀請功能。",
+      "url": "/order.html?action=my&source=shortcut&v=20261001-customer-ucoin-v1",
       "icons": [
         {
           "src": "/ubee-customer-icon-192.png",
