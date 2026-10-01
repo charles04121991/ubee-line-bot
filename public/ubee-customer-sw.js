@@ -1,66 +1,20 @@
-/* 2026-10-01｜Customer Native Notification Center V1：支援 Inbox notificationId、通知中心 Deep Link 與 Push 點擊訊息路由。 */
-/* 2026-09-29｜Customer Critical Sync V1.4.4：修復完成訂單誤生草稿與 Rider/Customer 狀態同步。 */
-/* 2026-09-29｜Customer Rating Lock V1.4.3：同步評價完成後永久鎖定再次評價入口。 */
-/* 2026-09-29｜Customer State Sync V1.4.2：主訂單狀態優先、備援防回退、2 秒前景同步。 */
-/* 2026-09-29｜Customer Active Meta Fix V1.4.1：同步建立時間與固定 ETA 資訊列。 */
-/* 2026-09-29｜Customer No-Map + Universal ETA + Drive Semantic V1.4：同步無可視地圖用戶端、六服務階段 ETA 與代駕專用語意；API 仍維持 Network Only。 */
-/* 2026-09-29｜Customer Map Restore + Native Form Fix V1.2：歷史版本。 */
-/* 2026-09-29｜Customer Contact Removal V1.3：同步移除 Order Chat／聯絡小U即時對話功能；保留代駕、地圖、通知與既有 Customer PWA 核心。 */
-/* 2026-09-24｜Customer Order Lifecycle V1：同步訂單總覽進行中 5 段進度、完成評價與已評價狀態卡；既有通知、ETA 與 API 快取策略不變。 */
-/* 2026-09-24｜Customer Segmented Live Progress V2：進度條精簡為 5 段短線；保留即時狀態、ETA 與 PWA 快取更新。 */
-/* 2026-09-24｜Customer Segmented Live Progress V1：同步外送平台式八段動態進度條與首頁進行中任務精簡進度；舊四節點 UI 已移除。 */
-/* 2026-09-24｜Customer Platform Home V3：移除首頁城市節點 Hero；五大正式服務維持不變，首頁改為服務→地址→建立任務的外送平台式結構。 */
-/* 2026-09-24｜Customer Home Dynamic Hero V2：首頁只移除 Google Map，恢復既有五大服務與內容結構；原地圖位置改城市節點 Hero／進行中任務摘要。 */
-/* 2026-09-24｜Customer Service Home + Linear Progress V1：同步首頁移除大地圖、服務導向首頁與 4 節點線性進度條。 */
-/* 2026-09-24｜Customer Final Delivery ETA V1：同步訂單總覽／明細／進行中任務的最終送達 ETA 與 Queue ETA 顯示。 */
-/* 2026-09-23｜Customer Production Multi-stop UI V1：正式 productionOrderFlow 顯示送達點 2（選填）；同步 PWA Release，留空不影響估價與送單。 */
-/* 2026-09-23｜Customer Multi-stop Delivery V1：同步一般客戶雙送達點、多點報價／建單與新版快取。 */
-/* 2026-09-23｜Customer Cloud Draft V1：同步跨裝置會員雲端草稿 API；草稿 API 維持 Network Only。 */
-/* 2026-09-23｜Customer Local State Fix V1：同步用戶端定位偏好、帳號本機資料隔離與草稿恢復修正。 */
-/* 2026-09-20｜Customer Rider Rating V1：同步完成任務小U評價功能。 */
-/* 2026-09-19｜Customer Cancel UX V1：同步訂單列表／詳情／進行中任務取消入口。 */
-/* 2026-09-18｜Smart Stack V1.1：同步 QUEUED Live ETA 與 Recovery Hard Lock 客戶端。 */
-/* 2026-09-17｜Profit Pricing V1 / Route Pricing V4：同步新計價核心與平台應收／已收辨識版本。 */
-/* 2026-09-16｜Growth Engine V1.8 My UX：雙端「我的」二級頁統一與快取升版。 */
-/*
- * ============================================================
- * UBee 跑腿｜用戶端 Service Worker
- * 2026-09-16 Growth Engine V1：同步我的 UBee／會員階級／邀請好友，並清除舊 Customer Cache。
- * 2026-09-14 Customer Native System V1.5 / Live Tracking Accept Sync V1：同步新版 order.html 主輪詢 tracking 摘要與接單即時 UI；升版後清除舊 Customer Cache。
- * 2026-09-11 Customer Native System V1.4 / Route Pricing V3：同步新版 order.html，移除舊一般配送時間費／重複費用明細並切換正式 fareMode；升版後清除舊 Customer Cache。
- * 2026-09-09 Customer Native System V1.3 / Live ETA V1：修復 Active Task ETA 狀態面板並切換至後端 traffic-aware ETA；升版後清除舊 Customer Cache。
- * Version: 2026-09-16 Native Experience V2 / Customer Isolation
- * File: ubee-customer-sw.js
+/* ============================================================
+ * UBee 跑腿｜客戶端 Service Worker｜最新正式版 2026-10-01
+ * Release: Customer Native Polish & Cleanup V1
+ * Version: 20261001-customer-native-polish-cleanup-v1
  *
- * 2026-09-09 Customer Native System V1.2：任務內容／配送設定／確認訂單改為 Native Form Sections、Selection Rows、Checkout Summary；升版清除舊 Customer Cache。
+ * Canonical responsibilities:
+ * - Customer PWA Cache 隔離與版本更新
+ * - API / Auth / Orders / Quote 一律 Network Only
+ * - order.html Navigation 採 Network First
+ * - 靜態資源 Stale While Revalidate
+ * - Web Push / Notification Center Deep Link / App Badge
  *
- * 2026-09-09 Customer Dispatch Recovery V1：建單後現金確認改為立即 Native Confirm；配合後端確認後立即啟動全區派單，升版清除舊 Customer Cache。
- *
- * 2026-09-09 Customer Native System V1：Step 5 進行中任務併入 productionOrderFlow；訂單列表／詳情／現場照片改為 Native Flat List、Grouped Detail、Timeline；升版清除舊 Customer Cache。
- *
- * 2026-09-07 Customer Advance Payment V1：客戶端最高自動代墊上限調整為 NT$1,500；升版後清除舊 Customer Cache，確保已安裝 PWA 取得最新版 order.html。
- *
- * 2026-09-03 Customer Location Bootstrap V3.3：DOM 完成即啟動定位；Map 建立仍受定位閘門保護，第一個正式地圖畫面不得先顯示城市預設中心。
- * 2026-09-03 Customer Location Lock V3.2：首頁 Map 建立前必須先完成定位嘗試；定位未完成前保持 placeholder，不再先顯示其他服務城市中心。
- * 2026-09-03 Arrival Photo Proof V1：客戶任務進度顯示小U到場照片；照片由後端以短效 signed URL 回傳。
- * 2026-09-03 Customer Task Contract V3 Full Flow：同步單點全能任務與完成回報結果；升版後清除舊 Customer Cache。
- * 2026-09-03 Customer Task Content V1：同步任務內容／細項／品項分類優化與全能跑腿結構化欄位；升版後清除舊 Customer Cache。
- * 2026-09-02 Customer Home Platform V3：同步正式首頁地圖、匿名小U運力、需求情境入口與訂單導覽文案；升版後清除舊 Customer Cache。
- *
- * 2026-08-11 Identity V1 更新：
- * 1. 實名制 / 會員 / 訂單 API 一律 Network Only，不寫入 Cache。
- * 2. HTML / navigation 採 Network First，避免 PWA 長期停在舊版 order.html。
- * 3. 靜態資源採 Stale While Revalidate。
- * 4. 啟用新版 SW 時清除舊版 UBee Customer Cache。
- * 5. 保留 Web Push、通知點擊與 App Badge 基本能力。
- * ============================================================
- */
-
-/* 2026-09-23｜Customer Multi-stop Fee V1：同步第二送達點選填與每新增一點固定 +NT$50 的正式報價版本。 */
-
+ * 舊 Map Restore 等歷史發版註解已移除；可視地圖不屬於目前客戶端 UI。
+ * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-notification-center-v1';
+const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-native-polish-cleanup-v1';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
