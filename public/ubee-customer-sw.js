@@ -1,7 +1,7 @@
 /* ============================================================
  * UBee 跑腿｜客戶端 Service Worker｜最新正式版 2026-10-01
- * Release: Customer U Coin Native V5
- * Version: 20261001-customer-ucoin-native-v5
+ * Release: Customer Reference Typography V6
+ * Version: 20261002-customer-reference-type-v6
  *
  * Canonical responsibilities:
  * - Customer PWA Cache 隔離與版本更新（同步首頁／訂單／通知／我的／我的U幣）
@@ -14,7 +14,7 @@
  * ============================================================ */
 'use strict';
 
-const UBEE_CUSTOMER_SW_VERSION = '20261001-customer-ucoin-native-v5';
+const UBEE_CUSTOMER_SW_VERSION = '20261002-customer-reference-type-v6';
 
 const CACHE_PREFIX = 'ubee-customer-';
 const STATIC_CACHE = `${CACHE_PREFIX}static-${UBEE_CUSTOMER_SW_VERSION}`;
