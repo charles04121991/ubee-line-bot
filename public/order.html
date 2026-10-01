@@ -3,8 +3,8 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-01
-  Release: Customer U Coin V1
-  PWA: 20261001-customer-ucoin-v1
+  Release: Customer U Coin Native V2
+  PWA: 20261001-customer-ucoin-native-v2
 
   本次整理：
   1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
@@ -21,7 +21,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-ucoin-v1" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-ucoin-native-v2" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -19784,7 +19784,7 @@ body.ubee-helper-task-active .flow-helper-structured{display:block;}
 </button>
 <button class="ubee-my-ucoin-card" id="ubeeMyUCoinCard" type="button" aria-label="查看我的U幣">
 <span class="ubee-my-ucoin-mark" aria-hidden="true">U</span>
-<span class="ubee-my-ucoin-copy"><small>簽到、任務與推薦獎勵</small><strong>我的U幣</strong></span>
+<span class="ubee-my-ucoin-copy"><small>簽到與任務獎勵</small><strong>我的U幣</strong></span>
 <span class="ubee-my-ucoin-balance"><small>可用餘額</small><strong id="ubeeMyUCoinBalance">—</strong></span>
 <span class="ubee-my-member-chevron" aria-hidden="true">›</span>
 </button>
@@ -29228,17 +29228,21 @@ body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
 })();
 </script>
 
-<style id="ubee-ucoin-v1-style">
-.ubee-my-ucoin-card{width:calc(100% - 64px);margin:18px 32px 8px;padding:18px 20px;border:1px solid #f0d36c;border-radius:22px;background:linear-gradient(135deg,#fffdf2,#fff8d2);display:grid;grid-template-columns:52px minmax(0,1fr) auto 18px;gap:14px;align-items:center;text-align:left;color:#111;box-shadow:0 8px 24px rgba(174,126,0,.08)}
-.ubee-my-ucoin-mark,.ubee-ucoin-checkout-mark{display:grid;place-items:center;background:#ffca0a;color:#111;font-weight:1000;border-radius:16px}.ubee-my-ucoin-mark{width:52px;height:52px;font-size:24px}.ubee-my-ucoin-copy{display:flex;flex-direction:column;gap:4px}.ubee-my-ucoin-copy small,.ubee-my-ucoin-balance small{color:#8b8d92;font-size:12px;font-weight:800}.ubee-my-ucoin-copy strong{font-size:20px}.ubee-my-ucoin-balance{text-align:right;display:flex;flex-direction:column;gap:3px}.ubee-my-ucoin-balance strong{font-size:20px}.ubee-my-subpage-open .ubee-my-ucoin-card{display:none}
-.ubee-ucoin-content{padding:18px 22px 110px;background:#f6f7f8;min-height:100%}.ubee-ucoin-hero{padding:24px;border-radius:24px;background:#111;color:#fff}.ubee-ucoin-hero small{color:#c8cbd0;font-weight:800}.ubee-ucoin-hero strong{display:block;font-size:40px;margin:8px 0 4px}.ubee-ucoin-hero p{margin:0;color:#c8cbd0;font-size:13px}.ubee-ucoin-checkin{margin-top:14px;padding:18px;background:#fff;border-radius:22px;border:1px solid #e7e8eb}.ubee-ucoin-checkin-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.ubee-ucoin-checkin-head strong{font-size:18px}.ubee-ucoin-checkin-head button{border:0;border-radius:14px;padding:11px 17px;background:#ffca0a;font-weight:900}.ubee-ucoin-checkin-head button:disabled{background:#eceef1;color:#90949a}.ubee-ucoin-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:16px}.ubee-ucoin-day{padding:9px 2px;border-radius:12px;background:#f3f4f6;text-align:center;font-size:11px;color:#777;font-weight:800}.ubee-ucoin-day b{display:block;color:#222;margin-top:4px}.ubee-ucoin-day.is-current{background:#fff3ba;outline:2px solid #ffca0a}.ubee-ucoin-section{margin-top:14px;padding:18px;background:#fff;border-radius:22px;border:1px solid #e7e8eb}.ubee-ucoin-section h3{margin:0 0 12px;font-size:18px}.ubee-ucoin-task,.ubee-ucoin-history-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid #eceef1}.ubee-ucoin-task:last-child,.ubee-ucoin-history-row:last-child{border-bottom:0}.ubee-ucoin-task span,.ubee-ucoin-history-copy{display:flex;flex-direction:column;gap:3px}.ubee-ucoin-task small,.ubee-ucoin-history-copy small{color:#92959a;font-size:12px}.ubee-ucoin-task b{color:#a46f00}.ubee-ucoin-history-row>strong.is-plus{color:#14934a}.ubee-ucoin-history-row>strong.is-minus{color:#e44b3b}.ubee-ucoin-rule{font-size:13px;line-height:1.65;color:#666;margin:0}.ubee-ucoin-empty{padding:18px 0;color:#93969b;text-align:center;font-size:13px}
-.ubee-ucoin-checkout{margin-top:12px;padding:15px 16px;border:1px solid #efd361;border-radius:18px;background:#fffdf1;display:flex;align-items:center;justify-content:space-between;gap:14px}.ubee-ucoin-checkout[hidden],.ubee-ucoin-checkout-saving[hidden]{display:none!important}.ubee-ucoin-checkout>div{display:flex;align-items:center;gap:11px}.ubee-ucoin-checkout-mark{width:38px;height:38px;border-radius:12px}.ubee-ucoin-checkout span span{display:flex;flex-direction:column;gap:3px}.ubee-ucoin-checkout small{color:#85878c;font-size:12px}.ubee-ucoin-switch input{position:absolute;opacity:0}.ubee-ucoin-switch>span{width:48px;height:28px;background:#d9dce1;border-radius:20px;display:block;position:relative}.ubee-ucoin-switch>span:after{content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 4px #999;transition:.2s}.ubee-ucoin-switch input:checked+span{background:#ffca0a}.ubee-ucoin-switch input:checked+span:after{transform:translateX(20px)}.ubee-ucoin-checkout-saving{padding:8px 4px 0;text-align:right;color:#138a45;font-size:13px;font-weight:900}
-@media(max-width:390px){.ubee-my-ucoin-card{width:calc(100% - 40px);margin-left:20px;margin-right:20px;padding:15px;grid-template-columns:46px minmax(0,1fr) auto 12px}.ubee-my-ucoin-mark{width:46px;height:46px}.ubee-my-ucoin-balance small{display:none}}
+<style id="ubee-ucoin-native-v2-style">
+.ubee-my-ucoin-card{width:calc(100% - 64px);min-height:76px;margin:14px 32px 12px;padding:12px 16px;border:1px solid #ececef;border-radius:18px;background:#fff;display:grid;grid-template-columns:44px minmax(0,1fr) auto 14px;gap:12px;align-items:center;text-align:left;color:#111;box-shadow:0 2px 8px rgba(17,24,39,.035);-webkit-tap-highlight-color:transparent}
+.ubee-my-ucoin-card:active{background:#f8f8f8;transform:scale(.995)}
+.ubee-my-ucoin-mark,.ubee-ucoin-checkout-mark{display:grid;place-items:center;background:#ffca0a;color:#111;font-weight:1000;border-radius:13px}.ubee-my-ucoin-mark{width:44px;height:44px;font-size:21px}.ubee-my-ucoin-copy{display:flex;flex-direction:column;gap:2px;min-width:0}.ubee-my-ucoin-copy small,.ubee-my-ucoin-balance small{color:#96999e;font-size:11px;font-weight:700}.ubee-my-ucoin-copy strong{font-size:17px;line-height:1.25}.ubee-my-ucoin-balance{text-align:right;display:flex;flex-direction:column;gap:1px}.ubee-my-ucoin-balance strong{font-size:17px;white-space:nowrap}.ubee-my-subpage-open .ubee-my-ucoin-card{display:none}
+body.ubee-ucoin-native-open{overflow:hidden;background:#f5f6f8}body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open .ubee-primary-bottom-nav{display:none!important}body.ubee-ucoin-native-open #ubeeMyUCoinPanel{bottom:0!important;padding-bottom:0!important;background:#f5f6f8}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head{position:sticky;top:0;z-index:10;height:56px;min-height:56px;padding:0 16px;padding-top:env(safe-area-inset-top);box-sizing:content-box;background:rgba(255,255,255,.94);border-bottom:1px solid #e7e8eb;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head strong{font-size:17px;font-weight:900}body.ubee-ucoin-native-open #ubeeMyUCoinPanel .ubee-my-panel-head button{width:40px;height:40px;padding:0;border:0;background:transparent;color:#111}
+.ubee-ucoin-content{padding:14px 16px calc(28px + env(safe-area-inset-bottom));background:#f5f6f8;min-height:100%;box-sizing:border-box}.ubee-ucoin-hero{position:relative;overflow:hidden;padding:20px;border-radius:20px;background:linear-gradient(140deg,#ffd21c 0%,#ffc400 100%);color:#111;box-shadow:0 8px 24px rgba(220,164,0,.18)}.ubee-ucoin-hero:after{content:"U";position:absolute;right:14px;top:-22px;font-size:118px;line-height:1;font-weight:1000;color:rgba(255,255,255,.27)}.ubee-ucoin-hero small{position:relative;z-index:1;color:#755800;font-size:12px;font-weight:800}.ubee-ucoin-hero strong{position:relative;z-index:1;display:block;font-size:36px;line-height:1.1;margin:8px 0 7px;letter-spacing:-1px}.ubee-ucoin-hero p{position:relative;z-index:1;margin:0;color:#715600;font-size:12px;font-weight:700}
+.ubee-ucoin-checkin{margin-top:12px;padding:16px;background:#fff;border-radius:20px;border:1px solid #e8e9ec}.ubee-ucoin-checkin-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.ubee-ucoin-checkin-title{display:flex;flex-direction:column;gap:2px}.ubee-ucoin-checkin-title strong{font-size:16px}.ubee-ucoin-checkin-title small{font-size:12px;color:#91959b}.ubee-ucoin-checkin-head button{min-width:92px;border:0;border-radius:12px;padding:10px 14px;background:#ffca0a;color:#111;font-size:14px;font-weight:900}.ubee-ucoin-checkin-head button:disabled{background:#eef0f3;color:#9a9ea4}.ubee-ucoin-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:14px}.ubee-ucoin-day{height:48px;padding:6px 1px;border-radius:11px;background:#f4f5f7;text-align:center;font-size:9px;line-height:1.1;color:#8b8e93;font-weight:800;box-sizing:border-box}.ubee-ucoin-day b{display:block;color:#222;font-size:11px;margin-top:5px}.ubee-ucoin-day.is-current{background:#fff5c9;box-shadow:inset 0 0 0 2px #f4bd00;color:#8c6900}
+.ubee-ucoin-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:12px;padding:3px;border-radius:13px;background:#e9eaed}.ubee-ucoin-tab{height:38px;border:0;border-radius:10px;background:transparent;color:#73777d;font-size:14px;font-weight:800}.ubee-ucoin-tab.is-active{background:#fff;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.08)}.ubee-ucoin-tabpanel{margin-top:10px;background:#fff;border:1px solid #e8e9ec;border-radius:20px;overflow:hidden}.ubee-ucoin-panel-title{padding:16px 16px 7px;font-size:15px;font-weight:900}.ubee-ucoin-section{margin:0;padding:0 16px;background:#fff;border:0;border-radius:0}.ubee-ucoin-section h3{display:none}.ubee-ucoin-task,.ubee-ucoin-history-row{min-height:62px;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #eceef1;box-sizing:border-box}.ubee-ucoin-task:last-child,.ubee-ucoin-history-row:last-child{border-bottom:0}.ubee-ucoin-task span,.ubee-ucoin-history-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.ubee-ucoin-task strong,.ubee-ucoin-history-copy strong{font-size:15px}.ubee-ucoin-task small,.ubee-ucoin-history-copy small{color:#969aa0;font-size:11px}.ubee-ucoin-task b{color:#9a6b00;font-size:14px;white-space:nowrap}.ubee-ucoin-history-row>strong{font-size:14px;white-space:nowrap}.ubee-ucoin-history-row>strong.is-plus{color:#15944c}.ubee-ucoin-history-row>strong.is-minus{color:#e44b3b}.ubee-ucoin-rule-list{padding:4px 16px 14px}.ubee-ucoin-rule-row{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid #eceef1}.ubee-ucoin-rule-row:last-child{border-bottom:0}.ubee-ucoin-rule-icon{flex:0 0 28px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:#fff3bd;color:#8f6800;font-size:13px;font-weight:1000}.ubee-ucoin-rule-row span{display:flex;flex-direction:column;gap:3px}.ubee-ucoin-rule-row strong{font-size:14px}.ubee-ucoin-rule-row small{font-size:12px;line-height:1.5;color:#777b81}.ubee-ucoin-empty{padding:34px 16px;color:#93969b;text-align:center;font-size:13px}
+.ubee-ucoin-checkout{margin-top:12px;padding:14px 15px;border:1px solid #ecd260;border-radius:16px;background:#fffdf3;display:flex;align-items:center;justify-content:space-between;gap:12px}.ubee-ucoin-checkout[hidden],.ubee-ucoin-checkout-saving[hidden]{display:none!important}.ubee-ucoin-checkout>div{display:flex;align-items:center;gap:10px}.ubee-ucoin-checkout-mark{width:36px;height:36px;border-radius:11px}.ubee-ucoin-checkout span span{display:flex;flex-direction:column;gap:2px}.ubee-ucoin-checkout small{color:#85878c;font-size:11px}.ubee-ucoin-switch input{position:absolute;opacity:0}.ubee-ucoin-switch>span{width:46px;height:27px;background:#d9dce1;border-radius:20px;display:block;position:relative}.ubee-ucoin-switch>span:after{content:"";position:absolute;width:21px;height:21px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 4px #999;transition:.2s}.ubee-ucoin-switch input:checked+span{background:#ffca0a}.ubee-ucoin-switch input:checked+span:after{transform:translateX(19px)}.ubee-ucoin-checkout-saving{padding:7px 4px 0;text-align:right;color:#138a45;font-size:12px;font-weight:900}
+@media(max-width:390px){.ubee-my-ucoin-card{width:calc(100% - 40px);margin-left:20px;margin-right:20px}.ubee-my-ucoin-balance small{display:none}.ubee-ucoin-content{padding-left:14px;padding-right:14px}.ubee-ucoin-hero{padding:18px}.ubee-ucoin-days{gap:3px}.ubee-ucoin-day{font-size:8px}.ubee-ucoin-day b{font-size:10px}}
 </style>
-<script id="ubee-ucoin-v1-script">
+<script id="ubee-ucoin-native-v2-script">
 (()=>{
   'use strict';
-  const state={data:null,maxWhole:0,checkoutTotal:0,loading:false};
+  const state={data:null,maxWhole:0,checkoutTotal:0,loading:false,tab:'earn'};
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const coins=units=>{
@@ -29250,18 +29254,37 @@ body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
     try{return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(Number(ms)))}catch(_){return''}
   };
   function setEntry(wallet={}){const el=$('ubeeMyUCoinBalance');if(el)el.textContent=`${coins(wallet.availableUnits)} U`}
+  function tabContent(data){
+    const rules=data?.rules||{},history=Array.isArray(data?.history)?data.history:[];
+    if(state.tab==='history'){
+      return `<section class="ubee-ucoin-tabpanel"><div class="ubee-ucoin-panel-title">最近異動</div><div class="ubee-ucoin-section">${history.length?history.map(item=>`<div class="ubee-ucoin-history-row"><span class="ubee-ucoin-history-copy"><strong>${esc(item.title)}</strong><small>${esc(timeText(item.createdAtMs))}${item.orderId?`・${esc(item.orderId)}`:''}</small></span><strong class="${Number(item.deltaUnits)>=0?'is-plus':'is-minus'}">${Number(item.deltaUnits)>=0?'+':'−'}${esc(coins(Math.abs(Number(item.deltaUnits||0))))} U</strong></div>`).join(''):'<div class="ubee-ucoin-empty">目前還沒有 U幣紀錄</div>'}</div></section>`;
+    }
+    if(state.tab==='rules'){
+      return `<section class="ubee-ucoin-tabpanel"><div class="ubee-ucoin-panel-title">使用規則</div><div class="ubee-ucoin-rule-list">
+        <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">1</b><span><strong>折抵比例</strong><small>1 U幣折抵 NT$1，只能使用整數 U幣，小數餘額會保留。</small></span></div>
+        <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">20</b><span><strong>每筆折抵上限</strong><small>最多折抵跑腿服務費 20%，並且不得超過 UBee 平台收入。</small></span></div>
+        <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">×</b><span><strong>不適用項目</strong><small>代墊費、停車費、過路費與小費不參與折抵，不影響小U收入。</small></span></div>
+        <div class="ubee-ucoin-rule-row"><b class="ubee-ucoin-rule-icon">天</b><span><strong>使用期限</strong><small>U幣自取得日起 ${esc(rules.expiryDays||180)} 天有效；取消訂單時，已保留但尚未使用的 U幣會退回。</small></span></div>
+      </div></section>`;
+    }
+    return `<section class="ubee-ucoin-tabpanel"><div class="ubee-ucoin-panel-title">完成任務賺 U幣</div><div class="ubee-ucoin-section">${(rules.earn||[]).map(item=>`<div class="ubee-ucoin-task"><span><strong>${esc(item.title)}</strong><small>${item.key==='referral'?'好友完成第一趟後發放':'完成條件後自動入帳'}</small></span><b>${esc(item.amountText)}</b></div>`).join('')}</div></section>`;
+  }
+  function bindTabEvents(){
+    document.querySelectorAll('[data-ucoin-tab]').forEach(button=>button.addEventListener('click',()=>{
+      state.tab=String(button.dataset.ucoinTab||'earn');render(state.data||{});
+    }));
+  }
   function render(data){
     state.data=data;setEntry(data?.wallet||{});
     const root=$('ubeeMyUCoinContent');if(!root)return;
-    const wallet=data?.wallet||{},checkin=data?.checkin||{},rules=data?.rules||{},history=Array.isArray(data?.history)?data.history:[];
+    const wallet=data?.wallet||{},checkin=data?.checkin||{};
     const current=checkin.checkedInToday?Number(checkin.cycleDay||1):Math.min(7,Number(checkin.cycleDay||0)+1)||1;
     root.innerHTML=`
-      <section class="ubee-ucoin-hero"><small>可用餘額</small><strong>${esc(coins(wallet.availableUnits))} U</strong><p>整數 U幣可在訂單確認時折抵；小數餘額會保留。</p></section>
-      <section class="ubee-ucoin-checkin"><div class="ubee-ucoin-checkin-head"><span><strong>每日簽到</strong><small>連續第 ${esc(checkin.streak||0)} 天</small></span><button id="ubeeUCoinCheckinButton" type="button" ${checkin.checkedInToday?'disabled':''}>${checkin.checkedInToday?'今日已簽到':'立即簽到'}</button></div><div class="ubee-ucoin-days">${[1,2,3,4,5,6,7].map(day=>`<div class="ubee-ucoin-day ${day===current?'is-current':''}">Day ${day}<b>+${day<=4?'0.1':'0.2'}</b></div>`).join('')}</div></section>
-      <section class="ubee-ucoin-section"><h3>U幣取得方式</h3>${(rules.earn||[]).map(item=>`<div class="ubee-ucoin-task"><span><strong>${esc(item.title)}</strong><small>${item.key==='referral'?'好友完成第一趟後發放':'完成條件後自動入帳'}</small></span><b>${esc(item.amountText)}</b></div>`).join('')}</section>
-      <section class="ubee-ucoin-section"><h3>U幣明細</h3>${history.length?history.map(item=>`<div class="ubee-ucoin-history-row"><span class="ubee-ucoin-history-copy"><strong>${esc(item.title)}</strong><small>${esc(timeText(item.createdAtMs))}${item.orderId?`・${esc(item.orderId)}`:''}</small></span><strong class="${Number(item.deltaUnits)>=0?'is-plus':'is-minus'}">${Number(item.deltaUnits)>=0?'+':'−'}${esc(coins(Math.abs(Number(item.deltaUnits||0))))} U</strong></div>`).join(''):'<div class="ubee-ucoin-empty">目前還沒有 U幣紀錄</div>'}</section>
-      <section class="ubee-ucoin-section"><h3>使用規則</h3><p class="ubee-ucoin-rule">${esc(rules.redemptionText||'1 U幣折抵 NT$1。')} U幣自取得日起 ${esc(rules.expiryDays||180)} 天有效；退款或取消訂單時，尚未使用的保留 U幣會退回。</p></section>`;
-    $('ubeeUCoinCheckinButton')?.addEventListener('click',checkinNow);
+      <section class="ubee-ucoin-hero"><small>可用餘額</small><strong>${esc(coins(wallet.availableUnits))} U</strong><p>下單確認時可使用整數 U幣折抵</p></section>
+      <section class="ubee-ucoin-checkin"><div class="ubee-ucoin-checkin-head"><span class="ubee-ucoin-checkin-title"><strong>每日簽到</strong><small>${checkin.checkedInToday?'今天已完成・': ''}連續 ${esc(checkin.streak||0)} 天</small></span><button id="ubeeUCoinCheckinButton" type="button" ${checkin.checkedInToday?'disabled':''}>${checkin.checkedInToday?'已簽到':'簽到領取'}</button></div><div class="ubee-ucoin-days">${[1,2,3,4,5,6,7].map(day=>`<div class="ubee-ucoin-day ${day===current?'is-current':''}">第 ${day} 天<b>+${day<=4?'0.1':'0.2'}</b></div>`).join('')}</div></section>
+      <nav class="ubee-ucoin-tabs" aria-label="U幣內容切換"><button class="ubee-ucoin-tab ${state.tab==='earn'?'is-active':''}" data-ucoin-tab="earn" type="button">賺取</button><button class="ubee-ucoin-tab ${state.tab==='history'?'is-active':''}" data-ucoin-tab="history" type="button">明細</button><button class="ubee-ucoin-tab ${state.tab==='rules'?'is-active':''}" data-ucoin-tab="rules" type="button">規則</button></nav>
+      ${tabContent(data)}`;
+    $('ubeeUCoinCheckinButton')?.addEventListener('click',checkinNow);bindTabEvents();
   }
   async function load(){
     const data=await customerApiFetch('/api/customer/u-coins');render(data);return data;
@@ -29275,7 +29298,7 @@ body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
     if(!signedIn){try{window.UBeeCustomerAuthHost?.show('login')}catch(_){}return}
     const profile=$('flowPageProfile'),panel=$('ubeeMyUCoinPanel');if(!profile||!panel)return;
     profile.querySelectorAll('.ubee-my-panel').forEach(item=>{item.hidden=true;item.classList.remove('is-open')});
-    panel.hidden=false;panel.scrollTop=0;profile.setAttribute('data-my-section','ucoin');document.body.classList.add('ubee-my-subpage-open');requestAnimationFrame(()=>panel.classList.add('is-open'));
+    panel.hidden=false;panel.scrollTop=0;profile.setAttribute('data-my-section','ucoin');document.body.classList.add('ubee-my-subpage-open','ubee-ucoin-native-open');requestAnimationFrame(()=>panel.classList.add('is-open'));
     $('ubeeMyUCoinContent').innerHTML='<div class="ubee-my-empty-state">正在讀取 U幣資料…</div>';
     try{await load()}catch(error){$('ubeeMyUCoinContent').innerHTML=`<div class="ubee-my-empty-state">${esc(error.message||'U幣資料暫時無法讀取')}</div>`}
   }
@@ -29306,7 +29329,9 @@ body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
   function init(){
     $('ubeeMyUCoinCard')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openPanel()});
     $('ubeeUCoinUseToggle')?.addEventListener('change',syncCheckout);
-    $('ubeeMyUCoinPanel')?.querySelector('[data-my-close]')?.addEventListener('click',()=>{document.body.classList.remove('ubee-my-subpage-open');$('flowPageProfile')?.removeAttribute('data-my-section')});
+    const panel=$('ubeeMyUCoinPanel');
+    panel?.querySelector('[data-my-close]')?.addEventListener('click',()=>{document.body.classList.remove('ubee-my-subpage-open','ubee-ucoin-native-open');$('flowPageProfile')?.removeAttribute('data-my-section')});
+    if(panel)new MutationObserver(()=>{if(panel.hidden)document.body.classList.remove('ubee-ucoin-native-open')}).observe(panel,{attributes:true,attributeFilter:['hidden']});
     if(typeof currentCustomer!=='undefined'&&currentCustomer)load().catch(()=>{});
     window.addEventListener('ubee:rider-rating-submitted',()=>load().catch(()=>{}));
   }
