@@ -3,8 +3,8 @@
 <head>
 <!-- =========================================================
   UBee 跑腿｜客戶端最新正式版｜2026-10-01
-  Release: Customer U Coin Native V2
-  PWA: 20261001-customer-ucoin-native-v2
+  Release: Customer U Coin Native V3
+  PWA: 20261001-customer-ucoin-native-v3
 
   本次整理：
   1. 「我的」新增「我的U幣」入口、七日簽到、取得任務、U幣明細與使用規則。
@@ -21,7 +21,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <!-- UBee 跑腿用戶端 PWA｜唯一正式設定 -->
-<link href="/manifest-order.json?v=20261001-customer-ucoin-native-v2" rel="manifest"/>
+<link href="/manifest-order.json?v=20261001-customer-ucoin-native-v3" rel="manifest"/>
 <link href="/ubee-customer-icon-192.png" rel="apple-touch-icon"/>
 <link href="/ubee-customer-icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="/ubee-customer-icon-512.png" rel="icon" sizes="512x512" type="image/png"/>
@@ -29228,7 +29228,7 @@ body.ubee-native-picker-open{overflow:hidden!important;touch-action:none}
 })();
 </script>
 
-<style id="ubee-ucoin-native-v2-style">
+<style id="ubee-ucoin-native-v3-style">
 .ubee-my-ucoin-card{width:calc(100% - 64px);min-height:76px;margin:14px 32px 12px;padding:12px 16px;border:1px solid #ececef;border-radius:18px;background:#fff;display:grid;grid-template-columns:44px minmax(0,1fr) auto 14px;gap:12px;align-items:center;text-align:left;color:#111;box-shadow:0 2px 8px rgba(17,24,39,.035);-webkit-tap-highlight-color:transparent}
 .ubee-my-ucoin-card:active{background:#f8f8f8;transform:scale(.995)}
 .ubee-my-ucoin-mark,.ubee-ucoin-checkout-mark{display:grid;place-items:center;background:#ffca0a;color:#111;font-weight:1000;border-radius:13px}.ubee-my-ucoin-mark{width:44px;height:44px;font-size:21px}.ubee-my-ucoin-copy{display:flex;flex-direction:column;gap:2px;min-width:0}.ubee-my-ucoin-copy small,.ubee-my-ucoin-balance small{color:#96999e;font-size:11px;font-weight:700}.ubee-my-ucoin-copy strong{font-size:17px;line-height:1.25}.ubee-my-ucoin-balance{text-align:right;display:flex;flex-direction:column;gap:1px}.ubee-my-ucoin-balance strong{font-size:17px;white-space:nowrap}.ubee-my-subpage-open .ubee-my-ucoin-card{display:none}
@@ -29239,7 +29239,56 @@ body.ubee-ucoin-native-open{overflow:hidden;background:#f5f6f8}body.ubee-ucoin-n
 .ubee-ucoin-checkout{margin-top:12px;padding:14px 15px;border:1px solid #ecd260;border-radius:16px;background:#fffdf3;display:flex;align-items:center;justify-content:space-between;gap:12px}.ubee-ucoin-checkout[hidden],.ubee-ucoin-checkout-saving[hidden]{display:none!important}.ubee-ucoin-checkout>div{display:flex;align-items:center;gap:10px}.ubee-ucoin-checkout-mark{width:36px;height:36px;border-radius:11px}.ubee-ucoin-checkout span span{display:flex;flex-direction:column;gap:2px}.ubee-ucoin-checkout small{color:#85878c;font-size:11px}.ubee-ucoin-switch input{position:absolute;opacity:0}.ubee-ucoin-switch>span{width:46px;height:27px;background:#d9dce1;border-radius:20px;display:block;position:relative}.ubee-ucoin-switch>span:after{content:"";position:absolute;width:21px;height:21px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 4px #999;transition:.2s}.ubee-ucoin-switch input:checked+span{background:#ffca0a}.ubee-ucoin-switch input:checked+span:after{transform:translateX(19px)}.ubee-ucoin-checkout-saving{padding:7px 4px 0;text-align:right;color:#138a45;font-size:12px;font-weight:900}
 @media(max-width:390px){.ubee-my-ucoin-card{width:calc(100% - 40px);margin-left:20px;margin-right:20px}.ubee-my-ucoin-balance small{display:none}.ubee-ucoin-content{padding-left:14px;padding-right:14px}.ubee-ucoin-hero{padding:18px}.ubee-ucoin-days{gap:3px}.ubee-ucoin-day{font-size:8px}.ubee-ucoin-day b{font-size:10px}}
 </style>
-<script id="ubee-ucoin-native-v2-script">
+<style id="ubee-ucoin-native-v3-layout-fix">
+/* V3：完全沿用「我的」頁原生列表節奏，不再使用獨立宣傳卡。 */
+#productionOrderFlow .ubee-my-ucoin-card{width:100%!important;min-height:60px!important;margin:0!important;padding:0 14px!important;border:0!important;border-bottom:1px solid #eceef0!important;border-radius:0!important;background:#fff!important;grid-template-columns:32px minmax(0,1fr) auto 18px!important;gap:11px!important;box-shadow:none!important;transform:none!important}
+#productionOrderFlow .ubee-my-ucoin-card:active{background:#f8f8fa!important}
+#productionOrderFlow .ubee-my-ucoin-mark{width:30px!important;height:30px!important;border-radius:9px!important;font-size:16px!important}
+#productionOrderFlow .ubee-my-ucoin-copy{gap:1px!important}
+#productionOrderFlow .ubee-my-ucoin-copy strong{font-size:15px!important;font-weight:700!important}
+#productionOrderFlow .ubee-my-ucoin-copy small{font-size:10.5px!important;font-weight:500!important;color:#8e8e93!important}
+#productionOrderFlow .ubee-my-ucoin-balance small{display:none!important}
+#productionOrderFlow .ubee-my-ucoin-balance strong{font-size:14px!important;font-weight:750!important;color:#636366!important}
+#productionOrderFlow .ubee-my-ucoin-card .ubee-my-member-chevron{font-size:21px!important;color:#c7c7cc!important}
+
+/* V3：完整原生子頁；強制覆蓋既有 Panel 的內距與標題列規則。 */
+body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel.ubee-my-app-page{inset:0!important;bottom:0!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;overflow-y:auto!important;overscroll-behavior-y:contain!important}
+body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head{position:sticky!important;top:0!important;z-index:30!important;display:grid!important;grid-template-columns:44px minmax(0,1fr) 44px!important;align-items:center!important;width:100%!important;height:52px!important;min-height:52px!important;margin:0!important;padding:env(safe-area-inset-top) 12px 0!important;box-sizing:content-box!important;background:rgba(255,255,255,.96)!important;border-bottom:1px solid #ececf0!important;backdrop-filter:saturate(180%) blur(18px)!important;-webkit-backdrop-filter:saturate(180%) blur(18px)!important}
+body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head strong{display:block!important;grid-column:2!important;grid-row:1!important;align-self:center!important;justify-self:center!important;margin:0!important;color:#111!important;font-size:17px!important;font-weight:800!important;line-height:1.2!important;white-space:nowrap!important}
+body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head button{display:block!important;grid-column:1!important;grid-row:1!important;width:44px!important;height:44px!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important}
+body.ubee-ucoin-native-open #productionOrderFlow #ubeeMyUCoinPanel .ubee-my-panel-head button::before{display:grid!important;width:44px!important;height:44px!important;place-items:center!important;color:#111!important;font-size:32px!important}
+body.ubee-ucoin-native-open #ubeePersistentBottomNav,body.ubee-ucoin-native-open .ubee-primary-bottom-nav{display:none!important}
+
+#productionOrderFlow .ubee-ucoin-content{width:100%!important;min-height:calc(100% - 53px)!important;margin:0!important;padding:0 20px calc(28px + env(safe-area-inset-bottom))!important;background:#fff!important;box-sizing:border-box!important}
+#productionOrderFlow .ubee-ucoin-hero{min-height:112px!important;margin:0!important;padding:22px 68px 18px 2px!important;border:0!important;border-bottom:1px solid #ececf0!important;border-radius:0!important;background:#fff!important;color:#111!important;box-shadow:none!important}
+#productionOrderFlow .ubee-ucoin-hero:after{content:"U"!important;right:2px!important;top:24px!important;width:52px!important;height:52px!important;display:grid!important;place-items:center!important;border-radius:16px!important;background:#ffd60a!important;color:#111!important;font-size:24px!important;line-height:1!important;font-weight:900!important}
+#productionOrderFlow .ubee-ucoin-hero small{color:#8e8e93!important;font-size:12px!important;font-weight:650!important}
+#productionOrderFlow .ubee-ucoin-hero strong{margin:6px 0 5px!important;color:#111!important;font-size:34px!important;font-weight:850!important;letter-spacing:-.8px!important}
+#productionOrderFlow .ubee-ucoin-hero p{color:#8e8e93!important;font-size:11.5px!important;font-weight:550!important}
+#productionOrderFlow .ubee-ucoin-checkin{margin:0!important;padding:17px 0 18px!important;border:0!important;border-bottom:1px solid #ececf0!important;border-radius:0!important;background:#fff!important}
+#productionOrderFlow .ubee-ucoin-checkin-title strong{font-size:16px!important;font-weight:750!important}
+#productionOrderFlow .ubee-ucoin-checkin-title small{font-size:11.5px!important;color:#8e8e93!important}
+#productionOrderFlow .ubee-ucoin-checkin-head button{min-width:86px!important;border-radius:12px!important;padding:9px 12px!important;font-size:13px!important;background:#ffd60a!important}
+#productionOrderFlow .ubee-ucoin-checkin-head button:disabled{background:#f2f2f7!important;color:#8e8e93!important}
+#productionOrderFlow .ubee-ucoin-days{gap:5px!important;margin-top:14px!important}
+#productionOrderFlow .ubee-ucoin-day{height:44px!important;padding:6px 1px!important;border-radius:10px!important;background:#f2f2f7!important;color:#8e8e93!important;font-size:9px!important}
+#productionOrderFlow .ubee-ucoin-day b{margin-top:4px!important;color:#3a3a3c!important;font-size:10.5px!important}
+#productionOrderFlow .ubee-ucoin-day.is-current{background:#fff4c2!important;box-shadow:inset 0 0 0 1.5px #ffd60a!important;color:#806000!important}
+#productionOrderFlow .ubee-ucoin-tabs{position:sticky!important;top:calc(52px + env(safe-area-inset-top))!important;z-index:20!important;display:flex!important;gap:0!important;margin:0!important;padding:0!important;border-bottom:1px solid #ececf0!important;border-radius:0!important;background:rgba(255,255,255,.96)!important;backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important}
+#productionOrderFlow .ubee-ucoin-tab{position:relative!important;flex:1!important;height:48px!important;border-radius:0!important;background:transparent!important;color:#8e8e93!important;font-size:14px!important;font-weight:650!important;box-shadow:none!important}
+#productionOrderFlow .ubee-ucoin-tab.is-active{color:#111!important;background:transparent!important;box-shadow:inset 0 -3px #ffd60a!important;font-weight:800!important}
+#productionOrderFlow .ubee-ucoin-tabpanel{margin:0!important;border:0!important;border-radius:0!important;background:#fff!important;overflow:visible!important}
+#productionOrderFlow .ubee-ucoin-panel-title{padding:20px 0 8px!important;color:#8e8e93!important;font-size:11px!important;font-weight:650!important}
+#productionOrderFlow .ubee-ucoin-section{padding:0!important}
+#productionOrderFlow .ubee-ucoin-task,#productionOrderFlow .ubee-ucoin-history-row{min-height:64px!important;padding:12px 0!important;border-bottom:1px solid #ececf0!important}
+#productionOrderFlow .ubee-ucoin-task strong,#productionOrderFlow .ubee-ucoin-history-copy strong{font-size:15px!important;font-weight:700!important}
+#productionOrderFlow .ubee-ucoin-task small,#productionOrderFlow .ubee-ucoin-history-copy small{font-size:11px!important;color:#8e8e93!important}
+#productionOrderFlow .ubee-ucoin-task b,#productionOrderFlow .ubee-ucoin-history-row>strong{font-size:13.5px!important}
+#productionOrderFlow .ubee-ucoin-rule-list{padding:4px 0 14px!important}
+#productionOrderFlow .ubee-ucoin-rule-row{padding:14px 0!important}
+@media(max-width:380px){#productionOrderFlow .ubee-ucoin-content{padding-left:16px!important;padding-right:16px!important}#productionOrderFlow .ubee-ucoin-days{gap:3px!important}#productionOrderFlow .ubee-ucoin-day{font-size:8px!important}#productionOrderFlow .ubee-ucoin-day b{font-size:9.5px!important}}
+</style>
+<script id="ubee-ucoin-native-v3-script">
 (()=>{
   'use strict';
   const state={data:null,maxWhole:0,checkoutTotal:0,loading:false,tab:'earn'};
@@ -29327,7 +29376,10 @@ body.ubee-ucoin-native-open{overflow:hidden;background:#f5f6f8}body.ubee-ucoin-n
     syncCheckout();
   }
   function init(){
-    $('ubeeMyUCoinCard')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openPanel()});
+    const entry=$('ubeeMyUCoinCard');
+    const serviceMenu=document.querySelector('#flowPageProfile .ubee-my-groups .ubee-my-group:first-child .ubee-my-menu');
+    if(entry&&serviceMenu&&entry.parentElement!==serviceMenu)serviceMenu.prepend(entry);
+    entry?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openPanel()});
     $('ubeeUCoinUseToggle')?.addEventListener('change',syncCheckout);
     const panel=$('ubeeMyUCoinPanel');
     panel?.querySelector('[data-my-close]')?.addEventListener('click',()=>{document.body.classList.remove('ubee-my-subpage-open','ubee-ucoin-native-open');$('flowPageProfile')?.removeAttribute('data-my-section')});
